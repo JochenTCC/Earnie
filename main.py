@@ -1,14 +1,16 @@
 # main.py
-import time
+import os
+import json
 from datetime import datetime
 import logging
 
 # Import der eigenen Sub-Module
-import logger_config  # Neu importieren
+import logger_config
 import awattar_client
 import loxone_client
 import profile_manager
 import optimizer
+import pv_tuner
 
 # Logger für dieses spezifische Modul instanziieren
 logger = logging.getLogger("main")
@@ -33,6 +35,14 @@ def main():
         logger.error("Optimierung abgebrochen: Keine Awattar-Preise empfangen.")
         return
         
+    # Neu: PV-Zähler abfragen und reales Delta ermitteln
+    pv_delta = pv_tuner.get_pv_delta_and_update()
+    if pv_delta is None:
+        logger.warning("⚠️ Tuning/Optimierungsdurchlauf für diese Stunde ausgesetzt (Warten auf valides Delta).")
+        return
+        
+    logger.info("📊 Tatsächlicher PV-Ertrag der letzten Stunde: %.3f kWh", pv_delta)
+    
     # 3. Prognose-Vektoren (Verbrauch & PV) laden
     forecast_consumption, forecast_pv = profile_manager.get_forecast_vectors()
     
@@ -59,16 +69,5 @@ def main():
     loxone_client.send_loxone_value("Ernie_Ziel_Leistung", target_power)
 
 
-# if __name__ == \"__main__\":
-#     main()
-
 if __name__ == "__main__":
-    print("🚀 Optimizer-Dauerlauf gestartet (Intervall: 5 Minuten)...")
-    while True:
-        try:
-            main()
-        except Exception as e:
-            print(f"💥 Kritischer Fehler im Hauptlauf: {e}")
-            
-        print("\n💤 Warte 5 Minuten bis zum nächsten Durchlauf...\n" + "="*40)
-        time.sleep(300)
+    main()

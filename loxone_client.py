@@ -122,3 +122,33 @@ def fetch_loxone_csv_file(local_path: str = 'live_consumption.csv') -> Optional[
                 except Exception:
                     pass  # Fail-silent beim Schließen der Verbindung
     return None
+
+# In loxone_client.py hinzufügen:
+
+# In loxone_client.py ergänzen:
+
+def fetch_loxone_pv_counter() -> Optional[float]:
+    """
+    Holt den aktuellen kumulierten PV-Gesamtertrag (Zählerstand in kWh) live aus dem Loxone Miniserver.
+    """
+    url = f"http://{config.LOXONE_IP}/jdev/sps/io/{config.LOXONE_PV_COUNTER_NAME}"
+    timeout_val = getattr(config, 'GLOBAL_TIMEOUT', 5)
+    
+    try:
+        response = requests.get(
+            url, 
+            auth=HTTPBasicAuth(config.LOXONE_USER, config.LOXONE_PASS),
+            timeout=timeout_val
+        )
+        response.raise_for_status()
+        data = response.json()
+        raw_value = data.get('LL', {}).get('value', '')
+        
+        if raw_value == '':
+            print(f"⚠️ Loxone-Warnung: Keine Daten im 'value'-Feld für {config.LOXONE_PV_COUNTER_NAME} gefunden.")
+            return None
+            
+        return float(raw_value)
+    except Exception as e:
+        print(f"🚨 Loxone-Fehler beim Abrufen des PV-Zählerstands: {e}")
+        return None

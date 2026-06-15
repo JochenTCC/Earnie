@@ -3,6 +3,7 @@ import requests
 from datetime import datetime, timedelta
 from typing import List
 import config
+import pv_tuner  # Importieren des neuen Moduls für das PV-Tuning
 
 def get_hourly_pv_forecast() -> List[float]:
     """
@@ -86,8 +87,15 @@ def get_hourly_pv_forecast() -> List[float]:
             simulated_kw = max_peak * (1 - (normalized_time ** 2))
             pv_vector[idx] = round(max(0.0, simulated_kw), 3)
             
-    print(f"ℹ️ Synthetischer PV-Fallback-Vektor generiert (Saisonaler Max-Peak: {max(pv_vector):.2f} kW).")
-    return pv_vector
+    # Bevor die Liste am Ende der Funktion zurückgegeben wird, tunen wir sie:
+    tuning_factor = pv_tuner.calculate_tuning_factor(days_back=14)
+    print(f"📈 Adaptives PV-Tuning: Wende Korrekturfaktor von {tuning_factor} an.")
+    
+    # Alle Werte im Vektor mit dem Faktor multiplizieren (und Abdeckelung bei 0)
+    tuned_pv_vector = [round(max(0.0, val * tuning_factor), 3) for val in pv_vector]
+
+    print(f"ℹ️ Synthetischer PV-Fallback-Vektor generiert (Saisonaler Max-Peak: {max(tuned_pv_vector):.2f} kW).")
+    return tuned_pv_vector
 
 if __name__ == "__main__":
     # Schneller Integrationstest
@@ -95,3 +103,6 @@ if __name__ == "__main__":
     res = get_hourly_pv_forecast()
     print(f"Vektor-Länge: {len(res)} Elemente.")
     print(f"Vektor-Werte (nächste 24h ab jetzt): {res}")
+
+    # In pv_forecast.py anpassen:
+

@@ -12,6 +12,7 @@ import loxone_client
 import awattar_client
 import profile_manager
 import optimizer
+import pv_tuner  # Adaptives PV-Tuning-Modul einbinden
 
 st.set_page_config(
     page_title="Ernie Energy Control Center",
@@ -33,121 +34,126 @@ def update_config_file(kwp, tilt, azimuth, k_push):
         lines = f.readlines()
         
     new_lines = []
-    updated_keys = set()
     
     for line in lines:
         stripped = line.strip()
         if stripped.startswith("PV_KWP =") or stripped.startswith("PV_KWP="):
             new_lines.append(f"PV_KWP = {kwp}  # Automatisch über Web-UI aktualisiert\n")
-            updated_keys.add("PV_KWP")
         elif stripped.startswith("PV_TILT =") or stripped.startswith("PV_TILT="):
             new_lines.append(f"PV_TILT = {tilt}  # Automatisch über Web-UI aktualisiert\n")
-            updated_keys.add("PV_TILT")
         elif stripped.startswith("PV_AZIMUTH =") or stripped.startswith("PV_AZIMUTH="):
             new_lines.append(f"PV_AZIMUTH = {azimuth}  # Automatisch über Web-UI aktualisiert\n")
-            updated_keys.add("PV_AZIMUTH")
         elif stripped.startswith("K_PUSH =") or stripped.startswith("K_PUSH="):
             new_lines.append(f"K_PUSH = {k_push}  # Automatisch über Web-UI aktualisiert\n")
-            updated_keys.add("K_PUSH")
         else:
             new_lines.append(line)
             
-    if "PV_KWP" not in updated_keys: new_lines.append(f"PV_KWP = {kwp}\n")
-    if "PV_TILT" not in updated_keys: new_lines.append(f"PV_TILT = {tilt}\n")
-    if "PV_AZIMUTH" not in updated_keys: new_lines.append(f"PV_AZIMUTH = {azimuth}\n")
-    if "K_PUSH" not in updated_keys: new_lines.append(f"K_PUSH = {k_push}\n")
-    
     with open(config_path, "w", encoding="utf-8") as f:
         f.writelines(new_lines)
-        
-    importlib.reload(config)
     return True
 
+
 # ==============================================================================
-# SIDEBAR - PARAMETER-FEINOPTIMIERUNG
+# SIDEBAR: EINSTELLUNGEN & TUNING-ANZEIGE
 # ==============================================================================
-st.sidebar.title("⚙️ Anlagen-Konfiguration")
-st.sidebar.markdown("Justiere hier die Kernparameter deiner PV-Anlage. Ein Klick auf Speichern berechnet die Prognose-Vektoren sofort neu.")
+st.sidebar.title("⚙️ Anlagenkonfiguration")
+st.sidebar.markdown("Änderungen werden direkt in der `config.py` hinterlegt.")
 
-current_kwp = float(getattr(config, 'PV_KWP', 6.0))
-current_tilt = int(getattr(config, 'PV_TILT', 18))
-current_azimuth = int(getattr(config, 'PV_AZIMUTH', 28))
-current_k_push = float(getattr(config, 'K_PUSH', 8.2))
+# Eingabefelder mit aktuellen Werten aus der config.py vorbefüllen
+kwp_val = st.sidebar.number_input("Anlagenleistung (kWp)", value=float(config.PV_KWP), step=0.1, format="%.2f")
+tilt_val = st.sidebar.number_input("Ausrichtung: Neigung (Tilt °)", value=int(config.PV_TILT), step=1)
+azimuth_val = st.sidebar.number_input("Ausrichtung: Azimut (Azimuth °)", value=int(config.PV_AZIMUTH), step=1)
+k_push_val = st.sidebar.number_input("Einspeisevergütung (Cent/kWh)", value=float(config.K_PUSH), step=0.1, format="%.2f")
 
-st.sidebar.subheader("PV-Generator")
-ui_kwp = st.sidebar.slider("Installierte Leistung (kWp)", 1.0, 25.0, current_kwp, 0.1, help="Maximale Peak-Leistung deiner Solarmodule.")
-ui_tilt = st.sidebar.slider("Neigungswinkel (°)", 0, 90, current_tilt, 1, help="0° = flach liegend, 90° = senkrecht an der Fassade.")
-ui_azimuth = st.sidebar.slider("Ausrichtung / Azimuth (°)", -180, 180, current_azimuth, 1, help="Süden = 0°, Westen = 90°, Norden = 180°, Osten = -90°.")
-
-st.sidebar.subheader("Wirtschaftlichkeit")
-ui_k_push = st.sidebar.number_input("Einspeisevergütung (Cent/kWh)", min_value=0.0, max_value=40.0, value=current_k_push, step=0.1)
-
-st.sidebar.markdown("---")
-if st.sidebar.button("💾 Parameter speichern & anwenden", type="primary"):
-    if update_config_file(ui_kwp, ui_tilt, ui_azimuth, ui_k_push):
-        st.sidebar.success("✅ config.py erfolgreich aktualisiert!")
+if st.sidebar.button("Einstellungen speichern"):
+    if update_config_file(kwp_val, tilt_val, azimuth_val, k_push_val):
+        st.sidebar.success("✅ Parameter erfolgreich gespeichert!")
+        # Modul neu laden, damit die Änderungen sofort im aktuellen Lauf greifen
+        importlib.reload(config)
         st.rerun()
 
+# --- ADAPTIVES PV-TUNING ANZEIGE ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("📈 Adaptives PV-Tuning")
+
+# Berechne den aktuellen Faktor aus der historischen CSV der letzten 14 Tage
+tuning_factor = pv_tuner.calculate_tuning_factor(days_back=14)
+deviation_pct = (tuning_factor - 1.0) * 100
+
+if tuning_factor == 1.0:
+    delta_text = "Keine Abweichung (Basis)"
+    delta_color = "off"
+elif tuning_factor > 1.0:
+    delta_text = f"+{deviation_pct:.1f}% Mehrertrag vs. Prognose"
+    delta_color = "normal"
+else:
+    delta_text = f"{deviation_pct:.1f}% Minderertrag vs. Prognose"
+    delta_color = "inverse"
+
+# Faktor visuell ansprechend als Metrik ausgeben
+st.sidebar.metric(
+    label="Aktueller Korrekturfaktor",
+    value=f"{tuning_factor:.2f}",
+    delta=delta_text,
+    delta_color=delta_color
+)
+
+st.sidebar.caption(
+    "Errechnet aus dem automatischen Abgleich zwischen Forecast.Solar "
+    "und deinen realen Loxone-Zählerständen der vergangenen 2 Wochen."
+)
+
+
 # ==============================================================================
-# HAUPTBEREICH - LIVE MONITORING & ZEITHORIZONT
+# MAIN PAGE: CONTROL CENTER COCKPIT
 # ==============================================================================
 st.title("🔋 Ernie Energy Control Center")
-st.markdown("### Interaktiver 24h-Optimierungsfahrplan (Testbetrieb)")
+st.markdown("Echtzeit-Cockpit und Vorhersage-Simulation des synchronisierten 24-Stunden-Horizonts.")
 
-with st.spinner("⏳ Aktualisiere Live-Daten von Loxone, aWATTar und Forecast.Solar..."):
-    current_soc = loxone_client.fetch_loxone_soc()
-    if current_soc is None:
-        current_soc = 50.0
-        st.warning("⚠️ Loxone SoC konnte nicht live abgerufen werden. Verwende Dummy-Wert (50.0%) für die Simulation.")
-        
-    market_data = awattar_client.fetch_awattar_prices()
-    forecast_consumption, forecast_pv = profile_manager.get_forecast_vectors()
+# 1. Live-Daten aus dem Miniserver abrufen
+current_soc = loxone_client.fetch_loxone_soc()
+if current_soc is None:
+    current_soc = 50.0  # Sicherer Fallback-Wert für die UI, falls Loxone offline ist
+    st.warning("⚠️ Live-Batteriestand konnte nicht von Loxone geladen werden. Simulation läuft mit 50% Fallback-SoC.")
+else:
+    st.info(f"⚡ Aktueller Batterie-Ladezustand (Live-SoC): **{current_soc}%**")
+
+# 2. Marktdaten von aWATTar abrufen
+market_data = awattar_client.fetch_awattar_prices()
 
 if not market_data:
-    st.error("🚨 Fehler: Es konnten keine Marktdaten von aWATTar geladen werden. Dashboard-Erstellung abgebrochen.")
+    st.error("🚨 Fehler: Börsenstrompreise von aWATTar konnten nicht geladen werden. Abbruch der Simulation.")
 else:
-    # Synchronisierte Basis-Matrix aufbauen
+    # 3. Prognose-Vektoren laden (Hier fließt das Tuning im Hintergrund bereits ein!)
+    forecast_consumption, forecast_pv = profile_manager.get_forecast_vectors()
+    
+    # 4. Matrix für den Simulations-Horizont aufbauen
     optimization_matrix = []
-    for i, item in enumerate(market_data[:24]):
+    for item in market_data[:24]:
+        hour = item['hour']
         optimization_matrix.append({
-            "hour": item['hour'], 
-            "k_act": item['price_buy'], 
-            "expected_p_act": forecast_consumption[i], 
-            "expected_p_pv": forecast_pv[i]
+            "hour": hour,
+            "k_act": item['price_buy'],
+            "expected_p_act": forecast_consumption[hour],
+            "expected_p_pv": forecast_pv[hour]
         })
-
-    # --- ZENTRALE SIMULATION UND FAHRPLAN-GENERIERUNG ---
-    chart_rows = optimizer.simulate_24h_horizon(optimization_matrix, current_soc)
-    df = pd.DataFrame(chart_rows)
+        
+    # 5. 24h-Horizont-Simulation anstoßen
+    df = pd.DataFrame(optimizer.simulate_24h_horizon(optimization_matrix, current_soc))
     
-    # --- METRIKEN (TOP BANNER) ---
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Aktueller Batterie-SoC", f"{current_soc} %")
-    
-    current_price_row = df.iloc[0]
-    col2.metric("Aktueller Börsenpreis", f"{current_price_row['Strompreis (Cent/kWh)']} Cnt/kWh")
-    col3.metric("PV-Ertragsspitze (Heute)", f"{df['PV-Prognose (kW)'].max():.2f} kW")
-    col4.metric("Nächster System-Befehl", current_price_row['Steuerbefehl'])
-    
-    st.markdown("---")
-    
-    # --- INTERAKTIVES PLOTLY CHART ---
+    # ==============================================================================
+    # PLOTLY CHART ERSTELLEN
+    # ==============================================================================
     fig = go.Figure()
     
-    fig.add_trace(go.Bar(
-        x=df["Uhrzeit"], 
-        y=df["Geplante Batterie-Aktion (kW)"], 
-        name="Batterie Laden(+)/Entladen(-) (kW)", 
-        marker_color='rgba(46, 204, 113, 0.7)',
-        yaxis="y1"
-    ))
-    
+    # Primäre Y-Achse: Leistungen (kW)
     fig.add_trace(go.Scatter(
         x=df["Uhrzeit"], 
         y=df["PV-Prognose (kW)"], 
-        name="PV-Prognose (kW)", 
-        fill='tozeroy', 
+        name="PV-Ertrag Prognose (kW)", 
         line=dict(color='#f1c40f', width=2),
+        fill='tozeroy',                             # Füllt die Fläche bis zur 0-Linie
+        fillcolor='rgba(241, 196, 15, 0.2)',        # Gelb mit 20% Deckkraft (transparent)
         yaxis="y1"
     ))
     
@@ -158,7 +164,19 @@ else:
         line=dict(color='#3498db', width=2, dash='dash'),
         yaxis="y1"
     ))
+
+    fig.add_trace(go.Bar(
+        x=df["Uhrzeit"],
+        y=df["Geplante Batterie-Aktion (kW)"],
+        name="Geplante Batterie-Aktion (kW)",
+        marker=dict(
+            color='rgba(46, 204, 113, 0.5)',        # Angenehmes Grün mit 50% Deckkraft
+            line=dict(color='#2ecc71', width=1.5)   # Solider grüner Rahmen um die Balken
+        ),
+        yaxis="y1"
+    ))
     
+    # Sekundäre Y-Achse: Preise & SoC
     fig.add_trace(go.Scatter(
         x=df["Uhrzeit"], 
         y=df["Strompreis (Cent/kWh)"], 
@@ -175,21 +193,22 @@ else:
         yaxis="y2"
     ))
     
+    # Layout-Konfiguration für zwei getrennte Achsen
     fig.update_layout(
         title="Synchronisierter 24-Stunden-Zeithorizont (Leistung vs. Preis & SoC)",
         xaxis=dict(title="Uhrzeit (Stunden-Slots)"),
         yaxis=dict(title="Leistung (kW)", side="left"),
-        yaxis2=dict(title="Strompreis (Cent/kWh) / SoC (%)", overlaying="y", side="right"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
-        hovermode="x unified",
-        height=600
+        yaxis2=dict(title="Preis (Cent/kWh) / SoC (%)", side="right", overlaying="y", showgrid=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=40, r=40, t=80, b=40)
     )
     
-    st.plotly_chart(fig, width="stretch")
+    # Visualisierung im Dashboard mit zukunftssicherer Breite (stretch)
+    st.plotly_chart(fig, width='stretch')
     
-    # --- TABELLEN-ANSICHT ---
-    with st.expander("🔍 Rohe Berechnungs-Matrix einsehen (Datenbasis für Loxone)"):
-        st.dataframe(
-            df.set_index("Uhrzeit"), 
-            width="stretch"
-        )
+    # ==============================================================================
+    # DATATABLE DETAILS
+    # ==============================================================================
+    st.subheader("📋 Simulations-Details (Nächste 24 Stunden)")
+    st.markdown("Hier sind die exakten mathematischen Stundenslots aufgelistet, die als Grundlage für den Chart dienen:")
+    st.dataframe(df, width='stretch')
