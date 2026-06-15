@@ -2,12 +2,18 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python: Debug main.py",
+      "name": "Python: Streamlit app.py",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/main.py",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "${workspaceFolder}/app.py",
+        "--server.port",
+        "8501"
+      ],
       "console": "integratedTerminal",
-      "args": []
+      "justMyCode": false
     }
   ]
 }
