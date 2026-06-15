@@ -1,0 +1,6 @@
+2026-06-15 14:53:50 [INFO] (root:56) - 📝 Logging-System initialisiert. Log-Datei: 'energy_optimizer.log' (max 5x5MB)
+2026-06-15 14:53:50 [INFO] (main:20) - --- Energy Optimizer Live-Abfrage gestartet ---
+2026-06-15 14:53:50 [INFO] (main:54) - Berechnete Werte für Loxone -> MODE: 0 | TARGET_POWER: 0.0 kW
+2026-06-15 14:53:50 [INFO] (main:57) - 📤 Sende Werte an Loxone...
+2026-06-15 14:58:50 [INFO] (root:56) - 📝 Logging-System initialisiert. Log-Datei: 'energy_optimizer.log' (max 5x5MB)
+2026-06-15 14:58:50 [INFO] (main:20) - --- Energy Optimizer Live-Abfrage gestartet ---

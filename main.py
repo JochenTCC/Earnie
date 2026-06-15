@@ -1,14 +1,23 @@
+# main.py
 import time
 from datetime import datetime
+import logging
 
 # Import der eigenen Sub-Module
+import logger_config  # Neu importieren
 import awattar_client
 import loxone_client
 import profile_manager
 import optimizer
 
+# Logger für dieses spezifische Modul instanziieren
+logger = logging.getLogger("main")
+
 def main():
-    print("--- Energy Optimizer Live-Abfrage ---")
+    # 0. Logging-System starten
+    logger_config.setup_logging(log_file="energy_optimizer.log", level=logging.INFO)
+    
+    logger.info("--- Energy Optimizer Live-Abfrage gestartet ---")
     
     # 1. Monats-Profil prüfen/aktualisieren
     profile_manager.check_and_update_profile_if_new_month()
@@ -16,12 +25,12 @@ def main():
     # 2. Live-Werte von Loxone & Awattar laden
     current_soc = loxone_client.fetch_loxone_soc()
     if current_soc is None:
-        print("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
+        logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
         return
 
     market_data = awattar_client.fetch_awattar_prices()
     if not market_data:
-        print("Optimierung abgebrochen: Keine Awattar-Preise empfangen.")
+        logger.error("Optimierung abgebrochen: Keine Awattar-Preise empfangen.")
         return
         
     # 3. Prognose-Vektoren (Verbrauch & PV) laden
@@ -42,14 +51,16 @@ def main():
     current_hour = datetime.now().hour
     mode, target_power = optimizer.heuristic_optimizer(optimization_matrix, current_hour, current_soc)
     
-    print("\n--- Berechnete Werte für Loxone ---")
-    print(f"MODE: {mode} | TARGET_POWER: {target_power} kW")
+    logger.info("Berechnete Werte für Loxone -> MODE: %s | TARGET_POWER: %s kW", mode, target_power)
     
     # 6. Werte aktiv an Loxone übertragen
-    print("\n📤 Sende Werte an Loxone...")
+    logger.info("📤 Sende Werte an Loxone...")
     loxone_client.send_loxone_value("Ernie_Mode", mode)
     loxone_client.send_loxone_value("Ernie_Ziel_Leistung", target_power)
 
+
+# if __name__ == \"__main__\":
+#     main()
 
 if __name__ == "__main__":
     print("🚀 Optimizer-Dauerlauf gestartet (Intervall: 5 Minuten)...")

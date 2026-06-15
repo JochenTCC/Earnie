@@ -1,10 +1,12 @@
+# profile_manager.py
 import os
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import List, Tuple
 import loxone_client
 import pv_forecast
 
-def generate_consumption_profile():
+def generate_consumption_profile() -> bool:
     """Lädt aktuelle Logdaten und berechnet die Profil-CSV neu."""
     local_csv = loxone_client.fetch_loxone_csv_file()
     if not local_csv or not os.path.exists(local_csv):
@@ -31,49 +33,74 @@ def generate_consumption_profile():
         print(f"🚨 Fehler bei der Profilberechnung: {e}")
         return False
 
-def check_and_update_profile_if_new_month():
-    """Prüft das Alter des Profils und triggert bei Monatswechsel ein Update."""
+def check_and_update_profile_if_new_month() -> None:
+    """Überprüft, ob ein neuer Monat begonnen hat, und triggert ggf. das Profil-Update."""
     profile_path = 'consumption_profiles.csv'
-    now = datetime.now()
     should_update = False
     
     if not os.path.exists(profile_path):
-        print("ℹ️ Kein Verbrauchsprofil gefunden. Initialer Download...")
+        print("ℹ️ Kein Verbrauchsprofil gefunden. Initialisiere erste Berechnung...")
         should_update = True
     else:
-        mtime = os.path.getmtime(profile_path)
-        file_date = datetime.fromtimestamp(mtime)
-        if file_date.month != now.month or file_date.year != now.year:
-            print(f"📅 Neuer Monat erkannt (Letztes Profil von: {file_date.strftime('%d.%m.%Y')}).")
+        # Prüfen, ob die Datei aus einem älteren Monat stammt
+        file_time = os.path.getmtime(profile_path)
+        file_date = datetime.fromtimestamp(file_time)
+        current_date = datetime.now()
+        
+        if file_date.month != current_date.month or file_date.year != current_date.year:
+            print(f"ℹ️ Neuer Monat erkannt (Letztes Profil von: {file_date.strftime('%d.%m.%Y')}).")
             should_update = True
             
     if should_update:
         generate_consumption_profile()
 
-def get_forecast_vectors():
-    """Lädt das passende historische Verbrauchsprofil und die PV-Prognose."""
+def get_forecast_vectors() -> Tuple[List[float], List[float]]:
+    """
+    Lädt das passende historische Verbrauchsprofil und die PV-Prognose 
+    für die NÄCHSTEN 24 STUNDEN (rollierender Horizont ab der aktuellen Stunde).
+    
+    Returns:
+        Tuple[List[float], List[float]]: (Verbrauchs_Vektor, PV_Vektor) jeweils exakt 24 Elemente.
+    """
     profile_path = 'consumption_profiles.csv'
-    try:
-        now = datetime.now()
-        current_month = now.month
-        current_weekday = now.weekday()
-        
-        df_profiles = pd.read_csv(profile_path, sep=';')
-        filtered = df_profiles[(df_profiles['Month'] == current_month) & (df_profiles['Weekday'] == current_weekday)].sort_values(by='Hour')
-        
-        if filtered.empty:
-            filtered = df_profiles[df_profiles['Month'] == current_month].groupby('Hour')['Consumption'].mean().reset_index()
-        if filtered.empty:
-            filtered = df_profiles.groupby('Hour')['Consumption'].mean().reset_index()
+    
+    # Zeitfenster definieren: Jetzt (auf Stunde gerundet) + die nächsten 23 Stunden
+    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    target_hours = [now + timedelta(hours=i) for i in range(24)]
+    
+    forecast_consumption: List[float] = []
+    global_hour_defaults = {h: 0.5 for h in range(24)} # Fallback falls alles fehlschlägt (0.5 kW)
+
+    if os.path.exists(profile_path):
+        try:
+            df_profiles = pd.read_csv(profile_path, sep=';')
             
-        forecast_consumption = filtered['Consumption'].tolist()
-        if len(forecast_consumption) < 24:
-            forecast_consumption = forecast_consumption + [0.5] * (24 - len(forecast_consumption))
+            # Extrem schneller O(1) Lookup über Dictionary statt Pandas-Filterung in der Schleife
+            # Key: (Month, Weekday, Hour) -> Value: Consumption
+            lookup = df_profiles.set_index(['Month', 'Weekday', 'Hour'])['Consumption'].to_dict()
             
-        # Live PV-Prognose aufrufen
-        forecast_pv = pv_forecast.get_hourly_pv_forecast()
-        return forecast_consumption[:24], forecast_pv[:24]
-        
-    except Exception as e:
-        print(f"⚠️ Fehler beim Laden des Verbrauchsprofils ({e}). Nutze Fallbacks.")
-        return [0.5] * 24, [0.0] * 24
+            # Grober Fallback (Nur nach Stunde gruppiert) falls ein Wochentag im Monat fehlt
+            hour_fallback = df_profiles.groupby('Hour')['Consumption'].mean().to_dict()
+            
+            for dt in target_hours:
+                key = (dt.month, dt.weekday(), dt.hour)
+                
+                if key in lookup:
+                    forecast_consumption.append(float(lookup[key]))
+                elif dt.hour in hour_fallback:
+                    forecast_consumption.append(float(hour_fallback[dt.hour]))
+                else:
+                    forecast_consumption.append(global_hour_defaults.get(dt.hour, 0.5))
+                    
+        except Exception as e:
+            print(f"🚨 Fehler beim Verarbeiten des Verbrauchsprofils: {e}. Nutze statische Defaults.")
+            forecast_consumption = [global_hour_defaults[dt.hour] for dt in target_hours]
+    else:
+        print("ℹ️ Keine 'consumption_profiles.csv' vorhanden. Nutze Standard-Verbrauchswerte.")
+        forecast_consumption = [global_hour_defaults[dt.hour] for dt in target_hours]
+
+    # Live PV-Prognose abrufen (liefert bereits die nächsten 24h relativ ab 'now')
+    forecast_pv = pv_forecast.get_hourly_pv_forecast()
+    
+    # Sicherheits-Slicing auf exakt 24 Elemente
+    return forecast_consumption[:24], forecast_pv[:24]
