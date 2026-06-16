@@ -16,8 +16,6 @@ import csv
 # Logger für dieses spezifische Modul instanziieren
 logger = logging.getLogger("main")
 
-# ... deine bisherigen Imports ...
-
 def log_to_csv(soc, price, pv_forecast, cons_forecast, mode, target_power):
     """Schreibt die Systemzustände und Loxone-Ausgangswerte in eine strukturierte CSV-Datei."""
     file_name = "system_history_log.csv"
@@ -46,7 +44,7 @@ def log_to_csv(soc, price, pv_forecast, cons_forecast, mode, target_power):
                 ])
             writer.writerow(row)
     except Exception as e:
-        logger.error(f"Fehler beim Schreiben in die CSV-Historie: {e}")
+        logger.error(f"Fehler beim Schreiben in die CSV-Historie (evtl. Datei durch Streamlit blockiert): {e}")
 
 def main():
     # 0. Logging-System starten
@@ -102,15 +100,25 @@ def main():
 
 
 if __name__ == "__main__":
+    # Da die Schleife primär für Testzwecke dient, halten wir die Taktung pragmatisch und robust:
     while True:
         try:
             # Führe die oben definierte Routine aus
             main()
             
+            # Nach einem erfolgreichen Durchlauf warten wir standardmäßig 15 Minuten (900 Sekunden)
+            logger.info("✅ Durchlauf erfolgreich beendet. Schlafe für 15 Minuten...")
+            time.sleep(900)
+            
         except Exception as e:
-            # Verhindert den Absturz des Skripts bei API-Fehlern oder Timeouts
-            print(f"🚨 Fehler während des Durchlaufs: {e}")
-            print("🔄 Skript läuft weiter. Nächster Versuch in 60 Sekunden...")
-        
-        # Warte exakt 60 Sekunden bis zum nächsten Durchlauf
-        time.sleep(900)
+            # Verhindert den Absturz des Skripts bei API-Fehlern, Timeouts oder Netzwerkabrissen
+            # Nutzt den Logger (sofern initialisiert) oder Fallback auf Print
+            msg = f"🚨 Unerwarteter Fehler während des Durchlaufs: {e}"
+            if logger.handlers:
+                logger.exception(msg)
+            else:
+                print(msg)
+                
+            print("🔄 Skript läuft weiter. Schneller Wiederholungsversuch in 60 Sekunden...")
+            # Bei einem Fehler warten wir nur 60 Sekunden für einen schnellen Retry (statt 15 Min CPU-Saturierung oder ewigem Warten)
+            time.sleep(60)

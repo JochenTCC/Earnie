@@ -1,4 +1,5 @@
 # app.py
+import json
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -21,37 +22,31 @@ st.set_page_config(
 )
 
 def update_config_file(kwp, tilt, azimuth, k_push):
-    """
-    Schreibt die veränderten UI-Parameter dauerhaft zurück in die config.py,
-    ohne andere Konfigurationen oder Kommentare zu zerstören.
-    """
-    config_path = "config.py"
-    if not os.path.exists(config_path):
-        st.error("🚨 config.py nicht gefunden!")
-        return False
-        
-    with open(config_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
-        
-    new_lines = []
+    """Schreibt Parameter atomar in eine JSON-Datei statt den Python-Code zu manipulieren."""
+    settings_path = "runtime_settings.json"
+    temp_path = f"{settings_path}.tmp"
     
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("PV_KWP =") or stripped.startswith("PV_KWP="):
-            new_lines.append(f"PV_KWP = {kwp}  # Automatisch über Web-UI aktualisiert\n")
-        elif stripped.startswith("PV_TILT =") or stripped.startswith("PV_TILT="):
-            new_lines.append(f"PV_TILT = {tilt}  # Automatisch über Web-UI aktualisiert\n")
-        elif stripped.startswith("PV_AZIMUTH =") or stripped.startswith("PV_AZIMUTH="):
-            new_lines.append(f"PV_AZIMUTH = {azimuth}  # Automatisch über Web-UI aktualisiert\n")
-        elif stripped.startswith("K_PUSH =") or stripped.startswith("K_PUSH="):
-            new_lines.append(f"K_PUSH = {k_push}  # Automatisch über Web-UI aktualisiert\n")
-        else:
-            new_lines.append(line)
-            
-    with open(config_path, "w", encoding="utf-8") as f:
-        f.writelines(new_lines)
-    return True
-
+    data = {
+        "PV_KWP": float(kwp),
+        "PV_TILT": int(tilt),
+        "PV_AZIMUTH": int(azimuth),
+        "K_PUSH": float(k_push)
+    }
+    
+    try:
+        # Erst in temporäre Datei schreiben
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+        
+        # Atomares Ersetzen auf OS-Ebene (verhindert Datei-Korruption bei Absturz)
+        os.replace(temp_path, settings_path)
+        st.success("✅ Einstellungen erfolgreich und sicher gespeichert!")
+        return True
+    except Exception as e:
+        st.error(f"🚨 Fehler beim Speichern der Einstellungen: {e}")
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return False
 
 # ==============================================================================
 # SIDEBAR: EINSTELLUNGEN & TUNING-ANZEIGE

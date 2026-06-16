@@ -5,3 +5,4 @@ __pycache__/
 pv_counter_state.json
 energy_optimizer.log
 system_history_log.csv
+runtime_settings.json
