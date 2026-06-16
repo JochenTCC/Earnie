@@ -34,7 +34,7 @@ PV_TUNING_LOG_FILE = "pv_accuracy_log.csv"
 # HIER ZU DEN STATISCHEN PARAMETERN HINZUFÜGEN:
 BATTERY_MAX_POWER_KW = 2.5       # Maximale Lade-/Entladeleistung des Wechselrichters/Akkus
 BATTERY_EFFICIENCY = 0.97        # Wirkungsgrad (97% entspricht 0.97)
-BATTERY_CAPACITY_KWH = 10.0      # (Falls noch nicht vorhanden, deine Netto-Kapazität)
+BATTERY_CAPACITY_KWH = 5.0       # (Falls noch nicht vorhanden, deine Netto-Kapazität)
 BATTERY_MIN_SOC = 10.0           # Minimaler SoC in %
 BATTERY_MAX_SOC = 100.0          # Maximaler SoC in %
 
