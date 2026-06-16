@@ -22,6 +22,22 @@
       ],
       "console": "integratedTerminal",
       "justMyCode": false
+    },
+    {
+      "name": "Python: Zip all .py files",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/zip_py_files.py",
+      "args": [
+        "--output",
+        "${workspaceFolder}/python_sources.zip",
+        "--exclude",
+        "merge-logs.py",
+        "--exclude",
+        "zip_py_files.py"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false
     }
   ]
 }
