@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # Service 1: Der Hintergrund-Optimierer (Daemon)
+  optimizer-worker:
+    build: .
+    container_name: ernie-optimizer-worker
+    command: python main.py
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    environment:
+      - TZ=Europe/Vienna # Setzt die korrekte Zeitzone für die Berechnungen
+
+  # Service 2: Das Streamlit Control Center (UI)
+  optimizer-ui:
+    build: .
+    container_name: ernie-optimizer-ui
+    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    environment:
+      - TZ=Europe/Vienna
