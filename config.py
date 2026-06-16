@@ -17,7 +17,7 @@ AWATTAR_URL = "https://api.awattar.at/v1/marketdata"
 GLOBAL_TIMEOUT = 10
 
 # Loxone Konfiguration (Sensible Daten und Infrastruktur kommen aus der .env)
-LOXONE_IP = os.getenv("LOXONE_IP", "192.168.178.20")
+LOXONE_IP = os.getenv("LOXONE_IP", "192.168.178.1")
 LOXONE_USER = os.getenv("LOXONE_USER", "Fallback_User")
 LOXONE_PASS = os.getenv("LOXONE_PASS", "Fallback_Pass")
 
