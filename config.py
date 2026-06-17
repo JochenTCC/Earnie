@@ -73,7 +73,6 @@ class Config:
         # NEU: Namen der Loxone-Objekte für die Live-Leistungswerte (kW)
         loxone_blocks = self._raw_config.get("loxone_blocks", {})
         self.LOXONE_PV_POWER_NAME = loxone_blocks.get("pv_power_name", "Ernie_Live_PV")
-        self.LOXONE_HOUSE_POWER_NAME = loxone_blocks.get("house_power_name", "Ernie_Live_House")
         self.LOXONE_BATTERY_POWER_NAME = loxone_blocks.get("battery_power_name", "Ernie_Live_Battery")
         self.LOXONE_GRID_POWER_NAME = loxone_blocks.get("grid_power_name", "Ernie_Live_Grid")
 

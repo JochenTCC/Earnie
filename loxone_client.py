@@ -187,44 +187,27 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
         logger.error(f"🚨 Loxone-Fehler beim Abrufen von '{io_name}': {e}")
         return None
 
+
 def fetch_loxone_live_power() -> Optional[dict]:
     """
-    Holt alle Echtzeit-Leistungswerte aus Loxone und bereitet sie normiert vor.
-    Konvention:
-      - pv: immer >= 0 (Erzeugung)
-      - house: immer >= 0 (Reiner Last-Absolutwert)
-      - battery: + = Entladen, - = Laden
-      - grid: + = Netzbezug, - = Netzeinspeisung
+    Holt Echtzeit-Leistungswerte aus Loxone, normiert sie und prüft Vorzeichen.
     """
     pv = fetch_loxone_generic_value(config.get('LOXONE_PV_POWER_NAME'))
-    house_raw = fetch_loxone_generic_value(config.get('LOXONE_HOUSE_POWER_NAME'))
     battery_raw = fetch_loxone_generic_value(config.get('LOXONE_BATTERY_POWER_NAME'))
     grid_raw = fetch_loxone_generic_value(config.get('LOXONE_GRID_POWER_NAME'))
     
-    # Kritische Basiswerte prüfen
-    if pv is None or house_raw is None or battery_raw is None:
+    if pv is None or grid_raw is None or battery_raw is None:
         return None
         
-    # 1. Normierung auf rein positive Werte für Erzeugung & Verbrauch
     pv = max(0.0, float(pv))
-    house = abs(float(house_raw))
-    
-    # 2. Batterie-Logik anpassen
-    # HINWEIS: Ernie erwartet (+) für Entladen und (-) für Laden.
-    # Falls dein Loxone-Baustein Laden positiv ausgibt, musst du hier ein Minus vorsetzen!
     battery = float(battery_raw)
-    
-    # 3. Netz-Wert ermitteln oder berechnen
-    if grid_raw is None:
-        grid = house - pv - battery
-    else:
-        grid = float(grid_raw)
+    grid = float(grid_raw)
+
+    house = pv + battery + grid
         
     return {
-        "pv": round(pv, 2),
-        "house": round(house, 2),
-        "battery": round(battery, 2),
-        "grid": round(grid, 2)
+        "pv": round(pv, 2), "house": round(house, 2),
+        "battery": round(battery, 2), "grid": round(grid, 2)
     }
 
     

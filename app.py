@@ -427,16 +427,6 @@ def render_live_power_flow():
         grid = round(house - pv - battery, 2)
         data = {"pv": pv, "house": house, "battery": battery, "grid": grid}
     
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("☀️ PV-Leistung", f"{data['pv']:.2f} kW")
-    col2.metric("🏠 Hausverbrauch", f"{data['house']:.2f} kW")
-    
-    bat_label = "🔋 Speicher-Ladung" if data['battery'] < 0 else "🔋 Speicher-Entladung"
-    col3.metric(bat_label, f"{abs(data['battery']):.2f} kW")
-    
-    grid_label = "🔌 Netzbezug" if data['grid'] >= 0 else "🔌 Netzeinspeisung"
-    col4.metric(grid_label, f"{abs(data['grid']):.2f} kW")
-    
     fig = _create_live_flow_sankey(data)
     st.plotly_chart(fig, use_container_width=True, key="live_power_flow_sankey")
 
