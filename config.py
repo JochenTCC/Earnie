@@ -70,6 +70,13 @@ class Config:
         self.LOXONE_LOG_FILENAME = self._get_strict(self._raw_config, ["loxone_blocks", "log_filename"])
         self.PV_TUNING_LOG_FILE = self._get_strict(self._raw_config, ["loxone_blocks", "pv_tuning_log_file"])
 
+        # NEU: Namen der Loxone-Objekte für die Live-Leistungswerte (kW)
+        loxone_blocks = self._raw_config.get("loxone_blocks", {})
+        self.LOXONE_PV_POWER_NAME = loxone_blocks.get("pv_power_name", "Ernie_Live_PV")
+        self.LOXONE_HOUSE_POWER_NAME = loxone_blocks.get("house_power_name", "Ernie_Live_House")
+        self.LOXONE_BATTERY_POWER_NAME = loxone_blocks.get("battery_power_name", "Ernie_Live_Battery")
+        self.LOXONE_GRID_POWER_NAME = loxone_blocks.get("grid_power_name", "Ernie_Live_Grid")
+
     def _load_dynamic_params(self) -> None:
         self.K_PUSH_CENT = self._get_strict(self._raw_config, ["runtime_settings", "k_push_cent"])
         self.PV_TILT = self._get_strict(self._raw_config, ["runtime_settings", "pv_tilt"])

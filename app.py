@@ -35,6 +35,26 @@ def update_config_file(settings_dict):
 def get_runtime_settings() -> dict:
     return config.get_runtime_settings()
 
+def _calculate_scaled_consumption_and_cost(optimized_rows: list) -> tuple[float, float, float]:
+    """Berechnet den Gesamtverbrauch und die Kosten ohne PV, skaliert auf einen 24h-Horizont."""
+    total_consumption_kwh = 0.0
+    cost_without_pv_cents = 0.0
+    
+    for row in optimized_rows:
+        consumption = row.get("Verbrauch-Prognose (kW)", 0.0)
+        price_cent = row.get("Strompreis (Cent/kWh)", 0.0)
+        total_consumption_kwh += consumption
+        cost_without_pv_cents += consumption * price_cent
+        
+    cost_without_pv_euro = cost_without_pv_cents / 100.0
+    num_hours = len(optimized_rows)
+    scaling_factor = (24 / num_hours) if num_hours > 0 else 0.0
+    
+    consumption_24h = total_consumption_kwh * scaling_factor
+    cost_without_pv_24h_euro = cost_without_pv_euro * scaling_factor
+    
+    return total_consumption_kwh, consumption_24h, cost_without_pv_24h_euro
+
 
 def render_pv_config_inputs(settings: dict):
     st.markdown("#### ☀️ PV-Anlage")
@@ -246,44 +266,27 @@ def render_optimization_chart(df, baseline_df=None):
 
 
 def render_savings_metrics(savings: dict):
+    """Rendert die finanzielle Metriken-Übersicht im Dashboard auf einheitlicher Zeitbasis."""
     st.subheader("💶 Optimierungs-Einsparungen")
     baseline_cost = savings.get('baseline_cost_euro', 0.0)
     optimized_cost = savings.get('optimized_cost_euro', 0.0)
     savings_euro = savings.get('savings_euro', 0.0)
     
-    # Berechne Gesamtverbrauch und Kosten ohne PV aus den Reihen
     optimized_rows = savings.get('optimized_rows', [])
-    total_consumption_kwh = 0.0
-    cost_without_pv_cents = 0.0
-    if optimized_rows:
-        for row in optimized_rows:
-            consumption = row.get("Verbrauch-Prognose (kW)", 0.0)
-            price_cent = row.get("Strompreis (Cent/kWh)", 0.0)
-            total_consumption_kwh += consumption
-            cost_without_pv_cents += consumption * price_cent
-        
-        cost_without_pv_euro = cost_without_pv_cents / 100.0
-        
-        # Hochrechnung auf 24h falls nur weniger als 24h vorhanden
-        num_hours = len(optimized_rows)
-        consumption_24h = total_consumption_kwh * (24 / num_hours) if num_hours > 0 else 0.0
+    total_kwh, consumption_24h, cost_without_pv_24h_euro = _calculate_scaled_consumption_and_cost(optimized_rows)
 
     col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Ohne PV (Netzbe­zug)", f"{cost_without_pv_euro:.2f} €", help="Kosten bei 100% Netzbezug ohne PV-Anlage")
+    col1.metric("Ohne PV (24h hochger.)", f"{cost_without_pv_24h_euro:.2f} €", help="Hochgerechnete Kosten bei 100% Netzbezug ohne PV-Anlage auf einen vollen 24h-Horizont.")
     col2.metric("Baseline-Kosten", f"{baseline_cost:.2f} €")
     col3.metric("Optimierte Kosten", f"{optimized_cost:.2f} €")
 
     if savings_euro >= 0:
-        display_value = f"-{savings_euro:.2f} €"
-        delta_value = f"-{savings_euro:.2f} €"
-        delta_color = "inverse"
+        display_value, delta_value, delta_color = f"-{savings_euro:.2f} €", f"-{savings_euro:.2f} €", "inverse"
     else:
-        display_value = f"+{abs(savings_euro):.2f} €"
-        delta_value = f"+{abs(savings_euro):.2f} €"
-        delta_color = "normal"
+        display_value, delta_value, delta_color = f"+{abs(savings_euro):.2f} €", f"+{abs(savings_euro):.2f} €", "normal"
 
     col4.metric("Ersparnis", display_value, delta=delta_value, delta_color=delta_color)
-    col5.metric("Verbrauch 24h", f"{consumption_24h:.1f} kWh", help=f"Tatsächlich gemessen: {total_consumption_kwh:.1f} kWh über {len(optimized_rows)} Stunden")
+    col5.metric("Verbrauch 24h", f"{consumption_24h:.1f} kWh", help=f"Tatsächlich gemessen: {total_kwh:.1f} kWh über {len(optimized_rows)} Stunden")
 
 
 def fetch_market_data():
@@ -319,7 +322,6 @@ def setup_auto_refresh():
 @st.fragment(run_every=config.get('LOOP_TIMEOUT', default=720, cast=int))
 def render_optimization_block(current_soc: float):
     """Führt die rechenintensive Optimierung im großen LOOP_TIMEOUT-Takt aus."""
-    st.subheader("📈 Last- & Preisverlauf")
     market_data = fetch_market_data()
     if market_data is None:
         return
@@ -345,7 +347,7 @@ def render_countdown_block():
     if 'last_optimization' not in st.session_state:
         st.session_state.last_optimization = time.time()
         
-    elapsed = time.time() - st.session_state.last_optimization +0.1
+    elapsed = time.time() - st.session_state.last_optimization
     remaining = max(0, int(loop_timeout - elapsed))
     
     last_time = time.strftime("%H:%M:%S", time.localtime(st.session_state.last_optimization))
@@ -356,6 +358,60 @@ def render_countdown_block():
         f"⏱️ Letzte Optimierung: **{last_time}**"
     )
     st.caption(f"⏳ **Nächste Berechnung in:** `{remaining}` Sekunden (Countdown aktualisiert alle 10s)")
+
+#### LEISTUNGSFLUSS DARSTELLUNG
+import random
+
+def _generate_mock_live_data() -> dict:
+    """Generiert dynamische, sich verändernde Mockup-Leistungswerte in kW."""
+    pv = round(0 + random.uniform(0, 4), 2)
+    house = -round(0.6 + random.uniform(-0.1, 3), 2)
+    battery = round(0 + random.uniform(-2, 2), 2)  # Angenommene konstante Ladung für das Mockup
+    grid = -pv - house - battery
+    return {"pv": pv, "house": house, "battery": battery, "grid": grid}
+
+
+def _create_live_flow_sankey(data: dict) -> go.Figure:
+    """Erstellt ein dynamisches Sankey-Diagramm mit integrierten Werten und konsistenten Farben."""
+    lbl_pv = f"☀️ PV-Anlage ({data['pv']:.2f} kW)"
+    lbl_grid = f"🔌 Netzbezug ({data['grid']:.2f} kW)" if data['grid'] >= 0 else f"🔌 Netzeinspeisung ({abs(data['grid']):.2f} kW)"
+    lbl_bat = f"🔋 Entladen ({data['battery']:.2f} kW)" if data['battery'] >= 0 else f"🔋 Laden ({abs(data['battery']):.2f} kW)"
+    lbl_house = f"🏠 Wohnhaus ({abs(data['house']):.2f} kW)"
+    labels = [lbl_pv, lbl_grid, lbl_bat, lbl_house, "⚙️ System-Knoten"]
+    
+    sources, targets, values = [], [], []
+    # Einspeisung in den zentralen Systemknoten
+    if data['pv'] > 0: sources.append(0); targets.append(4); values.append(data['pv'])
+    if data['grid'] > 0: sources.append(1); targets.append(4); values.append(data['grid'])
+    if data['battery'] > 0: sources.append(2); targets.append(4); values.append(data['battery'])
+    
+    # Verteilung aus dem zentralen Systemknoten
+    if data['house'] < 0: sources.append(4); targets.append(3); values.append(abs(data['house']))
+    if data['grid'] < 0: sources.append(4); targets.append(1); values.append(abs(data['grid']))
+    if data['battery'] < 0: sources.append(4); targets.append(2); values.append(abs(data['battery']))
+
+    c_grid = "crimson" if data['grid'] >= 0 else "#95a5a6"
+    c_bat = "crimson" if data['battery'] >= 0 else "forestgreen"
+    colors = ["#f1c40f", c_grid, c_bat, "#3498db", "#7f8c8d"]
+
+    fig = go.Figure(data=[go.Sankey(
+        node=dict(pad=15, thickness=20, label=labels, color=colors),
+        link=dict(source=sources, target=targets, value=values, color="rgba(180, 180, 180, 0.25)")
+    )])
+    fig.update_layout(height=260, margin=dict(l=10, r=10, t=10, b=10))
+    return fig
+
+@st.fragment(run_every=10)
+def render_live_power_flow():
+    """Rendert den kompakten Echtzeit-Leistungsfluss ohne separate Metrik-Karten."""
+    st.write("### ⚡ Echtzeit-Leistungsfluss (Live-Mockup)")
+    data = _generate_mock_live_data()
+    
+    fig = _create_live_flow_sankey(data)
+    # Beibehalten: Zukunftssicheres Strecken der Grafikbreite
+    st.plotly_chart(fig, width='stretch', key="live_power_flow_sankey")
+
+################################    
 
 def main():
     st.title("🔋 Ernie Energy Control Center")
@@ -372,9 +428,13 @@ def main():
     else:
         st.info(f"⚡ Aktueller Batterie-Ladezustand (Live-SoC): **{current_soc}%**")
 
-    # 2. Steuerung der beiden entkoppelten Refresh-Kreisläufe
+    # 2. NEU: Echtzeit-Leistungsfluss (5s Taktung)
+    render_live_power_flow()
+
+    # 3. Steuerung der beiden entkoppelten Refresh-Kreisläufe
     render_optimization_block(current_soc)
     render_countdown_block()
+
 
 if __name__ == "__main__":
     main()

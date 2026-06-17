@@ -162,6 +162,60 @@ def fetch_loxone_pv_counter() -> Optional[float]:
         
     return None
 
+def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
+    """Holt einen einzelnen analogen Wert live aus dem Loxone Miniserver via HTTP-REST."""
+    url = f"http://{config.get('LOXONE_IP')}/jdev/sps/io/{io_name}"
+    timeout_val = config.get_global_timeout(default=5)
+    
+    try:
+        response = requests.get(
+            url, 
+            auth=HTTPBasicAuth(config.get('LOXONE_USER'), config.get('LOXONE_PASS')),
+            timeout=timeout_val
+        )
+        response.raise_for_status()
+        data = response.json()
+        raw_value = data.get('LL', {}).get('value', '')
+        
+        if not raw_value:
+            return None
+            
+        # Bereinigung von Einheiten falls Loxone diese mitsendet
+        clean_value = raw_value.replace('%', '').replace('kW', '').replace('W', '').strip()
+        return float(clean_value)
+    except Exception as e:
+        logger.error(f"🚨 Loxone-Fehler beim Abrufen von '{io_name}': {e}")
+        return None
+
+def fetch_loxone_live_power() -> Optional[dict]:
+    """
+    Holt alle Echtzeit-Leistungswerte aus Loxone und bereitet sie für das Sankey-Diagramm vor.
+    Erwartet Werte standardmäßig in kW.
+    """
+    pv = fetch_loxone_generic_value(config.get('LOXONE_PV_POWER_NAME'))
+    house_raw = fetch_loxone_generic_value(config.get('LOXONE_HOUSE_POWER_NAME'))
+    battery = fetch_loxone_generic_value(config.get('LOXONE_BATTERY_POWER_NAME'))
+    grid = fetch_loxone_generic_value(config.get('LOXONE_GRID_POWER_NAME'))
+    
+    # Kritische Basiswerte prüfen
+    if pv is None or house_raw is None or battery is None:
+        return None
+        
+    # Vorzeichen-Harmonisierung:
+    # 1. Hausverbrauch wird im Sankey intern negativ erwartet (Verbrauch)
+    house = -abs(house_raw)
+    
+    # 2. Wenn der Netz-Wert fehlt/Fehler wirft, berechnen wir ihn mathematisch als Fallback
+    if grid is None:
+        grid = -pv - house - battery
+        
+    return {
+        "pv": round(pv, 2),
+        "house": round(house, 2),
+        "battery": round(battery, 2),
+        "grid": round(grid, 2)
+    }
+
 def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: float):
     """
     Übersetzt die Ernie-Optimierungsmodi in die vier exakten Huawei-Modbus-Steuerwerte
