@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import importlib
+import time
 
 # Bestehende Projektmodule importieren
 import config
@@ -299,18 +300,68 @@ def render_simulation_details(df):
     st.dataframe(df, width='stretch')
 
 
-def render_refresh_caption():
-    st.markdown("---")
+def setup_auto_refresh():
+    """Initialisiert den automatischen Refresh-Mechanismus basierend auf LOOP_TIMEOUT."""
     loop_timeout = config.get('LOOP_TIMEOUT', default=720, cast=int)
-    refresh_minutes = int(loop_timeout / 60) if loop_timeout else 12
-    st.caption(f"🔄 Automatischer Daten-Refresh aktiv. Taktung der Hauptschleife beträgt {refresh_minutes} Minuten...")
+    
+    # Initialisiere den Refresh-Timer in session_state, falls noch nicht vorhanden
+    if 'last_refresh' not in st.session_state:
+        st.session_state.last_refresh = time.time()
+    
+    # Überprüfe, ob genug Zeit seit dem letzten Refresh vergangen ist
+    time_since_refresh = time.time() - st.session_state.last_refresh
+    
+    if time_since_refresh >= loop_timeout:
+        # Zeit für einen Refresh
+        st.session_state.last_refresh = time.time()
+        st.rerun()
 
+@st.fragment(run_every=config.get('LOOP_TIMEOUT', default=720, cast=int))
+def render_optimization_block(current_soc: float):
+    """Führt die rechenintensive Optimierung im großen LOOP_TIMEOUT-Takt aus."""
+    st.subheader("📈 Last- & Preisverlauf")
+    market_data = fetch_market_data()
+    if market_data is None:
+        return
+
+    _, _, matrix = profile_manager.get_forecast_vectors(market_data)
+    savings_info = optimizer.calculate_optimization_savings(matrix, current_soc)
+    
+    optimized_df = pd.DataFrame(savings_info['optimized_rows'])
+    baseline_df = pd.DataFrame(savings_info['baseline_rows'])
+
+    render_savings_metrics(savings_info)
+    render_optimization_chart(optimized_df, baseline_df)
+    render_simulation_details(optimized_df)
+    
+    # Zeitstempel für den Countdown-Block bereitstellen
+    st.session_state.last_optimization = time.time()
+
+@st.fragment(run_every=10)
+def render_countdown_block():
+    """Aktualisiert alle 10 Sekunden exklusiv die Anzeige des Countdowns."""
+    loop_timeout = config.get('LOOP_TIMEOUT', default=720, cast=int)
+    
+    if 'last_optimization' not in st.session_state:
+        st.session_state.last_optimization = time.time()
+        
+    elapsed = time.time() - st.session_state.last_optimization +0.1
+    remaining = max(0, int(loop_timeout - elapsed))
+    
+    last_time = time.strftime("%H:%M:%S", time.localtime(st.session_state.last_optimization))
+     
+    st.markdown("---")
+    st.caption(
+        f"🔄 **Optimierungs-Takt:** Alle {int(loop_timeout/60)} Min ({loop_timeout}s) | "
+        f"⏱️ Letzte Optimierung: **{last_time}**"
+    )
+    st.caption(f"⏳ **Nächste Berechnung in:** `{remaining}` Sekunden (Countdown aktualisiert alle 10s)")
 
 def main():
     st.title("🔋 Ernie Energy Control Center")
     st.markdown("Echtzeit-Cockpit und Vorhersage-Simulation des synchronisierten 24-Stunden-Horizonts.")
 
-    # 1. Parameter-Eingabemaske rendern
+    # 1. Parameter-Eingabemaske in der Sidebar (statisch)
     render_parameter_input()
 
     # Live SoC abrufen
@@ -321,21 +372,9 @@ def main():
     else:
         st.info(f"⚡ Aktueller Batterie-Ladezustand (Live-SoC): **{current_soc}%**")
 
-    # 2. Marktdaten beschaffen
-    st.subheader("📈 Last- & Preisverlauf")
-    market_data = fetch_market_data()
-    if market_data is None:
-        return
-
-    _, _, matrix = profile_manager.get_forecast_vectors(market_data)
-    savings_info = optimizer.calculate_optimization_savings(matrix, current_soc)
-    optimized_df = pd.DataFrame(savings_info['optimized_rows'])
-    baseline_df = pd.DataFrame(savings_info['baseline_rows'])
-
-    render_savings_metrics(savings_info)
-    render_optimization_chart(optimized_df, baseline_df)
-    render_simulation_details(optimized_df)
-    render_refresh_caption()
+    # 2. Steuerung der beiden entkoppelten Refresh-Kreisläufe
+    render_optimization_block(current_soc)
+    render_countdown_block()
 
 if __name__ == "__main__":
     main()
