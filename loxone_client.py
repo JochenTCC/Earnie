@@ -189,25 +189,36 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
 
 def fetch_loxone_live_power() -> Optional[dict]:
     """
-    Holt alle Echtzeit-Leistungswerte aus Loxone und bereitet sie für das Sankey-Diagramm vor.
-    Erwartet Werte standardmäßig in kW.
+    Holt alle Echtzeit-Leistungswerte aus Loxone und bereitet sie normiert vor.
+    Konvention:
+      - pv: immer >= 0 (Erzeugung)
+      - house: immer >= 0 (Reiner Last-Absolutwert)
+      - battery: + = Entladen, - = Laden
+      - grid: + = Netzbezug, - = Netzeinspeisung
     """
     pv = fetch_loxone_generic_value(config.get('LOXONE_PV_POWER_NAME'))
     house_raw = fetch_loxone_generic_value(config.get('LOXONE_HOUSE_POWER_NAME'))
-    battery = fetch_loxone_generic_value(config.get('LOXONE_BATTERY_POWER_NAME'))
-    grid = fetch_loxone_generic_value(config.get('LOXONE_GRID_POWER_NAME'))
+    battery_raw = fetch_loxone_generic_value(config.get('LOXONE_BATTERY_POWER_NAME'))
+    grid_raw = fetch_loxone_generic_value(config.get('LOXONE_GRID_POWER_NAME'))
     
     # Kritische Basiswerte prüfen
-    if pv is None or house_raw is None or battery is None:
+    if pv is None or house_raw is None or battery_raw is None:
         return None
         
-    # Vorzeichen-Harmonisierung:
-    # 1. Hausverbrauch wird im Sankey intern negativ erwartet (Verbrauch)
-    house = -abs(house_raw)
+    # 1. Normierung auf rein positive Werte für Erzeugung & Verbrauch
+    pv = max(0.0, float(pv))
+    house = abs(float(house_raw))
     
-    # 2. Wenn der Netz-Wert fehlt/Fehler wirft, berechnen wir ihn mathematisch als Fallback
-    if grid is None:
-        grid = -pv - house - battery
+    # 2. Batterie-Logik anpassen
+    # HINWEIS: Ernie erwartet (+) für Entladen und (-) für Laden.
+    # Falls dein Loxone-Baustein Laden positiv ausgibt, musst du hier ein Minus vorsetzen!
+    battery = float(battery_raw)
+    
+    # 3. Netz-Wert ermitteln oder berechnen
+    if grid_raw is None:
+        grid = house - pv - battery
+    else:
+        grid = float(grid_raw)
         
     return {
         "pv": round(pv, 2),
@@ -216,6 +227,7 @@ def fetch_loxone_live_power() -> Optional[dict]:
         "grid": round(grid, 2)
     }
 
+    
 def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: float):
     """
     Übersetzt die Ernie-Optimierungsmodi in die vier exakten Huawei-Modbus-Steuerwerte

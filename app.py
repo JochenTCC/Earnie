@@ -371,45 +371,74 @@ def _generate_mock_live_data() -> dict:
     return {"pv": pv, "house": house, "battery": battery, "grid": grid}
 
 
+#### LEISTUNGSFLUSS DARSTELLUNG
+
 def _create_live_flow_sankey(data: dict) -> go.Figure:
-    """Erstellt ein dynamisches Sankey-Diagramm mit integrierten Werten und konsistenten Farben."""
-    lbl_pv = f"☀️ PV-Anlage ({data['pv']:.2f} kW)"
-    lbl_grid = f"🔌 Netzbezug ({data['grid']:.2f} kW)" if data['grid'] >= 0 else f"🔌 Netzeinspeisung ({abs(data['grid']):.2f} kW)"
-    lbl_bat = f"🔋 Entladen ({data['battery']:.2f} kW)" if data['battery'] >= 0 else f"🔋 Laden ({abs(data['battery']):.2f} kW)"
-    lbl_house = f"🏠 Wohnhaus ({abs(data['house']):.2f} kW)"
-    labels = [lbl_pv, lbl_grid, lbl_bat, lbl_house, "⚙️ System-Knoten"]
+    """Erstellt ein dynamisches Energiefluss-Diagramm basierend auf Plotly Sankey ohne Vorzeichenfehler."""
+    # Knoten-Indizes: 0=PV, 1=Netz, 2=Batterie, 3=Wohnhaus, 4=Zentraler Systemknoten
+    labels = ["☀️ PV-Anlage", "🔌 Stromnetz", "🔋 Batterie", "🏠 Wohnhaus", "⚙️ System-Knoten"]
     
     sources, targets, values = [], [], []
-    # Einspeisung in den zentralen Systemknoten
-    if data['pv'] > 0: sources.append(0); targets.append(4); values.append(data['pv'])
-    if data['grid'] > 0: sources.append(1); targets.append(4); values.append(data['grid'])
-    if data['battery'] > 0: sources.append(2); targets.append(4); values.append(data['battery'])
     
-    # Verteilung aus dem zentralen Systemknoten
-    if data['house'] < 0: sources.append(4); targets.append(3); values.append(abs(data['house']))
-    if data['grid'] < 0: sources.append(4); targets.append(1); values.append(abs(data['grid']))
-    if data['battery'] < 0: sources.append(4); targets.append(2); values.append(abs(data['battery']))
+    # A) ZUFLÜSSE zum zentralen Systemknoten (Index 4)
+    if data['pv'] > 0: 
+        sources.append(0); targets.append(4); values.append(data['pv'])
+    if data['grid'] > 0: # Netzbezug (Strom kommt rein)
+        sources.append(1); targets.append(4); values.append(data['grid'])
+    if data['battery'] > 0: # Batterie entlädt (Strom kommt rein)
+        sources.append(2); targets.append(4); values.append(data['battery'])
+        
+    # B) ABFLÜSSE aus dem zentralen Systemknoten (Index 4)
+    if data['house'] > 0: # Hausverbrauch
+        sources.append(4); targets.append(3); values.append(data['house'])
+    if data['grid'] < 0: # Netzeinspeisung (Strom geht ins Netz)
+        sources.append(4); targets.append(1); values.append(abs(data['grid']))
+    if data['battery'] < 0: # Batterie lädt (Strom geht in Speicher)
+        sources.append(4); targets.append(2); values.append(abs(data['battery']))
 
+    # Dynamische Farbanpassung je nach Zustand
     c_grid = "crimson" if data['grid'] >= 0 else "#95a5a6"
-    c_bat = "crimson" if data['battery'] >= 0 else "forestgreen"
+    c_bat = "forestgreen" if data['battery'] < 0 else "crimson"
     colors = ["#f1c40f", c_grid, c_bat, "#3498db", "#7f8c8d"]
 
     fig = go.Figure(data=[go.Sankey(
         node=dict(pad=15, thickness=20, label=labels, color=colors),
         link=dict(source=sources, target=targets, value=values, color="rgba(180, 180, 180, 0.25)")
     )])
-    fig.update_layout(height=260, margin=dict(l=10, r=10, t=10, b=10))
+    fig.update_layout(height=250, margin=dict(l=10, r=10, t=10, b=10))
     return fig
+
 
 @st.fragment(run_every=10)
 def render_live_power_flow():
-    """Rendert den kompakten Echtzeit-Leistungsfluss ohne separate Metrik-Karten."""
-    st.write("### ⚡ Echtzeit-Leistungsfluss (Live-Mockup)")
-    data = _generate_mock_live_data()
+    """Rendert die Live-Leistungsfluss-Ansicht basierend auf echten Loxone-Werten."""
+    st.write("### ⚡ Echtzeit-Leistungsfluss (Live)")
+    
+    # Holt die echten, frisch normierten Daten aus dem loxone_client
+    data = loxone_client.fetch_loxone_live_power()
+    
+    # Fallback auf simulierte Werte mit korrekter Logik, falls Loxone offline ist
+    if data is None:
+        st.warning("⚠️ Live-Leistungswerte konnten nicht von Loxone geladen werden. Zeige simulierte Werte.")
+        import random
+        pv = round(random.uniform(0, 4), 2)
+        house = round(random.uniform(0.5, 2.5), 2)
+        battery = round(random.uniform(-2, 2), 2)
+        grid = round(house - pv - battery, 2)
+        data = {"pv": pv, "house": house, "battery": battery, "grid": grid}
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("☀️ PV-Leistung", f"{data['pv']:.2f} kW")
+    col2.metric("🏠 Hausverbrauch", f"{data['house']:.2f} kW")
+    
+    bat_label = "🔋 Speicher-Ladung" if data['battery'] < 0 else "🔋 Speicher-Entladung"
+    col3.metric(bat_label, f"{abs(data['battery']):.2f} kW")
+    
+    grid_label = "🔌 Netzbezug" if data['grid'] >= 0 else "🔌 Netzeinspeisung"
+    col4.metric(grid_label, f"{abs(data['grid']):.2f} kW")
     
     fig = _create_live_flow_sankey(data)
-    # Beibehalten: Zukunftssicheres Strecken der Grafikbreite
-    st.plotly_chart(fig, width='stretch', key="live_power_flow_sankey")
+    st.plotly_chart(fig, use_container_width=True, key="live_power_flow_sankey")
 
 ################################    
 
@@ -428,7 +457,7 @@ def main():
     else:
         st.info(f"⚡ Aktueller Batterie-Ladezustand (Live-SoC): **{current_soc}%**")
 
-    # 2. NEU: Echtzeit-Leistungsfluss (5s Taktung)
+    # 2. Echtzeit-Leistungsfluss
     render_live_power_flow()
 
     # 3. Steuerung der beiden entkoppelten Refresh-Kreisläufe
