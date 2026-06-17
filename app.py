@@ -361,7 +361,7 @@ def render_countdown_block():
 
 #### LEISTUNGSFLUSS DARSTELLUNG
 
-def _prepare_sankey_data(data: dict) -> tuple[list[str], list[int], list[int], list[float], list[str]]:
+def _prepare_sankey_data(data: dict, current_soc: float) -> tuple[list[str], list[int], list[int], list[float], list[str]]:
     """Bereitet die Beschriftungen, Flusswege und Farben für das Sankey-Diagramm vor."""
     # Dynamische Beschriftungen mit Live-Leistungswerten zusammenbauen
     lbl_pv = f"☀️ PV-Anlage ({data['pv']:.2f} kW)"
@@ -373,9 +373,9 @@ def _prepare_sankey_data(data: dict) -> tuple[list[str], list[int], list[int], l
         lbl_grid = f"🔌 Stromnetz (Einspeisung: {abs(data['grid']):.2f} kW)"
         
     if data['battery'] >= 0:
-        lbl_bat = f"🔋 Batterie (Entladen: {data['battery']:.2f} kW)"
+        lbl_bat = f"🔋 Batterie ({current_soc:.1f}% - Entladen: {data['battery']:.2f} kW)"
     else:
-        lbl_bat = f"🔋 Batterie (Laden: {abs(data['battery']):.2f} kW)"
+        lbl_bat = f"🔋 Batterie ({current_soc:.1f}% - Laden: {abs(data['battery']):.2f} kW)"
 
     labels = [lbl_pv, lbl_grid, lbl_bat, lbl_house, "⚙️ System-Knoten"]
     sources, targets, values = [], [], []
@@ -404,9 +404,9 @@ def _prepare_sankey_data(data: dict) -> tuple[list[str], list[int], list[int], l
     return labels, sources, targets, values, colors
 
 
-def _create_live_flow_sankey(data: dict) -> go.Figure:
+def _create_live_flow_sankey(data: dict, current_soc: float) -> go.Figure:
     """Erstellt ein dynamisches Energiefluss-Diagramm."""
-    labels, sources, targets, values, colors = _prepare_sankey_data(data)
+    labels, sources, targets, values, colors = _prepare_sankey_data(data, current_soc=current_soc)
 
     fig = go.Figure(data=[go.Sankey(
         node=dict(
@@ -434,7 +434,7 @@ def _create_live_flow_sankey(data: dict) -> go.Figure:
 
 
 @st.fragment(run_every=10)
-def render_live_power_flow():
+def render_live_power_flow(current_soc: float):
     """Rendert die Live-Leistungsfluss-Ansicht mit CSS-Fix gegen den Text-Glow."""
     st.write("### ⚡ Echtzeit-Leistungsfluss (Live)")
     
@@ -457,7 +457,7 @@ def render_live_power_flow():
         st.warning("⚠️ Live-Leistungswerte konnten nicht von Loxone geladen werden. Zeige simulierte Werte.")
         return
     
-    fig = _create_live_flow_sankey(data)
+    fig = _create_live_flow_sankey(data, current_soc=current_soc)
     # BEHOBEN: API-Migration von use_container_width=True auf width='stretch'
     st.plotly_chart(fig, width='stretch', key="live_power_flow_sankey")
 
@@ -472,14 +472,9 @@ def main():
 
     # Live SoC abrufen
     current_soc = loxone_client.fetch_loxone_soc()
-    if current_soc is None:
-        current_soc = 50.0
-        st.warning("⚠️ Live-Batteriestand konnte nicht von Loxone geladen werden. Simulation läuft mit 50% Fallback-SoC.")
-    else:
-        st.info(f"⚡ Aktueller Batterie-Ladezustand (Live-SoC): **{current_soc}%**")
 
     # 2. Echtzeit-Leistungsfluss
-    render_live_power_flow()
+    render_live_power_flow(current_soc)
 
     # 3. Steuerung der beiden entkoppelten Refresh-Kreisläufe
     render_optimization_block(current_soc)
