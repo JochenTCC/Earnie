@@ -4,7 +4,7 @@
 - [x] Deployment auf Synology NAS einrichten
 - [x] Aktuellen Ladezustand in Sankey-Diagramm verschieben (oben rausnehmen)
 - [ ] Versionsnummer einführen und anzeigen (Github-Release-Nr?)
-- [ ] Web-App lokal auf Handy verfügbar machen
-- [ ] Umgang mit historischen Verbrauchsdaten nochmal prüfen
-- [ ] E-Auto (und weitere Verbraucher) in die Optimierung mit reinnehmen mit Empfehlung, wann der beste Startzeitpunkt wäre
+- [ ] Web-App in Loxone integrieren oder extern verfügbar machen. 
+- [ ] Umgang mit historischen Verbrauchsdaten nochmal prüfen (wie funktioniert das genau, wie sollte mit Großverbrauchern umgegangen werden, wie gehen neue Daten ein) 
+- [ ] E-Auto / Swim-Spa / Wärmepumpe (und Waschmaschine, Geschirrspüler) in die Optimierung mit reinnehmen mit Empfehlung, wann der beste Startzeitpunkt wäre bzw. autonomes Starten. 
 - [ ] Fiktive Simulation der historischen Daten mit einer größeren Batterie
