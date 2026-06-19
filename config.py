@@ -294,12 +294,72 @@ class Config:
         }
 
     def get_scenario_settings(self) -> dict:
-        """Lädt alle Szenario-Blöcke (z. B. scenario_settings_1, scenario_settings_2)."""
-        return {
+        """Lädt Szenario-Parameter als {id: settings}-Dict (Abwärtskompatibilität)."""
+        return {scenario["id"]: scenario["settings"] for scenario in self.get_scenarios()}
+
+    def get_scenarios(self) -> list[dict]:
+        """Lädt alle Backtesting-Szenarien aus dem scenarios-Array in config.json."""
+        raw = self._raw_config.get("scenarios")
+        if isinstance(raw, list) and raw:
+            return [self._normalize_scenario(entry, index) for index, entry in enumerate(raw)]
+
+        legacy = {
             key: value
             for key, value in self._raw_config.items()
-            if key.startswith("scenario_settings")
+            if key.startswith("scenario_settings") and isinstance(value, dict)
         }
+        return [
+            {
+                "id": key,
+                "label": key.replace("_", " "),
+                "settings": dict(value),
+            }
+            for key, value in sorted(legacy.items())
+        ]
+
+    @staticmethod
+    def _normalize_scenario(raw: dict, index: int) -> dict:
+        if not isinstance(raw, dict):
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: scenarios[{index}] muss ein Objekt sein."
+            )
+
+        scenario_id = str(raw.get("id") or f"scenario_{index + 1}").strip()
+        if not scenario_id:
+            scenario_id = f"scenario_{index + 1}"
+        if scenario_id == "runtime_settings":
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: Die Szenario-ID 'runtime_settings' "
+                "ist reserviert (Baseline)."
+            )
+
+        settings = raw.get("settings")
+        if not isinstance(settings, dict):
+            raise KeyError(
+                f"Kritischer Konfigurationsfehler: scenarios[{index}] ('{scenario_id}') "
+                "benötigt ein 'settings'-Objekt."
+            )
+
+        label = str(raw.get("label") or scenario_id).strip() or scenario_id
+        return {
+            "id": scenario_id,
+            "label": label,
+            "settings": dict(settings),
+        }
+
+    def get_scenario_labels(self) -> dict[str, str]:
+        """Anzeigenamen für Backtesting-Szenarien (runtime_settings = Baseline)."""
+        labels = {"runtime_settings": "Runtime (Baseline)"}
+        for scenario in self.get_scenarios():
+            labels[scenario["id"]] = scenario["label"]
+        return labels
+
+    def get_backtesting_scenarios(self) -> dict[str, dict]:
+        """runtime_settings als Baseline, gefolgt von allen konfigurierten Szenarien."""
+        scenarios = {"runtime_settings": dict(self._raw_config["runtime_settings"])}
+        for scenario in self.get_scenarios():
+            scenarios[scenario["id"]] = scenario["settings"]
+        return scenarios
 
     def get_value(self, name: str, default=None, cast=None):
         return self.get(name, default=default, cast=cast)
@@ -370,6 +430,18 @@ def get_file_paths_battery_simulation() -> dict:
 
 def get_scenario_settings() -> dict:
     return CONFIG.get_scenario_settings()
+
+
+def get_scenarios() -> list[dict]:
+    return CONFIG.get_scenarios()
+
+
+def get_scenario_labels() -> dict[str, str]:
+    return CONFIG.get_scenario_labels()
+
+
+def get_backtesting_scenarios() -> dict[str, dict]:
+    return CONFIG.get_backtesting_scenarios()
 
 
 def get_value(name: str, default=None, cast=None):

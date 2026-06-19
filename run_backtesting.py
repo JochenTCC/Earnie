@@ -4,15 +4,113 @@ import os
 # Backtesting braucht keine Loxone-Zugangsdaten aus der .env
 os.environ["ENERGY_OPTIMIZER_OFFLINE"] = "1"
 
+import argparse
+
 import pandas as pd
 import config
-from data_loader import (
-    create_averaged_profile,
-    generate_simulation_base,
-    load_market_prices,
-    resolve_simulation_window,
+import profile_manager
+from data_loader import load_market_prices, resolve_simulation_window
+from simulation_engine import (
+    HISTORICAL_REFERENCE_ID,
+    HistoricalDataCache,
+    compute_historical_reference_costs,
+    list_simulation_anchors,
+    print_plausibility_report,
+    run_simulation,
+    window_anchor_for_date,
+    window_slot_datetimes,
 )
-from simulation_engine import run_simulation
+
+HISTORICAL_REFERENCE_LABEL = "Historisch (ohne Optimierung)"
+BACKTESTING_YEAR = 2025
+MONTH_ARG_HELP = f"Monatsnummer 1–12 (Basisjahr {BACKTESTING_YEAR})"
+
+
+def _format_month_period(start: pd.Timestamp, end: pd.Timestamp) -> str:
+    if start.month == end.month and start.year == end.year:
+        return f"Monat {start.month}/{start.year}"
+    return f"Monat {start.month}–{end.month}/{start.year}"
+
+
+def _parse_month(value: str) -> pd.Timestamp:
+    """Parst Monatsnummer 1–12 zum ersten Tag in BACKTESTING_YEAR."""
+    try:
+        month = int(value.strip())
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            f"Ungültiger Monat '{value}'. Erwartet wird {MONTH_ARG_HELP}."
+        ) from exc
+    if not 1 <= month <= 12:
+        raise argparse.ArgumentTypeError(
+            f"Monat muss zwischen 1 und 12 liegen, nicht {value}."
+        )
+    return pd.Timestamp(BACKTESTING_YEAR, month, 1)
+
+
+def resolve_backtesting_window(
+    start_month: pd.Timestamp | None,
+    end_month: pd.Timestamp | None,
+    range_mode: str,
+    cons_path: str,
+    prod_path: str,
+) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """
+    Ermittelt Start/Ende für die Simulation.
+    Mit start_month/end_month: erster Tag des Startmonats bis letzter Tag des Endmonats.
+    Ohne Angabe: wie bisher aus config (price_range / resolve_simulation_window).
+    """
+    if start_month is None and end_month is None:
+        return resolve_simulation_window(range_mode, cons_path, prod_path)
+
+    if start_month is None or end_month is None:
+        raise SystemExit(
+            "Bitte --start-month und --end-month gemeinsam angeben "
+            f"({MONTH_ARG_HELP})."
+        )
+
+    start = start_month.normalize()
+    end = (end_month + pd.offsets.MonthEnd(0)).normalize()
+
+    if start > end:
+        raise SystemExit(
+            f"Startmonat ({start.month}) darf nicht nach Endmonat ({end_month.month}) liegen."
+        )
+
+    today = pd.Timestamp.now().normalize()
+    end = min(end, today)
+
+    lox_min, lox_max = profile_manager.get_loxone_date_bounds()
+    if lox_min is not None:
+        start = max(start, pd.Timestamp(lox_min))
+    if lox_max is not None:
+        end = min(end, pd.Timestamp(lox_max))
+
+    if start > end:
+        raise SystemExit(
+            "Kein gültiger Schnitt zwischen gewähltem Monatszeitraum "
+            "und verfügbaren Loxone-Logs."
+        )
+
+    return start, end
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Backtesting der Energie-Optimierung auf historischen Loxone-Daten.",
+    )
+    parser.add_argument(
+        "--start-month",
+        type=_parse_month,
+        metavar="MONAT",
+        help=f"Erster Monat der Simulation (inkl.). {MONTH_ARG_HELP}",
+    )
+    parser.add_argument(
+        "--end-month",
+        type=_parse_month,
+        metavar="MONAT",
+        help=f"Letzter Monat der Simulation (inkl.). {MONTH_ARG_HELP}",
+    )
+    return parser
 
 
 def _make_progress_printer(scenario_name: str):
@@ -32,54 +130,111 @@ def _make_progress_printer(scenario_name: str):
     return progress
 
 
-def print_monthly_report(results):
+def _all_labels(scenario_labels: dict[str, str]) -> dict[str, str]:
+    labels = {HISTORICAL_REFERENCE_ID: HISTORICAL_REFERENCE_LABEL}
+    labels.update(scenario_labels)
+    return labels
+
+
+def print_monthly_report(results, labels: dict[str, str]):
     """Erstellt den monatlichen tabellarischen Vergleich im Terminal."""
     report_df = pd.DataFrame()
+    ref_label = labels.get(HISTORICAL_REFERENCE_ID, HISTORICAL_REFERENCE_ID)
+    baseline_id = "runtime_settings"
+    baseline_label = labels.get(baseline_id, baseline_id)
 
     for name, df in results.items():
-        report_df[name] = df['sim_cost'].resample('ME').sum()
+        report_df[labels.get(name, name)] = df["sim_cost"].resample("ME").sum()
 
-    report_df['Einsparung (EUR)'] = report_df['runtime_settings'] - report_df['scenario_settings']
+    formatters = {col: "{:,.2f} €".format for col in report_df.columns}
+    if ref_label in report_df.columns:
+        for col in report_df.columns:
+            if col == ref_label:
+                continue
+            savings_col = f"Einsparung vs {col}"
+            report_df[savings_col] = report_df[ref_label] - report_df[col]
+            formatters[savings_col] = "{:,.2f} €".format
 
     print("\n=== MONATLICHER SIMULATIONS-VERGLEICH ===")
-    print(report_df.to_string(formatters={
-        'runtime_settings': '{:,.2f} €'.format,
-        'scenario_settings': '{:,.2f} €'.format,
-        'Einsparung (EUR)': '{:,.2f} €'.format
-    }))
+    print(report_df.to_string(formatters=formatters))
+    if ref_label in report_df.columns and baseline_label in report_df.columns:
+        print(
+            f"(Einsparung vs '{ref_label}' = Nutzen der Optimierung gegenüber "
+            "historischem Verbrauch ohne Steuerung)"
+        )
     print("=======================================================")
 
 
-def print_total_summary(results):
+def print_total_summary(results, labels: dict[str, str]):
     """Gibt die Gesamtkosten und Einsparung über den gesamten Zeitraum aus."""
-    runtime_total = results["runtime_settings"]["sim_cost"].sum()
-    scenario_total = results["scenario_settings"]["sim_cost"].sum()
-    savings_total = runtime_total - scenario_total
+    ref_id = HISTORICAL_REFERENCE_ID
+    ref_total = results[ref_id]["sim_cost"].sum() if ref_id in results else None
+    baseline_id = "runtime_settings"
+    runtime_total = results[baseline_id]["sim_cost"].sum() if baseline_id in results else None
 
     print("\n=== GESAMTSUMME (gesamter Simulationszeitraum) ===")
-    print(f"  Runtime-Settings : {runtime_total:>10,.2f} €")
-    print(f"  Szenario-Settings: {scenario_total:>10,.2f} €")
-    print(f"  Einsparung       : {savings_total:>10,.2f} €")
+    for name, df in results.items():
+        total = df["sim_cost"].sum()
+        display = labels.get(name, name)
+        if name == ref_id:
+            print(f"  {display:30s}: {total:>10,.2f} €  (Referenz, keine Optimierung)")
+        elif name == baseline_id:
+            if ref_total is not None:
+                savings = ref_total - total
+                print(
+                    f"  {display:30s}: {total:>10,.2f} €  "
+                    f"(Einsparung vs Referenz: {savings:>+10,.2f} €)"
+                )
+            else:
+                print(f"  {display:30s}: {total:>10,.2f} €  (Baseline)")
+        elif ref_total is not None:
+            savings = ref_total - total
+            print(
+                f"  {display:30s}: {total:>10,.2f} €  "
+                f"(Einsparung vs Referenz: {savings:>+10,.2f} €)"
+            )
+        elif runtime_total is not None and name != baseline_id:
+            savings = runtime_total - total
+            print(f"  {display:30s}: {total:>10,.2f} €  (Einsparung vs Baseline: {savings:>+10,.2f} €)")
+        else:
+            print(f"  {display:30s}: {total:>10,.2f} €")
     print("================================================")
 
 
-def main():
-    sim_cfg = config.CONFIG._raw_config["file_paths_battery_simulation"]
+def main(argv: list[str] | None = None):
+    args = _build_arg_parser().parse_args(argv)
+
+    sim_cfg = config.get_file_paths_battery_simulation()
     range_mode = sim_cfg.get("price_range", "last_12_months")
     price_source = sim_cfg.get("price_source", "csv")
 
-    start, end = resolve_simulation_window(
+    start, end = resolve_backtesting_window(
+        args.start_month,
+        args.end_month,
         range_mode,
         sim_cfg["path_consumption"],
         sim_cfg["path_production"],
     )
 
-    print("Starte Profil-Generierung aus historischen Daten...")
-    profile = create_averaged_profile(
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
-        before=start,
-    )
+    if args.start_month is not None:
+        print(
+            f"Gewählter Zeitraum: {_format_month_period(start, end)} "
+            f"({start.date()} – {end.date()})"
+        )
+    else:
+        print(
+            f"Standard-Zeitraum aus config ({range_mode}): "
+            f"{start.date()} – {end.date()}"
+        )
+
+    print("Lade historische Verbrauchsdaten (Loxone-Logs)...")
+    cache = HistoricalDataCache()
+    cache.load()
+    anchors = list_simulation_anchors(start, end, cache)
+    if not anchors:
+        raise SystemExit(
+            f"Keine historischen Verbrauchsfenster zwischen {start.date()} und {end.date()}."
+        )
 
     if price_source == "api":
         provider = sim_cfg.get("price_provider", "awattar")
@@ -91,36 +246,50 @@ def main():
         start,
         end,
         sim_cfg,
-        awattar_url=config.CONFIG._raw_config["awattar"]["url"],
-        timeout=config.CONFIG.get_global_timeout(default=30),
+        awattar_url=config.get("AWATTAR_URL"),
+        timeout=config.get_global_timeout(default=30),
     )
 
-    print("Erstelle Simulationsbasis...")
-    df_sim_base = generate_simulation_base(profile, prices, start, end)
-
-    covered_months = sorted(df_sim_base.index.month.unique())
-    span_days = (df_sim_base.index.max() - df_sim_base.index.min()).days
+    first_window = window_slot_datetimes(anchors[0])[0]
+    last_window = window_slot_datetimes(anchors[-1])[-1]
+    ready_h = window_anchor_for_date(anchors[-1].date()).strftime("%H:%M")
     print(
-        f"Simulationszeitraum: {df_sim_base.index.min().date()} bis {df_sim_base.index.max().date()} "
-        f"({span_days} Tage, Monate: {covered_months})"
+        f"Simulationszeitraum: {first_window.date()} bis {last_window.date()} "
+        f"({len(anchors)} x 24h-Fenster, {len(anchors) * 24} Stunden)"
+    )
+    print(
+        "Modus: tagweise Optimierung (Batterie + flexible Verbraucher), "
+        f"24h-Fenster endend um ready_by_hour (z. B. {ready_h})"
     )
 
-    scenarios = {
-        "runtime_settings": config.CONFIG._raw_config["runtime_settings"],
-        "scenario_settings": config.CONFIG._raw_config["scenario_settings"],
+    k_push = config.get_push_price_cent()
+    scenario_labels = config.get_scenario_labels()
+    labels = _all_labels(scenario_labels)
+
+    print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
+    sim_results = {
+        HISTORICAL_REFERENCE_ID: compute_historical_reference_costs(
+            start, end, prices, k_push, cache=cache
+        ),
     }
 
-    sim_results = {}
+    scenarios = config.get_backtesting_scenarios()
     for name, params in scenarios.items():
-        print(f"Simuliere Szenario: '{name}'...")
-        sim_results[name] = run_simulation(
-            df_sim_base,
+        display = labels.get(name, name)
+        print(f"Simuliere Szenario: '{display}'...")
+        df_result, plausibility = run_simulation(
+            start,
+            end,
             params,
-            on_progress=_make_progress_printer(name),
+            prices,
+            cache=cache,
+            on_progress=_make_progress_printer(display),
         )
+        sim_results[name] = df_result
+        print_plausibility_report(plausibility)
 
-    print_monthly_report(sim_results)
-    print_total_summary(sim_results)
+    print_monthly_report(sim_results, labels)
+    print_total_summary(sim_results, labels)
 
 
 if __name__ == "__main__":
