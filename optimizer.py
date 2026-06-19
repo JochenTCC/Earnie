@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Any, Tuple
 
-from datetime import datetime
+from datetime import datetime, timedelta, time
 
 import json
 
@@ -111,6 +111,307 @@ def _day_indices(matrix: List[Dict[str, Any]], horizon: int) -> list[int]:
 
 
 
+def _matrix_slot_datetime(matrix: list, index: int) -> datetime:
+    """Ermittelt den Zeitpunkt einer Matrix-Stunde."""
+    row = matrix[index]
+    slot = row.get("slot_datetime")
+    if isinstance(slot, datetime):
+        return slot.replace(minute=0, second=0, microsecond=0)
+    row_date = row.get("date")
+    hour = int(row.get("hour", 0)) % 24
+    if row_date is not None:
+        if isinstance(row_date, datetime):
+            row_date = row_date.date()
+        return datetime.combine(row_date, time(hour=hour))
+    return datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0)
+
+
+def _charging_schedule_enabled(consumer: dict) -> bool:
+    sched = consumer.get("charging_schedule")
+    return bool(sched and sched.get("enabled"))
+
+
+def _schedule_day_key(dt: datetime) -> str:
+    return "weekend" if dt.weekday() >= 5 else "weekday"
+
+
+def _config_day_schedule(consumer: dict, dt: datetime) -> dict:
+    sched = consumer.get("charging_schedule") or {}
+    return sched.get(_schedule_day_key(dt), {}) or {}
+
+
+def _parse_loxone_ready_by_time(value: float | None, from_dt: datetime) -> datetime | None:
+    """Wandelt einen Loxone-Zeitwert in eine absolute Deadline innerhalb von 24h um."""
+    if value is None:
+        return None
+
+    v = float(value)
+    if 0 <= v < 24:
+        hour = int(v)
+        minute = int(round((v - hour) * 60)) % 60
+    elif 0 <= v < 2400 and abs(v - int(v)) < 1e-6:
+        hour = int(v) // 100
+        minute = int(v) % 100
+    elif v > 1_000_000_000:
+        return datetime.fromtimestamp(v)
+    else:
+        return None
+
+    hour %= 24
+    minute %= 60
+    candidate = from_dt.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if candidate <= from_dt:
+        candidate += timedelta(days=1)
+    if candidate > from_dt + timedelta(hours=24):
+        return None
+    return candidate
+
+
+def _deadline_from_ready_hour(horizon_start: datetime, ready_hour: int | None) -> datetime | None:
+    if ready_hour is None:
+        return None
+    ready_h = int(ready_hour) % 24
+    for offset in range(8):
+        day = horizon_start.date() + timedelta(days=offset)
+        deadline = datetime.combine(day, time(hour=ready_h))
+        if deadline > horizon_start:
+            return deadline
+    return None
+
+
+def _target_kwh_from_rest_soc(consumer: dict, rest_soc_percent: float | None) -> float | None:
+    return config.Config.target_kwh_from_rest_soc(consumer, rest_soc_percent)
+
+
+def _loxone_target_kwh_from_soc(consumer: dict, soc_percent: float | None) -> float | None:
+    return _target_kwh_from_rest_soc(consumer, soc_percent)
+
+
+def _fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> dict:
+    sched = consumer.get("charging_schedule") or {}
+    lox = sched.get("loxone", {})
+    import loxone_client
+
+    plugged_val = (
+        loxone_client.fetch_loxone_generic_value(lox.get("plugged_in_name", ""))
+        if lox.get("plugged_in_name")
+        else None
+    )
+    plugged_in = plugged_val is not None and float(plugged_val) > 0.5
+
+    if not plugged_in:
+        return {
+            "active": False,
+            "deadline": None,
+            "target_kwh": 0.0,
+            "use_time_window": False,
+            "source_label": "loxone (nicht angeschlossen)",
+        }
+
+    ready_val = (
+        loxone_client.fetch_loxone_generic_value(lox.get("ready_by_time_name", ""))
+        if lox.get("ready_by_time_name")
+        else None
+    )
+    deadline = _parse_loxone_ready_by_time(ready_val, horizon_start)
+
+    soc_val = (
+        loxone_client.fetch_loxone_generic_value(lox.get("soc_at_plug_in_name", ""))
+        if lox.get("soc_at_plug_in_name")
+        else None
+    )
+    target_kwh = _loxone_target_kwh_from_soc(consumer, soc_val)
+
+    return {
+        "active": True,
+        "deadline": deadline,
+        "target_kwh": round(target_kwh, 3) if target_kwh is not None else None,
+        "use_time_window": False,
+        "source_label": "loxone (angeschlossen, SOC → kWh)",
+    }
+
+
+def _historical_charging_context(
+    consumer: dict,
+    matrix: list,
+    consumer_daily_targets_kwh: dict | None,
+    horizon_start: datetime,
+    *,
+    realtime: bool,
+) -> dict:
+    day_sched = _config_day_schedule(consumer, horizon_start)
+    targets = resolve_horizon_consumer_targets_kwh(matrix, consumer_daily_targets_kwh)
+    target_kwh = float(targets.get(consumer["id"], 0.0))
+    if realtime:
+        source_label = "historical (Profil 24h-Horizont + Config-Zeitfenster)"
+    else:
+        source_label = "historisch (Config-Zeitfenster + Log-Ziel)"
+    return {
+        "active": target_kwh > 0,
+        "deadline": _deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour")),
+        "target_kwh": round(target_kwh, 3) if target_kwh > 0 else 0.0,
+        "use_time_window": True,
+        "config_day_schedule": day_sched,
+        "source_label": source_label,
+    }
+
+
+def _resolve_charging_context(
+    consumer: dict,
+    matrix: list,
+    consumer_daily_targets_kwh: dict | None,
+    logged_simulation: bool,
+) -> dict:
+    sched = consumer.get("charging_schedule")
+    if not sched or not sched.get("enabled"):
+        return {"active": True, "deadline": None, "target_kwh": None, "use_time_window": False}
+
+    horizon_start = _matrix_slot_datetime(matrix, 0)
+    target_source = consumer.get("daily_target_source", "config")
+
+    if logged_simulation or target_source == "historical":
+        return _historical_charging_context(
+            consumer,
+            matrix,
+            consumer_daily_targets_kwh,
+            horizon_start,
+            realtime=not logged_simulation,
+        )
+
+    if target_source == "loxone":
+        return _fetch_loxone_charging_context(consumer, horizon_start)
+
+    day_sched = _config_day_schedule(consumer, horizon_start)
+    rest_soc = day_sched.get("daily_rest_soc")
+    target_kwh = _target_kwh_from_rest_soc(consumer, rest_soc)
+    return {
+        "active": True,
+        "deadline": _deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour")),
+        "target_kwh": round(target_kwh, 3) if target_kwh is not None else None,
+        "use_time_window": True,
+        "config_day_schedule": day_sched,
+        "source_label": "config.json (daily_rest_soc → kWh)",
+    }
+
+
+def resolve_charging_contexts(
+    optimization_matrix: list,
+    consumer_daily_targets_kwh: dict | None = None,
+) -> dict[str, dict]:
+    """Ladekontext je Verbraucher mit charging_schedule für den Optimierungshorizont."""
+    logged_simulation = bool(
+        optimization_matrix
+        and optimization_matrix[0].get("consumption_mode") == "logged_day"
+    )
+    contexts: dict[str, dict] = {}
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        if not _charging_schedule_enabled(consumer):
+            continue
+        contexts[consumer["id"]] = _resolve_charging_context(
+            consumer,
+            optimization_matrix,
+            consumer_daily_targets_kwh,
+            logged_simulation,
+        )
+    return contexts
+
+
+def _apply_horizon_charging_limits(
+    horizon_limits: dict[str, float],
+    charging_contexts: dict[str, dict],
+) -> dict[str, float]:
+    adjusted = dict(horizon_limits)
+    for cid, ctx in charging_contexts.items():
+        if not ctx.get("active", True):
+            adjusted[cid] = 0.0
+        elif ctx.get("target_kwh") is not None:
+            adjusted[cid] = round(float(ctx["target_kwh"]), 3)
+    return adjusted
+
+
+def _hour_in_charging_window(hour: int, available_from_h: int, ready_by_h: int) -> bool:
+    """Prüft Ladezeitfenster: ab car_available_from_hour bis ready_by_hour (exklusiv, Mitternacht-Sprung)."""
+    available_from_h %= 24
+    ready_by_h %= 24
+    if available_from_h == ready_by_h:
+        return True
+    if available_from_h < ready_by_h:
+        return available_from_h <= hour < ready_by_h
+    return hour >= available_from_h or hour < ready_by_h
+
+
+def _consumer_charging_eligible_indices(
+    matrix: list,
+    consumer: dict,
+    schedule_indices: list[int],
+    charging_context: dict | None = None,
+) -> list[int]:
+    """Stunden im Horizont, in denen der Verbraucher laden darf (vor Deadline / im Zeitfenster)."""
+    if not schedule_indices:
+        return []
+
+    if charging_context is not None and not charging_context.get("active", True):
+        return []
+
+    if charging_context is None and not _charging_schedule_enabled(consumer):
+        return list(schedule_indices)
+
+    ctx = charging_context or {}
+    deadline = ctx.get("deadline")
+    if deadline is None and _charging_schedule_enabled(consumer):
+        horizon_start = _matrix_slot_datetime(matrix, 0)
+        day_sched = ctx.get("config_day_schedule") or _config_day_schedule(consumer, horizon_start)
+        deadline = _deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour"))
+
+    use_time_window = bool(ctx.get("use_time_window"))
+    eligible = []
+
+    for t in schedule_indices:
+        slot_dt = _matrix_slot_datetime(matrix, t)
+        if deadline is not None and slot_dt >= deadline:
+            continue
+
+        if not use_time_window:
+            eligible.append(t)
+            continue
+
+        day_sched = ctx.get("config_day_schedule") or _config_day_schedule(consumer, slot_dt)
+        from_h = day_sched.get("car_available_from_hour")
+        until_h = day_sched.get("ready_by_hour")
+
+        if from_h is None and until_h is None:
+            eligible.append(t)
+            continue
+
+        from_h = int(from_h) if from_h is not None else 0
+        until_h = int(until_h) if until_h is not None else 24
+        if _hour_in_charging_window(slot_dt.hour, from_h, until_h):
+            eligible.append(t)
+
+    return eligible
+
+
+def _apply_charging_window_constraints(
+    prob,
+    consumer_on: dict[str, list],
+    matrix: list,
+    consumer: dict,
+    schedule_indices: list[int],
+    charging_context: dict | None = None,
+) -> list[int]:
+    """Setzt MILP-Nebenbedingungen für Ladezeitfenster; liefert die zulässigen Stunden."""
+    cid = consumer["id"]
+    eligible = _consumer_charging_eligible_indices(
+        matrix, consumer, schedule_indices, charging_context
+    )
+    blocked = set(schedule_indices) - set(eligible)
+    for t in blocked:
+        prob += consumer_on[cid][t] == 0
+    return eligible
+
+
+
+
 
 def _consumer_column_name(consumer: dict) -> str:
 
@@ -174,9 +475,13 @@ def _save_consumer_state(state: dict) -> None:
 
 
 
-def get_consumer_remaining_kwh(consumers: list | None = None) -> dict[str, float]:
+def get_consumer_remaining_kwh(
+    consumers: list | None = None,
+    optimization_matrix: list | None = None,
+    consumer_daily_targets_kwh: dict | None = None,
+) -> dict[str, float]:
 
-    """Verbleibende Tagesziele aller optimierbaren Verbraucher."""
+    """Verbleibende Zielenergie aller optimierbaren Verbraucher (inkl. Loxone E-Auto)."""
 
     import profile_manager
 
@@ -186,7 +491,16 @@ def get_consumer_remaining_kwh(consumers: list | None = None) -> dict[str, float
 
     delivered = state.get("delivered", {})
 
-    daily_targets = profile_manager.resolve_consumer_daily_targets()
+    if optimization_matrix is not None:
+        daily_targets = resolve_horizon_consumer_targets_kwh(
+            optimization_matrix, consumer_daily_targets_kwh
+        )
+        charging_contexts = resolve_charging_contexts(
+            optimization_matrix, consumer_daily_targets_kwh
+        )
+        daily_targets = _apply_horizon_charging_limits(daily_targets, charging_contexts)
+    else:
+        daily_targets = profile_manager.resolve_consumer_daily_targets()
 
     remaining = {}
 
@@ -315,15 +629,20 @@ def _filter_feasible_consumers(
 
     remaining_kwh: dict[str, float],
 
-    day_indices: list[int],
+    matrix: list,
+
+    schedule_indices: list[int],
 
     verbose: bool,
 
+    charging_contexts: dict[str, dict] | None = None,
+
 ) -> list:
 
-    """Entfernt Verbraucher, deren Tagesziel im verbleibenden Horizont nicht erreichbar ist."""
+    """Entfernt Verbraucher, deren Ziel im verbleibenden Horizont nicht erreichbar ist."""
 
     feasible = []
+    charging_contexts = charging_contexts or {}
 
     for consumer in consumers:
 
@@ -335,19 +654,32 @@ def _filter_feasible_consumers(
 
             continue
 
+        ctx = charging_contexts.get(cid)
+        if ctx is not None and not ctx.get("active", True):
+            continue
 
+        eligible = _consumer_charging_eligible_indices(
+            matrix, consumer, schedule_indices, ctx
+        )
+        capacity_indices = eligible if eligible else schedule_indices
 
-        max_deliverable = len(day_indices) * consumer["nominal_power_kw"]
+        max_deliverable = len(capacity_indices) * consumer["nominal_power_kw"]
 
         if target > max_deliverable + 1e-6:
 
             if verbose:
 
+                sched_hint = ""
+                if _charging_schedule_enabled(consumer):
+                    sched_hint = f" ({len(eligible)} h im Ladezeitfenster)"
+
                 print(
 
                     f"⚠️ {consumer['name']}: Ziel ({target:.2f} kWh) nicht erreichbar "
 
-                    f"mit {len(day_indices)} h à {consumer['nominal_power_kw']:.2f} kW. Wird übersprungen."
+                    f"mit {len(capacity_indices)} h à {consumer['nominal_power_kw']:.2f} kW"
+
+                    f"{sched_hint}. Wird übersprungen."
 
                 )
 
@@ -384,6 +716,8 @@ def heuristic_optimizer(
     spa_remaining_kwh: float | None = None,
 
     flex_indices: list[int] | None = None,
+
+    charging_contexts: dict[str, dict] | None = None,
 
 ) -> Tuple[int, float, float, dict[str, float], dict[str, float]]:
 
@@ -463,7 +797,11 @@ def heuristic_optimizer(
 
     schedule_indices = flex_indices if flex_indices is not None else day_indices
 
-    planned_consumers = _filter_feasible_consumers(active, remaining, schedule_indices, verbose)
+    charging_contexts = charging_contexts or {}
+
+    planned_consumers = _filter_feasible_consumers(
+        active, remaining, matrix[:N], schedule_indices, verbose, charging_contexts
+    )
 
 
 
@@ -577,13 +915,36 @@ def heuristic_optimizer(
 
             continue
 
+        eligible = _apply_charging_window_constraints(
+            prob,
+            consumer_on,
+            matrix[:N],
+            consumer,
+            schedule_indices,
+            charging_contexts.get(cid),
+        )
+
+        if not eligible:
+
+            if verbose:
+
+                print(
+
+                    f"⚠️ {consumer['name']}: Kein zulässiges Ladezeitfenster im Horizont. "
+
+                    "Flex-Laden wird übersprungen."
+
+                )
+
+            continue
+
         prob += (
 
             pulp.lpSum(
 
                 consumer["nominal_power_kw"] * consumer_on[cid][t]
 
-                for t in schedule_indices
+                for t in eligible
 
             ) >= target
 
@@ -748,10 +1109,12 @@ def _resolve_daily_target_kwh(
     consumer_daily_targets_kwh: dict | None,
     row_date=None,
     logged_targets_only: bool = False,
+    ref_datetime: datetime | None = None,
+    horizon_flex_kwh: float | None = None,
 ) -> float:
     """Tagesziel aus Overrides oder – je nach Modus – Logs bzw. daily_target_source."""
     cid = consumer["id"]
-    if consumer_daily_targets_kwh is not None:
+    if consumer_daily_targets_kwh is not None and logged_targets_only:
         if row_date is not None and row_date in consumer_daily_targets_kwh:
             day_targets = consumer_daily_targets_kwh[row_date]
             if isinstance(day_targets, dict) and cid in day_targets:
@@ -767,11 +1130,44 @@ def _resolve_daily_target_kwh(
         logged = profile_manager.resolve_historical_consumer_daily_targets(row_date)
         return float(logged.get(cid, 0.0))
 
+    if (
+        consumer.get("daily_target_source", "config") == "historical"
+        and horizon_flex_kwh is not None
+    ):
+        return float(horizon_flex_kwh)
+
     import profile_manager
 
     day = row_date or datetime.now().date()
+    when = ref_datetime or datetime.combine(day, time(12, 0))
+    if (
+        consumer.get("daily_target_source", "config") == "config"
+        and consumer.get("charging_schedule", {}).get("enabled")
+    ):
+        computed = config.Config.target_kwh_from_day_schedule(consumer, when)
+        if computed is not None:
+            return float(computed)
+
     resolved = profile_manager.resolve_consumer_daily_targets(target_date=day)
-    return float(resolved.get(cid, consumer["daily_target_kwh"]))
+    return float(resolved.get(cid, consumer.get("daily_target_kwh", 0.0)))
+
+
+def _resolve_horizon_target_kwh(
+    consumer: dict,
+    consumer_daily_targets_kwh: dict | None,
+    row_date=None,
+    logged_targets_only: bool = False,
+    ref_datetime: datetime | None = None,
+    horizon_flex_kwh: float | None = None,
+) -> float:
+    return _resolve_daily_target_kwh(
+        consumer,
+        consumer_daily_targets_kwh,
+        row_date,
+        logged_targets_only,
+        ref_datetime=ref_datetime,
+        horizon_flex_kwh=horizon_flex_kwh,
+    )
 
 
 def _is_flat_target_override(consumer_daily_targets_kwh: dict | None) -> bool:
@@ -797,20 +1193,41 @@ def resolve_horizon_consumer_targets_kwh(
         optimization_matrix[0].get("consumption_mode") == "logged_day"
     )
     ref_date = optimization_matrix[0].get("date")
+    ref_dt = optimization_matrix[0].get("slot_datetime")
+    if not isinstance(ref_dt, datetime):
+        ref_dt = (
+            datetime.combine(ref_date, time(12, 0))
+            if ref_date is not None
+            else datetime.now()
+        )
 
-    if _is_flat_target_override(consumer_daily_targets_kwh):
+    if _is_flat_target_override(consumer_daily_targets_kwh) and logged_targets_only:
         return {
             c["id"]: round(float(consumer_daily_targets_kwh.get(c["id"], 0.0)), 3)
             for c in consumers_cfg
         }
 
+    horizon_flex_targets = None
+    if not logged_targets_only:
+        import profile_manager
+
+        horizon_flex_targets = profile_manager.resolve_horizon_flex_targets_kwh(
+            optimization_matrix
+        )
+
     return {
         c["id"]: round(
-            _resolve_daily_target_kwh(
+            _resolve_horizon_target_kwh(
                 c,
                 consumer_daily_targets_kwh,
                 ref_date,
                 logged_targets_only,
+                ref_datetime=ref_dt,
+                horizon_flex_kwh=(
+                    horizon_flex_targets.get(c["id"])
+                    if horizon_flex_targets is not None
+                    else None
+                ),
             ),
             3,
         )
@@ -839,10 +1256,15 @@ def build_applied_targets_detail(
         and optimization_matrix[0].get("consumption_mode") == "logged_day"
     )
     targets = resolve_applied_daily_targets(optimization_matrix, consumer_daily_targets_kwh)
+    charging_contexts = resolve_charging_contexts(optimization_matrix, consumer_daily_targets_kwh)
+    targets = _apply_horizon_charging_limits(targets, charging_contexts)
     details = []
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         cid = consumer["id"]
-        if logged_day:
+        ctx = charging_contexts.get(cid)
+        if ctx and ctx.get("source_label"):
+            source = ctx["source_label"]
+        elif logged_day:
             source = "geloggt (historischer Tag)"
         else:
             source_key = consumer.get("daily_target_source", "config")
@@ -1002,6 +1424,13 @@ def simulate_horizon(
         consumer_daily_targets_kwh,
     )
 
+    charging_contexts = resolve_charging_contexts(
+        optimization_matrix,
+        consumer_daily_targets_kwh,
+    )
+
+    horizon_limits = _apply_horizon_charging_limits(horizon_limits, charging_contexts)
+
     delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
 
 
@@ -1038,6 +1467,8 @@ def simulate_horizon(
             consumer_remaining_kwh=remaining,
 
             flex_indices=list(range(len(remaining_slice))),
+
+            charging_contexts=charging_contexts,
 
         )
 
@@ -1129,6 +1560,8 @@ def _simulate_single_hour_optimizer(
 
     flex_indices: list[int] | None = None,
 
+    charging_contexts: dict[str, dict] | None = None,
+
 ) -> Tuple[float, dict]:
 
     """Simuliert eine einzelne Stunde im optimierten Pfad."""
@@ -1154,6 +1587,8 @@ def _simulate_single_hour_optimizer(
         spa_remaining_kwh=spa_remaining_kwh,
 
         flex_indices=flex_indices,
+
+        charging_contexts=charging_contexts,
 
     )
 
@@ -1375,9 +1810,19 @@ def _simulate_single_hour_baseline(row: dict, sim_soc: float, battery_params: di
 
     pv = row["expected_p_pv"]
 
-    con = row.get("expected_p_total", row["expected_p_act"])
+    flex_kw = row.get("expected_flex_kw") or {}
+    has_flex_profile = any(float(v or 0.0) > 0.0 for v in flex_kw.values())
+    logged_day = row.get("consumption_mode") == "logged_day"
 
-    net_pv_surplus = pv - con
+    if logged_day and not has_flex_profile:
+        con = float(row.get("expected_p_total", row["expected_p_act"]) or 0.0)
+        total_flex_power = 0.0
+        flex_kw = {}
+    else:
+        con = float(row["expected_p_act"] or 0.0)
+        total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
+
+    net_pv_surplus = pv - con - total_flex_power
 
 
 
@@ -1420,6 +1865,12 @@ def _simulate_single_hour_baseline(row: dict, sim_soc: float, battery_params: di
         "Steuerbefehl": "Baseline",
 
     }
+
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        if flex_kw:
+            chart_row[_consumer_column_name(consumer)] = round(
+                float(flex_kw.get(consumer["id"], 0.0) or 0.0), 2
+            )
 
     return sim_soc, chart_row
 

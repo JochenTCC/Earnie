@@ -1,7 +1,7 @@
 # profile_manager.py
 import os
 import pandas as pd
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 from typing import List, Tuple, Optional
 import loxone_client
 import pv_forecast
@@ -235,6 +235,7 @@ def _build_optimization_matrix(
         row = {
             "hour": hour,
             "date": target_hours[i].date() if target_hours else None,
+            "slot_datetime": target_hours[i] if target_hours else None,
             "k_act": brutto_price_cent,
             "expected_p_act": forecast_consumption[i],
             "expected_p_pv": forecast_pv[i],
@@ -315,6 +316,12 @@ def _resolve_single_consumer_daily_target_kwh(
     cache = historical_cache if historical_cache is not None else {}
 
     if source == "config":
+        if consumer.get("charging_schedule", {}).get("enabled"):
+            computed = config.Config.target_kwh_from_day_schedule(
+                consumer, datetime.combine(target_date, time(12, 0))
+            )
+            if computed is not None:
+                return computed
         return fallback
 
     if source == "historical":
@@ -355,6 +362,21 @@ def resolve_historical_consumer_daily_targets(target_date: date) -> dict[str, fl
     _, totals, _ = get_historical_day_data(target_date)
     consumers = config.get_flexible_consumers(optimizer_only=True)
     return {c["id"]: float(totals.get(c["id"], 0.0)) for c in consumers}
+
+
+def resolve_horizon_flex_targets_kwh(matrix: list) -> dict[str, float]:
+    """
+    Summiert expected_flex_kw über den gesamten Simulationshorizont (typ. 24h).
+    Gleiche Basis wie die Baseline in der Echtzeit-Optimierung (flexible_consumer_profiles.csv).
+    """
+    consumers = config.get_flexible_consumers(optimizer_only=True)
+    totals = {c["id"]: 0.0 for c in consumers}
+    for row in matrix[:24]:
+        flex = row.get("expected_flex_kw") or {}
+        for consumer in consumers:
+            cid = consumer["id"]
+            totals[cid] += float(flex.get(cid, 0.0) or 0.0)
+    return {cid: round(kwh, 3) for cid, kwh in totals.items()}
 
 
 def resolve_consumer_daily_targets(
@@ -577,9 +599,11 @@ def build_historical_optimization_matrix(target_date) -> Tuple[List[dict], dict]
 
     matrix = []
     for hour in range(24):
+        slot_dt = datetime.combine(target_date, time(hour=hour))
         matrix.append({
             "hour": hour,
             "date": target_date,
+            "slot_datetime": slot_dt,
             "k_act": brutto_prices[hour],
             "expected_p_act": baseload[hour],
             "expected_p_total": total_load[hour],

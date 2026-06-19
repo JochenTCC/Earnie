@@ -1,4 +1,5 @@
 {
+    "$schema": "./config.schema.json",
     "awattar": {
         "url": "https://api.awattar.at/v1/marketdata",
         "fix_aufschlag_cent": 1.5,
@@ -27,5 +28,48 @@
         "battery_max_soc": 100.0,
         "latitude": 48,
         "longitude": 10
-    }
+    },
+    "flexible_consumers": [
+        {
+            "id": "swimspa",
+            "name": "SwimSpa",
+            "nominal_power_kw": 2.8,
+            "daily_target_kwh": 5.0,
+            "daily_target_source": "historical",
+            "min_on_quarterhours": 8,
+            "path_log": "pfad/zum/swimspa-log.csv",
+            "signal_type": "power",
+            "optimizer_enabled": true
+        },
+        {
+            "id": "eauto",
+            "name": "E-Auto",
+            "nominal_power_kw": 3.5,
+            "daily_target_source": "config",
+            "min_on_quarterhours": 4,
+            "path_log": "pfad/zum/eauto-log.csv",
+            "signal_type": "power",
+            "optimizer_enabled": true,
+            "charging_schedule": {
+                "enabled": true,
+                "battery_capacity_kwh": 77.0,
+                "target_soc_percent": 100.0,
+                "weekday": {
+                    "car_available_from_hour": 18,
+                    "ready_by_hour": 7,
+                    "daily_rest_soc": 40.0
+                },
+                "weekend": {
+                    "car_available_from_hour": 20,
+                    "ready_by_hour": 9,
+                    "daily_rest_soc": 30.0
+                },
+                "loxone": {
+                    "plugged_in_name": "EAuto_Angeschlossen",
+                    "ready_by_time_name": "EAuto_FertigUm",
+                    "soc_at_plug_in_name": "EAuto_SOC_bei_Anschluss"
+                }
+            }
+        }
+    ]
 }

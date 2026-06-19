@@ -79,12 +79,20 @@ def main():
     
     # 4. Optimierung berechnen
     current_hour = datetime.now().hour
-    consumer_remaining = optimizer.get_consumer_remaining_kwh()
+    consumer_targets = profile_manager.resolve_consumer_daily_targets(matrix=optimization_matrix)
+    charging_contexts = optimizer.resolve_charging_contexts(
+        optimization_matrix, consumer_targets
+    )
+    consumer_remaining = optimizer.get_consumer_remaining_kwh(
+        consumer_daily_targets_kwh=consumer_targets,
+        optimization_matrix=optimization_matrix,
+    )
     mode, target_power, target_soc, consumer_powers, _ = optimizer.heuristic_optimizer(
         optimization_matrix,
         current_hour,
         current_soc,
         consumer_remaining_kwh=consumer_remaining,
+        charging_contexts=charging_contexts,
     )
     optimizer.register_consumer_hours(consumer_powers)
 

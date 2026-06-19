@@ -1,6 +1,7 @@
 # config.py
 import os
 import json
+from datetime import datetime
 from dotenv import load_dotenv
 
 # Sensible Daten aus .env laden
@@ -110,8 +111,69 @@ class Config:
         return consumer.get("path_log", default) if consumer else default
 
     @staticmethod
+    def _normalize_day_schedule(block: dict | None) -> dict:
+        if not isinstance(block, dict):
+            return {}
+        out = {}
+        available = block.get("car_available_from_hour", block.get("charge_from_hour"))
+        ready = block.get("ready_by_hour", block.get("charge_until_hour"))
+        if available is not None:
+            out["car_available_from_hour"] = int(available) % 24
+        if ready is not None:
+            out["ready_by_hour"] = int(ready) % 24
+        if block.get("daily_rest_soc") is not None:
+            out["daily_rest_soc"] = float(block["daily_rest_soc"])
+        return out
+
+    @staticmethod
+    def target_kwh_from_rest_soc(consumer: dict, rest_soc_percent: float | None) -> float | None:
+        """Berechnet Ladeziel (kWh) aus Rest-SOC (%) und Fahrzeugkapazität in charging_schedule."""
+        if rest_soc_percent is None:
+            return None
+        sched = consumer.get("charging_schedule") or {}
+        capacity = float(sched.get("battery_capacity_kwh", 0.0) or 0.0)
+        if capacity <= 0:
+            return None
+        target_soc = float(sched.get("target_soc_percent", 100.0) or 100.0)
+        return max(0.0, (target_soc - float(rest_soc_percent)) / 100.0 * capacity)
+
+    @staticmethod
+    def target_kwh_from_day_schedule(consumer: dict, when: datetime) -> float | None:
+        """Ladeziel (kWh) aus daily_rest_soc des passenden Wochentags in charging_schedule."""
+        sched = consumer.get("charging_schedule")
+        if not sched or not sched.get("enabled"):
+            return None
+        day_key = "weekend" if when.weekday() >= 5 else "weekday"
+        rest_soc = (sched.get(day_key) or {}).get("daily_rest_soc")
+        return Config.target_kwh_from_rest_soc(consumer, rest_soc)
+
+    @staticmethod
+    def _normalize_charging_schedule(raw: dict | None) -> dict | None:
+        if not raw or not bool(raw.get("enabled", False)):
+            return None
+        loxone = {}
+        if isinstance(raw.get("loxone"), dict):
+            for key in ("plugged_in_name", "ready_by_time_name", "soc_at_plug_in_name"):
+                if raw["loxone"].get(key):
+                    loxone[key] = str(raw["loxone"][key]).strip()
+        return {
+            "enabled": True,
+            "battery_capacity_kwh": float(raw.get("battery_capacity_kwh", 0.0) or 0.0),
+            "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
+            "weekday": Config._normalize_day_schedule(raw.get("weekday")),
+            "weekend": Config._normalize_day_schedule(raw.get("weekend")),
+            "loxone": loxone,
+        }
+
+    @staticmethod
     def _normalize_consumer(raw: dict) -> dict:
         source = str(raw.get("daily_target_source", "config")).lower().strip()
+        if "daily_target_source" not in raw:
+            charging_raw = raw.get("charging_schedule")
+            if isinstance(charging_raw, dict) and charging_raw.get("source"):
+                legacy = str(charging_raw["source"]).lower().strip()
+                if legacy in ("config", "historical", "loxone"):
+                    source = legacy
         if source not in ("config", "historical", "loxone"):
             source = "config"
         return {
@@ -125,13 +187,26 @@ class Config:
             "path_log": str(raw.get("path_log", "")),
             "signal_type": str(raw.get("signal_type", "power")),
             "optimizer_enabled": bool(raw.get("optimizer_enabled", True)),
+            "charging_schedule": Config._normalize_charging_schedule(raw.get("charging_schedule")),
         }
 
     @staticmethod
     def _consumer_has_daily_target(consumer: dict) -> bool:
-        if consumer.get("daily_target_source", "config") in ("historical", "loxone"):
+        sched = consumer.get("charging_schedule")
+        target_source = consumer.get("daily_target_source", "config")
+        if sched and sched.get("enabled"):
+            if target_source == "historical":
+                return bool(consumer.get("path_log"))
+            if target_source == "loxone":
+                return True
+            capacity = float(sched.get("battery_capacity_kwh", 0.0) or 0.0)
+            if capacity > 0:
+                for day_key in ("weekday", "weekend"):
+                    if (sched.get(day_key) or {}).get("daily_rest_soc") is not None:
+                        return True
+        if target_source in ("historical", "loxone"):
             return True
-        return consumer["daily_target_kwh"] > 0
+        return float(consumer.get("daily_target_kwh", 0.0) or 0.0) > 0
 
     def _load_dynamic_params(self) -> None:
         self.K_PUSH_CENT = self._get_strict(self._raw_config, ["runtime_settings", "k_push_cent"])

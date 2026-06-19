@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://energy-optimizer.local/config.schema.json",
+  "title": "Energy Optimizer Konfiguration",
+  "description": "JSON-Schema für config.json. In Cursor/VS Code erscheinen Beschreibungen als Hover-Hilfe, wenn \"$schema\" in config.json gesetzt ist.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
+    },
+    "flexible_consumers": {
+      "type": "array",
+      "description": "Steuerbare Verbraucher für die MILP-Optimierung.",
+      "items": {
+        "$ref": "#/definitions/flexible_consumer"
+      }
+    }
+  },
+  "definitions": {
+    "flexible_consumer": {
+      "type": "object",
+      "required": ["id", "name", "nominal_power_kw"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Eindeutige interne Kennung (z. B. eauto, swimspa)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Anzeigename in der UI."
+        },
+        "nominal_power_kw": {
+          "type": "number",
+          "description": "Nennleistung in kW für die Optimierung."
+        },
+        "daily_target_kwh": {
+          "type": "number",
+          "description": "Festes 24h-Ziel in kWh. Für Verbraucher ohne charging_schedule, wenn daily_target_source=config."
+        },
+        "daily_target_source": {
+          "type": "string",
+          "enum": ["config", "historical", "loxone"],
+          "description": "Quelle des 24h-Ziels (kWh): config = daily_target_kwh bzw. bei charging_schedule daily_rest_soc; historical = in Echtzeit Summe aus flexible_consumer_profiles.csv über den 24h-Horizont (wie Baseline), bei historischer Tages-Simulation geloggte CSV-Summen; loxone = Live-Merker (bei E-Auto: charging_schedule.loxone)."
+        },
+        "loxone_target_kwh_name": {
+          "type": "string",
+          "description": "Loxone-Merkername für kWh-Ziel (nur bei daily_target_source=loxone ohne charging_schedule)."
+        },
+        "min_on_quarterhours": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Mindestlaufzeit pro Einschaltung in 15-Minuten-Slots."
+        },
+        "path_log": {
+          "type": "string",
+          "description": "CSV-Pfad zum Loxone-Verbrauchslog (für historical und Backtesting)."
+        },
+        "signal_type": {
+          "type": "string",
+          "enum": ["power", "binary"],
+          "description": "power = Leistungsprofil in kW; binary = Ein/Aus-Signal."
+        },
+        "optimizer_enabled": {
+          "type": "boolean",
+          "description": "false = Verbraucher von der Optimierung ausschließen."
+        },
+        "charging_schedule": {
+          "$ref": "#/definitions/charging_schedule"
+        }
+      }
+    },
+    "charging_schedule": {
+      "type": "object",
+      "description": "Ladezeitfenster und Zielenergie für das E-Auto (oder andere zeitgebundene Lader).",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "true = Ladeplanung mit Zeitfenster aktiv."
+        },
+        "battery_capacity_kwh": {
+          "type": "number",
+          "description": "Fahrzeug-Akkukapazität in kWh (für SOC→kWh bei daily_target_source=config oder loxone)."
+        },
+        "target_soc_percent": {
+          "type": "number",
+          "description": "Ziel-SOC in % beim Abfahren (Standard 100). Ladeziel kWh = (target_soc_percent − daily_rest_soc) / 100 × battery_capacity_kwh."
+        },
+        "weekday": {
+          "$ref": "#/definitions/charging_day_schedule",
+          "description": "Montag–Freitag."
+        },
+        "weekend": {
+          "$ref": "#/definitions/charging_day_schedule",
+          "description": "Samstag–Sonntag."
+        },
+        "loxone": {
+          "type": "object",
+          "description": "Nur bei daily_target_source=loxone. Merkernamen im Miniserver.",
+          "properties": {
+            "plugged_in_name": {
+              "type": "string",
+              "description": "1 = Fahrzeug angeschlossen, sonst keine Ladeplanung."
+            },
+            "ready_by_time_name": {
+              "type": "string",
+              "description": "Absolute Uhrzeit, bis wann geladen sein soll (Loxone-Zeitformat)."
+            },
+            "soc_at_plug_in_name": {
+              "type": "string",
+              "description": "SOC in % beim Anschließen → Restenergiebedarf in kWh."
+            }
+          }
+        }
+      }
+    },
+    "charging_day_schedule": {
+      "type": "object",
+      "description": "Ladezeitfenster und Restladung für einen Tagtyp.",
+      "properties": {
+        "car_available_from_hour": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 23,
+          "description": "Früheste Stunde (0–23), ab der geladen werden darf."
+        },
+        "ready_by_hour": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 23,
+          "description": "Späteste Stunde (exklusiv) bzw. Abfahrtszeit; Laden muss bis dahin abgeschlossen sein (früher fertig ist erlaubt)."
+        },
+        "daily_rest_soc": {
+          "type": "number",
+          "description": "Rest-SOC in % beim Anschließen (nur daily_target_source=config). Unterschiedlich für weekday und weekend möglich."
+        }
+      }
+    }
+  }
+}
