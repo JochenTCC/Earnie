@@ -126,6 +126,16 @@ def _matrix_slot_datetime(matrix: list, index: int) -> datetime:
     return datetime.now().replace(hour=hour, minute=0, second=0, microsecond=0)
 
 
+def _matrix_charging_anchor(matrix: list) -> datetime | None:
+    """Expliziter Abfahrt-/Fertig-Zeitpunkt (Backtesting-Fenster-Ende), falls gesetzt."""
+    if not matrix:
+        return None
+    anchor = matrix[0].get("charging_anchor")
+    if isinstance(anchor, datetime):
+        return anchor.replace(minute=0, second=0, microsecond=0)
+    return None
+
+
 def _charging_schedule_enabled(consumer: dict) -> bool:
     sched = consumer.get("charging_schedule")
     return bool(sched and sched.get("enabled"))
@@ -239,16 +249,22 @@ def _historical_charging_context(
     *,
     realtime: bool,
 ) -> dict:
-    day_sched = _config_day_schedule(consumer, horizon_start)
+    charging_anchor = _matrix_charging_anchor(matrix)
+    schedule_ref = charging_anchor or horizon_start
+    day_sched = _config_day_schedule(consumer, schedule_ref)
     targets = resolve_horizon_consumer_targets_kwh(matrix, consumer_daily_targets_kwh)
     target_kwh = float(targets.get(consumer["id"], 0.0))
+    if charging_anchor is not None:
+        deadline = charging_anchor
+    else:
+        deadline = _deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour"))
     if realtime:
         source_label = "historical (Profil 24h-Horizont + Config-Zeitfenster)"
     else:
         source_label = "historisch (Config-Zeitfenster + Log-Ziel)"
     return {
         "active": target_kwh > 0,
-        "deadline": _deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour")),
+        "deadline": deadline,
         "target_kwh": round(target_kwh, 3) if target_kwh > 0 else 0.0,
         "use_time_window": True,
         "config_day_schedule": day_sched,
