@@ -383,6 +383,8 @@ def heuristic_optimizer(
 
     spa_remaining_kwh: float | None = None,
 
+    flex_indices: list[int] | None = None,
+
 ) -> Tuple[int, float, float, dict[str, float], dict[str, float]]:
 
     """
@@ -459,7 +461,9 @@ def heuristic_optimizer(
 
     day_indices = _day_indices(matrix, N)
 
-    planned_consumers = _filter_feasible_consumers(active, remaining, day_indices, verbose)
+    schedule_indices = flex_indices if flex_indices is not None else day_indices
+
+    planned_consumers = _filter_feasible_consumers(active, remaining, schedule_indices, verbose)
 
 
 
@@ -579,7 +583,7 @@ def heuristic_optimizer(
 
                 consumer["nominal_power_kw"] * consumer_on[cid][t]
 
-                for t in day_indices
+                for t in schedule_indices
 
             ) >= target
 
@@ -770,26 +774,11 @@ def _resolve_daily_target_kwh(
     return float(resolved.get(cid, consumer["daily_target_kwh"]))
 
 
-def _hours_per_date_in_matrix(matrix: list) -> dict:
-    """Zählt die Stunden je Kalendertag im 24h-Simulationsfenster."""
-    from collections import Counter
-
-    counts: Counter = Counter()
-    for row in matrix[:24]:
-        day = row.get("date")
-        if day is not None:
-            counts[day] += 1
-    return dict(counts)
-
-
-def _prorated_horizon_target_kwh(full_target_kwh: float, date, matrix: list) -> float:
-    """Skaliert ein Kalender-Tagesziel auf die Stunden dieses Datums im Simulationsfenster."""
-    if full_target_kwh <= 0:
-        return 0.0
-    hours = _hours_per_date_in_matrix(matrix).get(date, 0)
-    if hours <= 0:
-        return 0.0
-    return full_target_kwh * (hours / 24.0)
+def _is_flat_target_override(consumer_daily_targets_kwh: dict | None) -> bool:
+    """True, wenn das Dict flache Verbraucher-IDs enthält (nicht {date: {id: kwh}})."""
+    if not consumer_daily_targets_kwh:
+        return False
+    return not any(isinstance(v, dict) for v in consumer_daily_targets_kwh.values())
 
 
 def resolve_horizon_consumer_targets_kwh(
@@ -797,41 +786,36 @@ def resolve_horizon_consumer_targets_kwh(
     consumer_daily_targets_kwh: dict | None = None,
 ) -> dict[str, float]:
     """
-    Flex-Zielenergie je Verbraucher über das gesamte Simulationsfenster.
-    Bei rollierendem 24h-Horizont über Mitternacht: anteilig pro Kalendertag (h/24).
+    Flex-Zielenergie je Verbraucher für das gesamte 24h-Simulationsfenster (einmalig).
+    Kein erneutes Zählen bei Kalendertagwechsel im rollierenden Horizont.
     """
     consumers_cfg = config.get_flexible_consumers(optimizer_only=True)
-    logged_targets_only = bool(
-        optimization_matrix
-        and optimization_matrix[0].get("consumption_mode") == "logged_day"
+    if not optimization_matrix:
+        return {c["id"]: 0.0 for c in consumers_cfg}
+
+    logged_targets_only = (
+        optimization_matrix[0].get("consumption_mode") == "logged_day"
     )
-    hours_by_date = _hours_per_date_in_matrix(optimization_matrix)
-    if not hours_by_date:
-        row_date = optimization_matrix[0].get("date") if optimization_matrix else None
+    ref_date = optimization_matrix[0].get("date")
+
+    if _is_flat_target_override(consumer_daily_targets_kwh):
         return {
-            consumer["id"]: _resolve_daily_target_kwh(
-                consumer,
-                consumer_daily_targets_kwh,
-                row_date,
-                logged_targets_only,
-            )
-            for consumer in consumers_cfg
+            c["id"]: round(float(consumer_daily_targets_kwh.get(c["id"], 0.0)), 3)
+            for c in consumers_cfg
         }
 
-    targets: dict[str, float] = {}
-    for consumer in consumers_cfg:
-        cid = consumer["id"]
-        total = 0.0
-        for day in hours_by_date:
-            full_target = _resolve_daily_target_kwh(
-                consumer,
+    return {
+        c["id"]: round(
+            _resolve_daily_target_kwh(
+                c,
                 consumer_daily_targets_kwh,
-                day,
+                ref_date,
                 logged_targets_only,
-            )
-            total += _prorated_horizon_target_kwh(full_target, day, optimization_matrix)
-        targets[cid] = round(total, 3)
-    return targets
+            ),
+            3,
+        )
+        for c in consumers_cfg
+    }
 
 
 def resolve_applied_daily_targets(
@@ -863,13 +847,11 @@ def build_applied_targets_detail(
         else:
             source_key = consumer.get("daily_target_source", "config")
             source_labels = {
-                "config": "config.json (daily_target_kwh)",
-                "historical": "historical (Profil/Logs)",
-                "loxone": "loxone (Live-Wert)",
+                "config": "config.json (24h-Ziel)",
+                "historical": "historical (24h-Ziel)",
+                "loxone": "loxone (24h-Ziel)",
             }
-            source = source_labels.get(source_key, source_key)
-            if len(_hours_per_date_in_matrix(optimization_matrix)) > 1:
-                source = f"{source}, anteilig 24h-Fenster"
+            source = source_labels.get(source_key, f"{source_key} (24h-Ziel)")
         details.append({
             "id": cid,
             "name": consumer["name"],
@@ -1015,48 +997,16 @@ def simulate_horizon(
 
     consumers_cfg = config.get_flexible_consumers(optimizer_only=True)
 
-    delivered_by_date: dict = {}
-
-    daily_limits_by_date: dict = {}
-
-    logged_targets_only = bool(
-        optimization_matrix
-        and optimization_matrix[0].get("consumption_mode") == "logged_day"
+    horizon_limits = resolve_horizon_consumer_targets_kwh(
+        optimization_matrix,
+        consumer_daily_targets_kwh,
     )
+
+    delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
 
 
 
     for i, row in enumerate(optimization_matrix):
-
-        row_date = row.get("date")
-
-        if row_date is not None and row_date not in daily_limits_by_date:
-
-            daily_limits_by_date[row_date] = {
-
-                consumer["id"]: round(
-
-                    _prorated_horizon_target_kwh(
-
-                        _resolve_daily_target_kwh(
-
-                            consumer, consumer_daily_targets_kwh, row_date, logged_targets_only
-
-                        ),
-
-                        row_date,
-
-                        optimization_matrix,
-
-                    ),
-
-                    3,
-
-                )
-
-                for consumer in consumers_cfg
-
-            }
 
         remaining = {}
 
@@ -1064,26 +1014,16 @@ def simulate_horizon(
 
             cid = consumer["id"]
 
-            if row_date is not None:
-                daily_target = daily_limits_by_date.get(row_date, {}).get(cid, 0.0)
-            else:
-                daily_target = _resolve_daily_target_kwh(
-                    consumer, consumer_daily_targets_kwh, row_date, logged_targets_only
-                )
+            remaining[cid] = max(
+                0.0,
+                horizon_limits.get(cid, 0.0) - delivered_horizon.get(cid, 0.0),
+            )
 
-            delivered_today = 0.0
-
-            if row_date is not None:
-
-                delivered_today = delivered_by_date.get(row_date, {}).get(cid, 0.0)
-
-            remaining[cid] = max(0.0, daily_target - delivered_today)
-
-
+        remaining_slice = optimization_matrix[i:]
 
         sim_soc, chart_row = _simulate_single_hour_optimizer(
 
-            optimization_matrix[i:],
+            remaining_slice,
 
             row,
 
@@ -1097,43 +1037,39 @@ def simulate_horizon(
 
             consumer_remaining_kwh=remaining,
 
+            flex_indices=list(range(len(remaining_slice))),
+
         )
 
 
 
-        if row_date is not None:
+        for consumer in consumers_cfg:
 
-            day_delivered = delivered_by_date.setdefault(row_date, {})
+            col = _consumer_column_name(consumer)
 
-            limits = daily_limits_by_date.get(row_date, {})
+            cid = consumer["id"]
 
-            for consumer in consumers_cfg:
+            power = float(chart_row.get(col, 0.0) or 0.0)
 
-                col = _consumer_column_name(consumer)
+            if power <= 0:
 
-                cid = consumer["id"]
+                continue
 
-                power = float(chart_row.get(col, 0.0) or 0.0)
+            max_kwh = horizon_limits.get(cid, 0.0)
 
-                if power <= 0:
+            already = delivered_horizon.get(cid, 0.0)
 
-                    continue
+            room = max(0.0, max_kwh - already)
 
-                max_kwh = limits.get(cid, power)
+            if power > room + 1e-6:
 
-                already = day_delivered.get(cid, 0.0)
+                power = room
 
-                room = max(0.0, max_kwh - already)
+                chart_row[col] = round(power, 2)
 
-                if power > room + 1e-6:
+            if power > 0:
 
-                    power = room
-
-                    chart_row[col] = round(power, 2)
-
-                if power > 0:
-
-                    day_delivered[cid] = already + power
+                delivered_horizon[cid] = already + power
 
 
 
@@ -1191,6 +1127,8 @@ def _simulate_single_hour_optimizer(
 
     spa_remaining_kwh: float | None = None,
 
+    flex_indices: list[int] | None = None,
+
 ) -> Tuple[float, dict]:
 
     """Simuliert eine einzelne Stunde im optimierten Pfad."""
@@ -1214,6 +1152,8 @@ def _simulate_single_hour_optimizer(
         consumer_remaining_kwh=consumer_remaining_kwh,
 
         spa_remaining_kwh=spa_remaining_kwh,
+
+        flex_indices=flex_indices,
 
     )
 
