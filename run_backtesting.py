@@ -9,6 +9,7 @@ import argparse
 import pandas as pd
 import config
 import profile_manager
+from backtesting_log import save_backtesting_log
 from data_loader import load_market_prices, resolve_simulation_window
 from simulation_engine import (
     HISTORICAL_REFERENCE_ID,
@@ -272,6 +273,7 @@ def main(argv: list[str] | None = None):
             start, end, prices, k_push, cache=cache
         ),
     }
+    plausibility_by_scenario: dict = {}
 
     scenarios = config.get_backtesting_scenarios()
     for name, params in scenarios.items():
@@ -286,10 +288,28 @@ def main(argv: list[str] | None = None):
             on_progress=_make_progress_printer(display),
         )
         sim_results[name] = df_result
+        plausibility_by_scenario[name] = plausibility
         print_plausibility_report(plausibility)
 
     print_monthly_report(sim_results, labels)
     print_total_summary(sim_results, labels)
+
+    period_meta = {
+        "start": start.date().isoformat(),
+        "end": end.date().isoformat(),
+        "windows": len(anchors),
+        "start_month": args.start_month.month if args.start_month is not None else None,
+        "end_month": args.end_month.month if args.end_month is not None else None,
+        "backtesting_year": BACKTESTING_YEAR,
+        "price_source": price_source,
+    }
+    log_path = save_backtesting_log(
+        sim_results,
+        labels,
+        plausibility_by_scenario,
+        period_meta,
+    )
+    print(f"\nBacktesting-Log gespeichert: {log_path}")
 
 
 if __name__ == "__main__":
