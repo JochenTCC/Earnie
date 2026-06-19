@@ -29,8 +29,8 @@ def _parse_loxone_numeric(raw_value: str) -> float:
     return float(clean_value.strip())
 
 
-def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
-    """Holt einen einzelnen analogen Wert live aus dem Loxone Miniserver via HTTP-REST."""
+def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
+    """Holt den rohen LL.value-String live aus dem Loxone Miniserver."""
     io_name = str(io_name or "").strip()
     if not io_name:
         return None
@@ -44,19 +44,62 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
         )
         response.raise_for_status()
         raw_value = response.json().get("LL", {}).get("value", "")
-        if not raw_value:
+        if raw_value is None or str(raw_value).strip() == "":
             logger.warning("Loxone: Kein value für '%s'", io_name)
             return None
-        return _parse_loxone_numeric(raw_value)
+        return str(raw_value).strip()
     except requests.exceptions.Timeout:
         logger.error(
             "Loxone: Timeout (%ss) beim Abrufen von '%s'", timeout_val, io_name
         )
     except requests.exceptions.RequestException as e:
         logger.error("Loxone: Netzwerkfehler bei '%s': %s", io_name, e)
-    except (ValueError, KeyError, TypeError) as e:
-        logger.error("Loxone: Parsing-Fehler bei '%s': %s", io_name, e)
+    except (KeyError, TypeError) as e:
+        logger.error("Loxone: Antwort-Fehler bei '%s': %s", io_name, e)
     return None
+
+
+def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
+    """Holt einen numerischen Wert live aus dem Loxone Miniserver (Einheiten werden abgeschnitten)."""
+    raw_value = fetch_loxone_raw_value(io_name)
+    if raw_value is None:
+        return None
+    try:
+        return _parse_loxone_numeric(raw_value)
+    except ValueError as e:
+        logger.error("Loxone: Parsing-Fehler bei '%s' (raw=%r): %s", io_name, raw_value, e)
+        return None
+
+
+def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
+    """Nennleistung (kW): live aus Loxone, sonst Fallback aus config.json."""
+    fallback = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+    sched = consumer.get("charging_schedule") or {}
+    io_name = (sched.get("loxone") or {}).get("nominal_power_kw_name", "")
+    if not io_name:
+        return fallback
+    live = fetch_loxone_generic_value(io_name)
+    if live is None or live <= 0:
+        logger.warning(
+            "Loxone: Keine gültige Nennleistung für '%s' (%s), Fallback %.2f kW",
+            consumer.get("id"),
+            io_name,
+            fallback,
+        )
+        return fallback
+    return float(live)
+
+
+def consumers_with_live_nominal_power(consumers: list | None = None) -> list:
+    """Kopie der Verbraucher mit zur Laufzeit aus Loxone gelesener Nennleistung."""
+    import copy
+    source = consumers if consumers is not None else config.get_flexible_consumers(optimizer_only=True)
+    updated = []
+    for consumer in source:
+        item = copy.copy(consumer)
+        item["nominal_power_kw"] = resolve_consumer_nominal_power_kw(consumer)
+        updated.append(item)
+    return updated
 
 
 def send_loxone_value(input_name: str, value: float) -> bool:
@@ -186,3 +229,31 @@ def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: flo
     send_loxone_value("Ernie_Ziel_SoC", target_soc)
     send_loxone_value("Ernie_Ziel_Leistung", forced_power_kw)
     send_loxone_value("Ernie_Steuerbefehl", control_cmd)
+
+
+def send_flexible_consumer_states(
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict] | None = None,
+) -> None:
+    """Sendet Freigabe-Signale (0/1) der flexiblen Verbraucher an Loxone."""
+    charging_contexts = charging_contexts or {}
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        enable_name = (consumer.get("loxone_outputs") or {}).get("enable_name", "")
+        if not enable_name:
+            continue
+
+        cid = consumer["id"]
+        power_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
+        ctx = charging_contexts.get(cid)
+        if ctx is not None and not ctx.get("active", True):
+            power_kw = 0.0
+
+        enabled = 1 if power_kw > 1e-3 else 0
+        send_loxone_value(enable_name, enabled)
+        logger.info(
+            "Flex consumer %s -> Freigabe=%s (optimiert %.2f kW, Loxone: %s)",
+            consumer["name"],
+            enabled,
+            power_kw,
+            enable_name,
+        )

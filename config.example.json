@@ -39,7 +39,10 @@
             "min_on_quarterhours": 8,
             "path_log": "pfad/zum/swimspa-log.csv",
             "signal_type": "power",
-            "optimizer_enabled": true
+            "optimizer_enabled": true,
+            "loxone_outputs": {
+                "enable_name": "Ernie_SwimSpa_Freigabe"
+            }
         },
         {
             "id": "eauto",
@@ -50,6 +53,9 @@
             "path_log": "pfad/zum/eauto-log.csv",
             "signal_type": "power",
             "optimizer_enabled": true,
+            "loxone_outputs": {
+                "enable_name": "Ernie_EAuto_LadeFreigabe"
+            },
             "charging_schedule": {
                 "enabled": true,
                 "battery_capacity_kwh": 77.0,
@@ -67,7 +73,8 @@
                 "loxone": {
                     "plugged_in_name": "EAuto_Angeschlossen",
                     "ready_by_time_name": "EAuto_FertigUm",
-                    "soc_at_plug_in_name": "EAuto_SOC_bei_Anschluss"
+                    "soc_at_plug_in_name": "EAuto_SOC_bei_Anschluss",
+                    "nominal_power_kw_name": "EAuto_MaxLeistung"
                 }
             }
         }

@@ -18,6 +18,16 @@
     }
   },
   "definitions": {
+    "loxone_outputs": {
+      "type": "object",
+      "description": "Freigabe-Signal an den Loxone Miniserver (virtueller Eingang 0/1). Die tatsächliche Schaltung obliegt der Smarthome-Logik.",
+      "properties": {
+        "enable_name": {
+          "type": "string",
+          "description": "Virtueller Eingang: 0 = Optimierung sperrt, 1 = Optimierung gibt Freigabe."
+        }
+      }
+    },
     "flexible_consumer": {
       "type": "object",
       "required": ["id", "name", "nominal_power_kw"],
@@ -65,6 +75,10 @@
           "type": "boolean",
           "description": "false = Verbraucher von der Optimierung ausschließen."
         },
+        "loxone_outputs": {
+          "$ref": "#/definitions/loxone_outputs",
+          "description": "Freigabe-Merker für die aktive Ansteuerung durch die Optimierung."
+        },
         "charging_schedule": {
           "$ref": "#/definitions/charging_schedule"
         }
@@ -97,7 +111,7 @@
         },
         "loxone": {
           "type": "object",
-          "description": "Nur bei daily_target_source=loxone. Merkernamen im Miniserver.",
+          "description": "Loxone-Merker für E-Auto-Status (Lesen) und optional Steuerung (Schreiben).",
           "properties": {
             "plugged_in_name": {
               "type": "string",
@@ -105,11 +119,19 @@
             },
             "ready_by_time_name": {
               "type": "string",
-              "description": "Absolute Uhrzeit, bis wann geladen sein soll (Loxone-Zeitformat)."
+              "description": "Fertig-Ladezeitpunkt (z. B. 'Morgen, 06:00')."
             },
             "soc_at_plug_in_name": {
               "type": "string",
               "description": "SOC in % beim Anschließen → Restenergiebedarf in kWh."
+            },
+            "nominal_power_kw_name": {
+              "type": "string",
+              "description": "Max. Ladeleistung in kW (live gelesen für die Optimierung; Fallback: nominal_power_kw in config)."
+            },
+            "charge_enable_name": {
+              "type": "string",
+              "description": "Alternative zu loxone_outputs.enable_name (Legacy, nur E-Auto)."
             }
           }
         }

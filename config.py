@@ -148,12 +148,25 @@ class Config:
         return Config.target_kwh_from_rest_soc(consumer, rest_soc)
 
     @staticmethod
+    def _normalize_loxone_outputs(raw: dict | None) -> dict:
+        if not isinstance(raw, dict):
+            return {}
+        enable_name = str(raw.get("enable_name", "")).strip()
+        return {"enable_name": enable_name} if enable_name else {}
+
+    @staticmethod
     def _normalize_charging_schedule(raw: dict | None) -> dict | None:
         if not raw or not bool(raw.get("enabled", False)):
             return None
         loxone = {}
         if isinstance(raw.get("loxone"), dict):
-            for key in ("plugged_in_name", "ready_by_time_name", "soc_at_plug_in_name"):
+            for key in (
+                "plugged_in_name",
+                "ready_by_time_name",
+                "soc_at_plug_in_name",
+                "nominal_power_kw_name",
+                "charge_enable_name",
+            ):
                 if raw["loxone"].get(key):
                     loxone[key] = str(raw["loxone"][key]).strip()
         return {
@@ -176,6 +189,12 @@ class Config:
                     source = legacy
         if source not in ("config", "historical", "loxone"):
             source = "config"
+        loxone_outputs = Config._normalize_loxone_outputs(raw.get("loxone_outputs"))
+        charging_schedule = Config._normalize_charging_schedule(raw.get("charging_schedule"))
+        if not loxone_outputs and charging_schedule:
+            sched_lox = charging_schedule.get("loxone") or {}
+            if sched_lox.get("charge_enable_name"):
+                loxone_outputs = {"enable_name": sched_lox["charge_enable_name"]}
         return {
             "id": str(raw["id"]),
             "name": str(raw.get("name", raw["id"])),
@@ -187,7 +206,8 @@ class Config:
             "path_log": str(raw.get("path_log", "")),
             "signal_type": str(raw.get("signal_type", "power")),
             "optimizer_enabled": bool(raw.get("optimizer_enabled", True)),
-            "charging_schedule": Config._normalize_charging_schedule(raw.get("charging_schedule")),
+            "loxone_outputs": loxone_outputs,
+            "charging_schedule": charging_schedule,
         }
 
     @staticmethod
