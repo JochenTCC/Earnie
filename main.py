@@ -87,10 +87,21 @@ def main():
         consumer_daily_targets_kwh=consumer_targets,
         optimization_matrix=optimization_matrix,
     )
+    live_consumers = loxone_client.consumers_with_live_nominal_power()
+    for consumer in live_consumers:
+        lox = (consumer.get("charging_schedule") or {}).get("loxone") or {}
+        if lox.get("nominal_power_kw_name"):
+            logger.info(
+                "Verbraucher %s: Nennleistung live = %.2f kW (Loxone: %s)",
+                consumer["name"],
+                consumer["nominal_power_kw"],
+                lox["nominal_power_kw_name"],
+            )
     mode, target_power, target_soc, consumer_powers, _ = optimizer.heuristic_optimizer(
         optimization_matrix,
         current_hour,
         current_soc,
+        consumers=live_consumers,
         consumer_remaining_kwh=consumer_remaining,
         charging_contexts=charging_contexts,
     )
@@ -114,6 +125,8 @@ def main():
     
     logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
     loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)
+    logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
+    loxone_client.send_flexible_consumer_states(consumer_powers, charging_contexts)
 
 if __name__ == "__main__":
     while True:

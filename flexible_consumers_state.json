@@ -1,7 +1,8 @@
 {
   "date": "2026-06-19",
   "delivered": {
-    "swimspa": 0.7,
-    "waermepumpe": 0.4
+    "swimspa": 2.8,
+    "waermepumpe": 0.4,
+    "eauto": 1.75
   }
 }
