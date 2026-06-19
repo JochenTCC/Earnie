@@ -327,6 +327,10 @@ def render_applied_targets(savings: dict):
         return
 
     st.markdown("**⚡ Energievergleich Baseline vs. Optimierung (24h)**")
+    st.caption(
+        "Optimierung: je Verbraucher ein 24h-Ziel über das gesamte Simulationsfenster "
+        "(auch bei Kalendertagwechsel nur einmal gezählt)."
+    )
 
     def _format_optimization_cell(kwh: float, source: str) -> str:
         if source:
