@@ -15,6 +15,23 @@ from data_loader import (
 from simulation_engine import run_simulation
 
 
+def _make_progress_printer(scenario_name: str):
+    """Gibt eine Callback-Funktion für die Fortschrittsanzeige im Terminal zurück."""
+    def progress(current: int, total: int) -> None:
+        pct = 100 * current / total
+        bar_width = 30
+        filled = int(bar_width * current / total)
+        bar = "#" * filled + "-" * (bar_width - filled)
+        print(
+            f"\r  [{bar}] {pct:5.1f}% ({current}/{total} h) – {scenario_name}",
+            end="",
+            flush=True,
+        )
+        if current == total:
+            print()
+    return progress
+
+
 def print_monthly_report(results):
     """Erstellt den monatlichen tabellarischen Vergleich im Terminal."""
     report_df = pd.DataFrame()
@@ -31,6 +48,19 @@ def print_monthly_report(results):
         'Einsparung (EUR)': '{:,.2f} €'.format
     }))
     print("=======================================================")
+
+
+def print_total_summary(results):
+    """Gibt die Gesamtkosten und Einsparung über den gesamten Zeitraum aus."""
+    runtime_total = results["runtime_settings"]["sim_cost"].sum()
+    scenario_total = results["scenario_settings"]["sim_cost"].sum()
+    savings_total = runtime_total - scenario_total
+
+    print("\n=== GESAMTSUMME (gesamter Simulationszeitraum) ===")
+    print(f"  Runtime-Settings : {runtime_total:>10,.2f} €")
+    print(f"  Szenario-Settings: {scenario_total:>10,.2f} €")
+    print(f"  Einsparung       : {savings_total:>10,.2f} €")
+    print("================================================")
 
 
 def main():
@@ -83,9 +113,14 @@ def main():
     sim_results = {}
     for name, params in scenarios.items():
         print(f"Simuliere Szenario: '{name}'...")
-        sim_results[name] = run_simulation(df_sim_base, params)
+        sim_results[name] = run_simulation(
+            df_sim_base,
+            params,
+            on_progress=_make_progress_printer(name),
+        )
 
     print_monthly_report(sim_results)
+    print_total_summary(sim_results)
 
 
 if __name__ == "__main__":

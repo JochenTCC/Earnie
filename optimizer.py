@@ -158,6 +158,7 @@ def simulate_horizon(
     battery_params: dict | None = None,
     k_push: float | None = None,
     verbose: bool = True,
+    on_progress=None,
 ) -> list:
     """
     Simuliert einen rollierenden Optimierungshorizont über die gesamte Matrix.
@@ -165,6 +166,7 @@ def simulate_horizon(
     chart_rows = []
     sim_soc = initial_soc
     battery_params = battery_params or config.get_battery_params()
+    total_steps = len(optimization_matrix)
 
     for i, row in enumerate(optimization_matrix):
         sim_soc, chart_row = _simulate_single_hour_optimizer(
@@ -176,6 +178,8 @@ def simulate_horizon(
             verbose=verbose,
         )
         chart_rows.append(chart_row)
+        if on_progress is not None:
+            on_progress(i + 1, total_steps)
 
     return chart_rows
 

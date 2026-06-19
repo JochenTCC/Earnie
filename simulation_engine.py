@@ -41,7 +41,12 @@ def _build_hourly_optimization_matrix(df: pd.DataFrame, awattar_cfg: dict) -> li
     return matrix, hourly.index
 
 
-def run_simulation(df: pd.DataFrame, scenario_params: dict, initial_soc: float = 50.0) -> pd.DataFrame:
+def run_simulation(
+    df: pd.DataFrame,
+    scenario_params: dict,
+    initial_soc: float = 50.0,
+    on_progress=None,
+) -> pd.DataFrame:
     """Simuliert ein Szenario mit der MILP-Optimierung aus optimizer.py."""
     awattar_cfg = config.CONFIG._raw_config['awattar']
     battery_params = _scenario_to_battery_params(scenario_params)
@@ -54,6 +59,7 @@ def run_simulation(df: pd.DataFrame, scenario_params: dict, initial_soc: float =
         battery_params=battery_params,
         k_push=k_push,
         verbose=False,
+        on_progress=on_progress,
     )
 
     df_res = pd.DataFrame({
