@@ -849,7 +849,7 @@ def main():
         render_historical_optimization_block(selected_date, initial_soc)
         return
 
-    current_soc = loxone_client.fetch_loxone_soc()
+    current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     render_live_power_flow(current_soc)
     render_optimization_block(current_soc)
     render_countdown_block()

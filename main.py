@@ -56,7 +56,7 @@ def main():
     profile_manager.check_and_update_profile_if_new_month()
     
     # 2. Live-Werte von Loxone & Awattar laden
-    current_soc = loxone_client.fetch_loxone_soc()
+    current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     if current_soc is None:
         logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
         return

@@ -47,7 +47,9 @@ def get_pv_delta_and_update() -> Optional[float]:
     Holt den aktuellen PV-Zählerstand, berechnet das Delta zur vorherigen Stunde
     und aktualisiert den Zustand atomar.
     """
-    current_total_pv = loxone_client.fetch_loxone_pv_counter()
+    current_total_pv = loxone_client.fetch_loxone_generic_value(
+        config.get("LOXONE_PV_COUNTER_NAME")
+    )
     if current_total_pv is None:
         logger.error("🚨 Fehler beim Abrufen des PV-Zählerstands von Loxone. Tuning ausgesetzt.")
         return None
