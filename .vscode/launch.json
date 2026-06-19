@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python: main.py",
+      "name": "main.py",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
@@ -10,7 +10,7 @@
       "justMyCode": false
     },
     {
-      "name": "Python: Streamlit app.py",
+      "name": "Streamlit app.py",
       "type": "python",
       "request": "launch",
       "module": "streamlit",
@@ -24,18 +24,10 @@
       "justMyCode": false
     },
     {
-      "name": "Python: Zip all .py files",
+      "name": "run_backtesting.py",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/zip_py_files.py",
-      "args": [
-        "--output",
-        "${workspaceFolder}/python_sources.zip",
-        "--exclude",
-        "merge-logs.py",
-        "--exclude",
-        "zip_py_files.py"
-      ],
+      "program": "${workspaceFolder}/run_backtesting.py",
       "console": "integratedTerminal",
       "justMyCode": false
     }

@@ -10,8 +10,15 @@ CONFIG_JSON_PATH = "config.json"
 
 
 class Config:
-    def __init__(self, config_path: str = CONFIG_JSON_PATH):
+    def __init__(
+        self,
+        config_path: str = CONFIG_JSON_PATH,
+        require_loxone_credentials: bool | None = None,
+    ):
         self.config_path = config_path
+        if require_loxone_credentials is None:
+            require_loxone_credentials = os.getenv("ENERGY_OPTIMIZER_OFFLINE") != "1"
+        self.require_loxone_credentials = require_loxone_credentials
         self._raw_config = None
         self._load_all()
 
@@ -50,7 +57,7 @@ class Config:
         self.LOXONE_USER = os.getenv("LOXONE_USER")
         self.LOXONE_PASS = os.getenv("LOXONE_PASS")
 
-        if not all([self.LOXONE_IP, self.LOXONE_USER, self.LOXONE_PASS]):
+        if self.require_loxone_credentials and not all([self.LOXONE_IP, self.LOXONE_USER, self.LOXONE_PASS]):
             missing = [k for k in ["LOXONE_IP", "LOXONE_USER", "LOXONE_PASS"] if not os.getenv(k)]
             raise ValueError(
                 f"Kritischer Fehler: Fehlende sensible Daten in der .env: {', '.join(missing)}"
