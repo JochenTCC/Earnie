@@ -29,7 +29,14 @@ def _apply_soc_change(old_soc: float, batt_action: float, battery_capacity_kwh: 
     return new_soc, batt_action
 
 
-def heuristic_optimizer(matrix: List[Dict[str, Any]], current_hour: int, current_soc: float) -> Tuple[int, float, float]:
+def heuristic_optimizer(
+    matrix: List[Dict[str, Any]],
+    current_hour: int,
+    current_soc: float,
+    battery_params: dict | None = None,
+    k_push: float | None = None,
+    verbose: bool = True,
+) -> Tuple[int, float, float]:
     """
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
     Nutzt mathematische lineare Optimierung (MILP) über das PuLP-Framework.
@@ -43,14 +50,14 @@ def heuristic_optimizer(matrix: List[Dict[str, Any]], current_hour: int, current
         print("🚨 Optimizer-Fehler: Matrix ist leer.")
         return 0, 0.0, 99.0
 
-    # 1. Parameter sicher aus der Config laden
-    battery_params = config.get_battery_params()
+    # 1. Parameter laden (Szenario-Override oder globale Config)
+    battery_params = battery_params or config.get_battery_params()
     battery_capacity = battery_params['battery_capacity_kwh']
     min_soc = battery_params['min_soc']
     max_soc = battery_params['max_soc']
     max_power = battery_params['max_power_kw']
     efficiency = battery_params['efficiency']
-    k_push = config.get_push_price_cent()
+    k_push = k_push if k_push is not None else config.get_push_price_cent()
 
     # Planungshorizont bestimmen (maximal 24 Stunden)
     N = min(24, len(matrix))
@@ -101,7 +108,8 @@ def heuristic_optimizer(matrix: List[Dict[str, Any]], current_hour: int, current
     prob.solve(pulp.PULP_CBC_CMD(msg=False))
 
     if pulp.LpStatus[prob.status] != "Optimal":
-        print(f"⚠️ MILP-Solver konnte keine optimale Lösung finden Status: {pulp.LpStatus[prob.status]}. Fallback auf Automatik.")
+        if verbose:
+            print(f"⚠️ MILP-Solver konnte keine optimale Lösung finden Status: {pulp.LpStatus[prob.status]}. Fallback auf Automatik.")
         return 0, 0.0, 99.0
 
     # 7. Ergebnisse für die aktuelle Stunde (t=0) extrahieren
@@ -132,15 +140,44 @@ def heuristic_optimizer(matrix: List[Dict[str, Any]], current_hour: int, current
         target_power = 0.0
         target_soc = 99.0
 
-    print(f"\n--- 🧮 MILP Optimierungs-Entscheidung für {current_hour}:00 Uhr ---")
-    print(f"Aktueller Brutto-Preis: {matrix[0]['k_act']:.2f} Cent/kWh")
-    print(f"Aktueller Akku-SoC    : {current_soc:.1f}%")
-    print(f"Optimierter Fahrplan  : Ladung={opt_charge:.2f} kW | Entladung={opt_discharge:.2f} kW | Netzbezug={opt_grid_buy:.2f} kW")
-    
-    modi_text = {0: "AUTOMATIK", 1: "ZWANGSLADEN", 2: "ENTLADESPERRE"}
-    print(f"-> Steuerbefehl Loxone: {modi_text[mode]} (Leistung: {target_power} kW, Ziel-SoC: {target_soc}%)")
+    if verbose:
+        print(f"\n--- 🧮 MILP Optimierungs-Entscheidung für {current_hour}:00 Uhr ---")
+        print(f"Aktueller Brutto-Preis: {matrix[0]['k_act']:.2f} Cent/kWh")
+        print(f"Aktueller Akku-SoC    : {current_soc:.1f}%")
+        print(f"Optimierter Fahrplan  : Ladung={opt_charge:.2f} kW | Entladung={opt_discharge:.2f} kW | Netzbezug={opt_grid_buy:.2f} kW")
+        
+        modi_text = {0: "AUTOMATIK", 1: "ZWANGSLADEN", 2: "ENTLADESPERRE"}
+        print(f"-> Steuerbefehl Loxone: {modi_text[mode]} (Leistung: {target_power} kW, Ziel-SoC: {target_soc}%)")
 
     return mode, target_power, target_soc
+
+
+def simulate_horizon(
+    optimization_matrix: list,
+    initial_soc: float,
+    battery_params: dict | None = None,
+    k_push: float | None = None,
+    verbose: bool = True,
+) -> list:
+    """
+    Simuliert einen rollierenden Optimierungshorizont über die gesamte Matrix.
+    """
+    chart_rows = []
+    sim_soc = initial_soc
+    battery_params = battery_params or config.get_battery_params()
+
+    for i, row in enumerate(optimization_matrix):
+        sim_soc, chart_row = _simulate_single_hour_optimizer(
+            optimization_matrix[i:],
+            row,
+            sim_soc,
+            battery_params,
+            k_push=k_push,
+            verbose=verbose,
+        )
+        chart_rows.append(chart_row)
+
+    return chart_rows
 
 
 def simulate_24h_horizon(optimization_matrix: list, initial_soc: float) -> list:
@@ -148,23 +185,27 @@ def simulate_24h_horizon(optimization_matrix: list, initial_soc: float) -> list:
     Simuliert den 24-Stunden-Verlauf des SoC unter exakter Berücksichtigung
     des neuen mathematischen Wirkungsgrads und der Leistungsbegrenzungen.
     """
-    chart_rows = []
-    sim_soc = initial_soc
-    battery_params = config.get_battery_params()
-    
-    for i, row in enumerate(optimization_matrix[:24]):
-        sim_soc, chart_row = _simulate_single_hour_optimizer(
-            optimization_matrix[i:], row, sim_soc, battery_params
-        )
-        chart_rows.append(chart_row)
-        
-    return chart_rows
+    return simulate_horizon(optimization_matrix[:24], initial_soc)
 
 
-def _simulate_single_hour_optimizer(remaining_matrix: list, row: dict, sim_soc: float, battery_params: dict) -> Tuple[float, dict]:
+def _simulate_single_hour_optimizer(
+    remaining_matrix: list,
+    row: dict,
+    sim_soc: float,
+    battery_params: dict,
+    k_push: float | None = None,
+    verbose: bool = True,
+) -> Tuple[float, dict]:
     """Hilfsfunktion: Simuliert eine einzelne Stunde im optimierten Pfad (< 30 Zeilen)."""
     h = row['hour']
-    mode, target_power, target_soc = heuristic_optimizer(remaining_matrix, h, sim_soc)
+    mode, target_power, target_soc = heuristic_optimizer(
+        remaining_matrix,
+        h,
+        sim_soc,
+        battery_params=battery_params,
+        k_push=k_push,
+        verbose=verbose,
+    )
     
     pv = row['expected_p_pv']
     con = row['expected_p_act']
@@ -205,25 +246,25 @@ def _simulate_single_hour_optimizer(remaining_matrix: list, row: dict, sim_soc: 
     return sim_soc, chart_row
 
 
+def _calculate_step_cost_euro_from_row(row: dict, sell_price_cent: float) -> float:
+    """Berechnet die Stromkosten einer einzelnen Simulationsstunde in Euro."""
+    p_pv = row['PV-Prognose (kW)']
+    p_con = row['Verbrauch-Prognose (kW)']
+    batt_action = row['Geplante Batterie-Aktion (kW)']
+    price_cent = row['Strompreis (Cent/kWh)']
+
+    p_grid = p_con - p_pv + batt_action
+    if p_grid >= 0:
+        step_cents = p_grid * price_cent
+    else:
+        step_cents = p_grid * sell_price_cent
+
+    return step_cents / 100.0
+
+
 def _calculate_cost_euro_from_rows(rows: list, sell_price_cent: float) -> float:
     """Berechnet die Kosten in Euro für eine Stundenreihe aus einem Simulations-Output."""
-    total_cents = 0.0
-    for row in rows:
-        p_pv = row['PV-Prognose (kW)']
-        p_con = row['Verbrauch-Prognose (kW)']
-        batt_action = row['Geplante Batterie-Aktion (kW)']
-        price_cent = row['Strompreis (Cent/kWh)']
-
-        # Positiv = Netzbezug, Negativ = Einspeisung ins Netz
-        p_grid = p_con - p_pv + batt_action
-        if p_grid >= 0:
-            total_cents += p_grid * price_cent
-        else:
-            # BEHOBEN: Da p_grid negativ ist, zieht eine direkte Multiplikation mit sell_price_cent 
-            # den Betrag korrekt von den Gesamtkosten ab (Umsatz/Vergütung).
-            total_cents += p_grid * sell_price_cent
-
-    return total_cents / 100.0
+    return sum(_calculate_step_cost_euro_from_row(row, sell_price_cent) for row in rows)
 
 
 def simulate_baseline_horizon(optimization_matrix: list, initial_soc: float) -> list:
