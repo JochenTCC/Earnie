@@ -24,6 +24,20 @@
       "justMyCode": false
     },
     {
+      "name": "Streamlit app_test_data.py",
+      "type": "python",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "${workspaceFolder}/app_test_data.py",
+        "--server.port",
+        "8502"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
       "name": "run_backtesting.py",
       "type": "python",
       "request": "launch",

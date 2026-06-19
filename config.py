@@ -77,11 +77,26 @@ class Config:
         self.LOXONE_LOG_FILENAME = self._get_strict(self._raw_config, ["loxone_blocks", "log_filename"])
         self.PV_TUNING_LOG_FILE = self._get_strict(self._raw_config, ["loxone_blocks", "pv_tuning_log_file"])
 
-        # NEU: Namen der Loxone-Objekte für die Live-Leistungswerte (kW)
         loxone_blocks = self._raw_config.get("loxone_blocks", {})
         self.LOXONE_PV_POWER_NAME = loxone_blocks.get("pv_power_name", "Ernie_Live_PV")
         self.LOXONE_BATTERY_POWER_NAME = loxone_blocks.get("battery_power_name", "Ernie_Live_Battery")
         self.LOXONE_GRID_POWER_NAME = loxone_blocks.get("grid_power_name", "Ernie_Live_Grid")
+
+        sim_paths = self._raw_config.get("file_paths_battery_simulation", {})
+        self.PATH_CONSUMPTION = sim_paths.get("path_consumption", "")
+        self.PATH_CONSUMPTION_TOTAL = self.PATH_CONSUMPTION
+        self.PATH_PRODUCTION = sim_paths.get("path_production", "")
+        self.PATH_E_AUTO = sim_paths.get("path_e_auto", "")
+        self.PATH_POOL = sim_paths.get("path_pool", "")
+        self.PATH_WP = sim_paths.get("path_wp", "")
+        self.PATH_PRICE = sim_paths.get("path_price", "")
+        self.PRICE_SOURCE = sim_paths.get("price_source", "csv")
+        self.PRICE_PROVIDER = sim_paths.get("price_provider", "awattar")
+        self.PRICE_RANGE = sim_paths.get("price_range", "last_12_months")
+        self.ENERGY_CHARTS_BZN = sim_paths.get("energy_charts_bzn", "DE-LU")
+
+        runtime_settings = self._raw_config.get("runtime_settings", {})
+        self.WP_NOMINAL_POWER_KW = runtime_settings.get("wp_nominal_power_kw", 1.6)
 
     def _load_dynamic_params(self) -> None:
         self.K_PUSH_CENT = self._get_strict(self._raw_config, ["runtime_settings", "k_push_cent"])
@@ -130,6 +145,29 @@ class Config:
 
     def get_global_timeout(self, default: int = 5) -> int:
         return self.get('GLOBAL_TIMEOUT', default=default, cast=int)
+
+    def get_file_paths_battery_simulation(self) -> dict:
+        """Gibt den Block file_paths_battery_simulation aus der JSON-Struktur zurück."""
+        return {
+            "path_consumption": self.PATH_CONSUMPTION,
+            "path_production": self.PATH_PRODUCTION,
+            "path_e_auto": self.PATH_E_AUTO,
+            "path_pool": self.PATH_POOL,
+            "path_wp": self.PATH_WP,
+            "path_price": self.PATH_PRICE,
+            "price_source": self.PRICE_SOURCE,
+            "price_provider": self.PRICE_PROVIDER,
+            "price_range": self.PRICE_RANGE,
+            "energy_charts_bzn": self.ENERGY_CHARTS_BZN,
+        }
+
+    def get_scenario_settings(self) -> dict:
+        """Lädt alle Szenario-Blöcke (z. B. scenario_settings_1, scenario_settings_2)."""
+        return {
+            key: value
+            for key, value in self._raw_config.items()
+            if key.startswith("scenario_settings")
+        }
 
     def get_value(self, name: str, default=None, cast=None):
         return self.get(name, default=default, cast=cast)
@@ -184,6 +222,14 @@ def get_push_price_cent() -> float:
 
 def get_global_timeout(default: int = 5) -> int:
     return CONFIG.get_global_timeout(default=default)
+
+
+def get_file_paths_battery_simulation() -> dict:
+    return CONFIG.get_file_paths_battery_simulation()
+
+
+def get_scenario_settings() -> dict:
+    return CONFIG.get_scenario_settings()
 
 
 def get_value(name: str, default=None, cast=None):
