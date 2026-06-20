@@ -5,6 +5,7 @@
 - [x] Aktuellen Ladezustand in Sankey-Diagramm verschieben (oben rausnehmen)
 - [ ] Versionsnummer einführen und anzeigen (Github-Release-Nr?)
 - [ ] Web-App in Loxone integrieren oder extern verfügbar machen. 
-- [ ] Umgang mit historischen Verbrauchsdaten nochmal prüfen (wie funktioniert das genau, wie sollte mit Großverbrauchern umgegangen werden, wie gehen neue Daten ein) 
-- [ ] E-Auto / Swim-Spa / Wärmepumpe (und Waschmaschine, Geschirrspüler) in die Optimierung mit reinnehmen mit Empfehlung, wann der beste Startzeitpunkt wäre bzw. autonomes Starten. 
-- [ ] Fiktive Simulation der historischen Daten mit einer größeren Batterie
+- [x] Umgang mit historischen Verbrauchsdaten nochmal prüfen (wie funktioniert das genau, wie sollte mit Großverbrauchern umgegangen werden, wie gehen neue Daten ein) 
+- [x] E-Auto / Swim-Spa / Wärmepumpe (und Waschmaschine, Geschirrspüler) in die Optimierung mit reinnehmen mit Empfehlung, wann der beste Startzeitpunkt wäre bzw. autonomes Starten. 
+- [x] Fiktive Simulation der historischen Daten mit einer größeren Batterie
+- [ ] Zulässigen Maximalstrom für E-Auto Laden für Ernie bereitstellen

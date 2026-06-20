@@ -1,0 +1,55 @@
+# Synology Container Manager – Produktions-Compose (vorgefertigtes Image)
+#
+# Voraussetzungen im Projektordner auf der NAS:
+#   - .env (LOXONE_IP, LOXONE_USER, LOXONE_PASS)
+#   - config.json (aus config.example.json, Laufzeit-Parameter + flexible_consumers)
+#   - Leere Dateien anlegen, falls noch nicht vorhanden (Synology legt sonst Ordner an):
+#       touch flexible_consumers_state.json pv_counter_state.json
+#       touch pv_accuracy_log.csv system_history_log.csv energy_optimizer.log
+#       touch consumption_profiles.csv total_consumption_profiles.csv flexible_consumer_profiles.csv
+#   - Loxone-CSV-Logs (Namen wie in config.json) in ./loxone-logs/ ablegen
+#
+# Nach Änderungen an config.json: Container optimizer-worker neu starten (lädt Config nur beim Start).
+
+version: "3.8"
+
+x-persist-volumes: &persist-volumes
+  - ./.env:/app/.env
+  - ./config.json:/app/config.json
+  - ./flexible_consumers_state.json:/app/flexible_consumers_state.json
+  - ./pv_counter_state.json:/app/pv_counter_state.json
+  - ./pv_accuracy_log.csv:/app/pv_accuracy_log.csv
+  - ./system_history_log.csv:/app/system_history_log.csv
+  - ./energy_optimizer.log:/app/energy_optimizer.log
+  - ./consumption_profiles.csv:/app/consumption_profiles.csv
+  - ./total_consumption_profiles.csv:/app/total_consumption_profiles.csv
+  - ./flexible_consumer_profiles.csv:/app/flexible_consumer_profiles.csv
+  - ./backtesting_log.json:/app/backtesting_log.json
+  - ./backtesting_hourly.csv:/app/backtesting_hourly.csv
+  # Loxone-Historien (Pfade müssen zu config.json passen; Dateien unter ./loxone-logs/)
+  - ./loxone-logs/Miniserver-Gen2_Energiemonitor_LeistungVerbrauch_20230323-20260615.csv:/app/Miniserver-Gen2_Energiemonitor_LeistungVerbrauch_20230323-20260615.csv:ro
+  - ./loxone-logs/Miniserver-Gen2_Energiemonitor_LeistungProduktion_20230323-20260617.csv:/app/Miniserver-Gen2_Energiemonitor_LeistungProduktion_20230323-20260617.csv:ro
+  - ./loxone-logs/Miniserver-Gen2_VerbrauchszählerSwim-Spa_Leistung_20211013-20260619.csv:/app/Miniserver-Gen2_VerbrauchszählerSwim-Spa_Leistung_20211013-20260619.csv:ro
+  - ./loxone-logs/Miniserver-Gen2_VerbrauchszählerEAuto_Leistung_20210819-20260619.csv:/app/Miniserver-Gen2_VerbrauchszählerEAuto_Leistung_20210819-20260619.csv:ro
+  - ./loxone-logs/Miniserver-Gen2_AnforderungWärmepumpe_20190101-20260610.csv:/app/Miniserver-Gen2_AnforderungWärmepumpe_20190101-20260610.csv:ro
+
+services:
+  optimizer-worker:
+    image: ghcr.io/jochentcc/ernie-energy:latest
+    container_name: ernie-optimizer-worker
+    command: python main.py
+    restart: unless-stopped
+    volumes: *persist-volumes
+    environment:
+      - TZ=Europe/Vienna
+
+  optimizer-ui:
+    image: ghcr.io/jochentcc/ernie-energy:latest
+    container_name: ernie-optimizer-ui
+    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes: *persist-volumes
+    environment:
+      - TZ=Europe/Vienna

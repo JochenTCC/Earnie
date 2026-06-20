@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "completed_at": "2026-06-20T16:50:52",
+  "source": "main.py",
+  "success": true,
+  "loop_timeout_sec": 900,
+  "soc_percent": 99.0,
+  "pv_delta_kwh": 0.12,
+  "market_price_cent": 1.87,
+  "forecast_pv_kw": 2.071,
+  "forecast_consumption_kw": 0.363,
+  "mode": 0,
+  "target_power_kw": 0.0,
+  "target_soc_percent": 99.0,
+  "consumer_powers_kw": {
+    "swimspa": 2.8
+  },
+  "flex_live_kw": {
+    "swimspa": 0.18,
+    "eauto": 0.0,
+    "waermepumpe": 0.0
+  },
+  "consumption_snapshot": {
+    "house_kw": 0.83,
+    "baseload_kw": 0.65,
+    "flex_kw": {
+      "swimspa": 0.18,
+      "eauto": 0.0,
+      "waermepumpe": 0.0
+    },
+    "flex_sum_kw": 0.18,
+    "pv_kw": 2.96,
+    "grid_kw": -2.1,
+    "battery_kw": -0.03
+  },
+  "current_hour": 16
+}

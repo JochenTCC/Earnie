@@ -29,6 +29,23 @@ class Config:
         self._load_static_params()
         self._load_dynamic_params()
 
+    @staticmethod
+    def _read_json_dict(path: str) -> dict:
+        """Liest JSON mit UTF-8; Fallback cp1252 (häufig bei manueller Bearbeitung auf Windows/Synology)."""
+        last_decode_error: UnicodeDecodeError | None = None
+        for encoding in ("utf-8-sig", "utf-8", "cp1252"):
+            try:
+                with open(path, "r", encoding=encoding) as f:
+                    return json.load(f)
+            except UnicodeDecodeError as e:
+                last_decode_error = e
+            except json.JSONDecodeError:
+                raise
+        raise ValueError(
+            f"Konfigurationsdatei '{path}' ist weder UTF-8 noch cp1252 "
+            f"(z. B. Umlaute wie in 'Wärmepumpe'). Bitte als UTF-8 speichern."
+        ) from last_decode_error
+
     def _load_json(self) -> dict:
         if not os.path.exists(self.config_path):
             raise FileNotFoundError(
@@ -36,12 +53,15 @@ class Config:
             )
 
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+            return self._read_json_dict(self.config_path)
         except json.JSONDecodeError as e:
             raise ValueError(
                 f"Kritischer Fehler: '{self.config_path}' enthält ungültiges JSON: {e}"
-            )
+            ) from e
+        except ValueError as e:
+            raise ValueError(
+                f"Kritischer Fehler: '{self.config_path}' konnte nicht gelesen werden: {e}"
+            ) from e
 
     def _get_strict(self, source: dict, keys_path: list) -> any:
         current = source
@@ -88,6 +108,9 @@ class Config:
         self.PATH_CONSUMPTION_TOTAL = self.PATH_CONSUMPTION
         self.PATH_PRODUCTION = sim_paths.get("path_production", "")
         self.PATH_PRICE = sim_paths.get("path_price", "")
+        self.PATH_CONS_DATA = sim_paths.get("path_cons_data", "cons_data_hourly.csv")
+        self.CONS_DATA_RETENTION_MONTHS = sim_paths.get("cons_data_retention_months", 24)
+        self.CONS_DATA_WRITE_MODE = sim_paths.get("cons_data_write_mode", "hourly")
         self.PRICE_SOURCE = sim_paths.get("price_source", "csv")
         self.PRICE_PROVIDER = sim_paths.get("price_provider", "awattar")
         self.PRICE_RANGE = sim_paths.get("price_range", "last_12_months")
@@ -155,6 +178,14 @@ class Config:
         return {"enable_name": enable_name} if enable_name else {}
 
     @staticmethod
+    def _normalize_loxone_inputs(raw: dict | None) -> dict:
+        """Live-Messwerte aus Loxone (cons_data / Monitoring)."""
+        if not isinstance(raw, dict):
+            return {}
+        power_name = str(raw.get("power_name", "")).strip()
+        return {"power_name": power_name} if power_name else {}
+
+    @staticmethod
     def _normalize_charging_schedule(raw: dict | None) -> dict | None:
         if not raw or not bool(raw.get("enabled", False)):
             return None
@@ -205,8 +236,12 @@ class Config:
             "min_on_quarterhours": max(1, int(raw.get("min_on_quarterhours", raw.get("min_on_hours", 1) * 4))),
             "path_log": str(raw.get("path_log", "")),
             "signal_type": str(raw.get("signal_type", "power")),
+            "log_signal_type": str(
+                raw.get("log_signal_type") or raw.get("signal_type", "power")
+            ),
             "optimizer_enabled": bool(raw.get("optimizer_enabled", True)),
             "loxone_outputs": loxone_outputs,
+            "loxone_inputs": Config._normalize_loxone_inputs(raw.get("loxone_inputs")),
             "charging_schedule": charging_schedule,
         }
 
@@ -307,6 +342,9 @@ class Config:
             "path_consumption": self.PATH_CONSUMPTION,
             "path_production": self.PATH_PRODUCTION,
             "path_price": self.PATH_PRICE,
+            "path_cons_data": self.PATH_CONS_DATA,
+            "cons_data_retention_months": self.CONS_DATA_RETENTION_MONTHS,
+            "cons_data_write_mode": self.CONS_DATA_WRITE_MODE,
             "price_source": self.PRICE_SOURCE,
             "price_provider": self.PRICE_PROVIDER,
             "price_range": self.PRICE_RANGE,
@@ -388,8 +426,7 @@ class Config:
         self._load_all()
 
     def update_runtime_settings(self, new_settings: dict) -> None:
-        with open(self.config_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        data = self._read_json_dict(self.config_path)
 
         for key, value in new_settings.items():
             target_key = None
@@ -407,7 +444,8 @@ class Config:
             setattr(self, target_key.upper(), value)
 
         with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
+            json.dump(data, f, indent=4, ensure_ascii=False)
+            f.write("\n")
 
         self._raw_config = data
         self._load_dynamic_params()
@@ -466,6 +504,11 @@ def get_backtesting_scenarios() -> dict[str, dict]:
 
 def get_value(name: str, default=None, cast=None):
     return CONFIG.get_value(name, default=default, cast=cast)
+
+
+def reload_config() -> None:
+    """Lädt config.json neu (z. B. vor jedem main.py-Durchlauf oder in der App)."""
+    CONFIG.reload()
 
 
 def update_runtime_settings(new_settings: dict) -> None:

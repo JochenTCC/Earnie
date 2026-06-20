@@ -69,7 +69,12 @@
         "signal_type": {
           "type": "string",
           "enum": ["power", "binary"],
-          "description": "power = Leistungsprofil in kW; binary = Ein/Aus-Signal."
+          "description": "power = Leistungsprofil in kW; binary = Ein/Aus-Signal (Live und Logs, sofern log_signal_type nicht gesetzt)."
+        },
+        "log_signal_type": {
+          "type": "string",
+          "enum": ["power", "binary"],
+          "description": "Optional: Interpretation von path_log (z. B. binary für altes Loxone-Log, während signal_type=power für Live-Messung)."
         },
         "optimizer_enabled": {
           "type": "boolean",
@@ -78,6 +83,21 @@
         "loxone_outputs": {
           "$ref": "#/definitions/loxone_outputs",
           "description": "Freigabe-Merker für die aktive Ansteuerung durch die Optimierung."
+        },
+        "loxone_inputs": {
+          "type": "object",
+          "description": "Live-Messwerte aus Loxone für cons_data_hourly (main.py).",
+          "properties": {
+            "power_name": {
+              "type": "string",
+              "description": "Merkername: bei signal_type=power (oder loxone_inputs.signal_type=power) kW-Leistung; bei binary Ein/Aus (0/1), wird mit nominal_power_kw multipliziert."
+            },
+            "signal_type": {
+              "type": "string",
+              "enum": ["power", "binary"],
+              "description": "Optional: überschreibt signal_type nur für die Live-Abfrage in main.py."
+            }
+          }
         },
         "charging_schedule": {
           "$ref": "#/definitions/charging_schedule"

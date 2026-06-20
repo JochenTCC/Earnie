@@ -14,6 +14,8 @@ import profile_manager
 import optimizer
 import pv_tuner  # Adaptives PV-Tuning-Modul einbinden
 import backtesting_log
+import live_consumption
+import run_state
 from simulation_engine import HISTORICAL_REFERENCE_ID
 
 st.set_page_config(
@@ -21,6 +23,61 @@ st.set_page_config(
     page_icon="🔋",
     layout="wide"
 )
+
+def _reload_runtime_config() -> None:
+    """config.json vor UI-Aktualisierung neu laden (Änderungen aus main.py / Editor)."""
+    config.reload_config()
+
+
+def _mode_label(mode: int) -> str:
+    return {0: "Normal", 1: "Zwangs-Laden", 2: "Halten"}.get(int(mode), str(mode))
+
+
+def render_main_run_sync_panel() -> dict | None:
+    """Zeigt den letzten erfolgreichen Produktiv-Durchlauf von main.py."""
+    state = run_state.load_run_state()
+    if not state or not state.get("success"):
+        st.info(
+            "Noch kein Produktiv-Durchlauf von **main.py** gespeichert "
+            f"(`{run_state.RUN_STATE_FILE}`)."
+        )
+        return None
+
+    completed = state.get("completed_at", "")
+    age = run_state.age_seconds(state)
+    age_txt = f"{int(age)} s" if age is not None and age < 120 else (
+        f"{int(age // 60)} min" if age is not None else "?"
+    )
+
+    st.markdown("#### 🛰️ Produktiv-Durchlauf (main.py)")
+    st.caption(
+        f"Letzter Lauf: **{completed}** · vor **{age_txt}** · "
+        "Daten read-only aus `optimizer_run_state.json`"
+    )
+
+    cols = st.columns(5)
+    cols[0].metric("SoC", f"{state.get('soc_percent', 0):.1f} %")
+    cols[1].metric("Modus", _mode_label(state.get("mode", 0)))
+    cols[2].metric("Ziel-Leistung", f"{state.get('target_power_kw', 0):.2f} kW")
+    cols[3].metric("Ziel-SoC", f"{state.get('target_soc_percent', 0):.0f} %")
+    cols[4].metric("PV (letzte h)", f"{state.get('pv_delta_kwh', 0):.3f} kWh")
+
+    flex_live = state.get("flex_live_kw") or {}
+    flex_opt = state.get("consumer_powers_kw") or {}
+    if flex_live or flex_opt:
+        flex_cols = st.columns(max(1, len(config.get_flexible_consumers())))
+        for idx, consumer in enumerate(config.get_flexible_consumers()):
+            cid = consumer["id"]
+            live_kw = float(flex_live.get(cid, 0.0) or 0.0)
+            opt_kw = float(flex_opt.get(cid, 0.0) or 0.0)
+            flex_cols[idx].metric(
+                consumer["name"],
+                f"{live_kw:.2f} kW live",
+                delta=f"Soll {opt_kw:.2f} kW",
+            )
+
+    return state
+
 
 def update_config_file(settings_dict):
     """Aktualisiert alle übergebenen Parameter über die zentrale Laufzeit-Schnittstelle der config.py."""
@@ -674,126 +731,253 @@ def setup_auto_refresh():
 
 @st.fragment(run_every=config.get('LOOP_TIMEOUT', default=900, cast=int))
 def render_optimization_block(current_soc: float):
-    """Führt die rechenintensive Optimierung im großen LOOP_TIMEOUT-Takt aus."""
+    """What-if-Simulation; aktuelle Stunde optional aus main.py oder Live-Loxone."""
+    _reload_runtime_config()
+    main_state = run_state.load_run_state()
+
     market_data = fetch_market_data()
     if market_data is None:
         return
 
     _, _, matrix = profile_manager.get_forecast_vectors(market_data)
+
+    snapshot = None
+    if main_state and main_state.get("consumption_snapshot"):
+        age = run_state.age_seconds(main_state)
+        if age is not None and age <= config.get("LOOP_TIMEOUT", default=900, cast=int) * 1.5:
+            snapshot = main_state["consumption_snapshot"]
+
+    if snapshot is None:
+        snapshot = live_consumption.fetch_live_consumption_snapshot()
+
+    if snapshot:
+        matrix = live_consumption.apply_live_snapshot_to_matrix(matrix, snapshot, hour_index=0)
+
+    sim_soc = float(main_state.get("soc_percent", current_soc)) if main_state else current_soc
     consumer_targets = profile_manager.resolve_consumer_daily_targets(matrix=matrix)
     savings_info = optimizer.calculate_optimization_savings(
         matrix,
-        current_soc,
+        sim_soc,
         consumer_daily_targets_kwh=consumer_targets,
     )
     
     optimized_df = pd.DataFrame(savings_info['optimized_rows'])
     baseline_df = pd.DataFrame(savings_info['baseline_rows'])
 
+    if main_state:
+        st.caption(
+            f"📡 **Aktuelle Stunde:** Verbrauch aus "
+            f"{'main.py' if main_state.get('consumption_snapshot') and snapshot == main_state.get('consumption_snapshot') else 'Loxone live'} · "
+            f"SoC für Simulation: **{sim_soc:.1f} %** (main.py) — übrige Stunden aus Profil."
+        )
+    elif snapshot:
+        st.caption(
+            f"📡 **Aktuelle Stunde (Live):** Grundlast {snapshot['baseload_kw']:.2f} kW · "
+            f"Gesamt {snapshot['house_kw']:.2f} kW · PV {snapshot['pv_kw']:.2f} kW — "
+            "Rest des Horizonts aus Profil-Prognose."
+        )
+
     render_savings_metrics(savings_info)
     render_optimization_chart(optimized_df, baseline_df)
     render_simulation_details(optimized_df)
-    
-    # Zeitstempel für den Countdown-Block bereitstellen
-    st.session_state.last_optimization = time.time()
+
 
 @st.fragment(run_every=10)
 def render_countdown_block():
-    """Aktualisiert alle 10 Sekunden exklusiv die Anzeige des Countdowns."""
+    """Countdown synchron zum letzten main.py-Durchlauf (Fallback: App-Session)."""
+    _reload_runtime_config()
     loop_timeout = config.get('LOOP_TIMEOUT', default=900, cast=int)
-    
-    if 'last_optimization' not in st.session_state:
-        st.session_state.last_optimization = time.time()
-        
-    elapsed = time.time() - st.session_state.last_optimization
+
+    main_state = run_state.load_run_state()
+    main_epoch = run_state.completed_at_epoch(main_state)
+    if main_epoch is not None:
+        last_optimization = main_epoch
+        sync_label = "main.py"
+    elif 'last_optimization' in st.session_state:
+        last_optimization = st.session_state.last_optimization
+        sync_label = "App"
+    else:
+        last_optimization = time.time()
+        sync_label = "App"
+
+    elapsed = time.time() - last_optimization
     remaining = max(0, int(loop_timeout - elapsed))
-    
-    last_time = time.strftime("%H:%M:%S", time.localtime(st.session_state.last_optimization))
-     
+    last_time = time.strftime("%H:%M:%S", time.localtime(last_optimization))
+
     st.markdown("---")
     st.caption(
         f"🔄 **Optimierungs-Takt:** Alle {int(loop_timeout/60)} Min ({loop_timeout}s) | "
-        f"⏱️ Letzte Optimierung: **{last_time}**"
+        f"⏱️ Letzter Lauf ({sync_label}): **{last_time}**"
     )
-    st.caption(f"⏳ **Nächste Berechnung in:** `{remaining}` Sekunden (Countdown aktualisiert alle 10s)")
+    st.caption(f"⏳ **Nächster Takt in:** `{remaining}` s (aktualisiert alle 10s)")
 
 #### LEISTUNGSFLUSS DARSTELLUNG
 
-def _prepare_sankey_data(data: dict, current_soc: float) -> tuple[list[str], list[int], list[int], list[float], list[str]]:
-    """Bereitet die Beschriftungen, Flusswege und Farben für das Sankey-Diagramm vor."""
-    # Dynamische Beschriftungen mit Live-Leistungswerten zusammenbauen
+_FLEX_SANKEY_COLORS = ("#e67e22", "#9b59b6", "#1abc9c", "#e74c3c", "#34495e")
+
+
+def _prepare_sankey_data(
+    data: dict,
+    current_soc: float,
+    breakdown: dict | None = None,
+) -> tuple[list[str], list[int], list[int], list[float], list[str]]:
+    """Sankey: Energiebilanz; optional Auflösung Haus → Grundlast + flexible Verbraucher."""
     lbl_pv = f"☀️ PV-Anlage ({data['pv']:.2f} kW)"
-    lbl_house = f"🏠 Wohnhaus ({data['house']:.2f} kW)"
-    
-    if data['grid'] >= 0:
+    if data["grid"] >= 0:
         lbl_grid = f"🔌 Stromnetz (Bezug: {data['grid']:.2f} kW)"
     else:
         lbl_grid = f"🔌 Stromnetz (Einspeisung: {abs(data['grid']):.2f} kW)"
-        
-    if data['battery'] >= 0:
+    if data["battery"] >= 0:
         lbl_bat = f"🔋 Batterie ({current_soc:.1f}% - Entladen: {data['battery']:.2f} kW)"
     else:
         lbl_bat = f"🔋 Batterie ({current_soc:.1f}% - Laden: {abs(data['battery']):.2f} kW)"
 
-    labels = [lbl_pv, lbl_grid, lbl_bat, lbl_house, "⚙️ System-Knoten"]
+    c_grid = "crimson" if data["grid"] >= 0 else "#95a5a6"
+    c_bat = (
+        "forestgreen"
+        if data["battery"] < 0
+        else "crimson"
+        if data["battery"] > 0
+        else "#95a5a6"
+    )
+
     sources, targets, values = [], [], []
-    
-    # A) ZUFLÜSSE zum zentralen Systemknoten (Index 4)
-    if data['pv'] > 0: 
-        sources.append(0); targets.append(4); values.append(data['pv'])
-    if data['grid'] > 0: 
-        sources.append(1); targets.append(4); values.append(data['grid'])
-    if data['battery'] > 0: 
-        sources.append(2); targets.append(4); values.append(data['battery'])
-        
-    # B) ABFLÜSSE aus dem zentralen Systemknoten (Index 4)
-    if data['house'] > 0: 
-        sources.append(4); targets.append(3); values.append(data['house'])
-    if data['grid'] < 0: 
-        sources.append(4); targets.append(1); values.append(abs(data['grid']))
-    if data['battery'] < 0: 
-        sources.append(4); targets.append(2); values.append(abs(data['battery']))
+    min_flow = 0.01
 
-    # Dynamische Farbanpassung
-    c_grid = "crimson" if data['grid'] >= 0 else "#95a5a6"
-    c_bat = "forestgreen" if data['battery'] < 0 else "crimson" if data['battery'] > 0 else "#95a5a6"
+    if breakdown:
+        consumers = config.get_flexible_consumers()
+        lbl_baseload = f"🏠 Grundlast ({breakdown['baseload_kw']:.2f} kW)"
+        flex_labels = []
+        for idx, consumer in enumerate(consumers):
+            kw = float((breakdown.get("flex_kw") or {}).get(consumer["id"], 0.0) or 0.0)
+            flex_labels.append(f"⚡ {consumer['name']} ({kw:.2f} kW)")
+
+        labels = [lbl_pv, lbl_grid, lbl_bat, "⚙️ System-Knoten", lbl_baseload, *flex_labels]
+        system_idx = 3
+        baseload_idx = 4
+        flex_start = 5
+
+        node_colors = ["#f1c40f", c_grid, c_bat, "#7f8c8d", "#3498db"]
+        node_colors.extend(
+            _FLEX_SANKEY_COLORS[i % len(_FLEX_SANKEY_COLORS)] for i in range(len(consumers))
+        )
+
+        if data["pv"] > min_flow:
+            sources.append(0)
+            targets.append(system_idx)
+            values.append(data["pv"])
+        if data["grid"] > min_flow:
+            sources.append(1)
+            targets.append(system_idx)
+            values.append(data["grid"])
+        if data["battery"] > min_flow:
+            sources.append(2)
+            targets.append(system_idx)
+            values.append(data["battery"])
+
+        if breakdown["baseload_kw"] > min_flow:
+            sources.append(system_idx)
+            targets.append(baseload_idx)
+            values.append(breakdown["baseload_kw"])
+        for i, consumer in enumerate(consumers):
+            kw = float((breakdown.get("flex_kw") or {}).get(consumer["id"], 0.0) or 0.0)
+            if kw > min_flow:
+                sources.append(system_idx)
+                targets.append(flex_start + i)
+                values.append(kw)
+        if data["grid"] < -min_flow:
+            sources.append(system_idx)
+            targets.append(1)
+            values.append(abs(data["grid"]))
+        if data["battery"] < -min_flow:
+            sources.append(system_idx)
+            targets.append(2)
+            values.append(abs(data["battery"]))
+
+        return labels, sources, targets, values, node_colors
+
+    # Legacy: ein aggregierter Hausknoten
+    lbl_house = f"🏠 Wohnhaus ({data['house']:.2f} kW)"
+    labels = [lbl_pv, lbl_grid, lbl_bat, lbl_house, "⚙️ System-Knoten"]
+
+    if data["pv"] > min_flow:
+        sources.append(0)
+        targets.append(4)
+        values.append(data["pv"])
+    if data["grid"] > min_flow:
+        sources.append(1)
+        targets.append(4)
+        values.append(data["grid"])
+    if data["battery"] > min_flow:
+        sources.append(2)
+        targets.append(4)
+        values.append(data["battery"])
+    if data["house"] > min_flow:
+        sources.append(4)
+        targets.append(3)
+        values.append(data["house"])
+    if data["grid"] < -min_flow:
+        sources.append(4)
+        targets.append(1)
+        values.append(abs(data["grid"]))
+    if data["battery"] < -min_flow:
+        sources.append(4)
+        targets.append(2)
+        values.append(abs(data["battery"]))
+
     colors = ["#f1c40f", c_grid, c_bat, "#3498db", "#7f8c8d"]
-
     return labels, sources, targets, values, colors
 
 
-def _create_live_flow_sankey(data: dict, current_soc: float) -> go.Figure:
+def _create_live_flow_sankey(
+    data: dict,
+    current_soc: float,
+    breakdown: dict | None = None,
+) -> go.Figure:
     """Erstellt ein dynamisches Energiefluss-Diagramm."""
-    labels, sources, targets, values, colors = _prepare_sankey_data(data, current_soc=current_soc)
+    labels, sources, targets, values, colors = _prepare_sankey_data(
+        data, current_soc=current_soc, breakdown=breakdown
+    )
+    height = 280 + (len(config.get_flexible_consumers()) * 25 if breakdown else 0)
 
-    fig = go.Figure(data=[go.Sankey(
-        node=dict(
-            pad=15, 
-            thickness=20, 
-            label=labels, 
-            color=colors
-        ),
-        link=dict(
-            source=sources, 
-            target=targets, 
-            value=values, 
-            color="rgba(180, 180, 180, 0.25)"
-        ),
-        valueformat=".2f",
-        valuesuffix=" kW"
-    )])
-    
+    fig = go.Figure(
+        data=[
+            go.Sankey(
+                node=dict(pad=15, thickness=20, label=labels, color=colors),
+                link=dict(
+                    source=sources,
+                    target=targets,
+                    value=values,
+                    color="rgba(180, 180, 180, 0.25)",
+                ),
+                valueformat=".2f",
+                valuesuffix=" kW",
+            )
+        ]
+    )
+
     fig.update_layout(
-        height=250, 
+        height=height,
         margin=dict(l=10, r=10, t=10, b=10),
-        font=dict(color="black", size=12)
+        font=dict(color="black", size=12),
     )
     return fig
+
+
+def _render_live_consumption_metrics(snapshot: dict) -> None:
+    """Kacheln: Grundlast + flexible Verbraucher (nur Anzeige)."""
+    consumers = config.get_flexible_consumers()
+    cols = st.columns(1 + len(consumers))
+    cols[0].metric("Grundlast (live)", f"{snapshot['baseload_kw']:.2f} kW")
+    for idx, consumer in enumerate(consumers, start=1):
+        kw = float((snapshot.get("flex_kw") or {}).get(consumer["id"], 0.0) or 0.0)
+        cols[idx].metric(consumer["name"], f"{kw:.2f} kW")
 
 
 @st.fragment(run_every=10)
 def render_live_power_flow(current_soc: float):
     """Rendert die Live-Leistungsfluss-Ansicht mit CSS-Fix gegen den Text-Glow."""
+    _reload_runtime_config()
     st.write("### ⚡ Echtzeit-Leistungsfluss (Live)")
     
     # CSS-Injektion: Entfernt restlos den hardcodierten Plotly-Textschatten
@@ -812,10 +996,35 @@ def render_live_power_flow(current_soc: float):
     
     data = loxone_client.fetch_loxone_live_power()
     if data is None:
-        st.warning("⚠️ Live-Leistungswerte konnten nicht von Loxone geladen werden. Zeige simulierte Werte.")
+        st.warning("⚠️ Live-Leistungswerte konnten nicht von Loxone geladen werden.")
         return
-    
-    fig = _create_live_flow_sankey(data, current_soc=current_soc)
+
+    main_state = run_state.load_run_state()
+    use_main_snapshot = False
+    if main_state and main_state.get("consumption_snapshot"):
+        age = run_state.age_seconds(main_state)
+        if age is not None and age <= 120:
+            snapshot = main_state["consumption_snapshot"]
+            use_main_snapshot = True
+        else:
+            flex_kw = loxone_client.fetch_flexible_consumers_live_kw()
+            snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
+    else:
+        flex_kw = loxone_client.fetch_flexible_consumers_live_kw()
+        snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
+
+    _render_live_consumption_metrics(snapshot)
+    src = "main.py" if use_main_snapshot else "Loxone live"
+    st.caption(
+        f"Gesamtverbrauch: **{snapshot['house_kw']:.2f} kW** "
+        f"(Grundlast + flexible Verbraucher · Quelle: {src})"
+    )
+
+    fig = _create_live_flow_sankey(
+        data,
+        current_soc=current_soc,
+        breakdown=snapshot,
+    )
     # BEHOBEN: API-Migration von use_container_width=True auf width='stretch'
     st.plotly_chart(fig, width='stretch', key="live_power_flow_sankey")
 
@@ -836,6 +1045,7 @@ def main():
             "(Referenz ohne Optimierung vs. optimierte Szenarien)."
         )
     else:
+        _reload_runtime_config()
         st.markdown("Echtzeit-Cockpit und Vorhersage-Simulation des synchronisierten 24-Stunden-Horizonts.")
 
     render_parameter_input(mode)
@@ -850,6 +1060,11 @@ def main():
         return
 
     current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
+    render_main_run_sync_panel()
+    st.markdown("#### 🔮 What-if-Simulation (24h)")
+    st.caption(
+        "Unabhängige MILP-Simulation in der App; Produktiv-Steuerung läuft in **main.py**."
+    )
     render_live_power_flow(current_soc)
     render_optimization_block(current_soc)
     render_countdown_block()

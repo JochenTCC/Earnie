@@ -55,25 +55,23 @@ class HistoricalDataCache:
         if self._consumption_df is not None:
             return
 
-        path_total = config.get("PATH_CONSUMPTION_TOTAL", cast=str)
-        if not path_total:
+        df = profile_manager.load_cons_data_profile_dataframe()
+        if df is None or df.empty:
+            df = profile_manager._load_profile_source_dataframe()
+        if df is None or df.empty:
             raise ValueError(
-                "Backtesting benötigt path_consumption in file_paths_battery_simulation."
+                "Backtesting benötigt cons_data_hourly.csv oder path_consumption in der config."
             )
 
-        s_total = profile_manager._load_and_resample_csv(path_total)
-        if s_total.empty:
-            raise ValueError("Keine historischen Verbrauchsdaten in den Loxone-Logs gefunden.")
-
-        df = profile_manager._build_flexible_consumer_dataframe(s_total)
-        self._consumption_df = profile_manager._compute_baseload(df)
-
-        path_prod = config.get("PATH_PRODUCTION", cast=str)
-        self._pv_series = (
-            profile_manager._load_and_resample_csv(path_prod)
-            if path_prod
-            else pd.Series(dtype=float)
-        )
+        self._consumption_df = df
+        self._pv_series = profile_manager.load_cons_data_pv_series()
+        if self._pv_series.empty:
+            path_prod = config.get("PATH_PRODUCTION", cast=str)
+            self._pv_series = (
+                profile_manager._load_and_resample_csv(path_prod)
+                if path_prod
+                else pd.Series(dtype=float)
+            )
 
     def get_window_consumption(
         self, slot_datetimes: list[datetime]

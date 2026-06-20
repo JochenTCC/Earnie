@@ -9,6 +9,9 @@ import loxone_client
 import profile_manager
 import optimizer
 import pv_tuner
+import cons_data_store
+import live_consumption
+import run_state
 import os
 import csv
 
@@ -47,9 +50,8 @@ def log_to_csv(soc, price, pv_forecast, cons_forecast, mode, target_power, targe
         logger.error(f"Fehler beim Schreiben in die CSV-Historie (evtl. Datei durch Streamlit blockiert): {e}")
 
 def main():
-    # 0. Logging-System starten
-    logger_config.setup_logging(log_file="energy_optimizer.log", level=logging.INFO)
-    
+    config.reload_config()
+
     logger.info("--- Energy Optimizer Live-Abfrage gestartet ---")
     
     # 1. Monats-Profil prüfen/aktualisieren
@@ -128,7 +130,53 @@ def main():
     logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
     loxone_client.send_flexible_consumer_states(consumer_powers, charging_contexts)
 
+    live_power = loxone_client.fetch_loxone_live_power()
+    total_kw = live_power["house"] if live_power else None
+    flex_kw = loxone_client.fetch_flexible_consumers_live_kw(fallbacks=consumer_powers)
+    logger.info("cons_data Flex live (kW): %s", flex_kw)
+    try:
+        written = cons_data_store.record_and_maybe_flush(
+            total_kw=total_kw,
+            pv_kwh_interval=pv_delta,
+            flex_kw=flex_kw,
+        )
+        if written:
+            logger.info("cons_data: %s Stunde(n) in cons_data_hourly.csv geschrieben.", written)
+    except Exception as e:
+        logger.warning("cons_data: Messwerte konnten nicht gespeichert werden: %s", e)
+
+    consumption_snapshot = None
+    if live_power:
+        consumption_snapshot = live_consumption.build_consumption_snapshot(live_power, flex_kw)
+
+    try:
+        run_state.save_run_state(
+            {
+                "source": "main.py",
+                "success": True,
+                "loop_timeout_sec": config.get("LOOP_TIMEOUT", cast=int),
+                "soc_percent": round(float(current_soc), 2),
+                "pv_delta_kwh": round(float(pv_delta), 4),
+                "market_price_cent": round(float(current_market_item["price_buy"]), 4),
+                "forecast_pv_kw": round(float(forecast_pv[0]), 3),
+                "forecast_consumption_kw": round(float(forecast_consumption[0]), 3),
+                "mode": int(mode),
+                "target_power_kw": round(float(target_power), 3),
+                "target_soc_percent": round(float(target_soc), 1),
+                "consumer_powers_kw": {
+                    k: round(float(v), 3) for k, v in consumer_powers.items()
+                },
+                "flex_live_kw": flex_kw,
+                "consumption_snapshot": consumption_snapshot,
+                "current_hour": int(current_hour),
+            }
+        )
+        logger.info("run_state: Durchlauf in optimizer_run_state.json gespeichert.")
+    except Exception as e:
+        logger.warning("run_state: Zustand konnte nicht gespeichert werden: %s", e)
+
 if __name__ == "__main__":
+    logger_config.setup_logging(log_file="energy_optimizer.log", level=logging.INFO)
     while True:
         try:
             # Führe die oben definierte Routine aus

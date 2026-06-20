@@ -7,6 +7,7 @@ import loxone_client
 import pv_forecast
 import config
 import data_loader
+import cons_data_store
 
 
 def _load_and_resample_csv(filepath: str, is_wp: bool = False, wp_power: float = 1.6) -> pd.Series:
@@ -56,8 +57,9 @@ def _load_and_resample_csv(filepath: str, is_wp: bool = False, wp_power: float =
 
 
 def _load_consumer_series(consumer: dict) -> pd.Series:
-    """Lädt die Zeitreihe eines flexiblen Verbrauchers gemäß signal_type."""
-    is_binary = consumer.get("signal_type") == "binary"
+    """Lädt die Zeitreihe eines flexiblen Verbrauchers gemäß log_signal_type bzw. signal_type."""
+    log_signal = consumer.get("log_signal_type") or consumer.get("signal_type", "power")
+    is_binary = log_signal == "binary"
     nominal = float(consumer.get("nominal_power_kw", 1.6))
     return _load_and_resample_csv(
         consumer.get("path_log", ""),
@@ -87,24 +89,62 @@ def _compute_baseload(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def generate_consumption_profile() -> bool:
-    """Lädt alle Logs, isoliert die nackte Grundlast und berechnet das Profil neu."""
-    path_total = config.get('PATH_CONSUMPTION_TOTAL', cast=str) or loxone_client.fetch_loxone_csv_file()
+def _cons_data_to_profile_dataframe(cons_df: pd.DataFrame) -> pd.DataFrame:
+    """Wandelt cons_data_hourly in das interne Profil-Format (Total, BaseLoad, Verbraucher-Namen)."""
+    df = pd.DataFrame(index=cons_df.index)
+    df["Total"] = cons_df["total_kw"]
+    df["BaseLoad"] = cons_df["baseload_kw"]
+    for consumer in config.get_flexible_consumers():
+        col = f"{consumer['id']}_kw"
+        df[consumer["name"]] = cons_df[col] if col in cons_df.columns else 0.0
+    return df
 
+
+def load_cons_data_profile_dataframe() -> pd.DataFrame | None:
+    """Lädt cons_data_hourly.csv als Profil-DataFrame; None wenn leer/fehlend."""
+    cons_df = cons_data_store.load_cons_data()
+    if cons_df.empty:
+        return None
+    return _cons_data_to_profile_dataframe(cons_df)
+
+
+def load_cons_data_pv_series() -> pd.Series:
+    """PV-Zeitreihe (kW) aus cons_data_hourly."""
+    cons_df = cons_data_store.load_cons_data()
+    if cons_df.empty:
+        return pd.Series(dtype=float)
+    return cons_df["pv_kw"]
+
+
+def _load_profile_source_dataframe() -> pd.DataFrame | None:
+    """
+    Primäre Datenquelle für Profile und Historie: cons_data_hourly.csv.
+    Fallback: Loxone-CSVs (Migration / Backtesting ohne cons_data).
+    """
+    df = load_cons_data_profile_dataframe()
+    if df is not None and not df.empty:
+        return df
+
+    path_total = config.get("PATH_CONSUMPTION_TOTAL", cast=str) or loxone_client.fetch_loxone_csv_file()
     if not path_total or not os.path.exists(path_total):
-        print("⚠️ Profil-Update abgebrochen: Haupt-Logdatei für Gesamtverbrauch fehlt.")
-        return False
+        return None
 
+    s_total = _load_and_resample_csv(path_total)
+    if s_total.empty:
+        return None
+
+    df = _build_flexible_consumer_dataframe(s_total)
+    return _compute_baseload(df)
+
+
+def generate_consumption_profile() -> bool:
+    """Berechnet Verbrauchsprofile aus cons_data_hourly (Fallback: Loxone-Logs)."""
     try:
         print("⏳ Verarbeite Verbrauchsdaten und isoliere die Haus-Grundlast...")
-        
-        s_total = _load_and_resample_csv(path_total)
-        if s_total.empty:
-            print("⚠️ Gesamtverbrauch-Zeitreihe konnte nicht geladen werden oder ist leer.")
+        df = _load_profile_source_dataframe()
+        if df is None or df.empty:
+            print("⚠️ Profil-Update abgebrochen: Keine cons_data_hourly.csv und keine Loxone-Logs.")
             return False
-
-        df = _build_flexible_consumer_dataframe(s_total)
-        df = _compute_baseload(df)
         df['Month'] = df.index.month
         df['Weekday'] = df.index.weekday
         df['Hour'] = df.index.hour
@@ -138,7 +178,6 @@ def generate_consumption_profile() -> bool:
             "und ggf. 'flexible_consumer_profiles.csv' erfolgreich neu berechnet!"
         )
         return True
-        
     except Exception as e:
         print(f"🚨 Fehler bei der Profilberechnung: {e}")
         return False
@@ -473,16 +512,11 @@ def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]
     elif isinstance(target_date, datetime):
         target_date = target_date.date()
         
-    path_total = config.get('PATH_CONSUMPTION_TOTAL', cast=str) or loxone_client.fetch_loxone_csv_file()
-    s_total = _load_and_resample_csv(path_total)
-
-    if s_total.empty:
+    df = _load_profile_source_dataframe()
+    if df is None or df.empty:
         print(f"⚠️ Keine historischen Daten vorhanden für das Datum {target_date}.")
         empty_totals = {c["id"]: 0.0 for c in config.get_flexible_consumers()}
         return [0.5] * 24, empty_totals, [0.5] * 24
-
-    df = _build_flexible_consumer_dataframe(s_total)
-    df = _compute_baseload(df)
 
     df_day = df[df.index.date == target_date]
     full_day_range = pd.date_range(
@@ -502,9 +536,21 @@ def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]
     return actual_baseload, historical_totals, actual_total
 
 
+def get_cons_data_date_bounds() -> Tuple[Optional[date], Optional[date]]:
+    """Frühestes und spätestes Datum in cons_data_hourly.csv."""
+    ts_min, ts_max = cons_data_store.get_date_bounds()
+    if ts_min is None or ts_max is None:
+        return None, None
+    return ts_min.date(), ts_max.date()
+
+
 def get_loxone_date_bounds() -> Tuple[Optional[date], Optional[date]]:
-    """Gibt das früheste und späteste Datum aus den Loxone-Verbrauchslogs zurück."""
-    path_total = config.get('PATH_CONSUMPTION_TOTAL', cast=str)
+    """Datumsbereich der Historie (cons_data_hourly, Fallback: Loxone-CSV)."""
+    bounds = get_cons_data_date_bounds()
+    if bounds[0] is not None:
+        return bounds
+
+    path_total = config.get("PATH_CONSUMPTION_TOTAL", cast=str)
     if not path_total or not os.path.exists(path_total):
         return None, None
 
@@ -547,9 +593,11 @@ def _reindex_hourly_series(series: pd.Series, target_date: date) -> List[float]:
 
 
 def _get_historical_pv_for_day(target_date: date) -> List[float]:
-    """Liest den realen PV-Ertrag eines Tages aus den Loxone-Produktionslogs."""
-    path_prod = config.get('PATH_PRODUCTION', cast=str)
-    s_pv = _load_and_resample_csv(path_prod)
+    """Liest den PV-Ertrag eines Tages aus cons_data_hourly (Fallback: Loxone-Produktionslog)."""
+    s_pv = load_cons_data_pv_series()
+    if s_pv.empty:
+        path_prod = config.get("PATH_PRODUCTION", cast=str)
+        s_pv = _load_and_resample_csv(path_prod) if path_prod else pd.Series(dtype=float)
     return _reindex_hourly_series(s_pv, target_date)
 
 

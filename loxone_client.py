@@ -102,6 +102,67 @@ def consumers_with_live_nominal_power(consumers: list | None = None) -> list:
     return updated
 
 
+def resolve_consumer_live_power_kw(
+    consumer: dict,
+    *,
+    fallback_kw: float | None = None,
+) -> float | None:
+    """
+    Aktuelle Leistung (kW) eines flexiblen Verbrauchers live aus Loxone.
+    binary: Merker 0/1 × Nennleistung; power: direkter kW-Wert (≥ 0).
+    """
+    io_name = (consumer.get("loxone_inputs") or {}).get("power_name", "")
+    if not io_name:
+        return fallback_kw
+
+    raw = fetch_loxone_generic_value(io_name)
+    if raw is None:
+        logger.warning(
+            "Loxone: Keine Live-Leistung für '%s' (%s), Fallback %s kW",
+            consumer.get("id"),
+            io_name,
+            fallback_kw,
+        )
+        return fallback_kw
+
+    inputs = consumer.get("loxone_inputs") or {}
+    signal_type = str(inputs.get("signal_type") or consumer.get("signal_type", "power")).lower()
+    nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+    if signal_type == "binary":
+        return round(nominal if float(raw) >= 0.5 else 0.0, 3)
+
+    return round(max(0.0, float(raw)), 3)
+
+
+def fetch_flexible_consumers_live_kw(
+    fallbacks: dict[str, float] | None = None,
+    consumers: list | None = None,
+) -> dict[str, float]:
+    """
+    Live-Leistungen aller flexiblen Verbraucher für cons_data_hourly.
+    Fallback (z. B. Optimizer-Sollwerte) wenn Merker fehlt oder Loxone nicht antwortet.
+    """
+    fallbacks = fallbacks or {}
+    source = consumers if consumers is not None else config.get_flexible_consumers()
+    result: dict[str, float] = {}
+
+    for consumer in source:
+        cid = consumer["id"]
+        fallback = float(fallbacks.get(cid, 0.0) or 0.0)
+        live = resolve_consumer_live_power_kw(consumer, fallback_kw=fallback)
+        result[cid] = round(float(live if live is not None else fallback), 3)
+        io_name = (consumer.get("loxone_inputs") or {}).get("power_name", "")
+        if io_name and live is not None:
+            logger.debug(
+                "Loxone Live-Leistung %s: %.3f kW (%s)",
+                cid,
+                result[cid],
+                io_name,
+            )
+
+    return result
+
+
 def send_loxone_value(input_name: str, value: float) -> bool:
     """
     Sendet einen berechneten Steuerwert an einen Virtuellen Eingang des Loxone Miniservers.
