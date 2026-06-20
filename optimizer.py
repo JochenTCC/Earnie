@@ -458,7 +458,7 @@ def get_consumer_remaining_kwh(
     consumer_daily_targets_kwh: dict | None = None,
 ) -> dict[str, float]:
     """Verbleibende Zielenergie aller optimierbaren Verbraucher (inkl. Loxone E-Auto)."""
-    import profile_manager
+    import consumer_targets
     active = _active_consumers(consumers)
     state = _load_consumer_state()
     delivered = state.get("delivered", {})
@@ -471,7 +471,7 @@ def get_consumer_remaining_kwh(
         )
         daily_targets = _apply_horizon_charging_limits(daily_targets, charging_contexts)
     else:
-        daily_targets = profile_manager.resolve_consumer_daily_targets()
+        daily_targets = consumer_targets.resolve_consumer_daily_targets()
     remaining = {}
     for consumer in active:
         cid = consumer["id"]
@@ -799,17 +799,17 @@ def _resolve_daily_target_kwh(
         if cid in consumer_daily_targets_kwh:
             return float(consumer_daily_targets_kwh[cid])
     if logged_targets_only:
-        import profile_manager
+        import consumer_targets
         if row_date is None:
             return 0.0
-        logged = profile_manager.resolve_historical_consumer_daily_targets(row_date)
+        logged = consumer_targets.resolve_historical_consumer_daily_targets(row_date)
         return float(logged.get(cid, 0.0))
     if (
         consumer.get("daily_target_source", "config") == "historical"
         and horizon_flex_kwh is not None
     ):
         return float(horizon_flex_kwh)
-    import profile_manager
+    import consumer_targets
     day = row_date or datetime.now().date()
     when = ref_datetime or datetime.combine(day, time(12, 0))
     if (
@@ -819,7 +819,7 @@ def _resolve_daily_target_kwh(
         computed = config.Config.target_kwh_from_day_schedule(consumer, when)
         if computed is not None:
             return float(computed)
-    resolved = profile_manager.resolve_consumer_daily_targets(target_date=day)
+    resolved = consumer_targets.resolve_consumer_daily_targets(target_date=day)
     return float(resolved.get(cid, consumer.get("daily_target_kwh", 0.0)))
 
 
@@ -877,8 +877,8 @@ def resolve_horizon_consumer_targets_kwh(
         }
     horizon_flex_targets = None
     if not logged_targets_only:
-        import profile_manager
-        horizon_flex_targets = profile_manager.resolve_horizon_flex_targets_kwh(
+        import consumer_targets
+        horizon_flex_targets = consumer_targets.resolve_horizon_flex_targets_kwh(
             optimization_matrix
         )
     return {
@@ -962,8 +962,8 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
     details = []
     if logged_day:
         row_date = optimization_matrix[0].get("date")
-        import profile_manager
-        totals = profile_manager.resolve_historical_consumer_daily_targets(row_date)
+        import consumer_targets
+        totals = consumer_targets.resolve_historical_consumer_daily_targets(row_date)
         source = "geloggt (Gesamtverbrauchs-Stundenprofil)"
         for consumer in consumers:
             cid = consumer["id"]

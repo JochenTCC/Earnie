@@ -7,6 +7,7 @@ import logger_config
 import awattar_client
 import loxone_client
 import profile_manager
+import consumer_targets
 import optimizer
 import pv_tuner
 import cons_data_store
@@ -81,12 +82,12 @@ def main():
     
     # 4. Optimierung berechnen
     current_hour = datetime.now().hour
-    consumer_targets = profile_manager.resolve_consumer_daily_targets(matrix=optimization_matrix)
+    targets = consumer_targets.resolve_consumer_daily_targets(matrix=optimization_matrix)
     charging_contexts = optimizer.resolve_charging_contexts(
-        optimization_matrix, consumer_targets
+        optimization_matrix, targets
     )
     consumer_remaining = optimizer.get_consumer_remaining_kwh(
-        consumer_daily_targets_kwh=consumer_targets,
+        consumer_daily_targets_kwh=targets,
         optimization_matrix=optimization_matrix,
     )
     live_consumers = loxone_client.consumers_with_live_nominal_power()

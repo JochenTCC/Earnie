@@ -11,6 +11,7 @@ import config
 import loxone_client
 import awattar_client
 import profile_manager
+import consumer_targets
 import optimizer
 import pv_tuner  # Adaptives PV-Tuning-Modul einbinden
 import backtesting_log
@@ -680,7 +681,10 @@ def render_historical_optimization_block(selected_date: date, initial_soc: float
         return
 
     if not matrix or sum(row.get('expected_p_act', 0) for row in matrix) == 0:
-        st.warning(f"⚠️ Für den {selected_date.strftime('%d.%m.%Y')} wurden keine verwertbaren Loxone-Daten gefunden.")
+        st.warning(
+            f"⚠️ Für den {selected_date.strftime('%d.%m.%Y')} wurden keine Daten in "
+            "cons_data_hourly.csv gefunden."
+        )
         return
 
     render_historical_day_info(meta)
@@ -754,11 +758,11 @@ def render_optimization_block(current_soc: float):
         matrix = live_consumption.apply_live_snapshot_to_matrix(matrix, snapshot, hour_index=0)
 
     sim_soc = float(main_state.get("soc_percent", current_soc)) if main_state else current_soc
-    consumer_targets = profile_manager.resolve_consumer_daily_targets(matrix=matrix)
+    targets = consumer_targets.resolve_consumer_daily_targets(matrix=matrix)
     savings_info = optimizer.calculate_optimization_savings(
         matrix,
         sim_soc,
-        consumer_daily_targets_kwh=consumer_targets,
+        consumer_daily_targets_kwh=targets,
     )
     
     optimized_df = pd.DataFrame(savings_info['optimized_rows'])
@@ -1036,7 +1040,7 @@ def main():
 
     if mode == "Historischer Tag":
         st.markdown(
-            "Historische **24-Stunden-Optimierung** mit echten Loxone-Daten "
+            "Historische **24-Stunden-Optimierung** mit Daten aus **cons_data_hourly.csv** "
             "(Grundlast, PV) und historischen Marktpreisen."
         )
     elif mode == "Backtesting":

@@ -80,7 +80,7 @@ def resolve_backtesting_window(
     today = pd.Timestamp.now().normalize()
     end = min(end, today)
 
-    lox_min, lox_max = profile_manager.get_loxone_date_bounds()
+    lox_min, lox_max = profile_manager.get_cons_data_date_bounds()
     if lox_min is not None:
         start = max(start, pd.Timestamp(lox_min))
     if lox_max is not None:

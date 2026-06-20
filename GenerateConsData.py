@@ -15,7 +15,7 @@ import pandas as pd
 
 import config
 import cons_data_store
-import profile_manager
+import loxone_log_import
 
 SOURCE_LOXONE = cons_data_store.SOURCE_LOXONE
 SOURCE_SYNTHETIC = cons_data_store.SOURCE_SYNTHETIC
@@ -34,13 +34,13 @@ def build_from_loxone() -> pd.DataFrame | None:
         print(f"[WARN] Kein Gesamtverbrauchs-Log gefunden: {path_total!r}")
         return None
 
-    s_total = profile_manager._load_and_resample_csv(path_total)
+    s_total = loxone_log_import.load_and_resample_csv(path_total)
     if s_total.empty:
         print("[WARN] Gesamtverbrauchs-Zeitreihe ist leer.")
         return None
 
-    df = profile_manager._build_flexible_consumer_dataframe(s_total)
-    df = profile_manager._compute_baseload(df)
+    df = loxone_log_import.build_flexible_consumer_dataframe(s_total)
+    df = loxone_log_import.compute_baseload(df)
 
     out = pd.DataFrame(index=df.index)
     out["total_kw"] = df["Total"].round(3)
@@ -50,7 +50,7 @@ def build_from_loxone() -> pd.DataFrame | None:
 
     path_prod = config.get("PATH_PRODUCTION", cast=str)
     if path_prod and os.path.exists(path_prod):
-        s_pv = profile_manager._load_and_resample_csv(path_prod)
+        s_pv = loxone_log_import.load_and_resample_csv(path_prod)
         out["pv_kw"] = s_pv.reindex(out.index, fill_value=0.0).round(3)
     else:
         out["pv_kw"] = 0.0

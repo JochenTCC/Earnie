@@ -3,90 +3,10 @@ import os
 import pandas as pd
 from datetime import datetime, timedelta, date, time
 from typing import List, Tuple, Optional
-import loxone_client
 import pv_forecast
 import config
 import data_loader
 import cons_data_store
-
-
-def _load_and_resample_csv(filepath: str, is_wp: bool = False, wp_power: float = 1.6) -> pd.Series:
-    """Lädt eine Loxone-CSV, bereinigt sie und aggregiert sie robust über ein Minutenraster auf 1-Stunden-Mittelwerte."""
-    if not filepath or not os.path.exists(filepath):
-        return pd.Series(dtype=float)
-        
-    try:
-        # Einlesen mit Berücksichtigung des deutschen Dezimaltrennzeichens (Komma)
-        df = pd.read_csv(filepath, sep=';', decimal=',', header=0)
-        
-        # Falls die Datei keine Kopfzeile hat und 3 Spalten besitzt (alter loxone_client Standard):
-        if df.shape[1] == 3 and not any("datum" in str(col).lower() or "uhrzeit" in str(col).lower() for col in df.columns):
-            df = pd.read_csv(filepath, sep=';', decimal=',', names=['timestamp', 'label', 'value'], header=None)
-        else:
-            # Spalten passend umbenennen für eine einheitliche Verarbeitung
-            if df.shape[1] == 2:
-                df.columns = ['timestamp', 'value']
-            elif df.shape[1] == 3:
-                df.columns = ['timestamp', 'label', 'value']
-                
-        # Zeitstempel konvertieren (Loxone Standardformat bevorzugt testen)
-        df['timestamp'] = pd.to_datetime(df['timestamp'], format='%d.%m.%Y %H:%M', errors='coerce')
-        if df['timestamp'].isna().all():
-            df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
-            
-        df.dropna(subset=['timestamp', 'value'], inplace=True)
-        df['value'] = pd.to_numeric(df['value'], errors='coerce')
-        df.dropna(subset=['value'], inplace=True)
-        
-        df.set_index('timestamp', inplace=True)
-        df = df[~df.index.duplicated(keep='last')]
-        
-        # 1-Minuten-Raster zur feingranularen Überbrückung von Event-Lücken (Forward-Fill)
-        s_minutely = df['value'].resample('1min').ffill()
-        
-        # Falls Wärmepumpe: Status (0/1) mit Nennleistung multiplizieren
-        if is_wp:
-            s_minutely = s_minutely * wp_power
-            
-        # Zurück auf Stunden-Mittelwerte (Stunden-Verbrauch/Lastäquivalent)
-        return s_minutely.resample('1h').mean()
-        
-    except Exception as e:
-        print(f"⚠️ Fehler beim Verarbeiten von {filepath}: {e}")
-        return pd.Series(dtype=float)
-
-
-def _load_consumer_series(consumer: dict) -> pd.Series:
-    """Lädt die Zeitreihe eines flexiblen Verbrauchers gemäß log_signal_type bzw. signal_type."""
-    log_signal = consumer.get("log_signal_type") or consumer.get("signal_type", "power")
-    is_binary = log_signal == "binary"
-    nominal = float(consumer.get("nominal_power_kw", 1.6))
-    return _load_and_resample_csv(
-        consumer.get("path_log", ""),
-        is_wp=is_binary,
-        wp_power=nominal,
-    )
-
-
-def _build_flexible_consumer_dataframe(s_total: pd.Series) -> pd.DataFrame:
-    """Baut einen DataFrame mit Gesamtlast und allen flexiblen Verbrauchern."""
-    df = pd.DataFrame({"Total": s_total})
-    for consumer in config.get_flexible_consumers():
-        series = _load_consumer_series(consumer)
-        df[consumer["name"]] = series if not series.empty else 0.0
-        df[consumer["name"]] = df[consumer["name"]].fillna(0.0)
-    return df
-
-
-def _compute_baseload(df: pd.DataFrame) -> pd.DataFrame:
-    """Subtrahiert alle flexiblen Verbraucher von der Gesamtlast."""
-    flex_cols = [c["name"] for c in config.get_flexible_consumers()]
-    if flex_cols:
-        df["BaseLoad"] = df["Total"] - df[flex_cols].sum(axis=1)
-    else:
-        df["BaseLoad"] = df["Total"]
-    df["BaseLoad"] = df["BaseLoad"].clip(lower=0.0)
-    return df
 
 
 def _cons_data_to_profile_dataframe(cons_df: pd.DataFrame) -> pd.DataFrame:
@@ -117,33 +37,21 @@ def load_cons_data_pv_series() -> pd.Series:
 
 
 def _load_profile_source_dataframe() -> pd.DataFrame | None:
-    """
-    Primäre Datenquelle für Profile und Historie: cons_data_hourly.csv.
-    Fallback: Loxone-CSVs (Migration / Backtesting ohne cons_data).
-    """
-    df = load_cons_data_profile_dataframe()
-    if df is not None and not df.empty:
-        return df
-
-    path_total = config.get("PATH_CONSUMPTION_TOTAL", cast=str) or loxone_client.fetch_loxone_csv_file()
-    if not path_total or not os.path.exists(path_total):
-        return None
-
-    s_total = _load_and_resample_csv(path_total)
-    if s_total.empty:
-        return None
-
-    df = _build_flexible_consumer_dataframe(s_total)
-    return _compute_baseload(df)
+    """Datenquelle für Profile und Historie: ausschließlich cons_data_hourly.csv."""
+    return load_cons_data_profile_dataframe()
 
 
 def generate_consumption_profile() -> bool:
-    """Berechnet Verbrauchsprofile aus cons_data_hourly (Fallback: Loxone-Logs)."""
+    """Berechnet Verbrauchsprofile aus cons_data_hourly.csv."""
     try:
         print("⏳ Verarbeite Verbrauchsdaten und isoliere die Haus-Grundlast...")
         df = _load_profile_source_dataframe()
         if df is None or df.empty:
-            print("⚠️ Profil-Update abgebrochen: Keine cons_data_hourly.csv und keine Loxone-Logs.")
+            path = cons_data_store.get_output_path()
+            print(
+                f"⚠️ Profil-Update abgebrochen: '{path}' fehlt oder ist leer. "
+                "Bitte GenerateConsData.py ausführen."
+            )
             return False
         df['Month'] = df.index.month
         df['Weekday'] = df.index.weekday
@@ -327,149 +235,6 @@ def _load_flexible_consumer_hourly_profiles(target_hours: List) -> dict[str, Lis
     return profiles
 
 
-def get_forecast_consumer_daily_targets(matrix: list) -> dict:
-    """Legacy-Alias – nutzt resolve_consumer_daily_targets."""
-    return resolve_consumer_daily_targets(matrix=matrix)
-
-
-def _historical_totals_for_date(target_date: date, cache: dict) -> dict[str, float]:
-    if target_date not in cache:
-        _, totals, _ = get_historical_day_data(target_date)
-        cache[target_date] = totals
-    return cache[target_date]
-
-
-def _resolve_single_consumer_daily_target_kwh(
-    consumer: dict,
-    target_date: date,
-    matrix: list | None = None,
-    historical_cache: dict | None = None,
-) -> float:
-    """
-    Ermittelt das Tagesziel (kWh) für einen Verbraucher.
-    Quelle: config | historical (Logs/Profile) | loxone (Live-IO, nur heute).
-    """
-    source = consumer.get("daily_target_source", "config")
-    cid = consumer["id"]
-    fallback = float(consumer["daily_target_kwh"])
-    cache = historical_cache if historical_cache is not None else {}
-
-    if source == "config":
-        if consumer.get("charging_schedule", {}).get("enabled"):
-            computed = config.Config.target_kwh_from_day_schedule(
-                consumer, datetime.combine(target_date, time(12, 0))
-            )
-            if computed is not None:
-                return computed
-        return fallback
-
-    if source == "historical":
-        if matrix:
-            day_rows = [row for row in matrix if row.get("date") == target_date]
-            if day_rows and any(row.get("expected_flex_kw") for row in day_rows):
-                return sum(
-                    float((row.get("expected_flex_kw") or {}).get(cid, 0.0))
-                    for row in day_rows
-                )
-        totals = _historical_totals_for_date(target_date, cache)
-        if cid in totals:
-            return float(totals[cid])
-        return fallback
-
-    if source == "loxone":
-        loxone_name = consumer.get("loxone_target_kwh_name", "")
-        today = datetime.now().date()
-        if loxone_name and target_date == today:
-            value = loxone_client.fetch_loxone_generic_value(loxone_name)
-            if value is not None and value >= 0:
-                return float(value)
-        totals = _historical_totals_for_date(target_date, cache)
-        if cid in totals:
-            return float(totals[cid])
-        return fallback
-
-    return fallback
-
-
-def resolve_historical_consumer_daily_targets(target_date: date) -> dict[str, float]:
-    """Geloggte Tagesenergie je Verbraucher – nur für historische Simulation."""
-    if isinstance(target_date, str):
-        target_date = pd.to_datetime(target_date).date()
-    elif isinstance(target_date, datetime):
-        target_date = target_date.date()
-
-    _, totals, _ = get_historical_day_data(target_date)
-    consumers = config.get_flexible_consumers(optimizer_only=True)
-    return {c["id"]: float(totals.get(c["id"], 0.0)) for c in consumers}
-
-
-def resolve_horizon_flex_targets_kwh(matrix: list) -> dict[str, float]:
-    """
-    Summiert expected_flex_kw über den gesamten Simulationshorizont (typ. 24h).
-    Gleiche Basis wie die Baseline in der Echtzeit-Optimierung (flexible_consumer_profiles.csv).
-    """
-    consumers = config.get_flexible_consumers(optimizer_only=True)
-    totals = {c["id"]: 0.0 for c in consumers}
-    for row in matrix[:24]:
-        flex = row.get("expected_flex_kw") or {}
-        for consumer in consumers:
-            cid = consumer["id"]
-            totals[cid] += float(flex.get(cid, 0.0) or 0.0)
-    return {cid: round(kwh, 3) for cid, kwh in totals.items()}
-
-
-def resolve_consumer_daily_targets(
-    matrix: list | None = None,
-    target_date: date | None = None,
-    prefer_logged_totals: bool = False,
-) -> dict:
-    """
-    Liefert Tagesziele pro Verbraucher gemäß daily_target_source in config.json.
-    Bei prefer_logged_totals=True (Historischer Tag): ausschließlich geloggte Tages-Summen.
-    Bei mehrtägigem Horizont: {date: {consumer_id: kwh}}, sonst {consumer_id: kwh}.
-    """
-    if prefer_logged_totals:
-        day = target_date
-        if matrix and not day:
-            dates = {row["date"] for row in matrix if row.get("date") is not None}
-            if len(dates) == 1:
-                day = next(iter(dates))
-        if day is None:
-            raise ValueError("Historische Tagesziele benötigen ein gültiges Datum.")
-        return resolve_historical_consumer_daily_targets(day)
-
-    consumers = config.get_flexible_consumers(optimizer_only=True)
-    historical_cache: dict = {}
-
-    if matrix:
-        dates = sorted({row["date"] for row in matrix if row.get("date") is not None})
-        if len(dates) > 1:
-            return {
-                day: {
-                    c["id"]: _resolve_single_consumer_daily_target_kwh(
-                        c, day, matrix, historical_cache
-                    )
-                    for c in consumers
-                }
-                for day in dates
-            }
-        day = dates[0] if dates else (target_date or datetime.now().date())
-        return {
-            c["id"]: _resolve_single_consumer_daily_target_kwh(
-                c, day, matrix, historical_cache
-            )
-            for c in consumers
-        }
-
-    day = target_date or datetime.now().date()
-    return {
-        c["id"]: _resolve_single_consumer_daily_target_kwh(
-            c, day, None, historical_cache
-        )
-        for c in consumers
-    }
-
-
 def get_forecast_vectors(market_data) -> Tuple[List[float], List[float], List[dict]]:
     """
     Lädt das passende historische Verbrauchsprofil und die PV-Prognose 
@@ -514,7 +279,9 @@ def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]
         
     df = _load_profile_source_dataframe()
     if df is None or df.empty:
-        print(f"⚠️ Keine historischen Daten vorhanden für das Datum {target_date}.")
+        print(
+            f"⚠️ Keine historischen Daten in cons_data_hourly für das Datum {target_date}."
+        )
         empty_totals = {c["id"]: 0.0 for c in config.get_flexible_consumers()}
         return [0.5] * 24, empty_totals, [0.5] * 24
 
@@ -544,29 +311,12 @@ def get_cons_data_date_bounds() -> Tuple[Optional[date], Optional[date]]:
     return ts_min.date(), ts_max.date()
 
 
-def get_loxone_date_bounds() -> Tuple[Optional[date], Optional[date]]:
-    """Datumsbereich der Historie (cons_data_hourly, Fallback: Loxone-CSV)."""
-    bounds = get_cons_data_date_bounds()
-    if bounds[0] is not None:
-        return bounds
-
-    path_total = config.get("PATH_CONSUMPTION_TOTAL", cast=str)
-    if not path_total or not os.path.exists(path_total):
-        return None, None
-
-    s_total = _load_and_resample_csv(path_total)
-    if s_total.empty:
-        return None, None
-
-    return s_total.index.min().date(), s_total.index.max().date()
-
-
 def get_historical_date_picker_bounds(months_back: int = 12) -> Tuple[date, date]:
-    """Ermittelt den wählbaren Datumsbereich: Schnittmenge aus Loxone-Logs und den letzten N Monaten."""
+    """Wählbarer Datumsbereich: Schnittmenge aus cons_data_hourly und den letzten N Monaten."""
     today = datetime.now().date()
     rolling_min = today - timedelta(days=months_back * 30)
 
-    lox_min, lox_max = get_loxone_date_bounds()
+    lox_min, lox_max = get_cons_data_date_bounds()
     if lox_min is None or lox_max is None:
         return rolling_min, today - timedelta(days=1)
 
@@ -593,12 +343,8 @@ def _reindex_hourly_series(series: pd.Series, target_date: date) -> List[float]:
 
 
 def _get_historical_pv_for_day(target_date: date) -> List[float]:
-    """Liest den PV-Ertrag eines Tages aus cons_data_hourly (Fallback: Loxone-Produktionslog)."""
-    s_pv = load_cons_data_pv_series()
-    if s_pv.empty:
-        path_prod = config.get("PATH_PRODUCTION", cast=str)
-        s_pv = _load_and_resample_csv(path_prod) if path_prod else pd.Series(dtype=float)
-    return _reindex_hourly_series(s_pv, target_date)
+    """Liest den PV-Ertrag eines Tages aus cons_data_hourly.csv."""
+    return _reindex_hourly_series(load_cons_data_pv_series(), target_date)
 
 
 def _brutto_price_cent(epex_cent: float) -> float:
@@ -634,7 +380,7 @@ def _get_historical_brutto_prices_for_day(target_date: date) -> List[float]:
 
 def build_historical_optimization_matrix(target_date) -> Tuple[List[dict], dict]:
     """
-    Baut eine 24-Stunden-Optimierungsmatrix aus realen Loxone-Daten und historischen Preisen.
+    Baut eine 24-Stunden-Optimierungsmatrix aus cons_data_hourly und historischen Preisen.
     """
     if isinstance(target_date, str):
         target_date = pd.to_datetime(target_date).date()
@@ -666,5 +412,9 @@ def build_historical_optimization_matrix(target_date) -> Tuple[List[dict], dict]
         'total_kwh': round(sum(total_load), 3),
         'pv_kwh': round(sum(pv_profile), 3),
     }
-    meta['consumer_daily_targets_kwh'] = resolve_historical_consumer_daily_targets(target_date)
+    import consumer_targets
+
+    meta['consumer_daily_targets_kwh'] = consumer_targets.resolve_historical_consumer_daily_targets(
+        target_date
+    )
     return matrix, meta

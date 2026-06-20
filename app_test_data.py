@@ -2,8 +2,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import profile_manager
 import config
+import loxone_log_import
 
 # Streamlit Seitenkonfiguration
 st.set_page_config(page_title="Last-Isolierung Test", layout="wide")
@@ -28,11 +28,10 @@ def load_and_process_day(target_date):
     path_wp = config.get('PATH_WP', cast=str)
     wp_power = config.get('WP_NOMINAL_POWER_KW', cast=float)
 
-    # Loxone-CSVs über profile_manager einlesen
-    s_total = profile_manager._load_and_resample_csv(path_total)
-    s_eauto = profile_manager._load_and_resample_csv(path_eauto)
-    s_pool = profile_manager._load_and_resample_csv(path_pool)
-    s_wp = profile_manager._load_and_resample_csv(path_wp, is_wp=True, wp_power=wp_power)
+    s_total = loxone_log_import.load_and_resample_csv(path_total)
+    s_eauto = loxone_log_import.load_and_resample_csv(path_eauto)
+    s_pool = loxone_log_import.load_and_resample_csv(path_pool)
+    s_wp = loxone_log_import.load_and_resample_csv(path_wp, is_wp=True, wp_power=wp_power)
 
     if s_total.empty:
         return None, None
