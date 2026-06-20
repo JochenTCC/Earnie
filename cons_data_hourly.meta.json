@@ -1,28 +1,20 @@
 {
   "version": 1,
-  "generated_at": "2026-06-20T15:54:13",
+  "generated_at": "2026-06-20T17:04:37",
   "output_file": "cons_data_hourly.csv",
+  "retention_months": 24,
   "consumer_ids": [
     "swimspa",
     "eauto",
     "waermepumpe"
   ],
-  "columns": {
-    "timestamp": "Stundenbeginn (lokal)",
-    "total_kw": "Gesamtverbrauch, Stundenmittel [kW]",
-    "baseload_kw": "Grundlast (Total minus flexible Verbraucher) [kW]",
-    "pv_kw": "PV-Ertrag, Stundenmittel [kW]",
-    "source": "loxone | synthetic | measured",
-    "swimspa_kw": "Flex-Verbraucher 'swimspa', Stundenmittel [kW]",
-    "eauto_kw": "Flex-Verbraucher 'eauto', Stundenmittel [kW]",
-    "waermepumpe_kw": "Flex-Verbraucher 'waermepumpe', Stundenmittel [kW]"
-  },
   "date_range": {
-    "min": "2023-03-23 11:00:00",
-    "max": "2026-06-15 11:00:00"
+    "min": "2024-06-20 16:00:00",
+    "max": "2026-06-20 16:00:00"
   },
-  "row_count": 28321,
+  "row_count": 17397,
   "source_counts": {
-    "loxone": 28321
+    "loxone": 17396,
+    "measured": 1
   }
 }

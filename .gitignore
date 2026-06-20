@@ -4,6 +4,9 @@ config.json
 *.pyc
 __pycache__/
 pv_counter_state.json
+cons_data_hourly.meta.json
+cons_data_pending.json
+optimizer_run_state.json
 energy_optimizer.log
 system_history_log.csv
 runtime_settings.json

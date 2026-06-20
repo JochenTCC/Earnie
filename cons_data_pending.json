@@ -1,29 +1,9 @@
 {
   "samples": [
     {
-      "ts": "2026-06-20T16:33",
-      "total_kw": 0.81,
-      "pv_kwh": 0.18,
-      "flex_kw": {
-        "swimspa": 0.18,
-        "eauto": 0.001,
-        "waermepumpe": 0.0
-      }
-    },
-    {
-      "ts": "2026-06-20T16:48",
-      "total_kw": 0.67,
-      "pv_kwh": 0.11,
-      "flex_kw": {
-        "swimspa": 0.18,
-        "eauto": 0.0,
-        "waermepumpe": 0.0
-      }
-    },
-    {
-      "ts": "2026-06-20T16:50",
-      "total_kw": 0.83,
-      "pv_kwh": 0.12,
+      "ts": "2026-06-20T17:04",
+      "total_kw": 0.76,
+      "pv_kwh": 0.22,
       "flex_kw": {
         "swimspa": 0.18,
         "eauto": 0.0,
