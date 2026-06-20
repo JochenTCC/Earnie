@@ -15,6 +15,7 @@ import live_consumption
 import run_state
 import os
 import csv
+from version import __version__
 
 # Logger für dieses spezifische Modul instanziieren
 logger = logging.getLogger("main")
@@ -53,7 +54,7 @@ def log_to_csv(soc, price, pv_forecast, cons_forecast, mode, target_power, targe
 def main():
     config.reload_config()
 
-    logger.info("--- Energy Optimizer Live-Abfrage gestartet ---")
+    logger.info("--- Energy Optimizer Live-Abfrage gestartet (v%s) ---", __version__)
     
     # 1. Monats-Profil prüfen/aktualisieren
     profile_manager.check_and_update_profile_if_new_month()

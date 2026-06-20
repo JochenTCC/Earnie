@@ -14,6 +14,13 @@ from typing import Iterable
 import pandas as pd
 
 import config
+from file_metadata import (
+    CONS_DATA_META_SCHEMA,
+    CONS_DATA_PENDING_SCHEMA,
+    read_schema_version,
+    stamp_payload,
+    strip_metadata,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,16 +137,17 @@ def save_cons_data(df: pd.DataFrame, path: str | None = None, *, apply_retention
     export.to_csv(path, sep=CSV_SEP, index=False, decimal=".")
 
     meta_path = path.replace(".csv", METADATA_SUFFIX) if path.endswith(".csv") else path + METADATA_SUFFIX
-    meta = {
-        "version": 1,
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
-        "output_file": path,
-        "retention_months": get_retention_months(),
-        "consumer_ids": _consumer_column_ids(),
-        "date_range": {"min": str(df.index.min()), "max": str(df.index.max())},
-        "row_count": len(df),
-        "source_counts": df["source"].value_counts().to_dict() if not df.empty else {},
-    }
+    meta = stamp_payload(
+        {
+            "output_file": path,
+            "retention_months": get_retention_months(),
+            "consumer_ids": _consumer_column_ids(),
+            "date_range": {"min": str(df.index.min()), "max": str(df.index.max())},
+            "row_count": len(df),
+            "source_counts": df["source"].value_counts().to_dict() if not df.empty else {},
+        },
+        schema_version=CONS_DATA_META_SCHEMA,
+    )
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
@@ -219,17 +227,26 @@ def _load_pending_state() -> dict:
     try:
         with open(PENDING_STATE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        if "samples" not in data:
-            data["samples"] = []
-        return data
+        schema_version = read_schema_version(data, default=1)
+        if schema_version > CONS_DATA_PENDING_SCHEMA:
+            logger.warning(
+                "cons_data pending: neuere Schema-Version %s (aktuell %s) – lese best effort",
+                schema_version,
+                CONS_DATA_PENDING_SCHEMA,
+            )
+        payload = strip_metadata(data)
+        if "samples" not in payload:
+            payload["samples"] = []
+        return payload
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("cons_data pending state unreadable: %s", e)
         return {"samples": [], "last_daily_flush": None}
 
 
 def _save_pending_state(state: dict) -> None:
+    payload = stamp_payload(strip_metadata(state), schema_version=CONS_DATA_PENDING_SCHEMA)
     with open(PENDING_STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
+        json.dump(payload, f, indent=2)
 
 
 def record_live_sample(

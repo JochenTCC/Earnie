@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 
 import pandas as pd
+
+from file_metadata import (
+    BACKTESTING_LOG_SCHEMA,
+    read_schema_version,
+    stamp_payload,
+)
 
 from simulation_engine import (
     CONSUMPTION_TOLERANCE_KWH,
@@ -15,9 +22,11 @@ from simulation_engine import (
     PlausibilityReport,
 )
 
+logger = logging.getLogger(__name__)
+
 BACKTESTING_LOG_JSON = "backtesting_log.json"
 BACKTESTING_HOURLY_CSV = "backtesting_hourly.csv"
-LOG_VERSION = 1
+LOG_VERSION = BACKTESTING_LOG_SCHEMA
 
 
 def _serialize_plausibility(report: PlausibilityReport) -> dict:
@@ -99,20 +108,22 @@ def save_backtesting_log(
         if not df.empty:
             all_ts.extend(df.index.tolist())
 
-    payload = {
-        "version": LOG_VERSION,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "period": period,
-        "labels": labels,
-        "summary": _build_summary(results, labels),
-        "plausibility": {
-            sid: _serialize_plausibility(rep)
-            for sid, rep in plausibility_by_scenario.items()
+    payload = stamp_payload(
+        {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "period": period,
+            "labels": labels,
+            "summary": _build_summary(results, labels),
+            "plausibility": {
+                sid: _serialize_plausibility(rep)
+                for sid, rep in plausibility_by_scenario.items()
+            },
+            "hourly_file": BACKTESTING_HOURLY_CSV,
+            "scenario_ids": list(results.keys()),
+            "reference_id": HISTORICAL_REFERENCE_ID,
         },
-        "hourly_file": BACKTESTING_HOURLY_CSV,
-        "scenario_ids": list(results.keys()),
-        "reference_id": HISTORICAL_REFERENCE_ID,
-    }
+        schema_version=BACKTESTING_LOG_SCHEMA,
+    )
     if all_ts:
         payload["period"]["first_ts"] = pd.Timestamp(min(all_ts)).isoformat()
         payload["period"]["last_ts"] = pd.Timestamp(max(all_ts)).isoformat()
@@ -138,6 +149,14 @@ def load_backtesting_log(log_dir: str = ".") -> tuple[dict, pd.DataFrame]:
 
     with open(json_path, "r", encoding="utf-8") as f:
         meta = json.load(f)
+
+    schema_version = read_schema_version(meta, default=1)
+    if schema_version > BACKTESTING_LOG_SCHEMA:
+        logger.warning(
+            "backtesting_log: neuere Schema-Version %s (aktuell %s) – lese best effort",
+            schema_version,
+            BACKTESTING_LOG_SCHEMA,
+        )
 
     hourly_name = meta.get("hourly_file", BACKTESTING_HOURLY_CSV)
     csv_path = os.path.join(log_dir, hourly_name)

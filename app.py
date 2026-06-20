@@ -19,6 +19,7 @@ import backtesting_log
 import live_consumption
 import run_state
 from simulation_engine import HISTORICAL_REFERENCE_ID
+from version import __version__
 
 st.set_page_config(
     page_title="Ernie Energy Control Center",
@@ -1085,6 +1086,7 @@ def render_live_power_flow(current_soc: float):
 
 def main():
     st.title("🔋 Ernie Energy Control Center")
+    st.caption(f"Version {__version__}")
     mode = render_mode_selector()
 
     if mode == "Historischer Tag":

@@ -11,7 +11,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-_UNIT_SUFFIXES = ("%", "kWh", "kW", "W")
+_UNIT_SUFFIXES = (
+    ("kWh", "kwh"),
+    ("kW", "kw"),
+    ("W", "w"),
+    ("%", "pct"),
+    ("A", "a"),
+)
+_DEFAULT_CHARGING_VOLTAGE_V = 230.0
 
 
 def _loxone_auth() -> HTTPBasicAuth:
@@ -22,11 +29,32 @@ def _loxone_jdev_url(io_name: str) -> str:
     return f"http://{config.get('LOXONE_IP')}/jdev/sps/io/{io_name}"
 
 
+def _parse_loxone_value(raw_value: str) -> tuple[float, str | None]:
+    """Parst Loxone-Werte wie '3.5 kW', '16 A' oder '16A' → (Zahl, Einheit|None)."""
+    text = str(raw_value).strip().replace(",", ".")
+    if not text:
+        raise ValueError("leerer Wert")
+
+    for suffix, unit in _UNIT_SUFFIXES:
+        if text.endswith(suffix):
+            return float(text[: -len(suffix)].strip()), unit
+        if len(suffix) == 1 and text.lower().endswith(suffix.lower()):
+            return float(text[:-1].strip()), unit
+
+    parts = text.rsplit(maxsplit=1)
+    if len(parts) == 2 and parts[1].upper() == "A":
+        return float(parts[0]), "a"
+
+    return float(text), None
+
+
 def _parse_loxone_numeric(raw_value: str) -> float:
-    clean_value = str(raw_value)
-    for suffix in _UNIT_SUFFIXES:
-        clean_value = clean_value.replace(suffix, "")
-    return float(clean_value.strip())
+    value, _ = _parse_loxone_value(raw_value)
+    return value
+
+
+def _ampere_to_kw(amps: float, *, voltage_v: float, phases: int) -> float:
+    return amps * voltage_v * max(1, phases) / 1000.0
 
 
 def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
@@ -75,15 +103,45 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
     """Nennleistung (kW): live aus Loxone, sonst Fallback aus config.json."""
     fallback = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
     sched = consumer.get("charging_schedule") or {}
-    io_name = (sched.get("loxone") or {}).get("nominal_power_kw_name", "")
+    lox = sched.get("loxone") or {}
+    io_name = lox.get("nominal_power_kw_name", "")
     if not io_name:
         return fallback
-    live = fetch_loxone_generic_value(io_name)
-    if live is None or live <= 0:
+
+    raw = fetch_loxone_raw_value(io_name)
+    if raw is None:
         logger.warning(
             "Loxone: Keine gültige Nennleistung für '%s' (%s), Fallback %.2f kW",
             consumer.get("id"),
             io_name,
+            fallback,
+        )
+        return fallback
+
+    try:
+        value, unit = _parse_loxone_value(raw)
+    except ValueError as e:
+        logger.error(
+            "Loxone: Parsing-Fehler bei Nennleistung '%s' (raw=%r): %s",
+            io_name,
+            raw,
+            e,
+        )
+        return fallback
+
+    if unit == "a":
+        voltage_v = float(lox.get("nominal_power_voltage_v", _DEFAULT_CHARGING_VOLTAGE_V))
+        phases = int(lox.get("nominal_power_phases", 1))
+        live = _ampere_to_kw(value, voltage_v=voltage_v, phases=phases)
+    else:
+        live = value
+
+    if live <= 0:
+        logger.warning(
+            "Loxone: Keine gültige Nennleistung für '%s' (%s, raw=%r), Fallback %.2f kW",
+            consumer.get("id"),
+            io_name,
+            raw,
             fallback,
         )
         return fallback

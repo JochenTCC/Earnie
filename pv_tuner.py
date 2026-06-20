@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import config
 import loxone_client
+from file_metadata import PV_COUNTER_STATE_SCHEMA, read_schema_version, stamp_payload, strip_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,10 @@ def _save_state_atomic(file_path: str, data: dict):
     Schreibt Daten direkt in die JSON-Datei (Docker Bind-Mount kompatibel).
     Nutzt das direkte Überschreiben ('w'), damit die Inode für Docker intakt bleibt.
     """
+    payload = stamp_payload(strip_metadata(data), schema_version=PV_COUNTER_STATE_SCHEMA)
     try:
         with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
+            json.dump(payload, f, indent=4)
     except Exception as e:
         logger.error(f"🚨 Fehler beim Schreiben der State-Datei {file_path}: {e}")
         raise e
@@ -71,6 +73,14 @@ def get_pv_delta_and_update() -> Optional[float]:
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             state = json.load(f)
+        schema_version = read_schema_version(state, default=1)
+        if schema_version > PV_COUNTER_STATE_SCHEMA:
+            logger.warning(
+                "pv_counter_state: neuere Schema-Version %s (aktuell %s) – lese best effort",
+                schema_version,
+                PV_COUNTER_STATE_SCHEMA,
+            )
+        state = strip_metadata(state)
     except Exception as e:
         logger.exception(f"🚨 Fehler beim Lesen von pv_counter_state.json: {e}")
         return None

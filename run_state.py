@@ -9,6 +9,8 @@ import os
 from datetime import datetime
 from typing import Any
 
+from file_metadata import RUN_STATE_SCHEMA, read_schema_version, stamp_payload
+
 logger = logging.getLogger(__name__)
 
 RUN_STATE_FILE = "optimizer_run_state.json"
@@ -21,11 +23,13 @@ def _default_path() -> str:
 def save_run_state(payload: dict[str, Any], path: str | None = None) -> None:
     """Atomares Schreiben nach erfolgreichem main.py-Durchlauf."""
     path = path or _default_path()
-    data = {
-        "version": 1,
-        "completed_at": datetime.now().isoformat(timespec="seconds"),
-        **payload,
-    }
+    data = stamp_payload(
+        {
+            "completed_at": datetime.now().isoformat(timespec="seconds"),
+            **payload,
+        },
+        schema_version=RUN_STATE_SCHEMA,
+    )
     tmp = f"{path}.tmp"
     try:
         with open(tmp, "w", encoding="utf-8") as f:
@@ -49,7 +53,16 @@ def load_run_state(path: str | None = None) -> dict[str, Any] | None:
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else None
+        if not isinstance(data, dict):
+            return None
+        schema_version = read_schema_version(data, default=1)
+        if schema_version > RUN_STATE_SCHEMA:
+            logger.warning(
+                "run_state: neuere Schema-Version %s (aktuell %s) – lese best effort",
+                schema_version,
+                RUN_STATE_SCHEMA,
+            )
+        return data
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("run_state: Lesen fehlgeschlagen: %s", e)
         return None

@@ -6,6 +6,12 @@ import os
 import pulp
 import config
 import loxone_client
+from file_metadata import (
+    CONSUMER_STATE_SCHEMA,
+    read_schema_version,
+    stamp_payload,
+    strip_metadata,
+)
 
 
 CONSUMER_STATE_FILE = "flexible_consumers_state.json"
@@ -437,6 +443,15 @@ def _load_consumer_state() -> dict:
     try:
         with open(CONSUMER_STATE_FILE, "r", encoding="utf-8") as f:
             state = json.load(f)
+        schema_version = read_schema_version(state, default=1)
+        if schema_version > CONSUMER_STATE_SCHEMA:
+            import logging
+            logging.getLogger(__name__).warning(
+                "flexible_consumers_state: neuere Schema-Version %s (aktuell %s) – lese best effort",
+                schema_version,
+                CONSUMER_STATE_SCHEMA,
+            )
+        state = strip_metadata(state)
         if state.get("date") != today:
             return {"date": today, "delivered": {}}
         delivered = state.get("delivered", {})
@@ -448,8 +463,9 @@ def _load_consumer_state() -> dict:
 
 
 def _save_consumer_state(state: dict) -> None:
+    payload = stamp_payload(strip_metadata(state), schema_version=CONSUMER_STATE_SCHEMA)
     with open(CONSUMER_STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
+        json.dump(payload, f, indent=2)
 
 
 def get_consumer_remaining_kwh(
