@@ -3,35 +3,41 @@
 # Voraussetzungen im Projektordner auf der NAS:
 #   - .env (LOXONE_IP, LOXONE_USER, LOXONE_PASS)
 #   - config.json (aus config.example.json, Laufzeit-Parameter + flexible_consumers)
+#   - cons_data_hourly.csv (+ .meta.json) – einmalig lokal via GenerateConsData.py erzeugen,
+#     danach auf die NAS kopieren; laufende Pflege erfolgt über main.py
 #   - Leere Dateien anlegen, falls noch nicht vorhanden (Synology legt sonst Ordner an):
-#       touch flexible_consumers_state.json pv_counter_state.json
+#       touch flexible_consumers_state.json pv_counter_state.json cons_data_pending.json
+#       touch optimizer_run_state.json
 #       touch pv_accuracy_log.csv system_history_log.csv energy_optimizer.log
 #       touch consumption_profiles.csv total_consumption_profiles.csv flexible_consumer_profiles.csv
-#   - Loxone-CSV-Logs (Namen wie in config.json) in ./loxone-logs/ ablegen
+#
+# Nicht benötigt in Prod (nur Dev/Forschung): Loxone-Historien-CSVs, backtesting_log.json
 #
 # Nach Änderungen an config.json: Container optimizer-worker neu starten (lädt Config nur beim Start).
+# UI: ENERGY_OPTIMIZER_UI_MODES=live (nur Echtzeit); Dev ohne Variable = alle Modi.
 
 version: "3.8"
 
 x-persist-volumes: &persist-volumes
+  # Konfiguration
   - ./.env:/app/.env
   - ./config.json:/app/config.json
+  # Laufzeit-Zustand
   - ./flexible_consumers_state.json:/app/flexible_consumers_state.json
   - ./pv_counter_state.json:/app/pv_counter_state.json
-  - ./pv_accuracy_log.csv:/app/pv_accuracy_log.csv
-  - ./system_history_log.csv:/app/system_history_log.csv
-  - ./energy_optimizer.log:/app/energy_optimizer.log
+  - ./cons_data_pending.json:/app/cons_data_pending.json
+  - ./optimizer_run_state.json:/app/optimizer_run_state.json
+  # Stunden-Log (Profile + Tagesziele; wird von main.py fortgeschrieben)
+  - ./cons_data_hourly.csv:/app/cons_data_hourly.csv
+  - ./cons_data_hourly.meta.json:/app/cons_data_hourly.meta.json
+  # Verbrauchsprofile (monatlich aus cons_data neu berechnet)
   - ./consumption_profiles.csv:/app/consumption_profiles.csv
   - ./total_consumption_profiles.csv:/app/total_consumption_profiles.csv
   - ./flexible_consumer_profiles.csv:/app/flexible_consumer_profiles.csv
-  - ./backtesting_log.json:/app/backtesting_log.json
-  - ./backtesting_hourly.csv:/app/backtesting_hourly.csv
-  # Loxone-Historien (Pfade müssen zu config.json passen; Dateien unter ./loxone-logs/)
-  - ./loxone-logs/Miniserver-Gen2_Energiemonitor_LeistungVerbrauch_20230323-20260615.csv:/app/Miniserver-Gen2_Energiemonitor_LeistungVerbrauch_20230323-20260615.csv:ro
-  - ./loxone-logs/Miniserver-Gen2_Energiemonitor_LeistungProduktion_20230323-20260617.csv:/app/Miniserver-Gen2_Energiemonitor_LeistungProduktion_20230323-20260617.csv:ro
-  - ./loxone-logs/Miniserver-Gen2_VerbrauchszählerSwim-Spa_Leistung_20211013-20260619.csv:/app/Miniserver-Gen2_VerbrauchszählerSwim-Spa_Leistung_20211013-20260619.csv:ro
-  - ./loxone-logs/Miniserver-Gen2_VerbrauchszählerEAuto_Leistung_20210819-20260619.csv:/app/Miniserver-Gen2_VerbrauchszählerEAuto_Leistung_20210819-20260619.csv:ro
-  - ./loxone-logs/Miniserver-Gen2_AnforderungWärmepumpe_20190101-20260610.csv:/app/Miniserver-Gen2_AnforderungWärmepumpe_20190101-20260610.csv:ro
+  # Logs
+  - ./pv_accuracy_log.csv:/app/pv_accuracy_log.csv
+  - ./system_history_log.csv:/app/system_history_log.csv
+  - ./energy_optimizer.log:/app/energy_optimizer.log
 
 services:
   optimizer-worker:
@@ -53,3 +59,4 @@ services:
     volumes: *persist-volumes
     environment:
       - TZ=Europe/Vienna
+      - ENERGY_OPTIMIZER_UI_MODES=live
