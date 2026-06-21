@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import importlib
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 # Bestehende Projektmodule importieren
 import config
@@ -19,6 +19,7 @@ import pv_tuner  # Adaptives PV-Tuning-Modul einbinden
 import backtesting_log
 import live_consumption
 import live_optimization_debug
+import optimization_schedule
 import run_state
 from simulation_engine import HISTORICAL_REFERENCE_ID
 from version import __version__
@@ -880,9 +881,61 @@ def fetch_market_data():
 
 
 def _quarter_hour_slot_key() -> str:
-    now = datetime.now()
-    slot_minute = (now.minute // 15) * 15
-    return now.replace(minute=slot_minute, second=0, microsecond=0).isoformat(timespec="minutes")
+    return optimization_schedule.quarter_hour_slot_key()
+
+
+def _apply_main_run_to_live_df(
+    optimized_df: pd.DataFrame,
+    main_state: dict | None,
+) -> pd.DataFrame:
+    """Stunde 0 aus main.py übernehmen, wenn der Produktiv-Durchlauf zum Slot passt."""
+    if optimized_df is None or optimized_df.empty or not main_state:
+        return optimized_df
+    if not optimization_schedule.completed_at_in_current_slot(main_state.get("completed_at")):
+        return optimized_df
+    rows = optimizer.overlay_main_run_on_rows(optimized_df.to_dict("records"), main_state)
+    return pd.DataFrame(rows)
+
+
+def _render_live_optimization_results(
+    savings_info: dict,
+    optimized_df: pd.DataFrame,
+    baseline_df: pd.DataFrame,
+    *,
+    simulation_table_title: str | None = "📋 Simulations-Details (Nächste 24 Stunden)",
+) -> None:
+    render_savings_metrics(savings_info)
+    render_optimization_chart(optimized_df, baseline_df)
+    render_applied_targets(savings_info)
+    if simulation_table_title:
+        render_simulation_details(optimized_df, title=simulation_table_title)
+
+
+def _live_optimization_cache_key(current_slot: str, main_state: dict | None) -> str:
+    completed = (main_state or {}).get("completed_at", "")
+    return f"{current_slot}|{completed}"
+
+
+def _render_pending_live_sync(wait_sec: int, reason: str) -> bool:
+    """Zeigt vorherige Simulation, solange auf main.py gewartet wird."""
+    cached_df = st.session_state.get("live_optimization_df")
+    cached_savings = st.session_state.get("live_savings_info")
+    if cached_df is None or cached_savings is None or cached_df.empty:
+        return False
+
+    baseline_df = pd.DataFrame(cached_savings.get("baseline_rows", []))
+    _render_live_optimization_results(cached_savings, cached_df, baseline_df)
+    if reason == "delay":
+        st.caption(
+            f"⏳ **Synchronisation mit main.py:** Aktualisierung in ca. **{wait_sec} s** "
+            f"(1 Min nach Viertelstunden-Wechsel)."
+        )
+    else:
+        st.caption(
+            f"⏳ **Warte auf main.py-Durchlauf** für den aktuellen Slot "
+            f"(noch ca. **{wait_sec} s**)."
+        )
+    return True
 
 
 def _persist_simulation_debug(
@@ -894,6 +947,8 @@ def _persist_simulation_debug(
     initial_soc: float,
     main_state: dict | None = None,
     quarter_hour_slot: str | None = None,
+    sync_reason: str | None = None,
+    optimized_df_raw: pd.DataFrame | None = None,
     target_date: str | None = None,
     historical_meta: dict | None = None,
 ) -> None:
@@ -907,6 +962,10 @@ def _persist_simulation_debug(
             initial_soc=initial_soc,
             main_state=main_state,
             quarter_hour_slot=quarter_hour_slot,
+            sync_reason=sync_reason,
+            optimized_rows_raw=(
+                optimized_df_raw.to_dict("records") if optimized_df_raw is not None else None
+            ),
             target_date=target_date,
             historical_meta=historical_meta,
         )
@@ -926,7 +985,8 @@ def render_plausibility_debug_panel(main_state: dict | None) -> None:
 
     with st.expander("🔍 Plausibilität main.py ↔ App-Simulation"):
         st.caption(
-            f"Debug-Snapshot: `{path}` · Slot **{debug.get('quarter_hour_slot', '?')}**"
+            f"Debug-Snapshot: `{path}` · Slot **{debug.get('quarter_hour_slot', '?')}** · "
+            f"Sync: **{debug.get('sync_reason', '?')}**"
         )
         if main_state and debug.get("main_run_completed_at") != main_state.get("completed_at"):
             st.warning(
@@ -935,15 +995,26 @@ def render_plausibility_debug_panel(main_state: dict | None) -> None:
 
         if plaus.get("available"):
             if plaus.get("aligned"):
-                st.success("Stunde 0 der Simulation stimmt mit dem Produktiv-Durchlauf überein.")
+                st.success("Stunde 0 (nach main.py-Overlay) stimmt mit dem Produktiv-Durchlauf überein.")
             else:
-                st.error("Abweichungen in Stunde 0:")
+                st.error("Abweichungen in Stunde 0 (nach Overlay):")
                 for issue in plaus.get("issues", []):
                     st.markdown(f"- {issue}")
 
+        plaus_raw = debug.get("plausibility_before_overlay") or {}
+        if plaus_raw.get("available") and not plaus_raw.get("aligned"):
+            st.info(
+                "Vor dem main.py-Overlay wich die reine App-Simulation in Stunde 0 ab — "
+                "das ist erwartbar, wenn main.py die maßgeblichen Produktivwerte liefert."
+            )
+            with st.container():
+                st.markdown("**Roh-Simulation Stunde 0 vs. main.py:**")
+                for issue in plaus_raw.get("issues", []):
+                    st.markdown(f"- {issue}")
+
         st.caption(
-            "Die Datei enthält `simulation_rows`, `baseline_rows`, `applied_targets` "
-            "und `energy_comparison` zum gemeinsamen Nachrechnen."
+            "Die Datei enthält `main_run`, `simulation_rows_raw`, `simulation_rows` (24h) "
+            "und `baseline_rows` zum gemeinsamen Nachrechnen."
         )
 
 
@@ -1028,26 +1099,52 @@ def render_historical_optimization_block(selected_date: date, initial_soc: float
 
 
 def setup_auto_refresh():
-    """Initialisiert den automatischen Refresh-Mechanismus basierend auf LOOP_TIMEOUT."""
-    loop_timeout = config.get('LOOP_TIMEOUT', default=900, cast=int)
-    
-    # Initialisiere den Refresh-Timer in session_state, falls noch nicht vorhanden
-    if 'last_refresh' not in st.session_state:
-        st.session_state.last_refresh = time.time()
-    
-    # Überprüfe, ob genug Zeit seit dem letzten Refresh vergangen ist
-    time_since_refresh = time.time() - st.session_state.last_refresh
-    
-    if time_since_refresh >= loop_timeout:
-        # Zeit für einen Refresh
-        st.session_state.last_refresh = time.time()
+    """Seiten-Refresh beim Wechsel in den nächsten Viertelstunden-Slot."""
+    current_slot = optimization_schedule.quarter_hour_slot_key()
+
+    if "last_refresh_slot" not in st.session_state:
+        st.session_state.last_refresh_slot = current_slot
+        return
+
+    if st.session_state.last_refresh_slot != current_slot:
+        st.session_state.last_refresh_slot = current_slot
         st.rerun()
 
-@st.fragment(run_every=config.get('LOOP_TIMEOUT', default=900, cast=int))
+
+@st.fragment(run_every=timedelta(seconds=10))
 def render_optimization_savings_and_chart(current_soc: float):
-    """MILP-Simulation: Einsparungen und Chart (Fragment-Refresh)."""
+    """MILP-Simulation: Einsparungen und Chart (Refresh nach main.py-Sync)."""
     _reload_runtime_config()
+    current_slot = optimization_schedule.quarter_hour_slot_key()
     main_state = run_state.load_run_state()
+    cache_key = _live_optimization_cache_key(current_slot, main_state)
+    cached_key = st.session_state.get("live_optimization_cache_key")
+
+    if (
+        cached_key == cache_key
+        and st.session_state.get("live_optimization_df") is not None
+        and st.session_state.get("live_savings_info") is not None
+        and not st.session_state["live_optimization_df"].empty
+    ):
+        cached_savings = st.session_state["live_savings_info"]
+        cached_df = _apply_main_run_to_live_df(
+            st.session_state["live_optimization_df"], main_state
+        )
+        baseline_df = pd.DataFrame(cached_savings.get("baseline_rows", []))
+        _render_live_optimization_results(cached_savings, cached_df, baseline_df)
+        return
+
+    ready, reason, wait_sec = optimization_schedule.live_simulation_readiness(
+        (main_state or {}).get("completed_at"),
+    )
+    if not ready:
+        if _render_pending_live_sync(wait_sec, reason):
+            return
+        st.info(
+            f"⏳ Live-Simulation startet nach Synchronisation mit **main.py** "
+            f"(noch ca. **{wait_sec} s**)."
+        )
+        return
 
     market_data = fetch_market_data()
     if market_data is None:
@@ -1058,7 +1155,7 @@ def render_optimization_savings_and_chart(current_soc: float):
     snapshot = None
     if main_state and main_state.get("consumption_snapshot"):
         age = run_state.age_seconds(main_state)
-        if age is not None and age <= config.get("LOOP_TIMEOUT", default=900, cast=int) * 1.5:
+        if age is not None and age <= optimization_schedule.QUARTER_HOUR_SECONDS * 1.5:
             snapshot = main_state["consumption_snapshot"]
 
     if snapshot is None:
@@ -1077,24 +1174,12 @@ def render_optimization_savings_and_chart(current_soc: float):
 
     optimized_df = pd.DataFrame(savings_info['optimized_rows'])
     baseline_df = pd.DataFrame(savings_info['baseline_rows'])
+    optimized_df_raw = optimized_df.copy()
+    optimized_df = _apply_main_run_to_live_df(optimized_df, main_state)
+    st.session_state["live_optimization_cache_key"] = cache_key
     st.session_state["live_optimization_df"] = optimized_df
+    st.session_state["live_savings_info"] = savings_info
 
-    if main_state:
-        st.caption(
-            f"📡 **Aktuelle Stunde:** Verbrauch aus "
-            f"{'main.py' if main_state.get('consumption_snapshot') and snapshot == main_state.get('consumption_snapshot') else 'Loxone live'} · "
-            f"SoC für Simulation: **{sim_soc:.1f} %** (main.py) — übrige Stunden aus Profil."
-        )
-    elif snapshot:
-        st.caption(
-            f"📡 **Aktuelle Stunde (Live):** Grundlast {snapshot['baseload_kw']:.2f} kW · "
-            f"Gesamt {snapshot['house_kw']:.2f} kW · PV {snapshot['pv_kw']:.2f} kW — "
-            "Rest des Horizonts aus Profil-Prognose."
-        )
-
-    render_savings_metrics(savings_info)
-    render_optimization_chart(optimized_df, baseline_df)
-    render_applied_targets(savings_info)
     _persist_simulation_debug(
         savings_info,
         optimized_df,
@@ -1102,8 +1187,33 @@ def render_optimization_savings_and_chart(current_soc: float):
         kind="live",
         initial_soc=sim_soc,
         main_state=main_state,
-        quarter_hour_slot=_quarter_hour_slot_key(),
+        quarter_hour_slot=current_slot,
+        sync_reason=reason,
+        optimized_df_raw=optimized_df_raw,
     )
+
+    sync_note = ""
+    if reason == "main_synced":
+        sync_note = " · synchron mit main.py"
+    elif reason == "fallback":
+        sync_note = " · main.py für diesen Slot nicht verfügbar (Live-Fallback)"
+
+    if main_state:
+        st.caption(
+            f"📡 **Aktuelle Stunde:** Verbrauch aus "
+            f"{'main.py' if main_state.get('consumption_snapshot') and snapshot == main_state.get('consumption_snapshot') else 'Loxone live'} · "
+            f"SoC für Simulation: **{sim_soc:.1f} %** (main.py) · "
+            f"Stunde 0 = Produktiv-Durchlauf main.py — übrige Stunden simuliert{sync_note}."
+        )
+    elif snapshot:
+        st.caption(
+            f"📡 **Aktuelle Stunde (Live):** Grundlast {snapshot['baseload_kw']:.2f} kW · "
+            f"Gesamt {snapshot['house_kw']:.2f} kW · PV {snapshot['pv_kw']:.2f} kW — "
+            f"Rest des Horizonts aus Profil-Prognose{sync_note}."
+        )
+
+    _render_live_optimization_results(savings_info, optimized_df, baseline_df)
+    render_plausibility_debug_panel(main_state)
 
 
 def render_cached_simulation_details():
@@ -1115,9 +1225,8 @@ def render_cached_simulation_details():
 
 @st.fragment(run_every=10)
 def render_countdown_block():
-    """Countdown synchron zum letzten main.py-Durchlauf (Fallback: App-Session)."""
+    """Countdown bis zur nächsten Viertelstunde (synchron zu main.py)."""
     _reload_runtime_config()
-    loop_timeout = config.get('LOOP_TIMEOUT', default=900, cast=int)
 
     main_state = run_state.load_run_state()
     main_epoch = run_state.completed_at_epoch(main_state)
@@ -1131,16 +1240,21 @@ def render_countdown_block():
         last_optimization = time.time()
         sync_label = "App"
 
-    elapsed = time.time() - last_optimization
-    remaining = max(0, int(loop_timeout - elapsed))
+    remaining = max(0, int(optimization_schedule.seconds_until_next_quarter_hour()))
+    app_wait = max(0, int(optimization_schedule.seconds_until_app_refresh_ready()))
+    next_run = optimization_schedule.next_quarter_hour_datetime()
     last_time = time.strftime("%H:%M:%S", time.localtime(last_optimization))
 
     st.markdown("---")
     st.caption(
-        f"🔄 **Optimierungs-Takt:** Alle {int(loop_timeout/60)} Min ({loop_timeout}s) | "
+        f"🔄 **Optimierungs-Takt:** Viertelstunden (:00 / :15 / :30 / :45) | "
         f"⏱️ Letzter Lauf ({sync_label}): **{last_time}**"
     )
-    st.caption(f"⏳ **Nächster Takt in:** `{remaining}` s (aktualisiert alle 10s)")
+    st.caption(
+        f"⏳ **Nächster main.py-Takt:** `{next_run.strftime('%H:%M')}` "
+        f"(in `{remaining}` s) · **App-Sync** ca. 1 Min danach"
+        + (f" (noch `{app_wait}` s)" if app_wait > 0 else "")
+    )
 
 #### LEISTUNGSFLUSS DARSTELLUNG
 
@@ -1360,6 +1474,7 @@ def main():
         )
     else:
         _reload_runtime_config()
+        setup_auto_refresh()
         st.markdown("Echtzeit-Cockpit und Vorhersage-Simulation des synchronisierten 24-Stunden-Horizonts.")
 
     render_parameter_input(mode)
@@ -1375,7 +1490,6 @@ def main():
 
     current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     render_optimization_savings_and_chart(current_soc)
-    render_plausibility_debug_panel(run_state.load_run_state())
     render_live_power_flow(current_soc)
     render_main_run_sync_panel()
     render_cached_simulation_details()
