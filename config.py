@@ -73,6 +73,16 @@ class Config:
             current = current[key]
         return current
 
+    @staticmethod
+    def _validate_threshold_power(value) -> float:
+        rel = float(value)
+        if rel <= 0.0 or rel > 1.0:
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: runtime_settings.threshold_power "
+                "muss ein relativer Anteil zwischen 0 (exklusiv) und 1 (inklusiv) sein."
+            )
+        return rel
+
     def _load_env_vars(self) -> None:
         self.LOXONE_IP = os.getenv("LOXONE_IP")
         self.LOXONE_USER = os.getenv("LOXONE_USER")
@@ -280,6 +290,9 @@ class Config:
         self.BATTERY_CAPACITY_KWH = self._get_strict(self._raw_config, ["runtime_settings", "battery_capacity_kwh"])
         self.BATTERY_MIN_SOC = self._get_strict(self._raw_config, ["runtime_settings", "battery_min_soc"])
         self.BATTERY_MAX_SOC = self._get_strict(self._raw_config, ["runtime_settings", "battery_max_soc"])
+        self.THRESHOLD_POWER = self._validate_threshold_power(
+            self._get_strict(self._raw_config, ["runtime_settings", "threshold_power"])
+        )
 
         self.LATITUDE = self._get_strict(self._raw_config, ["runtime_settings", "latitude"])
         self.LONGITUDE = self._get_strict(self._raw_config, ["runtime_settings", "longitude"])
@@ -300,6 +313,7 @@ class Config:
             'BATTERY_MIN_SOC': self.get('BATTERY_MIN_SOC', cast=float),
             'BATTERY_MAX_SOC': self.get('BATTERY_MAX_SOC', cast=float),
             'BATTERY_MAX_POWER_KW': self.get('BATTERY_MAX_POWER_KW', cast=float),
+            'THRESHOLD_POWER': self.get('THRESHOLD_POWER', cast=float),
         }
 
     def get_battery_params(self) -> dict:
@@ -338,6 +352,10 @@ class Config:
 
     def get_push_price_cent(self) -> float:
         return self.get('K_PUSH_CENT', cast=float)
+
+    def get_threshold_power(self) -> float:
+        """Relativer Leistungsschwellenwert (Anteil von battery_max_power_kw)."""
+        return self.get('THRESHOLD_POWER', cast=float)
 
     def get_global_timeout(self, default: int = 5) -> int:
         return self.get('GLOBAL_TIMEOUT', default=default, cast=int)
@@ -446,6 +464,9 @@ class Config:
                     f"Sicherheitsfehler: '{key}' ist kein konfigurierbarer Laufzeit-Parameter!"
                 )
 
+            if target_key == "threshold_power":
+                value = self._validate_threshold_power(value)
+
             data["runtime_settings"][target_key] = value
             setattr(self, target_key.upper(), value)
 
@@ -482,6 +503,10 @@ def get_flexible_consumers(optimizer_only: bool = False) -> list:
 
 def get_push_price_cent() -> float:
     return CONFIG.get_push_price_cent()
+
+
+def get_threshold_power() -> float:
+    return CONFIG.get_threshold_power()
 
 
 def get_global_timeout(default: int = 5) -> int:

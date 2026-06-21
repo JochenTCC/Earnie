@@ -81,6 +81,21 @@ def _reload_runtime_config() -> None:
     config.reload_config()
 
 
+def _simulation_settings_fingerprint() -> str:
+    """Stabile Kennung aller Laufzeitparameter, die die 24h-Simulation beeinflussen."""
+    runtime = config.get_runtime_settings()
+    battery = config.get_battery_params()
+    tokens = [f"{key}={runtime[key]!r}" for key in sorted(runtime)]
+    tokens.extend(f"b.{key}={battery[key]!r}" for key in sorted(battery))
+    return ";".join(tokens)
+
+
+def _invalidate_live_optimization_cache() -> None:
+    """Erzwingt Neuberechnung der Live-24h-Simulation."""
+    for key in ("live_optimization_cache_key", "live_optimization_df", "live_savings_info"):
+        st.session_state.pop(key, None)
+
+
 def _mode_label(mode: int) -> str:
     return {
         0: "Normal",
@@ -145,6 +160,7 @@ def update_config_file(settings_dict):
         # 2. BEHOBEN: Modul im RAM neu laden, damit Streamlit die JSON-Änderungen sofort übernimmt
         importlib.reload(config)
         
+        _invalidate_live_optimization_cache()
         st.success("✅ Alle Parameter erfolgreich gespeichert und im System aktualisiert!")
     except Exception as e:
         st.error(f"🚨 Fehler beim Speichern der Konfiguration: {e}")
@@ -224,13 +240,23 @@ def render_battery_config_inputs(settings: dict):
         step=0.1,
         format="%.2f"
     )
-    return bat_capacity, bat_min_soc, bat_max_soc, bat_max_power
+    threshold_power = st.number_input(
+        "Leistungs-Schwelle (rel.)",
+        min_value=0.001,
+        max_value=1.0,
+        value=float(settings['THRESHOLD_POWER']),
+        step=0.001,
+        format="%.3f",
+        help="Anteil der max. Lade-/Entladeleistung (z. B. 0,02 = 2 %). "
+        "Gilt für Modus-Umschaltung und Zwangsentladen vs. Automatik.",
+    )
+    return bat_capacity, bat_min_soc, bat_max_soc, bat_max_power, threshold_power
 
 
 def render_config_form(settings: dict):
     with st.sidebar.form("config_form"):
         kwp, tilt, azimuth, k_push = render_pv_config_inputs(settings)
-        bat_capacity, bat_min_soc, bat_max_soc, bat_max_power = render_battery_config_inputs(settings)
+        bat_capacity, bat_min_soc, bat_max_soc, bat_max_power, threshold_power = render_battery_config_inputs(settings)
 
         submit_btn = st.form_submit_button("Alle Änderungen übernehmen")
         if submit_btn:
@@ -242,7 +268,8 @@ def render_config_form(settings: dict):
                 "BATTERY_CAPACITY_KWH": bat_capacity,
                 "BATTERY_MIN_SOC": bat_min_soc,
                 "BATTERY_MAX_SOC": bat_max_soc,
-                "BATTERY_MAX_POWER_KW": bat_max_power
+                "BATTERY_MAX_POWER_KW": bat_max_power,
+                "THRESHOLD_POWER": threshold_power,
             })
             st.rerun()
 
@@ -537,12 +564,21 @@ def load_historical_matrix(target_date: date):
 
 
 def get_bar_colors(df):
-    return [
-        "forestgreen" if "Zwangsladen" in cmd else
-        "crimson" if "Entladesperre" in cmd or "Entladen" in cmd else
-        "dodgerblue"
-        for cmd in df["Steuerbefehl"]
-    ]
+    """Batterie-Balkenfarbe je Steuerbefehl (Modus)."""
+    colors = []
+    for cmd in df["Steuerbefehl"]:
+        text = str(cmd)
+        if text.startswith("Zwangsladen"):
+            colors.append("forestgreen")
+        elif text.startswith("Zwangsentladen"):
+            colors.append("crimson")
+        elif "Entladesperre" in text:
+            colors.append("darkorange")
+        elif text == "Baseline":
+            colors.append("lightgray")
+        else:
+            colors.append("dodgerblue")
+    return colors
 
 
 def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
@@ -918,7 +954,7 @@ def _render_live_optimization_results(
 
 def _live_optimization_cache_key(current_slot: str, main_state: dict | None) -> str:
     completed = (main_state or {}).get("completed_at", "")
-    return f"{current_slot}|{completed}"
+    return f"{current_slot}|{completed}|{_simulation_settings_fingerprint()}"
 
 
 def _render_pending_live_sync(wait_sec: int, reason: str) -> bool:
