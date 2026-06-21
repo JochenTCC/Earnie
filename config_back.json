@@ -1,0 +1,164 @@
+{
+    "$schema": "./config.schema.json",
+    "awattar": {
+        "url": "https://api.awattar.at/v1/marketdata",
+        "fix_aufschlag_cent": 1.5,
+        "netzverlust_faktor": 1.03,
+        "mwst_austria_faktor": 1.2
+    },
+    "system": {
+        "global_timeout": 10,
+        "loop_timeout": 900
+    },
+    "loxone_blocks": {
+        "soc_name": "B004-Battery_SOC",
+        "pv_counter_name": "48 - Accumulated energy yield",
+        "log_filename": "Verbrauch.csv",
+        "pv_tuning_log_file": "pv_accuracy_log.csv",
+        "pv_power_name": "Ernie-Merker-PV_Act",
+        "battery_power_name": "Ernie-Merker-LeistungBat_Act",
+        "grid_power_name": "Ernie-Merker-LeistungNetz_Act",
+        "target_soc_name": "Ernie_Ziel_SoC",
+        "target_charge_power_name": "Ernie_Ziel_LadeLeistung",
+        "target_discharge_power_name": "Ernie_Ziel_Entladeleistung",
+        "control_cmd_name": "Ernie_Steuerbefehl"
+    },
+    "runtime_settings": {
+        "k_push_cent": 3.5,
+        "pv_tilt": 18,
+        "pv_azimuth": 28,
+        "pv_kwp": 6.0,
+        "battery_max_power_kw": 2.5,
+        "battery_efficiency": 0.95,
+        "battery_capacity_kwh": 5.0,
+        "battery_min_soc": 10.0,
+        "battery_force_discharge_min_soc": 30.0,
+        "battery_max_soc": 100.0,
+        "latitude": 47.404,
+        "longitude": 9.743
+    },
+    "scenarios": [
+        {
+            "id": "battery_10kwh",
+            "label": "10 kWh Speicher",
+            "settings": {
+                "k_push_cent": 3.5,
+                "pv_tilt": 18,
+                "pv_azimuth": 28,
+                "pv_kwp": 6.1,
+                "battery_max_power_kw": 5.0,
+                "battery_efficiency": 0.95,
+                "battery_capacity_kwh": 10.0,
+                "battery_min_soc": 10.0,
+                "battery_force_discharge_min_soc": 20.0,
+                "battery_max_soc": 100.0,
+                "latitude": 47.404,
+                "longitude": 9.743
+            }
+        },
+        {
+            "id": "battery_15kwh",
+            "label": "15 kWh Speicher",
+            "settings": {
+                "k_push_cent": 3.5,
+                "pv_tilt": 18,
+                "pv_azimuth": 28,
+                "pv_kwp": 6.1,
+                "battery_max_power_kw": 5.0,
+                "battery_efficiency": 0.95,
+                "battery_capacity_kwh": 15.0,
+                "battery_min_soc": 10.0,
+                "battery_force_discharge_min_soc": 17.0,
+                "battery_max_soc": 100.0,
+                "latitude": 47.404,
+                "longitude": 9.743
+            }
+        }
+    ],
+    "file_paths_battery_simulation": {
+        "path_consumption": "./Historical-Data/Miniserver-Gen2_Energiemonitor_LeistungVerbrauch_20230323-20260615.csv",
+        "path_production": "./Historical-Data/Miniserver-Gen2_Energiemonitor_LeistungProduktion_20230323-20260617.csv",
+        "path_price": "./Historical-Data/energy-charts_Stromproduktion_und_Börsenstrompreise_in_Deutschland_2025.csv",
+        "path_cons_data": "cons_data_hourly.csv",
+        "cons_data_retention_months": 24,
+        "cons_data_write_mode": "hourly",
+        "price_source": "api",
+        "price_provider": "awattar",
+        "price_range": "last_12_months",
+        "energy_charts_bzn": "DE-LU"
+    },
+    "flexible_consumers": [
+        {
+            "id": "swimspa",
+            "name": "SwimSpa",
+            "nominal_power_kw": 2.8,
+            "daily_target_kwh": 8.0,
+            "daily_target_source": "historical",
+            "min_on_quarterhours": 1,
+            "path_log": "./Historical-Data/Miniserver-Gen2_VerbrauchszählerSwim-Spa_Leistung_20211013-20260619.csv",
+            "signal_type": "power",
+            "optimizer_enabled": true,
+            "loxone_outputs": {
+                "enable_name": "Ernie_SwimSpa_Freigabe"
+            },
+            "loxone_inputs": {
+                "power_name": "Ernie_Swim-Spa-P_act"
+            }
+        },
+        {
+            "id": "eauto",
+            "name": "E-Auto",
+            "nominal_power_kw": 3.5,
+            "daily_target_source": "loxone",
+            "min_on_quarterhours": 1,
+            "path_log": "./Historical-Data/Miniserver-Gen2_VerbrauchszählerEAuto_Leistung_20210819-20260619.csv",
+            "signal_type": "power",
+            "optimizer_enabled": true,
+            "loxone_outputs": {
+                "enable_name": "Ernie_EAuto_LadeFreigabe"
+            },
+            "loxone_inputs": {
+                "power_name": "Ernie_EAuto_P_act"
+            },
+            "charging_schedule": {
+                "enabled": true,
+                "battery_capacity_kwh": 16.0,
+                "target_soc_percent": 100.0,
+                "weekday": {
+                    "car_available_from_hour": 19,
+                    "ready_by_hour": 7,
+                    "daily_rest_soc": 20.0
+                },
+                "weekend": {
+                    "car_available_from_hour": 18,
+                    "ready_by_hour": 10,
+                    "daily_rest_soc": 40.0
+                },
+                "loxone": {
+                    "plugged_in_name": "Ernie_EAuto_Da",
+                    "ready_by_time_name": "Ernie_EAuto_FertigUm",
+                    "soc_at_plug_in_name": "Rest-SOC",
+                    "nominal_power_kw_name": "Ladestrom Max EAuto"
+                }
+            }
+        },
+        {
+            "id": "waermepumpe",
+            "name": "Wärmepumpe",
+            "nominal_power_kw": 1.6,
+            "daily_target_kwh": 4.0,
+            "daily_target_source": "historical",
+            "min_on_quarterhours": 2,
+            "path_log": "./Historical-Data/Miniserver-Gen2_AnforderungWärmepumpe_20190101-20260610.csv",
+            "signal_type": "power",
+            "log_signal_type": "binary",
+            "optimizer_enabled": true,
+            "loxone_outputs": {
+                "enable_name": "Ernie_WP_Freigabe"
+            },
+            "loxone_inputs": {
+                "power_name": "Ernie_WP_P_act"
+            }
+        }
+    ]
+}

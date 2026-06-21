@@ -14,7 +14,14 @@
         "soc_name": "B004-Battery_SOC",
         "pv_counter_name": "48 - Accumulated energy yield",
         "log_filename": "Verbrauch.csv",
-        "pv_tuning_log_file": "pv_accuracy_log.csv"
+        "pv_tuning_log_file": "pv_accuracy_log.csv",
+        "pv_power_name": "Ernie-Merker-PV_Act",
+        "battery_power_name": "Ernie-Merker-LeistungBat_Act",
+        "grid_power_name": "Ernie-Merker-LeistungNetz_Act",
+        "target_soc_name": "Ernie_Ziel_SoC",
+        "target_charge_power_name": "Ernie_Ziel_LadeLeistung",
+        "target_discharge_power_name": "Ernie_Ziel_Entladeleistung",
+        "control_cmd_name": "Ernie_Steuerbefehl"
     },
     "runtime_settings": {
         "k_push_cent": 3.7,

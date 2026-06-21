@@ -325,29 +325,35 @@ def fetch_loxone_live_power() -> Optional[dict]:
 
 def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: float):
     """
-    Übersetzt die Ernie-Optimierungsmodi in die vier exakten Huawei-Modbus-Steuerwerte
+    Übersetzt die Optimierungsmodi in Huawei-Modbus-Steuerwerte
     und überträgt sie an die virtuellen Eingänge des Loxone Miniservers.
+    Merkernamen kommen aus config.json → loxone_blocks.
     """
     if mode == 1:
-        forced_power_kw = target_power_kw
+        charge_kw = target_power_kw
+        discharge_kw = 0.0
         control_cmd = 1
     elif mode == 2:
-        forced_power_kw = 0
+        charge_kw = 0.0
+        discharge_kw = 0.0
         control_cmd = 1
     else:
-        forced_power_kw = 0
+        charge_kw = 0.0
+        discharge_kw = 0.0
         control_cmd = 0
 
     logger.info(
-        "Sending Modbus Mapping -> SoC: %d, Power: %d W, Cmd: %d",
+        "Sending Modbus Mapping -> SoC: %s, Ladung: %s kW, Entladung: %s kW, Cmd: %s",
         target_soc,
-        forced_power_kw,
+        charge_kw,
+        discharge_kw,
         control_cmd,
     )
 
-    send_loxone_value("Ernie_Ziel_SoC", target_soc)
-    send_loxone_value("Ernie_Ziel_Leistung", forced_power_kw)
-    send_loxone_value("Ernie_Steuerbefehl", control_cmd)
+    send_loxone_value(config.get("LOXONE_TARGET_SOC_NAME"), target_soc)
+    send_loxone_value(config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw)
+    send_loxone_value(config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw)
+    send_loxone_value(config.get("LOXONE_CONTROL_CMD_NAME"), control_cmd)
 
 
 def send_flexible_consumer_states(

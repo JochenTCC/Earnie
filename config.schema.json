@@ -9,6 +9,10 @@
       "type": "string",
       "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
     },
+    "loxone_blocks": {
+      "$ref": "#/definitions/loxone_blocks",
+      "description": "Merker- und Virtuelle-Eingang-Namen des Loxone Miniservers (Lesen/Schreiben)."
+    },
     "flexible_consumers": {
       "type": "array",
       "description": "Steuerbare Verbraucher für die MILP-Optimierung.",
@@ -18,6 +22,69 @@
     }
   },
   "definitions": {
+    "loxone_blocks": {
+      "type": "object",
+      "description": "Zentrale Loxone-IO-Namen für Speicher, PV und Steuerbefehle.",
+      "required": [
+        "soc_name",
+        "pv_counter_name",
+        "log_filename",
+        "pv_tuning_log_file",
+        "pv_power_name",
+        "battery_power_name",
+        "grid_power_name",
+        "target_soc_name",
+        "target_charge_power_name",
+        "target_discharge_power_name",
+        "control_cmd_name"
+      ],
+      "properties": {
+        "soc_name": {
+          "type": "string",
+          "description": "Aktueller Batterie-SOC in % (Lesen)."
+        },
+        "pv_counter_name": {
+          "type": "string",
+          "description": "PV-Zählerstand kumuliert in kWh (Lesen, PV-Tuning)."
+        },
+        "log_filename": {
+          "type": "string",
+          "description": "FTP-Logdateiname auf dem Miniserver."
+        },
+        "pv_tuning_log_file": {
+          "type": "string",
+          "description": "Lokale CSV für PV-Tuning-Protokoll."
+        },
+        "pv_power_name": {
+          "type": "string",
+          "description": "Aktuelle PV-Leistung in kW (Lesen)."
+        },
+        "battery_power_name": {
+          "type": "string",
+          "description": "Aktuelle Batterieleistung in kW (Lesen, Vorzeichen: + laden, − entladen)."
+        },
+        "grid_power_name": {
+          "type": "string",
+          "description": "Aktuelle Netzleistung in kW (Lesen)."
+        },
+        "target_soc_name": {
+          "type": "string",
+          "description": "Virtueller Eingang: Ziel-SOC in % (Schreiben)."
+        },
+        "target_charge_power_name": {
+          "type": "string",
+          "description": "Virtueller Eingang: Zwangsladeleistung in kW (Schreiben)."
+        },
+        "target_discharge_power_name": {
+          "type": "string",
+          "description": "Virtueller Eingang: Ziel-Entladeleistung in kW (Schreiben)."
+        },
+        "control_cmd_name": {
+          "type": "string",
+          "description": "Virtueller Eingang: Steuerbefehl 0=Automatik, 1=aktiver Modus (Schreiben)."
+        }
+      }
+    },
     "loxone_outputs": {
       "type": "object",
       "description": "Freigabe-Signal an den Loxone Miniserver (virtueller Eingang 0/1). Die tatsächliche Schaltung obliegt der Smarthome-Logik.",

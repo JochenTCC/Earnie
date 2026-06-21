@@ -97,11 +97,17 @@ class Config:
         self.LOXONE_PV_COUNTER_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "pv_counter_name"])
         self.LOXONE_LOG_FILENAME = self._get_strict(self._raw_config, ["loxone_blocks", "log_filename"])
         self.PV_TUNING_LOG_FILE = self._get_strict(self._raw_config, ["loxone_blocks", "pv_tuning_log_file"])
-
-        loxone_blocks = self._raw_config.get("loxone_blocks", {})
-        self.LOXONE_PV_POWER_NAME = loxone_blocks.get("pv_power_name", "Ernie_Live_PV")
-        self.LOXONE_BATTERY_POWER_NAME = loxone_blocks.get("battery_power_name", "Ernie_Live_Battery")
-        self.LOXONE_GRID_POWER_NAME = loxone_blocks.get("grid_power_name", "Ernie_Live_Grid")
+        self.LOXONE_PV_POWER_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "pv_power_name"])
+        self.LOXONE_BATTERY_POWER_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "battery_power_name"])
+        self.LOXONE_GRID_POWER_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "grid_power_name"])
+        self.LOXONE_TARGET_SOC_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "target_soc_name"])
+        self.LOXONE_TARGET_CHARGE_POWER_NAME = self._get_strict(
+            self._raw_config, ["loxone_blocks", "target_charge_power_name"]
+        )
+        self.LOXONE_TARGET_DISCHARGE_POWER_NAME = self._get_strict(
+            self._raw_config, ["loxone_blocks", "target_discharge_power_name"]
+        )
+        self.LOXONE_CONTROL_CMD_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "control_cmd_name"])
 
         sim_paths = self._raw_config.get("file_paths_battery_simulation", {})
         self.PATH_CONSUMPTION = sim_paths.get("path_consumption", "")
