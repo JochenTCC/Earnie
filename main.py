@@ -13,6 +13,7 @@ import pv_tuner
 import cons_data_store
 import live_consumption
 import run_state
+import optimization_history
 import optimization_schedule
 import os
 import csv
@@ -179,28 +180,31 @@ def main():
         consumption_snapshot = live_consumption.build_consumption_snapshot(live_power, flex_kw)
 
     try:
-        run_state.save_run_state(
-            {
-                "source": "main.py",
-                "success": True,
-                "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
-                "soc_percent": round(float(current_soc), 2),
-                "pv_delta_kwh": round(float(pv_delta), 4),
-                "market_price_cent": round(float(current_market_item["price_buy"]), 4),
-                "forecast_pv_kw": round(float(optimization_matrix[0]["expected_p_pv"]), 3),
-                "forecast_consumption_kw": round(float(optimization_matrix[0]["expected_p_act"]), 3),
-                "mode": int(mode),
-                "target_power_kw": round(float(target_power), 3),
-                "target_soc_percent": round(float(target_soc), 1),
-                "battery_plan_kw": battery_plan_kw,
-                "consumer_powers_kw": {
-                    k: round(float(v), 3) for k, v in consumer_powers.items()
-                },
-                "flex_live_kw": flex_kw,
-                "consumption_snapshot": consumption_snapshot,
-                "current_hour": int(current_hour),
-            }
-        )
+        run_payload = {
+            "source": "main.py",
+            "success": True,
+            "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
+            "soc_percent": round(float(current_soc), 2),
+            "pv_delta_kwh": round(float(pv_delta), 4),
+            "market_price_cent": round(float(current_market_item["price_buy"]), 4),
+            "forecast_pv_kw": round(float(optimization_matrix[0]["expected_p_pv"]), 3),
+            "forecast_consumption_kw": round(float(optimization_matrix[0]["expected_p_act"]), 3),
+            "mode": int(mode),
+            "target_power_kw": round(float(target_power), 3),
+            "target_soc_percent": round(float(target_soc), 1),
+            "battery_plan_kw": battery_plan_kw,
+            "consumer_powers_kw": {
+                k: round(float(v), 3) for k, v in consumer_powers.items()
+            },
+            "flex_live_kw": flex_kw,
+            "consumption_snapshot": consumption_snapshot,
+            "current_hour": int(current_hour),
+        }
+        run_state.save_run_state(run_payload)
+        try:
+            optimization_history.append_production_run(run_payload)
+        except OSError as exc:
+            logger.warning("optimization_history: Anhängen fehlgeschlagen: %s", exc)
         logger.info("run_state: Durchlauf in optimizer_run_state.json gespeichert.")
     except Exception as e:
         logger.warning("run_state: Zustand konnte nicht gespeichert werden: %s", e)
