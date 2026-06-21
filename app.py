@@ -1,10 +1,8 @@
 # app.py
 import logging
-import os
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import importlib
 import time
 from datetime import date, datetime, timedelta
 
@@ -23,6 +21,15 @@ import optimization_history
 import optimization_schedule
 import run_state
 from simulation_engine import HISTORICAL_REFERENCE_ID
+from ui.auto_refresh import setup_auto_refresh
+from ui.mode_selector import render_mode_selector
+from ui.runtime_config import (
+    get_runtime_settings,
+    reload_runtime_config,
+    simulation_settings_fingerprint,
+    update_config_file,
+)
+from ui.styles import inject_compact_numeric_css
 from version import __version__
 
 logger = logging.getLogger("app")
@@ -32,69 +39,6 @@ st.set_page_config(
     page_icon="🔋",
     layout="wide"
 )
-
-
-def _inject_compact_numeric_css() -> None:
-    """Kleinere Schrift für Metrik-Zahlen und Tabellen."""
-    st.markdown(
-        """
-        <style>
-        [data-testid="stMetricValue"] {
-            font-size: 0.95rem;
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 0.75rem;
-        }
-        [data-testid="stMetricDelta"] {
-            font-size: 0.7rem;
-        }
-        div[data-testid="stDataFrame"] div[data-testid="stTable"] {
-            font-size: 0.8rem;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-UI_MODE_KEYS = ("live", "historical", "backtesting")
-UI_MODE_LABELS = {
-    "live": "Echtzeit",
-    "historical": "Historischer Tag",
-    "backtesting": "Backtesting",
-}
-
-
-def get_enabled_ui_modes() -> list[str]:
-    """
-    Aktivierte UI-Modi aus ENERGY_OPTIMIZER_UI_MODES (kommagetrennt: live,historical,backtesting).
-    Ohne Variable: alle Modi (Entwicklung).
-    """
-    raw = os.environ.get("ENERGY_OPTIMIZER_UI_MODES", "").strip()
-    if not raw:
-        return [UI_MODE_LABELS[k] for k in UI_MODE_KEYS]
-    requested = {part.strip().lower() for part in raw.split(",") if part.strip()}
-    enabled = [UI_MODE_LABELS[k] for k in UI_MODE_KEYS if k in requested]
-    return enabled or [UI_MODE_LABELS["live"]]
-
-
-def _reload_runtime_config() -> None:
-    """config.json vor UI-Aktualisierung neu laden (Änderungen aus main.py / Editor)."""
-    config.reload_config()
-
-
-def _simulation_settings_fingerprint() -> str:
-    """Stabile Kennung aller Laufzeitparameter, die die 24h-Simulation beeinflussen."""
-    runtime = config.get_runtime_settings()
-    battery = config.get_battery_params()
-    tokens = [f"{key}={runtime[key]!r}" for key in sorted(runtime)]
-    tokens.extend(f"b.{key}={battery[key]!r}" for key in sorted(battery))
-    return ";".join(tokens)
-
-
-def _invalidate_live_optimization_cache() -> None:
-    """Erzwingt Neuberechnung der Live-24h-Simulation."""
-    for key in ("live_optimization_cache_key", "live_optimization_df", "live_savings_info"):
-        st.session_state.pop(key, None)
 
 
 def _mode_label(mode: int) -> str:
@@ -256,23 +200,6 @@ def render_optimization_history_panel() -> None:
             st.write(row.to_dict())
 
 
-def update_config_file(settings_dict):
-    """Aktualisiert alle übergebenen Parameter über die zentrale Laufzeit-Schnittstelle der config.py."""
-    try:
-        # 1. Werte in die JSON-Konfiguration schreiben
-        config.update_runtime_settings(settings_dict)
-        
-        # 2. BEHOBEN: Modul im RAM neu laden, damit Streamlit die JSON-Änderungen sofort übernimmt
-        importlib.reload(config)
-        
-        _invalidate_live_optimization_cache()
-        st.success("✅ Alle Parameter erfolgreich gespeichert und im System aktualisiert!")
-    except Exception as e:
-        st.error(f"🚨 Fehler beim Speichern der Konfiguration: {e}")
-
-def get_runtime_settings() -> dict:
-    return config.get_runtime_settings()
-
 def _calculate_scaled_consumption_and_cost(optimized_rows: list) -> tuple[float, float, float]:
     """Berechnet den Gesamtverbrauch und die Kosten ohne PV, skaliert auf einen 24h-Horizont."""
     total_consumption_kwh = 0.0
@@ -422,47 +349,6 @@ def render_parameter_input(mode: str):
     render_config_form(get_runtime_settings())
     if mode == "Echtzeit":
         render_pv_tuning_sidebar()
-
-
-def render_mode_selector() -> str:
-    enabled_modes = get_enabled_ui_modes()
-    raw = os.environ.get("ENERGY_OPTIMIZER_UI_MODES", "").strip()
-    if raw and not any(
-        part.strip().lower() in UI_MODE_LABELS
-        for part in raw.split(",")
-        if part.strip()
-    ):
-        st.sidebar.warning(
-            "Ungültige ENERGY_OPTIMIZER_UI_MODES – verwende nur Echtzeit."
-        )
-
-    if len(enabled_modes) == 1:
-        mode = enabled_modes[0]
-        st.session_state.app_mode = mode
-        return mode
-
-    st.sidebar.header("🕒 Betriebsmodus")
-    default_idx = 0
-    previous = st.session_state.get("app_mode")
-    if previous in enabled_modes:
-        default_idx = enabled_modes.index(previous)
-
-    help_parts = []
-    if UI_MODE_LABELS["historical"] in enabled_modes:
-        help_parts.append("Historisch: beliebiger Tag aus den letzten 12 Monaten.")
-    if UI_MODE_LABELS["backtesting"] in enabled_modes:
-        help_parts.append(
-            "Backtesting: Ergebnisse aus run_backtesting.py (backtesting_log.json)."
-        )
-
-    mode = st.sidebar.radio(
-        "Optimierung für:",
-        enabled_modes,
-        index=default_idx,
-        help=" ".join(help_parts) if help_parts else None,
-    )
-    st.session_state.app_mode = mode
-    return mode
 
 
 def render_historical_inputs() -> tuple[date, float]:
@@ -1060,7 +946,7 @@ def _render_live_optimization_results(
 
 def _live_optimization_cache_key(current_slot: str, main_state: dict | None) -> str:
     completed = (main_state or {}).get("completed_at", "")
-    return f"{current_slot}|{completed}|{_simulation_settings_fingerprint()}"
+    return f"{current_slot}|{completed}|{simulation_settings_fingerprint()}"
 
 
 def _render_pending_live_sync(wait_sec: int, reason: str) -> bool:
@@ -1245,23 +1131,10 @@ def render_historical_optimization_block(selected_date: date, initial_soc: float
     )
 
 
-def setup_auto_refresh():
-    """Seiten-Refresh beim Wechsel in den nächsten Viertelstunden-Slot."""
-    current_slot = optimization_schedule.quarter_hour_slot_key()
-
-    if "last_refresh_slot" not in st.session_state:
-        st.session_state.last_refresh_slot = current_slot
-        return
-
-    if st.session_state.last_refresh_slot != current_slot:
-        st.session_state.last_refresh_slot = current_slot
-        st.rerun()
-
-
 @st.fragment(run_every=timedelta(seconds=10))
 def render_optimization_savings_and_chart(current_soc: float):
     """MILP-Simulation: Einsparungen und Chart (Refresh nach main.py-Sync)."""
-    _reload_runtime_config()
+    reload_runtime_config()
     current_slot = optimization_schedule.quarter_hour_slot_key()
     main_state = run_state.load_run_state()
     cache_key = _live_optimization_cache_key(current_slot, main_state)
@@ -1366,7 +1239,7 @@ def render_optimization_savings_and_chart(current_soc: float):
 @st.fragment(run_every=10)
 def render_countdown_block():
     """Countdown bis zur nächsten Viertelstunde (synchron zu main.py)."""
-    _reload_runtime_config()
+    reload_runtime_config()
 
     main_state = run_state.load_run_state()
     main_epoch = run_state.completed_at_epoch(main_state)
@@ -1552,7 +1425,7 @@ def _create_live_flow_sankey(
 @st.fragment(run_every=10)
 def render_live_power_flow(current_soc: float):
     """Rendert die Live-Leistungsfluss-Ansicht mit CSS-Fix gegen den Text-Glow."""
-    _reload_runtime_config()
+    reload_runtime_config()
     st.write("### ⚡ Echtzeit-Leistungsfluss (Live)")
     
     # CSS-Injektion: Entfernt restlos den hardcodierten Plotly-Textschatten
@@ -1597,7 +1470,7 @@ def render_live_power_flow(current_soc: float):
 ################################    
 
 def main():
-    _inject_compact_numeric_css()
+    inject_compact_numeric_css()
     st.title("🔋 Ernie Energy Control Center")
     st.caption(f"Version {__version__}")
     mode = render_mode_selector()
@@ -1613,7 +1486,7 @@ def main():
             "(Referenz ohne Optimierung vs. optimierte Szenarien)."
         )
     else:
-        _reload_runtime_config()
+        reload_runtime_config()
         setup_auto_refresh()
         st.markdown("Echtzeit-Cockpit und Vorhersage-Simulation des synchronisierten 24-Stunden-Horizonts.")
 
