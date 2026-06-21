@@ -9,12 +9,15 @@
 - [x] E-Auto / Swim-Spa / Wärmepumpe (und Waschmaschine, Geschirrspüler) in die Optimierung mit reinnehmen mit Empfehlung, wann der beste Startzeitpunkt wäre bzw. autonomes Starten. 
 - [x] Fiktive Simulation der historischen Daten mit einer größeren Batterie
 - [x] Zulässigen Maximalstrom für E-Auto Laden für Ernie bereitstellen
-- [ ] Optimierung von main.py wird in App nicht richtig übernommen (kleinen Zeitversatz einbauen?) 
-- [ ] Vergangene Optimierungen anzeigbar Machen im Live Modus (debugging) 
+- [x] Optimierung von main.py wird in App nicht richtig übernommen (kleinen Zeitversatz einbauen?) 
+- [x] Vergangene Optimierungen anzeigbar Machen im Live Modus (debugging) 
+- [ ] Testsuite für 24h-Optimierung mit historischen Daten aufbauen
+- [ ] Dateistruktur aufräumen
+- [ ] Dateigrößen prüfen und ggf. refaktorieren
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus
-- [ ] Container für Loxberry ausprobieren
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis
-- [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler
 - [ ] Einfacherer Austausch der Daten zwischen Produktiv und Dev-Version
+- [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler
+- [ ] Container für Loxberry ausprobieren
 
 

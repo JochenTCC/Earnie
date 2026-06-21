@@ -1342,7 +1342,7 @@ def _simulate_single_hour_optimizer(
         battery_params["min_soc"],
         battery_params["max_soc"],
     )
-    p_grid = con + total_flex_power - pv + batt_action
+    p_grid = con + total_flex_power - pv + round(batt_action, 2)
     chart_row = {
         "Uhrzeit": f"{h:02d}:00",
         "Strompreis (Cent/kWh)": row["k_act"],
@@ -1393,7 +1393,10 @@ def _finalize_chart_row_energy(
         battery_params["max_soc"],
     )
     chart_row["Geplante Batterie-Aktion (kW)"] = round(batt_action, 2)
-    chart_row["Netzbezug (kW)"] = round(con + total_flex - pv + batt_action, 2)
+    chart_row["Netzbezug (kW)"] = round(
+        con + total_flex - pv + chart_row["Geplante Batterie-Aktion (kW)"],
+        2,
+    )
     return new_soc
 
 
