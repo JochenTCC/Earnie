@@ -27,6 +27,29 @@ st.set_page_config(
     layout="wide"
 )
 
+
+def _inject_compact_numeric_css() -> None:
+    """Kleinere Schrift für Metrik-Zahlen und Tabellen."""
+    st.markdown(
+        """
+        <style>
+        [data-testid="stMetricValue"] {
+            font-size: 0.95rem;
+        }
+        [data-testid="stMetricLabel"] {
+            font-size: 0.75rem;
+        }
+        [data-testid="stMetricDelta"] {
+            font-size: 0.7rem;
+        }
+        div[data-testid="stDataFrame"] div[data-testid="stTable"] {
+            font-size: 0.8rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 UI_MODE_KEYS = ("live", "historical", "backtesting")
 UI_MODE_LABELS = {
     "live": "Echtzeit",
@@ -615,7 +638,7 @@ def add_power_traces(fig, df, bar_colors, slot_x: pd.Series):
         fig.add_trace(go.Scatter(
             x=pv_x,
             y=pv_y,
-            name="PV-Ertrag Prognose (kW)",
+            name="PV",
             line=dict(color='#f1c40f', width=2),
             fill='tozeroy',
             fillcolor='rgba(241, 196, 15, 0.15)',
@@ -628,7 +651,7 @@ def add_power_traces(fig, df, bar_colors, slot_x: pd.Series):
         fig.add_trace(go.Scatter(
             x=load_x,
             y=load_y,
-            name="Historischer Verbrauch (kW)",
+            name="Verbrauch",
             line=dict(color='#3498db', width=2, dash='dash'),
             yaxis="y",
             **_line_hover(uhrzeit, ".2f"),
@@ -637,7 +660,7 @@ def add_power_traces(fig, df, bar_colors, slot_x: pd.Series):
     fig.add_trace(go.Bar(
         x=slot_x + bar_offset,
         y=df["Geplante Batterie-Aktion (kW)"],
-        name="Batterie-Aktion (kW)",
+        name="Batterie",
         marker=dict(color=bar_colors),
         opacity=0.75,
         width=battery_bar_width,
@@ -651,7 +674,7 @@ def add_power_traces(fig, df, bar_colors, slot_x: pd.Series):
                 slot_x, index, consumer_count, consumer_bar_width, bar_offset
             ),
             y=df[col],
-            name=col,
+            name=consumer["name"],
             opacity=0.65,
             width=consumer_bar_width,
             yaxis="y",
@@ -665,7 +688,7 @@ def add_price_soc_traces(fig, df, slot_x: pd.Series):
     fig.add_trace(go.Scatter(
         x=price_x,
         y=price_y,
-        name="Brutto-Strompreis (Cent)",
+        name="Preis",
         mode="lines",
         line=dict(color="red", width=3, shape="hv"),
         yaxis="y2",
@@ -676,7 +699,7 @@ def add_price_soc_traces(fig, df, slot_x: pd.Series):
     fig.add_trace(go.Scatter(
         x=soc_x,
         y=soc_y,
-        name="Simulierter Speicher-SoC (%)",
+        name="SoC",
         mode="lines",
         line=dict(color="gold", width=2.5, dash="dash"),
         yaxis="y2",
@@ -700,7 +723,7 @@ def render_optimization_chart(df, baseline_df=None):
         fig.add_trace(go.Scatter(
             x=baseline_x,
             y=baseline_y,
-            name="Baseline SoC (%)",
+            name="SoC BL",
             mode="lines",
             line=dict(color="darkgrey", width=2.5, dash="dash"),
             yaxis="y2",
@@ -715,8 +738,15 @@ def render_optimization_chart(df, baseline_df=None):
         barmode="overlay",
         yaxis=dict(title="Leistung (kW)", side="left"),
         yaxis2=dict(title="Preis (Cent/kWh) / SoC (%)", side="right", overlaying="y", showgrid=False),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(l=40, r=40, t=80, b=40)
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.22,
+            x=0.5,
+            xanchor="center",
+            font=dict(size=10),
+        ),
+        margin=dict(l=40, r=40, t=50, b=110),
     )
 
     st.plotly_chart(fig, width='stretch')
@@ -756,6 +786,24 @@ def render_applied_targets(savings: dict):
     )
 
 
+def _normalized_savings_euro(
+    baseline_cost: float,
+    optimized_cost: float,
+    baseline_kwh: float,
+    optimized_kwh: float,
+) -> float | None:
+    """
+    Ersparnis auf gleichen Verbrauch normiert (Dreisatz auf Baseline-kWh).
+    Bei Δ Verbrauch = 0 entspricht das der unbereinigten Ersparnis.
+    """
+    if abs(optimized_kwh - baseline_kwh) < 1e-6:
+        return optimized_cost - baseline_cost
+    if optimized_kwh <= 0:
+        return None
+    normalized_optimized_cost = optimized_cost * (baseline_kwh / optimized_kwh)
+    return normalized_optimized_cost - baseline_cost
+
+
 def render_savings_metrics(savings: dict):
     """Rendert die finanzielle Metriken-Übersicht im Dashboard auf einheitlicher Zeitbasis."""
     st.subheader("💶 Optimierungs-Einsparungen")
@@ -767,7 +815,7 @@ def render_savings_metrics(savings: dict):
     optimized_rows = savings.get('optimized_rows', [])
     _, _, cost_without_pv_24h_euro = _calculate_scaled_consumption_and_cost(optimized_rows)
 
-    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(8)
     col1.metric(
         "Ohne PV (24h hochger.)",
         f"{cost_without_pv_24h_euro:.2f} €",
@@ -787,19 +835,36 @@ def render_savings_metrics(savings: dict):
     )
 
     display_savings = optimized_cost - baseline_cost
+    normalized_savings = _normalized_savings_euro(
+        baseline_cost, optimized_cost, baseline_kwh, optimized_kwh
+    )
     col6.metric(
         "Ersparnis",
         f"{display_savings:.2f} €",
         delta=f"{display_savings:.2f} €",
-        delta_color="normal" if display_savings <= 0 else "inverse",
+        delta_color="inverse",
     )
     col7.metric(
         "Δ Verbrauch",
         f"{optimized_kwh - baseline_kwh:+.1f} kWh",
         help="Differenz optimierter minus Baseline-Verbrauch.",
     )
-
-    render_applied_targets(savings)
+    if normalized_savings is None:
+        col8.metric(
+            "Norm. Ersparnis",
+            "—",
+            help="Nicht berechenbar (optimierter Verbrauch ist 0 kWh).",
+        )
+    else:
+        col8.metric(
+            "Norm. Ersparnis",
+            f"{normalized_savings:.2f} €",
+            help=(
+                "Kostenvergleich bei gleichem Verbrauch (Baseline-kWh): "
+                "optimierte Kosten per Dreisatz auf Baseline-Verbrauch hoch-/runtergerechnet. "
+                "Bei Δ Verbrauch = 0 identisch mit „Ersparnis“."
+            ),
+        )
 
 
 def fetch_market_data():
@@ -874,6 +939,7 @@ def render_historical_optimization_block(selected_date: date, initial_soc: float
 
     render_savings_metrics(savings_info)
     render_optimization_chart(optimized_df, baseline_df)
+    render_applied_targets(savings_info)
     render_simulation_details(
         optimized_df,
         title=f"📋 Simulations-Details ({selected_date.strftime('%d.%m.%Y')})",
@@ -897,8 +963,8 @@ def setup_auto_refresh():
         st.rerun()
 
 @st.fragment(run_every=config.get('LOOP_TIMEOUT', default=900, cast=int))
-def render_optimization_block(current_soc: float):
-    """What-if-Simulation; aktuelle Stunde optional aus main.py oder Live-Loxone."""
+def render_optimization_savings_and_chart(current_soc: float):
+    """MILP-Simulation: Einsparungen und Chart (Fragment-Refresh)."""
     _reload_runtime_config()
     main_state = run_state.load_run_state()
 
@@ -927,9 +993,10 @@ def render_optimization_block(current_soc: float):
         sim_soc,
         consumer_daily_targets_kwh=targets,
     )
-    
+
     optimized_df = pd.DataFrame(savings_info['optimized_rows'])
     baseline_df = pd.DataFrame(savings_info['baseline_rows'])
+    st.session_state["live_optimization_df"] = optimized_df
 
     if main_state:
         st.caption(
@@ -946,7 +1013,14 @@ def render_optimization_block(current_soc: float):
 
     render_savings_metrics(savings_info)
     render_optimization_chart(optimized_df, baseline_df)
-    render_simulation_details(optimized_df)
+    render_applied_targets(savings_info)
+
+
+def render_cached_simulation_details():
+    """Simulations-Tabelle aus dem letzten Optimierungs-Fragment-Lauf."""
+    df = st.session_state.get("live_optimization_df")
+    if df is not None and not df.empty:
+        render_simulation_details(df)
 
 
 @st.fragment(run_every=10)
@@ -1131,16 +1205,6 @@ def _create_live_flow_sankey(
     return fig
 
 
-def _render_live_consumption_metrics(snapshot: dict) -> None:
-    """Kacheln: Grundlast + flexible Verbraucher (nur Anzeige)."""
-    consumers = config.get_flexible_consumers()
-    cols = st.columns(1 + len(consumers))
-    cols[0].metric("Grundlast (live)", f"{snapshot['baseload_kw']:.2f} kW")
-    for idx, consumer in enumerate(consumers, start=1):
-        kw = float((snapshot.get("flex_kw") or {}).get(consumer["id"], 0.0) or 0.0)
-        cols[idx].metric(consumer["name"], f"{kw:.2f} kW")
-
-
 @st.fragment(run_every=10)
 def render_live_power_flow(current_soc: float):
     """Rendert die Live-Leistungsfluss-Ansicht mit CSS-Fix gegen den Text-Glow."""
@@ -1167,25 +1231,16 @@ def render_live_power_flow(current_soc: float):
         return
 
     main_state = run_state.load_run_state()
-    use_main_snapshot = False
     if main_state and main_state.get("consumption_snapshot"):
         age = run_state.age_seconds(main_state)
         if age is not None and age <= 120:
             snapshot = main_state["consumption_snapshot"]
-            use_main_snapshot = True
         else:
             flex_kw = loxone_client.fetch_flexible_consumers_live_kw()
             snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
     else:
         flex_kw = loxone_client.fetch_flexible_consumers_live_kw()
         snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
-
-    _render_live_consumption_metrics(snapshot)
-    src = "main.py" if use_main_snapshot else "Loxone live"
-    st.caption(
-        f"Gesamtverbrauch: **{snapshot['house_kw']:.2f} kW** "
-        f"(Grundlast + flexible Verbraucher · Quelle: {src})"
-    )
 
     fig = _create_live_flow_sankey(
         data,
@@ -1198,6 +1253,7 @@ def render_live_power_flow(current_soc: float):
 ################################    
 
 def main():
+    _inject_compact_numeric_css()
     st.title("🔋 Ernie Energy Control Center")
     st.caption(f"Version {__version__}")
     mode = render_mode_selector()
@@ -1228,13 +1284,10 @@ def main():
         return
 
     current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
-    render_main_run_sync_panel()
-    st.markdown("#### 🔮 What-if-Simulation (24h)")
-    st.caption(
-        "Unabhängige MILP-Simulation in der App; Produktiv-Steuerung läuft in **main.py**."
-    )
+    render_optimization_savings_and_chart(current_soc)
     render_live_power_flow(current_soc)
-    render_optimization_block(current_soc)
+    render_main_run_sync_panel()
+    render_cached_simulation_details()
     render_countdown_block()
 
 
