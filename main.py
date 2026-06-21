@@ -13,6 +13,7 @@ import pv_tuner
 import cons_data_store
 import live_consumption
 import run_state
+import optimization_schedule
 import os
 import csv
 from version import __version__
@@ -79,8 +80,24 @@ def main():
     logger.info("📊 Tatsächlicher PV-Ertrag der letzten Stunde: %.3f kWh", pv_delta)
     
     # 3. Prognose-Vektoren (Verbrauch & PV) laden
-    forecast_consumption, forecast_pv, optimization_matrix = profile_manager.get_forecast_vectors(market_data)
-    
+    _, _, optimization_matrix = profile_manager.get_forecast_vectors(market_data)
+
+    live_power = loxone_client.fetch_loxone_live_power()
+    flex_kw_for_matrix: dict[str, float] = {}
+    if live_power:
+        flex_kw_for_matrix = loxone_client.fetch_flexible_consumers_live_kw()
+        matrix_snapshot = live_consumption.build_consumption_snapshot(
+            live_power, flex_kw_for_matrix
+        )
+        optimization_matrix = live_consumption.apply_live_snapshot_to_matrix(
+            optimization_matrix, matrix_snapshot, hour_index=0
+        )
+        logger.info(
+            "Live-Snapshot in Optimierungsmatrix: PV=%.2f kW, Grundlast=%.2f kW",
+            matrix_snapshot["pv_kw"],
+            matrix_snapshot["baseload_kw"],
+        )
+
     # 4. Optimierung berechnen
     current_hour = datetime.now().hour
     targets = consumer_targets.resolve_consumer_daily_targets(matrix=optimization_matrix)
@@ -109,6 +126,15 @@ def main():
         consumer_remaining_kwh=consumer_remaining,
         charging_contexts=charging_contexts,
     )
+    battery_params = config.get_battery_params()
+    battery_plan_kw = optimizer.battery_plan_kw_from_control(
+        mode,
+        target_power,
+        optimization_matrix[0]["expected_p_pv"],
+        optimization_matrix[0]["expected_p_act"],
+        sum(consumer_powers.values()),
+        battery_params["max_power_kw"],
+    )
     optimizer.register_consumer_hours(consumer_powers)
 
     logger.info(
@@ -120,8 +146,8 @@ def main():
     log_to_csv(
         soc=current_soc,
         price=current_market_item['price_buy'],
-        pv_forecast=forecast_pv[0],
-        cons_forecast=forecast_consumption[0],
+        pv_forecast=optimization_matrix[0]["expected_p_pv"],
+        cons_forecast=optimization_matrix[0]["expected_p_act"],
         mode=mode,
         target_power=target_power,
         target_soc=target_soc
@@ -132,7 +158,8 @@ def main():
     logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
     loxone_client.send_flexible_consumer_states(consumer_powers, charging_contexts)
 
-    live_power = loxone_client.fetch_loxone_live_power()
+    if live_power is None:
+        live_power = loxone_client.fetch_loxone_live_power()
     total_kw = live_power["house"] if live_power else None
     flex_kw = loxone_client.fetch_flexible_consumers_live_kw(fallbacks=consumer_powers)
     logger.info("cons_data Flex live (kW): %s", flex_kw)
@@ -156,15 +183,16 @@ def main():
             {
                 "source": "main.py",
                 "success": True,
-                "loop_timeout_sec": config.get("LOOP_TIMEOUT", cast=int),
+                "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
                 "soc_percent": round(float(current_soc), 2),
                 "pv_delta_kwh": round(float(pv_delta), 4),
                 "market_price_cent": round(float(current_market_item["price_buy"]), 4),
-                "forecast_pv_kw": round(float(forecast_pv[0]), 3),
-                "forecast_consumption_kw": round(float(forecast_consumption[0]), 3),
+                "forecast_pv_kw": round(float(optimization_matrix[0]["expected_p_pv"]), 3),
+                "forecast_consumption_kw": round(float(optimization_matrix[0]["expected_p_act"]), 3),
                 "mode": int(mode),
                 "target_power_kw": round(float(target_power), 3),
                 "target_soc_percent": round(float(target_soc), 1),
+                "battery_plan_kw": battery_plan_kw,
                 "consumer_powers_kw": {
                     k: round(float(v), 3) for k, v in consumer_powers.items()
                 },
@@ -181,17 +209,18 @@ if __name__ == "__main__":
     logger_config.setup_logging(log_file="energy_optimizer.log", level=logging.INFO)
     while True:
         try:
-            # Führe die oben definierte Routine aus
             main()
             
-            # Strikter Zugriff auf das konfigurierte Intervall ohne versteckte Defaults
-            loop_timeout = config.get('LOOP_TIMEOUT', cast=int)
-            
-            logger.info(f"✅ Durchlauf erfolgreich beendet. Schlafe für {loop_timeout} Sekunden...")
-            time.sleep(loop_timeout)
+            wait_sec = optimization_schedule.seconds_until_next_quarter_hour()
+            next_run = optimization_schedule.next_quarter_hour_datetime()
+            logger.info(
+                "✅ Durchlauf erfolgreich beendet. Nächster Lauf um %s (in %.0f s).",
+                next_run.strftime("%H:%M:%S"),
+                wait_sec,
+            )
+            time.sleep(wait_sec)
             
         except Exception as e:
-            # Verhindert den Absturz des Skripts bei API-Fehlern, Timeouts oder Netzwerkabrissen
             msg = f"🚨 Unerwarteter Fehler während des Durchlaufs: {e}"
             if logger.handlers:
                 logger.exception(msg)

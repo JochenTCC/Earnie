@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any
 
 import config
+from optimizer import steuerbefehl_for_mode
 from file_metadata import (
     LIVE_OPTIMIZATION_DEBUG_SCHEMA,
     read_schema_version,
@@ -46,15 +47,6 @@ _MAIN_RUN_KEYS = (
     "forecast_consumption_kw",
     "current_hour",
 )
-
-
-def steuerbefehl_for_mode(mode: int, target_power_kw: float) -> str:
-    """Gleiche Beschriftung wie optimizer._simulate_single_hour_optimizer."""
-    if mode == 1:
-        return f"Zwangsladen ({target_power_kw} kW)"
-    if mode == 2:
-        return "Entladesperre aktiv"
-    return "Automatikbetrieb"
 
 
 def debug_file_path(kind: str = "live") -> str:
@@ -241,12 +233,15 @@ def build_debug_payload(
     initial_soc: float,
     main_state: dict[str, Any] | None = None,
     quarter_hour_slot: str | None = None,
+    sync_reason: str | None = None,
+    optimized_rows_raw: list[dict] | None = None,
     target_date: str | None = None,
     historical_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Gemeinsamer Snapshot für Debug und Nachrechnen."""
     main_summary = _main_run_summary(main_state)
     hour0 = _hour0_row(optimized_rows)
+    hour0_raw = _hour0_row(optimized_rows_raw or optimized_rows)
     payload: dict[str, Any] = {
         "completed_at": datetime.now().isoformat(timespec="seconds"),
         "source": "app.py",
@@ -260,8 +255,11 @@ def build_debug_payload(
     }
     if kind == "live":
         payload["quarter_hour_slot"] = quarter_hour_slot
+        payload["sync_reason"] = sync_reason
+        payload["simulation_rows_raw"] = optimized_rows_raw or optimized_rows
         payload["main_run"] = main_summary
         payload["main_run_completed_at"] = main_summary.get("completed_at")
+        payload["plausibility_before_overlay"] = build_plausibility(main_state, hour0_raw)
         payload["plausibility"] = build_plausibility(main_state, hour0)
     else:
         payload["target_date"] = target_date

@@ -6,6 +6,7 @@ import os
 import pulp
 import config
 import loxone_client
+import optimization_schedule
 from file_metadata import (
     CONSUMER_STATE_SCHEMA,
     read_schema_version,
@@ -25,6 +26,60 @@ _RESERVED_KW_COLUMNS = {
 
 def _clamp_power(value: float, max_power: float) -> float:
     return max(-max_power, min(value, max_power))
+
+
+MODE_AUTOMATIK = 0
+MODE_ZWANGS_LADEN = 1
+MODE_ENTLADESPERRE = 2
+_POWER_THRESHOLD_KW = 0.05
+
+
+def steuerbefehl_for_mode(mode: int, target_power_kw: float = 0.0) -> str:
+    """Steuerbefehl-Text für Chart und Simulations-Tabelle."""
+    if mode == MODE_ZWANGS_LADEN:
+        return f"Zwangsladen ({target_power_kw} kW)"
+    if mode == MODE_ENTLADESPERRE:
+        return "Entladesperre aktiv"
+    return "Automatikbetrieb"
+
+
+def battery_plan_kw_from_control(
+    mode: int,
+    target_power_kw: float,
+    p_pv: float,
+    p_con: float,
+    total_flex_power: float,
+    max_power_kw: float,
+) -> float:
+    """Batterieplan für run_state – abgeleitet aus Steuermodus (Huawei-Logik vereinfacht)."""
+    net_pv_surplus = p_pv - p_con - total_flex_power
+    if mode == MODE_ZWANGS_LADEN:
+        return round(_clamp_power(target_power_kw, max_power_kw), 3)
+    if mode == MODE_ENTLADESPERRE:
+        if net_pv_surplus > _POWER_THRESHOLD_KW:
+            return round(_clamp_power(net_pv_surplus, max_power_kw), 3)
+        return 0.0
+    return round(_clamp_power(net_pv_surplus, max_power_kw), 3)
+
+
+def overlay_main_run_on_rows(rows: list[dict], main_state: dict | None) -> list[dict]:
+    """Ersetzt Stunde 0 durch den Produktiv-Durchlauf von main.py."""
+    if not rows or not main_state or not main_state.get("success"):
+        return rows
+    updated = [dict(row) for row in rows]
+    row = updated[0]
+    mode = int(main_state.get("mode", MODE_AUTOMATIK))
+    target_power = float(main_state.get("target_power_kw", 0.0) or 0.0)
+    row["Steuerbefehl"] = steuerbefehl_for_mode(mode, target_power)
+    if "battery_plan_kw" in main_state:
+        row["Geplante Batterie-Aktion (kW)"] = float(main_state["battery_plan_kw"])
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        col = _consumer_column_name(consumer)
+        if col in row:
+            cid = consumer["id"]
+            row[col] = float((main_state.get("consumer_powers_kw") or {}).get(cid, 0.0) or 0.0)
+    updated[0] = row
+    return updated
 
 
 def _apply_soc_change(
@@ -498,8 +553,8 @@ def get_consumer_remaining_kwh(
 
 
 def _optimization_interval_hours() -> float:
-    """Dauer eines Live-Optimierungszyklus in Stunden (loop_timeout in Sekunden)."""
-    return config.get("LOOP_TIMEOUT", default=900, cast=int) / 3600.0
+    """Dauer eines Live-Optimierungszyklus in Stunden (Viertelstunde)."""
+    return optimization_schedule.optimization_interval_hours()
 
 
 def register_consumer_hours(consumer_powers: dict[str, float]) -> None:
@@ -1174,12 +1229,7 @@ def _simulate_single_hour_optimizer(
     p_discharge = milp_plan["p_discharge"]
     p_grid = milp_plan["p_grid_buy"] - milp_plan["p_grid_sell"]
     batt_action = p_charge - p_discharge
-    if mode == 1:
-        action_text = f"Zwangsladen ({target_power} kW)"
-    elif mode == 2:
-        action_text = "Entladesperre aktiv"
-    else:
-        action_text = "Automatikbetrieb"
+    action_text = steuerbefehl_for_mode(mode, target_power)
     old_soc = sim_soc
     batt_action = _clamp_power(batt_action, battery_params["max_power_kw"])
     sim_soc, batt_action = _apply_soc_change(
