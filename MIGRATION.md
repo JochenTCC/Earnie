@@ -40,10 +40,10 @@ Energy-Optimizer/
 | 0 Vorbereitung | offen | |
 | 1 scripts/ | offen | |
 | 2a ui/ Grundgerüst | **erledigt** | styles, runtime_config, mode_selector, auto_refresh |
-| 2b config_forms | offen | |
-| 2c charts | offen | |
-| 2d Modus-Panels | offen | |
-| 2e schlankes app.py | offen | |
+| 2b config_forms | **erledigt** | |
+| 2c charts | **erledigt** | |
+| 2d Modus-Panels | **erledigt** | inkl. simulation_results.py |
+| 2e schlankes app.py | **erledigt** | ~75 Zeilen |
 | 3 optimizer/ | offen | |
 | 4 integrations + data + simulation | offen | |
 | 5 runtime_store/ | offen | |
@@ -105,6 +105,8 @@ ui/
 ```
 
 `render_parameter_input` wandert in **Phase 2b** (`ui/config_forms.py`), da es `render_config_form` benötigt.
+
+Zusätzlich: `ui/simulation_results.py` für gemeinsame Ergebnis-Darstellung (Live + Historisch).
 
 **Akzeptanz:** `app.py` importiert aus `ui.*`; Streamlit startet; `pytest` grün.
 
@@ -244,7 +246,11 @@ Phase 1 und Phase 2 können parallel laufen.
 ## Empfohlene Reihenfolge
 
 - [ ] Phase 0
-- [x] Phase 2a → 2e
+- [x] Phase 2a 
+- [x] Phase 2b 
+- [x] Phase 2c 
+- [x] Phase 2d 
+- [x] Phase 2e 
 - [ ] Phase 1
 - [ ] Phase 3
 - [ ] Phase 4 → 5
