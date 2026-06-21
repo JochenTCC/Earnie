@@ -512,10 +512,58 @@ def get_bar_colors(df):
     ]
 
 
-def add_power_traces(fig, df, bar_colors):
+def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
+    """Verbraucher-Spalten mit sichtbaren Planwerten (> 0 kWh über den Tag)."""
+    active = []
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        col = f"{consumer['name']} (kW)"
+        if col in df.columns and df[col].sum() > 0:
+            active.append((consumer, col))
+    return active
+
+
+def _chart_slot_x(length: int) -> pd.Series:
+    """Numerische Slot-Positionen 0..n-1 (eine Einheit = eine Stunde)."""
+    return pd.Series(range(length), dtype=float)
+
+
+def _chart_xaxis_config(uhrzeit: pd.Series) -> dict:
+    tickvals = list(range(len(uhrzeit)))
+    return dict(
+        title="Uhrzeit (Stunden-Slots / Intervalle)",
+        type="linear",
+        tickmode="array",
+        tickvals=tickvals,
+        ticktext=uhrzeit.tolist(),
+        range=[-0.5, len(uhrzeit) - 0.5],
+    )
+
+
+def _consumer_bar_x(
+    slot_x: pd.Series,
+    index: int,
+    count: int,
+    bar_width: float,
+    base_offset: float,
+) -> pd.Series:
+    """X-Position je Stunde: nebeneinander und mit Batterie im selben Slot zentriert."""
+    if count <= 1:
+        return slot_x + base_offset
+    shift = (index - (count - 1) / 2) * bar_width
+    return slot_x + base_offset + shift
+
+
+def add_power_traces(fig, df, bar_colors, slot_x: pd.Series):
+    battery_bar_width = 0.9
+    bar_offset = 0.05
+    active_consumers = _active_consumer_bar_columns(df)
+    consumer_count = len(active_consumers)
+    consumer_bar_width = (
+        battery_bar_width / consumer_count if consumer_count else battery_bar_width
+    )
     if "PV-Prognose (kW)" in df.columns:
         fig.add_trace(go.Scatter(
-            x=df["Uhrzeit"],
+            x=slot_x,
             y=df["PV-Prognose (kW)"],
             name="PV-Ertrag Prognose (kW)",
             line=dict(color='#f1c40f', width=2),
@@ -526,41 +574,39 @@ def add_power_traces(fig, df, bar_colors):
 
     if "Verbrauch-Prognose (kW)" in df.columns:
         fig.add_trace(go.Scatter(
-            x=df["Uhrzeit"],
+            x=slot_x,
             y=df["Verbrauch-Prognose (kW)"],
             name="Historischer Verbrauch (kW)",
             line=dict(color='#3498db', width=2, dash='dash'),
             yaxis="y"
         ))
 
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
-        col = f"{consumer['name']} (kW)"
-        if col in df.columns and df[col].sum() > 0:
-            fig.add_trace(go.Bar(
-                x=df["Uhrzeit"],
-                y=df[col],
-                name=col,
-                opacity=0.65,
-                offsetgroup=consumer["id"],
-                yaxis="y"
-            ))
-
     fig.add_trace(go.Bar(
-        x=df["Uhrzeit"],
+        x=slot_x + bar_offset,
         y=df["Geplante Batterie-Aktion (kW)"],
         name="Batterie-Aktion (kW)",
         marker=dict(color=bar_colors),
         opacity=0.75,
-        offset=0.05,
-        width=0.9,
-        offsetgroup="bars",
-        yaxis="y"
+        width=battery_bar_width,
+        yaxis="y",
     ))
 
+    for index, (consumer, col) in enumerate(active_consumers):
+        fig.add_trace(go.Bar(
+            x=_consumer_bar_x(
+                slot_x, index, consumer_count, consumer_bar_width, bar_offset
+            ),
+            y=df[col],
+            name=col,
+            opacity=0.65,
+            width=consumer_bar_width,
+            yaxis="y",
+        ))
 
-def add_price_soc_traces(fig, df):
+
+def add_price_soc_traces(fig, df, slot_x: pd.Series):
     fig.add_trace(go.Scatter(
-        x=df["Uhrzeit"],
+        x=slot_x,
         y=df["Strompreis (Cent/kWh)"],
         name="Brutto-Strompreis (Cent)",
         mode="lines",
@@ -569,7 +615,7 @@ def add_price_soc_traces(fig, df):
     ))
 
     fig.add_trace(go.Scatter(
-        x=df["Uhrzeit"],
+        x=slot_x,
         y=df["Simulierter SoC (%)"],
         name="Simulierter Speicher-SoC (%)",
         mode="lines",
@@ -581,12 +627,14 @@ def add_price_soc_traces(fig, df):
 def render_optimization_chart(df, baseline_df=None):
     """Zeichnet Leistungen (PV, Verbrauch, Batterie) und Preise/SoC über zwei Y-Achsen."""
     bar_colors = get_bar_colors(df)
+    slot_x = _chart_slot_x(len(df))
     fig = go.Figure()
 
-    add_power_traces(fig, df, bar_colors)
+    add_power_traces(fig, df, bar_colors, slot_x)
     if baseline_df is not None and not baseline_df.empty:
+        baseline_slot_x = _chart_slot_x(len(baseline_df))
         fig.add_trace(go.Scatter(
-            x=baseline_df["Uhrzeit"],
+            x=baseline_slot_x,
             y=baseline_df["Simulierter SoC (%)"],
             name="Baseline SoC (%)",
             mode="lines",
@@ -594,11 +642,11 @@ def render_optimization_chart(df, baseline_df=None):
             yaxis="y2"
         ))
 
-    add_price_soc_traces(fig, df)
+    add_price_soc_traces(fig, df, slot_x)
 
     fig.update_layout(
         title="Synchronisierter 24-Stunden-Zeithorizont (Leistung vs. Preis & SoC)",
-        xaxis=dict(title="Uhrzeit (Stunden-Slots / Intervalle)", type="category"),
+        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
         barmode="overlay",
         yaxis=dict(title="Leistung (kW)", side="left"),
         yaxis2=dict(title="Preis (Cent/kWh) / SoC (%)", side="right", overlaying="y", showgrid=False),
