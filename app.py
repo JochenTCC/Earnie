@@ -82,7 +82,12 @@ def _reload_runtime_config() -> None:
 
 
 def _mode_label(mode: int) -> str:
-    return {0: "Normal", 1: "Zwangs-Laden", 2: "Halten"}.get(int(mode), str(mode))
+    return {
+        0: "Normal",
+        1: "Zwangs-Laden",
+        2: "Halten",
+        3: "Zwangs-Entladen",
+    }.get(int(mode), str(mode))
 
 
 def render_main_run_sync_panel() -> dict | None:

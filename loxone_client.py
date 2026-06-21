@@ -328,6 +328,12 @@ def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: flo
     Übersetzt die Optimierungsmodi in Huawei-Modbus-Steuerwerte
     und überträgt sie an die virtuellen Eingänge des Loxone Miniservers.
     Merkernamen kommen aus config.json → loxone_blocks.
+
+    Interner Modus → Ernie_Steuerbefehl (Huawei-Register 47100):
+      0 Automatik          → 0
+      1 Zwangsladen        → 1 + Ladeleistung
+      2 Entladesperre      → 1, Leistungen 0
+      3 Zwangs-Entladen    → 2 + Entladeleistung
     """
     if mode == 1:
         charge_kw = target_power_kw
@@ -337,6 +343,10 @@ def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: flo
         charge_kw = 0.0
         discharge_kw = 0.0
         control_cmd = 1
+    elif mode == 3:
+        charge_kw = 0.0
+        discharge_kw = target_power_kw
+        control_cmd = 2
     else:
         charge_kw = 0.0
         discharge_kw = 0.0

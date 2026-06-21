@@ -81,7 +81,7 @@
         },
         "control_cmd_name": {
           "type": "string",
-          "description": "Virtueller Eingang: Steuerbefehl 0=Automatik, 1=aktiver Modus (Schreiben)."
+          "description": "Virtueller Eingang: Huawei-Steuerbefehl (Register 47100): 0=Automatik, 1=Zwangsladen/Entladesperre, 2=Zwangs-Entladen."
         }
       }
     },

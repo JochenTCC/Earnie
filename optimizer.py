@@ -31,6 +31,7 @@ def _clamp_power(value: float, max_power: float) -> float:
 MODE_AUTOMATIK = 0
 MODE_ZWANGS_LADEN = 1
 MODE_ENTLADESPERRE = 2
+MODE_ZWANGS_ENTLADEN = 3
 _POWER_THRESHOLD_KW = 0.05
 
 
@@ -40,6 +41,8 @@ def steuerbefehl_for_mode(mode: int, target_power_kw: float = 0.0) -> str:
         return f"Zwangsladen ({target_power_kw} kW)"
     if mode == MODE_ENTLADESPERRE:
         return "Entladesperre aktiv"
+    if mode == MODE_ZWANGS_ENTLADEN:
+        return f"Zwangsentladen ({target_power_kw} kW)"
     return "Automatikbetrieb"
 
 
@@ -55,6 +58,8 @@ def battery_plan_kw_from_control(
     net_pv_surplus = p_pv - p_con - total_flex_power
     if mode == MODE_ZWANGS_LADEN:
         return round(_clamp_power(target_power_kw, max_power_kw), 3)
+    if mode == MODE_ZWANGS_ENTLADEN:
+        return round(-_clamp_power(target_power_kw, max_power_kw), 3)
     if mode == MODE_ENTLADESPERRE:
         if net_pv_surplus > _POWER_THRESHOLD_KW:
             return round(_clamp_power(net_pv_surplus, max_power_kw), 3)
