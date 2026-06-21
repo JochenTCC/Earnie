@@ -1,11 +1,12 @@
 # app.py
+import logging
 import os
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import importlib
 import time
-from datetime import date
+from datetime import date, datetime
 
 # Bestehende Projektmodule importieren
 import config
@@ -17,9 +18,12 @@ import optimizer
 import pv_tuner  # Adaptives PV-Tuning-Modul einbinden
 import backtesting_log
 import live_consumption
+import live_optimization_debug
 import run_state
 from simulation_engine import HISTORICAL_REFERENCE_ID
 from version import __version__
+
+logger = logging.getLogger("app")
 
 st.set_page_config(
     page_title="Ernie Energy Control Center",
@@ -875,6 +879,74 @@ def fetch_market_data():
     return market_data
 
 
+def _quarter_hour_slot_key() -> str:
+    now = datetime.now()
+    slot_minute = (now.minute // 15) * 15
+    return now.replace(minute=slot_minute, second=0, microsecond=0).isoformat(timespec="minutes")
+
+
+def _persist_simulation_debug(
+    savings_info: dict,
+    optimized_df: pd.DataFrame,
+    baseline_df: pd.DataFrame,
+    *,
+    kind: str,
+    initial_soc: float,
+    main_state: dict | None = None,
+    quarter_hour_slot: str | None = None,
+    target_date: str | None = None,
+    historical_meta: dict | None = None,
+) -> None:
+    """Schreibt Simulationsergebnis als JSON in runtime/ (Debug / Nachrechnen)."""
+    try:
+        payload = live_optimization_debug.build_debug_payload(
+            savings_info,
+            optimized_df.to_dict("records"),
+            baseline_df.to_dict("records"),
+            kind=kind,
+            initial_soc=initial_soc,
+            main_state=main_state,
+            quarter_hour_slot=quarter_hour_slot,
+            target_date=target_date,
+            historical_meta=historical_meta,
+        )
+        live_optimization_debug.save_debug_snapshot(payload, kind=kind)
+    except OSError as exc:
+        logger.warning("Debug-Snapshot konnte nicht gespeichert werden: %s", exc)
+
+
+def render_plausibility_debug_panel(main_state: dict | None) -> None:
+    """Zeigt Abgleich main.py vs. App-Simulation und Pfad zum Debug-Snapshot."""
+    debug = live_optimization_debug.load_debug_snapshot(kind="live")
+    if not debug or debug.get("simulation_kind") != "live":
+        return
+
+    path = live_optimization_debug.debug_file_path("live")
+    plaus = debug.get("plausibility") or {}
+
+    with st.expander("🔍 Plausibilität main.py ↔ App-Simulation"):
+        st.caption(
+            f"Debug-Snapshot: `{path}` · Slot **{debug.get('quarter_hour_slot', '?')}**"
+        )
+        if main_state and debug.get("main_run_completed_at") != main_state.get("completed_at"):
+            st.warning(
+                "Der gespeicherte Snapshot stammt von einem anderen main.py-Lauf als dem aktuellen Panel."
+            )
+
+        if plaus.get("available"):
+            if plaus.get("aligned"):
+                st.success("Stunde 0 der Simulation stimmt mit dem Produktiv-Durchlauf überein.")
+            else:
+                st.error("Abweichungen in Stunde 0:")
+                for issue in plaus.get("issues", []):
+                    st.markdown(f"- {issue}")
+
+        st.caption(
+            "Die Datei enthält `simulation_rows`, `baseline_rows`, `applied_targets` "
+            "und `energy_comparison` zum gemeinsamen Nachrechnen."
+        )
+
+
 def render_simulation_details(df, title: str = "📋 Simulations-Details (Nächste 24 Stunden)"):
     st.subheader(title)
     st.markdown("Hier sind die exakten mathematischen Stundenslots aufgelistet, die als Grundlage für den Chart dienen:")
@@ -940,6 +1012,15 @@ def render_historical_optimization_block(selected_date: date, initial_soc: float
     render_savings_metrics(savings_info)
     render_optimization_chart(optimized_df, baseline_df)
     render_applied_targets(savings_info)
+    _persist_simulation_debug(
+        savings_info,
+        optimized_df,
+        baseline_df,
+        kind="historical_day",
+        initial_soc=initial_soc,
+        target_date=selected_date.isoformat(),
+        historical_meta=meta,
+    )
     render_simulation_details(
         optimized_df,
         title=f"📋 Simulations-Details ({selected_date.strftime('%d.%m.%Y')})",
@@ -1014,6 +1095,15 @@ def render_optimization_savings_and_chart(current_soc: float):
     render_savings_metrics(savings_info)
     render_optimization_chart(optimized_df, baseline_df)
     render_applied_targets(savings_info)
+    _persist_simulation_debug(
+        savings_info,
+        optimized_df,
+        baseline_df,
+        kind="live",
+        initial_soc=sim_soc,
+        main_state=main_state,
+        quarter_hour_slot=_quarter_hour_slot_key(),
+    )
 
 
 def render_cached_simulation_details():
@@ -1285,6 +1375,7 @@ def main():
 
     current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     render_optimization_savings_and_chart(current_soc)
+    render_plausibility_debug_panel(run_state.load_run_state())
     render_live_power_flow(current_soc)
     render_main_run_sync_panel()
     render_cached_simulation_details()
