@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import csv
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -23,6 +24,17 @@ RUNTIME_DIR = os.environ.get("ENERGY_OPTIMIZER_RUNTIME_DIR", "runtime")
 HISTORY_FILENAME = "optimization_history.jsonl"
 HISTORY_FILE = os.path.join(RUNTIME_DIR, HISTORY_FILENAME)
 LEGACY_CSV_FILE = "system_history_log.csv"
+
+_LEGACY_CSV_COLUMNS = (
+    "Timestamp",
+    "SoC_%",
+    "Awattar_Price",
+    "PV_Forecast_kW",
+    "Consumption_Forecast_kW",
+    "Ernie_Mode",
+    "Target_Power_kW",
+    "Target_SoC_%",
+)
 
 MODE_LABELS = {
     0: "Automatik",
@@ -79,6 +91,15 @@ def _parse_timestamp(value: str | None) -> datetime | None:
         return datetime.fromisoformat(text)
     except ValueError:
         return None
+
+
+def _float_or_zero(value: Any) -> float:
+    if value is None:
+        return 0.0
+    text = str(value).strip()
+    if not text:
+        return 0.0
+    return float(text)
 
 
 def _flex_summary(consumer_powers: dict | None) -> str:
@@ -145,12 +166,57 @@ def _load_jsonl_history() -> list[dict[str, Any]]:
     return rows
 
 
+def _normalize_legacy_csv_fields(fields: list[str]) -> list[str] | None:
+    """
+    Alte system_history_log.csv: 7 Spalten ohne Target_SoC_%.
+    Neuere Zeilen (main.py): 8 Spalten.
+    """
+    if len(fields) < 7:
+        return None
+    if len(fields) == 7:
+        return fields + [""]
+    if len(fields) > 8:
+        logger.warning(
+            "optimization_history: Legacy-Zeile mit %s Feldern gekürzt (erwartet 7–8).",
+            len(fields),
+        )
+    return fields[:8]
+
+
+def _read_legacy_csv(path: str) -> pd.DataFrame:
+    """Liest Legacy-CSV robust, auch bei gemischten 7- und 8-Spalten-Zeilen."""
+    parsed_rows: list[list[str]] = []
+    with open(path, encoding="utf-8", newline="") as handle:
+        reader = csv.reader(handle)
+        header = next(reader, None)
+        if header is None:
+            return pd.DataFrame(columns=_LEGACY_CSV_COLUMNS)
+
+        for line_no, fields in enumerate(reader, start=2):
+            if not fields or all(not cell.strip() for cell in fields):
+                continue
+            normalized = _normalize_legacy_csv_fields(fields)
+            if normalized is None:
+                logger.warning(
+                    "optimization_history: Zeile %s in %s übersprungen (%s Felder).",
+                    line_no,
+                    path,
+                    len(fields),
+                )
+                continue
+            parsed_rows.append(normalized)
+
+    if not parsed_rows:
+        return pd.DataFrame(columns=_LEGACY_CSV_COLUMNS)
+    return pd.DataFrame(parsed_rows, columns=_LEGACY_CSV_COLUMNS)
+
+
 def _load_legacy_csv_history() -> list[dict[str, Any]]:
     if not os.path.isfile(LEGACY_CSV_FILE):
         return []
     try:
-        df = pd.read_csv(LEGACY_CSV_FILE, encoding="utf-8")
-    except (OSError, pd.errors.ParserError, UnicodeDecodeError) as exc:
+        df = _read_legacy_csv(LEGACY_CSV_FILE)
+    except (OSError, UnicodeDecodeError) as exc:
         logger.warning("optimization_history: %s konnte nicht gelesen werden: %s", LEGACY_CSV_FILE, exc)
         return []
 
@@ -165,7 +231,7 @@ def _load_legacy_csv_history() -> list[dict[str, Any]]:
             "soc_percent": float(record.get("SoC_%", 0.0) or 0.0),
             "mode_label": MODE_LABELS.get(mode, str(mode)),
             "target_power_kw": float(record.get("Target_Power_kW", 0.0) or 0.0),
-            "target_soc_percent": float(record.get("Target_SoC_%", 0.0) or 0.0),
+            "target_soc_percent": _float_or_zero(record.get("Target_SoC_%")),
             "market_price_cent": float(record.get("Awattar_Price", 0.0) or 0.0),
             "forecast_pv_kw": float(record.get("PV_Forecast_kW", 0.0) or 0.0),
             "forecast_consumption_kw": float(record.get("Consumption_Forecast_kW", 0.0) or 0.0),
