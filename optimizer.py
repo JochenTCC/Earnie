@@ -95,6 +95,13 @@ def overlay_main_run_on_rows(rows: list[dict], main_state: dict | None) -> list[
         if col in row:
             cid = consumer["id"]
             row[col] = float((main_state.get("consumer_powers_kw") or {}).get(cid, 0.0) or 0.0)
+    row["Netzbezug (kW)"] = round(
+        float(row["Verbrauch-Prognose (kW)"])
+        + _flexible_consumer_power_kw(row)
+        - float(row["PV-Prognose (kW)"])
+        + float(row["Geplante Batterie-Aktion (kW)"]),
+        2,
+    )
     updated[0] = row
     return updated
 
@@ -1239,7 +1246,7 @@ def simulate_horizon(
                 horizon_limits.get(cid, 0.0) - delivered_horizon.get(cid, 0.0),
             )
         remaining_slice = optimization_matrix[i:]
-        sim_soc, chart_row = _simulate_single_hour_optimizer(
+        sim_soc, chart_row, mode, target_power = _simulate_single_hour_optimizer(
             remaining_slice,
             row,
             sim_soc,
@@ -1250,6 +1257,7 @@ def simulate_horizon(
             flex_indices=list(range(len(remaining_slice))),
             charging_contexts=charging_contexts,
         )
+        flex_capped = False
         for consumer in consumers_cfg:
             col = _consumer_column_name(consumer)
             cid = consumer["id"]
@@ -1262,8 +1270,14 @@ def simulate_horizon(
             if power > room + 1e-6:
                 power = room
                 chart_row[col] = round(power, 2)
+                flex_capped = True
             if power > 0:
                 delivered_horizon[cid] = already + power
+        if flex_capped:
+            old_soc = float(chart_row["Simulierter SoC (%)"])
+            sim_soc = _finalize_chart_row_energy(
+                chart_row, mode, target_power, old_soc, battery_params
+            )
         chart_rows.append(chart_row)
         if on_progress is not None:
             on_progress(i + 1, total_steps)
@@ -1296,7 +1310,7 @@ def _simulate_single_hour_optimizer(
     spa_remaining_kwh: float | None = None,
     flex_indices: list[int] | None = None,
     charging_contexts: dict[str, dict] | None = None,
-) -> Tuple[float, dict]:
+) -> Tuple[float, dict, int, float]:
     """Simuliert eine einzelne Stunde im optimierten Pfad (Huawei-Logik für die Batterie)."""
     h = row["hour"]
     mode, target_power, target_soc, consumer_powers, _ = heuristic_optimizer(
@@ -1343,7 +1357,7 @@ def _simulate_single_hour_optimizer(
         chart_row[_consumer_column_name(consumer)] = round(
             consumer_powers.get(consumer["id"], 0.0), 2
         )
-    return sim_soc, chart_row
+    return sim_soc, chart_row, mode, target_power
 
 
 def _flexible_consumer_power_kw(row: dict) -> float:
@@ -1353,6 +1367,34 @@ def _flexible_consumer_power_kw(row: dict) -> float:
         for key, value in row.items()
         if key.endswith(" (kW)") and key not in _RESERVED_KW_COLUMNS
     )
+
+
+def _finalize_chart_row_energy(
+    chart_row: dict,
+    mode: int,
+    target_power: float,
+    old_soc: float,
+    battery_params: dict,
+) -> float:
+    """Leitet Batterieaktion, Netzbezug und End-SoC aus Zeileninhalt ab (Huawei-Logik)."""
+    pv = float(chart_row["PV-Prognose (kW)"])
+    con = float(chart_row["Verbrauch-Prognose (kW)"])
+    total_flex = _flexible_consumer_power_kw(chart_row)
+    max_power = battery_params["max_power_kw"]
+    batt_action = battery_plan_kw_from_control(
+        mode, target_power, pv, con, total_flex, max_power
+    )
+    new_soc, batt_action = _apply_soc_change(
+        old_soc,
+        batt_action,
+        battery_params["battery_capacity_kwh"],
+        battery_params["efficiency"],
+        battery_params["min_soc"],
+        battery_params["max_soc"],
+    )
+    chart_row["Geplante Batterie-Aktion (kW)"] = round(batt_action, 2)
+    chart_row["Netzbezug (kW)"] = round(con + total_flex - pv + batt_action, 2)
+    return new_soc
 
 
 def _total_consumption_kwh_from_rows(rows: list) -> float:

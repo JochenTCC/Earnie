@@ -240,16 +240,17 @@ def render_battery_config_inputs(settings: dict):
         step=0.1,
         format="%.2f"
     )
-    threshold_power = st.number_input(
-        "Leistungs-Schwelle (rel.)",
-        min_value=0.001,
-        max_value=1.0,
-        value=float(settings['THRESHOLD_POWER']),
-        step=0.001,
-        format="%.3f",
-        help="Anteil der max. Lade-/Entladeleistung (z. B. 0,02 = 2 %). "
+    threshold_percent = st.number_input(
+        "Leistungs-Schwelle (%)",
+        min_value=5.0,
+        max_value=100.0,
+        value=float(settings['THRESHOLD_POWER']) * 100.0,
+        step=5.0,
+        format="%.0f",
+        help="Anteil der max. Lade-/Entladeleistung (z. B. 5 % = 0,05 × max. kW). "
         "Gilt für Modus-Umschaltung und Zwangsentladen vs. Automatik.",
     )
+    threshold_power = threshold_percent / 100.0
     return bat_capacity, bat_min_soc, bat_max_soc, bat_max_power, threshold_power
 
 
@@ -1257,13 +1258,6 @@ def render_optimization_savings_and_chart(current_soc: float):
     render_plausibility_debug_panel(main_state)
 
 
-def render_cached_simulation_details():
-    """Simulations-Tabelle aus dem letzten Optimierungs-Fragment-Lauf."""
-    df = st.session_state.get("live_optimization_df")
-    if df is not None and not df.empty:
-        render_simulation_details(df)
-
-
 @st.fragment(run_every=10)
 def render_countdown_block():
     """Countdown bis zur nächsten Viertelstunde (synchron zu main.py)."""
@@ -1533,7 +1527,6 @@ def main():
     render_optimization_savings_and_chart(current_soc)
     render_live_power_flow(current_soc)
     render_main_run_sync_panel()
-    render_cached_simulation_details()
     render_countdown_block()
 
 
