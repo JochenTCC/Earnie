@@ -9,6 +9,10 @@
       "type": "string",
       "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
     },
+    "runtime_settings": {
+      "$ref": "#/definitions/runtime_settings",
+      "description": "Laufzeitparameter für PV, Batterie und Optimierung."
+    },
     "loxone_blocks": {
       "$ref": "#/definitions/loxone_blocks",
       "description": "Merker- und Virtuelle-Eingang-Namen des Loxone Miniservers (Lesen/Schreiben)."
@@ -22,6 +26,18 @@
     }
   },
   "definitions": {
+    "runtime_settings": {
+      "type": "object",
+      "description": "Laufzeitparameter (Echtzeit-Optimierung).",
+      "properties": {
+        "threshold_power": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Relative Leistungsschwelle als Anteil von battery_max_power_kw (z. B. 0.02 = 2 %). Gilt für Modus-Erkennung und Zwangsentladen vs. Automatik."
+        }
+      }
+    },
     "loxone_blocks": {
       "type": "object",
       "description": "Zentrale Loxone-IO-Namen für Speicher, PV und Steuerbefehle.",

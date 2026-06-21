@@ -33,6 +33,7 @@
         "battery_capacity_kwh": 5.0,
         "battery_min_soc": 10.0,
         "battery_max_soc": 100.0,
+        "threshold_power": 0.02,
         "latitude": 48,
         "longitude": 10
     },

@@ -32,7 +32,12 @@ MODE_AUTOMATIK = 0
 MODE_ZWANGS_LADEN = 1
 MODE_ENTLADESPERRE = 2
 MODE_ZWANGS_ENTLADEN = 3
-_POWER_THRESHOLD_KW = 0.05
+_SOC_DELTA_THRESHOLD = 0.05
+
+
+def _power_threshold_kw(max_power_kw: float) -> float:
+    """Mindestleistung (kW) aus relativem Schwellenwert und max. Batterieleistung."""
+    return max_power_kw * config.get_threshold_power()
 
 
 def steuerbefehl_for_mode(mode: int, target_power_kw: float = 0.0) -> str:
@@ -61,10 +66,17 @@ def battery_plan_kw_from_control(
     if mode == MODE_ZWANGS_ENTLADEN:
         return round(-_clamp_power(target_power_kw, max_power_kw), 3)
     if mode == MODE_ENTLADESPERRE:
-        if net_pv_surplus > _POWER_THRESHOLD_KW:
+        if net_pv_surplus > _power_threshold_kw(max_power_kw):
             return round(_clamp_power(net_pv_surplus, max_power_kw), 3)
         return 0.0
     return round(_clamp_power(net_pv_surplus, max_power_kw), 3)
+
+
+def _automatik_discharge_kw(net_pv_surplus: float, max_power_kw: float) -> float:
+    """Entladeleistung (kW, positiv) im Automatikmodus bei Lastdefizit ohne PV-Überschuss."""
+    if net_pv_surplus >= -_power_threshold_kw(max_power_kw):
+        return 0.0
+    return round(min(-net_pv_surplus, max_power_kw), 3)
 
 
 def overlay_main_run_on_rows(rows: list[dict], main_state: dict | None) -> list[dict]:
@@ -110,6 +122,42 @@ def _apply_soc_change(
         actual_energy = ((min_soc_limit - old_soc) / 100) * battery_capacity_kwh
         batt_action = actual_energy * efficiency if actual_energy < 0 else actual_energy / efficiency
     return new_soc, batt_action
+
+
+def _charge_kw_for_hourly_soc(
+    current_soc: float,
+    planned_soc: float,
+    battery_capacity_kwh: float,
+    efficiency: float,
+    max_power_kw: float,
+    min_soc: float,
+    max_soc: float,
+) -> float:
+    """Ladeleistung (kW) für geplanten SoC nach 1 h (konsistent zu _apply_soc_change)."""
+    planned = max(min_soc, min(max_soc, planned_soc))
+    delta_soc = planned - current_soc
+    if delta_soc <= _SOC_DELTA_THRESHOLD:
+        return 0.0
+    energy_kwh = (delta_soc / 100.0) * battery_capacity_kwh
+    return round(_clamp_power(energy_kwh / efficiency, max_power_kw), 3)
+
+
+def _discharge_kw_for_hourly_soc(
+    current_soc: float,
+    planned_soc: float,
+    battery_capacity_kwh: float,
+    efficiency: float,
+    max_power_kw: float,
+    min_soc: float,
+    max_soc: float,
+) -> float:
+    """Entladeleistung (kW, positiv) für geplanten SoC nach 1 h (konsistent zu _apply_soc_change)."""
+    planned = max(min_soc, min(max_soc, planned_soc))
+    delta_soc = current_soc - planned
+    if delta_soc <= _SOC_DELTA_THRESHOLD:
+        return 0.0
+    energy_kwh = (delta_soc / 100.0) * battery_capacity_kwh
+    return round(_clamp_power(energy_kwh * efficiency, max_power_kw), 3)
 
 
 def _day_indices(matrix: List[Dict[str, Any]], horizon: int) -> list[int]:
@@ -819,16 +867,47 @@ def heuristic_optimizer(
     p_pv_0 = matrix[0]["expected_p_pv"]
     p_con_0 = matrix[0]["expected_p_act"]
     net_pv_surplus = p_pv_0 - p_con_0 - total_flex_power
-    mode = 0
+    planned_soc = round(
+        max(min_soc, min(max_soc, (e_batt[0].varValue / battery_capacity) * 100.0)),
+        1,
+    )
+    mode = MODE_AUTOMATIK
     target_power = 0.0
     target_soc = 99.0
-    if opt_charge > 0.05 and opt_grid_buy > 0.05:
-        mode = 1
-        target_power = round(opt_charge, 2)
-        opt_end_soc = (e_batt[0].varValue / battery_capacity) * 100.0
-        target_soc = round(max(current_soc, opt_end_soc), 1)
-    elif net_pv_surplus < -0.05 and opt_discharge < 0.05 and current_soc > (min_soc + 2.0):
-        mode = 2
+    if opt_charge > _power_threshold_kw(max_power) and opt_grid_buy > _power_threshold_kw(max_power):
+        mode = MODE_ZWANGS_LADEN
+        target_soc = round(max(current_soc, planned_soc), 1)
+        target_power = _charge_kw_for_hourly_soc(
+            current_soc,
+            target_soc,
+            battery_capacity,
+            efficiency,
+            max_power,
+            min_soc,
+            max_soc,
+        )
+    elif opt_discharge > _power_threshold_kw(max_power):
+        candidate_soc = round(min(current_soc, planned_soc), 1)
+        candidate_power = _discharge_kw_for_hourly_soc(
+            current_soc,
+            candidate_soc,
+            battery_capacity,
+            efficiency,
+            max_power,
+            min_soc,
+            max_soc,
+        )
+        automatik_power = _automatik_discharge_kw(net_pv_surplus, max_power)
+        if candidate_power > automatik_power + _power_threshold_kw(max_power):
+            mode = MODE_ZWANGS_ENTLADEN
+            target_soc = candidate_soc
+            target_power = candidate_power
+    elif (
+        net_pv_surplus < -_power_threshold_kw(max_power)
+        and opt_discharge < _power_threshold_kw(max_power)
+        and current_soc > (min_soc + 2.0)
+    ):
+        mode = MODE_ENTLADESPERRE
         target_power = 0.0
         target_soc = 100.0
     if verbose:
@@ -852,7 +931,12 @@ def heuristic_optimizer(
                 f"({power_now:.2f} kW) | Restziel={remaining.get(cid, 0.0):.2f} kWh | "
                 f"Geplant={planned_kwh:.2f} kWh | min_on={consumer['min_on_quarterhours']} x 15min"
             )
-        modi_text = {0: "AUTOMATIK", 1: "ZWANGSLADEN", 2: "ENTLADESPERRE"}
+        modi_text = {
+            MODE_AUTOMATIK: "AUTOMATIK",
+            MODE_ZWANGS_LADEN: "ZWANGSLADEN",
+            MODE_ENTLADESPERRE: "ENTLADESPERRE",
+            MODE_ZWANGS_ENTLADEN: "ZWANGSENTLADEN",
+        }
         print(f"-> Steuerbefehl Loxone: {modi_text[mode]} (Leistung: {target_power} kW, Ziel-SoC: {target_soc}%)")
     return mode, target_power, target_soc, consumer_powers, milp_plan
 
