@@ -28,7 +28,12 @@ def simulation_settings_fingerprint() -> str:
 
 def invalidate_live_optimization_cache() -> None:
     """Erzwingt Neuberechnung der Live-24h-Simulation."""
-    for key in ("live_optimization_cache_key", "live_optimization_df", "live_savings_info"):
+    for key in (
+        "live_optimization_cache_key",
+        "live_optimization_df",
+        "live_savings_info",
+        "live_optimization_placeholder",
+    ):
         st.session_state.pop(key, None)
 
 

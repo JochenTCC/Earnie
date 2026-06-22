@@ -15,11 +15,10 @@
 - [x] Dateigrößen prüfen und ggf. refaktorieren
 - [x] Ladeenergie für E-Auto anpassen (ist derzeit zu klein)
 - [x] Ansicht Produktiv-Durchlauf wird nicht korrekt aktualisiert
-- [ ] Bei E-Auto wahrscheinliche Abwesenheite implementieren und Rücksetzen des Rest-SOC auf niedrige Werte
+- [x] Bei E-Auto wahrscheinliche Abwesenheite implementieren
 - [x] Prüfen, ob ältere Programm-Logs noch benötigt werden *(2026-06: siehe unten)*
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
 - [ ] Logik und UI für E-Auto verbessern
-  - Wie bekommt der Optimierer mit, wann das Auto wieder angeschlossen werden wird
   - Wie und wann wird das Rest-SOC wieder auf einen Default-Wert zurückgesetzt (damit komplettes Aufladen sichergestellt ist)
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementier)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis

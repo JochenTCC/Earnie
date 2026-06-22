@@ -34,6 +34,13 @@ def _live_optimization_cache_key(current_slot: str, main_state: dict | None) -> 
     return f"{current_slot}|{completed}|{simulation_settings_fingerprint()}"
 
 
+def _live_optimization_placeholder() -> st.delta_generator.DeltaGenerator:
+    """Ein Slot für die gesamte Live-Optimierungs-UI (verhindert Fragment-Duplikate)."""
+    if "live_optimization_placeholder" not in st.session_state:
+        st.session_state.live_optimization_placeholder = st.empty()
+    return st.session_state.live_optimization_placeholder
+
+
 def _apply_main_run_to_live_df(
     optimized_df: pd.DataFrame,
     main_state: dict | None,
@@ -55,17 +62,20 @@ def _render_pending_live_sync(wait_sec: int, reason: str) -> bool:
         return False
 
     baseline_df = pd.DataFrame(cached_savings.get("baseline_rows", []))
-    render_optimization_results(cached_savings, cached_df, baseline_df)
-    if reason == "delay":
-        st.caption(
-            f"⏳ **Synchronisation mit main.py:** Aktualisierung in ca. **{wait_sec} s** "
-            f"(1 Min nach Viertelstunden-Wechsel)."
-        )
-    else:
-        st.caption(
-            f"⏳ **Warte auf main.py-Durchlauf** für den aktuellen Slot "
-            f"(noch ca. **{wait_sec} s**)."
-        )
+    main_state = run_state.load_run_state()
+    cached_df = _apply_main_run_to_live_df(cached_df, main_state)
+    with _live_optimization_placeholder().container():
+        render_optimization_results(cached_savings, cached_df, baseline_df)
+        if reason == "delay":
+            st.caption(
+                f"⏳ **Synchronisation mit main.py:** Aktualisierung in ca. **{wait_sec} s** "
+                f"(1 Min nach Viertelstunden-Wechsel)."
+            )
+        else:
+            st.caption(
+                f"⏳ **Warte auf main.py-Durchlauf** für den aktuellen Slot "
+                f"(noch ca. **{wait_sec} s**)."
+            )
     return True
 
 
@@ -133,7 +143,8 @@ def render_optimization_savings_and_chart(current_soc: float) -> None:
             st.session_state["live_optimization_df"], main_state
         )
         baseline_df = pd.DataFrame(cached_savings.get("baseline_rows", []))
-        render_optimization_results(cached_savings, cached_df, baseline_df)
+        with _live_optimization_placeholder().container():
+            render_optimization_results(cached_savings, cached_df, baseline_df)
         return
 
     ready, reason, wait_sec = optimization_schedule.live_simulation_readiness(
@@ -200,19 +211,20 @@ def render_optimization_savings_and_chart(current_soc: float) -> None:
     elif reason == "fallback":
         sync_note = " · main.py für diesen Slot nicht verfügbar (Live-Fallback)"
 
-    if main_state:
-        st.caption(
-            f"📡 **Aktuelle Stunde:** Verbrauch aus "
-            f"{'main.py' if main_state.get('consumption_snapshot') and snapshot == main_state.get('consumption_snapshot') else 'Loxone live'} · "
-            f"SoC für Simulation: **{sim_soc:.1f} %** (main.py) · "
-            f"Stunde 0 = Produktiv-Durchlauf main.py — übrige Stunden simuliert{sync_note}."
-        )
-    elif snapshot:
-        st.caption(
-            f"📡 **Aktuelle Stunde (Live):** Grundlast {snapshot['baseload_kw']:.2f} kW · "
-            f"Gesamt {snapshot['house_kw']:.2f} kW · PV {snapshot['pv_kw']:.2f} kW — "
-            f"Rest des Horizonts aus Profil-Prognose{sync_note}."
-        )
+    with _live_optimization_placeholder().container():
+        if main_state:
+            st.caption(
+                f"📡 **Aktuelle Stunde:** Verbrauch aus "
+                f"{'main.py' if main_state.get('consumption_snapshot') and snapshot == main_state.get('consumption_snapshot') else 'Loxone live'} · "
+                f"SoC für Simulation: **{sim_soc:.1f} %** (main.py) · "
+                f"Stunde 0 = Produktiv-Durchlauf main.py — übrige Stunden simuliert{sync_note}."
+            )
+        elif snapshot:
+            st.caption(
+                f"📡 **Aktuelle Stunde (Live):** Grundlast {snapshot['baseload_kw']:.2f} kW · "
+                f"Gesamt {snapshot['house_kw']:.2f} kW · PV {snapshot['pv_kw']:.2f} kW — "
+                f"Rest des Horizonts aus Profil-Prognose{sync_note}."
+            )
 
-    render_optimization_results(savings_info, optimized_df, baseline_df)
-    render_plausibility_debug_panel(main_state)
+        render_optimization_results(savings_info, optimized_df, baseline_df)
+        render_plausibility_debug_panel(main_state)
