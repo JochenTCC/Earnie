@@ -1,6 +1,8 @@
 """Panel für den letzten Produktiv-Durchlauf von main.py."""
 from __future__ import annotations
 
+from datetime import timedelta
+
 import streamlit as st
 
 import config
@@ -16,8 +18,9 @@ def _mode_label(mode: int) -> str:
     }.get(int(mode), str(mode))
 
 
+@st.fragment(run_every=timedelta(seconds=10))
 def render_main_run_sync_panel() -> dict | None:
-    """Zeigt den letzten erfolgreichen Produktiv-Durchlauf von main.py."""
+    """Zeigt den letzten erfolgreichen Produktiv-Durchlauf von main.py (alle 10 s)."""
     state = run_state.load_run_state()
     if not state or not state.get("success"):
         st.info(
