@@ -8,10 +8,10 @@ import pandas as pd
 import pytest
 
 import config
-import data_loader
-from optimization_consistency import assert_24h_optimization_consistent, validate_24h_optimization_run
+from data.data_loader import load_market_prices, resolve_simulation_window
+from optimizer.consistency import assert_24h_optimization_consistent, validate_24h_optimization_run
 from optimizer import simulate_horizon
-from simulation_engine import (
+from simulation.engine import (
     HistoricalDataCache,
     _scenario_to_battery_params,
     build_historical_window_matrix,
@@ -61,7 +61,7 @@ def prices_df(historical_cache: HistoricalDataCache) -> pd.DataFrame:
     )
     start = pd.Timestamp(idx["timestamp"].min()).normalize()
     end = pd.Timestamp(idx["timestamp"].max()).normalize() + pd.Timedelta(days=1)
-    return data_loader.load_market_prices(
+    return load_market_prices(
         start,
         end,
         sim_cfg,

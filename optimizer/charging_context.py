@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, time
 
 import config
-import loxone_client
+from integrations import loxone_client
 
 _LOXONE_WEEKDAY_NAMES = {
     "montag": 0,

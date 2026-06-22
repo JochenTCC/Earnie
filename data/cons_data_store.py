@@ -14,7 +14,7 @@ from typing import Iterable
 import pandas as pd
 
 import config
-from file_metadata import (
+from runtime_store.file_metadata import (
     CONS_DATA_META_SCHEMA,
     CONS_DATA_PENDING_SCHEMA,
     read_schema_version,

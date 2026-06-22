@@ -8,7 +8,7 @@ import pandas as pd
 
 import config
 import optimizer
-import profile_manager
+from data import profile_manager
 from ui.runtime_config import get_runtime_settings
 from ui.simulation_results import (
     persist_simulation_debug,

@@ -3,7 +3,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import config
-import loxone_log_import
+from integrations import loxone_log_import
 
 # Streamlit Seitenkonfiguration
 st.set_page_config(page_title="Last-Isolierung Test", layout="wide")

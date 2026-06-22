@@ -5,8 +5,8 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-import backtesting_log
-from simulation_engine import HISTORICAL_REFERENCE_ID
+from simulation import backtesting_log
+from simulation.engine import HISTORICAL_REFERENCE_ID
 
 
 @st.cache_data(ttl=60, show_spinner="Lade Backtesting-Log...")

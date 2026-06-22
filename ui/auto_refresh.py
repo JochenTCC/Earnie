@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-import optimization_schedule
+from optimizer import schedule as optimization_schedule
 
 
 def setup_auto_refresh() -> None:

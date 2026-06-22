@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-import pv_tuner
+from data import pv_tuner
 from ui.runtime_config import get_runtime_settings, update_config_file
 
 

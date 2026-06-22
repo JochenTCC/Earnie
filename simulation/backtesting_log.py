@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from file_metadata import (
+from runtime_store.file_metadata import (
     BACKTESTING_LOG_SCHEMA,
     read_schema_version,
     stamp_payload,

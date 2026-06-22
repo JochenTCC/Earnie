@@ -5,9 +5,9 @@ import streamlit as st
 import plotly.graph_objects as go
 
 import config
-import live_consumption
-import loxone_client
-import run_state
+from data import live_consumption
+from integrations import loxone_client
+from runtime_store import run_state
 from ui.runtime_config import reload_runtime_config
 
 _FLEX_SANKEY_COLORS = ("#e67e22", "#9b59b6", "#1abc9c", "#e74c3c", "#34495e")

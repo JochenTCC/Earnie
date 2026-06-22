@@ -6,14 +6,11 @@ from datetime import timedelta
 import streamlit as st
 import pandas as pd
 
-import awattar_client
-import consumer_targets
-import live_consumption
-import live_optimization_debug
-import optimization_schedule
+from integrations import awattar_client
+from data import consumer_targets, live_consumption, profile_manager
+from runtime_store import live_optimization_debug, run_state
+from optimizer import schedule as optimization_schedule
 import optimizer
-import profile_manager
-import run_state
 from ui.runtime_config import reload_runtime_config, simulation_settings_fingerprint
 from ui.simulation_results import (
     persist_simulation_debug,

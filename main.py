@@ -4,17 +4,11 @@ from datetime import datetime
 import logging
 import config
 import logger_config
-import awattar_client
-import loxone_client
-import profile_manager
-import consumer_targets
+from integrations import awattar_client, loxone_client
+from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption
+from runtime_store import run_state, optimization_history
+from optimizer import schedule as optimization_schedule
 import optimizer
-import pv_tuner
-import cons_data_store
-import live_consumption
-import run_state
-import optimization_history
-import optimization_schedule
 import os
 import csv
 from version import __version__

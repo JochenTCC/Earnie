@@ -55,7 +55,7 @@ def resolve_daily_target_kwh(
         if cid in consumer_daily_targets_kwh:
             return float(consumer_daily_targets_kwh[cid])
     if logged_targets_only:
-        import consumer_targets
+        from data import consumer_targets
         if row_date is None:
             return 0.0
         logged = consumer_targets.resolve_historical_consumer_daily_targets(row_date)
@@ -65,7 +65,7 @@ def resolve_daily_target_kwh(
         and horizon_flex_kwh is not None
     ):
         return float(horizon_flex_kwh)
-    import consumer_targets
+    from data import consumer_targets
     day = row_date or datetime.now().date()
     when = ref_datetime or datetime.combine(day, time(12, 0))
     if (
@@ -133,7 +133,7 @@ def resolve_horizon_consumer_targets_kwh(
         }
     horizon_flex_targets = None
     if not logged_targets_only:
-        import consumer_targets
+        from data import consumer_targets
         horizon_flex_targets = consumer_targets.resolve_horizon_flex_targets_kwh(
             optimization_matrix
         )
@@ -218,7 +218,7 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
     details = []
     if logged_day:
         row_date = optimization_matrix[0].get("date")
-        import consumer_targets
+        from data import consumer_targets
         totals = consumer_targets.resolve_historical_consumer_daily_targets(row_date)
         source = "geloggt (Gesamtverbrauchs-Stundenprofil)"
         for consumer in consumers:

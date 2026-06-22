@@ -10,7 +10,7 @@ from datetime import date, datetime, time
 import pandas as pd
 
 import config
-import loxone_client
+from integrations import loxone_client
 from . import profile_manager
 
 

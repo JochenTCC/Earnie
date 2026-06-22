@@ -9,7 +9,7 @@ import copy
 import logging
 from typing import Any
 
-import loxone_client
+from integrations import loxone_client
 
 logger = logging.getLogger(__name__)
 

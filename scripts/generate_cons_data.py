@@ -16,8 +16,8 @@ from typing import Iterable
 import pandas as pd
 
 import config
-import cons_data_store
-import loxone_log_import
+from data import cons_data_store
+from integrations import loxone_log_import
 
 SOURCE_LOXONE = cons_data_store.SOURCE_LOXONE
 SOURCE_SYNTHETIC = cons_data_store.SOURCE_SYNTHETIC

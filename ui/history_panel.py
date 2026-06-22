@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
-import optimization_history
+from runtime_store import optimization_history
 
 
 def _history_days_options() -> dict[str, int | None]:

@@ -50,7 +50,7 @@ from .targets import (
     resolve_baseload_kwh,
     resolve_horizon_consumer_targets_kwh,
 )
-from file_metadata import (
+from runtime_store.file_metadata import (
     CONSUMER_STATE_SCHEMA,
     read_schema_version,
     stamp_payload,
@@ -162,7 +162,7 @@ def get_consumer_remaining_kwh(
     consumer_daily_targets_kwh: dict | None = None,
 ) -> dict[str, float]:
     """Verbleibende Zielenergie aller optimierbaren Verbraucher (inkl. Loxone E-Auto)."""
-    import consumer_targets
+    from data import consumer_targets
     active = _active_consumers(consumers)
     state = _load_consumer_state()
     delivered = state.get("delivered", {})

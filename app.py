@@ -3,7 +3,7 @@ import logging
 
 import streamlit as st
 import config
-import loxone_client
+from integrations import loxone_client
 from version import __version__
 from ui.auto_refresh import setup_auto_refresh
 from ui.backtesting import render_backtesting_block

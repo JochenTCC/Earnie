@@ -4,7 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 import config
-import run_state
+from runtime_store import run_state
 
 
 def _mode_label(mode: int) -> str:

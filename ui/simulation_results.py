@@ -6,7 +6,7 @@ import logging
 import streamlit as st
 import pandas as pd
 
-import live_optimization_debug
+from runtime_store import live_optimization_debug
 from ui.charts import render_optimization_chart
 
 logger = logging.getLogger("app")

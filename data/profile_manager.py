@@ -412,7 +412,7 @@ def build_historical_optimization_matrix(target_date) -> Tuple[List[dict], dict]
         'total_kwh': round(sum(total_load), 3),
         'pv_kwh': round(sum(pv_profile), 3),
     }
-    import consumer_targets
+    from . import consumer_targets
 
     meta['consumer_daily_targets_kwh'] = consumer_targets.resolve_historical_consumer_daily_targets(
         target_date

@@ -6,7 +6,7 @@ from datetime import date, datetime, time, timedelta
 
 import pandas as pd
 import config
-import profile_manager
+from data import profile_manager
 from optimizer import (
     simulate_horizon,
     _calculate_step_cost_euro_from_row,

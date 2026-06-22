@@ -11,7 +11,7 @@
 - [x] Optimierung von main.py wird in App nicht richtig übernommen (kleinen Zeitversatz einbauen?) 
 - [x] Vergangene Optimierungen anzeigbar Machen im Live Modus (debugging) 
 - [x] Testsuite für 24h-Optimierung mit historischen Daten aufbauen
-- [ ] Dateistruktur aufräumen
+- [x] Dateistruktur aufräumen
 - [x] Dateigrößen prüfen und ggf. refaktorieren
 - [x] Ladeenergie für E-Auto anpassen (ist derzeit zu klein)
 - [ ] Ansicht Produktiv-Durchlauf wird nicht korrekt aktualisiert

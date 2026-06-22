@@ -20,7 +20,7 @@ from .simulation import (
     flexible_consumer_power_kw as _flexible_consumer_power_kw,
 )
 from .targets import resolve_horizon_consumer_targets_kwh
-from simulation_engine import window_anchor_for_date, window_slot_datetimes
+from simulation.engine import window_anchor_for_date, window_slot_datetimes
 
 _GRID_TOLERANCE_KW = 0.03
 _SOC_DISPLAY_TOLERANCE = 0.2

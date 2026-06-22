@@ -5,8 +5,8 @@ import time
 
 import streamlit as st
 
-import optimization_schedule
-import run_state
+from optimizer import schedule as optimization_schedule
+from runtime_store import run_state
 from ui.runtime_config import reload_runtime_config
 
 
