@@ -165,8 +165,22 @@ class Config:
         return out
 
     @staticmethod
+    def _charging_efficiency(sched: dict) -> float:
+        """Lade-Wirkungsgrad (Netz-/Zählerenergie → Akku); Default 0,95 wenn nicht gesetzt."""
+        raw = sched.get("charging_efficiency")
+        if raw is None:
+            return 0.90
+        efficiency = float(raw)
+        if efficiency <= 0.0 or efficiency > 1.0:
+            raise ValueError(
+                "charging_schedule.charging_efficiency muss ein Wert zwischen 0 (exklusiv) "
+                "und 1 (inklusiv) sein."
+            )
+        return efficiency
+
+    @staticmethod
     def target_kwh_from_rest_soc(consumer: dict, rest_soc_percent: float | None) -> float | None:
-        """Berechnet Ladeziel (kWh) aus Rest-SOC (%) und Fahrzeugkapazität in charging_schedule."""
+        """Berechnet Ladeziel (kWh) aus Rest-SOC (%), Kapazität und Lade-Wirkungsgrad."""
         if rest_soc_percent is None:
             return None
         sched = consumer.get("charging_schedule") or {}
@@ -174,7 +188,9 @@ class Config:
         if capacity <= 0:
             return None
         target_soc = float(sched.get("target_soc_percent", 100.0) or 100.0)
-        return max(0.0, (target_soc - float(rest_soc_percent)) / 100.0 * capacity)
+        battery_delta_kwh = (target_soc - float(rest_soc_percent)) / 100.0 * capacity
+        efficiency = Config._charging_efficiency(sched)
+        return max(0.0, battery_delta_kwh / efficiency)
 
     @staticmethod
     def target_kwh_from_day_schedule(consumer: dict, when: datetime) -> float | None:
@@ -216,10 +232,17 @@ class Config:
             ):
                 if raw["loxone"].get(key):
                     loxone[key] = str(raw["loxone"][key]).strip()
+        charging_efficiency = raw.get("charging_efficiency")
+        normalized_efficiency = (
+            Config._charging_efficiency({"charging_efficiency": charging_efficiency})
+            if charging_efficiency is not None
+            else 0.95
+        )
         return {
             "enabled": True,
             "battery_capacity_kwh": float(raw.get("battery_capacity_kwh", 0.0) or 0.0),
             "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
+            "charging_efficiency": normalized_efficiency,
             "weekday": Config._normalize_day_schedule(raw.get("weekday")),
             "weekend": Config._normalize_day_schedule(raw.get("weekend")),
             "loxone": loxone,

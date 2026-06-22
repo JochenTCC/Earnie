@@ -44,7 +44,7 @@ Energy-Optimizer/
 | 2c charts | **erledigt** | |
 | 2d Modus-Panels | **erledigt** | inkl. simulation_results.py |
 | 2e schlankes app.py | **erledigt** | ~75 Zeilen |
-| 3 optimizer/ | offen | |
+| 3 optimizer/ | **erledigt** | Facade in optimizer/__init__.py, Shims in Wurzel |
 | 4 integrations + data + simulation | offen | |
 | 5 runtime_store/ | offen | |
 | 6 Cleanup | offen | |
@@ -252,7 +252,7 @@ Phase 1 und Phase 2 können parallel laufen.
 - [x] Phase 2d 
 - [x] Phase 2e 
 - [x] Phase 1
-- [ ] Phase 3
+- [x] Phase 3
 - [ ] Phase 4 → 5
 - [ ] Phase 6
 - [ ] Phase 7 (optional)

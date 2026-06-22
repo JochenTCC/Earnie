@@ -13,6 +13,7 @@
 - [x] Testsuite für 24h-Optimierung mit historischen Daten aufbauen
 - [ ] Dateistruktur aufräumen
 - [x] Dateigrößen prüfen und ggf. refaktorieren
+- [x] Ladeenergie für E-Auto anpassen (ist derzeit zu klein)
 - [ ] Ansicht Produktiv-Durchlauf wird nicht korrekt aktualisiert
 - [ ] Bei E-Auto wahrscheinliche Abwesenheite implementieren und Rücksetzen des Rest-SOC auf niedrige Werte
 - [ ] Prüfen, ob ältere Programm-Logs noch benötigt werden

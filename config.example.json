@@ -74,6 +74,7 @@
                 "enabled": true,
                 "battery_capacity_kwh": 77.0,
                 "target_soc_percent": 100.0,
+                "charging_efficiency": 0.95,
                 "weekday": {
                     "car_available_from_hour": 18,
                     "ready_by_hour": 7,

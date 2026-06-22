@@ -111,10 +111,8 @@ def _synthetic_flex_profile(consumer: dict, day: date) -> dict[int, float]:
         day_cfg = sched.get("weekend" if weekday >= 5 else "weekday") or {}
         from_h = int(day_cfg.get("car_available_from_hour", 19))
         ready_h = int(day_cfg.get("ready_by_hour", 7))
-        cap = float(sched.get("battery_capacity_kwh", 60))
-        rest_soc = float(day_cfg.get("daily_rest_soc", 30))
-        target_soc = float(sched.get("target_soc_percent", 100))
-        daily_kwh = max(0.0, (target_soc - rest_soc) / 100.0 * cap)
+        rest_soc = day_cfg.get("daily_rest_soc", 30)
+        daily_kwh = config.Config.target_kwh_from_rest_soc(consumer, rest_soc) or 0.0
         if from_h <= ready_h:
             charge_hours = list(range(from_h, ready_h))
         else:

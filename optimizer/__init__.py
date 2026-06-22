@@ -2,8 +2,8 @@
 """
 Öffentliche Einstiegsschnittstelle für main.py, app.py und Tests.
 
-Implementierung liegt in optimizer_battery, optimizer_milp, optimizer_simulation,
-optimizer_targets und charging_context. Neue Aufrufer sollen diese Facade nutzen,
+Implementierung liegt in optimizer.battery, optimizer.milp, optimizer.simulation,
+optimizer.targets und optimizer.charging_context. Neue Aufrufer sollen diese Facade nutzen,
 nicht die Submodule direkt.
 """
 from datetime import datetime
@@ -11,12 +11,12 @@ import json
 import os
 
 import config
-import optimization_schedule
-from charging_context import (
+from . import schedule
+from .charging_context import (
     apply_horizon_charging_limits as _apply_horizon_charging_limits,
     resolve_charging_contexts,
 )
-from optimizer_battery import (
+from .battery import (
     MODE_AUTOMATIK,
     MODE_ENTLADESPERRE,
     MODE_ZWANGS_ENTLADEN,
@@ -30,8 +30,8 @@ from optimizer_battery import (
     power_threshold_kw as _power_threshold_kw,
     steuerbefehl_for_mode,
 )
-from optimizer_milp import milp_optimizer
-from optimizer_simulation import (
+from .milp import milp_optimizer
+from .simulation import (
     calculate_optimization_savings,
     calculate_step_cost_euro_from_row as _calculate_step_cost_euro_from_row,
     delivered_flex_kwh_from_rows as _delivered_flex_kwh_from_rows,
@@ -41,7 +41,7 @@ from optimizer_simulation import (
     simulate_horizon,
     total_consumption_kwh_from_rows as _total_consumption_kwh_from_rows,
 )
-from optimizer_targets import (
+from .targets import (
     build_applied_targets_detail,
     build_baseline_targets_detail,
     build_energy_comparison_detail,
@@ -187,7 +187,7 @@ def get_consumer_remaining_kwh(
 
 def _optimization_interval_hours() -> float:
     """Dauer eines Live-Optimierungszyklus in Stunden (Viertelstunde)."""
-    return optimization_schedule.optimization_interval_hours()
+    return schedule.optimization_interval_hours()
 
 
 def register_consumer_hours(consumer_powers: dict[str, float]) -> None:

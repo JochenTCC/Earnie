@@ -202,7 +202,13 @@
         },
         "target_soc_percent": {
           "type": "number",
-          "description": "Ziel-SOC in % beim Abfahren (Standard 100). Ladeziel kWh = (target_soc_percent − daily_rest_soc) / 100 × battery_capacity_kwh."
+          "description": "Ziel-SOC in % beim Abfahren (Standard 100)."
+        },
+        "charging_efficiency": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Angenommener Lade-Wirkungsgrad (Netz-/Zählerenergie → Akku), Standard 0,95. Ladeziel kWh = (target_soc_percent − Rest-SOC) / 100 × battery_capacity_kwh / charging_efficiency."
         },
         "weekday": {
           "$ref": "#/definitions/charging_day_schedule",
