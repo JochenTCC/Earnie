@@ -3,13 +3,14 @@ import json
 from datetime import datetime
 
 import optimization_history as oh
+import runtime_store.optimization_history as oh_impl
 
 
 def test_legacy_csv_mixed_column_count(tmp_path, monkeypatch):
     """Ältere CSV-Zeilen ohne Target_SoC_% dürfen das Einlesen nicht abbrechen."""
     legacy = tmp_path / "legacy.csv"
-    monkeypatch.setattr(oh, "LEGACY_CSV_FILE", str(legacy))
-    monkeypatch.setattr(oh, "HISTORY_FILE", str(tmp_path / "missing.jsonl"))
+    monkeypatch.setattr(oh_impl, "LEGACY_CSV_FILE", str(legacy))
+    monkeypatch.setattr(oh_impl, "HISTORY_FILE", str(tmp_path / "missing.jsonl"))
 
     legacy.write_text(
         "Timestamp,SoC_%,Awattar_Price,PV_Forecast_kW,Consumption_Forecast_kW,"
@@ -28,9 +29,9 @@ def test_legacy_csv_mixed_column_count(tmp_path, monkeypatch):
 
 
 def test_merge_prefers_jsonl_over_csv(tmp_path, monkeypatch):
-    monkeypatch.setattr(oh, "RUNTIME_DIR", str(tmp_path))
-    monkeypatch.setattr(oh, "HISTORY_FILE", str(tmp_path / "optimization_history.jsonl"))
-    monkeypatch.setattr(oh, "LEGACY_CSV_FILE", str(tmp_path / "legacy.csv"))
+    monkeypatch.setattr(oh_impl, "RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setattr(oh_impl, "HISTORY_FILE", str(tmp_path / "optimization_history.jsonl"))
+    monkeypatch.setattr(oh_impl, "LEGACY_CSV_FILE", str(tmp_path / "legacy.csv"))
 
     ts = datetime(2026, 6, 21, 15, 0, 0)
     entry = {
@@ -46,10 +47,10 @@ def test_merge_prefers_jsonl_over_csv(tmp_path, monkeypatch):
         "battery_plan_kw": 1.5,
         "consumer_powers_kw": {"swimspa": 2.8},
     }
-    with open(oh.HISTORY_FILE, "w", encoding="utf-8") as f:
+    with open(oh_impl.HISTORY_FILE, "w", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
 
-    with open(oh.LEGACY_CSV_FILE, "w", encoding="utf-8") as f:
+    with open(oh_impl.LEGACY_CSV_FILE, "w", encoding="utf-8") as f:
         f.write(
             "Timestamp,SoC_%,Awattar_Price,PV_Forecast_kW,Consumption_Forecast_kW,"
             "Ernie_Mode,Target_Power_kW,Target_SoC_%\n"
