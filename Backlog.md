@@ -16,15 +16,60 @@
 - [x] Ladeenergie für E-Auto anpassen (ist derzeit zu klein)
 - [ ] Ansicht Produktiv-Durchlauf wird nicht korrekt aktualisiert
 - [ ] Bei E-Auto wahrscheinliche Abwesenheite implementieren und Rücksetzen des Rest-SOC auf niedrige Werte
-- [ ] Prüfen, ob ältere Programm-Logs noch benötigt werden
+- [x] Prüfen, ob ältere Programm-Logs noch benötigt werden *(2026-06: siehe unten)*
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
-- [ ] Generierung der Logs und .json Dateien beim Initialisieren des Containers automatisieren, so dass Dateien nicht mehr händisch angelegt werden müssen
-- [ ] Web-App in Loxone integrieren oder extern verfügbar machen.
 - [ ] Logik und UI für E-Auto verbessern
-  - [ ] Wie bekommt der Optimierer mit, wann das Auto wieder angeschlossen werden wird
-  - [ ] Wie und wann wird das Rest-SOC wieder auf einen Default-Wert zurückgesetzt (damit komplettes Aufladen sichergestellt ist)
+  - Wie bekommt der Optimierer mit, wann das Auto wieder angeschlossen werden wird
+  - Wie und wann wird das Rest-SOC wieder auf einen Default-Wert zurückgesetzt (damit komplettes Aufladen sichergestellt ist)
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementier)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis
-- [ ] Einfacherer Austausch / Synchronisation der Daten zwischen Produktiv und Dev-Version
 - [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler (Input: Laufzeit, mittlere Leistung / Output: Zeithorizont 6h: Güte des Startzeitpunkts)
-- [ ] Container für Loxberry ausprobieren
+- [ ] **Adaptives PV-Tuning wieder aktivieren** (`pv_accuracy_log.csv` / `log_pv_comparison`)
+  - Lesen + Anwenden des Korrekturfaktors läuft noch (`calculate_tuning_factor`, `pv_forecast`, Sidebar)
+  - Schreiben ist unterbrochen: `log_pv_comparison()` wird nirgends aufgerufen → Faktor bleibt praktisch bei 1,0
+  - `get_pv_delta_and_update()` (Zähler-Delta) nutzen, aber Regel für Vergleich mit Prognose klären (15-Min-Takt vs. Stunden-kW)
+  - Akzeptanz: CSV wächst wieder; Sidebar-Faktor ≠ 1,0 bei messbarer Abweichung; Synology-Mount für Log ggf. zurück in Compose
+
+### Log-Dateien (Review 2026-06)
+
+| Datei | Status | Aktion |
+|-------|--------|--------|
+| `runtime/optimization_history.jsonl` | **kanonisch** | Produktiv-Historie (main + App-Panel) |
+| `energy_optimizer.log` | **aktiv** | Python-Logging (rotierend, 5×5 MB) |
+| `runtime/optimizer_run_state.json` | **aktiv** | Letzter main-Durchlauf für App |
+| `runtime/live_optimization_debug.json` | **aktiv** | App-24h-Debug-Snapshot |
+| `system_history_log.csv` | **Legacy, nur Lesen** | Schreiben in main.py entfernt; App liest alte Einträge noch mit |
+| `pv_accuracy_log.csv` | **Lesen aktiv, Schreiben aus** | `log_pv_comparison` in main anbinden (siehe Backlog); Mount optional wieder für NAS |
+| `backtesting_log.json` | **nur Dev** | Backtesting-Modus, nicht für Prod-NAS |
+
+Offen: Legacy-CSV irgendwann archivieren und `_load_legacy_csv_history` entfernen, wenn JSONL die komplette Historie abdeckt.
+
+## Packaging & Deployment
+
+Ziel: reproduzierbares Build/Deploy und weniger manuelle Schritte — ohne Änderungen an der Optimierungslogik.
+
+Empfohlene Reihenfolge: 7b → 7c → 7a → 7d → 7e → 7f
+
+- [ ] **7b — Container-Bootstrap automatisieren**
+  - Beim ersten Start fehlende `runtime/`-JSONs, leere History und cons_data-Pfade anlegen
+  - Entrypoint-Skript statt nur `CMD ["python", "main.py"]`
+  - Akzeptanz: frischer Container startet ohne manuelles Anlegen von Dateien
+- [ ] **7c — Build-Pipeline vereinheitlichen**
+  - `containers.build` wiederherstellen oder README/Dockerfile als kanonischen Weg festhalten
+  - Synology-Compose (`docker-compose-synology.yml`) mit 7b abgleichen
+  - Akzeptanz: ein dokumentierter Build-Befehl, Synology-Deploy weiter möglich
+- [ ] **7a — Projekt-Metadaten (`pyproject.toml`)**
+  - Version aus `version.py` als Single Source of Truth
+  - Dependencies mit `requirements.txt` konsolidieren
+  - Optional: `[project.scripts]` für main/streamlit/scripts
+  - Akzeptanz: `pip install -e .` im Repo, `pytest` weiter grün
+- [ ] **7d — Streamlit extern bereitstellen**
+  - Separater Service/Port im Compose (main + app)
+  - In diesem Schritt nur erreichbare URL — kein Loxone-Embed
+  - Akzeptanz: App von außerhalb des NAS erreichbar (Netzwerk/VPN vorausgesetzt)
+- [ ] **7e — Prod/Dev-Datensync**
+  - Skript für `runtime/`, relevante CSVs, optional config-Template hin und zurück
+  - Akzeptanz: dokumentierter Ablauf Dev ↔ Produktiv ohne Copy-Paste
+- [ ] **7f — Loxberry-Container evaluieren**
+  - Erst nach 7b/7c; separates Compose oder Anleitung
+  - Akzeptanz: Go/No-Go mit kurzer Notiz im README

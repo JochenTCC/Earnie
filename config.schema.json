@@ -69,7 +69,7 @@
         },
         "pv_tuning_log_file": {
           "type": "string",
-          "description": "Lokale CSV für PV-Tuning-Protokoll."
+          "description": "Lokale CSV für adaptives PV-Tuning (Prognose vs. Ist). Schreiben derzeit in main.py nicht angebunden."
         },
         "pv_power_name": {
           "type": "string",

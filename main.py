@@ -9,43 +9,10 @@ from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, l
 from runtime_store import run_state, optimization_history
 from optimizer import schedule as optimization_schedule
 import optimizer
-import os
-import csv
 from version import __version__
 
 # Logger für dieses spezifische Modul instanziieren
 logger = logging.getLogger("main")
-
-def log_to_csv(soc, price, pv_forecast, cons_forecast, mode, target_power, target_soc):
-    """Schreibt die Systemzustände und Loxone-Ausgangswerte in eine strukturierte CSV-Datei."""
-    file_name = "system_history_log.csv"
-    file_exists = os.path.exists(file_name)
-    
-    # Datenzeile vorbereiten
-    row = [
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        soc,
-        round(price, 4),
-        round(pv_forecast, 3),
-        round(cons_forecast, 3),
-        mode,
-        round(target_power, 3),
-        round(target_soc, 0)
-    ]
-    
-    try:
-        with open(file_name, mode="a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
-            if not file_exists:
-                # Header schreiben, falls Datei nagelneu ist
-                writer.writerow([
-                    "Timestamp", "SoC_%", "Awattar_Price", 
-                    "PV_Forecast_kW", "Consumption_Forecast_kW", 
-                    "Ernie_Mode", "Target_Power_kW", "Target_SoC_%"
-                ])
-            writer.writerow(row)
-    except Exception as e:
-        logger.error(f"Fehler beim Schreiben in die CSV-Historie (evtl. Datei durch Streamlit blockiert): {e}")
 
 def main():
     config.reload_config()
@@ -138,16 +105,7 @@ def main():
     )
 
     current_market_item = market_data[0] # Aktuelle Stunde
-    log_to_csv(
-        soc=current_soc,
-        price=current_market_item['price_buy'],
-        pv_forecast=optimization_matrix[0]["expected_p_pv"],
-        cons_forecast=optimization_matrix[0]["expected_p_act"],
-        mode=mode,
-        target_power=target_power,
-        target_soc=target_soc
-    )
-    
+
     logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
     loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)
     logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
