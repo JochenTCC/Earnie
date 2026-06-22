@@ -164,6 +164,87 @@ def deadline_from_ready_hour(horizon_start: datetime, ready_hour: int | None) ->
     return None
 
 
+def charging_deadline_after(available_from: datetime, consumer: dict) -> datetime | None:
+    """Deadline (ready_by_hour) zum Ladezyklus ab prognostizierter Ankunft."""
+    day_sched = config_day_schedule(consumer, available_from)
+    return deadline_from_ready_hour(available_from, day_sched.get("ready_by_hour"))
+
+
+def _window_start_for_day(consumer: dict, day) -> datetime | None:
+    day_sched = config_day_schedule(consumer, datetime.combine(day, time(12, 0)))
+    from_h = day_sched.get("car_available_from_hour")
+    if from_h is None:
+        return None
+    return datetime.combine(day, time(hour=int(from_h) % 24))
+
+
+def next_scheduled_availability(horizon_start: datetime, consumer: dict) -> datetime | None:
+    """Nächster car_available_from_hour strikt nach horizon_start."""
+    for offset in range(8):
+        day = horizon_start.date() + timedelta(days=offset)
+        candidate = _window_start_for_day(consumer, day)
+        if candidate is not None and candidate > horizon_start:
+            return candidate
+    return None
+
+
+def resolve_absent_availability(horizon_start: datetime, consumer: dict) -> datetime | None:
+    """
+    Ladebeginn bei Abwesenheit: verspätete Rückkehr im aktuellen Fenster oder nächster Termin.
+    """
+    for day_offset in (0, -1):
+        day = horizon_start.date() + timedelta(days=day_offset)
+        window_start = _window_start_for_day(consumer, day)
+        if window_start is None or window_start > horizon_start:
+            continue
+        deadline = charging_deadline_after(window_start, consumer)
+        if deadline is not None and horizon_start < deadline:
+            return horizon_start
+    return next_scheduled_availability(horizon_start, consumer)
+
+
+def _loxone_inactive_context(source_label: str) -> dict:
+    return {
+        "active": False,
+        "plugged_in": False,
+        "deadline": None,
+        "target_kwh": 0.0,
+        "use_time_window": False,
+        "source_label": source_label,
+    }
+
+
+def _loxone_absent_forecast_context(consumer: dict, horizon_start: datetime) -> dict:
+    available_from = resolve_absent_availability(horizon_start, consumer)
+    if available_from is None:
+        return _loxone_inactive_context(
+            "loxone (abwesend, kein car_available_from_hour in Config)"
+        )
+    deadline = charging_deadline_after(available_from, consumer)
+    if deadline is None:
+        return _loxone_inactive_context(
+            "loxone (abwesend, kein ready_by_hour in Config)"
+        )
+    day_sched = config_day_schedule(consumer, available_from)
+    target_kwh = config.Config.target_kwh_from_rest_soc(
+        consumer, day_sched.get("daily_rest_soc")
+    )
+    if target_kwh is None or target_kwh <= 0:
+        return _loxone_inactive_context(
+            "loxone (abwesend, kein Ladeziel aus daily_rest_soc)"
+        )
+    return {
+        "active": True,
+        "plugged_in": False,
+        "anticipated": True,
+        "available_from": available_from,
+        "deadline": deadline,
+        "target_kwh": round(target_kwh, 3),
+        "use_time_window": True,
+        "source_label": "loxone (abwesend, Prognose charging_schedule)",
+    }
+
+
 def fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> dict:
     sched = consumer.get("charging_schedule") or {}
     lox = sched.get("loxone", {})
@@ -174,13 +255,9 @@ def fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> di
     )
     plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
     if not plugged_in:
-        return {
-            "active": False,
-            "deadline": None,
-            "target_kwh": 0.0,
-            "use_time_window": False,
-            "source_label": "loxone (nicht angeschlossen)",
-        }
+        if sched.get("forecast_when_absent"):
+            return _loxone_absent_forecast_context(consumer, horizon_start)
+        return _loxone_inactive_context("loxone (nicht angeschlossen)")
     ready_raw = (
         loxone_client.fetch_loxone_raw_value(lox.get("ready_by_time_name", ""))
         if lox.get("ready_by_time_name")
@@ -195,6 +272,7 @@ def fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> di
     target_kwh = config.Config.target_kwh_from_rest_soc(consumer, soc_val)
     return {
         "active": True,
+        "plugged_in": True,
         "deadline": deadline,
         "target_kwh": round(target_kwh, 3) if target_kwh is not None else None,
         "use_time_window": False,
@@ -338,8 +416,11 @@ def consumer_charging_eligible_indices(
         deadline = deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour"))
     use_time_window = bool(ctx.get("use_time_window"))
     eligible = []
+    available_from = ctx.get("available_from")
     for t in schedule_indices:
         slot_dt = matrix_slot_datetime(matrix, t)
+        if available_from is not None and slot_dt < available_from:
+            continue
         if deadline is not None and slot_dt >= deadline:
             continue
         if not use_time_window:

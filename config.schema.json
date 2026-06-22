@@ -196,6 +196,10 @@
           "type": "boolean",
           "description": "true = Ladeplanung mit Zeitfenster aktiv."
         },
+        "forecast_when_absent": {
+          "type": "boolean",
+          "description": "Nur bei daily_target_source=loxone: true = bei Abwesenheit (plugged_in≠1) Ladeplanung aus charging_schedule prognostizieren (car_available_from_hour, ready_by_hour, daily_rest_soc). false = E-Auto inaktiv bis Anschluss."
+        },
         "battery_capacity_kwh": {
           "type": "number",
           "description": "Fahrzeug-Akkukapazität in kWh (für SOC→kWh bei daily_target_source=config oder loxone)."
@@ -224,7 +228,7 @@
           "properties": {
             "plugged_in_name": {
               "type": "string",
-              "description": "1 = Fahrzeug angeschlossen, sonst keine Ladeplanung."
+              "description": "1 = Fahrzeug angeschlossen. Bei forecast_when_absent=false: sonst keine Ladeplanung."
             },
             "ready_by_time_name": {
               "type": "string",
