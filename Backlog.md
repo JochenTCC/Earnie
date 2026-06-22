@@ -14,10 +14,14 @@
 - [ ] Dateistruktur aufräumen
 - [x] Dateigrößen prüfen und ggf. refaktorieren
 - [ ] Prüfen, ob ältere Programm-Logs noch benötigt werden
-- [ ] Web-App in Loxone integrieren oder extern verfügbar machen. 
-- [ ] Verbrauchshistorie anzeigbar Machen im Live Modus
+- [ ] Generierung der Logs und .json Dateien beim Initialisieren des Containers automatisieren, so dass Dateien nicht mehr händisch angelegt werden müssen
+- [ ] Web-App in Loxone integrieren oder extern verfügbar machen.
+- [ ] Logik und UI für E-Auto verbessern
+  - [ ] Wie bekommt der Optimierer mit, wann das Auto wieder angeschlossen werden wird
+  - [ ] Wie und wann wird das Rest-SOC wieder auf einen Default-Wert zurückgesetzt (damit komplettes Aufladen sichergestellt ist)
+- [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementier)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis
-- [ ] Einfacherer Austausch der Daten zwischen Produktiv und Dev-Version
+- [ ] Einfacherer Austausch / Synchronisation der Daten zwischen Produktiv und Dev-Version
 - [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler
 - [ ] Container für Loxberry ausprobieren
 
