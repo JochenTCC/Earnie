@@ -240,6 +240,7 @@ class Config:
         )
         return {
             "enabled": True,
+            "forecast_when_absent": bool(raw.get("forecast_when_absent", False)),
             "battery_capacity_kwh": float(raw.get("battery_capacity_kwh", 0.0) or 0.0),
             "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
             "charging_efficiency": normalized_efficiency,

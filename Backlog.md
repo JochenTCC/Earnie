@@ -14,7 +14,7 @@
 - [x] Dateistruktur aufräumen
 - [x] Dateigrößen prüfen und ggf. refaktorieren
 - [x] Ladeenergie für E-Auto anpassen (ist derzeit zu klein)
-- [ ] Ansicht Produktiv-Durchlauf wird nicht korrekt aktualisiert
+- [x] Ansicht Produktiv-Durchlauf wird nicht korrekt aktualisiert
 - [ ] Bei E-Auto wahrscheinliche Abwesenheite implementieren und Rücksetzen des Rest-SOC auf niedrige Werte
 - [x] Prüfen, ob ältere Programm-Logs noch benötigt werden *(2026-06: siehe unten)*
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
