@@ -211,11 +211,82 @@ def add_power_traces(
         ))
 
 
+def add_optimized_soc_trace(
+    fig: go.Figure,
+    df: pd.DataFrame,
+    slot_x: pd.Series,
+    yaxis: str = "y2",
+) -> None:
+    uhrzeit = df["Uhrzeit"]
+    soc_x, soc_y = _extended_soc_line_xy(slot_x, df)
+    fig.add_trace(go.Scatter(
+        x=soc_x,
+        y=soc_y,
+        name="SoC",
+        mode="lines",
+        line=dict(color="#27ae60", width=2.5),
+        yaxis=yaxis,
+        **_line_hover(uhrzeit, ".1f"),
+    ))
+
+
+def add_baseline_soc_traces(
+    fig: go.Figure,
+    baseline_df: pd.DataFrame | None,
+    matched_baseline_df: pd.DataFrame | None,
+    yaxis: str = "y2",
+) -> None:
+    if baseline_df is not None and not baseline_df.empty:
+        baseline_slot_x = _chart_slot_x(len(baseline_df))
+        baseline_x, baseline_y = _extended_soc_line_xy(baseline_slot_x, baseline_df)
+        fig.add_trace(go.Scatter(
+            x=baseline_x,
+            y=baseline_y,
+            name="SoC BL Profil",
+            mode="lines",
+            line=dict(color="darkgrey", width=2.5, dash="dash"),
+            yaxis=yaxis,
+            **_line_hover(baseline_df["Uhrzeit"], ".1f"),
+        ))
+    if matched_baseline_df is not None and not matched_baseline_df.empty:
+        matched_slot_x = _chart_slot_x(len(matched_baseline_df))
+        matched_x, matched_y = _extended_soc_line_xy(matched_slot_x, matched_baseline_df)
+        fig.add_trace(go.Scatter(
+            x=matched_x,
+            y=matched_y,
+            name="SoC BL Ziel",
+            mode="lines",
+            line=dict(color="#7f8c8d", width=2.5, dash="dot"),
+            yaxis=yaxis,
+            **_line_hover(matched_baseline_df["Uhrzeit"], ".1f"),
+        ))
+
+
+def add_price_trace(
+    fig: go.Figure,
+    df: pd.DataFrame,
+    slot_x: pd.Series,
+    yaxis: str = "y",
+) -> None:
+    uhrzeit = df["Uhrzeit"]
+    price_x, price_y = _extended_line_xy(slot_x, df["Strompreis (Cent/kWh)"])
+    fig.add_trace(go.Scatter(
+        x=price_x,
+        y=price_y,
+        name="Preis",
+        mode="lines",
+        line=dict(color="red", width=3, shape="hv"),
+        yaxis=yaxis,
+        **_line_hover(uhrzeit, ".2f"),
+    ))
+
+
 def add_savings_trace(
     fig: go.Figure,
     uhrzeit: pd.Series,
     slot_x: pd.Series,
     hourly_savings_euro: list[float],
+    yaxis: str = "y2",
 ) -> None:
     """Kumulierte Ersparnis vs. Ziel-Baseline (negativ = optimiert günstiger)."""
     if not hourly_savings_euro:
@@ -230,7 +301,7 @@ def add_savings_trace(
         mode="lines+markers",
         line=dict(color="#27ae60", width=2, shape="hv"),
         marker=dict(size=5),
-        yaxis="y3",
+        yaxis=yaxis,
         customdata=_extended_hover_labels(uhrzeit),
         hovertemplate=(
             "Uhrzeit: %{customdata}<br>Einsparung (kumuliert): %{y:.3f} €"
@@ -239,29 +310,84 @@ def add_savings_trace(
     ))
 
 
-def add_price_soc_traces(fig: go.Figure, df: pd.DataFrame, slot_x: pd.Series) -> None:
-    uhrzeit = df["Uhrzeit"]
-    price_x, price_y = _extended_line_xy(slot_x, df["Strompreis (Cent/kWh)"])
-    fig.add_trace(go.Scatter(
-        x=price_x,
-        y=price_y,
-        name="Preis",
-        mode="lines",
-        line=dict(color="red", width=3, shape="hv"),
-        yaxis="y2",
-        **_line_hover(uhrzeit, ".2f"),
-    ))
+def _chart_legend() -> dict:
+    return dict(
+        orientation="h",
+        yanchor="top",
+        y=-0.22,
+        x=0.5,
+        xanchor="center",
+        font=dict(size=10),
+    )
 
-    soc_x, soc_y = _extended_soc_line_xy(slot_x, df)
-    fig.add_trace(go.Scatter(
-        x=soc_x,
-        y=soc_y,
-        name="SoC",
-        mode="lines",
-        line=dict(color="gold", width=2.5, dash="dash"),
-        yaxis="y2",
-        **_line_hover(uhrzeit, ".1f"),
-    ))
+
+def render_power_soc_chart(
+    df: pd.DataFrame,
+    baseline_df: pd.DataFrame | None = None,
+    matched_baseline_df: pd.DataFrame | None = None,
+) -> None:
+    """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
+    bar_colors = get_bar_colors(df)
+    slot_x = _chart_slot_x(len(df))
+    fig = go.Figure()
+
+    add_power_traces(fig, df, bar_colors, slot_x)
+    add_optimized_soc_trace(fig, df, slot_x)
+    add_baseline_soc_traces(fig, baseline_df, matched_baseline_df)
+
+    fig.update_layout(
+        title="24-Stunden-Zeithorizont (Leistung & SoC)",
+        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
+        barmode="overlay",
+        yaxis=dict(title="Leistung (kW)", side="left"),
+        yaxis2=dict(
+            title="SoC (%)",
+            side="right",
+            overlaying="y",
+            showgrid=False,
+        ),
+        legend=_chart_legend(),
+        margin=dict(l=40, r=40, t=50, b=110),
+    )
+    st.plotly_chart(fig, width="stretch")
+
+
+def render_price_savings_chart(
+    df: pd.DataFrame,
+    hourly_savings_euro: list[float] | None = None,
+) -> None:
+    """Stündlicher Strompreis und kumulierte Ersparnis."""
+    slot_x = _chart_slot_x(len(df))
+    fig = go.Figure()
+    has_savings = bool(hourly_savings_euro)
+
+    add_price_trace(fig, df, slot_x, yaxis="y")
+    if has_savings:
+        add_savings_trace(
+            fig,
+            df["Uhrzeit"],
+            slot_x,
+            hourly_savings_euro or [],
+            yaxis="y2",
+        )
+
+    layout = dict(
+        title="Preis & Einsparung",
+        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
+        yaxis=dict(title="Preis (Cent/kWh)", side="left"),
+        legend=_chart_legend(),
+        margin=dict(l=40, r=40, t=50, b=110),
+    )
+    if has_savings:
+        layout["yaxis2"] = dict(
+            title="Einsparung (€, kumuliert)",
+            side="right",
+            overlaying="y",
+            showgrid=False,
+        )
+
+    fig.update_layout(**layout)
+    st.plotly_chart(fig, width="stretch")
 
 
 def render_optimization_chart(
@@ -270,75 +396,6 @@ def render_optimization_chart(
     matched_baseline_df: pd.DataFrame | None = None,
     hourly_savings_euro: list[float] | None = None,
 ) -> None:
-    """Zeichnet Leistungen (PV, Verbrauch, Batterie) und Preise/SoC über zwei Y-Achsen."""
-    bar_colors = get_bar_colors(df)
-    slot_x = _chart_slot_x(len(df))
-    fig = go.Figure()
-    has_savings = bool(hourly_savings_euro)
-
-    add_power_traces(fig, df, bar_colors, slot_x)
-    if baseline_df is not None and not baseline_df.empty:
-        baseline_slot_x = _chart_slot_x(len(baseline_df))
-        baseline_x, baseline_y = _extended_soc_line_xy(baseline_slot_x, baseline_df)
-        fig.add_trace(go.Scatter(
-            x=baseline_x,
-            y=baseline_y,
-            name="SoC BL Profil",
-            mode="lines",
-            line=dict(color="darkgrey", width=2.5, dash="dash"),
-            yaxis="y2",
-            **_line_hover(baseline_df["Uhrzeit"], ".1f"),
-        ))
-    if matched_baseline_df is not None and not matched_baseline_df.empty:
-        matched_slot_x = _chart_slot_x(len(matched_baseline_df))
-        matched_x, matched_y = _extended_soc_line_xy(matched_slot_x, matched_baseline_df)
-        fig.add_trace(go.Scatter(
-            x=matched_x,
-            y=matched_y,
-            name="SoC BL Ziel",
-            mode="lines",
-            line=dict(color="#7f8c8d", width=2.5, dash="dot"),
-            yaxis="y2",
-            **_line_hover(matched_baseline_df["Uhrzeit"], ".1f"),
-        ))
-
-    add_price_soc_traces(fig, df, slot_x)
-    if has_savings:
-        add_savings_trace(fig, df["Uhrzeit"], slot_x, hourly_savings_euro or [])
-
-    layout = dict(
-        title="Synchronisierter 24-Stunden-Zeithorizont (Leistung vs. Preis & SoC)",
-        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
-        barmode="overlay",
-        yaxis=dict(title="Leistung (kW)", side="left"),
-        yaxis2=dict(
-            title="Preis (Cent/kWh) / SoC (%)",
-            side="right",
-            overlaying="y",
-            showgrid=False,
-            anchor="free",
-            position=0.92,
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="top",
-            y=-0.22,
-            x=0.5,
-            xanchor="center",
-            font=dict(size=10),
-        ),
-        margin=dict(l=40, r=70 if has_savings else 40, t=50, b=110),
-    )
-    if has_savings:
-        layout["yaxis3"] = dict(
-            title="Einsparung (€, kumuliert)",
-            overlaying="y",
-            side="right",
-            anchor="free",
-            position=1.0,
-            showgrid=False,
-        )
-
-    fig.update_layout(**layout)
-
-    st.plotly_chart(fig, width="stretch")
+    """Zeichnet Leistung/SoC und Preis/Einsparung in zwei getrennten Charts."""
+    render_power_soc_chart(df, baseline_df, matched_baseline_df)
+    render_price_savings_chart(df, hourly_savings_euro)
