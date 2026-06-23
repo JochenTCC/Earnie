@@ -45,6 +45,7 @@ def _simulate_single_hour_optimizer(
     spa_remaining_kwh: float | None,
     flex_indices: list[int] | None,
     charging_contexts: dict[str, dict] | None,
+    terminal_soc_percent: float | None,
 ) -> tuple[float, dict, int, float]:
     """Simuliert eine einzelne Stunde im optimierten Pfad (Huawei-Logik für die Batterie)."""
     h = row["hour"]
@@ -59,6 +60,7 @@ def _simulate_single_hour_optimizer(
         spa_remaining_kwh=spa_remaining_kwh,
         flex_indices=flex_indices,
         charging_contexts=charging_contexts,
+        terminal_soc_percent=terminal_soc_percent,
     )
     pv = row["expected_p_pv"]
     con = row["expected_p_act"]
@@ -198,6 +200,7 @@ def simulate_horizon(
             spa_remaining_kwh=None,
             flex_indices=list(range(len(remaining_slice))),
             charging_contexts=charging_contexts,
+            terminal_soc_percent=initial_soc,
         )
         flex_capped = _cap_flex_delivery(
             chart_row, consumers_cfg, horizon_limits, delivered_horizon

@@ -6,6 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import config
+from optimizer import battery as bat
 
 
 def get_bar_colors(df: pd.DataFrame) -> list[str]:
@@ -48,8 +49,12 @@ def _chart_line_x(slot_x: pd.Series) -> pd.Series:
     return slot_x - 0.5
 
 
-def _extended_line_xy(slot_x: pd.Series, y: pd.Series) -> tuple[pd.Series, pd.Series]:
-    """Verlängert Linien um 1 h (letzter Wert wiederholt) für die -0.5-Verschiebung."""
+def _extended_line_xy(
+    slot_x: pd.Series,
+    y: pd.Series,
+    tail_y: float | None = None,
+) -> tuple[pd.Series, pd.Series]:
+    """Verlängert Linien um 1 h für die -0.5-Verschiebung (Ende des letzten Slots)."""
     if y.empty:
         return _chart_line_x(slot_x), y
     tail_slot = float(slot_x.iloc[-1]) + 1.0
@@ -57,8 +62,34 @@ def _extended_line_xy(slot_x: pd.Series, y: pd.Series) -> tuple[pd.Series, pd.Se
         [slot_x, pd.Series([tail_slot])],
         ignore_index=True,
     )
-    extended_y = pd.concat([y, pd.Series([y.iloc[-1]])], ignore_index=True)
+    end_y = y.iloc[-1] if tail_y is None else tail_y
+    extended_y = pd.concat([y, pd.Series([end_y])], ignore_index=True)
     return _chart_line_x(extended_slot), extended_y
+
+
+def _soc_tail_y_from_row(row: pd.Series) -> float | None:
+    """SoC am Ende der Stunde aus geplanter Batterieaktion (Optimierer/Huawei-Logik)."""
+    if "Geplante Batterie-Aktion (kW)" not in row.index:
+        return None
+    params = config.get_battery_params()
+    new_soc, _ = bat.apply_soc_change(
+        float(row["Simulierter SoC (%)"]),
+        float(row["Geplante Batterie-Aktion (kW)"]),
+        params["battery_capacity_kwh"],
+        params["efficiency"],
+        params["min_soc"],
+        params["max_soc"],
+    )
+    return round(new_soc, 1)
+
+
+def _extended_soc_line_xy(
+    slot_x: pd.Series,
+    df: pd.DataFrame,
+) -> tuple[pd.Series, pd.Series]:
+    soc = df["Simulierter SoC (%)"]
+    tail_y = _soc_tail_y_from_row(df.iloc[-1]) if not df.empty else None
+    return _extended_line_xy(slot_x, soc, tail_y=tail_y)
 
 
 def _extended_hover_labels(uhrzeit: pd.Series) -> list[str]:
@@ -186,11 +217,12 @@ def add_savings_trace(
     slot_x: pd.Series,
     hourly_savings_euro: list[float],
 ) -> None:
-    """Stündliche Einsparung vs. Ziel-Baseline (positiv = optimiert günstiger)."""
+    """Kumulierte Ersparnis vs. Ziel-Baseline (negativ = optimiert günstiger)."""
     if not hourly_savings_euro:
         return
-    savings_series = pd.Series(hourly_savings_euro[: len(slot_x)])
-    savings_x, savings_y = _extended_line_xy(slot_x, savings_series)
+    hourly = pd.Series(hourly_savings_euro[: len(slot_x)])
+    cumulative_savings = (-hourly).cumsum()
+    savings_x, savings_y = _extended_line_xy(slot_x, cumulative_savings)
     fig.add_trace(go.Scatter(
         x=savings_x,
         y=savings_y,
@@ -201,7 +233,7 @@ def add_savings_trace(
         yaxis="y3",
         customdata=_extended_hover_labels(uhrzeit),
         hovertemplate=(
-            "Uhrzeit: %{customdata}<br>Einsparung: %{y:.3f} €/h"
+            "Uhrzeit: %{customdata}<br>Einsparung (kumuliert): %{y:.3f} €"
             "<extra></extra>"
         ),
     ))
@@ -220,7 +252,7 @@ def add_price_soc_traces(fig: go.Figure, df: pd.DataFrame, slot_x: pd.Series) ->
         **_line_hover(uhrzeit, ".2f"),
     ))
 
-    soc_x, soc_y = _extended_line_xy(slot_x, df["Simulierter SoC (%)"])
+    soc_x, soc_y = _extended_soc_line_xy(slot_x, df)
     fig.add_trace(go.Scatter(
         x=soc_x,
         y=soc_y,
@@ -247,10 +279,7 @@ def render_optimization_chart(
     add_power_traces(fig, df, bar_colors, slot_x)
     if baseline_df is not None and not baseline_df.empty:
         baseline_slot_x = _chart_slot_x(len(baseline_df))
-        baseline_x, baseline_y = _extended_line_xy(
-            baseline_slot_x,
-            baseline_df["Simulierter SoC (%)"],
-        )
+        baseline_x, baseline_y = _extended_soc_line_xy(baseline_slot_x, baseline_df)
         fig.add_trace(go.Scatter(
             x=baseline_x,
             y=baseline_y,
@@ -262,10 +291,7 @@ def render_optimization_chart(
         ))
     if matched_baseline_df is not None and not matched_baseline_df.empty:
         matched_slot_x = _chart_slot_x(len(matched_baseline_df))
-        matched_x, matched_y = _extended_line_xy(
-            matched_slot_x,
-            matched_baseline_df["Simulierter SoC (%)"],
-        )
+        matched_x, matched_y = _extended_soc_line_xy(matched_slot_x, matched_baseline_df)
         fig.add_trace(go.Scatter(
             x=matched_x,
             y=matched_y,
@@ -305,7 +331,7 @@ def render_optimization_chart(
     )
     if has_savings:
         layout["yaxis3"] = dict(
-            title="Einsparung (€/h)",
+            title="Einsparung (€, kumuliert)",
             overlaying="y",
             side="right",
             anchor="free",

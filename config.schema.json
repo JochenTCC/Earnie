@@ -35,6 +35,10 @@
           "exclusiveMinimum": 0,
           "maximum": 1,
           "description": "Relative Leistungsschwelle als Anteil von battery_max_power_kw (z. B. 0.02 = 2 %). Gilt für Modus-Erkennung und Zwangsentladen vs. Automatik."
+        },
+        "battery_end_soc_equals_start": {
+          "type": "boolean",
+          "description": "MILP-Randbedingung: SOC am Ende des Planungshorizonts entspricht dem SOC zu Beginn der Simulation bzw. (Live) dem aktuellen SOC. Verhindert künstliches Entladen am Horizontende."
         }
       }
     },
