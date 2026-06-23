@@ -12,29 +12,6 @@ from ui.charts import render_optimization_chart
 logger = logging.getLogger("app")
 
 
-def calculate_scaled_consumption_and_cost(
-    optimized_rows: list,
-) -> tuple[float, float, float]:
-    """Berechnet Gesamtverbrauch und Kosten ohne PV, skaliert auf 24h."""
-    total_consumption_kwh = 0.0
-    cost_without_pv_cents = 0.0
-
-    for row in optimized_rows:
-        consumption = row.get("Verbrauch-Prognose (kW)", 0.0)
-        price_cent = row.get("Strompreis (Cent/kWh)", 0.0)
-        total_consumption_kwh += consumption
-        cost_without_pv_cents += consumption * price_cent
-
-    cost_without_pv_euro = cost_without_pv_cents / 100.0
-    num_hours = len(optimized_rows)
-    scaling_factor = (24 / num_hours) if num_hours > 0 else 0.0
-
-    consumption_24h = total_consumption_kwh * scaling_factor
-    cost_without_pv_24h_euro = cost_without_pv_euro * scaling_factor
-
-    return total_consumption_kwh, consumption_24h, cost_without_pv_24h_euro
-
-
 def render_applied_targets(savings: dict) -> None:
     """Zeigt Baseline- und Optimierungsenergie je Verbraucher in einer Tabelle."""
     comparison = savings.get("energy_comparison") or []
@@ -77,29 +54,14 @@ def render_applied_targets(savings: dict) -> None:
 def render_savings_metrics(savings: dict) -> None:
     """Rendert die finanzielle Metriken-Übersicht im Dashboard auf einheitlicher Zeitbasis."""
     st.subheader("💶 Optimierungs-Einsparungen")
-    baseline_cost = savings.get("baseline_cost_euro", 0.0)
-    matched_baseline_cost = savings.get("matched_baseline_cost_euro", baseline_cost)
+    matched_baseline_cost = savings.get(
+        "matched_baseline_cost_euro",
+        savings.get("baseline_cost_euro", 0.0),
+    )
     optimized_cost = savings.get("optimized_cost_euro", 0.0)
-    matched_baseline_kwh = savings.get(
-        "matched_baseline_consumption_kwh", savings.get("optimized_consumption_kwh", 0.0)
-    )
-    optimized_kwh = savings.get("optimized_consumption_kwh", 0.0)
 
-    optimized_rows = savings.get("optimized_rows", [])
-    _, _, cost_without_pv_24h_euro = calculate_scaled_consumption_and_cost(optimized_rows)
-
-    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    col1, col2, col3 = st.columns(3)
     col1.metric(
-        "Ohne PV (24h hochger.)",
-        f"{cost_without_pv_24h_euro:.2f} €",
-        help="Hochgerechnete Kosten bei 100 % Netzbezug ohne PV-Anlage auf einen vollen 24h-Horizont.",
-    )
-    col2.metric(
-        "BL Profil",
-        f"{baseline_cost:.2f} €",
-        help="Baseline mit historischem Flex-Profil, ohne Lastverschiebung.",
-    )
-    col3.metric(
         "BL gleiches Ziel",
         f"{matched_baseline_cost:.2f} €",
         help=(
@@ -107,20 +69,10 @@ def render_savings_metrics(savings: dict) -> None:
             "aber ohne Lastverschiebung."
         ),
     )
-    col4.metric("Optimiert", f"{optimized_cost:.2f} €")
-    col5.metric(
-        "Verbrauch BL Ziel",
-        f"{matched_baseline_kwh:.1f} kWh",
-        help="Summe Grundlast + Flex in der Ziel-Baseline (entspricht dem Optimierungsziel).",
-    )
-    col6.metric(
-        "Verbrauch Opt.",
-        f"{optimized_kwh:.1f} kWh",
-        help="Summe Grundlast + Flex über alle Stunden im 24h-Fenster.",
-    )
+    col2.metric("Optimiert", f"{optimized_cost:.2f} €")
 
     display_savings = optimized_cost - matched_baseline_cost
-    col7.metric(
+    col3.metric(
         "Ersparnis",
         f"{display_savings:.2f} €",
         delta=f"{display_savings:.2f} €",
