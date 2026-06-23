@@ -214,6 +214,24 @@ def _build_milp_model(
     )
 
 
+def _add_terminal_soc_constraint(model: MilpHorizonModel, e_terminal: float) -> None:
+    """End-SOC am Horizontende = Ziel-SOC (Anker zu Simulations-/Planungsbeginn)."""
+    if model.horizon < 1:
+        return
+    model.prob += model.e_batt[model.horizon - 1] == e_terminal
+
+
+def _terminal_soc_energy_kwh(
+    battery_params: dict,
+    current_soc: float,
+    terminal_soc_percent: float | None,
+) -> float | None:
+    if not battery_params.get("end_soc_equals_start"):
+        return None
+    target_soc = current_soc if terminal_soc_percent is None else terminal_soc_percent
+    return (target_soc / 100.0) * battery_params["battery_capacity_kwh"]
+
+
 def _add_milp_objective(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
@@ -422,6 +440,7 @@ def milp_optimizer(
     spa_remaining_kwh: float | None = None,
     flex_indices: list[int] | None = None,
     charging_contexts: dict[str, dict] | None = None,
+    terminal_soc_percent: float | None = None,
 ) -> tuple[int, float, float, dict[str, float], dict[str, float]]:
     """
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
@@ -460,6 +479,18 @@ def milp_optimizer(
         contexts,
         verbose,
     )
+    if e_terminal := _terminal_soc_energy_kwh(
+        battery_params, current_soc, terminal_soc_percent
+    ):
+        _add_terminal_soc_constraint(model, e_terminal)
+        if verbose:
+            target_soc = (
+                current_soc if terminal_soc_percent is None else terminal_soc_percent
+            )
+            print(
+                f"🔒 MILP-Randbedingung aktiv: End-SoC = {target_soc:.1f} % "
+                f"(aktuell {current_soc:.1f} %)"
+            )
 
     model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
     if pulp.LpStatus[model.prob.status] != "Optimal":
