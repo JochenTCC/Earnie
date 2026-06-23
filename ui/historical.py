@@ -112,6 +112,10 @@ def render_historical_optimization_block(selected_date: date, initial_soc: float
         baseline_df,
         matched_baseline_df,
         hourly_savings_euro=savings_info.get("hourly_savings_euro"),
+        hourly_matched_baseline_cost_euro=savings_info.get(
+            "hourly_matched_baseline_cost_euro"
+        ),
+        hourly_optimized_cost_euro=savings_info.get("hourly_optimized_cost_euro"),
     )
     render_applied_targets(savings_info)
     persist_simulation_debug(
