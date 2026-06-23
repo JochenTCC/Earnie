@@ -35,31 +35,31 @@ def render_main_run_sync_panel() -> dict | None:
         f"{int(age // 60)} min" if age is not None else "?"
     )
 
-    st.markdown("#### 🛰️ Produktiv-Durchlauf (main.py)")
-    st.caption(
-        f"Letzter Lauf: **{completed}** · vor **{age_txt}** · "
-        f"Daten read-only aus `{run_state.RUN_STATE_FILE}`"
-    )
+    with st.expander("🛰️ Produktiv-Durchlauf (main.py)"):
+        st.caption(
+            f"Letzter Lauf: **{completed}** · vor **{age_txt}** · "
+            f"Daten read-only aus `{run_state.RUN_STATE_FILE}`"
+        )
 
-    cols = st.columns(5)
-    cols[0].metric("SoC", f"{state.get('soc_percent', 0):.1f} %")
-    cols[1].metric("Modus", _mode_label(state.get("mode", 0)))
-    cols[2].metric("Ziel-Leistung", f"{state.get('target_power_kw', 0):.2f} kW")
-    cols[3].metric("Ziel-SoC", f"{state.get('target_soc_percent', 0):.0f} %")
-    cols[4].metric("PV (letzte h)", f"{state.get('pv_delta_kwh', 0):.3f} kWh")
+        cols = st.columns(5)
+        cols[0].metric("SoC", f"{state.get('soc_percent', 0):.1f} %")
+        cols[1].metric("Modus", _mode_label(state.get("mode", 0)))
+        cols[2].metric("Ziel-Leistung", f"{state.get('target_power_kw', 0):.2f} kW")
+        cols[3].metric("Ziel-SoC", f"{state.get('target_soc_percent', 0):.0f} %")
+        cols[4].metric("PV (letzte h)", f"{state.get('pv_delta_kwh', 0):.3f} kWh")
 
-    flex_live = state.get("flex_live_kw") or {}
-    flex_opt = state.get("consumer_powers_kw") or {}
-    if flex_live or flex_opt:
-        flex_cols = st.columns(max(1, len(config.get_flexible_consumers())))
-        for idx, consumer in enumerate(config.get_flexible_consumers()):
-            cid = consumer["id"]
-            live_kw = float(flex_live.get(cid, 0.0) or 0.0)
-            opt_kw = float(flex_opt.get(cid, 0.0) or 0.0)
-            flex_cols[idx].metric(
-                consumer["name"],
-                f"{live_kw:.2f} kW live",
-                delta=f"Soll {opt_kw:.2f} kW",
-            )
+        flex_live = state.get("flex_live_kw") or {}
+        flex_opt = state.get("consumer_powers_kw") or {}
+        if flex_live or flex_opt:
+            flex_cols = st.columns(max(1, len(config.get_flexible_consumers())))
+            for idx, consumer in enumerate(config.get_flexible_consumers()):
+                cid = consumer["id"]
+                live_kw = float(flex_live.get(cid, 0.0) or 0.0)
+                opt_kw = float(flex_opt.get(cid, 0.0) or 0.0)
+                flex_cols[idx].metric(
+                    consumer["name"],
+                    f"{live_kw:.2f} kW live",
+                    delta=f"Soll {opt_kw:.2f} kW",
+                )
 
     return state

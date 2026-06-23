@@ -56,32 +56,36 @@ def render_applied_targets(savings: dict) -> None:
     if not comparison:
         return
 
-    st.markdown("**⚡ Energievergleich Baseline vs. Optimierung (24h)**")
-    st.caption(
-        "Optimierung: je Verbraucher ein 24h-Ziel über das gesamte Simulationsfenster "
-        "(auch bei Kalendertagwechsel nur einmal gezählt)."
-    )
+    with st.expander("⚡ Energievergleich Baseline vs. Optimierung (24h)"):
+        st.caption(
+            "Optimierung: je Verbraucher ein 24h-Ziel über das gesamte Simulationsfenster "
+            "(auch bei Kalendertagwechsel nur einmal gezählt)."
+        )
 
-    def _format_optimization_cell(kwh: float, source: str) -> str:
-        if source:
-            return f"{kwh:.1f} kWh ({source})"
-        return f"{kwh:.1f} kWh"
+        def _format_kwh_cell(kwh: float) -> str:
+            return f"{kwh:.1f} kWh"
 
-    st.dataframe(
-        pd.DataFrame([
-            {
-                "Verbraucher": row["name"],
-                "Baseline (kWh)": row["baseline_kwh"],
-                "Optimierung": _format_optimization_cell(
-                    row["optimization_kwh"],
-                    row.get("optimization_source", ""),
-                ),
-            }
-            for row in comparison
-        ]),
-        width="stretch",
-        hide_index=True,
-    )
+        def _format_optimization_cell(kwh: float, source: str) -> str:
+            formatted = _format_kwh_cell(kwh)
+            if source:
+                return f"{formatted} ({source})"
+            return formatted
+
+        st.dataframe(
+            pd.DataFrame([
+                {
+                    "Verbraucher": row["name"],
+                    "Baseline (kWh)": _format_kwh_cell(row["baseline_kwh"]),
+                    "Optimierung": _format_optimization_cell(
+                        row["optimization_kwh"],
+                        row.get("optimization_source", ""),
+                    ),
+                }
+                for row in comparison
+            ]),
+            width="stretch",
+            hide_index=True,
+        )
 
 
 def render_savings_metrics(savings: dict) -> None:
@@ -151,12 +155,12 @@ def render_simulation_details(
     df: pd.DataFrame,
     title: str = "📋 Simulations-Details (Nächste 24 Stunden)",
 ) -> None:
-    st.subheader(title)
-    st.markdown(
-        "Hier sind die exakten mathematischen Stundenslots aufgelistet, "
-        "die als Grundlage für den Chart dienen:"
-    )
-    st.dataframe(df, width="stretch")
+    with st.expander(title):
+        st.markdown(
+            "Hier sind die exakten mathematischen Stundenslots aufgelistet, "
+            "die als Grundlage für den Chart dienen:"
+        )
+        st.dataframe(df, width="stretch")
 
 
 def render_optimization_results(

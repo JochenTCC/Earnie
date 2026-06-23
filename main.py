@@ -1,4 +1,5 @@
 # main.py
+import sys
 import time
 from datetime import datetime
 import logging
@@ -7,6 +8,7 @@ import logger_config
 from integrations import awattar_client, loxone_client
 from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption
 from runtime_store import run_state, optimization_history
+from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
 import optimizer
 from version import __version__
@@ -131,11 +133,20 @@ def main():
     if live_power:
         consumption_snapshot = live_consumption.build_consumption_snapshot(live_power, flex_kw)
 
+    loxone_sent = loxone_client.build_sent_loxone_snapshot(
+        mode,
+        target_power,
+        target_soc,
+        consumer_powers,
+        charging_contexts,
+    )
+
     try:
         run_payload = {
             "source": "main.py",
             "success": True,
             "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
+            "loxone_sent": loxone_sent,
             "soc_percent": round(float(current_soc), 2),
             "pv_delta_kwh": round(float(pv_delta), 4),
             "market_price_cent": round(float(current_market_item["price_buy"]), 4),
@@ -163,6 +174,12 @@ def main():
 
 if __name__ == "__main__":
     logger_config.setup_logging(log_file="energy_optimizer.log", level=logging.INFO)
+    try:
+        ensure_single_instance("main")
+    except SingleInstanceError as exc:
+        logger.error("%s", exc)
+        print(f"Abbruch: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
     while True:
         try:
             main()

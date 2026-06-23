@@ -24,6 +24,28 @@
       "justMyCode": false
     },
     {
+      "name": "Streamlit + Caddy (HTTPS)",
+      "type": "python",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "${workspaceFolder}/app.py",
+        "--server.port",
+        "8501",
+        "--server.address",
+        "127.0.0.1",
+        "--server.enableCORS",
+        "false",
+        "--server.enableXsrfProtection",
+        "false"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "preLaunchTask": "caddy: run",
+      "postDebugTask": "caddy: stop"
+    },
+    {
       "name": "Streamlit app_test_data.py",
       "type": "python",
       "request": "launch",
@@ -45,6 +67,22 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "justMyCode": false
+    },
+    {
+      "name": "Loxone Watchdog",
+      "type": "python",
+      "request": "launch",
+      "module": "scripts.watch_loxone_states",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ],
+  "compounds": [
+    {
+      "name": "main.py + Loxone Watchdog",
+      "configurations": ["main.py", "Loxone Watchdog"],
+      "stopAll": true
     }
   ]
 }
