@@ -4,6 +4,7 @@ from __future__ import annotations
 import config
 from .charging_context import (
     apply_horizon_charging_limits,
+    consumer_charging_eligible_indices,
     resolve_charging_contexts,
 )
 from . import battery as bat
@@ -280,6 +281,14 @@ def calculate_cost_euro_from_rows(rows: list, sell_price_cent: float) -> float:
     return sum(calculate_step_cost_euro_from_row(row, sell_price_cent) for row in rows)
 
 
+def hourly_cost_euro_from_rows(rows: list, sell_price_cent: float) -> list[float]:
+    """Stündliche Stromkosten in Euro je Simulationszeile."""
+    return [
+        round(calculate_step_cost_euro_from_row(row, sell_price_cent), 4)
+        for row in rows
+    ]
+
+
 def hourly_savings_euro_from_rows(
     matched_baseline_rows: list,
     optimized_rows: list,
@@ -289,48 +298,67 @@ def hourly_savings_euro_from_rows(
     Stündliche Einsparung vs. Ziel-Baseline (positiv = günstiger optimiert).
     Summe entspricht savings_matched_euro in calculate_optimization_savings.
     """
-    hour_count = min(len(matched_baseline_rows), len(optimized_rows))
-    return [
-        round(
-            calculate_step_cost_euro_from_row(matched_baseline_rows[i], sell_price_cent)
-            - calculate_step_cost_euro_from_row(optimized_rows[i], sell_price_cent),
-            4,
-        )
-        for i in range(hour_count)
-    ]
+    matched = hourly_cost_euro_from_rows(matched_baseline_rows, sell_price_cent)
+    optimized = hourly_cost_euro_from_rows(optimized_rows, sell_price_cent)
+    hour_count = min(len(matched), len(optimized))
+    return [round(matched[i] - optimized[i], 4) for i in range(hour_count)]
 
 
 def build_matched_flex_kw_per_hour(
     optimization_matrix: list,
     consumer_targets_kwh: dict[str, float],
+    charging_contexts: dict[str, dict] | None = None,
 ) -> list[dict[str, float]]:
     """
-    Skaliert die stündlichen Flex-Profile auf dieselben Horizont-Ziele wie die Optimierung.
-    Ohne Profilanteile: gleichmäßige Verteilung über 24 h.
+    Skaliert das historische Flex-Profil auf die aktuellen Horizont-Ziele (kWh).
+    Zeitliche Form bleibt erhalten (auch unter Nennleistung); außerhalb des
+    Ladezeitfensters null – wie im MILP.
     """
     consumers_cfg = config.get_flexible_consumers(optimizer_only=True)
     rows = optimization_matrix[:24]
     hour_count = len(rows)
-    profile_sums = {consumer["id"]: 0.0 for consumer in consumers_cfg}
-    for row in rows:
-        flex = row.get("expected_flex_kw") or {}
-        for consumer in consumers_cfg:
-            cid = consumer["id"]
+    contexts = charging_contexts or {}
+    schedule_indices = list(range(hour_count))
+
+    eligible_by_consumer: dict[str, set[int]] = {}
+    for consumer in consumers_cfg:
+        cid = consumer["id"]
+        eligible = consumer_charging_eligible_indices(
+            rows,
+            consumer,
+            schedule_indices,
+            contexts.get(cid),
+        )
+        eligible_by_consumer[cid] = set(eligible)
+
+    profile_sums: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
+    for consumer in consumers_cfg:
+        cid = consumer["id"]
+        eligible = eligible_by_consumer[cid]
+        for t, row in enumerate(rows):
+            if t not in eligible:
+                continue
+            flex = row.get("expected_flex_kw") or {}
             profile_sums[cid] += float(flex.get(cid, 0.0) or 0.0)
 
     per_hour: list[dict[str, float]] = []
-    for row in rows:
+    for t, row in enumerate(rows):
         flex = row.get("expected_flex_kw") or {}
         hour_flex: dict[str, float] = {}
         for consumer in consumers_cfg:
             cid = consumer["id"]
             target = float(consumer_targets_kwh.get(cid, 0.0) or 0.0)
+            eligible = eligible_by_consumer[cid]
+            if t not in eligible:
+                hour_flex[cid] = 0.0
+                continue
+            eligible_count = len(eligible)
             profile_sum = profile_sums[cid]
             profile_val = float(flex.get(cid, 0.0) or 0.0)
             if profile_sum > 1e-6:
                 hour_flex[cid] = profile_val * (target / profile_sum)
-            elif target > 0 and hour_count > 0:
-                hour_flex[cid] = target / hour_count
+            elif target > 0 and eligible_count > 0:
+                hour_flex[cid] = target / eligible_count
             else:
                 hour_flex[cid] = 0.0
         per_hour.append(hour_flex)
@@ -398,16 +426,53 @@ def simulate_baseline_horizon(optimization_matrix: list, initial_soc: float) -> 
     return chart_rows
 
 
+def _flex_kw_from_chart_row(chart_row: dict) -> dict[str, float]:
+    """Flex-Leistungen je Verbraucher aus einer Simulationszeile."""
+    return {
+        consumer["id"]: float(chart_row.get(consumer_column_name(consumer), 0.0) or 0.0)
+        for consumer in config.get_flexible_consumers(optimizer_only=True)
+    }
+
+
+def simulate_baseline_with_optimized_flex(
+    optimization_matrix: list,
+    optimized_rows: list,
+    initial_soc: float,
+) -> list:
+    """
+    Baseline-Batterie (nur PV-Überschuss), aber dieselbe stündliche Flex-Last wie optimiert.
+    Für den stündlichen Kostenvergleich: gleiche Last, Unterschied nur Batterie/Netz.
+    """
+    battery_params = config.get_battery_params()
+    sim_soc = initial_soc
+    chart_rows: list[dict] = []
+    for row, optimized_row in zip(optimization_matrix[:24], optimized_rows[:24]):
+        sim_soc, chart_row = _simulate_single_hour_baseline(
+            row,
+            sim_soc,
+            battery_params,
+            flex_kw_override=_flex_kw_from_chart_row(optimized_row),
+            steuerbefehl="Baseline (Ziel)",
+        )
+        chart_rows.append(chart_row)
+    return chart_rows
+
+
 def simulate_matched_baseline_horizon(
     optimization_matrix: list,
     initial_soc: float,
     consumer_targets_kwh: dict[str, float],
+    charging_contexts: dict[str, dict] | None = None,
 ) -> list:
     """
-    Baseline mit gleicher Flex-Energie wie die Optimierung (Profilform skaliert),
-    aber ohne Lastverschiebung – Batterie nur PV-Überschuss.
+    Baseline mit gleicher Flex-Energie wie die Optimierung,
+    aber ohne Preis-Lastverschiebung – Batterie nur PV-Überschuss.
     """
-    matched_flex = build_matched_flex_kw_per_hour(optimization_matrix, consumer_targets_kwh)
+    matched_flex = build_matched_flex_kw_per_hour(
+        optimization_matrix,
+        consumer_targets_kwh,
+        charging_contexts,
+    )
     chart_rows = []
     sim_soc = initial_soc
     battery_params = config.get_battery_params()
@@ -449,6 +514,7 @@ def calculate_optimization_savings(
         optimization_matrix,
         initial_soc,
         horizon_targets,
+        charging_contexts,
     )
     sell_price_cent = config.get_push_price_cent()
     optimized_cost = calculate_cost_euro_from_rows(optimized_rows, sell_price_cent)
@@ -476,8 +542,20 @@ def calculate_optimization_savings(
         consumer_daily_targets_kwh,
         matched_flex_kwh=matched_flex_kwh,
     )
+    baseline_same_flex_rows = simulate_baseline_with_optimized_flex(
+        optimization_matrix,
+        optimized_rows,
+        initial_soc,
+    )
+    hourly_matched_cost = hourly_cost_euro_from_rows(
+        matched_baseline_rows, sell_price_cent
+    )
+    hourly_optimized_cost = hourly_cost_euro_from_rows(optimized_rows, sell_price_cent)
     hourly_savings = hourly_savings_euro_from_rows(
         matched_baseline_rows, optimized_rows, sell_price_cent
+    )
+    hourly_battery_only_cost = hourly_cost_euro_from_rows(
+        baseline_same_flex_rows, sell_price_cent
     )
     return {
         "baseline_cost_euro": round(baseline_cost, 4),
@@ -495,5 +573,9 @@ def calculate_optimization_savings(
         "optimized_rows": optimized_rows,
         "baseline_rows": baseline_rows,
         "matched_baseline_rows": matched_baseline_rows,
+        "baseline_same_flex_rows": baseline_same_flex_rows,
+        "hourly_matched_baseline_cost_euro": hourly_matched_cost,
+        "hourly_optimized_cost_euro": hourly_optimized_cost,
+        "hourly_battery_only_baseline_cost_euro": hourly_battery_only_cost,
         "hourly_savings_euro": hourly_savings,
     }

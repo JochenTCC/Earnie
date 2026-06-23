@@ -281,31 +281,54 @@ def add_price_trace(
     ))
 
 
-def add_savings_trace(
+def add_hourly_cost_comparison_bars(
     fig: go.Figure,
     uhrzeit: pd.Series,
     slot_x: pd.Series,
-    hourly_savings_euro: list[float],
+    hourly_matched_cost_euro: list[float],
+    hourly_optimized_cost_euro: list[float],
     yaxis: str = "y2",
 ) -> None:
-    """Kumulierte Ersparnis vs. Ziel-Baseline (negativ = optimiert günstiger)."""
-    if not hourly_savings_euro:
+    """Zwei Balken je Stunde: BL Ziel (grau) und optimiert (grün/rot bei Abweichung)."""
+    if not hourly_matched_cost_euro or not hourly_optimized_cost_euro:
         return
-    hourly = pd.Series(hourly_savings_euro[: len(slot_x)])
-    cumulative_savings = (-hourly).cumsum()
-    savings_x, savings_y = _extended_line_xy(slot_x, cumulative_savings)
-    fig.add_trace(go.Scatter(
-        x=savings_x,
-        y=savings_y,
-        name="Einsparung",
-        mode="lines+markers",
-        line=dict(color="#27ae60", width=2, shape="hv"),
-        marker=dict(size=5),
+    length = len(slot_x)
+    matched = pd.Series(hourly_matched_cost_euro[:length], dtype=float)
+    optimized = pd.Series(hourly_optimized_cost_euro[:length], dtype=float)
+    diff = optimized - matched
+    optimized_colors = [
+        "#27ae60" if delta < -1e-6 else "#e74c3c" if delta > 1e-6 else "#3498db"
+        for delta in diff
+    ]
+    bar_width = 0.36
+
+    fig.add_trace(go.Bar(
+        x=slot_x,
+        y=matched,
+        name="BL Ziel",
+        marker=dict(color="#bdc3c7"),
+        opacity=0.9,
+        width=bar_width,
         yaxis=yaxis,
-        customdata=_extended_hover_labels(uhrzeit),
+        customdata=uhrzeit,
         hovertemplate=(
-            "Uhrzeit: %{customdata}<br>Einsparung (kumuliert): %{y:.3f} €"
-            "<extra></extra>"
+            "Uhrzeit: %{customdata}<br>BL Ziel: %{y:.3f} €<extra></extra>"
+        ),
+    ))
+    fig.add_trace(go.Bar(
+        x=slot_x,
+        y=optimized,
+        name="Optimiert",
+        marker=dict(color=optimized_colors),
+        opacity=0.9,
+        width=bar_width,
+        yaxis=yaxis,
+        customdata=list(zip(uhrzeit, matched, diff)),
+        hovertemplate=(
+            "Uhrzeit: %{customdata[0]}<br>"
+            "Optimiert: %{y:.3f} €<br>"
+            "BL Ziel: %{customdata[1]:.3f} €<br>"
+            "Differenz: %{customdata[2]:+.3f} €<extra></extra>"
         ),
     ))
 
@@ -354,39 +377,50 @@ def render_power_soc_chart(
 
 def render_price_savings_chart(
     df: pd.DataFrame,
-    hourly_savings_euro: list[float] | None = None,
+    hourly_matched_baseline_cost_euro: list[float] | None = None,
+    hourly_optimized_cost_euro: list[float] | None = None,
 ) -> None:
-    """Stündlicher Strompreis und kumulierte Ersparnis."""
+    """Stündlicher Strompreis und Kostenvergleich BL Ziel vs. optimiert."""
     slot_x = _chart_slot_x(len(df))
     fig = go.Figure()
-    has_savings = bool(hourly_savings_euro)
+    has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
 
     add_price_trace(fig, df, slot_x, yaxis="y")
-    if has_savings:
-        add_savings_trace(
+    if has_costs:
+        add_hourly_cost_comparison_bars(
             fig,
             df["Uhrzeit"],
             slot_x,
-            hourly_savings_euro or [],
+            hourly_matched_baseline_cost_euro or [],
+            hourly_optimized_cost_euro or [],
             yaxis="y2",
         )
 
     layout = dict(
-        title="Preis & Einsparung",
+        title="Preis & Kostenvergleich",
         xaxis=_chart_xaxis_config(df["Uhrzeit"]),
         yaxis=dict(title="Preis (Cent/kWh)", side="left"),
         legend=_chart_legend(),
         margin=dict(l=40, r=40, t=50, b=110),
+        barmode="group",
     )
-    if has_savings:
+    if has_costs:
+        layout["bargap"] = 0.15
+        layout["bargroupgap"] = 0.08
+    if has_costs:
         layout["yaxis2"] = dict(
-            title="Einsparung (€, kumuliert)",
+            title="Kosten (€/h)",
             side="right",
             overlaying="y",
             showgrid=False,
         )
 
     fig.update_layout(**layout)
+    if has_costs:
+        st.caption(
+            "Je Stunde zwei Kostenbalken: grau = BL Ziel (Profil auf heutige Energiemengen "
+            "skaliert), farbig = optimiert – grün günstiger, rot teurer, blau gleich."
+        )
     st.plotly_chart(fig, width="stretch")
 
 
@@ -395,7 +429,13 @@ def render_optimization_chart(
     baseline_df: pd.DataFrame | None = None,
     matched_baseline_df: pd.DataFrame | None = None,
     hourly_savings_euro: list[float] | None = None,
+    hourly_matched_baseline_cost_euro: list[float] | None = None,
+    hourly_optimized_cost_euro: list[float] | None = None,
 ) -> None:
-    """Zeichnet Leistung/SoC und Preis/Einsparung in zwei getrennten Charts."""
+    """Zeichnet Leistung/SoC und Preis/Kostenvergleich in zwei getrennten Charts."""
     render_power_soc_chart(df, baseline_df, matched_baseline_df)
-    render_price_savings_chart(df, hourly_savings_euro)
+    render_price_savings_chart(
+        df,
+        hourly_matched_baseline_cost_euro,
+        hourly_optimized_cost_euro,
+    )
