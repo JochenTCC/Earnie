@@ -1,0 +1,23 @@
+# Kopieren nach C:\Tools\Caddy\Caddyfile
+#
+# Passwort-Hash erzeugen (in C:\Tools\Caddy, PowerShell als Admin):
+#   .\caddy.exe hash-password --plaintext "DEIN_PASSWORT"
+# Benutzername und Hash unten eintragen, dann:
+#   .\caddy.exe run --config Caddyfile
+#
+# Fritzbox: Portfreigaben 80 und 443 → PC (nicht mehr 8501 nach außen).
+# Streamlit lokal: --server.address 127.0.0.1 --server.port 8501
+#   oder .streamlit/config.toml mit address = "127.0.0.1"
+
+a9pmny27hbbx1c1f.myfritz.net {
+	basicauth {
+		ernie $2a$14$tXTaC06goxY6VqeUi1HnZeFg/DJm3ydJMdchfNbt92f29m9mlnPN.
+	}
+
+	reverse_proxy localhost:8501 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

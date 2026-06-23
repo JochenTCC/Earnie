@@ -323,34 +323,72 @@ def fetch_loxone_live_power() -> Optional[dict]:
     }
 
 
-def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: float):
+def map_huawei_modbus_values(mode: int, target_power_kw: float) -> tuple[float, float, int]:
     """
-    Übersetzt die Optimierungsmodi in Huawei-Modbus-Steuerwerte
-    und überträgt sie an die virtuellen Eingänge des Loxone Miniservers.
-    Merkernamen kommen aus config.json → loxone_blocks.
+    Interner Modus → (Lade-kW, Entlade-kW, Steuerbefehl).
 
-    Interner Modus → Ernie_Steuerbefehl (Huawei-Register 47100):
-      0 Automatik          → 0
-      1 Zwangsladen        → 1 + Ladeleistung
-      2 Entladesperre      → 1, Leistungen 0
-      3 Zwangs-Entladen    → 2 + Entladeleistung
+    Steuerbefehl (Huawei-Register 47100): 0=Automatik, 1=Zwangsladen/Entladesperre, 2=Zwangs-Entladen.
     """
     if mode == 1:
-        charge_kw = target_power_kw
-        discharge_kw = 0.0
-        control_cmd = 1
-    elif mode == 2:
-        charge_kw = 0.0
-        discharge_kw = 0.0
-        control_cmd = 1
-    elif mode == 3:
-        charge_kw = 0.0
-        discharge_kw = target_power_kw
-        control_cmd = 2
-    else:
-        charge_kw = 0.0
-        discharge_kw = 0.0
-        control_cmd = 0
+        return target_power_kw, 0.0, 1
+    if mode == 2:
+        return 0.0, 0.0, 1
+    if mode == 3:
+        return 0.0, target_power_kw, 2
+    return 0.0, 0.0, 0
+
+
+def flex_consumer_enable_value(
+    consumer: dict,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict],
+) -> int | None:
+    """Freigabe 0/1 für einen flexiblen Verbraucher (None wenn kein enable_name)."""
+    enable_name = (consumer.get("loxone_outputs") or {}).get("enable_name", "")
+    if not enable_name:
+        return None
+
+    cid = consumer["id"]
+    power_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
+    ctx = charging_contexts.get(cid)
+    if ctx is not None and not ctx.get("active", True):
+        power_kw = 0.0
+    return 1 if power_kw > 1e-3 else 0
+
+
+def build_sent_loxone_snapshot(
+    mode: int,
+    target_power_kw: float,
+    target_soc: float,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict] | None,
+) -> dict[str, float]:
+    """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
+    charge_kw, discharge_kw, control_cmd = map_huawei_modbus_values(mode, target_power_kw)
+    contexts = charging_contexts or {}
+    snapshot: dict[str, float] = {}
+
+    for cfg_name, value in (
+        (config.get("LOXONE_TARGET_SOC_NAME"), float(target_soc)),
+        (config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw),
+        (config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
+        (config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
+    ):
+        if cfg_name:
+            snapshot[str(cfg_name)] = value
+
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        enable_name = (consumer.get("loxone_outputs") or {}).get("enable_name", "")
+        enabled = flex_consumer_enable_value(consumer, consumer_powers, contexts)
+        if enable_name and enabled is not None:
+            snapshot[str(enable_name)] = float(enabled)
+
+    return snapshot
+
+
+def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: float):
+    """Übersetzt Optimierungsmodi und schreibt Huawei-Steuerwerte an Loxone."""
+    charge_kw, discharge_kw, control_cmd = map_huawei_modbus_values(mode, target_power_kw)
 
     logger.info(
         "Sending Modbus Mapping -> SoC: %s, Ladung: %s kW, Entladung: %s kW, Cmd: %s",
@@ -371,20 +409,16 @@ def send_flexible_consumer_states(
     charging_contexts: dict[str, dict] | None = None,
 ) -> None:
     """Sendet Freigabe-Signale (0/1) der flexiblen Verbraucher an Loxone."""
-    charging_contexts = charging_contexts or {}
+    contexts = charging_contexts or {}
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         enable_name = (consumer.get("loxone_outputs") or {}).get("enable_name", "")
-        if not enable_name:
+        enabled = flex_consumer_enable_value(consumer, consumer_powers, contexts)
+        if not enable_name or enabled is None:
             continue
 
+        send_loxone_value(enable_name, enabled)
         cid = consumer["id"]
         power_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
-        ctx = charging_contexts.get(cid)
-        if ctx is not None and not ctx.get("active", True):
-            power_kw = 0.0
-
-        enabled = 1 if power_kw > 1e-3 else 0
-        send_loxone_value(enable_name, enabled)
         logger.info(
             "Flex consumer %s -> Freigabe=%s (optimiert %.2f kW, Loxone: %s)",
             consumer["name"],

@@ -17,9 +17,11 @@
 - [x] Ansicht Produktiv-Durchlauf wird nicht korrekt aktualisiert
 - [x] Bei E-Auto wahrscheinliche Abwesenheite implementieren
 - [x] Prüfen, ob ältere Programm-Logs noch benötigt werden *(2026-06: siehe unten)*
+- [x] Steuersignale von main.py scheinen in Loxone wieder auf andere Werte gesetzt zu werden - Debug-Tool erstellen und Verhalten prüfen.
+  — Da hat wohl eine alte noch laufende Instant von main.py regelmäßig dazwischengefunkt.
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
 - [ ] Logik und UI für E-Auto verbessern
-  - Wie und wann wird das Rest-SOC wieder auf einen Default-Wert zurückgesetzt (damit komplettes Aufladen sichergestellt ist)
+  - Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementier)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis
 - [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler (Input: Laufzeit, mittlere Leistung / Output: Zeithorizont 6h: Güte des Startzeitpunkts)
