@@ -1,0 +1,43 @@
+# Betrieb
+
+## Zwei Einstiegspunkte
+
+| Komponente | Befehl | Rolle |
+|------------|--------|-------|
+| **Produktiv-Daemon** | `python main.py` | Liest Loxone, optimiert, schreibt Steuerwerte — läuft dauerhaft |
+| **Streamlit-App** | `streamlit run app.py` | Cockpit, Simulation, Debugging — optional parallel |
+
+Nur `main.py` steuert die Anlage. Die App **simuliert** den 24-Stunden-Horizont und zeigt den letzten Produktiv-Durchlauf an; sie überschreibt keine Loxone-Ausgänge (außer Sidebar-Parameter, die in `config.json` geschrieben werden).
+
+## Optimierungs-Takt
+
+- Auslösung an **Viertelstunden-Grenzen** (`:00`, `:15`, `:30`, `:45`)
+- `system.loop_timeout` in `config.json`: maximale Wartezeit zwischen Durchläufen in Sekunden (Standard 900 = 15 Min.)
+- Die App aktualisiert die Live-Simulation ca. **1 Minute nach** dem Viertelstunden-Wechsel, damit `main.py` zuerst laufen kann
+
+Countdown und letzter Lauf werden unten in der App angezeigt (siehe [Charts & Panels](../ui/charts.md)).
+
+## Laufzeitdateien (`runtime/`)
+
+Standardverzeichnis: `runtime/` (überschreibbar mit `ENERGY_OPTIMIZER_RUNTIME_DIR`).
+
+| Datei | Inhalt |
+|-------|--------|
+| `optimizer_run_state.json` | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll) |
+| `optimization_history.jsonl` | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf) |
+| `live_optimization_debug.json` | Debug-Snapshot der App-Simulation (Live-Modus) |
+
+Die App liest diese Dateien **read-only** für Panels und Abgleich.
+
+## Umgebungsvariablen (optional)
+
+| Variable | Wirkung |
+|----------|---------|
+| `ENERGY_OPTIMIZER_RUNTIME_DIR` | Anderes Verzeichnis für Laufzeit-JSONs |
+| `ENERGY_OPTIMIZER_UI_MODES` | Kommagetrennt: `live`, `historical`, `backtesting` — schränkt sichtbare App-Modi ein (z. B. nur `live` in Produktion) |
+
+## Typische Betriebsfehler
+
+- **Zwei `main.py`-Instanzen:** Steuerwerte können sich gegenseitig überschreiben — nur eine Produktiv-Instanz betreiben.
+- **App zeigt alte Werte:** `optimizer_run_state.json` fehlt oder `main.py` läuft nicht — Panel „Produktiv-Durchlauf“ prüfen.
+- **Keine aWATTar-Preise:** Simulation bricht in der App mit Fehlermeldung ab; Netzwerk oder API prüfen.

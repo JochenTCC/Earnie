@@ -9,9 +9,28 @@
       "type": "string",
       "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
     },
+    "awattar": {
+      "$ref": "#/definitions/awattar",
+      "description": "aWATTar-API und Aufschläge für den Bezugsstrompreis (Österreich)."
+    },
+    "system": {
+      "$ref": "#/definitions/system",
+      "description": "HTTP-Timeouts und Intervall der Optimierungs-Schleife (main.py)."
+    },
     "runtime_settings": {
       "$ref": "#/definitions/runtime_settings",
       "description": "Laufzeitparameter für PV, Batterie und Optimierung."
+    },
+    "scenarios": {
+      "type": "array",
+      "description": "Alternative Parameter-Sets nur für Simulation und Backtesting (nicht Produktiv).",
+      "items": {
+        "$ref": "#/definitions/scenario"
+      }
+    },
+    "file_paths_battery_simulation": {
+      "$ref": "#/definitions/file_paths_battery_simulation",
+      "description": "Pfade zu historischen CSVs, cons_data und Preisquelle."
     },
     "loxone_blocks": {
       "$ref": "#/definitions/loxone_blocks",
@@ -26,10 +45,109 @@
     }
   },
   "definitions": {
+    "awattar": {
+      "type": "object",
+      "description": "Bezugspreis aus aWATTar-Marktdaten mit Netzaufschlägen.",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "API-URL für Stundenmarktpreise (Standard: api.awattar.at)."
+        },
+        "fix_aufschlag_cent": {
+          "type": "number",
+          "description": "Fixer Aufschlag in Cent/kWh (Netz, Gebühren) auf den Börsenpreis."
+        },
+        "netzverlust_faktor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Multiplikator für Netzverluste auf den Marktpreis (z. B. 1.03)."
+        },
+        "mwst_austria_faktor": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "USt-Faktor auf den Bezugspreis (z. B. 1.2 für 20 %)."
+        }
+      }
+    },
+    "system": {
+      "type": "object",
+      "description": "System-Timeouts für Loxone-HTTP und main.py-Schleife.",
+      "properties": {
+        "global_timeout": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "HTTP-Timeout in Sekunden für Loxone- und API-Anfragen."
+        },
+        "loop_timeout": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Maximale Wartezeit zwischen Optimierungs-Durchläufen in Sekunden (900 = 15 Min.)."
+        }
+      }
+    },
     "runtime_settings": {
       "type": "object",
-      "description": "Laufzeitparameter (Echtzeit-Optimierung).",
+      "description": "Laufzeitparameter (Echtzeit-Optimierung). Siehe auch docs/konfiguration/batterie-pv.md.",
       "properties": {
+        "k_push_cent": {
+          "type": "number",
+          "description": "Einspeisevergütung in Cent/kWh (Erlös bei Netzeinspeisung)."
+        },
+        "pv_tilt": {
+          "type": "number",
+          "description": "PV-Dachneigung in Grad."
+        },
+        "pv_azimuth": {
+          "type": "number",
+          "description": "PV-Ausrichtung in Grad: 0=Süd, -90=Ost, 90=West."
+        },
+        "pv_kwp": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Installierte PV-Leistung in kWp."
+        },
+        "latitude": {
+          "type": "number",
+          "description": "Standort-Breitengrad für PV-Prognose (Forecast.Solar)."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "Standort-Längengrad für PV-Prognose."
+        },
+        "battery_max_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximale Lade- und Entladeleistung des Speichers in kW."
+        },
+        "battery_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Roundtrip-Wirkungsgrad Batterie (Laden/Entladen)."
+        },
+        "battery_capacity_kwh": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Nutzbare Speicherkapazität in kWh."
+        },
+        "battery_min_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Untere SOC-Grenze in % (Schutz)."
+        },
+        "battery_force_discharge_min_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Ab diesem SOC in % darf Zwangsentladung zur Kostensenkung genutzt werden."
+        },
+        "battery_max_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Obere SOC-Grenze in %."
+        },
         "threshold_power": {
           "type": "number",
           "exclusiveMinimum": 0,
@@ -39,6 +157,73 @@
         "battery_end_soc_equals_start": {
           "type": "boolean",
           "description": "MILP-Randbedingung: SOC am Ende des Planungshorizonts entspricht dem SOC zu Beginn der Simulation bzw. (Live) dem aktuellen SOC. Verhindert künstliches Entladen am Horizontende."
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "description": "Benanntes Szenario für Simulation/Backtesting.",
+      "required": ["id", "label", "settings"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Eindeutige Szenario-Kennung (z. B. battery_10kwh)."
+        },
+        "label": {
+          "type": "string",
+          "description": "Anzeigename in der UI."
+        },
+        "settings": {
+          "$ref": "#/definitions/runtime_settings",
+          "description": "Parameter-Override (gleiche Felder wie runtime_settings)."
+        }
+      }
+    },
+    "file_paths_battery_simulation": {
+      "type": "object",
+      "description": "Dateipfade und Preisquelle für Historie, cons_data und Backtesting.",
+      "properties": {
+        "path_consumption": {
+          "type": "string",
+          "description": "CSV mit historischem Gesamtverbrauch (Loxone-Export)."
+        },
+        "path_production": {
+          "type": "string",
+          "description": "CSV mit historischer PV-Produktion (Loxone-Export)."
+        },
+        "path_price": {
+          "type": "string",
+          "description": "CSV mit historischen Börsenstrompreisen (Energy-Charts o. ä.)."
+        },
+        "path_cons_data": {
+          "type": "string",
+          "description": "Stündliche Verbrauchs-/PV-Basisdatei (von main.py gepflegt)."
+        },
+        "cons_data_retention_months": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Aufbewahrungsdauer für cons_data in Monaten."
+        },
+        "cons_data_write_mode": {
+          "type": "string",
+          "enum": ["hourly"],
+          "description": "Schreibmodus für cons_data (derzeit nur hourly)."
+        },
+        "price_source": {
+          "type": "string",
+          "description": "api = Live-Preise; andere Werte für historische Preise aus path_price."
+        },
+        "price_provider": {
+          "type": "string",
+          "description": "Preisanbieter für Live-API (z. B. awattar)."
+        },
+        "price_range": {
+          "type": "string",
+          "description": "Zeitraum für historische Preise (z. B. last_12_months)."
+        },
+        "energy_charts_bzn": {
+          "type": "string",
+          "description": "Bidding Zone für Energy-Charts-CSV (z. B. DE-LU)."
         }
       }
     },

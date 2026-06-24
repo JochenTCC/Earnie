@@ -2,6 +2,10 @@
 
 Python-basierte Energieoptimierung für Smarthome (Batterie, PV, flexible Verbraucher) mit Streamlit-UI und Produktiv-Daemon (`main.py`).
 
+## Anwender-Dokumentation
+
+Einrichtung, `config.json`, Streamlit-Oberfläche und Loxone-Schnittstelle: **[docs/README.md](docs/README.md)**
+
 ## Projektstruktur
 
 ```
