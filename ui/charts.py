@@ -806,6 +806,71 @@ def _chart_legend() -> dict:
     )
 
 
+def _hv_line_endpoint_x(slot_count: int) -> float:
+    """X-Position am Ende des letzten Stunden-Slots (HV-Linien)."""
+    return float(slot_count - 1) + 0.5
+
+
+def _cost_summary_annotations(
+    endpoint_x: float,
+    matched_baseline_cost_euro: float,
+    optimized_cost_euro: float,
+) -> list[dict]:
+    """Plotly-Annotationen für die Gesamtkosten am Ende des 24h-Fensters."""
+    savings_euro = optimized_cost_euro - matched_baseline_cost_euro
+    if savings_euro < 0:
+        savings_color = "#27ae60"
+    elif savings_euro > 0:
+        savings_color = "#e74c3c"
+    else:
+        savings_color = _COLOR_BASELINE
+
+    anchor_y = max(matched_baseline_cost_euro, optimized_cost_euro)
+    base = dict(
+        x=endpoint_x,
+        y=anchor_y,
+        showarrow=False,
+        xanchor="left",
+        xshift=8,
+        yanchor="bottom",
+        font=dict(size=11),
+    )
+    return [
+        {
+            **base,
+            "text": f"BL Ziel: {matched_baseline_cost_euro:.2f} €",
+            "font": dict(color=_COLOR_BASELINE, size=11),
+        },
+        {
+            **base,
+            "text": f"Optimiert: {optimized_cost_euro:.2f} €",
+            "yshift": -16,
+            "font": dict(color=_COLOR_OPTIMIZED, size=11),
+        },
+        {
+            **base,
+            "text": f"Ersparnis: {savings_euro:+.2f} €",
+            "yshift": -32,
+            "font": dict(color=savings_color, size=11),
+        },
+    ]
+
+
+def _add_cost_summary_annotations(
+    fig: go.Figure,
+    slot_count: int,
+    matched_baseline_cost_euro: float,
+    optimized_cost_euro: float,
+) -> None:
+    endpoint_x = _hv_line_endpoint_x(slot_count)
+    for annotation in _cost_summary_annotations(
+        endpoint_x,
+        matched_baseline_cost_euro,
+        optimized_cost_euro,
+    ):
+        fig.add_annotation(**annotation)
+
+
 def render_power_soc_chart(
     df: pd.DataFrame,
     baseline_df: pd.DataFrame | None = None,
@@ -862,6 +927,9 @@ def render_cumulative_cost_chart(
     hourly_optimized_cost_euro: list[float] | None = None,
     hourly_matched_baseline_consumption_kwh: list[float] | None = None,
     hourly_optimized_consumption_kwh: list[float] | None = None,
+    *,
+    matched_baseline_cost_euro: float | None = None,
+    optimized_cost_euro: float | None = None,
 ) -> None:
     """Kumulierte Stromkosten und Verbrauch BL Ziel vs. optimiert."""
     slot_x = _chart_slot_x(len(df))
@@ -870,6 +938,11 @@ def render_cumulative_cost_chart(
     has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
     has_consumption = bool(
         hourly_matched_baseline_consumption_kwh and hourly_optimized_consumption_kwh
+    )
+    show_cost_summary = (
+        has_costs
+        and matched_baseline_cost_euro is not None
+        and optimized_cost_euro is not None
     )
 
     if has_costs:
@@ -892,13 +965,24 @@ def render_cumulative_cost_chart(
             extrap_start=extrap_start,
             extrap_end=extrap_end,
         )
+    if show_cost_summary:
+        _add_cost_summary_annotations(
+            fig,
+            len(df),
+            matched_baseline_cost_euro,
+            optimized_cost_euro,
+        )
+
+    xaxis = _chart_xaxis_config(df["Uhrzeit"])
+    if show_cost_summary:
+        xaxis["range"] = [xaxis["range"][0], xaxis["range"][1] + 2.5]
 
     layout = dict(
         title="Kumulierte Kosten & Verbrauch",
-        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
+        xaxis=xaxis,
         yaxis=dict(title="Kosten (€, kumuliert)"),
         legend=_chart_legend(),
-        margin=dict(l=40, r=40, t=50, b=110),
+        margin=dict(l=40, r=80 if show_cost_summary else 40, t=50, b=110),
     )
     if has_consumption:
         layout["yaxis2"] = dict(
@@ -926,6 +1010,9 @@ def render_price_savings_chart(
     hourly_optimized_cost_euro: list[float] | None = None,
     hourly_matched_baseline_consumption_kwh: list[float] | None = None,
     hourly_optimized_consumption_kwh: list[float] | None = None,
+    *,
+    matched_baseline_cost_euro: float | None = None,
+    optimized_cost_euro: float | None = None,
 ) -> None:
     """Alias für kumulierte Kosten- und Verbrauchslinien."""
     render_cumulative_cost_chart(
@@ -934,6 +1021,8 @@ def render_price_savings_chart(
         hourly_optimized_cost_euro,
         hourly_matched_baseline_consumption_kwh,
         hourly_optimized_consumption_kwh,
+        matched_baseline_cost_euro=matched_baseline_cost_euro,
+        optimized_cost_euro=optimized_cost_euro,
     )
 
 
@@ -946,6 +1035,9 @@ def render_optimization_chart(
     hourly_optimized_cost_euro: list[float] | None = None,
     hourly_matched_baseline_consumption_kwh: list[float] | None = None,
     hourly_optimized_consumption_kwh: list[float] | None = None,
+    *,
+    matched_baseline_cost_euro: float | None = None,
+    optimized_cost_euro: float | None = None,
 ) -> None:
     """Zeichnet Leistung/SoC/Preis und kumulierte Kosten/Verbrauch in zwei Charts."""
     render_power_soc_chart(df, baseline_df, matched_baseline_df)
@@ -955,4 +1047,6 @@ def render_optimization_chart(
         hourly_optimized_cost_euro,
         hourly_matched_baseline_consumption_kwh,
         hourly_optimized_consumption_kwh,
+        matched_baseline_cost_euro=matched_baseline_cost_euro,
+        optimized_cost_euro=optimized_cost_euro,
     )

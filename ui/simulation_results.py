@@ -12,6 +12,20 @@ from ui.charts import render_optimization_chart
 logger = logging.getLogger("app")
 
 
+def _cost_totals_from_savings(savings: dict) -> tuple[float | None, float | None]:
+    """Gesamtkosten BL Ziel und optimiert aus dem Savings-Dict."""
+    if "optimized_cost_euro" not in savings:
+        return None, None
+    matched_key = (
+        "matched_baseline_cost_euro"
+        if "matched_baseline_cost_euro" in savings
+        else "baseline_cost_euro"
+    )
+    if matched_key not in savings:
+        return None, None
+    return savings[matched_key], savings["optimized_cost_euro"]
+
+
 def render_applied_targets(savings: dict) -> None:
     """Zeigt Baseline- und Optimierungsenergie je Verbraucher in einer Tabelle."""
     comparison = savings.get("energy_comparison") or []
@@ -51,36 +65,6 @@ def render_applied_targets(savings: dict) -> None:
         )
 
 
-def render_savings_metrics(savings: dict) -> None:
-    """Rendert die finanzielle Metriken-Übersicht im Dashboard auf einheitlicher Zeitbasis."""
-    st.subheader("💶 Optimierungs-Einsparungen")
-    matched_baseline_cost = savings.get(
-        "matched_baseline_cost_euro",
-        savings.get("baseline_cost_euro", 0.0),
-    )
-    optimized_cost = savings.get("optimized_cost_euro", 0.0)
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric(
-        "BL gleiches Ziel",
-        f"{matched_baseline_cost:.2f} €",
-        help=(
-            "Baseline mit gleicher Flex-Energie wie die Optimierung (Profil skaliert), "
-            "aber ohne Lastverschiebung."
-        ),
-    )
-    col2.metric("Optimiert", f"{optimized_cost:.2f} €")
-
-    display_savings = optimized_cost - matched_baseline_cost
-    col3.metric(
-        "Ersparnis",
-        f"{display_savings:.2f} €",
-        delta=f"{display_savings:.2f} €",
-        delta_color="inverse",
-        help="Optimierte Kosten minus Baseline mit gleichem Verbrauchsziel (negativ = günstiger).",
-    )
-
-
 def render_simulation_details(
     df: pd.DataFrame,
     title: str = "📋 Simulations-Details (Nächste 24 Stunden)",
@@ -103,7 +87,7 @@ def render_optimization_results(
 ) -> None:
     if matched_baseline_df is None and savings_info.get("matched_baseline_rows"):
         matched_baseline_df = pd.DataFrame(savings_info["matched_baseline_rows"])
-    render_savings_metrics(savings_info)
+    matched_cost, optimized_cost = _cost_totals_from_savings(savings_info)
     render_optimization_chart(
         optimized_df,
         baseline_df,
@@ -119,6 +103,8 @@ def render_optimization_results(
         hourly_optimized_consumption_kwh=savings_info.get(
             "hourly_optimized_consumption_kwh"
         ),
+        matched_baseline_cost_euro=matched_cost,
+        optimized_cost_euro=optimized_cost,
     )
     render_applied_targets(savings_info)
     if simulation_table_title:
