@@ -173,7 +173,14 @@ def main():
         logger.warning("run_state: Zustand konnte nicht gespeichert werden: %s", e)
 
 if __name__ == "__main__":
-    logger_config.setup_logging(log_file="energy_optimizer.log", level=logging.INFO)
+    from runtime_store import bootstrap
+    from runtime_store.config_drift import log_config_drift
+    from runtime_store.persist_paths import log_file
+
+    bootstrap.run()
+    config.reinit_config()
+    logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
+    log_config_drift(logging.getLogger("main"))
     try:
         ensure_single_instance("main")
     except SingleInstanceError as exc:

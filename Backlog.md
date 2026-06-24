@@ -40,11 +40,11 @@
 | Datei | Status | Aktion |
 |-------|--------|--------|
 | `runtime/optimization_history.jsonl` | **kanonisch** | Produktiv-Historie (main + App-Panel) |
-| `energy_optimizer.log` | **aktiv** | Python-Logging (rotierend, 5×5 MB) |
+| `runtime/energy_optimizer.log` | **aktiv** | Python-Logging (rotierend, 5×5 MB) |
 | `runtime/optimizer_run_state.json` | **aktiv** | Letzter main-Durchlauf für App |
 | `runtime/live_optimization_debug.json` | **aktiv** | App-24h-Debug-Snapshot |
-| `system_history_log.csv` | **Legacy, nur Lesen** | Schreiben in main.py entfernt; App liest alte Einträge noch mit |
-| `pv_accuracy_log.csv` | **Lesen aktiv, Schreiben aus** | `log_pv_comparison` in main anbinden (siehe Backlog); Mount optional wieder für NAS |
+| `runtime/system_history_log.csv` | **Legacy, nur Lesen** | Schreiben in main.py entfernt; App liest alte Einträge noch mit |
+| `runtime/pv_accuracy_log.csv` | **Lesen aktiv, Schreiben aus** | `log_pv_comparison` in main anbinden (siehe Backlog) |
 | `backtesting_log.json` | **nur Dev** | Backtesting-Modus, nicht für Prod-NAS |
 
 Offen: Legacy-CSV irgendwann archivieren und `_load_legacy_csv_history` entfernen, wenn JSONL die komplette Historie abdeckt.
@@ -55,19 +55,21 @@ Ziel: reproduzierbares Build/Deploy und weniger manuelle Schritte — ohne Ände
 
 Empfohlene Reihenfolge: 7b → 7c → 7a → 7d → 7e → 7f
 
-- [ ] **7b — Container-Bootstrap automatisieren**
-  - Beim ersten Start fehlende `runtime/`-JSONs, leere History und cons_data-Pfade anlegen
-  - Entrypoint-Skript statt nur `CMD ["python", "main.py"]`
+- [x] **7b — Container-Bootstrap automatisieren**
+  - Entrypoint + `scripts/bootstrap_runtime` (legt fehlende Dateien an, überschreibt nie)
+  - Persistenz unter `config/` und `runtime/` (vereinfachte Compose-Mounts)
+  - Config-Drift-Hinweise (`config.example.json` vs. Anwender-config, kein Auto-Merge)
+  - Migration: `scripts/migrate_persist_layout.py`; Doku: [docs/einrichtung/container.md](docs/einrichtung/container.md)
   - Akzeptanz: frischer Container startet ohne manuelles Anlegen von Dateien
-- [ ] **7c — Build-Pipeline vereinheitlichen**
-  - `containers.build` wiederherstellen oder README/Dockerfile als kanonischen Weg festhalten
-  - Synology-Compose (`docker-compose-synology.yml`) mit 7b abgleichen
-  - Akzeptanz: ein dokumentierter Build-Befehl, Synology-Deploy weiter möglich
-- [ ] **7a — Projekt-Metadaten (`pyproject.toml`)**
-  - Version aus `version.py` als Single Source of Truth
-  - Dependencies mit `requirements.txt` konsolidieren
-  - Optional: `[project.scripts]` für main/streamlit/scripts
-  - Akzeptanz: `pip install -e .` im Repo, `pytest` weiter grün
+- [x] **7c — Build-Pipeline vereinheitlichen**
+  - Kanonisch: `python -m scripts.build_container` / `build-container.ps1` (linux/amd64, Tags latest + Version)
+  - Synology-Compose mit 7b abgeglichen; Deploy per `pull` + `up`
+  - Doku: [docs/einrichtung/container.md](docs/einrichtung/container.md), [README.md](README.md)
+- [x] **7a — Projekt-Metadaten (`pyproject.toml`)**
+  - Version aus `version.py` (`[tool.setuptools.dynamic]`)
+  - Abhängigkeiten in `pyproject.toml`; `requirements.txt` → `pip install .`
+  - `[project.scripts]`: ernie-bootstrap, ernie-build-image, ernie-verify-loxone, …
+  - Akzeptanz: `pip install -e .[dev]`, `pytest` grün
 - [ ] **7d — Streamlit extern bereitstellen**
   - Separater Service/Port im Compose (main + app)
   - In diesem Schritt nur erreichbare URL — kein Loxone-Embed

@@ -1,18 +1,24 @@
 version: '3.8'
 
+x-persist-volumes: &persist-volumes
+  - ./.env:/app/.env
+  - ./config:/app/config
+  - ./runtime:/app/runtime
+
+x-common-env: &common-env
+  TZ: Europe/Vienna
+  ENERGY_OPTIMIZER_CONFIG_PATH: config/config.json
+
 services:
-  # Service 1: Der Hintergrund-Optimierer (Daemon)
   optimizer-worker:
     build: .
     container_name: ernie-optimizer-worker
     command: python main.py
     restart: unless-stopped
-    volumes:
-      - .:/app
+    volumes: *persist-volumes
     environment:
-      - TZ=Europe/Vienna # Setzt die korrekte Zeitzone für die Berechnungen
+      <<: *common-env
 
-  # Service 2: Das Streamlit Control Center (UI)
   optimizer-ui:
     build: .
     container_name: ernie-optimizer-ui
@@ -20,7 +26,6 @@ services:
     restart: unless-stopped
     ports:
       - "8501:8501"
-    volumes:
-      - .:/app
+    volumes: *persist-volumes
     environment:
-      - TZ=Europe/Vienna
+      <<: *common-env

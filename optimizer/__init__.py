@@ -58,7 +58,9 @@ from runtime_store.file_metadata import (
     strip_metadata,
 )
 
-CONSUMER_STATE_FILE = "flexible_consumers_state.json"
+from runtime_store.persist_paths import consumer_state_file
+
+CONSUMER_STATE_FILE = consumer_state_file()
 
 __all__ = [
     "CONSUMER_STATE_FILE",

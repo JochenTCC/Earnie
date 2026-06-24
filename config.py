@@ -7,7 +7,9 @@ from dotenv import load_dotenv
 # Sensible Daten aus .env laden
 load_dotenv()
 
-CONFIG_JSON_PATH = "config.json"
+from runtime_store.persist_paths import resolve_config_json_path
+
+CONFIG_JSON_PATH = resolve_config_json_path()
 
 
 class Config:
@@ -124,7 +126,7 @@ class Config:
         self.PATH_CONSUMPTION_TOTAL = self.PATH_CONSUMPTION
         self.PATH_PRODUCTION = sim_paths.get("path_production", "")
         self.PATH_PRICE = sim_paths.get("path_price", "")
-        self.PATH_CONS_DATA = sim_paths.get("path_cons_data", "cons_data_hourly.csv")
+        self.PATH_CONS_DATA = sim_paths.get("path_cons_data", "runtime/cons_data_hourly.csv")
         self.CONS_DATA_RETENTION_MONTHS = sim_paths.get("cons_data_retention_months", 24)
         self.CONS_DATA_WRITE_MODE = sim_paths.get("cons_data_write_mode", "hourly")
         self.PRICE_SOURCE = sim_paths.get("price_source", "csv")
@@ -511,6 +513,13 @@ class Config:
 
 
 CONFIG = Config()
+
+
+def reinit_config() -> None:
+    """Lädt die Konfiguration neu (z. B. nach Bootstrap mit neu angelegter config.json)."""
+    global CONFIG, CONFIG_JSON_PATH
+    CONFIG_JSON_PATH = resolve_config_json_path()
+    CONFIG = Config(config_path=CONFIG_JSON_PATH)
 
 
 def get(name: str, default=None, cast=None):

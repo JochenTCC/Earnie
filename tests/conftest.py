@@ -10,7 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _has_runtime_data() -> bool:
-    return (ROOT / "cons_data_hourly.csv").is_file() and (ROOT / "config.json").is_file()
+    has_config = (ROOT / "config.json").is_file() or (ROOT / "config" / "config.json").is_file()
+    has_cons_data = (ROOT / "cons_data_hourly.csv").is_file() or (
+        ROOT / "runtime" / "cons_data_hourly.csv"
+    ).is_file()
+    return has_config and has_cons_data
 
 
 requires_historical_data = pytest.mark.skipif(
@@ -24,7 +28,9 @@ def _loxone_integration_enabled() -> bool:
         return False
     if os.getenv("ENERGY_OPTIMIZER_OFFLINE") == "1":
         return False
-    if not (ROOT / "config.json").is_file():
+    if not (
+        (ROOT / "config.json").is_file() or (ROOT / "config" / "config.json").is_file()
+    ):
         return False
     return all(
         str(os.getenv(key, "")).strip()

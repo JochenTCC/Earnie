@@ -8,6 +8,11 @@ import config
 from . import data_loader
 from . import market_prices
 from . import cons_data_store
+from runtime_store.persist_paths import (
+    consumption_profiles_file,
+    flexible_consumer_profiles_file,
+    total_consumption_profiles_file,
+)
 
 
 def _cons_data_to_profile_dataframe(cons_df: pd.DataFrame) -> pd.DataFrame:
@@ -61,12 +66,12 @@ def generate_consumption_profile() -> bool:
         profile = df.groupby(['Month', 'Weekday', 'Hour'])['BaseLoad'].mean().reset_index()
         profile.rename(columns={'BaseLoad': 'Consumption'}, inplace=True)
         profile['Consumption'] = profile['Consumption'].round(3)
-        profile.to_csv('consumption_profiles.csv', index=False, sep=';')
+        profile.to_csv(consumption_profiles_file(), index=False, sep=';')
 
         total_profile = df.groupby(['Month', 'Weekday', 'Hour'])['Total'].mean().reset_index()
         total_profile.rename(columns={'Total': 'Consumption'}, inplace=True)
         total_profile['Consumption'] = total_profile['Consumption'].round(3)
-        total_profile.to_csv('total_consumption_profiles.csv', index=False, sep=';')
+        total_profile.to_csv(total_consumption_profiles_file(), index=False, sep=';')
 
         flex_cols = [c["id"] for c in config.get_flexible_consumers()]
         if flex_cols:
@@ -80,7 +85,7 @@ def generate_consumption_profile() -> bool:
             flex_profile.rename(columns=rename_map, inplace=True)
             for cid in flex_cols:
                 flex_profile[cid] = flex_profile[cid].round(3)
-            flex_profile.to_csv('flexible_consumer_profiles.csv', index=False, sep=';')
+            flex_profile.to_csv(flexible_consumer_profiles_file(), index=False, sep=';')
 
         print(
             "✅ 'consumption_profiles.csv', 'total_consumption_profiles.csv' "
@@ -94,16 +99,16 @@ def generate_consumption_profile() -> bool:
 
 def check_and_update_profile_if_new_month() -> None:
     """Überprüft, ob ein neuer Monat begonnen hat, und triggert ggf. das Profil-Update."""
-    profile_path = 'consumption_profiles.csv'
+    profile_path = consumption_profiles_file()
     should_update = False
     
     if not os.path.exists(profile_path):
         print("ℹ️ Kein Verbrauchsprofil gefunden. Initialisiere erste Berechnung...")
         should_update = True
-    elif not os.path.exists('total_consumption_profiles.csv'):
+    elif not os.path.exists(total_consumption_profiles_file()):
         print("ℹ️ Gesamtverbrauchsprofil fehlt. Initialisiere Profil-Update...")
         should_update = True
-    elif not os.path.exists('flexible_consumer_profiles.csv') and config.get_flexible_consumers():
+    elif not os.path.exists(flexible_consumer_profiles_file()) and config.get_flexible_consumers():
         print("ℹ️ Flexible-Verbraucherprofil fehlt. Initialisiere Profil-Update...")
         should_update = True
     else:
@@ -147,12 +152,12 @@ def _load_hourly_profile(target_hours: List, profile_path: str, column: str = "C
 
 def _load_consumption_profile(target_hours: List) -> List[float]:
     """Lädt das Grundlast-Profil für die Zielstunden."""
-    return _load_hourly_profile(target_hours, 'consumption_profiles.csv')
+    return _load_hourly_profile(target_hours, consumption_profiles_file())
 
 
 def _load_total_consumption_profile(target_hours: List) -> List[float]:
     """Lädt das Gesamtverbrauchs-Profil (Grundlast + flexible Verbraucher) für die Zielstunden."""
-    return _load_hourly_profile(target_hours, 'total_consumption_profiles.csv')
+    return _load_hourly_profile(target_hours, total_consumption_profiles_file())
 
 
 def _build_optimization_matrix(
@@ -196,7 +201,7 @@ def _load_flexible_consumer_hourly_profiles(target_hours: List) -> dict[str, Lis
     """Lädt stündliche Profilwerte je flexiblem Verbraucher für die Zielstunden."""
     consumers = config.get_flexible_consumers()
     profiles = {consumer["id"]: [] for consumer in consumers}
-    profile_path = 'flexible_consumer_profiles.csv'
+    profile_path = flexible_consumer_profiles_file()
 
     if not os.path.exists(profile_path):
         return {cid: [0.0] * len(target_hours) for cid in profiles}

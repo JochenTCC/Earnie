@@ -8,11 +8,12 @@ from typing import Optional
 import config
 from integrations import loxone_client
 from runtime_store.file_metadata import PV_COUNTER_STATE_SCHEMA, read_schema_version, stamp_payload, strip_metadata
+from runtime_store.persist_paths import pv_counter_state_file
 
 logger = logging.getLogger(__name__)
 
 LOG_FILE = config.get('PV_TUNING_LOG_FILE')
-STATE_FILE = "pv_counter_state.json"
+STATE_FILE = pv_counter_state_file()
 
 def _save_state_atomic(file_path: str, data: dict):
     """

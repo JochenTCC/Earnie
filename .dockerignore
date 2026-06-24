@@ -1,0 +1,24 @@
+# Lokale Secrets und Laufzeitdaten nicht ins Image
+.env
+.env.*
+config.json
+config/config.json
+runtime/
+*.csv
+*.log
+*.jsonl
+backtesting_log.json
+flexible_consumers_state.json
+pv_counter_state.json
+cons_data_pending.json
+optimizer_run_state.json
+live_optimization_debug.json
+system_history_log.csv
+pv_accuracy_log.csv
+Historical-Data/
+.venv/
+__pycache__/
+*.pyc
+.git/
+.pytest_cache/
+.cursor/

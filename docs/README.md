@@ -6,9 +6,9 @@ Für Entwickler (Projektstruktur, Tests, Container) siehe [README.md](../README.
 
 ## Erste Schritte
 
-1. **Vorlage kopieren:** `config.example.json` → `config.json` (lokal, nicht ins Repository committen).
+1. **Konfiguration:** `config.example.json` → `config/config.json` (lokal, nicht committen). Alternativ legt `python -m scripts.bootstrap_runtime` die Datei beim ersten Start an.
 2. **Loxone-Zugang:** `.env.example` → `.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS`.
-3. **Merker-Namen** in `config.json` unter `loxone_blocks` und `flexible_consumers` an die eigenen virtuellen Eingänge/Merker anpassen (siehe [Loxone-Signale](referenz/loxone-signale.md)).
+3. **Merker-Namen** in `config/config.json` unter `loxone_blocks` und `flexible_consumers` anpassen (siehe [Loxone-Signale](referenz/loxone-signale.md)).
 4. **Verbindung prüfen:**
    ```powershell
    python -m scripts.verify_loxone_setup
@@ -17,7 +17,9 @@ Für Entwickler (Projektstruktur, Tests, Container) siehe [README.md](../README.
 5. **Produktivbetrieb starten:** `python main.py` (Optimierung im 15-Minuten-Takt).
 6. **Cockpit öffnen:** `streamlit run app.py` (Modus **Echtzeit**).
 
-Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `config.json` `"$schema": "./config.schema.json"` gesetzt ist.
+Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `config/config.json` `"$schema": "../config.schema.json"` gesetzt ist.
+
+**Container-Betrieb (Synology):** [Container](einrichtung/container.md)
 
 ## Inhaltsverzeichnis
 
@@ -25,8 +27,9 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 - [Loxone-Anbindung](einrichtung/loxone-anbindung.md) — HTTP-Schnittstelle, FTP-Log, Prüfskript
 - [Betrieb](einrichtung/betrieb.md) — `main.py` vs. App, Laufzeitdateien, Optimierungs-Takt
+- [Container](einrichtung/container.md) — Docker/Synology, Bootstrap, Migration, Config-Drift
 
-### Konfiguration (`config.json`)
+### Konfiguration (`config/config.json`)
 
 - [Überblick](konfiguration/ueberblick.md) — Aufbau der Datei, Szenarien, Dateipfade
 - [PV & Batterie](konfiguration/batterie-pv.md) — `runtime_settings`

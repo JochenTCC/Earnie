@@ -7,9 +7,19 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY pyproject.toml version.py README.md requirements.txt ./
+COPY optimizer/ optimizer/
+COPY data/ data/
+COPY integrations/ integrations/
+COPY runtime_store/ runtime_store/
+COPY ui/ ui/
+COPY simulation/ simulation/
+COPY scripts/ scripts/
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN chmod +x docker-entrypoint.sh
+
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["python", "main.py"]

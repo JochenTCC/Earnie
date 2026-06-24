@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "energy-optimizer"
+description = "Energieoptimierung für Smarthome (Batterie, PV, flexible Verbraucher) mit Streamlit-UI"
+readme = "README.md"
+requires-python = ">=3.12"
+dynamic = ["version"]
+dependencies = [
+    "requests==2.31.0",
+    "streamlit>=1.30.0",
+    "plotly>=5.18.0",
+    "pandas>=2.0.0",
+    "pulp>=2.8.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[project.scripts]
+ernie-backtesting = "scripts.run_backtesting:main"
+ernie-verify-loxone = "scripts.verify_loxone_setup:main"
+ernie-bootstrap = "scripts.bootstrap_runtime:main"
+ernie-build-image = "scripts.build_container:main"
+ernie-migrate-layout = "scripts.migrate_persist_layout:main"
+ernie-generate-cons-data = "scripts.generate_cons_data:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "optimizer*",
+    "data*",
+    "integrations*",
+    "runtime_store*",
+    "ui*",
+    "simulation*",
+    "scripts*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "requires_loxone: Integrationstest gegen echten Loxone-Miniserver",
+]

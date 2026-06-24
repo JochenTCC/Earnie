@@ -1,8 +1,10 @@
 *.csv
 config.py
 config.json
+config/config.json
 *.pyc
 __pycache__/
+*.egg-info/
 # Laufzeit-/Zustandsdateien (JSON)
 flexible_consumers_state.json
 pv_counter_state.json

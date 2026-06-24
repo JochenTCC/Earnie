@@ -17,13 +17,14 @@ import pandas as pd
 
 import config
 from .file_metadata import OPTIMIZATION_HISTORY_SCHEMA, stamp_payload, strip_metadata
+from .persist_paths import legacy_history_csv_file
 
 logger = logging.getLogger(__name__)
 
 RUNTIME_DIR = os.environ.get("ENERGY_OPTIMIZER_RUNTIME_DIR", "runtime")
 HISTORY_FILENAME = "optimization_history.jsonl"
 HISTORY_FILE = os.path.join(RUNTIME_DIR, HISTORY_FILENAME)
-LEGACY_CSV_FILE = "system_history_log.csv"
+LEGACY_CSV_FILE = legacy_history_csv_file()
 
 _LEGACY_CSV_COLUMNS = (
     "Timestamp",

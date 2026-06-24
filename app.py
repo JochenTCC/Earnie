@@ -1,9 +1,17 @@
 # app.py
+from runtime_store import bootstrap
+
+bootstrap.run()
+
 import logging
 
 import streamlit as st
+
 import config
+
+config.reinit_config()
 from integrations import loxone_client
+from runtime_store.config_drift import format_drift_message, load_config_drift_items
 from version import __version__
 from ui.auto_refresh import setup_auto_refresh
 from ui.backtesting import render_backtesting_block
@@ -31,6 +39,12 @@ def main() -> None:
     inject_compact_numeric_css()
     st.title("🔋 Ernie Energy Control Center")
     st.caption(f"Version {__version__}")
+    try:
+        drift_items = load_config_drift_items()
+        if drift_items:
+            st.warning(format_drift_message(drift_items))
+    except FileNotFoundError:
+        pass
     mode = render_mode_selector()
 
     if mode == "Historischer Tag":

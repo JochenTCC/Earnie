@@ -1,0 +1,3 @@
+# Entwicklungs-Abhängigkeiten (pytest etc.)
+# pip install -r requirements-dev.txt
+.[dev]

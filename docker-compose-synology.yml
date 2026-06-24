@@ -1,45 +1,41 @@
 # Synology Container Manager – Produktions-Compose (vorgefertigtes Image)
 #
-# Voraussetzungen im Projektordner auf der NAS:
-#   - .env (LOXONE_IP, LOXONE_USER, LOXONE_PASS)
-#   - config.json (aus config.example.json, Laufzeit-Parameter + flexible_consumers)
-#   - cons_data_hourly.csv (+ .meta.json) – einmalig lokal via scripts/generate_cons_data.py erzeugen,
-#     danach auf die NAS kopieren; laufende Pflege erfolgt über main.py
-#   - Leere Dateien anlegen, falls noch nicht vorhanden (Synology legt sonst Ordner an):
-#       touch flexible_consumers_state.json pv_counter_state.json cons_data_pending.json
-#       touch energy_optimizer.log
-#       touch consumption_profiles.csv total_consumption_profiles.csv flexible_consumer_profiles.csv
-#   - Optional (nur Legacy-Historie vor JSONL): system_history_log.csv
-#   - Laufzeit-Ordner für run_state (kein Einzeldatei-Mount – Synology EBUSY):
-#       mkdir -p runtime
+# Persistente Daten (überleben Image-Updates):
+#   ./config/config.json   – Haus-Konfiguration (wird nie überschrieben)
+#   ./runtime/             – cons_data, Zustands-JSONs, Profile, Logs
+#   ./.env                 – Loxone-Zugangsdaten
 #
-# Nicht benötigt in Prod (nur Dev/Forschung): Loxone-Historien-CSVs, backtesting_log.json
+# Erstinstallation:
+#   1. Ordner anlegen: mkdir -p config runtime
+#   2. .env aus .env.example befüllen
+#   3. Container starten – fehlende Dateien legt der Entrypoint an (config aus config.example.json)
+#   4. config/config.json anpassen (Loxone-Namen, Verbraucher)
+#   5. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
 #
-# Nach Änderungen an config.json: Container optimizer-worker neu starten (lädt Config nur beim Start).
+# Migration von älterem Layout (Dateien im Projektordner):
+#   mv config.json config/config.json
+#   mv cons_data_hourly.csv cons_data_hourly.meta.json runtime/ 2>/dev/null || true
+#   mv flexible_consumers_state.json pv_counter_state.json cons_data_pending.json runtime/ 2>/dev/null || true
+#   mv consumption_profiles.csv total_consumption_profiles.csv flexible_consumer_profiles.csv runtime/ 2>/dev/null || true
+#   mv energy_optimizer.log system_history_log.csv runtime/ 2>/dev/null || true
+#   In config/config.json: "path_cons_data": "runtime/cons_data_hourly.csv"
+#
+# Nach Änderungen an config/config.json: Container optimizer-worker neu starten.
+# Nach Code-Änderungen: Image bauen/pushen (docs/einrichtung/container.md), dann auf der NAS:
+#   docker compose -f docker-compose-synology.yml pull && docker compose -f docker-compose-synology.yml up -d
+#
 # UI: ENERGY_OPTIMIZER_UI_MODES=live (nur Echtzeit); Dev ohne Variable = alle Modi.
 
 version: "3.8"
 
 x-persist-volumes: &persist-volumes
-  # Konfiguration
   - ./.env:/app/.env
-  - ./config.json:/app/config.json
-  # Laufzeit-Zustand
-  - ./flexible_consumers_state.json:/app/flexible_consumers_state.json
-  - ./pv_counter_state.json:/app/pv_counter_state.json
-  - ./cons_data_pending.json:/app/cons_data_pending.json
+  - ./config:/app/config
   - ./runtime:/app/runtime
-  # Stunden-Log (Profile + Tagesziele; wird von main.py fortgeschrieben)
-  - ./cons_data_hourly.csv:/app/cons_data_hourly.csv
-  - ./cons_data_hourly.meta.json:/app/cons_data_hourly.meta.json
-  # Verbrauchsprofile (monatlich aus cons_data neu berechnet)
-  - ./consumption_profiles.csv:/app/consumption_profiles.csv
-  - ./total_consumption_profiles.csv:/app/total_consumption_profiles.csv
-  - ./flexible_consumer_profiles.csv:/app/flexible_consumer_profiles.csv
-  # Logs
-  - ./energy_optimizer.log:/app/energy_optimizer.log
-  # Optional: bestehende Legacy-Historie (nur Lesen in der App)
-  - ./system_history_log.csv:/app/system_history_log.csv
+
+x-common-env: &common-env
+  TZ: Europe/Vienna
+  ENERGY_OPTIMIZER_CONFIG_PATH: config/config.json
 
 services:
   optimizer-worker:
@@ -49,7 +45,7 @@ services:
     restart: unless-stopped
     volumes: *persist-volumes
     environment:
-      - TZ=Europe/Vienna
+      <<: *common-env
 
   optimizer-ui:
     image: ghcr.io/jochentcc/ernie-energy:latest
@@ -60,5 +56,5 @@ services:
       - "8501:8501"
     volumes: *persist-volumes
     environment:
-      - TZ=Europe/Vienna
-      - ENERGY_OPTIMIZER_UI_MODES=live
+      <<: *common-env
+      ENERGY_OPTIMIZER_UI_MODES: live
