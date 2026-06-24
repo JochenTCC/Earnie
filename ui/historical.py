@@ -11,9 +11,9 @@ import optimizer
 from data import profile_manager
 from ui.runtime_config import get_runtime_settings
 from ui.simulation_results import (
+    _cost_totals_from_savings,
     persist_simulation_debug,
     render_applied_targets,
-    render_savings_metrics,
     render_simulation_details,
 )
 from ui.charts import render_optimization_chart
@@ -106,7 +106,7 @@ def render_historical_optimization_block(selected_date: date, initial_soc: float
     if planned_lines:
         st.info("🏭 Geplante flexible Verbraucher: " + " | ".join(planned_lines))
 
-    render_savings_metrics(savings_info)
+    matched_cost, optimized_cost = _cost_totals_from_savings(savings_info)
     render_optimization_chart(
         optimized_df,
         baseline_df,
@@ -122,6 +122,8 @@ def render_historical_optimization_block(selected_date: date, initial_soc: float
         hourly_optimized_consumption_kwh=savings_info.get(
             "hourly_optimized_consumption_kwh"
         ),
+        matched_baseline_cost_euro=matched_cost,
+        optimized_cost_euro=optimized_cost,
     )
     render_applied_targets(savings_info)
     persist_simulation_debug(

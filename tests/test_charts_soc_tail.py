@@ -5,7 +5,9 @@ import pandas as pd
 
 from ui.charts import (
     _consumer_bar_palette,
+    _cost_summary_annotations,
     _extended_line_xy,
+    _hv_line_endpoint_x,
     _segment_connected_line_xy,
     _segment_linear_connected_line_xy,
     _soc_tail_y_from_row,
@@ -79,3 +81,17 @@ def test_extended_soc_line_uses_tail_not_flat_repeat():
     _, extended_y = _extended_line_xy(slot_x, y, tail_y=62.0)
     assert extended_y.iloc[-1] == 62.0
     assert extended_y.iloc[-2] == 55.0
+
+
+def test_hv_line_endpoint_x_matches_last_slot():
+    assert _hv_line_endpoint_x(24) == 23.5
+    assert _hv_line_endpoint_x(1) == 0.5
+
+
+def test_cost_summary_annotations_include_totals_and_savings_sign():
+    annotations = _cost_summary_annotations(23.5, 12.34, 11.50)
+    assert len(annotations) == 3
+    assert annotations[0]["text"] == "BL Ziel: 12.34 €"
+    assert annotations[1]["text"] == "Optimiert: 11.50 €"
+    assert annotations[2]["text"] == "Ersparnis: -0.84 €"
+    assert annotations[2]["font"]["color"] == "#27ae60"

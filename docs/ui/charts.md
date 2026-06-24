@@ -2,16 +2,6 @@
 
 Gilt primär für die Modi **Echtzeit** und **Historischer Tag** (gemeinsame Komponenten in `ui/simulation_results.py` und `ui/charts.py`). Der Modus **Backtesting** nutzt eigene Kosten- und Monatscharts.
 
-## Metriken: Optimierungs-Einsparungen
-
-Drei Kennzahlen über den 24-Stunden-Horizont:
-
-| Metrik | Bedeutung |
-|--------|-----------|
-| **BL gleiches Ziel** | Stromkosten, wenn flexible Verbraucher dieselbe Tagesenergie verbrauchen wie in der Optimierung, aber **ohne** zeitliche Verschiebung (Profil skaliert) |
-| **Optimiert** | Stromkosten mit MILP-Plan (Batterie + Flex-Verbraucher) |
-| **Ersparnis** | Optimiert minus BL gleiches Ziel (negativ = günstiger) |
-
 ## Chart 1: 24-Stunden-Zeithorizont (Leistung, SoC & Preis)
 
 **Linke Y-Achse (kW):**
@@ -46,6 +36,14 @@ Im **Echtzeit**-Modus kann unter den Charts erscheinen:
 Bei Wartezeit auf `main.py`: Countdown zur Synchronisation (ca. 1 Min. nach Viertelstunden-Wechsel).
 
 ## Chart 2: Kumulierte Kosten & Verbrauch
+
+Am Ende des 24-Stunden-Fensters (rechts am Kostenverlauf) werden die Gesamtwerte angezeigt:
+
+| Kennzahl | Bedeutung |
+|----------|-----------|
+| **BL Ziel** | Stromkosten mit skaliertem Profil, ohne Lastverschiebung |
+| **Optimiert** | Stromkosten mit MILP-Plan |
+| **Ersparnis** | Optimiert minus BL Ziel (negativ = günstiger, grün) |
 
 | Spur | Achse | Bedeutung |
 |------|-------|-----------|
