@@ -106,7 +106,7 @@ def main():
         mode, target_power, target_soc, consumer_powers,
     )
 
-    current_market_item = market_data[0] # Aktuelle Stunde
+    current_market_item = optimization_matrix[0]
 
     logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
     loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)

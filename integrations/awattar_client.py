@@ -1,8 +1,9 @@
 # awattar_client.py
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 import config
+from data.market_prices import awattar_fetch_window, normalize_price_slot
 
 def fetch_awattar_prices() -> Optional[List[Dict[str, Any]]]:
     """
@@ -13,8 +14,14 @@ def fetch_awattar_prices() -> Optional[List[Dict[str, Any]]]:
                                        oder None im Fehlerfall.
     """
     try:
-        # Timeout aus config setzen, um unendliches Blockieren der Schleife zu verhindern
-        response = requests.get(config.get('AWATTAR_URL'), timeout=config.get_global_timeout())
+        start, end = awattar_fetch_window()
+        start_ms = int(start.timestamp() * 1000)
+        end_ms = int((end + timedelta(hours=1)).timestamp() * 1000)
+        response = requests.get(
+            config.get('AWATTAR_URL'),
+            params={'start': start_ms, 'end': end_ms},
+            timeout=config.get_global_timeout(),
+        )
         response.raise_for_status()
         data = response.json()
         
@@ -29,7 +36,9 @@ def fetch_awattar_prices() -> Optional[List[Dict[str, Any]]]:
             if 'start_timestamp' not in entry or 'marketprice' not in entry:
                 continue
                 
-            dt = datetime.fromtimestamp(entry['start_timestamp'] / 1000)
+            dt = normalize_price_slot(
+                datetime.fromtimestamp(entry['start_timestamp'] / 1000)
+            )
             
             # Umrechnung von EUR/MWh in Cent/kWh: (X / 10)
             price_cent = entry['marketprice'] / 10
@@ -39,7 +48,8 @@ def fetch_awattar_prices() -> Optional[List[Dict[str, Any]]]:
                 "hour": dt.hour,
                 "price_buy": round(price_cent, 2)
             })
-            
+
+        prices.sort(key=lambda item: item["timestamp"])
         return prices
 
     except requests.exceptions.Timeout:

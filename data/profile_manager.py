@@ -6,6 +6,7 @@ from typing import List, Tuple, Optional
 from . import pv_forecast
 import config
 from . import data_loader
+from . import market_prices
 from . import cons_data_store
 
 
@@ -162,37 +163,33 @@ def _build_optimization_matrix(
     target_hours: list | None = None,
 ) -> list:
     """Erstellt die Optimierungs-Matrix mit Preis-, Verbrauchs- und PV-Daten."""
+    if target_hours is None or len(target_hours) != 24:
+        raise ValueError(
+            "_build_optimization_matrix erfordert genau 24 target_hours für das Live-Fenster."
+        )
+
+    price_slots = market_prices.resolve_24h_market_slots(market_data, target_hours)
     optimization_matrix = []
-    
-    fix_aufschlag = config.get('FIX_AUFSCHLAG_CENT', cast=float)
-    netzverlust = config.get('NETZVERLUST_FAKTOR', cast=float)
-    mwst_faktor = config.get('MWST_AUSTRIA_FAKTOR', cast=float)
 
-    for i, item in enumerate(market_data[:24]):    
-        hour = item['hour']
-        
-        try:
-            epex_price_cent = float(item['price_buy'])
-            brutto_price_cent = (epex_price_cent * netzverlust + fix_aufschlag) * mwst_faktor
-            brutto_price_cent = round(brutto_price_cent, 4)
-        except (TypeError, ValueError) as e:
-            print(f"🚨 Fehler bei Brutto-Berechnung für Stunde {hour}: {e}. Nutze Rohwert.")
-            brutto_price_cent = item['price_buy']
-
+    for i, price_slot in enumerate(price_slots):
         row = {
-            "hour": hour,
-            "date": target_hours[i].date() if target_hours else None,
-            "slot_datetime": target_hours[i] if target_hours else None,
-            "k_act": brutto_price_cent,
+            "hour": price_slot["hour"],
+            "date": target_hours[i].date(),
+            "slot_datetime": target_hours[i],
+            "k_act": price_slot["k_act"],
+            "price_buy": price_slot["price_buy"],
+            "price_source": price_slot["price_source"],
             "expected_p_act": forecast_consumption[i],
             "expected_p_pv": forecast_pv[i],
             "consumption_mode": "forecast",
         }
+        if price_slot.get("mirrored_from") is not None:
+            row["mirrored_from"] = price_slot["mirrored_from"]
         if forecast_total_consumption is not None:
             row["expected_p_total"] = forecast_total_consumption[i]
         optimization_matrix.append(row)
-    
-    return optimization_matrix[:24]
+
+    return optimization_matrix
 
 
 def _load_flexible_consumer_hourly_profiles(target_hours: List) -> dict[str, List[float]]:

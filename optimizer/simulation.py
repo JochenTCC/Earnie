@@ -18,6 +18,17 @@ from .targets import (
     resolve_horizon_consumer_targets_kwh,
 )
 
+from data.market_prices import PRICE_SOURCE_MIRRORED
+
+
+def _chart_price_fields(row: dict) -> dict:
+    """Preis-Felder für Simulations-/Chart-Zeilen."""
+    return {
+        "Strompreis (Cent/kWh)": row["k_act"],
+        "Preis extrapoliert": row.get("price_source") == PRICE_SOURCE_MIRRORED,
+    }
+
+
 _RESERVED_KW_COLUMNS = {
     "PV-Prognose (kW)",
     "Verbrauch-Prognose (kW)",
@@ -83,7 +94,7 @@ def _simulate_single_hour_optimizer(
     p_grid = con + total_flex_power - pv + round(batt_action, 2)
     chart_row = {
         "Uhrzeit": f"{h:02d}:00",
-        "Strompreis (Cent/kWh)": row["k_act"],
+        **_chart_price_fields(row),
         "PV-Prognose (kW)": pv,
         "Verbrauch-Prognose (kW)": con,
         "Geplante Batterie-Aktion (kW)": round(batt_action, 2),
@@ -411,7 +422,7 @@ def _simulate_single_hour_baseline(
     p_grid = con + total_flex_power - pv + round(batt_action, 2)
     chart_row = {
         "Uhrzeit": f"{h:02d}:00",
-        "Strompreis (Cent/kWh)": row["k_act"],
+        **_chart_price_fields(row),
         "PV-Prognose (kW)": pv,
         "Verbrauch-Prognose (kW)": con,
         "Geplante Batterie-Aktion (kW)": round(batt_action, 2),
