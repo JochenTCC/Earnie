@@ -8,6 +8,9 @@ import plotly.graph_objects as go
 import config
 from optimizer import battery as bat
 
+_COLOR_BASELINE = "#7f8c8d"
+_COLOR_OPTIMIZED = "#e67e22"
+
 
 def get_bar_colors(df: pd.DataFrame) -> list[str]:
     """Batterie-Balkenfarbe je Steuerbefehl (Modus)."""
@@ -224,7 +227,7 @@ def add_optimized_soc_trace(
         y=soc_y,
         name="SoC",
         mode="lines",
-        line=dict(color="#27ae60", width=2.5),
+        line=dict(color=_COLOR_OPTIMIZED, width=2.5),
         yaxis=yaxis,
         **_line_hover(uhrzeit, ".1f"),
     ))
@@ -244,7 +247,7 @@ def add_baseline_soc_traces(
             y=baseline_y,
             name="SoC BL Profil",
             mode="lines",
-            line=dict(color="darkgrey", width=2.5, dash="dash"),
+            line=dict(color=_COLOR_BASELINE, width=2.5, dash="dash"),
             yaxis=yaxis,
             **_line_hover(baseline_df["Uhrzeit"], ".1f"),
         ))
@@ -256,99 +259,133 @@ def add_baseline_soc_traces(
             y=matched_y,
             name="SoC BL Ziel",
             mode="lines",
-            line=dict(color="#7f8c8d", width=2.5, dash="dot"),
+            line=dict(color=_COLOR_BASELINE, width=2.5, dash="dot"),
             yaxis=yaxis,
             **_line_hover(matched_baseline_df["Uhrzeit"], ".1f"),
         ))
 
 
-def add_price_trace(
+def _scale_series_to_0_100(values: pd.Series) -> pd.Series:
+    """Lineare Skalierung auf 0–100 (für gemeinsame Achse mit SoC)."""
+    lo = float(values.min())
+    hi = float(values.max())
+    if hi - lo < 1e-6:
+        return pd.Series([50.0] * len(values), index=values.index)
+    return (values - lo) / (hi - lo) * 100.0
+
+
+def add_price_on_soc_axis_trace(
     fig: go.Figure,
     df: pd.DataFrame,
     slot_x: pd.Series,
-    yaxis: str = "y",
+    yaxis: str = "y2",
 ) -> None:
+    """Strompreis auf der SoC-Achse (0–100), Hover zeigt Cent/kWh."""
     uhrzeit = df["Uhrzeit"]
-    price_x, price_y = _extended_line_xy(slot_x, df["Strompreis (Cent/kWh)"])
+    price_cent = df["Strompreis (Cent/kWh)"]
+    price_scaled = _scale_series_to_0_100(price_cent)
+    price_x, price_y = _extended_line_xy(slot_x, price_scaled)
+    cent_labels = pd.concat(
+        [price_cent, pd.Series([price_cent.iloc[-1]])],
+        ignore_index=True,
+    ).tolist()
     fig.add_trace(go.Scatter(
         x=price_x,
         y=price_y,
         name="Preis",
         mode="lines",
-        line=dict(color="red", width=3, shape="hv"),
+        line=dict(color="red", width=2.5, shape="hv"),
         yaxis=yaxis,
-        **_line_hover(uhrzeit, ".2f"),
+        customdata=cent_labels,
+        hovertemplate=(
+            "Uhrzeit: %{text}<br>Preis: %{customdata:.2f} Cent/kWh<extra></extra>"
+        ),
+        text=_extended_hover_labels(uhrzeit),
     ))
 
 
-def add_hourly_cost_comparison_bars(
+def add_cumulative_cost_traces(
     fig: go.Figure,
     uhrzeit: pd.Series,
     slot_x: pd.Series,
     hourly_matched_cost_euro: list[float],
     hourly_optimized_cost_euro: list[float],
-    yaxis: str = "y2",
 ) -> None:
-    """
-    Zwei gestapelte Balken je Stunde, gleiche Gesamthöhe.
-    Ersparnis: grün auf Optimiert (blau); Mehrkosten: rot auf BL Ziel (grau).
-    """
+    """Kumulierte Stromkosten: BL Ziel und optimiert."""
     if not hourly_matched_cost_euro or not hourly_optimized_cost_euro:
         return
     length = len(slot_x)
-    matched = pd.Series(hourly_matched_cost_euro[:length], dtype=float)
-    optimized = pd.Series(hourly_optimized_cost_euro[:length], dtype=float)
-    savings = (matched - optimized).clip(lower=0.0)
-    extra = (optimized - matched).clip(lower=0.0)
-    bar_width = 0.38
-    bar_hover = dict(
-        customdata=uhrzeit,
-        hovertemplate="Uhrzeit: %{customdata}<br>%{fullData.name}: %{y:.3f} €<extra></extra>",
-    )
+    matched_cum = pd.Series(hourly_matched_cost_euro[:length], dtype=float).cumsum()
+    optimized_cum = pd.Series(hourly_optimized_cost_euro[:length], dtype=float).cumsum()
+    matched_x, matched_y = _extended_line_xy(slot_x, matched_cum)
+    optimized_x, optimized_y = _extended_line_xy(slot_x, optimized_cum)
+    fig.add_trace(go.Scatter(
+        x=matched_x,
+        y=matched_y,
+        name="Kosten BL Ziel",
+        mode="lines",
+        line=dict(color=_COLOR_BASELINE, width=2.5, shape="hv"),
+        customdata=_extended_hover_labels(uhrzeit),
+        hovertemplate=(
+            "Uhrzeit: %{customdata}<br>Kosten BL Ziel (kumuliert): %{y:.3f} €"
+            "<extra></extra>"
+        ),
+    ))
+    fig.add_trace(go.Scatter(
+        x=optimized_x,
+        y=optimized_y,
+        name="Kosten optimiert",
+        mode="lines",
+        line=dict(color=_COLOR_OPTIMIZED, width=2.5, shape="hv"),
+        customdata=_extended_hover_labels(uhrzeit),
+        hovertemplate=(
+            "Uhrzeit: %{customdata}<br>Kosten optimiert (kumuliert): %{y:.3f} €"
+            "<extra></extra>"
+        ),
+    ))
 
-    fig.add_trace(go.Bar(
-        x=slot_x,
-        y=matched,
-        name="BL Ziel",
-        marker=dict(color="#bdc3c7"),
-        opacity=0.9,
-        width=bar_width,
-        offsetgroup="bl",
+
+def add_cumulative_consumption_traces(
+    fig: go.Figure,
+    uhrzeit: pd.Series,
+    slot_x: pd.Series,
+    hourly_matched_kwh: list[float],
+    hourly_optimized_kwh: list[float],
+    yaxis: str = "y2",
+) -> None:
+    """Kumulierter Gesamtverbrauch (Grundlast + Flex) auf separater Achse."""
+    if not hourly_matched_kwh or not hourly_optimized_kwh:
+        return
+    length = len(slot_x)
+    matched_cum = pd.Series(hourly_matched_kwh[:length], dtype=float).cumsum()
+    optimized_cum = pd.Series(hourly_optimized_kwh[:length], dtype=float).cumsum()
+    matched_x, matched_y = _extended_line_xy(slot_x, matched_cum)
+    optimized_x, optimized_y = _extended_line_xy(slot_x, optimized_cum)
+    fig.add_trace(go.Scatter(
+        x=matched_x,
+        y=matched_y,
+        name="Verbrauch BL Ziel",
+        mode="lines",
+        line=dict(color=_COLOR_BASELINE, width=2.5, dash="dash", shape="hv"),
         yaxis=yaxis,
-        **bar_hover,
+        customdata=_extended_hover_labels(uhrzeit),
+        hovertemplate=(
+            "Uhrzeit: %{customdata}<br>Verbrauch BL Ziel (kumuliert): %{y:.2f} kWh"
+            "<extra></extra>"
+        ),
     ))
-    fig.add_trace(go.Bar(
-        x=slot_x,
-        y=extra,
-        name="Mehrkosten",
-        marker=dict(color="#e74c3c"),
-        opacity=0.9,
-        width=bar_width,
-        offsetgroup="bl",
+    fig.add_trace(go.Scatter(
+        x=optimized_x,
+        y=optimized_y,
+        name="Verbrauch optimiert",
+        mode="lines",
+        line=dict(color=_COLOR_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
         yaxis=yaxis,
-        **bar_hover,
-    ))
-    fig.add_trace(go.Bar(
-        x=slot_x,
-        y=optimized,
-        name="Optimiert",
-        marker=dict(color="#3498db"),
-        opacity=0.9,
-        width=bar_width,
-        offsetgroup="opt",
-        yaxis=yaxis,
-        **bar_hover,
-    ))
-    fig.add_trace(go.Bar(
-        x=slot_x,
-        y=savings,
-        name="Einsparung",
-        marker=dict(color="#27ae60"),
-        opacity=0.9,
-        width=bar_width,
-        offsetgroup="opt",
-        yaxis=yaxis,
-        **bar_hover,
+        customdata=_extended_hover_labels(uhrzeit),
+        hovertemplate=(
+            "Uhrzeit: %{customdata}<br>Verbrauch optimiert (kumuliert): %{y:.2f} kWh"
+            "<extra></extra>"
+        ),
     ))
 
 
@@ -376,21 +413,82 @@ def render_power_soc_chart(
     add_power_traces(fig, df, bar_colors, slot_x)
     add_optimized_soc_trace(fig, df, slot_x)
     add_baseline_soc_traces(fig, baseline_df, matched_baseline_df)
+    add_price_on_soc_axis_trace(fig, df, slot_x)
 
     fig.update_layout(
-        title="24-Stunden-Zeithorizont (Leistung & SoC)",
+        title="24-Stunden-Zeithorizont (Leistung, SoC & Preis)",
         xaxis=_chart_xaxis_config(df["Uhrzeit"]),
         barmode="overlay",
         yaxis=dict(title="Leistung (kW)", side="left"),
         yaxis2=dict(
-            title="SoC (%)",
+            title="SoC (%) / Preis (skaliert 0–100)",
             side="right",
             overlaying="y",
             showgrid=False,
+            range=[0, 100],
         ),
         legend=_chart_legend(),
         margin=dict(l=40, r=40, t=50, b=110),
     )
+    st.caption(
+        "Preis rot auf der rechten Achse: relativ auf 0–100 skaliert "
+        "(Hover zeigt Cent/kWh)."
+    )
+    st.plotly_chart(fig, width="stretch")
+
+
+def render_cumulative_cost_chart(
+    df: pd.DataFrame,
+    hourly_matched_baseline_cost_euro: list[float] | None = None,
+    hourly_optimized_cost_euro: list[float] | None = None,
+    hourly_matched_baseline_consumption_kwh: list[float] | None = None,
+    hourly_optimized_consumption_kwh: list[float] | None = None,
+) -> None:
+    """Kumulierte Stromkosten und Verbrauch BL Ziel vs. optimiert."""
+    slot_x = _chart_slot_x(len(df))
+    fig = go.Figure()
+    has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
+    has_consumption = bool(
+        hourly_matched_baseline_consumption_kwh and hourly_optimized_consumption_kwh
+    )
+
+    if has_costs:
+        add_cumulative_cost_traces(
+            fig,
+            df["Uhrzeit"],
+            slot_x,
+            hourly_matched_baseline_cost_euro or [],
+            hourly_optimized_cost_euro or [],
+        )
+    if has_consumption:
+        add_cumulative_consumption_traces(
+            fig,
+            df["Uhrzeit"],
+            slot_x,
+            hourly_matched_baseline_consumption_kwh or [],
+            hourly_optimized_consumption_kwh or [],
+        )
+
+    layout = dict(
+        title="Kumulierte Kosten & Verbrauch",
+        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
+        yaxis=dict(title="Kosten (€, kumuliert)"),
+        legend=_chart_legend(),
+        margin=dict(l=40, r=40, t=50, b=110),
+    )
+    if has_consumption:
+        layout["yaxis2"] = dict(
+            title="Verbrauch (kWh, kumuliert)",
+            side="right",
+            overlaying="y",
+            showgrid=False,
+        )
+    fig.update_layout(**layout)
+    if has_costs or has_consumption:
+        st.caption(
+            "Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): "
+            "Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert."
+        )
     st.plotly_chart(fig, width="stretch")
 
 
@@ -398,49 +496,17 @@ def render_price_savings_chart(
     df: pd.DataFrame,
     hourly_matched_baseline_cost_euro: list[float] | None = None,
     hourly_optimized_cost_euro: list[float] | None = None,
+    hourly_matched_baseline_consumption_kwh: list[float] | None = None,
+    hourly_optimized_consumption_kwh: list[float] | None = None,
 ) -> None:
-    """Stündlicher Strompreis und Kostenvergleich BL Ziel vs. optimiert."""
-    slot_x = _chart_slot_x(len(df))
-    fig = go.Figure()
-    has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
-
-    add_price_trace(fig, df, slot_x, yaxis="y")
-    if has_costs:
-        add_hourly_cost_comparison_bars(
-            fig,
-            df["Uhrzeit"],
-            slot_x,
-            hourly_matched_baseline_cost_euro or [],
-            hourly_optimized_cost_euro or [],
-            yaxis="y2",
-        )
-
-    layout = dict(
-        title="Preis & Kostenvergleich",
-        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
-        yaxis=dict(title="Preis (Cent/kWh)", side="left"),
-        legend=_chart_legend(),
-        margin=dict(l=40, r=40, t=50, b=110),
-        barmode="stack",
+    """Alias für kumulierte Kosten- und Verbrauchslinien."""
+    render_cumulative_cost_chart(
+        df,
+        hourly_matched_baseline_cost_euro,
+        hourly_optimized_cost_euro,
+        hourly_matched_baseline_consumption_kwh,
+        hourly_optimized_consumption_kwh,
     )
-    if has_costs:
-        layout["bargap"] = 0.22
-        layout["bargroupgap"] = 0.12
-    if has_costs:
-        layout["yaxis2"] = dict(
-            title="Kosten (€/h)",
-            side="right",
-            overlaying="y",
-            showgrid=False,
-        )
-
-    fig.update_layout(**layout)
-    if has_costs:
-        st.caption(
-            "Je Stunde zwei gleich hohe Kosten-Säulen: links BL Ziel (grau, ggf. +rot), "
-            "rechts Optimiert (blau, ggf. +grün). Grün = Ersparnis, rot = Mehrkosten."
-        )
-    st.plotly_chart(fig, width="stretch")
 
 
 def render_optimization_chart(
@@ -450,11 +516,15 @@ def render_optimization_chart(
     hourly_savings_euro: list[float] | None = None,
     hourly_matched_baseline_cost_euro: list[float] | None = None,
     hourly_optimized_cost_euro: list[float] | None = None,
+    hourly_matched_baseline_consumption_kwh: list[float] | None = None,
+    hourly_optimized_consumption_kwh: list[float] | None = None,
 ) -> None:
-    """Zeichnet Leistung/SoC und Preis/Kostenvergleich in zwei getrennten Charts."""
+    """Zeichnet Leistung/SoC/Preis und kumulierte Kosten/Verbrauch in zwei Charts."""
     render_power_soc_chart(df, baseline_df, matched_baseline_df)
     render_price_savings_chart(
         df,
         hourly_matched_baseline_cost_euro,
         hourly_optimized_cost_euro,
+        hourly_matched_baseline_consumption_kwh,
+        hourly_optimized_consumption_kwh,
     )

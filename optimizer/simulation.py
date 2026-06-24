@@ -281,6 +281,18 @@ def calculate_cost_euro_from_rows(rows: list, sell_price_cent: float) -> float:
     return sum(calculate_step_cost_euro_from_row(row, sell_price_cent) for row in rows)
 
 
+def hourly_consumption_kwh_from_rows(rows: list) -> list[float]:
+    """Stündlicher Gesamtverbrauch (Grundlast + Flex) in kWh je Simulationszeile."""
+    return [
+        round(
+            float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+            + flexible_consumer_power_kw(row),
+            4,
+        )
+        for row in rows
+    ]
+
+
 def hourly_cost_euro_from_rows(rows: list, sell_price_cent: float) -> list[float]:
     """Stündliche Stromkosten in Euro je Simulationszeile."""
     return [
@@ -557,6 +569,8 @@ def calculate_optimization_savings(
     hourly_battery_only_cost = hourly_cost_euro_from_rows(
         baseline_same_flex_rows, sell_price_cent
     )
+    hourly_matched_consumption = hourly_consumption_kwh_from_rows(matched_baseline_rows)
+    hourly_optimized_consumption = hourly_consumption_kwh_from_rows(optimized_rows)
     return {
         "baseline_cost_euro": round(baseline_cost, 4),
         "matched_baseline_cost_euro": round(matched_baseline_cost, 4),
@@ -578,4 +592,6 @@ def calculate_optimization_savings(
         "hourly_optimized_cost_euro": hourly_optimized_cost,
         "hourly_battery_only_baseline_cost_euro": hourly_battery_only_cost,
         "hourly_savings_euro": hourly_savings,
+        "hourly_matched_baseline_consumption_kwh": hourly_matched_consumption,
+        "hourly_optimized_consumption_kwh": hourly_optimized_consumption,
     }

@@ -19,7 +19,8 @@
 - [x] Prüfen, ob ältere Programm-Logs noch benötigt werden *(2026-06: siehe unten)*
 - [x] Steuersignale von main.py scheinen in Loxone wieder auf andere Werte gesetzt zu werden - Debug-Tool erstellen und Verhalten prüfen.
   — Da hat wohl eine alte noch laufende Instant von main.py regelmäßig dazwischengefunkt.
-- [ ] Chart für Ersparnis separat unter die anderen Zeitverläufe (kleiner?) packen. Vielleicht gemeinsam mit den stündlichen Kosten.  
+- [x] Chart für Ersparnis separat unter die anderen Zeitverläufe (kleiner?) packen. Vielleicht gemeinsam mit den stündlichen Kosten.  
+  - die Balken müssen bei Einspeisung noch richtig dargestellt werden.
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
 - [ ] Logik und UI für E-Auto verbessern
   - Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)

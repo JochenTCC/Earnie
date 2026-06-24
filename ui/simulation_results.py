@@ -113,6 +113,12 @@ def render_optimization_results(
             "hourly_matched_baseline_cost_euro"
         ),
         hourly_optimized_cost_euro=savings_info.get("hourly_optimized_cost_euro"),
+        hourly_matched_baseline_consumption_kwh=savings_info.get(
+            "hourly_matched_baseline_consumption_kwh"
+        ),
+        hourly_optimized_consumption_kwh=savings_info.get(
+            "hourly_optimized_consumption_kwh"
+        ),
     )
     render_applied_targets(savings_info)
     if simulation_table_title:
