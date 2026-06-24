@@ -21,11 +21,12 @@
   — Da hat wohl eine alte noch laufende Instant von main.py regelmäßig dazwischengefunkt.
 - [x] Chart für Ersparnis separat unter die anderen Zeitverläufe (kleiner?) packen. Vielleicht gemeinsam mit den stündlichen Kosten.  
   - die Balken müssen bei Einspeisung noch richtig dargestellt werden.
+- [x] Simulation hat immer ein 24h-Zeithorizont - wenn nötig, mit gespiegelten Kosten des Vortags
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
 - [ ] Logik und UI für E-Auto verbessern
   - Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)
   - Optimierung ausserplanmäßig anstoßen, wenn E-Auto angeschlossen wurde?
-- [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementier)
+- [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis
 - [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler (Input: Laufzeit, mittlere Leistung / Output: Zeithorizont 6h: Güte des Startzeitpunkts)
 - [ ] **Adaptives PV-Tuning wieder aktivieren** (`pv_accuracy_log.csv` / `log_pv_comparison`)
