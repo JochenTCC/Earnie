@@ -22,6 +22,9 @@
 - [x] Chart für Ersparnis separat unter die anderen Zeitverläufe (kleiner?) packen. Vielleicht gemeinsam mit den stündlichen Kosten.  
   - die Balken müssen bei Einspeisung noch richtig dargestellt werden.
 - [x] Simulation hat immer ein 24h-Zeithorizont - wenn nötig, mit gespiegelten Kosten des Vortags
+- [x] "Silent-Modus" einführen, damit Tests in der Dev-Umgebung laufen können, während Produktiv-Variante läuft
+- [x] Kostenchart fix skalieren (nicht flexibel)
+- [ ] Möglichkeit prüfen, ob variable Leistung bei E-Auto möglich und sinnvoll wäre
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
 - [ ] Logik und UI für E-Auto verbessern
   - Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)

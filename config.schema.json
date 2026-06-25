@@ -82,6 +82,10 @@
           "type": "integer",
           "exclusiveMinimum": 0,
           "description": "Maximale Wartezeit zwischen Optimierungs-Durchläufen in Sekunden (900 = 15 Min.)."
+        },
+        "loxone_silent_mode": {
+          "type": "boolean",
+          "description": "main.py: true = Optimierung läuft, aber keine Steuerwerte an Loxone senden (parallele Produktiv-Session schützen)."
         }
       }
     },

@@ -20,6 +20,10 @@ def main():
     config.reload_config()
 
     logger.info("--- Energy Optimizer Live-Abfrage gestartet (v%s) ---", __version__)
+    if config.is_loxone_silent_mode():
+        logger.warning(
+            "Loxone Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf den Miniserver."
+        )
     
     # 1. Monats-Profil prüfen/aktualisieren
     profile_manager.check_and_update_profile_if_new_month()
@@ -108,10 +112,16 @@ def main():
 
     current_market_item = optimization_matrix[0]
 
-    logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
-    loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)
-    logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
-    loxone_client.send_flexible_consumer_states(consumer_powers, charging_contexts)
+    if config.is_loxone_silent_mode():
+        logger.info(
+            "Silent-Modus: Steuerwerte (Huawei-Modbus, flexible Verbraucher) "
+            "werden nicht an Loxone gesendet."
+        )
+    else:
+        logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
+        loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)
+        logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
+        loxone_client.send_flexible_consumer_states(consumer_powers, charging_contexts)
 
     if live_power is None:
         live_power = loxone_client.fetch_loxone_live_power()
@@ -145,6 +155,7 @@ def main():
         run_payload = {
             "source": "main.py",
             "success": True,
+            "loxone_silent_mode": config.is_loxone_silent_mode(),
             "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
             "loxone_sent": loxone_sent,
             "soc_percent": round(float(current_soc), 2),

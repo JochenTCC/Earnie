@@ -85,6 +85,18 @@ class Config:
             )
         return rel
 
+    @staticmethod
+    def _load_loxone_silent_mode(raw_config: dict) -> bool:
+        raw = raw_config.get("system", {}).get("loxone_silent_mode")
+        if raw is None:
+            return False
+        if not isinstance(raw, bool):
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: system.loxone_silent_mode "
+                "muss true oder false sein."
+            )
+        return raw
+
     def _load_env_vars(self) -> None:
         self.LOXONE_IP = os.getenv("LOXONE_IP")
         self.LOXONE_USER = os.getenv("LOXONE_USER")
@@ -104,6 +116,7 @@ class Config:
 
         self.GLOBAL_TIMEOUT = self._get_strict(self._raw_config, ["system", "global_timeout"])
         self.LOOP_TIMEOUT = self._get_strict(self._raw_config, ["system", "loop_timeout"])
+        self.LOXONE_SILENT_MODE = self._load_loxone_silent_mode(self._raw_config)
 
         self.LOXONE_SOC_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "soc_name"])
         self.LOXONE_PV_COUNTER_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "pv_counter_name"])
@@ -394,6 +407,9 @@ class Config:
     def get_global_timeout(self, default: int = 5) -> int:
         return self.get('GLOBAL_TIMEOUT', default=default, cast=int)
 
+    def is_loxone_silent_mode(self) -> bool:
+        return bool(self.get('LOXONE_SILENT_MODE', default=False))
+
     def get_file_paths_battery_simulation(self) -> dict:
         """Gibt den Block file_paths_battery_simulation aus der JSON-Struktur zurück."""
         return {
@@ -552,6 +568,10 @@ def get_threshold_power() -> float:
 
 def get_global_timeout(default: int = 5) -> int:
     return CONFIG.get_global_timeout(default=default)
+
+
+def is_loxone_silent_mode() -> bool:
+    return CONFIG.is_loxone_silent_mode()
 
 
 def get_file_paths_battery_simulation() -> dict:

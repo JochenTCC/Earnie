@@ -658,15 +658,6 @@ def add_baseline_soc_traces(
             ))
 
 
-def _scale_series_to_0_100(values: pd.Series) -> pd.Series:
-    """Lineare Skalierung auf 0–100 (für gemeinsame Achse mit SoC)."""
-    lo = float(values.min())
-    hi = float(values.max())
-    if hi - lo < 1e-6:
-        return pd.Series([50.0] * len(values), index=values.index)
-    return (values - lo) / (hi - lo) * 100.0
-
-
 def add_price_on_soc_axis_trace(
     fig: go.Figure,
     df: pd.DataFrame,
@@ -675,15 +666,14 @@ def add_price_on_soc_axis_trace(
     extrap_start: int | None = None,
     extrap_end: int | None = None,
 ) -> None:
-    """Strompreis auf der SoC-Achse (0–100), Hover zeigt Cent/kWh."""
+    """Strompreis 1:1 auf der SoC-Achse (Cent/kWh = %), Hover zeigt Cent/kWh."""
     uhrzeit = df["Uhrzeit"]
     price_cent = df["Strompreis (Cent/kWh)"]
-    price_scaled = _scale_series_to_0_100(price_cent)
     segments = _trace_segments(len(df), extrap_start, extrap_end)
     _add_segmented_hv_line(
         fig,
         slot_x,
-        price_scaled,
+        price_cent,
         uhrzeit,
         segments,
         name="Preis",
@@ -901,11 +891,11 @@ def render_power_soc_chart(
         barmode="overlay",
         yaxis=dict(title="Leistung (kW)", side="left"),
         yaxis2=dict(
-            title="SoC (%) / Preis (skaliert 0–100)",
+            title="SoC (%) / Preis (Cent/kWh)",
             side="right",
             overlaying="y",
             showgrid=False,
-            range=[0, 100],
+            range=[-5, 105],
         ),
         legend=_chart_legend(),
         margin=dict(l=40, r=40, t=50, b=110),
@@ -915,8 +905,8 @@ def render_power_soc_chart(
         st.caption(extrap_caption)
     else:
         st.caption(
-            "Preis rot auf der rechten Achse: relativ auf 0–100 skaliert "
-            "(Hover zeigt Cent/kWh)."
+            "Preis rot auf der rechten Achse: 1:1 zu SoC "
+            "(30 Cent/kWh = 30 %, Hover zeigt Cent/kWh)."
         )
     st.plotly_chart(fig, width="stretch")
 
