@@ -12,9 +12,10 @@ Nur `main.py` steuert die Anlage. Die App **simuliert** den 24-Stunden-Horizont 
 ## Optimierungs-Takt
 
 - Auslösung an **Viertelstunden-Grenzen** (`:00`, `:15`, `:30`, `:45`)
-- Zusätzlich **sofort**, wenn ein E-Auto mit `daily_target_source: loxone` angesteckt oder abgesteckt wird (`plugged_in_name`)
-- `system.event_trigger_enabled` (Standard `true`): Event-Trigger ein/aus (z. B. E-Auto An-/Abstecken)
-- `system.charging_poll_interval_sec` (Standard `60`): Abfrageintervall für `plugged_in_name` zwischen den regulären Läufen
+- Zusätzlich **sofort**, wenn ein konfigurierter **Event-Trigger** (`system.event_triggers`) seinen Wert ändert
+- `system.event_trigger_enabled` (Standard `true`): Event-Trigger ein/aus
+- `system.event_poll_interval_sec` (Standard `60`): Abfrageintervall für `event_triggers` zwischen den regulären Läufen
+- `system.event_triggers`: Liste der Loxone-Signale (binary/text) – siehe `config.schema.json`
 - `system.loop_timeout` in `config.json`: maximale Wartezeit zwischen Durchläufen in Sekunden (Standard 900 = 15 Min.)
 - Die App aktualisiert die Live-Simulation ca. **1 Minute nach** dem Viertelstunden-Wechsel, damit `main.py` zuerst laufen kann
 

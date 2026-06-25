@@ -25,6 +25,7 @@ def _format_history_table(df: pd.DataFrame) -> pd.DataFrame:
     display = df.copy()
     display["Zeitpunkt"] = pd.to_datetime(display["completed_at"]).dt.strftime("%d.%m.%Y %H:%M")
     display = display.rename(columns={
+        "run_trigger_label": "Trigger",
         "soc_percent": "SoC (%)",
         "mode_label": "Modus",
         "target_power_kw": "Ziel-Leistung (kW)",
@@ -37,7 +38,7 @@ def _format_history_table(df: pd.DataFrame) -> pd.DataFrame:
         "source": "Quelle",
     })
     columns = [
-        "Zeitpunkt", "SoC (%)", "Modus", "Ziel-Leistung (kW)", "Ziel-SoC (%)",
+        "Zeitpunkt", "Trigger", "SoC (%)", "Modus", "Ziel-Leistung (kW)", "Ziel-SoC (%)",
         "Batterieplan (kW)", "PV-Prognose (kW)", "Grundlast-Prognose (kW)",
         "Preis (Cent/kWh)", "Flexible Verbraucher (Soll)", "Quelle",
     ]

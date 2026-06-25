@@ -1,15 +1,16 @@
 """Tests für Event-Läufe in main.py (Nebenläufer-Schutz)."""
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import main as main_module
-from optimizer.charging_trigger import TRIGGER_PLUGGED_IN, TRIGGER_QUARTER_HOUR
+from optimizer.event_trigger import TRIGGER_QUARTER_HOUR, build_run_trigger
 
 
 def _patch_main_dependencies(monkeypatch):
     monkeypatch.setattr(main_module.config, "reload_config", lambda: None)
     monkeypatch.setattr(main_module.config, "is_loxone_silent_mode", lambda: True)
+    monkeypatch.setattr(main_module.config, "get_event_triggers", lambda: [])
     monkeypatch.setattr(
         main_module.profile_manager,
         "check_and_update_profile_if_new_month",
@@ -58,8 +59,8 @@ def _patch_main_dependencies(monkeypatch):
     )
     monkeypatch.setattr(
         main_module,
-        "fetch_plugged_in_snapshot",
-        lambda: {"eauto": True},
+        "fetch_trigger_snapshot",
+        lambda _specs: {"eauto_plugged_in": True},
     )
 
 
@@ -82,14 +83,15 @@ def test_event_run_uses_peek_and_skips_side_effects(monkeypatch):
     )
     monkeypatch.setattr(main_module.optimization_history, "append_production_run", lambda _p: None)
 
-    main_module.main(run_trigger=f"{TRIGGER_PLUGGED_IN}:eauto")
+    run_trigger = build_run_trigger("eauto_plugged_in")
+    main_module.main(run_trigger=run_trigger)
 
     peek.assert_called_once()
     update.assert_not_called()
     register.assert_not_called()
     cons_data.assert_not_called()
-    assert saved[0]["run_trigger"] == f"{TRIGGER_PLUGGED_IN}:eauto"
-    assert saved[0]["charging_plugged_in"] == {"eauto": True}
+    assert saved[0]["run_trigger"] == run_trigger
+    assert saved[0]["event_trigger_snapshot"] == {"eauto_plugged_in": True}
 
 
 def test_regular_run_uses_update_and_side_effects(monkeypatch):
