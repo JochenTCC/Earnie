@@ -86,6 +86,15 @@
         "loxone_silent_mode": {
           "type": "boolean",
           "description": "main.py: true = Optimierung läuft, aber keine Steuerwerte an Loxone senden (parallele Produktiv-Session schützen)."
+        },
+        "event_trigger_enabled": {
+          "type": "boolean",
+          "description": "main.py: true = außerplanmäßige Optimierung bei Ereignissen (z. B. E-Auto An-/Abstecken) vor der nächsten Viertelstunde."
+        },
+        "charging_poll_interval_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Abfrageintervall in Sekunden für plugged_in_name zwischen regulären Optimierungsläufen."
         }
       }
     },
