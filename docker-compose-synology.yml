@@ -14,6 +14,8 @@
 #
 # Migration von älterem Layout (Dateien im Projektordner):
 #   mv config.json config/config.json
+#   Optional fehlen auf dem Volume: config.example.json / config.schema.json –
+#   der Entrypoint kopiert sie aus share/config/ im Image (für config_drift).
 #   mv cons_data_hourly.csv cons_data_hourly.meta.json runtime/ 2>/dev/null || true
 #   mv flexible_consumers_state.json pv_counter_state.json cons_data_pending.json runtime/ 2>/dev/null || true
 #   mv consumption_profiles.csv total_consumption_profiles.csv flexible_consumer_profiles.csv runtime/ 2>/dev/null || true

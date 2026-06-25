@@ -36,6 +36,38 @@ def test_bootstrap_creates_missing_files_without_overwriting(tmp_path, monkeypat
     assert cons_data_path.read_text(encoding="utf-8") == original_cons_data
 
 
+def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypatch):
+    """NAS-Szenario: ./config-Volume enthält nur config.json, Vorlagen liegen im Image."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
+
+    share_dir = tmp_path / "share" / "config"
+    share_dir.mkdir(parents=True)
+    example_payload = {"awattar": {"url": "https://bundled.example"}, "system": {"event_triggers": []}}
+    schema_payload = {"title": "schema"}
+    (share_dir / "config.example.json").write_text(
+        json.dumps(example_payload),
+        encoding="utf-8",
+    )
+    (share_dir / "config.schema.json").write_text(
+        json.dumps(schema_payload),
+        encoding="utf-8",
+    )
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "config.json").write_text("{}", encoding="utf-8")
+
+    bootstrap.run()
+
+    example_path = config_dir / "config.example.json"
+    schema_path = config_dir / "config.schema.json"
+    assert example_path.is_file()
+    assert schema_path.is_file()
+    assert json.loads(example_path.read_text(encoding="utf-8"))["awattar"]["url"] == "https://bundled.example"
+    assert json.loads(schema_path.read_text(encoding="utf-8"))["title"] == "schema"
+
+
 def test_bootstrap_rejects_directory_instead_of_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")

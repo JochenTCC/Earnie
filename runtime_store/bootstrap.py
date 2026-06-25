@@ -15,7 +15,6 @@ from runtime_store.file_metadata import (
     stamp_payload,
 )
 from runtime_store.persist_paths import (
-    config_example_file,
     cons_data_pending_file,
     consumer_state_file,
     consumption_profiles_file,
@@ -24,6 +23,8 @@ from runtime_store.persist_paths import (
     legacy_history_csv_file,
     log_file,
     resolve_config_json_path,
+    resolve_config_schema_template_path,
+    resolve_config_template_path,
     runtime_dir,
     total_consumption_profiles_file,
 )
@@ -78,9 +79,43 @@ def _ensure_directory(path: str) -> None:
     logger.info("bootstrap: Verzeichnis bereit: %s", path)
 
 
+def _copy_template_if_missing(dest_path: str, source_path: str, label: str) -> bool:
+    if not _is_missing_file(dest_path):
+        return False
+    if not os.path.isfile(source_path):
+        logger.warning(
+            "bootstrap: %s fehlt und Vorlage '%s' ist nicht verfügbar.",
+            dest_path,
+            source_path,
+        )
+        return False
+    _ensure_parent_dir(dest_path)
+    shutil.copyfile(source_path, dest_path)
+    logger.info("bootstrap: %s aus %s angelegt.", dest_path, label)
+    return True
+
+
+def _bootstrap_config_example() -> bool:
+    dest = os.path.join("config", "config.example.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_config_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_config_schema() -> bool:
+    dest = os.path.join("config", "config.schema.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_config_schema_template_path(),
+        "Image-Vorlage",
+    )
+
+
 def _bootstrap_config_json() -> bool:
     config_path = resolve_config_json_path()
-    template_path = config_example_file()
+    template_path = resolve_config_template_path()
     if not _is_missing_file(config_path):
         return False
     if not os.path.isfile(template_path):
@@ -143,6 +178,10 @@ def run() -> None:
 
     created: list[str] = []
 
+    if _bootstrap_config_example():
+        created.append(os.path.join("config", "config.example.json"))
+    if _bootstrap_config_schema():
+        created.append(os.path.join("config", "config.schema.json"))
     if _bootstrap_config_json():
         created.append(resolve_config_json_path())
     if _bootstrap_cons_data_csv():

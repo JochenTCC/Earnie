@@ -7,6 +7,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | Mount (Host) | Inhalt |
 |--------------|--------|
 | `./config/config.json` | Haus-Konfiguration (wird nie überschrieben) |
+| `./config/config.example.json` | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
 | `./runtime/` | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs |
 | `./.env` | Loxone-Zugangsdaten |
 
@@ -16,7 +17,7 @@ Umgebungsvariable in Compose: `ENERGY_OPTIMIZER_CONFIG_PATH=config/config.json`
 
 1. Projektordner mit `docker-compose-synology.yml` und `.env` anlegen
 2. `mkdir -p config runtime`
-3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/config.example.json` → `config/config.json`, leere Runtime-Dateien)
+3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/config.example.json` → `config/config.json`, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
 4. `config/config.json` anpassen (Loxone-Namen, Verbraucher)
 5. Optional: historische `cons_data` aus Dev nach `runtime/cons_data_hourly.csv` kopieren
 

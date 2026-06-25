@@ -53,26 +53,64 @@ def default_cons_data_file() -> str:
     return runtime_path("cons_data_hourly.csv")
 
 
+def bundled_config_dir() -> str:
+    """Im Image gebündelte Config-Vorlagen (nicht vom NAS-Volume überschrieben)."""
+    return os.path.join("share", "config")
+
+
+def bundled_config_example_file() -> str:
+    return os.path.join(bundled_config_dir(), "config.example.json")
+
+
+def bundled_config_schema_file() -> str:
+    return os.path.join(bundled_config_dir(), "config.schema.json")
+
+
+def resolve_config_template_path() -> str:
+    """Vorlage für config.json: Mount, Legacy oder gebündelte Image-Kopie."""
+    preferred = os.path.join("config", "config.example.json")
+    if os.path.isfile(preferred):
+        return preferred
+    legacy = "config.example.json"
+    if os.path.isfile(legacy):
+        return legacy
+    bundled = bundled_config_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
 def config_example_file() -> str:
-    """Pfad zur Config-Vorlage: bevorzugt config/config.example.json."""
+    """Pfad zur Config-Vorlage im Persistenz-Ordner (für Drift-Vergleich)."""
     preferred = os.path.join("config", "config.example.json")
     legacy = "config.example.json"
     if os.path.isfile(preferred):
         return preferred
     if os.path.isfile(legacy):
         return legacy
+    bundled = bundled_config_example_file()
+    if os.path.isfile(bundled):
+        return bundled
     return preferred
 
 
 def config_schema_file() -> str:
-    """Pfad zum JSON-Schema: bevorzugt config/config.schema.json."""
+    """Pfad zum JSON-Schema im Persistenz-Ordner."""
     preferred = os.path.join("config", "config.schema.json")
-    legacy = "config.schema.json"
     if os.path.isfile(preferred):
         return preferred
+    legacy = "config.schema.json"
     if os.path.isfile(legacy):
         return legacy
+    bundled = bundled_config_schema_file()
+    if os.path.isfile(bundled):
+        return bundled
     return preferred
+
+
+def resolve_config_schema_template_path() -> str:
+    """Schema-Vorlage: Mount, Legacy oder gebündelte Image-Kopie."""
+    return config_schema_file()
 
 
 def resolve_config_json_path() -> str:

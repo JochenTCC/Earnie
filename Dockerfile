@@ -21,5 +21,9 @@ COPY . .
 
 RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
+RUN mkdir -p share/config \
+    && cp config/config.example.json share/config/config.example.json \
+    && cp config/config.schema.json share/config/config.schema.json
+
 ENTRYPOINT ["/bin/sh", "docker-entrypoint.sh"]
 CMD ["python", "main.py"]
