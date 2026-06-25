@@ -97,6 +97,37 @@ class Config:
             )
         return raw
 
+    @staticmethod
+    def _load_event_trigger_enabled(raw_config: dict) -> bool:
+        raw = raw_config.get("system", {}).get("event_trigger_enabled")
+        if raw is None:
+            return True
+        if not isinstance(raw, bool):
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: system.event_trigger_enabled "
+                "muss true oder false sein."
+            )
+        return raw
+
+    @staticmethod
+    def _load_charging_poll_interval_sec(raw_config: dict) -> int:
+        raw = raw_config.get("system", {}).get("charging_poll_interval_sec")
+        if raw is None:
+            return 60
+        try:
+            value = int(raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: system.charging_poll_interval_sec "
+                "muss eine ganze Zahl sein."
+            ) from exc
+        if value < 1:
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: system.charging_poll_interval_sec "
+                "muss mindestens 1 sein."
+            )
+        return value
+
     def _load_env_vars(self) -> None:
         self.LOXONE_IP = os.getenv("LOXONE_IP")
         self.LOXONE_USER = os.getenv("LOXONE_USER")
@@ -117,6 +148,8 @@ class Config:
         self.GLOBAL_TIMEOUT = self._get_strict(self._raw_config, ["system", "global_timeout"])
         self.LOOP_TIMEOUT = self._get_strict(self._raw_config, ["system", "loop_timeout"])
         self.LOXONE_SILENT_MODE = self._load_loxone_silent_mode(self._raw_config)
+        self.EVENT_TRIGGER_ENABLED = self._load_event_trigger_enabled(self._raw_config)
+        self.CHARGING_POLL_INTERVAL_SEC = self._load_charging_poll_interval_sec(self._raw_config)
 
         self.LOXONE_SOC_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "soc_name"])
         self.LOXONE_PV_COUNTER_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "pv_counter_name"])
@@ -439,6 +472,12 @@ class Config:
     def is_loxone_silent_mode(self) -> bool:
         return bool(self.get('LOXONE_SILENT_MODE', default=False))
 
+    def is_event_trigger_enabled(self) -> bool:
+        return bool(self.get('EVENT_TRIGGER_ENABLED', default=True))
+
+    def get_charging_poll_interval_sec(self) -> int:
+        return int(self.get('CHARGING_POLL_INTERVAL_SEC', default=60))
+
     def get_file_paths_battery_simulation(self) -> dict:
         """Gibt den Block file_paths_battery_simulation aus der JSON-Struktur zurück."""
         return {
@@ -601,6 +640,14 @@ def get_global_timeout(default: int = 5) -> int:
 
 def is_loxone_silent_mode() -> bool:
     return CONFIG.is_loxone_silent_mode()
+
+
+def is_event_trigger_enabled() -> bool:
+    return CONFIG.is_event_trigger_enabled()
+
+
+def get_charging_poll_interval_sec() -> int:
+    return CONFIG.get_charging_poll_interval_sec()
 
 
 def get_file_paths_battery_simulation() -> dict:

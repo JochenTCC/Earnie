@@ -10,24 +10,48 @@ from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, l
 from runtime_store import run_state, optimization_history
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
+from optimizer.charging_trigger import (
+    TRIGGER_QUARTER_HOUR,
+    fetch_plugged_in_snapshot,
+    is_event_trigger,
+    plugged_in_from_run_state,
+    wait_until_next_run,
+)
 import optimizer
 from version import __version__
 
 # Logger für dieses spezifische Modul instanziieren
 logger = logging.getLogger("main")
 
-def main():
-    config.reload_config()
 
-    logger.info("--- Energy Optimizer Live-Abfrage gestartet (v%s) ---", __version__)
+def _baseline_plugged_in_snapshot() -> dict[str, bool | None]:
+    state = run_state.load_run_state()
+    snapshot = plugged_in_from_run_state(state)
+    if snapshot:
+        return snapshot
+    return fetch_plugged_in_snapshot()
+
+
+def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
+    config.reload_config()
+    event_run = is_event_trigger(run_trigger)
+
+    if event_run:
+        logger.info(
+            "--- Energy Optimizer Event-Lauf (v%s, Trigger: %s) ---",
+            __version__,
+            run_trigger,
+        )
+    else:
+        logger.info("--- Energy Optimizer Live-Abfrage gestartet (v%s) ---", __version__)
     if config.is_loxone_silent_mode():
         logger.warning(
             "Loxone Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf den Miniserver."
         )
-    
+
     # 1. Monats-Profil prüfen/aktualisieren
     profile_manager.check_and_update_profile_if_new_month()
-    
+
     # 2. Live-Werte von Loxone & Awattar laden
     current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     if current_soc is None:
@@ -38,15 +62,26 @@ def main():
     if not market_data:
         logger.error("Optimierung abgebrochen: Keine Awattar-Preise empfangen.")
         return
-        
-    # Neu: PV-Zähler abfragen und reales Delta ermitteln
-    pv_delta = pv_tuner.get_pv_delta_and_update()
+
+    if event_run:
+        pv_delta = pv_tuner.get_pv_delta_peek()
+    else:
+        pv_delta = pv_tuner.get_pv_delta_and_update()
     if pv_delta is None:
-        logger.warning("⚠️ Tuning/Optimierungsdurchlauf für diese Stunde ausgesetzt (Warten auf valides Delta).")
-        return
-        
+        if event_run:
+            logger.warning(
+                "Event-Lauf: Kein PV-Stunden-Delta verfügbar – Optimierung läuft ohne PV-Tuning."
+            )
+            pv_delta = 0.0
+        else:
+            logger.warning(
+                "⚠️ Tuning/Optimierungsdurchlauf für diese Stunde ausgesetzt "
+                "(Warten auf valides Delta)."
+            )
+            return
+
     logger.info("📊 Tatsächlicher PV-Ertrag der letzten Stunde: %.3f kWh", pv_delta)
-    
+
     # 3. Prognose-Vektoren (Verbrauch & PV) laden
     _, _, optimization_matrix = profile_manager.get_forecast_vectors(market_data)
 
@@ -103,7 +138,8 @@ def main():
         sum(consumer_powers.values()),
         battery_params["max_power_kw"],
     )
-    optimizer.register_consumer_hours(consumer_powers)
+    if not event_run:
+        optimizer.register_consumer_hours(consumer_powers)
 
     logger.info(
         "Berechnete Werte für Loxone -> MODE: %s | TARGET_POWER: %s kW | "
@@ -131,16 +167,17 @@ def main():
     total_kw = live_power["house"] if live_power else None
     flex_kw = loxone_client.fetch_flexible_consumers_live_kw(fallbacks=consumer_powers)
     logger.info("cons_data Flex live (kW): %s", flex_kw)
-    try:
-        written = cons_data_store.record_and_maybe_flush(
-            total_kw=total_kw,
-            pv_kwh_interval=pv_delta,
-            flex_kw=flex_kw,
-        )
-        if written:
-            logger.info("cons_data: %s Stunde(n) in cons_data_hourly.csv geschrieben.", written)
-    except Exception as e:
-        logger.warning("cons_data: Messwerte konnten nicht gespeichert werden: %s", e)
+    if not event_run:
+        try:
+            written = cons_data_store.record_and_maybe_flush(
+                total_kw=total_kw,
+                pv_kwh_interval=pv_delta,
+                flex_kw=flex_kw,
+            )
+            if written:
+                logger.info("cons_data: %s Stunde(n) in cons_data_hourly.csv geschrieben.", written)
+        except Exception as e:
+            logger.warning("cons_data: Messwerte konnten nicht gespeichert werden: %s", e)
 
     consumption_snapshot = None
     if live_power:
@@ -154,13 +191,16 @@ def main():
         charging_contexts,
         consumer_pv_follow,
     )
+    charging_plugged_in = fetch_plugged_in_snapshot()
 
     try:
         run_payload = {
             "source": "main.py",
             "success": True,
+            "run_trigger": run_trigger,
             "loxone_silent_mode": config.is_loxone_silent_mode(),
             "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
+            "charging_plugged_in": charging_plugged_in,
             "loxone_sent": loxone_sent,
             "soc_percent": round(float(current_soc), 2),
             "pv_delta_kwh": round(float(pv_delta), 4),
@@ -205,25 +245,43 @@ if __name__ == "__main__":
         logger.error("%s", exc)
         print(f"Abbruch: {exc}", file=sys.stderr)
         raise SystemExit(1) from exc
+
+    next_trigger = TRIGGER_QUARTER_HOUR
+    known_plugged_in = _baseline_plugged_in_snapshot()
+
     while True:
         try:
-            main()
-            
+            main(run_trigger=next_trigger)
+            next_trigger = TRIGGER_QUARTER_HOUR
+
+            state = run_state.load_run_state()
+            if state and state.get("success") and isinstance(state.get("charging_plugged_in"), dict):
+                known_plugged_in = plugged_in_from_run_state(state)
+            else:
+                known_plugged_in = fetch_plugged_in_snapshot()
+
             wait_sec = optimization_schedule.seconds_until_next_quarter_hour()
             next_run = optimization_schedule.next_quarter_hour_datetime()
             logger.info(
-                "✅ Durchlauf erfolgreich beendet. Nächster Lauf um %s (in %.0f s).",
+                "✅ Durchlauf erfolgreich beendet. Nächster regulärer Lauf um %s (in %.0f s).",
                 next_run.strftime("%H:%M:%S"),
                 wait_sec,
             )
-            time.sleep(wait_sec)
-            
+            event_trigger, known_plugged_in = wait_until_next_run(
+                previous_plugged_in=known_plugged_in,
+                total_wait_sec=wait_sec,
+                poll_interval_sec=config.get_charging_poll_interval_sec(),
+                event_trigger_enabled=config.is_event_trigger_enabled(),
+            )
+            if event_trigger:
+                next_trigger = event_trigger
+
         except Exception as e:
             msg = f"🚨 Unerwarteter Fehler während des Durchlaufs: {e}"
             if logger.handlers:
                 logger.exception(msg)
             else:
                 print(msg)
-                
+
             print("🔄 Skript läuft weiter. Schneller Wiederholungsversuch in 60 Sekunden...")
             time.sleep(60)

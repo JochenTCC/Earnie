@@ -29,13 +29,13 @@
 - [x] PV_Follow Modus in Loxone implementieren und beides testen
 - [x] Zusätzliche Balken im Chart einfügen, die eingespeiste Energie anzeigen (ist als Linienverlau implementiert)
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
-- [ ] Logik und UI für E-Auto verbessern
-  - Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)
-  - Optimierung ausserplanmäßig anstoßen, wenn E-Auto angeschlossen wurde?
+- [x] Logik und UI für E-Auto verbessern
+  - [x]Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)
+  - [x] Optimierung ausserplanmäßig anstoßen, wenn E-Auto angeschlossen wurde? --> umgesetzt (event_trigger in main.py)
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis
+- [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle (Swim-Spa, Gefrierschrank)
 - [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler (Input: Laufzeit, mittlere Leistung / Output: Zeithorizont 6h: Güte des Startzeitpunkts)
-- [ ] Bessere Verbrauchsoptimierung mit Geräte zur Temperaturkontrolle (Swim-Spa, Gefrierschrank)
 - [ ] **Adaptives PV-Tuning wieder aktivieren** (`pv_accuracy_log.csv` / `log_pv_comparison`)
   - Lesen + Anwenden des Korrekturfaktors läuft noch (`calculate_tuning_factor`, `pv_forecast`, Sidebar)
   - Schreiben ist unterbrochen: `log_pv_comparison()` wird nirgends aufgerufen → Faktor bleibt praktisch bei 1,0
