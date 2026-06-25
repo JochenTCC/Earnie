@@ -12,7 +12,12 @@ from .charging_context import (
     charging_schedule_enabled,
     consumer_charging_eligible_indices,
 )
-from .consumer_power import power_limits_kw, uses_power_setpoint
+from .consumer_power import (
+    estimate_pv_surplus_kw,
+    power_limits_kw,
+    uses_power_setpoint,
+    uses_pv_follow,
+)
 from . import battery as bat
 
 EMPTY_MILP_PLAN = {
@@ -22,7 +27,7 @@ EMPTY_MILP_PLAN = {
     "p_discharge": 0.0,
 }
 
-_AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, EMPTY_MILP_PLAN)
+_AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, {}, EMPTY_MILP_PLAN)
 
 
 @dataclass
@@ -36,6 +41,8 @@ class MilpHorizonModel:
     e_batt: list
     consumer_on: dict[str, list]
     consumer_p: dict[str, list]
+    consumer_p_fixed: dict[str, list]
+    consumer_pv_follow: dict[str, list]
     planned_consumers: list
 
 
@@ -138,15 +145,67 @@ def _flex_power_at_t(
     return consumer["nominal_power_kw"] * consumer_on[cid][t]
 
 
+def _add_setpoint_power_variables(
+    prob: pulp.LpProblem,
+    consumer: dict,
+    horizon: int,
+    matrix: list[dict[str, Any]],
+    consumer_on: dict[str, list],
+    consumer_p: dict[str, list],
+    consumer_p_fixed: dict[str, list],
+    consumer_pv_follow: dict[str, list],
+) -> None:
+    """kW-Sollwert-Verbraucher: optional pv_follow (Überschuss) vs. feste Leistung."""
+    cid = consumer["id"]
+    min_kw, max_kw = power_limits_kw(consumer)
+    big_m = max_kw + 1.0
+    consumer_p[cid] = [
+        pulp.LpVariable(f"{cid}_p_{t}", lowBound=0, upBound=max_kw)
+        for t in range(horizon)
+    ]
+    if not uses_pv_follow(consumer):
+        for t in range(horizon):
+            prob += consumer_p[cid][t] <= max_kw * consumer_on[cid][t]
+            if min_kw > 1e-9:
+                prob += consumer_p[cid][t] >= min_kw * consumer_on[cid][t]
+        return
+
+    consumer_p_fixed[cid] = [
+        pulp.LpVariable(f"{cid}_p_fix_{t}", lowBound=0, upBound=max_kw)
+        for t in range(horizon)
+    ]
+    consumer_pv_follow[cid] = [
+        pulp.LpVariable(f"{cid}_pv_{t}", cat=pulp.LpBinary)
+        for t in range(horizon)
+    ]
+    for t in range(horizon):
+        pv_est = estimate_pv_surplus_kw(matrix[t], max_kw)
+        on_t = consumer_on[cid][t]
+        pf_t = consumer_pv_follow[cid][t]
+        p_t = consumer_p[cid][t]
+        p_fix = consumer_p_fixed[cid][t]
+        prob += pf_t <= on_t
+        prob += p_t <= max_kw * on_t
+        prob += p_t <= p_fix + big_m * pf_t
+        prob += p_t >= p_fix - big_m * pf_t
+        prob += p_t <= pv_est + big_m * (1 - pf_t)
+        prob += p_t >= pv_est - big_m * (1 - pf_t)
+        prob += p_fix <= max_kw * on_t
+        if min_kw > 1e-9:
+            prob += p_fix >= min_kw * (on_t - pf_t)
+
+
 def _add_consumer_power_variables(
     prob: pulp.LpProblem,
     consumer: dict,
     horizon: int,
+    matrix: list[dict[str, Any]],
     consumer_on: dict[str, list],
     consumer_p: dict[str, list],
+    consumer_p_fixed: dict[str, list],
+    consumer_pv_follow: dict[str, list],
 ) -> None:
     cid = consumer["id"]
-    min_kw, max_kw = power_limits_kw(consumer)
     consumer_on[cid] = [
         pulp.LpVariable(f"{cid}_on_{t}", cat=pulp.LpBinary)
         for t in range(horizon)
@@ -159,14 +218,16 @@ def _add_consumer_power_variables(
     )
     if not uses_power_setpoint(consumer):
         return
-    consumer_p[cid] = [
-        pulp.LpVariable(f"{cid}_p_{t}", lowBound=0, upBound=max_kw)
-        for t in range(horizon)
-    ]
-    for t in range(horizon):
-        prob += consumer_p[cid][t] <= max_kw * consumer_on[cid][t]
-        if min_kw > 1e-9:
-            prob += consumer_p[cid][t] >= min_kw * consumer_on[cid][t]
+    _add_setpoint_power_variables(
+        prob,
+        consumer,
+        horizon,
+        matrix,
+        consumer_on,
+        consumer_p,
+        consumer_p_fixed,
+        consumer_pv_follow,
+    )
 
 
 def _build_milp_model(
@@ -209,9 +270,18 @@ def _build_milp_model(
 
     consumer_on: dict[str, list] = {}
     consumer_p: dict[str, list] = {}
+    consumer_p_fixed: dict[str, list] = {}
+    consumer_pv_follow: dict[str, list] = {}
     for consumer in planned_consumers:
         _add_consumer_power_variables(
-            prob, consumer, horizon, consumer_on, consumer_p
+            prob,
+            consumer,
+            horizon,
+            matrix,
+            consumer_on,
+            consumer_p,
+            consumer_p_fixed,
+            consumer_pv_follow,
         )
 
     for t in range(horizon):
@@ -250,6 +320,8 @@ def _build_milp_model(
         e_batt=e_batt,
         consumer_on=consumer_on,
         consumer_p=consumer_p,
+        consumer_p_fixed=consumer_p_fixed,
+        consumer_pv_follow=consumer_pv_follow,
         planned_consumers=planned_consumers,
     )
 
@@ -304,6 +376,7 @@ def _add_consumer_delivery_constraints(
             schedule_indices,
             charging_contexts.get(cid),
             model.consumer_p,
+            model.consumer_pv_follow,
         )
         if not eligible:
             if verbose:
@@ -334,6 +407,22 @@ def _extract_milp_plan(model: MilpHorizonModel) -> dict[str, float]:
         "p_charge": _var_value_at_zero(model.p_charge),
         "p_discharge": _var_value_at_zero(model.p_discharge),
     }
+
+
+def _consumer_pv_follow_now(model: MilpHorizonModel, consumer: dict) -> int:
+    cid = consumer["id"]
+    if not uses_pv_follow(consumer) or cid not in model.consumer_pv_follow:
+        return 0
+    value = model.consumer_pv_follow[cid][0].varValue
+    return 1 if value is not None and value > 0.5 else 0
+
+
+def _consumer_pv_follow_now_all(model: MilpHorizonModel) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for consumer in model.planned_consumers:
+        cid = consumer["id"]
+        result[cid] = _consumer_pv_follow_now(model, consumer)
+    return result
 
 
 def _consumer_power_now(model: MilpHorizonModel, consumer: dict) -> float:
@@ -455,6 +544,7 @@ def _log_milp_decision(
     model: MilpHorizonModel,
     remaining: dict[str, float],
     consumer_powers: dict[str, float],
+    consumer_pv_follow: dict[str, int],
     mode: int,
     target_power: float,
     target_soc: float,
@@ -473,9 +563,12 @@ def _log_milp_decision(
         cid = consumer["id"]
         power_now = consumer_powers.get(cid, 0.0)
         planned_kwh = _planned_consumer_kwh(model, consumer)
+        pv_flag = consumer_pv_follow.get(cid, 0)
+        mode_txt = f" | pv_follow={pv_flag}" if uses_pv_follow(consumer) else ""
         print(
             f"{consumer['name']:<16}: Jetzt={'AN' if power_now > 0 else 'AUS'} "
-            f"({power_now:.2f} kW) | Restziel={remaining.get(cid, 0.0):.2f} kWh | "
+            f"({power_now:.2f} kW){mode_txt} | "
+            f"Restziel={remaining.get(cid, 0.0):.2f} kWh | "
             f"Geplant={planned_kwh:.2f} kWh | min_on={consumer['min_on_quarterhours']} x 15min"
         )
     modi_text = {
@@ -504,11 +597,12 @@ def milp_optimizer(
     flex_indices: list[int] | None = None,
     charging_contexts: dict[str, dict] | None = None,
     terminal_soc_percent: float | None = None,
-) -> tuple[int, float, float, dict[str, float], dict[str, float]]:
+) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float]]:
     """
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
     Optimiert Batterie und alle konfigurierten flexible_consumers gemeinsam per MILP.
-    Rückgabe: (mode, target_power, target_soc, {consumer_id: leistung_kw}, milp_plan)
+    Rückgabe: (mode, target_power, target_soc, {consumer_id: leistung_kw},
+               {consumer_id: pv_follow 0|1}, milp_plan)
     """
     if not matrix:
         print("🚨 Optimizer-Fehler: Matrix ist leer.")
@@ -566,6 +660,7 @@ def milp_optimizer(
 
     milp_plan = _extract_milp_plan(model)
     consumer_powers, total_flex_power = _consumer_powers_now(model)
+    consumer_pv_follow = _consumer_pv_follow_now_all(model)
     mode, target_power, target_soc = _derive_control_from_milp(
         model,
         matrix,
@@ -585,9 +680,10 @@ def milp_optimizer(
             model,
             remaining,
             consumer_powers,
+            consumer_pv_follow,
             mode,
             target_power,
             target_soc,
         )
 
-    return mode, target_power, target_soc, consumer_powers, milp_plan
+    return mode, target_power, target_soc, consumer_powers, consumer_pv_follow, milp_plan

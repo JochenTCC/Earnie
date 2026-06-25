@@ -4,7 +4,9 @@ from __future__ import annotations
 import pandas as pd
 
 from ui.charts import (
+    _chart_has_pv_follow_bars,
     _consumer_bar_palette,
+    _consumer_bar_pattern_shapes,
     _cost_summary_annotations,
     _extended_line_xy,
     _hv_line_endpoint_x,
@@ -12,6 +14,24 @@ from ui.charts import (
     _segment_linear_connected_line_xy,
     _soc_tail_y_from_row,
 )
+
+
+def test_consumer_bar_pattern_shapes_pv_follow_only_when_active():
+    segment = pd.DataFrame({
+        "E-Auto (kW)": [0.0, 2.0, 3.5],
+        "E-Auto pv_follow": [1, 1, 0],
+    })
+    shapes = _consumer_bar_pattern_shapes(segment, "E-Auto (kW)", "E-Auto pv_follow")
+    assert shapes == ["", "/", ""]
+
+
+def test_chart_has_pv_follow_bars():
+    df = pd.DataFrame({
+        "E-Auto (kW)": [0.0, 2.0],
+        "E-Auto pv_follow": [0, 1],
+        "SwimSpa (kW)": [0.0, 0.0],
+    })
+    assert _chart_has_pv_follow_bars(df) is True
 
 
 def test_soc_tail_y_reflects_battery_action():

@@ -233,6 +233,14 @@ class Config:
             out["enable_name"] = enable_name
         if setpoint_name:
             out["power_setpoint_name"] = setpoint_name
+        pv_follow_name = str(raw.get("pv_follow_name", "")).strip()
+        if pv_follow_name:
+            if not setpoint_name:
+                raise ValueError(
+                    "Kritischer Konfigurationsfehler: pv_follow_name erfordert "
+                    "power_setpoint_name."
+                )
+            out["pv_follow_name"] = pv_follow_name
         return out
 
     @staticmethod

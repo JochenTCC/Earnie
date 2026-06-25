@@ -304,7 +304,11 @@
         },
         "power_setpoint_name": {
           "type": "string",
-          "description": "Virtueller Eingang: Soll-Ladeleistung in kW (0 = aus, sonst min_power_kw … nominal_power_kw)."
+          "description": "Virtueller Eingang: Soll-Ladeleistung in kW (0 = aus; bei pv_follow=1 als P_max-Deckel)."
+        },
+        "pv_follow_name": {
+          "type": "string",
+          "description": "Virtueller Eingang: 0 = feste Leistung laut power_setpoint_name; 1 = PV-Überschuss bis P_max."
         }
       }
     },

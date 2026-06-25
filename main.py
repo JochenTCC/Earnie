@@ -86,7 +86,7 @@ def main():
                 consumer["nominal_power_kw"],
                 lox["nominal_power_kw_name"],
             )
-    mode, target_power, target_soc, consumer_powers, _ = optimizer.milp_optimizer(
+    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _ = optimizer.milp_optimizer(
         optimization_matrix,
         current_hour,
         current_soc,
@@ -106,8 +106,9 @@ def main():
     optimizer.register_consumer_hours(consumer_powers)
 
     logger.info(
-        "Berechnete Werte für Loxone -> MODE: %s | TARGET_POWER: %s kW | TARGET_SOC: %s | Verbraucher: %s",
-        mode, target_power, target_soc, consumer_powers,
+        "Berechnete Werte für Loxone -> MODE: %s | TARGET_POWER: %s kW | "
+        "TARGET_SOC: %s | Verbraucher: %s | pv_follow: %s",
+        mode, target_power, target_soc, consumer_powers, consumer_pv_follow,
     )
 
     current_market_item = optimization_matrix[0]
@@ -121,7 +122,9 @@ def main():
         logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
         loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)
         logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
-        loxone_client.send_flexible_consumer_states(consumer_powers, charging_contexts)
+        loxone_client.send_flexible_consumer_states(
+            consumer_powers, charging_contexts, consumer_pv_follow
+        )
 
     if live_power is None:
         live_power = loxone_client.fetch_loxone_live_power()
@@ -149,6 +152,7 @@ def main():
         target_soc,
         consumer_powers,
         charging_contexts,
+        consumer_pv_follow,
     )
 
     try:
@@ -169,6 +173,9 @@ def main():
             "battery_plan_kw": battery_plan_kw,
             "consumer_powers_kw": {
                 k: round(float(v), 3) for k, v in consumer_powers.items()
+            },
+            "consumer_pv_follow": {
+                k: int(v) for k, v in consumer_pv_follow.items()
             },
             "flex_live_kw": flex_kw,
             "consumption_snapshot": consumption_snapshot,

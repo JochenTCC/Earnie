@@ -47,6 +47,7 @@ from .targets import (
     build_baseline_targets_detail,
     build_energy_comparison_detail,
     consumer_column_name as _consumer_column_name,
+    consumer_pv_follow_column_name as _consumer_pv_follow_column_name,
     resolve_applied_daily_targets,
     resolve_baseload_kwh,
     resolve_horizon_consumer_targets_kwh,
@@ -113,6 +114,10 @@ def overlay_main_run_on_rows(rows: list[dict], main_state: dict | None) -> list[
         if col in row:
             cid = consumer["id"]
             row[col] = float((main_state.get("consumer_powers_kw") or {}).get(cid, 0.0) or 0.0)
+        pv_col = _consumer_pv_follow_column_name(consumer)
+        if pv_col in row:
+            cid = consumer["id"]
+            row[pv_col] = int((main_state.get("consumer_pv_follow") or {}).get(cid, 0) or 0)
     row["Netzbezug (kW)"] = round(
         float(row["Verbrauch-Prognose (kW)"])
         + _flexible_consumer_power_kw(row)

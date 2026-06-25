@@ -68,7 +68,8 @@
             "signal_type": "power",
             "optimizer_enabled": true,
             "loxone_outputs": {
-                "power_setpoint_name": "Ernie_EAuto_Ziel_kW"
+                "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
+                "pv_follow_name": "Ernie_EAuto_pv_follow"
             },
             "loxone_inputs": {
                 "power_name": "Merkername EAuto kW"

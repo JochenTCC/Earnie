@@ -24,7 +24,10 @@
 - [x] Simulation hat immer ein 24h-Zeithorizont - wenn nötig, mit gespiegelten Kosten des Vortags
 - [x] "Silent-Modus" einführen, damit Tests in der Dev-Umgebung laufen können, während Produktiv-Variante läuft
 - [x] Kostenchart fix skalieren (nicht flexibel)
-- [ ] Möglichkeit prüfen, ob variable Leistung bei E-Auto möglich und sinnvoll wäre
+- [x] Möglichkeit prüfen, ob variable Leistung bei E-Auto möglich und sinnvoll wäre
+- [x] Prüfen, ob sich PV-Überschuss-Modus bei E-Auto sinnvoll einsetzen lässt. --> Ja ist möglich und sinnvoll
+- [ ] PV_Follow Modus in Loxone implementieren und beides testen
+- [ ] Zusätzliche Balken im Chart einfügen, die eingespeiste Energie anzeigen (damit deutlicher ersichtlich wird, wo Geld verdient wird)
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
 - [ ] Logik und UI für E-Auto verbessern
   - Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)

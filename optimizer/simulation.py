@@ -8,12 +8,14 @@ from .charging_context import (
     resolve_charging_contexts,
 )
 from . import battery as bat
+from .consumer_power import uses_pv_follow
 from .milp import milp_optimizer
 from .targets import (
     build_applied_targets_detail,
     build_baseline_targets_detail,
     build_energy_comparison_detail,
     consumer_column_name,
+    consumer_pv_follow_column_name,
     resolve_baseload_kwh,
     resolve_horizon_consumer_targets_kwh,
 )
@@ -61,7 +63,7 @@ def _simulate_single_hour_optimizer(
 ) -> tuple[float, dict, int, float]:
     """Simuliert eine einzelne Stunde im optimierten Pfad (Huawei-Logik für die Batterie)."""
     h = row["hour"]
-    mode, target_power, target_soc, consumer_powers, _ = milp_optimizer(
+    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _ = milp_optimizer(
         remaining_matrix,
         h,
         sim_soc,
@@ -106,6 +108,10 @@ def _simulate_single_hour_optimizer(
         chart_row[consumer_column_name(consumer)] = round(
             consumer_powers.get(consumer["id"], 0.0), 2
         )
+        if uses_pv_follow(consumer):
+            chart_row[consumer_pv_follow_column_name(consumer)] = int(
+                consumer_pv_follow.get(consumer["id"], 0) or 0
+            )
     return sim_soc, chart_row, mode, target_power
 
 

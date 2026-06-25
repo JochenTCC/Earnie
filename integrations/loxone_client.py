@@ -370,58 +370,89 @@ def flex_consumer_power_setpoint_kw(
     consumer: dict,
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict],
+    consumer_pv_follow: dict[str, int] | None = None,
 ) -> float | None:
     """kW-Sollwert für Loxone (None wenn kein power_setpoint_name)."""
-    from optimizer.consumer_power import clamp_setpoint_kw
+    from optimizer.consumer_power import loxone_control_outputs
 
     setpoint_name = (consumer.get("loxone_outputs") or {}).get("power_setpoint_name", "")
     if not setpoint_name:
         return None
 
     cid = consumer["id"]
-    power_kw = _effective_consumer_power_kw(consumer, consumer_powers, charging_contexts, cid)
-    return clamp_setpoint_kw(consumer, power_kw)
+    planned_kw = _effective_consumer_power_kw(consumer, consumer_powers, charging_contexts, cid)
+    pv_follow = int((consumer_pv_follow or {}).get(cid, 0) or 0)
+    setpoint_kw, _ = loxone_control_outputs(consumer, planned_kw, pv_follow)
+    return setpoint_kw
 
 
-def _write_flexible_consumer_output(
+def flex_consumer_pv_follow_value(
     consumer: dict,
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict],
-    snapshot: dict[str, float] | None,
-) -> None:
-    """Schreibt Freigabe oder kW-Sollwert; optional Eintrag in snapshot."""
+    consumer_pv_follow: dict[str, int] | None = None,
+) -> int | None:
+    """PV-Überschuss-Modus 0/1 für Loxone (None wenn kein pv_follow_name)."""
+    from optimizer.consumer_power import loxone_control_outputs
+
+    pv_follow_name = (consumer.get("loxone_outputs") or {}).get("pv_follow_name", "")
+    if not pv_follow_name:
+        return None
+
+    cid = consumer["id"]
+    planned_kw = _effective_consumer_power_kw(consumer, consumer_powers, charging_contexts, cid)
+    pv_follow = int((consumer_pv_follow or {}).get(cid, 0) or 0)
+    _, pv_out = loxone_control_outputs(consumer, planned_kw, pv_follow)
+    return pv_out
+
+
+def _flexible_consumer_output_values(
+    consumer: dict,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict],
+    consumer_pv_follow: dict[str, int] | None = None,
+) -> dict[str, float]:
+    """Berechnet Loxone-Merker → Wert für einen flexiblen Verbraucher (ohne HTTP)."""
     outputs = consumer.get("loxone_outputs") or {}
     enable_name = outputs.get("enable_name", "")
     setpoint_name = outputs.get("power_setpoint_name", "")
+    pv_follow_name = outputs.get("pv_follow_name", "")
     cid = consumer["id"]
+    values: dict[str, float] = {}
 
     if setpoint_name:
         setpoint_kw = flex_consumer_power_setpoint_kw(
-            consumer, consumer_powers, charging_contexts
+            consumer, consumer_powers, charging_contexts, consumer_pv_follow
         )
         if setpoint_kw is None:
-            return
-        send_loxone_value(setpoint_name, setpoint_kw)
-        opt_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
+            return values
+        values[str(setpoint_name)] = float(setpoint_kw)
+        pv_out = flex_consumer_pv_follow_value(
+            consumer, consumer_powers, charging_contexts, consumer_pv_follow
+        )
+        if pv_follow_name and pv_out is not None:
+            values[str(pv_follow_name)] = float(pv_out)
+        planned_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
         logger.info(
-            "Flex consumer %s -> Soll=%.2f kW (optimiert %.2f kW, Loxone: %s)",
+            "Flex consumer %s -> Soll=%.2f kW, pv_follow=%s "
+            "(geplant %.2f kW, Loxone: %s%s)",
             consumer["name"],
             setpoint_kw,
-            opt_kw,
+            pv_out if pv_follow_name else "n/a",
+            planned_kw,
             setpoint_name,
+            f", {pv_follow_name}" if pv_follow_name else "",
         )
-        if snapshot is not None:
-            snapshot[str(setpoint_name)] = float(setpoint_kw)
-        return
+        return values
 
     if not enable_name:
-        return
+        return values
 
     enabled = flex_consumer_enable_value(consumer, consumer_powers, charging_contexts)
     if enabled is None:
-        return
+        return values
 
-    send_loxone_value(enable_name, enabled)
+    values[str(enable_name)] = float(enabled)
     power_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
     logger.info(
         "Flex consumer %s -> Freigabe=%s (optimiert %.2f kW, Loxone: %s)",
@@ -430,8 +461,27 @@ def _write_flexible_consumer_output(
         power_kw,
         enable_name,
     )
+    return values
+
+
+def _write_flexible_consumer_output(
+    consumer: dict,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict],
+    snapshot: dict[str, float] | None,
+    consumer_pv_follow: dict[str, int] | None = None,
+    *,
+    send: bool,
+) -> None:
+    """Schreibt Freigabe/kW-Sollwert/pv_follow an Loxone und/oder in den Snapshot."""
+    values = _flexible_consumer_output_values(
+        consumer, consumer_powers, charging_contexts, consumer_pv_follow
+    )
+    if send:
+        for io_name, value in values.items():
+            send_loxone_value(io_name, value)
     if snapshot is not None:
-        snapshot[str(enable_name)] = float(enabled)
+        snapshot.update(values)
 
 
 def build_sent_loxone_snapshot(
@@ -440,6 +490,7 @@ def build_sent_loxone_snapshot(
     target_soc: float,
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None,
+    consumer_pv_follow: dict[str, int] | None = None,
 ) -> dict[str, float]:
     """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
     charge_kw, discharge_kw, control_cmd = map_huawei_modbus_values(mode, target_power_kw)
@@ -457,7 +508,7 @@ def build_sent_loxone_snapshot(
 
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         _write_flexible_consumer_output(
-            consumer, consumer_powers, contexts, snapshot
+            consumer, consumer_powers, contexts, snapshot, consumer_pv_follow, send=False
         )
 
     return snapshot
@@ -484,8 +535,11 @@ def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: flo
 def send_flexible_consumer_states(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,
+    consumer_pv_follow: dict[str, int] | None = None,
 ) -> None:
-    """Sendet Freigabe (0/1) oder kW-Sollwerte der flexiblen Verbraucher an Loxone."""
+    """Sendet Freigabe (0/1), kW-Sollwert und optional pv_follow an Loxone."""
     contexts = charging_contexts or {}
     for consumer in config.get_flexible_consumers(optimizer_only=True):
-        _write_flexible_consumer_output(consumer, consumer_powers, contexts, None)
+        _write_flexible_consumer_output(
+            consumer, consumer_powers, contexts, None, consumer_pv_follow, send=True
+        )

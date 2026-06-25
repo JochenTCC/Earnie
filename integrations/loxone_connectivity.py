@@ -118,6 +118,11 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
             checks.append(
                 (f"Verbraucher {cid} Soll-Leistung", setpoint_name, {"validate": _power_valid})
             )
+        pv_follow_name = outputs.get("pv_follow_name", "")
+        if pv_follow_name:
+            checks.append(
+                (f"Verbraucher {cid} pv_follow", pv_follow_name, {"validate": _binary_valid})
+            )
 
         sched = consumer.get("charging_schedule") or {}
         lox = sched.get("loxone") or {}

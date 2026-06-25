@@ -6,8 +6,11 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import config
+from optimizer.targets import consumer_pv_follow_column_name
 from optimizer import battery as bat
 
+_CONSUMER_BAR_OPACITY = 0.65
+_CONSUMER_PV_FOLLOW_PATTERN = "/"
 _COLOR_BASELINE = "#7f8c8d"
 _COLOR_OPTIMIZED = "#e67e22"
 _EXTRAPOLATED_TRACE_OPACITY = 0.5
@@ -15,6 +18,66 @@ _PV_LINE_COLOR = "#f1c40f"
 _PV_FILL_COLOR = "rgba(241, 196, 15, 0.15)"
 _CONSUMER_PALETTE_START = (127, 140, 141)
 _CONSUMER_PALETTE_END = (0, 188, 212)
+
+
+def _consumer_bar_pattern_shapes(
+    segment: pd.DataFrame,
+    power_col: str,
+    pv_follow_col: str | None,
+) -> list[str]:
+    """Muster je Stunde: pv_follow=1 und Leistung > 0 → Schraffur, sonst Vollfläche."""
+    if pv_follow_col is None or pv_follow_col not in segment.columns:
+        return [""] * len(segment)
+    shapes: list[str] = []
+    for _, row in segment.iterrows():
+        power = float(row.get(power_col, 0.0) or 0.0)
+        pv_follow = int(row.get(pv_follow_col, 0) or 0)
+        if power > 1e-6 and pv_follow == 1:
+            shapes.append(_CONSUMER_PV_FOLLOW_PATTERN)
+        else:
+            shapes.append("")
+    return shapes
+
+
+def _consumer_bar_marker(
+    color: str,
+    pattern_shapes: list[str],
+    opacity: float,
+) -> dict:
+    marker: dict = {"color": color, "opacity": opacity}
+    if any(shape for shape in pattern_shapes):
+        marker["pattern"] = dict(
+            shape=pattern_shapes,
+            fgcolor=color,
+            bgcolor=color,
+            solidity=0.45,
+        )
+    return marker
+
+
+def _chart_has_pv_follow_bars(df: pd.DataFrame) -> bool:
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        pv_col = consumer_pv_follow_column_name(consumer)
+        power_col = f"{consumer['name']} (kW)"
+        if pv_col not in df.columns or power_col not in df.columns:
+            continue
+        mask = (df[pv_col].fillna(0).astype(int) == 1) & (df[power_col].fillna(0.0) > 0)
+        if mask.any():
+            return True
+    return False
+
+
+def _power_chart_caption(df: pd.DataFrame) -> str:
+    base = (
+        "Preis rot auf der rechten Achse: 1:1 zu SoC "
+        "(30 Cent/kWh = 30 %, Hover zeigt Cent/kWh)."
+    )
+    if _chart_has_pv_follow_bars(df):
+        return (
+            f"{base} Schraffierte Flex-Balken: PV-Überschuss-Modus (pv_follow=1), "
+            "volle Balken: feste Soll-Leistung."
+        )
+    return base
 
 
 def get_bar_colors(df: pd.DataFrame) -> list[str]:
@@ -494,9 +557,22 @@ def add_power_traces(
         ))
 
     for consumer_index, (consumer, col) in enumerate(active_consumers):
+        pv_follow_col = consumer_pv_follow_column_name(consumer)
+        if pv_follow_col not in df.columns:
+            pv_follow_col = None
         for seg_index, (start, end, is_extrapolated) in enumerate(segments):
             if start >= end:
                 continue
+            segment = df.iloc[start:end]
+            pattern_shapes = _consumer_bar_pattern_shapes(
+                segment, col, pv_follow_col
+            )
+            opacity = _segment_opacity(_CONSUMER_BAR_OPACITY, is_extrapolated)
+            hover_pv = (
+                segment[pv_follow_col].fillna(0).astype(int).tolist()
+                if pv_follow_col is not None
+                else [0] * len(segment)
+            )
             fig.add_trace(go.Bar(
                 x=_consumer_bar_x(
                     slot_x.iloc[start:end],
@@ -505,17 +581,21 @@ def add_power_traces(
                     consumer_bar_width,
                     bar_offset,
                 ),
-                y=df[col].iloc[start:end],
+                y=segment[col],
                 name=consumer["name"] if seg_index == 0 else consumer["name"],
                 showlegend=seg_index == 0,
-                marker=dict(color=consumer_colors[consumer_index]),
-                opacity=_segment_opacity(0.65, is_extrapolated),
+                marker=_consumer_bar_marker(
+                    consumer_colors[consumer_index],
+                    pattern_shapes,
+                    opacity,
+                ),
                 width=consumer_bar_width,
                 yaxis="y",
-                customdata=uhrzeit.iloc[start:end],
+                customdata=list(zip(segment["Uhrzeit"], hover_pv)),
                 hovertemplate=(
-                    "Uhrzeit: %{customdata}<br>%{fullData.name}: "
-                    "%{y:.2f}<extra></extra>"
+                    "Uhrzeit: %{customdata[0]}<br>%{fullData.name}: "
+                    "%{y:.2f} kW<br>pv_follow: %{customdata[1]}"
+                    "<extra></extra>"
                 ),
             ))
 
@@ -903,11 +983,7 @@ def render_power_soc_chart(
     extrap_caption = _extrapolation_caption(df)
     if extrap_caption:
         st.caption(extrap_caption)
-    else:
-        st.caption(
-            "Preis rot auf der rechten Achse: 1:1 zu SoC "
-            "(30 Cent/kWh = 30 %, Hover zeigt Cent/kWh)."
-        )
+    st.caption(_power_chart_caption(df))
     st.plotly_chart(fig, width="stretch")
 
 

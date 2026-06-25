@@ -43,13 +43,10 @@ def _eauto_consumer() -> dict:
         "min_on_quarterhours": 1,
         "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
     }
-
-
-class TestMilpVariablePower:
     def test_partial_power_when_target_below_max(self):
         consumers = [_eauto_consumer()]
         matrix = _matrix(6)
-        _, _, _, powers, _ = milp_optimizer(
+        _, _, _, powers, pv_follow, _ = milp_optimizer(
             matrix,
             current_hour=0,
             current_soc=50.0,
