@@ -141,6 +141,16 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
         if ready_name:
             checks.append((f"Verbraucher {cid} Fertig-um", ready_name, {"read_raw": True}))
 
+    for trigger in config.get_event_triggers():
+        label = trigger.get("label") or trigger["id"]
+        io_name = trigger["loxone_name"]
+        if trigger["signal_type"] == "text":
+            checks.append((f"Event-Trigger {label}", io_name, {"read_raw": True}))
+        elif trigger["signal_type"] == "analog":
+            checks.append((f"Event-Trigger {label}", io_name, {"validate": _soc_valid}))
+        else:
+            checks.append((f"Event-Trigger {label}", io_name, {"validate": _binary_valid}))
+
     return checks
 
 

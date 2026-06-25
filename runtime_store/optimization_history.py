@@ -46,6 +46,7 @@ MODE_LABELS = {
 
 _HISTORY_COLUMNS = [
     "completed_at",
+    "run_trigger_label",
     "soc_percent",
     "mode_label",
     "target_power_kw",
@@ -115,6 +116,18 @@ def _flex_summary(consumer_powers: dict | None) -> str:
     return " · ".join(parts)
 
 
+def _format_run_trigger_label(run_trigger: str | None) -> str:
+    if not run_trigger or run_trigger == "quarter_hour":
+        return "Viertelstunde"
+    if run_trigger.startswith("event:"):
+        return run_trigger.split(":", 1)[1]
+    if run_trigger.startswith("ev_plugged_in:"):
+        return f"Anstecken ({run_trigger.split(':', 1)[1]})"
+    if run_trigger.startswith("ev_unplugged:"):
+        return f"Abstecken ({run_trigger.split(':', 1)[1]})"
+    return str(run_trigger)
+
+
 def _row_from_json_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
     clean = strip_metadata(entry)
     completed = _parse_timestamp(clean.get("completed_at"))
@@ -123,6 +136,7 @@ def _row_from_json_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
     mode = int(clean.get("mode", 0))
     return {
         "completed_at": completed,
+        "run_trigger_label": _format_run_trigger_label(clean.get("run_trigger")),
         "soc_percent": float(clean.get("soc_percent", 0.0) or 0.0),
         "mode_label": MODE_LABELS.get(mode, str(mode)),
         "target_power_kw": float(clean.get("target_power_kw", 0.0) or 0.0),
@@ -229,6 +243,7 @@ def _load_legacy_csv_history() -> list[dict[str, Any]]:
         mode = int(record.get("Ernie_Mode", 0))
         rows.append({
             "completed_at": completed,
+            "run_trigger_label": "Viertelstunde",
             "soc_percent": float(record.get("SoC_%", 0.0) or 0.0),
             "mode_label": MODE_LABELS.get(mode, str(mode)),
             "target_power_kw": float(record.get("Target_Power_kW", 0.0) or 0.0),

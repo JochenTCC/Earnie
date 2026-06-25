@@ -69,6 +69,34 @@
         }
       }
     },
+    "event_trigger": {
+      "type": "object",
+      "description": "Ein Loxone-Signal als Event-Trigger für main.py.",
+      "required": ["id", "loxone_name", "signal_type", "on_change"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Eindeutige Kennung für Logs und run_trigger (z. B. eauto_plugged_in)."
+        },
+        "loxone_name": {
+          "type": "string",
+          "description": "Merker- oder Virtueller-Eingang-Name im Miniserver."
+        },
+        "signal_type": {
+          "type": "string",
+          "enum": ["binary", "text", "analog"],
+          "description": "binary: 0/1-Merker; text: Textwert; analog: numerischer Wert (z. B. Rest-SOC in %)."
+        },
+        "on_change": {
+          "type": "string",
+          "description": "binary: any | rising | falling; text/analog: any."
+        },
+        "label": {
+          "type": "string",
+          "description": "Anzeigename für Logs und UI (optional, Standard: id)."
+        }
+      }
+    },
     "system": {
       "type": "object",
       "description": "System-Timeouts für Loxone-HTTP und main.py-Schleife.",
@@ -89,12 +117,19 @@
         },
         "event_trigger_enabled": {
           "type": "boolean",
-          "description": "main.py: true = außerplanmäßige Optimierung bei Ereignissen (z. B. E-Auto An-/Abstecken) vor der nächsten Viertelstunde."
+          "description": "main.py: true = außerplanmäßige Optimierung bei konfigurierten Event-Triggern vor der nächsten Viertelstunde."
         },
-        "charging_poll_interval_sec": {
+        "event_poll_interval_sec": {
           "type": "integer",
           "minimum": 1,
-          "description": "Abfrageintervall in Sekunden für plugged_in_name zwischen regulären Optimierungsläufen."
+          "description": "Abfrageintervall in Sekunden für event_triggers zwischen regulären Optimierungsläufen."
+        },
+        "event_triggers": {
+          "type": "array",
+          "description": "Loxone-Signale, deren Änderung einen außerplanmäßigen Optimierungslauf auslöst.",
+          "items": {
+            "$ref": "#/definitions/event_trigger"
+          }
         }
       }
     },

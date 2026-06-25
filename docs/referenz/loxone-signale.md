@@ -44,6 +44,20 @@ python -m scripts.verify_loxone_setup
 
 Die E-Auto-Freigabe zum Laden liegt bei `loxone_outputs.enable_name` (z. B. `Ernie_EAuto_LadeFreigabe`).
 
+## Event-Trigger (`system.event_triggers`)
+
+Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden). Konfiguration in `config.json`:
+
+| Feld | Bedeutung |
+|------|-----------|
+| `id` | Kennung für Logs und `run_trigger` (z. B. `eauto_plugged_in`) |
+| `loxone_name` | Merkername im Miniserver |
+| `signal_type` | `binary` (0/1) oder `text` oder `analog` (numerisch, z. B. Rest-SOC) |
+| `on_change` | `binary`: `any` / `rising` / `falling`; `text`/`analog`: `any` |
+| `label` | Anzeigename (optional) |
+
+`verify_loxone_setup` prüft alle konfigurierten Trigger zusätzlich.
+
 ## Beispiel-Mapping aus `config/config.example.json`
 
 | Verbraucher (`id`) | Freigabe (Schreiben) | Leistung (Lesen) |

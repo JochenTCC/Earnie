@@ -11,7 +11,30 @@
         "loop_timeout": 900,
         "loxone_silent_mode": false,
         "event_trigger_enabled": true,
-        "charging_poll_interval_sec": 60
+        "event_poll_interval_sec": 60,
+        "event_triggers": [
+            {
+                "id": "eauto_plugged_in",
+                "loxone_name": "EAuto_Angeschlossen",
+                "signal_type": "binary",
+                "on_change": "any",
+                "label": "E-Auto angeschlossen"
+            },
+            {
+                "id": "eauto_ready_by",
+                "loxone_name": "EAuto_FertigUm",
+                "signal_type": "text",
+                "on_change": "any",
+                "label": "E-Auto Fertig-Uhrzeit"
+            },
+            {
+                "id": "eauto_rest_soc",
+                "loxone_name": "EAuto_SOC_bei_Anschluss",
+                "signal_type": "analog",
+                "on_change": "any",
+                "label": "E-Auto Rest-SOC"
+            }
+        ]
     },
     "loxone_blocks": {
         "soc_name": "B004-Battery_SOC",
