@@ -18,7 +18,6 @@ def _eauto_consumer(*, forecast_when_absent: bool = True) -> dict:
         "charging_schedule": {
             "enabled": True,
             "forecast_when_absent": forecast_when_absent,
-            "battery_capacity_kwh": 16.0,
             "target_soc_percent": 100.0,
             "charging_efficiency": 0.90,
             "weekday": {
@@ -35,9 +34,16 @@ def _eauto_consumer(*, forecast_when_absent: bool = True) -> dict:
                 "plugged_in_name": "Ernie_EAuto_Da",
                 "ready_by_time_name": "Ernie_EAuto_FertigUm",
                 "soc_at_plug_in_name": "Rest-SOC",
+                "battery_capacity_kwh_name": "Batteriekapazität_E-Auto",
             },
         },
     }
+
+
+def _patch_eauto_capacity():
+    return patch.object(
+        cc.loxone_client, "resolve_consumer_battery_capacity_kwh", return_value=16.0
+    )
 
 
 def _hour_matrix(start: datetime, hours: int = 24) -> list:
@@ -75,7 +81,7 @@ class TestLoxoneAbsentForecast:
           cc.loxone_client, "fetch_loxone_generic_value", return_value=0
       ), patch.object(
           cc.loxone_client, "fetch_loxone_raw_value", return_value=None
-      ):
+      ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
       assert ctx["active"] is True
@@ -94,7 +100,7 @@ class TestLoxoneAbsentForecast:
           cc.loxone_client, "fetch_loxone_generic_value", return_value=0
       ), patch.object(
           cc.loxone_client, "fetch_loxone_raw_value", return_value="Morgen, 16:03"
-      ):
+      ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
       assert ctx["active"] is True
@@ -112,7 +118,7 @@ class TestLoxoneAbsentForecast:
           cc.loxone_client, "fetch_loxone_generic_value", return_value=0
       ), patch.object(
           cc.loxone_client, "fetch_loxone_raw_value", return_value="Heute, 16:03"
-      ):
+      ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
       assert ctx["active"] is True
@@ -125,7 +131,7 @@ class TestLoxoneAbsentForecast:
       horizon = datetime(2026, 6, 22, 17, 0)
       with patch.object(
           cc.loxone_client, "fetch_loxone_generic_value", return_value=0
-      ):
+      ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
       assert ctx["active"] is False
@@ -143,7 +149,7 @@ class TestLoxoneAbsentForecast:
           cc.loxone_client,
           "fetch_loxone_raw_value",
           return_value="Morgen, 07:00",
-      ):
+      ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
       assert ctx["active"] is True

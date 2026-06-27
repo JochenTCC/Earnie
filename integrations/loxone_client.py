@@ -150,23 +150,26 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
 
 
 def resolve_consumer_battery_capacity_kwh(consumer: dict) -> float | None:
-    """Akkukapazität (kWh): live aus Loxone, sonst Fallback aus charging_schedule."""
+    """Akkukapazität (kWh) live aus Loxone (einzige Quelle)."""
     sched = consumer.get("charging_schedule") or {}
-    fallback = float(sched.get("battery_capacity_kwh", 0.0) or 0.0)
     lox = sched.get("loxone") or {}
-    io_name = lox.get("battery_capacity_kwh_name", "")
+    io_name = str(lox.get("battery_capacity_kwh_name", "")).strip()
+    cid = consumer.get("id", "?")
     if not io_name:
-        return fallback if fallback > 0 else None
+        logger.error(
+            "Verbraucher '%s': charging_schedule.loxone.battery_capacity_kwh_name fehlt.",
+            cid,
+        )
+        return None
 
     raw = fetch_loxone_raw_value(io_name)
     if raw is None:
-        logger.warning(
-            "Loxone: Keine gültige Akkukapazität für '%s' (%s), Fallback %.2f kWh",
-            consumer.get("id"),
+        logger.error(
+            "Loxone: Akkukapazität für '%s' (%s) nicht lesbar.",
+            cid,
             io_name,
-            fallback,
         )
-        return fallback if fallback > 0 else None
+        return None
 
     try:
         value, unit = _parse_loxone_value(raw)
@@ -177,27 +180,25 @@ def resolve_consumer_battery_capacity_kwh(consumer: dict) -> float | None:
             raw,
             e,
         )
-        return fallback if fallback > 0 else None
+        return None
 
     if unit is not None and unit not in ("kwh", "kw", ""):
-        logger.warning(
-            "Loxone: Unbekannte Einheit '%s' bei Akkukapazität '%s' (%s), Fallback %.2f kWh",
+        logger.error(
+            "Loxone: Unbekannte Einheit '%s' bei Akkukapazität '%s' (%s).",
             unit,
-            consumer.get("id"),
+            cid,
             io_name,
-            fallback,
         )
-        return fallback if fallback > 0 else None
+        return None
 
     if value <= 0:
-        logger.warning(
-            "Loxone: Keine gültige Akkukapazität für '%s' (%s, raw=%r), Fallback %.2f kWh",
-            consumer.get("id"),
+        logger.error(
+            "Loxone: Ungültige Akkukapazität für '%s' (%s, raw=%r).",
+            cid,
             io_name,
             raw,
-            fallback,
         )
-        return fallback if fallback > 0 else None
+        return None
     return float(value)
 
 

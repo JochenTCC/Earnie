@@ -22,6 +22,9 @@ from integrations import loxone_log_import
 SOURCE_LOXONE = cons_data_store.SOURCE_LOXONE
 SOURCE_SYNTHETIC = cons_data_store.SOURCE_SYNTHETIC
 
+# Nur für Offline-Synthese ohne Loxone (kein Merker Batteriekapazität_E-Auto).
+_SYNTHETIC_EAUTO_BATTERY_KWH = 77.0
+
 get_output_path = cons_data_store.get_output_path
 load_cons_data = cons_data_store.load_cons_data
 save_cons_data = cons_data_store.save_cons_data
@@ -112,7 +115,12 @@ def _synthetic_flex_profile(consumer: dict, day: date) -> dict[int, float]:
         from_h = int(day_cfg.get("car_available_from_hour", 19))
         ready_h = int(day_cfg.get("ready_by_hour", 7))
         rest_soc = day_cfg.get("daily_rest_soc", 30)
-        daily_kwh = config.Config.target_kwh_from_rest_soc(consumer, rest_soc) or 0.0
+        daily_kwh = (
+            config.Config.target_kwh_from_rest_soc(
+                consumer, rest_soc, capacity_kwh=_SYNTHETIC_EAUTO_BATTERY_KWH
+            )
+            or 0.0
+        )
         if from_h <= ready_h:
             charge_hours = list(range(from_h, ready_h))
         else:

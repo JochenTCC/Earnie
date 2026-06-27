@@ -289,8 +289,9 @@ def _loxone_absent_forecast_context(consumer: dict, horizon_start: datetime) -> 
             "loxone (abwesend, keine gültige Fertigstellungszeit)"
         )
     day_sched = config_day_schedule(consumer, available_from)
+    capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
     target_kwh = config.Config.target_kwh_from_rest_soc(
-        consumer, day_sched.get("daily_rest_soc")
+        consumer, day_sched.get("daily_rest_soc"), capacity_kwh=capacity_kwh
     )
     if target_kwh is None or target_kwh <= 0:
         return _loxone_inactive_context(
@@ -408,7 +409,10 @@ def resolve_charging_context(
         return fetch_loxone_charging_context(consumer, horizon_start)
     day_sched = config_day_schedule(consumer, horizon_start)
     rest_soc = day_sched.get("daily_rest_soc")
-    target_kwh = config.Config.target_kwh_from_rest_soc(consumer, rest_soc)
+    capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    target_kwh = config.Config.target_kwh_from_rest_soc(
+        consumer, rest_soc, capacity_kwh=capacity_kwh
+    )
     return {
         "active": True,
         "deadline": deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour")),

@@ -292,32 +292,38 @@ class Config:
         consumer: dict,
         rest_soc_percent: float | None,
         *,
-        capacity_kwh: float | None = None,
+        capacity_kwh: float | None,
     ) -> float | None:
         """Berechnet Ladeziel (kWh) aus Rest-SOC (%), Kapazität und Lade-Wirkungsgrad."""
         if rest_soc_percent is None:
             return None
-        sched = consumer.get("charging_schedule") or {}
-        if capacity_kwh is not None:
-            capacity = float(capacity_kwh)
-        else:
-            capacity = float(sched.get("battery_capacity_kwh", 0.0) or 0.0)
+        if capacity_kwh is None:
+            return None
+        capacity = float(capacity_kwh)
         if capacity <= 0:
             return None
+        sched = consumer.get("charging_schedule") or {}
         target_soc = float(sched.get("target_soc_percent", 100.0) or 100.0)
         battery_delta_kwh = (target_soc - float(rest_soc_percent)) / 100.0 * capacity
         efficiency = Config._charging_efficiency(sched)
         return max(0.0, battery_delta_kwh / efficiency)
 
     @staticmethod
-    def target_kwh_from_day_schedule(consumer: dict, when: datetime) -> float | None:
+    def target_kwh_from_day_schedule(
+        consumer: dict,
+        when: datetime,
+        *,
+        capacity_kwh: float | None,
+    ) -> float | None:
         """Ladeziel (kWh) aus daily_rest_soc des passenden Wochentags in charging_schedule."""
         sched = consumer.get("charging_schedule")
         if not sched or not sched.get("enabled"):
             return None
         day_key = "weekend" if when.weekday() >= 5 else "weekday"
         rest_soc = (sched.get(day_key) or {}).get("daily_rest_soc")
-        return Config.target_kwh_from_rest_soc(consumer, rest_soc)
+        return Config.target_kwh_from_rest_soc(
+            consumer, rest_soc, capacity_kwh=capacity_kwh
+        )
 
     @staticmethod
     def _normalize_loxone_outputs(raw: dict | None) -> dict:
@@ -371,6 +377,11 @@ class Config:
             ):
                 if raw["loxone"].get(key):
                     loxone[key] = str(raw["loxone"][key]).strip()
+        if not loxone.get("battery_capacity_kwh_name"):
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: charging_schedule.enabled=true "
+                "erfordert loxone.battery_capacity_kwh_name (Kapazität nur aus Loxone)."
+            )
         charging_efficiency = raw.get("charging_efficiency")
         normalized_efficiency = (
             Config._charging_efficiency({"charging_efficiency": charging_efficiency})
@@ -380,7 +391,6 @@ class Config:
         return {
             "enabled": True,
             "forecast_when_absent": bool(raw.get("forecast_when_absent", False)),
-            "battery_capacity_kwh": float(raw.get("battery_capacity_kwh", 0.0) or 0.0),
             "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
             "charging_efficiency": normalized_efficiency,
             "weekday": Config._normalize_day_schedule(raw.get("weekday")),
