@@ -87,13 +87,14 @@ Empfohlene Reihenfolge: 7b → 7c → 7a → 7d → 7e → 7f
   - Abhängigkeiten in `pyproject.toml`; `requirements.txt` → `pip install .`
   - `[project.scripts]`: ernie-bootstrap, ernie-build-image, ernie-verify-loxone, …
   - Akzeptanz: `pip install -e .[dev]`, `pytest` grün
-- [ ] **7d — Streamlit extern bereitstellen**
-  - Separater Service/Port im Compose (main + app)
-  - In diesem Schritt nur erreichbare URL — kein Loxone-Embed
+- [x] **7d — Streamlit extern bereitstellen**
+  - Separater Service/Port im Compose (`optimizer-worker` + `optimizer-ui`)
+  - Synology Reverse Proxy (HTTPS, Let's Encrypt) → `127.0.0.1:8501`; WebSocket-Header in der DSM
+  - Fritzbox: 80 + 443 → NAS (8501 nur intern); Doku: [docs/einrichtung/container.md](docs/einrichtung/container.md)
   - Akzeptanz: App von außerhalb des NAS erreichbar (Netzwerk/VPN vorausgesetzt)
 - [ ] **7e — Prod/Dev-Datensync**
   - Skript für `runtime/`, relevante CSVs, optional config-Template hin und zurück
   - Akzeptanz: dokumentierter Ablauf Dev ↔ Produktiv ohne Copy-Paste
-- [ ] **7f — Loxberry-Container evaluieren**
+- [ ] **7f — Loxberry-Container evaluieren (erst wenn auf Loxberry 4 umgestellt wurde) **
   - Erst nach 7b/7c; separates Compose oder Anleitung
   - Akzeptanz: Go/No-Go mit kurzer Notiz im README

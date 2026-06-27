@@ -96,3 +96,64 @@ docker compose up -d
 ```
 
 Nutzt `docker-compose.yml` mit lokalem Build und denselben Mounts (`config/`, `runtime/`, `.env`).
+
+## Streamlit-UI extern (Synology Reverse Proxy)
+
+Produktion nutzt zwei Compose-Services:
+
+| Service | Rolle | Port nach außen |
+|---------|--------|-----------------|
+| `optimizer-worker` | `python main.py` (Steuerung) | — |
+| `optimizer-ui` | Streamlit Live-Cockpit | **8501** nur im LAN (Compose-Mapping) |
+
+Im Hausnetz: `http://<NAS-IP>:8501`
+
+Von außen: HTTPS über den **Synology Reverse Proxy** (kein direktes Freigeben von Port 8501 in der Fritzbox).
+
+### Voraussetzungen
+
+1. **Let's-Encrypt-Zertifikat** in der DSM für den externen Hostnamen (z. B. `*.myfritz.net` oder `*.synology.me`)
+2. **Fritzbox:** Port **80** und **443** → NAS-IP (80 für Zertifikatserneuerung)
+3. **DSM-HTTPS** idealerweise auf Port **5001**, nicht 443 — sonst Konflikt mit dem Reverse Proxy
+4. Bei myfritz: **IPv6 für Dynamic DNS deaktivieren**, falls Let's Encrypt die Domain nicht validieren kann (AAAA-Eintrag)
+
+### Reverse-Proxy-Regel (DSM)
+
+**Systemsteuerung → Anmeldeportal → Erweitert → Reverse Proxy**
+
+| | Quelle | Ziel |
+|--|--------|------|
+| Protokoll | HTTPS | HTTP |
+| Hostname | externer Hostname | `127.0.0.1` |
+| Port | 443 | 8501 |
+
+- Tab **Erweitert:** Let's-Encrypt-Zertifikat zuweisen
+- Tab **Benutzerdefinierte Kopfzeile → Erstellen → WebSocket** (für Streamlit)
+
+Optional: **Zugriffssteuerungsprofil** mit DSM-Anmeldung — Streamlit hat keine eigene Login-Abfrage.
+
+### Streamlit hinter dem Proxy
+
+`docker-compose-synology.yml` startet die UI mit Proxy-tauglichen Flags:
+
+```yaml
+command: >
+  streamlit run app.py
+  --server.port 8501
+  --server.address 0.0.0.0
+  --server.enableCORS false
+  --server.enableXsrfProtection false
+```
+
+Nach Änderung an der Compose-Datei: `docker compose -f docker-compose-synology.yml up -d optimizer-ui` (kein neues Image nötig).
+
+Produktion zeigt nur den Live-Modus (`ENERGY_OPTIMIZER_UI_MODES=live`).
+
+### Typische Probleme
+
+| Symptom | Prüfen |
+|---------|--------|
+| Seite von außen nicht erreichbar | Fritzbox **443 → NAS**; DSM nicht auf 443 |
+| 502 Bad Gateway | `ernie-optimizer-ui` läuft? `http://<NAS-IP>:8501` im LAN |
+| UI leer / verbindet nicht | WebSocket-Header am Reverse Proxy |
+| Let's Encrypt schlägt fehl | Port 80 erreichbar; IPv6/AAAA bei myfritz; ggf. Synology DDNS |
