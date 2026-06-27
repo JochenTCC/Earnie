@@ -18,13 +18,13 @@ def _eauto_consumer() -> dict:
         "daily_target_source": "loxone",
         "charging_schedule": {
             "enabled": True,
-            "battery_capacity_kwh": 16.0,
             "target_soc_percent": 100.0,
             "charging_efficiency": 0.9,
             "loxone": {
                 "plugged_in_name": "Ernie_EAuto_Da",
                 "charge_immediate_name": "E-Auto_SOFORT_LADEN",
                 "charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen",
+                "battery_capacity_kwh_name": "Batteriekapazität_E-Auto",
             },
         },
     }

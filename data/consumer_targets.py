@@ -37,8 +37,11 @@ def _resolve_single_consumer_daily_target_kwh(
 
     if source == "config":
         if consumer.get("charging_schedule", {}).get("enabled"):
+            capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
             computed = config.Config.target_kwh_from_day_schedule(
-                consumer, datetime.combine(target_date, time(12, 0))
+                consumer,
+                datetime.combine(target_date, time(12, 0)),
+                capacity_kwh=capacity_kwh,
             )
             if computed is not None:
                 return computed

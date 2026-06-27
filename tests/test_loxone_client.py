@@ -255,23 +255,28 @@ class TestFlexibleConsumerHelpers:
         consumer = {
             "id": "eauto",
             "charging_schedule": {
-                "battery_capacity_kwh": 16.0,
                 "loxone": {"battery_capacity_kwh_name": "Batteriekapazität_E-Auto"},
             },
         }
         with patch.object(lc, "fetch_loxone_raw_value", return_value="77 kWh"):
             assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(77.0)
 
-    def test_resolve_battery_capacity_fallback(self):
+    def test_resolve_battery_capacity_fails_without_loxone_value(self):
         consumer = {
             "id": "eauto",
             "charging_schedule": {
-                "battery_capacity_kwh": 16.0,
                 "loxone": {"battery_capacity_kwh_name": "Batteriekapazität_E-Auto"},
             },
         }
         with patch.object(lc, "fetch_loxone_raw_value", return_value=None):
-            assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(16.0)
+            assert lc.resolve_consumer_battery_capacity_kwh(consumer) is None
+
+    def test_resolve_battery_capacity_fails_without_io_name(self):
+        consumer = {
+            "id": "eauto",
+            "charging_schedule": {"loxone": {}},
+        }
+        assert lc.resolve_consumer_battery_capacity_kwh(consumer) is None
 
     def test_fetch_charge_immediate_remaining_seconds(self):
         consumer = {

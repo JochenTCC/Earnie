@@ -7,6 +7,8 @@ import config
 def test_charge_immediate_name_loaded_from_json():
     eauto = next(c for c in config.get_flexible_consumers() if c["id"] == "eauto")
     lox = (eauto.get("charging_schedule") or {}).get("loxone") or {}
+    sched = eauto.get("charging_schedule") or {}
     assert lox.get("charge_immediate_name") == "E-Auto_SOFORT_LADEN"
     assert lox.get("charge_immediate_remaining_name") == "Ernie_Restzeit_Sofortladen"
     assert lox.get("battery_capacity_kwh_name") == "Batteriekapazität_E-Auto"
+    assert "battery_capacity_kwh" not in sched

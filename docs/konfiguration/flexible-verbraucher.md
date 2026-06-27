@@ -37,16 +37,15 @@ Wenn gesetzt und `enabled: true`:
 
 | Feld | Bedeutung |
 |------|-----------|
-| `battery_capacity_kwh` | Fahrzeug-Akkukapazität |
 | `target_soc_percent` | Ziel-SOC beim Abfahren (meist 100) |
 | `charging_efficiency` | Lade-Wirkungsgrad (Netz → Akku) |
 | `forecast_when_absent` | Bei `daily_target_source: loxone`: Ladebedarf auch prognostizieren, wenn Auto nicht angeschlossen |
 | `weekday` / `weekend` | `car_available_from_hour`, `ready_by_hour`, `daily_rest_soc` |
-| `loxone` | `plugged_in_name`, `ready_by_time_name`, `soc_at_plug_in_name`, `nominal_power_kw_name` |
+| `loxone` | `plugged_in_name`, `ready_by_time_name`, `soc_at_plug_in_name`, `battery_capacity_kwh_name`, `nominal_power_kw_name` |
 
-Ladeziel in kWh (vereinfacht):
+Ladeziel in kWh (vereinfacht, Kapazität nur aus Loxone):
 
-`(target_soc_percent − Rest-SOC) / 100 × battery_capacity_kwh / charging_efficiency`
+`(target_soc_percent − Rest-SOC) / 100 × Akkukapazität_Loxone / charging_efficiency`
 
 `nominal_power_kw_name` überschreibt zur Laufzeit die konfigurierte `nominal_power_kw`, wenn der Merker lesbar ist.
 
