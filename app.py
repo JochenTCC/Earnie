@@ -18,7 +18,7 @@ from ui.backtesting import render_backtesting_block
 from ui.config_forms import render_parameter_input
 from ui.countdown import render_countdown_block
 from ui.historical import render_historical_inputs, render_historical_optimization_block
-from ui.history_panel import render_optimization_history_panel
+from ui.history_navigation import is_history_mode, render_disabled_live_section
 from ui.live_mode import render_optimization_savings_and_chart
 from ui.mode_selector import render_mode_selector
 from ui.runtime_config import reload_runtime_config
@@ -59,7 +59,8 @@ def main() -> None:
         )
     else:
         reload_runtime_config()
-        setup_auto_refresh()
+        if not is_history_mode():
+            setup_auto_refresh()
         st.markdown(
             "Echtzeit-Cockpit und Vorhersage-Simulation des synchronisierten 24-Stunden-Horizonts."
         )
@@ -77,10 +78,14 @@ def main() -> None:
 
     current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     render_optimization_savings_and_chart(current_soc)
-    render_live_power_flow(current_soc)
-    render_main_run_sync_panel()
-    render_optimization_history_panel()
-    render_countdown_block()
+    if is_history_mode():
+        render_disabled_live_section("Energiefluss (Sankey)")
+        render_disabled_live_section("Produktiv-Durchlauf (main.py)")
+        render_disabled_live_section("Countdown bis zur nächsten Optimierung")
+    else:
+        render_live_power_flow(current_soc)
+        render_main_run_sync_panel()
+        render_countdown_block()
 
 
 if __name__ == "__main__":

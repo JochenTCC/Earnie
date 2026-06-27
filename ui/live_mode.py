@@ -8,12 +8,14 @@ import pandas as pd
 
 from integrations import awattar_client
 from data import consumer_targets, live_consumption, profile_manager
-from runtime_store import live_optimization_debug, run_state
+from runtime_store import history_timeline, live_optimization_debug, run_state
 from optimizer import schedule as optimization_schedule
 import optimizer
+from ui.history_navigation import render_history_navigation
 from ui.runtime_config import reload_runtime_config, simulation_settings_fingerprint
 from ui.simulation_results import (
     persist_simulation_debug,
+    render_history_timeline_results,
     render_optimization_results,
 )
 
@@ -35,10 +37,14 @@ def _live_optimization_cache_key(current_slot: str, main_state: dict | None) -> 
 
 
 def _live_optimization_placeholder() -> st.delta_generator.DeltaGenerator:
-    """Ein Slot für die gesamte Live-Optimierungs-UI (verhindert Fragment-Duplikate)."""
+    """Ein Slot für die Live-Optimierungs-UI (verhindert Fragment-Duplikate)."""
     if "live_optimization_placeholder" not in st.session_state:
         st.session_state.live_optimization_placeholder = st.empty()
     return st.session_state.live_optimization_placeholder
+
+
+def _clear_live_optimization_placeholder() -> None:
+    st.session_state.pop("live_optimization_placeholder", None)
 
 
 def _apply_main_run_to_live_df(
@@ -52,6 +58,26 @@ def _apply_main_run_to_live_df(
         return optimized_df
     rows = optimizer.overlay_main_run_on_rows(optimized_df.to_dict("records"), main_state)
     return pd.DataFrame(rows)
+
+
+def _render_history_timeline(offset_days: int) -> None:
+    try:
+        result = history_timeline.build_history_timeline(offset_days)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    render_history_timeline_results(result)
+
+
+def render_optimization_savings_and_chart(current_soc: float) -> None:
+    """MILP-Simulation (Live) oder Produktiv-Historie mit gemeinsamer Navigation."""
+    reload_runtime_config()
+    offset_days = render_history_navigation()
+    if offset_days > 0:
+        _clear_live_optimization_placeholder()
+        _render_history_timeline(offset_days)
+        return
+    _live_optimization_fragment(current_soc)
 
 
 def _render_pending_live_sync(wait_sec: int, reason: str) -> bool:
@@ -127,9 +153,8 @@ def render_plausibility_debug_panel(main_state: dict | None) -> None:
 
 
 @st.fragment(run_every=timedelta(seconds=10))
-def render_optimization_savings_and_chart(current_soc: float) -> None:
+def _live_optimization_fragment(current_soc: float) -> None:
     """MILP-Simulation: Einsparungen und Chart (Refresh nach main.py-Sync)."""
-    reload_runtime_config()
     current_slot = optimization_schedule.quarter_hour_slot_key()
     main_state = run_state.load_run_state()
     cache_key = _live_optimization_cache_key(current_slot, main_state)
@@ -151,6 +176,7 @@ def render_optimization_savings_and_chart(current_soc: float) -> None:
             render_optimization_results(
                 cached_savings, cached_df, baseline_df, matched_baseline_df
             )
+            render_plausibility_debug_panel(main_state)
         return
 
     ready, reason, wait_sec = optimization_schedule.live_simulation_readiness(

@@ -39,6 +39,9 @@
   - [x]Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)
   - [x] Optimierung ausserplanmäßig anstoßen, wenn E-Auto angeschlossen wurde? --> umgesetzt (event_trigger in main.py)
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
+  - [x] Erster Schritt ist erledigt
+  - [ ] Es muss noch ein Weg gefunden werden, wie die tatsächlichen Verläufe angezeigt werden können, um Diskrepanzen zu erkennen
+  - [ ] Der neue Modus muss noch mit dem alten Verfahren (Historischer Tag) vereinheitlicht werden. Eine Idee wäre, den Betriebsmodus links zu entfernen und bei Offline-Anzeige zwischen geloggten und neu optimierten Daten umschalten zu können - dann könnte ein Vergleich früherer Optimierungen mit aktueller angeschaut werden - ähnlich wie Vergleich Soll <> Ist
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis
 - [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle (Swim-Spa, Gefrierschrank)
 - [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler (Input: Laufzeit, mittlere Leistung / Output: Zeithorizont 6h: Güte des Startzeitpunkts)

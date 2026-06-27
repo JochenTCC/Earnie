@@ -95,6 +95,14 @@ def _parse_timestamp(value: str | None) -> datetime | None:
         return None
 
 
+def _entry_completed_at(clean: dict[str, Any]) -> datetime | None:
+    """Zeitstempel eines JSONL-Eintrags (completed_at, sonst written_at)."""
+    completed = _parse_timestamp(clean.get("completed_at"))
+    if completed is not None:
+        return completed
+    return _parse_timestamp(clean.get("written_at"))
+
+
 def _float_or_zero(value: Any) -> float:
     if value is None:
         return 0.0
@@ -129,11 +137,13 @@ def _format_run_trigger_label(run_trigger: str | None) -> str:
 
 
 def _row_from_json_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
-    clean = strip_metadata(entry)
-    completed = _parse_timestamp(clean.get("completed_at"))
+    completed = _entry_completed_at(entry)
     if completed is None:
         return None
+    clean = strip_metadata(entry)
     mode = int(clean.get("mode", 0))
+    raw = dict(clean)
+    raw["completed_at"] = completed.isoformat(timespec="seconds")
     return {
         "completed_at": completed,
         "run_trigger_label": _format_run_trigger_label(clean.get("run_trigger")),
@@ -147,7 +157,7 @@ def _row_from_json_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
         "battery_plan_kw": float(clean.get("battery_plan_kw", 0.0) or 0.0),
         "flex_summary": _flex_summary(clean.get("consumer_powers_kw")),
         "source": str(clean.get("source", "main.py")),
-        "_raw": clean,
+        "_raw": raw,
     }
 
 
@@ -290,3 +300,89 @@ def load_history_entry_at(completed_at: datetime) -> dict[str, Any] | None:
         if delta < 60:
             return row.get("_raw")
     return None
+
+
+def _legacy_record_to_replay_entry(
+    record: pd.Series,
+    completed: datetime,
+) -> dict[str, Any]:
+    mode = int(record.get("Ernie_Mode", 0))
+    return {
+        "completed_at": completed.isoformat(timespec="seconds"),
+        "source": "system_history_log.csv",
+        "success": True,
+        "soc_percent": float(record.get("SoC_%", 0.0) or 0.0),
+        "mode": mode,
+        "target_power_kw": float(record.get("Target_Power_kW", 0.0) or 0.0),
+        "target_soc_percent": _float_or_zero(record.get("Target_SoC_%")),
+        "market_price_cent": float(record.get("Awattar_Price", 0.0) or 0.0),
+        "forecast_pv_kw": float(record.get("PV_Forecast_kW", 0.0) or 0.0),
+        "forecast_consumption_kw": float(record.get("Consumption_Forecast_kW", 0.0) or 0.0),
+        "battery_plan_kw": None,
+        "consumer_powers_kw": {},
+        "consumer_pv_follow": {},
+    }
+
+
+def _replay_entry_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    raw = row.get("_raw")
+    if isinstance(raw, dict):
+        return strip_metadata(raw)
+    if row.get("source") == "system_history_log.csv":
+        completed = row.get("completed_at")
+        if isinstance(completed, datetime):
+            return _legacy_record_to_replay_entry(
+                pd.Series({
+                    "Ernie_Mode": _mode_from_label(row.get("mode_label", "")),
+                    "SoC_%": row.get("soc_percent"),
+                    "Target_Power_kW": row.get("target_power_kw"),
+                    "Target_SoC_%": row.get("target_soc_percent"),
+                    "Awattar_Price": row.get("market_price_cent"),
+                    "PV_Forecast_kW": row.get("forecast_pv_kw"),
+                    "Consumption_Forecast_kW": row.get("forecast_consumption_kw"),
+                }),
+                completed,
+            )
+    return None
+
+
+def _mode_from_label(mode_label: str) -> int:
+    for mode_id, label in MODE_LABELS.items():
+        if label == mode_label:
+            return mode_id
+    return 0
+
+
+def _completed_in_window(completed: datetime, start: datetime, end: datetime) -> bool:
+    return start <= completed < end
+
+
+def load_replay_entries_between(
+    window_start: datetime,
+    window_end: datetime,
+) -> list[dict[str, Any]]:
+    """
+    Produktiv-Einträge mit completed_at in [window_start, window_end).
+
+    JSONL bevorzugt; Legacy-CSV nur für Zeitpunkte ohne JSONL-Eintrag.
+    """
+    merged = _merge_history_rows(_load_jsonl_history() + _load_legacy_csv_history())
+    entries: list[dict[str, Any]] = []
+    for row in merged:
+        completed = row.get("completed_at")
+        if not isinstance(completed, datetime):
+            continue
+        if not _completed_in_window(completed, window_start, window_end):
+            continue
+        entry = _replay_entry_from_row(row)
+        if entry is not None:
+            entries.append(entry)
+    return entries
+
+
+def earliest_replay_completed_at() -> datetime | None:
+    """Frühester bekanntes completed_at aus JSONL und Legacy-CSV."""
+    merged = _merge_history_rows(_load_jsonl_history() + _load_legacy_csv_history())
+    if not merged:
+        return None
+    return merged[0]["completed_at"]

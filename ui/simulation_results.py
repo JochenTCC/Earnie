@@ -7,7 +7,8 @@ import streamlit as st
 import pandas as pd
 
 from runtime_store import live_optimization_debug
-from ui.charts import render_optimization_chart
+from runtime_store.history_timeline import HistoryTimelineResult, format_gap_notice
+from ui.charts import render_history_optimization_chart, render_optimization_chart
 
 logger = logging.getLogger("app")
 
@@ -109,6 +110,29 @@ def render_optimization_results(
     render_applied_targets(savings_info)
     if simulation_table_title:
         render_simulation_details(optimized_df, title=simulation_table_title)
+
+
+def render_history_timeline_results(result: HistoryTimelineResult) -> None:
+    """Zwei Charts aus rekonstruierter Produktiv-Historie (ohne Live-Simulation)."""
+    df = pd.DataFrame(result.rows)
+    st.caption(
+        f"📜 **Produktiv-Historie** · {result.present_slot_count} von "
+        f"{len(result.rows)} Slots mit Messwerten"
+    )
+    gap_notice = format_gap_notice(result)
+    if gap_notice:
+        st.warning(gap_notice)
+    total_cost = (
+        result.cumulative_costs_euro[-1]
+        if result.cumulative_costs_euro
+        else 0.0
+    )
+    render_history_optimization_chart(
+        df,
+        result.slot_costs_euro,
+        result.slot_consumption_kwh,
+        total_cost,
+    )
 
 
 def persist_simulation_debug(

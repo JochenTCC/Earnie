@@ -496,14 +496,23 @@ def _add_pv_trace(
 
 
 def _chart_xaxis_config(uhrzeit: pd.Series) -> dict:
-    tickvals = list(range(len(uhrzeit)))
+    length = len(uhrzeit)
+    tickvals = list(range(length))
+    if length > 24:
+        tickvals = list(range(0, length, 4))
+    ticktext = [str(uhrzeit.iloc[index]) for index in tickvals]
+    axis_title = (
+        "Uhrzeit (15-Min-Slots)"
+        if length > 24
+        else "Uhrzeit (Stunden-Slots / Intervalle)"
+    )
     return dict(
-        title="Uhrzeit (Stunden-Slots / Intervalle)",
+        title=axis_title,
         type="linear",
         tickmode="array",
         tickvals=tickvals,
-        ticktext=uhrzeit.tolist(),
-        range=[-0.5, len(uhrzeit) - 0.5],
+        ticktext=ticktext,
+        range=[-0.5, length - 0.5],
     )
 
 
@@ -935,6 +944,10 @@ def render_power_soc_chart(
     df: pd.DataFrame,
     baseline_df: pd.DataFrame | None = None,
     matched_baseline_df: pd.DataFrame | None = None,
+    *,
+    chart_title: str | None = None,
+    show_baseline_soc: bool = True,
+    chart_key: str | None = None,
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
     bar_colors = get_bar_colors(df)
@@ -944,18 +957,19 @@ def render_power_soc_chart(
 
     add_power_traces(fig, df, bar_colors, slot_x, extrap_start, extrap_end)
     add_optimized_soc_trace(fig, df, slot_x, extrap_start=extrap_start, extrap_end=extrap_end)
-    add_baseline_soc_traces(
-        fig,
-        matched_baseline_df,
-        extrap_start=extrap_start,
-        extrap_end=extrap_end,
-    )
+    if show_baseline_soc:
+        add_baseline_soc_traces(
+            fig,
+            matched_baseline_df,
+            extrap_start=extrap_start,
+            extrap_end=extrap_end,
+        )
     add_price_on_soc_axis_trace(
         fig, df, slot_x, extrap_start=extrap_start, extrap_end=extrap_end
     )
 
     fig.update_layout(
-        title="24-Stunden-Zeithorizont (Leistung, SoC & Preis)",
+        title=chart_title or "24-Stunden-Zeithorizont (Leistung, SoC & Preis)",
         xaxis=_chart_xaxis_config(df["Uhrzeit"]),
         barmode="overlay",
         yaxis=dict(title="Leistung (kW)", side="left"),
@@ -973,7 +987,56 @@ def render_power_soc_chart(
     if extrap_caption:
         st.caption(extrap_caption)
     st.caption(_power_chart_caption(df))
-    st.plotly_chart(fig, width="stretch")
+    plotly_kwargs: dict = {"width": "stretch"}
+    if chart_key:
+        plotly_kwargs["key"] = chart_key
+    st.plotly_chart(fig, **plotly_kwargs)
+
+
+def add_cumulative_actual_traces(
+    fig: go.Figure,
+    uhrzeit: pd.Series,
+    slot_x: pd.Series,
+    slot_costs_euro: list[float],
+    slot_consumption_kwh: list[float],
+    extrap_start: int | None = None,
+    extrap_end: int | None = None,
+) -> None:
+    """Kumulierte Ist-Kosten und Ist-Verbrauch (Produktiv-Historie)."""
+    length = len(slot_x)
+    cost_cum = pd.Series(slot_costs_euro[:length], dtype=float).cumsum()
+    kwh_cum = pd.Series(slot_consumption_kwh[:length], dtype=float).cumsum()
+    segments = _trace_segments(length, extrap_start, extrap_end)
+    _add_segmented_hv_line(
+        fig,
+        slot_x,
+        cost_cum,
+        uhrzeit,
+        segments,
+        name="Kosten (Ist)",
+        line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, shape="hv"),
+        extrapolated_dotted=True,
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Kosten (Ist, kumuliert): %{y:.3f} €"
+            "<extra></extra>"
+        ),
+    )
+    _add_segmented_hv_line(
+        fig,
+        slot_x,
+        kwh_cum,
+        uhrzeit,
+        segments,
+        name="Verbrauch (Ist)",
+        line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
+        yaxis="y2",
+        y_format=".2f",
+        base_opacity=1.0,
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Verbrauch (Ist, kumuliert): %{y:.2f} kWh"
+            "<extra></extra>"
+        ),
+    )
 
 
 def render_cumulative_cost_chart(
@@ -1074,6 +1137,51 @@ def render_price_savings_chart(
         matched_baseline_cost_euro=matched_baseline_cost_euro,
         optimized_cost_euro=optimized_cost_euro,
     )
+
+
+def render_history_optimization_chart(
+    df: pd.DataFrame,
+    slot_costs_euro: list[float],
+    slot_consumption_kwh: list[float],
+    total_cost_euro: float,
+) -> None:
+    """Zwei Charts für die Produktiv-Historie (Ist-Daten, 96 Viertelstunden-Slots)."""
+    render_power_soc_chart(
+        df,
+        show_baseline_soc=False,
+        chart_title="24-Stunden-Horizont (Leistung, SoC & Preis) — Produktiv-Ist",
+        chart_key="history_power_soc_chart",
+    )
+    slot_x = _chart_slot_x(len(df))
+    extrap_start, extrap_end = _extrapolation_bounds(df)
+    fig = go.Figure()
+    add_cumulative_actual_traces(
+        fig,
+        df["Uhrzeit"],
+        slot_x,
+        slot_costs_euro,
+        slot_consumption_kwh,
+        extrap_start=extrap_start,
+        extrap_end=extrap_end,
+    )
+    fig.update_layout(
+        title="Kumulierte Kosten & Verbrauch — Produktiv-Ist",
+        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
+        yaxis=dict(title="Kosten (€, kumuliert)"),
+        yaxis2=dict(
+            title="Verbrauch (kWh, kumuliert)",
+            side="right",
+            overlaying="y",
+            showgrid=False,
+        ),
+        legend=_chart_legend(),
+        margin=dict(l=40, r=40, t=50, b=110),
+    )
+    st.caption(
+        f"Gesamtkosten (Ist): **{total_cost_euro:.2f} €** · "
+        "Kosten und Verbrauch aus gemessenen Produktiv-Durchläufen (15-Min-Takt)."
+    )
+    st.plotly_chart(fig, width="stretch", key="history_cumulative_cost_chart")
 
 
 def render_optimization_chart(

@@ -62,6 +62,31 @@ def test_merge_prefers_jsonl_over_csv(tmp_path, monkeypatch):
     assert df.iloc[0]["source"] == "main.py"
 
 
+def test_jsonl_written_at_fallback(tmp_path, monkeypatch):
+    monkeypatch.setattr(oh, "HISTORY_FILE", str(tmp_path / "optimization_history.jsonl"))
+    monkeypatch.setattr(oh, "LEGACY_CSV_FILE", str(tmp_path / "legacy.csv"))
+
+    entry = {
+        "written_at": "2026-06-25T10:15:00",
+        "source": "main.py",
+        "soc_percent": 61.0,
+        "mode": 0,
+        "target_power_kw": 0.0,
+        "target_soc_percent": 99.0,
+        "market_price_cent": 8.0,
+        "forecast_pv_kw": 1.0,
+        "forecast_consumption_kw": 0.8,
+        "battery_plan_kw": 0.0,
+        "consumer_powers_kw": {},
+    }
+    with open(oh.HISTORY_FILE, "w", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+
+    df = oh.load_optimization_history(days_back=None)
+    assert len(df) == 1
+    assert float(df.iloc[0]["soc_percent"]) == 61.0
+
+
 def test_run_trigger_label_from_jsonl(tmp_path, monkeypatch):
     monkeypatch.setattr(oh, "RUNTIME_DIR", str(tmp_path))
     monkeypatch.setattr(oh, "HISTORY_FILE", str(tmp_path / "optimization_history.jsonl"))
