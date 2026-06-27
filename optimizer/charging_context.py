@@ -419,21 +419,38 @@ def resolve_charging_context(
 def resolve_charging_contexts(
     optimization_matrix: list,
     consumer_daily_targets_kwh: dict | None = None,
+    *,
+    live_flex_kw: dict[str, float] | None = None,
+    consumers: list | None = None,
 ) -> dict[str, dict]:
     """Ladekontext je Verbraucher mit charging_schedule für den Optimierungshorizont."""
+    from . import charge_immediate as ci
+
     logged_simulation = bool(
         optimization_matrix
         and optimization_matrix[0].get("consumption_mode") == "logged_day"
     )
+    active = consumers if consumers is not None else config.get_flexible_consumers(
+        optimizer_only=True
+    )
+    horizon = len(optimization_matrix) if optimization_matrix else 24
     contexts: dict[str, dict] = {}
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in active:
         if not charging_schedule_enabled(consumer):
             continue
-        contexts[consumer["id"]] = resolve_charging_context(
+        cid = consumer["id"]
+        contexts[cid] = resolve_charging_context(
             consumer,
             optimization_matrix,
             consumer_daily_targets_kwh,
             logged_simulation,
+        )
+        live_kw = (live_flex_kw or {}).get(cid)
+        contexts[cid] = ci.enrich_context_with_immediate_charge(
+            consumer,
+            contexts[cid],
+            live_kw=live_kw,
+            horizon=horizon,
         )
     return contexts
 

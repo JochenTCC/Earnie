@@ -34,6 +34,31 @@ def test_consumer_bar_pattern_shapes_pv_follow_only_when_active():
     assert shapes == ["", "/", ""]
 
 
+def test_consumer_bar_pattern_shapes_immediate_charge_uses_karo():
+    segment = pd.DataFrame({
+        "E-Auto (kW)": [3.5, 3.5, 0.0],
+        "E-Auto pv_follow": [1, 0, 0],
+        "E-Auto sofort_laden": [1, 1, 0],
+    })
+    shapes = _consumer_bar_pattern_shapes(
+        segment,
+        "E-Auto (kW)",
+        "E-Auto pv_follow",
+        "E-Auto sofort_laden",
+    )
+    assert shapes == ["+", "+", ""]
+
+
+def test_chart_has_immediate_charge_bars():
+    from ui.charts import _chart_has_immediate_charge_bars
+
+    df = pd.DataFrame({
+        "E-Auto (kW)": [3.5, 0.0],
+        "E-Auto sofort_laden": [1, 0],
+    })
+    assert _chart_has_immediate_charge_bars(df) is True
+
+
 def test_chart_has_pv_follow_bars():
     df = pd.DataFrame({
         "E-Auto (kW)": [0.0, 2.0],

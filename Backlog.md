@@ -34,10 +34,11 @@
   - Ernie muss dafür sorgen, dass die Sollstunden in den nächsten 24 wieder auf Null kommen
   - Der Filter braucht eine bestimmte Leistung
   - In Loxone werden die Laufzeiten auf- und runter-integriert
-- [ ] Kommunikation mit Bew-Meldern (Hue) prüfen
+- [x] Kommunikation mit Bew-Meldern (Hue) prüfen (war ein Programmierfehler in loxone_publish)
 - [x] Logik und UI für E-Auto verbessern
   - [x]Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)
   - [x] Optimierung ausserplanmäßig anstoßen, wenn E-Auto angeschlossen wurde? --> umgesetzt (event_trigger in main.py)
+  - [ ] Ernie darüber Bescheid geben, wenn E-Auto SOFORT LADEN umgeschalten wird (als Event) und zur Berücksichtigung in der Optimierung
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
   - [x] Erster Schritt ist erledigt
   - [ ] Es muss noch ein Weg gefunden werden, wie die tatsächlichen Verläufe angezeigt werden können, um Diskrepanzen zu erkennen

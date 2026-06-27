@@ -20,6 +20,28 @@ from ui.simulation_results import (
 )
 
 
+def _render_live_captions(
+    *,
+    main_state: dict | None,
+    snapshot: dict | None,
+    sim_soc: float,
+    sync_note: str,
+) -> None:
+    if main_state:
+        st.caption(
+            f"📡 **Aktuelle Stunde:** Verbrauch aus "
+            f"{'main.py' if main_state.get('consumption_snapshot') and snapshot == main_state.get('consumption_snapshot') else 'Loxone live'} · "
+            f"SoC für Simulation: **{sim_soc:.1f} %** (main.py) · "
+            f"Stunde 0 = Produktiv-Durchlauf main.py — übrige Stunden simuliert{sync_note}."
+        )
+    elif snapshot:
+        st.caption(
+            f"📡 **Aktuelle Stunde (Live):** Grundlast {snapshot['baseload_kw']:.2f} kW · "
+            f"Gesamt {snapshot['house_kw']:.2f} kW · PV {snapshot['pv_kw']:.2f} kW — "
+            f"Rest des Horizonts aus Profil-Prognose{sync_note}."
+        )
+
+
 def fetch_market_data():
     market_data = awattar_client.fetch_awattar_prices()
     if not market_data:
@@ -92,6 +114,12 @@ def _render_pending_live_sync(wait_sec: int, reason: str) -> bool:
     main_state = run_state.load_run_state()
     cached_df = _apply_main_run_to_live_df(cached_df, main_state)
     with _live_optimization_placeholder().container():
+        _render_live_captions(
+            main_state=main_state,
+            snapshot=(main_state or {}).get("consumption_snapshot"),
+            sim_soc=float((main_state or {}).get("soc_percent", 0.0) or 0.0),
+            sync_note="",
+        )
         render_optimization_results(
             cached_savings, cached_df, baseline_df, matched_baseline_df
         )
@@ -173,6 +201,12 @@ def _live_optimization_fragment(current_soc: float) -> None:
         baseline_df = pd.DataFrame(cached_savings.get("baseline_rows", []))
         matched_baseline_df = pd.DataFrame(cached_savings.get("matched_baseline_rows", []))
         with _live_optimization_placeholder().container():
+            _render_live_captions(
+                main_state=main_state,
+                snapshot=(main_state or {}).get("consumption_snapshot"),
+                sim_soc=float((main_state or {}).get("soc_percent", current_soc) or current_soc),
+                sync_note="",
+            )
             render_optimization_results(
                 cached_savings, cached_df, baseline_df, matched_baseline_df
             )
@@ -246,19 +280,12 @@ def _live_optimization_fragment(current_soc: float) -> None:
         sync_note = " · main.py für diesen Slot nicht verfügbar (Live-Fallback)"
 
     with _live_optimization_placeholder().container():
-        if main_state:
-            st.caption(
-                f"📡 **Aktuelle Stunde:** Verbrauch aus "
-                f"{'main.py' if main_state.get('consumption_snapshot') and snapshot == main_state.get('consumption_snapshot') else 'Loxone live'} · "
-                f"SoC für Simulation: **{sim_soc:.1f} %** (main.py) · "
-                f"Stunde 0 = Produktiv-Durchlauf main.py — übrige Stunden simuliert{sync_note}."
-            )
-        elif snapshot:
-            st.caption(
-                f"📡 **Aktuelle Stunde (Live):** Grundlast {snapshot['baseload_kw']:.2f} kW · "
-                f"Gesamt {snapshot['house_kw']:.2f} kW · PV {snapshot['pv_kw']:.2f} kW — "
-                f"Rest des Horizonts aus Profil-Prognose{sync_note}."
-            )
+        _render_live_captions(
+            main_state=main_state,
+            snapshot=snapshot,
+            sim_soc=sim_soc,
+            sync_note=sync_note,
+        )
 
         render_optimization_results(
             savings_info, optimized_df, baseline_df, matched_baseline_df

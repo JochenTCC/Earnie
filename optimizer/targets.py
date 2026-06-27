@@ -18,6 +18,10 @@ def consumer_pv_follow_column_name(consumer: dict) -> str:
     return f"{consumer['name']} pv_follow"
 
 
+def consumer_immediate_charge_column_name(consumer: dict) -> str:
+    return f"{consumer['name']} sofort_laden"
+
+
 def min_delivery_kwh(consumer: dict) -> float:
     """Mindest-Energie (kWh) für eine einzelne Einschaltperiode (min_on_quarterhours)."""
     min_hours = max(1, (int(consumer["min_on_quarterhours"]) + 3) // 4)

@@ -191,6 +191,20 @@ class TestFlexibleConsumerHelpers:
         enabled = lc.flex_consumer_enable_value(consumer, {"swimspa": 2.0}, ctx)
         assert enabled == 0
 
+    def test_flex_consumer_setpoint_skipped_on_immediate_charge(self):
+        consumer = {
+            "id": "eauto",
+            "name": "E-Auto",
+            "nominal_power_kw": 3.5,
+            "min_power_kw": 1.4,
+            "loxone_outputs": {
+                "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
+                "pv_follow_name": "Ernie_EAuto_pv_follow",
+            },
+        }
+        ctx = {"eauto": {"skip_loxone_output": True}}
+        assert lc._flexible_consumer_output_values(consumer, {"eauto": 3.5}, ctx) == {}
+
     def test_flex_consumer_setpoint_clamped(self):
         consumer = {
             "id": "eauto",

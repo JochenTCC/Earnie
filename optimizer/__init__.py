@@ -12,6 +12,11 @@ import os
 
 import config
 from . import schedule
+from .charge_immediate import (
+    apply_immediate_charge_to_matrix,
+    apply_immediate_charge_chart_display,
+    prepare_optimization_matrix,
+)
 from .charging_context import (
     apply_horizon_charging_limits as _apply_horizon_charging_limits,
     resolve_charging_contexts,
@@ -55,6 +60,7 @@ from .targets import (
     build_energy_comparison_detail,
     consumer_column_name as _consumer_column_name,
     consumer_pv_follow_column_name as _consumer_pv_follow_column_name,
+    consumer_immediate_charge_column_name as _consumer_immediate_charge_column_name,
     resolve_applied_daily_targets,
     resolve_baseload_kwh,
     resolve_horizon_consumer_targets_kwh,
@@ -89,6 +95,8 @@ __all__ = [
     "register_spa_hour",
     "resolve_applied_daily_targets",
     "resolve_baseload_kwh",
+    "apply_immediate_charge_to_matrix",
+    "prepare_optimization_matrix",
     "resolve_charging_contexts",
     "serialize_charging_contexts",
     "resolve_horizon_consumer_targets_kwh",
@@ -126,12 +134,13 @@ def overlay_main_run_on_rows(rows: list[dict], main_state: dict | None) -> list[
         if pv_col in row:
             cid = consumer["id"]
             row[pv_col] = int((main_state.get("consumer_pv_follow") or {}).get(cid, 0) or 0)
-    row["Netzbezug (kW)"] = round(
-        float(row["Verbrauch-Prognose (kW)"])
-        + _flexible_consumer_power_kw(row)
-        - float(row["PV-Prognose (kW)"])
-        + float(row["Geplante Batterie-Aktion (kW)"]),
-        2,
+        imm_col = _consumer_immediate_charge_column_name(consumer)
+        if imm_col in row:
+            row[imm_col] = 0
+    contexts = main_state.get("charging_contexts") or {}
+    flex_live = main_state.get("flex_live_kw")
+    apply_immediate_charge_chart_display(
+        row, 0, contexts, flex_live_kw=flex_live
     )
     updated[0] = row
     return updated

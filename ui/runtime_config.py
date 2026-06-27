@@ -25,13 +25,16 @@ def simulation_settings_fingerprint() -> str:
     tokens.extend(f"b.{key}={battery[key]!r}" for key in sorted(battery))
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         outputs = consumer.get("loxone_outputs") or {}
+        sched = consumer.get("charging_schedule") or {}
+        lox = sched.get("loxone") or {}
         tokens.append(
-            "fc.{id}={enable}|{setpoint}|{pv_follow}|{min_kw}".format(
+            "fc.{id}={enable}|{setpoint}|{pv_follow}|{min_kw}|{immediate}".format(
                 id=consumer["id"],
                 enable=outputs.get("enable_name", ""),
                 setpoint=outputs.get("power_setpoint_name", ""),
                 pv_follow=outputs.get("pv_follow_name", ""),
                 min_kw=consumer.get("min_power_kw", ""),
+                immediate=lox.get("charge_immediate_name", ""),
             )
         )
     return ";".join(tokens)

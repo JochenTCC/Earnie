@@ -119,6 +119,7 @@
                     "plugged_in_name": "EAuto_Angeschlossen",
                     "ready_by_time_name": "EAuto_FertigUm",
                     "soc_at_plug_in_name": "EAuto_SOC_bei_Anschluss",
+                    "charge_immediate_name": "EAuto_SOFORT_LADEN",
                     "nominal_power_kw_name": "EAuto_MaxLeistung"
                 }
             }

@@ -130,11 +130,12 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
             ("plugged_in_name", f"Verbraucher {cid} angeschlossen"),
             ("soc_at_plug_in_name", f"Verbraucher {cid} Rest-SoC"),
             ("nominal_power_kw_name", f"Verbraucher {cid} Nennleistung"),
+            ("charge_immediate_name", f"Verbraucher {cid} Sofort laden"),
         ):
             io_name = lox.get(key, "")
             if io_name:
                 opts: dict = {}
-                if key == "plugged_in_name":
+                if key in ("plugged_in_name", "charge_immediate_name"):
                     opts["validate"] = _binary_valid
                 checks.append((label, io_name, opts))
         ready_name = lox.get("ready_by_time_name", "")

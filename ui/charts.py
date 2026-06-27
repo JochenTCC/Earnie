@@ -6,11 +6,12 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import config
-from optimizer.targets import consumer_pv_follow_column_name
+from optimizer.targets import consumer_pv_follow_column_name, consumer_immediate_charge_column_name
 from optimizer import battery as bat
 
 _CONSUMER_BAR_OPACITY = 0.65
 _CONSUMER_PV_FOLLOW_PATTERN = "/"
+_CONSUMER_IMMEDIATE_CHARGE_PATTERN = "+"
 _COLOR_BASELINE = "#7f8c8d"
 _COLOR_OPTIMIZED = "#e67e22"
 _COLOR_GRID_POWER = "#7f8c8d"
@@ -25,18 +26,24 @@ def _consumer_bar_pattern_shapes(
     segment: pd.DataFrame,
     power_col: str,
     pv_follow_col: str | None,
+    immediate_col: str | None = None,
 ) -> list[str]:
-    """Muster je Stunde: pv_follow=1 und Leistung > 0 → Schraffur, sonst Vollfläche."""
-    if pv_follow_col is None or pv_follow_col not in segment.columns:
-        return [""] * len(segment)
+    """Muster je Stunde: Sofort-Laden → Karo (+), pv_follow → Schräg (/), sonst Vollfläche."""
     shapes: list[str] = []
     for _, row in segment.iterrows():
         power = float(row.get(power_col, 0.0) or 0.0)
-        pv_follow = int(row.get(pv_follow_col, 0) or 0)
-        if power > 1e-6 and pv_follow == 1:
-            shapes.append(_CONSUMER_PV_FOLLOW_PATTERN)
-        else:
+        if power <= 1e-6:
             shapes.append("")
+            continue
+        if immediate_col and immediate_col in segment.columns:
+            if int(row.get(immediate_col, 0) or 0) == 1:
+                shapes.append(_CONSUMER_IMMEDIATE_CHARGE_PATTERN)
+                continue
+        if pv_follow_col and pv_follow_col in segment.columns:
+            if int(row.get(pv_follow_col, 0) or 0) == 1:
+                shapes.append(_CONSUMER_PV_FOLLOW_PATTERN)
+                continue
+        shapes.append("")
     return shapes
 
 
@@ -58,6 +65,18 @@ def _consumer_bar_marker(
     return marker
 
 
+def _chart_has_immediate_charge_bars(df: pd.DataFrame) -> bool:
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        imm_col = consumer_immediate_charge_column_name(consumer)
+        power_col = f"{consumer['name']} (kW)"
+        if imm_col not in df.columns or power_col not in df.columns:
+            continue
+        mask = (df[imm_col].fillna(0).astype(int) == 1) & (df[power_col].fillna(0.0) > 0)
+        if mask.any():
+            return True
+    return False
+
+
 def _chart_has_pv_follow_bars(df: pd.DataFrame) -> bool:
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         pv_col = consumer_pv_follow_column_name(consumer)
@@ -75,11 +94,14 @@ def _power_chart_caption(df: pd.DataFrame) -> str:
         "Preis rot auf der rechten Achse: 1:1 zu SoC "
         "(30 Cent/kWh = 30 %, Hover zeigt Cent/kWh)."
     )
+    notes: list[str] = []
     if _chart_has_pv_follow_bars(df):
-        return (
-            f"{base} Schraffierte Flex-Balken: PV-Überschuss-Modus (pv_follow=1), "
-            "volle Balken: feste Soll-Leistung."
+        notes.append(
+            "Schräg schraffierte Flex-Balken: PV-Überschuss-Modus (pv_follow=1), "
+            "volle Balken: feste Soll-Leistung"
         )
+    if notes:
+        return f"{base} {' · '.join(notes)}."
     return base
 
 
@@ -601,17 +623,25 @@ def add_power_traces(
         pv_follow_col = consumer_pv_follow_column_name(consumer)
         if pv_follow_col not in df.columns:
             pv_follow_col = None
+        immediate_col = consumer_immediate_charge_column_name(consumer)
+        if immediate_col not in df.columns:
+            immediate_col = None
         for seg_index, (start, end, is_extrapolated) in enumerate(segments):
             if start >= end:
                 continue
             segment = df.iloc[start:end]
             pattern_shapes = _consumer_bar_pattern_shapes(
-                segment, col, pv_follow_col
+                segment, col, pv_follow_col, immediate_col
             )
             opacity = _segment_opacity(_CONSUMER_BAR_OPACITY, is_extrapolated)
             hover_pv = (
                 segment[pv_follow_col].fillna(0).astype(int).tolist()
                 if pv_follow_col is not None
+                else [0] * len(segment)
+            )
+            hover_imm = (
+                segment[immediate_col].fillna(0).astype(int).tolist()
+                if immediate_col is not None
                 else [0] * len(segment)
             )
             fig.add_trace(go.Bar(
@@ -632,10 +662,11 @@ def add_power_traces(
                 ),
                 width=consumer_bar_width,
                 yaxis="y",
-                customdata=list(zip(segment["Uhrzeit"], hover_pv)),
+                customdata=list(zip(segment["Uhrzeit"], hover_pv, hover_imm)),
                 hovertemplate=(
                     "Uhrzeit: %{customdata[0]}<br>%{fullData.name}: "
-                    "%{y:.2f} kW<br>pv_follow: %{customdata[1]}"
+                    "%{y:.2f} kW<br>pv_follow: %{customdata[1]}<br>"
+                    "sofort_laden: %{customdata[2]}"
                     "<extra></extra>"
                 ),
             ))

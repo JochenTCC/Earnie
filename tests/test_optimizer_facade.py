@@ -18,6 +18,7 @@ def test_heuristic_optimizer_was_renamed() -> None:
 def test_main_and_app_entry_points_are_callable() -> None:
     for name in (
         "resolve_charging_contexts",
+        "prepare_optimization_matrix",
         "get_consumer_remaining_kwh",
         "milp_optimizer",
         "battery_plan_kw_from_control",

@@ -476,6 +476,10 @@
           "type": "object",
           "description": "Loxone-Merker für E-Auto-Status (Lesen) und optional Steuerung (Schreiben).",
           "properties": {
+            "charge_immediate_name": {
+              "type": "string",
+              "description": "1 = Sofort-Laden aktiv (Loxone lädt mit Volllast, Ernie plant E-Auto als fixen Verbraucher und sendet keine Lade-Sollwerte)."
+            },
             "plugged_in_name": {
               "type": "string",
               "description": "1 = Fahrzeug angeschlossen. Bei forecast_when_absent=false: sonst keine Ladeplanung."

@@ -100,15 +100,17 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
 
     current_hour = datetime.now().hour
     targets = consumer_targets.resolve_consumer_daily_targets(matrix=optimization_matrix)
-    charging_contexts = optimizer.resolve_charging_contexts(
-        optimization_matrix, targets
+    live_consumers = loxone_client.consumers_with_live_nominal_power()
+    optimization_matrix, charging_contexts, targets = optimizer.prepare_optimization_matrix(
+        optimization_matrix,
+        targets,
+        consumers=live_consumers,
     )
     consumer_remaining = optimizer.get_consumer_remaining_kwh(
         consumer_daily_targets_kwh=targets,
         optimization_matrix=optimization_matrix,
         charging_contexts=charging_contexts,
     )
-    live_consumers = loxone_client.consumers_with_live_nominal_power()
     for consumer in live_consumers:
         lox = (consumer.get("charging_schedule") or {}).get("loxone") or {}
         if lox.get("nominal_power_kw_name"):

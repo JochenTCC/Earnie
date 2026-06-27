@@ -357,6 +357,7 @@ class Config:
                 "soc_at_plug_in_name",
                 "nominal_power_kw_name",
                 "charge_enable_name",
+                "charge_immediate_name",
             ):
                 if raw["loxone"].get(key):
                     loxone[key] = str(raw["loxone"][key]).strip()

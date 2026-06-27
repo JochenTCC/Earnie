@@ -180,8 +180,25 @@ def simulate_horizon(
     verbose: bool = True,
     on_progress=None,
     consumer_daily_targets_kwh: dict[str, float] | None = None,
+    charging_contexts: dict[str, dict] | None = None,
+    matrix_prepared: bool = False,
 ) -> list:
     """Simuliert einen rollierenden Optimierungshorizont über die gesamte Matrix."""
+    if not matrix_prepared:
+        from .charge_immediate import prepare_optimization_matrix
+
+        optimization_matrix, charging_contexts, targets = prepare_optimization_matrix(
+            optimization_matrix,
+            consumer_daily_targets_kwh,
+        )
+        if consumer_daily_targets_kwh is None:
+            consumer_daily_targets_kwh = targets
+    elif charging_contexts is None:
+        charging_contexts = resolve_charging_contexts(
+            optimization_matrix,
+            consumer_daily_targets_kwh,
+        )
+
     chart_rows = []
     sim_soc = initial_soc
     battery_params = battery_params or config.get_battery_params()
@@ -191,7 +208,7 @@ def simulate_horizon(
         optimization_matrix,
         consumer_daily_targets_kwh,
     )
-    charging_contexts = resolve_charging_contexts(
+    charging_contexts = charging_contexts or resolve_charging_contexts(
         optimization_matrix,
         consumer_daily_targets_kwh,
     )
@@ -231,6 +248,9 @@ def simulate_horizon(
         chart_rows.append(chart_row)
         if on_progress is not None:
             on_progress(i + 1, total_steps)
+    from .charge_immediate import apply_immediate_charge_to_chart_rows
+
+    apply_immediate_charge_to_chart_rows(chart_rows, charging_contexts)
     return chart_rows
 
 
@@ -239,6 +259,8 @@ def simulate_24h_horizon(
     initial_soc: float,
     consumer_daily_targets_kwh: dict[str, float] | None = None,
     verbose: bool = True,
+    charging_contexts: dict[str, dict] | None = None,
+    matrix_prepared: bool = False,
 ) -> list:
     """Simuliert den 24-Stunden-Verlauf des SoC."""
     return simulate_horizon(
@@ -246,6 +268,8 @@ def simulate_24h_horizon(
         initial_soc,
         consumer_daily_targets_kwh=consumer_daily_targets_kwh,
         verbose=verbose,
+        charging_contexts=charging_contexts,
+        matrix_prepared=matrix_prepared,
     )
 
 
@@ -400,6 +424,7 @@ def _simulate_single_hour_baseline(
     battery_params: dict,
     flex_kw_override: dict[str, float] | None = None,
     steuerbefehl: str = "Baseline",
+    baseload_kw_override: float | None = None,
 ) -> tuple[float, dict]:
     """Simuliert eine einzelne Stunde im Baseline-Pfad."""
     h = row["hour"]
@@ -411,6 +436,9 @@ def _simulate_single_hour_baseline(
         con = float(row.get("expected_p_total", row["expected_p_act"]) or 0.0)
         total_flex_power = 0.0
         flex_kw = {}
+    elif baseload_kw_override is not None:
+        con = float(baseload_kw_override)
+        total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
     else:
         con = float(row["expected_p_act"] or 0.0)
         total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
@@ -444,7 +472,11 @@ def _simulate_single_hour_baseline(
     return sim_soc, chart_row
 
 
-def simulate_baseline_horizon(optimization_matrix: list, initial_soc: float) -> list:
+def simulate_baseline_horizon(
+    optimization_matrix: list,
+    initial_soc: float,
+    charging_contexts: dict[str, dict] | None = None,
+) -> list:
     """Simuliert den 24h-Verlauf ohne Optimierung: Batterie folgt nur dem aktuellen PV-Überschuss."""
     chart_rows = []
     sim_soc = initial_soc
@@ -452,6 +484,9 @@ def simulate_baseline_horizon(optimization_matrix: list, initial_soc: float) -> 
     for row in optimization_matrix[:24]:
         sim_soc, chart_row = _simulate_single_hour_baseline(row, sim_soc, battery_params)
         chart_rows.append(chart_row)
+    from .charge_immediate import apply_immediate_charge_to_chart_rows
+
+    apply_immediate_charge_to_chart_rows(chart_rows, charging_contexts)
     return chart_rows
 
 
@@ -482,6 +517,9 @@ def simulate_baseline_with_optimized_flex(
             battery_params,
             flex_kw_override=_flex_kw_from_chart_row(optimized_row),
             steuerbefehl="Baseline (Ziel)",
+            baseload_kw_override=float(
+                optimized_row.get("Verbrauch-Prognose (kW)", row["expected_p_act"]) or 0.0
+            ),
         )
         chart_rows.append(chart_row)
     return chart_rows
@@ -514,6 +552,9 @@ def simulate_matched_baseline_horizon(
             steuerbefehl="Baseline (Ziel)",
         )
         chart_rows.append(chart_row)
+    from .charge_immediate import apply_immediate_charge_to_chart_rows
+
+    apply_immediate_charge_to_chart_rows(chart_rows, charging_contexts)
     return chart_rows
 
 
@@ -523,24 +564,31 @@ def calculate_optimization_savings(
     consumer_daily_targets_kwh: dict[str, float] | None = None,
 ) -> dict:
     """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation."""
+    from .charge_immediate import prepare_optimization_matrix
+    from .charging_context import serialize_charging_contexts
+
+    matrix, charging_contexts, targets = prepare_optimization_matrix(
+        optimization_matrix,
+        consumer_daily_targets_kwh,
+    )
     optimized_rows = simulate_24h_horizon(
-        optimization_matrix,
+        matrix,
         initial_soc,
-        consumer_daily_targets_kwh=consumer_daily_targets_kwh,
+        consumer_daily_targets_kwh=targets,
         verbose=False,
+        charging_contexts=charging_contexts,
+        matrix_prepared=True,
     )
-    baseline_rows = simulate_baseline_horizon(optimization_matrix, initial_soc)
+    baseline_rows = simulate_baseline_horizon(
+        matrix, initial_soc, charging_contexts=charging_contexts
+    )
     horizon_targets = resolve_horizon_consumer_targets_kwh(
-        optimization_matrix,
-        consumer_daily_targets_kwh,
-    )
-    charging_contexts = resolve_charging_contexts(
-        optimization_matrix,
-        consumer_daily_targets_kwh,
+        matrix,
+        targets,
     )
     horizon_targets = apply_horizon_charging_limits(horizon_targets, charging_contexts)
     matched_baseline_rows = simulate_matched_baseline_horizon(
-        optimization_matrix,
+        matrix,
         initial_soc,
         horizon_targets,
         charging_contexts,
@@ -557,22 +605,22 @@ def calculate_optimization_savings(
     matched_baseline_kwh = total_consumption_kwh_from_rows(matched_baseline_rows)
     optimized_kwh = total_consumption_kwh_from_rows(optimized_rows)
     applied_targets = build_applied_targets_detail(
-        optimization_matrix,
-        consumer_daily_targets_kwh,
+        matrix,
+        targets,
     )
-    baseline_targets = build_baseline_targets_detail(optimization_matrix)
+    baseline_targets = build_baseline_targets_detail(matrix)
     matched_flex_kwh = (
         delivered_flex_kwh_from_rows(matched_baseline_rows)
         if matched_baseline_rows
         else None
     )
     energy_comparison = build_energy_comparison_detail(
-        optimization_matrix,
-        consumer_daily_targets_kwh,
+        matrix,
+        targets,
         matched_flex_kwh=matched_flex_kwh,
     )
     baseline_same_flex_rows = simulate_baseline_with_optimized_flex(
-        optimization_matrix,
+        matrix,
         optimized_rows,
         initial_soc,
     )
@@ -597,10 +645,11 @@ def calculate_optimization_savings(
         "baseline_consumption_kwh": round(baseline_kwh, 3),
         "matched_baseline_consumption_kwh": round(matched_baseline_kwh, 3),
         "optimized_consumption_kwh": round(optimized_kwh, 3),
-        "baseload_kwh": resolve_baseload_kwh(optimization_matrix),
+        "baseload_kwh": resolve_baseload_kwh(matrix),
         "baseline_targets": baseline_targets,
         "applied_targets": applied_targets,
         "energy_comparison": energy_comparison,
+        "charging_contexts": serialize_charging_contexts(charging_contexts),
         "optimized_rows": optimized_rows,
         "baseline_rows": baseline_rows,
         "matched_baseline_rows": matched_baseline_rows,

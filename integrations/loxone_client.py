@@ -406,6 +406,14 @@ def flex_consumer_pv_follow_value(
     return pv_out
 
 
+def _skip_flexible_consumer_output(
+    consumer: dict,
+    charging_contexts: dict[str, dict],
+) -> bool:
+    ctx = charging_contexts.get(consumer["id"]) or {}
+    return bool(ctx.get("skip_loxone_output"))
+
+
 def _flexible_consumer_output_values(
     consumer: dict,
     consumer_powers: dict[str, float],
@@ -413,6 +421,13 @@ def _flexible_consumer_output_values(
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> dict[str, float]:
     """Berechnet Loxone-Merker → Wert für einen flexiblen Verbraucher (ohne HTTP)."""
+    if _skip_flexible_consumer_output(consumer, charging_contexts):
+        logger.info(
+            "Flex consumer %s -> keine Steuerung (Sofort laden aktiv, Loxone regelt).",
+            consumer["name"],
+        )
+        return {}
+
     outputs = consumer.get("loxone_outputs") or {}
     enable_name = outputs.get("enable_name", "")
     setpoint_name = outputs.get("power_setpoint_name", "")
