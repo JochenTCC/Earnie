@@ -39,7 +39,7 @@ class TestExpectedSnapshotFromRunState:
             snapshot = wd.expected_loxone_snapshot_from_run_state(state)
 
         assert snapshot == {"SoC": 60.0}
-        mock_build.assert_called_once_with(1, 2.0, 60.0, {}, None)
+        mock_build.assert_called_once_with(1, 2.0, 60.0, {}, None, {})
 
 
 class TestVerifyAndRestore:

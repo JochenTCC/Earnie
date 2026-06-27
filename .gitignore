@@ -12,6 +12,7 @@ cons_data_hourly.meta.json
 cons_data_pending.json
 optimizer_run_state.json
 runtime/
+runtime-prod/
 backtesting_log.json
 energy_optimizer.log
 system_history_log.csv
