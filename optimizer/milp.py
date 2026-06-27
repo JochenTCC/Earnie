@@ -1,7 +1,9 @@
 """MILP-Optimierung für Batterie und flexible Verbraucher."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import pulp
@@ -11,6 +13,8 @@ from .charging_context import (
     apply_charging_window_constraints,
     charging_schedule_enabled,
     consumer_charging_eligible_indices,
+    schedule_indices_for_consumer,
+    urgent_charging_indices,
 )
 from .consumer_power import (
     estimate_pv_surplus_kw,
@@ -19,6 +23,8 @@ from .consumer_power import (
     uses_pv_follow,
 )
 from . import battery as bat
+
+logger = logging.getLogger(__name__)
 
 EMPTY_MILP_PLAN = {
     "p_grid_buy": 0.0,
@@ -93,6 +99,25 @@ def add_min_on_time_constraints(
         prob += pulp.lpSum(on_vars[t:t + min_hours]) >= min_hours * (on_vars[t] - prev)
 
 
+def _max_deliverable_kwh(consumer: dict, eligible_indices: list[int]) -> float:
+    _, max_kw = power_limits_kw(consumer)
+    return len(eligible_indices) * max_kw
+
+
+def _delivery_energy_expr(
+    model: MilpHorizonModel,
+    consumer: dict,
+    eligible_indices: list[int],
+):
+    cid = consumer["id"]
+    if uses_power_setpoint(consumer):
+        return pulp.lpSum(model.consumer_p[cid][t] for t in eligible_indices)
+    return pulp.lpSum(
+        consumer["nominal_power_kw"] * model.consumer_on[cid][t]
+        for t in eligible_indices
+    )
+
+
 def filter_feasible_consumers(
     consumers: list,
     remaining_kwh: dict[str, float],
@@ -104,6 +129,7 @@ def filter_feasible_consumers(
     """Entfernt Verbraucher, deren Ziel im verbleibenden Horizont nicht erreichbar ist."""
     feasible = []
     contexts = charging_contexts or {}
+    horizon = len(matrix)
     for consumer in consumers:
         cid = consumer["id"]
         target = remaining_kwh.get(cid, 0.0)
@@ -112,23 +138,28 @@ def filter_feasible_consumers(
         ctx = contexts.get(cid)
         if ctx is not None and not ctx.get("active", True):
             continue
-        eligible = consumer_charging_eligible_indices(
-            matrix, consumer, schedule_indices, ctx
+        consumer_indices = schedule_indices_for_consumer(
+            matrix, horizon, schedule_indices, consumer, ctx
         )
-        capacity_indices = eligible if eligible else schedule_indices
-        _, max_kw = power_limits_kw(consumer)
-        max_deliverable = len(capacity_indices) * max_kw
+        eligible = consumer_charging_eligible_indices(
+            matrix, consumer, consumer_indices, ctx
+        )
+        capacity_indices = eligible if eligible else consumer_indices
+        max_deliverable = _max_deliverable_kwh(consumer, capacity_indices)
         if target > max_deliverable + 1e-6:
             if verbose:
                 sched_hint = ""
                 if charging_schedule_enabled(consumer):
                     sched_hint = f" ({len(eligible)} h im Ladezeitfenster)"
-                print(
-                    f"⚠️ {consumer['name']}: Ziel ({target:.2f} kWh) nicht erreichbar "
-                    f"mit {len(capacity_indices)} h à {max_kw:.2f} kW"
-                    f"{sched_hint}. Wird übersprungen."
+                logger.warning(
+                    "%s: Ziel (%.2f kWh) nicht vollständig erreichbar "
+                    "mit %s h à %.2f kW%s – lade mit Best-Effort.",
+                    consumer["name"],
+                    target,
+                    len(capacity_indices),
+                    power_limits_kw(consumer)[1],
+                    sched_hint,
                 )
-            continue
         feasible.append(consumer)
     return feasible
 
@@ -368,31 +399,45 @@ def _add_consumer_delivery_constraints(
         target = remaining.get(cid, 0.0)
         if target <= 0:
             continue
+        ctx = charging_contexts.get(cid)
+        consumer_indices = schedule_indices_for_consumer(
+            matrix, model.horizon, schedule_indices, consumer, ctx
+        )
         eligible = apply_charging_window_constraints(
             model.prob,
             model.consumer_on,
             matrix[: model.horizon],
             consumer,
-            schedule_indices,
-            charging_contexts.get(cid),
+            consumer_indices,
+            ctx,
             model.consumer_p,
             model.consumer_pv_follow,
         )
         if not eligible:
             if verbose:
-                print(
-                    f"⚠️ {consumer['name']}: Kein zulässiges Ladezeitfenster im Horizont. "
-                    "Flex-Laden wird übersprungen."
+                logger.warning(
+                    "%s: Kein zulässiges Ladezeitfenster im Horizont – Flex-Laden übersprungen.",
+                    consumer["name"],
                 )
             continue
-        if uses_power_setpoint(consumer):
-            delivery = pulp.lpSum(model.consumer_p[cid][t] for t in eligible)
-        else:
-            delivery = pulp.lpSum(
-                consumer["nominal_power_kw"] * model.consumer_on[cid][t]
-                for t in eligible
+        _, max_kw = power_limits_kw(consumer)
+        max_deliverable = _max_deliverable_kwh(consumer, eligible)
+        effective_target = min(target, max_deliverable)
+        model.prob += _delivery_energy_expr(model, consumer, eligible) >= effective_target
+
+        deadline = ctx.get("deadline") if ctx else None
+        if isinstance(deadline, datetime) and effective_target > 1e-6:
+            urgent = urgent_charging_indices(
+                matrix[: model.horizon],
+                eligible,
+                deadline,
+                effective_target,
+                max_kw,
             )
-        model.prob += delivery >= target
+            if urgent:
+                model.prob += (
+                    _delivery_energy_expr(model, consumer, urgent) >= effective_target
+                )
 
 
 def _var_value_at_zero(variables: list) -> float:
@@ -552,24 +597,32 @@ def _log_milp_decision(
     opt_charge = milp_plan["p_charge"]
     opt_discharge = milp_plan["p_discharge"]
     opt_grid_buy = milp_plan["p_grid_buy"]
-    print(f"\n--- 🧮 MILP Optimierungs-Entscheidung für {current_hour}:00 Uhr ---")
-    print(f"Aktueller Brutto-Preis: {matrix[0]['k_act']:.2f} Cent/kWh")
-    print(f"Aktueller Akku-SoC    : {current_soc:.1f}%")
-    print(
-        f"Optimierter Fahrplan  : Ladung={opt_charge:.2f} kW | "
-        f"Entladung={opt_discharge:.2f} kW | Netzbezug={opt_grid_buy:.2f} kW"
+    logger.info(
+        "MILP-Entscheidung %s:00 | Preis=%.2f ct | SoC=%.1f%% | "
+        "Ladung=%.2f kW | Entladung=%.2f kW | Netzbezug=%.2f kW",
+        current_hour,
+        matrix[0]["k_act"],
+        current_soc,
+        opt_charge,
+        opt_discharge,
+        opt_grid_buy,
     )
     for consumer in model.planned_consumers:
         cid = consumer["id"]
         power_now = consumer_powers.get(cid, 0.0)
         planned_kwh = _planned_consumer_kwh(model, consumer)
         pv_flag = consumer_pv_follow.get(cid, 0)
-        mode_txt = f" | pv_follow={pv_flag}" if uses_pv_follow(consumer) else ""
-        print(
-            f"{consumer['name']:<16}: Jetzt={'AN' if power_now > 0 else 'AUS'} "
-            f"({power_now:.2f} kW){mode_txt} | "
-            f"Restziel={remaining.get(cid, 0.0):.2f} kWh | "
-            f"Geplant={planned_kwh:.2f} kWh | min_on={consumer['min_on_quarterhours']} x 15min"
+        mode_txt = f" pv_follow={pv_flag}" if uses_pv_follow(consumer) else ""
+        logger.info(
+            "MILP %s: jetzt=%s (%.2f kW)%s | Restziel=%.2f kWh | "
+            "geplant=%.2f kWh | min_on=%s x 15min",
+            consumer["name"],
+            "AN" if power_now > 0 else "AUS",
+            power_now,
+            mode_txt,
+            remaining.get(cid, 0.0),
+            planned_kwh,
+            consumer["min_on_quarterhours"],
         )
     modi_text = {
         bat.MODE_AUTOMATIK: "AUTOMATIK",
@@ -577,9 +630,11 @@ def _log_milp_decision(
         bat.MODE_ENTLADESPERRE: "ENTLADESPERRE",
         bat.MODE_ZWANGS_ENTLADEN: "ZWANGSENTLADEN",
     }
-    print(
-        f"-> Steuerbefehl Loxone: {modi_text[mode]} "
-        f"(Leistung: {target_power} kW, Ziel-SoC: {target_soc}%)"
+    logger.info(
+        "MILP Steuerbefehl: %s (Leistung=%.2f kW, Ziel-SoC=%.1f%%)",
+        modi_text[mode],
+        target_power,
+        target_soc,
     )
 
 
@@ -605,7 +660,7 @@ def milp_optimizer(
                {consumer_id: pv_follow 0|1}, milp_plan)
     """
     if not matrix:
-        print("🚨 Optimizer-Fehler: Matrix ist leer.")
+        logger.error("MILP: Optimierungsmatrix ist leer.")
         return _AUTOMATIK_FALLBACK
 
     battery_params = battery_params or config.get_battery_params()
@@ -644,17 +699,18 @@ def milp_optimizer(
             target_soc = (
                 current_soc if terminal_soc_percent is None else terminal_soc_percent
             )
-            print(
-                f"🔒 MILP-Randbedingung aktiv: End-SoC = {target_soc:.1f} % "
-                f"(aktuell {current_soc:.1f} %)"
+            logger.info(
+                "MILP End-SoC-Randbedingung: %.1f %% (aktuell %.1f %%)",
+                target_soc,
+                current_soc,
             )
 
     model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
     if pulp.LpStatus[model.prob.status] != "Optimal":
         if verbose:
-            print(
-                f"⚠️ MILP-Solver konnte keine optimale Lösung finden "
-                f"Status: {pulp.LpStatus[model.prob.status]}. Fallback auf Automatik."
+            logger.warning(
+                "MILP ohne optimale Lösung (Status: %s) – Fallback auf Automatik.",
+                pulp.LpStatus[model.prob.status],
             )
         return _AUTOMATIK_FALLBACK
 

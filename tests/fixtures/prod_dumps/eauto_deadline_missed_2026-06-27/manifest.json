@@ -1,0 +1,22 @@
+{
+  "id": "eauto_deadline_missed_2026-06-27",
+  "title": "E-Auto nicht voll bis Fertig-Uhrzeit",
+  "symptom": "Nur ca. 6.6 kWh Ist-Ladung statt 16 kWh bis 09:30 (Prod v1.9.3)",
+  "recorded_at": "2026-06-27",
+  "app_version": "1.9.3",
+  "archived_at": "2026-06-27T09:31:12+00:00",
+  "files": [
+    "optimization_history.jsonl",
+    "flexible_consumers_state.json",
+    "optimizer_run_state.json",
+    "live_optimization_debug.json",
+    "pv_counter_state.json"
+  ],
+  "regression": {
+    "session_start": "2026-06-26T18:22:00",
+    "deadline": "2026-06-27T09:30:00",
+    "target_kwh": 16.0,
+    "observed_live_kwh_max": 6.6,
+    "min_schedule_indices_from_22h": 10
+  }
+}

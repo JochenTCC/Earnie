@@ -1,0 +1,24 @@
+#!/bin/sh
+# Bricht den Commit ab, wenn pytest tests fehlschlägt.
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+if [ -x ".venv/Scripts/python.exe" ]; then
+  PYTHON=".venv/Scripts/python.exe"
+elif [ -x ".venv/bin/python" ]; then
+  PYTHON=".venv/bin/python"
+else
+  PYTHON="python"
+fi
+
+if ! command -v "$PYTHON" >/dev/null 2>&1 && ! [ -x "$PYTHON" ]; then
+  echo "pre-commit: Python nicht gefunden (erwartet .venv oder python im PATH)." >&2
+  exit 1
+fi
+
+echo "pre-commit: Starte Testsuite (pytest tests) ..."
+"$PYTHON" -m pytest tests -q
+
+echo "pre-commit: Tests bestanden."

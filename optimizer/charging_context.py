@@ -438,6 +438,74 @@ def resolve_charging_contexts(
     return contexts
 
 
+def hours_needed_to_deliver(remaining_kwh: float, max_kw: float) -> float:
+    """Benötigte Volllast-Stunden für verbleibende Energie (5 % Puffer)."""
+    if max_kw <= 1e-9 or remaining_kwh <= 1e-9:
+        return 0.0
+    return (remaining_kwh / max_kw) * 1.05
+
+
+def latest_start_datetime(
+    deadline: datetime,
+    remaining_kwh: float,
+    max_kw: float,
+) -> datetime:
+    """Spätester Beginn, damit remaining_kwh vor deadline bei max_kw geliefert werden kann."""
+    hours = hours_needed_to_deliver(remaining_kwh, max_kw)
+    if hours <= 0:
+        return deadline
+    return deadline - timedelta(hours=hours)
+
+
+def urgent_charging_indices(
+    matrix: list,
+    eligible_indices: list[int],
+    deadline: datetime,
+    remaining_kwh: float,
+    max_kw: float,
+) -> list[int]:
+    """Horizont-Slots ab spätestem Ladebeginn bis Deadline (harte Frist)."""
+    if not eligible_indices or remaining_kwh <= 1e-9:
+        return []
+    must_start = latest_start_datetime(deadline, remaining_kwh, max_kw)
+    urgent = [
+        t
+        for t in eligible_indices
+        if must_start <= matrix_slot_datetime(matrix, t) < deadline
+    ]
+    return urgent if urgent else list(eligible_indices)
+
+
+def schedule_indices_for_consumer(
+    matrix: list,
+    horizon: int,
+    default_indices: list[int],
+    consumer: dict,
+    charging_context: dict | None,
+) -> list[int]:
+    """Tages- oder Deadline-Horizont: bei Fertigstellungszeit alle Slots bis Deadline."""
+    ctx = charging_context or {}
+    deadline = ctx.get("deadline")
+    if ctx.get("active", True) and isinstance(deadline, datetime):
+        return consumer_charging_eligible_indices(
+            matrix, consumer, list(range(horizon)), ctx
+        )
+    return default_indices
+
+
+def serialize_charging_contexts(contexts: dict[str, dict]) -> dict[str, dict]:
+    """Datetime-Felder für JSON-Logs in ISO-Strings wandeln."""
+    serialized: dict[str, dict] = {}
+    for cid, ctx in contexts.items():
+        row = dict(ctx)
+        for key in ("deadline", "available_from"):
+            value = row.get(key)
+            if isinstance(value, datetime):
+                row[key] = value.isoformat(timespec="seconds")
+        serialized[cid] = row
+    return serialized
+
+
 def apply_horizon_charging_limits(
     horizon_limits: dict[str, float],
     charging_contexts: dict[str, dict],

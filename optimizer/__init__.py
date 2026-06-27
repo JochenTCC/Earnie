@@ -15,6 +15,13 @@ from . import schedule
 from .charging_context import (
     apply_horizon_charging_limits as _apply_horizon_charging_limits,
     resolve_charging_contexts,
+    serialize_charging_contexts,
+)
+from .charging_session import (
+    add_session_delivery,
+    is_charging_session_context,
+    normalize_consumer_state,
+    session_delivered_kwh,
 )
 from .battery import (
     MODE_AUTOMATIK,
@@ -83,6 +90,7 @@ __all__ = [
     "resolve_applied_daily_targets",
     "resolve_baseload_kwh",
     "resolve_charging_contexts",
+    "serialize_charging_contexts",
     "resolve_horizon_consumer_targets_kwh",
     "simulate_24h_horizon",
     "simulate_baseline_horizon",
@@ -133,10 +141,23 @@ def _active_consumers(consumers: list | None = None) -> list:
     return consumers if consumers is not None else config.get_flexible_consumers(optimizer_only=True)
 
 
-def _load_consumer_state() -> dict:
+def _consumers_by_id(consumers: list | None = None) -> dict[str, dict]:
+    return {consumer["id"]: consumer for consumer in _active_consumers(consumers)}
+
+
+def _load_consumer_state(
+    charging_contexts: dict[str, dict] | None = None,
+    consumers: list | None = None,
+) -> dict:
     today = datetime.now().date().isoformat()
+    consumers_by_id = _consumers_by_id(consumers)
     if not os.path.exists(CONSUMER_STATE_FILE):
-        return {"date": today, "delivered": {}}
+        return normalize_consumer_state(
+            {"date": today, "delivered": {}, "charging_sessions": {}},
+            today,
+            charging_contexts,
+            consumers_by_id,
+        )
     try:
         with open(CONSUMER_STATE_FILE, "r", encoding="utf-8") as f:
             state = json.load(f)
@@ -149,14 +170,14 @@ def _load_consumer_state() -> dict:
                 CONSUMER_STATE_SCHEMA,
             )
         state = strip_metadata(state)
-        if state.get("date") != today:
-            return {"date": today, "delivered": {}}
-        delivered = state.get("delivered", {})
-        if not isinstance(delivered, dict):
-            return {"date": today, "delivered": {}}
-        return {"date": today, "delivered": delivered}
+        return normalize_consumer_state(state, today, charging_contexts, consumers_by_id)
     except (json.JSONDecodeError, OSError, TypeError, ValueError):
-        return {"date": today, "delivered": {}}
+        return normalize_consumer_state(
+            {"date": today, "delivered": {}, "charging_sessions": {}},
+            today,
+            charging_contexts,
+            consumers_by_id,
+        )
 
 
 def _save_consumer_state(state: dict) -> None:
@@ -169,27 +190,37 @@ def get_consumer_remaining_kwh(
     consumers: list | None = None,
     optimization_matrix: list | None = None,
     consumer_daily_targets_kwh: dict | None = None,
+    charging_contexts: dict[str, dict] | None = None,
 ) -> dict[str, float]:
     """Verbleibende Zielenergie aller optimierbaren Verbraucher (inkl. Loxone E-Auto)."""
     from data import consumer_targets
     active = _active_consumers(consumers)
-    state = _load_consumer_state()
+    contexts = charging_contexts
+    if contexts is None and optimization_matrix is not None:
+        contexts = resolve_charging_contexts(
+            optimization_matrix, consumer_daily_targets_kwh
+        )
+    state = _load_consumer_state(contexts, active)
     delivered = state.get("delivered", {})
+    sessions = state.get("charging_sessions", {})
+    consumers_by_id = _consumers_by_id(active)
     if optimization_matrix is not None:
         daily_targets = resolve_horizon_consumer_targets_kwh(
             optimization_matrix, consumer_daily_targets_kwh
         )
-        charging_contexts = resolve_charging_contexts(
-            optimization_matrix, consumer_daily_targets_kwh
-        )
-        daily_targets = _apply_horizon_charging_limits(daily_targets, charging_contexts)
+        if contexts is not None:
+            daily_targets = _apply_horizon_charging_limits(daily_targets, contexts)
     else:
         daily_targets = consumer_targets.resolve_consumer_daily_targets()
     remaining = {}
     for consumer in active:
         cid = consumer["id"]
         daily_target = float(daily_targets.get(cid, consumer["daily_target_kwh"]))
-        already = float(delivered.get(cid, 0.0))
+        ctx = (contexts or {}).get(cid)
+        if is_charging_session_context(consumer, ctx):
+            already = session_delivered_kwh(sessions, cid)
+        else:
+            already = float(delivered.get(cid, 0.0))
         remaining[cid] = max(0.0, daily_target - already)
     return remaining
 
@@ -199,17 +230,32 @@ def _optimization_interval_hours() -> float:
     return schedule.optimization_interval_hours()
 
 
-def register_consumer_hours(consumer_powers: dict[str, float]) -> None:
+def register_consumer_hours(
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict] | None = None,
+    consumers: list | None = None,
+) -> None:
     """Bucht die gelieferte Energie aller Verbraucher im aktuellen Optimierungsintervall."""
     if not consumer_powers:
         return
     interval_h = _optimization_interval_hours()
-    state = _load_consumer_state()
+    active = _active_consumers(consumers)
+    consumers_by_id = _consumers_by_id(active)
+    state = _load_consumer_state(charging_contexts, active)
     delivered = dict(state.get("delivered", {}))
+    sessions = dict(state.get("charging_sessions", {}))
     for cid, power_kw in consumer_powers.items():
-        if power_kw > 0:
-            delivered[cid] = round(float(delivered.get(cid, 0.0)) + power_kw * interval_h, 3)
+        if power_kw <= 0:
+            continue
+        delta_kwh = power_kw * interval_h
+        consumer = consumers_by_id.get(cid)
+        ctx = (charging_contexts or {}).get(cid)
+        if consumer is not None and is_charging_session_context(consumer, ctx):
+            add_session_delivery(sessions, cid, delta_kwh)
+        else:
+            delivered[cid] = round(float(delivered.get(cid, 0.0)) + delta_kwh, 3)
     state["delivered"] = delivered
+    state["charging_sessions"] = sessions
     _save_consumer_state(state)
 
 

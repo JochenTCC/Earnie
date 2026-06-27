@@ -106,6 +106,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     consumer_remaining = optimizer.get_consumer_remaining_kwh(
         consumer_daily_targets_kwh=targets,
         optimization_matrix=optimization_matrix,
+        charging_contexts=charging_contexts,
     )
     live_consumers = loxone_client.consumers_with_live_nominal_power()
     for consumer in live_consumers:
@@ -135,7 +136,11 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         battery_params["max_power_kw"],
     )
     if not event_run:
-        optimizer.register_consumer_hours(consumer_powers)
+        optimizer.register_consumer_hours(
+            consumer_powers,
+            charging_contexts=charging_contexts,
+            consumers=live_consumers,
+        )
 
     logger.info(
         "Berechnete Werte für Loxone -> MODE: %s | TARGET_POWER: %s kW | "
@@ -210,6 +215,10 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "consumer_powers_kw": {
                 k: round(float(v), 3) for k, v in consumer_powers.items()
             },
+            "consumer_remaining_kwh": {
+                k: round(float(v), 3) for k, v in consumer_remaining.items()
+            },
+            "charging_contexts": optimizer.serialize_charging_contexts(charging_contexts),
             "consumer_pv_follow": {
                 k: int(v) for k, v in consumer_pv_follow.items()
             },
