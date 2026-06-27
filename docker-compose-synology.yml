@@ -38,6 +38,8 @@ x-persist-volumes: &persist-volumes
 x-common-env: &common-env
   TZ: Europe/Vienna
   ENERGY_OPTIMIZER_CONFIG_PATH: config/config.json
+  # Loxone-Smoke-Test beim Worker-Start (nach pull/up); siehe scripts/startup_checks.py
+  ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START: "1"
 
 services:
   optimizer-worker:

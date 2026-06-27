@@ -288,12 +288,20 @@ class Config:
         return efficiency
 
     @staticmethod
-    def target_kwh_from_rest_soc(consumer: dict, rest_soc_percent: float | None) -> float | None:
+    def target_kwh_from_rest_soc(
+        consumer: dict,
+        rest_soc_percent: float | None,
+        *,
+        capacity_kwh: float | None = None,
+    ) -> float | None:
         """Berechnet Ladeziel (kWh) aus Rest-SOC (%), Kapazität und Lade-Wirkungsgrad."""
         if rest_soc_percent is None:
             return None
         sched = consumer.get("charging_schedule") or {}
-        capacity = float(sched.get("battery_capacity_kwh", 0.0) or 0.0)
+        if capacity_kwh is not None:
+            capacity = float(capacity_kwh)
+        else:
+            capacity = float(sched.get("battery_capacity_kwh", 0.0) or 0.0)
         if capacity <= 0:
             return None
         target_soc = float(sched.get("target_soc_percent", 100.0) or 100.0)
@@ -356,6 +364,8 @@ class Config:
                 "ready_by_time_name",
                 "soc_at_plug_in_name",
                 "nominal_power_kw_name",
+                "battery_capacity_kwh_name",
+                "charge_immediate_remaining_name",
                 "charge_enable_name",
                 "charge_immediate_name",
             ):

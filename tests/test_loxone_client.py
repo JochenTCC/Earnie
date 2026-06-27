@@ -203,7 +203,9 @@ class TestFlexibleConsumerHelpers:
             },
         }
         ctx = {"eauto": {"skip_loxone_output": True}}
-        assert lc._flexible_consumer_output_values(consumer, {"eauto": 3.5}, ctx) == {}
+        assert lc._flexible_consumer_output_values(consumer, {"eauto": 3.5}, ctx) == {
+            "Ernie_EAuto_pv_follow": 0.0,
+        }
 
     def test_flex_consumer_setpoint_clamped(self):
         consumer = {
@@ -248,6 +250,48 @@ class TestFlexibleConsumerHelpers:
     def test_resolve_nominal_power_fallback_on_missing_io(self):
         consumer = {"id": "x", "nominal_power_kw": 1.6, "charging_schedule": {"loxone": {}}}
         assert lc.resolve_consumer_nominal_power_kw(consumer) == 1.6
+
+    def test_resolve_battery_capacity_from_loxone(self):
+        consumer = {
+            "id": "eauto",
+            "charging_schedule": {
+                "battery_capacity_kwh": 16.0,
+                "loxone": {"battery_capacity_kwh_name": "Batteriekapazität_E-Auto"},
+            },
+        }
+        with patch.object(lc, "fetch_loxone_raw_value", return_value="77 kWh"):
+            assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(77.0)
+
+    def test_resolve_battery_capacity_fallback(self):
+        consumer = {
+            "id": "eauto",
+            "charging_schedule": {
+                "battery_capacity_kwh": 16.0,
+                "loxone": {"battery_capacity_kwh_name": "Batteriekapazität_E-Auto"},
+            },
+        }
+        with patch.object(lc, "fetch_loxone_raw_value", return_value=None):
+            assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(16.0)
+
+    def test_fetch_charge_immediate_remaining_seconds(self):
+        consumer = {
+            "id": "eauto",
+            "charging_schedule": {
+                "loxone": {"charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen"},
+            },
+        }
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=5400.0):
+            assert lc.fetch_charge_immediate_remaining_seconds(consumer) == pytest.approx(5400.0)
+
+    def test_fetch_charge_immediate_remaining_seconds_invalid(self):
+        consumer = {
+            "id": "eauto",
+            "charging_schedule": {
+                "loxone": {"charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen"},
+            },
+        }
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=-1.0):
+            assert lc.fetch_charge_immediate_remaining_seconds(consumer) is None
 
 
 class TestBuildSentSnapshot:

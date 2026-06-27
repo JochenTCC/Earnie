@@ -86,6 +86,20 @@ docker compose -f docker-compose-synology.yml pull
 docker compose -f docker-compose-synology.yml up -d
 ```
 
+Der **optimizer-worker** führt beim Start automatisch `verify_loxone_setup` aus (alle konfigurierten Merker inkl. neuer E-Auto-Signale). Ergebnis steht in `runtime/energy_optimizer.log` unter `[loxone-verify]`. Optional:
+
+| Variable | Wirkung |
+|----------|---------|
+| `ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START=0` | Prüfung aus |
+| `ENERGY_OPTIMIZER_SKIP_LOXONE_VERIFY=1` | Prüfung aus |
+| `ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY=1` | Container startet nicht, wenn eine Prüfung fehlschlägt |
+
+Manuell (z. B. nach Config-Änderung ohne Neustart):
+
+```powershell
+python -m scripts.verify_loxone_setup
+```
+
 `docker-compose-synology.yml` referenziert `ghcr.io/jochentcc/ernie-energy:latest`.
 
 ### 3. Lokaler Test vor dem NAS-Deploy

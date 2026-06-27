@@ -336,7 +336,10 @@ def fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> di
         if lox.get("soc_at_plug_in_name")
         else None
     )
-    target_kwh = config.Config.target_kwh_from_rest_soc(consumer, soc_val)
+    capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    target_kwh = config.Config.target_kwh_from_rest_soc(
+        consumer, soc_val, capacity_kwh=capacity_kwh
+    )
     return {
         "active": True,
         "plugged_in": True,

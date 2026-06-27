@@ -24,6 +24,7 @@ def _eauto_consumer() -> dict:
             "loxone": {
                 "plugged_in_name": "Ernie_EAuto_Da",
                 "charge_immediate_name": "E-Auto_SOFORT_LADEN",
+                "charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen",
             },
         },
     }
@@ -77,10 +78,18 @@ class TestImmediateChargingActive:
 
 
 class TestImmediateHorizon:
-    def test_planning_horizon_is_six_hours(self):
-        assert ci.immediate_horizon_hours(10.0, 3.5, 24, consumer_id="eauto") == 6
-        assert ci.immediate_horizon_hours(0.0, 3.5, 24, consumer_id="eauto") == 6
-        assert ci.immediate_horizon_hours(10.0, 3.5, 4, consumer_id="eauto") == 4
+    def test_slots_from_loxone_remaining_seconds(self):
+        assert ci.immediate_horizon_slots(7200.0, 24) == 2
+        assert ci.immediate_horizon_slots(3600.0, 24) == 1
+        assert ci.immediate_horizon_slots(3601.0, 24) == 2
+        assert ci.immediate_horizon_slots(1.0, 24) == 1
+
+    def test_zero_or_missing_remaining_seconds(self):
+        assert ci.immediate_horizon_slots(0.0, 24) == 0
+        assert ci.immediate_horizon_slots(None, 24) == 0
+
+    def test_capped_by_matrix_horizon(self):
+        assert ci.immediate_horizon_slots(86400.0, 4) == 4
 
 
 class TestImmediateMatrix:
@@ -165,6 +174,18 @@ class TestMainStateFallback:
         labels = ci.merge_immediate_charging_labels({}, main_state)
         assert labels == ["eauto: 3.479 kW live (Sofort-Laden)"]
 
+    def test_labels_show_loxone_remaining_hours(self):
+        contexts = {
+            "eauto": {
+                "immediate_charge": True,
+                "immediate_charge_kw": 3.5,
+                "immediate_remaining_hours": 2.5,
+            }
+        }
+        assert ci.immediate_charging_labels(contexts) == [
+            "eauto: 3.5 kW fix (noch 2.5 h, Loxone)"
+        ]
+
 
 class TestChartDisplay:
     def test_apply_immediate_charge_chart_display_splits_baseload(self):
@@ -194,7 +215,13 @@ class TestChartDisplay:
 class TestEnrichContext:
     def test_enrich_sets_skip_loxone_output(self):
         consumer = _eauto_consumer()
-        with patch.object(ci, "fetch_charge_immediate_switch", return_value=True):
+        with (
+            patch.object(ci, "fetch_charge_immediate_switch", return_value=True),
+            patch(
+                "integrations.loxone_client.fetch_charge_immediate_remaining_seconds",
+                return_value=7200.0,
+            ),
+        ):
             result = ci.enrich_context_with_immediate_charge(
                 consumer,
                 _plugged_context(),
@@ -205,6 +232,25 @@ class TestEnrichContext:
         assert result["active"] is False
         assert result["skip_loxone_output"] is True
         assert result["immediate_charge_kw"] == 3.5
+        assert result["immediate_horizon_hours"] == 2
+        assert result["immediate_remaining_hours"] == 2.0
+
+    def test_enrich_unchanged_when_remaining_seconds_zero(self):
+        consumer = _eauto_consumer()
+        base = _plugged_context()
+        with (
+            patch.object(ci, "fetch_charge_immediate_switch", return_value=True),
+            patch(
+                "integrations.loxone_client.fetch_charge_immediate_remaining_seconds",
+                return_value=0.0,
+            ),
+        ):
+            assert (
+                ci.enrich_context_with_immediate_charge(
+                    consumer, base, live_kw=3.5, horizon=24
+                )
+                is base
+            )
 
     def test_enrich_unchanged_without_io_name(self):
         consumer = _eauto_consumer()

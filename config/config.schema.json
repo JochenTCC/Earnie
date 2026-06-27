@@ -496,6 +496,14 @@
               "type": "string",
               "description": "Max. Ladeleistung in kW (live gelesen für die Optimierung; Fallback: nominal_power_kw in config)."
             },
+            "battery_capacity_kwh_name": {
+              "type": "string",
+              "description": "Akkukapazität in kWh (live aus Loxone; Fallback: battery_capacity_kwh in config)."
+            },
+            "charge_immediate_remaining_name": {
+              "type": "string",
+              "description": "Verbleibende Sofort-Ladezeit in Sekunden (Loxone-Countdown; 0 = abgeschlossen)."
+            },
             "charge_enable_name": {
               "type": "string",
               "description": "Alternative zu loxone_outputs.enable_name (Legacy, nur E-Auto)."

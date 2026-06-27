@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import math
 from typing import Any
 
 import config
@@ -12,13 +13,19 @@ from optimizer.event_trigger import parse_binary_value
 
 logger = logging.getLogger(__name__)
 
-IMMEDIATE_CHARGE_PLANNING_HOURS = 6
+_SECONDS_PER_HOUR = 3600.0
 
 
 def charge_immediate_io_name(consumer: dict) -> str:
     sched = consumer.get("charging_schedule") or {}
     lox = sched.get("loxone") or {}
     return str(lox.get("charge_immediate_name", "")).strip()
+
+
+def charge_immediate_remaining_io_name(consumer: dict) -> str:
+    sched = consumer.get("charging_schedule") or {}
+    lox = sched.get("loxone") or {}
+    return str(lox.get("charge_immediate_remaining_name", "")).strip()
 
 
 def fetch_charge_immediate_switch(consumer: dict) -> bool | None:
@@ -54,19 +61,13 @@ def is_immediate_charging_active(
     return False
 
 
-def immediate_horizon_hours(
-    remaining_kwh: float,
-    max_kw: float,
-    horizon: int,
-    *,
-    consumer_id: str,
-) -> int:
-    if max_kw <= 1e-9:
-        raise ValueError(
-            f"Verbraucher '{consumer_id}': max_kw muss > 0 sein für Sofort-Laden."
-        )
-    del remaining_kwh
-    return min(int(horizon), IMMEDIATE_CHARGE_PLANNING_HOURS)
+def immediate_horizon_slots(remaining_seconds: float | None, matrix_horizon: int) -> int:
+    """Anzahl Matrix-Stunden mit Sofort-Laden aus Loxone-Restzeit (Sekunden)."""
+    if remaining_seconds is None or remaining_seconds <= 0:
+        return 0
+    hours = float(remaining_seconds) / _SECONDS_PER_HOUR
+    slots = int(math.ceil(hours - 1e-9))
+    return min(max(0, slots), int(matrix_horizon))
 
 
 def build_immediate_context(
@@ -75,16 +76,17 @@ def build_immediate_context(
     *,
     live_kw: float | None,
     max_kw: float,
-    horizon: int,
+    horizon_slots: int,
+    remaining_seconds: float,
 ) -> dict:
     threshold = charging_power_threshold_kw()
-    target_kwh = base_context.get("target_kwh")
-    remaining = float(target_kwh) if target_kwh is not None else max_kw
 
     if live_kw is not None and live_kw >= threshold:
         current_kw = round(float(live_kw), 3)
     else:
         current_kw = round(max_kw, 3)
+
+    remaining_hours = round(float(remaining_seconds) / _SECONDS_PER_HOUR, 2)
 
     return {
         **base_context,
@@ -93,9 +95,9 @@ def build_immediate_context(
         "skip_loxone_output": True,
         "immediate_charge_kw": round(max_kw, 3),
         "immediate_charge_current_kw": current_kw,
-        "immediate_horizon_hours": immediate_horizon_hours(
-            remaining, max_kw, horizon, consumer_id=consumer["id"]
-        ),
+        "immediate_horizon_hours": int(horizon_slots),
+        "immediate_remaining_seconds": round(float(remaining_seconds), 1),
+        "immediate_remaining_hours": remaining_hours,
         "source_label": "loxone (Sofort laden, Volllast)",
     }
 
@@ -121,17 +123,41 @@ def enrich_context_with_immediate_charge(
     ):
         return context
 
+    remaining_seconds = loxone_client.fetch_charge_immediate_remaining_seconds(consumer)
+    horizon_slots = immediate_horizon_slots(remaining_seconds, horizon)
+    if horizon_slots <= 0:
+        if remaining_seconds is None:
+            logger.warning(
+                "%s: Sofort-Laden aktiv, aber keine gültige Restladezeit von Loxone "
+                "(%s) – keine Planung als fixer Verbraucher.",
+                consumer["name"],
+                charge_immediate_remaining_io_name(consumer) or "?",
+            )
+        else:
+            logger.info(
+                "%s: Sofort-Laden aktiv, Restladezeit abgelaufen – keine Planung.",
+                consumer["name"],
+            )
+        return context
+
     _, max_kw = power_limits_kw(consumer)
     result = build_immediate_context(
-        consumer, context, live_kw=live_kw, max_kw=max_kw, horizon=horizon
+        consumer,
+        context,
+        live_kw=live_kw,
+        max_kw=max_kw,
+        horizon_slots=horizon_slots,
+        remaining_seconds=float(remaining_seconds),
     )
     logger.info(
-        "%s: Sofort-Laden aktiv (%s=1) – %.2f kW fix für bis zu %s h, "
-        "keine flexible MILP-Planung.",
+        "%s: Sofort-Laden aktiv (%s=1) – %.2f kW fix für noch %.2f h "
+        "(%s s, %s Slots), keine flexible MILP-Planung.",
         consumer["name"],
         charge_immediate_io_name(consumer),
         result["immediate_charge_kw"],
-        result["immediate_horizon_hours"],
+        result["immediate_remaining_hours"],
+        int(remaining_seconds),
+        horizon_slots,
     )
     return result
 
@@ -319,10 +345,17 @@ def immediate_charging_labels(contexts: dict[str, dict]) -> list[str]:
     for cid, ctx in contexts.items():
         if not ctx.get("immediate_charge"):
             continue
-        labels.append(
-            f"{cid}: {ctx.get('immediate_charge_kw')} kW fix "
-            f"(bis {ctx.get('immediate_horizon_hours')} h)"
-        )
+        remaining_h = ctx.get("immediate_remaining_hours")
+        if remaining_h is not None:
+            labels.append(
+                f"{cid}: {ctx.get('immediate_charge_kw')} kW fix "
+                f"(noch {remaining_h} h, Loxone)"
+            )
+        else:
+            labels.append(
+                f"{cid}: {ctx.get('immediate_charge_kw')} kW fix "
+                f"(bis {ctx.get('immediate_horizon_hours')} h)"
+            )
     return labels
 
 

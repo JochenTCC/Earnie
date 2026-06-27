@@ -246,6 +246,9 @@ if __name__ == "__main__":
     config.reinit_config()
     logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
     log_config_drift(logging.getLogger("main"))
+    from scripts.startup_checks import run_loxone_verify_on_startup
+
+    run_loxone_verify_on_startup()
     try:
         ensure_single_instance("main")
     except SingleInstanceError as exc:

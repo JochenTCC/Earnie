@@ -130,7 +130,9 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
             ("plugged_in_name", f"Verbraucher {cid} angeschlossen"),
             ("soc_at_plug_in_name", f"Verbraucher {cid} Rest-SoC"),
             ("nominal_power_kw_name", f"Verbraucher {cid} Nennleistung"),
+            ("battery_capacity_kwh_name", f"Verbraucher {cid} Akkukapazität"),
             ("charge_immediate_name", f"Verbraucher {cid} Sofort laden"),
+            ("charge_immediate_remaining_name", f"Verbraucher {cid} Restladezeit Sofort"),
         ):
             io_name = lox.get(key, "")
             if io_name:

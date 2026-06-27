@@ -1,4 +1,5 @@
 # loxone_client.py
+import math
 import os
 from ftplib import FTP, all_errors as ftp_errors
 from typing import Optional
@@ -146,6 +147,100 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
         )
         return fallback
     return float(live)
+
+
+def resolve_consumer_battery_capacity_kwh(consumer: dict) -> float | None:
+    """Akkukapazität (kWh): live aus Loxone, sonst Fallback aus charging_schedule."""
+    sched = consumer.get("charging_schedule") or {}
+    fallback = float(sched.get("battery_capacity_kwh", 0.0) or 0.0)
+    lox = sched.get("loxone") or {}
+    io_name = lox.get("battery_capacity_kwh_name", "")
+    if not io_name:
+        return fallback if fallback > 0 else None
+
+    raw = fetch_loxone_raw_value(io_name)
+    if raw is None:
+        logger.warning(
+            "Loxone: Keine gültige Akkukapazität für '%s' (%s), Fallback %.2f kWh",
+            consumer.get("id"),
+            io_name,
+            fallback,
+        )
+        return fallback if fallback > 0 else None
+
+    try:
+        value, unit = _parse_loxone_value(raw)
+    except ValueError as e:
+        logger.error(
+            "Loxone: Parsing-Fehler bei Akkukapazität '%s' (raw=%r): %s",
+            io_name,
+            raw,
+            e,
+        )
+        return fallback if fallback > 0 else None
+
+    if unit is not None and unit not in ("kwh", "kw", ""):
+        logger.warning(
+            "Loxone: Unbekannte Einheit '%s' bei Akkukapazität '%s' (%s), Fallback %.2f kWh",
+            unit,
+            consumer.get("id"),
+            io_name,
+            fallback,
+        )
+        return fallback if fallback > 0 else None
+
+    if value <= 0:
+        logger.warning(
+            "Loxone: Keine gültige Akkukapazität für '%s' (%s, raw=%r), Fallback %.2f kWh",
+            consumer.get("id"),
+            io_name,
+            raw,
+            fallback,
+        )
+        return fallback if fallback > 0 else None
+    return float(value)
+
+
+def fetch_charge_immediate_remaining_seconds(consumer: dict) -> float | None:
+    """Verbleibende Sofort-Ladezeit in Sekunden (Loxone-Countdown)."""
+    sched = consumer.get("charging_schedule") or {}
+    lox = sched.get("loxone") or {}
+    io_name = str(lox.get("charge_immediate_remaining_name", "")).strip()
+    if not io_name:
+        logger.warning(
+            "Verbraucher '%s': charge_immediate_remaining_name fehlt in der Config.",
+            consumer.get("id"),
+        )
+        return None
+
+    raw = fetch_loxone_generic_value(io_name)
+    if raw is None:
+        logger.warning(
+            "Loxone: Keine Restladezeit für '%s' (%s).",
+            consumer.get("id"),
+            io_name,
+        )
+        return None
+
+    try:
+        seconds = float(raw)
+    except (TypeError, ValueError):
+        logger.error(
+            "Loxone: Parsing-Fehler bei Restladezeit '%s' (raw=%r).",
+            io_name,
+            raw,
+        )
+        return None
+
+    if not math.isfinite(seconds) or seconds < 0:
+        logger.warning(
+            "Loxone: Ungültige Restladezeit für '%s' (%s, raw=%r).",
+            consumer.get("id"),
+            io_name,
+            raw,
+        )
+        return None
+    return seconds
 
 
 def consumers_with_live_nominal_power(consumers: list | None = None) -> list:
@@ -421,17 +516,25 @@ def _flexible_consumer_output_values(
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> dict[str, float]:
     """Berechnet Loxone-Merker → Wert für einen flexiblen Verbraucher (ohne HTTP)."""
+    outputs = consumer.get("loxone_outputs") or {}
+    pv_follow_name = str(outputs.get("pv_follow_name", "")).strip()
+
     if _skip_flexible_consumer_output(consumer, charging_contexts):
+        if pv_follow_name:
+            logger.info(
+                "Flex consumer %s -> Sofort laden: %s=0 (kein Lade-Sollwert von Ernie).",
+                consumer["name"],
+                pv_follow_name,
+            )
+            return {pv_follow_name: 0.0}
         logger.info(
             "Flex consumer %s -> keine Steuerung (Sofort laden aktiv, Loxone regelt).",
             consumer["name"],
         )
         return {}
 
-    outputs = consumer.get("loxone_outputs") or {}
     enable_name = outputs.get("enable_name", "")
     setpoint_name = outputs.get("power_setpoint_name", "")
-    pv_follow_name = outputs.get("pv_follow_name", "")
     cid = consumer["id"]
     values: dict[str, float] = {}
 

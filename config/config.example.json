@@ -120,6 +120,8 @@
                     "ready_by_time_name": "EAuto_FertigUm",
                     "soc_at_plug_in_name": "EAuto_SOC_bei_Anschluss",
                     "charge_immediate_name": "EAuto_SOFORT_LADEN",
+                    "charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen",
+                    "battery_capacity_kwh_name": "Batteriekapazität_E-Auto",
                     "nominal_power_kw_name": "EAuto_MaxLeistung"
                 }
             }
