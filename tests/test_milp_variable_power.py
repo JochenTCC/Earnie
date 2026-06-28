@@ -46,7 +46,7 @@ def _eauto_consumer() -> dict:
     def test_partial_power_when_target_below_max(self):
         consumers = [_eauto_consumer()]
         matrix = _matrix(6)
-        _, _, _, powers, pv_follow, _ = milp_optimizer(
+        _, _, _, powers, pv_follow, _, _ = milp_optimizer(
             matrix,
             current_hour=0,
             current_soc=50.0,

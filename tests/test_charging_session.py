@@ -110,3 +110,22 @@ class TestDeadlineHelpers:
         urgent = cc.urgent_charging_indices(matrix, eligible, deadline, 16.0, 3.5)
         first_slot = cc.matrix_slot_datetime(matrix, urgent[0])
         assert first_slot >= cc.latest_start_datetime(deadline, 16.0, 3.5)
+
+    def test_split_eligible_separates_optional_and_urgent(self):
+        start = datetime(2026, 6, 28, 9, 0)
+        matrix = _hour_matrix(start, 24)
+        deadline = datetime(2026, 6, 29, 7, 45)
+        eligible = list(range(23))
+        pre, urgent = cc.split_eligible_by_urgent_deadline(
+            matrix, eligible, deadline, 8.0, 3.5
+        )
+        assert pre
+        assert urgent
+        assert set(pre) & set(urgent) == set()
+        assert set(pre) | set(urgent) == set(eligible)
+        assert cc.matrix_slot_datetime(matrix, pre[-1]) < cc.latest_start_datetime(
+            deadline, 8.0, 3.5
+        )
+        assert cc.matrix_slot_datetime(matrix, urgent[0]) >= cc.latest_start_datetime(
+            deadline, 8.0, 3.5
+        )

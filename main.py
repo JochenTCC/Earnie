@@ -120,7 +120,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 consumer["nominal_power_kw"],
                 lox["nominal_power_kw_name"],
             )
-    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _ = optimizer.milp_optimizer(
+    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _, urgent_obs = optimizer.milp_optimizer(
         optimization_matrix,
         current_hour,
         current_soc,
@@ -221,6 +221,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 k: round(float(v), 3) for k, v in consumer_remaining.items()
             },
             "charging_contexts": optimizer.serialize_charging_contexts(charging_contexts),
+            "urgent_rule_observability": urgent_obs,
             "consumer_pv_follow": {
                 k: int(v) for k, v in consumer_pv_follow.items()
             },

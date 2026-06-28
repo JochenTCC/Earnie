@@ -1,0 +1,31 @@
+{
+  "id": "eauto_urgent_deferred_cheap_hours_2026-06-28",
+  "title": "E-Auto laedt erst im urgent-Fenster statt zu guenstigen Stunden",
+  "symptom": "Nach Anstecken ~09:31 mit nachtraeglich gesetztem Rest-SOC: 24h-Plan nur 05-07 Uhr (teuer), nicht 10-14 Uhr (guenstig)",
+  "recorded_at": "2026-06-28",
+  "app_version": "1.10.4",
+  "archived_at": "2026-06-28T08:06:30+00:00",
+  "files": [
+    "optimization_history.jsonl",
+    "flexible_consumers_state.json",
+    "optimizer_run_state.json",
+    "live_optimization_debug.json",
+    "pv_counter_state.json"
+  ],
+  "regression": {
+    "session_date": "2026-06-28",
+    "plug_in_rest_soc_percent": 10.0,
+    "plug_in_target_kwh": 16.0,
+    "corrected_rest_soc_percent": 35.0,
+    "corrected_target_kwh": 11.556,
+    "deadline": "2026-06-29T07:45:00",
+    "cheap_hour_from": 10,
+    "cheap_hour_to": 14,
+    "cheap_price_cent_max": 3.0,
+    "urgent_hour_from": 5,
+    "urgent_hour_to": 7,
+    "archived_debug_max_eauto_kw_cheap_hours": 0.0,
+    "archived_debug_min_eauto_kw_urgent_hours": 3.5,
+    "remaining_kwh_at_correction": 7.985
+  }
+}

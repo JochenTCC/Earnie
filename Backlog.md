@@ -39,6 +39,9 @@
   - [x]Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)
   - [x] Optimierung ausserplanmäßig anstoßen, wenn E-Auto angeschlossen wurde? --> umgesetzt (event_trigger in main.py)
   - [x] Ernie darüber Bescheid geben, wenn E-Auto SOFORT LADEN umgeschalten wird (als Event) und zur Berücksichtigung in der Optimierung
+- [ ] **urgent-Regel auf Notwendigkeit prüfen** (Review bis ca. **2026-07-12**, zwei Wochen nach Einführung der Observability)
+  - Auswertung: `urgent_rule_observability` in `energy_optimizer.log` und `optimization_history.jsonl` (`role`: `redundant` / `nachholen` / `nur_urgent_fenster`)
+  - Akzeptanz: Wenn durchgehend nur `redundant` → Nebenbedingung entfernen (reicht Gesamt-Deadline + Kostenminimierung); sonst behalten und kurz begründen
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
   - [x] Erster Schritt ist erledigt
   - [ ] Es muss noch ein Weg gefunden werden, wie die tatsächlichen Verläufe angezeigt werden können, um Diskrepanzen zu erkennen

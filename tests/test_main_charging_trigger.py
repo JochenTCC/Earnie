@@ -43,7 +43,7 @@ def _patch_main_dependencies(monkeypatch):
     monkeypatch.setattr(
         main_module.optimizer,
         "milp_optimizer",
-        lambda *a, **k: (0, 0.0, 99.0, {"eauto": 3.5}, {"eauto": 0}, {}),
+        lambda *a, **k: (0, 0.0, 99.0, {"eauto": 3.5}, {"eauto": 0}, {}, {}),
     )
     monkeypatch.setattr(main_module.config, "get_battery_params", lambda: {"max_power_kw": 2.5})
     monkeypatch.setattr(main_module.optimizer, "battery_plan_kw_from_control", lambda *a, **k: 0.0)

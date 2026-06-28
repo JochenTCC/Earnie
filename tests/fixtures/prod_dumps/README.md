@@ -36,3 +36,10 @@ Pflichtfelder: `id`, `title`, `symptom`, `recorded_at`, `app_version`, `files`, 
 
 `regression` beschreibt messbare Invarianten, die der Code künftig erfüllen muss
 (siehe `tests/test_prod_dump_regression.py`).
+
+## Archivierte Fälle
+
+| ID | Kurzbeschreibung |
+|----|------------------|
+| `eauto_deadline_missed_2026-06-27` | Zu wenig Ladung bis Fertig-Uhrzeit |
+| `eauto_urgent_deferred_cheap_hours_2026-06-28` | Laden erst im urgent-Fenster statt zu günstigen Stunden |

@@ -63,7 +63,7 @@ def _simulate_single_hour_optimizer(
 ) -> tuple[float, dict, int, float]:
     """Simuliert eine einzelne Stunde im optimierten Pfad (Huawei-Logik für die Batterie)."""
     h = row["hour"]
-    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _ = milp_optimizer(
+    mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _, _ = milp_optimizer(
         remaining_matrix,
         h,
         sim_soc,

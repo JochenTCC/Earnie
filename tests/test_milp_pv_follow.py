@@ -41,7 +41,7 @@ class TestMilpPvFollow:
         matrix = [
             {"hour": 0, "expected_p_pv": 4.0, "expected_p_act": 0.5, "k_act": 8.0},
         ]
-        _, _, _, powers, pv_follow, _ = milp_optimizer(
+        _, _, _, powers, pv_follow, _, _ = milp_optimizer(
             matrix,
             current_hour=0,
             current_soc=50.0,

@@ -13,8 +13,10 @@ from .charging_context import (
     apply_charging_window_constraints,
     charging_schedule_enabled,
     consumer_charging_eligible_indices,
+    latest_start_datetime,
     schedule_indices_for_consumer,
-    urgent_charging_indices,
+    split_eligible_by_urgent_deadline,
+    summarize_urgent_rule_usage,
 )
 from .consumer_power import (
     estimate_pv_surplus_kw,
@@ -33,7 +35,7 @@ EMPTY_MILP_PLAN = {
     "p_discharge": 0.0,
 }
 
-_AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, {}, EMPTY_MILP_PLAN)
+_AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, {}, EMPTY_MILP_PLAN, {})
 
 
 @dataclass
@@ -393,6 +395,8 @@ def _add_consumer_delivery_constraints(
     schedule_indices: list[int],
     charging_contexts: dict[str, dict],
     verbose: bool,
+    *,
+    include_urgent_deadline_constraint: bool = True,
 ) -> None:
     for consumer in model.planned_consumers:
         cid = consumer["id"]
@@ -426,8 +430,12 @@ def _add_consumer_delivery_constraints(
         model.prob += _delivery_energy_expr(model, consumer, eligible) >= effective_target
 
         deadline = ctx.get("deadline") if ctx else None
-        if isinstance(deadline, datetime) and effective_target > 1e-6:
-            urgent = urgent_charging_indices(
+        if (
+            include_urgent_deadline_constraint
+            and isinstance(deadline, datetime)
+            and effective_target > 1e-6
+        ):
+            pre_urgent, urgent = split_eligible_by_urgent_deadline(
                 matrix[: model.horizon],
                 eligible,
                 deadline,
@@ -435,9 +443,16 @@ def _add_consumer_delivery_constraints(
                 max_kw,
             )
             if urgent:
-                model.prob += (
-                    _delivery_energy_expr(model, consumer, urgent) >= effective_target
-                )
+                delivery_urgent = _delivery_energy_expr(model, consumer, urgent)
+                if pre_urgent:
+                    delivery_before = _delivery_energy_expr(
+                        model, consumer, pre_urgent
+                    )
+                    model.prob += (
+                        delivery_urgent >= effective_target - delivery_before
+                    )
+                else:
+                    model.prob += delivery_urgent >= effective_target
 
 
 def _var_value_at_zero(variables: list) -> float:
@@ -493,9 +508,19 @@ def _consumer_powers_now(model: MilpHorizonModel) -> tuple[dict[str, float], flo
 
 
 def _planned_consumer_kwh(model: MilpHorizonModel, consumer: dict) -> float:
+    return _planned_consumer_kwh_in_slots(
+        model, consumer, list(range(model.horizon))
+    )
+
+
+def _planned_consumer_kwh_in_slots(
+    model: MilpHorizonModel,
+    consumer: dict,
+    slot_indices: list[int],
+) -> float:
     cid = consumer["id"]
     total = 0.0
-    for t in range(model.horizon):
+    for t in slot_indices:
         if uses_power_setpoint(consumer):
             value = model.consumer_p[cid][t].varValue
             if value is not None:
@@ -505,6 +530,80 @@ def _planned_consumer_kwh(model: MilpHorizonModel, consumer: dict) -> float:
         if on_val is not None and on_val > 0.5:
             total += float(consumer["nominal_power_kw"])
     return total
+
+
+def _collect_urgent_rule_observability(
+    model: MilpHorizonModel,
+    matrix: list[dict[str, Any]],
+    remaining: dict[str, float],
+    schedule_indices: list[int],
+    charging_contexts: dict[str, dict],
+) -> dict[str, dict]:
+    """Ermittelt pro Verbraucher, ob die urgent-Nebenbedingung den Plan beeinflusst."""
+    observability: dict[str, dict] = {}
+    for consumer in model.planned_consumers:
+        cid = consumer["id"]
+        target = remaining.get(cid, 0.0)
+        if target <= 0:
+            continue
+        ctx = charging_contexts.get(cid) or {}
+        deadline = ctx.get("deadline")
+        if not isinstance(deadline, datetime):
+            continue
+        consumer_indices = schedule_indices_for_consumer(
+            matrix, model.horizon, schedule_indices, consumer, ctx
+        )
+        eligible = consumer_charging_eligible_indices(
+            matrix[: model.horizon],
+            consumer,
+            consumer_indices,
+            ctx,
+        )
+        if not eligible:
+            continue
+        _, max_kw = power_limits_kw(consumer)
+        max_deliverable = _max_deliverable_kwh(consumer, eligible)
+        effective_target = min(target, max_deliverable)
+        pre_urgent, urgent = split_eligible_by_urgent_deadline(
+            matrix[: model.horizon],
+            eligible,
+            deadline,
+            effective_target,
+            max_kw,
+        )
+        if not urgent:
+            continue
+        must_start = latest_start_datetime(deadline, effective_target, max_kw)
+        observability[cid] = summarize_urgent_rule_usage(
+            pre_urgent_indices=pre_urgent,
+            urgent_indices=urgent,
+            effective_target_kwh=effective_target,
+            planned_pre_urgent_kwh=_planned_consumer_kwh_in_slots(
+                model, consumer, pre_urgent
+            ),
+            planned_urgent_kwh=_planned_consumer_kwh_in_slots(model, consumer, urgent),
+            deadline=deadline,
+            must_start=must_start,
+        )
+    return observability
+
+
+def _log_urgent_rule_observability(observability: dict[str, dict]) -> None:
+    for cid, summary in observability.items():
+        role = summary.get("role")
+        if role == "nicht_aktiv":
+            continue
+        logger.info(
+            "urgent-Regel [%s]: %s — Ziel %.3f kWh, optional geplant %.3f kWh, "
+            "urgent geplant %.3f kWh (must_start=%s, deadline=%s)",
+            cid,
+            role,
+            summary.get("target_kwh", 0.0),
+            summary.get("planned_pre_urgent_kwh", 0.0),
+            summary.get("planned_urgent_kwh", 0.0),
+            summary.get("must_start", "?"),
+            summary.get("deadline", "?"),
+        )
 
 
 def _derive_control_from_milp(
@@ -657,7 +756,7 @@ def milp_optimizer(
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
     Optimiert Batterie und alle konfigurierten flexible_consumers gemeinsam per MILP.
     Rückgabe: (mode, target_power, target_soc, {consumer_id: leistung_kw},
-               {consumer_id: pv_follow 0|1}, milp_plan)
+               {consumer_id: pv_follow 0|1}, milp_plan, urgent_rule_observability)
     """
     if not matrix:
         logger.error("MILP: Optimierungsmatrix ist leer.")
@@ -727,6 +826,15 @@ def milp_optimizer(
         battery_params,
     )
 
+    urgent_observability = _collect_urgent_rule_observability(
+        model,
+        matrix,
+        remaining,
+        schedule_indices,
+        contexts,
+    )
+    _log_urgent_rule_observability(urgent_observability)
+
     if verbose:
         _log_milp_decision(
             current_hour,
@@ -742,4 +850,12 @@ def milp_optimizer(
             target_soc,
         )
 
-    return mode, target_power, target_soc, consumer_powers, consumer_pv_follow, milp_plan
+    return (
+        mode,
+        target_power,
+        target_soc,
+        consumer_powers,
+        consumer_pv_follow,
+        milp_plan,
+        urgent_observability,
+    )
