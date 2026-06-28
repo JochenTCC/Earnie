@@ -14,7 +14,7 @@ Die Streamlit-App bietet drei Modi (Sidebar: **Betriebsmodus**). In Produktion k
 
 **Sidebar:** PV-, Batterie- und Einspeiseparameter editierbar; adaptives PV-Tuning (Korrekturfaktor).
 
-**Panels:** Charts (inkl. Einsparungs-Kennzahlen in Chart 2), Sankey, Produktiv-Durchlauf, Optimierungs-Historie, Countdown — Details in [Charts & Panels](charts.md).
+**Panels:** Charts (inkl. Einsparungs-Kennzahlen in Chart 2), Sankey (Live + Produktiv-Overlay), Optimierungs-Historie, Countdown — Details in [Charts & Panels](charts.md).
 
 ## Historischer Tag
 

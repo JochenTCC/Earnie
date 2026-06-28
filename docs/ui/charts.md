@@ -66,24 +66,19 @@ Tabelle je flexiblem Verbraucher:
 
 Rohdaten-Tabelle aller Stundenslots — Grundlage für die Charts (Nachrechnen/Debug).
 
-## Echtzeit-Leistungsfluss (Sankey)
+## Energiefluss (Live-Sankey)
 
-**Titel:** „Echtzeit-Leistungsfluss (Live)“
+**Titel:** „Energiefluss (Live)“
 
-Sankey-Diagramm aus **aktuellen Loxone-Leistungswerten** (PV, Netz, Batterie, Verbrauch). Aktualisierung ca. alle 10 Sekunden. Bei Fehler: Warnung, dass Live-Werte nicht geladen werden konnten.
+Sankey-Diagramm aus **aktuellen Loxone-Leistungswerten** (PV, Netz, Batterie, Grundlast, flexible Verbraucher). Aktualisierung ca. alle 10 Sekunden.
 
-## Produktiv-Durchlauf (`main.py`)
+**Produktiv-Overlay** aus `runtime/optimizer_run_state.json` (solange ein erfolgreicher Lauf vorliegt):
 
-Expander mit dem letzten erfolgreichen Lauf aus `runtime/optimizer_run_state.json`:
+- Kopfzeile: Zeitstempel, Modus, Ziel-Leistung und Ziel-SoC der Batterie
+- Knoten **Batterie**: Live-Leistung + Soll-Steuerbefehl
+- Knoten **flexible Verbraucher**: Live-kW vs. Soll-kW aus der Optimierung (Abweichung orange markiert)
 
-| Anzeige | Bedeutung |
-|---------|-----------|
-| SoC | Batterie-SOC zum Optimierungszeitpunkt |
-| Modus | Normal / Zwangs-Laden / Halten / Zwangs-Entladen |
-| Ziel-Leistung | Soll-Leistung Batterie (kW) |
-| Ziel-SoC | Soll-SOC (%) |
-| PV (letzte h) | PV-Ertrag letzte Stunde (kWh) |
-| Je Flex-Verbraucher | Live-Leistung vs. Soll aus Optimierung |
+Ohne erfolgreichen Produktiv-Lauf: nur Live-Daten, Hinweis in der Kopfzeile.
 
 ## Vergangene Optimierungen (Produktiv)
 

@@ -50,5 +50,5 @@ Die App liest diese Dateien **read-only** für Panels und Abgleich.
 ## Typische Betriebsfehler
 
 - **Zwei `main.py`-Instanzen:** Steuerwerte können sich gegenseitig überschreiben — nur eine Produktiv-Instanz betreiben.
-- **App zeigt alte Werte:** `optimizer_run_state.json` fehlt oder `main.py` läuft nicht — Panel „Produktiv-Durchlauf“ prüfen.
+- **App zeigt alte Werte:** `optimizer_run_state.json` fehlt oder `main.py` läuft nicht — Kopfzeile im Sankey „Energiefluss (Live)“ prüfen.
 - **Keine aWATTar-Preise:** Simulation bricht in der App mit Fehlermeldung ab; Netzwerk oder API prüfen.

@@ -24,7 +24,6 @@ from ui.mode_selector import render_mode_selector
 from ui.runtime_config import reload_runtime_config
 from ui.sankey import render_live_power_flow
 from ui.styles import inject_compact_numeric_css
-from ui.sync_panel import render_main_run_sync_panel
 
 logger = logging.getLogger("app")
 
@@ -79,12 +78,10 @@ def main() -> None:
     current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     render_optimization_savings_and_chart(current_soc)
     if is_history_mode():
-        render_disabled_live_section("Energiefluss (Sankey)")
-        render_disabled_live_section("Produktiv-Durchlauf (main.py)")
+        render_disabled_live_section("Energiefluss (Live)")
         render_disabled_live_section("Countdown bis zur nächsten Optimierung")
     else:
         render_live_power_flow(current_soc)
-        render_main_run_sync_panel()
         render_countdown_block()
 
 
