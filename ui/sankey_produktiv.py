@@ -6,7 +6,11 @@ from runtime_store import run_state
 
 PRODUKTIV_RUN_FRESH_SEC = 120
 KW_TOLERANCE = 0.02
+MIN_REAL_FLOW_KW = 0.01
+SOLL_PLACEHOLDER_FLOW_KW = 0.05
 _FLEX_MISMATCH_COLOR = "#d35400"
+_SOLL_PLACEHOLDER_LINK_COLOR = "rgba(211, 84, 0, 0.45)"
+_DEFAULT_LINK_COLOR = "rgba(180, 180, 180, 0.25)"
 
 
 def mode_label(mode: int) -> str:
@@ -95,3 +99,32 @@ def flex_node_color(
     if not kw_match(live_kw, _soll_flex_kw(state, consumer_id)):
         return _FLEX_MISMATCH_COLOR
     return palette_color
+
+
+def flex_sankey_link(
+    live_kw: float,
+    consumer_id: str,
+    state: dict | None,
+) -> tuple[float | None, bool]:
+    """
+    Sankey-Link für einen Flex-Verbraucher.
+
+    Gibt (link_kw, is_soll_placeholder) zurück. link_kw=None → kein sichtbarer Link.
+    Platzhalter-Band nur zur Knoten-Sichtbarkeit wenn live≈0, Soll>0.
+    """
+    live = float(live_kw or 0.0)
+    if live > MIN_REAL_FLOW_KW:
+        return live, False
+    if not has_produktiv_run(state):
+        return None, False
+    soll = _soll_flex_kw(state, consumer_id)
+    if soll > MIN_REAL_FLOW_KW:
+        return SOLL_PLACEHOLDER_FLOW_KW, True
+    return None, False
+
+
+def flex_link_hover(live_kw: float, consumer_id: str, state: dict, is_placeholder: bool) -> str:
+    if is_placeholder:
+        soll = _soll_flex_kw(state, consumer_id)
+        return f"Geplant (inaktiv)<br>Soll: {soll:.2f} kW<br>Ist: 0,00 kW"
+    return f"Ist: {float(live_kw or 0.0):.2f} kW"

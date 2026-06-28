@@ -76,7 +76,7 @@ Sankey-Diagramm aus **aktuellen Loxone-Leistungswerten** (PV, Netz, Batterie, Gr
 
 - Kopfzeile: Zeitstempel, Modus, Ziel-Leistung und Ziel-SoC der Batterie
 - Knoten **Batterie**: Live-Leistung + Soll-Steuerbefehl
-- Knoten **flexible Verbraucher**: Live-kW vs. Soll-kW aus der Optimierung (Abweichung orange markiert)
+- Knoten **flexible Verbraucher**: Live-kW vs. Soll-kW aus der Optimierung (Abweichung orange markiert). Ist-Leistung 0 bei Soll > 0: schmales oranges Platzhalter-Band (Breite ≠ Soll, Hover zeigt Soll).
 
 Ohne erfolgreichen Produktiv-Lauf: nur Live-Daten, Hinweis in der Kopfzeile.
 

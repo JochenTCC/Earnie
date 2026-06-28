@@ -43,6 +43,26 @@ def test_caption_keeps_soll_hint_when_stale():
     assert "Soll-Werte aus diesem Lauf" in caption
 
 
+def test_flex_sankey_link_uses_placeholder_when_inactive_with_soll():
+    link_kw, is_placeholder = produktiv.flex_sankey_link(0.0, "eauto", _state())
+    assert link_kw == produktiv.SOLL_PLACEHOLDER_FLOW_KW
+    assert is_placeholder is True
+
+
+def test_flex_sankey_link_no_link_without_soll():
+    state = _state()
+    state["consumer_powers_kw"] = {"eauto": 0.0}
+    link_kw, is_placeholder = produktiv.flex_sankey_link(0.0, "eauto", state)
+    assert link_kw is None
+    assert is_placeholder is False
+
+
+def test_flex_sankey_link_live_when_drawing():
+    link_kw, is_placeholder = produktiv.flex_sankey_link(3.5, "eauto", _state())
+    assert link_kw == 3.5
+    assert is_placeholder is False
+
+
 def test_flex_mismatch_color():
     color = produktiv.flex_node_color("#9b59b6", 0.0, "eauto", _state())
     assert color == produktiv._FLEX_MISMATCH_COLOR

@@ -89,22 +89,6 @@ def _chart_has_pv_follow_bars(df: pd.DataFrame) -> bool:
     return False
 
 
-def _power_chart_caption(df: pd.DataFrame) -> str:
-    base = (
-        "Preis rot auf der rechten Achse: 1:1 zu SoC "
-        "(30 Cent/kWh = 30 %, Hover zeigt Cent/kWh)."
-    )
-    notes: list[str] = []
-    if _chart_has_pv_follow_bars(df):
-        notes.append(
-            "Schräg schraffierte Flex-Balken: PV-Überschuss-Modus (pv_follow=1), "
-            "volle Balken: feste Soll-Leistung"
-        )
-    if notes:
-        return f"{base} {' · '.join(notes)}."
-    return base
-
-
 def get_bar_colors(df: pd.DataFrame) -> list[str]:
     """Batterie-Balkenfarbe je Steuerbefehl (Modus)."""
     colors = []
@@ -482,19 +466,6 @@ def _add_segmented_hv_line(
                 ),
             )
         fig.add_trace(go.Scatter(**trace_kwargs))
-
-
-def _extrapolation_caption(df: pd.DataFrame) -> str | None:
-    extrap_start, extrap_end = _extrapolation_bounds(df)
-    if extrap_start is None:
-        return None
-    from_hour = df["Uhrzeit"].iloc[extrap_start]
-    to_hour = df["Uhrzeit"].iloc[extrap_end - 1]
-    return (
-        f"Ab **{from_hour}** bis **{to_hour}**: Strompreis geschätzt "
-        f"(Spiegelung gleicher Uhrzeit vom Vortag, gepunktete rote Linie). "
-        f"Übrige Verläufe (ohne PV) in diesem Bereich mit 50 % Transparenz."
-    )
 
 
 def _add_pv_trace(
@@ -1014,10 +985,6 @@ def render_power_soc_chart(
         legend=_chart_legend(),
         margin=dict(l=40, r=40, t=50, b=110),
     )
-    extrap_caption = _extrapolation_caption(df)
-    if extrap_caption:
-        st.caption(extrap_caption)
-    st.caption(_power_chart_caption(df))
     plotly_kwargs: dict = {"width": "stretch"}
     if chart_key:
         plotly_kwargs["key"] = chart_key
@@ -1136,11 +1103,9 @@ def render_cumulative_cost_chart(
             showgrid=False,
         )
     fig.update_layout(**layout)
-    extrap_caption = _extrapolation_caption(df)
     if has_costs or has_consumption:
-        if extrap_caption:
-            st.caption(extrap_caption)
-        else:
+        extrap_start, _ = _extrapolation_bounds(df)
+        if extrap_start is None:
             st.caption(
                 "Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): "
                 "Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert."
