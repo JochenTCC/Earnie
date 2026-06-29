@@ -2,7 +2,8 @@
 
 ## Offene Todos
 - [ ] E-Auto wurde am 29.06. nicht richtig aufgeladen - Verhalten prüfen
-- [ ] Erinnerung am Monatsanfang für Einspeisepreis
+- [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird -> Wenn Null, dann fünf Minuten laden mit Mindest-Strom)
+- [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
 - [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
   - [ ] Generell: Temperaturregelung bleibt eine "interne Logik"
   - [ ] Generell: Ernie soll ein Prognose-Modell für Energiebedarf erstellen (mit der Zeit) - Einfaches Knotenmodell mit angenommener Wärmekapazität und Wärmeleitfähigkeit nach aussen.
