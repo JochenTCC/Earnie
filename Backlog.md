@@ -1,5 +1,37 @@
 🗺️ Projekt-Roadmap & Backlog
 
+## Offene Todos
+- [ ] E-Auto wurde am 29.06. nicht richtig aufgeladen - Verhalten prüfen
+- [ ] Erinnerung am Monatsanfang für Einspeisepreis
+- [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
+  - [ ] Generell: Temperaturregelung bleibt eine "interne Logik"
+  - [ ] Generell: Ernie soll ein Prognose-Modell für Energiebedarf erstellen (mit der Zeit) - Einfaches Knotenmodell mit angenommener Wärmekapazität und Wärmeleitfähigkeit nach aussen.
+  - [ ] Generell: Folgende Temperaturen werden zur Verfügung gestellt: Soll- / Ist-Temperatur / Umgebungstemperatur (für Prognosemodell) / Erlaubte Differenz (bzw. Min- / Max Temp)
+  - [ ] Swim-Spa (Prio1) Hat großes Potenzial, da derzeit oft Energie vorgesehen wird, die gar nicht gebraucht wird - kann aber auch andersrum sein
+    - [ ] Für Temperaturvorhersage des Pools werden auch Außentemp-Vorhersagen benötigt
+  - [ ] Gefrierschrank (Prio2)
+  - [ ] Wärmepumpe (Prio3) - Nur indirekte Steuerung über Anpassung der Solltemperaturen
+- [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
+  - Es gibt ein Signal "Ernie_Swimspa_Filter_Sollstunden", das angibt, wie lange der Filter laufen soll in den nächsten 24 Stunden
+  - Es gibt ein Steuersignal "Ernie_Filter_Freigabe", mit dem der Filter ein- und ausgeschaltet werden kann
+  - Ernie muss dafür sorgen, dass die Sollstunden in den nächsten 24 wieder auf Null kommen
+  - Der Filter braucht eine bestimmte Leistung
+  - In Loxone werden die Laufzeiten auf- und runter-integriert
+- [ ] **urgent-Regel auf Notwendigkeit prüfen** (Review bis ca. **2026-07-12**, zwei Wochen nach Einführung der Observability)
+  - Auswertung: `urgent_rule_observability` in `energy_optimizer.log` und `optimization_history.jsonl` (`role`: `redundant` / `nachholen` / `nur_urgent_fenster`)
+  - Akzeptanz: Wenn durchgehend nur `redundant` → Nebenbedingung entfernen (reicht Gesamt-Deadline + Kostenminimierung); sonst behalten und kurz begründen
+- [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
+  - [x] Erster Schritt ist erledigt
+  - [ ] Es muss noch ein Weg gefunden werden, wie die tatsächlichen Verläufe angezeigt werden können, um Diskrepanzen zu erkennen
+  - [ ] Der neue Modus muss noch mit dem alten Verfahren (Historischer Tag) vereinheitlicht werden. Eine Idee wäre, den Betriebsmodus links zu entfernen und bei Offline-Anzeige zwischen geloggten und neu optimierten Daten umschalten zu können - dann könnte ein Vergleich früherer Optimierungen mit aktueller angeschaut werden - ähnlich wie Vergleich Soll <> Ist
+- [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler (Input: Laufzeit, mittlere Leistung / Output: Zeithorizont 6h: Güte des Startzeitpunkts)
+- [ ] **Adaptives PV-Tuning wieder aktivieren** (`pv_accuracy_log.csv` / `log_pv_comparison`)
+  - Lesen + Anwenden des Korrekturfaktors läuft noch (`calculate_tuning_factor`, `pv_forecast`, Sidebar)
+  - Schreiben ist unterbrochen: `log_pv_comparison()` wird nirgends aufgerufen → Faktor bleibt praktisch bei 1,0
+  - `get_pv_delta_and_update()` (Zähler-Delta) nutzen, aber Regel für Vergleich mit Prognose klären (15-Min-Takt vs. Stunden-kW)
+  - Akzeptanz: CSV wächst wieder; Sidebar-Faktor ≠ 1,0 bei messbarer Abweichung; Synology-Mount für Log ggf. zurück in Compose
+     
+## Erledigte Punkte
 - [x] Lineare Programmireung in optimizer.py einbauen (forecast_pv und forecast_consumption berücksichtigen)
 - [x] Deployment auf Synology NAS einrichten
 - [x] Aktuellen Ladezustand in Sankey-Diagramm verschieben (oben rausnehmen)
@@ -28,12 +60,6 @@
 - [x] Prüfen, ob sich PV-Überschuss-Modus bei E-Auto sinnvoll einsetzen lässt. --> Ja ist möglich und sinnvoll
 - [x] PV_Follow Modus in Loxone implementieren und beides testen
 - [x] Zusätzliche Balken im Chart einfügen, die eingespeiste Energie anzeigen (ist als Linienverlau implementiert)
-- [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
-  - Es gibt ein Signal "Ernie_Swimspa_Filter_Sollstunden", das angibt, wie lange der Filter laufen soll in den nächsten 24 Stunden
-  - Es gibt ein Steuersignal "Ernie_Filter_Freigabe", mit dem der Filter ein- und ausgeschaltet werden kann
-  - Ernie muss dafür sorgen, dass die Sollstunden in den nächsten 24 wieder auf Null kommen
-  - Der Filter braucht eine bestimmte Leistung
-  - In Loxone werden die Laufzeiten auf- und runter-integriert
 - [x] Kommunikation mit Bew-Meldern (Hue) prüfen (war ein Programmierfehler in loxone_publish)
 - [x] Logik und UI für E-Auto verbessern
   - [x]Logik zum Zurücksetzen des Rest-SOC ist in Loxone implementiert - muss aber noch getestet werden. Rest-SOC wird beim Abstecken des Autos zurückgesetzt (auf 10%)
@@ -41,21 +67,6 @@
   - [x] Ernie darüber Bescheid geben, wenn E-Auto SOFORT LADEN umgeschalten wird (als Event) und zur Berücksichtigung in der Optimierung
 - [x] Ergebnisse des Produktivlaufs in Sankey-Diagramm integrieren und getrennte Anzeige entfernen.
 - [x] Anzeige Plausibilität entfernen
-- [ ] **urgent-Regel auf Notwendigkeit prüfen** (Review bis ca. **2026-07-12**, zwei Wochen nach Einführung der Observability)
-  - Auswertung: `urgent_rule_observability` in `energy_optimizer.log` und `optimization_history.jsonl` (`role`: `redundant` / `nachholen` / `nur_urgent_fenster`)
-  - Akzeptanz: Wenn durchgehend nur `redundant` → Nebenbedingung entfernen (reicht Gesamt-Deadline + Kostenminimierung); sonst behalten und kurz begründen
-- [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
-  - [x] Erster Schritt ist erledigt
-  - [ ] Es muss noch ein Weg gefunden werden, wie die tatsächlichen Verläufe angezeigt werden können, um Diskrepanzen zu erkennen
-  - [ ] Der neue Modus muss noch mit dem alten Verfahren (Historischer Tag) vereinheitlicht werden. Eine Idee wäre, den Betriebsmodus links zu entfernen und bei Offline-Anzeige zwischen geloggten und neu optimierten Daten umschalten zu können - dann könnte ein Vergleich früherer Optimierungen mit aktueller angeschaut werden - ähnlich wie Vergleich Soll <> Ist
-- [ ] Erinnerung am Monatsanfang für Einspeisepreis
-- [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle (Swim-Spa, Gefrierschrank)
-- [ ] Empfehlungsmodus für Waschmaschine und Geschirrspüler (Input: Laufzeit, mittlere Leistung / Output: Zeithorizont 6h: Güte des Startzeitpunkts)
-- [ ] **Adaptives PV-Tuning wieder aktivieren** (`pv_accuracy_log.csv` / `log_pv_comparison`)
-  - Lesen + Anwenden des Korrekturfaktors läuft noch (`calculate_tuning_factor`, `pv_forecast`, Sidebar)
-  - Schreiben ist unterbrochen: `log_pv_comparison()` wird nirgends aufgerufen → Faktor bleibt praktisch bei 1,0
-  - `get_pv_delta_and_update()` (Zähler-Delta) nutzen, aber Regel für Vergleich mit Prognose klären (15-Min-Takt vs. Stunden-kW)
-  - Akzeptanz: CSV wächst wieder; Sidebar-Faktor ≠ 1,0 bei messbarer Abweichung; Synology-Mount für Log ggf. zurück in Compose
 
 ### Log-Dateien (Review 2026-06)
 
