@@ -207,6 +207,7 @@ def build_applied_targets_detail(
                 "config": "config.json (24h-Ziel)",
                 "historical": "historical (24h-Ziel)",
                 "loxone": "loxone (24h-Ziel)",
+                "thermal": "thermal (RC-Modell, 24h-Ziel)",
             }
             source = source_labels.get(source_key, f"{source_key} (24h-Ziel)")
         details.append({

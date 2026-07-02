@@ -399,16 +399,126 @@ class Config:
         }
 
     @staticmethod
+    def _normalize_thermal_control(raw: dict | None, consumer_id: str) -> dict | None:
+        if not isinstance(raw, dict) or not bool(raw.get("enabled", False)):
+            return None
+        mode = str(raw.get("mode", "observe")).strip().lower()
+        if mode not in ("observe", "active"):
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                "thermal_control.mode muss 'observe' oder 'active' sein."
+            )
+        volume = raw.get("water_volume_liters")
+        if volume is None:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                "thermal_control.water_volume_liters fehlt."
+            )
+        volume = float(volume)
+        if volume <= 0:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                "thermal_control.water_volume_liters muss > 0 sein."
+            )
+        efficiency = raw.get("heating_efficiency")
+        if efficiency is None:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                "thermal_control.heating_efficiency fehlt."
+            )
+        efficiency = float(efficiency)
+        if not 0.0 < efficiency <= 1.0:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                "thermal_control.heating_efficiency muss zwischen 0 (exkl.) und 1 liegen."
+            )
+        heat_loss = raw.get("heat_loss_kw_per_k")
+        if heat_loss is not None:
+            heat_loss = float(heat_loss)
+            if heat_loss < 0:
+                raise ValueError(
+                    f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                    "thermal_control.heat_loss_kw_per_k muss >= 0 sein."
+                )
+        threshold = float(raw.get("heating_power_threshold_kw", 2.0) or 2.0)
+        if threshold < 0:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                "thermal_control.heating_power_threshold_kw muss >= 0 sein."
+            )
+        step = float(raw.get("actual_temp_step_c", 0.5) or 0.5)
+        if step <= 0:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                "thermal_control.actual_temp_step_c muss > 0 sein."
+            )
+        loxone = {}
+        if isinstance(raw.get("loxone"), dict):
+            for key in (
+                "actual_temp_name",
+                "setpoint_temp_name",
+                "ambient_temp_name",
+                "tolerance_c_name",
+            ):
+                if raw["loxone"].get(key):
+                    loxone[key] = str(raw["loxone"][key]).strip()
+        history_logs = {}
+        if isinstance(raw.get("history_logs"), dict):
+            for key in ("actual_temp_csv", "ambient_temp_csv", "power_csv"):
+                path = str(raw["history_logs"].get(key, "")).strip()
+                if path:
+                    history_logs[key] = path
+        setpoint = raw.get("setpoint_c")
+        tolerance = raw.get("tolerance_c")
+        return {
+            "enabled": True,
+            "mode": mode,
+            "setpoint_c": None if setpoint is None else float(setpoint),
+            "tolerance_c": None if tolerance is None else float(tolerance),
+            "water_volume_liters": volume,
+            "heat_loss_kw_per_k": heat_loss,
+            "heating_efficiency": efficiency,
+            "heating_power_threshold_kw": threshold,
+            "actual_temp_step_c": step,
+            "history_logs": history_logs,
+            "loxone": loxone,
+        }
+
+    @staticmethod
     def _normalize_consumer(raw: dict) -> dict:
         source = str(raw.get("daily_target_source", "config")).lower().strip()
         if "daily_target_source" not in raw:
             charging_raw = raw.get("charging_schedule")
             if isinstance(charging_raw, dict) and charging_raw.get("source"):
                 legacy = str(charging_raw["source"]).lower().strip()
-                if legacy in ("config", "historical", "loxone"):
+                if legacy in ("config", "historical", "loxone", "thermal"):
                     source = legacy
-        if source not in ("config", "historical", "loxone"):
-            source = "config"
+        if source not in ("config", "historical", "loxone", "thermal"):
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers Eintrag '{raw.get('id', '?')}' "
+                "daily_target_source muss config, historical, loxone oder thermal sein."
+            )
+        consumer_id = str(raw["id"])
+        thermal_control = Config._normalize_thermal_control(
+            raw.get("thermal_control"), consumer_id
+        )
+        if source == "thermal":
+            if not thermal_control or not thermal_control.get("enabled"):
+                raise ValueError(
+                    f"Kritischer Konfigurationsfehler: '{consumer_id}' "
+                    "daily_target_source=thermal erfordert thermal_control.enabled=true."
+                )
+            if thermal_control.get("mode") != "active":
+                raise ValueError(
+                    f"Kritischer Konfigurationsfehler: '{consumer_id}' "
+                    "daily_target_source=thermal erfordert thermal_control.mode=active."
+                )
+            if thermal_control.get("heat_loss_kw_per_k") is None:
+                raise ValueError(
+                    f"Kritischer Konfigurationsfehler: '{consumer_id}' "
+                    "daily_target_source=thermal erfordert heat_loss_kw_per_k "
+                    "(python -m scripts.tune_thermal_model)."
+                )
         loxone_outputs = Config._normalize_loxone_outputs(raw.get("loxone_outputs"))
         charging_schedule = Config._normalize_charging_schedule(raw.get("charging_schedule"))
         if not loxone_outputs and charging_schedule:
@@ -442,6 +552,7 @@ class Config:
             "loxone_outputs": loxone_outputs,
             "loxone_inputs": Config._normalize_loxone_inputs(raw.get("loxone_inputs")),
             "charging_schedule": charging_schedule,
+            "thermal_control": thermal_control,
         }
 
     @staticmethod
@@ -458,7 +569,7 @@ class Config:
                 for day_key in ("weekday", "weekend"):
                     if (sched.get(day_key) or {}).get("daily_rest_soc") is not None:
                         return True
-        if target_source in ("historical", "loxone"):
+        if target_source in ("historical", "loxone", "thermal"):
             return True
         return float(consumer.get("daily_target_kwh", 0.0) or 0.0) > 0
 

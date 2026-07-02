@@ -10,6 +10,7 @@ from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, l
 from runtime_store import run_state, optimization_history
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
+from optimizer.thermal_targets import collect_thermal_observability
 from optimizer.event_trigger import (
     TRIGGER_QUARTER_HOUR,
     fetch_trigger_snapshot,
@@ -101,6 +102,41 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     current_hour = datetime.now().hour
     targets = consumer_targets.resolve_consumer_daily_targets(matrix=optimization_matrix)
     live_consumers = loxone_client.consumers_with_live_nominal_power()
+    baseline_targets = consumer_targets.resolve_historical_baseline_targets_kwh(
+        matrix=optimization_matrix,
+    )
+    thermal_observability = collect_thermal_observability(
+        live_consumers,
+        active_targets_kwh=targets,
+        baseline_targets_kwh=baseline_targets,
+        horizon=min(24, len(optimization_matrix)),
+    )
+    for item in thermal_observability:
+        if item.get("error"):
+            logger.warning(
+                "Thermisch %s: %s",
+                item.get("consumer_id", "?"),
+                item["error"],
+            )
+            continue
+        logger.info(
+            "Thermisch %s (mode=%s): aktiv %.2f kWh, thermisch %.2f kWh, Delta %+.2f kWh, "
+            "Heizstunden %s, Ist %.1f °C, Band %.1f–%.1f °C%s",
+            item["consumer_id"],
+            item.get("mode"),
+            item.get("active_target_kwh", 0.0),
+            item.get("thermal_target_kwh", 0.0),
+            item.get("delta_kwh", 0.0),
+            item.get("heating_hours", 0),
+            (item.get("readings_c") or {}).get("actual"),
+            (item.get("readings_c") or {}).get("band_min"),
+            (item.get("readings_c") or {}).get("band_max"),
+            (
+                f", historical {item['baseline_target_kwh']:.2f} kWh"
+                if item.get("baseline_target_kwh") is not None
+                else ""
+            ),
+        )
     optimization_matrix, charging_contexts, targets = optimizer.prepare_optimization_matrix(
         optimization_matrix,
         targets,
@@ -261,6 +297,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "flex_live_kw": flex_kw,
             "delivery_compliance": delivery_compliance,
             "delivery_plausibility": delivery_plausibility,
+            "thermal_observability": thermal_observability,
             "savings_snapshot": savings_snapshot,
             "consumption_snapshot": consumption_snapshot,
             "current_hour": int(current_hour),

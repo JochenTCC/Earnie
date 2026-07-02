@@ -144,6 +144,19 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
         if ready_name:
             checks.append((f"Verbraucher {cid} Fertig-um", ready_name, {"read_raw": True}))
 
+        thermal = consumer.get("thermal_control") or {}
+        if thermal.get("enabled"):
+            tlox = thermal.get("loxone") or {}
+            for key, label in (
+                ("actual_temp_name", f"Verbraucher {cid} Ist-Temp"),
+                ("setpoint_temp_name", f"Verbraucher {cid} Soll-Temp"),
+                ("ambient_temp_name", f"Verbraucher {cid} Außen-Temp"),
+                ("tolerance_c_name", f"Verbraucher {cid} Temp-Toleranz"),
+            ):
+                io_name = tlox.get(key, "")
+                if io_name:
+                    checks.append((label, io_name, {}))
+
     for trigger in config.get_event_triggers():
         label = trigger.get("label") or trigger["id"]
         io_name = trigger["loxone_name"]

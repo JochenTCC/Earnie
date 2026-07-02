@@ -28,6 +28,8 @@ class TestLoxoneValueParsing:
             ("1200 W", 1200.0, "w"),
             ("42", 42.0, None),
             ("  7.2 kWh  ", 7.2, "kwh"),
+            ("21.7°", 21.7, "c"),
+            ("21,7 °C", 21.7, "c"),
         ],
     )
     def test_parse_loxone_value_with_units(self, raw, expected_value, expected_unit):

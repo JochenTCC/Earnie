@@ -17,6 +17,8 @@ _UNIT_SUFFIXES = (
     ("kW", "kw"),
     ("W", "w"),
     ("%", "pct"),
+    ("°C", "c"),
+    ("°", "c"),
     ("A", "a"),
 )
 _DEFAULT_CHARGING_VOLTAGE_V = 230.0
@@ -662,3 +664,46 @@ def send_flexible_consumer_states(
         _write_flexible_consumer_output(
             consumer, consumer_powers, contexts, None, consumer_pv_follow, send=True
         )
+
+
+def _read_optional_temp_c(io_name: str) -> float | None:
+    io_name = str(io_name or "").strip()
+    if not io_name:
+        return None
+    return fetch_loxone_generic_value(io_name)
+
+
+def fetch_thermal_readings(consumer: dict) -> dict:
+    """
+    Liest Ist-/Soll-/Außen-Temperatur und Toleranz für thermal_control.
+    Config-Fallbacks werden nur genutzt, wenn der jeweilige Merker leer ist.
+    """
+    thermal = consumer.get("thermal_control") or {}
+    lox = thermal.get("loxone") or {}
+    missing: list[str] = []
+
+    actual = _read_optional_temp_c(lox.get("actual_temp_name", ""))
+    if actual is None:
+        missing.append("actual_temp_name")
+
+    setpoint = _read_optional_temp_c(lox.get("setpoint_temp_name", ""))
+    if setpoint is None:
+        if thermal.get("setpoint_c") is None:
+            missing.append("setpoint_temp_name")
+
+    ambient = _read_optional_temp_c(lox.get("ambient_temp_name", ""))
+    if ambient is None:
+        missing.append("ambient_temp_name")
+
+    tolerance = _read_optional_temp_c(lox.get("tolerance_c_name", ""))
+    if tolerance is None:
+        if thermal.get("tolerance_c") is None:
+            missing.append("tolerance_c_name")
+
+    return {
+        "actual_c": actual,
+        "setpoint_c": setpoint,
+        "ambient_c": ambient,
+        "tolerance_c": tolerance,
+        "missing_signals": missing,
+    }

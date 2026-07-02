@@ -356,6 +356,76 @@
         }
       }
     },
+    "thermal_control": {
+      "type": "object",
+      "description": "Thermisches RC-Modell für temperaturgeführte Verbraucher (z. B. SwimSpa). mode=observe: nur Prognose/Vergleich, keine Steuerungsumstellung.",
+      "required": ["enabled", "mode"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "true = thermisches Modell aktiv (observe oder active)."
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["observe", "active"],
+          "description": "observe = Phase 0: Ziel nur loggen und mit aktuellem daily_target vergleichen; active = thermisches Ziel steuert die Optimierung (Phase 1)."
+        },
+        "setpoint_c": {
+          "type": "number",
+          "description": "Fallback-Solltemperatur in °C, wenn setpoint_temp_name nicht lesbar ist."
+        },
+        "tolerance_c": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Fallback-Toleranz in °C um den Sollwert (Band = Soll ± Toleranz), wenn tolerance_c_name nicht lesbar ist."
+        },
+        "water_volume_liters": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Wasservolumen in Litern für die Wärmekapazität C (Pflicht wenn enabled)."
+        },
+        "heat_loss_kw_per_k": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Wärmeleitwert U in kW/K (Verlust nach außen). Pflicht für Berechnung; null = ggf. aus history_logs kalibrieren."
+        },
+        "heating_efficiency": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Wirkungsgrad Heizung → Wasser (Pflicht wenn enabled)."
+        },
+        "heating_power_threshold_kw": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Leistungsschwelle in kW: Werte darüber gelten als Heizung (für Historien-Kalibrierung)."
+        },
+        "actual_temp_step_c": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Auflösung der Ist-Temperatur in °C (z. B. 0.5 für SwimSpa-Sensor)."
+        },
+        "history_logs": {
+          "type": "object",
+          "description": "Optionale Loxone-CSV-Pfade für Offline-Kalibrierung von U (scripts/calibrate_thermal_loss.py).",
+          "properties": {
+            "actual_temp_csv": { "type": "string" },
+            "ambient_temp_csv": { "type": "string" },
+            "power_csv": { "type": "string" }
+          }
+        },
+        "loxone": {
+          "type": "object",
+          "description": "Live-Temperaturen aus Loxone (Lesen). Einheiten werden abgeschnitten.",
+          "properties": {
+            "actual_temp_name": { "type": "string", "description": "Ist-Temperatur °C" },
+            "setpoint_temp_name": { "type": "string", "description": "Soll-Temperatur °C" },
+            "ambient_temp_name": { "type": "string", "description": "Umgebungs-/Außentemperatur °C (Live)" },
+            "tolerance_c_name": { "type": "string", "description": "Erlaubte Abweichung vom Soll in °C" }
+          }
+        }
+      }
+    },
     "flexible_consumer": {
       "type": "object",
       "required": ["id", "name", "nominal_power_kw"],
@@ -383,8 +453,8 @@
         },
         "daily_target_source": {
           "type": "string",
-          "enum": ["config", "historical", "loxone"],
-          "description": "Quelle des 24h-Ziels (kWh): config = daily_target_kwh bzw. bei charging_schedule daily_rest_soc; historical = in Echtzeit Summe aus flexible_consumer_profiles.csv über den 24h-Horizont (wie Baseline), bei historischer Tages-Simulation geloggte CSV-Summen; loxone = Live-Merker (bei E-Auto: charging_schedule.loxone)."
+          "enum": ["config", "historical", "loxone", "thermal"],
+          "description": "Quelle des 24h-Ziels (kWh): config = daily_target_kwh bzw. bei charging_schedule daily_rest_soc; historical = in Echtzeit Summe aus flexible_consumer_profiles.csv über den 24h-Horizont (wie Baseline), bei historischer Tages-Simulation geloggte CSV-Summen; loxone = Live-Merker (bei E-Auto: charging_schedule.loxone); thermal = RC-Modell (thermal_control.mode=active, Live-Loxone)."
         },
         "loxone_target_kwh_name": {
           "type": "string",
@@ -434,6 +504,9 @@
         },
         "charging_schedule": {
           "$ref": "#/definitions/charging_schedule"
+        },
+        "thermal_control": {
+          "$ref": "#/definitions/thermal_control"
         }
       }
     },

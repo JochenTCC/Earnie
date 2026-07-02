@@ -21,6 +21,20 @@ def _historical_totals_for_date(target_date: date, cache: dict) -> dict[str, flo
     return cache[target_date]
 
 
+def _historical_target_kwh(
+    consumer: dict,
+    target_date: date,
+    matrix: list | None,
+    historical_cache: dict,
+) -> float:
+    """Historisches Tagesziel unabhängig von daily_target_source."""
+    probe = dict(consumer)
+    probe["daily_target_source"] = "historical"
+    return _resolve_single_consumer_daily_target_kwh(
+        probe, target_date, matrix, historical_cache
+    )
+
+
 def _resolve_single_consumer_daily_target_kwh(
     consumer: dict,
     target_date: date,
@@ -28,12 +42,26 @@ def _resolve_single_consumer_daily_target_kwh(
     historical_cache: dict | None = None,
 ) -> float:
     """
-    Tagesziel (kWh) gemäß daily_target_source: config | historical | loxone.
+    Tagesziel (kWh) gemäß daily_target_source: config | historical | loxone | thermal.
     """
     source = consumer.get("daily_target_source", "config")
     cid = consumer["id"]
     fallback = float(consumer.get("daily_target_kwh", 0.0) or 0.0)
     cache = historical_cache if historical_cache is not None else {}
+
+    if source == "thermal":
+        today = datetime.now().date()
+        if target_date != today:
+            raise ValueError(
+                f"Verbraucher '{cid}': daily_target_source=thermal nur für den Live-Tag "
+                f"({today}), nicht für {target_date}."
+            )
+        from optimizer.thermal_targets import resolve_thermal_daily_target_kwh
+
+        horizon = 24
+        if matrix:
+            horizon = max(1, min(24, len(matrix)))
+        return resolve_thermal_daily_target_kwh(consumer, horizon=horizon)
 
     if source == "config":
         if consumer.get("charging_schedule", {}).get("enabled"):
@@ -142,6 +170,24 @@ def resolve_consumer_daily_targets(
     day = target_date or datetime.now().date()
     return {
         c["id"]: _resolve_single_consumer_daily_target_kwh(c, day, None, historical_cache)
+        for c in consumers
+    }
+
+
+def resolve_historical_baseline_targets_kwh(
+    matrix: list | None = None,
+    target_date: date | None = None,
+) -> dict[str, float]:
+    """Historische Tagesziele je Verbraucher (Vergleichsbasis für thermal active)."""
+    consumers = config.get_flexible_consumers(optimizer_only=True)
+    cache: dict = {}
+    if matrix:
+        dates = sorted({row["date"] for row in matrix if row.get("date") is not None})
+        day = dates[0] if dates else (target_date or datetime.now().date())
+    else:
+        day = target_date or datetime.now().date()
+    return {
+        c["id"]: _historical_target_kwh(c, day, matrix, cache)
         for c in consumers
     }
 

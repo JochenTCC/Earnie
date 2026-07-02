@@ -70,7 +70,7 @@
             "name": "SwimSpa",
             "nominal_power_kw": 2.8,
             "daily_target_kwh": 5.0,
-            "daily_target_source": "historical",
+            "daily_target_source": "thermal",
             "min_on_quarterhours": 8,
             "path_log": "pfad/zum/swimspa-log.csv",
             "signal_type": "power",
@@ -80,6 +80,28 @@
             },
             "loxone_inputs": {
                 "power_name": "Merkername SwimSpa kW"
+            },
+            "thermal_control": {
+                "enabled": true,
+                "mode": "active",
+                "setpoint_c": 36.5,
+                "tolerance_c": 1.0,
+                "water_volume_liters": 6000,
+                "heat_loss_kw_per_k": null,
+                "heating_efficiency": 0.95,
+                "heating_power_threshold_kw": 2.0,
+                "actual_temp_step_c": 0.5,
+                "history_logs": {
+                    "actual_temp_csv": "./Historical-Data/Miniserver-Gen2_SwimSpa_IstTemperatur_20230701-20260702.csv",
+                    "ambient_temp_csv": "./Historical-Data/Miniserver-Gen2_SwimSpa_AussenTemperatur_20230701-20260702.csv",
+                    "power_csv": "./Historical-Data/Miniserver-Gen2_SwimSpa_Leistung_20230701-20260702.csv"
+                },
+                "loxone": {
+                    "actual_temp_name": "Merkername SwimSpa Ist-Temp",
+                    "setpoint_temp_name": "Merkername SwimSpa Soll-Temp",
+                    "ambient_temp_name": "Merkername SwimSpa Aussen-Temp",
+                    "tolerance_c_name": "Merkername SwimSpa Temp-Toleranz"
+                }
             }
         },
         {
