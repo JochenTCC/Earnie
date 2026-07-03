@@ -39,7 +39,7 @@ def test_terminal_soc_constraint_holds_in_solved_model():
     start_soc = 60.0
     battery_params = _battery_params(end_soc_equals_start=True)
     matrix = _price_matrix()
-    model = _build_milp_model(matrix, 24, battery_params, start_soc, [])
+    model = _build_milp_model(matrix, 24, battery_params, start_soc, [], 0.0)
     _add_milp_objective(model, matrix, 3.5)
     e_init = (start_soc / 100.0) * battery_params["battery_capacity_kwh"]
     _add_terminal_soc_constraint(model, e_init)
@@ -56,7 +56,7 @@ def test_without_constraint_end_soc_can_differ_from_start():
     start_soc = 60.0
     battery_params = _battery_params(end_soc_equals_start=False)
     matrix = _price_matrix()
-    model = _build_milp_model(matrix, 24, battery_params, start_soc, [])
+    model = _build_milp_model(matrix, 24, battery_params, start_soc, [], 0.0)
     _add_milp_objective(model, matrix, 3.5)
 
     model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
@@ -74,7 +74,7 @@ def test_terminal_soc_uses_anchor_not_current_soc():
     current_soc = 55.0
     battery_params = _battery_params(end_soc_equals_start=True)
     matrix = _price_matrix(hours=12)
-    model = _build_milp_model(matrix, 12, battery_params, current_soc, [])
+    model = _build_milp_model(matrix, 12, battery_params, current_soc, [], 0.0)
     _add_milp_objective(model, matrix, 3.5)
     e_terminal = (anchor_soc / 100.0) * battery_params["battery_capacity_kwh"]
     _add_terminal_soc_constraint(model, e_terminal)

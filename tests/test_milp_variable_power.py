@@ -71,6 +71,7 @@ def test_model_has_continuous_power_variables():
         _battery_params(),
         50.0,
         [_eauto_consumer()],
+        0.0,
     )
     assert "eauto" in model.consumer_p
     assert len(model.consumer_p["eauto"]) == 4
