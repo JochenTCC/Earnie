@@ -2,6 +2,55 @@
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import sys
+from typing import TextIO
+
+
+def configure_utf8_stdio() -> None:
+    """Setzt stdout/stderr auf UTF-8 (relevant unter Windows und bei Shell-Umleitung)."""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is None:
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError, AttributeError):
+            pass
+
+
+class _TeeStream:
+    """Schreibt parallel in Original-Stream und UTF-8-Logdatei."""
+
+    def __init__(self, original: TextIO, log_file: TextIO) -> None:
+        self._original = original
+        self._log_file = log_file
+
+    def write(self, data: str) -> int:
+        self._original.write(data)
+        self._log_file.write(data)
+        return len(data)
+
+    def flush(self) -> None:
+        self._original.flush()
+        self._log_file.flush()
+
+    def __getattr__(self, name: str):
+        return getattr(self._original, name)
+
+
+def attach_utf8_log_file(path: str) -> TextIO:
+    """Dupliziert stdout/stderr zusätzlich in eine UTF-8-Logdatei."""
+    log_dir = os.path.dirname(path)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+    handle = open(path, "w", encoding="utf-8", newline="\n")
+    configure_utf8_stdio()
+    sys.stdout = _TeeStream(sys.stdout, handle)
+    sys.stderr = _TeeStream(sys.stderr, handle)
+    return handle
+
 
 def setup_logging(log_file="energy_optimizer.log", level=logging.INFO):
     """
@@ -9,6 +58,8 @@ def setup_logging(log_file="energy_optimizer.log", level=logging.INFO):
     Erzeugt eine saubere Ausgabe auf der Konsole und schreibt rotierende
     Details in eine Log-Datei.
     """
+    configure_utf8_stdio()
+
     # Verzeichnis für Logfile erstellen, falls Pfade genutzt werden
     log_dir = os.path.dirname(log_file)
     if log_dir and not os.path.exists(log_dir):

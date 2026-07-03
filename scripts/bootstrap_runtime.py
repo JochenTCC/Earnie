@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 import sys
 
+import logger_config
 from runtime_store.bootstrap import BootstrapError, run
 
 
 def main() -> int:
+    logger_config.configure_utf8_stdio()
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",

@@ -23,9 +23,9 @@ from .charging_context import (
 from .consumer_power import (
     estimate_pv_surplus_kw,
     power_limits_kw,
-    uses_power_setpoint,
     uses_pv_follow,
 )
+from .eauto_milp import milp_binary_charge_kw, milp_uses_power_setpoint
 from . import battery as bat
 from .cbc_solver import solve_with_strict_fallback
 from .cbc_events import record_cbc_event, update_cbc_milp_context_from_row
@@ -56,6 +56,7 @@ class MilpHorizonModel:
     consumer_p_fixed: dict[str, list]
     consumer_pv_follow: dict[str, list]
     planned_consumers: list
+    consumer_milp_charge_kw: dict[str, float]
 
 
 def _day_indices(matrix: list[dict[str, Any]], horizon: int) -> list[int]:
@@ -116,10 +117,11 @@ def _delivery_energy_expr(
     eligible_indices: list[int],
 ):
     cid = consumer["id"]
-    if uses_power_setpoint(consumer):
+    if cid in model.consumer_p:
         return pulp.lpSum(model.consumer_p[cid][t] for t in eligible_indices)
+    charge_kw = model.consumer_milp_charge_kw[cid]
     return pulp.lpSum(
-        consumer["nominal_power_kw"] * model.consumer_on[cid][t]
+        charge_kw * model.consumer_on[cid][t]
         for t in eligible_indices
     )
 
@@ -174,12 +176,13 @@ def _flex_power_at_t(
     consumer: dict,
     consumer_on: dict[str, list],
     consumer_p: dict[str, list],
+    charge_kw: float,
     t: int,
 ):
     cid = consumer["id"]
-    if uses_power_setpoint(consumer):
+    if cid in consumer_p:
         return consumer_p[cid][t]
-    return consumer["nominal_power_kw"] * consumer_on[cid][t]
+    return charge_kw * consumer_on[cid][t]
 
 
 def _add_setpoint_power_variables(
@@ -253,7 +256,7 @@ def _add_consumer_power_variables(
         consumer["min_on_quarterhours"],
         cid,
     )
-    if not uses_power_setpoint(consumer):
+    if not milp_uses_power_setpoint(consumer, matrix):
         return
     _add_setpoint_power_variables(
         prob,
@@ -309,7 +312,10 @@ def _build_milp_model(
     consumer_p: dict[str, list] = {}
     consumer_p_fixed: dict[str, list] = {}
     consumer_pv_follow: dict[str, list] = {}
+    consumer_milp_charge_kw: dict[str, float] = {}
     for consumer in planned_consumers:
+        cid = consumer["id"]
+        consumer_milp_charge_kw[cid] = milp_binary_charge_kw(consumer, matrix)
         _add_consumer_power_variables(
             prob,
             consumer,
@@ -325,7 +331,13 @@ def _build_milp_model(
         p_pv = matrix[t]["expected_p_pv"]
         p_con = matrix[t]["expected_p_act"]
         p_flex = pulp.lpSum(
-            _flex_power_at_t(consumer, consumer_on, consumer_p, t)
+            _flex_power_at_t(
+                consumer,
+                consumer_on,
+                consumer_p,
+                consumer_milp_charge_kw[consumer["id"]],
+                t,
+            )
             for consumer in planned_consumers
         )
         prob += (
@@ -360,6 +372,7 @@ def _build_milp_model(
         consumer_p_fixed=consumer_p_fixed,
         consumer_pv_follow=consumer_pv_follow,
         planned_consumers=planned_consumers,
+        consumer_milp_charge_kw=consumer_milp_charge_kw,
     )
 
 
@@ -486,12 +499,12 @@ def _consumer_pv_follow_now_all(model: MilpHorizonModel) -> dict[str, int]:
 
 def _consumer_power_now(model: MilpHorizonModel, consumer: dict) -> float:
     cid = consumer["id"]
-    if uses_power_setpoint(consumer):
+    if cid in model.consumer_p:
         value = model.consumer_p[cid][0].varValue
         return max(0.0, float(value)) if value is not None else 0.0
     on_val = model.consumer_on[cid][0].varValue
     if on_val is not None and on_val > 0.5:
-        return float(consumer["nominal_power_kw"])
+        return float(model.consumer_milp_charge_kw[cid])
     return 0.0
 
 
@@ -519,15 +532,16 @@ def _planned_consumer_kwh_in_slots(
 ) -> float:
     cid = consumer["id"]
     total = 0.0
+    charge_kw = model.consumer_milp_charge_kw[cid]
     for t in slot_indices:
-        if uses_power_setpoint(consumer):
+        if cid in model.consumer_p:
             value = model.consumer_p[cid][t].varValue
             if value is not None:
                 total += float(value)
             continue
         on_val = model.consumer_on[cid][t].varValue
         if on_val is not None and on_val > 0.5:
-            total += float(consumer["nominal_power_kw"])
+            total += charge_kw
     return total
 
 

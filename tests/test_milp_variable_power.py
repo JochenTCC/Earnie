@@ -43,33 +43,36 @@ def _eauto_consumer() -> dict:
         "min_on_quarterhours": 1,
         "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
     }
-    def test_partial_power_when_target_below_max(self):
-        consumers = [_eauto_consumer()]
-        matrix = _matrix(6)
-        _, _, _, powers, pv_follow, _, _ = milp_optimizer(
-            matrix,
-            current_hour=0,
-            current_soc=50.0,
-            battery_params=_battery_params(),
-            k_push=3.5,
-            verbose=False,
-            consumers=consumers,
-            consumer_remaining_kwh={"eauto": 2.0},
-            charging_contexts={},
-        )
-        power = powers["eauto"]
-        assert 0.0 < power <= 3.5
-        assert power == pytest.approx(2.0, abs=0.05)
 
-    def test_model_has_continuous_power_variables(self):
-        model = _build_milp_model(
-            _matrix(4),
-            4,
-            _battery_params(),
-            50.0,
-            [_eauto_consumer()],
-        )
-        assert "eauto" in model.consumer_p
-        assert len(model.consumer_p["eauto"]) == 4
-        model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
-        assert pulp.LpStatus[model.prob.status] == "Optimal"
+
+def test_partial_power_when_target_below_max():
+    consumers = [_eauto_consumer()]
+    matrix = _matrix(6)
+    _, _, _, powers, pv_follow, _, _ = milp_optimizer(
+        matrix,
+        current_hour=0,
+        current_soc=50.0,
+        battery_params=_battery_params(),
+        k_push=3.5,
+        verbose=False,
+        consumers=consumers,
+        consumer_remaining_kwh={"eauto": 2.0},
+        charging_contexts={},
+    )
+    power = powers["eauto"]
+    assert 0.0 < power <= 3.5
+    assert power == pytest.approx(2.0, abs=0.05)
+
+
+def test_model_has_continuous_power_variables():
+    model = _build_milp_model(
+        _matrix(4),
+        4,
+        _battery_params(),
+        50.0,
+        [_eauto_consumer()],
+    )
+    assert "eauto" in model.consumer_p
+    assert len(model.consumer_p["eauto"]) == 4
+    model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
+    assert pulp.LpStatus[model.prob.status] == "Optimal"

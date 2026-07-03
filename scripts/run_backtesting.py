@@ -10,6 +10,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import pandas as pd
 import config
+import logger_config
 from data import profile_manager
 from simulation.backtesting_log import save_backtesting_log
 from simulation.backtesting_log import build_critical_cases, summarize_critical_cases
@@ -120,6 +121,14 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=1,
         metavar="N",
         help="Parallele Worker für Szenario-Simulationen (Standard: 1, sequentiell).",
+    )
+    parser.add_argument(
+        "--log-file",
+        metavar="PFAD",
+        help=(
+            "Zusätzliche UTF-8-Logdatei (empfohlen statt Shell-Umleitung "
+            "z. B. '> log.txt' unter Windows)."
+        ),
     )
     return parser
 
@@ -308,12 +317,15 @@ def print_total_summary(results, labels: dict[str, str]):
 
 
 def main(argv: list[str] | None = None):
+    logger_config.configure_utf8_stdio()
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
     args = _build_arg_parser().parse_args(argv)
+    if args.log_file:
+        logger_config.attach_utf8_log_file(args.log_file)
     if args.workers < 1:
         raise SystemExit("--workers muss >= 1 sein.")
 

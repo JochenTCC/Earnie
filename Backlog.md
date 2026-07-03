@@ -1,11 +1,27 @@
 🗺️ Projekt-Roadmap & Backlog
 
 ## Offene Todos
-- [ ] **Backtesting / E-Auto-MILP: Modell vereinfachen** (Rest nach CBC-Workaround, Stand 2026-07-03)
-  - **Symptom (historisch):** `run_backtesting` hing bei ~25–50 % bzw. Fortschritt `1392/1464 h` (Anker `2025-09-28 10:00`, E-Auto ~1,17 kWh).
-  - **Ursache:** Symmetrie/Entartung im MILP bei **E-Auto + `use_time_window` + `power_setpoint`** — CBC strict ohne Gap braucht Minuten, liefert aber dieselben Kosten wie `gapRel=10 %`.
-  - **Nächster Schritt:** E-Auto-MILP-Modell vereinfachen oder Constraints linearisieren (`power_setpoint` + Zeitfenster); urgent-Regel-Review (separater Punkt).
-  - **Diagnose-Skripte:** `scripts/diag_single_window.py`, `scripts/bench_cbc_gaps.py`, `scripts/analyze_benchmark_window.py` (Benchmark: hour-offset **1392**).
+- [ ] **E-Auto-MILP: Modus B (Backtesting) + Modus A (Live)** (Stand 2026-07-03, testweise Umsetzung geplant)
+  - **Kontext:** Symmetrie/Entartung bei **E-Auto + `use_time_window` + `power_setpoint`** — CBC strict langsam, `gapRel=10 %` liefert dieselben Kosten. Analyse `backtesting_cbc_events.jsonl`: 60/333 Fenster, 7 Kleinst-Restmengen-Fenster (0,3–1,5 kWh) → 41 % der Events. **urgent-Regel im Backtesting bereits aus** (`logged_day`).
+  - **Diagnose:** `scripts/bench_cbc_gaps.py`, `scripts/analyze_benchmark_window.py` (Benchmark `2025-09-28`, hour-offset **1392**), `backtesting_cbc_events.jsonl`.
+  - **Beschlossene Richtung:**
+    - **Modus B (binär, wie Swim-Spa/WP):** testweise **nur Backtesting** (`consumption_mode == "logged_day"`). Kein kontinuierliches `p[t]` im Solver.
+      - `remaining_kwh ≤ P_min` → eine eligible Stunde à **`P_min`**.
+      - `P_min < remaining_kwh ≤ P_nom` → **Preset:** günstigste eligible Stunde, `p = clamp(remaining_kwh, P_min, P_nom)` (E-Auto ohne MILP-Freiheit; Hochrechnen im Backtesting unkritisch).
+      - `remaining_kwh > P_nom` → **`P_nom × on[t]`** über mehrere Stunden (nur Binärvariablen).
+    - **Modus A (`power_setpoint`, heutiges Modell):** **nur Live** und wenn `remaining_kwh` über expliziter Schwelle (Vorschlag: `> 2×P_min`); inkl. PV-Follow / Sofortladen.
+    - **Tie-Break** (nur `_add_milp_objective`, nicht `calculate_step_cost_euro_from_row`): bei ähnlichen Stromkosten frühere/günstigere Pläne bevorzugen — **ε₁·Σ `on[t]`**, **ε₂·Σ `t·on[t]`** (E-Auto). Config-Pflichtparameter, `ε ≪ min(k_act)`.
+  - **Config (kein stiller Default):** Schwellwert Live A↔B, ε₁, ε₂; Fehler wenn fehlend.
+  - **Akzeptanz:** Benchmark-Fenster + Jahres-Backtesting — deutlich weniger `strict_slow`, Einsparungen vs. Historisch innerhalb bestehender Plausibilität; Live unverändert bis Phase 3.
+  - **Hinweis:** Backtesting-Einsparungen gelten dann mit vereinfachtem E-Auto-Modell, nicht 1:1 Live-Prognose.
+  - **Implementierung in Phasen** (nicht alles auf einmal — jede Phase einzeln verifizieren):
+    1. [x] **Modus B nur Backtesting** — `optimizer/eauto_milp.py`; bei `logged_day` kein `consumer_p` für E-Auto, feste `P_nom × on[t]` (`tests/test_eauto_milp_mode.py`).
+    2. **Preset** für `remaining ≤ P_nom` im Backtesting — Benchmark-Fälle (0,3–1,5 kWh).
+    3. **Live Umschaltung A↔B** nach Config-Schwelle.
+    4. **Tie-Break ε₁/ε₂** — vor allem Modus A; nachmessung ob noch nötig.
+  - **Später optional (nicht Teil der testweisen Umsetzung):** eligible-Stunden vorfiltern; lexikographisch zweistufig; SOC-/Netz-Straffaktoren; Degenerations-Erkennung → strict überspringen.
+  - **Verknüpfung:** urgent-Regel-Review; Prod-Dump-`xfail` (untere Einträge); PWM/Mindestlademenge E-Auto (Live-Ausgabe Modus A).
+- [ ] Batterieschädigung als Straffaktor in Optimierung einführen (lineares Amortisationsmodell, Angenommene Zyklenzahl 6000 - Gesamtkosten für Batterie (5 kWh) 1500€ --> Ein Hub = 1500/6000€)
 - [ ] **End-SOC-Randbedingung im Live-Modus reviewen** (`battery_end_soc_equals_start`)
   - Aktuell testweise deaktiviert; prüfen, ob `SOC Ende == SOC Start` am 24h-Horizont für Live sinnvoll bleibt oder angepasst werden soll
   - Kontext: Backtesting-Hänger lag am E-Auto-MILP, nicht an dieser Bedingung
@@ -13,11 +29,6 @@
 - [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird -> Wenn Null, dann fünf Minuten laden mit Mindest-Strom)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
 - [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
-  - [ ] Generell: Temperaturregelung bleibt eine "interne Logik"
-  - [ ] Generell: Ernie soll ein Prognose-Modell für Energiebedarf erstellen (mit der Zeit) - Einfaches Knotenmodell mit angenommener Wärmekapazität und Wärmeleitfähigkeit nach aussen.
-  - [ ] Generell: Folgende Temperaturen werden zur Verfügung gestellt: Soll- / Ist-Temperatur / Umgebungstemperatur (für Prognosemodell) / Erlaubte Differenz (bzw. Min- / Max Temp)
-  - [ ] Swim-Spa (Prio1) Hat großes Potenzial, da derzeit oft Energie vorgesehen wird, die gar nicht gebraucht wird - kann aber auch andersrum sein
-    - [ ] Für Temperaturvorhersage des Pools werden auch Außentemp-Vorhersagen benötigt
   - [ ] Gefrierschrank (Prio2)
   - [ ] Wärmepumpe (Prio3) - Nur indirekte Steuerung über Anpassung der Solltemperaturen
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
@@ -35,7 +46,7 @@
   - **Betroffene Tests** (vorerst `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py`):
     - `test_prod_dump_milp_prefers_cheap_hours_after_urgent_fix` — erwartet ≥6 kWh in günstigen Stunden bei aktiver urgent-Nebenbedingung
     - `test_prod_dump_urgent_rule_redundant_vs_deadline_only` — erwartet gleichen günstigen Plan mit/ohne urgent und `role=redundant`
-  - **Nächster Schritt:** Zusammenhang mit E-Auto-MILP-Vereinfachung und urgent-Regel-Review klären; `xfail` entfernen, sobald die Nebenbedingung wieder feasible ist
+  - **Nächster Schritt:** Nach E-Auto-Modus B/A (Haupt-Backlog-Eintrag) prüfen, ob urgent + binäres E-Auto-Modell wieder feasible ist; `xfail` entfernen.
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
   - [x] Erster Schritt ist erledigt
   - [ ] Es muss noch ein Weg gefunden werden, wie die tatsächlichen Verläufe angezeigt werden können, um Diskrepanzen zu erkennen
@@ -109,6 +120,13 @@
 - [x] E-Auto wurde am 29.06. nicht richtig aufgeladen - Verhalten prüfen
 - [x] Einspeisepotenzial aufzeichnen, um Trends zu erkennen 
 - [x] Optional den stündlichen Einspeisepreis von Awattar berücksichtigen und Potenzial-Simulation durchführen *(erweitert 2026-07-03: dynamisches `feed_in_mode`, Backtesting-Szenario, siehe oben)*
+- [x] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
+  - [x] Generell: Temperaturregelung bleibt eine "interne Logik"
+  - [x] Generell: Ernie soll ein Prognose-Modell für Energiebedarf erstellen (mit der Zeit) - Einfaches Knotenmodell mit angenommener Wärmekapazität und Wärmeleitfähigkeit nach aussen.
+  - [x] Generell: Folgende Temperaturen werden zur Verfügung gestellt: Soll- / Ist-Temperatur / Umgebungstemperatur (für Prognosemodell) / Erlaubte Differenz (bzw. Min- / Max Temp)
+  - [x] Swim-Spa (Prio1) Hat großes Potenzial, da derzeit oft Energie vorgesehen wird, die gar nicht gebraucht wird - kann aber auch andersrum sein
+    - [x] Für Temperaturvorhersage des Pools werden auch Außentemp-Vorhersagen benötigt
+
 
 ### Log-Dateien (Review 2026-06)
 
