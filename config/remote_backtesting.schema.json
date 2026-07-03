@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Remote-Backtesting",
+  "type": "object",
+  "required": ["share_root", "ssh"],
+  "properties": {
+    "share_root": {
+      "type": "string",
+      "description": "SMB-Freigabe oder lokaler Pfad: gemeinsame Sync-Basis (von diesem PC aus)."
+    },
+    "remote_share_root": {
+      "type": "string",
+      "description": "Gleiche Freigabe, Pfad wie vom Remote-PC aus (z. B. /mnt/nas/... unter Linux)."
+    },
+    "sync_paths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Relative Pfade im Repo, die vor dem Lauf auf den Share kopiert werden."
+    },
+    "result_dir": {
+      "type": "string",
+      "description": "Unterordner auf dem Share für Backtesting-Ergebnisse."
+    },
+    "result_files": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Dateinamen im Repo-Root nach run_backtesting.py."
+    },
+    "ssh": {
+      "type": "object",
+      "required": ["host", "user", "remote_repo"],
+      "properties": {
+        "host": { "type": "string" },
+        "user": { "type": "string" },
+        "port": { "type": "integer" },
+        "identity_file": { "type": "string" },
+        "remote_repo": { "type": "string" },
+        "python": { "type": "string" },
+        "shell": {
+          "type": "string",
+          "enum": ["powershell", "bash"]
+        }
+      }
+    }
+  }
+}
