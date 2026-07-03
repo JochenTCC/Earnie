@@ -1,0 +1,26 @@
+{
+    "$schema": "./remote_backtesting.schema.json",
+    "_comment": "Kopie nach config/remote_backtesting.json (gitignored) und Host/Pfade anpassen.",
+    "share_root": "\\\\DS-KO-DO-2\\home\\Ernie\\backtesting-sync",
+    "remote_share_root": "\\\\DS-KO-DO-2\\home\\Ernie\\backtesting-sync",
+    "sync_paths": [
+        "config/config.json",
+        "config/backtesting_scenarios.json",
+        "runtime/cons_data_hourly.csv",
+        "Historical-Data"
+    ],
+    "result_dir": "results",
+    "result_files": [
+        "backtesting_log.json",
+        "backtesting_hourly.csv"
+    ],
+    "ssh": {
+        "host": "192.168.178.137",
+        "user": "Jochen",
+        "port": 22,
+        "identity_file": "",
+        "remote_repo": "C:/Users/joche/Documents/Smarthome/Python/Energy-Optimizer",
+        "python": "python",
+        "shell": "powershell"
+    }
+}
