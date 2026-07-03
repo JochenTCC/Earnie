@@ -1,30 +1,21 @@
 🗺️ Projekt-Roadmap & Backlog
 
 ## Offene Todos
-- [ ] **E-Auto-MILP: Modus B (Backtesting) + Modus A (Live)** (Stand 2026-07-03, testweise Umsetzung geplant)
-  - **Kontext:** Symmetrie/Entartung bei **E-Auto + `use_time_window` + `power_setpoint`** — CBC strict langsam, `gapRel=10 %` liefert dieselben Kosten. Analyse `backtesting_cbc_events.jsonl`: 60/333 Fenster, 7 Kleinst-Restmengen-Fenster (0,3–1,5 kWh) → 41 % der Events. **urgent-Regel im Backtesting bereits aus** (`logged_day`).
-  - **Diagnose:** `scripts/bench_cbc_gaps.py`, `scripts/analyze_benchmark_window.py` (Benchmark `2025-09-28`, hour-offset **1392**), `backtesting_cbc_events.jsonl`.
-  - **Beschlossene Richtung:**
-    - **Modus B (binär, wie Swim-Spa/WP):** testweise **nur Backtesting** (`consumption_mode == "logged_day"`). Kein kontinuierliches `p[t]` im Solver.
-      - `remaining_kwh ≤ P_min` → eine eligible Stunde à **`P_min`**.
-      - `P_min < remaining_kwh ≤ P_nom` → **Preset:** günstigste eligible Stunde, `p = clamp(remaining_kwh, P_min, P_nom)` (E-Auto ohne MILP-Freiheit; Hochrechnen im Backtesting unkritisch).
-      - `remaining_kwh > P_nom` → **`P_nom × on[t]`** über mehrere Stunden (nur Binärvariablen).
-    - **Modus A (`power_setpoint`, heutiges Modell):** **nur Live** und wenn `remaining_kwh` über expliziter Schwelle (Vorschlag: `> 2×P_min`); inkl. PV-Follow / Sofortladen.
-    - **Tie-Break** (nur `_add_milp_objective`, nicht `calculate_step_cost_euro_from_row`): bei ähnlichen Stromkosten frühere/günstigere Pläne bevorzugen — **ε₁·Σ `on[t]`**, **ε₂·Σ `t·on[t]`** (E-Auto). Config-Pflichtparameter, `ε ≪ min(k_act)`.
-  - **Config (kein stiller Default):** Schwellwert Live A↔B, ε₁, ε₂; Fehler wenn fehlend.
-  - **Akzeptanz:** Benchmark-Fenster + Jahres-Backtesting — deutlich weniger `strict_slow`, Einsparungen vs. Historisch innerhalb bestehender Plausibilität; Live unverändert bis Phase 3.
-  - **Hinweis:** Backtesting-Einsparungen gelten dann mit vereinfachtem E-Auto-Modell, nicht 1:1 Live-Prognose.
-  - **Implementierung in Phasen** (nicht alles auf einmal — jede Phase einzeln verifizieren):
-    1. [x] **Modus B nur Backtesting** — `optimizer/eauto_milp.py`; bei `logged_day` kein `consumer_p` für E-Auto, feste `P_nom × on[t]` (`tests/test_eauto_milp_mode.py`).
-    2. **Preset** für `remaining ≤ P_nom` im Backtesting — Benchmark-Fälle (0,3–1,5 kWh).
-    3. **Live Umschaltung A↔B** nach Config-Schwelle.
-    4. **Tie-Break ε₁/ε₂** — vor allem Modus A; nachmessung ob noch nötig.
-  - **Später optional (nicht Teil der testweisen Umsetzung):** eligible-Stunden vorfiltern; lexikographisch zweistufig; SOC-/Netz-Straffaktoren; Degenerations-Erkennung → strict überspringen.
-  - **Verknüpfung:** urgent-Regel-Review; Prod-Dump-`xfail` (untere Einträge); PWM/Mindestlademenge E-Auto (Live-Ausgabe Modus A).
+- [ ] **E-Auto-MILP: Phase 2–4** (Preset, Live Umschaltung, Tie-Break; Stand 2026-07-03)
+  - **Basis:** Phase 1 erledigt — Backtesting (`logged_day`) ohne kontinuierliches `p[t]` im Solver, feste `P_nom × on[t]` (`optimizer/eauto_milp.py`, siehe Erledigte).
+  - **Offene Phasen** (jeweils einzeln verifizieren):
+    2. [ ] **Preset** für `remaining_kwh ≤ P_nom` im Backtesting — günstigste eligible Stunde, `p = clamp(remaining_kwh, P_min, P_nom)`; adressiert Kleinst-Restmengen (0,3–1,5 kWh) und 30 Plausibilitäts-Warnungen durch `P_nom`-Überlieferung.
+    3. [ ] **Live Umschaltung Modus A↔B** nach Config-Schwelle (Vorschlag: `> 2×P_min` → Modus A mit `power_setpoint`; darunter binär wie Backtesting); inkl. PV-Follow / Sofortladen in Modus A.
+    4. [ ] **Tie-Break ε₁/ε₂** in `_add_milp_objective` — **ε₁·Σ `on[t]`**, **ε₂·Σ `t·on[t]`** (E-Auto); Config-Pflichtparameter, `ε ≪ min(k_act)`; vor allem Modus A, Nachmessung ob nach Phase 1 noch nötig.
+  - **Modus B im Code (Phase 1):** MILP mit `P_nom × on[t]` für alle Restmengen; Preset/`P_min`-Sonderfälle fehlen noch (Phase 2).
+  - **Config (kein stiller Default):** Schwellwert Live A↔B, ε₁, ε₂ — Fehler wenn fehlend.
+  - **Hinweis:** Backtesting-Einsparungen gelten mit vereinfachtem E-Auto-Modell, nicht 1:1 Live-Prognose.
+  - **Später optional:** eligible-Stunden vorfiltern; lexikographisch zweistufig; SOC-/Netz-Straffaktoren; Degenerations-Erkennung → strict überspringen.
+  - **Verknüpfung:** urgent-Regel-Review; Prod-Dump-`xfail` (Live, unabhängig von Phase 1); PWM/Mindestlademenge E-Auto (Live-Ausgabe Modus A).
 - [ ] Batterieschädigung als Straffaktor in Optimierung einführen (lineares Amortisationsmodell, Angenommene Zyklenzahl 6000 - Gesamtkosten für Batterie (5 kWh) 1500€ --> Ein Hub = 1500/6000€)
 - [ ] **End-SOC-Randbedingung im Live-Modus reviewen** (`battery_end_soc_equals_start`)
   - Aktuell testweise deaktiviert; prüfen, ob `SOC Ende == SOC Start` am 24h-Horizont für Live sinnvoll bleibt oder angepasst werden soll
-  - Kontext: Backtesting-Hänger lag am E-Auto-MILP, nicht an dieser Bedingung
+  - Kontext: CBC-Hänger im Backtesting durch E-Auto Phase 1 behoben; Randbedingung selbst unabhängig davon prüfen
   - Offen: `end_soc_equals_start` wird in `_scenario_to_battery_params()` noch nicht an Backtesting-Szenarien durchgereicht
 - [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird -> Wenn Null, dann fünf Minuten laden mit Mindest-Strom)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
@@ -42,11 +33,11 @@
   - Akzeptanz: Wenn durchgehend nur `redundant` → Nebenbedingung entfernen (reicht Gesamt-Deadline + Kostenminimierung); sonst behalten und kurz begründen
 - [ ] **Prod-Dump-Regression: urgent-Nebenbedingung infeasible** (Stand 2026-07-03, Commit `a743318`)
   - Fixture: `eauto_urgent_deferred_cheap_hours_2026-06-28` (~7,99 kWh Rest bei `remaining_kwh_at_correction`)
-  - **Symptom:** MILP mit `include_urgent_deadline_constraint=True` → CBC **Infeasible**; ohne urgent → **Optimal** (~6,59 kWh in günstigen Stunden)
-  - **Betroffene Tests** (vorerst `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py`):
-    - `test_prod_dump_milp_prefers_cheap_hours_after_urgent_fix` — erwartet ≥6 kWh in günstigen Stunden bei aktiver urgent-Nebenbedingung
-    - `test_prod_dump_urgent_rule_redundant_vs_deadline_only` — erwartet gleichen günstigen Plan mit/ohne urgent und `role=redundant`
-  - **Nächster Schritt:** Nach E-Auto-Modus B/A (Haupt-Backlog-Eintrag) prüfen, ob urgent + binäres E-Auto-Modell wieder feasible ist; `xfail` entfernen.
+  - **Symptom (Live, Modus A):** MILP mit `include_urgent_deadline_constraint=True` → CBC **Infeasible**; ohne urgent → **Optimal** (~6,59 kWh in günstigen Stunden). Unverändert nach E-Auto Phase 1 (betrifft nur Backtesting).
+  - **Betroffene Tests** (`@pytest.mark.xfail` in `tests/test_prod_dump_regression.py`):
+    - `test_prod_dump_milp_prefers_cheap_hours_after_urgent_fix`
+    - `test_prod_dump_urgent_rule_redundant_vs_deadline_only`
+  - **Nächster Schritt:** Live urgent + `power_setpoint` prüfen (ggf. nach Phase 3); `xfail` entfernen wenn feasible.
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
   - [x] Erster Schritt ist erledigt
   - [ ] Es muss noch ein Weg gefunden werden, wie die tatsächlichen Verläufe angezeigt werden können, um Diskrepanzen zu erkennen
@@ -61,14 +52,20 @@
 ## Erledigte Punkte
 
 ### Backtesting & CBC (2026-07-03)
+- [x] **E-Auto-MILP Modus B im Backtesting (Phase 1)** — Commit `c8a20c9`
+  - `optimizer/eauto_milp.py` (`milp_uses_power_setpoint`, `milp_binary_charge_kw`); `optimizer/milp.py`: bei `logged_day` kein `consumer_p` für E-Auto, Lieferung/Bilanz über feste `P_nom × on[t]` (`consumer_milp_charge_kw`).
+  - Tests: `tests/test_eauto_milp_mode.py`; `tests/test_milp_variable_power.py` bereinigt.
+  - **Ursache der CBC-Hänger:** Symmetrie/Entartung bei E-Auto + `use_time_window` + `power_setpoint`; `gapRel=10 %` lieferte dieselben Kosten.
+  - **Ergebnis:** Benchmark `2025-09-28` (hour-offset **1392**) strict ~445 s → ~0,05 s; `bench_cbc_gaps` 24h strict Minuten → ~0,8 s (gleiche Kosten); Jahres-Backtest 2025: **`strict_slow` 758 → 0**, Laufzeit ~357 s (4 Worker), Plausibilität **303/333** unverändert, 10 kWh dynamisch **774,13 €** (+461,87 €).
+  - Diagnose: `scripts/bench_cbc_gaps.py`, `scripts/analyze_benchmark_window.py`, `backtesting_cbc_events.jsonl`.
+- [x] **UTF-8 für Backtesting-Logs** — Commits `c8a20c9`, `a292adc`
+  - `logger_config.configure_utf8_stdio`, `attach_utf8_log_file`; `scripts/run_backtesting --log-file`; `scripts/bootstrap_runtime.py`; `.vscode/settings.json` (Windows-Terminal `PYTHONUTF8`).
 - [x] **CBC-Performance: zweistufiger Solver**
   - `optimizer/cbc_solver.py`: Strict mit Timeout (**3 s**), Fallback auf `gapRel=10 %`; Log bei fehlender Optimalität (`INFO` in `run_backtesting`).
   - Config: `cbc_gap_rel`, `cbc_strict_time_limit_sec` in `backtesting_scenarios.json` (+ Schema); Env-Overrides für Benchmarks (`ENERGY_OPTIMIZER_CBC_*`, `ENERGY_OPTIMIZER_CBC_STRICT=1`).
   - `optimizer/milp.py` nutzt `solve_with_strict_fallback` statt barem `PULP_CBC_CMD`.
-- [x] **CBC-Gap-Diagnose & Benchmark-Tag**
-  - `scripts/bench_cbc_gaps.py` — Sensitivität (20 %, 15 %, 10 %, `gapAbs`, kombiniert, strict).
-  - `scripts/analyze_benchmark_window.py` — Fenster `2025-09-28 10:00` (hour-offset **1392**): E-Auto ~1,17 kWh, Nachbarn 7–13 kWh; strict ~445 s vs. gapRel 10 % ~0,2 s, **gleiche Kosten**.
-  - Erkenntnis: langsames strict = Symmetrie/Entartung, nicht fehlender Optimierungsnutzen.
+- [x] **CBC-Gap-Diagnose & Benchmark-Tag** (Vorarbeit zu Phase 1)
+  - `scripts/bench_cbc_gaps.py`, `scripts/analyze_benchmark_window.py` — siehe Phase-1-Ergebnis oben.
 - [x] **Backtesting urgent / Zeitfenster (Vorarbeit)**
   - `optimizer/milp.py`: urgent-Nebenbedingung für `consumption_mode == "logged_day"` aus; Live: einfache `urgent_charging_indices`-Logik.
   - `use_time_window` bleibt `True` im historischen Pfad; Smoke-Test `tests/test_backtesting_smoke.py`.
