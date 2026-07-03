@@ -11,6 +11,7 @@ pv_counter_state.json
 cons_data_hourly.meta.json
 cons_data_pending.json
 optimizer_run_state.json
+!tests/fixtures/prod_dumps/**/optimizer_run_state.json
 runtime/
 runtime-prod/
 backtesting_log.json

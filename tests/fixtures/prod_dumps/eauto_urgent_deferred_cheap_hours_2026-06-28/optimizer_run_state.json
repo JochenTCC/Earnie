@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "source": "main.py",
+  "success": true,
+  "run_trigger": "event:eauto_rest_soc",
+  "loxone_silent_mode": false,
+  "optimization_interval_sec": 900,
+  "event_trigger_snapshot": {
+    "eauto_plugged_in": true,
+    "eauto_charge_immediate": false,
+    "eauto_ready_by": "Morgen, 07:45",
+    "eauto_rest_soc": 35.0
+  },
+  "loxone_sent": {
+    "Ernie_Ziel_SoC": 99.0,
+    "Ernie_Ziel_LadeLeistung": 0.0,
+    "Ernie_Ziel_Entladeleistung": 0.0,
+    "Ernie_Steuerbefehl": 0.0,
+    "Ernie_SwimSpa_Freigabe": 0.0,
+    "Ernie_EAuto_Ziel_kW": 0.0,
+    "Ernie_EAuto_pv_follow": 0.0,
+    "Ernie_WP_Freigabe": 0.0
+  },
+  "soc_percent": 10.0,
+  "pv_delta_kwh": 0.01,
+  "market_price_cent": 3.28,
+  "forecast_pv_kw": 0.29,
+  "forecast_consumption_kw": 0.543,
+  "mode": 0,
+  "target_power_kw": 0.0,
+  "target_soc_percent": 99.0,
+  "battery_plan_kw": -0.253,
+  "consumer_powers_kw": {},
+  "consumer_remaining_kwh": {
+    "swimspa": 7.92,
+    "eauto": 7.985,
+    "waermepumpe": 0.0
+  },
+  "charging_contexts": {
+    "eauto": {
+      "active": true,
+      "plugged_in": true,
+      "deadline": "2026-06-29T07:45:00",
+      "target_kwh": 11.556,
+      "use_time_window": false,
+      "source_label": "loxone (angeschlossen, SOC → kWh)"
+    }
+  },
+  "consumer_pv_follow": {},
+  "flex_live_kw": {
+    "swimspa": 0.0,
+    "eauto": 0.997,
+    "waermepumpe": 0.0
+  },
+  "consumption_snapshot": {
+    "house_kw": 1.54,
+    "baseload_kw": 0.543,
+    "flex_kw": {
+      "swimspa": 0.0,
+      "eauto": 0.997,
+      "waermepumpe": 0.0
+    },
+    "flex_sum_kw": 0.997,
+    "pv_kw": 0.29,
+    "grid_kw": 1.27,
+    "battery_kw": -0.02
+  },
+  "current_hour": 9,
+  "completed_at": "2026-06-28T09:32:01"
+}
