@@ -79,7 +79,7 @@ def test_smoke_anchor_has_no_eauto_load(historical_cache: HistoricalDataCache):
     )
     from simulation.engine import window_slot_datetimes
 
-    _, totals, _ = historical_cache.get_window_consumption(window_slot_datetimes(anchor))
+    _, totals, _ = historical_cache.get_window_consumption(window_slot_datetimes(anchor))[:3]
     assert totals.get("eauto", 0.0) <= DEFAULT_MAX_EAUTO_KWH
 
 

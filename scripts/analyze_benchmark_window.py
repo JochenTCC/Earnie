@@ -71,7 +71,7 @@ def _eauto_context(matrix, meta):
 
 def _print_window_summary(anchor, idx, anchors, cache, matrix, meta) -> None:
     slots = window_slot_datetimes(anchor)
-    _, totals, loads = cache.get_window_consumption(slots)
+    _, totals, loads, _ = cache.get_window_consumption(slots)
     pv = cache.get_pv_for_slots(slots)
     eauto, ctx, targets, sched_idx, eligible = _eauto_context(matrix, meta)
 
@@ -105,7 +105,7 @@ def _print_window_summary(anchor, idx, anchors, cache, matrix, meta) -> None:
     for di in range(max(0, idx - 3), min(len(anchors), idx + 4)):
         a = anchors[di]
         sl = window_slot_datetimes(a)
-        _, t, _ = cache.get_window_consumption(sl)
+        _, t, _, _ = cache.get_window_consumption(sl)
         mark = " <--" if di == idx else ""
         print(
             f"  [{di:2d}] {a.date()}  eauto={t.get('eauto', 0):.2f}  "

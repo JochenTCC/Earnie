@@ -43,6 +43,18 @@ def _serialize_plausibility(report: PlausibilityReport) -> dict:
                 "historical_kwh": r.historical_kwh,
                 "optimized_kwh": r.optimized_kwh,
                 "diff_kwh": r.diff_kwh,
+                **(
+                    {
+                        "historical_baseload_kwh": r.historical_baseload_kwh,
+                        "optimized_baseload_kwh": r.optimized_baseload_kwh,
+                        "historical_flex_kwh": r.historical_flex_kwh,
+                        "optimized_flex_kwh": r.optimized_flex_kwh,
+                        "baseload_diff_kwh": r.baseload_diff_kwh,
+                        "flex_diff_kwh": r.flex_diff_kwh,
+                    }
+                    if r.baseload_diff_kwh is not None
+                    else {}
+                ),
             }
             for r in report.failed
         ],

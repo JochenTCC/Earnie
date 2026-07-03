@@ -55,7 +55,7 @@ def select_monthly_pv_extreme_cases(
         slots = window_slot_datetimes(anchor)
         if slots[0].date() < data_start or slots[-1].date() > data_end:
             continue
-        _, _, total_load = cache.get_window_consumption(slots)
+        _, _, total_load, _ = cache.get_window_consumption(slots)
         load_kwh = float(sum(total_load))
         if load_kwh <= 0:
             continue

@@ -103,7 +103,7 @@ def _scenario_params(scenario_id: str) -> dict:
 
 def _print_window_stats(anchor: datetime, cache: HistoricalDataCache) -> dict:
     slots = window_slot_datetimes(anchor)
-    _, totals, total_load = cache.get_window_consumption(slots)
+    _, totals, total_load, _ = cache.get_window_consumption(slots)
     print(f"Anker:     {anchor}")
     print(f"Fenster:   {slots[0]} -> {slots[-1]}")
     print(f"Verbrauch: gesamt={sum(total_load):.2f} kWh, baseload inkl.")

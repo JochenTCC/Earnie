@@ -68,5 +68,5 @@ def select_backtesting_smoke_anchor(
 
 def _flex_totals_for_anchor(cache: HistoricalDataCache, anchor: datetime) -> dict[str, float]:
     slots = window_slot_datetimes(anchor)
-    _, totals, _ = cache.get_window_consumption(slots)
+    _, totals, _, _ = cache.get_window_consumption(slots)
     return totals

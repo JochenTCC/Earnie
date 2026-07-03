@@ -12,7 +12,13 @@ from data.market_prices import epex_prices_for_slots
 from optimizer import (
     simulate_horizon,
     _calculate_step_cost_euro_from_row,
+    _delivered_flex_kwh_from_rows,
     _total_consumption_kwh_from_rows,
+)
+from simulation.baseload_validation import (
+    baseload_kwh_from_chart_rows,
+    derive_historical_baseload_kwh,
+    resolve_hourly_baseload_kw,
 )
 from optimizer.cbc_solver import (
     reset_cbc_gap_rel_override,
@@ -40,6 +46,12 @@ class PlausibilityResult:
     optimized_kwh: float
     diff_kwh: float
     ok: bool
+    historical_baseload_kwh: float | None = None
+    optimized_baseload_kwh: float | None = None
+    historical_flex_kwh: float | None = None
+    optimized_flex_kwh: float | None = None
+    baseload_diff_kwh: float | None = None
+    flex_diff_kwh: float | None = None
 
     @property
     def label(self) -> str:
@@ -80,19 +92,21 @@ class HistoricalDataCache:
 
     def get_window_consumption(
         self, slot_datetimes: list[datetime]
-    ) -> tuple[list[float], dict[str, float], list[float]]:
-        """Grundlast, Flex-Summen und Gesamtlast für ein 24h-Fenster (kW pro Stunde)."""
+    ) -> tuple[list[float], dict[str, float], list[float], list[float]]:
+        """Grundlast (CSV), Flex-Summen, Gesamtlast und stündliche Flex-Summe (kW pro Stunde)."""
         self.load()
         idx = pd.DatetimeIndex(slot_datetimes)
         df_window = self._consumption_df.reindex(idx, fill_value=0.0)
 
+        flex_cols = [consumer["name"] for consumer in config.get_flexible_consumers()]
         historical_totals = {
             consumer["id"]: round(float(df_window[consumer["name"]].sum()), 3)
             for consumer in config.get_flexible_consumers()
         }
         baseload = df_window["BaseLoad"].round(3).tolist()
         total_load = df_window["Total"].round(3).tolist()
-        return baseload, historical_totals, total_load
+        hourly_flex = df_window[flex_cols].sum(axis=1).round(3).tolist()
+        return baseload, historical_totals, total_load, hourly_flex
 
     def get_pv_for_slots(self, slot_datetimes: list[datetime]) -> list[float]:
         self.load()
@@ -177,7 +191,7 @@ def list_simulation_anchors(
     for day in pd.date_range(start.normalize(), end.normalize(), freq="D"):
         anchor = window_anchor_for_date(day.date())
         slots = window_slot_datetimes(anchor)
-        _, _, total_load = cache.get_window_consumption(slots)
+        _, _, total_load, _ = cache.get_window_consumption(slots)
         if sum(total_load) <= 0:
             continue
         anchors.append(anchor)
@@ -192,14 +206,20 @@ def build_historical_window_matrix(
 ) -> tuple[list[dict], dict]:
     """Baut eine 24h-Matrix aus historischen Logs für [Anker-24h, Anker)."""
     slot_datetimes = window_slot_datetimes(anchor)
-    baseload, historical_totals, total_load = cache.get_window_consumption(slot_datetimes)
+    baseload_stored, historical_totals, total_load, hourly_flex = (
+        cache.get_window_consumption(slot_datetimes)
+    )
+    baseload_kw, historical_baseload_kwh = resolve_hourly_baseload_kw(
+        total_load, hourly_flex
+    )
+    stored_baseload_kwh = round(sum(baseload_stored), 3)
     pv_profile = cache.get_pv_for_slots(slot_datetimes)
     epex_prices = epex_prices_for_slots(prices_df, slot_datetimes)
     brutto_prices = [_brutto_price_cent(epex) for epex in epex_prices]
 
     matrix = []
     for slot_dt, price, epex, pv, base, total in zip(
-        slot_datetimes, brutto_prices, epex_prices, pv_profile, baseload, total_load
+        slot_datetimes, brutto_prices, epex_prices, pv_profile, baseload_kw, total_load
     ):
         matrix.append(
             {
@@ -223,7 +243,11 @@ def build_historical_window_matrix(
         "window_end": anchor,
         "historical_totals": historical_totals,
         "historical_total_kwh": round(sum(total_load), 3),
-        "baseload_kwh": round(sum(baseload), 3),
+        "baseload_kwh": historical_baseload_kwh,
+        "baseload_stored_kwh": stored_baseload_kwh,
+        "baseload_adjustment_kwh": round(
+            stored_baseload_kwh - historical_baseload_kwh, 3
+        ),
         "consumer_daily_targets_kwh": dict(historical_totals),
     }
     return matrix, meta
@@ -273,7 +297,7 @@ def compute_historical_reference_costs(
 
     for anchor in anchors:
         slot_datetimes = window_slot_datetimes(anchor)
-        _, _, total_load = cache.get_window_consumption(slot_datetimes)
+        _, _, total_load, _ = cache.get_window_consumption(slot_datetimes)
         pv_profile = cache.get_pv_for_slots(slot_datetimes)
         brutto_prices = _brutto_prices_for_slots(prices_df, slot_datetimes)
         epex_prices = epex_prices_for_slots(prices_df, slot_datetimes)
@@ -305,17 +329,42 @@ def validate_window_consumption(
     chart_rows: list[dict],
     meta: dict,
 ) -> PlausibilityResult:
-    """Prüft Grundlast + optimierte Flex-Verbraucher gegen historischen 24h-Gesamtverbrauch."""
+    """Prüft Grundlast und Flex getrennt gegen historische 24h-Werte."""
     historical_kwh = float(meta["historical_total_kwh"])
-    optimized_kwh = _total_consumption_kwh_from_rows(chart_rows)
-    diff = round(abs(optimized_kwh - historical_kwh), 3)
-    ok = _consumption_within_tolerance(historical_kwh, optimized_kwh)
+    historical_totals = meta.get("historical_totals") or meta.get(
+        "consumer_daily_targets_kwh", {}
+    )
+    historical_baseload = float(
+        meta.get("baseload_kwh")
+        if meta.get("baseload_kwh") is not None
+        else derive_historical_baseload_kwh(historical_kwh, historical_totals)
+    )
+    historical_flex = round(sum(float(v) for v in historical_totals.values()), 3)
+
+    optimized_baseload = baseload_kwh_from_chart_rows(chart_rows)
+    delivered_flex = _delivered_flex_kwh_from_rows(chart_rows)
+    optimized_flex = round(sum(delivered_flex.values()), 3)
+    optimized_kwh = round(optimized_baseload + optimized_flex, 3)
+
+    baseload_ok = _consumption_within_tolerance(
+        historical_baseload, optimized_baseload
+    )
+    flex_ok = _consumption_within_tolerance(historical_flex, optimized_flex)
+    total_ok = _consumption_within_tolerance(historical_kwh, optimized_kwh)
+    ok = baseload_ok and flex_ok and total_ok
+
     return PlausibilityResult(
         window_end=meta["window_end"],
         historical_kwh=historical_kwh,
         optimized_kwh=optimized_kwh,
-        diff_kwh=diff,
+        diff_kwh=round(abs(optimized_kwh - historical_kwh), 3),
         ok=ok,
+        historical_baseload_kwh=historical_baseload,
+        optimized_baseload_kwh=optimized_baseload,
+        historical_flex_kwh=historical_flex,
+        optimized_flex_kwh=optimized_flex,
+        baseload_diff_kwh=round(abs(optimized_baseload - historical_baseload), 3),
+        flex_diff_kwh=round(abs(optimized_flex - historical_flex), 3),
     )
 
 
@@ -333,10 +382,16 @@ def print_plausibility_report(report: PlausibilityReport) -> None:
     if failed:
         print(f"  WARN: {len(failed)} Fenster ausserhalb der Toleranz:")
         for item in failed[:10]:
-            print(
+            detail = (
                 f"    Ende {item.label}: historisch={item.historical_kwh:.2f} kWh, "
                 f"optimiert={item.optimized_kwh:.2f} kWh, Delta={item.diff_kwh:.2f} kWh"
             )
+            if item.baseload_diff_kwh is not None and item.flex_diff_kwh is not None:
+                detail += (
+                    f" | Grundlast Δ={item.baseload_diff_kwh:.2f}, "
+                    f"Flex Δ={item.flex_diff_kwh:.2f}"
+                )
+            print(detail)
         if len(failed) > 10:
             print(f"    ... und {len(failed) - 10} weitere")
     print("===============================================")

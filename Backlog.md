@@ -2,12 +2,12 @@
 
 ## Offene Todos
 - [ ] **E-Auto-MILP: optionale Nacharbeiten** (Stand 2026-07-03)
-  - Plausibilitäts-Warnungen weiter analysieren (verbleibende 30/333); eligible-Stunden vorfiltern; lexikographisch zweistufig; SOC-/Netz-Straffaktoren; Degenerations-Erkennung → strict überspringen.
+  - Plausibilität weiter verbessern (verbleibend ~32/333 unter neuer Validierung); Auswertung: `scripts/analyze_plausibility_failures.py`.
+  - **Hybrid-Lieferung / Preset-Rest:** experimentell verworfen (Jahres-Backtest 2025: Plausibilität 181–301 vs. 303/333 Referenz).
   - **Verknüpfung:** urgent-Regel-Review; Prod-Dump-`xfail` (Live); PWM/Mindestlademenge E-Auto.
-- [ ] Batterieschädigung als Straffaktor in Optimierung einführen (lineares Amortisationsmodell, Angenommene Zyklenzahl 6000 - Gesamtkosten für Batterie (5 kWh) 1500€ --> Ein Hub = 1500/6000€)
+- [ ] Batterieschädigung als Straffaktor in Optimierung einführen (lineares Amortisationsmodell, Angenommene Zyklenzahl 6000 - Gesamtkosten für Batterie (5 kWh) 1500€ anteilig (weil zeitliche Alterung auch zuschlägt) --> Ein Hub = 0.5*1500/6000€)
 - [ ] **End-SOC-Randbedingung im Live-Modus reviewen** (`battery_end_soc_equals_start`)
   - Aktuell testweise deaktiviert; prüfen, ob `SOC Ende == SOC Start` am 24h-Horizont für Live sinnvoll bleibt oder angepasst werden soll
-  - Kontext: CBC-Hänger im Backtesting durch E-Auto Phase 1 behoben; Randbedingung selbst unabhängig davon prüfen
   - Offen: `end_soc_equals_start` wird in `_scenario_to_battery_params()` noch nicht an Backtesting-Szenarien durchgereicht
 - [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird -> Wenn Null, dann fünf Minuten laden mit Mindest-Strom)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
@@ -44,16 +44,17 @@
 ## Erledigte Punkte
 
 ### Backtesting & CBC (2026-07-03)
+- [x] **Grundlast-Validierung (Backtesting)**
+  - `simulation/baseload_validation.py`: stündliche Grundlast aus `Total − Flex` (skaliert, wenn Flex > Total in Einzelstunden).
+  - `validate_window_consumption`: getrennte Prüfung Grundlast + Flex + Gesamt; Meta `baseload_adjustment_kwh`.
+  - `scripts/analyze_plausibility_failures.py` für Fehlerfenster-Auswertung.
+  - Jahres-Backtest 2025 (10 kWh dynamisch): **301/333** Plausibilität, **739,72 €** (neue Validierung; Log `backtesting_2025_baseload.log`).
 - [x] **E-Auto-MILP (Phase 1–4)**
   - **Phase 1** (`c8a20c9`): bei `logged_day` kein `consumer_p` für E-Auto; MILP mit festem `P_nom × on[t]`.
-  - **Phase 2:** `remaining_kwh ≤ P_nom` → Preset außerhalb MILP (`eauto_preset_power_now`, `split_eauto_preset`, `fixed_flex_kw_t0`).
-  - **Phase 3:** Live Umschaltung Modus A↔B nach `eauto_milp.live_modus_a_min_remaining_kwh` (Prod: **2,8** = 2×P_min); darunter Modus B wie Backtesting.
-  - **Phase 4:** Tie-Break **ε₁·Σ on[t] + ε₂·Σ t·on[t]** in `_add_milp_objective` (`tie_break_on_epsilon`, `tie_break_time_epsilon`).
-  - Config: Block `eauto_milp` in `config.json` (+ Schema, Example); `config.get_eauto_milp_params()`.
-  - Code: `optimizer/eauto_milp.py` (`eauto_modus_a_active`, `eauto_in_modus_b`, `validate_eauto_milp_params`); Tests `tests/test_eauto_milp_mode.py`.
-  - **Ursache CBC-Hänger (Phase 1):** Symmetrie/Entartung bei E-Auto + `use_time_window` + `power_setpoint`.
-  - **Ergebnis Jahres-Backtest 2025** (nach Phase 2): **`strict_slow` 0**, ~360 s, Plausibilität **303/333**, 10 kWh dynamisch **774,35 €** (+461,65 €).
-  - **Benchmark** `2025-09-28` (E-Auto ~1,17 kWh): strict ~445 s → ~0,05 s; Preset ~0,07 s.
+  - **Phase 2** (`c3d74e9`): `remaining_kwh ≤ P_nom` → Preset außerhalb MILP (`eauto_preset_power_now`, `split_eauto_preset`, `fixed_flex_kw_t0`).
+  - **Phase 3+4** (`fe37f71`): Live Modus A↔B; Tie-Break **ε₁·Σ on[t] + ε₂·Σ t·on[t]**.
+  - Config: Block `eauto_milp`; Tests `tests/test_eauto_milp_mode.py`.
+  - Jahres-Backtest 2025 (alte Gesamt-Validierung): Plausibilität **303/333**, 10 kWh dynamisch **774,51 €** (`backtesting_2025_phase34.log`).
 - [x] **UTF-8 für Backtesting-Logs** — Commits `c8a20c9`, `a292adc`
   - `logger_config.configure_utf8_stdio`, `attach_utf8_log_file`; `scripts/run_backtesting --log-file`; `scripts/bootstrap_runtime.py`; `.vscode/settings.json` (Windows-Terminal `PYTHONUTF8`).
 - [x] **CBC-Performance: zweistufiger Solver**
