@@ -52,10 +52,7 @@ def _resolve_single_consumer_daily_target_kwh(
     if source == "thermal":
         today = datetime.now().date()
         if target_date != today:
-            raise ValueError(
-                f"Verbraucher '{cid}': daily_target_source=thermal nur für den Live-Tag "
-                f"({today}), nicht für {target_date}."
-            )
+            return _historical_target_kwh(consumer, target_date, matrix, cache)
         from optimizer.thermal_targets import resolve_thermal_daily_target_kwh
 
         horizon = 24
