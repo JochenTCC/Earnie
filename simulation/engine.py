@@ -14,6 +14,18 @@ from optimizer import (
     _calculate_step_cost_euro_from_row,
     _total_consumption_kwh_from_rows,
 )
+from optimizer.cbc_solver import (
+    reset_cbc_gap_rel_override,
+    reset_cbc_strict_time_limit_override,
+    set_cbc_gap_rel_override,
+    set_cbc_strict_time_limit_override,
+)
+from optimizer.cbc_events import (
+    begin_cbc_event_collection,
+    clear_cbc_milp_context,
+    set_cbc_milp_context,
+    take_cbc_events,
+)
 
 # Plausibilisierung: optimierter 24h-Verbrauch vs. historischer Gesamtverbrauch
 # (MILP min_on-Constraints können kleine Abweichungen erzeugen)
@@ -338,7 +350,8 @@ def run_simulation(
     cache: HistoricalDataCache | None = None,
     initial_soc: float = 50.0,
     on_progress=None,
-) -> tuple[pd.DataFrame, PlausibilityReport]:
+    scenario_id: str | None = None,
+) -> tuple[pd.DataFrame, PlausibilityReport, list[dict]]:
     """
     Simuliert in 24h-Fenstern mit historischen Verbrauchsdaten und Flex-Optimierung.
     Fensterende = E-Auto-Fertigstellungszeit (ready_by_hour), Start = 24h davor.
@@ -354,6 +367,10 @@ def run_simulation(
 
     battery_params = _scenario_to_battery_params(scenario_params)
     feed_in_settings = config.get_feed_in_settings(runtime_override=scenario_params)
+    gap_token = set_cbc_gap_rel_override(config.get_backtesting_cbc_gap_rel())
+    limit_token = set_cbc_strict_time_limit_override(
+        config.get_backtesting_cbc_strict_time_limit_sec()
+    )
     total_hours = len(anchors) * 24
     hours_done = 0
     sim_soc = initial_soc
@@ -361,27 +378,43 @@ def run_simulation(
     all_chart_rows: list[dict] = []
     all_timestamps: list[datetime] = []
     plausibility = PlausibilityReport()
+    collect_cbc = scenario_id is not None
+    if collect_cbc:
+        begin_cbc_event_collection()
+        set_cbc_milp_context(scenario_id=scenario_id)
 
-    for anchor in anchors:
-        matrix, meta = build_historical_window_matrix(
-            anchor, cache, prices_df, feed_in_settings=feed_in_settings
-        )
-        chart_rows = simulate_horizon(
-            matrix,
-            sim_soc,
-            battery_params=battery_params,
-            verbose=False,
-            consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
-        )
-        plausibility.add(validate_window_consumption(chart_rows, meta))
+    try:
+        for anchor in anchors:
+            matrix, meta = build_historical_window_matrix(
+                anchor, cache, prices_df, feed_in_settings=feed_in_settings
+            )
+            if collect_cbc:
+                set_cbc_milp_context(
+                    window_anchor=pd.Timestamp(anchor).isoformat(),
+                    consumer_targets_kwh=dict(meta["consumer_daily_targets_kwh"]),
+                )
+            chart_rows = simulate_horizon(
+                matrix,
+                sim_soc,
+                battery_params=battery_params,
+                verbose=False,
+                consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
+                simulation_hour_offset=hours_done if collect_cbc else None,
+            )
+            plausibility.add(validate_window_consumption(chart_rows, meta))
 
-        sim_soc = float(chart_rows[-1]["Simulierter SoC (%)"])
-        all_chart_rows.extend(chart_rows)
-        all_timestamps.extend(row["slot_datetime"] for row in matrix[: len(chart_rows)])
+            sim_soc = float(chart_rows[-1]["Simulierter SoC (%)"])
+            all_chart_rows.extend(chart_rows)
+            all_timestamps.extend(row["slot_datetime"] for row in matrix[: len(chart_rows)])
 
-        hours_done += len(chart_rows)
-        if on_progress is not None:
-            on_progress(hours_done, total_hours)
+            hours_done += len(chart_rows)
+            if on_progress is not None:
+                on_progress(hours_done, total_hours)
+    finally:
+        reset_cbc_gap_rel_override(gap_token)
+        reset_cbc_strict_time_limit_override(limit_token)
+        if collect_cbc:
+            clear_cbc_milp_context()
 
     df_res = pd.DataFrame(
         {
@@ -395,4 +428,5 @@ def run_simulation(
         index=pd.DatetimeIndex(all_timestamps),
     )
     df_res.index.name = "ts"
-    return df_res, plausibility
+    cbc_events = take_cbc_events() if collect_cbc else []
+    return df_res, plausibility, cbc_events

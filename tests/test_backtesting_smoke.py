@@ -163,16 +163,18 @@ def test_backtesting_run_simulation_single_window(
     runtime_scenario_params: dict,
 ):
     day = smoke_anchor.normalize()
-    df, plausibility = run_simulation(
+    df, plausibility, cbc_events = run_simulation(
         day,
         day,
         runtime_scenario_params,
         smoke_prices_df,
         cache=historical_cache,
+        scenario_id="runtime_settings",
     )
     assert len(df) == 24
     assert plausibility.failed == []
     assert df["sim_cost"].notna().all()
+    assert isinstance(cbc_events, list)
 
 
 @requires_historical_data

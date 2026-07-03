@@ -9,6 +9,7 @@ from typing import Any
 import pulp
 
 import config
+from data.feed_in_prices import k_push_act_for_matrix_row
 from .charging_context import (
     apply_charging_window_constraints,
     charging_schedule_enabled,
@@ -26,6 +27,8 @@ from .consumer_power import (
     uses_pv_follow,
 )
 from . import battery as bat
+from .cbc_solver import solve_with_strict_fallback
+from .cbc_events import record_cbc_event, update_cbc_milp_context_from_row
 
 logger = logging.getLogger(__name__)
 
@@ -381,10 +384,12 @@ def _terminal_soc_energy_kwh(
 def _add_milp_objective(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
-    k_push: float,
+    fallback_k_push: float,
 ) -> None:
     model.prob += pulp.lpSum([
-        model.p_grid_buy[t] * matrix[t]["k_act"] - model.p_grid_sell[t] * k_push
+        model.p_grid_buy[t] * matrix[t]["k_act"]
+        - model.p_grid_sell[t]
+        * k_push_act_for_matrix_row(matrix[t], fallback_k_push)
         for t in range(model.horizon)
     ])
 
@@ -757,7 +762,7 @@ def milp_optimizer(
         return _AUTOMATIK_FALLBACK
 
     battery_params = battery_params or config.get_battery_params()
-    k_push = k_push if k_push is not None else config.get_push_price_cent()
+    fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
     active = _active_consumers(consumers)
     remaining = _remaining_kwh_by_consumer(active, consumer_remaining_kwh, spa_remaining_kwh)
 
@@ -775,7 +780,7 @@ def milp_optimizer(
     )
 
     model = _build_milp_model(matrix, horizon, battery_params, current_soc, planned_consumers)
-    _add_milp_objective(model, matrix, k_push)
+    _add_milp_objective(model, matrix, fallback_k_push)
     logged_simulation = bool(
         matrix and matrix[0].get("consumption_mode") == "logged_day"
     )
@@ -802,13 +807,10 @@ def milp_optimizer(
                 current_soc,
             )
 
-    model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
-    if pulp.LpStatus[model.prob.status] != "Optimal":
-        if verbose:
-            logger.warning(
-                "MILP ohne optimale Lösung (Status: %s) – Fallback auf Automatik.",
-                pulp.LpStatus[model.prob.status],
-            )
+    update_cbc_milp_context_from_row(matrix[0])
+    status = solve_with_strict_fallback(model.prob, msg=False, verbose=verbose)
+    if status != "Optimal":
+        record_cbc_event("milp_no_optimal", final_status=status)
         return _AUTOMATIK_FALLBACK
 
     milp_plan = _extract_milp_plan(model)

@@ -197,6 +197,7 @@ def simulate_horizon(
     consumer_daily_targets_kwh: dict[str, float] | None = None,
     charging_contexts: dict[str, dict] | None = None,
     matrix_prepared: bool = False,
+    simulation_hour_offset: int | None = None,
 ) -> list:
     """Simuliert einen rollierenden Optimierungshorizont über die gesamte Matrix."""
     if not matrix_prepared:
@@ -230,6 +231,10 @@ def simulate_horizon(
     horizon_limits = apply_horizon_charging_limits(horizon_limits, charging_contexts)
     delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
     for i, row in enumerate(optimization_matrix):
+        if simulation_hour_offset is not None:
+            from optimizer.cbc_events import set_cbc_milp_context
+
+            set_cbc_milp_context(simulation_hour_index=simulation_hour_offset + i)
         remaining = {
             consumer["id"]: max(
                 0.0,

@@ -713,6 +713,51 @@ class Config:
         """Lädt Szenario-Parameter als {id: settings}-Dict (Abwärtskompatibilität)."""
         return {scenario["id"]: scenario["settings"] for scenario in self.get_scenarios()}
 
+    def _load_backtesting_scenarios_document(self) -> dict:
+        path = self.backtesting_scenarios_path
+        if not os.path.isfile(path):
+            return {}
+        return self._read_json_dict(path)
+
+    def get_backtesting_cbc_gap_rel(self) -> float:
+        """
+        Relativer CBC-MIP-Gap für Backtesting aus backtesting_scenarios.json.
+        Fehlt der Schlüssel, gilt optimizer.cbc_solver.DEFAULT_CBC_GAP_REL.
+        """
+        from optimizer.cbc_solver import DEFAULT_CBC_GAP_REL
+
+        doc = self._load_backtesting_scenarios_document()
+        raw = doc.get("cbc_gap_rel")
+        if raw is None:
+            return DEFAULT_CBC_GAP_REL
+        gap = float(raw)
+        if not 0.0 < gap < 1.0:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: cbc_gap_rel muss zwischen 0 und 1 liegen, "
+                f"nicht {gap!r} in '{self.backtesting_scenarios_path}'."
+            )
+        return gap
+
+    def get_backtesting_cbc_strict_time_limit_sec(self) -> float:
+        """
+        Zeitlimit (Sekunden) für den Strict-CBC-Versuch vor gapRel-Fallback.
+        Fehlt der Schlüssel, gilt optimizer.cbc_solver.DEFAULT_CBC_STRICT_TIME_LIMIT_SEC.
+        0 = Strict-Stufe überspringen.
+        """
+        from optimizer.cbc_solver import DEFAULT_CBC_STRICT_TIME_LIMIT_SEC
+
+        doc = self._load_backtesting_scenarios_document()
+        raw = doc.get("cbc_strict_time_limit_sec")
+        if raw is None:
+            return DEFAULT_CBC_STRICT_TIME_LIMIT_SEC
+        limit = float(raw)
+        if limit < 0:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: cbc_strict_time_limit_sec muss >= 0 sein, "
+                f"nicht {limit!r} in '{self.backtesting_scenarios_path}'."
+            )
+        return limit
+
     def _load_backtesting_scenarios_entries(self) -> list:
         path = self.backtesting_scenarios_path
         if os.path.isfile(path):
@@ -922,6 +967,14 @@ def get_scenario_labels() -> dict[str, str]:
 
 def get_backtesting_scenarios() -> dict[str, dict]:
     return CONFIG.get_backtesting_scenarios()
+
+
+def get_backtesting_cbc_gap_rel() -> float:
+    return CONFIG.get_backtesting_cbc_gap_rel()
+
+
+def get_backtesting_cbc_strict_time_limit_sec() -> float:
+    return CONFIG.get_backtesting_cbc_strict_time_limit_sec()
 
 
 def get_value(name: str, default=None, cast=None):

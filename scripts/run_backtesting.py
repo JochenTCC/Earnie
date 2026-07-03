@@ -5,11 +5,14 @@ import os
 os.environ["ENERGY_OPTIMIZER_OFFLINE"] = "1"
 
 import argparse
+import logging
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import pandas as pd
 import config
 from data import profile_manager
 from simulation.backtesting_log import save_backtesting_log
+from simulation.backtesting_log import build_critical_cases, summarize_critical_cases
 from data.data_loader import load_market_prices, resolve_simulation_window
 from simulation.engine import (
     HISTORICAL_REFERENCE_ID,
@@ -111,7 +114,82 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         metavar="MONAT",
         help=f"Letzter Monat der Simulation (inkl.). {MONTH_ARG_HELP}",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Parallele Worker für Szenario-Simulationen (Standard: 1, sequentiell).",
+    )
     return parser
+
+
+def _run_scenario_worker(
+    name: str,
+    params: dict,
+    start_iso: str,
+    end_iso: str,
+    prices: pd.DataFrame,
+) -> tuple[str, pd.DataFrame, object, list[dict]]:
+    """Top-Level-Worker für ProcessPoolExecutor (Windows spawn)."""
+    from simulation.engine import run_simulation, HistoricalDataCache
+
+    start = pd.Timestamp(start_iso)
+    end = pd.Timestamp(end_iso)
+    cache = HistoricalDataCache()
+    cache.load()
+    df_result, plausibility, cbc_events = run_simulation(
+        start,
+        end,
+        params,
+        prices,
+        cache=cache,
+        scenario_id=name,
+    )
+    return name, df_result, plausibility, cbc_events
+
+
+def _run_scenarios_parallel(
+    scenarios: dict[str, dict],
+    labels: dict[str, str],
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    prices: pd.DataFrame,
+    workers: int,
+) -> tuple[dict[str, pd.DataFrame], dict[str, object], dict[str, list[dict]]]:
+    sim_results: dict[str, pd.DataFrame] = {}
+    plausibility_by_scenario: dict[str, object] = {}
+    cbc_events_by_scenario: dict[str, list[dict]] = {}
+    start_iso = start.isoformat()
+    end_iso = end.isoformat()
+
+    print(f"Simuliere {len(scenarios)} Szenarien parallel ({workers} Worker)...")
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(
+                _run_scenario_worker,
+                name,
+                dict(params),
+                start_iso,
+                end_iso,
+                prices,
+            ): name
+            for name, params in scenarios.items()
+        }
+        for future in as_completed(futures):
+            name = futures[future]
+            display = labels.get(name, name)
+            try:
+                result_name, df_result, plausibility, cbc_events = future.result()
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Szenario '{display}' ({name}) fehlgeschlagen: {exc}"
+                ) from exc
+            sim_results[result_name] = df_result
+            plausibility_by_scenario[result_name] = plausibility
+            cbc_events_by_scenario[result_name] = cbc_events
+            print(f"  Fertig: {display}")
+    return sim_results, plausibility_by_scenario, cbc_events_by_scenario
 
 
 def _make_progress_printer(scenario_name: str):
@@ -135,6 +213,33 @@ def _all_labels(scenario_labels: dict[str, str]) -> dict[str, str]:
     labels = {HISTORICAL_REFERENCE_ID: HISTORICAL_REFERENCE_LABEL}
     labels.update(scenario_labels)
     return labels
+
+
+def _print_cbc_events_summary(cbc_events_by_scenario: dict[str, list[dict]], labels: dict[str, str]) -> None:
+    total = sum(len(events) for events in cbc_events_by_scenario.values())
+    if total == 0:
+        print("\nCBC-Ereignisse: keine (Strict innerhalb Limit und optimal).")
+        return
+    print(f"\n=== CBC-Ereignisse ({total} gesamt, siehe backtesting_cbc_events.jsonl) ===")
+    for scenario_id, events in cbc_events_by_scenario.items():
+        display = labels.get(scenario_id, scenario_id)
+        counts: dict[str, int] = {}
+        for event in events:
+            kind = str(event.get("event", "?"))
+            counts[kind] = counts.get(kind, 0) + 1
+        parts = ", ".join(f"{k}={v}" for k, v in sorted(counts.items()))
+        print(f"  {display}: {parts}")
+        for event in events[:5]:
+            anchor = event.get("window_anchor", "?")
+            slot = event.get("slot_datetime", "?")
+            hour = event.get("simulation_hour_index", "?")
+            kind = event.get("event", "?")
+            elapsed = event.get("strict_elapsed_sec")
+            elapsed_txt = f", {elapsed:.2f}s" if elapsed is not None else ""
+            print(f"    [{kind}] h={hour} Anker={anchor} Slot={slot}{elapsed_txt}")
+        if len(events) > 5:
+            print(f"    ... und {len(events) - 5} weitere")
+    print("====================================================")
 
 
 def print_monthly_report(results, labels: dict[str, str]):
@@ -203,7 +308,14 @@ def print_total_summary(results, labels: dict[str, str]):
 
 
 def main(argv: list[str] | None = None):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
     args = _build_arg_parser().parse_args(argv)
+    if args.workers < 1:
+        raise SystemExit("--workers muss >= 1 sein.")
 
     sim_cfg = config.get_file_paths_battery_simulation()
     range_mode = sim_cfg.get("price_range", "last_12_months")
@@ -274,22 +386,53 @@ def main(argv: list[str] | None = None):
         ),
     }
     plausibility_by_scenario: dict = {}
+    cbc_events_by_scenario: dict[str, list[dict]] = {}
 
     scenarios = config.get_backtesting_scenarios()
-    for name, params in scenarios.items():
-        display = labels.get(name, name)
-        print(f"Simuliere Szenario: '{display}'...")
-        df_result, plausibility = run_simulation(
+    if args.workers == 1:
+        for name, params in scenarios.items():
+            display = labels.get(name, name)
+            print(f"Simuliere Szenario: '{display}'...")
+            df_result, plausibility, cbc_events = run_simulation(
+                start,
+                end,
+                params,
+                prices,
+                cache=cache,
+                on_progress=_make_progress_printer(display),
+                scenario_id=name,
+            )
+            sim_results[name] = df_result
+            plausibility_by_scenario[name] = plausibility
+            cbc_events_by_scenario[name] = cbc_events
+            print_plausibility_report(plausibility)
+    else:
+        parallel_results, parallel_plausibility, parallel_cbc = _run_scenarios_parallel(
+            scenarios,
+            labels,
             start,
             end,
-            params,
             prices,
-            cache=cache,
-            on_progress=_make_progress_printer(display),
+            args.workers,
         )
-        sim_results[name] = df_result
-        plausibility_by_scenario[name] = plausibility
-        print_plausibility_report(plausibility)
+        sim_results.update(parallel_results)
+        plausibility_by_scenario.update(parallel_plausibility)
+        cbc_events_by_scenario.update(parallel_cbc)
+        for name in scenarios:
+            print_plausibility_report(plausibility_by_scenario[name])
+
+    _print_cbc_events_summary(cbc_events_by_scenario, labels)
+
+    critical_cases = build_critical_cases(
+        plausibility_by_scenario,
+        cbc_events_by_scenario,
+    )
+    if critical_cases:
+        summary = summarize_critical_cases(critical_cases)
+        print(
+            f"\nKritische Fälle gesamt: {summary['total']} "
+            f"({summary['distinct_windows']} Fenster) – siehe critical_cases in backtesting_log.json"
+        )
 
     print_monthly_report(sim_results, labels)
     print_total_summary(sim_results, labels)
@@ -308,6 +451,7 @@ def main(argv: list[str] | None = None):
         labels,
         plausibility_by_scenario,
         period_meta,
+        cbc_events_by_scenario=cbc_events_by_scenario,
     )
     print(f"\nBacktesting-Log gespeichert: {log_path}")
 

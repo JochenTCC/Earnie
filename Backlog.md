@@ -1,23 +1,18 @@
 🗺️ Projekt-Roadmap & Backlog
 
 ## Offene Todos
-- [ ] **Backtesting / E-Auto-MILP: CBC-Performance** (Priorität nach Smoke-Tests, Stand 2026-07-03)
-  - **Symptom:** `python -m scripts.run_backtesting` friert bei ~25–50 % ein (2. Fenster mit E-Auto, z. B. Anker `2026-06-29 07:00`, Log-Ziel **3,701 kWh**).
-  - **Ursache (isoliert):** Nicht `battery_end_soc_equals_start`, nicht primär falsche Fenster-Ausrichtung. CBC in `optimizer/milp.py` (`PULP_CBC_CMD`, kein Zeitlimit) wird extrem langsam bei **E-Auto + `use_time_window=True` + variable Leistung (`power_setpoint`)** — auch **ohne** urgent-Nebenbedingung.
-  - **Regression:** Commit `01f47bf` („E-Auto nicht nur in letzten Stunden laden“) führte `split_eligible_by_urgent_deadline` + härtere urgent-Constraints ein; `d4e40b1` löste dasselbe Fenster in ~0,1–0,2 s (mit alter urgent-Logik).
-  - **Bereits umgesetzt:**
-    - `optimizer/milp.py`: urgent-Nebenbedingung für `consumption_mode == "logged_day"` (Backtesting) **aus**; Live nutzt wieder einfache `urgent_charging_indices`-Logik (nicht split).
-    - `optimizer/charging_context.py`: `use_time_window` bleibt **`True`** im historischen Pfad (kein dauerhaftes Abschalten).
-    - Tests: `tests/test_backtesting_smoke.py` — 1 Fenster (`2026-06-25`, E-Auto=0 kWh), Szenario `runtime_settings`, ~5 s.
-  - **Workaround (nur manueller Voll-Lauf):** `use_time_window=False` bei `realtime=False` ließ Voll-Backtesting durchlaufen (~43 min) — **nicht** produktiv übernommen.
-  - **Nächste Schritte:** E-Auto-MILP-Modell vereinfachen oder Constraints linearisieren; urgent-Regel-Review (siehe separater Punkt); optional Solver-Zeitlimit nur mit klarer Fehlermeldung (User lehnt blindes Limit ab).
-  - **Diagnose-Skript-Idee:** Einzelnes Fenster `build_historical_window_matrix` + `milp_optimizer` mit `rem={'eauto': 3.701, ...}` vs. `use_time_window` an/aus.
+- [ ] **Backtesting / E-Auto-MILP: Modell vereinfachen** (Rest nach CBC-Workaround, Stand 2026-07-03)
+  - **Symptom (historisch):** `run_backtesting` hing bei ~25–50 % bzw. Fortschritt `1392/1464 h` (Anker `2025-09-28 10:00`, E-Auto ~1,17 kWh).
+  - **Ursache:** Symmetrie/Entartung im MILP bei **E-Auto + `use_time_window` + `power_setpoint`** — CBC strict ohne Gap braucht Minuten, liefert aber dieselben Kosten wie `gapRel=10 %`.
+  - **Workaround produktiv:** Zweistufiger CBC (siehe Erledigte Punkte) — kein dauerhaftes `use_time_window=False`.
+  - **Nächster Schritt:** E-Auto-MILP-Modell vereinfachen oder Constraints linearisieren (`power_setpoint` + Zeitfenster); urgent-Regel-Review (separater Punkt).
+  - **Diagnose-Skripte:** `scripts/diag_single_window.py`, `scripts/bench_cbc_gaps.py`, `scripts/analyze_benchmark_window.py` (Benchmark: hour-offset **1392**).
 - [ ] **End-SOC-Randbedingung im Live-Modus reviewen** (`battery_end_soc_equals_start`)
   - Aktuell testweise deaktiviert; prüfen, ob `SOC Ende == SOC Start` am 24h-Horizont für Live sinnvoll bleibt oder angepasst werden soll
   - Kontext: Backtesting-Hänger lag am E-Auto-MILP, nicht an dieser Bedingung
+  - Offen: `end_soc_equals_start` wird in `_scenario_to_battery_params()` noch nicht an Backtesting-Szenarien durchgereicht
 - [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird -> Wenn Null, dann fünf Minuten laden mit Mindest-Strom)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
-- [x] Optional den stündlichen Einspeisepreis von Awattar berücksichtigen und Potenzial-Simulation durchführen
 - [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
   - [ ] Generell: Temperaturregelung bleibt eine "interne Logik"
   - [ ] Generell: Ernie soll ein Prognose-Modell für Energiebedarf erstellen (mit der Zeit) - Einfaches Knotenmodell mit angenommener Wärmekapazität und Wärmeleitfähigkeit nach aussen.
@@ -47,6 +42,28 @@
   - Akzeptanz: CSV wächst wieder; Sidebar-Faktor ≠ 1,0 bei messbarer Abweichung; Synology-Mount für Log ggf. zurück in Compose
      
 ## Erledigte Punkte
+
+### Backtesting & CBC (2026-07-03)
+- [x] **CBC-Performance: zweistufiger Solver**
+  - `optimizer/cbc_solver.py`: Strict mit Timeout (**3 s**), Fallback auf `gapRel=10 %`; Log bei fehlender Optimalität (`INFO` in `run_backtesting`).
+  - Config: `cbc_gap_rel`, `cbc_strict_time_limit_sec` in `backtesting_scenarios.json` (+ Schema); Env-Overrides für Benchmarks (`ENERGY_OPTIMIZER_CBC_*`, `ENERGY_OPTIMIZER_CBC_STRICT=1`).
+  - `optimizer/milp.py` nutzt `solve_with_strict_fallback` statt barem `PULP_CBC_CMD`.
+- [x] **CBC-Gap-Diagnose & Benchmark-Tag**
+  - `scripts/bench_cbc_gaps.py` — Sensitivität (20 %, 15 %, 10 %, `gapAbs`, kombiniert, strict).
+  - `scripts/analyze_benchmark_window.py` — Fenster `2025-09-28 10:00` (hour-offset **1392**): E-Auto ~1,17 kWh, Nachbarn 7–13 kWh; strict ~445 s vs. gapRel 10 % ~0,2 s, **gleiche Kosten**.
+  - Erkenntnis: langsames strict = Symmetrie/Entartung, nicht fehlender Optimierungsnutzen.
+- [x] **Backtesting urgent / Zeitfenster (Vorarbeit)**
+  - `optimizer/milp.py`: urgent-Nebenbedingung für `consumption_mode == "logged_day"` aus; Live: einfache `urgent_charging_indices`-Logik.
+  - `use_time_window` bleibt `True` im historischen Pfad; Smoke-Test `tests/test_backtesting_smoke.py`.
+- [x] **`run_backtesting` parallelisiert**
+  - `--workers N` (Standard 1): Szenarien parallel via `ProcessPoolExecutor` (SoC-Kette bleibt pro Szenario sequentiell).
+  - Beispiel: `python -m scripts.run_backtesting --start-month 8 --end-month 8 --workers 4` (~71 s für Aug 2025).
+- [x] **Dynamische Einspeise (Awattar SUNNY Spot)**
+  - `data/feed_in_prices.py`: `EPEX − fee_factor×|EPEX| + fix`; Config `awattar.feed_in_fee_factor`, `feed_in_mode` in Szenarien.
+  - Vorzeichen in Kostenformel geprüft (Export bei negativem EPEX = Kosten, nicht Erlös).
+  - **MILP-Zielfunktion:** stündliches `k_push_act` aus Matrix (`k_push_act_for_matrix_row`) — Abrechnung und Optimierung konsistent.
+  - August 2025 Backtest: Runtime **4,39 €** vs. dynamisch **4,47 €** (vor MILP-Fix ~15 € Abstand durch falsches flat `k_push=6,4` im Solver).
+
 - [x] Lineare Programmireung in optimizer.py einbauen (forecast_pv und forecast_consumption berücksichtigen)
 - [x] Deployment auf Synology NAS einrichten
 - [x] Aktuellen Ladezustand in Sankey-Diagramm verschieben (oben rausnehmen)
@@ -84,7 +101,8 @@
 - [x] Anzeige Plausibilität entfernen
 - [x] Verhalten fehlerhaft, wenn kein Ladewecker aktiv und Auto nicht angehängt ist 29.06.
 - [x] E-Auto wurde am 29.06. nicht richtig aufgeladen - Verhalten prüfen
-- [x] Einsperpotenzial aufzeichnen, um Trends zu erkennen 
+- [x] Einspeisepotenzial aufzeichnen, um Trends zu erkennen 
+- [x] Optional den stündlichen Einspeisepreis von Awattar berücksichtigen und Potenzial-Simulation durchführen *(erweitert 2026-07-03: dynamisches `feed_in_mode`, Backtesting-Szenario, siehe oben)*
 
 ### Log-Dateien (Review 2026-06)
 

@@ -10,6 +10,17 @@
       "type": "string",
       "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
     },
+    "cbc_gap_rel": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1,
+      "description": "Relativer CBC-MIP-Gap für Backtesting (z. B. 0.10 = 10 %). Fehlt der Wert, gilt 10 %."
+    },
+    "cbc_strict_time_limit_sec": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Sekunden für Strict-CBC vor gapRel-Fallback (0 = Strict überspringen). Standard: 3."
+    },
     "scenarios": {
       "type": "array",
       "description": "Zusätzliche Szenarien neben runtime_settings (Baseline) aus config.json.",
