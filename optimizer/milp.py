@@ -17,6 +17,7 @@ from .charging_context import (
     schedule_indices_for_consumer,
     split_eligible_by_urgent_deadline,
     summarize_urgent_rule_usage,
+    urgent_charging_indices,
 )
 from .consumer_power import (
     estimate_pv_surplus_kw,
@@ -435,7 +436,7 @@ def _add_consumer_delivery_constraints(
             and isinstance(deadline, datetime)
             and effective_target > 1e-6
         ):
-            pre_urgent, urgent = split_eligible_by_urgent_deadline(
+            urgent = urgent_charging_indices(
                 matrix[: model.horizon],
                 eligible,
                 deadline,
@@ -443,16 +444,9 @@ def _add_consumer_delivery_constraints(
                 max_kw,
             )
             if urgent:
-                delivery_urgent = _delivery_energy_expr(model, consumer, urgent)
-                if pre_urgent:
-                    delivery_before = _delivery_energy_expr(
-                        model, consumer, pre_urgent
-                    )
-                    model.prob += (
-                        delivery_urgent >= effective_target - delivery_before
-                    )
-                else:
-                    model.prob += delivery_urgent >= effective_target
+                model.prob += (
+                    _delivery_energy_expr(model, consumer, urgent) >= effective_target
+                )
 
 
 def _var_value_at_zero(variables: list) -> float:
@@ -756,7 +750,7 @@ def milp_optimizer(
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
     Optimiert Batterie und alle konfigurierten flexible_consumers gemeinsam per MILP.
     Rückgabe: (mode, target_power, target_soc, {consumer_id: leistung_kw},
-               {consumer_id: pv_follow 0|1}, milp_plan, urgent_rule_observability)
+               {consumer_id: pv_follow 0|1}, milp_plan)
     """
     if not matrix:
         logger.error("MILP: Optimierungsmatrix ist leer.")
@@ -782,6 +776,9 @@ def milp_optimizer(
 
     model = _build_milp_model(matrix, horizon, battery_params, current_soc, planned_consumers)
     _add_milp_objective(model, matrix, k_push)
+    logged_simulation = bool(
+        matrix and matrix[0].get("consumption_mode") == "logged_day"
+    )
     _add_consumer_delivery_constraints(
         model,
         matrix,
@@ -789,6 +786,7 @@ def milp_optimizer(
         schedule_indices,
         contexts,
         verbose,
+        include_urgent_deadline_constraint=not logged_simulation,
     )
     if e_terminal := _terminal_soc_energy_kwh(
         battery_params, current_soc, terminal_soc_percent

@@ -1,9 +1,23 @@
 🗺️ Projekt-Roadmap & Backlog
 
 ## Offene Todos
+- [ ] **Backtesting / E-Auto-MILP: CBC-Performance** (Priorität nach Smoke-Tests, Stand 2026-07-03)
+  - **Symptom:** `python -m scripts.run_backtesting` friert bei ~25–50 % ein (2. Fenster mit E-Auto, z. B. Anker `2026-06-29 07:00`, Log-Ziel **3,701 kWh**).
+  - **Ursache (isoliert):** Nicht `battery_end_soc_equals_start`, nicht primär falsche Fenster-Ausrichtung. CBC in `optimizer/milp.py` (`PULP_CBC_CMD`, kein Zeitlimit) wird extrem langsam bei **E-Auto + `use_time_window=True` + variable Leistung (`power_setpoint`)** — auch **ohne** urgent-Nebenbedingung.
+  - **Regression:** Commit `01f47bf` („E-Auto nicht nur in letzten Stunden laden“) führte `split_eligible_by_urgent_deadline` + härtere urgent-Constraints ein; `d4e40b1` löste dasselbe Fenster in ~0,1–0,2 s (mit alter urgent-Logik).
+  - **Bereits umgesetzt:**
+    - `optimizer/milp.py`: urgent-Nebenbedingung für `consumption_mode == "logged_day"` (Backtesting) **aus**; Live nutzt wieder einfache `urgent_charging_indices`-Logik (nicht split).
+    - `optimizer/charging_context.py`: `use_time_window` bleibt **`True`** im historischen Pfad (kein dauerhaftes Abschalten).
+    - Tests: `tests/test_backtesting_smoke.py` — 1 Fenster (`2026-06-25`, E-Auto=0 kWh), Szenario `runtime_settings`, ~5 s.
+  - **Workaround (nur manueller Voll-Lauf):** `use_time_window=False` bei `realtime=False` ließ Voll-Backtesting durchlaufen (~43 min) — **nicht** produktiv übernommen.
+  - **Nächste Schritte:** E-Auto-MILP-Modell vereinfachen oder Constraints linearisieren; urgent-Regel-Review (siehe separater Punkt); optional Solver-Zeitlimit nur mit klarer Fehlermeldung (User lehnt blindes Limit ab).
+  - **Diagnose-Skript-Idee:** Einzelnes Fenster `build_historical_window_matrix` + `milp_optimizer` mit `rem={'eauto': 3.701, ...}` vs. `use_time_window` an/aus.
+- [ ] **End-SOC-Randbedingung im Live-Modus reviewen** (`battery_end_soc_equals_start`)
+  - Aktuell testweise deaktiviert; prüfen, ob `SOC Ende == SOC Start` am 24h-Horizont für Live sinnvoll bleibt oder angepasst werden soll
+  - Kontext: Backtesting-Hänger lag am E-Auto-MILP, nicht an dieser Bedingung
 - [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird -> Wenn Null, dann fünf Minuten laden mit Mindest-Strom)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
-- [ ] Optional den stündlichen Einspeisepreis von Awattar berücksichtigen und Potenzial-Simulation durchführen
+- [x] Optional den stündlichen Einspeisepreis von Awattar berücksichtigen und Potenzial-Simulation durchführen
 - [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
   - [ ] Generell: Temperaturregelung bleibt eine "interne Logik"
   - [ ] Generell: Ernie soll ein Prognose-Modell für Energiebedarf erstellen (mit der Zeit) - Einfaches Knotenmodell mit angenommener Wärmekapazität und Wärmeleitfähigkeit nach aussen.

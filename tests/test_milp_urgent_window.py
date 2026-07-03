@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 
+from optimizer import battery as bat
 from optimizer.milp import milp_optimizer
 
 def _battery_params() -> dict:
@@ -62,9 +63,12 @@ def _plugged_in_matrix() -> tuple[list[dict], datetime]:
 
 
 class TestMilpUrgentWindow:
-    def test_may_charge_in_cheap_hours_before_urgent(self):
+    def test_logged_day_may_charge_in_cheap_hours_without_urgent(self):
+        """Backtesting (logged_day): ohne urgent-Nebenbedingung günstige Stunden nutzbar."""
         matrix, deadline = _plugged_in_matrix()
-        _, _, _, _, _, _, obs = milp_optimizer(
+        for row in matrix:
+            row["consumption_mode"] = "logged_day"
+        mode, _, _, _, _, _, obs = milp_optimizer(
             matrix,
             current_hour=0,
             current_soc=50.0,
@@ -84,6 +88,7 @@ class TestMilpUrgentWindow:
             },
             flex_indices=list(range(len(matrix))),
         )
+        assert mode != bat.MODE_AUTOMATIK
         assert obs["eauto"]["role"] == "redundant"
         assert obs["eauto"]["planned_pre_urgent_kwh"] >= 6.0
         assert obs["eauto"]["planned_urgent_kwh"] == 0.0
