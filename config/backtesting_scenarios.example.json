@@ -1,0 +1,62 @@
+{
+    "$schema": "./backtesting_scenarios.schema.json",
+    "scenarios": [
+        {
+            "id": "battery_5kwh_dynamic",
+            "label": "5 kWh, dynamische Einspeise",
+            "settings": {
+                "k_push_cent": 3.7,
+                "feed_in_mode": "dynamic_epex",
+                "pv_tilt": 25,
+                "pv_azimuth": 0,
+                "pv_kwp": 10,
+                "battery_max_power_kw": 2.5,
+                "battery_efficiency": 0.97,
+                "battery_capacity_kwh": 5.0,
+                "battery_min_soc": 10.0,
+                "battery_max_soc": 100.0,
+                "threshold_power": 0.02,
+                "latitude": 48,
+                "longitude": 10
+            }
+        },
+        {
+            "id": "battery_10kwh_fixed",
+            "label": "10 kWh, fixe Einspeise",
+            "settings": {
+                "k_push_cent": 3.7,
+                "feed_in_mode": "fixed",
+                "pv_tilt": 25,
+                "pv_azimuth": 0,
+                "pv_kwp": 10,
+                "battery_max_power_kw": 5.0,
+                "battery_efficiency": 0.97,
+                "battery_capacity_kwh": 10.0,
+                "battery_min_soc": 10.0,
+                "battery_max_soc": 100.0,
+                "threshold_power": 0.02,
+                "latitude": 48,
+                "longitude": 10
+            }
+        },
+        {
+            "id": "battery_10kwh_dynamic",
+            "label": "10 kWh, dynamische Einspeise",
+            "settings": {
+                "k_push_cent": 3.7,
+                "feed_in_mode": "dynamic_epex",
+                "pv_tilt": 25,
+                "pv_azimuth": 0,
+                "pv_kwp": 10,
+                "battery_max_power_kw": 5.0,
+                "battery_efficiency": 0.97,
+                "battery_capacity_kwh": 10.0,
+                "battery_min_soc": 10.0,
+                "battery_max_soc": 100.0,
+                "threshold_power": 0.02,
+                "latitude": 48,
+                "longitude": 10
+            }
+        }
+    ]
+}

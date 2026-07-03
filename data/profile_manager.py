@@ -7,6 +7,7 @@ from . import pv_forecast
 import config
 from . import data_loader
 from . import market_prices
+from . import feed_in_prices
 from . import cons_data_store
 from runtime_store.persist_paths import (
     consumption_profiles_file,
@@ -194,6 +195,10 @@ def _build_optimization_matrix(
             row["expected_p_total"] = forecast_total_consumption[i]
         optimization_matrix.append(row)
 
+    feed_in_prices.enrich_matrix_feed_in_prices(
+        optimization_matrix,
+        config.get_feed_in_settings(),
+    )
     return optimization_matrix
 
 
@@ -356,8 +361,8 @@ def _brutto_price_cent(epex_cent: float) -> float:
     return round((epex_cent * netzverlust + fix_aufschlag) * mwst_faktor, 4)
 
 
-def _get_historical_brutto_prices_for_day(target_date: date) -> List[float]:
-    """Lädt die historischen Börsenpreise für einen Tag und rechnet sie in Brutto-Cent/kWh um."""
+def _get_historical_epex_and_brutto_prices_for_day(target_date: date) -> tuple[list[float], list[float]]:
+    """Lädt EPEX- und Brutto-Bezugspreise (Cent/kWh) für 24 Stunden eines Tages."""
     sim_cfg = config.get_file_paths_battery_simulation()
     start = pd.Timestamp(target_date)
     end = start
@@ -375,9 +380,16 @@ def _get_historical_brutto_prices_for_day(target_date: date) -> List[float]:
         end=f"{target_date} 23:00:00",
         freq='1h',
     )
-    hourly_prices = df_prices['price_cent_kwh'].resample('h').mean()
-    hourly_prices = hourly_prices.reindex(full_day_range).ffill().bfill().fillna(0.0)
-    return [_brutto_price_cent(float(p)) for p in hourly_prices.tolist()]
+    slot_datetimes = [ts.to_pydatetime() for ts in full_day_range]
+    epex_prices = market_prices.epex_prices_for_slots(df_prices, slot_datetimes)
+    brutto_prices = [_brutto_price_cent(float(p)) for p in epex_prices]
+    return epex_prices, brutto_prices
+
+
+def _get_historical_brutto_prices_for_day(target_date: date) -> List[float]:
+    """Lädt die historischen Börsenpreise für einen Tag und rechnet sie in Brutto-Cent/kWh um."""
+    _, brutto_prices = _get_historical_epex_and_brutto_prices_for_day(target_date)
+    return brutto_prices
 
 
 def build_historical_optimization_matrix(target_date) -> Tuple[List[dict], dict]:
@@ -391,7 +403,7 @@ def build_historical_optimization_matrix(target_date) -> Tuple[List[dict], dict]
 
     baseload, historical_totals, total_load = get_historical_day_data(target_date)
     pv_profile = _get_historical_pv_for_day(target_date)
-    brutto_prices = _get_historical_brutto_prices_for_day(target_date)
+    epex_prices, brutto_prices = _get_historical_epex_and_brutto_prices_for_day(target_date)
 
     matrix = []
     for hour in range(24):
@@ -401,11 +413,14 @@ def build_historical_optimization_matrix(target_date) -> Tuple[List[dict], dict]
             "date": target_date,
             "slot_datetime": slot_dt,
             "k_act": brutto_prices[hour],
+            "price_buy": epex_prices[hour],
             "expected_p_act": baseload[hour],
             "expected_p_total": total_load[hour],
             "expected_p_pv": pv_profile[hour],
             "consumption_mode": "logged_day",
         })
+
+    feed_in_prices.enrich_matrix_feed_in_prices(matrix, config.get_feed_in_settings())
 
     meta = {
         'target_date': target_date,

@@ -18,6 +18,7 @@ from .simulation import (
     calculate_step_cost_euro_from_row as _calculate_step_cost_euro_from_row,
     delivered_flex_kwh_from_rows as _delivered_flex_kwh_from_rows,
     flexible_consumer_power_kw as _flexible_consumer_power_kw,
+    resolve_sell_price_cent,
 )
 from .targets import resolve_horizon_consumer_targets_kwh
 from simulation.engine import window_anchor_for_date, window_slot_datetimes
@@ -268,16 +269,17 @@ def check_consumer_targets(
     return issues
 
 
-def check_cost_recompute(rows: list[dict], sell_price_cent: float) -> list[ConsistencyIssue]:
+def check_cost_recompute(rows: list[dict], sell_price_cent: float | None) -> list[ConsistencyIssue]:
     """Prüft, dass die Kostenfunktion mit dem gespeicherten Netzbezug übereinstimmt."""
     issues: list[ConsistencyIssue] = []
     for index, row in enumerate(rows):
         grid = float(row.get("Netzbezug (kW)", 0.0) or 0.0)
         price = float(row["Strompreis (Cent/kWh)"])
+        sell_cent = resolve_sell_price_cent(row, sell_price_cent)
         if grid >= 0:
             expected = grid * price / 100.0
         else:
-            expected = grid * sell_price_cent / 100.0
+            expected = grid * sell_cent / 100.0
         actual = _calculate_step_cost_euro_from_row(row, sell_price_cent)
         if abs(actual - expected) > 1e-6:
             issues.append(
@@ -298,7 +300,7 @@ def validate_24h_optimization_run(
     initial_soc: float,
     battery_params: dict,
     consumer_daily_targets_kwh: dict[str, float] | None,
-    sell_price_cent: float,
+    sell_price_cent: float | None,
     label: str = "",
 ) -> ConsistencyReport:
     """Führt alle internen Konsistenzprüfungen für einen 24h-Lauf aus."""

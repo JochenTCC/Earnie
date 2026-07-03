@@ -14,7 +14,6 @@ Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimi
 | `battery_efficiency` | 0–1 | Roundtrip-Wirkungsgrad (Laden/Entladen) |
 | `battery_min_soc` | % | Untere SOC-Grenze (Schutz) |
 | `battery_max_soc` | % | Obere SOC-Grenze |
-| `battery_force_discharge_min_soc` | % | Ab diesem SOC darf Zwangsentladung zur Kostensenkung genutzt werden |
 | `battery_end_soc_equals_start` | bool | SOC am Ende des 24h-Horizonts = Start-SOC (verhindert künstliches „Ausverkaufen“ am Planungsende) |
 | `threshold_power` | Anteil | Relativ zu `battery_max_power_kw` (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
 
@@ -28,4 +27,4 @@ Die App kann einen **Korrekturfaktor** aus dem Vergleich Forecast.Solar vs. real
 
 ## Szenarien
 
-Zum Vergleich größerer Speicher ohne Produktiv-Änderung: `scenarios[]` in `config.json` (siehe [Überblick](ueberblick.md)).
+Zum Vergleich größerer Speicher ohne Produktiv-Änderung: `scenarios[]` in `config/backtesting_scenarios.json` (siehe [Überblick](ueberblick.md)).

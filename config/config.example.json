@@ -4,7 +4,9 @@
         "url": "https://api.awattar.at/v1/marketdata",
         "fix_aufschlag_cent": 1.5,
         "netzverlust_faktor": 1.03,
-        "mwst_austria_faktor": 1.20
+        "mwst_austria_faktor": 1.20,
+        "feed_in_fee_factor": 0.19,
+        "feed_in_fix_cent": 0.0
     },
     "system": {
         "global_timeout": 10,
@@ -51,6 +53,7 @@
     },
     "runtime_settings": {
         "k_push_cent": 3.7,
+        "feed_in_mode": "fixed",
         "pv_tilt": 25,
         "pv_azimuth": 0,
         "pv_kwp": 10,

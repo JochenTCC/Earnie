@@ -2,6 +2,7 @@
 config.py
 config.json
 config/config.json
+config/backtesting_scenarios.json
 *.pyc
 __pycache__/
 *.egg-info/

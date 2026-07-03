@@ -125,3 +125,53 @@ def resolve_config_json_path() -> str:
     if os.path.isfile(legacy):
         return legacy
     return preferred
+
+
+def bundled_backtesting_scenarios_example_file() -> str:
+    return os.path.join(bundled_config_dir(), "backtesting_scenarios.example.json")
+
+
+def bundled_backtesting_scenarios_schema_file() -> str:
+    return os.path.join(bundled_config_dir(), "backtesting_scenarios.schema.json")
+
+
+def resolve_backtesting_scenarios_template_path() -> str:
+    """Vorlage für backtesting_scenarios.json: Mount, Legacy oder gebündelte Image-Kopie."""
+    preferred = os.path.join("config", "backtesting_scenarios.example.json")
+    if os.path.isfile(preferred):
+        return preferred
+    legacy = "backtesting_scenarios.example.json"
+    if os.path.isfile(legacy):
+        return legacy
+    bundled = bundled_backtesting_scenarios_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_backtesting_scenarios_schema_template_path() -> str:
+    """Schema-Vorlage für backtesting_scenarios.json."""
+    preferred = os.path.join("config", "backtesting_scenarios.schema.json")
+    if os.path.isfile(preferred):
+        return preferred
+    legacy = "backtesting_scenarios.schema.json"
+    if os.path.isfile(legacy):
+        return legacy
+    bundled = bundled_backtesting_scenarios_schema_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_backtesting_scenarios_json_path() -> str:
+    """Pfad zu backtesting_scenarios.json: ENV > config/ > Legacy im Repo-Wurzelverzeichnis."""
+    env = os.environ.get("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", "").strip()
+    if env:
+        return env
+    preferred = os.path.join("config", "backtesting_scenarios.json")
+    if os.path.isfile(preferred):
+        return preferred
+    legacy = "backtesting_scenarios.json"
+    if os.path.isfile(legacy):
+        return legacy
+    return preferred

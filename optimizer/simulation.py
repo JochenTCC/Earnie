@@ -25,10 +25,25 @@ from data.market_prices import PRICE_SOURCE_MIRRORED
 
 def _chart_price_fields(row: dict) -> dict:
     """Preis-Felder für Simulations-/Chart-Zeilen."""
-    return {
+    fields = {
         "Strompreis (Cent/kWh)": row["k_act"],
         "Preis extrapoliert": row.get("price_source") == PRICE_SOURCE_MIRRORED,
     }
+    if "k_push_act" in row:
+        fields["Einspeisevergütung (Cent/kWh)"] = row["k_push_act"]
+    return fields
+
+
+def resolve_sell_price_cent(row: dict, default_sell_price_cent: float | None = None) -> float:
+    """Stündliche Einspeisevergütung aus Chart-Zeile oder Fallback."""
+    if "Einspeisevergütung (Cent/kWh)" in row:
+        return float(row["Einspeisevergütung (Cent/kWh)"])
+    if default_sell_price_cent is not None:
+        return float(default_sell_price_cent)
+    raise ValueError(
+        "Kein Einspeisepreis in der Zeile und kein Fallback angegeben "
+        "(Einspeisevergütung (Cent/kWh) oder default_sell_price_cent)."
+    )
 
 
 _RESERVED_KW_COLUMNS = {
@@ -300,10 +315,14 @@ def delivered_flex_kwh_from_rows(rows: list) -> dict[str, float]:
     return totals
 
 
-def calculate_step_cost_euro_from_row(row: dict, sell_price_cent: float) -> float:
+def calculate_step_cost_euro_from_row(
+    row: dict,
+    sell_price_cent: float | None = None,
+) -> float:
     """Berechnet die Stromkosten einer einzelnen Simulationsstunde in Euro."""
     p_con = row["Verbrauch-Prognose (kW)"] + flexible_consumer_power_kw(row)
     price_cent = row["Strompreis (Cent/kWh)"]
+    sell_cent = resolve_sell_price_cent(row, sell_price_cent)
     if "Netzbezug (kW)" in row:
         p_grid = float(row["Netzbezug (kW)"])
     else:
@@ -313,11 +332,11 @@ def calculate_step_cost_euro_from_row(row: dict, sell_price_cent: float) -> floa
     if p_grid >= 0:
         step_cents = p_grid * price_cent
     else:
-        step_cents = p_grid * sell_price_cent
+        step_cents = p_grid * sell_cent
     return step_cents / 100.0
 
 
-def calculate_cost_euro_from_rows(rows: list, sell_price_cent: float) -> float:
+def calculate_cost_euro_from_rows(rows: list, sell_price_cent: float | None = None) -> float:
     """Berechnet die Kosten in Euro für eine Stundenreihe aus einem Simulations-Output."""
     return sum(calculate_step_cost_euro_from_row(row, sell_price_cent) for row in rows)
 
@@ -334,7 +353,7 @@ def hourly_consumption_kwh_from_rows(rows: list) -> list[float]:
     ]
 
 
-def hourly_cost_euro_from_rows(rows: list, sell_price_cent: float) -> list[float]:
+def hourly_cost_euro_from_rows(rows: list, sell_price_cent: float | None = None) -> list[float]:
     """Stündliche Stromkosten in Euro je Simulationszeile."""
     return [
         round(calculate_step_cost_euro_from_row(row, sell_price_cent), 4)
@@ -345,7 +364,7 @@ def hourly_cost_euro_from_rows(rows: list, sell_price_cent: float) -> list[float
 def hourly_savings_euro_from_rows(
     matched_baseline_rows: list,
     optimized_rows: list,
-    sell_price_cent: float,
+    sell_price_cent: float | None = None,
 ) -> list[float]:
     """
     Stündliche Einsparung vs. Ziel-Baseline (positiv = günstiger optimiert).
@@ -630,7 +649,7 @@ def calculate_optimization_savings(
         horizon_targets,
         charging_contexts,
     )
-    sell_price_cent = config.get_push_price_cent()
+    sell_price_cent = None
     optimized_cost = calculate_cost_euro_from_rows(optimized_rows, sell_price_cent)
     baseline_cost = calculate_cost_euro_from_rows(baseline_rows, sell_price_cent)
     matched_baseline_cost = calculate_cost_euro_from_rows(

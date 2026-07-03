@@ -7,6 +7,8 @@ from datetime import date, datetime, time, timedelta
 import pandas as pd
 import config
 from data import profile_manager
+from data import feed_in_prices
+from data.market_prices import epex_prices_for_slots
 from optimizer import (
     simulate_horizon,
     _calculate_step_cost_euro_from_row,
@@ -146,10 +148,10 @@ def _brutto_price_cent(epex_cent: float) -> float:
 def _brutto_prices_for_slots(
     prices_df: pd.DataFrame, slot_datetimes: list[datetime]
 ) -> list[float]:
-    hourly = prices_df["price_cent_kwh"].resample("h").mean()
-    idx = pd.DatetimeIndex(slot_datetimes)
-    series = hourly.reindex(idx).ffill().bfill().fillna(0.0)
-    return [_brutto_price_cent(float(p)) for p in series.tolist()]
+    return [
+        _brutto_price_cent(epex)
+        for epex in epex_prices_for_slots(prices_df, slot_datetimes)
+    ]
 
 
 def list_simulation_anchors(
@@ -174,16 +176,18 @@ def build_historical_window_matrix(
     anchor: datetime,
     cache: HistoricalDataCache,
     prices_df: pd.DataFrame,
+    feed_in_settings: feed_in_prices.FeedInSettings | None = None,
 ) -> tuple[list[dict], dict]:
     """Baut eine 24h-Matrix aus historischen Logs für [Anker-24h, Anker)."""
     slot_datetimes = window_slot_datetimes(anchor)
     baseload, historical_totals, total_load = cache.get_window_consumption(slot_datetimes)
     pv_profile = cache.get_pv_for_slots(slot_datetimes)
-    brutto_prices = _brutto_prices_for_slots(prices_df, slot_datetimes)
+    epex_prices = epex_prices_for_slots(prices_df, slot_datetimes)
+    brutto_prices = [_brutto_price_cent(epex) for epex in epex_prices]
 
     matrix = []
-    for slot_dt, price, pv, base, total in zip(
-        slot_datetimes, brutto_prices, pv_profile, baseload, total_load
+    for slot_dt, price, epex, pv, base, total in zip(
+        slot_datetimes, brutto_prices, epex_prices, pv_profile, baseload, total_load
     ):
         matrix.append(
             {
@@ -191,6 +195,7 @@ def build_historical_window_matrix(
                 "date": slot_dt.date(),
                 "slot_datetime": slot_dt,
                 "k_act": price,
+                "price_buy": epex,
                 "expected_p_act": base,
                 "expected_p_total": total,
                 "expected_p_pv": pv,
@@ -198,6 +203,9 @@ def build_historical_window_matrix(
                 "charging_anchor": anchor,
             }
         )
+
+    settings = feed_in_settings or config.get_feed_in_settings()
+    feed_in_prices.enrich_matrix_feed_in_prices(matrix, settings)
 
     meta = {
         "window_end": anchor,
@@ -232,7 +240,7 @@ def compute_historical_reference_costs(
     start: pd.Timestamp,
     end: pd.Timestamp,
     prices_df: pd.DataFrame,
-    k_push_cent: float,
+    feed_in_settings: feed_in_prices.FeedInSettings,
     cache: HistoricalDataCache | None = None,
 ) -> pd.DataFrame:
     """
@@ -256,13 +264,15 @@ def compute_historical_reference_costs(
         _, _, total_load = cache.get_window_consumption(slot_datetimes)
         pv_profile = cache.get_pv_for_slots(slot_datetimes)
         brutto_prices = _brutto_prices_for_slots(prices_df, slot_datetimes)
+        epex_prices = epex_prices_for_slots(prices_df, slot_datetimes)
 
-        for slot_dt, load, pv, price in zip(
-            slot_datetimes, total_load, pv_profile, brutto_prices
+        for slot_dt, load, pv, price, epex in zip(
+            slot_datetimes, total_load, pv_profile, brutto_prices, epex_prices
         ):
             timestamps.append(slot_dt)
+            k_push = feed_in_prices.resolve_k_push_act(epex, feed_in_settings)
             costs.append(
-                _hour_cost_without_optimization(load, pv, price, k_push_cent)
+                _hour_cost_without_optimization(load, pv, price, k_push)
             )
 
     df_res = pd.DataFrame({"sim_cost": costs}, index=pd.DatetimeIndex(timestamps))
@@ -343,7 +353,7 @@ def run_simulation(
         )
 
     battery_params = _scenario_to_battery_params(scenario_params)
-    k_push = float(scenario_params["k_push_cent"])
+    feed_in_settings = config.get_feed_in_settings(runtime_override=scenario_params)
     total_hours = len(anchors) * 24
     hours_done = 0
     sim_soc = initial_soc
@@ -353,12 +363,13 @@ def run_simulation(
     plausibility = PlausibilityReport()
 
     for anchor in anchors:
-        matrix, meta = build_historical_window_matrix(anchor, cache, prices_df)
+        matrix, meta = build_historical_window_matrix(
+            anchor, cache, prices_df, feed_in_settings=feed_in_settings
+        )
         chart_rows = simulate_horizon(
             matrix,
             sim_soc,
             battery_params=battery_params,
-            k_push=k_push,
             verbose=False,
             consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
         )
@@ -375,7 +386,7 @@ def run_simulation(
     df_res = pd.DataFrame(
         {
             "sim_cost": [
-                _calculate_step_cost_euro_from_row(row, k_push) for row in all_chart_rows
+                _calculate_step_cost_euro_from_row(row) for row in all_chart_rows
             ],
             "sim_soc": [row["Simulierter SoC (%)"] for row in all_chart_rows],
             "batt_action_kw": [row["Geplante Batterie-Aktion (kW)"] for row in all_chart_rows],

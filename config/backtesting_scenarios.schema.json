@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://energy-optimizer.local/backtesting_scenarios.schema.json",
+  "title": "Energy Optimizer Backtesting-Szenarien",
+  "description": "Alternative Parameter-Sets nur für Simulation und Backtesting. runtime_settings bleiben in config.json.",
+  "type": "object",
+  "required": ["scenarios"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
+    },
+    "scenarios": {
+      "type": "array",
+      "description": "Zusätzliche Szenarien neben runtime_settings (Baseline) aus config.json.",
+      "items": {
+        "$ref": "#/definitions/scenario"
+      }
+    }
+  },
+  "definitions": {
+    "scenario": {
+      "type": "object",
+      "description": "Benanntes Szenario für Simulation/Backtesting.",
+      "required": ["id", "label", "settings"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Eindeutige Szenario-Kennung (z. B. battery_10kwh). Nicht 'runtime_settings' verwenden."
+        },
+        "label": {
+          "type": "string",
+          "description": "Anzeigename in der UI."
+        },
+        "settings": {
+          "type": "object",
+          "description": "Parameter-Override (gleiche Felder wie runtime_settings in config.json).",
+          "properties": {
+            "k_push_cent": { "type": "number" },
+            "feed_in_mode": {
+              "type": "string",
+              "enum": ["fixed", "dynamic_epex"]
+            },
+            "pv_tilt": { "type": "number" },
+            "pv_azimuth": { "type": "number" },
+            "pv_kwp": { "type": "number" },
+            "battery_max_power_kw": { "type": "number" },
+            "battery_efficiency": { "type": "number" },
+            "battery_capacity_kwh": { "type": "number" },
+            "battery_min_soc": { "type": "number" },
+            "battery_max_soc": { "type": "number" },
+            "battery_end_soc_equals_start": { "type": "boolean" },
+            "threshold_power": { "type": "number" },
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}

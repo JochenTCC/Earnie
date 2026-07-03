@@ -22,6 +22,9 @@ from runtime_store.persist_paths import (
     flexible_consumer_profiles_file,
     legacy_history_csv_file,
     log_file,
+    resolve_backtesting_scenarios_json_path,
+    resolve_backtesting_scenarios_schema_template_path,
+    resolve_backtesting_scenarios_template_path,
     resolve_config_json_path,
     resolve_config_schema_template_path,
     resolve_config_template_path,
@@ -133,6 +136,34 @@ def _bootstrap_config_json() -> bool:
     return True
 
 
+def _bootstrap_backtesting_scenarios_example() -> bool:
+    dest = os.path.join("config", "backtesting_scenarios.example.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_backtesting_scenarios_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_backtesting_scenarios_schema() -> bool:
+    dest = os.path.join("config", "backtesting_scenarios.schema.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_backtesting_scenarios_schema_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_backtesting_scenarios_json() -> bool:
+    scenarios_path = resolve_backtesting_scenarios_json_path()
+    template_path = resolve_backtesting_scenarios_template_path()
+    return _copy_template_if_missing(
+        scenarios_path,
+        template_path,
+        "backtesting_scenarios.example.json",
+    )
+
+
 def _bootstrap_cons_data_pending() -> bool:
     path = cons_data_pending_file()
     payload = stamp_payload(
@@ -184,6 +215,12 @@ def run() -> None:
         created.append(os.path.join("config", "config.schema.json"))
     if _bootstrap_config_json():
         created.append(resolve_config_json_path())
+    if _bootstrap_backtesting_scenarios_example():
+        created.append(os.path.join("config", "backtesting_scenarios.example.json"))
+    if _bootstrap_backtesting_scenarios_schema():
+        created.append(os.path.join("config", "backtesting_scenarios.schema.json"))
+    if _bootstrap_backtesting_scenarios_json():
+        created.append(resolve_backtesting_scenarios_json_path())
     if _bootstrap_cons_data_csv():
         created.append(default_cons_data_file())
     if _bootstrap_cons_data_pending():

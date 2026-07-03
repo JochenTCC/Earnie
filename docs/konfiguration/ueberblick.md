@@ -19,15 +19,16 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`co
 | `awattar` | API und Aufschläge für Bezugsstrompreis (Österreich) |
 | `system` | Timeouts für HTTP und Optimierungs-Schleife |
 | `loxone_blocks` | Zentrale Loxone-IO-Namen (Speicher, PV, Steuerung) |
-| `runtime_settings` | PV-Anlage, Batterie, Standort — **Produktiv und Simulation** |
-| `scenarios` | Zusätzliche Parameter-Sets nur für Simulation/Backtesting |
+| `runtime_settings` | PV-Anlage, Batterie, Standort — **Produktiv und Live-Optimierung** |
 | `file_paths_battery_simulation` | Pfade zu historischen CSVs, Preisquelle, `cons_data_hourly.csv` |
 | `flexible_consumers` | Steuerbare Verbraucher (MILP) mit Loxone-Ein-/Ausgängen |
 
-## `scenarios` vs. `runtime_settings`
+Zusätzlich für Backtesting: **`config/backtesting_scenarios.json`** mit alternativen Parameter-Sets (Vorlage: [`backtesting_scenarios.example.json`](../../config/backtesting_scenarios.example.json)).
+
+## `backtesting_scenarios.json` vs. `runtime_settings`
 
 - **`runtime_settings`:** Maßgeblich für `main.py` und die App im Modus **Echtzeit**.
-- **`scenarios`:** Alternative Batterie-/PV-Konfigurationen zum Vergleich in Simulation und Backtesting (z. B. „10 kWh Speicher“). Ändern **nicht** automatisch den Produktivbetrieb.
+- **`backtesting_scenarios.json`:** Alternative Batterie-/PV-Konfigurationen zum Vergleich in Simulation und Backtesting (z. B. „10 kWh Speicher“). Ändern **nicht** automatisch den Produktivbetrieb. Die Baseline im Backtesting ist weiterhin `runtime_settings` aus `config.json`.
 
 ## `file_paths_battery_simulation`
 
@@ -46,7 +47,7 @@ Details zu Preisen: [Preise & aWATTar](preise.md).
 
 ## Sidebar in der App
 
-Im Modus **Echtzeit** und **Historischer Tag** können PV-, Batterie- und Einspeiseparameter in der Sidebar geändert werden. Gespeichert wird direkt in `runtime_settings` von `config.json` — nicht in `scenarios`.
+Im Modus **Echtzeit** und **Historischer Tag** können PV-, Batterie- und Einspeiseparameter in der Sidebar geändert werden. Gespeichert wird direkt in `runtime_settings` von `config.json` — nicht in `backtesting_scenarios.json`.
 
 ## Weiterführend
 

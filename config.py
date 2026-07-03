@@ -7,18 +7,24 @@ from dotenv import load_dotenv
 # Sensible Daten aus .env laden
 load_dotenv()
 
-from runtime_store.persist_paths import resolve_config_json_path
+from runtime_store.persist_paths import (
+    resolve_backtesting_scenarios_json_path,
+    resolve_config_json_path,
+)
 
 CONFIG_JSON_PATH = resolve_config_json_path()
+BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
 
 
 class Config:
     def __init__(
         self,
         config_path: str = CONFIG_JSON_PATH,
+        backtesting_scenarios_path: str = BACKTESTING_SCENARIOS_JSON_PATH,
         require_loxone_credentials: bool | None = None,
     ):
         self.config_path = config_path
+        self.backtesting_scenarios_path = backtesting_scenarios_path
         if require_loxone_credentials is None:
             require_loxone_credentials = os.getenv("ENERGY_OPTIMIZER_OFFLINE") != "1"
         self.require_loxone_credentials = require_loxone_credentials
@@ -575,6 +581,13 @@ class Config:
 
     def _load_dynamic_params(self) -> None:
         self.K_PUSH_CENT = self._get_strict(self._raw_config, ["runtime_settings", "k_push_cent"])
+        feed_in_mode_raw = self._raw_config.get("runtime_settings", {}).get("feed_in_mode")
+        if feed_in_mode_raw is None:
+            self.FEED_IN_MODE = "fixed"
+        else:
+            from data.feed_in_prices import validate_feed_in_mode
+
+            self.FEED_IN_MODE = validate_feed_in_mode(feed_in_mode_raw)
         self.PV_TILT = self._get_strict(self._raw_config, ["runtime_settings", "pv_tilt"])
         self.PV_AZIMUTH = self._get_strict(self._raw_config, ["runtime_settings", "pv_azimuth"])
         self.PV_KWP = self._get_strict(self._raw_config, ["runtime_settings", "pv_kwp"])
@@ -655,6 +668,13 @@ class Config:
     def get_push_price_cent(self) -> float:
         return self.get('K_PUSH_CENT', cast=float)
 
+    def get_feed_in_settings(self, runtime_override: dict | None = None):
+        from data.feed_in_prices import feed_in_settings_from_dict
+
+        runtime = runtime_override if runtime_override is not None else self._raw_config["runtime_settings"]
+        awattar = self._raw_config.get("awattar", {})
+        return feed_in_settings_from_dict(runtime, awattar)
+
     def get_threshold_power(self) -> float:
         """Relativer Leistungsschwellenwert (Anteil von battery_max_power_kw)."""
         return self.get('THRESHOLD_POWER', cast=float)
@@ -693,11 +713,30 @@ class Config:
         """Lädt Szenario-Parameter als {id: settings}-Dict (Abwärtskompatibilität)."""
         return {scenario["id"]: scenario["settings"] for scenario in self.get_scenarios()}
 
-    def get_scenarios(self) -> list[dict]:
-        """Lädt alle Backtesting-Szenarien aus dem scenarios-Array in config.json."""
+    def _load_backtesting_scenarios_entries(self) -> list:
+        path = self.backtesting_scenarios_path
+        if os.path.isfile(path):
+            try:
+                data = self._read_json_dict(path)
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"Kritischer Fehler: '{path}' enthält ungültiges JSON: {e}"
+                ) from e
+            raw = data.get("scenarios")
+            if raw is None:
+                raise KeyError(
+                    f"Kritischer Konfigurationsfehler: '{path}' benötigt ein "
+                    "'scenarios'-Array."
+                )
+            if not isinstance(raw, list):
+                raise ValueError(
+                    f"Kritischer Konfigurationsfehler: '{path}': scenarios muss ein Array sein."
+                )
+            return raw
+
         raw = self._raw_config.get("scenarios")
         if isinstance(raw, list) and raw:
-            return [self._normalize_scenario(entry, index) for index, entry in enumerate(raw)]
+            return raw
 
         legacy = {
             key: value
@@ -712,6 +751,13 @@ class Config:
             }
             for key, value in sorted(legacy.items())
         ]
+
+    def get_scenarios(self) -> list[dict]:
+        """Lädt alle Backtesting-Szenarien aus backtesting_scenarios.json."""
+        raw = self._load_backtesting_scenarios_entries()
+        if not raw:
+            return []
+        return [self._normalize_scenario(entry, index) for index, entry in enumerate(raw)]
 
     @staticmethod
     def _normalize_scenario(raw: dict, index: int) -> dict:
@@ -797,9 +843,13 @@ CONFIG = Config()
 
 def reinit_config() -> None:
     """Lädt die Konfiguration neu (z. B. nach Bootstrap mit neu angelegter config.json)."""
-    global CONFIG, CONFIG_JSON_PATH
+    global CONFIG, CONFIG_JSON_PATH, BACKTESTING_SCENARIOS_JSON_PATH
     CONFIG_JSON_PATH = resolve_config_json_path()
-    CONFIG = Config(config_path=CONFIG_JSON_PATH)
+    BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
+    CONFIG = Config(
+        config_path=CONFIG_JSON_PATH,
+        backtesting_scenarios_path=BACKTESTING_SCENARIOS_JSON_PATH,
+    )
 
 
 def get(name: str, default=None, cast=None):
@@ -824,6 +874,10 @@ def get_flexible_consumers(optimizer_only: bool = False) -> list:
 
 def get_push_price_cent() -> float:
     return CONFIG.get_push_price_cent()
+
+
+def get_feed_in_settings(runtime_override: dict | None = None):
+    return CONFIG.get_feed_in_settings(runtime_override=runtime_override)
 
 
 def get_threshold_power() -> float:

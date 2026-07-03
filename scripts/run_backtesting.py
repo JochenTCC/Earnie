@@ -263,14 +263,14 @@ def main(argv: list[str] | None = None):
         f"24h-Fenster endend um ready_by_hour (z. B. {ready_h})"
     )
 
-    k_push = config.get_push_price_cent()
+    ref_settings = config.get_feed_in_settings()
     scenario_labels = config.get_scenario_labels()
     labels = _all_labels(scenario_labels)
 
     print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
     sim_results = {
         HISTORICAL_REFERENCE_ID: compute_historical_reference_costs(
-            start, end, prices, k_push, cache=cache
+            start, end, prices, ref_settings, cache=cache
         ),
     }
     plausibility_by_scenario: dict = {}

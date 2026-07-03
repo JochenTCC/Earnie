@@ -21,13 +21,6 @@
       "$ref": "#/definitions/runtime_settings",
       "description": "Laufzeitparameter für PV, Batterie und Optimierung."
     },
-    "scenarios": {
-      "type": "array",
-      "description": "Alternative Parameter-Sets nur für Simulation und Backtesting (nicht Produktiv).",
-      "items": {
-        "$ref": "#/definitions/scenario"
-      }
-    },
     "file_paths_battery_simulation": {
       "$ref": "#/definitions/file_paths_battery_simulation",
       "description": "Pfade zu historischen CSVs, cons_data und Preisquelle."
@@ -66,6 +59,15 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "USt-Faktor auf den Bezugspreis (z. B. 1.2 für 20 %)."
+        },
+        "feed_in_fee_factor": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Bearbeitungsgebühr auf |EPEX| für dynamische Einspeise (Awattar SUNNY Spot: 0.19). Nur bei feed_in_mode=dynamic_epex erforderlich."
+        },
+        "feed_in_fix_cent": {
+          "type": "number",
+          "description": "Fixer Cent/kWh-Offset auf die dynamische Einspeisevergütung (z. B. regionale Abgaben)."
         }
       }
     },
@@ -141,6 +143,11 @@
           "type": "number",
           "description": "Einspeisevergütung in Cent/kWh (Erlös bei Netzeinspeisung)."
         },
+        "feed_in_mode": {
+          "type": "string",
+          "enum": ["fixed", "dynamic_epex"],
+          "description": "Einspeisevergütung: fix (k_push_cent) oder stündlich dynamisch aus EPEX (Awattar SUNNY Spot)."
+        },
         "pv_tilt": {
           "type": "number",
           "description": "PV-Dachneigung in Grad."
@@ -184,12 +191,6 @@
           "maximum": 100,
           "description": "Untere SOC-Grenze in % (Schutz)."
         },
-        "battery_force_discharge_min_soc": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100,
-          "description": "Ab diesem SOC in % darf Zwangsentladung zur Kostensenkung genutzt werden."
-        },
         "battery_max_soc": {
           "type": "number",
           "minimum": 0,
@@ -205,25 +206,6 @@
         "battery_end_soc_equals_start": {
           "type": "boolean",
           "description": "MILP-Randbedingung: SOC am Ende des Planungshorizonts entspricht dem SOC zu Beginn der Simulation bzw. (Live) dem aktuellen SOC. Verhindert künstliches Entladen am Horizontende."
-        }
-      }
-    },
-    "scenario": {
-      "type": "object",
-      "description": "Benanntes Szenario für Simulation/Backtesting.",
-      "required": ["id", "label", "settings"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Eindeutige Szenario-Kennung (z. B. battery_10kwh)."
-        },
-        "label": {
-          "type": "string",
-          "description": "Anzeigename in der UI."
-        },
-        "settings": {
-          "$ref": "#/definitions/runtime_settings",
-          "description": "Parameter-Override (gleiche Felder wie runtime_settings)."
         }
       }
     },

@@ -98,7 +98,6 @@ def test_historical_24h_optimization_is_internally_consistent(
         matrix,
         initial_soc,
         battery_params=battery_params,
-        k_push=float(scenario_params["k_push_cent"]),
         verbose=False,
         consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
     )
@@ -109,7 +108,7 @@ def test_historical_24h_optimization_is_internally_consistent(
         initial_soc=initial_soc,
         battery_params=battery_params,
         consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
-        sell_price_cent=float(scenario_params["k_push_cent"]),
+        sell_price_cent=None,
         label=historical_case.case_id,
     )
     assert_24h_optimization_consistent(report)

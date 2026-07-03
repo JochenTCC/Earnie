@@ -4,6 +4,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+import pandas as pd
+
 import config
 
 PRICE_SOURCE_DAY_AHEAD = "day_ahead"
@@ -111,3 +113,14 @@ def awattar_fetch_window() -> tuple[datetime, datetime]:
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end = now + timedelta(hours=24)
     return start, end
+
+
+def epex_prices_for_slots(
+    prices_df: pd.DataFrame,
+    slot_datetimes: list[datetime],
+) -> list[float]:
+    """EPEX Cent/kWh je Stunden-Slot aus einem Preis-DataFrame."""
+    hourly = prices_df["price_cent_kwh"].resample("h").mean()
+    idx = pd.DatetimeIndex(slot_datetimes)
+    series = hourly.reindex(idx).ffill().bfill().fillna(0.0)
+    return [float(p) for p in series.tolist()]

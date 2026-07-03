@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "written_at": "2026-07-02T09:15:01",
+  "written_by_app_version": "1.10.6",
+  "completed_at": "2026-07-02T09:15:01",
+  "source": "main.py",
+  "success": true,
+  "run_trigger": "quarter_hour",
+  "loxone_silent_mode": false,
+  "optimization_interval_sec": 900,
+  "event_trigger_snapshot": {
+    "eauto_plugged_in": false,
+    "eauto_charge_immediate": false,
+    "eauto_ready_by": null,
+    "eauto_rest_soc": 10.0
+  },
+  "loxone_sent": {
+    "Ernie_Ziel_SoC": 99.0,
+    "Ernie_Ziel_LadeLeistung": 0.0,
+    "Ernie_Ziel_Entladeleistung": 0.0,
+    "Ernie_Steuerbefehl": 0.0,
+    "Ernie_SwimSpa_Freigabe": 0.0,
+    "Ernie_EAuto_Ziel_kW": 0.0,
+    "Ernie_EAuto_pv_follow": 0.0,
+    "Ernie_WP_Freigabe": 0.0
+  },
+  "soc_percent": 20.0,
+  "pv_delta_kwh": 0.53,
+  "market_price_cent": 6.5,
+  "forecast_pv_kw": 1.72,
+  "forecast_consumption_kw": 0.43,
+  "mode": 0,
+  "target_power_kw": 0.0,
+  "target_soc_percent": 99.0,
+  "battery_plan_kw": 1.29,
+  "consumer_powers_kw": {
+    "swimspa": 0.0,
+    "eauto": 0.0
+  },
+  "consumer_remaining_kwh": {
+    "swimspa": 7.338,
+    "eauto": 14.222,
+    "waermepumpe": 0.0
+  },
+  "charging_contexts": {
+    "eauto": {
+      "active": true,
+      "plugged_in": false,
+      "anticipated": true,
+      "available_from": "2026-07-02T15:00:00",
+      "deadline": "2026-07-03T07:00:00",
+      "target_kwh": 14.222,
+      "use_time_window": true,
+      "source_label": "loxone (abwesend, Prognose charging_schedule)"
+    }
+  },
+  "urgent_rule_observability": {
+    "eauto": {
+      "role": "nachholen",
+      "target_kwh": 14.222,
+      "planned_pre_urgent_kwh": 12.214,
+      "planned_urgent_kwh": 2.008,
+      "deadline": "2026-07-03T07:00:00",
+      "must_start": "2026-07-03T02:56:31"
+    }
+  },
+  "consumer_pv_follow": {
+    "swimspa": 0,
+    "eauto": 0
+  },
+  "flex_live_kw": {
+    "swimspa": 0.0,
+    "eauto": 0.0,
+    "waermepumpe": 0.0
+  },
+  "consumption_snapshot": {
+    "house_kw": 0.43,
+    "baseload_kw": 0.43,
+    "flex_kw": {
+      "swimspa": 0.0,
+      "eauto": 0.0,
+      "waermepumpe": 0.0
+    },
+    "flex_sum_kw": 0.0,
+    "pv_kw": 1.72,
+    "grid_kw": -1.91,
+    "battery_kw": 0.62
+  },
+  "current_hour": 9
+}
