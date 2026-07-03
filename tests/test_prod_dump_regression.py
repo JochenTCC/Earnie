@@ -145,7 +145,7 @@ def _solve_urgent_dump_milp(
     reg = urgent_manifest["regression"]
     rows, matrix, contexts, _deadline, remaining = _urgent_dump_scenario(urgent_manifest)
     consumer = _eauto_consumer()
-    model = _build_milp_model(matrix, len(matrix), _battery_params(), 10.0, [consumer])
+    model = _build_milp_model(matrix, len(matrix), _battery_params(), 10.0, [consumer], 0.0)
     _add_milp_objective(model, matrix, 3.7)
     _add_consumer_delivery_constraints(
         model,

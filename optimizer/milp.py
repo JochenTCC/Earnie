@@ -25,7 +25,11 @@ from .consumer_power import (
     power_limits_kw,
     uses_pv_follow,
 )
-from .eauto_milp import milp_binary_charge_kw, milp_uses_power_setpoint
+from .eauto_milp import (
+    milp_binary_charge_kw,
+    milp_uses_power_setpoint,
+    split_backtesting_eauto_preset,
+)
 from . import battery as bat
 from .cbc_solver import solve_with_strict_fallback
 from .cbc_events import record_cbc_event, update_cbc_milp_context_from_row
@@ -276,6 +280,7 @@ def _build_milp_model(
     battery_params: dict,
     current_soc: float,
     planned_consumers: list,
+    fixed_flex_kw_t0: float,
 ) -> MilpHorizonModel:
     min_soc = battery_params["min_soc"]
     max_soc = battery_params["max_soc"]
@@ -330,7 +335,8 @@ def _build_milp_model(
     for t in range(horizon):
         p_pv = matrix[t]["expected_p_pv"]
         p_con = matrix[t]["expected_p_act"]
-        p_flex = pulp.lpSum(
+        fixed_flex = fixed_flex_kw_t0 if t == 0 else 0.0
+        p_flex = fixed_flex + pulp.lpSum(
             _flex_power_at_t(
                 consumer,
                 consumer_on,
@@ -792,8 +798,23 @@ def milp_optimizer(
         verbose,
         contexts,
     )
+    preset_powers, milp_consumers = split_backtesting_eauto_preset(
+        planned_consumers,
+        matrix[:horizon],
+        remaining,
+        schedule_indices,
+        contexts,
+    )
+    fixed_flex_kw_t0 = sum(preset_powers.values())
 
-    model = _build_milp_model(matrix, horizon, battery_params, current_soc, planned_consumers)
+    model = _build_milp_model(
+        matrix,
+        horizon,
+        battery_params,
+        current_soc,
+        milp_consumers,
+        fixed_flex_kw_t0,
+    )
     _add_milp_objective(model, matrix, fallback_k_push)
     logged_simulation = bool(
         matrix and matrix[0].get("consumption_mode") == "logged_day"
@@ -829,6 +850,8 @@ def milp_optimizer(
 
     milp_plan = _extract_milp_plan(model)
     consumer_powers, total_flex_power = _consumer_powers_now(model)
+    consumer_powers.update(preset_powers)
+    total_flex_power += sum(preset_powers.values())
     consumer_pv_follow = _consumer_pv_follow_now_all(model)
     mode, target_power, target_soc = _derive_control_from_milp(
         model,

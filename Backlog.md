@@ -1,17 +1,15 @@
 🗺️ Projekt-Roadmap & Backlog
 
 ## Offene Todos
-- [ ] **E-Auto-MILP: Phase 2–4** (Preset, Live Umschaltung, Tie-Break; Stand 2026-07-03)
-  - **Basis:** Phase 1 erledigt — Backtesting (`logged_day`) ohne kontinuierliches `p[t]` im Solver, feste `P_nom × on[t]` (`optimizer/eauto_milp.py`, siehe Erledigte).
+- [ ] **E-Auto-MILP: Phase 3–4** (Live Umschaltung, Tie-Break; Stand 2026-07-03)
+  - **Basis:** Modus B im Backtesting vollständig (Phase 1+2, siehe Erledigte): `remaining > P_nom` → MILP `P_nom × on[t]`; `remaining ≤ P_nom` → Preset außerhalb MILP.
   - **Offene Phasen** (jeweils einzeln verifizieren):
-    2. [ ] **Preset** für `remaining_kwh ≤ P_nom` im Backtesting — günstigste eligible Stunde, `p = clamp(remaining_kwh, P_min, P_nom)`; adressiert Kleinst-Restmengen (0,3–1,5 kWh) und 30 Plausibilitäts-Warnungen durch `P_nom`-Überlieferung.
-    3. [ ] **Live Umschaltung Modus A↔B** nach Config-Schwelle (Vorschlag: `> 2×P_min` → Modus A mit `power_setpoint`; darunter binär wie Backtesting); inkl. PV-Follow / Sofortladen in Modus A.
+    3. [ ] **Live Umschaltung Modus A↔B** nach Config-Schwelle (Vorschlag: `> 2×P_min` → Modus A mit `power_setpoint`; darunter binär/Preset wie Backtesting); inkl. PV-Follow / Sofortladen in Modus A.
     4. [ ] **Tie-Break ε₁/ε₂** in `_add_milp_objective` — **ε₁·Σ `on[t]`**, **ε₂·Σ `t·on[t]`** (E-Auto); Config-Pflichtparameter, `ε ≪ min(k_act)`; vor allem Modus A, Nachmessung ob nach Phase 1 noch nötig.
-  - **Modus B im Code (Phase 1):** MILP mit `P_nom × on[t]` für alle Restmengen; Preset/`P_min`-Sonderfälle fehlen noch (Phase 2).
   - **Config (kein stiller Default):** Schwellwert Live A↔B, ε₁, ε₂ — Fehler wenn fehlend.
   - **Hinweis:** Backtesting-Einsparungen gelten mit vereinfachtem E-Auto-Modell, nicht 1:1 Live-Prognose.
-  - **Später optional:** eligible-Stunden vorfiltern; lexikographisch zweistufig; SOC-/Netz-Straffaktoren; Degenerations-Erkennung → strict überspringen.
-  - **Verknüpfung:** urgent-Regel-Review; Prod-Dump-`xfail` (Live, unabhängig von Phase 1); PWM/Mindestlademenge E-Auto (Live-Ausgabe Modus A).
+  - **Später optional:** Plausibilitäts-Warnungen weiter analysieren (verbleibende 30/333: vermutlich `remaining > P_nom` bzw. andere Verbraucher); eligible-Stunden vorfiltern; lexikographisch zweistufig; SOC-/Netz-Straffaktoren; Degenerations-Erkennung → strict überspringen.
+  - **Verknüpfung:** urgent-Regel-Review; Prod-Dump-`xfail` (Live); PWM/Mindestlademenge E-Auto (Live-Ausgabe Modus A).
 - [ ] Batterieschädigung als Straffaktor in Optimierung einführen (lineares Amortisationsmodell, Angenommene Zyklenzahl 6000 - Gesamtkosten für Batterie (5 kWh) 1500€ --> Ein Hub = 1500/6000€)
 - [ ] **End-SOC-Randbedingung im Live-Modus reviewen** (`battery_end_soc_equals_start`)
   - Aktuell testweise deaktiviert; prüfen, ob `SOC Ende == SOC Start` am 24h-Horizont für Live sinnvoll bleibt oder angepasst werden soll
@@ -33,7 +31,7 @@
   - Akzeptanz: Wenn durchgehend nur `redundant` → Nebenbedingung entfernen (reicht Gesamt-Deadline + Kostenminimierung); sonst behalten und kurz begründen
 - [ ] **Prod-Dump-Regression: urgent-Nebenbedingung infeasible** (Stand 2026-07-03, Commit `a743318`)
   - Fixture: `eauto_urgent_deferred_cheap_hours_2026-06-28` (~7,99 kWh Rest bei `remaining_kwh_at_correction`)
-  - **Symptom (Live, Modus A):** MILP mit `include_urgent_deadline_constraint=True` → CBC **Infeasible**; ohne urgent → **Optimal** (~6,59 kWh in günstigen Stunden). Unverändert nach E-Auto Phase 1 (betrifft nur Backtesting).
+  - **Symptom (Live, Modus A):** MILP mit `include_urgent_deadline_constraint=True` → CBC **Infeasible**; ohne urgent → **Optimal** (~6,59 kWh in günstigen Stunden). Unverändert nach E-Auto Phase 1+2 (Backtesting betroffen nicht).
   - **Betroffene Tests** (`@pytest.mark.xfail` in `tests/test_prod_dump_regression.py`):
     - `test_prod_dump_milp_prefers_cheap_hours_after_urgent_fix`
     - `test_prod_dump_urgent_rule_redundant_vs_deadline_only`
@@ -52,11 +50,13 @@
 ## Erledigte Punkte
 
 ### Backtesting & CBC (2026-07-03)
-- [x] **E-Auto-MILP Modus B im Backtesting (Phase 1)** — Commit `c8a20c9`
-  - `optimizer/eauto_milp.py` (`milp_uses_power_setpoint`, `milp_binary_charge_kw`); `optimizer/milp.py`: bei `logged_day` kein `consumer_p` für E-Auto, Lieferung/Bilanz über feste `P_nom × on[t]` (`consumer_milp_charge_kw`).
-  - Tests: `tests/test_eauto_milp_mode.py`; `tests/test_milp_variable_power.py` bereinigt.
-  - **Ursache der CBC-Hänger:** Symmetrie/Entartung bei E-Auto + `use_time_window` + `power_setpoint`; `gapRel=10 %` lieferte dieselben Kosten.
-  - **Ergebnis:** Benchmark `2025-09-28` (hour-offset **1392**) strict ~445 s → ~0,05 s; `bench_cbc_gaps` 24h strict Minuten → ~0,8 s (gleiche Kosten); Jahres-Backtest 2025: **`strict_slow` 758 → 0**, Laufzeit ~357 s (4 Worker), Plausibilität **303/333** unverändert, 10 kWh dynamisch **774,13 €** (+461,87 €).
+- [x] **E-Auto-MILP Modus B im Backtesting (Phase 1+2)**
+  - **Phase 1** (`c8a20c9`): bei `logged_day` kein `consumer_p` für E-Auto; MILP mit festem `P_nom × on[t]` (`milp_uses_power_setpoint`, `milp_binary_charge_kw`, `consumer_milp_charge_kw`).
+  - **Phase 2:** `remaining_kwh ≤ P_nom` → Preset außerhalb MILP — günstigste eligible Stunde, `clamp(remaining, P_min, P_nom)` (`eauto_preset_power_now`, `split_backtesting_eauto_preset`, `fixed_flex_kw_t0` in Bilanz); MILP nur bei `remaining > P_nom`.
+  - Tests: `tests/test_eauto_milp_mode.py` (inkl. `TestEautoBacktestingPreset`); `tests/test_milp_variable_power.py` bereinigt.
+  - **Ursache CBC-Hänger (Phase 1):** Symmetrie/Entartung bei E-Auto + `use_time_window` + `power_setpoint`.
+  - **Ergebnis Jahres-Backtest 2025** (4 Worker, nach Phase 2): **`strict_slow` 0**, Laufzeit ~360 s, Plausibilität **303/333** (30 Warnungen unverändert — betroffene Fenster mit größeren E-Auto-Restmengen/`P_nom`-MILP oder anderen Verbrauchern), 10 kWh dynamisch **774,35 €** (+461,65 €); **0** CBC-Ereignisse.
+  - **Benchmark** `2025-09-28` (offset **1392**, E-Auto ~1,17 kWh): Phase 1 strict ~445 s → ~0,05 s; Phase 2 Preset-Pfad ~0,07 s.
   - Diagnose: `scripts/bench_cbc_gaps.py`, `scripts/analyze_benchmark_window.py`, `backtesting_cbc_events.jsonl`.
 - [x] **UTF-8 für Backtesting-Logs** — Commits `c8a20c9`, `a292adc`
   - `logger_config.configure_utf8_stdio`, `attach_utf8_log_file`; `scripts/run_backtesting --log-file`; `scripts/bootstrap_runtime.py`; `.vscode/settings.json` (Windows-Terminal `PYTHONUTF8`).
