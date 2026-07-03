@@ -4,7 +4,6 @@
 - [ ] **Backtesting / E-Auto-MILP: Modell vereinfachen** (Rest nach CBC-Workaround, Stand 2026-07-03)
   - **Symptom (historisch):** `run_backtesting` hing bei ~25–50 % bzw. Fortschritt `1392/1464 h` (Anker `2025-09-28 10:00`, E-Auto ~1,17 kWh).
   - **Ursache:** Symmetrie/Entartung im MILP bei **E-Auto + `use_time_window` + `power_setpoint`** — CBC strict ohne Gap braucht Minuten, liefert aber dieselben Kosten wie `gapRel=10 %`.
-  - **Workaround produktiv:** Zweistufiger CBC (siehe Erledigte Punkte) — kein dauerhaftes `use_time_window=False`.
   - **Nächster Schritt:** E-Auto-MILP-Modell vereinfachen oder Constraints linearisieren (`power_setpoint` + Zeitfenster); urgent-Regel-Review (separater Punkt).
   - **Diagnose-Skripte:** `scripts/diag_single_window.py`, `scripts/bench_cbc_gaps.py`, `scripts/analyze_benchmark_window.py` (Benchmark: hour-offset **1392**).
 - [ ] **End-SOC-Randbedingung im Live-Modus reviewen** (`battery_end_soc_equals_start`)
@@ -30,6 +29,13 @@
 - [ ] **urgent-Regel auf Notwendigkeit prüfen** (Review bis ca. **2026-07-12**, zwei Wochen nach Einführung der Observability)
   - Auswertung: `urgent_rule_observability` in `energy_optimizer.log` und `optimization_history.jsonl` (`role`: `redundant` / `nachholen` / `nur_urgent_fenster`)
   - Akzeptanz: Wenn durchgehend nur `redundant` → Nebenbedingung entfernen (reicht Gesamt-Deadline + Kostenminimierung); sonst behalten und kurz begründen
+- [ ] **Prod-Dump-Regression: urgent-Nebenbedingung infeasible** (Stand 2026-07-03, Commit `a743318`)
+  - Fixture: `eauto_urgent_deferred_cheap_hours_2026-06-28` (~7,99 kWh Rest bei `remaining_kwh_at_correction`)
+  - **Symptom:** MILP mit `include_urgent_deadline_constraint=True` → CBC **Infeasible**; ohne urgent → **Optimal** (~6,59 kWh in günstigen Stunden)
+  - **Betroffene Tests** (vorerst `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py`):
+    - `test_prod_dump_milp_prefers_cheap_hours_after_urgent_fix` — erwartet ≥6 kWh in günstigen Stunden bei aktiver urgent-Nebenbedingung
+    - `test_prod_dump_urgent_rule_redundant_vs_deadline_only` — erwartet gleichen günstigen Plan mit/ohne urgent und `role=redundant`
+  - **Nächster Schritt:** Zusammenhang mit E-Auto-MILP-Vereinfachung und urgent-Regel-Review klären; `xfail` entfernen, sobald die Nebenbedingung wieder feasible ist
 - [ ] Verbrauchshistorie anzeigbar Machen im Live Modus (ist nur unzulänglich implementiert)
   - [x] Erster Schritt ist erledigt
   - [ ] Es muss noch ein Weg gefunden werden, wie die tatsächlichen Verläufe angezeigt werden können, um Diskrepanzen zu erkennen
