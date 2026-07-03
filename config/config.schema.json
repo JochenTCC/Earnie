@@ -13,6 +13,10 @@
       "$ref": "#/definitions/awattar",
       "description": "aWATTar-API und Aufschläge für den Bezugsstrompreis (Österreich)."
     },
+    "eauto_milp": {
+      "$ref": "#/definitions/eauto_milp",
+      "description": "E-Auto MILP: Live-Schwelle Modus A/B und Tie-Break-Koeffizienten (Pflicht)."
+    },
     "system": {
       "$ref": "#/definitions/system",
       "description": "HTTP-Timeouts und Intervall der Optimierungs-Schleife (main.py)."
@@ -68,6 +72,32 @@
         "feed_in_fix_cent": {
           "type": "number",
           "description": "Fixer Cent/kWh-Offset auf die dynamische Einspeisevergütung (z. B. regionale Abgaben)."
+        }
+      }
+    },
+    "eauto_milp": {
+      "type": "object",
+      "description": "E-Auto MILP: Live Umschaltung Modus A/B und Tie-Break in der Zielfunktion.",
+      "required": [
+        "live_modus_a_min_remaining_kwh",
+        "tie_break_on_epsilon",
+        "tie_break_time_epsilon"
+      ],
+      "properties": {
+        "live_modus_a_min_remaining_kwh": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Live Modus A (power_setpoint) nur wenn Restmenge in kWh darüber liegt (Vorschlag: 2×P_min)."
+        },
+        "tie_break_on_epsilon": {
+          "type": "number",
+          "minimum": 0,
+          "description": "ε₁ für ε₁·Σ on[t] in der MILP-Zielfunktion (E-Auto); soll ≪ min(k_act) sein."
+        },
+        "tie_break_time_epsilon": {
+          "type": "number",
+          "minimum": 0,
+          "description": "ε₂ für ε₂·Σ t·on[t] in der MILP-Zielfunktion (E-Auto); soll ≪ min(k_act) sein."
         }
       }
     },

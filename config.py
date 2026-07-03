@@ -655,6 +655,12 @@ class Config:
             ]
         return consumers
 
+    def get_eauto_milp_params(self) -> dict[str, float]:
+        """Pflichtparameter für E-Auto MILP Modus A/B und Tie-Break."""
+        from optimizer.eauto_milp import validate_eauto_milp_params
+
+        return validate_eauto_milp_params(self._raw_config.get("eauto_milp"))
+
     def get_swimspa_settings(self) -> dict:
         """Legacy-Hilfsfunktion: liefert den SwimSpa-Verbraucher oder Defaults."""
         consumer = self._consumer_by_id("swimspa")
@@ -915,6 +921,10 @@ def get_swimspa_settings() -> dict:
 
 def get_flexible_consumers(optimizer_only: bool = False) -> list:
     return CONFIG.get_flexible_consumers(optimizer_only=optimizer_only)
+
+
+def get_eauto_milp_params() -> dict[str, float]:
+    return CONFIG.get_eauto_milp_params()
 
 
 def get_push_price_cent() -> float:

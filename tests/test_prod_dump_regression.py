@@ -145,8 +145,19 @@ def _solve_urgent_dump_milp(
     reg = urgent_manifest["regression"]
     rows, matrix, contexts, _deadline, remaining = _urgent_dump_scenario(urgent_manifest)
     consumer = _eauto_consumer()
-    model = _build_milp_model(matrix, len(matrix), _battery_params(), 10.0, [consumer], 0.0)
-    _add_milp_objective(model, matrix, 3.7)
+    model = _build_milp_model(
+        matrix, len(matrix), _battery_params(), 10.0, [consumer], 0.0, {"eauto": 8.0},
+        {
+            "live_modus_a_min_remaining_kwh": 2.8,
+            "tie_break_on_epsilon": 0.001,
+            "tie_break_time_epsilon": 0.0001,
+        },
+    )
+    _add_milp_objective(model, matrix, 3.7, {
+        "live_modus_a_min_remaining_kwh": 2.8,
+        "tie_break_on_epsilon": 0.001,
+        "tie_break_time_epsilon": 0.0001,
+    })
     _add_consumer_delivery_constraints(
         model,
         matrix,

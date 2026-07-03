@@ -41,7 +41,7 @@ def _grid_sell_kwh(model, matrix) -> list[float]:
 
 def test_milp_prefers_export_in_high_feed_in_hour():
     matrix = _matrix_with_feed_in(sell_high_hour=2)
-    model = _build_milp_model(matrix, 4, _battery_params(), 50.0, [], 0.0)
-    _add_milp_objective(model, matrix, fallback_k_push=2.0)
+    model = _build_milp_model(matrix, 4, _battery_params(), 50.0, [], 0.0, {}, None)
+    _add_milp_objective(model, matrix, fallback_k_push=2.0, eauto_milp_params=None)
     sells = _grid_sell_kwh(model, matrix)
     assert sells[2] > sells[0] + 0.1

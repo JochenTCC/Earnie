@@ -8,6 +8,11 @@
         "feed_in_fee_factor": 0.19,
         "feed_in_fix_cent": 0.0
     },
+    "eauto_milp": {
+        "live_modus_a_min_remaining_kwh": 2.8,
+        "tie_break_on_epsilon": 0.001,
+        "tie_break_time_epsilon": 0.0001
+    },
     "system": {
         "global_timeout": 10,
         "loop_timeout": 900,

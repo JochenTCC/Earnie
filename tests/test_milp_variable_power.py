@@ -72,6 +72,12 @@ def test_model_has_continuous_power_variables():
         50.0,
         [_eauto_consumer()],
         0.0,
+        {"eauto": 7.0},
+        {
+            "live_modus_a_min_remaining_kwh": 2.8,
+            "tie_break_on_epsilon": 0.001,
+            "tie_break_time_epsilon": 0.0001,
+        },
     )
     assert "eauto" in model.consumer_p
     assert len(model.consumer_p["eauto"]) == 4

@@ -28,7 +28,7 @@ from .consumer_power import (
 from .eauto_milp import (
     milp_binary_charge_kw,
     milp_uses_power_setpoint,
-    split_backtesting_eauto_preset,
+    split_eauto_preset,
 )
 from . import battery as bat
 from .cbc_solver import solve_with_strict_fallback
@@ -248,6 +248,8 @@ def _add_consumer_power_variables(
     consumer_p: dict[str, list],
     consumer_p_fixed: dict[str, list],
     consumer_pv_follow: dict[str, list],
+    remaining_kwh: float,
+    eauto_milp_params: dict[str, float] | None,
 ) -> None:
     cid = consumer["id"]
     consumer_on[cid] = [
@@ -260,7 +262,9 @@ def _add_consumer_power_variables(
         consumer["min_on_quarterhours"],
         cid,
     )
-    if not milp_uses_power_setpoint(consumer, matrix):
+    if not milp_uses_power_setpoint(
+        consumer, matrix, remaining_kwh, eauto_milp_params
+    ):
         return
     _add_setpoint_power_variables(
         prob,
@@ -281,6 +285,8 @@ def _build_milp_model(
     current_soc: float,
     planned_consumers: list,
     fixed_flex_kw_t0: float,
+    remaining_by_consumer: dict[str, float],
+    eauto_milp_params: dict[str, float] | None,
 ) -> MilpHorizonModel:
     min_soc = battery_params["min_soc"]
     max_soc = battery_params["max_soc"]
@@ -320,7 +326,10 @@ def _build_milp_model(
     consumer_milp_charge_kw: dict[str, float] = {}
     for consumer in planned_consumers:
         cid = consumer["id"]
-        consumer_milp_charge_kw[cid] = milp_binary_charge_kw(consumer, matrix)
+        rem = remaining_by_consumer.get(cid, 0.0)
+        consumer_milp_charge_kw[cid] = milp_binary_charge_kw(
+            consumer, matrix, rem, eauto_milp_params
+        )
         _add_consumer_power_variables(
             prob,
             consumer,
@@ -330,6 +339,8 @@ def _build_milp_model(
             consumer_p,
             consumer_p_fixed,
             consumer_pv_follow,
+            rem,
+            eauto_milp_params,
         )
 
     for t in range(horizon):
@@ -404,13 +415,23 @@ def _add_milp_objective(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
     fallback_k_push: float,
+    eauto_milp_params: dict[str, float] | None,
 ) -> None:
-    model.prob += pulp.lpSum([
+    energy_cost = pulp.lpSum([
         model.p_grid_buy[t] * matrix[t]["k_act"]
         - model.p_grid_sell[t]
         * k_push_act_for_matrix_row(matrix[t], fallback_k_push)
         for t in range(model.horizon)
     ])
+    tie_break = 0.0
+    if eauto_milp_params and "eauto" in model.consumer_on:
+        on_vars = model.consumer_on["eauto"]
+        eps_on = eauto_milp_params["tie_break_on_epsilon"]
+        eps_time = eauto_milp_params["tie_break_time_epsilon"]
+        tie_break = eps_on * pulp.lpSum(on_vars) + eps_time * pulp.lpSum(
+            t * on_vars[t] for t in range(len(on_vars))
+        )
+    model.prob += energy_cost + tie_break
 
 
 def _add_consumer_delivery_constraints(
@@ -798,12 +819,15 @@ def milp_optimizer(
         verbose,
         contexts,
     )
-    preset_powers, milp_consumers = split_backtesting_eauto_preset(
+    has_eauto = any(c.get("id") == "eauto" for c in planned_consumers)
+    eauto_milp_params = config.get_eauto_milp_params() if has_eauto else None
+    preset_powers, milp_consumers = split_eauto_preset(
         planned_consumers,
         matrix[:horizon],
         remaining,
         schedule_indices,
         contexts,
+        eauto_milp_params,
     )
     fixed_flex_kw_t0 = sum(preset_powers.values())
 
@@ -814,8 +838,10 @@ def milp_optimizer(
         current_soc,
         milp_consumers,
         fixed_flex_kw_t0,
+        remaining,
+        eauto_milp_params,
     )
-    _add_milp_objective(model, matrix, fallback_k_push)
+    _add_milp_objective(model, matrix, fallback_k_push, eauto_milp_params)
     logged_simulation = bool(
         matrix and matrix[0].get("consumption_mode") == "logged_day"
     )
