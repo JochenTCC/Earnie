@@ -50,6 +50,25 @@ def _safe_float(value, default: float = 0.0) -> float:
     return number
 
 
+def _optional_float(value) -> float | None:
+    """Wie _safe_float, aber None/NaN bleiben None (kein Default)."""
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(number):
+        return None
+    return number
+
+
+def _line_plot_float(value) -> float:
+    """Plotly-Linienwert: fehlende Messwerte als NaN (Lücken)."""
+    parsed = _optional_float(value)
+    return float("nan") if parsed is None else parsed
+
+
 def _safe_int_flag(value) -> int:
     return int(_safe_float(value, 0.0))
 
@@ -196,10 +215,14 @@ def _soc_tail_y_from_row(row: pd.Series) -> float | None:
     """SoC am Ende der Stunde aus geplanter Batterieaktion (Optimierer/Huawei-Logik)."""
     if "Geplante Batterie-Aktion (kW)" not in row.index:
         return None
+    soc = _optional_float(row.get("Simulierter SoC (%)"))
+    action = _optional_float(row.get("Geplante Batterie-Aktion (kW)"))
+    if soc is None or action is None:
+        return None
     params = config.get_battery_params()
     new_soc, _ = bat.apply_soc_change(
-        float(row["Simulierter SoC (%)"]),
-        float(row["Geplante Batterie-Aktion (kW)"]),
+        soc,
+        action,
         params["battery_capacity_kwh"],
         params["efficiency"],
         params["min_soc"],
@@ -614,16 +637,16 @@ def _segment_linear_connected_line_xy(
 
     if start > 0 and start - 1 < len(y):
         points_x.append(axis.at(start - 1, anchor_fraction).iloc[0])
-        points_y.append(float(y.iloc[start - 1]))
+        points_y.append(_line_plot_float(y.iloc[start - 1]))
 
     for hour_index in range(start, end):
         points_x.append(axis.at(hour_index, anchor_fraction).iloc[0])
-        points_y.append(float(y.iloc[hour_index]))
+        points_y.append(_line_plot_float(y.iloc[hour_index]))
 
     if end == len(axis.starts):
         points_x.append(axis.legacy_index_time(len(axis.starts) - 0.5))
         points_y.append(
-            float(y.iloc[end - 1]) if tail_y is None else float(tail_y)
+            _line_plot_float(y.iloc[end - 1]) if tail_y is None else float(tail_y)
         )
 
     return pd.Series(points_x, dtype="datetime64[ns, UTC]"), pd.Series(points_y, dtype=float)
@@ -1038,6 +1061,7 @@ def add_baseline_soc_traces(
             line=dict(color=_COLOR_OPTIMIZED, width=2.5, dash="dot"),
             opacity=_segment_opacity(1.0, is_extrapolated),
             yaxis=yaxis,
+            connectgaps=False,
             customdata=_segment_hover_labels(
                 matched_baseline_df["Uhrzeit"],
                 start,

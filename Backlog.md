@@ -6,15 +6,17 @@
 
 - [ ] **UI Sunset-2-Sunset (Spec v0.6.1)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
-  - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung)
+  - **Offene UI-Bugs (Priorität, Stand Analyse 2026-07-04):**
+    1. **Grauzone endet vor X-Achsen-Rand (Zyklus vor SA₀)** — bei `cycle_offset > 0` (zeitlich vor aktuellem SA₀): graue Vergangenheits-Hinterlegung reicht rechts nicht bis zum Ende der X-Achse; vermutlich `_add_zone_backgrounds` / `legacy_index_time` vs. gemischte Display-Slots oder `zones.history.end` vs. `chart.end` in `ui/charts.py`, `data/planning_window.py` (`ui_chart_zones`).
+    2. **15-Min → 1h Prognose-Übergang** — Spec §6; Daten in `ui/chart_context.py` (`_milp_tail_rows`) weitgehend ok; Darstellung: `ChartSlotAxis` nimmt uniformen `step` → Zonen/vrect/SOC an Grenze 14:45→15:00 falsch; Zonen auf stündlichen `chart.slot_datetimes`, Chart auf gemischten `display_ctx.slot_datetimes`. Fix: vrect/Marker per echtem Zeitstempel; Zonen auf Display-Slots; optional variable Slot-Schrittweite (Überschneidung mit 1.).
+    3. **SOC-Sprünge ohne Orange** — Spec §6: fehlende Log-Slots = orange + Lücke. Ursachen: Achsen-Bug (2.), stille Abschaltung wenn `len(slot_qualities) != len(df)`, Log/MILP-Grenze (kein Missing, aber visueller Sprung), SoC-Linie verbindet über Segmentgrenze. Fix: nach (2.); SoC-Trace an `history_slot_count` splitten (Phase 3); Tests für Orange Chart+Tabelle.
+    4. **SU-Marker entfernen** — kosmetisch; `ui/charts.py` `build_sun_markers` / `_add_sun_markers` (SU₁/SU₂ aus MILP); SA- und Jetzt-Marker behalten.
+  - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen. Zeithorizont für Verbrauchs-Vergleich zur History noch klären.
+  - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung) — siehe nummerierte Bugs oben
   - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
+- [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; Phase 2 des UI-Epics erledigt)
+  - Abweichungsmarkierung nach bestimmten Regeln (noch zu definieren -aber bspw. "HINWEIS" (gelbes Dreieck), wenn geheizt werden darf, aber es nicht nötig war - oder "FEHLER" (Rotes Stopschild), wenn E-Auto nicht geladen hat, obwohl es sollte (und es noch nicht voll sein kann))
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
-- [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
-  - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
-  - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** ersetzen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
-  - Modus **`sunset_window`:** unverändert **SOC_min am Sonnenaufgang** (hart)
-  - Spec ergänzen, Live-Tests für beide Modi
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
     1:  6.5,   # Januar
@@ -42,11 +44,13 @@ bodentemperaturen_nach_monat = {
   - Live Modus A: MILP mit urgent → **Infeasible**; ohne urgent → **Optimal**
   - `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py` (2 Tests)
   - Nächster Schritt: Live urgent + Modus A prüfen; `xfail` entfernen wenn feasible
-- [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; Phase 2 des UI-Epics erledigt)
-  - Stufe 1: Im grauen Bereich Soll (Ernie-Log) vs. Ist (`consumption_snapshot`), wo vorhanden — Chart-Overlay + Abweichungsmarkierung (analog Sankey)
-  - Stufe 2: Kontinuierliches Haus-Ist unabhängig vom 15-min-Takt (Logging erweitern oder `cons_data`) — Spezifikation offen
 - [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
   - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
+- [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
+  - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
+  - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** ersetzen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
+  - Modus **`sunset_window`:** unverändert **SOC_min am Sonnenaufgang** (hart)
+  - Spec ergänzen, Live-Tests für beide Modi
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
   - Loxone-Merker für Waschmaschinen-Leistung: "Leistung Waschmaschine"
   - Loxone-Merker für Trockner-Leistung: "Leistung Trockner"
@@ -76,6 +80,12 @@ bodentemperaturen_nach_monat = {
 - [ ] Generisches E-Auto-Modell - für bessere Wiederverwendbarkeit
 
 ## Erledigte Punkte
+
+### UI Sunset-2-Sunset — Navigation SA-Zyklen (2026-07-04)
+
+- [x] **Symmetrische Zyklus-Navigation** — `ui/s2_navigation.py` (reine Zustandslogik); `ui/history_navigation.py`: „Vor →“ bei `cycle_offset > 0` einen Zyklus Richtung Live, bei `cycle_offset == 0` Wechsel SA₁→SA₂; Zyklus zurück setzt Segment auf SA₀→SA₁ — **in Prod prinzipiell ok** (2026-07-04)
+- [x] **Crash bei Zyklus zurück behoben** — fehlender SoC im Historie-Fenster (`TypeError` in `_soc_tail_y_from_row`); Baseline-SoC bei `history_only` aus; `None`/NaN-sichere SoC-Linien (`ui/charts.py`, `ui/simulation_results.py`)
+- [x] **Tests:** `tests/test_s2_navigation.py`, `test_soc_tail_y_returns_none_for_missing_soc`
 
 ### Simulations-Tabelle & Datenbasis UI (2026-07-04)
 

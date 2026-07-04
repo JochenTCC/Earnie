@@ -24,7 +24,12 @@ from ui.chart_context import (
     build_display_savings_series,
     savings_view_for_chart,
 )
-from ui.charts import build_sun_markers, render_history_optimization_chart, render_optimization_chart
+from ui.charts import (
+    _mask_missing_log_slots,
+    build_sun_markers,
+    render_history_optimization_chart,
+    render_optimization_chart,
+)
 from ui.simulation_table_view import render_frozen_simulation_table
 
 logger = logging.getLogger("app")
@@ -330,13 +335,19 @@ def render_optimization_results(
         table_gap_notice = display_ctx.gap_notice
         display_df = pd.DataFrame(display_ctx.rows)
         history_slot_count = display_ctx.history_slot_count
-        if matched_baseline_df is not None:
+        if matched_baseline_df is not None and not display_ctx.history_only:
             display_matched = pd.DataFrame(
                 align_rows_to_display_slots(
                     matched_baseline_df.to_dict("records"),
                     display_ctx.slot_datetimes,
                 )
             )
+            if chart_qualities is not None:
+                display_matched = _mask_missing_log_slots(
+                    display_matched, chart_qualities
+                )
+        elif display_ctx.history_only:
+            display_matched = None
         sun_markers = build_sun_markers(
             chart_context.chart_window,
             chart_context.now,

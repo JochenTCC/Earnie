@@ -90,6 +90,14 @@ def test_soc_tail_y_reflects_battery_action():
     assert tail > 60.0
 
 
+def test_soc_tail_y_returns_none_for_missing_soc():
+    row = pd.Series({
+        "Simulierter SoC (%)": None,
+        "Geplante Batterie-Aktion (kW)": 2.0,
+    })
+    assert _soc_tail_y_from_row(row) is None
+
+
 def test_consumer_palette_spans_magenta_to_cyan():
     colors = _consumer_bar_palette(3)
     assert len(colors) == 3

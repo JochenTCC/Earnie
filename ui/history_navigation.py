@@ -11,6 +11,12 @@ from ui.chart_context import (
     max_sunrise_cycle_offset,
     segment_navigation_label,
 )
+from ui.s2_navigation import (
+    apply_s2_nav_back,
+    apply_s2_nav_forward,
+    s2_back_disabled,
+    s2_forward_disabled,
+)
 
 SESSION_OFFSET_KEY = "history_offset_days"
 SESSION_S2_CYCLE_OFFSET = "s2_cycle_offset"
@@ -80,17 +86,18 @@ def _render_s2_navigation(now: datetime | None = None) -> None:
 
     col_back, col_label, col_fwd = st.columns([1, 4, 1])
     with col_back:
-        back_disabled = segment_index == 0 and cycle_offset >= max_cycle
+        back_disabled = s2_back_disabled(cycle_offset, segment_index, max_cycle)
         if st.button(
             "← Zurück",
             disabled=back_disabled,
             key="s2_nav_back",
             width="stretch",
         ):
-            if segment_index == 1:
-                _set_s2_segment_index(0)
-            else:
-                _set_s2_cycle_offset(cycle_offset + 1)
+            new_cycle, new_segment = apply_s2_nav_back(
+                cycle_offset, segment_index, max_cycle
+            )
+            _set_s2_cycle_offset(new_cycle)
+            _set_s2_segment_index(new_segment)
             st.rerun()
     with col_label:
         if cycle_offset > 0:
@@ -99,16 +106,21 @@ def _render_s2_navigation(now: datetime | None = None) -> None:
             st.markdown(f"**{label}**")
         st.caption(
             "Hintergrund: grau = Vergangenheit · neutral = aktuelle Stunde · "
-            "grün = extrapolierte Preise"
+            "grün = extrapolierte Preise · "
+            "«Vor →»: ein Zyklus Richtung Live oder SA₁→SA₂ (nur Live)"
         )
     with col_fwd:
         if st.button(
             "Vor →",
-            disabled=segment_index >= 1,
+            disabled=s2_forward_disabled(cycle_offset, segment_index),
             key="s2_nav_forward",
             width="stretch",
         ):
-            _set_s2_segment_index(1)
+            new_cycle, new_segment = apply_s2_nav_forward(
+                cycle_offset, segment_index
+            )
+            _set_s2_cycle_offset(new_cycle)
+            _set_s2_segment_index(new_segment)
             st.rerun()
 
 
