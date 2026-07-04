@@ -9,7 +9,6 @@
   - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
   - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung)
   - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
-- [ ] **Simulations-Tabelle — Fixierung Kopfzeile und erste Spalte** (wie Excel „Fenster fixieren“): prüfen, ob `st.dataframe`/`st.table`, CSS oder Custom Component horizontales/vertikales Scrollen mit fixer `Uhrzeit`-Spalte und Header ermöglicht
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
 - [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
   - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
@@ -77,6 +76,13 @@ bodentemperaturen_nach_monat = {
 - [ ] Generisches E-Auto-Modell - für bessere Wiederverwendbarkeit
 
 ## Erledigte Punkte
+
+### Simulations-Tabelle & Datenbasis UI (2026-07-04)
+
+- [x] **Fixierung Kopfzeile und Uhrzeit-Spalte** — scrollbare HTML-Tabelle mit CSS Freeze-Panes (`ui/simulation_table_view.py`); orange Zeilen via Pandas-Styler
+- [x] **Datenbasis-Hinweis als Expander** — eingeklappt nur Produktiv-Log-Pfad, ausgeklappt voller Merge-/Runtime-Text
+- [x] **Layout:** Simulations-Tabelle direkt unter Chart, vor Energievergleich
+- [x] **Tests:** `test_simulation_results_table`, `test_production_log_source`
 
 ### UI Sunset-2-Sunset Phase 2 — Vergangenheit füllen (2026-07-04)
 

@@ -25,6 +25,7 @@ from ui.chart_context import (
     savings_view_for_chart,
 )
 from ui.charts import build_sun_markers, render_history_optimization_chart, render_optimization_chart
+from ui.simulation_table_view import render_frozen_simulation_table
 
 logger = logging.getLogger("app")
 
@@ -130,13 +131,20 @@ def _format_simulation_table_numbers(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def format_display_data_basis_path(
+    log_source: optimization_history.ProductionLogSourceInfo,
+) -> str:
+    """Kurzlabel für eingeklappte Datenbasis (nur Produktiv-Log-Pfad)."""
+    return log_source.history_file
+
+
 def format_display_data_basis_caption(
     log_source: optimization_history.ProductionLogSourceInfo,
     *,
     merge_active: bool,
     history_slot_count: int | None = None,
 ) -> str:
-    """Markdown für Chart/Tabelle: Produktiv-Log-Pfad und Merge-Pfad."""
+    """Markdown für ausgeklappte Datenbasis: Runtime, Merge-Pfad, Flex-Soll."""
     if log_source.env_runtime_dir:
         runtime_note = (
             f"`ENERGY_OPTIMIZER_RUNTIME_DIR` = `{log_source.env_runtime_dir}` "
@@ -193,6 +201,23 @@ def format_display_data_basis_caption(
     )
 
 
+def render_display_data_basis_expander(
+    log_source: optimization_history.ProductionLogSourceInfo,
+    *,
+    merge_active: bool,
+    history_slot_count: int | None = None,
+) -> None:
+    """Datenbasis-Hinweis vor Chart/Tabelle — eingeklappt nur Log-Pfad."""
+    with st.expander(format_display_data_basis_path(log_source), expanded=False):
+        st.markdown(
+            format_display_data_basis_caption(
+                log_source,
+                merge_active=merge_active,
+                history_slot_count=history_slot_count,
+            )
+        )
+
+
 def _quality_at_row(row_index, frame_index: pd.Index, qualities: tuple[str, ...]) -> str:
     position = int(frame_index.get_loc(row_index))
     return qualities[position]
@@ -205,8 +230,7 @@ def _style_simulation_table(
     """
     Zeilen-Hintergrund für fehlende Log-Slots (orange).
 
-    st.dataframe unterstützt Styler.apply, aber nicht zuverlässig mit hide() —
-    Qualitäten liegen daher außerhalb des DataFrames.
+    Wird als Pandas-Styler in die HTML-Tabelle (Freeze-Panes) übernommen.
     """
 
     def _highlight_row(row: pd.Series):
@@ -235,15 +259,11 @@ def _render_simulation_table(
     display_df = _format_simulation_table_numbers(display_df)
     display_df = display_df[_simulation_table_column_order(list(display_df.columns))]
 
-    has_gap_styles = slot_qualities is not None and any(
-        quality == SLOT_MISSING for quality in slot_qualities
-    )
-    if has_gap_styles:
-        # st.table rendert Pandas-Styler (Zeilenfarben) zuverlässiger als st.dataframe.
-        st.table(_style_simulation_table(display_df, slot_qualities))
+    if slot_qualities is not None:
+        styler = _style_simulation_table(display_df, slot_qualities)
     else:
-        # st.table: alle Spalten/Werte ohne Glide-DataFrame-Virtualisierung (weniger Verwechslungen).
-        st.table(display_df)
+        styler = display_df.style
+    render_frozen_simulation_table(styler)
 
 
 def render_simulation_details(
@@ -252,11 +272,8 @@ def render_simulation_details(
     *,
     slot_qualities: tuple[str, ...] | None = None,
     gap_notice: str | None = None,
-    data_basis_caption: str | None = None,
 ) -> None:
     with st.expander(title):
-        if data_basis_caption:
-            st.caption(data_basis_caption)
         if gap_notice:
             st.warning(gap_notice)
         st.markdown(
@@ -327,17 +344,17 @@ def render_optimization_results(
             slot_datetimes=display_ctx.slot_datetimes,
         )
 
-    data_basis_caption = None
+    log_source = None
     if chart_context is not None:
-        data_basis_caption = format_display_data_basis_caption(
-            optimization_history.describe_production_log_source(),
+        log_source = optimization_history.describe_production_log_source()
+
+    matched_cost, optimized_cost = _cost_totals_from_savings(savings_view)
+    if log_source is not None:
+        render_display_data_basis_expander(
+            log_source,
             merge_active=merge_active,
             history_slot_count=history_slot_count,
         )
-
-    matched_cost, optimized_cost = _cost_totals_from_savings(savings_view)
-    if data_basis_caption:
-        st.markdown(data_basis_caption)
     render_optimization_chart(
         display_df,
         baseline_df,
@@ -361,7 +378,6 @@ def render_optimization_results(
         sun_markers=sun_markers,
         slot_qualities=chart_qualities,
     )
-    render_applied_targets(savings_view)
     if simulation_table_title:
         table_title = simulation_table_title
         if chart_context is not None:
@@ -373,8 +389,8 @@ def render_optimization_results(
             title=table_title,
             slot_qualities=table_qualities,
             gap_notice=table_gap_notice,
-            data_basis_caption=data_basis_caption,
         )
+    render_applied_targets(savings_view)
 
 
 def render_history_timeline_results(result: HistoryTimelineResult) -> None:

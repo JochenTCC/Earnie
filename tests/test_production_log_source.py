@@ -4,7 +4,10 @@ from __future__ import annotations
 from datetime import datetime
 
 from runtime_store import optimization_history
-from ui.simulation_results import format_display_data_basis_caption
+from ui.simulation_results import (
+    format_display_data_basis_caption,
+    format_display_data_basis_path,
+)
 
 
 def test_describe_production_log_source(tmp_path, monkeypatch):
@@ -27,6 +30,20 @@ def test_describe_production_log_source(tmp_path, monkeypatch):
     assert info.history_exists
     assert info.history_file == str(history.resolve())
     assert info.env_runtime_dir == str(runtime)
+
+
+def test_format_display_data_basis_path():
+    info = optimization_history.ProductionLogSourceInfo(
+        runtime_dir=r"C:\data\runtime",
+        env_runtime_dir=r"\\nas\runtime",
+        history_file=r"\\nas\runtime\optimization_history.jsonl",
+        history_exists=True,
+        history_size_bytes=1200,
+        history_modified_at=datetime(2026, 7, 4, 19, 0, 0),
+        legacy_csv_file=r"C:\legacy.csv",
+        legacy_csv_exists=False,
+    )
+    assert format_display_data_basis_path(info) == r"\\nas\runtime\optimization_history.jsonl"
 
 
 def test_format_display_data_basis_caption_merge_active():
