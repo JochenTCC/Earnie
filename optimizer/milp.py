@@ -418,13 +418,11 @@ def _add_sunrise_soc_min_constraint(
 
 def _terminal_soc_energy_kwh(
     battery_params: dict,
-    current_soc: float,
     terminal_soc_percent: float | None,
 ) -> float | None:
-    if not battery_params.get("end_soc_equals_start"):
+    if terminal_soc_percent is None:
         return None
-    target_soc = current_soc if terminal_soc_percent is None else terminal_soc_percent
-    return (target_soc / 100.0) * battery_params["battery_capacity_kwh"]
+    return (terminal_soc_percent / 100.0) * battery_params["battery_capacity_kwh"]
 
 
 def _add_milp_objective(
@@ -897,17 +895,12 @@ def milp_optimizer(
                 sunrise_soc_min_index,
                 battery_params["min_soc"],
             )
-    elif e_terminal := _terminal_soc_energy_kwh(
-        battery_params, current_soc, terminal_soc_percent
-    ):
+    elif e_terminal := _terminal_soc_energy_kwh(battery_params, terminal_soc_percent):
         _add_terminal_soc_constraint(model, e_terminal)
         if verbose:
-            target_soc = (
-                current_soc if terminal_soc_percent is None else terminal_soc_percent
-            )
             logger.info(
                 "MILP End-SoC-Randbedingung: %.1f %% (aktuell %.1f %%)",
-                target_soc,
+                terminal_soc_percent,
                 current_soc,
             )
 

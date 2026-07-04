@@ -622,13 +622,6 @@ class Config:
         self.BATTERY_CAPACITY_KWH = self._get_strict(self._raw_config, ["runtime_settings", "battery_capacity_kwh"])
         self.BATTERY_MIN_SOC = self._get_strict(self._raw_config, ["runtime_settings", "battery_min_soc"])
         self.BATTERY_MAX_SOC = self._get_strict(self._raw_config, ["runtime_settings", "battery_max_soc"])
-        end_soc_raw = self._raw_config.get("runtime_settings", {}).get(
-            "battery_end_soc_equals_start"
-        )
-        if end_soc_raw is None:
-            self.BATTERY_END_SOC_EQUALS_START = False
-        else:
-            self.BATTERY_END_SOC_EQUALS_START = bool(end_soc_raw)
         self.THRESHOLD_POWER = self._validate_threshold_power(
             self._get_strict(self._raw_config, ["runtime_settings", "threshold_power"])
         )
@@ -687,7 +680,6 @@ class Config:
             'max_soc': self.get('BATTERY_MAX_SOC', cast=float),
             'max_power_kw': self.get('BATTERY_MAX_POWER_KW', cast=float),
             'efficiency': self.get('BATTERY_EFFICIENCY', cast=float),
-            'end_soc_equals_start': bool(self.get('BATTERY_END_SOC_EQUALS_START', default=False)),
         }
 
     def get_flexible_consumers(self, optimizer_only: bool = False) -> list:

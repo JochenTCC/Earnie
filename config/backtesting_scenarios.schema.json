@@ -86,7 +86,6 @@
             "battery_capacity_kwh": { "type": "number" },
             "battery_min_soc": { "type": "number" },
             "battery_max_soc": { "type": "number" },
-            "battery_end_soc_equals_start": { "type": "boolean" },
             "threshold_power": { "type": "number" },
             "latitude": { "type": "number" },
             "longitude": { "type": "number" }

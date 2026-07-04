@@ -14,8 +14,30 @@ Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimi
 | `battery_efficiency` | 0–1 | Roundtrip-Wirkungsgrad (Laden/Entladen) |
 | `battery_min_soc` | % | Untere SOC-Grenze (Schutz) |
 | `battery_max_soc` | % | Obere SOC-Grenze |
-| `battery_end_soc_equals_start` | bool | SOC am Ende des 24h-Horizonts = Start-SOC (verhindert künstliches „Ausverkaufen“ am Planungsende) |
 | `threshold_power` | Anteil | Relativ zu `battery_max_power_kw` (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
+| `timezone_name` | — | IANA-Zeitzone für astronomische Sonnenzeiten (z. B. `Europe/Vienna`); siehe `planning_horizon` |
+
+## End-SOC (MILP)
+
+Es gibt **keinen** Config-Parameter mehr für die End-SOC-Randbedingung (früher `battery_end_soc_equals_start`, entfernt 2026-07-04). Das Verhalten hängt vom Betriebsmodus ab:
+
+| Kontext | End-SOC-Regel |
+|---------|----------------|
+| **Live** (`planning_horizon.mode: sunset_window`) | Hart **SOC_min am nächsten Sonnenaufgang** innerhalb des MILP-Horizonts |
+| **Backtesting** (`--horizon-mode fixed_24h`) | End-SOC = **Anker-SOC** des Schritts (`initial_soc`; intern `terminal_soc_percent`) |
+| **Backtesting** (`--horizon-mode sunset_window`) | Wie Live: SOC_min am Sonnenaufgang |
+
+Zusätzlich kann **`battery_wear`** niedrigere End-SOCs wirtschaftlich bestrafen (weicher Anreiz, unabhängig vom Modus).
+
+Block `planning_horizon` in `config.json`:
+
+```json
+"planning_horizon": {
+  "mode": "sunset_window"
+}
+```
+
+Details: [Spezifikation Sunset-Planungshorizont](../spec/planning-horizon-sunset.md).
 
 ## Batterieverschleiß (`battery_wear`)
 

@@ -4,29 +4,14 @@
 
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
-- [ ] **Sunset-Planungshorizont + SOC_min am Sonnenaufgang** (Branch `feature/sunset-planning-horizon`)
-  - Spec: [docs/spec/planning-horizon-sunset.md](docs/spec/planning-horizon-sunset.md)
-  - Fenster: Jetzt→SA₁ + SA₁→SA₂; harte SOC-Randbedingung am nächsten Sonnenaufgang; danach frei bis SA₂
-  - Ersetzt `battery_end_soc_equals_start` im Live-Betrieb (deprecated)
-  - UI Live: sunrise→sunrise; Zonen grau (Vergangenheit) / neutral (jetzt→SA) / grün (Rest); SA₂-Ausblick Phase 2
-  - Backtesting: E-Auto-`ready_by_hour`-Anker; `--horizon-mode fixed_24h|sunset_window` (Spec Phase 5)
-  - [x] Phase 1: `data/planning_window.py` + Tests
-  - [x] Phase 2: Matrix/Preise/PV generalisieren, MILP SOC-Anker
-  - [x] Phase 3: `main.py`, Live-Simulation — **Live-Durchlauf verifiziert 2026-07-04**
-  - [x] Phase 4: UI sunrise→sunrise mit Zonenfarben — **verifiziert 2026-07-04**
-  - [x] **Phase 5:** Backtesting-Vergleich fixed_24h vs sunset_window — **abgeschlossen 2026-07-04**
-    - CLI `--horizon-mode`; Log-Feld `period.horizon_mode`
-    - Kein rollierendes Re-Optimieren im Backtesting (1× MILP pro Anker-Schritt; Spec Abschnitt 4.2)
-    - [x] Jahres-Backtest 2025 beide Modi; Plausibilität sunset **333/333** nach Grundlast-Overlay-Fix
-    - Entscheidung: **Live** `sunset_window`; **Backtesting-Referenz** `fixed_24h` (10 kWh dyn. ~779 € vs. sunset ~784 €/J; früherer Sunset-Vorteil war Plausibilitäts-Artefakt)
+- [ ] **Sunset-Planungshorizont — Restarbeiten**
   - [ ] **SA₂-Ausblick in UI** (Spec Phase 2): erweiterter MILP-Horizont bis SA₂, eigene Darstellung
   - [ ] **Preis-Spiegelung:** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
-  - [ ] Umschaltung Live-Modus und History-Modus aufgeben - sondern "fließend" ineinander übergehen lassen. Siehe auch "Verbrauchshistorie im Live-Modus"
+  - [ ] Umschaltung Live-Modus und History-Modus aufgeben — stattdessen „fließend“ ineinander übergehen lassen; siehe auch „Verbrauchshistorie im Live-Modus“
 - [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
   - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
-  - **`battery_end_soc_equals_start` entfernen** (Config, Schema, Example, `get_battery_params`) — kein separater Parameter mehr
   - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** ersetzen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
-  - Modus **`sunset_window`:** unverändert **SOC_min am Sonnenaufgang** (hart); kein Rückfall auf `battery_end_soc_equals_start`
+  - Modus **`sunset_window`:** unverändert **SOC_min am Sonnenaufgang** (hart)
   - Spec ergänzen, Live-Tests für beide Modi
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
@@ -56,7 +41,6 @@ bodentemperaturen_nach_monat = {
   - `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py` (2 Tests)
   - Nächster Schritt: Live urgent + Modus A prüfen; `xfail` entfernen wenn feasible
 - [ ] Verbrauchshistorie im Live-Modus (nur unzulänglich implementiert)
-  - [x] Erster Schritt erledigt
   - [ ] Ist-Verläufe anzeigen (Diskrepanzen erkennen)
   - [ ] Vereinheitlichung mit „Historischer Tag“ (Modus-Umschaltung geloggt vs. optimiert)
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
@@ -65,7 +49,6 @@ bodentemperaturen_nach_monat = {
   - Für Geschirrspüler ist keine Leistung bekannt (vielleicht später über Hue?)
   - [ ] Könnte auch adaptiv sein bzgl. Laufzeit und Energieverbrauch pro Lauf
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
-  - **Hybrid-Lieferung / Preset-Rest:** experimentell verworfen (Jahres-Backtest 2025)
 - [ ] Generische Wärme-Modelle für Verbraucher/Erzeuger anhand der konkreten Beispiele entwickeln
   - Wärme-Modelle
     - Isolierte Ein-Knoten-Modelle (Gefrierschrank, Swimspa), aber mit variablen Wärmepfaden (gegen Unendlich)
@@ -110,36 +93,52 @@ bodentemperaturen_nach_monat = {
   - Aus zentraler `config.json` / Schema / Example entfernt; verbleibender Schlüssel dort → klare Fehlermeldung
   - Tests: `tests/test_local_settings.py`
 
-### Sunset-Planungshorizont Live (2026-07-04)
+### Sunset-Planungshorizont + SOC_min am Sonnenaufgang (2026-07-04)
 
-- [x] **Phasen 1–3:** Fenster `Jetzt→SA₂`, SOC_min am Sonnenaufgang, variable Optimierungsmatrix
+- [x] **Hauptfeature abgeschlossen** (Branch `feature/sunset-planning-horizon`, merged)
   - Spec: [docs/spec/planning-horizon-sunset.md](docs/spec/planning-horizon-sunset.md)
+  - Fenster: Jetzt→SA₁ + SA₁→SA₂; harte SOC-Randbedingung am nächsten Sonnenaufgang; danach frei bis SA₂
+  - Ersetzt `battery_end_soc_equals_start` im Live-Betrieb
+  - Backtesting: E-Auto-`ready_by_hour`-Anker; `--horizon-mode fixed_24h|sunset_window`
+  - Entscheidung: **Live** `sunset_window`; **Backtesting-Referenz** `fixed_24h` (10 kWh dyn. ~779 € vs. sunset ~784 €/J; früherer Sunset-Vorteil war Plausibilitäts-Artefakt)
+- [x] **Phase 1:** `data/planning_window.py` + Tests
+- [x] **Phase 2:** Matrix/Preise/PV generalisieren, MILP SOC-Anker
   - Day-Ahead für variable Fensterlänge (`resolve_market_slots`); aWATTar-Abruf bis SA₂
   - Preis-Spiegelung: gleiche Uhrzeit, bis 7 Tage zurück; aWATTar-Lookback für Spiegelquellen
   - Zeitzonen-Ausrichtung Planungs-Slots ↔ aWATTar (`Europe/Vienna`)
   - Loxone-Verify: fehlende E-Auto-Fertig-Uhrzeit nur **Warnung** (nicht angeschlossen)
-- [x] **Phase 4:** UI sunrise→sunrise mit Zonenfarben (grau/neutral/grün), Marker, Navigation
+- [x] **Phase 3:** `main.py`, Live-Simulation — **Live-Durchlauf verifiziert 2026-07-04**
+- [x] **Phase 4:** UI sunrise→sunrise mit Zonenfarben — **verifiziert 2026-07-04**
+  - UI Live: sunrise→sunrise; Zonen grau (Vergangenheit) / neutral (jetzt→SA) / grün (Rest)
   - `ui/chart_context.py`: Chart-Fenster, Zeilen-Ausrichtung, Kosten-Summe nur über sunrise→sunrise
   - Live-Navigation ←/→; Button **Produktiv-Archiv** für 24h-Historie (Sankey/Countdown dort deaktiviert)
   - Platzhalter-Slots im Chart: NaN-sichere Hilfsfunktionen in `ui/charts.py`
   - Debug-Snapshot: `slot_datetime` (pandas Timestamp) JSON-serialisierbar; Persist nach Chart-Render
   - Sankey **Energiefluss (Live)** unverändert unterhalb der Charts in `app.py`
+- [x] **Phase 5:** Backtesting-Vergleich fixed_24h vs sunset_window — **abgeschlossen 2026-07-04**
+  - CLI `--horizon-mode`; Log-Feld `period.horizon_mode`; Standard Backtesting `fixed_24h`
+  - Kein rollierendes Re-Optimieren im Backtesting (1× MILP pro Anker-Schritt; Spec Abschnitt 4.2)
+  - Sunset-Pfad in `simulation/engine.py` (MILP Jetzt→SA₂, 24h Output/Schritt)
+  - Performance: Sunset-Matrix vor `simulate_horizon` auf 24 h gekürzt (volle SA₂-Matrix wäre ~36–39 MILP/Schritt)
+  - Jahres-Backtest 2025 beide Modi; Plausibilität sunset **333/333** nach Grundlast-Overlay-Fix
+  - **Grundlast-Overlay** in `build_sunset_window_matrix`: 24h-`expected_p_act` aus Schritt-Matrix
+  - Diagnose-Skripte: `scripts/diagnose_sunset_plausibility.py`, `scripts/debug_sunset_matrix_alignment.py`
+  - Jahreslauf-Log: `backtesting_logs/horizon_compare_2025_full_sunset_window_v3.log`
+  - Kostenvergleich: Referenz 1.195 €; fixed_24h 10 kWh dyn. 779 €; sunset 784 € (Einsparung vs. Historisch 416 € bzw. 411 €)
 
-### Backtesting Horizont-Vergleich (2026-07-04, Phase 5)
+### Config-Aufräumen Planungshorizont (2026-07-04)
 
-- [x] **Spec:** Abschnitt 4 — `fixed_24h` vs `sunset_window`, CLI-Umschaltung
-- [x] **`--horizon-mode`** in `scripts/run_backtesting.py`; Standard `fixed_24h`
-- [x] Sunset-Pfad in `simulation/engine.py` (MILP Jetzt→SA₂, 24h Output/Schritt)
-- [x] Kein rollierendes Re-Optimieren — bewusst außerhalb des Backtesting-Scopes
-- [x] Performance: Sunset-Matrix vor `simulate_horizon` auf 24 h gekürzt (volle SA₂-Matrix wäre ~36–39 MILP/Schritt)
-- [x] Jahresvergleich 2025: fixed_24h 333/333; sunset 333/333 nach `overlay_step_consumption_on_matrix`
-- [x] Diagnose-Skripte: `scripts/diagnose_sunset_plausibility.py`, `scripts/debug_sunset_matrix_alignment.py`
+- [x] **`battery_end_soc_equals_start` entfernt** (NAS-Config, Schema, Example, `get_battery_params`, Test-Fixtures)
+  - Terminal-SOC nur noch über `terminal_soc_percent` (Backtesting `fixed_24h`) bzw. Sonnenaufgang-Anker (Live `sunset_window`)
+  - Kein separater Config-Parameter mehr
 
-### Sunset Backtesting Plausibilität (2026-07-04)
+### Verbrauchshistorie Live (2026-07-04)
 
-- [x] **Grundlast-Overlay** in `build_sunset_window_matrix`: 24h-`expected_p_act` aus Schritt-Matrix (SA₂-Skalierung war Ursache für 287/333)
-- [x] **Jahreslauf 2025** `sunset_window`: 333/333 Plausibilität, Log `backtesting_logs/horizon_compare_2025_full_sunset_window_v3.log`
-- [x] **Kostenvergleich:** Referenz 1.195 €; fixed_24h 10 kWh dyn. 779 €; sunset 784 € (Einsparung vs. Historisch 416 € bzw. 411 €)
+- [x] **Erster Schritt** der Verbrauchshistorie im Live-Modus
+
+### E-Auto-MILP (2026-07-04)
+
+- [x] **Hybrid-Lieferung / Preset-Rest:** experimentell verworfen (Jahres-Backtest 2025)
 
 ### Optimierung & Einspeise (2026-07-03)
 

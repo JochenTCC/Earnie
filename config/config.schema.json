@@ -260,10 +260,6 @@
           "maximum": 1,
           "description": "Relative Leistungsschwelle als Anteil von battery_max_power_kw (z. B. 0.02 = 2 %). Gilt für Modus-Erkennung und Zwangsentladen vs. Automatik."
         },
-        "battery_end_soc_equals_start": {
-          "type": "boolean",
-          "description": "Deprecated: MILP-Randbedingung SOC Ende = Start. Im Live-Betrieb durch SOC_min am Sonnenaufgang ersetzt (planning_horizon.mode=sunset_window)."
-        },
         "timezone_name": {
           "type": "string",
           "description": "IANA-Zeitzone für official Sonnenaufgang/-untergang (z. B. Europe/Vienna)."

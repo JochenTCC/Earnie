@@ -24,20 +24,19 @@ def _price_matrix(hours: int = 24, cheap_first: bool = True) -> list[dict]:
     ]
 
 
-def _battery_params(end_soc_equals_start: bool) -> dict:
+def _battery_params() -> dict:
     return {
         "battery_capacity_kwh": 5.0,
         "min_soc": 10.0,
         "max_soc": 100.0,
         "max_power_kw": 2.5,
         "efficiency": 0.95,
-        "end_soc_equals_start": end_soc_equals_start,
     }
 
 
 def test_terminal_soc_constraint_holds_in_solved_model():
     start_soc = 60.0
-    battery_params = _battery_params(end_soc_equals_start=True)
+    battery_params = _battery_params()
     matrix = _price_matrix()
     model = _build_milp_model(matrix, 24, battery_params, start_soc, [], 0.0, {}, None)
     _add_milp_objective(model, matrix, 3.5, None, wear_cent_per_kwh=0.0)
@@ -54,7 +53,7 @@ def test_terminal_soc_constraint_holds_in_solved_model():
 
 def test_without_constraint_end_soc_can_differ_from_start():
     start_soc = 60.0
-    battery_params = _battery_params(end_soc_equals_start=False)
+    battery_params = _battery_params()
     matrix = _price_matrix()
     model = _build_milp_model(matrix, 24, battery_params, start_soc, [], 0.0, {}, None)
     _add_milp_objective(model, matrix, 3.5, None, wear_cent_per_kwh=0.0)
@@ -72,7 +71,7 @@ def test_terminal_soc_uses_anchor_not_current_soc():
     """Rollierende Optimierung: End-SOC = Anker (Simulationsstart), nicht aktueller SOC."""
     anchor_soc = 77.0
     current_soc = 55.0
-    battery_params = _battery_params(end_soc_equals_start=True)
+    battery_params = _battery_params()
     matrix = _price_matrix(hours=12)
     model = _build_milp_model(matrix, 12, battery_params, current_soc, [], 0.0, {}, None)
     _add_milp_objective(model, matrix, 3.5, None, wear_cent_per_kwh=0.0)

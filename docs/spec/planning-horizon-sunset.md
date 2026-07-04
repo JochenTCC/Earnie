@@ -1,13 +1,13 @@
 # Spezifikation: Sunset-Planungshorizont & SOC-Anker am Sonnenaufgang
 
-**Version:** 0.3  
-**Branch:** `feature/sunset-planning-horizon`  
-**Status:** Phase 1–4 implementiert; Phase 5 abgeschlossen (2026-07-04, Jahresvergleich 2025)
+**Version:** 0.4  
+**Status:** Phasen 1–5 abgeschlossen (2026-07-04, merged auf `main`)
 
 ## 1. Ziel
 
-Ersetzt den fixen 24-h-Rollhorizont und `battery_end_soc_equals_start` im Live-Betrieb durch einen
-PV-/Tagesrhythmus-orientierten Planungshorizont mit sinnvoller End-SOC-Randbedingung.
+Ersetzt den fixen 24-h-Rollhorizont im Live-Betrieb durch einen
+PV-/Tagesrhythmus-orientierten Planungshorizont mit sinnvoller SOC-Randbedingung am Sonnenaufgang.
+Der frühere Config-Parameter `battery_end_soc_equals_start` ist entfernt (2026-07-04).
 
 ### Annahmen (gesichert)
 
@@ -69,12 +69,12 @@ Standard bleibt `fixed_24h` (Abwärtskompatibilität).
 
 ```
 Fenster:  [Anker − 24h, Anker)   mit Anker = E-Auto ready_by_hour
-SOC @ Anker: frei
+MILP End-SOC: Anker-SOC des Schritts (intern terminal_soc_percent = initial_soc)
 SOC-Kette: End-SOC Fenster N → Start-SOC Fenster N+1
 MILP-Horizont: 24 h (identisch zum Output-Fenster)
 ```
 
-`battery_end_soc_equals_start` darf in Szenarien **nicht** reaktiviert werden.
+Kein Config-Schalter für End-SOC; Verhalten ist fest im Modus verankert (früher `battery_end_soc_equals_start`, entfernt).
 
 ### 4.2 Modus `sunset_window` (Vergleich zu Live-Prod)
 
@@ -112,24 +112,29 @@ Referenz „Historisch (ohne Optimierung)“ ist für beide Modi identisch.
 ## 5. Config (Live)
 
 ```json
+"runtime_settings": {
+  "latitude": 47.404,
+  "longitude": 9.743,
+  "timezone_name": "Europe/Vienna"
+},
 "planning_horizon": {
-  "mode": "sunset_window",
-  "timezone_name": "Europe/Vienna",
-  "terminal_soc_at_sunrise": true
+  "mode": "sunset_window"
 }
 ```
 
-`battery_end_soc_equals_start` → deprecated (Live: `false`).
+Live akzeptiert derzeit nur `planning_horizon.mode: "sunset_window"`. `timezone_name` gehört zu `runtime_settings` (nicht in `planning_horizon`).
 
 ## 6. Implementierungsphasen
 
-| Phase | Inhalt |
-|-------|--------|
-| **1** | `planning_window.py`, Tests, Spec, Backlog |
-| **2** | Matrix/Preise/PV generalisieren, MILP SOC-Anker |
-| **3** | `main.py`, Simulation Live |
-| **4** | UI sunrise→sunrise mit Zonenfarben |
-| **5** | Backtesting `--horizon-mode` (fixed_24h / sunset_window), Vergleichsdoku |
+| Phase | Inhalt | Status |
+|-------|--------|--------|
+| **1** | `planning_window.py`, Tests, Spec, Backlog | erledigt |
+| **2** | Matrix/Preise/PV generalisieren, MILP SOC-Anker | erledigt |
+| **3** | `main.py`, Simulation Live | erledigt |
+| **4** | UI sunrise→sunrise mit Zonenfarben | erledigt |
+| **5** | Backtesting `--horizon-mode` (fixed_24h / sunset_window), Vergleichsdoku | erledigt |
+
+Offen (Backlog): SA₂-Ausblick in UI, optional Live-Umschaltung `fixed_24h` \| `sunset_window`.
 
 ## 7. Akzeptanzkriterien
 
@@ -148,6 +153,7 @@ Referenz „Historisch (ohne Optimierung)“ ist für beide Modi identisch.
 | 2026-07-04 | Kosten-Summe: sunrise→sunrise |
 | 2026-07-04 | UI-Zonen: grau / keine / grün |
 | 2026-07-04 | SA₂-Ausblick in UI: Phase 2 |
-| 2026-07-04 | Backtesting fixed_24h: E-Auto-Anker, SOC frei am Ende |
+| 2026-07-04 | Backtesting fixed_24h: E-Auto-Anker; End-SOC = Anker-SOC (terminal_soc_percent) |
+| 2026-07-04 | `battery_end_soc_equals_start` entfernt; Terminal-SOC nur noch modus-/aufrufgesteuert |
 | 2026-07-04 | Backtesting-Vergleich: eine Version, CLI `--horizon-mode`, kein `.env` |
 | 2026-07-04 | Backtesting sunset: Grundlast-Overlay für 24h-Output; Jahresvergleich 2025; Live sunset, Referenz fixed_24h |

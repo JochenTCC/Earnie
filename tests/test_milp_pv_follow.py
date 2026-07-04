@@ -18,7 +18,6 @@ def _battery_params() -> dict:
         "max_soc": 100.0,
         "max_power_kw": 5.0,
         "efficiency": 0.95,
-        "end_soc_equals_start": False,
     }
 
 
