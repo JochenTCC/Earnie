@@ -263,7 +263,11 @@ def save_backtesting_log(
     all_ts = []
     for df in results.values():
         if not df.empty:
-            all_ts.extend(df.index.tolist())
+            for ts in df.index.tolist():
+                stamp = pd.Timestamp(ts)
+                if stamp.tzinfo is not None:
+                    stamp = stamp.tz_localize(None)
+                all_ts.append(stamp)
 
     payload = stamp_payload(
         {

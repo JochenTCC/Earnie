@@ -9,13 +9,18 @@
   - Fenster: Jetzt→SA₁ + SA₁→SA₂; harte SOC-Randbedingung am nächsten Sonnenaufgang; danach frei bis SA₂
   - Ersetzt `battery_end_soc_equals_start` im Live-Betrieb (deprecated)
   - UI Live: sunrise→sunrise; Zonen grau (Vergangenheit) / neutral (jetzt→SA) / grün (Rest); SA₂-Ausblick Phase 2
-  - Backtesting: unverändert E-Auto-`ready_by_hour`-Anker, SOC am Fensterende frei, Kette zum nächsten Fenster
+  - Backtesting: E-Auto-`ready_by_hour`-Anker; `--horizon-mode fixed_24h|sunset_window` (Spec Phase 5)
   - [x] Phase 1: `data/planning_window.py` + Tests
   - [x] Phase 2: Matrix/Preise/PV generalisieren, MILP SOC-Anker
   - [x] Phase 3: `main.py`, Live-Simulation — **Live-Durchlauf verifiziert 2026-07-04**
   - [x] Phase 4: UI sunrise→sunrise mit Zonenfarben — **verifiziert 2026-07-04**
+  - [ ] **Phase 5:** Backtesting-Vergleich fixed_24h vs sunset_window — **Implementierung gestartet 2026-07-04**
+    - CLI `--horizon-mode`; Log-Feld `period.horizon_mode`
+    - Kein rollierendes Re-Optimieren im Backtesting (1× MILP pro Anker-Schritt; Spec Abschnitt 4.2)
+    - [ ] Jahres-Backtest 2025 beide Modi auswerten und Entscheidung dokumentieren
   - [ ] **SA₂-Ausblick in UI** (Spec Phase 2): erweiterter MILP-Horizont bis SA₂, eigene Darstellung
   - [ ] **Preis-Spiegelung:** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
+  - [ ] Umschaltung Live-Modus und History-Modus aufgeben - sondern "fließend" ineinander übergehen lassen. Siehe auch "Verbrauchshistorie im Live-Modus"
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
     1:  6.5,   # Januar
@@ -55,14 +60,20 @@ bodentemperaturen_nach_monat = {
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler (Laufzeit, Leistung → Startgüte in 6 h)
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
   - **Hybrid-Lieferung / Preset-Rest:** experimentell verworfen (Jahres-Backtest 2025)
-- [ ] **Adaptives PV-Tuning wieder aktivieren** (`pv_accuracy_log.csv` / `log_pv_comparison`)
-  - Schreiben unterbrochen: `log_pv_comparison()` nicht angebunden → Faktor bleibt bei 1,0
-  - Akzeptanz: CSV wächst; Sidebar-Faktor ≠ 1,0 bei Abweichung
+- [ ] Generisches Adaptionsmodell entwickeln, das zur Parameter-Adaption verschiedener Modelle benutzt werden kann
+  - PV-Ertrag
+  - Wärmemodelle
+  - Ein generisches Vorhersagemodell muss hinterlegt werden mit:
+    - Referenzwert (auf den adaptiert werden soll)
+    - Veränderliche Parameter
+    - Zeithorizont (z.B. 24h für Gefrierschrank oder PV-Ertrag, 1 Jahr für Swimspa und Haus)
+    - Der Adapationsalgo entnimmt Start-Parameter (live-Parameter) aus config.json und hinterlegt Adaptionshistorie getrennt und korrigiert Live-Parameter bei Bedarf (festgelegter Rhythmus - am Zeithorizont orientiert)
 - [ ] Generische Modelle für Verbraucher anhand der konkreten Beispiele entwickeln
   - E-Auto-Modell
   - Wärme-Modelle
     - Isolierte Ein-Knoten-Modelle (Gefrierschrank, Swimspa), aber mit variablen Wärmepfaden (gegen Unendlich)
     - Gekoppelte Ein-Knoten-Modelle (Haus <-> Wärmespeicher)
+    - Parameter für Haus aus Energieausweis extrahieren ("C:\Users\joche\Documents\Hausbau\Hausbau_Köhler_Schreyögg\Energieausweis_komplett_EFH-Köhler_Dornbirn-2014.pdf")
 
 ## Erledigte Punkte
 
@@ -101,6 +112,15 @@ bodentemperaturen_nach_monat = {
   - Platzhalter-Slots im Chart: NaN-sichere Hilfsfunktionen in `ui/charts.py`
   - Debug-Snapshot: `slot_datetime` (pandas Timestamp) JSON-serialisierbar; Persist nach Chart-Render
   - Sankey **Energiefluss (Live)** unverändert unterhalb der Charts in `app.py`
+
+### Backtesting Horizont-Vergleich (2026-07-04, Phase 5)
+
+- [x] **Spec:** Abschnitt 4 — `fixed_24h` vs `sunset_window`, CLI-Umschaltung
+- [x] **`--horizon-mode`** in `scripts/run_backtesting.py`; Standard `fixed_24h`
+- [x] Sunset-Pfad in `simulation/engine.py` (MILP Jetzt→SA₂, 24h Output/Schritt)
+- [x] Kein rollierendes Re-Optimieren — bewusst außerhalb des Backtesting-Scopes
+- [x] Performance: Sunset-Matrix vor `simulate_horizon` auf 24 h gekürzt (volle SA₂-Matrix wäre ~36–39 MILP/Schritt)
+- [ ] Jahresvergleich 2025 und Bewertung vs. Live-Prod
 
 ### Optimierung & Einspeise (2026-07-03)
 

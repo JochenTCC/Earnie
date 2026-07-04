@@ -8,6 +8,7 @@ import pandas as pd
 import config
 from data import profile_manager
 from data import feed_in_prices
+from data.planning_window import normalize_hour_slot
 from data.market_prices import epex_prices_for_slots
 from optimizer import (
     simulate_horizon,
@@ -19,6 +20,20 @@ from simulation.baseload_validation import (
     baseload_kwh_from_chart_rows,
     derive_historical_baseload_kwh,
     resolve_hourly_baseload_kw,
+)
+from simulation.backtesting_horizon import (
+    compute_sunset_planning_at_anchor,
+    geo_params_from_scenario,
+    naive_backtesting_slot,
+    step_slot_datetimes,
+    truncate_matrix_for_step_simulation,
+)
+from simulation.horizon_mode import (
+    BACKTESTING_STEP_HOURS,
+    DEFAULT_HORIZON_MODE,
+    FIXED_24H,
+    SUNSET_WINDOW,
+    parse_horizon_mode,
 )
 from optimizer.cbc_solver import (
     reset_cbc_gap_rel_override,
@@ -198,14 +213,16 @@ def list_simulation_anchors(
     return anchors
 
 
-def build_historical_window_matrix(
-    anchor: datetime,
+def build_historical_matrix_for_slots(
+    slot_datetimes: list[datetime],
     cache: HistoricalDataCache,
     prices_df: pd.DataFrame,
+    *,
+    window_end: datetime,
     feed_in_settings: feed_in_prices.FeedInSettings | None = None,
+    charging_anchor: datetime | None = None,
 ) -> tuple[list[dict], dict]:
-    """Baut eine 24h-Matrix aus historischen Logs für [Anker-24h, Anker)."""
-    slot_datetimes = window_slot_datetimes(anchor)
+    """Baut eine Optimierungsmatrix für beliebige stündliche Slots aus historischen Logs."""
     baseload_stored, historical_totals, total_load, hourly_flex = (
         cache.get_window_consumption(slot_datetimes)
     )
@@ -216,6 +233,7 @@ def build_historical_window_matrix(
     pv_profile = cache.get_pv_for_slots(slot_datetimes)
     epex_prices = epex_prices_for_slots(prices_df, slot_datetimes)
     brutto_prices = [_brutto_price_cent(epex) for epex in epex_prices]
+    anchor = charging_anchor if charging_anchor is not None else window_end
 
     matrix = []
     for slot_dt, price, epex, pv, base, total in zip(
@@ -240,7 +258,7 @@ def build_historical_window_matrix(
     feed_in_prices.enrich_matrix_feed_in_prices(matrix, settings)
 
     meta = {
-        "window_end": anchor,
+        "window_end": window_end,
         "historical_totals": historical_totals,
         "historical_total_kwh": round(sum(total_load), 3),
         "baseload_kwh": historical_baseload_kwh,
@@ -251,6 +269,135 @@ def build_historical_window_matrix(
         "consumer_daily_targets_kwh": dict(historical_totals),
     }
     return matrix, meta
+
+
+def build_historical_window_matrix(
+    anchor: datetime,
+    cache: HistoricalDataCache,
+    prices_df: pd.DataFrame,
+    feed_in_settings: feed_in_prices.FeedInSettings | None = None,
+) -> tuple[list[dict], dict]:
+    """Baut eine 24h-Matrix aus historischen Logs für [Anker-24h, Anker)."""
+    slot_datetimes = window_slot_datetimes(anchor)
+    return build_historical_matrix_for_slots(
+        slot_datetimes,
+        cache,
+        prices_df,
+        window_end=anchor,
+        feed_in_settings=feed_in_settings,
+        charging_anchor=anchor,
+    )
+
+
+def build_sunset_window_matrix(
+    anchor: datetime,
+    cache: HistoricalDataCache,
+    prices_df: pd.DataFrame,
+    scenario_params: dict,
+    feed_in_settings: feed_in_prices.FeedInSettings | None = None,
+) -> tuple[list[dict], dict, int]:
+    """
+    Sunset-MILP-Matrix (Jetzt→SA₂) für einen Backtesting-Schritt ab Anker−24h.
+
+    Returns: (volle Matrix, Meta für den 24h-Schritt, sunrise_soc_min_index)
+    """
+    planning_window, sunrise_index = compute_sunset_planning_at_anchor(
+        anchor, scenario_params
+    )
+    _, _, tz_name = geo_params_from_scenario(scenario_params)
+    step_slots = step_slot_datetimes(anchor, tz_name)
+    full_slots = [naive_backtesting_slot(dt) for dt in planning_window.slot_datetimes]
+    matrix, _full_meta = build_historical_matrix_for_slots(
+        full_slots,
+        cache,
+        prices_df,
+        window_end=anchor,
+        feed_in_settings=feed_in_settings,
+        charging_anchor=anchor,
+    )
+    _, meta = build_historical_matrix_for_slots(
+        step_slots,
+        cache,
+        prices_df,
+        window_end=anchor,
+        feed_in_settings=feed_in_settings,
+        charging_anchor=anchor,
+    )
+    meta["planning_horizon_hours"] = len(full_slots)
+    meta["sunrise_anchor"] = planning_window.sunrise_anchor
+    meta["step_slot_datetimes"] = step_slots
+    matrix = truncate_matrix_for_step_simulation(matrix, sunrise_index)
+    return matrix, meta, sunrise_index
+
+
+def _apply_backtesting_step(
+    chart_rows: list[dict],
+    matrix: list[dict],
+    meta: dict,
+    *,
+    horizon_mode: str,
+) -> tuple[list[dict], list[dict]]:
+    """Schneidet Chart-Zeilen auf den 24h-Backtesting-Schritt zu."""
+    if horizon_mode == FIXED_24H:
+        return chart_rows, matrix
+    step_slots = {
+        normalize_hour_slot(slot)
+        for slot in meta.get("step_slot_datetimes", [])
+    }
+    if not step_slots:
+        raise ValueError("Sunset-Backtesting: step_slot_datetimes fehlen in meta.")
+
+    indices = [
+        index
+        for index, row in enumerate(matrix)
+        if normalize_hour_slot(row["slot_datetime"]) in step_slots
+    ]
+    if len(indices) != BACKTESTING_STEP_HOURS:
+        raise ValueError(
+            f"Sunset-Schritt: erwartet {BACKTESTING_STEP_HOURS} Slots, "
+            f"gefunden {len(indices)}."
+        )
+    return [chart_rows[i] for i in indices], [matrix[i] for i in indices]
+
+
+def _simulate_anchor_step(
+    anchor: datetime,
+    sim_soc: float,
+    *,
+    horizon_mode: str,
+    cache: HistoricalDataCache,
+    prices_df: pd.DataFrame,
+    scenario_params: dict,
+    battery_params: dict,
+    feed_in_settings: feed_in_prices.FeedInSettings,
+    hours_done: int,
+    collect_cbc: bool,
+) -> tuple[list[dict], list[dict], dict, float]:
+    """Ein Backtesting-Schritt (24h Output) für fixed_24h oder sunset_window."""
+    sunrise_index = None
+    if horizon_mode == SUNSET_WINDOW:
+        matrix, meta, sunrise_index = build_sunset_window_matrix(
+            anchor, cache, prices_df, scenario_params, feed_in_settings
+        )
+    else:
+        matrix, meta = build_historical_window_matrix(
+            anchor, cache, prices_df, feed_in_settings=feed_in_settings
+        )
+
+    chart_rows = simulate_horizon(
+        matrix,
+        sim_soc,
+        battery_params=battery_params,
+        verbose=False,
+        consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
+        simulation_hour_offset=hours_done if collect_cbc else None,
+        sunrise_soc_min_index=sunrise_index,
+    )
+    chart_rows, matrix = _apply_backtesting_step(
+        chart_rows, matrix, meta, horizon_mode=horizon_mode
+    )
+    new_soc = float(chart_rows[-1]["Simulierter SoC (%)"])
+    return chart_rows, matrix, meta, new_soc
 
 
 def _hour_cost_without_optimization(
@@ -408,11 +555,19 @@ def run_simulation(
     initial_soc: float = 50.0,
     on_progress=None,
     scenario_id: str | None = None,
+    horizon_mode: str = DEFAULT_HORIZON_MODE,
 ) -> tuple[pd.DataFrame, PlausibilityReport, list[dict]]:
     """
-    Simuliert in 24h-Fenstern mit historischen Verbrauchsdaten und Flex-Optimierung.
-    Fensterende = E-Auto-Fertigstellungszeit (ready_by_hour), Start = 24h davor.
+    Simuliert historische Verbrauchsdaten mit Flex-Optimierung.
+
+    horizon_mode:
+      - fixed_24h: [Anker−24h, Anker), SOC frei am Fensterende (E-Auto-Anker)
+      - sunset_window: MILP Jetzt→SA₂, SOC_min am Sonnenaufgang; Output weiter 24h/Schritt
     """
+    horizon_mode = parse_horizon_mode(horizon_mode)
+    if horizon_mode == SUNSET_WINDOW:
+        geo_params_from_scenario(scenario_params)
+
     cache = cache or HistoricalDataCache()
     cache.load()
 
@@ -428,7 +583,7 @@ def run_simulation(
     limit_token = set_cbc_strict_time_limit_override(
         config.get_backtesting_cbc_strict_time_limit_sec()
     )
-    total_hours = len(anchors) * 24
+    total_hours = len(anchors) * BACKTESTING_STEP_HOURS
     hours_done = 0
     sim_soc = initial_soc
 
@@ -442,27 +597,30 @@ def run_simulation(
 
     try:
         for anchor in anchors:
-            matrix, meta = build_historical_window_matrix(
-                anchor, cache, prices_df, feed_in_settings=feed_in_settings
-            )
             if collect_cbc:
                 set_cbc_milp_context(
                     window_anchor=pd.Timestamp(anchor).isoformat(),
+                )
+            chart_rows, matrix, meta, sim_soc = _simulate_anchor_step(
+                anchor,
+                sim_soc,
+                horizon_mode=horizon_mode,
+                cache=cache,
+                prices_df=prices_df,
+                scenario_params=scenario_params,
+                battery_params=battery_params,
+                feed_in_settings=feed_in_settings,
+                hours_done=hours_done,
+                collect_cbc=collect_cbc,
+            )
+            if collect_cbc:
+                set_cbc_milp_context(
                     consumer_targets_kwh=dict(meta["consumer_daily_targets_kwh"]),
                 )
-            chart_rows = simulate_horizon(
-                matrix,
-                sim_soc,
-                battery_params=battery_params,
-                verbose=False,
-                consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
-                simulation_hour_offset=hours_done if collect_cbc else None,
-            )
             plausibility.add(validate_window_consumption(chart_rows, meta))
 
-            sim_soc = float(chart_rows[-1]["Simulierter SoC (%)"])
             all_chart_rows.extend(chart_rows)
-            all_timestamps.extend(row["slot_datetime"] for row in matrix[: len(chart_rows)])
+            all_timestamps.extend(row["slot_datetime"] for row in matrix)
 
             hours_done += len(chart_rows)
             if on_progress is not None:

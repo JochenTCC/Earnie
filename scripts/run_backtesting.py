@@ -25,6 +25,12 @@ from simulation.engine import (
     window_anchor_for_date,
     window_slot_datetimes,
 )
+from simulation.horizon_mode import (
+    DEFAULT_HORIZON_MODE,
+    FIXED_24H,
+    SUNSET_WINDOW,
+    parse_horizon_mode,
+)
 
 HISTORICAL_REFERENCE_LABEL = "Historisch (ohne Optimierung)"
 BACKTESTING_YEAR = 2025
@@ -123,6 +129,16 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Parallele Worker für Szenario-Simulationen (Standard: 1, sequentiell).",
     )
     parser.add_argument(
+        "--horizon-mode",
+        choices=[FIXED_24H, SUNSET_WINDOW],
+        default=DEFAULT_HORIZON_MODE,
+        help=(
+            "Planungshorizont für die Optimierung: "
+            f"'{FIXED_24H}' (24h/E-Auto-Anker, Standard) oder "
+            f"'{SUNSET_WINDOW}' (Jetzt→SA₂, SOC_min am Sonnenaufgang)."
+        ),
+    )
+    parser.add_argument(
         "--log-file",
         metavar="PFAD",
         help=(
@@ -139,6 +155,7 @@ def _run_scenario_worker(
     start_iso: str,
     end_iso: str,
     prices: pd.DataFrame,
+    horizon_mode: str,
 ) -> tuple[str, pd.DataFrame, object, list[dict]]:
     """Top-Level-Worker für ProcessPoolExecutor (Windows spawn)."""
     from simulation.engine import run_simulation, HistoricalDataCache
@@ -154,6 +171,7 @@ def _run_scenario_worker(
         prices,
         cache=cache,
         scenario_id=name,
+        horizon_mode=horizon_mode,
     )
     return name, df_result, plausibility, cbc_events
 
@@ -165,6 +183,7 @@ def _run_scenarios_parallel(
     end: pd.Timestamp,
     prices: pd.DataFrame,
     workers: int,
+    horizon_mode: str,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, object], dict[str, list[dict]]]:
     sim_results: dict[str, pd.DataFrame] = {}
     plausibility_by_scenario: dict[str, object] = {}
@@ -182,6 +201,7 @@ def _run_scenarios_parallel(
                 start_iso,
                 end_iso,
                 prices,
+                horizon_mode,
             ): name
             for name, params in scenarios.items()
         }
@@ -324,6 +344,7 @@ def main(argv: list[str] | None = None):
         datefmt="%H:%M:%S",
     )
     args = _build_arg_parser().parse_args(argv)
+    horizon_mode = parse_horizon_mode(args.horizon_mode)
     if args.log_file:
         logger_config.attach_utf8_log_file(args.log_file)
     if args.workers < 1:
@@ -380,12 +401,21 @@ def main(argv: list[str] | None = None):
     ready_h = window_anchor_for_date(anchors[-1].date()).strftime("%H:%M")
     print(
         f"Simulationszeitraum: {first_window.date()} bis {last_window.date()} "
-        f"({len(anchors)} x 24h-Fenster, {len(anchors) * 24} Stunden)"
+        f"({len(anchors)} x 24h-Schritte, {len(anchors) * 24} Stunden Output)"
     )
     print(
         "Modus: tagweise Optimierung (Batterie + flexible Verbraucher), "
-        f"24h-Fenster endend um ready_by_hour (z. B. {ready_h})"
+        f"horizon_mode={horizon_mode}"
     )
+    if horizon_mode == FIXED_24H:
+        print(
+            f"  {len(anchors)} x 24h-Fenster endend um ready_by_hour (z. B. {ready_h})"
+        )
+    else:
+        print(
+            f"  {len(anchors)} Schritte à 24h Output; MILP Jetzt→SA₂ pro Schritt "
+            f"(SOC_min am Sonnenaufgang)"
+        )
 
     ref_settings = config.get_backtesting_feed_in_settings()
     scenario_labels = config.get_scenario_labels()
@@ -413,6 +443,7 @@ def main(argv: list[str] | None = None):
                 cache=cache,
                 on_progress=_make_progress_printer(display),
                 scenario_id=name,
+                horizon_mode=horizon_mode,
             )
             sim_results[name] = df_result
             plausibility_by_scenario[name] = plausibility
@@ -426,6 +457,7 @@ def main(argv: list[str] | None = None):
             end,
             prices,
             args.workers,
+            horizon_mode,
         )
         sim_results.update(parallel_results)
         plausibility_by_scenario.update(parallel_plausibility)
@@ -453,6 +485,7 @@ def main(argv: list[str] | None = None):
         "start": start.date().isoformat(),
         "end": end.date().isoformat(),
         "windows": len(anchors),
+        "horizon_mode": horizon_mode,
         "start_month": args.start_month.month if args.start_month is not None else None,
         "end_month": args.end_month.month if args.end_month is not None else None,
         "backtesting_year": BACKTESTING_YEAR,
