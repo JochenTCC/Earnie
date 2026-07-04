@@ -211,6 +211,53 @@ def compute_ui_chart_window(
     )
 
 
+def compute_ui_chart_window_with_offset(
+    now: datetime,
+    offset_cycles: int,
+    latitude: float,
+    longitude: float,
+    timezone_name: str,
+) -> UiChartWindow:
+    """Verschiebt das UI-Fenster um offset_cycles Sonnenaufgang→Sonnenaufgang-Zyklen zurück."""
+    if offset_cycles < 0:
+        raise ValueError(f"offset_cycles muss >= 0 sein, erhalten: {offset_cycles}.")
+    moment = now
+    for _ in range(offset_cycles):
+        prev_sunrise = previous_sunrise_before(moment, latitude, longitude, timezone_name)
+        moment = prev_sunrise - timedelta(seconds=1)
+    return compute_ui_chart_window(moment, latitude, longitude, timezone_name)
+
+
+def slot_index_at_or_before(slots: tuple[datetime, ...], moment: datetime) -> int:
+    """Index des letzten Slots mit slot <= moment (normalisiert auf volle Stunde)."""
+    if not slots:
+        raise ValueError("slots darf nicht leer sein.")
+    target = normalize_hour_slot(moment)
+    if target in slots:
+        return slots.index(target)
+    for index in range(len(slots) - 1, -1, -1):
+        if slots[index] <= target:
+            return index
+    return 0
+
+
+def ui_chart_zone_indices(
+    now: datetime,
+    chart: UiChartWindow,
+) -> tuple[int, int, int]:
+    """
+    Grenz-Indizes (inkl.) für Plotly-vrect im Chart.
+
+    Returns: (history_end, live_plan_end, last_index)
+    """
+    if now.tzinfo is None:
+        raise ValueError("now muss timezone-aware sein.")
+    slots = chart.slot_datetimes
+    now_idx = slot_index_at_or_before(slots, now)
+    sunrise_idx = slot_index_at_or_before(slots, chart.next_sunrise)
+    return now_idx, sunrise_idx, len(slots) - 1
+
+
 def ui_chart_zones(
     now: datetime,
     chart: UiChartWindow,

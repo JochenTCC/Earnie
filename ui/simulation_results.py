@@ -8,7 +8,12 @@ import pandas as pd
 
 from runtime_store import live_optimization_debug
 from runtime_store.history_timeline import HistoryTimelineResult, format_gap_notice
-from ui.charts import render_history_optimization_chart, render_optimization_chart
+from ui.chart_context import (
+    LiveChartContext,
+    align_rows_to_chart_slots,
+    savings_view_for_chart,
+)
+from ui.charts import build_sun_markers, render_history_optimization_chart, render_optimization_chart
 
 logger = logging.getLogger("app")
 
@@ -85,31 +90,72 @@ def render_optimization_results(
     matched_baseline_df: pd.DataFrame | None = None,
     *,
     simulation_table_title: str | None = "📋 Simulations-Details (Nächste 24 Stunden)",
+    chart_context: LiveChartContext | None = None,
+    optimization_matrix: list | None = None,
 ) -> None:
     if matched_baseline_df is None and savings_info.get("matched_baseline_rows"):
         matched_baseline_df = pd.DataFrame(savings_info["matched_baseline_rows"])
-    matched_cost, optimized_cost = _cost_totals_from_savings(savings_info)
+
+    savings_view = savings_info
+    display_df = optimized_df
+    display_matched = matched_baseline_df
+    sun_markers = None
+    if chart_context is not None and optimization_matrix is not None:
+        savings_view = savings_view_for_chart(
+            savings_info,
+            optimization_matrix,
+            chart_context.chart_window,
+        )
+        display_df = pd.DataFrame(
+            align_rows_to_chart_slots(
+                optimized_df.to_dict("records"),
+                chart_context.chart_window,
+            )
+        )
+        if matched_baseline_df is not None:
+            display_matched = pd.DataFrame(
+                align_rows_to_chart_slots(
+                    matched_baseline_df.to_dict("records"),
+                    chart_context.chart_window,
+                )
+            )
+        sun_markers = build_sun_markers(
+            chart_context.chart_window,
+            chart_context.zone_reference,
+            chart_context.planning_window,
+        )
+
+    matched_cost, optimized_cost = _cost_totals_from_savings(savings_view)
     render_optimization_chart(
-        optimized_df,
+        display_df,
         baseline_df,
-        matched_baseline_df,
-        hourly_savings_euro=savings_info.get("hourly_savings_euro"),
-        hourly_matched_baseline_cost_euro=savings_info.get(
+        display_matched,
+        hourly_savings_euro=savings_view.get("hourly_savings_euro"),
+        hourly_matched_baseline_cost_euro=savings_view.get(
             "hourly_matched_baseline_cost_euro"
         ),
-        hourly_optimized_cost_euro=savings_info.get("hourly_optimized_cost_euro"),
-        hourly_matched_baseline_consumption_kwh=savings_info.get(
+        hourly_optimized_cost_euro=savings_view.get("hourly_optimized_cost_euro"),
+        hourly_matched_baseline_consumption_kwh=savings_view.get(
             "hourly_matched_baseline_consumption_kwh"
         ),
-        hourly_optimized_consumption_kwh=savings_info.get(
+        hourly_optimized_consumption_kwh=savings_view.get(
             "hourly_optimized_consumption_kwh"
         ),
         matched_baseline_cost_euro=matched_cost,
         optimized_cost_euro=optimized_cost,
+        chart_window=chart_context.chart_window if chart_context else None,
+        chart_now=chart_context.zone_reference if chart_context else None,
+        chart_zones=chart_context.zones if chart_context else None,
+        sun_markers=sun_markers,
     )
-    render_applied_targets(savings_info)
+    render_applied_targets(savings_view)
     if simulation_table_title:
-        render_simulation_details(optimized_df, title=simulation_table_title)
+        table_title = simulation_table_title
+        if chart_context is not None:
+            table_title = (
+                "📋 Simulations-Details (Sonnenaufgang→Sonnenaufgang)"
+            )
+        render_simulation_details(display_df, title=table_title)
 
 
 def render_history_timeline_results(result: HistoryTimelineResult) -> None:
@@ -177,5 +223,5 @@ def persist_simulation_debug(
             ),
         )
         live_optimization_debug.save_debug_snapshot(payload, kind=kind)
-    except OSError as exc:
+    except (OSError, TypeError) as exc:
         logger.warning("Debug-Snapshot konnte nicht gespeichert werden: %s", exc)

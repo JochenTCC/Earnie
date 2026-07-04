@@ -2,7 +2,7 @@
 
 **Version:** 0.2  
 **Branch:** `feature/sunset-planning-horizon`  
-**Status:** Phase 1–3 implementiert; Phase 4 (UI-Zonen) offen
+**Status:** Phase 1–4 implementiert
 
 ## 1. Ziel
 

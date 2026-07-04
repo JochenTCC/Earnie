@@ -9,6 +9,7 @@ import pytest
 from data.planning_window import (
     compute_planning_window,
     compute_ui_chart_window,
+    compute_ui_chart_window_with_offset,
     normalize_hour_slot,
     official_sun_times,
     previous_sunrise_before,
@@ -88,6 +89,13 @@ class TestUiChartWindow:
         assert zones.live_plan.end == chart.next_sunrise
         assert zones.forecast.start == chart.next_sunrise
         assert zones.forecast.end == chart.end
+
+    def test_ui_chart_offset_shifts_window_back(self):
+        now = _dt(2026, 6, 15, 14, 0)
+        current = compute_ui_chart_window(now, LAT, LON, TZ)
+        previous = compute_ui_chart_window_with_offset(now, 1, LAT, LON, TZ)
+        assert previous.start < current.start
+        assert normalize_hour_slot(previous.end) <= normalize_hour_slot(current.start)
 
 
 class TestValidation:

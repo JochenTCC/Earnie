@@ -13,8 +13,25 @@
   - [x] Phase 1: `data/planning_window.py` + Tests
   - [x] Phase 2: Matrix/Preise/PV generalisieren, MILP SOC-Anker
   - [x] Phase 3: `main.py`, Live-Simulation — **Live-Durchlauf verifiziert 2026-07-04**
-  - [ ] Phase 4: UI sunrise→sunrise mit Zonenfarben
+  - [x] Phase 4: UI sunrise→sunrise mit Zonenfarben — **verifiziert 2026-07-04**
+  - [ ] **SA₂-Ausblick in UI** (Spec Phase 2): erweiterter MILP-Horizont bis SA₂, eigene Darstellung
   - [ ] **Preis-Spiegelung:** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
+- [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
+bodentemperaturen_nach_monat = {
+    1:  6.5,   # Januar
+    2:  5.0,   # Februar
+    3:  4.0,   # März (Minimum)
+    4:  5.5,   # April
+    5:  8.5,   # Mai
+    6:  11.5,  # Juni
+    7:  14.0,  # Juli
+    8:  16.0,  # August
+    9:  17.5,  # September (Maximum)
+    10: 15.5,  # Oktober
+    11: 12.5,  # November
+    12: 9.5    # Dezember
+}
+  - [ ] Einen Adaptionsalgo einbauen, der definierte Parameter selbständig ändert, um Vorhersage zu verbessern. Die Wärmemodelle bleiben weiterhin linear  
 - [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird → wenn Null, fünf Minuten laden mit Mindest-Strom)
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
 - [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
@@ -41,6 +58,11 @@
 - [ ] **Adaptives PV-Tuning wieder aktivieren** (`pv_accuracy_log.csv` / `log_pv_comparison`)
   - Schreiben unterbrochen: `log_pv_comparison()` nicht angebunden → Faktor bleibt bei 1,0
   - Akzeptanz: CSV wächst; Sidebar-Faktor ≠ 1,0 bei Abweichung
+- [ ] Generische Modelle für Verbraucher anhand der konkreten Beispiele entwickeln
+  - E-Auto-Modell
+  - Wärme-Modelle
+    - Isolierte Ein-Knoten-Modelle (Gefrierschrank, Swimspa), aber mit variablen Wärmepfaden (gegen Unendlich)
+    - Gekoppelte Ein-Knoten-Modelle (Haus <-> Wärmespeicher)
 
 ## Erledigte Punkte
 
@@ -64,7 +86,12 @@
   - Preis-Spiegelung: gleiche Uhrzeit, bis 7 Tage zurück; aWATTar-Lookback für Spiegelquellen
   - Zeitzonen-Ausrichtung Planungs-Slots ↔ aWATTar (`Europe/Vienna`)
   - Loxone-Verify: fehlende E-Auto-Fertig-Uhrzeit nur **Warnung** (nicht angeschlossen)
-- [ ] **Phase 4 offen:** UI sunrise→sunrise mit Zonenfarben (grau/neutral/grün)
+- [x] **Phase 4:** UI sunrise→sunrise mit Zonenfarben (grau/neutral/grün), Marker, Navigation
+  - `ui/chart_context.py`: Chart-Fenster, Zeilen-Ausrichtung, Kosten-Summe nur über sunrise→sunrise
+  - Live-Navigation ←/→; Button **Produktiv-Archiv** für 24h-Historie (Sankey/Countdown dort deaktiviert)
+  - Platzhalter-Slots im Chart: NaN-sichere Hilfsfunktionen in `ui/charts.py`
+  - Debug-Snapshot: `slot_datetime` (pandas Timestamp) JSON-serialisierbar; Persist nach Chart-Render
+  - Sankey **Energiefluss (Live)** unverändert unterhalb der Charts in `app.py`
 
 ### Optimierung & Einspeise (2026-07-03)
 

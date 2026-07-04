@@ -156,8 +156,8 @@ def build_debug_payload(
         payload["main_run_completed_at"] = main_summary.get("completed_at")
     else:
         payload["target_date"] = target_date
-        payload["historical_meta"] = _json_safe(historical_meta or {})
-    return payload
+        payload["historical_meta"] = historical_meta or {}
+    return _json_safe(payload)
 
 
 def save_debug_snapshot(

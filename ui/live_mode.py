@@ -1,4 +1,4 @@
-"""Live-Modus: 24h-Simulation."""
+"""Live-Modus: Sunset-Horizont-Simulation mit sunrise→sunrise-Chart."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -11,7 +11,8 @@ from data import consumer_targets, live_consumption, profile_manager
 from runtime_store import history_timeline, run_state
 from optimizer import schedule as optimization_schedule
 import optimizer
-from ui.history_navigation import render_history_navigation
+from ui.chart_context import build_live_chart_context
+from ui.history_navigation import get_ui_chart_offset, render_history_navigation
 from ui.runtime_config import reload_runtime_config, simulation_settings_fingerprint
 from ui.simulation_results import (
     persist_simulation_debug,
@@ -40,6 +41,28 @@ def _render_live_captions(
             f"Gesamt {snapshot['house_kw']:.2f} kW · PV {snapshot['pv_kw']:.2f} kW — "
             f"Rest des Horizonts aus Profil-Prognose{sync_note}."
         )
+
+
+def _render_live_optimization_results(
+    savings_info: dict,
+    optimized_df: pd.DataFrame,
+    baseline_df: pd.DataFrame,
+    matched_baseline_df: pd.DataFrame | None,
+    matrix: list,
+    planning_window,
+) -> None:
+    chart_context = build_live_chart_context(
+        get_ui_chart_offset(),
+        planning_window=planning_window,
+    )
+    render_optimization_results(
+        savings_info,
+        optimized_df,
+        baseline_df,
+        matched_baseline_df,
+        chart_context=chart_context,
+        optimization_matrix=matrix,
+    )
 
 
 def fetch_market_data():
@@ -120,8 +143,10 @@ def _render_pending_live_sync(wait_sec: int, reason: str) -> bool:
             sim_soc=float((main_state or {}).get("soc_percent", 0.0) or 0.0),
             sync_note="",
         )
-        render_optimization_results(
-            cached_savings, cached_df, baseline_df, matched_baseline_df
+        _render_live_optimization_results(
+            cached_savings, cached_df, baseline_df, matched_baseline_df,
+            st.session_state.get("live_optimization_matrix", []),
+            st.session_state.get("live_planning_window"),
         )
         if reason == "delay":
             st.caption(
@@ -163,8 +188,13 @@ def _live_optimization_fragment(current_soc: float) -> None:
                 sim_soc=float((main_state or {}).get("soc_percent", current_soc) or current_soc),
                 sync_note="",
             )
-            render_optimization_results(
-                cached_savings, cached_df, baseline_df, matched_baseline_df
+            _render_live_optimization_results(
+                cached_savings,
+                cached_df,
+                baseline_df,
+                matched_baseline_df,
+                st.session_state.get("live_optimization_matrix", []),
+                st.session_state.get("live_planning_window"),
             )
         return
 
@@ -223,19 +253,8 @@ def _live_optimization_fragment(current_soc: float) -> None:
     st.session_state["live_optimization_cache_key"] = cache_key
     st.session_state["live_optimization_df"] = optimized_df
     st.session_state["live_savings_info"] = savings_info
-
-    persist_simulation_debug(
-        savings_info,
-        optimized_df,
-        baseline_df,
-        kind="live",
-        initial_soc=sim_soc,
-        main_state=main_state,
-        quarter_hour_slot=current_slot,
-        sync_reason=reason,
-        optimized_df_raw=optimized_df_raw,
-        matched_baseline_df=matched_baseline_df,
-    )
+    st.session_state["live_optimization_matrix"] = matrix
+    st.session_state["live_planning_window"] = planning_window
 
     sync_note = ""
     if reason == "main_synced":
@@ -251,6 +270,24 @@ def _live_optimization_fragment(current_soc: float) -> None:
             sync_note=sync_note,
         )
 
-        render_optimization_results(
-            savings_info, optimized_df, baseline_df, matched_baseline_df
+        _render_live_optimization_results(
+            savings_info,
+            optimized_df,
+            baseline_df,
+            matched_baseline_df,
+            matrix,
+            planning_window,
         )
+
+    persist_simulation_debug(
+        savings_info,
+        optimized_df,
+        baseline_df,
+        kind="live",
+        initial_soc=sim_soc,
+        main_state=main_state,
+        quarter_hour_slot=current_slot,
+        sync_reason=reason,
+        optimized_df_raw=optimized_df_raw,
+        matched_baseline_df=matched_baseline_df,
+    )

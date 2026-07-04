@@ -1,11 +1,16 @@
-"""Plotly-Charts für 24h-Optimierungsdarstellung."""
+"""Plotly-Charts für Optimierungsdarstellung (sunrise→sunrise Live, 24h Historie)."""
 from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+from datetime import datetime
 
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
 import config
+from data.planning_window import UiChartWindow, normalize_hour_slot, ui_chart_zone_indices
 from optimizer.targets import consumer_pv_follow_column_name, consumer_immediate_charge_column_name
 from optimizer import battery as bat
 
@@ -19,8 +24,121 @@ _COLOR_GRID_POWER = "#7f8c8d"
 _EXTRAPOLATED_TRACE_OPACITY = 0.5
 _PV_LINE_COLOR = "#f1c40f"
 _PV_FILL_COLOR = "rgba(241, 196, 15, 0.15)"
+_ZONE_HISTORY_COLOR = "rgba(128, 128, 128, 0.18)"
+_ZONE_FORECAST_COLOR = "rgba(76, 175, 80, 0.15)"
+_MARKER_NOW_COLOR = "#3498db"
+_MARKER_SUNRISE_COLOR = "#f39c12"
+_MARKER_SUNSET_COLOR = "#8e44ad"
 _CONSUMER_PALETTE_START = (194, 24, 91)
 _CONSUMER_PALETTE_END = (0, 188, 212)
+
+
+def _safe_float(value, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if math.isnan(number):
+        return default
+    return number
+
+
+def _safe_int_flag(value) -> int:
+    return int(_safe_float(value, 0.0))
+
+
+@dataclass(frozen=True)
+class ChartSunMarkers:
+    now_x: float | None
+    sunrise_x: float | None
+    sunset_xs: tuple[float, ...]
+
+
+def _sunrise_chart_title(chart: UiChartWindow) -> str:
+    return (
+        "Sonnenaufgang→Sonnenaufgang "
+        f"({chart.start.strftime('%d.%m.%Y %H:%M')} – "
+        f"{chart.end.strftime('%d.%m.%Y %H:%M')})"
+    )
+
+
+def _slot_x_in_chart(slots: tuple[datetime, ...], moment: datetime) -> float | None:
+    target = normalize_hour_slot(moment)
+    if target not in slots:
+        return None
+    return float(slots.index(target))
+
+
+def build_sun_markers(
+    chart: UiChartWindow,
+    now: datetime,
+    planning_window,
+) -> ChartSunMarkers:
+    slots = chart.slot_datetimes
+    now_x = float(ui_chart_zone_indices(now, chart)[0])
+    sunrise_x = _slot_x_in_chart(slots, chart.next_sunrise)
+    sunset_xs: list[float] = []
+    if planning_window is not None:
+        for moment in (planning_window.sunset_1, planning_window.sunset_2):
+            sx = _slot_x_in_chart(slots, moment)
+            if sx is not None:
+                sunset_xs.append(sx)
+    return ChartSunMarkers(
+        now_x=now_x,
+        sunrise_x=sunrise_x,
+        sunset_xs=tuple(sunset_xs),
+    )
+
+
+def _add_zone_backgrounds(
+    fig: go.Figure,
+    now: datetime,
+    chart: UiChartWindow,
+    zones,
+) -> None:
+    now_idx, sunrise_idx, last_idx = ui_chart_zone_indices(now, chart)
+    if now_idx > 0 and zones.history.fill_color:
+        fig.add_vrect(
+            x0=-0.5,
+            x1=now_idx - 0.5,
+            fillcolor=zones.history.fill_color,
+            line_width=0,
+            layer="below",
+        )
+    if sunrise_idx < last_idx and zones.forecast.fill_color:
+        fig.add_vrect(
+            x0=sunrise_idx + 0.5,
+            x1=last_idx + 0.5,
+            fillcolor=zones.forecast.fill_color,
+            line_width=0,
+            layer="below",
+        )
+
+
+def _add_sun_markers(fig: go.Figure, markers: ChartSunMarkers) -> None:
+    if markers.now_x is not None:
+        fig.add_vline(
+            x=markers.now_x,
+            line=dict(color=_MARKER_NOW_COLOR, width=1.5, dash="dot"),
+            annotation_text="Jetzt",
+            annotation_position="top",
+        )
+    if markers.sunrise_x is not None:
+        fig.add_vline(
+            x=markers.sunrise_x,
+            line=dict(color=_MARKER_SUNRISE_COLOR, width=1.5),
+            annotation_text="SA (SOC)",
+            annotation_position="top",
+        )
+    for index, sx in enumerate(markers.sunset_xs):
+        fig.add_vline(
+            x=sx,
+            line=dict(color=_MARKER_SUNSET_COLOR, width=1, dash="dash"),
+            annotation_text="SU" if index == 0 else "SU₂",
+            annotation_position="bottom",
+        )
 
 
 def _consumer_bar_pattern_shapes(
@@ -32,16 +150,16 @@ def _consumer_bar_pattern_shapes(
     """Muster je Stunde: Sofort-Laden → Karo (+), pv_follow → Schräg (/), sonst Vollfläche."""
     shapes: list[str] = []
     for _, row in segment.iterrows():
-        power = float(row.get(power_col, 0.0) or 0.0)
+        power = _safe_float(row.get(power_col, 0.0))
         if power <= 1e-6:
             shapes.append("")
             continue
         if immediate_col and immediate_col in segment.columns:
-            if int(row.get(immediate_col, 0) or 0) == 1:
+            if _safe_int_flag(row.get(immediate_col, 0)) == 1:
                 shapes.append(_CONSUMER_IMMEDIATE_CHARGE_PATTERN)
                 continue
         if pv_follow_col and pv_follow_col in segment.columns:
-            if int(row.get(pv_follow_col, 0) or 0) == 1:
+            if _safe_int_flag(row.get(pv_follow_col, 0)) == 1:
                 shapes.append(_CONSUMER_PV_FOLLOW_PATTERN)
                 continue
         shapes.append("")
@@ -115,7 +233,7 @@ def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
     active = []
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         col = f"{consumer['name']} (kW)"
-        if col in df.columns and df[col].sum() > 0:
+        if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((consumer, col))
     return active
 
@@ -674,6 +792,7 @@ def add_optimized_soc_trace(
             line=dict(color=_COLOR_OPTIMIZED, width=2.5),
             opacity=_segment_opacity(1.0, is_extrapolated),
             yaxis=yaxis,
+            connectgaps=True,
             customdata=_segment_hover_labels(
                 uhrzeit,
                 start,
@@ -951,12 +1070,19 @@ def render_power_soc_chart(
     chart_title: str | None = None,
     show_baseline_soc: bool = True,
     chart_key: str | None = None,
+    chart_window: UiChartWindow | None = None,
+    chart_now: datetime | None = None,
+    chart_zones=None,
+    sun_markers: ChartSunMarkers | None = None,
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
     bar_colors = get_bar_colors(df)
     slot_x = _chart_slot_x(len(df))
     extrap_start, extrap_end = _extrapolation_bounds(df)
     fig = go.Figure()
+
+    if chart_window is not None and chart_now is not None and chart_zones is not None:
+        _add_zone_backgrounds(fig, chart_now, chart_window, chart_zones)
 
     add_power_traces(fig, df, bar_colors, slot_x, extrap_start, extrap_end)
     add_optimized_soc_trace(fig, df, slot_x, extrap_start=extrap_start, extrap_end=extrap_end)
@@ -971,8 +1097,16 @@ def render_power_soc_chart(
         fig, df, slot_x, extrap_start=extrap_start, extrap_end=extrap_end
     )
 
+    if sun_markers is not None:
+        _add_sun_markers(fig, sun_markers)
+
+    default_title = (
+        _sunrise_chart_title(chart_window)
+        if chart_window is not None
+        else "24-Stunden-Zeithorizont (Leistung, SoC & Preis)"
+    )
     fig.update_layout(
-        title=chart_title or "24-Stunden-Zeithorizont (Leistung, SoC & Preis)",
+        title=chart_title or default_title,
         xaxis=_chart_xaxis_config(df["Uhrzeit"]),
         barmode="overlay",
         yaxis=dict(title="Leistung (kW)", side="left"),
@@ -1047,11 +1181,16 @@ def render_cumulative_cost_chart(
     *,
     matched_baseline_cost_euro: float | None = None,
     optimized_cost_euro: float | None = None,
+    chart_window: UiChartWindow | None = None,
+    chart_now: datetime | None = None,
+    chart_zones=None,
 ) -> None:
     """Kumulierte Stromkosten und Verbrauch BL Ziel vs. optimiert."""
     slot_x = _chart_slot_x(len(df))
     extrap_start, extrap_end = _extrapolation_bounds(df)
     fig = go.Figure()
+    if chart_window is not None and chart_now is not None and chart_zones is not None:
+        _add_zone_backgrounds(fig, chart_now, chart_window, chart_zones)
     has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
     has_consumption = bool(
         hourly_matched_baseline_consumption_kwh and hourly_optimized_consumption_kwh
@@ -1090,7 +1229,11 @@ def render_cumulative_cost_chart(
         )
 
     layout = dict(
-        title="Kumulierte Kosten & Verbrauch",
+        title=(
+            "Kumulierte Kosten & Verbrauch (Sonnenaufgang→Sonnenaufgang)"
+            if chart_window is not None
+            else "Kumulierte Kosten & Verbrauch"
+        ),
         xaxis=_chart_xaxis_config(df["Uhrzeit"]),
         yaxis=dict(title="Kosten (€, kumuliert)"),
         legend=_chart_legend(),
@@ -1123,6 +1266,9 @@ def render_price_savings_chart(
     *,
     matched_baseline_cost_euro: float | None = None,
     optimized_cost_euro: float | None = None,
+    chart_window: UiChartWindow | None = None,
+    chart_now: datetime | None = None,
+    chart_zones=None,
 ) -> None:
     """Alias für kumulierte Kosten- und Verbrauchslinien."""
     render_cumulative_cost_chart(
@@ -1133,6 +1279,9 @@ def render_price_savings_chart(
         hourly_optimized_consumption_kwh,
         matched_baseline_cost_euro=matched_baseline_cost_euro,
         optimized_cost_euro=optimized_cost_euro,
+        chart_window=chart_window,
+        chart_now=chart_now,
+        chart_zones=chart_zones,
     )
 
 
@@ -1245,9 +1394,21 @@ def render_optimization_chart(
     *,
     matched_baseline_cost_euro: float | None = None,
     optimized_cost_euro: float | None = None,
+    chart_window: UiChartWindow | None = None,
+    chart_now: datetime | None = None,
+    chart_zones=None,
+    sun_markers: ChartSunMarkers | None = None,
 ) -> None:
     """Zeichnet Leistung/SoC/Preis und kumulierte Kosten/Verbrauch in zwei Charts."""
-    render_power_soc_chart(df, baseline_df, matched_baseline_df)
+    render_power_soc_chart(
+        df,
+        baseline_df,
+        matched_baseline_df,
+        chart_window=chart_window,
+        chart_now=chart_now,
+        chart_zones=chart_zones,
+        sun_markers=sun_markers,
+    )
     render_price_savings_chart(
         df,
         hourly_matched_baseline_cost_euro,
@@ -1256,4 +1417,7 @@ def render_optimization_chart(
         hourly_optimized_consumption_kwh,
         matched_baseline_cost_euro=matched_baseline_cost_euro,
         optimized_cost_euro=optimized_cost_euro,
+        chart_window=chart_window,
+        chart_now=chart_now,
+        chart_zones=chart_zones,
     )

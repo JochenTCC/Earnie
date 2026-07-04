@@ -73,6 +73,13 @@ def _format_chart_uhrzeit(row: dict) -> str:
     return f"{int(hour):02d}:00"
 
 
+def _chart_row_slot_field(row: dict) -> dict:
+    slot_dt = row.get("slot_datetime")
+    if isinstance(slot_dt, datetime):
+        return {"slot_datetime": slot_dt}
+    return {}
+
+
 def _relative_sunrise_index(
     sunrise_soc_min_index: int | None,
     slice_start: int,
@@ -144,6 +151,7 @@ def _simulate_single_hour_optimizer(
     p_grid = con + total_flex_power - pv + round(batt_action, 2)
     chart_row = {
         "Uhrzeit": _format_chart_uhrzeit(row),
+        **_chart_row_slot_field(row),
         **_chart_price_fields(row),
         "PV-Prognose (kW)": pv,
         "Verbrauch-Prognose (kW)": con,
@@ -516,7 +524,8 @@ def _simulate_single_hour_baseline(
     )
     p_grid = con + total_flex_power - pv + round(batt_action, 2)
     chart_row = {
-        "Uhrzeit": f"{h:02d}:00",
+        "Uhrzeit": _format_chart_uhrzeit(row),
+        **_chart_row_slot_field(row),
         **_chart_price_fields(row),
         "PV-Prognose (kW)": pv,
         "Verbrauch-Prognose (kW)": con,
