@@ -134,7 +134,7 @@ Live akzeptiert derzeit nur `planning_horizon.mode: "sunset_window"`. `timezone_
 | **4** | UI sunrise→sunrise mit Zonenfarben | erledigt |
 | **5** | Backtesting `--horizon-mode` (fixed_24h / sunset_window), Vergleichsdoku | erledigt |
 
-Offen (Backlog): SA₂-Ausblick in UI, optional Live-Umschaltung `fixed_24h` \| `sunset_window`.
+Offen (Backlog): [UI Sunset-2-Sunset](ui-sunset2sunset.md) (SA₁→SA₂-Segment, fließende Historie), optional Live-Umschaltung `fixed_24h` \| `sunset_window`.
 
 ## 7. Akzeptanzkriterien
 

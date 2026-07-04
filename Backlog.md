@@ -4,10 +4,14 @@
 
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
-- [ ] **Sunset-Planungshorizont — Restarbeiten**
-  - [ ] **SA₂-Ausblick in UI** (Spec Phase 2): erweiterter MILP-Horizont bis SA₂, eigene Darstellung
-  - [ ] **Preis-Spiegelung:** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
-  - [ ] Umschaltung Live-Modus und History-Modus aufgeben — stattdessen „fließend“ ineinander übergehen lassen; siehe auch „Verbrauchshistorie im Live-Modus“
+- [ ] **UI Sunset-2-Sunset (Spec v0.5)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
+  - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
+  - **Phase 1 — Modus & Fenster:** `mode_selector` / `app.py` (Key `sunset2sunset`); SA₀/SA₁/SA₂ in `planning_window.py`; zwei Chart-Segmente SA₀→SA₁ (Start) und SA₁→SA₂; Navigation ← (max. Log-Tiefe) / Vor →; neue Zonen grau/neutral/grün; Auto-Refresh nur SA₀→SA₁; Sidebar ohne adaptives PV-Tuning
+  - **Phase 2 — Vergangenheit füllen:** Produktiv-Log (`history_timeline`, 15 min) in grauem Bereich; Grenze an **voller Stunde** (laufende Stunde wie heute unsichtbar bis Stundenwechsel); ab voller Stunde 1h-MILP; Sankey + Countdown **immer**
+  - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
+  - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung)
+  - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
+- [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
 - [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
   - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
   - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** ersetzen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
@@ -40,9 +44,11 @@ bodentemperaturen_nach_monat = {
   - Live Modus A: MILP mit urgent → **Infeasible**; ohne urgent → **Optimal**
   - `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py` (2 Tests)
   - Nächster Schritt: Live urgent + Modus A prüfen; `xfail` entfernen wenn feasible
-- [ ] Verbrauchshistorie im Live-Modus (nur unzulänglich implementiert)
-  - [ ] Ist-Verläufe anzeigen (Diskrepanzen erkennen)
-  - [ ] Vereinheitlichung mit „Historischer Tag“ (Modus-Umschaltung geloggt vs. optimiert)
+- [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; nach Phase 2 des UI-Epics)
+  - Stufe 1: Im grauen Bereich Soll (Ernie-Log) vs. Ist (`consumption_snapshot`), wo vorhanden — Chart-Overlay + Abweichungsmarkierung (analog Sankey)
+  - Stufe 2: Kontinuierliches Haus-Ist unabhängig vom 15-min-Takt (Logging erweitern oder `cons_data`) — Spezifikation offen
+- [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
+  - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
   - Loxone-Merker für Waschmaschinen-Leistung: "Leistung Waschmaschine"
   - Loxone-Merker für Trockner-Leistung: "Leistung Trockner"
@@ -54,6 +60,7 @@ bodentemperaturen_nach_monat = {
     - Isolierte Ein-Knoten-Modelle (Gefrierschrank, Swimspa), aber mit variablen Wärmepfaden (gegen Unendlich)
     - Gekoppelte Ein-Knoten-Modelle (Haus <-> Wärmespeicher <-> Solaranlage)
     - Parameter für Haus aus Energieausweis extrahieren ("C:\Users\joche\Documents\Hausbau\Hausbau_Köhler_Schreyögg\Energieausweis_komplett_EFH-Köhler_Dornbirn-2014.pdf")
+- [ ] **PV-Adaption (neuer Ansatz)** — ersetzt Sidebar-PV-Tuning (wird mit UI Sunset-2-Sunset entfernt); siehe auch `runtime/pv_accuracy_log.csv`
 - [ ] Einen Adaptionsalgo einbauen, der definierte Parameter selbständig ändert, um Vorhersage zu verbessern. Die Wärmemodelle bleiben weiterhin linear  
 - [ ] Generisches Adaptionsmodell entwickeln, das zur Parameter-Adaption verschiedener Modelle benutzt werden kann
   - PV-Ertrag
@@ -115,7 +122,7 @@ bodentemperaturen_nach_monat = {
   - Zeitzonen-Ausrichtung Planungs-Slots ↔ aWATTar (`Europe/Vienna`)
   - Loxone-Verify: fehlende E-Auto-Fertig-Uhrzeit nur **Warnung** (nicht angeschlossen)
 - [x] **Phase 3:** `main.py`, Live-Simulation — **Live-Durchlauf verifiziert 2026-07-04**
-- [x] **Phase 4:** UI sunrise→sunrise mit Zonenfarben — **verifiziert 2026-07-04**
+- [x] **Phase 4:** UI sunrise→sunrise mit Zonenfarben — **verifiziert 2026-07-04** (wird durch Epic **UI Sunset-2-Sunset** abgelöst: SA₀→SA₁/SA₁→SA₂, neue Zonenlogik)
   - UI Live: sunrise→sunrise; Zonen grau (Vergangenheit) / neutral (jetzt→SA) / grün (Rest)
   - `ui/chart_context.py`: Chart-Fenster, Zeilen-Ausrichtung, Kosten-Summe nur über sunrise→sunrise
   - Live-Navigation ←/→; Button **Produktiv-Archiv** für 24h-Historie (Sankey/Countdown dort deaktiviert)
@@ -141,7 +148,7 @@ bodentemperaturen_nach_monat = {
 
 ### Verbrauchshistorie Live (2026-07-04)
 
-- [x] **Erster Schritt** der Verbrauchshistorie im Live-Modus
+- [x] **Erster Schritt** der Verbrauchshistorie im Live-Modus (Produktiv-Archiv, 96×15 min) — vollständige Integration → Epic **UI Sunset-2-Sunset**
 
 ### E-Auto-MILP (2026-07-04)
 
@@ -190,7 +197,7 @@ bodentemperaturen_nach_monat = {
 | `runtime/optimizer_run_state.json` | **aktiv** | Letzter main-Durchlauf |
 | `runtime/live_optimization_debug.json` | **aktiv** | App-24h-Debug |
 | `runtime/system_history_log.csv` | **Legacy, nur Lesen** | Archivieren wenn JSONL reicht |
-| `runtime/pv_accuracy_log.csv` | **Lesen aktiv, Schreiben aus** | siehe Backlog PV-Tuning |
+| `runtime/pv_accuracy_log.csv` | **Lesen aktiv, Schreiben aus** | siehe Backlog **PV-Adaption (neuer Ansatz)** |
 | `backtesting_log.json` | **nur Dev** | nicht für Prod-NAS |
 
 ## Packaging & Deployment
