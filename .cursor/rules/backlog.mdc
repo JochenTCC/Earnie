@@ -1,0 +1,17 @@
+---
+description: Backlog.md pflegen — erledigte Punkte verschieben, nicht durchstreichen
+globs: Backlog.md
+alwaysApply: false
+---
+
+# Backlog.md
+
+Beim Pflegen von `Backlog.md`:
+
+- **Erledigte Punkte nicht durchstreichen** (`~~…~~` vermeiden).
+- Stattdessen aus **Offene Todos** entfernen und unter **Erledigte Punkte** eintragen:
+  - Neuer Abschnitt `### <Thema> (YYYY-MM-DD)` (Datum Europe/Vienna)
+  - Einzelpunkte mit `- [x] …`
+- Bei **teilweise erledigten** Epics: nur die offenen Phasen/Unterpunkte unter **Offene Todos** belassen.
+- Nur dokumentieren, was tatsächlich erledigt wurde — nichts erfinden.
+- Referenz-Tabellen (z. B. Log-Dateien) gehören nicht unter **Erledigte Punkte**, sondern in ein separates **Referenz**-Kapitel.

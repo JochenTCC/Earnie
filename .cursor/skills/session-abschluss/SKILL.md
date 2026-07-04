@@ -43,9 +43,10 @@ Erst nach Antwort des Users stagen. Ausgeschlossene Dateien nicht committen.
 
 ### 3. Backlog.md aktualisieren
 
-Schema aus `Backlog.md` beibehalten:
+Schema aus `Backlog.md` beibehalten (siehe auch `.cursor/rules/backlog.mdc`):
 
-- **Offene Todos:** `[ ]` → `[x]` für erledigte Punkte; Unterpunkte und Verknüpfungen aktuell halten
+- **Erledigte Punkte nicht durchstreichen** — aus **Offene Todos** entfernen und unter **Erledigte Punkte** mit `- [x]` eintragen
+- **Offene Todos:** nur noch offene Phasen/Unterpunkte; Verknüpfungen aktuell halten
 - **Erledigte Punkte:** Neuer Abschnitt `### <Thema> (YYYY-MM-DD)` mit Datum **heute** (lokale Zeit Europe/Vienna)
 - Nur dokumentieren, was in Session/Diff tatsächlich erledigt wurde — nichts erfinden
 - Offene nächste Schritte bei teilweise erledigten Items belassen
