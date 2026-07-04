@@ -6,8 +6,6 @@
 
 - [ ] **UI Sunset-2-Sunset (Spec v0.5)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Phase 1 — Modus & Fenster:** ~~`mode_selector` / `app.py` … Sidebar ohne adaptives PV-Tuning~~ **erledigt (2026-07-04)**
-  - **Phase 1b — MILP bis SA₂ (Spec-Korrektur):** ~~`compute_planning_window` Horizontende Sonnenaufgang SA₂ …~~ **erledigt (2026-07-04)**
   - **Phase 2 — Vergangenheit füllen:** Produktiv-Log (`history_timeline`, 15 min) in grauem Bereich; Grenze an **voller Stunde** (laufende Stunde wie heute unsichtbar bis Stundenwechsel); ab voller Stunde 1h-MILP; Sankey + Countdown **immer**
   - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
   - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung)
@@ -79,6 +77,16 @@ bodentemperaturen_nach_monat = {
 - [ ] Generisches E-Auto-Modell - für bessere Wiederverwendbarkeit
 
 ## Erledigte Punkte
+
+### Dev-Umgebung NAS-Produktiv-Log (2026-07-04)
+
+- [x] **VS Code-Launch „Streamlit app.py (NAS Produktiv-Log)“** — `ENERGY_OPTIMIZER_RUNTIME_DIR` und `ENERGY_OPTIMIZER_CONFIG_PATH` auf NAS-Pfade (`.vscode/launch.json`)
+- [x] **Lokale Produktiv-Runtime bereinigt** — versehentliche Nutzung lokaler Logs ausgeschlossen; historischer E-Auto-Baseline-Test ohne lokale `cons_data` überspringen
+
+### UI Sunset-2-Sunset Phase 1 (2026-07-04)
+
+- [x] **Phase 1 — Modus & Fenster:** `mode_selector`, `app.py`, Sidebar ohne adaptives PV-Tuning; Sunset-2-Sunset-Modus in der UI
+- [x] **Phase 1b — MILP bis SA₂ (Spec-Korrektur):** `compute_planning_window` — Horizontende Sonnenaufgang SA₂; Tests und Spec angepasst
 
 ### Live-Chart IndexError kumulierte Kosten (2026-07-04)
 
@@ -189,6 +197,16 @@ bodentemperaturen_nach_monat = {
 - [x] Thermische Modelle (Swim-Spa Prio1, WP indirekt), dynamische Einspeise (Vorstufe)
 - [x] Packaging 7a–7d (pyproject, Bootstrap, Build, Streamlit extern)
 
+## Packaging & Deployment
+
+Empfohlene Reihenfolge offen: **7e → 7f**
+
+- [x] **7a–7d** — pyproject, Bootstrap, Build-Pipeline, Streamlit extern ([container.md](docs/einrichtung/container.md))
+- [ ] **7e — Prod/Dev-Datensync** — Skript runtime/ + CSVs; dokumentierter Ablauf Dev ↔ Prod
+- [ ] **7f — Loxberry-Container** — erst nach Loxberry 4; Go/No-Go im README
+
+## Referenz
+
 ### Log-Dateien (Review 2026-06)
 
 | Datei | Status | Aktion |
@@ -200,11 +218,3 @@ bodentemperaturen_nach_monat = {
 | `runtime/system_history_log.csv` | **Legacy, nur Lesen** | Archivieren wenn JSONL reicht |
 | `runtime/pv_accuracy_log.csv` | **Lesen aktiv, Schreiben aus** | siehe Backlog **PV-Adaption (neuer Ansatz)** |
 | `backtesting_log.json` | **nur Dev** | nicht für Prod-NAS |
-
-## Packaging & Deployment
-
-Empfohlene Reihenfolge offen: **7e → 7f**
-
-- [x] **7a–7d** — pyproject, Bootstrap, Build-Pipeline, Streamlit extern ([container.md](docs/einrichtung/container.md))
-- [ ] **7e — Prod/Dev-Datensync** — Skript runtime/ + CSVs; dokumentierter Ablauf Dev ↔ Prod
-- [ ] **7f — Loxberry-Container** — erst nach Loxberry 4; Go/No-Go im README
