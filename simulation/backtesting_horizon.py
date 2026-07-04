@@ -93,3 +93,35 @@ def truncate_matrix_for_step_simulation(
     if len(matrix) <= BACKTESTING_STEP_HOURS:
         return matrix
     return matrix[:BACKTESTING_STEP_HOURS]
+
+
+def _slot_lookup_key(moment: datetime) -> datetime:
+    return naive_backtesting_slot(normalize_hour_slot(moment))
+
+
+def overlay_step_consumption_on_matrix(
+    output_matrix: list[dict],
+    step_matrix: list[dict],
+) -> None:
+    """
+    Übernimmt stündliche Grundlast/Total aus dem 24h-Schritt in die Sunset-Output-Matrix.
+
+    Die volle SA₂-Matrix skaliert resolve_hourly_baseload_kw über alle Planungsstunden;
+    Plausibilität und fairer Vergleich zu fixed_24h verlangen die 24h-Werte.
+    """
+    by_slot = {_slot_lookup_key(row["slot_datetime"]): row for row in step_matrix}
+    missing: list[str] = []
+    for row in output_matrix:
+        key = _slot_lookup_key(row["slot_datetime"])
+        source = by_slot.get(key)
+        if source is None:
+            missing.append(key.isoformat())
+            continue
+        row["expected_p_act"] = source["expected_p_act"]
+        row["expected_p_total"] = source["expected_p_total"]
+    if missing:
+        raise ValueError(
+            "Sunset-Output-Matrix: fehlende Schritt-Slots für Grundlast-Overlay: "
+            + ", ".join(missing[:5])
+            + (" ..." if len(missing) > 5 else "")
+        )

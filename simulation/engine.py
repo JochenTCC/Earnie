@@ -26,6 +26,7 @@ from simulation.backtesting_horizon import (
     effective_sunrise_soc_min_index,
     geo_params_from_scenario,
     naive_backtesting_slot,
+    overlay_step_consumption_on_matrix,
     step_slot_datetimes,
     truncate_matrix_for_step_simulation,
 )
@@ -308,16 +309,16 @@ def build_sunset_window_matrix(
     _, _, tz_name = geo_params_from_scenario(scenario_params)
     step_slots = step_slot_datetimes(anchor, tz_name)
     full_slots = [naive_backtesting_slot(dt) for dt in planning_window.slot_datetimes]
-    matrix, _full_meta = build_historical_matrix_for_slots(
-        full_slots,
+    step_matrix, meta = build_historical_matrix_for_slots(
+        step_slots,
         cache,
         prices_df,
         window_end=anchor,
         feed_in_settings=feed_in_settings,
         charging_anchor=anchor,
     )
-    _, meta = build_historical_matrix_for_slots(
-        step_slots,
+    matrix, _full_meta = build_historical_matrix_for_slots(
+        full_slots,
         cache,
         prices_df,
         window_end=anchor,
@@ -328,6 +329,7 @@ def build_sunset_window_matrix(
     meta["sunrise_anchor"] = planning_window.sunrise_anchor
     meta["step_slot_datetimes"] = step_slots
     matrix = truncate_matrix_for_step_simulation(matrix, sunrise_index)
+    overlay_step_consumption_on_matrix(matrix, step_matrix)
     return matrix, meta, effective_sunrise_soc_min_index(sunrise_index)
 
 

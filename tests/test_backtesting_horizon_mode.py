@@ -9,9 +9,11 @@ import pytest
 
 from simulation.backtesting_horizon import (
     compute_sunset_planning_at_anchor,
+    overlay_step_consumption_on_matrix,
     truncate_matrix_for_step_simulation,
 )
 from simulation.engine import (
+    build_historical_window_matrix,
     build_sunset_window_matrix,
     list_simulation_anchors,
     run_simulation,
@@ -140,6 +142,54 @@ class TestSunsetHorizonSizing:
         )
         assert meta["planning_horizon_hours"] > BACKTESTING_STEP_HOURS
         assert len(matrix) == BACKTESTING_STEP_HOURS
+
+    def test_sunset_output_baseload_matches_fixed_window(self):
+        """24h-Grundlast in Sunset-Matrix = fixed_24h (Plausibilitäts-Regression)."""
+        scenario = fixture_scenario_params()
+        cache = load_fixture_cache()
+        prices = build_synthetic_prices_df(
+            pd.Timestamp(SOC_CHAIN_START_DAY),
+            pd.Timestamp(SOC_CHAIN_END_DAY),
+        )
+        anchor = window_anchor_for_date(SOC_CHAIN_START_DAY)
+        fixed_matrix, fixed_meta = build_historical_window_matrix(
+            anchor, cache, prices
+        )
+        sunset_matrix, sunset_meta, _ = build_sunset_window_matrix(
+            anchor, cache, prices, scenario
+        )
+        fixed_sum = round(sum(float(r["expected_p_act"]) for r in fixed_matrix), 3)
+        sunset_sum = round(sum(float(r["expected_p_act"]) for r in sunset_matrix), 3)
+        assert sunset_sum == fixed_sum
+        assert sunset_meta["baseload_kwh"] == fixed_meta["baseload_kwh"]
+        for fixed_row, sunset_row in zip(fixed_matrix, sunset_matrix):
+            assert float(sunset_row["expected_p_act"]) == pytest.approx(
+                float(fixed_row["expected_p_act"])
+            )
+            assert float(sunset_row["expected_p_total"]) == pytest.approx(
+                float(fixed_row["expected_p_total"])
+            )
+
+
+class TestOverlayStepConsumption:
+    def test_overlay_copies_baseload_by_slot(self):
+        step = [
+            {
+                "slot_datetime": pd.Timestamp("2025-01-09 07:00:00"),
+                "expected_p_act": 1.1,
+                "expected_p_total": 2.2,
+            }
+        ]
+        output = [
+            {
+                "slot_datetime": pd.Timestamp("2025-01-09 07:00:00"),
+                "expected_p_act": 0.5,
+                "expected_p_total": 0.6,
+            }
+        ]
+        overlay_step_consumption_on_matrix(output, step)
+        assert output[0]["expected_p_act"] == 1.1
+        assert output[0]["expected_p_total"] == 2.2
 
 
 class TestSunsetBacktestingRuntime:

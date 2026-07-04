@@ -14,10 +14,11 @@
   - [x] Phase 2: Matrix/Preise/PV generalisieren, MILP SOC-Anker
   - [x] Phase 3: `main.py`, Live-Simulation — **Live-Durchlauf verifiziert 2026-07-04**
   - [x] Phase 4: UI sunrise→sunrise mit Zonenfarben — **verifiziert 2026-07-04**
-  - [ ] **Phase 5:** Backtesting-Vergleich fixed_24h vs sunset_window — **Implementierung gestartet 2026-07-04**
+  - [x] **Phase 5:** Backtesting-Vergleich fixed_24h vs sunset_window — **abgeschlossen 2026-07-04**
     - CLI `--horizon-mode`; Log-Feld `period.horizon_mode`
     - Kein rollierendes Re-Optimieren im Backtesting (1× MILP pro Anker-Schritt; Spec Abschnitt 4.2)
-    - [ ] Jahres-Backtest 2025 beide Modi auswerten und Entscheidung dokumentieren
+    - [x] Jahres-Backtest 2025 beide Modi; Plausibilität sunset **333/333** nach Grundlast-Overlay-Fix
+    - Entscheidung: **Live** `sunset_window`; **Backtesting-Referenz** `fixed_24h` (10 kWh dyn. ~779 € vs. sunset ~784 €/J; früherer Sunset-Vorteil war Plausibilitäts-Artefakt)
   - [ ] **SA₂-Ausblick in UI** (Spec Phase 2): erweiterter MILP-Horizont bis SA₂, eigene Darstellung
   - [ ] **Preis-Spiegelung:** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
   - [ ] Umschaltung Live-Modus und History-Modus aufgeben - sondern "fließend" ineinander übergehen lassen. Siehe auch "Verbrauchshistorie im Live-Modus"
@@ -36,12 +37,7 @@ bodentemperaturen_nach_monat = {
     11: 12.5,  # November
     12: 9.5    # Dezember
 }
-  - [ ] Einen Adaptionsalgo einbauen, der definierte Parameter selbständig ändert, um Vorhersage zu verbessern. Die Wärmemodelle bleiben weiterhin linear  
 - [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird → wenn Null, fünf Minuten laden mit Mindest-Strom)
-- [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
-- [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
-  - [ ] Gefrierschrank (Prio2)
-  - [ ] Wärmepumpe (Prio3) — nur indirekte Steuerung über Anpassung der Solltemperaturen
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
   - Signal `Ernie_Swimspa_Filter_Sollstunden` (Sollstunden in 24 h), Steuerung `Ernie_Filter_Freigabe`
   - Ernie: Sollstunden in 24 h auf Null; Filterleistung; Laufzeiten in Loxone integriert
@@ -57,23 +53,33 @@ bodentemperaturen_nach_monat = {
   - [x] Erster Schritt erledigt
   - [ ] Ist-Verläufe anzeigen (Diskrepanzen erkennen)
   - [ ] Vereinheitlichung mit „Historischer Tag“ (Modus-Umschaltung geloggt vs. optimiert)
-- [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler (Laufzeit, Leistung → Startgüte in 6 h)
+- [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
+  - Loxone-Merker für Waschmaschinen-Leistung: "Leistung Waschmaschine"
+  - Loxone-Merker für Trockner-Leistung: "Leistung Trockner"
+  - Für Geschirrspüler ist keine Leistung bekannt (vielleicht später über Hue?)
+  - [ ] Könnte auch adaptiv sein bzgl. Laufzeit und Energieverbrauch pro Lauf
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
   - **Hybrid-Lieferung / Preset-Rest:** experimentell verworfen (Jahres-Backtest 2025)
+- [ ] Generische Wärme-Modelle für Verbraucher/Erzeuger anhand der konkreten Beispiele entwickeln
+  - Wärme-Modelle
+    - Isolierte Ein-Knoten-Modelle (Gefrierschrank, Swimspa), aber mit variablen Wärmepfaden (gegen Unendlich)
+    - Gekoppelte Ein-Knoten-Modelle (Haus <-> Wärmespeicher <-> Solaranlage)
+    - Parameter für Haus aus Energieausweis extrahieren ("C:\Users\joche\Documents\Hausbau\Hausbau_Köhler_Schreyögg\Energieausweis_komplett_EFH-Köhler_Dornbirn-2014.pdf")
+- [ ] Einen Adaptionsalgo einbauen, der definierte Parameter selbständig ändert, um Vorhersage zu verbessern. Die Wärmemodelle bleiben weiterhin linear  
 - [ ] Generisches Adaptionsmodell entwickeln, das zur Parameter-Adaption verschiedener Modelle benutzt werden kann
   - PV-Ertrag
   - Wärmemodelle
+  - Solar-Kollektor
   - Ein generisches Vorhersagemodell muss hinterlegt werden mit:
     - Referenzwert (auf den adaptiert werden soll)
     - Veränderliche Parameter
     - Zeithorizont (z.B. 24h für Gefrierschrank oder PV-Ertrag, 1 Jahr für Swimspa und Haus)
     - Der Adapationsalgo entnimmt Start-Parameter (live-Parameter) aus config.json und hinterlegt Adaptionshistorie getrennt und korrigiert Live-Parameter bei Bedarf (festgelegter Rhythmus - am Zeithorizont orientiert)
-- [ ] Generische Modelle für Verbraucher anhand der konkreten Beispiele entwickeln
-  - E-Auto-Modell
-  - Wärme-Modelle
-    - Isolierte Ein-Knoten-Modelle (Gefrierschrank, Swimspa), aber mit variablen Wärmepfaden (gegen Unendlich)
-    - Gekoppelte Ein-Knoten-Modelle (Haus <-> Wärmespeicher)
-    - Parameter für Haus aus Energieausweis extrahieren ("C:\Users\joche\Documents\Hausbau\Hausbau_Köhler_Schreyögg\Energieausweis_komplett_EFH-Köhler_Dornbirn-2014.pdf")
+- [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
+- [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
+  - [ ] Gefrierschrank (Prio2)
+  - [ ] Wärmepumpe (Prio3) — nur indirekte Steuerung über Anpassung der Solltemperaturen
+- [ ] Generisches E-Auto-Modell - für bessere Wiederverwendbarkeit
 
 ## Erledigte Punkte
 
@@ -120,7 +126,14 @@ bodentemperaturen_nach_monat = {
 - [x] Sunset-Pfad in `simulation/engine.py` (MILP Jetzt→SA₂, 24h Output/Schritt)
 - [x] Kein rollierendes Re-Optimieren — bewusst außerhalb des Backtesting-Scopes
 - [x] Performance: Sunset-Matrix vor `simulate_horizon` auf 24 h gekürzt (volle SA₂-Matrix wäre ~36–39 MILP/Schritt)
-- [ ] Jahresvergleich 2025 und Bewertung vs. Live-Prod
+- [x] Jahresvergleich 2025: fixed_24h 333/333; sunset 333/333 nach `overlay_step_consumption_on_matrix`
+- [x] Diagnose-Skripte: `scripts/diagnose_sunset_plausibility.py`, `scripts/debug_sunset_matrix_alignment.py`
+
+### Sunset Backtesting Plausibilität (2026-07-04)
+
+- [x] **Grundlast-Overlay** in `build_sunset_window_matrix`: 24h-`expected_p_act` aus Schritt-Matrix (SA₂-Skalierung war Ursache für 287/333)
+- [x] **Jahreslauf 2025** `sunset_window`: 333/333 Plausibilität, Log `backtesting_logs/horizon_compare_2025_full_sunset_window_v3.log`
+- [x] **Kostenvergleich:** Referenz 1.195 €; fixed_24h 10 kWh dyn. 779 €; sunset 784 € (Einsparung vs. Historisch 416 € bzw. 411 €)
 
 ### Optimierung & Einspeise (2026-07-03)
 

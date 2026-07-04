@@ -2,7 +2,7 @@
 
 **Version:** 0.3  
 **Branch:** `feature/sunset-planning-horizon`  
-**Status:** Phase 1–4 implementiert; Phase 5 (Backtesting-Vergleich) in Arbeit
+**Status:** Phase 1–4 implementiert; Phase 5 abgeschlossen (2026-07-04, Jahresvergleich 2025)
 
 ## 1. Ziel
 
@@ -150,4 +150,4 @@ Referenz „Historisch (ohne Optimierung)“ ist für beide Modi identisch.
 | 2026-07-04 | SA₂-Ausblick in UI: Phase 2 |
 | 2026-07-04 | Backtesting fixed_24h: E-Auto-Anker, SOC frei am Ende |
 | 2026-07-04 | Backtesting-Vergleich: eine Version, CLI `--horizon-mode`, kein `.env` |
-| 2026-07-04 | Backtesting: kein rollierendes Re-Optimieren (nur 1× pro Anker-Schritt) |
+| 2026-07-04 | Backtesting sunset: Grundlast-Overlay für 24h-Output; Jahresvergleich 2025; Live sunset, Referenz fixed_24h |
