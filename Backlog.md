@@ -22,6 +22,12 @@
   - [ ] **SA₂-Ausblick in UI** (Spec Phase 2): erweiterter MILP-Horizont bis SA₂, eigene Darstellung
   - [ ] **Preis-Spiegelung:** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
   - [ ] Umschaltung Live-Modus und History-Modus aufgeben - sondern "fließend" ineinander übergehen lassen. Siehe auch "Verbrauchshistorie im Live-Modus"
+- [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
+  - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
+  - **`battery_end_soc_equals_start` entfernen** (Config, Schema, Example, `get_battery_params`) — kein separater Parameter mehr
+  - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** ersetzen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
+  - Modus **`sunset_window`:** unverändert **SOC_min am Sonnenaufgang** (hart); kein Rückfall auf `battery_end_soc_equals_start`
+  - Spec ergänzen, Live-Tests für beide Modi
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
     1:  6.5,   # Januar
