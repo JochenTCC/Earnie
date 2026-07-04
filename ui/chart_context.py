@@ -1,4 +1,4 @@
-"""Live-Chart: sunrise→sunrise-Fenster, Zonen und Kosten-Summen."""
+"""Live-Chart: S-2-Segmente SA₀→SA₁ / SA₁→SA₂, Zonen und Kosten-Summen."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,10 +10,12 @@ from data.planning_window import (
     PlanningWindow,
     UiChartWindow,
     UiChartZones,
-    compute_ui_chart_window_with_offset,
+    compute_ui_chart_window,
     normalize_hour_slot,
+    normalize_planning_hour_slot,
     ui_chart_zones,
 )
+from runtime_store import optimization_history
 
 
 @dataclass(frozen=True)
@@ -23,7 +25,8 @@ class LiveChartContext:
     now: datetime
     chart_window: UiChartWindow
     zones: UiChartZones
-    ui_offset_cycles: int
+    cycle_offset: int
+    segment_index: int
     zone_reference: datetime
     planning_window: PlanningWindow | None = None
 
@@ -33,30 +36,68 @@ def live_now() -> datetime:
     return datetime.now(tz).replace(minute=0, second=0, microsecond=0)
 
 
-def build_live_chart_context(
-    ui_offset_cycles: int,
-    *,
-    now: datetime | None = None,
-    planning_window: PlanningWindow | None = None,
-) -> LiveChartContext:
-    if ui_offset_cycles < 0:
-        raise ValueError(f"ui_offset_cycles muss >= 0 sein, erhalten: {ui_offset_cycles}.")
+def max_sunrise_cycle_offset(now: datetime | None = None) -> int:
+    """Max. SA-Zyklen zurück, solange SA₀ >= frühestem JSONL-Eintrag."""
+    earliest = optimization_history.earliest_replay_completed_at()
+    if earliest is None:
+        return 0
     moment = now if now is not None else live_now()
     if moment.tzinfo is None:
         raise ValueError("now muss timezone-aware sein.")
     lat = config.get("LATITUDE", cast=float)
     lon = config.get("LONGITUDE", cast=float)
     tz_name = config.get_planning_timezone()
-    chart = compute_ui_chart_window_with_offset(
-        moment, ui_offset_cycles, lat, lon, tz_name
+    earliest_slot = normalize_planning_hour_slot(earliest, tz_name)
+    offset = 0
+    while True:
+        next_offset = offset + 1
+        chart = compute_ui_chart_window(
+            moment, lat, lon, tz_name, cycle_offset=next_offset
+        )
+        if normalize_hour_slot(chart.sa0) < earliest_slot:
+            break
+        offset = next_offset
+    return offset
+
+
+def build_live_chart_context(
+    cycle_offset: int,
+    segment_index: int,
+    *,
+    now: datetime | None = None,
+    planning_window: PlanningWindow | None = None,
+    sim_rows: list[dict] | None = None,
+) -> LiveChartContext:
+    if cycle_offset < 0:
+        raise ValueError(f"cycle_offset muss >= 0 sein, erhalten: {cycle_offset}.")
+    if segment_index not in (0, 1):
+        raise ValueError(
+            f"segment_index muss 0 oder 1 sein, erhalten: {segment_index}."
+        )
+    moment = now if now is not None else live_now()
+    if moment.tzinfo is None:
+        raise ValueError("now muss timezone-aware sein.")
+    lat = config.get("LATITUDE", cast=float)
+    lon = config.get("LONGITUDE", cast=float)
+    tz_name = config.get_planning_timezone()
+    chart = compute_ui_chart_window(
+        moment,
+        lat,
+        lon,
+        tz_name,
+        segment_index=segment_index,
+        cycle_offset=cycle_offset,
     )
-    reference = moment if ui_offset_cycles == 0 else chart.end
-    zones = ui_chart_zones(reference, chart)
+    is_live_segment = cycle_offset == 0 and segment_index == 0
+    reference = moment if is_live_segment else chart.end
+    zone_now = moment if is_live_segment else chart.end
+    zones = ui_chart_zones(zone_now, chart, sim_rows=sim_rows)
     return LiveChartContext(
         now=moment,
         chart_window=chart,
         zones=zones,
-        ui_offset_cycles=ui_offset_cycles,
+        cycle_offset=cycle_offset,
+        segment_index=segment_index,
         zone_reference=reference,
         planning_window=planning_window,
     )
@@ -173,3 +214,16 @@ def chart_window_label(chart: UiChartWindow) -> str:
         f"{chart.start.strftime('%d.%m.%Y %H:%M')} – "
         f"{chart.end.strftime('%d.%m.%Y %H:%M')}"
     )
+
+
+def segment_navigation_label(
+    chart: UiChartWindow,
+    *,
+    cycle_offset: int,
+    segment_index: int,
+) -> str:
+    if segment_index == 0:
+        prefix = "SA₀→SA₁ (Live)" if cycle_offset == 0 else "SA₀→SA₁"
+    else:
+        prefix = "SA₁→SA₂ (Vorausschau)"
+    return f"{prefix} · {chart_window_label(chart)}"

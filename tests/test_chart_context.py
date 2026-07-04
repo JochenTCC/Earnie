@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from data.planning_window import compute_ui_chart_window_with_offset
+from data.planning_window import compute_ui_chart_window
 from ui.chart_context import (
     align_rows_to_chart_slots,
     align_hourly_values_to_chart_slots,
@@ -23,7 +23,7 @@ def _dt(year: int, month: int, day: int, hour: int, minute: int = 0) -> datetime
 
 def test_align_rows_fills_missing_past_slots():
     now = _dt(2026, 6, 15, 14, 0)
-    chart = compute_ui_chart_window_with_offset(now, 0, LAT, LON, TZ)
+    chart = compute_ui_chart_window(now, LAT, LON, TZ)
     sim_rows = [
         {
             "slot_datetime": _dt(2026, 6, 15, 14, 0),
@@ -46,7 +46,7 @@ def test_align_rows_fills_missing_past_slots():
 
 def test_savings_view_sums_chart_window_only():
     now = _dt(2026, 6, 15, 14, 0)
-    chart = compute_ui_chart_window_with_offset(now, 0, LAT, LON, TZ)
+    chart = compute_ui_chart_window(now, LAT, LON, TZ)
     matrix = [
         {"slot_datetime": _dt(2026, 6, 15, hour, 0)} for hour in range(14, 20)
     ]
@@ -65,10 +65,23 @@ def test_savings_view_sums_chart_window_only():
     assert len(view["hourly_matched_baseline_cost_euro"]) == len(chart.slot_datetimes)
 
 
+def test_max_sunrise_cycle_offset_accepts_naive_log_timestamp(monkeypatch):
+    """JSONL completed_at ist oft naive lokale Zeit ohne TZ-Offset."""
+    from ui.chart_context import max_sunrise_cycle_offset
+
+    naive_earliest = datetime(2026, 6, 10, 8, 0)
+    monkeypatch.setattr(
+        "ui.chart_context.optimization_history.earliest_replay_completed_at",
+        lambda: naive_earliest,
+    )
+    now = _dt(2026, 6, 15, 14, 0)
+    assert max_sunrise_cycle_offset(now) >= 0
+
+
 def test_savings_view_aligns_hourly_to_full_chart_window():
     """Stundenkosten haben dieselbe Länge wie das Chart-Fenster (fehlende Slots = 0)."""
     now = _dt(2026, 6, 15, 14, 0)
-    chart = compute_ui_chart_window_with_offset(now, 0, LAT, LON, TZ)
+    chart = compute_ui_chart_window(now, LAT, LON, TZ)
     matrix = [
         {"slot_datetime": _dt(2026, 6, 15, hour, 0)} for hour in range(14, 20)
     ]

@@ -12,7 +12,11 @@ from runtime_store import history_timeline, run_state
 from optimizer import schedule as optimization_schedule
 import optimizer
 from ui.chart_context import build_live_chart_context
-from ui.history_navigation import get_ui_chart_offset, render_history_navigation
+from ui.history_navigation import (
+    get_s2_cycle_offset,
+    get_s2_segment_index,
+    render_history_navigation,
+)
 from ui.runtime_config import reload_runtime_config, simulation_settings_fingerprint
 from ui.simulation_results import (
     persist_simulation_debug,
@@ -52,8 +56,10 @@ def _render_live_optimization_results(
     planning_window,
 ) -> None:
     chart_context = build_live_chart_context(
-        get_ui_chart_offset(),
+        get_s2_cycle_offset(),
+        get_s2_segment_index(),
         planning_window=planning_window,
+        sim_rows=optimized_df.to_dict("records"),
     )
     render_optimization_results(
         savings_info,

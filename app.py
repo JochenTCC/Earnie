@@ -18,7 +18,7 @@ from ui.backtesting import render_backtesting_block
 from ui.config_forms import render_parameter_input
 from ui.countdown import render_countdown_block
 from ui.historical import render_historical_inputs, render_historical_optimization_block
-from ui.history_navigation import is_history_mode, render_disabled_live_section
+from ui.history_navigation import is_history_mode, is_live_s2_window, render_disabled_live_section
 from ui.live_mode import render_optimization_savings_and_chart
 from ui.mode_selector import render_mode_selector
 from ui.runtime_config import reload_runtime_config
@@ -58,10 +58,11 @@ def main() -> None:
         )
     else:
         reload_runtime_config()
-        if not is_history_mode():
+        if is_live_s2_window():
             setup_auto_refresh()
         st.markdown(
-            "Echtzeit-Cockpit und Vorhersage-Simulation des synchronisierten 24-Stunden-Horizonts."
+            "Produktiv-Cockpit **Sunset-2-Sunset**: Vergangenheit und Vorausschau "
+            "in zwei Sonnenaufgang-Segmenten (SA₀→SA₁, SA₁→SA₂)."
         )
 
     render_parameter_input(mode)

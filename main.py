@@ -60,7 +60,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     config.is_sunset_planning_horizon()
     planning_window = profile_manager.compute_live_planning_window()
     logger.info(
-        "Planungsfenster: %s → %s (%d h), SA₁=%s, SA₂=%s, Sonnenaufgang-Anker=%s",
+        "Planungsfenster: %s → %s (%d h), SU₁=%s, SU₂=%s, Sonnenaufgang-Anker=%s",
         planning_window.start.strftime("%Y-%m-%d %H:%M"),
         planning_window.end.strftime("%Y-%m-%d %H:%M"),
         planning_window.horizon_hours,

@@ -1,4 +1,4 @@
-"""Navigation: Live sunrise→sunrise-Chart und Produktiv-Archiv."""
+"""Navigation: S-2-Segmente SA₀→SA₁ / SA₁→SA₂ und optional Historischer Tag (Dev)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -6,38 +6,60 @@ from datetime import datetime
 import streamlit as st
 
 from runtime_store import history_timeline
-from ui.chart_context import build_live_chart_context, chart_window_label, live_now
+from ui.chart_context import (
+    build_live_chart_context,
+    max_sunrise_cycle_offset,
+    segment_navigation_label,
+)
 
 SESSION_OFFSET_KEY = "history_offset_days"
-SESSION_UI_CHART_OFFSET = "ui_chart_offset_cycles"
-MAX_UI_CHART_OFFSET = 30
+SESSION_S2_CYCLE_OFFSET = "s2_cycle_offset"
+SESSION_S2_SEGMENT_INDEX = "s2_segment_index"
 
 
 def get_history_offset_days() -> int:
-    """0 = Live; 1 = letzter vergangener 24h-Tag, usw."""
+    """0 = Sunset-2-Sunset; 1+ = Historischer Tag (Dev)."""
     return int(st.session_state.get(SESSION_OFFSET_KEY, 0))
 
 
-def get_ui_chart_offset() -> int:
-    """0 = aktueller sunrise→sunrise-Zyklus; höher = weiter zurück."""
-    return int(st.session_state.get(SESSION_UI_CHART_OFFSET, 0))
+def get_s2_cycle_offset() -> int:
+    """0 = aktuelle SA-Anker; höher = weiter zurück im Produktiv-Log."""
+    return int(st.session_state.get(SESSION_S2_CYCLE_OFFSET, 0))
+
+
+def get_s2_segment_index() -> int:
+    """0 = SA₀→SA₁, 1 = SA₁→SA₂."""
+    return int(st.session_state.get(SESSION_S2_SEGMENT_INDEX, 0))
 
 
 def is_history_mode() -> bool:
     return get_history_offset_days() > 0
 
 
+def is_live_s2_window() -> bool:
+    """Live-Fenster SA₀→SA₁ ohne Zyklus-Offset (Auto-Refresh, Sankey-Kontext)."""
+    return (
+        not is_history_mode()
+        and get_s2_cycle_offset() == 0
+        and get_s2_segment_index() == 0
+    )
+
+
 def _set_history_offset(days: int) -> None:
     st.session_state[SESSION_OFFSET_KEY] = max(0, int(days))
 
 
-def _set_ui_chart_offset(cycles: int) -> None:
-    st.session_state[SESSION_UI_CHART_OFFSET] = max(0, int(cycles))
+def _set_s2_cycle_offset(cycles: int) -> None:
+    st.session_state[SESSION_S2_CYCLE_OFFSET] = max(0, int(cycles))
+
+
+def _set_s2_segment_index(segment: int) -> None:
+    st.session_state[SESSION_S2_SEGMENT_INDEX] = 1 if int(segment) == 1 else 0
 
 
 def _window_label(offset_days: int, now: datetime | None = None) -> str:
     if offset_days <= 0:
-        return "Live · Echtzeit"
+        return "Live · Sunset-2-Sunset"
     start, end, _ = history_timeline.history_window_bounds(offset_days, now)
     return (
         f"Archiv · {start.strftime('%d.%m.%Y %H:%M')} – "
@@ -45,38 +67,48 @@ def _window_label(offset_days: int, now: datetime | None = None) -> str:
     )
 
 
-def _render_ui_chart_navigation(now: datetime | None = None) -> None:
-    moment = now if now is not None else live_now()
-    ui_offset = get_ui_chart_offset()
-    ctx = build_live_chart_context(ui_offset, now=moment)
+def _render_s2_navigation(now: datetime | None = None) -> None:
+    cycle_offset = get_s2_cycle_offset()
+    segment_index = get_s2_segment_index()
+    max_cycle = max_sunrise_cycle_offset(now)
+    ctx = build_live_chart_context(cycle_offset, segment_index, now=now)
+    label = segment_navigation_label(
+        ctx.chart_window,
+        cycle_offset=cycle_offset,
+        segment_index=segment_index,
+    )
 
     col_back, col_label, col_fwd = st.columns([1, 4, 1])
     with col_back:
+        back_disabled = segment_index == 0 and cycle_offset >= max_cycle
         if st.button(
             "← Zurück",
-            disabled=ui_offset >= MAX_UI_CHART_OFFSET,
-            key="ui_chart_nav_back",
+            disabled=back_disabled,
+            key="s2_nav_back",
             width="stretch",
         ):
-            _set_ui_chart_offset(ui_offset + 1)
+            if segment_index == 1:
+                _set_s2_segment_index(0)
+            else:
+                _set_s2_cycle_offset(cycle_offset + 1)
             st.rerun()
     with col_label:
-        label = chart_window_label(ctx.chart_window)
-        if ui_offset == 0:
-            st.markdown(f"**Live · {label}**")
+        if cycle_offset > 0:
+            st.markdown(f"**{label}** · {cycle_offset} Zyklus/Zyklen zurück")
         else:
-            st.markdown(f"**{label}** · {ui_offset} Zyklus/Zyklen zurück")
+            st.markdown(f"**{label}**")
         st.caption(
-            "Hintergrund: grau = Vergangenheit · neutral = Live/Plan · grün = Vorausschau"
+            "Hintergrund: grau = Vergangenheit · neutral = aktuelle Stunde · "
+            "grün = extrapolierte Preise"
         )
     with col_fwd:
         if st.button(
             "Vor →",
-            disabled=ui_offset <= 0,
-            key="ui_chart_nav_forward",
+            disabled=segment_index >= 1,
+            key="s2_nav_forward",
             width="stretch",
         ):
-            _set_ui_chart_offset(ui_offset - 1)
+            _set_s2_segment_index(1)
             st.rerun()
 
 
@@ -84,8 +116,8 @@ def render_history_navigation(now: datetime | None = None) -> int:
     """
     Zeigt Navigation und gibt history_offset_days zurück.
 
-    Live: ←/→ verschiebt das sunrise→sunrise-Fenster.
-    Archiv: ←/→ durch Produktiv-Historie (24h-Schritte).
+    Sunset-2-Sunset: SA-Segmente und Zyklus-Navigation.
+    Historischer Tag (Dev): 24h-Schritte aus dem Produktiv-Log.
     """
     offset = get_history_offset_days()
     if offset > 0:
@@ -115,12 +147,7 @@ def render_history_navigation(now: datetime | None = None) -> int:
                 st.rerun()
         return get_history_offset_days()
 
-    _render_ui_chart_navigation(now)
-    archive_col, _ = st.columns([1, 3])
-    with archive_col:
-        if st.button("📜 Produktiv-Archiv", key="open_prod_archive", width="stretch"):
-            _set_history_offset(1)
-            st.rerun()
+    _render_s2_navigation(now)
     return 0
 
 
@@ -128,7 +155,7 @@ def render_disabled_live_section(title: str) -> None:
     """Ausgegrauter Platzhalter für Live-only-Bereiche im Historie-Modus."""
     st.markdown(
         f"<div style='opacity:0.45; pointer-events:none;'>"
-        f"<p><strong>{title}</strong> — nur in der Echtzeit-Ansicht verfügbar.</p>"
+        f"<p><strong>{title}</strong> — nur im Sunset-2-Sunset-Modus verfügbar.</p>"
         f"</div>",
         unsafe_allow_html=True,
     )

@@ -1,7 +1,7 @@
 # Spezifikation: UI-Modus „Sunset-2-Sunset“
 
 **Version:** 0.5  
-**Status:** Spezifiziert (2026-07-04), Implementierung offen  
+**Status:** Phase 1 UI umgesetzt (2026-07-04); Phase 2–4 offen  
 **Ersetzt:** Streamlit-Modi „Echtzeit“ und „Historischer Tag“, Button „Produktiv-Archiv“, getrennte Live/History-Umschaltung
 
 ## 1. Ziel
@@ -85,5 +85,5 @@ Grün ersetzt die bisherige Zone „Vorausschau nach SOC-Anker“ (Phase 4 `plan
 
 ## 9. Bezug
 
-- MILP-Horizont: [planning-horizon-sunset.md](planning-horizon-sunset.md) (Jetzt → SU₂; UI zeigt SA-Segmente)
-- Produktiv-Log: `runtime_store/history_timeline.py`, `runtime/optimization_history.jsonl`
+- MILP-Horizont: [planning-horizon-sunset.md](planning-horizon-sunset.md) — Jetzt → **SA₂** (Sonnenaufgang, identisch UI-Segment SA₁→SA₂ Ende)
+- Produktiv-Log: `runtime_store/history_timeline.py`, `runtime/optimization_history.jsonl` (grauer Bereich ab **Phase 2**)

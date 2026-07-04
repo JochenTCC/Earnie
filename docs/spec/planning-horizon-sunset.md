@@ -1,13 +1,15 @@
 # Spezifikation: Sunset-Planungshorizont & SOC-Anker am Sonnenaufgang
 
-**Version:** 0.4  
-**Status:** Phasen 1–5 abgeschlossen (2026-07-04, merged auf `main`)
+**Version:** 0.5  
+**Status:** Phasen 1–5 abgeschlossen (2026-07-04); Horizontende SA₂ (§2.4) **umgesetzt 2026-07-04**
 
 ## 1. Ziel
 
 Ersetzt den fixen 24-h-Rollhorizont im Live-Betrieb durch einen
 PV-/Tagesrhythmus-orientierten Planungshorizont mit sinnvoller SOC-Randbedingung am Sonnenaufgang.
 Der frühere Config-Parameter `battery_end_soc_equals_start` ist entfernt (2026-07-04).
+
+Gemeinsame Anker-Benennung mit [UI Sunset-2-Sunset](ui-sunset2sunset.md): **SA₀/SA₁/SA₂ = Sonnenaufgang** (nicht Sonnenuntergang).
 
 ### Annahmen (gesichert)
 
@@ -17,17 +19,18 @@ Der frühere Config-Parameter `battery_end_soc_equals_start` ist entfernt (2026-
 
 ## 2. Planungsfenster (MILP)
 
-### 2.1 Definition
+### 2.1 Definition (Zielbild ab v0.5)
 
 ```
-Segment A:  t_now  →  SA₁   (erster kommender Sonnenuntergang)
-Segment B:  SA₁    →  SA₂   (vollständiger sunset→sunset-Tag)
-Horizont:   t_now  →  SA₂
+Horizont:   t_now  →  SA₂     (zweiter Sonnenaufgang im S-2-Sinne, identisch UI-Segment SA₁→SA₂ Ende)
+SOC-Anker:  t_SR   = erster Sonnenaufgang mit t_SR > t_now   (hart SOC_min)
 ```
 
-- **SA₁:** Sonnenuntergang heute, falls `t_now < SA_heute`; sonst morgen.
+- **SA₂:** übernächster Sonnenaufgang gemäß `compute_sunrise_anchors()` in `data/planning_window.py` (gleiche Logik wie UI).
 - **Sonnenzeiten:** astronomisch **official** aus `latitude` / `longitude` (Modul `astral`).
 - **Zeitzone:** explizit als Parameter (`timezone_name`, z. B. `Europe/Vienna`).
+
+**Sonnenuntergänge (SU₁, SU₂)** bleiben als **Marker** in Charts/Diagnose erhalten, definieren aber **nicht** das Horizontende.
 
 ### 2.2 SOC-Randbedingung (MILP)
 
@@ -40,25 +43,21 @@ Horizont:   t_now  →  SA₂
 
 Stündlich (wie bisher). Implementierung: `data/planning_window.py`.
 
-## 3. UI (Live-Chart sunrise→sunrise)
+### 2.4 Horizontende SA₂ (2026-07-04)
 
-Anzeigefenster: **letzter Sonnenaufgang → nächster Sonnenaufgang** (nicht voller MILP-Horizont bis SA₂).
+| | v0.4 (veraltet) | v0.5 (Live) |
+|---|----------------|-------------|
+| Horizontende | `sunset_2` (SU₂) | **SA₂** (`compute_sunrise_anchors().sa2`) |
+| aWATTar-Abruf | `planning_end=sunset_2` | `planning_end=SA₂` |
+| UI SA₁→SA₂ | Lücke ohne MILP-Daten | vollständig aus Live-MILP |
 
-Einsparungs-/Kosten-Summe: über dieses sunrise→sunrise-Fenster.
+**Umsetzung:** `compute_planning_window()` in `data/planning_window.py`; SU₁/SU₂ bleiben als Chart-Marker.
 
-### Hintergrundzonen
+## 3. UI (Live-Chart) — ersetzt durch [UI Sunset-2-Sunset](ui-sunset2sunset.md)
 
-| Zone | Zeitraum | Hintergrund |
-|------|----------|-------------|
-| Vergangenheit | letzter SA → jetzt | **Grau** |
-| Live/Plan | jetzt → nächster SA (SOC-Anker) | **Keine** |
-| Vorausschau | nächster SA → Ende Chart (nächster SA) | **Grün** |
+Die Produktiv-UI nutzt seit Epic **UI Sunset-2-Sunset** die Segmente SA₀→SA₁ und SA₁→SA₂ (Sonnenaufgang-Anker). Dieser Abschnitt beschreibt nur noch den MILP-Horizont; Darstellung siehe UI-Spec v0.5.
 
-Navigation ←/→: verschiebt das sunrise→sunrise-Fenster; fließender Übergang Ist/Vorausschau/Historie.
-
-**Phase 2:** Erweiterter MILP-Ausblick bis SA₂ (eigene Darstellung).
-
-Marker: Jetzt-Linie, Sonnenaufgang (SOC-Anker), Sonnenuntergänge.
+**Phase 4 (alt):** sunrise→sunrise mit Zonenfarben — durch S-2-UI abgelöst.
 
 ## 4. Backtesting
 
@@ -82,7 +81,7 @@ Pro Backtesting-Schritt (weiterhin **24 h Output** pro E-Auto-Anker, fairer Verg
 
 ```
 t_now     = Anker − 24h          (Fensterstart wie fixed_24h)
-MILP      = Jetzt → SA₂          (Planungsdaten bis SA₂)
+MILP      = Jetzt → SA₂          (SA₂ = Sonnenaufgang, vgl. §2.1 / UI-Spec)
 SOC       = hart SOC_min am Sonnenaufgang innerhalb des MILP
 Simulation= rollierend max. 24 h pro Schritt (wie fixed_24h; kein Durchsimulieren bis SA₂)
 Output    = erste 24 h ab t_now   (Kosten/SoC-Kette wie bisher)
@@ -90,9 +89,11 @@ Daten     = historische Ist-Verbräuche/PV aus cons_data_hourly.csv
 Geo/Zeit  = latitude/longitude aus Szenario + runtime_settings.timezone_name
 ```
 
-**Performance:** Volle SA₂-Matrix (typ. 36–39 h) würde pro Schritt ~58 % mehr MILP-Läufe
+**Performance:** Volle SA₂-Matrix (typ. ~40–48 h) würde pro Schritt mehr MILP-Läufe
 in `simulate_horizon` erzeugen als nötig; Backtesting kürzt daher auf 24 h Simulations-Tiefe.
 Der Sonnenaufgang-Index liegt im Sommer-Halbjahr stets innerhalb dieser 24 h.
+
+**Code-Stand:** Backtesting und Live nutzen bis zur Umsetzung von §2.4 noch `sunset_2` als Matrix-Ende.
 
 **Abweichung zu Live:** Re-Optimierung nur einmal pro Schritt (nicht alle 15 min).
 **Bewusst kein Ziel:** rollierende oder viertelstündliche Re-Optimierung im Backtesting —
@@ -157,3 +158,4 @@ Offen (Backlog): [UI Sunset-2-Sunset](ui-sunset2sunset.md) (SA₁→SA₂-Segmen
 | 2026-07-04 | `battery_end_soc_equals_start` entfernt; Terminal-SOC nur noch modus-/aufrufgesteuert |
 | 2026-07-04 | Backtesting-Vergleich: eine Version, CLI `--horizon-mode`, kein `.env` |
 | 2026-07-04 | Backtesting sunset: Grundlast-Overlay für 24h-Output; Jahresvergleich 2025; Live sunset, Referenz fixed_24h |
+| 2026-07-04 | **Korrektur:** MILP-Horizontende = SA₂ (**Sonnenaufgang**), nicht SU₂; v0.4 sunset_2 im Code = Rückstand (§2.4) |

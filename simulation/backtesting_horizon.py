@@ -87,7 +87,7 @@ def truncate_matrix_for_step_simulation(
     """
     Kürzt die Sunset-Matrix auf den 24h-Output-Schritt.
 
-    Volle Jetzt→SA₂-Matrix (typ. 36–39 h) würde simulate_horizon pro Extra-Stunde
+    Volle Jetzt→SA₂-Matrix (typ. ~40–48 h) würde simulate_horizon pro Extra-Stunde
     ein zusätzliches MILP lösen, obwohl Backtesting nur 24 h ausgibt.
     """
     if len(matrix) <= BACKTESTING_STEP_HOURS:

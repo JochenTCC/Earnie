@@ -26,7 +26,7 @@
 # Nach Code-Änderungen: Image bauen/pushen (docs/einrichtung/container.md), dann auf der NAS:
 #   docker compose -f docker-compose-synology.yml pull && docker compose -f docker-compose-synology.yml up -d
 #
-# UI: ENERGY_OPTIMIZER_UI_MODES=live (nur Echtzeit); Dev ohne Variable = alle Modi.
+# UI: ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting (Prod); Dev ohne Variable = alle Modi.
 
 version: "3.8"
 
@@ -66,4 +66,4 @@ services:
     volumes: *persist-volumes
     environment:
       <<: *common-env
-      ENERGY_OPTIMIZER_UI_MODES: live
+      ENERGY_OPTIMIZER_UI_MODES: sunset2sunset,backtesting

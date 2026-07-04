@@ -6,7 +6,8 @@
 
 - [ ] **UI Sunset-2-Sunset (Spec v0.5)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Phase 1 — Modus & Fenster:** `mode_selector` / `app.py` (Key `sunset2sunset`); SA₀/SA₁/SA₂ in `planning_window.py`; zwei Chart-Segmente SA₀→SA₁ (Start) und SA₁→SA₂; Navigation ← (max. Log-Tiefe) / Vor →; neue Zonen grau/neutral/grün; Auto-Refresh nur SA₀→SA₁; Sidebar ohne adaptives PV-Tuning
+  - **Phase 1 — Modus & Fenster:** ~~`mode_selector` / `app.py` … Sidebar ohne adaptives PV-Tuning~~ **erledigt (2026-07-04)**
+  - **Phase 1b — MILP bis SA₂ (Spec-Korrektur):** ~~`compute_planning_window` Horizontende Sonnenaufgang SA₂ …~~ **erledigt (2026-07-04)**
   - **Phase 2 — Vergangenheit füllen:** Produktiv-Log (`history_timeline`, 15 min) in grauem Bereich; Grenze an **voller Stunde** (laufende Stunde wie heute unsichtbar bis Stundenwechsel); ab voller Stunde 1h-MILP; Sankey + Countdown **immer**
   - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
   - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung)

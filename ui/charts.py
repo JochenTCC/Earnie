@@ -10,7 +10,11 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import config
-from data.planning_window import UiChartWindow, normalize_hour_slot, ui_chart_zone_indices
+from data.planning_window import (
+    UiChartWindow,
+    normalize_hour_slot,
+    slot_index_at_or_before,
+)
 from optimizer.targets import consumer_pv_follow_column_name, consumer_immediate_charge_column_name
 from optimizer import battery as bat
 
@@ -77,39 +81,51 @@ def build_sun_markers(
     planning_window,
 ) -> ChartSunMarkers:
     slots = chart.slot_datetimes
-    now_x = float(ui_chart_zone_indices(now, chart)[0])
-    sunrise_x = _slot_x_in_chart(slots, chart.next_sunrise)
+    now_x = _slot_x_in_chart(slots, normalize_hour_slot(now))
+    sunrise_x = _slot_x_in_chart(slots, chart.sa1)
+    sa2_x = _slot_x_in_chart(slots, chart.sa2)
     sunset_xs: list[float] = []
     if planning_window is not None:
         for moment in (planning_window.sunset_1, planning_window.sunset_2):
             sx = _slot_x_in_chart(slots, moment)
             if sx is not None:
                 sunset_xs.append(sx)
+    marker_sunrise = sunrise_x if chart.segment_index == 0 else sa2_x
     return ChartSunMarkers(
         now_x=now_x,
-        sunrise_x=sunrise_x,
+        sunrise_x=marker_sunrise,
         sunset_xs=tuple(sunset_xs),
     )
 
 
 def _add_zone_backgrounds(
     fig: go.Figure,
-    now: datetime,
     chart: UiChartWindow,
     zones,
 ) -> None:
-    now_idx, sunrise_idx, last_idx = ui_chart_zone_indices(now, chart)
-    if now_idx > 0 and zones.history.fill_color:
+    slots = chart.slot_datetimes
+    last_idx = len(slots) - 1
+    history_end_idx = slot_index_at_or_before(slots, zones.history.end)
+    if (
+        history_end_idx > 0
+        and zones.history.fill_color
+        and zones.history.end > zones.history.start
+    ):
         fig.add_vrect(
             x0=-0.5,
-            x1=now_idx - 0.5,
+            x1=history_end_idx - 0.5,
             fillcolor=zones.history.fill_color,
             line_width=0,
             layer="below",
         )
-    if sunrise_idx < last_idx and zones.forecast.fill_color:
+    green_start_idx = slot_index_at_or_before(slots, zones.forecast.start)
+    if (
+        green_start_idx <= last_idx
+        and zones.forecast.fill_color
+        and zones.forecast.end > zones.forecast.start
+    ):
         fig.add_vrect(
-            x0=sunrise_idx + 0.5,
+            x0=green_start_idx - 0.5,
             x1=last_idx + 0.5,
             fillcolor=zones.forecast.fill_color,
             line_width=0,
@@ -1095,7 +1111,7 @@ def render_power_soc_chart(
     fig = go.Figure()
 
     if chart_window is not None and chart_now is not None and chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_now, chart_window, chart_zones)
+        _add_zone_backgrounds(fig, chart_window, chart_zones)
 
     add_power_traces(fig, df, bar_colors, slot_x, extrap_start, extrap_end)
     add_optimized_soc_trace(fig, df, slot_x, extrap_start=extrap_start, extrap_end=extrap_end)
@@ -1203,7 +1219,7 @@ def render_cumulative_cost_chart(
     extrap_start, extrap_end = _extrapolation_bounds(df)
     fig = go.Figure()
     if chart_window is not None and chart_now is not None and chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_now, chart_window, chart_zones)
+        _add_zone_backgrounds(fig, chart_window, chart_zones)
     has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
     has_consumption = bool(
         hourly_matched_baseline_consumption_kwh and hourly_optimized_consumption_kwh

@@ -117,7 +117,7 @@ class TestSunsetHorizonSizing:
             window, _ = compute_sunset_planning_at_anchor(anchor, scenario)
             lengths.append(len(window.slot_datetimes))
         assert min(lengths) > BACKTESTING_STEP_HOURS
-        assert max(lengths) <= BACKTESTING_STEP_HOURS + 20
+        assert max(lengths) <= BACKTESTING_STEP_HOURS + 24
 
     def test_sunrise_index_within_or_at_output_boundary(self):
         scenario = fixture_scenario_params()

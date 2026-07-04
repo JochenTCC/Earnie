@@ -1,9 +1,8 @@
-"""Sidebar-Formulare für PV-, Batterie- und Tuning-Parameter."""
+"""Sidebar-Formulare für PV-, Batterie- und Runtime-Parameter."""
 from __future__ import annotations
 
 import streamlit as st
 
-from data import pv_tuner
 from ui.runtime_config import get_runtime_settings, update_config_file
 
 
@@ -106,39 +105,6 @@ def render_config_form(settings: dict) -> None:
             st.rerun()
 
 
-def render_pv_tuning_sidebar() -> None:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📈 Adaptives PV-Tuning")
-
-    try:
-        tuning_factor = pv_tuner.calculate_tuning_factor(days_back=14)
-        deviation_pct = (tuning_factor - 1.0) * 100
-
-        if tuning_factor == 1.0:
-            delta_text = "Keine Abweichung (Basis)"
-            delta_color = "off"
-        elif tuning_factor > 1.0:
-            delta_text = f"+{deviation_pct:.1f}% Mehrertrag vs. Prognose"
-            delta_color = "normal"
-        else:
-            delta_text = f"{deviation_pct:.1f}% Minderertrag vs. Prognose"
-            delta_color = "inverse"
-
-        st.sidebar.metric(
-            label="Aktueller Korrekturfaktor",
-            value=f"{tuning_factor:.2f}",
-            delta=delta_text,
-            delta_color=delta_color,
-        )
-    except Exception as e:
-        st.sidebar.warning(f"⚠️ Tuning-Faktor konnte nicht berechnet werden: {e}")
-
-    st.sidebar.caption(
-        "Errechnet aus dem automatischen Abgleich zwischen Forecast.Solar "
-        "und deine realen Loxone-Zählerständen der vergangenen 2 Wochen."
-    )
-
-
 def render_parameter_input(mode: str) -> None:
     if mode == "Backtesting":
         return
@@ -146,5 +112,3 @@ def render_parameter_input(mode: str) -> None:
     st.sidebar.markdown("Änderungen werden direkt über das Konfigurationsmodul angewendet.")
 
     render_config_form(get_runtime_settings())
-    if mode == "Echtzeit":
-        render_pv_tuning_sidebar()

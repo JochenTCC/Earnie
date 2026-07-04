@@ -153,7 +153,7 @@ def render_optimization_results(
         table_title = simulation_table_title
         if chart_context is not None:
             table_title = (
-                "📋 Simulations-Details (Sonnenaufgang→Sonnenaufgang)"
+                "📋 Simulations-Details (Sunset-2-Sunset-Fenster)"
             )
         render_simulation_details(display_df, title=table_title)
 
