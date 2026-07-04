@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import csv
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -395,3 +396,46 @@ def earliest_replay_completed_at() -> datetime | None:
     if not merged:
         return None
     return merged[0]["completed_at"]
+
+
+@dataclass(frozen=True)
+class ProductionLogSourceInfo:
+    """Metadaten zur aktuell eingebundenen Produktiv-Log-Datei."""
+
+    runtime_dir: str
+    env_runtime_dir: str | None
+    history_file: str
+    history_exists: bool
+    history_size_bytes: int | None
+    history_modified_at: datetime | None
+    legacy_csv_file: str
+    legacy_csv_exists: bool
+
+
+def describe_production_log_source() -> ProductionLogSourceInfo:
+    """
+    Beschreibt, welche Datei die UI für den Produktiv-Log liest.
+
+    Entspricht ``HISTORY_FILE`` / ``RUNTIME_DIR`` zum Zeitpunkt des Aufrufs
+    (Modul-Import cached die Pfade nicht — Streamlit-Reload übernimmt neue Env).
+    """
+    runtime_dir = os.path.abspath(RUNTIME_DIR)
+    history_file = os.path.abspath(HISTORY_FILE)
+    legacy_csv = os.path.abspath(LEGACY_CSV_FILE)
+    history_exists = os.path.isfile(history_file)
+    history_size: int | None = None
+    history_mtime: datetime | None = None
+    if history_exists:
+        stat = os.stat(history_file)
+        history_size = stat.st_size
+        history_mtime = datetime.fromtimestamp(stat.st_mtime)
+    return ProductionLogSourceInfo(
+        runtime_dir=runtime_dir,
+        env_runtime_dir=os.environ.get("ENERGY_OPTIMIZER_RUNTIME_DIR"),
+        history_file=history_file,
+        history_exists=history_exists,
+        history_size_bytes=history_size,
+        history_modified_at=history_mtime,
+        legacy_csv_file=legacy_csv,
+        legacy_csv_exists=os.path.isfile(legacy_csv),
+    )

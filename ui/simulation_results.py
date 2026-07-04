@@ -6,7 +6,10 @@ import logging
 import streamlit as st
 import pandas as pd
 
+import config
+from optimizer.targets import consumer_column_name
 from runtime_store import live_optimization_debug
+from runtime_store import optimization_history
 from runtime_store.history_timeline import (
     HistoryTimelineResult,
     SLOT_MISSING,
@@ -91,6 +94,105 @@ def _slot_quality_label(quality: str) -> str:
     return _SLOT_QUALITY_LABELS.get(quality, quality)
 
 
+def _simulation_table_column_order(columns: list[str]) -> list[str]:
+    """Uhrzeit und Flex-kW-Spalten nach vorne — weniger Verwechslung in der UI."""
+    front = [name for name in ("Uhrzeit", "Datenquelle") if name in columns]
+    flex_kw: list[str] = []
+    immediate: list[str] = []
+    pv_follow: list[str] = []
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        power_col = consumer_column_name(consumer)
+        if power_col in columns:
+            flex_kw.append(power_col)
+        imm_col = f"{consumer['name']} sofort_laden"
+        if imm_col in columns:
+            immediate.append(imm_col)
+        pv_col = f"{consumer['name']} pv_follow"
+        if pv_col in columns:
+            pv_follow.append(pv_col)
+    used = set(front + flex_kw + immediate + pv_follow)
+    rest = [col for col in columns if col not in used]
+    return front + flex_kw + immediate + pv_follow + rest
+
+
+def _format_simulation_table_numbers(df: pd.DataFrame) -> pd.DataFrame:
+    """Gleiche Dezimaldarstellung wie im Chart-Hover (2 Nachkommastellen)."""
+    out = df.copy()
+    numeric_suffixes = (" (kW)", " (Cent/kWh)", " (%)")
+    for col in out.columns:
+        if not any(token in col for token in numeric_suffixes):
+            continue
+        out[col] = out[col].apply(
+            lambda value: None
+            if value is None or (isinstance(value, float) and pd.isna(value))
+            else round(float(value), 2)
+        )
+    return out
+
+
+def format_display_data_basis_caption(
+    log_source: optimization_history.ProductionLogSourceInfo,
+    *,
+    merge_active: bool,
+    history_slot_count: int | None = None,
+) -> str:
+    """Markdown für Chart/Tabelle: Produktiv-Log-Pfad und Merge-Pfad."""
+    if log_source.env_runtime_dir:
+        runtime_note = (
+            f"`ENERGY_OPTIMIZER_RUNTIME_DIR` = `{log_source.env_runtime_dir}` "
+            f"(aufgelöst: `{log_source.runtime_dir}`)"
+        )
+    else:
+        runtime_note = (
+            "Keine `ENERGY_OPTIMIZER_RUNTIME_DIR` gesetzt — "
+            f"Standard `{log_source.runtime_dir}`"
+        )
+    if log_source.history_exists:
+        modified = ""
+        if log_source.history_modified_at is not None:
+            modified = (
+                f", zuletzt geändert "
+                f"{log_source.history_modified_at:%d.%m.%Y %H:%M:%S}"
+            )
+        size = log_source.history_size_bytes or 0
+        file_note = (
+            f"**Produktiv-Log:** `{log_source.history_file}` "
+            f"({size} Bytes{modified})"
+        )
+    else:
+        file_note = (
+            f"**Produktiv-Log:** `{log_source.history_file}` — "
+            "**Datei nicht gefunden** (graue Slots ohne Log-Einträge)"
+        )
+    legacy_note = ""
+    if log_source.legacy_csv_exists:
+        legacy_note = (
+            f" Zusätzlich Legacy-CSV: `{log_source.legacy_csv_file}` "
+            "(nur Lückenfüller für Zeitpunkte ohne JSONL-Eintrag)."
+        )
+    flex_note = (
+        "Flexible Verbraucher im grauen Bereich: **Soll** aus "
+        "`consumer_powers_kw` je Log-Eintrag (Fallback: `consumption_snapshot.flex_kw`)."
+    )
+    if merge_active:
+        slots_note = ""
+        if history_slot_count is not None:
+            slots_note = f" {history_slot_count} Viertelstunden-Slots aus dem Log."
+        merge_note = (
+            "**Merge-Pfad aktiv:** Chart und Tabelle nutzen dieselben Zeilen aus "
+            f"`build_chart_display_context` (Produktiv-Log + MILP-Tail).{slots_note}"
+        )
+    else:
+        merge_note = (
+            "**Kein Merge-Pfad:** nur MILP-Simulation (`optimized_df`) — "
+            "Produktiv-Log wird für Chart/Tabelle nicht eingemischt."
+        )
+    return (
+        f"**Datenbasis Produktiv-Log** — {runtime_note}. {file_note}{legacy_note} "
+        f"{flex_note} {merge_note}"
+    )
+
+
 def _quality_at_row(row_index, frame_index: pd.Index, qualities: tuple[str, ...]) -> str:
     position = int(frame_index.get_loc(row_index))
     return qualities[position]
@@ -130,6 +232,8 @@ def _render_simulation_table(
         display_df["Datenquelle"] = [_slot_quality_label(q) for q in slot_qualities]
     if "slot_datetime" in display_df.columns:
         display_df = display_df.drop(columns=["slot_datetime"])
+    display_df = _format_simulation_table_numbers(display_df)
+    display_df = display_df[_simulation_table_column_order(list(display_df.columns))]
 
     has_gap_styles = slot_qualities is not None and any(
         quality == SLOT_MISSING for quality in slot_qualities
@@ -138,7 +242,8 @@ def _render_simulation_table(
         # st.table rendert Pandas-Styler (Zeilenfarben) zuverlässiger als st.dataframe.
         st.table(_style_simulation_table(display_df, slot_qualities))
     else:
-        st.dataframe(display_df, width="stretch", hide_index=True)
+        # st.table: alle Spalten/Werte ohne Glide-DataFrame-Virtualisierung (weniger Verwechslungen).
+        st.table(display_df)
 
 
 def render_simulation_details(
@@ -147,8 +252,11 @@ def render_simulation_details(
     *,
     slot_qualities: tuple[str, ...] | None = None,
     gap_notice: str | None = None,
+    data_basis_caption: str | None = None,
 ) -> None:
     with st.expander(title):
+        if data_basis_caption:
+            st.caption(data_basis_caption)
         if gap_notice:
             st.warning(gap_notice)
         st.markdown(
@@ -180,7 +288,10 @@ def render_optimization_results(
     table_gap_notice: str | None = None
     chart_qualities: tuple[str, ...] | None = None
     sun_markers = None
+    merge_active = False
+    history_slot_count: int | None = None
     if chart_context is not None and optimization_matrix is not None:
+        merge_active = True
         savings_view = savings_view_for_chart(
             savings_info,
             optimization_matrix,
@@ -201,6 +312,7 @@ def render_optimization_results(
         chart_qualities = display_ctx.slot_qualities
         table_gap_notice = display_ctx.gap_notice
         display_df = pd.DataFrame(display_ctx.rows)
+        history_slot_count = display_ctx.history_slot_count
         if matched_baseline_df is not None:
             display_matched = pd.DataFrame(
                 align_rows_to_display_slots(
@@ -215,7 +327,17 @@ def render_optimization_results(
             slot_datetimes=display_ctx.slot_datetimes,
         )
 
+    data_basis_caption = None
+    if chart_context is not None:
+        data_basis_caption = format_display_data_basis_caption(
+            optimization_history.describe_production_log_source(),
+            merge_active=merge_active,
+            history_slot_count=history_slot_count,
+        )
+
     matched_cost, optimized_cost = _cost_totals_from_savings(savings_view)
+    if data_basis_caption:
+        st.markdown(data_basis_caption)
     render_optimization_chart(
         display_df,
         baseline_df,
@@ -251,6 +373,7 @@ def render_optimization_results(
             title=table_title,
             slot_qualities=table_qualities,
             gap_notice=table_gap_notice,
+            data_basis_caption=data_basis_caption,
         )
 
 

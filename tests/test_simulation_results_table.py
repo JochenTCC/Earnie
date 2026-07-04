@@ -4,7 +4,10 @@ from __future__ import annotations
 import pandas as pd
 
 from runtime_store.history_timeline import SLOT_MISSING, SLOT_PRESENT
-from ui.simulation_results import _style_simulation_table
+from ui.simulation_results import (
+    _simulation_table_column_order,
+    _style_simulation_table,
+)
 
 
 def test_style_simulation_table_colors_missing_rows_orange():
@@ -19,3 +22,15 @@ def test_style_simulation_table_colors_missing_rows_orange():
     assert "#ffe0b2" in html
     assert "#fff3e0" not in html
     assert "row0_col0" in html
+
+
+def test_simulation_table_column_order_puts_flex_kw_after_uhrzeit():
+    cols = _simulation_table_column_order([
+        "Steuerbefehl",
+        "Uhrzeit",
+        "SwimSpa (kW)",
+        "Datenquelle",
+        "E-Auto (kW)",
+        "Netzbezug (kW)",
+    ])
+    assert cols[:4] == ["Uhrzeit", "Datenquelle", "SwimSpa (kW)", "E-Auto (kW)"]

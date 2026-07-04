@@ -1627,6 +1627,7 @@ def render_optimization_chart(
         chart_zones=chart_zones,
         sun_markers=sun_markers,
         slot_qualities=slot_qualities,
+        chart_key="live_power_soc_chart",
     )
     render_price_savings_chart(
         df,

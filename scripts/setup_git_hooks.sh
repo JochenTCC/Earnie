@@ -5,4 +5,4 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 git config core.hooksPath .githooks
 echo "Git hooksPath gesetzt auf .githooks"
-echo "pre-commit führt vor jedem Commit 'pytest tests' aus."
+echo "pre-commit führt 'pytest tests' aus (übersprungen bei nur *.md, docs/, .cursor/)."
