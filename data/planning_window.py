@@ -8,6 +8,8 @@ from zoneinfo import ZoneInfo
 from astral import Observer
 from astral.sun import sun
 
+from optimizer.schedule import quarter_hour_slot_start
+
 
 @dataclass(frozen=True)
 class PlanningWindow:
@@ -400,10 +402,23 @@ def first_extrapolated_slot(
 
 
 def last_completed_hour_boundary(now: datetime) -> datetime:
-    """Start der aktuellen vollen Stunde (= Ende der letzten abgeschlossenen)."""
+    """Start der aktuellen vollen Stunde (= exklusives Ende des Log-Bereichs vor x:15)."""
     if now.tzinfo is None:
         raise ValueError("now muss timezone-aware sein.")
     return normalize_hour_slot(now)
+
+
+def history_boundary_exclusive(now: datetime) -> datetime:
+    """
+    Exklusives Ende des Produktiv-Log-Bereichs (Spec ui-sunset2sunset v0.6 §6).
+
+    x:00–x:14: letzte volle Stunde. Ab x:15: Beginn des laufenden Viertelstunden-Slots.
+    """
+    if now.tzinfo is None:
+        raise ValueError("now muss timezone-aware sein.")
+    if now.minute < 15:
+        return normalize_hour_slot(now)
+    return quarter_hour_slot_start(now)
 
 
 def _clip_zone_end(start: datetime, end: datetime, boundary: datetime) -> datetime:
@@ -436,7 +451,7 @@ def _ui_chart_zones_sa0_sa1(
     sim_rows: list[dict] | None,
 ) -> UiChartZones:
     """Segment SA₀→SA₁: grau / neutral / grün (Vergangenheit ab SA₀)."""
-    gray_end = last_completed_hour_boundary(now)
+    gray_end = history_boundary_exclusive(now)
     extrapolated = first_extrapolated_slot(chart.slot_datetimes, sim_rows)
     green_color = "rgba(76, 175, 80, 0.15)"
     if extrapolated is not None:

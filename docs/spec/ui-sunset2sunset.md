@@ -1,7 +1,7 @@
 # Spezifikation: UI-Modus „Sunset-2-Sunset“
 
-**Version:** 0.5  
-**Status:** Phase 1 UI umgesetzt (2026-07-04); Phase 2–4 offen  
+**Version:** 0.6.1  
+**Status:** Phase 1 UI umgesetzt (2026-07-04); Phase 2 (Charts) teilweise — Daten-Schicht v0.6, Hold-Forward-Abschaffung offen; Phase 3–4 offen  
 **Ersetzt:** Streamlit-Modi „Echtzeit“ und „Historischer Tag“, Button „Produktiv-Archiv“, getrennte Live/History-Umschaltung
 
 ## 1. Ziel
@@ -51,9 +51,16 @@ Beschriftung z. B. „SA₀→SA₁ (Live)“ / „SA₁→SA₂ (Vorausschau)
 
 | Zone | Zeitraum |
 |------|----------|
-| Grau | SA₀ → letzte **abgeschlossene** volle Stunde |
-| Neutral | aktuelle volle Stunde bis erster extrapolierter Preis |
+| Grau | SA₀ → letzter **abgeschlossener** 15-Min-Slot (siehe §6 — ab x:15 inkl. vergangene Viertelstunden der laufenden Stunde) |
+| Neutral | offener Bereich ab letztem grauen Slot bis erster extrapolierter Preis (verbleibende Viertelstunden der laufenden Stunde mit MILP-Soll; danach stündliche MILP-Slots) |
 | Grün | erster Slot mit `Preis extrapoliert == true` → **Fensterrand** (SA₁ bzw. SA₂) |
+
+**Grenze grau/neutral in der laufenden Stunde**
+
+| Uhrzeit | Grau endet bei | Neutral beginnt mit |
+|---------|----------------|---------------------|
+| x:00–x:14 | letzte **volle** Stunde (wie bisher) | einem stündlichen MILP-Slot für die laufende Stunde |
+| ab x:15 | letztem abgeschlossenen 15-Min-Slot | den verbleibenden Viertelstunden der laufenden Stunde (Soll aus MILP-Stunde 0) |
 
 Grün ersetzt die bisherige Zone „Vorausschau nach SOC-Anker“ (Phase 4 `planning-horizon-sunset.md`).
 
@@ -61,13 +68,37 @@ Grün ersetzt die bisherige Zone „Vorausschau nach SOC-Anker“ (Phase 4 `plan
 
 | Bereich | Quelle | Auflösung |
 |---------|--------|-----------|
-| Grau | `optimization_history.jsonl` (via `history_timeline`) | 15 min, nur abgeschlossene Stunden |
-| Ab aktueller voller Stunde | Live-MILP + `main.py`-Overlay Stunde 0 | 1 h |
-| Laufende Stunde | Anteile bis Stundenwechsel unsichtbar | wie bisher Echtzeit |
+| Vollständig vergangene Stunden | `optimization_history.jsonl` (via `history_timeline`) | 15 min (Log-Ist) |
+| Laufende Stunde, vor x:15 | Live-MILP Stunde 0 + `main.py`-Overlay | 1 h (wie bisher Echtzeit; Anteile bis x:15 unsichtbar) |
+| Laufende Stunde, ab x:15 | Log (abgeschlossene Viertelstunden) + MILP Stunde 0 (verbleibende Viertelstunden) | 15 min |
+| Ab nächster voller Stunde | Live-MILP + `main.py`-Overlay | 1 h |
+
+### Laufende Stunde ab x:15
+
+Ab Minute **15** der laufenden Stunde wird diese im **15-Minuten-Takt** dargestellt (Slots x:00, x:15, x:30, x:45):
+
+| Viertelstunde | Status | Befüllung |
+|---------------|--------|-----------|
+| bereits abgeschlossen | Vergangenheit (grau) | Produktiv-Log (`optimization_history.jsonl`) |
+| noch offen | Zukunft innerhalb der Stunde (neutral) | **konstant** die Soll-Werte der aktuellen MILP-Stunde 0 (keine Interpolation, kein stündlicher Aggregat-Slot) |
+
+Die Simulations-Tabelle und die Charts nutzen dieselbe Slot-Auflösung und dieselben Grenzen.
+
+### Fehlende Log-Slots
+
+Viertelstunden-Slots im **grauen Bereich** ohne Eintrag in `optimization_history.jsonl`:
+
+| Aspekt | Verhalten |
+|--------|-----------|
+| Werte | **leer** (`null` / keine Anzeige) — **kein** Hold-Forward, **keine** Übernahme älterer Messwerte |
+| Kennzeichnung | **Orange** Hintergrund in Simulations-Tabelle und Charts (einheitliche Farbe) |
+| Kumulativ | Kosten-/Verbrauchssummen zählen fehlende Slots **nicht** mit (Lücken in Kurven) |
+
+Hold-Forward (bisher „hellorange / gehalten“) gilt im S-2-Modus **nicht**. Fehlende Daten bleiben sichtbar als Lücke.
 
 **Chart 1 (grau):** Ist aus Log — SOC, Verbrauch, PV, Batterie/Flex, Preis zum Laufzeitpunkt. Keine rückwirkende MILP-Simulation.
 
-**Chart 2:** getrennt — „Ist bisher“ (Log, 15 min) und „Prognose optimiert“ (MILP ab voller Stunde); kein künstliches Zusammenfügen der Kurven.
+**Chart 2:** getrennt — „Ist bisher“ (Log, 15 min, inkl. abgeschlossene Viertelstunden der laufenden Stunde ab x:15) und „Prognose optimiert“ (Soll-Viertelstunden der laufenden Stunde ab x:15, danach MILP ab nächster voller Stunde); kein künstliches Zusammenfügen der Kurven.
 
 ## 7. Live-Panels
 
@@ -87,3 +118,11 @@ Grün ersetzt die bisherige Zone „Vorausschau nach SOC-Anker“ (Phase 4 `plan
 
 - MILP-Horizont: [planning-horizon-sunset.md](planning-horizon-sunset.md) — Jetzt → **SA₂** (Sonnenaufgang, identisch UI-Segment SA₁→SA₂ Ende)
 - Produktiv-Log: `runtime_store/history_timeline.py`, `runtime/optimization_history.jsonl` (grauer Bereich ab **Phase 2**)
+
+## Änderungshistorie
+
+| Datum | Version | Inhalt |
+|-------|---------|--------|
+| 2026-07-04 | 0.6.1 | Fehlende Log-Slots: orange markieren, keine Hold-Forward-Befüllung |
+| 2026-07-04 | 0.6 | Laufende Stunde ab x:15 im 15-Min-Takt: Log für vergangene Viertelstunden, konstantes MILP-Soll für offene; vor x:15 unverändert 1h-MILP |
+| 2026-07-04 | 0.5 | Erstfassung Phase 1 UI |

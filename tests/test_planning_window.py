@@ -11,6 +11,7 @@ from data.planning_window import (
     compute_sunrise_anchors,
     compute_ui_chart_window,
     compute_ui_chart_window_with_offset,
+    history_boundary_exclusive,
     is_sunrise_hour,
     normalize_hour_slot,
     official_sun_times,
@@ -146,6 +147,20 @@ class TestUiChartWindow:
         assert zones.forecast.fill_color is not None
         assert zones.history.end == normalize_hour_slot(now)
         assert zones.forecast.start == _dt(2026, 6, 15, 18, 0)
+
+    def test_history_boundary_before_x15_uses_hour(self):
+        now = _dt(2026, 6, 15, 14, 10)
+        assert history_boundary_exclusive(now) == _dt(2026, 6, 15, 14, 0)
+
+    def test_history_boundary_from_x15_uses_quarter(self):
+        now = _dt(2026, 6, 15, 14, 30)
+        assert history_boundary_exclusive(now) == _dt(2026, 6, 15, 14, 30)
+
+    def test_ui_zones_gray_includes_completed_quarters_after_x15(self):
+        now = _dt(2026, 6, 15, 14, 30)
+        chart = compute_ui_chart_window(now, LAT, LON, TZ, segment_index=0)
+        zones = ui_chart_zones(now, chart, sim_rows=[])
+        assert zones.history.end == _dt(2026, 6, 15, 14, 30)
 
     def test_ui_chart_offset_shifts_anchors_back(self):
         now = _dt(2026, 6, 15, 14, 0)

@@ -9,7 +9,6 @@ import pandas as pd
 from runtime_store import live_optimization_debug
 from runtime_store.history_timeline import (
     HistoryTimelineResult,
-    SLOT_HELD,
     SLOT_MISSING,
     SLOT_PRESENT,
     format_gap_notice,
@@ -17,8 +16,9 @@ from runtime_store.history_timeline import (
 from ui.chart_context import (
     LiveChartContext,
     SLOT_MILP,
-    align_rows_to_chart_slots,
+    align_rows_to_display_slots,
     build_chart_display_context,
+    build_display_savings_series,
     savings_view_for_chart,
 )
 from ui.charts import build_sun_markers, render_history_optimization_chart, render_optimization_chart
@@ -80,10 +80,8 @@ def render_applied_targets(savings: dict) -> None:
 
 
 _TABLE_MISSING_ROW_COLOR = "background-color: #ffe0b2;"
-_TABLE_HELD_ROW_COLOR = "background-color: #fff3e0;"
 _SLOT_QUALITY_LABELS = {
     SLOT_PRESENT: "Produktiv-Log",
-    SLOT_HELD: "Produktiv-Log (gehalten)",
     SLOT_MISSING: "fehlend",
     SLOT_MILP: "MILP",
 }
@@ -103,7 +101,7 @@ def _style_simulation_table(
     slot_qualities: tuple[str, ...],
 ) -> pd.io.formats.style.Styler:
     """
-    Zeilen-Hintergrund für fehlende/ gehaltene Log-Slots.
+    Zeilen-Hintergrund für fehlende Log-Slots (orange).
 
     st.dataframe unterstützt Styler.apply, aber nicht zuverlässig mit hide() —
     Qualitäten liegen daher außerhalb des DataFrames.
@@ -111,15 +109,9 @@ def _style_simulation_table(
 
     def _highlight_row(row: pd.Series):
         quality = _quality_at_row(row.name, df.index, slot_qualities)
-        if quality == SLOT_MISSING:
-            color = _TABLE_MISSING_ROW_COLOR
-        elif quality == SLOT_HELD:
-            color = _TABLE_HELD_ROW_COLOR
-        else:
-            color = None
-        if color is None:
+        if quality != SLOT_MISSING:
             return [None] * len(row)
-        return [color] * len(row)
+        return [_TABLE_MISSING_ROW_COLOR] * len(row)
 
     return df.style.apply(_highlight_row, axis=1)
 
@@ -140,7 +132,7 @@ def _render_simulation_table(
         display_df = display_df.drop(columns=["slot_datetime"])
 
     has_gap_styles = slot_qualities is not None and any(
-        quality in (SLOT_MISSING, SLOT_HELD) for quality in slot_qualities
+        quality == SLOT_MISSING for quality in slot_qualities
     )
     if has_gap_styles:
         # st.table rendert Pandas-Styler (Zeilenfarben) zuverlässiger als st.dataframe.
@@ -161,8 +153,8 @@ def render_simulation_details(
             st.warning(gap_notice)
         st.markdown(
             "Slots wie im Chart: **Produktiv-Log** (15 min, grauer Bereich) und "
-            "**MILP** (1 h ab voller Stunde). "
-            "**Orange** = kein Log-Eintrag · **hellorange** = Hold-Forward (gehalten)."
+            "**MILP** (laufende Stunde ab x:15 in 15-min-Soll-Slots, sonst 1 h ab voller Stunde). "
+            "**Orange** = kein Log-Eintrag (Werte leer, kein Hold-Forward)."
         )
         _render_simulation_table(df, slot_qualities)
 
@@ -186,6 +178,7 @@ def render_optimization_results(
     table_df = display_df
     table_qualities: tuple[str, ...] | None = None
     table_gap_notice: str | None = None
+    chart_qualities: tuple[str, ...] | None = None
     sun_markers = None
     if chart_context is not None and optimization_matrix is not None:
         savings_view = savings_view_for_chart(
@@ -197,26 +190,29 @@ def render_optimization_results(
             chart_context,
             optimized_df.to_dict("records"),
         )
+        savings_view = build_display_savings_series(
+            display_ctx,
+            savings_view,
+            optimization_matrix,
+            chart_context.chart_window,
+        )
         table_df = pd.DataFrame(display_ctx.rows)
         table_qualities = display_ctx.slot_qualities
+        chart_qualities = display_ctx.slot_qualities
         table_gap_notice = display_ctx.gap_notice
-        display_df = pd.DataFrame(
-            align_rows_to_chart_slots(
-                optimized_df.to_dict("records"),
-                chart_context.chart_window,
-            )
-        )
+        display_df = pd.DataFrame(display_ctx.rows)
         if matched_baseline_df is not None:
             display_matched = pd.DataFrame(
-                align_rows_to_chart_slots(
+                align_rows_to_display_slots(
                     matched_baseline_df.to_dict("records"),
-                    chart_context.chart_window,
+                    display_ctx.slot_datetimes,
                 )
             )
         sun_markers = build_sun_markers(
             chart_context.chart_window,
-            chart_context.zone_reference,
+            chart_context.now,
             chart_context.planning_window,
+            slot_datetimes=display_ctx.slot_datetimes,
         )
 
     matched_cost, optimized_cost = _cost_totals_from_savings(savings_view)
@@ -241,6 +237,7 @@ def render_optimization_results(
         chart_now=chart_context.zone_reference if chart_context else None,
         chart_zones=chart_context.zones if chart_context else None,
         sun_markers=sun_markers,
+        slot_qualities=chart_qualities,
     )
     render_applied_targets(savings_view)
     if simulation_table_title:

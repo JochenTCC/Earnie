@@ -4,9 +4,9 @@
 
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
-- [ ] **UI Sunset-2-Sunset (Spec v0.5)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
+- [ ] **UI Sunset-2-Sunset (Spec v0.6.1)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Phase 2 — Vergangenheit füllen (Charts, offen):** Produktiv-Log (`history_timeline`, 15 min) im **grauen Chart-Bereich**; Grenze an **voller Stunde**; ab voller Stunde 1h-MILP in Charts; Sankey + Countdown **immer**; Darstellung konsistent zur Simulations-Tabelle
+  - **Phase 2 — Vergangenheit füllen (Charts, teilweise):** Daten-Schicht v0.6.1 (15-min ab x:15, kein Hold-Forward), Charts auf `display_ctx` — **offen:** Chart-Werte im **grauen Bereich** stimmen noch nicht mit Simulations-Tabelle überein (zuerst Ursache finden und beheben)
   - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
   - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung)
   - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting

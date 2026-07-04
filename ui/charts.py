@@ -13,10 +13,10 @@ import config
 from data.planning_window import (
     UiChartWindow,
     normalize_hour_slot,
-    slot_index_at_or_before,
 )
 from optimizer.targets import consumer_pv_follow_column_name, consumer_immediate_charge_column_name
 from optimizer import battery as bat
+from runtime_store.history_timeline import SLOT_MISSING
 
 _CONSUMER_BAR_OPACITY = 0.65
 _CONSUMER_PV_FOLLOW_PATTERN = "/"
@@ -30,6 +30,7 @@ _PV_LINE_COLOR = "#f1c40f"
 _PV_FILL_COLOR = "rgba(241, 196, 15, 0.15)"
 _ZONE_HISTORY_COLOR = "rgba(128, 128, 128, 0.18)"
 _ZONE_FORECAST_COLOR = "rgba(76, 175, 80, 0.15)"
+_MISSING_SLOT_FILL = "rgba(255, 224, 178, 0.55)"
 _MARKER_NOW_COLOR = "#3498db"
 _MARKER_SUNRISE_COLOR = "#f39c12"
 _MARKER_SUNSET_COLOR = "#8e44ad"
@@ -215,20 +216,68 @@ def _sunrise_chart_title(chart: UiChartWindow) -> str:
     )
 
 
-def _slot_time_in_chart(slots: tuple[datetime, ...], moment: datetime) -> datetime | None:
-    target = normalize_hour_slot(moment)
-    if target not in slots:
+def _slot_time_in_chart(
+    slots: tuple[datetime, ...] | list[datetime],
+    moment: datetime,
+) -> datetime | None:
+    if not slots:
         return None
-    return target
+    target = normalize_hour_slot(moment)
+    if target in slots:
+        return target
+    for slot in slots:
+        if slot == moment:
+            return slot
+    return None
+
+
+def _slot_index_before(axis: ChartSlotAxis, moment: datetime) -> int:
+    """Letzter Index mit Slotbeginn strikt vor ``moment``."""
+    for index in range(len(axis.starts) - 1, -1, -1):
+        if axis.starts.iloc[index] < moment:
+            return index
+    return -1
+
+
+def _mask_missing_log_slots(
+    df: pd.DataFrame,
+    slot_qualities: tuple[str, ...] | None,
+) -> pd.DataFrame:
+    """Setzt Messwerte in fehlenden Log-Slots auf NaN (Lücken in Linien)."""
+    if not slot_qualities or len(slot_qualities) != len(df):
+        return df
+    masked = df.copy()
+    numeric_cols = [
+        "PV-Prognose (kW)",
+        "Verbrauch-Prognose (kW)",
+        "Geplante Batterie-Aktion (kW)",
+        "Netzbezug (kW)",
+        "Simulierter SoC (%)",
+        "Strompreis (Cent/kWh)",
+    ]
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        numeric_cols.append(f"{consumer['name']} (kW)")
+    for index, quality in enumerate(slot_qualities):
+        if quality != SLOT_MISSING:
+            continue
+        for col in numeric_cols:
+            if col in masked.columns:
+                masked.iloc[index, masked.columns.get_loc(col)] = float("nan")
+    return masked
 
 
 def build_sun_markers(
     chart: UiChartWindow,
     now: datetime,
     planning_window,
+    *,
+    slot_datetimes: tuple[datetime, ...] | None = None,
 ) -> ChartSunMarkers:
-    slots = chart.slot_datetimes
-    now_x = _slot_time_in_chart(slots, normalize_hour_slot(now))
+    slots = slot_datetimes or chart.slot_datetimes
+    if slots and slots[0] <= now <= chart.end + timedelta(hours=1):
+        now_x = now
+    else:
+        now_x = _slot_time_in_chart(slots, now)
     sunrise_x = _slot_time_in_chart(slots, chart.sa1)
     sa2_x = _slot_time_in_chart(slots, chart.sa2)
     sunset_xs: list[datetime] = []
@@ -247,28 +296,30 @@ def build_sun_markers(
 
 def _add_zone_backgrounds(
     fig: go.Figure,
-    chart: UiChartWindow,
     zones,
     axis: ChartSlotAxis,
 ) -> None:
-    slots = chart.slot_datetimes
-    last_idx = len(slots) - 1
-    history_end_idx = slot_index_at_or_before(slots, zones.history.end)
+    last_idx = len(axis.starts) - 1
+    history_end_idx = _slot_index_before(axis, zones.history.end)
     if (
-        history_end_idx > 0
+        history_end_idx >= 0
         and zones.history.fill_color
         and zones.history.end > zones.history.start
     ):
         fig.add_vrect(
             x0=axis.legacy_index_time(-0.5),
-            x1=axis.legacy_index_time(history_end_idx - 0.5),
+            x1=axis.legacy_index_time(history_end_idx + 0.5),
             fillcolor=zones.history.fill_color,
             line_width=0,
             layer="below",
         )
-    green_start_idx = slot_index_at_or_before(slots, zones.forecast.start)
+    green_start_idx = None
+    for index, slot in enumerate(axis.starts):
+        if slot >= zones.forecast.start:
+            green_start_idx = index
+            break
     if (
-        green_start_idx <= last_idx
+        green_start_idx is not None
         and zones.forecast.fill_color
         and zones.forecast.end > zones.forecast.start
     ):
@@ -276,6 +327,25 @@ def _add_zone_backgrounds(
             x0=axis.legacy_index_time(green_start_idx - 0.5),
             x1=axis.legacy_index_time(last_idx + 0.5),
             fillcolor=zones.forecast.fill_color,
+            line_width=0,
+            layer="below",
+        )
+
+
+def _add_missing_slot_backgrounds(
+    fig: go.Figure,
+    axis: ChartSlotAxis,
+    slot_qualities: tuple[str, ...] | None,
+) -> None:
+    if not slot_qualities or len(slot_qualities) != len(axis.starts):
+        return
+    for index, quality in enumerate(slot_qualities):
+        if quality != SLOT_MISSING:
+            continue
+        fig.add_vrect(
+            x0=axis.legacy_index_time(index - 0.5),
+            x1=axis.legacy_index_time(index + 0.5),
+            fillcolor=_MISSING_SLOT_FILL,
             line_width=0,
             layer="below",
         )
@@ -917,7 +987,7 @@ def add_optimized_soc_trace(
             line=dict(color=_COLOR_OPTIMIZED, width=2.5),
             opacity=_segment_opacity(1.0, is_extrapolated),
             yaxis=yaxis,
-            connectgaps=True,
+            connectgaps=False,
             customdata=_segment_hover_labels(
                 uhrzeit,
                 start,
@@ -1212,23 +1282,22 @@ def render_power_soc_chart(
     chart_now: datetime | None = None,
     chart_zones=None,
     sun_markers: ChartSunMarkers | None = None,
+    slot_qualities: tuple[str, ...] | None = None,
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
-    bar_colors = get_bar_colors(df)
-    chart_slot_datetimes = chart_window.slot_datetimes if chart_window is not None else None
-    axis = ChartSlotAxis.from_dataframe(
-        df,
-        slot_datetimes=chart_slot_datetimes,
-    )
-    extrap_start, extrap_end = _extrapolation_bounds(df)
+    plot_df = _mask_missing_log_slots(df, slot_qualities)
+    bar_colors = get_bar_colors(plot_df)
+    axis = ChartSlotAxis.from_dataframe(plot_df)
+    extrap_start, extrap_end = _extrapolation_bounds(plot_df)
     fig = go.Figure()
 
-    if chart_window is not None and chart_now is not None and chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_window, chart_zones, axis)
+    if chart_zones is not None:
+        _add_zone_backgrounds(fig, chart_zones, axis)
+    _add_missing_slot_backgrounds(fig, axis, slot_qualities)
 
-    add_power_traces(fig, df, bar_colors, axis, extrap_start, extrap_end)
+    add_power_traces(fig, plot_df, bar_colors, axis, extrap_start, extrap_end)
     add_optimized_soc_trace(
-        fig, df, axis, extrap_start=extrap_start, extrap_end=extrap_end
+        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
     )
     if show_baseline_soc:
         add_baseline_soc_traces(
@@ -1238,7 +1307,7 @@ def render_power_soc_chart(
             extrap_end=extrap_end,
         )
     add_price_on_soc_axis_trace(
-        fig, df, axis, extrap_start=extrap_start, extrap_end=extrap_end
+        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
     )
 
     if sun_markers is not None:
@@ -1328,16 +1397,15 @@ def render_cumulative_cost_chart(
     chart_window: UiChartWindow | None = None,
     chart_now: datetime | None = None,
     chart_zones=None,
+    slot_qualities: tuple[str, ...] | None = None,
 ) -> None:
     """Kumulierte Stromkosten und Verbrauch BL Ziel vs. optimiert."""
-    axis = ChartSlotAxis.from_dataframe(
-        df,
-        slot_datetimes=chart_window.slot_datetimes if chart_window is not None else None,
-    )
+    axis = ChartSlotAxis.from_dataframe(df)
     extrap_start, extrap_end = _extrapolation_bounds(df)
     fig = go.Figure()
-    if chart_window is not None and chart_now is not None and chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_window, chart_zones, axis)
+    if chart_zones is not None:
+        _add_zone_backgrounds(fig, chart_zones, axis)
+    _add_missing_slot_backgrounds(fig, axis, slot_qualities)
     has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
     has_consumption = bool(
         hourly_matched_baseline_consumption_kwh and hourly_optimized_consumption_kwh
@@ -1416,6 +1484,7 @@ def render_price_savings_chart(
     chart_window: UiChartWindow | None = None,
     chart_now: datetime | None = None,
     chart_zones=None,
+    slot_qualities: tuple[str, ...] | None = None,
 ) -> None:
     """Alias für kumulierte Kosten- und Verbrauchslinien."""
     render_cumulative_cost_chart(
@@ -1429,6 +1498,7 @@ def render_price_savings_chart(
         chart_window=chart_window,
         chart_now=chart_now,
         chart_zones=chart_zones,
+        slot_qualities=slot_qualities,
     )
 
 
@@ -1545,6 +1615,7 @@ def render_optimization_chart(
     chart_now: datetime | None = None,
     chart_zones=None,
     sun_markers: ChartSunMarkers | None = None,
+    slot_qualities: tuple[str, ...] | None = None,
 ) -> None:
     """Zeichnet Leistung/SoC/Preis und kumulierte Kosten/Verbrauch in zwei Charts."""
     render_power_soc_chart(
@@ -1555,6 +1626,7 @@ def render_optimization_chart(
         chart_now=chart_now,
         chart_zones=chart_zones,
         sun_markers=sun_markers,
+        slot_qualities=slot_qualities,
     )
     render_price_savings_chart(
         df,
@@ -1567,4 +1639,5 @@ def render_optimization_chart(
         chart_window=chart_window,
         chart_now=chart_now,
         chart_zones=chart_zones,
+        slot_qualities=slot_qualities,
     )

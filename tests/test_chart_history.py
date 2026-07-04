@@ -78,14 +78,15 @@ def test_build_chart_history_tracks_slot_qualities(history_files):
         window_start.replace(hour=11),
     )
     assert result.present_slot_count == 1
-    assert result.missing_slot_count == 2
-    assert result.held_slot_count == 1
+    assert result.missing_slot_count == 3
+    assert result.held_slot_count == 0
     assert result.slot_qualities == (
         history_timeline.SLOT_MISSING,
         history_timeline.SLOT_MISSING,
         history_timeline.SLOT_PRESENT,
-        history_timeline.SLOT_HELD,
+        history_timeline.SLOT_MISSING,
     )
+    assert result.rows[3]["Simulierter SoC (%)"] is None
 
 
 def test_build_chart_history_accepts_naive_log_timestamps(history_files):
@@ -100,7 +101,7 @@ def test_build_chart_history_accepts_naive_log_timestamps(history_files):
     assert result.rows[0]["Simulierter SoC (%)"] == 41.0
 
 
-def test_hold_forward_zeros_flex_power(history_files):
+def test_missing_slots_after_present_leave_gaps(history_files):
     import config
     from optimizer.targets import consumer_column_name
 
@@ -113,29 +114,46 @@ def test_hold_forward_zeros_flex_power(history_files):
     col = consumer_column_name(swimspa)
     _write_jsonl(
         history_files,
-        [
-            _entry(window_start, consumer_powers_kw={"swimspa": 2.8}),
-            _entry(window_start.replace(minute=15)),
-        ],
+        [_entry(window_start, consumer_powers_kw={"swimspa": 2.8})],
     )
     result = history_timeline.build_chart_history(
         window_start,
         window_start.replace(hour=11),
     )
     assert result.rows[0][col] == 2.8
-    assert result.rows[1][col] == 0.0
+    assert result.rows[1][col] is None
+    assert result.slot_qualities[1] == history_timeline.SLOT_MISSING
+    assert result.rows[1]["Simulierter SoC (%)"] is None
+
+
+def test_build_chart_history_cumulative_skips_missing_slots(history_files):
+    window_start = _dt(2026, 6, 15, 10, 0)
+    _write_jsonl(
+        history_files,
+        [_entry(window_start.replace(minute=30), soc_percent=50.0, market_price_cent=20.0)],
+    )
+    result = history_timeline.build_chart_history(
+        window_start,
+        window_start.replace(hour=11),
+    )
+    assert result.slot_costs_euro[:2] == [0.0, 0.0]
+    assert result.slot_costs_euro[3] == 0.0
+    assert result.slot_costs_euro[2] != 0.0
+    assert result.cumulative_costs_euro[2] == round(result.slot_costs_euro[2], 4)
+    assert result.cumulative_costs_euro[3] == result.cumulative_costs_euro[2]
 
 
 def test_build_chart_display_merges_history_and_milp(history_files):
     now = _dt(2026, 6, 15, 14, 30)
     chart_context = build_live_chart_context(0, 0, now=now)
     history_end = chart_context.zones.history.end
+    assert history_end == _dt(2026, 6, 15, 14, 30)
     log_slot = chart_context.chart_window.start.replace(
         hour=chart_context.chart_window.start.hour + 1
     )
     _write_jsonl(history_files, [_entry(log_slot, soc_percent=33.0)])
 
-    milp_slot = history_end
+    hour_zero = _dt(2026, 6, 15, 14, 0)
     sim_rows = [
         {
             "slot_datetime": slot,
@@ -150,7 +168,7 @@ def test_build_chart_display_merges_history_and_milp(history_files):
             "Steuerbefehl": "Automatik",
         }
         for slot in chart_context.chart_window.slot_datetimes
-        if slot >= milp_slot
+        if slot >= hour_zero
     ]
 
     display = build_chart_display_context(chart_context, sim_rows)
@@ -160,11 +178,51 @@ def test_build_chart_display_merges_history_and_milp(history_files):
     assert all(
         quality in (
             history_timeline.SLOT_PRESENT,
-            history_timeline.SLOT_HELD,
             history_timeline.SLOT_MISSING,
         )
         for quality in display.slot_qualities[: display.history_slot_count]
     )
+
+
+def test_build_chart_display_quarter_soll_from_milp_hour_zero(history_files):
+    now = _dt(2026, 6, 15, 14, 45)
+    chart_context = build_live_chart_context(0, 0, now=now)
+    hour_zero = _dt(2026, 6, 15, 14, 0)
+    _write_jsonl(
+        history_files,
+        [
+            _entry(_dt(2026, 6, 15, 14, 0), soc_percent=40.0),
+            _entry(_dt(2026, 6, 15, 14, 15), soc_percent=41.0),
+            _entry(_dt(2026, 6, 15, 14, 30), soc_percent=42.0),
+        ],
+    )
+    sim_rows = [
+        {
+            "slot_datetime": hour_zero,
+            "Uhrzeit": hour_zero.strftime("%d.%m. %H:%M"),
+            "Strompreis (Cent/kWh)": 12.0,
+            "Preis extrapoliert": False,
+            "PV-Prognose (kW)": 3.3,
+            "Verbrauch-Prognose (kW)": 0.5,
+            "Geplante Batterie-Aktion (kW)": 0.0,
+            "Netzbezug (kW)": 0.0,
+            "Simulierter SoC (%)": 60.0,
+            "Steuerbefehl": "Automatik",
+        }
+    ]
+    display = build_chart_display_context(chart_context, sim_rows)
+    soll_slots = [
+        slot
+        for slot, quality in zip(display.slot_datetimes, display.slot_qualities)
+        if quality == SLOT_MILP and slot < _dt(2026, 6, 15, 15, 0)
+    ]
+    assert soll_slots == [_dt(2026, 6, 15, 14, 45)]
+    soll_row = next(
+        row for row, slot in zip(display.rows, display.slot_datetimes)
+        if slot == _dt(2026, 6, 15, 14, 45)
+    )
+    assert soll_row["PV-Prognose (kW)"] == 3.3
+    assert soll_row["Simulierter SoC (%)"] == 60.0
 
 
 def test_entry_to_chart_row_uses_logged_k_push_act(history_files):

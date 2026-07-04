@@ -11,7 +11,7 @@ from data import consumer_targets, live_consumption, profile_manager
 from runtime_store import history_timeline, run_state
 from optimizer import schedule as optimization_schedule
 import optimizer
-from ui.chart_context import build_live_chart_context
+from ui.chart_context import build_live_chart_context, live_now
 from ui.history_navigation import (
     get_s2_cycle_offset,
     get_s2_segment_index,
@@ -58,6 +58,7 @@ def _render_live_optimization_results(
     chart_context = build_live_chart_context(
         get_s2_cycle_offset(),
         get_s2_segment_index(),
+        now=live_now(),
         planning_window=planning_window,
         sim_rows=optimized_df.to_dict("records"),
     )
@@ -123,7 +124,7 @@ def _render_history_timeline(offset_days: int) -> None:
 def render_optimization_savings_and_chart(current_soc: float) -> None:
     """MILP-Simulation (Live) oder Produktiv-Historie mit gemeinsamer Navigation."""
     reload_runtime_config()
-    offset_days = render_history_navigation()
+    offset_days = render_history_navigation(now=live_now())
     if offset_days > 0:
         _clear_live_optimization_placeholder()
         _render_history_timeline(offset_days)

@@ -1,7 +1,8 @@
 """
 history_timeline.py – 24h-Historie aus optimization_history.jsonl (96 Viertelstunden-Slots).
 
-Rekonstruiert das tatsächliche Produktiv-Verhalten; fehlende Slots per Hold-Forward.
+Rekonstruiert das tatsächliche Produktiv-Verhalten. S-2-Charts (`build_chart_history`): fehlende Slots leer.
+96h-Archiv (`build_history_timeline`): Hold-Forward für SoC/Preis.
 """
 from __future__ import annotations
 
@@ -423,6 +424,7 @@ def _build_rows_for_slot_starts(
     slot_starts: tuple[datetime, ...] | list[datetime],
     *,
     include_date: bool = False,
+    hold_forward: bool = True,
 ) -> tuple[list[dict[str, Any]], tuple[str, ...], int, int, int]:
     if not slot_starts:
         return [], (), 0, 0, 0
@@ -443,12 +445,16 @@ def _build_rows_for_slot_starts(
             present += 1
             last_row = row
             qualities.append(SLOT_PRESENT)
-        elif last_row is not None:
+        elif hold_forward and last_row is not None:
             row = _hold_forward_row(last_row, slot_key, include_date=include_date)
             held += 1
             qualities.append(SLOT_HELD)
-        else:
+        elif hold_forward:
             row = _empty_chart_row(slot_key, include_date=include_date)
+            missing += 1
+            qualities.append(SLOT_MISSING)
+        else:
+            row = _missing_chart_row(slot_key, include_date=include_date)
             missing += 1
             qualities.append(SLOT_MISSING)
         rows.append(row)
@@ -462,7 +468,7 @@ def build_chart_history(
     """
     Rekonstruiert 15-Min-Ist-Daten für [window_start, window_end_exclusive).
 
-    Fensterende = letzte abgeschlossene volle Stunde (Spec Phase 2).
+    Fensterende exklusiv = history_boundary_exclusive(now) (Spec ui-sunset2sunset v0.6 §6).
     """
     if window_start.tzinfo is None or window_end_exclusive.tzinfo is None:
         raise ValueError("window_start und window_end_exclusive müssen timezone-aware sein.")
@@ -485,10 +491,17 @@ def build_chart_history(
     rows, qualities, present, held, missing = _build_rows_for_slot_starts(
         slot_starts,
         include_date=True,
+        hold_forward=False,
     )
     sell_price_cent = config.get_push_price_cent()
-    slot_costs = [_slot_cost_euro(row, sell_price_cent) for row in rows]
-    slot_kwh = [_slot_consumption_kwh(row) for row in rows]
+    slot_costs = [
+        0.0 if quality == SLOT_MISSING else _slot_cost_euro(row, sell_price_cent)
+        for row, quality in zip(rows, qualities)
+    ]
+    slot_kwh = [
+        0.0 if quality == SLOT_MISSING else _slot_consumption_kwh(row)
+        for row, quality in zip(rows, qualities)
+    ]
     return ChartHistoryResult(
         rows=rows,
         slot_starts=slot_starts,
@@ -545,6 +558,33 @@ def build_history_timeline(
         anchor_slot=anchor,
         offset_days=offset_days,
     )
+
+
+def _missing_chart_row(
+    slot_start: datetime,
+    *,
+    include_date: bool = False,
+) -> dict[str, Any]:
+    """Leere Zeile für fehlende Log-Slots (S-2, Spec v0.6.1 — kein Hold-Forward)."""
+    row: dict[str, Any] = {
+        "slot_datetime": slot_start,
+        "Uhrzeit": _format_slot_time(slot_start, include_date=include_date),
+        "Strompreis (Cent/kWh)": None,
+        "Preis extrapoliert": False,
+        "PV-Prognose (kW)": None,
+        "Verbrauch-Prognose (kW)": None,
+        "Geplante Batterie-Aktion (kW)": None,
+        "Netzbezug (kW)": None,
+        "Simulierter SoC (%)": None,
+        "Steuerbefehl": "",
+        "Einspeisevergütung (Cent/kWh)": None,
+    }
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        row[consumer_column_name(consumer)] = None
+        if uses_pv_follow(consumer):
+            row[consumer_pv_follow_column_name(consumer)] = None
+        row[consumer_immediate_charge_column_name(consumer)] = None
+    return row
 
 
 def _empty_chart_row(
