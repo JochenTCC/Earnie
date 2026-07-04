@@ -72,6 +72,13 @@ bodentemperaturen_nach_monat = {
 
 ## Erledigte Punkte
 
+### Live-Chart IndexError kumulierte Kosten (2026-07-04)
+
+- [x] **IndexError in Produktiv-UI behoben** (`_segment_connected_line_xy`, kumulierte Kosten/Verbrauch)
+  - Ursache: Stundenkosten-Listen kürzer als sunrise→sunrise-Chart-Fenster (Matrix vs. `display_df`)
+  - `align_hourly_values_to_chart_slots` in `ui/chart_context.py`; Padding in `ui/charts.py`
+  - Release **1.13.1**
+
 ### Cursor Session-Abschluss (2026-07-04)
 
 - [x] **Zweiphasiger Session-Abschluss automatisieren**

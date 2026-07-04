@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from data.planning_window import compute_ui_chart_window_with_offset
 from ui.chart_context import (
     align_rows_to_chart_slots,
+    align_hourly_values_to_chart_slots,
     matrix_indices_for_chart,
     savings_view_for_chart,
 )
@@ -61,4 +62,26 @@ def test_savings_view_sums_chart_window_only():
     view = savings_view_for_chart(savings, matrix, chart)
     assert view["matched_baseline_cost_euro"] == 21.0
     assert view["optimized_cost_euro"] == 18.0
-    assert len(view["hourly_matched_baseline_cost_euro"]) == 6
+    assert len(view["hourly_matched_baseline_cost_euro"]) == len(chart.slot_datetimes)
+
+
+def test_savings_view_aligns_hourly_to_full_chart_window():
+    """Stundenkosten haben dieselbe Länge wie das Chart-Fenster (fehlende Slots = 0)."""
+    now = _dt(2026, 6, 15, 14, 0)
+    chart = compute_ui_chart_window_with_offset(now, 0, LAT, LON, TZ)
+    matrix = [
+        {"slot_datetime": _dt(2026, 6, 15, hour, 0)} for hour in range(14, 20)
+    ]
+    savings = {
+        "hourly_matched_baseline_cost_euro": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        "hourly_optimized_cost_euro": [0.5, 1.5, 2.5, 3.5, 4.5, 5.5],
+    }
+    aligned = align_hourly_values_to_chart_slots(
+        savings["hourly_matched_baseline_cost_euro"],
+        matrix,
+        chart,
+    )
+    assert len(aligned) == len(chart.slot_datetimes)
+    assert sum(aligned) == 21.0
+    nonzero = [value for value in aligned if value != 0.0]
+    assert nonzero == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]

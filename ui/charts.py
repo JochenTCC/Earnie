@@ -431,7 +431,7 @@ def _segment_linear_connected_line_xy(
     points_x: list[float] = []
     points_y: list[float] = []
 
-    if start > 0:
+    if start > 0 and start - 1 < len(y):
         join_x = float(slot_x.iloc[start - 1]) + x_shift
         points_x.append(join_x)
         points_y.append(float(y.iloc[start - 1]))
@@ -476,7 +476,7 @@ def _segment_connected_line_xy(
     line_x, line_y = _segment_extended_line(
         slot_x, y, start, end, tail_y=seg_tail, x_shift=x_shift
     )
-    if start > 0:
+    if start > 0 and start - 1 < len(y):
         boundary_x = float(slot_x.iloc[start]) + x_shift
         bridge_y = float(y.iloc[start - 1])
         line_x = pd.concat([pd.Series([boundary_x]), line_x], ignore_index=True)
@@ -887,6 +887,19 @@ def add_price_on_soc_axis_trace(
     )
 
 
+def _hourly_cumsum_for_chart(
+    hourly_values: list[float],
+    slot_count: int,
+) -> pd.Series | None:
+    """Kumulierte Stundenreihe mit Länge slot_count (0-Padding bei kürzerer Liste)."""
+    if not hourly_values or slot_count <= 0:
+        return None
+    padded = list(hourly_values[:slot_count])
+    if len(padded) < slot_count:
+        padded.extend([0.0] * (slot_count - len(padded)))
+    return pd.Series(padded, dtype=float).cumsum()
+
+
 def add_cumulative_cost_traces(
     fig: go.Figure,
     uhrzeit: pd.Series,
@@ -897,11 +910,11 @@ def add_cumulative_cost_traces(
     extrap_end: int | None = None,
 ) -> None:
     """Kumulierte Stromkosten: BL Ziel und optimiert."""
-    if not hourly_matched_cost_euro or not hourly_optimized_cost_euro:
-        return
     length = len(slot_x)
-    matched_cum = pd.Series(hourly_matched_cost_euro[:length], dtype=float).cumsum()
-    optimized_cum = pd.Series(hourly_optimized_cost_euro[:length], dtype=float).cumsum()
+    matched_cum = _hourly_cumsum_for_chart(hourly_matched_cost_euro, length)
+    optimized_cum = _hourly_cumsum_for_chart(hourly_optimized_cost_euro, length)
+    if matched_cum is None or optimized_cum is None:
+        return
     segments = _trace_segments(length, extrap_start, extrap_end)
     _add_segmented_hv_line(
         fig,
@@ -944,11 +957,11 @@ def add_cumulative_consumption_traces(
     extrap_end: int | None = None,
 ) -> None:
     """Kumulierter Gesamtverbrauch (Grundlast + Flex) auf separater Achse."""
-    if not hourly_matched_kwh or not hourly_optimized_kwh:
-        return
     length = len(slot_x)
-    matched_cum = pd.Series(hourly_matched_kwh[:length], dtype=float).cumsum()
-    optimized_cum = pd.Series(hourly_optimized_kwh[:length], dtype=float).cumsum()
+    matched_cum = _hourly_cumsum_for_chart(hourly_matched_kwh, length)
+    optimized_cum = _hourly_cumsum_for_chart(hourly_optimized_kwh, length)
+    if matched_cum is None or optimized_cum is None:
+        return
     segments = _trace_segments(length, extrap_start, extrap_end)
     _add_segmented_hv_line(
         fig,

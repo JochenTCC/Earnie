@@ -118,6 +118,24 @@ def align_rows_to_chart_slots(
     return aligned
 
 
+def align_hourly_values_to_chart_slots(
+    values: list,
+    matrix: list[dict],
+    chart: UiChartWindow,
+    *,
+    fill: float = 0.0,
+) -> list:
+    """Stundenwerte auf chart.slot_datetimes abbilden (fehlende Slots mit fill)."""
+    by_slot: dict[datetime, object] = {}
+    for index, row in enumerate(matrix):
+        slot = _row_slot(row)
+        if slot is None or not (chart.start <= slot <= chart.end):
+            continue
+        if index < len(values):
+            by_slot[slot] = values[index]
+    return [by_slot.get(slot, fill) for slot in chart.slot_datetimes]
+
+
 def savings_view_for_chart(
     savings_info: dict,
     matrix: list[dict],
@@ -130,7 +148,7 @@ def savings_view_for_chart(
 
     def _pick(key: str) -> list:
         values = savings_info.get(key) or []
-        return [values[i] for i in indices if i < len(values)]
+        return align_hourly_values_to_chart_slots(values, matrix, chart)
 
     hourly_matched = _pick("hourly_matched_baseline_cost_euro")
     hourly_optimized = _pick("hourly_optimized_cost_euro")
