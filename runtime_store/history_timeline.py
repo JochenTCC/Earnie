@@ -167,6 +167,7 @@ def entry_to_chart_row(entry: dict[str, Any], slot_start: datetime) -> dict[str,
     target_power = float(entry.get("target_power_kw", 0.0) or 0.0)
     pv, baseload, battery_plan = _power_kw_from_entry(entry)
     row: dict[str, Any] = {
+        "slot_datetime": slot_start,
         "Uhrzeit": _format_slot_time(slot_start),
         "Strompreis (Cent/kWh)": round(float(entry.get("market_price_cent", 0.0) or 0.0), 4),
         "Preis extrapoliert": False,
@@ -191,6 +192,7 @@ def entry_to_chart_row(entry: dict[str, Any], slot_start: datetime) -> dict[str,
 
 def _hold_forward_row(previous: dict[str, Any], slot_start: datetime) -> dict[str, Any]:
     row = dict(previous)
+    row["slot_datetime"] = slot_start
     row["Uhrzeit"] = _format_slot_time(slot_start)
     return row
 
@@ -355,6 +357,7 @@ def build_history_timeline(
 
 def _empty_chart_row(slot_start: datetime) -> dict[str, Any]:
     row: dict[str, Any] = {
+        "slot_datetime": slot_start,
         "Uhrzeit": _format_slot_time(slot_start),
         "Strompreis (Cent/kWh)": 0.0,
         "Preis extrapoliert": False,

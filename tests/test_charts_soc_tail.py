@@ -1,21 +1,33 @@
 """Tests für SoC-Hochrechnung am Ende des Chart-Horizonts."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 import pandas as pd
 
 from ui.charts import (
+    ChartSlotAxis,
+    _battery_bar_times,
     _chart_has_pv_follow_bars,
-    _chart_slot_x,
     _consumer_bar_marker,
     _consumer_bar_palette,
     _consumer_bar_pattern_shapes,
     _cost_summary_annotations,
     _extended_line_xy,
-    _hv_line_endpoint_x,
+    _hv_line_endpoint_time,
     _segment_connected_line_xy,
     _segment_linear_connected_line_xy,
     _soc_tail_y_from_row,
 )
+
+_TZ = ZoneInfo("Europe/Vienna")
+
+
+def _hourly_axis(length: int, start: datetime | None = None) -> ChartSlotAxis:
+    t0 = start or datetime(2025, 6, 17, 0, 0, tzinfo=_TZ)
+    slots = [t0 + timedelta(hours=index) for index in range(length)]
+    return ChartSlotAxis.from_dataframe(pd.DataFrame({"slot_datetime": slots}))
 
 
 def test_consumer_bar_marker_pattern_has_visible_contrast():
@@ -87,68 +99,85 @@ def test_consumer_palette_spans_magenta_to_cyan():
 
 
 def test_grid_line_x_centered_on_hour_slots():
-    slot_x = _chart_slot_x(4)
+    axis = _hourly_axis(4)
     values = pd.Series([1.0, 2.0, 3.0, 4.0])
     line_x, _ = _segment_connected_line_xy(
-        slot_x, values, 0, 4, step_line=True, x_shift=0.0
+        axis,
+        values,
+        0,
+        4,
+        step_line=True,
+        anchor_fraction=0.5,
     )
-    assert line_x.tolist() == [0.0, 1.0, 2.0, 3.0, 3.5]
+    expected = axis.at(slice(None), 0.5).tolist() + [_hv_line_endpoint_time(axis)]
+    assert line_x.dt.floor("s").tolist() == pd.Series(expected).dt.floor("s").tolist()
 
 
 def test_segment_connected_line_bridges_interior_boundary_for_hv():
-    slot_x = pd.Series([0.0, 1.0, 2.0, 3.0])
+    axis = _hourly_axis(4)
     values = pd.Series([10.0, 20.0, 30.0, 40.0])
-    line_x, line_y = _segment_connected_line_xy(slot_x, values, 2, 4, step_line=True)
-    assert line_x.iloc[0] == 1.5
+    line_x, line_y = _segment_connected_line_xy(axis, values, 2, 4, step_line=True)
+    assert line_x.iloc[0] == axis.at(2, 0.0).iloc[0]
     assert line_y.iloc[0] == 20.0
     assert line_y.iloc[1] == 30.0
 
 
 def test_segment_linear_connection_is_continuous_across_boundary():
-    slot_x = pd.Series([0.0, 1.0, 2.0, 3.0])
+    axis = _hourly_axis(4)
     values = pd.Series([10.0, 20.0, 30.0, 40.0])
-    x_before, y_before = _segment_linear_connected_line_xy(slot_x, values, 0, 2)
-    x_after, y_after = _segment_linear_connected_line_xy(slot_x, values, 2, 4)
-    assert float(x_before.iloc[-1]) == 0.5
-    assert float(y_before.iloc[-1]) == 20.0
-    assert float(x_after.iloc[0]) == 0.5
-    assert float(y_after.iloc[0]) == 20.0
-    assert float(x_after.iloc[1]) == 1.5
-    assert float(y_after.iloc[1]) == 30.0
+    x_before, y_before = _segment_linear_connected_line_xy(axis, values, 0, 2)
+    x_after, y_after = _segment_linear_connected_line_xy(axis, values, 2, 4)
+    assert x_before.iloc[-1] == x_after.iloc[0]
+    assert y_before.iloc[-1] == y_after.iloc[0]
+    assert y_after.iloc[1] == 30.0
 
 
 def test_segment_linear_matches_unsegmented_line():
-    slot_x = pd.Series([0.0, 1.0, 2.0, 3.0])
+    axis = _hourly_axis(4)
     values = pd.Series([10.0, 20.0, 30.0, 40.0])
-    full_x, full_y = _segment_linear_connected_line_xy(slot_x, values, 0, 4)
-    x_before, y_before = _segment_linear_connected_line_xy(slot_x, values, 0, 2)
-    x_after, y_after = _segment_linear_connected_line_xy(slot_x, values, 2, 4)
+    full_x, full_y = _segment_linear_connected_line_xy(axis, values, 0, 4)
+    x_before, y_before = _segment_linear_connected_line_xy(axis, values, 0, 2)
+    x_after, y_after = _segment_linear_connected_line_xy(axis, values, 2, 4)
     merged_x = pd.concat([x_before, x_after.iloc[1:]], ignore_index=True)
     merged_y = pd.concat([y_before, y_after.iloc[1:]], ignore_index=True)
-    pd.testing.assert_series_equal(merged_x, full_x)
+    pd.testing.assert_series_equal(
+        merged_x.dt.floor("s"),
+        full_x.dt.floor("s"),
+    )
     pd.testing.assert_series_equal(merged_y, full_y)
 
 
 def test_segment_connected_line_first_segment_unchanged():
-    slot_x = pd.Series([0.0, 1.0, 2.0])
+    axis = _hourly_axis(3)
     values = pd.Series([10.0, 20.0, 30.0])
-    line_x, line_y = _segment_linear_connected_line_xy(slot_x, values, 0, 2)
+    line_x, line_y = _segment_linear_connected_line_xy(axis, values, 0, 2)
     assert line_y.iloc[0] == 10.0
     assert line_y.iloc[-1] == 20.0
-    assert float(line_x.iloc[-1]) == 0.5
+    assert line_x.iloc[-1] == axis.at(1, 0.0).iloc[0]
 
 
 def test_extended_soc_line_uses_tail_not_flat_repeat():
-    slot_x = pd.Series([0.0, 1.0])
+    axis = _hourly_axis(2)
     y = pd.Series([50.0, 55.0])
-    _, extended_y = _extended_line_xy(slot_x, y, tail_y=62.0)
+    _, extended_y = _extended_line_xy(axis, y, tail_y=62.0)
     assert extended_y.iloc[-1] == 62.0
     assert extended_y.iloc[-2] == 55.0
 
 
-def test_hv_line_endpoint_x_matches_last_slot():
-    assert _hv_line_endpoint_x(24) == 23.5
-    assert _hv_line_endpoint_x(1) == 0.5
+def test_hv_line_endpoint_time_matches_last_slot():
+    axis24 = _hourly_axis(24)
+    assert _hv_line_endpoint_time(axis24) == axis24.legacy_index_time(23.5)
+    axis1 = _hourly_axis(1)
+    assert _hv_line_endpoint_time(axis1) == axis1.legacy_index_time(0.5)
+
+
+def test_battery_bar_times_nudged_past_slot_center():
+    axis = _hourly_axis(1)
+    bar_x = _battery_bar_times(axis, slice(None)).iloc[0]
+    center = axis.at(0, 0.5).iloc[0]
+    nudged = axis.at(0, 0.5 + 0.05).iloc[0]
+    assert bar_x == nudged
+    assert bar_x > center
 
 
 def test_cost_summary_annotations_include_totals_and_savings_sign():

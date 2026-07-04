@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import streamlit as st
 import pandas as pd
@@ -55,9 +55,156 @@ def _safe_int_flag(value) -> int:
 
 @dataclass(frozen=True)
 class ChartSunMarkers:
-    now_x: float | None
-    sunrise_x: float | None
-    sunset_xs: tuple[float, ...]
+    now_x: datetime | None
+    sunrise_x: datetime | None
+    sunset_xs: tuple[datetime, ...]
+
+
+@dataclass(frozen=True)
+class ChartSlotAxis:
+    """
+    Zeitbasierte Plotly-X-Achse (type=date).
+
+    Jede Chart-Zeile hat ``slot_datetime`` = Slotbeginn (volle Stunde oder Viertelstunde).
+    Plotly erhält echte Zeitstempel — kein Index 0..n-1 mehr.
+
+    **Warum früher Index + Verschiebungen?**
+    Historisch lief die X-Achse als ``linear`` mit Tick-Labels aus ``Uhrzeit``, während
+    Traces intern mit Slot-Indizes 0..n-1 rechneten. Ein Slot i wurde als Mitte bei x=i
+    dargestellt (sichtbarer Bereich [-0.5, n-0.5]). Daraus folgten die Korrekturen:
+
+    | Trace / Element | Index-Offset | Bedeutung (jetzt: Anteil × ``step`` ab Slotbeginn) |
+    |-----------------|--------------|-----------------------------------------------------|
+    | HV-Linien (Verbrauch, Preis, kum. Kosten) | −0.5 | Wert gilt ab Slotbeginn (Treppenfunktion) |
+    | Netz-Linie | 0 (Mitte) | Stundenmittelwert zentriert im Slot |
+    | Batterie-Balken | +0.05 | Leichte Verschiebung nach rechts (optische Trennung von Linien) |
+    | Flex-Balken nebeneinander | ± ``bar_width``/2 | Mehrere Verbraucher im selben Slot nebeneinander |
+    | ``add_vrect`` / Jetzt-Linie | Index ± 0.5 | Zonen- und Marker-Grenzen zwischen Sloträndern |
+
+    Konstanten unten (``_LINE_ANCHOR_*``, ``_BAR_CENTER_NUDGE``) sind die zeitliche
+    Entsprechung dieser Index-Brüche.
+    """
+
+    starts: pd.Series
+    step: timedelta
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        df: pd.DataFrame,
+        *,
+        slot_datetimes: tuple[datetime, ...] | None = None,
+    ) -> ChartSlotAxis:
+        if "slot_datetime" in df.columns:
+            starts = pd.to_datetime(df["slot_datetime"])
+        elif slot_datetimes is not None:
+            if len(slot_datetimes) != len(df):
+                raise ValueError(
+                    f"slot_datetimes ({len(slot_datetimes)} Einträge) "
+                    f"passt nicht zur DataFrame-Länge ({len(df)})."
+                )
+            starts = pd.Series(list(slot_datetimes))
+        else:
+            raise ValueError(
+                "Chart-Daten benötigen Spalte 'slot_datetime' "
+                "oder explizites slot_datetimes-Tuple."
+            )
+        return cls(starts=starts, step=cls._infer_step(starts))
+
+    @staticmethod
+    def _infer_step(starts: pd.Series) -> timedelta:
+        if len(starts) < 2:
+            return timedelta(hours=1)
+        diffs = starts.diff().dropna()
+        positive = diffs[diffs > timedelta(0)]
+        if positive.empty:
+            return timedelta(hours=1)
+        return timedelta(seconds=float(positive.dt.total_seconds().median()))
+
+    def _offset(self, fraction: float) -> pd.Timedelta:
+        return pd.to_timedelta(self.step.total_seconds() * fraction, unit="s")
+
+    def at(self, index_slice, fraction: float) -> pd.Series:
+        """Zeitpunkt = Slotbeginn + ``fraction`` × ``step`` (0=Beginn, 0.5=Mitte, 1=Ende)."""
+        if isinstance(index_slice, int):
+            times = pd.Series([self.starts.iloc[index_slice]])
+        else:
+            times = self.starts.iloc[index_slice].reset_index(drop=True)
+        return times + self._offset(fraction)
+
+    def legacy_index_time(self, index: float) -> datetime:
+        """
+        Altes Index-X (Slot k zentriert bei x=k, Bereich ±0.5) → Zeitstempel.
+
+        Index −0.5 = ``starts[0]``; Index 0 = Slotmitte; Index k−0.5 = ``starts[k]``.
+        """
+        return self.starts.iloc[0] + self.step * (index + 0.5)
+
+    def bar_width_ms(self, width_fraction: float) -> float:
+        """Plotly ``go.Bar``-Breite auf Datumsachse (Millisekunden)."""
+        return self.step.total_seconds() * 1000.0 * width_fraction
+
+    def x_range(self) -> list[datetime]:
+        """Sichtbarer X-Bereich inkl. halber Slot-Ränder (wie früher [-0.5, n-0.5])."""
+        return [
+            self.legacy_index_time(-0.5),
+            self.legacy_index_time(len(self.starts) - 0.5),
+        ]
+
+    def slice(self, start: int, end: int) -> ChartSlotAxis:
+        """Teilfenster für Segment-Traces (behält ``step`` bei)."""
+        return ChartSlotAxis(
+            starts=self.starts.iloc[start:end].reset_index(drop=True),
+            step=self.step,
+        )
+
+
+# Anteile der Slot-Dauer (Entsprechung zum früheren Index-Modell, siehe ChartSlotAxis).
+_LINE_ANCHOR_SLOT_START = 0.0
+_LINE_ANCHOR_SLOT_CENTER = 0.5
+_BAR_CENTER_NUDGE = 0.05
+_BATTERY_BAR_WIDTH_FRACTION = 0.9
+
+
+def _anchor_fraction_from_legacy_shift(x_shift: float) -> float:
+    """Legacy Index-Verschiebung (−0.5 = Slotbeginn, 0 = Mitte) → Anteil ab Slotbeginn."""
+    return 0.5 + x_shift
+
+
+def _extended_line_xy(
+    axis: ChartSlotAxis,
+    y: pd.Series,
+    tail_y: float | None = None,
+    *,
+    anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
+) -> tuple[pd.Series, pd.Series]:
+    """Verlängert Linien bis zum rechten Slot-Rand (Ende des letzten Slots)."""
+    if y.empty:
+        return axis.at(slice(None), anchor_fraction), y
+    tail_time = axis.legacy_index_time(len(axis.starts) - 0.5)
+    extended_x = pd.concat(
+        [axis.at(slice(None), anchor_fraction), pd.Series([tail_time])],
+        ignore_index=True,
+    )
+    end_y = y.iloc[-1] if tail_y is None else tail_y
+    extended_y = pd.concat([y, pd.Series([end_y])], ignore_index=True)
+    return extended_x, extended_y
+
+
+def _soc_tail_y_from_row(row: pd.Series) -> float | None:
+    """SoC am Ende der Stunde aus geplanter Batterieaktion (Optimierer/Huawei-Logik)."""
+    if "Geplante Batterie-Aktion (kW)" not in row.index:
+        return None
+    params = config.get_battery_params()
+    new_soc, _ = bat.apply_soc_change(
+        float(row["Simulierter SoC (%)"]),
+        float(row["Geplante Batterie-Aktion (kW)"]),
+        params["battery_capacity_kwh"],
+        params["efficiency"],
+        params["min_soc"],
+        params["max_soc"],
+    )
+    return round(new_soc, 1)
 
 
 def _sunrise_chart_title(chart: UiChartWindow) -> str:
@@ -68,11 +215,11 @@ def _sunrise_chart_title(chart: UiChartWindow) -> str:
     )
 
 
-def _slot_x_in_chart(slots: tuple[datetime, ...], moment: datetime) -> float | None:
+def _slot_time_in_chart(slots: tuple[datetime, ...], moment: datetime) -> datetime | None:
     target = normalize_hour_slot(moment)
     if target not in slots:
         return None
-    return float(slots.index(target))
+    return target
 
 
 def build_sun_markers(
@@ -81,13 +228,13 @@ def build_sun_markers(
     planning_window,
 ) -> ChartSunMarkers:
     slots = chart.slot_datetimes
-    now_x = _slot_x_in_chart(slots, normalize_hour_slot(now))
-    sunrise_x = _slot_x_in_chart(slots, chart.sa1)
-    sa2_x = _slot_x_in_chart(slots, chart.sa2)
-    sunset_xs: list[float] = []
+    now_x = _slot_time_in_chart(slots, normalize_hour_slot(now))
+    sunrise_x = _slot_time_in_chart(slots, chart.sa1)
+    sa2_x = _slot_time_in_chart(slots, chart.sa2)
+    sunset_xs: list[datetime] = []
     if planning_window is not None:
         for moment in (planning_window.sunset_1, planning_window.sunset_2):
-            sx = _slot_x_in_chart(slots, moment)
+            sx = _slot_time_in_chart(slots, moment)
             if sx is not None:
                 sunset_xs.append(sx)
     marker_sunrise = sunrise_x if chart.segment_index == 0 else sa2_x
@@ -102,6 +249,7 @@ def _add_zone_backgrounds(
     fig: go.Figure,
     chart: UiChartWindow,
     zones,
+    axis: ChartSlotAxis,
 ) -> None:
     slots = chart.slot_datetimes
     last_idx = len(slots) - 1
@@ -112,8 +260,8 @@ def _add_zone_backgrounds(
         and zones.history.end > zones.history.start
     ):
         fig.add_vrect(
-            x0=-0.5,
-            x1=history_end_idx - 0.5,
+            x0=axis.legacy_index_time(-0.5),
+            x1=axis.legacy_index_time(history_end_idx - 0.5),
             fillcolor=zones.history.fill_color,
             line_width=0,
             layer="below",
@@ -125,8 +273,8 @@ def _add_zone_backgrounds(
         and zones.forecast.end > zones.forecast.start
     ):
         fig.add_vrect(
-            x0=green_start_idx - 0.5,
-            x1=last_idx + 0.5,
+            x0=axis.legacy_index_time(green_start_idx - 0.5),
+            x1=axis.legacy_index_time(last_idx + 0.5),
             fillcolor=zones.forecast.fill_color,
             line_width=0,
             layer="below",
@@ -287,64 +435,6 @@ def _consumer_bar_palette(count: int) -> list[str]:
     ]
 
 
-def _chart_slot_x(length: int) -> pd.Series:
-    """Numerische Slot-Positionen 0..n-1 (eine Einheit = eine Stunde)."""
-    return pd.Series(range(length), dtype=float)
-
-
-_LINE_X_SHIFT_SLOT_START = -0.5
-_LINE_X_SHIFT_SLOT_CENTER = 0.0
-
-
-def _chart_line_x(slot_x: pd.Series, x_shift: float = _LINE_X_SHIFT_SLOT_START) -> pd.Series:
-    """X-Position für Stundenlinien; Standard −0,5 h (HV-Anker am Slotbeginn)."""
-    return slot_x + x_shift
-
-
-def _extended_line_xy(
-    slot_x: pd.Series,
-    y: pd.Series,
-    tail_y: float | None = None,
-    x_shift: float = _LINE_X_SHIFT_SLOT_START,
-) -> tuple[pd.Series, pd.Series]:
-    """Verlängert Linien bis zum rechten Slot-Rand (Ende des letzten Slots)."""
-    if y.empty:
-        return _chart_line_x(slot_x, x_shift), y
-    tail_slot = float(slot_x.iloc[-1]) + (0.5 - x_shift)
-    extended_slot = pd.concat(
-        [slot_x, pd.Series([tail_slot])],
-        ignore_index=True,
-    )
-    end_y = y.iloc[-1] if tail_y is None else tail_y
-    extended_y = pd.concat([y, pd.Series([end_y])], ignore_index=True)
-    return _chart_line_x(extended_slot, x_shift), extended_y
-
-
-def _soc_tail_y_from_row(row: pd.Series) -> float | None:
-    """SoC am Ende der Stunde aus geplanter Batterieaktion (Optimierer/Huawei-Logik)."""
-    if "Geplante Batterie-Aktion (kW)" not in row.index:
-        return None
-    params = config.get_battery_params()
-    new_soc, _ = bat.apply_soc_change(
-        float(row["Simulierter SoC (%)"]),
-        float(row["Geplante Batterie-Aktion (kW)"]),
-        params["battery_capacity_kwh"],
-        params["efficiency"],
-        params["min_soc"],
-        params["max_soc"],
-    )
-    return round(new_soc, 1)
-
-
-def _extended_soc_line_xy(
-    slot_x: pd.Series,
-    df: pd.DataFrame,
-) -> tuple[pd.Series, pd.Series]:
-    soc = df["Simulierter SoC (%)"]
-    tail_y = _soc_tail_y_from_row(df.iloc[-1]) if not df.empty else None
-    return _extended_line_xy(slot_x, soc, tail_y=tail_y)
-
-
 def _extended_hover_labels(uhrzeit: pd.Series) -> list[str]:
     """Hover-Labels für verlängerte Linien (letzte Uhrzeit einmal wiederholt)."""
     if uhrzeit.empty:
@@ -413,67 +503,71 @@ def _segment_opacity(base_opacity: float, is_extrapolated: bool) -> float:
 
 
 def _segment_extended_line(
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     y: pd.Series,
     start: int,
     end: int,
     tail_y: float | None = None,
-    x_shift: float = _LINE_X_SHIFT_SLOT_START,
+    *,
+    anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
 ) -> tuple[pd.Series, pd.Series]:
     if start >= end:
-        return pd.Series(dtype=float), pd.Series(dtype=float)
+        return pd.Series(dtype="datetime64[ns, UTC]"), pd.Series(dtype=float)
     return _extended_line_xy(
-        slot_x.iloc[start:end], y.iloc[start:end], tail_y=tail_y, x_shift=x_shift
+        axis.slice(start, end),
+        y.iloc[start:end],
+        tail_y=tail_y,
+        anchor_fraction=anchor_fraction,
     )
 
 
 def _segment_linear_connected_line_xy(
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     y: pd.Series,
     start: int,
     end: int,
     tail_y: float | None = None,
-    x_shift: float = _LINE_X_SHIFT_SLOT_START,
+    *,
+    anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
 ) -> tuple[pd.Series, pd.Series]:
     """
     Stückweise lineare Verbindung ohne Stufen an Segmentgrenzen.
 
-    Standard x_shift −0,5 h: Anker am Slotbeginn (HV).
-    x_shift 0: Stundenwert in der Slot-Mitte (wie Flex-Balken).
+    anchor_fraction 0.0: Anker am Slotbeginn (früher Index −0.5).
+    anchor_fraction 0.5: Slotmitte (früher Index +0.0, wie Flex-Balken).
     """
     if start >= end:
-        return pd.Series(dtype=float), pd.Series(dtype=float)
+        return pd.Series(dtype="datetime64[ns, UTC]"), pd.Series(dtype=float)
 
-    points_x: list[float] = []
+    points_x: list[datetime] = []
     points_y: list[float] = []
 
     if start > 0 and start - 1 < len(y):
-        join_x = float(slot_x.iloc[start - 1]) + x_shift
-        points_x.append(join_x)
+        points_x.append(axis.at(start - 1, anchor_fraction).iloc[0])
         points_y.append(float(y.iloc[start - 1]))
 
     for hour_index in range(start, end):
-        points_x.append(float(slot_x.iloc[hour_index]) + x_shift)
+        points_x.append(axis.at(hour_index, anchor_fraction).iloc[0])
         points_y.append(float(y.iloc[hour_index]))
 
-    if end == len(slot_x):
-        points_x.append(float(slot_x.iloc[end - 1]) + 0.5)
+    if end == len(axis.starts):
+        points_x.append(axis.legacy_index_time(len(axis.starts) - 0.5))
         points_y.append(
             float(y.iloc[end - 1]) if tail_y is None else float(tail_y)
         )
 
-    return pd.Series(points_x, dtype=float), pd.Series(points_y, dtype=float)
+    return pd.Series(points_x, dtype="datetime64[ns, UTC]"), pd.Series(points_y, dtype=float)
 
 
 def _segment_connected_line_xy(
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     y: pd.Series,
     start: int,
     end: int,
     tail_y: float | None = None,
     *,
     step_line: bool = True,
-    x_shift: float = _LINE_X_SHIFT_SLOT_START,
+    anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
 ) -> tuple[pd.Series, pd.Series]:
     """
     Linienabschnitt inkl. Brückenpunkt an der linken Grenze.
@@ -483,17 +577,17 @@ def _segment_connected_line_xy(
     """
     if not step_line:
         return _segment_linear_connected_line_xy(
-            slot_x, y, start, end, tail_y=tail_y, x_shift=x_shift
+            axis, y, start, end, tail_y=tail_y, anchor_fraction=anchor_fraction
         )
 
     if start >= end:
-        return pd.Series(dtype=float), pd.Series(dtype=float)
-    seg_tail = tail_y if end == len(slot_x) else None
+        return pd.Series(dtype="datetime64[ns, UTC]"), pd.Series(dtype=float)
+    seg_tail = tail_y if end == len(axis.starts) else None
     line_x, line_y = _segment_extended_line(
-        slot_x, y, start, end, tail_y=seg_tail, x_shift=x_shift
+        axis, y, start, end, tail_y=seg_tail, anchor_fraction=anchor_fraction
     )
     if start > 0 and start - 1 < len(y):
-        boundary_x = float(slot_x.iloc[start]) + x_shift
+        boundary_x = axis.at(start, anchor_fraction).iloc[0]
         bridge_y = float(y.iloc[start - 1])
         line_x = pd.concat([pd.Series([boundary_x]), line_x], ignore_index=True)
         line_y = pd.concat([pd.Series([bridge_y]), line_y], ignore_index=True)
@@ -532,7 +626,7 @@ def _segment_hover_labels(
 
 def _add_segmented_hv_line(
     fig: go.Figure,
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     y: pd.Series,
     uhrzeit: pd.Series,
     segments: list[tuple[int, int, bool]],
@@ -547,14 +641,20 @@ def _add_segmented_hv_line(
     custom_hover_values: pd.Series | None = None,
     hover_template: str | None = None,
     segment_hover_template: str | None = None,
-    x_shift: float = _LINE_X_SHIFT_SLOT_START,
+    anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
 ) -> None:
     for index, (start, end, is_extrapolated) in enumerate(segments):
         if start >= end:
             continue
-        seg_tail = tail_y if end == len(slot_x) else None
+        seg_tail = tail_y if end == len(axis.starts) else None
         line_x, line_y = _segment_connected_line_xy(
-            slot_x, y, start, end, tail_y=seg_tail, step_line=True, x_shift=x_shift
+            axis,
+            y,
+            start,
+            end,
+            tail_y=seg_tail,
+            step_line=True,
+            anchor_fraction=anchor_fraction,
         )
         if line_x.empty:
             continue
@@ -605,12 +705,12 @@ def _add_segmented_hv_line(
 
 def _add_pv_trace(
     fig: go.Figure,
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     pv_kw: pd.Series,
     uhrzeit: pd.Series,
 ) -> None:
     """PV-Verlauf mit gelber Fläche — unabhängig von extrapolierten Preisen."""
-    pv_x, pv_y = _extended_line_xy(slot_x, pv_kw)
+    pv_x, pv_y = _extended_line_xy(axis, pv_kw)
     fig.add_trace(go.Scatter(
         x=pv_x,
         y=pv_y,
@@ -623,66 +723,75 @@ def _add_pv_trace(
     ))
 
 
-def _chart_xaxis_config(uhrzeit: pd.Series) -> dict:
-    length = len(uhrzeit)
-    tickvals = list(range(length))
-    if length > 24:
-        tickvals = list(range(0, length, 4))
-    ticktext = [str(uhrzeit.iloc[index]) for index in tickvals]
-    axis_title = (
-        "Uhrzeit (15-Min-Slots)"
-        if length > 24
-        else "Uhrzeit (Stunden-Slots / Intervalle)"
-    )
+def _chart_xaxis_config(axis: ChartSlotAxis) -> dict:
+    step_minutes = axis.step.total_seconds() / 60.0
+    if step_minutes >= 60:
+        dtick = 3600000 * 4
+        axis_title = "Uhrzeit (Stunden-Slots)"
+    else:
+        dtick = 3600000
+        axis_title = "Uhrzeit (15-Min-Slots)"
+    x0, x1 = axis.x_range()
     return dict(
         title=axis_title,
-        type="linear",
-        tickmode="array",
-        tickvals=tickvals,
-        ticktext=ticktext,
-        range=[-0.5, length - 0.5],
+        type="date",
+        tickformat="%d.%m. %H:%M",
+        dtick=dtick,
+        range=[x0, x1],
     )
 
 
-def _consumer_bar_x(
-    slot_x: pd.Series,
-    index: int,
+def _consumer_bar_times(
+    axis: ChartSlotAxis,
+    index_slice,
+    consumer_index: int,
     count: int,
-    bar_width: float,
-    base_offset: float,
+    bar_width_fraction: float,
 ) -> pd.Series:
-    """X-Position je Stunde: nebeneinander und mit Batterie im selben Slot zentriert."""
+    """
+    X-Zeitpunkte für Flex-Balken nebeneinander im Slot.
+
+    Früher: Index-Mitte + base_offset + (i − (n−1)/2) × bar_width.
+    """
+    center_fraction = _LINE_ANCHOR_SLOT_CENTER + _BAR_CENTER_NUDGE
     if count <= 1:
-        return slot_x + base_offset
-    shift = (index - (count - 1) / 2) * bar_width
-    return slot_x + base_offset + shift
+        return axis.at(index_slice, center_fraction)
+    shift = (consumer_index - (count - 1) / 2) * bar_width_fraction
+    return axis.at(index_slice, center_fraction + shift)
+
+
+def _battery_bar_times(axis: ChartSlotAxis, index_slice) -> pd.Series:
+    """Batterie-Balken: leicht nach rechts versetzt (früher ``bar_offset`` +0.05)."""
+    return axis.at(index_slice, _LINE_ANCHOR_SLOT_CENTER + _BAR_CENTER_NUDGE)
 
 
 def add_power_traces(
     fig: go.Figure,
     df: pd.DataFrame,
     bar_colors: list[str],
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     extrap_start: int | None = None,
     extrap_end: int | None = None,
 ) -> None:
-    battery_bar_width = 0.9
-    bar_offset = 0.05
     uhrzeit = df["Uhrzeit"]
     segments = _trace_segments(len(df), extrap_start, extrap_end)
     active_consumers = _active_consumer_bar_columns(df)
     consumer_count = len(active_consumers)
     consumer_bar_width = (
-        battery_bar_width / consumer_count if consumer_count else battery_bar_width
+        _BATTERY_BAR_WIDTH_FRACTION / consumer_count
+        if consumer_count
+        else _BATTERY_BAR_WIDTH_FRACTION
     )
     consumer_colors = _consumer_bar_palette(consumer_count)
+    battery_width_ms = axis.bar_width_ms(_BATTERY_BAR_WIDTH_FRACTION)
+    consumer_width_ms = axis.bar_width_ms(consumer_bar_width)
     if "PV-Prognose (kW)" in df.columns:
-        _add_pv_trace(fig, slot_x, df["PV-Prognose (kW)"], uhrzeit)
+        _add_pv_trace(fig, axis, df["PV-Prognose (kW)"], uhrzeit)
 
     if "Verbrauch-Prognose (kW)" in df.columns:
         _add_segmented_hv_line(
             fig,
-            slot_x,
+            axis,
             df["Verbrauch-Prognose (kW)"],
             uhrzeit,
             segments,
@@ -695,7 +804,7 @@ def add_power_traces(
     if "Netzbezug (kW)" in df.columns:
         _add_segmented_hv_line(
             fig,
-            slot_x,
+            axis,
             df["Netzbezug (kW)"],
             uhrzeit,
             segments,
@@ -703,20 +812,20 @@ def add_power_traces(
             line_kwargs=dict(color=_COLOR_GRID_POWER, width=2, dash="dash"),
             y_format=".2f",
             base_opacity=1.0,
-            x_shift=_LINE_X_SHIFT_SLOT_CENTER,
+            anchor_fraction=_LINE_ANCHOR_SLOT_CENTER,
         )
 
     for seg_index, (start, end, is_extrapolated) in enumerate(segments):
         if start >= end:
             continue
         fig.add_trace(go.Bar(
-            x=slot_x.iloc[start:end] + bar_offset,
+            x=_battery_bar_times(axis, slice(start, end)),
             y=df["Geplante Batterie-Aktion (kW)"].iloc[start:end],
             name="Batterie" if seg_index == 0 else "Batterie",
             showlegend=seg_index == 0,
             marker=dict(color=bar_colors[start:end]),
             opacity=_segment_opacity(0.75, is_extrapolated),
-            width=battery_bar_width,
+            width=battery_width_ms,
             yaxis="y",
             customdata=uhrzeit.iloc[start:end],
             hovertemplate=(
@@ -751,12 +860,12 @@ def add_power_traces(
                 else [0] * len(segment)
             )
             fig.add_trace(go.Bar(
-                x=_consumer_bar_x(
-                    slot_x.iloc[start:end],
+                x=_consumer_bar_times(
+                    axis,
+                    slice(start, end),
                     consumer_index,
                     consumer_count,
                     consumer_bar_width,
-                    bar_offset,
                 ),
                 y=segment[col],
                 name=consumer["name"] if seg_index == 0 else consumer["name"],
@@ -766,7 +875,7 @@ def add_power_traces(
                     pattern_shapes,
                     opacity,
                 ),
-                width=consumer_bar_width,
+                width=consumer_width_ms,
                 yaxis="y",
                 customdata=list(zip(segment["Uhrzeit"], hover_pv, hover_imm)),
                 hovertemplate=(
@@ -781,7 +890,7 @@ def add_power_traces(
 def add_optimized_soc_trace(
     fig: go.Figure,
     df: pd.DataFrame,
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     yaxis: str = "y2",
     extrap_start: int | None = None,
     extrap_end: int | None = None,
@@ -793,9 +902,9 @@ def add_optimized_soc_trace(
     for index, (start, end, is_extrapolated) in enumerate(segments):
         if start >= end:
             continue
-        seg_tail = tail_y if end == len(slot_x) else None
+        seg_tail = tail_y if end == len(axis.starts) else None
         soc_x, soc_y = _segment_connected_line_xy(
-            slot_x, soc, start, end, tail_y=seg_tail, step_line=False
+            axis, soc, start, end, tail_y=seg_tail, step_line=False
         )
         if soc_x.empty:
             continue
@@ -832,16 +941,16 @@ def add_baseline_soc_traces(
 ) -> None:
     if matched_baseline_df is None or matched_baseline_df.empty:
         return
-    matched_slot_x = _chart_slot_x(len(matched_baseline_df))
+    matched_axis = ChartSlotAxis.from_dataframe(matched_baseline_df)
     matched_segments = _trace_segments(len(matched_baseline_df), extrap_start, extrap_end)
     for index, (start, end, is_extrapolated) in enumerate(matched_segments):
         if start >= end:
             continue
         seg_tail = None
-        if end == len(matched_slot_x):
+        if end == len(matched_axis.starts):
             seg_tail = _soc_tail_y_from_row(matched_baseline_df.iloc[-1])
         matched_x, matched_y = _segment_connected_line_xy(
-            matched_slot_x,
+            matched_axis,
             matched_baseline_df["Simulierter SoC (%)"],
             start,
             end,
@@ -876,7 +985,7 @@ def add_baseline_soc_traces(
 def add_price_on_soc_axis_trace(
     fig: go.Figure,
     df: pd.DataFrame,
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     yaxis: str = "y2",
     extrap_start: int | None = None,
     extrap_end: int | None = None,
@@ -887,7 +996,7 @@ def add_price_on_soc_axis_trace(
     segments = _trace_segments(len(df), extrap_start, extrap_end)
     _add_segmented_hv_line(
         fig,
-        slot_x,
+        axis,
         price_cent,
         uhrzeit,
         segments,
@@ -919,14 +1028,14 @@ def _hourly_cumsum_for_chart(
 def add_cumulative_cost_traces(
     fig: go.Figure,
     uhrzeit: pd.Series,
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     hourly_matched_cost_euro: list[float],
     hourly_optimized_cost_euro: list[float],
     extrap_start: int | None = None,
     extrap_end: int | None = None,
 ) -> None:
     """Kumulierte Stromkosten: BL Ziel und optimiert."""
-    length = len(slot_x)
+    length = len(axis.starts)
     matched_cum = _hourly_cumsum_for_chart(hourly_matched_cost_euro, length)
     optimized_cum = _hourly_cumsum_for_chart(hourly_optimized_cost_euro, length)
     if matched_cum is None or optimized_cum is None:
@@ -934,7 +1043,7 @@ def add_cumulative_cost_traces(
     segments = _trace_segments(length, extrap_start, extrap_end)
     _add_segmented_hv_line(
         fig,
-        slot_x,
+        axis,
         matched_cum,
         uhrzeit,
         segments,
@@ -948,7 +1057,7 @@ def add_cumulative_cost_traces(
     )
     _add_segmented_hv_line(
         fig,
-        slot_x,
+        axis,
         optimized_cum,
         uhrzeit,
         segments,
@@ -965,7 +1074,7 @@ def add_cumulative_cost_traces(
 def add_cumulative_consumption_traces(
     fig: go.Figure,
     uhrzeit: pd.Series,
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     hourly_matched_kwh: list[float],
     hourly_optimized_kwh: list[float],
     yaxis: str = "y2",
@@ -973,7 +1082,7 @@ def add_cumulative_consumption_traces(
     extrap_end: int | None = None,
 ) -> None:
     """Kumulierter Gesamtverbrauch (Grundlast + Flex) auf separater Achse."""
-    length = len(slot_x)
+    length = len(axis.starts)
     matched_cum = _hourly_cumsum_for_chart(hourly_matched_kwh, length)
     optimized_cum = _hourly_cumsum_for_chart(hourly_optimized_kwh, length)
     if matched_cum is None or optimized_cum is None:
@@ -981,7 +1090,7 @@ def add_cumulative_consumption_traces(
     segments = _trace_segments(length, extrap_start, extrap_end)
     _add_segmented_hv_line(
         fig,
-        slot_x,
+        axis,
         matched_cum,
         uhrzeit,
         segments,
@@ -997,7 +1106,7 @@ def add_cumulative_consumption_traces(
     )
     _add_segmented_hv_line(
         fig,
-        slot_x,
+        axis,
         optimized_cum,
         uhrzeit,
         segments,
@@ -1024,9 +1133,9 @@ def _chart_legend() -> dict:
     )
 
 
-def _hv_line_endpoint_x(slot_count: int) -> float:
-    """X-Position am Ende des letzten Stunden-Slots (HV-Linien)."""
-    return float(slot_count - 1) + 0.5
+def _hv_line_endpoint_time(axis: ChartSlotAxis) -> datetime:
+    """Zeitpunkt am Ende des letzten Slots (HV-Linien, früher Index n−0.5)."""
+    return axis.legacy_index_time(len(axis.starts) - 0.5)
 
 
 _COST_SUMMARY_FONT_SIZE = 14
@@ -1106,15 +1215,21 @@ def render_power_soc_chart(
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
     bar_colors = get_bar_colors(df)
-    slot_x = _chart_slot_x(len(df))
+    chart_slot_datetimes = chart_window.slot_datetimes if chart_window is not None else None
+    axis = ChartSlotAxis.from_dataframe(
+        df,
+        slot_datetimes=chart_slot_datetimes,
+    )
     extrap_start, extrap_end = _extrapolation_bounds(df)
     fig = go.Figure()
 
     if chart_window is not None and chart_now is not None and chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_window, chart_zones)
+        _add_zone_backgrounds(fig, chart_window, chart_zones, axis)
 
-    add_power_traces(fig, df, bar_colors, slot_x, extrap_start, extrap_end)
-    add_optimized_soc_trace(fig, df, slot_x, extrap_start=extrap_start, extrap_end=extrap_end)
+    add_power_traces(fig, df, bar_colors, axis, extrap_start, extrap_end)
+    add_optimized_soc_trace(
+        fig, df, axis, extrap_start=extrap_start, extrap_end=extrap_end
+    )
     if show_baseline_soc:
         add_baseline_soc_traces(
             fig,
@@ -1123,7 +1238,7 @@ def render_power_soc_chart(
             extrap_end=extrap_end,
         )
     add_price_on_soc_axis_trace(
-        fig, df, slot_x, extrap_start=extrap_start, extrap_end=extrap_end
+        fig, df, axis, extrap_start=extrap_start, extrap_end=extrap_end
     )
 
     if sun_markers is not None:
@@ -1136,7 +1251,7 @@ def render_power_soc_chart(
     )
     fig.update_layout(
         title=chart_title or default_title,
-        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
+        xaxis=_chart_xaxis_config(axis),
         barmode="overlay",
         yaxis=dict(title="Leistung (kW)", side="left"),
         yaxis2=dict(
@@ -1158,20 +1273,20 @@ def render_power_soc_chart(
 def add_cumulative_actual_traces(
     fig: go.Figure,
     uhrzeit: pd.Series,
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     slot_costs_euro: list[float],
     slot_consumption_kwh: list[float],
     extrap_start: int | None = None,
     extrap_end: int | None = None,
 ) -> None:
     """Kumulierte Ist-Kosten und Ist-Verbrauch (Produktiv-Historie)."""
-    length = len(slot_x)
+    length = len(axis.starts)
     cost_cum = pd.Series(slot_costs_euro[:length], dtype=float).cumsum()
     kwh_cum = pd.Series(slot_consumption_kwh[:length], dtype=float).cumsum()
     segments = _trace_segments(length, extrap_start, extrap_end)
     _add_segmented_hv_line(
         fig,
-        slot_x,
+        axis,
         cost_cum,
         uhrzeit,
         segments,
@@ -1185,7 +1300,7 @@ def add_cumulative_actual_traces(
     )
     _add_segmented_hv_line(
         fig,
-        slot_x,
+        axis,
         kwh_cum,
         uhrzeit,
         segments,
@@ -1215,11 +1330,14 @@ def render_cumulative_cost_chart(
     chart_zones=None,
 ) -> None:
     """Kumulierte Stromkosten und Verbrauch BL Ziel vs. optimiert."""
-    slot_x = _chart_slot_x(len(df))
+    axis = ChartSlotAxis.from_dataframe(
+        df,
+        slot_datetimes=chart_window.slot_datetimes if chart_window is not None else None,
+    )
     extrap_start, extrap_end = _extrapolation_bounds(df)
     fig = go.Figure()
     if chart_window is not None and chart_now is not None and chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_window, chart_zones)
+        _add_zone_backgrounds(fig, chart_window, chart_zones, axis)
     has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
     has_consumption = bool(
         hourly_matched_baseline_consumption_kwh and hourly_optimized_consumption_kwh
@@ -1234,7 +1352,7 @@ def render_cumulative_cost_chart(
         add_cumulative_cost_traces(
             fig,
             df["Uhrzeit"],
-            slot_x,
+            axis,
             hourly_matched_baseline_cost_euro or [],
             hourly_optimized_cost_euro or [],
             extrap_start=extrap_start,
@@ -1244,7 +1362,7 @@ def render_cumulative_cost_chart(
         add_cumulative_consumption_traces(
             fig,
             df["Uhrzeit"],
-            slot_x,
+            axis,
             hourly_matched_baseline_consumption_kwh or [],
             hourly_optimized_consumption_kwh or [],
             extrap_start=extrap_start,
@@ -1263,7 +1381,7 @@ def render_cumulative_cost_chart(
             if chart_window is not None
             else "Kumulierte Kosten & Verbrauch"
         ),
-        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
+        xaxis=_chart_xaxis_config(axis),
         yaxis=dict(title="Kosten (€, kumuliert)"),
         legend=_chart_legend(),
         margin=dict(l=40, r=40, t=50, b=110),
@@ -1317,7 +1435,7 @@ def render_price_savings_chart(
 def add_projected_savings_trace(
     fig: go.Figure,
     uhrzeit: pd.Series,
-    slot_x: pd.Series,
+    axis: ChartSlotAxis,
     projected_savings_cumulative_euro: list[float],
     extrap_start: int | None = None,
     extrap_end: int | None = None,
@@ -1325,12 +1443,12 @@ def add_projected_savings_trace(
     """Kumulierte prognostizierte Ersparnis (Produktiv-Historie)."""
     if not projected_savings_cumulative_euro:
         return
-    length = len(slot_x)
+    length = len(axis.starts)
     savings_cum = pd.Series(projected_savings_cumulative_euro[:length], dtype=float)
     segments = _trace_segments(length, extrap_start, extrap_end)
     _add_segmented_hv_line(
         fig,
-        slot_x,
+        axis,
         savings_cum,
         uhrzeit,
         segments,
@@ -1360,13 +1478,13 @@ def render_history_optimization_chart(
         chart_title="24-Stunden-Horizont (Leistung, SoC & Preis) — Produktiv-Ist",
         chart_key="history_power_soc_chart",
     )
-    slot_x = _chart_slot_x(len(df))
+    axis = ChartSlotAxis.from_dataframe(df)
     extrap_start, extrap_end = _extrapolation_bounds(df)
     fig = go.Figure()
     add_cumulative_actual_traces(
         fig,
         df["Uhrzeit"],
-        slot_x,
+        axis,
         slot_costs_euro,
         slot_consumption_kwh,
         extrap_start=extrap_start,
@@ -1380,14 +1498,14 @@ def render_history_optimization_chart(
         add_projected_savings_trace(
             fig,
             df["Uhrzeit"],
-            slot_x,
+            axis,
             projected_savings_cumulative_euro or [],
             extrap_start=extrap_start,
             extrap_end=extrap_end,
         )
     fig.update_layout(
         title="Kumulierte Kosten & Verbrauch — Produktiv-Ist",
-        xaxis=_chart_xaxis_config(df["Uhrzeit"]),
+        xaxis=_chart_xaxis_config(axis),
         yaxis=dict(title="Kosten (€, kumuliert)"),
         yaxis2=dict(
             title="Verbrauch (kWh, kumuliert)",
