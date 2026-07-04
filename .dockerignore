@@ -4,6 +4,7 @@
 config.json
 config/config.json
 runtime/
+!runtime/local_settings.example.json
 *.csv
 *.log
 *.jsonl
