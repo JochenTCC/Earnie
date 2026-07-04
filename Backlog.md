@@ -6,7 +6,7 @@
 
 - [ ] **UI Sunset-2-Sunset (Spec v0.5)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Phase 2 — Vergangenheit füllen:** Produktiv-Log (`history_timeline`, 15 min) in grauem Bereich; Grenze an **voller Stunde** (laufende Stunde wie heute unsichtbar bis Stundenwechsel); ab voller Stunde 1h-MILP; Sankey + Countdown **immer**
+  - **Phase 2 — Vergangenheit füllen:** Produktiv-Log (`history_timeline`, 15 min) in grauem Bereich; Grenze an **voller Stunde** (laufende Stunde wie heute unsichtbar bis Stundenwechsel); ab voller Stunde 1h-MILP; Sankey + Countdown **immer**; **Simulationsergebnis-Tabelle** (`ui/simulation_results.py`) im grauen Bereich korrekt befüllen (15-min-Ist + stündliche MILP-Slots, konsistent zum Chart)
   - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
   - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung)
   - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
