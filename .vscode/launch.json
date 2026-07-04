@@ -39,6 +39,25 @@
       "justMyCode": false
     },
     {
+      "name": "Streamlit app.py (NAS Produktiv-Log)",
+      "type": "python",
+      "request": "launch",
+      "module": "streamlit",
+      "args": [
+        "run",
+        "${workspaceFolder}/app.py",
+        "--server.port",
+        "8501"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "ENERGY_OPTIMIZER_RUNTIME_DIR": "\\\\DS-KO-DO-2\\docker\\energy_optimizer\\runtime",
+        "ENERGY_OPTIMIZER_CONFIG_PATH": "\\\\DS-KO-DO-2\\docker\\energy_optimizer\\config\\config.json"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
       "name": "run_backtesting",
       "type": "python",
       "request": "launch",
