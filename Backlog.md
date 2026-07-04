@@ -6,10 +6,10 @@
 
 - [ ] **UI Sunset-2-Sunset (Spec v0.6.1)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Phase 2 — Vergangenheit füllen (Charts, teilweise):** Daten-Schicht v0.6.1 (15-min ab x:15, kein Hold-Forward), Charts auf `display_ctx` — **offen:** Chart-Werte im **grauen Bereich** stimmen noch nicht mit Simulations-Tabelle überein (zuerst Ursache finden und beheben)
   - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
   - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung)
   - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
+- [ ] **Simulations-Tabelle — Fixierung Kopfzeile und erste Spalte** (wie Excel „Fenster fixieren“): prüfen, ob `st.dataframe`/`st.table`, CSS oder Custom Component horizontales/vertikales Scrollen mit fixer `Uhrzeit`-Spalte und Header ermöglicht
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
 - [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
   - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
@@ -43,7 +43,7 @@ bodentemperaturen_nach_monat = {
   - Live Modus A: MILP mit urgent → **Infeasible**; ohne urgent → **Optimal**
   - `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py` (2 Tests)
   - Nächster Schritt: Live urgent + Modus A prüfen; `xfail` entfernen wenn feasible
-- [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; nach Phase 2 des UI-Epics)
+- [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; Phase 2 des UI-Epics erledigt)
   - Stufe 1: Im grauen Bereich Soll (Ernie-Log) vs. Ist (`consumption_snapshot`), wo vorhanden — Chart-Overlay + Abweichungsmarkierung (analog Sankey)
   - Stufe 2: Kontinuierliches Haus-Ist unabhängig vom 15-min-Takt (Logging erweitern oder `cons_data`) — Spezifikation offen
 - [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
@@ -78,13 +78,15 @@ bodentemperaturen_nach_monat = {
 
 ## Erledigte Punkte
 
-### UI Sunset-2-Sunset Phase 2 — Simulations-Tabelle (2026-07-04)
+### UI Sunset-2-Sunset Phase 2 — Vergangenheit füllen (2026-07-04)
 
-- [x] **Daten-Schicht:** `build_chart_history`, `build_chart_display_context` — 15-min Produktiv-Log + stündliche MILP-Slots für die Tabelle
-- [x] **Simulationsergebnis-Tabelle:** Log/MILP-Mix, Spalte Datenquelle, orange/hellorange für fehlende/gehaltene Log-Slots (`ui/simulation_results.py`, `st.table` + Styler)
-- [x] **Produktiv-Log:** `k_push_act` in `main.py` / `optimization_history.jsonl`; Einspeisevergütung und `sofort_laden` in Tabellenzeilen aus Log-Kontext
-- [x] **TZ-Fix:** naive `completed_at`-Zeitstempel für Log-Lookup in Planungszeitzone
-- [x] **Tests:** `test_chart_history`, `test_simulation_results_table`
+- [x] **Daten-Schicht v0.6.1:** `build_chart_history`, `build_chart_display_context` — 15-min Produktiv-Log (kein Hold-Forward im Live-Chart), MILP-Tail (1 h bzw. 15-min-Soll ab x:15)
+- [x] **Chart + Tabelle:** gemeinsamer Merge-Pfad (`display_ctx`), Soll aus `consumer_powers_kw`; Datenbasis-Hinweis (Runtime-Pfad, Merge-Status)
+- [x] **Simulationsergebnis-Tabelle:** Log/MILP-Mix, Spalte Datenquelle, `st.table`, Flex-kW-Spalten nach vorne; orange für fehlende Log-Slots
+- [x] **Chart vs. Tabelle grauer Bereich:** Abweichung war Darstellungsart (`st.dataframe`, Spaltenverwechslung); `chart_key` für Live-Chart
+- [x] **Produktiv-Log:** `k_push_act`, Einspeisevergütung und `sofort_laden` in Tabellenzeilen; TZ-Fix für `completed_at`-Lookup
+- [x] **Tests:** `test_chart_history`, `test_simulation_results_table`, `test_production_log_source`
+- [x] **Diagnose:** `scripts/_diag_swimspa_nas.py` (NAS-`optimization_history.jsonl`)
 
 ### Dev-Umgebung NAS-Produktiv-Log (2026-07-04)
 

@@ -5,4 +5,4 @@ Set-Location $Root
 
 git config core.hooksPath .githooks
 Write-Host "Git hooksPath gesetzt auf .githooks"
-Write-Host "pre-commit fuehrt vor jedem Commit 'pytest tests' aus."
+Write-Host "pre-commit fuehrt 'pytest tests' aus (uebersprungen bei nur *.md, docs/, .cursor/)."
