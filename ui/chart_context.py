@@ -17,6 +17,8 @@ from data.planning_window import (
     ui_chart_zones,
 )
 from runtime_store import optimization_history
+from optimizer.deviation_eval import DeviationEvent
+from optimizer.deviation_timeline import empty_deviation_series
 from runtime_store.history_timeline import (
     ChartHistoryResult,
     SLOT_MISSING,
@@ -39,6 +41,7 @@ class ChartDisplayContext:
     history_result: ChartHistoryResult | None
     gap_notice: str | None
     history_only: bool
+    slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -258,6 +261,21 @@ def _history_gap_notice(result: ChartHistoryResult | None) -> str | None:
     return f"{result.missing_slot_count} Viertelstunden-Slots ohne Log-Daten"
 
 
+def _display_deviation_events(
+    history: ChartHistoryResult | None,
+    history_slot_count: int,
+    total_slot_count: int,
+) -> tuple[tuple[DeviationEvent, ...], ...]:
+    """Historie-Events + leere Tuples für MILP/neutral/grün."""
+    if history is None or history_slot_count <= 0:
+        return empty_deviation_series(total_slot_count)
+    history_events = history.slot_deviation_events
+    if len(history_events) != history_slot_count:
+        return empty_deviation_series(total_slot_count)
+    tail = empty_deviation_series(total_slot_count - history_slot_count)
+    return history_events + tail
+
+
 def build_chart_display_context(
     chart_context: LiveChartContext,
     sim_rows: list[dict] | None,
@@ -284,6 +302,7 @@ def build_chart_display_context(
             history_result=None,
             gap_notice=None,
             history_only=False,
+            slot_deviation_events=empty_deviation_series(len(hourly_rows)),
         )
 
     if not is_live_segment:
@@ -297,6 +316,7 @@ def build_chart_display_context(
             history_result=history,
             gap_notice=_history_gap_notice(history),
             history_only=True,
+            slot_deviation_events=history.slot_deviation_events,
         )
 
     history_end = history_log_end_exclusive(chart_context.now, chart)
@@ -312,6 +332,7 @@ def build_chart_display_context(
             history_result=None,
             gap_notice=None,
             history_only=False,
+            slot_deviation_events=empty_deviation_series(len(milp_rows)),
         )
 
     history = build_chart_history(chart.start, history_end)
@@ -319,6 +340,7 @@ def build_chart_display_context(
         chart_context, rows_input, history_end
     )
     qualities = history.slot_qualities + milp_qualities
+    total_slots = len(history.rows) + len(milp_rows)
     return ChartDisplayContext(
         rows=history.rows + milp_rows,
         slot_datetimes=history.slot_starts + milp_slots,
@@ -327,6 +349,11 @@ def build_chart_display_context(
         history_result=history,
         gap_notice=_history_gap_notice(history),
         history_only=False,
+        slot_deviation_events=_display_deviation_events(
+            history,
+            len(history.rows),
+            total_slots,
+        ),
     )
 
 

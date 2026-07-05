@@ -1,7 +1,7 @@
 # Spezifikation: Soll/Ist-Abweichung (Chart 1)
 
 **Version:** 0.1  
-**Status:** Epic geplant (2026-07-05); Phasen 1–4 offen  
+**Status:** P3 abgeschlossen (2026-07-05); P4 offen  
 **Epic-Kurzname:** **Soll-Ist**  
 **Voraussetzung:** Epic **UI Sunset-2-Sunset** abgeschlossen ([ui-sunset2sunset.md](ui-sunset2sunset.md) v0.7.0)
 
@@ -173,9 +173,9 @@ Weitere Szenarien werden im Betrieb ergänzt; Kategorie **Hinweis** erst bei kon
 
 | Phase | Inhalt | Akzeptanz |
 |-------|--------|-----------|
-| **P1** | Facts, Schema, Beispiel-JSON, Prädikat-MVP, Evaluator, Tests S1–S5 | `pytest tests/test_deviation_*.py` grün |
-| **P2** | Anbindung `build_chart_history` / `ChartDisplayContext`; Events pro Slot | Events nur bei `present`; keine Events in neutral/grün |
-| **P3** | Chart-1-Marker, Tooltip, ?-Hilfe | Icons sichtbar in Streamlit; Hover zeigt Kategorie + Text |
+| **P1** | Facts, Schema, Beispiel-JSON, Prädikat-MVP, Evaluator, Tests S1–S5 | `pytest tests/test_deviation_*.py` grün ✓ |
+| **P2** | Anbindung `build_chart_history` / `ChartDisplayContext`; Events pro Slot | Events nur bei `present`; keine Events in neutral/grün ✓ |
+| **P3** | Chart-1-Marker, Tooltip, ?-Hilfe | Icons sichtbar in Streamlit; Hover zeigt Kategorie + Text ✓ |
 | **P4** | `docs/ui/charts.md`, Szenario-Doku, Regel-Pflegehinweis | Spec v0.2; Backlog Epic-Abschluss |
 
 Commit-Präfix: `deviation(soll-ist): P1a …` bzw. kurz `soll-ist: P1 …`.
@@ -201,4 +201,7 @@ Commit-Präfix: `deviation(soll-ist): P1a …` bzw. kurz `soll-ist: P1 …`.
 
 | Datum | Version | Inhalt |
 |-------|---------|--------|
+| 2026-07-05 | 0.1.3 | P3: Chart-1-Marker, Hover, ?-Hilfe |
+| 2026-07-05 | 0.1.2 | P2: `deviation_timeline`, Events in `ChartHistoryResult` / `ChartDisplayContext` |
+| 2026-07-05 | 0.1.1 | P1: `deviation_facts`, `deviation_eval`, `deviation_rules`; Tests S1–S5 |
 | 2026-07-05 | 0.1 | Erstfassung Epic-Plan, Architektur, Regelwerk, Phasen P1–P4 |

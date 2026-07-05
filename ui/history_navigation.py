@@ -62,7 +62,11 @@ def s2_zone_help_text() -> str:
     return (
         "Hintergrund: grau = Vergangenheit · neutral = aktuelle Stunde · "
         "grün = extrapolierte Preise · "
-        "«Vor →»: ein Zyklus Richtung Live oder SA₁→SA₂ (nur Live)"
+        "«Vor →»: ein Zyklus Richtung Live oder SA₁→SA₂ (nur Live)\n\n"
+        "**Soll/Ist-Icons** (nur grauer Log-Bereich): "
+        "▲ Hinweis (gelb) · ◆ Warnung (orange) · ⬡ Fehler (rot). "
+        "Hover zeigt Kategorie und Erläuterung. "
+        "Regeln: `config/deviation_rules.json`."
     )
 
 

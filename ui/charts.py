@@ -17,6 +17,7 @@ from data.planning_window import (
 )
 from optimizer.targets import consumer_pv_follow_column_name, consumer_immediate_charge_column_name
 from optimizer import battery as bat
+from optimizer.deviation_eval import DeviationEvent
 from runtime_store.history_timeline import SLOT_MISSING
 from ui.help_hint import render_title_with_help
 
@@ -35,6 +36,8 @@ _ZONE_FORECAST_COLOR = "rgba(76, 175, 80, 0.15)"
 _MISSING_SLOT_FILL = "rgba(255, 224, 178, 0.55)"
 _MARKER_NOW_COLOR = "#3498db"
 _MARKER_SUNRISE_COLOR = "#f39c12"
+_DEVIATION_MARKER_SIZE = 11
+_DEVIATION_Y_STACK_FACTOR = 0.06
 _CONSUMER_PALETTE_START = (194, 24, 91)
 _CONSUMER_PALETTE_END = (0, 188, 212)
 
@@ -526,6 +529,87 @@ def _add_sun_markers(fig: go.Figure, markers: ChartSunMarkers) -> None:
             annotation_text=label,
             annotation_position="top",
         )
+
+
+def _power_chart_ymax(df: pd.DataFrame) -> float:
+    """Oberkante für Soll/Ist-Marker oberhalb der Leistungskurven."""
+    columns = [
+        "PV-Prognose (kW)",
+        "Verbrauch-Prognose (kW)",
+        "Geplante Batterie-Aktion (kW)",
+        "Netzbezug (kW)",
+    ]
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        columns.append(f"{consumer['name']} (kW)")
+    peak = 0.0
+    for column in columns:
+        if column not in df.columns:
+            continue
+        series = pd.to_numeric(df[column], errors="coerce").abs()
+        if series.empty:
+            continue
+        value = series.max()
+        if value is not None and not math.isnan(value):
+            peak = max(peak, float(value))
+    return max(peak, 0.5)
+
+
+def build_deviation_marker_traces(
+    axis: ChartSlotAxis,
+    slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...],
+    power_ymax: float,
+) -> list[go.Scatter]:
+    """Plotly-Scatter-Marker für Soll/Ist-Abweichungen (Epic Soll-Ist P3)."""
+    if not slot_deviation_events:
+        return []
+    slot_count = len(axis.starts)
+    if len(slot_deviation_events) != slot_count:
+        return []
+    traces: list[go.Scatter] = []
+    base_y = power_ymax * 1.04
+    step_y = max(power_ymax * _DEVIATION_Y_STACK_FACTOR, 0.08)
+    for index, events in enumerate(slot_deviation_events):
+        if not events:
+            continue
+        x_time = axis.at(index, _LINE_ANCHOR_SLOT_CENTER).iloc[0]
+        for stack_index, event in enumerate(events):
+            traces.append(
+                go.Scatter(
+                    x=[x_time],
+                    y=[base_y + stack_index * step_y],
+                    mode="markers",
+                    marker=dict(
+                        symbol=event.symbol,
+                        color=event.color,
+                        size=_DEVIATION_MARKER_SIZE,
+                        line=dict(width=1, color="white"),
+                    ),
+                    name=event.label,
+                    showlegend=False,
+                    hovertemplate=(
+                        f"<b>{event.label}</b><br>"
+                        f"{event.message}"
+                        f"<br><extra></extra>"
+                    ),
+                )
+            )
+    return traces
+
+
+def _add_deviation_markers(
+    fig: go.Figure,
+    axis: ChartSlotAxis,
+    plot_df: pd.DataFrame,
+    slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] | None,
+) -> None:
+    if not slot_deviation_events:
+        return
+    for trace in build_deviation_marker_traces(
+        axis,
+        slot_deviation_events,
+        _power_chart_ymax(plot_df),
+    ):
+        fig.add_trace(trace)
 
 
 def _consumer_bar_pattern_shapes(
@@ -1786,6 +1870,7 @@ def render_power_soc_chart(
     history_slot_count: int | None = None,
     chart_header_label: str | None = None,
     chart_header_help: str | None = None,
+    slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] | None = None,
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
     if chart_header_label and chart_header_help:
@@ -1823,6 +1908,7 @@ def render_power_soc_chart(
 
     if sun_markers is not None:
         _add_sun_markers(fig, sun_markers)
+    _add_deviation_markers(fig, axis, plot_df, slot_deviation_events)
 
     default_title = (
         _sunrise_chart_title(chart_window)
@@ -2107,6 +2193,7 @@ def render_optimization_chart(
     between_charts_hook: Callable[[], None] | None = None,
     chart_header_label: str | None = None,
     chart_header_help: str | None = None,
+    slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] | None = None,
 ) -> None:
     """Zeichnet Leistung/SoC/Preis und kumulierte Kosten/Verbrauch in zwei Charts."""
     render_power_soc_chart(
@@ -2122,6 +2209,7 @@ def render_optimization_chart(
         chart_key="live_power_soc_chart",
         chart_header_label=chart_header_label,
         chart_header_help=chart_header_help,
+        slot_deviation_events=slot_deviation_events,
     )
     if between_charts_hook is not None:
         between_charts_hook()

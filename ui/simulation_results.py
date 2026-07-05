@@ -441,6 +441,7 @@ def render_optimization_results(
         between_charts_hook=between_charts,
         chart_header_label=chart_header_label,
         chart_header_help=chart_header_help,
+        slot_deviation_events=display_ctx.slot_deviation_events,
     )
     if simulation_table_title:
         table_title = simulation_table_title

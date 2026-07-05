@@ -48,6 +48,7 @@ class ChartHistoryResult:
     missing_slot_count: int
     window_start: datetime
     window_end_exclusive: datetime
+    slot_deviation_events: tuple[tuple[Any, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -425,9 +426,9 @@ def _build_rows_for_slot_starts(
     *,
     include_date: bool = False,
     hold_forward: bool = True,
-) -> tuple[list[dict[str, Any]], tuple[str, ...], int, int, int]:
+) -> tuple[list[dict[str, Any]], tuple[str, ...], int, int, int, dict[datetime, dict[str, Any]]]:
     if not slot_starts:
-        return [], (), 0, 0, 0
+        return [], (), 0, 0, 0, {}
     starts = tuple(slot_starts)
     window_start = _coerce_slot_start(starts[0])
     window_end = _coerce_slot_start(starts[-1]) + timedelta(minutes=QUARTER_HOUR_MINUTES)
@@ -458,7 +459,7 @@ def _build_rows_for_slot_starts(
             missing += 1
             qualities.append(SLOT_MISSING)
         rows.append(row)
-    return rows, tuple(qualities), present, held, missing
+    return rows, tuple(qualities), present, held, missing, by_slot
 
 
 def build_chart_history(
@@ -486,13 +487,17 @@ def build_chart_history(
             missing_slot_count=0,
             window_start=window_start,
             window_end_exclusive=window_end_exclusive,
+            slot_deviation_events=(),
         )
     slot_starts = quarter_hour_slots_between(window_start, window_end_exclusive)
-    rows, qualities, present, held, missing = _build_rows_for_slot_starts(
+    rows, qualities, present, held, missing, by_slot = _build_rows_for_slot_starts(
         slot_starts,
         include_date=True,
         hold_forward=False,
     )
+    from optimizer.deviation_timeline import build_slot_deviation_series
+
+    deviation_events = build_slot_deviation_series(by_slot, slot_starts, qualities)
     sell_price_cent = config.get_push_price_cent()
     slot_costs = [
         0.0 if quality == SLOT_MISSING else _slot_cost_euro(row, sell_price_cent)
@@ -515,6 +520,7 @@ def build_chart_history(
         missing_slot_count=missing,
         window_start=window_start,
         window_end_exclusive=window_end_exclusive,
+        slot_deviation_events=deviation_events,
     )
 
 
@@ -529,7 +535,7 @@ def build_history_timeline(
     """
     window_start, window_end, anchor = history_window_bounds(offset_days, now)
     slot_starts = _slot_starts(window_start)
-    rows, qualities, present, held, missing = _build_rows_for_slot_starts(slot_starts)
+    rows, qualities, present, held, missing, _by_slot = _build_rows_for_slot_starts(slot_starts)
     entries = optimization_history.load_replay_entries_between(window_start, window_end)
     by_slot = _index_entries_by_slot(entries)
     sell_price_cent = config.get_push_price_cent()

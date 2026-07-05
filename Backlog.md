@@ -5,10 +5,10 @@
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
 - [ ] **Epic Soll-Ist** — Soll/Ist-Abweichung in Chart 1 (Icons Hinweis / Warnung / Fehler)
-  - Spec: [docs/spec/soll-ist-abweichung.md](docs/spec/soll-ist-abweichung.md) v0.1 · Regeln: `config/deviation_rules.example.json` (+ Schema)
-  - **P1** Facts & Regelwerk: `deviation_facts`, `deviation_eval`, Prädikat-MVP, Schema/Beispiel-JSON, Tests S1–S5
-  - **P2** Slot-Auswertung: Anbindung `history_timeline` / `chart_context`; Events nur `slot_quality=present` (grauer Bereich)
-  - **P3** Chart-1-Icons: Plotly-Marker, Tooltip, ?-Hilfe
+  - Spec: [docs/spec/soll-ist-abweichung.md](docs/spec/soll-ist-abweichung.md) v0.1 · Regeln: `config/deviation_rules.json` (+ Schema, `deviation_rules.example.json`)
+  - [x] **P1** Facts & Regelwerk: `deviation_facts`, `deviation_eval`, `deviation_rules`, Prädikat-MVP, Tests S1–S5
+  - [x] **P2** Slot-Auswertung: `deviation_timeline`, `ChartHistoryResult.slot_deviation_events`, `ChartDisplayContext.slot_deviation_events`; nur `present` im grauen Bereich
+  - [x] **P3** Chart-1-Icons: Plotly-Marker, Tooltip, ?-Hilfe (`build_deviation_marker_traces`, `s2_zone_help_text`)
   - **P4** Szenario-Katalog, `docs/ui/charts.md`, Epic-Abschluss
   - **Follow-ups (nach Epic):** Nachrechnung Backtesting (Batch über JSONL); Stufe 2 kontinuierliches Haus-Ist; Hinweis-Regeln wenn Fälle da
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)

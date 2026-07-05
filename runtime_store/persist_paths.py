@@ -203,3 +203,39 @@ def resolve_backtesting_scenarios_json_path() -> str:
     if os.path.isfile(legacy):
         return legacy
     return preferred
+
+
+def bundled_deviation_rules_example_file() -> str:
+    return os.path.join(bundled_config_dir(), "deviation_rules.example.json")
+
+
+def bundled_deviation_rules_schema_file() -> str:
+    return os.path.join(bundled_config_dir(), "deviation_rules.schema.json")
+
+
+def resolve_deviation_rules_template_path() -> str:
+    """Vorlage für deviation_rules.json: Mount, Legacy oder gebündelte Image-Kopie."""
+    preferred = os.path.join("config", "deviation_rules.example.json")
+    if os.path.isfile(preferred):
+        return preferred
+    legacy = "deviation_rules.example.json"
+    if os.path.isfile(legacy):
+        return legacy
+    bundled = bundled_deviation_rules_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_deviation_rules_json_path() -> str:
+    """Pfad zu deviation_rules.json: ENV > config/ > Fallback auf Vorlage."""
+    env = os.environ.get("ENERGY_OPTIMIZER_DEVIATION_RULES_PATH", "").strip()
+    if env:
+        return env
+    preferred = os.path.join("config", "deviation_rules.json")
+    if os.path.isfile(preferred):
+        return preferred
+    legacy = "deviation_rules.json"
+    if os.path.isfile(legacy):
+        return legacy
+    return resolve_deviation_rules_template_path()
