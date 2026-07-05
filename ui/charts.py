@@ -33,7 +33,6 @@ _ZONE_FORECAST_COLOR = "rgba(76, 175, 80, 0.15)"
 _MISSING_SLOT_FILL = "rgba(255, 224, 178, 0.55)"
 _MARKER_NOW_COLOR = "#3498db"
 _MARKER_SUNRISE_COLOR = "#f39c12"
-_MARKER_SUNSET_COLOR = "#8e44ad"
 _CONSUMER_PALETTE_START = (194, 24, 91)
 _CONSUMER_PALETTE_END = (0, 188, 212)
 
@@ -141,33 +140,68 @@ class ChartSlotAxis:
             return timedelta(hours=1)
         return timedelta(seconds=float(positive.dt.total_seconds().median()))
 
-    def _offset(self, fraction: float) -> pd.Timedelta:
-        return pd.to_timedelta(self.step.total_seconds() * fraction, unit="s")
+    def slot_duration(self, index: int) -> timedelta:
+        """Dauer eines Slots (15 min oder 1 h — aus Nachbar-Slots abgeleitet)."""
+        if index + 1 < len(self.starts):
+            diff = self.starts.iloc[index + 1] - self.starts.iloc[index]
+            if diff > timedelta(0):
+                return diff
+        if index > 0:
+            diff = self.starts.iloc[index] - self.starts.iloc[index - 1]
+            if diff > timedelta(0):
+                return diff
+        return self.step
+
+    def _offset_for(self, index: int, fraction: float) -> pd.Timedelta:
+        seconds = self.slot_duration(index).total_seconds() * fraction
+        return pd.to_timedelta(seconds, unit="s")
 
     def at(self, index_slice, fraction: float) -> pd.Series:
-        """Zeitpunkt = Slotbeginn + ``fraction`` × ``step`` (0=Beginn, 0.5=Mitte, 1=Ende)."""
+        """Zeitpunkt = Slotbeginn + ``fraction`` × Slotdauer (0=Beginn, 0.5=Mitte, 1=Ende)."""
         if isinstance(index_slice, int):
-            times = pd.Series([self.starts.iloc[index_slice]])
-        else:
-            times = self.starts.iloc[index_slice].reset_index(drop=True)
-        return times + self._offset(fraction)
+            return pd.Series([self.starts.iloc[index_slice] + self._offset_for(index_slice, fraction)])
+        indices = list(range(len(self.starts)))
+        times = [
+            self.starts.iloc[i] + self._offset_for(i, fraction)
+            for i in indices
+        ]
+        return pd.Series(times)
 
     def legacy_index_time(self, index: float) -> datetime:
         """
         Altes Index-X (Slot k zentriert bei x=k, Bereich ±0.5) → Zeitstempel.
 
         Index −0.5 = ``starts[0]``; Index 0 = Slotmitte; Index k−0.5 = ``starts[k]``.
+        Nutzt die echte Slot-Dauer je Zeile (gemischte 15-min/1-h-Auflösung).
         """
-        return self.starts.iloc[0] + self.step * (index + 0.5)
+        if len(self.starts) == 0:
+            raise ValueError("ChartSlotAxis.starts darf nicht leer sein.")
+        slot_idx = int(math.floor(index + 0.5))
+        if slot_idx < 0:
+            return self.starts.iloc[0].to_pydatetime()
+        if slot_idx >= len(self.starts):
+            last = len(self.starts) - 1
+            within = index - (last - 0.5)
+            duration = self.slot_duration(last)
+            return (self.starts.iloc[last] + duration * within).to_pydatetime()
+        within = index - (slot_idx - 0.5)
+        duration = self.slot_duration(slot_idx)
+        return (self.starts.iloc[slot_idx] + duration * within).to_pydatetime()
 
-    def bar_width_ms(self, width_fraction: float) -> float:
+    def bar_width_ms(self, width_fraction: float, index: int | None = None) -> float:
         """Plotly ``go.Bar``-Breite auf Datumsachse (Millisekunden)."""
-        return self.step.total_seconds() * 1000.0 * width_fraction
+        duration = self.slot_duration(index) if index is not None else self.step
+        return duration.total_seconds() * 1000.0 * width_fraction
 
-    def x_range(self) -> list[datetime]:
-        """Sichtbarer X-Bereich inkl. halber Slot-Ränder (wie früher [-0.5, n-0.5])."""
+    def x_range(self, *, range_start: datetime | None = None) -> list[datetime]:
+        """Sichtbarer X-Bereich; ``range_start`` = SA₀/SA₁-Fensteranfang (Spec §4)."""
+        left = self.legacy_index_time(-0.5)
+        if range_start is not None:
+            anchor = pd.Timestamp(range_start)
+            if anchor > left:
+                left = anchor.to_pydatetime()
         return [
-            self.legacy_index_time(-0.5),
+            left,
             self.legacy_index_time(len(self.starts) - 0.5),
         ]
 
@@ -303,52 +337,118 @@ def build_sun_markers(
         now_x = _slot_time_in_chart(slots, now)
     sunrise_x = _slot_time_in_chart(slots, chart.sa1)
     sa2_x = _slot_time_in_chart(slots, chart.sa2)
-    sunset_xs: list[datetime] = []
-    if planning_window is not None:
-        for moment in (planning_window.sunset_1, planning_window.sunset_2):
-            sx = _slot_time_in_chart(slots, moment)
-            if sx is not None:
-                sunset_xs.append(sx)
     marker_sunrise = sunrise_x if chart.segment_index == 0 else sa2_x
     return ChartSunMarkers(
         now_x=now_x,
         sunrise_x=marker_sunrise,
-        sunset_xs=tuple(sunset_xs),
+        sunset_xs=(),
     )
+
+
+def _axis_x_bounds(
+    axis: ChartSlotAxis,
+    *,
+    range_start: datetime | None = None,
+) -> tuple[datetime, datetime]:
+    """Linker/rechter X-Achsenrand (inkl. ``range_start`` = SA₀/SA₁)."""
+    return tuple(axis.x_range(range_start=range_start))  # type: ignore[return-value]
+
+
+def _zone_slot_left(axis: ChartSlotAxis, index: int) -> datetime:
+    return axis.legacy_index_time(index - 0.5)
+
+
+def _zone_slot_right(axis: ChartSlotAxis, index: int) -> datetime:
+    return axis.legacy_index_time(index + 0.5)
+
+
+def _slot_index_at_or_after(axis: ChartSlotAxis, moment: datetime) -> int | None:
+    for index, slot in enumerate(axis.starts):
+        if slot >= moment:
+            return index
+    return None
+
+
+def _zone_right_edge(axis: ChartSlotAxis, moment: datetime) -> datetime:
+    """Rechter Rand des letzten Slots mit Beginn strikt vor ``moment``."""
+    history_end_idx = _slot_index_before(axis, moment)
+    if history_end_idx < 0:
+        return moment
+    return _zone_slot_right(axis, history_end_idx)
+
+
+def _zone_left_edge(axis: ChartSlotAxis, moment: datetime) -> datetime:
+    """Linker Rand des ersten Slots mit Beginn >= ``moment``."""
+    index = _slot_index_at_or_after(axis, moment)
+    if index is None:
+        last = len(axis.starts) - 1
+        if last < 0:
+            raise ValueError("ChartSlotAxis.starts darf nicht leer sein.")
+        return _zone_slot_right(axis, last)
+    return _zone_slot_left(axis, index)
+
+
+def _history_zone_x1(
+    axis: ChartSlotAxis,
+    history_end: datetime,
+    *,
+    x_right: datetime,
+    fill_to_axis_end: bool,
+) -> datetime:
+    """Rechter Grauzonen-Rand: bis History-Grenze oder voller Achsenrand."""
+    if fill_to_axis_end:
+        return x_right
+    return _zone_right_edge(axis, history_end)
+
+
+def _forecast_zone_x0(
+    axis: ChartSlotAxis,
+    forecast_start: datetime,
+    x_left: datetime,
+) -> datetime:
+    """Linker Grünzonen-Rand: ab ``forecast_start``, mindestens ``x_left``."""
+    for index, slot in enumerate(axis.starts):
+        if slot == forecast_start:
+            return max(_zone_slot_left(axis, index), x_left)
+    return max(forecast_start, x_left)
 
 
 def _add_zone_backgrounds(
     fig: go.Figure,
     zones,
     axis: ChartSlotAxis,
+    *,
+    range_start: datetime | None = None,
 ) -> None:
-    last_idx = len(axis.starts) - 1
-    history_end_idx = _slot_index_before(axis, zones.history.end)
+    x_left, x_right = _axis_x_bounds(axis, range_start=range_start)
+    history_fills_axis = (
+        zones.history.fill_color is not None
+        and zones.forecast.fill_color is None
+        and zones.live_plan.end <= zones.history.end
+    )
     if (
-        history_end_idx >= 0
-        and zones.history.fill_color
+        zones.history.fill_color
         and zones.history.end > zones.history.start
     ):
         fig.add_vrect(
-            x0=axis.legacy_index_time(-0.5),
-            x1=axis.legacy_index_time(history_end_idx + 0.5),
+            x0=x_left,
+            x1=_history_zone_x1(
+                axis,
+                zones.history.end,
+                x_right=x_right,
+                fill_to_axis_end=history_fills_axis,
+            ),
             fillcolor=zones.history.fill_color,
             line_width=0,
             layer="below",
         )
-    green_start_idx = None
-    for index, slot in enumerate(axis.starts):
-        if slot >= zones.forecast.start:
-            green_start_idx = index
-            break
     if (
-        green_start_idx is not None
-        and zones.forecast.fill_color
+        zones.forecast.fill_color
         and zones.forecast.end > zones.forecast.start
     ):
         fig.add_vrect(
-            x0=axis.legacy_index_time(green_start_idx - 0.5),
-            x1=axis.legacy_index_time(last_idx + 0.5),
+            x0=_forecast_zone_x0(axis, zones.forecast.start, x_left),
+            x1=x_right,
             fillcolor=zones.forecast.fill_color,
             line_width=0,
             layer="below",
@@ -388,13 +488,6 @@ def _add_sun_markers(fig: go.Figure, markers: ChartSunMarkers) -> None:
             line=dict(color=_MARKER_SUNRISE_COLOR, width=1.5),
             annotation_text="SA (SOC)",
             annotation_position="top",
-        )
-    for index, sx in enumerate(markers.sunset_xs):
-        fig.add_vline(
-            x=sx,
-            line=dict(color=_MARKER_SUNSET_COLOR, width=1, dash="dash"),
-            annotation_text="SU" if index == 0 else "SU₂",
-            annotation_position="bottom",
         )
 
 
@@ -589,6 +682,110 @@ def _trace_segments(
     return segments
 
 
+def _bar_widths_ms(
+    axis: ChartSlotAxis,
+    start: int,
+    end: int,
+    width_fraction: float,
+) -> list[float]:
+    return [
+        axis.bar_width_ms(width_fraction, index)
+        for index in range(start, end)
+    ]
+
+
+def _hour_prices_from_df(df: pd.DataFrame) -> list[tuple[datetime, float]]:
+    """Ein Preis pro volle Stunde (chronologisch), bevorzugt Wert am Stunden-Slot."""
+    by_hour: dict[datetime, float] = {}
+    for _, row in df.iterrows():
+        slot = pd.Timestamp(row["slot_datetime"]).to_pydatetime()
+        hour = normalize_hour_slot(slot)
+        price = _optional_float(row.get("Strompreis (Cent/kWh)"))
+        if price is None:
+            continue
+        if slot == hour or hour not in by_hour:
+            by_hour[hour] = price
+    ordered: list[tuple[datetime, float]] = []
+    seen: set[datetime] = set()
+    for _, row in df.iterrows():
+        hour = normalize_hour_slot(pd.Timestamp(row["slot_datetime"]).to_pydatetime())
+        if hour in seen or hour not in by_hour:
+            continue
+        seen.add(hour)
+        ordered.append((hour, by_hour[hour]))
+    return ordered
+
+
+def _slot_indices_for_hour(axis: ChartSlotAxis, hour: datetime) -> list[int]:
+    indices: list[int] = []
+    for index in range(len(axis.starts)):
+        slot = axis.starts.iloc[index].to_pydatetime()
+        if normalize_hour_slot(slot) == hour:
+            indices.append(index)
+    return indices
+
+
+def _hourly_price_hv_xy(
+    axis: ChartSlotAxis,
+    df: pd.DataFrame,
+) -> tuple[pd.Series, pd.Series]:
+    """
+    Preis-Treppe mit Stufen nur an Stundengrenzen (Spec: stündlicher Marktpreis).
+
+    Bei gemischter 15-min/1-h-Achse spannt jede Stufe die volle Stundenbreite auf der Achse.
+    """
+    hour_prices = _hour_prices_from_df(df)
+    if not hour_prices:
+        return pd.Series(dtype="datetime64[ns, UTC]"), pd.Series(dtype=float)
+    points_x: list[datetime] = []
+    points_y: list[float] = []
+    for hour, price in hour_prices:
+        indices = _slot_indices_for_hour(axis, hour)
+        if not indices:
+            continue
+        x_left = _zone_slot_left(axis, indices[0])
+        x_right = _zone_slot_right(axis, indices[-1])
+        if not points_x:
+            points_x.extend([x_left, x_right])
+            points_y.extend([price, price])
+            continue
+        if x_left != points_x[-1]:
+            points_x.append(x_left)
+            points_y.append(points_y[-1])
+        if price != points_y[-1]:
+            points_x.append(x_left)
+            points_y.append(price)
+        points_x.append(x_right)
+        points_y.append(price)
+    tail_x = axis.legacy_index_time(len(axis.starts) - 0.5)
+    if points_x and points_x[-1] < tail_x:
+        points_x.append(tail_x)
+        points_y.append(points_y[-1])
+    return pd.Series(points_x, dtype="datetime64[ns, UTC]"), pd.Series(points_y, dtype=float)
+
+
+def _hourly_price_hover_labels(
+    df: pd.DataFrame,
+    line_x: pd.Series,
+) -> list[str]:
+    """Hover-Uhrzeit je Punkt entlang der stündlichen Preis-Treppe."""
+    hour_prices = _hour_prices_from_df(df)
+    if not hour_prices or line_x.empty:
+        return []
+    labels: list[str] = []
+    hour_idx = 0
+    for x in line_x:
+        x_ts = pd.Timestamp(x)
+        while hour_idx + 1 < len(hour_prices):
+            _hour, _ = hour_prices[hour_idx + 1]
+            if x_ts >= pd.Timestamp(_hour):
+                hour_idx += 1
+            else:
+                break
+        labels.append(hour_prices[hour_idx][0].strftime("%d.%m. %H:%M"))
+    return labels
+
+
 def _segment_opacity(base_opacity: float, is_extrapolated: bool) -> float:
     if is_extrapolated:
         return base_opacity * _EXTRAPOLATED_TRACE_OPACITY
@@ -622,6 +819,7 @@ def _segment_linear_connected_line_xy(
     tail_y: float | None = None,
     *,
     anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
+    bridge_left: bool = True,
 ) -> tuple[pd.Series, pd.Series]:
     """
     Stückweise lineare Verbindung ohne Stufen an Segmentgrenzen.
@@ -635,7 +833,7 @@ def _segment_linear_connected_line_xy(
     points_x: list[datetime] = []
     points_y: list[float] = []
 
-    if start > 0 and start - 1 < len(y):
+    if bridge_left and start > 0 and start - 1 < len(y):
         points_x.append(axis.at(start - 1, anchor_fraction).iloc[0])
         points_y.append(_line_plot_float(y.iloc[start - 1]))
 
@@ -661,6 +859,7 @@ def _segment_connected_line_xy(
     *,
     step_line: bool = True,
     anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
+    bridge_left: bool = True,
 ) -> tuple[pd.Series, pd.Series]:
     """
     Linienabschnitt inkl. Brückenpunkt an der linken Grenze.
@@ -670,7 +869,8 @@ def _segment_connected_line_xy(
     """
     if not step_line:
         return _segment_linear_connected_line_xy(
-            axis, y, start, end, tail_y=tail_y, anchor_fraction=anchor_fraction
+            axis, y, start, end, tail_y=tail_y,
+            anchor_fraction=anchor_fraction, bridge_left=bridge_left,
         )
 
     if start >= end:
@@ -816,7 +1016,7 @@ def _add_pv_trace(
     ))
 
 
-def _chart_xaxis_config(axis: ChartSlotAxis) -> dict:
+def _chart_xaxis_config(axis: ChartSlotAxis, *, range_start: datetime | None = None) -> dict:
     step_minutes = axis.step.total_seconds() / 60.0
     if step_minutes >= 60:
         dtick = 3600000 * 4
@@ -824,7 +1024,7 @@ def _chart_xaxis_config(axis: ChartSlotAxis) -> dict:
     else:
         dtick = 3600000
         axis_title = "Uhrzeit (15-Min-Slots)"
-    x0, x1 = axis.x_range()
+    x0, x1 = axis.x_range(range_start=range_start)
     return dict(
         title=axis_title,
         type="date",
@@ -876,8 +1076,6 @@ def add_power_traces(
         else _BATTERY_BAR_WIDTH_FRACTION
     )
     consumer_colors = _consumer_bar_palette(consumer_count)
-    battery_width_ms = axis.bar_width_ms(_BATTERY_BAR_WIDTH_FRACTION)
-    consumer_width_ms = axis.bar_width_ms(consumer_bar_width)
     if "PV-Prognose (kW)" in df.columns:
         _add_pv_trace(fig, axis, df["PV-Prognose (kW)"], uhrzeit)
 
@@ -918,7 +1116,7 @@ def add_power_traces(
             showlegend=seg_index == 0,
             marker=dict(color=bar_colors[start:end]),
             opacity=_segment_opacity(0.75, is_extrapolated),
-            width=battery_width_ms,
+            width=_bar_widths_ms(axis, start, end, _BATTERY_BAR_WIDTH_FRACTION),
             yaxis="y",
             customdata=uhrzeit.iloc[start:end],
             hovertemplate=(
@@ -968,7 +1166,7 @@ def add_power_traces(
                     pattern_shapes,
                     opacity,
                 ),
-                width=consumer_width_ms,
+                width=_bar_widths_ms(axis, start, end, consumer_bar_width),
                 yaxis="y",
                 customdata=list(zip(segment["Uhrzeit"], hover_pv, hover_imm)),
                 hovertemplate=(
@@ -987,42 +1185,70 @@ def add_optimized_soc_trace(
     yaxis: str = "y2",
     extrap_start: int | None = None,
     extrap_end: int | None = None,
+    history_slot_count: int | None = None,
 ) -> None:
     uhrzeit = df["Uhrzeit"]
-    segments = _trace_segments(len(df), extrap_start, extrap_end)
+    length = len(df)
     soc = df["Simulierter SoC (%)"]
     tail_y = _soc_tail_y_from_row(df.iloc[-1]) if not df.empty else None
-    for index, (start, end, is_extrapolated) in enumerate(segments):
-        if start >= end:
-            continue
-        seg_tail = tail_y if end == len(axis.starts) else None
-        soc_x, soc_y = _segment_connected_line_xy(
-            axis, soc, start, end, tail_y=seg_tail, step_line=False
+
+    split_points: list[tuple[int, int]] = []
+    if history_slot_count is not None and 0 < history_slot_count < length:
+        split_points = [(0, history_slot_count), (history_slot_count, length)]
+    else:
+        split_points = [(0, length)]
+
+    for part_start, part_end in split_points:
+        part_extrap_start: int | None = None
+        part_extrap_end: int | None = None
+        if extrap_start is not None and extrap_end is not None:
+            abs_extrap_start = max(extrap_start, part_start)
+            abs_extrap_end = min(extrap_end, part_end)
+            if abs_extrap_start < abs_extrap_end:
+                part_extrap_start = abs_extrap_start - part_start
+                part_extrap_end = abs_extrap_end - part_start
+        segments = _trace_segments(
+            part_end - part_start, part_extrap_start, part_extrap_end
         )
-        if soc_x.empty:
-            continue
-        fig.add_trace(go.Scatter(
-            x=soc_x,
-            y=soc_y,
-            name="SoC" if index == 0 else "SoC",
-            showlegend=index == 0,
-            mode="lines",
-            line=dict(color=_COLOR_OPTIMIZED, width=2.5),
-            opacity=_segment_opacity(1.0, is_extrapolated),
-            yaxis=yaxis,
-            connectgaps=False,
-            customdata=_segment_hover_labels(
-                uhrzeit,
-                start,
-                end,
-                step_line=False,
-                point_count=len(soc_x),
-            ),
-            hovertemplate=(
-                "Uhrzeit: %{customdata}<br>%{fullData.name}: "
-                "%{y:.1f}<extra></extra>"
-            ),
-        ))
+        for index, (start, end, is_extrapolated) in enumerate(segments):
+            abs_start = part_start + start
+            abs_end = part_start + end
+            if abs_start >= abs_end:
+                continue
+            seg_tail = tail_y if abs_end == length else None
+            bridge_left = not (
+                history_slot_count is not None
+                and abs_start >= history_slot_count
+            )
+            soc_x, soc_y = _segment_connected_line_xy(
+                axis, soc, abs_start, abs_end, tail_y=seg_tail,
+                step_line=False, bridge_left=bridge_left,
+            )
+            if soc_x.empty:
+                continue
+            show_legend = part_start == 0 and index == 0
+            fig.add_trace(go.Scatter(
+                x=soc_x,
+                y=soc_y,
+                name="SoC",
+                showlegend=show_legend,
+                mode="lines",
+                line=dict(color=_COLOR_OPTIMIZED, width=2.5),
+                opacity=_segment_opacity(1.0, is_extrapolated),
+                yaxis=yaxis,
+                connectgaps=False,
+                customdata=_segment_hover_labels(
+                    uhrzeit,
+                    abs_start,
+                    abs_end,
+                    step_line=False,
+                    point_count=len(soc_x),
+                ),
+                hovertemplate=(
+                    "Uhrzeit: %{customdata}<br>%{fullData.name}: "
+                    "%{y:.1f}<extra></extra>"
+                ),
+            ))
 
 
 def add_baseline_soc_traces(
@@ -1084,26 +1310,47 @@ def add_price_on_soc_axis_trace(
     extrap_start: int | None = None,
     extrap_end: int | None = None,
 ) -> None:
-    """Strompreis 1:1 auf der SoC-Achse (Cent/kWh = %), Hover zeigt Cent/kWh."""
-    uhrzeit = df["Uhrzeit"]
-    price_cent = df["Strompreis (Cent/kWh)"]
+    """Strompreis auf der SoC-Achse — stündliche Stufen, an Slot-Rändern ausgerichtet."""
     segments = _trace_segments(len(df), extrap_start, extrap_end)
-    _add_segmented_hv_line(
-        fig,
-        axis,
-        price_cent,
-        uhrzeit,
-        segments,
-        name="Preis",
-        line_kwargs=dict(color="red", width=2.5, shape="hv"),
-        yaxis=yaxis,
-        extrapolated_dotted=True,
-        custom_hover_values=price_cent,
-        hover_template=(
-            "Uhrzeit: %{text}<br>Preis: %{customdata:.2f} Cent/kWh"
-            "<extra></extra>"
-        ),
-    )
+    for index, (start, end, is_extrapolated) in enumerate(segments):
+        if start >= end:
+            continue
+        segment_df = df.iloc[start:end]
+        segment_axis = axis.slice(start, end)
+        line_x, line_y = _hourly_price_hv_xy(segment_axis, segment_df)
+        if line_x.empty:
+            continue
+        hour_prices = _hour_prices_from_df(segment_df)
+        customdata: list[float] = []
+        hour_idx = 0
+        for x in line_x:
+            x_ts = pd.Timestamp(x)
+            while hour_idx + 1 < len(hour_prices):
+                next_hour = hour_prices[hour_idx + 1][0]
+                if x_ts >= pd.Timestamp(next_hour):
+                    hour_idx += 1
+                else:
+                    break
+            customdata.append(hour_prices[hour_idx][1])
+        line = dict(color="red", width=2.5, shape="hv")
+        if is_extrapolated:
+            line["dash"] = "dot"
+        fig.add_trace(go.Scatter(
+            x=line_x,
+            y=line_y,
+            name="Preis" if index == 0 else "Preis",
+            showlegend=index == 0,
+            mode="lines",
+            line=line,
+            opacity=1.0,
+            yaxis=yaxis,
+            text=_hourly_price_hover_labels(segment_df, line_x),
+            customdata=customdata,
+            hovertemplate=(
+                "Uhrzeit: %{text}<br>Preis: %{customdata:.2f} Cent/kWh"
+                "<extra></extra>"
+            ),
+        ))
 
 
 def _hourly_cumsum_for_chart(
@@ -1294,6 +1541,13 @@ def _add_cost_summary_annotations(
         fig.add_annotation(**annotation)
 
 
+def _chart_range_start(chart_window: UiChartWindow | None) -> datetime | None:
+    """Linker X-Rand = Fensteranfang SA₀ bzw. SA₁ (Spec ui-sunset2sunset §4)."""
+    if chart_window is None:
+        return None
+    return chart_window.start
+
+
 def render_power_soc_chart(
     df: pd.DataFrame,
     baseline_df: pd.DataFrame | None = None,
@@ -1307,21 +1561,24 @@ def render_power_soc_chart(
     chart_zones=None,
     sun_markers: ChartSunMarkers | None = None,
     slot_qualities: tuple[str, ...] | None = None,
+    history_slot_count: int | None = None,
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
     plot_df = _mask_missing_log_slots(df, slot_qualities)
     bar_colors = get_bar_colors(plot_df)
     axis = ChartSlotAxis.from_dataframe(plot_df)
     extrap_start, extrap_end = _extrapolation_bounds(plot_df)
+    range_start = _chart_range_start(chart_window)
     fig = go.Figure()
 
     if chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_zones, axis)
+        _add_zone_backgrounds(fig, chart_zones, axis, range_start=range_start)
     _add_missing_slot_backgrounds(fig, axis, slot_qualities)
 
     add_power_traces(fig, plot_df, bar_colors, axis, extrap_start, extrap_end)
     add_optimized_soc_trace(
-        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
+        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
+        history_slot_count=history_slot_count,
     )
     if show_baseline_soc:
         add_baseline_soc_traces(
@@ -1344,7 +1601,7 @@ def render_power_soc_chart(
     )
     fig.update_layout(
         title=chart_title or default_title,
-        xaxis=_chart_xaxis_config(axis),
+        xaxis=_chart_xaxis_config(axis, range_start=range_start),
         barmode="overlay",
         yaxis=dict(title="Leistung (kW)", side="left"),
         yaxis2=dict(
@@ -1426,9 +1683,10 @@ def render_cumulative_cost_chart(
     """Kumulierte Stromkosten und Verbrauch BL Ziel vs. optimiert."""
     axis = ChartSlotAxis.from_dataframe(df)
     extrap_start, extrap_end = _extrapolation_bounds(df)
+    range_start = _chart_range_start(chart_window)
     fig = go.Figure()
     if chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_zones, axis)
+        _add_zone_backgrounds(fig, chart_zones, axis, range_start=range_start)
     _add_missing_slot_backgrounds(fig, axis, slot_qualities)
     has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
     has_consumption = bool(
@@ -1473,7 +1731,7 @@ def render_cumulative_cost_chart(
             if chart_window is not None
             else "Kumulierte Kosten & Verbrauch"
         ),
-        xaxis=_chart_xaxis_config(axis),
+        xaxis=_chart_xaxis_config(axis, range_start=range_start),
         yaxis=dict(title="Kosten (€, kumuliert)"),
         legend=_chart_legend(),
         margin=dict(l=40, r=40, t=50, b=110),
@@ -1640,6 +1898,7 @@ def render_optimization_chart(
     chart_zones=None,
     sun_markers: ChartSunMarkers | None = None,
     slot_qualities: tuple[str, ...] | None = None,
+    history_slot_count: int | None = None,
 ) -> None:
     """Zeichnet Leistung/SoC/Preis und kumulierte Kosten/Verbrauch in zwei Charts."""
     render_power_soc_chart(
@@ -1651,6 +1910,7 @@ def render_optimization_chart(
         chart_zones=chart_zones,
         sun_markers=sun_markers,
         slot_qualities=slot_qualities,
+        history_slot_count=history_slot_count,
         chart_key="live_power_soc_chart",
     )
     render_price_savings_chart(

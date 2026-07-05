@@ -113,7 +113,12 @@ def build_live_chart_context(
     is_live_segment = cycle_offset == 0 and segment_index == 0
     reference = moment if is_live_segment else chart.end
     zone_now = moment if is_live_segment else chart.end
-    zones = ui_chart_zones(zone_now, chart, sim_rows=sim_rows)
+    zones = ui_chart_zones(
+        zone_now,
+        chart,
+        sim_rows=sim_rows,
+        is_live_segment=is_live_segment,
+    )
     return LiveChartContext(
         now=moment,
         chart_window=chart,

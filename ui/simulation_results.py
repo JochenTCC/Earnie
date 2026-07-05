@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 
 import config
+from data.planning_window import ui_chart_zones
 from optimizer.targets import consumer_column_name
 from runtime_store import live_optimization_debug
 from runtime_store import optimization_history
@@ -310,6 +311,7 @@ def render_optimization_results(
     table_gap_notice: str | None = None
     chart_qualities: tuple[str, ...] | None = None
     sun_markers = None
+    chart_zones = chart_context.zones if chart_context else None
     merge_active = False
     history_slot_count: int | None = None
     if chart_context is not None and optimization_matrix is not None:
@@ -322,6 +324,21 @@ def render_optimization_results(
         display_ctx = build_chart_display_context(
             chart_context,
             optimized_df.to_dict("records"),
+        )
+        is_live_segment = (
+            chart_context.cycle_offset == 0 and chart_context.segment_index == 0
+        )
+        zone_now = (
+            chart_context.now
+            if is_live_segment
+            else chart_context.chart_window.end
+        )
+        chart_zones = ui_chart_zones(
+            zone_now,
+            chart_context.chart_window,
+            sim_rows=optimized_df.to_dict("records"),
+            is_live_segment=is_live_segment,
+            slot_datetimes=display_ctx.slot_datetimes,
         )
         savings_view = build_display_savings_series(
             display_ctx,
@@ -385,9 +402,10 @@ def render_optimization_results(
         optimized_cost_euro=optimized_cost,
         chart_window=chart_context.chart_window if chart_context else None,
         chart_now=chart_context.zone_reference if chart_context else None,
-        chart_zones=chart_context.zones if chart_context else None,
+        chart_zones=chart_zones,
         sun_markers=sun_markers,
         slot_qualities=chart_qualities,
+        history_slot_count=history_slot_count,
     )
     if simulation_table_title:
         table_title = simulation_table_title

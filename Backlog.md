@@ -6,13 +6,10 @@
 
 - [ ] **UI Sunset-2-Sunset (Spec v0.6.1)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Offene UI-Bugs (Priorität, Stand Analyse 2026-07-04):**
-    1. **Grauzone endet vor X-Achsen-Rand (Zyklus vor SA₀)** — bei `cycle_offset > 0` (zeitlich vor aktuellem SA₀): graue Vergangenheits-Hinterlegung reicht rechts nicht bis zum Ende der X-Achse; vermutlich `_add_zone_backgrounds` / `legacy_index_time` vs. gemischte Display-Slots oder `zones.history.end` vs. `chart.end` in `ui/charts.py`, `data/planning_window.py` (`ui_chart_zones`).
-    2. **15-Min → 1h Prognose-Übergang** — Spec §6; Daten in `ui/chart_context.py` (`_milp_tail_rows`) weitgehend ok; Darstellung: `ChartSlotAxis` nimmt uniformen `step` → Zonen/vrect/SOC an Grenze 14:45→15:00 falsch; Zonen auf stündlichen `chart.slot_datetimes`, Chart auf gemischten `display_ctx.slot_datetimes`. Fix: vrect/Marker per echtem Zeitstempel; Zonen auf Display-Slots; optional variable Slot-Schrittweite (Überschneidung mit 1.).
-    3. **SOC-Sprünge ohne Orange** — Spec §6: fehlende Log-Slots = orange + Lücke. Ursachen: Achsen-Bug (2.), stille Abschaltung wenn `len(slot_qualities) != len(df)`, Log/MILP-Grenze (kein Missing, aber visueller Sprung), SoC-Linie verbindet über Segmentgrenze. Fix: nach (2.); SoC-Trace an `history_slot_count` splitten (Phase 3); Tests für Orange Chart+Tabelle.
-    4. **SU-Marker entfernen** — kosmetisch; `ui/charts.py` `build_sun_markers` / `_add_sun_markers` (SU₁/SU₂ aus MILP); SA- und Jetzt-Marker behalten.
+  - **Offener UI-Bug (Stand 2026-07-05):**
+    - **SOC-Sprünge ohne Orange** — Spec §6: fehlende Log-Slots = orange + Lücke. Noch offen: Orange-Markierung in Chart und Tabelle; SoC-Lücke an Log/MILP-Grenze (`history_slot_count`-Split unvollständig); stille Abschaltung bei `len(slot_qualities) != len(df)`. Zusätzlich: **Chartlinien (Preis, Verbrauch, SoC, kum. Kosten/Verbrauch) werden teilweise nicht bis zum rechten X-Achsen-Rand gezeichnet.**
   - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen. Zeithorizont für Verbrauchs-Vergleich zur History noch klären.
-  - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (`test_planning_window`, Navigation, gemischte Auflösung) — siehe nummerierte Bugs oben
+  - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (Navigation, Orange Chart+Tabelle, Linien bis Achsenrand) — siehe offener UI-Bug oben
   - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
 - [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; Phase 2 des UI-Epics erledigt)
   - Abweichungsmarkierung nach bestimmten Regeln (noch zu definieren -aber bspw. "HINWEIS" (gelbes Dreieck), wenn geheizt werden darf, aber es nicht nötig war - oder "FEHLER" (Rotes Stopschild), wenn E-Auto nicht geladen hat, obwohl es sollte (und es noch nicht voll sein kann))
@@ -80,6 +77,13 @@ bodentemperaturen_nach_monat = {
 - [ ] Generisches E-Auto-Modell - für bessere Wiederverwendbarkeit
 
 ## Erledigte Punkte
+
+### UI Sunset-2-Sunset — Chart-Darstellung (2026-07-05)
+
+- [x] **Grau-/Grünzone an X-Achsen-Rändern** — variable Slot-Dauer in `ChartSlotAxis`; Zonen auf Display-Slots (`ui/simulation_results.py`); Fensterrand SA₀/SA₁ via `x_range(range_start=chart.start)`; volle Grauzone bei Vergangenheits-Zyklen (`is_live_segment=False`)
+- [x] **15-Min → 1-h gemischte Achse** — Preis stündliche HV-Treppe an Slot-Grenzen; Balkenbreite pro Slot (`_bar_widths_ms`); Zonen/vrect auf `display_ctx.slot_datetimes`
+- [x] **SU-Marker entfernt** — nur noch Jetzt + SA (SOC)
+- [x] **Tests:** `tests/test_chart_ui_bugs.py`, `tests/test_chart_mixed_resolution_traces.py`
 
 ### UI Sunset-2-Sunset — Navigation SA-Zyklen (2026-07-04)
 

@@ -449,20 +449,30 @@ def _ui_chart_zones_sa0_sa1(
     now: datetime,
     chart: UiChartWindow,
     sim_rows: list[dict] | None,
+    *,
+    is_live_segment: bool,
+    slot_datetimes: tuple[datetime, ...],
 ) -> UiChartZones:
     """Segment SA₀→SA₁: grau / neutral / grün (Vergangenheit ab SA₀)."""
-    gray_end = history_boundary_exclusive(now)
-    extrapolated = first_extrapolated_slot(chart.slot_datetimes, sim_rows)
+    gray_color = "rgba(128, 128, 128, 0.18)"
+    if is_live_segment:
+        gray_end = history_boundary_exclusive(now)
+    else:
+        gray_end = chart.end + timedelta(hours=1)
+    extrapolated = first_extrapolated_slot(slot_datetimes, sim_rows)
     green_color = "rgba(76, 175, 80, 0.15)"
-    if extrapolated is not None:
+    if is_live_segment and extrapolated is not None:
         green_start = extrapolated
     else:
         green_start = chart.end
         green_color = None
     neutral_end = _clip_zone_end(chart.start, chart.end, green_start)
-    history_end = _clip_zone_end(chart.start, chart.end, gray_end)
-    if history_end < chart.start:
-        history_end = chart.start
+    if is_live_segment:
+        history_end = _clip_zone_end(chart.start, chart.end, gray_end)
+        if history_end < chart.start:
+            history_end = chart.start
+    else:
+        history_end = gray_end
     if neutral_end < history_end:
         neutral_end = history_end
     if green_start < neutral_end:
@@ -472,7 +482,7 @@ def _ui_chart_zones_sa0_sa1(
             label="Vergangenheit",
             start=chart.start,
             end=history_end,
-            fill_color="rgba(128, 128, 128, 0.18)",
+            fill_color=gray_color if history_end > chart.start else None,
         ),
         live_plan=UiChartZone(
             label="Aktuell/Plan",
@@ -492,9 +502,11 @@ def _ui_chart_zones_sa0_sa1(
 def _ui_chart_zones_sa1_sa2(
     chart: UiChartWindow,
     sim_rows: list[dict] | None,
+    *,
+    slot_datetimes: tuple[datetime, ...],
 ) -> UiChartZones:
     """Segment SA₁→SA₂: nur neutral und grün (keine Vergangenheit)."""
-    extrapolated = first_extrapolated_slot(chart.slot_datetimes, sim_rows)
+    extrapolated = first_extrapolated_slot(slot_datetimes, sim_rows)
     green_color = "rgba(76, 175, 80, 0.15)"
     if extrapolated is not None:
         green_start = extrapolated
@@ -530,18 +542,31 @@ def ui_chart_zones(
     now: datetime,
     chart: UiChartWindow,
     sim_rows: list[dict] | None = None,
+    *,
+    is_live_segment: bool = True,
+    slot_datetimes: tuple[datetime, ...] | None = None,
 ) -> UiChartZones:
     """
     Hintergrundzonen für den S-2-Chart.
 
     SA₀→SA₁: grau (Vergangenheit) · neutral · grün (extrapolierte Preise)
     SA₁→SA₂: neutral · grün (nur gespiegelte/extrapolierte Preise)
+
+    ``slot_datetimes``: Display-Slots (15-min/1-h gemischt); Default ``chart.slot_datetimes``.
+    ``is_live_segment``: False bei vergangenen SA-Zyklen (cycle_offset > 0) — volle Grauzone.
     """
     if now.tzinfo is None:
         raise ValueError("now muss timezone-aware sein.")
+    slots = slot_datetimes if slot_datetimes is not None else chart.slot_datetimes
     if chart.segment_index == 1:
-        return _ui_chart_zones_sa1_sa2(chart, sim_rows)
-    return _ui_chart_zones_sa0_sa1(now, chart, sim_rows)
+        return _ui_chart_zones_sa1_sa2(chart, sim_rows, slot_datetimes=slots)
+    return _ui_chart_zones_sa0_sa1(
+        now,
+        chart,
+        sim_rows,
+        is_live_segment=is_live_segment,
+        slot_datetimes=slots,
+    )
 
 
 def sunrise_anchor_slot_index(window: PlanningWindow) -> int:
