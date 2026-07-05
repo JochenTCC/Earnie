@@ -1,96 +1,89 @@
 # Charts & Panels
 
-Gilt primär für die Modi **Echtzeit** und **Historischer Tag** (gemeinsame Komponenten in `ui/simulation_results.py` und `ui/charts.py`). Der Modus **Backtesting** nutzt eigene Kosten- und Monatscharts.
+Gilt für den Produktiv-Modus **Sunset-2-Sunset** (`ui/simulation_results.py`, `ui/charts.py`, `ui/live_mode.py`). Der Modus **Backtesting** nutzt teils dieselben Chart-Komponenten, eigene Kosten- und Monatscharts.
 
-## Chart 1: 24-Stunden-Zeithorizont (Leistung, SoC & Preis)
+## Seitenaufbau (Sunset-2-Sunset)
+
+| Bereich | Inhalt |
+|---------|--------|
+| Kopf | Seitentitel, **Version** (Caption), **?** mit Modus-Scope (Sunset-2-Sunset / Backtesting) |
+| Sidebar | Betriebsparameter (PV, Batterie, Runtime) |
+| Charts | Chart 1 → Navigation ←/→ → Chart 2 |
+| Darunter | Simulations-Tabelle, Energievergleich (Expander) |
+| Sankey | Live-Energiefluss (Loxone) |
+| Footer | Trennlinie → **Datenbasis** (Expander, Log-Pfad) → Optimierungs-Takt / Countdown |
+
+Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdown + **?**); im Footer zusätzlich **?** beim nächsten main.py-Takt.
+
+## Chart 1: Leistung, SoC & Preis
+
+**Überschrift:** Segment-Label (z. B. „SA₀→SA₁ (Live) · Datumsbereich“) mit **?** (Hintergrundzonen grau/neutral/grün, Navigation).
 
 **Linke Y-Achse (kW):**
 
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
-| PV | Gelbe Linie | PV-Prognose |
-| Verbrauch | Blaue gestrichelte Linie | Grundlast-Prognose |
-| Batterie | Grün/rot Balken | Geplante Lade- (+) / Entladeleistung (−) |
-| Flexible Verbraucher | Farbige Balken | Geplante Leistung je Verbraucher (`flexible_consumers[].name`) |
+| PV | Gelbe Linie | PV-Prognose / Log-Ist |
+| Verbrauch | Blaue gestrichelte Linie | Grundlast |
+| Batterie | Grün/rot Balken | Lade- (+) / Entladeleistung (−) |
+| Flexible Verbraucher | Farbige Balken | Leistung je Verbraucher |
 
 **Rechte Y-Achse (0–100, skaliert):**
 
 | Spur | Bedeutung |
 |------|-----------|
-| SoC (optimiert) | Simulierter Batterie-SOC über 24 h |
-| SoC Baseline | SOC ohne Optimierung (historisches Profil) |
-| SoC BL Ziel | SOC bei gleicher Flex-Energie ohne Verschiebung |
-| Preis (rot) | Strompreis relativ skaliert; **Hover** zeigt Cent/kWh |
+| SoC (optimiert) | Simulierter Batterie-SOC |
+| SoC Baseline / BL Ziel | Referenz-SOC-Verläufe |
+| Preis (rot) | Strompreis skaliert; Hover: Cent/kWh |
 
-**Hinweise:**
+**Hintergrundzonen** (Details im **?** der Chart-1-Überschrift): grau = Vergangenheit (Log), neutral = laufende Stunde, grün = extrapolierte Preise bis Fensterrand.
 
-- Ohne Preis-Extrapolation: *„Preis rot auf der rechten Achse: relativ auf 0–100 skaliert (Hover zeigt Cent/kWh).“*
-- Wenn Zukunftspreise geschätzt werden: *„Ab {Stunde} bis {Stunde}: Strompreis geschätzt (Spiegelung gleicher Uhrzeit vom Vortag, gepunktete rote Linie). Übrige Verläufe (ohne PV) in diesem Bereich mit 50 % Transparenz.“*
+Vertikale Marker **SA₀**, **SA₁**, **SA₂**; **Jetzt** nur im Live-Segment SA₀→SA₁.
 
-Im **Echtzeit**-Modus kann unter den Charts erscheinen:
+## Navigation zwischen Chart 1 und Chart 2
 
-- Verbrauch der **aktuellen Stunde** aus `main.py` oder Loxone live
-- **SoC für Simulation** aus dem letzten Produktiv-Lauf
-- **Stunde 0 = Produktiv-Durchlauf** — übrige Stunden simuliert
+| Steuerung | Verhalten |
+|-----------|-----------|
+| ← Zurück | Weitere SA-Zyklen zurück im Produktiv-Log |
+| Vor → | SA₀→SA₁ ↔ SA₁→SA₂ bzw. einen Zyklus Richtung Live |
 
-Bei Wartezeit auf `main.py`: Countdown zur Synchronisation (ca. 1 Min. nach Viertelstunden-Wechsel).
+Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich).
 
 ## Chart 2: Kumulierte Kosten & Verbrauch
 
-Am Ende des 24-Stunden-Fensters (rechts am Kostenverlauf) werden die Gesamtwerte angezeigt:
+**Überschrift** mit **?** (Ist vs. Prognose, orange Lücken) — im S-2-Split-Modus getrennte Kurven:
 
-| Kennzahl | Bedeutung |
-|----------|-----------|
-| **BL Ziel** | Stromkosten mit skaliertem Profil, ohne Lastverschiebung |
-| **Optimiert** | Stromkosten mit MILP-Plan |
-| **Ersparnis** | Optimiert minus BL Ziel (negativ = günstiger, grün) |
+| Bereich | Kurven |
+|---------|--------|
+| Grau (Log) | **Ist bisher** — kumuliert aus Produktiv-Log |
+| Neutral/Grün | **Prognose** — BL Ziel / optimiert ab Log-Grenze (ohne Anschluss an Ist) |
 
-| Spur | Achse | Bedeutung |
-|------|-------|-----------|
-| BL Ziel (Kosten) | links, € kumuliert | Kosten mit skaliertem Profil |
-| Optimiert (Kosten) | links | Kosten mit Optimierung |
-| BL Ziel (Verbrauch) | rechts, kWh kumuliert | Gesamtverbrauch Grundlast + Flex |
-| Optimiert (Verbrauch) | rechts | Entsprechend optimiert |
+Fehlende Log-Slots: orange Markierung, Lücken in Ist-Kurven.
 
-Caption: *„Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert.“*
-
-## Expander: Energievergleich Baseline vs. Optimierung
-
-Tabelle je flexiblem Verbraucher:
-
-- **BL Profil:** historisches Flex-Profil (kWh)
-- **BL Ziel:** gleiche Energie wie Optimierung, ohne Verschiebung
-- **Optimierung:** geplante kWh (ggf. mit Quellenhinweis, z. B. `loxone`)
+Kennzahlen **BL Ziel**, **Optimiert**, **Ersparnis** beziehen sich auf den Horizont **Jetzt → SA₂** (nicht nur das sichtbare Chart-Segment).
 
 ## Expander: Simulations-Details
 
-Rohdaten-Tabelle aller Stundenslots — Grundlage für die Charts (Nachrechnen/Debug).
+Rohdaten-Tabelle aller Slots im sichtbaren S-2-Fenster (15-min Log + MILP); Spalte **Datenquelle**; orange Zeilen = fehlende Log-Einträge. Erklär-Markdown bleibt im Expander.
+
+## Expander: Energievergleich Baseline vs. Optimierung
+
+Tabelle je flexiblem Verbraucher über Horizont Jetzt→SA₂:
+
+- **BL Profil**, **BL Ziel**, **Optimierung** (kWh)
 
 ## Energiefluss (Live-Sankey)
 
-**Titel:** „Energiefluss (Live)“
+Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden.
 
-Sankey-Diagramm aus **aktuellen Loxone-Leistungswerten** (PV, Netz, Batterie, Grundlast, flexible Verbraucher). Aktualisierung ca. alle 10 Sekunden.
+## Footer
 
-**Produktiv-Overlay** aus `runtime/optimizer_run_state.json` (solange ein erfolgreicher Lauf vorliegt):
+| Element | Inhalt |
+|---------|--------|
+| **Datenbasis** | Expander: eingeklappt Produktiv-Log-Pfad; ausgeklappt Runtime, Merge-Pfad, Flex-Soll |
+| **Optimierungs-Takt** | Viertelstunden; letzter Lauf main.py/App |
+| **Nächster main.py-Takt** | Countdown + **?** (Sync-Erklärung) |
 
-- Kopfzeile: Zeitstempel, Modus, Ziel-Leistung und Ziel-SoC der Batterie
-- Knoten **Batterie**: Live-Leistung + Soll-Steuerbefehl
-- Knoten **flexible Verbraucher**: Live-kW vs. Soll-kW aus der Optimierung (Abweichung orange markiert). Ist-Leistung 0 bei Soll > 0: schmales oranges Platzhalter-Band (Breite ≠ Soll, Hover zeigt Soll).
+## Backtesting
 
-Ohne erfolgreichen Produktiv-Lauf: nur Live-Daten, Hinweis in der Kopfzeile.
-
-## Vergangene Optimierungen (Produktiv)
-
-Historie aus `runtime/optimization_history.jsonl` (plus Legacy-CSV falls vorhanden):
-
-- Filter: Zeitraum (24 h bis „Alles“)
-- Mini-Chart: SOC über die Zeit
-- Tabelle: Zeitpunkt, Modus, Zielwerte, Preis, Prognosen, Flex-Soll
-- Expander „Details zu einem Durchlauf“ für Einzelansicht
-
-## Countdown (Fußzeile)
-
-- **Optimierungs-Takt:** Viertelstunden (`:00` / `:15` / `:30` / `:45`)
-- **Letzter Lauf:** Zeitstempel von `main.py` oder App
-- **Nächster main.py-Takt** und **App-Sync** (ca. 1 Min. danach)
+Eigene Charts und Monatsauswertung aus `backtesting_log.json` — ohne S-2-Navigation und ohne Produktiv-Log-Merge.

@@ -21,6 +21,8 @@ from ui.chart_context import (
     align_rows_to_display_slots,
     build_chart_display_context,
     build_display_savings_series,
+    live_now,
+    s2_chart_header_label,
     savings_view_for_chart,
 )
 from ui.charts import (
@@ -29,6 +31,7 @@ from ui.charts import (
     render_optimization_chart,
 )
 from ui.simulation_table_view import render_frozen_simulation_table
+from ui.history_navigation import render_s2_nav_buttons, s2_zone_help_text
 
 logger = logging.getLogger("app")
 
@@ -210,7 +213,7 @@ def render_display_data_basis_expander(
     merge_active: bool,
     history_slot_count: int | None = None,
 ) -> None:
-    """Datenbasis-Hinweis vor Chart/Tabelle — eingeklappt nur Log-Pfad."""
+    """Datenbasis-Hinweis — eingeklappt nur Log-Pfad."""
     with st.expander(format_display_data_basis_path(log_source), expanded=False):
         st.markdown(
             format_display_data_basis_caption(
@@ -219,6 +222,30 @@ def render_display_data_basis_expander(
                 history_slot_count=history_slot_count,
             )
         )
+
+
+def _store_s2_data_basis_meta(
+    *,
+    merge_active: bool,
+    history_slot_count: int | None,
+) -> None:
+    st.session_state["s2_data_basis_meta"] = {
+        "merge_active": merge_active,
+        "history_slot_count": history_slot_count,
+    }
+
+
+def render_live_display_data_basis_expander() -> None:
+    """Datenbasis-Expander für Sunset-2-Sunset (nach Sankey in app.py)."""
+    meta = st.session_state.get("s2_data_basis_meta")
+    if meta is None:
+        return
+    log_source = optimization_history.describe_production_log_source()
+    render_display_data_basis_expander(
+        log_source,
+        merge_active=bool(meta["merge_active"]),
+        history_slot_count=meta.get("history_slot_count"),
+    )
 
 
 def _quality_at_row(row_index, frame_index: pd.Index, qualities: tuple[str, ...]) -> str:
@@ -371,17 +398,21 @@ def render_optimization_results(
             show_now=is_live_segment,
         )
 
-    log_source = None
     if chart_context is not None:
-        log_source = optimization_history.describe_production_log_source()
-
-    matched_cost, optimized_cost = _cost_totals_from_savings(savings_info)
-    if log_source is not None:
-        render_display_data_basis_expander(
-            log_source,
+        _store_s2_data_basis_meta(
             merge_active=merge_active,
             history_slot_count=history_slot_count,
         )
+
+    matched_cost, optimized_cost = _cost_totals_from_savings(savings_info)
+    chart_header_label = None
+    chart_header_help = None
+    if chart_context is not None:
+        chart_header_label = s2_chart_header_label(chart_context)
+        chart_header_help = s2_zone_help_text()
+    between_charts = None
+    if chart_context is not None:
+        between_charts = lambda: render_s2_nav_buttons(now=live_now())
     render_optimization_chart(
         display_df,
         baseline_df,
@@ -407,6 +438,9 @@ def render_optimization_results(
         history_slot_count=history_slot_count,
         slot_actual_cost_euro=savings_view.get("slot_actual_cost_euro"),
         slot_actual_consumption_kwh=savings_view.get("slot_actual_consumption_kwh"),
+        between_charts_hook=between_charts,
+        chart_header_label=chart_header_label,
+        chart_header_help=chart_header_help,
     )
     if simulation_table_title:
         table_title = simulation_table_title

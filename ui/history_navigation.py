@@ -44,8 +44,8 @@ def _set_s2_segment_index(segment: int) -> None:
     st.session_state[SESSION_S2_SEGMENT_INDEX] = 1 if int(segment) == 1 else 0
 
 
-def render_s2_navigation(now: datetime | None = None) -> None:
-    """SA-Segment- und Zyklus-Navigation für Sunset-2-Sunset."""
+def _s2_segment_label(now: datetime | None) -> tuple[int, int, int, str]:
+    """Zyklus, Segment, max_cycle und Navigations-Label für S-2."""
     cycle_offset = get_s2_cycle_offset()
     segment_index = get_s2_segment_index()
     max_cycle = max_sunrise_cycle_offset(now)
@@ -55,13 +55,25 @@ def render_s2_navigation(now: datetime | None = None) -> None:
         cycle_offset=cycle_offset,
         segment_index=segment_index,
     )
+    return cycle_offset, segment_index, max_cycle, label
 
-    col_back, col_label, col_fwd = st.columns([1, 4, 1])
+
+def s2_zone_help_text() -> str:
+    return (
+        "Hintergrund: grau = Vergangenheit · neutral = aktuelle Stunde · "
+        "grün = extrapolierte Preise · "
+        "«Vor →»: ein Zyklus Richtung Live oder SA₁→SA₂ (nur Live)"
+    )
+
+
+def render_s2_nav_buttons(now: datetime | None = None) -> None:
+    """Kompakte ←/→-Navigation zwischen Chart 1 und Chart 2."""
+    cycle_offset, segment_index, max_cycle, _ = _s2_segment_label(now)
+    _, col_back, col_fwd, _ = st.columns([3, 1, 1, 3])
     with col_back:
-        back_disabled = s2_back_disabled(cycle_offset, segment_index, max_cycle)
         if st.button(
             "← Zurück",
-            disabled=back_disabled,
+            disabled=s2_back_disabled(cycle_offset, segment_index, max_cycle),
             key="s2_nav_back",
             width="stretch",
         ):
@@ -71,16 +83,6 @@ def render_s2_navigation(now: datetime | None = None) -> None:
             _set_s2_cycle_offset(new_cycle)
             _set_s2_segment_index(new_segment)
             st.rerun()
-    with col_label:
-        if cycle_offset > 0:
-            st.markdown(f"**{label}** · {cycle_offset} Zyklus/Zyklen zurück")
-        else:
-            st.markdown(f"**{label}**")
-        st.caption(
-            "Hintergrund: grau = Vergangenheit · neutral = aktuelle Stunde · "
-            "grün = extrapolierte Preise · "
-            "«Vor →»: ein Zyklus Richtung Live oder SA₁→SA₂ (nur Live)"
-        )
     with col_fwd:
         if st.button(
             "Vor →",
@@ -94,3 +96,8 @@ def render_s2_navigation(now: datetime | None = None) -> None:
             _set_s2_cycle_offset(new_cycle)
             _set_s2_segment_index(new_segment)
             st.rerun()
+
+
+def render_s2_navigation(now: datetime | None = None) -> None:
+    """SA-Segment- und Zyklus-Navigation für Sunset-2-Sunset (Legacy)."""
+    render_s2_nav_buttons(now=now)

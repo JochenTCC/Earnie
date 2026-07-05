@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -17,6 +18,7 @@ from data.planning_window import (
 from optimizer.targets import consumer_pv_follow_column_name, consumer_immediate_charge_column_name
 from optimizer import battery as bat
 from runtime_store.history_timeline import SLOT_MISSING
+from ui.help_hint import render_title_with_help
 
 _CONSUMER_BAR_OPACITY = 0.65
 _CONSUMER_PV_FOLLOW_PATTERN = "/"
@@ -284,6 +286,14 @@ def _sunrise_chart_title(chart: UiChartWindow) -> str:
         f"({chart.start.strftime('%d.%m.%Y %H:%M')} – "
         f"{chart.end.strftime('%d.%m.%Y %H:%M')})"
     )
+
+
+_CHART2_S2_TITLE = "Kumulierte Kosten & Verbrauch (Sonnenaufgang→Sonnenaufgang)"
+_CHART2_S2_HELP = (
+    "Grauer Bereich: **Ist bisher** (blau, kumuliert aus Produktiv-Log). "
+    "Neutral/Grün: **Prognose** (BL Ziel / optimiert, kumuliert ab Log-Grenze "
+    "ohne Anschluss an Ist). Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
+)
 
 
 def _slot_time_in_chart(
@@ -1774,8 +1784,16 @@ def render_power_soc_chart(
     sun_markers: ChartSunMarkers | None = None,
     slot_qualities: tuple[str, ...] | None = None,
     history_slot_count: int | None = None,
+    chart_header_label: str | None = None,
+    chart_header_help: str | None = None,
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
+    if chart_header_label and chart_header_help:
+        render_title_with_help(
+            chart_header_label,
+            chart_header_help,
+            key="s2_zone_help",
+        )
     plot_df = _mask_missing_log_slots(df, slot_qualities)
     bar_colors = get_bar_colors(plot_df)
     axis = ChartSlotAxis.from_dataframe(plot_df)
@@ -1811,8 +1829,11 @@ def render_power_soc_chart(
         if chart_window is not None
         else "24-Stunden-Zeithorizont (Leistung, SoC & Preis)"
     )
+    plotly_title = None if chart_header_label else (chart_title or default_title)
+    layout_title = plotly_title if plotly_title else ""
+    top_margin = 20 if chart_header_label else 50
     fig.update_layout(
-        title=chart_title or default_title,
+        title=layout_title,
         xaxis=_chart_xaxis_config(axis, range_start=range_start),
         barmode="overlay",
         yaxis=dict(title="Leistung (kW)", side="left"),
@@ -1824,7 +1845,7 @@ def render_power_soc_chart(
             range=[-5, 105],
         ),
         legend=_chart_legend(),
-        margin=dict(l=40, r=40, t=50, b=110),
+        margin=dict(l=40, r=40, t=top_margin, b=110),
     )
     plotly_kwargs: dict = {"width": "stretch"}
     if chart_key:
@@ -1964,16 +1985,22 @@ def render_cumulative_cost_chart(
             optimized_cost_euro,
         )
 
+    if split_mode:
+        render_title_with_help(_CHART2_S2_TITLE, _CHART2_S2_HELP, key="chart2_s2_help")
+
+    default_title = (
+        _CHART2_S2_TITLE
+        if chart_window is not None
+        else "Kumulierte Kosten & Verbrauch"
+    )
+    plotly_title = "" if split_mode else default_title
+    top_margin = 20 if split_mode else 50
     layout = dict(
-        title=(
-            "Kumulierte Kosten & Verbrauch (Sonnenaufgang→Sonnenaufgang)"
-            if chart_window is not None
-            else "Kumulierte Kosten & Verbrauch"
-        ),
+        title=plotly_title,
         xaxis=_chart_xaxis_config(axis, range_start=range_start),
         yaxis=dict(title="Kosten (€, kumuliert)"),
         legend=_chart_legend(),
-        margin=dict(l=40, r=40, t=50, b=110),
+        margin=dict(l=40, r=40, t=top_margin, b=110),
     )
     if has_consumption:
         layout["yaxis2"] = dict(
@@ -1983,20 +2010,13 @@ def render_cumulative_cost_chart(
             showgrid=False,
         )
     fig.update_layout(**layout)
-    if has_costs or has_consumption:
-        if split_mode:
+    if (has_costs or has_consumption) and not split_mode:
+        extrap_start, _ = _extrapolation_bounds(df)
+        if extrap_start is None:
             st.caption(
-                "Grauer Bereich: **Ist bisher** (blau, kumuliert aus Produktiv-Log). "
-                "Neutral/Grün: **Prognose** (BL Ziel / optimiert, kumuliert ab Log-Grenze "
-                "ohne Anschluss an Ist). Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
+                "Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): "
+                "Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert."
             )
-        else:
-            extrap_start, _ = _extrapolation_bounds(df)
-            if extrap_start is None:
-                st.caption(
-                    "Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): "
-                    "Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert."
-                )
     st.plotly_chart(fig, width="stretch")
 
 
@@ -2084,6 +2104,9 @@ def render_optimization_chart(
     history_slot_count: int | None = None,
     slot_actual_cost_euro: list[float] | None = None,
     slot_actual_consumption_kwh: list[float] | None = None,
+    between_charts_hook: Callable[[], None] | None = None,
+    chart_header_label: str | None = None,
+    chart_header_help: str | None = None,
 ) -> None:
     """Zeichnet Leistung/SoC/Preis und kumulierte Kosten/Verbrauch in zwei Charts."""
     render_power_soc_chart(
@@ -2097,7 +2120,11 @@ def render_optimization_chart(
         slot_qualities=slot_qualities,
         history_slot_count=history_slot_count,
         chart_key="live_power_soc_chart",
+        chart_header_label=chart_header_label,
+        chart_header_help=chart_header_help,
     )
+    if between_charts_hook is not None:
+        between_charts_hook()
     render_price_savings_chart(
         df,
         hourly_matched_baseline_cost_euro,
