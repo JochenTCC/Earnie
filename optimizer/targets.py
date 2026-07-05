@@ -122,7 +122,7 @@ def resolve_horizon_consumer_targets_kwh(
     consumer_daily_targets_kwh: dict | None = None,
 ) -> dict[str, float]:
     """
-    Flex-Zielenergie je Verbraucher für das gesamte 24h-Simulationsfenster (einmalig).
+    Flex-Zielenergie je Verbraucher für den gesamten Planungshorizont (einmalig).
     Kein erneutes Zählen bei Kalendertagwechsel im rollierenden Horizont.
     """
     consumers_cfg = config.get_flexible_consumers(optimizer_only=True)
@@ -204,12 +204,12 @@ def build_applied_targets_detail(
         else:
             source_key = consumer.get("daily_target_source", "config")
             source_labels = {
-                "config": "config.json (24h-Ziel)",
-                "historical": "historical (24h-Ziel)",
-                "loxone": "loxone (24h-Ziel)",
-                "thermal": "thermal (RC-Modell, 24h-Ziel)",
+                "config": "config.json",
+                "historical": "historical (Profil)",
+                "loxone": "loxone",
+                "thermal": "thermal (RC-Modell)",
             }
-            source = source_labels.get(source_key, f"{source_key} (24h-Ziel)")
+            source = source_labels.get(source_key, source_key)
         details.append({
             "id": cid,
             "name": consumer["name"],
@@ -245,7 +245,7 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
             })
         return details
     flex_sums = {consumer["id"]: 0.0 for consumer in consumers}
-    for row in optimization_matrix[:24]:
+    for row in optimization_matrix:
         flex = row.get("expected_flex_kw") or {}
         for cid in flex_sums:
             flex_sums[cid] += float(flex.get(cid, 0.0) or 0.0)
@@ -271,7 +271,7 @@ def resolve_baseload_kwh(optimization_matrix: list) -> float:
     if not optimization_matrix:
         return 0.0
     return round(
-        sum(float(row.get("expected_p_act", 0.0) or 0.0) for row in optimization_matrix[:24]),
+        sum(float(row.get("expected_p_act", 0.0) or 0.0) for row in optimization_matrix),
         3,
     )
 

@@ -49,25 +49,29 @@ def test_align_rows_fills_missing_past_slots():
     assert any(row["PV-Prognose (kW)"] == 1.0 for row in aligned)
 
 
-def test_savings_view_sums_chart_window_only():
+def test_savings_view_preserves_full_horizon_totals():
+    """S-2 P3d: Kennzahlen-Summen bleiben auf vollem Horizont, nur Stundenlisten segmentiert."""
     now = _dt(2026, 6, 15, 14, 0)
     chart = compute_ui_chart_window(now, LAT, LON, TZ)
     matrix = [
         {"slot_datetime": _dt(2026, 6, 15, hour, 0)} for hour in range(14, 20)
     ]
     savings = {
+        "matched_baseline_cost_euro": 99.0,
+        "optimized_cost_euro": 88.0,
+        "savings_matched_euro": 11.0,
         "hourly_matched_baseline_cost_euro": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         "hourly_optimized_cost_euro": [0.5, 1.5, 2.5, 3.5, 4.5, 5.5],
         "hourly_savings_euro": [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
         "hourly_matched_baseline_consumption_kwh": [1.0] * 6,
         "hourly_optimized_consumption_kwh": [1.0] * 6,
     }
-    indices = matrix_indices_for_chart(matrix, chart)
-    assert indices == [0, 1, 2, 3, 4, 5]
     view = savings_view_for_chart(savings, matrix, chart)
-    assert view["matched_baseline_cost_euro"] == 21.0
-    assert view["optimized_cost_euro"] == 18.0
+    assert view["matched_baseline_cost_euro"] == 99.0
+    assert view["optimized_cost_euro"] == 88.0
+    assert view["savings_matched_euro"] == 11.0
     assert len(view["hourly_matched_baseline_cost_euro"]) == len(chart.slot_datetimes)
+    assert sum(view["hourly_matched_baseline_cost_euro"]) == 21.0
 
 
 def test_max_sunrise_cycle_offset_accepts_naive_log_timestamp(monkeypatch):
@@ -193,9 +197,7 @@ def test_build_display_savings_series_sa1_sa2_uses_matrix_indexed_values():
         chart,
         savings_info=savings_info,
     )
-    assert sum(fixed["hourly_optimized_cost_euro"]) == pytest.approx(
-        savings_view["optimized_cost_euro"]
-    )
-    assert sum(broken["hourly_optimized_cost_euro"]) < sum(
-        fixed["hourly_optimized_cost_euro"]
-    )
+    segment_sum = sum(fixed["hourly_optimized_cost_euro"])
+    full_horizon_sum = sum(savings_info["hourly_optimized_cost_euro"])
+    assert segment_sum < full_horizon_sum
+    assert sum(broken["hourly_optimized_cost_euro"]) < segment_sum

@@ -6,9 +6,6 @@
 
 - [ ] **UI Sunset-2-Sunset (Spec v0.6.2)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Phase 3 — Charts & Kennzahlen** (Schritte **P3a–P3d**, Nomenklatur: `.cursor/rules/roadmap-nomenclature.mdc`)
-    - [ ] **P3c** Legacy-Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
-    - [ ] **P3d** Kennzahlen-Horizont **Jetzt→SA₂** (MILP-Horizont, identisch BL-Ziel-Matching) — **Entscheidung 2026-07-05**; umsetzen: Energievergleich/ Ersparnis-Summen nicht auf Chart-Segment kürzen, Labels „(24h)“ entfernen, Legacy `[:24]` bei Grundlast/Profil-Zielen bereinigen
   - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (Navigation, Orange Chart+Tabelle)
   - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
 - [ ] **Anordnungen in UI ändern:**
@@ -80,6 +77,18 @@ bodentemperaturen_nach_monat = {
 - [ ] Generisches E-Auto-Modell - für bessere Wiederverwendbarkeit
 
 ## Erledigte Punkte
+
+### UI Sunset-2-Sunset — Phase 3 Charts & Kennzahlen abgeschlossen (2026-07-05)
+
+- [x] **Phase 3 (P3a–P3d)** — Chart 2 Ist/Prognose, SA-Marker, Legacy-Cleanup Prod-UI, Kennzahlen-Horizont Jetzt→SA₂; Details in den Unterpunkten unten
+
+### UI Sunset-2-Sunset — Phase 3 P3d Kennzahlen-Horizont Jetzt→SA₂ (2026-07-05)
+
+- [x] **P3d** Ersparnis-/Kosten-Kennzahlen und Energievergleich über volle Matrix (Jetzt→SA₂), nicht Chart-Segment; Labels „(24h)“ entfernt; `[:24]` bei Grundlast/Profil-Zielen bereinigt (`ui/chart_context.py`, `ui/simulation_results.py`, `ui/charts.py`, `optimizer/targets.py`, `data/consumer_targets.py`); Tests `test_horizon_targets.py`, `test_chart_context.py`
+
+### UI Sunset-2-Sunset — Phase 3 P3c Legacy-Pfade entfernt (2026-07-05)
+
+- [x] **P3c** `history_offset_days`, Produktiv-Archiv-Navigation, Modus „Historischer Tag“ und `render_historical_*` aus Prod-UI entfernt; S-2 nur noch `render_s2_navigation` (`ui/history_navigation.py`, `ui/live_mode.py`, `app.py`, `ui/mode_selector.py`); `ui/historical.py` gelöscht; Tests `test_mode_selector.py`
 
 ### UI Sunset-2-Sunset — Phase 3 P3a Chart 2 Ist/Prognose (2026-07-05)
 

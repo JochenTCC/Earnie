@@ -17,8 +17,7 @@ from ui.auto_refresh import setup_auto_refresh
 from ui.backtesting import render_backtesting_block
 from ui.config_forms import render_parameter_input
 from ui.countdown import render_countdown_block
-from ui.historical import render_historical_inputs, render_historical_optimization_block
-from ui.history_navigation import is_history_mode, is_live_s2_window, render_disabled_live_section
+from ui.history_navigation import is_live_s2_window
 from ui.live_mode import render_optimization_savings_and_chart
 from ui.mode_selector import render_mode_selector
 from ui.runtime_config import reload_runtime_config
@@ -46,12 +45,7 @@ def main() -> None:
         pass
     mode = render_mode_selector()
 
-    if mode == "Historischer Tag":
-        st.markdown(
-            "Historische **24-Stunden-Optimierung** mit Daten aus **cons_data_hourly.csv** "
-            "(Grundlast, PV) und historischen Marktpreisen."
-        )
-    elif mode == "Backtesting":
+    if mode == "Backtesting":
         st.markdown(
             "Auswertung des **Backtesting-Logs** aus `scripts/run_backtesting.py` "
             "(Referenz ohne Optimierung vs. optimierte Szenarien)."
@@ -71,19 +65,10 @@ def main() -> None:
         render_backtesting_block()
         return
 
-    if mode == "Historischer Tag":
-        selected_date, initial_soc = render_historical_inputs()
-        render_historical_optimization_block(selected_date, initial_soc)
-        return
-
     current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     render_optimization_savings_and_chart(current_soc)
-    if is_history_mode():
-        render_disabled_live_section("Energiefluss (Live)")
-        render_disabled_live_section("Countdown bis zur nächsten Optimierung")
-    else:
-        render_live_power_flow(current_soc)
-        render_countdown_block()
+    render_live_power_flow(current_soc)
+    render_countdown_block()
 
 
 if __name__ == "__main__":

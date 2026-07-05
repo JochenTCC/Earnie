@@ -1913,7 +1913,6 @@ def render_cumulative_cost_chart(
     has_consumption = bool(
         hourly_matched_baseline_consumption_kwh and hourly_optimized_consumption_kwh
     )
-    forecast_start = history_slot_count if split_mode else 0
     if split_mode:
         add_cumulative_s2_split_traces(
             fig,
@@ -1958,24 +1957,6 @@ def render_cumulative_cost_chart(
         and optimized_cost_euro is not None
         and not split_mode
     )
-    if split_mode and has_costs and history_slot_count is not None:
-        if history_slot_count < length:
-            matched_forecast = _sum_slot_increments(
-                hourly_matched_baseline_cost_euro,
-                forecast_start,
-                length,
-            )
-            optimized_forecast = _sum_slot_increments(
-                hourly_optimized_cost_euro,
-                forecast_start,
-                length,
-            )
-            show_cost_summary = True
-            matched_baseline_cost_euro = matched_forecast
-            optimized_cost_euro = optimized_forecast
-        else:
-            show_cost_summary = False
-
     if show_cost_summary:
         _add_cost_summary_annotations(
             fig,
@@ -2082,74 +2063,6 @@ def add_projected_savings_trace(
             "<extra></extra>"
         ),
     )
-
-
-def render_history_optimization_chart(
-    df: pd.DataFrame,
-    slot_costs_euro: list[float],
-    slot_consumption_kwh: list[float],
-    total_cost_euro: float,
-    *,
-    projected_savings_cumulative_euro: list[float] | None = None,
-    latest_projected_savings_euro: float | None = None,
-) -> None:
-    """Zwei Charts für die Produktiv-Historie (Ist-Daten, 96 Viertelstunden-Slots)."""
-    render_power_soc_chart(
-        df,
-        show_baseline_soc=False,
-        chart_title="24-Stunden-Horizont (Leistung, SoC & Preis) — Produktiv-Ist",
-        chart_key="history_power_soc_chart",
-    )
-    axis = ChartSlotAxis.from_dataframe(df)
-    extrap_start, extrap_end = _extrapolation_bounds(df)
-    fig = go.Figure()
-    add_cumulative_actual_traces(
-        fig,
-        df["Uhrzeit"],
-        axis,
-        slot_costs_euro,
-        slot_consumption_kwh,
-        extrap_start=extrap_start,
-        extrap_end=extrap_end,
-    )
-    has_projected_savings = bool(
-        projected_savings_cumulative_euro
-        and any(abs(value) > 1e-9 for value in projected_savings_cumulative_euro)
-    )
-    if has_projected_savings:
-        add_projected_savings_trace(
-            fig,
-            df["Uhrzeit"],
-            axis,
-            projected_savings_cumulative_euro or [],
-            extrap_start=extrap_start,
-            extrap_end=extrap_end,
-        )
-    fig.update_layout(
-        title="Kumulierte Kosten & Verbrauch — Produktiv-Ist",
-        xaxis=_chart_xaxis_config(axis),
-        yaxis=dict(title="Kosten (€, kumuliert)"),
-        yaxis2=dict(
-            title="Verbrauch (kWh, kumuliert)",
-            side="right",
-            overlaying="y",
-            showgrid=False,
-        ),
-        legend=_chart_legend(),
-        margin=dict(l=40, r=40, t=50, b=110),
-    )
-    caption = (
-        f"Gesamtkosten (Ist): **{total_cost_euro:.2f} €** · "
-        "Kosten und Verbrauch aus gemessenen Produktiv-Durchläufen (15-Min-Takt)."
-    )
-    if has_projected_savings and latest_projected_savings_euro is not None:
-        caption += (
-            f" Gestrichelte grüne Linie: kumulierte prognostizierte Ersparnis "
-            f"(letzte 24h-Prognose: **{latest_projected_savings_euro:+.2f} €** vs BL Ziel)."
-        )
-    st.caption(caption)
-    st.plotly_chart(fig, width="stretch", key="history_cumulative_cost_chart")
-
 
 def render_optimization_chart(
     df: pd.DataFrame,

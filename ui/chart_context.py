@@ -457,25 +457,17 @@ def savings_view_for_chart(
     matrix: list[dict],
     chart: UiChartWindow,
 ) -> dict:
-    """Kosten-Summen und Stundenlisten auf das sunrise→sunrise-Fenster beschränken."""
-    indices = matrix_indices_for_chart(matrix, chart)
-    if not indices:
+    """Stunden-Inkremente auf das Chart-Segment abbilden; Kennzahlen-Summen unverändert."""
+    if not matrix_indices_for_chart(matrix, chart):
         return savings_info
 
     def _pick(key: str) -> list:
         values = savings_info.get(key) or []
         return align_hourly_values_to_chart_slots(values, matrix, chart)
 
-    hourly_matched = _pick("hourly_matched_baseline_cost_euro")
-    hourly_optimized = _pick("hourly_optimized_cost_euro")
-    matched_total = round(sum(hourly_matched), 4)
-    optimized_total = round(sum(hourly_optimized), 4)
     view = dict(savings_info)
-    view["matched_baseline_cost_euro"] = matched_total
-    view["optimized_cost_euro"] = optimized_total
-    view["savings_matched_euro"] = round(matched_total - optimized_total, 4)
-    view["hourly_matched_baseline_cost_euro"] = hourly_matched
-    view["hourly_optimized_cost_euro"] = hourly_optimized
+    view["hourly_matched_baseline_cost_euro"] = _pick("hourly_matched_baseline_cost_euro")
+    view["hourly_optimized_cost_euro"] = _pick("hourly_optimized_cost_euro")
     view["hourly_savings_euro"] = _pick("hourly_savings_euro")
     view["hourly_matched_baseline_consumption_kwh"] = _pick(
         "hourly_matched_baseline_consumption_kwh"

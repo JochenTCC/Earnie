@@ -114,10 +114,10 @@ def resolve_historical_consumer_daily_targets(target_date: date) -> dict[str, fl
 
 
 def resolve_horizon_flex_targets_kwh(matrix: list) -> dict[str, float]:
-    """Summiert expected_flex_kw über den 24h-Horizont."""
+    """Summiert expected_flex_kw über den gesamten Planungshorizont."""
     consumers = config.get_flexible_consumers(optimizer_only=True)
     totals = {c["id"]: 0.0 for c in consumers}
-    for row in matrix[:24]:
+    for row in matrix:
         flex = row.get("expected_flex_kw") or {}
         for consumer in consumers:
             cid = consumer["id"]

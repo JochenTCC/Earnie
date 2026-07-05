@@ -8,19 +8,14 @@ import pandas as pd
 
 from integrations import awattar_client
 from data import consumer_targets, live_consumption, profile_manager
-from runtime_store import history_timeline, run_state
+from runtime_store import run_state
 from optimizer import schedule as optimization_schedule
 import optimizer
 from ui.chart_context import build_live_chart_context, live_now
-from ui.history_navigation import (
-    get_s2_cycle_offset,
-    get_s2_segment_index,
-    render_history_navigation,
-)
+from ui.history_navigation import get_s2_cycle_offset, get_s2_segment_index, render_s2_navigation
 from ui.runtime_config import reload_runtime_config, simulation_settings_fingerprint
 from ui.simulation_results import (
     persist_simulation_debug,
-    render_history_timeline_results,
     render_optimization_results,
 )
 
@@ -95,10 +90,6 @@ def _live_optimization_placeholder() -> st.delta_generator.DeltaGenerator:
     return st.session_state.live_optimization_placeholder
 
 
-def _clear_live_optimization_placeholder() -> None:
-    st.session_state.pop("live_optimization_placeholder", None)
-
-
 def _apply_main_run_to_live_df(
     optimized_df: pd.DataFrame,
     main_state: dict | None,
@@ -112,23 +103,10 @@ def _apply_main_run_to_live_df(
     return pd.DataFrame(rows)
 
 
-def _render_history_timeline(offset_days: int) -> None:
-    try:
-        result = history_timeline.build_history_timeline(offset_days)
-    except ValueError as exc:
-        st.error(str(exc))
-        return
-    render_history_timeline_results(result)
-
-
 def render_optimization_savings_and_chart(current_soc: float) -> None:
-    """MILP-Simulation (Live) oder Produktiv-Historie mit gemeinsamer Navigation."""
+    """MILP-Simulation im Sunset-2-Sunset-Modus."""
     reload_runtime_config()
-    offset_days = render_history_navigation(now=live_now())
-    if offset_days > 0:
-        _clear_live_optimization_placeholder()
-        _render_history_timeline(offset_days)
-        return
+    render_s2_navigation(now=live_now())
     _live_optimization_fragment(current_soc)
 
 

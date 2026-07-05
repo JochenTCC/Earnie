@@ -12,10 +12,8 @@ from optimizer.targets import consumer_column_name
 from runtime_store import live_optimization_debug
 from runtime_store import optimization_history
 from runtime_store.history_timeline import (
-    HistoryTimelineResult,
     SLOT_MISSING,
     SLOT_PRESENT,
-    format_gap_notice,
 )
 from ui.chart_context import (
     LiveChartContext,
@@ -28,7 +26,6 @@ from ui.chart_context import (
 from ui.charts import (
     _mask_missing_log_slots,
     build_sun_markers,
-    render_history_optimization_chart,
     render_optimization_chart,
 )
 from ui.simulation_table_view import render_frozen_simulation_table
@@ -56,10 +53,10 @@ def render_applied_targets(savings: dict) -> None:
     if not comparison:
         return
 
-    with st.expander("⚡ Energievergleich Baseline vs. Optimierung (24h)"):
+    with st.expander("⚡ Energievergleich Baseline vs. Optimierung"):
         st.caption(
-            "BL Profil: historisches Flex-Profil. BL Ziel: gleiche Energie wie die Optimierung "
-            "(Profil skaliert), ohne Lastverschiebung."
+            "Horizont Jetzt→SA₂ (voller MILP-Plan). BL Profil: historisches Flex-Profil. "
+            "BL Ziel: gleiche Energie wie die Optimierung (Profil skaliert), ohne Lastverschiebung."
         )
 
         def _format_kwh_cell(kwh: float) -> str:
@@ -378,7 +375,7 @@ def render_optimization_results(
     if chart_context is not None:
         log_source = optimization_history.describe_production_log_source()
 
-    matched_cost, optimized_cost = _cost_totals_from_savings(savings_view)
+    matched_cost, optimized_cost = _cost_totals_from_savings(savings_info)
     if log_source is not None:
         render_display_data_basis_expander(
             log_source,
@@ -423,38 +420,7 @@ def render_optimization_results(
             slot_qualities=table_qualities,
             gap_notice=table_gap_notice,
         )
-    render_applied_targets(savings_view)
-
-
-def render_history_timeline_results(result: HistoryTimelineResult) -> None:
-    """Zwei Charts aus rekonstruierter Produktiv-Historie (ohne Live-Simulation)."""
-    df = pd.DataFrame(result.rows)
-    st.caption(
-        f"📜 **Produktiv-Historie** · {result.present_slot_count} von "
-        f"{len(result.rows)} Slots mit Messwerten"
-    )
-    gap_notice = format_gap_notice(result)
-    if gap_notice:
-        st.warning(gap_notice)
-    total_cost = (
-        result.cumulative_costs_euro[-1]
-        if result.cumulative_costs_euro
-        else 0.0
-    )
-    render_history_optimization_chart(
-        df,
-        result.slot_costs_euro,
-        result.slot_consumption_kwh,
-        total_cost,
-        projected_savings_cumulative_euro=result.projected_savings_cumulative_euro,
-        latest_projected_savings_euro=result.latest_projected_savings_euro,
-    )
-    render_simulation_details(
-        df,
-        title="📋 Simulations-Details (Produktiv-Historie, 15 min)",
-        slot_qualities=result.slot_qualities,
-        gap_notice=format_gap_notice(result),
-    )
+    render_applied_targets(savings_info)
 
 
 def persist_simulation_debug(

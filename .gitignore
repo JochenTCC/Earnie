@@ -20,7 +20,9 @@ runtime/*
 !runtime/local_settings.example.json
 runtime-prod/
 backtesting_log.json
+backtesting_cbc_events.jsonl
 backtesting_logs/
+live_optimization_debug.json
 energy_optimizer.log
 system_history_log.csv
 runtime_settings.json
