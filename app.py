@@ -17,6 +17,7 @@ from ui.auto_refresh import setup_auto_refresh
 from ui.backtesting import render_backtesting_block
 from ui.config_forms import render_parameter_input
 from ui.countdown import render_countdown_block
+from ui.help_hint import render_page_title_with_help
 from ui.history_navigation import is_live_s2_window
 from ui.live_mode import render_optimization_savings_and_chart
 from ui.mode_selector import render_mode_selector
@@ -25,6 +26,21 @@ from ui.sankey import render_live_power_flow
 from ui.styles import inject_compact_numeric_css
 
 logger = logging.getLogger("app")
+
+_PAGE_TITLE = "🔋 Ernie Energy Control Center"
+
+
+def _mode_scope_help(mode: str) -> str:
+    if mode == "Backtesting":
+        return (
+            "Auswertung des **Backtesting-Logs** aus `scripts/run_backtesting.py` "
+            "(Referenz ohne Optimierung vs. optimierte Szenarien)."
+        )
+    return (
+        "Produktiv-Cockpit **Sunset-2-Sunset**: Vergangenheit und Vorausschau "
+        "in zwei Sonnenaufgang-Segmenten (SA₀→SA₁, SA₁→SA₂)."
+    )
+
 
 st.set_page_config(
     page_title="Ernie Energy Control Center",
@@ -35,8 +51,6 @@ st.set_page_config(
 
 def main() -> None:
     inject_compact_numeric_css()
-    st.title("🔋 Ernie Energy Control Center")
-    st.caption(f"Version {__version__}")
     try:
         drift_items = load_config_drift_items()
         if drift_items:
@@ -44,20 +58,17 @@ def main() -> None:
     except FileNotFoundError:
         pass
     mode = render_mode_selector()
+    render_page_title_with_help(
+        _PAGE_TITLE,
+        _mode_scope_help(mode),
+        key="app_mode_scope_help",
+        version=__version__,
+    )
 
-    if mode == "Backtesting":
-        st.markdown(
-            "Auswertung des **Backtesting-Logs** aus `scripts/run_backtesting.py` "
-            "(Referenz ohne Optimierung vs. optimierte Szenarien)."
-        )
-    else:
+    if mode != "Backtesting":
         reload_runtime_config()
         if is_live_s2_window():
             setup_auto_refresh()
-        st.markdown(
-            "Produktiv-Cockpit **Sunset-2-Sunset**: Vergangenheit und Vorausschau "
-            "in zwei Sonnenaufgang-Segmenten (SA₀→SA₁, SA₁→SA₂)."
-        )
 
     render_parameter_input(mode)
 

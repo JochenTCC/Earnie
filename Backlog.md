@@ -4,15 +4,21 @@
 
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
-- [ ] **UI Sunset-2-Sunset (Spec v0.6.2)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
+- [ ] **UI Sunset-2-Sunset (Spec v0.6.2 → v0.7.0 bei Epic-Abschluss)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (Navigation, Orange Chart+Tabelle)
-  - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
-- [ ] **Anordnungen in UI ändern:**
-  - [ ] Buttons kleiner machen und zwischen beide Charts platzieren — kein Text dazwischen (weil auf Mobilgeräten dann die Buttons untereinander gezeigt werden)
-  - [ ] Hinweistexte entfernen bzw. durch kleine „?“ ersetzen, die dann den Text anzeigen
-- [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; Phase 2 des UI-Epics erledigt)
-  - Abweichungsmarkierung nach bestimmten Regeln (noch zu definieren -aber bspw. "HINWEIS" (gelbes Dreieck), wenn geheizt werden darf, aber es nicht nötig war - oder "FEHLER" (Rotes Stopschild), wenn E-Auto nicht geladen hat, obwohl es sollte (und es noch nicht voll sein kann))
+  - **Phase 4 — Docs & Tests** (Schritte **P4a–P4d**, Nomenklatur: `.cursor/rules/roadmap-nomenclature.mdc`) — schließt Epic ab; keine neue UI-Funktionalität
+    - [ ] **P4a** `docs/ui/betriebsmodi.md` auf Spec v0.6.2: Sunset-2-Sunset (Prod), Backtesting (Dev); SA₀→SA₁/SA₁→SA₂, Navigation, Panels, Kennzahlen Jetzt→SA₂; entfallene Modi dokumentieren; Env-Var ohne `live`/`historical`
+    - [ ] **P4b** Deployment & Querverweise: `docker-compose-synology.yml` prüfen (ist `sunset2sunset,backtesting`); `docs/einrichtung/betrieb.md`, `container.md`; `docs/README.md`, `docs/ui/charts.md`, `docs/konfiguration/ueberblick.md`, `preise.md`; Spec-Status Phase 3 erledigt — Akzeptanz: kein widersprüchlicher Prod-Hinweis auf `live`/`historical` in `docs/`
+    - [ ] **P4c** Tests Navigation: über `test_s2_navigation.py` hinaus — `segment_navigation_label`, `max_sunrise_cycle_offset`, `build_live_chart_context` (cycle/segment → Fenster); Spec §4
+    - [ ] **P4d** Tests Orange fehlende Log-Slots: Chart + Tabelle konsistent (`slot_qualities`, `_mask_missing_log_slots`, kumulative Lücken, kein Hold-Forward); Spec §6 — Vorschlag `tests/test_s2_missing_slots.py`
+    - Epic-Abschluss nach P4d: Epic unter **Erledigte Punkte**, Spec v0.7.0, optional `version.py`-Bump, Commit `ui(s2): P4 Docs & Tests`
+- [ ] **Doppelte UI-Wartezeit nach main.py-Durchlauf klären**
+  - Beobachtung: nach main.py-Lauf zweimaliges Warten in der UI — zuerst ca. **60 s**, danach erneut ca. **120 s**
+  - Kontext: `optimizer/schedule.py` (`APP_REFRESH_DELAY_SECONDS`, `APP_MAIN_SYNC_GRACE_SECONDS`, `live_simulation_readiness`), `ui/live_mode.py` (Sync-Hinweis)
+  - Klären: beabsichtigte Phasen (`delay` vs. `wait_main`) vs. Bug/UX; ggf. zusammenführen, verkürzen oder in der UI klarer als zwei Schritte kommunizieren
+- [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; eigenes Feature **nach** S-2 Layout)
+  - Abweichungsmarkierung nach bestimmten Regeln (noch zu definieren — bspw. „HINWEIS“ (gelbes Dreieck), wenn geheizt werden darf, aber es nicht nötig war — oder „FEHLER“ (rotes Stopschild), wenn E-Auto nicht geladen hat, obwohl es sollte (und es noch nicht voll sein kann))
+  - **Follow-ups (nach Epic, nicht Phase 4):** Soll/Ist-Overlay, Nachrechnung Backtesting, Preis-Spiegelung — siehe unten
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
@@ -75,8 +81,18 @@ bodentemperaturen_nach_monat = {
   - [ ] Gefrierschrank (Prio2)
   - [ ] Wärmepumpe (Prio3) — nur indirekte Steuerung über Anpassung der Solltemperaturen
 - [ ] Generisches E-Auto-Modell - für bessere Wiederverwendbarkeit
+- [ ] **S-2 Layout (optional):** kompakteres Button-CSS für Navigation zwischen Chart 1 und 2 (`ui/styles.py`) — derzeit nur schmale Spalten `[8,2,1]`, kein Extra-CSS
+- [ ] **S-2 Layout (optional):** Mobil-Check (~375 px) — Buttons nebeneinander ohne Caption dazwischen; ? touch-tauglich; einmal manuell prüfen
 
 ## Erledigte Punkte
+
+### UI Sunset-2-Sunset — Follow-up Layout (2026-07-05)
+
+- [x] **Layout-a** Navigation kompakt zwischen Chart 1 und Chart 2; Segment-Label in Chart-1-Überschrift (`ui/history_navigation.py`, `ui/charts.py`, `ui/simulation_results.py`, `ui/live_mode.py`)
+- [x] **Layout-b** Hilfe-„?“ (`ui/help_hint.py`, `st.popover`): Zonen (Chart 1), Chart 2 Ist/Prognose, Sync-Wartezeit, Modus-Scope am Seitentitel; Version als Caption neben Titel
+- [x] **Datenbasis** Expander im Footer unter Trennlinie, vor Optimierungs-Takt (`ui/countdown.py`, `app.py`)
+- [x] **H2/H6/H7** bewusst ohne Änderung (kein „Aktuelle Stunde“-Hinweis; Tabellen-/Energievergleich-Expander unverändert)
+- [x] Docs: `docs/ui/charts.md`, Spec §7.1 in `docs/spec/ui-sunset2sunset.md`
 
 ### UI Sunset-2-Sunset — Phase 3 Charts & Kennzahlen abgeschlossen (2026-07-05)
 

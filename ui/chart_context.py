@@ -494,3 +494,15 @@ def segment_navigation_label(
     else:
         prefix = "SA₁→SA₂ (Vorausschau)"
     return f"{prefix} · {chart_window_label(chart)}"
+
+
+def s2_chart_header_label(chart_context: LiveChartContext) -> str:
+    """Streamlit-Überschrift für Chart 1 (Segment + optional Zyklus-Hinweis)."""
+    label = segment_navigation_label(
+        chart_context.chart_window,
+        cycle_offset=chart_context.cycle_offset,
+        segment_index=chart_context.segment_index,
+    )
+    if chart_context.cycle_offset > 0:
+        label += f" · {chart_context.cycle_offset} Zyklus/Zyklen zurück"
+    return label
