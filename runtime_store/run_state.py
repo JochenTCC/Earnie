@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
+import tempfile
 from datetime import datetime
 from typing import Any
 
@@ -64,14 +66,39 @@ def _save_to_path(path: str, data: dict[str, Any]) -> None:
         _write_json(path, data)
 
 
+def _is_unc_path(path: str) -> bool:
+    return path.startswith("\\\\") or path.startswith("//")
+
+
+def _load_json_from_path(path: str) -> dict[str, Any]:
+    """JSON lesen; bei UNC-Pfaden Kopie über SMB-Client-Cache."""
+    if _is_unc_path(path):
+        fd, tmp = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        try:
+            shutil.copyfile(path, tmp)
+            with open(tmp, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        finally:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        if not isinstance(data, dict):
+            raise json.JSONDecodeError("root is not object", path, 0)
+        return data
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise json.JSONDecodeError("root is not object", path, 0)
+    return data
+
+
 def _load_from_path(path: str) -> dict[str, Any] | None:
     if not os.path.isfile(path):
         return None
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            return None
+        data = _load_json_from_path(path)
         schema_version = read_schema_version(data, default=1)
         if schema_version > RUN_STATE_SCHEMA:
             logger.warning(

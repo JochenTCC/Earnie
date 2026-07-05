@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://energy-optimizer.local/deviation_rules.schema.json",
+  "title": "Energy Optimizer — Soll/Ist-Abweichungsregeln",
+  "description": "Kategorien und Regeln für Soll/Ist-Icons in Chart 1 (Epic Soll-Ist). Prädikate sind in Python implementiert; JSON referenziert nur Namen.",
+  "type": "object",
+  "required": ["version", "tolerances", "categories", "rules", "fallback"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema-Version der Regeldatei."
+    },
+    "tolerances": {
+      "type": "object",
+      "required": ["power_kw"],
+      "properties": {
+        "power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Leistungs-Toleranz für Abweichungsvergleich (kW)."
+        },
+        "soc_percent": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "SoC-Toleranz (Prozentpunkte), falls für Batterie-Regeln genutzt."
+        }
+      },
+      "additionalProperties": false
+    },
+    "categories": {
+      "type": "object",
+      "required": ["hint", "warning", "error"],
+      "properties": {
+        "hint": { "$ref": "#/definitions/category" },
+        "warning": { "$ref": "#/definitions/category" },
+        "error": { "$ref": "#/definitions/category" }
+      },
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/rule" }
+    },
+    "fallback": {
+      "type": "object",
+      "required": ["on_unclassified_mismatch"],
+      "properties": {
+        "on_unclassified_mismatch": {
+          "type": "string",
+          "enum": ["none", "warning", "error"],
+          "description": "Verhalten bei numerischer Abweichung ohne passende Regel."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "category": {
+      "type": "object",
+      "required": ["label", "symbol", "color"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Anzeigename in Tooltip und Legende."
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Plotly-Marker-Symbol (z. B. triangle-up, diamond, octagon)."
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "Hex-Farbe für Chart-Marker."
+        }
+      },
+      "additionalProperties": false
+    },
+    "rule": {
+      "type": "object",
+      "required": ["id", "category", "priority", "scope", "when", "message"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Stabile Regel-ID für Tests und Changelog."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Regel temporär deaktivieren ohne zu löschen."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["hint", "warning", "error"]
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Höhere Zahl = früher prüfen; erste Treffer-Regel pro scope gewinnt."
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Betroffenes Signal: consumer_id (eauto, swimspa, …) oder battery."
+        },
+        "when": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "AND-verknüpfte Prädikat-Namen (in Python registriert)."
+        },
+        "params": {
+          "type": "object",
+          "description": "Optionale Prädikat-Parameter (z. B. remaining_kwh_threshold).",
+          "additionalProperties": {
+            "type": ["number", "string", "boolean"]
+          }
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Tooltip-Text; Platzhalter {soll_kw}, {ist_kw}, {consumer_name}, {scope}."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

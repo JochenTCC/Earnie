@@ -5,10 +5,15 @@ from datetime import datetime, timedelta
 
 QUARTER_HOUR_MINUTES = 15
 QUARTER_HOUR_SECONDS = QUARTER_HOUR_MINUTES * 60
-# app.py wartet nach Slot-Start, damit main.py run_state schreiben kann
-APP_REFRESH_DELAY_SECONDS = 60
-# Zusätzliche Wartezeit, falls main.py etwas länger braucht
-APP_MAIN_SYNC_GRACE_SECONDS = 120
+# Wartezeit app.py auf main.py pro Viertelstunden-Slot: 60 s, dann ggf. 30 s Grace, danach Fallback.
+APP_MAIN_SYNC_INITIAL_WAIT_SECONDS = 60
+APP_MAIN_SYNC_EXTRA_GRACE_SECONDS = 30
+APP_MAIN_SYNC_MAX_WAIT_SECONDS = (
+    APP_MAIN_SYNC_INITIAL_WAIT_SECONDS + APP_MAIN_SYNC_EXTRA_GRACE_SECONDS
+)
+# Legacy-Namen (Doku/Kompatibilität)
+APP_REFRESH_DELAY_SECONDS = APP_MAIN_SYNC_INITIAL_WAIT_SECONDS
+APP_MAIN_SYNC_GRACE_SECONDS = APP_MAIN_SYNC_EXTRA_GRACE_SECONDS
 
 
 def _normalize_now(now: datetime | None) -> datetime:
@@ -45,9 +50,22 @@ def seconds_since_slot_start(now: datetime | None = None) -> float:
     return (dt - quarter_hour_slot_start(dt)).total_seconds()
 
 
+def seconds_until_main_py_sync_ready(
+    main_completed_at: str | None,
+    now: datetime | None = None,
+) -> float:
+    """Sekunden bis app.py auf main.py wartet (0 = bereit oder Fallback-Zeit abgelaufen)."""
+    if completed_at_in_current_slot(main_completed_at, now):
+        return 0.0
+    since_start = seconds_since_slot_start(now)
+    if since_start >= APP_MAIN_SYNC_MAX_WAIT_SECONDS:
+        return 0.0
+    return max(0.0, APP_MAIN_SYNC_MAX_WAIT_SECONDS - since_start)
+
+
 def seconds_until_app_refresh_ready(now: datetime | None = None) -> float:
-    """Sekunden bis app.py nach Slot-Wechsel aktualisieren soll (Abstand zu main.py)."""
-    return max(0.0, APP_REFRESH_DELAY_SECONDS - seconds_since_slot_start(now))
+    """Alias für Countdown: verbleibende Sync-Wartezeit ohne run_state (Legacy-Name)."""
+    return seconds_until_main_py_sync_ready(None, now)
 
 
 def completed_at_in_current_slot(completed_at: str | None, now: datetime | None = None) -> bool:
@@ -72,18 +90,12 @@ def live_simulation_readiness(
 
     Rückgabe: (bereit, grund, warte_sekunden)
     """
-    wait_delay = int(seconds_until_app_refresh_ready(now))
-    if wait_delay > 0:
-        return False, "delay", wait_delay
-
     if completed_at_in_current_slot(main_completed_at, now):
         return True, "main_synced", 0
 
-    since_start = seconds_since_slot_start(now)
-    if since_start < APP_REFRESH_DELAY_SECONDS + APP_MAIN_SYNC_GRACE_SECONDS:
-        return False, "wait_main", max(1, int(
-            APP_REFRESH_DELAY_SECONDS + APP_MAIN_SYNC_GRACE_SECONDS - since_start
-        ))
+    wait_sec = int(seconds_until_main_py_sync_ready(main_completed_at, now))
+    if wait_sec > 0:
+        return False, "wait_main", max(1, wait_sec)
 
     return True, "fallback", 0
 

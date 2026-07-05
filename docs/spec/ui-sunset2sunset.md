@@ -128,7 +128,7 @@ Kompaktere Chart-UI; Details in [docs/ui/charts.md](../ui/charts.md).
 
 ## 8. Follow-ups (nicht v0.5)
 
-- **Soll/Ist-Overlay** im grauen Bereich: Stufe 1 Log-Soll vs. `consumption_snapshot`; Stufe 2 kontinuierliches Haus-Ist
+- **Soll/Ist-Abweichung:** eigenes Epic **Soll-Ist** — [soll-ist-abweichung.md](soll-ist-abweichung.md) (Stufe 1 Log-Soll vs. `consumption_snapshot`; Stufe 2 kontinuierliches Haus-Ist als Follow-up)
 - **Nachrechnung** (ex Historischer Tag) ins Backtesting, Dev-only
 - **Preis-Spiegelung:** optional Mittelung über mehrere Tage (`data/market_prices.py`)
 - **UI-Layout optional:** kompakteres Button-CSS; Mobil-Check — siehe Backlog
