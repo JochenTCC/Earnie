@@ -23,6 +23,7 @@ _CONSUMER_PV_FOLLOW_PATTERN = "/"
 _CONSUMER_IMMEDIATE_CHARGE_PATTERN = "+"
 _COLOR_BASELINE = "#7f8c8d"
 _COLOR_OPTIMIZED = "#e67e22"
+_COLOR_ACTUAL = "#3498db"
 _COLOR_SAVINGS = "#27ae60"
 _COLOR_GRID_POWER = "#7f8c8d"
 _PV_LINE_COLOR = "#f1c40f"
@@ -74,8 +75,9 @@ def _safe_int_flag(value) -> int:
 @dataclass(frozen=True)
 class ChartSunMarkers:
     now_x: datetime | None
-    sunrise_x: datetime | None
-    sunset_xs: tuple[datetime, ...]
+    sa0_x: datetime | None
+    sa1_x: datetime | None
+    sa2_x: datetime | None
 
 
 @dataclass(frozen=True)
@@ -334,25 +336,33 @@ def _mask_missing_log_slots(
     return masked
 
 
+def _anchor_x_in_chart_window(chart: UiChartWindow, anchor: datetime) -> datetime | None:
+    """SA-Anker als Marker, wenn er im sichtbaren Chart-Fenster liegt."""
+    if anchor < chart.start or anchor > chart.end:
+        return None
+    return anchor
+
+
 def build_sun_markers(
     chart: UiChartWindow,
     now: datetime,
     planning_window,
     *,
     slot_datetimes: tuple[datetime, ...] | None = None,
+    show_now: bool = True,
 ) -> ChartSunMarkers:
     slots = slot_datetimes or chart.slot_datetimes
-    if slots and slots[0] <= now <= chart.end + timedelta(hours=1):
-        now_x = now
-    else:
-        now_x = _slot_time_in_chart(slots, now)
-    sunrise_x = _slot_time_in_chart(slots, chart.sa1)
-    sa2_x = _slot_time_in_chart(slots, chart.sa2)
-    marker_sunrise = sunrise_x if chart.segment_index == 0 else sa2_x
+    now_x: datetime | None = None
+    if show_now:
+        if slots and chart.start <= now <= chart.end + timedelta(hours=1):
+            now_x = now
+        else:
+            now_x = _slot_time_in_chart(slots, now)
     return ChartSunMarkers(
         now_x=now_x,
-        sunrise_x=marker_sunrise,
-        sunset_xs=(),
+        sa0_x=_anchor_x_in_chart_window(chart, chart.sa0),
+        sa1_x=_anchor_x_in_chart_window(chart, chart.sa1),
+        sa2_x=_anchor_x_in_chart_window(chart, chart.sa2),
     )
 
 
@@ -493,11 +503,17 @@ def _add_sun_markers(fig: go.Figure, markers: ChartSunMarkers) -> None:
             annotation_text="Jetzt",
             annotation_position="top",
         )
-    if markers.sunrise_x is not None:
+    for label, anchor_x in (
+        ("SA₀", markers.sa0_x),
+        ("SA₁", markers.sa1_x),
+        ("SA₂", markers.sa2_x),
+    ):
+        if anchor_x is None:
+            continue
         fig.add_vline(
-            x=markers.sunrise_x,
+            x=anchor_x,
             line=dict(color=_MARKER_SUNRISE_COLOR, width=1.5),
-            annotation_text="SA (SOC)",
+            annotation_text=label,
             annotation_position="top",
         )
 
@@ -884,7 +900,7 @@ def _segment_connected_line_xy(
     line_x, line_y = _segment_extended_line(
         axis, y, start, end, tail_y=seg_tail, anchor_fraction=anchor_fraction
     )
-    if start > 0 and start - 1 < len(y):
+    if start > 0 and start - 1 < len(y) and bridge_left:
         boundary_x = axis.at(start, anchor_fraction).iloc[0]
         bridge_y = float(y.iloc[start - 1])
         line_x = pd.concat([pd.Series([boundary_x]), line_x], ignore_index=True)
@@ -939,6 +955,7 @@ def _add_segmented_hv_line(
     hover_template: str | None = None,
     segment_hover_template: str | None = None,
     anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
+    bridge_left: bool = True,
 ) -> None:
     for index, (start, end, _is_extrapolated) in enumerate(segments):
         if start >= end:
@@ -952,6 +969,7 @@ def _add_segmented_hv_line(
             tail_y=seg_tail,
             step_line=True,
             anchor_fraction=anchor_fraction,
+            bridge_left=bridge_left,
         )
         if line_x.empty:
             continue
@@ -1360,6 +1378,208 @@ def _hourly_cumsum_for_chart(
     return pd.Series(padded, dtype=float).cumsum()
 
 
+def _increment_is_finite(value: float | None) -> bool:
+    if value is None:
+        return False
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return False
+    return not math.isnan(number)
+
+
+def _region_cumulative_series(
+    increments: list[float],
+    length: int,
+    region_start: int,
+    region_end: int,
+) -> pd.Series | None:
+    """Kumulierte Slot-Reihe nur in [region_start, region_end); fehlende Slots = NaN."""
+    if region_start >= region_end or region_end > length:
+        return None
+    values = [float("nan")] * length
+    total = 0.0
+    for index in range(region_start, region_end):
+        increment = increments[index] if index < len(increments) else float("nan")
+        if not _increment_is_finite(increment):
+            values[index] = float("nan")
+            continue
+        total += float(increment)
+        values[index] = total
+    if not any(_increment_is_finite(values[i]) for i in range(region_start, region_end)):
+        return None
+    return pd.Series(values, dtype=float)
+
+
+def _sum_slot_increments(
+    increments: list[float] | None,
+    region_start: int,
+    region_end: int,
+) -> float:
+    if not increments:
+        return 0.0
+    total = 0.0
+    for index in range(region_start, min(region_end, len(increments))):
+        increment = increments[index]
+        if _increment_is_finite(increment):
+            total += float(increment)
+    return total
+
+
+def _add_region_cumulative_hv_trace(
+    fig: go.Figure,
+    uhrzeit: pd.Series,
+    axis: ChartSlotAxis,
+    increments: list[float],
+    region_start: int,
+    region_end: int,
+    *,
+    name: str,
+    line_kwargs: dict,
+    yaxis: str = "y",
+    y_format: str = ".3f",
+    segment_hover_template: str,
+    bridge_left: bool = True,
+) -> None:
+    length = len(axis.starts)
+    cumulative = _region_cumulative_series(
+        increments, length, region_start, region_end
+    )
+    if cumulative is None:
+        return
+    segments = [(region_start, region_end, False)]
+    _add_segmented_hv_line(
+        fig,
+        axis,
+        cumulative,
+        uhrzeit,
+        segments,
+        name=name,
+        line_kwargs=line_kwargs,
+        yaxis=yaxis,
+        y_format=y_format,
+        segment_hover_template=segment_hover_template,
+        bridge_left=bridge_left,
+    )
+
+
+def add_cumulative_s2_split_traces(
+    fig: go.Figure,
+    uhrzeit: pd.Series,
+    axis: ChartSlotAxis,
+    *,
+    history_slot_count: int,
+    slot_actual_cost_euro: list[float],
+    slot_actual_consumption_kwh: list[float],
+    hourly_matched_baseline_cost_euro: list[float],
+    hourly_optimized_cost_euro: list[float],
+    hourly_matched_baseline_consumption_kwh: list[float],
+    hourly_optimized_consumption_kwh: list[float],
+) -> None:
+    """Chart 2 S-2 P3a: Ist (Log) und Prognose (MILP) ohne Brücke an der Grenze."""
+    length = len(axis.starts)
+    split = history_slot_count
+    if split <= 0 or split > length:
+        return
+
+    if split < length:
+        _add_region_cumulative_hv_trace(
+            fig,
+            uhrzeit,
+            axis,
+            hourly_matched_baseline_cost_euro,
+            split,
+            length,
+            name="Kosten BL Ziel (Prognose)",
+            line_kwargs=dict(color=_COLOR_BASELINE, width=2.5, shape="hv"),
+            segment_hover_template=(
+                "Uhrzeit: %{customdata}<br>Kosten BL Ziel (Prognose, kumuliert): "
+                "%{y:.3f} €<extra></extra>"
+            ),
+            bridge_left=False,
+        )
+        _add_region_cumulative_hv_trace(
+            fig,
+            uhrzeit,
+            axis,
+            hourly_optimized_cost_euro,
+            split,
+            length,
+            name="Kosten optimiert (Prognose)",
+            line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, shape="hv"),
+            segment_hover_template=(
+                "Uhrzeit: %{customdata}<br>Kosten optimiert (Prognose, kumuliert): "
+                "%{y:.3f} €<extra></extra>"
+            ),
+            bridge_left=False,
+        )
+        _add_region_cumulative_hv_trace(
+            fig,
+            uhrzeit,
+            axis,
+            hourly_matched_baseline_consumption_kwh,
+            split,
+            length,
+            name="Verbrauch BL Ziel (Prognose)",
+            line_kwargs=dict(color=_COLOR_BASELINE, width=2.5, dash="dash", shape="hv"),
+            yaxis="y2",
+            y_format=".2f",
+            segment_hover_template=(
+                "Uhrzeit: %{customdata}<br>Verbrauch BL Ziel (Prognose, kumuliert): "
+                "%{y:.2f} kWh<extra></extra>"
+            ),
+            bridge_left=False,
+        )
+        _add_region_cumulative_hv_trace(
+            fig,
+            uhrzeit,
+            axis,
+            hourly_optimized_consumption_kwh,
+            split,
+            length,
+            name="Verbrauch optimiert (Prognose)",
+            line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
+            yaxis="y2",
+            y_format=".2f",
+            segment_hover_template=(
+                "Uhrzeit: %{customdata}<br>Verbrauch optimiert (Prognose, kumuliert): "
+                "%{y:.2f} kWh<extra></extra>"
+            ),
+            bridge_left=False,
+        )
+
+    _add_region_cumulative_hv_trace(
+        fig,
+        uhrzeit,
+        axis,
+        slot_actual_cost_euro,
+        0,
+        split,
+        name="Kosten (Ist bisher)",
+        line_kwargs=dict(color=_COLOR_ACTUAL, width=2.5, shape="hv"),
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Kosten (Ist bisher, kumuliert): "
+            "%{y:.3f} €<extra></extra>"
+        ),
+    )
+    _add_region_cumulative_hv_trace(
+        fig,
+        uhrzeit,
+        axis,
+        slot_actual_consumption_kwh,
+        0,
+        split,
+        name="Verbrauch (Ist bisher)",
+        line_kwargs=dict(color=_COLOR_ACTUAL, width=2.5, dash="dash", shape="hv"),
+        yaxis="y2",
+        y_format=".2f",
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Verbrauch (Ist bisher, kumuliert): "
+            "%{y:.2f} kWh<extra></extra>"
+        ),
+    )
+
+
 def add_cumulative_cost_traces(
     fig: go.Figure,
     uhrzeit: pd.Series,
@@ -1670,6 +1890,9 @@ def render_cumulative_cost_chart(
     chart_now: datetime | None = None,
     chart_zones=None,
     slot_qualities: tuple[str, ...] | None = None,
+    history_slot_count: int | None = None,
+    slot_actual_cost_euro: list[float] | None = None,
+    slot_actual_consumption_kwh: list[float] | None = None,
 ) -> None:
     """Kumulierte Stromkosten und Verbrauch BL Ziel vs. optimiert."""
     axis = ChartSlotAxis.from_dataframe(df)
@@ -1679,17 +1902,36 @@ def render_cumulative_cost_chart(
     if chart_zones is not None:
         _add_zone_backgrounds(fig, chart_zones, axis, range_start=range_start)
     _add_missing_slot_backgrounds(fig, axis, slot_qualities)
+    length = len(axis.starts)
+    split_mode = (
+        history_slot_count is not None
+        and history_slot_count > 0
+        and slot_actual_cost_euro is not None
+        and slot_actual_consumption_kwh is not None
+    )
     has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
     has_consumption = bool(
         hourly_matched_baseline_consumption_kwh and hourly_optimized_consumption_kwh
     )
-    show_cost_summary = (
-        has_costs
-        and matched_baseline_cost_euro is not None
-        and optimized_cost_euro is not None
-    )
-
-    if has_costs:
+    forecast_start = history_slot_count if split_mode else 0
+    if split_mode:
+        add_cumulative_s2_split_traces(
+            fig,
+            df["Uhrzeit"],
+            axis,
+            history_slot_count=history_slot_count,
+            slot_actual_cost_euro=slot_actual_cost_euro or [],
+            slot_actual_consumption_kwh=slot_actual_consumption_kwh or [],
+            hourly_matched_baseline_cost_euro=hourly_matched_baseline_cost_euro or [],
+            hourly_optimized_cost_euro=hourly_optimized_cost_euro or [],
+            hourly_matched_baseline_consumption_kwh=(
+                hourly_matched_baseline_consumption_kwh or []
+            ),
+            hourly_optimized_consumption_kwh=hourly_optimized_consumption_kwh or [],
+        )
+        has_costs = has_costs or history_slot_count > 0
+        has_consumption = has_consumption or history_slot_count > 0
+    elif has_costs:
         add_cumulative_cost_traces(
             fig,
             df["Uhrzeit"],
@@ -1699,7 +1941,7 @@ def render_cumulative_cost_chart(
             extrap_start=extrap_start,
             extrap_end=extrap_end,
         )
-    if has_consumption:
+    if not split_mode and has_consumption:
         add_cumulative_consumption_traces(
             fig,
             df["Uhrzeit"],
@@ -1709,6 +1951,31 @@ def render_cumulative_cost_chart(
             extrap_start=extrap_start,
             extrap_end=extrap_end,
         )
+
+    show_cost_summary = (
+        has_costs
+        and matched_baseline_cost_euro is not None
+        and optimized_cost_euro is not None
+        and not split_mode
+    )
+    if split_mode and has_costs and history_slot_count is not None:
+        if history_slot_count < length:
+            matched_forecast = _sum_slot_increments(
+                hourly_matched_baseline_cost_euro,
+                forecast_start,
+                length,
+            )
+            optimized_forecast = _sum_slot_increments(
+                hourly_optimized_cost_euro,
+                forecast_start,
+                length,
+            )
+            show_cost_summary = True
+            matched_baseline_cost_euro = matched_forecast
+            optimized_cost_euro = optimized_forecast
+        else:
+            show_cost_summary = False
+
     if show_cost_summary:
         _add_cost_summary_annotations(
             fig,
@@ -1736,12 +2003,19 @@ def render_cumulative_cost_chart(
         )
     fig.update_layout(**layout)
     if has_costs or has_consumption:
-        extrap_start, _ = _extrapolation_bounds(df)
-        if extrap_start is None:
+        if split_mode:
             st.caption(
-                "Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): "
-                "Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert."
+                "Grauer Bereich: **Ist bisher** (blau, kumuliert aus Produktiv-Log). "
+                "Neutral/Grün: **Prognose** (BL Ziel / optimiert, kumuliert ab Log-Grenze "
+                "ohne Anschluss an Ist). Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
             )
+        else:
+            extrap_start, _ = _extrapolation_bounds(df)
+            if extrap_start is None:
+                st.caption(
+                    "Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): "
+                    "Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert."
+                )
     st.plotly_chart(fig, width="stretch")
 
 
@@ -1758,6 +2032,9 @@ def render_price_savings_chart(
     chart_now: datetime | None = None,
     chart_zones=None,
     slot_qualities: tuple[str, ...] | None = None,
+    history_slot_count: int | None = None,
+    slot_actual_cost_euro: list[float] | None = None,
+    slot_actual_consumption_kwh: list[float] | None = None,
 ) -> None:
     """Alias für kumulierte Kosten- und Verbrauchslinien."""
     render_cumulative_cost_chart(
@@ -1772,6 +2049,9 @@ def render_price_savings_chart(
         chart_now=chart_now,
         chart_zones=chart_zones,
         slot_qualities=slot_qualities,
+        history_slot_count=history_slot_count,
+        slot_actual_cost_euro=slot_actual_cost_euro,
+        slot_actual_consumption_kwh=slot_actual_consumption_kwh,
     )
 
 
@@ -1889,6 +2169,8 @@ def render_optimization_chart(
     sun_markers: ChartSunMarkers | None = None,
     slot_qualities: tuple[str, ...] | None = None,
     history_slot_count: int | None = None,
+    slot_actual_cost_euro: list[float] | None = None,
+    slot_actual_consumption_kwh: list[float] | None = None,
 ) -> None:
     """Zeichnet Leistung/SoC/Preis und kumulierte Kosten/Verbrauch in zwei Charts."""
     render_power_soc_chart(
@@ -1915,4 +2197,7 @@ def render_optimization_chart(
         chart_now=chart_now,
         chart_zones=chart_zones,
         slot_qualities=slot_qualities,
+        history_slot_count=history_slot_count,
+        slot_actual_cost_euro=slot_actual_cost_euro,
+        slot_actual_consumption_kwh=slot_actual_consumption_kwh,
     )

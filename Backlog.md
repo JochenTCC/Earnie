@@ -4,11 +4,16 @@
 
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
-- [ ] **UI Sunset-2-Sunset (Spec v0.6.1)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
+- [ ] **UI Sunset-2-Sunset (Spec v0.6.2)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen. Zeithorizont für Verbrauchs-Vergleich zur History noch klären.
+  - **Phase 3 — Charts & Kennzahlen** (Schritte **P3a–P3d**, Nomenklatur: `.cursor/rules/roadmap-nomenclature.mdc`)
+    - [ ] **P3c** Legacy-Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen
+    - [ ] **P3d** Kennzahlen-Horizont **Jetzt→SA₂** (MILP-Horizont, identisch BL-Ziel-Matching) — **Entscheidung 2026-07-05**; umsetzen: Energievergleich/ Ersparnis-Summen nicht auf Chart-Segment kürzen, Labels „(24h)“ entfernen, Legacy `[:24]` bei Grundlast/Profil-Zielen bereinigen
   - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (Navigation, Orange Chart+Tabelle)
   - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
+- [ ] **Anordnungen in UI ändern:**
+  - [ ] Buttons kleiner machen und zwischen beide Charts platzieren — kein Text dazwischen (weil auf Mobilgeräten dann die Buttons untereinander gezeigt werden)
+  - [ ] Hinweistexte entfernen bzw. durch kleine „?“ ersetzen, die dann den Text anzeigen
 - [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; Phase 2 des UI-Epics erledigt)
   - Abweichungsmarkierung nach bestimmten Regeln (noch zu definieren -aber bspw. "HINWEIS" (gelbes Dreieck), wenn geheizt werden darf, aber es nicht nötig war - oder "FEHLER" (Rotes Stopschild), wenn E-Auto nicht geladen hat, obwohl es sollte (und es noch nicht voll sein kann))
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
@@ -75,6 +80,14 @@ bodentemperaturen_nach_monat = {
 - [ ] Generisches E-Auto-Modell - für bessere Wiederverwendbarkeit
 
 ## Erledigte Punkte
+
+### UI Sunset-2-Sunset — Phase 3 P3a Chart 2 Ist/Prognose (2026-07-05)
+
+- [x] **P3a** Chart 2: „Ist bisher“ (Log) und „Prognose optimiert“ (MILP) getrennt, keine Brücke an Log/MILP-Grenze; Matrix-Index-Fix für SA₁→SA₂; matched baseline über volle Matrix (`ui/chart_context.py`, `ui/charts.py`, `optimizer/simulation.py`); Tests `test_chart2_s2_split.py`, `test_chart_context.py`
+
+### UI Sunset-2-Sunset — Phase 3 P3b SA-Marker (2026-07-05)
+
+- [x] **P3b** Vertikale Marker SA₀/SA₁/SA₂ im Chart (nur Anker im sichtbaren Fenster); **Jetzt** nur Live-Segment SA₀→SA₁ (`ui/charts.py`, `ui/simulation_results.py`); Tests `test_chart_ui_bugs.py`
 
 ### UI Sunset-2-Sunset — Chart-Darstellung (2026-07-05)
 

@@ -133,27 +133,41 @@ def test_gray_zone_aligns_with_sa0_at_left_axis():
     assert fig.layout.shapes[0].x0 == x_left
 
 
-def test_build_sun_markers_omits_sunset():
+def test_build_sun_markers_sa0_sa1_in_live_segment():
     now = _dt(2026, 6, 15, 14, 0)
     chart = compute_ui_chart_window(now, LAT, LON, TZ, segment_index=0)
-    markers = build_sun_markers(chart, now, planning_window=None)
-    assert markers.sunset_xs == ()
+    markers = build_sun_markers(chart, now, planning_window=None, show_now=True)
+    assert markers.sa0_x == chart.sa0
+    assert markers.sa1_x == chart.sa1
+    assert markers.sa2_x is None
+    assert markers.now_x == now
 
 
-def test_add_sun_markers_only_now_and_sa():
+def test_build_sun_markers_sa1_sa2_in_forecast_segment():
+    now = _dt(2026, 6, 15, 14, 0)
+    chart = compute_ui_chart_window(now, LAT, LON, TZ, segment_index=1)
+    markers = build_sun_markers(chart, now, planning_window=None, show_now=False)
+    assert markers.sa0_x is None
+    assert markers.sa1_x == chart.sa1
+    assert markers.sa2_x == chart.sa2
+    assert markers.now_x is None
+
+
+def test_add_sun_markers_shows_sa_labels_not_sunset():
     fig = go.Figure()
+    now = _dt(2026, 6, 15, 14, 0)
     markers = build_sun_markers(
-        compute_ui_chart_window(_dt(2026, 6, 15, 14, 0), LAT, LON, TZ),
-        _dt(2026, 6, 15, 14, 0),
+        compute_ui_chart_window(now, LAT, LON, TZ),
+        now,
         planning_window=None,
     )
     _add_sun_markers(fig, markers)
-    annotations = [
-        shape.get("annotation_text", "")
-        for shape in fig.layout.shapes or []
-        if hasattr(shape, "annotation_text")
-    ]
+    annotations = [getattr(item, "text", "") for item in (fig.layout.annotations or [])]
+    assert "Jetzt" in annotations
+    assert "SA₀" in annotations
+    assert "SA₁" in annotations
     assert not any(text.startswith("SU") for text in annotations if text)
+    assert "SA (SOC)" not in annotations
 
 
 def test_missing_slot_backgrounds_align_with_mixed_axis():

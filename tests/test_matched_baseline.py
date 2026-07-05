@@ -5,6 +5,7 @@ from tests.conftest import requires_historical_data
 from optimizer.simulation import (
     build_matched_flex_kw_per_hour,
     delivered_flex_kwh_from_rows,
+    hourly_cost_euro_from_rows,
     simulate_baseline_horizon,
     simulate_matched_baseline_horizon,
     total_consumption_kwh_from_rows,
@@ -39,6 +40,27 @@ def test_build_matched_flex_scales_to_target():
     assert abs(swimspa_sum - 6.0) < 0.01
     assert abs(eauto_sum - 12.0) < 0.01
     assert all(hour["swimspa"] == 0.0 for hour in per_hour[12:])
+
+
+def test_matched_baseline_covers_matrix_beyond_24_hours():
+    """Sunset-Horizont > 24 h: BL Ziel muss für alle Matrix-Stunden vorliegen."""
+    matrix = [
+        {
+            "hour": h,
+            "expected_p_pv": 1.0,
+            "expected_p_act": 0.5,
+            "k_act": 20.0,
+            "expected_flex_kw": {"swimspa": 0.5, "eauto": 0.5, "waermepumpe": 0.0},
+        }
+        for h in range(30)
+    ]
+    targets = {"swimspa": 6.0, "eauto": 12.0, "waermepumpe": 0.0}
+    per_hour = build_matched_flex_kw_per_hour(matrix, targets)
+    matched_rows = simulate_matched_baseline_horizon(matrix, 50.0, targets)
+    assert len(per_hour) == 30
+    assert len(matched_rows) == 30
+    hourly = hourly_cost_euro_from_rows(matched_rows, 3.5)
+    assert len(hourly) == 30
 
 
 def test_matched_baseline_matches_optimized_consumption_total():

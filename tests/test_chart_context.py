@@ -1,16 +1,21 @@
 """Tests für Live-Chart-Kontext (sunrise→sunrise)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+import pytest
 
 from data.planning_window import compute_ui_chart_window
 from ui.chart_context import (
+    ChartDisplayContext,
     align_rows_to_chart_slots,
     align_hourly_values_to_chart_slots,
+    build_display_savings_series,
     matrix_indices_for_chart,
     savings_view_for_chart,
 )
+from runtime_store.history_timeline import ChartHistoryResult, SLOT_PRESENT
 
 LAT = 47.404
 LON = 9.743
@@ -98,3 +103,99 @@ def test_savings_view_aligns_hourly_to_full_chart_window():
     assert sum(aligned) == 21.0
     nonzero = [value for value in aligned if value != 0.0]
     assert nonzero == [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+
+
+def test_build_display_savings_series_keeps_forecast_and_actual_separate():
+    """S-2 P3a: Ist-Inkremente getrennt; MILP-Optimiert wird nicht mit Log überschrieben."""
+    slots = (
+        _dt(2026, 6, 15, 10, 0),
+        _dt(2026, 6, 15, 10, 15),
+        _dt(2026, 6, 15, 11, 0),
+    )
+    history = ChartHistoryResult(
+        rows=[{"Uhrzeit": "15.06. 10:00"}, {"Uhrzeit": "15.06. 10:15"}],
+        slot_starts=slots[:2],
+        slot_qualities=(SLOT_PRESENT, SLOT_PRESENT),
+        slot_costs_euro=[0.11, 0.12],
+        cumulative_costs_euro=[0.11, 0.23],
+        slot_consumption_kwh=[0.5, 0.6],
+        cumulative_consumption_kwh=[0.5, 1.1],
+        present_slot_count=2,
+        held_slot_count=0,
+        missing_slot_count=0,
+        window_start=slots[0],
+        window_end_exclusive=slots[2],
+    )
+    display_ctx = ChartDisplayContext(
+        rows=[],
+        slot_datetimes=slots,
+        slot_qualities=(SLOT_PRESENT, SLOT_PRESENT, "milp"),
+        history_slot_count=2,
+        history_result=history,
+        gap_notice=None,
+        history_only=False,
+    )
+    now = _dt(2026, 6, 15, 14, 0)
+    chart = compute_ui_chart_window(now, LAT, LON, TZ)
+    matrix = [
+        {"slot_datetime": _dt(2026, 6, 15, 11, 0)},
+    ]
+    savings_info = {
+        "hourly_matched_baseline_cost_euro": [2.0],
+        "hourly_optimized_cost_euro": [1.0],
+        "hourly_matched_baseline_consumption_kwh": [3.0],
+        "hourly_optimized_consumption_kwh": [2.0],
+    }
+    savings_view = savings_view_for_chart(savings_info, matrix, chart)
+    view = build_display_savings_series(
+        display_ctx,
+        savings_view,
+        matrix,
+        chart,
+        savings_info=savings_info,
+    )
+    assert view["slot_actual_cost_euro"][:2] == [0.11, 0.12]
+    assert view["hourly_optimized_cost_euro"][0] != 0.11
+    assert view["hourly_optimized_cost_euro"][2] == 1.0
+
+
+def test_build_display_savings_series_sa1_sa2_uses_matrix_indexed_values():
+    """SA₁→SA₂: Inkremente aus Matrix-Index, nicht aus chart-voralignierter Liste."""
+    now = _dt(2026, 6, 15, 14, 0)
+    chart = compute_ui_chart_window(now, LAT, LON, TZ, segment_index=1)
+    matrix = [
+        {"slot_datetime": now.replace(minute=0) + timedelta(hours=offset)}
+        for offset in range(40)
+    ]
+    savings_info = {
+        "hourly_matched_baseline_cost_euro": [1.0] * len(matrix),
+        "hourly_optimized_cost_euro": [0.5] * len(matrix),
+        "hourly_matched_baseline_consumption_kwh": [2.0] * len(matrix),
+        "hourly_optimized_consumption_kwh": [1.5] * len(matrix),
+    }
+    savings_view = savings_view_for_chart(savings_info, matrix, chart)
+    display_ctx = ChartDisplayContext(
+        rows=[],
+        slot_datetimes=chart.slot_datetimes,
+        slot_qualities=tuple("milp" for _ in chart.slot_datetimes),
+        history_slot_count=0,
+        history_result=None,
+        gap_notice=None,
+        history_only=False,
+    )
+    broken = build_display_savings_series(
+        display_ctx, savings_view, matrix, chart
+    )
+    fixed = build_display_savings_series(
+        display_ctx,
+        savings_view,
+        matrix,
+        chart,
+        savings_info=savings_info,
+    )
+    assert sum(fixed["hourly_optimized_cost_euro"]) == pytest.approx(
+        savings_view["optimized_cost_euro"]
+    )
+    assert sum(broken["hourly_optimized_cost_euro"]) < sum(
+        fixed["hourly_optimized_cost_euro"]
+    )

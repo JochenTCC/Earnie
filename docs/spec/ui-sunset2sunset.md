@@ -1,7 +1,7 @@
 # Spezifikation: UI-Modus „Sunset-2-Sunset“
 
-**Version:** 0.6.1  
-**Status:** Phase 1 UI umgesetzt (2026-07-04); Phase 2 (Charts) teilweise — Daten-Schicht v0.6, Hold-Forward-Abschaffung offen; Phase 3–4 offen  
+**Version:** 0.6.2  
+**Status:** Phase 1 UI umgesetzt (2026-07-04); Phase 2 (Charts) teilweise — Daten-Schicht v0.6, Hold-Forward-Abschaffung offen; Phase 3 P3d Horizont entschieden (Jetzt→SA₂, 2026-07-05), Umsetzung offen; Phase 4 offen  
 **Ersetzt:** Streamlit-Modi „Echtzeit“ und „Historischer Tag“, Button „Produktiv-Archiv“, getrennte Live/History-Umschaltung
 
 ## 1. Ziel
@@ -44,6 +44,8 @@ Zwei umschaltbare Segmente (~24 h):
 | ← Zurück | Weitere SA-Zyklen zurück, max. bis `optimization_history.jsonl` reicht |
 | Vor → | Wechsel SA₀→SA₁ ↔ SA₁→SA₂; in SA₁→SA₂ deaktiviert |
 | Produktiv-Archiv | entfällt |
+
+**Chart-Marker (P3b):** Vertikale Linien **SA₀**, **SA₁**, **SA₂** (Sonnenaufgang), jeweils nur wenn der Anker im sichtbaren Segment liegt. **Jetzt** (gestrichelt) nur im Live-Segment SA₀→SA₁ (`cycle_offset=0`, `segment_index=0`). Keine SU-Marker mehr.
 
 Beschriftung z. B. „SA₀→SA₁ (Live)“ / „SA₁→SA₂ (Vorausschau)“ plus Datumsbereich.
 
@@ -100,6 +102,8 @@ Hold-Forward (bisher „hellorange / gehalten“) gilt im S-2-Modus **nicht**. F
 
 **Chart 2:** getrennt — „Ist bisher“ (Log, 15 min, inkl. abgeschlossene Viertelstunden der laufenden Stunde ab x:15) und „Prognose optimiert“ (Soll-Viertelstunden der laufenden Stunde ab x:15, danach MILP ab nächster voller Stunde); kein künstliches Zusammenfügen der Kurven.
 
+**Kennzahlen-Horizont (BL Ziel, Energievergleich, Ersparnis-Summen):** **Jetzt → SA₂** (voller MILP-Planungshorizont). BL Ziel und Optimierung werden über diesen Zeitraum auf gleiche Flex-Energie ausgerichtet. Die Chart-Segmente SA₀→SA₁ und SA₁→SA₂ sind **Darstellungsfenster** — kumulierte Kurven darin sind Ausschnitte, keine eigene Matching-Periode. Ist-Anteil (Log) unterliegt dem Matching nicht.
+
 ## 7. Live-Panels
 
 | Panel | Verhalten |
@@ -123,6 +127,7 @@ Hold-Forward (bisher „hellorange / gehalten“) gilt im S-2-Modus **nicht**. F
 
 | Datum | Version | Inhalt |
 |-------|---------|--------|
+| 2026-07-05 | 0.6.2 | P3b: Chart-Marker SA₀/SA₁/SA₂; Jetzt nur Live SA₀→SA₁; P3d Horizont Jetzt→SA₂ |
 | 2026-07-04 | 0.6.1 | Fehlende Log-Slots: orange markieren, keine Hold-Forward-Befüllung |
 | 2026-07-04 | 0.6 | Laufende Stunde ab x:15 im 15-Min-Takt: Log für vergangene Viertelstunden, konstantes MILP-Soll für offene; vor x:15 unverändert 1h-MILP |
 | 2026-07-04 | 0.5 | Erstfassung Phase 1 UI |
