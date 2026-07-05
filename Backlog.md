@@ -65,7 +65,7 @@ bodentemperaturen_nach_monat = {
     - Veränderliche Parameter
     - Zeithorizont (z.B. 24h für Gefrierschrank oder PV-Ertrag, 1 Jahr für Swimspa und Haus)
     - Der Adapationsalgo entnimmt Start-Parameter (live-Parameter) aus config.json und hinterlegt Adaptionshistorie getrennt und korrigiert Live-Parameter bei Bedarf (festgelegter Rhythmus - am Zeithorizont orientiert)
-- [] Chart 1 für variable Anzahl von Verbrauchern fit machen (max 4 anzeigen, nach Leistung priorisieren, Zoom einführen) 
+- [] Chart 1 für variable Anzahl von Verbrauchern fit machen (max 4 anzeigen, nach Leistung priorisieren, Zoom einführen) - alternativ ein negativer Balken mit allen aufsummierten Verbrauchern
 - [] Eigene UI Seite zur Visualisierung der Adaptionsalgos
 - [] Visualisierung des tatsächlichen Verbraucher-Verhaltens evtl. mit Empfehlungen 
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
