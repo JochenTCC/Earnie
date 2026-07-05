@@ -25,6 +25,10 @@
       "$ref": "#/definitions/system",
       "description": "HTTP-Timeouts und Intervall der Optimierungs-Schleife (main.py)."
     },
+    "ui": {
+      "$ref": "#/definitions/ui",
+      "description": "Streamlit-Cockpit: Fragment-Auto-Refresh-Intervalle."
+    },
     "runtime_settings": {
       "$ref": "#/definitions/runtime_settings",
       "description": "Laufzeitparameter für PV, Batterie und Optimierung."
@@ -189,6 +193,27 @@
           "items": {
             "$ref": "#/definitions/event_trigger"
           }
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "description": "Streamlit-UI (Fragment-Auto-Refresh). Env: ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC, ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC, ENERGY_OPTIMIZER_UI_MAIN_SYNC_POLL_SEC.",
+      "properties": {
+        "fragment_refresh_charts_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Auto-Refresh für Charts 1+2 in Sekunden (Standard: 60)."
+        },
+        "fragment_refresh_status_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Auto-Refresh für Sankey und Countdown in Sekunden (Standard: 10)."
+        },
+        "main_sync_poll_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Leichtgewichtiger main.py-Abgleich in Sekunden (Standard: 15)."
         }
       }
     },

@@ -4,12 +4,10 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
 ## Offene Bugfixes
 
-- [ ] **UI: Fragment-Refresh getrennt konfigurierbar** — heute hardcodiert `@st.fragment(run_every=10)` für Charts 1+2 (`ui/live_mode.py`), Sankey (`ui/sankey.py`), Countdown (`ui/countdown.py`); Ziel: getrennte Intervalle (z. B. Env oder `config.json`), **Charts 1+2: 60 s**, Sankey/Countdown weiter 10 s (oder ebenfalls konfigurierbar); weniger Flackern/Rerender auf NAS
-- [ ] **UI: main.py-Sync schneller nach Durchlauf** — Prod zeigt teils volle **90 s** Wartezeit (`APP_MAIN_SYNC_MAX_WAIT_SECONDS`, `optimizer/schedule.py`) obwohl `optimizer_run_state.json` bereits aktualisiert; Soll: bei `completed_at` im aktuellen Viertelstunden-Slot **sofort** neu simulieren (Ziel ≤ Fragment-Intervall); Max-Wartezeit **15+15 s** statt 60+30 (`APP_MAIN_SYNC_INITIAL_WAIT_SECONDS` / `APP_MAIN_SYNC_EXTRA_GRACE_SECONDS`); Prod prüfen: Slot-Erkennung `completed_at_in_current_slot`, `run_state`-Lesen im UI-Container, `ui/auto_refresh.py` + `ui/live_mode.py`
-- [ ] **UI S-2 Chart 2: Einsparungs-Texteinblendungen in beiden Segmenten** — Plotly-Annotationen (`BL Ziel`, `Optimiert`, `Ersparnis`) via `_cost_summary_annotations` in `ui/charts.py` fehlen im S-2-Split-Modus (`show_cost_summary` nur bei `not split_mode`); in **SA₀→SA₁** und **SA₁→SA₂** anzeigen, Werte **immer Gesamt-Horizont Jetzt→SA₂** (wie Kennzahlen/Energievergleich, unabhängig vom sichtbaren Chart-Segment); Kontext `ui/simulation_results.py` (`_cost_totals_from_savings`)
 - [ ] **Bugfix Chart 2: Ist-Kosten im grauen Log-Bereich konstant 0 €** — Kurve „Kosten (Ist bisher)“ bleibt in Prod flach, obwohl Verbrauch/Log-Slots befüllt sind; vermutlich `_slot_cost_euro` / `entry_to_chart_row` (`runtime_store/history_timeline.py`): Netzbezug aus Soll (PV + `battery_plan_kw`) statt **`consumption_snapshot.grid_kw`** bzw. fehlendes `market_price_cent` im Log; Pipeline `build_chart_history` → `_actual_slot_increments` → `add_cumulative_s2_split_traces` (`ui/charts.py`); Akzeptanz: kumulierte Ist-Kosten > 0 bei realem Netzbezug im `optimization_history.jsonl`; Regressionstest mit Log-Eintrag inkl. Snapshot
+- [ ] **UI S-2 Chart 2: Einsparungs-Texteinblendungen in beiden Segmenten** — Plotly-Annotationen (`BL Ziel`, `Optimiert`, `Ersparnis`) via `_cost_summary_annotations` in `ui/charts.py` fehlen im S-2-Split-Modus (`show_cost_summary` nur bei `not split_mode`); in **SA₀→SA₁** und **SA₁→SA₂** anzeigen, Werte **immer Gesamt-Horizont Jetzt→SA₂** (wie Kennzahlen/Energievergleich, unabhängig vom sichtbaren Chart-Segment); Kontext `ui/simulation_results.py` (`_cost_totals_from_savings`)
 - [ ] **Bugfix Chart 1: SoC-Lücke grau → neutral (Log/MILP-Grenze)** — SoC-Linie bricht am Übergang grauer Log-Zone in neutralen MILP-Bereich ab; analog zur behobenen Lücke neutral→grün (`test_soc_trace_bridges_extrapolation_start`): `add_optimized_soc_trace` setzt `bridge_left=False` an `history_slot_count` (`ui/charts.py`); vermutlich fehlender Brückenpunkt wie bei Extrap-Start oder fehlendes SoC im ersten MILP-Slot nach Merge (`ui/chart_context.py` `_milp_tail_rows`); Akzeptanz: durchgehende SoC-Linie an Log/MILP-Grenze ohne sichtbare Lücke; Test anpassen/ergänzen (`test_soc_trace_splits_at_history_boundary`)
-- [ ] ist PV-Leistung auf x-Achse richtig positioniert?
+- [ ] Warum zeigt streamlit auf PC Warnungen und Fehler an, Produktivsystem aber nicht?
 - [ ] **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
 
@@ -77,6 +75,8 @@ bodentemperaturen_nach_monat = {
 - [ ] Readme ausführlicher machen mit Motivation / Nutzen
 
 ### Version 2.0
+- [ ] Ausführlicher Code-Review und Refactoring
+### Version 2.+1
 - [ ] Generische Wärme-Modelle für Verbraucher/Erzeuger anhand der konkreten Beispiele entwickeln
   - Wärme-Modelle
     - Isolierte Ein-Knoten-Modelle (Gefrierschrank, Swimspa), aber mit variablen Wärmepfaden (gegen Unendlich)

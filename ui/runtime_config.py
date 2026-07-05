@@ -46,7 +46,7 @@ def invalidate_live_optimization_cache() -> None:
         "live_optimization_cache_key",
         "live_optimization_df",
         "live_savings_info",
-        "live_optimization_placeholder",
+        "live_display_bundle",
     ):
         st.session_state.pop(key, None)
 

@@ -136,6 +136,23 @@ class Config:
         return raw
 
     @staticmethod
+    def _load_ui_fragment_refresh_sec(raw_config: dict, key: str, default: int) -> int:
+        raw = raw_config.get("ui", {}).get(key)
+        if raw is None:
+            return default
+        try:
+            value = int(raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: ui.{key} muss eine ganze Zahl sein."
+            ) from exc
+        if value < 1:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: ui.{key} muss mindestens 1 sein."
+            )
+        return value
+
+    @staticmethod
     def _load_event_poll_interval_sec(raw_config: dict) -> int:
         system = raw_config.get("system", {})
         raw = system.get("event_poll_interval_sec")
@@ -242,6 +259,21 @@ class Config:
         self.EVENT_TRIGGER_ENABLED = self._load_event_trigger_enabled(self._raw_config)
         self.EVENT_POLL_INTERVAL_SEC = self._load_event_poll_interval_sec(self._raw_config)
         self.EVENT_TRIGGERS = self._load_event_triggers()
+        self.UI_FRAGMENT_REFRESH_CHARTS_SEC = self._load_ui_fragment_refresh_sec(
+            self._raw_config,
+            "fragment_refresh_charts_sec",
+            60,
+        )
+        self.UI_FRAGMENT_REFRESH_STATUS_SEC = self._load_ui_fragment_refresh_sec(
+            self._raw_config,
+            "fragment_refresh_status_sec",
+            10,
+        )
+        self.UI_MAIN_SYNC_POLL_SEC = self._load_ui_fragment_refresh_sec(
+            self._raw_config,
+            "main_sync_poll_sec",
+            15,
+        )
 
         self.LOXONE_SOC_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "soc_name"])
         self.LOXONE_PV_COUNTER_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "pv_counter_name"])
@@ -774,6 +806,15 @@ class Config:
     def get_event_poll_interval_sec(self) -> int:
         return int(self.get('EVENT_POLL_INTERVAL_SEC', default=60))
 
+    def get_ui_fragment_charts_sec(self) -> int:
+        return int(self.get("UI_FRAGMENT_REFRESH_CHARTS_SEC", default=60))
+
+    def get_ui_fragment_status_sec(self) -> int:
+        return int(self.get("UI_FRAGMENT_REFRESH_STATUS_SEC", default=10))
+
+    def get_ui_main_sync_poll_sec(self) -> int:
+        return int(self.get("UI_MAIN_SYNC_POLL_SEC", default=15))
+
     def get_event_triggers(self) -> list[dict]:
         return list(self.EVENT_TRIGGERS)
 
@@ -1048,6 +1089,18 @@ def is_event_trigger_enabled() -> bool:
 
 def get_event_poll_interval_sec() -> int:
     return CONFIG.get_event_poll_interval_sec()
+
+
+def get_ui_fragment_charts_sec() -> int:
+    return CONFIG.get_ui_fragment_charts_sec()
+
+
+def get_ui_fragment_status_sec() -> int:
+    return CONFIG.get_ui_fragment_status_sec()
+
+
+def get_ui_main_sync_poll_sec() -> int:
+    return CONFIG.get_ui_main_sync_poll_sec()
 
 
 def get_event_triggers() -> list[dict]:

@@ -19,6 +19,11 @@
         "expected_cycles": 6000,
         "cycle_cost_fraction": 0.5
     },
+    "ui": {
+        "fragment_refresh_charts_sec": 60,
+        "fragment_refresh_status_sec": 10,
+        "main_sync_poll_sec": 15
+    },
     "system": {
         "global_timeout": 10,
         "loop_timeout": 900,

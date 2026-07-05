@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 import streamlit as st
 import pandas as pd
 
 import config
 from data.planning_window import ui_chart_zones
+from optimizer.deviation_eval import DeviationEvent
 from optimizer.targets import consumer_column_name
 from runtime_store import live_optimization_debug
 from runtime_store import optimization_history
@@ -28,12 +30,213 @@ from ui.chart_context import (
 from ui.charts import (
     _mask_missing_log_slots,
     build_sun_markers,
-    render_optimization_chart,
+    render_power_soc_chart,
+    render_price_savings_chart,
 )
 from ui.simulation_table_view import render_frozen_simulation_table
 from ui.history_navigation import render_s2_nav_buttons, s2_zone_help_text
 
 logger = logging.getLogger("app")
+
+SESSION_LIVE_DISPLAY_BUNDLE = "live_display_bundle"
+
+
+@dataclass(frozen=True)
+class OptimizationDisplayBundle:
+    """Vorbereitete Chart-/Tabellen-Daten für Live-Optimierung."""
+
+    savings_info: dict
+    baseline_df: pd.DataFrame
+    display_df: pd.DataFrame
+    display_matched: pd.DataFrame | None
+    savings_view: dict
+    table_df: pd.DataFrame
+    table_qualities: tuple[str, ...] | None
+    table_gap_notice: str | None
+    chart_context: LiveChartContext | None
+    chart_zones: object | None
+    sun_markers: object | None
+    chart_qualities: tuple[str, ...] | None
+    history_slot_count: int | None
+    matched_cost: float | None
+    optimized_cost: float | None
+    chart_header_label: str | None
+    chart_header_help: str | None
+    slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...]
+    simulation_table_title: str | None
+
+
+def build_optimization_display_bundle(
+    savings_info: dict,
+    optimized_df: pd.DataFrame,
+    baseline_df: pd.DataFrame,
+    matched_baseline_df: pd.DataFrame | None = None,
+    *,
+    simulation_table_title: str | None = "📋 Simulations-Details (Nächste 24 Stunden)",
+    chart_context: LiveChartContext | None = None,
+    optimization_matrix: list | None = None,
+) -> OptimizationDisplayBundle:
+    if matched_baseline_df is None and savings_info.get("matched_baseline_rows"):
+        matched_baseline_df = pd.DataFrame(savings_info["matched_baseline_rows"])
+
+    savings_view = savings_info
+    display_df = optimized_df
+    display_matched = matched_baseline_df
+    table_df = display_df
+    table_qualities: tuple[str, ...] | None = None
+    table_gap_notice: str | None = None
+    chart_qualities: tuple[str, ...] | None = None
+    sun_markers = None
+    chart_zones = chart_context.zones if chart_context else None
+    merge_active = False
+    history_slot_count: int | None = None
+    slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] = ()
+    if chart_context is not None and optimization_matrix is not None:
+        merge_active = True
+        savings_view = savings_view_for_chart(
+            savings_info,
+            optimization_matrix,
+            chart_context.chart_window,
+        )
+        display_ctx = build_chart_display_context(
+            chart_context,
+            optimized_df.to_dict("records"),
+        )
+        is_live_segment = (
+            chart_context.cycle_offset == 0 and chart_context.segment_index == 0
+        )
+        zone_now = (
+            chart_context.now
+            if is_live_segment
+            else chart_context.chart_window.end
+        )
+        chart_zones = ui_chart_zones(
+            zone_now,
+            chart_context.chart_window,
+            sim_rows=optimized_df.to_dict("records"),
+            is_live_segment=is_live_segment,
+            slot_datetimes=display_ctx.slot_datetimes,
+        )
+        savings_view = build_display_savings_series(
+            display_ctx,
+            savings_view,
+            optimization_matrix,
+            chart_context.chart_window,
+            savings_info=savings_info,
+        )
+        table_df = pd.DataFrame(display_ctx.rows)
+        table_qualities = display_ctx.slot_qualities
+        chart_qualities = display_ctx.slot_qualities
+        table_gap_notice = display_ctx.gap_notice
+        display_df = pd.DataFrame(display_ctx.rows)
+        history_slot_count = display_ctx.history_slot_count
+        slot_deviation_events = display_ctx.slot_deviation_events
+        if matched_baseline_df is not None and not display_ctx.history_only:
+            display_matched = pd.DataFrame(
+                align_rows_to_display_slots(
+                    matched_baseline_df.to_dict("records"),
+                    display_ctx.slot_datetimes,
+                )
+            )
+            if chart_qualities is not None:
+                display_matched = _mask_missing_log_slots(
+                    display_matched, chart_qualities
+                )
+        elif display_ctx.history_only:
+            display_matched = None
+        sun_markers = build_sun_markers(
+            chart_context.chart_window,
+            chart_context.now,
+            chart_context.planning_window,
+            slot_datetimes=display_ctx.slot_datetimes,
+            show_now=is_live_segment,
+        )
+
+    if chart_context is not None:
+        _store_s2_data_basis_meta(
+            merge_active=merge_active,
+            history_slot_count=history_slot_count,
+        )
+
+    matched_cost, optimized_cost = _cost_totals_from_savings(savings_info)
+    chart_header_label = None
+    chart_header_help = None
+    if chart_context is not None:
+        chart_header_label = s2_chart_header_label(chart_context)
+        chart_header_help = s2_zone_help_text()
+
+    return OptimizationDisplayBundle(
+        savings_info=savings_info,
+        baseline_df=baseline_df,
+        display_df=display_df,
+        display_matched=display_matched,
+        savings_view=savings_view,
+        table_df=table_df,
+        table_qualities=table_qualities,
+        table_gap_notice=table_gap_notice,
+        chart_context=chart_context,
+        chart_zones=chart_zones,
+        sun_markers=sun_markers,
+        chart_qualities=chart_qualities,
+        history_slot_count=history_slot_count,
+        matched_cost=matched_cost,
+        optimized_cost=optimized_cost,
+        chart_header_label=chart_header_label,
+        chart_header_help=chart_header_help,
+        slot_deviation_events=slot_deviation_events,
+        simulation_table_title=simulation_table_title,
+    )
+
+
+def render_optimization_chart1(bundle: OptimizationDisplayBundle) -> None:
+    render_power_soc_chart(
+        bundle.display_df,
+        bundle.baseline_df,
+        bundle.display_matched,
+        chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
+        chart_now=bundle.chart_context.zone_reference if bundle.chart_context else None,
+        chart_zones=bundle.chart_zones,
+        sun_markers=bundle.sun_markers,
+        slot_qualities=bundle.chart_qualities,
+        history_slot_count=bundle.history_slot_count,
+        chart_key="live_power_soc_chart",
+        chart_header_label=bundle.chart_header_label,
+        chart_header_help=bundle.chart_header_help,
+        slot_deviation_events=bundle.slot_deviation_events,
+    )
+
+
+def render_optimization_chart2(bundle: OptimizationDisplayBundle) -> None:
+    render_price_savings_chart(
+        bundle.display_df,
+        bundle.savings_view.get("hourly_matched_baseline_cost_euro"),
+        bundle.savings_view.get("hourly_optimized_cost_euro"),
+        bundle.savings_view.get("hourly_matched_baseline_consumption_kwh"),
+        bundle.savings_view.get("hourly_optimized_consumption_kwh"),
+        matched_baseline_cost_euro=bundle.matched_cost,
+        optimized_cost_euro=bundle.optimized_cost,
+        chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
+        chart_now=bundle.chart_context.zone_reference if bundle.chart_context else None,
+        chart_zones=bundle.chart_zones,
+        slot_qualities=bundle.chart_qualities,
+        history_slot_count=bundle.history_slot_count,
+        slot_actual_cost_euro=bundle.savings_view.get("slot_actual_cost_euro"),
+        slot_actual_consumption_kwh=bundle.savings_view.get("slot_actual_consumption_kwh"),
+    )
+
+
+def render_optimization_results_tail(bundle: OptimizationDisplayBundle) -> None:
+    if bundle.simulation_table_title:
+        table_title = bundle.simulation_table_title
+        if bundle.chart_context is not None:
+            table_title = "📋 Simulations-Details (Sunset-2-Sunset-Fenster)"
+        render_simulation_details(
+            bundle.table_df,
+            title=table_title,
+            slot_qualities=bundle.table_qualities,
+            gap_notice=bundle.table_gap_notice,
+        )
+    render_applied_targets(bundle.savings_info)
 
 
 def _cost_totals_from_savings(savings: dict) -> tuple[float | None, float | None]:
@@ -324,138 +527,20 @@ def render_optimization_results(
     chart_context: LiveChartContext | None = None,
     optimization_matrix: list | None = None,
 ) -> None:
-    if matched_baseline_df is None and savings_info.get("matched_baseline_rows"):
-        matched_baseline_df = pd.DataFrame(savings_info["matched_baseline_rows"])
-
-    savings_view = savings_info
-    display_df = optimized_df
-    display_matched = matched_baseline_df
-    table_df = display_df
-    table_qualities: tuple[str, ...] | None = None
-    table_gap_notice: str | None = None
-    chart_qualities: tuple[str, ...] | None = None
-    sun_markers = None
-    chart_zones = chart_context.zones if chart_context else None
-    merge_active = False
-    history_slot_count: int | None = None
-    if chart_context is not None and optimization_matrix is not None:
-        merge_active = True
-        savings_view = savings_view_for_chart(
-            savings_info,
-            optimization_matrix,
-            chart_context.chart_window,
-        )
-        display_ctx = build_chart_display_context(
-            chart_context,
-            optimized_df.to_dict("records"),
-        )
-        is_live_segment = (
-            chart_context.cycle_offset == 0 and chart_context.segment_index == 0
-        )
-        zone_now = (
-            chart_context.now
-            if is_live_segment
-            else chart_context.chart_window.end
-        )
-        chart_zones = ui_chart_zones(
-            zone_now,
-            chart_context.chart_window,
-            sim_rows=optimized_df.to_dict("records"),
-            is_live_segment=is_live_segment,
-            slot_datetimes=display_ctx.slot_datetimes,
-        )
-        savings_view = build_display_savings_series(
-            display_ctx,
-            savings_view,
-            optimization_matrix,
-            chart_context.chart_window,
-            savings_info=savings_info,
-        )
-        table_df = pd.DataFrame(display_ctx.rows)
-        table_qualities = display_ctx.slot_qualities
-        chart_qualities = display_ctx.slot_qualities
-        table_gap_notice = display_ctx.gap_notice
-        display_df = pd.DataFrame(display_ctx.rows)
-        history_slot_count = display_ctx.history_slot_count
-        if matched_baseline_df is not None and not display_ctx.history_only:
-            display_matched = pd.DataFrame(
-                align_rows_to_display_slots(
-                    matched_baseline_df.to_dict("records"),
-                    display_ctx.slot_datetimes,
-                )
-            )
-            if chart_qualities is not None:
-                display_matched = _mask_missing_log_slots(
-                    display_matched, chart_qualities
-                )
-        elif display_ctx.history_only:
-            display_matched = None
-        sun_markers = build_sun_markers(
-            chart_context.chart_window,
-            chart_context.now,
-            chart_context.planning_window,
-            slot_datetimes=display_ctx.slot_datetimes,
-            show_now=is_live_segment,
-        )
-
-    if chart_context is not None:
-        _store_s2_data_basis_meta(
-            merge_active=merge_active,
-            history_slot_count=history_slot_count,
-        )
-
-    matched_cost, optimized_cost = _cost_totals_from_savings(savings_info)
-    chart_header_label = None
-    chart_header_help = None
-    if chart_context is not None:
-        chart_header_label = s2_chart_header_label(chart_context)
-        chart_header_help = s2_zone_help_text()
-    between_charts = None
-    if chart_context is not None:
-        between_charts = lambda: render_s2_nav_buttons(now=live_now())
-    render_optimization_chart(
-        display_df,
+    bundle = build_optimization_display_bundle(
+        savings_info,
+        optimized_df,
         baseline_df,
-        display_matched,
-        hourly_savings_euro=savings_view.get("hourly_savings_euro"),
-        hourly_matched_baseline_cost_euro=savings_view.get(
-            "hourly_matched_baseline_cost_euro"
-        ),
-        hourly_optimized_cost_euro=savings_view.get("hourly_optimized_cost_euro"),
-        hourly_matched_baseline_consumption_kwh=savings_view.get(
-            "hourly_matched_baseline_consumption_kwh"
-        ),
-        hourly_optimized_consumption_kwh=savings_view.get(
-            "hourly_optimized_consumption_kwh"
-        ),
-        matched_baseline_cost_euro=matched_cost,
-        optimized_cost_euro=optimized_cost,
-        chart_window=chart_context.chart_window if chart_context else None,
-        chart_now=chart_context.zone_reference if chart_context else None,
-        chart_zones=chart_zones,
-        sun_markers=sun_markers,
-        slot_qualities=chart_qualities,
-        history_slot_count=history_slot_count,
-        slot_actual_cost_euro=savings_view.get("slot_actual_cost_euro"),
-        slot_actual_consumption_kwh=savings_view.get("slot_actual_consumption_kwh"),
-        between_charts_hook=between_charts,
-        chart_header_label=chart_header_label,
-        chart_header_help=chart_header_help,
-        slot_deviation_events=display_ctx.slot_deviation_events,
+        matched_baseline_df,
+        simulation_table_title=simulation_table_title,
+        chart_context=chart_context,
+        optimization_matrix=optimization_matrix,
     )
-    if simulation_table_title:
-        table_title = simulation_table_title
-        if chart_context is not None:
-            table_title = (
-                "📋 Simulations-Details (Sunset-2-Sunset-Fenster)"
-            )
-        render_simulation_details(
-            table_df,
-            title=table_title,
-            slot_qualities=table_qualities,
-            gap_notice=table_gap_notice,
-        )
-    render_applied_targets(savings_info)
+    render_optimization_chart1(bundle)
+    if bundle.chart_context is not None:
+        render_s2_nav_buttons(now=live_now())
+    render_optimization_chart2(bundle)
+    render_optimization_results_tail(bundle)
 
 
 def persist_simulation_debug(

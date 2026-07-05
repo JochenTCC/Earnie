@@ -8,6 +8,7 @@ import config
 from data import live_consumption
 from integrations import loxone_client
 from runtime_store import run_state
+from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY
 from ui.runtime_config import reload_runtime_config
 from ui import sankey_produktiv as produktiv
 
@@ -256,7 +257,7 @@ def _create_live_flow_sankey(
     return fig
 
 
-@st.fragment(run_every=10)
+@st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
 def render_live_power_flow(current_soc: float) -> None:
     """Rendert die Live-Leistungsfluss-Ansicht mit CSS-Fix gegen den Text-Glow."""
     reload_runtime_config()
