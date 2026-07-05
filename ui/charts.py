@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -1112,8 +1111,10 @@ def _add_pv_trace(
     pv_kw: pd.Series,
     uhrzeit: pd.Series,
 ) -> None:
-    """PV-Verlauf mit gelber Fläche — unabhängig von extrapolierten Preisen."""
-    pv_x, pv_y = _extended_line_xy(axis, pv_kw)
+    """PV-Verlauf mit gelber Fläche — Anker in der Slotmitte, glatte Interpolation."""
+    pv_x, pv_y = _extended_line_xy(
+        axis, pv_kw, anchor_fraction=_LINE_ANCHOR_SLOT_CENTER
+    )
     fig.add_trace(go.Scatter(
         x=pv_x,
         y=pv_y,
@@ -2190,7 +2191,6 @@ def render_optimization_chart(
     history_slot_count: int | None = None,
     slot_actual_cost_euro: list[float] | None = None,
     slot_actual_consumption_kwh: list[float] | None = None,
-    between_charts_hook: Callable[[], None] | None = None,
     chart_header_label: str | None = None,
     chart_header_help: str | None = None,
     slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] | None = None,
@@ -2211,8 +2211,6 @@ def render_optimization_chart(
         chart_header_help=chart_header_help,
         slot_deviation_events=slot_deviation_events,
     )
-    if between_charts_hook is not None:
-        between_charts_hook()
     render_price_savings_chart(
         df,
         hourly_matched_baseline_cost_euro,

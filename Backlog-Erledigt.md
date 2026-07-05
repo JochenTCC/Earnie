@@ -3,6 +3,14 @@
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
 
+### UI Chart PV-Zeitbasis (2026-07-05)
+
+- [x] **PV-Leistung auf X-Achse korrekt positioniert** — Ursache: glatte Linearinterpolation zwischen Slotbeginnen ließ PV vor Sonnenaufgang ansteigen (Rohdaten stündlich ab Slotbeginn waren plausibel); Fix: PV-Anker in **Slotmitte** (`_LINE_ANCHOR_SLOT_CENTER` in `_add_pv_trace`, `ui/charts.py`); Regressionstest `test_chart1_pv_center_anchor_avoids_early_morning_ramp`; S-2-Nav zwischen Chart 1/2 aus Fragment ausgelagert (`StreamlitFragmentWidgetsNotAllowedOutsideError`, `ui/live_mode.py`)
+
+### UI Fragment-Refresh (2026-07-05)
+
+- [x] **UI: Fragment-Refresh getrennt konfigurierbar** — `ui/fragment_refresh.py`; Charts 1+2 **60 s** (`ui/live_mode.py`), Sankey/Countdown **10 s** (`ui/sankey.py`, `ui/countdown.py`); optional `config.json` → `ui.fragment_refresh_charts_sec` / `ui.fragment_refresh_status_sec` oder Env `ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC` / `ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC`; Schema/Beispiel, Tests `tests/test_fragment_refresh.py`
+
 ### Historische Tests & Energiebilanz (2026-07-05)
 
 - [x] **stderr-Warnung `Keine historischen Daten in cons_data_hourly`** — `profile_manager.get_historical_day_data`: `cons_data_hourly.csv` fehlt oder ist leer (Datum in der Meldung = angefragter Tag, typisch heute via `consumer_targets` in der Live-UI); Ausgabe per `print()` → stderr; Fallback Grundlast 0,5 kW/h, Verbraucher-Tagesziele 0; Abhilfe: `runtime/cons_data_hourly.csv` pflegen (`main.py` oder `scripts/generate_cons_data.py`)
@@ -18,6 +26,7 @@ Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 - [x] **Doppelte UI-Wartezeit nach main.py-Durchlauf klären**
   - Ursache: feste 60-s-Phase (`delay`) ohne `completed_at`-Check, danach bis 120 s Grace (`wait_main`) — wirkte wie zweimaliges Warten
   - Fix: früher Exit bei Sync im aktuellen Slot; max. 60+30 s Wartezeit; UNC-Lesefix in `run_state`; einheitlicher UI-Hinweis; Tests `tests/test_schedule.py`
+- [x] **UI: main.py-Sync schneller nach Durchlauf** — Fallback **15+15 s** (`optimizer/schedule.py`); Anzeige „nächster Abgleich spätestens in X s“ statt voller Fallback-Countdown (`sync_ui_countdown_seconds`, `ui/main_py_sync.py`); 15-s-Poll-Fragment `poll_main_py_sync_if_pending` + Footer (`ui/countdown.py`, `app.py`); Config `ui.main_sync_poll_sec` / Env `ENERGY_OPTIMIZER_UI_MAIN_SYNC_POLL_SEC`; Tests `tests/test_schedule.py`, `tests/test_main_py_sync_ui.py`
 
 ### UI Sunset-2-Sunset Epic abgeschlossen (2026-07-05)
 

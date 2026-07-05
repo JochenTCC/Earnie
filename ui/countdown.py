@@ -7,15 +7,16 @@ import streamlit as st
 
 from optimizer import schedule as optimization_schedule
 from runtime_store import run_state
+from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY, main_sync_poll_interval_sec
 from ui.help_hint import render_help_hint
-from ui.main_py_sync import MAIN_PY_SYNC_HELP
+from ui.main_py_sync import MAIN_PY_SYNC_HELP, sync_footer_caption
 from ui.runtime_config import reload_runtime_config
 from ui.simulation_results import render_live_display_data_basis_expander
 
 
-@st.fragment(run_every=10)
+@st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
 def _render_countdown_captions() -> None:
-    """Countdown-Zeilen (Fragment-Refresh alle 10 s)."""
+    """Countdown-Zeilen (Fragment-Refresh, Intervall konfigurierbar)."""
     reload_runtime_config()
 
     main_state = run_state.load_run_state()
@@ -31,13 +32,11 @@ def _render_countdown_captions() -> None:
         sync_label = "App"
 
     remaining = max(0, int(optimization_schedule.seconds_until_next_quarter_hour()))
-    app_wait = max(
-        0,
-        int(
-            optimization_schedule.seconds_until_main_py_sync_ready(
-                (main_state or {}).get("completed_at"),
-            )
-        ),
+    poll_sec = main_sync_poll_interval_sec()
+    completed = (main_state or {}).get("completed_at")
+    _, _, retry_sec, fallback_sec = optimization_schedule.live_simulation_readiness(
+        completed,
+        poll_sec=poll_sec,
     )
     next_run = optimization_schedule.next_quarter_hour_datetime()
     last_time = time.strftime("%H:%M:%S", time.localtime(last_optimization))
@@ -48,11 +47,7 @@ def _render_countdown_captions() -> None:
     )
     col_sync, col_help = st.columns([11, 1], vertical_alignment="center")
     with col_sync:
-        sync_hint = (
-            f" · **App-Sync** wartet auf main.py (noch `{app_wait}` s)"
-            if app_wait > 0
-            else " · **App-Sync** bereit"
-        )
+        sync_hint = sync_footer_caption(retry_sec, fallback_sec)
         st.caption(
             f"⏳ **Nächster main.py-Takt:** `{next_run.strftime('%H:%M')}` "
             f"(in `{remaining}` s){sync_hint}"

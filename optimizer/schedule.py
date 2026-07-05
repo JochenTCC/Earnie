@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 
 QUARTER_HOUR_MINUTES = 15
 QUARTER_HOUR_SECONDS = QUARTER_HOUR_MINUTES * 60
-# Wartezeit app.py auf main.py pro Viertelstunden-Slot: 60 s, dann ggf. 30 s Grace, danach Fallback.
-APP_MAIN_SYNC_INITIAL_WAIT_SECONDS = 60
-APP_MAIN_SYNC_EXTRA_GRACE_SECONDS = 30
+# Wartezeit app.py auf main.py pro Viertelstunden-Slot: 15 s, dann ggf. 15 s Grace, danach Fallback.
+APP_MAIN_SYNC_INITIAL_WAIT_SECONDS = 15
+APP_MAIN_SYNC_EXTRA_GRACE_SECONDS = 15
 APP_MAIN_SYNC_MAX_WAIT_SECONDS = (
     APP_MAIN_SYNC_INITIAL_WAIT_SECONDS + APP_MAIN_SYNC_EXTRA_GRACE_SECONDS
 )
@@ -81,23 +81,40 @@ def completed_at_in_current_slot(completed_at: str | None, now: datetime | None 
     return slot_start <= completed < slot_end
 
 
+def sync_ui_countdown_seconds(
+    main_completed_at: str | None,
+    poll_sec: int,
+    now: datetime | None = None,
+) -> int:
+    """Sekunden bis zum nächsten erwarteten UI-Abgleich (Anzeige, nicht Fallback-Obergrenze)."""
+    if completed_at_in_current_slot(main_completed_at, now):
+        return 0
+    fallback_remaining = int(seconds_until_main_py_sync_ready(main_completed_at, now))
+    if fallback_remaining <= 0:
+        return 0
+    return max(1, min(int(poll_sec), fallback_remaining))
+
+
 def live_simulation_readiness(
     main_completed_at: str | None,
     now: datetime | None = None,
-) -> tuple[bool, str, int]:
+    *,
+    poll_sec: int = 15,
+) -> tuple[bool, str, int, int]:
     """
     Steuert, wann app.py die Live-Simulation neu berechnet.
 
-    Rückgabe: (bereit, grund, warte_sekunden)
+    Rückgabe: (bereit, grund, ui_retry_sekunden, fallback_sekunden)
     """
     if completed_at_in_current_slot(main_completed_at, now):
-        return True, "main_synced", 0
+        return True, "main_synced", 0, 0
 
-    wait_sec = int(seconds_until_main_py_sync_ready(main_completed_at, now))
-    if wait_sec > 0:
-        return False, "wait_main", max(1, wait_sec)
+    fallback_sec = int(seconds_until_main_py_sync_ready(main_completed_at, now))
+    if fallback_sec > 0:
+        ui_retry = sync_ui_countdown_seconds(main_completed_at, poll_sec, now)
+        return False, "wait_main", ui_retry, fallback_sec
 
-    return True, "fallback", 0
+    return True, "fallback", 0, 0
 
 
 def seconds_until_next_quarter_hour(now: datetime | None = None) -> float:
