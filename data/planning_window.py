@@ -455,24 +455,43 @@ def _ui_chart_zones_sa0_sa1(
 ) -> UiChartZones:
     """Segment SA₀→SA₁: grau / neutral / grün (Vergangenheit ab SA₀)."""
     gray_color = "rgba(128, 128, 128, 0.18)"
-    if is_live_segment:
-        gray_end = history_boundary_exclusive(now)
-    else:
-        gray_end = chart.end + timedelta(hours=1)
+    if not is_live_segment:
+        history_end = chart.end
+        neutral_end = chart.end
+        green_start = chart.end
+        green_color = None
+        return UiChartZones(
+            history=UiChartZone(
+                label="Vergangenheit",
+                start=chart.start,
+                end=history_end,
+                fill_color=gray_color if history_end > chart.start else None,
+            ),
+            live_plan=UiChartZone(
+                label="Aktuell/Plan",
+                start=history_end,
+                end=neutral_end,
+                fill_color=None,
+            ),
+            forecast=UiChartZone(
+                label="Vorausschau",
+                start=green_start,
+                end=chart.end,
+                fill_color=green_color,
+            ),
+        )
+    gray_end = history_boundary_exclusive(now)
     extrapolated = first_extrapolated_slot(slot_datetimes, sim_rows)
     green_color = "rgba(76, 175, 80, 0.15)"
-    if is_live_segment and extrapolated is not None:
+    if extrapolated is not None:
         green_start = extrapolated
     else:
         green_start = chart.end
         green_color = None
     neutral_end = _clip_zone_end(chart.start, chart.end, green_start)
-    if is_live_segment:
-        history_end = _clip_zone_end(chart.start, chart.end, gray_end)
-        if history_end < chart.start:
-            history_end = chart.start
-    else:
-        history_end = gray_end
+    history_end = _clip_zone_end(chart.start, chart.end, gray_end)
+    if history_end < chart.start:
+        history_end = chart.start
     if neutral_end < history_end:
         neutral_end = history_end
     if green_start < neutral_end:

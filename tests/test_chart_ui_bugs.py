@@ -17,6 +17,7 @@ from ui.charts import (
     _add_missing_slot_backgrounds,
     _add_sun_markers,
     _add_zone_backgrounds,
+    _history_zone_x1,
     _zone_right_edge,
     add_optimized_soc_trace,
     build_sun_markers,
@@ -69,12 +70,46 @@ def test_past_cycle_zones_cover_full_display_window():
     )
     assert zones.history.fill_color is not None
     assert zones.forecast.fill_color is None
-    assert zones.history.end == chart.end + timedelta(hours=1)
+    assert zones.history.end == chart.end
+    assert zones.live_plan.start <= zones.live_plan.end
+    assert zones.forecast.start <= zones.forecast.end
+    assert chart.start <= zones.history.end <= chart.end
     axis = ChartSlotAxis.from_dataframe(
         pd.DataFrame({"slot_datetime": list(display.slot_datetimes)})
     )
     x_left, x_right = axis.x_range(range_start=chart.start)
-    assert _zone_right_edge(axis, zones.history.end) == x_right
+    history_fills_axis = (
+        zones.history.fill_color is not None
+        and zones.forecast.fill_color is None
+        and zones.live_plan.end <= zones.history.end
+    )
+    assert history_fills_axis
+    assert _history_zone_x1(
+        axis,
+        zones.history.end,
+        x_right=x_right,
+        fill_to_axis_end=history_fills_axis,
+    ) == x_right
+
+
+def test_past_cycle_zones_stay_within_chart_window():
+    """Vergangenheits-Zyklen: Zonen innerhalb [chart.start, chart.end], keine invertierte Forecast-Zone."""
+    now = _dt(2026, 6, 15, 14, 0)
+    chart_context = build_live_chart_context(1, 0, now=now)
+    display = build_chart_display_context(chart_context, [])
+    chart = chart_context.chart_window
+    zones = ui_chart_zones(
+        chart.end,
+        chart,
+        is_live_segment=False,
+        slot_datetimes=display.slot_datetimes,
+    )
+    assert zones.history.start == chart.start
+    assert zones.history.end == chart.end
+    assert zones.live_plan.start <= zones.live_plan.end <= chart.end
+    assert zones.forecast.start <= zones.forecast.end
+    assert zones.forecast.end == chart.end
+    assert zones.forecast.fill_color is None
 
 
 def test_gray_zone_aligns_with_sa0_at_left_axis():
