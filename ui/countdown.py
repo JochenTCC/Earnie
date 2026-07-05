@@ -31,7 +31,14 @@ def _render_countdown_captions() -> None:
         sync_label = "App"
 
     remaining = max(0, int(optimization_schedule.seconds_until_next_quarter_hour()))
-    app_wait = max(0, int(optimization_schedule.seconds_until_app_refresh_ready()))
+    app_wait = max(
+        0,
+        int(
+            optimization_schedule.seconds_until_main_py_sync_ready(
+                (main_state or {}).get("completed_at"),
+            )
+        ),
+    )
     next_run = optimization_schedule.next_quarter_hour_datetime()
     last_time = time.strftime("%H:%M:%S", time.localtime(last_optimization))
 
@@ -41,10 +48,14 @@ def _render_countdown_captions() -> None:
     )
     col_sync, col_help = st.columns([11, 1], vertical_alignment="center")
     with col_sync:
+        sync_hint = (
+            f" · **App-Sync** wartet auf main.py (noch `{app_wait}` s)"
+            if app_wait > 0
+            else " · **App-Sync** bereit"
+        )
         st.caption(
             f"⏳ **Nächster main.py-Takt:** `{next_run.strftime('%H:%M')}` "
-            f"(in `{remaining}` s) · **App-Sync** ca. 1 Min danach"
-            + (f" (noch `{app_wait}` s)" if app_wait > 0 else "")
+            f"(in `{remaining}` s){sync_hint}"
         )
     with col_help:
         render_help_hint(MAIN_PY_SYNC_HELP, key="countdown_main_py_sync_help")

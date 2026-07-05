@@ -40,6 +40,8 @@ Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdo
 
 Vertikale Marker **SA₀**, **SA₁**, **SA₂**; **Jetzt** nur im Live-Segment SA₀→SA₁.
 
+**Geplant (Epic Soll-Ist):** Im grauen Bereich Icons bei Soll/Ist-Abweichungen (Hinweis / Warnung / Fehler) — Spec [soll-ist-abweichung.md](../spec/soll-ist-abweichung.md).
+
 ## Navigation zwischen Chart 1 und Chart 2
 
 | Steuerung | Verhalten |

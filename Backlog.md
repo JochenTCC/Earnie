@@ -4,14 +4,15 @@
 
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
-- [ ] **Doppelte UI-Wartezeit nach main.py-Durchlauf klären**
-  - Beobachtung: nach main.py-Lauf zweimaliges Warten in der UI — zuerst ca. **60 s**, danach erneut ca. **120 s**
-  - Kontext: `optimizer/schedule.py` (`APP_REFRESH_DELAY_SECONDS`, `APP_MAIN_SYNC_GRACE_SECONDS`, `live_simulation_readiness`), `ui/live_mode.py` (Sync-Hinweis)
-  - Klären: beabsichtigte Phasen (`delay` vs. `wait_main`) vs. Bug/UX; ggf. zusammenführen, verkürzen oder in der UI klarer als zwei Schritte kommunizieren
-- [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; eigenes Feature **nach** S-2 Layout)
-  - Abweichungsmarkierung nach bestimmten Regeln (noch zu definieren — bspw. „HINWEIS“ (gelbes Dreieck), wenn geheizt werden darf, aber es nicht nötig war — oder „FEHLER“ (rotes Stopschild), wenn E-Auto nicht geladen hat, obwohl es sollte (und es noch nicht voll sein kann))
-  - **Follow-ups (nach Epic, nicht Phase 4):** Soll/Ist-Overlay, Nachrechnung Backtesting, Preis-Spiegelung — siehe unten
+- [ ] **Epic Soll-Ist** — Soll/Ist-Abweichung in Chart 1 (Icons Hinweis / Warnung / Fehler)
+  - Spec: [docs/spec/soll-ist-abweichung.md](docs/spec/soll-ist-abweichung.md) v0.1 · Regeln: `config/deviation_rules.example.json` (+ Schema)
+  - **P1** Facts & Regelwerk: `deviation_facts`, `deviation_eval`, Prädikat-MVP, Schema/Beispiel-JSON, Tests S1–S5
+  - **P2** Slot-Auswertung: Anbindung `history_timeline` / `chart_context`; Events nur `slot_quality=present` (grauer Bereich)
+  - **P3** Chart-1-Icons: Plotly-Marker, Tooltip, ?-Hilfe
+  - **P4** Szenario-Katalog, `docs/ui/charts.md`, Epic-Abschluss
+  - **Follow-ups (nach Epic):** Nachrechnung Backtesting (Batch über JSONL); Stufe 2 kontinuierliches Haus-Ist; Hinweis-Regeln wenn Fälle da
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
+- [ ] Was bedeutet "⚠️ Keine historischen Daten in cons_data_hourly für das Datum 2026-07-05." in stderr ausgabe von streamlit / app.py?
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
     1:  6.5,   # Januar
@@ -77,6 +78,12 @@ bodentemperaturen_nach_monat = {
 - [ ] **S-2 Layout (optional):** Mobil-Check (~375 px) — Buttons nebeneinander ohne Caption dazwischen; ? touch-tauglich; einmal manuell prüfen
 
 ## Erledigte Punkte
+
+### UI main.py-Sync (2026-07-05)
+
+- [x] **Doppelte UI-Wartezeit nach main.py-Durchlauf klären**
+  - Ursache: feste 60-s-Phase (`delay`) ohne `completed_at`-Check, danach bis 120 s Grace (`wait_main`) — wirkte wie zweimaliges Warten
+  - Fix: früher Exit bei Sync im aktuellen Slot; max. 60+30 s Wartezeit; UNC-Lesefix in `run_state`; einheitlicher UI-Hinweis; Tests `tests/test_schedule.py`
 
 ### UI Sunset-2-Sunset Epic abgeschlossen (2026-07-05)
 
