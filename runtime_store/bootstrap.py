@@ -26,6 +26,8 @@ from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_schema_template_path,
     resolve_backtesting_scenarios_template_path,
     resolve_config_json_path,
+    resolve_deviation_rules_schema_template_path,
+    resolve_deviation_rules_template_path,
     resolve_config_schema_template_path,
     resolve_config_template_path,
     resolve_local_settings_json_path,
@@ -166,6 +168,34 @@ def _bootstrap_backtesting_scenarios_json() -> bool:
     )
 
 
+def _bootstrap_deviation_rules_example() -> bool:
+    dest = os.path.join("config", "deviation_rules.example.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_deviation_rules_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_deviation_rules_schema() -> bool:
+    dest = os.path.join("config", "deviation_rules.schema.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_deviation_rules_schema_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_deviation_rules_json() -> bool:
+    rules_path = os.path.join("config", "deviation_rules.json")
+    template_path = resolve_deviation_rules_template_path()
+    return _copy_template_if_missing(
+        rules_path,
+        template_path,
+        "deviation_rules.example.json",
+    )
+
+
 def _bootstrap_local_settings_json() -> bool:
     settings_path = resolve_local_settings_json_path()
     template_path = resolve_local_settings_template_path()
@@ -243,6 +273,12 @@ def run() -> None:
         created.append(os.path.join("config", "backtesting_scenarios.schema.json"))
     if _bootstrap_backtesting_scenarios_json():
         created.append(resolve_backtesting_scenarios_json_path())
+    if _bootstrap_deviation_rules_example():
+        created.append(os.path.join("config", "deviation_rules.example.json"))
+    if _bootstrap_deviation_rules_schema():
+        created.append(os.path.join("config", "deviation_rules.schema.json"))
+    if _bootstrap_deviation_rules_json():
+        created.append(os.path.join("config", "deviation_rules.json"))
     if _bootstrap_local_settings_json():
         created.append(resolve_local_settings_json_path())
     if _bootstrap_cons_data_csv():

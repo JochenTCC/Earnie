@@ -4,7 +4,6 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
 ## Offene Bugfixes
 
-- [ ] Warum zeigt streamlit auf PC Warnungen und Fehler an, Produktivsystem aber nicht?
 - [ ] **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
 

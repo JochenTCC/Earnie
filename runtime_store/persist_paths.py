@@ -227,6 +227,20 @@ def resolve_deviation_rules_template_path() -> str:
     return preferred
 
 
+def resolve_deviation_rules_schema_template_path() -> str:
+    """Schema-Vorlage für deviation_rules.json."""
+    preferred = os.path.join("config", "deviation_rules.schema.json")
+    if os.path.isfile(preferred):
+        return preferred
+    legacy = "deviation_rules.schema.json"
+    if os.path.isfile(legacy):
+        return legacy
+    bundled = bundled_deviation_rules_schema_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
 def resolve_deviation_rules_json_path() -> str:
     """Pfad zu deviation_rules.json: ENV > config/ > Fallback auf Vorlage."""
     env = os.environ.get("ENERGY_OPTIMIZER_DEVIATION_RULES_PATH", "").strip()

@@ -3,6 +3,10 @@
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
 
+### Chart 1 Soll-Ist-Marker NAS (2026-07-05)
+
+- [x] **Bugfix: Chart-1-Soll/Ist-Marker auf NAS fehlten trotz gleichem `optimization_history.jsonl`** — Ursache fehlende `config/deviation_rules.json` (und Vorlagen) auf dem NAS-Config-Volume; ohne Regeldatei unterdrückt `deviation_timeline` alle Events still. Fix: Dateien manuell auf NAS kopiert; Bootstrap legt `deviation_rules.example.json`, `deviation_rules.schema.json` und `deviation_rules.json` aus Image-Vorlage an; Dockerfile `share/config/` ergänzt (`runtime_store/bootstrap.py`)
+
 ### UI S-2 Chart 2 Einsparungs-Text (2026-07-05)
 
 - [x] **UI S-2 Chart 2: Einsparungs-Texteinblendungen in beiden Segmenten** — `show_cost_summary` nicht mehr an `not split_mode` gekoppelt; Annotationen (`BL Ziel`, `Optimiert`, `Ersparnis`) in SA₀→SA₁ und SA₁→SA₂ mit Gesamt-Horizont-Werten aus `_cost_totals_from_savings`; Test `test_chart2_s2_split_mode_shows_cost_summary_annotations` (`ui/charts.py`)
