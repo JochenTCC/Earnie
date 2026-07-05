@@ -5,7 +5,6 @@
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
-- [ ] Was bedeutet "⚠️ Keine historischen Daten in cons_data_hourly für das Datum 2026-07-05." in stderr ausgabe von streamlit / app.py?
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
     1:  6.5,   # Januar
@@ -77,6 +76,7 @@ bodentemperaturen_nach_monat = {
 
 ### Historische Tests & Energiebilanz (2026-07-05)
 
+- [x] **stderr-Warnung `Keine historischen Daten in cons_data_hourly`** — `profile_manager.get_historical_day_data`: `cons_data_hourly.csv` fehlt oder ist leer (Datum in der Meldung = angefragter Tag, typisch heute via `consumer_targets` in der Live-UI); Ausgabe per `print()` → stderr; Fallback Grundlast 0,5 kW/h, Verbraucher-Tagesziele 0; Abhilfe: `runtime/cons_data_hourly.csv` pflegen (`main.py` oder `scripts/generate_cons_data.py`)
 - [x] **Pre-commit / historische Testsuite validieren** — Nachholen von `--no-verify` (Commit `8721df2`): `pytest tests` inkl. 25× `test_historical_24h_consistency` grün; Pre-commit-Hook wieder sinnvoll nutzbar für Code-Änderungen
 - [x] **`runtime/cons_data_hourly.csv`** aus Loxone-Logs regeneriert (≥12 Monate Retention)
 - [x] **Test-Fixture** `tests/fixtures/historical/cons_data_hourly.csv` + `scripts/extract_historical_fixtures.py` (isoliert von Runtime)
