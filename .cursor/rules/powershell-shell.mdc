@@ -1,0 +1,41 @@
+---
+description: Shell-Befehle unter Windows PowerShell — kein &&, stattdessen working_directory oder ;
+alwaysApply: true
+---
+
+# Windows PowerShell — Shell-Befehle
+
+Die Umgebung nutzt **Windows PowerShell 5.x** (nicht pwsh 7+). `&&` und `||` sind dort **kein** gültiges Anweisungstrennzeichen.
+
+## Verboten
+
+```powershell
+# ❌ ParserError: Das Token "&&" ist kein gültiges Anweisungstrennzeichen
+cd "c:\...\Energy-Optimizer" && .venv\Scripts\python.exe -m pytest ...
+```
+
+## Stattdessen
+
+**Bevorzugt:** `working_directory` im Shell-Tool setzen und den Befehl ohne `cd` ausführen:
+
+```powershell
+.venv\Scripts\python.exe -m pytest tests/ -q --tb=short
+```
+
+**Alternativ:** Semikolon statt `&&` (läuft auch bei Fehler im ersten Teil weiter):
+
+```powershell
+Set-Location "c:\Users\joche\Documents\Smarthome\Python\Energy-Optimizer"; .venv\Scripts\python.exe -m pytest tests/ -q --tb=short
+```
+
+**Bedingte Verkettung** (nur bei Erfolg des ersten Befehls) in PS 5.x:
+
+```powershell
+Set-Location "c:\...\Energy-Optimizer"; if ($?) { .venv\Scripts\python.exe -m pytest tests/ -q }
+```
+
+## Weitere Hinweise
+
+- Python aus dem Projekt: `.venv\Scripts\python.exe` (nicht `python` ohne Pfad, wenn venv gemeint ist)
+- Keine Bash-Heredocs (`<<'EOF'`) — unter PowerShell Heredocs mit `@"..."@` oder `-m` mit einzeiligem String
+- Git-Befehle funktionieren in PowerShell; nur die Verkettungssyntax anpassen
