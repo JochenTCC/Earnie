@@ -4,6 +4,7 @@
 
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
+- [] scripts.migrate_persist_layout löschen
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
@@ -39,7 +40,7 @@ bodentemperaturen_nach_monat = {
 - [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
 - [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
   - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
-  - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** ersetzen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
+  - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** einführen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
   - Modus **`sunset_window`:** unverändert **SOC_min am Sonnenaufgang** (hart)
   - Spec ergänzen, Live-Tests für beide Modi
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
@@ -64,6 +65,9 @@ bodentemperaturen_nach_monat = {
     - Veränderliche Parameter
     - Zeithorizont (z.B. 24h für Gefrierschrank oder PV-Ertrag, 1 Jahr für Swimspa und Haus)
     - Der Adapationsalgo entnimmt Start-Parameter (live-Parameter) aus config.json und hinterlegt Adaptionshistorie getrennt und korrigiert Live-Parameter bei Bedarf (festgelegter Rhythmus - am Zeithorizont orientiert)
+- [] Chart 1 für variable Anzahl von Verbrauchern fit machen (max 4 anzeigen, nach Leistung priorisieren, Zoom einführen) 
+- [] Eigene UI Seite zur Visualisierung der Adaptionsalgos
+- [] Visualisierung des tatsächlichen Verbraucher-Verhaltens evtl. mit Empfehlungen 
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
 - [ ] Bessere Verbrauchsoptimierung mit Geräten zur Temperaturkontrolle
   - [ ] Gefrierschrank (Prio2)
@@ -71,6 +75,12 @@ bodentemperaturen_nach_monat = {
 - [ ] Generisches E-Auto-Modell - für bessere Wiederverwendbarkeit
 - [ ] **S-2 Layout (optional):** kompakteres Button-CSS für Navigation zwischen Chart 1 und 2 (`ui/styles.py`) — derzeit nur schmale Spalten `[8,2,1]`, kein Extra-CSS
 - [ ] **S-2 Layout (optional):** Mobil-Check (~375 px) — Buttons nebeneinander ohne Caption dazwischen; ? touch-tauglich; einmal manuell prüfen
+- [] Konfigurationsseite einfügen zum einfachen Editieren der config.json und Szenarien. 
+- [] Readme ausführlicher machen mit Motivation / Nutzen
+- [] Was wäre wenn Assistenten für backtesting designen:
+  - würde sich Ernie lohnen (mit Awattar)? 
+  - würde sich (mehr) Batterie lohnen? 
+  - Verbraucher abfragen und daraus Verbraucherprofile generieren
 
 ## Erledigte Punkte
 
