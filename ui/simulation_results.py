@@ -345,6 +345,7 @@ def render_optimization_results(
             savings_view,
             optimization_matrix,
             chart_context.chart_window,
+            savings_info=savings_info,
         )
         table_df = pd.DataFrame(display_ctx.rows)
         table_qualities = display_ctx.slot_qualities
@@ -370,6 +371,7 @@ def render_optimization_results(
             chart_context.now,
             chart_context.planning_window,
             slot_datetimes=display_ctx.slot_datetimes,
+            show_now=is_live_segment,
         )
 
     log_source = None
@@ -406,6 +408,8 @@ def render_optimization_results(
         sun_markers=sun_markers,
         slot_qualities=chart_qualities,
         history_slot_count=history_slot_count,
+        slot_actual_cost_euro=savings_view.get("slot_actual_cost_euro"),
+        slot_actual_consumption_kwh=savings_view.get("slot_actual_consumption_kwh"),
     )
     if simulation_table_title:
         table_title = simulation_table_title

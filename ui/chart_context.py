@@ -384,15 +384,36 @@ def align_hourly_increments_to_display_slots(
     return increments
 
 
+def _actual_slot_increments(
+    display_ctx: ChartDisplayContext,
+) -> tuple[list[float], list[float]]:
+    """Pro-Slot-Ist-Inkremente aus dem Produktiv-Log (fehlende Slots = NaN)."""
+    slot_count = len(display_ctx.slot_datetimes)
+    cost = [float("nan")] * slot_count
+    kwh = [float("nan")] * slot_count
+    history = display_ctx.history_result
+    if history is None or display_ctx.history_slot_count <= 0:
+        return cost, kwh
+    for index in range(display_ctx.history_slot_count):
+        quality = display_ctx.slot_qualities[index]
+        if quality == SLOT_PRESENT:
+            cost[index] = history.slot_costs_euro[index]
+            kwh[index] = history.slot_consumption_kwh[index]
+    return cost, kwh
+
+
 def build_display_savings_series(
     display_ctx: ChartDisplayContext,
     savings_view: dict,
     matrix: list[dict],
     chart: UiChartWindow,
+    *,
+    savings_info: dict | None = None,
 ) -> dict:
     """Kosten-/Verbrauchs-Inkremente auf die gemischte Display-Achse abbilden."""
     slots = display_ctx.slot_datetimes
     view = dict(savings_view)
+    matrix_source = savings_info if savings_info is not None else savings_view
     cost_keys = (
         "hourly_matched_baseline_cost_euro",
         "hourly_optimized_cost_euro",
@@ -403,22 +424,13 @@ def build_display_savings_series(
         "hourly_optimized_consumption_kwh",
     )
     for key in cost_keys + kwh_keys:
-        values = savings_view.get(key) or []
-        increments = align_hourly_increments_to_display_slots(
+        values = matrix_source.get(key) or []
+        view[key] = align_hourly_increments_to_display_slots(
             values, matrix, chart, slots
         )
-        history = display_ctx.history_result
-        if history is not None:
-            for index in range(display_ctx.history_slot_count):
-                quality = display_ctx.slot_qualities[index]
-                if quality == SLOT_MISSING:
-                    increments[index] = 0.0
-                elif quality == SLOT_PRESENT:
-                    if key == "hourly_optimized_cost_euro":
-                        increments[index] = history.slot_costs_euro[index]
-                    elif key == "hourly_optimized_consumption_kwh":
-                        increments[index] = history.slot_consumption_kwh[index]
-        view[key] = increments
+    actual_cost, actual_kwh = _actual_slot_increments(display_ctx)
+    view["slot_actual_cost_euro"] = actual_cost
+    view["slot_actual_consumption_kwh"] = actual_kwh
     return view
 
 

@@ -437,7 +437,7 @@ def build_matched_flex_kw_per_hour(
     Ladezeitfensters null – wie im MILP.
     """
     consumers_cfg = config.get_flexible_consumers(optimizer_only=True)
-    rows = optimization_matrix[:24]
+    rows = optimization_matrix
     hour_count = len(rows)
     contexts = charging_contexts or {}
     schedule_indices = list(range(hour_count))
@@ -613,7 +613,7 @@ def simulate_matched_baseline_horizon(
     chart_rows = []
     sim_soc = initial_soc
     battery_params = config.get_battery_params()
-    for row, flex_kw in zip(optimization_matrix[:24], matched_flex):
+    for row, flex_kw in zip(optimization_matrix, matched_flex):
         sim_soc, chart_row = _simulate_single_hour_baseline(
             row,
             sim_soc,

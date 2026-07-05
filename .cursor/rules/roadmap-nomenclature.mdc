@@ -1,0 +1,47 @@
+---
+description: Einheitliche Benennung für Epics, Phasen und Schritte (Roadmap, Backlog, Commits)
+alwaysApply: true
+---
+
+# Roadmap-Nomenklatur
+
+## Drei Ebenen
+
+| Ebene | Begriff | Schreibweise | Beispiel |
+|-------|---------|--------------|----------|
+| 1 | **Epic** | Kurzname oder voller Titel | **UI S-2** (= UI Sunset-2-Sunset) |
+| 2 | **Phase** | Epic · Phase N | **S-2 P3**, **MILP-Horizont P3** |
+| 3 | **Schritt** | Epic · Phase · Buchstabe | **S-2 P3a** |
+
+## Regeln
+
+- **Nie** „Phase 3“ ohne Epic — mehrere Epics nutzen dieselbe Nummer.
+- **Schritte** nur innerhalb einer **offenen Phase** (3a, 3b, …).
+- Keine „Paket A/B“ — immer **S-2 P3a** o. ä.
+- Follow-ups im Backlog sind **eigene Punkte**, keine Phasen.
+
+## Epics (Qualifikation)
+
+| Epic | Phasen | Kurz |
+|------|--------|------|
+| UI Sunset-2-Sunset | P1–P4 | **UI S-2** |
+| MILP Sunset-Horizont | P1–P5 | **MILP-Horizont** |
+| Session-Abschluss | P1–P2 | **Session-Abschluss** |
+| MIGRATION.md | P1–P7 | **Migration** |
+
+## UI S-2 — Phasen
+
+| Phase | Inhalt |
+|-------|--------|
+| P1 | Modus, Fenster, SA-Navigation |
+| P2 | Daten-Schicht, Chart 1, Tabelle |
+| P3 | Chart 2, Marker, Cleanup, Kennzahlen (Schritte 3a–3d) |
+| P4 | Docs & Tests |
+
+## Commits & Chat
+
+```
+ui(s2): P3a Chart 2 Ist/Prognose getrennt
+```
+
+Im Dialog: „Als Nächstes **S-2 P3a**“ — nicht „Paket A“ oder bare „Phase 3“.
