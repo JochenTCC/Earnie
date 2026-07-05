@@ -6,10 +6,8 @@
 
 - [ ] **UI Sunset-2-Sunset (Spec v0.6.1)** — [docs/spec/ui-sunset2sunset.md](docs/spec/ui-sunset2sunset.md)
   - Ersetzt Modi **Echtzeit** + **Historischer Tag**, Button **Produktiv-Archiv**, Live/History-Grenze; Prod: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting`
-  - **Offener UI-Bug (Stand 2026-07-05):**
-    - **SOC-Sprünge ohne Orange** — Spec §6: fehlende Log-Slots = orange + Lücke. Noch offen: Orange-Markierung in Chart und Tabelle; SoC-Lücke an Log/MILP-Grenze (`history_slot_count`-Split unvollständig); stille Abschaltung bei `len(slot_qualities) != len(df)`. Zusätzlich: **Chartlinien (Preis, Verbrauch, SoC, kum. Kosten/Verbrauch) werden teilweise nicht bis zum rechten X-Achsen-Rand gezeichnet.**
-  - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); grün ab erstem `Preis extrapoliert`; Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen. Zeithorizont für Verbrauchs-Vergleich zur History noch klären.
-  - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (Navigation, Orange Chart+Tabelle, Linien bis Achsenrand) — siehe offener UI-Bug oben
+  - **Phase 3 — Charts & Kennzahlen:** Chart 2 getrennt „Ist bisher“ (Log) vs. „Prognose optimiert“ (MILP); Marker SA₀/SA₁/SA₂, Jetzt-Linie; alte Pfade `history_offset_days`, `render_historical_*` aus Prod-UI entfernen. Zeithorizont für Verbrauchs-Vergleich zur History noch klären.
+  - **Phase 4 — Docs & Tests:** `docs/ui/betriebsmodi.md`, `docker-compose-synology.yml`, Tests (Navigation, Orange Chart+Tabelle)
   - **Follow-ups (nach v0.5):** siehe unten Soll/Ist + Nachrechnung Backtesting
 - [ ] **Soll/Ist-Abweichung in S-2-UI** (Visualisierung; Phase 2 des UI-Epics erledigt)
   - Abweichungsmarkierung nach bestimmten Regeln (noch zu definieren -aber bspw. "HINWEIS" (gelbes Dreieck), wenn geheizt werden darf, aber es nicht nötig war - oder "FEHLER" (Rotes Stopschild), wenn E-Auto nicht geladen hat, obwohl es sollte (und es noch nicht voll sein kann))
@@ -80,10 +78,14 @@ bodentemperaturen_nach_monat = {
 
 ### UI Sunset-2-Sunset — Chart-Darstellung (2026-07-05)
 
+- [x] **SOC-Sprünge / fehlende Log-Slots (Spec §6)** — Orange vrect im Chart und Tabellenzeilen für `SLOT_MISSING`; sichtbare SoC-Lücken an Log/MILP-Grenze (kein fälscher Brückenpunkt) und neutral→grün (Extrap-Start); kein UTC-Versatz mehr bei SoC/Preis-X
+- [x] **SoC-Lücke am Übergang neutral→grün** — extrapoliertes Segment ohne Brückenpunkt (`bridge_left` fälschlich für gesamtes MILP deaktiviert); Fix: nur an Log/MILP-Grenze (`abs_start == history_slot_count`); Test `test_soc_trace_bridges_extrapolation_start`
+- [x] **Kein Strichwechsel/Transparenz in grüner Zone** — gepunktete Preis-Linie und 50 %-Opacity extrapolierter Traces entfernt (Kennzeichnung nur noch grüner Hintergrund, Spec §5)
+- [x] **SoC/Preis-Zeitbezug im Chart** — Plotly-X für SOC- und Preis-Traces wurde fälschlich als `datetime64[ns, UTC]` erzeugt (+2 h Versatz in CEST, wirkte wie fehlende Linien bis zum Achsenrand); Fix: `_chart_time_series()` in `ui/charts.py`; Test `test_soc_and_price_traces_align_with_slot_datetimes`
 - [x] **Grau-/Grünzone an X-Achsen-Rändern** — variable Slot-Dauer in `ChartSlotAxis`; Zonen auf Display-Slots (`ui/simulation_results.py`); Fensterrand SA₀/SA₁ via `x_range(range_start=chart.start)`; volle Grauzone bei Vergangenheits-Zyklen (`is_live_segment=False`)
 - [x] **15-Min → 1-h gemischte Achse** — Preis stündliche HV-Treppe an Slot-Grenzen; Balkenbreite pro Slot (`_bar_widths_ms`); Zonen/vrect auf `display_ctx.slot_datetimes`
 - [x] **SU-Marker entfernt** — nur noch Jetzt + SA (SOC)
-- [x] **Tests:** `tests/test_chart_ui_bugs.py`, `tests/test_chart_mixed_resolution_traces.py`
+- [x] **Tests:** `tests/test_chart_ui_bugs.py`, `tests/test_chart_mixed_resolution_traces.py` (Zeitbezug, Zonen, extrap-Brücke, gemischte Achse)
 
 ### UI Sunset-2-Sunset — Navigation SA-Zyklen (2026-07-04)
 

@@ -25,7 +25,6 @@ _COLOR_BASELINE = "#7f8c8d"
 _COLOR_OPTIMIZED = "#e67e22"
 _COLOR_SAVINGS = "#27ae60"
 _COLOR_GRID_POWER = "#7f8c8d"
-_EXTRAPOLATED_TRACE_OPACITY = 0.5
 _PV_LINE_COLOR = "#f1c40f"
 _PV_FILL_COLOR = "rgba(241, 196, 15, 0.15)"
 _ZONE_HISTORY_COLOR = "rgba(128, 128, 128, 0.18)"
@@ -218,6 +217,18 @@ _LINE_ANCHOR_SLOT_START = 0.0
 _LINE_ANCHOR_SLOT_CENTER = 0.5
 _BAR_CENTER_NUDGE = 0.05
 _BATTERY_BAR_WIDTH_FRACTION = 0.9
+_EMPTY_FLOAT_SERIES = pd.Series(dtype=float)
+
+
+def _empty_chart_time_series() -> pd.Series:
+    return pd.Series(dtype=object)
+
+
+def _chart_time_series(times: list[datetime]) -> pd.Series:
+    """Plotly-X in Planungszeitzone — kein ``datetime64[ns, UTC]`` (sonst +2 h Versatz)."""
+    if not times:
+        return _empty_chart_time_series()
+    return pd.Series(times)
 
 
 def _anchor_fraction_from_legacy_shift(x_shift: float) -> float:
@@ -736,7 +747,7 @@ def _hourly_price_hv_xy(
     """
     hour_prices = _hour_prices_from_df(df)
     if not hour_prices:
-        return pd.Series(dtype="datetime64[ns, UTC]"), pd.Series(dtype=float)
+        return _empty_chart_time_series(), _EMPTY_FLOAT_SERIES
     points_x: list[datetime] = []
     points_y: list[float] = []
     for hour, price in hour_prices:
@@ -758,10 +769,10 @@ def _hourly_price_hv_xy(
         points_x.append(x_right)
         points_y.append(price)
     tail_x = axis.legacy_index_time(len(axis.starts) - 0.5)
-    if points_x and points_x[-1] < tail_x:
+    if points_x and pd.Timestamp(points_x[-1]) < pd.Timestamp(tail_x):
         points_x.append(tail_x)
         points_y.append(points_y[-1])
-    return pd.Series(points_x, dtype="datetime64[ns, UTC]"), pd.Series(points_y, dtype=float)
+    return _chart_time_series(points_x), pd.Series(points_y, dtype=float)
 
 
 def _hourly_price_hover_labels(
@@ -786,12 +797,6 @@ def _hourly_price_hover_labels(
     return labels
 
 
-def _segment_opacity(base_opacity: float, is_extrapolated: bool) -> float:
-    if is_extrapolated:
-        return base_opacity * _EXTRAPOLATED_TRACE_OPACITY
-    return base_opacity
-
-
 def _segment_extended_line(
     axis: ChartSlotAxis,
     y: pd.Series,
@@ -802,7 +807,7 @@ def _segment_extended_line(
     anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
 ) -> tuple[pd.Series, pd.Series]:
     if start >= end:
-        return pd.Series(dtype="datetime64[ns, UTC]"), pd.Series(dtype=float)
+        return _empty_chart_time_series(), _EMPTY_FLOAT_SERIES
     return _extended_line_xy(
         axis.slice(start, end),
         y.iloc[start:end],
@@ -828,7 +833,7 @@ def _segment_linear_connected_line_xy(
     anchor_fraction 0.5: Slotmitte (früher Index +0.0, wie Flex-Balken).
     """
     if start >= end:
-        return pd.Series(dtype="datetime64[ns, UTC]"), pd.Series(dtype=float)
+        return _empty_chart_time_series(), _EMPTY_FLOAT_SERIES
 
     points_x: list[datetime] = []
     points_y: list[float] = []
@@ -847,7 +852,7 @@ def _segment_linear_connected_line_xy(
             _line_plot_float(y.iloc[end - 1]) if tail_y is None else float(tail_y)
         )
 
-    return pd.Series(points_x, dtype="datetime64[ns, UTC]"), pd.Series(points_y, dtype=float)
+    return _chart_time_series(points_x), pd.Series(points_y, dtype=float)
 
 
 def _segment_connected_line_xy(
@@ -874,7 +879,7 @@ def _segment_connected_line_xy(
         )
 
     if start >= end:
-        return pd.Series(dtype="datetime64[ns, UTC]"), pd.Series(dtype=float)
+        return _empty_chart_time_series(), _EMPTY_FLOAT_SERIES
     seg_tail = tail_y if end == len(axis.starts) else None
     line_x, line_y = _segment_extended_line(
         axis, y, start, end, tail_y=seg_tail, anchor_fraction=anchor_fraction
@@ -929,14 +934,13 @@ def _add_segmented_hv_line(
     yaxis: str = "y",
     y_format: str = ".2f",
     base_opacity: float = 1.0,
-    extrapolated_dotted: bool = False,
     tail_y: float | None = None,
     custom_hover_values: pd.Series | None = None,
     hover_template: str | None = None,
     segment_hover_template: str | None = None,
     anchor_fraction: float = _LINE_ANCHOR_SLOT_START,
 ) -> None:
-    for index, (start, end, is_extrapolated) in enumerate(segments):
+    for index, (start, end, _is_extrapolated) in enumerate(segments):
         if start >= end:
             continue
         seg_tail = tail_y if end == len(axis.starts) else None
@@ -951,20 +955,14 @@ def _add_segmented_hv_line(
         )
         if line_x.empty:
             continue
-        line = dict(line_kwargs)
-        if extrapolated_dotted and is_extrapolated:
-            line["dash"] = "dot"
-            opacity = 1.0
-        else:
-            opacity = _segment_opacity(base_opacity, is_extrapolated)
         trace_kwargs: dict = dict(
             x=line_x,
             y=line_y,
             name=name if index == 0 else name,
             showlegend=index == 0,
             mode="lines",
-            line=line,
-            opacity=opacity,
+            line=dict(line_kwargs),
+            opacity=base_opacity,
             yaxis=yaxis,
         )
         if custom_hover_values is not None and hover_template is not None:
@@ -1106,7 +1104,7 @@ def add_power_traces(
             anchor_fraction=_LINE_ANCHOR_SLOT_CENTER,
         )
 
-    for seg_index, (start, end, is_extrapolated) in enumerate(segments):
+    for seg_index, (start, end, _is_extrapolated) in enumerate(segments):
         if start >= end:
             continue
         fig.add_trace(go.Bar(
@@ -1115,7 +1113,7 @@ def add_power_traces(
             name="Batterie" if seg_index == 0 else "Batterie",
             showlegend=seg_index == 0,
             marker=dict(color=bar_colors[start:end]),
-            opacity=_segment_opacity(0.75, is_extrapolated),
+            opacity=0.75,
             width=_bar_widths_ms(axis, start, end, _BATTERY_BAR_WIDTH_FRACTION),
             yaxis="y",
             customdata=uhrzeit.iloc[start:end],
@@ -1132,14 +1130,13 @@ def add_power_traces(
         immediate_col = consumer_immediate_charge_column_name(consumer)
         if immediate_col not in df.columns:
             immediate_col = None
-        for seg_index, (start, end, is_extrapolated) in enumerate(segments):
+        for seg_index, (start, end, _is_extrapolated) in enumerate(segments):
             if start >= end:
                 continue
             segment = df.iloc[start:end]
             pattern_shapes = _consumer_bar_pattern_shapes(
                 segment, col, pv_follow_col, immediate_col
             )
-            opacity = _segment_opacity(_CONSUMER_BAR_OPACITY, is_extrapolated)
             hover_pv = (
                 segment[pv_follow_col].fillna(0).astype(int).tolist()
                 if pv_follow_col is not None
@@ -1164,7 +1161,7 @@ def add_power_traces(
                 marker=_consumer_bar_marker(
                     consumer_colors[consumer_index],
                     pattern_shapes,
-                    opacity,
+                    _CONSUMER_BAR_OPACITY,
                 ),
                 width=_bar_widths_ms(axis, start, end, consumer_bar_width),
                 yaxis="y",
@@ -1210,7 +1207,7 @@ def add_optimized_soc_trace(
         segments = _trace_segments(
             part_end - part_start, part_extrap_start, part_extrap_end
         )
-        for index, (start, end, is_extrapolated) in enumerate(segments):
+        for index, (start, end, _is_extrapolated) in enumerate(segments):
             abs_start = part_start + start
             abs_end = part_start + end
             if abs_start >= abs_end:
@@ -1218,7 +1215,7 @@ def add_optimized_soc_trace(
             seg_tail = tail_y if abs_end == length else None
             bridge_left = not (
                 history_slot_count is not None
-                and abs_start >= history_slot_count
+                and abs_start == history_slot_count
             )
             soc_x, soc_y = _segment_connected_line_xy(
                 axis, soc, abs_start, abs_end, tail_y=seg_tail,
@@ -1234,7 +1231,7 @@ def add_optimized_soc_trace(
                 showlegend=show_legend,
                 mode="lines",
                 line=dict(color=_COLOR_OPTIMIZED, width=2.5),
-                opacity=_segment_opacity(1.0, is_extrapolated),
+                opacity=1.0,
                 yaxis=yaxis,
                 connectgaps=False,
                 customdata=_segment_hover_labels(
@@ -1262,7 +1259,7 @@ def add_baseline_soc_traces(
         return
     matched_axis = ChartSlotAxis.from_dataframe(matched_baseline_df)
     matched_segments = _trace_segments(len(matched_baseline_df), extrap_start, extrap_end)
-    for index, (start, end, is_extrapolated) in enumerate(matched_segments):
+    for index, (start, end, _is_extrapolated) in enumerate(matched_segments):
         if start >= end:
             continue
         seg_tail = None
@@ -1285,7 +1282,7 @@ def add_baseline_soc_traces(
             showlegend=index == 0,
             mode="lines",
             line=dict(color=_COLOR_OPTIMIZED, width=2.5, dash="dot"),
-            opacity=_segment_opacity(1.0, is_extrapolated),
+            opacity=1.0,
             yaxis=yaxis,
             connectgaps=False,
             customdata=_segment_hover_labels(
@@ -1312,7 +1309,7 @@ def add_price_on_soc_axis_trace(
 ) -> None:
     """Strompreis auf der SoC-Achse — stündliche Stufen, an Slot-Rändern ausgerichtet."""
     segments = _trace_segments(len(df), extrap_start, extrap_end)
-    for index, (start, end, is_extrapolated) in enumerate(segments):
+    for index, (start, end, _is_extrapolated) in enumerate(segments):
         if start >= end:
             continue
         segment_df = df.iloc[start:end]
@@ -1332,16 +1329,13 @@ def add_price_on_soc_axis_trace(
                 else:
                     break
             customdata.append(hour_prices[hour_idx][1])
-        line = dict(color="red", width=2.5, shape="hv")
-        if is_extrapolated:
-            line["dash"] = "dot"
         fig.add_trace(go.Scatter(
             x=line_x,
             y=line_y,
             name="Preis" if index == 0 else "Preis",
             showlegend=index == 0,
             mode="lines",
-            line=line,
+            line=dict(color="red", width=2.5, shape="hv"),
             opacity=1.0,
             yaxis=yaxis,
             text=_hourly_price_hover_labels(segment_df, line_x),
@@ -1390,7 +1384,6 @@ def add_cumulative_cost_traces(
         segments,
         name="Kosten BL Ziel",
         line_kwargs=dict(color=_COLOR_BASELINE, width=2.5, shape="hv"),
-        extrapolated_dotted=True,
         segment_hover_template=(
             "Uhrzeit: %{customdata}<br>Kosten BL Ziel (kumuliert): %{y:.3f} €"
             "<extra></extra>"
@@ -1404,7 +1397,6 @@ def add_cumulative_cost_traces(
         segments,
         name="Kosten optimiert",
         line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, shape="hv"),
-        extrapolated_dotted=True,
         segment_hover_template=(
             "Uhrzeit: %{customdata}<br>Kosten optimiert (kumuliert): %{y:.3f} €"
             "<extra></extra>"
@@ -1642,7 +1634,6 @@ def add_cumulative_actual_traces(
         segments,
         name="Kosten (Ist)",
         line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, shape="hv"),
-        extrapolated_dotted=True,
         segment_hover_template=(
             "Uhrzeit: %{customdata}<br>Kosten (Ist, kumuliert): %{y:.3f} €"
             "<extra></extra>"
@@ -1806,7 +1797,6 @@ def add_projected_savings_trace(
         segments,
         name="Ersparnis prognostiziert",
         line_kwargs=dict(color=_COLOR_SAVINGS, width=2.5, dash="dot", shape="hv"),
-        extrapolated_dotted=True,
         segment_hover_template=(
             "Uhrzeit: %{customdata}<br>Ersparnis prognostiziert (kumuliert): %{y:.3f} €"
             "<extra></extra>"

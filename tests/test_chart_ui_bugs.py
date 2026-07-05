@@ -18,8 +18,10 @@ from ui.charts import (
     _add_sun_markers,
     _add_zone_backgrounds,
     _history_zone_x1,
+    _hour_prices_from_df,
     _zone_right_edge,
     add_optimized_soc_trace,
+    add_price_on_soc_axis_trace,
     build_sun_markers,
 )
 from runtime_store.history_timeline import SLOT_MISSING
@@ -166,6 +168,62 @@ def test_missing_slot_backgrounds_align_with_mixed_axis():
     assert shape.x1 == axis.legacy_index_time(1.5)
 
 
+def _trace_x_vienna(raw_x, tz=_TZ) -> datetime:
+    """Plotly-X aus Trace: naive Werte = Planungszeitzone (nicht UTC)."""
+    ts = pd.Timestamp(raw_x)
+    if ts.tzinfo is None:
+        return ts.tz_localize(tz).to_pydatetime()
+    return ts.tz_convert(tz).to_pydatetime()
+
+
+def test_soc_and_price_traces_align_with_slot_datetimes():
+    """SOC/Preis-X darf nicht per UTC-Cast gegenüber der Achse verschoben sein (+2 h CEST)."""
+    slots = _mixed_resolution_slots()
+    rows = []
+    for index, slot in enumerate(slots):
+        rows.append({
+            "slot_datetime": slot,
+            "Uhrzeit": slot.strftime("%d.%m. %H:%M"),
+            "Simulierter SoC (%)": 40.0 + index,
+            "Geplante Batterie-Aktion (kW)": 0.0,
+            "Strompreis (Cent/kWh)": 20.0 + index,
+            "Preis extrapoliert": False,
+        })
+    df = pd.DataFrame(rows)
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_optimized_soc_trace(fig, df, axis)
+    add_price_on_soc_axis_trace(fig, df, axis)
+    soc_trace = next(trace for trace in fig.data if trace.name == "SoC")
+    for index, slot in enumerate(slots):
+        expected_x = pd.Timestamp(axis.at(index, 0.0).iloc[0]).tz_convert(_TZ)
+        expected_y = float(df.iloc[index]["Simulierter SoC (%)"])
+        soc_points = [
+            _trace_x_vienna(x)
+            for x, y in zip(soc_trace.x, soc_trace.y)
+            if float(y) == expected_y
+        ]
+        assert expected_x in soc_points, f"SoC Slot {slot} fehlt bei x={expected_x}"
+    price_trace = next(trace for trace in fig.data if trace.name == "Preis")
+    for hour, price in _hour_prices_from_df(df):
+        left_idx = next(
+            idx for idx, slot in enumerate(slots)
+            if pd.Timestamp(slot).tz_convert(_TZ) == pd.Timestamp(hour).tz_convert(_TZ)
+        )
+        expected_left = pd.Timestamp(
+            axis.legacy_index_time(left_idx - 0.5)
+        ).tz_convert(_TZ)
+        price_points = [
+            _trace_x_vienna(x)
+            for x, y in zip(price_trace.x, price_trace.y)
+            if float(y) == price
+        ]
+        assert expected_left in price_points, (
+            f"Preis {price} Cent für {hour} erwartet ab {expected_left}, "
+            f"gefunden {price_points[:4]}"
+        )
+
+
 def test_soc_trace_splits_at_history_boundary():
     slots = _mixed_resolution_slots()[:6]
     df = pd.DataFrame({
@@ -182,6 +240,28 @@ def test_soc_trace_splits_at_history_boundary():
     assert len(soc_traces) == 2
     assert soc_traces[0].y[-1] == 52.0
     assert soc_traces[1].y[0] == 80.0
+
+
+def test_soc_trace_bridges_extrapolation_start():
+    """Keine Lücke am Übergang neutral→grün (Preis extrapoliert)."""
+    slots = [_dt(2026, 7, 5, hour, 0) for hour in (20, 21, 22, 23)]
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [60.0, 59.0, 58.0, 57.0],
+        "Geplante Batterie-Aktion (kW)": [0.0] * 4,
+        "Preis extrapoliert": [False, False, True, True],
+    })
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_optimized_soc_trace(fig, df, axis, extrap_start=2, extrap_end=4)
+    soc_traces = [trace for trace in fig.data if trace.name == "SoC"]
+    assert len(soc_traces) == 2
+    assert soc_traces[0].y[-1] == 59.0
+    assert soc_traces[1].y[0] == 59.0
+    assert soc_traces[1].y[1] == 58.0
+    assert _trace_x_vienna(soc_traces[1].x[0]) == _dt(2026, 7, 5, 21, 0)
+    assert _trace_x_vienna(soc_traces[1].x[1]) == _dt(2026, 7, 5, 22, 0)
 
 
 def _green_vrect(fig) -> object | None:
