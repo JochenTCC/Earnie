@@ -45,7 +45,8 @@ def select_backtesting_smoke_anchor(
 
     best_anchor: datetime | None = None
     best_eauto = float("inf")
-    for day in pd.date_range(data_start, data_end, freq="D"):
+    search_start = max(data_start, data_end - pd.Timedelta(days=90))
+    for day in pd.date_range(search_start, data_end, freq="D"):
         anchors = list_simulation_anchors(day, day, cache)
         if not anchors:
             continue

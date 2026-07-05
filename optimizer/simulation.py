@@ -302,14 +302,13 @@ def simulate_horizon(
             sunrise_soc_min_index=sunrise_soc_min_index,
             matrix_hour_index=i,
         )
-        flex_capped = _cap_flex_delivery(
+        _cap_flex_delivery(
             chart_row, consumers_cfg, horizon_limits, delivered_horizon
         )
-        if flex_capped:
-            old_soc = float(chart_row["Simulierter SoC (%)"])
-            sim_soc = finalize_chart_row_energy(
-                chart_row, mode, target_power, old_soc, battery_params
-            )
+        old_soc = float(chart_row["Simulierter SoC (%)"])
+        sim_soc = finalize_chart_row_energy(
+            chart_row, mode, target_power, old_soc, battery_params
+        )
         chart_rows.append(chart_row)
         if on_progress is not None:
             on_progress(i + 1, total_steps)

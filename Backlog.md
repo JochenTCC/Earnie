@@ -4,9 +4,10 @@
 
 **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
-- [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
-- [ ] **Soll-Ist Stufe 2 (Haus-Ist)** — Kontinuierlicher Abgleich feinerer Auflösung als 15-min-Log (Follow-up Epic Soll-Ist)
-- [ ] **Soll-Ist Hinweis-Regeln** — Kategorie „Hinweis“ sobald konkrete unkritische Fälle identifiziert (Follow-up Epic Soll-Ist)
+- [ ] **Pre-commit / Testsuite vollständig validieren** — vor nächstem Push erneut `pytest tests` und Pre-commit-Hook prüfen. Offen (optional / Env-abhängig):
+  - **Loxone-Integration** (`ENERGY_OPTIMIZER_RUN_LOXONE_INTEGRATION=1`, `LOXONE_IP`/`USER`/`PASS`, `ENERGY_OPTIMIZER_OFFLINE` ≠ 1): Skip — `test_all_configured_ios_readable`, `test_live_power_aggregate`, `test_individual_read_checks_return_details` (`test_loxone_integration.py`); optional `LOXONE_INTEGRATION_FTP=1` → `test_ftp_log_available`, `LOXONE_INTEGRATION_ROUNDTRIP=1` → `test_soc_roundtrip_without_change`
+  - **Thermische CSV-Fixtures** (`tests/fixtures/thermal/` fehlt): Skip — `test_backtest_runs_on_fixtures`, `test_estimate_u_from_fixtures`
+  - **XFAIL** (laufen, erwarteter Fail — s. Prod-Dump-Regression unten): `test_prod_dump_milp_prefers_cheap_hours_after_urgent_fix`, `test_prod_dump_urgent_rule_redundant_vs_deadline_only`
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
 - [ ] Was bedeutet "⚠️ Keine historischen Daten in cons_data_hourly für das Datum 2026-07-05." in stderr ausgabe von streamlit / app.py?
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
@@ -38,6 +39,9 @@ bodentemperaturen_nach_monat = {
   - Nächster Schritt: Live urgent + Modus A prüfen; `xfail` entfernen wenn feasible
 - [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
   - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
+- [ ] **Soll-Ist Stufe 2 (Haus-Ist)** — Kontinuierlicher Abgleich feinerer Auflösung als 15-min-Log (Follow-up Epic Soll-Ist)
+- [ ] **Soll-Ist Hinweis-Regeln** — Kategorie „Hinweis“ sobald konkrete unkritische Fälle identifiziert (Follow-up Epic Soll-Ist)
+- [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
 - [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
   - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
   - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** ersetzen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
@@ -74,6 +78,13 @@ bodentemperaturen_nach_monat = {
 - [ ] **S-2 Layout (optional):** Mobil-Check (~375 px) — Buttons nebeneinander ohne Caption dazwischen; ? touch-tauglich; einmal manuell prüfen
 
 ## Erledigte Punkte
+
+### Historische Tests & Energiebilanz (2026-07-05)
+
+- [x] **`runtime/cons_data_hourly.csv`** aus Loxone-Logs regeneriert (≥12 Monate Retention)
+- [x] **Test-Fixture** `tests/fixtures/historical/cons_data_hourly.csv` + `scripts/extract_historical_fixtures.py` (isoliert von Runtime)
+- [x] **`test_historical_24h_consistency.py`:** Fixture-Pfad, 25 parametrisierte Konsistenzläufe grün
+- [x] **Bugfix** `simulate_horizon`: `finalize_chart_row_energy` nach jeder Stunde — Netzbezug konsistent mit gerundeten Flex-Spalten (Δ 8 W am Fall `2026-03-21_high_pv`)
 
 ### UI main.py-Sync (2026-07-05)
 

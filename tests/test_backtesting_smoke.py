@@ -24,11 +24,11 @@ from tests.backtesting_case_selection import (
     DEFAULT_MAX_EAUTO_KWH,
     select_backtesting_smoke_anchor,
 )
-from tests.conftest import requires_historical_data
+from tests.conftest import requires_runtime_cons_data
 
 os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 
-SMOKE_DAY = date(2026, 6, 25)
+SMOKE_DAY = date(2026, 6, 14)
 
 
 @pytest.fixture(scope="module")
@@ -70,7 +70,7 @@ def runtime_scenario_params() -> dict:
     return dict(scenarios["runtime_settings"])
 
 
-@requires_historical_data
+@requires_runtime_cons_data
 def test_smoke_anchor_has_no_eauto_load(historical_cache: HistoricalDataCache):
     anchor = select_backtesting_smoke_anchor(
         historical_cache,
@@ -83,7 +83,7 @@ def test_smoke_anchor_has_no_eauto_load(historical_cache: HistoricalDataCache):
     assert totals.get("eauto", 0.0) <= DEFAULT_MAX_EAUTO_KWH
 
 
-@requires_historical_data
+@requires_runtime_cons_data
 def test_historical_charging_context_keeps_time_window(
     historical_cache: HistoricalDataCache,
     smoke_anchor: pd.Timestamp,
@@ -110,7 +110,7 @@ def test_historical_charging_context_keeps_time_window(
     assert ctx.get("use_time_window") is True
 
 
-@requires_historical_data
+@requires_runtime_cons_data
 def test_logged_day_milp_skips_urgent_deadline_constraint(
     historical_cache: HistoricalDataCache,
     smoke_anchor: pd.Timestamp,
@@ -155,7 +155,7 @@ def test_logged_day_milp_skips_urgent_deadline_constraint(
     assert captured == [False]
 
 
-@requires_historical_data
+@requires_runtime_cons_data
 def test_backtesting_run_simulation_single_window(
     historical_cache: HistoricalDataCache,
     smoke_anchor: pd.Timestamp,
@@ -177,7 +177,7 @@ def test_backtesting_run_simulation_single_window(
     assert isinstance(cbc_events, list)
 
 
-@requires_historical_data
+@requires_runtime_cons_data
 def test_backtesting_reference_costs_single_window(
     historical_cache: HistoricalDataCache,
     smoke_anchor: pd.Timestamp,
@@ -197,7 +197,7 @@ def test_backtesting_reference_costs_single_window(
     assert df["sim_cost"].notna().all()
 
 
-@requires_historical_data
+@requires_runtime_cons_data
 def test_backtesting_log_roundtrip(tmp_path, smoke_anchor: pd.Timestamp):
     ts = pd.date_range(
         smoke_anchor - pd.Timedelta(hours=23),

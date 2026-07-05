@@ -90,12 +90,26 @@ class PlausibilityReport:
 class HistoricalDataCache:
     """Lädt Loxone-Verbrauchs-, Flex- und PV-Daten einmalig für tagweise Simulation."""
 
-    def __init__(self) -> None:
+    def __init__(self, cons_data_path: str | None = None) -> None:
+        self._cons_data_path = cons_data_path
         self._consumption_df: pd.DataFrame | None = None
         self._pv_series: pd.Series | None = None
 
     def load(self) -> None:
         if self._consumption_df is not None:
+            return
+
+        if self._cons_data_path:
+            from data import cons_data_store
+
+            cons_df = cons_data_store.load_cons_data(self._cons_data_path)
+            if cons_df.empty:
+                raise ValueError(
+                    f"Backtesting benötigt cons_data unter {self._cons_data_path!r}."
+                )
+            df = profile_manager._cons_data_to_profile_dataframe(cons_df)
+            self._consumption_df = df
+            self._pv_series = cons_df["pv_kw"]
             return
 
         df = profile_manager.load_cons_data_profile_dataframe()

@@ -1,5 +1,6 @@
 *.csv
 !tests/fixtures/backtesting/cons_data_hourly.csv
+!tests/fixtures/historical/cons_data_hourly.csv
 config.py
 config.json
 !tests/fixtures/backtesting/config.json

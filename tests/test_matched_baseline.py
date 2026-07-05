@@ -1,7 +1,6 @@
 """Tests für Profil- und Ziel-Baseline in der Simulation."""
 from __future__ import annotations
 
-from tests.conftest import requires_historical_data
 from optimizer.simulation import (
     build_matched_flex_kw_per_hour,
     delivered_flex_kwh_from_rows,
@@ -157,7 +156,6 @@ def test_hourly_costs_equal_when_same_flex_and_battery_at_min_soc():
         assert abs(opt_costs[h] - bl_costs[h]) < 0.001, f"hour {h}"
 
 
-@requires_historical_data
 def test_matched_eauto_profile_shape_scaled_to_current_target():
     """E-Auto BL Ziel: Profilform skaliert auf Ziel-kWh, nicht gleichmäßig im Fenster."""
     from datetime import date, datetime
