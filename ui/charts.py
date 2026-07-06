@@ -27,6 +27,11 @@ from ui.help_hint import render_title_with_help
 _CONSUMER_BAR_OPACITY = 0.65
 _CONSUMER_PV_FOLLOW_PATTERN = "/"
 _CONSUMER_IMMEDIATE_CHARGE_PATTERN = "+"
+_ENTLADESPERRE_BAND_HEIGHT_PCT = 4.0
+_ENTLADESPERRE_BAND_Y_MIN = -5.0
+_ENTLADESPERRE_BAND_FILL = "#f1c40f"
+_ENTLADESPERRE_BAND_STRIPE = "#1a1a1a"
+_ENTLADESPERRE_BAND_WIDTH_FRACTION = 0.85
 _COLOR_BASELINE = "#7f8c8d"
 _COLOR_OPTIMIZED = "#e67e22"
 _COLOR_ACTUAL = "#3498db"
@@ -682,6 +687,10 @@ def _chart_has_pv_follow_bars(df: pd.DataFrame) -> bool:
     return False
 
 
+def _is_entladesperre_command(cmd) -> bool:
+    return "Entladesperre" in str(cmd)
+
+
 def get_bar_colors(df: pd.DataFrame) -> list[str]:
     """Batterie-Balkenfarbe je Steuerbefehl (Modus)."""
     colors = []
@@ -691,7 +700,7 @@ def get_bar_colors(df: pd.DataFrame) -> list[str]:
             colors.append("forestgreen")
         elif text.startswith("Zwangsentladen"):
             colors.append("crimson")
-        elif "Entladesperre" in text:
+        elif _is_entladesperre_command(text):
             colors.append("darkorange")
         elif text == "Baseline":
             colors.append("lightgray")
@@ -1370,6 +1379,84 @@ def add_power_traces(
             cumulative_base = cumulative_base - power_kw
 
 
+def _entladesperre_band_marker() -> dict:
+    return dict(
+        color=_ENTLADESPERRE_BAND_FILL,
+        opacity=0.95,
+        pattern=dict(
+            shape=_CONSUMER_PV_FOLLOW_PATTERN,
+            fgcolor=_ENTLADESPERRE_BAND_STRIPE,
+            bgcolor=_ENTLADESPERRE_BAND_FILL,
+            solidity=0.45,
+            fillmode="overlay",
+        ),
+    )
+
+
+def _entladesperre_soc_band_bottom(soc: float) -> float:
+    return max(_ENTLADESPERRE_BAND_Y_MIN, soc - _ENTLADESPERRE_BAND_HEIGHT_PCT)
+
+
+def add_entladesperre_soc_band_traces(
+    fig: go.Figure,
+    df: pd.DataFrame,
+    axis: ChartSlotAxis,
+    extrap_start: int | None = None,
+    extrap_end: int | None = None,
+) -> None:
+    """Gelb-schwarz gestreiftes Band knapp unter dem SoC bei Entladesperre."""
+    if "Steuerbefehl" not in df.columns or "Simulierter SoC (%)" not in df.columns:
+        return
+    commands = df["Steuerbefehl"]
+    soc_series = df["Simulierter SoC (%)"]
+    uhrzeit = df["Uhrzeit"]
+    segments = _trace_segments(len(df), extrap_start, extrap_end)
+    legend_shown = False
+    for start, end, _is_extrapolated in segments:
+        indices = [
+            index
+            for index in range(start, end)
+            if _is_entladesperre_command(commands.iloc[index])
+        ]
+        if not indices:
+            continue
+        xs: list = []
+        ys: list[float] = []
+        bases: list[float] = []
+        widths: list[float] = []
+        custom: list = []
+        for index in indices:
+            soc = _safe_float(soc_series.iloc[index], 0.0)
+            band_bottom = _entladesperre_soc_band_bottom(soc)
+            band_height = max(0.0, soc - band_bottom)
+            if band_height <= 0:
+                continue
+            xs.append(_battery_bar_times(axis, index).iloc[0])
+            ys.append(band_height)
+            bases.append(band_bottom)
+            widths.append(
+                axis.bar_width_ms(_ENTLADESPERRE_BAND_WIDTH_FRACTION, index)
+            )
+            custom.append(uhrzeit.iloc[index])
+        if not xs:
+            continue
+        fig.add_trace(go.Bar(
+            x=xs,
+            y=ys,
+            base=bases,
+            name="Entladesperre",
+            showlegend=not legend_shown,
+            marker=_entladesperre_band_marker(),
+            width=widths,
+            yaxis="y2",
+            customdata=custom,
+            hovertemplate=(
+                "Uhrzeit: %{customdata}<br>Entladesperre aktiv<extra></extra>"
+            ),
+        ))
+        legend_shown = True
+
+
 def add_optimized_soc_trace(
     fig: go.Figure,
     df: pd.DataFrame,
@@ -1970,6 +2057,9 @@ def build_power_soc_chart_figure(
         extrap_end,
         matrix=optimization_matrix,
         chart_window=chart_window,
+    )
+    add_entladesperre_soc_band_traces(
+        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
     )
     add_optimized_soc_trace(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
