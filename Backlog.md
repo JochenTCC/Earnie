@@ -9,19 +9,6 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Feature-Backlog
 
 ### Version 0.+1
-- [x] Entladesperre besser visualisieren (Farbe des Plots ändern?)
-- [x] Einen "Rauf-Runter"-Balken für Energie-Gewinnung und Verbrauch anstatt Batterie-BAlken und Verbraucherbalken. *(Basis umgesetzt: `ui/chart_flow_balance.py`, `ui/flow_balance_allocate.py` — Follow-ups unten)*
-- [x] **Chart 1 Rauf/Runter — Farbpalette Netz & Batterie** (neuer Chat)
-  - **Netz** kräftig und gedämpft: **Blau** statt Rot (visuelles Gegenstück zu PV-Gelb)
-  - Daraus abgeleitet: gedämpfte Flüsse für Netzbezug, Netz-Laden, Einspeisung ins Netz (falls abweichend von PV/Batterie)
-  - Batterie-Flüsse (laden/entladen → Last vs. Einspeisung) farblich an die neue Zuordnung anpassen; Legenden/Hover konsistent
-  - Dateien: `ui/chart_flow_balance.py`, `docs/ui/charts.md`, ggf. Netz-Linie `ui/charts.py` (`_COLOR_GRID_POWER`)
-  - Tests/Szenarien A–H in `scripts/flow_balance_test_data.py` + `tests/test_chart_flow_balance.py` anpassen
-- [ ] **Chart 1 Rauf/Runter — PV-Überschuss & volle Batterie** (neuer Chat)
-  - Bei deutlichem PV-Überschuss und **keinem** (mehr) Ladebedarf (Batterie voll / SoC-Limit): **kein** Segment „Batterie laden (PV)“ — Überschuss als **Einspeisung (PV)** (gelb gedämpft)
-  - Ursache vermutlich in `ui/flow_balance_allocate.py` (`allocate_slot_flows`): `charge_from_pv` begrenzen auf tatsächlich mögliche Ladung (nicht nur geplante `battery_charge` aus der Zeile)
-  - Klären: SoC aus `Simulierter SoC (%)` / Batterieparameter vs. reine Bilanz aus Zeilenwerten; Randfall Szenario E (Überschuss ohne negatives `Netzbezug`)
-  - Regression: neues Szenario „volle Batterie + PV-Überschuss“; Streamlit-Produktivdaten neutral/grau prüfen
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
     1:  6.5,   # Januar
