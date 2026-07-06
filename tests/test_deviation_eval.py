@@ -152,13 +152,16 @@ class TestScenarioCatalog:
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
         assert events == []
 
-    def test_s5_unclassified_mismatch_no_fallback(self, rules_doc):
+    def test_s5_waermepumpe_hint(self, rules_doc):
         entry = _entry(
             consumer_powers_kw={"waermepumpe": 1.5},
             consumption_snapshot={"flex_kw": {"waermepumpe": 0.0}, "battery_kw": 0.0},
         )
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
-        assert events == []
+        assert len(events) == 1
+        assert events[0].category == "hint"
+        assert events[0].rule_id == "waermepumpe_enable_no_start"
+        assert "1.50" in events[0].message
 
     def test_missing_slot_quality_skips_evaluation(self, rules_doc):
         entry = _entry(

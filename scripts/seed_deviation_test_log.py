@@ -36,7 +36,7 @@ SCENARIO_LABELS = (
     "S6_battery_forced_discharge",
     "S7_eauto_pv_follow",
     "S4_within_tolerance",
-    "S5_unclassified",
+    "S5_waermepumpe_hint",
 )
 
 
@@ -235,7 +235,7 @@ def _scenario_s4_within_tolerance() -> dict:
     }
 
 
-def _scenario_s5_unclassified() -> dict:
+def _scenario_s5_waermepumpe_hint() -> dict:
     return {
         "source": "seed_deviation_test_log.py",
         "success": True,
@@ -268,7 +268,7 @@ def build_deviation_test_entries(*, baseline_count: int) -> list[dict]:
             _scenario_s6_battery_forced_discharge(),
             _scenario_s7_eauto_pv_follow(),
             _scenario_s4_within_tolerance(),
-            _scenario_s5_unclassified(),
+            _scenario_s5_waermepumpe_hint(),
         ]
     )
     return entries
@@ -283,7 +283,7 @@ def _validate_scenarios(entries: list[dict], rules_doc: dict) -> None:
         (1, "error", "battery_forced_discharge_missing"),
         (1, "error", "eauto_pv_follow_missing"),
         (0, None, None),
-        (0, None, None),
+        (1, "hint", "waermepumpe_enable_no_start"),
     ]
     for entry, (expected_count, category, rule_id) in zip(scenarios, expectations):
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)

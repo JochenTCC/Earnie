@@ -94,9 +94,9 @@ SCENARIOS = [
             consumer_powers_kw={"waermepumpe": 1.5},
             consumption_snapshot={"flex_kw": {"waermepumpe": 0.0}, "battery_kw": 0.0},
         ),
-        None,
-        None,
-        id="S5_unclassified",
+        "hint",
+        "waermepumpe_enable_no_start",
+        id="S5_waermepumpe_hint",
     ),
     pytest.param(
         "S6",

@@ -64,6 +64,7 @@ class OptimizationDisplayBundle:
     chart_header_help: str | None
     slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...]
     simulation_table_title: str | None
+    optimization_matrix: list[dict] | None = None
 
 
 def build_optimization_display_bundle(
@@ -185,6 +186,7 @@ def build_optimization_display_bundle(
         chart_header_help=chart_header_help,
         slot_deviation_events=slot_deviation_events,
         simulation_table_title=simulation_table_title,
+        optimization_matrix=optimization_matrix,
     )
 
 
@@ -203,6 +205,7 @@ def render_optimization_chart1(bundle: OptimizationDisplayBundle) -> None:
         chart_header_label=bundle.chart_header_label,
         chart_header_help=bundle.chart_header_help,
         slot_deviation_events=bundle.slot_deviation_events,
+        optimization_matrix=bundle.optimization_matrix,
     )
 
 

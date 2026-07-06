@@ -166,6 +166,7 @@ def test_matched_eauto_profile_shape_scaled_to_current_target():
         {
             "hour": h,
             "date": date(2025, 6, 17),
+            "consumption_mode": "logged_day",
             "expected_p_pv": 0.0,
             "expected_p_act": 0.5,
             "k_act": 20.0,

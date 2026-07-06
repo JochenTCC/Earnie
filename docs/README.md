@@ -12,7 +12,6 @@ Für Entwickler (Projektstruktur, Tests, Container) siehe [README.md](../README.
 4. **Verbindung prüfen:**
    ```powershell
    python -m scripts.verify_loxone_setup
-   python -m scripts.verify_loxone_setup --ftp --roundtrip
    ```
 5. **Produktivbetrieb starten:** `python main.py` (Optimierung im 15-Minuten-Takt).
 6. **Cockpit öffnen:** `python -m scripts.run_streamlit` (Port: `ui.streamlit_port` in config.json, Standard 8501)

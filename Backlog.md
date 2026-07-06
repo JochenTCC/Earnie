@@ -2,21 +2,20 @@
 
 Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
+## Non-Dev-Related Topics
+
 ## Offene Bugfixes
 
 - [ ] **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
 ## Research-Items
 
+- [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
+
 ## Feature-Backlog
 
 ### Version 0.+1
-- [ ] Vor / Zurück Button kleiner machen und neuen Knopf Heute einfügen, sowie Datumsauswahl ermöglichen (nur für vorhandene Daten)
-- [ ] Hover-Fragezeichen deutlich kleiner machen (Mini-Icon), so dass sie auf Mobile Devices keine Extra-Zeile brauchen
-- [ ] Chart 1 für variable Anzahl von Verbrauchern fit machen (max 4 anzeigen, nach Leistung priorisieren, Zoom einführen) — alternativ ein negativer Balken mit allen aufsummierten Verbrauchern
 - [ ] Entladesperre besser visualisieren (Farbe des Plots ändern?)
-
-### Version 0.+1
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
     1:  6.5,   # Januar
@@ -34,6 +33,7 @@ bodentemperaturen_nach_monat = {
 }
 
 ### Version 0.+1
+- [ ] Debug-Dump einführen, in den alle relevanten Daten (inkl. config.json etc. ) abgelegt werden, damit später reproduzierbar gedebuggt werden kann.
 - [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird → wenn Null, fünf Minuten laden mit Mindest-Strom)
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
 - [ ] **urgent-Regel auf Notwendigkeit prüfen** (Review bis ca. **2026-07-12**)

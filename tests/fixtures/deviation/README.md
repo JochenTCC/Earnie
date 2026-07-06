@@ -10,7 +10,7 @@ Acceptance-Katalog für Abweichungsregeln in Chart 1. Vollständige Spec: [docs/
 | S2 | `test_s2_eauto_error` | `eauto_should_charge` | Fehler |
 | S3 | `test_s3_forced_charge_error` | `battery_forced_charge_missing` | Fehler |
 | S4 | `test_s4_no_deviation_within_tolerance` | — | kein Icon |
-| S5 | `test_s5_unclassified_mismatch_no_fallback` | — | kein Icon |
+| S5 | `test_s5_waermepumpe_hint` | `waermepumpe_enable_no_start` | Hinweis |
 | S6 | `test_s3b_forced_discharge_error` | `battery_forced_discharge_missing` | Fehler |
 | S7 | `test_s2b_eauto_pv_follow_error` | `eauto_pv_follow_missing` | Fehler |
 

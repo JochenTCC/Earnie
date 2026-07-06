@@ -249,7 +249,7 @@ def test_prod_dump_schedule_indices_cross_midnight(eauto_manifest):
 def test_prod_dump_session_state_survives_midnight(eauto_manifest):
     reg = eauto_manifest["regression"]
     state_path = pdf.fixture_file(CASE_EAUTO, "flexible_consumers_state.json")
-    raw = json.loads(state_path.read_text(encoding="utf-8"))
+    prior = json.loads(state_path.read_text(encoding="utf-8"))
     consumer = {
         "id": "eauto",
         "charging_schedule": {"enabled": True},
@@ -260,17 +260,6 @@ def test_prod_dump_session_state_survives_midnight(eauto_manifest):
             "deadline": _parse_ts(reg["deadline"]),
             "target_kwh": float(reg["target_kwh"]),
         }
-    }
-    prior = {
-        "date": "2026-06-26",
-        "delivered": {"swimspa": 1.0},
-        "charging_sessions": {
-            "eauto": {
-                "target_kwh": float(reg["target_kwh"]),
-                "delivered_kwh": 2.0,
-                "deadline": reg["deadline"],
-            }
-        },
     }
     normalized = cs.normalize_consumer_state(
         prior,

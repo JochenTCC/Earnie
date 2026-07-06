@@ -20,6 +20,16 @@ def s2_forward_disabled(cycle_offset: int, segment_index: int) -> bool:
     return False
 
 
+def s2_heute_disabled(cycle_offset: int, segment_index: int) -> bool:
+    """True, wenn „Heute“ deaktiviert sein soll (bereits Live SA₀→SA₁)."""
+    return cycle_offset == 0 and segment_index == 0
+
+
+def apply_s2_nav_heute() -> tuple[int, int]:
+    """Zustand nach „Heute“: Live-Fenster SA₀→SA₁."""
+    return 0, 0
+
+
 def apply_s2_nav_back(
     cycle_offset: int,
     segment_index: int,

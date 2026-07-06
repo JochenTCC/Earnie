@@ -97,6 +97,7 @@
         {
             "id": "swimspa",
             "name": "SwimSpa",
+            "chart_color": "#c2185b",
             "nominal_power_kw": 2.8,
             "daily_target_kwh": 5.0,
             "daily_target_source": "thermal",
@@ -136,6 +137,7 @@
         {
             "id": "eauto",
             "name": "E-Auto",
+            "chart_color": "#00bcd4",
             "nominal_power_kw": 3.5,
             "min_power_kw": 1.4,
             "daily_target_source": "config",
@@ -175,7 +177,27 @@
                     "nominal_power_kw_name": "EAuto_MaxLeistung"
                 }
             }
+        },
+        {
+            "id": "waermepumpe",
+            "name": "Wärmepumpe",
+            "chart_color": "#ff9800",
+            "nominal_power_kw": 1.6,
+            "daily_target_kwh": 4.0,
+            "daily_target_source": "historical",
+            "min_on_quarterhours": 2,
+            "path_log": "./Historical-Data/Miniserver-Gen2_AnforderungWärmepumpe_20190101-20260610.csv",
+            "signal_type": "power",
+            "log_signal_type": "binary",
+            "optimizer_enabled": true,
+            "loxone_outputs": {
+                "enable_name": "Ernie_WP_Freigabe"
+            },
+            "loxone_inputs": {
+                "power_name": "Ernie_WP_P_act"
+            }
         }
+
     ],
     "file_paths_battery_simulation": {
         "path_cons_data": "runtime/cons_data_hourly.csv",
