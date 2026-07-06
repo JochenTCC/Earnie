@@ -10,6 +10,7 @@ import pytest
 from data.price_forecast_live import (
     MISSING_PRICE_STRATEGY_FORECAST,
     MISSING_PRICE_STRATEGY_MIRROR,
+    get_forecast_model_path,
     get_missing_price_strategy,
     resolve_market_slots_kwargs,
 )
@@ -56,3 +57,23 @@ def test_resolve_market_slots_kwargs_forecast_without_model_falls_back_to_mirror
                 path_mock.return_value = Path("data/cache/missing.json")
                 kwargs = resolve_market_slots_kwargs([])
     assert kwargs["missing_price_strategy"] == MISSING_PRICE_STRATEGY_MIRROR
+
+
+def test_get_forecast_model_path_resolves_runtime_prefix(monkeypatch, tmp_path):
+    nas_runtime = tmp_path / "nas_runtime"
+    nas_runtime.mkdir()
+    model_file = nas_runtime / "price_model_coefficients.json"
+    model_file.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(nas_runtime))
+
+    with patch(
+        "config.Config._read_json_dict",
+        return_value={
+            "market_prices": {
+                "forecast_model_path": "runtime/price_model_coefficients.json",
+            }
+        },
+    ):
+        resolved = get_forecast_model_path()
+        assert resolved == model_file
+        assert resolved.exists()

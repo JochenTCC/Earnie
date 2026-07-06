@@ -14,6 +14,8 @@ from data.price_forecast_model import (
 )
 
 from data.market_prices import PRICE_SOURCE_PREDICTED
+from runtime_store.persist_paths import resolve_runtime_prefixed_path
+
 MISSING_PRICE_STRATEGY_MIRROR = "mirror"
 MISSING_PRICE_STRATEGY_FORECAST = "forecast"
 DEFAULT_MODEL_PATH = Path("data/cache/price_model_coefficients.json")
@@ -42,7 +44,8 @@ def get_forecast_model_path() -> Path:
 
     block = config.Config._read_json_dict(str(config.CONFIG_JSON_PATH)).get("market_prices")
     if isinstance(block, dict) and block.get("forecast_model_path"):
-        return Path(str(block["forecast_model_path"]))
+        configured = str(block["forecast_model_path"])
+        return Path(resolve_runtime_prefixed_path(configured))
     return DEFAULT_MODEL_PATH
 
 
