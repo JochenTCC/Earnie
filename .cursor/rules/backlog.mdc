@@ -1,22 +1,27 @@
 ---
-description: Backlog.md pflegen — erledigte Punkte verschieben, nicht durchstreichen
-globs: Backlog.md,Backlog-Erledigt.md
+description: Backlog-Dateien pflegen — erledigte Punkte verschieben, nicht durchstreichen
+globs: Backlog.md,Backlog-Bugfixes.md,Backlog-Erledigt.md
 alwaysApply: false
 ---
 
-# Backlog.md & Backlog-Erledigt.md
+# Backlog.md, Backlog-Bugfixes.md & Backlog-Erledigt.md
 
-**Offen:** `Backlog.md` (Bugfixes, Feature-Backlog nach Version, Packaging, Referenz)
+**Offen:**
 
-**Archiv:** `Backlog-Erledigt.md` (abgeschlossene Arbeiten)
+- `Backlog.md` — Feature-Backlog nach Version, Packaging, Referenz
+- `Backlog-Bugfixes.md` — Prod-Abweichungen, Regressionen (`xfail`), bekannte Fehlverhalten
+
+**Archiv:** `Backlog-Erledigt.md` (abgeschlossene Arbeiten — Features und Bugfixes gemeinsam)
 
 Beim Pflegen:
 
 - **Erledigte Punkte nicht durchstreichen** (`~~…~~` vermeiden).
-- Stattdessen aus den offenen Kapiteln in `Backlog.md` entfernen und in `Backlog-Erledigt.md` eintragen:
+- Stattdessen aus der jeweiligen offenen Datei entfernen und in `Backlog-Erledigt.md` eintragen:
   - Neuer Abschnitt `### <Thema> (YYYY-MM-DD)` (Datum Europe/Vienna)
   - Einzelpunkte mit `- [x] …`
-- Bei **teilweise erledigten** Epics: nur die offenen Phasen/Unterpunkte in `Backlog.md` belassen.
+  - Bugfixes: Abschnittstitel z. B. `### Bugfix …` oder `### … Regression …`
+- Bei **teilweise erledigten** Epics: nur die offenen Phasen/Unterpunkte in der Quelldatei belassen.
 - Nur dokumentieren, was tatsächlich erledigt wurde — nichts erfinden.
 - Referenz-Tabellen (z. B. Log-Dateien) gehören nicht ins Erledigt-Archiv, sondern unter **Referenz** in `Backlog.md`.
 - Wiederholte `### Version …`-Überschriften in `Backlog.md` sind bewusst — Reihenfolge per Block verschieben, nicht zusammenführen.
+- **Versionierung:** abgeschlossener Bugfix → nur **PATCH**; abgeschlossenes `### Version 0.+1`-Feature → **MINOR** (siehe `versioning.mdc`).

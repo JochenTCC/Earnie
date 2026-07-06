@@ -8,7 +8,7 @@ alwaysApply: false
 Wenn der User **Session beenden**, **Backlog sync**, **Commit und Push** oder einen vergleichbaren Session-Abschluss wünscht:
 
 1. Skill `.cursor/skills/session-abschluss/SKILL.md` vollständig befolgen
-2. **Phase 1:** `Backlog.md` / `Backlog-Erledigt.md` pflegen → alle freigegebenen offenen Änderungen committen → pushen
+2. **Phase 1:** `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` pflegen → alle freigegebenen offenen Änderungen committen → pushen
 3. Bei lokalen oder möglicherweise temporären Dateien **vorher nachfragen** (z. B. persönliche VS-Code-Einstellungen, lokale Pfade)
 4. **Phase 2** (Docker build/push) **nur** nach expliziter Bestätigung — nie automatisch
 

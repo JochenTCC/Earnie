@@ -1,7 +1,8 @@
 ---
 name: session-abschluss
 description: >-
-  Beendet eine Entwicklungs-Session: Backlog.md und Backlog-Erledigt.md pflegen,
+  Beendet eine Entwicklungs-Session: Backlog.md, Backlog-Bugfixes.md und
+  Backlog-Erledigt.md pflegen,
   alle offenen Änderungen committen und pushen, optional Docker-Image bauen
   und nach ghcr.io pushen.
   Verwenden bei „Session beenden“, „Backlog sync“, „Commit und Push“ oder
@@ -44,10 +45,11 @@ Erst nach Antwort des Users stagen. Ausgeschlossene Dateien nicht committen.
 
 ### 3. Backlog aktualisieren
 
-Schema aus `Backlog.md` / `Backlog-Erledigt.md` beibehalten (siehe auch `.cursor/rules/backlog.mdc`):
+Schema aus `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` beibehalten (siehe auch `.cursor/rules/backlog.mdc`):
 
-- **Erledigte Punkte nicht durchstreichen** — aus offenen Kapiteln in `Backlog.md` entfernen und in `Backlog-Erledigt.md` mit `- [x]` eintragen
-- **Backlog.md:** Bugfixes, Feature-Backlog (Version-Blöcke), Packaging, Referenz — nur noch offene Phasen/Unterpunkte; Verknüpfungen aktuell halten
+- **Erledigte Punkte nicht durchstreichen** — aus der jeweiligen offenen Datei entfernen und in `Backlog-Erledigt.md` mit `- [x]` eintragen
+- **Backlog-Bugfixes.md:** offene Prod-Bugs/Regressionen; bei Erledigung PATCH in `version.py` prüfen
+- **Backlog.md:** Feature-Backlog (Version-Blöcke), Packaging, Referenz — nur noch offene Phasen/Unterpunkte
 - **Backlog-Erledigt.md:** Neuer Abschnitt `### <Thema> (YYYY-MM-DD)` mit Datum **heute** (lokale Zeit Europe/Vienna)
 - Nur dokumentieren, was in Session/Diff tatsächlich erledigt wurde — nichts erfinden
 - Offene nächste Schritte bei teilweise erledigten Items belassen
