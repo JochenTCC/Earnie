@@ -1,6 +1,16 @@
 # Erledigte Punkte
 
-Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
+Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+
+### Chart 1 Rauf/Runter-Energiebilanz (2026-07-06)
+
+- [x] **Entladesperre besser visualisieren** — gelb-schwarzes Streifenband unter SoC (`ui/charts.py`)
+- [x] **Rauf/Runter-Balken** statt Batterie-/Verbraucher-Balken — Basis `ui/chart_flow_balance.py`, `ui/flow_balance_allocate.py`
+- [x] **Farbpalette Netz & Batterie** — Netz blau, Batterie-Flüsse gedämpft (HSL in `chart_flow_balance.py`); Szenarien A–I, `docs/ui/charts.md`
+- [x] **PV-Überschuss & volle Batterie** — SoC-Rand-Korrektur (MILP); Szenario I; Produktiv-Log: Ist-`battery_kw` aus `consumption_snapshot` → `Ist Batterie-Leistung (kW)` (`runtime_store/history_timeline.py`)
+- [x] **Netz- und Grundlast-Linien entfernt** — Darstellung nur noch über Rauf/Runter-Balken (`ui/charts.py`)
+- [x] **SoC-Verlauf** — gemeinsame Farbe optimiert + „SoC BL Ziel“ über `_HSL_SOC` in `ui/charts.py`
+- [x] **Version 1.17.0** — Minor-Bump nach abgeschlossenem Version-0.+1-Block Chart 1
 
 ### UI S-2 Cold-Start & Preisprognose-Logging (2026-07-06)
 
