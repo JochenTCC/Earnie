@@ -7,6 +7,7 @@ os.environ["ENERGY_OPTIMIZER_OFFLINE"] = "1"
 import argparse
 import logging
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
 
 import pandas as pd
 import config
@@ -15,6 +16,12 @@ from data import profile_manager
 from simulation.backtesting_log import save_backtesting_log
 from simulation.backtesting_log import build_critical_cases, summarize_critical_cases
 from data.data_loader import load_market_prices, resolve_simulation_window
+from data.backtesting_prices import (
+    PRICE_STRATEGY_PERFECT,
+    VALID_PRICE_STRATEGIES,
+    load_price_resources,
+    parse_price_strategy,
+)
 from simulation.engine import (
     HISTORICAL_REFERENCE_ID,
     HistoricalDataCache,
@@ -146,7 +153,59 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "nicht Shell-Umleitung unter Windows)."
         ),
     )
+    parser.add_argument(
+        "--price-strategy",
+        choices=list(VALID_PRICE_STRATEGIES),
+        default=PRICE_STRATEGY_PERFECT,
+        help=(
+            "Preise in der grünen Zone (nur sunset_window): "
+            "'perfect' = historischer Ist-Preis (Standard), "
+            "'mirror' = Spiegelung, 'forecast' = OLS-Prognose."
+        ),
+    )
+    parser.add_argument(
+        "--feature-dataset",
+        metavar="CSV",
+        help="Training-CSV für price_strategy=forecast (Standard: neuestes data/cache/price_training_*.csv).",
+    )
+    parser.add_argument(
+        "--forecast-model",
+        metavar="JSON",
+        help="OLS-Koeffizienten für price_strategy=forecast (Standard: market_prices.forecast_model_path).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        metavar="PFAD",
+        default=".",
+        help="Zielordner für backtesting_log.json und backtesting_hourly.csv (Standard: .).",
+    )
     return parser
+
+
+def _default_feature_dataset() -> Path:
+    cache = Path("data/cache")
+    candidates = sorted(cache.glob("price_training_*.csv"), key=lambda p: p.stat().st_mtime)
+    if not candidates:
+        raise SystemExit(
+            "Kein price_training_*.csv in data/cache — "
+            "python -m scripts.build_price_training_dataset ausführen."
+        )
+    return candidates[-1]
+
+
+def _default_forecast_model() -> Path:
+    from data.price_forecast_live import get_forecast_model_path
+
+    return get_forecast_model_path()
+
+
+def _resolve_price_paths(args) -> tuple[Path | None, Path | None]:
+    strategy = parse_price_strategy(args.price_strategy)
+    if strategy != MISSING_PRICE_STRATEGY_FORECAST:
+        return None, None
+    dataset = Path(args.feature_dataset) if args.feature_dataset else _default_feature_dataset()
+    model = Path(args.forecast_model) if args.forecast_model else _default_forecast_model()
+    return dataset, model
 
 
 def _run_scenario_worker(
@@ -156,14 +215,24 @@ def _run_scenario_worker(
     end_iso: str,
     prices: pd.DataFrame,
     horizon_mode: str,
+    price_strategy: str,
+    feature_dataset_path: str | None,
+    forecast_model_path: str | None,
 ) -> tuple[str, pd.DataFrame, object, list[dict]]:
     """Top-Level-Worker für ProcessPoolExecutor (Windows spawn)."""
+    from pathlib import Path
+
     from simulation.engine import run_simulation, HistoricalDataCache
 
     start = pd.Timestamp(start_iso)
     end = pd.Timestamp(end_iso)
     cache = HistoricalDataCache()
     cache.load()
+    price_resources = load_price_resources(
+        price_strategy,
+        feature_dataset_path=Path(feature_dataset_path) if feature_dataset_path else None,
+        forecast_model_path=Path(forecast_model_path) if forecast_model_path else None,
+    )
     df_result, plausibility, cbc_events = run_simulation(
         start,
         end,
@@ -172,6 +241,7 @@ def _run_scenario_worker(
         cache=cache,
         scenario_id=name,
         horizon_mode=horizon_mode,
+        price_resources=price_resources,
     )
     return name, df_result, plausibility, cbc_events
 
@@ -184,6 +254,9 @@ def _run_scenarios_parallel(
     prices: pd.DataFrame,
     workers: int,
     horizon_mode: str,
+    price_strategy: str,
+    feature_dataset_path: str | None,
+    forecast_model_path: str | None,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, object], dict[str, list[dict]]]:
     sim_results: dict[str, pd.DataFrame] = {}
     plausibility_by_scenario: dict[str, object] = {}
@@ -202,6 +275,9 @@ def _run_scenarios_parallel(
                 end_iso,
                 prices,
                 horizon_mode,
+                price_strategy,
+                feature_dataset_path,
+                forecast_model_path,
             ): name
             for name, params in scenarios.items()
         }
@@ -345,6 +421,19 @@ def main(argv: list[str] | None = None):
     )
     args = _build_arg_parser().parse_args(argv)
     horizon_mode = parse_horizon_mode(args.horizon_mode)
+    price_strategy = parse_price_strategy(args.price_strategy)
+    if price_strategy != PRICE_STRATEGY_PERFECT and horizon_mode != SUNSET_WINDOW:
+        raise SystemExit(
+            f"--price-strategy {price_strategy} erfordert --horizon-mode {SUNSET_WINDOW}."
+        )
+    feature_dataset_path, forecast_model_path = _resolve_price_paths(args)
+    feature_dataset_str = str(feature_dataset_path) if feature_dataset_path else None
+    forecast_model_str = str(forecast_model_path) if forecast_model_path else None
+    price_resources = load_price_resources(
+        price_strategy,
+        feature_dataset_path=feature_dataset_path,
+        forecast_model_path=forecast_model_path,
+    )
     if args.log_file:
         logger_config.attach_utf8_log_file(args.log_file)
     if args.workers < 1:
@@ -372,6 +461,13 @@ def main(argv: list[str] | None = None):
             f"Standard-Zeitraum aus config ({range_mode}): "
             f"{start.date()} – {end.date()}"
         )
+
+    if price_strategy != PRICE_STRATEGY_PERFECT:
+        print(f"Preisstrategie grüne Zone: {price_strategy}")
+        if feature_dataset_path is not None:
+            print(f"  Feature-Dataset: {feature_dataset_path}")
+        if forecast_model_path is not None:
+            print(f"  Prognosemodell: {forecast_model_path}")
 
     print("Lade historische Verbrauchsdaten (Loxone-Logs)...")
     cache = HistoricalDataCache()
@@ -444,6 +540,7 @@ def main(argv: list[str] | None = None):
                 on_progress=_make_progress_printer(display),
                 scenario_id=name,
                 horizon_mode=horizon_mode,
+                price_resources=price_resources,
             )
             sim_results[name] = df_result
             plausibility_by_scenario[name] = plausibility
@@ -458,6 +555,9 @@ def main(argv: list[str] | None = None):
             prices,
             args.workers,
             horizon_mode,
+            price_strategy,
+            feature_dataset_str,
+            forecast_model_str,
         )
         sim_results.update(parallel_results)
         plausibility_by_scenario.update(parallel_plausibility)
@@ -490,12 +590,14 @@ def main(argv: list[str] | None = None):
         "end_month": args.end_month.month if args.end_month is not None else None,
         "backtesting_year": BACKTESTING_YEAR,
         "price_source": price_source,
+        "price_strategy": price_strategy,
     }
     log_path = save_backtesting_log(
         sim_results,
         labels,
         plausibility_by_scenario,
         period_meta,
+        log_dir=args.output_dir,
         cbc_events_by_scenario=cbc_events_by_scenario,
     )
     print(f"\nBacktesting-Log gespeichert: {log_path}")

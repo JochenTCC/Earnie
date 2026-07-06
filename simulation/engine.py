@@ -8,6 +8,7 @@ import pandas as pd
 import config
 from data import profile_manager
 from data import feed_in_prices
+from data.backtesting_prices import BacktestingPriceResources, matrix_prices_from_context
 from data.planning_window import normalize_hour_slot
 from data.market_prices import epex_prices_for_slots
 from optimizer import (
@@ -29,6 +30,7 @@ from simulation.backtesting_horizon import (
     overlay_step_consumption_on_matrix,
     step_slot_datetimes,
     truncate_matrix_for_step_simulation,
+    window_start_before_anchor,
 )
 from simulation.horizon_mode import (
     BACKTESTING_STEP_HOURS,
@@ -237,6 +239,8 @@ def build_historical_matrix_for_slots(
     window_end: datetime,
     feed_in_settings: feed_in_prices.FeedInSettings | None = None,
     charging_anchor: datetime | None = None,
+    price_resources: BacktestingPriceResources | None = None,
+    planning_moment: datetime | None = None,
 ) -> tuple[list[dict], dict]:
     """Baut eine Optimierungsmatrix für beliebige stündliche Slots aus historischen Logs."""
     baseload_stored, historical_totals, total_load, hourly_flex = (
@@ -247,28 +251,43 @@ def build_historical_matrix_for_slots(
     )
     stored_baseload_kwh = round(sum(baseload_stored), 3)
     pv_profile = cache.get_pv_for_slots(slot_datetimes)
-    epex_prices = epex_prices_for_slots(prices_df, slot_datetimes)
-    brutto_prices = [_brutto_price_cent(epex) for epex in epex_prices]
+    price_ctx = (
+        price_resources.at_planning_moment(planning_moment)
+        if price_resources is not None and planning_moment is not None
+        else None
+    )
+    epex_prices, brutto_prices, price_sources = matrix_prices_from_context(
+        prices_df,
+        slot_datetimes,
+        price_ctx,
+        planning_moment=planning_moment,
+    )
     anchor = charging_anchor if charging_anchor is not None else window_end
 
     matrix = []
-    for slot_dt, price, epex, pv, base, total in zip(
-        slot_datetimes, brutto_prices, epex_prices, pv_profile, baseload_kw, total_load
+    for slot_dt, price, epex, pv, base, total, price_source in zip(
+        slot_datetimes,
+        brutto_prices,
+        epex_prices,
+        pv_profile,
+        baseload_kw,
+        total_load,
+        price_sources,
     ):
-        matrix.append(
-            {
-                "hour": slot_dt.hour,
-                "date": slot_dt.date(),
-                "slot_datetime": slot_dt,
-                "k_act": price,
-                "price_buy": epex,
-                "expected_p_act": base,
-                "expected_p_total": total,
-                "expected_p_pv": pv,
-                "consumption_mode": "logged_day",
-                "charging_anchor": anchor,
-            }
-        )
+        row = {
+            "hour": slot_dt.hour,
+            "date": slot_dt.date(),
+            "slot_datetime": slot_dt,
+            "k_act": price,
+            "price_buy": epex,
+            "price_source": price_source,
+            "expected_p_act": base,
+            "expected_p_total": total,
+            "expected_p_pv": pv,
+            "consumption_mode": "logged_day",
+            "charging_anchor": anchor,
+        }
+        matrix.append(row)
 
     settings = feed_in_settings or config.get_feed_in_settings()
     feed_in_prices.enrich_matrix_feed_in_prices(matrix, settings)
@@ -311,6 +330,7 @@ def build_sunset_window_matrix(
     prices_df: pd.DataFrame,
     scenario_params: dict,
     feed_in_settings: feed_in_prices.FeedInSettings | None = None,
+    price_resources: BacktestingPriceResources | None = None,
 ) -> tuple[list[dict], dict, int]:
     """
     Sunset-MILP-Matrix (Jetzt→SA₂) für einen Backtesting-Schritt ab Anker−24h.
@@ -321,8 +341,13 @@ def build_sunset_window_matrix(
         anchor, scenario_params
     )
     _, _, tz_name = geo_params_from_scenario(scenario_params)
+    planning_moment = window_start_before_anchor(anchor, tz_name)
     step_slots = step_slot_datetimes(anchor, tz_name)
     full_slots = [naive_backtesting_slot(dt) for dt in planning_window.slot_datetimes]
+    matrix_kwargs = {
+        "price_resources": price_resources,
+        "planning_moment": planning_moment,
+    }
     step_matrix, meta = build_historical_matrix_for_slots(
         step_slots,
         cache,
@@ -330,6 +355,7 @@ def build_sunset_window_matrix(
         window_end=anchor,
         feed_in_settings=feed_in_settings,
         charging_anchor=anchor,
+        **matrix_kwargs,
     )
     matrix, _full_meta = build_historical_matrix_for_slots(
         full_slots,
@@ -338,6 +364,7 @@ def build_sunset_window_matrix(
         window_end=anchor,
         feed_in_settings=feed_in_settings,
         charging_anchor=anchor,
+        **matrix_kwargs,
     )
     meta["planning_horizon_hours"] = len(full_slots)
     meta["sunrise_anchor"] = planning_window.sunrise_anchor
@@ -389,12 +416,18 @@ def _simulate_anchor_step(
     feed_in_settings: feed_in_prices.FeedInSettings,
     hours_done: int,
     collect_cbc: bool,
+    price_resources: BacktestingPriceResources | None = None,
 ) -> tuple[list[dict], list[dict], dict, float]:
     """Ein Backtesting-Schritt (24h Output) für fixed_24h oder sunset_window."""
     sunrise_index = None
     if horizon_mode == SUNSET_WINDOW:
         matrix, meta, sunrise_index = build_sunset_window_matrix(
-            anchor, cache, prices_df, scenario_params, feed_in_settings
+            anchor,
+            cache,
+            prices_df,
+            scenario_params,
+            feed_in_settings,
+            price_resources=price_resources,
         )
     else:
         matrix, meta = build_historical_window_matrix(
@@ -573,6 +606,7 @@ def run_simulation(
     on_progress=None,
     scenario_id: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
+    price_resources: BacktestingPriceResources | None = None,
 ) -> tuple[pd.DataFrame, PlausibilityReport, list[dict]]:
     """
     Simuliert historische Verbrauchsdaten mit Flex-Optimierung.
@@ -629,6 +663,7 @@ def run_simulation(
                 feed_in_settings=feed_in_settings,
                 hours_done=hours_done,
                 collect_cbc=collect_cbc,
+                price_resources=price_resources,
             )
             if collect_cbc:
                 set_cbc_milp_context(
