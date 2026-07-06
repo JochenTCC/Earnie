@@ -43,7 +43,7 @@ Einspeisung (Batterie) ← Rest der Einspeisung (≤ Entlade-Rest)
 Entladen → Last ← verbleibende Entladung
 ```
 
-**Sonderfälle:** `Netzbezug` und `Geplante Batterie-Aktion` sind vorzeichenkodiert (Bezug/Laden positiv, Einspeisung/Entladen negativ). Fehlt eine explizite Einspeisung in der Zeile, wird PV-Überschuss (`offset_kw > 0`) als gedämpfte PV-Einspeisung gezeichnet. Im neutralen MILP-Bereich wird `Netzbezug` nach Live-Overlay aus Last, Flex, PV und Batterie neu abgeleitet.
+**Sonderfälle:** `Netzbezug` und `Geplante Batterie-Aktion` sind vorzeichenkodiert (Bezug/Laden positiv, Einspeisung/Entladen negativ). Fehlt eine explizite Einspeisung in der Zeile, wird PV-Überschuss (`offset_kw > 0`) als gedämpfte PV-Einspeisung gezeichnet. Ist `Simulierter SoC (%)` am oberen/unteren SoC-Limit, wird geplanter Lade-/Entladeanteil nicht gezeichnet; der Überschuss erscheint als PV-Einspeisung bzw. Netzbezug (volle Batterie + PV-Überschuss). Ohne SoC-Spalte bleibt die geplante Batterieleistung unverändert. Im neutralen MILP-Bereich wird `Netzbezug` nach Live-Overlay aus Last, Flex, PV und Batterie neu abgeleitet.
 
 | Segment (Chart) | Farbe gedämpft | Bedeutung |
 |-----------------|----------------|-----------|

@@ -185,7 +185,30 @@ def test_blend_hsl_l_delta_shifts_lightness() -> None:
 
 def test_slots_from_dataframe_length(flow_balance_df) -> None:
     slots = build_flow_balance_slots_from_df(flow_balance_df, flex_consumers=_flex_pairs())
-    assert len(slots) == len(flow_balance_df) == 8
+    assert len(slots) == len(flow_balance_df) == 9
+
+
+def test_full_battery_pv_surplus_skips_charge_segment() -> None:
+    scenario = next(item for item in flow_balance_scenario_rows() if item.scenario_id == "I")
+    slot = build_flow_balance_segments(scenario.row, flex_consumers=_flex_pairs())
+    kinds_down = {segment.kind for segment in slot.down}
+    export = next(segment for segment in slot.down if segment.kind == KIND_EXPORT_PV)
+    assert KIND_BATTERY_CHARGE_PV not in kinds_down
+    assert export.kw == pytest.approx(8.0)
+    assert slot.is_visually_balanced
+
+
+def test_rows_without_soc_keep_planned_charge() -> None:
+    row = {
+        "PV-Prognose (kW)": 10.0,
+        "Verbrauch-Prognose (kW)": 2.0,
+        "SwimSpa (kW)": 0.0,
+        "Geplante Batterie-Aktion (kW)": 3.0,
+        "Netzbezug (kW)": -5.0,
+    }
+    slot = build_flow_balance_segments(row, flex_consumers=_flex_pairs())
+    kinds_down = {segment.kind for segment in slot.down}
+    assert KIND_BATTERY_CHARGE_PV in kinds_down
 
 
 @pytest.mark.parametrize(

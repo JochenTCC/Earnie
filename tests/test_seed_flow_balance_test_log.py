@@ -16,15 +16,15 @@ from ui.chart_flow_balance import build_flow_balance_segments
 _TZ = ZoneInfo("Europe/Vienna")
 
 
-def test_seed_flow_balance_test_log_writes_eight_scenarios(tmp_path):
+def test_seed_flow_balance_test_log_writes_nine_scenarios(tmp_path):
     target = tmp_path / "runtime" / "optimization_history.jsonl"
     anchor = datetime(2026, 7, 6, 14, 0, 0, tzinfo=_TZ)
     summary = seed_flow_balance_test_log(target, anchor=anchor)
 
-    assert summary["entries"] == 8
+    assert summary["entries"] == 9
     rows = [json.loads(line) for line in target.read_text(encoding="utf-8").splitlines()]
     assert rows[0]["scenario"] == "flow_balance_A"
-    assert rows[-1]["scenario"] == "flow_balance_H"
+    assert rows[-1]["scenario"] == "flow_balance_I"
     assert rows[-1]["completed_at"].startswith("2026-07-06T13:45:00")
 
     flex = flow_balance_flex_pairs()

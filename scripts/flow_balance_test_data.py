@@ -149,6 +149,22 @@ def flow_balance_scenario_rows() -> tuple[FlowBalanceScenario, ...]:
             kinds_down=(),
             balanced=True,
         ),
+        FlowBalanceScenario(
+            scenario_id="I",
+            title="Volle Batterie: PV-Überschuss nur Einspeisung (kein PV-Laden)",
+            row={
+                "PV-Prognose (kW)": 10.0,
+                "Verbrauch-Prognose (kW)": 2.0,
+                _FLEX_SWIMSPA_COLUMN: 0.0,
+                "Geplante Batterie-Aktion (kW)": 3.0,
+                "Netzbezug (kW)": -5.0,
+                "Simulierter SoC (%)": 100.0,
+            },
+            offset_kw=8.0,
+            kinds_up=(KIND_PV,),
+            kinds_down=(KIND_BASELOAD, KIND_EXPORT_PV),
+            balanced=False,
+        ),
     )
 
 
@@ -189,7 +205,7 @@ def scenario_history_entry(scenario: FlowBalanceScenario) -> dict[str, Any]:
         "source": "seed_flow_balance_test_log.py",
         "success": True,
         "optimization_interval_sec": 900,
-        "soc_percent": 70.0,
+        "soc_percent": float(scenario.row.get("Simulierter SoC (%)", 70.0) or 70.0),
         "market_price_cent": 12.0,
         "forecast_pv_kw": pv,
         "forecast_consumption_kw": baseload,

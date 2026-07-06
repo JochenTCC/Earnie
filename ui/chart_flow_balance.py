@@ -21,6 +21,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import config
+from optimizer import battery as bat
 from optimizer.targets import (
     consumer_column_name,
     consumer_immediate_charge_column_name,
@@ -169,6 +170,51 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     if math.isnan(number):
         return default
     return number
+
+
+def _optional_soc_percent(row: Mapping[str, Any]) -> float | None:
+    if "Simulierter SoC (%)" not in row:
+        return None
+    value = row.get("Simulierter SoC (%)")
+    if value is None:
+        return None
+    try:
+        soc = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(soc):
+        return None
+    return soc
+
+
+def _soc_capped_battery_plan(
+    row: Mapping[str, Any],
+    battery_kw: float,
+) -> tuple[float, float, float]:
+    """
+    Begrenzt Batterieleistung nur am SoC-Rand (volle/leere Batterie).
+
+    Produktiv-Zeilen tragen bereits SoC-gekappte ``Geplante Batterie-Aktion``;
+    hier wird nur korrigiert, wenn wegen SoC-Limit kein Laden/Entladen mehr
+    möglich ist, die Zeile aber noch einen Plananteil enthält.
+
+    Returns
+    -------
+    capped_kw, charge_skipped_kw, discharge_skipped_kw
+    """
+    soc = _optional_soc_percent(row)
+    if soc is None:
+        return battery_kw, 0.0, 0.0
+    params = config.get_battery_params()
+    max_soc = float(params["max_soc"])
+    min_soc = float(params["min_soc"])
+    eps = bat.SOC_DELTA_THRESHOLD
+
+    if battery_kw > 0 and soc >= max_soc - eps:
+        return 0.0, battery_kw, 0.0
+    if battery_kw < 0 and soc <= min_soc + eps:
+        return 0.0, 0.0, -battery_kw
+    return battery_kw, 0.0, 0.0
 
 
 def _safe_int_flag(value: Any) -> int:
@@ -361,12 +407,13 @@ def build_flow_balance_segments(
     """
     pv = _safe_float(row.get("PV-Prognose (kW)"))
     baseload = _safe_float(row.get("Verbrauch-Prognose (kW)"))
-    battery = _safe_float(row.get("Geplante Batterie-Aktion (kW)"))
+    battery_raw = _safe_float(row.get("Geplante Batterie-Aktion (kW)"))
     grid = _safe_float(row.get("Netzbezug (kW)"))
     load_kw = baseload + _flex_total_kw(row, flex_consumers)
 
-    grid_import = max(grid, 0.0)
-    grid_export = max(-grid, 0.0)
+    battery, charge_skipped, discharge_skipped = _soc_capped_battery_plan(row, battery_raw)
+    grid_import = max(grid, 0.0) + discharge_skipped
+    grid_export = max(-grid, 0.0) + charge_skipped
     battery_charge = max(battery, 0.0)
     battery_discharge = max(-battery, 0.0)
 
