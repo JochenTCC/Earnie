@@ -1,21 +1,33 @@
-"""Kleine Hilfe-„?“ per Popover (Streamlit ≥ 1.30)."""
+"""Kleine Hilfe-Icons per Popover (Streamlit ≥ 1.30)."""
 from __future__ import annotations
 
 import streamlit as st
 
+_HELP_ICON = ":material/help_outline:"
+_HELP_POPOVER_PREFIX = "help_hint__"
 
-def render_help_hint(body: str, *, key: str, label: str = "?") -> None:
-    """Zeigt ein kompaktes ? — Inhalt erscheint im Popover."""
-    with st.popover(label, help="Hilfe anzeigen", key=key):
+
+def _help_popover_key(key: str) -> str:
+    return f"{_HELP_POPOVER_PREFIX}{key}"
+
+
+def render_help_hint(body: str, *, key: str) -> None:
+    """Zeigt ein kompaktes Hilfe-Icon — Inhalt erscheint im Popover."""
+    with st.popover(
+        "",
+        icon=_HELP_ICON,
+        type="tertiary",
+        help="Hilfe anzeigen",
+        key=_help_popover_key(key),
+        width="content",
+    ):
         st.markdown(body)
 
 
 def render_title_with_help(title: str, help_text: str, *, key: str) -> None:
-    """Überschrift mit ?-Popover in einer Zeile."""
-    col_title, col_help = st.columns([11, 1])
-    with col_title:
+    """Überschrift mit Hilfe-Icon in einer Zeile."""
+    with st.container(horizontal=True, vertical_alignment="center", gap="small"):
         st.markdown(f"**{title}**")
-    with col_help:
         render_help_hint(help_text, key=key)
 
 
@@ -26,14 +38,11 @@ def render_page_title_with_help(
     key: str,
     version: str | None = None,
 ) -> None:
-    """Seiten-Titel mit optionaler Versions-Caption und ?-Popover (Scope nur im ?)."""
-    col_title, col_version, col_help = st.columns([8, 2, 1], vertical_alignment="bottom")
-    with col_title:
+    """Seiten-Titel mit optionaler Versions-Caption und Hilfe-Icon."""
+    with st.container(horizontal=True, vertical_alignment="bottom", gap="small"):
         st.title(title)
-    with col_version:
         if version:
             st.caption(f"Version {version}")
-    with col_help:
         render_help_hint(help_text, key=key)
 
 
@@ -44,16 +53,10 @@ def render_status_with_help(
     key: str,
     prominent: bool = False,
 ) -> None:
-    """Statuszeile sichtbar, Erklärung im ?-Popover."""
-    if prominent:
-        col_status, col_help = st.columns([11, 1], vertical_alignment="center")
-        with col_status:
+    """Statuszeile sichtbar, Erklärung im Hilfe-Popover."""
+    with st.container(horizontal=True, vertical_alignment="center", gap="small"):
+        if prominent:
             st.info(message)
-        with col_help:
-            render_help_hint(help_text, key=key)
-        return
-    col_status, col_help = st.columns([11, 1], vertical_alignment="center")
-    with col_status:
-        st.caption(message)
-    with col_help:
+        else:
+            st.caption(message)
         render_help_hint(help_text, key=key)

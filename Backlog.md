@@ -13,8 +13,6 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 ## Feature-Backlog
 
 ### Version 0.+1
-- [ ] Vor / Zurück Button kleiner machen und neuen Knopf Heute einfügen, sowie Datumsauswahl ermöglichen (nur für vorhandene Daten)
-- [ ] Hover-Fragezeichen deutlich kleiner machen (Mini-Icon), so dass sie auf Mobile Devices keine Extra-Zeile brauchen
 - [ ] Chart 1 für variable Anzahl von Verbrauchern fit machen (max 4 anzeigen, nach Leistung priorisieren, Zoom einführen) — alternativ ein negativer Balken mit allen aufsummierten Verbrauchern
 
 ### Version 0.+1

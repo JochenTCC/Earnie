@@ -2,6 +2,11 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
+### UI S-2 Nav & Hilfe-Icons Mobile (2026-07-06)
+
+- [x] **Kompakte S-2-Navigation** — `←` / `Heute` / Kalender-Icon / `→` in `st.container(horizontal=True)`; Datumsauswahl im Popover (nur SA₀-Tage mit Log); `Heute` und Zyklus-Logik in `ui/s2_navigation.py`, `ui/chart_context.py`, `ui/history_navigation.py`
+- [x] **Mini-Hilfe-Icons** — Material-Icon + tertiary-Popover statt `?`-Button; horizontales Layout ohne Extra-Zeile auf Mobile; CSS in `ui/styles.py` (`inject_help_hint_css`); `ui/help_hint.py`, `ui/countdown.py`
+
 ### Entladesperre: Netz-Trickelladen (2026-07-06)
 
 - [x] **Bugfix: SOC stieg bei Halten aus dem Netz (05.07. ~22–23 Uhr)** — Prod-Log (`runtime-prod/runtime.zip`): PV=0, `battery_plan_kw=0`, gemessen ~0,2 kW Laden + Netzbezug; Ursache `target_soc_percent=100` bei Huawei-Steuerbefehl 1; Fix: bei `MODE_ENTLADESPERRE` `target_soc = current_soc` (`optimizer/milp.py`); Test `test_entladesperre_target_soc_matches_current_soc`

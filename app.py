@@ -24,7 +24,7 @@ from ui.main_py_sync import poll_main_py_sync_if_pending
 from ui.mode_selector import render_mode_selector
 from ui.runtime_config import reload_runtime_config
 from ui.sankey import render_live_power_flow
-from ui.styles import inject_compact_numeric_css
+from ui.styles import inject_compact_numeric_css, inject_help_hint_css
 
 logger = logging.getLogger("app")
 
@@ -52,6 +52,7 @@ st.set_page_config(
 
 def main() -> None:
     inject_compact_numeric_css()
+    inject_help_hint_css()
     try:
         drift_items = load_config_drift_items()
         if drift_items:
