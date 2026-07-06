@@ -1,7 +1,7 @@
 """Tests für S-2-Navigation (Zyklus + Segment, Spec §4)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -9,14 +9,19 @@ import pytest
 from data.planning_window import compute_ui_chart_window, normalize_hour_slot, normalize_planning_hour_slot
 from ui.chart_context import (
     build_live_chart_context,
+    cycle_offset_for_sa0_date,
     max_sunrise_cycle_offset,
+    sa0_date_for_s2_cycle,
+    s2_navigable_cycles,
     segment_navigation_label,
 )
 from ui.s2_navigation import (
     apply_s2_nav_back,
     apply_s2_nav_forward,
+    apply_s2_nav_heute,
     s2_back_disabled,
     s2_forward_disabled,
+    s2_heute_disabled,
 )
 
 LAT = 47.404
@@ -53,6 +58,47 @@ def test_back_at_max_cycle_unchanged():
 def test_forward_disabled_on_forecast_segment():
     assert s2_forward_disabled(0, 1) is True
     assert apply_s2_nav_forward(0, 1) == (0, 1)
+
+
+def test_heute_disabled_only_on_live_segment():
+    assert s2_heute_disabled(0, 0) is True
+    assert s2_heute_disabled(0, 1) is False
+    assert s2_heute_disabled(2, 0) is False
+
+
+def test_apply_s2_nav_heute_returns_live():
+    assert apply_s2_nav_heute() == (0, 0)
+
+
+def test_s2_navigable_cycles_without_log(monkeypatch):
+    monkeypatch.setattr(
+        "ui.chart_context.optimization_history.earliest_replay_completed_at",
+        lambda: None,
+    )
+    now = _dt(2026, 6, 15, 14, 0)
+    cycles = s2_navigable_cycles(now)
+    assert len(cycles) == 1
+    assert cycles[0][0] == 0
+
+
+def test_cycle_offset_for_sa0_date_matches_navigable_cycles(monkeypatch):
+    earliest = datetime(2026, 6, 10, 8, 0)
+    monkeypatch.setattr(
+        "ui.chart_context.optimization_history.earliest_replay_completed_at",
+        lambda: earliest,
+    )
+    now = _dt(2026, 6, 15, 14, 0)
+    for offset, sa0 in s2_navigable_cycles(now):
+        assert cycle_offset_for_sa0_date(sa0.date(), now) == offset
+    assert cycle_offset_for_sa0_date(date(1999, 1, 1), now) is None
+
+
+def test_sa0_date_for_s2_cycle_matches_chart_window():
+    now = _dt(2026, 6, 15, 14, 0)
+    live = build_live_chart_context(0, 0, now=now)
+    past = build_live_chart_context(1, 0, now=now)
+    assert sa0_date_for_s2_cycle(0, now=now) == live.chart_window.sa0.date()
+    assert sa0_date_for_s2_cycle(1, now=now) == past.chart_window.sa0.date()
 
 
 def test_round_trip_back_then_forward_reaches_live():

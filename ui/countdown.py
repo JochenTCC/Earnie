@@ -8,7 +8,7 @@ import streamlit as st
 from optimizer import schedule as optimization_schedule
 from runtime_store import run_state
 from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY, main_sync_poll_interval_sec
-from ui.help_hint import render_help_hint
+from ui.help_hint import render_status_with_help
 from ui.main_py_sync import MAIN_PY_SYNC_HELP, sync_footer_caption
 from ui.runtime_config import reload_runtime_config
 from ui.simulation_results import render_live_display_data_basis_expander
@@ -45,15 +45,13 @@ def _render_countdown_captions() -> None:
         f"🔄 **Optimierungs-Takt:** Viertelstunden (:00 / :15 / :30 / :45) | "
         f"⏱️ Letzter Lauf ({sync_label}): **{last_time}**"
     )
-    col_sync, col_help = st.columns([11, 1], vertical_alignment="center")
-    with col_sync:
-        sync_hint = sync_footer_caption(retry_sec, fallback_sec)
-        st.caption(
-            f"⏳ **Nächster main.py-Takt:** `{next_run.strftime('%H:%M')}` "
-            f"(in `{remaining}` s){sync_hint}"
-        )
-    with col_help:
-        render_help_hint(MAIN_PY_SYNC_HELP, key="countdown_main_py_sync_help")
+    sync_hint = sync_footer_caption(retry_sec, fallback_sec)
+    render_status_with_help(
+        f"⏳ **Nächster main.py-Takt:** `{next_run.strftime('%H:%M')}` "
+        f"(in `{remaining}` s){sync_hint}",
+        MAIN_PY_SYNC_HELP,
+        key="countdown_main_py_sync_help",
+    )
 
 
 def render_countdown_block() -> None:

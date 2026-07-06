@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import config
@@ -84,6 +84,59 @@ def max_sunrise_cycle_offset(now: datetime | None = None) -> int:
             break
         offset = next_offset
     return offset
+
+
+def s2_navigable_cycles(now: datetime | None = None) -> list[tuple[int, datetime]]:
+    """(cycle_offset, SA₀) für jeden navigierbaren Zyklus (0 = Live)."""
+    moment = now if now is not None else live_now()
+    if moment.tzinfo is None:
+        raise ValueError("now muss timezone-aware sein.")
+    lat = config.get("LATITUDE", cast=float)
+    lon = config.get("LONGITUDE", cast=float)
+    tz_name = config.get_planning_timezone()
+    max_cycle = max_sunrise_cycle_offset(moment)
+    return [
+        (
+            offset,
+            compute_ui_chart_window(
+                moment, lat, lon, tz_name, cycle_offset=offset
+            ).sa0,
+        )
+        for offset in range(max_cycle + 1)
+    ]
+
+
+def sa0_date_for_s2_cycle(cycle_offset: int, now: datetime | None = None) -> date:
+    """Kalenderdatum von SA₀ für einen Zyklus-Offset."""
+    if cycle_offset < 0:
+        raise ValueError(f"cycle_offset muss >= 0 sein, erhalten: {cycle_offset}.")
+    moment = now if now is not None else live_now()
+    if moment.tzinfo is None:
+        raise ValueError("now muss timezone-aware sein.")
+    lat = config.get("LATITUDE", cast=float)
+    lon = config.get("LONGITUDE", cast=float)
+    tz_name = config.get_planning_timezone()
+    chart = compute_ui_chart_window(
+        moment, lat, lon, tz_name, cycle_offset=cycle_offset
+    )
+    return chart.sa0.date()
+
+
+def cycle_offset_for_sa0_date(target: date, now: datetime | None = None) -> int | None:
+    """Zyklus-Offset zu einem SA₀-Kalenderdatum; None wenn nicht navigierbar."""
+    for offset, sa0 in s2_navigable_cycles(now):
+        if sa0.date() == target:
+            return offset
+    return None
+
+
+def s2_date_picker_bounds(now: datetime | None = None) -> tuple[date, date] | None:
+    """Min-/Max-Datum für die S-2-Datumsauswahl (nur Tage mit Log-Daten)."""
+    cycles = s2_navigable_cycles(now)
+    if not cycles:
+        return None
+    dates = [sa0.date() for _, sa0 in cycles]
+    return min(dates), max(dates)
 
 
 def build_live_chart_context(
