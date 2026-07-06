@@ -2,6 +2,10 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
+### Entladesperre: Netz-Trickelladen (2026-07-06)
+
+- [x] **Bugfix: SOC stieg bei Halten aus dem Netz (05.07. ~22–23 Uhr)** — Prod-Log (`runtime-prod/runtime.zip`): PV=0, `battery_plan_kw=0`, gemessen ~0,2 kW Laden + Netzbezug; Ursache `target_soc_percent=100` bei Huawei-Steuerbefehl 1; Fix: bei `MODE_ENTLADESPERRE` `target_soc = current_soc` (`optimizer/milp.py`); Test `test_entladesperre_target_soc_matches_current_soc`
+
 ### Migration-Skript entfernt (2026-07-05)
 
 - [x] **`scripts.migrate_persist_layout` gelöscht** — Einmal-Migration config/ + runtime/ nicht mehr nötig; Skript, Test, `ernie-migrate-layout`-Entrypoint und Doku-Hinweise entfernt

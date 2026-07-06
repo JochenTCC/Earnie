@@ -1851,31 +1851,22 @@ def _chart_range_start(chart_window: UiChartWindow | None) -> datetime | None:
     return chart_window.start
 
 
-def render_power_soc_chart(
+def build_power_soc_chart_figure(
     df: pd.DataFrame,
     baseline_df: pd.DataFrame | None = None,
     matched_baseline_df: pd.DataFrame | None = None,
     *,
     chart_title: str | None = None,
     show_baseline_soc: bool = True,
-    chart_key: str | None = None,
     chart_window: UiChartWindow | None = None,
-    chart_now: datetime | None = None,
     chart_zones=None,
     sun_markers: ChartSunMarkers | None = None,
     slot_qualities: tuple[str, ...] | None = None,
     history_slot_count: int | None = None,
     chart_header_label: str | None = None,
-    chart_header_help: str | None = None,
     slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] | None = None,
-) -> None:
-    """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
-    if chart_header_label and chart_header_help:
-        render_title_with_help(
-            chart_header_label,
-            chart_header_help,
-            key="s2_zone_help",
-        )
+) -> go.Figure:
+    """Baut Chart 1 (Leistung, SoC, Preis) ohne Streamlit-Rendering."""
     plot_df = _mask_missing_log_slots(df, slot_qualities)
     bar_colors = get_bar_colors(plot_df)
     axis = ChartSlotAxis.from_dataframe(plot_df)
@@ -1912,7 +1903,7 @@ def render_power_soc_chart(
         if chart_window is not None
         else "24-Stunden-Zeithorizont (Leistung, SoC & Preis)"
     )
-    plotly_title = None if chart_header_label else (chart_title or default_title)
+    plotly_title = None if chart_header_label else chart_title or default_title
     layout_title = plotly_title if plotly_title else ""
     top_margin = 20 if chart_header_label else 50
     fig.update_layout(
@@ -1929,6 +1920,48 @@ def render_power_soc_chart(
         ),
         legend=_chart_legend(),
         margin=dict(l=40, r=40, t=top_margin, b=110),
+    )
+    return fig
+
+
+def render_power_soc_chart(
+    df: pd.DataFrame,
+    baseline_df: pd.DataFrame | None = None,
+    matched_baseline_df: pd.DataFrame | None = None,
+    *,
+    chart_title: str | None = None,
+    show_baseline_soc: bool = True,
+    chart_key: str | None = None,
+    chart_window: UiChartWindow | None = None,
+    chart_now: datetime | None = None,
+    chart_zones=None,
+    sun_markers: ChartSunMarkers | None = None,
+    slot_qualities: tuple[str, ...] | None = None,
+    history_slot_count: int | None = None,
+    chart_header_label: str | None = None,
+    chart_header_help: str | None = None,
+    slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] | None = None,
+) -> None:
+    """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
+    if chart_header_label and chart_header_help:
+        render_title_with_help(
+            chart_header_label,
+            chart_header_help,
+            key="s2_zone_help",
+        )
+    fig = build_power_soc_chart_figure(
+        df,
+        baseline_df,
+        matched_baseline_df,
+        chart_title=chart_title,
+        show_baseline_soc=show_baseline_soc,
+        chart_window=chart_window,
+        chart_zones=chart_zones,
+        sun_markers=sun_markers,
+        slot_qualities=slot_qualities,
+        history_slot_count=history_slot_count,
+        chart_header_label=chart_header_label,
+        slot_deviation_events=slot_deviation_events,
     )
     plotly_kwargs: dict = {"width": "stretch"}
     if chart_key:

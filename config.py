@@ -153,6 +153,29 @@ class Config:
         return value
 
     @staticmethod
+    def _load_ui_bool(raw_config: dict, key: str, default: bool) -> bool:
+        raw = raw_config.get("ui", {}).get(key)
+        if raw is None:
+            return default
+        if not isinstance(raw, bool):
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: ui.{key} muss true oder false sein."
+            )
+        return raw
+
+    @staticmethod
+    def _load_ui_chart_debug_capture_dir(raw_config: dict) -> str:
+        raw = raw_config.get("ui", {}).get("chart_debug_capture_dir")
+        if raw is None:
+            return "chart_debug"
+        path = str(raw).strip()
+        if not path:
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: ui.chart_debug_capture_dir darf nicht leer sein."
+            )
+        return path
+
+    @staticmethod
     def _load_event_poll_interval_sec(raw_config: dict) -> int:
         system = raw_config.get("system", {})
         raw = system.get("event_poll_interval_sec")
@@ -273,6 +296,14 @@ class Config:
             self._raw_config,
             "main_sync_poll_sec",
             15,
+        )
+        self.UI_CHART_DEBUG_CAPTURE_ENABLED = self._load_ui_bool(
+            self._raw_config,
+            "chart_debug_capture_enabled",
+            False,
+        )
+        self.UI_CHART_DEBUG_CAPTURE_DIR = self._load_ui_chart_debug_capture_dir(
+            self._raw_config
         )
 
         self.LOXONE_SOC_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "soc_name"])
@@ -815,6 +846,12 @@ class Config:
     def get_ui_main_sync_poll_sec(self) -> int:
         return int(self.get("UI_MAIN_SYNC_POLL_SEC", default=15))
 
+    def get_ui_chart_debug_capture_enabled(self) -> bool:
+        return bool(self.get("UI_CHART_DEBUG_CAPTURE_ENABLED", default=False))
+
+    def get_ui_chart_debug_capture_dir(self) -> str:
+        return str(self.get("UI_CHART_DEBUG_CAPTURE_DIR", default="chart_debug"))
+
     def get_event_triggers(self) -> list[dict]:
         return list(self.EVENT_TRIGGERS)
 
@@ -1101,6 +1138,14 @@ def get_ui_fragment_status_sec() -> int:
 
 def get_ui_main_sync_poll_sec() -> int:
     return CONFIG.get_ui_main_sync_poll_sec()
+
+
+def get_ui_chart_debug_capture_enabled() -> bool:
+    return CONFIG.get_ui_chart_debug_capture_enabled()
+
+
+def get_ui_chart_debug_capture_dir() -> str:
+    return CONFIG.get_ui_chart_debug_capture_dir()
 
 
 def get_event_triggers() -> list[dict]:

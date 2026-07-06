@@ -214,6 +214,14 @@
           "type": "integer",
           "minimum": 1,
           "description": "Leichtgewichtiger main.py-Abgleich in Sekunden (Standard: 15)."
+        },
+        "chart_debug_capture_enabled": {
+          "type": "boolean",
+          "description": "Button in der App: Plot-Quelldaten als ZIP mit Zeitstempel speichern (Verdachtsfall-Analyse)."
+        },
+        "chart_debug_capture_dir": {
+          "type": "string",
+          "description": "Zielordner für Chart-Debug-ZIPs relativ zu runtime/ (Standard: chart_debug) oder absoluter Pfad."
         }
       }
     },

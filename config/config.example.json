@@ -22,7 +22,9 @@
     "ui": {
         "fragment_refresh_charts_sec": 60,
         "fragment_refresh_status_sec": 10,
-        "main_sync_poll_sec": 15
+        "main_sync_poll_sec": 15,
+        "chart_debug_capture_enabled": false,
+        "chart_debug_capture_dir": "chart_debug"
     },
     "system": {
         "global_timeout": 10,

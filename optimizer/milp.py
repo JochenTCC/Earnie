@@ -737,7 +737,8 @@ def _derive_control_from_milp(
     ):
         mode = bat.MODE_ENTLADESPERRE
         target_power = 0.0
-        target_soc = 100.0
+        # Ist-SOC: Huawei Register 47100=1 + Ziel 100 % würde sonst Netz-Trickelladen auslösen.
+        target_soc = round(current_soc, 1)
 
     return mode, target_power, target_soc
 

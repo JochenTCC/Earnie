@@ -1,0 +1,194 @@
+"""Tests für Chart-Debug-ZIP-Export."""
+from __future__ import annotations
+
+import json
+import os
+import zipfile
+from contextlib import contextmanager
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import pandas as pd
+import pytest
+
+import config
+from runtime_store.chart_debug_capture import (
+    build_capture_payload,
+    resolve_output_dir,
+    write_capture_zip,
+)
+from ui.chart_context import build_live_chart_context
+from ui.simulation_results import OptimizationDisplayBundle, build_optimization_display_bundle
+
+_TZ = ZoneInfo("Europe/Vienna")
+_CONFIG_ENV_KEYS = (
+    "ENERGY_OPTIMIZER_CONFIG_PATH",
+    "ENERGY_OPTIMIZER_OFFLINE",
+    "ENERGY_OPTIMIZER_RUNTIME_DIR",
+)
+
+
+@contextmanager
+def _chart_debug_config(tmp_path, monkeypatch, *, enabled: bool):
+    """Mini-Config für Tests; stellt danach Projekt-Config wieder her."""
+    prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
+    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "awattar": {
+                    "url": "https://example.test",
+                    "fix_aufschlag_cent": 1.0,
+                    "netzverlust_faktor": 1.0,
+                    "mwst_austria_faktor": 1.0,
+                },
+                "system": {"global_timeout": 10, "loop_timeout": 900},
+                "ui": {
+                    "chart_debug_capture_enabled": enabled,
+                    "chart_debug_capture_dir": "chart_debug",
+                },
+                "loxone_blocks": {
+                    "soc_name": "soc",
+                    "pv_counter_name": "pv",
+                    "log_filename": "log.csv",
+                    "pv_tuning_log_file": "pv.csv",
+                    "pv_power_name": "pv_act",
+                    "battery_power_name": "bat",
+                    "grid_power_name": "grid",
+                    "target_soc_name": "t_soc",
+                    "target_charge_power_name": "t_charge",
+                    "target_discharge_power_name": "t_discharge",
+                    "control_cmd_name": "cmd",
+                },
+                "runtime_settings": {
+                    "k_push_cent": 1.0,
+                    "pv_tilt": 18,
+                    "pv_azimuth": 0,
+                    "pv_kwp": 6.0,
+                    "battery_max_power_kw": 2.5,
+                    "battery_efficiency": 0.95,
+                    "battery_capacity_kwh": 5.0,
+                    "battery_min_soc": 10.0,
+                    "battery_max_soc": 100.0,
+                    "threshold_power": 0.2,
+                    "latitude": 47.0,
+                    "longitude": 9.0,
+                    "timezone_name": "Europe/Vienna",
+                },
+                "planning_horizon": {"mode": "sunset_window"},
+                "file_paths_battery_simulation": {
+                    "path_cons_data": "runtime/cons_data_hourly.csv",
+                },
+                "flexible_consumers": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(path))
+    config.reinit_config()
+    try:
+        yield str(path)
+    finally:
+        for key, value in prev.items():
+            if value is None:
+                monkeypatch.delenv(key, raising=False)
+            else:
+                monkeypatch.setenv(key, value)
+        config.reinit_config()
+
+
+def _sample_bundle(now: datetime) -> OptimizationDisplayBundle:
+    chart_context = build_live_chart_context(0, 0, now=now)
+    savings_info = {
+        "optimized_cost_euro": 1.0,
+        "matched_baseline_cost_euro": 1.2,
+        "savings_matched_euro": 0.2,
+        "optimized_rows": [],
+        "baseline_rows": [],
+    }
+    optimized_df = pd.DataFrame(
+        [{
+            "slot_datetime": chart_context.chart_window.start,
+            "Uhrzeit": chart_context.chart_window.start.strftime("%d.%m. %H:%M"),
+            "Simulierter SoC (%)": 42.0,
+            "Geplante Batterie-Aktion (kW)": 0.0,
+            "Preis extrapoliert": False,
+        }]
+    )
+    return build_optimization_display_bundle(
+        savings_info,
+        optimized_df,
+        pd.DataFrame(),
+        chart_context=chart_context,
+        optimization_matrix=optimized_df.to_dict("records"),
+    )
+
+
+def test_chart_debug_capture_config_default_disabled(tmp_path, monkeypatch):
+    with _chart_debug_config(tmp_path, monkeypatch, enabled=False):
+        assert config.get_ui_chart_debug_capture_enabled() is False
+
+
+def test_chart_debug_capture_config_enabled(tmp_path, monkeypatch):
+    with _chart_debug_config(tmp_path, monkeypatch, enabled=True):
+        assert config.get_ui_chart_debug_capture_enabled() is True
+        assert resolve_output_dir().endswith("chart_debug")
+
+
+def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
+    with _chart_debug_config(tmp_path, monkeypatch, enabled=True):
+        now = datetime(2026, 7, 5, 23, 0, tzinfo=_TZ)
+        bundle = _sample_bundle(now)
+        zip_path = write_capture_zip(
+            bundle,
+            current_soc=20.5,
+            session_meta={"s2_cycle_offset": 0},
+            captured_at=datetime(2026, 7, 5, 23, 0, 5),
+        )
+    assert zip_path.endswith("chart_debug_20260705_230005.zip")
+    with zipfile.ZipFile(zip_path) as archive:
+        names = set(archive.namelist())
+        assert "manifest.json" in names
+        assert "README.txt" in names
+        manifest = json.loads(archive.read("manifest.json"))
+        assert manifest["live_soc_percent"] == 20.5
+        assert manifest["display_rows"]
+        assert "Simulierter SoC (%)" in manifest["display_rows"][0]
+        assert manifest["session_meta"]["s2_cycle_offset"] == 0
+        assert manifest["chart_context"] is not None
+
+
+def test_build_capture_payload_json_safe(tmp_path, monkeypatch):
+    with _chart_debug_config(tmp_path, monkeypatch, enabled=True):
+        now = datetime(2026, 7, 5, 23, 0, tzinfo=_TZ)
+        bundle = OptimizationDisplayBundle(
+            savings_info={},
+            baseline_df=pd.DataFrame(),
+            display_df=pd.DataFrame([{"slot_datetime": now, "Simulierter SoC (%)": 19.0}]),
+            display_matched=None,
+            savings_view={},
+            table_df=pd.DataFrame(),
+            table_qualities=None,
+            table_gap_notice=None,
+            chart_context=None,
+            chart_zones=None,
+            sun_markers=None,
+            chart_qualities=None,
+            history_slot_count=None,
+            matched_cost=None,
+            optimized_cost=None,
+            chart_header_label=None,
+            chart_header_help=None,
+            slot_deviation_events=(),
+            simulation_table_title=None,
+        )
+        payload = build_capture_payload(
+            bundle,
+            current_soc=19.0,
+            live_power=None,
+            session_meta=None,
+            chart1_plotly_json=None,
+        )
+    assert payload["live_soc_percent"] == 19.0
