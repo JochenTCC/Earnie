@@ -5,7 +5,7 @@
 | Komponente | Befehl | Rolle |
 |------------|--------|-------|
 | **Produktiv-Daemon** | `python main.py` | Liest Loxone, optimiert, schreibt Steuerwerte — läuft dauerhaft |
-| **Streamlit-App** | `streamlit run app.py` | Cockpit, Simulation, Debugging — optional parallel |
+| **Streamlit-App** | `python -m scripts.run_streamlit` | Cockpit, Simulation, Debugging — optional parallel |
 
 Nur `main.py` steuert die Anlage. Die App **simuliert** den 24-Stunden-Horizont und zeigt den letzten Produktiv-Durchlauf an; sie überschreibt keine Loxone-Ausgänge (außer Sidebar-Parameter, die in `config.json` geschrieben werden).
 

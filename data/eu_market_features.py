@@ -20,6 +20,8 @@ API_RETRY_BASE_SECONDS = 2.0
 API_PAUSE_SECONDS = 0.75
 WIND_PRODUCTION_NAMES = frozenset({"Wind onshore", "Wind offshore"})
 SOLAR_PRODUCTION_NAME = "Solar"
+LOAD_PRODUCTION_NAME = "Load"
+RESIDUAL_LOAD_PRODUCTION_NAME = "Residual load"
 
 GENERATION_COUNTRIES: tuple[str, ...] = (
     "de",
@@ -131,7 +133,7 @@ def _dedupe_hourly_mean(frame: pd.DataFrame | pd.Series) -> pd.DataFrame | pd.Se
     return frame
 
 
-def _renewable_series_from_public_power(payload: dict[str, Any]) -> pd.DataFrame:
+def _public_power_hourly(payload: dict[str, Any]) -> pd.DataFrame:
     seconds = payload.get("unix_seconds") or []
     if not seconds:
         raise ValueError("Energy-Charts public_power: unix_seconds fehlt.")
@@ -140,27 +142,43 @@ def _renewable_series_from_public_power(payload: dict[str, Any]) -> pd.DataFrame
         [datetime.fromtimestamp(int(ts), tz=tz) for ts in seconds],
         name="slot_datetime",
     )
-    wind = pd.Series(0.0, index=index)
-    solar = pd.Series(0.0, index=index)
+    series = {
+        "wind_mw": pd.Series(0.0, index=index),
+        "solar_mw": pd.Series(0.0, index=index),
+        "load_mw": pd.Series(0.0, index=index),
+        "residual_load_mw": pd.Series(0.0, index=index),
+    }
     for entry in payload.get("production_types") or []:
         name = entry.get("name")
         values = entry.get("data") or []
         if len(values) != len(index):
             continue
+        value_series = pd.Series(values, index=index)
         if name in WIND_PRODUCTION_NAMES:
-            wind = wind.add(pd.Series(values, index=index), fill_value=0.0)
+            series["wind_mw"] = series["wind_mw"].add(value_series, fill_value=0.0)
         elif name == SOLAR_PRODUCTION_NAME:
-            solar = solar.add(pd.Series(values, index=index), fill_value=0.0)
-    frame = pd.DataFrame({"wind_mw": wind, "solar_mw": solar})
-    return frame.resample("h").mean()
+            series["solar_mw"] = series["solar_mw"].add(value_series, fill_value=0.0)
+        elif name == LOAD_PRODUCTION_NAME:
+            series["load_mw"] = series["load_mw"].add(value_series, fill_value=0.0)
+        elif name == RESIDUAL_LOAD_PRODUCTION_NAME:
+            series["residual_load_mw"] = series["residual_load_mw"].add(
+                value_series, fill_value=0.0
+            )
+    return pd.DataFrame(series).resample("h").mean()
 
 
-def fetch_country_renewables_hourly(
+def _renewable_series_from_public_power(payload: dict[str, Any]) -> pd.DataFrame:
+    """Rückwärtskompatibel: nur Wind/Solar."""
+    hourly = _public_power_hourly(payload)
+    return hourly[["wind_mw", "solar_mw"]]
+
+
+def fetch_country_power_hourly(
     country: str,
     start: date,
     end: date,
 ) -> pd.DataFrame:
-    """Stündliche Wind-/Solar-MW für ein Land (Energy-Charts public_power)."""
+    """Stündliche Wind/Solar/Last/Residuallast je Land (Energy-Charts)."""
     frames: list[pd.DataFrame] = []
     for chunk_start, chunk_end in month_ranges(start, end):
         payload = _http_get_json(
@@ -173,7 +191,7 @@ def fetch_country_renewables_hourly(
                 else chunk_start.isoformat(),
             },
         )
-        frames.append(_renewable_series_from_public_power(payload))
+        frames.append(_public_power_hourly(payload))
     if not frames:
         raise ValueError(f"Keine Erzeugungsdaten für {country}.")
     merged = pd.concat(frames)
@@ -182,30 +200,46 @@ def fetch_country_renewables_hourly(
     return merged.sort_index()
 
 
-def fetch_eu_renewables_hourly(start: date, end: date) -> pd.DataFrame:
-    """Summierte EU-Wind- und Solar-Erzeugung (MW) je Stunde."""
+def fetch_country_renewables_hourly(
+    country: str,
+    start: date,
+    end: date,
+) -> pd.DataFrame:
+    """Nur Wind/Solar (Kompatibilitäts-Wrapper)."""
+    return fetch_country_power_hourly(country, start, end)[["wind_mw", "solar_mw"]]
+
+
+def fetch_eu_power_hourly(start: date, end: date) -> pd.DataFrame:
+    """Summierte EU-Wind, Solar, Last und Residuallast (MW) je Stunde."""
     total: pd.DataFrame | None = None
     for country in GENERATION_COUNTRIES:
-        country_frame = fetch_country_renewables_hourly(country, start, end)
+        country_frame = fetch_country_power_hourly(country, start, end)
         country_frame = country_frame.rename(
-            columns={
-                "wind_mw": f"wind_{country}",
-                "solar_mw": f"solar_{country}",
-            }
+            columns={col: f"{col}_{country}" for col in country_frame.columns}
         )
         if total is None:
             total = country_frame
         else:
             total = total.join(country_frame, how="outer")
     if total is None:
-        raise ValueError("EU-Erzeugungsdaten konnten nicht geladen werden.")
-    wind_cols = [c for c in total.columns if c.startswith("wind_")]
-    solar_cols = [c for c in total.columns if c.startswith("solar_")]
+        raise ValueError("EU-Leistungsdaten konnten nicht geladen werden.")
     result = pd.DataFrame(index=total.index)
-    result["eu_wind_mw"] = total[wind_cols].sum(axis=1, min_count=1)
-    result["eu_solar_mw"] = total[solar_cols].sum(axis=1, min_count=1)
+    for base, eu_name in (
+        ("wind_mw", "eu_wind_mw"),
+        ("solar_mw", "eu_solar_mw"),
+        ("load_mw", "eu_load_mw"),
+        ("residual_load_mw", "eu_residual_load_mw"),
+    ):
+        cols = [c for c in total.columns if c.startswith(f"{base}_")]
+        result[eu_name] = total[cols].sum(axis=1, min_count=1)
     mask = (result.index.date >= start) & (result.index.date < end)
     return result.loc[mask].sort_index()
+
+
+def fetch_eu_renewables_hourly(start: date, end: date) -> pd.DataFrame:
+    """Summierte EU-Wind- und Solar-Erzeugung (MW) je Stunde."""
+    power = fetch_eu_power_hourly(start, end)
+    return power[["eu_wind_mw", "eu_solar_mw"]]
 
 
 def fetch_at_day_ahead_hourly(start: date, end: date) -> pd.Series:
@@ -316,12 +350,12 @@ def _add_calendar_columns(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_training_dataset(start: date, end: date) -> pd.DataFrame:
-    """Stündliches Training-Dataset: AT-Preis + EU-Wetter + EU-Erzeugung."""
+    """Stündliches Training-Dataset: AT-Preis + EU-Leistung + EU-Wetter."""
     prices = fetch_at_day_ahead_hourly(start, end)
-    generation = fetch_eu_renewables_hourly(start, end)
+    power = fetch_eu_power_hourly(start, end)
     weather = fetch_eu_weather_hourly(start, end)
     merged = pd.DataFrame({"price_epex_cent_kwh": prices})
-    merged = merged.join(generation, how="inner")
+    merged = merged.join(power, how="inner")
     merged = merged.join(weather, how="inner")
     merged = merged.dropna()
     if merged.empty:
@@ -330,6 +364,22 @@ def build_training_dataset(start: date, end: date) -> pd.DataFrame:
             "Zeitraum oder API-Verfügbarkeit prüfen."
         )
     return _add_calendar_columns(merged)
+
+
+def enrich_dataset_with_eu_load(frame: pd.DataFrame) -> pd.DataFrame:
+    """Ergänzt bestehendes Dataset um eu_load_mw und eu_residual_load_mw."""
+    if frame.empty:
+        raise ValueError("enrich_dataset_with_eu_load: leeres DataFrame.")
+    start = frame.index.min().date()
+    end = frame.index.max().date() + timedelta(days=1)
+    power = fetch_eu_power_hourly(start, end)[["eu_load_mw", "eu_residual_load_mw"]]
+    enriched = frame.join(power, how="left")
+    missing = enriched[["eu_load_mw", "eu_residual_load_mw"]].isna().any(axis=1).sum()
+    if missing:
+        raise ValueError(
+            f"Last/Residuallast fehlt für {missing} Stunden nach dem Join."
+        )
+    return enriched
 
 
 def default_training_range() -> tuple[date, date]:

@@ -28,7 +28,8 @@
         "fragment_refresh_status_sec": 10,
         "main_sync_poll_sec": 15,
         "chart_debug_capture_enabled": false,
-        "chart_debug_capture_dir": "chart_debug"
+        "chart_debug_capture_dir": "chart_debug",
+        "streamlit_port": 8501
     },
     "system": {
         "global_timeout": 10,

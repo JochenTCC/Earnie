@@ -141,12 +141,13 @@ Optional: **Zugriffssteuerungsprofil** mit DSM-Anmeldung — Streamlit hat keine
 
 ```yaml
 command: >
-  streamlit run app.py
-  --server.port 8501
-  --server.address 0.0.0.0
+  python -m scripts.run_streamlit
+  --
   --server.enableCORS false
   --server.enableXsrfProtection false
 ```
+
+Port in `config/config.json` → `ui.streamlit_port` (Standard 8501). Das Compose-Mapping `ports` muss denselben Wert verwenden.
 
 Nach Änderung an der Compose-Datei: `docker compose -f docker-compose-synology.yml up -d optimizer-ui` (kein neues Image nötig).
 

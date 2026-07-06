@@ -164,6 +164,23 @@ class Config:
         return raw
 
     @staticmethod
+    def _load_ui_streamlit_port(raw_config: dict) -> int:
+        raw = raw_config.get("ui", {}).get("streamlit_port")
+        if raw is None:
+            return 8501
+        try:
+            value = int(raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: ui.streamlit_port muss eine ganze Zahl sein."
+            ) from exc
+        if not 1024 <= value <= 65535:
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: ui.streamlit_port muss zwischen 1024 und 65535 liegen."
+            )
+        return value
+
+    @staticmethod
     def _load_ui_chart_debug_capture_dir(raw_config: dict) -> str:
         raw = raw_config.get("ui", {}).get("chart_debug_capture_dir")
         if raw is None:
@@ -305,6 +322,7 @@ class Config:
         self.UI_CHART_DEBUG_CAPTURE_DIR = self._load_ui_chart_debug_capture_dir(
             self._raw_config
         )
+        self.UI_STREAMLIT_PORT = self._load_ui_streamlit_port(self._raw_config)
 
         self.LOXONE_SOC_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "soc_name"])
         self.LOXONE_PV_COUNTER_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "pv_counter_name"])
@@ -852,6 +870,9 @@ class Config:
     def get_ui_chart_debug_capture_dir(self) -> str:
         return str(self.get("UI_CHART_DEBUG_CAPTURE_DIR", default="chart_debug"))
 
+    def get_ui_streamlit_port(self) -> int:
+        return int(self.get("UI_STREAMLIT_PORT", default=8501))
+
     def get_event_triggers(self) -> list[dict]:
         return list(self.EVENT_TRIGGERS)
 
@@ -1146,6 +1167,10 @@ def get_ui_chart_debug_capture_enabled() -> bool:
 
 def get_ui_chart_debug_capture_dir() -> str:
     return CONFIG.get_ui_chart_debug_capture_dir()
+
+
+def get_ui_streamlit_port() -> int:
+    return CONFIG.get_ui_streamlit_port()
 
 
 def get_event_triggers() -> list[dict]:

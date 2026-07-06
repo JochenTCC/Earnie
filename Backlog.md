@@ -10,8 +10,11 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
 - [ ] **Preis-Prognose (EU-Wetter & Erzeugung):** Korrelationsmodell für grüne Zone (kein Day-Ahead bis SA₂) statt Spiegelung — Wind + Solar auf EU-Ebene; Spec [price-forecast-renewables.md](docs/spec/price-forecast-renewables.md)
   - Phase 0: Scope ✅ | Phase 1: Dataset-Skript `scripts/build_price_training_dataset.py` ✅
-  - Phase 2: OLS + Walk-forward (`train_price_forecast_model`, `evaluate_price_forecast`) ✅
+  - Phase 2: OLS + Walk-forward ✅; **extended** (+ EU-Last/Residuallast) via `enrich_price_training_dataset` + `compare_price_forecast_features`; Bias-Korrektur (Nicht-Peak P90) ✅
   - Phase 3: UI-Eval + Live-Hooks vorbereitet; `resolve_market_slots` offen
+  - [ ] **Rollierende Bias-Rekalibrierung** — Korrektur aus letzten N Tagen (Nicht-Peak), nicht nur einmalig beim Training; für Live-Betrieb (Holdout-Shift)
+  - [ ] **Backtesting Jahresvergleich (alle Szenarien):** Ganzes Jahr, Optimierung jeweils mit dem **aktiven Preismodell** (Spiegelung vs. OLS-Prognose in der grünen Zone); Kennzahlen: Kosten, Einsparung, Lade-/Entladeverhalten — Entscheidungsgrundlage vor Live-Umschaltung `missing_price_strategy: forecast`
+  - [ ] Extra-UI-Seite für Preismodell über config.json aktivierbar machen (Default: Aus)
 
 ## Feature-Backlog
 

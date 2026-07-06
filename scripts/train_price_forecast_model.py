@@ -9,9 +9,12 @@ from pathlib import Path
 
 from data.price_forecast_eval import chronological_split_evaluate
 from data.price_forecast_model import (
+    FEATURE_VARIANT_BASE,
+    FEATURE_VARIANT_EXTENDED,
     fit_price_model,
     load_training_dataset,
     regression_metrics,
+    resolve_feature_variant,
     save_price_model,
     predict_prices,
 )
@@ -50,6 +53,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=0.2,
         help="Anteil am Ende fuer Holdout-Metriken (0 = kein Holdout)",
     )
+    parser.add_argument(
+        "--feature-variant",
+        choices=(FEATURE_VARIANT_BASE, FEATURE_VARIANT_EXTENDED),
+        default=None,
+        help="Feature-Set (Standard: auto aus Dataset-Spalten)",
+    )
     return parser.parse_args(argv)
 
 
@@ -57,7 +66,16 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     try:
         dataset_path = args.dataset or _default_dataset()
-        frame = load_training_dataset(dataset_path)
+        peek = load_training_dataset(
+            dataset_path,
+            feature_variant=FEATURE_VARIANT_BASE,
+        )
+        variant = args.feature_variant or resolve_feature_variant(peek)
+        frame = (
+            peek
+            if variant == FEATURE_VARIANT_BASE
+            else load_training_dataset(dataset_path, feature_variant=variant)
+        )
     except (OSError, ValueError, FileNotFoundError) as exc:
         print(f"Fehler: {exc}", file=sys.stderr)
         return 1
@@ -75,12 +93,14 @@ def main(argv: list[str] | None = None) -> int:
         else:
             split = int(len(frame) * train_ratio)
             train_frame = frame.iloc[:split]
-            holdout_report = chronological_split_evaluate(frame, train_ratio=train_ratio)
+            holdout_report = chronological_split_evaluate(
+                frame, train_ratio=train_ratio, feature_variant=variant
+            )
     else:
         train_frame = frame
         holdout_report = None
 
-    model = fit_price_model(train_frame)
+    model = fit_price_model(train_frame, feature_variant=variant)
     save_price_model(model, args.output)
 
     in_sample = regression_metrics(
@@ -88,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
         predict_prices(model, train_frame),
     )
 
-    print(f"Dataset: {dataset_path} ({len(frame)} h)")
+    print(f"Dataset: {dataset_path} ({len(frame)} h, {variant})")
     print(f"Modell: {args.output} ({model.training_rows} Trainingszeilen)")
     print("In-sample:", json.dumps(in_sample, ensure_ascii=False))
     if holdout_report is not None:

@@ -105,7 +105,11 @@ Standard: rollierende 12 Monate bis gestern. Output: `data/cache/price_training_
 | `eu_solar_mw` | Summe Solar EU |
 | `eu_wind_speed_kmh` | gewichteter Mittelwert Gitter |
 | `eu_shortwave_radiation_wm2` | gewichteter Mittelwert Gitter |
-| `hour`, `weekday`, `month` | Kalenderfeatures |
+| `eu_load_mw` | Summe Last EU (Energy-Charts „Load“) |
+| `eu_residual_load_mw` | Summe Residuallast EU |
+| `hour`, `weekday`, `month` | Kalenderfeatures (Modell nutzt `hour_sin`/`hour_cos`) |
+
+Bestehende CSVs ohne Last-Spalten: `python -m scripts.enrich_price_training_dataset <csv>`.
 
 Zeitliche Auflösung: **stündlich**. Energy-Charts 15-min-Daten → stündlicher Mittelwert.
 
@@ -131,18 +135,27 @@ Zeitliche Auflösung: **stündlich**. Energy-Charts 15-min-Daten → stündliche
 .venv\Scripts\python.exe -m scripts.evaluate_price_forecast --mode walk_forward --train-days 90 --test-days 7
 ```
 
-### 6.3 Modell-JSON
+### 6.3 Modell-JSON (Version 2)
+
+Nach OLS-Fit: additive **Bias-Korrektur** aus Nicht-Peak-Stunden (Ist-Preis unter Perzentil, Standard P90). Peaks werden bei der Kalibrierung ausgeschlossen.
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "feature_names": ["intercept", "eu_wind_mw", "..."],
   "coefficients": [ ... ],
+  "bias_correction_cent_kwh": -0.33,
+  "bias_correction_peak_percentile": 90.0,
+  "bias_correction_peak_threshold_cent_kwh": 12.5,
+  "bias_correction_non_peak_hours": 6300,
   "trained_range_start": "...",
   "trained_range_end": "...",
-  "training_rows": 8760
+  "training_rows": 8760,
+  "feature_variant": "extended"
 }
 ```
+
+`predict_prices` wendet die Korrektur standardmäßig an (`apply_bias_correction=False` für Roh-OLS).
 
 ### 6.4 Erste Erkenntnisse (7-Tage-Stichprobe, 2025-07-01..08)
 

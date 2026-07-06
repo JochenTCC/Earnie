@@ -5,6 +5,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from data.eu_market_features import (
+    _public_power_hourly,
     _renewable_series_from_public_power,
     month_ranges,
     normalize_hour_slot,
@@ -46,6 +47,23 @@ def test_renewable_series_from_public_power_sums_wind_and_resamples_hourly():
     hour = normalize_hour_slot(slot)
     assert frame.loc[hour, "wind_mw"] == 2000.0
     assert frame.loc[hour, "solar_mw"] == 2000.0
+
+
+def test_public_power_hourly_includes_load_and_residual():
+    slot = datetime(2025, 7, 1, 10, 0, tzinfo=VIENNA)
+    payload = {
+        "unix_seconds": [int(slot.timestamp())],
+        "production_types": [
+            {"name": "Wind onshore", "data": [1000.0]},
+            {"name": "Solar", "data": [2000.0]},
+            {"name": "Load", "data": [50000.0]},
+            {"name": "Residual load", "data": [47000.0]},
+        ],
+    }
+    frame = _public_power_hourly(payload)
+    hour = normalize_hour_slot(slot)
+    assert frame.loc[hour, "load_mw"] == 50000.0
+    assert frame.loc[hour, "residual_load_mw"] == 47000.0
 
 
 def test_normalize_hour_slot_strips_minutes():

@@ -35,7 +35,7 @@ python -m venv .venv
 pip install -r requirements-dev.txt
 python -m pytest
 python main.py
-streamlit run app.py
+python -m scripts.run_streamlit
 ```
 
 Kanonische Metadaten und Abhängigkeiten: **`pyproject.toml`** (`version.py` = Versionsquelle).

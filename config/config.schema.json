@@ -217,7 +217,7 @@
     },
     "ui": {
       "type": "object",
-      "description": "Streamlit-UI (Fragment-Auto-Refresh). Env: ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC, ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC, ENERGY_OPTIMIZER_UI_MAIN_SYNC_POLL_SEC.",
+      "description": "Streamlit-UI (Fragment-Auto-Refresh, Server-Port). Env: ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC, ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC, ENERGY_OPTIMIZER_UI_MAIN_SYNC_POLL_SEC, ENERGY_OPTIMIZER_UI_STREAMLIT_PORT.",
       "properties": {
         "fragment_refresh_charts_sec": {
           "type": "integer",
@@ -241,6 +241,12 @@
         "chart_debug_capture_dir": {
           "type": "string",
           "description": "Zielordner für Chart-Debug-ZIPs relativ zu runtime/ (Standard: chart_debug) oder absoluter Pfad."
+        },
+        "streamlit_port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535,
+          "description": "TCP-Port für `streamlit run` (Standard: 8501). Env-Override: ENERGY_OPTIMIZER_UI_STREAMLIT_PORT."
         }
       }
     },

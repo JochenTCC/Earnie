@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
+from data.price_forecast_model import peak_regression_metrics
 from data.price_forecast_viz import (
     DEFAULT_MODEL_PATH,
     build_forecast_evaluation,
@@ -21,9 +22,17 @@ from ui.help_hint import render_title_with_help
 
 @st.cache_data(ttl=120, show_spinner="Lade Preis-Dataset …")
 def _load_dataset(path_str: str) -> pd.DataFrame:
-    from data.price_forecast_model import load_training_dataset
+    from data.price_forecast_model import (
+        FEATURE_VARIANT_BASE,
+        load_training_dataset,
+        resolve_feature_variant,
+    )
 
-    return load_training_dataset(Path(path_str))
+    path = Path(path_str)
+    peek = load_training_dataset(path, feature_variant=FEATURE_VARIANT_BASE)
+    if resolve_feature_variant(peek) == FEATURE_VARIANT_BASE:
+        return peek
+    return load_training_dataset(path)
 
 
 def _render_sidebar_controls() -> tuple[Path, float, Path | None]:
@@ -58,8 +67,11 @@ def _render_sidebar_controls() -> tuple[Path, float, Path | None]:
     return dataset_path, train_ratio, model_path
 
 
-def _metric_columns(model_metrics: dict, mirror_metrics: dict) -> None:
-    cols = st.columns(3)
+def _metric_columns(model_metrics: dict, mirror_metrics: dict, test: pd.DataFrame) -> None:
+    actual = test["actual_cent_kwh"].to_numpy(dtype=float)
+    model_peak = peak_regression_metrics(actual, test["model_cent_kwh"].to_numpy(dtype=float))
+    mirror_peak = peak_regression_metrics(actual, test["mirror_cent_kwh"].to_numpy(dtype=float))
+    cols = st.columns(4)
     cols[0].metric(
         "Modell MAE",
         f"{model_metrics['mae_cent_kwh']:.2f} Cent/kWh",
@@ -68,9 +80,13 @@ def _metric_columns(model_metrics: dict, mirror_metrics: dict) -> None:
     )
     cols[1].metric("Spiegel MAE", f"{mirror_metrics['mae_cent_kwh']:.2f} Cent/kWh")
     cols[2].metric(
-        "Modell RMSE",
-        f"{model_metrics['rmse_cent_kwh']:.2f} Cent/kWh",
-        help=f"MAPE Modell: {model_metrics['mape_percent']:.1f} %",
+        "Peak-MAE Modell",
+        f"{model_peak['mae_cent_kwh']:.2f} Cent/kWh",
+        help=f"Obere {model_peak['peak_percentile']:.0f} % der Ist-Preise (≥ {model_peak['peak_threshold_cent_kwh']:.1f} Cent/kWh)",
+    )
+    cols[3].metric(
+        "Peak-MAE Spiegel",
+        f"{mirror_peak['mae_cent_kwh']:.2f} Cent/kWh",
     )
 
 
@@ -159,12 +175,11 @@ def _hourly_mae_chart(summary: pd.DataFrame) -> go.Figure:
 def render_price_forecast_block() -> None:
     dataset_path, train_ratio, model_path = _render_sidebar_controls()
     render_title_with_help(
-        "Preis-Prognose (EU-Wind & Solar)",
+        "Preis-Prognose (EU-Wetter & Last)",
         (
             "Vergleicht **Ist-Preise** (AT Day-Ahead) mit **OLS-Prognose** "
-            "(EU-Wetter + Erzeugung) und **Spiegelung** auf dem Holdout-Anteil. "
-            "Spec: docs/spec/price-forecast-renewables.md. "
-            "Live-Integration folgt in Phase 3 (Config `market_prices.missing_price_strategy`)."
+            "(EU-Wind/Solar/Wetter + optional Last/Residuallast) und **Spiegelung** "
+            "auf dem Holdout-Anteil. Spec: docs/spec/price-forecast-renewables.md."
         ),
         key="price_forecast_help",
     )
@@ -180,9 +195,12 @@ def render_price_forecast_block() -> None:
 
     st.caption(
         f"Dataset: `{dataset_path.name}` · {len(frame)} h gesamt · "
-        f"Holdout: {len(evaluation.test)} h · Modell-Zeilen: {evaluation.model.training_rows}"
+        f"Holdout: {len(evaluation.test)} h · Modell: {evaluation.model.feature_variant} "
+        f"({evaluation.model.training_rows} Trainingszeilen) · "
+        f"Bias-Korrektur: {evaluation.model.bias_correction_cent_kwh:+.3f} Cent/kWh "
+        f"(Nicht-Peak < P{evaluation.model.bias_correction_peak_percentile:.0f})"
     )
-    _metric_columns(evaluation.model_metrics, evaluation.mirror_metrics)
+    _metric_columns(evaluation.model_metrics, evaluation.mirror_metrics, evaluation.test)
 
     st.plotly_chart(_price_timeseries_chart(evaluation.test), use_container_width=True)
     left, right = st.columns(2)

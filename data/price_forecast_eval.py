@@ -9,9 +9,13 @@ import pandas as pd
 
 from data.market_prices import MAX_MIRROR_LOOKBACK_DAYS
 from data.price_forecast_model import (
+    FEATURE_VARIANT_BASE,
+    FEATURE_VARIANT_EXTENDED,
     TARGET_COLUMN,
     PriceForecastModel,
+    bias_metrics,
     fit_price_model,
+    peak_regression_metrics,
     predict_prices,
     regression_metrics,
 )
@@ -47,6 +51,7 @@ def evaluate_strategies(
     *,
     model: PriceForecastModel | None = None,
     price_lookup: pd.Series | None = None,
+    peak_percentile: float = 90.0,
 ) -> dict[str, Any]:
     """Vergleicht Modell (optional) und Spiegelung gegen Ist-Preise."""
     actual = frame[TARGET_COLUMN].to_numpy(dtype=float)
@@ -57,10 +62,20 @@ def evaluate_strategies(
         "range_start": frame.index[0].isoformat(),
         "range_end": frame.index[-1].isoformat(),
         "mirror": regression_metrics(actual, mirror),
+        "mirror_peak": peak_regression_metrics(actual, mirror, percentile=peak_percentile),
     }
     if model is not None:
-        predicted = predict_prices(model, frame)
+        predicted_raw = predict_prices(model, frame, apply_bias_correction=False)
+        predicted = predict_prices(model, frame, apply_bias_correction=True)
         report["model"] = regression_metrics(actual, predicted)
+        report["model_bias"] = bias_metrics(actual, predicted)
+        report["model_peak"] = peak_regression_metrics(
+            actual, predicted, percentile=peak_percentile
+        )
+        report["model_raw"] = regression_metrics(actual, predicted_raw)
+        report["model_raw_bias"] = bias_metrics(actual, predicted_raw)
+        report["feature_variant"] = model.feature_variant
+        report["bias_correction_cent_kwh"] = model.bias_correction_cent_kwh
         report["model_vs_mirror_mae_delta"] = (
             report["mirror"]["mae_cent_kwh"] - report["model"]["mae_cent_kwh"]
         )
@@ -72,6 +87,7 @@ def walk_forward_evaluate(
     *,
     train_days: int,
     test_days: int,
+    feature_variant: str = FEATURE_VARIANT_EXTENDED,
 ) -> dict[str, Any]:
     """
     Rollierendes Training: je Fenster train_days trainieren, test_days testen.
@@ -95,7 +111,7 @@ def walk_forward_evaluate(
     while cursor + test_hours <= len(frame):
         train = frame.iloc[cursor - train_hours : cursor]
         test = frame.iloc[cursor : cursor + test_hours]
-        model = fit_price_model(train)
+        model = fit_price_model(train, feature_variant=feature_variant)
         fold_report = evaluate_strategies(
             test,
             model=model,
@@ -110,6 +126,7 @@ def walk_forward_evaluate(
         "folds": folds,
         "train_days": train_days,
         "test_days": test_days,
+        "feature_variant": feature_variant,
         "mean_model_mae_cent_kwh": float(np.mean(model_errors)),
         "mean_mirror_mae_cent_kwh": float(np.mean(mirror_errors)),
         "mean_mae_delta_model_better": float(np.mean(mirror_errors) - np.mean(model_errors)),
@@ -121,6 +138,7 @@ def chronological_split_evaluate(
     frame: pd.DataFrame,
     *,
     train_ratio: float = 0.8,
+    feature_variant: str = FEATURE_VARIANT_EXTENDED,
 ) -> dict[str, Any]:
     """Einfacher chronologischer Split: train → fit, test → evaluieren."""
     if not 0.5 <= train_ratio < 1.0:
@@ -130,7 +148,7 @@ def chronological_split_evaluate(
         raise ValueError("Dataset zu kurz für chronologischen Split.")
     train = frame.iloc[:split]
     test = frame.iloc[split:]
-    model = fit_price_model(train)
+    model = fit_price_model(train, feature_variant=feature_variant)
     report = evaluate_strategies(test, model=model, price_lookup=frame[TARGET_COLUMN])
     report["split"] = {
         "train_rows": len(train),
@@ -138,3 +156,38 @@ def chronological_split_evaluate(
         "train_ratio": train_ratio,
     }
     return report
+
+
+def compare_feature_variants(
+    frame: pd.DataFrame,
+    *,
+    train_ratio: float = 0.8,
+    train_days: int = 90,
+    test_days: int = 7,
+) -> dict[str, Any]:
+    """Vergleicht base vs. extended vs. Spiegelung (Holdout + Walk-forward)."""
+    variants = [FEATURE_VARIANT_BASE]
+    if all(col in frame.columns for col in ("eu_load_mw", "eu_residual_load_mw")):
+        variants.append(FEATURE_VARIANT_EXTENDED)
+    holdout: dict[str, Any] = {}
+    walk_forward: dict[str, Any] = {}
+    for variant in variants:
+        holdout[variant] = chronological_split_evaluate(
+            frame,
+            train_ratio=train_ratio,
+            feature_variant=variant,
+        )
+        try:
+            walk_forward[variant] = walk_forward_evaluate(
+                frame,
+                train_days=train_days,
+                test_days=test_days,
+                feature_variant=variant,
+            )
+        except ValueError as exc:
+            walk_forward[variant] = {"error": str(exc)}
+    return {
+        "rows": len(frame),
+        "holdout": holdout,
+        "walk_forward": walk_forward,
+    }

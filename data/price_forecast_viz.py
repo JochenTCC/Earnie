@@ -16,10 +16,15 @@ from data.price_forecast_model import (
     load_training_dataset,
     predict_prices,
     regression_metrics,
+    resolve_feature_variant,
 )
 
 DEFAULT_CACHE_DIR = Path("data/cache")
 DEFAULT_MODEL_PATH = DEFAULT_CACHE_DIR / "price_model_coefficients.json"
+
+
+def feature_variant_for_frame(frame: pd.DataFrame) -> str:
+    return resolve_feature_variant(frame)
 
 
 @dataclass(frozen=True)
@@ -89,7 +94,8 @@ def build_forecast_evaluation(
     model: PriceForecastModel | None = None,
 ) -> ForecastEvaluation:
     train, test = split_train_test(frame, train_ratio=train_ratio)
-    fitted = model if model is not None else fit_price_model(train)
+    variant = feature_variant_for_frame(train)
+    fitted = model if model is not None else fit_price_model(train, feature_variant=variant)
     test_enriched = attach_forecast_columns(
         test,
         model=fitted,
@@ -117,6 +123,9 @@ def hourly_error_summary(test: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_model_or_fit(train: pd.DataFrame, model_path: Path | None) -> PriceForecastModel:
+    variant = feature_variant_for_frame(train)
     if model_path is not None and model_path.exists():
-        return load_price_model(model_path)
-    return fit_price_model(train)
+        loaded = load_price_model(model_path)
+        if loaded.feature_variant == variant:
+            return loaded
+    return fit_price_model(train, feature_variant=variant)

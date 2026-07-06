@@ -55,9 +55,8 @@ services:
     image: ghcr.io/jochentcc/ernie-energy:latest
     container_name: ernie-optimizer-ui
     command: >
-      streamlit run app.py
-      --server.port 8501
-      --server.address 0.0.0.0
+      python -m scripts.run_streamlit
+      --
       --server.enableCORS false
       --server.enableXsrfProtection false
     restart: unless-stopped
