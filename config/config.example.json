@@ -9,7 +9,7 @@
         "feed_in_fix_cent": 0.0
     },
     "market_prices": {
-        "missing_price_strategy": "mirror",
+        "missing_price_strategy": "forecast",
         "forecast_model_path": "data/cache/price_model_coefficients.json"
     },
     "eauto_milp": {

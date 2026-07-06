@@ -17,6 +17,7 @@ from simulation.backtesting_log import save_backtesting_log
 from simulation.backtesting_log import build_critical_cases, summarize_critical_cases
 from data.data_loader import load_market_prices, resolve_simulation_window
 from data.backtesting_prices import (
+    MISSING_PRICE_STRATEGY_FORECAST,
     PRICE_STRATEGY_PERFECT,
     VALID_PRICE_STRATEGIES,
     load_price_resources,
@@ -110,6 +111,20 @@ def resolve_backtesting_window(
         )
 
     return start, end
+
+
+def _price_load_window(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    price_strategy: str,
+) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """Erweitert den Preisabruf für Spiegelung/Prognose (Lookback + 24h-Fenster vor start)."""
+    if price_strategy == PRICE_STRATEGY_PERFECT:
+        return start, end
+    from data.market_prices import MAX_MIRROR_LOOKBACK_DAYS
+
+    load_start = (start - pd.Timedelta(days=MAX_MIRROR_LOOKBACK_DAYS + 1)).normalize()
+    return load_start, end
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -480,13 +495,30 @@ def main(argv: list[str] | None = None):
 
     if price_source == "api":
         provider = sim_cfg.get("price_provider", "awattar")
-        print(f"Lade Börsenpreise per API ({provider}) für {start.date()} bis {end.date()}...")
+        price_load_start, price_load_end = _price_load_window(start, end, price_strategy)
+        if price_load_start < start:
+            print(
+                f"Lade Börsenpreise per API ({provider}) für {price_load_start.date()} "
+                f"bis {price_load_end.date()} (Simulation {start.date()}–{end.date()}, "
+                f"+{ (start - price_load_start).days}d Lookback für {price_strategy})..."
+            )
+        else:
+            print(
+                f"Lade Börsenpreise per API ({provider}) für {start.date()} bis {end.date()}..."
+            )
     else:
-        print(f"Lade Börsenpreise aus CSV für {start.date()} bis {end.date()}...")
+        price_load_start, price_load_end = _price_load_window(start, end, price_strategy)
+        if price_load_start < start:
+            print(
+                f"Lade Börsenpreise aus CSV für {price_load_start.date()} bis "
+                f"{price_load_end.date()} (+Lookback für {price_strategy})..."
+            )
+        else:
+            print(f"Lade Börsenpreise aus CSV für {start.date()} bis {end.date()}...")
 
     prices = load_market_prices(
-        start,
-        end,
+        price_load_start,
+        price_load_end,
         sim_cfg,
         awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),

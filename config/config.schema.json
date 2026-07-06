@@ -89,11 +89,12 @@
     },
     "market_prices": {
       "type": "object",
-      "description": "Ergänzung für fehlende Day-Ahead-Stunden (grüne Zone). Standard: mirror.",
+      "description": "Ergänzung für fehlende Day-Ahead-Stunden (grüne Zone). Standard: forecast.",
       "properties": {
         "missing_price_strategy": {
           "type": "string",
           "enum": ["mirror", "forecast"],
+          "default": "forecast",
           "description": "mirror = gleiche Uhrzeit zurück; forecast = OLS aus EU-Wetter/Erzeugung."
         },
         "forecast_model_path": {

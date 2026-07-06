@@ -2,6 +2,16 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
+### Preis-Prognose (EU-Wetter & Erzeugung) Epic abgeschlossen (2026-07-06)
+
+- [x] **Preis-Prognose (EU-Wetter & Erzeugung):** Korrelationsmodell für grüne Zone (kein Day-Ahead bis SA₂) statt Spiegelung — Wind + Solar auf EU-Ebene; Spec [price-forecast-renewables.md](docs/spec/price-forecast-renewables.md)
+- [x] **Phase 0:** Scope festgelegt (AT Day-Ahead, EU-Länder, OLS, Akzeptanz)
+- [x] **Phase 1:** Dataset-Pipeline `data/eu_market_features.py`, `scripts/build_price_training_dataset.py`, `data/cache/price_training_*.csv`
+- [x] **Phase 2:** OLS + Walk-forward; **extended** (+ EU-Last/Residuallast) via `enrich_price_training_dataset` + `compare_price_forecast_features`; Bias-Korrektur (Nicht-Peak P90)
+- [x] **Phase 3:** UI-Eval (`ui/price_forecast.py`); Live in `resolve_market_slots` (`data/price_forecast_live.py`, `data/profile_manager.py`); `config.market_prices.missing_price_strategy` (`mirror` \| `forecast`, Default **forecast**)
+- [x] **Jahresvergleich 2025:** `run_price_strategy_backtests` (333 Fenster, `sunset_window`, alle Szenarien); Bericht `backtesting_logs/price_strategy_compare/comparison.md` — Prognose vs. Spiegelung marginal (±0,1–0,6 %), Go-Live mit `forecast`
+- [x] **Rollierende Bias-Rekalibrierung** — zurückgestellt; statische P90-Bias-Korrektur beim Training bleibt für Live aktiv
+
 ### Preis-Prognose Backtesting Jahresvergleich (2026-07-06)
 
 - [x] **Backtesting Jahresvergleich (Infrastruktur):** Grüne Zone im `sunset_window` — Day-Ahead-Cutoff, Spiegelung vs. OLS (`data/backtesting_prices.py`, `resolve_market_slots` forecast); `--price-strategy` / `--output-dir` in `run_backtesting`; Orchestrator `run_price_strategy_backtests` + `compare_price_strategy_backtests`; Tests

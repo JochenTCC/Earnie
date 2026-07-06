@@ -29,7 +29,7 @@ def _battery_summary(hourly_csv: Path | None, scenario_id: str) -> dict[str, flo
 
     df = pd.read_csv(hourly_csv, sep=";")
     mask = df["scenario_id"] == scenario_id
-    batt = df.loc[mask, "batt_action_kw"].fillna(0.0)
+    batt = pd.to_numeric(df.loc[mask, "batt_action_kw"], errors="coerce").fillna(0.0)
     charge = batt.clip(lower=0.0).sum()
     discharge = (-batt.clip(upper=0.0)).sum()
     return {"charge_kwh": float(charge), "discharge_kwh": float(discharge)}
