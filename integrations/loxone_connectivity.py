@@ -4,7 +4,6 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass
-from ftplib import FTP, all_errors as ftp_errors
 from typing import Callable
 
 import config
@@ -200,81 +199,13 @@ def run_read_checks() -> list[LoxoneCheck]:
     return results
 
 
-def check_ftp_log_available() -> LoxoneCheck:
-    """Prüft FTP-Zugang und Existenz der konfigurierten Logdatei."""
-    remote_filename = config.get("LOXONE_LOG_FILENAME")
-    io_name = f"log/{remote_filename}"
-    ftp = None
-    try:
-        ftp = FTP(config.get("LOXONE_IP"), timeout=15)
-        ftp.login(user=config.get("LOXONE_USER"), passwd=config.get("LOXONE_PASS"))
-        ftp.cwd("log")
-        size = ftp.size(remote_filename)
-        if size is None:
-            names = ftp.nlst()
-            if remote_filename not in names:
-                return LoxoneCheck(
-                    "FTP-Logdatei",
-                    io_name,
-                    False,
-                    f"'{remote_filename}' nicht im log-Verzeichnis",
-                )
-            return LoxoneCheck("FTP-Logdatei", io_name, True, "Datei vorhanden (Größe unbekannt)")
-        return LoxoneCheck("FTP-Logdatei", io_name, True, f"{size} Bytes")
-    except ftp_errors as exc:
-        return LoxoneCheck("FTP-Logdatei", io_name, False, f"FTP-Fehler: {exc}")
-    finally:
-        if ftp is not None:
-            try:
-                ftp.quit()
-            except Exception:
-                try:
-                    ftp.close()
-                except Exception:
-                    pass
-
-
-def check_roundtrip_soc() -> LoxoneCheck:
-    """Schreibt den aktuellen SoC-Sollwert zurück (keine Zustandsänderung)."""
-    io_name = config.get("LOXONE_TARGET_SOC_NAME")
-    if not io_name:
-        return LoxoneCheck("SoC-Roundtrip", "", False, "LOXONE_TARGET_SOC_NAME fehlt")
-
-    current = loxone_client.fetch_loxone_generic_value(io_name)
-    if current is None:
-        return LoxoneCheck("SoC-Roundtrip", io_name, False, "Aktuellen Wert nicht lesbar")
-
-    if not loxone_client.send_loxone_value(io_name, float(current)):
-        return LoxoneCheck("SoC-Roundtrip", io_name, False, "Senden fehlgeschlagen")
-
-    after = loxone_client.fetch_loxone_generic_value(io_name)
-    if after is None:
-        return LoxoneCheck("SoC-Roundtrip", io_name, False, "Wert nach Senden nicht lesbar")
-    if abs(float(after) - float(current)) > 0.05:
-        return LoxoneCheck(
-            "SoC-Roundtrip",
-            io_name,
-            False,
-            f"Wert geändert: vorher {current}, nachher {after}",
-        )
-    return LoxoneCheck("SoC-Roundtrip", io_name, True, f"unverändert bei {current}")
-
-
-def verify_loxone_setup(
-    *,
-    include_ftp: bool = False,
-    include_roundtrip: bool = False,
-) -> tuple[bool, list[LoxoneCheck]]:
+def verify_loxone_setup() -> tuple[bool, list[LoxoneCheck]]:
     """
-    Führt alle Verbindungsprüfungen aus.
+    Führt alle Lese-Prüfungen gegen den Miniserver aus.
 
     Returns:
         (alle_ok, einzelergebnisse)
     """
     ensure_live_config()
     results = run_read_checks()
-    if include_ftp:
-        results.append(check_ftp_log_available())
-    if include_roundtrip:
-        results.append(check_roundtrip_soc())
     return all(_check_counts_as_ok(item) for item in results), results

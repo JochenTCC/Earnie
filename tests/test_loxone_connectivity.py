@@ -73,6 +73,27 @@ class TestCollectReadChecks:
         assert "Verbraucher swimspa Freigabe" in labels
 
 
+class TestLoxoneIntegrationGate:
+    def test_integration_skips_without_credentials(self, monkeypatch):
+        from tests import conftest as ct
+
+        monkeypatch.setattr(ct, "_load_dotenv_for_tests", lambda: None)
+        monkeypatch.delenv("ENERGY_OPTIMIZER_SKIP_LOXONE_INTEGRATION", raising=False)
+        monkeypatch.delenv("LOXONE_IP", raising=False)
+        monkeypatch.delenv("LOXONE_USER", raising=False)
+        monkeypatch.delenv("LOXONE_PASS", raising=False)
+        assert ct._loxone_integration_enabled() is False
+
+    def test_integration_honours_skip_flag(self, monkeypatch):
+        from tests import conftest as ct
+
+        monkeypatch.setenv("ENERGY_OPTIMIZER_SKIP_LOXONE_INTEGRATION", "1")
+        monkeypatch.setenv("LOXONE_IP", "10.0.0.1")
+        monkeypatch.setenv("LOXONE_USER", "u")
+        monkeypatch.setenv("LOXONE_PASS", "p")
+        assert ct._loxone_integration_enabled() is False
+
+
 class TestVerifySetupAggregation:
     def test_verify_reports_failure_from_read_checks(self):
         with patch.object(lc, "ensure_live_config"), patch.object(
@@ -82,11 +103,3 @@ class TestVerifySetupAggregation:
             ok, results = lc.verify_loxone_setup()
         assert ok is False
         assert len(results) == 1
-
-    def test_roundtrip_fails_when_send_fails(self):
-        with patch.object(lc.config, "get", return_value="SoC_IO"), patch.object(
-            lc.loxone_client, "fetch_loxone_generic_value", return_value=50.0
-        ), patch.object(lc.loxone_client, "send_loxone_value", return_value=False):
-            result = lc.check_roundtrip_soc()
-        assert result.passed is False
-        assert "Senden" in result.detail
