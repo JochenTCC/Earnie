@@ -24,9 +24,34 @@ Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdo
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
 | PV | Gelbe Linie | PV-Prognose / Log-Ist |
-| Verbrauch | Blaue gestrichelte Linie | Grundlast |
-| Batterie | Grün/rot Balken | Lade- (+) / Entladeleistung (−) |
-| Flexible Verbraucher | Gestapelte Balken nach unten (negativ) | Leistung je Verbraucher; größter Horizont-Bedarf unten; Farbe via `chart_color` in `flexible_consumers` |
+| Verbrauch | Braune gestrichelte Linie | Grundlast |
+| Netz | Blaue gestrichelte Linie | Netzbezug (+) / Einspeisung (−) skaliert als Linie |
+| Energiebilanz | Rauf/Runter-Balken (gestapelt) | **↑ kräftig** PV (gelb), Netzbezug (blau); **↓ kräftig** Grundlast (braun), Flex; **gedämpft** Batterie→Last grün, Netz→Batterie cyan, PV→Batterie gelb-grün, PV→Netz magenta — Up- und Down-Säule gleich hoch |
+
+### Rauf/Runter-Algorithmus (Wasserfall)
+
+Pro Slot werden Leistungen aus den Chart-Feldern auf Flüsse verteilt (`ui/flow_balance_allocate.py`):
+
+```
+PV-Rest  := PV − min(PV, Last)
+Last-Rest nach PV-Deckung
+Netz     → min(Netzbezug, Last-Rest)
+Entladen → min(Batterie-Entladen, verbleibende Last)
+Laden    ← min(Laden, PV-Rest); PV-Rest reduzieren
+Einspeisung (PV) ← min(Einspeisung, PV-Rest)
+Einspeisung (Batterie) ← Rest der Einspeisung (≤ Entlade-Rest)
+Entladen → Last ← verbleibende Entladung
+```
+
+**Sonderfälle:** `Netzbezug` und `Geplante Batterie-Aktion` sind vorzeichenkodiert (Bezug/Laden positiv, Einspeisung/Entladen negativ). Fehlt eine explizite Einspeisung in der Zeile, wird PV-Überschuss (`offset_kw > 0`) als gedämpfte PV-Einspeisung gezeichnet. Im neutralen MILP-Bereich wird `Netzbezug` nach Live-Overlay aus Last, Flex, PV und Batterie neu abgeleitet.
+
+| Segment (Chart) | Farbe gedämpft | Bedeutung |
+|-----------------|----------------|-----------|
+| `battery_charge_pv` | Gelb-Grün | Laden aus PV-Rest |
+| `battery_charge_grid` | Cyan | Laden aus Netz |
+| `export_pv` | Blassgelb | PV direkt ins Netz |
+| `export_battery` | Cyan | Einspeisung aus Entladung (Batterie→Netz) |
+| `battery_discharge_load` | Grün | Entladen in die Last (0-Bilanz) |
 
 **Rechte Y-Achse (0–100, skaliert):**
 
@@ -64,6 +89,8 @@ Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Re
 | `waermepumpe_enable_no_start` | waermepumpe | Hinweis |
 
 **Entwickler-Test:** VS Code Launch **Streamlit app.py (Deviation-Test)** — seedet fiktives Log (`scripts/seed_deviation_test_log.py`) in lokales `runtime/` und startet Streamlit. Manuell: `python -m scripts.seed_deviation_test_log --force`.
+
+**Rauf/Runter-Balken (Szenarien A–H):** Launch **Streamlit app.py (Flow-Balance-Test)** (`scripts/seed_flow_balance_test_log.py`) oder HTML-Vorschau: `python -m scripts.export_flow_balance_chart_html --open` → `runtime/flow_balance_preview.html`.
 
 ## Navigation zwischen Chart 1 und Chart 2
 

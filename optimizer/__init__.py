@@ -58,6 +58,7 @@ from .simulation import (
     simulate_baseline_horizon,
     simulate_matched_baseline_horizon,
     simulate_horizon,
+    sync_chart_row_netzbezug,
     total_consumption_kwh_from_rows as _total_consumption_kwh_from_rows,
 )
 from .targets import (
@@ -150,6 +151,7 @@ def overlay_main_run_on_rows(rows: list[dict], main_state: dict | None) -> list[
     apply_immediate_charge_chart_display(
         row, 0, contexts, flex_live_kw=flex_live
     )
+    sync_chart_row_netzbezug(row)
     updated[0] = row
     return updated
 

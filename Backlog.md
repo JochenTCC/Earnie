@@ -2,21 +2,26 @@
 
 Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
-## Non-Dev-Related Topics
-
-## Offene Bugfixes
-
-- [ ] **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
+Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Research-Items
-
-- [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
 
 ## Feature-Backlog
 
 ### Version 0.+1
-- [ ] **Live-Preisprognose: EU-Features für Zukunfts-Slots** — Open-Meteo **Forecast-API** (`api.open-meteo.com/v1/forecast`, vgl. `outdoor_forecast.py`) statt Archive für fehlende Day-Ahead-Stunden im Live-Horizont; Energy-Charts nur für Vergangenheit. Ziel: OLS-Prognose (`missing_price_strategy: forecast`) im Produktivbetrieb nutzbar, nicht nur Spiegelung.
-- [ ] Entladesperre besser visualisieren (Farbe des Plots ändern?)
+- [x] Entladesperre besser visualisieren (Farbe des Plots ändern?)
+- [x] Einen "Rauf-Runter"-Balken für Energie-Gewinnung und Verbrauch anstatt Batterie-BAlken und Verbraucherbalken. *(Basis umgesetzt: `ui/chart_flow_balance.py`, `ui/flow_balance_allocate.py` — Follow-ups unten)*
+- [x] **Chart 1 Rauf/Runter — Farbpalette Netz & Batterie** (neuer Chat)
+  - **Netz** kräftig und gedämpft: **Blau** statt Rot (visuelles Gegenstück zu PV-Gelb)
+  - Daraus abgeleitet: gedämpfte Flüsse für Netzbezug, Netz-Laden, Einspeisung ins Netz (falls abweichend von PV/Batterie)
+  - Batterie-Flüsse (laden/entladen → Last vs. Einspeisung) farblich an die neue Zuordnung anpassen; Legenden/Hover konsistent
+  - Dateien: `ui/chart_flow_balance.py`, `docs/ui/charts.md`, ggf. Netz-Linie `ui/charts.py` (`_COLOR_GRID_POWER`)
+  - Tests/Szenarien A–H in `scripts/flow_balance_test_data.py` + `tests/test_chart_flow_balance.py` anpassen
+- [ ] **Chart 1 Rauf/Runter — PV-Überschuss & volle Batterie** (neuer Chat)
+  - Bei deutlichem PV-Überschuss und **keinem** (mehr) Ladebedarf (Batterie voll / SoC-Limit): **kein** Segment „Batterie laden (PV)“ — Überschuss als **Einspeisung (PV)** (gelb gedämpft)
+  - Ursache vermutlich in `ui/flow_balance_allocate.py` (`allocate_slot_flows`): `charge_from_pv` begrenzen auf tatsächlich mögliche Ladung (nicht nur geplante `battery_charge` aus der Zeile)
+  - Klären: SoC aus `Simulierter SoC (%)` / Batterieparameter vs. reine Bilanz aus Zeilenwerten; Randfall Szenario E (Überschuss ohne negatives `Netzbezug`)
+  - Regression: neues Szenario „volle Batterie + PV-Überschuss“; Streamlit-Produktivdaten neutral/grau prüfen
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {
     1:  6.5,   # Januar
@@ -35,16 +40,7 @@ bodentemperaturen_nach_monat = {
 
 ### Version 0.+1
 - [ ] Debug-Dump einführen, in den alle relevanten Daten (inkl. config.json etc. ) abgelegt werden, damit später reproduzierbar gedebuggt werden kann.
-- [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird → wenn Null, fünf Minuten laden mit Mindest-Strom)
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
-- [ ] **urgent-Regel auf Notwendigkeit prüfen** (Review bis ca. **2026-07-12**)
-  - Auswertung: `urgent_rule_observability` in Log + `optimization_history.jsonl` (`role`: `redundant` / `nachholen` / `nur_urgent_fenster`)
-  - Akzeptanz: durchgehend nur `redundant` → Nebenbedingung entfernen; sonst behalten und begründen
-- [ ] **Prod-Dump-Regression: urgent-Nebenbedingung infeasible** (Stand 2026-07-03, Commit `a743318`)
-  - Fixture: `eauto_urgent_deferred_cheap_hours_2026-06-28` (~7,99 kWh Rest)
-  - Live Modus A: MILP mit urgent → **Infeasible**; ohne urgent → **Optimal**
-  - `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py` (2 Tests)
-  - Nächster Schritt: Live urgent + Modus A prüfen; `xfail` entfernen wenn feasible
 
 ### Version 0.+1
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)

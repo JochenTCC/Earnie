@@ -228,6 +228,15 @@ def finalize_chart_row_energy(
     return new_soc
 
 
+def sync_chart_row_netzbezug(chart_row: dict) -> None:
+    """Netzbezug aus PV, Last, Flex und Batterie ableiten (Chart-Energiebilanz)."""
+    pv = float(chart_row.get("PV-Prognose (kW)", 0.0) or 0.0)
+    con = float(chart_row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+    batt = float(chart_row.get("Geplante Batterie-Aktion (kW)", 0.0) or 0.0)
+    flex_sum = flexible_consumer_power_kw(chart_row)
+    chart_row["Netzbezug (kW)"] = round(con + flex_sum - pv + batt, 2)
+
+
 def simulate_horizon(
     optimization_matrix: list,
     initial_soc: float,

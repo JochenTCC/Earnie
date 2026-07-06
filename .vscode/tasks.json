@@ -46,6 +46,20 @@
         "panel": "shared",
         "showReuseMessage": false
       }
+    },
+    {
+      "label": "seed: flow balance test log",
+      "type": "shell",
+      "command": "& '${workspaceFolder}\\.venv\\Scripts\\python.exe' -m scripts.seed_flow_balance_test_log --force",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
+      }
     }
   ]
 }

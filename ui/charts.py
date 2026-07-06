@@ -1282,6 +1282,13 @@ def add_power_traces(
     if "PV-Prognose (kW)" in df.columns:
         _add_pv_trace(fig, axis, df["PV-Prognose (kW)"], uhrzeit)
 
+    from ui.chart_flow_balance import (
+        COLOR_BASELOAD,
+        COLOR_GRID_IMPORT,
+        add_flow_balance_traces,
+        build_flow_balance_slots_from_df,
+    )
+
     if "Verbrauch-Prognose (kW)" in df.columns:
         _add_segmented_hv_line(
             fig,
@@ -1290,7 +1297,7 @@ def add_power_traces(
             uhrzeit,
             segments,
             name="Verbrauch",
-            line_kwargs=dict(color="#3498db", width=2, dash="dash"),
+            line_kwargs=dict(color=COLOR_BASELOAD, width=2, dash="dash"),
             y_format=".2f",
             base_opacity=1.0,
         )
@@ -1303,80 +1310,22 @@ def add_power_traces(
             uhrzeit,
             segments,
             name="Netz",
-            line_kwargs=dict(color=_COLOR_GRID_POWER, width=2, dash="dash"),
+            line_kwargs=dict(color=COLOR_GRID_IMPORT, width=2, dash="dash"),
             y_format=".2f",
             base_opacity=1.0,
             anchor_fraction=_LINE_ANCHOR_SLOT_CENTER,
         )
 
-    for seg_index, (start, end, _is_extrapolated) in enumerate(segments):
-        if start >= end:
-            continue
-        fig.add_trace(go.Bar(
-            x=_battery_bar_times(axis, slice(start, end)),
-            y=df["Geplante Batterie-Aktion (kW)"].iloc[start:end],
-            name="Batterie" if seg_index == 0 else "Batterie",
-            showlegend=seg_index == 0,
-            marker=dict(color=bar_colors[start:end]),
-            opacity=0.75,
-            width=_bar_widths_ms(axis, start, end, _BATTERY_BAR_WIDTH_FRACTION),
-            yaxis="y",
-            customdata=uhrzeit.iloc[start:end],
-            hovertemplate=(
-                "Uhrzeit: %{customdata}<br>%{fullData.name}: "
-                "%{y:.2f}<extra></extra>"
-            ),
-        ))
-
-    for seg_index, (start, end, _is_extrapolated) in enumerate(segments):
-        if start >= end:
-            continue
-        segment = df.iloc[start:end]
-        cumulative_base = pd.Series(0.0, index=segment.index)
-        for consumer, col in active_consumers:
-            consumer_color = _consumer_chart_color(consumer)
-            pv_follow_col = consumer_pv_follow_column_name(consumer)
-            if pv_follow_col not in df.columns:
-                pv_follow_col = None
-            immediate_col = consumer_immediate_charge_column_name(consumer)
-            if immediate_col not in df.columns:
-                immediate_col = None
-            pattern_shapes = _consumer_bar_pattern_shapes(
-                segment, col, pv_follow_col, immediate_col
-            )
-            hover_pv = (
-                segment[pv_follow_col].fillna(0).astype(int).tolist()
-                if pv_follow_col is not None
-                else [0] * len(segment)
-            )
-            hover_imm = (
-                segment[immediate_col].fillna(0).astype(int).tolist()
-                if immediate_col is not None
-                else [0] * len(segment)
-            )
-            power_kw = segment[col].fillna(0.0).astype(float)
-            fig.add_trace(go.Bar(
-                x=_battery_bar_times(axis, slice(start, end)),
-                y=-power_kw,
-                base=cumulative_base,
-                name=consumer["name"] if seg_index == 0 else consumer["name"],
-                showlegend=seg_index == 0,
-                marker=_consumer_bar_marker(
-                    consumer_color,
-                    pattern_shapes,
-                    _CONSUMER_BAR_OPACITY,
-                ),
-                width=_bar_widths_ms(axis, start, end, _BATTERY_BAR_WIDTH_FRACTION),
-                yaxis="y",
-                customdata=list(zip(segment["Uhrzeit"], hover_pv, hover_imm, power_kw)),
-                hovertemplate=(
-                    "Uhrzeit: %{customdata[0]}<br>%{fullData.name}: "
-                    "%{customdata[3]:.2f} kW<br>pv_follow: %{customdata[1]}<br>"
-                    "sofort_laden: %{customdata[2]}"
-                    "<extra></extra>"
-                ),
-            ))
-            cumulative_base = cumulative_base - power_kw
+    flow_slots = build_flow_balance_slots_from_df(df, flex_consumers=active_consumers)
+    add_flow_balance_traces(
+        fig,
+        df,
+        flow_slots,
+        axis,
+        extrap_start,
+        extrap_end,
+        flex_consumers=active_consumers,
+    )
 
 
 def _entladesperre_band_marker() -> dict:

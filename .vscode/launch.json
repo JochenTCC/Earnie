@@ -53,11 +53,37 @@
       "justMyCode": false
     },
     {
+      "name": "Streamlit app.py (Flow-Balance-Test)",
+      "type": "python",
+      "request": "launch",
+      "preLaunchTask": "seed: flow balance test log",
+      "module": "scripts.run_streamlit",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/runtime"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
       "name": "run_backtesting",
       "type": "python",
       "request": "launch",
       "module": "scripts.run_backtesting",
       "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "export_flow_balance_chart_html",
+      "type": "python",
+      "request": "launch",
+      "module": "scripts.export_flow_balance_chart_html",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--output",
+        "runtime/flow_balance_preview.html"
+      ],
       "console": "integratedTerminal",
       "justMyCode": false
     }

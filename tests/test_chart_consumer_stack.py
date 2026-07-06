@@ -1,4 +1,4 @@
-"""Gestapelte Flex-Verbraucher-Balken in Chart 1."""
+"""Gestapelte Flex-Verbraucher in Chart-1-Rauf/Runter-Balken."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -127,7 +127,7 @@ def test_stack_order_recomputed_for_new_sa0(monkeypatch):
     assert [consumer["id"] for consumer, _ in order_b] == ["swimspa", "eauto"]
 
 
-def test_consumer_bars_are_negative_and_stacked_at_battery_x(monkeypatch):
+def test_flow_balance_bars_replace_battery_and_flex_at_same_x(monkeypatch):
     _patch_consumers(monkeypatch)
     clear_consumer_stack_order_cache()
     chart = _chart_window()
@@ -156,12 +156,14 @@ def test_consumer_bars_are_negative_and_stacked_at_battery_x(monkeypatch):
         matrix=matrix,
         chart_window=chart,
     )
-    flex_traces = [trace for trace in fig.data if trace.name in ("SwimSpa", "E-Auto")]
-    battery = next(trace for trace in fig.data if trace.name == "Batterie")
+    bar_traces = [trace for trace in fig.data if isinstance(trace, go.Bar)]
+    flex_traces = [trace for trace in bar_traces if trace.name in ("SwimSpa", "E-Auto")]
+    assert not any(trace.name == "Batterie" for trace in fig.data)
     assert len(flex_traces) == 2
     assert all(float(y) <= 0.0 for trace in flex_traces for y in trace.y)
-    assert flex_traces[0].x[0] == battery.x[0]
-    assert flex_traces[1].x[0] == battery.x[0]
+    assert flex_traces[0].x[0] == flex_traces[1].x[0]
+    baseload = next(trace for trace in bar_traces if trace.name == "Grundlast")
+    assert flex_traces[0].x[0] == baseload.x[0]
 
 
 def test_consumer_chart_color_uses_config_when_set(monkeypatch):
