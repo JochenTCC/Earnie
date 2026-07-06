@@ -2,6 +2,10 @@
 
 Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
+## Non-Dev-Related Topics
+- [ ] Lizenzmodell in Github aufnehmen
+- [ ] BP in .gitignore aufnehmen 
+
 ## Offene Bugfixes
 
 - [ ] **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
@@ -11,9 +15,6 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 - [ ] **Preis-Spiegelung (Markt):** statt einzelner Spiegelquelle (gleiche Uhrzeit, bis 7 Tage zurück) ggf. **Mittelung über mehrere vergangene Tage** prüfen — Genauigkeit/Robustheit vs. Einfachheit; Kontext `data/market_prices.py` (`resolve_market_slots`)
 
 ## Feature-Backlog
-
-### Version 0.+1
-- [ ] Chart 1 für variable Anzahl von Verbrauchern fit machen (max 4 anzeigen, nach Leistung priorisieren, Zoom einführen) — alternativ ein negativer Balken mit allen aufsummierten Verbrauchern
 
 ### Version 0.+1
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:

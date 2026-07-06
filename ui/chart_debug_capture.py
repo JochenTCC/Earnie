@@ -40,6 +40,7 @@ def _chart1_plotly_json(bundle) -> str | None:
             history_slot_count=bundle.history_slot_count,
             chart_header_label=bundle.chart_header_label,
             slot_deviation_events=bundle.slot_deviation_events,
+            optimization_matrix=bundle.optimization_matrix,
         )
         return fig.to_json()
     except Exception as exc:

@@ -13,6 +13,10 @@
       "$ref": "#/definitions/awattar",
       "description": "aWATTar-API und Aufschläge für den Bezugsstrompreis (Österreich)."
     },
+    "market_prices": {
+      "$ref": "#/definitions/market_prices",
+      "description": "Fehlende Day-Ahead-Slots: Spiegelung oder OLS-Prognose (Phase 3)."
+    },
     "eauto_milp": {
       "$ref": "#/definitions/eauto_milp",
       "description": "E-Auto MILP: Live-Schwelle Modus A/B und Tie-Break-Koeffizienten (Pflicht)."
@@ -80,6 +84,21 @@
         "feed_in_fix_cent": {
           "type": "number",
           "description": "Fixer Cent/kWh-Offset auf die dynamische Einspeisevergütung (z. B. regionale Abgaben)."
+        }
+      }
+    },
+    "market_prices": {
+      "type": "object",
+      "description": "Ergänzung für fehlende Day-Ahead-Stunden (grüne Zone). Standard: mirror.",
+      "properties": {
+        "missing_price_strategy": {
+          "type": "string",
+          "enum": ["mirror", "forecast"],
+          "description": "mirror = gleiche Uhrzeit zurück; forecast = OLS aus EU-Wetter/Erzeugung."
+        },
+        "forecast_model_path": {
+          "type": "string",
+          "description": "Pfad zur JSON mit OLS-Koeffizienten (scripts/train_price_forecast_model.py)."
         }
       }
     },
@@ -521,6 +540,11 @@
         "name": {
           "type": "string",
           "description": "Anzeigename in der UI."
+        },
+        "chart_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "Hex-Farbe für Flex-Verbraucher-Balken in Chart 1 (z. B. #00bcd4)."
         },
         "nominal_power_kw": {
           "type": "number",
