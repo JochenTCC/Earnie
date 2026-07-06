@@ -2,6 +2,14 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
+### Preis-Prognose Backtesting Jahresvergleich (2026-07-06)
+
+- [x] **Backtesting Jahresvergleich (Infrastruktur):** Grüne Zone im `sunset_window` — Day-Ahead-Cutoff, Spiegelung vs. OLS (`data/backtesting_prices.py`, `resolve_market_slots` forecast); `--price-strategy` / `--output-dir` in `run_backtesting`; Orchestrator `run_price_strategy_backtests` + `compare_price_strategy_backtests`; Tests
+
+### Preis-Prognose UI per config.json (2026-07-06)
+
+- [x] **Extra-UI-Seite für Preismodell über config.json aktivierbar** — `ui.price_forecast_page_enabled` (Standard: `false`); ohne `ENERGY_OPTIMIZER_UI_MODES` nur Sunset-2-Sunset + Backtesting, Preis-Prognose (Dev) optional per Config; Env-Variable hat weiterhin Vorrang (`ui/mode_selector.py`, `config.py`, Schema/Beispiel, Tests `tests/test_mode_selector.py`)
+
 ### Entladesperre: Netz-Trickelladen (2026-07-06)
 
 - [x] **Bugfix: SOC stieg bei Halten aus dem Netz (05.07. ~22–23 Uhr)** — Prod-Log (`runtime-prod/runtime.zip`): PV=0, `battery_plan_kw=0`, gemessen ~0,2 kW Laden + Netzbezug; Ursache `target_soc_percent=100` bei Huawei-Steuerbefehl 1; Fix: bei `MODE_ENTLADESPERRE` `target_soc = current_soc` (`optimizer/milp.py`); Test `test_entladesperre_target_soc_matches_current_soc`

@@ -247,6 +247,10 @@
           "minimum": 1024,
           "maximum": 65535,
           "description": "TCP-Port für `streamlit run` (Standard: 8501). Env-Override: ENERGY_OPTIMIZER_UI_STREAMLIT_PORT."
+        },
+        "price_forecast_page_enabled": {
+          "type": "boolean",
+          "description": "Sidebar-Modus „Preis-Prognose (Dev)“ (OLS-Evaluations-UI). Standard: false. Env ENERGY_OPTIMIZER_UI_MODES hat Vorrang."
         }
       }
     },

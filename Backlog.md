@@ -13,8 +13,7 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
   - Phase 2: OLS + Walk-forward ✅; **extended** (+ EU-Last/Residuallast) via `enrich_price_training_dataset` + `compare_price_forecast_features`; Bias-Korrektur (Nicht-Peak P90) ✅
   - Phase 3: UI-Eval + Live-Hooks vorbereitet; `resolve_market_slots` offen
   - [ ] **Rollierende Bias-Rekalibrierung** — Korrektur aus letzten N Tagen (Nicht-Peak), nicht nur einmalig beim Training; für Live-Betrieb (Holdout-Shift)
-  - [ ] **Backtesting Jahresvergleich (alle Szenarien):** Ganzes Jahr, Optimierung jeweils mit dem **aktiven Preismodell** (Spiegelung vs. OLS-Prognose in der grünen Zone); Kennzahlen: Kosten, Einsparung, Lade-/Entladeverhalten — Entscheidungsgrundlage vor Live-Umschaltung `missing_price_strategy: forecast`
-  - [ ] Extra-UI-Seite für Preismodell über config.json aktivierbar machen (Default: Aus)
+  - [ ] **Jahresvergleich Spiegelung vs. Prognose ausführen:** `python -m scripts.run_price_strategy_backtests` für 2025 (`--start-month 1 --end-month 12`, `sunset_window`, alle Szenarien); `backtesting_logs/price_strategy_compare/comparison.md` auswerten (Kosten, Einsparung, Batterie) — Entscheidung vor `missing_price_strategy: forecast`
 
 ## Feature-Backlog
 

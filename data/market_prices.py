@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -12,6 +13,8 @@ PRICE_SOURCE_DAY_AHEAD = "day_ahead"
 PRICE_SOURCE_MIRRORED = "mirrored"
 PRICE_SOURCE_PREDICTED = "predicted"
 MAX_MIRROR_LOOKBACK_DAYS = 7
+MISSING_PRICE_STRATEGY_MIRROR = "mirror"
+MISSING_PRICE_STRATEGY_FORECAST = "forecast"
 
 
 def normalize_price_slot(dt: datetime) -> datetime:
@@ -95,18 +98,113 @@ def _append_mirrored_slot(
     )
 
 
+def _append_predicted_slot(
+    resolved: list[dict[str, Any]],
+    slot: datetime,
+    epex_cent: float,
+    *,
+    forecast_model_path: Path | None = None,
+) -> None:
+    row: dict[str, Any] = {
+        "slot_datetime": slot,
+        "hour": slot.hour,
+        "price_buy": round(float(epex_cent), 4),
+        "price_source": PRICE_SOURCE_PREDICTED,
+        "k_act": epex_to_brutto_cent(float(epex_cent)),
+    }
+    if forecast_model_path is not None:
+        row["forecast_model_path"] = str(forecast_model_path)
+    resolved.append(row)
+
+
+def _lookup_forecast_epex(
+    slot: datetime,
+    *,
+    forecast_model: Any,
+    forecast_feature_frame: pd.DataFrame,
+) -> float | None:
+    from data.price_forecast_model import predict_prices
+
+    key = normalize_price_slot(slot)
+    idx = forecast_feature_frame.index
+    if idx.tz is None and key.tzinfo is not None:
+        lookup_key = key.replace(tzinfo=None)
+    else:
+        lookup_key = key
+    if lookup_key not in forecast_feature_frame.index:
+        return None
+    frame = forecast_feature_frame.loc[[lookup_key]]
+    return float(predict_prices(forecast_model, frame)[0])
+
+
+def _resolve_missing_slot(
+    resolved: list[dict[str, Any]],
+    slot: datetime,
+    by_slot: dict[datetime, dict[str, Any]],
+    *,
+    missing_price_strategy: str,
+    forecast_model: Any | None,
+    forecast_feature_frame: pd.DataFrame | None,
+    forecast_model_path: Path | None,
+    max_lookback_days: int,
+) -> None:
+    if (
+        missing_price_strategy == MISSING_PRICE_STRATEGY_FORECAST
+        and forecast_model is not None
+        and forecast_feature_frame is not None
+    ):
+        epex = _lookup_forecast_epex(
+            slot,
+            forecast_model=forecast_model,
+            forecast_feature_frame=forecast_feature_frame,
+        )
+        if epex is not None:
+            _append_predicted_slot(
+                resolved,
+                slot,
+                epex,
+                forecast_model_path=forecast_model_path,
+            )
+            return
+
+    mirror_slot = find_mirror_slot(
+        slot,
+        by_slot,
+        max_lookback_days=max_lookback_days,
+    )
+    if mirror_slot is None:
+        raise ValueError(
+            f"Kein Day-Ahead-Preis für {slot:%Y-%m-%d %H:%M} und keine Spiegelquelle "
+            f"innerhalb von {max_lookback_days} Tagen verfügbar. "
+            "aWATTar-Zeitraum erweitern oder später erneut versuchen."
+        )
+    _append_mirrored_slot(resolved, slot, mirror_slot, by_slot)
+
+
 def resolve_market_slots(
     market_data: list[dict[str, Any]],
     target_hours: list[datetime],
+    *,
+    missing_price_strategy: str = MISSING_PRICE_STRATEGY_MIRROR,
+    forecast_model: Any | None = None,
+    forecast_feature_frame: pd.DataFrame | None = None,
+    forecast_model_path: Path | None = None,
 ) -> list[dict[str, Any]]:
     """
     Liefert Preis-Slots für target_hours (beliebige Länge >= 1).
 
-    Fehlende Day-Ahead-Stunden werden per Spiegelung befüllt:
-    gleiche Uhrzeit an vorherigen Tagen (bis MAX_MIRROR_LOOKBACK_DAYS).
+    Fehlende Day-Ahead-Stunden: Spiegelung (Standard) oder OLS-Prognose bei
+    missing_price_strategy='forecast' (Fallback: Spiegelung).
     """
     if not target_hours:
         raise ValueError("resolve_market_slots erfordert mindestens eine Zielstunde.")
+    if missing_price_strategy not in (
+        MISSING_PRICE_STRATEGY_MIRROR,
+        MISSING_PRICE_STRATEGY_FORECAST,
+    ):
+        raise ValueError(
+            "missing_price_strategy muss 'mirror' oder 'forecast' sein."
+        )
 
     by_slot = index_market_data_by_slot(market_data)
     resolved: list[dict[str, Any]] = []
@@ -126,19 +224,16 @@ def resolve_market_slots(
             )
             continue
 
-        mirror_slot = find_mirror_slot(
+        _resolve_missing_slot(
+            resolved,
             slot,
             by_slot,
+            missing_price_strategy=missing_price_strategy,
+            forecast_model=forecast_model,
+            forecast_feature_frame=forecast_feature_frame,
+            forecast_model_path=forecast_model_path,
             max_lookback_days=MAX_MIRROR_LOOKBACK_DAYS,
         )
-        if mirror_slot is None:
-            raise ValueError(
-                f"Kein Day-Ahead-Preis für {slot:%Y-%m-%d %H:%M} und keine Spiegelquelle "
-                f"innerhalb von {MAX_MIRROR_LOOKBACK_DAYS} Tagen verfügbar. "
-                "aWATTar-Zeitraum erweitern oder später erneut versuchen."
-            )
-
-        _append_mirrored_slot(resolved, slot, mirror_slot, by_slot)
 
     return resolved
 

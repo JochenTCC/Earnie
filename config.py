@@ -323,6 +323,11 @@ class Config:
             self._raw_config
         )
         self.UI_STREAMLIT_PORT = self._load_ui_streamlit_port(self._raw_config)
+        self.UI_PRICE_FORECAST_PAGE_ENABLED = self._load_ui_bool(
+            self._raw_config,
+            "price_forecast_page_enabled",
+            False,
+        )
 
         self.LOXONE_SOC_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "soc_name"])
         self.LOXONE_PV_COUNTER_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "pv_counter_name"])
@@ -873,6 +878,9 @@ class Config:
     def get_ui_streamlit_port(self) -> int:
         return int(self.get("UI_STREAMLIT_PORT", default=8501))
 
+    def get_ui_price_forecast_page_enabled(self) -> bool:
+        return bool(self.get("UI_PRICE_FORECAST_PAGE_ENABLED", default=False))
+
     def get_event_triggers(self) -> list[dict]:
         return list(self.EVENT_TRIGGERS)
 
@@ -1171,6 +1179,10 @@ def get_ui_chart_debug_capture_dir() -> str:
 
 def get_ui_streamlit_port() -> int:
     return CONFIG.get_ui_streamlit_port()
+
+
+def get_ui_price_forecast_page_enabled() -> bool:
+    return CONFIG.get_ui_price_forecast_page_enabled()
 
 
 def get_event_triggers() -> list[dict]:
