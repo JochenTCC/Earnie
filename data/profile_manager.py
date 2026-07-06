@@ -9,6 +9,7 @@ from . import data_loader
 from . import market_prices
 from . import feed_in_prices
 from . import cons_data_store
+from data.price_forecast_live import is_extrapolated_source, resolve_market_slots_kwargs
 from runtime_store.persist_paths import (
     consumption_profiles_file,
     flexible_consumer_profiles_file,
@@ -180,7 +181,11 @@ def _build_optimization_matrix(
             "forecast_consumption, forecast_pv und target_hours müssen gleiche Länge haben."
         )
 
-    price_slots = market_prices.resolve_market_slots(market_data, target_hours)
+    price_slots = market_prices.resolve_market_slots(
+        market_data,
+        target_hours,
+        **resolve_market_slots_kwargs(target_hours),
+    )
     optimization_matrix = []
 
     for i, price_slot in enumerate(price_slots):
@@ -305,10 +310,14 @@ def build_live_planning_matrix(market_data: list, window) -> list:
             for row in optimization_matrix
         ]
     )
-    if mirrored_share > 0.2:
+    extrapolated_share = sum(
+        1 for row in optimization_matrix if is_extrapolated_source(row.get("price_source"))
+    ) / len(optimization_matrix)
+    if extrapolated_share > 0.2:
         print(
-            f"⚠️ Preis-Spiegelung: {mirrored_share:.0%} der {len(optimization_matrix)} "
-            "Planungs-Slots ohne Day-Ahead-Preis."
+            f"⚠️ Preis-Extrapolation: {extrapolated_share:.0%} der {len(optimization_matrix)} "
+            "Planungs-Slots ohne Day-Ahead-Preis "
+            f"(gespiegelt: {mirrored_share:.0%})."
         )
 
     return optimization_matrix
