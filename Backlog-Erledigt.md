@@ -2,6 +2,11 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
+### UI S-2 Cold-Start & Preisprognose-Logging (2026-07-06)
+
+- [x] **Initiales Rendering UI (SA-2-SA)** — Cold-Start ~112 s → ~7 s: Archive-EU-Feature-Abruf für Zukunfts-Slots übersprungen (`_archive_covers_slot_range` in `data/price_forecast_live.py`); JSONL-In-Memory-Cache in `runtime_store/optimization_history.py`
+- [x] **Terminal-Warnung EU-Features (Open-Meteo 400)** — `print()` durch `logging` ersetzt; erwarteter Live-Fall nur `logger.debug`, API-Fehler als kompaktes `logger.warning` ohne volle URL
+
 ### Preis-Prognose (EU-Wetter & Erzeugung) Epic abgeschlossen (2026-07-06)
 
 - [x] **Preis-Prognose (EU-Wetter & Erzeugung):** Korrelationsmodell für grüne Zone (kein Day-Ahead bis SA₂) statt Spiegelung — Wind + Solar auf EU-Ebene; Spec [price-forecast-renewables.md](docs/spec/price-forecast-renewables.md)
