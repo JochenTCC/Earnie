@@ -8,6 +8,7 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
 ## Offene Bugfixes
 
+- [ ] Prüfen, ob alle Daten für alle Tests im Repo liegen und bei neu Auschecken ausführbar sind.
 - [ ] **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
 ## Research Items (in Branch)
