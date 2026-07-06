@@ -2,6 +2,12 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
+### Bugfixes: Test-Fixtures & Wärmepumpe (2026-07-06)
+
+- [x] **Testdaten für frisches Checkout ausführbar** — Prod-Dump-Fixtures ergänzt (`.gitignore`-Ausnahmen, `scripts/complete_prod_dump_fixtures.py`), thermische CSV-Fixtures (`tests/fixtures/thermal/`), Smoke-Tests auf `tests/fixtures/historical/cons_data_hourly.csv`; **551 passed** (Commit `71a4764`)
+- [x] **Wärmepumpe in `config.json` wiederhergestellt** — Eintrag `flexible_consumers[id=waermepumpe]` aus Produktiv-Backup (`config_back.json`, Commit `3b7fa1c`): `Ernie_WP_Freigabe`, `Ernie_WP_P_act`, historisches Tagesziel, `chart_color` `#ff9800`; auch `config.example.json`
+- [x] **Soll-Ist Hinweis: Wärmepumpe nicht angesprungen** — Regel `waermepumpe_enable_no_start` (Kategorie Hinweis), Doku/Szenario S5, Seed-Skript und Tests
+
 ### Chart 1 gestapelte Flex-Verbraucher (2026-07-06)
 
 - [x] **Chart 1: variable Flex-Verbraucher als gestapelter Negativ-Balken** — ein Balken pro Slot (gleiche X-Position wie Batterie, `barmode=overlay`, Stapelung per `base`); Sortierung nach Horizont-Energie SA₀…SA₂, Cache bis nächster SA₀; Farben via `flexible_consumers.chart_color` in `config.json`; Tests `tests/test_chart_consumer_stack.py` (`ui/charts.py`, `config.py`)

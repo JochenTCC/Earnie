@@ -44,7 +44,7 @@ Vertikale Marker **SA₀**, **SA₁**, **SA₂**; **Jetzt** nur im Live-Segment 
 
 | Symbol | Kategorie | Farbe | Bedeutung |
 |--------|-----------|-------|-----------|
-| ▲ | Hinweis | gelb | Unkritische Abweichung (Kategorie reserviert, noch ohne Regel) |
+| ▲ | Hinweis | gelb | Unkritische Abweichung (z. B. Wärmepumpe: Freigabe ohne Anlauf) |
 | ◆ | Warnung | orange | Erwartete Abweichung — Loxone handelt bewusst anders |
 | ⬡ | Fehler | rot | Anweisung von Ernie nicht befolgt |
 
@@ -61,6 +61,7 @@ Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Re
 | `eauto_should_charge` | eauto | Fehler |
 | `battery_forced_discharge_missing` | battery | Fehler |
 | `battery_forced_charge_missing` | battery | Fehler |
+| `waermepumpe_enable_no_start` | waermepumpe | Hinweis |
 
 **Entwickler-Test:** VS Code Launch **Streamlit app.py (Deviation-Test)** — seedet fiktives Log (`scripts/seed_deviation_test_log.py`) in lokales `runtime/` und startet Streamlit. Manuell: `python -m scripts.seed_deviation_test_log --force`.
 

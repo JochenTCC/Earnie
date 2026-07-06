@@ -6,8 +6,6 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
 ## Offene Bugfixes
 
-- [ ] Prüfen, ob alle Daten für alle Tests im Repo liegen und bei neu Auschecken ausführbar sind.
-- [ ] Wärmepumpe ist nicht mehr in config.json - neu herstellen.
 - [ ] **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
 ## Research Items (in Branch)
@@ -34,6 +32,7 @@ bodentemperaturen_nach_monat = {
 }
 
 ### Version 0.+1
+- [ ] Debug-Dump einführen, in den alle relevanten Daten (inkl. config.json etc. ) abgelegt werden, damit später reproduzierbar gedebuggt werden kann.
 - [ ] PWM für E-Auto-Laden nur noch benutzen für Ströme < A_min, ansonsten ersetzen durch Mindestlademenge pro h (Zähler, der runterzählt und bei jedem Ladevorgang wieder geresettet wird → wenn Null, fünf Minuten laden mit Mindest-Strom)
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
 - [ ] **urgent-Regel auf Notwendigkeit prüfen** (Review bis ca. **2026-07-12**)
