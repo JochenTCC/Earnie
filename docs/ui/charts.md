@@ -26,7 +26,7 @@ Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdo
 | PV | Gelbe Linie | PV-Prognose / Log-Ist |
 | Verbrauch | Blaue gestrichelte Linie | Grundlast |
 | Batterie | Grün/rot Balken | Lade- (+) / Entladeleistung (−) |
-| Flexible Verbraucher | Farbige Balken | Leistung je Verbraucher |
+| Flexible Verbraucher | Gestapelte Balken nach unten (negativ) | Leistung je Verbraucher; größter Horizont-Bedarf unten; Farbe via `chart_color` in `flexible_consumers` |
 
 **Rechte Y-Achse (0–100, skaliert):**
 

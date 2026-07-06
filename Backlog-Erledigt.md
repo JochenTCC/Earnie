@@ -2,6 +2,10 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
+### Chart 1 gestapelte Flex-Verbraucher (2026-07-06)
+
+- [x] **Chart 1: variable Flex-Verbraucher als gestapelter Negativ-Balken** — ein Balken pro Slot (gleiche X-Position wie Batterie, `barmode=overlay`, Stapelung per `base`); Sortierung nach Horizont-Energie SA₀…SA₂, Cache bis nächster SA₀; Farben via `flexible_consumers.chart_color` in `config.json`; Tests `tests/test_chart_consumer_stack.py` (`ui/charts.py`, `config.py`)
+
 ### UI S-2 Nav & Hilfe-Icons Mobile (2026-07-06)
 
 - [x] **Kompakte S-2-Navigation** — `←` / `Heute` / Kalender-Icon / `→` in `st.container(horizontal=True)`; Datumsauswahl im Popover (nur SA₀-Tage mit Log); `Heute` und Zyklus-Logik in `ui/s2_navigation.py`, `ui/chart_context.py`, `ui/history_navigation.py`

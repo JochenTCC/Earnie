@@ -14,7 +14,11 @@ from data.planning_window import (
     UiChartWindow,
     normalize_hour_slot,
 )
-from optimizer.targets import consumer_pv_follow_column_name, consumer_immediate_charge_column_name
+from optimizer.targets import (
+    consumer_column_name,
+    consumer_pv_follow_column_name,
+    consumer_immediate_charge_column_name,
+)
 from optimizer import battery as bat
 from optimizer.deviation_eval import DeviationEvent
 from runtime_store.history_timeline import SLOT_MISSING
@@ -39,6 +43,7 @@ _DEVIATION_MARKER_SIZE = 11
 _DEVIATION_Y_STACK_FACTOR = 0.06
 _CONSUMER_PALETTE_START = (194, 24, 91)
 _CONSUMER_PALETTE_END = (0, 188, 212)
+_STACK_ORDER_BY_SA0: dict[str, tuple[str, ...]] = {}
 
 
 def _safe_float(value, default: float = 0.0) -> float:
@@ -101,8 +106,7 @@ class ChartSlotAxis:
     |-----------------|--------------|-----------------------------------------------------|
     | HV-Linien (Verbrauch, Preis, kum. Kosten) | −0.5 | Wert gilt ab Slotbeginn (Treppenfunktion) |
     | Netz-Linie | 0 (Mitte) | Stundenmittelwert zentriert im Slot |
-    | Batterie-Balken | +0.05 | Leichte Verschiebung nach rechts (optische Trennung von Linien) |
-    | Flex-Balken nebeneinander | ± ``bar_width``/2 | Mehrere Verbraucher im selben Slot nebeneinander |
+    | Batterie- / Flex-Balken | +0.05 | Gleiche X-Position (gestapelt, ``barmode=overlay``) |
     | ``add_vrect`` / Jetzt-Linie | Index ± 0.5 | Zonen- und Marker-Grenzen zwischen Sloträndern |
 
     Konstanten unten (``_LINE_ANCHOR_*``, ``_BAR_CENTER_NUDGE``) sind die zeitliche
@@ -702,10 +706,108 @@ def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
     """Verbraucher-Spalten mit sichtbaren Planwerten (> 0 kWh über den Tag)."""
     active = []
     for consumer in config.get_flexible_consumers(optimizer_only=True):
-        col = f"{consumer['name']} (kW)"
+        col = consumer_column_name(consumer)
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((consumer, col))
     return active
+
+
+def clear_consumer_stack_order_cache() -> None:
+    """Test-Hilfe: Stack-Reihenfolge-Cache leeren."""
+    _STACK_ORDER_BY_SA0.clear()
+
+
+def _consumer_horizon_energy_kwh(
+    matrix: list[dict] | None,
+    chart_window: UiChartWindow | None,
+    df: pd.DataFrame,
+) -> dict[str, float]:
+    """Geplante Flex-Energie (kWh) je Verbraucher über SA₀…SA₂."""
+    consumers = config.get_flexible_consumers(optimizer_only=True)
+    energy = {consumer["id"]: 0.0 for consumer in consumers}
+    if matrix and chart_window is not None:
+        horizon_start = normalize_hour_slot(chart_window.sa0)
+        horizon_end = normalize_hour_slot(chart_window.sa2)
+        for row in matrix:
+            slot = row.get("slot_datetime")
+            if not isinstance(slot, datetime):
+                continue
+            slot = normalize_hour_slot(slot)
+            if not (horizon_start <= slot <= horizon_end):
+                continue
+            for consumer in consumers:
+                col = consumer_column_name(consumer)
+                energy[consumer["id"]] += float(row.get(col, 0.0) or 0.0)
+        return energy
+    if chart_window is not None:
+        horizon_start = normalize_hour_slot(chart_window.sa0)
+        horizon_end = normalize_hour_slot(chart_window.sa2)
+        for _, row in df.iterrows():
+            slot = row.get("slot_datetime")
+            if isinstance(slot, datetime):
+                slot = normalize_hour_slot(slot)
+                if not (horizon_start <= slot <= horizon_end):
+                    continue
+            for consumer in consumers:
+                col = consumer_column_name(consumer)
+                if col in df.columns:
+                    energy[consumer["id"]] += float(row.get(col, 0.0) or 0.0)
+        return energy
+    for consumer in consumers:
+        col = consumer_column_name(consumer)
+        if col in df.columns:
+            energy[consumer["id"]] = float(df[col].fillna(0.0).sum())
+    return energy
+
+
+def _stack_order_cache_key(chart_window: UiChartWindow | None) -> str:
+    if chart_window is None:
+        return "default"
+    return chart_window.sa0.isoformat()
+
+
+def _consumer_stack_order_ids(
+    energy_kwh: dict[str, float],
+    cache_key: str,
+) -> tuple[str, ...]:
+    if cache_key in _STACK_ORDER_BY_SA0:
+        return _STACK_ORDER_BY_SA0[cache_key]
+    consumers = config.get_flexible_consumers(optimizer_only=True)
+    ordered = sorted(
+        consumers,
+        key=lambda consumer: (-energy_kwh.get(consumer["id"], 0.0), consumer["id"]),
+    )
+    order = tuple(consumer["id"] for consumer in ordered)
+    _STACK_ORDER_BY_SA0[cache_key] = order
+    return order
+
+
+def ordered_active_consumers_for_stack(
+    df: pd.DataFrame,
+    *,
+    matrix: list[dict] | None = None,
+    chart_window: UiChartWindow | None = None,
+) -> list[tuple[dict, str]]:
+    """Aktive Flex-Verbraucher für gestapelte Chart-1-Balken (größter Bedarf unten)."""
+    active = _active_consumer_bar_columns(df)
+    if not active:
+        return []
+    energy = _consumer_horizon_energy_kwh(matrix, chart_window, df)
+    order_ids = _consumer_stack_order_ids(energy, _stack_order_cache_key(chart_window))
+    order_index = {consumer_id: index for index, consumer_id in enumerate(order_ids)}
+    active.sort(key=lambda pair: order_index.get(pair[0]["id"], len(order_ids)))
+    return active
+
+
+def _consumer_chart_color(consumer: dict) -> str:
+    configured = consumer.get("chart_color")
+    if configured:
+        return str(configured)
+    all_consumers = config.get_flexible_consumers(optimizer_only=False)
+    index = next(
+        item for item, candidate in enumerate(all_consumers) if candidate["id"] == consumer["id"]
+    )
+    return _consumer_bar_palette(len(all_consumers))[index]
 
 
 def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
@@ -1145,25 +1247,6 @@ def _chart_xaxis_config(axis: ChartSlotAxis, *, range_start: datetime | None = N
     )
 
 
-def _consumer_bar_times(
-    axis: ChartSlotAxis,
-    index_slice,
-    consumer_index: int,
-    count: int,
-    bar_width_fraction: float,
-) -> pd.Series:
-    """
-    X-Zeitpunkte für Flex-Balken nebeneinander im Slot.
-
-    Früher: Index-Mitte + base_offset + (i − (n−1)/2) × bar_width.
-    """
-    center_fraction = _LINE_ANCHOR_SLOT_CENTER + _BAR_CENTER_NUDGE
-    if count <= 1:
-        return axis.at(index_slice, center_fraction)
-    shift = (consumer_index - (count - 1) / 2) * bar_width_fraction
-    return axis.at(index_slice, center_fraction + shift)
-
-
 def _battery_bar_times(axis: ChartSlotAxis, index_slice) -> pd.Series:
     """Batterie-Balken: leicht nach rechts versetzt (früher ``bar_offset`` +0.05)."""
     return axis.at(index_slice, _LINE_ANCHOR_SLOT_CENTER + _BAR_CENTER_NUDGE)
@@ -1176,17 +1259,17 @@ def add_power_traces(
     axis: ChartSlotAxis,
     extrap_start: int | None = None,
     extrap_end: int | None = None,
+    *,
+    matrix: list[dict] | None = None,
+    chart_window: UiChartWindow | None = None,
 ) -> None:
     uhrzeit = df["Uhrzeit"]
     segments = _trace_segments(len(df), extrap_start, extrap_end)
-    active_consumers = _active_consumer_bar_columns(df)
-    consumer_count = len(active_consumers)
-    consumer_bar_width = (
-        _BATTERY_BAR_WIDTH_FRACTION / consumer_count
-        if consumer_count
-        else _BATTERY_BAR_WIDTH_FRACTION
+    active_consumers = ordered_active_consumers_for_stack(
+        df,
+        matrix=matrix,
+        chart_window=chart_window,
     )
-    consumer_colors = _consumer_bar_palette(consumer_count)
     if "PV-Prognose (kW)" in df.columns:
         _add_pv_trace(fig, axis, df["PV-Prognose (kW)"], uhrzeit)
 
@@ -1236,17 +1319,19 @@ def add_power_traces(
             ),
         ))
 
-    for consumer_index, (consumer, col) in enumerate(active_consumers):
-        pv_follow_col = consumer_pv_follow_column_name(consumer)
-        if pv_follow_col not in df.columns:
-            pv_follow_col = None
-        immediate_col = consumer_immediate_charge_column_name(consumer)
-        if immediate_col not in df.columns:
-            immediate_col = None
-        for seg_index, (start, end, _is_extrapolated) in enumerate(segments):
-            if start >= end:
-                continue
-            segment = df.iloc[start:end]
+    for seg_index, (start, end, _is_extrapolated) in enumerate(segments):
+        if start >= end:
+            continue
+        segment = df.iloc[start:end]
+        cumulative_base = pd.Series(0.0, index=segment.index)
+        for consumer, col in active_consumers:
+            consumer_color = _consumer_chart_color(consumer)
+            pv_follow_col = consumer_pv_follow_column_name(consumer)
+            if pv_follow_col not in df.columns:
+                pv_follow_col = None
+            immediate_col = consumer_immediate_charge_column_name(consumer)
+            if immediate_col not in df.columns:
+                immediate_col = None
             pattern_shapes = _consumer_bar_pattern_shapes(
                 segment, col, pv_follow_col, immediate_col
             )
@@ -1260,32 +1345,29 @@ def add_power_traces(
                 if immediate_col is not None
                 else [0] * len(segment)
             )
+            power_kw = segment[col].fillna(0.0).astype(float)
             fig.add_trace(go.Bar(
-                x=_consumer_bar_times(
-                    axis,
-                    slice(start, end),
-                    consumer_index,
-                    consumer_count,
-                    consumer_bar_width,
-                ),
-                y=segment[col],
+                x=_battery_bar_times(axis, slice(start, end)),
+                y=-power_kw,
+                base=cumulative_base,
                 name=consumer["name"] if seg_index == 0 else consumer["name"],
                 showlegend=seg_index == 0,
                 marker=_consumer_bar_marker(
-                    consumer_colors[consumer_index],
+                    consumer_color,
                     pattern_shapes,
                     _CONSUMER_BAR_OPACITY,
                 ),
-                width=_bar_widths_ms(axis, start, end, consumer_bar_width),
+                width=_bar_widths_ms(axis, start, end, _BATTERY_BAR_WIDTH_FRACTION),
                 yaxis="y",
-                customdata=list(zip(segment["Uhrzeit"], hover_pv, hover_imm)),
+                customdata=list(zip(segment["Uhrzeit"], hover_pv, hover_imm, power_kw)),
                 hovertemplate=(
                     "Uhrzeit: %{customdata[0]}<br>%{fullData.name}: "
-                    "%{y:.2f} kW<br>pv_follow: %{customdata[1]}<br>"
+                    "%{customdata[3]:.2f} kW<br>pv_follow: %{customdata[1]}<br>"
                     "sofort_laden: %{customdata[2]}"
                     "<extra></extra>"
                 ),
             ))
+            cumulative_base = cumulative_base - power_kw
 
 
 def add_optimized_soc_trace(
@@ -1865,6 +1947,7 @@ def build_power_soc_chart_figure(
     history_slot_count: int | None = None,
     chart_header_label: str | None = None,
     slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] | None = None,
+    optimization_matrix: list[dict] | None = None,
 ) -> go.Figure:
     """Baut Chart 1 (Leistung, SoC, Preis) ohne Streamlit-Rendering."""
     plot_df = _mask_missing_log_slots(df, slot_qualities)
@@ -1878,7 +1961,16 @@ def build_power_soc_chart_figure(
         _add_zone_backgrounds(fig, chart_zones, axis, range_start=range_start)
     _add_missing_slot_backgrounds(fig, axis, slot_qualities)
 
-    add_power_traces(fig, plot_df, bar_colors, axis, extrap_start, extrap_end)
+    add_power_traces(
+        fig,
+        plot_df,
+        bar_colors,
+        axis,
+        extrap_start,
+        extrap_end,
+        matrix=optimization_matrix,
+        chart_window=chart_window,
+    )
     add_optimized_soc_trace(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
         history_slot_count=history_slot_count,
@@ -1941,6 +2033,7 @@ def render_power_soc_chart(
     chart_header_label: str | None = None,
     chart_header_help: str | None = None,
     slot_deviation_events: tuple[tuple[DeviationEvent, ...], ...] | None = None,
+    optimization_matrix: list[dict] | None = None,
 ) -> None:
     """Leistungen (PV, Verbrauch, Batterie, Flex) und SoC-Verläufe."""
     if chart_header_label and chart_header_help:
@@ -1962,6 +2055,7 @@ def render_power_soc_chart(
         history_slot_count=history_slot_count,
         chart_header_label=chart_header_label,
         slot_deviation_events=slot_deviation_events,
+        optimization_matrix=optimization_matrix,
     )
     plotly_kwargs: dict = {"width": "stretch"}
     if chart_key:
