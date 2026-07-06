@@ -552,6 +552,11 @@
           "type": "string",
           "description": "Anzeigename in der UI."
         },
+        "chart_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "Hex-Farbe für Flex-Verbraucher-Balken in Chart 1 (z. B. #00bcd4)."
+        },
         "nominal_power_kw": {
           "type": "number",
           "description": "Maximale Leistung in kW für die Optimierung (P_max; live überschreibbar via charging_schedule.loxone.nominal_power_kw_name)."

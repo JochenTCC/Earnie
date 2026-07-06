@@ -25,7 +25,7 @@ from ui.mode_selector import render_mode_selector, UI_MODE_LABELS
 from ui.price_forecast import render_price_forecast_block
 from ui.runtime_config import reload_runtime_config
 from ui.sankey import render_live_power_flow
-from ui.styles import inject_compact_numeric_css
+from ui.styles import inject_compact_numeric_css, inject_help_hint_css
 
 logger = logging.getLogger("app")
 
@@ -53,6 +53,7 @@ st.set_page_config(
 
 def main() -> None:
     inject_compact_numeric_css()
+    inject_help_hint_css()
     try:
         drift_items = load_config_drift_items()
         if drift_items:

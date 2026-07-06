@@ -20,6 +20,22 @@ Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md).
 
 - [x] **Extra-UI-Seite für Preismodell über config.json aktivierbar** — `ui.price_forecast_page_enabled` (Standard: `false`); ohne `ENERGY_OPTIMIZER_UI_MODES` nur Sunset-2-Sunset + Backtesting, Preis-Prognose (Dev) optional per Config; Env-Variable hat weiterhin Vorrang (`ui/mode_selector.py`, `config.py`, Schema/Beispiel, Tests `tests/test_mode_selector.py`)
 
+### Bugfixes: Test-Fixtures & Wärmepumpe (2026-07-06)
+
+- [x] **Testdaten für frisches Checkout ausführbar** — Prod-Dump-Fixtures ergänzt (`.gitignore`-Ausnahmen, `scripts/complete_prod_dump_fixtures.py`), thermische CSV-Fixtures (`tests/fixtures/thermal/`), Smoke-Tests auf `tests/fixtures/historical/cons_data_hourly.csv`; **551 passed** (Commit `71a4764`)
+- [x] **Wärmepumpe in `config.json` wiederhergestellt** — Eintrag `flexible_consumers[id=waermepumpe]` aus Produktiv-Backup (`config_back.json`, Commit `3b7fa1c`): `Ernie_WP_Freigabe`, `Ernie_WP_P_act`, historisches Tagesziel, `chart_color` `#ff9800`; auch `config.example.json`
+- [x] **Soll-Ist Hinweis: Wärmepumpe nicht angesprungen** — Regel `waermepumpe_enable_no_start` (Kategorie Hinweis), Doku/Szenario S5, Seed-Skript und Tests
+
+### Chart 1 gestapelte Flex-Verbraucher (2026-07-06)
+
+- [x] **Chart 1: variable Flex-Verbraucher als gestapelter Negativ-Balken** — ein Balken pro Slot (gleiche X-Position wie Batterie, `barmode=overlay`, Stapelung per `base`); Sortierung nach Horizont-Energie SA₀…SA₂, Cache bis nächster SA₀; Farben via `flexible_consumers.chart_color` in `config.json`; Tests `tests/test_chart_consumer_stack.py` (`ui/charts.py`, `config.py`)
+- [x] **Version 1.15.0** — Minor-Bump nach abgeschlossenem Version-0.+1-Punkt; Regel `.cursor/rules/versioning.mdc` (Minor vs. Patch)
+
+### UI S-2 Nav & Hilfe-Icons Mobile (2026-07-06)
+
+- [x] **Kompakte S-2-Navigation** — `←` / `Heute` / Kalender-Icon / `→` in `st.container(horizontal=True)`; Datumsauswahl im Popover (nur SA₀-Tage mit Log); `Heute` und Zyklus-Logik in `ui/s2_navigation.py`, `ui/chart_context.py`, `ui/history_navigation.py`
+- [x] **Mini-Hilfe-Icons** — Material-Icon + tertiary-Popover statt `?`-Button; horizontales Layout ohne Extra-Zeile auf Mobile; CSS in `ui/styles.py` (`inject_help_hint_css`); `ui/help_hint.py`, `ui/countdown.py`
+
 ### Entladesperre: Netz-Trickelladen (2026-07-06)
 
 - [x] **Bugfix: SOC stieg bei Halten aus dem Netz (05.07. ~22–23 Uhr)** — Prod-Log (`runtime-prod/runtime.zip`): PV=0, `battery_plan_kw=0`, gemessen ~0,2 kW Laden + Netzbezug; Ursache `target_soc_percent=100` bei Huawei-Steuerbefehl 1; Fix: bei `MODE_ENTLADESPERRE` `target_soc = current_soc` (`optimizer/milp.py`); Test `test_entladesperre_target_soc_matches_current_soc`

@@ -53,12 +53,6 @@ Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-
 ```powershell
 # Lesen aller konfigurierten IOs
 python -m scripts.verify_loxone_setup
-
-# Zusätzlich FTP-Logdatei
-python -m scripts.verify_loxone_setup --ftp
-
-# Zusätzlich Schreibtest (SoC-Soll unverändert zurückschreiben)
-python -m scripts.verify_loxone_setup --roundtrip
 ```
 
 Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit IO-Name und Detailtext. Typische Fehler: falscher Merkername, Benutzer ohne Rechte, Wert außerhalb des erwarteten Bereichs (z. B. Freigabe ≠ 0/1).

@@ -25,3 +25,26 @@ def inject_compact_numeric_css() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def inject_help_hint_css() -> None:
+    """Kompakte Hilfe-Popover (Material-Icon, tertiary)."""
+    st.markdown(
+        """
+        <style>
+        div[class*="st-key-help_hint__"] button,
+        div.st-key-s2_nav_date_popover button {
+            min-height: 1.25rem;
+            height: 1.25rem;
+            padding: 0 0.1rem;
+            font-size: 0.9rem;
+            line-height: 1;
+        }
+        div[class*="st-key-help_hint__"] [data-testid="stIconMaterial"],
+        div.st-key-s2_nav_date_popover [data-testid="stIconMaterial"] {
+            font-size: 0.95rem;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )

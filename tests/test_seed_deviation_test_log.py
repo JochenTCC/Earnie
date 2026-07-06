@@ -16,7 +16,7 @@ RULES_PATH = "config/deviation_rules.json"
 def test_build_deviation_test_entries_scenario_count():
     entries = build_deviation_test_entries(baseline_count=3)
     assert len(entries) == 10
-    assert entries[-1]["scenario"] == "S5_unclassified"
+    assert entries[-1]["scenario"] == "S5_waermepumpe_hint"
     assert entries[-2]["scenario"] == "S4_within_tolerance"
     assert entries[-3]["scenario"] == "S7_eauto_pv_follow"
     assert entries[-4]["scenario"] == "S6_battery_forced_discharge"
@@ -46,7 +46,7 @@ def test_seed_deviation_test_log_writes_expected_events(tmp_path):
         ("error", "battery_forced_discharge_missing"),
         ("error", "eauto_pv_follow_missing"),
         None,
-        None,
+        ("hint", "waermepumpe_enable_no_start"),
     ]
     for row, exp in zip(scenarios, expected):
         events = evaluate_entry_deviations(row, rules_doc=rules_doc)

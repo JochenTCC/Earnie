@@ -87,6 +87,17 @@
         "battery_power_below_tolerance"
       ],
       "message": "Zwangs-Laden nicht ausgeführt"
+    },
+    {
+      "id": "waermepumpe_enable_no_start",
+      "enabled": true,
+      "category": "hint",
+      "priority": 40,
+      "scope": "waermepumpe",
+      "when": [
+        "power_mismatch_positive"
+      ],
+      "message": "Wärmepumpe: Freigabe, aber nicht angesprungen (Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW)"
     }
   ],
   "fallback": {

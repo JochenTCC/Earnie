@@ -1,8 +1,11 @@
 # config.py
 import os
 import json
+import re
 from datetime import datetime
 from dotenv import load_dotenv
+
+_HEX_CHART_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 # Sensible Daten aus .env laden
 load_dotenv()
@@ -602,6 +605,19 @@ class Config:
         }
 
     @staticmethod
+    def _normalize_chart_color(raw: dict, consumer_id: str) -> str | None:
+        value = raw.get("chart_color")
+        if value is None:
+            return None
+        color = str(value).strip()
+        if not _HEX_CHART_COLOR_RE.match(color):
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                "chart_color muss ein Hex-Farbcode sein (z. B. #00bcd4)."
+            )
+        return color.lower()
+
+    @staticmethod
     def _normalize_consumer(raw: dict) -> dict:
         source = str(raw.get("daily_target_source", "config")).lower().strip()
         if "daily_target_source" not in raw:
@@ -654,6 +670,7 @@ class Config:
         return {
             "id": consumer_id,
             "name": str(raw.get("name", raw["id"])),
+            "chart_color": Config._normalize_chart_color(raw, consumer_id),
             "nominal_power_kw": float(raw.get("nominal_power_kw", 0.0)),
             "min_power_kw": min_power_kw,
             "daily_target_kwh": float(raw.get("daily_target_kwh", 0.0)),

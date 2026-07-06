@@ -88,3 +88,7 @@ Details: **[docs/einrichtung/container.md](docs/einrichtung/container.md)**
 - `config/config.json` (oder Legacy `config.json`) ist lokal und gitignored.
 - Laufzeitdaten liegen unter `runtime/` (`ENERGY_OPTIMIZER_RUNTIME_DIR`).
 - Config-Pfad überschreibbar mit `ENERGY_OPTIMIZER_CONFIG_PATH`.
+
+## Lizenz
+
+Die Software ist **Source-Available** und auf **private, nicht-kommerzielle Nutzung** beschränkt. Vollständige Bedingungen: **[LICENSE.md](LICENSE.md)**.

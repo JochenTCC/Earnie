@@ -11,7 +11,7 @@ Im **grauen Bereich** von Chart 1 (Produktiv-Log, 15-Min-Slots) sollen Abweichun
 
 | Kategorie | Bedeutung | Beispiel (vorläufig) |
 |-----------|-----------|----------------------|
-| **Hinweis** | Unkritische Abweichung | *(noch ohne festes Beispiel — Kategorie reserviert)* |
+| **Hinweis** | Unkritische Abweichung | Wärmepumpe: Freigabe, aber nicht angesprungen |
 | **Warnung** | Erwartete Abweichung — Loxone kennt die Anforderung, entscheidet bewusst anders | SwimSpa nicht geheizt, obwohl Soll > 0, weil Ist-Temperatur noch im Band |
 | **Fehler** | Fehlerhafte Abweichung — Anweisung von Ernie nicht befolgt | E-Auto lädt nicht trotz Soll und Restladung; Zwangs-Laden der Batterie fehlt |
 
@@ -131,6 +131,15 @@ Siehe `config/deviation_rules.schema.json` und `config/deviation_rules.example.j
       "scope": "swimspa",
       "when": ["power_mismatch_positive", "thermal_actual_in_band", "heating_was_scheduled"],
       "message": "SwimSpa nicht geheizt — Ist-Temperatur im Sollband"
+    },
+    {
+      "id": "waermepumpe_enable_no_start",
+      "enabled": true,
+      "category": "hint",
+      "priority": 40,
+      "scope": "waermepumpe",
+      "when": ["power_mismatch_positive"],
+      "message": "Wärmepumpe: Freigabe, aber nicht angesprungen (Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW)"
     }
   ],
   "fallback": {
@@ -168,11 +177,11 @@ Abgedeckt durch `tests/test_deviation_eval.py`, `tests/test_deviation_scenario_c
 | S2 | E-Auto Soll > 0, angesteckt, Rest > Schwelle, Ist ≈ 0 | `eauto_should_charge` | Fehler |
 | S3 | Modus Zwangs-Laden, Batterie lädt nicht | `battery_forced_charge_missing` | Fehler |
 | S4 | Soll ≈ Ist (innerhalb Toleranz) | — | kein Icon |
-| S5 | Soll > 0, Ist ≈ 0, ohne passende Regel | — | kein Icon (`fallback`: `none`) |
+| S5 | Wärmepumpe Soll > 0, Ist ≈ 0 | `waermepumpe_enable_no_start` | Hinweis |
 | S6 | Modus Zwangs-Entladen, Batterie entlädt nicht | `battery_forced_discharge_missing` | Fehler |
 | S7 | pv_follow = 1, Loxone-Setpoint (P_max) nicht erreicht | `eauto_pv_follow_missing` | Fehler |
 
-Kategorie **Hinweis** ist in der Regeldatei reserviert; erste Regel folgt bei konkretem Fall.
+Erste Hinweis-Regel: `waermepumpe_enable_no_start` (Freigabe ohne Anlauf).
 
 ### 5.3 Regeln pflegen
 
