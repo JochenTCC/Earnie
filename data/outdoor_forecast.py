@@ -11,17 +11,37 @@ import config
 
 logger = logging.getLogger(__name__)
 
-_CACHE: dict[tuple[float, float], tuple[datetime, list[float]]] = {}
+_CACHE: dict[tuple[float, float, int], tuple[datetime, list[tuple[datetime, float]]]] = {}
 _CACHE_TTL = timedelta(minutes=30)
+_OPEN_METEO_MAX_FORECAST_DAYS = 16
+_OPEN_METEO_MIN_FORECAST_DAYS = 2
 
 
-def _fetch_open_meteo_hourly(lat: float, lon: float) -> list[tuple[datetime, float]]:
+def _required_forecast_days(start: datetime, horizon: int) -> int:
+    """Kalendertage für Open-Meteo ab heute, damit start..start+horizon abgedeckt ist."""
+    if horizon < 1:
+        raise ValueError("horizon muss mindestens 1 sein")
+    end = start + timedelta(hours=horizon - 1)
+    today = datetime.now().date()
+    days_ahead = (end.date() - today).days + 1
+    return max(
+        _OPEN_METEO_MIN_FORECAST_DAYS,
+        min(_OPEN_METEO_MAX_FORECAST_DAYS, days_ahead),
+    )
+
+
+def _fetch_open_meteo_hourly(
+    lat: float,
+    lon: float,
+    *,
+    forecast_days: int,
+) -> list[tuple[datetime, float]]:
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,
         "longitude": lon,
         "hourly": "temperature_2m",
-        "forecast_days": 2,
+        "forecast_days": forecast_days,
         "timezone": "auto",
     }
     response = requests.get(url, params=params, timeout=config.get_global_timeout())
@@ -67,14 +87,15 @@ def get_hourly_outdoor_forecast_c(
     lat = float(latitude if latitude is not None else config.get("LATITUDE", cast=float))
     lon = float(longitude if longitude is not None else config.get("LONGITUDE", cast=float))
     start_dt = (start or datetime.now()).replace(minute=0, second=0, microsecond=0)
+    forecast_days = _required_forecast_days(start_dt, horizon)
 
-    cache_key = (round(lat, 4), round(lon, 4))
+    cache_key = (round(lat, 4), round(lon, 4), forecast_days)
     cached = _CACHE.get(cache_key)
     now = datetime.now()
     if cached and now - cached[0] < _CACHE_TTL:
         hourly = cached[1]
     else:
-        hourly = _fetch_open_meteo_hourly(lat, lon)
+        hourly = _fetch_open_meteo_hourly(lat, lon, forecast_days=forecast_days)
         _CACHE[cache_key] = (now, hourly)
 
     try:

@@ -15,6 +15,7 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 ## Feature-Backlog
 
 ### Version 0.+1
+- [ ] **Live-Preisprognose: EU-Features für Zukunfts-Slots** — Open-Meteo **Forecast-API** (`api.open-meteo.com/v1/forecast`, vgl. `outdoor_forecast.py`) statt Archive für fehlende Day-Ahead-Stunden im Live-Horizont; Energy-Charts nur für Vergangenheit. Ziel: OLS-Prognose (`missing_price_strategy: forecast`) im Produktivbetrieb nutzbar, nicht nur Spiegelung.
 - [ ] Entladesperre besser visualisieren (Farbe des Plots ändern?)
 - [ ] Erweitertes Temperaturmodell für Swim-Spa mit zweitem Wärmepfad in die Erde. Hier ist eine Lookup-Table für die Erdtemperatur:
 bodentemperaturen_nach_monat = {

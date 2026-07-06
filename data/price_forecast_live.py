@@ -1,10 +1,14 @@
 """Live-Vorbereitung: Preisprognose für fehlende Day-Ahead-Slots (Phase 3)."""
 from __future__ import annotations
 
+import logging
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
+import requests
 
 from data.market_prices import PRICE_SOURCE_DAY_AHEAD, PRICE_SOURCE_MIRRORED
 from data.price_forecast_model import (
@@ -14,9 +18,20 @@ from data.price_forecast_model import (
 )
 
 from data.market_prices import PRICE_SOURCE_PREDICTED
+from runtime_store.persist_paths import resolve_runtime_prefixed_path
+
 MISSING_PRICE_STRATEGY_MIRROR = "mirror"
 MISSING_PRICE_STRATEGY_FORECAST = "forecast"
 DEFAULT_MODEL_PATH = Path("data/cache/price_model_coefficients.json")
+
+logger = logging.getLogger(__name__)
+
+
+def _feature_load_error_summary(exc: BaseException) -> str:
+    """Kurzbeschreibung für Logs (ohne volle Request-URL)."""
+    if isinstance(exc, requests.HTTPError) and exc.response is not None:
+        return f"HTTP {exc.response.status_code}"
+    return type(exc).__name__
 
 
 def get_missing_price_strategy() -> str:
@@ -42,7 +57,8 @@ def get_forecast_model_path() -> Path:
 
     block = config.Config._read_json_dict(str(config.CONFIG_JSON_PATH)).get("market_prices")
     if isinstance(block, dict) and block.get("forecast_model_path"):
-        return Path(str(block["forecast_model_path"]))
+        configured = str(block["forecast_model_path"])
+        return Path(resolve_runtime_prefixed_path(configured))
     return DEFAULT_MODEL_PATH
 
 
@@ -67,33 +83,60 @@ def _align_live_feature_index(frame: pd.DataFrame) -> pd.DataFrame:
     return aligned
 
 
+def _archive_latest_complete_day() -> date:
+    """Letzter Kalendertag mit vollständigen Open-Meteo/Energy-Charts-Archivdaten."""
+    import config
+
+    tz = ZoneInfo(config.get_planning_timezone())
+    return datetime.now(tz).date() - timedelta(days=1)
+
+
+def _archive_covers_slot_range(slot_datetimes: list) -> bool:
+    """True, wenn alle Slots durch Archive-APIs abgedeckt werden können."""
+    from data.market_prices import normalize_price_slot
+
+    if not slot_datetimes:
+        return False
+    latest_archive_day = _archive_latest_complete_day()
+    slots = [normalize_price_slot(dt) for dt in slot_datetimes]
+    return max(slot.date() for slot in slots) <= latest_archive_day
+
+
 def build_live_feature_frame_for_slots(slot_datetimes: list) -> pd.DataFrame | None:
     """EU-Features für OLS-Prognose fehlender Day-Ahead-Slots (ohne AT-Preise)."""
-    from datetime import timedelta
-
-    import requests
-
     from data.eu_market_features import fetch_eu_power_hourly, fetch_eu_weather_hourly
     from data.market_prices import normalize_price_slot
     from data.price_forecast_model import enrich_model_features
 
     if not slot_datetimes:
         return None
+    if not _archive_covers_slot_range(slot_datetimes):
+        logger.debug(
+            "Preisprognose: Archive-API deckt Live-Slots nicht ab "
+            "(Zukunft/aktueller Tag) — Spiegelung für fehlende Slots."
+        )
+        return None
 
     slots = [normalize_price_slot(dt) for dt in slot_datetimes]
     start = min(slot.date() for slot in slots)
     end = max(slot.date() for slot in slots) + timedelta(days=1)
     try:
-        power = fetch_eu_power_hourly(start, end)
         weather = fetch_eu_weather_hourly(start, end)
+        power = fetch_eu_power_hourly(start, end)
         merged = power.join(weather, how="inner")
         if merged.empty:
+            logger.debug(
+                "Preisprognose: EU-Features leer für %s..%s — Spiegelung.",
+                start.isoformat(),
+                (end - timedelta(days=1)).isoformat(),
+            )
             return None
         return enrich_model_features(_align_live_feature_index(merged))
     except (OSError, ValueError, requests.HTTPError) as exc:
-        print(
-            f"⚠️ Preisprognose: EU-Features nicht ladbar ({exc}) — "
-            "Spiegelung als Fallback für fehlende Slots."
+        logger.warning(
+            "Preisprognose: EU-Features nicht ladbar (%s) — "
+            "Spiegelung als Fallback für fehlende Slots.",
+            _feature_load_error_summary(exc),
         )
         return None
 
@@ -108,9 +151,9 @@ def resolve_market_slots_kwargs(target_hours: list) -> dict:
     model_path = get_forecast_model_path()
     model = load_configured_model()
     if model is None:
-        print(
-            f"⚠️ Preisprognose: Modell nicht gefunden ({model_path}) — "
-            "Fallback Spiegelung."
+        logger.warning(
+            "Preisprognose: Modell nicht gefunden (%s) — Fallback Spiegelung.",
+            model_path,
         )
         kwargs["missing_price_strategy"] = MISSING_PRICE_STRATEGY_MIRROR
         return kwargs
@@ -120,6 +163,11 @@ def resolve_market_slots_kwargs(target_hours: list) -> dict:
     feature_frame = build_live_feature_frame_for_slots(target_hours)
     if feature_frame is not None and not feature_frame.empty:
         kwargs["forecast_feature_frame"] = feature_frame
+        return kwargs
+
+    kwargs["missing_price_strategy"] = MISSING_PRICE_STRATEGY_MIRROR
+    kwargs.pop("forecast_model", None)
+    kwargs.pop("forecast_model_path", None)
     return kwargs
 
 

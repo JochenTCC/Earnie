@@ -18,6 +18,21 @@ def runtime_path(filename: str) -> str:
     return os.path.join(runtime_dir(), filename)
 
 
+def resolve_runtime_prefixed_path(configured_path: str) -> str:
+    """
+    Relative Pfade mit ``runtime/``-Präfix gegen ``runtime_dir()`` auflösen.
+
+    So greift ``ENERGY_OPTIMIZER_RUNTIME_DIR`` auch für ``path_cons_data`` in
+    config.json (z. B. Dev mit NAS-Config, Docker unverändert).
+    """
+    if os.path.isabs(configured_path):
+        return configured_path
+    norm = configured_path.replace("\\", "/")
+    if norm.startswith("runtime/"):
+        return runtime_path(norm[len("runtime/") :])
+    return configured_path
+
+
 def consumer_state_file() -> str:
     return runtime_path("flexible_consumers_state.json")
 

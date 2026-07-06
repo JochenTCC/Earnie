@@ -1,4 +1,8 @@
 # app.py
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from runtime_store import bootstrap
 
 bootstrap.run()

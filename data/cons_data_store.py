@@ -14,7 +14,11 @@ from typing import Iterable
 import pandas as pd
 
 import config
-from runtime_store.persist_paths import cons_data_pending_file, default_cons_data_file
+from runtime_store.persist_paths import (
+    cons_data_pending_file,
+    default_cons_data_file,
+    resolve_runtime_prefixed_path,
+)
 from runtime_store.file_metadata import (
     CONS_DATA_META_SCHEMA,
     CONS_DATA_PENDING_SCHEMA,
@@ -25,7 +29,6 @@ from runtime_store.file_metadata import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_OUTPUT = default_cons_data_file()
 METADATA_SUFFIX = ".meta.json"
 PENDING_STATE_FILE = cons_data_pending_file()
 CSV_SEP = ";"
@@ -36,7 +39,10 @@ SOURCE_MEASURED = "measured"
 
 def get_output_path() -> str:
     sim = config.get_file_paths_battery_simulation()
-    return sim.get("path_cons_data") or DEFAULT_OUTPUT
+    configured = sim.get("path_cons_data")
+    if not configured:
+        return default_cons_data_file()
+    return resolve_runtime_prefixed_path(configured)
 
 
 def get_retention_months() -> int:

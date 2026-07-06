@@ -28,6 +28,8 @@ HISTORY_FILENAME = "optimization_history.jsonl"
 HISTORY_FILE = os.path.join(RUNTIME_DIR, HISTORY_FILENAME)
 LEGACY_CSV_FILE = legacy_history_csv_file()
 
+_JSONL_HISTORY_CACHE: tuple[tuple[int, int], list[dict[str, Any]]] | None = None
+
 _LEGACY_CSV_COLUMNS = (
     "Timestamp",
     "SoC_%",
@@ -164,8 +166,13 @@ def _row_from_json_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _load_jsonl_history() -> list[dict[str, Any]]:
+    global _JSONL_HISTORY_CACHE
     if not os.path.isfile(HISTORY_FILE):
         return []
+    stat = os.stat(HISTORY_FILE)
+    cache_key = (int(stat.st_mtime_ns), int(stat.st_size))
+    if _JSONL_HISTORY_CACHE is not None and _JSONL_HISTORY_CACHE[0] == cache_key:
+        return list(_JSONL_HISTORY_CACHE[1])
     rows: list[dict[str, Any]] = []
     try:
         with open(HISTORY_FILE, "r", encoding="utf-8") as f:
@@ -190,6 +197,7 @@ def _load_jsonl_history() -> list[dict[str, Any]]:
                     rows.append(row)
     except OSError as exc:
         logger.warning("optimization_history: %s konnte nicht gelesen werden: %s", HISTORY_FILE, exc)
+    _JSONL_HISTORY_CACHE = (cache_key, rows)
     return rows
 
 

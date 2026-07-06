@@ -102,6 +102,7 @@ def test_bootstrap_creates_local_settings(tmp_path, monkeypatch):
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
 
     config_dir = tmp_path / "config"
     config_dir.mkdir()
