@@ -28,3 +28,5 @@ energy_optimizer.log
 system_history_log.csv
 runtime_settings.json
 .env
+# Vertraulich — Businessplan (lokal)
+CONF_Businessplan/

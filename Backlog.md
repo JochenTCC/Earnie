@@ -3,12 +3,11 @@
 Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
 ## Non-Dev-Related Topics
-- [ ] Lizenzmodell in Github aufnehmen
-- [ ] BP in .gitignore aufnehmen 
 
 ## Offene Bugfixes
 
 - [ ] Prüfen, ob alle Daten für alle Tests im Repo liegen und bei neu Auschecken ausführbar sind.
+- [ ] Wärmepumpe ist nicht mehr in config.json - neu herstellen.
 - [ ] **Verknüpfung:** urgent-Regel-Review (bis ca. 2026-07-12) ↔ Prod-Dump-`xfail` (Live, Modus A) ↔ PWM/Mindestlademenge E-Auto.
 
 ## Research Items (in Branch)
