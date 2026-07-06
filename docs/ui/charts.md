@@ -24,9 +24,7 @@ Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdo
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
 | PV | Gelbe Linie | PV-Prognose / Log-Ist |
-| Verbrauch | Braune gestrichelte Linie | Grundlast |
-| Netz | Blaue gestrichelte Linie | Netzbezug (+) / Einspeisung (−) skaliert als Linie |
-| Energiebilanz | Rauf/Runter-Balken (gestapelt) | **↑ kräftig** PV (gelb), Netzbezug (blau); **↓ kräftig** Grundlast (braun), Flex; **gedämpft** Batterie→Last grün, Netz→Batterie cyan, PV→Batterie gelb-grün, PV→Netz magenta — Up- und Down-Säule gleich hoch |
+| Energiebilanz | Rauf/Runter-Balken (gestapelt) | **↑ kräftig** PV (gelb), Netzbezug (blau); **↓ kräftig** Grundlast (braun), Flex; **gedämpft** Batterie→Last grün, Netz→Batterie cyan, PV→Batterie gelb-grün, PV→Netz blassgelb — Up- und Down-Säule gleich hoch |
 
 ### Rauf/Runter-Algorithmus (Wasserfall)
 
@@ -43,7 +41,7 @@ Einspeisung (Batterie) ← Rest der Einspeisung (≤ Entlade-Rest)
 Entladen → Last ← verbleibende Entladung
 ```
 
-**Sonderfälle:** `Netzbezug` und `Geplante Batterie-Aktion` sind vorzeichenkodiert (Bezug/Laden positiv, Einspeisung/Entladen negativ). Fehlt eine explizite Einspeisung in der Zeile, wird PV-Überschuss (`offset_kw > 0`) als gedämpfte PV-Einspeisung gezeichnet. Ist `Simulierter SoC (%)` am oberen/unteren SoC-Limit, wird geplanter Lade-/Entladeanteil nicht gezeichnet; der Überschuss erscheint als PV-Einspeisung bzw. Netzbezug (volle Batterie + PV-Überschuss). Ohne SoC-Spalte bleibt die geplante Batterieleistung unverändert. Im neutralen MILP-Bereich wird `Netzbezug` nach Live-Overlay aus Last, Flex, PV und Batterie neu abgeleitet.
+**Sonderfälle:** `Netzbezug` und `Geplante Batterie-Aktion` sind vorzeichenkodiert (Bezug/Laden positiv, Einspeisung/Entladen negativ). Fehlt eine explizite Einspeisung in der Zeile, wird PV-Überschuss (`offset_kw > 0`) als gedämpfte PV-Einspeisung gezeichnet. **Grauer Bereich (Produktiv-Log):** PV, Last, Netz und Batterieflüsse nutzen `consumption_snapshot` — die Aufteilung Laden/Einspeisung leitet sich aus gemessener Batterieleistung (`Ist Batterie-Leistung (kW)`) ab, nicht aus `battery_plan_kw`. **MILP/neutral/grün:** geplanter Batteriewert; am oberen/unteren SoC-Limit wird geplanter Lade-/Entladeanteil nicht gezeichnet, Überschuss erscheint als PV-Einspeisung bzw. Netzbezug. Im neutralen MILP-Bereich wird `Netzbezug` nach Live-Overlay aus Last, Flex, PV und Batterie neu abgeleitet.
 
 | Segment (Chart) | Farbe gedämpft | Bedeutung |
 |-----------------|----------------|-----------|
@@ -55,11 +53,11 @@ Entladen → Last ← verbleibende Entladung
 
 **Rechte Y-Achse (0–100, skaliert):**
 
-| Spur | Bedeutung |
-|------|-----------|
-| SoC (optimiert) | Simulierter Batterie-SOC |
-| SoC Baseline / BL Ziel | Referenz-SOC-Verläufe |
-| Preis (rot) | Strompreis skaliert; Hover: Cent/kWh |
+| Spur | Darstellung | Bedeutung |
+|------|-------------|-----------|
+| SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/charts.py`) | Simulierter Batterie-SOC |
+| SoC BL Ziel | Dieselbe Farbe, gestrichelt | Referenz-SOC (Baseline) |
+| Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 
 **Hintergrundzonen** (Details im **?** der Chart-1-Überschrift): grau = Vergangenheit (Log), neutral = laufende Stunde, grün = extrapolierte Preise bis Fensterrand.
 

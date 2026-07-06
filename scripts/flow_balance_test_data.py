@@ -157,8 +157,9 @@ def flow_balance_scenario_rows() -> tuple[FlowBalanceScenario, ...]:
                 "Verbrauch-Prognose (kW)": 2.0,
                 _FLEX_SWIMSPA_COLUMN: 0.0,
                 "Geplante Batterie-Aktion (kW)": 3.0,
-                "Netzbezug (kW)": -5.0,
+                "Netzbezug (kW)": -8.0,
                 "Simulierter SoC (%)": 100.0,
+                "_loxone_battery_kw": 0.0,
             },
             offset_kw=8.0,
             kinds_up=(KIND_PV,),
@@ -200,6 +201,11 @@ def scenario_history_entry(scenario: FlowBalanceScenario) -> dict[str, Any]:
     flex = float(row.get(_FLEX_SWIMSPA_COLUMN, 0.0) or 0.0)
     battery = float(row["Geplante Batterie-Aktion (kW)"])
     netz = float(row["Netzbezug (kW)"])
+    loxone_battery_kw = row.get("_loxone_battery_kw")
+    if loxone_battery_kw is None:
+        snapshot_battery_kw = round(-battery, 3)
+    else:
+        snapshot_battery_kw = float(loxone_battery_kw)
     consumer_powers = {"swimspa": flex} if flex > 0 else {}
     return {
         "source": "seed_flow_balance_test_log.py",
@@ -222,7 +228,7 @@ def scenario_history_entry(scenario: FlowBalanceScenario) -> dict[str, Any]:
             "flex_sum_kw": flex,
             "house_kw": round(baseload + flex, 3),
             "grid_kw": netz,
-            "battery_kw": round(-battery, 3),
+            "battery_kw": snapshot_battery_kw,
         },
         "scenario": f"flow_balance_{scenario.scenario_id}",
         "scenario_title": scenario.title,

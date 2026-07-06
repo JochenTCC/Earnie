@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 
 from ui.charts import (
     ChartSlotAxis,
+    _COLOR_SOC,
     _LINE_ANCHOR_SLOT_CENTER,
     _LINE_ANCHOR_SLOT_START,
     add_cumulative_s2_split_traces,
@@ -70,35 +71,33 @@ def _build_chart1_df(slots: list[datetime]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_chart1_hv_lines_share_slot_start_anchor_except_grid():
+def test_chart1_has_no_verbrauch_or_netz_line_traces():
+    slots = _mixed_slots()
+    df = _build_chart1_df(slots)
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_power_traces(fig, df, get_bar_colors(df), axis)
+    trace_names = {trace.name for trace in fig.data}
+    assert "Verbrauch" not in trace_names
+    assert "Netz" not in trace_names
+
+
+def test_chart1_pv_uses_slot_center_anchor():
     slots = _mixed_slots()
     df = _build_chart1_df(slots)
     axis = ChartSlotAxis.from_dataframe(df)
     fig = go.Figure()
     add_power_traces(fig, df, get_bar_colors(df), axis)
     pv = next(t for t in fig.data if t.name == "PV")
-    load = next(t for t in fig.data if t.name == "Verbrauch")
-    grid = next(t for t in fig.data if t.name == "Netz")
 
     for index, slot in enumerate(slots):
         pv_value = float(df.iloc[index]["PV-Prognose (kW)"])
-        load_value = float(df.iloc[index]["Verbrauch-Prognose (kW)"])
-        grid_value = float(df.iloc[index]["Netzbezug (kW)"])
         expected_start = _slot_start(axis, index)
         expected_center = _slot_center(axis, index)
-
         pv_points = _points_at_y(pv, pv_value)
-        load_points = _points_at_y(load, load_value)
-        grid_points = _points_at_y(grid, grid_value)
-
         assert expected_center in [p[0] for p in pv_points], f"PV Slot {slot}"
-        assert expected_start in [p[0] for p in load_points], f"Verbrauch Slot {slot}"
-        assert expected_center in [p[0] for p in grid_points], f"Netz Slot {slot}"
         assert expected_start not in [p[0] for p in pv_points], (
             f"PV bewusst Slotmitte, nicht Beginn ({slot})"
-        )
-        assert expected_start not in [p[0] for p in grid_points], (
-            f"Netz bewusst Slotmitte, nicht Beginn ({slot})"
         )
 
 
@@ -154,6 +153,7 @@ def test_chart1_soc_uses_slot_start_anchor():
     fig = go.Figure()
     add_optimized_soc_trace(fig, df, axis)
     soc = next(t for t in fig.data if t.name == "SoC")
+    assert soc.line.color == _COLOR_SOC
     for index, slot in enumerate(slots):
         soc_value = float(df.iloc[index]["Simulierter SoC (%)"])
         expected = _slot_start(axis, index)

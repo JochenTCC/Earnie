@@ -22,7 +22,12 @@ from optimizer.targets import (
 from optimizer import battery as bat
 from optimizer.deviation_eval import DeviationEvent
 from runtime_store.history_timeline import SLOT_MISSING
+from ui.chart_flow_balance import hsl
 from ui.help_hint import render_title_with_help
+
+# Chart 1 — SoC-Verlauf (optimiert + „SoC BL Ziel“): Farbe hier per HSL anpassen.
+_HSL_SOC = (120.0, 90.0, 40.0)
+_COLOR_SOC = hsl(*_HSL_SOC)
 
 _CONSUMER_BAR_OPACITY = 0.65
 _CONSUMER_PV_FOLLOW_PATTERN = "/"
@@ -109,9 +114,8 @@ class ChartSlotAxis:
 
     | Trace / Element | Index-Offset | Bedeutung (jetzt: Anteil × ``step`` ab Slotbeginn) |
     |-----------------|--------------|-----------------------------------------------------|
-    | HV-Linien (Verbrauch, Preis, kum. Kosten) | −0.5 | Wert gilt ab Slotbeginn (Treppenfunktion) |
-    | Netz-Linie | 0 (Mitte) | Stundenmittelwert zentriert im Slot |
-    | Batterie- / Flex-Balken | +0.05 | Gleiche X-Position (gestapelt, ``barmode=overlay``) |
+    | HV-Linien (Preis, kum. Kosten) | −0.5 | Wert gilt ab Slotbeginn (Treppenfunktion) |
+    | Energiebilanz-Balken | +0.05 | Gleiche X-Position (gestapelt, ``barmode=overlay``) |
     | ``add_vrect`` / Jetzt-Linie | Index ± 0.5 | Zonen- und Marker-Grenzen zwischen Sloträndern |
 
     Konstanten unten (``_LINE_ANCHOR_*``, ``_BAR_CENTER_NUDGE``) sind die zeitliche
@@ -1272,49 +1276,18 @@ def add_power_traces(
     matrix: list[dict] | None = None,
     chart_window: UiChartWindow | None = None,
 ) -> None:
-    uhrzeit = df["Uhrzeit"]
-    segments = _trace_segments(len(df), extrap_start, extrap_end)
     active_consumers = ordered_active_consumers_for_stack(
         df,
         matrix=matrix,
         chart_window=chart_window,
     )
     if "PV-Prognose (kW)" in df.columns:
-        _add_pv_trace(fig, axis, df["PV-Prognose (kW)"], uhrzeit)
+        _add_pv_trace(fig, axis, df["PV-Prognose (kW)"], df["Uhrzeit"])
 
     from ui.chart_flow_balance import (
-        COLOR_BASELOAD,
-        COLOR_GRID_IMPORT,
         add_flow_balance_traces,
         build_flow_balance_slots_from_df,
     )
-
-    if "Verbrauch-Prognose (kW)" in df.columns:
-        _add_segmented_hv_line(
-            fig,
-            axis,
-            df["Verbrauch-Prognose (kW)"],
-            uhrzeit,
-            segments,
-            name="Verbrauch",
-            line_kwargs=dict(color=COLOR_BASELOAD, width=2, dash="dash"),
-            y_format=".2f",
-            base_opacity=1.0,
-        )
-
-    if "Netzbezug (kW)" in df.columns:
-        _add_segmented_hv_line(
-            fig,
-            axis,
-            df["Netzbezug (kW)"],
-            uhrzeit,
-            segments,
-            name="Netz",
-            line_kwargs=dict(color=COLOR_GRID_IMPORT, width=2, dash="dash"),
-            y_format=".2f",
-            base_opacity=1.0,
-            anchor_fraction=_LINE_ANCHOR_SLOT_CENTER,
-        )
 
     flow_slots = build_flow_balance_slots_from_df(df, flex_consumers=active_consumers)
     add_flow_balance_traces(
@@ -1457,7 +1430,7 @@ def add_optimized_soc_trace(
                 name="SoC",
                 showlegend=show_legend,
                 mode="lines",
-                line=dict(color=_COLOR_OPTIMIZED, width=2.5),
+                line=dict(color=_COLOR_SOC, width=2.5),
                 opacity=1.0,
                 yaxis=yaxis,
                 connectgaps=False,
@@ -1508,7 +1481,7 @@ def add_baseline_soc_traces(
             name="SoC BL Ziel" if index == 0 else "SoC BL Ziel",
             showlegend=index == 0,
             mode="lines",
-            line=dict(color=_COLOR_OPTIMIZED, width=2.5, dash="dot"),
+            line=dict(color=_COLOR_SOC, width=2.5, dash="dot"),
             opacity=1.0,
             yaxis=yaxis,
             connectgaps=False,

@@ -22,6 +22,7 @@ import plotly.graph_objects as go
 
 import config
 from optimizer import battery as bat
+from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN
 from optimizer.targets import (
     consumer_column_name,
     consumer_immediate_charge_column_name,
@@ -136,6 +137,7 @@ _MUTED_EXPORT_PV = blend_hsl(_HSL_PV, _HSL_WHITE, 0.1, 25)
 COLOR_PV = _COLOR_PV
 COLOR_GRID_IMPORT = _COLOR_GRID_IMPORT
 COLOR_BASELOAD = _COLOR_BASELOAD
+COLOR_BATTERY = _COLOR_BATTERY
 MUTED_BATTERY_CHARGE_PV = _MUTED_BATTERY_CHARGE_PV
 MUTED_BATTERY_CHARGE_GRID = _MUTED_BATTERY_CHARGE_GRID
 MUTED_BATTERY_LOAD = _MUTED_BATTERY_LOAD
@@ -187,16 +189,52 @@ def _optional_soc_percent(row: Mapping[str, Any]) -> float | None:
     return soc
 
 
+def _optional_column_float(row: Mapping[str, Any], column: str) -> float | None:
+    if column not in row:
+        return None
+    value = row.get(column)
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(number):
+        return None
+    return number
+
+
+def _battery_for_flow_balance(
+    row: Mapping[str, Any],
+    battery_plan_kw: float,
+) -> tuple[float, float, float, bool]:
+    """
+    Batterieleistung für die Flusszuordnung.
+
+    Produktiv-Log (grau): ``CHART_IST_BATTERY_KW_COLUMN`` aus Loxone-Snapshot.
+    MILP/neutral: geplanter Wert, ggf. SoC-Rand-Korrektur.
+
+    Returns
+    -------
+    battery_kw, charge_skipped_kw, discharge_skipped_kw, uses_logged_ist
+    """
+    ist = _optional_column_float(row, CHART_IST_BATTERY_KW_COLUMN)
+    if ist is not None:
+        return ist, 0.0, 0.0, True
+    capped, charge_skipped, discharge_skipped = _soc_capped_battery_plan(
+        row,
+        battery_plan_kw,
+    )
+    return capped, charge_skipped, discharge_skipped, False
+
+
 def _soc_capped_battery_plan(
     row: Mapping[str, Any],
     battery_kw: float,
 ) -> tuple[float, float, float]:
     """
-    Begrenzt Batterieleistung nur am SoC-Rand (volle/leere Batterie).
-
-    Produktiv-Zeilen tragen bereits SoC-gekappte ``Geplante Batterie-Aktion``;
-    hier wird nur korrigiert, wenn wegen SoC-Limit kein Laden/Entladen mehr
-    möglich ist, die Zeile aber noch einen Plananteil enthält.
+    Begrenzt Batterieleistung nur am SoC-Rand (volle/leere Batterie) — nur MILP/neutral,
+    nicht wenn ``CHART_IST_BATTERY_KW_COLUMN`` aus dem Produktiv-Log gesetzt ist.
 
     Returns
     -------
@@ -391,7 +429,8 @@ def build_flow_balance_segments(
     ----------
     row:
         Chart-/Simulationszeile mit ``PV-Prognose (kW)``, ``Verbrauch-Prognose (kW)``,
-        ``Geplante Batterie-Aktion (kW)``, ``Netzbezug (kW)`` und optional Flex-Spalten.
+        ``Geplante Batterie-Aktion (kW)``, ``Netzbezug (kW)``, optional
+        ``CHART_IST_BATTERY_KW_COLUMN`` (Produktiv-Log) und Flex-Spalten.
     flex_consumers:
         ``(consumer_cfg, spaltenname)`` in Stapelreihenfolge unten→oben
         (wie ``ordered_active_consumers_for_stack``). Fehlt die Liste, werden alle
@@ -411,7 +450,10 @@ def build_flow_balance_segments(
     grid = _safe_float(row.get("Netzbezug (kW)"))
     load_kw = baseload + _flex_total_kw(row, flex_consumers)
 
-    battery, charge_skipped, discharge_skipped = _soc_capped_battery_plan(row, battery_raw)
+    battery, charge_skipped, discharge_skipped, _uses_ist = _battery_for_flow_balance(
+        row,
+        battery_raw,
+    )
     grid_import = max(grid, 0.0) + discharge_skipped
     grid_export = max(-grid, 0.0) + charge_skipped
     battery_charge = max(battery, 0.0)

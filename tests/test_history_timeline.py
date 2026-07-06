@@ -76,12 +76,14 @@ def test_entry_to_chart_row_prefers_consumption_snapshot():
             "baseload_kw": 0.8,
             "pv_kw": 3.5,
             "flex_kw": {"swimspa": 2.0},
+            "battery_kw": -1.2,
         },
         consumer_powers_kw={"swimspa": 2.2},
     )
     row = history_timeline.entry_to_chart_row(entry, datetime(2026, 6, 26, 11, 0, 0))
     assert row["PV-Prognose (kW)"] == 3.5
     assert row["Verbrauch-Prognose (kW)"] == 0.8
+    assert row[history_timeline.CHART_IST_BATTERY_KW_COLUMN] == pytest.approx(1.2)
     assert row["Uhrzeit"] == "11:00"
 
 

@@ -2,7 +2,7 @@
 """
 Exportiert die fiktiven Rauf/Runter-Szenarien als Plotly-HTML.
 
-Erzeugt eine vereinfachte Chart-1-Vorschau (Leistungsbalken + PV/Verbrauch/Netz-Linien).
+Erzeugt eine vereinfachte Chart-1-Vorschau (Rauf/Runter-Balken + PV-Linie).
 
 Aufruf:
     python -m scripts.export_flow_balance_chart_html

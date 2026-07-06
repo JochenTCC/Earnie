@@ -211,6 +211,62 @@ def test_rows_without_soc_keep_planned_charge() -> None:
     assert KIND_BATTERY_CHARGE_PV in kinds_down
 
 
+def test_logged_ist_battery_splits_flows_without_soc_heuristic() -> None:
+    from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN
+
+    row = {
+        "PV-Prognose (kW)": 10.0,
+        "Verbrauch-Prognose (kW)": 2.0,
+        "SwimSpa (kW)": 0.0,
+        "Geplante Batterie-Aktion (kW)": 3.0,
+        "Netzbezug (kW)": -8.0,
+        "Simulierter SoC (%)": 100.0,
+        CHART_IST_BATTERY_KW_COLUMN: 0.0,
+    }
+    slot = build_flow_balance_segments(row, flex_consumers=_flex_pairs())
+    kinds_down = {segment.kind for segment in slot.down}
+    export = next(segment for segment in slot.down if segment.kind == KIND_EXPORT_PV)
+    assert KIND_BATTERY_CHARGE_PV not in kinds_down
+    assert export.kw == pytest.approx(8.0)
+
+
+def test_logged_ist_battery_via_history_row() -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from runtime_store import history_timeline
+
+    entry = {
+        "completed_at": datetime(2026, 7, 6, 12, 0, tzinfo=ZoneInfo("Europe/Vienna")).isoformat(),
+        "source": "main.py",
+        "success": True,
+        "soc_percent": 100.0,
+        "mode": 0,
+        "target_power_kw": 0.0,
+        "battery_plan_kw": 3.0,
+        "forecast_pv_kw": 10.0,
+        "forecast_consumption_kw": 2.0,
+        "consumption_snapshot": {
+            "pv_kw": 10.0,
+            "baseload_kw": 2.0,
+            "flex_kw": {},
+            "flex_sum_kw": 0.0,
+            "house_kw": 2.0,
+            "grid_kw": -8.0,
+            "battery_kw": 0.0,
+        },
+    }
+    chart_row = history_timeline.entry_to_chart_row(
+        entry,
+        datetime(2026, 7, 6, 12, 0, tzinfo=ZoneInfo("Europe/Vienna")),
+    )
+    slot = build_flow_balance_segments(chart_row, flex_consumers=_flex_pairs())
+    kinds_down = {segment.kind for segment in slot.down}
+    assert KIND_BATTERY_CHARGE_PV not in kinds_down
+    export = next(segment for segment in slot.down if segment.kind == KIND_EXPORT_PV)
+    assert export.kw == pytest.approx(8.0)
+
+
 @pytest.mark.parametrize(
     "scenario_id,kind,expected",
     [

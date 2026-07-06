@@ -28,6 +28,9 @@ SLOTS_PER_DAY = 96
 SLOT_DURATION_HOURS = QUARTER_HOUR_MINUTES / 60.0
 
 SLOT_PRESENT = "present"
+
+# Chart-1-Rauf/Runter: gemessene Batterieleistung (kW, positiv = laden) aus Loxone-Snapshot
+CHART_IST_BATTERY_KW_COLUMN = "Ist Batterie-Leistung (kW)"
 SLOT_HELD = "held"
 SLOT_MISSING = "missing"
 
@@ -218,6 +221,14 @@ def _power_kw_from_entry(entry: dict[str, Any]) -> tuple[float, float, float]:
     return float(pv), float(baseload), float(battery_plan)
 
 
+def _chart_battery_kw_from_snapshot(snapshot: dict[str, Any]) -> float | None:
+    """Loxone ``battery_kw`` (negativ = laden) → Chart-Vorzeichen (positiv = laden)."""
+    raw = snapshot.get("battery_kw")
+    if raw is None:
+        return None
+    return round(-float(raw), 3)
+
+
 def _netzbezug_kw_from_entry(entry: dict[str, Any], row: dict[str, Any]) -> float:
     """Netzbezug: gemessenes grid_kw aus consumption_snapshot, sonst Bilanz aus der Zeile."""
     snapshot = entry.get("consumption_snapshot") or {}
@@ -304,6 +315,10 @@ def entry_to_chart_row(
             pv_follow = (entry.get("consumer_pv_follow") or {}).get(cid, 0)
             row[consumer_pv_follow_column_name(consumer)] = int(pv_follow or 0)
     row["Netzbezug (kW)"] = _netzbezug_kw_from_entry(entry, row)
+    snapshot = entry.get("consumption_snapshot") or {}
+    ist_battery = _chart_battery_kw_from_snapshot(snapshot)
+    if ist_battery is not None:
+        row[CHART_IST_BATTERY_KW_COLUMN] = ist_battery
     _append_milp_table_columns(row, entry)
     return row
 
@@ -329,6 +344,7 @@ def _hold_forward_row(
     row = dict(previous)
     row["slot_datetime"] = slot_start
     row["Uhrzeit"] = _format_slot_time(slot_start, include_date=include_date)
+    row.pop(CHART_IST_BATTERY_KW_COLUMN, None)
     _zero_flex_power(row)
     return row
 
