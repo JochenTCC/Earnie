@@ -1,6 +1,7 @@
 *.csv
 !tests/fixtures/backtesting/cons_data_hourly.csv
 !tests/fixtures/historical/cons_data_hourly.csv
+!tests/fixtures/thermal/*.csv
 config.py
 config.json
 !tests/fixtures/backtesting/config.json
@@ -12,7 +13,9 @@ __pycache__/
 *.egg-info/
 # Laufzeit-/Zustandsdateien (JSON)
 flexible_consumers_state.json
+!tests/fixtures/prod_dumps/**/flexible_consumers_state.json
 pv_counter_state.json
+!tests/fixtures/prod_dumps/**/pv_counter_state.json
 cons_data_hourly.meta.json
 cons_data_pending.json
 optimizer_run_state.json
@@ -24,6 +27,7 @@ backtesting_log.json
 backtesting_cbc_events.jsonl
 backtesting_logs/
 live_optimization_debug.json
+!tests/fixtures/prod_dumps/**/live_optimization_debug.json
 energy_optimizer.log
 system_history_log.csv
 runtime_settings.json

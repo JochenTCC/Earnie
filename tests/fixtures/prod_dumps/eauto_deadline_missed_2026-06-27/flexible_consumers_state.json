@@ -1,0 +1,13 @@
+{
+  "date": "2026-06-26",
+  "delivered": {
+    "swimspa": 1.0
+  },
+  "charging_sessions": {
+    "eauto": {
+      "target_kwh": 16.0,
+      "delivered_kwh": 2.0,
+      "deadline": "2026-06-27T09:30:00"
+    }
+  }
+}

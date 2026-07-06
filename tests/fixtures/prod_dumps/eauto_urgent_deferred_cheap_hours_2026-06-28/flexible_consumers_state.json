@@ -1,0 +1,14 @@
+{
+  "schema_version": 2,
+  "written_at": "2026-06-28T09:32:01",
+  "written_by_app_version": "1.10.4",
+  "date": "2026-06-28",
+  "delivered": {},
+  "charging_sessions": {
+    "eauto": {
+      "target_kwh": 11.556,
+      "delivered_kwh": 3.571,
+      "deadline": "2026-06-29T07:45:00"
+    }
+  }
+}

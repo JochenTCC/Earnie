@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "source": "main.py",
+  "success": true,
+  "run_trigger": "event:eauto_ready_by",
+  "written_by_app_version": "1.9.3",
+  "soc_percent": 10.0,
+  "charging_contexts": {
+    "eauto": {
+      "active": true,
+      "plugged_in": true,
+      "deadline": "2026-06-27T09:30:00",
+      "target_kwh": 16.0,
+      "use_time_window": false,
+      "source_label": "loxone (Fertig-Uhrzeit)"
+    }
+  },
+  "consumer_remaining_kwh": {
+    "eauto": 9.4
+  },
+  "completed_at": "2026-06-27T09:30:02"
+}
