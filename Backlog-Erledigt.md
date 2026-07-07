@@ -5,7 +5,7 @@ Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bu
 ### Verbraucher-Farben P2 — Zonenabhängige Sättigung (2026-07-07)
 
 - [x] **P2 — Zonenabhängige Sättigung (nur Chart-1-Flex-Balken)** — History volle Palette; neutral + Forecast gemeinsam `CONSUMER_CHART_SATURATION_MUTED` (0,6); Slot → Zone via `chart_zone_kind_for_slot_start`; Flex-Farbe pro Slot/Bucket; Legende Vollfarbe (`legendonly`); Sankey unverändert; Tests und `docs/ui/charts.md`
-- [x] **Version 1.17.4** — Patch-Bump
+- [x] **Version 1.18.0** — Minor-Bump
 
 ### Verbraucher-Farben P1 — 8er-Palette & chart_color_index (2026-07-07)
 
