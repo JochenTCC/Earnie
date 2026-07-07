@@ -20,6 +20,12 @@ Beim Pflegen:
   - Neuer Abschnitt `### <Thema> (YYYY-MM-DD)` (Datum Europe/Vienna)
   - Einzelpunkte mit `- [x] …`
   - Bugfixes: Abschnittstitel z. B. `### Bugfix …` oder `### … Regression …`
+  - **Aufwand-Zeile (optional)** als **letzte** Zeile des Abschnitts, kursiv:
+    `_Aufwand: <Wert> Cursor-Tokens · Chats: <uuid>[, <uuid>…]_`
+    - `<Wert>` **manuell** aus dem Cursor-Usage-Dashboard (cursor.com → Settings → Usage) — steht **nicht** in den lokalen Transcripts und ist vom Agent nicht automatisch ermittelbar.
+    - Chat-UUID(s) werden vom Nutzer genannt (Zuordnung Kapitel → Chat ist manuell).
+    - Weglassen, wenn kein Wert vorliegt — keine Schätzwerte erfinden.
+    - **Zeitbasierte Näherung:** `scripts/token_commit_report.py` ordnet einen Cursor-Usage-CSV-Export den Minor-Bump-Commits zu und aggregiert Tokens/Kosten pro Kapitel (kein Chat-ID im Export → Näherung). Für ältere Kapitel CSV mit größerem Datumsbereich exportieren.
 - Bei **teilweise erledigten** Epics: nur die offenen Phasen/Unterpunkte in der Quelldatei belassen.
 - Nur dokumentieren, was tatsächlich erledigt wurde — nichts erfinden.
 - Referenz-Tabellen (z. B. Log-Dateien) gehören nicht ins Erledigt-Archiv, sondern unter **Referenz** in `Backlog.md`.

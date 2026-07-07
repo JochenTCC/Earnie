@@ -53,6 +53,12 @@ Schema aus `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` beibehal
 - **Backlog-Erledigt.md:** Neuer Abschnitt `### <Thema> (YYYY-MM-DD)` mit Datum **heute** (lokale Zeit Europe/Vienna)
 - Nur dokumentieren, was in Session/Diff tatsächlich erledigt wurde — nichts erfinden
 - Offene nächste Schritte bei teilweise erledigten Items belassen
+- **Aufwand-Zeile je neuem Erledigt-Abschnitt (optional):** Nutzer nach Cursor-Token-Verbrauch und relevanten Chat-UUID(s) fragen und als letzte Zeile eintragen:
+  `_Aufwand: <Wert> Cursor-Tokens · Chats: <uuid>[, <uuid>…]_`
+  - Wert kommt **manuell** aus dem Cursor-Usage-Dashboard (nicht in Transcripts, nicht automatisch ermittelbar) — bei „weiß nicht"/keine Angabe Zeile **weglassen**, nicht schätzen
+  - **Näherung per Zeitfenster:** `scripts/token_commit_report.py` korreliert einen Cursor-Usage-CSV-Export mit den Minor-Bump-Commits (= Kapiteln) und weist Events/Total-Tokens/Tokens-o.-Cache/Kosten pro Kapitel aus. Zeitbasiert (kein Chat-ID im Export). Aufruf:
+    `.venv\Scripts\python.exe -m scripts.token_commit_report --usage-csv "<pfad>\usage-events-*.csv"`
+  - Format-Details siehe `.cursor/rules/backlog.mdc`
 
 Geänderte Backlog-Datei(en) in den Commit aufnehmen.
 
