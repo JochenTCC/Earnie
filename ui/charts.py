@@ -22,37 +22,37 @@ from optimizer.targets import (
 from optimizer import battery as bat
 from optimizer.deviation_eval import DeviationEvent
 from runtime_store.history_timeline import SLOT_MISSING
-from ui.chart_flow_balance import hsl
+from ui.chart_colors import (
+    CHART_ENTLADESPERRE_BAND_FILL,
+    CHART_ENTLADESPERRE_BAND_STRIPE,
+    CHART_MARKER_NOW_COLOR,
+    CHART_MARKER_SUNRISE_COLOR,
+    CHART_MISSING_SLOT_FILL,
+    CHART_PV_FILL_COLOR,
+    CHART_PV_LINE_COLOR,
+    COLOR_COST_ACTUAL,
+    COLOR_COST_BASELINE,
+    COLOR_COST_OPTIMIZED,
+    COLOR_COST_SAVINGS,
+    COLOR_COST_SAVINGS_NEGATIVE,
+    COLOR_SOC,
+    COLOR_STEER_BASELINE,
+    COLOR_STEER_DEFAULT,
+    COLOR_STEER_ENTLADESPERRE,
+    COLOR_STEER_FORCE_CHARGE,
+    COLOR_STEER_FORCE_DISCHARGE,
+    consumer_bar_palette,
+)
 from ui.help_hint import render_title_with_help
-
-# Chart 1 — SoC-Verlauf (optimiert + „SoC BL Ziel“): Farbe hier per HSL anpassen.
-_HSL_SOC = (120.0, 90.0, 40.0)
-_COLOR_SOC = hsl(*_HSL_SOC)
 
 _CONSUMER_BAR_OPACITY = 0.65
 _CONSUMER_PV_FOLLOW_PATTERN = "/"
 _CONSUMER_IMMEDIATE_CHARGE_PATTERN = "+"
 _ENTLADESPERRE_BAND_HEIGHT_PCT = 4.0
 _ENTLADESPERRE_BAND_Y_MIN = -5.0
-_ENTLADESPERRE_BAND_FILL = "#f1c40f"
-_ENTLADESPERRE_BAND_STRIPE = "#1a1a1a"
 _ENTLADESPERRE_BAND_WIDTH_FRACTION = 0.85
-_COLOR_BASELINE = "#7f8c8d"
-_COLOR_OPTIMIZED = "#e67e22"
-_COLOR_ACTUAL = "#3498db"
-_COLOR_SAVINGS = "#27ae60"
-_COLOR_GRID_POWER = "#7f8c8d"
-_PV_LINE_COLOR = "#f1c40f"
-_PV_FILL_COLOR = "rgba(241, 196, 15, 0.15)"
-_ZONE_HISTORY_COLOR = "rgba(128, 128, 128, 0.18)"
-_ZONE_FORECAST_COLOR = "rgba(76, 175, 80, 0.15)"
-_MISSING_SLOT_FILL = "rgba(255, 224, 178, 0.55)"
-_MARKER_NOW_COLOR = "#3498db"
-_MARKER_SUNRISE_COLOR = "#f39c12"
 _DEVIATION_MARKER_SIZE = 11
 _DEVIATION_Y_STACK_FACTOR = 0.06
-_CONSUMER_PALETTE_START = (194, 24, 91)
-_CONSUMER_PALETTE_END = (0, 188, 212)
 _STACK_ORDER_BY_SA0: dict[str, tuple[str, ...]] = {}
 
 
@@ -178,7 +178,10 @@ class ChartSlotAxis:
         """Zeitpunkt = Slotbeginn + ``fraction`` × Slotdauer (0=Beginn, 0.5=Mitte, 1=Ende)."""
         if isinstance(index_slice, int):
             return pd.Series([self.starts.iloc[index_slice] + self._offset_for(index_slice, fraction)])
-        indices = list(range(len(self.starts)))
+        if isinstance(index_slice, slice):
+            indices = list(range(*index_slice.indices(len(self.starts))))
+        else:
+            indices = list(range(len(self.starts)))
         times = [
             self.starts.iloc[i] + self._offset_for(i, fraction)
             for i in indices
@@ -514,7 +517,7 @@ def _add_missing_slot_backgrounds(
         fig.add_vrect(
             x0=axis.legacy_index_time(index - 0.5),
             x1=axis.legacy_index_time(index + 0.5),
-            fillcolor=_MISSING_SLOT_FILL,
+            fillcolor=CHART_MISSING_SLOT_FILL,
             line_width=0,
             layer="below",
         )
@@ -524,7 +527,7 @@ def _add_sun_markers(fig: go.Figure, markers: ChartSunMarkers) -> None:
     if markers.now_x is not None:
         fig.add_vline(
             x=markers.now_x,
-            line=dict(color=_MARKER_NOW_COLOR, width=1.5, dash="dot"),
+            line=dict(color=CHART_MARKER_NOW_COLOR, width=1.5, dash="dot"),
             annotation_text="Jetzt",
             annotation_position="top",
         )
@@ -537,7 +540,7 @@ def _add_sun_markers(fig: go.Figure, markers: ChartSunMarkers) -> None:
             continue
         fig.add_vline(
             x=anchor_x,
-            line=dict(color=_MARKER_SUNRISE_COLOR, width=1.5),
+            line=dict(color=CHART_MARKER_SUNRISE_COLOR, width=1.5),
             annotation_text=label,
             annotation_position="top",
         )
@@ -701,17 +704,17 @@ def get_bar_colors(df: pd.DataFrame) -> list[str]:
     for cmd in df["Steuerbefehl"]:
         text = str(cmd)
         if text.startswith("Zwangsladen"):
-            colors.append("forestgreen")
+            colors.append(COLOR_STEER_FORCE_CHARGE)
         elif text.startswith("Zwangsentladen"):
-            colors.append("crimson")
+            colors.append(COLOR_STEER_FORCE_DISCHARGE)
         elif _is_entladesperre_command(text):
-            colors.append("darkorange")
+            colors.append(COLOR_STEER_ENTLADESPERRE)
         elif text == "Baseline":
-            colors.append("lightgray")
+            colors.append(COLOR_STEER_BASELINE)
         elif text.startswith("Baseline (Ziel)"):
-            colors.append("lightgray")
+            colors.append(COLOR_STEER_BASELINE)
         else:
-            colors.append("dodgerblue")
+            colors.append(COLOR_STEER_DEFAULT)
     return colors
 
 
@@ -820,40 +823,12 @@ def _consumer_chart_color(consumer: dict) -> str:
     index = next(
         item for item, candidate in enumerate(all_consumers) if candidate["id"] == consumer["id"]
     )
-    return _consumer_bar_palette(len(all_consumers))[index]
-
-
-def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
-    return "#{:02x}{:02x}{:02x}".format(*rgb)
-
-
-def _lerp_rgb(
-    start: tuple[int, int, int],
-    end: tuple[int, int, int],
-    factor: float,
-) -> tuple[int, int, int]:
-    return tuple(
-        int(round(start[channel] + (end[channel] - start[channel]) * factor))
-        for channel in range(3)
-    )
+    return consumer_bar_palette(len(all_consumers))[index]
 
 
 def _consumer_bar_palette(count: int) -> list[str]:
-    """Farben für Flex-Verbraucher: gleichmäßig von Grau nach Cyan."""
-    if count <= 0:
-        return []
-    if count == 1:
-        return [_rgb_to_hex(_lerp_rgb(_CONSUMER_PALETTE_START, _CONSUMER_PALETTE_END, 0.5))]
-    return [
-        _rgb_to_hex(
-            _lerp_rgb(
-                _CONSUMER_PALETTE_START,
-                _CONSUMER_PALETTE_END,
-                index / (count - 1),
-            )
-        )
-        for index in range(count)
-    ]
+    """Rückwärtskompatibilität für Tests — siehe ``consumer_bar_palette``."""
+    return consumer_bar_palette(count)
 
 
 def _extended_hover_labels(uhrzeit: pd.Series) -> list[str]:
@@ -1234,9 +1209,9 @@ def _add_pv_trace(
         x=pv_x,
         y=pv_y,
         name="PV",
-        line=dict(color=_PV_LINE_COLOR, width=2),
+        line=dict(color=CHART_PV_LINE_COLOR, width=2),
         fill="tozeroy",
-        fillcolor=_PV_FILL_COLOR,
+        fillcolor=CHART_PV_FILL_COLOR,
         yaxis="y",
         **_line_hover(uhrzeit, ".2f"),
     ))
@@ -1303,12 +1278,12 @@ def add_power_traces(
 
 def _entladesperre_band_marker() -> dict:
     return dict(
-        color=_ENTLADESPERRE_BAND_FILL,
+        color=CHART_ENTLADESPERRE_BAND_FILL,
         opacity=0.95,
         pattern=dict(
             shape=_CONSUMER_PV_FOLLOW_PATTERN,
-            fgcolor=_ENTLADESPERRE_BAND_STRIPE,
-            bgcolor=_ENTLADESPERRE_BAND_FILL,
+            fgcolor=CHART_ENTLADESPERRE_BAND_STRIPE,
+            bgcolor=CHART_ENTLADESPERRE_BAND_FILL,
             solidity=0.45,
             fillmode="overlay",
         ),
@@ -1430,7 +1405,7 @@ def add_optimized_soc_trace(
                 name="SoC",
                 showlegend=show_legend,
                 mode="lines",
-                line=dict(color=_COLOR_SOC, width=2.5),
+                line=dict(color=COLOR_SOC, width=2.5),
                 opacity=1.0,
                 yaxis=yaxis,
                 connectgaps=False,
@@ -1481,7 +1456,7 @@ def add_baseline_soc_traces(
             name="SoC BL Ziel" if index == 0 else "SoC BL Ziel",
             showlegend=index == 0,
             mode="lines",
-            line=dict(color=_COLOR_SOC, width=2.5, dash="dot"),
+            line=dict(color=COLOR_SOC, width=2.5, dash="dot"),
             opacity=1.0,
             yaxis=yaxis,
             connectgaps=False,
@@ -1673,7 +1648,7 @@ def add_cumulative_s2_split_traces(
             split,
             length,
             name="Kosten BL Ziel (Prognose)",
-            line_kwargs=dict(color=_COLOR_BASELINE, width=2.5, shape="hv"),
+            line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, shape="hv"),
             segment_hover_template=(
                 "Uhrzeit: %{customdata}<br>Kosten BL Ziel (Prognose, kumuliert): "
                 "%{y:.3f} €<extra></extra>"
@@ -1688,7 +1663,7 @@ def add_cumulative_s2_split_traces(
             split,
             length,
             name="Kosten optimiert (Prognose)",
-            line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, shape="hv"),
+            line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, shape="hv"),
             segment_hover_template=(
                 "Uhrzeit: %{customdata}<br>Kosten optimiert (Prognose, kumuliert): "
                 "%{y:.3f} €<extra></extra>"
@@ -1703,7 +1678,7 @@ def add_cumulative_s2_split_traces(
             split,
             length,
             name="Verbrauch BL Ziel (Prognose)",
-            line_kwargs=dict(color=_COLOR_BASELINE, width=2.5, dash="dash", shape="hv"),
+            line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, dash="dash", shape="hv"),
             yaxis="y2",
             y_format=".2f",
             segment_hover_template=(
@@ -1720,7 +1695,7 @@ def add_cumulative_s2_split_traces(
             split,
             length,
             name="Verbrauch optimiert (Prognose)",
-            line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
+            line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
             yaxis="y2",
             y_format=".2f",
             segment_hover_template=(
@@ -1738,7 +1713,7 @@ def add_cumulative_s2_split_traces(
         0,
         split,
         name="Kosten (Ist bisher)",
-        line_kwargs=dict(color=_COLOR_ACTUAL, width=2.5, shape="hv"),
+        line_kwargs=dict(color=COLOR_COST_ACTUAL, width=2.5, shape="hv"),
         segment_hover_template=(
             "Uhrzeit: %{customdata}<br>Kosten (Ist bisher, kumuliert): "
             "%{y:.3f} €<extra></extra>"
@@ -1752,7 +1727,7 @@ def add_cumulative_s2_split_traces(
         0,
         split,
         name="Verbrauch (Ist bisher)",
-        line_kwargs=dict(color=_COLOR_ACTUAL, width=2.5, dash="dash", shape="hv"),
+        line_kwargs=dict(color=COLOR_COST_ACTUAL, width=2.5, dash="dash", shape="hv"),
         yaxis="y2",
         y_format=".2f",
         segment_hover_template=(
@@ -1785,7 +1760,7 @@ def add_cumulative_cost_traces(
         uhrzeit,
         segments,
         name="Kosten BL Ziel",
-        line_kwargs=dict(color=_COLOR_BASELINE, width=2.5, shape="hv"),
+        line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, shape="hv"),
         segment_hover_template=(
             "Uhrzeit: %{customdata}<br>Kosten BL Ziel (kumuliert): %{y:.3f} €"
             "<extra></extra>"
@@ -1798,7 +1773,7 @@ def add_cumulative_cost_traces(
         uhrzeit,
         segments,
         name="Kosten optimiert",
-        line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, shape="hv"),
+        line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, shape="hv"),
         segment_hover_template=(
             "Uhrzeit: %{customdata}<br>Kosten optimiert (kumuliert): %{y:.3f} €"
             "<extra></extra>"
@@ -1830,7 +1805,7 @@ def add_cumulative_consumption_traces(
         uhrzeit,
         segments,
         name="Verbrauch BL Ziel",
-        line_kwargs=dict(color=_COLOR_BASELINE, width=2.5, dash="dash", shape="hv"),
+        line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, dash="dash", shape="hv"),
         yaxis=yaxis,
         y_format=".2f",
         base_opacity=1.0,
@@ -1846,7 +1821,7 @@ def add_cumulative_consumption_traces(
         uhrzeit,
         segments,
         name="Verbrauch optimiert",
-        line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
+        line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
         yaxis=yaxis,
         y_format=".2f",
         base_opacity=1.0,
@@ -1885,11 +1860,11 @@ def _cost_summary_annotations(
     """Plotly-Annotationen für die Gesamtkosten (oben links im Chart)."""
     savings_euro = optimized_cost_euro - matched_baseline_cost_euro
     if savings_euro < 0:
-        savings_color = "#27ae60"
+        savings_color = COLOR_COST_SAVINGS
     elif savings_euro > 0:
-        savings_color = "#e74c3c"
+        savings_color = COLOR_COST_SAVINGS_NEGATIVE
     else:
-        savings_color = _COLOR_BASELINE
+        savings_color = COLOR_COST_BASELINE
 
     summary_font = dict(size=_COST_SUMMARY_FONT_SIZE)
     base = dict(
@@ -1906,13 +1881,13 @@ def _cost_summary_annotations(
         {
             **base,
             "text": f"BL Ziel: {matched_baseline_cost_euro:.2f} €",
-            "font": {**summary_font, "color": _COLOR_BASELINE},
+            "font": {**summary_font, "color": COLOR_COST_BASELINE},
         },
         {
             **base,
             "text": f"Optimiert: {optimized_cost_euro:.2f} €",
             "yshift": -_COST_SUMMARY_LINE_SHIFT,
-            "font": {**summary_font, "color": _COLOR_OPTIMIZED},
+            "font": {**summary_font, "color": COLOR_COST_OPTIMIZED},
         },
         {
             **base,
@@ -2096,7 +2071,7 @@ def add_cumulative_actual_traces(
         uhrzeit,
         segments,
         name="Kosten (Ist)",
-        line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, shape="hv"),
+        line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, shape="hv"),
         segment_hover_template=(
             "Uhrzeit: %{customdata}<br>Kosten (Ist, kumuliert): %{y:.3f} €"
             "<extra></extra>"
@@ -2109,7 +2084,7 @@ def add_cumulative_actual_traces(
         uhrzeit,
         segments,
         name="Verbrauch (Ist)",
-        line_kwargs=dict(color=_COLOR_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
+        line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
         yaxis="y2",
         y_format=".2f",
         base_opacity=1.0,
@@ -2298,7 +2273,7 @@ def add_projected_savings_trace(
         uhrzeit,
         segments,
         name="Ersparnis prognostiziert",
-        line_kwargs=dict(color=_COLOR_SAVINGS, width=2.5, dash="dot", shape="hv"),
+        line_kwargs=dict(color=COLOR_COST_SAVINGS, width=2.5, dash="dot", shape="hv"),
         segment_hover_template=(
             "Uhrzeit: %{customdata}<br>Ersparnis prognostiziert (kumuliert): %{y:.3f} €"
             "<extra></extra>"

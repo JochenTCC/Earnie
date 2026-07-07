@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from ui.chart_colors import COLOR_COST_SAVINGS
 from ui.charts import (
     ChartSlotAxis,
     _battery_bar_times,
@@ -194,7 +195,7 @@ def test_cost_summary_annotations_include_totals_and_savings_sign():
     assert annotations[0]["text"] == "BL Ziel: 12.34 €"
     assert annotations[1]["text"] == "Optimiert: 11.50 €"
     assert annotations[2]["text"] == "Ersparnis: -0.84 €"
-    assert annotations[2]["font"]["color"] == "#27ae60"
+    assert annotations[2]["font"]["color"] == COLOR_COST_SAVINGS
     assert annotations[0]["xref"] == "paper"
     assert annotations[0]["xanchor"] == "left"
     assert annotations[0]["yanchor"] == "top"

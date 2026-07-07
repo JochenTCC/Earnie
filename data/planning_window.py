@@ -9,6 +9,7 @@ from astral import Observer
 from astral.sun import sun
 
 from optimizer.schedule import quarter_hour_slot_start
+from ui.chart_colors import CHART_ZONE_FORECAST_FILL, CHART_ZONE_HISTORY_FILL
 
 
 @dataclass(frozen=True)
@@ -471,7 +472,7 @@ def _ui_chart_zones_sa0_sa1(
     slot_datetimes: tuple[datetime, ...],
 ) -> UiChartZones:
     """Segment SA₀→SA₁: grau / neutral / grün (Vergangenheit ab SA₀)."""
-    gray_color = "rgba(128, 128, 128, 0.18)"
+    gray_color = CHART_ZONE_HISTORY_FILL
     if not is_live_segment:
         history_end = chart.end
         neutral_end = chart.end
@@ -498,7 +499,7 @@ def _ui_chart_zones_sa0_sa1(
             ),
         )
     extrapolated = first_extrapolated_slot(slot_datetimes, sim_rows)
-    green_color = "rgba(76, 175, 80, 0.15)"
+    green_color = CHART_ZONE_FORECAST_FILL
     if extrapolated is not None:
         green_start = extrapolated
     else:
@@ -542,7 +543,7 @@ def _ui_chart_zones_sa1_sa2(
 ) -> UiChartZones:
     """Segment SA₁→SA₂: nur neutral und grün (keine Vergangenheit)."""
     extrapolated = first_extrapolated_slot(slot_datetimes, sim_rows)
-    green_color = "rgba(76, 175, 80, 0.15)"
+    green_color = CHART_ZONE_FORECAST_FILL
     if extrapolated is not None:
         green_start = extrapolated
     else:

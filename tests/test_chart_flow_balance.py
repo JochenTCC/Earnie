@@ -28,13 +28,11 @@ from ui.chart_flow_balance import (
     MUTED_BATTERY_EXPORT,
     MUTED_BATTERY_LOAD,
     MUTED_EXPORT_PV,
-    blend_hsl,
     build_flow_balance_segments,
     build_flow_balance_slots_from_df,
     energy_balance_residual_kw,
     flow_balance_plotly_trace_specs,
     flow_balance_plotly_traces,
-    hsl,
 )
 from ui.charts import ChartSlotAxis
 
@@ -132,55 +130,6 @@ def test_muted_balance_traces_use_lower_opacity(flow_balance_df) -> None:
     )
     by_name = {trace.name: trace for trace in traces}
     assert by_name["PV"].opacity > by_name["Einspeisung (PV)"].opacity
-
-
-def test_hsl_converts_to_hex() -> None:
-    assert hsl(0, 100, 50) == "#ff0000"
-    assert hsl(0, 0, 100) == "#ffffff"
-
-
-def test_flow_balance_base_colors_match_hsl_constants() -> None:
-    from ui.chart_flow_balance import (
-        _HSL_BASELOAD,
-        _HSL_GRID_IMPORT,
-        _HSL_PV,
-    )
-
-    assert hsl(*_HSL_PV) == COLOR_PV
-    assert hsl(*_HSL_GRID_IMPORT) == COLOR_GRID_IMPORT
-    assert hsl(*_HSL_BASELOAD) == COLOR_BASELOAD
-
-
-def test_flow_balance_muted_colors_match_module_constants() -> None:
-    from ui.chart_flow_balance import (
-        _MUTED_BATTERY_CHARGE_GRID,
-        _MUTED_BATTERY_CHARGE_PV,
-        _MUTED_BATTERY_EXPORT,
-        _MUTED_BATTERY_LOAD,
-        _MUTED_EXPORT_PV,
-    )
-
-    assert MUTED_BATTERY_LOAD == _MUTED_BATTERY_LOAD
-    assert MUTED_BATTERY_CHARGE_PV == _MUTED_BATTERY_CHARGE_PV
-    assert MUTED_BATTERY_CHARGE_GRID == _MUTED_BATTERY_CHARGE_GRID
-    assert MUTED_BATTERY_EXPORT == _MUTED_BATTERY_EXPORT
-    assert MUTED_EXPORT_PV == _MUTED_EXPORT_PV
-
-
-def test_blend_hsl_interpolates_hue_on_short_arc() -> None:
-    assert blend_hsl((350.0, 100.0, 50.0), (10.0, 100.0, 50.0), 0.5) == "#ff0000"
-
-
-def test_blend_hsl_l_delta_shifts_lightness() -> None:
-    assert blend_hsl((0.0, 100.0, 50.0), (0.0, 100.0, 50.0), 0.5, l_delta=20.0) == hsl(
-        0.0, 100.0, 70.0
-    )
-    assert blend_hsl((0.0, 100.0, 50.0), (0.0, 100.0, 50.0), 0.5, l_delta=-20.0) == hsl(
-        0.0, 100.0, 30.0
-    )
-    assert blend_hsl((0.0, 100.0, 95.0), (0.0, 100.0, 95.0), 0.5, l_delta=10.0) == hsl(
-        0.0, 100.0, 100.0
-    )
 
 
 def test_slots_from_dataframe_length(flow_balance_df) -> None:
@@ -362,6 +311,18 @@ def test_build_power_soc_chart_flow_balance_with_extrapolation_split() -> None:
     ]
     assert export_traces
     assert any(len(trace.x) >= 1 for trace in export_traces)
+    extrapolated_start = slots[3]
+    baseload_traces = [
+        trace for trace in fig.data if isinstance(trace, go.Bar) and trace.name == "Grundlast"
+    ]
+    extrap_x = [
+        pd.Timestamp(x).to_pydatetime()
+        for trace in baseload_traces
+        for x in trace.x
+        if pd.Timestamp(x).to_pydatetime() >= extrapolated_start
+    ]
+    assert extrap_x, "Grundlast-Balken fehlen in der extrapolierten Zone"
+    assert all(x >= extrapolated_start for x in extrap_x)
 
 
 def test_flow_balance_bar_widths_follow_per_slot_resolution() -> None:

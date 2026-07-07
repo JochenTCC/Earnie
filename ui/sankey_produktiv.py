@@ -3,14 +3,19 @@ from __future__ import annotations
 
 from optimizer import steuerbefehl_for_mode
 from runtime_store import run_state
+from ui.chart_colors import (
+    SANKEY_DEFAULT_LINK_COLOR,
+    SANKEY_FLEX_MISMATCH_COLOR,
+    SANKEY_SOLL_PLACEHOLDER_LINK_COLOR,
+)
 
 PRODUKTIV_RUN_FRESH_SEC = 120
 KW_TOLERANCE = 0.02
 MIN_REAL_FLOW_KW = 0.01
 SOLL_PLACEHOLDER_FLOW_KW = 0.05
-_FLEX_MISMATCH_COLOR = "#d35400"
-_SOLL_PLACEHOLDER_LINK_COLOR = "rgba(211, 84, 0, 0.45)"
-_DEFAULT_LINK_COLOR = "rgba(180, 180, 180, 0.25)"
+FLEX_MISMATCH_COLOR = SANKEY_FLEX_MISMATCH_COLOR
+_DEFAULT_LINK_COLOR = SANKEY_DEFAULT_LINK_COLOR
+_SOLL_PLACEHOLDER_LINK_COLOR = SANKEY_SOLL_PLACEHOLDER_LINK_COLOR
 
 
 def mode_label(mode: int) -> str:
@@ -97,7 +102,7 @@ def flex_node_color(
     state: dict,
 ) -> str:
     if not kw_match(live_kw, _soll_flex_kw(state, consumer_id)):
-        return _FLEX_MISMATCH_COLOR
+        return FLEX_MISMATCH_COLOR
     return palette_color
 
 

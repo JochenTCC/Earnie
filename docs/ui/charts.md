@@ -55,7 +55,7 @@ Entladen → Last ← verbleibende Entladung
 
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
-| SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/charts.py`) | Simulierter Batterie-SOC |
+| SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/chart_colors.py`) | Simulierter Batterie-SOC |
 | SoC BL Ziel | Dieselbe Farbe, gestrichelt | Referenz-SOC (Baseline) |
 | Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 
@@ -110,7 +110,7 @@ Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich).
 
 Fehlende Log-Slots: orange Markierung, Lücken in Ist-Kurven.
 
-Kennzahlen **BL Ziel**, **Optimiert**, **Ersparnis** beziehen sich auf den Horizont **Jetzt → SA₂** (nicht nur das sichtbare Chart-Segment).
+Kennzahlen **BL Ziel**, **Optimiert**, **Ersparnis** beziehen sich auf den Horizont **Jetzt → SA₂** (nicht nur das sichtbare Chart-Segment). Linienfarben: `_HSL_COST_*` in `ui/chart_colors.py`.
 
 ## Expander: Simulations-Details
 
@@ -124,7 +124,7 @@ Tabelle je flexiblem Verbraucher über Horizont Jetzt→SA₂:
 
 ## Energiefluss (Live-Sankey)
 
-Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden.
+Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden. Knotenfarben: `ui/chart_colors.py` (Abschnitt Sankey).
 
 ## Footer
 

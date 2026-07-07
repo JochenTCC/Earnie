@@ -11,8 +11,21 @@ from runtime_store import run_state
 from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY
 from ui.runtime_config import reload_runtime_config
 from ui import sankey_produktiv as produktiv
+from ui.chart_colors import (
+    SANKEY_BATTERY_CHARGE_COLOR,
+    SANKEY_BATTERY_DISCHARGE_COLOR,
+    SANKEY_BATTERY_IDLE_COLOR,
+    SANKEY_DEFAULT_LINK_COLOR,
+    SANKEY_FLEX_PALETTE,
+    SANKEY_GRID_EXPORT_COLOR,
+    SANKEY_GRID_IMPORT_COLOR,
+    SANKEY_NODE_BASELOAD,
+    SANKEY_NODE_HOUSE,
+    SANKEY_NODE_PV,
+    SANKEY_NODE_SYSTEM,
+    SANKEY_SOLL_PLACEHOLDER_LINK_COLOR,
+)
 
-_FLEX_SANKEY_COLORS = ("#e67e22", "#9b59b6", "#1abc9c", "#e74c3c", "#34495e")
 _MIN_FLOW_KW = produktiv.MIN_REAL_FLOW_KW
 
 
@@ -23,15 +36,15 @@ def _grid_label(grid_kw: float) -> str:
 
 
 def _grid_color(grid_kw: float) -> str:
-    return "crimson" if grid_kw >= 0 else "#95a5a6"
+    return SANKEY_GRID_IMPORT_COLOR if grid_kw >= 0 else SANKEY_GRID_EXPORT_COLOR
 
 
 def _battery_color(battery_kw: float) -> str:
     if battery_kw < 0:
-        return "forestgreen"
+        return SANKEY_BATTERY_DISCHARGE_COLOR
     if battery_kw > 0:
-        return "crimson"
-    return "#95a5a6"
+        return SANKEY_BATTERY_CHARGE_COLOR
+    return SANKEY_BATTERY_IDLE_COLOR
 
 
 def _live_battery_label(current_soc: float, battery_kw: float) -> str:
@@ -77,7 +90,7 @@ class _SankeyLinks:
         self.sources.append(source)
         self.targets.append(target)
         self.values.append(value)
-        self.colors.append(color or produktiv._DEFAULT_LINK_COLOR)
+        self.colors.append(color or SANKEY_DEFAULT_LINK_COLOR)
         self.hover.append(hover if hover is not None else f"{value:.2f} kW")
 
 
@@ -138,10 +151,10 @@ def _prepare_sankey_data(
         baseload_idx = 4
         flex_start = 5
 
-        node_colors = ["#f1c40f", c_grid, c_bat, "#7f8c8d", "#3498db"]
+        node_colors = [SANKEY_NODE_PV, c_grid, c_bat, SANKEY_NODE_SYSTEM, SANKEY_NODE_BASELOAD]
         overlay = produktiv.has_produktiv_run(main_state)
         for i, consumer in enumerate(consumers):
-            palette = _FLEX_SANKEY_COLORS[i % len(_FLEX_SANKEY_COLORS)]
+            palette = SANKEY_FLEX_PALETTE[i % len(SANKEY_FLEX_PALETTE)]
             live_kw = float((breakdown.get("flex_kw") or {}).get(consumer["id"], 0.0) or 0.0)
             if overlay:
                 palette = produktiv.flex_node_color(palette, live_kw, consumer["id"], main_state)
@@ -170,9 +183,9 @@ def _prepare_sankey_data(
                 flex_start + i,
                 link_kw,
                 color=(
-                    produktiv._SOLL_PLACEHOLDER_LINK_COLOR
+                    SANKEY_SOLL_PLACEHOLDER_LINK_COLOR
                     if is_placeholder
-                    else produktiv._DEFAULT_LINK_COLOR
+                    else SANKEY_DEFAULT_LINK_COLOR
                 ),
                 hover=produktiv.flex_link_hover(
                     live_kw,
@@ -198,7 +211,7 @@ def _prepare_sankey_data(
         links.add(4, 3, data["house"], hover=f"Wohnhaus: {data['house']:.2f} kW")
     _append_return_flows(links, data, 4)
 
-    colors = ["#f1c40f", c_grid, c_bat, "#3498db", "#7f8c8d"]
+    colors = [SANKEY_NODE_PV, c_grid, c_bat, SANKEY_NODE_HOUSE, SANKEY_NODE_SYSTEM]
     return labels, links, colors
 
 

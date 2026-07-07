@@ -65,4 +65,4 @@ def test_flex_sankey_link_live_when_drawing():
 
 def test_flex_mismatch_color():
     color = produktiv.flex_node_color("#9b59b6", 0.0, "eauto", _state())
-    assert color == produktiv._FLEX_MISMATCH_COLOR
+    assert color == produktiv.FLEX_MISMATCH_COLOR

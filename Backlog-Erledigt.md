@@ -2,14 +2,25 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Chart-Farben zentralisieren (2026-07-07)
+
+- [x] **Phase 1–4 `ui/chart_colors.py`** — Single Source für Zonen, Energiebilanz-Balken, Chart-1-Linien/Overlays, Chart-2-Kosten, Sankey, Flex-Palette, Legacy-Steuerbefehl-Balken; `chart_flow_balance`, `charts`, `sankey`, `sankey_produktiv`, `planning_window` nur noch Konsumenten
+- [x] **Version 1.17.3** — Patch-Bump
+
+### Bugfix Chart 1 Zonen & Balken-X (2026-07-07)
+
+- [x] **Balken in grüner Zone SA₀→SA₁ unsichtbar** — `ChartSlotAxis.at()` ignorierte `slice(start, end)`; Extrapolations-Balken landeten am Chart-Anfang statt in der grünen Zone (`ui/charts.py`); Regressionstests
+- [x] **Zonenfarben grau/grün zentral & kontrastreicher** — `ui/chart_colors.py` mit `hsl`, `blend_hsl`, `rgba_from_hsl`, `CHART_ZONE_HISTORY_FILL`, `CHART_ZONE_FORECAST_FILL`; Forecast bewusst Gelb-Grün (H≠120) statt Material-Grün; Anbindung `data/planning_window.py`
+- [x] **Version 1.17.2** — Patch-Bump (zwei Bugfixes)
+
 ### Chart 1 Rauf/Runter-Energiebilanz (2026-07-06)
 
 - [x] **Entladesperre besser visualisieren** — gelb-schwarzes Streifenband unter SoC (`ui/charts.py`)
 - [x] **Rauf/Runter-Balken** statt Batterie-/Verbraucher-Balken — Basis `ui/chart_flow_balance.py`, `ui/flow_balance_allocate.py`
-- [x] **Farbpalette Netz & Batterie** — Netz blau, Batterie-Flüsse gedämpft (HSL in `chart_flow_balance.py`); Szenarien A–I, `docs/ui/charts.md`
+- [x] **Farbpalette Netz & Batterie** — Netz blau, Batterie-Flüsse gedämpft (HSL in `ui/chart_colors.py`); Szenarien A–I, `docs/ui/charts.md`
 - [x] **PV-Überschuss & volle Batterie** — SoC-Rand-Korrektur (MILP); Szenario I; Produktiv-Log: Ist-`battery_kw` aus `consumption_snapshot` → `Ist Batterie-Leistung (kW)` (`runtime_store/history_timeline.py`)
 - [x] **Netz- und Grundlast-Linien entfernt** — Darstellung nur noch über Rauf/Runter-Balken (`ui/charts.py`)
-- [x] **SoC-Verlauf** — gemeinsame Farbe optimiert + „SoC BL Ziel“ über `_HSL_SOC` in `ui/charts.py`
+- [x] **SoC-Verlauf** — gemeinsame Farbe optimiert + „SoC BL Ziel“ über `_HSL_SOC` in `ui/chart_colors.py`
 - [x] **Version 1.17.0** — Minor-Bump nach abgeschlossenem Version-0.+1-Block Chart 1
 
 ### UI S-2 Cold-Start & Preisprognose-Logging (2026-07-06)

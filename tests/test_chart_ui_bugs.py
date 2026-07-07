@@ -281,9 +281,11 @@ def test_soc_trace_bridges_extrapolation_start():
     assert _trace_x_vienna(soc_traces[1].x[1]) == _dt(2026, 7, 5, 22, 0)
 
 
-def _green_vrect(fig) -> object | None:
+def _forecast_zone_vrect(fig) -> object | None:
+    from ui.chart_colors import CHART_ZONE_FORECAST_FILL
+
     for shape in fig.layout.shapes or []:
-        if shape.fillcolor and "76, 175, 80" in str(shape.fillcolor):
+        if shape.fillcolor == CHART_ZONE_FORECAST_FILL:
             return shape
     return None
 
@@ -313,7 +315,7 @@ def test_green_zone_reaches_axis_edges_live():
     x_left, x_right = axis.x_range(range_start=chart.start)
     fig = go.Figure()
     _add_zone_backgrounds(fig, zones, axis, range_start=chart.start)
-    green = _green_vrect(fig)
+    green = _forecast_zone_vrect(fig)
     assert green is not None
     assert green.x0 == _dt(2026, 6, 15, 18, 0)
     assert green.x0 >= x_left
@@ -339,7 +341,7 @@ def test_green_zone_reaches_axis_edges_sa1_sa2():
     x_left, x_right = axis.x_range(range_start=chart.start)
     fig = go.Figure()
     _add_zone_backgrounds(fig, zones, axis, range_start=chart.start)
-    green = _green_vrect(fig)
+    green = _forecast_zone_vrect(fig)
     assert green is not None
     assert green.x0 == _dt(2026, 6, 16, 10, 0)
     assert green.x0 >= x_left
@@ -365,7 +367,7 @@ def test_green_zone_x0_clipped_to_sa0_when_extrap_before_window():
     x_left, x_right = axis.x_range(range_start=chart.start)
     fig = go.Figure()
     _add_zone_backgrounds(fig, zones, axis, range_start=chart.start)
-    green = _green_vrect(fig)
+    green = _forecast_zone_vrect(fig)
     assert green is not None
     assert x_left == chart.start
     assert green.x0 == x_left
@@ -400,7 +402,7 @@ def test_green_zone_left_at_quarter_to_hour_transition():
     idx = list(display.slot_datetimes).index(zones.forecast.start)
     fig = go.Figure()
     _add_zone_backgrounds(fig, zones, axis, range_start=chart.start)
-    green = _green_vrect(fig)
+    green = _forecast_zone_vrect(fig)
     assert green is not None
     assert green.x0 == axis.legacy_index_time(idx - 0.5)
     assert green.x1 == x_right

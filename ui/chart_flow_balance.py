@@ -30,6 +30,20 @@ from optimizer.targets import (
 )
 
 from ui.flow_balance_allocate import FlowAllocation, allocate_slot_flows
+from ui.chart_colors import (
+    COLOR_BASELOAD,
+    COLOR_BATTERY,
+    COLOR_CONSUMER_FALLBACK,
+    COLOR_GRID_IMPORT,
+    COLOR_PV,
+    MUTED_BATTERY_CHARGE_GRID,
+    MUTED_BATTERY_CHARGE_PV,
+    MUTED_BATTERY_EXPORT,
+    MUTED_BATTERY_LOAD,
+    MUTED_EXPORT_PV,
+    blend_hsl,
+    hsl,
+)
 
 FLOW_BALANCE_BAR_WIDTH_FRACTION = 0.9
 
@@ -52,97 +66,6 @@ KIND_SURPLUS_BALANCE = KIND_EXPORT_PV
 KIND_SURPLUS_OFFSET = KIND_EXPORT_PV
 
 Direction = Literal["up", "down"]
-
-
-def hsl(h: float, s: float, l: float) -> str:
-    """HSL → ``#RRGGBB`` (h: 0–360, s/l: 0–100)."""
-
-    hue = h % 360.0
-    sat = max(0.0, min(100.0, s)) / 100.0
-    lig = max(0.0, min(100.0, l)) / 100.0
-
-    if sat == 0.0:
-        channel = round(lig * 255)
-        return f"#{channel:02x}{channel:02x}{channel:02x}"
-
-    def _hue_channel(p: float, q: float, t: float) -> float:
-        if t < 0:
-            t += 1
-        if t > 1:
-            t -= 1
-        if t < 1 / 6:
-            return p + (q - p) * 6 * t
-        if t < 1 / 2:
-            return q
-        if t < 2 / 3:
-            return p + (q - p) * (2 / 3 - t) * 6
-        return p
-
-    q = lig * (1 + sat) if lig < 0.5 else lig + sat - lig * sat
-    p = 2 * lig - q
-    hk = hue / 360.0
-    red = round(_hue_channel(p, q, hk + 1 / 3) * 255)
-    green = round(_hue_channel(p, q, hk) * 255)
-    blue = round(_hue_channel(p, q, hk - 1 / 3) * 255)
-    return f"#{red:02x}{green:02x}{blue:02x}"
-
-
-def _lerp_hue(h_a: float, h_b: float, weight: float) -> float:
-    """Farbton entlang des kürzesten Kreisbogens interpolieren."""
-    delta = ((h_b - h_a + 180.0) % 360.0) - 180.0
-    return (h_a + delta * weight) % 360.0
-
-
-def blend_hsl(
-    hsl_a: tuple[float, float, float],
-    hsl_b: tuple[float, float, float],
-    ratio_b: float,
-    l_delta: float = 0.0,
-) -> str:
-    """
-    Mischt zwei HSL-Tripel; ``ratio_b`` = Anteil von ``hsl_b`` (0…1).
-
-    ``l_delta`` verschiebt die Lightness nach der Mischung in Prozentpunkten
-    (positiv = heller, negativ = dunkler), begrenzt auf 0…100.
-    """
-    weight = max(0.0, min(1.0, ratio_b))
-    hue = _lerp_hue(hsl_a[0], hsl_b[0], weight)
-    sat = hsl_a[1] * (1.0 - weight) + hsl_b[1] * weight
-    lig = hsl_a[2] * (1.0 - weight) + hsl_b[2] * weight
-    lig = max(0.0, min(100.0, lig + l_delta))
-    return hsl(hue, sat, lig)
-
-
-# Basis-HSL (h: 0–360, s/l: 0–100) — Mischungen unten per ``blend_hsl`` anpassen.
-_HSL_PV = (60.0, 90.0, 50.0) # Rein Gelb
-_HSL_GRID = (240.0, 90.0, 50.0) # Rein Blau
-_HSL_GRID_IMPORT = (240.0, 80.0, 60.0) 
-_HSL_BASELOAD = (300.0, 60.0, 50.0) # Rein Magenta
-_HSL_BATTERY = (120.0, 100.0, 50.0) # Rein Grün
-_HSL_WHITE = (0.0, 0.0, 100.0)
-
-_COLOR_PV = hsl(*_HSL_PV)
-_COLOR_GRID = hsl(*_HSL_GRID)
-_COLOR_BASELOAD = hsl(*_HSL_BASELOAD)
-_COLOR_BATTERY = hsl(*_HSL_BATTERY)
-_COLOR_GRID_IMPORT = hsl(*_HSL_GRID_IMPORT)
-
-# Gedämpfte Bilanz-Segmente (Transparenz über Trace-Opacity _MUTED_BAR_OPACITY).
-_MUTED_BATTERY_LOAD = blend_hsl(_HSL_BATTERY, _HSL_WHITE, 0.1, 25.0)
-_MUTED_BATTERY_CHARGE_PV = blend_hsl(_HSL_PV, _HSL_BATTERY, 0.5, 25)
-_MUTED_BATTERY_CHARGE_GRID = blend_hsl(_HSL_BATTERY, _HSL_GRID, 0.6, 35)
-_MUTED_BATTERY_EXPORT = blend_hsl(_HSL_BATTERY, _HSL_GRID, 0.5, 0.8)
-_MUTED_EXPORT_PV = blend_hsl(_HSL_PV, _HSL_WHITE, 0.1, 25)
-
-COLOR_PV = _COLOR_PV
-COLOR_GRID_IMPORT = _COLOR_GRID_IMPORT
-COLOR_BASELOAD = _COLOR_BASELOAD
-COLOR_BATTERY = _COLOR_BATTERY
-MUTED_BATTERY_CHARGE_PV = _MUTED_BATTERY_CHARGE_PV
-MUTED_BATTERY_CHARGE_GRID = _MUTED_BATTERY_CHARGE_GRID
-MUTED_BATTERY_LOAD = _MUTED_BATTERY_LOAD
-MUTED_BATTERY_EXPORT = _MUTED_BATTERY_EXPORT
-MUTED_EXPORT_PV = _MUTED_EXPORT_PV
 
 FLOW_BALANCE_TRACE_ORDER: tuple[str, ...] = (
     KIND_EXPORT_PV,
@@ -263,7 +186,7 @@ def _consumer_color(consumer: Mapping[str, Any]) -> str:
     configured = consumer.get("chart_color")
     if configured:
         return str(configured)
-    return "#7f8c8d"
+    return COLOR_CONSUMER_FALLBACK
 
 
 @dataclass(frozen=True)
@@ -377,35 +300,35 @@ def _segments_from_allocation(
             label="Batterie laden (PV)",
             kw=flows.charge_from_pv,
             direction="down",
-            color=_MUTED_BATTERY_CHARGE_PV,
+            color=MUTED_BATTERY_CHARGE_PV,
         ),
         _muted_segment(
             kind=KIND_BATTERY_CHARGE_GRID,
             label="Batterie laden (Netz)",
             kw=flows.charge_from_grid,
             direction="down",
-            color=_MUTED_BATTERY_CHARGE_GRID,
+            color=MUTED_BATTERY_CHARGE_GRID,
         ),
         _muted_segment(
             kind=KIND_EXPORT_PV,
             label="Einspeisung (PV)",
             kw=export_pv,
             direction="down",
-            color=_MUTED_EXPORT_PV,
+            color=MUTED_EXPORT_PV,
         ),
         _muted_segment(
             kind=KIND_EXPORT_BATTERY,
             label="Einspeisung (Batterie)",
             kw=flows.export_from_battery,
             direction="down",
-            color=_MUTED_BATTERY_EXPORT,
+            color=MUTED_BATTERY_EXPORT,
         ),
         _muted_segment(
             kind=KIND_BATTERY_DISCHARGE_LOAD,
             label="Batterie entladen (Verbrauch)",
             kw=flows.discharge_to_load,
             direction="up",
-            color=_MUTED_BATTERY_LOAD,
+            color=MUTED_BATTERY_LOAD,
         ),
     ):
         if segment is None:
@@ -467,7 +390,7 @@ def build_flow_balance_segments(
                 label="PV",
                 kw=pv,
                 direction="up",
-                color=_COLOR_PV,
+                color=COLOR_PV,
             )
         )
     if grid_import > 0:
@@ -477,7 +400,7 @@ def build_flow_balance_segments(
                 label="Netzbezug",
                 kw=grid_import,
                 direction="up",
-                color=_COLOR_GRID_IMPORT,
+                color=COLOR_GRID_IMPORT,
             )
         )
 
@@ -489,7 +412,7 @@ def build_flow_balance_segments(
                 label="Grundlast",
                 kw=baseload,
                 direction="down",
-                color=_COLOR_BASELOAD,
+                color=COLOR_BASELOAD,
             )
         )
 

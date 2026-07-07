@@ -7,9 +7,9 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import plotly.graph_objects as go
 
+from ui.chart_colors import COLOR_SOC
 from ui.charts import (
     ChartSlotAxis,
-    _COLOR_SOC,
     _LINE_ANCHOR_SLOT_CENTER,
     _LINE_ANCHOR_SLOT_START,
     add_cumulative_s2_split_traces,
@@ -153,7 +153,7 @@ def test_chart1_soc_uses_slot_start_anchor():
     fig = go.Figure()
     add_optimized_soc_trace(fig, df, axis)
     soc = next(t for t in fig.data if t.name == "SoC")
-    assert soc.line.color == _COLOR_SOC
+    assert soc.line.color == COLOR_SOC
     for index, slot in enumerate(slots):
         soc_value = float(df.iloc[index]["Simulierter SoC (%)"])
         expected = _slot_start(axis, index)
