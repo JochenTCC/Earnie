@@ -11,6 +11,19 @@ from tests.fixtures.historical_fixtures import CONS_DATA_FILE, fixture_available
 
 ROOT = Path(__file__).resolve().parents[1]
 DOTENV_PATH = ROOT / ".env"
+DEFAULT_TEST_CONFIG_PATH = ROOT / "tests" / "fixtures" / "backtesting" / "config.json"
+_USE_LIVE_CONFIG_ENV = "ENERGY_OPTIMIZER_TEST_USE_LIVE_CONFIG"
+
+
+def _apply_default_test_config_env() -> None:
+    """Fixture-Config erzwingen — unabhängig von lokaler .env/NAS-Pfad."""
+    if os.getenv(_USE_LIVE_CONFIG_ENV) == "1":
+        return
+    os.environ["ENERGY_OPTIMIZER_CONFIG_PATH"] = str(DEFAULT_TEST_CONFIG_PATH)
+    os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+
+
+_apply_default_test_config_env()
 
 
 def _has_runtime_cons_data() -> bool:
@@ -48,13 +61,35 @@ def historical_cons_data():
 def _load_dotenv_for_tests() -> None:
     if DOTENV_PATH.is_file():
         load_dotenv(DOTENV_PATH, override=False)
+    _apply_default_test_config_env()
 
 
 _load_dotenv_for_tests()
 
+import config as _config_module
+
+_config_module.reinit_config()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _bootstrap_test_config():
+    """Stellt sicher, dass CONFIG nach Session-Start auf der Fixture-Config basiert."""
+    _apply_default_test_config_env()
+    _config_module.reinit_config()
+
+
+@pytest.fixture(autouse=True)
+def _restore_default_test_config_after_test():
+    """Nach jedem Test zurück auf Fixture-Config (tmp_path-Overrides aus Einzeltests)."""
+    yield
+    _apply_default_test_config_env()
+    _config_module.reinit_config()
+
 
 def _loxone_integration_enabled() -> bool:
     if os.getenv("ENERGY_OPTIMIZER_SKIP_LOXONE_INTEGRATION") == "1":
+        return False
+    if os.getenv(_USE_LIVE_CONFIG_ENV) != "1":
         return False
     if not (
         (ROOT / "config.json").is_file() or (ROOT / "config" / "config.json").is_file()
@@ -70,7 +105,8 @@ def _loxone_integration_enabled() -> bool:
 requires_loxone = pytest.mark.skipif(
     not _loxone_integration_enabled(),
     reason=(
-        "Loxone-Integration: .env mit LOXONE_IP/USER/PASS und config.json erforderlich "
+        "Loxone-Integration: ENERGY_OPTIMIZER_TEST_USE_LIVE_CONFIG=1, .env mit "
+        "LOXONE_IP/USER/PASS und config.json erforderlich "
         "(ENERGY_OPTIMIZER_SKIP_LOXONE_INTEGRATION=1 zum Überspringen)"
     ),
 )
@@ -84,4 +120,8 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers",
         "slow: Längerer Backtesting- oder MILP-Integrationslauf",
+    )
+    config.addinivalue_line(
+        "markers",
+        "requires_live_config: bewusst NAS/Prod-config.json (ENERGY_OPTIMIZER_TEST_USE_LIVE_CONFIG=1)",
     )

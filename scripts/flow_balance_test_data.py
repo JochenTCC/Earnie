@@ -27,7 +27,7 @@ SCENARIO_START = datetime(2026, 7, 6, 8, 0, tzinfo=_TZ)
 _FLEX_SWIMSPA_CONFIG = {
     "id": "swimspa",
     "name": "SwimSpa",
-    "chart_color": "#c2185b",
+    "chart_color_index": 0,
     "optimizer_enabled": True,
 }
 _FLEX_SWIMSPA_COLUMN = "SwimSpa (kW)"

@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from data.planning_window import (
+    chart_zone_kind_for_slot_start,
     compute_planning_window,
     compute_sunrise_anchors,
     compute_ui_chart_window,
@@ -199,6 +200,21 @@ class TestUiChartWindow:
         assert past_history == past_neutral == expected_end
         assert past_history < past_last
         assert live_default_history < past_history
+
+    def test_chart_zone_kind_for_slot_start(self):
+        now = _dt(2026, 6, 15, 14, 0)
+        chart = compute_ui_chart_window(now, LAT, LON, TZ, segment_index=0)
+        rows = [
+            {
+                "slot_datetime": _dt(2026, 6, 15, hour, 0),
+                "Preis extrapoliert": hour >= 18,
+            }
+            for hour in range(5, 20)
+        ]
+        zones = ui_chart_zones(now, chart, sim_rows=rows)
+        assert chart_zone_kind_for_slot_start(_dt(2026, 6, 15, 13, 0), zones) == "history"
+        assert chart_zone_kind_for_slot_start(normalize_hour_slot(now), zones) == "live_plan"
+        assert chart_zone_kind_for_slot_start(_dt(2026, 6, 15, 18, 0), zones) == "forecast"
 
     def test_ui_chart_offset_shifts_anchors_back(self):
         now = _dt(2026, 6, 15, 14, 0)

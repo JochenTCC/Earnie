@@ -81,7 +81,8 @@
             },
             "loxone_inputs": {
                 "power_name": "SwimSpa_Power"
-            }
+            },
+            "chart_color_index": 0
         },
         {
             "id": "eauto",
@@ -124,7 +125,8 @@
                     "battery_capacity_kwh_name": "EAuto_Battery_kWh",
                     "nominal_power_kw_name": "EAuto_Max_kW"
                 }
-            }
+            },
+            "chart_color_index": 2
         },
         {
             "id": "waermepumpe",
@@ -142,7 +144,8 @@
             },
             "loxone_inputs": {
                 "power_name": "WP_Power"
-            }
+            },
+            "chart_color_index": 7
         }
     ]
 }

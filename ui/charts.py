@@ -41,7 +41,6 @@ from ui.chart_colors import (
     COLOR_STEER_ENTLADESPERRE,
     COLOR_STEER_FORCE_CHARGE,
     COLOR_STEER_FORCE_DISCHARGE,
-    consumer_bar_palette,
 )
 from ui.help_hint import render_title_with_help
 
@@ -815,22 +814,6 @@ def ordered_active_consumers_for_stack(
     return active
 
 
-def _consumer_chart_color(consumer: dict) -> str:
-    configured = consumer.get("chart_color")
-    if configured:
-        return str(configured)
-    all_consumers = config.get_flexible_consumers(optimizer_only=False)
-    index = next(
-        item for item, candidate in enumerate(all_consumers) if candidate["id"] == consumer["id"]
-    )
-    return consumer_bar_palette(len(all_consumers))[index]
-
-
-def _consumer_bar_palette(count: int) -> list[str]:
-    """Rückwärtskompatibilität für Tests — siehe ``consumer_bar_palette``."""
-    return consumer_bar_palette(count)
-
-
 def _extended_hover_labels(uhrzeit: pd.Series) -> list[str]:
     """Hover-Labels für verlängerte Linien (letzte Uhrzeit einmal wiederholt)."""
     if uhrzeit.empty:
@@ -1250,6 +1233,7 @@ def add_power_traces(
     *,
     matrix: list[dict] | None = None,
     chart_window: UiChartWindow | None = None,
+    chart_zones=None,
 ) -> None:
     active_consumers = ordered_active_consumers_for_stack(
         df,
@@ -1273,6 +1257,7 @@ def add_power_traces(
         extrap_start,
         extrap_end,
         flex_consumers=active_consumers,
+        chart_zones=chart_zones,
     )
 
 
@@ -1954,6 +1939,7 @@ def build_power_soc_chart_figure(
         extrap_end,
         matrix=optimization_matrix,
         chart_window=chart_window,
+        chart_zones=chart_zones,
     )
     add_entladesperre_soc_band_traces(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,

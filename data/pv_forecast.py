@@ -19,7 +19,7 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
     now_time = datetime.now()
     
     if _LAST_API_CALL and (now_time - _LAST_API_CALL) < timedelta(minutes=15):
-        print("⏳ forecast.solar-Schutz: Letzter API-Aufruf vor weniger als 15 min. Nutze lokalen Cache.")
+        print("[cache] forecast.solar-Schutz: Letzter API-Aufruf vor weniger als 15 min. Nutze lokalen Cache.")
         return _CACHED_HOURLY_WATTS
     
     try:
@@ -31,11 +31,11 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
         _CACHED_HOURLY_WATTS = hourly_watts
         return hourly_watts
     except requests.exceptions.Timeout:
-        print(f"🚨 Timeout beim PV-Forecast ({config.get_global_timeout()}s überschritten). Nutze Fallback.")
+        print(f"[FEHLER] Timeout beim PV-Forecast ({config.get_global_timeout()}s überschritten). Nutze Fallback.")
     except requests.exceptions.HTTPError as http_err:
-        print(f"🚨 HTTP-Fehler beim PV-Forecast-Abruf: {http_err}. Nutze Fallback.")
+        print(f"[FEHLER] HTTP-Fehler beim PV-Forecast-Abruf: {http_err}. Nutze Fallback.")
     except Exception as e:
-        print(f"🚨 Unerwarteter Fehler beim PV-Forecast: {e}. Nutze Fallback.")
+        print(f"[FEHLER] Unerwarteter Fehler beim PV-Forecast: {e}. Nutze Fallback.")
     
     return None
 
@@ -54,7 +54,7 @@ def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[
     
     if success_count > 0:
         print(
-            f"✅ PV-Ertragsprognose erfolgreich bereitgestellt "
+            f"[OK] PV-Ertragsprognose erfolgreich bereitgestellt "
             f"({success_count}/{len(target_hours)} Stunden gemappt. Max: {max(pv_vector)} kW)."
         )
         return pv_vector, True
@@ -87,10 +87,10 @@ def _generate_seasonal_fallback(target_hours: list, kwp: float) -> list:
 def _apply_tuning_factor(pv_vector: list) -> list:
     """Wendet den adaptiven PV-Tuning-Faktor an."""
     tuning_factor = pv_tuner.calculate_tuning_factor(days_back=14)
-    print(f"📈 Adaptives PV-Tuning: Wende Korrekturfaktor von {tuning_factor} an.")
+    print(f"[tuning] Adaptives PV-Tuning: Wende Korrekturfaktor von {tuning_factor} an.")
     
     tuned_vector = [round(max(0.0, val * tuning_factor), 3) for val in pv_vector]
-    print(f"ℹ️ Synthetischer PV-Fallback-Vektor generiert (Saisonaler Max-Peak: {max(tuned_vector):.2f} kW).")
+    print(f"[info] Synthetischer PV-Fallback-Vektor generiert (Saisonaler Max-Peak: {max(tuned_vector):.2f} kW).")
     
     return tuned_vector
 
@@ -117,7 +117,7 @@ def get_hourly_pv_forecast_for_hours(target_hours: list) -> List[float]:
         if success:
             return _apply_tuning_factor(pv_vector)
         print(
-            "⚠️ API-/Cache-Daten empfangen, aber keine passenden Zeitstempel für "
+            "[WARN] API-/Cache-Daten empfangen, aber keine passenden Zeitstempel für "
             f"die {len(target_hours)} Zielstunden gefunden. Nutze Fallback."
         )
 

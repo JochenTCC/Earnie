@@ -16,7 +16,6 @@ from ui.chart_colors import (
     SANKEY_BATTERY_DISCHARGE_COLOR,
     SANKEY_BATTERY_IDLE_COLOR,
     SANKEY_DEFAULT_LINK_COLOR,
-    SANKEY_FLEX_PALETTE,
     SANKEY_GRID_EXPORT_COLOR,
     SANKEY_GRID_IMPORT_COLOR,
     SANKEY_NODE_BASELOAD,
@@ -24,6 +23,7 @@ from ui.chart_colors import (
     SANKEY_NODE_PV,
     SANKEY_NODE_SYSTEM,
     SANKEY_SOLL_PLACEHOLDER_LINK_COLOR,
+    consumer_chart_color,
 )
 
 _MIN_FLOW_KW = produktiv.MIN_REAL_FLOW_KW
@@ -153,12 +153,17 @@ def _prepare_sankey_data(
 
         node_colors = [SANKEY_NODE_PV, c_grid, c_bat, SANKEY_NODE_SYSTEM, SANKEY_NODE_BASELOAD]
         overlay = produktiv.has_produktiv_run(main_state)
-        for i, consumer in enumerate(consumers):
-            palette = SANKEY_FLEX_PALETTE[i % len(SANKEY_FLEX_PALETTE)]
+        for consumer in consumers:
+            node_color = consumer_chart_color(consumer)
             live_kw = float((breakdown.get("flex_kw") or {}).get(consumer["id"], 0.0) or 0.0)
             if overlay:
-                palette = produktiv.flex_node_color(palette, live_kw, consumer["id"], main_state)
-            node_colors.append(palette)
+                node_color = produktiv.flex_node_color(
+                    node_color,
+                    live_kw,
+                    consumer["id"],
+                    main_state,
+                )
+            node_colors.append(node_color)
 
         _append_sources_to_system(links, data, system_idx)
 

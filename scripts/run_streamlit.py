@@ -56,6 +56,10 @@ def _run_streamlit_cli(argv: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    import logger_config
+
+    logger_config.configure_utf8_stdio()
+
     args = _parse_args(argv)
     port = streamlit_port()
     print(

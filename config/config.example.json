@@ -40,21 +40,28 @@
         "event_triggers": [
             {
                 "id": "eauto_plugged_in",
-                "loxone_name": "EAuto_Angeschlossen",
+                "loxone_name": "Ernie_EAuto_Da",
                 "signal_type": "binary",
                 "on_change": "any",
                 "label": "E-Auto angeschlossen"
             },
             {
+                "id": "eauto_charge_immediate",
+                "loxone_name": "E-Auto_SOFORT_LADEN",
+                "signal_type": "binary",
+                "on_change": "any",
+                "label": "E-Auto wird sofort geladen"
+            },
+            {
                 "id": "eauto_ready_by",
-                "loxone_name": "EAuto_FertigUm",
+                "loxone_name": "Ernie_EAuto_FertigUm",
                 "signal_type": "text",
                 "on_change": "any",
                 "label": "E-Auto Fertig-Uhrzeit"
             },
             {
                 "id": "eauto_rest_soc",
-                "loxone_name": "EAuto_SOC_bei_Anschluss",
+                "loxone_name": "Rest-SOC",
                 "signal_type": "analog",
                 "on_change": "any",
                 "label": "E-Auto Rest-SOC"
@@ -85,7 +92,7 @@
         "battery_capacity_kwh": 5.0,
         "battery_min_soc": 10.0,
         "battery_max_soc": 100.0,
-        "threshold_power": 0.02,
+        "threshold_power": 0.05,
         "latitude": 48,
         "longitude": 10,
         "timezone_name": "Europe/Vienna"
@@ -97,7 +104,7 @@
         {
             "id": "swimspa",
             "name": "SwimSpa",
-            "chart_color": "#c2185b",
+            "chart_color_index": 0,
             "nominal_power_kw": 2.8,
             "daily_target_kwh": 5.0,
             "daily_target_source": "thermal",
@@ -109,7 +116,7 @@
                 "enable_name": "Ernie_SwimSpa_Freigabe"
             },
             "loxone_inputs": {
-                "power_name": "Merkername SwimSpa kW"
+                "power_name": "Ernie_Swim-Spa-P_act"
             },
             "thermal_control": {
                 "enabled": true,
@@ -127,17 +134,17 @@
                     "power_csv": "./Historical-Data/Miniserver-Gen2_SwimSpa_Leistung_20230701-20260702.csv"
                 },
                 "loxone": {
-                    "actual_temp_name": "Merkername SwimSpa Ist-Temp",
-                    "setpoint_temp_name": "Merkername SwimSpa Soll-Temp",
-                    "ambient_temp_name": "Merkername SwimSpa Aussen-Temp",
-                    "tolerance_c_name": "Merkername SwimSpa Temp-Toleranz"
+                    "actual_temp_name": "homie_bwa_spa_currenttemperature",
+                    "setpoint_temp_name": "SwimSpa_Temp_Soll",
+                    "ambient_temp_name": "Außentemperatur",
+                    "tolerance_c_name": "SwimSpa_Max_Temp_Delta"
                 }
             }
         },
         {
             "id": "eauto",
             "name": "E-Auto",
-            "chart_color": "#00bcd4",
+            "chart_color_index": 2,
             "nominal_power_kw": 3.5,
             "min_power_kw": 1.4,
             "daily_target_source": "config",
@@ -150,7 +157,7 @@
                 "pv_follow_name": "Ernie_EAuto_pv_follow"
             },
             "loxone_inputs": {
-                "power_name": "Merkername EAuto kW"
+                "power_name": "Ernie_EAuto_P_act"
             },
             "charging_schedule": {
                 "enabled": true,
@@ -168,20 +175,20 @@
                     "daily_rest_soc": 30.0
                 },
                 "loxone": {
-                    "plugged_in_name": "EAuto_Angeschlossen",
-                    "ready_by_time_name": "EAuto_FertigUm",
-                    "soc_at_plug_in_name": "EAuto_SOC_bei_Anschluss",
-                    "charge_immediate_name": "EAuto_SOFORT_LADEN",
+                    "plugged_in_name": "Ernie_EAuto_Da",
+                    "ready_by_time_name": "Ernie_EAuto_FertigUm",
+                    "soc_at_plug_in_name": "Rest-SOC",
+                    "charge_immediate_name": "E-Auto_SOFORT_LADEN",
                     "charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen",
                     "battery_capacity_kwh_name": "Batteriekapazität_E-Auto",
-                    "nominal_power_kw_name": "EAuto_MaxLeistung"
+                    "nominal_power_kw_name": "Ladestrom Max EAuto"
                 }
             }
         },
         {
             "id": "waermepumpe",
             "name": "Wärmepumpe",
-            "chart_color": "#ff9800",
+            "chart_color_index": 7,
             "nominal_power_kw": 1.6,
             "daily_target_kwh": 4.0,
             "daily_target_source": "historical",

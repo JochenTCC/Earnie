@@ -8,10 +8,18 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import config
-from data.planning_window import UiChartWindow
+from data.planning_window import UiChartWindow, UiChartZone, UiChartZones
+from ui.chart_colors import (
+    CONSUMER_CHART_SATURATION_MUTED,
+    consumer_chart_color,
+)
+from ui.chart_flow_balance import (
+    KIND_FLEX,
+    flow_balance_plotly_trace_specs,
+    build_flow_balance_slots_from_df,
+)
 from ui.charts import (
     ChartSlotAxis,
-    _consumer_chart_color,
     _consumer_horizon_energy_kwh,
     add_power_traces,
     clear_consumer_stack_order_cache,
@@ -25,13 +33,13 @@ _TEST_CONSUMERS = (
     {
         "id": "swimspa",
         "name": "SwimSpa",
-        "chart_color": "#c2185b",
+        "chart_color_index": 0,
         "optimizer_enabled": True,
     },
     {
         "id": "eauto",
         "name": "E-Auto",
-        "chart_color": "#00bcd4",
+        "chart_color_index": 2,
         "optimizer_enabled": True,
     },
 )
@@ -166,13 +174,94 @@ def test_flow_balance_bars_replace_battery_and_flex_at_same_x(monkeypatch):
     assert flex_traces[0].x[0] == baseload.x[0]
 
 
-def test_consumer_chart_color_uses_config_when_set(monkeypatch):
+def test_consumer_chart_color_uses_palette_index(monkeypatch):
     _patch_consumers(monkeypatch)
     consumers = list(_TEST_CONSUMERS)
-    consumers[1] = {**consumers[1], "chart_color": None}
-    monkeypatch.setattr(
-        config,
-        "get_flexible_consumers",
-        lambda optimizer_only=False: consumers,
+    assert consumer_chart_color(consumers[0]) == consumer_chart_color(
+        {"id": "swimspa", "chart_color_index": 0}
     )
-    assert _consumer_chart_color(consumers[0]) == "#c2185b"
+    assert consumer_chart_color(consumers[1]) == consumer_chart_color(
+        {"id": "eauto", "chart_color_index": 2}
+    )
+
+
+def test_flex_bar_colors_use_zone_saturation(monkeypatch):
+    _patch_consumers(monkeypatch)
+    chart = _chart_window()
+    slots = list(chart.slot_datetimes)
+    history_slot = slots[0]
+    live_slot = slots[1]
+    df = pd.DataFrame(
+        {
+            "slot_datetime": slots,
+            "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+            "PV-Prognose (kW)": [0.0] * len(slots),
+            "Verbrauch-Prognose (kW)": [0.0] * len(slots),
+            "Netzbezug (kW)": [0.0] * len(slots),
+            "Geplante Batterie-Aktion (kW)": [0.0] * len(slots),
+            "Steuerbefehl": ["IDLE"] * len(slots),
+            "SwimSpa (kW)": [
+                2.0 if slot == history_slot else (2.0 if slot == live_slot else 0.0)
+                for slot in slots
+            ],
+            "E-Auto (kW)": [0.0] * len(slots),
+        }
+    )
+    zones = UiChartZones(
+        history=UiChartZone(
+            label="Vergangenheit",
+            start=chart.start,
+            end=live_slot,
+            fill_color="rgba(0,0,0,0.1)",
+        ),
+        live_plan=UiChartZone(
+            label="Plan",
+            start=live_slot,
+            end=chart.end,
+            fill_color=None,
+        ),
+        forecast=UiChartZone(
+            label="Forecast",
+            start=chart.end,
+            end=chart.end,
+            fill_color=None,
+        ),
+    )
+    flex = ordered_active_consumers_for_stack(df, chart_window=chart)
+    flow_slots = build_flow_balance_slots_from_df(df, flex_consumers=flex)
+    axis = ChartSlotAxis.from_dataframe(df)
+    specs = flow_balance_plotly_trace_specs(
+        flow_slots,
+        x_values=list(axis.at(slice(0, len(df)), 0.55)),
+        uhrzeit=list(df["Uhrzeit"]),
+        start=0,
+        end=len(df),
+        df=df,
+        flex_consumers=flex,
+        axis=axis,
+        chart_zones=zones,
+    )
+    swimspa = _TEST_CONSUMERS[0]
+    full_color = consumer_chart_color(swimspa)
+    muted_color = consumer_chart_color(
+        swimspa,
+        saturation_factor=CONSUMER_CHART_SATURATION_MUTED,
+    )
+    history_spec = next(
+        spec
+        for spec in specs
+        if spec.kind == KIND_FLEX
+        and spec.legendgroup == "flex:swimspa"
+        and spec.marker["color"] == full_color
+    )
+    live_spec = next(
+        spec
+        for spec in specs
+        if spec.kind == KIND_FLEX
+        and spec.legendgroup == "flex:swimspa"
+        and spec.marker["color"] == muted_color
+    )
+    assert history_spec.legend_color == full_color
+    assert live_spec.legend_color == full_color
+    assert len(history_spec.x) == 1
+    assert len(live_spec.x) == 1

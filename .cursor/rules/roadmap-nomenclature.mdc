@@ -10,7 +10,7 @@ alwaysApply: true
 | Ebene | Begriff | Schreibweise | Beispiel |
 |-------|---------|--------------|----------|
 | 1 | **Epic** | Kurzname oder voller Titel | **UI S-2** (= UI Sunset-2-Sunset) |
-| 2 | **Phase** | Epic · Phase N | **S-2 P3**, **MILP-Horizont P3** |
+| 2 | **Phase** | Epic · Phase N | **S-2 P3**, **MILP-Horizont P3**, **Adaption P1**, **Thermik P2** |
 | 3 | **Schritt** | Epic · Phase · Buchstabe | **S-2 P3a** |
 
 ## Regeln
@@ -28,6 +28,25 @@ alwaysApply: true
 | MILP Sunset-Horizont | P1–P5 | **MILP-Horizont** |
 | Session-Abschluss | P1–P2 | **Session-Abschluss** |
 | MIGRATION.md | P1–P7 | **Migration** |
+| Parameter-Adaption | P1–P4 | **Adaption** |
+| Generische Wärmemodelle | P1–P3 | **Thermik** |
+
+## Adaption — Phasen
+
+| Phase | Inhalt |
+|-------|--------|
+| P1 | Generisches Adaptionsmodell (Skeleton) |
+| P2 | PV-Adaption (neuer Ansatz) |
+| P3 | Adaptionsalgorithmus (PV-Pilot) |
+| P4 | UI Visualisierung Adaptionsalgos |
+
+## Thermik — Phasen
+
+| Phase | Inhalt |
+|-------|--------|
+| P1 | Isolierte Ein-Knoten-Modelle (Swim-Spa, Gefrierschrank) |
+| P2 | Gekoppelte Ein-Knoten-Modelle (Haus ↔ Speicher ↔ Solar) |
+| P3 | Thermik-Parameter-Adaption |
 
 ## UI S-2 — Phasen
 
@@ -42,6 +61,8 @@ alwaysApply: true
 
 ```
 ui(s2): P3a Chart 2 Ist/Prognose getrennt
+adaptation: P1 Generisches Adaptionsmodell (Skeleton)
+thermik: P1 Isolierte Ein-Knoten-Modelle
 ```
 
-Im Dialog: „Als Nächstes **S-2 P3a**“ — nicht „Paket A“ oder bare „Phase 3“.
+Im Dialog: „Als Nächstes **S-2 P3a**“ — nicht „Paket A“ oder bare „Phase 3“. Analog: **Adaption P1**, **Thermik P2**.

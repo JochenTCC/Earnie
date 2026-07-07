@@ -3,6 +3,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import logger_config
+
+logger_config.configure_utf8_stdio()
+
 from runtime_store import bootstrap
 
 bootstrap.run()

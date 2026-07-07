@@ -542,7 +542,7 @@
     },
     "flexible_consumer": {
       "type": "object",
-      "required": ["id", "name", "nominal_power_kw"],
+      "required": ["id", "name", "nominal_power_kw", "chart_color_index"],
       "properties": {
         "id": {
           "type": "string",
@@ -552,10 +552,11 @@
           "type": "string",
           "description": "Anzeigename in der UI."
         },
-        "chart_color": {
-          "type": "string",
-          "pattern": "^#[0-9A-Fa-f]{6}$",
-          "description": "Hex-Farbe für Flex-Verbraucher-Balken in Chart 1 (z. B. #00bcd4)."
+        "chart_color_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7,
+          "description": "Index 0–7 in der festen Verbraucher-Palette (ui/chart_colors.py, H=260→40). Chart 1 und Sankey nutzen dieselbe Farbe."
         },
         "nominal_power_kw": {
           "type": "number",

@@ -6,13 +6,12 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from ui.chart_colors import COLOR_COST_SAVINGS
+from ui.chart_colors import COLOR_COST_SAVINGS, CONSUMER_PALETTE, consumer_palette_color
 from ui.charts import (
     ChartSlotAxis,
     _battery_bar_times,
     _chart_has_pv_follow_bars,
     _consumer_bar_marker,
-    _consumer_bar_palette,
     _consumer_bar_pattern_shapes,
     _cost_summary_annotations,
     _extended_line_xy,
@@ -99,12 +98,11 @@ def test_soc_tail_y_returns_none_for_missing_soc():
     assert _soc_tail_y_from_row(row) is None
 
 
-def test_consumer_palette_spans_magenta_to_cyan():
-    colors = _consumer_bar_palette(3)
-    assert len(colors) == 3
-    assert colors[0] == "#c2185b"
-    assert colors[-1] == "#00bcd4"
-    assert colors[0] != colors[-1]
+def test_consumer_palette_spans_blue_violet_to_yellow_orange():
+    assert len(CONSUMER_PALETTE) == 8
+    assert consumer_palette_color(0) == CONSUMER_PALETTE[0]
+    assert consumer_palette_color(7) == CONSUMER_PALETTE[-1]
+    assert CONSUMER_PALETTE[0] != CONSUMER_PALETTE[-1]
 
 
 def test_grid_line_x_centered_on_hour_slots():

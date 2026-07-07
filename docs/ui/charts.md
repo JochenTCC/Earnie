@@ -51,6 +51,10 @@ Entladen → Last ← verbleibende Entladung
 | `export_battery` | Cyan | Einspeisung aus Entladung (Batterie→Netz) |
 | `battery_discharge_load` | Grün | Entladen in die Last (0-Bilanz) |
 
+**Flexible Verbraucher** (gestapelte Down-Segmente): Farbe aus fester **8er-Palette** in `ui/chart_colors.py` (`CONSUMER_PALETTE`, Hue **260→40**, S≈90, L≈50). In `config.json` je Verbraucher **`chart_color_index`** (0–7), nicht mehr freies Hex. Auflösung zentral über `consumer_chart_color()` — Chart 1 und Sankey nutzen dieselben Vollfarben.
+
+**Zonenabhängige Sättigung (nur Chart-1-Flex-Balken):** Grauer Bereich (Vergangenheit) volle Palette-Sättigung; neutraler Bereich (laufender Plan) und grüner Bereich (Preis-Prognose) gemeinsam gedämpft (`CONSUMER_CHART_SATURATION_MUTED`, derzeit 0,6). Slot → Zone über `chart_zone_kind_for_slot_start()` / `UiChartZones`; Legende bleibt in Vollfarbe (`visible='legendonly'`). Sankey unverändert volle Sättigung.
+
 **Rechte Y-Achse (0–100, skaliert):**
 
 | Spur | Darstellung | Bedeutung |
@@ -124,7 +128,7 @@ Tabelle je flexiblem Verbraucher über Horizont Jetzt→SA₂:
 
 ## Energiefluss (Live-Sankey)
 
-Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden. Knotenfarben: `ui/chart_colors.py` (Abschnitt Sankey).
+Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden. Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`).
 
 ## Footer
 

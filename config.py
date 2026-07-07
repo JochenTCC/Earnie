@@ -6,6 +6,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 _HEX_CHART_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+_CONSUMER_PALETTE_SIZE = 8
 
 # Sensible Daten aus .env laden
 load_dotenv()
@@ -605,17 +606,30 @@ class Config:
         }
 
     @staticmethod
-    def _normalize_chart_color(raw: dict, consumer_id: str) -> str | None:
-        value = raw.get("chart_color")
-        if value is None:
-            return None
-        color = str(value).strip()
-        if not _HEX_CHART_COLOR_RE.match(color):
+    def _normalize_chart_color_index(raw: dict, consumer_id: str) -> int:
+        if "chart_color_index" not in raw:
             raise ValueError(
                 f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "chart_color muss ein Hex-Farbcode sein (z. B. #00bcd4)."
+                f"chart_color_index fehlt (Pflichtfeld, Integer 0–{_CONSUMER_PALETTE_SIZE - 1})."
             )
-        return color.lower()
+        try:
+            index = int(raw["chart_color_index"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                f"chart_color_index muss Integer 0–{_CONSUMER_PALETTE_SIZE - 1} sein."
+            ) from exc
+        if index < 0 or index >= _CONSUMER_PALETTE_SIZE:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                f"chart_color_index muss 0–{_CONSUMER_PALETTE_SIZE - 1} sein, erhalten: {index}."
+            )
+        if "chart_color" in raw:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+                "chart_color ist entfernt — nur chart_color_index verwenden."
+            )
+        return index
 
     @staticmethod
     def _normalize_consumer(raw: dict) -> dict:
@@ -670,7 +684,7 @@ class Config:
         return {
             "id": consumer_id,
             "name": str(raw.get("name", raw["id"])),
-            "chart_color": Config._normalize_chart_color(raw, consumer_id),
+            "chart_color_index": Config._normalize_chart_color_index(raw, consumer_id),
             "nominal_power_kw": float(raw.get("nominal_power_kw", 0.0)),
             "min_power_kw": min_power_kw,
             "daily_target_kwh": float(raw.get("daily_target_kwh", 0.0)),

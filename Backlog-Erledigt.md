@@ -2,6 +2,15 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Verbraucher-Farben P2 — Zonenabhängige Sättigung (2026-07-07)
+
+- [x] **P2 — Zonenabhängige Sättigung (nur Chart-1-Flex-Balken)** — History volle Palette; neutral + Forecast gemeinsam `CONSUMER_CHART_SATURATION_MUTED` (0,6); Slot → Zone via `chart_zone_kind_for_slot_start`; Flex-Farbe pro Slot/Bucket; Legende Vollfarbe (`legendonly`); Sankey unverändert; Tests und `docs/ui/charts.md`
+- [x] **Version 1.17.4** — Patch-Bump
+
+### Verbraucher-Farben P1 — 8er-Palette & chart_color_index (2026-07-07)
+
+- [x] **P1 — Feste 8er-Palette & `chart_color_index`** — `CONSUMER_PALETTE` (H 260→40, S=90, L=50); `color_from_hsl()` mit optionalem Alpha; Grundfarben als `_HSL_*` + `_ALPHA_*`; `consumer_chart_color()` zentral für Chart 1 (`chart_flow_balance`) und Sankey; `chart_color` entfernt, Schema/`config.example.json` mit Indizes SwimSpa=0, E-Auto=2, Wärmepumpe=7; Tests und `docs/ui/charts.md`
+
 ### Chart-Farben zentralisieren (2026-07-07)
 
 - [x] **Phase 1–4 `ui/chart_colors.py`** — Single Source für Zonen, Energiebilanz-Balken, Chart-1-Linien/Overlays, Chart-2-Kosten, Sankey, Flex-Palette, Legacy-Steuerbefehl-Balken; `chart_flow_balance`, `charts`, `sankey`, `sankey_produktiv`, `planning_window` nur noch Konsumenten

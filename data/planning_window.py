@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from astral import Observer
@@ -76,6 +77,21 @@ class UiChartZones:
     history: UiChartZone
     live_plan: UiChartZone
     forecast: UiChartZone
+
+
+ChartZoneKind = Literal["history", "live_plan", "forecast"]
+
+
+def chart_zone_kind_for_slot_start(
+    slot_start: datetime,
+    zones: UiChartZones,
+) -> ChartZoneKind:
+    """Chart-1-Hintergrundzone für einen Slotbeginn (exkl. History-Ende, inkl. Forecast-Start)."""
+    if zones.history.end > zones.history.start and slot_start < zones.history.end:
+        return "history"
+    if zones.forecast.end > zones.forecast.start and slot_start >= zones.forecast.start:
+        return "forecast"
+    return "live_plan"
 
 
 def normalize_hour_slot(moment: datetime) -> datetime:

@@ -52,12 +52,12 @@ def _load_profile_source_dataframe() -> pd.DataFrame | None:
 def generate_consumption_profile() -> bool:
     """Berechnet Verbrauchsprofile aus cons_data_hourly.csv."""
     try:
-        print("⏳ Verarbeite Verbrauchsdaten und isoliere die Haus-Grundlast...")
+        print("[cache] Verarbeite Verbrauchsdaten und isoliere die Haus-Grundlast...")
         df = _load_profile_source_dataframe()
         if df is None or df.empty:
             path = cons_data_store.get_output_path()
             print(
-                f"⚠️ Profil-Update abgebrochen: '{path}' fehlt oder ist leer. "
+                f"[WARN] Profil-Update abgebrochen: '{path}' fehlt oder ist leer. "
                 "Bitte scripts/generate_cons_data.py ausführen."
             )
             return False
@@ -90,12 +90,12 @@ def generate_consumption_profile() -> bool:
             flex_profile.to_csv(flexible_consumer_profiles_file(), index=False, sep=';')
 
         print(
-            "✅ 'consumption_profiles.csv', 'total_consumption_profiles.csv' "
+            "[OK] 'consumption_profiles.csv', 'total_consumption_profiles.csv' "
             "und ggf. 'flexible_consumer_profiles.csv' erfolgreich neu berechnet!"
         )
         return True
     except Exception as e:
-        print(f"🚨 Fehler bei der Profilberechnung: {e}")
+        print(f"[FEHLER] Fehler bei der Profilberechnung: {e}")
         return False
 
 
@@ -105,13 +105,13 @@ def check_and_update_profile_if_new_month() -> None:
     should_update = False
     
     if not os.path.exists(profile_path):
-        print("ℹ️ Kein Verbrauchsprofil gefunden. Initialisiere erste Berechnung...")
+        print("[info] Kein Verbrauchsprofil gefunden. Initialisiere erste Berechnung...")
         should_update = True
     elif not os.path.exists(total_consumption_profiles_file()):
-        print("ℹ️ Gesamtverbrauchsprofil fehlt. Initialisiere Profil-Update...")
+        print("[info] Gesamtverbrauchsprofil fehlt. Initialisiere Profil-Update...")
         should_update = True
     elif not os.path.exists(flexible_consumer_profiles_file()) and config.get_flexible_consumers():
-        print("ℹ️ Flexible-Verbraucherprofil fehlt. Initialisiere Profil-Update...")
+        print("[info] Flexible-Verbraucherprofil fehlt. Initialisiere Profil-Update...")
         should_update = True
     else:
         file_time = os.path.getmtime(profile_path)
@@ -119,7 +119,7 @@ def check_and_update_profile_if_new_month() -> None:
         current_date = datetime.now()
         
         if file_date.month != current_date.month or file_date.year != current_date.year:
-            print(f"ℹ️ Neuer Monat erkannt (Letztes Profil von: {file_date.strftime('%d.%m.%Y')}).")
+            print(f"[info] Neuer Monat erkannt (Letztes Profil von: {file_date.strftime('%d.%m.%Y')}).")
             should_update = True
             
     if should_update:
@@ -148,7 +148,7 @@ def _load_hourly_profile(target_hours: List, profile_path: str, column: str = "C
                 values.append(global_hour_defaults.get(dt.hour, 0.5))
         return values
     except Exception as e:
-        print(f"🚨 Fehler beim Verarbeiten von '{profile_path}': {e}. Nutze statische Defaults.")
+        print(f"[FEHLER] Fehler beim Verarbeiten von '{profile_path}': {e}. Nutze statische Defaults.")
         return [global_hour_defaults[dt.hour] for dt in target_hours]
 
 
@@ -247,7 +247,7 @@ def _load_flexible_consumer_hourly_profiles(target_hours: List) -> dict[str, Lis
                 else:
                     profiles[cid].append(0.0)
     except Exception as e:
-        print(f"🚨 Fehler beim Laden von '{profile_path}': {e}. Nutze Null-Profile.")
+        print(f"[FEHLER] Fehler beim Laden von '{profile_path}': {e}. Nutze Null-Profile.")
         return {cid: [0.0] * len(target_hours) for cid in profiles}
 
     return profiles
@@ -315,7 +315,7 @@ def build_live_planning_matrix(market_data: list, window) -> list:
     ) / len(optimization_matrix)
     if extrapolated_share > 0.2:
         print(
-            f"⚠️ Preis-Extrapolation: {extrapolated_share:.0%} der {len(optimization_matrix)} "
+            f"[WARN] Preis-Extrapolation: {extrapolated_share:.0%} der {len(optimization_matrix)} "
             "Planungs-Slots ohne Day-Ahead-Preis "
             f"(gespiegelt: {mirrored_share:.0%})."
         )
@@ -368,7 +368,7 @@ def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]
     df = _load_profile_source_dataframe()
     if df is None or df.empty:
         print(
-            f"⚠️ Keine historischen Daten in cons_data_hourly für das Datum {target_date}."
+            f"[WARN] Keine historischen Daten in cons_data_hourly für das Datum {target_date}."
         )
         empty_totals = {c["id"]: 0.0 for c in config.get_flexible_consumers()}
         return [0.5] * 24, empty_totals, [0.5] * 24

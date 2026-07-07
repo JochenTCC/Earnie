@@ -70,10 +70,10 @@ def render_battery_config_inputs(settings: dict) -> tuple[float, float, float, f
     )
     threshold_percent = st.number_input(
         "Leistungs-Schwelle (%)",
-        min_value=5.0,
+        min_value=1.0,
         max_value=100.0,
         value=float(settings["THRESHOLD_POWER"]) * 100.0,
-        step=5.0,
+        step=1.0,
         format="%.0f",
         help="Anteil der max. Lade-/Entladeleistung (z. B. 5 % = 0,05 × max. kW). "
         "Gilt für Modus-Umschaltung und Zwangsentladen vs. Automatik.",

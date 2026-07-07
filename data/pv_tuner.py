@@ -178,6 +178,6 @@ def calculate_tuning_factor(days_back: int = 14) -> float:
         return round(tuned_factor, 3)
         
     except Exception as e:
-        print(f"⚠️ Fehler bei der Berechnung des PV-Tuning-Faktors: {e}")
+        print(f"[WARN] Fehler bei der Berechnung des PV-Tuning-Faktors: {e}")
         return 1.0
     

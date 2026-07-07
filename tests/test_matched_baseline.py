@@ -156,6 +156,45 @@ def test_hourly_costs_equal_when_same_flex_and_battery_at_min_soc():
         assert abs(opt_costs[h] - bl_costs[h]) < 0.001, f"hour {h}"
 
 
+def _eauto_historical_consumer() -> dict:
+    """Minimal normalisierter E-Auto für historical_charging_context (ohne config.json)."""
+    return {
+        "id": "eauto",
+        "name": "E-Auto",
+        "chart_color_index": 2,
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "daily_target_kwh": 0.0,
+        "daily_target_source": "historical",
+        "loxone_target_kwh_name": "",
+        "min_on_quarterhours": 4,
+        "path_log": "",
+        "signal_type": "power",
+        "log_signal_type": "power",
+        "optimizer_enabled": True,
+        "loxone_outputs": {},
+        "loxone_inputs": {},
+        "charging_schedule": {
+            "enabled": True,
+            "forecast_when_absent": True,
+            "target_soc_percent": 100.0,
+            "charging_efficiency": 0.95,
+            "weekday": {
+                "car_available_from_hour": 18,
+                "ready_by_hour": 7,
+                "daily_rest_soc": 40.0,
+            },
+            "weekend": {
+                "car_available_from_hour": 20,
+                "ready_by_hour": 9,
+                "daily_rest_soc": 30.0,
+            },
+            "loxone": {},
+        },
+        "thermal_control": None,
+    }
+
+
 def test_matched_eauto_profile_shape_scaled_to_current_target():
     """E-Auto BL Ziel: Profilform skaliert auf Ziel-kWh, nicht gleichmäßig im Fenster."""
     from datetime import date, datetime
@@ -175,7 +214,7 @@ def test_matched_eauto_profile_shape_scaled_to_current_target():
         for h in range(24)
     ]
     target_kwh = 12.0
-    eauto = next(c for c in __import__("config").get_flexible_consumers() if c["id"] == "eauto")
+    eauto = _eauto_historical_consumer()
     horizon_start = datetime(2025, 6, 17, 19, 0)
     ctx = historical_charging_context(
         eauto,
