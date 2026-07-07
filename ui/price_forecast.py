@@ -35,35 +35,35 @@ def _load_dataset(path_str: str) -> pd.DataFrame:
     return load_training_dataset(path)
 
 
-def _render_sidebar_controls() -> tuple[Path, float, Path | None]:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("Preis-Prognose (Dev)")
+def _render_controls() -> tuple[Path, float, Path | None]:
+    """Dataset-/Modell-Steuerung im Seiten-Body (ersetzt die frühere Sidebar)."""
     datasets = list_training_datasets()
     if not datasets:
-        st.sidebar.warning(
+        st.warning(
             "Kein Dataset in data/cache/. "
             "Zuerst `python -m scripts.build_price_training_dataset` ausführen."
         )
         st.stop()
 
     labels = [p.name for p in datasets]
-    selected_name = st.sidebar.selectbox("Training-Dataset", labels, index=len(labels) - 1)
+    col_dataset, col_ratio = st.columns([2, 1])
+    selected_name = col_dataset.selectbox("Training-Dataset", labels, index=len(labels) - 1)
     dataset_path = next(p for p in datasets if p.name == selected_name)
 
-    train_ratio = st.sidebar.slider(
+    train_ratio = col_ratio.slider(
         "Train-Anteil (chronologisch)",
         min_value=0.5,
         max_value=0.95,
         value=0.8,
         step=0.05,
     )
-    use_saved_model = st.sidebar.checkbox(
+    use_saved_model = st.checkbox(
         "Gespeichertes Modell verwenden",
         value=DEFAULT_MODEL_PATH.exists(),
     )
     model_path = DEFAULT_MODEL_PATH if use_saved_model else None
     if use_saved_model and not DEFAULT_MODEL_PATH.exists():
-        st.sidebar.info("Kein Modell unter data/cache/price_model_coefficients.json")
+        st.info("Kein Modell unter data/cache/price_model_coefficients.json")
     return dataset_path, train_ratio, model_path
 
 
@@ -173,7 +173,6 @@ def _hourly_mae_chart(summary: pd.DataFrame) -> go.Figure:
 
 
 def render_price_forecast_block() -> None:
-    dataset_path, train_ratio, model_path = _render_sidebar_controls()
     render_title_with_help(
         "Preis-Prognose (EU-Wetter & Last)",
         (
@@ -183,6 +182,7 @@ def render_price_forecast_block() -> None:
         ),
         key="price_forecast_help",
     )
+    dataset_path, train_ratio, model_path = _render_controls()
 
     try:
         frame = _load_dataset(str(dataset_path.resolve()))

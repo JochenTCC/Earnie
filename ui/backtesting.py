@@ -14,13 +14,13 @@ def load_backtesting_data():
     return backtesting_log.load_backtesting_log()
 
 
-def render_backtesting_sidebar(meta: dict, hourly: pd.DataFrame) -> tuple[str, str | None]:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📊 Backtesting-Log")
+def render_backtesting_controls(meta: dict, hourly: pd.DataFrame) -> tuple[str, str | None]:
+    """Detailansicht-Steuerung im Seiten-Body (ersetzt die frühere Sidebar)."""
+    st.subheader("📊 Backtesting-Log")
     created = meta.get("created_at", "")[:19].replace("T", " ")
-    st.sidebar.caption(f"Erstellt: {created} UTC")
     period = meta.get("period", {})
-    st.sidebar.caption(
+    st.caption(
+        f"Erstellt: {created} UTC · "
         f"Zeitraum: {period.get('start', '?')} – {period.get('end', '?')} "
         f"({period.get('windows', '?')} Fenster)"
     )
@@ -28,15 +28,17 @@ def render_backtesting_sidebar(meta: dict, hourly: pd.DataFrame) -> tuple[str, s
     labels = meta.get("labels", {})
     scenario_ids = meta.get("scenario_ids", hourly["scenario_id"].unique().tolist())
     scenario_labels = [labels.get(sid, sid) for sid in scenario_ids]
-    selected_label = st.sidebar.selectbox(
+    months = sorted(hourly["ts"].dt.to_period("M").astype(str).unique())
+
+    col_scenario, col_month = st.columns(2)
+    selected_label = col_scenario.selectbox(
         "Szenario (Detailansicht)",
         scenario_labels,
         index=0,
     )
     selected_id = scenario_ids[scenario_labels.index(selected_label)]
 
-    months = sorted(hourly["ts"].dt.to_period("M").astype(str).unique())
-    month_filter = st.sidebar.selectbox(
+    month_filter = col_month.selectbox(
         "Monat (Detailansicht)",
         ["Gesamter Zeitraum"] + months,
     )
@@ -176,7 +178,7 @@ def render_backtesting_block() -> None:
         st.error(f"Backtesting-Log konnte nicht geladen werden: {e}")
         return
 
-    selected_id, month_key = render_backtesting_sidebar(meta, hourly)
+    selected_id, month_key = render_backtesting_controls(meta, hourly)
     render_backtesting_summary(meta)
     render_backtesting_monthly_table(meta)
 

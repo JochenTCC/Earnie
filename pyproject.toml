@@ -16,6 +16,7 @@ dependencies = [
     "pulp>=2.8.0",
     "python-dotenv>=1.0.0",
     "astral>=3.2",
+    "jsonschema>=4.0.0",
 ]
 
 [project.optional-dependencies]

@@ -6,9 +6,6 @@
 .env.*
 !.env.example
 
-# Legacy-Secrets (gitignored)
-config.py
-
 # SSH-/TLS-Schlüssel (z. B. remote_backtesting.json → identity_file)
 *.pem
 *.key

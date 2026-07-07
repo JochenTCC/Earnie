@@ -17,12 +17,12 @@ Design & Detaildesign: [docs/spec/ui-menu-structure.md](docs/spec/ui-menu-struct
 Entscheidungen: `st.navigation`+`st.Page`; Config-Editor = Roh-JSON; `*`-Punkte nur Mockup; Dev-Modi bleiben gegated; Startgüte = Stromkosten (€); Horizont fest 6 h.
 Abschluss: MINOR-Bump auf **1.21.0**; beide Punkte (Menüstruktur + Empfehlungsmodus) gemeinsam nach `Backlog-Erledigt.md`.
 
-- [ ] **Menüstruktur als Sidebar-Ersatz** (`st.navigation` + `st.Page`)
-  - [ ] Schritt 1 — Navigations-Gerüst: `app.py` → Router, `ui/pages/`; bestehende Modi (Cockpit, Backtesting, Preis-Prognose Dev) 1:1 als Seiten; Env-Gating bleibt
-  - [ ] Schritt 2 — Subpage Konfiguration: Roh-JSON-Editor für `config.json` (Validierung + Schema-Check, dann `config.reinit_config()`)
-  - [ ] Schritt 4 — Mockup-Seiten (funktionslos): Szenarieneditor*, Hauskonfigurator*, Verbraucheranalyse inkl. Adaptionsalgo*
-  - [ ] Backtesting- und Preis-Prognose-Controls von Sidebar in den Seiten-Body verschieben
-- [ ] **Empfehlungsmodus manuelle Geräte** (Waschmaschine / Trockner / Geschirrspüler; Laufzeit + Leistung → günstigste Startzeit in 6 h)
+- [x] **Menüstruktur als Sidebar-Ersatz** (`st.navigation` + `st.Page`)
+  - [x] Schritt 1 — Navigations-Gerüst: `app.py` → Router, `ui/pages/`; bestehende Modi (Cockpit, Backtesting, Preis-Prognose Dev) 1:1 als Seiten; Env-Gating bleibt
+  - [x] Schritt 2 — Subpage Konfiguration: Roh-JSON-Editor für `config.json` (Validierung + Schema-Check, dann `config.reinit_config()`)
+  - [x] Schritt 4 — Mockup-Seiten (funktionslos): Szenarieneditor*, Hauskonfigurator*, Verbraucheranalyse inkl. Adaptionsalgo* (zusätzlich „Manuelle Geräte" als Mockup-Menüpunkt bis Empfehlungsmodus)
+  - [x] Backtesting- und Preis-Prognose-Controls von Sidebar in den Seiten-Body verschieben
+- [ ] **Empfehlungsmodus manuelle Geräte** (Waschmaschine / Trockner / Geschirrspüler; Laufzeit + Leistung → Ranking der Startzeiten (je Stunde - sortiert ) in den nächsten  6 h)
   - [ ] Schritt 3a — `optimizer/appliance_recommendation.py` (reine Kosten-/Startzeit-Logik) + Tests
   - [ ] Schritt 3b — `ui/pages/page_devices.py`: Leistung Waschmaschine/Trockner aus Loxone-Merkern, Geschirrspüler manuelles Eingabefeld; Startgüte = Stromkosten (€); rein beratend
   - [ ] Config: neue Felder für Loxone-Merker `Leistung Waschmaschine` / `Leistung Trockner` (+ Schema/Example, Geräte-Block)

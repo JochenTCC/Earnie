@@ -82,8 +82,9 @@ def render_battery_config_inputs(settings: dict) -> tuple[float, float, float, f
     return bat_capacity, bat_min_soc, bat_max_soc, bat_max_power, threshold_power
 
 
-def render_config_form(settings: dict) -> None:
-    with st.sidebar.form("config_form"):
+def render_config_form_body(settings: dict) -> None:
+    """PV-/Batterie-Formular im Seiten-Body (kein Sidebar-Kontext)."""
+    with st.form("config_form"):
         kwp, tilt, azimuth, k_push = render_pv_config_inputs(settings)
         bat_capacity, bat_min_soc, bat_max_soc, bat_max_power, threshold_power = (
             render_battery_config_inputs(settings)
@@ -105,10 +106,7 @@ def render_config_form(settings: dict) -> None:
             st.rerun()
 
 
-def render_parameter_input(mode: str) -> None:
-    if mode == "Backtesting":
-        return
-    st.sidebar.header("⚙️ System-Parameter")
-    st.sidebar.markdown("Änderungen werden direkt über das Konfigurationsmodul angewendet.")
-
-    render_config_form(get_runtime_settings())
+def render_system_parameter_section() -> None:
+    """Komfort-Ansicht der Kern-Laufzeitparameter (PV/Batterie) im Seiten-Body."""
+    st.markdown("Änderungen werden direkt über das Konfigurationsmodul angewendet.")
+    render_config_form_body(get_runtime_settings())
