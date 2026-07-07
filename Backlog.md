@@ -13,13 +13,20 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Signal `Ernie_Swimspa_Filter_Sollstunden` (Sollstunden in 24 h), Steuerung `Ernie_Filter_Freigabe`
   - Ernie: Sollstunden in 24 h auf Null; Filterleistung; Laufzeiten in Loxone integriert
 
-### Version 1.+1
-- [] Einfachen Editor für config.json etc. in UI integrieren 
+### Version 1.+1 
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
   - Loxone-Merker für Waschmaschinen-Leistung: "Leistung Waschmaschine"
   - Loxone-Merker für Trockner-Leistung: "Leistung Trockner"
   - Für Geschirrspüler ist keine Leistung bekannt (vielleicht später über Hue?)
+  - könnte später auch für smarte Geräte erweitert werden*
   - [ ] Könnte auch adaptiv sein bzgl. Laufzeit und Energieverbrauch pro Lauf
+- [ ] Menuestruktur in UI einführen als Ersatz für Sidebar.
+  - Eigene Subpages für manuelle Geräte (Waschmaschine, Geschirrspüler)
+  - Subpage mit einfachem Editor für config.json etc.
+  - Subpage Backtesting (mit Szenarieneditor)
+  - Subpage Hauskonfigurator*
+  - Subpage Verbraucheranalyse inkl. Adaptionsalgo *
+  
 
 ### Version 1.+1
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
@@ -105,6 +112,7 @@ Validierung quer über alle Phasen: **Nachrechnung „Historischer Tag“** (0.+
 - [ ] **Thermik P2** — Gekoppelte Ein-Knoten-Modelle
   - Haus ↔ Wärmespeicher ↔ Solaranlage
   - Parameter für Haus aus Energieausweis extrahieren (`C:\Users\joche\Documents\Hausbau\Hausbau_Köhler_Schreyögg\Energieausweis_komplett_EFH-Köhler_Dornbirn-2014.pdf`)
+ - Klimaanlage als thermischen Verbraucher vorbereiten
 
 ### Version 2.+1
 - [ ] **Thermik P3** — Thermik-Parameter-Adaption (auf Adaption P1)
