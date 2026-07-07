@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Live-Abnahme SwimSpa-Filter: Loxone-Formate und natives Fenster prüfen.
+r"""Live-Abnahme SwimSpa-Filter: Loxone-Formate und natives Fenster prüfen.
 
 Aufruf (Miniserver erreichbar, .env gesetzt):
     .venv\Scripts\python.exe -m scripts.verify_swimspa_filter_live

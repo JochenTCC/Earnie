@@ -116,7 +116,8 @@
                 "enable_name": "Ernie_SwimSpa_Freigabe"
             },
             "loxone_inputs": {
-                "power_name": "Ernie_Swim-Spa-P_act"
+                "power_name": "Ernie_Swim-Spa-P_act",
+                "subtract_consumer_ids": ["swimspa_filter"]
             },
             "thermal_control": {
                 "enabled": true,

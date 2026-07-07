@@ -8,15 +8,6 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature-Backlog
 
-### Version 1.20.0
-- [ ] **Swimspa Filternutzung optimieren** — Spec: [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md)
-  - **Release:** noch **nicht** abgeschlossen — aktuell **v1.19.0**; Minor-Bump auf **1.20.0** erst nach Live-Abnahme und Nutzer-Test
-  - **Ziel:** Kostenoptimale **ergänzende** Filterlaufzeit; `Sollstunden` (Schulden in h) langfristig → 0. Nativer Duty-Cycle unabhängig.
-  - [x] Code Phasen 1–4: `loxone_remaining_hours`, `filter_context`/MILP-Sperrung, Schema/`config.example.json`/Doku, Live-Parser + `verify_swimspa_filter_live` / `patch_swimspa_filter_config`
-  - [ ] **Live-Abnahme (Nutzer):** Prod-`config.json` patchen; `.venv\Scripts\python.exe -m scripts.verify_swimspa_filter_live`; Formate `filter1hour` und `Sollstunden` am Miniserver bestätigen
-- [ ] Passende Regeln für Deviatons entwickeln (Fehler: Swimspa Filter läuft nicht, obwohl er soll / Fehler: Swimspa Filter läuft, obwohl er nicht soll / Warnung: Swimspa Filter zieht mehr Leistung als nominal)  
-- [ ] Prüfen, ob Ist_Leistungen für Heizen und Filtern des SwimSpa getrennt betrachtet und korrekt geloggt und visualisiert werden.
-
 ### Version 1.+1
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
   - Loxone-Merker für Waschmaschinen-Leistung: "Leistung Waschmaschine"
@@ -25,27 +16,24 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [ ] Könnte auch adaptiv sein bzgl. Laufzeit und Energieverbrauch pro Lauf
 
 ### Version 1.+1
+- [ ] **SwimSpa Fall B — Folgeprüfung historische Leistung & Loxone-Trennung**
+  - Prüfen, ob die historischen SwimSpa-Leistungslogs (`thermal_control.history_logs.power_csv` = `..._SwimSpa_Leistung_...csv`, Quelle `Ernie_Swim-Spa-P_act`) ebenfalls den **Filter-Anteil** enthalten (Fall B). Falls ja: Auswirkung auf die **Thermik-Modell-Kalibrierung** (`heat_loss_kw_per_k` etc.) bewerten — Filter (~0,18 kW) würde als Heizleistung fehlinterpretiert.
+  - **Grundsatzfrage:** Sollte die Trennung Heizung/Filter besser **direkt in Loxone** geschehen (separater Heizungs-Leistungsmerker ohne Filter), statt softwareseitig per `subtract_consumer_ids`? Vorteil: konsistente Live- **und** Historien-Daten an der Quelle.
+  - Bezug: Fall-B-Korrektur (Live-Ist) bereits umgesetzt; Thermik-Kalibrierung siehe **Thermik P1** (Swim-Spa)
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
+- [ ] Neuen Loxberry aufsetzen bzw. produktiv-Loxberry auf 4 upgraden
+- [ ] **7f — Loxberry-Container** — erst nach Loxberry 4; Go/No-Go im README
+- [ ] Readme ausführlicher machen mit Motivation / Nutzen
+- [ ] Nach Interessenten fragen in loxforum / reddit / ...
+
+### Version 2.0
+- [ ] Ausführlicher Code-Review und Refactoring
+
+### Version 2.+1
 - [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
   - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
 - [ ] **Soll-Ist Hinweis-Regeln** — Kategorie „Hinweis“ sobald konkrete unkritische Fälle identifiziert (Follow-up Epic Soll-Ist)
 - [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
-
-### Version 1.+1
-- [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
-  - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
-  - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** einführen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
-  - Modus **`sunset_window`:** unverändert **SOC_min am Sonnenaufgang** (hart)
-  - Spec ergänzen, Live-Tests für beide Modi
-
-### Version 1.+1
-- [ ] Neuen Loxberry aufsetzen bzw. produktiv-Loxberry auf 4 upgraden
-- [ ] **7f — Loxberry-Container** — erst nach Loxberry 4; Go/No-Go im README
-- [ ] Readme ausführlicher machen mit Motivation / Nutzen
-- [ ] Nach Interessenten fragen
-
-### Version 2.0
-- [ ] Ausführlicher Code-Review und Refactoring
 
 ### Version 2.+1 — Test-Config entkoppeln
 - [x] **Stufe 1 — Standard-Test-Config in `conftest.py`**
@@ -135,6 +123,13 @@ Validierung quer über alle Phasen: **Nachrechnung „Historischer Tag“** (0.+
   - würde sich (mehr) Batterie lohnen?
   - Verbraucher abfragen und daraus Verbraucherprofile generieren
 - [ ] Erinnerung am Monatsanfang für Einspeisepreis (E-Mail von Loxone!)
+
+### Version 2.+1
+- [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
+  - Aktuell Live nur `sunset_window` (Schema/Code); Backtesting kennt beide Modi bereits — Live-Verzweigung noch implementieren (`main.py`, `profile_manager`, UI-Chart, aWATTar-Fenster)
+  - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** einführen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
+  - Modus **`sunset_window`:** unverändert **SOC_min am Sonnenaufgang** (hart)
+  - Spec ergänzen, Live-Tests für beide Modi
 
 
 ## Packaging & Deployment

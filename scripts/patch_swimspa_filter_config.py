@@ -2,8 +2,8 @@
 """Fügt swimspa_filter in eine bestehende config.json ein (idempotent).
 
 Aufruf:
-    .venv\Scripts\python.exe -m scripts.patch_swimspa_filter_config
-    .venv\Scripts\python.exe -m scripts.patch_swimspa_filter_config --config path/to/config.json
+    .venv/Scripts/python.exe -m scripts.patch_swimspa_filter_config
+    .venv/Scripts/python.exe -m scripts.patch_swimspa_filter_config --config path/to/config.json
 """
 from __future__ import annotations
 
@@ -79,6 +79,27 @@ def patch_flexible_consumers(consumers: list) -> tuple[list, bool]:
     return updated, True
 
 
+def patch_swimspa_shared_meter(consumers: list) -> bool:
+    """Fall B: SwimSpa-Heizungszähler misst Heizung + Filter — Filter abziehen.
+
+    Ergänzt swimspa.loxone_inputs.subtract_consumer_ids um 'swimspa_filter'
+    (idempotent). Gibt True zurück, wenn etwas geändert wurde.
+    """
+    for item in consumers:
+        if item.get("id") != "swimspa":
+            continue
+        inputs = item.setdefault("loxone_inputs", {})
+        subtract = inputs.get("subtract_consumer_ids")
+        if not isinstance(subtract, list):
+            subtract = []
+        if "swimspa_filter" in subtract:
+            return False
+        subtract.append("swimspa_filter")
+        inputs["subtract_consumer_ids"] = subtract
+        return True
+    return False
+
+
 def patch_config(data: dict) -> bool:
     consumers = data.get("flexible_consumers")
     if not isinstance(consumers, list):
@@ -86,7 +107,8 @@ def patch_config(data: dict) -> bool:
     patched, changed = patch_flexible_consumers(consumers)
     if changed:
         data["flexible_consumers"] = patched
-    return changed
+    meter_changed = patch_swimspa_shared_meter(data["flexible_consumers"])
+    return changed or meter_changed
 
 
 def main() -> int:
@@ -118,11 +140,14 @@ def main() -> int:
         return 2
 
     if not changed:
-        print(f"OK: swimspa_filter bereits in {path}")
+        print(f"OK: swimspa_filter + Shared-Meter-Abzug bereits in {path}")
         return 0
 
     _save_config(path, data)
-    print(f"OK: swimspa_filter in {path} eingefügt (nach swimspa).")
+    print(
+        f"OK: {path} aktualisiert — swimspa_filter vorhanden und "
+        "swimspa.loxone_inputs.subtract_consumer_ids=['swimspa_filter'] gesetzt."
+    )
     return 0
 
 

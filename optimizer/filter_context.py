@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, time
+from zoneinfo import ZoneInfo
 
 import config
 from integrations import loxone_client
@@ -16,6 +17,15 @@ def filter_schedule_enabled(consumer: dict) -> bool:
     return bool(sched and sched.get("enabled"))
 
 
+def _wall_clock_slot(slot_dt: datetime) -> datetime:
+    """Vergleichsfähiger Stunden-Slot als naive Ortszeit (Planungs-TZ)."""
+    slot_dt = slot_dt.replace(minute=0, second=0, microsecond=0)
+    if slot_dt.tzinfo is None:
+        return slot_dt
+    tz = ZoneInfo(config.get_planning_timezone())
+    return slot_dt.astimezone(tz).replace(tzinfo=None)
+
+
 def slot_in_native_window(
     slot_dt: datetime,
     start_hour: float,
@@ -24,6 +34,7 @@ def slot_in_native_window(
     """True wenn slot_dt im halboffenen Intervall [Start, Start+Dauer) eines Tages liegt."""
     if duration_hours <= 0:
         return False
+    slot_dt = _wall_clock_slot(slot_dt)
     day_start = datetime.combine(
         slot_dt.date(),
         time(hour=int(start_hour) % 24, minute=0, second=0, microsecond=0),
@@ -156,6 +167,18 @@ def resolve_filter_contexts(
             consumer, optimization_matrix, logged_simulation
         )
     return contexts
+
+
+def serialize_filter_contexts(contexts: dict[str, dict]) -> dict[str, dict]:
+    """Schlanke, JSON-taugliche Fenster-Infos fürs Produktiv-Log (ohne Matrix-Indizes)."""
+    serialized: dict[str, dict] = {}
+    for cid, ctx in (contexts or {}).items():
+        serialized[cid] = {
+            "native_start_hour": ctx.get("native_start_hour"),
+            "native_duration_hours": ctx.get("native_duration_hours"),
+            "source_label": ctx.get("source_label"),
+        }
+    return serialized
 
 
 def consumer_flex_eligible_indices(

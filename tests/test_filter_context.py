@@ -76,6 +76,12 @@ class TestSlotInNativeWindow:
         slot = datetime(2026, 7, 7, 14, 0)
         assert not fc.slot_in_native_window(slot, 10, 4.0)
 
+    def test_aware_slot_in_planning_timezone(self):
+        from zoneinfo import ZoneInfo
+
+        slot = datetime(2026, 7, 7, 11, 0, tzinfo=ZoneInfo("Europe/Vienna"))
+        assert fc.slot_in_native_window(slot, 10, 4.0)
+
 
 class TestNativeBlockedIndices:
     def test_blocks_native_hours_only(self):

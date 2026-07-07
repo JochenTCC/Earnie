@@ -9,6 +9,7 @@ import config
 from optimizer import battery as bat
 from optimizer.deviation_facts import FlexPowerFacts, SlotDeviationFacts
 from optimizer.deviation_rules import load_deviation_rules, validate_deviation_rules_document
+from optimizer.filter_context import slot_in_native_window
 from runtime_store.history_timeline import SLOT_PRESENT
 
 Predicate = Callable[
@@ -215,6 +216,58 @@ def _slot_quality_present(
     return facts.slot_quality == SLOT_PRESENT
 
 
+def _power_ist_without_soll(
+    facts: SlotDeviationFacts,
+    scope: str,
+    _rule: dict[str, Any],
+    tolerances: dict[str, float],
+    _params: dict[str, Any],
+) -> bool:
+    """Ist-Leistung vorhanden, obwohl kein Soll geplant war (soll ≈ 0, ist > Toleranz)."""
+    flex = _flex_for_scope(facts, scope)
+    if flex is None:
+        return False
+    tol = _power_tolerance(tolerances)
+    return flex.soll_kw <= tol and flex.ist_kw > tol
+
+
+def _slot_outside_native_filter_window(
+    facts: SlotDeviationFacts,
+    scope: str,
+    _rule: dict[str, Any],
+    _tolerances: dict[str, float],
+    _params: dict[str, Any],
+) -> bool:
+    """True nur, wenn das native Fenster bekannt ist UND der Slot außerhalb liegt.
+
+    Konservativ: Bei fehlendem Fenster oder unbekanntem Slot-Zeitpunkt False —
+    ein legitimer nativer Lauf wird so nie fälschlich als Fehler markiert.
+    """
+    window = facts.filter_windows.get(scope)
+    if window is None or facts.slot_start is None:
+        return False
+    start = window.native_start_hour
+    duration = window.native_duration_hours
+    if start is None or duration is None or duration <= 0:
+        return False
+    return not slot_in_native_window(facts.slot_start, start, duration)
+
+
+def _ist_power_above_nominal(
+    facts: SlotDeviationFacts,
+    scope: str,
+    _rule: dict[str, Any],
+    tolerances: dict[str, float],
+    _params: dict[str, Any],
+) -> bool:
+    """Ist-Leistung über der Nennleistung (Toleranz) — Plausibilitätswarnung."""
+    flex = _flex_for_scope(facts, scope)
+    if flex is None or flex.nominal_power_kw is None:
+        return False
+    tol = _power_tolerance(tolerances)
+    return flex.ist_kw > flex.nominal_power_kw + tol
+
+
 PREDICATES: dict[str, Predicate] = {
     "power_mismatch_positive": _power_mismatch_positive,
     "power_mismatch_any": _power_mismatch_any,
@@ -228,6 +281,9 @@ PREDICATES: dict[str, Predicate] = {
     "pv_follow_scheduled": _pv_follow_scheduled,
     "pv_follow_power_below_tolerance": _pv_follow_power_below_tolerance,
     "slot_quality_present": _slot_quality_present,
+    "power_ist_without_soll": _power_ist_without_soll,
+    "slot_outside_native_filter_window": _slot_outside_native_filter_window,
+    "ist_power_above_nominal": _ist_power_above_nominal,
 }
 
 
@@ -373,10 +429,13 @@ def evaluate_entry_deviations(
     slot_quality: str = SLOT_PRESENT,
     rules_doc: dict[str, Any] | None = None,
     rules_path: str | None = None,
+    slot_start: Any = None,
 ) -> list[DeviationEvent]:
     """Facts aus Log-Eintrag bauen und Regeln auswerten."""
     from optimizer.deviation_facts import build_slot_deviation_facts
 
-    facts = build_slot_deviation_facts(entry, slot_quality=slot_quality)
+    facts = build_slot_deviation_facts(
+        entry, slot_quality=slot_quality, slot_start=slot_start
+    )
     document = rules_doc if rules_doc is not None else load_deviation_rules(rules_path)
     return evaluate_slot_deviations(facts, document)

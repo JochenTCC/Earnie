@@ -98,6 +98,40 @@
         "power_mismatch_positive"
       ],
       "message": "Wärmepumpe: Freigabe, aber nicht angesprungen (Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW)"
+    },
+    {
+      "id": "swimspa_filter_should_run_missing",
+      "enabled": true,
+      "category": "error",
+      "priority": 55,
+      "scope": "swimspa_filter",
+      "when": [
+        "power_mismatch_positive"
+      ],
+      "message": "SwimSpa Filter läuft nicht trotz Freigabe (Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW)"
+    },
+    {
+      "id": "swimspa_filter_runs_unexpectedly",
+      "enabled": true,
+      "category": "error",
+      "priority": 52,
+      "scope": "swimspa_filter",
+      "when": [
+        "power_ist_without_soll",
+        "slot_outside_native_filter_window"
+      ],
+      "message": "SwimSpa Filter läuft ohne Freigabe außerhalb nativem Fenster (Ist {ist_kw:.2f} kW)"
+    },
+    {
+      "id": "swimspa_filter_over_nominal",
+      "enabled": true,
+      "category": "warning",
+      "priority": 45,
+      "scope": "swimspa_filter",
+      "when": [
+        "ist_power_above_nominal"
+      ],
+      "message": "SwimSpa Filter zieht mehr als Nennleistung (Ist {ist_kw:.2f} kW)"
     }
   ],
   "fallback": {

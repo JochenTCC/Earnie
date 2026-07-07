@@ -481,6 +481,27 @@ class Config:
         return {"power_name": power_name} if power_name else {}
 
     @staticmethod
+    def _normalize_filter_schedule(raw, consumer_id: str) -> dict | None:
+        if not isinstance(raw, dict):
+            return None
+        enabled = bool(raw.get("enabled"))
+        if not enabled:
+            return {"enabled": False}
+        loxone_raw = raw.get("loxone") if isinstance(raw.get("loxone"), dict) else {}
+        fallback_raw = raw.get("config_fallback") if isinstance(raw.get("config_fallback"), dict) else {}
+        return {
+            "enabled": True,
+            "loxone": {
+                "native_start_hour_name": str(loxone_raw.get("native_start_hour_name", "")).strip(),
+                "native_duration_hours_name": str(loxone_raw.get("native_duration_hours_name", "")).strip(),
+            },
+            "config_fallback": {
+                "native_start_hour": fallback_raw.get("native_start_hour"),
+                "native_duration_hours": fallback_raw.get("native_duration_hours"),
+            },
+        }
+
+    @staticmethod
     def _normalize_charging_schedule(raw: dict | None) -> dict | None:
         if not raw or not bool(raw.get("enabled", False)):
             return None
@@ -638,12 +659,12 @@ class Config:
             charging_raw = raw.get("charging_schedule")
             if isinstance(charging_raw, dict) and charging_raw.get("source"):
                 legacy = str(charging_raw["source"]).lower().strip()
-                if legacy in ("config", "historical", "loxone", "thermal"):
+                if legacy in ("config", "historical", "loxone", "loxone_remaining_hours", "thermal"):
                     source = legacy
-        if source not in ("config", "historical", "loxone", "thermal"):
+        if source not in ("config", "historical", "loxone", "loxone_remaining_hours", "thermal"):
             raise ValueError(
                 f"Kritischer Konfigurationsfehler: flexible_consumers Eintrag '{raw.get('id', '?')}' "
-                "daily_target_source muss config, historical, loxone oder thermal sein."
+                "daily_target_source muss config, historical, loxone, loxone_remaining_hours oder thermal sein."
             )
         consumer_id = str(raw["id"])
         thermal_control = Config._normalize_thermal_control(
@@ -690,6 +711,7 @@ class Config:
             "daily_target_kwh": float(raw.get("daily_target_kwh", 0.0)),
             "daily_target_source": source,
             "loxone_target_kwh_name": str(raw.get("loxone_target_kwh_name", "")).strip(),
+            "loxone_target_hours_name": str(raw.get("loxone_target_hours_name", "")).strip(),
             "min_on_quarterhours": max(1, int(raw.get("min_on_quarterhours", raw.get("min_on_hours", 1) * 4))),
             "path_log": str(raw.get("path_log", "")),
             "signal_type": str(raw.get("signal_type", "power")),
@@ -701,6 +723,9 @@ class Config:
             "loxone_inputs": Config._normalize_loxone_inputs(raw.get("loxone_inputs")),
             "charging_schedule": charging_schedule,
             "thermal_control": thermal_control,
+            "filter_schedule": Config._normalize_filter_schedule(
+                raw.get("filter_schedule"), consumer_id
+            ),
         }
 
     @staticmethod
@@ -717,7 +742,7 @@ class Config:
                 for day_key in ("weekday", "weekend"):
                     if (sched.get(day_key) or {}).get("daily_rest_soc") is not None:
                         return True
-        if target_source in ("historical", "loxone", "thermal"):
+        if target_source in ("historical", "loxone", "loxone_remaining_hours", "thermal"):
             return True
         return float(consumer.get("daily_target_kwh", 0.0) or 0.0) > 0
 

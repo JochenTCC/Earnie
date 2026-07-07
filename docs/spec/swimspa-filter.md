@@ -1,7 +1,7 @@
 # Spezifikation: SwimSpa Filter — kostenoptimale ergänzende Filternutzung
 
-**Version:** 0.1  
-**Status:** Code Phasen 1–4 umgesetzt (2026-07-07); **Live-Abnahme ausstehend** — Release-Ziel **v1.20.0**  
+**Version:** 1.0  
+**Status:** Abgeschlossen (2026-07-07) — Code Phasen 1–4, Live-Abnahme, Deviation-Regeln, Ist-Leistung/Fall B; Release **v1.20.0**  
 **Backlog:** `Backlog.md` → **Version 1.20.0** → **Swimspa Filternutzung optimieren**
 
 ## 1. Ziel
@@ -33,6 +33,8 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 | Schreiben | `Ernie_Swimspa_Filter_Freigabe` | Ernie-Freigabe für **zusätzlichen** Filterlauf (`0`/`1`) |
 
 `homie_bwa_spa_filter2` erfasst jeden Filterlauf (nativ + Ernie) — für Logging, Soll-Ist und Delivery-Tracking.
+
+**Gemeinsame Leistungsmessung (Fall B, Live-Abnahme bestätigt):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistungsaufnahme des SwimSpa (Heizung **inkl.** Filter am selben Zähler). Damit der Filter-Anteil (~0,18 kW) nicht doppelt in Summe/Grundlast einfließt, wird er vom Heizungs-Ist abgezogen. Konfiguriert über `swimspa.loxone_inputs.subtract_consumer_ids: ["swimspa_filter"]`; die Korrektur greift in `fetch_flexible_consumers_live_kw` nur, wenn der Heizungswert tatsächlich vom Zähler stammt (nicht Fallback). Invariante: `swimspa_ist + swimspa_filter_ist = Gesamtmessung`.
 
 ## 4. Verbraucher-Config (`swimspa_filter`)
 
@@ -116,7 +118,15 @@ Ernie (pro 15-Min-Slot):
 ## 9. UI & Soll-Ist
 
 - Chart 1 / Sankey: eigener Eintrag „SwimSpa Filter“ (`chart_color_index: 1`).
-- Soll-Ist-Regel (Follow-up): z. B. Warnung bei dauerhaft hohen `Sollstunden`.
+- **Soll-Ist-Regeln** (Backlog Z.17, umgesetzt) — scope `swimspa_filter`, siehe [soll-ist-abweichung.md](soll-ist-abweichung.md) §5.1/§5.2:
+
+| Regel-ID | Kategorie | Bedeutung |
+|----------|-----------|-----------|
+| `swimspa_filter_should_run_missing` | Fehler | Ernie-Freigabe (Soll > 0), aber Filter läuft nicht |
+| `swimspa_filter_runs_unexpectedly` | Fehler | Filter läuft (Ist > 0) ohne Soll **außerhalb** nativem Fenster |
+| `swimspa_filter_over_nominal` | Warnung | Ist-Leistung über Nennleistung (0,18 kW) + Toleranz |
+
+- Der native Duty-Cycle läuft unabhängig; `swimspa_filter_runs_unexpectedly` blendet legitime native Läufe über das je Durchlauf mitgeloggte `filter_contexts`-Fenster (`main.py`) aus.
 
 ## 10. Implementierungsphasen
 

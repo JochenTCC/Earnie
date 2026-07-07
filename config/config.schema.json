@@ -623,6 +623,11 @@
               "type": "string",
               "enum": ["power", "binary"],
               "description": "Optional: überschreibt signal_type nur für die Live-Abfrage in main.py."
+            },
+            "subtract_consumer_ids": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Optional: Misst power_name die Gesamtleistung mehrerer Lasten am selben Zähler (z. B. SwimSpa-Heizung inkl. Filter), werden die hier gelisteten consumer_ids vom Live-Ist abgezogen — nur wenn der Wert wirklich vom Zähler stammt (nicht Fallback)."
             }
           }
         },

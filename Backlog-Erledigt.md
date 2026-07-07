@@ -2,6 +2,16 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Swimspa Filternutzung optimieren (2026-07-07)
+
+Spec: [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md). Ziel: kostenoptimale **ergänzende** Filterlaufzeit; `Sollstunden` (Schulden in h) langfristig → 0; nativer Duty-Cycle unabhängig.
+
+- [x] **Code Phasen 1–4** — `loxone_remaining_hours`, `filter_context`/MILP-Sperrung, Schema/`config.example.json`/Doku, Live-Parser + `verify_swimspa_filter_live` / `patch_swimspa_filter_config`
+- [x] **Live-Abnahme (Nutzer)** — Prod-`config.json` gepatcht; Formate `filter1hour` und `Sollstunden` am Miniserver bestätigt
+- [x] **Deviation-Regeln SwimSpa-Filter (S8–S10)** — `swimspa_filter_should_run_missing`, `swimspa_filter_runs_unexpectedly` (nur außerhalb nativem Fenster), `swimspa_filter_over_nominal`; neue Prädikate `power_ist_without_soll`, `slot_outside_native_filter_window`, `ist_power_above_nominal`; natives Fenster als `filter_contexts` in `optimization_history.jsonl` mitgeloggt
+- [x] **Ist-Leistung Heizen/Filtern getrennt geprüft + Fall B korrigiert** — getrennte Loxone-Merker/Keys/Charts bestätigt; Heizungszähler `Ernie_Swim-Spa-P_act` misst inkl. Filter → `subtract_consumer_ids` zieht Filter-Anteil vom Heizungs-Ist ab (kein Doppelzählen in `flex_sum_kw`/`baseload_kw`); `patch_swimspa_filter_config` idempotent erweitert. Follow-up (historische Logs / Loxone-Trennung) als eigener 1.+1-Punkt
+- [x] **Version 1.20.0** — Minor-Bump
+
 ### Chart 1 Prognose-Sättigung PV & Grundlast (2026-07-07)
 
 - [x] **Chart 1: Prognose-Sättigung auch für PV und Grundlast reduziert** — Zonenlogik aus den Flex-Verbrauchern auf `PV` und `Grundlast` erweitert; Historie bleibt voll gesättigt, neutraler und grüner Bereich nutzen denselben Sättigungsfaktor wie Flex; Regressionstests für Farbableitung und zonenspezifische Buckets ergänzt

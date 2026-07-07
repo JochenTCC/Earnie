@@ -80,11 +80,13 @@ Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden)
 
 | Verbraucher (`id`) | Freigabe (Schreiben) | Leistung (Lesen) |
 |--------------------|----------------------|------------------|
-| `swimspa` | `Ernie_SwimSpa_Freigabe` | `Ernie_Swim-Spa-P_act` |
+| `swimspa` | `Ernie_SwimSpa_Freigabe` | `Ernie_Swim-Spa-P_act` (Gesamt inkl. Filter) |
 | `swimspa_filter` | `Ernie_Swimspa_Filter_Freigabe` | `homie_bwa_spa_filter2` (binär) |
 | `eauto` | `Ernie_EAuto_LadeFreigabe` | `Ernie_EAuto_P_act` |
 
 Weitere Verbraucher (z. B. Wärmepumpe) nach demselben Muster in `flexible_consumers` ergänzen.
+
+**Hinweis SwimSpa (Fall B):** `Ernie_Swim-Spa-P_act` misst Heizung **und** Filter am selben Zähler. Über `swimspa.loxone_inputs.subtract_consumer_ids: ["swimspa_filter"]` wird der Filter-Anteil vom Heizungs-Ist abgezogen (kein Doppelzählen in `flex_sum_kw`/`baseload_kw`).
 
 ## Lesen vs. Schreiben in `main.py`
 

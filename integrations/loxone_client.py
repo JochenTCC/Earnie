@@ -19,6 +19,7 @@ _UNIT_SUFFIXES = (
     ("%", "pct"),
     ("°C", "c"),
     ("°", "c"),
+    (" h", "h"),
     ("A", "a"),
 )
 _DEFAULT_CHARGING_VOLTAGE_V = 230.0
@@ -322,6 +323,27 @@ def consumers_with_live_nominal_power(consumers: list | None = None) -> list:
     return updated
 
 
+def _read_consumer_meter_kw(consumer: dict) -> float | None:
+    """Reine Zähler-Messung (kW) ohne Fallback.
+
+    None, wenn der Merker fehlt oder Loxone nicht antwortet — so lässt sich
+    „gemessen" von „Fallback verwendet" unterscheiden.
+    binary: Merker 0/1 × Nennleistung; power: direkter kW-Wert (≥ 0).
+    """
+    io_name = (consumer.get("loxone_inputs") or {}).get("power_name", "")
+    if not io_name:
+        return None
+    raw = fetch_loxone_generic_value(io_name)
+    if raw is None:
+        return None
+    inputs = consumer.get("loxone_inputs") or {}
+    signal_type = str(inputs.get("signal_type") or consumer.get("signal_type", "power")).lower()
+    nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+    if signal_type == "binary":
+        return round(nominal if float(raw) >= 0.5 else 0.0, 3)
+    return round(max(0.0, float(raw)), 3)
+
+
 def resolve_consumer_live_power_kw(
     consumer: dict,
     *,
@@ -331,27 +353,54 @@ def resolve_consumer_live_power_kw(
     Aktuelle Leistung (kW) eines flexiblen Verbrauchers live aus Loxone.
     binary: Merker 0/1 × Nennleistung; power: direkter kW-Wert (≥ 0).
     """
+    measured = _read_consumer_meter_kw(consumer)
+    if measured is not None:
+        return measured
     io_name = (consumer.get("loxone_inputs") or {}).get("power_name", "")
-    if not io_name:
-        return fallback_kw
-
-    raw = fetch_loxone_generic_value(io_name)
-    if raw is None:
+    if io_name:
         logger.warning(
             "Loxone: Keine Live-Leistung für '%s' (%s), Fallback %s kW",
             consumer.get("id"),
             io_name,
             fallback_kw,
         )
-        return fallback_kw
+    return fallback_kw
 
-    inputs = consumer.get("loxone_inputs") or {}
-    signal_type = str(inputs.get("signal_type") or consumer.get("signal_type", "power")).lower()
-    nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
-    if signal_type == "binary":
-        return round(nominal if float(raw) >= 0.5 else 0.0, 3)
 
-    return round(max(0.0, float(raw)), 3)
+def _subtract_shared_meter_loads(
+    result: dict[str, float],
+    consumers: list,
+    measured_ids: set[str],
+) -> dict[str, float]:
+    """Zieht bei gemeinsamer Leistungsmessung enthaltene Verbraucher-Anteile ab.
+
+    Misst der ``power_name`` eines Verbrauchers die Gesamtleistung mehrerer Lasten
+    am selben Zähler (z. B. SwimSpa-Heizung inkl. Filter), listet er die enthaltenen
+    IDs unter ``loxone_inputs.subtract_consumer_ids``. Der Abzug wird nur angewandt,
+    wenn der Gesamtwert tatsächlich vom Zähler stammt (nicht aus dem Fallback) —
+    sonst würde ein bereits filterfreier Fallback-Sollwert doppelt gekürzt.
+    """
+    corrected = dict(result)
+    for consumer in consumers:
+        subtract_ids = (consumer.get("loxone_inputs") or {}).get("subtract_consumer_ids") or []
+        cid = consumer["id"]
+        if not subtract_ids or cid not in measured_ids or cid not in corrected:
+            continue
+        deduction = sum(float(result.get(sub_id, 0.0) or 0.0) for sub_id in subtract_ids)
+        if deduction <= 0:
+            continue
+        new_value = round(max(0.0, corrected[cid] - deduction), 3)
+        logger.info(
+            "Loxone: '%s' Gesamtmessung %.3f kW − enthaltene Last(en) %s (%.3f kW) "
+            "= %.3f kW.",
+            cid,
+            corrected[cid],
+            list(subtract_ids),
+            deduction,
+            new_value,
+        )
+        corrected[cid] = new_value
+    return corrected
 
 
 def fetch_flexible_consumers_live_kw(
@@ -365,22 +414,31 @@ def fetch_flexible_consumers_live_kw(
     fallbacks = fallbacks or {}
     source = consumers if consumers is not None else config.get_flexible_consumers()
     result: dict[str, float] = {}
+    measured_ids: set[str] = set()
 
     for consumer in source:
         cid = consumer["id"]
         fallback = float(fallbacks.get(cid, 0.0) or 0.0)
-        live = resolve_consumer_live_power_kw(consumer, fallback_kw=fallback)
-        result[cid] = round(float(live if live is not None else fallback), 3)
         io_name = (consumer.get("loxone_inputs") or {}).get("power_name", "")
-        if io_name and live is not None:
-            logger.debug(
-                "Loxone Live-Leistung %s: %.3f kW (%s)",
-                cid,
-                result[cid],
-                io_name,
-            )
+        measured = _read_consumer_meter_kw(consumer)
+        if measured is not None:
+            measured_ids.add(cid)
+            result[cid] = round(float(measured), 3)
+            if io_name:
+                logger.debug(
+                    "Loxone Live-Leistung %s: %.3f kW (%s)", cid, result[cid], io_name
+                )
+        else:
+            result[cid] = round(fallback, 3)
+            if io_name:
+                logger.warning(
+                    "Loxone: Keine Live-Leistung für '%s' (%s), Fallback %s kW",
+                    cid,
+                    io_name,
+                    fallback,
+                )
 
-    return result
+    return _subtract_shared_meter_loads(result, source, measured_ids)
 
 
 def send_loxone_value(input_name: str, value: float) -> bool:

@@ -18,6 +18,14 @@ class FlexPowerFacts:
     mismatch_kw: float
     pv_follow_soll: int | None = None
     loxone_setpoint_kw: float | None = None
+    nominal_power_kw: float | None = None
+
+
+@dataclass(frozen=True)
+class FilterWindowFacts:
+    """Natives Filterfenster (SwimSpa) eines Slots — aus dem Log-Eintrag."""
+    native_start_hour: float | None
+    native_duration_hours: float | None
 
 
 @dataclass(frozen=True)
@@ -44,6 +52,8 @@ class SlotDeviationFacts:
     thermal: dict[str, ThermalFacts]
     charging_contexts: dict[str, dict[str, Any]]
     consumer_remaining_kwh: dict[str, float]
+    filter_windows: dict[str, FilterWindowFacts]
+    slot_start: datetime | None
 
 
 def _float_or_zero(value: Any) -> float:
@@ -125,6 +135,32 @@ def _ist_flex_kw(entry: dict[str, Any], consumer_id: str) -> float:
     return _float_or_zero(live.get(consumer_id))
 
 
+def _nominal_power_kw(consumer: dict | None) -> float | None:
+    if consumer is None:
+        return None
+    value = consumer.get("nominal_power_kw")
+    if value is None:
+        return None
+    return float(value)
+
+
+def _filter_windows(entry: dict[str, Any], consumer_ids: set[str]) -> dict[str, FilterWindowFacts]:
+    """Natives Filterfenster je Verbraucher aus dem geloggten filter_contexts-Block."""
+    logged = entry.get("filter_contexts") or {}
+    windows: dict[str, FilterWindowFacts] = {}
+    for consumer_id in consumer_ids:
+        ctx = logged.get(consumer_id)
+        if not isinstance(ctx, dict):
+            continue
+        start = ctx.get("native_start_hour")
+        duration = ctx.get("native_duration_hours")
+        windows[consumer_id] = FilterWindowFacts(
+            native_start_hour=None if start is None else float(start),
+            native_duration_hours=None if duration is None else float(duration),
+        )
+    return windows
+
+
 def _thermal_by_consumer(entry: dict[str, Any]) -> dict[str, dict[str, Any]]:
     indexed: dict[str, dict[str, Any]] = {}
     for item in entry.get("thermal_observability") or []:
@@ -176,7 +212,6 @@ def build_slot_deviation_facts(
     slot_start: datetime | None = None,
 ) -> SlotDeviationFacts:
     """Extrahiert Vergleichsfakten aus einem Produktiv-Log-Eintrag."""
-    del slot_start  # reserviert für Stufe 2 / Slot-spezifische Thermik
     consumers: dict[str, FlexPowerFacts] = {}
     for consumer_id in sorted(_consumer_ids_from_entry(entry)):
         consumer = _consumer_config(consumer_id)
@@ -188,6 +223,7 @@ def build_slot_deviation_facts(
             mismatch_kw=round(soll_kw - ist_kw, 3),
             pv_follow_soll=_pv_follow_soll(entry, consumer_id, consumer),
             loxone_setpoint_kw=_loxone_setpoint_kw(entry, consumer_id, consumer),
+            nominal_power_kw=_nominal_power_kw(consumer),
         )
     thermal_index = _thermal_by_consumer(entry)
     thermal = {
@@ -210,4 +246,6 @@ def build_slot_deviation_facts(
         thermal=thermal,
         charging_contexts=contexts,
         consumer_remaining_kwh=remaining,
+        filter_windows=_filter_windows(entry, set(consumers)),
+        slot_start=slot_start,
     )

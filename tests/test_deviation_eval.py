@@ -1,8 +1,9 @@
-"""Tests für Regeldatei und Auswertung (Szenarien S1–S5)."""
+"""Tests für Regeldatei und Auswertung (Szenarien S1–S10)."""
 from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ import pytest
 os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 
 from optimizer import battery as bat
+from optimizer import deviation_facts as facts_mod
 from optimizer.deviation_eval import (
     evaluate_entry_deviations,
     evaluate_slot_deviations,
@@ -183,6 +185,98 @@ class TestScenarioCatalog:
         facts = build_slot_deviation_facts(entry, slot_quality=SLOT_PRESENT)
         events = evaluate_slot_deviations(facts, rules_doc)
         assert len(events) == 1
+
+
+class TestSwimspaFilterRules:
+    """Szenarien S8–S10 für den ergänzenden SwimSpa-Filter (Backlog Z.17)."""
+
+    @pytest.fixture
+    def with_filter_consumer(self, monkeypatch):
+        """swimspa_filter mit Nennleistung 0,18 kW für den Facts-Lookup bereitstellen."""
+        consumer = {"id": "swimspa_filter", "name": "SwimSpa Filter", "nominal_power_kw": 0.18}
+
+        def _fake_consumer_config(consumer_id: str):
+            return consumer if consumer_id == "swimspa_filter" else None
+
+        monkeypatch.setattr(facts_mod, "_consumer_config", _fake_consumer_config)
+
+    def test_s8_should_run_but_missing(self, rules_doc):
+        entry = _entry(
+            consumer_powers_kw={"swimspa_filter": 0.18},
+            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.0}, "battery_kw": 0.0},
+        )
+        events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
+        assert len(events) == 1
+        assert events[0].category == "error"
+        assert events[0].rule_id == "swimspa_filter_should_run_missing"
+
+    def test_s9_runs_unexpectedly_outside_native_window(self, rules_doc):
+        entry = _entry(
+            consumer_powers_kw={"swimspa_filter": 0.0},
+            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.18}, "battery_kw": 0.0},
+            filter_contexts={
+                "swimspa_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
+            },
+        )
+        events = evaluate_entry_deviations(
+            entry, rules_doc=rules_doc, slot_start=datetime(2026, 7, 7, 15, 0)
+        )
+        assert len(events) == 1
+        assert events[0].category == "error"
+        assert events[0].rule_id == "swimspa_filter_runs_unexpectedly"
+
+    def test_s9b_native_run_inside_window_no_event(self, rules_doc):
+        entry = _entry(
+            consumer_powers_kw={"swimspa_filter": 0.0},
+            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.18}, "battery_kw": 0.0},
+            filter_contexts={
+                "swimspa_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
+            },
+        )
+        events = evaluate_entry_deviations(
+            entry, rules_doc=rules_doc, slot_start=datetime(2026, 7, 7, 11, 0)
+        )
+        assert events == []
+
+    def test_s9c_no_window_info_is_conservative(self, rules_doc):
+        entry = _entry(
+            consumer_powers_kw={"swimspa_filter": 0.0},
+            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.18}, "battery_kw": 0.0},
+        )
+        events = evaluate_entry_deviations(
+            entry, rules_doc=rules_doc, slot_start=datetime(2026, 7, 7, 15, 0)
+        )
+        assert events == []
+
+    def test_s10_over_nominal_warning(self, rules_doc, with_filter_consumer):
+        entry = _entry(
+            consumer_powers_kw={"swimspa_filter": 0.18},
+            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.40}, "battery_kw": 0.0},
+            filter_contexts={
+                "swimspa_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
+            },
+        )
+        events = evaluate_entry_deviations(
+            entry, rules_doc=rules_doc, slot_start=datetime(2026, 7, 7, 11, 0)
+        )
+        assert len(events) == 1
+        assert events[0].category == "warning"
+        assert events[0].rule_id == "swimspa_filter_over_nominal"
+        assert "0.40" in events[0].message
+
+    def test_over_nominal_without_config_does_not_fire(self, rules_doc):
+        """Ohne bekannte Nennleistung (Consumer nicht in Config) keine Warnung."""
+        entry = _entry(
+            consumer_powers_kw={"swimspa_filter": 0.18},
+            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.40}, "battery_kw": 0.0},
+            filter_contexts={
+                "swimspa_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
+            },
+        )
+        events = evaluate_entry_deviations(
+            entry, rules_doc=rules_doc, slot_start=datetime(2026, 7, 7, 11, 0)
+        )
+        assert events == []
 
 
 class TestPredicateErrors:

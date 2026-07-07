@@ -33,6 +33,10 @@ from .delivery_tracking import (
     booking_power_kw,
     build_delivery_compliance_row,
 )
+from .filter_context import (
+    resolve_filter_contexts,
+    serialize_filter_contexts,
+)
 from .battery import (
     MODE_AUTOMATIK,
     MODE_ENTLADESPERRE,
@@ -107,7 +111,9 @@ __all__ = [
     "apply_immediate_charge_to_matrix",
     "prepare_optimization_matrix",
     "resolve_charging_contexts",
+    "resolve_filter_contexts",
     "serialize_charging_contexts",
+    "serialize_filter_contexts",
     "resolve_horizon_consumer_targets_kwh",
     "simulate_24h_horizon",
     "simulate_baseline_horizon",

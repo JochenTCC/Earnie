@@ -32,8 +32,59 @@ def test_patch_inserts_swimspa_filter_after_swimspa(tmp_path: Path):
 def test_patch_is_idempotent(tmp_path: Path):
     config_path = tmp_path / "config.json"
     config_path.write_text(
-        json.dumps({"flexible_consumers": [patch_mod.SWIMSPA_FILTER_BLOCK]}),
+        json.dumps(
+            {
+                "flexible_consumers": [
+                    {
+                        "id": "swimspa",
+                        "name": "SwimSpa",
+                        "loxone_inputs": {
+                            "power_name": "Ernie_Swim-Spa-P_act",
+                            "subtract_consumer_ids": ["swimspa_filter"],
+                        },
+                    },
+                    patch_mod.SWIMSPA_FILTER_BLOCK,
+                ]
+            }
+        ),
         encoding="utf-8",
     )
     data = patch_mod._load_config(config_path)
     assert patch_mod.patch_config(data) is False
+
+
+def test_patch_adds_shared_meter_subtraction_to_swimspa(tmp_path: Path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "flexible_consumers": [
+                    {
+                        "id": "swimspa",
+                        "name": "SwimSpa",
+                        "loxone_inputs": {"power_name": "Ernie_Swim-Spa-P_act"},
+                    },
+                    patch_mod.SWIMSPA_FILTER_BLOCK,
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    data = patch_mod._load_config(config_path)
+    assert patch_mod.patch_config(data) is True
+    swimspa = data["flexible_consumers"][0]
+    assert swimspa["loxone_inputs"]["subtract_consumer_ids"] == ["swimspa_filter"]
+
+
+def test_shared_meter_patch_idempotent(tmp_path: Path):
+    consumers = [
+        {
+            "id": "swimspa",
+            "loxone_inputs": {
+                "power_name": "Ernie_Swim-Spa-P_act",
+                "subtract_consumer_ids": ["swimspa_filter"],
+            },
+        }
+    ]
+    assert patch_mod.patch_swimspa_shared_meter(consumers) is False
+    assert consumers[0]["loxone_inputs"]["subtract_consumer_ids"] == ["swimspa_filter"]

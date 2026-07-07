@@ -179,6 +179,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 consumer["nominal_power_kw"],
                 lox["nominal_power_kw_name"],
             )
+    filter_contexts = optimizer.resolve_filter_contexts(optimization_matrix, live_consumers)
     mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _, urgent_obs = optimizer.milp_optimizer(
         optimization_matrix,
         current_hour,
@@ -186,6 +187,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         consumers=live_consumers,
         consumer_remaining_kwh=consumer_remaining,
         charging_contexts=charging_contexts,
+        filter_contexts=filter_contexts,
         sunrise_soc_min_index=sunrise_soc_min_index,
     )
     battery_params = config.get_battery_params()
@@ -318,6 +320,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 k: round(float(v), 3) for k, v in consumer_remaining.items()
             },
             "charging_contexts": optimizer.serialize_charging_contexts(charging_contexts),
+            "filter_contexts": optimizer.serialize_filter_contexts(filter_contexts),
             "urgent_rule_observability": urgent_obs,
             "consumer_pv_follow": {
                 k: int(v) for k, v in consumer_pv_follow.items()

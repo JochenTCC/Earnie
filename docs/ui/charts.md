@@ -89,6 +89,9 @@ Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Re
 | `battery_forced_discharge_missing` | battery | Fehler |
 | `battery_forced_charge_missing` | battery | Fehler |
 | `waermepumpe_enable_no_start` | waermepumpe | Hinweis |
+| `swimspa_filter_should_run_missing` | swimspa_filter | Fehler |
+| `swimspa_filter_runs_unexpectedly` | swimspa_filter | Fehler |
+| `swimspa_filter_over_nominal` | swimspa_filter | Warnung |
 
 **Entwickler-Test:** VS Code Launch **Streamlit app.py (Deviation-Test)** — seedet fiktives Log (`scripts/seed_deviation_test_log.py`) in lokales `runtime/` und startet Streamlit. Manuell: `python -m scripts.seed_deviation_test_log --force`.
 

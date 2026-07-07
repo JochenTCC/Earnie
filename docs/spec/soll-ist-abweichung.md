@@ -1,7 +1,7 @@
 # Spezifikation: Soll/Ist-Abweichung (Chart 1)
 
-**Version:** 0.2  
-**Status:** Epic abgeschlossen (2026-07-05, P1–P4)  
+**Version:** 0.3  
+**Status:** Epic abgeschlossen (2026-07-05, P1–P4); Erweiterung SwimSpa-Filter-Regeln (2026-07-07)  
 **Epic-Kurzname:** **Soll-Ist**  
 **Voraussetzung:** Epic **UI Sunset-2-Sunset** abgeschlossen ([ui-sunset2sunset.md](ui-sunset2sunset.md) v0.7.0)
 
@@ -41,6 +41,7 @@ Aus einem Eintrag in `optimization_history.jsonl` (siehe `main.py` → `append_p
 | PV / Grundlast | `forecast_*` | `consumption_snapshot.pv_kw`, `baseload_kw` | Stufe 1: nur wo für Regeln nötig |
 | Thermik (SwimSpa) | `thermal_observability` | `readings_c.actual`, Band | Kontext für Warnungs-Regeln |
 | E-Auto-Kontext | `charging_contexts.eauto` | — | `plugged_in`, `remaining_kwh`, `immediate_charge` |
+| Natives Filterfenster | `filter_contexts.{id}` | — | `native_start_hour`, `native_duration_hours` (SwimSpa-Filter) |
 | Loxone-Soll gesendet | `loxone_sent` | — | optional für erweiterte Regeln |
 
 **Auswertungsgrenze:** nur Slots mit `slot_quality == present` im grauen Bereich (Spec UI S-2 §6). Keine Icons bei `missing` oder `held`.
@@ -164,6 +165,9 @@ Siehe `config/deviation_rules.schema.json` und `config/deviation_rules.example.j
 | `pv_follow_scheduled` | `consumer_pv_follow.{scope} == 1` und Loxone-Setpoint > Toleranz |
 | `pv_follow_power_below_tolerance` | pv_follow aktiv, Setpoint − Ist > Toleranz |
 | `slot_quality_present` | Slot hat echten Log-Eintrag |
+| `power_ist_without_soll` | Ist > Toleranz, aber Soll ≈ 0 (läuft ohne Planung) |
+| `slot_outside_native_filter_window` | Natives Filterfenster bekannt **und** Slot außerhalb; sonst konservativ `False` (aus `filter_contexts` im Log) |
+| `ist_power_above_nominal` | Ist > `nominal_power_kw` + Toleranz (Plausibilität) |
 
 Neue Domänenkenntnis = neues Prädikat (Python + Test) + JSON-Regelzeile.
 
@@ -180,8 +184,13 @@ Abgedeckt durch `tests/test_deviation_eval.py`, `tests/test_deviation_scenario_c
 | S5 | Wärmepumpe Soll > 0, Ist ≈ 0 | `waermepumpe_enable_no_start` | Hinweis |
 | S6 | Modus Zwangs-Entladen, Batterie entlädt nicht | `battery_forced_discharge_missing` | Fehler |
 | S7 | pv_follow = 1, Loxone-Setpoint (P_max) nicht erreicht | `eauto_pv_follow_missing` | Fehler |
+| S8 | SwimSpa-Filter Soll > 0, Ist ≈ 0 | `swimspa_filter_should_run_missing` | Fehler |
+| S9 | SwimSpa-Filter Ist > 0, Soll ≈ 0, Slot außerhalb nativem Fenster | `swimspa_filter_runs_unexpectedly` | Fehler |
+| S10 | SwimSpa-Filter Ist > Nennleistung (0,18 kW) + Toleranz | `swimspa_filter_over_nominal` | Warnung |
 
 Erste Hinweis-Regel: `waermepumpe_enable_no_start` (Freigabe ohne Anlauf).
+
+**SwimSpa-Filter (Backlog Z.17):** Der native Duty-Cycle läuft unabhängig von Ernie. Damit ein legitimer nativer Lauf (Ist > 0, Soll = 0 **im** Fenster) nicht als Fehler markiert wird, prüft `swimspa_filter_runs_unexpectedly` zusätzlich `slot_outside_native_filter_window`. Das native Fenster (`native_start_hour`/`native_duration_hours`) wird dafür je Durchlauf in `optimization_history.jsonl` unter `filter_contexts` mitgeloggt (`main.py`). Fehlt die Fenster-Info (Alt-Logs), fällt das Prädikat konservativ auf „kein Fehler".
 
 ### 5.3 Regeln pflegen
 
@@ -243,6 +252,7 @@ Commit-Präfix: `deviation(soll-ist): P1a …` bzw. kurz `soll-ist: P1 …`.
 
 | Datum | Version | Inhalt |
 |-------|---------|--------|
+| 2026-07-07 | 0.3 | SwimSpa-Filter-Regeln S8–S10 (`power_ist_without_soll`, `slot_outside_native_filter_window`, `ist_power_above_nominal`); `filter_contexts` im Log |
 | 2026-07-05 | 0.2 | P4: Szenario-Katalog S1–S7, Regel-Pflege §5.3, charts.md, Epic-Abschluss |
 | 2026-07-05 | 0.1.4 | Regeln Zwangs-Entladen, pv_follow; Seed-Log S6/S7, Launch Deviation-Test |
 | 2026-07-05 | 0.1.3 | P3: Chart-1-Marker, Hover, ?-Hilfe |

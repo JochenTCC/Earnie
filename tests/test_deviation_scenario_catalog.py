@@ -127,6 +127,16 @@ SCENARIOS = [
         "eauto_pv_follow_missing",
         id="S7_pv_follow",
     ),
+    pytest.param(
+        "S8",
+        _entry(
+            consumer_powers_kw={"swimspa_filter": 0.18},
+            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.0}, "battery_kw": 0.0},
+        ),
+        "error",
+        "swimspa_filter_should_run_missing",
+        id="S8_swimspa_filter_missing",
+    ),
 ]
 
 

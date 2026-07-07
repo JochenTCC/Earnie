@@ -30,6 +30,7 @@ class TestLoxoneValueParsing:
             ("  7.2 kWh  ", 7.2, "kwh"),
             ("21.7°", 21.7, "c"),
             ("21,7 °C", 21.7, "c"),
+            ("4 h", 4.0, "h"),
         ],
     )
     def test_parse_loxone_value_with_units(self, raw, expected_value, expected_unit):
@@ -255,6 +256,79 @@ class TestFlexibleConsumerHelpers:
             assert lc.resolve_consumer_live_power_kw(consumer) == 2.8
         with patch.object(lc, "fetch_loxone_generic_value", return_value=0.0):
             assert lc.resolve_consumer_live_power_kw(consumer) == 0.0
+
+
+class TestSharedMeterSubtraction:
+    """Fall B: SwimSpa-Heizungszähler misst Heizung + Filter am selben Zähler."""
+
+    def _consumers(self) -> list[dict]:
+        return [
+            {
+                "id": "swimspa",
+                "name": "SwimSpa",
+                "nominal_power_kw": 2.8,
+                "signal_type": "power",
+                "loxone_inputs": {
+                    "power_name": "Ernie_Swim-Spa-P_act",
+                    "subtract_consumer_ids": ["swimspa_filter"],
+                },
+            },
+            {
+                "id": "swimspa_filter",
+                "name": "SwimSpa Filter",
+                "nominal_power_kw": 0.18,
+                "signal_type": "binary",
+                "loxone_inputs": {
+                    "power_name": "homie_bwa_spa_filter2",
+                    "signal_type": "binary",
+                },
+            },
+        ]
+
+    def _reads(self, mapping: dict[str, float | None]):
+        def _fake(io_name: str):
+            return mapping.get(io_name)
+
+        return _fake
+
+    def test_filter_running_is_subtracted_from_heating_total(self):
+        reads = self._reads(
+            {"Ernie_Swim-Spa-P_act": 2.98, "homie_bwa_spa_filter2": 1.0}
+        )
+        with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
+            result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
+        assert result["swimspa_filter"] == 0.18
+        assert result["swimspa"] == 2.8
+        assert round(result["swimspa"] + result["swimspa_filter"], 3) == 2.98
+
+    def test_filter_off_leaves_heating_unchanged(self):
+        reads = self._reads(
+            {"Ernie_Swim-Spa-P_act": 2.8, "homie_bwa_spa_filter2": 0.0}
+        )
+        with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
+            result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
+        assert result["swimspa_filter"] == 0.0
+        assert result["swimspa"] == 2.8
+
+    def test_no_subtraction_when_heating_uses_fallback(self):
+        """Zähler antwortet nicht → Fallback (Heizungs-Soll, bereits filterfrei), kein Abzug."""
+        reads = self._reads(
+            {"Ernie_Swim-Spa-P_act": None, "homie_bwa_spa_filter2": 1.0}
+        )
+        with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
+            result = lc.fetch_flexible_consumers_live_kw(
+                fallbacks={"swimspa": 2.8}, consumers=self._consumers()
+            )
+        assert result["swimspa"] == 2.8
+        assert result["swimspa_filter"] == 0.18
+
+    def test_deduction_clamped_to_zero(self):
+        reads = self._reads(
+            {"Ernie_Swim-Spa-P_act": 0.1, "homie_bwa_spa_filter2": 1.0}
+        )
+        with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
+            result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
+        assert result["swimspa"] == 0.0
 
     def test_resolve_nominal_power_from_ampere(self):
         consumer = {

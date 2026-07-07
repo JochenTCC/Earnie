@@ -52,6 +52,7 @@ def build_slot_deviation_series(
             entry,
             slot_quality=quality,
             rules_doc=document,
+            slot_start=slot_start,
         )
         series.append(tuple(slot_events))
     return tuple(series)
