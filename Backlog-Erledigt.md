@@ -2,6 +2,20 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Chart 1 Prognose-Sättigung PV & Grundlast (2026-07-07)
+
+- [x] **Chart 1: Prognose-Sättigung auch für PV und Grundlast reduziert** — Zonenlogik aus den Flex-Verbrauchern auf `PV` und `Grundlast` erweitert; Historie bleibt voll gesättigt, neutraler und grüner Bereich nutzen denselben Sättigungsfaktor wie Flex; Regressionstests für Farbableitung und zonenspezifische Buckets ergänzt
+- [x] **Version 1.19.0** — Minor-Bump
+
+### Debug-Dump Vorarbeit (2026-07-07)
+
+- [x] **Reproduzierbare Repro-Inputs für Debug-Dumps zentralisiert** — gemeinsame Sammlung in `runtime_store/debug_dump_inputs.py`; `chart_debug_capture` und `archive_prod_dump` sichern jetzt aktive `config.json`, `deviation_rules.json`, optionale `local_settings.json`, relevante Env-Overrides und aufgelöste Pfade
+- [x] **Explizit konfigurierte Zusatzdateien in Dumps aufgenommen** — Preisprognose-Modell (`forecast_model_path`) und `cons_data_hourly.csv` werden bei vorhandener aktiver Referenz mitarchiviert; fokussierte Tests für ZIP- und Prod-Dump-Archiv ergänzt
+
+### Verbraucher-Farben P1 — NAS-Deploy Cleanup (2026-07-07)
+
+- [x] **Temporären lokalen `chart_color_index`-Test zurückgenommen** — lokale `config/config.json` entfernt; NAS-Pfad `ENERGY_OPTIMIZER_CONFIG_PATH=\\DS-KO-DO-2\docker\energy_optimizer\config\config.json` wieder maßgeblich, lokaler Override nicht mehr aktiv
+
 ### Verbraucher-Farben P2 — Zonenabhängige Sättigung (2026-07-07)
 
 - [x] **P2 — Zonenabhängige Sättigung (nur Chart-1-Flex-Balken)** — History volle Palette; neutral + Forecast gemeinsam `CONSUMER_CHART_SATURATION_MUTED` (0,6); Slot → Zone via `chart_zone_kind_for_slot_start`; Flex-Farbe pro Slot/Bucket; Legende Vollfarbe (`legendonly`); Sankey unverändert; Tests und `docs/ui/charts.md`

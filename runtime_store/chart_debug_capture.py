@@ -11,6 +11,7 @@ from typing import Any
 
 import config
 from runtime_store import optimization_history
+from runtime_store.debug_dump_inputs import collect_dump_context, write_inputs_to_zip
 from runtime_store.file_metadata import strip_metadata
 from runtime_store.live_optimization_debug import _json_safe
 from runtime_store.persist_paths import runtime_dir, runtime_path
@@ -153,7 +154,7 @@ def build_capture_payload(
 ) -> dict[str, Any]:
     """Serialisiert den aktuellen Chart-Zustand für JSON-Dateien im ZIP."""
     chart_context = bundle.chart_context
-    chart_window = chart_context.chart_window if chart_context else None
+    dump_context = collect_dump_context()
     return _json_safe(
         {
             "schema_version": CAPTURE_SCHEMA_VERSION,
@@ -182,6 +183,8 @@ def build_capture_payload(
             "chart1_plotly": json.loads(chart1_plotly_json) if chart1_plotly_json else None,
             "run_state": _read_json_file(run_state.RUN_STATE_FILE),
             "battery_params": config.get_battery_params(),
+            "env_overrides": dump_context["env_overrides"],
+            "resolved_paths": dump_context["resolved_paths"],
         }
     )
 
@@ -241,6 +244,8 @@ def write_capture_zip(
     chart_window = chart_context.chart_window if chart_context else None
 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        input_files = write_inputs_to_zip(archive)
+        payload["included_input_files"] = input_files
         archive.writestr(
             "manifest.json",
             json.dumps(payload, indent=2, ensure_ascii=False),
@@ -249,9 +254,10 @@ def write_capture_zip(
             "README.txt",
             (
                 "Chart-Debug-Archiv (Energy Optimizer)\n"
-                "manifest.json – Plot-Tabellen, Kontext, Live-SOC, Plotly Chart 1\n"
+                "manifest.json – Plot-Tabellen, Kontext, Live-SOC, Plotly Chart 1, Pfadauflosung\n"
                 "runtime/optimization_history_window.jsonl – Produktiv-Log um das Chart-Fenster\n"
                 "runtime/*.json – Kopien weiterer Laufzeitdateien falls vorhanden\n"
+                "inputs/*.json – aktive Konfigurationen fuer spaetere Reproduktion\n"
             ),
         )
         if chart_window is not None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 
+from data.planning_window import UiChartZone, UiChartZones
 from scripts.flow_balance_test_data import (
     FlowBalanceScenario,
     flow_balance_flex_pairs,
@@ -362,3 +363,65 @@ def test_flow_balance_bar_widths_follow_per_slot_resolution() -> None:
     assert pv_trace.width[4] == hour_ms
     baseload = next(t for t in traces if isinstance(t, go.Bar) and t.name == "Grundlast")
     assert baseload.width[4] == hour_ms
+
+
+def test_chart1_pv_and_baseload_use_zone_muted_colors() -> None:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    import pandas as pd
+
+    from ui.chart_colors import (
+        chart1_baseload_color_for_zone,
+        chart1_pv_color_for_zone,
+    )
+    from ui.charts import _battery_bar_times
+
+    tz = ZoneInfo("Europe/Vienna")
+    slots = [
+        datetime(2026, 7, 6, 6, 0, tzinfo=tz),
+        datetime(2026, 7, 6, 7, 0, tzinfo=tz),
+        datetime(2026, 7, 6, 8, 0, tzinfo=tz),
+    ]
+    df = pd.DataFrame(
+        {
+            "slot_datetime": slots,
+            "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+            "PV-Prognose (kW)": [2.0, 2.0, 2.0],
+            "Verbrauch-Prognose (kW)": [1.0, 1.0, 1.0],
+            "Geplante Batterie-Aktion (kW)": [0.0, 0.0, 0.0],
+            "Netzbezug (kW)": [0.0, 0.0, 0.0],
+            "SwimSpa (kW)": [0.0, 0.0, 0.0],
+        }
+    )
+    chart_zones = UiChartZones(
+        history=UiChartZone(label="history", start=slots[0], end=slots[1], fill_color="gray"),
+        live_plan=UiChartZone(label="live_plan", start=slots[1], end=slots[2], fill_color=None),
+        forecast=UiChartZone(label="forecast", start=slots[2], end=slots[2], fill_color="green"),
+    )
+    flex = _flex_pairs()
+    slot_models = build_flow_balance_slots_from_df(df, flex_consumers=flex)
+    axis = ChartSlotAxis.from_dataframe(df)
+    specs = flow_balance_plotly_trace_specs(
+        slot_models,
+        x_values=list(_battery_bar_times(axis, slice(0, len(df)))),
+        uhrzeit=list(df["Uhrzeit"]),
+        start=0,
+        end=len(df),
+        df=df,
+        flex_consumers=flex,
+        axis=axis,
+        chart_zones=chart_zones,
+    )
+
+    pv_specs = [spec for spec in specs if spec.kind == KIND_PV]
+    baseload_specs = [spec for spec in specs if spec.kind == KIND_BASELOAD]
+
+    assert {spec.marker["color"] for spec in pv_specs} == {
+        chart1_pv_color_for_zone("history"),
+        chart1_pv_color_for_zone("live_plan"),
+    }
+    assert {spec.marker["color"] for spec in baseload_specs} == {
+        chart1_baseload_color_for_zone("history"),
+        chart1_baseload_color_for_zone("live_plan"),
+    }

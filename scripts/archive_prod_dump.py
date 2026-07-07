@@ -9,6 +9,8 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from runtime_store.debug_dump_inputs import collect_dump_context, copy_inputs_to_directory
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = ROOT / "runtime-prod"
 FIXTURES_ROOT = ROOT / "tests" / "fixtures" / "prod_dumps"
@@ -75,6 +77,8 @@ def _write_manifest(
     recorded_at: str,
     files: list[str],
     regression: dict,
+    env_overrides: dict[str, str],
+    resolved_paths: dict[str, str],
 ) -> None:
     manifest = {
         "id": case_id,
@@ -84,6 +88,8 @@ def _write_manifest(
         "app_version": app_version,
         "archived_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "files": files,
+        "env_overrides": env_overrides,
+        "resolved_paths": resolved_paths,
         "regression": regression,
     }
     with open(target / "manifest.json", "w", encoding="utf-8") as handle:
@@ -122,11 +128,14 @@ def archive_prod_dump(
             continue
         shutil.copy2(src, target / name)
         copied.append(name)
+    copied.extend(copy_inputs_to_directory(target))
 
     if "optimization_history.jsonl" not in copied:
         raise FileNotFoundError(
             f"optimization_history.jsonl fehlt in {source_dir} – Archiv abgebrochen"
         )
+
+    dump_context = collect_dump_context()
 
     _write_manifest(
         target,
@@ -136,6 +145,8 @@ def archive_prod_dump(
         app_version=app_version,
         recorded_at=recorded_at,
         files=copied,
+        env_overrides=dump_context["env_overrides"],
+        resolved_paths=dump_context["resolved_paths"],
         regression=regression or {},
     )
     return target

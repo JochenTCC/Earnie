@@ -43,6 +43,8 @@ from ui.chart_colors import (
     MUTED_BATTERY_LOAD,
     MUTED_EXPORT_PV,
     blend_hsl,
+    chart1_baseload_color_for_zone,
+    chart1_pv_color_for_zone,
     consumer_chart_color,
     consumer_chart_saturation_for_zone,
     hsl,
@@ -718,6 +720,15 @@ def _accumulate_slot_traces(
     }
     cumulative_up = 0.0
     for segment in slot.up:
+        zone_kind = None
+        bar_color = None
+        if (
+            chart_zones is not None
+            and slot_start is not None
+            and segment.kind == KIND_PV
+        ):
+            zone_kind = chart_zone_kind_for_slot_start(slot_start, chart_zones)
+            bar_color = chart1_pv_color_for_zone(zone_kind)
         _append_stack_bucket(
             buckets,
             segment,
@@ -726,6 +737,8 @@ def _accumulate_slot_traces(
             direction="up",
             cumulative=cumulative_up,
             bar_width_ms=bar_width_ms,
+            zone_kind=zone_kind,
+            bar_color=bar_color,
         )
         cumulative_up += segment.kw
 
@@ -735,6 +748,8 @@ def _accumulate_slot_traces(
         flex_meta: tuple[Any, ...] = ()
         zone_kind: str | None = None
         bar_color: str | None = None
+        if chart_zones is not None and slot_start is not None:
+            zone_kind = chart_zone_kind_for_slot_start(slot_start, chart_zones)
         if segment.kind == KIND_FLEX and segment.consumer_id in flex_by_id:
             consumer, column = flex_by_id[segment.consumer_id]
             pattern_shape = _flex_pattern_shape(
@@ -749,13 +764,14 @@ def _accumulate_slot_traces(
                     _safe_int_flag(row.get(pv_col, 0)) if pv_col in row else 0,
                     _safe_int_flag(row.get(imm_col, 0)) if imm_col in row else 0,
                 )
-            if chart_zones is not None and slot_start is not None:
-                zone_kind = chart_zone_kind_for_slot_start(slot_start, chart_zones)
+            if zone_kind is not None:
                 saturation = consumer_chart_saturation_for_zone(zone_kind)
                 bar_color = consumer_chart_color(
                     consumer,
                     saturation_factor=saturation,
                 )
+        elif segment.kind == KIND_BASELOAD and zone_kind is not None:
+            bar_color = chart1_baseload_color_for_zone(zone_kind)
         _append_stack_bucket(
             buckets,
             segment,
@@ -773,6 +789,8 @@ def _accumulate_slot_traces(
 
 
 def _bucket_key(segment: FlowBalanceSegment, *, zone_kind: str | None = None) -> str:
+    if segment.kind in {KIND_PV, KIND_BASELOAD} and zone_kind is not None:
+        return f"{segment.kind}:{zone_kind}"
     if segment.kind == KIND_FLEX and segment.consumer_id:
         if zone_kind is not None:
             return f"{segment.kind}:{segment.consumer_id}:{zone_kind}"
@@ -853,7 +871,7 @@ def _bucket_specs_to_trace_specs(
             )
             legend_color = segment.color
         else:
-            marker = {"color": segment.color}
+            marker = {"color": bar_color}
             hovertemplate = (
                 "Uhrzeit: %{customdata[0]}<br>%{customdata[2]}: "
                 "%{customdata[1]:.2f} kW<extra></extra>"

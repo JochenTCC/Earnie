@@ -139,6 +139,25 @@ def test_chart_debug_capture_config_enabled(tmp_path, monkeypatch):
 
 def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
     with _chart_debug_config(tmp_path, monkeypatch, enabled=True):
+        rules_path = tmp_path / "deviation_rules.json"
+        model_path = tmp_path / "runtime" / "price_model_coefficients.json"
+        cons_data_path = tmp_path / "runtime" / "cons_data_hourly.csv"
+        rules_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "tolerances": {"power_kw": 0.2},
+                    "categories": {"hint": {}, "warning": {}, "error": {}},
+                    "rules": [],
+                    "fallback": {"on_unclassified_mismatch": "warning"},
+                }
+            ),
+            encoding="utf-8",
+        )
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+        model_path.write_text('{"version": 2, "coefficients": {}}', encoding="utf-8")
+        cons_data_path.write_text("timestamp;total_kw;baseload_kw;pv_kw;source\n", encoding="utf-8")
+        monkeypatch.setenv("ENERGY_OPTIMIZER_DEVIATION_RULES_PATH", str(rules_path))
         now = datetime(2026, 7, 5, 23, 0, tzinfo=_TZ)
         bundle = _sample_bundle(now)
         zip_path = write_capture_zip(
@@ -158,6 +177,23 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
         assert "Simulierter SoC (%)" in manifest["display_rows"][0]
         assert manifest["session_meta"]["s2_cycle_offset"] == 0
         assert manifest["chart_context"] is not None
+        assert "inputs/config.json" in names
+        assert "inputs/deviation_rules.json" in names
+        assert "inputs/price_model_coefficients.json" in names
+        assert "inputs/cons_data_hourly.csv" in names
+        assert manifest["resolved_paths"]["config_json"].endswith("config.json")
+        assert manifest["resolved_paths"]["deviation_rules_json"].endswith(
+            "deviation_rules.json"
+        )
+        assert manifest["resolved_paths"]["forecast_model_path"].endswith(
+            "price_model_coefficients.json"
+        )
+        assert manifest["resolved_paths"]["cons_data_path"].endswith(
+            "cons_data_hourly.csv"
+        )
+        assert "inputs/config.json" in manifest["included_input_files"]
+        assert "inputs/price_model_coefficients.json" in manifest["included_input_files"]
+        assert "ENERGY_OPTIMIZER_CONFIG_PATH" in manifest["env_overrides"]
 
 
 def test_build_capture_payload_json_safe(tmp_path, monkeypatch):

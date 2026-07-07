@@ -138,12 +138,12 @@ MUTED_EXPORT_PV = blend_hsl(_HSL_PV, _HSL_WHITE, 0.1, 25.0)
 # --- Chart 1 — Linien & Overlays ----------------------------------------------
 
 
-_HSL_SOC = (120.0, 90.0, 30.0)
+_HSL_SOC = (120.0, 90.0, 40.0)
 _ALPHA_SOC = 1.0
 COLOR_SOC = color_from_hsl(*_HSL_SOC, _ALPHA_SOC)
 
 _ALPHA_PV_LINE_FILL = 0.15
-CHART_PV_LINE_COLOR = COLOR_PV
+CHART_PV_LINE_COLOR = color_from_hsl(_HSL_PV[0], _HSL_PV[1], 45.0)
 CHART_PV_FILL_COLOR = color_from_hsl(*_HSL_PV, _ALPHA_PV_LINE_FILL)
 
 _HSL_MARKER_NOW = (204.0, 62.0, 58.0)
@@ -199,7 +199,11 @@ _CONSUMER_HUE_START = 260.0
 _CONSUMER_HUE_END = 40.0
 
 # Neutraler + Forecast-Bereich: gemeinsame Sättigungsreduktion (P2, nur Chart-1-Flex-Balken).
-CONSUMER_CHART_SATURATION_MUTED = 0.6
+CONSUMER_CHART_SATURATION_MUTED = 0.8
+CHART1_PV_SATURATION_MUTED = CONSUMER_CHART_SATURATION_MUTED
+CHART1_BASELOAD_SATURATION_MUTED = CONSUMER_CHART_SATURATION_MUTED
+CHART1_PV_LUMINANCE_MUTED = 1.2
+CHART1_BASELOAD_LUMINANCE_MUTED = 1.2
 
 CONSUMER_PALETTE_HUES: tuple[float, ...] = tuple(
     _CONSUMER_HUE_START - index * (_CONSUMER_HUE_START - _CONSUMER_HUE_END) / (CONSUMER_PALETTE_SIZE - 1)
@@ -251,6 +255,26 @@ def consumer_chart_saturation_for_zone(zone: str) -> float:
     if zone == "history":
         return 1.0
     return CONSUMER_CHART_SATURATION_MUTED
+
+
+def chart1_pv_color_for_zone(zone: str) -> str:
+    """PV-Farbe in Chart 1: History voll, Live/Forecast gedämpft."""
+    saturation = _HSL_PV[1]
+    luminance = _HSL_PV[2]
+    if zone != "history":
+        saturation *= CHART1_PV_SATURATION_MUTED
+        luminance *= CHART1_PV_LUMINANCE_MUTED
+    return color_from_hsl(_HSL_PV[0], saturation, luminance, _ALPHA_PV)
+
+
+def chart1_baseload_color_for_zone(zone: str) -> str:
+    """Grundlast-Farbe in Chart 1: History voll, Live/Forecast gedämpft."""
+    saturation = _HSL_BASELOAD[1]
+    luminance = _HSL_BASELOAD[2]
+    if zone != "history":
+        saturation *= CHART1_BASELOAD_SATURATION_MUTED
+        luminance *= CHART1_BASELOAD_LUMINANCE_MUTED
+    return color_from_hsl(_HSL_BASELOAD[0], saturation, luminance, _ALPHA_BASELOAD)
 
 
 # --- Chart 2 — Kostenlinien & Summary -----------------------------------------

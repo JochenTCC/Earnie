@@ -8,26 +8,10 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature-Backlog
 
-### Version 1.+1 — Verbraucher-Farben (Chart 1 & Sankey)
-
-**Temporär bis NAS-Deploy (`chart_color_index` lokal testen):**
-- [x] `config/config.json` aus `config.example.json` (Indizes SwimSpa=0, E-Auto=2, Wärmepumpe=7)
-- [x] `.env`: `ENERGY_OPTIMIZER_CONFIG_PATH=config/config.json` (NAS-Pfad auskommentiert)
-- [ ] **Nach Deploy rückgängig:** lokale `config/config.json` löschen; in `.env` NAS-Pfad wieder aktivieren:
-  `ENERGY_OPTIMIZER_CONFIG_PATH=\\DS-KO-DO-2\docker\energy_optimizer\config\config.json` (lokale Zeile entfernen/auskommentieren)
-
-### Version 1.+1
-- [ ] Debug-Dump einführen, in den alle relevanten Daten (inkl. config.json etc. ) abgelegt werden, damit später reproduzierbar gedebuggt werden kann.
-- [ ] **E-Auto-MILP: optionale Nacharbeiten**
-
 ### Version 1.+1
 - [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
   - Signal `Ernie_Swimspa_Filter_Sollstunden` (Sollstunden in 24 h), Steuerung `Ernie_Filter_Freigabe`
   - Ernie: Sollstunden in 24 h auf Null; Filterleistung; Laufzeiten in Loxone integriert
-- [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
-  - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
-- [ ] **Soll-Ist Hinweis-Regeln** — Kategorie „Hinweis“ sobald konkrete unkritische Fälle identifiziert (Follow-up Epic Soll-Ist)
-- [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
 
 ### Version 1.+1
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
@@ -35,6 +19,13 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Loxone-Merker für Trockner-Leistung: "Leistung Trockner"
   - Für Geschirrspüler ist keine Leistung bekannt (vielleicht später über Hue?)
   - [ ] Könnte auch adaptiv sein bzgl. Laufzeit und Energieverbrauch pro Lauf
+
+### Version 1.+1
+- [ ] **E-Auto-MILP: optionale Nacharbeiten**
+- [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
+  - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
+- [ ] **Soll-Ist Hinweis-Regeln** — Kategorie „Hinweis“ sobald konkrete unkritische Fälle identifiziert (Follow-up Epic Soll-Ist)
+- [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
 
 ### Version 1.+1
 - [ ] **Optional: Live-Planungshorizont per `config.json` umschaltbar** (`planning_horizon.mode`: `fixed_24h` | `sunset_window`)
@@ -64,6 +55,19 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Stufe 3 — Test-Typen trennen** (Config-Loader vs. Domain vs. UI-Patch; keine nackten `config.get_*()` ohne Fixture)
 - [ ] **Stufe 4 — Marker `requires_live_config`** für NAS/Prod-Integrationsläufe (`ENERGY_OPTIMIZER_TEST_USE_LIVE_CONFIG=1`; `@requires_loxone` nutzt diesen Schalter bereits)
 - [ ] **Stufe 5 (optional) — Config nur an Rändern** (reine Funktionen mit `consumers`/`battery_params` als Parameter)
+
+### Version 2.+1
+- [ ] **Debug-Dump Phase 2 — Dump-Formate und Reproduktion schärfen**
+  - Ziel: Ein Debug-Dump soll einen Fall später **nachvollziehbar und möglichst reproduzierbar** machen, ohne erneut produktive Dateien zusammensuchen zu müssen
+  - Dump-Typen klar trennen:
+    - **Chart-Debug-Dump** für UI-/Darstellungsfehler
+    - **Prod-Dump-Archiv** für fachliche/optimizerbezogene Fehlfälle
+  - Je Dump-Typ festlegen:
+    - Pflichtdateien
+    - optionale Zusatzdateien
+    - Manifest-Felder / Schema
+  - Prüfen, ob ein **Replay-/Nachrechen-Pfad** aus einem Dump dokumentiert oder teilautomatisiert werden soll
+  - Weitere Inputs nur ergänzen, wenn sie für reale Fehlfälle nachweislich relevant sind
 
 ### Version 2.+1 — Epics **Adaption** & **Thermik** (Architektur first)
 

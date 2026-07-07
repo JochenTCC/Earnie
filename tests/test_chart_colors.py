@@ -5,6 +5,10 @@ import pytest
 
 from ui.chart_colors import (
     CHART_PV_LINE_COLOR,
+    CHART1_BASELOAD_LUMINANCE_MUTED,
+    CHART1_BASELOAD_SATURATION_MUTED,
+    CHART1_PV_LUMINANCE_MUTED,
+    CHART1_PV_SATURATION_MUTED,
     CHART_ZONE_FORECAST_FILL,
     CHART_ZONE_HISTORY_FILL,
     COLOR_BASELOAD,
@@ -20,6 +24,7 @@ from ui.chart_colors import (
     CONSUMER_PALETTE,
     CONSUMER_PALETTE_HUES,
     CONSUMER_PALETTE_SIZE,
+    CONSUMER_CHART_SATURATION_MUTED,
     MUTED_BATTERY_CHARGE_GRID,
     MUTED_BATTERY_CHARGE_PV,
     MUTED_BATTERY_EXPORT,
@@ -35,6 +40,8 @@ from ui.chart_colors import (
     _HSL_PV,
     _HSL_SOC,
     blend_hsl,
+    chart1_baseload_color_for_zone,
+    chart1_pv_color_for_zone,
     color_from_hsl,
     consumer_chart_color,
     consumer_chart_saturation_for_zone,
@@ -99,7 +106,8 @@ def test_blend_hsl_l_delta_shifts_lightness() -> None:
 
 
 def test_chart1_pv_line_matches_balance_bar_color() -> None:
-    assert CHART_PV_LINE_COLOR == COLOR_PV
+    assert CHART_PV_LINE_COLOR != COLOR_PV
+    assert CHART_PV_LINE_COLOR == color_from_hsl(_HSL_PV[0], _HSL_PV[1], 45.0)
 
 
 def test_chart1_soc_color_from_hsl_constant() -> None:
@@ -147,5 +155,20 @@ def test_consumer_chart_color_requires_index() -> None:
 
 def test_consumer_chart_saturation_for_zone() -> None:
     assert consumer_chart_saturation_for_zone("history") == 1.0
-    assert consumer_chart_saturation_for_zone("live_plan") == pytest.approx(0.6)
-    assert consumer_chart_saturation_for_zone("forecast") == pytest.approx(0.6)
+    assert consumer_chart_saturation_for_zone("live_plan") == pytest.approx(
+        CONSUMER_CHART_SATURATION_MUTED
+    )
+    assert consumer_chart_saturation_for_zone("forecast") == pytest.approx(
+        CONSUMER_CHART_SATURATION_MUTED
+    )
+
+
+def test_chart1_pv_and_baseload_colors_are_muted_outside_history() -> None:
+    assert chart1_pv_color_for_zone("history") == COLOR_PV
+    assert chart1_baseload_color_for_zone("history") == COLOR_BASELOAD
+    assert CHART1_PV_SATURATION_MUTED == CONSUMER_CHART_SATURATION_MUTED
+    assert CHART1_BASELOAD_SATURATION_MUTED == CONSUMER_CHART_SATURATION_MUTED
+    assert CHART1_PV_LUMINANCE_MUTED > 0.0
+    assert CHART1_BASELOAD_LUMINANCE_MUTED > 0.0
+    assert chart1_pv_color_for_zone("forecast") != COLOR_PV
+    assert chart1_baseload_color_for_zone("live_plan") != COLOR_BASELOAD
