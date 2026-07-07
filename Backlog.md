@@ -5,6 +5,9 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Research-Items
+- [ ] Smart Energy App anschauen zum Vergleich
+- [ ] Weitere Anbieter mit flexiblen Preisen anschauen
+- [ ] Businessplan adaptieren
 
 ## Feature-Backlog
 
