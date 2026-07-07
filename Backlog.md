@@ -14,6 +14,7 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Ernie: Sollstunden in 24 h auf Null; Filterleistung; Laufzeiten in Loxone integriert
 
 ### Version 1.+1
+- [] Einfachen Editor für config.json etc. in UI integrieren 
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
   - Loxone-Merker für Waschmaschinen-Leistung: "Leistung Waschmaschine"
   - Loxone-Merker für Trockner-Leistung: "Leistung Trockner"
