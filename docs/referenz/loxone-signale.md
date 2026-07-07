@@ -5,7 +5,8 @@ Alle Namen sind **Beispiele** aus [`config/config.example.json`](../../config/co
 Prüfung aller konfigurierten Signale:
 
 ```powershell
-python -m scripts.verify_loxone_setup
+.venv\Scripts\python.exe -m scripts.verify_loxone_setup
+.venv\Scripts\python.exe -m scripts.verify_swimspa_filter_live
 ```
 
 ## Zentrale Signale (`loxone_blocks`)
@@ -47,6 +48,20 @@ python -m scripts.verify_loxone_setup
 
 Die E-Auto-Freigabe zum Laden liegt bei `loxone_outputs.enable_name` (z. B. `Ernie_EAuto_LadeFreigabe`).
 
+### SwimSpa-Filter — zusätzlich (`swimspa_filter`)
+
+Ergänzende Filterlaufzeit; nativer Duty-Cycle läuft unabhängig. Spec: [swimspa-filter.md](../spec/swimspa-filter.md).
+
+| Config-Pfad | Richtung | Beispiel | Wert |
+|-------------|----------|----------|------|
+| `loxone_target_hours_name` | Lesen | `Ernie_Swimspa_Filter_Sollstunden` | Verbleibende Filter-Schulden, **Stunden** (Float) |
+| `loxone_inputs.power_name` | Lesen | `homie_bwa_spa_filter2` | `0`/`1` — Filter läuft (nativ + Ernie) |
+| `loxone_outputs.enable_name` | Schreiben | `Ernie_Swimspa_Filter_Freigabe` | `0`/`1` — Ernie-Freigabe für **Zusatzlauf** |
+| `filter_schedule.loxone.native_start_hour_name` | Lesen | `homie_bwa_spa_filter1hour` | Start-Stunde natives Fenster (0–23) |
+| `filter_schedule.loxone.native_duration_hours_name` | Lesen | `homie_bwa_spa_filter1durationhours` | Dauer natives Fenster, **Stunden** (Float) |
+
+`verify_loxone_setup` prüft diese Merker, wenn `filter_schedule.enabled: true` bzw. `daily_target_source: loxone_remaining_hours`.
+
 ## Event-Trigger (`system.event_triggers`)
 
 Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden). Konfiguration in `config.json`:
@@ -65,8 +80,9 @@ Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden)
 
 | Verbraucher (`id`) | Freigabe (Schreiben) | Leistung (Lesen) |
 |--------------------|----------------------|------------------|
-| `swimspa` | `Ernie_SwimSpa_Freigabe` | `Merkername SwimSpa kW` |
-| `eauto` | `Ernie_EAuto_LadeFreigabe` | `Merkername EAuto kW` |
+| `swimspa` | `Ernie_SwimSpa_Freigabe` | `Ernie_Swim-Spa-P_act` |
+| `swimspa_filter` | `Ernie_Swimspa_Filter_Freigabe` | `homie_bwa_spa_filter2` (binär) |
+| `eauto` | `Ernie_EAuto_LadeFreigabe` | `Ernie_EAuto_P_act` |
 
 Weitere Verbraucher (z. B. Wärmepumpe) nach demselben Muster in `flexible_consumers` ergänzen.
 

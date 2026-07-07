@@ -49,6 +49,7 @@ def _read_check(
     validate: Callable[[float], str | None] | None = None,
     read_raw: bool = False,
     warn_if_missing: bool = False,
+    validate_filter_start_hour: bool = False,
 ) -> LoxoneCheck:
     io_name = str(io_name or "").strip()
     if not io_name:
@@ -62,6 +63,18 @@ def _read_check(
                 return LoxoneCheck(label, io_name, False, detail, severity="warning")
             return LoxoneCheck(label, io_name, False, detail)
         return LoxoneCheck(label, io_name, True, f"raw={raw!r}")
+
+    if validate_filter_start_hour:
+        hour, fmt, raw = loxone_client.fetch_filter_native_start_hour(io_name)
+        if hour is None:
+            detail = f"Start-Stunde nicht parsebar (raw={raw!r}, format={fmt})"
+            return LoxoneCheck(label, io_name, False, detail)
+        return LoxoneCheck(
+            label,
+            io_name,
+            True,
+            f"Start={hour:.0f} h, Format={fmt}, raw={raw!r}",
+        )
 
     value = loxone_client.fetch_loxone_generic_value(io_name)
     if value is None:
@@ -93,6 +106,29 @@ def _binary_valid(value: float) -> str | None:
     return f"Erwartet 0 oder 1, erhalten: {value}"
 
 
+def _non_negative_hours(value: float) -> str | None:
+    if not math.isfinite(value) or value < 0.0:
+        return f"Stundenwert ungültig: {value}"
+    return None
+
+
+def _filter_duration_hours_valid(value: float) -> str | None:
+    err = _non_negative_hours(value)
+    if err:
+        return err
+    if value <= 0.0:
+        return f"Dauer muss > 0 sein: {value}"
+    return None
+
+
+def _consumer_power_validate(consumer: dict) -> Callable[[float], str | None]:
+    inputs = consumer.get("loxone_inputs") or {}
+    signal = inputs.get("signal_type") or consumer.get("signal_type", "power")
+    if signal == "binary":
+        return _binary_valid
+    return _power_valid
+
+
 def collect_read_checks() -> list[tuple[str, str, dict]]:
     """(Label, IO-Name, Optionen) für alle konfigurierten Loxone-Eingänge."""
     checks: list[tuple[str, str, dict]] = [
@@ -118,7 +154,13 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
         outputs = consumer.get("loxone_outputs") or {}
         power_name = inputs.get("power_name", "")
         if power_name:
-            checks.append((f"Verbraucher {cid} Leistung", power_name, {"validate": _power_valid}))
+            checks.append(
+                (
+                    f"Verbraucher {cid} Leistung",
+                    power_name,
+                    {"validate": _consumer_power_validate(consumer)},
+                )
+            )
         enable_name = outputs.get("enable_name", "")
         if enable_name:
             checks.append((f"Verbraucher {cid} Freigabe", enable_name, {"validate": _binary_valid}))
@@ -158,6 +200,39 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
                     {"read_raw": True, "warn_if_missing": True},
                 )
             )
+
+        if consumer.get("daily_target_source") == "loxone_remaining_hours":
+            hours_name = consumer.get("loxone_target_hours_name", "")
+            if hours_name:
+                checks.append(
+                    (
+                        f"Verbraucher {cid} Sollstunden",
+                        hours_name,
+                        {"validate": _non_negative_hours},
+                    )
+                )
+
+        filter_sched = consumer.get("filter_schedule") or {}
+        if filter_sched.get("enabled"):
+            flox = filter_sched.get("loxone") or {}
+            start_name = flox.get("native_start_hour_name", "")
+            if start_name:
+                checks.append(
+                    (
+                        f"Verbraucher {cid} Filter Start-Stunde",
+                        start_name,
+                        {"validate_filter_start_hour": True},
+                    )
+                )
+            duration_name = flox.get("native_duration_hours_name", "")
+            if duration_name:
+                checks.append(
+                    (
+                        f"Verbraucher {cid} Filter Dauer (h)",
+                        duration_name,
+                        {"validate": _filter_duration_hours_valid},
+                    )
+                )
 
         thermal = consumer.get("thermal_control") or {}
         if thermal.get("enabled"):

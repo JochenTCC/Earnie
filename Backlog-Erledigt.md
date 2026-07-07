@@ -2,6 +2,11 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Swimspa Filternutzung optimieren (2026-07-07)
+
+- [x] **Swimspa Filter — kostenoptimale ergänzende Filternutzung** — Spec [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md): Verbraucher `swimspa_filter` (0,18 kW, binär); `daily_target_source: loxone_remaining_hours` ohne `delivered`-Abzug; `filter_context` + MILP-Sperrung natives Fenster `[Start, Start+Dauer)`; Schema/`config.example.json`/Doku; Live-Parser für `filter1hour` (Integer/`HH:MM`); `verify_swimspa_filter_live`, `patch_swimspa_filter_config`
+- [x] **Version 1.20.0** — Minor-Bump
+
 ### Chart 1 Prognose-Sättigung PV & Grundlast (2026-07-07)
 
 - [x] **Chart 1: Prognose-Sättigung auch für PV und Grundlast reduziert** — Zonenlogik aus den Flex-Verbrauchern auf `PV` und `Grundlast` erweitert; Historie bleibt voll gesättigt, neutraler und grüner Bereich nutzen denselben Sättigungsfaktor wie Flex; Regressionstests für Farbableitung und zonenspezifische Buckets ergänzt

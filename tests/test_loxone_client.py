@@ -45,6 +45,29 @@ class TestLoxoneValueParsing:
         assert _parse_loxone_numeric("65.5 %") == pytest.approx(65.5)
 
 
+class TestFilterNativeStartHourParsing:
+    @pytest.mark.parametrize(
+        "raw,expected_hour,expected_fmt",
+        [
+            ("10", 10.0, "integer"),
+            ("10.0", 10.0, "integer"),
+            ("10 h", 10.0, "integer"),
+            ("10:30", 10.0, "hm"),
+            ("00:00", 0.0, "hm"),
+            (22, 22.0, "integer"),
+        ],
+    )
+    def test_parse_filter_start_hour(self, raw, expected_hour, expected_fmt):
+        hour, fmt = lc.parse_filter_native_start_hour(raw)
+        assert hour == pytest.approx(expected_hour)
+        assert fmt == expected_fmt
+
+    def test_parse_unknown_returns_none(self):
+        hour, fmt = lc.parse_filter_native_start_hour("morgen")
+        assert hour is None
+        assert fmt == "unknown"
+
+
 def _mock_http_response(*, json_data: dict | None = None, status_ok: bool = True) -> MagicMock:
     response = MagicMock()
     response.json.return_value = json_data or {}

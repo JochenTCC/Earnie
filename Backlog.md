@@ -9,9 +9,7 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Feature-Backlog
 
 ### Version 1.+1
-- [ ] Nutzung des Swim-Spa Filters reviewen (läuft derzeit ständig?)
-  - Signal `Ernie_Swimspa_Filter_Sollstunden` (Sollstunden in 24 h), Steuerung `Ernie_Filter_Freigabe`
-  - Ernie: Sollstunden in 24 h auf Null; Filterleistung; Laufzeiten in Loxone integriert
+- [ ] Passende Regeln für Deviatons entwickeln (Fehler: Swimspa Filter läuft nicht, obwohl er soll / Fehler: Swimspa Filter läuft, obwohl er nicht soll / Warnung: Swimspa Filter zieht mehr Leistung als nominal)  
 
 ### Version 1.+1
 - [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)

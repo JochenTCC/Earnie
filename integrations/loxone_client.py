@@ -56,6 +56,70 @@ def _parse_loxone_numeric(raw_value: str) -> float:
     return value
 
 
+def _parse_hour_minute_text(text: str) -> int | None:
+    from datetime import datetime
+
+    for fmt in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(text.strip(), fmt).hour
+        except ValueError:
+            continue
+    return None
+
+
+def parse_filter_native_start_hour(
+    raw_value: str | float | int | None,
+) -> tuple[float | None, str]:
+    """
+    Parst die Start-Stunde des nativen Filter-Duty-Cycles.
+
+    Unterstützt Integer 0–23 (z. B. ``10``, ``10.0``, ``10 h``) und ``HH:MM``.
+    Returns:
+        (Stunde 0–23 oder None, Format: integer | hm | missing | unknown)
+    """
+    if raw_value is None:
+        return None, "missing"
+    if isinstance(raw_value, (int, float)):
+        hour = float(raw_value)
+        if 0.0 <= hour <= 23.0:
+            return hour, "integer"
+        return None, "unknown"
+
+    text = str(raw_value).strip()
+    if not text:
+        return None, "missing"
+
+    hm_hour = _parse_hour_minute_text(text)
+    if hm_hour is not None:
+        return float(hm_hour), "hm"
+
+    clean = text
+    if clean.lower().endswith(" h"):
+        clean = clean[:-2].strip()
+    elif clean.lower().endswith("h") and ":" not in clean:
+        clean = clean[:-1].strip()
+
+    try:
+        hour = float(clean.replace(",", "."))
+    except ValueError:
+        return None, "unknown"
+    if 0.0 <= hour <= 23.0:
+        return hour, "integer"
+    return None, "unknown"
+
+
+def fetch_filter_native_start_hour(io_name: str) -> tuple[float | None, str, str | None]:
+    """Liest und parst die native Filter-Start-Stunde live. Returns: (hour, format, raw)."""
+    io_name = str(io_name or "").strip()
+    if not io_name:
+        return None, "missing", None
+    raw = fetch_loxone_raw_value(io_name)
+    if raw is None:
+        return None, "missing", None
+    hour, fmt = parse_filter_native_start_hour(raw)
+    return hour, fmt, raw
+
+
 def _ampere_to_kw(amps: float, *, voltage_v: float, phases: int) -> float:
     return amps * voltage_v * max(1, phases) / 1000.0
 

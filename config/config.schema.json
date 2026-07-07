@@ -573,12 +573,16 @@
         },
         "daily_target_source": {
           "type": "string",
-          "enum": ["config", "historical", "loxone", "thermal"],
-          "description": "Quelle des 24h-Ziels (kWh): config = daily_target_kwh bzw. bei charging_schedule daily_rest_soc; historical = in Echtzeit Summe aus flexible_consumer_profiles.csv über den 24h-Horizont (wie Baseline), bei historischer Tages-Simulation geloggte CSV-Summen; loxone = Live-Merker (bei E-Auto: charging_schedule.loxone); thermal = RC-Modell (thermal_control.mode=active, Live-Loxone)."
+          "enum": ["config", "historical", "loxone", "loxone_remaining_hours", "thermal"],
+          "description": "Quelle des 24h-Ziels (kWh): config = daily_target_kwh bzw. bei charging_schedule daily_rest_soc; historical = in Echtzeit Summe aus flexible_consumer_profiles.csv über den 24h-Horizont (wie Baseline), bei historischer Tages-Simulation geloggte CSV-Summen; loxone = Live-Merker in kWh (bei E-Auto: charging_schedule.loxone); loxone_remaining_hours = Live-Schulden in Stunden × nominal_power_kw (z. B. SwimSpa-Filter); thermal = RC-Modell (thermal_control.mode=active, Live-Loxone)."
         },
         "loxone_target_kwh_name": {
           "type": "string",
           "description": "Loxone-Merkername für kWh-Ziel (nur bei daily_target_source=loxone ohne charging_schedule)."
+        },
+        "loxone_target_hours_name": {
+          "type": "string",
+          "description": "Loxone-Merkername für verbleibende Stunden (Schuldenstand). Nur bei daily_target_source=loxone_remaining_hours; Ziel_kWh = Wert × nominal_power_kw."
         },
         "min_on_quarterhours": {
           "type": "integer",
@@ -627,6 +631,51 @@
         },
         "thermal_control": {
           "$ref": "#/definitions/thermal_control"
+        },
+        "filter_schedule": {
+          "$ref": "#/definitions/filter_schedule"
+        }
+      }
+    },
+    "filter_schedule": {
+      "type": "object",
+      "description": "Natives Filter-Duty-Cycle-Fenster (z. B. SwimSpa-Filter): Ernie plant ergänzende Laufzeit nur außerhalb [Start, Start+Dauer).",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "true = natives Fenster sperrt MILP-Slots; Ernie schaltet nur zusätzlich außerhalb ein."
+        },
+        "loxone": {
+          "type": "object",
+          "description": "Live-Lesung des nativen Filterfensters aus Loxone.",
+          "properties": {
+            "native_start_hour_name": {
+              "type": "string",
+              "description": "Start-Stunde des nativen Duty-Cycles (ganze Stunde 0–23; Live-Format ggf. noch verifizieren)."
+            },
+            "native_duration_hours_name": {
+              "type": "string",
+              "description": "Dauer des nativen Fensters in Stunden (Float)."
+            }
+          }
+        },
+        "config_fallback": {
+          "type": "object",
+          "description": "Festes natives Fenster für Backtesting/Offline, wenn Loxone nicht lesbar ist.",
+          "properties": {
+            "native_start_hour": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 23,
+              "description": "Start-Stunde (0–23) des nativen Duty-Cycles."
+            },
+            "native_duration_hours": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Dauer in Stunden (halboffenes Intervoll [Start, Start+Dauer))."
+            }
+          }
         }
       }
     },

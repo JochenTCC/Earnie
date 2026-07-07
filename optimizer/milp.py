@@ -11,7 +11,6 @@ import pulp
 import config
 from data.feed_in_prices import k_push_act_for_matrix_row
 from .charging_context import (
-    apply_charging_window_constraints,
     charging_schedule_enabled,
     consumer_charging_eligible_indices,
     latest_start_datetime,
@@ -19,6 +18,11 @@ from .charging_context import (
     split_eligible_by_urgent_deadline,
     summarize_urgent_rule_usage,
     urgent_charging_indices,
+)
+from .filter_context import (
+    apply_slot_availability_constraints,
+    consumer_flex_eligible_indices,
+    resolve_filter_contexts,
 )
 from .consumer_power import (
     estimate_pv_surplus_kw,
@@ -137,10 +141,12 @@ def filter_feasible_consumers(
     schedule_indices: list[int],
     verbose: bool,
     charging_contexts: dict[str, dict] | None,
+    filter_contexts: dict[str, dict] | None = None,
 ) -> list:
     """Entfernt Verbraucher, deren Ziel im verbleibenden Horizont nicht erreichbar ist."""
     feasible = []
     contexts = charging_contexts or {}
+    filters = filter_contexts or {}
     horizon = len(matrix)
     for consumer in consumers:
         cid = consumer["id"]
@@ -153,8 +159,8 @@ def filter_feasible_consumers(
         consumer_indices = schedule_indices_for_consumer(
             matrix, horizon, schedule_indices, consumer, ctx
         )
-        eligible = consumer_charging_eligible_indices(
-            matrix, consumer, consumer_indices, ctx
+        eligible = consumer_flex_eligible_indices(
+            matrix, consumer, consumer_indices, ctx, filters.get(cid)
         )
         capacity_indices = eligible if eligible else consumer_indices
         max_deliverable = _max_deliverable_kwh(consumer, capacity_indices)
@@ -163,6 +169,10 @@ def filter_feasible_consumers(
                 sched_hint = ""
                 if charging_schedule_enabled(consumer):
                     sched_hint = f" ({len(eligible)} h im Ladezeitfenster)"
+                elif filters.get(cid, {}).get("blocked_indices"):
+                    sched_hint = (
+                        f" ({len(eligible)} h außerhalb nativem Filterfenster)"
+                    )
                 logger.warning(
                     "%s: Ziel (%.2f kWh) nicht vollständig erreichbar "
                     "mit %s h à %.2f kW%s – lade mit Best-Effort.",
@@ -464,8 +474,10 @@ def _add_consumer_delivery_constraints(
     charging_contexts: dict[str, dict],
     verbose: bool,
     *,
+    filter_contexts: dict[str, dict] | None = None,
     include_urgent_deadline_constraint: bool = True,
 ) -> None:
+    filters = filter_contexts or {}
     for consumer in model.planned_consumers:
         cid = consumer["id"]
         target = remaining.get(cid, 0.0)
@@ -475,13 +487,19 @@ def _add_consumer_delivery_constraints(
         consumer_indices = schedule_indices_for_consumer(
             matrix, model.horizon, schedule_indices, consumer, ctx
         )
-        eligible = apply_charging_window_constraints(
-            model.prob,
-            model.consumer_on,
+        eligible = consumer_flex_eligible_indices(
             matrix[: model.horizon],
             consumer,
             consumer_indices,
             ctx,
+            filters.get(cid),
+        )
+        eligible = apply_slot_availability_constraints(
+            model.prob,
+            model.consumer_on,
+            consumer,
+            consumer_indices,
+            eligible,
             model.consumer_p,
             model.consumer_pv_follow,
         )
@@ -600,8 +618,10 @@ def _collect_urgent_rule_observability(
     remaining: dict[str, float],
     schedule_indices: list[int],
     charging_contexts: dict[str, dict],
+    filter_contexts: dict[str, dict] | None = None,
 ) -> dict[str, dict]:
     """Ermittelt pro Verbraucher, ob die urgent-Nebenbedingung den Plan beeinflusst."""
+    filters = filter_contexts or {}
     observability: dict[str, dict] = {}
     for consumer in model.planned_consumers:
         cid = consumer["id"]
@@ -615,11 +635,12 @@ def _collect_urgent_rule_observability(
         consumer_indices = schedule_indices_for_consumer(
             matrix, model.horizon, schedule_indices, consumer, ctx
         )
-        eligible = consumer_charging_eligible_indices(
+        eligible = consumer_flex_eligible_indices(
             matrix[: model.horizon],
             consumer,
             consumer_indices,
             ctx,
+            filters.get(cid),
         )
         if not eligible:
             continue
@@ -813,6 +834,7 @@ def milp_optimizer(
     spa_remaining_kwh: float | None = None,
     flex_indices: list[int] | None = None,
     charging_contexts: dict[str, dict] | None = None,
+    filter_contexts: dict[str, dict] | None = None,
     terminal_soc_percent: float | None = None,
     sunrise_soc_min_index: int | None = None,
 ) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float]]:
@@ -835,6 +857,11 @@ def milp_optimizer(
     day_indices = _day_indices(matrix, horizon)
     schedule_indices = flex_indices if flex_indices is not None else day_indices
     contexts = charging_contexts or {}
+    filters = (
+        filter_contexts
+        if filter_contexts is not None
+        else resolve_filter_contexts(matrix[:horizon], active)
+    )
     planned_consumers = filter_feasible_consumers(
         active,
         remaining,
@@ -842,6 +869,7 @@ def milp_optimizer(
         schedule_indices,
         verbose,
         contexts,
+        filters,
     )
     has_eauto = any(c.get("id") == "eauto" for c in planned_consumers)
     eauto_milp_params = config.get_eauto_milp_params() if has_eauto else None
@@ -885,6 +913,7 @@ def milp_optimizer(
         schedule_indices,
         contexts,
         verbose,
+        filter_contexts=filters,
         include_urgent_deadline_constraint=not logged_simulation,
     )
     if sunrise_soc_min_index is not None:
@@ -932,6 +961,7 @@ def milp_optimizer(
         remaining,
         schedule_indices,
         contexts,
+        filters,
     )
     _log_urgent_rule_observability(urgent_observability)
 

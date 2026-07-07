@@ -16,7 +16,7 @@ Einträge in `flexible_consumers[]` sind zeitlich verschiebbare Lasten (SwimSpa,
 | Feld | Bedeutung |
 |------|-----------|
 | `daily_target_kwh` | Festes 24h-Ziel in kWh (bei `daily_target_source: config`) |
-| `daily_target_source` | `config` = fester Wert / `charging_schedule`; `historical` = Profil aus Vergangenheit; `loxone` = Live-Merker bzw. E-Auto-Logik |
+| `daily_target_source` | `config` = fester Wert / `charging_schedule`; `historical` = Profil aus Vergangenheit; `loxone` = Live-Merker in kWh; `loxone_remaining_hours` = Live-Schulden in Stunden × `nominal_power_kw` (SwimSpa-Filter); `thermal` = RC-Modell |
 | `min_on_quarterhours` | Mindestlaufzeit pro Einschaltung in 15-Minuten-Slots |
 | `path_log` | Loxone-CSV für historische Profile und Backtesting |
 | `signal_type` | `power` (kW) oder `binary` (Ein/Aus × `nominal_power_kw`) |
@@ -48,6 +48,20 @@ Ladeziel in kWh (vereinfacht, Kapazität nur aus Loxone):
 `(target_soc_percent − Rest-SOC) / 100 × Akkukapazität_Loxone / charging_efficiency`
 
 `nominal_power_kw_name` überschreibt zur Laufzeit die konfigurierte `nominal_power_kw`, wenn der Merker lesbar ist.
+
+## SwimSpa-Filter: `filter_schedule` und `loxone_remaining_hours`
+
+Getrennter Verbraucher `swimspa_filter` (Heizung bleibt `swimspa` mit `daily_target_source: thermal`).
+
+| Feld | Bedeutung |
+|------|-----------|
+| `daily_target_source` | `loxone_remaining_hours` — Ziel_kWh = `Sollstunden` × `nominal_power_kw` |
+| `loxone_target_hours_name` | Loxone-Merker für verbleibende Filter-Schulden in **Stunden** (Float) |
+| `filter_schedule.enabled` | `true` = natives Duty-Cycle-Fenster sperrt MILP-Slots |
+| `filter_schedule.loxone` | `native_start_hour_name`, `native_duration_hours_name` — natives Fenster `[Start, Start+Dauer)` |
+| `filter_schedule.config_fallback` | Festes Fenster für Backtesting/Offline (kein `path_log`) |
+
+Ernie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`loxone_outputs.enable_name`). Spec: [SwimSpa Filter](../spec/swimspa-filter.md).
 
 ## Baseline in der UI
 

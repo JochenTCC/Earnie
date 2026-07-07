@@ -207,6 +207,7 @@ def build_applied_targets_detail(
                 "config": "config.json",
                 "historical": "historical (Profil)",
                 "loxone": "loxone",
+                "loxone_remaining_hours": "loxone (Sollstunden)",
                 "thermal": "thermal (RC-Modell)",
             }
             source = source_labels.get(source_key, source_key)

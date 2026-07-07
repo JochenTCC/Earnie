@@ -72,6 +72,50 @@ class TestCollectReadChecks:
         assert "Verbraucher swimspa Leistung" in labels
         assert "Verbraucher swimspa Freigabe" in labels
 
+    def test_collects_swimspa_filter_ios(self):
+        consumers = [
+            {
+                "id": "swimspa_filter",
+                "signal_type": "binary",
+                "daily_target_source": "loxone_remaining_hours",
+                "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
+                "loxone_inputs": {
+                    "power_name": "homie_bwa_spa_filter2",
+                    "signal_type": "binary",
+                },
+                "loxone_outputs": {"enable_name": "Ernie_Swimspa_Filter_Freigabe"},
+                "filter_schedule": {
+                    "enabled": True,
+                    "loxone": {
+                        "native_start_hour_name": "homie_bwa_spa_filter1hour",
+                        "native_duration_hours_name": "homie_bwa_spa_filter1durationhours",
+                    },
+                },
+            }
+        ]
+        with patch.object(lc.config, "get", side_effect=lambda name, **kw: {
+            "LOXONE_SOC_NAME": "SOC",
+            "LOXONE_PV_POWER_NAME": "PV",
+            "LOXONE_BATTERY_POWER_NAME": "BAT",
+            "LOXONE_GRID_POWER_NAME": "GRID",
+            "LOXONE_PV_COUNTER_NAME": "CNT",
+        }.get(name)), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+            checks = lc.collect_read_checks()
+
+        labels = [label for label, _, _ in checks]
+        assert "Verbraucher swimspa_filter Sollstunden" in labels
+        assert "Verbraucher swimspa_filter Filter Start-Stunde" in labels
+        assert "Verbraucher swimspa_filter Filter Dauer (h)" in labels
+        assert "Verbraucher swimspa_filter Freigabe" in labels
+
+    def test_binary_consumer_uses_binary_validation(self):
+        consumer = {
+            "id": "swimspa_filter",
+            "signal_type": "binary",
+            "loxone_inputs": {"power_name": "F", "signal_type": "binary"},
+        }
+        assert lc._consumer_power_validate(consumer) is lc._binary_valid
+
 
 class TestLoxoneIntegrationGate:
     def test_integration_skips_without_credentials(self, monkeypatch):

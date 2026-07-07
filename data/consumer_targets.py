@@ -5,6 +5,7 @@ Kann Live-Loxone-IO lesen (daily_target_source=loxone); profile_manager bleibt d
 """
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, time
 
 import pandas as pd
@@ -12,6 +13,36 @@ import pandas as pd
 import config
 from integrations import loxone_client
 from . import profile_manager
+
+logger = logging.getLogger(__name__)
+
+LOXONE_DEBT_HOURS_EPS = 1e-6
+
+
+def uses_loxone_debt_counter(consumer: dict) -> bool:
+    """True wenn der Loxone-Schuldenzähler die alleinige Restquelle ist (ohne delivered-Abzug)."""
+    return consumer.get("daily_target_source") == "loxone_remaining_hours"
+
+
+def _loxone_remaining_hours_target_kwh(consumer: dict, hours: float | None) -> float:
+    cid = consumer["id"]
+    loxone_name = consumer.get("loxone_target_hours_name", "")
+    if hours is None:
+        logger.warning(
+            "Verbraucher '%s': Merker '%s' nicht lesbar — Verbraucher inaktiv.",
+            cid,
+            loxone_name,
+        )
+        return 0.0
+    if hours <= LOXONE_DEBT_HOURS_EPS:
+        logger.warning(
+            "Verbraucher '%s': Sollstunden=%.4f — Verbraucher inaktiv.",
+            cid,
+            hours,
+        )
+        return 0.0
+    power = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+    return float(hours) * power
 
 
 def _historical_totals_for_date(target_date: date, cache: dict) -> dict[str, float]:
@@ -42,7 +73,8 @@ def _resolve_single_consumer_daily_target_kwh(
     historical_cache: dict | None = None,
 ) -> float:
     """
-    Tagesziel (kWh) gemäß daily_target_source: config | historical | loxone | thermal.
+    Tagesziel (kWh) gemäß daily_target_source:
+    config | historical | loxone | loxone_remaining_hours | thermal.
     """
     source = consumer.get("daily_target_source", "config")
     cid = consumer["id"]
@@ -93,6 +125,17 @@ def _resolve_single_consumer_daily_target_kwh(
             value = loxone_client.fetch_loxone_generic_value(loxone_name)
             if value is not None and value >= 0:
                 return float(value)
+        totals = _historical_totals_for_date(target_date, cache)
+        if cid in totals:
+            return float(totals[cid])
+        return fallback
+
+    if source == "loxone_remaining_hours":
+        loxone_name = consumer.get("loxone_target_hours_name", "")
+        today = datetime.now().date()
+        if loxone_name and target_date == today:
+            hours = loxone_client.fetch_loxone_generic_value(loxone_name)
+            return _loxone_remaining_hours_target_kwh(consumer, hours)
         totals = _historical_totals_for_date(target_date, cache)
         if cid in totals:
             return float(totals[cid])

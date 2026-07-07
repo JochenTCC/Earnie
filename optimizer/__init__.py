@@ -217,6 +217,7 @@ def get_consumer_remaining_kwh(
 ) -> dict[str, float]:
     """Verbleibende Zielenergie aller optimierbaren Verbraucher (inkl. Loxone E-Auto)."""
     from data import consumer_targets
+    from data.consumer_targets import uses_loxone_debt_counter
     active = _active_consumers(consumers)
     contexts = charging_contexts
     if contexts is None and optimization_matrix is not None:
@@ -242,7 +243,9 @@ def get_consumer_remaining_kwh(
         cid = consumer["id"]
         daily_target = float(daily_targets.get(cid, consumer["daily_target_kwh"]))
         ctx = (contexts or {}).get(cid)
-        if is_charging_session_context(consumer, ctx):
+        if uses_loxone_debt_counter(consumer):
+            already = 0.0
+        elif is_charging_session_context(consumer, ctx):
             booked = session_delivered_kwh(sessions, cid)
             live_kw = (live_flex_kw or {}).get(cid)
             already, note = assess_session_delivery(
