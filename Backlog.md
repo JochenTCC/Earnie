@@ -5,21 +5,32 @@ Erledigte Punkte → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Research-Items
+- [ ] Smart Energy App anschauen zum Vergleich
+- [ ] Weitere Anbieter mit flexiblen Preisen anschauen
+- [ ] Businessplan adaptieren
 
 ## Feature-Backlog
 
-### Version 1.+1
-- [ ] Empfehlungsmodus Waschmaschine / Geschirrspüler / Trockner (Laufzeit, Leistung → Startgüte in 6 h)
-  - Loxone-Merker für Waschmaschinen-Leistung: "Leistung Waschmaschine"
-  - Loxone-Merker für Trockner-Leistung: "Leistung Trockner"
-  - Für Geschirrspüler ist keine Leistung bekannt (vielleicht später über Hue?)
-  - [ ] Könnte auch adaptiv sein bzgl. Laufzeit und Energieverbrauch pro Lauf
+### Version 1.21
 
-### Version 1.+1
-- [ ] **SwimSpa Fall B — Folgeprüfung historische Leistung & Loxone-Trennung**
-  - Prüfen, ob die historischen SwimSpa-Leistungslogs (`thermal_control.history_logs.power_csv` = `..._SwimSpa_Leistung_...csv`, Quelle `Ernie_Swim-Spa-P_act`) ebenfalls den **Filter-Anteil** enthalten (Fall B). Falls ja: Auswirkung auf die **Thermik-Modell-Kalibrierung** (`heat_loss_kw_per_k` etc.) bewerten — Filter (~0,18 kW) würde als Heizleistung fehlinterpretiert.
-  - **Grundsatzfrage:** Sollte die Trennung Heizung/Filter besser **direkt in Loxone** geschehen (separater Heizungs-Leistungsmerker ohne Filter), statt softwareseitig per `subtract_consumer_ids`? Vorteil: konsistente Live- **und** Historien-Daten an der Quelle.
-  - Bezug: Fall-B-Korrektur (Live-Ist) bereits umgesetzt; Thermik-Kalibrierung siehe **Thermik P1** (Swim-Spa)
+Design & Detaildesign: [docs/spec/ui-menu-structure.md](docs/spec/ui-menu-structure.md).
+Entscheidungen: `st.navigation`+`st.Page`; Config-Editor = Roh-JSON; `*`-Punkte nur Mockup; Dev-Modi bleiben gegated; Startgüte = Stromkosten (€); Horizont fest 6 h.
+Abschluss: MINOR-Bump auf **1.21.0**; beide Punkte (Menüstruktur + Empfehlungsmodus) gemeinsam nach `Backlog-Erledigt.md`.
+
+- [ ] **Menüstruktur als Sidebar-Ersatz** (`st.navigation` + `st.Page`)
+  - [ ] Schritt 1 — Navigations-Gerüst: `app.py` → Router, `ui/pages/`; bestehende Modi (Cockpit, Backtesting, Preis-Prognose Dev) 1:1 als Seiten; Env-Gating bleibt
+  - [ ] Schritt 2 — Subpage Konfiguration: Roh-JSON-Editor für `config.json` (Validierung + Schema-Check, dann `config.reinit_config()`)
+  - [ ] Schritt 4 — Mockup-Seiten (funktionslos): Szenarieneditor*, Hauskonfigurator*, Verbraucheranalyse inkl. Adaptionsalgo*
+  - [ ] Backtesting- und Preis-Prognose-Controls von Sidebar in den Seiten-Body verschieben
+- [ ] **Empfehlungsmodus manuelle Geräte** (Waschmaschine / Trockner / Geschirrspüler; Laufzeit + Leistung → günstigste Startzeit in 6 h)
+  - [ ] Schritt 3a — `optimizer/appliance_recommendation.py` (reine Kosten-/Startzeit-Logik) + Tests
+  - [ ] Schritt 3b — `ui/pages/page_devices.py`: Leistung Waschmaschine/Trockner aus Loxone-Merkern, Geschirrspüler manuelles Eingabefeld; Startgüte = Stromkosten (€); rein beratend
+  - [ ] Config: neue Felder für Loxone-Merker `Leistung Waschmaschine` / `Leistung Trockner` (+ Schema/Example, Geräte-Block)
+  - später*: smarte Geräte; adaptiv bzgl. Laufzeit/Energieverbrauch pro Lauf; Geschirrspüler-Leistung ggf. über Hue
+- [ ] Schritt 5 — Abschluss: Backlog-Sync + Version-Bump 1.21.0
+
+
+### Version 1.22
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
 - [ ] Neuen Loxberry aufsetzen bzw. produktiv-Loxberry auf 4 upgraden
 - [ ] **7f — Loxberry-Container** — erst nach Loxberry 4; Go/No-Go im README
@@ -28,6 +39,12 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.0
 - [ ] Ausführlicher Code-Review und Refactoring
+
+### Version 2.+1
+- [ ] **SwimSpa Fall B — Folgeprüfung historische Leistung & Loxone-Trennung**
+  - Prüfen, ob die historischen SwimSpa-Leistungslogs (`thermal_control.history_logs.power_csv` = `..._SwimSpa_Leistung_...csv`, Quelle `Ernie_Swim-Spa-P_act`) ebenfalls den **Filter-Anteil** enthalten (Fall B). Falls ja: Auswirkung auf die **Thermik-Modell-Kalibrierung** (`heat_loss_kw_per_k` etc.) bewerten — Filter (~0,18 kW) würde als Heizleistung fehlinterpretiert.
+  - **Grundsatzfrage:** Sollte die Trennung Heizung/Filter besser **direkt in Loxone** geschehen (separater Heizungs-Leistungsmerker ohne Filter), statt softwareseitig per `subtract_consumer_ids`? Vorteil: konsistente Live- **und** Historien-Daten an der Quelle.
+  - Bezug: Fall-B-Korrektur (Live-Ist) bereits umgesetzt; Thermik-Kalibrierung siehe **Thermik P1** (Swim-Spa)
 
 ### Version 2.+1
 - [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
@@ -96,6 +113,7 @@ Validierung quer über alle Phasen: **Nachrechnung „Historischer Tag“** (0.+
 - [ ] **Thermik P2** — Gekoppelte Ein-Knoten-Modelle
   - Haus ↔ Wärmespeicher ↔ Solaranlage
   - Parameter für Haus aus Energieausweis extrahieren (`C:\Users\joche\Documents\Hausbau\Hausbau_Köhler_Schreyögg\Energieausweis_komplett_EFH-Köhler_Dornbirn-2014.pdf`)
+  - Klimaanlage als thermischen Verbraucher vorbereiten
 
 ### Version 2.+1
 - [ ] **Thermik P3** — Thermik-Parameter-Adaption (auf Adaption P1)
