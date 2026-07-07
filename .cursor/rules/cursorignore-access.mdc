@@ -1,0 +1,27 @@
+---
+description: Vorgehen, wenn .cursorignore den Zugriff auf benötigte Dateien blockiert
+alwaysApply: true
+---
+
+# .cursorignore — Zugriff aktiv abstimmen
+
+Wenn du irgendwo Einblick brauchst, dieser aber durch `.cursorignore` verhindert wird
+(nicht lesbare Datei/Ordner, fehlender Index), dann **nicht still umgehen und nicht raten**.
+Stattdessen: den Nutzer aktiv fragen und gemeinsam entscheiden, was mit dem `.cursorignore`-Eintrag passiert.
+
+## Ablauf
+
+1. Kurz benennen, **welche** Datei/welchen Ordner du sehen willst und **wofür** (Zweck).
+2. Nennen, **welcher Eintrag** in `.cursorignore` den Zugriff blockiert.
+3. Optionen zur Entscheidung anbieten, z. B.:
+   - Eintrag anpassen/entfernen (dauerhaft lesbar machen)
+   - Gezielte Ausnahme ergänzen (`!pfad/...`) statt Eintrag zu löschen
+   - Datei einmalig an einen nicht-ignorierten Ort kopieren/entpacken
+   - So lassen (kein Zugriff) und anders vorgehen
+4. Erst nach Bestätigung handeln. `.cursorignore` **nie eigenmächtig** ändern.
+
+## Hintergrund
+
+`.cursorignore` ist bewusst restriktiv (Zugangsdaten, Produktivkonfiguration, Laufzeit-/Dumps).
+Manche Einträge sind evtl. zu weit gefasst — deshalb im Zweifel gemeinsam entscheiden,
+statt Zugriff zu erzwingen oder ganz auf die Information zu verzichten.

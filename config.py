@@ -839,6 +839,83 @@ class Config:
             ]
         return consumers
 
+    @staticmethod
+    def _normalize_appliance(raw: dict, index: int) -> dict:
+        """Manuelles Gerät (Empfehlungsmodus): Anzeigename + Leistungsquelle."""
+        if not isinstance(raw, dict):
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: appliances[{index}] muss ein Objekt sein."
+            )
+        appliance_id = str(raw.get("id", "")).strip()
+        if not appliance_id:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: appliances[{index}]: id fehlt."
+            )
+        power_source = str(raw.get("power_source", "")).strip().lower()
+        if power_source not in ("loxone", "manual"):
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: appliances '{appliance_id}': "
+                "power_source muss 'loxone' oder 'manual' sein."
+            )
+        loxone_power_name = str(raw.get("loxone_power_name", "")).strip()
+        if power_source == "loxone" and not loxone_power_name:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: appliances '{appliance_id}': "
+                "power_source=loxone erfordert loxone_power_name."
+            )
+        default_power_kw = Config._optional_positive(
+            raw.get("default_power_kw"), appliance_id, "default_power_kw", allow_zero=True
+        )
+        if power_source == "loxone" and not default_power_kw:
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: appliances '{appliance_id}': "
+                "power_source=loxone erfordert default_power_kw > 0 (Nennleistung für die "
+                "Kostenbewertung; wird später vom Adaptionsalgo gepflegt)."
+            )
+        return {
+            "id": appliance_id,
+            "name": str(raw.get("name", appliance_id)),
+            "power_source": power_source,
+            "loxone_power_name": loxone_power_name,
+            "default_power_kw": default_power_kw,
+            "default_runtime_h": Config._optional_positive(
+                raw.get("default_runtime_h"), appliance_id, "default_runtime_h", allow_zero=False
+            ),
+        }
+
+    @staticmethod
+    def _optional_positive(value, appliance_id: str, field: str, *, allow_zero: bool):
+        if value is None:
+            return None
+        number = float(value)
+        if number < 0 or (not allow_zero and number == 0):
+            bound = ">= 0" if allow_zero else "> 0"
+            raise ValueError(
+                f"Kritischer Konfigurationsfehler: appliances '{appliance_id}': "
+                f"{field} muss {bound} sein."
+            )
+        return number
+
+    def get_appliances(self) -> list[dict]:
+        """Manuelle Geräte für den Empfehlungsmodus (rein beratend, kein MILP)."""
+        raw = self._raw_config.get("appliances", [])
+        if not isinstance(raw, list):
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: 'appliances' muss ein Array sein."
+            )
+        seen: set[str] = set()
+        appliances: list[dict] = []
+        for index, item in enumerate(raw):
+            spec = self._normalize_appliance(item, index)
+            if spec["id"] in seen:
+                raise ValueError(
+                    "Kritischer Konfigurationsfehler: appliances enthält doppelte "
+                    f"id '{spec['id']}'."
+                )
+            seen.add(spec["id"])
+            appliances.append(spec)
+        return appliances
+
     def get_eauto_milp_params(self) -> dict[str, float]:
         """Pflichtparameter für E-Auto MILP Modus A/B und Tie-Break."""
         from optimizer.eauto_milp import validate_eauto_milp_params
@@ -1163,6 +1240,10 @@ def get_swimspa_settings() -> dict:
 
 def get_flexible_consumers(optimizer_only: bool = False) -> list:
     return CONFIG.get_flexible_consumers(optimizer_only=optimizer_only)
+
+
+def get_appliances() -> list[dict]:
+    return CONFIG.get_appliances()
 
 
 def get_eauto_milp_params() -> dict[str, float]:

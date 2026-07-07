@@ -237,6 +237,31 @@
         }
 
     ],
+    "appliances": [
+        {
+            "id": "waschmaschine",
+            "name": "Waschmaschine",
+            "power_source": "loxone",
+            "loxone_power_name": "Leistung Waschmaschine",
+            "default_power_kw": 2.0,
+            "default_runtime_h": 2.0
+        },
+        {
+            "id": "trockner",
+            "name": "Trockner",
+            "power_source": "loxone",
+            "loxone_power_name": "Leistung Trockner",
+            "default_power_kw": 2.5,
+            "default_runtime_h": 1.5
+        },
+        {
+            "id": "geschirrspueler",
+            "name": "Geschirrspüler",
+            "power_source": "manual",
+            "default_power_kw": 1.2,
+            "default_runtime_h": 2.5
+        }
+    ],
     "file_paths_battery_simulation": {
         "path_cons_data": "runtime/cons_data_hourly.csv",
         "cons_data_retention_months": 24,

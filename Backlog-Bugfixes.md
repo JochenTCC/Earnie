@@ -10,6 +10,9 @@ Feature-Roadmap → [Backlog.md](Backlog.md)
 **Nicht hier:** Neues Verhalten, UX, Modelle, Research — siehe Feature-Backlog in `Backlog.md`.
 **Versionierung:** abgeschlossene Bugfixes → nur **PATCH** in `version.py` (kein Minor-Bump).
 
+## Bugfix SwimSpa Leistung
+- [ ] Im Chart 1 wird offensichtlich der Verbrauch des Swimspa (Heizung) nicht korrekt berechnet / angezeigt. Siehe Dump ("C:\Users\joche\Documents\Smarthome\Python\Energy-Optimizer-fix\chart_debug_review\chart_debug_20260707_213204.zip")
+
 ## E-Auto: urgent-Regel, Prod-Dump, PWM
 
 Verknüpfte Themen — gemeinsam priorisieren und abarbeiten.

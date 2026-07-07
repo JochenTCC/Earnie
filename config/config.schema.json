@@ -51,6 +51,13 @@
       "items": {
         "$ref": "#/definitions/flexible_consumer"
       }
+    },
+    "appliances": {
+      "type": "array",
+      "description": "Manuelle Geräte für den Empfehlungsmodus (rein beratend, kein MILP): günstigste Startzeit im 6-h-Horizont.",
+      "items": {
+        "$ref": "#/definitions/appliance"
+      }
     }
   },
   "definitions": {
@@ -752,6 +759,40 @@
               "description": "Alternative zu loxone_outputs.enable_name (Legacy, nur E-Auto)."
             }
           }
+        }
+      }
+    },
+    "appliance": {
+      "type": "object",
+      "description": "Manuelles Gerät für den Empfehlungsmodus (Waschmaschine, Trockner, Geschirrspüler).",
+      "required": ["id", "name", "power_source"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Eindeutige technische ID (z. B. 'waschmaschine')."
+        },
+        "name": {
+          "type": "string",
+          "description": "Anzeigename in der UI."
+        },
+        "power_source": {
+          "type": "string",
+          "enum": ["loxone", "manual"],
+          "description": "manual: Leistung im UI-Eingabefeld (Vorbelegung default_power_kw). loxone: Nennleistung aus default_power_kw für die Kostenbewertung; loxone_power_name ist für den späteren Adaptionsalgo reserviert (keine Live-Abfrage)."
+        },
+        "loxone_power_name": {
+          "type": "string",
+          "description": "Loxone-Merker für die aktuelle Leistung in kW (Pflicht bei power_source=loxone), z. B. 'Leistung Waschmaschine'. Aktuell nur reserviert: ein späterer Adaptionsalgo ermittelt daraus die Nennleistung (default_power_kw)."
+        },
+        "default_power_kw": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Nennleistung in kW für die Kostenbewertung der Startstunden. Pflicht (> 0) bei power_source=loxone; bei manual Vorbelegung des Eingabefeldes. Wird bei loxone später vom Adaptionsalgo aus dem Loxone-Merker gepflegt."
+        },
+        "default_runtime_h": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Vorbelegung der Laufzeit in Stunden für die UI."
         }
       }
     },

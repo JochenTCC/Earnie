@@ -12,15 +12,6 @@
 id_rsa
 id_ed25519
 
-# --- Produktiv-Konfiguration (Loxone-IO, Standort, Pfade, Verbraucher) ---
-config/config.json
-config.json
-config/backtesting_scenarios.json
-backtesting_scenarios.json
-config/remote_backtesting.json
-remote_backtesting.json
-runtime_settings.json
-
 # --- Maschinenspezifische Runtime ---
 runtime/*
 !runtime/.gitkeep
@@ -50,4 +41,7 @@ chart_debug/
 
 # --- Produktiv-Dumps (lokal; Archiv unter tests/fixtures/prod_dumps/ bleibt für Regression) ---
 # Enthält u. a. cons_data_hourly.csv und energy_optimizer.log aus NAS/runtime.zip
-tests/fixtures/prod_dumps/**/live_optimization_debug.json
+!tests/fixtures/prod_dumps/**/live_optimization_debug.json
+!tests/fixtures/prod_dumps/**/flexible_consumers_state.json
+!tests/fixtures/prod_dumps/**/pv_counter_state.json
+!tests/fixtures/prod_dumps/**/optimizer_run_state.json

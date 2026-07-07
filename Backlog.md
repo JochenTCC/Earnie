@@ -11,31 +11,18 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature-Backlog
 
-### Version 1.21
-
-Design & Detaildesign: [docs/spec/ui-menu-structure.md](docs/spec/ui-menu-structure.md).
-Entscheidungen: `st.navigation`+`st.Page`; Config-Editor = Roh-JSON; `*`-Punkte nur Mockup; Dev-Modi bleiben gegated; Startgüte = Stromkosten (€); Horizont fest 6 h.
-Abschluss: MINOR-Bump auf **1.21.0**; beide Punkte (Menüstruktur + Empfehlungsmodus) gemeinsam nach `Backlog-Erledigt.md`.
-
-- [x] **Menüstruktur als Sidebar-Ersatz** (`st.navigation` + `st.Page`)
-  - [x] Schritt 1 — Navigations-Gerüst: `app.py` → Router, `ui/pages/`; bestehende Modi (Cockpit, Backtesting, Preis-Prognose Dev) 1:1 als Seiten; Env-Gating bleibt
-  - [x] Schritt 2 — Subpage Konfiguration: Roh-JSON-Editor für `config.json` (Validierung + Schema-Check, dann `config.reinit_config()`)
-  - [x] Schritt 4 — Mockup-Seiten (funktionslos): Szenarieneditor*, Hauskonfigurator*, Verbraucheranalyse inkl. Adaptionsalgo* (zusätzlich „Manuelle Geräte" als Mockup-Menüpunkt bis Empfehlungsmodus)
-  - [x] Backtesting- und Preis-Prognose-Controls von Sidebar in den Seiten-Body verschieben
-- [ ] **Empfehlungsmodus manuelle Geräte** (Waschmaschine / Trockner / Geschirrspüler; Laufzeit + Leistung → Ranking der Startzeiten (je Stunde - sortiert ) in den nächsten  6 h)
-  - [ ] Schritt 3a — `optimizer/appliance_recommendation.py` (reine Kosten-/Startzeit-Logik) + Tests
-  - [ ] Schritt 3b — `ui/pages/page_devices.py`: Leistung Waschmaschine/Trockner aus Loxone-Merkern, Geschirrspüler manuelles Eingabefeld; Startgüte = Stromkosten (€); rein beratend
-  - [ ] Config: neue Felder für Loxone-Merker `Leistung Waschmaschine` / `Leistung Trockner` (+ Schema/Example, Geräte-Block)
-  - später*: smarte Geräte; adaptiv bzgl. Laufzeit/Energieverbrauch pro Lauf; Geschirrspüler-Leistung ggf. über Hue
-- [ ] Schritt 5 — Abschluss: Backlog-Sync + Version-Bump 1.21.0
-
-
 ### Version 1.22
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
 - [ ] Neuen Loxberry aufsetzen bzw. produktiv-Loxberry auf 4 upgraden
 - [ ] **7f — Loxberry-Container** — erst nach Loxberry 4; Go/No-Go im README
 - [ ] Readme ausführlicher machen mit Motivation / Nutzen
 - [ ] Nach Interessenten fragen in loxforum / reddit / ...
+
+### Version 2.+1
+- [ ] **Empfehlungsmodus smarte/adaptive Geräte** (Folge des Empfehlungsmodus manuelle Geräte)
+  - Adaptiv bzgl. Laufzeit/Energieverbrauch pro Lauf; smarte Geräte statt manueller Eingabe
+  - Adaptionsalgo pflegt `appliances[].default_power_kw` aus den Loxone-Leistungsmerkern (`loxone_power_name`) — bisher nur reserviert, keine Live-Nutzung
+  - Geschirrspüler-Leistung ggf. über Hue
 
 ### Version 2.0
 - [ ] Ausführlicher Code-Review und Refactoring

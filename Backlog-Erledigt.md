@@ -2,6 +2,16 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### UI-Menüstruktur & Empfehlungsmodus manuelle Geräte (2026-07-07)
+
+Spec: [docs/spec/ui-menu-structure.md](docs/spec/ui-menu-structure.md). `### Version 1.21`-Feature-Block gemeinsam abgeschlossen.
+
+- [x] **Menüstruktur als Sidebar-Ersatz** (`st.navigation` + `st.Page`) — `app.py` als Router, `ui/pages/`; bestehende Modi (Cockpit, Backtesting, Preis-Prognose Dev) als Seiten (Env-Gating erhalten); Roh-JSON-Config-Editor (`page_config.py`); Mockup-Seiten (Szenarieneditor, Hauskonfigurator, Verbraucheranalyse); Backtesting-/Preis-Prognose-Controls in den Seiten-Body verschoben
+- [x] **Empfehlungsmodus manuelle Geräte** — `optimizer/appliance_recommendation.py` (reine Startzeit-/Kostenlogik: Ranking der Startstunden im 6-h-Horizont nach Netzbezugskosten, 1–5 Sterne linear, Ersparnis vs. sofort) + Tests
+- [x] **`ui/pages/page_devices.py`** — pro Gerät (Waschmaschine, Trockner, Geschirrspüler) Nennleistung + Laufzeit → Startzeit-Empfehlung; rein beratend, kein Loxone-Schaltsignal
+- [x] **Config `appliances`-Block** — `config.get_appliances()` + Normalisierung, Schema + `config.example.json`; `default_power_kw` als Nennleistung für die Kostenbewertung (bei `power_source=loxone` Pflicht), `loxone_power_name` reserviert für späteren Adaptionsalgo
+- [x] **Version 1.21.0** — Minor-Bump
+
 ### Swimspa Filternutzung optimieren (2026-07-07)
 
 Spec: [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md). Ziel: kostenoptimale **ergänzende** Filterlaufzeit; `Sollstunden` (Schulden in h) langfristig → 0; nativer Duty-Cycle unabhängig.
