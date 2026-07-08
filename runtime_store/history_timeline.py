@@ -247,8 +247,12 @@ def _netzbezug_kw_from_entry(entry: dict[str, Any], row: dict[str, Any]) -> floa
 def _consumer_kw_from_entry(
     entry: dict[str, Any],
     consumer_id: str,
-) -> float:
+) -> float | None:
     """Flex-Leistung für Chart/Tabelle im Produktiv-Log — Ist, nicht MILP-Soll."""
+    measured_ids = entry.get("flex_measured_ids")
+    if measured_ids is not None and consumer_id not in measured_ids:
+        return None
+
     snapshot = entry.get("consumption_snapshot") or {}
     flex_kw = snapshot.get("flex_kw") or {}
     if consumer_id in flex_kw:
@@ -256,6 +260,8 @@ def _consumer_kw_from_entry(
     live = entry.get("flex_live_kw") or {}
     if consumer_id in live:
         return float(live[consumer_id] or 0.0)
+    if measured_ids is not None:
+        return None
     return 0.0
 
 
@@ -313,7 +319,10 @@ def entry_to_chart_row(
     }
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         cid = consumer["id"]
-        row[consumer_column_name(consumer)] = round(_consumer_kw_from_entry(entry, cid), 2)
+        flex_kw = _consumer_kw_from_entry(entry, cid)
+        row[consumer_column_name(consumer)] = (
+            round(flex_kw, 2) if flex_kw is not None else None
+        )
         if uses_pv_follow(consumer):
             pv_follow = (entry.get("consumer_pv_follow") or {}).get(cid, 0)
             row[consumer_pv_follow_column_name(consumer)] = int(pv_follow or 0)

@@ -35,7 +35,18 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 
 `homie_bwa_spa_filter2` erfasst jeden Filterlauf (nativ + Ernie) — für Logging, Soll-Ist und Delivery-Tracking.
 
-**Gemeinsame Leistungsmessung (Fall B, Live-Abnahme bestätigt):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistungsaufnahme des SwimSpa (Heizung **inkl.** Filter am selben Zähler). Damit der Filter-Anteil (~0,18 kW) nicht doppelt in Summe/Grundlast einfließt, wird er vom Heizungs-Ist abgezogen. Konfiguriert über `swimspa.loxone_inputs.subtract_consumer_ids: ["swimspa_filter"]`; die Korrektur greift in `fetch_flexible_consumers_live_kw` nur, wenn der Heizungswert tatsächlich vom Zähler stammt (nicht Fallback). Invariante: `swimspa_ist + swimspa_filter_ist = Gesamtmessung`.
+**Gemeinsame Leistungsmessung (Fall B, Live-Abnahme bestätigt):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistungsaufnahme des SwimSpa (Heizung **inkl.** Filter und sonstige Pumpen am selben Zähler). Die Chart-Spalte **SwimSpa** zeigt den **Rest** nach Abzug bekannter Binär-Lasten (Heizung + „Allgemein“ — weitere Pumpen nicht einzeln modelliert). Der Filter-Anteil (~0,18 kW) wird über `subtract_consumer_ids` abgezogen. Korrektur in `resolve_flexible_consumers_live_power` nur bei echtem Zählerwert (nicht MILP-Fallback). Invariante: `swimspa_ist + swimspa_filter_ist = Gesamtmessung`.
+
+### Chart-Ist (seit v1.22.3)
+
+| Aspekt | Verhalten |
+|--------|-----------|
+| Log-Feld `flex_live_kw` | Nur gemessene/inferierte kW — **kein** MILP-Soll |
+| `flex_measured_ids` | IDs mit echter Messung (inkl. explizitem 0 bei Binär-aus) |
+| Chart 1 | Verbraucher ohne Messung → **leer** (`None`), nicht Fallback |
+| Inferenz | Natives Filterfenster + Gesamtzähler ≈ Filter-Nennleistung (±0,05 kW), Binär-Merker 0 → Filter dem Chart zuordnen |
+
+Operative Pfade (`cons_data`, Delivery) nutzen weiterhin `kw` mit Fallback, wenn der Zähler ausfällt.
 
 ## 4. Verbraucher-Config (`swimspa_filter`)
 
