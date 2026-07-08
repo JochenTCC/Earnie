@@ -6,6 +6,7 @@ Rekonstruiert das tatsächliche Produktiv-Verhalten. S-2-Charts (`build_chart_hi
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -31,7 +32,7 @@ SLOT_PRESENT = "present"
 
 # Chart-1-Rauf/Runter: gemessene Batterieleistung (kW, positiv = laden) aus Loxone-Snapshot
 CHART_IST_BATTERY_KW_COLUMN = "Ist Batterie-Leistung (kW)"
-PV_HISTORY_FORECAST_COLUMN = "PV-Prognose-Log (kW)"
+PV_IST_COLUMN = "PV-Ist (kW)"
 SLOT_HELD = "held"
 SLOT_MISSING = "missing"
 
@@ -234,6 +235,20 @@ def _chart_battery_kw_from_snapshot(snapshot: dict[str, Any]) -> float | None:
     return round(-float(raw), 3)
 
 
+def _pv_kw_for_balance(row: dict[str, Any]) -> float:
+    """PV für Energiebilanz: Ist aus Log-Snapshot, sonst Prognose."""
+    if PV_IST_COLUMN in row:
+        raw = row.get(PV_IST_COLUMN)
+        if raw is not None:
+            try:
+                ist = float(raw)
+                if not math.isnan(ist):
+                    return ist
+            except (TypeError, ValueError):
+                pass
+    return float(row.get("PV-Prognose (kW)", 0.0) or 0.0)
+
+
 def _netzbezug_kw_from_entry(entry: dict[str, Any], row: dict[str, Any]) -> float:
     """Netzbezug: gemessenes grid_kw aus consumption_snapshot, sonst Bilanz aus der Zeile."""
     snapshot = entry.get("consumption_snapshot") or {}
@@ -243,7 +258,7 @@ def _netzbezug_kw_from_entry(entry: dict[str, Any], row: dict[str, Any]) -> floa
     return round(
         float(row["Verbrauch-Prognose (kW)"])
         + flexible_consumer_power_kw(row)
-        - float(row["PV-Prognose (kW)"])
+        - _pv_kw_for_balance(row)
         + float(row["Geplante Batterie-Aktion (kW)"]),
         2,
     )
@@ -310,14 +325,14 @@ def entry_to_chart_row(
     """Baut eine Chart-Zeile aus einem Produktiv-Durchlauf."""
     mode = int(entry.get("mode", bat.MODE_AUTOMATIK))
     target_power = float(entry.get("target_power_kw", 0.0) or 0.0)
-    pv, baseload, battery_plan = _power_kw_from_entry(entry)
+    _, baseload, battery_plan = _power_kw_from_entry(entry)
+    snapshot = entry.get("consumption_snapshot") or {}
     row: dict[str, Any] = {
         "slot_datetime": slot_start,
         "Uhrzeit": _format_slot_time(slot_start, include_date=include_date),
         "Strompreis (Cent/kWh)": round(float(entry.get("market_price_cent", 0.0) or 0.0), 4),
         "Preis extrapoliert": False,
-        "PV-Prognose (kW)": round(pv, 3),
-        PV_HISTORY_FORECAST_COLUMN: round(_pv_forecast_kw_from_entry(entry), 3),
+        "PV-Prognose (kW)": round(_pv_forecast_kw_from_entry(entry), 3),
         "Verbrauch-Prognose (kW)": round(baseload, 3),
         "Geplante Batterie-Aktion (kW)": round(battery_plan, 3),
         "Simulierter SoC (%)": round(float(entry.get("soc_percent", 0.0) or 0.0), 1),
@@ -332,8 +347,9 @@ def entry_to_chart_row(
         if uses_pv_follow(consumer):
             pv_follow = (entry.get("consumer_pv_follow") or {}).get(cid, 0)
             row[consumer_pv_follow_column_name(consumer)] = int(pv_follow or 0)
+    if snapshot.get("pv_kw") is not None:
+        row[PV_IST_COLUMN] = round(float(snapshot["pv_kw"]), 3)
     row["Netzbezug (kW)"] = _netzbezug_kw_from_entry(entry, row)
-    snapshot = entry.get("consumption_snapshot") or {}
     ist_battery = _chart_battery_kw_from_snapshot(snapshot)
     if ist_battery is not None:
         row[CHART_IST_BATTERY_KW_COLUMN] = ist_battery
@@ -347,10 +363,12 @@ def _zero_flex_power(row: dict[str, Any]) -> None:
         row[consumer_column_name(consumer)] = 0.0
         if uses_pv_follow(consumer):
             row[consumer_pv_follow_column_name(consumer)] = 0
-    pv = float(row.get("PV-Prognose (kW)", 0.0) or 0.0)
     baseload = float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
     battery_plan = float(row.get("Geplante Batterie-Aktion (kW)", 0.0) or 0.0)
-    row["Netzbezug (kW)"] = round(baseload - pv + battery_plan, 2)
+    row["Netzbezug (kW)"] = round(
+        baseload - _pv_kw_for_balance(row) + battery_plan,
+        2,
+    )
 
 
 def _hold_forward_row(
@@ -363,6 +381,7 @@ def _hold_forward_row(
     row["slot_datetime"] = slot_start
     row["Uhrzeit"] = _format_slot_time(slot_start, include_date=include_date)
     row.pop(CHART_IST_BATTERY_KW_COLUMN, None)
+    row.pop(PV_IST_COLUMN, None)
     _zero_flex_power(row)
     return row
 
@@ -624,7 +643,7 @@ def _missing_chart_row(
         "Strompreis (Cent/kWh)": None,
         "Preis extrapoliert": False,
         "PV-Prognose (kW)": None,
-        PV_HISTORY_FORECAST_COLUMN: None,
+        PV_IST_COLUMN: None,
         "Verbrauch-Prognose (kW)": None,
         "Geplante Batterie-Aktion (kW)": None,
         "Netzbezug (kW)": None,
@@ -651,7 +670,6 @@ def _empty_chart_row(
         "Strompreis (Cent/kWh)": 0.0,
         "Preis extrapoliert": False,
         "PV-Prognose (kW)": 0.0,
-        PV_HISTORY_FORECAST_COLUMN: 0.0,
         "Verbrauch-Prognose (kW)": 0.0,
         "Geplante Batterie-Aktion (kW)": 0.0,
         "Netzbezug (kW)": 0.0,

@@ -100,6 +100,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     from data.planning_window import sunrise_anchor_slot_index
 
     sunrise_soc_min_index = sunrise_anchor_slot_index(planning_window)
+    pv_forecast_kw_for_log = float(optimization_matrix[0]["expected_p_pv"])
 
     live_power = loxone_client.fetch_loxone_live_power()
     flex_kw_for_matrix: dict[str, float] = {}
@@ -319,7 +320,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 ),
                 4,
             ),
-            "forecast_pv_kw": round(float(optimization_matrix[0]["expected_p_pv"]), 3),
+            "forecast_pv_kw": round(pv_forecast_kw_for_log, 3),
             "forecast_consumption_kw": round(float(optimization_matrix[0]["expected_p_act"]), 3),
             "mode": int(mode),
             "target_power_kw": round(float(target_power), 3),

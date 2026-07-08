@@ -81,14 +81,28 @@ def test_entry_to_chart_row_prefers_consumption_snapshot():
         consumer_powers_kw={"swimspa": 2.2},
     )
     row = history_timeline.entry_to_chart_row(entry, datetime(2026, 6, 26, 11, 0, 0))
-    assert row["PV-Prognose (kW)"] == 3.5
-    assert row[history_timeline.PV_HISTORY_FORECAST_COLUMN] == 1.0
+    assert row["PV-Prognose (kW)"] == 1.0
+    assert row[history_timeline.PV_IST_COLUMN] == 3.5
     assert row["Verbrauch-Prognose (kW)"] == 0.8
     assert row[history_timeline.CHART_IST_BATTERY_KW_COLUMN] == pytest.approx(1.2)
     assert row["Uhrzeit"] == "11:00"
 
 
-def test_entry_to_chart_row_uses_ist_flex_not_soll():
+def test_entry_to_chart_row_line_and_bar_pv_sources_differ():
+    entry = _entry(
+        datetime(2026, 6, 26, 11, 0, 0),
+        forecast_pv_kw=1.2,
+        consumption_snapshot={"pv_kw": 3.5, "baseload_kw": 0.8, "grid_kw": 0.0},
+    )
+    row = history_timeline.entry_to_chart_row(entry, datetime(2026, 6, 26, 11, 0, 0))
+    from ui.chart_flow_balance import KIND_PV, build_flow_balance_segments
+
+    slot = build_flow_balance_segments(row, flex_consumers=[])
+    pv_bar = next(segment for segment in slot.up if segment.kind == KIND_PV)
+    assert row["PV-Prognose (kW)"] == 1.2
+    assert pv_bar.kw == pytest.approx(3.5)
+
+
     import config
     from optimizer.targets import consumer_column_name
 

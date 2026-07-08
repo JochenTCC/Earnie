@@ -24,7 +24,7 @@ import plotly.graph_objects as go
 import config
 from data.planning_window import UiChartZones, chart_zone_kind_for_slot_start
 from optimizer import battery as bat
-from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN
+from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN, PV_IST_COLUMN
 from optimizer.targets import (
     consumer_column_name,
     consumer_immediate_charge_column_name,
@@ -339,6 +339,15 @@ def _segments_from_allocation(
     return up, down
 
 
+def _pv_kw_from_row(row: Mapping[str, Any]) -> float:
+    """PV für Flow-Balance: Ist aus Log-Snapshot, sonst Prognose."""
+    if PV_IST_COLUMN in row:
+        ist = _safe_float(row.get(PV_IST_COLUMN), default=float("nan"))
+        if not math.isnan(ist):
+            return ist
+    return _safe_float(row.get("PV-Prognose (kW)"))
+
+
 def build_flow_balance_segments(
     row: Mapping[str, Any],
     *,
@@ -366,7 +375,7 @@ def build_flow_balance_segments(
         (Entladen gedämpft ↑). ``is_visually_balanced`` ist bei konsistenten Zeilen
         immer wahr.
     """
-    pv = _safe_float(row.get("PV-Prognose (kW)"))
+    pv = _pv_kw_from_row(row)
     baseload = _safe_float(row.get("Verbrauch-Prognose (kW)"))
     battery_raw = _safe_float(row.get("Geplante Batterie-Aktion (kW)"))
     grid = _safe_float(row.get("Netzbezug (kW)"))
@@ -904,7 +913,7 @@ def energy_balance_residual_kw(row: Mapping[str, Any]) -> float:
 
     PV + Netz_import + Batt_entladen − Grundlast − Flex − Batt_laden − Einspeisung
     """
-    pv = _safe_float(row.get("PV-Prognose (kW)"))
+    pv = _pv_kw_from_row(row)
     baseload = _safe_float(row.get("Verbrauch-Prognose (kW)"))
     battery = _safe_float(row.get("Geplante Batterie-Aktion (kW)"))
     grid = _safe_float(row.get("Netzbezug (kW)"))

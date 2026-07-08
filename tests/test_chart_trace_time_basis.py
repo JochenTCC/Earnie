@@ -107,8 +107,13 @@ def test_chart1_pv_uses_smooth_line_not_hv_steps():
     axis = ChartSlotAxis.from_dataframe(df)
     fig = go.Figure()
     add_power_traces(fig, df, get_bar_colors(df), axis)
-    pv = next(t for t in fig.data if t.name == "PV")
-    assert getattr(pv.line, "shape", None) in (None, "linear")
+    assert not any(trace.name == "PV-Prognose (Log)" for trace in fig.data)
+    pv_line = next(
+        trace
+        for trace in fig.data
+        if trace.name == "PV" and getattr(trace, "fill", None) == "tozeroy"
+    )
+    assert getattr(pv_line.line, "shape", None) in (None, "linear")
 
 
 def test_chart1_pv_center_anchor_avoids_early_morning_ramp():

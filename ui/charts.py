@@ -28,7 +28,6 @@ from optimizer import battery as bat
 from optimizer.deviation_eval import DeviationEvent
 from runtime_store.history_timeline import (
     CHART_IST_BATTERY_KW_COLUMN,
-    PV_HISTORY_FORECAST_COLUMN,
     SLOT_MISSING,
 )
 from ui.chart_colors import (
@@ -39,7 +38,6 @@ from ui.chart_colors import (
     CHART_MISSING_SLOT_FILL,
     CHART_PV_FILL_COLOR,
     CHART_PV_LINE_COLOR,
-    chart1_pv_history_forecast_color,
     COLOR_COST_ACTUAL,
     COLOR_COST_BASELINE,
     COLOR_COST_OPTIMIZED,
@@ -1561,30 +1559,6 @@ def _add_pv_trace(
     ))
 
 
-def _add_pv_history_forecast_trace(
-    fig: go.Figure,
-    axis: ChartSlotAxis,
-    pv_kw: pd.Series,
-    uhrzeit: pd.Series,
-) -> None:
-    """PV-Prognose aus dem Produktiv-Log (gedämpft, nur wo Log-Werte vorliegen)."""
-    if pv_kw.isna().all():
-        return
-    pv_x, pv_y = _extended_line_xy(
-        axis, pv_kw, anchor_fraction=_LINE_ANCHOR_SLOT_CENTER
-    )
-    line_color = chart1_pv_history_forecast_color()
-    fig.add_trace(go.Scatter(
-        x=pv_x,
-        y=pv_y,
-        name="PV-Prognose (Log)",
-        line=dict(color=line_color, width=1.5, dash="dot"),
-        yaxis="y",
-        connectgaps=False,
-        **_line_hover(uhrzeit, ".2f"),
-    ))
-
-
 def _chart_xaxis_config(axis: ChartSlotAxis, *, range_start: datetime | None = None) -> dict:
     step_minutes = axis.step.total_seconds() / 60.0
     if step_minutes >= 60:
@@ -1627,10 +1601,6 @@ def add_power_traces(
     )
     if "PV-Prognose (kW)" in df.columns:
         _add_pv_trace(fig, axis, df["PV-Prognose (kW)"], df["Uhrzeit"])
-    if PV_HISTORY_FORECAST_COLUMN in df.columns:
-        _add_pv_history_forecast_trace(
-            fig, axis, df[PV_HISTORY_FORECAST_COLUMN], df["Uhrzeit"]
-        )
 
     from ui.chart_flow_balance import (
         add_flow_balance_traces,

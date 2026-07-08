@@ -8,12 +8,11 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Smart Energy App anschauen zum Vergleich
 - [ ] Weitere Anbieter mit flexiblen Preisen anschauen
 - [ ] Businessplan adaptieren
+
 ### Loxberry 4 Installation - Notizen
-- Loxberry4 läuft 192.168.178.34:88
-- Plugin FOSHKplugin funktioniert (ist derzeit deaktiviert)
-- Plugin FHEM läuft auch
-- MQTT Kommunikation läuft auch
-- [ ] Update von bestehendem Loxberry versuchen - ansonsten auf neuen umschwenken
+- [x] Update von bestehendem Loxberry auf 4.0 hat funktioniert
+- [x] Installation des Docker Container Plugins hat funktioniert
+- [x] Inbetriebnahme des Ernie-Stacks hat funktioniert und Worker / UI laufen!!!
 
 ## Feature-Backlog
 
@@ -23,13 +22,17 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 1.+1
 - [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
-  - H
+  - Habe Admins in loxforum nach der besten Stelle für einen Post gefragt
 
 ### Version 1.+1
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
 
 ### Version 2.0
 - [ ] Ausführlicher Code-Review und Refactoring
+
+### Version 2.+1
+- [ ] Möglichkeit für Test der Code-Coverage prüfen
+- [ ] Möglichkeit zum automatisierten UI-Testing prüfen
 
 ### Version 2.+1
 - [ ] **SwimSpa Fall B — Folgeprüfung historische Leistung & Loxone-Trennung**

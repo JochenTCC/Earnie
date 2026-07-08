@@ -5,10 +5,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from ui.chart_legend_mobile import (
-    inject_mobile_legend_css,
-    render_collapsible_legend_from_figure,
-)
 from ui.charts import ChartSlotAxis, _add_zone_backgrounds, _chart_legend, _chart_xaxis_config
 
 
@@ -51,9 +47,7 @@ def _render_zone_line_chart(
         legend=_chart_legend(),
         margin=dict(l=40, r=40, t=50, b=110),
     )
-    inject_mobile_legend_css()
     st.plotly_chart(fig, width="stretch")
-    render_collapsible_legend_from_figure(fig)
 
 
 def render_swimspa_temperature_chart(df: pd.DataFrame, *, chart_zones) -> None:
@@ -99,6 +93,4 @@ def render_swimspa_filter_chart(df: pd.DataFrame, *, chart_zones) -> None:
         legend=_chart_legend(),
         margin=dict(l=40, r=40, t=50, b=110),
     )
-    inject_mobile_legend_css()
     st.plotly_chart(fig, width="stretch")
-    render_collapsible_legend_from_figure(fig)

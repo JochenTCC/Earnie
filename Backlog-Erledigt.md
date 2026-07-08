@@ -2,6 +2,17 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Chart 1 PV-Linie = Ist (forecast_pv nach Overlay) (2026-07-08)
+
+- [x] **`forecast_pv_kw` vor Live-Overlay loggen** — `main.py` speichert Forecast.Solar-Wert, nicht `consumption_snapshot.pv_kw`; Chart-Linie vs. Ist-Balken unterscheidbar
+- [x] **NaN-`PV-Ist` in MILP-Zeilen** — Flow-Balance fällt auf Prognose zurück (`chart_flow_balance.py`)
+
+### UI S-2 — Chart 1 PV-Linie durchgängig (2026-07-08)
+
+- [x] **PV-Prognose-Linie durchgängig** — eine gelbe Linie (`CHART_PV_LINE_COLOR`) über grau/neutral/grün; Overlay „PV-Prognose (Log)“ entfernt
+- [x] **Datenmodell** — `PV-Prognose (kW)` = Prognose; `PV-Ist (kW)` nur für Flow-Balance-Balken im Log
+- [x] Tests + `docs/ui/charts.md`
+
 ### Manuelle Geräte — Chart 1 Cockpit (Follow-up Phase 5) (2026-07-08)
 
 - [x] **Eigene benannte Spuren im Chart-1-Flex-Stack** — geplante Geräte aus `appliance_schedules.json` als Flex-Balken (Waschmaschine, Trockner, …), nicht nur in `expected_p_act`/`Grundlast`; `apply_appliance_schedules_to_chart_rows` + `_finalize_chart_rows_for_display`

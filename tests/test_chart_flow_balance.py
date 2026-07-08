@@ -425,3 +425,33 @@ def test_chart1_pv_and_baseload_use_zone_muted_colors() -> None:
         chart1_baseload_color_for_zone("history"),
         chart1_baseload_color_for_zone("live_plan"),
     }
+
+
+def test_flow_balance_pv_bar_uses_ist_when_present() -> None:
+    row = {
+        "PV-Prognose (kW)": 1.0,
+        "PV-Ist (kW)": 3.5,
+        "Verbrauch-Prognose (kW)": 0.0,
+        "Geplante Batterie-Aktion (kW)": 0.0,
+        "Netzbezug (kW)": 0.0,
+    }
+    slot = build_flow_balance_segments(row, flex_consumers=[])
+    pv_seg = next(segment for segment in slot.up if segment.kind == KIND_PV)
+    assert pv_seg.kw == pytest.approx(3.5)
+
+
+def test_flow_balance_pv_bar_ignores_nan_ist_column() -> None:
+    import pandas as pd
+
+    row = pd.Series(
+        {
+            "PV-Prognose (kW)": 2.0,
+            "PV-Ist (kW)": float("nan"),
+            "Verbrauch-Prognose (kW)": 0.0,
+            "Geplante Batterie-Aktion (kW)": 0.0,
+            "Netzbezug (kW)": 0.0,
+        }
+    )
+    slot = build_flow_balance_segments(row, flex_consumers=[])
+    pv_seg = next(segment for segment in slot.up if segment.kind == KIND_PV)
+    assert pv_seg.kw == pytest.approx(2.0)

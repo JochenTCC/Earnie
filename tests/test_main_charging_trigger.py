@@ -152,3 +152,40 @@ def test_regular_run_uses_update_and_side_effects(monkeypatch):
     cons_data.assert_called_once()
     assert saved[0]["run_trigger"] == TRIGGER_QUARTER_HOUR
     assert saved[0]["k_push_act"] == main_module.config.get_push_price_cent()
+
+
+def test_run_payload_forecast_pv_kw_uses_pre_overlay_matrix(monkeypatch):
+    _patch_main_dependencies(monkeypatch)
+    monkeypatch.setattr(
+        main_module.profile_manager,
+        "build_live_planning_matrix",
+        lambda _market, _window: [
+            {"expected_p_pv": 2.5, "expected_p_act": 1.0, "price_buy": 10.0, "hour": 10}
+        ],
+    )
+    monkeypatch.setattr(
+        main_module.loxone_client,
+        "fetch_loxone_live_power",
+        lambda: {"house": 1.0, "pv": 4.2, "grid": 0.0, "battery": 0.0},
+    )
+    monkeypatch.setattr(
+        main_module.loxone_client,
+        "fetch_flexible_consumers_live_kw",
+        lambda **_: {},
+    )
+    monkeypatch.setattr(main_module.pv_tuner, "get_pv_delta_peek", MagicMock(return_value=1.5))
+    monkeypatch.setattr(main_module.pv_tuner, "get_pv_delta_and_update", MagicMock(return_value=2.0))
+    monkeypatch.setattr(main_module.optimizer, "register_consumer_delivery", MagicMock())
+    monkeypatch.setattr(main_module.cons_data_store, "record_and_maybe_flush", MagicMock(return_value=0))
+    saved: list[dict] = []
+    monkeypatch.setattr(
+        main_module.run_state,
+        "save_run_state",
+        lambda payload: saved.append(payload),
+    )
+    monkeypatch.setattr(main_module.optimization_history, "append_production_run", lambda _p: None)
+
+    main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
+
+    assert saved[0]["forecast_pv_kw"] == 2.5
+    assert saved[0]["consumption_snapshot"]["pv_kw"] == 4.2

@@ -23,7 +23,7 @@ Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdo
 
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
-| PV | Gelbe Linie | PV-Prognose / Log-Ist |
+| PV | Gelbe Linie | PV-Prognose (durchgängig grau/neutral/grün) |
 | Energiebilanz | Rauf/Runter-Balken (gestapelt) | **↑ kräftig** PV (gelb), Netzbezug (blau); **↓ kräftig** Grundlast (braun), Flex; **gedämpft** Batterie→Last grün, Netz→Batterie cyan, PV→Batterie gelb-grün, PV→Netz blassgelb — Up- und Down-Säule gleich hoch |
 
 ### Rauf/Runter-Algorithmus (Wasserfall)
@@ -55,9 +55,9 @@ Entladen → Last ← verbleibende Entladung
 
 **Zonenabhängige Sättigung (nur Chart-1-Flex-Balken):** Grauer Bereich (Vergangenheit) volle Palette-Sättigung; neutraler Bereich (laufender Plan) und grüner Bereich (Preis-Prognose) gemeinsam gedämpft (`CONSUMER_CHART_SATURATION_MUTED`, derzeit 0,6). Slot → Zone über `chart_zone_kind_for_slot_start()` / `UiChartZones`; Legende bleibt in Vollfarbe (`visible='legendonly'`). Sankey unverändert volle Sättigung.
 
-**PV im grauen Bereich:** Zwei Linien — Ist (`consumption_snapshot.pv_kw`) und Prognose zum Laufzeitpunkt (`forecast_pv_kw`, Spalte `PV-Prognose-Log (kW)`, gestrichelt/gedämpft).
+**PV im grauen Bereich:** Eine Prognose-Linie (Forecast.Solar-Wert **vor** Live-Overlay, Feld `forecast_pv_kw` im Log) über alle Zonen; PV-Balken (Flow-Balance ↑) nutzen im Log **Ist** (`PV-Ist (kW)` aus `consumption_snapshot.pv_kw`). Abweichung sichtbar ab dem nächsten Worker-Lauf nach dem Fix; ältere Log-Einträge können identische Werte haben (früher wurde Ist fälschlich als Prognose geloggt).
 
-**Mobile Legende:** Unter 768px Viewport-Breite blendet CSS die Plotly-Legende aus; darunter ein Streamlit-Expander „Legende“ (`ui/chart_legend_mobile.py`).
+**Mobile Legende (Cockpit Chart 1/2):** Unter 768px Viewport-Breite blendet CSS die Plotly-Legende aus; stattdessen ein ausklappbares HTML-`<details>` mit Farbfeldern (`ui/chart_legend_mobile.py`). Ab 769px nur die Plotly-Legende im Chart.
 
 **Rechte Y-Achse (0–100, skaliert):**
 

@@ -296,16 +296,6 @@ def chart1_pv_color_for_zone(zone: str) -> str:
     return color_from_hsl(_HSL_PV[0], saturation, luminance, _ALPHA_PV)
 
 
-def chart1_pv_history_forecast_color() -> str:
-    """Gedämpfte PV-Prognose im grauen History-Bereich (Overlay zum Ist-Wert)."""
-    return color_from_hsl(
-        _HSL_PV[0],
-        _HSL_PV[1] * CHART1_PV_SATURATION_MUTED,
-        _HSL_PV[2] * CHART1_PV_LUMINANCE_MUTED,
-        _ALPHA_PV * 0.75,
-    )
-
-
 def chart1_baseload_color_for_zone(zone: str) -> str:
     """Grundlast-Farbe in Chart 1: History voll, Live/Forecast gedämpft."""
     saturation = _HSL_BASELOAD[1]
