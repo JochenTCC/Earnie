@@ -3,17 +3,19 @@ import os
 import json
 import re
 from datetime import datetime
-from dotenv import load_dotenv
+
+from runtime_store.dotenv_loader import load_app_dotenv
 
 _HEX_CHART_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 _CONSUMER_PALETTE_SIZE = 8
 
-# Sensible Daten aus .env laden
-load_dotenv()
+# Sensible Daten aus .env laden (Prod: config/.env, Dev: Fallback ./.env)
+load_app_dotenv()
 
 from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
     resolve_config_json_path,
+    resolve_dotenv_path,
     resolve_local_settings_json_path,
 )
 
@@ -282,8 +284,10 @@ class Config:
 
         if self.require_loxone_credentials and not all([self.LOXONE_IP, self.LOXONE_USER, self.LOXONE_PASS]):
             missing = [k for k in ["LOXONE_IP", "LOXONE_USER", "LOXONE_PASS"] if not os.getenv(k)]
+            dotenv_path = resolve_dotenv_path()
             raise ValueError(
-                f"Kritischer Fehler: Fehlende sensible Daten in der .env: {', '.join(missing)}"
+                f"Kritischer Fehler: Fehlende sensible Daten in '{dotenv_path}': "
+                f"{', '.join(missing)}"
             )
 
     def _load_static_params(self) -> None:
@@ -916,6 +920,101 @@ class Config:
             appliances.append(spec)
         return appliances
 
+    def update_appliance_defaults(
+        self,
+        appliance_id: str,
+        *,
+        power_kw: float,
+        runtime_h: float,
+    ) -> None:
+        """Persistiert Nennleistung und Laufzeit-Vorbelegung für ein manuelles Gerät."""
+        if power_kw < 0:
+            raise ValueError(
+                f"update_appliance_defaults: power_kw muss >= 0 sein (erhalten: {power_kw})."
+            )
+        if runtime_h <= 0:
+            raise ValueError(
+                f"update_appliance_defaults: runtime_h muss > 0 sein (erhalten: {runtime_h})."
+            )
+        data = self._read_json_dict(self.config_path)
+        raw = data.get("appliances")
+        if not isinstance(raw, list):
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: 'appliances' muss ein Array sein."
+            )
+        target_index = None
+        for index, item in enumerate(raw):
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("id", "")).strip() == appliance_id:
+                target_index = index
+                break
+        if target_index is None:
+            raise KeyError(
+                f"update_appliance_defaults: unbekannte appliance_id '{appliance_id}'."
+            )
+        entry = dict(raw[target_index])
+        entry["default_power_kw"] = float(power_kw)
+        entry["default_runtime_h"] = float(runtime_h)
+        self._normalize_appliance(entry, target_index)
+        raw[target_index] = entry
+        data["appliances"] = raw
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+            f.write("\n")
+        self._raw_config = data
+
+    @staticmethod
+    def _normalize_appliance_recommendation(raw: dict | None) -> dict:
+        from optimizer.appliance_recommendation import (
+            DEFAULT_ABS_MARGIN_CENT,
+            DEFAULT_PCT_STARS_1,
+            DEFAULT_PCT_STARS_4,
+        )
+
+        defaults = {
+            "abs_margin_cent": DEFAULT_ABS_MARGIN_CENT,
+            "pct_stars_4": DEFAULT_PCT_STARS_4,
+            "pct_stars_1": DEFAULT_PCT_STARS_1,
+        }
+        if raw is None:
+            return dict(defaults)
+        if not isinstance(raw, dict):
+            raise ValueError(
+                "Kritischer Konfigurationsfehler: 'appliance_recommendation' muss ein Objekt sein."
+            )
+        result = dict(defaults)
+        for key in defaults:
+            if key in raw and raw[key] is not None:
+                result[key] = float(raw[key])
+        margin = result["abs_margin_cent"]
+        pct_4 = result["pct_stars_4"]
+        pct_1 = result["pct_stars_1"]
+        if margin < 0:
+            raise ValueError("appliance_recommendation.abs_margin_cent muss >= 0 sein.")
+        if pct_4 <= 0:
+            raise ValueError("appliance_recommendation.pct_stars_4 muss > 0 sein.")
+        if pct_1 <= pct_4:
+            raise ValueError("appliance_recommendation.pct_stars_1 muss > pct_stars_4 sein.")
+        return result
+
+    def get_appliance_recommendation_settings(self) -> dict:
+        """Schwellen für Sterne-Vergabe bei manuellen Geräten."""
+        return self._normalize_appliance_recommendation(
+            self._raw_config.get("appliance_recommendation")
+        )
+
+    def update_appliance_recommendation_settings(self, new_settings: dict) -> None:
+        data = self._read_json_dict(self.config_path)
+        merged = self._normalize_appliance_recommendation(
+            {**self.get_appliance_recommendation_settings(), **new_settings}
+        )
+        data["appliance_recommendation"] = merged
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+            f.write("\n")
+        self._raw_config = data
+
     def get_eauto_milp_params(self) -> dict[str, float]:
         """Pflichtparameter für E-Auto MILP Modus A/B und Tie-Break."""
         from optimizer.eauto_milp import validate_eauto_milp_params
@@ -1246,6 +1345,14 @@ def get_appliances() -> list[dict]:
     return CONFIG.get_appliances()
 
 
+def get_appliance_recommendation_settings() -> dict:
+    return CONFIG.get_appliance_recommendation_settings()
+
+
+def update_appliance_recommendation_settings(new_settings: dict) -> None:
+    return CONFIG.update_appliance_recommendation_settings(new_settings)
+
+
 def get_eauto_milp_params() -> dict[str, float]:
     return CONFIG.get_eauto_milp_params()
 
@@ -1365,3 +1472,14 @@ def reload_config() -> None:
 
 def update_runtime_settings(new_settings: dict) -> None:
     return CONFIG.update_runtime_settings(new_settings)
+
+
+def update_appliance_defaults(
+    appliance_id: str,
+    *,
+    power_kw: float,
+    runtime_h: float,
+) -> None:
+    return CONFIG.update_appliance_defaults(
+        appliance_id, power_kw=power_kw, runtime_h=runtime_h
+    )

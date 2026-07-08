@@ -251,6 +251,11 @@ def prepare_optimization_matrix(
         consumers=live_consumers,
     )
     prepared = apply_immediate_charge_to_matrix(matrix, contexts, live_consumers)
+    from optimizer.appliance_schedule import apply_appliance_schedules_to_matrix
+    from runtime_store.appliance_schedules import purge_expired
+
+    schedules = purge_expired()
+    prepared = apply_appliance_schedules_to_matrix(prepared, schedules)
     return prepared, contexts, targets
 
 

@@ -18,21 +18,17 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Feature-Backlog
 
 ### Version 1.+1
+- [ ] **Manuelle Geräte — Chart 1 Cockpit (Follow-up Phase 5)**
+  - Geplante Geräte aus `runtime/appliance_schedules.json` als **eigene benannte Spuren** im Chart-1-Flex-Stack (Waschmaschine, Trockner, …) — nicht nur unsichtbar in der Grundlast (`expected_p_act`)
+  - Appliance-Schedules beim Aufbau der Chart-/Sim-Zeilen einbeziehen (Wiederverwendung Flex-Balken-Logik, ohne MILP-`expected_flex_kw`)
+  - Nach Checkbox-Änderung auf „Manuelle Geräte“ Live-Optimierungs-Cache invalidieren, damit die Planung vor dem nächsten `main.py`-Lauf im Cockpit sichtbar ist
+
+### Version 1.+1
 - [ ] Nicht Software-Relevant: Neuen Loxberry aufsetzen bzw. produktiv-Loxberry auf 4 upgraden
 - [ ] Readme ausführlicher machen mit Motivation / Nutzen
 
 ### Version 1.+1
 - [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
-
-### Version 1.+1
-- [ ] Veränderte Parameter bei manuellen Verbrauchern in der Subpage sollten in der config.json abgespeichert werden können.
-- [ ] Chart 1+2: Prüfen, ob Legende zusammengeklappt werden kann auf Mobilgeräten.
-- [ ] Manuelle Verbraucher: Sternevergabe nicht gemäß linearer Anordnung von Am Billigsten - Am Teuersten, sondern nach kombinierter Regel: Alles, was höchstens 0,05 Cent teurer ist bekommt 5 Sterne, danach prozentuale Bewertung: Bis zehn Prozent mehr -> 4 Sterne / Ab 30% mehr -> 1 Sterne. Dazwischen interpolieren. Die Werte für die Schwellen sollen auch in der config.json veränderbar sein (auch in der UI-Seite). Default-Werte wie hier angegeben.
-- [ ] Erste Funktionalität für Verbraucheranalyse: 
-  - Temperaturverlauf von Swimspa Ist und Soll mit eigenem Verbrauchs-chart (möglichst hohe Wiederverwendung von Chart1 - auch mit Deviation-Anzeige)
-  - Verbrauchs-Chart für Swimspa Filterung (Sowohl die autonomen Filterzeiten als auch die von Ernie initiierten)
-  - Wenn eine Stunde ausgewählt wird (checkbox für "Startet in x Stunden"), wird das in die Optimierung mit Nennleistung und Dauer einbezogen. Der Check wird nach Gesamtablauf automatisch wieder gelöscht, kann aber manuell jederzeit geändert werden.
-- [ ] PV Verlauf im grauen Bereich zeigt auch die Prognose an (evtl. mit geringerer Sättigung)
 
 ### Version 1.+1
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**

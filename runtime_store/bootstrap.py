@@ -30,11 +30,15 @@ from runtime_store.persist_paths import (
     resolve_deviation_rules_template_path,
     resolve_config_schema_template_path,
     resolve_config_template_path,
+    resolve_dotenv_template_path,
     resolve_local_settings_json_path,
     resolve_local_settings_template_path,
     runtime_dir,
     total_consumption_profiles_file,
 )
+
+_CANONICAL_DOTENV = os.path.join("config", ".env")
+_LEGACY_DOTENV = ".env"
 
 logger = logging.getLogger(__name__)
 
@@ -254,6 +258,35 @@ def _bootstrap_log_file() -> bool:
     return _create_file_if_missing(path, lambda: _write_text(path, ""))
 
 
+def _warn_legacy_dotenv_directory() -> None:
+    if os.path.isdir(_LEGACY_DOTENV):
+        logger.error(
+            "bootstrap: './.env' ist ein Verzeichnis (typisch nach fehlgeschlagenem "
+            "Docker-Bind-Mount). Bitte auf dem Host löschen: rm -rf .env"
+        )
+
+
+def _bootstrap_dotenv() -> bool:
+    _warn_legacy_dotenv_directory()
+    if not _is_missing_file(_CANONICAL_DOTENV):
+        return False
+    if os.path.isfile(_LEGACY_DOTENV):
+        _ensure_parent_dir(_CANONICAL_DOTENV)
+        shutil.copyfile(_LEGACY_DOTENV, _CANONICAL_DOTENV)
+        logger.info(
+            "bootstrap: %s aus Legacy %s migriert – bitte Loxone-Zugangsdaten prüfen.",
+            _CANONICAL_DOTENV,
+            _LEGACY_DOTENV,
+        )
+        return True
+    template_path = resolve_dotenv_template_path()
+    return _copy_template_if_missing(
+        _CANONICAL_DOTENV,
+        template_path,
+        ".env.example",
+    )
+
+
 def run() -> None:
     """Fehlende Laufzeitdateien anlegen; bestehende Dateien bleiben unverändert."""
     _ensure_directory(runtime_dir())
@@ -281,6 +314,8 @@ def run() -> None:
         created.append(os.path.join("config", "deviation_rules.json"))
     if _bootstrap_local_settings_json():
         created.append(resolve_local_settings_json_path())
+    if _bootstrap_dotenv():
+        created.append(_CANONICAL_DOTENV)
     if _bootstrap_cons_data_csv():
         created.append(default_cons_data_file())
     if _bootstrap_cons_data_pending():

@@ -1,6 +1,8 @@
 # Lokale Secrets und Laufzeitdaten nicht ins Image
 .env
 .env.*
+!.env.example
+config/.env
 config.json
 config/config.json
 runtime/

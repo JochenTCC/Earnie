@@ -2,18 +2,18 @@
 #
 # Persistente Daten (überleben Image-Updates):
 #   ./config/config.json   – Haus-Konfiguration (wird nie überschrieben)
+#   ./config/.env          – Loxone-Zugangsdaten
 #   ./runtime/             – cons_data, Zustands-JSONs, Profile, Logs
-#   ./.env                 – Loxone-Zugangsdaten
 #
 # Erstinstallation:
 #   1. Ordner anlegen: mkdir -p config runtime
-#   2. .env aus .env.example befüllen
-#   3. Container starten – fehlende Dateien legt der Entrypoint an (config aus config/config.example.json)
-#   4. config/config.json anpassen (Loxone-Namen, Verbraucher)
-#   5. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
+#   2. Container starten – fehlende Dateien legt der Entrypoint an (config/.env, config.json)
+#   3. config/.env und config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
+#   4. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
 #
 # Migration von älterem Layout (Dateien im Projektordner):
 #   mv config.json config/config.json
+#   mv .env config/.env   # falls Zugangsdaten noch im Projektroot lagen
 #   Optional fehlen auf dem Volume: config.example.json / config.schema.json –
 #   der Entrypoint kopiert sie aus share/config/ im Image (für config_drift).
 #   mv cons_data_hourly.csv cons_data_hourly.meta.json runtime/ 2>/dev/null || true
@@ -31,7 +31,6 @@
 version: "3.8"
 
 x-persist-volumes: &persist-volumes
-  - ./.env:/app/.env
   - ./config:/app/config
   - ./runtime:/app/runtime
 

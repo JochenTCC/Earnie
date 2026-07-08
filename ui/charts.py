@@ -21,7 +21,11 @@ from optimizer.targets import (
 )
 from optimizer import battery as bat
 from optimizer.deviation_eval import DeviationEvent
-from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN, SLOT_MISSING
+from runtime_store.history_timeline import (
+    CHART_IST_BATTERY_KW_COLUMN,
+    PV_HISTORY_FORECAST_COLUMN,
+    SLOT_MISSING,
+)
 from ui.chart_colors import (
     CHART_ENTLADESPERRE_BAND_FILL,
     CHART_ENTLADESPERRE_BAND_STRIPE,
@@ -30,6 +34,7 @@ from ui.chart_colors import (
     CHART_MISSING_SLOT_FILL,
     CHART_PV_FILL_COLOR,
     CHART_PV_LINE_COLOR,
+    chart1_pv_history_forecast_color,
     COLOR_COST_ACTUAL,
     COLOR_COST_BASELINE,
     COLOR_COST_OPTIMIZED,
@@ -41,6 +46,10 @@ from ui.chart_colors import (
     COLOR_STEER_ENTLADESPERRE,
     COLOR_STEER_FORCE_CHARGE,
     COLOR_STEER_FORCE_DISCHARGE,
+)
+from ui.chart_legend_mobile import (
+    inject_mobile_legend_css,
+    render_collapsible_legend_from_figure,
 )
 from ui.help_hint import render_title_with_help
 
@@ -1484,6 +1493,30 @@ def _add_pv_trace(
     ))
 
 
+def _add_pv_history_forecast_trace(
+    fig: go.Figure,
+    axis: ChartSlotAxis,
+    pv_kw: pd.Series,
+    uhrzeit: pd.Series,
+) -> None:
+    """PV-Prognose aus dem Produktiv-Log (gedämpft, nur wo Log-Werte vorliegen)."""
+    if pv_kw.isna().all():
+        return
+    pv_x, pv_y = _extended_line_xy(
+        axis, pv_kw, anchor_fraction=_LINE_ANCHOR_SLOT_CENTER
+    )
+    line_color = chart1_pv_history_forecast_color()
+    fig.add_trace(go.Scatter(
+        x=pv_x,
+        y=pv_y,
+        name="PV-Prognose (Log)",
+        line=dict(color=line_color, width=1.5, dash="dot"),
+        yaxis="y",
+        connectgaps=False,
+        **_line_hover(uhrzeit, ".2f"),
+    ))
+
+
 def _chart_xaxis_config(axis: ChartSlotAxis, *, range_start: datetime | None = None) -> dict:
     step_minutes = axis.step.total_seconds() / 60.0
     if step_minutes >= 60:
@@ -1526,6 +1559,10 @@ def add_power_traces(
     )
     if "PV-Prognose (kW)" in df.columns:
         _add_pv_trace(fig, axis, df["PV-Prognose (kW)"], df["Uhrzeit"])
+    if PV_HISTORY_FORECAST_COLUMN in df.columns:
+        _add_pv_history_forecast_trace(
+            fig, axis, df[PV_HISTORY_FORECAST_COLUMN], df["Uhrzeit"]
+        )
 
     from ui.chart_flow_balance import (
         add_flow_balance_traces,
@@ -2452,7 +2489,9 @@ def render_power_soc_chart(
     plotly_kwargs: dict = {"width": "stretch"}
     if chart_key:
         plotly_kwargs["key"] = chart_key
+    inject_mobile_legend_css()
     st.plotly_chart(fig, **plotly_kwargs)
+    render_collapsible_legend_from_figure(fig)
 
 
 def add_cumulative_actual_traces(
@@ -2618,7 +2657,9 @@ def render_cumulative_cost_chart(
                 "Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): "
                 "Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert."
             )
+    inject_mobile_legend_css()
     st.plotly_chart(fig, width="stretch")
+    render_collapsible_legend_from_figure(fig)
 
 
 def render_price_savings_chart(

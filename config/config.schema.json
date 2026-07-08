@@ -58,6 +58,9 @@
       "items": {
         "$ref": "#/definitions/appliance"
       }
+    },
+    "appliance_recommendation": {
+      "$ref": "#/definitions/appliance_recommendation"
     }
   },
   "definitions": {
@@ -797,6 +800,27 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "description": "Vorbelegung der Laufzeit in Stunden für die UI."
+        }
+      }
+    },
+    "appliance_recommendation": {
+      "type": "object",
+      "description": "Schwellen für die Sterne-Vergabe bei manuellen Geräten.",
+      "properties": {
+        "abs_margin_cent": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Max. k_act-Mehrpreis (Cent/kWh) gegenüber dem günstigsten Horizont-Slot für 5 Sterne."
+        },
+        "pct_stars_4": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Prozentuale Mehrkosten (gegenüber günstigster Startstunde) für 4 Sterne."
+        },
+        "pct_stars_1": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Prozentuale Mehrkosten ab der 1 Stern vergeben wird."
         }
       }
     },

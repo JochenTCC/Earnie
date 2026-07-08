@@ -7,7 +7,7 @@ Für Entwickler (Projektstruktur, Tests, Container) siehe [README.md](../README.
 ## Erste Schritte
 
 1. **Konfiguration:** `config/config.example.json` → `config/config.json` (lokal, nicht committen). Alternativ legt `python -m scripts.bootstrap_runtime` die Datei beim ersten Start an.
-2. **Loxone-Zugang:** `.env.example` → `.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS`.
+2. **Loxone-Zugang:** `.env.example` → `config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `config/.env` an).
 3. **Merker-Namen** in `config/config.json` unter `loxone_blocks` und `flexible_consumers` anpassen (siehe [Loxone-Signale](referenz/loxone-signale.md)).
 4. **Verbindung prüfen:**
    ```powershell

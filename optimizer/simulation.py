@@ -51,6 +51,7 @@ def resolve_sell_price_cent(row: dict, default_sell_price_cent: float | None = N
 
 _RESERVED_KW_COLUMNS = {
     "PV-Prognose (kW)",
+    "PV-Prognose-Log (kW)",
     "Verbrauch-Prognose (kW)",
     "Geplante Batterie-Aktion (kW)",
     "Netzbezug (kW)",

@@ -1,7 +1,7 @@
 # app.py
-from dotenv import load_dotenv
+from runtime_store.dotenv_loader import load_app_dotenv
 
-load_dotenv()
+load_app_dotenv()
 
 import logger_config
 

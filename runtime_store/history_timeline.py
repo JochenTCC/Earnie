@@ -31,6 +31,7 @@ SLOT_PRESENT = "present"
 
 # Chart-1-Rauf/Runter: gemessene Batterieleistung (kW, positiv = laden) aus Loxone-Snapshot
 CHART_IST_BATTERY_KW_COLUMN = "Ist Batterie-Leistung (kW)"
+PV_HISTORY_FORECAST_COLUMN = "PV-Prognose-Log (kW)"
 SLOT_HELD = "held"
 SLOT_MISSING = "missing"
 
@@ -202,6 +203,10 @@ def _index_entries_by_slot(
     return by_slot
 
 
+def _pv_forecast_kw_from_entry(entry: dict[str, Any]) -> float:
+    return float(entry.get("forecast_pv_kw", 0.0) or 0.0)
+
+
 def _power_kw_from_entry(entry: dict[str, Any]) -> tuple[float, float, float]:
     snapshot = entry.get("consumption_snapshot") or {}
     pv = snapshot.get("pv_kw")
@@ -312,6 +317,7 @@ def entry_to_chart_row(
         "Strompreis (Cent/kWh)": round(float(entry.get("market_price_cent", 0.0) or 0.0), 4),
         "Preis extrapoliert": False,
         "PV-Prognose (kW)": round(pv, 3),
+        PV_HISTORY_FORECAST_COLUMN: round(_pv_forecast_kw_from_entry(entry), 3),
         "Verbrauch-Prognose (kW)": round(baseload, 3),
         "Geplante Batterie-Aktion (kW)": round(battery_plan, 3),
         "Simulierter SoC (%)": round(float(entry.get("soc_percent", 0.0) or 0.0), 1),
@@ -618,6 +624,7 @@ def _missing_chart_row(
         "Strompreis (Cent/kWh)": None,
         "Preis extrapoliert": False,
         "PV-Prognose (kW)": None,
+        PV_HISTORY_FORECAST_COLUMN: None,
         "Verbrauch-Prognose (kW)": None,
         "Geplante Batterie-Aktion (kW)": None,
         "Netzbezug (kW)": None,
@@ -644,6 +651,7 @@ def _empty_chart_row(
         "Strompreis (Cent/kWh)": 0.0,
         "Preis extrapoliert": False,
         "PV-Prognose (kW)": 0.0,
+        PV_HISTORY_FORECAST_COLUMN: 0.0,
         "Verbrauch-Prognose (kW)": 0.0,
         "Geplante Batterie-Aktion (kW)": 0.0,
         "Netzbezug (kW)": 0.0,

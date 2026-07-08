@@ -80,13 +80,13 @@ docker compose up -d
 ### Produktion (Synology)
 
 1. Multi-Arch-Image bauen und pushen: `python -m scripts.build_container --target all --push`
-2. Auf der NAS nur `docker-compose-synology.yml`, `.env`, `config/`, `runtime/` bereitstellen
+2. Auf der NAS nur `docker-compose-synology.yml`, `config/`, `runtime/` bereitstellen
 3. `docker compose -f docker-compose-synology.yml pull && docker compose -f docker-compose-synology.yml up -d`
 
 ### Produktion (LoxBerry, RPi 4B)
 
 1. Multi-Arch-Image bauen und pushen (siehe oben)
-2. Auf dem LoxBerry nur `docker-compose-loxberry.yml`, `.env`, `config/`, `runtime/` bereitstellen
+2. Auf dem LoxBerry nur `docker-compose-loxberry.yml`, `config/`, `runtime/` bereitstellen
 3. `docker compose -f docker-compose-loxberry.yml pull && docker compose -f docker-compose-loxberry.yml up -d`
 4. UI im LAN: `http://<loxberry-ip>:8501`
 
@@ -98,7 +98,7 @@ docker compose up -d
 
 **No-Go:** 32-bit-Image, unter 2 GB RAM, Erwartung identischer MILP-Performance wie auf der Synology.
 
-Persistente Daten liegen in `./config/`, `./runtime/` und `./.env` — sie werden **nicht** vom Image überschrieben. Beim ersten Start legt der Entrypoint fehlende Dateien an.
+Persistente Daten liegen in `./config/` (inkl. `config/.env`) und `./runtime/` — sie werden **nicht** vom Image überschrieben. Beim ersten Start legt der Entrypoint fehlende Dateien an.
 
 Details: **[docs/einrichtung/container.md](docs/einrichtung/container.md)**
 

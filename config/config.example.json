@@ -263,6 +263,11 @@
             "default_runtime_h": 2.5
         }
     ],
+    "appliance_recommendation": {
+        "abs_margin_cent": 0.05,
+        "pct_stars_4": 10.0,
+        "pct_stars_1": 30.0
+    },
     "file_paths_battery_simulation": {
         "path_cons_data": "runtime/cons_data_hourly.csv",
         "cons_data_retention_months": 24,

@@ -2,7 +2,7 @@
 
 Der Energy Optimizer kommuniziert mit dem Loxone Miniserver über **HTTP** (Lesen und Schreiben von Werten) und optional **FTP** (Verbrauchs-Logdateien). Die konkrete Schaltlogik in Loxone (Relais, Huawei-WR, Ladebox) liegt außerhalb dieses Tools — der Optimizer liefert Sollwerte und Freigaben.
 
-## Zugangsdaten (`.env`)
+## Zugangsdaten (`config/.env`)
 
 | Variable | Bedeutung |
 |----------|-----------|
@@ -10,7 +10,7 @@ Der Energy Optimizer kommuniziert mit dem Loxone Miniserver über **HTTP** (Lese
 | `LOXONE_USER` | Benutzername (HTTP Basic Auth und FTP) |
 | `LOXONE_PASS` | Passwort |
 
-Vorlage: [.env.example](../../.env.example). Die `.env` wird nicht versioniert.
+Vorlage: [.env.example](../../.env.example) → nach `config/.env` kopieren (Prod/Docker legt der Entrypoint die Datei an). Die Datei wird nicht versioniert. Lokale Dev kann weiterhin `./.env` im Projektroot nutzen (Legacy-Fallback).
 
 ## HTTP-Schnittstelle
 

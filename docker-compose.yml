@@ -1,7 +1,6 @@
 version: '3.8'
 
 x-persist-volumes: &persist-volumes
-  - ./.env:/app/.env
   - ./config:/app/config
   - ./runtime:/app/runtime
 

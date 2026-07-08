@@ -9,6 +9,7 @@ from optimizer.appliance_recommendation import (
     STAR_MAX,
     STAR_MIN,
     STAR_NEUTRAL,
+    StarThresholdSettings,
     recommend_start_times,
     run_cost_eur,
 )
@@ -46,11 +47,35 @@ def test_fractional_runtime_weights_last_hour():
     assert result.immediate.cost_eur == pytest.approx(0.20)
 
 
-def test_stars_linear_min_and_max():
+def test_stars_five_within_abs_margin():
+    slots = make_slots([10.0, 10.04, 10.03, 40.0, 50.0, 60.0])
+    settings = StarThresholdSettings(0.05, 10.0, 30.0)
+    result = recommend_start_times(
+        slots, power_kw=1.0, runtime_h=1.0, star_settings=settings
+    )
+    assert result.options[0].stars == STAR_MAX
+    assert result.options[1].stars == STAR_MAX
+    assert result.options[2].stars == STAR_MAX
+
+
+def test_stars_one_above_pct_threshold():
     slots = make_slots([10.0, 20.0, 30.0, 40.0, 50.0, 60.0])
-    result = recommend_start_times(slots, power_kw=1.0, runtime_h=1.0)
+    settings = StarThresholdSettings(0.05, 10.0, 30.0)
+    result = recommend_start_times(
+        slots, power_kw=1.0, runtime_h=1.0, star_settings=settings
+    )
     assert result.options[0].stars == STAR_MAX
     assert result.options[-1].stars == STAR_MIN
+
+
+def test_stars_interpolate_between_pct_thresholds():
+    slots = make_slots([10.0, 11.5, 30.0, 40.0, 50.0, 60.0])
+    settings = StarThresholdSettings(0.05, 10.0, 30.0)
+    result = recommend_start_times(
+        slots, power_kw=1.0, runtime_h=1.0, star_settings=settings
+    )
+    # Start 1: cost 0.115 vs min 0.10 → 15 % mehr → zwischen 4 und 1 Sternen
+    assert 1 < result.options[1].stars < 4
 
 
 def test_stars_neutral_when_all_equal():

@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from tests.fixtures.historical_fixtures import CONS_DATA_FILE, fixture_available
 
 ROOT = Path(__file__).resolve().parents[1]
-DOTENV_PATH = ROOT / ".env"
+DOTENV_PATHS = (ROOT / "config" / ".env", ROOT / ".env")
 DEFAULT_TEST_CONFIG_PATH = ROOT / "tests" / "fixtures" / "backtesting" / "config.json"
 _USE_LIVE_CONFIG_ENV = "ENERGY_OPTIMIZER_TEST_USE_LIVE_CONFIG"
 
@@ -59,8 +59,10 @@ def historical_cons_data():
 
 
 def _load_dotenv_for_tests() -> None:
-    if DOTENV_PATH.is_file():
-        load_dotenv(DOTENV_PATH, override=False)
+    for dotenv_path in DOTENV_PATHS:
+        if dotenv_path.is_file():
+            load_dotenv(dotenv_path, override=False)
+            break
     _apply_default_test_config_env()
 
 

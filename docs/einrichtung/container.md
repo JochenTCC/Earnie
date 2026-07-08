@@ -9,16 +9,16 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./config/config.json` | Haus-Konfiguration (wird nie überschrieben) |
 | `./config/config.example.json` | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
 | `./runtime/` | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs |
-| `./.env` | Loxone-Zugangsdaten |
+| `./config/.env` | Loxone-Zugangsdaten |
 
 Umgebungsvariable in Compose: `ENERGY_OPTIMIZER_CONFIG_PATH=config/config.json`
 
 ## Erstinstallation (NAS)
 
-1. Projektordner mit `docker-compose-synology.yml` und `.env` anlegen
+1. Projektordner mit `docker-compose-synology.yml` anlegen
 2. `mkdir -p config runtime`
-3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/config.example.json` → `config/config.json`, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
-4. `config/config.json` anpassen (Loxone-Namen, Verbraucher)
+3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config/config.json`, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
+4. `config/.env` und `config/config.json` anpassen (Loxone-Zugang, Namen, Verbraucher)
 5. Optional: historische `cons_data` aus Dev nach `runtime/cons_data_hourly.csv` kopieren
 
 ## Config-Updates nach Programm-Upgrade
@@ -134,7 +134,7 @@ docker compose build
 docker compose up -d
 ```
 
-Nutzt `docker-compose.yml` mit lokalem Build und denselben Mounts (`config/`, `runtime/`, `.env`).
+Nutzt `docker-compose.yml` mit lokalem Build und denselben Mounts (`config/`, `runtime/`).
 
 ## LoxBerry (RPi 4B, arm64)
 
@@ -146,10 +146,10 @@ Nutzt `docker-compose.yml` mit lokalem Build und denselben Mounts (`config/`, `r
 
 ### Erstinstallation
 
-1. Projektordner anlegen (z. B. `/opt/ernie-energy/`) mit `docker-compose-loxberry.yml` und `.env`
+1. Projektordner anlegen (z. B. `/opt/ernie-energy/`) mit `docker-compose-loxberry.yml`
 2. `mkdir -p config runtime`
-3. Container starten — der **Entrypoint** legt fehlende Dateien an
-4. `config/config.json` anpassen (Loxone-Namen, Verbraucher)
+3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config/config.json`, …)
+4. `config/.env` und `config/config.json` anpassen (Loxone-Zugang, Namen, Verbraucher)
 5. Optional: historische `cons_data` nach `runtime/cons_data_hourly.csv` kopieren
 
 ### Deploy (LoxBerry)

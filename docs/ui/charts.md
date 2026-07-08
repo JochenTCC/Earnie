@@ -55,6 +55,10 @@ Entladen → Last ← verbleibende Entladung
 
 **Zonenabhängige Sättigung (nur Chart-1-Flex-Balken):** Grauer Bereich (Vergangenheit) volle Palette-Sättigung; neutraler Bereich (laufender Plan) und grüner Bereich (Preis-Prognose) gemeinsam gedämpft (`CONSUMER_CHART_SATURATION_MUTED`, derzeit 0,6). Slot → Zone über `chart_zone_kind_for_slot_start()` / `UiChartZones`; Legende bleibt in Vollfarbe (`visible='legendonly'`). Sankey unverändert volle Sättigung.
 
+**PV im grauen Bereich:** Zwei Linien — Ist (`consumption_snapshot.pv_kw`) und Prognose zum Laufzeitpunkt (`forecast_pv_kw`, Spalte `PV-Prognose-Log (kW)`, gestrichelt/gedämpft).
+
+**Mobile Legende:** Unter 768px Viewport-Breite blendet CSS die Plotly-Legende aus; darunter ein Streamlit-Expander „Legende“ (`ui/chart_legend_mobile.py`).
+
 **Rechte Y-Achse (0–100, skaliert):**
 
 | Spur | Darstellung | Bedeutung |

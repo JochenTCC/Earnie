@@ -8,6 +8,9 @@ import os
 _RUNTIME_DIR_ENV = "ENERGY_OPTIMIZER_RUNTIME_DIR"
 _DEFAULT_RUNTIME_DIR = "runtime"
 _LOCAL_SETTINGS_ENV = "ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH"
+_DOTENV_ENV = "ENERGY_OPTIMIZER_DOTENV_PATH"
+_DEFAULT_DOTENV = os.path.join("config", ".env")
+_LEGACY_DOTENV = ".env"
 
 
 def runtime_dir() -> str:
@@ -268,3 +271,29 @@ def resolve_deviation_rules_json_path() -> str:
     if os.path.isfile(legacy):
         return legacy
     return resolve_deviation_rules_template_path()
+
+
+def bundled_dotenv_example_file() -> str:
+    return os.path.join(bundled_config_dir(), ".env.example")
+
+
+def resolve_dotenv_path() -> str:
+    """Pfad zur .env: ENV > config/.env > Legacy ./.env im Repo-Wurzelverzeichnis."""
+    env = os.environ.get(_DOTENV_ENV, "").strip()
+    if env:
+        return env
+    if os.path.isfile(_DEFAULT_DOTENV):
+        return _DEFAULT_DOTENV
+    if os.path.isfile(_LEGACY_DOTENV):
+        return _LEGACY_DOTENV
+    return _DEFAULT_DOTENV
+
+
+def resolve_dotenv_template_path() -> str:
+    """Vorlage für .env: Repo-.env.example oder gebündelte Image-Kopie."""
+    if os.path.isfile(".env.example"):
+        return ".env.example"
+    bundled = bundled_dotenv_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return bundled

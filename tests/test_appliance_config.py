@@ -1,10 +1,12 @@
 """Tests für den appliances-Config-Block (Empfehlungsmodus)."""
 from __future__ import annotations
 
+import json
+
 import pytest
 
 import config
-from config import Config
+from config import Config, reinit_config
 
 
 def test_get_appliances_empty_without_block():
@@ -85,3 +87,42 @@ def test_negative_runtime_raises():
             {"id": "x", "name": "X", "power_source": "manual", "default_runtime_h": 0},
             0,
         )
+
+
+def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
+    base = json.loads(open(config.CONFIG_JSON_PATH, encoding="utf-8").read())
+    cfg_path = tmp_path / "config.json"
+    base["appliances"] = [
+        {
+            "id": "waschmaschine",
+            "name": "Waschmaschine",
+            "power_source": "manual",
+            "default_power_kw": 2.0,
+            "default_runtime_h": 2.0,
+        }
+    ]
+    cfg_path.write_text(json.dumps(base, indent=2), encoding="utf-8")
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(cfg_path))
+    reinit_config()
+
+    config.update_appliance_defaults("waschmaschine", power_kw=2.5, runtime_h=1.75)
+    reinit_config()
+
+    saved = json.loads(cfg_path.read_text(encoding="utf-8"))
+    entry = saved["appliances"][0]
+    assert entry["default_power_kw"] == 2.5
+    assert entry["default_runtime_h"] == 1.75
+    appliance = config.get_appliances()[0]
+    assert appliance["default_power_kw"] == 2.5
+    assert appliance["default_runtime_h"] == 1.75
+
+
+def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
+    base = json.loads(open(config.CONFIG_JSON_PATH, encoding="utf-8").read())
+    base["appliances"] = []
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps(base, indent=2), encoding="utf-8")
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(cfg_path))
+    reinit_config()
+    with pytest.raises(KeyError, match="waschmaschine"):
+        config.update_appliance_defaults("waschmaschine", power_kw=2.0, runtime_h=2.0)

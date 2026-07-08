@@ -26,7 +26,8 @@ RUN mkdir -p share/config \
     && cp config/config.schema.json share/config/config.schema.json \
     && cp config/deviation_rules.example.json share/config/deviation_rules.example.json \
     && cp config/deviation_rules.schema.json share/config/deviation_rules.schema.json \
-    && cp runtime/local_settings.example.json share/config/local_settings.example.json
+    && cp runtime/local_settings.example.json share/config/local_settings.example.json \
+    && cp .env.example share/config/.env.example
 
 ENTRYPOINT ["/bin/sh", "docker-entrypoint.sh"]
 CMD ["python", "main.py"]

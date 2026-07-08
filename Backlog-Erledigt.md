@@ -2,6 +2,16 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 1.23 — Manuelle Geräte, Verbraucheranalyse & Charts (2026-07-08)
+
+- [x] **Appliance-Parameter in config.json** — `update_appliance_defaults()`, Save-Form auf „Manuelle Geräte“
+- [x] **Sterne-Schwellen** — kombinierte k_act-/Prozent-Regel; Config-Block `appliance_recommendation` + UI-Expander
+- [x] **PV Ist + Prognose im grauen Bereich** — Spalte `PV-Prognose-Log (kW)`, gedämpfte Chart-Spur
+- [x] **Mobile Legende** — CSS + Expander unter Chart 1/2 (`ui/chart_legend_mobile.py`)
+- [x] **Planung manuelle Geräte → Optimierung** — `appliance_schedules.json`, Matrix-Injektion auf `expected_p_act`, Checkbox in Empfehlungstabelle (sofortige Übernahme); SMB-Fallback beim Schreiben
+- [x] **Verbraucheranalyse Swimspa** — Temperatur Ist/Soll + Filter autonom/Ernie (`page_consumer_analysis.py`)
+- [x] **Version 1.23.0** — Minor-Bump
+
 ### Bugfix Chart 1 SoC laufende Stunde vor Jetzt + BL-Ziel (2026-07-08)
 
 - [x] **Chart 1: SoC vor Jetzt ohne MILP-Konstante** — Rampe erster MILP-Viertelstunde → Jetzt aus Log-Hochrechnung (`_current_hour_soc_ramp_before_now`, `_soc_from_history_extrapolation`); Test `test_soc_intra_hour_ramp_before_now_replaces_flat_milp_head`

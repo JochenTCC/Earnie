@@ -99,3 +99,42 @@ def test_bootstrap_rejects_directory_instead_of_file(tmp_path, monkeypatch):
 
     with pytest.raises(bootstrap.BootstrapError, match="Verzeichnis"):
         bootstrap.run()
+
+
+def test_bootstrap_creates_dotenv_from_template(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+
+    share_dir = tmp_path / "share" / "config"
+    share_dir.mkdir(parents=True)
+    (share_dir / ".env.example").write_text(
+        "LOXONE_USER=test\nLOXONE_PASS=secret\nLOXONE_IP=10.0.0.1\n",
+        encoding="utf-8",
+    )
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "config.example.json").write_text("{}", encoding="utf-8")
+
+    bootstrap.run()
+
+    dotenv_path = config_dir / ".env"
+    assert dotenv_path.is_file()
+    content = dotenv_path.read_text(encoding="utf-8")
+    assert "LOXONE_USER=test" in content
+
+
+def test_bootstrap_migrates_legacy_root_dotenv(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "config.example.json").write_text("{}", encoding="utf-8")
+    (tmp_path / ".env").write_text("LOXONE_USER=legacy\n", encoding="utf-8")
+
+    bootstrap.run()
+
+    assert (config_dir / ".env").read_text(encoding="utf-8") == "LOXONE_USER=legacy\n"
