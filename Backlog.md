@@ -15,7 +15,9 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Erste Funktionalität für Verbraucheranalyse: 
   - Temperaturverlauf von Swimspa Ist und Soll mit eigenem Verbrauchs-chart (möglichst hohe Wiederverwendung von Chart1 - auch mit Deviation-Anzeige)
   - Verbrauchs-Chart für Swimspa Filterung (Sowohl die autonomen Filterzeiten als auch die von Ernie initiierten)
-  
+  - Wenn eine Stunde ausgewählt wird (checkbox für "Startet in x Stunden"), wird das in die Optimierung mit Nennleistung und Dauer einbezogen. Der Check wird nach Gesamtablauf automatisch wieder gelöscht, kann aber manuell jederzeit geändert werden.
+- [ ] PV Verlauf im grauen Bereich zeigt auch die Prognose an (evtl. mit geringerer Sättigung)
+
 ### Version 1.23
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
 - [ ] Neuen Loxberry aufsetzen bzw. produktiv-Loxberry auf 4 upgraden
