@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
+import pytest
 
 from ui.chart_colors import COLOR_COST_SAVINGS, CONSUMER_PALETTE, consumer_palette_color
 from ui.charts import (
@@ -18,7 +19,10 @@ from ui.charts import (
     _hv_line_endpoint_time,
     _segment_connected_line_xy,
     _segment_linear_connected_line_xy,
+    _soc_at_chart_now,
+    _soc_from_history_extrapolation,
     _soc_tail_y_from_row,
+    add_baseline_soc_traces,
     add_optimized_soc_trace,
 )
 
@@ -223,6 +227,107 @@ def test_soc_intra_hour_ramp_replaces_flat_milp_tail():
     assert hour_end in xs
     assert ys[hour_end] == tail_y
     assert ys[hour_end] > 60.0
+
+
+def test_soc_intra_hour_ramp_before_now_replaces_flat_milp_head():
+    """Keine horizontale SoC-Treppe zwischen erstem MILP-Viertel und Jetzt."""
+    import plotly.graph_objects as go
+
+    now = datetime(2026, 6, 15, 14, 37, tzinfo=_TZ)
+    hour_end = datetime(2026, 6, 15, 15, 0, tzinfo=_TZ)
+    slots = [
+        datetime(2026, 6, 15, 14, 0, tzinfo=_TZ),
+        datetime(2026, 6, 15, 14, 15, tzinfo=_TZ),
+        datetime(2026, 6, 15, 14, 30, tzinfo=_TZ),
+        datetime(2026, 6, 15, 14, 45, tzinfo=_TZ),
+        hour_end,
+    ]
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [40.0, 41.0, 60.0, 60.0, 60.0],
+        "Geplante Batterie-Aktion (kW)": [0.0, 2.0, 0.0, 0.0, 0.0],
+        "Preis extrapoliert": [False] * 5,
+    })
+    axis = ChartSlotAxis.from_dataframe(df)
+    history_slot_count = 2
+    y_at_now = _soc_from_history_extrapolation(
+        axis, df["Simulierter SoC (%)"], df, now, history_slot_count,
+    )
+    assert y_at_now > 41.0
+    assert y_at_now < 60.0
+
+    fig = go.Figure()
+    add_optimized_soc_trace(
+        fig, df, axis, history_slot_count=history_slot_count, chart_now=now,
+    )
+    milp_trace = [trace for trace in fig.data if trace.name == "SoC"][-1]
+    ys = {
+        pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ): float(y)
+        for x, y in zip(milp_trace.x, milp_trace.y)
+    }
+    first_milp = datetime(2026, 6, 15, 14, 30, tzinfo=_TZ)
+    assert ys[first_milp] < 60.0
+    assert ys[now] == pytest.approx(y_at_now)
+    assert ys[now] < 60.0
+
+
+def test_baseline_soc_meets_optimized_soc_at_now():
+    """BL-Ziel und optimierter SoC treffen sich am Jetzt-Marker."""
+    import plotly.graph_objects as go
+
+    now = datetime(2026, 6, 15, 14, 37, tzinfo=_TZ)
+    hour_end = datetime(2026, 6, 15, 15, 0, tzinfo=_TZ)
+    slots = [
+        datetime(2026, 6, 15, 14, 0, tzinfo=_TZ),
+        datetime(2026, 6, 15, 14, 15, tzinfo=_TZ),
+        datetime(2026, 6, 15, 14, 30, tzinfo=_TZ),
+        datetime(2026, 6, 15, 14, 45, tzinfo=_TZ),
+        hour_end,
+    ]
+    optimized_df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [40.0, 41.0, 60.0, 60.0, 60.0],
+        "Geplante Batterie-Aktion (kW)": [0.0, 2.0, 0.0, 0.0, 0.0],
+        "Preis extrapoliert": [False] * 5,
+    })
+    baseline_df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [55.0, 55.0, 70.0, 70.0, 70.0],
+        "Geplante Batterie-Aktion (kW)": [0.0] * 5,
+        "Preis extrapoliert": [False] * 5,
+    })
+    axis = ChartSlotAxis.from_dataframe(optimized_df)
+    history_slot_count = 2
+    fig = go.Figure()
+    add_optimized_soc_trace(
+        fig, optimized_df, axis,
+        history_slot_count=history_slot_count, chart_now=now,
+    )
+    add_baseline_soc_traces(
+        fig,
+        baseline_df,
+        history_slot_count=history_slot_count,
+        chart_now=now,
+        soc_at_now=_soc_at_chart_now(
+            axis, optimized_df, now, history_slot_count,
+        ),
+    )
+    soc_trace = [trace for trace in fig.data if trace.name == "SoC"][-1]
+    bl_trace = next(trace for trace in fig.data if trace.name == "SoC BL Ziel")
+    soc_at_now = {
+        pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ): float(y)
+        for x, y in zip(soc_trace.x, soc_trace.y)
+    }
+    bl_at_now = {
+        pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ): float(y)
+        for x, y in zip(bl_trace.x, bl_trace.y)
+    }
+    assert now in soc_at_now
+    assert now in bl_at_now
+    assert bl_at_now[now] == pytest.approx(soc_at_now[now])
 
 
 def test_battery_bar_times_nudged_past_slot_center():

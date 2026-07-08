@@ -20,6 +20,7 @@ from ui.charts import (
     _history_zone_x1,
     _hour_prices_from_df,
     _zone_right_edge,
+    add_baseline_soc_traces,
     add_optimized_soc_trace,
     add_price_on_soc_axis_trace,
     build_sun_markers,
@@ -257,6 +258,26 @@ def test_soc_trace_bridges_at_history_boundary():
     assert soc_traces[0].y[-1] == 52.0
     assert soc_traces[1].y[0] == 52.0
     assert soc_traces[1].y[1] == 80.0
+
+
+def test_baseline_soc_trace_starts_at_history_boundary_not_in_gray():
+    """SoC BL Ziel beginnt an der Log-Grenze, nicht eine Viertelstunde im grauen Bereich."""
+    slots = _mixed_resolution_slots()[:6]
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [50.0, 51.0, 52.0, 80.0, 81.0, 82.0],
+        "Geplante Batterie-Aktion (kW)": [0.0] * 6,
+        "Preis extrapoliert": [False] * 6,
+    })
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_baseline_soc_traces(fig, df, history_slot_count=3)
+    bl_traces = [trace for trace in fig.data if trace.name == "SoC BL Ziel"]
+    assert len(bl_traces) == 1
+    first_x = _trace_x_vienna(bl_traces[0].x[0])
+    assert first_x == _dt(2026, 6, 15, 14, 45)
+    assert first_x == slots[3]
 
 
 def test_soc_trace_bridges_extrapolation_start():

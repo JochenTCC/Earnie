@@ -1,6 +1,8 @@
 # loxone_client.py
 import math
 import os
+from dataclasses import dataclass
+from datetime import datetime
 from ftplib import FTP, all_errors as ftp_errors
 from typing import Optional
 
@@ -387,6 +389,90 @@ def resolve_consumer_live_power_kw(
     return fallback_kw
 
 
+FILTER_INFERENCE_TOLERANCE_KW = 0.05
+SWIMSPA_FILTER_ID = "swimspa_filter"
+SWIMSPA_HEATING_ID = "swimspa"
+
+
+@dataclass(frozen=True)
+class LiveFlexPowerResult:
+    """Live-Leistungen flexibler Verbraucher: operativ (mit Fallback) vs. Chart-Ist."""
+
+    kw: dict[str, float]
+    chart_kw: dict[str, float]
+    measured_ids: frozenset[str]
+
+
+def _build_chart_kw(result: dict[str, float], measured_ids: set[str]) -> dict[str, float]:
+    return {
+        cid: round(float(result[cid]), 3)
+        for cid in measured_ids
+        if cid in result
+    }
+
+
+def _slot_in_native_filter_window(
+    filter_contexts: dict[str, dict] | None,
+    filter_consumer_id: str,
+    slot_dt: datetime,
+) -> bool:
+    if not filter_contexts or slot_dt is None:
+        return False
+    ctx = filter_contexts.get(filter_consumer_id) or {}
+    start = ctx.get("native_start_hour")
+    duration = ctx.get("native_duration_hours")
+    if start is None or duration is None:
+        return False
+    from optimizer.filter_context import slot_in_native_window
+
+    return slot_in_native_window(slot_dt, float(start), float(duration))
+
+
+def _apply_native_filter_inference(
+    result: dict[str, float],
+    measured_ids: set[str],
+    consumers: list,
+    *,
+    filter_contexts: dict[str, dict] | None,
+    slot_datetime: datetime | None,
+) -> None:
+    """Filter-Ist aus Gesamtzähler, wenn Binär-Merker 0 sind aber natives Fenster + Last passt."""
+    if slot_datetime is None:
+        return
+    if not _slot_in_native_filter_window(
+        filter_contexts, SWIMSPA_FILTER_ID, slot_datetime
+    ):
+        return
+    if SWIMSPA_HEATING_ID not in measured_ids:
+        return
+    if float(result.get(SWIMSPA_FILTER_ID, 0.0) or 0.0) > 1e-9:
+        return
+
+    filter_consumer = next(
+        (item for item in consumers if item.get("id") == SWIMSPA_FILTER_ID),
+        None,
+    )
+    if filter_consumer is None:
+        return
+    nominal = float(filter_consumer.get("nominal_power_kw", 0.0) or 0.0)
+    if nominal <= 1e-9:
+        return
+
+    total = float(result.get(SWIMSPA_HEATING_ID, 0.0) or 0.0)
+    if total <= 1e-9 or abs(total - nominal) > FILTER_INFERENCE_TOLERANCE_KW:
+        return
+
+    result[SWIMSPA_FILTER_ID] = round(nominal, 3)
+    result[SWIMSPA_HEATING_ID] = round(max(0.0, total - nominal), 3)
+    measured_ids.add(SWIMSPA_FILTER_ID)
+    logger.info(
+        "Loxone: natives Filterfenster — Filter %.3f kW aus Gesamtzähler %.3f kW "
+        "inferiert (Binär-Merker 0).",
+        nominal,
+        total,
+    )
+
+
 def _subtract_shared_meter_loads(
     result: dict[str, float],
     consumers: list,
@@ -423,13 +509,18 @@ def _subtract_shared_meter_loads(
     return corrected
 
 
-def fetch_flexible_consumers_live_kw(
+def resolve_flexible_consumers_live_power(
     fallbacks: dict[str, float] | None = None,
     consumers: list | None = None,
-) -> dict[str, float]:
+    *,
+    filter_contexts: dict[str, dict] | None = None,
+    slot_datetime: datetime | None = None,
+) -> LiveFlexPowerResult:
     """
-    Live-Leistungen aller flexiblen Verbraucher für cons_data_hourly.
-    Fallback (z. B. Optimizer-Sollwerte) wenn Merker fehlt oder Loxone nicht antwortet.
+    Live-Leistungen aller flexiblen Verbraucher.
+
+    ``kw`` enthält Fallbacks für cons_data/Delivery; ``chart_kw`` nur gemessene
+    (und inferierte) Werte — ohne MILP-Soll — für Chart/Log-Ist.
     """
     fallbacks = fallbacks or {}
     source = consumers if consumers is not None else config.get_flexible_consumers()
@@ -458,7 +549,39 @@ def fetch_flexible_consumers_live_kw(
                     fallback,
                 )
 
-    return _subtract_shared_meter_loads(result, source, measured_ids)
+    corrected = _subtract_shared_meter_loads(result, source, measured_ids)
+    _apply_native_filter_inference(
+        corrected,
+        measured_ids,
+        source,
+        filter_contexts=filter_contexts,
+        slot_datetime=slot_datetime,
+    )
+    chart_kw = _build_chart_kw(corrected, measured_ids)
+    return LiveFlexPowerResult(
+        kw=corrected,
+        chart_kw=chart_kw,
+        measured_ids=frozenset(measured_ids),
+    )
+
+
+def fetch_flexible_consumers_live_kw(
+    fallbacks: dict[str, float] | None = None,
+    consumers: list | None = None,
+    *,
+    filter_contexts: dict[str, dict] | None = None,
+    slot_datetime: datetime | None = None,
+) -> dict[str, float]:
+    """
+    Live-Leistungen aller flexiblen Verbraucher für cons_data_hourly.
+    Fallback (z. B. Optimizer-Sollwerte) wenn Merker fehlt oder Loxone nicht antwortet.
+    """
+    return resolve_flexible_consumers_live_power(
+        fallbacks,
+        consumers,
+        filter_contexts=filter_contexts,
+        slot_datetime=slot_datetime,
+    ).kw
 
 
 def send_loxone_value(input_name: str, value: float) -> bool:

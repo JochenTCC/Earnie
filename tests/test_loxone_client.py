@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -315,6 +316,46 @@ class TestSharedMeterSubtraction:
             result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
         assert result["swimspa_filter"] == 0.18
         assert result["swimspa"] == 0.0
+
+    def test_native_filter_inferred_when_binary_silent_in_native_window(self):
+        """Prod-Dump 2026-07-07 10:15: Merker 0, Gesamtzähler nur Filterlast."""
+        reads = self._reads(
+            {
+                "Ernie_Swim-Spa-P_act": 0.18,
+                "homie_bwa_spa_filter2": 0.0,
+                "homie_bwa_spa_filter1": 0.0,
+            }
+        )
+        filter_contexts = {
+            "swimspa_filter": {
+                "native_start_hour": 10,
+                "native_duration_hours": 4.0,
+            }
+        }
+        slot = datetime(2026, 7, 7, 10, 15)
+        with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
+            live = lc.resolve_flexible_consumers_live_power(
+                consumers=self._consumers(),
+                filter_contexts=filter_contexts,
+                slot_datetime=slot,
+            )
+        assert live.kw["swimspa_filter"] == 0.18
+        assert live.kw["swimspa"] == 0.0
+        assert live.chart_kw["swimspa_filter"] == 0.18
+        assert live.chart_kw["swimspa"] == 0.0
+
+    def test_chart_kw_omits_milp_fallback_when_meter_missing(self):
+        reads = self._reads(
+            {"Ernie_Swim-Spa-P_act": None, "homie_bwa_spa_filter2": 0.0}
+        )
+        with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
+            live = lc.resolve_flexible_consumers_live_power(
+                fallbacks={"swimspa": 2.8},
+                consumers=self._consumers(),
+            )
+        assert live.kw["swimspa"] == 2.8
+        assert "swimspa" not in live.chart_kw
+        assert "swimspa" not in live.measured_ids
 
     def test_filter_off_leaves_heating_unchanged(self):
         reads = self._reads(

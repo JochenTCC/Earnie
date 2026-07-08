@@ -224,8 +224,18 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     if live_power is None:
         live_power = loxone_client.fetch_loxone_live_power()
     total_kw = live_power["house"] if live_power else None
-    flex_kw = loxone_client.fetch_flexible_consumers_live_kw(fallbacks=consumer_powers)
+    from optimizer.charging_context import matrix_slot_datetime
+
+    live_flex = loxone_client.resolve_flexible_consumers_live_power(
+        fallbacks=consumer_powers,
+        consumers=live_consumers,
+        filter_contexts=filter_contexts,
+        slot_datetime=matrix_slot_datetime(optimization_matrix, 0),
+    )
+    flex_kw = live_flex.kw
+    flex_chart_kw = live_flex.chart_kw
     logger.info("cons_data Flex live (kW): %s", flex_kw)
+    logger.info("Chart-Ist Flex (kW): %s | gemessen: %s", flex_chart_kw, sorted(live_flex.measured_ids))
 
     loxone_sent = loxone_client.build_sent_loxone_snapshot(
         mode,
@@ -286,7 +296,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
 
     consumption_snapshot = None
     if live_power:
-        consumption_snapshot = live_consumption.build_consumption_snapshot(live_power, flex_kw)
+        consumption_snapshot = live_consumption.build_consumption_snapshot(
+            live_power, flex_chart_kw
+        )
 
     try:
         run_payload = {
@@ -325,7 +337,8 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "consumer_pv_follow": {
                 k: int(v) for k, v in consumer_pv_follow.items()
             },
-            "flex_live_kw": flex_kw,
+            "flex_live_kw": flex_chart_kw,
+            "flex_measured_ids": sorted(live_flex.measured_ids),
             "delivery_compliance": delivery_compliance,
             "delivery_plausibility": delivery_plausibility,
             "thermal_observability": thermal_observability,

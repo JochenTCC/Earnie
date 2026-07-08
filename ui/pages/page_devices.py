@@ -18,6 +18,7 @@ from optimizer.appliance_recommendation import (
     ApplianceRecommendation,
     recommend_start_times,
 )
+from ui.chart_colors import COLOR_COST_SAVINGS, COLOR_COST_SAVINGS_NEGATIVE
 from ui.help_hint import render_page_title_with_help
 
 _DEVICES_HELP = (
@@ -27,6 +28,21 @@ _DEVICES_HELP = (
     "geschaltet."
 )
 _DEFAULT_RUNTIME_H = 2.0
+_DELTA_COLUMN = "Delta zu bestem Zeitpunkt (€)"
+_DELTA_EPS = 0.005
+
+
+def _delta_to_best_eur(cost_eur: float, best_cost_eur: float) -> float:
+    """Mehrkosten gegenüber der günstigsten Startstunde (positiv = teurer)."""
+    return cost_eur - best_cost_eur
+
+
+def _delta_cell_color(delta_eur: float) -> str:
+    if delta_eur > _DELTA_EPS:
+        return f"color: {COLOR_COST_SAVINGS_NEGATIVE}"
+    if delta_eur < -_DELTA_EPS:
+        return f"color: {COLOR_COST_SAVINGS}"
+    return "color: inherit"
 
 
 def render() -> None:
@@ -87,28 +103,26 @@ def _render_appliance(appliance: dict, matrix: list) -> None:
 
 
 def _resolve_power_kw(appliance: dict, col) -> float | None:
-    """Nennleistung (kW) für die Kostenbewertung: manuelles Feld oder default_power_kw.
+    """Nennleistung (kW) für die Kostenbewertung aus dem UI-Eingabefeld.
 
-    Bei power_source=loxone dient der Loxone-Merker nur einem späteren
-    Adaptionsalgo (der default_power_kw pflegt); hier wird kein Live-Wert
-    abgefragt, sondern die konfigurierte Nennleistung verwendet.
+    ``default_power_kw`` aus der Config dient nur als Vorbelegung/Hinweis;
+    bei power_source=loxone wird kein Live-Merker gelesen (Adaptionsalgo später).
     """
-    if appliance["power_source"] == "manual":
-        return col.number_input(
-            "Leistung (kW)",
-            min_value=0.0,
-            value=float(appliance.get("default_power_kw") or 0.0),
-            step=0.1,
-            key=f"appliance_power_{appliance['id']}",
-        )
-    power = appliance.get("default_power_kw")
-    col.metric("Nennleistung (kW)", f"{power:.2f}" if power else "—")
-    if appliance.get("loxone_power_name"):
-        col.caption(
-            f"Nennleistung wird später per Adaptionsalgo aus Loxone-Merker "
-            f"'{appliance['loxone_power_name']}' ermittelt."
-        )
-    return float(power) if power else None
+    default_kw = float(appliance.get("default_power_kw") or 0.0)
+    power_kw = col.number_input(
+        "Nennleistung (kW)",
+        min_value=0.0,
+        value=default_kw,
+        step=0.1,
+        key=f"appliance_power_{appliance['id']}",
+    )
+    if appliance["power_source"] == "loxone" and default_kw > 0:
+        hint = f"Hinweis: {default_kw:.2f} kW (aus Config"
+        merker = appliance.get("loxone_power_name")
+        if merker:
+            hint += f"; Merker '{merker}' für spätere Adaption"
+        col.caption(f"{hint})")
+    return power_kw if power_kw > 0 else None
 
 
 def _render_recommendation(matrix: list, power_kw: float, runtime_h: float) -> None:
@@ -120,7 +134,9 @@ def _render_recommendation(matrix: list, power_kw: float, runtime_h: float) -> N
         st.warning(str(exc))
         return
     _render_cheapest_caption(rec)
-    st.dataframe(_recommendation_dataframe(rec), hide_index=True, width="stretch")
+    st.dataframe(
+        _style_recommendation_dataframe(rec), hide_index=True, width="stretch"
+    )
     if rec.skipped_start_slots:
         st.caption(
             f"{rec.skipped_start_slots} spätere Startstunde(n) entfallen — "
@@ -130,10 +146,14 @@ def _render_recommendation(matrix: list, power_kw: float, runtime_h: float) -> N
 
 def _render_cheapest_caption(rec: ApplianceRecommendation) -> None:
     best = rec.cheapest
-    text = f"Günstigste Startzeit: **{best.start_datetime:%H:%M} Uhr** · {best.cost_eur:.2f} €"
-    if best.savings_vs_now_eur > 0.005:
-        text += f" · spart {best.savings_vs_now_eur:.2f} € ggü. sofort starten"
-    st.success(text)
+    delta = _delta_to_best_eur(rec.immediate.cost_eur, best.cost_eur)
+    color = _delta_cell_color(delta)
+    st.markdown(
+        f"Günstigste Startzeit: **{best.start_datetime:%H:%M} Uhr** · "
+        f"{best.cost_eur:.2f} € · {_DELTA_COLUMN} (sofort): "
+        f'<span style="{color}">{delta:+.2f} €</span>',
+        unsafe_allow_html=True,
+    )
 
 
 def _stars_text(stars: int) -> str:
@@ -141,14 +161,30 @@ def _stars_text(stars: int) -> str:
 
 
 def _recommendation_dataframe(rec: ApplianceRecommendation) -> pd.DataFrame:
+    best_cost = rec.cheapest.cost_eur
     return pd.DataFrame(
         [
             {
                 "Start": f"{option.start_datetime:%H:%M}",
                 "Güte": _stars_text(option.stars),
                 "Kosten (€)": round(option.cost_eur, 2),
-                "Ersparnis (€)": round(option.savings_vs_now_eur, 2),
+                _DELTA_COLUMN: round(
+                    _delta_to_best_eur(option.cost_eur, best_cost), 2
+                ),
             }
             for option in rec.options
         ]
+    )
+
+
+def _style_recommendation_dataframe(
+    rec: ApplianceRecommendation,
+) -> pd.io.formats.style.Styler:
+    df = _recommendation_dataframe(rec)
+
+    def _color_delta(val: float) -> str:
+        return _delta_cell_color(float(val))
+
+    return df.style.format({_DELTA_COLUMN: "{:+.2f}"}).map(
+        _color_delta, subset=[_DELTA_COLUMN]
     )

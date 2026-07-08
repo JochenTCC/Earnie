@@ -2,6 +2,20 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Chart 1 SoC laufende Stunde vor Jetzt + BL-Ziel (2026-07-08)
+
+- [x] **Chart 1: SoC vor Jetzt ohne MILP-Konstante** — Rampe erster MILP-Viertelstunde → Jetzt aus Log-Hochrechnung (`_current_hour_soc_ramp_before_now`, `_soc_from_history_extrapolation`); Test `test_soc_intra_hour_ramp_before_now_replaces_flat_milp_head`
+- [x] **Chart 1: SoC BL Ziel nicht im grauen Bereich** — BL-Ziel-Spur nur ab Log-Grenze, ohne Brücke ins Graue; Test `test_baseline_soc_trace_starts_at_history_boundary_not_in_gray`
+- [x] **Chart 1: BL-Ziel und SoC treffen sich an Jetzt** — gemeinsamer Anker `soc_at_now` aus Log-Daten; Test `test_baseline_soc_meets_optimized_soc_at_now`
+- [x] **Live-Abnahme bestätigt**
+- [x] **Version 1.22.5** — Patch-Bump
+
+### Bugfix Ersparnis Manuelle Geräte (2026-07-08)
+
+- [x] **Delta zu bestem Zeitpunkt statt Ersparnis** — Spalte/Caption „Delta zu bestem Zeitpunkt (€)“ (`Kosten − günstigste`); Vorzeichen `+`/`-`; rot bei positiv, grün bei negativ (`ui/pages/page_devices.py`, `tests/test_page_devices_display.py`)
+- [x] **Nennleistung immer editierbar** — `number_input` für alle `power_source`; `default_power_kw` aus Config nur als Vorbelegung/Hinweis-Caption
+- [x] **Version 1.22.2** — Patch-Bump
+
 ### Bugfix charging_context timezone-aware Live (2026-07-08)
 
 - [x] **Streamlit TypeError naive/aware datetime** — `_align_like` in `optimizer/charging_context.py`; Config-Fenster (`car_available_from_hour`, Loxone-FertigUm) an timezone-aware Matrix-Slots angeglichen; Tests timezone-aware Horizont
