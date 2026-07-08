@@ -12,17 +12,16 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Feature-Backlog
 
 ### Version 1.22
+- [ ] Erste Funktionalität für Verbraucheranalyse: 
+  - Temperaturverlauf von Swimspa Ist und Soll mit eigenem Verbrauchs-chart (möglichst hohe Wiederverwendung von Chart1 - auch mit Deviation-Anzeige)
+  - Verbrauchs-Chart für Swimspa Filterung (Sowohl die autonomen Filterzeiten als auch die von Ernie initiierten)
+  
+### Version 1.23
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
 - [ ] Neuen Loxberry aufsetzen bzw. produktiv-Loxberry auf 4 upgraden
 - [ ] **7f — Loxberry-Container** — erst nach Loxberry 4; Go/No-Go im README
 - [ ] Readme ausführlicher machen mit Motivation / Nutzen
-- [ ] Nach Interessenten fragen in loxforum / reddit / ...
-
-### Version 2.+1
-- [ ] **Empfehlungsmodus smarte/adaptive Geräte** (Folge des Empfehlungsmodus manuelle Geräte)
-  - Adaptiv bzgl. Laufzeit/Energieverbrauch pro Lauf; smarte Geräte statt manueller Eingabe
-  - Adaptionsalgo pflegt `appliances[].default_power_kw` aus den Loxone-Leistungsmerkern (`loxone_power_name`) — bisher nur reserviert, keine Live-Nutzung
-  - Geschirrspüler-Leistung ggf. über Hue
+- [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
 
 ### Version 2.0
 - [ ] Ausführlicher Code-Review und Refactoring
@@ -32,6 +31,13 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Prüfen, ob die historischen SwimSpa-Leistungslogs (`thermal_control.history_logs.power_csv` = `..._SwimSpa_Leistung_...csv`, Quelle `Ernie_Swim-Spa-P_act`) ebenfalls den **Filter-Anteil** enthalten (Fall B). Falls ja: Auswirkung auf die **Thermik-Modell-Kalibrierung** (`heat_loss_kw_per_k` etc.) bewerten — Filter (~0,18 kW) würde als Heizleistung fehlinterpretiert.
   - **Grundsatzfrage:** Sollte die Trennung Heizung/Filter besser **direkt in Loxone** geschehen (separater Heizungs-Leistungsmerker ohne Filter), statt softwareseitig per `subtract_consumer_ids`? Vorteil: konsistente Live- **und** Historien-Daten an der Quelle.
   - Bezug: Fall-B-Korrektur (Live-Ist) bereits umgesetzt; Thermik-Kalibrierung siehe **Thermik P1** (Swim-Spa)
+
+### Version 2.+1
+- [ ] **Empfehlungsmodus smarte/adaptive Geräte** (Folge des Empfehlungsmodus manuelle Geräte)
+  - Adaptiv bzgl. Laufzeit/Energieverbrauch pro Lauf; smarte Geräte statt manueller Eingabe
+  - Adaptionsalgo pflegt `appliances[].default_power_kw` aus den Loxone-Leistungsmerkern (`loxone_power_name`) — bisher nur reserviert, keine Live-Nutzung
+  - Geschirrspüler-Leistung ggf. über Hue
+
 
 ### Version 2.+1
 - [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)

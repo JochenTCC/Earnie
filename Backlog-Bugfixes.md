@@ -11,7 +11,12 @@ Feature-Roadmap → [Backlog.md](Backlog.md)
 **Versionierung:** abgeschlossene Bugfixes → nur **PATCH** in `version.py` (kein Minor-Bump).
 
 ## Bugfix SwimSpa Leistung
+- [ ] Versionsanzeige ganz oben im Sidebar statt im Titel vom Cockpit
 - [ ] Im Chart 1 wird offensichtlich der Verbrauch des Swimspa (Heizung) nicht korrekt berechnet / angezeigt. Siehe Dump ("C:\Users\joche\Documents\Smarthome\Python\Energy-Optimizer-fix\chart_debug_review\chart_debug_20260707_213204.zip")
+- [ ] Swimspa Leistungen für Heizung und Filter sind im Sankey-Diagramm nicht sauber getrennt
+- [ ] Schaltzeiten für Swimspa Filter scheinen nicht kostenoptimal zu sein
+- [ ] Chart 2: Kosten und Verbräuche sollten an der Grenze grau | neutral doch verbunden werden. Die Einsparungen werden für den gesamten Bereich SA_0 - SA_2 berechnet und es wird neu angefangen, wenn SA_0 gewechselt wird.
+- [ ] SOC Verlauf in der aktuellen Stunde nicht kostant halten, sondern auch für den Bereich vor "Jetzt" extrapolieren
 
 ## E-Auto: urgent-Regel, Prod-Dump, PWM
 
