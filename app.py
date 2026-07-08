@@ -17,6 +17,9 @@ import streamlit as st
 
 import config
 
+from runtime_store.dotenv_io import needs_loxone_setup
+from ui.setup_dotenv import render_loxone_setup_page
+
 config.reinit_config()
 from runtime_store.config_drift import format_drift_message, load_config_drift_items
 from version import __version__
@@ -48,6 +51,11 @@ def _render_drift_warning() -> None:
 
 
 def main() -> None:
+    if needs_loxone_setup():
+        render_loxone_setup_page()
+        st.stop()
+
+    config.reinit_config(require_loxone_credentials=True)
     inject_compact_numeric_css()
     inject_help_hint_css()
     _render_sidebar_version()

@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from runtime_store.persist_paths import resolve_dotenv_path
 
 
-def load_app_dotenv() -> str | None:
+def load_app_dotenv(*, override: bool = False) -> str | None:
     """
     Lädt Loxone-Zugangsdaten aus der aufgelösten .env-Datei.
 
@@ -20,5 +20,5 @@ def load_app_dotenv() -> str | None:
         return None
     if not os.path.isfile(path):
         return None
-    load_dotenv(path, override=False)
+    load_dotenv(path, override=override)
     return path

@@ -380,11 +380,32 @@ if __name__ == "__main__":
             "kein Event-Polling zwischen den regulären Läufen."
         )
 
+    from runtime_store.dotenv_io import needs_loxone_setup
+    from runtime_store.dotenv_loader import load_app_dotenv
+
+    _SETUP_WAIT_SEC = 60
     next_trigger = TRIGGER_QUARTER_HOUR
-    known_snapshot = _baseline_trigger_snapshot()
+    known_snapshot: dict = {}
     trigger_specs = config.get_event_triggers()
 
     while True:
+        if needs_loxone_setup():
+            logger.warning(
+                "Loxone-Zugangsdaten fehlen oder sind noch Platzhalter. "
+                "Bitte in der Streamlit-UI (Port %s) die Ersteinrichtung abschließen. "
+                "Erneuter Versuch in %s Sekunden.",
+                config.get_ui_streamlit_port(),
+                _SETUP_WAIT_SEC,
+            )
+            time.sleep(_SETUP_WAIT_SEC)
+            load_app_dotenv(override=True)
+            config.reinit_config()
+            continue
+
+        if not known_snapshot:
+            known_snapshot = _baseline_trigger_snapshot()
+            trigger_specs = config.get_event_triggers()
+
         try:
             main(run_trigger=next_trigger)
             next_trigger = TRIGGER_QUARTER_HOUR

@@ -28,10 +28,9 @@ def _check_counts_as_ok(item: LoxoneCheck) -> bool:
 
 def loxone_env_configured() -> bool:
     """True wenn Miniserver-Zugangsdaten in der Umgebung gesetzt sind."""
-    return all(
-        str(os.getenv(key, "")).strip()
-        for key in ("LOXONE_IP", "LOXONE_USER", "LOXONE_PASS")
-    )
+    from runtime_store.dotenv_io import loxone_credentials_configured
+
+    return loxone_credentials_configured()
 
 
 def ensure_live_config(config_path: str = config.CONFIG_JSON_PATH) -> None:

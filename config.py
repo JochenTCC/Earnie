@@ -4,6 +4,7 @@ import json
 import re
 from datetime import datetime
 
+from runtime_store.dotenv_io import loxone_credentials_configured
 from runtime_store.dotenv_loader import load_app_dotenv
 
 _HEX_CHART_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -24,6 +25,12 @@ BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
 LOCAL_SETTINGS_JSON_PATH = resolve_local_settings_json_path()
 
 
+def _default_require_loxone_credentials() -> bool:
+    if os.getenv("ENERGY_OPTIMIZER_OFFLINE") == "1":
+        return False
+    return loxone_credentials_configured()
+
+
 class Config:
     def __init__(
         self,
@@ -36,7 +43,7 @@ class Config:
         self.backtesting_scenarios_path = backtesting_scenarios_path
         self.local_settings_path = local_settings_path
         if require_loxone_credentials is None:
-            require_loxone_credentials = os.getenv("ENERGY_OPTIMIZER_OFFLINE") != "1"
+            require_loxone_credentials = _default_require_loxone_credentials()
         self.require_loxone_credentials = require_loxone_credentials
         self._raw_config = None
         self._load_all()
@@ -1305,19 +1312,22 @@ class Config:
         self._load_dynamic_params()
 
 
-CONFIG = Config()
+CONFIG = Config(require_loxone_credentials=_default_require_loxone_credentials())
 
 
-def reinit_config() -> None:
+def reinit_config(require_loxone_credentials: bool | None = None) -> None:
     """Lädt die Konfiguration neu (z. B. nach Bootstrap mit neu angelegter config.json)."""
     global CONFIG, CONFIG_JSON_PATH, BACKTESTING_SCENARIOS_JSON_PATH, LOCAL_SETTINGS_JSON_PATH
     CONFIG_JSON_PATH = resolve_config_json_path()
     BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
     LOCAL_SETTINGS_JSON_PATH = resolve_local_settings_json_path()
+    if require_loxone_credentials is None:
+        require_loxone_credentials = _default_require_loxone_credentials()
     CONFIG = Config(
         config_path=CONFIG_JSON_PATH,
         backtesting_scenarios_path=BACKTESTING_SCENARIOS_JSON_PATH,
         local_settings_path=LOCAL_SETTINGS_JSON_PATH,
+        require_loxone_credentials=require_loxone_credentials,
     )
 
 
