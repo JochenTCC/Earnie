@@ -21,6 +21,7 @@ Fix ist **implementiert** (Code + Tests + ggf. PATCH in `version.py`), aber die 
 
 
 ## Neue Bugs (Das Kapitel nicht entfernen - auch wenn es leer ist)
+- [ ] Wenn mehrere manuelle Verbraucher im Chart 1 (aktuelle Ansicht) aktiv sind, dann mit unterschiedlichen Schraffuren ausstatten. Machbarkeit prüfen.
 
 
 
