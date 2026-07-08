@@ -19,9 +19,9 @@ Fix ist **implementiert** (Code + Tests + ggf. PATCH in `version.py`), aber die 
 - Nach erfolgreicher Verifikation: aus diesem Kapitel entfernen → `Backlog-Erledigt.md` (`### Bugfix …`) mit `- [x]`.
 - Schlägt die Verifikation fehl: zurück ins offene Bugfix-Kapitel oder Follow-up formulieren; PATCH ggf. dokumentieren, aber nicht als erledigt archivieren.
 
-## Bug SwimSpa Leistung
-- [ ] Chart 2: Kosten und Verbräuche sollten an der Grenze grau | neutral doch verbunden werden. Die Einsparungen werden für den gesamten Bereich SA_0 - SA_2 berechnet und es wird neu angefangen, wenn SA_0 gewechselt wird.
-- [ ] SOC Verlauf in der aktuellen Stunde nicht kostant halten, sondern für den Bereich nach "Jetzt" in dieser Stunde extrapolieren  (also maximal von Stunde_Jetzt:15 - Stunde_Jetzt+1:00), so dass KEINE Treppe entsteht
+## Bugs Liste
+- [ ] Chart 1: SOC Verlauf in der aktuellen Stunde nicht kostant halten, sondern für den Bereich nach "Jetzt" in dieser Stunde extrapolieren  (also maximal von Stunde_Jetzt:15 - Stunde_Jetzt+1:00), so dass KEINE Treppe entsteht
+- [] Chart 1+2: Prüfen, ob Legende zusammengeklappt werden kann auf Mobilgeräten.
 
 ## Bugfix Verifications Pending
 
