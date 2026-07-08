@@ -10,6 +10,11 @@ Feature-Roadmap → [Backlog.md](Backlog.md)
 **Nicht hier:** Neues Verhalten, UX, Modelle, Research — siehe Feature-Backlog in `Backlog.md`.
 **Versionierung:** abgeschlossene Bugfixes → nur **PATCH** in `version.py` (kein Minor-Bump).
 
+## Bug Ersparnis Manuelle Geräte
+Geräte
+- [ ] Ersparnis numerische Werte haben falsches Vorzeichen: Gespartes Geld IMMER mit Minus ausgeben.
+- [ ] Nennleistung immer editierbar machen. Adaptierter Wert gilt bis auf weiteres nur als Hinweis
+
 ## Bugfix SwimSpa Leistung
 - [ ] Versionsanzeige ganz oben im Sidebar statt im Titel vom Cockpit
 - [ ] Im Chart 1 wird offensichtlich der Verbrauch des Swimspa (Heizung) nicht korrekt berechnet / angezeigt. Siehe Dump ("C:\Users\joche\Documents\Smarthome\Python\Energy-Optimizer-fix\chart_debug_review\chart_debug_20260707_213204.zip")
