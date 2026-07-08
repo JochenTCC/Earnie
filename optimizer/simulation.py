@@ -11,6 +11,7 @@ from .charging_context import (
 )
 from . import battery as bat
 from .consumer_power import uses_pv_follow
+from .filter_context import adjust_targets_for_native_filter
 from .milp import milp_optimizer
 from .targets import (
     build_applied_targets_detail,
@@ -280,6 +281,9 @@ def simulate_horizon(
         consumer_daily_targets_kwh,
     )
     horizon_limits = apply_horizon_charging_limits(horizon_limits, charging_contexts)
+    horizon_limits = adjust_targets_for_native_filter(
+        horizon_limits, consumers_cfg, optimization_matrix
+    )
     delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
     terminal_soc_percent = None if sunrise_soc_min_index is not None else initial_soc
     for i, row in enumerate(optimization_matrix):

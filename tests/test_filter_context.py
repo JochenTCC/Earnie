@@ -96,12 +96,31 @@ class TestNativeBlockedIndices:
         assert ctx["source_label"] == "config_fallback"
 
 
+class TestErnieFilterRemaining:
+    def test_native_covers_debt_fully(self):
+        consumer = _swimspa_filter()
+        matrix = _matrix_24h()
+        ctx = fc.resolve_filter_context(consumer, matrix, logged_simulation=True)
+        assert fc.expected_native_delivery_kwh(consumer, ctx) == pytest.approx(0.72)
+        assert fc.ernie_filter_remaining_kwh(consumer, 0.63, ctx) == pytest.approx(0.0)
+
+    def test_native_partial_credit(self):
+        consumer = _swimspa_filter()
+        matrix = _matrix_24h()
+        ctx = fc.resolve_filter_context(consumer, matrix, logged_simulation=True)
+        assert fc.ernie_filter_remaining_kwh(consumer, 1.0, ctx) == pytest.approx(0.28)
+
+    def test_no_filter_context_returns_debt(self):
+        consumer = _swimspa_filter()
+        assert fc.ernie_filter_remaining_kwh(consumer, 0.63, None) == pytest.approx(0.63)
+
+
 class TestMilpFilterWindow:
     def test_plans_outside_native_window(self):
         matrix = _matrix_24h()
-        filter_ctx = fc.resolve_filter_context(
-            _swimspa_filter(), matrix, logged_simulation=True
-        )
+        consumer = _swimspa_filter()
+        filter_ctx = fc.resolve_filter_context(consumer, matrix, logged_simulation=True)
+        ernie_rem = fc.ernie_filter_remaining_kwh(consumer, 1.0, filter_ctx)
         _, _, _, powers, _, _, _ = milp_optimizer(
             matrix,
             current_hour=0,
@@ -109,8 +128,8 @@ class TestMilpFilterWindow:
             battery_params=_battery_params(),
             k_push=3.5,
             verbose=False,
-            consumers=[_swimspa_filter()],
-            consumer_remaining_kwh={"swimspa_filter": 0.36},
+            consumers=[consumer],
+            consumer_remaining_kwh={"swimspa_filter": ernie_rem},
             filter_contexts={"swimspa_filter": filter_ctx},
         )
         assert powers.get("swimspa_filter", 0.0) == pytest.approx(0.18)
@@ -123,11 +142,30 @@ class TestMilpFilterWindow:
         else:
             pytest.fail("kein günstiger Slot außerhalb des nativen Fensters")
 
+    def test_no_ernie_when_native_covers_debt(self):
+        matrix = _matrix_24h()
+        consumer = _swimspa_filter()
+        filter_ctx = fc.resolve_filter_context(consumer, matrix, logged_simulation=True)
+        ernie_rem = fc.ernie_filter_remaining_kwh(consumer, 0.63, filter_ctx)
+        assert ernie_rem == pytest.approx(0.0)
+        _, _, _, powers, _, _, _ = milp_optimizer(
+            matrix,
+            current_hour=8,
+            current_soc=50.0,
+            battery_params=_battery_params(),
+            k_push=3.5,
+            verbose=False,
+            consumers=[consumer],
+            consumer_remaining_kwh={"swimspa_filter": ernie_rem},
+            filter_contexts={"swimspa_filter": filter_ctx},
+        )
+        assert powers.get("swimspa_filter", 0.0) == pytest.approx(0.0)
+
     def test_no_power_in_blocked_native_slots(self):
         matrix = _matrix_24h()
-        filter_ctx = fc.resolve_filter_context(
-            _swimspa_filter(), matrix, logged_simulation=True
-        )
+        consumer = _swimspa_filter()
+        filter_ctx = fc.resolve_filter_context(consumer, matrix, logged_simulation=True)
+        ernie_rem = fc.ernie_filter_remaining_kwh(consumer, 1.0, filter_ctx)
         powers_by_hour: dict[int, float] = {}
         for hour in range(24):
             slice_matrix = matrix[hour:]
@@ -138,11 +176,11 @@ class TestMilpFilterWindow:
                 battery_params=_battery_params(),
                 k_push=3.5,
                 verbose=False,
-                consumers=[_swimspa_filter()],
-                consumer_remaining_kwh={"swimspa_filter": 0.36},
+                consumers=[consumer],
+                consumer_remaining_kwh={"swimspa_filter": ernie_rem},
                 filter_contexts={
                     "swimspa_filter": fc.resolve_filter_context(
-                        _swimspa_filter(),
+                        consumer,
                         slice_matrix,
                         logged_simulation=True,
                     )

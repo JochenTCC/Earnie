@@ -1,7 +1,7 @@
 """Tests für daily_target_source=loxone_remaining_hours (SwimSpa Filter, Phase 1)."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from unittest.mock import patch
 
 import pytest
@@ -102,6 +102,47 @@ def test_get_consumer_remaining_kwh_skips_delivered(mock_targets, mock_state):
         consumer_daily_targets_kwh={"swimspa_filter": 0.9},
     )
     assert remaining["swimspa_filter"] == pytest.approx(0.9)
+
+
+@patch("optimizer._load_consumer_state")
+@patch("optimizer.resolve_horizon_consumer_targets_kwh")
+def test_get_consumer_remaining_kwh_credits_native_filter(
+    mock_horizon_targets, mock_state
+):
+    consumer = {
+        **_swimspa_filter(),
+        "filter_schedule": {
+            "enabled": True,
+            "config_fallback": {
+                "native_start_hour": 10,
+                "native_duration_hours": 4.0,
+            },
+        },
+    }
+    mock_horizon_targets.return_value = {"swimspa_filter": 0.63}
+    mock_state.return_value = {
+        "date": date.today().isoformat(),
+        "delivered": {},
+        "charging_sessions": {},
+    }
+    matrix = [
+        {
+            "hour": hour,
+            "date": date(2026, 7, 8),
+            "slot_datetime": datetime(2026, 7, 8, hour, 0),
+            "expected_p_pv": 0.0,
+            "expected_p_act": 0.3,
+            "k_act": 14.0,
+            "consumption_mode": "forecast",
+        }
+        for hour in range(8, 20)
+    ]
+    remaining = optimizer.get_consumer_remaining_kwh(
+        consumers=[consumer],
+        optimization_matrix=matrix,
+        consumer_daily_targets_kwh={"swimspa_filter": 0.63},
+    )
+    assert remaining["swimspa_filter"] == pytest.approx(0.0)
 
 
 @patch("optimizer._load_consumer_state")

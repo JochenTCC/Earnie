@@ -169,6 +169,62 @@ def resolve_filter_contexts(
     return contexts
 
 
+def expected_native_delivery_kwh(consumer: dict, filter_context: dict | None) -> float:
+    """Erwartete native Filterenergie (kWh) für gesperrte Slots im Horizont."""
+    if not filter_context or not filter_schedule_enabled(consumer):
+        return 0.0
+    blocked = filter_context.get("blocked_indices") or []
+    power = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+    return len(blocked) * power
+
+
+def ernie_filter_remaining_kwh(
+    consumer: dict,
+    debt_kwh: float,
+    filter_context: dict | None,
+) -> float:
+    """Ernie-Zusatzziel: Loxone-Schulden minus erwartete native Lieferung im Horizont."""
+    if debt_kwh <= 1e-9:
+        return 0.0
+    native_kwh = expected_native_delivery_kwh(consumer, filter_context)
+    if native_kwh <= 1e-9:
+        return debt_kwh
+    ernie_kwh = max(0.0, debt_kwh - native_kwh)
+    if ernie_kwh < debt_kwh - 1e-6:
+        logger.info(
+            "Verbraucher '%s': natives Fenster liefert ~%.2f kWh im Horizont — "
+            "Ernie-Zusatzziel %.2f → %.2f kWh.",
+            consumer.get("id"),
+            native_kwh,
+            debt_kwh,
+            ernie_kwh,
+        )
+    return ernie_kwh
+
+
+def adjust_targets_for_native_filter(
+    targets: dict[str, float],
+    consumers: list,
+    optimization_matrix: list,
+    filter_contexts: dict[str, dict] | None = None,
+) -> dict[str, float]:
+    """Reduziert Horizont-/Restziele um erwartete native Filterlieferung."""
+    if not optimization_matrix:
+        return targets
+    contexts = filter_contexts or resolve_filter_contexts(optimization_matrix, consumers)
+    adjusted = dict(targets)
+    for consumer in consumers:
+        if not filter_schedule_enabled(consumer):
+            continue
+        cid = consumer["id"]
+        if cid not in adjusted:
+            continue
+        adjusted[cid] = ernie_filter_remaining_kwh(
+            consumer, float(adjusted[cid]), contexts.get(cid)
+        )
+    return adjusted
+
+
 def serialize_filter_contexts(contexts: dict[str, dict]) -> dict[str, dict]:
     """Schlanke, JSON-taugliche Fenster-Infos fürs Produktiv-Log (ohne Matrix-Indizes)."""
     serialized: dict[str, dict] = {}

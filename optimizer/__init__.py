@@ -34,6 +34,7 @@ from .delivery_tracking import (
     build_delivery_compliance_row,
 )
 from .filter_context import (
+    adjust_targets_for_native_filter,
     resolve_filter_contexts,
     serialize_filter_contexts,
 )
@@ -266,6 +267,10 @@ def get_consumer_remaining_kwh(
         else:
             already = float(delivered.get(cid, 0.0))
         remaining[cid] = max(0.0, daily_target - already)
+    if optimization_matrix is not None:
+        remaining = adjust_targets_for_native_filter(
+            remaining, active, optimization_matrix
+        )
     return remaining
 
 
