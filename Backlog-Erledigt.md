@@ -2,6 +2,12 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Manuelle Geräte — Chart 1 Cockpit (Follow-up Phase 5) (2026-07-08)
+
+- [x] **Eigene benannte Spuren im Chart-1-Flex-Stack** — geplante Geräte aus `appliance_schedules.json` als Flex-Balken (Waschmaschine, Trockner, …), nicht nur in `expected_p_act`/`Grundlast`; `apply_appliance_schedules_to_chart_rows` + `_finalize_chart_rows_for_display`
+- [x] **Gemeinsame Farbe, gerätespezifischer Hover** — `COLOR_MANUAL_APPLIANCE` / `flex_bar_chart_color`; Stack-Reihenfolge in `ordered_active_consumers_for_stack`
+- [x] **Live-Cache bei Plan-Checkbox** — `invalidate_live_optimization_cache()` auf „Manuelle Geräte“ nach Speichern/Löschen des Plans
+
 ### Version 1.23 — Manuelle Geräte, Verbraucheranalyse & Charts (2026-07-08)
 
 - [x] **Appliance-Parameter in config.json** — `update_appliance_defaults()`, Save-Form auf „Manuelle Geräte“

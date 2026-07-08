@@ -45,7 +45,7 @@ from ui.chart_colors import (
     blend_hsl,
     chart1_baseload_color_for_zone,
     chart1_pv_color_for_zone,
-    consumer_chart_color,
+    flex_bar_chart_color,
     consumer_chart_saturation_for_zone,
     hsl,
 )
@@ -427,7 +427,7 @@ def build_flow_balance_segments(
                 label=str(consumer.get("name", consumer.get("id", column))),
                 kw=flex_kw,
                 direction="down",
-                color=consumer_chart_color(consumer),
+                color=flex_bar_chart_color(consumer),
                 consumer_id=str(consumer.get("id", "")) or None,
                 hover_lines=hover_lines,
             )
@@ -766,7 +766,7 @@ def _accumulate_slot_traces(
                 )
             if zone_kind is not None:
                 saturation = consumer_chart_saturation_for_zone(zone_kind)
-                bar_color = consumer_chart_color(
+                bar_color = flex_bar_chart_color(
                     consumer,
                     saturation_factor=saturation,
                 )

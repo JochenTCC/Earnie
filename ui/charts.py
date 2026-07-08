@@ -14,6 +14,11 @@ from data.planning_window import (
     UiChartWindow,
     normalize_hour_slot,
 )
+from optimizer.appliance_schedule import (
+    appliance_as_chart_consumer,
+    appliance_column_name,
+    appliance_kw_for_slot,
+)
 from optimizer.targets import (
     consumer_column_name,
     consumer_pv_follow_column_name,
@@ -1017,7 +1022,56 @@ def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
         col = consumer_column_name(consumer)
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((consumer, col))
+    for appliance in config.get_appliances():
+        col = appliance_column_name(appliance)
+        if col in df.columns and df[col].fillna(0.0).sum() > 0:
+            active.append((appliance_as_chart_consumer(appliance), col))
     return active
+
+
+def _appliance_horizon_energy_kwh(
+    matrix: list[dict] | None,
+    chart_window: UiChartWindow | None,
+    df: pd.DataFrame,
+) -> dict[str, float]:
+    """Geplante Energie (kWh) manueller Geräte über SA₀…SA₂."""
+    from runtime_store.appliance_schedules import purge_expired
+
+    appliances = config.get_appliances()
+    energy = {appliance["id"]: 0.0 for appliance in appliances}
+    if not appliances:
+        return energy
+
+    def _in_horizon(slot: datetime) -> bool:
+        if chart_window is None:
+            return True
+        normalized = normalize_hour_slot(slot)
+        return (
+            normalize_hour_slot(chart_window.sa0)
+            <= normalized
+            <= normalize_hour_slot(chart_window.sa2)
+        )
+
+    if matrix:
+        schedules = purge_expired()
+        if schedules:
+            for row in matrix:
+                slot = row.get("slot_datetime")
+                if not isinstance(slot, datetime) or not _in_horizon(slot):
+                    continue
+                for appliance_id, kw in appliance_kw_for_slot(slot, schedules).items():
+                    energy[appliance_id] = energy.get(appliance_id, 0.0) + kw
+        return energy
+
+    for _, row in df.iterrows():
+        slot = row.get("slot_datetime")
+        if isinstance(slot, datetime) and not _in_horizon(slot):
+            continue
+        for appliance in appliances:
+            col = appliance_column_name(appliance)
+            if col in df.columns:
+                energy[appliance["id"]] += float(row.get(col, 0.0) or 0.0)
+    return energy
 
 
 def clear_consumer_stack_order_cache() -> None:
@@ -1033,6 +1087,8 @@ def _consumer_horizon_energy_kwh(
     """Geplante Flex-Energie (kWh) je Verbraucher über SA₀…SA₂."""
     consumers = config.get_flexible_consumers(optimizer_only=True)
     energy = {consumer["id"]: 0.0 for consumer in consumers}
+    for appliance in config.get_appliances():
+        energy[appliance["id"]] = 0.0
     if matrix and chart_window is not None:
         horizon_start = normalize_hour_slot(chart_window.sa0)
         horizon_end = normalize_hour_slot(chart_window.sa2)
@@ -1046,6 +1102,9 @@ def _consumer_horizon_energy_kwh(
             for consumer in consumers:
                 col = consumer_column_name(consumer)
                 energy[consumer["id"]] += float(row.get(col, 0.0) or 0.0)
+        appliance_energy = _appliance_horizon_energy_kwh(matrix, chart_window, df)
+        for appliance_id, kwh in appliance_energy.items():
+            energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
         return energy
     if chart_window is not None:
         horizon_start = normalize_hour_slot(chart_window.sa0)
@@ -1060,11 +1119,17 @@ def _consumer_horizon_energy_kwh(
                 col = consumer_column_name(consumer)
                 if col in df.columns:
                     energy[consumer["id"]] += float(row.get(col, 0.0) or 0.0)
+        appliance_energy = _appliance_horizon_energy_kwh(None, chart_window, df)
+        for appliance_id, kwh in appliance_energy.items():
+            energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
         return energy
     for consumer in consumers:
         col = consumer_column_name(consumer)
         if col in df.columns:
             energy[consumer["id"]] = float(df[col].fillna(0.0).sum())
+    appliance_energy = _appliance_horizon_energy_kwh(matrix, chart_window, df)
+    for appliance_id, kwh in appliance_energy.items():
+        energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
     return energy
 
 
@@ -1080,12 +1145,15 @@ def _consumer_stack_order_ids(
 ) -> tuple[str, ...]:
     if cache_key in _STACK_ORDER_BY_SA0:
         return _STACK_ORDER_BY_SA0[cache_key]
-    consumers = config.get_flexible_consumers(optimizer_only=True)
+    stack_entries = [
+        *config.get_flexible_consumers(optimizer_only=True),
+        *(appliance_as_chart_consumer(appliance) for appliance in config.get_appliances()),
+    ]
     ordered = sorted(
-        consumers,
-        key=lambda consumer: (-energy_kwh.get(consumer["id"], 0.0), consumer["id"]),
+        stack_entries,
+        key=lambda entry: (-energy_kwh.get(entry["id"], 0.0), entry["id"]),
     )
-    order = tuple(consumer["id"] for consumer in ordered)
+    order = tuple(entry["id"] for entry in ordered)
     _STACK_ORDER_BY_SA0[cache_key] = order
     return order
 

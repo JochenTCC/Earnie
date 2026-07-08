@@ -67,6 +67,24 @@ def flexible_consumer_power_kw(row: dict) -> float:
     )
 
 
+def _finalize_chart_rows_for_display(
+    chart_rows: list[dict],
+    charging_contexts: dict[str, dict] | None = None,
+    *,
+    flex_live_kw: dict[str, float] | None = None,
+) -> None:
+    """Chart-Darstellung: Sofort-Laden und manuelle Geräte als Flex-Spuren."""
+    from .charge_immediate import apply_immediate_charge_to_chart_rows
+    from .appliance_schedule import apply_appliance_schedules_to_chart_rows
+
+    apply_immediate_charge_to_chart_rows(
+        chart_rows,
+        charging_contexts,
+        flex_live_kw=flex_live_kw,
+    )
+    apply_appliance_schedules_to_chart_rows(chart_rows)
+
+
 def _format_chart_uhrzeit(row: dict) -> str:
     slot_dt = row.get("slot_datetime")
     if isinstance(slot_dt, datetime):
@@ -326,9 +344,7 @@ def simulate_horizon(
         chart_rows.append(chart_row)
         if on_progress is not None:
             on_progress(i + 1, total_steps)
-    from .charge_immediate import apply_immediate_charge_to_chart_rows
-
-    apply_immediate_charge_to_chart_rows(chart_rows, charging_contexts)
+    _finalize_chart_rows_for_display(chart_rows, charging_contexts)
     return chart_rows
 
 
@@ -567,9 +583,7 @@ def simulate_baseline_horizon(
     for row in optimization_matrix[:24]:
         sim_soc, chart_row = _simulate_single_hour_baseline(row, sim_soc, battery_params)
         chart_rows.append(chart_row)
-    from .charge_immediate import apply_immediate_charge_to_chart_rows
-
-    apply_immediate_charge_to_chart_rows(chart_rows, charging_contexts)
+    _finalize_chart_rows_for_display(chart_rows, charging_contexts)
     return chart_rows
 
 
@@ -635,9 +649,7 @@ def simulate_matched_baseline_horizon(
             steuerbefehl="Baseline (Ziel)",
         )
         chart_rows.append(chart_row)
-    from .charge_immediate import apply_immediate_charge_to_chart_rows
-
-    apply_immediate_charge_to_chart_rows(chart_rows, charging_contexts)
+    _finalize_chart_rows_for_display(chart_rows, charging_contexts)
     return chart_rows
 
 

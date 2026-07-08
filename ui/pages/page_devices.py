@@ -23,6 +23,7 @@ from optimizer.appliance_recommendation import (
 from runtime_store import appliance_schedules
 from ui.chart_colors import COLOR_COST_SAVINGS, COLOR_COST_SAVINGS_NEGATIVE
 from ui.help_hint import render_page_title_with_help
+from ui.runtime_config import invalidate_live_optimization_cache
 
 _DEVICES_HELP = (
     "Empfehlungsmodus für manuelle Geräte (Waschmaschine, Trockner, "
@@ -271,11 +272,13 @@ def _on_plan_checkbox_change(
                 power_kw=power_kw,
                 runtime_h=runtime_h,
             )
+            invalidate_live_optimization_cache()
             return
         active = appliance_schedules.active_schedule_for(appliance_id)
         option = rec.options[index]
         if active and _schedule_matches_option(active, option.start_datetime):
             appliance_schedules.remove_schedule(appliance_id)
+            invalidate_live_optimization_cache()
     except OSError as exc:
         st.session_state[key] = not bool(st.session_state.get(key))
         st.error(f"Plan konnte nicht gespeichert werden: {exc}")

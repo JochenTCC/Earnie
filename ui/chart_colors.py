@@ -226,6 +226,35 @@ CONSUMER_PALETTE: tuple[str, ...] = tuple(
     consumer_palette_color(index) for index in range(CONSUMER_PALETTE_SIZE)
 )
 
+# --- Chart 1 — Manuelle Geräte (gemeinsame Farbe für alle Appliance-Spuren) ----
+
+_HSL_MANUAL_APPLIANCE = (28.0, 72.0, 52.0)
+_ALPHA_MANUAL_APPLIANCE = 1.0
+COLOR_MANUAL_APPLIANCE = color_from_hsl(
+    *_HSL_MANUAL_APPLIANCE,
+    _ALPHA_MANUAL_APPLIANCE,
+)
+
+
+def manual_appliance_chart_color(*, saturation_factor: float = 1.0) -> str:
+    """Einheitliche Chart-Farbe für alle manuellen Geräte."""
+    hue, saturation, luminance = _HSL_MANUAL_APPLIANCE
+    saturation = max(0.0, min(100.0, saturation * saturation_factor))
+    return color_from_hsl(hue, saturation, luminance, _ALPHA_MANUAL_APPLIANCE)
+
+
+def flex_bar_chart_color(
+    consumer: Mapping[str, Any],
+    *,
+    saturation_factor: float = 1.0,
+) -> str:
+    """Flex-Balkenfarbe: Optimizer-Verbraucher oder manuelles Gerät."""
+    from optimizer.appliance_schedule import is_manual_appliance_chart_consumer
+
+    if is_manual_appliance_chart_consumer(consumer):
+        return manual_appliance_chart_color(saturation_factor=saturation_factor)
+    return consumer_chart_color(consumer, saturation_factor=saturation_factor)
+
 
 def consumer_chart_color(
     consumer: Mapping[str, Any],

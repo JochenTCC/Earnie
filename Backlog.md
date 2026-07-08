@@ -18,17 +18,12 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Feature-Backlog
 
 ### Version 1.+1
-- [ ] **Manuelle Geräte — Chart 1 Cockpit (Follow-up Phase 5)**
-  - Geplante Geräte aus `runtime/appliance_schedules.json` als **eigene benannte Spuren** im Chart-1-Flex-Stack (Waschmaschine, Trockner, …) — nicht nur unsichtbar in der Grundlast (`expected_p_act`)
-  - Appliance-Schedules beim Aufbau der Chart-/Sim-Zeilen einbeziehen (Wiederverwendung Flex-Balken-Logik, ohne MILP-`expected_flex_kw`)
-  - Nach Checkbox-Änderung auf „Manuelle Geräte“ Live-Optimierungs-Cache invalidieren, damit die Planung vor dem nächsten `main.py`-Lauf im Cockpit sichtbar ist
-
-### Version 1.+1
 - [ ] Nicht Software-Relevant: Neuen Loxberry aufsetzen bzw. produktiv-Loxberry auf 4 upgraden
 - [ ] Readme ausführlicher machen mit Motivation / Nutzen
 
 ### Version 1.+1
 - [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
+  - H
 
 ### Version 1.+1
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
