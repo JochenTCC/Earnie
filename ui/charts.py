@@ -308,8 +308,10 @@ def _sunrise_chart_title(chart: UiChartWindow) -> str:
 _CHART2_S2_TITLE = "Kumulierte Kosten & Verbrauch (Sonnenaufgang→Sonnenaufgang)"
 _CHART2_S2_HELP = (
     "Grauer Bereich: **Ist bisher** (blau, kumuliert aus Produktiv-Log). "
-    "Neutral/Grün: **Prognose** (BL Ziel / optimiert, kumuliert ab Log-Grenze "
-    "ohne Anschluss an Ist). Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
+    "Neutral/Grün: **Prognose** (BL Ziel / optimiert, kumuliert ab SA₀ und "
+    "ans Ist an der Log-Grenze angeschlossen). Kennzahlen BL Ziel / Optimiert / "
+    "Ersparnis: Horizont SA₀→SA₂ (Neustart bei SA₀-Wechsel). "
+    "Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
 )
 
 
@@ -1553,6 +1555,43 @@ def _region_cumulative_series(
     return pd.Series(values, dtype=float)
 
 
+def _bridged_forecast_cumulative_series(
+    forecast_increments: list[float],
+    history_increments: list[float],
+    length: int,
+    region_start: int,
+    region_end: int,
+) -> pd.Series | None:
+    """
+    Prognose-Kumulation ab Log-Grenze, fortgesetzt ab Ist-Summe im grauen Bereich.
+
+    Setzt einen Ankerpunkt bei region_start - 1 für die visuelle Brücke grau → neutral.
+    """
+    if region_start >= region_end or region_end > length:
+        return None
+    offset = _sum_slot_increments(history_increments, 0, region_start)
+    values = [float("nan")] * length
+    if region_start > 0:
+        values[region_start - 1] = offset
+    total = offset
+    has_value = region_start > 0 and _increment_is_finite(offset)
+    for index in range(region_start, region_end):
+        increment = (
+            forecast_increments[index]
+            if index < len(forecast_increments)
+            else float("nan")
+        )
+        if not _increment_is_finite(increment):
+            values[index] = float("nan")
+            continue
+        total += float(increment)
+        values[index] = total
+        has_value = True
+    if not has_value:
+        return None
+    return pd.Series(values, dtype=float)
+
+
 def _sum_slot_increments(
     increments: list[float] | None,
     region_start: int,
@@ -1582,11 +1621,21 @@ def _add_region_cumulative_hv_trace(
     y_format: str = ".3f",
     segment_hover_template: str,
     bridge_left: bool = True,
+    history_increments: list[float] | None = None,
 ) -> None:
     length = len(axis.starts)
-    cumulative = _region_cumulative_series(
-        increments, length, region_start, region_end
-    )
+    if history_increments is not None:
+        cumulative = _bridged_forecast_cumulative_series(
+            increments,
+            history_increments,
+            length,
+            region_start,
+            region_end,
+        )
+    else:
+        cumulative = _region_cumulative_series(
+            increments, length, region_start, region_end
+        )
     if cumulative is None:
         return
     segments = [(region_start, region_end, False)]
@@ -1618,7 +1667,7 @@ def add_cumulative_s2_split_traces(
     hourly_matched_baseline_consumption_kwh: list[float],
     hourly_optimized_consumption_kwh: list[float],
 ) -> None:
-    """Chart 2 S-2 P3a: Ist (Log) und Prognose (MILP) ohne Brücke an der Grenze."""
+    """Chart 2 S-2: Ist (Log) und Prognose (MILP) mit Brücke an der grau/neutral-Grenze."""
     length = len(axis.starts)
     split = history_slot_count
     if split <= 0 or split > length:
@@ -1638,7 +1687,7 @@ def add_cumulative_s2_split_traces(
                 "Uhrzeit: %{customdata}<br>Kosten BL Ziel (Prognose, kumuliert): "
                 "%{y:.3f} €<extra></extra>"
             ),
-            bridge_left=False,
+            history_increments=slot_actual_cost_euro,
         )
         _add_region_cumulative_hv_trace(
             fig,
@@ -1653,7 +1702,7 @@ def add_cumulative_s2_split_traces(
                 "Uhrzeit: %{customdata}<br>Kosten optimiert (Prognose, kumuliert): "
                 "%{y:.3f} €<extra></extra>"
             ),
-            bridge_left=False,
+            history_increments=slot_actual_cost_euro,
         )
         _add_region_cumulative_hv_trace(
             fig,
@@ -1670,7 +1719,7 @@ def add_cumulative_s2_split_traces(
                 "Uhrzeit: %{customdata}<br>Verbrauch BL Ziel (Prognose, kumuliert): "
                 "%{y:.2f} kWh<extra></extra>"
             ),
-            bridge_left=False,
+            history_increments=slot_actual_consumption_kwh,
         )
         _add_region_cumulative_hv_trace(
             fig,
@@ -1687,7 +1736,7 @@ def add_cumulative_s2_split_traces(
                 "Uhrzeit: %{customdata}<br>Verbrauch optimiert (Prognose, kumuliert): "
                 "%{y:.2f} kWh<extra></extra>"
             ),
-            bridge_left=False,
+            history_increments=slot_actual_consumption_kwh,
         )
 
     _add_region_cumulative_hv_trace(

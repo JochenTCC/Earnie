@@ -7,6 +7,11 @@ Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bu
 - [x] **Versionsanzeige ganz oben in der Sidebar** statt im Cockpit-Titel — `app.py` (`_render_sidebar_version`), `version`-Parameter aus `render_page_title_with_help` entfernt
 - [x] **Version 1.21.1** — Patch-Bump
 
+### Bugfix Chart 2 grau/neutral-Brücke (2026-07-08)
+
+- [x] **Chart 2: Kosten und Verbrauch an grau|neutral-Grenze verbunden** — Prognose-Kurven kumulieren ab Ist-Summe (`_bridged_forecast_cumulative_series` in `ui/charts.py`); Kennzahlen BL Ziel / Optimiert / Ersparnis unverändert Horizont SA₀→SA₂; Tests `test_bridged_forecast_cumulative_continues_from_history`, `test_chart2_prognose_bridges_at_history_boundary`
+- [x] **Version 1.21.4** — Patch-Bump
+
 ### UI-Menüstruktur & Empfehlungsmodus manuelle Geräte (2026-07-07)
 
 Spec: [docs/spec/ui-menu-structure.md](docs/spec/ui-menu-structure.md). `### Version 1.21`-Feature-Block gemeinsam abgeschlossen.
