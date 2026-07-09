@@ -11,6 +11,8 @@ def consumer_annual_kwh(consumer: dict) -> float:
         from data.heating_need import estimate_annual_kwh
 
         thermal = consumer.get("thermal") or {}
+        hwb = thermal.get("hwb_kwh_m2")
+        hwb_value = float(hwb) if hwb not in (None, "") else None
         return estimate_annual_kwh(
             living_area_m2=float(thermal.get("living_area_m2", 0.0)),
             building_class=int(thermal.get("building_class", 3)),
@@ -20,6 +22,7 @@ def consumer_annual_kwh(consumer: dict) -> float:
             longitude=float(thermal.get("longitude", 10.0)),
             target_temp_c=float(thermal.get("target_temp_c", 21.5)),
             heating_limit_c=float(thermal.get("heating_limit_c", 15.0)),
+            hwb_kwh_m2=hwb_value,
         )
     return float(consumer.get("annual_kwh", 0.0) or 0.0)
 

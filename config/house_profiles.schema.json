@@ -31,6 +31,11 @@
                 "schedule": { "$ref": "#/definitions/schedule" },
                 "living_area_m2": { "type": "number" },
                 "building_class": { "type": "integer", "minimum": 1, "maximum": 4 },
+                "hwb_kwh_m2": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Optional: genauer Heizwärmebedarf HWB in kWh/m²a (überschreibt Gebäudeklasse)."
+                },
                 "heat_pump_type": { "enum": ["luft", "erde"] },
                 "persons": { "type": "integer", "minimum": 0 },
                 "target_temp_c": { "type": "number" },

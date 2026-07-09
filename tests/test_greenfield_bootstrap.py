@@ -18,7 +18,15 @@ from runtime_store.persist_paths import (
 
 def _prepare_greenfield_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH", str(config_dir / "house_profiles.json"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        str(config_dir / "backtesting_scenarios.json"),
+    )
     monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
     monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
 
@@ -30,10 +38,43 @@ def _prepare_greenfield_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         "LOXONE_IP=192.168.178.1\n",
         encoding="utf-8",
     )
-    config_dir = tmp_path / "config"
-    config_dir.mkdir()
-    (config_dir / "config.example.json").write_text(
-        json.dumps({"awattar": {"url": "https://greenfield.example"}}),
+    minimal_config = {
+        "awattar": {"url": "https://greenfield.example"},
+        "batteries": [],
+        "pv_systems": [],
+        "flexible_consumers": [],
+    }
+    (share_dir / "config.minimal.json").write_text(
+        json.dumps(minimal_config),
+        encoding="utf-8",
+    )
+    (share_dir / "config.example.json").write_text(
+        json.dumps({"awattar": {"url": "https://greenfield.example-full"}}),
+        encoding="utf-8",
+    )
+    (share_dir / "house_profiles.minimal.json").write_text(
+        json.dumps({"profiles": []}),
+        encoding="utf-8",
+    )
+    (share_dir / "tariffs.minimal.json").write_text(
+        json.dumps({"import_tariffs": [], "export_tariffs": []}),
+        encoding="utf-8",
+    )
+    (share_dir / "tariffs.example.json").write_text(
+        json.dumps(
+            {
+                "import_tariffs": [
+                    {"id": "awattar_at", "label": "aWATTar", "type": "awattar"},
+                ],
+                "export_tariffs": [
+                    {"id": "fixed_37ct", "label": "Fix Export", "type": "fixed", "k_push_cent": 3.7},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (share_dir / "backtesting_scenarios.minimal.json").write_text(
+        json.dumps({"cbc_gap_rel": 0.1, "scenarios": []}),
         encoding="utf-8",
     )
     return tmp_path
@@ -53,6 +94,16 @@ def test_greenfield_bootstrap_creates_expected_files(tmp_path, monkeypatch):
     assert dotenv_path.is_file()
     assert local_settings.is_file()
     assert cons_data.is_file()
+
+    config_payload = json.loads(config_json.read_text(encoding="utf-8"))
+    assert config_payload["awattar"]["url"] == "https://greenfield.example"
+    assert config_payload["batteries"] == []
+    assert config_payload["pv_systems"] == []
+    assert config_payload["flexible_consumers"] == []
+    assert json.loads((root / "config" / "house_profiles.json").read_text(encoding="utf-8"))["profiles"] == []
+    tariffs_payload = json.loads((root / "config" / "tariffs.json").read_text(encoding="utf-8"))
+    assert len(tariffs_payload["import_tariffs"]) >= 1
+    assert len(tariffs_payload["export_tariffs"]) >= 1
 
     cons_lines = cons_data.read_text(encoding="utf-8").strip().splitlines()
     assert len(cons_lines) == 1

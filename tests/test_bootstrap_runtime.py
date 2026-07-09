@@ -20,6 +20,17 @@ def test_bootstrap_creates_missing_files_without_overwriting(tmp_path, monkeypat
         json.dumps({"awattar": {"url": "https://example.test"}}),
         encoding="utf-8",
     )
+    (config_dir / "config.minimal.json").write_text(
+        json.dumps(
+            {
+                "awattar": {"url": "https://minimal.example"},
+                "batteries": [],
+                "pv_systems": [],
+                "flexible_consumers": [],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     bootstrap.run()
 
@@ -27,7 +38,9 @@ def test_bootstrap_creates_missing_files_without_overwriting(tmp_path, monkeypat
     cons_data_path = tmp_path / "runtime" / "cons_data_hourly.csv"
     assert config_path.is_file()
     assert cons_data_path.is_file()
-    assert json.loads(config_path.read_text(encoding="utf-8"))["awattar"]["url"] == "https://example.test"
+    config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+    assert config_payload["awattar"]["url"] == "https://minimal.example"
+    assert config_payload["batteries"] == []
 
     original_cons_data = "timestamp;total_kw;baseload_kw;pv_kw;source\n2020-01-01 00:00:00;1;1;0;measured\n"
     cons_data_path.write_text(original_cons_data, encoding="utf-8")
@@ -116,6 +129,7 @@ def test_bootstrap_creates_dotenv_from_template(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "config.example.json").write_text("{}", encoding="utf-8")
+    (config_dir / "config.minimal.json").write_text("{}", encoding="utf-8")
 
     bootstrap.run()
 
@@ -133,6 +147,7 @@ def test_bootstrap_migrates_legacy_root_dotenv(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "config.example.json").write_text("{}", encoding="utf-8")
+    (config_dir / "config.minimal.json").write_text("{}", encoding="utf-8")
     (tmp_path / ".env").write_text("LOXONE_USER=legacy\n", encoding="utf-8")
 
     bootstrap.run()

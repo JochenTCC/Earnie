@@ -1,0 +1,6 @@
+{
+    "$schema": "./backtesting_scenarios.schema.json",
+    "cbc_gap_rel": 0.10,
+    "cbc_strict_time_limit_sec": 3,
+    "scenarios": []
+}

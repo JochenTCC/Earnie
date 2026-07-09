@@ -63,6 +63,8 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
         "schedule": _normalize_schedule(raw.get("schedule")),
     }
     if consumer_type == "thermal_annual":
+        hwb_raw = raw.get("hwb_kwh_m2")
+        hwb_value = float(hwb_raw) if hwb_raw not in (None, "") else 0.0
         spec["thermal"] = {
             "living_area_m2": float(raw.get("living_area_m2", 0.0) or 0.0),
             "building_class": int(raw.get("building_class", 3)),
@@ -71,6 +73,8 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
             "target_temp_c": float(raw.get("target_temp_c", 21.5)),
             "heating_limit_c": float(raw.get("heating_limit_c", 15.0)),
         }
+        if hwb_value > 0:
+            spec["thermal"]["hwb_kwh_m2"] = hwb_value
     return spec
 
 
@@ -169,7 +173,10 @@ def _serialize_consumer(consumer: dict) -> dict:
     if consumer.get("schedule"):
         out["schedule"] = consumer["schedule"]
     if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
-        out.update(consumer["thermal"])
+        thermal = dict(consumer["thermal"])
+        thermal.pop("latitude", None)
+        thermal.pop("longitude", None)
+        out.update(thermal)
     return out
 
 

@@ -1,0 +1,93 @@
+{
+    "$schema": "./config.schema.json",
+    "awattar": {
+        "url": "https://api.awattar.at/v1/marketdata",
+        "fix_aufschlag_cent": 1.5,
+        "netzverlust_faktor": 1.03,
+        "mwst_austria_faktor": 1.20,
+        "feed_in_fee_factor": 0.19,
+        "feed_in_fix_cent": 0.0
+    },
+    "market_prices": {
+        "missing_price_strategy": "forecast",
+        "forecast_model_path": "data/cache/price_model_coefficients.json"
+    },
+    "eauto_milp": {
+        "live_modus_a_min_remaining_kwh": 2.8,
+        "tie_break_on_epsilon": 0.001,
+        "tie_break_time_epsilon": 0.0001
+    },
+    "battery_wear": {
+        "enabled": false,
+        "replacement_cost_euro": 1500,
+        "expected_cycles": 6000,
+        "cycle_cost_fraction": 0.5
+    },
+    "ui": {
+        "fragment_refresh_charts_sec": 60,
+        "fragment_refresh_status_sec": 10,
+        "main_sync_poll_sec": 15,
+        "chart_debug_capture_enabled": false,
+        "chart_debug_capture_dir": "chart_debug",
+        "streamlit_port": 8501,
+        "price_forecast_page_enabled": false
+    },
+    "system": {
+        "global_timeout": 10,
+        "loop_timeout": 900,
+        "event_trigger_enabled": false,
+        "event_poll_interval_sec": 60,
+        "event_triggers": []
+    },
+    "loxone_blocks": {
+        "soc_name": "Battery_SOC",
+        "pv_counter_name": "PV_Counter",
+        "log_filename": "Verbrauch.csv",
+        "pv_tuning_log_file": "runtime/pv_accuracy_log.csv",
+        "pv_power_name": "PV_Act",
+        "battery_power_name": "Battery_Act",
+        "grid_power_name": "Grid_Act",
+        "target_soc_name": "Target_SoC",
+        "target_charge_power_name": "Target_Charge",
+        "target_discharge_power_name": "Target_Discharge",
+        "control_cmd_name": "Control_Cmd"
+    },
+    "runtime_settings": {
+        "k_push_cent": 3.5,
+        "feed_in_mode": "fixed",
+        "pv_tilt": 25,
+        "pv_azimuth": 0,
+        "pv_kwp": 0,
+        "battery_max_power_kw": 0,
+        "battery_efficiency": 0.97,
+        "battery_capacity_kwh": 0,
+        "battery_min_soc": 10.0,
+        "battery_max_soc": 100.0,
+        "threshold_power": 0.05,
+        "latitude": 48.2,
+        "longitude": 16.37,
+        "timezone_name": "Europe/Vienna",
+        "import_tariff_id": "",
+        "export_tariff_id": ""
+    },
+    "batteries": [],
+    "pv_systems": [],
+    "planning_horizon": {
+        "mode": "sunset_window"
+    },
+    "flexible_consumers": [],
+    "appliances": [],
+    "appliance_recommendation": {
+        "abs_margin_cent": 0.05,
+        "pct_stars_4": 10.0,
+        "pct_stars_1": 30.0
+    },
+    "file_paths_battery_simulation": {
+        "path_cons_data": "runtime/cons_data_hourly.csv",
+        "cons_data_retention_months": 24,
+        "cons_data_write_mode": "hourly",
+        "price_source": "api",
+        "price_provider": "awattar",
+        "price_range": "last_12_months"
+    }
+}

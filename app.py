@@ -21,10 +21,15 @@ from runtime_store.dotenv_io import needs_loxone_setup
 from ui.setup_dotenv import render_loxone_setup_page
 
 config.reinit_config()
-from runtime_store.config_drift import format_drift_message, load_config_drift_items
+from runtime_store.config_drift import (
+    format_drift_message,
+    load_config_drift_items,
+    should_show_config_drift,
+)
 from version import __version__
 from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notices
 from ui.navigation import build_navigation
+from ui.setup_progress import render_setup_progress_notice
 from ui.styles import inject_compact_numeric_css, inject_help_hint_css
 
 logger = logging.getLogger("app")
@@ -42,6 +47,8 @@ def _render_sidebar_version() -> None:
 
 
 def _render_drift_warning() -> None:
+    if not should_show_config_drift():
+        return
     try:
         drift_items = load_config_drift_items()
     except FileNotFoundError:
@@ -60,6 +67,7 @@ def main() -> None:
     inject_help_hint_css()
     _render_sidebar_version()
     render_ui_mode_env_notices()
+    render_setup_progress_notice()
     _render_drift_warning()
 
     navigation = build_navigation(get_enabled_ui_mode_keys())

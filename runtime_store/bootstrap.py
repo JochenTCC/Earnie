@@ -23,19 +23,23 @@ from runtime_store.persist_paths import (
     legacy_history_csv_file,
     log_file,
     resolve_backtesting_scenarios_json_path,
+    resolve_backtesting_scenarios_minimal_template_path,
     resolve_backtesting_scenarios_schema_template_path,
     resolve_backtesting_scenarios_template_path,
     resolve_house_profiles_json_path,
+    resolve_house_profiles_minimal_template_path,
     resolve_house_profiles_schema_template_path,
     resolve_house_profiles_template_path,
     resolve_tariffs_json_path,
+    resolve_tariffs_minimal_template_path,
     resolve_tariffs_schema_template_path,
     resolve_tariffs_template_path,
     resolve_config_json_path,
-    resolve_deviation_rules_schema_template_path,
-    resolve_deviation_rules_template_path,
+    resolve_config_minimal_template_path,
     resolve_config_schema_template_path,
     resolve_config_template_path,
+    resolve_deviation_rules_schema_template_path,
+    resolve_deviation_rules_template_path,
     resolve_dotenv_template_path,
     resolve_local_settings_json_path,
     resolve_local_settings_template_path,
@@ -132,7 +136,7 @@ def _bootstrap_config_schema() -> bool:
 
 def _bootstrap_config_json() -> bool:
     config_path = resolve_config_json_path()
-    template_path = resolve_config_template_path()
+    template_path = resolve_config_minimal_template_path()
     if not _is_missing_file(config_path):
         return False
     if not os.path.isfile(template_path):
@@ -143,7 +147,7 @@ def _bootstrap_config_json() -> bool:
     _ensure_parent_dir(config_path)
     shutil.copyfile(template_path, config_path)
     logger.info(
-        "bootstrap: %s aus %s erstellt – bitte Loxone-Namen und Verbraucher anpassen.",
+        "bootstrap: %s aus %s erstellt – Hausdaten im Hauskonfigurator und in der Konfiguration anlegen.",
         config_path,
         template_path,
     )
@@ -170,11 +174,11 @@ def _bootstrap_backtesting_scenarios_schema() -> bool:
 
 def _bootstrap_backtesting_scenarios_json() -> bool:
     scenarios_path = resolve_backtesting_scenarios_json_path()
-    template_path = resolve_backtesting_scenarios_template_path()
+    template_path = resolve_backtesting_scenarios_minimal_template_path()
     return _copy_template_if_missing(
         scenarios_path,
         template_path,
-        "backtesting_scenarios.example.json",
+        "backtesting_scenarios.minimal.json",
     )
 
 
@@ -225,8 +229,8 @@ def _bootstrap_house_profiles_schema() -> bool:
 def _bootstrap_house_profiles_json() -> bool:
     return _copy_template_if_missing(
         resolve_house_profiles_json_path(),
-        resolve_house_profiles_template_path(),
-        "house_profiles.example.json",
+        resolve_house_profiles_minimal_template_path(),
+        "house_profiles.minimal.json",
     )
 
 

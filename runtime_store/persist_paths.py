@@ -81,12 +81,16 @@ def bundled_config_example_file() -> str:
     return os.path.join(bundled_config_dir(), "config.example.json")
 
 
+def bundled_config_minimal_file() -> str:
+    return os.path.join(bundled_config_dir(), "config.minimal.json")
+
+
 def bundled_config_schema_file() -> str:
     return os.path.join(bundled_config_dir(), "config.schema.json")
 
 
 def resolve_config_template_path() -> str:
-    """Vorlage für config.json: Mount, Legacy oder gebündelte Image-Kopie."""
+    """Vorlage für config.example.json: Mount, Legacy oder gebündelte Image-Kopie."""
     preferred = os.path.join("config", "config.example.json")
     if os.path.isfile(preferred):
         return preferred
@@ -94,6 +98,17 @@ def resolve_config_template_path() -> str:
     if os.path.isfile(legacy):
         return legacy
     bundled = bundled_config_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_config_minimal_template_path() -> str:
+    """Vorlage für neue config.json (Greenfield-Bootstrap, ohne Hausdaten)."""
+    preferred = os.path.join("config", "config.minimal.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_config_minimal_file()
     if os.path.isfile(bundled):
         return bundled
     return preferred
@@ -177,12 +192,16 @@ def bundled_backtesting_scenarios_example_file() -> str:
     return os.path.join(bundled_config_dir(), "backtesting_scenarios.example.json")
 
 
+def bundled_backtesting_scenarios_minimal_file() -> str:
+    return os.path.join(bundled_config_dir(), "backtesting_scenarios.minimal.json")
+
+
 def bundled_backtesting_scenarios_schema_file() -> str:
     return os.path.join(bundled_config_dir(), "backtesting_scenarios.schema.json")
 
 
 def resolve_backtesting_scenarios_template_path() -> str:
-    """Vorlage für backtesting_scenarios.json: Mount, Legacy oder gebündelte Image-Kopie."""
+    """Vorlage für backtesting_scenarios.example.json: Mount, Legacy oder gebündelte Image-Kopie."""
     preferred = os.path.join("config", "backtesting_scenarios.example.json")
     if os.path.isfile(preferred):
         return preferred
@@ -190,6 +209,17 @@ def resolve_backtesting_scenarios_template_path() -> str:
     if os.path.isfile(legacy):
         return legacy
     bundled = bundled_backtesting_scenarios_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_backtesting_scenarios_minimal_template_path() -> str:
+    """Vorlage für neue backtesting_scenarios.json (leere Szenarien)."""
+    preferred = os.path.join("config", "backtesting_scenarios.minimal.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_backtesting_scenarios_minimal_file()
     if os.path.isfile(bundled):
         return bundled
     return preferred
@@ -227,6 +257,10 @@ def bundled_tariffs_example_file() -> str:
     return os.path.join(bundled_config_dir(), "tariffs.example.json")
 
 
+def bundled_tariffs_minimal_file() -> str:
+    return os.path.join(bundled_config_dir(), "tariffs.minimal.json")
+
+
 def bundled_tariffs_schema_file() -> str:
     return os.path.join(bundled_config_dir(), "tariffs.schema.json")
 
@@ -236,6 +270,17 @@ def resolve_tariffs_template_path() -> str:
     if os.path.isfile(preferred):
         return preferred
     bundled = bundled_tariffs_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_tariffs_minimal_template_path() -> str:
+    """Vorlage für neue tariffs.json (leere Tarif-Kataloge)."""
+    preferred = os.path.join("config", "tariffs.minimal.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_tariffs_minimal_file()
     if os.path.isfile(bundled):
         return bundled
     return preferred
@@ -265,6 +310,10 @@ def bundled_house_profiles_example_file() -> str:
     return os.path.join(bundled_config_dir(), "house_profiles.example.json")
 
 
+def bundled_house_profiles_minimal_file() -> str:
+    return os.path.join(bundled_config_dir(), "house_profiles.minimal.json")
+
+
 def bundled_house_profiles_schema_file() -> str:
     return os.path.join(bundled_config_dir(), "house_profiles.schema.json")
 
@@ -274,6 +323,17 @@ def resolve_house_profiles_template_path() -> str:
     if os.path.isfile(preferred):
         return preferred
     bundled = bundled_house_profiles_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_house_profiles_minimal_template_path() -> str:
+    """Vorlage für neue house_profiles.json (leere Profile)."""
+    preferred = os.path.join("config", "house_profiles.minimal.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_house_profiles_minimal_file()
     if os.path.isfile(bundled):
         return bundled
     return preferred

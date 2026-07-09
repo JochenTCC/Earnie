@@ -354,6 +354,14 @@
         "pv_system_id": {
           "type": "string",
           "description": "Optional: Referenz auf pv_systems[].id (Backtesting/Szenarien)."
+        },
+        "import_tariff_id": {
+          "type": "string",
+          "description": "Gewählter Bezugstarif (tariffs.json import_tariffs[].id)."
+        },
+        "export_tariff_id": {
+          "type": "string",
+          "description": "Gewählter Einspeisetarif (tariffs.json export_tariffs[].id)."
         }
       }
     },

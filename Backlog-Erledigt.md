@@ -2,6 +2,20 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 1.24.e — Planungs-Editoren & Hauskonfigurator-UX (2026-07-09)
+
+- [x] **P1 — Config-Drift** — `should_show_config_drift()` unterdrückt Hinweis während `needs_planning_onboarding()`; leere `flexible_consumers` werden in der Drift-Prüfung ignoriert
+- [x] **P2 — Hauskonfigurator UX** — Auto-IDs (`house_config/id_slug.py`); Typ-Label „Haus Wärme“; Gebäudeklassen mit HWB; optionales `hwb_kwh_m2`
+- [x] **P3 — Planungs-Konfiguration** — Tabs PV/Batterie/Tarife im Hauskonfigurator; Bootstrap `tariffs.json` aus `tariffs.example.json`; Tarifwahl → `runtime_settings.import/export_tariff_id` (kein Tarif-Editor)
+- [x] **P4 — Tests & Doku** — `tests/test_planning_editors.py`; Anpassungen Setup/Navigation/Drift; [`greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md)
+
+### Version 1.24.d — Greenfield-Onboarding (minimale Config + UI-Freischaltung) (2026-07-09)
+
+- [x] **P1 — Minimal-Bootstrap** — `config.minimal.json` + leere Vorlagen für `house_profiles`, `tariffs`, `backtesting_scenarios`; Bootstrap nutzt Minimal- statt Example-Dateien; `config.example.json` bleibt Referenz
+- [x] **P2 — Laufzeit-UI-Gating** — `ui/setup_readiness.py`, `ui/setup_progress.py`, `ui/navigation.py`: nach Loxone-Setup nur Hauskonfigurator + Konfiguration bis Planung vollständig
+- [x] **P3 — Backtesting-Freischaltung** — Freischaltung bei thermischem Hausprofil + PV + Batterie + Import-/Export-Tarif; Szenarieneditor vorerst gesperrt (Follow-up)
+- [x] **Tests + Doku** — `tests/test_setup_readiness.py`, `tests/test_navigation_setup.py`; [`greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md)
+
 ### Version 1.24.c — Greenfield Dev-Stack (2026-07-09)
 
 - [x] **P1 — Greenfield-Compose** — `docker-compose-greenfield.yml` mit `greenfield/config` + `greenfield/runtime`, Container `ernie-greenfield-*`, UI-Port **8502**, Loxone-Verify aus

@@ -11,7 +11,13 @@ _JAZ = {"luft": 3.5, "erde": 4.3}
 _CLIMATE_CACHE = Path("data/cache/heating_climate_default.json")
 
 
-def specific_heating_kwh_m2(building_class: int) -> float:
+def specific_heating_kwh_m2(
+    building_class: int,
+    *,
+    hwb_kwh_m2: float | None = None,
+) -> float:
+    if hwb_kwh_m2 is not None and float(hwb_kwh_m2) > 0:
+        return float(hwb_kwh_m2)
     return _BUILDING_KWH_M2.get(int(building_class), 80.0)
 
 
@@ -77,11 +83,15 @@ def weekly_electric_kwh(
     target_temp_c: float,
     heating_limit_c: float,
     daily_temps: list[float] | None = None,
+    hwb_kwh_m2: float | None = None,
 ) -> list[float]:
     """Elektrischer WP-Bedarf pro Kalenderwoche (kWh)."""
     if daily_temps is None:
         daily_temps = load_climate_fixture()
-    annual_heat = living_area_m2 * specific_heating_kwh_m2(building_class)
+    annual_heat = living_area_m2 * specific_heating_kwh_m2(
+        building_class,
+        hwb_kwh_m2=hwb_kwh_m2,
+    )
     factors = weekly_heating_factors(daily_temps, target_temp_c, heating_limit_c)
     ww_week = warm_water_kwh_week(persons)
     jaz = heat_pump_jaz(heat_pump_type)
@@ -102,6 +112,7 @@ def estimate_annual_kwh(
     longitude: float,
     target_temp_c: float = 21.5,
     heating_limit_c: float = 15.0,
+    hwb_kwh_m2: float | None = None,
 ) -> float:
     if living_area_m2 <= 0:
         return 0.0
@@ -114,6 +125,7 @@ def estimate_annual_kwh(
         longitude=longitude,
         target_temp_c=target_temp_c,
         heating_limit_c=heating_limit_c,
+        hwb_kwh_m2=hwb_kwh_m2,
     )
     return round(sum(weekly), 3)
 

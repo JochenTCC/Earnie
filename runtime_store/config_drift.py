@@ -66,6 +66,8 @@ def _find_missing_flexible_consumers(
 ) -> list[ConfigDriftItem]:
     if not isinstance(example_list, list):
         return []
+    if isinstance(actual_list, list) and not actual_list:
+        return []
     actual_by_id: dict[str, dict[str, Any]] = {}
     if isinstance(actual_list, list):
         for item in actual_list:
@@ -93,6 +95,13 @@ def find_config_drift(
     actual: dict[str, Any],
 ) -> list[ConfigDriftItem]:
     return _find_missing_in_object(example, actual, prefix="")
+
+
+def should_show_config_drift() -> bool:
+    """False während Greenfield-Planung (minimale config.json ohne Live-Verbraucher)."""
+    from ui.setup_readiness import needs_planning_onboarding
+
+    return not needs_planning_onboarding()
 
 
 def load_config_drift_items(

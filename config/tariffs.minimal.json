@@ -1,0 +1,5 @@
+{
+    "$schema": "./tariffs.schema.json",
+    "import_tariffs": [],
+    "export_tariffs": []
+}

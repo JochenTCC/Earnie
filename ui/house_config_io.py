@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import config
+from house_config.id_slug import slug_id
 from house_config.profiles_store import (
     load_house_profiles_document,
     save_house_profiles_document,
@@ -13,9 +14,11 @@ from house_config.profiles_store import (
 from house_config.tariffs_store import load_tariffs_document
 from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
+    resolve_config_json_path,
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
 )
+from settings.json_io import read_json_dict, write_json_dict
 
 
 def read_json_document(path: str) -> dict:
@@ -90,6 +93,86 @@ def upsert_house_profile(profile: dict) -> None:
     profiles = [p for p in profiles if p.get("id") != profile["id"]]
     profiles.append(profile)
     save_house_profiles_document(path, {"profiles": profiles})
+
+
+def _load_config_document() -> dict:
+    return read_json_dict(resolve_config_json_path())
+
+
+def _save_config_document(data: dict) -> None:
+    write_json_dict(resolve_config_json_path(), data)
+    config.reinit_config()
+
+
+def upsert_pv_system(raw_spec: dict, *, stable_id: str = "") -> None:
+    from house_config.entity_resolution import normalize_pv_system
+
+    data = _load_config_document()
+    systems = list(data.get("pv_systems") or [])
+    taken = {str(item.get("id", "")) for item in systems if item.get("id")}
+    if stable_id:
+        taken.discard(stable_id)
+    label = str(raw_spec.get("label", "")).strip()
+    entity_id = stable_id.strip() or slug_id(label or "pv_anlage", existing=taken)
+    spec = {
+        "id": entity_id,
+        "label": label or entity_id,
+        "kwp": float(raw_spec["kwp"]),
+        "pv_tilt": float(raw_spec.get("pv_tilt", 25.0)),
+        "pv_azimuth": float(raw_spec.get("pv_azimuth", 0.0)),
+    }
+    normalize_pv_system(spec, 0)
+    systems = [item for item in systems if item.get("id") != entity_id]
+    systems.append(spec)
+    data["pv_systems"] = systems
+    _save_config_document(data)
+
+
+def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
+    from house_config.entity_resolution import normalize_battery
+
+    data = _load_config_document()
+    batteries = list(data.get("batteries") or [])
+    taken = {str(item.get("id", "")) for item in batteries if item.get("id")}
+    if stable_id:
+        taken.discard(stable_id)
+    label = str(raw_spec.get("label", "")).strip()
+    entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
+    spec = {
+        "id": entity_id,
+        "label": label or entity_id,
+        "battery_capacity_kwh": float(raw_spec["battery_capacity_kwh"]),
+        "battery_max_power_kw": float(raw_spec["battery_max_power_kw"]),
+        "battery_efficiency": float(raw_spec["battery_efficiency"]),
+        "battery_min_soc": float(raw_spec["battery_min_soc"]),
+        "battery_max_soc": float(raw_spec["battery_max_soc"]),
+        "threshold_power": float(raw_spec.get("threshold_power", 0.05)),
+    }
+    normalize_battery(spec, 0)
+    batteries = [item for item in batteries if item.get("id") != entity_id]
+    batteries.append(spec)
+    data["batteries"] = batteries
+    _save_config_document(data)
+
+
+def get_planning_tariff_selection() -> tuple[str, str]:
+    runtime = _load_config_document().get("runtime_settings", {})
+    if not isinstance(runtime, dict):
+        return "", ""
+    return (
+        str(runtime.get("import_tariff_id", "") or "").strip(),
+        str(runtime.get("export_tariff_id", "") or "").strip(),
+    )
+
+
+def save_planning_tariff_selection(import_tariff_id: str, export_tariff_id: str) -> None:
+    data = _load_config_document()
+    runtime = data.setdefault("runtime_settings", {})
+    if not isinstance(runtime, dict):
+        raise ValueError("runtime_settings muss ein Objekt sein.")
+    runtime["import_tariff_id"] = import_tariff_id.strip()
+    runtime["export_tariff_id"] = export_tariff_id.strip()
+    _save_config_document(data)
 
 
 def upsert_scenario(scenario: dict) -> None:
