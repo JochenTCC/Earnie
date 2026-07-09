@@ -1,0 +1,29 @@
+{
+  "id": "eauto_urgent_deferred_cheap_hours_2026-07-09",
+  "title": "E-Auto laedt erst im urgent-Fenster statt guenstiger Nacht",
+  "symptom": "MILP plant 05-07 Uhr statt 02-04 Uhr trotz guenstigerer Preise; Deadline 07:45",
+  "recorded_at": "2026-07-09",
+  "app_version": "1.24.1",
+  "archived_at": "2026-07-09T21:11:07+00:00",
+  "files": [
+    "optimization_history.jsonl",
+    "optimizer_run_state.json",
+    "live_optimization_debug.json"
+  ],
+  "regression": {
+    "session_date": "2026-07-09",
+    "plug_in_rest_soc_percent": 35.0,
+    "plug_in_target_kwh": 11.556,
+    "corrected_rest_soc_percent": 35.0,
+    "corrected_target_kwh": 11.556,
+    "deadline": "2026-07-10T07:45:00",
+    "cheap_hour_from": 2,
+    "cheap_hour_to": 4,
+    "cheap_price_cent_max": 19.5,
+    "urgent_hour_from": 5,
+    "urgent_hour_to": 7,
+    "archived_debug_max_eauto_kw_cheap_hours": 0.0,
+    "archived_debug_min_eauto_kw_urgent_hours": 3.5,
+    "remaining_kwh_at_correction": 11.556
+  }
+}

@@ -19,6 +19,13 @@ Fix ist **implementiert** (Code + Tests + ggf. PATCH in `version.py`), aber die 
 - Nach erfolgreicher Verifikation: aus diesem Kapitel entfernen → `Backlog-Erledigt.md` (`### Bugfix …`) mit `- [x]`.
 - Schlägt die Verifikation fehl: zurück ins offene Bugfix-Kapitel oder Follow-up formulieren; PATCH ggf. dokumentieren, aber nicht als erledigt archivieren.
 
+## Bugfix Verifications Pending
+
+- [ ] **E-Auto: urgent-Nebenbedingung entfernt** (2026-07-09)
+  - MILP: separate `urgent >= target`-Constraint entfernt; Deadline weiter über `eligible`-Slots bis Fertigstellungszeit
+  - Observability bleibt (`role` post-hoc); Parsing für ISO-Deadlines ergänzt
+  - Regression: `eauto_urgent_deferred_cheap_hours_2026-06-28`, neu `eauto_urgent_deferred_cheap_hours_2026-07-09`; xfail entfernt
+  - **Prod-Abnahme:** nächster Ladezyklus mit Deadline 07:45 — Plan nutzt günstige Nachtstunden (02–04), `urgent_rule_observability.eauto.role == redundant`
 
 ## Neue Bugs (Das Kapitel nicht entfernen - auch wenn es leer ist)
 
@@ -29,12 +36,7 @@ Fix ist **implementiert** (Code + Tests + ggf. PATCH in `version.py`), aber die 
 ## E-Auto: urgent-Regel, Prod-Dump, PWM
 Verknüpfte Themen — gemeinsam priorisieren und abarbeiten.
 
-- [ ] **urgent-Regel auf Notwendigkeit prüfen** (Review bis ca. **2026-07-12**)
-  - Auswertung: `urgent_rule_observability` in Log + `optimization_history.jsonl` (`role`: `redundant` / `nachholen` / `nur_urgent_fenster`)
-  - Akzeptanz: durchgehend nur `redundant` → Nebenbedingung entfernen; sonst behalten und begründen
-- [ ] **Prod-Dump-Regression: urgent-Nebenbedingung infeasible** (Stand 2026-07-03, Commit `a743318`)
-  - Fixture: `eauto_urgent_deferred_cheap_hours_2026-06-28` (~7,99 kWh Rest)
-  - Live Modus A: MILP mit urgent → **Infeasible**; ohne urgent → **Optimal**
-  - `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py` (2 Tests)
-  - Nächster Schritt: Live urgent + Modus A prüfen; `xfail` entfernen wenn feasible
+- [ ] **urgent-Regel Observability-Review** (bis ca. **2026-07-12**, nach Prod-Abnahme)
+  - Nebenbedingung entfernt → Auswertung: `urgent_rule_observability` in Log + `optimization_history.jsonl` (`role`: erwartet `redundant`)
+  - Akzeptanz: durchgehend `redundant` über mehrere Ladezykklus → Review abschließen, Observability-Logging ggf. vereinfachen
 - [ ] **PWM für E-Auto-Laden** — nur für Ströme < A_min; sonst Mindestlademenge pro h (Zähler runterzählen, bei jedem Ladevorgang reset → bei Null fünf Minuten mit Mindest-Strom laden)

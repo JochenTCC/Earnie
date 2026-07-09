@@ -16,8 +16,9 @@ from tests.fixtures import prod_dump_fixtures as pdf
 
 CASE_EAUTO = "eauto_deadline_missed_2026-06-27"
 CASE_URGENT = "eauto_urgent_deferred_cheap_hours_2026-06-28"
+CASE_URGENT_JULY = "eauto_urgent_deferred_cheap_hours_2026-07-09"
 CASE_FALSE_COMPLETE = "eauto_false_complete_2026-06-29"
-ALL_CASES = (CASE_EAUTO, CASE_URGENT, CASE_FALSE_COMPLETE)
+ALL_CASES = (CASE_EAUTO, CASE_URGENT, CASE_URGENT_JULY, CASE_FALSE_COMPLETE)
 
 
 def _parse_ts(value: str) -> datetime:
@@ -36,14 +37,26 @@ def _integrate_kw(rows: list[dict], start: datetime, end: datetime, key: str) ->
 
 
 def _hour_from_row(row: dict) -> int:
-    return int(str(row["Uhrzeit"]).split(":")[0])
+    raw_slot = row.get("slot_datetime")
+    if raw_slot:
+        return datetime.fromisoformat(str(raw_slot)).hour
+    uhrzeit = str(row["Uhrzeit"])
+    if " " in uhrzeit:
+        return int(uhrzeit.split()[-1].split(":")[0])
+    return int(uhrzeit.split(":")[0])
 
 
 def _matrix_from_debug_rows(rows: list[dict], session_date: str) -> list[dict]:
     base = datetime.fromisoformat(f"{session_date}T09:00:00")
     matrix: list[dict] = []
     for index, row in enumerate(rows):
-        slot = base + timedelta(hours=index)
+        raw_slot = row.get("slot_datetime")
+        if raw_slot:
+            slot = datetime.fromisoformat(str(raw_slot))
+            if slot.tzinfo is not None:
+                slot = slot.replace(tzinfo=None)
+        else:
+            slot = base + timedelta(hours=index)
         matrix.append(
             {
                 "slot_datetime": slot,
@@ -79,14 +92,17 @@ def _battery_params() -> dict:
     }
 
 
-def _urgent_dump_scenario(urgent_manifest: dict) -> tuple[list[dict], list[dict], dict, datetime, float]:
+def _urgent_dump_scenario(
+    urgent_manifest: dict,
+    case_id: str,
+) -> tuple[list[dict], list[dict], dict, datetime, float]:
     reg = urgent_manifest["regression"]
     debug = json.loads(
-        pdf.fixture_file(CASE_URGENT, "live_optimization_debug.json").read_text(encoding="utf-8")
+        pdf.fixture_file(case_id, "live_optimization_debug.json").read_text(encoding="utf-8")
     )
     rows = debug["simulation_rows"]
     matrix = _matrix_from_debug_rows(rows, reg["session_date"])
-    deadline = _parse_ts(reg["deadline"])
+    deadline = _parse_ts(str(reg["deadline"]).split("+")[0])
     remaining = float(reg["remaining_kwh_at_correction"])
     contexts = {
         "eauto": {
@@ -127,11 +143,7 @@ def _planned_kwh_breakdown(
     }
 
 
-def _solve_urgent_dump_milp(
-    urgent_manifest: dict,
-    *,
-    include_urgent_deadline_constraint: bool,
-) -> dict:
+def _solve_urgent_dump_milp(urgent_manifest: dict, case_id: str) -> dict:
     import pulp
 
     from optimizer.milp import (
@@ -142,7 +154,9 @@ def _solve_urgent_dump_milp(
     )
 
     reg = urgent_manifest["regression"]
-    rows, matrix, contexts, _deadline, remaining = _urgent_dump_scenario(urgent_manifest)
+    rows, matrix, contexts, _deadline, remaining = _urgent_dump_scenario(
+        urgent_manifest, case_id
+    )
     consumer = _eauto_consumer()
     model = _build_milp_model(
         matrix, len(matrix), _battery_params(), 10.0, [consumer], 0.0, {"eauto": 8.0},
@@ -164,20 +178,17 @@ def _solve_urgent_dump_milp(
         list(range(len(matrix))),
         contexts,
         False,
-        include_urgent_deadline_constraint=include_urgent_deadline_constraint,
     )
     model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
     assert pulp.LpStatus[model.prob.status] == "Optimal"
     breakdown = _planned_kwh_breakdown(model, rows, reg)
-    observability = {}
-    if include_urgent_deadline_constraint:
-        observability = _collect_urgent_rule_observability(
-            model,
-            matrix,
-            {"eauto": remaining},
-            list(range(len(matrix))),
-            contexts,
-        )
+    observability = _collect_urgent_rule_observability(
+        model,
+        matrix,
+        {"eauto": remaining},
+        list(range(len(matrix))),
+        contexts,
+    )
     return {"breakdown": breakdown, "observability": observability}
 
 
@@ -194,6 +205,11 @@ def eauto_history() -> list[dict]:
 @pytest.fixture(scope="module")
 def urgent_manifest() -> dict:
     return pdf.load_manifest(CASE_URGENT)
+
+
+@pytest.fixture(scope="module")
+def urgent_july_manifest() -> dict:
+    return pdf.load_manifest(CASE_URGENT_JULY)
 
 
 @pytest.fixture(scope="module")
@@ -359,41 +375,34 @@ def test_prod_dump_archived_debug_shows_deferred_charging(urgent_manifest):
     ) - 0.01
 
 
-@pytest.mark.xfail(
-    reason="urgent-Nebenbedingung derzeit infeasible auf investigate/backtesting (Review offen)",
-    strict=False,
-)
 def test_prod_dump_milp_prefers_cheap_hours_after_urgent_fix(urgent_manifest):
-    with_urgent = _solve_urgent_dump_milp(
-        urgent_manifest, include_urgent_deadline_constraint=True
-    )
-    assert with_urgent["breakdown"]["cheap_kwh"] >= 6.0
+    result = _solve_urgent_dump_milp(urgent_manifest, CASE_URGENT)
+    assert result["breakdown"]["cheap_kwh"] >= 6.0
 
 
-@pytest.mark.xfail(
-    reason="urgent-Nebenbedingung derzeit infeasible auf investigate/backtesting (Review offen)",
-    strict=False,
-)
 def test_prod_dump_urgent_rule_redundant_vs_deadline_only(urgent_manifest):
-    """Prod-Dump 2026-06-28: Mit und ohne urgent-Nebenbedingung gleicher günstiger Plan."""
+    """Prod-Dump 2026-06-28: MILP nutzt günstige Stunden, urgent-Observability redundant."""
     reg = urgent_manifest["regression"]
     remaining = float(reg["remaining_kwh_at_correction"])
 
-    with_urgent = _solve_urgent_dump_milp(
-        urgent_manifest, include_urgent_deadline_constraint=True
-    )
-    without_urgent = _solve_urgent_dump_milp(
-        urgent_manifest, include_urgent_deadline_constraint=False
-    )
+    result = _solve_urgent_dump_milp(urgent_manifest, CASE_URGENT)
 
-    assert with_urgent["observability"]["eauto"]["role"] == "redundant"
-    assert with_urgent["breakdown"]["urgent_kwh"] == pytest.approx(0.0, abs=0.1)
-    assert with_urgent["breakdown"]["total_kwh"] >= remaining * 0.95
-    assert without_urgent["breakdown"]["total_kwh"] >= remaining * 0.95
-    assert without_urgent["breakdown"]["urgent_kwh"] == pytest.approx(0.0, abs=0.1)
-    assert without_urgent["breakdown"]["cheap_kwh"] == pytest.approx(
-        with_urgent["breakdown"]["cheap_kwh"], abs=0.2
-    )
+    assert result["observability"]["eauto"]["role"] == "redundant"
+    assert result["breakdown"]["urgent_kwh"] == pytest.approx(0.0, abs=0.1)
+    assert result["breakdown"]["total_kwh"] >= remaining * 0.95
+
+
+def test_prod_dump_july_milp_prefers_cheap_night_hours(urgent_july_manifest):
+    """Prod-Dump 2026-07-09: Nacht 02–04 statt urgent-Fenster 05–07."""
+    reg = urgent_july_manifest["regression"]
+    remaining = float(reg["remaining_kwh_at_correction"])
+
+    result = _solve_urgent_dump_milp(urgent_july_manifest, CASE_URGENT_JULY)
+
+    assert result["observability"]["eauto"]["role"] == "redundant"
+    assert result["breakdown"]["cheap_kwh"] >= 8.0
+    assert result["breakdown"]["urgent_kwh"] == pytest.approx(0.0, abs=0.1)
+    assert result["breakdown"]["total_kwh"] >= remaining * 0.95
 
 
 def _history_row_at(history: list[dict], prefix: str) -> dict:

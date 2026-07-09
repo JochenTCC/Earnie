@@ -12,7 +12,6 @@ from .charging_context import (
     schedule_indices_for_consumer,
     split_eligible_by_urgent_deadline,
     summarize_urgent_rule_usage,
-    urgent_charging_indices,
     charging_schedule_enabled,
 )
 from .consumer_power import (
@@ -226,6 +225,17 @@ def _add_consumer_power_variables(
     )
 
 
+def _parse_charging_deadline(value: datetime | str | None) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    return datetime.fromisoformat(text)
+
+
 def _add_consumer_delivery_constraints(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
@@ -235,7 +245,6 @@ def _add_consumer_delivery_constraints(
     verbose: bool,
     *,
     filter_contexts: dict[str, dict] | None = None,
-    include_urgent_deadline_constraint: bool = True,
 ) -> None:
     filters = filter_contexts or {}
     for consumer in model.planned_consumers:
@@ -283,24 +292,6 @@ def _add_consumer_delivery_constraints(
         max_deliverable = _max_deliverable_kwh(consumer, eligible)
         effective_target = min(target, max_deliverable)
         model.prob += _delivery_energy_expr(model, consumer, eligible) >= effective_target
-
-        deadline = ctx.get("deadline") if ctx else None
-        if (
-            include_urgent_deadline_constraint
-            and isinstance(deadline, datetime)
-            and effective_target > 1e-6
-        ):
-            urgent = urgent_charging_indices(
-                matrix[: model.horizon],
-                eligible,
-                deadline,
-                effective_target,
-                max_kw,
-            )
-            if urgent:
-                model.prob += (
-                    _delivery_energy_expr(model, consumer, urgent) >= effective_target
-                )
 
 
 def _consumer_pv_follow_now(model: MilpHorizonModel, consumer: dict) -> int:
@@ -384,8 +375,8 @@ def _collect_urgent_rule_observability(
         if target <= 0:
             continue
         ctx = charging_contexts.get(cid) or {}
-        deadline = ctx.get("deadline")
-        if not isinstance(deadline, datetime):
+        deadline = _parse_charging_deadline(ctx.get("deadline"))
+        if deadline is None:
             continue
         consumer_indices = schedule_indices_for_consumer(
             matrix, model.horizon, schedule_indices, consumer, ctx
@@ -409,7 +400,7 @@ def _collect_urgent_rule_observability(
             effective_target,
             max_kw,
         )
-        if not urgent:
+        if not pre_urgent and not urgent:
             continue
         must_start = latest_start_datetime(deadline, effective_target, max_kw)
         observability[cid] = summarize_urgent_rule_usage(

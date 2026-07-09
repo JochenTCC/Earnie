@@ -1,0 +1,106 @@
+{
+  "$schema": "./deviation_rules.schema.json",
+  "version": 1,
+  "tolerances": {
+    "power_kw": 0.05,
+    "soc_percent": 0.1
+  },
+  "categories": {
+    "hint": {
+      "label": "Hinweis",
+      "symbol": "triangle-up",
+      "color": "#f1c40f"
+    },
+    "warning": {
+      "label": "Warnung",
+      "symbol": "diamond",
+      "color": "#e67e22"
+    },
+    "error": {
+      "label": "Fehler",
+      "symbol": "octagon",
+      "color": "#c0392b"
+    }
+  },
+  "rules": [
+    {
+      "id": "swimspa_thermal_band_ok",
+      "enabled": true,
+      "category": "warning",
+      "priority": 100,
+      "scope": "swimspa",
+      "when": [
+        "power_mismatch_positive",
+        "thermal_actual_in_band",
+        "heating_was_scheduled"
+      ],
+      "message": "SwimSpa nicht geheizt — Ist-Temperatur im Sollband"
+    },
+    {
+      "id": "eauto_pv_follow_missing",
+      "enabled": true,
+      "category": "error",
+      "priority": 60,
+      "scope": "eauto",
+      "when": [
+        "pv_follow_scheduled",
+        "pv_follow_power_below_tolerance"
+      ],
+      "message": "PV-Überschuss-Modus: Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW"
+    },
+    {
+      "id": "eauto_should_charge",
+      "enabled": true,
+      "category": "error",
+      "priority": 50,
+      "scope": "eauto",
+      "when": [
+        "power_mismatch_positive",
+        "plugged_in",
+        "remaining_kwh_above_threshold"
+      ],
+      "params": {
+        "remaining_kwh_threshold": 0.5
+      },
+      "message": "E-Auto: Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW"
+    },
+    {
+      "id": "battery_forced_discharge_missing",
+      "enabled": true,
+      "category": "error",
+      "priority": 75,
+      "scope": "battery",
+      "when": [
+        "mode_is_forced_discharge",
+        "battery_power_below_tolerance"
+      ],
+      "message": "Zwangs-Entladen nicht ausgeführt"
+    },
+    {
+      "id": "battery_forced_charge_missing",
+      "enabled": true,
+      "category": "error",
+      "priority": 80,
+      "scope": "battery",
+      "when": [
+        "mode_is_forced_charge",
+        "battery_power_below_tolerance"
+      ],
+      "message": "Zwangs-Laden nicht ausgeführt"
+    },
+    {
+      "id": "waermepumpe_enable_no_start",
+      "enabled": true,
+      "category": "hint",
+      "priority": 40,
+      "scope": "waermepumpe",
+      "when": [
+        "power_mismatch_positive"
+      ],
+      "message": "Wärmepumpe: Freigabe, aber nicht angesprungen (Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW)"
+    }
+  ],
+  "fallback": {
+    "on_unclassified_mismatch": "none"
+  }
+}
