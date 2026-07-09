@@ -18,8 +18,8 @@ from ui.chart_decorations import (
     _add_missing_slot_backgrounds,
     _add_sun_markers,
     _add_zone_backgrounds,
-    _chart_legend,
     _chart_range_start,
+    _collapsible_chart_layout,
     _mask_missing_log_slots,
     _sunrise_chart_title,
     build_sun_markers,
@@ -172,8 +172,7 @@ def build_power_soc_chart_figure(
             showgrid=False,
             range=[-5, 105],
         ),
-        legend=_chart_legend(),
-        margin=dict(l=40, r=40, t=top_margin, b=110),
+        **_collapsible_chart_layout(top_margin=top_margin),
     )
     return fig
 
@@ -328,8 +327,7 @@ def render_cumulative_cost_chart(
         title=plotly_title,
         xaxis=_chart_xaxis_config(axis, range_start=range_start),
         yaxis=dict(title="Kosten (€, kumuliert)"),
-        legend=_chart_legend(),
-        margin=dict(l=40, r=40, t=top_margin, b=110),
+        **_collapsible_chart_layout(top_margin=top_margin),
     )
     if has_consumption:
         layout["yaxis2"] = dict(

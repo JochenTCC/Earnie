@@ -590,7 +590,7 @@ def add_baseline_soc_traces(
                 abs_end,
                 tail_y=seg_tail_for_line,
                 step_line=False,
-                bridge_left=False,
+                bridge_left=(index > 0),
             )
             if matched_x.empty:
                 continue
@@ -630,41 +630,36 @@ def add_price_on_soc_axis_trace(
     extrap_end: int | None = None,
 ) -> None:
     """Strompreis auf der SoC-Achse — stündliche Stufen, an Slot-Rändern ausgerichtet."""
-    segments = _trace_segments(len(df), extrap_start, extrap_end)
-    for index, (start, end, _is_extrapolated) in enumerate(segments):
-        if start >= end:
-            continue
-        segment_df = df.iloc[start:end]
-        segment_axis = axis.slice(start, end)
-        line_x, line_y = _hourly_price_hv_xy(segment_axis, segment_df)
-        if line_x.empty:
-            continue
-        hour_prices = _hour_prices_from_df(segment_df)
-        customdata: list[float] = []
-        hour_idx = 0
-        for x in line_x:
-            x_ts = pd.Timestamp(x)
-            while hour_idx + 1 < len(hour_prices):
-                next_hour = hour_prices[hour_idx + 1][0]
-                if x_ts >= pd.Timestamp(next_hour):
-                    hour_idx += 1
-                else:
-                    break
-            customdata.append(hour_prices[hour_idx][1])
-        fig.add_trace(go.Scatter(
-            x=line_x,
-            y=line_y,
-            name="Preis" if index == 0 else "Preis",
-            showlegend=index == 0,
-            mode="lines",
-            line=dict(color="red", width=2.5, shape="hv"),
-            opacity=1.0,
-            yaxis=yaxis,
-            text=_hourly_price_hover_labels(segment_df, line_x),
-            customdata=customdata,
-            hovertemplate=(
-                "Uhrzeit: %{text}<br>Preis: %{customdata:.2f} Cent/kWh"
-                "<extra></extra>"
-            ),
-        ))
+    del extrap_start, extrap_end
+    line_x, line_y = _hourly_price_hv_xy(axis, df)
+    if line_x.empty:
+        return
+    hour_prices = _hour_prices_from_df(df)
+    customdata: list[float] = []
+    hour_idx = 0
+    for x in line_x:
+        x_ts = pd.Timestamp(x)
+        while hour_idx + 1 < len(hour_prices):
+            next_hour = hour_prices[hour_idx + 1][0]
+            if x_ts >= pd.Timestamp(next_hour):
+                hour_idx += 1
+            else:
+                break
+        customdata.append(hour_prices[hour_idx][1])
+    fig.add_trace(go.Scatter(
+        x=line_x,
+        y=line_y,
+        name="Preis",
+        showlegend=True,
+        mode="lines",
+        line=dict(color="red", width=2.5, shape="hv"),
+        opacity=1.0,
+        yaxis=yaxis,
+        text=_hourly_price_hover_labels(df, line_x),
+        customdata=customdata,
+        hovertemplate=(
+            "Uhrzeit: %{text}<br>Preis: %{customdata:.2f} Cent/kWh"
+            "<extra></extra>"
+        ),
+    ))
 

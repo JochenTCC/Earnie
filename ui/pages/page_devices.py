@@ -32,8 +32,16 @@ _DEVICES_HELP = (
     "nächste Optimierung einfließen (Nennleistung × Laufzeit)."
 )
 _DEFAULT_RUNTIME_H = 2.0
-_DELTA_COLUMN = "Delta zu bestem Zeitpunkt (€)"
+_DELTA_COLUMN = "Delta"
 _DELTA_EPS = 0.005
+_PLAN_ACTIVE_INPUT_HINT = (
+    "Plan aktiv — zuerst Häkchen entfernen, um Leistung/Laufzeit zu ändern."
+)
+
+
+def _appliance_inputs_disabled(active: dict | None) -> bool:
+    """Nennleistung/Laufzeit sperren, solange ein Optimierungsplan aktiv ist."""
+    return active is not None
 
 
 def _delta_to_best_eur(cost_eur: float, best_cost_eur: float) -> float:
@@ -149,6 +157,8 @@ def _render_appliance(appliance: dict, matrix: list) -> None:
     appliance_id = appliance["id"]
     default_kw = float(appliance.get("default_power_kw") or 0.0)
     default_runtime = float(appliance.get("default_runtime_h") or _DEFAULT_RUNTIME_H)
+    active = appliance_schedules.active_schedule_for(appliance_id)
+    inputs_disabled = _appliance_inputs_disabled(active)
     with st.form(key=f"appliance_form_{appliance_id}"):
         col_power, col_runtime = st.columns(2)
         power_kw = col_power.number_input(
@@ -157,6 +167,7 @@ def _render_appliance(appliance: dict, matrix: list) -> None:
             value=default_kw,
             step=0.1,
             key=f"appliance_power_{appliance_id}",
+            disabled=inputs_disabled,
         )
         runtime_h = col_runtime.number_input(
             "Laufzeit (h)",
@@ -164,14 +175,20 @@ def _render_appliance(appliance: dict, matrix: list) -> None:
             value=default_runtime,
             step=0.25,
             key=f"appliance_runtime_{appliance_id}",
+            disabled=inputs_disabled,
         )
-        if appliance["power_source"] == "loxone" and default_kw > 0:
+        if inputs_disabled:
+            st.caption(_PLAN_ACTIVE_INPUT_HINT)
+        elif appliance["power_source"] == "loxone" and default_kw > 0:
             hint = f"Hinweis: {default_kw:.2f} kW (aus Config"
             merker = appliance.get("loxone_power_name")
             if merker:
                 hint += f"; Merker '{merker}' für spätere Adaption"
             col_power.caption(f"{hint})")
-        save_defaults = st.form_submit_button("In config.json speichern")
+        save_defaults = st.form_submit_button(
+            "In config.json speichern",
+            disabled=inputs_disabled,
+        )
     if save_defaults:
         _save_appliance_defaults(appliance_id, power_kw, runtime_h)
     if power_kw is None or power_kw <= 0:
@@ -234,6 +251,76 @@ def _schedule_matches_option(schedule: dict, option_start) -> bool:
 
 
 _PLAN_CHECKBOX_PREFIX = "appliance_plan_"
+_REC_TABLE_COL_WIDTHS = [1, 1, 1, 1]
+# Spaltenbreiten (rem) — Plan | Start | Güte | Delta
+_REC_TABLE_COL_REM = (1.55, 5.0, 6.0, 5.0)
+
+
+def _recommendation_table_css() -> str:
+    col_rules = "\n".join(
+        f"""[class*="st-key-appliance_rec_table_"] [data-testid="stColumn"]:nth-child({index}) {{
+    width: {width_rem}rem !important;
+    flex-basis: {width_rem}rem !important;
+    max-width: {width_rem}rem;
+}}"""
+        for index, width_rem in enumerate(_REC_TABLE_COL_REM, start=1)
+    )
+    return f"""
+<style>
+[class*="st-key-appliance_rec_table_"] {{
+    width: fit-content !important;
+    max-width: 100%;
+}}
+[class*="st-key-appliance_rec_table_"] [data-testid="stVerticalBlock"] {{
+    gap: 0.4rem !important;
+}}
+[class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"] {{
+    width: fit-content !important;
+    max-width: 100%;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.2rem !important;
+    min-height: 0.8em;
+}}
+[class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"]:first-child {{
+    padding-bottom: 1.3rem; 
+    margin-bottom: 0.0rem;
+    border-bottom: 1px solid rgba(49, 51, 63, 0.18);
+}}
+[class*="st-key-appliance_rec_table_"] [data-testid="stColumn"] {{
+    flex: 0 0 auto !important;
+    flex-grow: 0 !important;
+    min-width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}}
+{col_rules}
+[class*="st-key-appliance_rec_table_"] [data-testid="stMarkdown"] p {{
+    margin-top: 0;
+    margin-bottom: 0;
+    line-height: 0.8;
+}}
+[class*="st-key-appliance_rec_table_"] [data-testid="stCheckbox"] label {{
+    min-height: 0;
+    padding: 0;
+}}
+[class*="st-key-appliance_rec_table_"] [data-testid="stCheckbox"] {{
+    padding: 0;
+    margin: 0;
+}}
+[class*="st-key-appliance_rec_table_"] [data-testid="stColumn"]:nth-child(1) [data-testid="stVerticalBlock"] {{
+    justify-content: center;
+}}
+@media (max-width: 768px) {{
+    [class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"] {{
+        overflow-x: auto;
+    }}
+}}
+.stApp[data-theme="dark"] [class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"]:first-child {{
+    border-bottom-color: rgba(250, 250, 250, 0.15);
+}}
+</style>
+"""
 
 
 def _plan_checkbox_key(appliance_id: str, index: int) -> str:
@@ -284,6 +371,10 @@ def _on_plan_checkbox_change(
         st.error(f"Plan konnte nicht gespeichert werden: {exc}")
 
 
+def _inject_recommendation_table_css() -> None:
+    st.markdown(_recommendation_table_css(), unsafe_allow_html=True)
+
+
 def _render_recommendation_table(
     appliance_id: str,
     rec: ApplianceRecommendation,
@@ -298,34 +389,37 @@ def _render_recommendation_table(
             f"({active['power_kw']} kW × {active['runtime_h']} h)."
         )
     st.caption(
-        "Häkchen hinter der Startzeit = sofort in die nächste Optimierung; "
+        "Häkchen vor der Startzeit = sofort in die nächste Optimierung; "
         "entfernen löscht den Plan."
     )
+    _inject_recommendation_table_css()
     best_cost = rec.cheapest.cost_eur
-    header = st.columns([1.4, 1.0, 0.9, 1.4])
-    header[0].markdown("**Start**")
-    header[1].markdown("**Güte**")
-    header[2].markdown("**Kosten (€)**")
-    header[3].markdown(f"**{_DELTA_COLUMN}**")
-    for index, option in enumerate(rec.options):
-        delta = _delta_to_best_eur(option.cost_eur, best_cost)
-        row = st.columns([1.4, 1.0, 0.9, 1.4])
-        with row[0]:
-            time_col, check_col = st.columns([0.75, 0.25], gap="small")
-            time_col.markdown(f"**{option.start_datetime:%H:%M}**")
-            check_col.checkbox(
+    with st.container(key=f"appliance_rec_table_{appliance_id}", width="content"):
+        header = st.columns(
+            _REC_TABLE_COL_WIDTHS, gap="xxsmall", vertical_alignment="center"
+        )
+        header[0].markdown("")
+        header[1].markdown("**Startzeit**")
+        header[2].markdown("**Ranking**")
+        header[3].markdown(f"**{_DELTA_COLUMN}**")
+        for index, option in enumerate(rec.options):
+            delta = _delta_to_best_eur(option.cost_eur, best_cost)
+            row = st.columns(
+                _REC_TABLE_COL_WIDTHS, gap="xxsmall", vertical_alignment="center"
+            )
+            row[0].checkbox(
                 "Planen",
                 label_visibility="collapsed",
                 key=_plan_checkbox_key(appliance_id, index),
                 on_change=_on_plan_checkbox_change,
                 args=(appliance_id, index, rec, power_kw, runtime_h),
             )
-        row[1].markdown(_stars_text(option.stars))
-        row[2].markdown(f"{option.cost_eur:.2f}")
-        row[3].markdown(
-            f'<span style="{_delta_cell_color(delta)}">{delta:+.2f}</span>',
-            unsafe_allow_html=True,
-        )
+            row[1].markdown(f"**{option.start_datetime:%H:%M}**")
+            row[2].markdown(_stars_text(option.stars))
+            row[3].markdown(
+                f'<span style="{_delta_cell_color(delta)}">{delta:+.2f}</span>',
+                unsafe_allow_html=True,
+            )
 
 
 def _render_cheapest_caption(rec: ApplianceRecommendation) -> None:
@@ -334,7 +428,7 @@ def _render_cheapest_caption(rec: ApplianceRecommendation) -> None:
     color = _delta_cell_color(delta)
     st.markdown(
         f"Günstigste Startzeit: **{best.start_datetime:%H:%M} Uhr** · "
-        f"{best.cost_eur:.2f} € · {_DELTA_COLUMN} (sofort): "
+        f"{best.cost_eur:.2f} € · Delta (sofort): "
         f'<span style="{color}">{delta:+.2f} €</span>',
         unsafe_allow_html=True,
     )

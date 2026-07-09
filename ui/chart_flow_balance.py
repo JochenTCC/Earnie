@@ -46,6 +46,7 @@ from ui.chart_colors import (
     chart1_baseload_color_for_zone,
     chart1_pv_color_for_zone,
     flex_bar_chart_color,
+    manual_appliance_pattern_shape,
     consumer_chart_saturation_for_zone,
     hsl,
 )
@@ -766,6 +767,13 @@ def _accumulate_slot_traces(
                 consumer,
                 column,
             )
+            if not pattern_shape:
+                from optimizer.appliance_schedule import is_manual_appliance_chart_consumer
+
+                if is_manual_appliance_chart_consumer(consumer):
+                    pattern_shape = manual_appliance_pattern_shape(
+                        str(consumer.get("id", "")),
+                    )
             if row is not None:
                 pv_col = consumer_pv_follow_column_name(consumer)
                 imm_col = consumer_immediate_charge_column_name(consumer)
