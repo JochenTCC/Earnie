@@ -5,7 +5,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from ui.charts import ChartSlotAxis, _add_zone_backgrounds, _chart_legend, _chart_xaxis_config
+from ui.chart_decorations import _add_zone_backgrounds, _chart_legend
+from ui.chart_slot_axis import ChartSlotAxis, _chart_xaxis_config
 
 
 def _axis_for_df(df: pd.DataFrame) -> ChartSlotAxis:

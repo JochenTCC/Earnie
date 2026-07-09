@@ -53,14 +53,14 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Abnahme:** Volle pytest-Suite grün; Charts 1+2 manuell (SoC-Rampe, S-2-Split, Consumer-Stack, Entladesperre).
 
-- [ ] **Epic 1 — `optimizer/milp.py`** (~991 → ~170)
+- [x] **Epic 1 — `optimizer/milp.py`** (~991 → ~170)
   - `milp_consumers.py`, `milp_horizon.py`, `milp_result.py`; `_derive_control_from_milp` → [`optimizer/battery.py`](optimizer/battery.py)
   - Re-Exports privater `_`-Symbole für Tests; Docstring `milp_optimizer` (7 Rückgabewerte)
-- [ ] **Epic 2 — `config.py`** (~1543 → ~720)
+- [x] **Epic 2 — `config.py`** (~1543 → ~720)
   - Neues Paket [`settings/`](settings/) (kein Python-Paket `config/` — Namenskollision mit JSON-Ordner + Root-Modul)
   - `settings/json_io.py`, `flexible_consumers.py`, `appliances.py`, `scenarios.py`, `system_settings.py`
   - [`config.py`](config.py) bleibt Orchestrator + `import config`-Fassade; Abgrenzung zu [`house_config/`](house_config/) (Live vs. Backtesting)
-- [ ] **Epic 3 — `ui/charts.py`** (~2822 → ~400)
+- [x] **Epic 3 — `ui/charts.py`** (~2822 → ~400)
   - **3a:** `chart_slot_axis.py`, `chart_trace_segments.py` — Import-Zyklus mit [`chart_flow_balance.py`](ui/chart_flow_balance.py) auflösen
   - **3b:** `chart_soc.py`, `chart_cumulative.py`, `chart_decorations.py`, `chart_consumer_stack.py`
   - **3c:** [`ui/charts.py`](ui/charts.py) als dünne Fassade + Re-Exports; Caller [`consumer_analysis_charts.py`](ui/consumer_analysis_charts.py) bereinigen
@@ -132,7 +132,8 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Readme ausführlicher machen mit Motivation / Nutzen
   - Sinnvolle Reihenfolge in der Nutzung beschreiben
   - Weniger technische Hintergründe beschreiben als Hinweise zur Installation und Konfiguration
-- [ ] Weiteren Container für Windows machen
+- [ ] Weiteren Container für Windows machen und als reine Python-Umgebung (wenn das Sinn macht)
+- [ ] Ausführung als "Web-App" prüfen
 
 ### Version 1.+1
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**

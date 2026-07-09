@@ -1,14 +1,9 @@
 # config.py
 import os
 import json
-import re
-from datetime import datetime
 
 from runtime_store.dotenv_io import loxone_credentials_configured
 from runtime_store.dotenv_loader import load_app_dotenv
-
-_HEX_CHART_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
-_CONSUMER_PALETTE_SIZE = 8
 
 # Sensible Daten aus .env laden (Prod: config/.env, Dev: Fallback ./.env)
 load_app_dotenv()
@@ -21,6 +16,11 @@ from runtime_store.persist_paths import (
     resolve_local_settings_json_path,
     resolve_tariffs_json_path,
 )
+from settings import appliances as appliance_settings
+from settings import flexible_consumers as fc_settings
+from settings import scenarios as scenario_settings
+from settings import system_settings
+from settings.json_io import read_json_dict, write_json_dict
 
 CONFIG_JSON_PATH = resolve_config_json_path()
 BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
@@ -36,6 +36,30 @@ def _default_require_loxone_credentials() -> bool:
 
 
 class Config:
+    # --- Delegation an settings/* (API-Stabilität für Tests und Caller) ---
+    _read_json_dict = staticmethod(read_json_dict)
+    _normalize_consumer = staticmethod(fc_settings.normalize_consumer)
+    _consumer_has_daily_target = staticmethod(fc_settings.consumer_has_daily_target)
+    _charging_efficiency = staticmethod(fc_settings.charging_efficiency)
+    target_kwh_from_rest_soc = staticmethod(fc_settings.target_kwh_from_rest_soc)
+    target_kwh_from_day_schedule = staticmethod(fc_settings.target_kwh_from_day_schedule)
+    _normalize_appliance = staticmethod(appliance_settings.normalize_appliance)
+    _optional_positive = staticmethod(appliance_settings.optional_positive)
+    _normalize_appliance_recommendation = staticmethod(
+        appliance_settings.normalize_appliance_recommendation
+    )
+    _normalize_scenario = staticmethod(scenario_settings.normalize_scenario)
+    _load_loxone_silent_mode = staticmethod(system_settings.load_loxone_silent_mode)
+    _load_event_trigger_enabled = staticmethod(system_settings.load_event_trigger_enabled)
+    _load_ui_fragment_refresh_sec = staticmethod(system_settings.load_ui_fragment_refresh_sec)
+    _load_ui_bool = staticmethod(system_settings.load_ui_bool)
+    _load_ui_streamlit_port = staticmethod(system_settings.load_ui_streamlit_port)
+    _load_ui_chart_debug_capture_dir = staticmethod(
+        system_settings.load_ui_chart_debug_capture_dir
+    )
+    _load_event_poll_interval_sec = staticmethod(system_settings.load_event_poll_interval_sec)
+    _normalize_event_trigger = staticmethod(system_settings.normalize_event_trigger)
+
     def __init__(
         self,
         config_path: str = CONFIG_JSON_PATH,
@@ -62,23 +86,6 @@ class Config:
         self._load_static_params()
         self._load_dynamic_params()
 
-    @staticmethod
-    def _read_json_dict(path: str) -> dict:
-        """Liest JSON mit UTF-8; Fallback cp1252 (häufig bei manueller Bearbeitung auf Windows/Synology)."""
-        last_decode_error: UnicodeDecodeError | None = None
-        for encoding in ("utf-8-sig", "utf-8", "cp1252"):
-            try:
-                with open(path, "r", encoding=encoding) as f:
-                    return json.load(f)
-            except UnicodeDecodeError as e:
-                last_decode_error = e
-            except json.JSONDecodeError:
-                raise
-        raise ValueError(
-            f"Konfigurationsdatei '{path}' ist weder UTF-8 noch cp1252 "
-            f"(z. B. Umlaute wie in 'Wärmepumpe'). Bitte als UTF-8 speichern."
-        ) from last_decode_error
-
     def _load_json(self) -> dict:
         if not os.path.exists(self.config_path):
             raise FileNotFoundError(
@@ -86,7 +93,7 @@ class Config:
             )
 
         try:
-            return self._read_json_dict(self.config_path)
+            return read_json_dict(self.config_path)
         except json.JSONDecodeError as e:
             raise ValueError(
                 f"Kritischer Fehler: '{self.config_path}' enthält ungültiges JSON: {e}"
@@ -116,181 +123,19 @@ class Config:
             )
         return rel
 
-    @staticmethod
-    def _load_loxone_silent_mode(raw_config: dict, local_settings: dict, local_settings_path: str) -> bool:
-        if "loxone_silent_mode" in raw_config.get("system", {}):
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: system.loxone_silent_mode gehört nicht mehr "
-                f"in config.json — bitte in '{local_settings_path}' setzen."
-            )
-        raw = local_settings.get("loxone_silent_mode")
-        if raw is None:
-            return False
-        if not isinstance(raw, bool):
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: loxone_silent_mode in '{local_settings_path}' "
-                "muss true oder false sein."
-            )
-        return raw
-
     def _load_local_settings_document(self) -> dict:
         path = self.local_settings_path
         if not os.path.isfile(path):
             return {}
         try:
-            return self._read_json_dict(path)
+            return read_json_dict(path)
         except json.JSONDecodeError as e:
             raise ValueError(
                 f"Kritischer Fehler: '{path}' enthält ungültiges JSON: {e}"
             ) from e
 
-    @staticmethod
-    def _load_event_trigger_enabled(raw_config: dict) -> bool:
-        raw = raw_config.get("system", {}).get("event_trigger_enabled")
-        if raw is None:
-            return True
-        if not isinstance(raw, bool):
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: system.event_trigger_enabled "
-                "muss true oder false sein."
-            )
-        return raw
-
-    @staticmethod
-    def _load_ui_fragment_refresh_sec(raw_config: dict, key: str, default: int) -> int:
-        raw = raw_config.get("ui", {}).get(key)
-        if raw is None:
-            return default
-        try:
-            value = int(raw)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: ui.{key} muss eine ganze Zahl sein."
-            ) from exc
-        if value < 1:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: ui.{key} muss mindestens 1 sein."
-            )
-        return value
-
-    @staticmethod
-    def _load_ui_bool(raw_config: dict, key: str, default: bool) -> bool:
-        raw = raw_config.get("ui", {}).get(key)
-        if raw is None:
-            return default
-        if not isinstance(raw, bool):
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: ui.{key} muss true oder false sein."
-            )
-        return raw
-
-    @staticmethod
-    def _load_ui_streamlit_port(raw_config: dict) -> int:
-        raw = raw_config.get("ui", {}).get("streamlit_port")
-        if raw is None:
-            return 8501
-        try:
-            value = int(raw)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: ui.streamlit_port muss eine ganze Zahl sein."
-            ) from exc
-        if not 1024 <= value <= 65535:
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: ui.streamlit_port muss zwischen 1024 und 65535 liegen."
-            )
-        return value
-
-    @staticmethod
-    def _load_ui_chart_debug_capture_dir(raw_config: dict) -> str:
-        raw = raw_config.get("ui", {}).get("chart_debug_capture_dir")
-        if raw is None:
-            return "chart_debug"
-        path = str(raw).strip()
-        if not path:
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: ui.chart_debug_capture_dir darf nicht leer sein."
-            )
-        return path
-
-    @staticmethod
-    def _load_event_poll_interval_sec(raw_config: dict) -> int:
-        system = raw_config.get("system", {})
-        raw = system.get("event_poll_interval_sec")
-        if raw is None:
-            raw = system.get("charging_poll_interval_sec")
-        if raw is None:
-            return 60
-        try:
-            value = int(raw)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: system.event_poll_interval_sec "
-                "muss eine ganze Zahl sein."
-            ) from exc
-        if value < 1:
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: system.event_poll_interval_sec "
-                "muss mindestens 1 sein."
-            )
-        return value
-
-    @staticmethod
-    def _normalize_event_trigger(raw: dict, index: int) -> dict:
-        if not isinstance(raw, dict):
-            raise ValueError(f"system.event_triggers[{index}] muss ein Objekt sein.")
-        trigger_id = str(raw.get("id", "")).strip()
-        if not trigger_id:
-            raise ValueError(f"system.event_triggers[{index}]: id fehlt.")
-        loxone_name = str(raw.get("loxone_name", "")).strip()
-        if not loxone_name:
-            raise ValueError(
-                f"system.event_triggers[{index}] ('{trigger_id}'): loxone_name fehlt."
-            )
-        signal_type = str(raw.get("signal_type", "")).strip().lower()
-        if signal_type not in ("binary", "text", "analog"):
-            raise ValueError(
-                f"system.event_triggers[{index}] ('{trigger_id}'): "
-                "signal_type muss 'binary', 'text' oder 'analog' sein."
-            )
-        on_change = str(raw.get("on_change", "")).strip().lower()
-        if signal_type == "binary":
-            allowed = {"any", "rising", "falling"}
-        else:
-            allowed = {"any"}
-        if on_change not in allowed:
-            allowed_text = ", ".join(sorted(allowed))
-            raise ValueError(
-                f"system.event_triggers[{index}] ('{trigger_id}'): "
-                f"on_change muss einer von [{allowed_text}] sein."
-            )
-        label = str(raw.get("label", trigger_id)).strip() or trigger_id
-        return {
-            "id": trigger_id,
-            "loxone_name": loxone_name,
-            "signal_type": signal_type,
-            "on_change": on_change,
-            "label": label,
-        }
-
     def _load_event_triggers(self) -> list[dict]:
-        raw = self._raw_config.get("system", {}).get("event_triggers")
-        if raw is None:
-            return []
-        if not isinstance(raw, list):
-            raise ValueError("Kritischer Konfigurationsfehler: system.event_triggers muss ein Array sein.")
-        seen: set[str] = set()
-        triggers: list[dict] = []
-        for index, item in enumerate(raw):
-            spec = self._normalize_event_trigger(item, index)
-            if spec["id"] in seen:
-                raise ValueError(
-                    f"Kritischer Konfigurationsfehler: system.event_triggers enthält "
-                    f"doppelte id '{spec['id']}'."
-                )
-            seen.add(spec["id"])
-            triggers.append(spec)
-        return triggers
+        return system_settings.load_event_triggers(self._raw_config)
 
     def _load_env_vars(self) -> None:
         self.LOXONE_IP = os.getenv("LOXONE_IP")
@@ -314,39 +159,39 @@ class Config:
         self.GLOBAL_TIMEOUT = self._get_strict(self._raw_config, ["system", "global_timeout"])
         self.LOOP_TIMEOUT = self._get_strict(self._raw_config, ["system", "loop_timeout"])
         local_settings = self._load_local_settings_document()
-        self.LOXONE_SILENT_MODE = self._load_loxone_silent_mode(
+        self.LOXONE_SILENT_MODE = system_settings.load_loxone_silent_mode(
             self._raw_config,
             local_settings,
             self.local_settings_path,
         )
-        self.EVENT_TRIGGER_ENABLED = self._load_event_trigger_enabled(self._raw_config)
-        self.EVENT_POLL_INTERVAL_SEC = self._load_event_poll_interval_sec(self._raw_config)
+        self.EVENT_TRIGGER_ENABLED = system_settings.load_event_trigger_enabled(self._raw_config)
+        self.EVENT_POLL_INTERVAL_SEC = system_settings.load_event_poll_interval_sec(self._raw_config)
         self.EVENT_TRIGGERS = self._load_event_triggers()
-        self.UI_FRAGMENT_REFRESH_CHARTS_SEC = self._load_ui_fragment_refresh_sec(
+        self.UI_FRAGMENT_REFRESH_CHARTS_SEC = system_settings.load_ui_fragment_refresh_sec(
             self._raw_config,
             "fragment_refresh_charts_sec",
             60,
         )
-        self.UI_FRAGMENT_REFRESH_STATUS_SEC = self._load_ui_fragment_refresh_sec(
+        self.UI_FRAGMENT_REFRESH_STATUS_SEC = system_settings.load_ui_fragment_refresh_sec(
             self._raw_config,
             "fragment_refresh_status_sec",
             10,
         )
-        self.UI_MAIN_SYNC_POLL_SEC = self._load_ui_fragment_refresh_sec(
+        self.UI_MAIN_SYNC_POLL_SEC = system_settings.load_ui_fragment_refresh_sec(
             self._raw_config,
             "main_sync_poll_sec",
             15,
         )
-        self.UI_CHART_DEBUG_CAPTURE_ENABLED = self._load_ui_bool(
+        self.UI_CHART_DEBUG_CAPTURE_ENABLED = system_settings.load_ui_bool(
             self._raw_config,
             "chart_debug_capture_enabled",
             False,
         )
-        self.UI_CHART_DEBUG_CAPTURE_DIR = self._load_ui_chart_debug_capture_dir(
+        self.UI_CHART_DEBUG_CAPTURE_DIR = system_settings.load_ui_chart_debug_capture_dir(
             self._raw_config
         )
-        self.UI_STREAMLIT_PORT = self._load_ui_streamlit_port(self._raw_config)
-        self.UI_PRICE_FORECAST_PAGE_ENABLED = self._load_ui_bool(
+        self.UI_STREAMLIT_PORT = system_settings.load_ui_streamlit_port(self._raw_config)
+        self.UI_PRICE_FORECAST_PAGE_ENABLED = system_settings.load_ui_bool(
             self._raw_config,
             "price_forecast_page_enabled",
             False,
@@ -389,381 +234,10 @@ class Config:
         self.WP_NOMINAL_POWER_KW = float(wp_consumer.get("nominal_power_kw", 1.6)) if wp_consumer else 1.6
 
     def _consumer_by_id(self, consumer_id: str) -> dict | None:
-        for raw in self._raw_config.get("flexible_consumers", []):
-            if raw.get("id") == consumer_id:
-                return self._normalize_consumer(raw)
-        return None
+        return fc_settings.consumer_by_id(self._raw_config, consumer_id)
 
     def _consumer_path(self, consumer_id: str, default: str = "") -> str:
-        consumer = self._consumer_by_id(consumer_id)
-        return consumer.get("path_log", default) if consumer else default
-
-    @staticmethod
-    def _normalize_day_schedule(block: dict | None) -> dict:
-        if not isinstance(block, dict):
-            return {}
-        out = {}
-        available = block.get("car_available_from_hour", block.get("charge_from_hour"))
-        ready = block.get("ready_by_hour", block.get("charge_until_hour"))
-        if available is not None:
-            out["car_available_from_hour"] = int(available) % 24
-        if ready is not None:
-            out["ready_by_hour"] = int(ready) % 24
-        if block.get("daily_rest_soc") is not None:
-            out["daily_rest_soc"] = float(block["daily_rest_soc"])
-        return out
-
-    @staticmethod
-    def _charging_efficiency(sched: dict) -> float:
-        """Lade-Wirkungsgrad (Netz-/Zählerenergie → Akku); Default 0,95 wenn nicht gesetzt."""
-        raw = sched.get("charging_efficiency")
-        if raw is None:
-            return 0.90
-        efficiency = float(raw)
-        if efficiency <= 0.0 or efficiency > 1.0:
-            raise ValueError(
-                "charging_schedule.charging_efficiency muss ein Wert zwischen 0 (exklusiv) "
-                "und 1 (inklusiv) sein."
-            )
-        return efficiency
-
-    @staticmethod
-    def target_kwh_from_rest_soc(
-        consumer: dict,
-        rest_soc_percent: float | None,
-        *,
-        capacity_kwh: float | None,
-    ) -> float | None:
-        """Berechnet Ladeziel (kWh) aus Rest-SOC (%), Kapazität und Lade-Wirkungsgrad."""
-        if rest_soc_percent is None:
-            return None
-        if capacity_kwh is None:
-            return None
-        capacity = float(capacity_kwh)
-        if capacity <= 0:
-            return None
-        sched = consumer.get("charging_schedule") or {}
-        target_soc = float(sched.get("target_soc_percent", 100.0) or 100.0)
-        battery_delta_kwh = (target_soc - float(rest_soc_percent)) / 100.0 * capacity
-        efficiency = Config._charging_efficiency(sched)
-        return max(0.0, battery_delta_kwh / efficiency)
-
-    @staticmethod
-    def target_kwh_from_day_schedule(
-        consumer: dict,
-        when: datetime,
-        *,
-        capacity_kwh: float | None,
-    ) -> float | None:
-        """Ladeziel (kWh) aus daily_rest_soc des passenden Wochentags in charging_schedule."""
-        sched = consumer.get("charging_schedule")
-        if not sched or not sched.get("enabled"):
-            return None
-        day_key = "weekend" if when.weekday() >= 5 else "weekday"
-        rest_soc = (sched.get(day_key) or {}).get("daily_rest_soc")
-        return Config.target_kwh_from_rest_soc(
-            consumer, rest_soc, capacity_kwh=capacity_kwh
-        )
-
-    @staticmethod
-    def _normalize_loxone_outputs(raw: dict | None) -> dict:
-        if not isinstance(raw, dict):
-            return {}
-        enable_name = str(raw.get("enable_name", "")).strip()
-        setpoint_name = str(raw.get("power_setpoint_name", "")).strip()
-        if enable_name and setpoint_name:
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: enable_name und power_setpoint_name "
-                "dürfen nicht gleichzeitig gesetzt sein."
-            )
-        out: dict[str, str] = {}
-        if enable_name:
-            out["enable_name"] = enable_name
-        if setpoint_name:
-            out["power_setpoint_name"] = setpoint_name
-        pv_follow_name = str(raw.get("pv_follow_name", "")).strip()
-        if pv_follow_name:
-            if not setpoint_name:
-                raise ValueError(
-                    "Kritischer Konfigurationsfehler: pv_follow_name erfordert "
-                    "power_setpoint_name."
-                )
-            out["pv_follow_name"] = pv_follow_name
-        return out
-
-    @staticmethod
-    def _normalize_loxone_inputs(raw: dict | None) -> dict:
-        """Live-Messwerte aus Loxone (cons_data / Monitoring)."""
-        if not isinstance(raw, dict):
-            return {}
-        power_name = str(raw.get("power_name", "")).strip()
-        return {"power_name": power_name} if power_name else {}
-
-    @staticmethod
-    def _normalize_filter_schedule(raw, consumer_id: str) -> dict | None:
-        if not isinstance(raw, dict):
-            return None
-        enabled = bool(raw.get("enabled"))
-        if not enabled:
-            return {"enabled": False}
-        loxone_raw = raw.get("loxone") if isinstance(raw.get("loxone"), dict) else {}
-        fallback_raw = raw.get("config_fallback") if isinstance(raw.get("config_fallback"), dict) else {}
-        return {
-            "enabled": True,
-            "loxone": {
-                "native_start_hour_name": str(loxone_raw.get("native_start_hour_name", "")).strip(),
-                "native_duration_hours_name": str(loxone_raw.get("native_duration_hours_name", "")).strip(),
-            },
-            "config_fallback": {
-                "native_start_hour": fallback_raw.get("native_start_hour"),
-                "native_duration_hours": fallback_raw.get("native_duration_hours"),
-            },
-        }
-
-    @staticmethod
-    def _normalize_charging_schedule(raw: dict | None) -> dict | None:
-        if not raw or not bool(raw.get("enabled", False)):
-            return None
-        loxone = {}
-        if isinstance(raw.get("loxone"), dict):
-            for key in (
-                "plugged_in_name",
-                "ready_by_time_name",
-                "soc_at_plug_in_name",
-                "nominal_power_kw_name",
-                "battery_capacity_kwh_name",
-                "charge_immediate_remaining_name",
-                "charge_enable_name",
-                "charge_immediate_name",
-            ):
-                if raw["loxone"].get(key):
-                    loxone[key] = str(raw["loxone"][key]).strip()
-        if not loxone.get("battery_capacity_kwh_name"):
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: charging_schedule.enabled=true "
-                "erfordert loxone.battery_capacity_kwh_name (Kapazität nur aus Loxone)."
-            )
-        charging_efficiency = raw.get("charging_efficiency")
-        normalized_efficiency = (
-            Config._charging_efficiency({"charging_efficiency": charging_efficiency})
-            if charging_efficiency is not None
-            else 0.95
-        )
-        return {
-            "enabled": True,
-            "forecast_when_absent": bool(raw.get("forecast_when_absent", False)),
-            "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
-            "charging_efficiency": normalized_efficiency,
-            "weekday": Config._normalize_day_schedule(raw.get("weekday")),
-            "weekend": Config._normalize_day_schedule(raw.get("weekend")),
-            "loxone": loxone,
-        }
-
-    @staticmethod
-    def _normalize_thermal_control(raw: dict | None, consumer_id: str) -> dict | None:
-        if not isinstance(raw, dict) or not bool(raw.get("enabled", False)):
-            return None
-        mode = str(raw.get("mode", "observe")).strip().lower()
-        if mode not in ("observe", "active"):
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "thermal_control.mode muss 'observe' oder 'active' sein."
-            )
-        volume = raw.get("water_volume_liters")
-        if volume is None:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "thermal_control.water_volume_liters fehlt."
-            )
-        volume = float(volume)
-        if volume <= 0:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "thermal_control.water_volume_liters muss > 0 sein."
-            )
-        efficiency = raw.get("heating_efficiency")
-        if efficiency is None:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "thermal_control.heating_efficiency fehlt."
-            )
-        efficiency = float(efficiency)
-        if not 0.0 < efficiency <= 1.0:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "thermal_control.heating_efficiency muss zwischen 0 (exkl.) und 1 liegen."
-            )
-        heat_loss = raw.get("heat_loss_kw_per_k")
-        if heat_loss is not None:
-            heat_loss = float(heat_loss)
-            if heat_loss < 0:
-                raise ValueError(
-                    f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                    "thermal_control.heat_loss_kw_per_k muss >= 0 sein."
-                )
-        threshold = float(raw.get("heating_power_threshold_kw", 2.0) or 2.0)
-        if threshold < 0:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "thermal_control.heating_power_threshold_kw muss >= 0 sein."
-            )
-        step = float(raw.get("actual_temp_step_c", 0.5) or 0.5)
-        if step <= 0:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "thermal_control.actual_temp_step_c muss > 0 sein."
-            )
-        loxone = {}
-        if isinstance(raw.get("loxone"), dict):
-            for key in (
-                "actual_temp_name",
-                "setpoint_temp_name",
-                "ambient_temp_name",
-                "tolerance_c_name",
-            ):
-                if raw["loxone"].get(key):
-                    loxone[key] = str(raw["loxone"][key]).strip()
-        history_logs = {}
-        if isinstance(raw.get("history_logs"), dict):
-            for key in ("actual_temp_csv", "ambient_temp_csv", "power_csv"):
-                path = str(raw["history_logs"].get(key, "")).strip()
-                if path:
-                    history_logs[key] = path
-        setpoint = raw.get("setpoint_c")
-        tolerance = raw.get("tolerance_c")
-        return {
-            "enabled": True,
-            "mode": mode,
-            "setpoint_c": None if setpoint is None else float(setpoint),
-            "tolerance_c": None if tolerance is None else float(tolerance),
-            "water_volume_liters": volume,
-            "heat_loss_kw_per_k": heat_loss,
-            "heating_efficiency": efficiency,
-            "heating_power_threshold_kw": threshold,
-            "actual_temp_step_c": step,
-            "history_logs": history_logs,
-            "loxone": loxone,
-        }
-
-    @staticmethod
-    def _normalize_chart_color_index(raw: dict, consumer_id: str) -> int:
-        if "chart_color_index" not in raw:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                f"chart_color_index fehlt (Pflichtfeld, Integer 0–{_CONSUMER_PALETTE_SIZE - 1})."
-            )
-        try:
-            index = int(raw["chart_color_index"])
-        except (TypeError, ValueError) as exc:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                f"chart_color_index muss Integer 0–{_CONSUMER_PALETTE_SIZE - 1} sein."
-            ) from exc
-        if index < 0 or index >= _CONSUMER_PALETTE_SIZE:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                f"chart_color_index muss 0–{_CONSUMER_PALETTE_SIZE - 1} sein, erhalten: {index}."
-            )
-        if "chart_color" in raw:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "chart_color ist entfernt — nur chart_color_index verwenden."
-            )
-        return index
-
-    @staticmethod
-    def _normalize_consumer(raw: dict) -> dict:
-        source = str(raw.get("daily_target_source", "config")).lower().strip()
-        if "daily_target_source" not in raw:
-            charging_raw = raw.get("charging_schedule")
-            if isinstance(charging_raw, dict) and charging_raw.get("source"):
-                legacy = str(charging_raw["source"]).lower().strip()
-                if legacy in ("config", "historical", "loxone", "loxone_remaining_hours", "thermal"):
-                    source = legacy
-        if source not in ("config", "historical", "loxone", "loxone_remaining_hours", "thermal"):
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers Eintrag '{raw.get('id', '?')}' "
-                "daily_target_source muss config, historical, loxone, loxone_remaining_hours oder thermal sein."
-            )
-        consumer_id = str(raw["id"])
-        thermal_control = Config._normalize_thermal_control(
-            raw.get("thermal_control"), consumer_id
-        )
-        if source == "thermal":
-            if not thermal_control or not thermal_control.get("enabled"):
-                raise ValueError(
-                    f"Kritischer Konfigurationsfehler: '{consumer_id}' "
-                    "daily_target_source=thermal erfordert thermal_control.enabled=true."
-                )
-            if thermal_control.get("mode") != "active":
-                raise ValueError(
-                    f"Kritischer Konfigurationsfehler: '{consumer_id}' "
-                    "daily_target_source=thermal erfordert thermal_control.mode=active."
-                )
-            if thermal_control.get("heat_loss_kw_per_k") is None:
-                raise ValueError(
-                    f"Kritischer Konfigurationsfehler: '{consumer_id}' "
-                    "daily_target_source=thermal erfordert heat_loss_kw_per_k "
-                    "(python -m scripts.tune_thermal_model)."
-                )
-        loxone_outputs = Config._normalize_loxone_outputs(raw.get("loxone_outputs"))
-        charging_schedule = Config._normalize_charging_schedule(raw.get("charging_schedule"))
-        if not loxone_outputs and charging_schedule:
-            sched_lox = charging_schedule.get("loxone") or {}
-            if sched_lox.get("charge_enable_name"):
-                loxone_outputs = {"enable_name": sched_lox["charge_enable_name"]}
-        consumer_id = str(raw["id"])
-        min_power_kw = None
-        if "min_power_kw" in raw:
-            min_power_kw = float(raw["min_power_kw"])
-        if loxone_outputs.get("power_setpoint_name") and min_power_kw is None:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers Eintrag '{consumer_id}' "
-                "benötigt min_power_kw bei power_setpoint_name."
-            )
-        return {
-            "id": consumer_id,
-            "name": str(raw.get("name", raw["id"])),
-            "chart_color_index": Config._normalize_chart_color_index(raw, consumer_id),
-            "nominal_power_kw": float(raw.get("nominal_power_kw", 0.0)),
-            "min_power_kw": min_power_kw,
-            "daily_target_kwh": float(raw.get("daily_target_kwh", 0.0)),
-            "daily_target_source": source,
-            "loxone_target_kwh_name": str(raw.get("loxone_target_kwh_name", "")).strip(),
-            "loxone_target_hours_name": str(raw.get("loxone_target_hours_name", "")).strip(),
-            "min_on_quarterhours": max(1, int(raw.get("min_on_quarterhours", raw.get("min_on_hours", 1) * 4))),
-            "path_log": str(raw.get("path_log", "")),
-            "signal_type": str(raw.get("signal_type", "power")),
-            "log_signal_type": str(
-                raw.get("log_signal_type") or raw.get("signal_type", "power")
-            ),
-            "optimizer_enabled": bool(raw.get("optimizer_enabled", True)),
-            "loxone_outputs": loxone_outputs,
-            "loxone_inputs": Config._normalize_loxone_inputs(raw.get("loxone_inputs")),
-            "charging_schedule": charging_schedule,
-            "thermal_control": thermal_control,
-            "filter_schedule": Config._normalize_filter_schedule(
-                raw.get("filter_schedule"), consumer_id
-            ),
-        }
-
-    @staticmethod
-    def _consumer_has_daily_target(consumer: dict) -> bool:
-        sched = consumer.get("charging_schedule")
-        target_source = consumer.get("daily_target_source", "config")
-        if sched and sched.get("enabled"):
-            if target_source == "historical":
-                return bool(consumer.get("path_log"))
-            if target_source == "loxone":
-                return True
-            capacity = float(sched.get("battery_capacity_kwh", 0.0) or 0.0)
-            if capacity > 0:
-                for day_key in ("weekday", "weekend"):
-                    if (sched.get(day_key) or {}).get("daily_rest_soc") is not None:
-                        return True
-        if target_source in ("historical", "loxone", "loxone_remaining_hours", "thermal"):
-            return True
-        return float(consumer.get("daily_target_kwh", 0.0) or 0.0) > 0
+        return fc_settings.consumer_path(self._raw_config, consumer_id, default)
 
     def _load_dynamic_params(self) -> None:
         self.K_PUSH_CENT = self._get_strict(self._raw_config, ["runtime_settings", "k_push_cent"])
@@ -846,7 +320,7 @@ class Config:
     def get_flexible_consumers(self, optimizer_only: bool = False) -> list:
         """Lädt alle konfigurierten flexiblen Verbraucher."""
         consumers = [
-            self._normalize_consumer(raw)
+            fc_settings.normalize_consumer(raw)
             for raw in self._raw_config.get("flexible_consumers", [])
         ]
         if optimizer_only:
@@ -854,86 +328,15 @@ class Config:
                 c for c in consumers
                 if c["optimizer_enabled"]
                 and c["nominal_power_kw"] > 0
-                and self._consumer_has_daily_target(c)
+                and fc_settings.consumer_has_daily_target(c)
             ]
         return consumers
 
-    @staticmethod
-    def _normalize_appliance(raw: dict, index: int) -> dict:
-        """Manuelles Gerät (Empfehlungsmodus): Anzeigename + Leistungsquelle."""
-        if not isinstance(raw, dict):
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: appliances[{index}] muss ein Objekt sein."
-            )
-        appliance_id = str(raw.get("id", "")).strip()
-        if not appliance_id:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: appliances[{index}]: id fehlt."
-            )
-        power_source = str(raw.get("power_source", "")).strip().lower()
-        if power_source not in ("loxone", "manual"):
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: appliances '{appliance_id}': "
-                "power_source muss 'loxone' oder 'manual' sein."
-            )
-        loxone_power_name = str(raw.get("loxone_power_name", "")).strip()
-        if power_source == "loxone" and not loxone_power_name:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: appliances '{appliance_id}': "
-                "power_source=loxone erfordert loxone_power_name."
-            )
-        default_power_kw = Config._optional_positive(
-            raw.get("default_power_kw"), appliance_id, "default_power_kw", allow_zero=True
-        )
-        if power_source == "loxone" and not default_power_kw:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: appliances '{appliance_id}': "
-                "power_source=loxone erfordert default_power_kw > 0 (Nennleistung für die "
-                "Kostenbewertung; wird später vom Adaptionsalgo gepflegt)."
-            )
-        return {
-            "id": appliance_id,
-            "name": str(raw.get("name", appliance_id)),
-            "power_source": power_source,
-            "loxone_power_name": loxone_power_name,
-            "default_power_kw": default_power_kw,
-            "default_runtime_h": Config._optional_positive(
-                raw.get("default_runtime_h"), appliance_id, "default_runtime_h", allow_zero=False
-            ),
-        }
-
-    @staticmethod
-    def _optional_positive(value, appliance_id: str, field: str, *, allow_zero: bool):
-        if value is None:
-            return None
-        number = float(value)
-        if number < 0 or (not allow_zero and number == 0):
-            bound = ">= 0" if allow_zero else "> 0"
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: appliances '{appliance_id}': "
-                f"{field} muss {bound} sein."
-            )
-        return number
-
     def get_appliances(self) -> list[dict]:
         """Manuelle Geräte für den Empfehlungsmodus (rein beratend, kein MILP)."""
-        raw = self._raw_config.get("appliances", [])
-        if not isinstance(raw, list):
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: 'appliances' muss ein Array sein."
-            )
-        seen: set[str] = set()
-        appliances: list[dict] = []
-        for index, item in enumerate(raw):
-            spec = self._normalize_appliance(item, index)
-            if spec["id"] in seen:
-                raise ValueError(
-                    "Kritischer Konfigurationsfehler: appliances enthält doppelte "
-                    f"id '{spec['id']}'."
-                )
-            seen.add(spec["id"])
-            appliances.append(spec)
-        return appliances
+        return appliance_settings.normalize_appliance_list(
+            self._raw_config.get("appliances", [])
+        )
 
     def update_appliance_defaults(
         self,
@@ -943,92 +346,25 @@ class Config:
         runtime_h: float,
     ) -> None:
         """Persistiert Nennleistung und Laufzeit-Vorbelegung für ein manuelles Gerät."""
-        if power_kw < 0:
-            raise ValueError(
-                f"update_appliance_defaults: power_kw muss >= 0 sein (erhalten: {power_kw})."
-            )
-        if runtime_h <= 0:
-            raise ValueError(
-                f"update_appliance_defaults: runtime_h muss > 0 sein (erhalten: {runtime_h})."
-            )
-        data = self._read_json_dict(self.config_path)
-        raw = data.get("appliances")
-        if not isinstance(raw, list):
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: 'appliances' muss ein Array sein."
-            )
-        target_index = None
-        for index, item in enumerate(raw):
-            if not isinstance(item, dict):
-                continue
-            if str(item.get("id", "")).strip() == appliance_id:
-                target_index = index
-                break
-        if target_index is None:
-            raise KeyError(
-                f"update_appliance_defaults: unbekannte appliance_id '{appliance_id}'."
-            )
-        entry = dict(raw[target_index])
-        entry["default_power_kw"] = float(power_kw)
-        entry["default_runtime_h"] = float(runtime_h)
-        self._normalize_appliance(entry, target_index)
-        raw[target_index] = entry
-        data["appliances"] = raw
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-            f.write("\n")
-        self._raw_config = data
-
-    @staticmethod
-    def _normalize_appliance_recommendation(raw: dict | None) -> dict:
-        from optimizer.appliance_recommendation import (
-            DEFAULT_ABS_MARGIN_CENT,
-            DEFAULT_PCT_STARS_1,
-            DEFAULT_PCT_STARS_4,
+        self._raw_config = appliance_settings.update_appliance_defaults_in_file(
+            self.config_path,
+            appliance_id,
+            power_kw=power_kw,
+            runtime_h=runtime_h,
         )
-
-        defaults = {
-            "abs_margin_cent": DEFAULT_ABS_MARGIN_CENT,
-            "pct_stars_4": DEFAULT_PCT_STARS_4,
-            "pct_stars_1": DEFAULT_PCT_STARS_1,
-        }
-        if raw is None:
-            return dict(defaults)
-        if not isinstance(raw, dict):
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: 'appliance_recommendation' muss ein Objekt sein."
-            )
-        result = dict(defaults)
-        for key in defaults:
-            if key in raw and raw[key] is not None:
-                result[key] = float(raw[key])
-        margin = result["abs_margin_cent"]
-        pct_4 = result["pct_stars_4"]
-        pct_1 = result["pct_stars_1"]
-        if margin < 0:
-            raise ValueError("appliance_recommendation.abs_margin_cent muss >= 0 sein.")
-        if pct_4 <= 0:
-            raise ValueError("appliance_recommendation.pct_stars_4 muss > 0 sein.")
-        if pct_1 <= pct_4:
-            raise ValueError("appliance_recommendation.pct_stars_1 muss > pct_stars_4 sein.")
-        return result
 
     def get_appliance_recommendation_settings(self) -> dict:
         """Schwellen für Sterne-Vergabe bei manuellen Geräten."""
-        return self._normalize_appliance_recommendation(
+        return appliance_settings.normalize_appliance_recommendation(
             self._raw_config.get("appliance_recommendation")
         )
 
     def update_appliance_recommendation_settings(self, new_settings: dict) -> None:
-        data = self._read_json_dict(self.config_path)
-        merged = self._normalize_appliance_recommendation(
-            {**self.get_appliance_recommendation_settings(), **new_settings}
+        self._raw_config = appliance_settings.update_appliance_recommendation_in_file(
+            self.config_path,
+            self.get_appliance_recommendation_settings(),
+            new_settings,
         )
-        data["appliance_recommendation"] = merged
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-            f.write("\n")
-        self._raw_config = data
 
     def get_eauto_milp_params(self) -> dict[str, float]:
         """Pflichtparameter für E-Auto MILP Modus A/B und Tie-Break."""
@@ -1153,125 +489,33 @@ class Config:
         return {scenario["id"]: scenario["settings"] for scenario in self.get_scenarios()}
 
     def _load_backtesting_scenarios_document(self) -> dict:
-        path = self.backtesting_scenarios_path
-        if not os.path.isfile(path):
-            return {}
-        return self._read_json_dict(path)
+        return scenario_settings.load_backtesting_scenarios_document(
+            self.backtesting_scenarios_path
+        )
 
     def get_backtesting_cbc_gap_rel(self) -> float:
-        """
-        Relativer CBC-MIP-Gap für Backtesting aus backtesting_scenarios.json.
-        Fehlt der Schlüssel, gilt optimizer.cbc_solver.DEFAULT_CBC_GAP_REL.
-        """
-        from optimizer.cbc_solver import DEFAULT_CBC_GAP_REL
-
-        doc = self._load_backtesting_scenarios_document()
-        raw = doc.get("cbc_gap_rel")
-        if raw is None:
-            return DEFAULT_CBC_GAP_REL
-        gap = float(raw)
-        if not 0.0 < gap < 1.0:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: cbc_gap_rel muss zwischen 0 und 1 liegen, "
-                f"nicht {gap!r} in '{self.backtesting_scenarios_path}'."
-            )
-        return gap
+        return scenario_settings.get_backtesting_cbc_gap_rel(self.backtesting_scenarios_path)
 
     def get_backtesting_cbc_strict_time_limit_sec(self) -> float:
-        """
-        Zeitlimit (Sekunden) für den Strict-CBC-Versuch vor gapRel-Fallback.
-        Fehlt der Schlüssel, gilt optimizer.cbc_solver.DEFAULT_CBC_STRICT_TIME_LIMIT_SEC.
-        0 = Strict-Stufe überspringen.
-        """
-        from optimizer.cbc_solver import DEFAULT_CBC_STRICT_TIME_LIMIT_SEC
-
-        doc = self._load_backtesting_scenarios_document()
-        raw = doc.get("cbc_strict_time_limit_sec")
-        if raw is None:
-            return DEFAULT_CBC_STRICT_TIME_LIMIT_SEC
-        limit = float(raw)
-        if limit < 0:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: cbc_strict_time_limit_sec muss >= 0 sein, "
-                f"nicht {limit!r} in '{self.backtesting_scenarios_path}'."
-            )
-        return limit
+        return scenario_settings.get_backtesting_cbc_strict_time_limit_sec(
+            self.backtesting_scenarios_path
+        )
 
     def _load_backtesting_scenarios_entries(self) -> list:
-        path = self.backtesting_scenarios_path
-        if os.path.isfile(path):
-            try:
-                data = self._read_json_dict(path)
-            except json.JSONDecodeError as e:
-                raise ValueError(
-                    f"Kritischer Fehler: '{path}' enthält ungültiges JSON: {e}"
-                ) from e
-            raw = data.get("scenarios")
-            if raw is None:
-                raise KeyError(
-                    f"Kritischer Konfigurationsfehler: '{path}' benötigt ein "
-                    "'scenarios'-Array."
-                )
-            if not isinstance(raw, list):
-                raise ValueError(
-                    f"Kritischer Konfigurationsfehler: '{path}': scenarios muss ein Array sein."
-                )
-            return raw
-
-        raw = self._raw_config.get("scenarios")
-        if isinstance(raw, list) and raw:
-            return raw
-
-        legacy = {
-            key: value
-            for key, value in self._raw_config.items()
-            if key.startswith("scenario_settings") and isinstance(value, dict)
-        }
-        return [
-            {
-                "id": key,
-                "label": key.replace("_", " "),
-                "settings": dict(value),
-            }
-            for key, value in sorted(legacy.items())
-        ]
+        return scenario_settings.load_backtesting_scenarios_entries(
+            self.backtesting_scenarios_path,
+            self._raw_config,
+        )
 
     def get_scenarios(self) -> list[dict]:
         """Lädt alle Backtesting-Szenarien aus backtesting_scenarios.json."""
         raw = self._load_backtesting_scenarios_entries()
         if not raw:
             return []
-        return [self._normalize_scenario(entry, index) for index, entry in enumerate(raw)]
-
-    @staticmethod
-    def _normalize_scenario(raw: dict, index: int) -> dict:
-        if not isinstance(raw, dict):
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: scenarios[{index}] muss ein Objekt sein."
-            )
-
-        scenario_id = str(raw.get("id") or f"scenario_{index + 1}").strip()
-        if not scenario_id:
-            scenario_id = f"scenario_{index + 1}"
-        if scenario_id == "runtime_settings":
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: Die Szenario-ID 'runtime_settings' "
-                "ist reserviert (Baseline)."
-            )
-
-        settings = raw.get("settings")
-        if not isinstance(settings, dict):
-            raise KeyError(
-                f"Kritischer Konfigurationsfehler: scenarios[{index}] ('{scenario_id}') "
-                "benötigt ein 'settings'-Objekt."
-            )
-
-        label = str(raw.get("label") or scenario_id).strip() or scenario_id
-        return {
-            "id": scenario_id,
-            "label": label,
-            "settings": dict(settings),
-        }
+        return [
+            scenario_settings.normalize_scenario(entry, index)
+            for index, entry in enumerate(raw)
+        ]
 
     def get_scenario_labels(self) -> dict[str, str]:
         """Anzeigenamen für Backtesting-Szenarien (runtime_settings = Baseline)."""
@@ -1319,7 +563,7 @@ class Config:
         self._load_all()
 
     def update_runtime_settings(self, new_settings: dict) -> None:
-        data = self._read_json_dict(self.config_path)
+        data = read_json_dict(self.config_path)
 
         for key, value in new_settings.items():
             target_key = None
@@ -1339,9 +583,7 @@ class Config:
             data["runtime_settings"][target_key] = value
             setattr(self, target_key.upper(), value)
 
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-            f.write("\n")
+        write_json_dict(self.config_path, data)
 
         self._raw_config = data
         self._load_dynamic_params()

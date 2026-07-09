@@ -117,3 +117,78 @@ def discharge_kw_for_hourly_soc(
         return 0.0
     energy_kwh = (delta_soc / 100.0) * battery_capacity_kwh
     return round(clamp_power(energy_kwh * efficiency, max_power_kw), 3)
+
+
+def _derive_control_from_milp(
+    model,
+    matrix: list,
+    milp_plan: dict[str, float],
+    consumer_powers: dict[str, float],
+    total_flex_power: float,
+    current_soc: float,
+    battery_params: dict,
+) -> tuple[int, float, float]:
+    min_soc = battery_params["min_soc"]
+    max_soc = battery_params["max_soc"]
+    max_power = battery_params["max_power_kw"]
+    battery_capacity = battery_params["battery_capacity_kwh"]
+    efficiency = battery_params["efficiency"]
+
+    opt_charge = milp_plan["p_charge"]
+    opt_discharge = milp_plan["p_discharge"]
+    opt_grid_buy = milp_plan["p_grid_buy"]
+    p_pv_0 = matrix[0]["expected_p_pv"]
+    p_con_0 = matrix[0]["expected_p_act"]
+    net_pv_surplus = p_pv_0 - p_con_0 - total_flex_power
+    planned_soc = round(
+        max(
+            min_soc,
+            min(max_soc, (model.e_batt[0].varValue / battery_capacity) * 100.0),
+        ),
+        1,
+    )
+
+    mode = MODE_AUTOMATIK
+    target_power = 0.0
+    target_soc = 99.0
+    threshold = power_threshold_kw(max_power)
+
+    if opt_charge > threshold and opt_grid_buy > threshold:
+        mode = MODE_ZWANGS_LADEN
+        target_soc = round(max(current_soc, planned_soc), 1)
+        target_power = charge_kw_for_hourly_soc(
+            current_soc,
+            target_soc,
+            battery_capacity,
+            efficiency,
+            max_power,
+            min_soc,
+            max_soc,
+        )
+    elif opt_discharge > threshold:
+        candidate_soc = round(min(current_soc, planned_soc), 1)
+        candidate_power = discharge_kw_for_hourly_soc(
+            current_soc,
+            candidate_soc,
+            battery_capacity,
+            efficiency,
+            max_power,
+            min_soc,
+            max_soc,
+        )
+        automatik_power = automatik_discharge_kw(net_pv_surplus, max_power)
+        if candidate_power > automatik_power + threshold:
+            mode = MODE_ZWANGS_ENTLADEN
+            target_soc = candidate_soc
+            target_power = candidate_power
+    elif (
+        net_pv_surplus < -threshold
+        and opt_discharge < threshold
+        and current_soc > (min_soc + 2.0)
+    ):
+        mode = MODE_ENTLADESPERRE
+        target_power = 0.0
+        # Ist-SOC: Huawei Register 47100=1 + Ziel 100 % würde sonst Netz-Trickelladen auslösen.
+        target_soc = round(current_soc, 1)
+
+    return mode, target_power, target_soc

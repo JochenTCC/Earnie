@@ -552,7 +552,7 @@ def flow_balance_plotly_traces(
 
     ``axis`` ist ``ui.charts.ChartSlotAxis`` (Any wegen Import-Zyklus).
     """
-    from ui.charts import _battery_bar_times
+    from ui.chart_slot_axis import _battery_bar_times
 
     x_series = _battery_bar_times(axis, slice(start, end))
     uhrzeit = df["Uhrzeit"].iloc[start:end]
@@ -643,7 +643,7 @@ def add_flow_balance_traces(
 
     Extrapolations-Segmente analog ``add_power_traces`` / ``_trace_segments``.
     """
-    from ui.charts import _trace_segments
+    from ui.chart_trace_segments import _trace_segments
 
     length = len(df)
     legend_shown: set[str] = set()
@@ -860,7 +860,7 @@ def _append_stack_bucket(
 def _bucket_specs_to_trace_specs(
     buckets: dict[str, dict[str, list[Any]]],
 ) -> list[FlowBalanceTraceSpec]:
-    from ui.charts import _consumer_bar_marker
+    from ui.chart_consumer_stack import _consumer_bar_marker
 
     specs: list[FlowBalanceTraceSpec] = []
     for bucket in buckets.values():
