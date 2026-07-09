@@ -49,8 +49,12 @@ def save_house_profiles(doc: dict) -> None:
     save_house_profiles_document(resolve_house_profiles_json_path(), doc)
 
 
+def tariffs_json_path() -> str:
+    return resolve_tariffs_json_path()
+
+
 def load_tariffs() -> dict:
-    return load_tariffs_document(resolve_tariffs_json_path())
+    return load_tariffs_document(tariffs_json_path())
 
 
 def load_backtesting_scenarios_raw() -> dict:

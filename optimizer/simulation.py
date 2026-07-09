@@ -129,6 +129,7 @@ def _simulate_single_hour_optimizer(
     terminal_soc_percent: float | None,
     sunrise_soc_min_index: int | None,
     matrix_hour_index: int,
+    flexible_consumers: list | None = None,
 ) -> tuple[float, dict, int, float]:
     """Simuliert eine einzelne Stunde im optimierten Pfad (Huawei-Logik für die Batterie)."""
     h = row["hour"]
@@ -137,6 +138,7 @@ def _simulate_single_hour_optimizer(
         matrix_hour_index,
         len(remaining_matrix),
     )
+    consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
     mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _, _ = milp_optimizer(
         remaining_matrix,
         h,
@@ -144,6 +146,7 @@ def _simulate_single_hour_optimizer(
         battery_params=battery_params,
         k_push=k_push,
         verbose=verbose,
+        consumers=consumers_cfg,
         consumer_remaining_kwh=consumer_remaining_kwh,
         spa_remaining_kwh=spa_remaining_kwh,
         flex_indices=flex_indices,
@@ -180,7 +183,7 @@ def _simulate_single_hour_optimizer(
         "Simulierter SoC (%)": round(old_soc, 1),
         "Steuerbefehl": action_text,
     }
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in consumers_cfg:
         chart_row[consumer_column_name(consumer)] = round(
             consumer_powers.get(consumer["id"], 0.0), 2
         )
@@ -269,8 +272,10 @@ def simulate_horizon(
     matrix_prepared: bool = False,
     simulation_hour_offset: int | None = None,
     sunrise_soc_min_index: int | None = None,
+    flexible_consumers: list | None = None,
 ) -> list:
     """Simuliert einen rollierenden Optimierungshorizont über die gesamte Matrix."""
+    consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
     if not matrix_prepared:
         from .charge_immediate import prepare_optimization_matrix
 
@@ -290,7 +295,6 @@ def simulate_horizon(
     sim_soc = initial_soc
     battery_params = battery_params or config.get_battery_params()
     total_steps = len(optimization_matrix)
-    consumers_cfg = config.get_flexible_consumers(optimizer_only=True)
     horizon_limits = resolve_horizon_consumer_targets_kwh(
         optimization_matrix,
         consumer_daily_targets_kwh,
@@ -333,6 +337,7 @@ def simulate_horizon(
             terminal_soc_percent=terminal_soc_percent,
             sunrise_soc_min_index=sunrise_soc_min_index,
             matrix_hour_index=i,
+            flexible_consumers=consumers_cfg,
         )
         _cap_flex_delivery(
             chart_row, consumers_cfg, horizon_limits, delivered_horizon

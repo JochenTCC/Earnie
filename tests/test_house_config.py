@@ -1,20 +1,50 @@
 """Tests für Hauskonfigurator-Entitäten, Tarife und Szenario-Auflösung (Version 1.24)."""
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
 
 import config
 from data.consumption_profiles import build_hourly_kw_profile
-from house_config.baseload import compute_baseload_kwh
+from house_config.baseload import compute_baseload_kwh, consumer_annual_kwh
 from house_config.entity_resolution import (
     batteries_by_id,
     resolve_battery_into_settings,
     resolve_pv_into_settings,
 )
+from house_config.ev_profile import estimate_ev_annual_kwh, ev_hourly_kw_for_day
 from house_config.profiles_store import load_house_profiles_document
 from house_config.tariffs_store import load_tariffs_document
+from optimizer.charging_context import hour_in_charging_window
+
+
+def _sample_ev_consumer() -> dict:
+    return {
+        "id": "ev",
+        "label": "E-Auto",
+        "type": "ev",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "min_on_quarterhours": 4,
+        "battery_capacity_kwh": 60.0,
+        "charging_schedule": {
+            "target_soc_percent": 100.0,
+            "charging_efficiency": 0.95,
+            "forecast_when_absent": True,
+            "weekday": {
+                "car_available_from_hour": 18,
+                "ready_by_hour": 7,
+                "daily_rest_soc": 40.0,
+            },
+            "weekend": {
+                "car_available_from_hour": 20,
+                "ready_by_hour": 9,
+                "daily_rest_soc": 30.0,
+            },
+        },
+    }
 
 
 def test_batteries_by_id_from_fixture():
@@ -52,6 +82,17 @@ def test_scenario_entity_resolution():
 def test_baseload_minimum_fraction():
     result = compute_baseload_kwh(4000, [{"annual_kwh": 3900, "type": "generic"}])
     assert result["baseload_kwh"] >= 200.0
+
+
+def test_consumer_annual_kwh_flat_thermal():
+    consumer = {
+        "type": "thermal_annual",
+        "living_area_m2": 120.0,
+        "building_class": 3,
+        "heat_pump_type": "luft",
+        "persons": 2,
+    }
+    assert consumer_annual_kwh(consumer) > 0.0
 
 
 def test_house_profile_thermal_annual():
@@ -109,3 +150,299 @@ def test_monthly_float_export_tariff_resolution():
     assert oemag is not None
     assert oemag["type"] == "monthly_float"
     assert oemag["arbeitspreis_kwh_cent"] == pytest.approx(7.15)
+
+
+def test_ev_consumer_normalization(tmp_path):
+    import json
+
+    path = tmp_path / "house_profiles.json"
+    path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home",
+                        "annual_kwh": 5000,
+                        "consumers": [
+                            {
+                                "id": "ev",
+                                "type": "ev",
+                                "nominal_power_kw": 3.5,
+                                "min_power_kw": 1.4,
+                                "min_on_quarterhours": 4,
+                                "battery_capacity_kwh": 60.0,
+                                "charging_schedule": _sample_ev_consumer()["charging_schedule"],
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    doc = load_house_profiles_document(str(path))
+    ev = doc["profiles"]["home"]["consumers"][0]
+    assert ev["type"] == "ev"
+    assert ev["battery_capacity_kwh"] == 60.0
+    assert "loxone" not in ev.get("charging_schedule", {})
+
+
+def test_ev_annual_kwh_from_charging_schedule():
+    consumer = _sample_ev_consumer()
+    annual = estimate_ev_annual_kwh(consumer)
+    assert annual > 5000.0
+    assert consumer_annual_kwh(consumer) == annual
+
+
+def test_ev_hourly_profile_only_in_charging_window():
+    consumer = _sample_ev_consumer()
+    weekday = date(2023, 6, 7)
+    hourly = ev_hourly_kw_for_day(consumer, weekday)
+    day_sched = consumer["charging_schedule"]["weekday"]
+    from_h = int(day_sched["car_available_from_hour"])
+    ready_h = int(day_sched["ready_by_hour"])
+    for hour, kw in enumerate(hourly):
+        if hour_in_charging_window(hour, from_h, ready_h):
+            assert kw >= 0.0
+        else:
+            assert kw == 0.0
+    assert sum(hourly) > 0.0
+
+
+def test_build_hourly_kw_profile_with_ev_consumer(tmp_path):
+    import json
+
+    path = tmp_path / "house_profiles.json"
+    ev = _sample_ev_consumer()
+    path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home",
+                        "annual_kwh": 15000,
+                        "consumers": [
+                            {
+                                "id": "ev",
+                                "type": "ev",
+                                "nominal_power_kw": 3.5,
+                                "min_power_kw": 1.4,
+                                "min_on_quarterhours": 4,
+                                "battery_capacity_kwh": 60.0,
+                                "charging_schedule": ev["charging_schedule"],
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    doc = load_house_profiles_document(str(path))
+    profile = doc["profiles"]["home"]
+    hourly = build_hourly_kw_profile(profile, hours=168)
+    assert len(hourly) == 168
+    assert max(hourly) > 0.0
+    assert compute_baseload_kwh(profile["annual_kwh"], profile["consumers"])["consumer_kwh"] > 0
+
+
+def _sample_generic_consumer(**overrides) -> dict:
+    base = {
+        "id": "washer",
+        "label": "Waschmaschine",
+        "type": "generic",
+        "nominal_power_kw": 1.0,
+        "schedule": {
+            "runs_per_week": 2,
+            "duration_h": 2.0,
+            "start_hour": 18,
+            "start_shift_h": 0.0,
+        },
+    }
+    base.update(overrides)
+    return base
+
+
+def test_generic_annual_kwh_from_schedule():
+    from house_config.generic_schedule import generic_annual_kwh
+
+    consumer = _sample_generic_consumer()
+    assert generic_annual_kwh(consumer) == pytest.approx(1.0 * 2.0 * 2 * 52)
+
+
+def test_eligible_start_hours_shift_cases():
+    from house_config.generic_schedule import eligible_start_hours
+
+    assert eligible_start_hours(18, 0.0) == frozenset({18})
+    assert eligible_start_hours(18, 2.0) == frozenset({16, 17, 18, 19, 20})
+    assert len(eligible_start_hours(18, 12.0)) == 24
+
+
+def test_migrate_start_flexibility_legacy():
+    from house_config.generic_schedule import migrate_start_flexibility
+
+    assert migrate_start_flexibility({"start_flexibility": "fixed"})["start_shift_h"] == 0.0
+    assert migrate_start_flexibility({"start_flexibility": "day"})["start_shift_h"] == 12.0
+
+
+def test_normalize_generic_schedule_migration(tmp_path):
+    import json
+
+    path = tmp_path / "house_profiles.json"
+    path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home",
+                        "annual_kwh": 5000,
+                        "consumers": [
+                            {
+                                "id": "washer",
+                                "type": "generic",
+                                "nominal_power_kw": 1.0,
+                                "annual_kwh": 208.0,
+                                "schedule": {
+                                    "runs_per_week": 2,
+                                    "start_flexibility": "day",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    doc = load_house_profiles_document(str(path))
+    washer = doc["profiles"]["home"]["consumers"][0]
+    assert washer["schedule"]["start_shift_h"] == 12.0
+    assert washer["schedule"]["duration_h"] == pytest.approx(2.0)
+    assert washer["annual_kwh"] == pytest.approx(208.0)
+
+
+def test_generic_hourly_profile_fixed_start():
+    from datetime import date
+
+    from house_config.generic_schedule import generic_hourly_kw_for_day
+
+    consumer = _sample_generic_consumer()
+    monday = date(2023, 6, 5)
+    hourly = generic_hourly_kw_for_day(consumer, monday)
+    assert hourly[18] == pytest.approx(1.0)
+    assert hourly[19] == pytest.approx(1.0)
+    assert sum(hourly) == pytest.approx(2.0)
+
+
+def test_build_hourly_kw_profile_generic_blocks(tmp_path):
+    import json
+
+    path = tmp_path / "house_profiles.json"
+    path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home",
+                        "annual_kwh": 5000,
+                        "consumers": [
+                            {
+                                "id": "washer",
+                                "type": "generic",
+                                "nominal_power_kw": 1.0,
+                                "schedule": {
+                                    "runs_per_week": 2,
+                                    "duration_h": 2.0,
+                                    "start_hour": 10,
+                                    "start_shift_h": 0.0,
+                                },
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    doc = load_house_profiles_document(str(path))
+    profile = doc["profiles"]["home"]
+    hourly = build_hourly_kw_profile(profile, hours=168)
+    assert max(hourly) >= 1.0
+    assert sum(hourly) > 0.0
+
+
+def test_planning_flex_bridge_split():
+    from house_config.planning_flex_bridge import split_planning_generic_consumers
+
+    profile = {
+        "consumers": [
+            _sample_generic_consumer(),
+            _sample_generic_consumer(
+                id="dryer",
+                schedule={
+                    "runs_per_week": 3,
+                    "duration_h": 1.5,
+                    "start_hour": 12,
+                    "start_shift_h": 4.0,
+                },
+            ),
+        ]
+    }
+    fixed, flex = split_planning_generic_consumers(profile)
+    assert len(fixed) == 1
+    assert len(flex) == 1
+    assert flex[0]["generic_flex_window"]["start_shift_h"] == 4.0
+
+
+def test_generic_flex_allowed_hours():
+    from house_config.generic_schedule import generic_allowed_slot_hours
+
+    allowed = generic_allowed_slot_hours(18, 2.0, 2.0)
+    assert 16 in allowed
+    assert 19 in allowed
+    assert 21 in allowed
+    assert 15 not in allowed
+    assert 22 not in allowed
+
+
+def test_scenario_resolution_includes_planning_flex(tmp_path):
+    import json
+
+    from house_config.scenario_resolution import resolve_scenario_settings
+
+    path = tmp_path / "house_profiles.json"
+    path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home",
+                        "annual_kwh": 5000,
+                        "consumers": [
+                            {
+                                "id": "washer",
+                                "type": "generic",
+                                "nominal_power_kw": 1.0,
+                                "schedule": {
+                                    "runs_per_week": 2,
+                                    "duration_h": 2.0,
+                                    "start_hour": 12,
+                                    "start_shift_h": 6.0,
+                                },
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    resolved = resolve_scenario_settings(
+        {"house_profile_id": "home"},
+        raw_config=config.CONFIG._raw_config,
+        tariffs_path=config.TARIFFS_JSON_PATH,
+        house_profiles_path=str(path),
+    )
+    assert resolved.get("_house_profile") is not None
+    flex = resolved.get("_planning_flex_consumers") or []
+    assert any(item["id"] == "washer" for item in flex)

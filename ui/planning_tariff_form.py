@@ -1,6 +1,8 @@
 """Tarif-Auswahl-Tab im Hauskonfigurator (kein Tarif-Editor)."""
 from __future__ import annotations
 
+import os
+
 import streamlit as st
 
 from ui.house_config_io import (
@@ -9,6 +11,7 @@ from ui.house_config_io import (
     list_import_tariffs,
     load_tariffs_catalog_meta,
     save_planning_tariff_selection,
+    tariffs_json_path,
 )
 
 _IMPORT_TYPE_LABELS = {
@@ -60,8 +63,10 @@ def render_tariff_selection_tab() -> None:
     imports = list_import_tariffs()
     exports = list_export_tariffs()
     if not imports or not exports:
+        catalog_path = tariffs_json_path()
+        missing_hint = " (Datei nicht gefunden)" if not os.path.isfile(catalog_path) else ""
         st.warning(
-            "Der Tarif-Katalog in `config/tariffs.json` ist leer oder unvollständig. "
+            f"Der Tarif-Katalog in `{catalog_path}` ist leer oder unvollständig{missing_hint}. "
             "Neue Tarife bitte manuell in der Datei ergänzen (Vorlage: `tariffs.example.json`)."
         )
         return
@@ -100,7 +105,7 @@ def render_tariff_selection_tab() -> None:
 
     st.info(
         "Neue Tarife werden nicht in der UI angelegt. "
-        "Ergänze Einträge manuell in `config/tariffs.json` "
+        f"Ergänze Einträge manuell in `{tariffs_json_path()}` "
         "(Referenz: `config/tariffs.example.json` oder `tools/convert_dach_tariffs.py`)."
     )
 

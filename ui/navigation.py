@@ -6,7 +6,8 @@ die Konfigurations-/Mockup-Seiten sind immer verfügbar; Backtesting und
 Preis-Prognose (Dev) folgen dem bisherigen Modus-Gating.
 
 Nach Minimal-Bootstrap (Greenfield) sind bis zur vollständigen Planungs-Konfiguration
-nur Hauskonfigurator und Konfiguration sichtbar.
+nur Hauskonfigurator und Konfiguration sichtbar. Danach wird Analyse freigeschaltet;
+Betrieb (Cockpit, Manuelle Geräte) erst nach vollständiger Loxone-Merker-Konfiguration.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from ui.setup_readiness import (
+    is_betrieb_unlocked,
     is_planning_ready,
     is_scenario_editor_unlocked,
     is_setup_navigation_restricted,
@@ -64,15 +66,43 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
         page_scenario_editor,
     )
 
-    specs: list[PageSpec] = [
-        PageSpec(page_cockpit.render, "Cockpit", "🔋", "Betrieb", "cockpit", default=True),
-        PageSpec(page_devices.render, "Manuelle Geräte", "🔌", "Betrieb", "devices"),
-    ]
+    specs: list[PageSpec] = []
+    betrieb_unlocked = is_betrieb_unlocked()
+    if betrieb_unlocked:
+        specs.extend(
+            [
+                PageSpec(
+                    page_cockpit.render,
+                    "Cockpit",
+                    "🔋",
+                    "Betrieb",
+                    "cockpit",
+                    default=True,
+                ),
+                PageSpec(
+                    page_devices.render,
+                    "Manuelle Geräte",
+                    "🔌",
+                    "Betrieb",
+                    "devices",
+                ),
+            ]
+        )
+
     backtesting_allowed = "backtesting" in enabled_mode_keys and is_planning_ready()
+    analyse_default = not betrieb_unlocked
     if backtesting_allowed:
         specs.append(
-            PageSpec(page_backtesting.render, "Backtesting", "📊", "Analyse", "backtesting")
+            PageSpec(
+                page_backtesting.render,
+                "Backtesting",
+                "📊",
+                "Analyse",
+                "backtesting",
+                default=analyse_default,
+            )
         )
+        analyse_default = False
     if "price_forecast" in enabled_mode_keys:
         specs.append(
             PageSpec(
@@ -81,8 +111,10 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
                 "💹",
                 "Analyse",
                 "price-forecast",
+                default=analyse_default,
             )
         )
+        analyse_default = False
     specs.append(
         PageSpec(
             page_consumer_analysis.render,
@@ -90,6 +122,7 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
             "📈",
             "Analyse",
             "consumer-analysis",
+            default=analyse_default,
         )
     )
     specs.append(

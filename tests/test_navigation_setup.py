@@ -85,4 +85,9 @@ def test_backtesting_hidden_until_planning_ready(tmp_path, monkeypatch):
     titles = [spec.title for spec in specs]
 
     assert "Backtesting" in titles
+    assert "Cockpit" not in titles
+    assert "Manuelle Geräte" not in titles
     assert "Szenarieneditor" not in titles
+    defaults = [spec for spec in specs if spec.default]
+    assert len(defaults) == 1
+    assert defaults[0].title == "Backtesting"

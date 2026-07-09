@@ -6,9 +6,14 @@ import os
 
 from house_config.baseload import compute_baseload_kwh
 from house_config.consumption_csv import load_hourly_profile_csv
+from house_config.ev_profile import normalize_ev_charging_schedule
+from house_config.generic_schedule import (
+    derive_duration_h,
+    generic_annual_kwh,
+    normalize_generic_schedule,
+)
 
-SCHEDULE_FLEX = frozenset({"fixed", "day", "any"})
-CONSUMER_TYPES = frozenset({"generic", "thermal_annual"})
+CONSUMER_TYPES = frozenset({"generic", "thermal_annual", "ev"})
 
 
 def _read_json(path: str) -> dict:
@@ -23,21 +28,18 @@ def _read_json(path: str) -> dict:
     raise ValueError(f"house_profiles.json '{path}' ist weder UTF-8 noch cp1252 lesbar.")
 
 
-def _normalize_schedule(raw: dict | None) -> dict | None:
+def _normalize_schedule(raw: dict | None, *, consumer: dict) -> dict | None:
     if not isinstance(raw, dict):
         return None
     runs = int(raw.get("runs_per_week", 0) or 0)
-    duration = float(raw.get("duration_h", 0.0) or 0.0)
-    flex = str(raw.get("start_flexibility", "day")).strip().lower()
-    if flex not in SCHEDULE_FLEX:
-        raise ValueError(
-            f"schedule.start_flexibility muss einer von {sorted(SCHEDULE_FLEX)} sein."
-        )
-    return {
-        "runs_per_week": max(0, runs),
-        "duration_h": max(0.0, duration),
-        "start_flexibility": flex,
-    }
+    if runs <= 0:
+        return None
+    schedule_input = dict(raw)
+    if float(schedule_input.get("duration_h", 0.0) or 0.0) <= 0:
+        derived = derive_duration_h({**consumer, "schedule": schedule_input})
+        if derived is not None and derived > 0:
+            schedule_input["duration_h"] = derived
+    return normalize_generic_schedule(schedule_input)
 
 
 def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
@@ -50,7 +52,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     if consumer_type not in CONSUMER_TYPES:
         raise ValueError(
             f"profiles '{profile_id}' consumers[{index}]: "
-            f"type muss generic oder thermal_annual sein."
+            f"type muss generic, thermal_annual oder ev sein."
         )
     label = str(raw.get("label", consumer_id)).strip() or consumer_id
     spec: dict = {
@@ -58,10 +60,22 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
         "label": label,
         "type": consumer_type,
         "nominal_power_kw": float(raw.get("nominal_power_kw", 0.0) or 0.0),
-        "annual_kwh": float(raw.get("annual_kwh", 0.0) or 0.0),
         "profile_csv": str(raw.get("profile_csv", "")).strip(),
-        "schedule": _normalize_schedule(raw.get("schedule")),
     }
+    if consumer_type == "generic":
+        spec["schedule"] = _normalize_schedule(raw.get("schedule"), consumer=raw)
+        spec["annual_kwh"] = generic_annual_kwh(spec)
+    elif consumer_type == "ev":
+        battery_capacity = float(raw.get("battery_capacity_kwh", 0.0) or 0.0)
+        if battery_capacity <= 0:
+            raise ValueError(
+                f"profiles '{profile_id}' consumers[{index}]: "
+                "battery_capacity_kwh muss > 0 sein."
+            )
+        spec["min_power_kw"] = float(raw.get("min_power_kw", 0.0) or 0.0)
+        spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 0) or 0))
+        spec["battery_capacity_kwh"] = battery_capacity
+        spec["charging_schedule"] = normalize_ev_charging_schedule(raw.get("charging_schedule"))
     if consumer_type == "thermal_annual":
         hwb_raw = raw.get("hwb_kwh_m2")
         hwb_value = float(hwb_raw) if hwb_raw not in (None, "") else 0.0
@@ -94,8 +108,11 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         raise ValueError(f"profiles '{profile_id}': consumers muss ein Array sein.")
     consumers: list[dict] = []
     seen: set[str] = set()
+    thermal_consumer_indices: list[int] = []
     for c_index, item in enumerate(consumers_raw):
         consumer = _normalize_consumer(item, c_index, profile_id)
+        if consumer["type"] == "thermal_annual":
+            thermal_consumer_indices.append(c_index)
         if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
             consumer["thermal"]["latitude"] = latitude
             consumer["thermal"]["longitude"] = longitude
@@ -105,6 +122,16 @@ def _normalize_profile(raw: dict, index: int) -> dict:
             )
         seen.add(consumer["id"])
         consumers.append(consumer)
+    if len(thermal_consumer_indices) > 1:
+        raise ValueError(
+            f"profiles '{profile_id}': nur ein Verbraucher vom Typ "
+            "'thermal_annual' (Haus Wärme) erlaubt."
+        )
+    if thermal_consumer_indices and thermal_consumer_indices[0] != 0:
+        raise ValueError(
+            f"profiles '{profile_id}': Typ 'thermal_annual' (Haus Wärme) "
+            "nur für Verbraucher 1 erlaubt."
+        )
     baseload = compute_baseload_kwh(annual_kwh, consumers)
     return {
         "id": profile_id,
@@ -166,12 +193,18 @@ def _serialize_consumer(consumer: dict) -> dict:
         "label": consumer["label"],
         "type": consumer["type"],
         "nominal_power_kw": consumer["nominal_power_kw"],
-        "annual_kwh": consumer["annual_kwh"],
     }
     if consumer.get("profile_csv"):
         out["profile_csv"] = consumer["profile_csv"]
-    if consumer.get("schedule"):
-        out["schedule"] = consumer["schedule"]
+    if consumer["type"] == "generic":
+        out["annual_kwh"] = consumer.get("annual_kwh", 0.0)
+        if consumer.get("schedule"):
+            out["schedule"] = consumer["schedule"]
+    elif consumer["type"] == "ev":
+        out["min_power_kw"] = consumer.get("min_power_kw", 0.0)
+        out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 0)
+        out["battery_capacity_kwh"] = consumer["battery_capacity_kwh"]
+        out["charging_schedule"] = consumer["charging_schedule"]
     if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
         thermal = dict(consumer["thermal"])
         thermal.pop("latitude", None)

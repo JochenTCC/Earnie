@@ -7,6 +7,7 @@ from house_config.entity_resolution import (
     resolve_battery_into_settings,
     resolve_pv_into_settings,
 )
+from house_config.planning_flex_bridge import split_planning_generic_consumers
 from house_config.profiles_store import load_house_profiles_document
 from house_config.tariffs_store import (
     load_tariffs_document,
@@ -47,5 +48,9 @@ def resolve_scenario_settings(
         profile_id = str(profile_id).strip()
         if profile_id not in profiles:
             raise ValueError(f"Unbekannte house_profile_id '{profile_id}'.")
-        out["_house_profile"] = profiles[profile_id]
+        profile = profiles[profile_id]
+        out["_house_profile"] = profile
+        _fixed, flex_consumers = split_planning_generic_consumers(profile)
+        if flex_consumers:
+            out["_planning_flex_consumers"] = flex_consumers
     return out
