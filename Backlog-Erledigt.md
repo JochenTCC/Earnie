@@ -2,6 +2,14 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Mobile Legende Cockpit (Chart 1/2) (2026-07-09)
+
+- [x] **Mobile Legende Cockpit (Chart 1/2)** — Plotly-Legende unter 768px per CSS aus; farbiges `<details>` als Ersatz (nur mobil sichtbar). Desktop: nur Plotly-Legende, kein Expander (`ui/chart_legend_mobile.py`). Prod-Abnahme bestätigt.
+
+### Bugfix Sankey SwimSpa/Filter Fall B (Gesamtzähler) (2026-07-09)
+
+- [x] **Sankey + Chart 1 SwimSpa/Filter (Gesamtzähler Fall B)** — Fix **v1.24.4**: Sankey/Live-UI laden Flex-Leistung bei veraltetem `optimizer_run_state` (>120 s) mit `filter_contexts` + `slot_datetime` (`fetch_live_flex_kw_for_ui` in `data/live_consumption.py`); Filter-Inferenz wie in `main.py`. Prod-Abnahme: natives Fenster 10–14 — zwei Sankey-Ströme (SwimSpa + SwimSpa Filter), Filterleistung korrekt zugeordnet, keine irreführende Soll-Ist-Mismatch-Farbe bei Soll 0. Referenz-Dumps: `chart_debug_20260708_114712`, `chart_debug_20260709_120500`.
+
 ### Version 1.24.g — monthly_float Einspeisetarif (OeMAG-Referenzkurve) (2026-07-09)
 
 - [x] **Schema** — Export-Typ `monthly_float` in `tariffs.schema.json`; `oemag_monthly_feed_in_rates` + `monthly_float_reference_cent_kwh` in `backtesting_scenarios.schema.json`
