@@ -15,7 +15,12 @@ from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
     building_class_option_label,
 )
-from ui.house_config_io import load_house_profiles, preview_baseload, upsert_house_profile
+from ui.house_config_io import (
+    load_house_profiles,
+    preview_baseload,
+    save_profile_consumption_csv,
+    upsert_house_profile,
+)
 
 CONSUMER_TYPE_OPTIONS = ["generic", "thermal_annual", "ev"]
 _SESSION_SYNC_KEY = "house_profile_sync_id"
@@ -394,6 +399,98 @@ def _apply_pending_profile_select() -> None:
         st.session_state["house_profile_select"] = pending
 
 
+def _render_consumption_csv_section(
+    *,
+    existing: dict,
+    preview_id: str,
+    annual_kwh: float,
+    resolved: list[dict],
+    preview: dict,
+) -> None:
+    from pathlib import Path
+
+    from house_config.consumption_csv import load_hourly_profile_csv
+    from ui.consumption_validation_charts import (
+        load_csv_monthly_kwh,
+        modeled_monthly_kwh,
+        monthly_comparison_chart,
+        timeseries_comparison_chart,
+    )
+
+    st.subheader("Jahres-Verbrauchs-CSV (optional)")
+    st.caption(
+        "Format: `timestamp;power_kw` (stündlich). "
+        "Zum Abgleich Ist-Verbrauch vs. modellierte Konfiguration."
+    )
+
+    session_key = f"house_profile_csv_path_{preview_id}"
+    if session_key not in st.session_state:
+        st.session_state[session_key] = str(existing.get("total_profile_csv", "") or "").strip()
+
+    csv_path = st.text_input(
+        "CSV-Pfad",
+        value=st.session_state[session_key],
+        key=f"house_profile_csv_input_{preview_id}",
+        help="Relativer Pfad, z. B. config/uploads/mein_haushalt_verbrauch.csv",
+    )
+    st.session_state[session_key] = csv_path.strip()
+
+    upload = st.file_uploader(
+        "CSV hochladen",
+        type=["csv"],
+        key=f"house_profile_csv_upload_{preview_id}",
+    )
+    if upload is not None:
+        try:
+            saved_path = save_profile_consumption_csv(
+                preview_id,
+                upload.getvalue(),
+                upload.name,
+            )
+            load_hourly_profile_csv(saved_path)
+            st.session_state[session_key] = saved_path
+            st.success(f"CSV gespeichert: `{saved_path}`")
+        except (ValueError, OSError) as exc:
+            st.error(f"CSV ungültig: {exc}")
+
+    if st.button("CSV-Zuordnung entfernen", key=f"house_profile_csv_clear_{preview_id}"):
+        st.session_state[session_key] = ""
+        st.rerun()
+
+    active_path = st.session_state[session_key]
+    if not active_path:
+        return
+    if not Path(active_path).is_file():
+        st.warning(f"Datei nicht gefunden: `{active_path}`")
+        return
+
+    try:
+        actual_monthly = load_csv_monthly_kwh(active_path)
+        modeled_profile = {
+            "annual_kwh": annual_kwh,
+            "baseload_kwh": preview["baseload_kwh"],
+            "consumers": resolved,
+        }
+        model_monthly = modeled_monthly_kwh(modeled_profile)
+        actual_total = sum(actual_monthly.values())
+        model_total = sum(model_monthly.values())
+        col_a, col_b = st.columns(2)
+        col_a.metric("Ist-Jahresverbrauch (CSV)", f"{actual_total:.0f} kWh")
+        col_b.metric("Modell-Jahresverbrauch", f"{model_total:.0f} kWh")
+        if annual_kwh > 0 and abs(actual_total - annual_kwh) / annual_kwh > 0.15:
+            st.info(
+                f"Hinweis: Konfigurierter Jahresverbrauch ({annual_kwh:.0f} kWh) "
+                f"weicht vom CSV ({actual_total:.0f} kWh) ab."
+            )
+        st.plotly_chart(monthly_comparison_chart(actual_monthly, model_monthly), width="stretch")
+        st.plotly_chart(
+            timeseries_comparison_chart(active_path, modeled_profile),
+            width="stretch",
+        )
+    except (ValueError, OSError) as exc:
+        st.error(f"CSV konnte nicht ausgewertet werden: {exc}")
+
+
 def render_house_profile_tab() -> None:
     _apply_pending_profile_select()
     profiles_doc = load_house_profiles()
@@ -446,6 +543,14 @@ def render_house_profile_tab() -> None:
         f"Untergrenze 5 % = {preview['baseload_min_kwh']:.0f} kWh/a"
     )
 
+    _render_consumption_csv_section(
+        existing=existing,
+        preview_id=preview_id,
+        annual_kwh=float(annual_kwh),
+        resolved=resolved,
+        preview=preview,
+    )
+
     if st.button("Profil speichern", type="primary", key="house_profile_save"):
         profile_id = _resolve_profile_id(
             is_new=is_new,
@@ -459,6 +564,10 @@ def render_house_profile_tab() -> None:
                 "label": label.strip() or profile_id,
                 "annual_kwh": float(annual_kwh),
                 "consumers": resolved,
+                "total_profile_csv": st.session_state.get(
+                    f"house_profile_csv_path_{preview_id}",
+                    existing.get("total_profile_csv", ""),
+                ),
             }
         )
         saved_profile = load_house_profiles().get("profiles", {}).get(profile_id, {})

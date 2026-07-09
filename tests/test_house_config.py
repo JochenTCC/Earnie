@@ -446,3 +446,95 @@ def test_scenario_resolution_includes_planning_flex(tmp_path):
     assert resolved.get("_house_profile") is not None
     flex = resolved.get("_planning_flex_consumers") or []
     assert any(item["id"] == "washer" for item in flex)
+
+
+def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
+    from house_config.scenario_resolution import resolve_runtime_settings_for_backtesting
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        str(config_dir / "house_profiles.json"),
+    )
+    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+
+    (config_dir / "config.json").write_text(
+        """
+        {
+            "awattar": {"url": "https://api.awattar.at/v1/marketdata"},
+            "system": {"global_timeout": 10, "loop_timeout": 900},
+            "loxone_blocks": {"soc_name": "Battery_SOC"},
+            "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+            "runtime_settings": {
+                "battery_id": "home_5kwh",
+                "pv_system_id": "roof",
+                "import_tariff_id": "fixed_imp",
+                "export_tariff_id": "fixed_exp",
+                "house_profile_id": "efh",
+                "latitude": 48.0,
+                "longitude": 11.0,
+                "k_push_cent": 3.5,
+                "feed_in_mode": "fixed",
+                "battery_capacity_kwh": 0,
+                "battery_max_power_kw": 0
+            },
+            "batteries": [{
+                "id": "home_5kwh",
+                "label": "5 kWh",
+                "battery_capacity_kwh": 5.0,
+                "battery_max_power_kw": 2.5,
+                "battery_efficiency": 0.97,
+                "battery_min_soc": 10.0,
+                "battery_max_soc": 100.0,
+                "threshold_power": 0.05
+            }],
+            "pv_systems": [{
+                "id": "roof",
+                "label": "Dach",
+                "kwp": 10.0,
+                "pv_tilt": 30,
+                "pv_azimuth": 180
+            }],
+            "flexible_consumers": []
+        }
+        """.strip(),
+        encoding="utf-8",
+    )
+    (config_dir / "house_profiles.json").write_text(
+        """
+        {
+            "profiles": [{
+                "id": "efh",
+                "label": "EFH",
+                "annual_kwh": 4000,
+                "consumers": [{"id": "heat", "type": "thermal_annual", "nominal_power_kw": 3.0}]
+            }]
+        }
+        """.strip(),
+        encoding="utf-8",
+    )
+    (config_dir / "tariffs.json").write_text(
+        """
+        {
+            "import_tariffs": [{"id": "fixed_imp", "label": "Fix", "type": "fixed_cent", "fix_cent_kwh": 37}],
+            "export_tariffs": [{"id": "fixed_exp", "label": "Fix", "type": "fixed", "k_push_cent": 3.7}]
+        }
+        """.strip(),
+        encoding="utf-8",
+    )
+
+    import json
+
+    raw = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+    resolved = resolve_runtime_settings_for_backtesting(
+        raw,
+        tariffs_path=str(config_dir / "tariffs.json"),
+        house_profiles_path=str(config_dir / "house_profiles.json"),
+    )
+    assert resolved["battery_capacity_kwh"] == 5.0
+    assert resolved["pv_kwp"] == 10.0
+    assert resolved["feed_in_mode"] == "fixed"
+    assert resolved.get("_house_profile") is not None

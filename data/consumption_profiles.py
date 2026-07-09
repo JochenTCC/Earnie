@@ -23,6 +23,11 @@ def build_hourly_kw_profile(profile: dict, *, hours: int = 8760) -> list[float]:
         pad = values[-1] if values else 0.0
         return values + [pad] * (hours - len(values))
 
+    return build_modeled_hourly_kw_profile(profile, hours=hours)
+
+
+def build_modeled_hourly_kw_profile(profile: dict, *, hours: int = 8760) -> list[float]:
+    """Modelliertes Profil aus Verbrauchern — ignoriert total_profile_csv."""
     annual = float(profile.get("annual_kwh", 0.0) or 0.0)
     baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
     baseload_kw = baseload_kwh / max(1, hours)

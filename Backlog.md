@@ -17,17 +17,27 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Feature-Backlog
 
 ### Version 1.25.0 Backtesting mit Hauskonfiguration starten und auswerten
-- [ ] Nach Ersteinrichtung gibt es außer runtime_setting noch keine Szenarios
-- [ ] Einfachen Szenario-Editor erstellen
+- [x] Im Hauskonfigurator kann optional ein Jahres-Gesamt-Verbrauchs csv eingelesen werden (nach vorgegebenem Format).Damit kann überprüft werden, ob die Konfiguration einigermaßen passt (graphischer Verlauf und Gesamtmenge pro Monat)
+- [x] Nach Ersteinrichtung gibt es außer runtime_setting noch keine Szenarios
+- [x] Einfachen Szenario-Editor erstellen
   - Es gibt eine neue Subpage unter Konfiguration für Szenarien
   - Hauskonfigurator umfasst nur noch Verbraucher und PV-Anlage
   - Batterie und Tarife wandern in den Szenario-Editor
   - Default-Scenario ist Runtime (Pflicht vor Freischaltung von backtesting (und Betrieb))
   - Es können weitere Scenarios hinzugefügt werden mit anderen Batterien und Tarien
-- [ ] Daten aus Konfiguration nehmen und backtesting Rechnung ausführbar machen.
-- [ ] Auf der Seite backtesting werden vorhandene Szenarios und ggf. vorhandener backtesting Lauf eingelesen
+- [x] Daten aus Konfiguration nehmen und backtesting Rechnung ausführbar machen.
+- [x] Auf der Seite backtesting werden vorhandene Szenarios und ggf. vorhandener backtesting Lauf eingelesen
   - Wenn beides zueinanderpasst, kann backtesting Lauf wie schon implementiert analysiert werden
-  - Wenn noch kein Backtesting-Lauf existiert oder nicht zu den aktuellen Szenarien passt, dann wird ein Knopf aktiviert, der das backtesting (mit main.py) startet. Nach Fertigstellung werden die Ergebnisse eingelesen und angezeigt
+  - Wenn noch kein Backtesting-Lauf existiert oder nicht zu den aktuellen Szenarien passt, dann wird ein Knopf aktiviert, der das backtesting (mit main.py) startet. Nach Fertigstellung werden die Ergebnisse eingelesen und angezeigt  
+
+**Manuelle Abnahme (Greenfield, Streamlit :8511 oder Container :8502)**
+
+- [ ] Greenfield zurückgesetzt; nur Hauskonfigurator + Konfiguration sichtbar; Sidebar zeigt fehlende Schritte
+- [ ] **Hauskonfigurator** — thermisches Hausprofil + PV-Anlage speichern; optional Jahres-CSV hochladen → Monatsbalken und Stundenverlauf (Ist vs. Modell)
+- [ ] **Szenarieneditor** erscheint nach Hausprofil + PV — Batterie anlegen, Runtime speichern (Batterie, Tarife, Hausprofil, Geo)
+- [ ] **Backtesting** erscheint nach vollständigem Runtime-Szenario — konfigurierte Szenarien werden angezeigt
+- [ ] Button **Backtesting starten** — Lauf endet erfolgreich; Kosten, Monate, Plausibilität und Stundenchart sichtbar
+- [ ] Nach Änderung an Runtime/Szenario — Warnung „Lauf passt nicht zur Konfiguration“ + **Neu berechnen**
 
 - [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
   - Habe Admins in loxforum nach der besten Stelle für einen Post gefragt
@@ -63,9 +73,6 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Tests in [`tests/test_house_config.py`](tests/test_house_config.py) + Live-Auflösungs-Test
   - Docs: [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md), Sidebar-Hinweis
 
-**Follow-up (eigenständiger Punkt):**
-- [ ] Stromtarif „stündlich fest“ (Import + Export)
-
 
 ### Version 1.+1
 - [ ] Readme ausführlicher machen mit Motivation / Nutzen
@@ -97,12 +104,8 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Adaptionsalgo pflegt `appliances[].default_power_kw` aus den Loxone-Leistungsmerkern (`loxone_power_name`) — bisher nur reserviert, keine Live-Nutzung
   - Geschirrspüler-Leistung ggf. über Hue
 
-
 ### Version 2.+1
-- [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
-  - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
-- [ ] **Soll-Ist Hinweis-Regeln** — Kategorie „Hinweis“ sobald konkrete unkritische Fälle identifiziert (Follow-up Epic Soll-Ist)
-- [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
+- [ ] csv-Datenformat für Verbraucher Jahresbedarf (außer Haus und E-Auto) definieren und Möglichkeit zum Importieren geben (zusätzlich zu Nennwerten). Jahresverlauf aus Nennwerten kann mit gemessenem Verlauf graphisch und summarisch verglichen werden. 
 
 ### Version 2.+1 — Test-Config entkoppeln
 - [x] **Stufe 1 — Standard-Test-Config in `conftest.py`**
@@ -129,6 +132,14 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - Manifest-Felder / Schema
   - Prüfen, ob ein **Replay-/Nachrechen-Pfad** aus einem Dump dokumentiert oder teilautomatisiert werden soll
   - Weitere Inputs nur ergänzen, wenn sie für reale Fehlfälle nachweislich relevant sind
+
+
+### Version 2.+1
+- [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
+  - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
+- [ ] **Soll-Ist Hinweis-Regeln** — Kategorie „Hinweis“ sobald konkrete unkritische Fälle identifiziert (Follow-up Epic Soll-Ist)
+- [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
+
 
 ### Version 2.+1 — Epics **Adaption** & **Thermik** (Architektur first)
 

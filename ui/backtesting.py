@@ -1,17 +1,65 @@
-"""Backtesting-Auswertung aus scripts/run_backtesting.py."""
+"""Backtesting-Auswertung und UI-Start aus scripts/run_backtesting.py."""
 from __future__ import annotations
 
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 
+import config
 from simulation import backtesting_log
+from simulation.backtesting_fingerprint import fingerprint_for_current_config
 from simulation.engine import HISTORICAL_REFERENCE_ID
+from ui.backtesting_runner import run_backtesting_subprocess
 
 
 @st.cache_data(ttl=60, show_spinner="Lade Backtesting-Log...")
 def load_backtesting_data():
     return backtesting_log.load_backtesting_log()
+
+
+def scenario_labels_map() -> dict[str, str]:
+    labels = {"runtime_settings": "Runtime (Baseline)"}
+    for scenario in config.get_scenarios():
+        labels[scenario["id"]] = scenario.get("label", scenario["id"])
+    return labels
+
+
+def log_matches_current_config(meta: dict) -> bool:
+    stored = meta.get("config_fingerprint")
+    if not stored:
+        return False
+    period = meta.get("period")
+    return stored == fingerprint_for_current_config(period=period)
+
+
+def render_configured_scenarios() -> None:
+    st.subheader("Konfigurierte Szenarien")
+    labels = scenario_labels_map()
+    scenarios = config.get_backtesting_scenarios()
+    for scenario_id in scenarios:
+        st.write(f"- **{labels.get(scenario_id, scenario_id)}** (`{scenario_id}`)")
+
+
+def render_backtesting_run_controls(*, log_exists: bool, log_stale: bool) -> None:
+    label = "Backtesting neu berechnen" if log_exists else "Backtesting starten"
+    if st.button(label, type="primary", key="backtesting_run_btn"):
+        with st.status("Backtesting läuft…", expanded=True) as status:
+            exit_code, output = run_backtesting_subprocess()
+            if exit_code == 0:
+                status.update(label="Backtesting abgeschlossen", state="complete")
+                load_backtesting_data.clear()
+                st.rerun()
+            else:
+                status.update(label="Backtesting fehlgeschlagen", state="error")
+                st.error(f"Exit-Code {exit_code}")
+                tail = output[-8000:] if len(output) > 8000 else output
+                if tail:
+                    st.code(tail)
+    if log_stale:
+        st.caption(
+            "Die aktuelle Konfiguration weicht vom gespeicherten Lauf ab. "
+            "Ergebnisse unten sind veraltet."
+        )
 
 
 def render_backtesting_controls(meta: dict, hourly: pd.DataFrame) -> tuple[str, str | None]:
@@ -163,21 +211,7 @@ def render_backtesting_hourly_chart(
         )
 
 
-def render_backtesting_block() -> None:
-    if not backtesting_log.log_exists():
-        st.warning(
-            "Kein Backtesting-Log gefunden. Bitte zuerst "
-            "`python -m scripts.run_backtesting` ausführen "
-            "(erzeugt `backtesting_log.json` und `backtesting_hourly.csv`)."
-        )
-        return
-
-    try:
-        meta, hourly = load_backtesting_data()
-    except Exception as e:
-        st.error(f"Backtesting-Log konnte nicht geladen werden: {e}")
-        return
-
+def _render_backtesting_results(meta: dict, hourly: pd.DataFrame) -> None:
     selected_id, month_key = render_backtesting_controls(meta, hourly)
     render_backtesting_summary(meta)
     render_backtesting_monthly_table(meta)
@@ -187,3 +221,38 @@ def render_backtesting_block() -> None:
         render_backtesting_plausibility(meta, selected_id)
 
     render_backtesting_hourly_chart(hourly, selected_id, month_key)
+
+
+def render_backtesting_block() -> None:
+    log_exists = backtesting_log.log_exists()
+    meta: dict | None = None
+    hourly: pd.DataFrame | None = None
+    log_stale = False
+
+    if log_exists:
+        try:
+            meta, hourly = load_backtesting_data()
+            log_stale = not log_matches_current_config(meta)
+        except Exception as exc:
+            st.error(f"Backtesting-Log konnte nicht geladen werden: {exc}")
+            log_exists = False
+
+    render_configured_scenarios()
+
+    if log_exists and meta is not None and log_stale:
+        st.warning(
+            "Gespeicherter Backtesting-Lauf passt nicht zur aktuellen Konfiguration. "
+            "Bitte neu berechnen."
+        )
+
+    render_backtesting_run_controls(log_exists=log_exists, log_stale=log_stale)
+
+    if not log_exists or meta is None or hourly is None:
+        if not log_exists:
+            st.info(
+                "Noch kein Backtesting-Lauf vorhanden. "
+                "Starte die Berechnung mit dem Button oben."
+            )
+        return
+
+    _render_backtesting_results(meta, hourly)

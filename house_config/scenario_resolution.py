@@ -54,3 +54,41 @@ def resolve_scenario_settings(
         if flex_consumers:
             out["_planning_flex_consumers"] = flex_consumers
     return out
+
+
+def resolve_runtime_settings_for_backtesting(
+    raw_config: dict,
+    *,
+    tariffs_path: str,
+    house_profiles_path: str,
+    monthly_rates_holder: dict | None = None,
+) -> dict:
+    """
+    Löst runtime_settings für die Backtesting-Baseline auf (nur Offline-Simulation).
+    Live-Pfad (_load_dynamic_params) bleibt unverändert bis Backlog 1.26.0.
+    """
+    runtime = raw_config.get("runtime_settings", {})
+    if not isinstance(runtime, dict):
+        raise ValueError("runtime_settings muss ein Objekt sein.")
+    settings = dict(runtime)
+    if not str(settings.get("house_profile_id", "") or "").strip():
+        profiles_doc = load_house_profiles_document(house_profiles_path)
+        for profile in profiles_doc.get("profiles", {}).values():
+            if not isinstance(profile, dict):
+                continue
+            profile_id = str(profile.get("id", "")).strip()
+            if not profile_id:
+                continue
+            for consumer in profile.get("consumers", []):
+                if isinstance(consumer, dict) and consumer.get("type") == "thermal_annual":
+                    settings["house_profile_id"] = profile_id
+                    break
+            if settings.get("house_profile_id"):
+                break
+    return resolve_scenario_settings(
+        settings,
+        raw_config=raw_config,
+        tariffs_path=tariffs_path,
+        house_profiles_path=house_profiles_path,
+        monthly_rates_holder=monthly_rates_holder,
+    )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -45,7 +46,38 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
     assert titles == ["Hauskonfigurator", "Konfiguration"]
 
 
-def test_backtesting_hidden_until_planning_ready(tmp_path, monkeypatch):
+def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(
+        config_dir / "config.json",
+        {
+            "batteries": [],
+            "pv_systems": [{"id": "pv"}],
+            "flexible_consumers": [],
+            "runtime_settings": {},
+        },
+    )
+    _write(
+        config_dir / "house_profiles.json",
+        {
+            "profiles": [
+                {
+                    "id": "efh",
+                    "consumers": [{"id": "wp", "type": "thermal_annual"}],
+                }
+            ]
+        },
+    )
+    _write(config_dir / "tariffs.json", {"import_tariffs": [], "export_tariffs": []})
+
+    specs = build_page_specs(["backtesting"])
+    titles = [spec.title for spec in specs]
+
+    assert titles == ["Hauskonfigurator", "Szenarieneditor", "Konfiguration"]
+    assert "Backtesting" not in titles
+
+
+def test_backtesting_visible_when_planning_ready(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(
         config_dir / "config.json",
@@ -54,6 +86,9 @@ def test_backtesting_hidden_until_planning_ready(tmp_path, monkeypatch):
             "pv_systems": [{"id": "pv"}],
             "flexible_consumers": [],
             "runtime_settings": {
+                "battery_id": "bat",
+                "pv_system_id": "pv",
+                "house_profile_id": "efh",
                 "import_tariff_id": "imp",
                 "export_tariff_id": "exp",
             },
@@ -85,9 +120,9 @@ def test_backtesting_hidden_until_planning_ready(tmp_path, monkeypatch):
     titles = [spec.title for spec in specs]
 
     assert "Backtesting" in titles
+    assert "Szenarieneditor" in titles
     assert "Cockpit" not in titles
     assert "Manuelle Geräte" not in titles
-    assert "Szenarieneditor" not in titles
     defaults = [spec for spec in specs if spec.default]
     assert len(defaults) == 1
     assert defaults[0].title == "Backtesting"

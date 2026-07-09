@@ -5,8 +5,9 @@ from ui.backtesting import render_backtesting_block
 from ui.help_hint import render_page_title_with_help
 
 _BACKTESTING_HELP = (
-    "Auswertung des **Backtesting-Logs** aus `scripts/run_backtesting.py` "
-    "(Referenz ohne Optimierung vs. optimierte Szenarien)."
+    "Backtesting aus der Konfiguration starten und Ergebnisse auswerten "
+    "(Referenz ohne Optimierung vs. optimierte Szenarien). "
+    "Läuft offline via `scripts.run_backtesting`."
 )
 
 

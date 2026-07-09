@@ -30,6 +30,12 @@ BACKTESTING_CBC_EVENTS_JSONL = "backtesting_cbc_events.jsonl"
 LOG_VERSION = BACKTESTING_LOG_SCHEMA
 
 
+def _compute_config_fingerprint(period: dict) -> str:
+    from simulation.backtesting_fingerprint import fingerprint_for_current_config
+
+    return fingerprint_for_current_config(period=period)
+
+
 def _serialize_plausibility(report: PlausibilityReport) -> dict:
     return {
         "total_windows": len(report.results),
@@ -251,6 +257,7 @@ def save_backtesting_log(
     period: dict,
     log_dir: str = ".",
     cbc_events_by_scenario: dict[str, list[dict]] | None = None,
+    config_fingerprint: str | None = None,
 ) -> str:
     """Schreibt Metadaten (JSON) und Stundenwerte (CSV). Gibt den JSON-Pfad zurück."""
     os.makedirs(log_dir, exist_ok=True)
@@ -282,6 +289,7 @@ def save_backtesting_log(
             "hourly_file": BACKTESTING_HOURLY_CSV,
             "scenario_ids": list(results.keys()),
             "reference_id": HISTORICAL_REFERENCE_ID,
+            "config_fingerprint": config_fingerprint or _compute_config_fingerprint(period),
         },
         schema_version=BACKTESTING_LOG_SCHEMA,
     )

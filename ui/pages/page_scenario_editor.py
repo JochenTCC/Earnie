@@ -1,4 +1,4 @@
-"""Szenarieneditor: Tarif-, PV-, Batterie- und Hausprofil-Auswahl für Backtesting."""
+"""Szenarieneditor: Runtime-Baseline, Batterien und weitere Backtesting-Szenarien."""
 from __future__ import annotations
 
 import streamlit as st
@@ -15,17 +15,19 @@ from ui.house_config_io import (
     load_tariffs_catalog_meta,
     upsert_scenario,
 )
+from ui.planning_battery_form import render_battery_planning_tab
 from ui.planning_tariff_form import (
     _EXPORT_TYPE_LABELS,
     _IMPORT_TYPE_LABELS,
     _tariff_meta_caption,
     _type_caption,
 )
+from ui.scenario_runtime_form import render_runtime_scenario_form
 
 _HELP = (
-    "Backtesting-Szenarien aus Entitäten zusammenstellen: "
-    "Tarif (Bezug/Einspeise), PV, Batterie, optional Hausprofil. "
-    "Speichert nach `config/backtesting_scenarios.json`."
+    "Runtime-Szenario (Pflicht), Batterie-Entitäten und optionale weitere "
+    "Backtesting-Varianten. Speichert Runtime nach `config.json`, "
+    "weitere Szenarien nach `config/backtesting_scenarios.json`."
 )
 
 
@@ -42,12 +44,18 @@ def _options(items: list[dict], *, allow_none: bool = True) -> tuple[list[str], 
     return labels, mapping
 
 
-def render() -> None:
-    render_page_title_with_help("🧪 Szenarieneditor", _HELP, key="scenario_editor_help")
+def _default_label(options: list[str], item_id: str | None) -> int:
+    if not item_id:
+        return 0
+    for index, opt in enumerate(options):
+        if opt.endswith(f"({item_id})"):
+            return index
+    return 0
 
-    catalog_meta = load_tariffs_catalog_meta()
-    if catalog_meta.get("catalog_as_of"):
-        st.caption(f"Tarifkatalog: Stand {catalog_meta['catalog_as_of']}")
+
+def _render_additional_scenarios_tab() -> None:
+    st.subheader("Weitere Szenarien")
+    st.caption("Optionale Varianten mit anderen Batterien oder Tarifen (zusätzlich zu Runtime).")
 
     scenarios_doc = load_backtesting_scenarios_raw()
     scenarios = scenarios_doc.get("scenarios", [])
@@ -84,14 +92,6 @@ def render() -> None:
     imp_labels, imp_map = _options(import_tariffs)
     exp_labels, exp_map = _options(export_tariffs)
     prof_labels, prof_map = _options(list(profiles.values()))
-
-    def _default_label(options: list[str], item_id: str | None) -> int:
-        if not item_id:
-            return 0
-        for index, opt in enumerate(options):
-            if opt.endswith(f"({item_id})"):
-                return index
-        return 0
 
     battery_pick = st.selectbox(
         "Batterie",
@@ -146,7 +146,6 @@ def render() -> None:
                 value=float(settings.get("netzentgelt_cent_kwh_override", 0.0) or 0.0),
                 step=0.1,
                 key="scenario_netzentgelt",
-                help="Optionaler Szenario-Override; leer im Tarifkatalog für manuelle Nachpflege.",
             )
 
     prof_pick = st.selectbox(
@@ -182,13 +181,7 @@ def render() -> None:
         )
         try:
             resolved = config.CONFIG.resolve_scenario_settings_dict(draft)
-            st.json(
-                {
-                    k: v
-                    for k, v in resolved.items()
-                    if not k.startswith("_")
-                }
-            )
+            st.json({k: v for k, v in resolved.items() if not k.startswith("_")})
         except ValueError as exc:
             st.error(str(exc))
 
@@ -247,3 +240,21 @@ def _build_settings(
     if netzentgelt_cent_kwh_override is not None and netzentgelt_cent_kwh_override > 0.0:
         settings["netzentgelt_cent_kwh_override"] = float(netzentgelt_cent_kwh_override)
     return settings
+
+
+def render() -> None:
+    render_page_title_with_help("🧪 Szenarieneditor", _HELP, key="scenario_editor_help")
+
+    catalog_meta = load_tariffs_catalog_meta()
+    if catalog_meta.get("catalog_as_of"):
+        st.caption(f"Tarifkatalog: Stand {catalog_meta['catalog_as_of']}")
+
+    tab_runtime, tab_battery, tab_more = st.tabs(
+        ["Runtime (Baseline)", "Batterien", "Weitere Szenarien"]
+    )
+    with tab_runtime:
+        render_runtime_scenario_form()
+    with tab_battery:
+        render_battery_planning_tab()
+    with tab_more:
+        _render_additional_scenarios_tab()

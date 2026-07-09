@@ -563,7 +563,18 @@ class Config:
 
     def get_backtesting_scenarios(self) -> dict[str, dict]:
         """runtime_settings als Baseline, gefolgt von aufgelösten Szenarien."""
-        scenarios = {"runtime_settings": dict(self._raw_config["runtime_settings"])}
+        from house_config.scenario_resolution import resolve_runtime_settings_for_backtesting
+
+        baseline_holder: dict = {}
+        baseline = resolve_runtime_settings_for_backtesting(
+            self._raw_config,
+            tariffs_path=self.tariffs_path,
+            house_profiles_path=self.house_profiles_path,
+            monthly_rates_holder=baseline_holder,
+        )
+        if baseline_holder.get("_monthly_fixed_tariffs") is not None:
+            baseline["_monthly_fixed_tariffs"] = baseline_holder["_monthly_fixed_tariffs"]
+        scenarios = {"runtime_settings": baseline}
         for scenario in self.get_scenarios():
             scenarios[scenario["id"]] = self.resolve_scenario_settings_dict(scenario["settings"])
         return scenarios

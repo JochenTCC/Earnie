@@ -107,6 +107,18 @@ def upsert_house_profile(profile: dict) -> None:
     save_house_profiles_document(path, {"profiles": profiles})
 
 
+def save_profile_consumption_csv(profile_id: str, content: bytes, filename: str) -> str:
+    """Speichert hochgeladene Verbrauchs-CSV unter config/uploads/."""
+    uploads_dir = Path("config") / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = Path(filename).name or "consumption.csv"
+    if not safe_name.lower().endswith(".csv"):
+        safe_name = f"{safe_name}.csv"
+    target = uploads_dir / f"{profile_id}_{safe_name}"
+    target.write_bytes(content)
+    return target.as_posix()
+
+
 def _load_config_document() -> dict:
     return read_json_dict(resolve_config_json_path())
 
@@ -184,6 +196,50 @@ def save_planning_tariff_selection(import_tariff_id: str, export_tariff_id: str)
         raise ValueError("runtime_settings muss ein Objekt sein.")
     runtime["import_tariff_id"] = import_tariff_id.strip()
     runtime["export_tariff_id"] = export_tariff_id.strip()
+    _save_config_document(data)
+
+
+def get_runtime_scenario_refs() -> dict:
+    """Entitäts-Referenzen des Runtime-Szenarios aus runtime_settings."""
+    runtime = _load_config_document().get("runtime_settings", {})
+    if not isinstance(runtime, dict):
+        return {}
+    return {
+        "battery_id": str(runtime.get("battery_id", "") or "").strip(),
+        "pv_system_id": str(runtime.get("pv_system_id", "") or "").strip(),
+        "import_tariff_id": str(runtime.get("import_tariff_id", "") or "").strip(),
+        "export_tariff_id": str(runtime.get("export_tariff_id", "") or "").strip(),
+        "house_profile_id": str(runtime.get("house_profile_id", "") or "").strip(),
+        "latitude": float(runtime.get("latitude", 48.2)),
+        "longitude": float(runtime.get("longitude", 16.37)),
+        "timezone_name": str(runtime.get("timezone_name", "Europe/Vienna") or "Europe/Vienna"),
+    }
+
+
+def save_runtime_scenario_refs(
+    *,
+    battery_id: str,
+    pv_system_id: str,
+    import_tariff_id: str,
+    export_tariff_id: str,
+    house_profile_id: str,
+    latitude: float,
+    longitude: float,
+    timezone_name: str,
+) -> None:
+    """Speichert Entitäts-Referenzen für das Runtime-Szenario (Baseline)."""
+    data = _load_config_document()
+    runtime = data.setdefault("runtime_settings", {})
+    if not isinstance(runtime, dict):
+        raise ValueError("runtime_settings muss ein Objekt sein.")
+    runtime["battery_id"] = battery_id.strip()
+    runtime["pv_system_id"] = pv_system_id.strip()
+    runtime["import_tariff_id"] = import_tariff_id.strip()
+    runtime["export_tariff_id"] = export_tariff_id.strip()
+    runtime["house_profile_id"] = house_profile_id.strip()
+    runtime["latitude"] = float(latitude)
+    runtime["longitude"] = float(longitude)
+    runtime["timezone_name"] = timezone_name.strip() or "Europe/Vienna"
     _save_config_document(data)
 
 

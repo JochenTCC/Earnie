@@ -136,6 +136,9 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
                 "pv_systems": [{"id": "pv"}],
                 "flexible_consumers": [],
                 "runtime_settings": {
+                    "battery_id": "bat",
+                    "pv_system_id": "pv",
+                    "house_profile_id": "efh",
                     "import_tariff_id": "imp",
                     "export_tariff_id": "exp",
                 },

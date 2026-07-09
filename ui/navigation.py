@@ -35,9 +35,9 @@ class PageSpec:
 
 
 def _restricted_page_specs() -> list[PageSpec]:
-    from ui.pages import page_config, page_house_config
+    from ui.pages import page_config, page_house_config, page_scenario_editor
 
-    return [
+    specs = [
         PageSpec(
             page_house_config.render,
             "Hauskonfigurator",
@@ -46,8 +46,21 @@ def _restricted_page_specs() -> list[PageSpec]:
             "house-config",
             default=True,
         ),
-        PageSpec(page_config.render, "Konfiguration", "⚙️", "Konfiguration", "config"),
     ]
+    if is_scenario_editor_unlocked():
+        specs.append(
+            PageSpec(
+                page_scenario_editor.render,
+                "Szenarieneditor",
+                "🧪",
+                "Konfiguration",
+                "scenario-editor",
+            )
+        )
+    specs.append(
+        PageSpec(page_config.render, "Konfiguration", "⚙️", "Konfiguration", "config")
+    )
+    return specs
 
 
 def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
