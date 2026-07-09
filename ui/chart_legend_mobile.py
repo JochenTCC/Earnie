@@ -1,4 +1,4 @@
-"""Mobile Legende für Cockpit-Charts: Plotly-Legende auf schmalen Viewports ausblenden, Expander als Ersatz."""
+"""Kompakte Legende für Cockpit-Charts: Plotly-Legende aus, klappbare HTML-Legende darunter."""
 from __future__ import annotations
 
 import html
@@ -6,19 +6,10 @@ from typing import Any
 
 import streamlit as st
 
-_MOBILE_LEGEND_CSS = """
+_COLLAPSIBLE_LEGEND_CSS = """
 <style>
 .chart-mobile-legend-wrap {
-    display: none;
-    margin-top: 0.25rem;
-}
-@media (max-width: 768px) {
-    .chart-mobile-legend-wrap {
-        display: block;
-    }
-    div[data-testid="stPlotlyChart"] .legend {
-        display: none !important;
-    }
+    margin-top: 0;
 }
 .chart-mobile-legend summary {
     cursor: pointer;
@@ -53,7 +44,7 @@ _FALLBACK_LEGEND_COLOR = "#999999"
 
 
 def inject_mobile_legend_css() -> None:
-    st.markdown(_MOBILE_LEGEND_CSS, unsafe_allow_html=True)
+    st.markdown(_COLLAPSIBLE_LEGEND_CSS, unsafe_allow_html=True)
 
 
 def _first_color_value(color: Any) -> str | None:

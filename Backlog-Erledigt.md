@@ -2,6 +2,15 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix UI-Bugs 1.23.1 (2026-07-09)
+
+- [x] **Ranking-Tabelle mobil kompakt** — 3 Spalten (Checkbox vor Uhrzeit, Güte, Delta); Kostenspalte entfernt (`ui/pages/page_devices.py`)
+- [x] **Legende Cockpit Chart 1/2** — Variante A (unified collapsible): `showlegend=False`, `margin.b` ≈ 55, HTML-`<details>` auf allen Viewports (`ui/chart_legend_mobile.py`, `ui/charts.py`)
+- [x] **Nennleistung/Laufzeit bei aktivem Plan** — Eingabefelder und Speichern-Button deaktiviert mit Hinweistext
+- [x] **SOC-BL-Ziel Brücke an Zonengrenzen** — `bridge_left=(index > 0)` in `add_baseline_soc_traces`
+- [x] **Preiskurve durchgängig** — Einzel-Trace statt segmentierter HV-Linien (`add_price_on_soc_axis_trace`)
+- [x] **Manuelle Verbraucher Schraffur** — stabile Muster pro `appliance_id` (`manual_appliance_pattern_shape` in `ui/chart_colors.py`)
+
 ### Bugfix Mobile Legende Cockpit (Chart 1/2) (2026-07-09)
 
 - [x] **Mobile Legende Cockpit (Chart 1/2)** — Plotly-Legende unter 768px per CSS aus; farbiges `<details>` als Ersatz (nur mobil sichtbar). Desktop: nur Plotly-Legende, kein Expander (`ui/chart_legend_mobile.py`). Prod-Abnahme bestätigt.

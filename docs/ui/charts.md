@@ -57,7 +57,7 @@ Entladen → Last ← verbleibende Entladung
 
 **PV im grauen Bereich:** Eine Prognose-Linie (Forecast.Solar-Wert **vor** Live-Overlay, Feld `forecast_pv_kw` im Log) über alle Zonen; PV-Balken (Flow-Balance ↑) nutzen im Log **Ist** (`PV-Ist (kW)` aus `consumption_snapshot.pv_kw`). Abweichung sichtbar ab dem nächsten Worker-Lauf nach dem Fix; ältere Log-Einträge können identische Werte haben (früher wurde Ist fälschlich als Prognose geloggt).
 
-**Mobile Legende (Cockpit Chart 1/2):** Unter 768px Viewport-Breite blendet CSS die Plotly-Legende aus; stattdessen ein ausklappbares HTML-`<details>` mit Farbfeldern (`ui/chart_legend_mobile.py`). Ab 769px nur die Plotly-Legende im Chart.
+**Legende (Cockpit Chart 1/2):** Plotly-`showlegend` ist aus; unter dem Chart ein ausklappbares HTML-`<details>` mit Farbfeldern auf allen Viewports (`ui/chart_legend_mobile.py`, `margin.b` = 0). Kein toter Legendenstreifen im Chart.
 
 **Rechte Y-Achse (0–100, skaliert):**
 

@@ -9,6 +9,7 @@ from optimizer.appliance_recommendation import recommend_start_times
 from ui.chart_colors import COLOR_COST_SAVINGS, COLOR_COST_SAVINGS_NEGATIVE
 from ui.pages.page_devices import (
     _DELTA_COLUMN,
+    _appliance_inputs_disabled,
     _delta_cell_color,
     _delta_to_best_eur,
     _recommendation_dataframe,
@@ -40,6 +41,22 @@ def test_delta_to_best_eur(cost_eur: float, best_cost_eur: float, delta: float) 
 )
 def test_delta_cell_color(delta: float, expected_color: str) -> None:
     assert _delta_cell_color(delta) == expected_color
+
+
+def test_delta_column_label_is_compact() -> None:
+    assert _DELTA_COLUMN == "Delta"
+
+
+@pytest.mark.parametrize(
+    ("active", "expected"),
+    [
+        (None, False),
+        ({}, True),
+        ({"power_kw": 2.0}, True),
+    ],
+)
+def test_appliance_inputs_disabled(active, expected: bool) -> None:
+    assert _appliance_inputs_disabled(active) is expected
 
 
 def test_recommendation_dataframe_delta_to_best() -> None:

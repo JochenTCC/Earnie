@@ -12,7 +12,11 @@ from optimizer.appliance_schedule import (
     appliance_column_name,
     apply_appliance_schedules_to_chart_rows,
 )
-from ui.chart_colors import COLOR_MANUAL_APPLIANCE, flex_bar_chart_color
+from ui.chart_colors import (
+    COLOR_MANUAL_APPLIANCE,
+    flex_bar_chart_color,
+    manual_appliance_pattern_shape,
+)
 from ui.charts import clear_consumer_stack_order_cache, ordered_active_consumers_for_stack
 
 _TZ = ZoneInfo("Europe/Vienna")
@@ -83,6 +87,17 @@ def test_manual_appliances_share_chart_color(monkeypatch):
     assert flex_bar_chart_color(washer) == COLOR_MANUAL_APPLIANCE
     assert flex_bar_chart_color(dryer) == COLOR_MANUAL_APPLIANCE
     assert washer["name"] != dryer["name"]
+
+
+def test_manual_appliances_have_distinct_pattern_shapes(monkeypatch):
+    _patch_appliances(monkeypatch)
+    washer = appliance_as_chart_consumer(_APPLIANCES[0])
+    dryer = appliance_as_chart_consumer(_APPLIANCES[1])
+    washer_pattern = manual_appliance_pattern_shape(washer["id"])
+    dryer_pattern = manual_appliance_pattern_shape(dryer["id"])
+    assert washer_pattern
+    assert dryer_pattern
+    assert washer_pattern != dryer_pattern
 
 
 def test_ordered_stack_includes_named_appliances(monkeypatch):

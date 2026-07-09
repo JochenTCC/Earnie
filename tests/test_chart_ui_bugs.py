@@ -280,6 +280,59 @@ def test_baseline_soc_trace_starts_at_history_boundary_not_in_gray():
     assert first_x == slots[3]
 
 
+def test_baseline_soc_bridges_extrapolation_start():
+    """Keine Lücke am Übergang neutral→grün (Preis extrapoliert) für SoC BL Ziel."""
+    slots = [_dt(2026, 7, 5, hour, 0) for hour in (20, 21, 22, 23)]
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [60.0, 59.0, 58.0, 57.0],
+        "Geplante Batterie-Aktion (kW)": [0.0] * 4,
+        "Preis extrapoliert": [False, False, True, True],
+    })
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_baseline_soc_traces(fig, df, extrap_start=2, extrap_end=4)
+    bl_traces = [trace for trace in fig.data if trace.name == "SoC BL Ziel"]
+    assert len(bl_traces) == 2
+    assert bl_traces[0].y[-1] == 59.0
+    assert bl_traces[1].y[0] == 59.0
+    assert bl_traces[1].y[1] == 58.0
+    assert _trace_x_vienna(bl_traces[1].x[0]) == _dt(2026, 7, 5, 21, 0)
+    assert _trace_x_vienna(bl_traces[1].x[1]) == _dt(2026, 7, 5, 22, 0)
+
+
+def test_price_trace_bridges_extrapolation_start():
+    """Keine x-Lücke an Zonengrenzen — HV-Schritt bleibt durchgängig."""
+    slots = [_dt(2026, 7, 5, hour, 0) for hour in (20, 21, 22, 23)]
+    rows = []
+    for index, slot in enumerate(slots):
+        rows.append({
+            "slot_datetime": slot,
+            "Uhrzeit": slot.strftime("%d.%m. %H:%M"),
+            "Simulierter SoC (%)": 50.0,
+            "Geplante Batterie-Aktion (kW)": 0.0,
+            "Strompreis (Cent/kWh)": 20.0 + index * 5,
+            "Preis extrapoliert": index >= 2,
+        })
+    df = pd.DataFrame(rows)
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_price_on_soc_axis_trace(fig, df, axis, extrap_start=2, extrap_end=4)
+    price_trace = next(trace for trace in fig.data if trace.name == "Preis")
+    boundary_x = _dt(2026, 7, 5, 22, 0)
+    boundary_points = [
+        (float(y), _trace_x_vienna(x))
+        for x, y in zip(price_trace.x, price_trace.y)
+        if _trace_x_vienna(x) == boundary_x
+    ]
+    assert len(boundary_points) >= 2
+    ys = {y for y, _x in boundary_points}
+    assert len(ys) == 2
+    assert 25.0 in ys
+    assert 30.0 in ys
+
+
 def test_soc_trace_bridges_extrapolation_start():
     """Keine Lücke am Übergang neutral→grün (Preis extrapoliert)."""
     slots = [_dt(2026, 7, 5, hour, 0) for hour in (20, 21, 22, 23)]

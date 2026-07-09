@@ -236,6 +236,17 @@ COLOR_MANUAL_APPLIANCE = color_from_hsl(
 )
 
 
+_MANUAL_APPLIANCE_PATTERNS: tuple[str, ...] = ("/", "\\", "x", "|", "-", ".")
+
+
+def manual_appliance_pattern_shape(appliance_id: str) -> str:
+    """Stabile Schraffur pro manuellem Gerät (ohne + wegen Sofort-Laden)."""
+    if not appliance_id:
+        return _MANUAL_APPLIANCE_PATTERNS[0]
+    index = sum(ord(char) for char in appliance_id) % len(_MANUAL_APPLIANCE_PATTERNS)
+    return _MANUAL_APPLIANCE_PATTERNS[index]
+
+
 def manual_appliance_chart_color(*, saturation_factor: float = 1.0) -> str:
     """Einheitliche Chart-Farbe für alle manuellen Geräte."""
     hue, saturation, luminance = _HSL_MANUAL_APPLIANCE
