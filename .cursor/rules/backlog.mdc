@@ -31,7 +31,7 @@ Beim Pflegen:
 - Referenz-Tabellen (z. B. Log-Dateien) gehören nicht ins Erledigt-Archiv, sondern unter **Referenz** in `Backlog.md`.
 - Wiederholte `### Version …`-Überschriften in `Backlog.md` sind bewusst — Reihenfolge per Block verschieben, nicht zusammenführen.
 - **Kapitel-Nomenklatur:** `MAJOR.MINOR.letter` (Teilschritte a, b, …) → `MAJOR.MINOR.0` (Release des Zyklus) → nächster MINOR `MAJOR.NEXT.0`; Buchstaben nur im Backlog, `version.py` ohne Buchstaben (Details: `roadmap-nomenclature.mdc`, `versioning.mdc`).
-- **Versionierung:** abgeschlossener Bugfix → nur **PATCH**; abgeschlossenes Feature-Kapitel → MINOR oder PATCH je nach Buchstaben-/Platzhalter-Typ (siehe `versioning.mdc`).
+- **Versionierung:** `version.py` **nie ohne Nutzer-Freigabe** ändern; während offener Buchstaben-/Release-Kapitel desselben MINOR **kein automatischer Bump** — Vorschlag und Nachfrage (siehe `versioning.mdc`).
 
 ### Bugfix-Verifikation (`## Bugfix Verifications Pending`)
 
