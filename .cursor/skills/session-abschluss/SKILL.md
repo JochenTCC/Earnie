@@ -47,12 +47,12 @@ Erst nach Antwort des Users stagen. Ausgeschlossene Dateien nicht committen.
 
 Schema aus `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` beibehalten (siehe auch `.cursor/rules/backlog.mdc`, Kapitel-Nomenklatur in `roadmap-nomenclature.mdc`):
 
-- **Buchstaben-Kapitel** (`1.24.a`, `1.24.b`): Teilschritte vor dem `.0`-Release; bei erledigt → `Backlog-Erledigt.md`; `version.py`: `.a` → MINOR+PATCH=0, `.b` → PATCH (siehe `versioning.mdc`)
-- **Release-Kapitel** (`1.24.0`, `1.25.0`): `.0` schließt MINOR-Zyklus bzw. startet nächsten MINOR; Version-Bump je nach Kapitel-MINOR vs. aktuellem Stand (siehe `versioning.mdc`)
-- **`version.py` ≠ Backlog-Stand:** `1.24.0` in `version.py` bei offenem `1.24.b` ist beabsichtigt — Buchstabe markiert nur den laufenden Teilschritt im Backlog
+- **Buchstaben-Kapitel** (`1.24.a` … `1.24.g`): bei erledigt → `Backlog-Erledigt.md`; **`version.py` dabei nicht automatisch ändern** (siehe `versioning.mdc`)
+- **Release-Kapitel** (`1.24.0`, `1.25.0`): Backlog-Fortschritt wie üblich; Version-Bump **nur nach expliziter Nutzer-Freigabe**
+- **`version.py` ≠ Backlog-Stand:** Backlog-Kapitel markieren Entwicklungsschritte; `version.py` bleibt während eines MINOR-Zyklus stabil, bis der Nutzer einen Bump freigibt
 
 - **Erledigte Punkte nicht durchstreichen** — aus der jeweiligen offenen Datei entfernen und in `Backlog-Erledigt.md` mit `- [x]` eintragen
-- **Backlog-Bugfixes.md:** offene Prod-Bugs/Regressionen; bei Erledigung PATCH in `version.py` prüfen
+- **Backlog-Bugfixes.md:** offene Prod-Bugs/Regressionen; bei Erledigung **PATCH nur vorschlagen** und Nutzer fragen — nicht still ändern
 - **`## Bugfix Verifications Pending`:** implementierte Fixes mit ausstehender Live-Abnahme — nach Commit hierher verschieben, **nicht** nach `Backlog-Erledigt.md`; nach erfolgreicher Verifikation erst archivieren (siehe `.cursor/rules/backlog.mdc`)
 - **Backlog.md:** Feature-Backlog (Version-Blöcke), Packaging, Referenz — nur noch offene Phasen/Unterpunkte
 - **Backlog-Erledigt.md:** Neuer Abschnitt `### <Thema> (YYYY-MM-DD)` mit Datum **heute** (lokale Zeit Europe/Vienna)
@@ -105,9 +105,11 @@ Start **nur** bei explizitem „Ja“ / „Docker bauen“ / „Image pushen“ 
 
 ### 1. Version prüfen
 
-`version.py` lesen. **`version.py` nicht „korrigieren“, weil Buchstaben-Kapitel im Backlog noch offen sind** — früher MINOR-Bump nach `.a` ist beabsichtigt (siehe `versioning.mdc`).
+`version.py` lesen. **Niemals ohne explizite Nutzer-Freigabe ändern** (siehe `versioning.mdc`).
 
-Wenn Code-Release sinnvoll erscheint, aber Version unverändert: User **einmal** fragen, ob `version.py` angehoben werden soll — nicht still ändern.
+Während eines laufenden MINOR-Zyklus (`1.24.a` … `1.24.g`, Release `1.24.0`): **keinen automatischen Bump** — auch nicht „zurücksetzen“ oder PATCH nachholen.
+
+Wenn ein Release sinnvoll erscheint: **einmal** Vorschlag (Zielversion + Begründung) und Nutzer fragen. Bei „nein“ oder ohne Antwort: unverändert lassen.
 
 ### 2. Build & Push
 

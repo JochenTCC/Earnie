@@ -20,7 +20,7 @@ In `Backlog.md` kennzeichnen **Buchstaben an dritter Stelle** einzelne Entwicklu
 
 - Reihenfolge im MINOR-Zyklus: **a → b → … → `MAJOR.MINOR.0`** (z. B. `1.24.a` → `1.24.b` → `1.24.0`, danach nächster MINOR `1.25.0`).
 - Buchstaben-Kapitel und das zugehörige `.0`-Kapitel **teilen** dieselbe MINOR-Zahl in der Planung.
-- **`version.py` vs. Backlog:** SemVer in `version.py` ohne Buchstaben; laufende Teilschritte nur im Backlog markiert (`.a`, `.b`, …). Nach Abschluss von `.a` darf `version.py` bereits `MAJOR.MINOR.0` zeigen, während `.b` noch offen ist (siehe `versioning.mdc`).
+- **`version.py` vs. Backlog:** SemVer in `version.py` ohne Buchstaben; Fortschritt (`.a` … `.g`, Release `.0`) nur im Backlog. Während eines laufenden MINOR-Zyklus **`version.py` nicht automatisch hochzählen** — Änderungen nur nach expliziter Nutzer-Freigabe (siehe `versioning.mdc`).
 - **Abgrenzung Epic-Schritte:** Backlog-Buchstabe = ganzes Kapitel/Feature-Block; **P3a** = Feinschritt *innerhalb* eines Kapitels (siehe unten).
 - Im Dialog: „Als Nächstes **1.24.b**“ — nicht „nächstes 1.+1“ oder bare „Phase 3“.
 

@@ -7,63 +7,49 @@ alwaysApply: true
 
 Format: **MAJOR.MINOR.PATCH** (Semantic Versioning in `version.py`) — **ohne Buchstaben-Suffix**.
 
-## Abgrenzung `version.py` ↔ Backlog
+## Grundsatz: Nutzer-Freigabe (Pflicht)
 
-Zwei Ebenen für parallele Versionsarbeit (Details Buchstaben-Kapitel: `roadmap-nomenclature.mdc`):
+- **`version.py` niemals ohne explizite Bestätigung des Nutzers ändern** — auch nicht bei Session-Abschluss, Bugfix oder abgeschlossenem Backlog-Kapitel.
+- Stattdessen: **Vorschlag** formulieren (Zielversion + kurze Begründung) und **fragen**.
+- Bei Ablehnung oder ohne Antwort: `version.py` **unverändert** lassen.
+- Commit-Messages dürfen Backlog-Kapitel nennen (`hausconfig: 1.24.f …`) — das ersetzt **keinen** automatischen Version-Bump.
+
+## Abgrenzung `version.py` ↔ Backlog
 
 | Ebene | Datei / Ort | Schreibweise | Zweck |
 |-------|-------------|--------------|-------|
-| **Release-Stand** | `version.py` | `1.24.0` | Aktuelle App-/Container-Version (SemVer) |
-| **Entwicklungsschritt** | `Backlog.md` | `1.24.b` | Teilschritt im MINOR-Zyklus (visuelle Markierung) |
+| **Release-Stand** | `version.py` | `1.24.0` | Veröffentlichte App-/Container-Version (nur nach Nutzer-Freigabe) |
+| **Entwicklungsschritt** | `Backlog.md` | `1.24.f` | Teilschritt im MINOR-Zyklus (Planung/Fortschritt) |
 
-**Regeln:**
+- Buchstaben-Kapitel (`.a`, `.b`, … `.g`) und das Release-Kapitel (`.0`) existieren **nur im Backlog**, nicht in `version.py`.
+- Fortschritt im Backlog (Kapitel nach `Backlog-Erledigt.md` verschieben) ist **unabhängig** von `version.py`.
 
-- `version.py` **darf und soll** die Zielversion eines MINOR-Zyklus tragen, **bevor** alle Buchstaben-Schritte abgeschlossen sind — z. B. `1.24.0` während `1.24.b` noch offen ist. Das ist **korrekt**, nicht nachjustieren.
-- Die **spezielle Markierung** für laufende Teilschritte steht **nur im Backlog** (Buchstabe an dritter Stelle: `.a`, `.b`, …), **nicht** in `version.py`.
-- Offene Buchstaben-Kapitel sind **kein Grund**, `version.py` zurückzusetzen oder einen Bump zu verzögern.
-- PATCH in `version.py` erst beim **Abschluss** des jeweiligen Buchstaben-/Release-Kapitels (Session-Ende), nicht beim bloßen Start eines Teilschritts.
+## MINOR-Zyklus: keine automatische Hochzählung
 
-**Beispiel (Ist-Stand):** `1.24.a` erledigt → `version.py` = `1.24.0`; `1.24.b` noch offen → Backlog zeigt `1.24.b`, `version.py` bleibt `1.24.0`.
+Solange am **selben MINOR-Zyklus** gearbeitet wird — d. h. es gibt noch Backlog-Kapitel `MAJOR.MINOR.letter` (z. B. `1.24.a` … `1.24.g`) und/oder das zugehörige Release-Kapitel `MAJOR.MINOR.0` ist für einen Release noch nicht vom Nutzer freigegeben:
 
-## Backlog Feature-Kapitel (`version.py`)
+- **`version.py` nicht automatisch erhöhen** — weder MINOR noch PATCH.
+- Abschluss einzelner Buchstaben-Kapitel rechtfertigt **keinen** PATCH (+1).
+- Beispiel: während `1.24.c` … `1.24.g` und `1.24.0` im Backlog → `version.py` bleibt z. B. `1.24.0`, **nicht** `1.24.1` … `1.24.3`.
 
-### Buchstaben-Kapitel — `### Version MAJOR.MINOR.letter`
+**Nach Abschluss des gesamten MINOR-Zyklus** (alle Kapitel dieser MINOR-Nummer erledigt): Version-Bump **nur vorschlagen** und Nutzer fragen (typisch: bei `1.25.0` als nächstem Kapitel → `1.25.0`; oder PATCH auf letztem Stand — Nutzer entscheidet).
 
-Teilschritte vor dem `.0`-Release eines MINOR-Zyklus (siehe `roadmap-nomenclature.mdc`). Wenn ein Buchstaben-Kapitel vollständig in `Backlog-Erledigt.md` landet:
+## Wann einen Bump vorschlagen (immer nur nach Freigabe)
 
-- **Erster Schritt** des Zyklus (typisch `.a`): **MINOR** auf die Kapitel-MINOR-Zahl setzen, **PATCH = 0**
-  - Beispiel: `1.23.2` + abgeschlossenes `1.24.a` → `1.24.0`
-- **Weitere Buchstaben-Schritte** (`.b`, …), solange dasselbe MINOR-Kapitel offen ist: nur **PATCH** (+1)
-  - Beispiel: `1.24.0` + abgeschlossenes `1.24.b` → `1.24.1`
+| Anlass | Typischer Vorschlag | Entscheidung |
+|--------|-------------------|--------------|
+| Gesamter MINOR-Zyklus abgeschlossen, Release gewünscht | `MAJOR.MINOR.0` oder nächster MINOR | Nutzer |
+| Nächstes MINOR-Kapitel abgeschlossen (z. B. `1.25.0`) | `1.25.0` | Nutzer |
+| Bugfix abgeschlossen | PATCH +1 | Nutzer |
+| `### Version N.+1` abgeschlossen | MINOR +1, PATCH = 0 | Nutzer |
+| Zyklusbeginn: einmalig Ziel-MINOR setzen | z. B. `1.24.0` | Nutzer |
 
-### Release-Kapitel — `### Version MAJOR.MINOR.0`
-
-Abschluss eines MINOR-Zyklus (nach den Buchstaben-Schritten). Wenn vollständig erledigt:
-
-- **Gleiche MINOR-Zahl** wie aktuelles `version.py` (z. B. `1.24.0`-Kapitel bei laufendem 1.24.x): nur **PATCH** (+1), sofern nicht bereits die Zielversion
-  - Beispiel: `1.24.1` + abgeschlossenes `1.24.0`-Kapitel → `1.24.2`
-- **Höhere MINOR-Zahl** als aktuelles `version.py` (z. B. `1.25.0`-Kapitel): **MINOR** auf Kapitel-MINOR, **PATCH = 0**
-  - Beispiel: `1.24.2` + abgeschlossenes `1.25.0`-Kapitel → `1.25.0`
-
-Bei Session-Ende prüfen, welcher Fall zutrifft — nicht blind PATCH.
-
-### Platzhalter — `### Version N.+1`
-
-Wenn ein **abgeschlossenes Feature** aus einem `### Version N.+1`-Block (ohne konkrete MINOR-Zahl) in `Backlog-Erledigt.md` landet:
-
-- **MINOR** (+1) erhöhen
-- **PATCH** auf **0** setzen
-
-Beispiel: `1.14.2` → `1.15.0` (nicht `1.14.3`).
-
-## Bugfixes & kleine Nacharbeiten
-
-Ohne abgeschlossenes Feature-Kapitel (Buchstabe, Release oder `N.+1`) nur **PATCH** erhöhen:
-
-Beispiel: `1.15.0` → `1.15.1`.
+Keine feste Automatik mehr vom Typ „`.a` → MINOR“, „`.b` → PATCH“ — diese Zuordnung gilt **nicht**.
 
 ## Session-Abschluss
 
-Bei Session-Ende mit erledigtem Backlog-Kapitel (`MAJOR.MINOR.letter`, `MAJOR.MINOR.0` oder `N.+1`): Minor- vs. Patch-Bump prüfen (siehe oben), nicht blind PATCH.
+- Backlog pflegen wie üblich (`backlog.mdc`).
+- **Kein** stiller Version-Bump am Session-Ende.
+- Wenn ein Release sinnvoll erscheint: einmal nachfragen; sonst weglassen.
 
-Commit-Message kann die Version nennen: `… (v1.15.0)`.
+Commit-Message kann die Version nennen, wenn der Nutzer sie gesetzt hat: `… (v1.24.0)`.
