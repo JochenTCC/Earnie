@@ -117,15 +117,33 @@ def render_runtime_scenario_form() -> None:
         key="runtime_profile",
     )
 
+    selected_profile_id = prof_map[prof_pick]
+    selected_profile = profiles.get(selected_profile_id, {})
+    if (
+        selected_profile_id
+        and st.session_state.get("runtime_geo_profile_id") != selected_profile_id
+    ):
+        st.session_state.runtime_geo_profile_id = selected_profile_id
+        st.session_state.runtime_lat = float(
+            selected_profile.get("latitude", refs.get("latitude", 48.2))
+        )
+        st.session_state.runtime_lon = float(
+            selected_profile.get("longitude", refs.get("longitude", 16.37))
+        )
+    if "runtime_lat" not in st.session_state:
+        st.session_state.runtime_lat = float(refs.get("latitude", 48.2))
+    if "runtime_lon" not in st.session_state:
+        st.session_state.runtime_lon = float(refs.get("longitude", 16.37))
+    if "runtime_geo_profile_id" not in st.session_state:
+        st.session_state.runtime_geo_profile_id = selected_profile_id
+
     col_a, col_b = st.columns(2)
     latitude = col_a.number_input(
         "Breitengrad",
-        value=float(refs.get("latitude", 48.2)),
         key="runtime_lat",
     )
     longitude = col_b.number_input(
         "Längengrad",
-        value=float(refs.get("longitude", 16.37)),
         key="runtime_lon",
     )
 

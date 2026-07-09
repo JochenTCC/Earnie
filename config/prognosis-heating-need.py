@@ -1,6 +1,7 @@
-import urllib.request
+"""Standalone-Prototyp — produktive Logik: data.heating_need."""
 import json
 import math
+import urllib.request
 
 # =====================================================================
 # EINGABEPARAMETER

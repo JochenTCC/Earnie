@@ -1,6 +1,8 @@
 """Hausprofil-Tab im Hauskonfigurator."""
 from __future__ import annotations
 
+import os
+
 import streamlit as st
 
 from house_config.generic_schedule import (
@@ -15,6 +17,7 @@ from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
     building_class_option_label,
 )
+from runtime_store.persist_paths import resolve_house_profiles_json_path
 from ui.house_config_io import (
     load_house_profiles,
     preview_baseload,
@@ -26,6 +29,11 @@ CONSUMER_TYPE_OPTIONS = ["generic", "thermal_annual", "ev"]
 _SESSION_SYNC_KEY = "house_profile_sync_id"
 _SESSION_CONSUMERS_KEY = "house_profile_consumers"
 _SESSION_SELECT_PENDING_KEY = "house_profile_select_pending"
+_SESSION_FILE_STAMP_KEY = "house_profile_file_stamp"
+
+
+def _scoped_key(session_scope: str, base: str) -> str:
+    return f"{session_scope}__{base}"
 
 
 def _default_consumer() -> dict:
@@ -60,14 +68,20 @@ def _schedule_defaults(sched: dict) -> dict:
     }
 
 
-def _render_generic_fields(consumer: dict, index: int, nominal: float) -> dict:
+def _render_generic_fields(
+    consumer: dict,
+    index: int,
+    nominal: float,
+    *,
+    session_scope: str,
+) -> dict:
     sched = consumer.get("schedule") or {}
     defaults = _schedule_defaults(sched)
     runs = st.number_input(
         "Läufe pro Woche",
         min_value=0,
         value=int(sched.get("runs_per_week", 0)),
-        key=f"hc_runs_{index}",
+        key=_scoped_key(session_scope, f"hc_runs_{index}"),
     )
     item: dict = {
         "nominal_power_kw": nominal,
@@ -81,14 +95,14 @@ def _render_generic_fields(consumer: dict, index: int, nominal: float) -> dict:
         min_value=0.1,
         value=defaults["duration_h"],
         step=0.25,
-        key=f"hc_duration_{index}",
+        key=_scoped_key(session_scope, f"hc_duration_{index}"),
     )
     start_hour = st.number_input(
         "Referenz-Startzeit (Stunde)",
         min_value=0,
         max_value=23,
         value=defaults["start_hour"],
-        key=f"hc_start_{index}",
+        key=_scoped_key(session_scope, f"hc_start_{index}"),
     )
     start_shift_h = st.number_input(
         "Verschiebung (± h)",
@@ -96,7 +110,7 @@ def _render_generic_fields(consumer: dict, index: int, nominal: float) -> dict:
         max_value=MAX_START_SHIFT_H,
         value=min(MAX_START_SHIFT_H, defaults["start_shift_h"]),
         step=0.5,
-        key=f"hc_shift_{index}",
+        key=_scoped_key(session_scope, f"hc_shift_{index}"),
     )
     st.caption(format_start_window_caption(int(start_hour), float(start_shift_h)))
     st.caption("Bei 12 h Verschiebung ist der Startzeitpunkt vollständig frei.")
@@ -142,20 +156,73 @@ def _default_ev_consumer() -> dict:
     }
 
 
+def _flatten_consumer_for_edit(consumer: dict) -> dict:
+    item = dict(consumer)
+    thermal = item.pop("thermal", None)
+    if isinstance(thermal, dict):
+        for key, value in thermal.items():
+            if key not in item and key not in {"latitude", "longitude"}:
+                item[key] = value
+    return item
+
+
 def _consumers_from_existing(existing: dict) -> list[dict]:
     consumers = list(existing.get("consumers", []))
     if not consumers:
         return [_default_consumer()]
-    return [dict(consumer) for consumer in consumers]
+    return [_flatten_consumer_for_edit(consumer) for consumer in consumers]
 
 
 def _profile_session_scope(selected_id: str, *, is_new: bool) -> str:
     return "__new__" if is_new else selected_id
 
 
-def _sync_consumers_session(session_scope: str, existing: dict) -> list[dict]:
-    if st.session_state.get(_SESSION_SYNC_KEY) != session_scope:
+def _house_profiles_file_stamp() -> str:
+    path = resolve_house_profiles_json_path()
+    try:
+        return f"{os.path.abspath(path)}:{os.path.getmtime(path)}"
+    except OSError:
+        return os.path.abspath(path)
+
+
+def _clear_scoped_widget_keys(session_scope: str) -> None:
+    prefix = f"{session_scope}__"
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith(prefix):
+            del st.session_state[key]
+
+
+def _seed_profile_widget_state(session_scope: str, existing: dict) -> None:
+    if existing:
+        label = str(existing.get("label", "Mein Haushalt"))
+        annual_kwh = float(existing.get("annual_kwh", 4500.0))
+        latitude = float(existing.get("latitude", 48.2))
+        longitude = float(existing.get("longitude", 11.0))
+        default_pv_tilt = int(existing.get("default_pv_tilt", 25))
+        default_pv_azimuth = int(existing.get("default_pv_azimuth", 0))
+    else:
+        label = "Mein Haushalt"
+        annual_kwh = 4500.0
+        latitude = 48.2
+        longitude = 11.0
+        default_pv_tilt = 25
+        default_pv_azimuth = 0
+    st.session_state[_scoped_key(session_scope, "house_profile_label")] = label
+    st.session_state[_scoped_key(session_scope, "house_annual_kwh")] = annual_kwh
+    st.session_state[_scoped_key(session_scope, "house_profile_latitude")] = latitude
+    st.session_state[_scoped_key(session_scope, "house_profile_longitude")] = longitude
+    st.session_state[_scoped_key(session_scope, "house_profile_default_pv_tilt")] = default_pv_tilt
+    st.session_state[_scoped_key(session_scope, "house_profile_default_pv_azimuth")] = default_pv_azimuth
+
+
+def _sync_profile_session(session_scope: str, existing: dict, *, file_stamp: str) -> list[dict]:
+    scope_changed = st.session_state.get(_SESSION_SYNC_KEY) != session_scope
+    file_changed = st.session_state.get(_SESSION_FILE_STAMP_KEY) != file_stamp
+    if scope_changed or file_changed:
+        _clear_scoped_widget_keys(session_scope)
+        _seed_profile_widget_state(session_scope, existing)
         st.session_state[_SESSION_SYNC_KEY] = session_scope
+        st.session_state[_SESSION_FILE_STAMP_KEY] = file_stamp
         st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(existing)
     return list(st.session_state.get(_SESSION_CONSUMERS_KEY, []))
 
@@ -210,6 +277,7 @@ def _render_day_schedule(
     block: dict,
     *,
     index: int,
+    session_scope: str,
 ) -> dict:
     return {
         "car_available_from_hour": st.number_input(
@@ -217,14 +285,14 @@ def _render_day_schedule(
             min_value=0,
             max_value=23,
             value=int(block.get("car_available_from_hour", 18)),
-            key=f"hc_ev_{prefix}_from_{index}",
+            key=_scoped_key(session_scope, f"hc_ev_{prefix}_from_{index}"),
         ),
         "ready_by_hour": st.number_input(
             f"{prefix}: Fertig bis (Stunde)",
             min_value=0,
             max_value=23,
             value=int(block.get("ready_by_hour", 7)),
-            key=f"hc_ev_{prefix}_ready_{index}",
+            key=_scoped_key(session_scope, f"hc_ev_{prefix}_ready_{index}"),
         ),
         "daily_rest_soc": st.number_input(
             f"{prefix}: Rest-SOC (%)",
@@ -232,32 +300,32 @@ def _render_day_schedule(
             max_value=100.0,
             value=float(block.get("daily_rest_soc", 30.0)),
             step=1.0,
-            key=f"hc_ev_{prefix}_soc_{index}",
+            key=_scoped_key(session_scope, f"hc_ev_{prefix}_soc_{index}"),
         ),
     }
 
 
-def _render_ev_fields(consumer: dict, index: int) -> dict:
+def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict:
     sched = dict(consumer.get("charging_schedule") or {})
     item: dict = {
         "min_power_kw": st.number_input(
             "Mindestleistung (kW)",
             min_value=0.0,
             value=float(consumer.get("min_power_kw", 1.4)),
-            key=f"hc_ev_min_{index}",
+            key=_scoped_key(session_scope, f"hc_ev_min_{index}"),
         ),
         "min_on_quarterhours": st.number_input(
             "Mindest-Ladedauer (Viertelstunden)",
             min_value=0,
             value=int(consumer.get("min_on_quarterhours", 4)),
-            key=f"hc_ev_min_qh_{index}",
+            key=_scoped_key(session_scope, f"hc_ev_min_qh_{index}"),
         ),
         "battery_capacity_kwh": st.number_input(
             "Akkukapazität (kWh)",
             min_value=0.1,
             value=float(consumer.get("battery_capacity_kwh", 60.0)),
             step=1.0,
-            key=f"hc_ev_cap_{index}",
+            key=_scoped_key(session_scope, f"hc_ev_cap_{index}"),
         ),
     }
     item["charging_schedule"] = {
@@ -266,7 +334,7 @@ def _render_ev_fields(consumer: dict, index: int) -> dict:
             min_value=0.0,
             max_value=100.0,
             value=float(sched.get("target_soc_percent", 100.0)),
-            key=f"hc_ev_target_soc_{index}",
+            key=_scoped_key(session_scope, f"hc_ev_target_soc_{index}"),
         ),
         "charging_efficiency": st.number_input(
             "Lade-Wirkungsgrad",
@@ -274,33 +342,117 @@ def _render_ev_fields(consumer: dict, index: int) -> dict:
             max_value=1.0,
             value=float(sched.get("charging_efficiency", 0.95)),
             step=0.01,
-            key=f"hc_ev_eff_{index}",
+            key=_scoped_key(session_scope, f"hc_ev_eff_{index}"),
         ),
         "forecast_when_absent": st.checkbox(
             "Prognose bei Abwesenheit",
             value=bool(sched.get("forecast_when_absent", True)),
-            key=f"hc_ev_forecast_{index}",
+            key=_scoped_key(session_scope, f"hc_ev_forecast_{index}"),
         ),
         "weekday": _render_day_schedule(
             "Werktag",
             sched.get("weekday") or {},
             index=index,
+            session_scope=session_scope,
         ),
         "weekend": _render_day_schedule(
             "Wochenende",
             sched.get("weekend") or {},
             index=index,
+            session_scope=session_scope,
         ),
     }
     return item
 
 
-def _render_consumer_form(consumer: dict, index: int) -> dict:
+def _inject_profile_geo(consumers: list[dict], latitude: float, longitude: float) -> list[dict]:
+    enriched: list[dict] = []
+    for consumer in consumers:
+        item = dict(consumer)
+        if item.get("type") == "thermal_annual":
+            item = dict(item)
+            item["latitude"] = latitude
+            item["longitude"] = longitude
+        enriched.append(item)
+    return enriched
+
+
+def _render_location_fields(*, session_scope: str) -> dict:
+    st.subheader("Standort")
+    col_a, col_b = st.columns(2)
+    latitude = col_a.number_input(
+        "Breitengrad",
+        format="%.4f",
+        key=_scoped_key(session_scope, "house_profile_latitude"),
+    )
+    longitude = col_b.number_input(
+        "Längengrad",
+        format="%.4f",
+        key=_scoped_key(session_scope, "house_profile_longitude"),
+    )
+    col_c, col_d = st.columns(2)
+    default_pv_tilt = col_c.number_input(
+        "PV-Default Neigung (°)",
+        min_value=0,
+        max_value=90,
+        help="Vorschlag für neue PV-Anlage im Tab PV-Anlage (überschreibbar).",
+        key=_scoped_key(session_scope, "house_profile_default_pv_tilt"),
+    )
+    default_pv_azimuth = col_d.number_input(
+        "PV-Default Azimut (°)",
+        min_value=-180,
+        max_value=180,
+        help="0 = Süd, -90 = Ost, 90 = West. Überschreibbar im Tab PV-Anlage.",
+        key=_scoped_key(session_scope, "house_profile_default_pv_azimuth"),
+    )
+    return {
+        "latitude": float(latitude),
+        "longitude": float(longitude),
+        "default_pv_tilt": float(default_pv_tilt),
+        "default_pv_azimuth": float(default_pv_azimuth),
+    }
+
+
+def _render_thermal_solar_fields(thermal: dict, index: int, *, session_scope: str) -> dict:
+    return {
+        "solar_thermal_area_m2": st.number_input(
+            "Solar-Kollektor Fläche (m²)",
+            min_value=0.0,
+            value=float(thermal.get("solar_thermal_area_m2", 0.0) or 0.0),
+            step=1.0,
+            key=_scoped_key(session_scope, f"hc_solar_area_{index}"),
+        ),
+        "solar_thermal_tilt_deg": st.number_input(
+            "Solar-Kollektor Neigung (°)",
+            min_value=0,
+            max_value=90,
+            value=int(thermal.get("solar_thermal_tilt_deg", 18)),
+            key=_scoped_key(session_scope, f"hc_solar_tilt_{index}"),
+        ),
+        "solar_thermal_azimuth_deg": st.number_input(
+            "Solar-Kollektor Azimut (°)",
+            min_value=-180,
+            max_value=180,
+            value=int(thermal.get("solar_thermal_azimuth_deg", 0)),
+            help="0 = Süd, -90 = Ost, 90 = West",
+            key=_scoped_key(session_scope, f"hc_solar_azimuth_{index}"),
+        ),
+    }
+
+
+def _render_consumer_form(
+    consumer: dict,
+    index: int,
+    *,
+    latitude: float,
+    longitude: float,
+    session_scope: str,
+) -> dict:
     title = consumer.get("label") or f"Verbraucher {index + 1}"
     with st.expander(f"Verbraucher {index + 1}: {title}", expanded=index == 0):
         cols = st.columns([5, 1])
         with cols[1]:
-            if st.button("Entfernen", key=f"hc_remove_{index}"):
+            if st.button("Entfernen", key=_scoped_key(session_scope, f"hc_remove_{index}")):
                 consumers = list(st.session_state[_SESSION_CONSUMERS_KEY])
                 if len(consumers) > 1:
                     del consumers[index]
@@ -321,10 +473,10 @@ def _render_consumer_form(consumer: dict, index: int) -> dict:
             options=type_options,
             index=_type_index(current_type, type_options),
             format_func=lambda value: CONSUMER_TYPE_LABELS.get(value, value),
-            key=f"hc_type_{index}",
+            key=_scoped_key(session_scope, f"hc_type_{index}"),
         )
         c_label = st.text_input(
-            "Bezeichnung", value=consumer.get("label", ""), key=f"hc_label_{index}"
+            "Bezeichnung", value=consumer.get("label", ""), key=_scoped_key(session_scope, f"hc_label_{index}")
         )
         if consumer.get("id"):
             st.caption(f"Verbraucher-ID: `{consumer['id']}`")
@@ -332,7 +484,7 @@ def _render_consumer_form(consumer: dict, index: int) -> dict:
             "Nennleistung (kW)",
             min_value=0.0,
             value=float(consumer.get("nominal_power_kw", 0.0)),
-            key=f"hc_nom_{index}",
+            key=_scoped_key(session_scope, f"hc_nom_{index}"),
         )
         item: dict = {
             "label": c_label,
@@ -340,17 +492,19 @@ def _render_consumer_form(consumer: dict, index: int) -> dict:
             "nominal_power_kw": nominal,
         }
         if c_type == "generic":
-            generic_fields = _render_generic_fields(consumer, index, nominal)
+            generic_fields = _render_generic_fields(
+                consumer, index, nominal, session_scope=session_scope
+            )
             item.update(generic_fields)
         elif c_type == "ev":
-            item.update(_render_ev_fields(consumer, index))
+            item.update(_render_ev_fields(consumer, index, session_scope=session_scope))
         else:
             thermal = consumer.get("thermal") or consumer
             item["living_area_m2"] = st.number_input(
                 "Wohnfläche (m²)",
                 min_value=0.0,
                 value=float(thermal.get("living_area_m2", 120.0)),
-                key=f"hc_area_{index}",
+                key=_scoped_key(session_scope, f"hc_area_{index}"),
             )
             building_class = int(thermal.get("building_class", 3))
             item["building_class"] = st.selectbox(
@@ -358,12 +512,12 @@ def _render_consumer_form(consumer: dict, index: int) -> dict:
                 options=[1, 2, 3, 4],
                 index=max(0, min(3, building_class - 1)),
                 format_func=building_class_option_label,
-                key=f"hc_class_{index}",
+                key=_scoped_key(session_scope, f"hc_class_{index}"),
             )
             use_exact_hwb = st.checkbox(
                 "Genaue HWB-Angabe",
                 value=bool(float(thermal.get("hwb_kwh_m2", 0.0) or 0.0) > 0),
-                key=f"hc_hwb_use_{index}",
+                key=_scoped_key(session_scope, f"hc_hwb_use_{index}"),
             )
             if use_exact_hwb:
                 from data.heating_need import specific_heating_kwh_m2
@@ -376,20 +530,26 @@ def _render_consumer_form(consumer: dict, index: int) -> dict:
                     min_value=0.1,
                     value=default_hwb,
                     step=1.0,
-                    key=f"hc_hwb_{index}",
+                    key=_scoped_key(session_scope, f"hc_hwb_{index}"),
                 )
             item["heat_pump_type"] = st.selectbox(
                 "WP-Typ",
                 options=["luft", "erde"],
                 index=0 if thermal.get("heat_pump_type") != "erde" else 1,
-                key=f"hc_wp_{index}",
+                key=_scoped_key(session_scope, f"hc_wp_{index}"),
             )
             item["persons"] = st.number_input(
                 "Personen",
                 min_value=0,
                 value=int(thermal.get("persons", 2)),
-                key=f"hc_persons_{index}",
+                key=_scoped_key(session_scope, f"hc_persons_{index}"),
             )
+            item.update(_render_thermal_solar_fields(thermal, index, session_scope=session_scope))
+            from data.heating_need import estimate_annual_kwh, heating_params_from_thermal
+
+            thermal_preview = {**item, "latitude": latitude, "longitude": longitude}
+            wp_annual = estimate_annual_kwh(**heating_params_from_thermal(thermal_preview))
+            st.metric("Geschätzter WP-Jahresbedarf (kWh/a)", f"{wp_annual:.0f}")
     return item
 
 
@@ -397,6 +557,17 @@ def _apply_pending_profile_select() -> None:
     pending = st.session_state.pop(_SESSION_SELECT_PENDING_KEY, None)
     if pending is not None:
         st.session_state["house_profile_select"] = pending
+
+
+def _initial_profile_index(profile_ids: list[str]) -> int | None:
+    if "house_profile_select" in st.session_state:
+        return None
+    from ui.house_config_io import get_runtime_scenario_refs
+
+    profile_id = str(get_runtime_scenario_refs().get("house_profile_id", "") or "").strip()
+    if profile_id in profile_ids:
+        return profile_ids.index(profile_id) + 1
+    return None
 
 
 def _render_consumption_csv_section(
@@ -411,6 +582,8 @@ def _render_consumption_csv_section(
 
     from house_config.consumption_csv import load_hourly_profile_csv
     from ui.consumption_validation_charts import (
+        format_iso_week_label,
+        iso_weeks_in_series,
         load_csv_monthly_kwh,
         modeled_monthly_kwh,
         monthly_comparison_chart,
@@ -483,8 +656,53 @@ def _render_consumption_csv_section(
                 f"weicht vom CSV ({actual_total:.0f} kWh) ab."
             )
         st.plotly_chart(monthly_comparison_chart(actual_monthly, model_monthly), width="stretch")
+
+        series = load_hourly_profile_csv(active_path)
+        weeks = iso_weeks_in_series(series)
+        week_idx_key = f"house_profile_csv_week_idx_{preview_id}"
+        week_path_key = f"house_profile_csv_week_path_{preview_id}"
+        if st.session_state.get(week_path_key) != active_path:
+            st.session_state[week_path_key] = active_path
+            st.session_state[week_idx_key] = 0
+        week_idx = int(st.session_state.get(week_idx_key, 0))
+        week_idx = max(0, min(week_idx, len(weeks) - 1))
+        st.session_state[week_idx_key] = week_idx
+        iso_year, iso_week = weeks[week_idx]
+        week_label = format_iso_week_label(iso_year, iso_week)
+        with st.container(
+            horizontal=True,
+            horizontal_alignment="center",
+            gap="small",
+            vertical_alignment="center",
+        ):
+            if st.button(
+                "←",
+                disabled=week_idx <= 0,
+                key=f"house_profile_csv_week_back_{preview_id}",
+                help="Vorherige Kalenderwoche",
+                type="secondary",
+                width="content",
+            ):
+                st.session_state[week_idx_key] = week_idx - 1
+                st.rerun()
+            st.markdown(f"**{week_label}**")
+            if st.button(
+                "→",
+                disabled=week_idx >= len(weeks) - 1,
+                key=f"house_profile_csv_week_forward_{preview_id}",
+                help="Nächste Kalenderwoche",
+                type="secondary",
+                width="content",
+            ):
+                st.session_state[week_idx_key] = week_idx + 1
+                st.rerun()
         st.plotly_chart(
-            timeseries_comparison_chart(active_path, modeled_profile),
+            timeseries_comparison_chart(
+                active_path,
+                modeled_profile,
+                iso_year=iso_year,
+                iso_week=iso_week,
+            ),
             width="stretch",
         )
     except (ValueError, OSError) as exc:
@@ -496,19 +714,31 @@ def render_house_profile_tab() -> None:
     profiles_doc = load_house_profiles()
     profile_map = profiles_doc.get("profiles", {})
     profile_ids = sorted(profile_map.keys())
-    selected_id = st.selectbox(
-        "Profil",
-        options=["— neu —", *profile_ids],
-        key="house_profile_select",
-    )
+    profile_options = ["— neu —", *profile_ids]
+    initial_index = _initial_profile_index(profile_ids)
+    if initial_index is not None:
+        selected_id = st.selectbox(
+            "Profil",
+            options=profile_options,
+            index=initial_index,
+            key="house_profile_select",
+        )
+    else:
+        selected_id = st.selectbox(
+            "Profil",
+            options=profile_options,
+            key="house_profile_select",
+        )
     is_new = selected_id == "— neu —"
     existing = profile_map.get(selected_id, {}) if not is_new else {}
     stable_profile_id = str(existing.get("id", "")).strip()
+    session_scope = _profile_session_scope(selected_id, is_new=is_new)
+    file_stamp = _house_profiles_file_stamp()
+    _sync_profile_session(session_scope, existing, file_stamp=file_stamp)
 
     label = st.text_input(
         "Bezeichnung",
-        value=existing.get("label", "Mein Haushalt"),
-        key="house_profile_label",
+        key=_scoped_key(session_scope, "house_profile_label"),
     )
     preview_id = _resolve_profile_id(
         is_new=is_new,
@@ -521,21 +751,35 @@ def render_house_profile_tab() -> None:
     annual_kwh = st.number_input(
         "Jahresverbrauch (kWh/a)",
         min_value=0.0,
-        value=float(existing.get("annual_kwh", 4500.0)),
         step=100.0,
-        key="house_annual_kwh",
+        key=_scoped_key(session_scope, "house_annual_kwh"),
     )
 
+    location = _render_location_fields(session_scope=session_scope)
+
     st.subheader("Verbraucher")
-    session_scope = _profile_session_scope(selected_id, is_new=is_new)
-    consumers = _sync_consumers_session(session_scope, existing)
-    if st.button("Verbraucher hinzufügen", key="house_consumer_add"):
+    consumers = list(st.session_state.get(_SESSION_CONSUMERS_KEY, []))
+    if st.button("Verbraucher hinzufügen", key=_scoped_key(session_scope, "house_consumer_add")):
         st.session_state[_SESSION_CONSUMERS_KEY].append(_default_additional_consumer())
         st.rerun()
 
-    edited = [_render_consumer_form(consumer, index) for index, consumer in enumerate(consumers)]
+    edited = [
+        _render_consumer_form(
+            consumer,
+            index,
+            latitude=location["latitude"],
+            longitude=location["longitude"],
+            session_scope=session_scope,
+        )
+        for index, consumer in enumerate(consumers)
+    ]
     resolved = _resolve_consumer_ids(consumers, edited)
-    preview = preview_baseload(annual_kwh, resolved)
+    resolved_for_preview = _inject_profile_geo(
+        resolved,
+        location["latitude"],
+        location["longitude"],
+    )
+    preview = preview_baseload(annual_kwh, resolved_for_preview)
     st.metric("Verbraucher-Summe (kWh/a)", f"{preview['consumer_kwh']:.0f}")
     st.metric("Grundlast (kWh/a)", f"{preview['baseload_kwh']:.0f}")
     st.caption(
@@ -547,11 +791,11 @@ def render_house_profile_tab() -> None:
         existing=existing,
         preview_id=preview_id,
         annual_kwh=float(annual_kwh),
-        resolved=resolved,
+        resolved=resolved_for_preview,
         preview=preview,
     )
 
-    if st.button("Profil speichern", type="primary", key="house_profile_save"):
+    if st.button("Profil speichern", type="primary", key=_scoped_key(session_scope, "house_profile_save")):
         profile_id = _resolve_profile_id(
             is_new=is_new,
             existing_id=stable_profile_id,
@@ -563,6 +807,10 @@ def render_house_profile_tab() -> None:
                 "id": profile_id,
                 "label": label.strip() or profile_id,
                 "annual_kwh": float(annual_kwh),
+                "latitude": location["latitude"],
+                "longitude": location["longitude"],
+                "default_pv_tilt": location["default_pv_tilt"],
+                "default_pv_azimuth": location["default_pv_azimuth"],
                 "consumers": resolved,
                 "total_profile_csv": st.session_state.get(
                     f"house_profile_csv_path_{preview_id}",
@@ -572,7 +820,8 @@ def render_house_profile_tab() -> None:
         )
         saved_profile = load_house_profiles().get("profiles", {}).get(profile_id, {})
         st.session_state[_SESSION_SELECT_PENDING_KEY] = profile_id
-        st.session_state[_SESSION_SYNC_KEY] = profile_id
+        st.session_state[_SESSION_FILE_STAMP_KEY] = _house_profiles_file_stamp()
+        st.session_state[_SESSION_SYNC_KEY] = None
         st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(saved_profile)
         st.success(f"Profil '{profile_id}' gespeichert.")
         st.rerun()

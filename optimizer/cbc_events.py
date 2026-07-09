@@ -73,8 +73,9 @@ def record_cbc_event(event: str, **details: Any) -> dict[str, Any]:
     collected = _events.get()
     if collected is not None:
         collected.append(entry)
+        return entry
     level = logging.INFO
-    if collected is None and event == "strict_slow":
+    if event == "strict_slow":
         level = logging.DEBUG
     logger.log(level, _format_event_log(entry))
     return entry
@@ -132,3 +133,26 @@ def maybe_record_strict_timing(
         return
     if strict_elapsed_sec >= strict_limit_sec * STRICT_SLOW_FRACTION:
         record_cbc_event("strict_slow", **base)
+
+
+def cbc_event_collection_active() -> bool:
+    return _events.get() is not None
+
+
+def summarize_cbc_events(events: list[dict[str, Any]]) -> str | None:
+    """Kompakte INFO-Zusammenfassung für gesammelte Horizont-CBC-Ereignisse."""
+    if not events:
+        return None
+    counts: dict[str, int] = {}
+    final_statuses: dict[str, int] = {}
+    for entry in events:
+        name = str(entry.get("event", "?"))
+        counts[name] = counts.get(name, 0) + 1
+        if name == "milp_no_optimal":
+            status = str(entry.get("final_status", "?"))
+            final_statuses[status] = final_statuses.get(status, 0) + 1
+    parts = [f"{name}={count}" for name, count in sorted(counts.items())]
+    if final_statuses:
+        detail = ", ".join(f"{k}:{v}" for k, v in sorted(final_statuses.items()))
+        parts.append(f"final({detail})")
+    return "CBC Horizont-Simulation: " + ", ".join(parts)

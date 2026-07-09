@@ -63,6 +63,8 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
             "profiles": [
                 {
                     "id": "efh",
+                    "latitude": 48.2,
+                    "longitude": 11.0,
                     "consumers": [{"id": "wp", "type": "thermal_annual"}],
                 }
             ]
@@ -101,6 +103,8 @@ def test_backtesting_visible_when_planning_ready(tmp_path, monkeypatch):
                 {
                     "id": "efh",
                     "annual_kwh": 4000,
+                    "latitude": 48.2,
+                    "longitude": 11.0,
                     "consumers": [{"id": "wp", "type": "thermal_annual", "living_area_m2": 100}],
                 }
             ]

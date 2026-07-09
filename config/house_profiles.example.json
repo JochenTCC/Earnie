@@ -5,6 +5,10 @@
             "id": "example_efh",
             "label": "Beispiel EFH 4500 kWh/a",
             "annual_kwh": 4500,
+            "latitude": 48.2,
+            "longitude": 11.0,
+            "default_pv_tilt": 25,
+            "default_pv_azimuth": 0,
             "consumers": [
                 {
                     "id": "wp_heating",

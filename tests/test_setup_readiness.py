@@ -79,6 +79,8 @@ def test_missing_runtime_scenario_items_lists_gaps(tmp_path, monkeypatch):
             "profiles": [
                 {
                     "id": "efh",
+                    "latitude": 48.2,
+                    "longitude": 11.0,
                     "consumers": [{"id": "wp", "type": "thermal_annual"}],
                 }
             ]
@@ -115,6 +117,8 @@ def test_planning_ready_unlocks_backtesting(tmp_path, monkeypatch):
             "profiles": [
                 {
                     "id": "efh",
+                    "latitude": 48.2,
+                    "longitude": 11.0,
                     "consumers": [{"id": "wp", "type": "thermal_annual"}],
                 }
             ]
@@ -166,6 +170,8 @@ def test_scenario_editor_unlocked_after_house_config(tmp_path, monkeypatch):
             "profiles": [
                 {
                     "id": "efh",
+                    "latitude": 48.2,
+                    "longitude": 11.0,
                     "consumers": [{"id": "wp", "type": "thermal_annual"}],
                 }
             ]

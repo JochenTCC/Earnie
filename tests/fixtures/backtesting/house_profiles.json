@@ -6,6 +6,8 @@
             "annual_kwh": 4000,
             "latitude": 47.4,
             "longitude": 9.7,
+            "default_pv_tilt": 25,
+            "default_pv_azimuth": 0,
             "consumers": [
                 {
                     "id": "wp",

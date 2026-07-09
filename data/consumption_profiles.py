@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from data.heating_need import hourly_profile_for_year, weekly_electric_kwh
+from data.heating_need import (
+    heating_params_from_thermal,
+    hourly_profile_for_year,
+    weekly_electric_kwh,
+)
 from house_config.baseload import consumer_annual_kwh
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.ev_profile import ev_hourly_kw_for_day
@@ -49,20 +53,8 @@ def build_modeled_hourly_kw_profile(profile: dict, *, hours: int = 8760) -> list
                 hourly[hour_index] += day_hourly[hour_index % 24]
             continue
         if consumer.get("type") == "thermal_annual":
-            thermal = consumer.get("thermal") or {}
-            hwb = thermal.get("hwb_kwh_m2")
-            hwb_value = float(hwb) if hwb not in (None, "") else None
-            weekly = weekly_electric_kwh(
-                living_area_m2=float(thermal.get("living_area_m2", 0.0)),
-                building_class=int(thermal.get("building_class", 3)),
-                heat_pump_type=str(thermal.get("heat_pump_type", "luft")),
-                persons=int(thermal.get("persons", 2)),
-                latitude=float(thermal.get("latitude", 48.0)),
-                longitude=float(thermal.get("longitude", 10.0)),
-                target_temp_c=float(thermal.get("target_temp_c", 21.5)),
-                heating_limit_c=float(thermal.get("heating_limit_c", 15.0)),
-                hwb_kwh_m2=hwb_value,
-            )
+            thermal = consumer.get("thermal") or consumer
+            weekly = weekly_electric_kwh(**heating_params_from_thermal(thermal))
             thermal_hourly = hourly_profile_for_year(weekly, hours_per_year=hours)
             hourly = [a + b for a, b in zip(hourly, thermal_hourly)]
             continue

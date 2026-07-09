@@ -190,3 +190,101 @@ class TestMilpFilterWindow:
 
         for blocked_hour in filter_ctx["blocked_indices"]:
             assert powers_by_hour[blocked_hour] == pytest.approx(0.0)
+
+
+def _swimspa_filter_loxone() -> dict:
+    consumer = _swimspa_filter()
+    consumer["filter_schedule"] = {
+        "enabled": True,
+        "loxone": {
+            "native_start_hour_name": "FilterStart",
+            "native_duration_hours_name": "FilterDuration",
+        },
+        "config_fallback": {
+            "native_start_hour": 10,
+            "native_duration_hours": 4.0,
+        },
+    }
+    return consumer
+
+
+def _matrix_forecast_6h() -> list[dict]:
+    start = datetime(2026, 7, 7, 8, 0)
+    return [
+        {
+            "hour": (start + timedelta(hours=i)).hour,
+            "date": start.date(),
+            "slot_datetime": start + timedelta(hours=i),
+            "expected_p_pv": 0.0,
+            "expected_p_act": 0.3,
+            "k_act": 2.0,
+            "consumption_mode": "forecast",
+        }
+        for i in range(6)
+    ]
+
+
+class TestFilterContextCaching:
+    def test_simulate_horizon_resolves_native_window_once(self, monkeypatch):
+        from integrations import loxone_client
+        from optimizer.simulation import simulate_horizon
+
+        fetch_calls: list[str] = []
+
+        def _mock_start(name: str):
+            fetch_calls.append(name)
+            return 10.0, "integer", "10 h"
+
+        monkeypatch.setattr(
+            loxone_client, "fetch_filter_native_start_hour", _mock_start
+        )
+        monkeypatch.setattr(
+            loxone_client, "fetch_loxone_generic_value", lambda _name: 4.0
+        )
+
+        matrix = _matrix_forecast_6h()
+        consumer = _swimspa_filter_loxone()
+        simulate_horizon(
+            matrix,
+            50.0,
+            verbose=False,
+            matrix_prepared=True,
+            charging_contexts={},
+            consumer_daily_targets_kwh={"swimspa_filter": 0.0},
+            flexible_consumers=[consumer],
+        )
+        assert fetch_calls == ["FilterStart"]
+
+    def test_simulate_horizon_reuses_passed_filter_contexts(self, monkeypatch):
+        from integrations import loxone_client
+        from optimizer.simulation import simulate_horizon
+
+        fetch_calls: list[str] = []
+
+        def _mock_start(name: str):
+            fetch_calls.append(name)
+            return 10.0, "integer", "10 h"
+
+        monkeypatch.setattr(
+            loxone_client, "fetch_filter_native_start_hour", _mock_start
+        )
+        monkeypatch.setattr(
+            loxone_client, "fetch_loxone_generic_value", lambda _name: 4.0
+        )
+
+        matrix = _matrix_forecast_6h()
+        consumer = _swimspa_filter_loxone()
+        filters = fc.resolve_filter_contexts(matrix, [consumer])
+        fetch_calls.clear()
+
+        simulate_horizon(
+            matrix,
+            50.0,
+            verbose=False,
+            matrix_prepared=True,
+            charging_contexts={},
+            consumer_daily_targets_kwh={"swimspa_filter": 0.0},
+            flexible_consumers=[consumer],
+            filter_contexts=filters,
+        )
+        assert fetch_calls == []

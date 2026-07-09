@@ -2,6 +2,14 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix natives Filterfenster Log-Spam (main.py) (2026-07-09)
+
+- [x] **`filter_contexts` einmal pro Lauf** — `main.py` löst vor `get_consumer_remaining_kwh` auf und reicht durch an MILP, Restziel-Anpassung und `calculate_optimization_savings`
+- [x] **Horizont-Simulation** — `simulate_horizon` / `_simulate_single_hour_optimizer` / `calculate_optimization_savings` akzeptieren vorgefertigte `filter_contexts`; kein erneutes Loxone-Lesen pro MILP-Stunde
+- [x] **Logging** — INFO „natives Filterfenster Start=…“ nur noch bei `resolve_filter_context`, nicht bei jedem indirekten Aufruf
+- [x] **CBC-Log-Spam** — `record_cbc_event` loggt bei aktiver Sammlung (`begin_cbc_event_collection`) nicht mehr pro Slot; `simulate_horizon` fasst am Ende als eine INFO-Zeile zusammen (`summarize_cbc_events`); Live-MILP in `main.py` unverändert auf INFO
+- [x] **Tests** — `TestFilterContextCaching` in `tests/test_filter_context.py`; CBC-Suppression/Summary in `tests/test_cbc_events.py`
+
 ### Bugfix UI-Bugs 1.23.1 (2026-07-09)
 
 - [x] **Ranking-Tabelle mobil kompakt** — 3 Spalten (Checkbox vor Uhrzeit, Güte, Delta); Kostenspalte entfernt (`ui/pages/page_devices.py`)

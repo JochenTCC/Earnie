@@ -6,7 +6,7 @@ import json
 import pytest
 
 from house_config.id_slug import slug_id
-from house_config.profiles_store import load_house_profiles_document
+from house_config.profiles_store import load_house_profiles_document, save_house_profiles_document
 from data.heating_need import specific_heating_kwh_m2
 from ui import setup_readiness
 from ui.house_config_io import (
@@ -20,7 +20,9 @@ from ui.house_config_profile_form import (
     _consumer_type_options,
     _default_additional_consumer,
     _default_consumer,
+    _flatten_consumer_for_edit,
     _profile_session_scope,
+    _seed_profile_widget_state,
 )
 
 
@@ -153,6 +155,8 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
                     {
                         "id": "efh",
                         "annual_kwh": 4000,
+                        "latitude": 48.2,
+                        "longitude": 11.0,
                         "consumers": [{"id": "wp", "type": "thermal_annual", "living_area_m2": 100}],
                     }
                 ]
@@ -186,6 +190,8 @@ def test_house_profile_hwb_normalization(tmp_path):
                     {
                         "id": "home",
                         "annual_kwh": 5000,
+                        "latitude": 48.2,
+                        "longitude": 11.0,
                         "consumers": [
                             {
                                 "id": "heat",
@@ -239,6 +245,8 @@ def test_profile_rejects_thermal_on_second_consumer(tmp_path):
                     {
                         "id": "home",
                         "annual_kwh": 5000,
+                        "latitude": 48.2,
+                        "longitude": 11.0,
                         "consumers": [
                             {"id": "heat", "type": "generic", "annual_kwh": 1000},
                             {
@@ -257,6 +265,91 @@ def test_profile_rejects_thermal_on_second_consumer(tmp_path):
         load_house_profiles_document(str(path))
     assert _profile_session_scope("— neu —", is_new=True) == "__new__"
     assert _profile_session_scope("example_efh", is_new=False) == "example_efh"
+
+
+def test_flatten_consumer_for_edit_merges_thermal():
+    flattened = _flatten_consumer_for_edit(
+        {
+            "id": "heat",
+            "type": "thermal_annual",
+            "thermal": {
+                "living_area_m2": 150.0,
+                "building_class": 2,
+                "hwb_kwh_m2": 55.0,
+                "latitude": 48.2,
+                "longitude": 11.0,
+            },
+        }
+    )
+    assert flattened["living_area_m2"] == 150.0
+    assert flattened["building_class"] == 2
+    assert flattened["hwb_kwh_m2"] == 55.0
+    assert "thermal" not in flattened
+    assert "latitude" not in flattened
+
+
+def test_seed_profile_widget_state_uses_existing_annual_kwh():
+    class _Session(dict):
+        pass
+
+    session = _Session()
+    existing = {"label": "EFH", "annual_kwh": 11500.0, "latitude": 47.8, "longitude": 12.1}
+    import ui.house_config_profile_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        form._seed_profile_widget_state("schuetzenstrasse_7c", existing)
+    finally:
+        form.st.session_state = original
+
+    assert session["schuetzenstrasse_7c__house_annual_kwh"] == 11500.0
+    assert session["schuetzenstrasse_7c__house_profile_label"] == "EFH"
+
+
+def test_upsert_thermal_profile_roundtrip(tmp_path):
+    path = tmp_path / "house_profiles.json"
+    save_house_profiles_document(
+        str(path),
+        {
+            "profiles": [
+                {
+                    "id": "home",
+                    "label": "EFH Test",
+                    "annual_kwh": 9123.0,
+                    "latitude": 47.8,
+                    "longitude": 12.1,
+                    "default_pv_tilt": 28.0,
+                    "default_pv_azimuth": -10.0,
+                    "consumers": [
+                        {
+                            "id": "heat",
+                            "label": "Haus Wärme",
+                            "type": "thermal_annual",
+                            "nominal_power_kw": 6.0,
+                            "living_area_m2": 165.0,
+                            "building_class": 2,
+                            "heat_pump_type": "erde",
+                            "persons": 3,
+                            "hwb_kwh_m2": 58.0,
+                            "solar_thermal_area_m2": 8.0,
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    doc = load_house_profiles_document(str(path))
+    profile = doc["profiles"]["home"]
+    assert profile["annual_kwh"] == 9123.0
+    assert profile["latitude"] == pytest.approx(47.8)
+    assert profile["longitude"] == pytest.approx(12.1)
+    thermal = profile["consumers"][0]["thermal"]
+    assert thermal["living_area_m2"] == 165.0
+    assert thermal["building_class"] == 2
+    assert thermal["hwb_kwh_m2"] == 58.0
+    assert thermal["heat_pump_type"] == "erde"
+    assert thermal["latitude"] == pytest.approx(47.8)
 
 
 def test_upsert_two_consumers_roundtrip(tmp_path, monkeypatch):

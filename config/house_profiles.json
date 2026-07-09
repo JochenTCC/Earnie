@@ -4,6 +4,10 @@
             "id": "example_efh",
             "label": "Beispiel EFH 4500 kWh/a",
             "annual_kwh": 4500.0,
+            "latitude": 48.2,
+            "longitude": 11.0,
+            "default_pv_tilt": 25.0,
+            "default_pv_azimuth": 0.0,
             "total_profile_csv": "",
             "consumers": [
                 {
@@ -37,6 +41,10 @@
             "id": "test1",
             "label": "Test1",
             "annual_kwh": 7000.0,
+            "latitude": 48.2,
+            "longitude": 11.0,
+            "default_pv_tilt": 25.0,
+            "default_pv_azimuth": 0.0,
             "total_profile_csv": "",
             "consumers": [
                 {
@@ -57,6 +65,10 @@
             "id": "test1_2",
             "label": "Test1",
             "annual_kwh": 7000.0,
+            "latitude": 48.2,
+            "longitude": 11.0,
+            "default_pv_tilt": 25.0,
+            "default_pv_azimuth": 0.0,
             "total_profile_csv": "",
             "consumers": [
                 {
@@ -101,6 +113,10 @@
             "id": "test1_3",
             "label": "Test1",
             "annual_kwh": 7000.0,
+            "latitude": 48.2,
+            "longitude": 11.0,
+            "default_pv_tilt": 25.0,
+            "default_pv_azimuth": 0.0,
             "total_profile_csv": "",
             "consumers": [
                 {
@@ -121,6 +137,10 @@
             "id": "test1_4",
             "label": "Test1",
             "annual_kwh": 7000.0,
+            "latitude": 48.2,
+            "longitude": 11.0,
+            "default_pv_tilt": 25.0,
+            "default_pv_azimuth": 0.0,
             "total_profile_csv": "",
             "consumers": [
                 {

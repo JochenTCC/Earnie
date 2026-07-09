@@ -62,7 +62,24 @@
                 "heat_pump_type": { "enum": ["luft", "erde"] },
                 "persons": { "type": "integer", "minimum": 0 },
                 "target_temp_c": { "type": "number" },
-                "heating_limit_c": { "type": "number" }
+                "heating_limit_c": { "type": "number" },
+                "solar_thermal_area_m2": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Kollektorfläche in m² (0 = kein Solarthermie-Kollektor)."
+                },
+                "solar_thermal_tilt_deg": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 90,
+                    "description": "Neigung Solar-Kollektor: 0° flach, 90° Fassade."
+                },
+                "solar_thermal_azimuth_deg": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180,
+                    "description": "Ausrichtung Solar-Kollektor: 0° Süd, -90° Ost, 90° West."
+                }
             }
         },
         "profile": {
@@ -72,6 +89,20 @@
                 "id": { "type": "string" },
                 "label": { "type": "string" },
                 "annual_kwh": { "type": "number", "minimum": 0 },
+                "latitude": { "type": "number", "description": "Breitengrad (Standort Heizung/PV)." },
+                "longitude": { "type": "number", "description": "Längengrad (Standort Heizung/PV)." },
+                "default_pv_tilt": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 90,
+                    "description": "Vorschlag Dachneigung für neue PV-Anlage (überschreibbar)."
+                },
+                "default_pv_azimuth": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180,
+                    "description": "Vorschlag PV-Azimut für neue PV-Anlage (überschreibbar)."
+                },
                 "total_profile_csv": { "type": "string" },
                 "consumers": {
                     "type": "array",

@@ -217,6 +217,7 @@ def get_consumer_remaining_kwh(
     optimization_matrix: list | None = None,
     consumer_daily_targets_kwh: dict | None = None,
     charging_contexts: dict[str, dict] | None = None,
+    filter_contexts: dict[str, dict] | None = None,
     *,
     live_flex_kw: dict[str, float] | None = None,
     trigger_snapshot: dict | None = None,
@@ -269,7 +270,7 @@ def get_consumer_remaining_kwh(
         remaining[cid] = max(0.0, daily_target - already)
     if optimization_matrix is not None:
         remaining = adjust_targets_for_native_filter(
-            remaining, active, optimization_matrix
+            remaining, active, optimization_matrix, filter_contexts
         )
     return remaining
 

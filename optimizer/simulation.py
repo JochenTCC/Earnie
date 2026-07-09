@@ -1,9 +1,18 @@
 """Horizont-Simulation (optimiert, Baseline) und Kostenberechnung."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
 import config
+from .cbc_events import (
+    begin_cbc_event_collection,
+    cbc_event_collection_active,
+    clear_cbc_milp_context,
+    set_cbc_milp_context,
+    summarize_cbc_events,
+    take_cbc_events,
+)
 from .charging_context import (
     apply_horizon_charging_limits,
     consumer_charging_eligible_indices,
@@ -11,7 +20,7 @@ from .charging_context import (
 )
 from . import battery as bat
 from .consumer_power import uses_pv_follow
-from .filter_context import adjust_targets_for_native_filter
+from .filter_context import adjust_targets_for_native_filter, resolve_filter_contexts
 from .milp import milp_optimizer
 from .targets import (
     build_applied_targets_detail,
@@ -24,6 +33,8 @@ from .targets import (
 )
 
 from data.price_forecast_live import is_extrapolated_source
+
+logger = logging.getLogger(__name__)
 
 
 def _chart_price_fields(row: dict) -> dict:
@@ -126,6 +137,7 @@ def _simulate_single_hour_optimizer(
     spa_remaining_kwh: float | None,
     flex_indices: list[int] | None,
     charging_contexts: dict[str, dict] | None,
+    filter_contexts: dict[str, dict] | None,
     terminal_soc_percent: float | None,
     sunrise_soc_min_index: int | None,
     matrix_hour_index: int,
@@ -151,6 +163,7 @@ def _simulate_single_hour_optimizer(
         spa_remaining_kwh=spa_remaining_kwh,
         flex_indices=flex_indices,
         charging_contexts=charging_contexts,
+        filter_contexts=filter_contexts,
         terminal_soc_percent=terminal_soc_percent,
         sunrise_soc_min_index=rel_sunrise,
     )
@@ -269,6 +282,7 @@ def simulate_horizon(
     on_progress=None,
     consumer_daily_targets_kwh: dict[str, float] | None = None,
     charging_contexts: dict[str, dict] | None = None,
+    filter_contexts: dict[str, dict] | None = None,
     matrix_prepared: bool = False,
     simulation_hour_offset: int | None = None,
     sunrise_soc_min_index: int | None = None,
@@ -304,51 +318,63 @@ def simulate_horizon(
         consumer_daily_targets_kwh,
     )
     horizon_limits = apply_horizon_charging_limits(horizon_limits, charging_contexts)
+    filters = filter_contexts or resolve_filter_contexts(
+        optimization_matrix, consumers_cfg
+    )
     horizon_limits = adjust_targets_for_native_filter(
-        horizon_limits, consumers_cfg, optimization_matrix
+        horizon_limits, consumers_cfg, optimization_matrix, filters
     )
     delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
     terminal_soc_percent = None if sunrise_soc_min_index is not None else initial_soc
-    for i, row in enumerate(optimization_matrix):
-        if simulation_hour_offset is not None:
-            from optimizer.cbc_events import set_cbc_milp_context
-
-            set_cbc_milp_context(simulation_hour_index=simulation_hour_offset + i)
-        remaining = {
-            consumer["id"]: max(
-                0.0,
-                horizon_limits.get(consumer["id"], 0.0)
-                - delivered_horizon.get(consumer["id"], 0.0),
+    own_cbc_collection = not cbc_event_collection_active()
+    if own_cbc_collection:
+        begin_cbc_event_collection()
+    try:
+        hour_base = simulation_hour_offset or 0
+        for i, row in enumerate(optimization_matrix):
+            set_cbc_milp_context(simulation_hour_index=hour_base + i)
+            remaining = {
+                consumer["id"]: max(
+                    0.0,
+                    horizon_limits.get(consumer["id"], 0.0)
+                    - delivered_horizon.get(consumer["id"], 0.0),
+                )
+                for consumer in consumers_cfg
+            }
+            remaining_slice = optimization_matrix[i:]
+            sim_soc, chart_row, mode, target_power = _simulate_single_hour_optimizer(
+                remaining_slice,
+                row,
+                sim_soc,
+                battery_params,
+                k_push=k_push,
+                verbose=verbose,
+                consumer_remaining_kwh=remaining,
+                spa_remaining_kwh=None,
+                flex_indices=list(range(len(remaining_slice))),
+                charging_contexts=charging_contexts,
+                filter_contexts=filters,
+                terminal_soc_percent=terminal_soc_percent,
+                sunrise_soc_min_index=sunrise_soc_min_index,
+                matrix_hour_index=i,
+                flexible_consumers=consumers_cfg,
             )
-            for consumer in consumers_cfg
-        }
-        remaining_slice = optimization_matrix[i:]
-        sim_soc, chart_row, mode, target_power = _simulate_single_hour_optimizer(
-            remaining_slice,
-            row,
-            sim_soc,
-            battery_params,
-            k_push=k_push,
-            verbose=verbose,
-            consumer_remaining_kwh=remaining,
-            spa_remaining_kwh=None,
-            flex_indices=list(range(len(remaining_slice))),
-            charging_contexts=charging_contexts,
-            terminal_soc_percent=terminal_soc_percent,
-            sunrise_soc_min_index=sunrise_soc_min_index,
-            matrix_hour_index=i,
-            flexible_consumers=consumers_cfg,
-        )
-        _cap_flex_delivery(
-            chart_row, consumers_cfg, horizon_limits, delivered_horizon
-        )
-        old_soc = float(chart_row["Simulierter SoC (%)"])
-        sim_soc = finalize_chart_row_energy(
-            chart_row, mode, target_power, old_soc, battery_params
-        )
-        chart_rows.append(chart_row)
-        if on_progress is not None:
-            on_progress(i + 1, total_steps)
+            _cap_flex_delivery(
+                chart_row, consumers_cfg, horizon_limits, delivered_horizon
+            )
+            old_soc = float(chart_row["Simulierter SoC (%)"])
+            sim_soc = finalize_chart_row_energy(
+                chart_row, mode, target_power, old_soc, battery_params
+            )
+            chart_rows.append(chart_row)
+            if on_progress is not None:
+                on_progress(i + 1, total_steps)
+    finally:
+        if own_cbc_collection:
+            summary = summarize_cbc_events(take_cbc_events())
+            if summary:
+                logger.info(summary)
+            clear_cbc_milp_context()
     _finalize_chart_rows_for_display(chart_rows, charging_contexts)
     return chart_rows
 
@@ -700,6 +726,7 @@ def calculate_optimization_savings(
     initial_soc: float,
     consumer_daily_targets_kwh: dict[str, float] | None = None,
     sunrise_soc_min_index: int | None = None,
+    filter_contexts: dict[str, dict] | None = None,
 ) -> dict:
     """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation."""
     from .charge_immediate import prepare_optimization_matrix
@@ -709,12 +736,14 @@ def calculate_optimization_savings(
         optimization_matrix,
         consumer_daily_targets_kwh,
     )
+    filters = filter_contexts or resolve_filter_contexts(matrix)
     optimized_rows = simulate_horizon(
         matrix,
         initial_soc,
         consumer_daily_targets_kwh=targets,
         verbose=False,
         charging_contexts=charging_contexts,
+        filter_contexts=filters,
         matrix_prepared=True,
         sunrise_soc_min_index=sunrise_soc_min_index,
     )

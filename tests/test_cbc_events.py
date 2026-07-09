@@ -9,6 +9,7 @@ from optimizer.cbc_events import (
     begin_cbc_event_collection,
     record_cbc_event,
     set_cbc_milp_context,
+    summarize_cbc_events,
     take_cbc_events,
     update_cbc_milp_context_from_row,
 )
@@ -42,6 +43,30 @@ def test_record_cbc_event_collects_with_context():
     assert events[0]["scenario_id"] == "runtime_settings"
     assert events[0]["slot_datetime"] == "2025-09-27T10:00:00"
     assert events[0]["strict_status"] == "Not Solved"
+
+
+def test_record_cbc_event_suppresses_console_while_collecting(caplog):
+    begin_cbc_event_collection()
+    with caplog.at_level(logging.INFO, logger="optimizer.cbc_events"):
+        record_cbc_event("strict_fallback", strict_status="Infeasible")
+        record_cbc_event("milp_no_optimal", final_status="Infeasible")
+    events = take_cbc_events()
+    assert len(events) == 2
+    assert not caplog.records
+
+
+def test_summarize_cbc_events():
+    summary = summarize_cbc_events(
+        [
+            {"event": "strict_fallback"},
+            {"event": "strict_fallback"},
+            {"event": "milp_no_optimal", "final_status": "Infeasible"},
+        ]
+    )
+    assert summary == (
+        "CBC Horizont-Simulation: milp_no_optimal=1, strict_fallback=2, "
+        "final(Infeasible:1)"
+    )
 
 
 def test_solve_with_strict_fallback_records_slow_strict(caplog):

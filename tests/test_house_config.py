@@ -510,6 +510,8 @@ def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
                 "id": "efh",
                 "label": "EFH",
                 "annual_kwh": 4000,
+                "latitude": 48.2,
+                "longitude": 11.0,
                 "consumers": [{"id": "heat", "type": "thermal_annual", "nominal_power_kw": 3.0}]
             }]
         }

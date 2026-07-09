@@ -163,10 +163,12 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     )
     event_trigger_snapshot = fetch_trigger_snapshot(trigger_specs)
     delivery_plausibility: dict = {}
+    filter_contexts = optimizer.resolve_filter_contexts(optimization_matrix, live_consumers)
     consumer_remaining = optimizer.get_consumer_remaining_kwh(
         consumer_daily_targets_kwh=targets,
         optimization_matrix=optimization_matrix,
         charging_contexts=charging_contexts,
+        filter_contexts=filter_contexts,
         live_flex_kw=flex_kw_for_matrix,
         trigger_snapshot=event_trigger_snapshot,
         delivery_plausibility=delivery_plausibility,
@@ -180,7 +182,6 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 consumer["nominal_power_kw"],
                 lox["nominal_power_kw_name"],
             )
-    filter_contexts = optimizer.resolve_filter_contexts(optimization_matrix, live_consumers)
     mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _, urgent_obs = optimizer.milp_optimizer(
         optimization_matrix,
         current_hour,
@@ -270,6 +271,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             float(current_soc),
             consumer_daily_targets_kwh=targets,
             sunrise_soc_min_index=sunrise_soc_min_index,
+            filter_contexts=filter_contexts,
         )
         savings_snapshot = optimizer.build_savings_snapshot(savings_info)
         logger.info(

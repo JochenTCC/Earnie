@@ -12,22 +12,10 @@ def consumer_annual_kwh(consumer: dict) -> float:
 
         return estimate_ev_annual_kwh(consumer)
     if consumer.get("type") == "thermal_annual":
-        from data.heating_need import estimate_annual_kwh
+        from data.heating_need import estimate_annual_kwh, heating_params_from_thermal
 
         thermal = consumer.get("thermal") or consumer
-        hwb = thermal.get("hwb_kwh_m2")
-        hwb_value = float(hwb) if hwb not in (None, "") else None
-        return estimate_annual_kwh(
-            living_area_m2=float(thermal.get("living_area_m2", 0.0)),
-            building_class=int(thermal.get("building_class", 3)),
-            heat_pump_type=str(thermal.get("heat_pump_type", "luft")),
-            persons=int(thermal.get("persons", 2)),
-            latitude=float(thermal.get("latitude", 48.0)),
-            longitude=float(thermal.get("longitude", 10.0)),
-            target_temp_c=float(thermal.get("target_temp_c", 21.5)),
-            heating_limit_c=float(thermal.get("heating_limit_c", 15.0)),
-            hwb_kwh_m2=hwb_value,
-        )
+        return estimate_annual_kwh(**heating_params_from_thermal(thermal))
     if consumer.get("type") == "generic":
         from house_config.generic_schedule import generic_annual_kwh
 

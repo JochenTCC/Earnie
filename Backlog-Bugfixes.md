@@ -22,6 +22,10 @@ Fix ist **implementiert** (Code + Tests + ggf. PATCH in `version.py`), aber die 
 
 ## Neue Bugs (Das Kapitel nicht entfernen - auch wenn es leer ist)
 
+## Bugs nach Test von 1.25.0
+- [ ] Loxone-Zugangsdaten erst abfragen, wenn Live-Betrieb aktiviert wird und getestet werden soll, ob alle Merker richtig sind (auf später verschieben)
+
+
 ## E-Auto: urgent-Regel, Prod-Dump, PWM
 Verknüpfte Themen — gemeinsam priorisieren und abarbeiten.
 

@@ -66,8 +66,12 @@ def native_blocked_indices(
 def resolve_native_window(
     consumer: dict,
     logged_simulation: bool,
-) -> tuple[float | None, float | None, str]:
-    """Start-Stunde und Dauer des nativen Duty-Cycles (Loxone oder config_fallback)."""
+) -> tuple[float | None, float | None, str, dict | None]:
+    """Start-Stunde und Dauer des nativen Duty-Cycles (Loxone oder config_fallback).
+
+    Rückgabe: (start_hour, duration_hours, source_label, log_extra).
+    log_extra enthält format/raw nur bei erfolgreichem Loxone-Lesen (für einmaliges INFO-Log).
+    """
     sched = consumer.get("filter_schedule") or {}
     fallback = sched.get("config_fallback") or {}
     fb_start = fallback.get("native_start_hour")
@@ -75,33 +79,28 @@ def resolve_native_window(
 
     if logged_simulation:
         if fb_start is not None and fb_duration is not None:
-            return float(fb_start), float(fb_duration), "config_fallback"
+            return float(fb_start), float(fb_duration), "config_fallback", None
         logger.warning(
             "Verbraucher '%s': filter_schedule.config_fallback unvollständig — "
             "keine natives Fenster-Sperrung.",
             consumer.get("id"),
         )
-        return None, None, "config_fallback (fehlend)"
+        return None, None, "config_fallback (fehlend)", None
 
     lox = sched.get("loxone") or {}
     start_name = lox.get("native_start_hour_name", "")
     duration_name = lox.get("native_duration_hours_name", "")
     start = duration = None
     start_format = "missing"
+    log_extra = None
     if start_name:
         start, start_format, raw_start = loxone_client.fetch_filter_native_start_hour(start_name)
         if start is not None:
-            logger.info(
-                "Verbraucher '%s': natives Filterfenster Start=%.0f h (Format=%s, raw=%r).",
-                consumer.get("id"),
-                start,
-                start_format,
-                raw_start,
-            )
+            log_extra = {"format": start_format, "raw": raw_start}
     if duration_name:
         duration = loxone_client.fetch_loxone_generic_value(duration_name)
     if start is not None and duration is not None and float(duration) > 0:
-        return float(start), float(duration), "loxone"
+        return float(start), float(duration), "loxone", log_extra
 
     if fb_start is not None and fb_duration is not None:
         logger.warning(
@@ -111,14 +110,14 @@ def resolve_native_window(
             fb_start,
             fb_duration,
         )
-        return float(fb_start), float(fb_duration), "config_fallback"
+        return float(fb_start), float(fb_duration), "config_fallback", None
 
     logger.warning(
         "Verbraucher '%s': natives Filterfenster weder aus Loxone noch Fallback — "
         "keine Slot-Sperrung.",
         consumer.get("id"),
     )
-    return None, None, "unbekannt"
+    return None, None, "unbekannt", None
 
 
 def resolve_filter_context(
@@ -126,7 +125,17 @@ def resolve_filter_context(
     matrix: list,
     logged_simulation: bool,
 ) -> dict:
-    start, duration, source_label = resolve_native_window(consumer, logged_simulation)
+    start, duration, source_label, log_extra = resolve_native_window(
+        consumer, logged_simulation
+    )
+    if log_extra is not None and start is not None:
+        logger.info(
+            "Verbraucher '%s': natives Filterfenster Start=%.0f h (Format=%s, raw=%r).",
+            consumer.get("id"),
+            start,
+            log_extra.get("format"),
+            log_extra.get("raw"),
+        )
     horizon = len(matrix)
     schedule = list(range(horizon))
     if start is None or duration is None:
