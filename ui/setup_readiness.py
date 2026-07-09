@@ -92,6 +92,18 @@ def is_setup_navigation_restricted() -> bool:
     return needs_planning_onboarding() and not is_planning_ready()
 
 
+def is_betrieb_unlocked() -> bool:
+    """Cockpit und Manuelle Geräte — erst nach vollständiger Loxone-Merker-Konfiguration."""
+    if not needs_planning_onboarding():
+        return True
+    return _loxone_markers_complete()
+
+
+def _loxone_markers_complete() -> bool:
+    """Prüfung aller benötigten Loxone-Merker — noch nicht implementiert."""
+    return False
+
+
 def is_scenario_editor_unlocked() -> bool:
     """Szenarieneditor folgt in einem späteren Schritt — vorerst gesperrt."""
     return not needs_planning_onboarding()

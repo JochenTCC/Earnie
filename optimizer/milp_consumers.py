@@ -25,6 +25,10 @@ from .filter_context import (
     apply_slot_availability_constraints,
     consumer_flex_eligible_indices,
 )
+from .generic_flex_context import (
+    consumer_generic_eligible_indices,
+    generic_flex_window,
+)
 
 if TYPE_CHECKING:
     from .milp_horizon import MilpHorizonModel
@@ -250,6 +254,15 @@ def _add_consumer_delivery_constraints(
             ctx,
             filters.get(cid),
         )
+        if generic_flex_window(consumer):
+            generic_eligible = set(
+                consumer_generic_eligible_indices(
+                    matrix[: model.horizon],
+                    consumer,
+                    consumer_indices,
+                )
+            )
+            eligible = [index for index in eligible if index in generic_eligible]
         eligible = apply_slot_availability_constraints(
             model.prob,
             model.consumer_on,

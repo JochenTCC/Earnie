@@ -110,6 +110,21 @@ def test_planning_ready_unlocks_backtesting(tmp_path, monkeypatch):
 
     assert setup_readiness.is_planning_ready() is True
     assert setup_readiness.is_setup_navigation_restricted() is False
+    assert setup_readiness.is_betrieb_unlocked() is False
+
+
+def test_betrieb_unlocked_after_live_config(tmp_path, monkeypatch):
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(
+        config_dir / "config.json",
+        {
+            "batteries": [{"id": "bat"}],
+            "pv_systems": [],
+            "flexible_consumers": [{"id": "swimspa"}],
+        },
+    )
+
+    assert setup_readiness.is_betrieb_unlocked() is True
 
 
 def test_scenario_editor_locked_during_onboarding(tmp_path, monkeypatch):
