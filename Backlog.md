@@ -16,13 +16,123 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature-Backlog
 
-### Version 1.+1
-- [ ] Nicht Software-Relevant: Neuen Loxberry aufsetzen bzw. produktiv-Loxberry auf 4 upgraden
-- [ ] Readme ausführlicher machen mit Motivation / Nutzen
+### Version 1.24.a — Hauskonfigurator und Szenarien
+
+**Scope:** Backtesting-first (Was-wäre-wenn / Planung ohne Loxone). Live-Prod nutzte bis 1.24 flache `runtime_settings`; Anbindung Live → **Version 1.25**.
+
+**Phasen:** P1 Entitäten → P2 Tarife → P3 Verbraucher/Grundlast → P4 Szenario-Modell → P5 UI.
+
+**Abnahme:** Backtesting-Lauf mit synthetischem Hausprofil und mindestens zwei Tarif-Szenarien (unterschiedliche Import-/Export-Kombination).
+
+- [x] **P1 — Batterie & PV als Entitäten** (`config.json`)
+  - `batteries[]`: `id`, `label`, `capacity_kwh`, `max_power_kw`, `efficiency`, `min_soc`, `max_soc`, `threshold_power`
+  - `pv_systems[]`: `id`, `label`, `kwp`, `tilt`, `azimuth` (Standort: global in `runtime_settings.latitude/longitude`)
+  - Schema erlaubt Mehrfach-Definition; Szenario/Runtime wählt je **eine** `battery_id` + **eine** `pv_system_id`
+  - Abwärtskompatibel: fehlende IDs → flache Felder in `runtime_settings` (Live unverändert)
+- [x] **P2 — Stromtarife** (`config/tariffs.json`, getrennt Bezug/Einspeisung)
+  - `import_tariffs[]`: Typen `awattar` (EPEX + Aufschläge aus `config.json`), `fixed_cent` (fester Cent/kWh)
+  - `export_tariffs[]`: Typen `fixed` (`k_push_cent`), `monthly_table` (bestehende Monatstabelle), `dynamic_epex`
+  - Szenario referenziert `import_tariff_id` + `export_tariff_id` (Backtesting); globales `awattar` bleibt Fallback
+- [x] **P3 — Verbraucher & Grundlast** (`config/house_profiles.json`)
+  - Generischer Planungs-Verbraucher: `id`, `label`, `nominal_power_kw`, `annual_kwh` oder `profile_csv`, optionales `schedule` (`runs_per_week`, `duration_h`, `start_flexibility`: `fixed`|`day`|`any`)
+  - Thermischer Verbraucher (Jahreszyklus): Parameter wie Prototyp [`prognosis-heating-need.py`](config/prognosis-heating-need.py); wöchentliche Klimagliederung → Stundenprofil; Klimadaten aus Cache/Fixture (kein Live-API in Tests)
+  - CSV-Format historische Profile: `timestamp;power_kw` (stündlich, `;`, lokale TZ `Europe/Vienna`, Dezimalpunkt)
+  - Grundlast = Jahresverbrauch minus Summe Verbraucher; **Untergrenze:** min. 5 % des Jahresverbrauchs als Grundlast (Plausibilität im Konfigurator)
+- [x] **P4 — Zusammengesetztes Szenario**
+  - `backtesting_scenarios.json`: Szenario neben flachen Overrides mit `battery_id`, `pv_system_id`, `import_tariff_id`, `export_tariff_id`, `house_profile_id`
+  - `config.py` löst Referenzen in flaches Parameter-Dict für `simulation/engine.py` auf
+- [x] **P5 — UI**
+  - **Hauskonfigurator** ([`page_house_config.py`](ui/pages/page_house_config.py)): Jahresverbrauch, Verbraucher, Grundlast-Vorschau; speichert `house_profiles.json`
+  - **Szenarieneditor** ([`page_scenario_editor.py`](ui/pages/page_scenario_editor.py)): Auswahl Tarif + PV + Batterie + Hausprofil; speichert `backtesting_scenarios.json`
+
+### Version 1.24.b — LOC-Refactoring Top-3 (nächstes Todo)
+
+**Scope:** [`optimizer/milp.py`](optimizer/milp.py) (991), [`config.py`](config.py) (1543), [`ui/charts.py`](ui/charts.py) (2822) jeweils unter **1000 LOC**. Keine Verhaltensänderung; API-Stabilität (`import config`, Re-Exports in `milp.py`/`charts.py`).
+
+**Reihenfolge:** milp → config → charts
+
+**Abnahme:** Volle pytest-Suite grün; Charts 1+2 manuell (SoC-Rampe, S-2-Split, Consumer-Stack, Entladesperre).
+
+- [ ] **Epic 1 — `optimizer/milp.py`** (~991 → ~170)
+  - `milp_consumers.py`, `milp_horizon.py`, `milp_result.py`; `_derive_control_from_milp` → [`optimizer/battery.py`](optimizer/battery.py)
+  - Re-Exports privater `_`-Symbole für Tests; Docstring `milp_optimizer` (7 Rückgabewerte)
+- [ ] **Epic 2 — `config.py`** (~1543 → ~720)
+  - Neues Paket [`settings/`](settings/) (kein Python-Paket `config/` — Namenskollision mit JSON-Ordner + Root-Modul)
+  - `settings/json_io.py`, `flexible_consumers.py`, `appliances.py`, `scenarios.py`, `system_settings.py`
+  - [`config.py`](config.py) bleibt Orchestrator + `import config`-Fassade; Abgrenzung zu [`house_config/`](house_config/) (Live vs. Backtesting)
+- [ ] **Epic 3 — `ui/charts.py`** (~2822 → ~400)
+  - **3a:** `chart_slot_axis.py`, `chart_trace_segments.py` — Import-Zyklus mit [`chart_flow_balance.py`](ui/chart_flow_balance.py) auflösen
+  - **3b:** `chart_soc.py`, `chart_cumulative.py`, `chart_decorations.py`, `chart_consumer_stack.py`
+  - **3c:** [`ui/charts.py`](ui/charts.py) als dünne Fassade + Re-Exports; Caller [`consumer_analysis_charts.py`](ui/consumer_analysis_charts.py) bereinigen
+
+### Version 1.24.0 — Hauskonfigurator UX & E-Auto-Profil
+
+**Scope:** Follow-up zu 1.24 P5. Backtesting-Planung ohne Loxone. Verbraucher dynamisch per Neu/Entfernen statt Anzahl-Feld; eigener Planungs-Verbrauchertyp `ev` mit Live-E-Auto-Eigenschaften (ohne Loxone-Merker).
+
+**Phasen:** P1 Datenmodell → P2 UI → P3 Jahres- und Stundenprofil → P4 Tests.
+
+**Abnahme:** Hausprofil mit mind. einem `ev`-Verbraucher speichern; Grundlast-Vorschau plausibel; `build_hourly_kw_profile` liefert stündliches Ladezeitfenster-Profil; pytest grün.
+
+- [ ] **P1 — Datenmodell `ev`** (`config/house_profiles.json`)
+  - Typ `ev` in [`house_profiles.schema.json`](config/house_profiles.schema.json) und [`profiles_store.py`](house_config/profiles_store.py)
+  - Planungs-Subset aus Live-`flexible_consumers[].eauto` ([`config.example.json`](config/config.example.json)): `nominal_power_kw`, `min_power_kw`, `min_on_quarterhours`, `battery_capacity_kwh`, `charging_schedule` (`target_soc_percent`, `charging_efficiency`, `forecast_when_absent`, `weekday`/`weekend` mit `car_available_from_hour`, `ready_by_hour`, `daily_rest_soc`) — ohne `loxone`
+  - [`house_profiles.example.json`](config/house_profiles.example.json): E-Auto als `ev` statt `generic` + `schedule`
+- [ ] **P2 — UI Neu/Entfernen** ([`page_house_config.py`](ui/pages/page_house_config.py))
+  - `number_input` „Anzahl Verbraucher“ entfernen; `st.session_state` für Verbraucherliste (Sync bei Profilwechsel)
+  - Button **„Verbraucher hinzufügen“**; pro Expander **„Entfernen“**
+  - Typ-Dropdown: `generic`, `thermal_annual`, `ev` (Anzeige „E-Auto“); bedingte Felder für `ev`
+- [ ] **P3 — Jahres- und Stundenprofil**
+  - Neues Modul [`house_config/ev_profile.py`](house_config/ev_profile.py): `estimate_ev_annual_kwh`, `ev_hourly_kw_for_day` (Ladezeitfenster wie Live; Logik aus [`generate_cons_data.py`](scripts/generate_cons_data.py) extrahieren)
+  - [`baseload.py`](house_config/baseload.py): `consumer_annual_kwh` für `ev`
+  - [`consumption_profiles.py`](data/consumption_profiles.py): `ev`-Zweig mit fensterbasiertem Stundenprofil statt Gleichverteilung
+- [ ] **P4 — Tests** ([`tests/test_house_config.py`](tests/test_house_config.py))
+  - Normalisierung `ev`, Jahres-kWh-Formel, Stundenprofil nur im Ladezeitfenster
+
+**Abgrenzung:** Keine Loxone-Merker in `house_profiles.json`; keine Anbindung Hausprofil-`ev` → `flexible_consumers` in `config.json` (Live bleibt separates Modell).
+
+### Version 1.25.0 — Runtime-Entitäten & Tarife (Live)
+
+**Scope:** Live-Prod (`main.py`, Sunset-2-Sunset-UI) nutzt dieselbe Referenz-Auflösung wie Backtesting (1.24). `runtime_settings` enthält nur Auswahl-IDs + Standort/Zeitzone (optional `pv_system_id`). Technische Parameter kommen aus `batteries[]` bzw. `config/tariffs.json`.
+
+**Phasen:** P1 Datenmodell → P2 config.py-Auflösung → P3 Preis-Pipeline Live → P4 UI → P5 Migration/Tests/Doku.
+
+**Abnahme:** Prod-`config.json` mit `battery_id` + Tarif-IDs; Live-Optimierung und UI zeigen aufgelöste Werte; Backtesting-Baseline unverändert kompatibel.
+
+- [ ] **P1 — Datenmodell & Schema**
+  - `runtime_settings`: `battery_id` (Pflicht nach Migration), `import_tariff_id`, `export_tariff_id`
+  - Flache Batterie-/Tarif-Felder deprecated (Abwärtskompat: ID gewinnt, sonst Legacy-Felder)
+  - Import-Tarif-Typ `monthly_table` ergänzen (symmetrisch zu Export)
+  - [`config.schema.json`](config/config.schema.json), [`config/tariffs.schema.json`](config/tariffs.schema.json), Beispiel-Configs
+- [ ] **P2 — Zentrale Auflösung in config.py**
+  - `resolve_runtime_settings()` via bestehende `house_config`-Hilfen
+  - `_load_dynamic_params()` / `get_battery_params()` / `get_runtime_settings()` aus aufgelöstem Dict
+  - `get_backtesting_scenarios()`: Baseline ebenfalls auflösen (ein Codepfad)
+- [ ] **P3 — Preis-Pipeline Live**
+  - Bezug: `awattar` (EPEX + `awattar`-Block), `fixed_cent`, `monthly_table`
+  - Einspeisung: `fixed`, `monthly_table`, `dynamic_epex` aus Tarif-Auflösung (nicht flache `k_push_cent`)
+  - Anpassung: [`data/profile_manager.py`](data/profile_manager.py), [`data/market_prices.py`](data/market_prices.py), [`simulation/engine.py`](simulation/engine.py)
+- [ ] **P4 — UI Live-Konfiguration**
+  - [`ui/config_forms.py`](ui/config_forms.py): Dropdowns Batterie + Import-/Export-Tarif statt Einzelfelder
+  - `update_runtime_settings()` speichert IDs; Anzeige aufgelöster Werte (read-only)
+  - Optional gleiches Muster für `pv_system_id` (bereits in 1.24 vorbereitet)
+- [ ] **P5 — Migration, Tests, Doku**
+  - Prod-Migration: flache Werte → passende `batteries[]`-Einträge + Tarif-IDs (z. B. `home_5kwh`, `fixed_37ct`)
+  - Tests in [`tests/test_house_config.py`](tests/test_house_config.py) + Live-Auflösungs-Test
+  - Docs: [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md), Sidebar-Hinweis
+
+**Follow-up (eigenständiger Punkt):**
+- [ ] Stromtarif „stündlich fest“ (Import + Export)
 
 ### Version 1.+1
 - [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
   - Habe Admins in loxforum nach der besten Stelle für einen Post gefragt
+  - Soll unter "mein Projekt" gepostet werden
+
+### Version 1.+1
+- [ ] Readme ausführlicher machen mit Motivation / Nutzen
+  - Sinnvolle Reihenfolge in der Nutzung beschreiben
+  - Weniger technische Hintergründe beschreiben als Hinweise zur Installation und Konfiguration
+- [ ] Weiteren Container für Windows machen
 
 ### Version 1.+1
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**

@@ -1,0 +1,36 @@
+{
+    "$schema": "./house_profiles.schema.json",
+    "profiles": [
+        {
+            "id": "example_efh",
+            "label": "Beispiel EFH 4500 kWh/a",
+            "annual_kwh": 4500,
+            "consumers": [
+                {
+                    "id": "wp_heating",
+                    "label": "Wärmepumpe Heizen+WW",
+                    "type": "thermal_annual",
+                    "nominal_power_kw": 3.5,
+                    "living_area_m2": 120,
+                    "building_class": 2,
+                    "heat_pump_type": "erde",
+                    "persons": 2,
+                    "target_temp_c": 21.5,
+                    "heating_limit_c": 15.0
+                },
+                {
+                    "id": "ev",
+                    "label": "E-Auto",
+                    "type": "generic",
+                    "nominal_power_kw": 3.5,
+                    "annual_kwh": 2500,
+                    "schedule": {
+                        "runs_per_week": 7,
+                        "duration_h": 3,
+                        "start_flexibility": "day"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,23 @@
+{
+    "profiles": [
+        {
+            "id": "test_home",
+            "label": "Test-Haushalt 4000 kWh/a",
+            "annual_kwh": 4000,
+            "latitude": 47.4,
+            "longitude": 9.7,
+            "consumers": [
+                {
+                    "id": "wp",
+                    "label": "Wärmepumpe",
+                    "type": "thermal_annual",
+                    "nominal_power_kw": 3.0,
+                    "living_area_m2": 100,
+                    "building_class": 3,
+                    "heat_pump_type": "luft",
+                    "persons": 2
+                }
+            ]
+        }
+    ]
+}

@@ -45,7 +45,11 @@ Erst nach Antwort des Users stagen. Ausgeschlossene Dateien nicht committen.
 
 ### 3. Backlog aktualisieren
 
-Schema aus `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` beibehalten (siehe auch `.cursor/rules/backlog.mdc`):
+Schema aus `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` beibehalten (siehe auch `.cursor/rules/backlog.mdc`, Kapitel-Nomenklatur in `roadmap-nomenclature.mdc`):
+
+- **Buchstaben-Kapitel** (`1.24.a`, `1.24.b`): Teilschritte vor dem `.0`-Release; bei erledigt → `Backlog-Erledigt.md`; `version.py`: `.a` → MINOR+PATCH=0, `.b` → PATCH (siehe `versioning.mdc`)
+- **Release-Kapitel** (`1.24.0`, `1.25.0`): `.0` schließt MINOR-Zyklus bzw. startet nächsten MINOR; Version-Bump je nach Kapitel-MINOR vs. aktuellem Stand (siehe `versioning.mdc`)
+- **`version.py` ≠ Backlog-Stand:** `1.24.0` in `version.py` bei offenem `1.24.b` ist beabsichtigt — Buchstabe markiert nur den laufenden Teilschritt im Backlog
 
 - **Erledigte Punkte nicht durchstreichen** — aus der jeweiligen offenen Datei entfernen und in `Backlog-Erledigt.md` mit `- [x]` eintragen
 - **Backlog-Bugfixes.md:** offene Prod-Bugs/Regressionen; bei Erledigung PATCH in `version.py` prüfen
@@ -101,7 +105,9 @@ Start **nur** bei explizitem „Ja“ / „Docker bauen“ / „Image pushen“ 
 
 ### 1. Version prüfen
 
-`version.py` lesen. Wenn Code-Release sinnvoll erscheint, aber Version unverändert: User **einmal** fragen, ob `version.py` angehoben werden soll — nicht still ändern.
+`version.py` lesen. **`version.py` nicht „korrigieren“, weil Buchstaben-Kapitel im Backlog noch offen sind** — früher MINOR-Bump nach `.a` ist beabsichtigt (siehe `versioning.mdc`).
+
+Wenn Code-Release sinnvoll erscheint, aber Version unverändert: User **einmal** fragen, ob `version.py` angehoben werden soll — nicht still ändern.
 
 ### 2. Build & Push
 

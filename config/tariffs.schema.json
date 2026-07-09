@@ -1,0 +1,50 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://energy-optimizer.local/tariffs.schema.json",
+    "title": "Energy Optimizer Stromtarife",
+    "type": "object",
+    "properties": {
+        "import_tariffs": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/import_tariff" }
+        },
+        "export_tariffs": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/export_tariff" }
+        }
+    },
+    "definitions": {
+        "import_tariff": {
+            "type": "object",
+            "required": ["id", "type"],
+            "properties": {
+                "id": { "type": "string" },
+                "label": { "type": "string" },
+                "type": { "enum": ["awattar", "fixed_cent"] },
+                "fix_cent_kwh": { "type": "number", "exclusiveMinimum": 0 }
+            }
+        },
+        "export_tariff": {
+            "type": "object",
+            "required": ["id", "type"],
+            "properties": {
+                "id": { "type": "string" },
+                "label": { "type": "string" },
+                "type": { "enum": ["fixed", "monthly_table", "dynamic_epex"] },
+                "k_push_cent": { "type": "number" },
+                "monthly_rates": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["year", "month", "tariff_cent_kwh"],
+                        "properties": {
+                            "year": { "type": "integer" },
+                            "month": { "type": "integer", "minimum": 1, "maximum": 12 },
+                            "tariff_cent_kwh": { "type": "number", "exclusiveMinimum": 0 }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

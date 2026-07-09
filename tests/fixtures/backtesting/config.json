@@ -54,6 +54,27 @@
         "longitude": 9.743,
         "timezone_name": "Europe/Vienna"
     },
+    "batteries": [
+        {
+            "id": "test_battery",
+            "label": "Test 8 kWh",
+            "battery_capacity_kwh": 8.0,
+            "battery_max_power_kw": 4.0,
+            "battery_efficiency": 0.95,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.02
+        }
+    ],
+    "pv_systems": [
+        {
+            "id": "test_pv",
+            "label": "Test PV 6 kWp",
+            "kwp": 6.0,
+            "pv_tilt": 18,
+            "pv_azimuth": 28
+        }
+    ],
     "planning_horizon": {
         "mode": "sunset_window"
     },

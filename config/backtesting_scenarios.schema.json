@@ -71,8 +71,13 @@
         },
         "settings": {
           "type": "object",
-          "description": "Parameter-Override (gleiche Felder wie runtime_settings in config.json).",
+          "description": "Parameter-Override (flache Felder oder Referenzen auf Entitäten).",
           "properties": {
+            "battery_id": { "type": "string", "description": "Referenz auf batteries[].id in config.json." },
+            "pv_system_id": { "type": "string", "description": "Referenz auf pv_systems[].id in config.json." },
+            "import_tariff_id": { "type": "string", "description": "Referenz auf import_tariffs[].id in tariffs.json." },
+            "export_tariff_id": { "type": "string", "description": "Referenz auf export_tariffs[].id in tariffs.json." },
+            "house_profile_id": { "type": "string", "description": "Referenz auf profiles[].id in house_profiles.json." },
             "k_push_cent": { "type": "number" },
             "feed_in_mode": {
               "type": "string",

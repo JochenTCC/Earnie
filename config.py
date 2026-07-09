@@ -17,12 +17,16 @@ from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
     resolve_config_json_path,
     resolve_dotenv_path,
+    resolve_house_profiles_json_path,
     resolve_local_settings_json_path,
+    resolve_tariffs_json_path,
 )
 
 CONFIG_JSON_PATH = resolve_config_json_path()
 BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
 LOCAL_SETTINGS_JSON_PATH = resolve_local_settings_json_path()
+TARIFFS_JSON_PATH = resolve_tariffs_json_path()
+HOUSE_PROFILES_JSON_PATH = resolve_house_profiles_json_path()
 
 
 def _default_require_loxone_credentials() -> bool:
@@ -37,11 +41,15 @@ class Config:
         config_path: str = CONFIG_JSON_PATH,
         backtesting_scenarios_path: str = BACKTESTING_SCENARIOS_JSON_PATH,
         local_settings_path: str = LOCAL_SETTINGS_JSON_PATH,
+        tariffs_path: str = TARIFFS_JSON_PATH,
+        house_profiles_path: str = HOUSE_PROFILES_JSON_PATH,
         require_loxone_credentials: bool | None = None,
     ):
         self.config_path = config_path
         self.backtesting_scenarios_path = backtesting_scenarios_path
         self.local_settings_path = local_settings_path
+        self.tariffs_path = tariffs_path
+        self.house_profiles_path = house_profiles_path
         if require_loxone_credentials is None:
             require_loxone_credentials = _default_require_loxone_credentials()
         self.require_loxone_credentials = require_loxone_credentials
@@ -1075,7 +1083,9 @@ class Config:
         runtime = runtime_override if runtime_override is not None else self._raw_config["runtime_settings"]
         awattar = self._raw_config.get("awattar", {})
         monthly = None
-        if validate_feed_in_mode(runtime.get("feed_in_mode", FEED_IN_MODE_FIXED)) == FEED_IN_MODE_FIXED:
+        if runtime_override and runtime_override.get("_monthly_fixed_tariffs") is not None:
+            monthly = runtime_override["_monthly_fixed_tariffs"]
+        elif validate_feed_in_mode(runtime.get("feed_in_mode", FEED_IN_MODE_FIXED)) == FEED_IN_MODE_FIXED:
             monthly = self.get_backtesting_fixed_monthly_feed_in_rates()
         return feed_in_settings_from_dict(
             runtime,
@@ -1270,11 +1280,36 @@ class Config:
             labels[scenario["id"]] = scenario["label"]
         return labels
 
+    def get_batteries(self) -> list[dict]:
+        from house_config.entity_resolution import batteries_by_id
+
+        return list(batteries_by_id(self._raw_config).values())
+
+    def get_pv_systems(self) -> list[dict]:
+        from house_config.entity_resolution import pv_systems_by_id
+
+        return list(pv_systems_by_id(self._raw_config).values())
+
+    def resolve_scenario_settings_dict(self, settings: dict) -> dict:
+        from house_config.scenario_resolution import resolve_scenario_settings
+
+        holder: dict = {}
+        resolved = resolve_scenario_settings(
+            settings,
+            raw_config=self._raw_config,
+            tariffs_path=self.tariffs_path,
+            house_profiles_path=self.house_profiles_path,
+            monthly_rates_holder=holder,
+        )
+        if holder.get("_monthly_fixed_tariffs") is not None:
+            resolved["_monthly_fixed_tariffs"] = holder["_monthly_fixed_tariffs"]
+        return resolved
+
     def get_backtesting_scenarios(self) -> dict[str, dict]:
-        """runtime_settings als Baseline, gefolgt von allen konfigurierten Szenarien."""
+        """runtime_settings als Baseline, gefolgt von aufgelösten Szenarien."""
         scenarios = {"runtime_settings": dict(self._raw_config["runtime_settings"])}
         for scenario in self.get_scenarios():
-            scenarios[scenario["id"]] = scenario["settings"]
+            scenarios[scenario["id"]] = self.resolve_scenario_settings_dict(scenario["settings"])
         return scenarios
 
     def get_value(self, name: str, default=None, cast=None):
@@ -1318,15 +1353,20 @@ CONFIG = Config(require_loxone_credentials=_default_require_loxone_credentials()
 def reinit_config(require_loxone_credentials: bool | None = None) -> None:
     """Lädt die Konfiguration neu (z. B. nach Bootstrap mit neu angelegter config.json)."""
     global CONFIG, CONFIG_JSON_PATH, BACKTESTING_SCENARIOS_JSON_PATH, LOCAL_SETTINGS_JSON_PATH
+    global TARIFFS_JSON_PATH, HOUSE_PROFILES_JSON_PATH
     CONFIG_JSON_PATH = resolve_config_json_path()
     BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
     LOCAL_SETTINGS_JSON_PATH = resolve_local_settings_json_path()
+    TARIFFS_JSON_PATH = resolve_tariffs_json_path()
+    HOUSE_PROFILES_JSON_PATH = resolve_house_profiles_json_path()
     if require_loxone_credentials is None:
         require_loxone_credentials = _default_require_loxone_credentials()
     CONFIG = Config(
         config_path=CONFIG_JSON_PATH,
         backtesting_scenarios_path=BACKTESTING_SCENARIOS_JSON_PATH,
         local_settings_path=LOCAL_SETTINGS_JSON_PATH,
+        tariffs_path=TARIFFS_JSON_PATH,
+        house_profiles_path=HOUSE_PROFILES_JSON_PATH,
         require_loxone_credentials=require_loxone_credentials,
     )
 
@@ -1461,6 +1501,14 @@ def get_scenario_labels() -> dict[str, str]:
 
 def get_backtesting_scenarios() -> dict[str, dict]:
     return CONFIG.get_backtesting_scenarios()
+
+
+def get_batteries() -> list[dict]:
+    return CONFIG.get_batteries()
+
+
+def get_pv_systems() -> list[dict]:
+    return CONFIG.get_pv_systems()
 
 
 def get_backtesting_cbc_gap_rel() -> float:

@@ -223,6 +223,82 @@ def resolve_backtesting_scenarios_json_path() -> str:
     return preferred
 
 
+def bundled_tariffs_example_file() -> str:
+    return os.path.join(bundled_config_dir(), "tariffs.example.json")
+
+
+def bundled_tariffs_schema_file() -> str:
+    return os.path.join(bundled_config_dir(), "tariffs.schema.json")
+
+
+def resolve_tariffs_template_path() -> str:
+    preferred = os.path.join("config", "tariffs.example.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_tariffs_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_tariffs_schema_template_path() -> str:
+    preferred = os.path.join("config", "tariffs.schema.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_tariffs_schema_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_tariffs_json_path() -> str:
+    env = os.environ.get("ENERGY_OPTIMIZER_TARIFFS_PATH", "").strip()
+    if env:
+        return env
+    preferred = os.path.join("config", "tariffs.json")
+    if os.path.isfile(preferred):
+        return preferred
+    return preferred
+
+
+def bundled_house_profiles_example_file() -> str:
+    return os.path.join(bundled_config_dir(), "house_profiles.example.json")
+
+
+def bundled_house_profiles_schema_file() -> str:
+    return os.path.join(bundled_config_dir(), "house_profiles.schema.json")
+
+
+def resolve_house_profiles_template_path() -> str:
+    preferred = os.path.join("config", "house_profiles.example.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_house_profiles_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_house_profiles_schema_template_path() -> str:
+    preferred = os.path.join("config", "house_profiles.schema.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_house_profiles_schema_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_house_profiles_json_path() -> str:
+    env = os.environ.get("ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH", "").strip()
+    if env:
+        return env
+    preferred = os.path.join("config", "house_profiles.json")
+    if os.path.isfile(preferred):
+        return preferred
+    return preferred
+
+
 def bundled_deviation_rules_example_file() -> str:
     return os.path.join(bundled_config_dir(), "deviation_rules.example.json")
 

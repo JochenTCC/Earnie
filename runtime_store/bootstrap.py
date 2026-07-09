@@ -25,6 +25,12 @@ from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
     resolve_backtesting_scenarios_schema_template_path,
     resolve_backtesting_scenarios_template_path,
+    resolve_house_profiles_json_path,
+    resolve_house_profiles_schema_template_path,
+    resolve_house_profiles_template_path,
+    resolve_tariffs_json_path,
+    resolve_tariffs_schema_template_path,
+    resolve_tariffs_template_path,
     resolve_config_json_path,
     resolve_deviation_rules_schema_template_path,
     resolve_deviation_rules_template_path,
@@ -172,6 +178,58 @@ def _bootstrap_backtesting_scenarios_json() -> bool:
     )
 
 
+def _bootstrap_tariffs_example() -> bool:
+    dest = os.path.join("config", "tariffs.example.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_tariffs_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_tariffs_schema() -> bool:
+    dest = os.path.join("config", "tariffs.schema.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_tariffs_schema_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_tariffs_json() -> bool:
+    return _copy_template_if_missing(
+        resolve_tariffs_json_path(),
+        resolve_tariffs_template_path(),
+        "tariffs.example.json",
+    )
+
+
+def _bootstrap_house_profiles_example() -> bool:
+    dest = os.path.join("config", "house_profiles.example.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_house_profiles_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_house_profiles_schema() -> bool:
+    dest = os.path.join("config", "house_profiles.schema.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_house_profiles_schema_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_house_profiles_json() -> bool:
+    return _copy_template_if_missing(
+        resolve_house_profiles_json_path(),
+        resolve_house_profiles_template_path(),
+        "house_profiles.example.json",
+    )
+
+
 def _bootstrap_deviation_rules_example() -> bool:
     dest = os.path.join("config", "deviation_rules.example.json")
     return _copy_template_if_missing(
@@ -306,6 +364,18 @@ def run() -> None:
         created.append(os.path.join("config", "backtesting_scenarios.schema.json"))
     if _bootstrap_backtesting_scenarios_json():
         created.append(resolve_backtesting_scenarios_json_path())
+    if _bootstrap_tariffs_example():
+        created.append(os.path.join("config", "tariffs.example.json"))
+    if _bootstrap_tariffs_schema():
+        created.append(os.path.join("config", "tariffs.schema.json"))
+    if _bootstrap_tariffs_json():
+        created.append(resolve_tariffs_json_path())
+    if _bootstrap_house_profiles_example():
+        created.append(os.path.join("config", "house_profiles.example.json"))
+    if _bootstrap_house_profiles_schema():
+        created.append(os.path.join("config", "house_profiles.schema.json"))
+    if _bootstrap_house_profiles_json():
+        created.append(resolve_house_profiles_json_path())
     if _bootstrap_deviation_rules_example():
         created.append(os.path.join("config", "deviation_rules.example.json"))
     if _bootstrap_deviation_rules_schema():

@@ -81,6 +81,20 @@
                 "latitude": 48,
                 "longitude": 10
             }
+        },
+        {
+            "id": "entity_refs_planning",
+            "label": "10 kWh + monatliche Einspeise (Entitäten-Referenzen)",
+            "settings": {
+                "battery_id": "upgrade_10kwh",
+                "pv_system_id": "roof_south",
+                "import_tariff_id": "awattar_at",
+                "export_tariff_id": "monthly_sunny",
+                "house_profile_id": "example_efh",
+                "latitude": 48,
+                "longitude": 10,
+                "timezone_name": "Europe/Vienna"
+            }
         }
     ]
 }

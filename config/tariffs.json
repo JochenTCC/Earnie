@@ -1,0 +1,39 @@
+{
+    "$schema": "./tariffs.schema.json",
+    "import_tariffs": [
+        {
+            "id": "awattar_at",
+            "label": "aWATTar Österreich (EPEX + Aufschlag)",
+            "type": "awattar"
+        },
+        {
+            "id": "fixed_25ct",
+            "label": "Fix 25 ct/kWh Bezug",
+            "type": "fixed_cent",
+            "fix_cent_kwh": 25.0
+        }
+    ],
+    "export_tariffs": [
+        {
+            "id": "fixed_37ct",
+            "label": "Fix 3,7 ct/kWh Einspeise",
+            "type": "fixed",
+            "k_push_cent": 3.7
+        },
+        {
+            "id": "dynamic_epex",
+            "label": "Dynamisch EPEX (SUNNY Spot)",
+            "type": "dynamic_epex"
+        },
+        {
+            "id": "monthly_sunny",
+            "label": "Monatliche SUNNY-Fixwerte",
+            "type": "monthly_table",
+            "monthly_rates": [
+                {"year": 2025, "month": 1, "tariff_cent_kwh": 9.73},
+                {"year": 2025, "month": 6, "tariff_cent_kwh": 5.86},
+                {"year": 2025, "month": 12, "tariff_cent_kwh": 8.70}
+            ]
+        }
+    ]
+}

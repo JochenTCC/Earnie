@@ -37,6 +37,16 @@
       "$ref": "#/definitions/runtime_settings",
       "description": "Laufzeitparameter für PV, Batterie und Optimierung."
     },
+    "batteries": {
+      "type": "array",
+      "description": "Batteriespezifikationen (Mehrfach-Definition; Szenario wählt battery_id).",
+      "items": { "$ref": "#/definitions/battery_entity" }
+    },
+    "pv_systems": {
+      "type": "array",
+      "description": "PV-Anlagen (Mehrfach-Definition; Szenario wählt pv_system_id).",
+      "items": { "$ref": "#/definitions/pv_system_entity" }
+    },
     "file_paths_battery_simulation": {
       "$ref": "#/definitions/file_paths_battery_simulation",
       "description": "Pfade zu historischen CSVs, cons_data und Preisquelle."
@@ -336,7 +346,54 @@
         "timezone_name": {
           "type": "string",
           "description": "IANA-Zeitzone für official Sonnenaufgang/-untergang (z. B. Europe/Vienna)."
+        },
+        "battery_id": {
+          "type": "string",
+          "description": "Optional: Referenz auf batteries[].id (Backtesting/Szenarien)."
+        },
+        "pv_system_id": {
+          "type": "string",
+          "description": "Optional: Referenz auf pv_systems[].id (Backtesting/Szenarien)."
         }
+      }
+    },
+    "battery_entity": {
+      "type": "object",
+      "description": "Hausbatterie (nicht E-Auto — siehe flexible_consumers).",
+      "required": [
+        "id",
+        "battery_capacity_kwh",
+        "battery_max_power_kw",
+        "battery_efficiency",
+        "battery_min_soc",
+        "battery_max_soc"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "battery_capacity_kwh": { "type": "number", "exclusiveMinimum": 0 },
+        "battery_max_power_kw": { "type": "number", "exclusiveMinimum": 0 },
+        "battery_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "battery_min_soc": { "type": "number", "minimum": 0, "maximum": 100 },
+        "battery_max_soc": { "type": "number", "minimum": 0, "maximum": 100 },
+        "threshold_power": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Relativer Anteil von battery_max_power_kw (Standard 0.02)."
+        }
+      }
+    },
+    "pv_system_entity": {
+      "type": "object",
+      "description": "PV-Anlage für Prognose und Backtesting.",
+      "required": ["id", "kwp"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "kwp": { "type": "number", "exclusiveMinimum": 0 },
+        "pv_tilt": { "type": "number", "description": "Neigung in Grad." },
+        "pv_azimuth": { "type": "number", "description": "0=Süd, -90=Ost, 90=West." }
       }
     },
     "planning_horizon": {

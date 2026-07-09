@@ -1,0 +1,27 @@
+{
+    "import_tariffs": [
+        {
+            "id": "awattar_at",
+            "label": "aWATTar Österreich",
+            "type": "awattar"
+        }
+    ],
+    "export_tariffs": [
+        {
+            "id": "fixed_35ct",
+            "label": "Fix 3,5 ct/kWh",
+            "type": "fixed",
+            "k_push_cent": 3.5
+        },
+        {
+            "id": "monthly_test",
+            "label": "Monatliche Testwerte",
+            "type": "monthly_table",
+            "monthly_rates": [
+                {"year": 2025, "month": 1, "tariff_cent_kwh": 9.0},
+                {"year": 2025, "month": 6, "tariff_cent_kwh": 5.0},
+                {"year": 2025, "month": 12, "tariff_cent_kwh": 8.0}
+            ]
+        }
+    ]
+}

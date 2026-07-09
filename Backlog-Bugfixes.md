@@ -21,8 +21,18 @@ Fix ist **implementiert** (Code + Tests + ggf. PATCH in `version.py`), aber die 
 
 
 ## Neue Bugs (Das Kapitel nicht entfernen - auch wenn es leer ist)
-- [ ] Wenn mehrere manuelle Verbraucher im Chart 1 (aktuelle Ansicht) aktiv sind, dann mit unterschiedlichen Schraffuren ausstatten. Machbarkeit prüfen.
 
+### UI-Bugs 1.23.1
+- [ ] Wenn mehrere manuelle Verbraucher im Chart 1 (aktuelle Ansicht) aktiv sind, dann mit unterschiedlichen Schraffuren ausstatten. Machbarkeit prüfen.
+- [ ] Ranking-Tabelle für manuelle Verbraucher möglichst kompakt halten, damit sie auf Mobilgeräten auch als Tabelle angezeigt werden kann (derzeit wird das Design komplett aufgelöst)
+  - Checkbox direkt vor Uhrzeit
+  - Möglichst kleine Breiten der einzelnen Spalten
+  - Kostenspalte weglassen
+  - Überschrift "Delta zu bestem Zeitpunkt" einkürzen in "Delta"
+- Klappbare Legenden sind nur dann sinnvoll, wenn der Platz für die Legende im Chart selbst nicht leer bleibt (Motivation dafür ist, die Anzeige möglichst kompakt zu halten). Prüfen, ob Legendenplatz eingespaart werden kann. Ansonsten alte Lösung wieder herstellen.
+- [ ] Änderung der Nennleistung bei man. Verbrauchern (direktes Eingeben) wird nicht in Optimierung übernommen, wenn schon ein Check gesetzt wurde. Feld für Nennleistung un Dauer deaktivieren bei gesetztem Check
+- [ ] SOC-BL-Ziel hat ähnliche Fehler, wie SOC-Verlaub an den Grenzen zu grauem (da fällt es nicht auf) und grünem Bereich. 
+- [ ] Preiskurve: Beim Übergang in grünen Bereich (bei grau auch?) fehlt der senkrechte Strich, damit der Verlauf nicht unterbrochen ist
 
 ## Bugfix Verifications Pending
 - [ ] **Mobile Legende Cockpit (Chart 1/2)** — Plotly-Legende unter 768px per CSS aus; farbiges `<details>` als Ersatz (nur mobil sichtbar). Desktop: nur Plotly-Legende, kein Expander (`ui/chart_legend_mobile.py`).

@@ -1,28 +1,6 @@
 {
     "cbc_gap_rel": 0.10,
     "cbc_strict_time_limit_sec": 3,
-    "fixed_monthly_feed_in_rates": [
-        {"year": 2024, "month": 12, "tariff_cent_kwh": 9.73},
-        {"year": 2025, "month": 1, "tariff_cent_kwh": 9.73},
-        {"year": 2025, "month": 2, "tariff_cent_kwh": 9.73},
-        {"year": 2025, "month": 3, "tariff_cent_kwh": 6.01},
-        {"year": 2025, "month": 4, "tariff_cent_kwh": 5.86},
-        {"year": 2025, "month": 5, "tariff_cent_kwh": 5.86},
-        {"year": 2025, "month": 6, "tariff_cent_kwh": 5.86},
-        {"year": 2025, "month": 7, "tariff_cent_kwh": 5.97},
-        {"year": 2025, "month": 8, "tariff_cent_kwh": 5.89},
-        {"year": 2025, "month": 9, "tariff_cent_kwh": 5.89},
-        {"year": 2025, "month": 10, "tariff_cent_kwh": 6.87},
-        {"year": 2025, "month": 11, "tariff_cent_kwh": 8.70},
-        {"year": 2025, "month": 12, "tariff_cent_kwh": 8.70},
-        {"year": 2026, "month": 1, "tariff_cent_kwh": 7.50},
-        {"year": 2026, "month": 2, "tariff_cent_kwh": 7.10},
-        {"year": 2026, "month": 3, "tariff_cent_kwh": 5.42},
-        {"year": 2026, "month": 4, "tariff_cent_kwh": 5.60},
-        {"year": 2026, "month": 5, "tariff_cent_kwh": 5.90},
-        {"year": 2026, "month": 6, "tariff_cent_kwh": 3.60},
-        {"year": 2026, "month": 7, "tariff_cent_kwh": 6.46}
-    ],
     "scenarios": [
         {
             "id": "fixture_5kwh_fixed",
@@ -40,7 +18,21 @@
                 "battery_max_soc": 100.0,
                 "threshold_power": 0.02,
                 "latitude": 47.404,
-                "longitude": 9.743
+                "longitude": 9.743,
+                "timezone_name": "Europe/Vienna"
+            }
+        },
+        {
+            "id": "entity_test",
+            "label": "Entitäten-Referenzen Test",
+            "settings": {
+                "battery_id": "test_battery",
+                "pv_system_id": "test_pv",
+                "export_tariff_id": "monthly_test",
+                "house_profile_id": "test_home",
+                "latitude": 47.404,
+                "longitude": 9.743,
+                "timezone_name": "Europe/Vienna"
             }
         }
     ]

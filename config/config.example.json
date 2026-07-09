@@ -97,6 +97,37 @@
         "longitude": 10,
         "timezone_name": "Europe/Vienna"
     },
+    "batteries": [
+        {
+            "id": "default_5kwh",
+            "label": "5 kWh Speicher",
+            "battery_capacity_kwh": 5.0,
+            "battery_max_power_kw": 2.5,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05
+        },
+        {
+            "id": "upgrade_10kwh",
+            "label": "10 kWh Speicher",
+            "battery_capacity_kwh": 10.0,
+            "battery_max_power_kw": 5.0,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.02
+        }
+    ],
+    "pv_systems": [
+        {
+            "id": "roof_south",
+            "label": "Dach Süd 10 kWp",
+            "kwp": 10,
+            "pv_tilt": 25,
+            "pv_azimuth": 0
+        }
+    ],
     "planning_horizon": {
         "mode": "sunset_window"
     },

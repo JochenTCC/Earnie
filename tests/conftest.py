@@ -21,6 +21,19 @@ def _apply_default_test_config_env() -> None:
         return
     os.environ["ENERGY_OPTIMIZER_CONFIG_PATH"] = str(DEFAULT_TEST_CONFIG_PATH)
     os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+    bt_dir = DEFAULT_TEST_CONFIG_PATH.parent
+    os.environ.setdefault(
+        "ENERGY_OPTIMIZER_TARIFFS_PATH",
+        str(bt_dir / "tariffs.json"),
+    )
+    os.environ.setdefault(
+        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        str(bt_dir / "house_profiles.json"),
+    )
+    os.environ.setdefault(
+        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        str(bt_dir / "backtesting_scenarios.json"),
+    )
 
 
 _apply_default_test_config_env()

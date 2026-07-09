@@ -1,0 +1,55 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://energy-optimizer.local/house_profiles.schema.json",
+    "title": "Energy Optimizer Hausprofile",
+    "type": "object",
+    "properties": {
+        "profiles": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/profile" }
+        }
+    },
+    "definitions": {
+        "schedule": {
+            "type": "object",
+            "properties": {
+                "runs_per_week": { "type": "integer", "minimum": 0 },
+                "duration_h": { "type": "number", "minimum": 0 },
+                "start_flexibility": { "enum": ["fixed", "day", "any"] }
+            }
+        },
+        "consumer": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+                "id": { "type": "string" },
+                "label": { "type": "string" },
+                "type": { "enum": ["generic", "thermal_annual"] },
+                "nominal_power_kw": { "type": "number" },
+                "annual_kwh": { "type": "number" },
+                "profile_csv": { "type": "string" },
+                "schedule": { "$ref": "#/definitions/schedule" },
+                "living_area_m2": { "type": "number" },
+                "building_class": { "type": "integer", "minimum": 1, "maximum": 4 },
+                "heat_pump_type": { "enum": ["luft", "erde"] },
+                "persons": { "type": "integer", "minimum": 0 },
+                "target_temp_c": { "type": "number" },
+                "heating_limit_c": { "type": "number" }
+            }
+        },
+        "profile": {
+            "type": "object",
+            "required": ["id", "annual_kwh"],
+            "properties": {
+                "id": { "type": "string" },
+                "label": { "type": "string" },
+                "annual_kwh": { "type": "number", "minimum": 0 },
+                "total_profile_csv": { "type": "string" },
+                "consumers": {
+                    "type": "array",
+                    "items": { "$ref": "#/definitions/consumer" }
+                }
+            }
+        }
+    }
+}

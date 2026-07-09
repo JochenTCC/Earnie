@@ -59,6 +59,10 @@ def activate_backtesting_fixtures(monkeypatch):
         "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH": os.environ.get(
             "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH"
         ),
+        "ENERGY_OPTIMIZER_TARIFFS_PATH": os.environ.get("ENERGY_OPTIMIZER_TARIFFS_PATH"),
+        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH": os.environ.get(
+            "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH"
+        ),
         "ENERGY_OPTIMIZER_OFFLINE": os.environ.get("ENERGY_OPTIMIZER_OFFLINE"),
     }
     monkeypatch.setenv(
@@ -68,6 +72,14 @@ def activate_backtesting_fixtures(monkeypatch):
     monkeypatch.setenv(
         "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
         str(fixture_path("backtesting_scenarios.json")),
+    )
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_TARIFFS_PATH",
+        str(fixture_path("tariffs.json")),
+    )
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        str(fixture_path("house_profiles.json")),
     )
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
     config_module.reinit_config()
