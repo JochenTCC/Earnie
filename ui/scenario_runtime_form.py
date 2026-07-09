@@ -19,28 +19,11 @@ from ui.planning_tariff_form import (
     _tariff_meta_caption,
     _type_caption,
 )
-
-
-def _options(items: list[dict], *, allow_none: bool = False) -> tuple[list[str], dict[str, str]]:
-    labels: list[str] = []
-    mapping: dict[str, str] = {}
-    if allow_none:
-        labels.append("— keine —")
-        mapping["— keine —"] = ""
-    for item in items:
-        label = f"{item.get('label', item['id'])} ({item['id']})"
-        labels.append(label)
-        mapping[label] = item["id"]
-    return labels, mapping
-
-
-def _default_label(options: list[str], item_id: str | None) -> int:
-    if not item_id:
-        return 0
-    for index, opt in enumerate(options):
-        if opt.endswith(f"({item_id})"):
-            return index
-    return 0
+from ui.scenario_form_helpers import (
+    lookup_entity_id,
+    options_for_entities,
+    render_entity_selectbox,
+)
 
 
 def render_runtime_scenario_form() -> None:
@@ -61,42 +44,51 @@ def render_runtime_scenario_form() -> None:
         st.warning("Zuerst mindestens eine Batterie unter Tab „Batterien“ anlegen.")
     if not pv_systems:
         st.warning("Zuerst eine PV-Anlage im Hauskonfigurator anlegen.")
+    if not import_tariffs:
+        st.warning("Zuerst mindestens einen Bezugstarif anlegen.")
+    if not export_tariffs:
+        st.warning("Zuerst mindestens einen Einspeisetarif anlegen.")
     if not profiles:
         st.warning("Zuerst ein Hausprofil im Hauskonfigurator anlegen.")
 
-    bat_labels, bat_map = _options(batteries)
-    pv_labels, pv_map = _options(pv_systems, allow_none=True)
-    imp_labels, imp_map = _options(import_tariffs)
-    exp_labels, exp_map = _options(export_tariffs)
-    prof_labels, prof_map = _options(list(profiles.values()))
+    _, bat_map = options_for_entities(batteries)
+    _, pv_map = options_for_entities(pv_systems, allow_none=True)
+    _, imp_map = options_for_entities(import_tariffs)
+    _, exp_map = options_for_entities(export_tariffs)
+    _, prof_map = options_for_entities(list(profiles.values()))
 
-    battery_pick = st.selectbox(
+    required_lists_empty = not (
+        batteries and import_tariffs and export_tariffs and profiles
+    )
+
+    battery_pick = render_entity_selectbox(
         "Batterie",
-        options=bat_labels,
-        index=_default_label(bat_labels, refs.get("battery_id")),
+        batteries,
         key="runtime_battery",
+        current_id=refs.get("battery_id"),
     )
-    pv_pick = st.selectbox(
+    pv_pick = render_entity_selectbox(
         "PV-Anlage",
-        options=pv_labels,
-        index=_default_label(pv_labels, refs.get("pv_system_id")),
+        pv_systems,
+        allow_none=True,
         key="runtime_pv",
+        current_id=refs.get("pv_system_id"),
     )
-    imp_pick = st.selectbox(
+    imp_pick = render_entity_selectbox(
         "Bezugstarif",
-        options=imp_labels,
-        index=_default_label(imp_labels, refs.get("import_tariff_id")),
+        import_tariffs,
         key="runtime_import",
+        current_id=refs.get("import_tariff_id"),
     )
-    exp_pick = st.selectbox(
+    exp_pick = render_entity_selectbox(
         "Einspeisetarif",
-        options=exp_labels,
-        index=_default_label(exp_labels, refs.get("export_tariff_id")),
+        export_tariffs,
         key="runtime_export",
+        current_id=refs.get("export_tariff_id"),
     )
 
-    selected_import = imp_map[imp_pick]
-    selected_export = exp_map[exp_pick]
+    selected_import = lookup_entity_id(imp_map, imp_pick)
+    selected_export = lookup_entity_id(exp_map, exp_pick)
     if selected_import:
         import_tariff = next(t for t in import_tariffs if t["id"] == selected_import)
         st.caption(
@@ -110,14 +102,14 @@ def render_runtime_scenario_form() -> None:
             + (f" · {_tariff_meta_caption(export_tariff)}" if _tariff_meta_caption(export_tariff) else "")
         )
 
-    prof_pick = st.selectbox(
+    prof_pick = render_entity_selectbox(
         "Hausprofil",
-        options=prof_labels,
-        index=_default_label(prof_labels, refs.get("house_profile_id")),
+        list(profiles.values()),
         key="runtime_profile",
+        current_id=refs.get("house_profile_id"),
     )
 
-    selected_profile_id = prof_map[prof_pick]
+    selected_profile_id = lookup_entity_id(prof_map, prof_pick)
     selected_profile = profiles.get(selected_profile_id, {})
     if (
         selected_profile_id
@@ -147,13 +139,13 @@ def render_runtime_scenario_form() -> None:
         key="runtime_lon",
     )
 
-    if st.button("Auflösung testen", key="runtime_preview"):
+    if st.button("Auflösung testen", key="runtime_preview", disabled=required_lists_empty):
         draft = _build_runtime_settings(
-            battery_id=bat_map[battery_pick],
-            pv_system_id=pv_map[pv_pick],
-            import_tariff_id=imp_map[imp_pick],
-            export_tariff_id=exp_map[exp_pick],
-            house_profile_id=prof_map[prof_pick],
+            battery_id=lookup_entity_id(bat_map, battery_pick),
+            pv_system_id=lookup_entity_id(pv_map, pv_pick),
+            import_tariff_id=lookup_entity_id(imp_map, imp_pick),
+            export_tariff_id=lookup_entity_id(exp_map, exp_pick),
+            house_profile_id=lookup_entity_id(prof_map, prof_pick),
             latitude=latitude,
             longitude=longitude,
         )
@@ -163,20 +155,25 @@ def render_runtime_scenario_form() -> None:
         except ValueError as exc:
             st.error(str(exc))
 
-    if st.button("Runtime speichern", type="primary", key="runtime_save"):
-        if not bat_map[battery_pick]:
+    if st.button(
+        "Runtime speichern",
+        type="primary",
+        key="runtime_save",
+        disabled=required_lists_empty,
+    ):
+        if not lookup_entity_id(bat_map, battery_pick):
             st.error("Batterie auswählen.")
-        elif not imp_map[imp_pick] or not exp_map[exp_pick]:
+        elif not lookup_entity_id(imp_map, imp_pick) or not lookup_entity_id(exp_map, exp_pick):
             st.error("Bezugs- und Einspeisetarif auswählen.")
-        elif not prof_map[prof_pick]:
+        elif not lookup_entity_id(prof_map, prof_pick):
             st.error("Hausprofil auswählen.")
         else:
             save_runtime_scenario_refs(
-                battery_id=bat_map[battery_pick],
-                pv_system_id=pv_map[pv_pick],
-                import_tariff_id=imp_map[imp_pick],
-                export_tariff_id=exp_map[exp_pick],
-                house_profile_id=prof_map[prof_pick],
+                battery_id=lookup_entity_id(bat_map, battery_pick),
+                pv_system_id=lookup_entity_id(pv_map, pv_pick),
+                import_tariff_id=lookup_entity_id(imp_map, imp_pick),
+                export_tariff_id=lookup_entity_id(exp_map, exp_pick),
+                house_profile_id=lookup_entity_id(prof_map, prof_pick),
                 latitude=latitude,
                 longitude=longitude,
                 timezone_name=str(refs.get("timezone_name", "Europe/Vienna")),

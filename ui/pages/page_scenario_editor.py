@@ -22,6 +22,11 @@ from ui.planning_tariff_form import (
     _tariff_meta_caption,
     _type_caption,
 )
+from ui.scenario_form_helpers import (
+    lookup_entity_id,
+    options_for_entities,
+    render_entity_selectbox,
+)
 from ui.scenario_runtime_form import render_runtime_scenario_form
 
 _HELP = (
@@ -29,28 +34,6 @@ _HELP = (
     "Backtesting-Varianten. Speichert Runtime nach `config.json`, "
     "weitere Szenarien nach `config/backtesting_scenarios.json`."
 )
-
-
-def _options(items: list[dict], *, allow_none: bool = True) -> tuple[list[str], dict[str, str]]:
-    labels: list[str] = []
-    mapping: dict[str, str] = {}
-    if allow_none:
-        labels.append("— keine —")
-        mapping["— keine —"] = ""
-    for item in items:
-        label = f"{item.get('label', item['id'])} ({item['id']})"
-        labels.append(label)
-        mapping[label] = item["id"]
-    return labels, mapping
-
-
-def _default_label(options: list[str], item_id: str | None) -> int:
-    if not item_id:
-        return 0
-    for index, opt in enumerate(options):
-        if opt.endswith(f"({item_id})"):
-            return index
-    return 0
 
 
 def _render_additional_scenarios_tab() -> None:
@@ -87,38 +70,44 @@ def _render_additional_scenarios_tab() -> None:
     export_tariffs = list_export_tariffs()
     profiles = load_house_profiles().get("profiles", {})
 
-    bat_labels, bat_map = _options(batteries)
-    pv_labels, pv_map = _options(pv_systems)
-    imp_labels, imp_map = _options(import_tariffs)
-    exp_labels, exp_map = _options(export_tariffs)
-    prof_labels, prof_map = _options(list(profiles.values()))
+    _, bat_map = options_for_entities(batteries, allow_none=True)
+    _, pv_map = options_for_entities(pv_systems, allow_none=True)
+    _, imp_map = options_for_entities(import_tariffs, allow_none=True)
+    _, exp_map = options_for_entities(export_tariffs, allow_none=True)
+    _, prof_map = options_for_entities(list(profiles.values()), allow_none=True)
 
-    battery_pick = st.selectbox(
+    required_lists_empty = not (import_tariffs and export_tariffs and profiles)
+
+    battery_pick = render_entity_selectbox(
         "Batterie",
-        options=bat_labels,
-        index=_default_label(bat_labels, settings.get("battery_id")),
+        batteries,
+        allow_none=True,
         key="scenario_battery",
+        current_id=settings.get("battery_id"),
     )
-    pv_pick = st.selectbox(
+    pv_pick = render_entity_selectbox(
         "PV-Anlage",
-        options=pv_labels,
-        index=_default_label(pv_labels, settings.get("pv_system_id")),
+        pv_systems,
+        allow_none=True,
         key="scenario_pv",
+        current_id=settings.get("pv_system_id"),
     )
-    imp_pick = st.selectbox(
+    imp_pick = render_entity_selectbox(
         "Bezugstarif",
-        options=imp_labels,
-        index=_default_label(imp_labels, settings.get("import_tariff_id")),
+        import_tariffs,
+        allow_none=True,
         key="scenario_import",
+        current_id=settings.get("import_tariff_id"),
     )
-    exp_pick = st.selectbox(
+    exp_pick = render_entity_selectbox(
         "Einspeisetarif",
-        options=exp_labels,
-        index=_default_label(exp_labels, settings.get("export_tariff_id")),
+        export_tariffs,
+        allow_none=True,
         key="scenario_export",
+        current_id=settings.get("export_tariff_id"),
     )
-    selected_import = imp_map[imp_pick]
-    selected_export = exp_map[exp_pick]
+    selected_import = lookup_entity_id(imp_map, imp_pick)
+    selected_export = lookup_entity_id(exp_map, exp_pick)
     if selected_import:
         import_tariff = next(t for t in import_tariffs if t["id"] == selected_import)
         st.caption(
@@ -148,11 +137,12 @@ def _render_additional_scenarios_tab() -> None:
                 key="scenario_netzentgelt",
             )
 
-    prof_pick = st.selectbox(
+    prof_pick = render_entity_selectbox(
         "Hausprofil",
-        options=prof_labels,
-        index=_default_label(prof_labels, settings.get("house_profile_id")),
+        list(profiles.values()),
+        allow_none=True,
         key="scenario_profile",
+        current_id=settings.get("house_profile_id"),
     )
 
     runtime = config.CONFIG._raw_config.get("runtime_settings", {})
@@ -168,13 +158,13 @@ def _render_additional_scenarios_tab() -> None:
         key="scenario_lon",
     )
 
-    if st.button("Auflösung testen", key="scenario_preview"):
+    if st.button("Auflösung testen", key="scenario_preview", disabled=required_lists_empty):
         draft = _build_settings(
-            battery_id=bat_map[battery_pick],
-            pv_system_id=pv_map[pv_pick],
-            import_tariff_id=imp_map[imp_pick],
-            export_tariff_id=exp_map[exp_pick],
-            house_profile_id=prof_map[prof_pick],
+            battery_id=lookup_entity_id(bat_map, battery_pick),
+            pv_system_id=lookup_entity_id(pv_map, pv_pick),
+            import_tariff_id=lookup_entity_id(imp_map, imp_pick),
+            export_tariff_id=lookup_entity_id(exp_map, exp_pick),
+            house_profile_id=lookup_entity_id(prof_map, prof_pick),
             latitude=latitude,
             longitude=longitude,
             netzentgelt_cent_kwh_override=netzentgelt_override,
@@ -185,7 +175,12 @@ def _render_additional_scenarios_tab() -> None:
         except ValueError as exc:
             st.error(str(exc))
 
-    if st.button("Szenario speichern", type="primary", key="scenario_save"):
+    if st.button(
+        "Szenario speichern",
+        type="primary",
+        key="scenario_save",
+        disabled=required_lists_empty,
+    ):
         if not scenario_id.strip():
             st.error("Szenario-ID fehlt.")
         elif scenario_id.strip() == "runtime_settings":
@@ -196,11 +191,11 @@ def _render_additional_scenarios_tab() -> None:
                     "id": scenario_id.strip(),
                     "label": label.strip() or scenario_id.strip(),
                     "settings": _build_settings(
-                        battery_id=bat_map[battery_pick],
-                        pv_system_id=pv_map[pv_pick],
-                        import_tariff_id=imp_map[imp_pick],
-                        export_tariff_id=exp_map[exp_pick],
-                        house_profile_id=prof_map[prof_pick],
+                        battery_id=lookup_entity_id(bat_map, battery_pick),
+                        pv_system_id=lookup_entity_id(pv_map, pv_pick),
+                        import_tariff_id=lookup_entity_id(imp_map, imp_pick),
+                        export_tariff_id=lookup_entity_id(exp_map, exp_pick),
+                        house_profile_id=lookup_entity_id(prof_map, prof_pick),
                         latitude=latitude,
                         longitude=longitude,
                         netzentgelt_cent_kwh_override=netzentgelt_override,

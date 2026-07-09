@@ -307,6 +307,66 @@ def test_seed_profile_widget_state_uses_existing_annual_kwh():
     assert session["schuetzenstrasse_7c__house_profile_label"] == "EFH"
 
 
+def test_seed_pv_widget_state_uses_existing_kwp():
+    class _Session(dict):
+        pass
+
+    session = _Session()
+    existing = {
+        "label": "Dach Süd",
+        "pv_kwp": 6.0,
+        "pv_tilt": 18,
+        "pv_azimuth": 26,
+    }
+    import ui.planning_pv_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        form._seed_pv_widget_state(
+            "dach_sued",
+            existing,
+            profiles={},
+            default_profile={},
+        )
+    finally:
+        form.st.session_state = original
+
+    assert session["dach_sued__planning_pv_kwp"] == 6.0
+    assert session["dach_sued__planning_pv_label"] == "Dach Süd"
+    assert session["dach_sued__planning_pv_tilt"] == 18
+    assert session["dach_sued__planning_pv_azimuth"] == 26
+
+
+def test_seed_battery_widget_state_uses_existing_capacity():
+    class _Session(dict):
+        pass
+
+    session = _Session()
+    existing = {
+        "label": "Speicher 8kWh",
+        "battery_capacity_kwh": 8.0,
+        "battery_max_power_kw": 4.0,
+        "battery_efficiency": 0.95,
+        "battery_min_soc": 15.0,
+        "battery_max_soc": 95.0,
+        "threshold_power": 0.08,
+    }
+    import ui.planning_battery_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        form._seed_battery_widget_state("speicher_8kwh", existing)
+    finally:
+        form.st.session_state = original
+
+    assert session["speicher_8kwh__planning_battery_capacity"] == 8.0
+    assert session["speicher_8kwh__planning_battery_label"] == "Speicher 8kWh"
+    assert session["speicher_8kwh__planning_battery_power"] == 4.0
+    assert session["speicher_8kwh__planning_battery_threshold"] == 8.0
+
+
 def test_upsert_thermal_profile_roundtrip(tmp_path):
     path = tmp_path / "house_profiles.json"
     save_house_profiles_document(
