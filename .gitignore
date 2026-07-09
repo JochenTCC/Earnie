@@ -22,6 +22,7 @@ optimizer_run_state.json
 !tests/fixtures/prod_dumps/**/optimizer_run_state.json
 runtime/*
 !runtime/local_settings.example.json
+greenfield/
 runtime-prod/
 backtesting_log.json
 backtesting_cbc_events.jsonl

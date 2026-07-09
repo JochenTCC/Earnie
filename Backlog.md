@@ -71,7 +71,7 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Phasen:** P1 Datenmodell → P2 UI → P3 Jahres- und Stundenprofil → P4 Tests.
 
-**Abnahme:** Hausprofil mit mind. einem `ev`-Verbraucher speichern; Grundlast-Vorschau plausibel; `build_hourly_kw_profile` liefert stündliches Ladezeitfenster-Profil; pytest grün.
+**Abnahme:** Hausprofil mit mind. einem `ev`-Verbraucher speichern; Grundlast-Vorschau plausibel; `build_hourly_kw_profile` liefert stündliches Ladezeitfenster-Profil; pytest grün; manuelle UI-Prüfung auf Greenfield-Dev-Stack (**1.24.c**).
 
 - [ ] **P1 — Datenmodell `ev`** (`config/house_profiles.json`)
   - Typ `ev` in [`house_profiles.schema.json`](config/house_profiles.schema.json) und [`profiles_store.py`](house_config/profiles_store.py)
@@ -264,11 +264,25 @@ Validierung quer über alle Phasen: **Nachrechnung „Historischer Tag“** (0.+
 
 ## Packaging & Deployment
 
-Empfohlene Reihenfolge offen: **7e**
+Empfohlene Reihenfolge offen: **7e** → **7g**
 
 - [x] **7a–7d** — pyproject, Bootstrap, Build-Pipeline, Streamlit extern ([container.md](docs/einrichtung/container.md))
-- [x] **7f** — Loxberry-Container Multi-Arch ([container.md](docs/einrichtung/container.md), `docker-compose-loxberry.yml`)
 - [ ] **7e — Prod/Dev-Datensync** — Skript runtime/ + CSVs; dokumentierter Ablauf Dev ↔ Prod
+- [ ] **7g — Lokale Dev-Stacks (Staging, ab 1.25)**
+
+  **Scope:** Weitere Container-Stacks auf dem **lokalen Dev-PC** — **nicht** Greenfield (**1.24.c**) und **nicht** pytest-Fixtures (`Version 2.+1 — Test-Config entkoppeln`) und **nicht** Datensync (`7e`). `config/` bleibt bei Image-Updates unangetastet.
+
+  **Phasen:** 7g-a Silent (Prod-Loxone) → 7g-b Simuliert (später).
+
+  **Abnahme:** Silent-Stack liest produktive Loxone-Instanz, schreibt nicht (`loxone_silent_mode: true`); Simuliert-Stack erst nach Loxone-Simulator.
+
+  - [ ] **7g-a — Silent-Stack** (Prod-Loxone, deploy-sicher)
+    - Eigener Compose-Ordner: separate `config/` + `runtime/`, abweichende `container_name` und UI-Port
+    - `runtime/local_settings.json`: `loxone_silent_mode: true` — Lesezugriff auf **produktive Loxone-Instanz**, keine Schreibzugriffe auf Miniserver/Huawei/Verbraucher
+    - Prod-`config.json` als Vorlage oder per `ENERGY_OPTIMIZER_CONFIG_PATH`; Image-Updates (`pull`/`up -d`) überschreiben bestehende `config/` nicht
+  - [ ] **7g-b — Simuliert-Stack** (Follow-up, nach Loxone-Simulator)
+    - Eigener Stack ohne echte Loxone-Anbindung; vollständig synthetisches „Haus“ (Signale, Verbraucher, ggf. Backtesting-Fixtures)
+    - Voraussetzung: Loxone-Simulator verfügbar — bis dahin offen lassen
 
 ## Referenz
 

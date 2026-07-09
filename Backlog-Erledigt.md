@@ -2,6 +2,12 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 1.24.c — Greenfield Dev-Stack (2026-07-09)
+
+- [x] **P1 — Greenfield-Compose** — `docker-compose-greenfield.yml` mit `greenfield/config` + `greenfield/runtime`, Container `ernie-greenfield-*`, UI-Port **8502**, Loxone-Verify aus
+- [x] **P2 — Abnahme-Hilfen** — Checkliste in [`docs/einrichtung/greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md); Smoke-Test `tests/test_greenfield_bootstrap.py` (ohne Fixture-Snapshot `tests/fixtures/greenfield/`)
+- [x] **Follow-up beim Durchspielen** — `Dockerfile`: `share/config/` um Tarife-, Hausprofile- und Backtesting-Szenario-Vorlagen ergänzt (Bootstrap auf leerem Volume)
+
 ### Bugfix Chart 1 PV-Linie = Ist (forecast_pv nach Overlay) (2026-07-08)
 
 - [x] **`forecast_pv_kw` vor Live-Overlay loggen** — `main.py` speichert Forecast.Solar-Wert, nicht `consumption_snapshot.pv_kw`; Chart-Linie vs. Ist-Balken unterscheidbar

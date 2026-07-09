@@ -46,6 +46,9 @@ Die App liest diese Dateien **read-only** für Panels und Abgleich.
 | `ENERGY_OPTIMIZER_CONFIG_PATH` | Pfad zur `config.json` (Standard: `config/config.json`, Legacy: `config.json` im Root) |
 | `ENERGY_OPTIMIZER_RUNTIME_DIR` | Anderes Verzeichnis für Laufzeitdaten |
 | `ENERGY_OPTIMIZER_UI_MODES` | Kommagetrennt: `sunset2sunset`, `backtesting` — schränkt sichtbare App-Modi ein (Prod: `sunset2sunset,backtesting`; siehe [Betriebsmodi](../ui/betriebsmodi.md)) |
+| `ENERGY_OPTIMIZER_UI_STREAMLIT_PORT` | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md)) |
+
+Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).
 
 ## Typische Betriebsfehler
 

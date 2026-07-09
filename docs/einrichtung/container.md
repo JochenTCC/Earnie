@@ -1,5 +1,7 @@
 # Container-Betrieb (Synology / LoxBerry / Docker)
 
+**Streamlit-Ports aller Stacks:** [streamlit-ports.md](../referenz/streamlit-ports.md)
+
 ## Persistente Daten
 
 Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Updates:
@@ -135,6 +137,10 @@ docker compose up -d
 ```
 
 Nutzt `docker-compose.yml` mit lokalem Build und denselben Mounts (`config/`, `runtime/`).
+
+### Greenfield Dev-Stack (Ersteinrichtung)
+
+Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port **8502**, getrennte Container-Namen): [greenfield-dev-stack.md](greenfield-dev-stack.md) und `docker-compose-greenfield.yml`.
 
 ## LoxBerry (RPi 4B, arm64)
 

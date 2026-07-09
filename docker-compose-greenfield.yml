@@ -1,0 +1,48 @@
+# Greenfield Dev-Stack (1.24.c) — Ersteinrichtung auf leerem config/ + runtime/
+#
+# Abnahme-Infrastruktur für Hauskonfigurator und Backtesting ohne produktive Loxone-Anbindung.
+# Getrennt vom lokalen Dev-Stack (docker-compose.yml) und von Silent/Simuliert (Backlog 7g).
+#
+# Erststart:
+#   mkdir greenfield\config greenfield\runtime
+#   docker compose -f docker-compose-greenfield.yml up -d --build
+#
+# UI: http://localhost:8502 — Ersteinrichtung (setup_dotenv), danach Backtesting + Hauskonfigurator.
+# Checkliste: docs/einrichtung/greenfield-dev-stack.md
+#
+# Stack stoppen (Daten bleiben in greenfield/):
+#   docker compose -f docker-compose-greenfield.yml down
+
+version: "3.8"
+
+x-persist-volumes: &persist-volumes
+  - ./greenfield/config:/app/config
+  - ./greenfield/runtime:/app/runtime
+
+x-common-env: &common-env
+  TZ: Europe/Vienna
+  ENERGY_OPTIMIZER_CONFIG_PATH: config/config.json
+  # Kein Loxone-Smoke-Test — Greenfield nutzt Dummy-Zugangsdaten aus der Ersteinrichtung.
+  ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START: "0"
+
+services:
+  optimizer-worker:
+    build: .
+    container_name: ernie-greenfield-worker
+    command: python main.py
+    restart: unless-stopped
+    volumes: *persist-volumes
+    environment:
+      <<: *common-env
+
+  optimizer-ui:
+    build: .
+    container_name: ernie-greenfield-ui
+    command: python -m scripts.run_streamlit
+    restart: unless-stopped
+    ports:
+      - "8502:8501"
+    volumes: *persist-volumes
+    environment:
+      <<: *common-env
+      ENERGY_OPTIMIZER_UI_MODES: backtesting

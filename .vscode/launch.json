@@ -10,31 +10,38 @@
       "justMyCode": false
     },
     {
-      "name": "Streamlit app.py",
+      "name": "Streamlit app.py (:8501 lokal)",
       "type": "python",
       "request": "launch",
       "module": "scripts.run_streamlit",
       "console": "integratedTerminal",
+      "env": {
+        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
+      },
       "justMyCode": false
     },
     {
-      "name": "Streamlit app.py (nach 15s)",
+      "name": "Streamlit app.py (nach 15s, :8501)",
       "type": "python",
       "request": "launch",
       "preLaunchTask": "wait: 15s vor Streamlit",
       "module": "scripts.run_streamlit",
       "console": "integratedTerminal",
+      "env": {
+        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
+      },
       "justMyCode": false
     },
     {
-      "name": "Streamlit app.py (NAS Produktiv-Log)",
+      "name": "Streamlit app.py (NAS :8503)",
       "type": "python",
       "request": "launch",
       "module": "scripts.run_streamlit",
       "cwd": "${workspaceFolder}",
       "env": {
         "ENERGY_OPTIMIZER_RUNTIME_DIR": "\\\\DS-KO-DO-2\\docker\\energy_optimizer\\runtime",
-        "ENERGY_OPTIMIZER_CONFIG_PATH": "\\\\DS-KO-DO-2\\docker\\energy_optimizer\\config\\config.json"
+        "ENERGY_OPTIMIZER_CONFIG_PATH": "\\\\DS-KO-DO-2\\docker\\energy_optimizer\\config\\config.json",
+        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8503"
       },
       "console": "integratedTerminal",
       "justMyCode": false
@@ -47,7 +54,8 @@
       "module": "scripts.run_streamlit",
       "cwd": "${workspaceFolder}",
       "env": {
-        "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/runtime"
+        "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/runtime",
+        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
       },
       "console": "integratedTerminal",
       "justMyCode": false
@@ -60,7 +68,8 @@
       "module": "scripts.run_streamlit",
       "cwd": "${workspaceFolder}",
       "env": {
-        "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/runtime"
+        "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/runtime",
+        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
       },
       "console": "integratedTerminal",
       "justMyCode": false
@@ -90,10 +99,10 @@
   ],
   "compounds": [
     {
-      "name": "main.py + Streamlit app.py",
+      "name": "main.py + Streamlit (:8501 lokal)",
       "configurations": [
         "main.py",
-        "Streamlit app.py (nach 15s)"
+        "Streamlit app.py (nach 15s, :8501)"
       ],
       "stopAll": true
     }
