@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -343,6 +344,31 @@ class TestSharedMeterSubtraction:
         assert live.kw["swimspa"] == 0.0
         assert live.chart_kw["swimspa_filter"] == 0.18
         assert live.chart_kw["swimspa"] == 0.0
+
+    def test_native_filter_inferred_at_sub_nominal_meter_reading(self):
+        """Prod-Dump 2026-07-09 12:05: Gesamtzähler ~0,15 kW, Toleranz ±0,05."""
+        reads = self._reads(
+            {
+                "Ernie_Swim-Spa-P_act": 0.15,
+                "homie_bwa_spa_filter2": 0.0,
+                "homie_bwa_spa_filter1": 0.0,
+            }
+        )
+        filter_contexts = {
+            "swimspa_filter": {
+                "native_start_hour": 10,
+                "native_duration_hours": 4.0,
+            }
+        }
+        slot = datetime(2026, 7, 9, 12, 5, tzinfo=ZoneInfo("Europe/Vienna"))
+        with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
+            live = lc.resolve_flexible_consumers_live_power(
+                consumers=self._consumers(),
+                filter_contexts=filter_contexts,
+                slot_datetime=slot,
+            )
+        assert live.kw["swimspa_filter"] == 0.18
+        assert live.kw["swimspa"] == 0.0
 
     def test_chart_kw_omits_milp_fallback_when_meter_missing(self):
         reads = self._reads(

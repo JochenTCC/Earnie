@@ -307,10 +307,10 @@ def render_live_power_flow(current_soc: float) -> None:
         if age is not None and age <= produktiv.PRODUKTIV_RUN_FRESH_SEC:
             snapshot = main_state["consumption_snapshot"]
         else:
-            flex_kw = loxone_client.fetch_flexible_consumers_live_kw()
+            flex_kw = live_consumption.fetch_live_flex_kw_for_ui(main_state)
             snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
     else:
-        flex_kw = loxone_client.fetch_flexible_consumers_live_kw()
+        flex_kw = live_consumption.fetch_live_flex_kw_for_ui(main_state)
         snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
 
     fig = _create_live_flow_sankey(

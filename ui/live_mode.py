@@ -192,7 +192,7 @@ def _live_optimization_prepare_fragment(current_soc: float) -> None:
             snapshot = main_state["consumption_snapshot"]
 
     if snapshot is None:
-        snapshot = live_consumption.fetch_live_consumption_snapshot()
+        snapshot = live_consumption.fetch_live_consumption_snapshot(main_state)
 
     if snapshot:
         matrix = live_consumption.apply_live_snapshot_to_matrix(matrix, snapshot, hour_index=0)

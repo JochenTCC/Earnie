@@ -7,11 +7,17 @@ from __future__ import annotations
 
 import copy
 import logging
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
+import config
 from integrations import loxone_client
+from optimizer.filter_context import filter_schedule_enabled
 
 logger = logging.getLogger(__name__)
+
+_UI_TIMEZONE = ZoneInfo("Europe/Vienna")
 
 
 def build_consumption_snapshot(
@@ -33,14 +39,62 @@ def build_consumption_snapshot(
     }
 
 
-def fetch_live_consumption_snapshot() -> dict[str, Any] | None:
+def _ui_slot_datetime() -> datetime:
+    """Aktueller Zeitpunkt für Live-UI (Filter-Inferenz im nativen Fenster)."""
+    return datetime.now(tz=_UI_TIMEZONE)
+
+
+def _filter_contexts_from_config_fallback() -> dict[str, dict]:
+    """Minimale Fenster-Infos aus config_fallback, wenn run_state keine hat."""
+    contexts: dict[str, dict] = {}
+    for consumer in config.get_flexible_consumers():
+        if not filter_schedule_enabled(consumer):
+            continue
+        fallback = (consumer.get("filter_schedule") or {}).get("config_fallback") or {}
+        start = fallback.get("native_start_hour")
+        duration = fallback.get("native_duration_hours")
+        if start is None or duration is None:
+            continue
+        contexts[consumer["id"]] = {
+            "native_start_hour": float(start),
+            "native_duration_hours": float(duration),
+            "source_label": "config_fallback",
+        }
+    return contexts
+
+
+def filter_contexts_for_ui(main_state: dict[str, Any] | None) -> dict[str, dict] | None:
+    """Filter-Fenster für Live-UI: run_state oder config_fallback."""
+    if main_state:
+        stored = main_state.get("filter_contexts")
+        if stored:
+            return stored
+    fallback = _filter_contexts_from_config_fallback()
+    return fallback or None
+
+
+def fetch_live_flex_kw_for_ui(main_state: dict[str, Any] | None = None) -> dict[str, float]:
+    """
+    Flex-Leistungen für Sankey/Live-UI mit Filter-Inferenz (Fall B).
+
+    Nutzt filter_contexts aus dem letzten Produktiv-Lauf oder config_fallback.
+    """
+    return loxone_client.resolve_flexible_consumers_live_power(
+        filter_contexts=filter_contexts_for_ui(main_state),
+        slot_datetime=_ui_slot_datetime(),
+    ).kw
+
+
+def fetch_live_consumption_snapshot(
+    main_state: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     """
     Aktueller Verbrauchs-Snapshot: Haus gesamt, Grundlast, Flex je id, PV/Netz/Batterie.
     """
     live_power = loxone_client.fetch_loxone_live_power()
     if live_power is None:
         return None
-    flex_kw = loxone_client.fetch_flexible_consumers_live_kw()
+    flex_kw = fetch_live_flex_kw_for_ui(main_state)
     return build_consumption_snapshot(live_power, flex_kw)
 
 
