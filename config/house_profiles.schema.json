@@ -15,7 +15,26 @@
             "properties": {
                 "runs_per_week": { "type": "integer", "minimum": 0 },
                 "duration_h": { "type": "number", "minimum": 0 },
-                "start_flexibility": { "enum": ["fixed", "day", "any"] }
+                "start_hour": { "type": "integer", "minimum": 0, "maximum": 23 },
+                "start_shift_h": { "type": "number", "minimum": 0, "maximum": 12 }
+            }
+        },
+        "day_schedule": {
+            "type": "object",
+            "properties": {
+                "car_available_from_hour": { "type": "integer", "minimum": 0, "maximum": 23 },
+                "ready_by_hour": { "type": "integer", "minimum": 0, "maximum": 23 },
+                "daily_rest_soc": { "type": "number", "minimum": 0, "maximum": 100 }
+            }
+        },
+        "ev_charging_schedule": {
+            "type": "object",
+            "properties": {
+                "target_soc_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+                "charging_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+                "forecast_when_absent": { "type": "boolean" },
+                "weekday": { "$ref": "#/definitions/day_schedule" },
+                "weekend": { "$ref": "#/definitions/day_schedule" }
             }
         },
         "consumer": {
@@ -24,11 +43,15 @@
             "properties": {
                 "id": { "type": "string" },
                 "label": { "type": "string" },
-                "type": { "enum": ["generic", "thermal_annual"] },
+                "type": { "enum": ["generic", "thermal_annual", "ev"] },
                 "nominal_power_kw": { "type": "number" },
                 "annual_kwh": { "type": "number" },
                 "profile_csv": { "type": "string" },
                 "schedule": { "$ref": "#/definitions/schedule" },
+                "min_power_kw": { "type": "number", "minimum": 0 },
+                "min_on_quarterhours": { "type": "integer", "minimum": 0 },
+                "battery_capacity_kwh": { "type": "number", "exclusiveMinimum": 0 },
+                "charging_schedule": { "$ref": "#/definitions/ev_charging_schedule" },
                 "living_area_m2": { "type": "number" },
                 "building_class": { "type": "integer", "minimum": 1, "maximum": 4 },
                 "hwb_kwh_m2": {

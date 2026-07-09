@@ -13,7 +13,14 @@ from ui.house_config_io import (
     get_planning_tariff_selection,
     save_planning_tariff_selection,
     upsert_battery,
+    upsert_house_profile,
     upsert_pv_system,
+)
+from ui.house_config_profile_form import (
+    _consumer_type_options,
+    _default_additional_consumer,
+    _default_consumer,
+    _profile_session_scope,
 )
 
 
@@ -198,3 +205,101 @@ def test_house_profile_hwb_normalization(tmp_path):
     doc = load_house_profiles_document(str(path))
     thermal = doc["profiles"]["home"]["consumers"][0]["thermal"]
     assert thermal["hwb_kwh_m2"] == 62.0
+
+
+def test_default_consumer_is_thermal():
+    consumer = _default_consumer()
+    assert consumer["type"] == "thermal_annual"
+    assert consumer["label"] == "Haus Wärme"
+    assert consumer["living_area_m2"] == 120.0
+
+
+def test_default_additional_consumer_is_generic():
+    consumer = _default_additional_consumer()
+    assert consumer["type"] == "generic"
+    assert consumer["label"] == "Verbraucher"
+    assert "schedule" in consumer
+
+
+def test_consumer_type_options_thermal_only_on_first():
+    assert "thermal_annual" in _consumer_type_options(0)
+    assert "thermal_annual" not in _consumer_type_options(1)
+    assert _consumer_type_options(1) == ["generic", "ev"]
+
+
+def test_profile_rejects_thermal_on_second_consumer(tmp_path):
+    path = tmp_path / "house_profiles.json"
+    path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home",
+                        "annual_kwh": 5000,
+                        "consumers": [
+                            {"id": "heat", "type": "generic", "annual_kwh": 1000},
+                            {
+                                "id": "heat2",
+                                "type": "thermal_annual",
+                                "living_area_m2": 100,
+                            },
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="Verbraucher 1"):
+        load_house_profiles_document(str(path))
+    assert _profile_session_scope("— neu —", is_new=True) == "__new__"
+    assert _profile_session_scope("example_efh", is_new=False) == "example_efh"
+
+
+def test_upsert_two_consumers_roundtrip(tmp_path, monkeypatch):
+    config_dir = _bind_paths(tmp_path, monkeypatch)
+    path = config_dir / "house_profiles.json"
+    upsert_house_profile(
+        {
+            "id": "home",
+            "label": "Test",
+            "annual_kwh": 8000.0,
+            "consumers": [
+                {
+                    "id": "pool",
+                    "label": "Pool",
+                    "type": "generic",
+                    "nominal_power_kw": 2.0,
+                    "annual_kwh": 1200.0,
+                },
+                {
+                    "id": "ev",
+                    "label": "E-Auto",
+                    "type": "ev",
+                    "nominal_power_kw": 3.5,
+                    "min_power_kw": 1.4,
+                    "min_on_quarterhours": 4,
+                    "battery_capacity_kwh": 60.0,
+                    "charging_schedule": {
+                        "target_soc_percent": 100.0,
+                        "charging_efficiency": 0.95,
+                        "forecast_when_absent": True,
+                        "weekday": {
+                            "car_available_from_hour": 18,
+                            "ready_by_hour": 7,
+                            "daily_rest_soc": 40.0,
+                        },
+                        "weekend": {
+                            "car_available_from_hour": 20,
+                            "ready_by_hour": 9,
+                            "daily_rest_soc": 30.0,
+                        },
+                    },
+                },
+            ],
+        }
+    )
+    doc = load_house_profiles_document(str(path))
+    consumers = doc["profiles"]["home"]["consumers"]
+    assert len(consumers) == 2
+    assert {consumer["id"] for consumer in consumers} == {"pool", "ev"}

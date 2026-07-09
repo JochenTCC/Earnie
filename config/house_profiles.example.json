@@ -21,13 +21,25 @@
                 {
                     "id": "ev",
                     "label": "E-Auto",
-                    "type": "generic",
+                    "type": "ev",
                     "nominal_power_kw": 3.5,
-                    "annual_kwh": 2500,
-                    "schedule": {
-                        "runs_per_week": 7,
-                        "duration_h": 3,
-                        "start_flexibility": "day"
+                    "min_power_kw": 1.4,
+                    "min_on_quarterhours": 4,
+                    "battery_capacity_kwh": 60.0,
+                    "charging_schedule": {
+                        "target_soc_percent": 100.0,
+                        "charging_efficiency": 0.95,
+                        "forecast_when_absent": true,
+                        "weekday": {
+                            "car_available_from_hour": 18,
+                            "ready_by_hour": 7,
+                            "daily_rest_soc": 40.0
+                        },
+                        "weekend": {
+                            "car_available_from_hour": 20,
+                            "ready_by_hour": 9,
+                            "daily_rest_soc": 30.0
+                        }
                     }
                 }
             ]

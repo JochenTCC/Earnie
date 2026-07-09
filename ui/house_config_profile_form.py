@@ -3,12 +3,156 @@ from __future__ import annotations
 
 import streamlit as st
 
+from house_config.generic_schedule import (
+    DEFAULT_START_HOUR,
+    MAX_START_SHIFT_H,
+    format_start_window_caption,
+    generic_annual_kwh,
+    migrate_start_flexibility,
+)
 from house_config.id_slug import slug_id
 from house_config.thermal_labels import (
     CONSUMER_TYPE_LABELS,
     building_class_option_label,
 )
 from ui.house_config_io import load_house_profiles, preview_baseload, upsert_house_profile
+
+CONSUMER_TYPE_OPTIONS = ["generic", "thermal_annual", "ev"]
+_SESSION_SYNC_KEY = "house_profile_sync_id"
+_SESSION_CONSUMERS_KEY = "house_profile_consumers"
+_SESSION_SELECT_PENDING_KEY = "house_profile_select_pending"
+
+
+def _default_consumer() -> dict:
+    return {
+        "label": "Haus Wärme",
+        "type": "thermal_annual",
+        "nominal_power_kw": 3.5,
+        "living_area_m2": 120.0,
+        "building_class": 3,
+        "heat_pump_type": "luft",
+        "persons": 2,
+    }
+
+
+def _default_additional_consumer() -> dict:
+    return {
+        "label": "Verbraucher",
+        "type": "generic",
+        "nominal_power_kw": 1.0,
+        "schedule": {
+            "runs_per_week": 0,
+        },
+    }
+
+
+def _schedule_defaults(sched: dict) -> dict:
+    migrated = migrate_start_flexibility(dict(sched))
+    return {
+        "duration_h": float(migrated.get("duration_h", 2.0) or 2.0),
+        "start_hour": int(migrated.get("start_hour", DEFAULT_START_HOUR)) % 24,
+        "start_shift_h": float(migrated.get("start_shift_h", 12.0) or 12.0),
+    }
+
+
+def _render_generic_fields(consumer: dict, index: int, nominal: float) -> dict:
+    sched = consumer.get("schedule") or {}
+    defaults = _schedule_defaults(sched)
+    runs = st.number_input(
+        "Läufe pro Woche",
+        min_value=0,
+        value=int(sched.get("runs_per_week", 0)),
+        key=f"hc_runs_{index}",
+    )
+    item: dict = {
+        "nominal_power_kw": nominal,
+        "schedule": None,
+    }
+    if runs <= 0:
+        item["annual_kwh"] = 0.0
+        return item
+    duration_h = st.number_input(
+        "Nenndauer pro Lauf (h)",
+        min_value=0.1,
+        value=defaults["duration_h"],
+        step=0.25,
+        key=f"hc_duration_{index}",
+    )
+    start_hour = st.number_input(
+        "Referenz-Startzeit (Stunde)",
+        min_value=0,
+        max_value=23,
+        value=defaults["start_hour"],
+        key=f"hc_start_{index}",
+    )
+    start_shift_h = st.number_input(
+        "Verschiebung (± h)",
+        min_value=0.0,
+        max_value=MAX_START_SHIFT_H,
+        value=min(MAX_START_SHIFT_H, defaults["start_shift_h"]),
+        step=0.5,
+        key=f"hc_shift_{index}",
+    )
+    st.caption(format_start_window_caption(int(start_hour), float(start_shift_h)))
+    st.caption("Bei 12 h Verschiebung ist der Startzeitpunkt vollständig frei.")
+    item["schedule"] = {
+        "runs_per_week": runs,
+        "duration_h": float(duration_h),
+        "start_hour": int(start_hour) % 24,
+        "start_shift_h": float(start_shift_h),
+    }
+    preview_consumer = {
+        "type": "generic",
+        "nominal_power_kw": nominal,
+        "schedule": item["schedule"],
+    }
+    item["annual_kwh"] = generic_annual_kwh(preview_consumer)
+    st.metric("Jahresenergie (kWh/a)", f"{item['annual_kwh']:.0f}")
+    return item
+
+
+def _default_ev_consumer() -> dict:
+    return {
+        "label": "E-Auto",
+        "type": "ev",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "min_on_quarterhours": 4,
+        "battery_capacity_kwh": 60.0,
+        "charging_schedule": {
+            "target_soc_percent": 100.0,
+            "charging_efficiency": 0.95,
+            "forecast_when_absent": True,
+            "weekday": {
+                "car_available_from_hour": 18,
+                "ready_by_hour": 7,
+                "daily_rest_soc": 40.0,
+            },
+            "weekend": {
+                "car_available_from_hour": 20,
+                "ready_by_hour": 9,
+                "daily_rest_soc": 30.0,
+            },
+        },
+    }
+
+
+def _consumers_from_existing(existing: dict) -> list[dict]:
+    consumers = list(existing.get("consumers", []))
+    if not consumers:
+        return [_default_consumer()]
+    return [dict(consumer) for consumer in consumers]
+
+
+def _profile_session_scope(selected_id: str, *, is_new: bool) -> str:
+    return "__new__" if is_new else selected_id
+
+
+def _sync_consumers_session(session_scope: str, existing: dict) -> list[dict]:
+    if st.session_state.get(_SESSION_SYNC_KEY) != session_scope:
+        st.session_state[_SESSION_SYNC_KEY] = session_scope
+        st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(existing)
+    return list(st.session_state.get(_SESSION_CONSUMERS_KEY, []))
 
 
 def _resolve_profile_id(
@@ -27,8 +171,9 @@ def _resolve_profile_id(
 def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dict]:
     taken: set[str] = set()
     resolved: list[dict] = []
-    for original, item in zip(consumers, edited):
+    for index, item in enumerate(edited):
         label = str(item.get("label", "")).strip()
+        original = consumers[index] if index < len(consumers) else {}
         stable_id = str(original.get("id", "")).strip()
         if stable_id:
             consumer_id = stable_id
@@ -42,7 +187,215 @@ def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dic
     return resolved
 
 
+def _consumer_type_options(consumer_index: int) -> list[str]:
+    if consumer_index == 0:
+        return list(CONSUMER_TYPE_OPTIONS)
+    return [value for value in CONSUMER_TYPE_OPTIONS if value != "thermal_annual"]
+
+
+def _type_index(consumer_type: str, options: list[str]) -> int:
+    try:
+        return options.index(consumer_type)
+    except ValueError:
+        return 0
+
+
+def _render_day_schedule(
+    prefix: str,
+    block: dict,
+    *,
+    index: int,
+) -> dict:
+    return {
+        "car_available_from_hour": st.number_input(
+            f"{prefix}: Ankunft ab (Stunde)",
+            min_value=0,
+            max_value=23,
+            value=int(block.get("car_available_from_hour", 18)),
+            key=f"hc_ev_{prefix}_from_{index}",
+        ),
+        "ready_by_hour": st.number_input(
+            f"{prefix}: Fertig bis (Stunde)",
+            min_value=0,
+            max_value=23,
+            value=int(block.get("ready_by_hour", 7)),
+            key=f"hc_ev_{prefix}_ready_{index}",
+        ),
+        "daily_rest_soc": st.number_input(
+            f"{prefix}: Rest-SOC (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(block.get("daily_rest_soc", 30.0)),
+            step=1.0,
+            key=f"hc_ev_{prefix}_soc_{index}",
+        ),
+    }
+
+
+def _render_ev_fields(consumer: dict, index: int) -> dict:
+    sched = dict(consumer.get("charging_schedule") or {})
+    item: dict = {
+        "min_power_kw": st.number_input(
+            "Mindestleistung (kW)",
+            min_value=0.0,
+            value=float(consumer.get("min_power_kw", 1.4)),
+            key=f"hc_ev_min_{index}",
+        ),
+        "min_on_quarterhours": st.number_input(
+            "Mindest-Ladedauer (Viertelstunden)",
+            min_value=0,
+            value=int(consumer.get("min_on_quarterhours", 4)),
+            key=f"hc_ev_min_qh_{index}",
+        ),
+        "battery_capacity_kwh": st.number_input(
+            "Akkukapazität (kWh)",
+            min_value=0.1,
+            value=float(consumer.get("battery_capacity_kwh", 60.0)),
+            step=1.0,
+            key=f"hc_ev_cap_{index}",
+        ),
+    }
+    item["charging_schedule"] = {
+        "target_soc_percent": st.number_input(
+            "Ziel-SOC (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=float(sched.get("target_soc_percent", 100.0)),
+            key=f"hc_ev_target_soc_{index}",
+        ),
+        "charging_efficiency": st.number_input(
+            "Lade-Wirkungsgrad",
+            min_value=0.01,
+            max_value=1.0,
+            value=float(sched.get("charging_efficiency", 0.95)),
+            step=0.01,
+            key=f"hc_ev_eff_{index}",
+        ),
+        "forecast_when_absent": st.checkbox(
+            "Prognose bei Abwesenheit",
+            value=bool(sched.get("forecast_when_absent", True)),
+            key=f"hc_ev_forecast_{index}",
+        ),
+        "weekday": _render_day_schedule(
+            "Werktag",
+            sched.get("weekday") or {},
+            index=index,
+        ),
+        "weekend": _render_day_schedule(
+            "Wochenende",
+            sched.get("weekend") or {},
+            index=index,
+        ),
+    }
+    return item
+
+
+def _render_consumer_form(consumer: dict, index: int) -> dict:
+    title = consumer.get("label") or f"Verbraucher {index + 1}"
+    with st.expander(f"Verbraucher {index + 1}: {title}", expanded=index == 0):
+        cols = st.columns([5, 1])
+        with cols[1]:
+            if st.button("Entfernen", key=f"hc_remove_{index}"):
+                consumers = list(st.session_state[_SESSION_CONSUMERS_KEY])
+                if len(consumers) > 1:
+                    del consumers[index]
+                    st.session_state[_SESSION_CONSUMERS_KEY] = consumers
+                    st.rerun()
+                else:
+                    st.warning("Mindestens ein Verbraucher erforderlich.")
+
+        type_options = _consumer_type_options(index)
+        current_type = str(consumer.get("type", "thermal_annual"))
+        if index > 0 and current_type == "thermal_annual":
+            st.warning(
+                "Typ „Haus Wärme“ ist nur für Verbraucher 1 erlaubt. "
+                "Bitte einen anderen Typ wählen."
+            )
+        c_type = st.selectbox(
+            "Typ",
+            options=type_options,
+            index=_type_index(current_type, type_options),
+            format_func=lambda value: CONSUMER_TYPE_LABELS.get(value, value),
+            key=f"hc_type_{index}",
+        )
+        c_label = st.text_input(
+            "Bezeichnung", value=consumer.get("label", ""), key=f"hc_label_{index}"
+        )
+        if consumer.get("id"):
+            st.caption(f"Verbraucher-ID: `{consumer['id']}`")
+        nominal = st.number_input(
+            "Nennleistung (kW)",
+            min_value=0.0,
+            value=float(consumer.get("nominal_power_kw", 0.0)),
+            key=f"hc_nom_{index}",
+        )
+        item: dict = {
+            "label": c_label,
+            "type": c_type,
+            "nominal_power_kw": nominal,
+        }
+        if c_type == "generic":
+            generic_fields = _render_generic_fields(consumer, index, nominal)
+            item.update(generic_fields)
+        elif c_type == "ev":
+            item.update(_render_ev_fields(consumer, index))
+        else:
+            thermal = consumer.get("thermal") or consumer
+            item["living_area_m2"] = st.number_input(
+                "Wohnfläche (m²)",
+                min_value=0.0,
+                value=float(thermal.get("living_area_m2", 120.0)),
+                key=f"hc_area_{index}",
+            )
+            building_class = int(thermal.get("building_class", 3))
+            item["building_class"] = st.selectbox(
+                "Gebäudeklasse",
+                options=[1, 2, 3, 4],
+                index=max(0, min(3, building_class - 1)),
+                format_func=building_class_option_label,
+                key=f"hc_class_{index}",
+            )
+            use_exact_hwb = st.checkbox(
+                "Genaue HWB-Angabe",
+                value=bool(float(thermal.get("hwb_kwh_m2", 0.0) or 0.0) > 0),
+                key=f"hc_hwb_use_{index}",
+            )
+            if use_exact_hwb:
+                from data.heating_need import specific_heating_kwh_m2
+
+                default_hwb = float(thermal.get("hwb_kwh_m2", 0.0) or 0.0)
+                if default_hwb <= 0:
+                    default_hwb = specific_heating_kwh_m2(int(item["building_class"]))
+                item["hwb_kwh_m2"] = st.number_input(
+                    "HWB (kWh/m²a)",
+                    min_value=0.1,
+                    value=default_hwb,
+                    step=1.0,
+                    key=f"hc_hwb_{index}",
+                )
+            item["heat_pump_type"] = st.selectbox(
+                "WP-Typ",
+                options=["luft", "erde"],
+                index=0 if thermal.get("heat_pump_type") != "erde" else 1,
+                key=f"hc_wp_{index}",
+            )
+            item["persons"] = st.number_input(
+                "Personen",
+                min_value=0,
+                value=int(thermal.get("persons", 2)),
+                key=f"hc_persons_{index}",
+            )
+    return item
+
+
+def _apply_pending_profile_select() -> None:
+    pending = st.session_state.pop(_SESSION_SELECT_PENDING_KEY, None)
+    if pending is not None:
+        st.session_state["house_profile_select"] = pending
+
+
 def render_house_profile_tab() -> None:
+    _apply_pending_profile_select()
     profiles_doc = load_house_profiles()
     profile_map = profiles_doc.get("profiles", {})
     profile_ids = sorted(profile_map.keys())
@@ -77,121 +430,13 @@ def render_house_profile_tab() -> None:
     )
 
     st.subheader("Verbraucher")
-    consumers = list(existing.get("consumers", []))
-    consumer_count = st.number_input(
-        "Anzahl Verbraucher",
-        min_value=0,
-        max_value=8,
-        value=max(1, len(consumers)),
-        step=1,
-        key="house_consumer_count",
-    )
-    while len(consumers) < int(consumer_count):
-        consumers.append(
-            {
-                "label": f"Verbraucher {len(consumers) + 1}",
-                "type": "generic",
-                "nominal_power_kw": 2.0,
-                "annual_kwh": 500.0,
-            }
-        )
-    consumers = consumers[: int(consumer_count)]
+    session_scope = _profile_session_scope(selected_id, is_new=is_new)
+    consumers = _sync_consumers_session(session_scope, existing)
+    if st.button("Verbraucher hinzufügen", key="house_consumer_add"):
+        st.session_state[_SESSION_CONSUMERS_KEY].append(_default_additional_consumer())
+        st.rerun()
 
-    edited: list[dict] = []
-    for index, consumer in enumerate(consumers):
-        title = consumer.get("label") or f"Verbraucher {index + 1}"
-        with st.expander(f"Verbraucher {index + 1}: {title}", expanded=index == 0):
-            c_label = st.text_input(
-                "Bezeichnung", value=consumer.get("label", ""), key=f"hc_label_{index}"
-            )
-            if consumer.get("id"):
-                st.caption(f"Verbraucher-ID: `{consumer['id']}`")
-            c_type = st.selectbox(
-                "Typ",
-                options=["generic", "thermal_annual"],
-                index=0 if consumer.get("type") != "thermal_annual" else 1,
-                format_func=lambda value: CONSUMER_TYPE_LABELS.get(value, value),
-                key=f"hc_type_{index}",
-            )
-            nominal = st.number_input(
-                "Nennleistung (kW)",
-                min_value=0.0,
-                value=float(consumer.get("nominal_power_kw", 0.0)),
-                key=f"hc_nom_{index}",
-            )
-            item: dict = {
-                "label": c_label,
-                "type": c_type,
-                "nominal_power_kw": nominal,
-            }
-            if c_type == "generic":
-                item["annual_kwh"] = st.number_input(
-                    "Jahresenergie (kWh/a)",
-                    min_value=0.0,
-                    value=float(consumer.get("annual_kwh", 0.0)),
-                    key=f"hc_kwh_{index}",
-                )
-                sched = consumer.get("schedule") or {}
-                runs = st.number_input(
-                    "Läufe pro Woche",
-                    min_value=0,
-                    value=int(sched.get("runs_per_week", 0)),
-                    key=f"hc_runs_{index}",
-                )
-                if runs > 0:
-                    item["schedule"] = {
-                        "runs_per_week": runs,
-                        "duration_h": float(sched.get("duration_h", 2.0)),
-                        "start_flexibility": sched.get("start_flexibility", "day"),
-                    }
-            else:
-                thermal = consumer.get("thermal") or consumer
-                item["living_area_m2"] = st.number_input(
-                    "Wohnfläche (m²)",
-                    min_value=0.0,
-                    value=float(thermal.get("living_area_m2", 120.0)),
-                    key=f"hc_area_{index}",
-                )
-                building_class = int(thermal.get("building_class", 3))
-                item["building_class"] = st.selectbox(
-                    "Gebäudeklasse",
-                    options=[1, 2, 3, 4],
-                    index=max(0, min(3, building_class - 1)),
-                    format_func=building_class_option_label,
-                    key=f"hc_class_{index}",
-                )
-                use_exact_hwb = st.checkbox(
-                    "Genaue HWB-Angabe",
-                    value=bool(float(thermal.get("hwb_kwh_m2", 0.0) or 0.0) > 0),
-                    key=f"hc_hwb_use_{index}",
-                )
-                if use_exact_hwb:
-                    from data.heating_need import specific_heating_kwh_m2
-
-                    default_hwb = float(thermal.get("hwb_kwh_m2", 0.0) or 0.0)
-                    if default_hwb <= 0:
-                        default_hwb = specific_heating_kwh_m2(int(item["building_class"]))
-                    item["hwb_kwh_m2"] = st.number_input(
-                        "HWB (kWh/m²a)",
-                        min_value=0.1,
-                        value=default_hwb,
-                        step=1.0,
-                        key=f"hc_hwb_{index}",
-                    )
-                item["heat_pump_type"] = st.selectbox(
-                    "WP-Typ",
-                    options=["luft", "erde"],
-                    index=0 if thermal.get("heat_pump_type") != "erde" else 1,
-                    key=f"hc_wp_{index}",
-                )
-                item["persons"] = st.number_input(
-                    "Personen",
-                    min_value=0,
-                    value=int(thermal.get("persons", 2)),
-                    key=f"hc_persons_{index}",
-                )
-            edited.append(item)
-
+    edited = [_render_consumer_form(consumer, index) for index, consumer in enumerate(consumers)]
     resolved = _resolve_consumer_ids(consumers, edited)
     preview = preview_baseload(annual_kwh, resolved)
     st.metric("Verbraucher-Summe (kWh/a)", f"{preview['consumer_kwh']:.0f}")
@@ -216,5 +461,9 @@ def render_house_profile_tab() -> None:
                 "consumers": resolved,
             }
         )
+        saved_profile = load_house_profiles().get("profiles", {}).get(profile_id, {})
+        st.session_state[_SESSION_SELECT_PENDING_KEY] = profile_id
+        st.session_state[_SESSION_SYNC_KEY] = profile_id
+        st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(saved_profile)
         st.success(f"Profil '{profile_id}' gespeichert.")
         st.rerun()

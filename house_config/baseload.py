@@ -7,10 +7,14 @@ BASELOAD_MIN_FRACTION = 0.05
 def consumer_annual_kwh(consumer: dict) -> float:
     if consumer.get("profile_csv"):
         return float(consumer.get("annual_kwh", 0.0) or 0.0)
+    if consumer.get("type") == "ev":
+        from house_config.ev_profile import estimate_ev_annual_kwh
+
+        return estimate_ev_annual_kwh(consumer)
     if consumer.get("type") == "thermal_annual":
         from data.heating_need import estimate_annual_kwh
 
-        thermal = consumer.get("thermal") or {}
+        thermal = consumer.get("thermal") or consumer
         hwb = thermal.get("hwb_kwh_m2")
         hwb_value = float(hwb) if hwb not in (None, "") else None
         return estimate_annual_kwh(
@@ -24,6 +28,10 @@ def consumer_annual_kwh(consumer: dict) -> float:
             heating_limit_c=float(thermal.get("heating_limit_c", 15.0)),
             hwb_kwh_m2=hwb_value,
         )
+    if consumer.get("type") == "generic":
+        from house_config.generic_schedule import generic_annual_kwh
+
+        return generic_annual_kwh(consumer)
     return float(consumer.get("annual_kwh", 0.0) or 0.0)
 
 

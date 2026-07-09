@@ -17,7 +17,7 @@ Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bu
 
 ### Bugfix Sankey SwimSpa/Filter Fall B (Gesamtzähler) (2026-07-09)
 
-- [x] **Sankey + Chart 1 SwimSpa/Filter (Gesamtzähler Fall B)** — Fix **v1.24.4**: Sankey/Live-UI laden Flex-Leistung bei veraltetem `optimizer_run_state` (>120 s) mit `filter_contexts` + `slot_datetime` (`fetch_live_flex_kw_for_ui` in `data/live_consumption.py`); Filter-Inferenz wie in `main.py`. Prod-Abnahme: natives Fenster 10–14 — zwei Sankey-Ströme (SwimSpa + SwimSpa Filter), Filterleistung korrekt zugeordnet, keine irreführende Soll-Ist-Mismatch-Farbe bei Soll 0. Referenz-Dumps: `chart_debug_20260708_114712`, `chart_debug_20260709_120500`.
+- [x] **Sankey + Chart 1 SwimSpa/Filter (Gesamtzähler Fall B)** — Fix **v1.24.1**: Sankey/Live-UI laden Flex-Leistung bei veraltetem `optimizer_run_state` (>120 s) mit `filter_contexts` + `slot_datetime` (`fetch_live_flex_kw_for_ui` in `data/live_consumption.py`); Filter-Inferenz wie in `main.py`. Prod-Abnahme: natives Fenster 10–14 — zwei Sankey-Ströme (SwimSpa + SwimSpa Filter), Filterleistung korrekt zugeordnet, keine irreführende Soll-Ist-Mismatch-Farbe bei Soll 0. Referenz-Dumps: `chart_debug_20260708_114712`, `chart_debug_20260709_120500`.
 
 ### Version 1.24.g — monthly_float Einspeisetarif (OeMAG-Referenzkurve) (2026-07-09)
 
@@ -54,6 +54,28 @@ Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bu
 - [x] **P1 — Greenfield-Compose** — `docker-compose-greenfield.yml` mit `greenfield/config` + `greenfield/runtime`, Container `ernie-greenfield-*`, UI-Port **8502**, Loxone-Verify aus
 - [x] **P2 — Abnahme-Hilfen** — Checkliste in [`docs/einrichtung/greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md); Smoke-Test `tests/test_greenfield_bootstrap.py` (ohne Fixture-Snapshot `tests/fixtures/greenfield/`)
 - [x] **Follow-up beim Durchspielen** — `Dockerfile`: `share/config/` um Tarife-, Hausprofile- und Backtesting-Szenario-Vorlagen ergänzt (Bootstrap auf leerem Volume)
+
+### Version 1.24.0 — Hauskonfigurator UX & E-Auto-Profil (2026-07-09)
+
+- [x] **P1 — Datenmodell `ev`** — Typ `ev` in `house_profiles.schema.json` und `house_config/profiles_store.py`; Planungs-Subset aus Live-`eauto` ohne `loxone`; `house_profiles.example.json` mit E-Auto als `ev`
+- [x] **P2 — UI Neu/Entfernen** — `ui/house_config_profile_form.py` (Tab in `page_house_config.py`): `st.session_state`-Verbraucherliste, „Verbraucher hinzufügen“ / „Entfernen“, Typ-Dropdown inkl. „E-Auto“ mit bedingten Feldern
+- [x] **P3 — Jahres- und Stundenprofil** — `house_config/ev_profile.py` (`estimate_ev_annual_kwh`, `ev_hourly_kw_for_day`); `baseload.py` und `data/consumption_profiles.py` mit fensterbasiertem `ev`-Zweig
+- [x] **P4 — Tests** — `tests/test_house_config.py`: Normalisierung, Jahres-kWh, Stundenprofil nur im Ladezeitfenster, `build_hourly_kw_profile`
+- [x] **P5 — Tariflisten-Stand in der UI** — mit **1.24.f** umgesetzt (`catalog_as_of` in `planning_tariff_form.py` und `page_scenario_editor.py`)
+
+### Version 1.24.b — LOC-Refactoring Top-3 (2026-07-09)
+
+- [x] **Epic 1 — `optimizer/milp.py`** (~991 → ~170) — `milp_consumers.py`, `milp_horizon.py`, `milp_result.py`; `_derive_control_from_milp` → `optimizer/battery.py`; Re-Exports für Tests
+- [x] **Epic 2 — `config.py`** (~1543 → ~720) — Paket `settings/` (`json_io`, `flexible_consumers`, `appliances`, `scenarios`, `system_settings`); `config.py` als Orchestrator-Fassade
+- [x] **Epic 3 — `ui/charts.py`** (~2822 → ~400) — `chart_slot_axis`, `chart_trace_segments`, `chart_soc`, `chart_cumulative`, `chart_decorations`, `chart_consumer_stack`; dünne Fassade + Re-Exports
+
+### Version 1.24.a — Hauskonfigurator und Szenarien (2026-07-09)
+
+- [x] **P1 — Batterie & PV als Entitäten** — `batteries[]` / `pv_systems[]` in `config.json`; Szenario wählt je eine ID; Abwärtskompatibel zu flachen `runtime_settings`
+- [x] **P2 — Stromtarife** — `config/tariffs.json` mit Import-/Export-Tarifen; Szenario-Referenzen `import_tariff_id` / `export_tariff_id`
+- [x] **P3 — Verbraucher & Grundlast** — `config/house_profiles.json`; generisch, thermisch, Grundlast mit 5-%-Untergrenze
+- [x] **P4 — Zusammengesetztes Szenario** — `backtesting_scenarios.json`; Auflösung in `config.py` für `simulation/engine.py`
+- [x] **P5 — UI** — Hauskonfigurator (`page_house_config.py`) und Szenarieneditor (`page_scenario_editor.py`)
 
 ### Bugfix Chart 1 PV-Linie = Ist (forecast_pv nach Overlay) (2026-07-08)
 

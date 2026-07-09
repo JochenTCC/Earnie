@@ -4,6 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 from ui.setup_readiness import (
+    is_betrieb_unlocked,
     is_planning_ready,
     is_setup_navigation_restricted,
     missing_planning_setup_items,
@@ -16,7 +17,12 @@ def render_setup_progress_notice() -> None:
     if not needs_planning_onboarding():
         return
     if is_planning_ready():
-        st.sidebar.success("Planungs-Konfiguration vollständig — Backtesting ist freigeschaltet.")
+        if is_betrieb_unlocked():
+            return
+        st.sidebar.success(
+            "Planungs-Konfiguration vollständig — Analyse ist freigeschaltet. "
+            "Betrieb folgt nach Loxone-Anbindung."
+        )
         return
     if not is_setup_navigation_restricted():
         return

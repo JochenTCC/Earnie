@@ -149,6 +149,16 @@ class HistoricalDataCache:
         return self._pv_series.reindex(idx, fill_value=0.0).round(3).tolist()
 
 
+def _flexible_consumers_from_scenario(scenario_params: dict | None) -> list:
+    from house_config.planning_flex_bridge import merge_flexible_consumers
+
+    base = config.get_flexible_consumers(optimizer_only=True)
+    if not scenario_params:
+        return base
+    planning = scenario_params.get("_planning_flex_consumers") or []
+    return merge_flexible_consumers(base, planning)
+
+
 def _charging_schedule_consumer() -> dict | None:
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         sched = consumer.get("charging_schedule")
@@ -266,6 +276,19 @@ def build_historical_matrix_for_slots(
     baseload_kw, historical_baseload_kwh = resolve_hourly_baseload_kw(
         total_load, hourly_flex
     )
+    if scenario_params and scenario_params.get("_house_profile"):
+        from house_config.planning_flex_bridge import (
+            fixed_generic_hourly_overlay,
+            planning_flex_daily_targets,
+        )
+
+        profile = scenario_params["_house_profile"]
+        overlay = fixed_generic_hourly_overlay(profile, slot_datetimes)
+        baseload_kw = [round(base + extra, 3) for base, extra in zip(baseload_kw, overlay)]
+        flex_consumers = scenario_params.get("_planning_flex_consumers") or []
+        historical_totals.update(
+            planning_flex_daily_targets(flex_consumers, profile, slot_datetimes)
+        )
     stored_baseload_kwh = round(sum(baseload_stored), 3)
     pv_profile = cache.get_pv_for_slots(slot_datetimes)
     price_ctx = (
@@ -467,6 +490,7 @@ def _simulate_anchor_step(
         consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
         simulation_hour_offset=hours_done if collect_cbc else None,
         sunrise_soc_min_index=sunrise_index,
+        flexible_consumers=_flexible_consumers_from_scenario(scenario_params),
     )
     chart_rows, matrix = _apply_backtesting_step(
         chart_rows, matrix, meta, horizon_mode=horizon_mode

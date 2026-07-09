@@ -1,17 +1,17 @@
 {
-    "$schema": "./house_profiles.schema.json",
     "profiles": [
         {
             "id": "example_efh",
             "label": "Beispiel EFH 4500 kWh/a",
-            "annual_kwh": 4500,
+            "annual_kwh": 4500.0,
+            "total_profile_csv": "",
             "consumers": [
                 {
                     "id": "wp_heating",
                     "label": "Wärmepumpe Heizen+WW",
                     "type": "thermal_annual",
                     "nominal_power_kw": 3.5,
-                    "living_area_m2": 120,
+                    "living_area_m2": 120.0,
                     "building_class": 2,
                     "heat_pump_type": "erde",
                     "persons": 2,
@@ -23,11 +23,140 @@
                     "label": "E-Auto",
                     "type": "generic",
                     "nominal_power_kw": 3.5,
-                    "annual_kwh": 2500,
+                    "annual_kwh": 546.0,
                     "schedule": {
                         "runs_per_week": 7,
-                        "duration_h": 3,
-                        "start_flexibility": "day"
+                        "duration_h": 3.0,
+                        "start_hour": 12,
+                        "start_shift_h": 12.0
+                    }
+                }
+            ]
+        },
+        {
+            "id": "test1",
+            "label": "Test1",
+            "annual_kwh": 7000.0,
+            "total_profile_csv": "",
+            "consumers": [
+                {
+                    "id": "haus",
+                    "label": "Haus",
+                    "type": "thermal_annual",
+                    "nominal_power_kw": 6.5,
+                    "living_area_m2": 150.0,
+                    "building_class": 2,
+                    "heat_pump_type": "erde",
+                    "persons": 2,
+                    "target_temp_c": 21.5,
+                    "heating_limit_c": 15.0
+                }
+            ]
+        },
+        {
+            "id": "test1_2",
+            "label": "Test1",
+            "annual_kwh": 7000.0,
+            "total_profile_csv": "",
+            "consumers": [
+                {
+                    "id": "haus",
+                    "label": "Haus",
+                    "type": "thermal_annual",
+                    "nominal_power_kw": 6.5,
+                    "living_area_m2": 120.0,
+                    "building_class": 3,
+                    "heat_pump_type": "luft",
+                    "persons": 2,
+                    "target_temp_c": 21.5,
+                    "heating_limit_c": 15.0
+                },
+                {
+                    "id": "e_auto",
+                    "label": "E-Auto",
+                    "type": "ev",
+                    "nominal_power_kw": 3.5,
+                    "min_power_kw": 1.4,
+                    "min_on_quarterhours": 4,
+                    "battery_capacity_kwh": 20.0,
+                    "charging_schedule": {
+                        "target_soc_percent": 100.0,
+                        "charging_efficiency": 0.95,
+                        "forecast_when_absent": true,
+                        "weekday": {
+                            "car_available_from_hour": 20,
+                            "ready_by_hour": 7,
+                            "daily_rest_soc": 20.0
+                        },
+                        "weekend": {
+                            "car_available_from_hour": 17,
+                            "ready_by_hour": 12,
+                            "daily_rest_soc": 50.0
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": "test1_3",
+            "label": "Test1",
+            "annual_kwh": 7000.0,
+            "total_profile_csv": "",
+            "consumers": [
+                {
+                    "id": "haus",
+                    "label": "Haus",
+                    "type": "thermal_annual",
+                    "nominal_power_kw": 6.5,
+                    "living_area_m2": 120.0,
+                    "building_class": 3,
+                    "heat_pump_type": "luft",
+                    "persons": 2,
+                    "target_temp_c": 21.5,
+                    "heating_limit_c": 15.0
+                }
+            ]
+        },
+        {
+            "id": "test1_4",
+            "label": "Test1",
+            "annual_kwh": 7000.0,
+            "total_profile_csv": "",
+            "consumers": [
+                {
+                    "id": "haus",
+                    "label": "Haus",
+                    "type": "thermal_annual",
+                    "nominal_power_kw": 6.5,
+                    "living_area_m2": 120.0,
+                    "building_class": 3,
+                    "heat_pump_type": "luft",
+                    "persons": 2,
+                    "target_temp_c": 21.5,
+                    "heating_limit_c": 15.0
+                },
+                {
+                    "id": "smart",
+                    "label": "Smart",
+                    "type": "ev",
+                    "nominal_power_kw": 2.0,
+                    "min_power_kw": 1.4,
+                    "min_on_quarterhours": 4,
+                    "battery_capacity_kwh": 60.0,
+                    "charging_schedule": {
+                        "target_soc_percent": 100.0,
+                        "charging_efficiency": 0.95,
+                        "forecast_when_absent": true,
+                        "weekday": {
+                            "car_available_from_hour": 18,
+                            "ready_by_hour": 7,
+                            "daily_rest_soc": 30.0
+                        },
+                        "weekend": {
+                            "car_available_from_hour": 18,
+                            "ready_by_hour": 7,
+                            "daily_rest_soc": 30.0
+                        }
                     }
                 }
             ]
