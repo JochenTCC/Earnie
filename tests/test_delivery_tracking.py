@@ -24,10 +24,11 @@ def _eauto_consumer() -> dict:
     }
 
 
-def _session_ctx(*, plugged_in: bool = True) -> dict:
+def _session_ctx(*, plugged_in: bool = True, anticipated: bool = False) -> dict:
     return {
         "active": True,
         "plugged_in": plugged_in,
+        "anticipated": anticipated,
         "deadline": datetime(2026, 6, 29, 7, 45),
         "target_kwh": 8.0,
         "use_time_window": False,
@@ -63,6 +64,13 @@ class TestBookingPower:
         consumer = {"id": "swimspa", "charging_schedule": {"enabled": False}}
         assert dt.booking_power_kw(
             consumer, None, planned_kw=2.8, live_kw=1.0, book_planned=False
+        ) == 0.0
+
+    def test_anticipated_absence_does_not_book_planned(self):
+        consumer = _eauto_consumer()
+        ctx = _session_ctx(plugged_in=False, anticipated=True)
+        assert dt.booking_power_kw(
+            consumer, ctx, planned_kw=2.76, live_kw=0.0, book_planned=True
         ) == 0.0
 
 

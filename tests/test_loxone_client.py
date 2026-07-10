@@ -593,6 +593,52 @@ class TestBuildSentSnapshot:
         assert snapshot["Ernie_EAuto_Ziel_kW"] == 3.5
         assert snapshot["Ernie_EAuto_pv_follow"] == 1.0
 
+    def test_snapshot_suppresses_power_when_anticipated_absent(self):
+        consumers = [
+            {
+                "id": "eauto",
+                "name": "E-Auto",
+                "nominal_power_kw": 3.5,
+                "min_power_kw": 1.4,
+                "optimizer_enabled": True,
+                "daily_target_kwh": 10.0,
+                "daily_target_source": "config",
+                "loxone_outputs": {
+                    "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
+                    "pv_follow_name": "Ernie_EAuto_pv_follow",
+                },
+            }
+        ]
+        config_map = {
+            "LOXONE_TARGET_SOC_NAME": "Ernie_Ziel_SoC",
+            "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
+            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
+            "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
+        }
+        absent_ctx = {
+            "eauto": {
+                "active": True,
+                "plugged_in": False,
+                "anticipated": True,
+                "target_kwh": 14.222,
+            }
+        }
+
+        with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ):
+            snapshot = lc.build_sent_loxone_snapshot(
+                mode=0,
+                target_power_kw=0.0,
+                target_soc=80.0,
+                consumer_powers={"eauto": 2.76},
+                charging_contexts=absent_ctx,
+                consumer_pv_follow={"eauto": 1},
+            )
+
+        assert snapshot["Ernie_EAuto_Ziel_kW"] == 0.0
+        assert snapshot["Ernie_EAuto_pv_follow"] == 0.0
+
 
     def test_build_snapshot_does_not_send_to_loxone(self):
         consumers = [

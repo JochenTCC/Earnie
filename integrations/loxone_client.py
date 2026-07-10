@@ -726,6 +726,8 @@ def _effective_consumer_power_kw(
     ctx = charging_contexts.get(cid)
     if ctx is not None and not ctx.get("active", True):
         return 0.0
+    if ctx is not None and ctx.get("anticipated") and not ctx.get("plugged_in"):
+        return 0.0
     return power_kw
 
 
