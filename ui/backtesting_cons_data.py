@@ -5,6 +5,7 @@ import streamlit as st
 
 from data import cons_data_store
 from scripts.generate_cons_data import generate
+from ui.backtesting_results_helpers import cons_data_has_flex_energy
 from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
 _MATCH_OK = "Passt zur aktuellen Konfiguration (Verbraucher-IDs)."
@@ -53,16 +54,6 @@ def render_cons_data_section() -> bool:
         else:
             st.warning(message)
 
-        try:
-            render_consumption_display(
-                ConsumptionDisplayMode.CONS_DATA,
-                key_prefix="backtesting_cons_data",
-                cons_data=df,
-                reset_token=str(len(df)),
-            )
-        except ValueError as exc:
-            st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")
-
     if st.button(
         "Verbrauchsdaten generieren (synthetisch)",
         key="backtesting_cons_data_generate_btn",
@@ -76,5 +67,22 @@ def render_cons_data_section() -> bool:
             else:
                 status.update(label="Verbrauchsdaten generiert", state="complete")
                 st.rerun()
+
+    if populated:
+        df = cons_data_store.load_cons_data(path)
+        if not cons_data_has_flex_energy(df):
+            st.warning(
+                "Flexible Verbraucher haben in `cons_data_hourly.csv` keine "
+                "messbaren Werte (nur Basislast). Bitte Daten neu generieren."
+            )
+        try:
+            render_consumption_display(
+                ConsumptionDisplayMode.CONS_DATA,
+                key_prefix="backtesting_cons_data",
+                cons_data=df,
+                reset_token=str(df.index.max()),
+            )
+        except ValueError as exc:
+            st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")
 
     return cons_data_ready()

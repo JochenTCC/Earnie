@@ -2,6 +2,25 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 1.25.c — Backtesting-Seitenaufbau (2026-07-10)
+
+Ziel-Reihenfolge: cons_data (Status/Generierung/Verbrauchs-UI) → Szenarien + Run-Buttons → Gesamtkosten-Tabelle → Referenz-Verbrauch → Monatskosten-Chart (ohne Dataframe/Stundenchart).
+
+- [x] Seitenreihenfolge (`ui/backtesting.py`, `ui/backtesting_cons_data.py`, `ui/backtesting_results_helpers.py`)
+- [x] Entfernt: Szenario-/Monat-Selectbox, Stundenkosten-Chart, Monats-Dataframe im Kostenvergleich
+- [x] Testlauf-Caption + `nav_bounds` für KW-Navigation
+- [x] Gesamtkosten-Tabelle mit Δ als Kostenänderung (`Szenario-€ − Referenz-€`)
+- [x] Verbrauchs-UI im cons_data-Abschnitt und bei Ergebnissen (Log-Periode, periodengerechter Subheader)
+- [x] Synthetische `cons_data` aus Hausprofil wenn `flexible_consumers` leer (`data/cons_data_house_profile.py`)
+- [x] Warnung wenn `{verbraucher_id}_kw` fehlen oder nur 0 sind
+- [x] Tests: `test_backtesting_results_helpers.py`, `test_cons_data_house_profile.py`
+
+**Manuelle Abnahme**
+
+- [x] Voller Lauf: keine Szenario-/Monat-Selectbox, kein Stundenkosten-Chart
+- [x] Gesamtkosten-Tabelle mit Referenz + Szenarien + Δ
+- [x] Testlauf: Charts/Navigation nur Testmonat; Verbraucher im Verlauf sichtbar
+
 ### Version 1.25.b — Verbrauchs-UI in drei Seiten (2026-07-10)
 
 - [x] **Hauskonfigurator** — `render_consumption_comparison_panel` durch Kern, Modus `csv_validation`

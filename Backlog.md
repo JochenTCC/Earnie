@@ -20,9 +20,9 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Basis erledigt** (siehe [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.25.0): Hauskonfigurator, Szenarieneditor, Backtesting-Runner, `cons_data`, Fingerprint, erste Charts/Tests.
 
-**Offen:** Einheitliche Verbrauchs-UI, neuer Backtesting-Seitenaufbau, Abweichungsliste, Chart1/2-Detail (Scope nach Smoketest).
+**Offen:** Abweichungsliste, Chart1/2-Detail (Scope nach Smoketest), Tarif-Plausibilisierung vor Backtesting-Start.
 
-**Ist-Stand Code (Kurz):** `ui/consumption_comparison_panel.py` (nur Hauskonfigurator, Ist vs. Modell, nur KW-Navigation); `ui/backtesting_cons_data.py` (`total_kw`/`baseload_kw`/`pv_kw`); Backtesting-Seite noch mit Szenario-/Monat-Selectbox, Monats-Dataframe, Stundenkosten-Chart; Plausibilität ohne Cockpit-Chart1/2 (`backtesting_plausibility_charts.py`).
+**Ist-Stand Code (Kurz):** `ui/consumption_display/` (drei Modi); Backtesting-Seite: cons_data-Abschnitt mit Status/Generierung/Verbrauchs-UI, Gesamtkosten-Tabelle, Referenz-Verbrauch (periodengeschnitten), Monatskosten-Chart — ohne Szenario-/Monat-Selectbox, ohne Stundenchart, ohne Monats-Dataframe; Abweichungsliste noch offen (1.25.d).
 
 #### Getroffene Entscheidungen (2026-07-10)
 
@@ -34,14 +34,15 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 | **Abweichungsdetail (Ziel)** | Volle Cockpit-Chart1/2 in **24h** und **SA_0–SA_2** — **aber** erst nach Smoketest `sunset_window` und Persistenz-Entscheid (siehe 1.25.e / 1.25.f). |
 | **Monatskosten-Tabelle** | Dataframe-Tabelle im Monatsvergleich **entfällt**; Plotly-Monatschart **bleibt**. |
 | **Gesamtkosten** | Neue kompakte Jahres-Tabelle (alle Szenarien inkl. Referenz) statt Metrik-Spalten allein. |
+| **Δ vs. Referenz** | **Kostenänderung** (`Szenario-€ − Referenz-€`); negativ = günstiger, positiv = teurer. |
 
 #### Offene Klärungen (für spätere Chats)
 
-- [ ] **„Nicht optimierte Jahresverbräuche“** — gemeint vermutlich Referenz/`cons_data` (historisch ohne Optimierung), nicht optimierte Szenarien. Bestätigen?
-- [ ] **Testlauf (1 Monat):** Verbrauchs-UI nur auf Testmonat beschränken; Navigation außerhalb disabled/leer?
+- [x] **„Nicht optimierte Jahresverbräuche“** — Referenz/`cons_data` (historisch ohne Optimierung), nicht optimierte Szenarien.
+- [x] **Testlauf (1 Monat):** Verbrauchs-UI auf Testmonat beschränkt (`nav_bounds` + geschnittene `cons_data`).
 - [ ] **Szenarieneditor:** Nur modelliertes Hausprofil des zugeordneten Profils (ohne `cons_data`, ohne CSV-Ist)?
 - [ ] **PV in Verbrauchs-UI:** `pv_kw` als eigene Spur (Erzeugung) oder nur Verbraucher + Basislast?
-- [ ] **Gesamtkosten-Tabelle:** Spalten — Szenario | Jahres-kWh | Jahres-€ | Δ vs. Referenz (weitere Spalten?)
+- [x] **Gesamtkosten-Tabelle:** Spalten — Szenario | Jahres-kWh | Jahres-€ | Δ vs. Referenz.
 
 - [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
   - Habe Admins in loxforum nach der besten Stelle für einen Post gefragt
@@ -49,29 +50,10 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ---
 
-### Version 1.25.c — Backtesting-Seitenaufbau
+### Version 1.25.c-follow — Tarif-Plausibilisierung (Backtesting)
 
-Ziel-Reihenfolge (oben → unten):
-
-1. Verbrauchsdaten (`cons_data`) — Status, Generierung, Verbrauchs-UI
-2. Konfigurierte Szenarien + Run-Buttons (wie heute)
-3. **Gesamtkosten-Tabelle** (alle Szenarien inkl. Referenz)
-4. **Verbrauchs-UI** (Referenz-Jahresverbrauch / nicht optimiert)
-5. **Kostenvergleich** — Monatschart je Szenario; **ohne** Monats-Dataframe, **ohne** Stundenkosten-Chart
-
-**Entfernen**
-
-- [ ] `render_backtesting_controls` (Szenario-/Monat-Detailauswahl)
-- [ ] `render_backtesting_hourly_chart`
-- [ ] `st.dataframe` in `render_backtesting_monthly_table` (Chart behalten)
-
-**Testlauf-Sonderfall:** Caption „Testlauf — nur Monat MM/YYYY“; Navigation auf diesen Monat beschränkt.
-
-**Manuelle Abnahme**
-
-- [ ] Voller Lauf: keine Szenario-/Monat-Selectbox, kein Stundenkosten-Chart
-- [ ] Gesamtkosten-Tabelle mit Referenz + Szenarien + Δ
-- [ ] Testlauf: Charts/Navigation nur für einen Monat
+- [ ] Vor Start: Import-/Export-Tarif-IDs gegen Katalog prüfen (Klartext-Fehler statt Lauf-Abbruch)
+- [ ] Optional: Hinweis/Link zum Szenarieneditor bei ungültigen Tarif-IDs
 
 ---
 
@@ -171,6 +153,9 @@ Ziel-Reihenfolge (oben → unten):
 
 
 ### Version 1.+1
+- [ ] tariffs.json auf "Vollständigkeit" checken: Sind alle Daten von "einspeisetarife*.json" aus Gemini übernommen?
+- [ ] tariffs.json in Deploy inkludieren
+- [ ] Plausibilitäts-Test für tariffs.json erstellen, der vor Deploy läuft
 - [ ] Readme ausführlicher machen mit Motivation / Nutzen
   - Sinnvolle Reihenfolge in der Nutzung beschreiben
   - Weniger technische Hintergründe beschreiben als Hinweise zur Installation und Konfiguration

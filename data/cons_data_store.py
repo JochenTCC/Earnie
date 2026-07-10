@@ -62,7 +62,21 @@ def get_write_mode() -> str:
 
 
 def _consumer_column_ids() -> list[str]:
+    from data.cons_data_house_profile import expected_cons_data_consumer_ids
+
+    ids = expected_cons_data_consumer_ids()
+    if ids:
+        return ids
     return [c["id"] for c in config.get_flexible_consumers()]
+
+
+def _consumer_ids_from_dataframe(df: pd.DataFrame) -> list[str]:
+    skip = {"total", "baseload", "pv"}
+    return sorted(
+        str(col[: -len("_kw")])
+        for col in df.columns
+        if str(col).endswith("_kw") and str(col[: -len("_kw")]) not in skip
+    )
 
 
 def trim_retention(df: pd.DataFrame, months: int | None = None) -> pd.DataFrame:
@@ -148,7 +162,7 @@ def save_cons_data(df: pd.DataFrame, path: str | None = None, *, apply_retention
         {
             "output_file": path,
             "retention_months": get_retention_months(),
-            "consumer_ids": _consumer_column_ids(),
+            "consumer_ids": _consumer_ids_from_dataframe(df) or _consumer_column_ids(),
             "date_range": {"min": str(df.index.min()), "max": str(df.index.max())},
             "row_count": len(df),
             "source_counts": df["source"].value_counts().to_dict() if not df.empty else {},

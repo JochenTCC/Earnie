@@ -3,28 +3,30 @@ from __future__ import annotations
 
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
 
 import config
 from data import cons_data_store
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation import backtesting_log
 from simulation.backtesting_fingerprint import fingerprint_for_current_config
-from simulation.engine import HISTORICAL_REFERENCE_ID
 from scripts.run_backtesting import BACKTESTING_YEAR
 from ui.backtesting_charts import scenario_monthly_cost_chart
 from ui.backtesting_cons_data import render_cons_data_section
-from ui.backtesting_plausibility_charts import (
-    cockpit_hint_caption,
-    failure_window_label,
-    plausibility_window_consumption_chart,
-    slice_cons_data_for_window,
+from ui.backtesting_results_helpers import (
+    build_annual_cost_rows,
+    cons_data_has_flex_energy,
+    nav_bounds_from_period,
+    reference_consumption_subheader,
+    reference_kwh_for_period,
+    slice_cons_data_for_period,
+    format_test_run_caption,
 )
 from ui.backtesting_runner import (
     default_progress_file_path,
     run_backtesting_subprocess,
     suggest_test_month,
 )
+from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
 _LEGACY_STALE_WARNING = (
     "Älterer Backtesting-Lauf ohne Konfigurations-Fingerabdruck — "
@@ -223,9 +225,8 @@ def render_backtesting_run_controls(
         st.caption(_STALE_CAPTION)
 
 
-def render_backtesting_controls(meta: dict, hourly: pd.DataFrame) -> tuple[str, str | None]:
-    """Detailansicht-Steuerung im Seiten-Body (ersetzt die frühere Sidebar)."""
-    st.subheader("📊 Backtesting-Log")
+def render_backtesting_log_caption(meta: dict) -> None:
+    st.subheader("Backtesting-Log")
     created = meta.get("created_at", "")[:19].replace("T", " ")
     period = meta.get("period", {})
     st.caption(
@@ -233,197 +234,91 @@ def render_backtesting_controls(meta: dict, hourly: pd.DataFrame) -> tuple[str, 
         f"Zeitraum: {period.get('start', '?')} – {period.get('end', '?')} "
         f"({period.get('windows', '?')} Fenster)"
     )
-
-    labels = meta.get("labels", {})
-    scenario_ids = meta.get("scenario_ids", hourly["scenario_id"].unique().tolist())
-    scenario_labels = [labels.get(sid, sid) for sid in scenario_ids]
-    months = sorted(hourly["ts"].dt.to_period("M").astype(str).unique())
-
-    col_scenario, col_month = st.columns(2)
-    selected_label = col_scenario.selectbox(
-        "Szenario (Detailansicht)",
-        scenario_labels,
-        index=0,
-    )
-    selected_id = scenario_ids[scenario_labels.index(selected_label)]
-
-    month_filter = col_month.selectbox(
-        "Monat (Detailansicht)",
-        ["Gesamter Zeitraum"] + months,
-    )
-    month_key = None if month_filter == "Gesamter Zeitraum" else month_filter
-    return selected_id, month_key
+    caption = format_test_run_caption(period)
+    if caption:
+        st.warning(caption)
 
 
-def render_backtesting_summary(meta: dict) -> None:
-    st.subheader("💶 Gesamtkosten-Vergleich")
-    summary = meta.get("summary", {})
-    totals = summary.get("total_eur", {})
-    labels = meta.get("labels", {})
-    ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
-    ref_total = totals.get(ref_id)
-
-    cols = st.columns(min(len(totals), 4))
-    for idx, (sid, total) in enumerate(totals.items()):
-        col = cols[idx % len(cols)]
-        label = labels.get(sid, sid)
-        if sid == ref_id:
-            col.metric(label, f"{total:.2f} €", help="Historischer Verbrauch ohne Optimierung")
-        elif ref_total is not None:
-            savings = ref_total - total
-            col.metric(
-                label,
-                f"{total:.2f} €",
-                delta=f"{savings:+.2f} € vs Referenz",
-                delta_color="normal" if savings >= 0 else "inverse",
-            )
-        else:
-            col.metric(label, f"{total:.2f} €")
+def render_annual_cost_table(meta: dict) -> None:
+    st.subheader("Gesamtkosten")
+    period = meta.get("period", {})
+    ref_kwh: float | None = None
+    if cons_data_store.is_cons_data_populated():
+        cons_df = cons_data_store.load_cons_data()
+        ref_kwh = reference_kwh_for_period(cons_df, period)
+    rows = build_annual_cost_rows(meta, ref_kwh)
+    if not rows:
+        st.info("Keine Gesamtkosten im Log.")
+        return
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
-def render_backtesting_monthly_table(meta: dict) -> None:
-    st.subheader("📅 Monatlicher Kostenvergleich")
+def render_reference_consumption_ui(meta: dict) -> None:
+    period = meta.get("period", {})
+    st.subheader(reference_consumption_subheader(period))
+    if not cons_data_store.is_cons_data_populated():
+        st.info("Keine Verbrauchsdaten (`cons_data_hourly.csv`) für die Visualisierung.")
+        return
+    cons_df = cons_data_store.load_cons_data()
+    sliced = slice_cons_data_for_period(cons_df, period)
+    if sliced.empty:
+        st.info("Keine Verbrauchsdaten im Zeitraum des Backtesting-Logs.")
+        return
+    if not cons_data_has_flex_energy(sliced):
+        st.warning(
+            "In den Verbrauchsdaten fehlen Werte für flexible Verbraucher "
+            "(nur Basislast sichtbar). Bitte **Verbrauchsdaten generieren** "
+            "oder `cons_data_hourly.csv` mit `{verbraucher_id}_kw`-Spalten "
+            "bereitstellen."
+        )
+    nav_bounds = nav_bounds_from_period(period)
+    try:
+        render_consumption_display(
+            ConsumptionDisplayMode.CONS_DATA,
+            key_prefix="backtesting_reference",
+            cons_data=sliced,
+            reset_token=str(meta.get("created_at", "")),
+            nav_bounds=nav_bounds,
+        )
+    except ValueError as exc:
+        st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")
+
+
+def render_backtesting_monthly_chart(meta: dict) -> None:
+    st.subheader("Monatlicher Kostenvergleich")
     monthly = meta.get("summary", {}).get("monthly_eur", {})
     if not monthly:
         st.info("Keine Monatswerte im Log.")
         return
     df = pd.DataFrame(monthly).T.round(2)
-    df.index.name = "Monat"
-    st.dataframe(df, width="stretch")
-
     chart_columns = [
         col for col in df.columns if not col.startswith("Einsparung")
     ]
-    if chart_columns:
-        chart_monthly = {
-            month: {col: float(df.loc[month, col]) for col in chart_columns}
-            for month in df.index
-        }
-        st.plotly_chart(scenario_monthly_cost_chart(chart_monthly), width="stretch")
-
-
-def render_backtesting_plausibility(meta: dict, scenario_id: str) -> None:
-    plausi = meta.get("plausibility", {}).get(scenario_id)
-    if not plausi:
+    if not chart_columns:
         return
-    label = meta.get("labels", {}).get(scenario_id, scenario_id)
-    st.subheader(f"✅ Plausibilisierung – {label}")
-    ok = plausi.get("ok_count", 0)
-    total = plausi.get("total_windows", 0)
-    failed = plausi.get("failed_count", 0)
-    st.caption(
-        f"{ok}/{total} Fenster OK "
-        f"(Toleranz: {plausi.get('tolerance_kwh')} kWh oder "
-        f"{plausi.get('tolerance_rel', 0) * 100:.0f} % relativ)"
-    )
-    failures: list[dict] = list(plausi.get("failures", []))
-    if not failures:
-        return
-
-    st.warning(f"{failed} Fenster ausserhalb der Toleranz")
-    only_failed = st.checkbox(
-        "Nur Fenster außerhalb Toleranz",
-        value=True,
-        key=f"plausi_only_failed_{scenario_id}",
-    )
-    visible_failures = failures if only_failed else failures
-    if not visible_failures:
-        st.info("Keine Fehlerfenster zur Anzeige.")
-        return
-
-    labels = [failure_window_label(item) for item in visible_failures]
-    selected_label = st.selectbox(
-        "Fenster analysieren",
-        labels,
-        key=f"plausi_window_select_{scenario_id}",
-    )
-    selected = visible_failures[labels.index(selected_label)]
-    st.dataframe(
-        pd.DataFrame(visible_failures),
-        width="stretch",
-        hide_index=True,
-    )
-
-    cons_df = cons_data_store.load_cons_data()
-    window_slice = slice_cons_data_for_window(cons_df, str(selected["window_end"]))
-    st.plotly_chart(
-        plausibility_window_consumption_chart(window_slice, selected),
-        width="stretch",
-    )
-    st.caption(cockpit_hint_caption())
+    chart_monthly = {
+        month: {col: float(df.loc[month, col]) for col in chart_columns}
+        for month in df.index
+    }
+    st.plotly_chart(scenario_monthly_cost_chart(chart_monthly), width="stretch")
 
 
-def render_backtesting_hourly_chart(
-    hourly: pd.DataFrame,
-    scenario_id: str,
-    month_key: str | None,
-) -> None:
-    df = hourly[hourly["scenario_id"] == scenario_id].copy()
-    if month_key:
-        df = df[df["ts"].dt.to_period("M").astype(str) == month_key]
-    if df.empty:
-        st.warning("Keine Stundenwerte für die Auswahl.")
-        return
-
-    label = df["scenario_label"].iloc[0]
-    st.subheader(f"📈 Stundenverlauf – {label}" + (f" ({month_key})" if month_key else ""))
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=df["ts"],
-        y=df["sim_cost"],
-        name="Stromkosten (€/h)",
-        marker_color="steelblue",
-        yaxis="y",
-    ))
-    if "sim_soc" in df.columns and df["sim_soc"].notna().any():
-        fig.add_trace(go.Scatter(
-            x=df["ts"],
-            y=df["sim_soc"],
-            name="SoC (%)",
-            line=dict(color="gold", width=2),
-            yaxis="y2",
-        ))
-    fig.update_layout(
-        xaxis_title="Zeit",
-        yaxis=dict(title="Kosten (€)", side="left"),
-        yaxis2=dict(title="SoC (%)", side="right", overlaying="y", showgrid=False),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02),
-        margin=dict(l=40, r=40, t=40, b=40),
-        height=400,
-    )
-    st.plotly_chart(fig, width="stretch")
-
-    with st.expander("Stundendetails"):
-        st.dataframe(
-            df.sort_values("ts", ascending=False),
-            width="stretch",
-            hide_index=True,
-        )
-
-
-def _render_backtesting_results(meta: dict, hourly: pd.DataFrame) -> None:
-    selected_id, month_key = render_backtesting_controls(meta, hourly)
-    render_backtesting_summary(meta)
-    render_backtesting_monthly_table(meta)
-
-    ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
-    if selected_id != ref_id:
-        render_backtesting_plausibility(meta, selected_id)
-
-    render_backtesting_hourly_chart(hourly, selected_id, month_key)
+def _render_backtesting_results(meta: dict) -> None:
+    render_backtesting_log_caption(meta)
+    render_annual_cost_table(meta)
+    render_reference_consumption_ui(meta)
+    render_backtesting_monthly_chart(meta)
 
 
 def render_backtesting_block() -> None:
     log_exists = backtesting_log.log_exists()
     meta: dict | None = None
-    hourly: pd.DataFrame | None = None
     log_stale = False
     stale_reason: str | None = None
 
     if log_exists:
         try:
-            meta, hourly = load_backtesting_data()
+            meta, _hourly = load_backtesting_data()
             stale_reason = log_stale_reason(meta)
             log_stale = stale_reason is not None
         except Exception as exc:
@@ -447,7 +342,7 @@ def render_backtesting_block() -> None:
         cons_data_ready=cons_ready,
     )
 
-    if not log_exists or meta is None or hourly is None:
+    if not log_exists or meta is None:
         if not log_exists:
             st.info(
                 "Noch kein Backtesting-Lauf vorhanden. "
@@ -455,4 +350,4 @@ def render_backtesting_block() -> None:
             )
         return
 
-    _render_backtesting_results(meta, hourly)
+    _render_backtesting_results(meta)

@@ -1,10 +1,13 @@
 """Datenadapter für die drei Verbrauchs-UI-Modi."""
 from __future__ import annotations
 
-import config
 import pandas as pd
 
 from data.consumption_profiles import build_modeled_hourly_kw_by_consumer
+from data.cons_data_house_profile import (
+    consumer_labels_for_ids,
+    expected_cons_data_consumer_ids,
+)
 from ui.consumption_display.types import ConsumptionSeriesBundle
 from ui.consumption_validation_charts import csv_series_to_monthly_kwh
 
@@ -54,7 +57,7 @@ def bundle_from_cons_data(df: pd.DataFrame) -> ConsumptionSeriesBundle:
     }
     baseload = df["baseload_kw"].astype(float).tolist()
     pv = df["pv_kw"].astype(float).tolist() if "pv_kw" in df.columns else None
-    labels = {cid: cid for cid in consumer_ids}
+    labels = consumer_labels_for_ids(consumer_ids)
     return ConsumptionSeriesBundle(
         timestamps=timestamps,
         consumer_series=consumer_series,
@@ -75,7 +78,7 @@ def _cons_data_consumer_ids(df: pd.DataFrame) -> list[str]:
         for col in df.columns
         if col.endswith("_kw") and col[: -len("_kw")] not in skip
     ]
-    configured = [c["id"] for c in config.get_flexible_consumers()]
+    configured = expected_cons_data_consumer_ids()
     if configured:
         matched = [cid for cid in configured if f"{cid}_kw" in df.columns]
         if matched:
