@@ -1,44 +1,52 @@
 ---
-description: Backlog-Dateien pflegen — erledigte Punkte verschieben, nicht durchstreichen
-globs: Backlog.md,Backlog-Bugfixes.md,Backlog-Erledigt.md
+description: 
+globs: Backlog.md, Backlog-Bugfixes.md, Backlog-Erledigt.md
 alwaysApply: false
 ---
 
-# Backlog.md, Backlog-Bugfixes.md & Backlog-Erledigt.md
+# Backlog Management & Bugfix Lifecycle
 
-**Offen:**
+## 1. File Structure & Responsibilities
 
-- `Backlog.md` — Feature-Backlog nach Version, Packaging, Referenz
-- `Backlog-Bugfixes.md` — Prod-Abweichungen, Regressionen (`xfail`), bekannte Fehlverhalten; Kapitel **`## Bugfix Verifications Pending`** für implementierte, noch nicht live verifizierte Fixes
+* **`Backlog.md`:** Open features (sorted by version, packaging, references). Repeated `### Version …` headings are intentional – move blocks, do not merge them.
 
-**Archiv:** `Backlog-Erledigt.md` (abgeschlossene Arbeiten — Features und Bugfixes gemeinsam)
+* **`Backlog-Bugfixes.md`:** Open bugs, deviations, and regressions (`xfail`). Contains the dedicated chapter `## Bugfix Verifications Pending`.
 
-Beim Pflegen:
+* **`Backlog-Completed.md`:** Central archive for all completed features and bugfixes.
 
-- **Erledigte Punkte nicht durchstreichen** (`~~…~~` vermeiden).
-- Stattdessen aus der jeweiligen offenen Datei entfernen und in `Backlog-Erledigt.md` eintragen:
-  - Neuer Abschnitt `### <Thema> (YYYY-MM-DD)` (Datum Europe/Vienna)
-  - Einzelpunkte mit `- [x] …`
-  - Bugfixes: Abschnittstitel z. B. `### Bugfix …` oder `### … Regression …`
-  - **Aufwand-Zeile (optional)** als **letzte** Zeile des Abschnitts, kursiv:
-    `_Aufwand: <Wert> Cursor-Tokens · Chats: <uuid>[, <uuid>…]_`
-    - `<Wert>` **manuell** aus dem Cursor-Usage-Dashboard (cursor.com → Settings → Usage) — steht **nicht** in den lokalen Transcripts und ist vom Agent nicht automatisch ermittelbar.
-    - Chat-UUID(s) werden vom Nutzer genannt (Zuordnung Kapitel → Chat ist manuell).
-    - Weglassen, wenn kein Wert vorliegt — keine Schätzwerte erfinden.
-    - **Zeitbasierte Näherung:** `scripts/token_commit_report.py` ordnet einen Cursor-Usage-CSV-Export den Minor-Bump-Commits zu und aggregiert Tokens/Kosten pro Kapitel (kein Chat-ID im Export → Näherung). Für ältere Kapitel CSV mit größerem Datumsbereich exportieren.
-- Bei **teilweise erledigten** Epics: nur die offenen Phasen/Unterpunkte in der Quelldatei belassen.
-- Nur dokumentieren, was tatsächlich erledigt wurde — nichts erfinden.
-- Referenz-Tabellen (z. B. Log-Dateien) gehören nicht ins Erledigt-Archiv, sondern unter **Referenz** in `Backlog.md`.
-- Wiederholte `### Version …`-Überschriften in `Backlog.md` sind bewusst — Reihenfolge per Block verschieben, nicht zusammenführen.
-- **Kapitel-Nomenklatur:** `MAJOR.MINOR.letter` (Teilschritte a, b, …) → `MAJOR.MINOR.0` (Release des Zyklus) → nächster MINOR `MAJOR.NEXT.0`; Buchstaben nur im Backlog, `version.py` ohne Buchstaben (Details: `roadmap-nomenclature.mdc`, `versioning.mdc`).
-- **Versionierung:** `version.py` **nie ohne Nutzer-Freigabe** ändern; während offener Buchstaben-/Release-Kapitel desselben MINOR **kein automatischer Bump** — Vorschlag und Nachfrage (siehe `versioning.mdc`).
+## 2. Archiving & Maintenance Rules
 
-### Bugfix-Verifikation (`## Bugfix Verifications Pending`)
+* **No Strikethrough:** Completed items are not formatted with `~~…~~`, but are completely deleted from the open files and moved to the archive.
 
-Drei Stufen für Bugfixes in `Backlog-Bugfixes.md`:
+* **Partially Completed:** For incomplete epics, only the remaining open phases/items remain in the source file.
 
-1. **Offen** — unter thematischem Kapitel (z. B. `## Bug SwimSpa Leistung`): Problem bekannt, noch kein Fix.
-2. **Verifications Pending** — Fix implementiert und committed; Punkt aus dem Themen-Kapitel nach `## Bugfix Verifications Pending` verschieben. **Nicht** nach `Backlog-Erledigt.md`.
-3. **Erledigt** — Live-/Prod-Abnahme erfolgreich: aus Pending entfernen → `Backlog-Erledigt.md` (`### Bugfix …`, `- [x]`).
 
-Bei fehlgeschlagener Verifikation: zurück ins Themen-Kapitel oder neuer Follow-up-Punkt; nicht als erledigt archivieren.
+**Backlog-Completed.md:** * **References:** Reference tables (e.g., log files) remain permanently under **Reference** in `Backlog.md`.
+
+* **Archive Format (`Backlog-Completed.md`):**
+
+* Structure: `### <Topic Bugfix or> (YYYY-MM-DD)` (Date according to Europe/Vienna).
+
+* Checkboxes: Entries must be formatted as `- [x] …`.
+
+* **Effort Line (Optional, last line of the section, italicized):**
+
+`_Effort: <Value> Cursor Tokens · Chats: <uuid>[, <uuid>…]_`
+
+*(Note: Determine values ​​manually from the cursor usage dashboard or via `scripts/token_commit_report.py`. Never invent estimates; omit if missing).*
+
+## 3. Bugfix 3-Step Workflow
+
+Bugfixes go through three strict phases in `Backlog-Bugfixes.md`:
+
+1. **Open:** The bug is known but unresolved $\rightarrow$ It is in the relevant chapter (e.g., `## Bug SwimSpa`).
+
+2. **Verifications Pending:** The fix is ​​implemented and committed $\rightarrow$ Move the entry from the topic to the chapter `## Bugfix Verifications Pending` (**do not archive yet!**). If verification fails, return to the topic or create a new follow-up item.
+
+3. **Done:** Only after successful live/production acceptance, remove from *Pending* and permanently move to `Backlog-Done.md`.
+
+## 4. Versioning & Release
+
+* **Rule:** Changes to `version.py` must **never be made without explicit user approval**.
+
+* During an ongoing MINOR cycle (letter steps/release chapters), **no automatic bump** occurs – instead, generate a proposal and request approval.

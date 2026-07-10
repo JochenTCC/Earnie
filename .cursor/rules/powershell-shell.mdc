@@ -1,41 +1,44 @@
 ---
-description: Shell-Befehle unter Windows PowerShell — kein &&, stattdessen working_directory oder ;
+description: 
 alwaysApply: true
 ---
 
-# Windows PowerShell — Shell-Befehle
+# Windows PowerShell — Shell Commands
 
-Die Umgebung nutzt **Windows PowerShell 5.x** (nicht pwsh 7+). `&&` und `||` sind dort **kein** gültiges Anweisungstrennzeichen.
+This environment uses **Windows PowerShell 5.x** (not pwsh 7+). `&&` and `||` are **not** valid statement separators in this environment.
 
-## Verboten
+
+``` ## Forbidden
 
 ```powershell
-# ❌ ParserError: Das Token "&&" ist kein gültiges Anweisungstrennzeichen
+# ❌ ParserError: The token "&&" is not a valid statement separator
 cd "c:\...\Energy-Optimizer" && .venv\Scripts\python.exe -m pytest ...
 ```
 
-## Stattdessen
+## Instead
 
-**Bevorzugt:** `working_directory` im Shell-Tool setzen und den Befehl ohne `cd` ausführen:
+**Preferred:** Set `working_directory` in the shell tool and execute the command without `cd`:
 
 ```powershell
 .venv\Scripts\python.exe -m pytest tests/ -q --tb=short
 ```
 
-**Alternativ:** Semikolon statt `&&` (läuft auch bei Fehler im ersten Teil weiter):
+**Alternative:** Use a semicolon instead of `&&` (continues execution even if the first part fails):
 
 ```powershell
 Set-Location "c:\Users\joche\Documents\Smarthome\Python\Energy-Optimizer"; .venv\Scripts\python.exe -m pytest tests/ -q --tb=short
-```
 
-**Bedingte Verkettung** (nur bei Erfolg des ersten Befehls) in PS 5.x:
+**Conditional Chaining** (only if the first command succeeds) in PowerShell 5.x:
 
 ```powershell
 Set-Location "c:\...\Energy-Optimizer"; if ($?) { .venv\Scripts\python.exe -m pytest tests/ -q }
+
 ```
 
-## Weitere Hinweise
+## Further Notes
 
-- Python aus dem Projekt: `.venv\Scripts\python.exe` (nicht `python` ohne Pfad, wenn venv gemeint ist)
-- Keine Bash-Heredocs (`<<'EOF'`) — unter PowerShell Heredocs mit `@"..."@` oder `-m` mit einzeiligem String
-- Git-Befehle funktionieren in PowerShell; nur die Verkettungssyntax anpassen
+- Python from the project: `.venv\Scripts\python.exe` (not `python` without the path if venv is meant)
+
+- No Bash heredocs (`<<'EOF'`) — in PowerShell, heredocs are created with `@"..."@` or `-m` with a single-line string
+
+- Git commands work in PowerShell; only the chaining syntax needs to be adjusted.

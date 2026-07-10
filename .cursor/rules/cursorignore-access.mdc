@@ -1,27 +1,35 @@
 ---
-description: Vorgehen, wenn .cursorignore den Zugriff auf benötigte Dateien blockiert
+description: 
 alwaysApply: true
 ---
 
-# .cursorignore — Zugriff aktiv abstimmen
+# .cursorignore — Actively coordinate access
 
-Wenn du irgendwo Einblick brauchst, dieser aber durch `.cursorignore` verhindert wird
-(nicht lesbare Datei/Ordner, fehlender Index), dann **nicht still umgehen und nicht raten**.
-Stattdessen: den Nutzer aktiv fragen und gemeinsam entscheiden, was mit dem `.cursorignore`-Eintrag passiert.
+If you need access to something that's blocked by `.cursorignore` (unreadable file/folder, missing index), then **don't just ignore it or guess**.
 
-## Ablauf
+Instead: actively ask the user and decide together what to do with the `.cursorignore` entry.
 
-1. Kurz benennen, **welche** Datei/welchen Ordner du sehen willst und **wofür** (Zweck).
-2. Nennen, **welcher Eintrag** in `.cursorignore` den Zugriff blockiert.
-3. Optionen zur Entscheidung anbieten, z. B.:
-   - Eintrag anpassen/entfernen (dauerhaft lesbar machen)
-   - Gezielte Ausnahme ergänzen (`!pfad/...`) statt Eintrag zu löschen
-   - Datei einmalig an einen nicht-ignorierten Ort kopieren/entpacken
-   - So lassen (kein Zugriff) und anders vorgehen
-4. Erst nach Bestätigung handeln. `.cursorignore` **nie eigenmächtig** ändern.
+## Procedure
 
-## Hintergrund
+1. Briefly state **which** file/folder you want to see and **why** (purpose).
 
-`.cursorignore` ist bewusst restriktiv (Zugangsdaten, Produktivkonfiguration, Laufzeit-/Dumps).
-Manche Einträge sind evtl. zu weit gefasst — deshalb im Zweifel gemeinsam entscheiden,
-statt Zugriff zu erzwingen oder ganz auf die Information zu verzichten.
+2. State **which** entry in `.cursorignore` is blocking access.
+
+3. Offer options for a decision, e.g.:
+
+- Modify/remove the entry (make it permanently readable)
+
+- Add a specific exception (`!path/...`) instead of deleting the entry
+
+- Copy/extract the file once to a non-ignored location
+
+- Leave it as is (no access) and proceed differently
+
+4. Only act after confirmation. Never change `.cursorignore` on your own.
+
+## Background
+
+`.cursorignore` is intentionally restrictive (access credentials, production configuration, runtime/dumps).
+
+Some entries may be too broad—therefore, if in doubt, decide together,
+instead of forcing access or foregoing the information altogether.

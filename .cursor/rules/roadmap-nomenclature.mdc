@@ -1,89 +1,59 @@
 ---
-description: Einheitliche Benennung für Epics, Phasen und Schritte (Roadmap, Backlog, Commits)
+description: 
 alwaysApply: true
 ---
 
-# Roadmap-Nomenklatur
+# Roadmap & Versioning Nomenclature
 
-## Backlog-Kapitel — `Version MAJOR.MINOR.letter`
+## 1. Backlog Versioning (`Backlog.md`)
 
-In `Backlog.md` kennzeichnen **Buchstaben an dritter Stelle** einzelne Entwicklungsschritte **innerhalb desselben MINOR-Zyklus** (gleiche MINOR-Zahl wie das Release-Kapitel).
+* **Cycle Logic:** Development steps proceed alphabetically up to Release `.0` (e.g., `1.24.a` → `1.24.b` → Release `1.24.0` → Next Minor `1.25.0`).
 
-| Schreibweise | Bedeutung | Beispiel |
-|--------------|-----------|----------|
-| `### Version MAJOR.MINOR.letter — Titel` | Teilschritt im MINOR-Zyklus (vor dem `.0`-Release) | `### Version 1.24.a — Hauskonfigurator und Szenarien` |
-| `### Version MAJOR.MINOR.0 — Titel` | Release-Kapitel des MINOR-Zyklus (Ziel = `version.py` nach Abschluss der Buchstaben-Schritte) | `### Version 1.24.0 — Hauskonfigurator UX & E-Auto-Profil` |
-| `### Version MAJOR.NEXT_MINOR.0 — Titel` | Nächster MINOR-Release | `### Version 1.25.0 — Runtime-Entitäten & Tarife (Live)` |
-| `### Version N.+1 — Titel` | Platzhalter für noch nicht nummerierte künftige MINORS | `### Version 2.+1 — Test-Config entkoppeln` |
+* **Placeholders:** Future minors that are not yet numbered are designated as `N.+1` (e.g., `2.+1`).
 
-**Regeln:**
+* **`version.py` vs. Backlog:** `version.py` contains only the SemVer (without letters). Changes to `version.py` **always** require explicit user approval (no automatic increment).
 
-- Reihenfolge im MINOR-Zyklus: **a → b → … → `MAJOR.MINOR.0`** (z. B. `1.24.a` → `1.24.b` → `1.24.0`, danach nächster MINOR `1.25.0`).
-- Buchstaben-Kapitel und das zugehörige `.0`-Kapitel **teilen** dieselbe MINOR-Zahl in der Planung.
-- **`version.py` vs. Backlog:** SemVer in `version.py` ohne Buchstaben; Fortschritt (`.a` … `.g`, Release `.0`) nur im Backlog. Während eines laufenden MINOR-Zyklus **`version.py` nicht automatisch hochzählen** — Änderungen nur nach expliziter Nutzer-Freigabe (siehe `versioning.mdc`).
-- **Abgrenzung Epic-Schritte:** Backlog-Buchstabe = ganzes Kapitel/Feature-Block; **P3a** = Feinschritt *innerhalb* eines Kapitels (siehe unten).
-- Im Dialog: „Als Nächstes **1.24.b**“ — nicht „nächstes 1.+1“ oder bare „Phase 3“.
+* **Granularity:** Backlog letter (`1.24.a`) = Entire chapter/feature block. Incremental steps within this process utilize the Step level (`P3a`).
 
-## Drei Ebenen (Epics / Phasen / Schritte)
+## 2. The 3 Hierarchy Levels
 
-| Ebene | Begriff | Schreibweise | Beispiel |
-|-------|---------|--------------|----------|
-| 1 | **Epic** | Kurzname oder voller Titel | **UI S-2** (= UI Sunset-2-Sunset) |
-| 2 | **Phase** | Epic · Phase N | **S-2 P3**, **MILP-Horizont P3**, **Adaption P1**, **Thermik P2** |
-| 3 | **Schritt** | Epic · Phase · Buchstabe | **S-2 P3a** |
+1. **Epic:** Short name or full text (e.g., `UI S-2`).
 
-## Regeln
+2. **Phase:** `<Epic> P<Number>` (e.g., `S-2 P3`, `Adaptation P1`).
 
-- **Nie** „Phase 3“ ohne Epic — mehrere Epics nutzen dieselbe Nummer.
-- **Schritte** nur innerhalb einer **offenen Phase** (3a, 3b, …).
-- Keine „Paket A/B“ — immer **S-2 P3a** o. ä.
-- Follow-ups im Backlog sind **eigene Punkte**, keine Phasen.
+3. **Step:** `<Epic> P<Number><Letter>` (e.g., `S-2 P3a`) $\rightarrow$ Only permitted within open phases.
 
-## Epics (Qualifikation)
+## 3. Strict Communication Rules
 
-| Epic | Phasen | Kurz |
-|------|--------|------|
-| UI Sunset-2-Sunset | P1–P4 | **UI S-2** |
-| MILP Sunset-Horizont | P1–P5 | **MILP-Horizont** |
-| Session-Abschluss | P1–P2 | **Session-Abschluss** |
-| MIGRATION.md | P1–P7 | **Migration** |
-| Parameter-Adaption | P1–P4 | **Adaption** |
-| Generische Wärmemodelle | P1–P3 | **Thermik** |
+* **Precision:** Always use exact identifiers in dialogue/chat (e.g., *"Continue with 1.24.b"* or *"S-2 P3a"*).
 
-## Adaption — Phasen
+* **Forbidden:** No isolated phase specifications (*"Phase 3"* without an epic), no fabricated clusters (*"Package A"*), and no vague placeholders (*"1.+1"*).
 
-| Phase | Inhalt |
-|-------|--------|
-| P1 | Generisches Adaptionsmodell (Skeleton) |
-| P2 | PV-Adaption (neuer Ansatz) |
-| P3 | Adaptionsalgorithmus (PV-Pilot) |
-| P4 | UI Visualisierung Adaptionsalgos |
+**Backlog Logic:** Subsequent tasks (follow-ups) are separate items, not new phases.
 
-## Thermik — Phasen
 
-| Phase | Inhalt |
-|-------|--------|
-| P1 | Isolierte Ein-Knoten-Modelle (Swim-Spa, Gefrierschrank) |
-| P2 | Gekoppelte Ein-Knoten-Modelle (Haus ↔ Speicher ↔ Solar) |
-| P3 | Thermik-Parameter-Adaption |
+**Forbidden:** No isolated phase specifications (*"Phase 3"* without an epic), no fabricated clusters (*"Package A"*), and no vague placeholders (*"1.+1"*).
 
-## UI S-2 — Phasen
+**Backlog Logic:** Subsequent tasks (follow-ups) are separate items, not new phases.
 
-| Phase | Inhalt |
-|-------|--------|
-| P1 | Modus, Fenster, SA-Navigation |
-| P2 | Daten-Schicht, Chart 1, Tabelle |
-| P3 | Chart 2, Marker, Cleanup, Kennzahlen (Schritte 3a–3d) |
-| P4 | Docs & Tests |
+** ## 4. Validated Epics & Phases
 
-## Commits & Chat
+* **UI Sunset-2-Sunset (`UI S-2`):** P1 (Navi/Mode), P2 (Data/Table), P3 (Charts/Markers/Steps 3a–3d), P4 (Docs/Tests)
+* **Parameter Adaptation (`Adaptation`):** P1 (Skeleton), P2 (PV New), P3 (PV Pilot), P4 (UI Viz)
+* **Generic Thermal Models (`Thermals`):** P1 (Single-Node), P2 (Coupled), P3 (Adaptation)
+* **MILP Sunset Horizon (`MILP Horizon`):** Phases P1-P5
+* **Session Conclusion:** Phases P1-P2
+* **Migration (`MIGRATION.md`):** Phases P1-P7
+
+## 5. Commit & Chat Syntax
+
+Format: `<Scope>: <Version> <Phase/Step> <Description>` or directly via Epic-Scope:
+
+```text
+houseconfig: 1.24.a P5 UI House Configurator and Scenario Editor
+refactor: 1.24.b Epic 1 milp.py LOC Split
+houseconfig: 1.24.0 P2 UI New/Remove Electric Car Profile
+runtime: 1.25.0 P1 Data Model Live Entities
+ui(s2): P3a Chart 2 Actual/Forecast Separated
 
 ```
-hausconfig: 1.24.a P5 UI Hauskonfigurator und Szenarieneditor
-refactor: 1.24.b Epic 1 milp.py LOC-Split
-hausconfig: 1.24.0 P2 UI Neu/Entfernen E-Auto-Profil
-runtime: 1.25.0 P1 Datenmodell Live-Entitäten
-ui(s2): P3a Chart 2 Ist/Prognose getrennt
-```
-
-Im Dialog: „Als Nächstes **1.24.b**“ oder **S-2 P3a** — nicht „Paket A“, bare „Phase 3“ oder undifferenziertes „1.+1“. Analog: **Adaption P1**, **Thermik P2**.

@@ -1,16 +1,16 @@
 ---
-description: Session beenden — Backlog sync, Commit aller Änderungen, Push, optional Docker
+description: End session — backlog sync, commit all changes, push, optional Docker
 alwaysApply: false
 ---
 
-# Session-Abschluss
+# Session Conclusion
 
-Wenn der User **Session beenden**, **Backlog sync**, **Commit und Push** oder einen vergleichbaren Session-Abschluss wünscht:
+When the user wants to **end session**, **backlog sync**, **commit and push**, or a comparable session wrap-up:
 
-1. Skill `.cursor/skills/session-abschluss/SKILL.md` vollständig befolgen
-2. **Phase 1:** `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` pflegen → alle freigegebenen offenen Änderungen committen → pushen
-3. **`version.py`:** nur nach expliziter Nutzer-Freigabe ändern (siehe `versioning.mdc`) — kein automatischer Bump bei Session-Ende
-4. Bei lokalen oder möglicherweise temporären Dateien **vorher nachfragen** (z. B. persönliche VS-Code-Einstellungen, lokale Pfade)
-5. **Phase 2** (Docker build/push) **nur** nach expliziter Bestätigung — nie automatisch
+1. Follow skill `.cursor/skills/session-abschluss/SKILL.md` in full
+2. **Phase 1:** Maintain `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` → commit all approved open changes → push
+3. **`version.py`:** change only after explicit user approval (see `versioning.mdc`) — no automatic bump at session end
+4. For local or possibly temporary files **ask first** (e.g. personal VS Code settings, local paths)
+5. **Phase 2** (Docker build/push) **only** after explicit confirmation — never automatically
 
-Commit- und Push-Freigabe gilt durch die Session-beenden-Anfrage; trotzdem keine Secrets oder gitignored Dateien committen.
+Commit and push approval is implied by the end-session request; still do not commit secrets or gitignored files.

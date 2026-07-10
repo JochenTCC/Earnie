@@ -1,78 +1,78 @@
 ---
 name: session-abschluss
 description: >-
-  Beendet eine Entwicklungs-Session: Backlog.md, Backlog-Bugfixes.md und
-  Backlog-Erledigt.md pflegen,
-  alle offenen Änderungen committen und pushen, optional Docker-Image bauen
-  und nach ghcr.io pushen.
-  Verwenden bei „Session beenden“, „Backlog sync“, „Commit und Push“ oder
-  ausdrücklicher Anfrage zum Session-Abschluss.
+  Ends a development session: maintain Backlog.md, Backlog-Bugfixes.md, and
+  Backlog-Erledigt.md,
+  commit and push all open changes, optionally build a Docker image
+  and push it to ghcr.io.
+  Use for "end session", "backlog sync", "commit and push", or
+  an explicit request to conclude the session.
 ---
 
-# Session-Abschluss
+# Session Conclusion
 
-Zweiphasiger Workflow. **Phase 2 nur nach expliziter Bestätigung** des Users starten.
+Two-phase workflow. **Start Phase 2 only after explicit user confirmation.**
 
 ## Phase 1 — Backlog, Commit, Push
 
-### 1. Kontext sammeln
+### 1. Gather context
 
-Parallel ausführen:
+Run in parallel:
 
 - `git status`
 - `git diff` (unstaged + staged)
 - `git diff --cached`
-- `git log -5 --oneline` (Commit-Stil)
-- Chat-Verlauf dieser Session: was wurde erledigt, was ist offen geblieben?
+- `git log -5 --oneline` (commit style)
+- Chat history for this session: what was completed, what remains open?
 
-### 2. Änderungen klassifizieren
+### 2. Classify changes
 
-**Standard:** Alle getrackten und sinnvollen untracked Änderungen committen.
+**Default:** Commit all tracked and meaningful untracked changes.
 
-**Vor dem Staging nachfragen** bei Dateien/Gruppen, die nur lokal oder möglicherweise temporär sind:
+**Ask before staging** for files/groups that are local-only or possibly temporary:
 
-| Kategorie | Beispiele | Vorgehen |
-|-----------|-----------|----------|
-| IDE/Dev lokal | `.vscode/launch.json`, `.vscode/settings.json` mit persönlichen Pfaden | Einzeln vorstellen, committen ja/nein |
-| Lokale Pfade | UNC-Pfade (`\\NAS\...`), absolute User-Pfade, Debug-Ports | Nachfragen |
-| Experimentell | Scratch-Skripte, `tmp/`, `*.bak`, Kommentar-Reste | Nachfragen |
-| Runtime/Secrets | `.env`, `runtime/*`, `config/config.json` | **Nicht** committen (gitignored); warnen falls doch sichtbar |
-| Unklar | Große Diff ohne klaren Session-Bezug | Kurz beschreiben und nachfragen |
+| Category | Examples | Approach |
+|----------|----------|----------|
+| IDE/dev local | `.vscode/launch.json`, `.vscode/settings.json` with personal paths | Present individually, commit yes/no |
+| Local paths | UNC paths (`\\NAS\...`), absolute user paths, debug ports | Ask |
+| Experimental | Scratch scripts, `tmp/`, `*.bak`, leftover comments | Ask |
+| Runtime/secrets | `.env`, `runtime/*`, `config/config.json` | **Do not** commit (gitignored); warn if visible |
+| Unclear | Large diff without clear session context | Briefly describe and ask |
 
-Wenn mehrere fragliche Dateien: **eine kompakte Liste** mit Empfehlung (committen / auslassen / später).
+If multiple questionable files: **one compact list** with recommendation (commit / skip / later).
 
-Erst nach Antwort des Users stagen. Ausgeschlossene Dateien nicht committen.
+Stage only after the user responds. Do not commit excluded files.
 
-### 3. Backlog aktualisieren
+### 3. Update backlog
 
-Schema aus `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` beibehalten (siehe auch `.cursor/rules/backlog.mdc`, Kapitel-Nomenklatur in `roadmap-nomenclature.mdc`):
+Keep the schema from `Backlog.md` / `Backlog-Bugfixes.md` / `Backlog-Erledigt.md` (see also `.cursor/rules/backlog.mdc`, chapter nomenclature in `roadmap-nomenclature.mdc`):
 
-- **Buchstaben-Kapitel** (`1.24.a` … `1.24.g`): bei erledigt → `Backlog-Erledigt.md`; **`version.py` dabei nicht automatisch ändern** (siehe `versioning.mdc`)
-- **Release-Kapitel** (`1.24.0`, `1.25.0`): Backlog-Fortschritt wie üblich; Version-Bump **nur nach expliziter Nutzer-Freigabe**
-- **`version.py` ≠ Backlog-Stand:** Backlog-Kapitel markieren Entwicklungsschritte; `version.py` bleibt während eines MINOR-Zyklus stabil, bis der Nutzer einen Bump freigibt
+- **Letter chapters** (`1.24.a` … `1.24.g`): when done → `Backlog-Erledigt.md`; **do not change `version.py` automatically** (see `versioning.mdc`)
+- **Release chapters** (`1.24.0`, `1.25.0`): backlog progress as usual; version bump **only after explicit user approval**
+- **`version.py` ≠ backlog state:** backlog chapters mark development steps; `version.py` stays stable during a MINOR cycle until the user approves a bump
 
-- **Erledigte Punkte nicht durchstreichen** — aus der jeweiligen offenen Datei entfernen und in `Backlog-Erledigt.md` mit `- [x]` eintragen
-- **Backlog-Bugfixes.md:** offene Prod-Bugs/Regressionen; bei Erledigung **PATCH nur vorschlagen** und Nutzer fragen — nicht still ändern
-- **`## Bugfix Verifications Pending`:** implementierte Fixes mit ausstehender Live-Abnahme — nach Commit hierher verschieben, **nicht** nach `Backlog-Erledigt.md`; nach erfolgreicher Verifikation erst archivieren (siehe `.cursor/rules/backlog.mdc`)
-- **Backlog.md:** Feature-Backlog (Version-Blöcke), Packaging, Referenz — nur noch offene Phasen/Unterpunkte
-- **Backlog-Erledigt.md:** Neuer Abschnitt `### <Thema> (YYYY-MM-DD)` mit Datum **heute** (lokale Zeit Europe/Vienna)
-- Nur dokumentieren, was in Session/Diff tatsächlich erledigt wurde — nichts erfinden
-- Offene nächste Schritte bei teilweise erledigten Items belassen
-- **Aufwand-Zeile je neuem Erledigt-Abschnitt (optional):** Nutzer nach Cursor-Token-Verbrauch und relevanten Chat-UUID(s) fragen und als letzte Zeile eintragen:
-  `_Aufwand: <Wert> Cursor-Tokens · Chats: <uuid>[, <uuid>…]_`
-  - Wert kommt **manuell** aus dem Cursor-Usage-Dashboard (nicht in Transcripts, nicht automatisch ermittelbar) — bei „weiß nicht"/keine Angabe Zeile **weglassen**, nicht schätzen
-  - **Näherung per Zeitfenster:** `scripts/token_commit_report.py` korreliert einen Cursor-Usage-CSV-Export mit den Minor-Bump-Commits (= Kapiteln) und weist Events/Total-Tokens/Tokens-o.-Cache/Kosten pro Kapitel aus. Zeitbasiert (kein Chat-ID im Export). Aufruf:
-    `.venv\Scripts\python.exe -m scripts.token_commit_report --usage-csv "<pfad>\usage-events-*.csv"`
-  - Format-Details siehe `.cursor/rules/backlog.mdc`
+- **Do not strikethrough completed items** — remove them from the respective open file and add them to `Backlog-Erledigt.md` with `- [x]`
+- **Backlog-Bugfixes.md:** open prod bugs/regressions; when done **suggest PATCH only** and ask the user — do not change silently
+- **`## Bugfix Verifications Pending`:** implemented fixes awaiting live verification — move here after commit, **not** to `Backlog-Erledigt.md`; archive only after successful verification (see `.cursor/rules/backlog.mdc`)
+- **Backlog.md:** feature backlog (version blocks), packaging, reference — only remaining open phases/sub-items
+- **Backlog-Erledigt.md:** New section `### <Topic> (YYYY-MM-DD)` with date **today** (local time Europe/Vienna)
+- Document only what was actually completed in the session/diff — do not invent items
+- Leave open next steps for partially completed items
+- **Effort line per new completed section (optional):** Ask the user for Cursor token usage and relevant chat UUID(s), and add as the last line:
+  `_Effort: <value> Cursor tokens · Chats: <uuid>[, <uuid>…]_`
+  - Value comes **manually** from the Cursor usage dashboard (not in transcripts, not auto-detectable) — if "don't know"/no value, **omit** the line, do not estimate
+  - **Approximation by time window:** `scripts/token_commit_report.py` correlates a Cursor usage CSV export with minor-bump commits (= chapters) and reports events/total tokens/tokens w/o cache/cost per chapter. Time-based (no chat ID in export). Invoke:
+    `.venv\Scripts\python.exe -m scripts.token_commit_report --usage-csv "<path>\usage-events-*.csv"`
+  - Format details see `.cursor/rules/backlog.mdc`
 
-Geänderte Backlog-Datei(en) in den Commit aufnehmen.
+Include changed backlog file(s) in the commit.
 
 ### 4. Commit
 
-- Alle **freigegebenen** Änderungen stagen (`git add` gezielt oder `-A` minus ausgeschlossene Pfade)
-- Commit-Message im Repo-Stil: kurz, Deutsch, Punkt am Ende, Fokus auf **Warum/Was** (vgl. `git log`)
-- Mehrere thematisch getrennte Blöcke → ein Commit mit Bullet-Zeilen im Body ist ok; lieber **ein Session-Commit** als viele Mini-Commits
-- **Nur committen, wenn der User Phase 1 ausgelöst hat** (explizite Session-beenden-Anfrage = Freigabe)
+- Stage all **approved** changes (`git add` selectively or `-A` minus excluded paths)
+- Commit message in repo style: short, German, period at end, focus on **why/what** (see `git log`)
+- Multiple thematically separate blocks → one commit with bullet lines in the body is ok; prefer **one session commit** over many mini-commits
+- **Commit only when the user triggered Phase 1** (explicit end-session request = approval)
 
 ### 5. Push
 
@@ -80,79 +80,79 @@ Geänderte Backlog-Datei(en) in den Commit aufnehmen.
 git push
 ```
 
-Bei Fehler (upstream, Auth): Ursache nennen, nicht blind wiederholen.
+On failure (upstream, auth): state the cause, do not blindly retry.
 
-### 6. Phase-1-Bericht
+### 6. Phase 1 report
 
-Kurz zusammenfassen:
+Briefly summarize:
 
-- Backlog-Änderungen
-- Commit-Hash und Message
-- Push-Status
-- Ausgeschlossene Dateien (falls vorhanden)
+- Backlog changes
+- Commit hash and message
+- Push status
+- Excluded files (if any)
 
-Abschließen mit:
+Close with:
 
-> Soll ich jetzt das Docker-Image bauen und nach ghcr.io pushen?
+> Should I now build the Docker image and push it to ghcr.io?
 
-**Nicht** automatisch mit Phase 2 starten.
+**Do not** automatically proceed to Phase 2.
 
 ---
 
-## Phase 2 — Docker bauen & pushen (nur auf Nachfrage)
+## Phase 2 — Build & push Docker (on request only)
 
-Start **nur** bei explizitem „Ja“ / „Docker bauen“ / „Image pushen“ nach Phase 1.
+Start **only** on explicit "Yes" / "build Docker" / "push image" after Phase 1.
 
-### 1. Version prüfen
+### 1. Check version
 
-`version.py` lesen. **Niemals ohne explizite Nutzer-Freigabe ändern** (siehe `versioning.mdc`).
+Read `version.py`. **Never change without explicit user approval** (see `versioning.mdc`).
 
-Während eines laufenden MINOR-Zyklus (`1.24.a` … `1.24.g`, Release `1.24.0`): **keinen automatischen Bump** — auch nicht „zurücksetzen“ oder PATCH nachholen.
+During an active MINOR cycle (`1.24.a` … `1.24.g`, release `1.24.0`): **no automatic bump** — also do not "reset" or catch up PATCH.
 
-Wenn ein Release sinnvoll erscheint: **einmal** Vorschlag (Zielversion + Begründung) und Nutzer fragen. Bei „nein“ oder ohne Antwort: unverändert lassen.
+If a release seems appropriate: **once** suggest (target version + rationale) and ask the user. On "no" or no response: leave unchanged.
 
-### 2. Build & Push
+### 2. Build & push
 
-Kanonischer Befehl für Release (Synology + LoxBerry, Multi-Arch):
+Canonical command for release (Synology + LoxBerry, multi-arch):
 
 ```powershell
 python -m scripts.build_container --target all --push
 ```
 
-Nur Synology (amd64):
+Synology only (amd64):
 
 ```powershell
 python -m scripts.build_container --target synology --push
 ```
 
-Alternativ Windows-Wrapper: `.\build-container.ps1 --target all --push`
+Alternative Windows wrapper: `.\build-container.ps1 --target all --push`
 
-Standard-Tags:
+Default tags:
 
 - `ghcr.io/jochentcc/ernie-energy:latest`
-- `ghcr.io/jochentcc/ernie-energy:<version>` aus `version.py`
+- `ghcr.io/jochentcc/ernie-energy:<version>` from `version.py`
 
 Details: `docs/einrichtung/container.md`
 
-### 3. Voraussetzungen
+### 3. Prerequisites
 
-- Docker läuft; für `--target all`: `docker buildx create --use` (einmalig, siehe container.md)
-- `docker login ghcr.io` erfolgreich — bei Auth-Fehler stoppen und Hinweis geben
-- Hook kann `docker push` zur Bestätigung markieren — User-Freigabe abwarten
+- Docker is running; for `--target all`: `docker buildx create --use` (once, see container.md)
+- `docker login ghcr.io` successful — on auth error stop and give guidance
+- Hook may mark `docker push` for confirmation — wait for user approval
 
-### 4. Phase-2-Bericht
+### 4. Phase 2 report
 
-- Gebaute/gepushte Tags
-- Version aus `version.py`
-- Deploy-Hinweise:
+- Built/pushed tags
+- Version from `version.py`
+- Deploy notes:
   - Synology: `docker compose -f docker-compose-synology.yml pull && ... up -d`
   - LoxBerry: `docker compose -f docker-compose-loxberry.yml pull && ... up -d`
 
 ---
 
-## Fehlerbehandlung
+## Error handling
 
-- Keine leeren Commits
-- Kein Push force ohne explizite User-Anweisung
-- Kein Commit von Secrets oder gitignored Runtime-Dateien
-- Bei Hook-Abfrage zu `docker push`: User-Entscheidung abwarten
+- No empty commits
+- No force push without explicit user instruction
+- No commit of secrets or gitignored runtime files
+- On hook prompt for `docker push`: wait for user decision
