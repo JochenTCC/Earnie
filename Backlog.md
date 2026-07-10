@@ -16,33 +16,162 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature-Backlog
 
-### Version 1.25.0 Backtesting mit Hauskonfiguration starten und auswerten
+### Version 1.25.0 — Backtesting mit Hauskonfiguration (UI-Nachzug)
 
-- [ ] Neue UI für Verbrauchs-Anzeige (Wird benutzt in Hauskonfigurator / Backtesting / Szenarieneditor)
- - Normalerweise wird ein ganzes Jahr angezeigt (Sonderfall bei backtesting - Test)
- - Gleiche Basis zur Anzeige des Verbrauch-Verhaltens in allen Seiten
-  - Es gibt eine Monatsübersicht mit Balken (Vergleich mit Balken nebeneinander)
-  - Darunter gibt es einen Chart mit zeitlichem Verlauf, bei dem zwischen Monats- und Wochenansicht umgeschaltet werden kann. Es bleiben die Vor- und Zürück Buttons (entweder um einen Monat oder um eine Woche)
-  - Jeder Verbraucher hat einen eigenen Verlauf im Chart und einen eigenen Balken. Die Verbrauchsbalken werden aufsummiert zum Gesamtverbrauch
-  - Basis-Verbrauch als Residuum hat einen eigenen Verlauf
-- [ ] Neue UI für Kostenvergleich (beim Backtesting)
-  - Monatliche Stromkosten je Szenario bleibt
-  - Die Tabelle wird entfernt
-  - Der Stundenverlauf der Kosten wird entfernt
-  - Verbrauchsanzeige einfügen (siehe oben)
-  - Bei Abweichungen der Optimierung werden auffälligen Ergebnisse in einer Liste angezeigt, mit Differenz zwischen Soll- und Ist-Verbrauch
-    - Jedes Ergebnis kann ausgewählt werden, damit dafür im 24h oder SA_0-SA_2 Modus ein detaillierter Verlauf angezeigt werden kann - Code aus Cockpit für Chart1 und Chart 2 wiederverwenden.
-- [ ] Gesamtaufbau Backtesting-Seite
-  - Anzeige der nicht optimierten Jahresverbräuche
-  - Buttons zur Ausführung des backtesting (mit allen definierten Szenarien) - wie bereits vorhanden
-  - Auswahl "Szenario Detailansicht" und "Monat Detailansicht" entfallen
-  - Eine Tabelle mit den Gesamtkosten aller Szenarien (inkl. Nicht optimiert)
-  - Verbrauchs-Anzeige (siehe oben)
-  - Kostenvergleich (siehe oben)
+**Basis erledigt** (siehe [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.25.0): Hauskonfigurator, Szenarieneditor, Backtesting-Runner, `cons_data`, Fingerprint, erste Charts/Tests.
+
+**Offen:** Einheitliche Verbrauchs-UI, neuer Backtesting-Seitenaufbau, Abweichungsliste, Chart1/2-Detail (Scope nach Smoketest).
+
+**Ist-Stand Code (Kurz):** `ui/consumption_comparison_panel.py` (nur Hauskonfigurator, Ist vs. Modell, nur KW-Navigation); `ui/backtesting_cons_data.py` (`total_kw`/`baseload_kw`/`pv_kw`); Backtesting-Seite noch mit Szenario-/Monat-Selectbox, Monats-Dataframe, Stundenkosten-Chart; Plausibilität ohne Cockpit-Chart1/2 (`backtesting_plausibility_charts.py`).
+
+#### Getroffene Entscheidungen (2026-07-10)
+
+| Thema | Entscheidung |
+|-------|--------------|
+| **Datenmodus Verbrauchs-UI** | **Modus A:** Hauskonfigurator = Ist-CSV vs. Modell. Backtesting = nur `cons_data` (historisch). Szenarieneditor = nur modelliertes Hausprofil. Kein Ist-vs-Modell-Vergleich auf Backtesting/Szenarieneditor. |
+| **Monatsansicht Verlauf** | Stündlich innerhalb des gewählten Monats; Navigation ←/→ pro Monat. |
+| **Wochenansicht Verlauf** | ISO-KW, stündlich (wie heute). |
+| **Abweichungsdetail (Ziel)** | Volle Cockpit-Chart1/2 in **24h** und **SA_0–SA_2** — **aber** erst nach Smoketest `sunset_window` und Persistenz-Entscheid (siehe 1.25.e / 1.25.f). |
+| **Monatskosten-Tabelle** | Dataframe-Tabelle im Monatsvergleich **entfällt**; Plotly-Monatschart **bleibt**. |
+| **Gesamtkosten** | Neue kompakte Jahres-Tabelle (alle Szenarien inkl. Referenz) statt Metrik-Spalten allein. |
+
+#### Offene Klärungen (für spätere Chats)
+
+- [ ] **„Nicht optimierte Jahresverbräuche“** — gemeint vermutlich Referenz/`cons_data` (historisch ohne Optimierung), nicht optimierte Szenarien. Bestätigen?
+- [ ] **Testlauf (1 Monat):** Verbrauchs-UI nur auf Testmonat beschränken; Navigation außerhalb disabled/leer?
+- [ ] **Szenarieneditor:** Nur modelliertes Hausprofil des zugeordneten Profils (ohne `cons_data`, ohne CSV-Ist)?
+- [ ] **PV in Verbrauchs-UI:** `pv_kw` als eigene Spur (Erzeugung) oder nur Verbraucher + Basislast?
+- [ ] **Gesamtkosten-Tabelle:** Spalten — Szenario | Jahres-kWh | Jahres-€ | Δ vs. Referenz (weitere Spalten?)
 
 - [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
   - Habe Admins in loxforum nach der besten Stelle für einen Post gefragt
   - Soll unter "mein Projekt" gepostet werden
+
+---
+
+### Version 1.25.a — Verbrauchs-UI-Kern
+
+Gemeinsame Streamlit-Komponente für Hauskonfigurator, Backtesting und Szenarieneditor.
+
+- [ ] **Drei Modi** in einem Kernmodul (z. B. `ui/consumption_display/`):
+  - `csv_validation` — Ist-CSV + Modell (Hauskonfigurator)
+  - `cons_data` — `cons_data_hourly.csv` mit `{id}_kw`, `baseload_kw`, optional `pv_kw` (Backtesting)
+  - `modeled_profile` — Hausprofil-Modell je Verbraucher (Szenarieneditor)
+- [ ] **Monatsübersicht:** je Verbraucher eigener Balken; Summe = Gesamtverbrauch; Basislast als Residuum eigene Spur
+- [ ] **Zeitverlauf:** Toggle **Monat | Woche**; ←/→ je nach Modus (Monat = stündlich, Woche = ISO-KW stündlich)
+- [ ] **Datenschicht:** `build_modeled_hourly_kw_by_consumer()` in `data/consumption_profiles.py` (Split je Verbraucher + Basislast)
+- [ ] **Tests:** Monatsaggregation, Navigation-Grenzen, per-Consumer-Split
+
+**Manuelle Abnahme**
+
+- [ ] Hauskonfigurator + CSV: Monatsbalken Ist vs. Modell; Toggle Monat/Woche; jeder Verbraucher + Basislast sichtbar
+- [ ] `cons_data` synthetisch: gestapelte Monatsbalken summieren sich ≈ `total_kw`
+- [ ] ←/→ Monat: stündlicher Verlauf; Woche: korrekte ISO-KW-Grenzen
+
+---
+
+### Version 1.25.b — Verbrauchs-UI in drei Seiten
+
+- [ ] **Hauskonfigurator** — `render_consumption_comparison_panel` durch Kern, Modus `csv_validation`
+- [ ] **Backtesting** — `render_cons_data_section`: Status/Generierung behalten, Visualisierung an Kern (`cons_data`)
+- [ ] **Szenarieneditor** — Abschnitt „Verbrauchsprofil (Modell)“ beim Runtime-Hausprofil, Modus `modeled_profile`
+
+**Manuelle Abnahme**
+
+- [ ] Drei Seiten: gleiches Layout, Navigation, Legenden-Farben
+- [ ] Szenarieneditor ohne Ist-Daten; Backtesting ohne Modell-Vergleich
+
+---
+
+### Version 1.25.c — Backtesting-Seitenaufbau
+
+Ziel-Reihenfolge (oben → unten):
+
+1. Verbrauchsdaten (`cons_data`) — Status, Generierung, Verbrauchs-UI
+2. Konfigurierte Szenarien + Run-Buttons (wie heute)
+3. **Gesamtkosten-Tabelle** (alle Szenarien inkl. Referenz)
+4. **Verbrauchs-UI** (Referenz-Jahresverbrauch / nicht optimiert)
+5. **Kostenvergleich** — Monatschart je Szenario; **ohne** Monats-Dataframe, **ohne** Stundenkosten-Chart
+
+**Entfernen**
+
+- [ ] `render_backtesting_controls` (Szenario-/Monat-Detailauswahl)
+- [ ] `render_backtesting_hourly_chart`
+- [ ] `st.dataframe` in `render_backtesting_monthly_table` (Chart behalten)
+
+**Testlauf-Sonderfall:** Caption „Testlauf — nur Monat MM/YYYY“; Navigation auf diesen Monat beschränkt.
+
+**Manuelle Abnahme**
+
+- [ ] Voller Lauf: keine Szenario-/Monat-Selectbox, kein Stundenkosten-Chart
+- [ ] Gesamtkosten-Tabelle mit Referenz + Szenarien + Δ
+- [ ] Testlauf: Charts/Navigation nur für einen Monat
+
+---
+
+### Version 1.25.d — Abweichungsliste (Kostenvergleich)
+
+- [ ] Einheitliche Liste auffälliger Fälle (Basis: `extract_critical_cases()` — Plausibilität + CBC-Events)
+- [ ] Spalten: Fenster, Szenario, Art, Δ kWh (Soll/Ist)
+- [ ] Auswahl eines Eintrags → Detailbereich (Platzhalter bis 1.25.f)
+- [ ] Referenz-Szenario: keine Abweichungsliste
+
+**Manuelle Abnahme**
+
+- [ ] Lauf mit Abweichungen: sortierte Liste; Auswahl markiert Fenster + Szenario
+- [ ] Sauberer Lauf: leere Liste / Info-Hinweis
+
+---
+
+### Version 1.25.e — Smoketest Backtesting `sunset_window`
+
+**Zweck:** Klären, ob Backtesting im Modus `sunset_window` (Jetzt→SA₂) stabil läuft — **Voraussetzung** für die Entscheidung zu Chart1/2-Wiederverwendung (SA_0–SA_2-Modus).
+
+**Hintergrund:** UI startet Backtesting ohne `--horizon-mode` → Standard `fixed_24h` (`simulation/horizon_mode.py`). Cockpit-Chart1/2 mit SA-Zonen setzt funktionierendes `sunset_window`-Backtesting voraus.
+
+- [ ] **CLI-Smoketest** (Greenfield oder Test-Config mit Geo + PV + Batterie + Tarife):
+  - `scripts/run_backtesting.py --horizon-mode sunset_window --start-month <M> --end-month <M>` (1 Monat)
+  - Lauf endet Exit 0; `backtesting_log.json` enthält `"horizon_mode": "sunset_window"`
+  - Plausibilität/CBC ohne unerwartete Abbrüche; Kosten plausibel vs. `fixed_24h`-Referenzlauf
+- [ ] **Optional UI:** `--horizon-mode` an `build_backtesting_command` / Run-Controls (nur wenn Smoketest grün)
+- [ ] **Ergebnis dokumentieren** (in diesem Kapitel oder Kurznotiz in Erledigt): ✅ stabil / ⚠️ mit Einschränkungen / ❌ blockiert
+
+**Manuelle Abnahme**
+
+- [ ] Smoketest-Protokoll: Kommando, Config-Pfad, Monat, Dauer, Exit-Code, `horizon_mode` im Log
+- [ ] Bei Fehler: Log-Auszug + ob Blocker für 1.25.f
+
+---
+
+### Version 1.25.f — Chart1/2-Detail für Abweichungen (Scope nach 1.25.e)
+
+**Abhängigkeit:** Scope und Priorität **nach** Smoketest 1.25.e neu bewerten.
+
+**Technischer Engpass (heute):** `simulation/engine.py` persistiert nur aggregierte Stundenwerte (`sim_cost`, `sim_soc`, …), nicht `chart_rows` + `optimization_matrix` pro Fenster — Cockpit-Chart1/2 brauchen `OptimizationDisplayBundle` (`ui/simulation_results.py`).
+
+| Smoketest-Ergebnis | Empfohlener Scope 1.25.f |
+|--------------------|--------------------------|
+| ✅ `sunset_window` stabil | **Voll:** 24h + SA_0–SA_2 mit Chart1/2; Fenster-Snapshots persistieren (failed windows + on-demand) |
+| ⚠️ `sunset_window` mit Einschränkungen | **24h zuerst** mit Chart1/2; SA_0–SA_2 erst nach Follow-up-Fixes |
+| ❌ `sunset_window` blockiert | **Nur 24h** mit Chart1/2; SA_0–SA_2 und Sunset-Zonen zurückstellen; Smoketest-Fix als eigenes Bugfix-Kapitel |
+
+- [ ] **Persistenz:** Fenster-Snapshots (`chart_rows`, `matrix`, `meta`, `horizon_mode`, Szenario-ID) — Sidecar neben `backtesting_log.json` oder JSONL
+- [ ] **Adapter:** `build_backtesting_display_bundle(window_anchor, mode=24h\|sunset)` → `OptimizationDisplayBundle`
+- [ ] **UI:** Unter Abweichungsliste — `render_optimization_chart1/2`; Toggle 24h | SA_0–SA_2 (disabled wenn Log `fixed_24h` oder Smoketest negativ)
+- [ ] **Fallback:** On-demand Re-Simulation eines Fensters (langsamer, weniger Speicher)
+- [ ] **Tests:** Bundle-Builder-Fixture; Trace-Namen/Snapshot
+
+**Manuelle Abnahme**
+
+- [ ] Abweichung wählen → Chart1 Energiebilanz (PV, Batterie, Verbraucher-Stack, Zonen soweit Scope)
+- [ ] Chart2 Kostenlinien Soll/Ist
+- [ ] Toggle 24h ↔ SA_0–SA_2 (wenn im Scope)
+
+**Abhängigkeiten**
+
+```
+1.25.a → 1.25.b → 1.25.c → 1.25.d → 1.25.e (Smoketest) → 1.25.f (Scope festlegen)
+```
 
 ### Version 1.26.0 — Runtime-Entitäten & Tarife (Live)
 
