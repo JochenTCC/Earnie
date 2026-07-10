@@ -3,14 +3,12 @@ from __future__ import annotations
 
 import os
 from datetime import date
-from unittest.mock import patch
 
 import pandas as pd
 import pytest
 
 import config
 from data.data_loader import load_market_prices
-from optimizer.milp import milp_optimizer
 from optimizer.charging_context import resolve_charging_context
 from simulation.backtesting_log import load_backtesting_log, save_backtesting_log
 from simulation.engine import (
@@ -114,51 +112,6 @@ def test_historical_charging_context_keeps_time_window(
         logged_simulation=True,
     )
     assert ctx.get("use_time_window") is True
-
-
-@requires_historical_data
-def test_logged_day_milp_skips_urgent_deadline_constraint(
-    historical_cache: HistoricalDataCache,
-    smoke_anchor: pd.Timestamp,
-    smoke_prices_df: pd.DataFrame,
-    runtime_scenario_params: dict,
-):
-    from simulation.engine import build_historical_window_matrix, _scenario_to_battery_params
-
-    matrix, meta = build_historical_window_matrix(
-        smoke_anchor.to_pydatetime(),
-        historical_cache,
-        smoke_prices_df,
-        feed_in_settings=config.get_backtesting_feed_in_settings(
-            runtime_override=runtime_scenario_params
-        ),
-    )
-    captured: list[bool] = []
-    from optimizer import milp as milp_module
-
-    original = milp_module._add_consumer_delivery_constraints
-
-    def _capture_and_call(*args, **kwargs):
-        captured.append(kwargs.get("include_urgent_deadline_constraint", True))
-        return original(*args, **kwargs)
-
-    battery = _scenario_to_battery_params(runtime_scenario_params)
-    with patch.object(
-        milp_module,
-        "_add_consumer_delivery_constraints",
-        side_effect=_capture_and_call,
-    ):
-        milp_optimizer(
-            matrix,
-            matrix[0]["hour"],
-            50.0,
-            battery_params=battery,
-            verbose=False,
-            consumer_remaining_kwh=meta["consumer_daily_targets_kwh"],
-            flex_indices=list(range(len(matrix))),
-            charging_contexts=None,
-        )
-    assert captured == [False]
 
 
 @requires_historical_data

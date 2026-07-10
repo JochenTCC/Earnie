@@ -276,7 +276,6 @@ class TestEautoTieBreak:
             list(range(6)),
             {},
             False,
-            include_urgent_deadline_constraint=False,
         )
         model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
         assert pulp.LpStatus[model.prob.status] == "Optimal"

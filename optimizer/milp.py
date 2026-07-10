@@ -148,9 +148,6 @@ def milp_optimizer(
         eauto_milp_params,
         wear_cent_per_kwh=wear_cent_per_kwh,
     )
-    logged_simulation = bool(
-        matrix and matrix[0].get("consumption_mode") == "logged_day"
-    )
     _add_consumer_delivery_constraints(
         model,
         matrix,
@@ -159,7 +156,6 @@ def milp_optimizer(
         contexts,
         verbose,
         filter_contexts=filters,
-        include_urgent_deadline_constraint=not logged_simulation,
     )
     if sunrise_soc_min_index is not None:
         e_min = (battery_params["min_soc"] / 100.0) * battery_params["battery_capacity_kwh"]

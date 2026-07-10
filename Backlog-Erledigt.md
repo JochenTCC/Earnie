@@ -2,6 +2,12 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix EV absence vs. live control (2026-07-10)
+
+- [x] **EV unplugged: no charge setpoint to Loxone** — With `anticipated` + `plugged_in: false`, `_effective_consumer_power_kw` suppresses output; `booking_power_kw` books no fictitious energy (v1.24.3)
+- [x] **`available_from` during actual absence** — Same-day late return does not count as immediately available; overnight window preserved (`resolve_absent_availability`)
+- [x] **Tests** — `test_charging_context`, `test_delivery_tracking`, `test_loxone_client`; reference dump `chart_debug_20260710_111939`
+
 ### Version 1.25.0 — UI follow-up close-out (2026-07-10)
 
 - [x] **Backtesting UI — explain time ranges** — Caption + expander in `ui/backtesting_cons_data.py` and `ui/backtesting.py` (`ui/backtesting_time_ranges.py`): `cons_data_retention_months` vs. `price_range` simulation window vs. sliced reference consumption vs. Hauskonfigurator 8760 h
@@ -172,6 +178,18 @@ Target order: cons_data (status/generation/consumption UI) → scenarios + run b
 - [x] Button **Start backtesting** — run completes successfully; costs, months, plausibility and hourly chart visible
 - [x] After change to runtime/scenario — warning “Run does not match configuration” + **Recalculate**
 - [x] Merge PR #4
+
+### Bugfix runtime scenario save (2026-07-09)
+
+- [x] **KeyError on empty entity lists** — safe ID resolution in `scenario_form_helpers.py`; disabled selectboxes for empty PV/battery lists in runtime and scenario editor
+- [x] **PV/battery form state** — seed widget state from saved values (`planning_pv_form.py`, `planning_battery_form.py`)
+- [x] **Tests** — `tests/test_scenario_form_helpers.py`, extension `tests/test_planning_editors.py`
+
+### hausconfig: solar thermal, profile location (2026-07-09)
+
+- [x] **Solar thermal collector** — heating need model with solar thermal in `data/heating_need.py`; validation charts and tests (`tests/test_heating_need_solar.py`)
+- [x] **Profile location** — `latitude`/`longitude` and PV defaults at profile level (`house_profiles.schema.json`, `house_config_profile_form.py`)
+- [x] **Consumption validation** — extended charts and tests for thermal profile with solar thermal
 
 ### Bugfix native filter window log spam (main.py) (2026-07-09)
 

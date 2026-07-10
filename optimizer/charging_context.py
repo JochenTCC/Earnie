@@ -257,6 +257,13 @@ def next_scheduled_availability(horizon_start: datetime, consumer: dict) -> date
     return None
 
 
+def suppresses_live_charging_output(ctx: dict | None) -> bool:
+    """Kein Loxone-Sollwert und keine Buchung: Prognose bei Abwesenheit ohne Anschluss."""
+    if not ctx:
+        return False
+    return bool(ctx.get("anticipated") and not ctx.get("plugged_in"))
+
+
 def resolve_absent_availability(
     horizon_start: datetime,
     consumer: dict,
@@ -264,7 +271,10 @@ def resolve_absent_availability(
     ready_raw: str | None = None,
 ) -> datetime | None:
     """
-    Ladebeginn bei Abwesenheit: verspätete Rückkehr im aktuellen Fenster oder nächster Termin.
+    Ladebeginn bei Abwesenheit: offenes Übernacht-Fenster oder nächster Termin.
+
+    Verspätete Rückkehr am selben Tag (Slot vorbei, Auto noch abgehängt) gilt nicht
+    als „jetzt verfügbar“ — es wird der nächste car_available_from_hour verwendet.
     """
     for day_offset in (0, -1):
         day = horizon_start.date() + timedelta(days=day_offset)
@@ -277,7 +287,14 @@ def resolve_absent_availability(
             window_start,
             ready_raw=ready_raw,
         )
-        if deadline is not None and horizon_start < deadline:
+        if deadline is None or horizon_start >= deadline:
+            continue
+        if window_start.date() < horizon_start.date():
+            today_from = _window_start_for_day(
+                consumer, horizon_start.date(), reference=horizon_start
+            )
+            if today_from is not None and horizon_start >= today_from:
+                continue
             return horizon_start
     return next_scheduled_availability(horizon_start, consumer)
 

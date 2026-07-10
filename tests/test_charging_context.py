@@ -62,9 +62,16 @@ class TestAbsentAvailability:
       horizon = datetime(2026, 6, 22, 17, 0)  # Montag
       assert cc.next_scheduled_availability(horizon, consumer) == datetime(2026, 6, 22, 19, 0)
 
-  def test_resolve_absent_late_return_in_window(self):
+  def test_resolve_absent_same_day_past_slot_uses_next_scheduled(self):
       consumer = _eauto_consumer()
-      horizon = datetime(2026, 6, 22, 21, 0)  # Montag, verspätet
+      horizon = datetime(2026, 6, 22, 21, 0)
+      assert cc.resolve_absent_availability(horizon, consumer) == cc.next_scheduled_availability(
+          horizon, consumer
+      )
+
+  def test_resolve_absent_overnight_window_still_returns_horizon(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 6, 23, 8, 0)  # Dienstag, Fenster von Montag noch offen
       assert cc.resolve_absent_availability(horizon, consumer) == horizon
 
   def test_resolve_absent_with_timezone_aware_horizon(self):
@@ -72,7 +79,7 @@ class TestAbsentAvailability:
 
       consumer = _eauto_consumer()
       tz = ZoneInfo("Europe/Vienna")
-      horizon = datetime(2026, 6, 22, 21, 0, tzinfo=tz)
+      horizon = datetime(2026, 6, 23, 8, 0, tzinfo=tz)
       result = cc.resolve_absent_availability(horizon, consumer)
       assert result == horizon
       assert result.tzinfo == tz
@@ -160,6 +167,22 @@ class TestLoxoneAbsentForecast:
       assert ctx["available_from"] == horizon
       assert ctx["deadline"] == datetime(2026, 6, 23, 16, 3)
       assert ctx["use_time_window"] is False
+
+  def test_forecast_same_day_past_slot_waits_for_next_arrival(self):
+      consumer = _eauto_consumer()
+      consumer["charging_schedule"]["weekday"]["car_available_from_hour"] = 11
+      consumer["charging_schedule"]["weekend"]["car_available_from_hour"] = 10
+      horizon = datetime(2026, 7, 10, 11, 15)
+      with patch.object(
+          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+      ), patch.object(
+          cc.loxone_client, "fetch_loxone_raw_value", return_value="Morgen, 12:00"
+      ), _patch_eauto_capacity():
+          ctx = cc.fetch_loxone_charging_context(consumer, horizon)
+
+      assert ctx["active"] is True
+      assert ctx["anticipated"] is True
+      assert ctx["available_from"] == datetime(2026, 7, 11, 10, 0)
 
   def test_forecast_disabled_when_unplugged(self):
       consumer = _eauto_consumer(forecast_when_absent=False)

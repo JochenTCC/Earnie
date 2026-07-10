@@ -61,6 +61,33 @@ def _plugged_in_matrix() -> tuple[list[dict], datetime]:
 
 
 class TestMilpUrgentWindow:
+    def test_live_may_charge_in_cheap_hours(self):
+        """Live-MILP: günstige Stunden vor Deadline, urgent-Observability redundant."""
+        matrix, deadline = _plugged_in_matrix()
+        _, _, _, _, _, _, obs = milp_optimizer(
+            matrix,
+            current_hour=0,
+            current_soc=50.0,
+            battery_params=_battery_params(),
+            k_push=3.5,
+            verbose=False,
+            consumers=[_eauto_consumer()],
+            consumer_remaining_kwh={"eauto": 8.0},
+            charging_contexts={
+                "eauto": {
+                    "active": True,
+                    "plugged_in": True,
+                    "deadline": deadline,
+                    "target_kwh": 8.0,
+                    "use_time_window": False,
+                }
+            },
+            flex_indices=list(range(len(matrix))),
+        )
+        assert obs["eauto"]["role"] == "redundant"
+        assert obs["eauto"]["planned_pre_urgent_kwh"] >= 6.0
+        assert obs["eauto"]["planned_urgent_kwh"] == 0.0
+
     def test_logged_day_may_charge_in_cheap_hours_without_urgent(self):
         """Backtesting (logged_day): ohne urgent-Nebenbedingung günstige Stunden nutzbar."""
         matrix, deadline = _plugged_in_matrix()

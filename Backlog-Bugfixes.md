@@ -19,6 +19,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 - After successful verification: remove from this chapter → `Backlog-Erledigt.md` (`### Bugfix …`) with `- [x]`.
 - If verification fails: return to open bugfix chapter or formulate follow-up; document PATCH if applicable, but do not archive as done.
 
+## Bugfix Verifications Pending
+
+- [ ] **EV: urgent constraint removed** (2026-07-09)
+  - MILP: separate `urgent >= target` constraint removed; deadline still enforced via `eligible` slots until completion time
+  - Observability retained (`role` post-hoc); ISO deadline parsing added
+  - Regression: `eauto_urgent_deferred_cheap_hours_2026-06-28`, new `eauto_urgent_deferred_cheap_hours_2026-07-09`; `xfail` removed
+  - **Prod acceptance:** next charge cycle with deadline 07:45 — plan uses cheap night hours (02–04), `urgent_rule_observability.eauto.role == redundant`
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
@@ -29,12 +36,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## EV: urgent rule, prod dump, PWM
 Related topics — prioritize and work through together.
 
-- [ ] **Review urgent rule for necessity** (review by approx. **2026-07-12**)
-  - Evaluation: `urgent_rule_observability` in log + `optimization_history.jsonl` (`role`: `redundant` / `nachholen` / `nur_urgent_fenster`)
-  - Acceptance: consistently only `redundant` → remove constraint; otherwise keep and justify
-- [ ] **Prod-dump regression: urgent constraint infeasible** (as of 2026-07-03, commit `a743318`)
-  - Fixture: `eauto_urgent_deferred_cheap_hours_2026-06-28` (~7.99 kWh remaining)
-  - Live mode A: MILP with urgent → **Infeasible**; without urgent → **Optimal**
-  - `@pytest.mark.xfail` in `tests/test_prod_dump_regression.py` (2 tests)
-  - Next step: verify live urgent + mode A; remove `xfail` when feasible
-- [ ] **PWM for EV charging** — only for currents < A_min; otherwise minimum charge amount per h (count down meter, reset on each charge → at zero charge five minutes at minimum current)
+- [ ] **Urgent rule observability review** (by approx. **2026-07-12**, after prod acceptance)
+  - Constraint removed → evaluate `urgent_rule_observability` in log + `optimization_history.jsonl` (`role`: expected `redundant`)
+  - Acceptance: consistently `redundant` over several charge cycles → close review, simplify observability logging if applicable
+- [ ] **PWM for EV charging** — only for currents < A_min; otherwise minimum charge amount per h (count down meter, reset on each charge → at zero charge charge five minutes at minimum current)

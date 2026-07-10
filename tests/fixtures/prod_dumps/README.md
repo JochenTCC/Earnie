@@ -43,4 +43,5 @@ Pflichtfelder: `id`, `title`, `symptom`, `recorded_at`, `app_version`, `files`, 
 |----|------------------|
 | `eauto_deadline_missed_2026-06-27` | Zu wenig Ladung bis Fertig-Uhrzeit |
 | `eauto_urgent_deferred_cheap_hours_2026-06-28` | Laden erst im urgent-Fenster statt zu günstigen Stunden |
+| `eauto_urgent_deferred_cheap_hours_2026-07-09` | Laden erst 05–07 Uhr statt günstiger Nacht 02–04 (Deadline 07:45) |
 | `eauto_false_complete_2026-06-29` | Session fälschlich voll (Plan-Buchung), Loxone-Sofortladen ohne Ernie-Sollwert |
