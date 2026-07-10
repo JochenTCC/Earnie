@@ -12,11 +12,6 @@
 id_rsa
 id_ed25519
 
-# --- Maschinenspezifische Runtime ---
-runtime/*
-!runtime/.gitkeep
-!runtime/local_settings.example.json
-runtime-prod/
 
 # --- Laufzeit-Zustand & Optimierer-Output ---
 flexible_consumers_state.json

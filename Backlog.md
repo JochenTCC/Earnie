@@ -8,6 +8,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Review Smart Energy app for comparison
 - [ ] Review other providers with flexible prices
 - [ ] Adapt business plan
+- [ ] **Outreach (not software):** Ask for interested parties in loxforum / reddit — post under “my project”; take interesting chart snapshots (loxforum admins contacted re. best place)
 
 ### Loxberry 4 Installation — Notes
 - [x] Update from existing Loxberry to 4.0 worked
@@ -15,46 +16,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [x] Ernie stack commissioning worked and worker / UI are running!!!
 
 ## Feature Backlog
-
-### Version 1.25.0 — Backtesting with house configuration (UI follow-up)
-
-**Foundation done** (see [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.25.0): house configurator, scenario editor, backtesting runner, `cons_data`, fingerprint, first charts/tests.
-
-**Open:** tariff plausibility check before backtesting start; deviation-list UX follow-ups (below).
-
-**Current code state (brief):** `ui/consumption_display/` (three modes); backtesting page: cons_data section, total cost table, deviation list with **Chart1/2** (1.25.f), window snapshots (`backtesting_window_snapshots.jsonl`), horizon-mode UI (`fixed_24h` / `sunset_window`), reference consumption, monthly cost chart — plausibility false positives with house profile fixed (bugfix → completed).
-
-#### Decisions made (2026-07-10)
-
-| Topic | Decision |
-|-------|----------|
-| **Consumption UI data mode** | **Mode A:** House configurator = actual CSV vs. model. Backtesting = `cons_data` only (historical). Scenario editor = modeled house profile only. No actual-vs-model comparison on backtesting/scenario editor. |
-| **Monthly view timeline** | **Dropped** (accepted 2026-07-10). Timeline only ISO week, hourly. |
-| **Weekly view timeline** | ISO week, hourly; navigation ←/→; datetime X-axis, lines per consumer. |
-| **Deviation detail** | Full cockpit Chart1/2 in **24h** and **SA_0–SA_2** (1.25.f done; UX follow-ups below). |
-| **Monthly cost table** | Dataframe table in monthly comparison **dropped**; Plotly monthly chart **remains**. |
-| **Total costs** | New compact annual table (all scenarios incl. reference) instead of metric columns alone. |
-| **Δ vs. reference** | **Cost change** (`scenario-€ − reference-€`); negative = cheaper, positive = more expensive. |
-
-#### Open clarifications (for later chats)
-
-- [x] **"Non-optimized annual consumption"** — reference/`cons_data` (historical without optimization), not non-optimized scenarios.
-- [x] **Test run (1 month):** consumption UI limited to test month (`nav_bounds` + sliced `cons_data`).
-- [ ] **Scenario editor:** Only modeled house profile of assigned profile (without `cons_data`, without CSV actual)?
-- [ ] **PV in consumption UI:** `pv_kw` as own trace (generation) or only consumers + baseload?
-- [x] **Total cost table:** columns — Scenario | Annual kWh | Annual € | Δ vs. reference.
-
-- [ ] Not software-relevant: Ask for interested parties in loxforum / reddit / ...
-  - Asked loxforum admins for best place to post
-  - Should be posted under "my project"
-  - Take interesting chart snapshots
-
-#### Follow-ups (1.25.f acceptance)
-
-- [ ] Deviation table: deduplicate by horizon — keep only the most critical deviation per window
-- [ ] Deviation table: selecting a row should drive Chart1/2 directly (instead of separate selection)
-
----
 
 ### Version 1.26.0 — Runtime entities & tariffs (live)
 
@@ -67,11 +28,14 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **P1 — Data model & schema**
   - `runtime_settings`: `battery_id` (required after migration), `import_tariff_id`, `export_tariff_id`
   - Flat battery/tariff fields deprecated (backward compat: ID wins, else legacy fields)
+  - **`battery_wear` on `batteries[]`** (moved from top-level `config.json`): `enabled`, `replacement_cost_euro`, `expected_cycles`, `cycle_cost_fraction`; deprecate global `battery_wear` block (backward compat: battery entity wins, else legacy global block)
+  - **Backtesting wear:** MILP already applies wear via `config.get_battery_wear_cent_per_kwh(capacity)` — today from global `battery_wear` only; after P1/P2 resolve wear per scenario `battery_id` (same code path as live)
   - Import tariff type `monthly_table` added (symmetric to export)
   - [`config.schema.json`](config/config.schema.json), [`config/tariffs.schema.json`](config/tariffs.schema.json), example configs
 - [ ] **P2 — Central resolution in config.py**
   - `resolve_runtime_settings()` via existing `house_config` helpers
   - `_load_dynamic_params()` / `get_battery_params()` / `get_runtime_settings()` from resolved dict
+  - `get_battery_wear_cent_per_kwh()`: from resolved `batteries[]` entry (not global `battery_wear` alone)
   - `get_backtesting_scenarios()`: resolve baseline too (single code path)
 - [ ] **P3 — Price pipeline live**
   - Import: `awattar` (EPEX + `awattar` block), `fixed_cent`, `monthly_table`
@@ -90,6 +54,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ### Version 1.+1
 - [ ] rename sunset_window to sunrise_window - and all belonging namings to avoid further irritation.
 - [ ] Check tariffs.json for "completeness": are all data from "einspeisetarife*.json" from Gemini included?
+- [ ] **Tariff plausibility check** before backtesting start
 - [ ] Include tariffs.json in deploy
 - [ ] Create plausibility test for tariffs.json that runs before deploy
 - [ ] Expand README with motivation / benefits

@@ -2,6 +2,44 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 1.25.0 — UI follow-up close-out (2026-07-10)
+
+- [x] **Backtesting UI — explain time ranges** — Caption + expander in `ui/backtesting_cons_data.py` and `ui/backtesting.py` (`ui/backtesting_time_ranges.py`): `cons_data_retention_months` vs. `price_range` simulation window vs. sliced reference consumption vs. Hauskonfigurator 8760 h
+- [x] **PV in consumption UI** — `pv_kw` as own trace **PV-Erzeugung** (not in consumption stack); monthly line + weekly line in `ui/consumption_display/charts.py`; test `test_cons_data_bundle_pv_not_in_stack`
+
+### Version 1.25.0 — UI follow-up decisions & clarifications (2026-07-10)
+
+**Scope:** Close-out of planning notes from `Backlog.md` § Version 1.25.0 UI follow-up; implementation in 1.25.a–1.25.f.
+
+#### Decisions recorded
+
+- [x] **Consumption UI data mode (Mode A):** House configurator = actual CSV vs. model; backtesting = `cons_data` only (historical); scenario editor = modeled house profile only — no actual-vs-model on backtesting/scenario editor
+- [x] **Monthly view timeline:** dropped — timeline only ISO week, hourly
+- [x] **Weekly view timeline:** ISO week, hourly; navigation ←/→; datetime X-axis, lines per consumer
+- [x] **Deviation detail:** full cockpit Chart1/2 in 24h and SA_0–SA_2 (1.25.f)
+- [x] **Monthly cost table:** dataframe table dropped; Plotly monthly chart remains
+- [x] **Total costs:** compact annual table (all scenarios incl. reference) instead of metric columns alone
+- [x] **Δ vs. reference:** cost change (`scenario € − reference €`); negative = cheaper, positive = more expensive
+
+#### Clarifications resolved
+
+- [x] **"Non-optimized annual consumption"** — reference/`cons_data` (historical without optimization), not non-optimized scenarios
+- [x] **Test run (1 month):** consumption UI limited to test month (`nav_bounds` + sliced `cons_data`)
+- [x] **Scenario editor:** modeled house profile of assigned profile only (no `cons_data`, no CSV actual) — per Mode A
+- [x] **Total cost table columns:** Scenario | Annual kWh | Annual € | Δ vs. reference
+
+#### Delivered code state (at close-out)
+
+- [x] `ui/consumption_display/` (three modes); backtesting page: cons_data section, total cost table, deviation list with Chart1/2 (1.25.f), window snapshots (`backtesting_window_snapshots.jsonl`), horizon-mode UI (`fixed_24h` / `sunset_window`), reference consumption, monthly cost chart
+- [x] Plausibility false positives with house profile fixed (bugfix → `Backlog-Erledigt.md` § Bugfix — Backtesting plausibility)
+
+### Version 1.25.f follow-ups — deviation list & week navigation (2026-07-10)
+
+- [x] **Deviation dedup:** `dedupe_critical_cases_by_window()` — per `(scenario_id, window_anchor)` keep most critical (`milp_no_optimal` > `strict_slow` > `strict_fallback` > `consumption_tolerance`)
+- [x] **Row selection → Chart1/2:** `st.dataframe` single-row selection replaces separate selectbox (`ui/backtesting_deviation_list.py`)
+- [x] **ISO week jump:** direct KW entry (`12/2025`, `KW 12/2025`, `2025-W12`) in `ui/consumption_display/navigation.py`
+- [x] **Tests:** `test_backtesting_critical_cases.py`, `test_backtesting_deviation_list.py`, `test_consumption_display.py`
+
 ### Version 1.25.f — Chart1/2 detail for deviations (2026-07-10)
 
 **Scope (after 1.25.e smoketest ✅):** full — 24h + SA_0–SA_2 with cockpit Chart1/2; window snapshots for failed windows + on-demand fallback.

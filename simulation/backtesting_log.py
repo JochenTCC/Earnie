@@ -167,6 +167,57 @@ def _cbc_event_cases(cbc_events_by_scenario: dict[str, list[dict]]) -> list[dict
     return cases
 
 
+def _critical_case_sort_key(case: dict) -> tuple:
+    return (
+        case.get("window_anchor") or "",
+        case.get("slot_datetime") or "",
+        case.get("simulation_hour_index") if case.get("simulation_hour_index") is not None else -1,
+        case.get("kind") or "",
+    )
+
+
+KIND_CRITICALITY_ORDER: dict[str, int] = {
+    "milp_no_optimal": 0,
+    "strict_slow": 1,
+    "strict_fallback": 2,
+    "consumption_tolerance": 3,
+}
+
+
+def _case_severity_key(case: dict) -> tuple[int, float]:
+    """Niedrigerer Wert = kritischer (für Dedup pro Fenster)."""
+    kind = str(case.get("kind", "unknown"))
+    priority = KIND_CRITICALITY_ORDER.get(kind, 99)
+    if kind == "consumption_tolerance":
+        metric = abs(float(case.get("diff_kwh") or 0.0))
+    elif kind in {"strict_slow", "strict_fallback"}:
+        metric = float(
+            case.get("strict_elapsed_sec")
+            or case.get("gap_rel")
+            or 0.0
+        )
+    else:
+        metric = 0.0
+    return priority, -metric
+
+
+def dedupe_critical_cases_by_window(cases: list[dict]) -> list[dict]:
+    """Behält pro (Szenario, Fenster) nur den kritischsten Eintrag."""
+    without_anchor: list[dict] = []
+    best_by_key: dict[tuple[str, str], dict] = {}
+    for case in cases:
+        anchor = case.get("window_anchor")
+        if not anchor:
+            without_anchor.append(case)
+            continue
+        key = (str(case.get("scenario_id", "?")), str(anchor))
+        existing = best_by_key.get(key)
+        if existing is None or _case_severity_key(case) < _case_severity_key(existing):
+            best_by_key[key] = case
+    deduped = list(best_by_key.values()) + without_anchor
+    return sorted(deduped, key=_critical_case_sort_key)
+
+
 def build_critical_cases(
     plausibility_by_scenario: dict[str, PlausibilityReport],
     cbc_events_by_scenario: dict[str, list[dict]] | None = None,
@@ -175,15 +226,7 @@ def build_critical_cases(
     cases = _plausibility_failure_cases(plausibility_by_scenario)
     if cbc_events_by_scenario:
         cases.extend(_cbc_event_cases(cbc_events_by_scenario))
-    return sorted(
-        cases,
-        key=lambda c: (
-            c.get("window_anchor") or "",
-            c.get("slot_datetime") or "",
-            c.get("simulation_hour_index") if c.get("simulation_hour_index") is not None else -1,
-            c.get("kind") or "",
-        ),
-    )
+    return sorted(cases, key=_critical_case_sort_key)
 
 
 def summarize_critical_cases(cases: list[dict]) -> dict:
@@ -227,15 +270,7 @@ def extract_critical_cases(meta: dict) -> list[dict]:
                 }
             )
     cases.extend(_cbc_event_cases(meta.get("cbc_events_by_scenario", {})))
-    return sorted(
-        cases,
-        key=lambda c: (
-            c.get("window_anchor") or "",
-            c.get("slot_datetime") or "",
-            c.get("simulation_hour_index") if c.get("simulation_hour_index") is not None else -1,
-            c.get("kind") or "",
-        ),
-    )
+    return sorted(cases, key=_critical_case_sort_key)
 
 
 def _append_cbc_events_jsonl(

@@ -6,6 +6,7 @@ import streamlit as st
 from data import cons_data_store
 from scripts.generate_cons_data import generate
 from ui.backtesting_results_helpers import cons_data_has_flex_energy
+from ui.backtesting_time_ranges import cons_data_section_caption, render_time_range_help
 from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
 _MATCH_OK = "Passt zur aktuellen Konfiguration (Verbraucher-IDs)."
@@ -33,6 +34,8 @@ def render_cons_data_section() -> bool:
     path = cons_data_store.get_output_path()
     st.subheader("Verbrauchsdaten (`cons_data_hourly.csv`)")
     st.caption(f"Pfad: `{path}`")
+    st.caption(cons_data_section_caption())
+    render_time_range_help(key="backtesting_time_ranges_cons_data")
 
     populated = cons_data_ready()
     if not populated:

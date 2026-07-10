@@ -27,6 +27,7 @@ from ui.backtesting_runner import (
     run_backtesting_subprocess,
     suggest_test_month,
 )
+from ui.backtesting_time_ranges import render_time_range_help
 from scripts.run_backtesting import BACKTESTING_YEAR
 from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
@@ -232,6 +233,8 @@ def render_backtesting_run_controls(
 ) -> bool:
     """Rendert Start-Steuerung. True wenn Horizont-Auswahl vom Log abweicht."""
     label = "Backtesting neu berechnen" if log_exists else "Backtesting starten"
+    log_period = meta.get("period") if meta else None
+    render_time_range_help(key="backtesting_time_ranges_run", log_period=log_period)
     test_month = suggest_test_month()
     if log_exists and meta is not None:
         sync_horizon_selectbox_from_log(meta)

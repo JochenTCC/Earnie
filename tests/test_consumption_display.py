@@ -25,6 +25,10 @@ from ui.consumption_display.charts import (
     stacked_monthly_chart,
     week_timeseries_chart,
 )
+from ui.consumption_display.navigation import (
+    parse_iso_week_jump,
+    week_index_for_iso,
+)
 
 
 def _sample_profile() -> dict:
@@ -205,3 +209,18 @@ def test_week_timeseries_chart_uses_datetime_axis_and_lines():
     trace_names = {trace.name for trace in fig.data}
     assert "Ist (CSV)" in trace_names
     assert "pool" in trace_names
+
+
+def test_parse_iso_week_jump_formats():
+    assert parse_iso_week_jump("12/2025") == (2025, 12)
+    assert parse_iso_week_jump("KW 12/2025") == (2025, 12)
+    assert parse_iso_week_jump("2025-W12") == (2025, 12)
+    assert parse_iso_week_jump("2025/12") == (2025, 12)
+    assert parse_iso_week_jump("") is None
+    assert parse_iso_week_jump("invalid") is None
+
+
+def test_week_index_for_iso():
+    weeks = [(2024, 11), (2024, 12), (2024, 13)]
+    assert week_index_for_iso(weeks, 2024, 12) == 1
+    assert week_index_for_iso(weeks, 2024, 99) is None
