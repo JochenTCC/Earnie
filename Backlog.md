@@ -29,8 +29,8 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 | Thema | Entscheidung |
 |-------|--------------|
 | **Datenmodus Verbrauchs-UI** | **Modus A:** Hauskonfigurator = Ist-CSV vs. Modell. Backtesting = nur `cons_data` (historisch). Szenarieneditor = nur modelliertes Hausprofil. Kein Ist-vs-Modell-Vergleich auf Backtesting/Szenarieneditor. |
-| **Monatsansicht Verlauf** | Stündlich innerhalb des gewählten Monats; Navigation ←/→ pro Monat. |
-| **Wochenansicht Verlauf** | ISO-KW, stündlich (wie heute). |
+| **Monatsansicht Verlauf** | **Entfällt** (Abnahme 2026-07-10). Zeitverlauf nur ISO-KW, stündlich. |
+| **Wochenansicht Verlauf** | ISO-KW, stündlich; Navigation ←/→; datetime-X-Achse, Linien je Verbraucher. |
 | **Abweichungsdetail (Ziel)** | Volle Cockpit-Chart1/2 in **24h** und **SA_0–SA_2** — **aber** erst nach Smoketest `sunset_window` und Persistenz-Entscheid (siehe 1.25.e / 1.25.f). |
 | **Monatskosten-Tabelle** | Dataframe-Tabelle im Monatsvergleich **entfällt**; Plotly-Monatschart **bleibt**. |
 | **Gesamtkosten** | Neue kompakte Jahres-Tabelle (alle Szenarien inkl. Referenz) statt Metrik-Spalten allein. |
@@ -46,40 +46,6 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
   - Habe Admins in loxforum nach der besten Stelle für einen Post gefragt
   - Soll unter "mein Projekt" gepostet werden
-
----
-
-### Version 1.25.a — Verbrauchs-UI-Kern
-
-Gemeinsame Streamlit-Komponente für Hauskonfigurator, Backtesting und Szenarieneditor.
-
-- [ ] **Drei Modi** in einem Kernmodul (z. B. `ui/consumption_display/`):
-  - `csv_validation` — Ist-CSV + Modell (Hauskonfigurator)
-  - `cons_data` — `cons_data_hourly.csv` mit `{id}_kw`, `baseload_kw`, optional `pv_kw` (Backtesting)
-  - `modeled_profile` — Hausprofil-Modell je Verbraucher (Szenarieneditor)
-- [ ] **Monatsübersicht:** je Verbraucher eigener Balken; Summe = Gesamtverbrauch; Basislast als Residuum eigene Spur
-- [ ] **Zeitverlauf:** Toggle **Monat | Woche**; ←/→ je nach Modus (Monat = stündlich, Woche = ISO-KW stündlich)
-- [ ] **Datenschicht:** `build_modeled_hourly_kw_by_consumer()` in `data/consumption_profiles.py` (Split je Verbraucher + Basislast)
-- [ ] **Tests:** Monatsaggregation, Navigation-Grenzen, per-Consumer-Split
-
-**Manuelle Abnahme**
-
-- [ ] Hauskonfigurator + CSV: Monatsbalken Ist vs. Modell; Toggle Monat/Woche; jeder Verbraucher + Basislast sichtbar
-- [ ] `cons_data` synthetisch: gestapelte Monatsbalken summieren sich ≈ `total_kw`
-- [ ] ←/→ Monat: stündlicher Verlauf; Woche: korrekte ISO-KW-Grenzen
-
----
-
-### Version 1.25.b — Verbrauchs-UI in drei Seiten
-
-- [ ] **Hauskonfigurator** — `render_consumption_comparison_panel` durch Kern, Modus `csv_validation`
-- [ ] **Backtesting** — `render_cons_data_section`: Status/Generierung behalten, Visualisierung an Kern (`cons_data`)
-- [ ] **Szenarieneditor** — Abschnitt „Verbrauchsprofil (Modell)“ beim Runtime-Hausprofil, Modus `modeled_profile`
-
-**Manuelle Abnahme**
-
-- [ ] Drei Seiten: gleiches Layout, Navigation, Legenden-Farben
-- [ ] Szenarieneditor ohne Ist-Daten; Backtesting ohne Modell-Vergleich
 
 ---
 

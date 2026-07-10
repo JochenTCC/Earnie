@@ -5,11 +5,7 @@ import streamlit as st
 
 from data import cons_data_store
 from scripts.generate_cons_data import generate
-from ui.consumption_comparison_panel import render_iso_week_navigation
-from ui.consumption_validation_charts import (
-    cons_data_columns_timeseries_chart,
-    cons_dataframe_to_navigation_series,
-)
+from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
 _MATCH_OK = "Passt zur aktuellen Konfiguration (Verbraucher-IDs)."
 _MATCH_MISSING_META = "Prüfung nicht möglich (keine Meta-Datei)."
@@ -58,22 +54,12 @@ def render_cons_data_section() -> bool:
             st.warning(message)
 
         try:
-            series = cons_dataframe_to_navigation_series(df)
-            week = render_iso_week_navigation(
-                series,
+            render_consumption_display(
+                ConsumptionDisplayMode.CONS_DATA,
                 key_prefix="backtesting_cons_data",
-                reset_token=str(len(series)),
+                cons_data=df,
+                reset_token=str(len(df)),
             )
-            if week is not None:
-                iso_year, iso_week = week
-                st.plotly_chart(
-                    cons_data_columns_timeseries_chart(
-                        df,
-                        iso_year=iso_year,
-                        iso_week=iso_week,
-                    ),
-                    width="stretch",
-                )
         except ValueError as exc:
             st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")
 

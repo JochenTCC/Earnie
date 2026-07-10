@@ -24,6 +24,7 @@ from ui.scenario_form_helpers import (
     options_for_entities,
     render_entity_selectbox,
 )
+from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
 
 def render_runtime_scenario_form() -> None:
@@ -138,6 +139,16 @@ def render_runtime_scenario_form() -> None:
         "Längengrad",
         key="runtime_lon",
     )
+
+    if selected_profile_id and selected_profile:
+        st.subheader("Verbrauchsprofil (Modell)")
+        st.caption("Modelliertes Hausprofil — ohne Ist-Daten und ohne cons_data.")
+        render_consumption_display(
+            ConsumptionDisplayMode.MODELED_PROFILE,
+            key_prefix=f"scenario_runtime_profile_{selected_profile_id}",
+            profile=selected_profile,
+            reset_token=selected_profile_id,
+        )
 
     if st.button("Auflösung testen", key="runtime_preview", disabled=required_lists_empty):
         draft = _build_runtime_settings(

@@ -2,6 +2,31 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 1.25.b — Verbrauchs-UI in drei Seiten (2026-07-10)
+
+- [x] **Hauskonfigurator** — `render_consumption_comparison_panel` durch Kern, Modus `csv_validation`
+- [x] **Backtesting** — `render_cons_data_section`: Status/Generierung behalten, Visualisierung an Kern (`cons_data`)
+- [x] **Szenarieneditor** — Abschnitt „Verbrauchsprofil (Modell)“ beim Runtime-Hausprofil, Modus `modeled_profile`
+
+**Manuelle Abnahme**
+
+- [x] Drei Seiten: gleiches Layout, Navigation, Legenden-Farben
+- [x] Szenarieneditor ohne Ist-Daten; Backtesting ohne Modell-Vergleich
+
+### Version 1.25.a — Verbrauchs-UI-Kern (2026-07-10)
+
+- [x] **Drei Modi** in `ui/consumption_display/`: `csv_validation`, `cons_data`, `modeled_profile`
+- [x] **Monatsübersicht:** je Verbraucher eigener Balken; Summe = Gesamtverbrauch; Basislast als Residuum eigene Spur
+- [x] **Zeitverlauf:** ISO-KW, stündlich; Navigation ←/→ (kein Monats-Toggle; Nacharbeit: datetime-X-Achse, Linien je Verbraucher)
+- [x] **Datenschicht:** `build_modeled_hourly_kw_by_consumer()` in `data/consumption_profiles.py`
+- [x] **Tests:** `tests/test_consumption_display.py`, `tests/test_consumption_display_integration.py`
+
+**Manuelle Abnahme**
+
+- [x] Hauskonfigurator + CSV: Monatsbalken Ist vs. Modell; KW-Navigation; Verbraucher + Basislast im Wochenverlauf sichtbar
+- [x] `cons_data` synthetisch: gestapelte Monatsbalken summieren sich ≈ `total_kw`
+- [x] ←/→ KW: korrekte ISO-KW-Grenzen; lesbarer stündlicher Verlauf
+
 ### Version 1.25.0 — Backtesting mit Hauskonfiguration (2026-07-10)
 
 - [x] **Hauskonfigurator** — optionales Jahres-Gesamt-Verbrauchs-CSV (Format-Check: Monatsbalken + Stundenverlauf)

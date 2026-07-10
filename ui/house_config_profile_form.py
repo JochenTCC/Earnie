@@ -581,7 +581,6 @@ def _render_consumption_csv_section(
     from pathlib import Path
 
     from house_config.consumption_csv import load_hourly_profile_csv
-    from ui.consumption_validation_charts import load_csv_monthly_kwh
 
     st.subheader("Jahres-Verbrauchs-CSV (optional)")
     st.caption(
@@ -631,20 +630,19 @@ def _render_consumption_csv_section(
         return
 
     try:
-        actual_monthly = load_csv_monthly_kwh(active_path)
         modeled_profile = {
             "annual_kwh": annual_kwh,
             "baseload_kwh": preview["baseload_kwh"],
             "consumers": resolved,
         }
         series = load_hourly_profile_csv(active_path)
-        from ui.consumption_comparison_panel import render_consumption_comparison_panel
+        from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
-        render_consumption_comparison_panel(
-            actual_monthly=actual_monthly,
-            modeled_profile=modeled_profile,
-            series=series,
+        render_consumption_display(
+            ConsumptionDisplayMode.CSV_VALIDATION,
             key_prefix=f"house_profile_csv_{preview_id}",
+            profile=modeled_profile,
+            csv_series=series,
             annual_kwh=float(annual_kwh),
             reset_token=active_path,
         )
