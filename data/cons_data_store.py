@@ -224,6 +224,49 @@ def get_date_bounds() -> tuple[datetime | None, datetime | None]:
     return df.index.min(), df.index.max()
 
 
+def _meta_file_path(path: str) -> str:
+    if path.endswith(".csv"):
+        return path.replace(".csv", METADATA_SUFFIX)
+    return path + METADATA_SUFFIX
+
+
+def is_cons_data_populated(path: str | None = None) -> bool:
+    """True wenn CSV existiert und nach load_cons_data mindestens eine Datenzeile."""
+    path = path or get_output_path()
+    if not os.path.exists(path):
+        return False
+    return not load_cons_data(path).empty
+
+
+def load_cons_data_meta(path: str | None = None) -> dict | None:
+    """Liest cons_data_hourly.meta.json; None wenn nicht vorhanden oder ungültig."""
+    path = path or get_output_path()
+    meta_path = _meta_file_path(path)
+    if not os.path.isfile(meta_path):
+        return None
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def cons_data_consumer_match_reason(path: str | None = None) -> str | None:
+    """None wenn consumer_ids passen; sonst 'missing_meta' oder 'id_mismatch'."""
+    meta = load_cons_data_meta(path)
+    if meta is None:
+        return "missing_meta"
+    stored = meta.get("consumer_ids")
+    if not isinstance(stored, list):
+        return "missing_meta"
+    current = sorted(_consumer_column_ids())
+    stored_sorted = sorted(str(item) for item in stored)
+    if stored_sorted != current:
+        return "id_mismatch"
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Live-Sampling (main.py): Pro Durchlauf sammeln, stündlich/täglich flushen
 # ---------------------------------------------------------------------------

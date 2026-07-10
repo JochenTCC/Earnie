@@ -581,14 +581,7 @@ def _render_consumption_csv_section(
     from pathlib import Path
 
     from house_config.consumption_csv import load_hourly_profile_csv
-    from ui.consumption_validation_charts import (
-        format_iso_week_label,
-        iso_weeks_in_series,
-        load_csv_monthly_kwh,
-        modeled_monthly_kwh,
-        monthly_comparison_chart,
-        timeseries_comparison_chart,
-    )
+    from ui.consumption_validation_charts import load_csv_monthly_kwh
 
     st.subheader("Jahres-Verbrauchs-CSV (optional)")
     st.caption(
@@ -644,66 +637,16 @@ def _render_consumption_csv_section(
             "baseload_kwh": preview["baseload_kwh"],
             "consumers": resolved,
         }
-        model_monthly = modeled_monthly_kwh(modeled_profile)
-        actual_total = sum(actual_monthly.values())
-        model_total = sum(model_monthly.values())
-        col_a, col_b = st.columns(2)
-        col_a.metric("Ist-Jahresverbrauch (CSV)", f"{actual_total:.0f} kWh")
-        col_b.metric("Modell-Jahresverbrauch", f"{model_total:.0f} kWh")
-        if annual_kwh > 0 and abs(actual_total - annual_kwh) / annual_kwh > 0.15:
-            st.info(
-                f"Hinweis: Konfigurierter Jahresverbrauch ({annual_kwh:.0f} kWh) "
-                f"weicht vom CSV ({actual_total:.0f} kWh) ab."
-            )
-        st.plotly_chart(monthly_comparison_chart(actual_monthly, model_monthly), width="stretch")
-
         series = load_hourly_profile_csv(active_path)
-        weeks = iso_weeks_in_series(series)
-        week_idx_key = f"house_profile_csv_week_idx_{preview_id}"
-        week_path_key = f"house_profile_csv_week_path_{preview_id}"
-        if st.session_state.get(week_path_key) != active_path:
-            st.session_state[week_path_key] = active_path
-            st.session_state[week_idx_key] = 0
-        week_idx = int(st.session_state.get(week_idx_key, 0))
-        week_idx = max(0, min(week_idx, len(weeks) - 1))
-        st.session_state[week_idx_key] = week_idx
-        iso_year, iso_week = weeks[week_idx]
-        week_label = format_iso_week_label(iso_year, iso_week)
-        with st.container(
-            horizontal=True,
-            horizontal_alignment="center",
-            gap="small",
-            vertical_alignment="center",
-        ):
-            if st.button(
-                "←",
-                disabled=week_idx <= 0,
-                key=f"house_profile_csv_week_back_{preview_id}",
-                help="Vorherige Kalenderwoche",
-                type="secondary",
-                width="content",
-            ):
-                st.session_state[week_idx_key] = week_idx - 1
-                st.rerun()
-            st.markdown(f"**{week_label}**")
-            if st.button(
-                "→",
-                disabled=week_idx >= len(weeks) - 1,
-                key=f"house_profile_csv_week_forward_{preview_id}",
-                help="Nächste Kalenderwoche",
-                type="secondary",
-                width="content",
-            ):
-                st.session_state[week_idx_key] = week_idx + 1
-                st.rerun()
-        st.plotly_chart(
-            timeseries_comparison_chart(
-                active_path,
-                modeled_profile,
-                iso_year=iso_year,
-                iso_week=iso_week,
-            ),
-            width="stretch",
+        from ui.consumption_comparison_panel import render_consumption_comparison_panel
+
+        render_consumption_comparison_panel(
+            actual_monthly=actual_monthly,
+            modeled_profile=modeled_profile,
+            series=series,
+            key_prefix=f"house_profile_csv_{preview_id}",
+            annual_kwh=float(annual_kwh),
+            reset_token=active_path,
         )
     except (ValueError, OSError) as exc:
         st.error(f"CSV konnte nicht ausgewertet werden: {exc}")

@@ -118,6 +118,27 @@ def test_dach_tariffs_catalog():
     assert len(doc["import_tariffs"]) == 33
     assert len(doc["export_tariffs"]) == 11
     assert "awattar_at" in doc["import_tariffs"]
+    assert "dynamic_epex" in doc["export_tariffs"]
+
+
+def test_export_tariff_id_alias_awattar_sunny_float():
+    from house_config.tariffs_store import resolve_export_tariff_into_settings
+
+    tariffs = {
+        "export_tariffs": {
+            "dynamic_epex": {
+                "id": "dynamic_epex",
+                "label": "aWATTar SUNNY SPOT",
+                "type": "dynamic_epex",
+            }
+        }
+    }
+    resolved = resolve_export_tariff_into_settings(
+        {"export_tariff_id": "awattar_sunny_float"},
+        tariffs,
+    )
+    assert resolved["feed_in_mode"] == "dynamic_epex"
+    assert resolved["_export_tariff_spec"]["id"] == "dynamic_epex"
 
 
 def test_tariff_spec_resolution_de_spot_ch_fix():

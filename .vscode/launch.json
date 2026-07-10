@@ -18,6 +18,7 @@
       "env": {
         "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
       },
+      "subProcess": false,
       "justMyCode": false
     },
     {
@@ -30,6 +31,7 @@
       "env": {
         "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
       },
+      "subProcess": false,
       "justMyCode": false
     },
     {
@@ -43,6 +45,7 @@
         "ENERGY_OPTIMIZER_CONFIG_PATH": "\\\\DS-KO-DO-2\\docker\\energy_optimizer\\config\\config.json",
         "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8503"
       },
+      "subProcess": false,
       "console": "integratedTerminal",
       "justMyCode": false
     },
@@ -62,6 +65,7 @@
         "ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START": "0",
         "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8511"
       },
+      "subProcess": false,
       "console": "integratedTerminal",
       "justMyCode": false
     },
@@ -76,6 +80,7 @@
         "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/runtime",
         "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
       },
+      "subProcess": false,
       "console": "integratedTerminal",
       "justMyCode": false
     },

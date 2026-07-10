@@ -23,6 +23,16 @@ EXPORT_TYPES = frozenset(
 )
 VALID_LANDS = frozenset({"AT", "DE", "CH"})
 VALID_CURRENCIES = frozenset({"EUR", "CHF"})
+# Umbenannte IDs aus Tarifkatalog 1.24.f (Abwärtskompatibilität für runtime_settings).
+_EXPORT_TARIFF_ID_ALIASES: dict[str, str] = {
+    "awattar_sunny_float": "dynamic_epex",
+}
+
+
+def resolve_export_tariff_id(tariff_id: str) -> str:
+    """Mappt veraltete export_tariff_id auf den aktuellen Katalog-Eintrag."""
+    key = str(tariff_id).strip()
+    return _EXPORT_TARIFF_ID_ALIASES.get(key, key)
 
 
 def _read_json(path: str) -> dict:
@@ -211,7 +221,7 @@ def resolve_export_tariff_into_settings(
     tariff_id = out.pop("export_tariff_id", None)
     if not tariff_id:
         return out
-    tariff_id = str(tariff_id).strip()
+    tariff_id = resolve_export_tariff_id(str(tariff_id).strip())
     export_map = tariffs.get("export_tariffs", {})
     if tariff_id not in export_map:
         raise ValueError(f"Unbekannte export_tariff_id '{tariff_id}'.")

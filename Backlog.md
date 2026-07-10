@@ -17,27 +17,28 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Feature-Backlog
 
 ### Version 1.25.0 Backtesting mit Hauskonfiguration starten und auswerten
-- [x] Im Hauskonfigurator kann optional ein Jahres-Gesamt-Verbrauchs csv eingelesen werden (nach vorgegebenem Format).Damit kann überprüft werden, ob die Konfiguration einigermaßen passt (graphischer Verlauf und Gesamtmenge pro Monat)
-- [x] Nach Ersteinrichtung gibt es außer runtime_setting noch keine Szenarios
-- [x] Einfachen Szenario-Editor erstellen
-  - Es gibt eine neue Subpage unter Konfiguration für Szenarien
-  - Hauskonfigurator umfasst nur noch Verbraucher und PV-Anlage
-  - Batterie und Tarife wandern in den Szenario-Editor
-  - Default-Scenario ist Runtime (Pflicht vor Freischaltung von backtesting (und Betrieb))
-  - Es können weitere Scenarios hinzugefügt werden mit anderen Batterien und Tarien
-- [x] Daten aus Konfiguration nehmen und backtesting Rechnung ausführbar machen.
-- [x] Auf der Seite backtesting werden vorhandene Szenarios und ggf. vorhandener backtesting Lauf eingelesen
-  - Wenn beides zueinanderpasst, kann backtesting Lauf wie schon implementiert analysiert werden
-  - Wenn noch kein Backtesting-Lauf existiert oder nicht zu den aktuellen Szenarien passt, dann wird ein Knopf aktiviert, der das backtesting (mit main.py) startet. Nach Fertigstellung werden die Ergebnisse eingelesen und angezeigt  
 
-**Manuelle Abnahme (Greenfield, Streamlit :8511 oder Container :8502)**
-
-- [ ] Greenfield zurückgesetzt; nur Hauskonfigurator + Konfiguration sichtbar; Sidebar zeigt fehlende Schritte
-- [ ] **Hauskonfigurator** — thermisches Hausprofil + PV-Anlage speichern; optional Jahres-CSV hochladen → Monatsbalken und Stundenverlauf (Ist vs. Modell)
-- [ ] **Szenarieneditor** erscheint nach Hausprofil + PV — Batterie anlegen, Runtime speichern (Batterie, Tarife, Hausprofil, Geo)
-- [ ] **Backtesting** erscheint nach vollständigem Runtime-Szenario — konfigurierte Szenarien werden angezeigt
-- [ ] Button **Backtesting starten** — Lauf endet erfolgreich; Kosten, Monate, Plausibilität und Stundenchart sichtbar
-- [ ] Nach Änderung an Runtime/Szenario — Warnung „Lauf passt nicht zur Konfiguration“ + **Neu berechnen**
+- [ ] Neue UI für Verbrauchs-Anzeige (Wird benutzt in Hauskonfigurator / Backtesting / Szenarieneditor)
+ - Normalerweise wird ein ganzes Jahr angezeigt (Sonderfall bei backtesting - Test)
+ - Gleiche Basis zur Anzeige des Verbrauch-Verhaltens in allen Seiten
+  - Es gibt eine Monatsübersicht mit Balken (Vergleich mit Balken nebeneinander)
+  - Darunter gibt es einen Chart mit zeitlichem Verlauf, bei dem zwischen Monats- und Wochenansicht umgeschaltet werden kann. Es bleiben die Vor- und Zürück Buttons (entweder um einen Monat oder um eine Woche)
+  - Jeder Verbraucher hat einen eigenen Verlauf im Chart und einen eigenen Balken. Die Verbrauchsbalken werden aufsummiert zum Gesamtverbrauch
+  - Basis-Verbrauch als Residuum hat einen eigenen Verlauf
+- [ ] Neue UI für Kostenvergleich (beim Backtesting)
+  - Monatliche Stromkosten je Szenario bleibt
+  - Die Tabelle wird entfernt
+  - Der Stundenverlauf der Kosten wird entfernt
+  - Verbrauchsanzeige einfügen (siehe oben)
+  - Bei Abweichungen der Optimierung werden auffälligen Ergebnisse in einer Liste angezeigt, mit Differenz zwischen Soll- und Ist-Verbrauch
+    - Jedes Ergebnis kann ausgewählt werden, damit dafür im 24h oder SA_0-SA_2 Modus ein detaillierter Verlauf angezeigt werden kann - Code aus Cockpit für Chart1 und Chart 2 wiederverwenden.
+- [ ] Gesamtaufbau Backtesting-Seite
+  - Anzeige der nicht optimierten Jahresverbräuche
+  - Buttons zur Ausführung des backtesting (mit allen definierten Szenarien) - wie bereits vorhanden
+  - Auswahl "Szenario Detailansicht" und "Monat Detailansicht" entfallen
+  - Eine Tabelle mit den Gesamtkosten aller Szenarien (inkl. Nicht optimiert)
+  - Verbrauchs-Anzeige (siehe oben)
+  - Kostenvergleich (siehe oben)
 
 - [ ] Nicht Software-Relevant: Nach Interessenten fragen in loxforum / reddit / ...
   - Habe Admins in loxforum nach der besten Stelle für einen Post gefragt
@@ -84,12 +85,12 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ### Version 1.+1
 - [ ] **E-Auto-MILP: optionale Nacharbeiten**
 
-### Version 2.0
+### Version 2.0 - Quality-Epic
 - [ ] Ausführlicher Code-Review und Refactoring
-
-### Version 2.+1
 - [ ] Möglichkeit für Test der Code-Coverage prüfen
 - [ ] Möglichkeit zum automatisierten UI-Testing prüfen
+
+### Version 2.+1
 - [ ] Backtesting mit Scenarios auf Streamlit Community Cloud zur Verfügung stellen, um Leads zu generieren und evtl. als Affiliate Quelle (Bei Wechsel des Stromtarif-Anbieters oder bei Kontakt mit PV-Erstellern)
 
 ### Version 2.+1
@@ -106,6 +107,7 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.+1
 - [ ] csv-Datenformat für Verbraucher Jahresbedarf (außer Haus und E-Auto) definieren und Möglichkeit zum Importieren geben (zusätzlich zu Nennwerten). Jahresverlauf aus Nennwerten kann mit gemessenem Verlauf graphisch und summarisch verglichen werden. 
+- [ ] Debug-Seite für Loxone-Kommunikation einrichten, bei der die eingelesenen Daten angezeigt werden mit letztem Update, ob Daten an die Loxone erfolgreich versendet wurden (mit Wert und Zeitstempel - wenn silentmode==false)
 
 ### Version 2.+1 — Test-Config entkoppeln
 - [x] **Stufe 1 — Standard-Test-Config in `conftest.py`**
@@ -132,13 +134,6 @@ Offene Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - Manifest-Felder / Schema
   - Prüfen, ob ein **Replay-/Nachrechen-Pfad** aus einem Dump dokumentiert oder teilautomatisiert werden soll
   - Weitere Inputs nur ergänzen, wenn sie für reale Fehlfälle nachweislich relevant sind
-
-
-### Version 2.+1
-- [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
-  - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
-- [ ] **Soll-Ist Hinweis-Regeln** — Kategorie „Hinweis“ sobald konkrete unkritische Fälle identifiziert (Follow-up Epic Soll-Ist)
-- [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
 
 
 ### Version 2.+1 — Epics **Adaption** & **Thermik** (Architektur first)
@@ -211,6 +206,12 @@ Validierung quer über alle Phasen: **Nachrechnung „Historischer Tag“** (0.+
   - Modus **`fixed_24h`:** End-SOC-Verhalten **fest im Modus** verankern — wirtschaftlich äquivalent zu bisher `battery_end_soc_equals_start: true` (Start-SOC am Horizontende), **oder** harte Gleichheits-Nebenbedingung durch die bestehende **`battery_wear`-Strafe** einführen, die niedrigere End-SOCs angemessen „bestraft“ (eine Variante wählen, nicht beides parallel)
   - Modus **`sunset_window`:** unverändert **SOC_min am Sonnenaufgang** (hart)
   - Spec ergänzen, Live-Tests für beide Modi
+
+### Version 2.+1 (Wird das noch gebraucht???)
+- [ ] **Nachrechnung „Historischer Tag“ ins Backtesting** (Dev-only)
+  - Beliebiger Kalendertag aus `cons_data_hourly.csv` + historische Preise; Umsetzung später klären (ersetzt Sidebar-Modus „Historischer Tag“)
+- [ ] **Soll-Ist Hinweis-Regeln** — Kategorie „Hinweis“ sobald konkrete unkritische Fälle identifiziert (Follow-up Epic Soll-Ist)
+- [ ] **Soll-Ist Nachrechnung (Backtesting)** — Regelwerk batchweise über historische JSONL / Prod-Dumps; Statistik je Kategorie (Follow-up Epic Soll-Ist)
 
 
 ## Packaging & Deployment

@@ -5,12 +5,17 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from ui.consumption_validation_charts import (
+    cons_data_columns_timeseries_chart,
+    cons_dataframe_to_navigation_series,
+    cons_dataframe_to_series,
     csv_series_to_monthly_kwh,
     format_iso_week_label,
     iso_weeks_in_series,
     modeled_monthly_kwh,
+    slice_cons_dataframe_for_iso_week,
     slice_series_for_iso_week,
     timeseries_comparison_chart,
+    timeseries_comparison_from_series,
 )
 
 
@@ -100,3 +105,68 @@ def test_timeseries_comparison_chart_title_contains_kw(tmp_path):
         iso_week=iso_week,
     )
     assert f"KW {iso_week}/{iso_year}" in fig.layout.title.text
+
+
+def test_timeseries_comparison_from_series_matches_csv_chart(tmp_path):
+    csv_path = tmp_path / "week.csv"
+    start = datetime(2024, 3, 18, 0, 0, 0)
+    lines = ["timestamp;power_kw"]
+    series: list[tuple[str, float]] = []
+    for index in range(168):
+        ts = (start + timedelta(hours=index)).strftime("%Y-%m-%d %H:%M:%S")
+        lines.append(f"{ts};1.0")
+        series.append((ts, 1.0))
+    csv_path.write_text("\n".join(lines), encoding="utf-8")
+    iso_year, iso_week = start.isocalendar()[:2]
+    profile = {"annual_kwh": 8760.0, "baseload_kwh": 8760.0, "consumers": []}
+    from_csv = timeseries_comparison_chart(
+        str(csv_path),
+        profile,
+        iso_year=iso_year,
+        iso_week=iso_week,
+    )
+    from_series = timeseries_comparison_from_series(
+        series,
+        profile,
+        iso_year=iso_year,
+        iso_week=iso_week,
+    )
+    assert from_csv.layout.title.text == from_series.layout.title.text
+    assert from_csv.data[0].y == from_series.data[0].y
+
+
+def test_cons_dataframe_to_series_empty():
+    import pandas as pd
+
+    assert cons_dataframe_to_series(pd.DataFrame()) == []
+
+
+def test_cons_data_columns_timeseries_chart_three_traces():
+    import pandas as pd
+
+    start = datetime(2024, 3, 18, 0, 0, 0)
+    index = pd.date_range(start, periods=168, freq="h", name="timestamp")
+    df = pd.DataFrame(
+        {
+            "total_kw": [1.0] * 168,
+            "baseload_kw": [0.5] * 168,
+            "pv_kw": [0.2] * 168,
+        },
+        index=index,
+    )
+    iso_year, iso_week = start.isocalendar()[:2]
+    sliced = slice_cons_dataframe_for_iso_week(df, iso_year=iso_year, iso_week=iso_week)
+    assert len(sliced) == 168
+    fig = cons_data_columns_timeseries_chart(df, iso_year=iso_year, iso_week=iso_week)
+    assert len(fig.data) == 3
+    assert {trace.name for trace in fig.data} == {"total_kw", "baseload_kw", "pv_kw"}
+
+
+def test_cons_dataframe_to_navigation_series_uses_index():
+    import pandas as pd
+
+    index = pd.date_range("2024-01-01", periods=3, freq="h", name="timestamp")
+    df = pd.DataFrame({"total_kw": [1.0, 2.0, 3.0]}, index=index)
+    series = cons_dataframe_to_navigation_series(df)
+    assert len(series) == 3
+    assert series[0][0].startswith("2024-01-01")

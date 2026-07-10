@@ -2,6 +2,32 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 1.25.0 — Backtesting mit Hauskonfiguration (2026-07-10)
+
+- [x] **Hauskonfigurator** — optionales Jahres-Gesamt-Verbrauchs-CSV (Format-Check: Monatsbalken + Stundenverlauf)
+- [x] **Szenarieneditor** — Subpage unter Konfiguration; Hauskonfigurator nur Verbraucher + PV; Batterie/Tarife im Szenario-Editor; Default-Scenario Runtime (Pflicht vor Backtesting/Betrieb); weitere Szenarien mit anderen Batterien/Tarifen
+- [x] **Backtesting aus Konfiguration** — Daten aus Hauskonfiguration + Szenarien; Lauf einlesen wenn Fingerprint passt, sonst Neu-Berechnen
+- [x] **Verbrauchsdaten (`cons_data_hourly.csv`)** — Visualisierung, synthetische Generierung (`scripts.generate_cons_data`), Match-Status Verbraucher-IDs, Backtesting-Start ohne gültige Datei deaktiviert
+- [x] **cons_data-Plot** — Navigation wie Jahres-CSV; Spaltenverläufe `total_kw` / `baseload_kw` / `pv_kw`
+- [x] **Backtesting-Runner** — Testlauf (ein Monat), Fortschrittsbalken (`--progress-file`), gruppierte Szenario-Balken im Monatskostenvergleich
+- [x] **Sidecar-Pfade** — `tariffs.json` / `house_profiles.json` / `backtesting_scenarios.json` neben per-ENV gesetzter `config.json` (`persist_paths`)
+- [x] **Fingerprint** — Tarif-Specs und aWATTar-Pricing-Block im Szenario-Fingerprint; Export-Tarif-Alias `awattar_sunny_float` → `dynamic_epex`
+- [x] **Tests** — `test_backtesting_cons_data`, `test_backtesting_charts`, `test_backtesting_plausibility_charts`, `test_backtesting_ui_helpers`, `test_persist_paths_sidecars`
+
+**Manuelle Abnahme (Greenfield, Streamlit :8511 oder Container :8502)**
+
+- [x] Greenfield zurückgesetzt; nur Hauskonfigurator + Konfiguration sichtbar; Sidebar zeigt fehlende Schritte
+- [x] **Hauskonfigurator** — thermisches Hausprofil + PV-Anlage speichern; optional Jahres-CSV hochladen → Monatsbalken und Stundenverlauf (Ist vs. Modell)
+- [x] **Szenarieneditor** erscheint nach Hausprofil + PV — Batterie anlegen, Runtime speichern (Batterie, Tarife, Hausprofil, Geo)
+- [x] **Backtesting** erscheint nach vollständigem Runtime-Szenario — konfigurierte Szenarien werden angezeigt
+- [x] **Verbrauchsdaten (`cons_data_hourly.csv`)** — ohne gültige Datei: Abschnitt mit Hinweis, Button **Backtesting starten** deaktiviert
+- [x] Button **Verbrauchsdaten generieren (synthetisch)** — `runtime/cons_data_hourly.csv` + `.meta.json` mit Datenzeilen
+- [x] Monatsbalken und KW-Stundenverlauf (Ist vs. Modell) im Verbrauchsdaten-Abschnitt
+- [x] Match-Status Verbraucher-IDs — passt zur aktuellen Config (grün) bzw. Warnung bei Abweichung oder fehlender Meta-Datei
+- [x] Button **Backtesting starten** — Lauf endet erfolgreich; Kosten, Monate, Plausibilität und Stundenchart sichtbar
+- [x] Nach Änderung an Runtime/Szenario — Warnung „Lauf passt nicht zur Konfiguration“ + **Neu berechnen**
+- [x] PR #4 mergen
+
 ### Bugfix natives Filterfenster Log-Spam (main.py) (2026-07-09)
 
 - [x] **`filter_contexts` einmal pro Lauf** — `main.py` löst vor `get_consumer_remaining_kwh` auf und reicht durch an MILP, Restziel-Anpassung und `calculate_optimization_savings`

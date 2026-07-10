@@ -5,7 +5,9 @@ import os
 os.environ["ENERGY_OPTIMIZER_OFFLINE"] = "1"
 
 import argparse
+import json
 import logging
+import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
@@ -194,6 +196,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=".",
         help="Zielordner für backtesting_log.json und backtesting_hourly.csv (Standard: .).",
     )
+    parser.add_argument(
+        "--progress-file",
+        metavar="PFAD",
+        help="JSON-Datei für UI-Fortschritt (current/total/scenario/phase).",
+    )
     return parser
 
 
@@ -312,12 +319,57 @@ def _run_scenarios_parallel(
     return sim_results, plausibility_by_scenario, cbc_events_by_scenario
 
 
-def _make_progress_printer(scenario_name: str):
+_PROGRESS_WRITE_MIN_INTERVAL_SEC = 1.0
+_PROGRESS_REPLACE_RETRIES = 3
+_PROGRESS_REPLACE_RETRY_DELAY_SEC = 0.05
+
+
+def _atomic_replace_unavailable(exc: OSError) -> bool:
+    """True wenn tmp→Ziel nicht atomar ersetzt werden kann (Windows/SMB/UNC)."""
+    if getattr(exc, "errno", None) in (13, 16):
+        return True
+    return getattr(exc, "winerror", None) == 5
+
+
+def _write_progress_file(path: str | None, payload: dict) -> None:
+    if not path:
+        return
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    content = json.dumps(payload)
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    try:
+        for attempt in range(_PROGRESS_REPLACE_RETRIES):
+            try:
+                tmp.write_text(content, encoding="utf-8")
+                tmp.replace(target)
+                return
+            except OSError as exc:
+                if not _atomic_replace_unavailable(exc):
+                    raise
+                if attempt + 1 < _PROGRESS_REPLACE_RETRIES:
+                    time.sleep(_PROGRESS_REPLACE_RETRY_DELAY_SEC)
+                    continue
+                target.write_text(content, encoding="utf-8")
+                return
+    finally:
+        if tmp.is_file():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+
+
+def _make_progress_printer(scenario_name: str, progress_file: str | None = None):
     """Gibt eine Callback-Funktion für die Fortschrittsanzeige im Terminal zurück."""
+    last_write_at = 0.0
+    last_written_current = -1
+
     def progress(current: int, total: int) -> None:
-        pct = 100 * current / total
+        nonlocal last_write_at, last_written_current
+        pct = 100 * current / total if total else 0.0
         bar_width = 30
-        filled = int(bar_width * current / total)
+        filled = int(bar_width * current / total) if total else 0
         bar = "#" * filled + "-" * (bar_width - filled)
         print(
             f"\r  [{bar}] {pct:5.1f}% ({current}/{total} h) – {scenario_name}",
@@ -326,6 +378,27 @@ def _make_progress_printer(scenario_name: str):
         )
         if current == total:
             print()
+        if not progress_file:
+            return
+        now = time.monotonic()
+        if (
+            current != total
+            and current == last_written_current
+            and now - last_write_at < _PROGRESS_WRITE_MIN_INTERVAL_SEC
+        ):
+            return
+        _write_progress_file(
+            progress_file,
+            {
+                "current": current,
+                "total": total,
+                "scenario": scenario_name,
+                "phase": "simulation",
+            },
+        )
+        last_write_at = now
+        last_written_current = current
+
     return progress
 
 
@@ -548,6 +621,19 @@ def main(argv: list[str] | None = None):
     ref_settings = config.get_backtesting_feed_in_settings()
     scenario_labels = config.get_scenario_labels()
     labels = _all_labels(scenario_labels)
+    progress_file = args.progress_file
+    total_hours = len(anchors) * 24
+
+    if progress_file:
+        _write_progress_file(
+            progress_file,
+            {
+                "current": 0,
+                "total": total_hours,
+                "scenario": HISTORICAL_REFERENCE_LABEL,
+                "phase": "reference",
+            },
+        )
 
     print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
     sim_results = {
@@ -569,7 +655,7 @@ def main(argv: list[str] | None = None):
                 params,
                 prices,
                 cache=cache,
-                on_progress=_make_progress_printer(display),
+                on_progress=_make_progress_printer(display, progress_file),
                 scenario_id=name,
                 horizon_mode=horizon_mode,
                 price_resources=price_resources,
@@ -632,6 +718,8 @@ def main(argv: list[str] | None = None):
         log_dir=args.output_dir,
         cbc_events_by_scenario=cbc_events_by_scenario,
     )
+    if progress_file:
+        Path(progress_file).unlink(missing_ok=True)
     print(f"\nBacktesting-Log gespeichert: {log_path}")
 
 

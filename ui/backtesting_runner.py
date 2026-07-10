@@ -1,38 +1,190 @@
-"""Subprocess-Start für scripts/run_backtesting aus der Streamlit-UI."""
-from __future__ import annotations
-
-import subprocess
-import sys
-from pathlib import Path
-
-
-def project_root() -> Path:
-    return Path(__file__).resolve().parents[1]
-
-
-def python_executable() -> str:
-    venv_python = project_root() / ".venv" / "Scripts" / "python.exe"
-    if venv_python.is_file():
-        return str(venv_python)
-    return sys.executable
-
-
-def run_backtesting_subprocess(*, output_dir: str = ".") -> tuple[int, str]:
-    """Startet Backtesting offline; gibt (exit_code, kombiniertes stdout/stderr) zurück."""
-    cmd = [
-        python_executable(),
-        "-m",
-        "scripts.run_backtesting",
-        "--output-dir",
-        output_dir,
-    ]
-    completed = subprocess.run(
-        cmd,
-        cwd=str(project_root()),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    output = (completed.stdout or "") + (completed.stderr or "")
-    return completed.returncode, output
+"""Subprocess-Start für scripts/run_backtesting aus der Streamlit-UI."""
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+from datetime import date
+from pathlib import Path
+from typing import Callable, TextIO
+
+from data import profile_manager
+from runtime_store.persist_paths import resolve_backtesting_log_dir
+from scripts.run_backtesting import BACKTESTING_YEAR
+
+_FAILURE_MARKERS = (
+    "No module named scripts.run_backtesting",
+    "ModuleNotFoundError: No module named 'scripts'",
+    "No module named scripts",
+)
+_DEBUGPY_ENV_PREFIXES = (
+    "DEBUGPY",
+    "PYDEVD",
+    "BUNDLED_DEBUGPY",
+    "VSCODE_DEBUGPY",
+)
+_PROGRESS_POLL_SEC = 0.5
+
+
+def project_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def backtesting_script_path() -> Path:
+    return project_root() / "scripts" / "run_backtesting.py"
+
+
+def python_executable() -> str:
+    venv_python = project_root() / ".venv" / "Scripts" / "python.exe"
+    if venv_python.is_file():
+        return str(venv_python)
+    return sys.executable
+
+
+def default_backtesting_output_dir() -> str:
+    return resolve_backtesting_log_dir()
+
+
+def default_progress_file_path() -> str:
+    return str(Path(default_backtesting_output_dir()) / ".backtesting_progress.json")
+
+
+def suggest_test_month() -> int | None:
+    """Erster Monat in BACKTESTING_YEAR mit cons_data-Daten, sonst None."""
+    lox_min, lox_max = profile_manager.get_cons_data_date_bounds()
+    if lox_min is None or lox_max is None:
+        return None
+    year_start = date(BACKTESTING_YEAR, 1, 1)
+    year_end = date(BACKTESTING_YEAR, 12, 31)
+    if lox_max < year_start or lox_min > year_end:
+        return None
+    overlap_start = max(lox_min, year_start)
+    return overlap_start.month
+
+
+def _subprocess_env() -> dict[str, str]:
+    """Kindprozess-Env: PYTHONPATH + ohne Debugpy-Hooks (VS-Code-Launcher)."""
+    root = str(project_root())
+    env = os.environ.copy()
+    for key in list(env):
+        if any(key.startswith(prefix) for prefix in _DEBUGPY_ENV_PREFIXES):
+            del env[key]
+    existing = env.get("PYTHONPATH", "").strip()
+    env["PYTHONPATH"] = f"{root}{os.pathsep}{existing}" if existing else root
+    return env
+
+
+def _normalize_exit_code(returncode: int, output: str) -> int:
+    if returncode != 0:
+        return returncode
+    if any(marker in output for marker in _FAILURE_MARKERS):
+        return 1
+    return returncode
+
+
+def _drain_subprocess_stdout(pipe: TextIO | None, chunks: list[str]) -> None:
+    """Liest stdout inkrementell, damit der Kindprozess nicht am Pipe-Puffer blockiert."""
+    if pipe is None:
+        return
+    try:
+        while True:
+            data = pipe.read(4096)
+            if not data:
+                break
+            chunks.append(data)
+    finally:
+        pipe.close()
+
+
+def read_progress_file(path: str) -> dict | None:
+    """Liest Fortschritts-JSON; None wenn nicht vorhanden oder ungültig."""
+    progress_path = Path(path)
+    if not progress_path.is_file():
+        return None
+    try:
+        return json.loads(progress_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def build_backtesting_command(
+    *,
+    output_dir: str,
+    start_month: int | None = None,
+    end_month: int | None = None,
+    progress_file: str | None = None,
+) -> list[str]:
+    script_path = backtesting_script_path()
+    cmd = [
+        python_executable(),
+        str(script_path),
+        "--output-dir",
+        output_dir,
+    ]
+    if start_month is not None:
+        cmd.extend(["--start-month", str(start_month)])
+    if end_month is not None:
+        cmd.extend(["--end-month", str(end_month)])
+    if progress_file:
+        cmd.append("--progress-file")
+        cmd.append(progress_file)
+    return cmd
+
+
+def run_backtesting_subprocess(
+    *,
+    output_dir: str | None = None,
+    start_month: int | None = None,
+    end_month: int | None = None,
+    progress_file: str | None = None,
+    on_progress: Callable[[dict], None] | None = None,
+) -> tuple[int, str]:
+    """Startet Backtesting offline; gibt (exit_code, kombiniertes stdout/stderr) zurück."""
+    log_dir = default_backtesting_output_dir() if output_dir is None else output_dir
+    script_path = backtesting_script_path()
+    if not script_path.is_file():
+        message = f"Backtesting-Skript fehlt: {script_path}"
+        return 1, message
+
+    if progress_file:
+        Path(progress_file).unlink(missing_ok=True)
+
+    cmd = build_backtesting_command(
+        output_dir=log_dir,
+        start_month=start_month,
+        end_month=end_month,
+        progress_file=progress_file,
+    )
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(project_root()),
+        env=_subprocess_env(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    stdout_chunks: list[str] = []
+    stdout_reader = threading.Thread(
+        target=_drain_subprocess_stdout,
+        args=(proc.stdout, stdout_chunks),
+        daemon=True,
+    )
+    stdout_reader.start()
+    while proc.poll() is None:
+        if progress_file and on_progress is not None:
+            progress = read_progress_file(progress_file)
+            if progress is not None:
+                on_progress(progress)
+        time.sleep(_PROGRESS_POLL_SEC)
+
+    stdout_reader.join(timeout=5.0)
+    output = "".join(stdout_chunks)
+    exit_code = _normalize_exit_code(proc.returncode or 0, output)
+    if progress_file:
+        Path(progress_file).unlink(missing_ok=True)
+    return exit_code, output

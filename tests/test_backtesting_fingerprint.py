@@ -2,7 +2,10 @@
 """Tests für Backtesting-Konfigurations-Fingerprint."""
 from __future__ import annotations
 
-from simulation.backtesting_fingerprint import compute_backtesting_fingerprint
+from simulation.backtesting_fingerprint import (
+    _awattar_pricing_block,
+    compute_backtesting_fingerprint,
+)
 
 
 def test_fingerprint_stable_for_same_settings():
@@ -23,3 +26,67 @@ def test_fingerprint_changes_when_scenario_changes():
         {"runtime_settings": {**base, "pv_kwp": 8.0}},
     )
     assert fp_a != fp_b
+
+
+def test_fingerprint_includes_import_tariff_spec():
+    base_spec = {
+        "id": "fixed_imp",
+        "type": "fixed_cent",
+        "fix_cent_kwh": 25.0,
+    }
+    scenario = {
+        "import_tariff_type": "fixed_cent",
+        "import_fixed_cent_kwh": 25.0,
+        "_import_tariff_spec": dict(base_spec),
+    }
+    fp_a = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario})
+    changed = {
+        **scenario,
+        "_import_tariff_spec": {**base_spec, "fix_cent_kwh": 30.0},
+    }
+    fp_b = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": changed})
+    assert fp_a != fp_b
+
+
+def test_fingerprint_includes_monthly_fixed_tariffs():
+    rates_a = [{"year": 2025, "month": 6, "tariff_cent_kwh": 5.86}]
+    rates_b = [{"year": 2025, "month": 6, "tariff_cent_kwh": 7.10}]
+    scenario_a = {
+        "feed_in_mode": "fixed",
+        "_monthly_fixed_tariffs": rates_a,
+    }
+    scenario_b = {
+        "feed_in_mode": "fixed",
+        "_monthly_fixed_tariffs": rates_b,
+    }
+    fp_a = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario_a})
+    fp_b = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario_b})
+    assert fp_a != fp_b
+
+
+def test_fingerprint_includes_awattar_pricing_when_provided():
+    scenario = {
+        "import_tariff_type": "awattar",
+        "_import_tariff_spec": {"id": "awattar_at", "type": "awattar"},
+    }
+    awattar_a = _awattar_pricing_block({"awattar": {"fix_aufschlag_cent": 1.5}})
+    awattar_b = _awattar_pricing_block({"awattar": {"fix_aufschlag_cent": 2.0}})
+    fp_a = compute_backtesting_fingerprint(
+        ["runtime_settings"],
+        {"runtime_settings": scenario},
+        awattar_pricing=awattar_a,
+    )
+    fp_b = compute_backtesting_fingerprint(
+        ["runtime_settings"],
+        {"runtime_settings": scenario},
+        awattar_pricing=awattar_b,
+    )
+    assert fp_a != fp_b
+
+
+def test_fingerprint_ignores_unrelated_private_keys():
+    scenario_a = {"battery_capacity_kwh": 5.0, "_house_profile": {"id": "home_a"}}
+    scenario_b = {"battery_capacity_kwh": 5.0, "_house_profile": {"id": "home_b"}}
+    fp_a = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario_a})
+    fp_b = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario_b})
+    assert fp_a == fp_b

@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime
 
+import pandas as pd
 import plotly.graph_objects as go
 
 from data.consumption_profiles import build_modeled_hourly_kw_profile
@@ -43,6 +44,88 @@ def modeled_monthly_kwh(profile: dict, *, hours: int = 8760) -> dict[str, float]
 def load_csv_monthly_kwh(csv_path: str) -> dict[str, float]:
     series = load_hourly_profile_csv(csv_path)
     return csv_series_to_monthly_kwh(series)
+
+
+def cons_dataframe_to_series(df: pd.DataFrame) -> list[tuple[str, float]]:
+    """Mappt cons_data_hourly DataFrame (total_kw) auf (timestamp, kW)-Serie."""
+    if df.empty:
+        return []
+    series: list[tuple[str, float]] = []
+    for ts, row in df.iterrows():
+        series.append((ts.strftime("%Y-%m-%d %H:%M:%S"), float(row["total_kw"])))
+    return series
+
+
+def cons_dataframe_to_navigation_series(df: pd.DataFrame) -> list[tuple[str, float]]:
+    """Timestamp-Serie für KW-Navigation aus cons_data DataFrame-Index."""
+    if df.empty:
+        return []
+    return [(ts.strftime("%Y-%m-%d %H:%M:%S"), 0.0) for ts in df.index]
+
+
+_CONS_DATA_PLOT_COLUMNS = ("total_kw", "baseload_kw", "pv_kw")
+
+
+def slice_cons_dataframe_for_iso_week(
+    df: pd.DataFrame,
+    *,
+    iso_year: int,
+    iso_week: int,
+) -> pd.DataFrame:
+    """Schneidet cons_data-Zeilen für eine ISO-Kalenderwoche."""
+    if df.empty:
+        return df
+    rows: list[pd.Series] = []
+    index_labels: list[datetime] = []
+    for ts, row in df.iterrows():
+        ts_dt = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+        if ts_dt.isocalendar()[:2] != (iso_year, iso_week):
+            continue
+        rows.append(row)
+        index_labels.append(ts_dt)
+    if not rows:
+        return pd.DataFrame(columns=df.columns)
+    sliced = pd.DataFrame(rows)
+    sliced.index = pd.DatetimeIndex(index_labels)
+    return sliced
+
+
+def cons_data_columns_timeseries_chart(
+    df: pd.DataFrame,
+    *,
+    iso_year: int,
+    iso_week: int,
+) -> go.Figure:
+    """Stündliche Verläufe total_kw, baseload_kw, pv_kw für eine ISO-KW."""
+    week_df = slice_cons_dataframe_for_iso_week(df, iso_year=iso_year, iso_week=iso_week)
+    if week_df.empty:
+        raise ValueError(f"Keine Daten für {format_iso_week_label(iso_year, iso_week)}.")
+    x_labels = [
+        _format_hour_axis_label(ts.strftime("%Y-%m-%d %H:%M:%S"))
+        for ts in week_df.index
+    ]
+    fig = go.Figure()
+    for column in _CONS_DATA_PLOT_COLUMNS:
+        if column not in week_df.columns:
+            continue
+        fig.add_scatter(
+            name=column,
+            x=x_labels,
+            y=week_df[column].astype(float).tolist(),
+            mode="lines",
+        )
+    fig.update_layout(
+        title=f"Stündlicher Verlauf — KW {iso_week}/{iso_year}",
+        xaxis_title="Zeit",
+        yaxis_title="kW",
+        height=360,
+        margin=dict(l=40, r=20, t=50, b=40),
+    )
+    return fig
+
+
+def cons_data_monthly_kwh(df: pd.DataFrame) -> dict[str, float]:
+    return csv_series_to_monthly_kwh(cons_dataframe_to_series(df))
 
 
 def iso_weeks_in_series(series: list[tuple[str, float]]) -> list[tuple[int, int]]:
@@ -115,24 +198,24 @@ def monthly_comparison_chart(
     return fig
 
 
-def timeseries_comparison_chart(
-    csv_path: str,
+def timeseries_comparison_from_series(
+    series: list[tuple[str, float]],
     profile: dict,
     *,
     iso_year: int,
     iso_week: int,
+    actual_label: str = "Ist (CSV)",
 ) -> go.Figure:
-    """Vergleicht Ist und Modell für eine ISO-Kalenderwoche."""
-    series = load_hourly_profile_csv(csv_path)
+    """Vergleicht Ist-Serie und Modell für eine ISO-Kalenderwoche."""
     modeled = build_modeled_hourly_kw_profile(profile, hours=len(series))
     timestamps, actual, modeled_slice = slice_series_for_iso_week(
         series, modeled, iso_year, iso_week
     )
     if not actual:
-        raise ValueError(f"Keine CSV-Daten für {format_iso_week_label(iso_year, iso_week)}.")
+        raise ValueError(f"Keine Daten für {format_iso_week_label(iso_year, iso_week)}.")
     x_labels = [_format_hour_axis_label(ts_raw) for ts_raw in timestamps]
     fig = go.Figure()
-    fig.add_scatter(name="Ist (CSV)", x=x_labels, y=actual, mode="lines")
+    fig.add_scatter(name=actual_label, x=x_labels, y=actual, mode="lines")
     fig.add_scatter(name="Modell", x=x_labels, y=modeled_slice, mode="lines")
     fig.update_layout(
         title=f"Stündlicher Verlauf — KW {iso_week}/{iso_year}",
@@ -142,3 +225,20 @@ def timeseries_comparison_chart(
         margin=dict(l=40, r=20, t=50, b=40),
     )
     return fig
+
+
+def timeseries_comparison_chart(
+    csv_path: str,
+    profile: dict,
+    *,
+    iso_year: int,
+    iso_week: int,
+) -> go.Figure:
+    """Vergleicht Ist und Modell für eine ISO-Kalenderwoche."""
+    series = load_hourly_profile_csv(csv_path)
+    return timeseries_comparison_from_series(
+        series,
+        profile,
+        iso_year=iso_year,
+        iso_week=iso_week,
+    )

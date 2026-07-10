@@ -9,6 +9,10 @@ _RUNTIME_DIR_ENV = "ENERGY_OPTIMIZER_RUNTIME_DIR"
 _DEFAULT_RUNTIME_DIR = "runtime"
 _LOCAL_SETTINGS_ENV = "ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH"
 _DOTENV_ENV = "ENERGY_OPTIMIZER_DOTENV_PATH"
+_CONFIG_PATH_ENV = "ENERGY_OPTIMIZER_CONFIG_PATH"
+_TARIFFS_PATH_ENV = "ENERGY_OPTIMIZER_TARIFFS_PATH"
+_HOUSE_PROFILES_PATH_ENV = "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH"
+_BACKTESTING_SCENARIOS_PATH_ENV = "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH"
 _DEFAULT_DOTENV = os.path.join("config", ".env")
 _LEGACY_DOTENV = ".env"
 
@@ -19,6 +23,11 @@ def runtime_dir() -> str:
 
 def runtime_path(filename: str) -> str:
     return os.path.join(runtime_dir(), filename)
+
+
+def resolve_backtesting_log_dir() -> str:
+    """Zielordner für backtesting_log.json und backtesting_hourly.csv (UI und Laufzeit)."""
+    return runtime_dir()
 
 
 def resolve_runtime_prefixed_path(configured_path: str) -> str:
@@ -149,7 +158,7 @@ def resolve_config_schema_template_path() -> str:
 
 def resolve_config_json_path() -> str:
     """Konfigurationspfad: ENV > config/config.json > Legacy config.json im Repo-Wurzelverzeichnis."""
-    env = os.environ.get("ENERGY_OPTIMIZER_CONFIG_PATH", "").strip()
+    env = os.environ.get(_CONFIG_PATH_ENV, "").strip()
     if env:
         return env
     preferred = os.path.join("config", "config.json")
@@ -159,6 +168,41 @@ def resolve_config_json_path() -> str:
     if os.path.isfile(legacy):
         return legacy
     return preferred
+
+
+def _config_directory_from_env() -> str | None:
+    """Verzeichnis der per ENV gesetzten config.json, sonst None."""
+    env = os.environ.get(_CONFIG_PATH_ENV, "").strip()
+    if not env:
+        return None
+    return os.path.dirname(os.path.abspath(env))
+
+
+def _resolve_sidecar_json_path(
+    *,
+    env_var: str,
+    filename: str,
+    default_path: str,
+    legacy_basename: str | None = None,
+) -> str:
+    """
+    Sidecar-JSON neben config.json, wenn CONFIG_PATH per ENV gesetzt ist.
+
+    Reihenfolge: explizite Sidecar-ENV > Datei im Config-Verzeichnis > Default > Legacy.
+    """
+    env = os.environ.get(env_var, "").strip()
+    if env:
+        return env
+    config_dir = _config_directory_from_env()
+    if config_dir:
+        co_located = os.path.join(config_dir, filename)
+        if os.path.isfile(co_located):
+            return co_located
+    if os.path.isfile(default_path):
+        return default_path
+    if legacy_basename and os.path.isfile(legacy_basename):
+        return legacy_basename
+    return default_path
 
 
 def local_settings_file() -> str:
@@ -240,17 +284,13 @@ def resolve_backtesting_scenarios_schema_template_path() -> str:
 
 
 def resolve_backtesting_scenarios_json_path() -> str:
-    """Pfad zu backtesting_scenarios.json: ENV > config/ > Legacy im Repo-Wurzelverzeichnis."""
-    env = os.environ.get("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", "").strip()
-    if env:
-        return env
-    preferred = os.path.join("config", "backtesting_scenarios.json")
-    if os.path.isfile(preferred):
-        return preferred
-    legacy = "backtesting_scenarios.json"
-    if os.path.isfile(legacy):
-        return legacy
-    return preferred
+    """Pfad zu backtesting_scenarios.json: ENV > neben config.json > config/ > Legacy."""
+    return _resolve_sidecar_json_path(
+        env_var=_BACKTESTING_SCENARIOS_PATH_ENV,
+        filename="backtesting_scenarios.json",
+        default_path=os.path.join("config", "backtesting_scenarios.json"),
+        legacy_basename="backtesting_scenarios.json",
+    )
 
 
 def bundled_tariffs_example_file() -> str:
@@ -297,13 +337,12 @@ def resolve_tariffs_schema_template_path() -> str:
 
 
 def resolve_tariffs_json_path() -> str:
-    env = os.environ.get("ENERGY_OPTIMIZER_TARIFFS_PATH", "").strip()
-    if env:
-        return env
-    preferred = os.path.join("config", "tariffs.json")
-    if os.path.isfile(preferred):
-        return preferred
-    return preferred
+    """Pfad zu tariffs.json: ENV > neben config.json > config/."""
+    return _resolve_sidecar_json_path(
+        env_var=_TARIFFS_PATH_ENV,
+        filename="tariffs.json",
+        default_path=os.path.join("config", "tariffs.json"),
+    )
 
 
 def bundled_house_profiles_example_file() -> str:
@@ -350,13 +389,12 @@ def resolve_house_profiles_schema_template_path() -> str:
 
 
 def resolve_house_profiles_json_path() -> str:
-    env = os.environ.get("ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH", "").strip()
-    if env:
-        return env
-    preferred = os.path.join("config", "house_profiles.json")
-    if os.path.isfile(preferred):
-        return preferred
-    return preferred
+    """Pfad zu house_profiles.json: ENV > neben config.json > config/."""
+    return _resolve_sidecar_json_path(
+        env_var=_HOUSE_PROFILES_PATH_ENV,
+        filename="house_profiles.json",
+        default_path=os.path.join("config", "house_profiles.json"),
+    )
 
 
 def bundled_deviation_rules_example_file() -> str:

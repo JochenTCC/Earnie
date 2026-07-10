@@ -14,6 +14,7 @@ from runtime_store.file_metadata import (
     read_schema_version,
     stamp_payload,
 )
+from runtime_store.persist_paths import resolve_backtesting_log_dir
 
 from .engine import (
     CONSUMPTION_TOLERANCE_KWH,
@@ -28,6 +29,7 @@ BACKTESTING_LOG_JSON = "backtesting_log.json"
 BACKTESTING_HOURLY_CSV = "backtesting_hourly.csv"
 BACKTESTING_CBC_EVENTS_JSONL = "backtesting_cbc_events.jsonl"
 LOG_VERSION = BACKTESTING_LOG_SCHEMA
+_DEFAULT_LOG_DIR = resolve_backtesting_log_dir()
 
 
 def _compute_config_fingerprint(period: dict) -> str:
@@ -255,14 +257,15 @@ def save_backtesting_log(
     labels: dict[str, str],
     plausibility_by_scenario: dict[str, PlausibilityReport],
     period: dict,
-    log_dir: str = ".",
+    log_dir: str | None = None,
     cbc_events_by_scenario: dict[str, list[dict]] | None = None,
     config_fingerprint: str | None = None,
 ) -> str:
     """Schreibt Metadaten (JSON) und Stundenwerte (CSV). Gibt den JSON-Pfad zurück."""
-    os.makedirs(log_dir, exist_ok=True)
-    json_path = os.path.join(log_dir, BACKTESTING_LOG_JSON)
-    csv_path = os.path.join(log_dir, BACKTESTING_HOURLY_CSV)
+    target_dir = _DEFAULT_LOG_DIR if log_dir is None else log_dir
+    os.makedirs(target_dir, exist_ok=True)
+    json_path = os.path.join(target_dir, BACKTESTING_LOG_JSON)
+    csv_path = os.path.join(target_dir, BACKTESTING_HOURLY_CSV)
 
     hourly_df = _hourly_to_csv(results, labels)
     hourly_df.to_csv(csv_path, index=False, sep=";", decimal=",")
@@ -297,7 +300,7 @@ def save_backtesting_log(
         payload["cbc_events_by_scenario"] = cbc_events_by_scenario
         payload["cbc_events_summary"] = _summarize_cbc_events(cbc_events_by_scenario)
         payload["cbc_events_file"] = BACKTESTING_CBC_EVENTS_JSONL
-        _append_cbc_events_jsonl(log_dir, cbc_events_by_scenario, period)
+        _append_cbc_events_jsonl(target_dir, cbc_events_by_scenario, period)
     critical_cases = build_critical_cases(
         plausibility_by_scenario,
         cbc_events_by_scenario,
@@ -315,12 +318,13 @@ def save_backtesting_log(
     return json_path
 
 
-def load_backtesting_log(log_dir: str = ".") -> tuple[dict, pd.DataFrame]:
+def load_backtesting_log(log_dir: str | None = None) -> tuple[dict, pd.DataFrame]:
     """
     Lädt Backtesting-Log.
     Returns: (metadata dict, hourly DataFrame mit allen Szenarien)
     """
-    json_path = os.path.join(log_dir, BACKTESTING_LOG_JSON)
+    target_dir = _DEFAULT_LOG_DIR if log_dir is None else log_dir
+    json_path = os.path.join(target_dir, BACKTESTING_LOG_JSON)
     if not os.path.exists(json_path):
         raise FileNotFoundError(
             f"Kein Backtesting-Log gefunden ({json_path}). "
@@ -339,7 +343,7 @@ def load_backtesting_log(log_dir: str = ".") -> tuple[dict, pd.DataFrame]:
         )
 
     hourly_name = meta.get("hourly_file", BACKTESTING_HOURLY_CSV)
-    csv_path = os.path.join(log_dir, hourly_name)
+    csv_path = os.path.join(target_dir, hourly_name)
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"Stundendatei fehlt: {csv_path}")
 
@@ -349,5 +353,6 @@ def load_backtesting_log(log_dir: str = ".") -> tuple[dict, pd.DataFrame]:
     return meta, hourly
 
 
-def log_exists(log_dir: str = ".") -> bool:
-    return os.path.exists(os.path.join(log_dir, BACKTESTING_LOG_JSON))
+def log_exists(log_dir: str | None = None) -> bool:
+    target_dir = _DEFAULT_LOG_DIR if log_dir is None else log_dir
+    return os.path.exists(os.path.join(target_dir, BACKTESTING_LOG_JSON))
