@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from .charge_immediate import charging_power_threshold_kw, fetch_charge_immediate_switch
+from .charging_context import suppresses_live_charging_output
 from .charging_session import is_charging_session_context
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,8 @@ def booking_power_kw(
     """Leistung für die Energiebuchung in diesem Intervall (kW)."""
     planned = max(0.0, float(planned_kw or 0.0))
     live = None if live_kw is None else max(0.0, float(live_kw))
+    if suppresses_live_charging_output(ctx):
+        return 0.0
     if is_charging_session_context(consumer, ctx):
         if live is not None and live > 0:
             return live

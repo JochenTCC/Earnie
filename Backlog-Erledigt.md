@@ -2,6 +2,12 @@
 
 Archiv abgeschlossener Arbeiten. Offene Todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix E-Auto Abwesenheit vs. Live-Steuerung (2026-07-10)
+
+- [x] **E-Auto abgehängt: kein Lade-Sollwert an Loxone** — Bei `anticipated` + `plugged_in: false` unterdrückt `_effective_consumer_power_kw` die Ausgabe; `booking_power_kw` bucht keine fiktive Energie (v1.24.3)
+- [x] **`available_from` bei tatsächlicher Abwesenheit** — Same-day „verspätete Rückkehr“ zählt nicht als sofort verfügbar; Übernacht-Fenster bleibt erhalten (`resolve_absent_availability`)
+- [x] **Tests** — `test_charging_context`, `test_delivery_tracking`, `test_loxone_client`; Referenz-Dump `chart_debug_20260710_111939`
+
 ### Bugfix Runtime-Szenario speichern (2026-07-09)
 
 - [x] **KeyError bei leeren Entitätslisten** — sichere ID-Auflösung in `scenario_form_helpers.py`; deaktivierte Selectboxen bei leeren PV-/Batterie-Listen im Runtime- und Szenario-Editor
