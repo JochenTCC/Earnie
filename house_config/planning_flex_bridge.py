@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from settings.flexible_consumers import CONSUMER_PALETTE_SIZE
 from house_config.generic_schedule import (
     generic_daily_target_kwh_for_day,
     generic_hourly_kw_for_day,
@@ -140,6 +141,26 @@ def planning_flex_daily_targets(
     return targets
 
 
+def _used_chart_color_indices(consumers: list[dict]) -> set[int]:
+    used: set[int] = set()
+    for consumer in consumers:
+        raw = consumer.get("chart_color_index")
+        if raw is None:
+            continue
+        try:
+            used.add(int(raw))
+        except (TypeError, ValueError):
+            continue
+    return used
+
+
+def _allocate_chart_color_index(used: set[int], consumer_id: str) -> int:
+    for index in range(CONSUMER_PALETTE_SIZE):
+        if index not in used:
+            return index
+    return sum(ord(char) for char in consumer_id) % CONSUMER_PALETTE_SIZE
+
+
 def merge_flexible_consumers(
     base_consumers: list[dict],
     planning_consumers: list[dict],
@@ -147,9 +168,15 @@ def merge_flexible_consumers(
     """Config-Verbraucher + Planungs-Verbraucher ohne ID-Kollision."""
     merged = list(base_consumers)
     taken = {consumer["id"] for consumer in base_consumers}
+    used_indices = _used_chart_color_indices(base_consumers)
     for consumer in planning_consumers:
         if consumer["id"] in taken:
             continue
-        merged.append(consumer)
-        taken.add(consumer["id"])
+        entry = dict(consumer)
+        if entry.get("chart_color_index") is None:
+            index = _allocate_chart_color_index(used_indices, str(entry["id"]))
+            entry["chart_color_index"] = index
+            used_indices.add(index)
+        merged.append(entry)
+        taken.add(entry["id"])
     return merged

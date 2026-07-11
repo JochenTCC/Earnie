@@ -486,6 +486,16 @@ def test_planning_flex_bridge_split():
     assert flex[0]["generic_flex_window"]["start_shift_h"] == 4.0
 
 
+def test_merge_flexible_consumers_assigns_chart_color_index():
+    from house_config.planning_flex_bridge import merge_flexible_consumers
+
+    base = [{"id": "swimspa", "chart_color_index": 0}]
+    planning = [{"id": "herd_kochen", "name": "Herd (Kochen)"}]
+    merged = merge_flexible_consumers(base, planning)
+    herd = next(item for item in merged if item["id"] == "herd_kochen")
+    assert herd["chart_color_index"] == 1
+
+
 def test_generic_flex_allowed_hours():
     from house_config.generic_schedule import generic_allowed_slot_hours
 
@@ -858,4 +868,251 @@ def test_migrate_runtime_entities_cli_writes_draft(tmp_path):
     ]
     assert "battery_id" in runtime
     assert "pv_kwp" not in runtime
+
+
+def test_finalize_migration_for_2_0_removes_legacy_blocks(tmp_path):
+    from house_config.migrate_runtime_entities import (
+        finalize_migration_for_2_0,
+        migrate_runtime_entities,
+    )
+
+    config = {
+        "awattar": {"fix_aufschlag_cent": 1.5},
+        "battery_wear": {"enabled": False},
+        "runtime_settings": {
+            "k_push_cent": 3.5,
+            "feed_in_mode": "fixed",
+            "pv_tilt": 18,
+            "pv_azimuth": 28,
+            "pv_kwp": 6.0,
+            "battery_max_power_kw": 4.0,
+            "battery_efficiency": 0.95,
+            "battery_capacity_kwh": 8.0,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.02,
+            "latitude": 47.404,
+            "longitude": 9.743,
+            "timezone_name": "Europe/Vienna",
+        },
+        "batteries": [],
+        "pv_systems": [],
+        "system": {"global_timeout": 10, "loop_timeout": 900},
+        "loxone_blocks": {
+            "soc_name": "Battery_SOC",
+            "pv_counter_name": "PV_Counter",
+            "log_filename": "log.csv",
+            "pv_tuning_log_file": "runtime/pv_accuracy_log.csv",
+            "pv_power_name": "PV_Power",
+            "battery_power_name": "Bat_Power",
+            "grid_power_name": "Grid_Power",
+            "target_soc_name": "Target_SOC",
+            "target_charge_power_name": "Charge_Power",
+            "target_discharge_power_name": "Discharge_Power",
+            "control_cmd_name": "Control_Cmd",
+        },
+        "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+        "planning_horizon": {"mode": "sunrise_window"},
+        "flexible_consumers": [],
+    }
+    tariffs = {
+        "import_tariffs": [
+            {"id": "awattar_at", "label": "aWATTar", "type": "awattar", "land": "AT"}
+        ],
+        "export_tariffs": [
+            {"id": "fixed_35ct", "label": "Fix", "type": "fixed", "k_push_cent": 3.5}
+        ],
+    }
+    profiles = {"profiles": []}
+
+    p5_config, _, _, _ = migrate_runtime_entities(
+        config, tariffs_doc=tariffs, house_profiles_doc=profiles
+    )
+    template = {
+        "cbc_gap_rel": 0.1,
+        "scenarios": [
+            {
+                "id": "whatif",
+                "label": "What-if",
+                "settings": {"battery_capacity_kwh": 10.0},
+            }
+        ],
+    }
+    config_2_0, scenarios_doc, notes = finalize_migration_for_2_0(
+        p5_config,
+        scenarios_template=template,
+    )
+
+    assert "runtime_settings" not in config_2_0
+    assert "awattar" not in config_2_0
+    assert "battery_wear" not in config_2_0
+    assert config_2_0["live_scenario_id"] == "live"
+    live = next(s for s in scenarios_doc["scenarios"] if s["id"] == "live")
+    assert "battery_id" in live["settings"]
+    assert "pv_kwp" not in live["settings"]
+    assert any(s["id"] == "whatif" for s in scenarios_doc["scenarios"])
+    assert any("awattar" in note for note in notes)
+
+
+def test_finalize_migration_for_2_0_config_loads(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+
+    from config import Config
+    from house_config.migrate_runtime_entities import (
+        effective_runtime_values,
+        finalize_migration_for_2_0,
+        migrate_runtime_entities,
+    )
+
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    legacy = {
+        "awattar": {"fix_aufschlag_cent": 1.5},
+        "battery_wear": {"enabled": False},
+        "runtime_settings": {
+            "k_push_cent": 3.5,
+            "feed_in_mode": "fixed",
+            "pv_tilt": 18,
+            "pv_azimuth": 28,
+            "pv_kwp": 6.0,
+            "battery_max_power_kw": 4.0,
+            "battery_efficiency": 0.95,
+            "battery_capacity_kwh": 8.0,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.02,
+            "latitude": 47.404,
+            "longitude": 9.743,
+            "timezone_name": "Europe/Vienna",
+        },
+        "batteries": [],
+        "pv_systems": [],
+        "system": {"global_timeout": 10, "loop_timeout": 900},
+        "loxone_blocks": {
+            "soc_name": "Battery_SOC",
+            "pv_counter_name": "PV_Counter",
+            "log_filename": "log.csv",
+            "pv_tuning_log_file": "runtime/pv_accuracy_log.csv",
+            "pv_power_name": "PV_Power",
+            "battery_power_name": "Bat_Power",
+            "grid_power_name": "Grid_Power",
+            "target_soc_name": "Target_SOC",
+            "target_charge_power_name": "Charge_Power",
+            "target_discharge_power_name": "Discharge_Power",
+            "control_cmd_name": "Control_Cmd",
+        },
+        "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+        "planning_horizon": {"mode": "sunrise_window"},
+        "flexible_consumers": [],
+    }
+    tariffs = {
+        "import_tariffs": [
+            {"id": "awattar_at", "label": "aWATTar", "type": "awattar", "land": "AT"}
+        ],
+        "export_tariffs": [
+            {"id": "fixed_35ct", "label": "Fix", "type": "fixed", "k_push_cent": 3.5}
+        ],
+    }
+    profiles = {"profiles": []}
+
+    p5_config, p5_tariffs, p5_profiles, _ = migrate_runtime_entities(
+        legacy, tariffs_doc=tariffs, house_profiles_doc=profiles
+    )
+    tariffs_path = config_dir / "tariffs.json"
+    profiles_path = config_dir / "house_profiles.json"
+    tariffs_path.write_text(json.dumps(p5_tariffs), encoding="utf-8")
+    profiles_path.write_text(json.dumps(p5_profiles), encoding="utf-8")
+
+    before = effective_runtime_values(
+        p5_config,
+        tariffs_path=str(tariffs_path),
+        house_profiles_path=str(profiles_path),
+    )
+
+    config_2_0, scenarios_doc, _ = finalize_migration_for_2_0(p5_config)
+    config_path = config_dir / "config.json"
+    scenarios_path = config_dir / "backtesting_scenarios.json"
+    config_path.write_text(json.dumps(config_2_0), encoding="utf-8")
+    scenarios_path.write_text(json.dumps(scenarios_doc), encoding="utf-8")
+
+    cfg = Config(
+        config_path=str(config_path),
+        backtesting_scenarios_path=str(scenarios_path),
+        tariffs_path=str(tariffs_path),
+        house_profiles_path=str(profiles_path),
+        require_loxone_credentials=False,
+    )
+
+    resolved = cfg.get_resolved_runtime_settings()
+    assert cfg.PV_KWP == pytest.approx(before["pv_kwp"])
+    assert cfg.BATTERY_CAPACITY_KWH == pytest.approx(before["battery_capacity_kwh"])
+    assert resolved["k_push_cent"] == pytest.approx(before["k_push_cent"])
+
+
+def test_setup_silent_migration_test_writes_stack(tmp_path):
+    from scripts.setup_silent_migration_test import setup_silent_migration_test
+
+    nas_dir = tmp_path / "nas" / "config"
+    nas_dir.mkdir(parents=True)
+    legacy = {
+        "battery_wear": {"enabled": False},
+        "runtime_settings": {
+            "k_push_cent": 3.5,
+            "feed_in_mode": "fixed",
+            "pv_kwp": 6.0,
+            "pv_tilt": 18,
+            "pv_azimuth": 28,
+            "battery_capacity_kwh": 8.0,
+            "battery_max_power_kw": 4.0,
+            "battery_efficiency": 0.95,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.02,
+            "latitude": 47.404,
+            "longitude": 9.743,
+            "timezone_name": "Europe/Vienna",
+        },
+        "batteries": [],
+        "pv_systems": [],
+    }
+    (nas_dir / "config.json").write_text(json.dumps(legacy), encoding="utf-8")
+    repo = Path(__file__).resolve().parents[1]
+    (nas_dir / "tariffs.json").write_text(
+        (repo / "tests/fixtures/backtesting/tariffs.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (nas_dir / "house_profiles.json").write_text(
+        json.dumps({"profiles": []}),
+        encoding="utf-8",
+    )
+    (nas_dir / ".env").write_text(
+        'LOXONE_USER="test"\nLOXONE_PASS="secret"\nLOXONE_IP=192.168.1.1\n',
+        encoding="utf-8",
+    )
+    nas_runtime = tmp_path / "nas" / "runtime"
+    nas_runtime.mkdir(parents=True)
+    (nas_runtime / "cons_data_hourly.csv").write_text("header\n", encoding="utf-8")
+    (nas_runtime / "flexible_consumers_state.json").write_text("{}", encoding="utf-8")
+
+    out = tmp_path / "silent-migration-test"
+    config_out, runtime_out = setup_silent_migration_test(
+        nas_config=nas_dir / "config.json",
+        output_dir=out,
+        nas_runtime=nas_runtime,
+        force=True,
+    )
+
+    config_payload = json.loads((config_out / "config.json").read_text(encoding="utf-8"))
+    assert "runtime_settings" not in config_payload
+    assert config_payload.get("live_scenario_id") == "live"
+    assert (config_out / "backtesting_scenarios.json").is_file()
+    assert (config_out / "MIGRATION_REVIEW.md").is_file()
+    assert (config_out / ".env").is_file()
+    assert (runtime_out / "cons_data_hourly.csv").is_file()
+    assert (runtime_out / "flexible_consumers_state.json").is_file()
+    local = json.loads((runtime_out / "local_settings.json").read_text(encoding="utf-8"))
+    assert local["loxone_silent_mode"] is True
 

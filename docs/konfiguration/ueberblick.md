@@ -64,13 +64,27 @@ Tarif-Katalog: manuell in `config/tariffs.json` (kein UI-Editor).
 
 ## Migration von flachen `runtime_settings` (1.26.0 P5 → 2.0 P6)
 
-Bestehende Produktiv-Configs mit flachem Block `runtime_settings` in `config.json` werden per Skript in ID-Referenzen überführt:
+Bestehende Produktiv-Configs mit flachem Block `runtime_settings` in `config.json` werden in zwei Schritten überführt:
+
+**Schritt 1 — P5 (Entitäts-IDs):**
 
 ```powershell
 python -m scripts.migrate_runtime_entities --input config/config.json --output-dir migrated/
 ```
 
-Das Skript schreibt **Entwürfe** (`config.json`, `tariffs.json`, `house_profiles.json`, `MIGRATION_REVIEW.md`) — **manuelle Prüfung vor NAS-Deploy**. Für **2.0** folgt zusätzlich die Überführung in `live_scenario_id` + Live-Eintrag in `backtesting_scenarios.json` (Backlog **2.0 P6**). Globaler `battery_wear` wird in den gewählten `batteries[]`-Eintrag übernommen; aWATTar-Aufschläge in den passenden Tarif in `tariffs.json`. Geo/Zeitzone wandern ins referenzierte Hausprofil.
+**Schritt 2 — 2.0 P6 (Live-Szenario):** Entitäts-IDs aus `runtime_settings` → Szenario `live` in `backtesting_scenarios.json`; `live_scenario_id` in `config.json`; Entfernen von `runtime_settings`, global `awattar`, global `battery_wear`. Automatisiert in [`house_config/migrate_runtime_entities.py`](../../house_config/migrate_runtime_entities.py) (`finalize_migration_for_2_0`) und im Setup-Skript unten.
+
+Globaler `battery_wear` wird in den gewählten `batteries[]`-Eintrag übernommen; aWATTar-Aufschläge in den passenden Tarif in `tariffs.json`. Geo/Zeitzone wandern ins referenzierte Hausprofil.
+
+**Lokaler Silent-Test vor NAS-Cutover** (NAS-Config einmal lesen, alles unter `silent-migration-test/` lokal — inkl. `.env`- und `runtime`-Kopie):
+
+```powershell
+python -m scripts.setup_silent_migration_test `
+  --nas-config "\\DS-KO-DO-2\docker\earnie\config\config.json" `
+  --force
+```
+
+Vollständige Anleitung: [Silent Migration Test Stack](../einrichtung/silent-migration-test.md).
 
 ## Seite Konfiguration
 

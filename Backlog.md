@@ -21,7 +21,7 @@ Branding (Earnie rename) → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
 **Status (2026-07-11):** P1–P5 done (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). Greenfield smoke test completed — follow-ups in [Backlog-Bugfixes.md](Backlog-Bugfixes.md) and below.
 
-Recommended order: **P6** prod NAS cutover → **P7** README / evaluations.
+Recommended order: **P6a** parallel NAS stack (silent) → **P6b** live cutover → **P7** README / evaluations.
 
 Critical path: **P6**. Smoke-test bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
@@ -33,14 +33,23 @@ Critical path: **P6**. Smoke-test bugs → [Backlog-Bugfixes.md](Backlog-Bugfixe
 | `EARNIE_UI_MODES` key            | Hard rename `backtesting` **→** `scenario_exploration` — no alias; update compose, launch configs, docs, tests in same PR (P2)                                                        |
 | Scenario id `runtime_settings`   | **Remove in 2.0** — live baseline is a normal scenario entry (default id `live`) selected via `live_scenario_id` in `config.json`; update scripts/tests/fixtures in same release (P2) |
 | Battery without PV               | **Allowed** — battery still required for MILP / planning readiness; PV optional (zero PV forecast when `pv_system_id` unset) (P1)                                                     |
-| **7g-a** before P6               | **Skip for 2.0** — direct NAS cutover after P5; 7g-a remains in Packaging backlog, not a 2.0 gate                                                                                     |
+| **7g-a** before P6               | **Skip for 2.0** — parallel NAS stack after local silent acceptance; 7g-a remains in Packaging backlog, not a 2.0 gate                                                                |
+| **P6 NAS deploy**                | **Parallel stack** — deploy validated `silent-migration-test/` to a new NAS folder; legacy `docker/earnie/` unchanged for rollback; first trial **silent mode**, then non-silent cutover |
 | `**sunrise_window` rename (P4)** | Hard rename `sunset_window` **→** `sunrise_window` — no alias; internal symbols renamed; prod deploy only with P6 config migration                                                    |
 
 
 - [ ] **Version 2.0 P6 — Prod NAS cutover**
-  - Apply migrated config per `[migrated/MIGRATION_REVIEW.md](migrated/MIGRATION_REVIEW.md)` and `[house_config/migrate_runtime_entities.py](house_config/migrate_runtime_entities.py)` (1.26.0 P5)
-  - **Direct NAS cutover** after P5 — no 7g-a gate for 2.0; live acceptance on prod NAS
-  - Propose `version.py` → `2.0.0` only after P6 acceptance (user approval required)
+  - [ ] **P6a — Parallel NAS stack (silent trial)**
+    - After local silent acceptance: copy `silent-migration-test/config/` + `runtime/` to a **new** NAS folder (e.g. `docker/earnie-2.0/`); **do not modify** legacy `docker/earnie/` (rollback)
+    - Review `silent-migration-test/config/MIGRATION_REVIEW.md` and entity IDs before copy; migration logic in [`house_config/migrate_runtime_entities.py`](house_config/migrate_runtime_entities.py) (1.26.0 P5 + 2.0 P6)
+    - New compose: distinct container names, UI port ≠ 8501 (e.g. 8503), image pinned to 2.0.x
+    - `runtime/local_settings.json`: `{"loxone_silent_mode": true}` — Loxone read-only; **legacy prod worker may keep running** (no dual writes)
+    - Acceptance: `validate_tariffs --check-catalog`, `startup_checks`, worker/UI on new stack; guide: [Silent Migration Test Stack](docs/einrichtung/silent-migration-test.md)
+  - [ ] **P6b — Live cutover (non-silent)**
+    - After successful P6a silent trial: **stop legacy worker**; remove silent mode on new stack (delete or set `loxone_silent_mode: false` in `local_settings.json`); restart new worker
+    - Switch daily use to new stack (UI port); keep old `docker/earnie/` stopped but intact for rollback window
+    - Rollback: stop new containers, start legacy compose on `docker/earnie/`, UI on 8501
+  - Propose `version.py` → `2.0.0` only after P6b acceptance (user approval required)
 
 - [ ] **Version 2.0 P7 — Documentation & evaluations**
   - Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
@@ -120,6 +129,7 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
 
 - [ ] **Thermals P1** — Isolated single-node models
   - **Follow-up (1.26.0 P0 smoke, decision #11):** legacy RC / `thermal_control` models (SwimSpa, freezer, etc.) from `flexible_consumers` — not in 1.26.0 P3b
+  - **Migrate existing consumers** — move prod entries from `config.json` → `flexible_consumers[]` into `house_profiles.json` (`profiles[].consumers[]`) where they belong in the planning model; keep live Loxone/MILP bindings explicit (no duplicate Hausprofil clutter); migration script or one-time cutover doc alongside new thermal schema (follow-up to **2.0 P6** silent migration test)
   - Variable heat paths (against infinity); replaces single-path special case in `optimizer/thermal_model.py`
   - **Freezer** (former 0.+1 Prio2) — second isolated reference model; acceptance: calibration/backtest against historical Loxone CSV logs
 

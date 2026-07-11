@@ -70,6 +70,70 @@ def migrate_runtime_entities(
     return config_out, tariffs_out, profiles_out, notes
 
 
+def finalize_migration_for_2_0(
+    config: dict,
+    *,
+    scenarios_template: dict | None = None,
+    live_scenario_id: str = "live",
+) -> tuple[dict, dict, list[str]]:
+    """
+    Schließt 2.0 P6 ab: Live-Szenario in backtesting_scenarios.json, legacy-Blöcke entfernen.
+
+    Voraussetzung: migrate_runtime_entities (P5) mit ID-only runtime_settings.
+    """
+    _DEFAULT_LIVE_ID = "live"
+
+    notes: list[str] = []
+    config_out = copy.deepcopy(config)
+    live_id = str(live_scenario_id or _DEFAULT_LIVE_ID).strip() or _DEFAULT_LIVE_ID
+
+    runtime = config_out.get("runtime_settings")
+    if not isinstance(runtime, dict):
+        raise ValueError(
+            "runtime_settings fehlt — zuerst migrate_runtime_entities (P5) ausführen."
+        )
+
+    flat_remaining = [key for key in RUNTIME_STRIP_KEYS if key in runtime]
+    if flat_remaining:
+        raise ValueError(
+            "runtime_settings enthält noch flache Felder "
+            f"({', '.join(flat_remaining)}) — zuerst P5-Migration ausführen."
+        )
+
+    live_settings = {
+        key: runtime[key]
+        for key in RUNTIME_ID_KEYS
+        if key in runtime
+        and runtime[key] is not None
+        and str(runtime[key]).strip()
+    }
+    if not live_settings:
+        raise ValueError("runtime_settings enthält keine Entitäts-IDs für das Live-Szenario.")
+
+    scenarios_doc = copy.deepcopy(scenarios_template or {"scenarios": []})
+    scenarios = scenarios_doc.setdefault("scenarios", [])
+    if not isinstance(scenarios, list):
+        raise ValueError("scenarios_template.scenarios muss ein Array sein.")
+
+    _upsert_scenario_entry(
+        scenarios,
+        {"id": live_id, "label": "Live", "settings": live_settings},
+    )
+    notes.append(
+        f"Live-Szenario '{live_id}' in backtesting_scenarios.json mit Entitäts-Referenzen angelegt."
+    )
+
+    config_out["live_scenario_id"] = live_id
+    config_out.pop("runtime_settings", None)
+
+    if config_out.pop("awattar", None) is not None:
+        notes.append("Globaler Block 'awattar' aus config.json entfernt (1.26.0 P6).")
+    if config_out.pop("battery_wear", None) is not None:
+        notes.append("Globaler Block 'battery_wear' aus config.json entfernt (1.26.0 P6).")
+
+    return config_out, scenarios_doc, notes
+
+
 def effective_runtime_values(
     config: dict,
     *,
@@ -556,3 +620,12 @@ def _upsert_list_entry(items: list, entry: dict) -> None:
             items[index] = entry
             return
     items.append(entry)
+
+
+def _upsert_scenario_entry(scenarios: list, entry: dict) -> None:
+    entry_id = str(entry["id"]).strip()
+    for index, item in enumerate(scenarios):
+        if isinstance(item, dict) and str(item.get("id", "")).strip() == entry_id:
+            scenarios[index] = entry
+            return
+    scenarios.append(entry)

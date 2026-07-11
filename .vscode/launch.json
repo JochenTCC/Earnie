@@ -124,6 +124,71 @@
       "subProcess": false,
       "console": "integratedTerminal",
       "justMyCode": false
+    },
+    {
+      "name": "main.py (Silent Migration Test)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "EARNIE_CONFIG_PATH": "${workspaceFolder}/silent-migration-test/config/config.json",
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/silent-migration-test/runtime",
+        "EARNIE_DOTENV_PATH": "${workspaceFolder}/silent-migration-test/config/.env",
+        "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/silent-migration-test/runtime/local_settings.json",
+        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/silent-migration-test/config/house_profiles.json",
+        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/silent-migration-test/config/tariffs.json",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/silent-migration-test/config/backtesting_scenarios.json",
+        "EARNIE_VERIFY_LOXONE_ON_START": "1",
+        "EARNIE_STRICT_TARIFF_VALIDATE": "1"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Streamlit app.py (Silent Migration :8512)",
+      "type": "python",
+      "request": "launch",
+      "module": "scripts.run_streamlit",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "EARNIE_CONFIG_PATH": "${workspaceFolder}/silent-migration-test/config/config.json",
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/silent-migration-test/runtime",
+        "EARNIE_DOTENV_PATH": "${workspaceFolder}/silent-migration-test/config/.env",
+        "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/silent-migration-test/runtime/local_settings.json",
+        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/silent-migration-test/config/house_profiles.json",
+        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/silent-migration-test/config/tariffs.json",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/silent-migration-test/config/backtesting_scenarios.json",
+        "EARNIE_VERIFY_LOXONE_ON_START": "0",
+        "EARNIE_UI_MODES": "sunset2sunset,scenario_exploration",
+        "EARNIE_UI_STREAMLIT_PORT": "8512"
+      },
+      "subProcess": false,
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Streamlit app.py (nach 15s, Silent Migration :8512)",
+      "type": "python",
+      "request": "launch",
+      "preLaunchTask": "wait: 15s vor Streamlit",
+      "module": "scripts.run_streamlit",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "EARNIE_CONFIG_PATH": "${workspaceFolder}/silent-migration-test/config/config.json",
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/silent-migration-test/runtime",
+        "EARNIE_DOTENV_PATH": "${workspaceFolder}/silent-migration-test/config/.env",
+        "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/silent-migration-test/runtime/local_settings.json",
+        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/silent-migration-test/config/house_profiles.json",
+        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/silent-migration-test/config/tariffs.json",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/silent-migration-test/config/backtesting_scenarios.json",
+        "EARNIE_VERIFY_LOXONE_ON_START": "0",
+        "EARNIE_UI_MODES": "sunset2sunset,scenario_exploration",
+        "EARNIE_UI_STREAMLIT_PORT": "8512"
+      },
+      "subProcess": false,
+      "console": "integratedTerminal",
+      "justMyCode": false
     }
   ],
   "compounds": [
@@ -140,6 +205,14 @@
       "configurations": [
         "main.py (Greenfield)",
         "Streamlit app.py (nach 15s, Greenfield :8511)"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "main.py + Streamlit (Silent Migration :8512)",
+      "configurations": [
+        "main.py (Silent Migration Test)",
+        "Streamlit app.py (nach 15s, Silent Migration :8512)"
       ],
       "stopAll": true
     }
