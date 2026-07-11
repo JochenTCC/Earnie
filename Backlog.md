@@ -18,30 +18,65 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.0
 
-- [ ] Make "Haus Wärme" consumer not mandatory
-- [ ] Make "PV-Anlage" not mandatory
-- [ ] Do not differentiate in scenarios between runtime and others
-- [ ] Rearrange "Haus Konfigurator" und "Szenario-Editor"
-- [ ] Change "Konfiguration" in "Echtzeit-Umgebung"
-  - You can select one "Hausprofil" together with one Scenario as live configuration (former known as runtime_setting)
-- [ ] rename sunset_window to sunrise_window - and all belonging namings to avoid further irritation.
-- [ ] Expand README with motivation / benefits
-  - Describe sensible order of use
-  - Less technical background than hints for installation and configuration
-- [ ] Check tariffs.json for "completeness": are all data from "einspeisetarife*.json" from Gemini included?
-- [ ] **Tariff plausibility check** before backtesting start
-- [ ] Include tariffs.json in deploy
-- [ ] **Thermals P1** — Isolated single-node models
-  - **Follow-up (1.26.0 P0 smoke, decision #11):** legacy RC / `thermal_control` models (SwimSpa, freezer, etc.) from `flexible_consumers` — not in 1.26.0 P3b
-  - Variable heat paths (against infinity); replaces single-path special case in `optimizer/thermal_model.py`
-- [ ] Migrate running system to new data model!!!
-- [ ] Create plausibility test for tariffs.json that runs before deploy
-- [ ] Build additional container for Windows as pure Python environment (if that makes sense)
-- [ ] Evaluate running Backtesting as "web app" in Streamlit Community Cloud
+Branding (Earnie rename) → [Backlog-Erledigt.md](Backlog-Erledigt.md).
+
+Recommended order: **P1** optional consumers → **P2** scenario model → **P3** UI (Konfigurator / Echtzeit-Umgebung) → **P4** sunrise rename → **P5** tariffs → **P6** prod cutover → **P7** README / evaluations.
+
+Critical path: P1 → P2 → P5 → P6. UX path: P1 → P2 → P3. Prefer **P4 before P3** if single-threaded (schema/horizon naming conflicts).
+
+**Decisions (2026-07-11):**
+
+| Topic | Decision |
+| ----- | -------- |
+| `EARNIE_UI_MODES` key | Hard rename **`backtesting` → `scenario_exploration`** — no alias; update compose, launch configs, docs, tests in same PR (P2) |
+| Scenario id `runtime_settings` | **Remove in 2.0** — live baseline is a normal scenario entry (default id **`live`**) selected via `live_scenario_id` in `config.json`; update scripts/tests/fixtures in same release (P2) |
+| Battery without PV | **Allowed** — battery still required for MILP / planning readiness; PV optional (zero PV forecast when `pv_system_id` unset) (P1) |
+| **7g-a** before P6 | **Skip for 2.0** — direct NAS cutover after P5; 7g-a remains in Packaging backlog, not a 2.0 gate |
+
+- [ ] **Version 2.0 P1 — Optional consumers**
+  - Make "Haus Wärme" (`thermal_annual`) not mandatory — `house_config/profiles_store.py`, Hauskonfigurator
+  - Make "PV-Anlage" not mandatory — `ui/setup_readiness.py`, `ui/planning_pv_form.py`
+  - **Battery without PV allowed** — battery required for MILP / `is_planning_ready()`; unset `pv_system_id` → zero PV forecast
+  - Optimizer/simulation tolerates missing PV/thermal — `house_config/entity_resolution.py`, `config.py`, `house_config/baseload.py`, `house_config/planning_flex_bridge.py`
+  - Tests: greenfield bootstrap, setup readiness, house profiles without thermal/PV
+
+- [ ] **Version 2.0 P2 — Unified scenario model**
+  - Do not differentiate in scenarios between runtime and others — live baseline is a normal scenario (default id **`live`**, selected by `live_scenario_id` in `config.json`); ID resolution from 1.26.0 P2 stays
+  - Hard rename UI mode **`backtesting` → `scenario_exploration`** — `ui/mode_selector.py`, `docker-compose-greenfield.yml`, VS Code launch, docs; user-facing label **Scenario-Exploration**
+  - **Remove scenario id `runtime_settings`** — no alias; update `scripts/run_backtesting.py`, fixtures, tests, Szenarieneditor special case
+  - Data model: scenarios in `backtesting_scenarios.json` and live config share the same shape; resolution via `house_config/scenario_resolution.py`
+  - Remove `runtime_settings` special case in Szenarieneditor (`ui/pages/page_scenario_editor.py`, `ui/scenario_runtime_form.py`)
+
+- [ ] **Version 2.0 P3 — Configuration UI restructure**
+  - Rearrange "Haus Konfigurator" und "Szenario-Editor" — `ui/navigation.py`, onboarding gating
+  - Change "Konfiguration" section/page into **Echtzeit-Umgebung** — select one Hausprofil + one scenario (`live_scenario_id`) as live configuration
+  - Structure/navigation only in 2.0; full JSON/scenario editor → Version 2.+1
+  - Update [`docs/einrichtung/greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md) acceptance table
+
+- [ ] **Version 2.0 P4 — `sunrise_window` rename**
+  - Rename `sunset_window` → `sunrise_window` — schema, code, docs, tests (`simulation/horizon_mode.py`, `config/config.schema.json`, fixtures, scripts)
+  - Prerequisite for 2.+1 live horizon switch; **do not** implement live `planning_horizon.mode` branching in 2.0
+
+- [ ] **Version 2.0 P5 — Tariffs & deploy gate**
+  - Check `tariffs.json` for completeness: are all data from `einspeisetarife*.json` (Gemini) included? (`tools/convert_dach_tariffs.py`)
+  - **Tariff plausibility** — validate `tariffs.json` before Scenario-Exploration start **and** before deploy (CI/deploy gate)
+  - Include `tariffs.json` in deploy (follow-up 1.26.0 P5) — sidecar alongside `config.json` on NAS; image/bootstrap docs
+
+- [ ] **Version 2.0 P6 — Prod NAS cutover**
+  - Apply migrated config per [`migrated/MIGRATION_REVIEW.md`](migrated/MIGRATION_REVIEW.md) and [`house_config/migrate_runtime_entities.py`](house_config/migrate_runtime_entities.py) (1.26.0 P5)
+  - **Direct NAS cutover** after P5 — no 7g-a gate for 2.0; live acceptance on prod NAS
+  - Propose `version.py` → `2.0.0` only after P6 acceptance (user approval required)
+
+- [ ] **Version 2.0 P7 — Documentation & evaluations**
+  - Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
+  - Build additional container for Windows as pure Python environment (if that makes sense) — spike vs local venv; go/no-go note
+  - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
 
 
 
-### Version 2.+1 — Quality epic / Remove legacy data model trunks
+### Version 2.+1 — Quality epic / post-migration cleanup
+
+After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26.0 data model (1.26.0 P6 removed runtime fallbacks; this epic mops up the rest)
 
 - [ ] Evaluate option for code coverage testing and identification of deprecated code / tests (especially due to substantial data model change) / obsolete patches because of legacy data model
 - [ ] Thorough code review and refactoring
@@ -92,8 +127,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P1 → Thermals P2 → Thermals P3 → Adaptation P4**
 
-  - **Freezer** (former 0.+1 Prio2) — second isolated reference model
-  - Acceptance: calibration/backtest against historical Loxone CSV logs
 - [ ] **Adaptation P1** — Generic adaptation model (skeleton)
   - Common structure for parameter adaptation of various forecast models:
     - Reference value (target for adaptation)
@@ -116,6 +149,15 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
 
 - [ ] **Adaptation P3** — Adaptation algorithm (PV pilot)
   - Concrete update loop on Adaptation P2; thermal models remain **linear** (thermal adaptation only in Thermals P3)
+
+
+
+### Version 2.+1
+
+- [ ] **Thermals P1** — Isolated single-node models
+  - **Follow-up (1.26.0 P0 smoke, decision #11):** legacy RC / `thermal_control` models (SwimSpa, freezer, etc.) from `flexible_consumers` — not in 1.26.0 P3b
+  - Variable heat paths (against infinity); replaces single-path special case in `optimizer/thermal_model.py`
+  - **Freezer** (former 0.+1 Prio2) — second isolated reference model; acceptance: calibration/backtest against historical Loxone CSV logs
 
 
 
@@ -162,22 +204,6 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
 
 ### Version 2.+1
 
-- [ ] Add configuration page for easy editing of `config.json` and scenarios
-
-
-
-### Version 2.+1
-
-- [ ] Design what-if assistants for backtesting:
-  - would Ernie pay off (with aWATTar)?
-  - would (more) battery pay off?
-  - query consumers and generate consumer profiles from them
-- [ ] Reminder at month start for feed-in price (email from Loxone!)
-
-
-
-### Version 2.+1
-
 - [ ] **Optional: live planning horizon switchable via** `config.json` (`planning_horizon.mode`: `fixed_24h` | `sunrise_window`)
   - **Prerequisite:** Version 2.0 rename `sunset_window` → `sunrise_window` (schema/code/docs)
   - After 2.0 rename: live only `sunrise_window` today; backtesting already supports both modes — live branching still to implement (`main.py`, `profile_manager`, UI chart, aWATTar window)
@@ -187,12 +213,12 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
 
 
 
-### Version 2.+1 (Still needed???)
+### Version 2.+1 — follow-ups (low priority; confirm after 2.0)
 
 - [ ] **Recalculation "historical day" into backtesting** (dev-only)
   - Arbitrary calendar day from `cons_data_hourly.csv` + historical prices; implementation to clarify later (replaces sidebar mode "historical day")
-- [ ] **Target/actual hint rules** — category "hint" once concrete non-critical cases identified (follow-up epic target/actual)
-- [ ] **Target/actual recalculation (backtesting)** — rule set batch-wise over historical JSONL / prod dumps; statistics per category (follow-up epic target/actual)
+- [ ] **Target/actual hint rules** — category "hint" once concrete non-critical cases identified (follow-up epic target/actual; after **Debug dump phase 2**)
+- [ ] **Target/actual recalculation (backtesting)** — rule set batch-wise over historical JSONL / prod dumps; statistics per category (follow-up epic target/actual; after **Debug dump phase 2**)
 
 
 
@@ -203,8 +229,9 @@ Recommended open order: **7e** → **7g**
 - [x] **7a–7d** — pyproject, bootstrap, build pipeline, Streamlit external ([container.md](docs/einrichtung/container.md))
 - [ ] **7e — Prod/dev data sync** — script runtime/ + CSVs; documented dev ↔ prod workflow
 - [ ] **7g — Local dev stacks (staging, from 1.25)**
-  **Scope:** Additional container stacks on **local dev PC** — **not** greenfield (**1.24.c**) and **not** pytest fixtures (`Version 2.+1 — Decouple test config`) and **not** data sync (`7e`). `config/` remains untouched on image updates.
+  **Scope:** Additional container stacks on **local dev PC** — **not** greenfield (**1.24.c**), **not** pytest fixture configs, **not** data sync (`7e`). `config/` remains untouched on image updates.
   **Phases:** 7g-a silent (prod Loxone) → 7g-b simulated (later).
+  **Not a Version 2.0 P6 gate** — NAS cutover proceeds directly after P5; 7g-a remains useful post-2.0 for staging.
   **Acceptance:** silent stack reads productive Loxone instance, does not write (`loxone_silent_mode: true`); simulated stack only after Loxone simulator.
   - [ ] **7g-a — Silent stack** (prod Loxone, deploy-safe)
     - Own compose folder: separate `config/` + `runtime/`, distinct `container_name` and UI port
@@ -226,7 +253,7 @@ Recommended open order: **7e** → **7g**
 | File                                   | Status                     | Action                        |
 | -------------------------------------- | -------------------------- | ----------------------------- |
 | `runtime/optimization_history.jsonl`   | **canonical**              | Prod history                  |
-| `runtime/energy_optimizer.log`         | **active**                 | Rotating 5×5 MB               |
+| `runtime/earnie.log`                   | **active**                 | Rotating 5×5 MB               |
 | `runtime/optimizer_run_state.json`     | **active**                 | Last main run                 |
 | `runtime/live_optimization_debug.json` | **active**                 | App 24h debug                 |
 | `runtime/system_history_log.csv`       | **legacy, read-only**      | Archive when JSONL sufficient |
