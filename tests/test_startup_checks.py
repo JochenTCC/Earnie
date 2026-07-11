@@ -72,6 +72,23 @@ class TestRunLoxoneVerifyOnStartup:
         ):
             sc.run_loxone_verify_on_startup()
 
+    def test_tariff_validate_skipped_when_env_set(self, monkeypatch):
+        monkeypatch.setenv("ENERGY_OPTIMIZER_SKIP_TARIFF_VALIDATE", "1")
+        with patch.object(sc, "collect_tariff_plausibility_errors") as mock_collect:
+            sc.run_tariff_plausibility_on_startup()
+        mock_collect.assert_not_called()
+
+    def test_tariff_validate_strict_exits_on_error(self, monkeypatch):
+        monkeypatch.setenv("ENERGY_OPTIMIZER_STRICT_TARIFF_VALIDATE", "1")
+        with patch.object(
+            sc,
+            "collect_tariff_plausibility_errors",
+            return_value=["tariffs.json ungültig"],
+        ):
+            with pytest.raises(SystemExit) as exc:
+                sc.run_tariff_plausibility_on_startup()
+        assert exc.value.code == 1
+
     def test_warning_severity_does_not_count_as_failed(self, monkeypatch):
         monkeypatch.delenv("ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY", raising=False)
         with (

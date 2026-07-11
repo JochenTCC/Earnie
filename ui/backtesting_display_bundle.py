@@ -33,10 +33,10 @@ from data.planning_window import (
 from simulation.backtesting_horizon import window_start_before_anchor
 from simulation.backtesting_snapshots import (
     load_window_snapshot,
-    snapshot_supports_sunset_view,
+    snapshot_supports_sunrise_view,
 )
 from simulation.engine import _scenario_to_battery_params
-from simulation.horizon_mode import BACKTESTING_STEP_HOURS, SUNSET_WINDOW
+from simulation.horizon_mode import BACKTESTING_STEP_HOURS, SUNRISE_WINDOW
 from ui.chart_context import LiveChartContext
 from ui.history_navigation import s2_zone_help_text
 from ui.simulation_results import (
@@ -45,22 +45,22 @@ from ui.simulation_results import (
 )
 
 VIEW_MODE_24H = "24h"
-VIEW_MODE_SUNSET = "sunset"
-_SUNSET_SEGMENT_LABELS = {
+VIEW_MODE_SUNRISE = "sunrise"
+_SUNRISE_SEGMENT_LABELS = {
     0: "SA₀→SA₁",
     1: "SA₁→SA₂",
 }
 
 
-def _backtesting_sunset_header_label(
+def _backtesting_sunrise_header_label(
     window_anchor: str,
     tz_name: str,
     segment_index: int,
 ) -> str:
     anchor_dt = _parse_window_anchor(window_anchor, tz_name)
-    segment = _SUNSET_SEGMENT_LABELS.get(segment_index, f"Segment {segment_index}")
+    segment = _SUNRISE_SEGMENT_LABELS.get(segment_index, f"Segment {segment_index}")
     return (
-        f"Sunset Backtesting · {anchor_dt.strftime('%d.%m.%Y %H:%M')} · {segment}"
+        f"Sunrise Backtesting · {anchor_dt.strftime('%d.%m.%Y %H:%M')} · {segment}"
     )
 
 
@@ -136,7 +136,7 @@ def _planning_moment(
     else:
         anchor = anchor.tz_convert(tz_name)
     anchor_dt = anchor.to_pydatetime()
-    if view_mode == VIEW_MODE_SUNSET:
+    if view_mode == VIEW_MODE_SUNRISE:
         moment = window_start_before_anchor(anchor_dt, tz_name)
     else:
         moment = anchor_dt
@@ -200,7 +200,7 @@ def _backtesting_24h_header_label(window_anchor: str, tz_name: str) -> str:
     )
 
 
-def _backtesting_sunset_segment_window(
+def _backtesting_sunrise_segment_window(
     planning_moment: datetime,
     segment_index: int,
     lat: float,
@@ -249,7 +249,7 @@ def _backtesting_sunset_segment_window(
     )
 
 
-def _build_backtesting_sunset_chart_context(
+def _build_backtesting_sunrise_chart_context(
     *,
     window_anchor: str,
     segment_index: int,
@@ -259,7 +259,7 @@ def _build_backtesting_sunset_chart_context(
     lat, lon, tz_name = geo
     anchor_dt = _parse_window_anchor(window_anchor, tz_name)
     planning_moment = window_start_before_anchor(anchor_dt, tz_name)
-    chart = _backtesting_sunset_segment_window(
+    chart = _backtesting_sunrise_segment_window(
         planning_moment,
         segment_index,
         lat,
@@ -349,7 +349,7 @@ def build_backtesting_chart_context(
             sim_rows=sim_rows,
             geo=(lat, lon, tz_name),
         )
-    return _build_backtesting_sunset_chart_context(
+    return _build_backtesting_sunrise_chart_context(
         window_anchor=window_anchor,
         segment_index=segment_index,
         sim_rows=sim_rows,
@@ -363,7 +363,7 @@ def _select_snapshot_rows(
     view_mode: str,
     tz_name: str,
 ) -> tuple[list[dict], list[dict]]:
-    if view_mode == VIEW_MODE_SUNSET and snapshot_supports_sunset_view(snapshot):
+    if view_mode == VIEW_MODE_SUNRISE and snapshot_supports_sunrise_view(snapshot):
         return (
             _rows_with_parsed_slots(snapshot["chart_rows_full"], tz_name),
             _rows_with_parsed_slots(snapshot["matrix_full"], tz_name),
@@ -501,8 +501,8 @@ def build_backtesting_display_bundle(
     header_help = None
     if view_mode == VIEW_MODE_24H:
         header_label = _backtesting_24h_header_label(window_anchor, tz_name)
-    elif view_mode == VIEW_MODE_SUNSET:
-        header_label = _backtesting_sunset_header_label(
+    elif view_mode == VIEW_MODE_SUNRISE:
+        header_label = _backtesting_sunrise_header_label(
             window_anchor,
             tz_name,
             segment_index,
@@ -555,5 +555,5 @@ def load_backtesting_display_bundle(
     )
 
 
-def log_supports_sunset_chart_view(meta: dict) -> bool:
-    return meta.get("period", {}).get("horizon_mode") == SUNSET_WINDOW
+def log_supports_sunrise_chart_view(meta: dict) -> bool:
+    return meta.get("period", {}).get("horizon_mode") == SUNRISE_WINDOW

@@ -2,6 +2,22 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 2.0 P5 — Tariffs & deploy gate (2026-07-11)
+
+- [x] **Tariff plausibility** — [`house_config/tariff_plausibility.py`](house_config/tariff_plausibility.py): Normalisierung, JSON-Schema, Szenario-Referenzen; CLI [`scripts/validate_tariffs.py`](scripts/validate_tariffs.py) (`earnie-validate-tariffs`)
+- [x] **Runtime gates** — Scenario-Exploration UI + [`scripts/run_backtesting.py`](scripts/run_backtesting.py); Worker-Start [`scripts/startup_checks.py`](scripts/startup_checks.py) (`EARNIE_STRICT_TARIFF_VALIDATE` in Prod-Compose)
+- [x] **Deploy gate** — [`scripts/build_container.py`](scripts/build_container.py) prüft vor `--push`; [`tools/convert_dach_tariffs.py`](tools/convert_dach_tariffs.py) `--check` für DACH-Vollständigkeit
+- [x] **Catalog** — DACH-Quellen abgedeckt; `fixed_37ct` (Greenfield-Beispiel) in [`config/tariffs.json`](config/tariffs.json)
+- [x] **Deploy docs** — [`docs/einrichtung/container.md`](docs/einrichtung/container.md), [`docker-compose-synology.yml`](docker-compose-synology.yml), [`docker-compose-loxberry.yml`](docker-compose-loxberry.yml): `tariffs.json` Sidecar + Strict-Validate
+- [x] **Tests** — `tests/test_tariff_plausibility.py`, `tests/test_validate_tariffs_cli.py`, Erweiterung `tests/test_startup_checks.py`
+
+### Version 2.0 P4 — `sunrise_window` rename (2026-07-11)
+
+- [x] **Hard rename** — `sunset_window` → `sunrise_window` in schema, config templates, fixtures, CLI `--horizon-mode`, live `planning_horizon.mode`; no alias
+- [x] **Internal symbols** — `SUNRISE_WINDOW`, `is_sunrise_planning_horizon`, `build_sunrise_window_matrix`, `compute_sunrise_planning_at_anchor`, `log_supports_sunrise_chart_view`, `VIEW_MODE_SUNRISE`
+- [x] **Docs** — [`docs/spec/planning-horizon-sunset.md`](docs/spec/planning-horizon-sunset.md), [`docs/konfiguration/batterie-pv.md`](docs/konfiguration/batterie-pv.md)
+- [x] **Out of scope** — live `planning_horizon.mode` branching (`fixed_24h` | `sunrise_window`) remains **2.+1**; historical backtesting log filenames unchanged
+
 ### Version 2.0 P3 — Configuration UI restructure (2026-07-11)
 
 - [x] **Nav sections** — `Planung` (Hauskonfigurator, Szenarieneditor) + `Echtzeit-Umgebung` ([`ui/navigation.py`](ui/navigation.py)); raw JSON editor not in main nav

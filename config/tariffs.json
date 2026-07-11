@@ -522,6 +522,12 @@
             "k_push_cent": 12.5
         },
         {
+            "id": "fixed_37ct",
+            "label": "Fix 3,7 ct/kWh Einspeise (Beispiel/Greenfield)",
+            "type": "fixed",
+            "k_push_cent": 3.7
+        },
+        {
             "id": "monthly_sunny",
             "label": "Monatliche SUNNY-Fixwerte",
             "type": "monthly_table",

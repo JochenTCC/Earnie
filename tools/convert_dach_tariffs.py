@@ -159,7 +159,30 @@ def main() -> None:
         default="config/tariffs.json",
         help="Ziel tariffs.json",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Nur prüfen: alle DACH-Quell-Einträge im Ziel-Katalog? (Exit 1 bei Lücken)",
+    )
     args = parser.parse_args()
+    if args.check:
+        from scripts.validate_tariffs import run_validation
+
+        errors = run_validation(
+            tariffs_path=args.output,
+            scenarios_path=None,
+            schema_path=None,
+            check_catalog=True,
+            import_json=args.import_json,
+            export_json=args.export_json,
+        )
+        if errors:
+            for item in errors:
+                print(item, file=sys.stderr)
+            raise SystemExit(1)
+        print(f"OK: {args.output} deckt DACH-Quellen ab.")
+        return
+
     doc = convert_document(Path(args.import_json), Path(args.export_json))
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

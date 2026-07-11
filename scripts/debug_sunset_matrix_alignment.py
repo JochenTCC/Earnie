@@ -21,14 +21,14 @@ from data.data_loader import load_market_prices
 from data.planning_window import normalize_hour_slot
 from scripts.run_backtesting import resolve_backtesting_window
 from simulation.backtesting_horizon import (
-    compute_sunset_planning_at_anchor,
+    compute_sunrise_planning_at_anchor,
     step_slot_datetimes,
 )
 from simulation.engine import (
     HistoricalDataCache,
     build_historical_matrix_for_slots,
     build_historical_window_matrix,
-    build_sunset_window_matrix,
+    build_sunrise_window_matrix,
     window_slot_datetimes,
 )
 from simulation.baseload_validation import resolve_hourly_baseload_kw
@@ -114,11 +114,11 @@ def main() -> None:
     fixed_matrix, fixed_meta = build_historical_window_matrix(
         anchor, cache, prices_df, feed_in_settings=feed_in
     )
-    sunset_matrix, sunset_meta, sunrise_idx, _matrix_full = build_sunset_window_matrix(
+    sunset_matrix, sunset_meta, sunrise_idx, _matrix_full = build_sunrise_window_matrix(
         anchor, cache, prices_df, scenario, feed_in_settings=feed_in
     )
 
-    planning_window, sunrise_index_raw = compute_sunset_planning_at_anchor(
+    planning_window, sunrise_index_raw = compute_sunrise_planning_at_anchor(
         anchor, scenario
     )
     tz_name = config.get_planning_timezone()

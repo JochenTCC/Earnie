@@ -62,7 +62,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
         return
 
-    config.is_sunset_planning_horizon()
+    config.is_sunrise_planning_horizon()
     planning_window = profile_manager.compute_live_planning_window()
     logger.info(
         "Planungsfenster: %s → %s (%d h), SU₁=%s, SU₂=%s, Sonnenaufgang-Anker=%s",
@@ -371,8 +371,12 @@ if __name__ == "__main__":
     reinit_config_or_exit(config)
     logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
     log_config_drift(logging.getLogger("main"))
-    from scripts.startup_checks import run_loxone_verify_on_startup
+    from scripts.startup_checks import (
+        run_loxone_verify_on_startup,
+        run_tariff_plausibility_on_startup,
+    )
 
+    run_tariff_plausibility_on_startup()
     run_loxone_verify_on_startup()
     try:
         ensure_single_instance("main")

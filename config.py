@@ -397,11 +397,11 @@ class Config:
     def get_planning_timezone(self) -> str:
         return str(self.PLANNING_TIMEZONE)
 
-    def is_sunset_planning_horizon(self) -> bool:
-        if self.PLANNING_HORIZON_MODE != "sunset_window":
+    def is_sunrise_planning_horizon(self) -> bool:
+        if self.PLANNING_HORIZON_MODE != "sunrise_window":
             raise ValueError(
                 "Unbekannter planning_horizon.mode "
-                f"'{self.PLANNING_HORIZON_MODE}' — erwartet 'sunset_window'."
+                f"'{self.PLANNING_HORIZON_MODE}' — erwartet 'sunrise_window'."
             )
         return True
 
@@ -918,8 +918,8 @@ def get_planning_timezone() -> str:
     return CONFIG.get_planning_timezone()
 
 
-def is_sunset_planning_horizon() -> bool:
-    return CONFIG.is_sunset_planning_horizon()
+def is_sunrise_planning_horizon() -> bool:
+    return CONFIG.is_sunrise_planning_horizon()
 
 
 def get_global_timeout(default: int = 5) -> int:

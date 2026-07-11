@@ -18,10 +18,10 @@ from simulation.engine import HISTORICAL_REFERENCE_ID
 from simulation.horizon_mode import FIXED_24H
 from ui.backtesting_display_bundle import (
     VIEW_MODE_24H,
-    VIEW_MODE_SUNSET,
+    VIEW_MODE_SUNRISE,
     format_backtesting_window_range,
     load_backtesting_display_bundle,
-    log_supports_sunset_chart_view,
+    log_supports_sunrise_chart_view,
 )
 from ui.simulation_results import (
     render_optimization_chart1,
@@ -58,7 +58,7 @@ def _format_deviation_window(case: dict, meta: dict) -> str:
     anchor = case.get("window_anchor")
     if not anchor:
         return _DASH
-    if log_supports_sunset_chart_view(meta):
+    if log_supports_sunrise_chart_view(meta):
         return _format_window_anchor(str(anchor))
     return format_backtesting_window_range(
         str(anchor),
@@ -169,10 +169,10 @@ def _resolve_chart_view(
     segment_toggle: str,
 ) -> tuple[str, int]:
     """Chart-Ansicht folgt dem Planungshorizont des Backtesting-Logs."""
-    if not log_supports_sunset_chart_view(meta):
+    if not log_supports_sunrise_chart_view(meta):
         return VIEW_MODE_24H, 0
     segment_index = 0 if segment_toggle == "SA₀→SA₁" else 1
-    return VIEW_MODE_SUNSET, segment_index
+    return VIEW_MODE_SUNRISE, segment_index
 
 
 def _render_deviation_charts(
@@ -181,7 +181,7 @@ def _render_deviation_charts(
     log_dir: str,
 ) -> None:
     segment_toggle = "SA₀→SA₁"
-    if log_supports_sunset_chart_view(meta):
+    if log_supports_sunrise_chart_view(meta):
         segment_toggle = st.radio(
             "SA-Segment",
             options=["SA₀→SA₁", "SA₁→SA₂"],

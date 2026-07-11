@@ -10,14 +10,14 @@ import pytest
 from simulation import engine
 from simulation.backtesting_snapshots import build_window_snapshot, write_window_snapshots_jsonl
 from simulation.engine import PlausibilityResult, run_simulation
-from simulation.horizon_mode import FIXED_24H, SUNSET_WINDOW
+from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
 from ui.backtesting_display_bundle import (
     VIEW_MODE_24H,
-    VIEW_MODE_SUNSET,
+    VIEW_MODE_SUNRISE,
     build_backtesting_display_bundle,
     format_backtesting_window_range,
     load_backtesting_display_bundle,
-    log_supports_sunset_chart_view,
+    log_supports_sunrise_chart_view,
 )
 from ui.backtesting_deviation_list import _format_deviation_window, _resolve_chart_view
 from ui.chart_decorations import _chart_range_start
@@ -115,38 +115,38 @@ class TestBacktestingDisplayBundle:
         assert x0 == bundle.chart_context.chart_window.start
         assert x1 == anchor_ts.to_pydatetime()
 
-    def test_build_backtesting_display_bundle_sunset_uses_full_rows(self):
-        snapshots = self._collect_snapshots(SUNSET_WINDOW)
+    def test_build_backtesting_display_bundle_sunrise_uses_full_rows(self):
+        snapshots = self._collect_snapshots(SUNRISE_WINDOW)
         snapshot = snapshots[0]
         assert len(snapshot["chart_rows_24h"]) == 24
         assert snapshot.get("chart_rows_full") is not None
         assert len(snapshot["chart_rows_full"]) > 24
         bundle_24h = build_backtesting_display_bundle(snapshot, view_mode=VIEW_MODE_24H)
-        bundle_sunset = build_backtesting_display_bundle(
+        bundle_sunrise = build_backtesting_display_bundle(
             snapshot,
-            view_mode=VIEW_MODE_SUNSET,
+            view_mode=VIEW_MODE_SUNRISE,
             segment_index=0,
         )
         assert not bundle_24h.display_df.empty
-        assert not bundle_sunset.display_df.empty
-        assert bundle_sunset.chart_context is not None
+        assert not bundle_sunrise.display_df.empty
+        assert bundle_sunrise.chart_context is not None
         anchor = snapshot["window_anchor"]
-        assert "Sunset Backtesting" in (bundle_sunset.chart_header_label or "")
-        assert "(Live)" not in (bundle_sunset.chart_header_label or "")
+        assert "Sunrise Backtesting" in (bundle_sunrise.chart_header_label or "")
+        assert "(Live)" not in (bundle_sunrise.chart_header_label or "")
         assert pd.Timestamp(anchor).strftime("%d.%m.%Y %H:%M") in (
-            bundle_sunset.chart_header_label or ""
+            bundle_sunrise.chart_header_label or ""
         )
-        assert len(bundle_sunset.display_df) == len(
-            bundle_sunset.chart_context.chart_window.slot_datetimes
+        assert len(bundle_sunrise.display_df) == len(
+            bundle_sunrise.chart_context.chart_window.slot_datetimes
         )
         planning_start = pd.Timestamp(anchor) - pd.Timedelta(hours=24)
         if planning_start.tzinfo is None:
             planning_start = planning_start.tz_localize("Europe/Vienna")
-        assert bundle_sunset.chart_context.chart_window.start >= planning_start.to_pydatetime()
+        assert bundle_sunrise.chart_context.chart_window.start >= planning_start.to_pydatetime()
         snapshot_first = pd.Timestamp(snapshot["chart_rows_full"][0]["slot_datetime"])
         if snapshot_first.tzinfo is None:
             snapshot_first = snapshot_first.tz_localize("Europe/Vienna")
-        assert bundle_sunset.chart_context.chart_window.start >= snapshot_first.to_pydatetime()
+        assert bundle_sunrise.chart_context.chart_window.start >= snapshot_first.to_pydatetime()
 
 
 def test_soc_tail_y_uses_explicit_battery_params_when_live_capacity_zero(monkeypatch):
@@ -194,26 +194,26 @@ def test_battery_params_from_snapshot_prefers_stored():
     assert resolved["battery_capacity_kwh"] == 12.5
 
 
-def test_log_supports_sunset_chart_view():
-    assert log_supports_sunset_chart_view({"period": {"horizon_mode": SUNSET_WINDOW}})
-    assert not log_supports_sunset_chart_view({"period": {"horizon_mode": FIXED_24H}})
+def test_log_supports_sunrise_chart_view():
+    assert log_supports_sunrise_chart_view({"period": {"horizon_mode": SUNRISE_WINDOW}})
+    assert not log_supports_sunrise_chart_view({"period": {"horizon_mode": FIXED_24H}})
 
 
 def test_resolve_chart_view_modes():
     fixed_meta = {"period": {"horizon_mode": FIXED_24H}}
-    sunset_meta = {"period": {"horizon_mode": SUNSET_WINDOW}}
+    sunrise_meta = {"period": {"horizon_mode": SUNRISE_WINDOW}}
     assert _resolve_chart_view(
         fixed_meta,
         segment_toggle="SA₁→SA₂",
     ) == (VIEW_MODE_24H, 0)
     assert _resolve_chart_view(
-        sunset_meta,
+        sunrise_meta,
         segment_toggle="SA₀→SA₁",
-    ) == (VIEW_MODE_SUNSET, 0)
+    ) == (VIEW_MODE_SUNRISE, 0)
     assert _resolve_chart_view(
-        sunset_meta,
+        sunrise_meta,
         segment_toggle="SA₁→SA₂",
-    ) == (VIEW_MODE_SUNSET, 1)
+    ) == (VIEW_MODE_SUNRISE, 1)
 
 
 def test_format_backtesting_window_range_matches_anchor_minus_24h():
@@ -250,7 +250,7 @@ def test_load_backtesting_display_bundle_rejects_horizon_mismatch(tmp_path):
             str(tmp_path),
             "2026-06-23T07:00:00",
             "live",
-            log_horizon_mode=SUNSET_WINDOW,
+            log_horizon_mode=SUNRISE_WINDOW,
         )
 
 

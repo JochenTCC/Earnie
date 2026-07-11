@@ -75,7 +75,7 @@ MILP-Horizont: 24 h (identisch zum Output-Fenster)
 
 Kein Config-Schalter für End-SOC; Verhalten ist fest im Modus verankert (früher `battery_end_soc_equals_start`, entfernt).
 
-### 4.2 Modus `sunset_window` (Vergleich zu Live-Prod)
+### 4.2 Modus `sunrise_window` (Vergleich zu Live-Prod)
 
 Pro Backtesting-Schritt (weiterhin **24 h Output** pro E-Auto-Anker, fairer Vergleich):
 
@@ -104,7 +104,7 @@ ein Schritt pro E-Auto-Anker reicht für den Horizont-Vergleich; Live-Prod bleib
 
 ```bash
 python run_backtesting.py --start-month 1 --end-month 12 --horizon-mode fixed_24h
-python run_backtesting.py --start-month 1 --end-month 12 --horizon-mode sunset_window
+python run_backtesting.py --start-month 1 --end-month 12 --horizon-mode sunrise_window
 ```
 
 `horizon_mode` wird in `backtesting_log.json` unter `period.horizon_mode` persistiert.
@@ -115,11 +115,11 @@ Referenz „Historisch (ohne Optimierung)“ ist für beide Modi identisch.
 ```json
 "live_scenario_id": "live",
 "planning_horizon": {
-  "mode": "sunset_window"
+  "mode": "sunrise_window"
 }
 ```
 
-Live-Szenario `live` in `backtesting_scenarios.json` referenziert `house_profile_id` (Geo/Zeitzone aus `house_profiles.json`). Live akzeptiert derzeit nur `planning_horizon.mode: "sunset_window"`.
+Live-Szenario `live` in `backtesting_scenarios.json` referenziert `house_profile_id` (Geo/Zeitzone aus `house_profiles.json`). Live akzeptiert derzeit nur `planning_horizon.mode: "sunrise_window"`.
 
 ## 6. Implementierungsphasen
 
@@ -129,9 +129,9 @@ Live-Szenario `live` in `backtesting_scenarios.json` referenziert `house_profile
 | **2** | Matrix/Preise/PV generalisieren, MILP SOC-Anker | erledigt |
 | **3** | `main.py`, Simulation Live | erledigt |
 | **4** | UI sunrise→sunrise mit Zonenfarben | erledigt |
-| **5** | Backtesting `--horizon-mode` (fixed_24h / sunset_window), Vergleichsdoku | erledigt |
+| **5** | Backtesting `--horizon-mode` (fixed_24h / sunrise_window), Vergleichsdoku | erledigt |
 
-Offen (Backlog): [UI Sunset-2-Sunset](ui-sunset2sunset.md) (SA₁→SA₂-Segment, fließende Historie), optional Live-Umschaltung `fixed_24h` \| `sunset_window`.
+Offen (Backlog): [UI Sunset-2-Sunset](ui-sunset2sunset.md) (SA₁→SA₂-Segment, fließende Historie), optional Live-Umschaltung `fixed_24h` \| `sunrise_window`.
 
 ## 7. Akzeptanzkriterien
 
@@ -140,7 +140,7 @@ Offen (Backlog): [UI Sunset-2-Sunset](ui-sunset2sunset.md) (SA₁→SA₂-Segmen
 3. Zweiter Zyklus nach Sonnenaufgang ohne End-SOC-Constraint.
 4. UI-Zonen: grau / neutral / grün gemäß Abschnitt 3.
 5. Backtesting `fixed_24h`: SOC-Kette über Fenstergrenzen unverändert.
-6. Backtesting `sunset_window`: Lauf ohne Fehler; `horizon_mode` im Log; Jahresvergleich manuell.
+6. Backtesting `sunrise_window`: Lauf ohne Fehler; `horizon_mode` im Log; Jahresvergleich manuell.
 
 ## 8. Entscheidungsprotokoll
 

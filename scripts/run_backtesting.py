@@ -41,7 +41,7 @@ from simulation.engine import (
 from simulation.horizon_mode import (
     DEFAULT_HORIZON_MODE,
     FIXED_24H,
-    SUNSET_WINDOW,
+    SUNRISE_WINDOW,
     parse_horizon_mode,
 )
 
@@ -157,12 +157,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--horizon-mode",
-        choices=[FIXED_24H, SUNSET_WINDOW],
+        choices=[FIXED_24H, SUNRISE_WINDOW],
         default=DEFAULT_HORIZON_MODE,
         help=(
             "Planungshorizont für die Optimierung: "
             f"'{FIXED_24H}' (24h/E-Auto-Anker, Standard) oder "
-            f"'{SUNSET_WINDOW}' (Jetzt→SA₂, SOC_min am Sonnenaufgang)."
+            f"'{SUNRISE_WINDOW}' (Jetzt→SA₂, SOC_min am Sonnenaufgang)."
         ),
     )
     parser.add_argument(
@@ -178,7 +178,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         choices=list(VALID_PRICE_STRATEGIES),
         default=PRICE_STRATEGY_PERFECT,
         help=(
-            "Preise in der grünen Zone (nur sunset_window): "
+            "Preise in der grünen Zone (nur sunrise_window): "
             "'perfect' = historischer Ist-Preis (Standard), "
             "'mirror' = Spiegelung, 'forecast' = OLS-Prognose."
         ),
@@ -514,12 +514,30 @@ def main(argv: list[str] | None = None):
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
+    from house_config.tariff_plausibility import (
+        collect_tariff_plausibility_errors,
+        format_tariff_plausibility_errors,
+    )
+    from runtime_store.persist_paths import (
+        resolve_backtesting_scenarios_json_path,
+        resolve_tariffs_json_path,
+        resolve_tariffs_schema_template_path,
+    )
+
+    tariff_errors = collect_tariff_plausibility_errors(
+        tariffs_path=resolve_tariffs_json_path(),
+        scenarios_path=resolve_backtesting_scenarios_json_path(),
+        schema_path=resolve_tariffs_schema_template_path(),
+    )
+    if tariff_errors:
+        raise SystemExit(format_tariff_plausibility_errors(tariff_errors))
+
     args = _build_arg_parser().parse_args(argv)
     horizon_mode = parse_horizon_mode(args.horizon_mode)
     price_strategy = parse_price_strategy(args.price_strategy)
-    if price_strategy != PRICE_STRATEGY_PERFECT and horizon_mode != SUNSET_WINDOW:
+    if price_strategy != PRICE_STRATEGY_PERFECT and horizon_mode != SUNRISE_WINDOW:
         raise SystemExit(
-            f"--price-strategy {price_strategy} erfordert --horizon-mode {SUNSET_WINDOW}."
+            f"--price-strategy {price_strategy} erfordert --horizon-mode {SUNRISE_WINDOW}."
         )
     feature_dataset_path, forecast_model_path = _resolve_price_paths(args)
     feature_dataset_str = str(feature_dataset_path) if feature_dataset_path else None

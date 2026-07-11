@@ -320,8 +320,8 @@
       "properties": {
         "mode": {
           "type": "string",
-          "enum": ["sunset_window"],
-          "description": "sunset_window: Jetzt→SA₁ + SA₁→SA₂ mit SOC_min am Sonnenaufgang."
+          "enum": ["sunrise_window"],
+          "description": "sunrise_window: Jetzt→SA₁ + SA₁→SA₂ mit SOC_min am Sonnenaufgang."
         }
       },
       "required": ["mode"]

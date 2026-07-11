@@ -155,7 +155,7 @@ def test_dach_tariffs_catalog():
     doc = load_tariffs_document(str(root / "config" / "tariffs.json"))
     assert doc.get("catalog_as_of") == "2026"
     assert len(doc["import_tariffs"]) == 33
-    assert len(doc["export_tariffs"]) == 12
+    assert len(doc["export_tariffs"]) == 13
     assert "awattar_at" in doc["import_tariffs"]
     assert "dynamic_epex" in doc["export_tariffs"]
 
@@ -567,7 +567,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
             "system": {"global_timeout": 10, "loop_timeout": 900},
             "loxone_blocks": {"soc_name": "Battery_SOC"},
             "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
-            "planning_horizon": {"mode": "sunset_window"},
+            "planning_horizon": {"mode": "sunrise_window"},
             "batteries": [{
                 "id": "home_5kwh",
                 "label": "5 kWh",
@@ -755,7 +755,7 @@ def test_migrate_runtime_entities_preserves_resolved_values(tmp_path):
             }
         ],
         "flexible_consumers": [],
-        "planning_horizon": {"mode": "sunset_window"},
+        "planning_horizon": {"mode": "sunrise_window"},
     }
     tariffs = json.loads(
         (Path(__file__).resolve().parents[1] / "tests/fixtures/backtesting/tariffs.json").read_text(

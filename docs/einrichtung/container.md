@@ -9,6 +9,9 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | Mount (Host) | Inhalt |
 |--------------|--------|
 | `./config/config.json` | Haus-Konfiguration (wird nie überschrieben) |
+| `./config/tariffs.json` | Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json` |
+| `./config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline |
+| `./config/house_profiles.json` | Hausprofile (Sidecar) |
 | `./config/config.example.json` | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
 | `./runtime/` | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs |
 | `./config/.env` | Loxone-Zugangsdaten |
@@ -19,8 +22,8 @@ Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config/config.json`
 
 1. Projektordner mit `docker-compose-synology.yml` anlegen
 2. `mkdir -p config runtime`
-3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config/config.json`, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
-4. `config/.env` und `config/config.json` anpassen (Loxone-Zugang, Namen, Verbraucher)
+3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config.json`, `tariffs.json`, weitere Sidecars, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
+4. `config/.env`, `config/config.json` und **`config/tariffs.json`** anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
 5. Optional: historische `cons_data` aus Dev nach `runtime/cons_data_hourly.csv` kopieren
 
 ## Config-Updates nach Programm-Upgrade
@@ -77,6 +80,20 @@ python -m scripts.build_container --target loxberry
 python -m scripts.build_container --target all --push
 ```
 
+Vor `--push` prüft der Build automatisch den gebündelten Tarifkatalog (`config/tariffs.json`: Schema, Beispiel-Szenario-Referenzen, DACH-Vollständigkeit). Manuell:
+
+```powershell
+python -m scripts.validate_tariffs --check-catalog
+```
+
+Auf der NAS vor dem ersten Prod-Cutover (Backlog **2.0 P6**) die produktive Sidecar-Datei prüfen:
+
+```powershell
+python -m scripts.validate_tariffs --tariffs config/tariffs.json --check-catalog
+```
+
+Bei Fehlern bricht der Worker mit `EARNIE_STRICT_TARIFF_VALIDATE=1` ab (siehe Compose).
+
 Erzeugt standardmäßig vier Tags (kanonisch + Legacy-Alias für Übergang):
 
 - `ghcr.io/jochentcc/earnie-energy:latest`
@@ -115,7 +132,7 @@ docker compose -f docker-compose-synology.yml pull
 docker compose -f docker-compose-synology.yml up -d
 ```
 
-Der **optimizer-worker** führt beim Start automatisch `verify_loxone_setup` aus (alle konfigurierten Merker inkl. neuer E-Auto-Signale). Ergebnis steht in `runtime/earnie.log` unter `[loxone-verify]`.
+Der **optimizer-worker** führt beim Start automatisch Tarif-Plausibilität und `verify_loxone_setup` aus. Ergebnis steht in `runtime/earnie.log` (`Tarif-Startup-Prüfung`, `[loxone-verify]`).
 
 **Log-Datei nach Upgrade:** Ab Version 2.0 heißt die Worker-Logdatei `earnie.log` (früher `energy_optimizer.log`). Beim ersten Start nach dem Upgrade entsteht eine neue Datei; optional die alte manuell umbenennen oder archivieren.
 

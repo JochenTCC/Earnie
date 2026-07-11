@@ -22,7 +22,7 @@ config = load_config_or_exit()
 from data.data_loader import load_market_prices
 from scripts.run_backtesting import resolve_backtesting_window
 from simulation.backtesting_horizon import (
-    compute_sunset_planning_at_anchor,
+    compute_sunrise_planning_at_anchor,
     effective_sunrise_soc_min_index,
 )
 from simulation.engine import (
@@ -33,7 +33,7 @@ from simulation.engine import (
     validate_window_consumption,
     window_slot_datetimes,
 )
-from simulation.horizon_mode import FIXED_24H, SUNSET_WINDOW
+from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
 
 SUNSET_LOG = ROOT / "backtesting_logs" / "horizon_compare_2025_full_sunset_window.json"
 OUT_2A = ROOT / "backtesting_logs" / "plausibility_sunset_2025.json"
@@ -176,7 +176,7 @@ def _compare_window(
     )
     sunset_rows, sunset_meta, sunset_plaus = _simulate_mode(
         anchor,
-        horizon_mode=SUNSET_WINDOW,
+        horizon_mode=SUNRISE_WINDOW,
         cache=cache,
         prices_df=prices_df,
         scenario=scenario,
@@ -184,7 +184,7 @@ def _compare_window(
         battery_params=battery_params,
     )
 
-    _, sunrise_index = compute_sunset_planning_at_anchor(anchor, scenario)
+    _, sunrise_index = compute_sunrise_planning_at_anchor(anchor, scenario)
     sunrise_effective = effective_sunrise_soc_min_index(sunrise_index)
 
     hourly = []

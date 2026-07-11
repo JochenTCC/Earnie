@@ -1,4 +1,4 @@
-"""Jahres-Backtesting: Spiegelung vs. OLS-Prognose in der grünen Zone (sunset_window)."""
+"""Jahres-Backtesting: Spiegelung vs. OLS-Prognose in der grünen Zone (sunrise_window)."""
 from __future__ import annotations
 
 import argparse
@@ -22,7 +22,7 @@ def _run_backtesting(
         "-m",
         "scripts.run_backtesting",
         "--horizon-mode",
-        "sunset_window",
+        "sunrise_window",
         "--price-strategy",
         price_strategy,
         "--start-month",
@@ -44,7 +44,7 @@ def _run_backtesting(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Führt zwei sunset_window-Jahresläufe aus (mirror + forecast) "
+            "Führt zwei sunrise_window-Jahresläufe aus (mirror + forecast) "
             "und schreibt einen Vergleichsbericht."
         )
     )

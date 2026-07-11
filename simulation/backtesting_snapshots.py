@@ -11,7 +11,7 @@ import pandas as pd
 from runtime_store.file_metadata import stamp_payload
 from runtime_store.live_optimization_debug import _json_safe
 from simulation.backtesting_horizon import geo_params_from_scenario
-from simulation.horizon_mode import FIXED_24H, SUNSET_WINDOW
+from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
 
 BACKTESTING_WINDOW_SNAPSHOTS_JSONL = "backtesting_window_snapshots.jsonl"
 WINDOW_SNAPSHOT_SCHEMA = 1
@@ -52,7 +52,7 @@ def build_window_snapshot(
 ) -> dict:
     """Baut ein serialisierbares Fenster-Snapshot-Dict."""
     geo: dict[str, Any] | None = None
-    if scenario_params and horizon_mode == SUNSET_WINDOW:
+    if scenario_params and horizon_mode == SUNRISE_WINDOW:
         lat, lon, tz_name = geo_params_from_scenario(scenario_params)
         geo = {"latitude": lat, "longitude": lon, "timezone": tz_name}
 
@@ -129,9 +129,9 @@ def load_window_snapshot(
     return None
 
 
-def snapshot_supports_sunset_view(snapshot: dict) -> bool:
+def snapshot_supports_sunrise_view(snapshot: dict) -> bool:
     return (
-        snapshot.get("horizon_mode") == SUNSET_WINDOW
+        snapshot.get("horizon_mode") == SUNRISE_WINDOW
         and bool(snapshot.get("chart_rows_full"))
         and bool(snapshot.get("matrix_full"))
     )

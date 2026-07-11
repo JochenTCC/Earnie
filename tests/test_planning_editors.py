@@ -80,7 +80,7 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
                     "target_discharge_power_name": "Target_Discharge",
                     "control_cmd_name": "Control_Cmd",
                 },
-                "planning_horizon": {"mode": "sunset_window"},
+                "planning_horizon": {"mode": "sunrise_window"},
                 "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
             }
         ),

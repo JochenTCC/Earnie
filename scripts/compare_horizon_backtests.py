@@ -1,4 +1,4 @@
-"""Vergleicht zwei backtesting_log.json-Läufe (fixed_24h vs sunset_window)."""
+"""Vergleicht zwei backtesting_log.json-Läufe (fixed_24h vs sunrise_window)."""
 from __future__ import annotations
 
 import argparse
@@ -34,7 +34,7 @@ def build_comparison(fixed: dict, sunset: dict) -> str:
         "",
         f"**Referenz** ({labels.get(ref_id, ref_id)}): {ref_cost:.2f} €",
         "",
-        f"| Szenario | fixed_24h (€) | sunset_window (€) | Δ Kosten (€) | Δ Einsparung vs. Ref (€) |",
+        f"| Szenario | fixed_24h (€) | sunrise_window (€) | Δ Kosten (€) | Δ Einsparung vs. Ref (€) |",
         f"|----------|---------------|---------------------|--------------|---------------------------|",
     ]
 
@@ -57,13 +57,13 @@ def build_comparison(fixed: dict, sunset: dict) -> str:
             "## Plausibilität",
             "",
             f"- **fixed_24h:** {_plaus_summary(fixed.get('plausibility', {}))}",
-            f"- **sunset_window:** {_plaus_summary(sunset.get('plausibility', {}))}",
+            f"- **sunrise_window:** {_plaus_summary(sunset.get('plausibility', {}))}",
             "",
             "## Metadaten",
             "",
             f"- Fenster: {fixed['period'].get('windows')} · Stunden: {fixed['period'].get('hours')}",
             f"- fixed_24h: `{fixed['period'].get('start')}` – `{fixed['period'].get('last_ts')}`",
-            f"- sunset_window: `{sunset['period'].get('start')}` – `{sunset['period'].get('last_ts')}`",
+            f"- sunrise_window: `{sunset['period'].get('start')}` – `{sunset['period'].get('last_ts')}`",
         ]
     )
     crit_f = fixed.get("critical_cases_summary", {}).get("total", 0)

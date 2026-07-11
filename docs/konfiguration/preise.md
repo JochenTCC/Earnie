@@ -63,6 +63,13 @@ Berechnung: [`data/tariff_pricing.py`](../../data/tariff_pricing.py) (`import_ce
 
 DACH-Katalog importieren: `tools/convert_dach_tariffs.py` aus `stromtarife_dach_kombiniert.json` + `einspeisetarife_dach_erweitert.json`.
 
+Plausibilität prüfen (vor Deploy / NAS-Cutover):
+
+```powershell
+python -m scripts.validate_tariffs --check-catalog
+tools/convert_dach_tariffs.py --check
+```
+
 ### monthly_float — OeMAG-Referenz vs. aWATTar-SUNNY
 
 Zwei getrennte Monatstabellen in `backtesting_scenarios.json`:

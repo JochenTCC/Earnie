@@ -14,8 +14,8 @@ from ui.backtesting_deviation_list import (
     format_deviation_delta_kwh,
     kind_label,
 )
-from ui.backtesting_display_bundle import VIEW_MODE_24H, VIEW_MODE_SUNSET
-from simulation.horizon_mode import SUNSET_WINDOW
+from ui.backtesting_display_bundle import VIEW_MODE_24H, VIEW_MODE_SUNRISE
+from simulation.horizon_mode import SUNRISE_WINDOW
 
 
 def _sample_meta() -> dict:
@@ -138,8 +138,8 @@ def test_selected_deviation_index_defaults_without_selection():
 
 
 def test_resolve_chart_view_from_deviation_list():
-    sunset_meta = {"period": {"horizon_mode": SUNSET_WINDOW}}
+    sunrise_meta = {"period": {"horizon_mode": SUNRISE_WINDOW}}
     assert _resolve_chart_view(
-        sunset_meta,
+        sunrise_meta,
         segment_toggle="SA₀→SA₁",
-    ) == (VIEW_MODE_SUNSET, 0)
+    ) == (VIEW_MODE_SUNRISE, 0)

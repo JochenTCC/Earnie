@@ -9,7 +9,7 @@ from data import cons_data_store
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation import backtesting_log
 from simulation.backtesting_fingerprint import fingerprint_for_current_config
-from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNSET_WINDOW
+from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNRISE_WINDOW
 from ui.backtesting_charts import scenario_monthly_cost_chart
 from ui.backtesting_cons_data import render_cons_data_section
 from ui.backtesting_deviation_list import render_deviation_list
@@ -75,6 +75,24 @@ def try_get_backtesting_scenarios() -> tuple[dict[str, dict] | None, str | None]
 
 def validate_backtesting_config() -> str | None:
     """None wenn auflösbar, sonst Fehlermeldung für die UI."""
+    from house_config.tariff_plausibility import (
+        collect_tariff_plausibility_errors,
+        format_tariff_plausibility_errors,
+    )
+    from runtime_store.persist_paths import (
+        resolve_backtesting_scenarios_json_path,
+        resolve_tariffs_json_path,
+        resolve_tariffs_schema_template_path,
+    )
+
+    tariff_errors = collect_tariff_plausibility_errors(
+        tariffs_path=resolve_tariffs_json_path(),
+        scenarios_path=resolve_backtesting_scenarios_json_path(),
+        schema_path=resolve_tariffs_schema_template_path(),
+    )
+    if tariff_errors:
+        return format_tariff_plausibility_errors(tariff_errors)
+
     _, error = try_get_backtesting_scenarios()
     return error
 
@@ -140,7 +158,7 @@ def render_configured_scenarios() -> None:
 
 _HORIZON_MODE_LABELS = {
     FIXED_24H: "24h (Standard, E-Auto-Anker)",
-    SUNSET_WINDOW: "Sunset Now→SA₂ (SOC_min am Sonnenaufgang)",
+    SUNRISE_WINDOW: "Sunrise Now→SA₂ (SOC_min am Sonnenaufgang)",
 }
 
 
@@ -238,17 +256,17 @@ def render_backtesting_run_controls(
     selectbox_index = 0
     if "backtesting_horizon_mode" not in st.session_state:
         log_horizon = log_horizon_mode(meta) if log_exists else None
-        if log_horizon == SUNSET_WINDOW:
+        if log_horizon == SUNRISE_WINDOW:
             selectbox_index = 1
     horizon_mode = st.selectbox(
         "Planungshorizont",
-        options=[FIXED_24H, SUNSET_WINDOW],
+        options=[FIXED_24H, SUNRISE_WINDOW],
         format_func=lambda mode: _HORIZON_MODE_LABELS[mode],
         index=selectbox_index,
         key="backtesting_horizon_mode",
         help=(
             "24h: Referenzmodus für Jahresvergleiche. "
-            "Sunset: wie Live-Optimierung (Jetzt→SA₂); Voraussetzung für SA-Zonen in Chart1/2. "
+            "Sunrise: wie Live-Optimierung (Jetzt→SA₂); Voraussetzung für SA-Zonen in Chart1/2. "
             "Bei vorhandenem Lauf entspricht die Auswahl dem gespeicherten Horizont; "
             "eine Änderung macht die Ergebnisse ungültig bis zur Neuberechnung."
         ),

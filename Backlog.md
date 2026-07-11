@@ -13,41 +13,29 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Adapt business plan
 - [ ] **Outreach (not software):** Ask for interested parties in loxforum / reddit — post under “my project”; take interesting chart snapshots (loxforum admins contacted re. best place)
 
-
-
 ## Feature Backlog
-
-
 
 ### Version 2.0
 
 Branding (Earnie rename) → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
-**Status (2026-07-11):** P1–P3 done (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). Greenfield smoke test completed — follow-ups in [Backlog-Bugfixes.md](Backlog-Bugfixes.md) and below.
+**Status (2026-07-11):** P1–P5 done (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). Greenfield smoke test completed — follow-ups in [Backlog-Bugfixes.md](Backlog-Bugfixes.md) and below.
 
-Recommended order: **P4** sunrise rename → **P5** tariffs & deploy gate → **P6** prod NAS cutover → **P7** README / evaluations.
+Recommended order: **P6** prod NAS cutover → **P7** README / evaluations.
 
-Critical path: **P5 → P6**. **P4** can run in parallel with P5 prep. Smoke-test bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+Critical path: **P6**. Smoke-test bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 **Decisions (2026-07-11):**
 
 
-| Topic                          | Decision                                                                                                                                                                              |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EARNIE_UI_MODES` key          | Hard rename `backtesting` **→** `scenario_exploration` — no alias; update compose, launch configs, docs, tests in same PR (P2)                                                        |
-| Scenario id `runtime_settings` | **Remove in 2.0** — live baseline is a normal scenario entry (default id `live`) selected via `live_scenario_id` in `config.json`; update scripts/tests/fixtures in same release (P2) |
-| Battery without PV             | **Allowed** — battery still required for MILP / planning readiness; PV optional (zero PV forecast when `pv_system_id` unset) (P1)                                                     |
-| **7g-a** before P6             | **Skip for 2.0** — direct NAS cutover after P5; 7g-a remains in Packaging backlog, not a 2.0 gate                                                                                     |
+| Topic                            | Decision                                                                                                                                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EARNIE_UI_MODES` key            | Hard rename `backtesting` **→** `scenario_exploration` — no alias; update compose, launch configs, docs, tests in same PR (P2)                                                        |
+| Scenario id `runtime_settings`   | **Remove in 2.0** — live baseline is a normal scenario entry (default id `live`) selected via `live_scenario_id` in `config.json`; update scripts/tests/fixtures in same release (P2) |
+| Battery without PV               | **Allowed** — battery still required for MILP / planning readiness; PV optional (zero PV forecast when `pv_system_id` unset) (P1)                                                     |
+| **7g-a** before P6               | **Skip for 2.0** — direct NAS cutover after P5; 7g-a remains in Packaging backlog, not a 2.0 gate                                                                                     |
+| `**sunrise_window` rename (P4)** | Hard rename `sunset_window` **→** `sunrise_window` — no alias; internal symbols renamed; prod deploy only with P6 config migration                                                    |
 
-
-- [ ] **Version 2.0 P4 —** `sunrise_window` **rename**
-  - Rename `sunset_window` → `sunrise_window` — schema, code, docs, tests (`simulation/horizon_mode.py`, `config/config.schema.json`, fixtures, scripts)
-  - Prerequisite for 2.+1 live horizon switch; **do not** implement live `planning_horizon.mode` branching in 2.0
-
-- [ ] **Version 2.0 P5 — Tariffs & deploy gate**
-  - Check `tariffs.json` for completeness: are all data from `einspeisetarife*.json` (Gemini) included? (`tools/convert_dach_tariffs.py`)
-  - **Tariff plausibility** — validate `tariffs.json` before Scenario-Exploration start **and** before deploy (CI/deploy gate)
-  - Include `tariffs.json` in deploy (follow-up 1.26.0 P5) — sidecar alongside `config.json` on NAS; image/bootstrap docs
 
 - [ ] **Version 2.0 P6 — Prod NAS cutover**
   - Apply migrated config per `[migrated/MIGRATION_REVIEW.md](migrated/MIGRATION_REVIEW.md)` and `[house_config/migrate_runtime_entities.py](house_config/migrate_runtime_entities.py)` (1.26.0 P5)
@@ -58,8 +46,6 @@ Critical path: **P5 → P6**. **P4** can run in parallel with P5 prep. Smoke-tes
   - Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
   - Build additional container for Windows as pure Python environment (if that makes sense) — spike vs local venv; go/no-go note
   - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
-
-
 
 ### Version 2.0 — smoke-test follow-ups (non-blocking for P5/P6)
 
@@ -74,14 +60,10 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
 - [ ] Search for deprecated and unneccessary files and remove them
 - [ ] Evaluate option for automated UI testing
 
-
-
 ### Version 2.+1
 
 - [ ] Define CSV data format for consumer annual demand (except house and EV) and provide import option (in addition to rated values). Annual profile from rated values can be compared graphically and in summary with measured profile.
 - [ ] Set up debug page for Loxone communication showing read data with last update, whether data was sent to Loxone successfully (with value and timestamp — when silentmode==false)
-
-
 
 ### Version 2.+1
 
@@ -90,16 +72,12 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
   - **Fundamental question:** Should heating/filter separation happen **directly in Loxone** (separate heating power marker without filter) instead of software-side via `subtract_consumer_ids`? Advantage: consistent live **and** historical data at the source.
   - Reference: case B correction (live actual) already implemented; thermal calibration see **Thermals P1** (Swim-Spa)
 
-
-
 ### Version 2.+1
 
 - [ ] **Recommendation mode smart/adaptive devices** (follow-up to recommendation mode manual devices)
   - Adaptive re runtime/energy per run; smart devices instead of manual input
   - Adaptation algo maintains `appliances[].default_power_kw` from Loxone power markers (`loxone_power_name`) — reserved so far, no live use
   - Dishwasher power possibly via Hue
-
-
 
 ### Version 2.+1
 
@@ -115,8 +93,6 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
   - Evaluate whether a **replay/recalculation path** from a dump should be documented or partially automated
   - Add further inputs only if proven relevant for real failure cases
 
-
-
 ### Version 2.+1 — Epics **Adaptation** & **Thermals** (architecture first)
 
 Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P1 → Thermals P2 → Thermals P3 → Adaptation P4**
@@ -129,22 +105,16 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
     - Start parameters from `config.json`; adaptation history **separate**; correct live parameters only when needed (rhythm oriented to horizon)
   - Target models (connect later): PV yield, thermal models, solar collector
 
-
-
 ### Version 2.+1
 
 - [ ] **Adaptation P2** — PV adaptation (new approach) — first pilot on Adaptation P1
   - Replaces sidebar PV tuning (removed with UI Sunset-2-Sunset); see `runtime/pv_accuracy_log.csv`
   - Replace or integrate old `pv_tuner` path into Adaptation P1
 
-
-
 ### Version 2.+1
 
 - [ ] **Adaptation P3** — Adaptation algorithm (PV pilot)
   - Concrete update loop on Adaptation P2; thermal models remain **linear** (thermal adaptation only in Thermals P3)
-
-
 
 ### Version 2.+1
 
@@ -153,8 +123,6 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
   - Variable heat paths (against infinity); replaces single-path special case in `optimizer/thermal_model.py`
   - **Freezer** (former 0.+1 Prio2) — second isolated reference model; acceptance: calibration/backtest against historical Loxone CSV logs
 
-
-
 ### Version 2.+1
 
 - [ ] **Thermals P2** — Coupled single-node models
@@ -162,50 +130,36 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
   - House parameters from energy certificate (`C:\Users\joche\Documents\Hausbau\Hausbau_Köhler_Schreyögg\Energieausweis_komplett_EFH-Köhler_Dornbirn-2014.pdf`)
   - Prepare air conditioning as thermal consumer
 
-
-
 ### Version 2.+1
 
 - [ ] **Thermals P3** — Thermal parameter adaptation (on Adaptation P1)
   - `heat_loss_kw_per_k` and further linear model parameters; horizon per consumer (24 h / 1 year)
 
-
-
 ### Version 2.+1
 
 - [ ] **Adaptation P4** — UI visualization adaptation algos (after Adaptation P3 and Thermals P3)
 
-
-
 ### Version 2.+1
 
 - [ ] Generic EV model — for better reusability
-
-
 
 ### Version 2.+1
 
 - [ ] Better consumption optimization with temperature-control devices
   - [ ] Heat pump (Prio3) — only indirect control via setpoint adjustment (after **Thermals P2**)
 
-
-
 ### Version 2.+1
 
 - [ ] Visualization of actual consumer behavior possibly with recommendations
 
-
-
 ### Version 2.+1
 
 - [ ] **Optional: live planning horizon switchable via** `config.json` (`planning_horizon.mode`: `fixed_24h` | `sunrise_window`)
-  - **Prerequisite:** Version 2.0 rename `sunset_window` → `sunrise_window` (schema/code/docs)
+  - **Prerequisite:** Version 2.0 P4 rename done (`sunrise_window` in schema/code/docs)
   - After 2.0 rename: live only `sunrise_window` today; backtesting already supports both modes — live branching still to implement (`main.py`, `profile_manager`, UI chart, aWATTar window)
   - Mode `fixed_24h`**:** end-SOC behavior **fixed in mode** — economically equivalent to former `battery_end_soc_equals_start: true` (start SOC at horizon end), **or** introduce hard equality constraint via existing `battery_wear` penalty that appropriately "punishes" lower end SOC (choose one variant, not both in parallel)
   - Mode `sunrise_window`**:** unchanged **SOC_min at sunrise** (hard)
   - Extend spec, live tests for both modes
-
-
 
 ### Version 2.+1 — follow-ups (low priority; confirm after 2.0)
 
@@ -213,8 +167,6 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
   - Arbitrary calendar day from `cons_data_hourly.csv` + historical prices; implementation to clarify later (replaces sidebar mode "historical day")
 - [ ] **Target/actual hint rules** — category "hint" once concrete non-critical cases identified (follow-up epic target/actual; after **Debug dump phase 2**)
 - [ ] **Target/actual recalculation (backtesting)** — rule set batch-wise over historical JSONL / prod dumps; statistics per category (follow-up epic target/actual; after **Debug dump phase 2**)
-
-
 
 ## Packaging & Deployment
 
@@ -235,11 +187,7 @@ Recommended open order: **7e** → **7g**
     - Own stack without real Loxone connection; fully synthetic "house" (signals, consumers, possibly backtesting fixtures)
     - Prerequisite: Loxone simulator available — leave open until then
 
-
-
 ## Reference
-
-
 
 ### Log files (review 2026-06)
 

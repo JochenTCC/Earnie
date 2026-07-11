@@ -6,7 +6,7 @@ import json
 from datetime import date
 
 from scripts.run_backtesting import _write_progress_file
-from simulation.horizon_mode import FIXED_24H, SUNSET_WINDOW
+from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
 from ui.backtesting import (
     horizon_selection_stale,
     log_horizon_mode,
@@ -23,14 +23,14 @@ from ui.backtesting_runner import (
 )
 
 def test_log_horizon_mode_from_period():
-    assert log_horizon_mode({"period": {"horizon_mode": SUNSET_WINDOW}}) == SUNSET_WINDOW
+    assert log_horizon_mode({"period": {"horizon_mode": SUNRISE_WINDOW}}) == SUNRISE_WINDOW
     assert log_horizon_mode({"period": {}}) == FIXED_24H
     assert log_horizon_mode(None) is None
 
 
 def test_horizon_selection_stale_when_ui_differs_from_log():
-    meta = {"period": {"horizon_mode": SUNSET_WINDOW}}
-    assert horizon_selection_stale(meta, SUNSET_WINDOW) is False
+    meta = {"period": {"horizon_mode": SUNRISE_WINDOW}}
+    assert horizon_selection_stale(meta, SUNRISE_WINDOW) is False
     assert horizon_selection_stale(meta, FIXED_24H) is True
     assert horizon_selection_stale(None, FIXED_24H) is False
 
@@ -94,12 +94,12 @@ def test_build_backtesting_command_includes_month_and_progress(tmp_path):
     assert "--horizon-mode" not in cmd
 
 
-def test_build_backtesting_command_includes_sunset_horizon_mode(tmp_path):
+def test_build_backtesting_command_includes_sunrise_horizon_mode(tmp_path):
     cmd = build_backtesting_command(
         output_dir=str(tmp_path),
-        horizon_mode="sunset_window",
+        horizon_mode="sunrise_window",
     )
-    assert cmd[-2:] == ["--horizon-mode", "sunset_window"]
+    assert cmd[-2:] == ["--horizon-mode", "sunrise_window"]
 
 
 def test_suggest_test_month_from_cons_data_bounds(monkeypatch):

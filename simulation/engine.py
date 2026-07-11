@@ -23,7 +23,7 @@ from simulation.baseload_validation import (
     resolve_hourly_baseload_kw,
 )
 from simulation.backtesting_horizon import (
-    compute_sunset_planning_at_anchor,
+    compute_sunrise_planning_at_anchor,
     effective_sunrise_soc_min_index,
     geo_params_from_scenario,
     naive_backtesting_slot,
@@ -36,7 +36,7 @@ from simulation.horizon_mode import (
     BACKTESTING_STEP_HOURS,
     DEFAULT_HORIZON_MODE,
     FIXED_24H,
-    SUNSET_WINDOW,
+    SUNRISE_WINDOW,
     parse_horizon_mode,
 )
 from optimizer.cbc_solver import (
@@ -385,7 +385,7 @@ def build_historical_window_matrix(
     )
 
 
-def build_sunset_window_matrix(
+def build_sunrise_window_matrix(
     anchor: datetime,
     cache: HistoricalDataCache,
     prices_df: pd.DataFrame,
@@ -394,11 +394,11 @@ def build_sunset_window_matrix(
     price_resources: BacktestingPriceResources | None = None,
 ) -> tuple[list[dict], dict, int, list[dict]]:
     """
-    Sunset-MILP-Matrix (Jetzt→SA₂) für einen Backtesting-Schritt ab Anker−24h.
+    Sunrise-MILP-Matrix (Jetzt→SA₂) für einen Backtesting-Schritt ab Anker−24h.
 
     Returns: (24h-Schritt-Matrix, Meta, sunrise_soc_min_index, volle Planungsmatrix)
     """
-    planning_window, sunrise_index = compute_sunset_planning_at_anchor(
+    planning_window, sunrise_index = compute_sunrise_planning_at_anchor(
         anchor, scenario_params
     )
     _, _, tz_name = geo_params_from_scenario(scenario_params)
@@ -489,12 +489,12 @@ def _simulate_anchor_step(
     list[dict] | None,
     int | None,
 ]:
-    """Ein Backtesting-Schritt (24h Output) für fixed_24h oder sunset_window."""
+    """Ein Backtesting-Schritt (24h Output) für fixed_24h oder sunrise_window."""
     sunrise_index = None
     sunrise_soc_min_index = None
     matrix_full: list[dict] | None = None
-    if horizon_mode == SUNSET_WINDOW:
-        matrix, meta, sunrise_index, matrix_full = build_sunset_window_matrix(
+    if horizon_mode == SUNRISE_WINDOW:
+        matrix, meta, sunrise_index, matrix_full = build_sunrise_window_matrix(
             anchor,
             cache,
             prices_df,
@@ -741,10 +741,10 @@ def run_simulation(
 
     horizon_mode:
       - fixed_24h: [Anker−24h, Anker), SOC frei am Fensterende (E-Auto-Anker)
-      - sunset_window: MILP Jetzt→SA₂, SOC_min am Sonnenaufgang; Output weiter 24h/Schritt
+      - sunrise_window: MILP Jetzt→SA₂, SOC_min am Sonnenaufgang; Output weiter 24h/Schritt
     """
     horizon_mode = parse_horizon_mode(horizon_mode)
-    if horizon_mode == SUNSET_WINDOW:
+    if horizon_mode == SUNRISE_WINDOW:
         geo_params_from_scenario(scenario_params)
 
     cache = cache or HistoricalDataCache()

@@ -43,12 +43,12 @@ def window_start_before_anchor(anchor: datetime, timezone_name: str) -> datetime
     return start.astimezone(tz)
 
 
-def compute_sunset_planning_at_anchor(
+def compute_sunrise_planning_at_anchor(
     anchor: datetime,
     scenario_params: dict,
 ) -> tuple[object, int]:
     """
-    Sunset-MILP-Fenster ab Fensterstart (Anker−24h).
+    Sunrise-MILP-Fenster ab Fensterstart (Anker−24h).
 
     Returns: (PlanningWindow, sunrise_soc_min_index)
     """
@@ -57,7 +57,7 @@ def compute_sunset_planning_at_anchor(
     window = compute_planning_window(now, lat, lon, tz_name)
     if len(window.slot_datetimes) < BACKTESTING_STEP_HOURS:
         raise ValueError(
-            f"Sunset-Planungsfenster ab {now} hat nur {len(window.slot_datetimes)} h, "
+            f"Sunrise-Planungsfenster ab {now} hat nur {len(window.slot_datetimes)} h, "
             f"benötigt mindestens {BACKTESTING_STEP_HOURS}."
         )
     return window, sunrise_anchor_slot_index(window)

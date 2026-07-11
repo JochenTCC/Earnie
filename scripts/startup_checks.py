@@ -1,12 +1,20 @@
-"""Startup-Prüfungen nach Bootstrap (z. B. Loxone-Smoke-Test)."""
+"""Startup-Prüfungen nach Bootstrap (z. B. Loxone-Smoke-Test, Tarif-Plausibilität)."""
 from __future__ import annotations
 
 import logging
-import os
 import sys
 
+from house_config.tariff_plausibility import (
+    collect_tariff_plausibility_errors,
+    format_tariff_plausibility_errors,
+)
 from integrations.loxone_connectivity import loxone_env_configured, verify_loxone_setup
 from runtime_store.env_vars import read_env
+from runtime_store.persist_paths import (
+    resolve_backtesting_scenarios_json_path,
+    resolve_tariffs_json_path,
+    resolve_tariffs_schema_template_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +94,37 @@ def run_loxone_verify_on_startup() -> None:
     logger.error("%s Optimierung startet trotzdem.", message)
 
 
+def run_tariff_plausibility_on_startup() -> None:
+    """
+    Validiert tariffs.json und Szenario-Referenzen beim Worker-Start.
+
+    EARNIE_SKIP_TARIFF_VALIDATE=1 → überspringen
+    EARNIE_STRICT_TARIFF_VALIDATE=1 → bei Fehler mit Exit-Code 1 abbrechen
+    """
+    if _env_flag("SKIP_TARIFF_VALIDATE"):
+        logger.info(
+            "Tarif-Startup-Prüfung übersprungen (EARNIE_SKIP_TARIFF_VALIDATE)."
+        )
+        return
+
+    errors = collect_tariff_plausibility_errors(
+        tariffs_path=resolve_tariffs_json_path(),
+        scenarios_path=resolve_backtesting_scenarios_json_path(),
+        schema_path=resolve_tariffs_schema_template_path(),
+    )
+    if not errors:
+        logger.info("Tarif-Startup-Prüfung: tariffs.json plausibel.")
+        return
+
+    message = format_tariff_plausibility_errors(errors)
+    if _env_flag("STRICT_TARIFF_VALIDATE"):
+        logger.error(
+            "%s Abbruch (EARNIE_STRICT_TARIFF_VALIDATE).", message
+        )
+        raise SystemExit(1)
+    logger.error("%s Optimierung startet trotzdem.", message)
+
+
 def main() -> int:
     """CLI-Einstieg (gleiche Logik wie beim Worker-Start)."""
     import config as cfg
@@ -94,6 +133,7 @@ def main() -> int:
 
     cfg.reinit_config()
     logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
+    run_tariff_plausibility_on_startup()
     run_loxone_verify_on_startup()
     return 0
 

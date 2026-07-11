@@ -43,7 +43,7 @@
     "batteries": [],
     "pv_systems": [],
     "planning_horizon": {
-        "mode": "sunset_window"
+        "mode": "sunrise_window"
     },
     "flexible_consumers": [],
     "appliances": [],

@@ -28,6 +28,28 @@ TARGET_PLATFORMS = {
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+def _run_deploy_tariff_gate() -> None:
+    """Deploy-Gate: gebündelter Tarifkatalog muss plausibel und vollständig sein."""
+    from scripts.validate_tariffs import run_validation
+
+    tariffs_path = str(REPO_ROOT / "config" / "tariffs.json")
+    errors = run_validation(
+        tariffs_path=tariffs_path,
+        scenarios_path=str(REPO_ROOT / "config" / "backtesting_scenarios.example.json"),
+        schema_path=str(REPO_ROOT / "config" / "tariffs.schema.json"),
+        check_catalog=True,
+        import_json=str(REPO_ROOT / "stromtarife_dach_kombiniert.json"),
+        export_json=str(REPO_ROOT / "einspeisetarife_dach_erweitert.json"),
+    )
+    if errors:
+        detail = "\n".join(f"  - {item}" for item in errors)
+        raise ValueError(
+            "Deploy-Gate: Tarif-Plausibilität fehlgeschlagen "
+            f"({tariffs_path}):\n{detail}"
+        )
+    print("Deploy-Gate: Tarifkatalog OK.")
+
+
 def default_tags() -> list[str]:
     tags: list[str] = []
     for image in (DEFAULT_REGISTRY_IMAGE, LEGACY_REGISTRY_IMAGE):
@@ -150,6 +172,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     tags = args.tags or default_tags()
     try:
+        if args.push:
+            _run_deploy_tariff_gate()
         platform = resolve_platform(args.target, args.platform)
         cmd = build_command(
             tags=tags,

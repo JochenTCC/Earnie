@@ -13,10 +13,10 @@ from simulation.backtesting_snapshots import (
     load_window_snapshot,
     normalize_window_anchor_key,
     remove_window_snapshots_jsonl,
-    snapshot_supports_sunset_view,
+    snapshot_supports_sunrise_view,
     write_window_snapshots_jsonl,
 )
-from simulation.horizon_mode import FIXED_24H, SUNSET_WINDOW
+from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
 
 os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 
@@ -72,16 +72,16 @@ def test_build_window_snapshot_fixed_24h_has_no_full_rows():
     )
     assert "chart_rows_full" not in snapshot
     assert len(snapshot["chart_rows_24h"]) == 24
-    assert snapshot_supports_sunset_view(snapshot) is False
+    assert snapshot_supports_sunrise_view(snapshot) is False
 
 
-def test_build_window_snapshot_sunset_includes_full_rows():
+def test_build_window_snapshot_sunrise_includes_full_rows():
     chart_rows, matrix = _sample_rows()
     full_rows, full_matrix = _sample_rows(count=40)
     snapshot = build_window_snapshot(
         window_anchor=datetime(2026, 6, 23, 7, 0),
         scenario_id="live",
-        horizon_mode=SUNSET_WINDOW,
+        horizon_mode=SUNRISE_WINDOW,
         kind="consumption_tolerance",
         initial_soc=50.0,
         meta={"window_end": datetime(2026, 6, 23, 7, 0), "historical_total_kwh": 10.0},
@@ -97,7 +97,7 @@ def test_build_window_snapshot_sunset_includes_full_rows():
     )
     assert len(snapshot["chart_rows_full"]) == 40
     assert snapshot["geo"]["latitude"] == pytest.approx(47.404)
-    assert snapshot_supports_sunset_view(snapshot) is True
+    assert snapshot_supports_sunrise_view(snapshot) is True
 
 
 def test_build_window_snapshot_includes_battery_params():
@@ -173,7 +173,7 @@ def test_save_backtesting_log_removes_stale_snapshots_without_new_ones(tmp_path)
         results,
         {HISTORICAL_REFERENCE_ID: "Ref"},
         {HISTORICAL_REFERENCE_ID: empty_report},
-        {"start": "2025-06-01", "end": "2025-06-01", "horizon_mode": SUNSET_WINDOW},
+        {"start": "2025-06-01", "end": "2025-06-01", "horizon_mode": SUNRISE_WINDOW},
         log_dir=str(tmp_path),
         window_snapshots=[],
     )

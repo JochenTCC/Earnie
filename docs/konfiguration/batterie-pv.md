@@ -23,9 +23,9 @@ Es gibt **keinen** Config-Parameter mehr für die End-SOC-Randbedingung (früher
 
 | Kontext | End-SOC-Regel |
 |---------|----------------|
-| **Live** (`planning_horizon.mode: sunset_window`) | Hart **SOC_min am nächsten Sonnenaufgang** innerhalb des MILP-Horizonts |
+| **Live** (`planning_horizon.mode: sunrise_window`) | Hart **SOC_min am nächsten Sonnenaufgang** innerhalb des MILP-Horizonts |
 | **Backtesting** (`--horizon-mode fixed_24h`) | End-SOC = **Anker-SOC** des Schritts (`initial_soc`; intern `terminal_soc_percent`) |
-| **Backtesting** (`--horizon-mode sunset_window`) | Wie Live: SOC_min am Sonnenaufgang |
+| **Backtesting** (`--horizon-mode sunrise_window`) | Wie Live: SOC_min am Sonnenaufgang |
 
 Zusätzlich kann **`battery_wear`** niedrigere End-SOCs wirtschaftlich bestrafen (weicher Anreiz, unabhängig vom Modus).
 
@@ -33,7 +33,7 @@ Block `planning_horizon` in `config.json`:
 
 ```json
 "planning_horizon": {
-  "mode": "sunset_window"
+  "mode": "sunrise_window"
 }
 ```
 

@@ -33,7 +33,7 @@ def _sample_planning_window() -> PlanningWindow:
 def _patch_main_dependencies(monkeypatch):
     monkeypatch.setattr(main_module.config, "reload_config", lambda: None)
     monkeypatch.setattr(main_module.config, "is_loxone_silent_mode", lambda: True)
-    monkeypatch.setattr(main_module.config, "is_sunset_planning_horizon", lambda: True)
+    monkeypatch.setattr(main_module.config, "is_sunrise_planning_horizon", lambda: True)
     monkeypatch.setattr(main_module.config, "get_event_triggers", lambda: [])
     monkeypatch.setattr(
         main_module.profile_manager,

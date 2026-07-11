@@ -2,6 +2,8 @@
 #
 # Persistente Daten (überleben Image-Updates):
 #   ./config/config.json   – Haus-Konfiguration (wird nie überschrieben)
+#   ./config/tariffs.json  – Tarif-Katalog (Sidecar; wird nie überschrieben)
+#   ./config/backtesting_scenarios.json, house_profiles.json – weitere Sidecars
 #   ./config/.env          – Loxone-Zugangsdaten
 #   ./runtime/             – cons_data, Zustands-JSONs, Profile, Logs
 #
@@ -37,6 +39,8 @@ x-persist-volumes: &persist-volumes
 x-common-env: &common-env
   TZ: Europe/Vienna
   EARNIE_CONFIG_PATH: config/config.json
+  # Tarif-Plausibilität beim Worker-Start; siehe scripts/startup_checks.py
+  EARNIE_STRICT_TARIFF_VALIDATE: "1"
   # Loxone-Smoke-Test beim Worker-Start (nach pull/up); siehe scripts/startup_checks.py
   EARNIE_VERIFY_LOXONE_ON_START: "1"
 
