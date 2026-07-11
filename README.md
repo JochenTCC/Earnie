@@ -1,6 +1,8 @@
-# Energy Optimizer
+# Earnie
 
 Python-basierte Energieoptimierung für Smarthome (Batterie, PV, flexible Verbraucher) mit Streamlit-UI und Produktiv-Daemon (`main.py`).
+
+GitHub-Repository: [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie) (früher `Energy-Optimizer`).
 
 ## Anwender-Dokumentation
 
@@ -9,7 +11,7 @@ Einrichtung, Konfiguration, Streamlit-Oberfläche und Loxone-Schnittstelle: **[d
 ## Projektstruktur
 
 ```
-Energy-Optimizer/
+Earnie/
 ├── main.py, app.py          # Einstiegspunkte (bleiben in der Wurzel)
 ├── config.py                # Konfigurations-Loader
 ├── config/
@@ -40,7 +42,7 @@ python -m scripts.run_streamlit
 
 Kanonische Metadaten und Abhängigkeiten: **`pyproject.toml`** (`version.py` = Versionsquelle).
 
-CLI nach `pip install -e .` (optional): `ernie-bootstrap`, `ernie-build-image`, `ernie-verify-loxone`, …
+CLI nach `pip install -e .` (optional): `earnie-bootstrap`, `earnie-build-image`, `earnie-verify-loxone`, … (Legacy-Aliase: `ernie-*`).
 
 Legacy: `config.json` im Projektroot wird weiterhin unterstützt, wenn `config/config.json` fehlt.
 
@@ -56,7 +58,7 @@ Legacy: `config.json` im Projektroot wird weiterhin unterstützt, wenn `config/c
 python -m scripts.build_container
 ```
 
-Standard-Tags: `ghcr.io/jochentcc/ernie-energy:latest` und `ghcr.io/jochentcc/ernie-energy:<version>` (aus `version.py`).
+Standard-Tags: `ghcr.io/jochentcc/earnie-energy:latest` und `ghcr.io/jochentcc/earnie-energy:<version>` (aus `version.py`). Übergangsweise zusätzlich `ernie-energy`-Tags.
 
 Registry-Push:
 
@@ -94,7 +96,7 @@ docker compose up -d
 
 **Go:** LoxBerry 4, Docker-Plugin, RPi 4B 64-bit, mind. 4 GB RAM, SSD empfohlen.
 
-**Risiko:** MILP-Läufe sind auf dem Pi langsamer als auf einem x86-NAS — vor Produktivbetrieb `runtime/energy_optimizer.log` prüfen.
+**Risiko:** MILP-Läufe sind auf dem Pi langsamer als auf einem x86-NAS — vor Produktivbetrieb `runtime/earnie.log` prüfen.
 
 **No-Go:** 32-bit-Image, unter 2 GB RAM, Erwartung identischer MILP-Performance wie auf der Synology.
 
@@ -105,8 +107,8 @@ Details: **[docs/einrichtung/container.md](docs/einrichtung/container.md)**
 ## Hinweise
 
 - `config/config.json` (oder Legacy `config.json`) ist lokal und gitignored.
-- Laufzeitdaten liegen unter `runtime/` (`ENERGY_OPTIMIZER_RUNTIME_DIR`).
-- Config-Pfad überschreibbar mit `ENERGY_OPTIMIZER_CONFIG_PATH`.
+- Laufzeitdaten liegen unter `runtime/` (`EARNIE_RUNTIME_DIR`, Legacy: `ENERGY_OPTIMIZER_RUNTIME_DIR`).
+- Config-Pfad überschreibbar mit `EARNIE_CONFIG_PATH` (Legacy: `ENERGY_OPTIMIZER_CONFIG_PATH`).
 
 ## Lizenz
 

@@ -44,12 +44,12 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
 
     if event_run:
         logger.info(
-            "--- Energy Optimizer Event-Lauf (v%s, Trigger: %s) ---",
+            "--- Earnie Event-Lauf (v%s, Trigger: %s) ---",
             __version__,
             run_trigger,
         )
     else:
-        logger.info("--- Energy Optimizer Live-Abfrage gestartet (v%s) ---", __version__)
+        logger.info("--- Earnie Live-Abfrage gestartet (v%s) ---", __version__)
     if config.is_loxone_silent_mode():
         logger.warning(
             "Loxone Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf den Miniserver."

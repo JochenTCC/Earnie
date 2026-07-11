@@ -141,6 +141,9 @@ def _pv_by_id() -> dict[str, dict]:
 
 
 def render_pv_planning_tab() -> None:
+    st.caption(
+        "Optional — ohne PV-Anlage bleibt die Prognose bei 0 kW (z. B. reine Batterie-Arbitrage)."
+    )
     _apply_pending_pv_select()
     system_map = _pv_by_id()
     system_ids = sorted(system_map.keys())

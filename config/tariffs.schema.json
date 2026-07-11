@@ -1,7 +1,7 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "https://energy-optimizer.local/tariffs.schema.json",
-    "title": "Energy Optimizer Stromtarife",
+    "$id": "https://earnie.local/tariffs.schema.json",
+    "title": "Earnie Stromtarife",
     "type": "object",
     "properties": {
         "catalog_as_of": {

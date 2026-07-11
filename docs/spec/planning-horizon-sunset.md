@@ -86,7 +86,7 @@ SOC       = hart SOC_min am Sonnenaufgang innerhalb des MILP
 Simulation= rollierend max. 24 h pro Schritt (wie fixed_24h; kein Durchsimulieren bis SA₂)
 Output    = erste 24 h ab t_now   (Kosten/SoC-Kette wie bisher)
 Daten     = historische Ist-Verbräuche/PV aus cons_data_hourly.csv
-Geo/Zeit  = latitude/longitude aus Szenario + runtime_settings.timezone_name
+Geo/Zeit  = latitude/longitude aus aufgelöstem Live-Szenario (Hausprofil oder Szenario-Override)
 ```
 
 **Performance:** Volle SA₂-Matrix (typ. ~40–48 h) würde pro Schritt mehr MILP-Läufe
@@ -113,17 +113,13 @@ Referenz „Historisch (ohne Optimierung)“ ist für beide Modi identisch.
 ## 5. Config (Live)
 
 ```json
-"runtime_settings": {
-  "latitude": 47.404,
-  "longitude": 9.743,
-  "timezone_name": "Europe/Vienna"
-},
+"live_scenario_id": "live",
 "planning_horizon": {
   "mode": "sunset_window"
 }
 ```
 
-Live akzeptiert derzeit nur `planning_horizon.mode: "sunset_window"`. `timezone_name` gehört zu `runtime_settings` (nicht in `planning_horizon`).
+Live-Szenario `live` in `backtesting_scenarios.json` referenziert `house_profile_id` (Geo/Zeitzone aus `house_profiles.json`). Live akzeptiert derzeit nur `planning_horizon.mode: "sunset_window"`.
 
 ## 6. Implementierungsphasen
 

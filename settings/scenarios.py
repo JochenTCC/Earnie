@@ -66,11 +66,6 @@ def normalize_scenario(raw: dict, index: int) -> dict:
     scenario_id = str(raw.get("id") or f"scenario_{index + 1}").strip()
     if not scenario_id:
         scenario_id = f"scenario_{index + 1}"
-    if scenario_id == "runtime_settings":
-        raise ValueError(
-            "Kritischer Konfigurationsfehler: Die Szenario-ID 'runtime_settings' "
-            "ist reserviert (Baseline)."
-        )
 
     settings = raw.get("settings")
     if not isinstance(settings, dict):

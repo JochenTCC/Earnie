@@ -116,7 +116,7 @@ def build_swimspa_analysis_data(
                 "slot_datetime": slot_start,
                 "Uhrzeit": label,
                 "Autonom (kW)": round(autonom_kw, 3),
-                "Ernie (kW)": round(ernie_kw, 3),
+                "Earnie (kW)": round(ernie_kw, 3),
             }
         )
 

@@ -446,7 +446,7 @@ def print_monthly_report(results, labels: dict[str, str]):
     """Erstellt den monatlichen tabellarischen Vergleich im Terminal."""
     report_df = pd.DataFrame()
     ref_label = labels.get(HISTORICAL_REFERENCE_ID, HISTORICAL_REFERENCE_ID)
-    baseline_id = "runtime_settings"
+    baseline_id = config.get_live_scenario_id()
     baseline_label = labels.get(baseline_id, baseline_id)
 
     for name, df in results.items():
@@ -475,7 +475,7 @@ def print_total_summary(results, labels: dict[str, str]):
     """Gibt die Gesamtkosten und Einsparung über den gesamten Zeitraum aus."""
     ref_id = HISTORICAL_REFERENCE_ID
     ref_total = results[ref_id]["sim_cost"].sum() if ref_id in results else None
-    baseline_id = "runtime_settings"
+    baseline_id = config.get_live_scenario_id()
     runtime_total = results[baseline_id]["sim_cost"].sum() if baseline_id in results else None
 
     print("\n=== GESAMTSUMME (gesamter Simulationszeitraum) ===")

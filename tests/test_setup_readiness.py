@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from house_config.scenario_resolution import DEFAULT_LIVE_SCENARIO_ID
 from ui import setup_readiness
 
 
@@ -20,6 +21,10 @@ def _bind_config_paths(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Path:
         str(config_dir / "house_profiles.json"),
     )
     monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        str(config_dir / "backtesting_scenarios.json"),
+    )
     return config_dir
 
 
@@ -61,13 +66,40 @@ def test_prod_config_skips_onboarding(tmp_path, monkeypatch):
 
 def test_missing_house_config_items_lists_gaps(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
-    _write(config_dir / "config.json", _minimal_config())
+    _write(
+        config_dir / "config.json",
+        {
+            **_minimal_config(),
+            "batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}],
+        },
+    )
     _write(config_dir / "house_profiles.json", {"profiles": []})
 
     missing = setup_readiness.missing_house_config_items()
 
-    assert "PV-Anlage (Hauskonfigurator → PV-Anlage)" in missing
-    assert "Hausprofil mit thermischem Verbraucher (Hauskonfigurator → Hausprofil)" in missing
+    assert missing == ["Hausprofil anlegen (Hauskonfigurator → Hausprofil)"]
+
+
+def test_missing_house_config_items_lists_battery_gap(tmp_path, monkeypatch):
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(config_dir / "config.json", _minimal_config())
+    _write(
+        config_dir / "house_profiles.json",
+        {
+            "profiles": [
+                {
+                    "id": "efh",
+                    "latitude": 48.2,
+                    "longitude": 11.0,
+                    "consumers": [{"id": "wp", "type": "thermal_annual"}],
+                }
+            ]
+        },
+    )
+
+    missing = setup_readiness.missing_house_config_items()
+
+    assert missing == ["Batterie anlegen (Hauskonfigurator → Batterien)"]
 
 
 def test_missing_runtime_scenario_items_lists_gaps(tmp_path, monkeypatch):
@@ -87,28 +119,39 @@ def test_missing_runtime_scenario_items_lists_gaps(tmp_path, monkeypatch):
         },
     )
     _write(config_dir / "tariffs.json", {"import_tariffs": [], "export_tariffs": []})
+    _write(
+        config_dir / "backtesting_scenarios.json",
+        {
+            "scenarios": [
+                {
+                    "id": DEFAULT_LIVE_SCENARIO_ID,
+                    "label": "Live",
+                    "settings": {
+                        "battery_id": "",
+                        "import_tariff_id": "",
+                        "export_tariff_id": "",
+                        "house_profile_id": "",
+                    },
+                }
+            ]
+        },
+    )
 
     missing = setup_readiness.missing_runtime_scenario_items()
 
-    assert "Batterie anlegen (Szenarieneditor → Batterien)" in missing
-    assert "Bezugstarif wählen (Szenarieneditor → Runtime)" in missing
+    assert "Batterie anlegen (Hauskonfigurator → Batterien)" not in missing
+    assert "Bezugstarif wählen (Echtzeit-Umgebung)" in missing
 
 
-def test_planning_ready_unlocks_backtesting(tmp_path, monkeypatch):
+def test_planning_ready_unlocks_scenario_exploration(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(
         config_dir / "config.json",
         {
+            "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
             "batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}],
-            "pv_systems": [{"id": "pv"}],
+            "pv_systems": [],
             "flexible_consumers": [],
-            "runtime_settings": {
-                "battery_id": "bat",
-                "pv_system_id": "pv",
-                "house_profile_id": "efh",
-                "import_tariff_id": "imp",
-                "export_tariff_id": "exp",
-            },
         },
     )
     _write(
@@ -117,9 +160,11 @@ def test_planning_ready_unlocks_backtesting(tmp_path, monkeypatch):
             "profiles": [
                 {
                     "id": "efh",
+                    "label": "EFH",
+                    "annual_kwh": 4000.0,
                     "latitude": 48.2,
                     "longitude": 11.0,
-                    "consumers": [{"id": "wp", "type": "thermal_annual"}],
+                    "consumers": [],
                 }
             ]
         },
@@ -131,6 +176,24 @@ def test_planning_ready_unlocks_backtesting(tmp_path, monkeypatch):
             "export_tariffs": [
                 {"id": "exp", "label": "Export", "type": "fixed", "k_push_cent": 3.7}
             ],
+        },
+    )
+    _write(
+        config_dir / "backtesting_scenarios.json",
+        {
+            "scenarios": [
+                {
+                    "id": DEFAULT_LIVE_SCENARIO_ID,
+                    "label": "Live",
+                    "settings": {
+                        "battery_id": "bat",
+                        "pv_system_id": "",
+                        "house_profile_id": "efh",
+                        "import_tariff_id": "imp",
+                        "export_tariff_id": "exp",
+                    },
+                }
+            ]
         },
     )
 
@@ -161,7 +224,7 @@ def test_scenario_editor_unlocked_after_house_config(tmp_path, monkeypatch):
         config_dir / "config.json",
         {
             **_minimal_config(),
-            "pv_systems": [{"id": "pv"}],
+            "batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}],
         },
     )
     _write(
@@ -170,9 +233,11 @@ def test_scenario_editor_unlocked_after_house_config(tmp_path, monkeypatch):
             "profiles": [
                 {
                     "id": "efh",
+                    "label": "EFH",
+                    "annual_kwh": 4000.0,
                     "latitude": 48.2,
                     "longitude": 11.0,
-                    "consumers": [{"id": "wp", "type": "thermal_annual"}],
+                    "consumers": [],
                 }
             ]
         },

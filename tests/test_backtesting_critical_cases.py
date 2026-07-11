@@ -24,7 +24,7 @@ def test_build_critical_cases_merges_plausibility_and_cbc():
         )
     )
     cbc = {
-        "runtime_settings": [
+        "live": [
             {
                 "event": "strict_slow",
                 "window_anchor": "2025-09-28T10:00:00",
@@ -35,7 +35,7 @@ def test_build_critical_cases_merges_plausibility_and_cbc():
             }
         ]
     }
-    cases = build_critical_cases({"runtime_settings": report}, cbc)
+    cases = build_critical_cases({"live": report}, cbc)
     kinds = {c["kind"] for c in cases}
     assert kinds == {"consumption_tolerance", "strict_slow"}
     summary = summarize_critical_cases(cases)
@@ -46,7 +46,7 @@ def test_build_critical_cases_merges_plausibility_and_cbc():
 def test_extract_critical_cases_from_legacy_meta():
     meta = {
         "plausibility": {
-            "runtime_settings": {
+            "live": {
                 "failures": [
                     {
                         "window_end": "2025-08-11T07:00:00",
@@ -58,7 +58,7 @@ def test_extract_critical_cases_from_legacy_meta():
             }
         },
         "cbc_events_by_scenario": {
-            "runtime_settings": [
+            "live": [
                 {"event": "strict_fallback", "window_anchor": "2025-09-28T10:00:00"}
             ]
         },
@@ -72,13 +72,13 @@ def test_dedupe_critical_cases_keeps_most_critical_per_window():
     cases = [
         {
             "kind": "consumption_tolerance",
-            "scenario_id": "runtime_settings",
+            "scenario_id": "live",
             "window_anchor": "2025-08-01T07:00:00",
             "diff_kwh": 1.0,
         },
         {
             "kind": "strict_slow",
-            "scenario_id": "runtime_settings",
+            "scenario_id": "live",
             "window_anchor": "2025-08-01T07:00:00",
             "strict_elapsed_sec": 2.5,
         },
@@ -92,7 +92,7 @@ def test_dedupe_critical_cases_keeps_most_critical_per_window():
     deduped = dedupe_critical_cases_by_window(cases)
     assert len(deduped) == 2
     by_scenario = {case["scenario_id"]: case for case in deduped}
-    assert by_scenario["runtime_settings"]["kind"] == "strict_slow"
+    assert by_scenario["live"]["kind"] == "strict_slow"
     assert by_scenario["fixture_5kwh"]["kind"] == "consumption_tolerance"
 
 
@@ -100,13 +100,13 @@ def test_dedupe_critical_cases_prefers_higher_consumption_diff():
     cases = [
         {
             "kind": "consumption_tolerance",
-            "scenario_id": "runtime_settings",
+            "scenario_id": "live",
             "window_anchor": "2025-08-01T07:00:00",
             "diff_kwh": 1.0,
         },
         {
             "kind": "consumption_tolerance",
-            "scenario_id": "runtime_settings",
+            "scenario_id": "live",
             "window_anchor": "2025-08-01T07:00:00",
             "diff_kwh": -4.0,
         },

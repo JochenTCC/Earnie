@@ -11,7 +11,9 @@ from version import __version__
 
 def test_default_tags_include_latest_and_version():
     tags = bc.default_tags()
-    assert f"ghcr.io/jochentcc/ernie-energy:latest" in tags
+    assert "ghcr.io/jochentcc/earnie-energy:latest" in tags
+    assert f"ghcr.io/jochentcc/earnie-energy:{__version__}" in tags
+    assert "ghcr.io/jochentcc/ernie-energy:latest" in tags
     assert f"ghcr.io/jochentcc/ernie-energy:{__version__}" in tags
 
 
@@ -20,7 +22,7 @@ def test_build_command_assembles_docker_args(tmp_path):
     dockerfile.write_text("FROM python:3.14-slim\n", encoding="utf-8")
 
     cmd = bc.build_command(
-        tags=["ghcr.io/example/ernie:test"],
+        tags=["ghcr.io/example/earnie:test"],
         platform="linux/amd64",
         dockerfile=dockerfile,
         context=tmp_path,
@@ -30,7 +32,7 @@ def test_build_command_assembles_docker_args(tmp_path):
 
     assert cmd[0:2] == ["docker", "build"]
     assert "--platform" in cmd and "linux/amd64" in cmd
-    assert "-t" in cmd and "ghcr.io/example/ernie:test" in cmd
+    assert "-t" in cmd and "ghcr.io/example/earnie:test" in cmd
     assert "--no-cache" in cmd
     assert str(tmp_path) in cmd
 
@@ -40,7 +42,7 @@ def test_build_command_multiarch_uses_buildx_and_push(tmp_path):
     dockerfile.write_text("FROM python:3.14-slim\n", encoding="utf-8")
 
     cmd = bc.build_command(
-        tags=["ghcr.io/example/ernie:latest"],
+        tags=["ghcr.io/example/earnie:latest"],
         platform=bc.MULTIARCH_PLATFORM,
         dockerfile=dockerfile,
         context=tmp_path,
@@ -60,7 +62,7 @@ def test_build_command_multiarch_without_push_raises(tmp_path):
 
     with pytest.raises(ValueError, match="Multi-Arch-Build"):
         bc.build_command(
-            tags=["ghcr.io/example/ernie:latest"],
+            tags=["ghcr.io/example/earnie:latest"],
             platform=bc.MULTIARCH_PLATFORM,
             dockerfile=dockerfile,
             context=tmp_path,
@@ -99,8 +101,8 @@ def test_resolve_platform_target_and_platform_conflict():
 
 
 def test_parse_args_custom_tag():
-    args = bc.parse_args(["--tag", "myregistry/ernie:custom"])
-    assert args.tags == ["myregistry/ernie:custom"]
+    args = bc.parse_args(["--tag", "myregistry/earnie:custom"])
+    assert args.tags == ["myregistry/earnie:custom"]
     assert args.target is None
 
 

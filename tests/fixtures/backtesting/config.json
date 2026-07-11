@@ -24,13 +24,7 @@
         "target_discharge_power_name": "Target_Discharge",
         "control_cmd_name": "Control_Cmd"
     },
-    "runtime_settings": {
-        "battery_id": "test_battery",
-        "pv_system_id": "test_pv",
-        "import_tariff_id": "awattar_at",
-        "export_tariff_id": "fixed_35ct",
-        "house_profile_id": "test_home"
-    },
+    "live_scenario_id": "live",
     "batteries": [
         {
             "id": "test_battery",

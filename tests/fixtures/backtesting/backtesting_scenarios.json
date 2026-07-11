@@ -1,7 +1,18 @@
 {
-    "cbc_gap_rel": 0.10,
+    "cbc_gap_rel": 0.1,
     "cbc_strict_time_limit_sec": 3,
     "scenarios": [
+        {
+            "id": "live",
+            "label": "Live",
+            "settings": {
+                "battery_id": "test_battery",
+                "pv_system_id": "test_pv",
+                "import_tariff_id": "fixed_25ct",
+                "export_tariff_id": "fixed_37ct",
+                "house_profile_id": "test_home"
+            }
+        },
         {
             "id": "fixture_5kwh_fixed",
             "label": "Fixture 5 kWh fixe Einspeise",

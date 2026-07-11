@@ -77,7 +77,7 @@ class TestBacktestingDisplayBundle:
             scenario,
             prices,
             cache=cache,
-            scenario_id="runtime_settings",
+            scenario_id="live",
             horizon_mode=horizon_mode,
             snapshot_collector=snapshots,
         )
@@ -236,7 +236,7 @@ def test_load_backtesting_display_bundle_rejects_horizon_mismatch(tmp_path):
     chart_rows, matrix = _sample_rows_for_snapshot()
     snapshot = build_window_snapshot(
         window_anchor=datetime(2026, 6, 23, 7, 0),
-        scenario_id="runtime_settings",
+        scenario_id="live",
         horizon_mode=FIXED_24H,
         kind="consumption_tolerance",
         initial_soc=50.0,
@@ -249,7 +249,7 @@ def test_load_backtesting_display_bundle_rejects_horizon_mismatch(tmp_path):
         load_backtesting_display_bundle(
             str(tmp_path),
             "2026-06-23T07:00:00",
-            "runtime_settings",
+            "live",
             log_horizon_mode=SUNSET_WINDOW,
         )
 

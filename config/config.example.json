@@ -68,12 +68,7 @@
         "target_discharge_power_name": "Ernie_Ziel_Entladeleistung",
         "control_cmd_name": "Ernie_Steuerbefehl"
     },
-    "runtime_settings": {
-        "battery_id": "default_5kwh",
-        "pv_system_id": "roof_south",
-        "import_tariff_id": "awattar_at",
-        "export_tariff_id": "fixed_37ct"
-    },
+    "live_scenario_id": "live",
     "batteries": [
         {
             "id": "default_5kwh",

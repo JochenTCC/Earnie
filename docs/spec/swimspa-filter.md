@@ -6,9 +6,9 @@
 
 ## 1. Ziel
 
-Der SwimSpa-Filter soll als **eigener flexibler Verbraucher** (`swimspa_filter`) in die MILP-Optimierung eingebunden werden. Ernie plant **ergänzende** Filterlaufzeit, wenn Schulden in Stunden (`Sollstunden`) offen sind und Strom/PV günstig ist.
+Der SwimSpa-Filter soll als **eigener flexibler Verbraucher** (`swimspa_filter`) in die MILP-Optimierung eingebunden werden. Earnie plant **ergänzende** Filterlaufzeit, wenn Schulden in Stunden (`Sollstunden`) offen sind und Strom/PV günstig ist.
 
-Der native Duty-Cycle des SwimSpa läuft **unabhängig** und reduziert `Sollstunden` ohne Ernie. Ernie schaltet nur **zusätzlich** ein (nicht als Gate für den nativen Zyklus).
+Der native Duty-Cycle des SwimSpa läuft **unabhängig** und reduziert `Sollstunden` ohne Earnie. Earnie schaltet nur **zusätzlich** ein (nicht als Gate für den nativen Zyklus).
 
 Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähler darf nicht unbegrenzt steigen.
 
@@ -16,10 +16,10 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 
 | Thema | Entscheidung |
 |-------|----------------|
-| Steuerungsmodell | Ergänzend — nativer Duty-Cycle unabhängig; Ernie nur Zusatzläufe |
+| Steuerungsmodell | Ergänzend — nativer Duty-Cycle unabhängig; Earnie nur Zusatzläufe |
 | `Sollstunden`-Semantik | Verbleibende Filter-Stunden (Schuldenstand), Float (Live-Format noch verifizieren) |
 | Natives Fenster | Start-Stunde + Dauer aus Loxone (nicht Start/Ende) |
-| Mindestlaufzeit Ernie | 30 min gewünscht; MILP plant stündlich → effektiv **1 h**-Slots |
+| Mindestlaufzeit Earnie | 30 min gewünscht; MILP plant stündlich → effektiv **1 h**-Slots |
 | Backtesting | Kein `path_log`; fiktives natives Fenster über `config_fallback` |
 
 ## 3. Loxone-Signale
@@ -31,9 +31,9 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 | Lesen | `homie_bwa_spa_filter1durationhours` | Dauer natives Fenster in **Stunden** (Float) |
 | Lesen | `homie_bwa_spa_filter2` | Filter läuft (binär 0/1) → Ist-Leistung 0 / 0,18 kW |
 | Lesen | `homie_bwa_spa_filter1` | Autonome/native Filtersteuerung (binär 0/1) — Fallback wenn `filter2` = 0 |
-| Schreiben | `Ernie_Swimspa_Filter_Freigabe` | Ernie-Freigabe für **zusätzlichen** Filterlauf (`0`/`1`) |
+| Schreiben | `Ernie_Swimspa_Filter_Freigabe` | Earnie-Freigabe für **zusätzlichen** Filterlauf (`0`/`1`) |
 
-`homie_bwa_spa_filter2` erfasst jeden Filterlauf (nativ + Ernie) — für Logging, Soll-Ist und Delivery-Tracking.
+`homie_bwa_spa_filter2` erfasst jeden Filterlauf (nativ + Earnie) — für Logging, Soll-Ist und Delivery-Tracking.
 
 **Gemeinsame Leistungsmessung (Fall B, Live-Abnahme bestätigt):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistungsaufnahme des SwimSpa (Heizung **inkl.** Filter und sonstige Pumpen am selben Zähler). Die Chart-Spalte **SwimSpa** zeigt den **Rest** nach Abzug bekannter Binär-Lasten (Heizung + „Allgemein“ — weitere Pumpen nicht einzeln modelliert). Der Filter-Anteil (~0,18 kW) wird über `subtract_consumer_ids` abgezogen. Korrektur in `resolve_flexible_consumers_live_power` nur bei echtem Zählerwert (nicht MILP-Fallback). Invariante: `swimspa_ist + swimspa_filter_ist = Gesamtmessung`.
 
@@ -114,9 +114,9 @@ Die MILP-Matrix ist **stündlich**; `min_on_quarterhours` wird auf ganze Stunden
 ```
 Native Duty-Cycle:
   läuft im Fenster [filter1hour, filter1hour + duration)
-  dekrementiert Sollstunden unabhängig von Ernie
+  dekrementiert Sollstunden unabhängig von Earnie
 
-Ernie (pro 15-Min-Slot):
+Earnie (pro 15-Min-Slot):
   Wenn Sollstunden > 0 UND außerhalb nativem Fenster UND MILP-Freigabe
     → Ernie_Swimspa_Filter_Freigabe = 1
   sonst → 0
@@ -135,7 +135,7 @@ Ernie (pro 15-Min-Slot):
 
 | Regel-ID | Kategorie | Bedeutung |
 |----------|-----------|-----------|
-| `swimspa_filter_should_run_missing` | Fehler | Ernie-Freigabe (Soll > 0), aber Filter läuft nicht |
+| `swimspa_filter_should_run_missing` | Fehler | Earnie-Freigabe (Soll > 0), aber Filter läuft nicht |
 | `swimspa_filter_runs_unexpectedly` | Fehler | Filter läuft (Ist > 0) ohne Soll **außerhalb** nativem Fenster |
 | `swimspa_filter_over_nominal` | Warnung | Ist-Leistung über Nennleistung (0,18 kW) + Toleranz |
 

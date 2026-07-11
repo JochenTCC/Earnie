@@ -39,13 +39,7 @@
         "target_discharge_power_name": "Target_Discharge",
         "control_cmd_name": "Control_Cmd"
     },
-    "runtime_settings": {
-        "battery_id": "",
-        "pv_system_id": "",
-        "house_profile_id": "",
-        "import_tariff_id": "",
-        "export_tariff_id": ""
-    },
+    "live_scenario_id": "live",
     "batteries": [],
     "pv_systems": [],
     "planning_horizon": {

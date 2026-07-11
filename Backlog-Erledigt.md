@@ -2,6 +2,42 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 2.0 P3 — Configuration UI restructure (2026-07-11)
+
+- [x] **Nav sections** — `Planung` (Hauskonfigurator, Szenarieneditor) + `Echtzeit-Umgebung` ([`ui/navigation.py`](ui/navigation.py)); raw JSON editor not in main nav
+- [x] **Echtzeit-Umgebung page** — [`ui/pages/page_live_environment.py`](ui/pages/page_live_environment.py): `live_scenario_id` picker, resolved snapshot, comfort form from [`ui/config_forms.py`](ui/config_forms.py)
+- [x] **Onboarding hints** — [`ui/setup_readiness.py`](ui/setup_readiness.py) sidebar copy aligned to new page names and order
+- [x] **Tests & docs** — `tests/test_navigation_setup.py`, `tests/test_setup_readiness.py`; [`docs/einrichtung/greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md) acceptance table
+- [x] **Acceptance** — greenfield smoke: onboarding → live selection → Scenario-Exploration unlock (follow-ups → Backlog-Bugfixes.md / 2.0 smoke-test follow-ups)
+- [x] **Batterien tab** — entity CRUD moved to Hauskonfigurator ([`ui/pages/page_house_config.py`](ui/pages/page_house_config.py)); Szenarieneditor scenario CRUD only; onboarding copy + tests updated
+
+### Version 2.0 P1 — Optional consumers (2026-07-11)
+
+- [x] **Haus Wärme optional** — `thermal_annual` not mandatory ([`house_config/profiles_store.py`](house_config/profiles_store.py), Hauskonfigurator)
+- [x] **PV optional** — [`ui/setup_readiness.py`](ui/setup_readiness.py), [`ui/planning_pv_form.py`](ui/planning_pv_form.py)
+- [x] **Battery without PV** — battery required for MILP / `is_planning_ready()`; unset `pv_system_id` → zero PV forecast
+- [x] **Optimizer/simulation tolerance** — [`house_config/entity_resolution.py`](house_config/entity_resolution.py), [`config.py`](config.py), [`house_config/baseload.py`](house_config/baseload.py), [`house_config/planning_flex_bridge.py`](house_config/planning_flex_bridge.py)
+- [x] **Tests** — greenfield bootstrap, setup readiness, house profiles without thermal/PV
+
+### Version 2.0 P2 — Unified scenario model (2026-07-11)
+
+- [x] **Live baseline as normal scenario** — `live_scenario_id` in `config.json` (default `live`); unified resolution in [`house_config/scenario_resolution.py`](house_config/scenario_resolution.py); `config.py` rejects `runtime_settings` block
+- [x] **UI mode rename** — `backtesting` → `scenario_exploration` ([`ui/mode_selector.py`](ui/mode_selector.py), [`ui/navigation.py`](ui/navigation.py), compose, VS Code launch); user-facing label **Scenario-Exploration**
+- [x] **Szenarieneditor** — unified editor ([`ui/pages/page_scenario_editor.py`](ui/pages/page_scenario_editor.py)); removed orphaned `ui/scenario_runtime_form.py`; live scenario via [`ui/house_config_io.py`](ui/house_config_io.py)
+- [x] **Templates & schema** — `config.example.json`, `backtesting_scenarios.example.json` (`live` entry), `config.schema.json` without `runtime_settings`
+- [x] **Scripts & tests** — dev scripts default to `live`; backtesting tests use scenario id `live`; [`tests/config_fixtures.py`](tests/config_fixtures.py)
+- [x] **Docs (DE)** — [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md), [`docs/ui/betriebsmodi.md`](docs/ui/betriebsmodi.md), greenfield/container/betrieb, PV/preise specs
+- [x] **Tests** — 143 passed locally (P2 subset); `migrate_runtime_entities` output update deferred to **2.0 P6**
+
+### Earnie rename (2026-07-11)
+
+- [x] **Version 2.0 — branding** — UI/docs Ernie→Earnie; Loxone signal names (`Ernie_*`) unchanged in production config
+- [x] **Packaging** — `pyproject` package `earnie`; CLI `earnie-*` with legacy `ernie-*` aliases
+- [x] **Env vars** — canonical `EARNIE_*` with `ENERGY_OPTIMIZER_*` fallback (`runtime_store/env_vars.py`)
+- [x] **Docker** — `ghcr.io/jochentcc/earnie-energy` image and `earnie-*` container names; dual-tag transition (`ernie-energy` alias)
+- [x] **Runtime paths** — log file `earnie.log`; NAS path docs `docker/earnie`
+- [x] **GitHub** — rename repository to `Earnie` on GitHub (Settings → General), then update remotes: `git remote set-url origin https://github.com/JochenTCC/Earnie.git` *(manual step — repo still `Energy-Optimizer` until renamed on GitHub)*
+
 ### Version 1.26.0 — Runtime entities & tariffs (release) (2026-07-11)
 
 - [x] **Release 1.26.0** — Greenfield-first P0–P4, prod migration P5, legacy removal P6; live + backtesting share ID-only `runtime_settings` resolution; `version.py` → 1.26.0

@@ -69,9 +69,10 @@ def smoke_prices_df(smoke_anchor: pd.Timestamp) -> pd.DataFrame:
 @pytest.fixture(scope="module")
 def runtime_scenario_params() -> dict:
     scenarios = config.get_backtesting_scenarios()
-    if "runtime_settings" not in scenarios:
-        pytest.fail("config: backtesting_scenarios.runtime_settings fehlt")
-    return dict(scenarios["runtime_settings"])
+    live_id = config.get_live_scenario_id()
+    if live_id not in scenarios:
+        pytest.fail(f"config: Live-Szenario '{live_id}' fehlt in backtesting_scenarios.json")
+    return dict(scenarios[live_id])
 
 
 @requires_historical_data
@@ -128,7 +129,7 @@ def test_backtesting_run_simulation_single_window(
         runtime_scenario_params,
         smoke_prices_df,
         cache=historical_cache,
-        scenario_id="runtime_settings",
+        scenario_id=config.get_live_scenario_id(),
     )
     assert len(df) == 24
     assert plausibility.failed == []
@@ -173,13 +174,14 @@ def test_backtesting_log_roundtrip(tmp_path, smoke_anchor: pd.Timestamp):
         index=ts,
     )
     sample.index.name = "ts"
-    results = {HISTORICAL_REFERENCE_ID: sample, "runtime_settings": sample}
+    live_id = config.get_live_scenario_id()
+    results = {HISTORICAL_REFERENCE_ID: sample, live_id: sample}
     labels = {
         HISTORICAL_REFERENCE_ID: "Historisch (ohne Optimierung)",
-        "runtime_settings": "Runtime (Baseline)",
+        live_id: "Live",
     }
     plausibility = {
-        "runtime_settings": PlausibilityReport(),
+        live_id: PlausibilityReport(),
     }
     period_meta = {
         "start": ts[0].date().isoformat(),

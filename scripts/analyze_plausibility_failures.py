@@ -230,7 +230,8 @@ def main() -> None:
         awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
     )
-    scenario_params = config.get_backtesting_scenarios()["runtime_settings"]
+    live_id = config.get_live_scenario_id()
+    scenario_params = config.get_backtesting_scenarios()[live_id]
 
     results = [
         analyze_failure(

@@ -19,7 +19,7 @@ from optimizer.cbc_solver import solve_with_strict_fallback
 def test_record_cbc_event_collects_with_context():
     begin_cbc_event_collection()
     set_cbc_milp_context(
-        scenario_id="runtime_settings",
+        scenario_id="live",
         window_anchor="2025-09-28T10:00:00",
         consumer_targets_kwh={"eauto": 1.168},
     )
@@ -40,7 +40,7 @@ def test_record_cbc_event_collects_with_context():
     events = take_cbc_events()
     assert len(events) == 1
     assert events[0]["event"] == "strict_fallback"
-    assert events[0]["scenario_id"] == "runtime_settings"
+    assert events[0]["scenario_id"] == "live"
     assert events[0]["slot_datetime"] == "2025-09-27T10:00:00"
     assert events[0]["strict_status"] == "Not Solved"
 

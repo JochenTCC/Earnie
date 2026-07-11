@@ -1,4 +1,4 @@
-"""Komfort-Formular für runtime_settings: Entitäts-IDs speichern, Werte nur lesend."""
+"""Komfort-Formular für das Live-Szenario: Entitäts-IDs speichern, Werte nur lesend."""
 from __future__ import annotations
 
 import streamlit as st
@@ -33,7 +33,7 @@ def _render_resolved_snapshot(resolved: dict) -> None:
     st.markdown("#### Aufgelöste Parameter (nur Anzeige)")
     st.caption(
         "Technische Werte aus batteries[], pv_systems[], tariffs.json und Hausprofil. "
-        "Bearbeiten im Hauskonfigurator oder Szenarieneditor."
+        "Bearbeiten im Hauskonfigurator, Szenarieneditor oder Echtzeit-Umgebung."
     )
 
     geo_cols = st.columns(3)
@@ -97,7 +97,7 @@ def _render_resolved_snapshot(resolved: dict) -> None:
 
 
 def render_runtime_entity_form_body() -> None:
-    """ID-Auswahl für runtime_settings im Seiten-Body (Komfort-Ansicht)."""
+    """ID-Auswahl für das Live-Szenario im Seiten-Body (Komfort-Ansicht)."""
     refs = get_runtime_scenario_refs()
     batteries = list_batteries()
     pv_systems = list_pv_systems()
@@ -116,11 +116,11 @@ def render_runtime_entity_form_body() -> None:
     )
 
     if not batteries:
-        st.warning("Zuerst mindestens eine Batterie im Hauskonfigurator anlegen.")
+        st.warning("Zuerst mindestens eine Batterie im Szenarieneditor anlegen.")
     if not pv_systems:
-        st.warning("Zuerst eine PV-Anlage im Hauskonfigurator anlegen.")
+        st.warning("Optional: PV-Anlage im Hauskonfigurator anlegen.")
     if not import_tariffs or not export_tariffs:
-        st.warning("Zuerst Bezugs- und Einspeisetarif im Hauskonfigurator wählen.")
+        st.warning("Tarifkatalog leer — tariffs.json prüfen.")
     if not profiles:
         st.warning("Zuerst ein Hausprofil im Hauskonfigurator anlegen.")
 
@@ -181,7 +181,7 @@ def render_runtime_entity_form_body() -> None:
                     house_profile_id=profile_id,
                 )
                 invalidate_live_optimization_cache()
-                st.success("Runtime-Referenzen gespeichert.")
+                st.success("Live-Szenario-Referenzen gespeichert.")
                 st.rerun()
 
     selected_profile_id = refs.get("house_profile_id")
@@ -197,18 +197,63 @@ def render_runtime_entity_form_body() -> None:
             st.error(str(exc))
 
 
-def render_system_parameter_section() -> None:
-    """Komfort-Ansicht: Entitäts-IDs für runtime_settings, Parameter read-only."""
+def _render_live_scenario_id_picker() -> None:
+    """Wählt live_scenario_id in config.json aus vorhandenen Szenarien."""
+    from ui.house_config_io import load_backtesting_scenarios_raw, save_live_scenario_id
+
+    scenarios_doc = load_backtesting_scenarios_raw()
+    scenarios = [
+        item
+        for item in scenarios_doc.get("scenarios", [])
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    ]
+    if not scenarios:
+        st.warning("Zuerst mindestens ein Szenario im Szenarieneditor anlegen.")
+        return
+
+    scenario_ids = [str(item["id"]).strip() for item in scenarios]
+    labels = {
+        str(item["id"]).strip(): str(item.get("label") or item["id"]).strip()
+        for item in scenarios
+    }
+    current = config.get_live_scenario_id()
+    pick = st.selectbox(
+        "Live-Szenario",
+        options=scenario_ids,
+        index=scenario_ids.index(current) if current in scenario_ids else 0,
+        format_func=lambda sid: f"{sid} — {labels.get(sid, sid)}",
+        key="live_environment_scenario_picker",
+    )
+    if pick != current:
+        if st.button("Als Live-Szenario übernehmen", type="primary"):
+            save_live_scenario_id(pick)
+            invalidate_live_optimization_cache()
+            st.success(f"Live-Szenario auf `{pick}` gesetzt.")
+            st.rerun()
+    else:
+        st.caption(f"Aktives Live-Szenario: `{current}` (`config.json` → `live_scenario_id`).")
+
+
+def render_live_environment_section() -> None:
+    """Echtzeit-Umgebung: Live-Szenario wählen, Entitäts-Referenzen, Auflösung read-only."""
+    _render_live_scenario_id_picker()
+    live_id = config.get_live_scenario_id()
     if config.is_runtime_params_deferred():
         st.info(
             "PV- und Batterie-Parameter werden nach Abschluss der Planungs-Konfiguration "
-            "aus den gewählten Entitäten aufgelöst. Bitte Hauskonfigurator und Szenarieneditor nutzen."
+            "aus den gewählten Entitäten aufgelöst. Bitte Hauskonfigurator, Szenarieneditor "
+            "und diese Seite nutzen."
         )
         render_runtime_entity_form_body()
         return
 
     st.markdown(
-        "Speichert nur Entitäts-Referenzen in `runtime_settings`. "
-        "Standort und Zeitzone kommen aus dem gewählten Hausprofil."
+        f"Entitäts-Referenzen für das Live-Szenario **`{live_id}`** in "
+        "`backtesting_scenarios.json`. Standort und Zeitzone kommen aus dem Hausprofil."
     )
     render_runtime_entity_form_body()
+
+
+def render_system_parameter_section() -> None:
+    """Alias für render_live_environment_section (API-Stabilität, z. B. page_config)."""
+    render_live_environment_section()

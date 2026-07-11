@@ -10,7 +10,7 @@ import pandas as pd
 from ui.consumption_comparison_panel import render_consumption_comparison_panel
 from ui.consumption_display import ConsumptionDisplayMode
 from ui.consumption_display.adapters import bundle_from_cons_data, bundle_from_csv_validation
-from ui.scenario_runtime_form import render_runtime_scenario_form
+from ui.pages.page_scenario_editor import _render_scenarios_tab
 
 
 def _sample_profile() -> dict:
@@ -62,6 +62,6 @@ def test_legacy_panel_delegates_to_csv_validation_mode():
     assert mock_render.call_args.args[0] == ConsumptionDisplayMode.CSV_VALIDATION
 
 
-def test_runtime_form_imports_consumption_display():
+def test_scenario_editor_imports_consumption_display():
     assert ConsumptionDisplayMode.MODELED_PROFILE.value == "modeled_profile"
-    assert callable(render_runtime_scenario_form)
+    assert callable(_render_scenarios_tab)

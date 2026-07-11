@@ -93,7 +93,7 @@ def _native_window_summary(
     inside = slot_in_native_window(now, start_hour, duration_hours)
     return (
         f"Fenster [{start_hour:.0f}, {start_hour + duration_hours:.2f}) h — "
-        f"jetzt {'INNERHALB (Ernie-Zusatz gesperrt)' if inside else 'AUSSERHALB (Zusatz möglich)'}"
+        f"jetzt {'INNERHALB (Earnie-Zusatz gesperrt)' if inside else 'AUSSERHALB (Zusatz möglich)'}"
     )
 
 
@@ -148,8 +148,8 @@ def main() -> int:
     ok, detail = _check_binary("Filter läuft", inputs.get("power_name", ""))
     checks.append(("Filter läuft (Ist)", ok, detail))
 
-    ok, detail = _check_binary("Ernie-Freigabe", outputs.get("enable_name", ""))
-    checks.append(("Ernie Filter-Freigabe", ok, detail))
+    ok, detail = _check_binary("Earnie-Freigabe", outputs.get("enable_name", ""))
+    checks.append(("Earnie Filter-Freigabe", ok, detail))
 
     print("SwimSpa-Filter Live-Abnahme\n")
     for label, passed, detail in checks:

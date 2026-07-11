@@ -9,15 +9,15 @@ def test_build_comparison_includes_cost_delta():
         "reference_id": "historical_reference",
         "labels": {
             "historical_reference": "Ref",
-            "runtime_settings": "Baseline",
+            "live": "Baseline",
         },
         "summary": {
             "total_eur": {
                 "historical_reference": 1000.0,
-                "runtime_settings": 900.0,
+                "live": 900.0,
             }
         },
-        "plausibility": {"runtime_settings": {"total_windows": 10, "ok_count": 10}},
+        "plausibility": {"live": {"total_windows": 10, "ok_count": 10}},
         "period": {"start": "2025-01-01", "last_ts": "2025-12-31", "price_strategy": "mirror"},
     }
     forecast = {
@@ -26,10 +26,10 @@ def test_build_comparison_includes_cost_delta():
         "summary": {
             "total_eur": {
                 "historical_reference": 1000.0,
-                "runtime_settings": 880.0,
+                "live": 880.0,
             }
         },
-        "plausibility": {"runtime_settings": {"total_windows": 10, "ok_count": 9}},
+        "plausibility": {"live": {"total_windows": 10, "ok_count": 9}},
         "period": {"start": "2025-01-01", "last_ts": "2025-12-31", "price_strategy": "forecast"},
     }
     report = build_comparison(mirror, forecast)

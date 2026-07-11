@@ -283,7 +283,7 @@ def _parse_date(value: str | None) -> date | None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Generische Stunden-Log-Datei für den Energy Optimizer erzeugen."
+        description="Generische Stunden-Log-Datei für Earnie erzeugen."
     )
     parser.add_argument(
         "--source",

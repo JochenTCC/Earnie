@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://energy-optimizer.local/config.schema.json",
-  "title": "Energy Optimizer Konfiguration",
+  "$id": "https://earnie.local/config.schema.json",
+  "title": "Earnie Konfiguration",
   "description": "JSON-Schema für config.json. In Cursor/VS Code erscheinen Beschreibungen als Hover-Hilfe, wenn \"$schema\" in config.json gesetzt ist.",
   "type": "object",
     "properties": {
@@ -25,9 +25,9 @@
       "$ref": "#/definitions/ui",
       "description": "Streamlit-Cockpit: Fragment-Auto-Refresh-Intervalle."
     },
-    "runtime_settings": {
-      "$ref": "#/definitions/runtime_settings",
-      "description": "Laufzeitparameter für PV, Batterie und Optimierung."
+    "live_scenario_id": {
+      "type": "string",
+      "description": "ID des Live-Szenarios in backtesting_scenarios.json (Standard: live)."
     },
     "batteries": {
       "type": "array",
@@ -234,7 +234,7 @@
     },
     "ui": {
       "type": "object",
-      "description": "Streamlit-UI (Fragment-Auto-Refresh, Server-Port). Env: ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC, ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC, ENERGY_OPTIMIZER_UI_MAIN_SYNC_POLL_SEC, ENERGY_OPTIMIZER_UI_STREAMLIT_PORT.",
+      "description": "Streamlit-UI (Fragment-Auto-Refresh, Server-Port). Env: EARNIE_UI_FRAGMENT_CHARTS_SEC, EARNIE_UI_FRAGMENT_STATUS_SEC, EARNIE_UI_MAIN_SYNC_POLL_SEC, EARNIE_UI_STREAMLIT_PORT.",
       "properties": {
         "fragment_refresh_charts_sec": {
           "type": "integer",
@@ -263,37 +263,11 @@
           "type": "integer",
           "minimum": 1024,
           "maximum": 65535,
-          "description": "TCP-Port für `streamlit run` (Standard: 8501). Env-Override: ENERGY_OPTIMIZER_UI_STREAMLIT_PORT."
+          "description": "TCP-Port für `streamlit run` (Standard: 8501). Env-Override: EARNIE_UI_STREAMLIT_PORT."
         },
         "price_forecast_page_enabled": {
           "type": "boolean",
-          "description": "Sidebar-Modus „Preis-Prognose (Dev)“ (OLS-Evaluations-UI). Standard: false. Env ENERGY_OPTIMIZER_UI_MODES hat Vorrang."
-        }
-      }
-    },
-    "runtime_settings": {
-      "type": "object",
-      "description": "Laufzeitparameter (Echtzeit-Optimierung). Ab 1.26.0: nur Entitäts-IDs; Geo/Zeitzone über house_profile_id.",
-      "properties": {
-        "battery_id": {
-          "type": "string",
-          "description": "Referenz auf batteries[].id (Runtime/Baseline)."
-        },
-        "pv_system_id": {
-          "type": "string",
-          "description": "Referenz auf pv_systems[].id (Runtime/Baseline)."
-        },
-        "import_tariff_id": {
-          "type": "string",
-          "description": "Gewählter Bezugstarif (tariffs.json import_tariffs[].id)."
-        },
-        "export_tariff_id": {
-          "type": "string",
-          "description": "Gewählter Einspeisetarif (tariffs.json export_tariffs[].id)."
-        },
-        "house_profile_id": {
-          "type": "string",
-          "description": "Hausprofil für modellierte Grundlast (house_profiles.json)."
+          "description": "Sidebar-Modus „Preis-Prognose (Dev)“ (OLS-Evaluations-UI). Standard: false. Env EARNIE_UI_MODES hat Vorrang."
         }
       }
     },

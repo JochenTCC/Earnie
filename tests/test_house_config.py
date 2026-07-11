@@ -79,6 +79,34 @@ def test_resolve_pv_into_settings():
     assert resolved["pv_kwp"] == 6.0
 
 
+def test_resolve_pv_into_settings_without_id():
+    resolved = resolve_pv_into_settings({"battery_id": "bat"}, {})
+    assert "pv_kwp" not in resolved
+    assert "pv_system_id" not in resolved
+
+
+def test_house_profile_without_consumers():
+    from house_config.profiles_store import normalize_house_profiles_document
+
+    doc = normalize_house_profiles_document(
+        {
+            "profiles": [
+                {
+                    "id": "minimal",
+                    "label": "Minimal",
+                    "annual_kwh": 3000.0,
+                    "latitude": 48.2,
+                    "longitude": 11.0,
+                    "consumers": [],
+                }
+            ]
+        }
+    )
+    profile = doc["profiles"]["minimal"]
+    assert profile["consumers"] == []
+    assert profile["baseload_kwh"] == pytest.approx(3000.0, rel=1e-3)
+
+
 def test_scenario_entity_resolution():
     scenarios = config.get_backtesting_scenarios()
     assert "entity_test" in scenarios
@@ -512,8 +540,11 @@ def test_scenario_resolution_includes_planning_flex(tmp_path):
     assert any(item["id"] == "washer" for item in flex)
 
 
-def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
-    from house_config.scenario_resolution import resolve_runtime_settings_for_backtesting
+def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
+    from house_config.scenario_resolution import (
+        DEFAULT_LIVE_SCENARIO_ID,
+        resolve_live_scenario_settings,
+    )
 
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -524,21 +555,19 @@ def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
         str(config_dir / "house_profiles.json"),
     )
     monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        str(config_dir / "backtesting_scenarios.json"),
+    )
 
     (config_dir / "config.json").write_text(
         """
         {
+            "live_scenario_id": "live",
             "system": {"global_timeout": 10, "loop_timeout": 900},
             "loxone_blocks": {"soc_name": "Battery_SOC"},
             "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
             "planning_horizon": {"mode": "sunset_window"},
-            "runtime_settings": {
-                "battery_id": "home_5kwh",
-                "pv_system_id": "roof",
-                "import_tariff_id": "fixed_imp",
-                "export_tariff_id": "fixed_exp",
-                "house_profile_id": "efh"
-            },
             "batteries": [{
                 "id": "home_5kwh",
                 "label": "5 kWh",
@@ -587,11 +616,31 @@ def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
+    (config_dir / "backtesting_scenarios.json").write_text(
+        """
+        {
+            "scenarios": [{
+                "id": "live",
+                "label": "Live",
+                "settings": {
+                    "battery_id": "home_5kwh",
+                    "pv_system_id": "roof",
+                    "import_tariff_id": "fixed_imp",
+                    "export_tariff_id": "fixed_exp",
+                    "house_profile_id": "efh"
+                }
+            }]
+        }
+        """.strip(),
+        encoding="utf-8",
+    )
+
     import json
 
     raw = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
-    resolved = resolve_runtime_settings_for_backtesting(
+    resolved = resolve_live_scenario_settings(
         raw,
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
     )
@@ -675,15 +724,49 @@ def test_migrate_runtime_entities_preserves_resolved_values(tmp_path):
         migrate_runtime_entities,
     )
 
-    repo = Path(__file__).resolve().parents[1]
-    config = json.loads(
-        (repo / "tests/fixtures/backtesting/config.json").read_text(encoding="utf-8")
-    )
+    config = {
+        "runtime_settings": {
+            "battery_id": "test_battery",
+            "pv_system_id": "test_pv",
+            "import_tariff_id": "awattar_at",
+            "export_tariff_id": "fixed_35ct",
+            "house_profile_id": "test_home",
+        },
+        "batteries": [
+            {
+                "id": "test_battery",
+                "label": "Test 8 kWh",
+                "battery_capacity_kwh": 8.0,
+                "battery_max_power_kw": 4.0,
+                "battery_efficiency": 0.95,
+                "battery_min_soc": 10.0,
+                "battery_max_soc": 100.0,
+                "threshold_power": 0.02,
+                "battery_wear": {"enabled": False},
+            }
+        ],
+        "pv_systems": [
+            {
+                "id": "test_pv",
+                "label": "Test PV 6 kWp",
+                "kwp": 6.0,
+                "pv_tilt": 18,
+                "pv_azimuth": 28,
+            }
+        ],
+        "flexible_consumers": [],
+        "planning_horizon": {"mode": "sunset_window"},
+    }
     tariffs = json.loads(
-        (repo / "tests/fixtures/backtesting/tariffs.json").read_text(encoding="utf-8")
+        (Path(__file__).resolve().parents[1] / "tests/fixtures/backtesting/tariffs.json").read_text(
+            encoding="utf-8"
+        )
     )
     profiles = json.loads(
-        (repo / "tests/fixtures/backtesting/house_profiles.json").read_text(encoding="utf-8")
+        (
+            Path(__file__).resolve().parents[1]
+            / "tests/fixtures/backtesting/house_profiles.json"
+        ).read_text(encoding="utf-8")
     )
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -723,8 +806,38 @@ def test_migrate_runtime_entities_preserves_resolved_values(tmp_path):
 def test_migrate_runtime_entities_cli_writes_draft(tmp_path):
     from scripts.migrate_runtime_entities import main
 
+    config_dir = tmp_path / "input"
+    config_dir.mkdir()
+    legacy_config = {
+        "runtime_settings": {
+            "k_push_cent": 3.5,
+            "feed_in_mode": "fixed",
+            "pv_kwp": 6.0,
+            "pv_tilt": 18,
+            "pv_azimuth": 28,
+            "battery_capacity_kwh": 8.0,
+            "battery_max_power_kw": 4.0,
+            "battery_efficiency": 0.95,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.02,
+            "latitude": 47.404,
+            "longitude": 9.743,
+            "timezone_name": "Europe/Vienna",
+        },
+        "batteries": [],
+        "pv_systems": [],
+    }
+    (config_dir / "config.json").write_text(json.dumps(legacy_config), encoding="utf-8")
     repo = Path(__file__).resolve().parents[1]
-    config_dir = repo / "tests/fixtures/backtesting"
+    (config_dir / "tariffs.json").write_text(
+        (repo / "tests/fixtures/backtesting/tariffs.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (config_dir / "house_profiles.json").write_text(
+        json.dumps({"profiles": []}),
+        encoding="utf-8",
+    )
     out_dir = tmp_path / "draft"
     assert main(
         [

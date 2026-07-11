@@ -41,6 +41,17 @@
     ],
     "scenarios": [
         {
+            "id": "live",
+            "label": "Live",
+            "settings": {
+                "battery_id": "default_5kwh",
+                "pv_system_id": "roof_south",
+                "import_tariff_id": "awattar_at",
+                "export_tariff_id": "fixed_37ct",
+                "house_profile_id": "example_efh"
+            }
+        },
+        {
             "id": "battery_5kwh_dynamic",
             "label": "5 kWh, dynamische Einspeise",
             "settings": {

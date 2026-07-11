@@ -6,13 +6,13 @@ x-persist-volumes: &persist-volumes
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  ENERGY_OPTIMIZER_CONFIG_PATH: config/config.json
-  ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START: "1"
+  EARNIE_CONFIG_PATH: config/config.json
+  EARNIE_VERIFY_LOXONE_ON_START: "1"
 
 services:
   optimizer-worker:
     build: .
-    container_name: ernie-optimizer-worker
+    container_name: earnie-optimizer-worker
     command: python main.py
     restart: unless-stopped
     volumes: *persist-volumes
@@ -21,7 +21,7 @@ services:
 
   optimizer-ui:
     build: .
-    container_name: ernie-optimizer-ui
+    container_name: earnie-optimizer-ui
     command: python -m scripts.run_streamlit
     restart: unless-stopped
     # Host-Port muss ui.streamlit_port in config/config.json entsprechen (Standard: 8501).

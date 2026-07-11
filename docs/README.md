@@ -1,6 +1,6 @@
-# Energy Optimizer — Anwender-Dokumentation
+# Earnie — Anwender-Dokumentation
 
-Diese Dokumentation richtet sich an Betreiber des Energy Optimizers (Ernie): Einrichtung, Konfiguration, Streamlit-Oberfläche und die Schnittstelle zum Loxone Miniserver.
+Diese Dokumentation richtet sich an Betreiber von Earnie: Einrichtung, Konfiguration, Streamlit-Oberfläche und die Schnittstelle zum Loxone Miniserver.
 
 Für Entwickler (Projektstruktur, Tests, Container) siehe [README.md](../README.md) im Projektroot.
 
@@ -32,7 +32,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 ### Konfiguration (`config/config.json`)
 
 - [Überblick](konfiguration/ueberblick.md) — Aufbau der Datei, Szenarien, Dateipfade
-- [PV & Batterie](konfiguration/batterie-pv.md) — `runtime_settings`
+- [PV & Batterie](konfiguration/batterie-pv.md) — Live-Szenario, Entitäts-Referenzen
 - [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe
 - [Preise & aWATTar](konfiguration/preise.md) — Bezugspreis, Einspeisevergütung, Steuern
 

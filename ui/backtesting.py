@@ -62,10 +62,7 @@ def load_backtesting_data():
 
 
 def scenario_labels_map() -> dict[str, str]:
-    labels = {"runtime_settings": "Runtime (Baseline)"}
-    for scenario in config.get_scenarios():
-        labels[scenario["id"]] = scenario.get("label", scenario["id"])
-    return labels
+    return config.get_scenario_labels()
 
 
 def try_get_backtesting_scenarios() -> tuple[dict[str, dict] | None, str | None]:

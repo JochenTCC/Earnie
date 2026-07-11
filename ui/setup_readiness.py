@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from runtime_store.persist_paths import (
+    resolve_backtesting_scenarios_json_path,
     resolve_config_json_path,
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
@@ -37,27 +38,31 @@ def needs_planning_onboarding() -> bool:
     return needs_planning_onboarding_from_raw(raw)
 
 
-def _has_thermal_house_profile_in_doc(doc: dict) -> bool:
-    for profile in doc.get("profiles", []):
-        if not isinstance(profile, dict):
-            continue
-        for consumer in profile.get("consumers", []):
-            if isinstance(consumer, dict) and consumer.get("type") == "thermal_annual":
-                return True
+def _iter_profiles_from_doc(doc: dict):
+    profiles = doc.get("profiles", [])
+    if isinstance(profiles, dict):
+        for profile_id, profile in profiles.items():
+            if isinstance(profile, dict):
+                yield str(profile_id).strip(), profile
+        return
+    if isinstance(profiles, list):
+        for profile in profiles:
+            if isinstance(profile, dict):
+                yield str(profile.get("id", "")).strip(), profile
+
+
+def _has_house_profile_in_doc(doc: dict) -> bool:
+    for profile_id, _profile in _iter_profiles_from_doc(doc):
+        if profile_id:
+            return True
     return False
 
 
 def _default_house_profile_id_from_doc(doc: dict) -> str:
-    """Erstes Hausprofil mit thermischem Verbraucher — Default für Runtime-Szenario."""
-    for profile in doc.get("profiles", []):
-        if not isinstance(profile, dict):
-            continue
-        profile_id = str(profile.get("id", "")).strip()
-        if not profile_id:
-            continue
-        for consumer in profile.get("consumers", []):
-            if isinstance(consumer, dict) and consumer.get("type") == "thermal_annual":
-                return profile_id
+    """Erstes Hausprofil — Default für Runtime-Szenario."""
+    for profile_id, _profile in _iter_profiles_from_doc(doc):
+        if profile_id:
+            return profile_id
     return ""
 
 
@@ -76,16 +81,16 @@ def _tariff_id_maps_from_doc(tariffs_doc: dict) -> tuple[set[str], set[str]]:
 
 
 def missing_house_config_items_for(raw: dict, *, house_profiles_path: str) -> list[str]:
-    """Fehlende Schritte im Hauskonfigurator (Verbraucher + PV)."""
+    """Fehlende Schritte im Hauskonfigurator (Hausprofil, Batterie)."""
     if not needs_planning_onboarding_from_raw(raw):
         return []
 
     missing: list[str] = []
-    if not raw.get("pv_systems"):
-        missing.append("PV-Anlage (Hauskonfigurator → PV-Anlage)")
     profiles_doc = _read_json_document(house_profiles_path)
-    if not _has_thermal_house_profile_in_doc(profiles_doc):
-        missing.append("Hausprofil mit thermischem Verbraucher (Hauskonfigurator → Hausprofil)")
+    if not _has_house_profile_in_doc(profiles_doc):
+        missing.append("Hausprofil anlegen (Hauskonfigurator → Hausprofil)")
+    if not raw.get("batteries"):
+        missing.append("Batterie anlegen (Hauskonfigurator → Batterien)")
     return missing
 
 
@@ -94,43 +99,52 @@ def missing_runtime_scenario_items_for(
     *,
     tariffs_path: str,
     house_profiles_path: str,
+    backtesting_scenarios_path: str | None = None,
 ) -> list[str]:
-    """Fehlende Schritte im Runtime-Szenario (Szenarieneditor)."""
+    """Fehlende Schritte für Live-Szenario und Echtzeit-Umgebung."""
     if not needs_planning_onboarding_from_raw(raw):
         return []
 
+    from house_config.scenario_resolution import (
+        get_live_scenario_id,
+        find_scenario_settings,
+    )
+
     missing: list[str] = []
-    if not raw.get("batteries"):
-        missing.append("Batterie anlegen (Szenarieneditor → Batterien)")
+    scenarios_path = backtesting_scenarios_path or resolve_backtesting_scenarios_json_path()
+    live_id = get_live_scenario_id(raw)
+    try:
+        live_settings = find_scenario_settings(scenarios_path, live_id)
+    except ValueError:
+        missing.append(
+            f"Live-Szenario '{live_id}' anlegen (Szenarieneditor → Szenarien)"
+        )
+        return missing
 
-    runtime = raw.get("runtime_settings", {})
-    if not isinstance(runtime, dict):
-        runtime = {}
-
-    battery_id = str(runtime.get("battery_id", "") or "").strip()
+    battery_id = str(live_settings.get("battery_id", "") or "").strip()
     batteries = {
         str(item.get("id", "")).strip()
         for item in raw.get("batteries", [])
         if isinstance(item, dict) and item.get("id")
     }
     if not battery_id or battery_id not in batteries:
-        missing.append("Batterie für Runtime wählen (Szenarieneditor → Runtime)")
+        missing.append("Batterie für Live-Szenario wählen (Echtzeit-Umgebung)")
 
-    import_id = str(runtime.get("import_tariff_id", "") or "").strip()
-    export_id = str(runtime.get("export_tariff_id", "") or "").strip()
+    import_id = str(live_settings.get("import_tariff_id", "") or "").strip()
+    export_id = str(live_settings.get("export_tariff_id", "") or "").strip()
     tariffs_doc = _read_json_document(tariffs_path)
     import_map, export_map = _tariff_id_maps_from_doc(tariffs_doc)
     if not import_id or import_id not in import_map:
-        missing.append("Bezugstarif wählen (Szenarieneditor → Runtime)")
+        missing.append("Bezugstarif wählen (Echtzeit-Umgebung)")
     if not export_id or export_id not in export_map:
-        missing.append("Einspeisetarif wählen (Szenarieneditor → Runtime)")
+        missing.append("Einspeisetarif wählen (Echtzeit-Umgebung)")
 
     profiles_doc = _read_json_document(house_profiles_path)
-    profile_id = str(runtime.get("house_profile_id", "") or "").strip()
+    profile_id = str(live_settings.get("house_profile_id", "") or "").strip()
     if not profile_id:
         profile_id = _default_house_profile_id_from_doc(profiles_doc)
     if not profile_id:
-        missing.append("Hausprofil zuordnen (Szenarieneditor → Runtime)")
+        missing.append("Hausprofil zuordnen (Echtzeit-Umgebung)")
     return missing
 
 
@@ -139,8 +153,9 @@ def missing_planning_setup_items_for(
     *,
     tariffs_path: str,
     house_profiles_path: str,
+    backtesting_scenarios_path: str | None = None,
 ) -> list[str]:
-    """Fehlende Schritte bis Backtesting freigeschaltet werden kann."""
+    """Fehlende Schritte bis Scenario-Exploration freigeschaltet werden kann."""
     return missing_house_config_items_for(
         raw,
         house_profiles_path=house_profiles_path,
@@ -148,6 +163,7 @@ def missing_planning_setup_items_for(
         raw,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
+        backtesting_scenarios_path=backtesting_scenarios_path,
     )
 
 
@@ -156,19 +172,21 @@ def is_planning_ready_for(
     *,
     tariffs_path: str,
     house_profiles_path: str,
+    backtesting_scenarios_path: str | None = None,
 ) -> bool:
-    """Alle Mindestanforderungen für Backtesting erfüllt (explizite Pfade)."""
+    """Alle Mindestanforderungen für Scenario-Exploration erfüllt (explizite Pfade)."""
     if not needs_planning_onboarding_from_raw(raw):
         return True
     return not missing_planning_setup_items_for(
         raw,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
+        backtesting_scenarios_path=backtesting_scenarios_path,
     )
 
 
 def missing_house_config_items() -> list[str]:
-    """Fehlende Schritte im Hauskonfigurator (Verbraucher + PV)."""
+    """Fehlende Schritte im Hauskonfigurator (Hausprofil, Batterie, PV optional)."""
     return missing_house_config_items_for(
         _read_json_document(resolve_config_json_path()),
         house_profiles_path=resolve_house_profiles_json_path(),
@@ -176,7 +194,7 @@ def missing_house_config_items() -> list[str]:
 
 
 def missing_runtime_scenario_items() -> list[str]:
-    """Fehlende Schritte im Runtime-Szenario (Szenarieneditor)."""
+    """Fehlende Schritte in Echtzeit-Umgebung / Live-Szenario."""
     return missing_runtime_scenario_items_for(
         _read_json_document(resolve_config_json_path()),
         tariffs_path=resolve_tariffs_json_path(),
@@ -194,7 +212,7 @@ def missing_planning_setup_items() -> list[str]:
 
 
 def is_house_config_ready() -> bool:
-    """Hausprofil + PV vollständig."""
+    """Mindestens ein Hausprofil vorhanden (PV und Haus Wärme optional)."""
     if not needs_planning_onboarding():
         return True
     return not missing_house_config_items()
@@ -232,7 +250,7 @@ def _loxone_markers_complete() -> bool:
 
 
 def is_scenario_editor_unlocked() -> bool:
-    """Szenarieneditor nach vollständigem Hauskonfigurator-Schritt."""
+    """Szenarieneditor nach vollständigem Hauskonfigurator-Schritt (Profil + Batterie)."""
     if not needs_planning_onboarding():
         return True
     return is_house_config_ready()

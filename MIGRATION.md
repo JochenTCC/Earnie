@@ -1,4 +1,4 @@
-# Migrationsplan: Dateistruktur Energy-Optimizer
+# Migrationsplan: Dateistruktur Earnie
 
 Ziel: Bessere Übersicht und Pflegbarkeit, ohne Deployment oder tägliche Workflows zu brechen.
 
@@ -12,7 +12,7 @@ Ziel: Bessere Übersicht und Pflegbarkeit, ohne Deployment oder tägliche Workfl
 **Zielstruktur (Endzustand)**
 
 ```
-Energy-Optimizer/
+Earnie/
 ├── main.py
 ├── app.py
 ├── config.py / config.json

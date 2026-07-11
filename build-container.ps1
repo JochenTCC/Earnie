@@ -7,7 +7,7 @@
     .\build-container.ps1
     .\build-container.ps1 --target synology --push
     .\build-container.ps1 --target all --push
-    .\build-container.ps1 --tag ghcr.io/jochentcc/ernie-energy:latest --push
+    .\build-container.ps1 --tag ghcr.io/jochentcc/earnie-energy:latest --push
 #>
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

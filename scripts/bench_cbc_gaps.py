@@ -77,7 +77,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--hour-offset", type=int, default=1392)
     parser.add_argument("--start-month", type=int, default=8)
     parser.add_argument("--end-month", type=int, default=9)
-    parser.add_argument("--scenario", type=str, default="runtime_settings")
+    parser.add_argument("--scenario", type=str, default="live")
     parser.add_argument("--initial-soc", type=float, default=50.0)
     parser.add_argument(
         "--skip-baseline",

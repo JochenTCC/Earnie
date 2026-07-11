@@ -57,7 +57,7 @@ def render_setup_progress_notice() -> None:
         lines.append("**Hauskonfigurator:**")
         lines.extend(f"- {item}" for item in house_missing)
     if is_house_config_ready() and runtime_missing:
-        lines.append("**Szenarieneditor:**")
+        lines.append("**Echtzeit-Umgebung:**")
         lines.extend(f"- {item}" for item in runtime_missing)
     if not lines:
         missing = missing_planning_setup_items()

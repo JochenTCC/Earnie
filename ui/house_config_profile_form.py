@@ -169,7 +169,7 @@ def _flatten_consumer_for_edit(consumer: dict) -> dict:
 def _consumers_from_existing(existing: dict) -> list[dict]:
     consumers = list(existing.get("consumers", []))
     if not consumers:
-        return [_default_consumer()]
+        return []
     return [_flatten_consumer_for_edit(consumer) for consumer in consumers]
 
 
@@ -473,15 +473,12 @@ def _render_consumer_form(
         with cols[1]:
             if st.button("Entfernen", key=_scoped_key(session_scope, f"hc_remove_{index}")):
                 consumers = list(st.session_state[_SESSION_CONSUMERS_KEY])
-                if len(consumers) > 1:
-                    del consumers[index]
-                    st.session_state[_SESSION_CONSUMERS_KEY] = consumers
-                    st.rerun()
-                else:
-                    st.warning("Mindestens ein Verbraucher erforderlich.")
+                del consumers[index]
+                st.session_state[_SESSION_CONSUMERS_KEY] = consumers
+                st.rerun()
 
         type_options = _consumer_type_options(index)
-        current_type = str(consumer.get("type", "thermal_annual"))
+        current_type = str(consumer.get("type", "generic"))
         if index > 0 and current_type == "thermal_annual":
             st.warning(
                 "Typ „Haus Wärme“ ist nur für Verbraucher 1 erlaubt. "
@@ -754,6 +751,10 @@ def render_house_profile_tab() -> None:
     location = _render_location_fields(session_scope=session_scope)
 
     st.subheader("Verbraucher")
+    st.caption(
+        "Optional — ohne Verbraucher gilt der gesamte Jahresverbrauch als Grundlast. "
+        "„Haus Wärme“ ist nicht erforderlich."
+    )
     consumers = list(st.session_state.get(_SESSION_CONSUMERS_KEY, []))
     if st.button("Verbraucher hinzufügen", key=_scoped_key(session_scope, "house_consumer_add")):
         st.session_state[_SESSION_CONSUMERS_KEY].append(_default_additional_consumer())

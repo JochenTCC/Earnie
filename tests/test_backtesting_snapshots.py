@@ -62,7 +62,7 @@ def test_build_window_snapshot_fixed_24h_has_no_full_rows():
     chart_rows, matrix = _sample_rows()
     snapshot = build_window_snapshot(
         window_anchor=datetime(2026, 6, 23, 7, 0),
-        scenario_id="runtime_settings",
+        scenario_id="live",
         horizon_mode=FIXED_24H,
         kind="consumption_tolerance",
         initial_soc=50.0,
@@ -80,7 +80,7 @@ def test_build_window_snapshot_sunset_includes_full_rows():
     full_rows, full_matrix = _sample_rows(count=40)
     snapshot = build_window_snapshot(
         window_anchor=datetime(2026, 6, 23, 7, 0),
-        scenario_id="runtime_settings",
+        scenario_id="live",
         horizon_mode=SUNSET_WINDOW,
         kind="consumption_tolerance",
         initial_soc=50.0,
@@ -111,7 +111,7 @@ def test_build_window_snapshot_includes_battery_params():
     }
     snapshot = build_window_snapshot(
         window_anchor=datetime(2026, 6, 23, 7, 0),
-        scenario_id="runtime_settings",
+        scenario_id="live",
         horizon_mode=FIXED_24H,
         kind="consumption_tolerance",
         initial_soc=50.0,
@@ -127,7 +127,7 @@ def test_write_and_load_window_snapshot_roundtrip(tmp_path):
     chart_rows, matrix = _sample_rows()
     snapshot = build_window_snapshot(
         window_anchor=datetime(2026, 6, 23, 7, 0),
-        scenario_id="runtime_settings",
+        scenario_id="live",
         horizon_mode=FIXED_24H,
         kind="consumption_tolerance",
         initial_soc=50.0,
@@ -142,10 +142,10 @@ def test_write_and_load_window_snapshot_roundtrip(tmp_path):
     loaded = load_window_snapshot(
         str(tmp_path),
         "2026-06-23T07:00:00",
-        "runtime_settings",
+        "live",
     )
     assert loaded is not None
-    assert loaded["scenario_id"] == "runtime_settings"
+    assert loaded["scenario_id"] == "live"
     assert json.loads(json.dumps(loaded))["window_anchor"] == snapshot["window_anchor"]
 
 

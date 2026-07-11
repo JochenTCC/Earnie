@@ -2,7 +2,7 @@
 
 ## Bezugspreis (Live)
 
-Live-Optimierung löst `runtime_settings.import_tariff_id` gegen [`config/tariffs.json`](../../config/tariffs.json) auf. Bei Typ `awattar` gelten die Aufschläge **am Tarif-Eintrag** (`fix_aufschlag_cent`, `netzverlust_faktor`, `mwst_austria_faktor`).
+Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen [`config/tariffs.json`](../../config/tariffs.json) auf. Bei Typ `awattar` gelten die Aufschläge **am Tarif-Eintrag** (`fix_aufschlag_cent`, `netzverlust_faktor`, `mwst_austria_faktor`).
 
 Stundenpreise kommen von der aWATTar-API; die URL wird aus `import_tariff_id` → `land` abgeleitet (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
 
@@ -21,7 +21,7 @@ Marktpreis (API)
 
 ## Einspeisevergütung (Live)
 
-Live-Optimierung löst `runtime_settings.export_tariff_id` auf. Bei Typ `fixed` kommt `k_push_cent` aus dem Tarif-Eintrag in `tariffs.json`. In der UI (Seite **Konfiguration**) ist die aufgelöste Vergütung read-only; geändert wird die Tarif-Referenz, nicht mehr ein flaches `k_push_cent` in `runtime_settings`.
+Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Typ `fixed` kommt `k_push_cent` aus dem Tarif-Eintrag in `tariffs.json`. In der UI (Seite **Konfiguration**) ist die aufgelöste Vergütung read-only; geändert wird die Tarif-Referenz im Live-Szenario.
 
 **Hinweis:** Vergütung kann sich ändern (z. B. monatlich). Tarif in `tariffs.json` bzw. gewählte `export_tariff_id` aktuell halten.
 
@@ -87,4 +87,4 @@ Für **Backtesting** (und geplante Dev-Nachrechnung): `file_paths_battery_simula
 
 ### Monatliche Fixtarife (Backtesting)
 
-In `config/backtesting_scenarios.json` kann `fixed_monthly_feed_in_rates` die aWATTar-SUNNY-Fixwerte pro Monat enthalten. Alternativ Export-Tarif-Typ `monthly_table` in `tariffs.json`. **Sunset-2-Sunset** (Produktiv) nutzt die aufgelöste Export-Tarif-Referenz aus `runtime_settings.export_tariff_id`.
+In `config/backtesting_scenarios.json` kann `fixed_monthly_feed_in_rates` die aWATTar-SUNNY-Fixwerte pro Monat enthalten. Alternativ Export-Tarif-Typ `monthly_table` in `tariffs.json`. **Sunset-2-Sunset** (Produktiv) nutzt die aufgelöste Export-Tarif-Referenz aus dem Live-Szenario.

@@ -81,8 +81,8 @@ def render_swimspa_filter_chart(df: pd.DataFrame, *, chart_zones) -> None:
     fig.add_trace(
         go.Bar(
             x=x_values,
-            y=df["Ernie (kW)"],
-            name="Ernie-initiiert",
+            y=df["Earnie (kW)"],
+            name="Earnie-initiiert",
             marker_color="rgba(220, 140, 60, 0.75)",
         )
     )

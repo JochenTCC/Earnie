@@ -2,12 +2,13 @@
 
 Das Env-/Config-Gating (ENERGY_OPTIMIZER_UI_MODES, ui.price_forecast_page_enabled)
 steuert nur noch, welche Seiten registriert werden. Cockpit, Manuelle Geräte und
-die Konfigurations-/Mockup-Seiten sind immer verfügbar; Backtesting und
+die Planungs-/Echtzeit-Seiten sind immer verfügbar; Scenario-Exploration und
 Preis-Prognose (Dev) folgen dem bisherigen Modus-Gating.
 
 Nach Minimal-Bootstrap (Greenfield) sind bis zur vollständigen Planungs-Konfiguration
-nur Hauskonfigurator und Konfiguration sichtbar. Danach wird Analyse freigeschaltet;
-Betrieb (Cockpit, Manuelle Geräte) erst nach vollständiger Loxone-Merker-Konfiguration.
+nur Hauskonfigurator und Echtzeit-Umgebung sichtbar (Szenarieneditor nach Hausprofil).
+Danach wird Analyse freigeschaltet; Betrieb (Cockpit, Manuelle Geräte) erst nach
+vollständiger Loxone-Merker-Konfiguration.
 """
 from __future__ import annotations
 
@@ -20,6 +21,9 @@ from ui.setup_readiness import (
     is_scenario_editor_unlocked,
     is_setup_navigation_restricted,
 )
+
+SECTION_PLANUNG = "Planung"
+SECTION_ECHTZEIT = "Echtzeit-Umgebung"
 
 
 @dataclass(frozen=True)
@@ -34,17 +38,17 @@ class PageSpec:
     default: bool = False
 
 
-def _restricted_page_specs() -> list[PageSpec]:
-    from ui.pages import page_config, page_house_config, page_scenario_editor
+def _planning_page_specs(*, house_config_default: bool) -> list[PageSpec]:
+    from ui.pages import page_house_config, page_live_environment, page_scenario_editor
 
     specs = [
         PageSpec(
             page_house_config.render,
             "Hauskonfigurator",
             "🏠",
-            "Konfiguration",
+            SECTION_PLANUNG,
             "house-config",
-            default=True,
+            default=house_config_default,
         ),
     ]
     if is_scenario_editor_unlocked():
@@ -53,14 +57,24 @@ def _restricted_page_specs() -> list[PageSpec]:
                 page_scenario_editor.render,
                 "Szenarieneditor",
                 "🧪",
-                "Konfiguration",
+                SECTION_PLANUNG,
                 "scenario-editor",
             )
         )
     specs.append(
-        PageSpec(page_config.render, "Konfiguration", "⚙️", "Konfiguration", "config")
+        PageSpec(
+            page_live_environment.render,
+            "Live-Konfiguration",
+            "⚡",
+            SECTION_ECHTZEIT,
+            "live-environment",
+        )
     )
     return specs
+
+
+def _restricted_page_specs() -> list[PageSpec]:
+    return _planning_page_specs(house_config_default=True)
 
 
 def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
@@ -71,12 +85,9 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
     from ui.pages import (
         page_backtesting,
         page_cockpit,
-        page_config,
         page_consumer_analysis,
         page_devices,
-        page_house_config,
         page_price_forecast,
-        page_scenario_editor,
     )
 
     specs: list[PageSpec] = []
@@ -102,16 +113,18 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
             ]
         )
 
-    backtesting_allowed = "backtesting" in enabled_mode_keys and is_planning_ready()
+    scenario_exploration_allowed = (
+        "scenario_exploration" in enabled_mode_keys and is_planning_ready()
+    )
     analyse_default = not betrieb_unlocked
-    if backtesting_allowed:
+    if scenario_exploration_allowed:
         specs.append(
             PageSpec(
                 page_backtesting.render,
-                "Backtesting",
+                "Scenario-Exploration",
                 "📊",
                 "Analyse",
-                "backtesting",
+                "scenario-exploration",
                 default=analyse_default,
             )
         )
@@ -138,28 +151,7 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
             default=analyse_default,
         )
     )
-    specs.append(
-        PageSpec(page_config.render, "Konfiguration", "⚙️", "Konfiguration", "config")
-    )
-    if is_scenario_editor_unlocked():
-        specs.append(
-            PageSpec(
-                page_scenario_editor.render,
-                "Szenarieneditor",
-                "🧪",
-                "Konfiguration",
-                "scenario-editor",
-            )
-        )
-    specs.append(
-        PageSpec(
-            page_house_config.render,
-            "Hauskonfigurator",
-            "🏠",
-            "Konfiguration",
-            "house-config",
-        )
-    )
+    specs.extend(_planning_page_specs(house_config_default=False))
     return specs
 
 

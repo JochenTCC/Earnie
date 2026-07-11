@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 import config
+from tests.config_fixtures import minimal_config_payload, write_minimal_config_tree
 
 
-def _write_minimal_config(tmp_path, system_extra: dict | None = None) -> str:
+def _write_minimal_config(tmp_path, system_extra: dict | None = None) -> tuple[str, str]:
     system = {
         "global_timeout": 10,
         "loop_timeout": 900,
@@ -17,46 +16,19 @@ def _write_minimal_config(tmp_path, system_extra: dict | None = None) -> str:
     }
     if system_extra:
         system.update(system_extra)
-    payload = {
-        "system": system,
-        "loxone_blocks": {
-            "soc_name": "soc",
-            "pv_counter_name": "pv",
-            "log_filename": "log.csv",
-            "pv_tuning_log_file": "pv.csv",
-            "pv_power_name": "pv_act",
-            "battery_power_name": "bat",
-            "grid_power_name": "grid",
-            "target_soc_name": "t_soc",
-            "target_charge_power_name": "t_charge",
-            "target_discharge_power_name": "t_discharge",
-            "control_cmd_name": "cmd",
-        },
-        "runtime_settings": {
-            "battery_id": "",
-            "pv_system_id": "",
-            "house_profile_id": "",
-            "import_tariff_id": "",
-            "export_tariff_id": "",
-        },
-        "batteries": [],
-        "pv_systems": [],
-        "planning_horizon": {"mode": "sunset_window"},
-        "file_paths_battery_simulation": {
-            "path_cons_data": "runtime/cons_data_hourly.csv",
-        },
-    }
-    path = tmp_path / "config.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    return str(path)
+    return write_minimal_config_tree(
+        tmp_path,
+        config_payload=minimal_config_payload(extra={"system": system}),
+    )
 
 
 def test_loxone_silent_mode_defaults_true_without_local_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    config_path = _write_minimal_config(tmp_path)
+    config_path, scenarios_path = _write_minimal_config(tmp_path)
     local_path = tmp_path / "missing_local_settings.json"
     cfg = config.Config(
         config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
         local_settings_path=str(local_path),
         require_loxone_credentials=False,
     )
@@ -65,11 +37,12 @@ def test_loxone_silent_mode_defaults_true_without_local_settings(tmp_path, monke
 
 def test_loxone_silent_mode_from_local_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    config_path = _write_minimal_config(tmp_path)
+    config_path, scenarios_path = _write_minimal_config(tmp_path)
     local_path = tmp_path / "local_settings.json"
     local_path.write_text(json.dumps({"loxone_silent_mode": True}), encoding="utf-8")
     cfg = config.Config(
         config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
         local_settings_path=str(local_path),
         require_loxone_credentials=False,
     )
@@ -78,10 +51,11 @@ def test_loxone_silent_mode_from_local_settings(tmp_path, monkeypatch):
 
 def test_loxone_silent_mode_from_central_config(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    config_path = _write_minimal_config(tmp_path, {"loxone_silent_mode": True})
+    config_path, scenarios_path = _write_minimal_config(tmp_path, {"loxone_silent_mode": True})
     local_path = tmp_path / "local_settings.json"
     cfg = config.Config(
         config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
         local_settings_path=str(local_path),
         require_loxone_credentials=False,
     )
@@ -90,11 +64,12 @@ def test_loxone_silent_mode_from_central_config(tmp_path, monkeypatch):
 
 def test_loxone_silent_mode_local_settings_overrides_central_config(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    config_path = _write_minimal_config(tmp_path, {"loxone_silent_mode": False})
+    config_path, scenarios_path = _write_minimal_config(tmp_path, {"loxone_silent_mode": False})
     local_path = tmp_path / "local_settings.json"
     local_path.write_text(json.dumps({"loxone_silent_mode": True}), encoding="utf-8")
     cfg = config.Config(
         config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
         local_settings_path=str(local_path),
         require_loxone_credentials=False,
     )

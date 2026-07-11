@@ -77,7 +77,7 @@ Vertikale Marker **SA₀**, **SA₁**, **SA₂**; **Jetzt** nur im Live-Segment 
 |--------|-----------|-------|-----------|
 | ▲ | Hinweis | gelb | Unkritische Abweichung (z. B. Wärmepumpe: Freigabe ohne Anlauf) |
 | ◆ | Warnung | orange | Erwartete Abweichung — Loxone handelt bewusst anders |
-| ⬡ | Fehler | rot | Anweisung von Ernie nicht befolgt |
+| ⬡ | Fehler | rot | Anweisung von Earnie nicht befolgt |
 
 Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Regeltext. Mehrere Icons pro Slot möglich (verschiedene Scopes, z. B. Batterie + E-Auto).
 
@@ -145,6 +145,6 @@ Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/
 | **Optimierungs-Takt** | Viertelstunden; letzter Lauf main.py/App |
 | **Nächster main.py-Takt** | Countdown + **?** (Sync-Erklärung) |
 
-## Backtesting
+## Scenario-Exploration
 
-Eigene Charts und Monatsauswertung aus `backtesting_log.json` — ohne S-2-Navigation und ohne Produktiv-Log-Merge.
+Eigene Charts und Monatsauswertung aus `backtesting_log.json` — ohne S-2-Navigation und ohne Produktiv-Log-Merge. UI-Modus: **Scenario-Exploration** (`scenario_exploration`).

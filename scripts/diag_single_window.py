@@ -54,8 +54,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--scenario",
         type=str,
-        default="runtime_settings",
-        help="Szenario-ID aus backtesting_scenarios / runtime_settings",
+        default="live",
+        help="Szenario-ID aus backtesting_scenarios.json (Standard: Live-Szenario live)",
     )
     parser.add_argument(
         "--initial-soc",

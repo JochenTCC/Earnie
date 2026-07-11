@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import config
-from tests.test_fragment_refresh import _write_config
+from tests.config_fixtures import minimal_config_payload, write_minimal_config_tree
 from ui.mode_selector import UI_MODE_KEYS, get_enabled_ui_modes
 
 
@@ -13,7 +13,7 @@ def test_default_modes_exclude_historical_and_price_forecast(monkeypatch):
         lambda: False,
     )
     modes = get_enabled_ui_modes()
-    assert modes == ["Sunset-2-Sunset", "Backtesting"]
+    assert modes == ["Sunset-2-Sunset", "Scenario-Exploration"]
     assert "Historischer Tag" not in modes
     assert "Preis-Prognose (Dev)" not in modes
 
@@ -26,23 +26,23 @@ def test_price_forecast_mode_when_config_enabled(monkeypatch):
     )
     assert get_enabled_ui_modes() == [
         "Sunset-2-Sunset",
-        "Backtesting",
+        "Scenario-Exploration",
         "Preis-Prognose (Dev)",
     ]
 
 
 def test_prod_modes_from_env(monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_UI_MODES", "sunset2sunset,backtesting")
-    assert get_enabled_ui_modes() == ["Sunset-2-Sunset", "Backtesting"]
+    monkeypatch.setenv("ENERGY_OPTIMIZER_UI_MODES", "sunset2sunset,scenario_exploration")
+    assert get_enabled_ui_modes() == ["Sunset-2-Sunset", "Scenario-Exploration"]
 
 
 def test_historical_in_env_is_ignored(monkeypatch):
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_UI_MODES", "sunset2sunset,historical,backtesting"
+        "ENERGY_OPTIMIZER_UI_MODES", "sunset2sunset,historical,scenario_exploration"
     )
     modes = get_enabled_ui_modes()
     assert "Historischer Tag" not in modes
-    assert modes == ["Sunset-2-Sunset", "Backtesting"]
+    assert modes == ["Sunset-2-Sunset", "Scenario-Exploration"]
 
 
 def test_ui_mode_keys_has_no_historical():
@@ -51,13 +51,26 @@ def test_ui_mode_keys_has_no_historical():
 
 def test_ui_price_forecast_page_default_false(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    path = _write_config(tmp_path, None)
-    cfg = config.Config(config_path=path, require_loxone_credentials=False)
+    config_path, scenarios_path = write_minimal_config_tree(tmp_path)
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        require_loxone_credentials=False,
+    )
     assert cfg.get_ui_price_forecast_page_enabled() is False
 
 
 def test_ui_price_forecast_page_from_config_json(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    path = _write_config(tmp_path, {"price_forecast_page_enabled": True})
-    cfg = config.Config(config_path=path, require_loxone_credentials=False)
+    config_path, scenarios_path = write_minimal_config_tree(
+        tmp_path,
+        config_payload=minimal_config_payload(
+            extra={"ui": {"price_forecast_page_enabled": True}}
+        ),
+    )
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        require_loxone_credentials=False,
+    )
     assert cfg.get_ui_price_forecast_page_enabled() is True

@@ -2,17 +2,17 @@
 
 Übersicht, welcher **Host-Port** zu welchem Betriebsmodell gehört. Im Container lauscht Streamlit intern fast immer auf **8501** (`ui.streamlit_port`); das Compose-Mapping `HOST:CONTAINER` kann abweichen.
 
-Konfiguration im Container/venv: `config.json` → `ui.streamlit_port` oder `ENERGY_OPTIMIZER_UI_STREAMLIT_PORT`.
+Konfiguration im Container/venv: `config.json` → `ui.streamlit_port` oder `EARNIE_UI_STREAMLIT_PORT`.
 
 ## Port-Zuordnung
 
 | Port | Stack / Betrieb | Plattform | Worker | UI-Zugriff | Compose / Start |
 |------|-----------------|-----------|--------|------------|-----------------|
 | **8501** | **Produktion** | Synology NAS, LoxBerry | `optimizer-worker` auf dem Gerät | LAN: `http://<host>:8501`; Synology extern: HTTPS :443 → Reverse Proxy → 8501 | `docker-compose-synology.yml`, `docker-compose-loxberry.yml` |
-| **8502** | **Lokaler Dev-Stack (Docker)** | Windows/Linux Dev-PC | `ernie-optimizer-worker` (lokal) | `http://localhost:8502` | `docker-compose.yml` |
+| **8502** | **Lokaler Dev-Stack (Docker)** | Windows/Linux Dev-PC | `earnie-optimizer-worker` (lokal) | `http://localhost:8502` | `docker-compose.yml` |
 | **8504** | **Lokal ohne Docker** | Dev-PC (venv) | `python main.py` (lokal) | `http://localhost:8504` (Standard `ui.streamlit_port`) | `python -m scripts.run_streamlit`, VS Code „Streamlit app.py“ |
-| **8510** | **Greenfield** | Dev-PC (Docker) | `ernie-greenfield-worker` | `http://localhost:8510` | `docker-compose-greenfield.yml` (`8510:8510`) |
-| **8511** | **Greenfield** | Dev-PC (venv) | `ernie-greenfield-worker` | `http://localhost:8511` | `python -m scripts.run_streamlit`, VS Code „Streamlit app.py“ |
+| **8502** | **Greenfield** | Dev-PC (Docker) | `earnie-greenfield-worker` | `http://localhost:8502` | `docker-compose-greenfield.yml` (`8502:8501`) |
+| **8511** | **Greenfield** | Dev-PC (venv) | `earnie-greenfield-worker` | `http://localhost:8511` | `python -m scripts.run_streamlit`, VS Code „Streamlit app.py“ |
 | **8503** | **Lokal gegen NAS-Daten** | Dev-PC (venv) | **auf der NAS** (`optimizer-worker` im Prod-Container) | `http://localhost:8503` | VS Code „Streamlit app.py (NAS :8503)“ — liest `config`/`runtime` per UNC/SMB von der NAS |
 
 ## Parallelbetrieb auf dem Dev-PC
@@ -28,7 +28,7 @@ Typisch gleichzeitig möglich:
 ## Umgebungsvariable
 
 ```text
-ENERGY_OPTIMIZER_UI_STREAMLIT_PORT=8503
+EARNIE_UI_STREAMLIT_PORT=8503
 ```
 
 Überschreibt `ui.streamlit_port` aus `config.json` (siehe `ui/streamlit_server.py`).

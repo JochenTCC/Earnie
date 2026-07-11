@@ -1,4 +1,4 @@
-"""Szenarieneditor: Runtime-Baseline, Batterien und weitere Backtesting-Szenarien."""
+"""Szenarieneditor: Live-Szenario und weitere Scenario-Exploration-Varianten."""
 from __future__ import annotations
 
 import streamlit as st
@@ -15,7 +15,6 @@ from ui.house_config_io import (
     load_tariffs_catalog_meta,
     upsert_scenario,
 )
-from ui.planning_battery_form import render_battery_planning_tab
 from ui.planning_tariff_form import (
     _EXPORT_TYPE_LABELS,
     _IMPORT_TYPE_LABELS,
@@ -28,35 +27,45 @@ from ui.scenario_form_helpers import (
     render_entity_selectbox,
     render_profile_geo_caption,
 )
-from ui.scenario_runtime_form import render_runtime_scenario_form
 
 _HELP = (
-    "Runtime-Szenario (Pflicht), Batterie-Entitäten und optionale weitere "
-    "Backtesting-Varianten. Speichert Runtime nach `config.json`, "
-    "weitere Szenarien nach `config/backtesting_scenarios.json`."
+    "Live-Szenario (Pflicht für Echtzeit und Scenario-Exploration) und optionale "
+    "weitere Varianten. Batterie-Entitäten legst du im Hauskonfigurator an; "
+    "Speichert Szenarien nach `config/backtesting_scenarios.json`; Live-Auswahl über "
+    "`live_scenario_id` in `config.json`."
 )
 
 
-def _render_additional_scenarios_tab() -> None:
-    st.subheader("Weitere Szenarien")
-    st.caption("Optionale Varianten mit anderen Batterien oder Tarifen (zusätzlich zu Runtime).")
+def _render_scenarios_tab() -> None:
+    live_id = config.get_live_scenario_id()
+    st.subheader("Szenarien")
+    st.caption(
+        f"Live-Szenario (aktuell: `{live_id}`) ist die Baseline für Scenario-Exploration "
+        "und Echtzeit-Betrieb. Standort und Zeitzone kommen aus dem Hausprofil."
+    )
 
     scenarios_doc = load_backtesting_scenarios_raw()
     scenarios = scenarios_doc.get("scenarios", [])
     scenario_ids = [s.get("id", "") for s in scenarios]
+    default_pick = live_id if live_id in scenario_ids else "— neu —"
     selected = st.selectbox(
         "Szenario",
         options=["— neu —", *scenario_ids],
+        index=(["— neu —", *scenario_ids].index(default_pick) if default_pick in scenario_ids else 0),
         key="scenario_select",
     )
     existing = next((s for s in scenarios if s.get("id") == selected), None)
     if selected == "— neu —":
         existing = None
 
+    if existing and str(existing.get("id", "")).strip() == live_id:
+        st.info(f"Dies ist das Live-Szenario (`live_scenario_id`: `{live_id}`).")
+
     scenario_id = st.text_input(
         "Szenario-ID",
         value=(existing or {}).get("id", "mein_szenario"),
         key="scenario_id",
+        disabled=existing is not None and str(existing.get("id", "")).strip() == live_id,
     )
     label = st.text_input(
         "Bezeichnung",
@@ -201,15 +210,14 @@ def _render_additional_scenarios_tab() -> None:
         key="scenario_save",
         disabled=required_lists_empty,
     ):
-        if not scenario_id.strip():
+        save_id = (existing or {}).get("id", scenario_id).strip() if existing else scenario_id.strip()
+        if not save_id:
             st.error("Szenario-ID fehlt.")
-        elif scenario_id.strip() == "runtime_settings":
-            st.error("Die ID 'runtime_settings' ist reserviert.")
         else:
             upsert_scenario(
                 {
-                    "id": scenario_id.strip(),
-                    "label": label.strip() or scenario_id.strip(),
+                    "id": save_id,
+                    "label": label.strip() or save_id,
                     "settings": _build_settings(
                         battery_id=lookup_entity_id(bat_map, battery_pick),
                         pv_system_id=lookup_entity_id(pv_map, pv_pick),
@@ -222,7 +230,7 @@ def _render_additional_scenarios_tab() -> None:
                     ),
                 }
             )
-            st.success(f"Szenario '{scenario_id}' gespeichert.")
+            st.success(f"Szenario '{save_id}' gespeichert.")
             st.rerun()
 
 
@@ -264,12 +272,4 @@ def render() -> None:
     if catalog_meta.get("catalog_as_of"):
         st.caption(f"Tarifkatalog: Stand {catalog_meta['catalog_as_of']}")
 
-    tab_runtime, tab_battery, tab_more = st.tabs(
-        ["Runtime (Baseline)", "Batterien", "Weitere Szenarien"]
-    )
-    with tab_runtime:
-        render_runtime_scenario_form()
-    with tab_battery:
-        render_battery_planning_tab()
-    with tab_more:
-        _render_additional_scenarios_tab()
+    _render_scenarios_tab()

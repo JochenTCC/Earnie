@@ -16,7 +16,7 @@
       "module": "scripts.run_streamlit",
       "console": "integratedTerminal",
       "env": {
-        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
+        "EARNIE_UI_STREAMLIT_PORT": "8501"
       },
       "subProcess": false,
       "justMyCode": false
@@ -29,7 +29,7 @@
       "module": "scripts.run_streamlit",
       "console": "integratedTerminal",
       "env": {
-        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
+        "EARNIE_UI_STREAMLIT_PORT": "8501"
       },
       "subProcess": false,
       "justMyCode": false
@@ -41,9 +41,9 @@
       "module": "scripts.run_streamlit",
       "cwd": "${workspaceFolder}",
       "env": {
-        "ENERGY_OPTIMIZER_RUNTIME_DIR": "\\\\DS-KO-DO-2\\docker\\energy_optimizer\\runtime",
-        "ENERGY_OPTIMIZER_CONFIG_PATH": "\\\\DS-KO-DO-2\\docker\\energy_optimizer\\config\\config.json",
-        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8503"
+        "EARNIE_RUNTIME_DIR": "\\\\DS-KO-DO-2\\docker\\earnie\\runtime",
+        "EARNIE_CONFIG_PATH": "\\\\DS-KO-DO-2\\docker\\earnie\\config\\config.json",
+        "EARNIE_UI_STREAMLIT_PORT": "8503"
       },
       "subProcess": false,
       "console": "integratedTerminal",
@@ -56,15 +56,15 @@
       "module": "scripts.run_streamlit",
       "cwd": "${workspaceFolder}",
       "env": {
-        "ENERGY_OPTIMIZER_CONFIG_PATH": "${workspaceFolder}/greenfield/config/config.json",
-        "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/greenfield/runtime",
-        "ENERGY_OPTIMIZER_DOTENV_PATH": "${workspaceFolder}/greenfield/config/.env",
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH": "${workspaceFolder}/greenfield/config/house_profiles.json",
-        "ENERGY_OPTIMIZER_TARIFFS_PATH": "${workspaceFolder}/greenfield/config/tariffs.json",
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/greenfield/config/backtesting_scenarios.json",
-        "ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START": "0",
-        "ENERGY_OPTIMIZER_UI_MODES": "sunset2sunset,backtesting",
-        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8511"
+        "EARNIE_CONFIG_PATH": "${workspaceFolder}/greenfield/config/config.json",
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/greenfield/runtime",
+        "EARNIE_DOTENV_PATH": "${workspaceFolder}/greenfield/config/.env",
+        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/greenfield/config/house_profiles.json",
+        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/greenfield/config/tariffs.json",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/greenfield/config/backtesting_scenarios.json",
+        "EARNIE_VERIFY_LOXONE_ON_START": "0",
+        "EARNIE_UI_MODES": "sunset2sunset,scenario_exploration",
+        "EARNIE_UI_STREAMLIT_PORT": "8511"
       },
       "subProcess": false,
       "console": "integratedTerminal",
@@ -78,8 +78,8 @@
       "module": "scripts.run_streamlit",
       "cwd": "${workspaceFolder}",
       "env": {
-        "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/runtime",
-        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8501"
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/runtime",
+        "EARNIE_UI_STREAMLIT_PORT": "8501"
       },
       "subProcess": false,
       "console": "integratedTerminal",
@@ -93,13 +93,13 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "env": {
-        "ENERGY_OPTIMIZER_CONFIG_PATH": "${workspaceFolder}/greenfield/config/config.json",
-        "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/greenfield/runtime",
-        "ENERGY_OPTIMIZER_DOTENV_PATH": "${workspaceFolder}/greenfield/config/.env",
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH": "${workspaceFolder}/greenfield/config/house_profiles.json",
-        "ENERGY_OPTIMIZER_TARIFFS_PATH": "${workspaceFolder}/greenfield/config/tariffs.json",
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/greenfield/config/backtesting_scenarios.json",
-        "ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START": "0"
+        "EARNIE_CONFIG_PATH": "${workspaceFolder}/greenfield/config/config.json",
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/greenfield/runtime",
+        "EARNIE_DOTENV_PATH": "${workspaceFolder}/greenfield/config/.env",
+        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/greenfield/config/house_profiles.json",
+        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/greenfield/config/tariffs.json",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/greenfield/config/backtesting_scenarios.json",
+        "EARNIE_VERIFY_LOXONE_ON_START": "0"
       },
       "justMyCode": false
     },
@@ -111,15 +111,15 @@
       "module": "scripts.run_streamlit",
       "cwd": "${workspaceFolder}",
       "env": {
-        "ENERGY_OPTIMIZER_CONFIG_PATH": "${workspaceFolder}/greenfield/config/config.json",
-        "ENERGY_OPTIMIZER_RUNTIME_DIR": "${workspaceFolder}/greenfield/runtime",
-        "ENERGY_OPTIMIZER_DOTENV_PATH": "${workspaceFolder}/greenfield/config/.env",
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH": "${workspaceFolder}/greenfield/config/house_profiles.json",
-        "ENERGY_OPTIMIZER_TARIFFS_PATH": "${workspaceFolder}/greenfield/config/tariffs.json",
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/greenfield/config/backtesting_scenarios.json",
-        "ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START": "0",
-        "ENERGY_OPTIMIZER_UI_MODES": "sunset2sunset,backtesting",
-        "ENERGY_OPTIMIZER_UI_STREAMLIT_PORT": "8511"
+        "EARNIE_CONFIG_PATH": "${workspaceFolder}/greenfield/config/config.json",
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/greenfield/runtime",
+        "EARNIE_DOTENV_PATH": "${workspaceFolder}/greenfield/config/.env",
+        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/greenfield/config/house_profiles.json",
+        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/greenfield/config/tariffs.json",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/greenfield/config/backtesting_scenarios.json",
+        "EARNIE_VERIFY_LOXONE_ON_START": "0",
+        "EARNIE_UI_MODES": "sunset2sunset,scenario_exploration",
+        "EARNIE_UI_STREAMLIT_PORT": "8511"
       },
       "subProcess": false,
       "console": "integratedTerminal",

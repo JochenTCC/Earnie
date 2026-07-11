@@ -7,53 +7,40 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Research Items
 
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
-    - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
+  - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [x] Review Smart Energy app for comparison
 - [x] Review other providers with flexible prices
 - [ ] Adapt business plan
 - [ ] **Outreach (not software):** Ask for interested parties in loxforum / reddit — post under “my project”; take interesting chart snapshots (loxforum admins contacted re. best place)
 
 
+
 ## Feature Backlog
+
+
 
 ### Version 2.0
 
 Branding (Earnie rename) → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
-Recommended order: **P1** optional consumers → **P2** scenario model → **P3** UI (Konfigurator / Echtzeit-Umgebung) → **P4** sunrise rename → **P5** tariffs → **P6** prod cutover → **P7** README / evaluations.
+**Status (2026-07-11):** P1–P3 done (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). Greenfield smoke test completed — follow-ups in [Backlog-Bugfixes.md](Backlog-Bugfixes.md) and below.
 
-Critical path: P1 → P2 → P5 → P6. UX path: P1 → P2 → P3. Prefer **P4 before P3** if single-threaded (schema/horizon naming conflicts).
+Recommended order: **P4** sunrise rename → **P5** tariffs & deploy gate → **P6** prod NAS cutover → **P7** README / evaluations.
+
+Critical path: **P5 → P6**. **P4** can run in parallel with P5 prep. Smoke-test bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 **Decisions (2026-07-11):**
 
-| Topic | Decision |
-| ----- | -------- |
-| `EARNIE_UI_MODES` key | Hard rename **`backtesting` → `scenario_exploration`** — no alias; update compose, launch configs, docs, tests in same PR (P2) |
-| Scenario id `runtime_settings` | **Remove in 2.0** — live baseline is a normal scenario entry (default id **`live`**) selected via `live_scenario_id` in `config.json`; update scripts/tests/fixtures in same release (P2) |
-| Battery without PV | **Allowed** — battery still required for MILP / planning readiness; PV optional (zero PV forecast when `pv_system_id` unset) (P1) |
-| **7g-a** before P6 | **Skip for 2.0** — direct NAS cutover after P5; 7g-a remains in Packaging backlog, not a 2.0 gate |
 
-- [ ] **Version 2.0 P1 — Optional consumers**
-  - Make "Haus Wärme" (`thermal_annual`) not mandatory — `house_config/profiles_store.py`, Hauskonfigurator
-  - Make "PV-Anlage" not mandatory — `ui/setup_readiness.py`, `ui/planning_pv_form.py`
-  - **Battery without PV allowed** — battery required for MILP / `is_planning_ready()`; unset `pv_system_id` → zero PV forecast
-  - Optimizer/simulation tolerates missing PV/thermal — `house_config/entity_resolution.py`, `config.py`, `house_config/baseload.py`, `house_config/planning_flex_bridge.py`
-  - Tests: greenfield bootstrap, setup readiness, house profiles without thermal/PV
+| Topic                          | Decision                                                                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EARNIE_UI_MODES` key          | Hard rename `backtesting` **→** `scenario_exploration` — no alias; update compose, launch configs, docs, tests in same PR (P2)                                                        |
+| Scenario id `runtime_settings` | **Remove in 2.0** — live baseline is a normal scenario entry (default id `live`) selected via `live_scenario_id` in `config.json`; update scripts/tests/fixtures in same release (P2) |
+| Battery without PV             | **Allowed** — battery still required for MILP / planning readiness; PV optional (zero PV forecast when `pv_system_id` unset) (P1)                                                     |
+| **7g-a** before P6             | **Skip for 2.0** — direct NAS cutover after P5; 7g-a remains in Packaging backlog, not a 2.0 gate                                                                                     |
 
-- [ ] **Version 2.0 P2 — Unified scenario model**
-  - Do not differentiate in scenarios between runtime and others — live baseline is a normal scenario (default id **`live`**, selected by `live_scenario_id` in `config.json`); ID resolution from 1.26.0 P2 stays
-  - Hard rename UI mode **`backtesting` → `scenario_exploration`** — `ui/mode_selector.py`, `docker-compose-greenfield.yml`, VS Code launch, docs; user-facing label **Scenario-Exploration**
-  - **Remove scenario id `runtime_settings`** — no alias; update `scripts/run_backtesting.py`, fixtures, tests, Szenarieneditor special case
-  - Data model: scenarios in `backtesting_scenarios.json` and live config share the same shape; resolution via `house_config/scenario_resolution.py`
-  - Remove `runtime_settings` special case in Szenarieneditor (`ui/pages/page_scenario_editor.py`, `ui/scenario_runtime_form.py`)
 
-- [ ] **Version 2.0 P3 — Configuration UI restructure**
-  - Rearrange "Haus Konfigurator" und "Szenario-Editor" — `ui/navigation.py`, onboarding gating
-  - Change "Konfiguration" section/page into **Echtzeit-Umgebung** — select one Hausprofil + one scenario (`live_scenario_id`) as live configuration
-  - Structure/navigation only in 2.0; full JSON/scenario editor → Version 2.+1
-  - Update [`docs/einrichtung/greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md) acceptance table
-
-- [ ] **Version 2.0 P4 — `sunrise_window` rename**
+- [ ] **Version 2.0 P4 —** `sunrise_window` **rename**
   - Rename `sunset_window` → `sunrise_window` — schema, code, docs, tests (`simulation/horizon_mode.py`, `config/config.schema.json`, fixtures, scripts)
   - Prerequisite for 2.+1 live horizon switch; **do not** implement live `planning_horizon.mode` branching in 2.0
 
@@ -63,7 +50,7 @@ Critical path: P1 → P2 → P5 → P6. UX path: P1 → P2 → P3. Prefer **P4 b
   - Include `tariffs.json` in deploy (follow-up 1.26.0 P5) — sidecar alongside `config.json` on NAS; image/bootstrap docs
 
 - [ ] **Version 2.0 P6 — Prod NAS cutover**
-  - Apply migrated config per [`migrated/MIGRATION_REVIEW.md`](migrated/MIGRATION_REVIEW.md) and [`house_config/migrate_runtime_entities.py`](house_config/migrate_runtime_entities.py) (1.26.0 P5)
+  - Apply migrated config per `[migrated/MIGRATION_REVIEW.md](migrated/MIGRATION_REVIEW.md)` and `[house_config/migrate_runtime_entities.py](house_config/migrate_runtime_entities.py)` (1.26.0 P5)
   - **Direct NAS cutover** after P5 — no 7g-a gate for 2.0; live acceptance on prod NAS
   - Propose `version.py` → `2.0.0` only after P6 acceptance (user approval required)
 
@@ -73,6 +60,10 @@ Critical path: P1 → P2 → P5 → P6. UX path: P1 → P2 → P3. Prefer **P4 b
   - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
 
 
+
+### Version 2.0 — smoke-test follow-ups (non-blocking for P5/P6)
+
+- [ ] **Scenario-Exploration without PV** — optimization/backtesting path incomplete when `pv_system_id` unset (P1 allows battery-only; simulation/MILP gaps remain — defer to **Thermals** / **Adaptation** epics unless blocking prod cutover)
 
 ### Version 2.+1 — Quality epic / post-migration cleanup
 
@@ -84,10 +75,12 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
 - [ ] Evaluate option for automated UI testing
 
 
+
 ### Version 2.+1
 
 - [ ] Define CSV data format for consumer annual demand (except house and EV) and provide import option (in addition to rated values). Annual profile from rated values can be compared graphically and in summary with measured profile.
 - [ ] Set up debug page for Loxone communication showing read data with last update, whether data was sent to Loxone successfully (with value and timestamp — when silentmode==false)
+
 
 
 ### Version 2.+1
@@ -96,6 +89,7 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
   - Check whether historical SwimSpa power logs (`thermal_control.history_logs.power_csv` = `..._SwimSpa_Leistung_...csv`, source `Ernie_Swim-Spa-P_act`) also contain the **filter share** (case B). If yes: assess impact on **thermal model calibration** (`heat_loss_kw_per_k` etc.) — filter (~0.18 kW) would be misinterpreted as heating power.
   - **Fundamental question:** Should heating/filter separation happen **directly in Loxone** (separate heating power marker without filter) instead of software-side via `subtract_consumer_ids`? Advantage: consistent live **and** historical data at the source.
   - Reference: case B correction (live actual) already implemented; thermal calibration see **Thermals P1** (Swim-Spa)
+
 
 
 ### Version 2.+1

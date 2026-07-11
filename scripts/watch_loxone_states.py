@@ -12,10 +12,11 @@ import sys
 import time
 
 import logger_config
+from runtime_store.env_vars import read_env_or
 
 DEFAULT_INTERVAL_SEC = 60
 DEFAULT_LOG_FILE = os.path.join(
-    os.environ.get("ENERGY_OPTIMIZER_RUNTIME_DIR", "runtime"),
+    read_env_or("RUNTIME_DIR", "runtime"),
     "loxone_watchdog.log",
 )
 

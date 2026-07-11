@@ -61,11 +61,11 @@ class TestSnapshotCollector:
             scenario,
             prices,
             cache=cache,
-            scenario_id="runtime_settings",
+            scenario_id="live",
             horizon_mode=FIXED_24H,
             snapshot_collector=snapshots,
         )
         assert len(snapshots) == 2
-        assert snapshots[0]["scenario_id"] == "runtime_settings"
+        assert snapshots[0]["scenario_id"] == "live"
         assert snapshots[0]["horizon_mode"] == FIXED_24H
         assert len(snapshots[0]["chart_rows_24h"]) == 24

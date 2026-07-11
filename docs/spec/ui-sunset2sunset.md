@@ -15,11 +15,11 @@ Ein einheitlicher Produktiv-Cockpit-Modus ohne Grenze zwischen Live und Historie
 | Modus | Key | Prod |
 |-------|-----|------|
 | Sunset-2-Sunset | `sunset2sunset` | ja |
-| Backtesting | `backtesting` | optional Dev |
+| Scenario-Exploration | `scenario_exploration` | optional Dev |
 
-`ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting` (Prod). Kein Alias `live`.
+`ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,scenario_exploration` (Prod). Kein Alias `live` oder `backtesting`.
 
-**Sidebar:** wie bisher Echtzeit (PV-, Batterie-, Einspeiseparameter, Runtime) — **ohne** adaptives PV-Tuning (entfernen; neuer Adaptions-Ansatz separat im Backlog).
+**Sidebar:** Live-Szenario (PV-, Batterie-, Einspeiseparameter über Entitäts-Referenzen) — **ohne** adaptives PV-Tuning (entfernen; neuer Adaptions-Ansatz separat im Backlog).
 
 ## 3. Sonnenaufgang-Anker SA₀, SA₁, SA₂
 

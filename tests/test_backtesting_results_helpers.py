@@ -76,12 +76,12 @@ def test_build_annual_cost_rows_reference_kwh_and_delta():
         "reference_id": HISTORICAL_REFERENCE_ID,
         "labels": {
             HISTORICAL_REFERENCE_ID: "Historisch",
-            "runtime_settings": "Runtime",
+            "live": "Live",
         },
         "summary": {
             "total_eur": {
                 HISTORICAL_REFERENCE_ID: 1200.0,
-                "runtime_settings": 1000.0,
+                "live": 1000.0,
             },
         },
     }
@@ -90,9 +90,9 @@ def test_build_annual_cost_rows_reference_kwh_and_delta():
     ref_row = next(r for r in rows if r["Szenario"] == "Historisch")
     assert ref_row["Jahres-kWh"] == "5000"
     assert ref_row["Δ vs. Referenz"] == "—"
-    runtime_row = next(r for r in rows if r["Szenario"] == "Runtime")
-    assert runtime_row["Jahres-kWh"] == "—"
-    assert runtime_row["Δ vs. Referenz"] == "-200.00 €"
+    live_row = next(r for r in rows if r["Szenario"] == "Live")
+    assert live_row["Jahres-kWh"] == "—"
+    assert live_row["Δ vs. Referenz"] == "-200.00 €"
 
 
 def test_reference_consumption_subheader_test_run():

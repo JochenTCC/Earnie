@@ -10,8 +10,10 @@ from typing import IO, TextIO
 logger = logging.getLogger(__name__)
 
 
+from runtime_store.env_vars import read_env_or
+
 def _runtime_dir() -> str:
-    return os.environ.get("ENERGY_OPTIMIZER_RUNTIME_DIR", "runtime")
+    return read_env_or("RUNTIME_DIR", "runtime")
 
 
 class SingleInstanceError(RuntimeError):

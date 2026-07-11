@@ -129,8 +129,8 @@ Alternative Windows wrapper: `.\build-container.ps1 --target all --push`
 
 Default tags:
 
-- `ghcr.io/jochentcc/ernie-energy:latest`
-- `ghcr.io/jochentcc/ernie-energy:<version>` from `version.py`
+- `ghcr.io/jochentcc/earnie-energy:latest`
+- `ghcr.io/jochentcc/earnie-energy:<version>` from `version.py`
 
 Details: `docs/einrichtung/container.md`
 

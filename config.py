@@ -256,29 +256,23 @@ class Config:
                 "Verschleiß pro batteries[]-Eintrag konfigurieren."
             )
 
-    def _reject_legacy_runtime_flat_fields(self) -> None:
-        runtime = self._raw_config.get("runtime_settings", {})
-        if not isinstance(runtime, dict):
-            return
-        found = {
-            key
-            for raw_key in runtime
-            if (key := self._normalize_runtime_settings_key(raw_key))
-            in self._DEPRECATED_RUNTIME_FLAT_KEYS
-        }
-        if found:
+    def _reject_legacy_runtime_settings_block(self) -> None:
+        if self._raw_config.get("runtime_settings") is not None:
+            from house_config.scenario_resolution import DEFAULT_LIVE_SCENARIO_ID
+
             raise ValueError(
-                "Deprecated flache runtime_settings-Felder: "
-                f"{', '.join(sorted(found))}. "
-                "Nutzen Sie battery_id, pv_system_id, import_tariff_id, export_tariff_id."
+                "Block 'runtime_settings' in config.json ist entfernt (2.0 P2). "
+                "Live-Konfiguration als Szenario in backtesting_scenarios.json "
+                f"(live_scenario_id, Standard: '{DEFAULT_LIVE_SCENARIO_ID}')."
             )
 
-    def _resolve_runtime_settings_dict(self) -> dict:
-        from house_config.scenario_resolution import resolve_runtime_settings
+    def _resolve_live_scenario_settings_dict(self) -> dict:
+        from house_config.scenario_resolution import resolve_live_scenario_settings
 
         holder: dict = {}
-        resolved = resolve_runtime_settings(
+        resolved = resolve_live_scenario_settings(
             self._raw_config,
+            backtesting_scenarios_path=self.backtesting_scenarios_path,
             tariffs_path=self.tariffs_path,
             house_profiles_path=self.house_profiles_path,
             monthly_rates_holder=holder,
@@ -305,6 +299,7 @@ class Config:
             self._raw_config,
             tariffs_path=self.tariffs_path,
             house_profiles_path=self.house_profiles_path,
+            backtesting_scenarios_path=self.backtesting_scenarios_path,
         )
         detail = "; ".join(missing) if missing else "unbekannte Lücken"
         raise RuntimeError(
@@ -324,6 +319,7 @@ class Config:
             self._raw_config,
             tariffs_path=self.tariffs_path,
             house_profiles_path=self.house_profiles_path,
+            backtesting_scenarios_path=self.backtesting_scenarios_path,
         )
 
     def _load_planning_horizon_mode(self) -> None:
@@ -361,9 +357,9 @@ class Config:
             self.FEED_IN_MODE = validate_feed_in_mode(feed_in_mode_raw)
 
         self.K_PUSH_CENT = float(self._lookup_runtime_value(resolved, "k_push_cent"))
-        self.PV_TILT = float(self._lookup_runtime_value(resolved, "pv_tilt"))
-        self.PV_AZIMUTH = float(self._lookup_runtime_value(resolved, "pv_azimuth"))
-        self.PV_KWP = float(self._lookup_runtime_value(resolved, "pv_kwp"))
+        self.PV_TILT = float(resolved.get("pv_tilt", 0.0) or 0.0)
+        self.PV_AZIMUTH = float(resolved.get("pv_azimuth", 0.0) or 0.0)
+        self.PV_KWP = float(resolved.get("pv_kwp", 0.0) or 0.0)
         self.BATTERY_MAX_POWER_KW = float(
             self._lookup_runtime_value(resolved, "battery_max_power_kw")
         )
@@ -382,8 +378,8 @@ class Config:
 
     def _load_dynamic_params(self) -> None:
         self._reject_legacy_config_blocks()
-        self._reject_legacy_runtime_flat_fields()
-        resolved = self._resolve_runtime_settings_dict()
+        self._reject_legacy_runtime_settings_block()
+        resolved = self._resolve_live_scenario_settings_dict()
         self._resolved_runtime_settings = resolved
 
         from house_config.awattar_api import resolve_awattar_api_url
@@ -507,11 +503,20 @@ class Config:
         if wear_raw is not None:
             return battery_wear_cent_per_kwh_from_config(wear_raw, float(capacity_kwh))
 
-        runtime = self._raw_config.get("runtime_settings", {})
-        battery_id = str(runtime.get("battery_id", "") or "").strip()
+        live_id = self.get_live_scenario_id()
+        from house_config.scenario_resolution import find_scenario_settings
+
+        try:
+            live_settings = find_scenario_settings(
+                self.backtesting_scenarios_path,
+                live_id,
+            )
+        except ValueError:
+            return 0.0
+        battery_id = str(live_settings.get("battery_id", "") or "").strip()
         if battery_id:
             raise ValueError(
-                f"Batterie '{battery_id}': battery_wear fehlt in batteries[] "
+                f"Live-Szenario '{live_id}': battery_wear fehlt in batteries[] "
                 "(Pflicht wenn battery_id gesetzt)."
             )
         return 0.0
@@ -673,11 +678,13 @@ class Config:
         ]
 
     def get_scenario_labels(self) -> dict[str, str]:
-        """Anzeigenamen für Backtesting-Szenarien (runtime_settings = Baseline)."""
-        labels = {"runtime_settings": "Runtime (Baseline)"}
-        for scenario in self.get_scenarios():
-            labels[scenario["id"]] = scenario["label"]
-        return labels
+        """Anzeigenamen für Scenario-Exploration-Szenarien."""
+        return {scenario["id"]: scenario["label"] for scenario in self.get_scenarios()}
+
+    def get_live_scenario_id(self) -> str:
+        from house_config.scenario_resolution import get_live_scenario_id
+
+        return get_live_scenario_id(self._raw_config)
 
     def get_batteries(self) -> list[dict]:
         from house_config.entity_resolution import batteries_by_id
@@ -708,14 +715,11 @@ class Config:
         return resolved
 
     def get_backtesting_scenarios(self) -> dict[str, dict]:
-        """runtime_settings als Baseline, gefolgt von aufgelösten Szenarien."""
-        baseline = self._resolve_runtime_settings_dict()
-        scenarios = {"runtime_settings": baseline}
-        for scenario in self.get_scenarios():
-            scenarios[scenario["id"]] = self._resolve_scenario_settings_dict(
-                scenario["settings"]
-            )
-        return scenarios
+        """Alle aufgelösten Szenarien aus backtesting_scenarios.json."""
+        return {
+            scenario["id"]: self._resolve_scenario_settings_dict(scenario["settings"])
+            for scenario in self.get_scenarios()
+        }
 
     def get_value(self, name: str, default=None, cast=None):
         return self.get(name, default=default, cast=cast)
@@ -753,11 +757,30 @@ class Config:
     def _normalize_runtime_settings_key(cls, key: str) -> str:
         return str(key).strip().lower()
 
-    def update_runtime_settings(self, new_settings: dict) -> None:
-        data = read_json_dict(self.config_path)
-        runtime = data.get("runtime_settings")
-        if not isinstance(runtime, dict):
-            raise ValueError("runtime_settings muss ein Objekt sein.")
+    def update_live_scenario_settings(self, new_settings: dict) -> None:
+        """Aktualisiert Entitäts-Referenzen im Live-Szenario (backtesting_scenarios.json)."""
+        doc = read_json_dict(self.backtesting_scenarios_path)
+        scenarios = doc.get("scenarios")
+        if not isinstance(scenarios, list):
+            raise ValueError(
+                f"'{self.backtesting_scenarios_path}' benötigt ein 'scenarios'-Array."
+            )
+
+        live_id = self.get_live_scenario_id()
+        entry = None
+        for item in scenarios:
+            if isinstance(item, dict) and str(item.get("id", "") or "").strip() == live_id:
+                entry = item
+                break
+        if entry is None:
+            raise ValueError(
+                f"Unbekanntes Live-Szenario '{live_id}' in '{self.backtesting_scenarios_path}'."
+            )
+        settings = entry.get("settings")
+        if not isinstance(settings, dict):
+            raise ValueError(
+                f"Live-Szenario '{live_id}' benötigt ein 'settings'-Objekt."
+            )
 
         for raw_key, value in new_settings.items():
             key = self._normalize_runtime_settings_key(raw_key)
@@ -774,14 +797,29 @@ class Config:
             if key not in self._RUNTIME_REF_KEYS:
                 raise KeyError(
                     f"Sicherheitsfehler: '{raw_key}' ist kein zulässiger "
-                    "runtime_settings-Referenzparameter."
+                    f"Szenario-Referenzparameter (Live-Szenario '{live_id}')."
                 )
-            runtime[key] = value
+            settings[key] = value
 
-        write_json_dict(self.config_path, data)
-
-        self._raw_config = data
+        write_json_dict(self.backtesting_scenarios_path, doc)
         self._load_dynamic_params()
+
+    def set_live_scenario_id(self, scenario_id: str) -> None:
+        """Setzt live_scenario_id in config.json (Szenario muss existieren)."""
+        from house_config.scenario_resolution import find_scenario_settings
+
+        normalized = str(scenario_id or "").strip()
+        if not normalized:
+            raise ValueError("live_scenario_id darf nicht leer sein.")
+        find_scenario_settings(self.backtesting_scenarios_path, normalized)
+        raw = read_json_dict(self.config_path)
+        raw["live_scenario_id"] = normalized
+        write_json_dict(self.config_path, raw)
+        self._load_all()
+
+    def update_runtime_settings(self, new_settings: dict) -> None:
+        """Alias für update_live_scenario_settings (API-Stabilität)."""
+        self.update_live_scenario_settings(new_settings)
 
 
 def get_resolved_runtime_settings() -> dict:
@@ -948,6 +986,10 @@ def get_scenario_labels() -> dict[str, str]:
     return CONFIG.get_scenario_labels()
 
 
+def get_live_scenario_id() -> str:
+    return CONFIG.get_live_scenario_id()
+
+
 def get_backtesting_scenarios() -> dict[str, dict]:
     return CONFIG.get_backtesting_scenarios()
 
@@ -979,6 +1021,14 @@ def reload_config() -> None:
 
 def update_runtime_settings(new_settings: dict) -> None:
     return CONFIG.update_runtime_settings(new_settings)
+
+
+def update_live_scenario_settings(new_settings: dict) -> None:
+    return CONFIG.update_live_scenario_settings(new_settings)
+
+
+def set_live_scenario_id(scenario_id: str) -> None:
+    return CONFIG.set_live_scenario_id(scenario_id)
 
 
 def update_appliance_defaults(

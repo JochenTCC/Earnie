@@ -13,7 +13,7 @@ from ui.history_navigation import get_s2_cycle_offset, get_s2_segment_index
 
 _HELP = (
     "Swimspa-Analyse aus dem Produktiv-Log: Ist-/Soll-Temperatur und "
-    "Filter-Leistung (autonom vs. Ernie-initiiert). Nutzt dasselbe "
+    "Filter-Leistung (autonom vs. Earnie-initiiert). Nutzt dasselbe "
     "S-2-Zeitfenster wie das Cockpit."
 )
 

@@ -2,5 +2,17 @@
     "$schema": "./backtesting_scenarios.schema.json",
     "cbc_gap_rel": 0.10,
     "cbc_strict_time_limit_sec": 3,
-    "scenarios": []
+    "scenarios": [
+        {
+            "id": "live",
+            "label": "Live",
+            "settings": {
+                "battery_id": "",
+                "pv_system_id": "",
+                "import_tariff_id": "",
+                "export_tariff_id": "",
+                "house_profile_id": ""
+            }
+        }
+    ]
 }

@@ -8,14 +8,17 @@ from types import ModuleType
 _CONFIG_ERRORS = (FileNotFoundError, ValueError, KeyError)
 
 
+from runtime_store.env_vars import read_env
+
+
 def _missing_config_message(config_path: str) -> str:
-    env_path = os.environ.get("ENERGY_OPTIMIZER_CONFIG_PATH", "").strip()
+    env_path = read_env("CONFIG_PATH")
     lines = [f"Abbruch: Konfigurationsdatei nicht gefunden: {config_path!r}"]
     if env_path:
-        lines.append(f"  ENERGY_OPTIMIZER_CONFIG_PATH={env_path!r}")
+        lines.append(f"  EARNIE_CONFIG_PATH={env_path!r}")
     else:
         lines.append(
-            "  Prüfen Sie ENERGY_OPTIMIZER_CONFIG_PATH in config/.env "
+            "  Prüfen Sie EARNIE_CONFIG_PATH in config/.env "
             "oder legen Sie config/config.json an."
         )
     return "\n".join(lines)

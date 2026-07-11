@@ -23,7 +23,7 @@ Countdown und letzter Lauf werden unten in der App angezeigt (siehe [Charts & Pa
 
 ## Laufzeitdateien (`runtime/`)
 
-Standardverzeichnis: `runtime/` (überschreibbar mit `ENERGY_OPTIMIZER_RUNTIME_DIR`).
+Standardverzeichnis: `runtime/` (überschreibbar mit `EARNIE_RUNTIME_DIR`, Legacy: `ENERGY_OPTIMIZER_RUNTIME_DIR`).
 
 | Datei | Inhalt |
 |-------|--------|
@@ -32,7 +32,7 @@ Standardverzeichnis: `runtime/` (überschreibbar mit `ENERGY_OPTIMIZER_RUNTIME_D
 | `pv_counter_state.json` | PV-Zählerstand für Stunden-Delta |
 | `cons_data_pending.json` | Pending-Puffer für cons_data-Samples |
 | `consumption_profiles.csv` | Berechnete Grundlast-Profile |
-| `energy_optimizer.log` | Rotierendes Python-Log |
+| `earnie.log` | Rotierendes Python-Log |
 | `optimizer_run_state.json` | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll) |
 | `optimization_history.jsonl` | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf) |
 | `live_optimization_debug.json` | Debug-Snapshot der App-Simulation (Sunset-2-Sunset) |
@@ -43,10 +43,10 @@ Die App liest diese Dateien **read-only** für Panels und Abgleich.
 
 | Variable | Wirkung |
 |----------|---------|
-| `ENERGY_OPTIMIZER_CONFIG_PATH` | Pfad zur `config.json` (Standard: `config/config.json`, Legacy: `config.json` im Root) |
-| `ENERGY_OPTIMIZER_RUNTIME_DIR` | Anderes Verzeichnis für Laufzeitdaten |
-| `ENERGY_OPTIMIZER_UI_MODES` | Kommagetrennt: `sunset2sunset`, `backtesting` — schränkt sichtbare App-Modi ein (Prod: `sunset2sunset,backtesting`; siehe [Betriebsmodi](../ui/betriebsmodi.md)) |
-| `ENERGY_OPTIMIZER_UI_STREAMLIT_PORT` | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md)) |
+| `EARNIE_CONFIG_PATH` | Pfad zur `config.json` (Standard: `config/config.json`, Legacy: `config.json` im Root). Legacy-Alias: `ENERGY_OPTIMIZER_CONFIG_PATH`. |
+| `EARNIE_RUNTIME_DIR` | Anderes Verzeichnis für Laufzeitdaten |
+| `EARNIE_UI_MODES` | Kommagetrennt: `sunset2sunset`, `scenario_exploration` — schränkt sichtbare App-Modi ein (Prod: `sunset2sunset,scenario_exploration`; siehe [Betriebsmodi](../ui/betriebsmodi.md)) |
+| `EARNIE_UI_STREAMLIT_PORT` | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md)) |
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).
 

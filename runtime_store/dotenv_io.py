@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import re
 
+from runtime_store.env_vars import is_truthy
 from runtime_store.persist_paths import resolve_dotenv_path
 
 _IPV4_RE = re.compile(
@@ -45,7 +46,7 @@ def loxone_setup_deferred() -> bool:
 
     Zugangsdaten werden erst bei Live-/Silent-Betrieb oder Merker-Test benötigt.
     """
-    if os.getenv("ENERGY_OPTIMIZER_OFFLINE") == "1":
+    if is_truthy("OFFLINE"):
         return False
     from ui.setup_readiness import needs_planning_onboarding
 
@@ -54,7 +55,7 @@ def loxone_setup_deferred() -> bool:
 
 def needs_loxone_setup() -> bool:
     """True wenn die App auf der Loxone-Setup-Seite blockieren soll."""
-    if os.getenv("ENERGY_OPTIMIZER_OFFLINE") == "1":
+    if is_truthy("OFFLINE"):
         return False
     if loxone_setup_deferred():
         return False
@@ -63,7 +64,7 @@ def needs_loxone_setup() -> bool:
 
 def require_loxone_credentials_for_config() -> bool:
     """Ob config.Config Loxone-Variablen zwingend laden soll."""
-    if os.getenv("ENERGY_OPTIMIZER_OFFLINE") == "1":
+    if is_truthy("OFFLINE"):
         return False
     if loxone_setup_deferred():
         return False

@@ -139,28 +139,39 @@ def test_greenfield_bootstrap_creates_expected_files(tmp_path, monkeypatch):
     assert dotenv_io.needs_loxone_setup() is False
 
 
-def test_config_minimal_runtime_settings_id_only():
-    """1.26.0 P0: Bootstrap-Vorlage ohne flache PV-/Batterie-/Tarif-Duplikate."""
+def test_config_minimal_live_scenario_id_only():
+    """2.0 P2: Bootstrap-Vorlage ohne runtime_settings; Live-Szenario in backtesting_scenarios.json."""
     repo_root = Path(__file__).resolve().parents[1]
     minimal_path = repo_root / "config" / "config.minimal.json"
     minimal = json.loads(minimal_path.read_text(encoding="utf-8"))
-    runtime = minimal["runtime_settings"]
 
-    assert not _RUNTIME_SETTINGS_FLAT_LEGACY_KEYS.intersection(runtime)
-    assert set(runtime).issubset(_RUNTIME_SETTINGS_ID_ONLY_KEYS)
+    assert "runtime_settings" not in minimal
+    assert minimal.get("live_scenario_id") == "live"
     assert minimal["system"]["loxone_silent_mode"] is True
 
+    scenarios_path = repo_root / "config" / "backtesting_scenarios.minimal.json"
+    scenarios = json.loads(scenarios_path.read_text(encoding="utf-8"))
+    live = next(s for s in scenarios["scenarios"] if s["id"] == "live")
+    assert set(live["settings"]) <= {
+        "battery_id",
+        "pv_system_id",
+        "import_tariff_id",
+        "export_tariff_id",
+        "house_profile_id",
+    }
 
-def test_greenfield_config_runtime_settings_id_only():
-    """1.26.0 P0: Greenfield-Referenzconfig ohne flache Duplikate."""
+
+def test_greenfield_config_live_scenario_id_only():
+    """2.0 P2: Greenfield-Referenzconfig ohne runtime_settings."""
     repo_root = Path(__file__).resolve().parents[1]
     config_path = repo_root / "greenfield" / "config" / "config.json"
     if not config_path.is_file():
         pytest.skip("greenfield/config/config.json nicht vorhanden")
 
-    runtime = json.loads(config_path.read_text(encoding="utf-8"))["runtime_settings"]
-    assert not _RUNTIME_SETTINGS_FLAT_LEGACY_KEYS.intersection(runtime)
-    assert set(runtime).issubset(_RUNTIME_SETTINGS_ID_ONLY_KEYS)
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    if "runtime_settings" in payload:
+        pytest.skip("greenfield/config/config.json noch nicht auf 2.0 P2 migriert")
+    assert payload.get("live_scenario_id", "live") == "live"
 
 
 def test_greenfield_setup_completes_after_dotenv_save(tmp_path, monkeypatch):

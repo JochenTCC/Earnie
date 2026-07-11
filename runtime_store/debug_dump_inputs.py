@@ -15,19 +15,23 @@ from runtime_store.persist_paths import (
     runtime_dir,
 )
 
-_ENV_KEYS = (
-    "ENERGY_OPTIMIZER_CONFIG_PATH",
-    "ENERGY_OPTIMIZER_DEVIATION_RULES_PATH",
-    "ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH",
-    "ENERGY_OPTIMIZER_RUNTIME_DIR",
+_ENV_SUFFIXES = (
+    "CONFIG_PATH",
+    "DEVIATION_RULES_PATH",
+    "LOCAL_SETTINGS_PATH",
+    "RUNTIME_DIR",
 )
 
 
 def collect_dump_context() -> dict[str, object]:
     """Liefert aufgeloeste Pfade und relevante Env-Overrides fuer Repro-Dumps."""
-    env_overrides = {
-        key: value for key in _ENV_KEYS if (value := os.environ.get(key, "").strip())
-    }
+    env_overrides = {}
+    for suffix in _ENV_SUFFIXES:
+        for prefix in ("EARNIE_", "ENERGY_OPTIMIZER_"):
+            key = f"{prefix}{suffix}"
+            value = os.environ.get(key, "").strip()
+            if value:
+                env_overrides[key] = value
     extra_paths = _resolve_optional_input_paths()
     return {
         "env_overrides": env_overrides,

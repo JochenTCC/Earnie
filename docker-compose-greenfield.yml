@@ -21,14 +21,14 @@ x-persist-volumes: &persist-volumes
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  ENERGY_OPTIMIZER_CONFIG_PATH: config/config.json
+  EARNIE_CONFIG_PATH: config/config.json
   # Kein Loxone-Smoke-Test — Greenfield nutzt Dummy-Zugangsdaten aus der Ersteinrichtung.
-  ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START: "0"
+  EARNIE_VERIFY_LOXONE_ON_START: "0"
 
 services:
   optimizer-worker:
     build: .
-    container_name: ernie-greenfield-worker
+    container_name: earnie-greenfield-worker
     command: python main.py
     restart: unless-stopped
     volumes: *persist-volumes
@@ -37,7 +37,7 @@ services:
 
   optimizer-ui:
     build: .
-    container_name: ernie-greenfield-ui
+    container_name: earnie-greenfield-ui
     command: python -m scripts.run_streamlit
     restart: unless-stopped
     ports:
@@ -45,4 +45,4 @@ services:
     volumes: *persist-volumes
     environment:
       <<: *common-env
-      ENERGY_OPTIMIZER_UI_MODES: sunset2sunset,backtesting
+      EARNIE_UI_MODES: sunset2sunset,scenario_exploration

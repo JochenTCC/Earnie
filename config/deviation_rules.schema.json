@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://energy-optimizer.local/deviation_rules.schema.json",
-  "title": "Energy Optimizer — Soll/Ist-Abweichungsregeln",
+  "$id": "https://earnie.local/deviation_rules.schema.json",
+  "title": "Earnie — Soll/Ist-Abweichungsregeln",
   "description": "Kategorien und Regeln für Soll/Ist-Icons in Chart 1 (Epic Soll-Ist). Prädikate sind in Python implementiert; JSON referenziert nur Namen.",
   "type": "object",
   "required": ["version", "tolerances", "categories", "rules", "fallback"],

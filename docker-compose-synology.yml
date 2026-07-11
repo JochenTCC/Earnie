@@ -19,14 +19,14 @@
 #   mv cons_data_hourly.csv cons_data_hourly.meta.json runtime/ 2>/dev/null || true
 #   mv flexible_consumers_state.json pv_counter_state.json cons_data_pending.json runtime/ 2>/dev/null || true
 #   mv consumption_profiles.csv total_consumption_profiles.csv flexible_consumer_profiles.csv runtime/ 2>/dev/null || true
-#   mv energy_optimizer.log system_history_log.csv runtime/ 2>/dev/null || true
+#   mv earnie.log system_history_log.csv runtime/ 2>/dev/null || true
 #   In config/config.json: "path_cons_data": "runtime/cons_data_hourly.csv"
 #
 # Nach Änderungen an config/config.json: Container optimizer-worker neu starten.
 # Nach Code-Änderungen: Image bauen/pushen (docs/einrichtung/container.md), dann auf der NAS:
 #   docker compose -f docker-compose-synology.yml pull && docker compose -f docker-compose-synology.yml up -d
 #
-# UI: ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting (Prod); Dev ohne Variable = alle Modi.
+# UI: EARNIE_UI_MODES=sunset2sunset,scenario_exploration (Prod); Dev ohne Variable = Standard-Modi.
 
 version: "3.8"
 
@@ -36,14 +36,14 @@ x-persist-volumes: &persist-volumes
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  ENERGY_OPTIMIZER_CONFIG_PATH: config/config.json
+  EARNIE_CONFIG_PATH: config/config.json
   # Loxone-Smoke-Test beim Worker-Start (nach pull/up); siehe scripts/startup_checks.py
-  ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START: "1"
+  EARNIE_VERIFY_LOXONE_ON_START: "1"
 
 services:
   optimizer-worker:
-    image: ghcr.io/jochentcc/ernie-energy:latest
-    container_name: ernie-optimizer-worker
+    image: ghcr.io/jochentcc/earnie-energy:latest
+    container_name: earnie-optimizer-worker
     command: python main.py
     restart: unless-stopped
     volumes: *persist-volumes
@@ -51,8 +51,8 @@ services:
       <<: *common-env
 
   optimizer-ui:
-    image: ghcr.io/jochentcc/ernie-energy:latest
-    container_name: ernie-optimizer-ui
+    image: ghcr.io/jochentcc/earnie-energy:latest
+    container_name: earnie-optimizer-ui
     command: >
       python -m scripts.run_streamlit
       --
@@ -64,4 +64,4 @@ services:
     volumes: *persist-volumes
     environment:
       <<: *common-env
-      ENERGY_OPTIMIZER_UI_MODES: sunset2sunset,backtesting
+      EARNIE_UI_MODES: sunset2sunset,scenario_exploration

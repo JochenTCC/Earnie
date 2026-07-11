@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from house_config.scenario_resolution import DEFAULT_LIVE_SCENARIO_ID
 from ui.navigation import build_page_specs
 
 
@@ -20,12 +21,31 @@ def _bind_config_paths(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Path:
         str(config_dir / "house_profiles.json"),
     )
     monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        str(config_dir / "backtesting_scenarios.json"),
+    )
     return config_dir
 
 
 def _write(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _write_live_scenario(config_dir: Path, settings: dict) -> None:
+    _write(
+        config_dir / "backtesting_scenarios.json",
+        {
+            "scenarios": [
+                {
+                    "id": DEFAULT_LIVE_SCENARIO_ID,
+                    "label": "Live",
+                    "settings": settings,
+                }
+            ]
+        },
+    )
 
 
 def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
@@ -39,11 +59,21 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
         config_dir / "tariffs.json",
         {"import_tariffs": [], "export_tariffs": []},
     )
+    _write_live_scenario(
+        config_dir,
+        {
+            "battery_id": "",
+            "pv_system_id": "",
+            "import_tariff_id": "",
+            "export_tariff_id": "",
+            "house_profile_id": "",
+        },
+    )
 
-    specs = build_page_specs(["backtesting"])
+    specs = build_page_specs(["scenario_exploration"])
     titles = [spec.title for spec in specs]
 
-    assert titles == ["Hauskonfigurator", "Konfiguration"]
+    assert titles == ["Hauskonfigurator", "Live-Konfiguration"]
 
 
 def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
@@ -51,10 +81,10 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
     _write(
         config_dir / "config.json",
         {
-            "batteries": [],
+            "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
+            "batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}],
             "pv_systems": [{"id": "pv"}],
             "flexible_consumers": [],
-            "runtime_settings": {},
         },
     )
     _write(
@@ -71,29 +101,33 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
         },
     )
     _write(config_dir / "tariffs.json", {"import_tariffs": [], "export_tariffs": []})
+    _write_live_scenario(
+        config_dir,
+        {
+            "battery_id": "",
+            "pv_system_id": "",
+            "import_tariff_id": "",
+            "export_tariff_id": "",
+            "house_profile_id": "efh",
+        },
+    )
 
-    specs = build_page_specs(["backtesting"])
+    specs = build_page_specs(["scenario_exploration"])
     titles = [spec.title for spec in specs]
 
-    assert titles == ["Hauskonfigurator", "Szenarieneditor", "Konfiguration"]
-    assert "Backtesting" not in titles
+    assert titles == ["Hauskonfigurator", "Szenarieneditor", "Live-Konfiguration"]
+    assert "Scenario-Exploration" not in titles
 
 
-def test_backtesting_visible_when_planning_ready(tmp_path, monkeypatch):
+def test_scenario_exploration_visible_when_planning_ready(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(
         config_dir / "config.json",
         {
+            "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
             "batteries": [{"id": "bat"}],
             "pv_systems": [{"id": "pv"}],
             "flexible_consumers": [],
-            "runtime_settings": {
-                "battery_id": "bat",
-                "pv_system_id": "pv",
-                "house_profile_id": "efh",
-                "import_tariff_id": "imp",
-                "export_tariff_id": "exp",
-            },
         },
     )
     _write(
@@ -119,14 +153,24 @@ def test_backtesting_visible_when_planning_ready(tmp_path, monkeypatch):
             ],
         },
     )
+    _write_live_scenario(
+        config_dir,
+        {
+            "battery_id": "bat",
+            "pv_system_id": "pv",
+            "house_profile_id": "efh",
+            "import_tariff_id": "imp",
+            "export_tariff_id": "exp",
+        },
+    )
 
-    specs = build_page_specs(["backtesting"])
+    specs = build_page_specs(["scenario_exploration"])
     titles = [spec.title for spec in specs]
 
-    assert "Backtesting" in titles
+    assert "Scenario-Exploration" in titles
     assert "Szenarieneditor" in titles
     assert "Cockpit" not in titles
     assert "Manuelle Geräte" not in titles
     defaults = [spec for spec in specs if spec.default]
     assert len(defaults) == 1
-    assert defaults[0].title == "Backtesting"
+    assert defaults[0].title == "Scenario-Exploration"

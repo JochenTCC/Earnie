@@ -1,53 +1,20 @@
 """Tests für konfigurierbare UI-Fragment-Refresh-Intervalle."""
 from __future__ import annotations
 
-import json
-
 import pytest
 
 import config
+from tests.config_fixtures import write_minimal_config_tree
 from ui import fragment_refresh
 
 
 def _write_config(tmp_path, ui_block: dict | None) -> str:
-    payload = {
-        "system": {
-            "global_timeout": 10,
-            "loop_timeout": 900,
-        },
-        "loxone_blocks": {
-            "soc_name": "soc",
-            "pv_counter_name": "pv",
-            "log_filename": "log.csv",
-            "pv_tuning_log_file": "pv.csv",
-            "pv_power_name": "pv_act",
-            "battery_power_name": "bat",
-            "grid_power_name": "grid",
-            "target_soc_name": "t_soc",
-            "target_charge_power_name": "t_charge",
-            "target_discharge_power_name": "t_discharge",
-            "control_cmd_name": "cmd",
-        },
-        "runtime_settings": {
-            "battery_id": "",
-            "pv_system_id": "",
-            "house_profile_id": "",
-            "import_tariff_id": "",
-            "export_tariff_id": "",
-        },
-        "batteries": [],
-        "pv_systems": [],
-        "planning_horizon": {"mode": "sunset_window"},
-        "file_paths_battery_simulation": {
-            "path_cons_data": "runtime/cons_data_hourly.csv",
-        },
-        "flexible_consumers": [],
-    }
-    if ui_block is not None:
-        payload["ui"] = ui_block
-    path = tmp_path / "config.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    return str(path)
+    extra = {"ui": ui_block} if ui_block is not None else None
+    payload = __import__("tests.config_fixtures", fromlist=["minimal_config_payload"]).minimal_config_payload(
+        extra=extra
+    )
+    config_path, scenarios_path = write_minimal_config_tree(tmp_path, config_payload=payload)
+    return config_path
 
 
 def test_ui_fragment_defaults_without_ui_block(tmp_path, monkeypatch):
@@ -55,8 +22,12 @@ def test_ui_fragment_defaults_without_ui_block(tmp_path, monkeypatch):
     monkeypatch.delenv("ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC", raising=False)
     monkeypatch.delenv("ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC", raising=False)
     monkeypatch.delenv("ENERGY_OPTIMIZER_UI_MAIN_SYNC_POLL_SEC", raising=False)
-    path = _write_config(tmp_path, None)
-    cfg = config.Config(config_path=path, require_loxone_credentials=False)
+    config_path, scenarios_path = write_minimal_config_tree(tmp_path)
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        require_loxone_credentials=False,
+    )
     assert cfg.get_ui_fragment_charts_sec() == 60
     assert cfg.get_ui_fragment_status_sec() == 10
     assert cfg.get_ui_main_sync_poll_sec() == 15
@@ -66,11 +37,19 @@ def test_ui_fragment_from_config_json(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
     monkeypatch.delenv("ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC", raising=False)
     monkeypatch.delenv("ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC", raising=False)
-    path = _write_config(
+    from tests.config_fixtures import minimal_config_payload
+
+    config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
-        {"fragment_refresh_charts_sec": 45, "fragment_refresh_status_sec": 5},
+        config_payload=minimal_config_payload(
+            extra={"ui": {"fragment_refresh_charts_sec": 45, "fragment_refresh_status_sec": 5}}
+        ),
     )
-    cfg = config.Config(config_path=path, require_loxone_credentials=False)
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        require_loxone_credentials=False,
+    )
     assert cfg.get_ui_fragment_charts_sec() == 45
     assert cfg.get_ui_fragment_status_sec() == 5
 

@@ -191,38 +191,78 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
     _save_config_document(data)
 
 
+def _live_scenario_settings() -> dict:
+    from house_config.scenario_resolution import (
+        find_scenario_settings,
+        get_live_scenario_id,
+    )
+
+    raw_config = _load_config_document()
+    live_id = get_live_scenario_id(raw_config)
+    scenarios_path = config.CONFIG.backtesting_scenarios_path
+    try:
+        return find_scenario_settings(scenarios_path, live_id)
+    except ValueError:
+        return {}
+
+
 def get_planning_tariff_selection() -> tuple[str, str]:
-    runtime = _load_config_document().get("runtime_settings", {})
-    if not isinstance(runtime, dict):
-        return "", ""
+    settings = _live_scenario_settings()
     return (
-        str(runtime.get("import_tariff_id", "") or "").strip(),
-        str(runtime.get("export_tariff_id", "") or "").strip(),
+        str(settings.get("import_tariff_id", "") or "").strip(),
+        str(settings.get("export_tariff_id", "") or "").strip(),
     )
 
 
 def save_planning_tariff_selection(import_tariff_id: str, export_tariff_id: str) -> None:
-    data = _load_config_document()
-    runtime = data.setdefault("runtime_settings", {})
-    if not isinstance(runtime, dict):
-        raise ValueError("runtime_settings muss ein Objekt sein.")
-    runtime["import_tariff_id"] = import_tariff_id.strip()
-    runtime["export_tariff_id"] = export_tariff_id.strip()
-    _save_config_document(data)
+    config.update_live_scenario_settings(
+        {
+            "import_tariff_id": import_tariff_id.strip(),
+            "export_tariff_id": export_tariff_id.strip(),
+        }
+    )
+
+
+def get_live_scenario_refs() -> dict:
+    """Entitäts-Referenzen des Live-Szenarios aus backtesting_scenarios.json."""
+    settings = _live_scenario_settings()
+    return {
+        "battery_id": str(settings.get("battery_id", "") or "").strip(),
+        "pv_system_id": str(settings.get("pv_system_id", "") or "").strip(),
+        "import_tariff_id": str(settings.get("import_tariff_id", "") or "").strip(),
+        "export_tariff_id": str(settings.get("export_tariff_id", "") or "").strip(),
+        "house_profile_id": str(settings.get("house_profile_id", "") or "").strip(),
+    }
 
 
 def get_runtime_scenario_refs() -> dict:
-    """Entitäts-Referenzen des Runtime-Szenarios aus runtime_settings."""
-    runtime = _load_config_document().get("runtime_settings", {})
-    if not isinstance(runtime, dict):
-        return {}
-    return {
-        "battery_id": str(runtime.get("battery_id", "") or "").strip(),
-        "pv_system_id": str(runtime.get("pv_system_id", "") or "").strip(),
-        "import_tariff_id": str(runtime.get("import_tariff_id", "") or "").strip(),
-        "export_tariff_id": str(runtime.get("export_tariff_id", "") or "").strip(),
-        "house_profile_id": str(runtime.get("house_profile_id", "") or "").strip(),
-    }
+    """Alias für get_live_scenario_refs (API-Stabilität)."""
+    return get_live_scenario_refs()
+
+
+def save_live_scenario_refs(
+    *,
+    battery_id: str,
+    pv_system_id: str,
+    import_tariff_id: str,
+    export_tariff_id: str,
+    house_profile_id: str,
+) -> None:
+    """Speichert Entitäts-Referenzen für das Live-Szenario."""
+    config.update_live_scenario_settings(
+        {
+            "battery_id": battery_id.strip(),
+            "pv_system_id": pv_system_id.strip(),
+            "import_tariff_id": import_tariff_id.strip(),
+            "export_tariff_id": export_tariff_id.strip(),
+            "house_profile_id": house_profile_id.strip(),
+        }
+    )
+
+
+def save_live_scenario_id(scenario_id: str) -> None:
+    """Setzt live_scenario_id in config.json."""
+    config.set_live_scenario_id(scenario_id.strip())
 
 
 def save_runtime_scenario_refs(
@@ -233,19 +273,14 @@ def save_runtime_scenario_refs(
     export_tariff_id: str,
     house_profile_id: str,
 ) -> None:
-    """Speichert Entitäts-Referenzen für das Runtime-Szenario (Baseline)."""
-    data = _load_config_document()
-    runtime = data.setdefault("runtime_settings", {})
-    if not isinstance(runtime, dict):
-        raise ValueError("runtime_settings muss ein Objekt sein.")
-    runtime["battery_id"] = battery_id.strip()
-    runtime["pv_system_id"] = pv_system_id.strip()
-    runtime["import_tariff_id"] = import_tariff_id.strip()
-    runtime["export_tariff_id"] = export_tariff_id.strip()
-    runtime["house_profile_id"] = house_profile_id.strip()
-    for legacy_geo in ("latitude", "longitude", "timezone_name"):
-        runtime.pop(legacy_geo, None)
-    _save_config_document(data)
+    """Alias für save_live_scenario_refs (API-Stabilität)."""
+    save_live_scenario_refs(
+        battery_id=battery_id,
+        pv_system_id=pv_system_id,
+        import_tariff_id=import_tariff_id,
+        export_tariff_id=export_tariff_id,
+        house_profile_id=house_profile_id,
+    )
 
 
 def upsert_scenario(scenario: dict) -> None:

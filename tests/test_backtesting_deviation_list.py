@@ -23,12 +23,12 @@ def _sample_meta() -> dict:
         "reference_id": HISTORICAL_REFERENCE_ID,
         "labels": {
             HISTORICAL_REFERENCE_ID: "Historisch",
-            "runtime_settings": "Runtime",
+            "live": "Live",
         },
         "critical_cases": [
             {
                 "kind": "consumption_tolerance",
-                "scenario_id": "runtime_settings",
+                "scenario_id": "live",
                 "window_anchor": "2025-08-01T07:00:00",
                 "historical_kwh": 32.0,
                 "optimized_kwh": 34.0,
@@ -36,7 +36,7 @@ def _sample_meta() -> dict:
             },
             {
                 "kind": "strict_slow",
-                "scenario_id": "runtime_settings",
+                "scenario_id": "live",
                 "window_anchor": "2025-09-28T10:00:00",
                 "slot_datetime": "2025-09-27T10:00:00",
                 "simulation_hour_index": 1392,
@@ -64,7 +64,7 @@ def test_deviation_cases_for_display_dedupes_same_window():
     meta["critical_cases"].append(
         {
             "kind": "strict_fallback",
-            "scenario_id": "runtime_settings",
+            "scenario_id": "live",
             "window_anchor": "2025-08-01T07:00:00",
             "strict_elapsed_sec": 1.0,
         }
@@ -107,7 +107,7 @@ def test_build_deviation_table_rows_columns():
     cbc_row = next(r for r in rows if r["Art"] == KIND_LABELS["strict_slow"])
     assert tolerance_row["Δ kWh (Soll/Ist)"] == "+2.00"
     assert cbc_row["Δ kWh (Soll/Ist)"] == "—"
-    assert tolerance_row["Szenario"] == "Runtime"
+    assert tolerance_row["Szenario"] == "Live"
     assert "2025-08-01 07:00" in tolerance_row["Fenster"]
 
 

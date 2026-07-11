@@ -16,7 +16,8 @@ from pathlib import Path
 
 from version import __version__
 
-DEFAULT_REGISTRY_IMAGE = "ghcr.io/jochentcc/ernie-energy"
+DEFAULT_REGISTRY_IMAGE = "ghcr.io/jochentcc/earnie-energy"
+LEGACY_REGISTRY_IMAGE = "ghcr.io/jochentcc/ernie-energy"
 DEFAULT_PLATFORM = "linux/amd64"
 MULTIARCH_PLATFORM = "linux/amd64,linux/arm64"
 TARGET_PLATFORMS = {
@@ -28,7 +29,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def default_tags() -> list[str]:
-    return [f"{DEFAULT_REGISTRY_IMAGE}:latest", f"{DEFAULT_REGISTRY_IMAGE}:{__version__}"]
+    tags: list[str] = []
+    for image in (DEFAULT_REGISTRY_IMAGE, LEGACY_REGISTRY_IMAGE):
+        tags.extend([f"{image}:latest", f"{image}:{__version__}"])
+    return tags
 
 
 def is_multiarch(platform: str) -> bool:
@@ -101,7 +105,7 @@ def run_push(tags: list[str]) -> None:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Docker-Image für Energy Optimizer bauen "
+            "Docker-Image für Earnie bauen "
             "(Standard: Synology linux/amd64; Multi-Arch: --target all --push)."
         )
     )

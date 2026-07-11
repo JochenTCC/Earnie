@@ -20,9 +20,21 @@
             "markup_percent": 3.0,
             "prices_include_vat": false,
             "vat_percent": 19.0
+        },
+        {
+            "id": "fixed_25ct",
+            "label": "Fix 25 ct/kWh Bezug",
+            "type": "fixed_cent",
+            "fix_cent_kwh": 25.0
         }
     ],
     "export_tariffs": [
+        {
+            "id": "fixed_37ct",
+            "label": "Fix 3,7 ct/kWh Einspeise",
+            "type": "fixed",
+            "k_push_cent": 3.7
+        },
         {
             "id": "fixed_35ct",
             "label": "Fix 3,5 ct/kWh",

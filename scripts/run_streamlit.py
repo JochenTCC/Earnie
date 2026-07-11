@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     port = streamlit_port()
     print(
-        f"Streamlit Port {port} (ui.streamlit_port / ENERGY_OPTIMIZER_UI_STREAMLIT_PORT)",
+        f"Streamlit Port {port} (ui.streamlit_port / EARNIE_UI_STREAMLIT_PORT)",
         flush=True,
     )
     return _run_streamlit_cli(_streamlit_argv(port, args.extra))

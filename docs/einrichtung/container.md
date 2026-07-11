@@ -13,7 +13,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./runtime/` | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs |
 | `./config/.env` | Loxone-Zugangsdaten |
 
-Umgebungsvariable in Compose: `ENERGY_OPTIMIZER_CONFIG_PATH=config/config.json`
+Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config/config.json`
 
 ## Erstinstallation (NAS)
 
@@ -41,14 +41,14 @@ Legt nur fehlende Dateien an; bestehende bleiben unverändert.
 
 ## Image bauen und deployen
 
-Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/arm64` für LoxBerry). Beide Hosts referenzieren denselben Tag `ghcr.io/jochentcc/ernie-energy:latest`.
+Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/arm64` für LoxBerry). Beide Hosts referenzieren denselben Tag `ghcr.io/jochentcc/earnie-energy:latest`.
 
 ### Einmaliges buildx-Setup (Entwicklungsrechner)
 
 Für Multi-Arch-Builds von Windows/Linux:
 
 ```powershell
-docker buildx create --name ernie-builder --use
+docker buildx create --name earnie-builder --use
 docker buildx inspect --bootstrap
 ```
 
@@ -77,10 +77,12 @@ python -m scripts.build_container --target loxberry
 python -m scripts.build_container --target all --push
 ```
 
-Erzeugt standardmäßig zwei Tags:
+Erzeugt standardmäßig vier Tags (kanonisch + Legacy-Alias für Übergang):
 
-- `ghcr.io/jochentcc/ernie-energy:latest`
-- `ghcr.io/jochentcc/ernie-energy:<version>` (aus `version.py`)
+- `ghcr.io/jochentcc/earnie-energy:latest`
+- `ghcr.io/jochentcc/earnie-energy:<version>` (aus `version.py`)
+- `ghcr.io/jochentcc/ernie-energy:latest` (Legacy-Alias, gleicher Digest)
+- `ghcr.io/jochentcc/ernie-energy:<version>` (Legacy-Alias)
 
 Nach `docker login ghcr.io`:
 
@@ -95,13 +97,13 @@ python -m scripts.build_container --target all --push
 Nur ein bestimmter Tag:
 
 ```powershell
-python -m scripts.build_container --target all --tag ghcr.io/jochentcc/ernie-energy:latest --push
+python -m scripts.build_container --target all --tag ghcr.io/jochentcc/earnie-energy:latest --push
 ```
 
 Manifest prüfen:
 
 ```bash
-docker manifest inspect ghcr.io/jochentcc/ernie-energy:latest
+docker manifest inspect ghcr.io/jochentcc/earnie-energy:latest
 ```
 
 ### 2. Deploy (Synology)
@@ -113,13 +115,17 @@ docker compose -f docker-compose-synology.yml pull
 docker compose -f docker-compose-synology.yml up -d
 ```
 
-Der **optimizer-worker** führt beim Start automatisch `verify_loxone_setup` aus (alle konfigurierten Merker inkl. neuer E-Auto-Signale). Ergebnis steht in `runtime/energy_optimizer.log` unter `[loxone-verify]`. Optional:
+Der **optimizer-worker** führt beim Start automatisch `verify_loxone_setup` aus (alle konfigurierten Merker inkl. neuer E-Auto-Signale). Ergebnis steht in `runtime/earnie.log` unter `[loxone-verify]`.
+
+**Log-Datei nach Upgrade:** Ab Version 2.0 heißt die Worker-Logdatei `earnie.log` (früher `energy_optimizer.log`). Beim ersten Start nach dem Upgrade entsteht eine neue Datei; optional die alte manuell umbenennen oder archivieren.
+
+Optional:
 
 | Variable | Wirkung |
 |----------|---------|
-| `ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START=0` | Prüfung aus |
-| `ENERGY_OPTIMIZER_SKIP_LOXONE_VERIFY=1` | Prüfung aus |
-| `ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY=1` | Container startet nicht, wenn eine Prüfung fehlschlägt |
+| `EARNIE_VERIFY_LOXONE_ON_START=0` | Prüfung aus |
+| `EARNIE_SKIP_LOXONE_VERIFY=1` | Prüfung aus |
+| `EARNIE_STRICT_LOXONE_VERIFY=1` | Container startet nicht, wenn eine Prüfung fehlschlägt |
 
 Manuell (z. B. nach Config-Änderung ohne Neustart):
 
@@ -127,7 +133,7 @@ Manuell (z. B. nach Config-Änderung ohne Neustart):
 python -m scripts.verify_loxone_setup
 ```
 
-`docker-compose-synology.yml` referenziert `ghcr.io/jochentcc/ernie-energy:latest`.
+`docker-compose-synology.yml` referenziert `ghcr.io/jochentcc/earnie-energy:latest`.
 
 ### 3. Lokaler Test vor dem NAS-Deploy
 
@@ -152,7 +158,7 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 
 ### Erstinstallation
 
-1. Projektordner anlegen (z. B. `/opt/ernie-energy/`) mit `docker-compose-loxberry.yml`
+1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker-compose-loxberry.yml`
 2. `mkdir -p config runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config/config.json`, …)
 4. `config/.env` und `config/config.json` anpassen (Loxone-Zugang, Namen, Verbraucher)
@@ -185,7 +191,7 @@ Von außen gibt es keinen eingebauten Reverse Proxy wie bei Synology DSM. Extern
 | Speicher | SSD empfohlen | nur langsame SD ohne Puffer |
 | MILP-Performance | langsamer als NAS akzeptabel, Log prüfen | Erwartung identischer Laufzeit wie x86-NAS |
 
-Vor Produktivbetrieb: Worker-Log (`runtime/energy_optimizer.log`) auf CBC-Timing und Startfehler prüfen. Optionaler Follow-up: natives `coinor-cbc` im Image für kürzere MILP-Läufe.
+Vor Produktivbetrieb: Worker-Log (`runtime/earnie.log`) auf CBC-Timing und Startfehler prüfen. Optionaler Follow-up: natives `coinor-cbc` im Image für kürzere MILP-Läufe.
 
 ## Streamlit-UI extern (Synology Reverse Proxy)
 
@@ -238,13 +244,13 @@ Port in `config/config.json` → `ui.streamlit_port` (Standard 8501). Das Compos
 
 Nach Änderung an der Compose-Datei: `docker compose -f docker-compose-synology.yml up -d optimizer-ui` (kein neues Image nötig).
 
-Produktion: `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting` (in `docker-compose-synology.yml` am Service `optimizer-ui`). Nur Sunset-2-Sunset ohne Backtesting: `sunset2sunset`. Details: [Betriebsmodi](../ui/betriebsmodi.md).
+Produktion: `EARNIE_UI_MODES=sunset2sunset,scenario_exploration` (in `docker-compose-synology.yml` am Service `optimizer-ui`). Nur Sunset-2-Sunset ohne Scenario-Exploration: `sunset2sunset`. Details: [Betriebsmodi](../ui/betriebsmodi.md).
 
 ### Typische Probleme
 
 | Symptom | Prüfen |
 |---------|--------|
 | Seite von außen nicht erreichbar | Fritzbox **443 → NAS**; DSM nicht auf 443 |
-| 502 Bad Gateway | `ernie-optimizer-ui` läuft? `http://<NAS-IP>:8501` im LAN |
+| 502 Bad Gateway | `earnie-optimizer-ui` läuft? `http://<NAS-IP>:8501` im LAN |
 | UI leer / verbindet nicht | WebSocket-Header am Reverse Proxy |
 | Let's Encrypt schlägt fehl | Port 80 erreichbar; IPv6/AAAA bei myfritz; ggf. Synology DDNS |

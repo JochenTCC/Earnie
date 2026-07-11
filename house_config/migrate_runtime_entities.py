@@ -77,9 +77,9 @@ def effective_runtime_values(
     house_profiles_path: str,
 ) -> dict[str, Any]:
     """Flache Laufzeitwerte inkl. Legacy-Fallback aus runtime_settings."""
-    from house_config.scenario_resolution import resolve_runtime_settings
+    from house_config.scenario_resolution import resolve_legacy_runtime_settings
 
-    resolved = resolve_runtime_settings(
+    resolved = resolve_legacy_runtime_settings(
         config,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,

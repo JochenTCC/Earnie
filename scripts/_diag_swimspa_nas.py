@@ -33,12 +33,15 @@ from ui.charts import (
 )
 
 
+from runtime_store.env_vars import read_env
+
+
 def _require_nas_runtime() -> str:
-    runtime = os.environ.get("ENERGY_OPTIMIZER_RUNTIME_DIR", "")
+    runtime = read_env("RUNTIME_DIR")
     if not runtime or "DS-KO-DO-2" not in runtime.replace("/", "\\"):
         raise SystemExit(
-            "ENERGY_OPTIMIZER_RUNTIME_DIR muss auf NAS zeigen "
-            "(z. B. \\\\DS-KO-DO-2\\docker\\energy_optimizer\\runtime)."
+            "EARNIE_RUNTIME_DIR muss auf NAS zeigen "
+            "(z. B. \\\\DS-KO-DO-2\\docker\\earnie\\runtime)."
         )
     if not os.path.isfile(optimization_history.HISTORY_FILE):
         raise SystemExit(f"NAS-Log fehlt: {optimization_history.HISTORY_FILE}")

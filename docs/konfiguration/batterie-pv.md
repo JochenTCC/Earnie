@@ -1,6 +1,6 @@
-# PV & Batterie (`runtime_settings`)
+# PV & Batterie (Live-Szenario)
 
-Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation).
+Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation). Konfiguration über Entitäts-Referenzen im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`); technische Werte liegen in `batteries[]` und `pv_systems[]`.
 
 | Parameter | Einheit | Bedeutung |
 |-----------|---------|-----------|
@@ -54,9 +54,9 @@ Beispiel (5 kWh, 1500 €, 6000 Zyklen, 50 % zyklenbedingt): **2,5 ct/kWh**.
 | `expected_cycles` | Angenommene Vollzyklen bis Ersatz |
 | `cycle_cost_fraction` | Anteil der Kosten durch Zyklen (Rest: Kalenderalterung) |
 
-## Sidebar vs. `config.json`
+## Seite Konfiguration vs. `config.json`
 
-In der App-Sidebar sind dieselben Werte editierbar (Leistungsschwelle dort in **Prozent** der max. Batterieleistung). Nach „Alle Änderungen übernehmen“ landen sie in `runtime_settings`.
+In der App (Seite **Konfiguration**, Komfort-Ansicht Live-Szenario) werden Entitäts-Referenzen per Dropdown gewählt; die Leistungsschwelle erscheint dort in **Prozent** der max. Batterieleistung. Gespeichert wird in das Live-Szenario in `backtesting_scenarios.json`.
 
 ## Adaptives PV-Tuning (entfallen)
 

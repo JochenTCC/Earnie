@@ -19,7 +19,9 @@ from .file_metadata import (
 
 logger = logging.getLogger(__name__)
 
-RUNTIME_DIR = os.environ.get("ENERGY_OPTIMIZER_RUNTIME_DIR", "runtime")
+from runtime_store.env_vars import read_env_or
+
+RUNTIME_DIR = read_env_or("RUNTIME_DIR", "runtime")
 DEBUG_FILES = {
     "live": os.path.join(RUNTIME_DIR, "live_optimization_debug.json"),
     "historical_day": os.path.join(RUNTIME_DIR, "historical_optimization_debug.json"),

@@ -792,7 +792,7 @@ def _flexible_consumer_output_values(
     if _skip_flexible_consumer_output(consumer, charging_contexts):
         if pv_follow_name:
             logger.info(
-                "Flex consumer %s -> Sofort laden: %s=0 (kein Lade-Sollwert von Ernie).",
+                "Flex consumer %s -> Sofort laden: %s=0 (kein Lade-Sollwert von Earnie).",
                 consumer["name"],
                 pv_follow_name,
             )

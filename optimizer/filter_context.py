@@ -1,4 +1,4 @@
-"""Natives Filterfenster (SwimSpa) — gesperrte MILP-Slots außerhalb Ernie-Zusatzläufen."""
+"""Natives Filterfenster (SwimSpa) — gesperrte MILP-Slots außerhalb Earnie-Zusatzläufen."""
 from __future__ import annotations
 
 import logging
@@ -192,7 +192,7 @@ def ernie_filter_remaining_kwh(
     debt_kwh: float,
     filter_context: dict | None,
 ) -> float:
-    """Ernie-Zusatzziel: Loxone-Schulden minus erwartete native Lieferung im Horizont."""
+    """Earnie-Zusatzziel: Loxone-Schulden minus erwartete native Lieferung im Horizont."""
     if debt_kwh <= 1e-9:
         return 0.0
     native_kwh = expected_native_delivery_kwh(consumer, filter_context)
@@ -202,7 +202,7 @@ def ernie_filter_remaining_kwh(
     if ernie_kwh < debt_kwh - 1e-6:
         logger.info(
             "Verbraucher '%s': natives Fenster liefert ~%.2f kWh im Horizont — "
-            "Ernie-Zusatzziel %.2f → %.2f kWh.",
+            "Earnie-Zusatzziel %.2f → %.2f kWh.",
             consumer.get("id"),
             native_kwh,
             debt_kwh,

@@ -15,6 +15,54 @@ from house_config.tariffs_store import (
     resolve_export_tariff_into_settings,
     resolve_import_tariff_into_settings,
 )
+from settings.scenarios import load_backtesting_scenarios_document
+
+DEFAULT_LIVE_SCENARIO_ID = "live"
+
+
+def get_live_scenario_id(raw_config: dict) -> str:
+    """Live-Szenario-ID aus config.json (Standard: ``live``)."""
+    raw = raw_config.get("live_scenario_id", DEFAULT_LIVE_SCENARIO_ID)
+    scenario_id = str(raw or DEFAULT_LIVE_SCENARIO_ID).strip()
+    return scenario_id or DEFAULT_LIVE_SCENARIO_ID
+
+
+def find_scenario_entry(
+    backtesting_scenarios_path: str,
+    scenario_id: str,
+) -> dict:
+    """Liefert den Roh-Eintrag aus backtesting_scenarios.json."""
+    doc = load_backtesting_scenarios_document(backtesting_scenarios_path)
+    scenarios = doc.get("scenarios")
+    if not isinstance(scenarios, list):
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: '{backtesting_scenarios_path}' "
+            "benötigt ein 'scenarios'-Array."
+        )
+    target = str(scenario_id or "").strip()
+    for index, entry in enumerate(scenarios):
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("id", "") or "").strip() == target:
+            return entry
+    raise ValueError(
+        f"Unbekanntes Szenario '{target}' in '{backtesting_scenarios_path}'."
+    )
+
+
+def find_scenario_settings(
+    backtesting_scenarios_path: str,
+    scenario_id: str,
+) -> dict:
+    """Liefert settings-Dict eines Szenarios."""
+    entry = find_scenario_entry(backtesting_scenarios_path, scenario_id)
+    settings = entry.get("settings")
+    if not isinstance(settings, dict):
+        raise ValueError(
+            f"Szenario '{scenario_id}' benötigt ein 'settings'-Objekt in "
+            f"'{backtesting_scenarios_path}'."
+        )
+    return dict(settings)
 
 
 def resolve_scenario_settings(
@@ -89,40 +137,48 @@ def _apply_profile_geo(out: dict, profile: dict, source_settings: dict) -> None:
             )
 
 
-def resolve_runtime_settings(
+def _prepare_live_scenario_settings(
+    settings: dict,
+    *,
+    house_profiles_path: str,
+) -> dict:
+    """Geo aus Hausprofil; Default-Hausprofil wenn leer."""
+    prepared = dict(settings)
+    if str(prepared.get("house_profile_id", "") or "").strip():
+        for geo_key in ("latitude", "longitude", "timezone_name"):
+            prepared.pop(geo_key, None)
+    if not str(prepared.get("house_profile_id", "") or "").strip():
+        profiles_doc = load_house_profiles_document(house_profiles_path)
+        for profile_id, profile in profiles_doc.get("profiles", {}).items():
+            if not isinstance(profile, dict):
+                continue
+            profile_id = str(profile_id or profile.get("id", "")).strip()
+            if profile_id:
+                prepared["house_profile_id"] = profile_id
+                break
+    return prepared
+
+
+def resolve_live_scenario_settings(
     raw_config: dict,
     *,
+    backtesting_scenarios_path: str,
     tariffs_path: str,
     house_profiles_path: str,
     monthly_rates_holder: dict | None = None,
 ) -> dict:
     """
-    Löst runtime_settings für Live-Betrieb und Backtesting-Baseline auf.
-    Erfordert Entitäts-IDs in runtime_settings (keine flachen Legacy-Felder).
+    Löst das Live-Szenario (live_scenario_id) für Echtzeit und Scenario-Exploration auf.
+    Erfordert Entitäts-IDs im Szenario (keine flachen Legacy-Felder in config.json).
     """
-    runtime = raw_config.get("runtime_settings", {})
-    if not isinstance(runtime, dict):
-        raise ValueError("runtime_settings muss ein Objekt sein.")
-    settings = dict(runtime)
-    if str(settings.get("house_profile_id", "") or "").strip():
-        for geo_key in ("latitude", "longitude", "timezone_name"):
-            settings.pop(geo_key, None)
-    if not str(settings.get("house_profile_id", "") or "").strip():
-        profiles_doc = load_house_profiles_document(house_profiles_path)
-        for profile in profiles_doc.get("profiles", {}).values():
-            if not isinstance(profile, dict):
-                continue
-            profile_id = str(profile.get("id", "")).strip()
-            if not profile_id:
-                continue
-            for consumer in profile.get("consumers", []):
-                if isinstance(consumer, dict) and consumer.get("type") == "thermal_annual":
-                    settings["house_profile_id"] = profile_id
-                    break
-            if settings.get("house_profile_id"):
-                break
-    return resolve_scenario_settings(
+    scenario_id = get_live_scenario_id(raw_config)
+    settings = find_scenario_settings(backtesting_scenarios_path, scenario_id)
+    prepared = _prepare_live_scenario_settings(
         settings,
+        house_profiles_path=house_profiles_path,
+    )
+    return resolve_scenario_settings(
+        prepared,
         raw_config=raw_config,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
@@ -130,16 +186,27 @@ def resolve_runtime_settings(
     )
 
 
-def resolve_runtime_settings_for_backtesting(
+def resolve_legacy_runtime_settings(
     raw_config: dict,
     *,
     tariffs_path: str,
     house_profiles_path: str,
     monthly_rates_holder: dict | None = None,
 ) -> dict:
-    """Alias für resolve_runtime_settings (Backtesting-Baseline)."""
-    return resolve_runtime_settings(
-        raw_config,
+    """
+    Legacy-Auflösung aus config.json runtime_settings (nur Migration 1.26.0 P5).
+    """
+    runtime = raw_config.get("runtime_settings", {})
+    if not isinstance(runtime, dict):
+        raise ValueError("runtime_settings muss ein Objekt sein.")
+    settings = dict(runtime)
+    prepared = _prepare_live_scenario_settings(
+        settings,
+        house_profiles_path=house_profiles_path,
+    )
+    return resolve_scenario_settings(
+        prepared,
+        raw_config=raw_config,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
         monthly_rates_holder=monthly_rates_holder,

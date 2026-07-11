@@ -24,6 +24,7 @@ from ui.simulation_results import OptimizationDisplayBundle, build_optimization_
 _TZ = ZoneInfo("Europe/Vienna")
 _CONFIG_ENV_KEYS = (
     "ENERGY_OPTIMIZER_CONFIG_PATH",
+    "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
     "ENERGY_OPTIMIZER_OFFLINE",
     "ENERGY_OPTIMIZER_RUNTIME_DIR",
 )
@@ -35,50 +36,24 @@ def _chart_debug_config(tmp_path, monkeypatch, *, enabled: bool):
     prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
     monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
-    path = tmp_path / "config.json"
-    path.write_text(
-        json.dumps(
-            {
-                "system": {"global_timeout": 10, "loop_timeout": 900},
+    from tests.config_fixtures import minimal_config_payload, write_minimal_config_tree
+
+    config_path, scenarios_path = write_minimal_config_tree(
+        tmp_path,
+        config_payload=minimal_config_payload(
+            extra={
                 "ui": {
                     "chart_debug_capture_enabled": enabled,
                     "chart_debug_capture_dir": "chart_debug",
-                },
-                "loxone_blocks": {
-                    "soc_name": "soc",
-                    "pv_counter_name": "pv",
-                    "log_filename": "log.csv",
-                    "pv_tuning_log_file": "pv.csv",
-                    "pv_power_name": "pv_act",
-                    "battery_power_name": "bat",
-                    "grid_power_name": "grid",
-                    "target_soc_name": "t_soc",
-                    "target_charge_power_name": "t_charge",
-                    "target_discharge_power_name": "t_discharge",
-                    "control_cmd_name": "cmd",
-                },
-                "runtime_settings": {
-                    "battery_id": "",
-                    "pv_system_id": "",
-                    "house_profile_id": "",
-                    "import_tariff_id": "",
-                    "export_tariff_id": "",
-                },
-                "batteries": [],
-                "pv_systems": [],
-                "planning_horizon": {"mode": "sunset_window"},
-                "file_paths_battery_simulation": {
-                    "path_cons_data": "runtime/cons_data_hourly.csv",
-                },
-                "flexible_consumers": [],
+                }
             }
         ),
-        encoding="utf-8",
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", config_path)
+    monkeypatch.setenv("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", scenarios_path)
     config.reinit_config()
     try:
-        yield str(path)
+        yield config_path
     finally:
         for key, value in prev.items():
             if value is None:

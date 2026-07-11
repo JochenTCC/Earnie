@@ -61,7 +61,7 @@ Getrennter Verbraucher `swimspa_filter` (Heizung bleibt `swimspa` mit `daily_tar
 | `filter_schedule.loxone` | `native_start_hour_name`, `native_duration_hours_name` — natives Fenster `[Start, Start+Dauer)` |
 | `filter_schedule.config_fallback` | Festes Fenster für Backtesting/Offline (kein `path_log`) |
 
-Ernie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`loxone_outputs.enable_name`). Spec: [SwimSpa Filter](../spec/swimspa-filter.md).
+Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`loxone_outputs.enable_name`). Spec: [SwimSpa Filter](../spec/swimspa-filter.md).
 
 ## Baseline in der UI
 

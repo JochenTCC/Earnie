@@ -52,7 +52,7 @@ def attach_utf8_log_file(path: str) -> TextIO:
     return handle
 
 
-def setup_logging(log_file="energy_optimizer.log", level=logging.INFO):
+def setup_logging(log_file="earnie.log", level=logging.INFO):
     """
     Konfiguriert das globale Logging-System für das gesamte Projekt.
     Erzeugt eine saubere Ausgabe auf der Konsole und schreibt rotierende

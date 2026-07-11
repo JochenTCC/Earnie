@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://energy-optimizer.local/backtesting_scenarios.schema.json",
-  "title": "Energy Optimizer Backtesting-Szenarien",
-  "description": "Alternative Parameter-Sets nur für Simulation und Backtesting. runtime_settings bleiben in config.json.",
+  "$id": "https://earnie.local/backtesting_scenarios.schema.json",
+  "title": "Earnie Backtesting-Szenarien",
+  "description": "Szenarien für Scenario-Exploration und Live-Betrieb (live_scenario_id in config.json).",
   "type": "object",
   "required": ["scenarios"],
   "properties": {
@@ -82,7 +82,7 @@
     },
     "scenarios": {
       "type": "array",
-      "description": "Zusätzliche Szenarien neben runtime_settings (Baseline) aus config.json.",
+      "description": "Alle Szenarien inkl. Live-Baseline (Standard-ID: live, gewählt via live_scenario_id).",
       "items": {
         "$ref": "#/definitions/scenario"
       }
@@ -96,7 +96,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Eindeutige Szenario-Kennung (z. B. battery_10kwh). Nicht 'runtime_settings' verwenden."
+          "description": "Eindeutige Szenario-Kennung (z. B. live, battery_10kwh)."
         },
         "label": {
           "type": "string",

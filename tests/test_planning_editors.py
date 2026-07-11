@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+import config
 from house_config.id_slug import slug_id
 from house_config.profiles_store import load_house_profiles_document, save_house_profiles_document
 from data.heating_need import specific_heating_kwh_m2
@@ -16,6 +17,7 @@ from ui.house_config_io import (
     upsert_house_profile,
     upsert_pv_system,
 )
+from tests.config_fixtures import default_live_settings, minimal_config_payload
 from ui.house_config_profile_form import (
     _consumer_type_options,
     _default_additional_consumer,
@@ -36,6 +38,10 @@ def _bind_paths(tmp_path, monkeypatch: pytest.MonkeyPatch):
         str(config_dir / "house_profiles.json"),
     )
     monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        str(config_dir / "backtesting_scenarios.json"),
+    )
     return config_dir
 
 
@@ -56,13 +62,7 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
     config_dir.joinpath("config.json").write_text(
         json.dumps(
             {
-                "runtime_settings": {
-                    "battery_id": "",
-                    "pv_system_id": "",
-                    "house_profile_id": "",
-                    "import_tariff_id": "",
-                    "export_tariff_id": "",
-                },
+                "live_scenario_id": "live",
                 "batteries": [],
                 "pv_systems": [],
                 "flexible_consumers": [],
@@ -82,6 +82,26 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
                 },
                 "planning_horizon": {"mode": "sunset_window"},
                 "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    config_dir.joinpath("backtesting_scenarios.json").write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "id": "live",
+                        "label": "Live",
+                        "settings": {
+                            "battery_id": "",
+                            "pv_system_id": "",
+                            "house_profile_id": "",
+                            "import_tariff_id": "",
+                            "export_tariff_id": "",
+                        },
+                    }
+                ]
             }
         ),
         encoding="utf-8",
@@ -107,14 +127,61 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
 
 def test_save_planning_tariff_selection(tmp_path, monkeypatch):
     config_dir = _bind_paths(tmp_path, monkeypatch)
-    monkeypatch.setattr("ui.house_config_io.config.reinit_config", lambda **kwargs: None)
     config_dir.joinpath("config.json").write_text(
-        json.dumps({"runtime_settings": {}, "flexible_consumers": []}),
+        json.dumps(minimal_config_payload()),
+        encoding="utf-8",
+    )
+    config_dir.joinpath("backtesting_scenarios.json").write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "id": "live",
+                        "label": "Live",
+                        "settings": default_live_settings(),
+                    }
+                ]
+            }
+        ),
         encoding="utf-8",
     )
 
+    config_dir.joinpath("house_profiles.json").write_text(
+        json.dumps({"profiles": []}),
+        encoding="utf-8",
+    )
+    config_dir.joinpath("tariffs.json").write_text(
+        json.dumps(
+            {
+                "import_tariffs": [
+                    {
+                        "id": "fixed_25ct",
+                        "label": "Fix 25 ct/kWh",
+                        "type": "fixed_cent",
+                        "fix_cent_kwh": 25.0,
+                    }
+                ],
+                "export_tariffs": [
+                    {
+                        "id": "fixed_37ct",
+                        "label": "Fix 3,7 ct/kWh",
+                        "type": "fixed",
+                        "k_push_cent": 3.7,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config.reinit_config(require_loxone_credentials=False)
+    monkeypatch.setattr(config.Config, "_load_dynamic_params", lambda self: None)
+
     save_planning_tariff_selection("fixed_25ct", "fixed_37ct")
     assert get_planning_tariff_selection() == ("fixed_25ct", "fixed_37ct")
+    saved = json.loads(config_dir.joinpath("backtesting_scenarios.json").read_text(encoding="utf-8"))
+    live = next(item for item in saved["scenarios"] if item["id"] == "live")
+    assert live["settings"]["import_tariff_id"] == "fixed_25ct"
 
 
 def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
@@ -122,16 +189,30 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
     config_dir.joinpath("config.json").write_text(
         json.dumps(
             {
+                "live_scenario_id": "live",
                 "batteries": [{"id": "bat"}],
                 "pv_systems": [{"id": "pv"}],
                 "flexible_consumers": [],
-                "runtime_settings": {
-                    "battery_id": "bat",
-                    "pv_system_id": "pv",
-                    "house_profile_id": "efh",
-                    "import_tariff_id": "imp",
-                    "export_tariff_id": "exp",
-                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    config_dir.joinpath("backtesting_scenarios.json").write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "id": "live",
+                        "label": "Live",
+                        "settings": {
+                            "battery_id": "bat",
+                            "pv_system_id": "pv",
+                            "house_profile_id": "efh",
+                            "import_tariff_id": "imp",
+                            "export_tariff_id": "exp",
+                        },
+                    }
+                ]
             }
         ),
         encoding="utf-8",

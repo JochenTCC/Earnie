@@ -27,7 +27,7 @@ tests/fixtures/prod_dumps/<fall-id>/
   optimizer_run_state.json   # optional
 ```
 
-Große Dateien (`cons_data_hourly.csv`, `energy_optimizer.log`) werden nicht versioniert;
+Große Dateien (`cons_data_hourly.csv`, `earnie.log`) werden nicht versioniert;
 sie bleiben im lokalen `runtime-prod/`-Zip zur manuellen Analyse.
 
 ## manifest.json

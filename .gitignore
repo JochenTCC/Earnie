@@ -30,6 +30,7 @@ backtesting_logs/
 data/cache/
 live_optimization_debug.json
 !tests/fixtures/prod_dumps/**/live_optimization_debug.json
+earnie.log
 energy_optimizer.log
 system_history_log.csv
 runtime_settings.json

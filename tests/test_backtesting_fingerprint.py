@@ -10,7 +10,7 @@ from simulation.backtesting_fingerprint import (
 
 def test_fingerprint_stable_for_same_settings():
     settings = {
-        "runtime_settings": {"battery_capacity_kwh": 5.0, "pv_kwp": 10.0},
+        "live": {"battery_capacity_kwh": 5.0, "pv_kwp": 10.0},
         "alt": {"battery_capacity_kwh": 10.0, "pv_kwp": 10.0},
     }
     fp1 = compute_backtesting_fingerprint(list(settings.keys()), settings)
@@ -20,10 +20,10 @@ def test_fingerprint_stable_for_same_settings():
 
 def test_fingerprint_changes_when_scenario_changes():
     base = {"battery_capacity_kwh": 5.0}
-    fp_a = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": base})
+    fp_a = compute_backtesting_fingerprint(["live"], {"live": base})
     fp_b = compute_backtesting_fingerprint(
-        ["runtime_settings"],
-        {"runtime_settings": {**base, "pv_kwp": 8.0}},
+        ["live"],
+        {"live": {**base, "pv_kwp": 8.0}},
     )
     assert fp_a != fp_b
 
@@ -39,12 +39,12 @@ def test_fingerprint_includes_import_tariff_spec():
         "import_fixed_cent_kwh": 25.0,
         "_import_tariff_spec": dict(base_spec),
     }
-    fp_a = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario})
+    fp_a = compute_backtesting_fingerprint(["live"], {"live": scenario})
     changed = {
         **scenario,
         "_import_tariff_spec": {**base_spec, "fix_cent_kwh": 30.0},
     }
-    fp_b = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": changed})
+    fp_b = compute_backtesting_fingerprint(["live"], {"live": changed})
     assert fp_a != fp_b
 
 
@@ -59,8 +59,8 @@ def test_fingerprint_includes_monthly_fixed_tariffs():
         "feed_in_mode": "fixed",
         "_monthly_fixed_tariffs": rates_b,
     }
-    fp_a = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario_a})
-    fp_b = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario_b})
+    fp_a = compute_backtesting_fingerprint(["live"], {"live": scenario_a})
+    fp_b = compute_backtesting_fingerprint(["live"], {"live": scenario_b})
     assert fp_a != fp_b
 
 
@@ -86,13 +86,13 @@ def test_fingerprint_includes_awattar_pricing_when_provided():
         }
     )
     fp_a = compute_backtesting_fingerprint(
-        ["runtime_settings"],
-        {"runtime_settings": scenario},
+        ["live"],
+        {"live": scenario},
         awattar_pricing=awattar_a,
     )
     fp_b = compute_backtesting_fingerprint(
-        ["runtime_settings"],
-        {"runtime_settings": scenario},
+        ["live"],
+        {"live": scenario},
         awattar_pricing=awattar_b,
     )
     assert fp_a != fp_b
@@ -101,6 +101,6 @@ def test_fingerprint_includes_awattar_pricing_when_provided():
 def test_fingerprint_ignores_unrelated_private_keys():
     scenario_a = {"battery_capacity_kwh": 5.0, "_house_profile": {"id": "home_a"}}
     scenario_b = {"battery_capacity_kwh": 5.0, "_house_profile": {"id": "home_b"}}
-    fp_a = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario_a})
-    fp_b = compute_backtesting_fingerprint(["runtime_settings"], {"runtime_settings": scenario_b})
+    fp_a = compute_backtesting_fingerprint(["live"], {"live": scenario_a})
+    fp_b = compute_backtesting_fingerprint(["live"], {"live": scenario_b})
     assert fp_a == fp_b

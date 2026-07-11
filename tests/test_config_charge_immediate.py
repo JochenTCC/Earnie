@@ -27,13 +27,7 @@ def _minimal_charge_immediate_config() -> dict:
             "target_discharge_power_name": "Target_Discharge",
             "control_cmd_name": "Control_Cmd",
         },
-        "runtime_settings": {
-            "battery_id": "",
-            "pv_system_id": "",
-            "house_profile_id": "",
-            "import_tariff_id": "",
-            "export_tariff_id": "",
-        },
+        "live_scenario_id": "live",
         "batteries": [],
         "pv_systems": [],
         "planning_horizon": {"mode": "sunset_window"},
@@ -108,7 +102,7 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     payload = _minimal_charge_immediate_config()
-    payload["runtime_settings"] = {
+    live_settings = {
         "battery_id": "home",
         "pv_system_id": "roof",
         "import_tariff_id": "fixed_imp",
@@ -133,11 +127,25 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
     ]
     path = config_dir / "config.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
+    (config_dir / "backtesting_scenarios.json").write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {"id": "live", "label": "Live", "settings": live_settings},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(path))
     monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
     monkeypatch.setenv(
         "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
         str(config_dir / "house_profiles.json"),
+    )
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        str(config_dir / "backtesting_scenarios.json"),
     )
     config.reinit_config()
 

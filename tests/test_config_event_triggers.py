@@ -6,51 +6,17 @@ import json
 import pytest
 
 import config
+from tests.config_fixtures import minimal_config_payload, write_minimal_config_tree
 
 
-def _write_config(tmp_path, system_block: dict) -> str:
-    payload = {
-        "system": {
-            "global_timeout": 10,
-            "loop_timeout": 900,
-            **system_block,
-        },
-        "loxone_blocks": {
-            "soc_name": "soc",
-            "pv_counter_name": "pv",
-            "log_filename": "log.csv",
-            "pv_tuning_log_file": "pv.csv",
-            "pv_power_name": "pv_act",
-            "battery_power_name": "bat",
-            "grid_power_name": "grid",
-            "target_soc_name": "t_soc",
-            "target_charge_power_name": "t_charge",
-            "target_discharge_power_name": "t_discharge",
-            "control_cmd_name": "cmd",
-        },
-        "runtime_settings": {
-            "battery_id": "",
-            "pv_system_id": "",
-            "house_profile_id": "",
-            "import_tariff_id": "",
-            "export_tariff_id": "",
-        },
-        "batteries": [],
-        "pv_systems": [],
-        "planning_horizon": {"mode": "sunset_window"},
-        "file_paths_battery_simulation": {
-            "path_cons_data": "runtime/cons_data_hourly.csv",
-        },
-        "flexible_consumers": [],
-    }
-    path = tmp_path / "config.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    return str(path)
+def _write_config(tmp_path, system_block: dict) -> tuple[str, str]:
+    payload = minimal_config_payload(extra={"system": {"global_timeout": 10, "loop_timeout": 900, **system_block}})
+    return write_minimal_config_tree(tmp_path, config_payload=payload)
 
 
 def test_event_triggers_loaded(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    path = _write_config(
+    config_path, scenarios_path = _write_config(
         tmp_path,
         {
             "event_triggers": [
@@ -64,7 +30,11 @@ def test_event_triggers_loaded(tmp_path, monkeypatch):
             ]
         },
     )
-    cfg = config.Config(config_path=path, require_loxone_credentials=False)
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        require_loxone_credentials=False,
+    )
     triggers = cfg.get_event_triggers()
     assert len(triggers) == 1
     assert triggers[0]["id"] == "eauto_plugged_in"
@@ -73,7 +43,7 @@ def test_event_triggers_loaded(tmp_path, monkeypatch):
 
 def test_duplicate_trigger_id_rejected(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    path = _write_config(
+    config_path, scenarios_path = _write_config(
         tmp_path,
         {
             "event_triggers": [
@@ -93,12 +63,16 @@ def test_duplicate_trigger_id_rejected(tmp_path, monkeypatch):
         },
     )
     with pytest.raises(ValueError, match="doppelte id"):
-        config.Config(config_path=path, require_loxone_credentials=False)
+        config.Config(
+            config_path=config_path,
+            backtesting_scenarios_path=scenarios_path,
+            require_loxone_credentials=False,
+        )
 
 
 def test_text_trigger_invalid_on_change_rejected(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    path = _write_config(
+    config_path, scenarios_path = _write_config(
         tmp_path,
         {
             "event_triggers": [
@@ -112,4 +86,8 @@ def test_text_trigger_invalid_on_change_rejected(tmp_path, monkeypatch):
         },
     )
     with pytest.raises(ValueError, match="on_change"):
-        config.Config(config_path=path, require_loxone_credentials=False)
+        config.Config(
+            config_path=config_path,
+            backtesting_scenarios_path=scenarios_path,
+            require_loxone_credentials=False,
+        )

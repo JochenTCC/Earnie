@@ -15,7 +15,9 @@ from .file_metadata import RUN_STATE_SCHEMA, read_schema_version, stamp_payload
 
 logger = logging.getLogger(__name__)
 
-RUNTIME_DIR = os.environ.get("ENERGY_OPTIMIZER_RUNTIME_DIR", "runtime")
+from runtime_store.env_vars import read_env_or
+
+RUNTIME_DIR = read_env_or("RUNTIME_DIR", "runtime")
 RUN_STATE_FILENAME = "optimizer_run_state.json"
 RUN_STATE_FILE = os.path.join(RUNTIME_DIR, RUN_STATE_FILENAME)
 LEGACY_RUN_STATE_PATH = RUN_STATE_FILENAME

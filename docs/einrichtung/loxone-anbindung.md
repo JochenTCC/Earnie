@@ -1,6 +1,6 @@
 # Loxone-Anbindung
 
-Der Energy Optimizer kommuniziert mit dem Loxone Miniserver über **HTTP** (Lesen und Schreiben von Werten) und optional **FTP** (Verbrauchs-Logdateien). Die konkrete Schaltlogik in Loxone (Relais, Huawei-WR, Ladebox) liegt außerhalb dieses Tools — der Optimizer liefert Sollwerte und Freigaben.
+Earnie kommuniziert mit dem Loxone Miniserver über **HTTP** (Lesen und Schreiben von Werten) und optional **FTP** (Verbrauchs-Logdateien). Die konkrete Schaltlogik in Loxone (Relais, Huawei-WR, Ladebox) liegt außerhalb dieses Tools — der Optimizer liefert Sollwerte und Freigaben.
 
 ## Zugangsdaten (`config/.env`)
 
@@ -60,7 +60,7 @@ Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit IO-Name und Detailtext. Typische
 ## Datenfluss (Überblick)
 
 ```
-Loxone Miniserver                    Energy Optimizer
+Loxone Miniserver                    Earnie
 ─────────────────                    ────────────────
 Merker (SOC, Leistung, PV)    ──►   main.py liest
 E-Auto-Status, Flex-Leistung  ──►   Optimierung (MILP)

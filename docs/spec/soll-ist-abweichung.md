@@ -7,13 +7,13 @@
 
 ## 1. Ziel
 
-Im **grauen Bereich** von Chart 1 (Produktiv-Log, 15-Min-Slots) sollen Abweichungen zwischen **Soll** (Ernie/MILP zum Laufzeitpunkt) und **Ist** (Loxone/Messung) sichtbar werden — als **Icons** mit drei Kategorien:
+Im **grauen Bereich** von Chart 1 (Produktiv-Log, 15-Min-Slots) sollen Abweichungen zwischen **Soll** (Earnie/MILP zum Laufzeitpunkt) und **Ist** (Loxone/Messung) sichtbar werden — als **Icons** mit drei Kategorien:
 
 | Kategorie | Bedeutung | Beispiel (vorläufig) |
 |-----------|-----------|----------------------|
 | **Hinweis** | Unkritische Abweichung | Wärmepumpe: Freigabe, aber nicht angesprungen |
 | **Warnung** | Erwartete Abweichung — Loxone kennt die Anforderung, entscheidet bewusst anders | SwimSpa nicht geheizt, obwohl Soll > 0, weil Ist-Temperatur noch im Band |
-| **Fehler** | Fehlerhafte Abweichung — Anweisung von Ernie nicht befolgt | E-Auto lädt nicht trotz Soll und Restladung; Zwangs-Laden der Batterie fehlt |
+| **Fehler** | Fehlerhafte Abweichung — Anweisung von Earnie nicht befolgt | E-Auto lädt nicht trotz Soll und Restladung; Zwangs-Laden der Batterie fehlt |
 
 Kategorien und Zuordnung werden **gemeinsam nach und nach** verfeinert. Technisch sind sie in einer **JSON-Regeldatei** pflegbar (nicht hart codiert).
 
@@ -190,7 +190,7 @@ Abgedeckt durch `tests/test_deviation_eval.py`, `tests/test_deviation_scenario_c
 
 Erste Hinweis-Regel: `waermepumpe_enable_no_start` (Freigabe ohne Anlauf).
 
-**SwimSpa-Filter (Backlog Z.17):** Der native Duty-Cycle läuft unabhängig von Ernie. Damit ein legitimer nativer Lauf (Ist > 0, Soll = 0 **im** Fenster) nicht als Fehler markiert wird, prüft `swimspa_filter_runs_unexpectedly` zusätzlich `slot_outside_native_filter_window`. Das native Fenster (`native_start_hour`/`native_duration_hours`) wird dafür je Durchlauf in `optimization_history.jsonl` unter `filter_contexts` mitgeloggt (`main.py`). Fehlt die Fenster-Info (Alt-Logs), fällt das Prädikat konservativ auf „kein Fehler".
+**SwimSpa-Filter (Backlog Z.17):** Der native Duty-Cycle läuft unabhängig von Earnie. Damit ein legitimer nativer Lauf (Ist > 0, Soll = 0 **im** Fenster) nicht als Fehler markiert wird, prüft `swimspa_filter_runs_unexpectedly` zusätzlich `slot_outside_native_filter_window`. Das native Fenster (`native_start_hour`/`native_duration_hours`) wird dafür je Durchlauf in `optimization_history.jsonl` unter `filter_contexts` mitgeloggt (`main.py`). Fehlt die Fenster-Info (Alt-Logs), fällt das Prädikat konservativ auf „kein Fehler".
 
 ### 5.3 Regeln pflegen
 

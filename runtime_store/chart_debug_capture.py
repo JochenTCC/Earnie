@@ -253,7 +253,7 @@ def write_capture_zip(
         archive.writestr(
             "README.txt",
             (
-                "Chart-Debug-Archiv (Energy Optimizer)\n"
+                "Chart-Debug-Archiv (Earnie)\n"
                 "manifest.json – Plot-Tabellen, Kontext, Live-SOC, Plotly Chart 1, Pfadauflosung\n"
                 "runtime/optimization_history_window.jsonl – Produktiv-Log um das Chart-Fenster\n"
                 "runtime/*.json – Kopien weiterer Laufzeitdateien falls vorhanden\n"

@@ -1,7 +1,7 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "https://energy-optimizer.local/house_profiles.schema.json",
-    "title": "Energy Optimizer Hausprofile",
+    "$id": "https://earnie.local/house_profiles.schema.json",
+    "title": "Earnie Hausprofile",
     "type": "object",
     "properties": {
         "profiles": {

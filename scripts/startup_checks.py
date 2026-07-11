@@ -6,17 +6,18 @@ import os
 import sys
 
 from integrations.loxone_connectivity import loxone_env_configured, verify_loxone_setup
+from runtime_store.env_vars import read_env
 
 logger = logging.getLogger(__name__)
 
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 
-def _env_flag(name: str, *, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
+def _env_flag(suffix: str, *, default: bool = False) -> bool:
+    raw = read_env(suffix)
+    if not raw:
         return default
-    return str(raw).strip().lower() in _TRUTHY
+    return raw.lower() in _TRUTHY
 
 
 def run_loxone_verify_on_startup() -> None:
@@ -26,19 +27,19 @@ def run_loxone_verify_on_startup() -> None:
     Standard: einmal pro Worker-Start nach Deploy/Neustart.
     Fehler werden geloggt; der Betrieb läuft weiter.
 
-    ENERGY_OPTIMIZER_SKIP_LOXONE_VERIFY=1 → überspringen
-    ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START=0 → überspringen
-    ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY=1 → bei Fehler mit Exit-Code 1 abbrechen
+    EARNIE_SKIP_LOXONE_VERIFY=1 → überspringen
+    EARNIE_VERIFY_LOXONE_ON_START=0 → überspringen
+    EARNIE_STRICT_LOXONE_VERIFY=1 → bei Fehler mit Exit-Code 1 abbrechen
     """
-    if _env_flag("ENERGY_OPTIMIZER_SKIP_LOXONE_VERIFY"):
+    if _env_flag("SKIP_LOXONE_VERIFY"):
         logger.info(
-            "Loxone-Startup-Prüfung übersprungen (ENERGY_OPTIMIZER_SKIP_LOXONE_VERIFY)."
+            "Loxone-Startup-Prüfung übersprungen (EARNIE_SKIP_LOXONE_VERIFY)."
         )
         return
-    if not _env_flag("ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START", default=True):
+    if not _env_flag("VERIFY_LOXONE_ON_START", default=True):
         logger.info(
             "Loxone-Startup-Prüfung übersprungen "
-            "(ENERGY_OPTIMIZER_VERIFY_LOXONE_ON_START=0)."
+            "(EARNIE_VERIFY_LOXONE_ON_START=0)."
         )
         return
     if not loxone_env_configured():
@@ -51,7 +52,7 @@ def run_loxone_verify_on_startup() -> None:
         ok, results = verify_loxone_setup()
     except (FileNotFoundError, ValueError, KeyError) as exc:
         logger.error("Loxone-Startup-Prüfung: ungültige Konfiguration: %s", exc)
-        if _env_flag("ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY"):
+        if _env_flag("STRICT_LOXONE_VERIFY"):
             raise SystemExit(1) from exc
         return
 
@@ -79,8 +80,8 @@ def run_loxone_verify_on_startup() -> None:
     message = (
         f"Loxone-Startup-Prüfung: {failed} von {len(results)} Prüfungen fehlgeschlagen."
     )
-    if _env_flag("ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY"):
-        logger.error("%s Abbruch (ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY).", message)
+    if _env_flag("STRICT_LOXONE_VERIFY"):
+        logger.error("%s Abbruch (EARNIE_STRICT_LOXONE_VERIFY).", message)
         raise SystemExit(1)
     logger.error("%s Optimierung startet trotzdem.", message)
 

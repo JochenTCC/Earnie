@@ -116,7 +116,8 @@ def _print_window_summary(anchor, idx, anchors, cache, matrix, meta) -> None:
 
 
 def _time_milp(matrix, meta, *, strict: bool, label: str) -> float:
-    scenario = config.get_backtesting_scenarios()["runtime_settings"]
+    live_id = config.get_live_scenario_id()
+    scenario = config.get_backtesting_scenarios()[live_id]
     battery = _scenario_to_battery_params(scenario)
     eauto, ctx, targets, _, _ = _eauto_context(matrix, meta)
     remaining = {cid: float(targets.get(cid, 0.0)) for cid in targets}

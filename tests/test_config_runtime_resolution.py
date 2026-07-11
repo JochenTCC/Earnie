@@ -1,4 +1,4 @@
-"""Tests für zentrale Runtime-Auflösung in config.py (1.26.0 P2)."""
+"""Tests für zentrale Live-Szenario-Auflösung in config.py (1.26.0 P2 / 2.0 P2)."""
 from __future__ import annotations
 
 import json
@@ -7,6 +7,32 @@ from pathlib import Path
 import pytest
 
 from config import Config
+from house_config.scenario_resolution import DEFAULT_LIVE_SCENARIO_ID
+
+
+def _write_live_scenarios(config_dir, *, settings: dict | None = None) -> None:
+    live_settings = settings or {
+        "battery_id": "home_5kwh",
+        "pv_system_id": "roof",
+        "import_tariff_id": "fixed_imp",
+        "export_tariff_id": "monthly_exp",
+        "house_profile_id": "efh",
+    }
+    (config_dir / "backtesting_scenarios.json").write_text(
+        json.dumps(
+            {
+                "cbc_gap_rel": 0.1,
+                "scenarios": [
+                    {
+                        "id": DEFAULT_LIVE_SCENARIO_ID,
+                        "label": "Live",
+                        "settings": live_settings,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def _write_minimal_greenfield_config(config_dir) -> None:
@@ -23,6 +49,13 @@ def _write_minimal_greenfield_config(config_dir) -> None:
         json.dumps({"import_tariffs": [], "export_tariffs": []}),
         encoding="utf-8",
     )
+    _write_live_scenarios(config_dir, settings={
+        "battery_id": "",
+        "pv_system_id": "",
+        "import_tariff_id": "",
+        "export_tariff_id": "",
+        "house_profile_id": "",
+    })
 
 
 def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> None:
@@ -46,6 +79,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
     (config_dir / "config.json").write_text(
         json.dumps(
             {
+                "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
                 "eauto_milp": {
                     "live_modus_a_min_remaining_kwh": 2.8,
                     "tie_break_on_epsilon": 0.001,
@@ -68,13 +102,6 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                 "planning_horizon": {"mode": "sunset_window"},
                 "file_paths_battery_simulation": {
                     "path_cons_data": "runtime/cons_data_hourly.csv"
-                },
-                "runtime_settings": {
-                    "battery_id": "home_5kwh",
-                    "pv_system_id": "roof",
-                    "import_tariff_id": "fixed_imp",
-                    "export_tariff_id": "monthly_exp",
-                    "house_profile_id": "efh",
                 },
                 "batteries": [battery],
                 "pv_systems": [
@@ -139,9 +166,10 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
         ),
         encoding="utf-8",
     )
+    _write_live_scenarios(config_dir)
 
 
-def test_config_loads_id_only_runtime_settings(tmp_path, monkeypatch):
+def test_config_loads_id_only_live_scenario(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -149,6 +177,7 @@ def test_config_loads_id_only_runtime_settings(tmp_path, monkeypatch):
 
     cfg = Config(
         config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
         require_loxone_credentials=False,
@@ -176,6 +205,7 @@ def test_battery_wear_requires_entity_config_when_battery_id_set(tmp_path, monke
 
     cfg = Config(
         config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
         require_loxone_credentials=False,
@@ -192,10 +222,6 @@ def test_backtesting_feed_in_settings_uses_resolved_baseline(tmp_path, monkeypat
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
     _write_id_only_config(config_dir, battery_wear_enabled=True)
-    (config_dir / "backtesting_scenarios.json").write_text(
-        json.dumps({"cbc_gap_rel": 0.1, "scenarios": []}),
-        encoding="utf-8",
-    )
 
     cfg = Config(
         config_path=str(config_dir / "config.json"),
@@ -211,15 +237,11 @@ def test_backtesting_feed_in_settings_uses_resolved_baseline(tmp_path, monkeypat
     assert settings.k_push_cent == pytest.approx(0.0)
 
 
-def test_backtesting_baseline_uses_same_resolution_path(tmp_path, monkeypatch):
+def test_live_scenario_in_backtesting_scenarios(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
     _write_id_only_config(config_dir, battery_wear_enabled=True)
-    (config_dir / "backtesting_scenarios.json").write_text(
-        json.dumps({"cbc_gap_rel": 0.1, "scenarios": []}),
-        encoding="utf-8",
-    )
 
     cfg = Config(
         config_path=str(config_dir / "config.json"),
@@ -229,10 +251,31 @@ def test_backtesting_baseline_uses_same_resolution_path(tmp_path, monkeypatch):
         require_loxone_credentials=False,
     )
 
-    baseline = cfg.get_backtesting_scenarios()["runtime_settings"]
-    live = cfg.get_resolved_runtime_settings()
-    assert baseline["pv_kwp"] == live["pv_kwp"]
-    assert baseline["battery_capacity_kwh"] == live["battery_capacity_kwh"]
+    scenarios = cfg.get_backtesting_scenarios()
+    assert DEFAULT_LIVE_SCENARIO_ID in scenarios
+    live = scenarios[DEFAULT_LIVE_SCENARIO_ID]
+    resolved = cfg.get_resolved_runtime_settings()
+    assert live["pv_kwp"] == resolved["pv_kwp"]
+    assert live["battery_capacity_kwh"] == resolved["battery_capacity_kwh"]
+
+
+def test_config_rejects_legacy_runtime_settings_block(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+    _write_id_only_config(config_dir)
+    payload = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+    payload["runtime_settings"] = {"battery_id": "home_5kwh"}
+    (config_dir / "config.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="runtime_settings"):
+        Config(
+            config_path=str(config_dir / "config.json"),
+            backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
+            tariffs_path=str(config_dir / "tariffs.json"),
+            house_profiles_path=str(config_dir / "house_profiles.json"),
+            require_loxone_credentials=False,
+        )
 
 
 def test_config_defers_runtime_params_during_incomplete_greenfield(tmp_path, monkeypatch):
@@ -243,6 +286,7 @@ def test_config_defers_runtime_params_during_incomplete_greenfield(tmp_path, mon
 
     cfg = Config(
         config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
         require_loxone_credentials=False,
@@ -265,6 +309,7 @@ def test_config_loads_full_params_after_planning_complete(tmp_path, monkeypatch)
 
     cfg = Config(
         config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
         require_loxone_credentials=False,
@@ -275,7 +320,39 @@ def test_config_loads_full_params_after_planning_complete(tmp_path, monkeypatch)
     cfg.require_runtime_params_loaded()
 
 
-def test_update_runtime_settings_accepts_id_refs_only(tmp_path, monkeypatch):
+def test_config_loads_zero_pv_without_pv_system(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+    _write_id_only_config(config_dir, battery_wear_enabled=False)
+    payload = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+    payload["pv_systems"] = []
+    (config_dir / "config.json").write_text(json.dumps(payload), encoding="utf-8")
+    scenarios_doc = json.loads(
+        (config_dir / "backtesting_scenarios.json").read_text(encoding="utf-8")
+    )
+    scenarios_doc["scenarios"][0]["settings"]["pv_system_id"] = ""
+    (config_dir / "backtesting_scenarios.json").write_text(
+        json.dumps(scenarios_doc),
+        encoding="utf-8",
+    )
+
+    cfg = Config(
+        config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
+        tariffs_path=str(config_dir / "tariffs.json"),
+        house_profiles_path=str(config_dir / "house_profiles.json"),
+        require_loxone_credentials=False,
+    )
+
+    assert cfg.is_runtime_params_deferred() is False
+    assert cfg.PV_KWP == pytest.approx(0.0)
+    assert cfg.PV_TILT == pytest.approx(0.0)
+    assert cfg.PV_AZIMUTH == pytest.approx(0.0)
+    cfg.require_runtime_params_loaded()
+
+
+def test_update_live_scenario_settings_accepts_id_refs_only(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -283,27 +360,30 @@ def test_update_runtime_settings_accepts_id_refs_only(tmp_path, monkeypatch):
 
     cfg = Config(
         config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
         require_loxone_credentials=False,
     )
 
-    cfg.update_runtime_settings({"battery_id": "home_5kwh"})
+    cfg.update_live_scenario_settings({"battery_id": "home_5kwh"})
 
     reloaded = Config(
         config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
         require_loxone_credentials=False,
     )
-    runtime = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))[
-        "runtime_settings"
-    ]
-    assert runtime["battery_id"] == "home_5kwh"
+    scenarios_doc = json.loads(
+        (config_dir / "backtesting_scenarios.json").read_text(encoding="utf-8")
+    )
+    live = next(s for s in scenarios_doc["scenarios"] if s["id"] == DEFAULT_LIVE_SCENARIO_ID)
+    assert live["settings"]["battery_id"] == "home_5kwh"
     assert reloaded.BATTERY_CAPACITY_KWH == pytest.approx(5.0)
 
 
-def test_update_runtime_settings_rejects_geo_fields(tmp_path, monkeypatch):
+def test_update_live_scenario_settings_rejects_geo_fields(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -311,19 +391,20 @@ def test_update_runtime_settings_rejects_geo_fields(tmp_path, monkeypatch):
 
     cfg = Config(
         config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
         require_loxone_credentials=False,
     )
 
     with pytest.raises(KeyError, match="Hausprofil"):
-        cfg.update_runtime_settings({"latitude": 47.5})
+        cfg.update_live_scenario_settings({"latitude": 47.5})
 
     with pytest.raises(KeyError, match="Hausprofil"):
-        cfg.update_runtime_settings({"timezone_name": "Europe/Berlin"})
+        cfg.update_live_scenario_settings({"timezone_name": "Europe/Berlin"})
 
 
-def test_update_runtime_settings_rejects_flat_pv_fields(tmp_path, monkeypatch):
+def test_update_live_scenario_settings_rejects_flat_pv_fields(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -331,14 +412,70 @@ def test_update_runtime_settings_rejects_flat_pv_fields(tmp_path, monkeypatch):
 
     cfg = Config(
         config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
         require_loxone_credentials=False,
     )
 
     with pytest.raises(KeyError, match="deprecated flaches Feld"):
-        cfg.update_runtime_settings({"PV_KWP": 12.0})
+        cfg.update_live_scenario_settings({"PV_KWP": 12.0})
 
     with pytest.raises(KeyError, match="deprecated flaches Feld"):
-        cfg.update_runtime_settings({"battery_capacity_kwh": 8.0})
+        cfg.update_live_scenario_settings({"battery_capacity_kwh": 8.0})
 
+
+def test_set_live_scenario_id_persists_and_reloads(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+    _write_id_only_config(config_dir, battery_wear_enabled=False)
+    scenarios_path = config_dir / "backtesting_scenarios.json"
+    scenarios_doc = json.loads(scenarios_path.read_text(encoding="utf-8"))
+    scenarios_doc["scenarios"].append(
+        {
+            "id": "alt",
+            "label": "Alternative",
+            "settings": {
+                "battery_id": "home_5kwh",
+                "pv_system_id": "roof",
+                "import_tariff_id": "fixed_imp",
+                "export_tariff_id": "monthly_exp",
+                "house_profile_id": "efh",
+            },
+        }
+    )
+    scenarios_path.write_text(json.dumps(scenarios_doc), encoding="utf-8")
+
+    cfg = Config(
+        config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(scenarios_path),
+        tariffs_path=str(config_dir / "tariffs.json"),
+        house_profiles_path=str(config_dir / "house_profiles.json"),
+        require_loxone_credentials=False,
+    )
+    assert cfg.get_live_scenario_id() == DEFAULT_LIVE_SCENARIO_ID
+
+    cfg.set_live_scenario_id("alt")
+
+    config_doc = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
+    assert config_doc["live_scenario_id"] == "alt"
+    assert cfg.get_live_scenario_id() == "alt"
+
+
+def test_set_live_scenario_id_rejects_unknown(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+    _write_id_only_config(config_dir, battery_wear_enabled=False)
+
+    cfg = Config(
+        config_path=str(config_dir / "config.json"),
+        backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
+        tariffs_path=str(config_dir / "tariffs.json"),
+        house_profiles_path=str(config_dir / "house_profiles.json"),
+        require_loxone_credentials=False,
+    )
+
+    with pytest.raises(ValueError, match="Unbekanntes Szenario"):
+        cfg.set_live_scenario_id("missing")
