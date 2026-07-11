@@ -30,6 +30,39 @@ def parse_iso_week_jump(text: str) -> tuple[int, int] | None:
     return right, left
 
 
+def parse_iso_week_number_only(text: str) -> int | None:
+    """Parst reine Kalenderwoche (1–53), z. B. '12'."""
+    cleaned = re.sub(r"^KW\s*", "", text.strip(), flags=re.IGNORECASE).strip()
+    if not cleaned.isdigit():
+        return None
+    week = int(cleaned)
+    if week < 1 or week > 53:
+        return None
+    return week
+
+
+def resolve_iso_week_jump_target(
+    jump_text: str,
+    weeks: list[tuple[int, int]],
+    *,
+    current_idx: int = 0,
+) -> tuple[int, int] | None:
+    """Löst Sprungziel auf; bei reiner KW wird das ISO-Jahr aus dem Datenbereich abgeleitet."""
+    parsed = parse_iso_week_jump(jump_text)
+    if parsed is not None:
+        return parsed
+    week_only = parse_iso_week_number_only(jump_text)
+    if week_only is None:
+        return None
+    matches = [index for index, (_, iso_week) in enumerate(weeks) if iso_week == week_only]
+    if not matches:
+        return None
+    if len(matches) == 1:
+        return weeks[matches[0]]
+    best_idx = min(matches, key=lambda index: abs(index - current_idx))
+    return weeks[best_idx]
+
+
 def week_index_for_iso(
     weeks: list[tuple[int, int]],
     iso_year: int,
@@ -48,11 +81,16 @@ def _apply_iso_week_jump(
     week_idx_key: str,
     error_key: str,
 ) -> None:
-    parsed = parse_iso_week_jump(jump_text)
-    if parsed is None:
-        st.session_state[error_key] = "Format: KW/Woche/Jahr, z. B. 12/2025 oder 2025-W12."
+    week_idx = int(st.session_state.get(week_idx_key, 0))
+    week_only = parse_iso_week_number_only(jump_text)
+    target = resolve_iso_week_jump_target(jump_text, weeks, current_idx=week_idx)
+    if target is None:
+        if week_only is not None:
+            st.session_state[error_key] = f"KW {week_only} liegt außerhalb des Zeitraums."
+        else:
+            st.session_state[error_key] = "Format: KW, z. B. 12 oder 12/2025 oder 2025-W12."
         return
-    iso_year, iso_week = parsed
+    iso_year, iso_week = target
     if iso_week < 1 or iso_week > 53:
         st.session_state[error_key] = f"Ungültige Kalenderwoche: {iso_week}."
         return
@@ -126,7 +164,7 @@ def render_iso_week_navigation(
     with jump_col:
         jump_text = st.text_input(
             "Kalenderwoche springen",
-            placeholder="12/2025",
+            placeholder="12 oder 12/2025",
             key=f"{key_prefix}_week_jump",
             label_visibility="collapsed",
         )

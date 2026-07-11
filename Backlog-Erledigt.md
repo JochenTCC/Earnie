@@ -2,6 +2,24 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 1.26.0 P4 — UI live configuration (2026-07-11)
+
+- [x] **Runtime entity UI** — [`ui/config_forms.py`](ui/config_forms.py), [`ui/scenario_runtime_form.py`](ui/scenario_runtime_form.py): ID dropdowns (battery, PV, tariffs, house profile); resolved PV/battery/tariff read-only; [`ui/pages/page_config.py`](ui/pages/page_config.py) expander renamed
+- [x] **`update_runtime_settings()`** — IDs only in [`config.py`](config.py); rejects flat PV/battery and geo fields
+- [x] **`save_runtime_scenario_refs()`** — entity IDs only; strips legacy geo from `runtime_settings` ([`ui/house_config_io.py`](ui/house_config_io.py))
+- [x] **Geo on house profile** — `latitude`/`longitude`/`timezone_name` resolved from `house_profile_id` ([`house_config/scenario_resolution.py`](house_config/scenario_resolution.py)); removed from greenfield `runtime_settings`
+- [x] **Timezone derivation** — `timezonefinder` + [`house_config/geo_timezone.py`](house_config/geo_timezone.py); no manual timezone entry in Hauskonfigurator; optional geo override in Szenarieneditor “Weitere Szenarien”
+- [x] **Tests** — `tests/test_config_runtime_resolution.py`, `tests/test_geo_timezone.py`; greenfield ID-only keys in `tests/test_greenfield_bootstrap.py`
+- [x] **Docs** — [`docs/einrichtung/greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md) acceptance table updated
+
+### Version 1.26.0 P3 — Price pipeline live (2026-07-11)
+
+- [x] **Import pricing live** — shared `import_brutto_cent_for_slots` / `enrich_slots_import_prices` in `data/backtesting_prices.py`; live matrix + historical day via `profile_manager.py`; reference costs in `simulation/engine.py`
+- [x] **Parity test** — same tariff IDs → identical import cent/kWh live vs backtesting (`tests/test_price_pipeline_p3.py`)
+- [x] **P3a — Backtesting window** — `resolve_simulation_window()` snaps start to Monday of week with `(today − 12 months)`; documented in `ui/backtesting_time_ranges.py`
+- [x] **P3b — Minimal thermal bridge** — `thermal_on_off_hourly_profile` in `data/heating_need.py`; on/off at `nominal_power_kw` in `data/consumption_profiles.py`; `house_profile_baseload_overlay` (generic + thermal) in `house_config/planning_flex_bridge.py` for live + backtesting
+- [x] **Tests** — `tests/test_price_pipeline_p3.py`
+
 ### Version 1.26.0 P0 — Greenfield onboarding deferrals (2026-07-11)
 
 - [x] **Deferred runtime params** — incomplete Greenfield planning no longer crashes `import config`; PV/battery/tariff params load after Szenarieneditor; `main.py` waits until planning complete (`config.py`, `main.py`, `ui/config_forms.py`, `tests/test_config_runtime_resolution.py`)
@@ -29,7 +47,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Version 1.26.0 P0 — Greenfield pilot (strict target config) (2026-07-11)
 
-- [x] **ID-only `runtime_settings`** — `greenfield/config/config.json` and `config/config.minimal.json` stripped of flat PV/battery/tariff duplicates; IDs + geo/timezone only
+- [x] **ID-only `runtime_settings`** — `greenfield/config/config.json` and `config/config.minimal.json` stripped of flat PV/battery/tariff duplicates; IDs only (geo/timezone on house profile since P4)
 - [x] **Sunset-2-Sunset on greenfield** — `ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,backtesting` in `docker-compose-greenfield.yml` and VS Code Greenfield launch
 - [x] **Acceptance checklist** — Live-path smoke steps in [`docs/einrichtung/greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md) (execution blocked until **1.26.0 P2**)
 - [x] **Tests** — `tests/test_greenfield_bootstrap.py`: ID-only runtime_settings assertions for minimal template and greenfield config
@@ -70,6 +88,12 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] `ui/consumption_display/` (three modes); backtesting page: cons_data section, total cost table, deviation list with Chart1/2 (1.25.f), window snapshots (`backtesting_window_snapshots.jsonl`), horizon-mode UI (`fixed_24h` / `sunset_window`), reference consumption, monthly cost chart
 - [x] Plausibility false positives with house profile fixed (bugfix → `Backlog-Erledigt.md` § Bugfix — Backtesting plausibility)
+
+### Version 1.26.0 P2b — Smoketest follow-ups (UX) (2026-07-11)
+
+- [x] **Hauskonfigurator:** modeled consumption chart without Jahres-Verbrauchs-CSV (`ConsumptionDisplayMode.MODELED_PROFILE`; scenario-editor pattern in `ui/house_config_profile_form.py`)
+- [x] **ISO week jump:** week number only — year inferred from data range (`ui/consumption_display/navigation.py`: `parse_iso_week_number_only`, `resolve_iso_week_jump_target`)
+- [x] **New PV-Anlage / Solarkollektor:** inherit profile `default_pv_tilt` / `default_pv_azimuth` (18°/0° fallback; PV profile picker updates tilt/azimuth via `on_change`)
 
 ### Version 1.25.f follow-ups — deviation list & week navigation (2026-07-10)
 

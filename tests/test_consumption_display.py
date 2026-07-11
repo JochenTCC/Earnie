@@ -27,6 +27,8 @@ from ui.consumption_display.charts import (
 )
 from ui.consumption_display.navigation import (
     parse_iso_week_jump,
+    parse_iso_week_number_only,
+    resolve_iso_week_jump_target,
     week_index_for_iso,
 )
 
@@ -218,6 +220,24 @@ def test_parse_iso_week_jump_formats():
     assert parse_iso_week_jump("2025/12") == (2025, 12)
     assert parse_iso_week_jump("") is None
     assert parse_iso_week_jump("invalid") is None
+    assert parse_iso_week_jump("12") is None
+
+
+def test_parse_iso_week_number_only():
+    assert parse_iso_week_number_only("12") == 12
+    assert parse_iso_week_number_only("KW 12") == 12
+    assert parse_iso_week_number_only("53") == 53
+    assert parse_iso_week_number_only("0") is None
+    assert parse_iso_week_number_only("54") is None
+    assert parse_iso_week_number_only("") is None
+
+
+def test_resolve_iso_week_jump_target_week_only():
+    weeks = [(2024, 11), (2024, 12), (2025, 12), (2025, 13)]
+    assert resolve_iso_week_jump_target("12", weeks, current_idx=1) == (2024, 12)
+    assert resolve_iso_week_jump_target("12", weeks, current_idx=3) == (2025, 12)
+    assert resolve_iso_week_jump_target("99", weeks) is None
+    assert resolve_iso_week_jump_target("12/2025", weeks) == (2025, 12)
 
 
 def test_week_index_for_iso():

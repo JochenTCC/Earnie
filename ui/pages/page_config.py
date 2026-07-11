@@ -104,7 +104,7 @@ def render() -> None:
     path = resolve_config_json_path()
     st.caption(f"Datei: `{path}`")
 
-    with st.expander("Komfort-Ansicht: PV- & Batterie-Parameter", expanded=False):
+    with st.expander("Komfort-Ansicht: Runtime-Entitäten (IDs)", expanded=False):
         render_system_parameter_section()
 
     st.subheader("Roh-JSON-Editor")

@@ -20,13 +20,13 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ### Version 1.26.0 — Runtime entities & tariffs (live)
 
 **Strategy:** Greenfield-first (1.24.c), then prod cutover, then legacy removal.
-- **P0–P4:** implement and accept on `greenfield/` (ID-only `runtime_settings`; no flat battery/PV/tariff duplicates).
+- **P0–P4:** implement and accept on `greenfield/` (ID-only `runtime_settings`; no flat battery/PV/tariff/geo duplicates) — **done**
 - **P5:** prod migration + live acceptance (NAS or **7g-a** silent stack with prod `config/` copy).
 - **P6:** remove legacy code paths and schema fields (breaking for unmigrated configs).
 
-**Scope:** Live prod (`main.py`, Sunset-2-Sunset UI) uses the same reference resolution as backtesting (1.24). `runtime_settings` holds only selection IDs + location/timezone (+ optional `pv_system_id`). Technical parameters from `batteries[]`, `pv_systems[]`, `config/tariffs.json`. **Out of scope:** full migration of live `flexible_consumers` to house profiles. **In scope (minimal):** thermal overlay from `house_profile_id` in live baseload (P2/P3 — define before coding).
+**Scope:** Live prod (`main.py`, Sunset-2-Sunset UI) uses the same reference resolution as backtesting (1.24). `runtime_settings` holds only selection IDs (+ optional `pv_system_id`). Geo/timezone from `house_profile_id` → `house_profiles.json`. Technical parameters from `batteries[]`, `pv_systems[]`, `config/tariffs.json`. **Out of scope:** full migration of live `flexible_consumers` to house profiles. **In scope (minimal):** thermal overlay from `house_profile_id` in live baseload (P2/P3 — define before coding).
 
-**Phases:** P1 data model → P2 config.py resolution → P0 greenfield pilot (smoke ✅) → **P2b smoketest follow-ups** → P3 price pipeline live (+ P3a/P3b) → P4 UI → P5 prod cutover → P6 legacy removal.
+**Phases:** P1 data model → P2 config.py resolution → P0 greenfield pilot (smoke ✅) → P3 price pipeline live (+ P3a/P3b) → P4 UI ✅ → P5 prod cutover → P6 legacy removal.
 
 **Acceptance:** greenfield: live optimization + backtesting share one resolution path; prod: migrated `config.json` with IDs only; backtesting baseline unchanged; no flat-field fallbacks remain after P6.
 
@@ -46,24 +46,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 | 10 | Docs (P5) | Update [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md) / [`preise.md`](docs/konfiguration/preise.md) in German — content only, no translation |
 | 11 | Legacy thermal models (RC / `thermal_control`) | **Option A:** defer to **Thermals P1** (2.+1); 1.26.0 only minimal bridge via **P3b** (Haus Wärme on/off at `nominal_power_kw`) |
 
-- [ ] **P2b — Smoketest follow-ups (UX)**
-  - Hauskonfigurator: modeled consumption chart without Jahres-Verbrauchs-CSV (`ConsumptionDisplayMode.MODELED_PROFILE`; reuse scenario-editor pattern)
-  - ISO week jump: week number only — year inferred from data range (`ui/consumption_display/navigation.py`)
-  - New PV-Anlage / Solarkollektor: inherit profile `default_pv_tilt` / `default_pv_azimuth` (existing 18°/0° fallback)
-
-- [ ] **P3 — Price pipeline live**
-  - Import: `awattar` (EPEX + surcharges from tariff spec in `tariffs.json`), `fixed_cent`, `monthly_table`
-  - Export: `fixed`, `monthly_table`, `dynamic_epex` from tariff resolution (not flat `k_push_cent`)
-  - Changes: [`data/profile_manager.py`](data/profile_manager.py), [`data/market_prices.py`](data/market_prices.py), [`simulation/engine.py`](simulation/engine.py)
-  - Parity test: same tariff IDs → identical import/export cent/kWh live vs backtesting for a fixed hour window
-  - **P3a — Backtesting window:** default simulation start = Monday of the week containing `(today − 12 months)`; document in [`ui/backtesting_time_ranges.py`](ui/backtesting_time_ranges.py) (`data/data_loader.py`, [`scripts/run_backtesting.py`](scripts/run_backtesting.py))
-  - **P3b — Minimal thermal bridge (decision #8 / #11):** Haus Wärme hourly profile — on/off at `nominal_power_kw`, not flat weekly average (`data/consumption_profiles.py`, [`data/heating_need.py`](data/heating_need.py)); scenario-editor week chart acceptance
-- [ ] **P4 — UI live configuration**
-  - Replace flat sidebar editors in [`ui/config_forms.py`](ui/config_forms.py) with ID dropdowns (reuse house configurator / `scenario_runtime_form` patterns)
-  - `update_runtime_settings()` saves IDs only; display resolved values (read-only)
-  - Optional same pattern for `pv_system_id` (already prepared in 1.24)
 - [ ] **P5 — Prod cutover (migration, tests, docs)**
-  - Migration script: prod flat values → draft `batteries[]` / `pv_systems[]` + tariff IDs in `tariffs.json`; `runtime_settings` stripped to IDs + geo — **manual review before deploy**
+  - Migration script: prod flat values → draft `batteries[]` / `pv_systems[]` + tariff IDs in `tariffs.json`; `runtime_settings` stripped to IDs only; migrate geo/timezone into selected `house_profiles.json` entry — **manual review before deploy**
   - Migrate global `battery_wear` → selected `batteries[]` entry (in script output)
   - Build/use **7g-a** silent stack for acceptance (prod Loxone read-only) before NAS deploy
   - Tests in [`tests/test_house_config.py`](tests/test_house_config.py) + live resolution test

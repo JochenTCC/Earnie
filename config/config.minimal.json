@@ -53,9 +53,6 @@
         "control_cmd_name": "Control_Cmd"
     },
     "runtime_settings": {
-        "latitude": 48.2,
-        "longitude": 16.37,
-        "timezone_name": "Europe/Vienna",
         "battery_id": "",
         "pv_system_id": "",
         "house_profile_id": "",

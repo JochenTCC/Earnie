@@ -26,6 +26,7 @@ from ui.scenario_form_helpers import (
     lookup_entity_id,
     options_for_entities,
     render_entity_selectbox,
+    render_profile_geo_caption,
 )
 from ui.scenario_runtime_form import render_runtime_scenario_form
 
@@ -145,18 +146,37 @@ def _render_additional_scenarios_tab() -> None:
         current_id=settings.get("house_profile_id"),
     )
 
-    runtime = config.CONFIG._raw_config.get("runtime_settings", {})
-    col_a, col_b = st.columns(2)
-    latitude = col_a.number_input(
-        "Breitengrad",
-        value=float(settings.get("latitude", runtime.get("latitude", 48.0))),
-        key="scenario_lat",
-    )
-    longitude = col_b.number_input(
-        "Längengrad",
-        value=float(settings.get("longitude", runtime.get("longitude", 10.0))),
-        key="scenario_lon",
-    )
+    selected_profile_id = lookup_entity_id(prof_map, prof_pick)
+    selected_profile = profiles.get(selected_profile_id, {})
+    if selected_profile:
+        render_profile_geo_caption(selected_profile)
+
+    with st.expander("Standort-Override (optional, Backtesting)", expanded=False):
+        st.caption(
+            "Nur für What-if-Szenarien. Leer lassen = Standort/Zeitzone aus Hausprofil."
+        )
+        default_lat = float(
+            settings.get("latitude", selected_profile.get("latitude", 48.0))
+        )
+        default_lon = float(
+            settings.get("longitude", selected_profile.get("longitude", 10.0))
+        )
+        col_a, col_b = st.columns(2)
+        latitude = col_a.number_input(
+            "Breitengrad (Override)",
+            value=default_lat,
+            key="scenario_lat",
+        )
+        longitude = col_b.number_input(
+            "Längengrad (Override)",
+            value=default_lon,
+            key="scenario_lon",
+        )
+        use_geo_override = st.checkbox(
+            "Standort-Override in Szenario speichern",
+            value="latitude" in settings or "longitude" in settings,
+            key="scenario_geo_override",
+        )
 
     if st.button("Auflösung testen", key="scenario_preview", disabled=required_lists_empty):
         draft = _build_settings(
@@ -165,8 +185,8 @@ def _render_additional_scenarios_tab() -> None:
             import_tariff_id=lookup_entity_id(imp_map, imp_pick),
             export_tariff_id=lookup_entity_id(exp_map, exp_pick),
             house_profile_id=lookup_entity_id(prof_map, prof_pick),
-            latitude=latitude,
-            longitude=longitude,
+            latitude=latitude if use_geo_override else None,
+            longitude=longitude if use_geo_override else None,
             netzentgelt_cent_kwh_override=netzentgelt_override,
         )
         try:
@@ -196,8 +216,8 @@ def _render_additional_scenarios_tab() -> None:
                         import_tariff_id=lookup_entity_id(imp_map, imp_pick),
                         export_tariff_id=lookup_entity_id(exp_map, exp_pick),
                         house_profile_id=lookup_entity_id(prof_map, prof_pick),
-                        latitude=latitude,
-                        longitude=longitude,
+                        latitude=latitude if use_geo_override else None,
+                        longitude=longitude if use_geo_override else None,
                         netzentgelt_cent_kwh_override=netzentgelt_override,
                     ),
                 }
@@ -213,15 +233,11 @@ def _build_settings(
     import_tariff_id: str,
     export_tariff_id: str,
     house_profile_id: str,
-    latitude: float,
-    longitude: float,
+    latitude: float | None = None,
+    longitude: float | None = None,
     netzentgelt_cent_kwh_override: float | None = None,
 ) -> dict:
-    settings: dict = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "timezone_name": "Europe/Vienna",
-    }
+    settings: dict = {}
     if battery_id:
         settings["battery_id"] = battery_id
     if pv_system_id:
@@ -232,6 +248,10 @@ def _build_settings(
         settings["export_tariff_id"] = export_tariff_id
     if house_profile_id:
         settings["house_profile_id"] = house_profile_id
+    if latitude is not None:
+        settings["latitude"] = float(latitude)
+    if longitude is not None:
+        settings["longitude"] = float(longitude)
     if netzentgelt_cent_kwh_override is not None and netzentgelt_cent_kwh_override > 0.0:
         settings["netzentgelt_cent_kwh_override"] = float(netzentgelt_cent_kwh_override)
     return settings

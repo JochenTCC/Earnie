@@ -81,7 +81,7 @@ Ziel: Greenfield nutzt **ID-only** `runtime_settings` (Entitäts-Referenzen + Ge
 
 | Schritt | Prüfung | Erwartung |
 |---------|---------|-----------|
-| 1. Config | `greenfield/config/config.json` → `runtime_settings` | Nur `battery_id`, `import_tariff_id`, `export_tariff_id`, `house_profile_id`, optional `pv_system_id`, `latitude`, `longitude`, `timezone_name` — **keine** `pv_kwp`, `battery_capacity_kwh`, `k_push_cent`, `feed_in_mode` usw. |
+| 1. Config | `greenfield/config/config.json` → `runtime_settings` | Nur Entitäts-IDs: `battery_id`, `import_tariff_id`, `export_tariff_id`, `house_profile_id`, optional `pv_system_id` — **keine** flachen PV-/Batterie-/Tarif-/Geo-Felder. Standort/Zeitzone in `house_profiles.json`. |
 | 2. Entitäts-Auflösung | Szenarieneditor → Runtime → **Auflösung testen** | JSON mit aufgelösten PV-, Batterie- und Tarifparametern aus `batteries[]`, `pv_systems[]`, `tariffs.json` |
 | 3. Live-Zyklus | `docker compose -f docker-compose-greenfield.yml logs -f optimizer-worker` | `main.py` durchläuft mindestens einen Optimierungszyklus ohne Config-Fehler |
 | 4. UI Sunset-2-Sunset | Modus **Sunset-2-Sunset** in der UI | Aufgelöste Werte (PV kWp, Batterie, Einspeisevergütung) **read-only** — keine flachen Sidebar-Edits auf Duplikat-Felder |

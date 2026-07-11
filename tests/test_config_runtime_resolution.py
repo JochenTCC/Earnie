@@ -84,9 +84,6 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                     "path_cons_data": "runtime/cons_data_hourly.csv"
                 },
                 "runtime_settings": {
-                    "latitude": 48.0,
-                    "longitude": 11.0,
-                    "timezone_name": "Europe/Vienna",
                     "battery_id": "home_5kwh",
                     "pv_system_id": "roof",
                     "import_tariff_id": "fixed_imp",
@@ -177,6 +174,9 @@ def test_config_loads_id_only_runtime_settings(tmp_path, monkeypatch):
 
     resolved = cfg.get_resolved_runtime_settings()
     assert resolved["battery_capacity_kwh"] == pytest.approx(5.0)
+    assert resolved["latitude"] == pytest.approx(48.2)
+    assert resolved["longitude"] == pytest.approx(11.0)
+    assert resolved["timezone_name"] == "Europe/Berlin"
     assert resolved.get("_house_profile") is not None
     assert resolved.get("_monthly_fixed_tariffs") is not None
     assert cfg.get_battery_wear_cent_per_kwh(5.0) == pytest.approx(2.5, rel=1e-3)
@@ -286,3 +286,72 @@ def test_config_loads_full_params_after_planning_complete(tmp_path, monkeypatch)
     assert cfg.is_runtime_params_deferred() is False
     assert cfg.PV_KWP == pytest.approx(10.0)
     cfg.require_runtime_params_loaded()
+
+
+def test_update_runtime_settings_accepts_id_refs_only(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+    _write_id_only_config(config_dir, battery_wear_enabled=False)
+
+    cfg = Config(
+        config_path=str(config_dir / "config.json"),
+        tariffs_path=str(config_dir / "tariffs.json"),
+        house_profiles_path=str(config_dir / "house_profiles.json"),
+        require_loxone_credentials=False,
+    )
+
+    cfg.update_runtime_settings({"battery_id": "home_5kwh"})
+
+    reloaded = Config(
+        config_path=str(config_dir / "config.json"),
+        tariffs_path=str(config_dir / "tariffs.json"),
+        house_profiles_path=str(config_dir / "house_profiles.json"),
+        require_loxone_credentials=False,
+    )
+    runtime = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))[
+        "runtime_settings"
+    ]
+    assert runtime["battery_id"] == "home_5kwh"
+    assert reloaded.BATTERY_CAPACITY_KWH == pytest.approx(5.0)
+
+
+def test_update_runtime_settings_rejects_geo_fields(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+    _write_id_only_config(config_dir, battery_wear_enabled=False)
+
+    cfg = Config(
+        config_path=str(config_dir / "config.json"),
+        tariffs_path=str(config_dir / "tariffs.json"),
+        house_profiles_path=str(config_dir / "house_profiles.json"),
+        require_loxone_credentials=False,
+    )
+
+    with pytest.raises(KeyError, match="Hausprofil"):
+        cfg.update_runtime_settings({"latitude": 47.5})
+
+    with pytest.raises(KeyError, match="Hausprofil"):
+        cfg.update_runtime_settings({"timezone_name": "Europe/Berlin"})
+
+
+def test_update_runtime_settings_rejects_flat_pv_fields(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+    _write_id_only_config(config_dir, battery_wear_enabled=False)
+
+    cfg = Config(
+        config_path=str(config_dir / "config.json"),
+        tariffs_path=str(config_dir / "tariffs.json"),
+        house_profiles_path=str(config_dir / "house_profiles.json"),
+        require_loxone_credentials=False,
+    )
+
+    with pytest.raises(KeyError, match="deprecated flaches Feld"):
+        cfg.update_runtime_settings({"PV_KWP": 12.0})
+
+    with pytest.raises(KeyError, match="deprecated flaches Feld"):
+        cfg.update_runtime_settings({"battery_capacity_kwh": 8.0})
+

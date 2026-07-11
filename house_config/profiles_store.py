@@ -7,6 +7,7 @@ import os
 from house_config.baseload import compute_baseload_kwh
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.ev_profile import normalize_ev_charging_schedule
+from house_config.geo_timezone import lookup_timezone_name
 from house_config.generic_schedule import (
     derive_duration_h,
     generic_annual_kwh,
@@ -119,6 +120,7 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         )
     latitude = float(raw.get("latitude", 48.0) or 48.0)
     longitude = float(raw.get("longitude", 10.0) or 10.0)
+    timezone_name = lookup_timezone_name(latitude, longitude)
     default_pv_tilt = float(raw.get("default_pv_tilt", 25.0) or 25.0)
     default_pv_azimuth = float(raw.get("default_pv_azimuth", 0.0) or 0.0)
     consumers: list[dict] = []
@@ -154,6 +156,7 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         "annual_kwh": annual_kwh,
         "latitude": latitude,
         "longitude": longitude,
+        "timezone_name": timezone_name,
         "default_pv_tilt": default_pv_tilt,
         "default_pv_azimuth": default_pv_azimuth,
         "total_profile_csv": total_profile_csv,
@@ -195,6 +198,8 @@ def _serialize_profile(profile: dict) -> dict:
         out["latitude"] = profile["latitude"]
     if profile.get("longitude") is not None:
         out["longitude"] = profile["longitude"]
+    if profile.get("timezone_name"):
+        out["timezone_name"] = profile["timezone_name"]
     if profile.get("default_pv_tilt") is not None:
         out["default_pv_tilt"] = profile["default_pv_tilt"]
     if profile.get("default_pv_azimuth") is not None:

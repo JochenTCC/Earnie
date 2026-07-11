@@ -227,20 +227,20 @@ def _scenario_to_battery_params(scenario_params: dict) -> dict:
     }
 
 
-def _brutto_price_cent(epex_cent: float) -> float:
-    fix_aufschlag = config.get("FIX_AUFSCHLAG_CENT", cast=float)
-    netzverlust = config.get("NETZVERLUST_FAKTOR", cast=float)
-    mwst_faktor = config.get("MWST_AUSTRIA_FAKTOR", cast=float)
-    return round((epex_cent * netzverlust + fix_aufschlag) * mwst_faktor, 4)
-
-
 def _brutto_prices_for_slots(
-    prices_df: pd.DataFrame, slot_datetimes: list[datetime]
+    prices_df: pd.DataFrame,
+    slot_datetimes: list[datetime],
+    *,
+    scenario_params: dict | None = None,
 ) -> list[float]:
-    return [
-        _brutto_price_cent(epex)
-        for epex in epex_prices_for_slots(prices_df, slot_datetimes)
-    ]
+    from data.backtesting_prices import import_brutto_cent_for_slots, pricing_kwargs_from_resolved
+
+    epex = epex_prices_for_slots(prices_df, slot_datetimes)
+    return import_brutto_cent_for_slots(
+        [float(p) for p in epex],
+        slot_datetimes,
+        **pricing_kwargs_from_resolved(scenario_params, config.CONFIG._raw_config),
+    )
 
 
 def list_simulation_anchors(
@@ -264,17 +264,9 @@ def list_simulation_anchors(
 def _pricing_kwargs_from_scenario(scenario_params: dict | None) -> dict:
     if not scenario_params:
         return {}
-    import config
+    from data.backtesting_prices import pricing_kwargs_from_resolved
 
-    kwargs: dict = {}
-    spec = scenario_params.get("_import_tariff_spec")
-    if spec is not None:
-        kwargs["import_tariff_spec"] = spec
-        override = scenario_params.get("netzentgelt_cent_kwh")
-        if override is not None:
-            kwargs["netzentgelt_override"] = float(override)
-        kwargs["legacy_awattar"] = dict(config.CONFIG._raw_config.get("awattar", {}))
-    return kwargs
+    return pricing_kwargs_from_resolved(scenario_params, config.CONFIG._raw_config)
 
 
 def build_historical_matrix_for_slots(
@@ -307,10 +299,10 @@ def build_historical_matrix_for_slots(
         total_load, hourly_flex
     )
     if scenario_params and scenario_params.get("_house_profile"):
-        from house_config.planning_flex_bridge import fixed_generic_hourly_overlay
+        from house_config.planning_flex_bridge import house_profile_baseload_overlay
 
         profile = scenario_params["_house_profile"]
-        overlay = fixed_generic_hourly_overlay(profile, slot_datetimes)
+        overlay = house_profile_baseload_overlay(profile, slot_datetimes)
         baseload_kw = [round(base + extra, 3) for base, extra in zip(baseload_kw, overlay)]
         historical_baseload_kwh = round(sum(baseload_kw), 3)
     stored_baseload_kwh = round(sum(baseload_stored), 3)
@@ -584,6 +576,8 @@ def compute_historical_reference_costs(
     prices_df: pd.DataFrame,
     feed_in_settings: feed_in_prices.FeedInSettings,
     cache: HistoricalDataCache | None = None,
+    *,
+    scenario_params: dict | None = None,
 ) -> pd.DataFrame:
     """
     Referenzkosten: historischer Verbrauch + PV, verrechnet mit Börsenpreisen,
@@ -605,7 +599,11 @@ def compute_historical_reference_costs(
         slot_datetimes = window_slot_datetimes(anchor)
         _, _, total_load, _ = cache.get_window_consumption(slot_datetimes)
         pv_profile = cache.get_pv_for_slots(slot_datetimes)
-        brutto_prices = _brutto_prices_for_slots(prices_df, slot_datetimes)
+        brutto_prices = _brutto_prices_for_slots(
+            prices_df,
+            slot_datetimes,
+            scenario_params=scenario_params,
+        )
         epex_prices = epex_prices_for_slots(prices_df, slot_datetimes)
 
         for slot_dt, load, pv, price, epex in zip(

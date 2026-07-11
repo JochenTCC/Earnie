@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from data.heating_need import (
     heating_params_from_thermal,
     hourly_profile_for_year,
+    thermal_on_off_hourly_profile,
     weekly_electric_kwh,
 )
 from house_config.baseload import consumer_annual_kwh
@@ -56,6 +57,13 @@ def _modeled_consumer_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     if consumer.get("type") == "thermal_annual":
         thermal = consumer.get("thermal") or consumer
         weekly = weekly_electric_kwh(**heating_params_from_thermal(thermal))
+        nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+        if nominal > 0.0:
+            return thermal_on_off_hourly_profile(
+                weekly,
+                nominal_power_kw=nominal,
+                hours_per_year=hours,
+            )
         return hourly_profile_for_year(weekly, hours_per_year=hours)
     if consumer.get("type") == "generic" and consumer.get("schedule"):
         from house_config.generic_schedule import generic_hourly_kw_for_day

@@ -30,7 +30,9 @@ def test_configured_price_range_default(monkeypatch):
         lambda: {"price_range": "last_12_months"},
     )
     assert configured_price_range() == "last_12_months"
-    assert describe_price_range("last_12_months") == "rollierende 12 Monate bis heute"
+    assert describe_price_range("last_12_months") == (
+        "rollierende 12 Monate bis heute; Start = Montag der Woche mit (heute − 12 Monate)"
+    )
 
 
 def test_default_simulation_window_last_12_months(monkeypatch):
@@ -49,7 +51,7 @@ def test_default_simulation_window_last_12_months(monkeypatch):
     )
     start, end = default_simulation_window()
     assert end == date(2026, 7, 10)
-    assert start == date(2025, 7, 10)
+    assert start == date(2025, 7, 7)
 
 
 def test_build_time_range_help_lines_without_log(monkeypatch):

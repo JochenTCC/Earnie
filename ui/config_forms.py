@@ -1,122 +1,214 @@
-"""Sidebar-Formulare für PV-, Batterie- und Runtime-Parameter."""
+"""Komfort-Formular für runtime_settings: Entitäts-IDs speichern, Werte nur lesend."""
 from __future__ import annotations
 
 import streamlit as st
 
-from ui.runtime_config import get_runtime_settings, update_config_file
+import config
+from ui.house_config_io import (
+    get_runtime_scenario_refs,
+    list_batteries,
+    list_export_tariffs,
+    list_import_tariffs,
+    list_pv_systems,
+    load_house_profiles,
+    save_runtime_scenario_refs,
+)
+from ui.planning_tariff_form import (
+    _EXPORT_TYPE_LABELS,
+    _IMPORT_TYPE_LABELS,
+    _tariff_meta_caption,
+    _type_caption,
+)
+from ui.runtime_config import invalidate_live_optimization_cache
+from ui.scenario_form_helpers import (
+    lookup_entity_id,
+    options_for_entities,
+    render_entity_selectbox,
+    render_profile_geo_caption,
+)
 
 
-def render_pv_config_inputs(settings: dict) -> tuple[float, int, int, float]:
-    st.markdown("#### ☀️ PV-Anlage")
-    kwp = st.number_input(
-        "PV Leistung (kWp)",
-        min_value=0.0,
-        value=float(settings["PV_KWP"]),
-        step=0.1,
-        format="%.2f",
+def _render_resolved_snapshot(resolved: dict) -> None:
+    """Zeigt aufgelöste PV-/Batterie-/Tarif-/Standort-Parameter read-only."""
+    st.markdown("#### Aufgelöste Parameter (nur Anzeige)")
+    st.caption(
+        "Technische Werte aus batteries[], pv_systems[], tariffs.json und Hausprofil. "
+        "Bearbeiten im Hauskonfigurator oder Szenarieneditor."
     )
-    tilt = st.number_input(
-        "Dachneigung (°)",
-        min_value=0,
-        max_value=90,
-        value=int(settings["PV_TILT"]),
-    )
-    azimuth = st.number_input(
-        "Ausrichtung (Azimut °)",
-        min_value=-180,
-        max_value=180,
-        value=int(settings["PV_AZIMUTH"]),
-        help="0=Süd, -90=Ost, 90=West",
-    )
-    k_push = st.number_input(
-        "Einspeisevergütung (Cent/kWh)",
-        min_value=0.0,
-        value=float(settings["K_PUSH_CENT"]),
-        step=0.1,
-        format="%.2f",
-    )
-    return kwp, tilt, azimuth, k_push
 
+    geo_cols = st.columns(3)
+    geo_cols[0].metric("Breitengrad", f"{float(resolved.get('latitude', 0.0)):.4f}")
+    geo_cols[1].metric("Längengrad", f"{float(resolved.get('longitude', 0.0)):.4f}")
+    geo_cols[2].metric("Zeitzone", str(resolved.get("timezone_name", "Europe/Vienna")))
 
-def render_battery_config_inputs(settings: dict) -> tuple[float, float, float, float, float]:
-    st.markdown("#### 🔋 Batterie-Speicher")
-    bat_capacity = st.number_input(
+    pv_cols = st.columns(3)
+    pv_cols[0].metric("PV Leistung (kWp)", f"{float(resolved.get('pv_kwp', 0.0)):.2f}")
+    pv_cols[1].metric("Dachneigung (°)", f"{float(resolved.get('pv_tilt', 0.0)):.0f}")
+    pv_cols[2].metric("Ausrichtung Azimut (°)", f"{float(resolved.get('pv_azimuth', 0.0)):.0f}")
+
+    bat_cols = st.columns(4)
+    bat_cols[0].metric(
         "Speicher-Kapazität (kWh)",
-        min_value=0.0,
-        value=float(settings["BATTERY_CAPACITY_KWH"]),
-        step=0.5,
-        format="%.1f",
-        help="0 = kein Hausspeicher (z. B. nur PV oder reine Verbrauchersteuerung).",
+        f"{float(resolved.get('battery_capacity_kwh', 0.0)):.1f}",
     )
-    bat_min_soc = st.number_input(
-        "Minimaler SoC (%)",
-        min_value=0.0,
-        max_value=100.0,
-        value=float(settings["BATTERY_MIN_SOC"]),
-        step=1.0,
+    bat_cols[1].metric(
+        "Min. SoC (%)",
+        f"{float(resolved.get('battery_min_soc', 0.0)):.0f}",
     )
-    bat_max_soc = st.number_input(
-        "Maximaler SoC (%)",
-        min_value=0.0,
-        max_value=100.0,
-        value=float(settings["BATTERY_MAX_SOC"]),
-        step=1.0,
+    bat_cols[2].metric(
+        "Max. SoC (%)",
+        f"{float(resolved.get('battery_max_soc', 0.0)):.0f}",
     )
-    bat_max_power = st.number_input(
+    bat_cols[3].metric(
         "Max. Lade-/Entladeleistung (kW)",
-        min_value=0.0,
-        value=float(settings["BATTERY_MAX_POWER_KW"]),
-        step=0.1,
-        format="%.2f",
-        help="0 = kein Speicher aktiv (Kapazität ebenfalls 0).",
+        f"{float(resolved.get('battery_max_power_kw', 0.0)):.2f}",
     )
-    threshold_percent = st.number_input(
-        "Leistungs-Schwelle (%)",
-        min_value=1.0,
-        max_value=100.0,
-        value=float(settings["THRESHOLD_POWER"]) * 100.0,
-        step=1.0,
-        format="%.0f",
-        help="Anteil der max. Lade-/Entladeleistung (z. B. 5 % = 0,05 × max. kW). "
-        "Gilt für Modus-Umschaltung und Zwangsentladen vs. Automatik.",
+
+    tariff_cols = st.columns(2)
+    tariff_cols[0].metric(
+        "Einspeisevergütung (Cent/kWh)",
+        f"{float(resolved.get('k_push_cent', 0.0)):.2f}",
     )
-    threshold_power = threshold_percent / 100.0
-    return bat_capacity, bat_min_soc, bat_max_soc, bat_max_power, threshold_power
+    threshold = float(resolved.get("threshold_power", 0.0)) * 100.0
+    tariff_cols[1].metric("Leistungs-Schwelle (%)", f"{threshold:.0f}")
 
-
-def render_config_form_body(settings: dict) -> None:
-    """PV-/Batterie-Formular im Seiten-Body (kein Sidebar-Kontext)."""
-    with st.form("config_form"):
-        kwp, tilt, azimuth, k_push = render_pv_config_inputs(settings)
-        bat_capacity, bat_min_soc, bat_max_soc, bat_max_power, threshold_power = (
-            render_battery_config_inputs(settings)
+    export_spec = resolved.get("_export_tariff_spec")
+    import_spec = resolved.get("_import_tariff_spec")
+    if import_spec:
+        st.caption(
+            "Bezug: "
+            + _type_caption(import_spec, _IMPORT_TYPE_LABELS)
+            + (
+                f" · {_tariff_meta_caption(import_spec)}"
+                if _tariff_meta_caption(import_spec)
+                else ""
+            )
+        )
+    if export_spec:
+        st.caption(
+            "Einspeise: "
+            + _type_caption(export_spec, _EXPORT_TYPE_LABELS)
+            + (
+                f" · {_tariff_meta_caption(export_spec)}"
+                if _tariff_meta_caption(export_spec)
+                else ""
+            )
         )
 
-        submit_btn = st.form_submit_button("Alle Änderungen übernehmen")
+
+def render_runtime_entity_form_body() -> None:
+    """ID-Auswahl für runtime_settings im Seiten-Body (Komfort-Ansicht)."""
+    refs = get_runtime_scenario_refs()
+    batteries = list_batteries()
+    pv_systems = list_pv_systems()
+    import_tariffs = list_import_tariffs()
+    export_tariffs = list_export_tariffs()
+    profiles = load_house_profiles().get("profiles", {})
+
+    _, bat_map = options_for_entities(batteries)
+    _, pv_map = options_for_entities(pv_systems, allow_none=True)
+    _, imp_map = options_for_entities(import_tariffs)
+    _, exp_map = options_for_entities(export_tariffs)
+    _, prof_map = options_for_entities(list(profiles.values()))
+
+    required_lists_empty = not (
+        batteries and import_tariffs and export_tariffs and profiles
+    )
+
+    if not batteries:
+        st.warning("Zuerst mindestens eine Batterie im Hauskonfigurator anlegen.")
+    if not pv_systems:
+        st.warning("Zuerst eine PV-Anlage im Hauskonfigurator anlegen.")
+    if not import_tariffs or not export_tariffs:
+        st.warning("Zuerst Bezugs- und Einspeisetarif im Hauskonfigurator wählen.")
+    if not profiles:
+        st.warning("Zuerst ein Hausprofil im Hauskonfigurator anlegen.")
+
+    with st.form("runtime_entity_form"):
+        battery_pick = render_entity_selectbox(
+            "Batterie",
+            batteries,
+            key="config_runtime_battery",
+            current_id=refs.get("battery_id"),
+        )
+        pv_pick = render_entity_selectbox(
+            "PV-Anlage",
+            pv_systems,
+            allow_none=True,
+            key="config_runtime_pv",
+            current_id=refs.get("pv_system_id"),
+        )
+        imp_pick = render_entity_selectbox(
+            "Bezugstarif",
+            import_tariffs,
+            key="config_runtime_import",
+            current_id=refs.get("import_tariff_id"),
+        )
+        exp_pick = render_entity_selectbox(
+            "Einspeisetarif",
+            export_tariffs,
+            key="config_runtime_export",
+            current_id=refs.get("export_tariff_id"),
+        )
+        prof_pick = render_entity_selectbox(
+            "Hausprofil",
+            list(profiles.values()),
+            key="config_runtime_profile",
+            current_id=refs.get("house_profile_id"),
+        )
+
+        submit_btn = st.form_submit_button(
+            "Entitäts-Referenzen speichern",
+            disabled=required_lists_empty,
+        )
         if submit_btn:
-            update_config_file({
-                "PV_KWP": kwp,
-                "PV_TILT": tilt,
-                "PV_AZIMUTH": azimuth,
-                "K_PUSH_CENT": k_push,
-                "BATTERY_CAPACITY_KWH": bat_capacity,
-                "BATTERY_MIN_SOC": bat_min_soc,
-                "BATTERY_MAX_SOC": bat_max_soc,
-                "BATTERY_MAX_POWER_KW": bat_max_power,
-                "THRESHOLD_POWER": threshold_power,
-            })
-            st.rerun()
+            battery_id = lookup_entity_id(bat_map, battery_pick)
+            import_id = lookup_entity_id(imp_map, imp_pick)
+            export_id = lookup_entity_id(exp_map, exp_pick)
+            profile_id = lookup_entity_id(prof_map, prof_pick)
+            if not battery_id:
+                st.error("Batterie auswählen.")
+            elif not import_id or not export_id:
+                st.error("Bezugs- und Einspeisetarif auswählen.")
+            elif not profile_id:
+                st.error("Hausprofil auswählen.")
+            else:
+                save_runtime_scenario_refs(
+                    battery_id=battery_id,
+                    pv_system_id=lookup_entity_id(pv_map, pv_pick),
+                    import_tariff_id=import_id,
+                    export_tariff_id=export_id,
+                    house_profile_id=profile_id,
+                )
+                invalidate_live_optimization_cache()
+                st.success("Runtime-Referenzen gespeichert.")
+                st.rerun()
+
+    selected_profile_id = refs.get("house_profile_id")
+    if selected_profile_id:
+        render_profile_geo_caption(profiles.get(selected_profile_id, {}))
+        st.caption("Standort/Zeitzone im Hauskonfigurator bearbeiten.")
+
+    if not config.is_runtime_params_deferred():
+        try:
+            resolved = config.get_resolved_runtime_settings()
+            _render_resolved_snapshot(resolved)
+        except ValueError as exc:
+            st.error(str(exc))
 
 
 def render_system_parameter_section() -> None:
-    """Komfort-Ansicht der Kern-Laufzeitparameter (PV/Batterie) im Seiten-Body."""
-    import config
-
+    """Komfort-Ansicht: Entitäts-IDs für runtime_settings, Parameter read-only."""
     if config.is_runtime_params_deferred():
         st.info(
             "PV- und Batterie-Parameter werden nach Abschluss der Planungs-Konfiguration "
             "aus den gewählten Entitäten aufgelöst. Bitte Hauskonfigurator und Szenarieneditor nutzen."
         )
+        render_runtime_entity_form_body()
         return
-    st.markdown("Änderungen werden direkt über das Konfigurationsmodul angewendet.")
-    render_config_form_body(get_runtime_settings())
+
+    st.markdown(
+        "Speichert nur Entitäts-Referenzen in `runtime_settings`. "
+        "Standort und Zeitzone kommen aus dem gewählten Hausprofil."
+    )
+    render_runtime_entity_form_body()

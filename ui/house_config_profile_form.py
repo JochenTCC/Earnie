@@ -390,6 +390,14 @@ def _render_location_fields(*, session_scope: str) -> dict:
         format="%.4f",
         key=_scoped_key(session_scope, "house_profile_longitude"),
     )
+    try:
+        from house_config.geo_timezone import lookup_timezone_name
+
+        st.caption(
+            f"Zeitzone (abgeleitet): **{lookup_timezone_name(float(latitude), float(longitude))}**"
+        )
+    except ValueError as exc:
+        st.warning(str(exc))
     col_c, col_d = st.columns(2)
     default_pv_tilt = col_c.number_input(
         "PV-Default Neigung (°)",
@@ -413,7 +421,16 @@ def _render_location_fields(*, session_scope: str) -> dict:
     }
 
 
-def _render_thermal_solar_fields(thermal: dict, index: int, *, session_scope: str) -> dict:
+def _render_thermal_solar_fields(
+    thermal: dict,
+    index: int,
+    *,
+    session_scope: str,
+    default_tilt: float = 18.0,
+    default_azimuth: float = 0.0,
+) -> dict:
+    tilt_fallback = int(thermal.get("solar_thermal_tilt_deg", default_tilt))
+    azimuth_fallback = int(thermal.get("solar_thermal_azimuth_deg", default_azimuth))
     return {
         "solar_thermal_area_m2": st.number_input(
             "Solar-Kollektor Fläche (m²)",
@@ -426,14 +443,14 @@ def _render_thermal_solar_fields(thermal: dict, index: int, *, session_scope: st
             "Solar-Kollektor Neigung (°)",
             min_value=0,
             max_value=90,
-            value=int(thermal.get("solar_thermal_tilt_deg", 18)),
+            value=tilt_fallback,
             key=_scoped_key(session_scope, f"hc_solar_tilt_{index}"),
         ),
         "solar_thermal_azimuth_deg": st.number_input(
             "Solar-Kollektor Azimut (°)",
             min_value=-180,
             max_value=180,
-            value=int(thermal.get("solar_thermal_azimuth_deg", 0)),
+            value=azimuth_fallback,
             help="0 = Süd, -90 = Ost, 90 = West",
             key=_scoped_key(session_scope, f"hc_solar_azimuth_{index}"),
         ),
@@ -447,6 +464,8 @@ def _render_consumer_form(
     latitude: float,
     longitude: float,
     session_scope: str,
+    default_pv_tilt: float = 18.0,
+    default_pv_azimuth: float = 0.0,
 ) -> dict:
     title = consumer.get("label") or f"Verbraucher {index + 1}"
     with st.expander(f"Verbraucher {index + 1}: {title}", expanded=index == 0):
@@ -544,7 +563,15 @@ def _render_consumer_form(
                 value=int(thermal.get("persons", 2)),
                 key=_scoped_key(session_scope, f"hc_persons_{index}"),
             )
-            item.update(_render_thermal_solar_fields(thermal, index, session_scope=session_scope))
+            item.update(
+                _render_thermal_solar_fields(
+                    thermal,
+                    index,
+                    session_scope=session_scope,
+                    default_tilt=default_pv_tilt,
+                    default_azimuth=default_pv_azimuth,
+                )
+            )
             from data.heating_need import estimate_annual_kwh, heating_params_from_thermal
 
             thermal_preview = {**item, "latitude": latitude, "longitude": longitude}
@@ -568,6 +595,34 @@ def _initial_profile_index(profile_ids: list[str]) -> int | None:
     if profile_id in profile_ids:
         return profile_ids.index(profile_id) + 1
     return None
+
+
+def _render_modeled_consumption_section(
+    *,
+    preview_id: str,
+    annual_kwh: float,
+    resolved: list[dict],
+    preview: dict,
+) -> None:
+    from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
+
+    modeled_profile = {
+        "annual_kwh": annual_kwh,
+        "baseload_kwh": preview["baseload_kwh"],
+        "consumers": resolved,
+    }
+    reset_token = (
+        f"{preview_id}:{annual_kwh:.0f}:{preview['consumer_kwh']:.0f}:"
+        f"{preview['baseload_kwh']:.0f}"
+    )
+    st.subheader("Verbrauchsprofil (Modell)")
+    st.caption("Modelliertes Hausprofil — ohne Ist-CSV und ohne cons_data.")
+    render_consumption_display(
+        ConsumptionDisplayMode.MODELED_PROFILE,
+        key_prefix=f"house_profile_model_{preview_id}",
+        profile=modeled_profile,
+        reset_token=reset_token,
+    )
 
 
 def _render_consumption_csv_section(
@@ -711,6 +766,8 @@ def render_house_profile_tab() -> None:
             latitude=location["latitude"],
             longitude=location["longitude"],
             session_scope=session_scope,
+            default_pv_tilt=location["default_pv_tilt"],
+            default_pv_azimuth=location["default_pv_azimuth"],
         )
         for index, consumer in enumerate(consumers)
     ]
@@ -726,6 +783,13 @@ def render_house_profile_tab() -> None:
     st.caption(
         f"Roh-Differenz {preview['raw_baseload_kwh']:.0f} kWh/a; "
         f"Untergrenze 5 % = {preview['baseload_min_kwh']:.0f} kWh/a"
+    )
+
+    _render_modeled_consumption_section(
+        preview_id=preview_id,
+        annual_kwh=float(annual_kwh),
+        resolved=resolved_for_preview,
+        preview=preview,
     )
 
     _render_consumption_csv_section(

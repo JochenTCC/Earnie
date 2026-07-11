@@ -270,3 +270,38 @@ def hourly_profile_for_year(
     while len(profile) < hours_per_year:
         profile.append(profile[-1] if profile else 0.0)
     return profile[:hours_per_year]
+
+
+def thermal_on_off_hourly_profile(
+    weekly_kwh: list[float],
+    *,
+    nominal_power_kw: float,
+    hours_per_year: int = 8760,
+) -> list[float]:
+    """
+    Thermisches Profil: volle Nennleistung oder 0 kW (kein flacher Wochenmittelwert).
+    Wochen-kWh werden in volle und ggf. eine partielle Stunde aufgeteilt.
+    """
+    if len(weekly_kwh) != 52:
+        raise ValueError("weekly_kwh muss 52 Einträge haben.")
+    nominal = float(nominal_power_kw)
+    if nominal <= 0.0:
+        return hourly_profile_for_year(weekly_kwh, hours_per_year=hours_per_year)
+    hours_per_week = hours_per_year // 52
+    profile: list[float] = []
+    for week_kwh in weekly_kwh:
+        remaining = float(week_kwh)
+        week_hours: list[float] = []
+        for _ in range(hours_per_week):
+            if remaining >= nominal:
+                week_hours.append(round(nominal, 6))
+                remaining -= nominal
+            elif remaining > 0.0:
+                week_hours.append(round(remaining, 6))
+                remaining = 0.0
+            else:
+                week_hours.append(0.0)
+        profile.extend(week_hours)
+    while len(profile) < hours_per_year:
+        profile.append(0.0)
+    return profile[:hours_per_year]

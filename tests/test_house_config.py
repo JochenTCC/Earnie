@@ -537,8 +537,6 @@ def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
                 "import_tariff_id": "fixed_imp",
                 "export_tariff_id": "fixed_exp",
                 "house_profile_id": "efh",
-                "latitude": 48.0,
-                "longitude": 11.0,
                 "k_push_cent": 3.5,
                 "feed_in_mode": "fixed",
                 "battery_capacity_kwh": 0,
@@ -603,3 +601,5 @@ def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
     assert resolved["pv_kwp"] == 10.0
     assert resolved["feed_in_mode"] == "fixed"
     assert resolved.get("_house_profile") is not None
+    assert resolved["latitude"] == pytest.approx(48.2)
+    assert resolved["timezone_name"] == "Europe/Berlin"

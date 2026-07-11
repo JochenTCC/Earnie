@@ -224,6 +224,82 @@ def resolve_backtesting_slot_prices(
     return resolved
 
 
+def pricing_kwargs_from_resolved(
+    resolved: dict | None,
+    raw_config: dict | None = None,
+) -> dict:
+    """Import-Tarif-Kwargs aus aufgelöstem Runtime-Szenario (Live + Backtesting)."""
+    if not resolved:
+        return {}
+    spec = resolved.get("_import_tariff_spec")
+    if spec is None:
+        return {}
+    kwargs: dict = {"import_tariff_spec": spec}
+    override = resolved.get("netzentgelt_cent_kwh")
+    if override is not None:
+        kwargs["netzentgelt_override"] = float(override)
+    if raw_config is not None:
+        kwargs["legacy_awattar"] = dict(raw_config.get("awattar", {}))
+    return kwargs
+
+
+def import_brutto_cent_for_slots(
+    epex_values: list[float],
+    slot_datetimes: list[datetime],
+    *,
+    import_tariff_spec: dict | None = None,
+    netzentgelt_override: float | None = None,
+    legacy_awattar: dict | None = None,
+) -> list[float]:
+    """EPEX Cent/kWh → Bezugspreis je Slot (Tarif-Spec oder Legacy-Brutto)."""
+    from data.tariff_pricing import import_cent_kwh
+
+    if import_tariff_spec is None:
+        return [epex_to_brutto_cent(float(p)) for p in epex_values]
+    tariff_type = str(import_tariff_spec.get("type", "")).strip().lower()
+    if tariff_type == "monthly_table":
+        return [
+            import_cent_kwh(
+                float(p),
+                import_tariff_spec,
+                netzentgelt_override=netzentgelt_override,
+                legacy_awattar=legacy_awattar,
+                slot_datetime=slot,
+            )
+            for p, slot in zip(epex_values, slot_datetimes)
+        ]
+    return [
+        import_cent_kwh(
+            float(p),
+            import_tariff_spec,
+            netzentgelt_override=netzentgelt_override,
+            legacy_awattar=legacy_awattar,
+        )
+        for p in epex_values
+    ]
+
+
+def enrich_slots_import_prices(
+    slots: list[dict[str, Any]],
+    slot_datetimes: list[datetime],
+    *,
+    import_tariff_spec: dict | None = None,
+    netzentgelt_override: float | None = None,
+    legacy_awattar: dict | None = None,
+) -> None:
+    """Setzt k_act in resolve_market_slots-Ergebnissen aus Tarif-Spec."""
+    epex_values = [float(slot["price_buy"]) for slot in slots]
+    brutto = import_brutto_cent_for_slots(
+        epex_values,
+        slot_datetimes,
+        import_tariff_spec=import_tariff_spec,
+        netzentgelt_override=netzentgelt_override,
+        legacy_awattar=legacy_awattar,
+    )
+    for slot, price in zip(slots, brutto):
+        slot["k_act"] = price
+
+
 def matrix_prices_from_context(
     prices_df: pd.DataFrame,
     slot_datetimes: list[datetime],
@@ -235,32 +311,15 @@ def matrix_prices_from_context(
     legacy_awattar: dict | None = None,
 ) -> tuple[list[float], list[float], list[str]]:
     """EPEX- und Brutto-Preise je Slot; bei ctx=None Perfect-Foresight aus CSV."""
-    from data.tariff_pricing import import_cent_kwh
 
     def _brutto_list(epex_values: list[float]) -> list[float]:
-        if import_tariff_spec is None:
-            return [epex_to_brutto_cent(float(p)) for p in epex_values]
-        tariff_type = str(import_tariff_spec.get("type", "")).strip().lower()
-        if tariff_type == "monthly_table":
-            return [
-                import_cent_kwh(
-                    float(p),
-                    import_tariff_spec,
-                    netzentgelt_override=netzentgelt_override,
-                    legacy_awattar=legacy_awattar,
-                    slot_datetime=slot,
-                )
-                for p, slot in zip(epex_values, slot_datetimes)
-            ]
-        return [
-            import_cent_kwh(
-                float(p),
-                import_tariff_spec,
-                netzentgelt_override=netzentgelt_override,
-                legacy_awattar=legacy_awattar,
-            )
-            for p in epex_values
-        ]
+        return import_brutto_cent_for_slots(
+            epex_values,
+            slot_datetimes,
+            import_tariff_spec=import_tariff_spec,
+            netzentgelt_override=netzentgelt_override,
+            legacy_awattar=legacy_awattar,
+        )
 
     if ctx is None:
         from data.market_prices import epex_prices_for_slots

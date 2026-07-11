@@ -224,9 +224,6 @@ def get_runtime_scenario_refs() -> dict:
         "import_tariff_id": str(runtime.get("import_tariff_id", "") or "").strip(),
         "export_tariff_id": str(runtime.get("export_tariff_id", "") or "").strip(),
         "house_profile_id": str(runtime.get("house_profile_id", "") or "").strip(),
-        "latitude": float(runtime.get("latitude", 48.2)),
-        "longitude": float(runtime.get("longitude", 16.37)),
-        "timezone_name": str(runtime.get("timezone_name", "Europe/Vienna") or "Europe/Vienna"),
     }
 
 
@@ -237,9 +234,6 @@ def save_runtime_scenario_refs(
     import_tariff_id: str,
     export_tariff_id: str,
     house_profile_id: str,
-    latitude: float,
-    longitude: float,
-    timezone_name: str,
 ) -> None:
     """Speichert Entitäts-Referenzen für das Runtime-Szenario (Baseline)."""
     data = _load_config_document()
@@ -251,9 +245,8 @@ def save_runtime_scenario_refs(
     runtime["import_tariff_id"] = import_tariff_id.strip()
     runtime["export_tariff_id"] = export_tariff_id.strip()
     runtime["house_profile_id"] = house_profile_id.strip()
-    runtime["latitude"] = float(latitude)
-    runtime["longitude"] = float(longitude)
-    runtime["timezone_name"] = timezone_name.strip() or "Europe/Vienna"
+    for legacy_geo in ("latitude", "longitude", "timezone_name"):
+        runtime.pop(legacy_geo, None)
     _save_config_document(data)
 
 

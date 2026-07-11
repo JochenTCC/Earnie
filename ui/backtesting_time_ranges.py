@@ -10,8 +10,12 @@ from data import cons_data_store
 from data.data_loader import resolve_simulation_window
 
 _PRICE_RANGE_DESCRIPTIONS = {
-    "last_12_months": "rollierende 12 Monate bis heute",
-    "loxone_logs": "letzte 12 Monate innerhalb der Loxone-Logs",
+    "last_12_months": (
+        "rollierende 12 Monate bis heute; Start = Montag der Woche mit (heute − 12 Monate)"
+    ),
+    "loxone_logs": (
+        "letzte 12 Monate innerhalb der Loxone-Logs; Start ebenfalls auf Montag ausgerichtet"
+    ),
 }
 
 

@@ -39,6 +39,18 @@ def lookup_entity_id(mapping: dict[str, str], pick: str | None) -> str:
     return mapping.get(pick, "")
 
 
+def render_profile_geo_caption(profile: dict) -> None:
+    """Read-only Standort/Zeitzone aus Hausprofil."""
+    if not profile:
+        return
+    st.caption(
+        "Standort (Hausprofil): "
+        f"{float(profile.get('latitude', 0.0)):.4f}° N, "
+        f"{float(profile.get('longitude', 0.0)):.4f}° E · "
+        f"Zeitzone: {profile.get('timezone_name', 'Europe/Vienna')}"
+    )
+
+
 def render_entity_selectbox(
     label: str,
     items: list[dict],

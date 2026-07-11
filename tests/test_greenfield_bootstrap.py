@@ -30,9 +30,6 @@ _RUNTIME_SETTINGS_FLAT_LEGACY_KEYS = frozenset({
 })
 
 _RUNTIME_SETTINGS_ID_ONLY_KEYS = frozenset({
-    "latitude",
-    "longitude",
-    "timezone_name",
     "battery_id",
     "pv_system_id",
     "house_profile_id",

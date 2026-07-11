@@ -170,15 +170,15 @@ def _apply_house_profile_baseload_overlay(
     target_hours: List,
     baseload: List[float],
 ) -> List[float]:
-    """Fixe generic-Verbraucher aus Hausprofil auf Grundlast (Greenfield ohne flexible_consumers)."""
+    """Hausprofil-Overlay auf Grundlast (Greenfield ohne flexible_consumers)."""
     if config.CONFIG._raw_config.get("flexible_consumers"):
         return baseload
     profile = config.get_resolved_runtime_settings().get("_house_profile")
     if not profile:
         return baseload
-    from house_config.planning_flex_bridge import fixed_generic_hourly_overlay
+    from house_config.planning_flex_bridge import house_profile_baseload_overlay
 
-    overlay = fixed_generic_hourly_overlay(profile, target_hours)
+    overlay = house_profile_baseload_overlay(profile, target_hours)
     return [round(base + extra, 3) for base, extra in zip(baseload, overlay)]
 
 
@@ -210,6 +210,19 @@ def _build_optimization_matrix(
         market_data,
         target_hours,
         **resolve_market_slots_kwargs(target_hours),
+    )
+    from data.backtesting_prices import (
+        enrich_slots_import_prices,
+        pricing_kwargs_from_resolved,
+    )
+
+    enrich_slots_import_prices(
+        price_slots,
+        target_hours,
+        **pricing_kwargs_from_resolved(
+            config.get_resolved_runtime_settings(),
+            config.CONFIG._raw_config,
+        ),
     )
     optimization_matrix = []
 
@@ -462,11 +475,13 @@ def _get_historical_pv_for_day(target_date: date) -> List[float]:
     return _reindex_hourly_series(load_cons_data_pv_series(), target_date)
 
 
-def _brutto_price_cent(epex_cent: float) -> float:
-    fix_aufschlag = config.get('FIX_AUFSCHLAG_CENT', cast=float)
-    netzverlust = config.get('NETZVERLUST_FAKTOR', cast=float)
-    mwst_faktor = config.get('MWST_AUSTRIA_FAKTOR', cast=float)
-    return round((epex_cent * netzverlust + fix_aufschlag) * mwst_faktor, 4)
+def _import_pricing_kwargs() -> dict:
+    from data.backtesting_prices import pricing_kwargs_from_resolved
+
+    return pricing_kwargs_from_resolved(
+        config.get_resolved_runtime_settings(),
+        config.CONFIG._raw_config,
+    )
 
 
 def _get_historical_epex_and_brutto_prices_for_day(target_date: date) -> tuple[list[float], list[float]]:
@@ -490,7 +505,13 @@ def _get_historical_epex_and_brutto_prices_for_day(target_date: date) -> tuple[l
     )
     slot_datetimes = [ts.to_pydatetime() for ts in full_day_range]
     epex_prices = market_prices.epex_prices_for_slots(df_prices, slot_datetimes)
-    brutto_prices = [_brutto_price_cent(float(p)) for p in epex_prices]
+    from data.backtesting_prices import import_brutto_cent_for_slots
+
+    brutto_prices = import_brutto_cent_for_slots(
+        [float(p) for p in epex_prices],
+        slot_datetimes,
+        **_import_pricing_kwargs(),
+    )
     return epex_prices, brutto_prices
 
 

@@ -706,26 +706,60 @@ class Config:
     def reload(self) -> None:
         self._load_all()
 
+    _RUNTIME_REF_KEYS = frozenset({
+        "battery_id",
+        "pv_system_id",
+        "import_tariff_id",
+        "export_tariff_id",
+        "house_profile_id",
+    })
+    _DEPRECATED_RUNTIME_GEO_KEYS = frozenset({
+        "latitude",
+        "longitude",
+        "timezone_name",
+    })
+    _DEPRECATED_RUNTIME_FLAT_KEYS = frozenset({
+        "k_push_cent",
+        "feed_in_mode",
+        "pv_tilt",
+        "pv_azimuth",
+        "pv_kwp",
+        "battery_max_power_kw",
+        "battery_efficiency",
+        "battery_capacity_kwh",
+        "battery_min_soc",
+        "battery_max_soc",
+        "threshold_power",
+    })
+
+    @classmethod
+    def _normalize_runtime_settings_key(cls, key: str) -> str:
+        return str(key).strip().lower()
+
     def update_runtime_settings(self, new_settings: dict) -> None:
         data = read_json_dict(self.config_path)
+        runtime = data.get("runtime_settings")
+        if not isinstance(runtime, dict):
+            raise ValueError("runtime_settings muss ein Objekt sein.")
 
-        for key, value in new_settings.items():
-            target_key = None
-            for json_key in data["runtime_settings"].keys():
-                if json_key.lower() == key.lower():
-                    target_key = json_key
-                    break
-
-            if target_key is None:
+        for raw_key, value in new_settings.items():
+            key = self._normalize_runtime_settings_key(raw_key)
+            if key in self._DEPRECATED_RUNTIME_FLAT_KEYS:
                 raise KeyError(
-                    f"Sicherheitsfehler: '{key}' ist kein konfigurierbarer Laufzeit-Parameter!"
+                    f"Sicherheitsfehler: '{raw_key}' ist ein deprecated flaches Feld — "
+                    "bearbeiten Sie batteries[], pv_systems[] oder tariffs.json."
                 )
-
-            if target_key == "threshold_power":
-                value = self._validate_threshold_power(value)
-
-            data["runtime_settings"][target_key] = value
-            setattr(self, target_key.upper(), value)
+            if key in self._DEPRECATED_RUNTIME_GEO_KEYS:
+                raise KeyError(
+                    f"Sicherheitsfehler: '{raw_key}' gehört zum Hausprofil — "
+                    "bearbeiten Sie latitude/longitude/timezone_name in house_profiles.json."
+                )
+            if key not in self._RUNTIME_REF_KEYS:
+                raise KeyError(
+                    f"Sicherheitsfehler: '{raw_key}' ist kein zulässiger "
+                    "runtime_settings-Referenzparameter."
+                )
+            runtime[key] = value
 
         write_json_dict(self.config_path, data)
 

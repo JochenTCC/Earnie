@@ -44,9 +44,18 @@ def _clear_scoped_widget_keys(session_scope: str) -> None:
 
 def _profile_pv_defaults(profile: dict) -> tuple[float, float]:
     return (
-        float(profile.get("default_pv_tilt", 25.0)),
+        float(profile.get("default_pv_tilt", 18.0)),
         float(profile.get("default_pv_azimuth", 0.0)),
     )
+
+
+def _apply_profile_pv_defaults(session_scope: str, profiles: dict[str, dict]) -> None:
+    profile_id = st.session_state.get(_scoped_key(session_scope, "planning_pv_defaults_profile"))
+    if not profile_id or profile_id not in profiles:
+        return
+    tilt, azimuth = _profile_pv_defaults(profiles[profile_id])
+    st.session_state[_scoped_key(session_scope, "planning_pv_tilt")] = int(tilt)
+    st.session_state[_scoped_key(session_scope, "planning_pv_azimuth")] = int(azimuth)
 
 
 def _default_profile_for_pv(profiles: dict[str, dict]) -> dict:
@@ -179,6 +188,8 @@ def render_pv_planning_tab() -> None:
             options=profile_ids,
             format_func=lambda pid: profile_labels[pid],
             key=_scoped_key(session_scope, "planning_pv_defaults_profile"),
+            on_change=_apply_profile_pv_defaults,
+            args=(session_scope, profiles),
         )
         picked = profiles[profile_pick]
         st.caption(

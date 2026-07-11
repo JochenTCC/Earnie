@@ -303,11 +303,11 @@
         },
         "latitude": {
           "type": "number",
-          "description": "Standort-Breitengrad für PV-Prognose (Forecast.Solar)."
+          "description": "Deprecated: nutze house_profile_id (latitude im Hausprofil)."
         },
         "longitude": {
           "type": "number",
-          "description": "Standort-Längengrad für PV-Prognose."
+          "description": "Deprecated: nutze house_profile_id (longitude im Hausprofil)."
         },
         "battery_max_power_kw": {
           "type": "number",
@@ -345,7 +345,7 @@
         },
         "timezone_name": {
           "type": "string",
-          "description": "IANA-Zeitzone für official Sonnenaufgang/-untergang (z. B. Europe/Vienna)."
+          "description": "Deprecated: nutze house_profile_id (timezone_name im Hausprofil)."
         },
         "battery_id": {
           "type": "string",

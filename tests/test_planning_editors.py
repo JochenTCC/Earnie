@@ -307,6 +307,61 @@ def test_seed_profile_widget_state_uses_existing_annual_kwh():
     assert session["schuetzenstrasse_7c__house_profile_label"] == "EFH"
 
 
+def test_seed_pv_widget_state_uses_profile_defaults_for_new_system():
+    class _Session(dict):
+        pass
+
+    session = _Session()
+    profiles = {
+        "home": {
+            "id": "home",
+            "default_pv_tilt": 28.0,
+            "default_pv_azimuth": -10.0,
+        }
+    }
+    import ui.planning_pv_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        form._seed_pv_widget_state(
+            "__new__",
+            {},
+            profiles=profiles,
+            default_profile=profiles["home"],
+        )
+    finally:
+        form.st.session_state = original
+
+    assert session["__new____planning_pv_tilt"] == 28
+    assert session["__new____planning_pv_azimuth"] == -10
+
+
+def test_apply_profile_pv_defaults_updates_widget_state():
+    class _Session(dict):
+        pass
+
+    session = _Session()
+    profiles = {
+        "a": {"default_pv_tilt": 20.0, "default_pv_azimuth": 5.0},
+        "b": {"default_pv_tilt": 35.0, "default_pv_azimuth": -15.0},
+    }
+    session["scope__planning_pv_defaults_profile"] = "b"
+    session["scope__planning_pv_tilt"] = 20
+    session["scope__planning_pv_azimuth"] = 5
+    import ui.planning_pv_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        form._apply_profile_pv_defaults("scope", profiles)
+    finally:
+        form.st.session_state = original
+
+    assert session["scope__planning_pv_tilt"] == 35
+    assert session["scope__planning_pv_azimuth"] == -15
+
+
 def test_seed_pv_widget_state_uses_existing_kwp():
     class _Session(dict):
         pass

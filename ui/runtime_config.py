@@ -52,7 +52,7 @@ def invalidate_live_optimization_cache() -> None:
 
 
 def update_config_file(settings_dict: dict) -> None:
-    """Aktualisiert Parameter über die zentrale Laufzeit-Schnittstelle der config.py."""
+    """Aktualisiert runtime_settings-Referenzen (IDs + Geo) über config.update_runtime_settings."""
     try:
         config.update_runtime_settings(settings_dict)
         importlib.reload(config)

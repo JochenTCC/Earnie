@@ -23,6 +23,7 @@ from ui.scenario_form_helpers import (
     lookup_entity_id,
     options_for_entities,
     render_entity_selectbox,
+    render_profile_geo_caption,
 )
 from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
@@ -31,7 +32,8 @@ def render_runtime_scenario_form() -> None:
     st.subheader("Runtime (Betrieb & Baseline)")
     st.caption(
         "Pflicht-Szenario für Backtesting und späteren Live-Betrieb. "
-        "Speichert nach `config.json` → `runtime_settings`."
+        "Speichert nach `config.json` → `runtime_settings`. "
+        "Standort und Zeitzone kommen aus dem Hausprofil."
     )
 
     refs = get_runtime_scenario_refs()
@@ -112,33 +114,8 @@ def render_runtime_scenario_form() -> None:
 
     selected_profile_id = lookup_entity_id(prof_map, prof_pick)
     selected_profile = profiles.get(selected_profile_id, {})
-    if (
-        selected_profile_id
-        and st.session_state.get("runtime_geo_profile_id") != selected_profile_id
-    ):
-        st.session_state.runtime_geo_profile_id = selected_profile_id
-        st.session_state.runtime_lat = float(
-            selected_profile.get("latitude", refs.get("latitude", 48.2))
-        )
-        st.session_state.runtime_lon = float(
-            selected_profile.get("longitude", refs.get("longitude", 16.37))
-        )
-    if "runtime_lat" not in st.session_state:
-        st.session_state.runtime_lat = float(refs.get("latitude", 48.2))
-    if "runtime_lon" not in st.session_state:
-        st.session_state.runtime_lon = float(refs.get("longitude", 16.37))
-    if "runtime_geo_profile_id" not in st.session_state:
-        st.session_state.runtime_geo_profile_id = selected_profile_id
-
-    col_a, col_b = st.columns(2)
-    latitude = col_a.number_input(
-        "Breitengrad",
-        key="runtime_lat",
-    )
-    longitude = col_b.number_input(
-        "Längengrad",
-        key="runtime_lon",
-    )
+    if selected_profile:
+        render_profile_geo_caption(selected_profile)
 
     if selected_profile_id and selected_profile:
         st.subheader("Verbrauchsprofil (Modell)")
@@ -157,8 +134,6 @@ def render_runtime_scenario_form() -> None:
             import_tariff_id=lookup_entity_id(imp_map, imp_pick),
             export_tariff_id=lookup_entity_id(exp_map, exp_pick),
             house_profile_id=lookup_entity_id(prof_map, prof_pick),
-            latitude=latitude,
-            longitude=longitude,
         )
         try:
             resolved = config.CONFIG.resolve_scenario_settings_dict(draft)
@@ -185,9 +160,6 @@ def render_runtime_scenario_form() -> None:
                 import_tariff_id=lookup_entity_id(imp_map, imp_pick),
                 export_tariff_id=lookup_entity_id(exp_map, exp_pick),
                 house_profile_id=lookup_entity_id(prof_map, prof_pick),
-                latitude=latitude,
-                longitude=longitude,
-                timezone_name=str(refs.get("timezone_name", "Europe/Vienna")),
             )
             st.success("Runtime-Szenario gespeichert.")
             st.rerun()
@@ -200,14 +172,8 @@ def _build_runtime_settings(
     import_tariff_id: str,
     export_tariff_id: str,
     house_profile_id: str,
-    latitude: float,
-    longitude: float,
 ) -> dict:
-    settings: dict = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "timezone_name": "Europe/Vienna",
-    }
+    settings: dict = {}
     if battery_id:
         settings["battery_id"] = battery_id
     if pv_system_id:

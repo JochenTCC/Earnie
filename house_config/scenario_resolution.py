@@ -7,6 +7,7 @@ from house_config.entity_resolution import (
     resolve_battery_into_settings,
     resolve_pv_into_settings,
 )
+from house_config.geo_timezone import lookup_timezone_name
 from house_config.planning_flex_bridge import split_planning_generic_consumers
 from house_config.profiles_store import load_house_profiles_document
 from house_config.tariffs_store import (
@@ -50,10 +51,42 @@ def resolve_scenario_settings(
             raise ValueError(f"Unbekannte house_profile_id '{profile_id}'.")
         profile = profiles[profile_id]
         out["_house_profile"] = profile
+        _apply_profile_geo(out, profile, settings)
         _fixed, flex_consumers = split_planning_generic_consumers(profile)
         if flex_consumers:
             out["_planning_flex_consumers"] = flex_consumers
+    _ensure_geo_defaults(out)
     return out
+
+
+def _ensure_geo_defaults(out: dict) -> None:
+    """Fallback für Bootstrap ohne Hausprofil (bis Planung vollständig)."""
+    if "latitude" not in out:
+        out["latitude"] = 48.2
+    if "longitude" not in out:
+        out["longitude"] = 16.37
+    if not str(out.get("timezone_name", "") or "").strip():
+        out["timezone_name"] = lookup_timezone_name(
+            float(out["latitude"]),
+            float(out["longitude"]),
+        )
+
+
+def _apply_profile_geo(out: dict, profile: dict, source_settings: dict) -> None:
+    """Geo/Zeitzone aus Hausprofil; explizite Szenario-Overrides bleiben erhalten."""
+    if "latitude" not in source_settings:
+        out["latitude"] = float(profile["latitude"])
+    if "longitude" not in source_settings:
+        out["longitude"] = float(profile["longitude"])
+    if "timezone_name" not in source_settings or not str(
+        source_settings.get("timezone_name", "") or ""
+    ).strip():
+        out["timezone_name"] = str(profile.get("timezone_name", "") or "").strip()
+        if not out["timezone_name"]:
+            out["timezone_name"] = lookup_timezone_name(
+                float(out.get("latitude", profile["latitude"])),
+                float(out.get("longitude", profile["longitude"])),
+            )
 
 
 def resolve_runtime_settings(
@@ -71,6 +104,9 @@ def resolve_runtime_settings(
     if not isinstance(runtime, dict):
         raise ValueError("runtime_settings muss ein Objekt sein.")
     settings = dict(runtime)
+    if str(settings.get("house_profile_id", "") or "").strip():
+        for geo_key in ("latitude", "longitude", "timezone_name"):
+            settings.pop(geo_key, None)
     if not str(settings.get("house_profile_id", "") or "").strip():
         profiles_doc = load_house_profiles_document(house_profiles_path)
         for profile in profiles_doc.get("profiles", {}).values():

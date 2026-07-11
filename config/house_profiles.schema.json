@@ -91,6 +91,10 @@
                 "annual_kwh": { "type": "number", "minimum": 0 },
                 "latitude": { "type": "number", "description": "Breitengrad (Standort Heizung/PV)." },
                 "longitude": { "type": "number", "description": "Längengrad (Standort Heizung/PV)." },
+                "timezone_name": {
+                    "type": "string",
+                    "description": "Optional, abgeleitet aus latitude/longitude beim Laden — nicht manuell pflegen."
+                },
                 "default_pv_tilt": {
                     "type": "number",
                     "minimum": 0,

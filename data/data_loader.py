@@ -41,6 +41,11 @@ def get_loxone_time_bounds(cons_path: str, prod_path: str) -> tuple[pd.Timestamp
     return df['ts'].min(), df['ts'].max()
 
 
+def _monday_of_week(ts: pd.Timestamp) -> pd.Timestamp:
+    """Montag der Kalenderwoche, die ts enthält (ISO: Montag = Wochenstart)."""
+    return ts.normalize() - pd.Timedelta(days=int(ts.dayofweek))
+
+
 def resolve_simulation_window(
     range_mode: str,
     cons_path: str,
@@ -49,8 +54,9 @@ def resolve_simulation_window(
     """
     Ermittelt das Simulationsfenster.
 
-    - last_12_months: rollierende 12 Monate bis heute
-    - loxone_logs: letzte 12 Monate innerhalb des Loxone-Log-Zeitraums
+    - last_12_months: rollierende 12 Monate bis heute; Start = Montag der Woche
+      mit (heute − 12 Monate)
+    - loxone_logs: gleiche 12-Monats-Regel, begrenzt auf Loxone-Log-Zeitraum
     """
     today = pd.Timestamp.now().normalize()
 
@@ -62,6 +68,7 @@ def resolve_simulation_window(
         end = today
         start = end - pd.DateOffset(months=12)
 
+    start = _monday_of_week(start)
     return start, end
 
 
