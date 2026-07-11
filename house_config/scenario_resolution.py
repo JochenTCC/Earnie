@@ -32,7 +32,7 @@ def resolve_scenario_settings(
     out = dict(settings)
     batteries = batteries_by_id(raw_config)
     pv_systems = pv_systems_by_id(raw_config)
-    out = resolve_battery_into_settings(out, batteries, raw_config=raw_config)
+    out = resolve_battery_into_settings(out, batteries)
     out = resolve_pv_into_settings(out, pv_systems)
 
     tariffs_doc = load_tariffs_document(tariffs_path)
@@ -98,7 +98,7 @@ def resolve_runtime_settings(
 ) -> dict:
     """
     Löst runtime_settings für Live-Betrieb und Backtesting-Baseline auf.
-    ID-Referenzen haben Vorrang; flache Legacy-Felder bleiben als Fallback erhalten.
+    Erfordert Entitäts-IDs in runtime_settings (keine flachen Legacy-Felder).
     """
     runtime = raw_config.get("runtime_settings", {})
     if not isinstance(runtime, dict):

@@ -62,7 +62,7 @@ def _resolved_fixed_import() -> dict:
 def test_live_and_backtesting_import_prices_match(resolved):
     slots = [datetime(2025, 6, 10, h, 0) for h in range(6)]
     epex = [4.2, 5.1, 6.0, 7.3, 8.0, 3.9]
-    kwargs = pricing_kwargs_from_resolved(resolved, {"awattar": _LEGACY_AWATTAR})
+    kwargs = pricing_kwargs_from_resolved(resolved)
 
     live_brutto = import_brutto_cent_for_slots(epex, slots, **kwargs)
     index = pd.DatetimeIndex(slots)
@@ -78,7 +78,7 @@ def test_live_and_backtesting_import_prices_match(resolved):
 
 def test_enrich_slots_import_prices_matches_matrix():
     resolved = _resolved_awattar()
-    kwargs = pricing_kwargs_from_resolved(resolved, {"awattar": _LEGACY_AWATTAR})
+    kwargs = pricing_kwargs_from_resolved(resolved)
     slots_dt = [datetime(2025, 7, 1, h, 0) for h in (0, 1, 2)]
     market = [
         {"timestamp": slots_dt[0], "price_buy": 10.0},

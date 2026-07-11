@@ -1,10 +1,17 @@
 """Tests für daily_target_source=thermal."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time
 from unittest.mock import patch
 
 from data import consumer_targets
+
+_FIXED_TODAY = date(2026, 7, 11)
+
+
+def _patch_consumer_today(mock_dt):
+    mock_dt.now.return_value = datetime.combine(_FIXED_TODAY, time(12, 0))
+    mock_dt.combine = datetime.combine
 
 
 def _swimspa() -> dict:
@@ -25,14 +32,15 @@ def _swimspa() -> dict:
     }
 
 
+@patch("data.consumer_targets.datetime")
 @patch("optimizer.thermal_targets.resolve_thermal_daily_target_kwh")
-def test_resolve_thermal_source_for_today(mock_resolve):
+def test_resolve_thermal_source_for_today(mock_resolve, mock_dt):
+    _patch_consumer_today(mock_dt)
     mock_resolve.return_value = 12.5
-    today = date.today()
     result = consumer_targets._resolve_single_consumer_daily_target_kwh(
         _swimspa(),
-        today,
-        [{"date": today}] * 24,
+        _FIXED_TODAY,
+        [{"date": _FIXED_TODAY}] * 24,
         {},
     )
     assert result == 12.5
@@ -53,12 +61,14 @@ def test_resolve_thermal_uses_historical_for_other_dates(mock_historical):
     mock_historical.assert_called_once()
 
 
-@patch("config.get_flexible_consumers")
+@patch("data.consumer_targets.config.get_flexible_consumers")
 @patch("optimizer.thermal_targets.resolve_thermal_daily_target_kwh")
-def test_resolve_consumer_daily_targets_multi_day_matrix(mock_resolve, mock_consumers):
+@patch("data.consumer_targets.datetime")
+def test_resolve_consumer_daily_targets_multi_day_matrix(mock_dt, mock_resolve, mock_consumers):
+    _patch_consumer_today(mock_dt)
     mock_consumers.return_value = [_swimspa()]
     mock_resolve.return_value = 12.5
-    today = date.today()
+    today = _FIXED_TODAY
     tomorrow = date.fromordinal(today.toordinal() + 1)
     matrix = [{"date": today, "expected_flex_kw": {"swimspa": 0.5}}] * 18
     matrix += [{"date": tomorrow, "expected_flex_kw": {"swimspa": 0.4}}] * 6

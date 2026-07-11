@@ -1,0 +1,638 @@
+{
+    "$schema": "./tariffs.schema.json",
+    "catalog_as_of": "2026",
+    "import_tariffs": [
+        {
+            "id": "at_tiwag_flex_privat",
+            "label": "TIWAG — flex privat",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.44,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_aae_naturstrom_naturstrom_spot_stunde_ii",
+            "label": "AAE NATURSTROM — Naturstrom SPOT Stunde II",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.56,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_pullstrom_pullstrom_ora",
+            "label": "pullstrom — Pullstrom ORA",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.6,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_smartenergy_smartcontrol",
+            "label": "smartENERGY — smartCONTROL",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.44,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_oekostrom_oeko_spot",
+            "label": "oekostrom — oeko Spot+",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.8,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_spotty_smart_active",
+            "label": "Spotty — Smart Active",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.79,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_energie_steiermark_e1_floater",
+            "label": "Energie Steiermark — E1 Floater",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.44,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_elektrizitaetswerk_perg_heimatstrom_spot",
+            "label": "Elektrizitaetswerk Perg — HeimatStrom SPOT",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.92,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_hofer_gruenstrom_hofer_gruenstrom_spot",
+            "label": "HOFER GRUENSTROM — HOFER GRUENSTROM SPOT",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.9,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_verbund_v_strom_spot",
+            "label": "Verbund — V-Strom SPOT",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.3,
+            "markup_percent": 4.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_wuesterstrom_wuesterstrom_spot",
+            "label": "wuesterstrom — wuesterstrom Spot",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.8,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_kittel_muehle_aquavento_flex_smart",
+            "label": "Kittel Muehle — Aquavento Flex Smart",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.7,
+            "markup_percent": 5.0,
+            "prices_include_vat": false,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_wien_energie_optima_voll_aktiv",
+            "label": "Wien Energie — OPTIMA Voll Aktiv",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.42,
+            "markup_percent": 7.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_avia_energy_avia_strom_plus_stundenfloater",
+            "label": "AVIA ENERGY — AVIA STROM PLUS STUNDENFLOATER",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 2.34,
+            "markup_percent": 3.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "awattar_at",
+            "label": "aWATTar — HOURLY",
+            "type": "awattar",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.5,
+            "markup_percent": 3.0,
+            "prices_include_vat": false,
+            "vat_percent": 20.0,
+            "fix_aufschlag_cent": 1.5,
+            "netzverlust_faktor": 1.03,
+            "mwst_austria_faktor": 1.2
+        },
+        {
+            "id": "at_energie_ag_oberoesterreich_oekostrom_spot",
+            "label": "Energie AG Oberoesterreich — Oekostrom Spot",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 3.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_wels_strom_privat_strom_spot",
+            "label": "Wels Strom — Privat Strom SPOT",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 3.48,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_stadtwerke_klagenfurt_ekg_strom_flex",
+            "label": "Stadtwerke Klagenfurt — EKG Strom Flex",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 3.6,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_schlau_pv_gmbh_spot",
+            "label": "schlau-pv GmbH — Spot",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 5.4,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "at_energie_steiermark_first_energy_steirerstrom_spot",
+            "label": "Energie Steiermark (First Energy) — SteirerStrom Spot",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 9.816,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0
+        },
+        {
+            "id": "de_tibber_tibber_dynamic",
+            "label": "Tibber — Tibber Dynamic",
+            "type": "spot_hourly",
+            "land": "DE",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 2.15,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 19.0
+        },
+        {
+            "id": "de_eprimo_eprimo_smart",
+            "label": "eprimo — eprimo Smart",
+            "type": "spot_hourly",
+            "land": "DE",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.2,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 19.0
+        },
+        {
+            "id": "de_awattar_de_hourly_de",
+            "label": "aWATTar DE — HOURLY DE",
+            "type": "spot_hourly",
+            "land": "DE",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 2.25,
+            "markup_percent": 3.0,
+            "prices_include_vat": false,
+            "vat_percent": 19.0
+        },
+        {
+            "id": "ch_ekz_elektrizitaetswerke_des_kantons_zuerich_dynamischer_tarif",
+            "label": "EKZ (Elektrizitaetswerke des Kantons Zuerich) — Dynamischer Tarif",
+            "type": "spot_hourly",
+            "land": "CH",
+            "currency": "CHF",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 8.1
+        },
+        {
+            "id": "ch_groupe_e_vario",
+            "label": "Groupe E — VARIO",
+            "type": "spot_hourly",
+            "land": "CH",
+            "currency": "CHF",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 8.1
+        },
+        {
+            "id": "at_verbund_v_strom_sterreich",
+            "label": "VERBUND — V-Strom ÖSTERREICH",
+            "type": "fixed_cent",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
+            "fix_cent_kwh": 11.4
+        },
+        {
+            "id": "at_wien_energie_optima_entspannt_plus",
+            "label": "Wien Energie — OPTIMA Entspannt plus",
+            "type": "fixed_cent",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
+            "fix_cent_kwh": 12.83
+        },
+        {
+            "id": "at_smartenergy_smarttimes",
+            "label": "smartENERGY — smartTIMES",
+            "type": "fixed_cent",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
+            "fix_cent_kwh": 13.5
+        },
+        {
+            "id": "at_tiwag_tiwag_komfort_strom",
+            "label": "TIWAG — TIWAG Komfort Strom",
+            "type": "fixed_cent",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
+            "fix_cent_kwh": 12.2
+        },
+        {
+            "id": "at_energie_steiermark_steirerstrom_fix",
+            "label": "Energie Steiermark — SteirerStrom Fix",
+            "type": "fixed_cent",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
+            "fix_cent_kwh": 12.9
+        },
+        {
+            "id": "at_energie_ag_ober_sterreich_kostrom_garant_12",
+            "label": "Energie AG Oberösterreich — Ökostrom Garant 12",
+            "type": "fixed_cent",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
+            "fix_cent_kwh": 13.1
+        },
+        {
+            "id": "de_eprimo_eprimostrom_primaklima_pur",
+            "label": "eprimo — eprimoStrom PrimaKlima Pur",
+            "type": "fixed_cent",
+            "land": "DE",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 19.0,
+            "fix_cent_kwh": 29.11
+        },
+        {
+            "id": "ch_ekz_elektrizit_tswerke_des_kantons_z_rich_ekz_mix_standard",
+            "label": "EKZ (Elektrizitätswerke des Kantons Zürich) — EKZ Mix Standard",
+            "type": "fixed_cent",
+            "land": "CH",
+            "currency": "CHF",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 8.1,
+            "fix_cent_kwh": 26.4
+        }
+    ],
+    "export_tariffs": [
+        {
+            "id": "dynamic_epex",
+            "label": "aWATTar — SUNNY SPOT",
+            "type": "dynamic_epex",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "feed_in_fee_factor": 0.19,
+            "feed_in_fix_cent": 0.0,
+            "notes": "Echte stuentliche Abrechnung gekoppelt an den EPEX Day-Ahead-Markt minus 1.0 Cent Handlingfee."
+        },
+        {
+            "id": "at_smartenergy_smartsun_spot",
+            "label": "smartENERGY — smartSUN SPOT",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.2,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Stuentlich dynamischer Einspeisetarif abzueglich fixer Servicepauschale pro kWh."
+        },
+        {
+            "id": "at_oemag_gesetzlicher_marktpreis",
+            "label": "OeMAG — Gesetzlicher Marktpreis",
+            "type": "monthly_float",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Gesetzlicher Quartals- bzw. Monatsmarktpreis nach § 13 ÖSG. Konstanter Festpreis pro Kalendermonat, Abrechnung ex-post.",
+            "arbeitspreis_kwh_cent": 7.15
+        },
+        {
+            "id": "at_energie_ag_ober_sterreich_team_sonne_float",
+            "label": "Energie AG Oberösterreich — Team Sonne Float",
+            "type": "monthly_float",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.5,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Kopplung an den monatlichen PV-Referenzmarktwert nach § 13 EAG abzueglich Bearbeitungsgebuehr. Untergrenze bei 0 Cent.",
+            "arbeitspreis_kwh_cent": 5.85
+        },
+        {
+            "id": "at_evn_evn_sonnenstrom_garant_float",
+            "label": "EVN — EVN SonnenStrom Garant Float",
+            "type": "monthly_float",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Monatlich angepasster Einspeisetarif basierend auf den Großhandelspreisen des Vormonats. Flat über den Tag.",
+            "arbeitspreis_kwh_cent": 6.4
+        },
+        {
+            "id": "at_wien_energie_optima_sonnenstrom_float",
+            "label": "Wien Energie — OPTIMA SonnenStrom Float",
+            "type": "monthly_float",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Monatlicher Index-Einspeisetarif. Verrechnung erfolgt starr pro Monat ohne Intraday-Volatilitaet.",
+            "arbeitspreis_kwh_cent": 6.95
+        },
+        {
+            "id": "at_verbund_v_strom_sonneneinspeisung_fix",
+            "label": "VERBUND — V-Strom SonnenEinspeisung Fix",
+            "type": "fixed",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Klassischer Einspeise-Festpreis mit 12 Monaten Preisbindung unabhaengig vom Marktgeschehen.",
+            "k_push_cent": 6.5
+        },
+        {
+            "id": "at_tiwag_tiwag_einspeisung_fix",
+            "label": "TIWAG — TIWAG Einspeisung Fix",
+            "type": "fixed",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Landesversorger-Festpreis fuer Tiroler PV-Anlagen.",
+            "k_push_cent": 5.8
+        },
+        {
+            "id": "de_eeg_staatliche_verguetung_eeg_einspeiseverguetung_10kwp",
+            "label": "EEG Staatliche Verguetung — EEG Einspeiseverguetung <10kWp",
+            "type": "fixed",
+            "land": "DE",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Gesetzlich garantierter Festpreis ueber 20 Jahre hinweg für kleine Dachanlagen.",
+            "k_push_cent": 8.04
+        },
+        {
+            "id": "de_tibber_tibber_einspeisung_monats_marktwert",
+            "label": "Tibber — Tibber Einspeisung (Monats-Marktwert)",
+            "type": "monthly_float",
+            "land": "DE",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Gibt den monatlich ermittelten solaren Marktwert der Netzbetreiber (Netztransparenz) direkt an den Kunden weiter.",
+            "arbeitspreis_kwh_cent": 6.1
+        },
+        {
+            "id": "ch_ekz_elektrizitaetswerke_des_kantons_zuerich_ekz_ruecklieferung_fix",
+            "label": "EKZ (Elektrizitaetswerke des Kantons Zuerich) — EKZ Ruecklieferung Fix",
+            "type": "fixed",
+            "land": "CH",
+            "currency": "CHF",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 0.0,
+            "notes": "Regulierter Standard-Festpreis fuer die Energie-Rueckspeisung im Kanton Zuerich.",
+            "k_push_cent": 12.5
+        },
+        {
+            "id": "monthly_sunny",
+            "label": "Monatliche SUNNY-Fixwerte",
+            "type": "monthly_table",
+            "monthly_rates": [
+                {
+                    "year": 2024,
+                    "month": 12,
+                    "tariff_cent_kwh": 9.73
+                },
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 9.73
+                },
+                {
+                    "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 9.73
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 6.01
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 5.86
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 5.86
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 5.86
+                },
+                {
+                    "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 5.97
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 5.89
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 5.89
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 6.87
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 8.7
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 8.7
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 7.5
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 7.1
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 5.42
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 5.6
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 5.9
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 3.6
+                },
+                {
+                    "year": 2026,
+                    "month": 7,
+                    "tariff_cent_kwh": 6.46
+                }
+            ]
+        },
+        {
+            "id": "export_fixed_3_70ct",
+            "label": "Fix 3.70 ct/kWh (migriert)",
+            "type": "fixed",
+            "k_push_cent": 3.7
+        }
+    ]
+}

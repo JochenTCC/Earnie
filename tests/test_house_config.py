@@ -1,6 +1,7 @@
 """Tests für Hauskonfigurator-Entitäten, Tarife und Szenario-Auflösung (Version 1.24)."""
 from __future__ import annotations
 
+import json
 from datetime import date
 from pathlib import Path
 
@@ -527,20 +528,16 @@ def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
     (config_dir / "config.json").write_text(
         """
         {
-            "awattar": {"url": "https://api.awattar.at/v1/marketdata"},
             "system": {"global_timeout": 10, "loop_timeout": 900},
             "loxone_blocks": {"soc_name": "Battery_SOC"},
             "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+            "planning_horizon": {"mode": "sunset_window"},
             "runtime_settings": {
                 "battery_id": "home_5kwh",
                 "pv_system_id": "roof",
                 "import_tariff_id": "fixed_imp",
                 "export_tariff_id": "fixed_exp",
-                "house_profile_id": "efh",
-                "k_push_cent": 3.5,
-                "feed_in_mode": "fixed",
-                "battery_capacity_kwh": 0,
-                "battery_max_power_kw": 0
+                "house_profile_id": "efh"
             },
             "batteries": [{
                 "id": "home_5kwh",
@@ -550,7 +547,8 @@ def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
                 "battery_efficiency": 0.97,
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
-                "threshold_power": 0.05
+                "threshold_power": 0.05,
+                "battery_wear": {"enabled": false}
             }],
             "pv_systems": [{
                 "id": "roof",
@@ -603,3 +601,148 @@ def test_runtime_baseline_resolves_entity_refs(tmp_path, monkeypatch):
     assert resolved.get("_house_profile") is not None
     assert resolved["latitude"] == pytest.approx(48.2)
     assert resolved["timezone_name"] == "Europe/Berlin"
+
+
+def test_migrate_runtime_entities_legacy_flat_to_ids(tmp_path):
+    from house_config.migrate_runtime_entities import (
+        RUNTIME_ID_KEYS,
+        migrate_runtime_entities,
+    )
+
+    config = {
+        "battery_wear": {
+            "enabled": True,
+            "replacement_cost_euro": 1500,
+            "expected_cycles": 6000,
+            "cycle_cost_fraction": 0.5,
+        },
+        "runtime_settings": {
+            "k_push_cent": 3.5,
+            "feed_in_mode": "fixed",
+            "pv_tilt": 18,
+            "pv_azimuth": 28,
+            "pv_kwp": 6.0,
+            "battery_max_power_kw": 4.0,
+            "battery_efficiency": 0.95,
+            "battery_capacity_kwh": 8.0,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.02,
+            "latitude": 47.404,
+            "longitude": 9.743,
+            "timezone_name": "Europe/Vienna",
+        },
+        "batteries": [],
+        "pv_systems": [],
+    }
+    tariffs = {
+        "import_tariffs": [
+            {
+                "id": "awattar_at",
+                "label": "aWATTar",
+                "type": "awattar",
+                "land": "AT",
+                "fix_aufschlag_cent": 1.5,
+                "netzverlust_faktor": 1.03,
+                "mwst_austria_faktor": 1.2,
+            }
+        ],
+        "export_tariffs": [
+            {"id": "fixed_35ct", "label": "Fix", "type": "fixed", "k_push_cent": 3.5}
+        ],
+    }
+    profiles = {"profiles": []}
+
+    migrated_config, migrated_tariffs, migrated_profiles, notes = migrate_runtime_entities(
+        config,
+        tariffs_doc=tariffs,
+        house_profiles_doc=profiles,
+    )
+    runtime = migrated_config["runtime_settings"]
+    assert set(runtime) <= RUNTIME_ID_KEYS
+    assert runtime["pv_system_id"].startswith("pv_")
+    assert runtime["import_tariff_id"] == "awattar_at"
+    assert runtime["export_tariff_id"] == "fixed_35ct"
+    assert runtime["house_profile_id"] == "migrated_home"
+    assert any("battery_wear" in note for note in notes)
+    assert migrated_profiles["profiles"][0]["latitude"] == pytest.approx(47.404)
+    assert migrated_profiles["profiles"][0]["timezone_name"] == "Europe/Vienna"
+
+
+def test_migrate_runtime_entities_preserves_resolved_values(tmp_path):
+    from house_config.migrate_runtime_entities import (
+        effective_runtime_values,
+        migrate_runtime_entities,
+    )
+
+    repo = Path(__file__).resolve().parents[1]
+    config = json.loads(
+        (repo / "tests/fixtures/backtesting/config.json").read_text(encoding="utf-8")
+    )
+    tariffs = json.loads(
+        (repo / "tests/fixtures/backtesting/tariffs.json").read_text(encoding="utf-8")
+    )
+    profiles = json.loads(
+        (repo / "tests/fixtures/backtesting/house_profiles.json").read_text(encoding="utf-8")
+    )
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "config.json").write_text(json.dumps(config), encoding="utf-8")
+    (config_dir / "tariffs.json").write_text(json.dumps(tariffs), encoding="utf-8")
+    (config_dir / "house_profiles.json").write_text(json.dumps(profiles), encoding="utf-8")
+
+    before = effective_runtime_values(
+        config,
+        tariffs_path=str(config_dir / "tariffs.json"),
+        house_profiles_path=str(config_dir / "house_profiles.json"),
+    )
+    migrated_config, _, migrated_profiles, _ = migrate_runtime_entities(
+        config,
+        tariffs_doc=tariffs,
+        house_profiles_doc=profiles,
+    )
+    out_dir = tmp_path / "migrated"
+    out_dir.mkdir()
+    (out_dir / "config.json").write_text(json.dumps(migrated_config), encoding="utf-8")
+    (out_dir / "tariffs.json").write_text(json.dumps(tariffs), encoding="utf-8")
+    (out_dir / "house_profiles.json").write_text(
+        json.dumps(migrated_profiles), encoding="utf-8"
+    )
+
+    after = effective_runtime_values(
+        migrated_config,
+        tariffs_path=str(out_dir / "tariffs.json"),
+        house_profiles_path=str(out_dir / "house_profiles.json"),
+    )
+    for key in before:
+        if before[key] is None and after[key] is None:
+            continue
+        assert after[key] == pytest.approx(before[key], rel=1e-4, abs=1e-4), key
+
+
+def test_migrate_runtime_entities_cli_writes_draft(tmp_path):
+    from scripts.migrate_runtime_entities import main
+
+    repo = Path(__file__).resolve().parents[1]
+    config_dir = repo / "tests/fixtures/backtesting"
+    out_dir = tmp_path / "draft"
+    assert main(
+        [
+            "--input",
+            str(config_dir / "config.json"),
+            "--tariffs",
+            str(config_dir / "tariffs.json"),
+            "--house-profiles",
+            str(config_dir / "house_profiles.json"),
+            "--output-dir",
+            str(out_dir),
+        ]
+    ) == 0
+    assert (out_dir / "config.json").is_file()
+    assert (out_dir / "MIGRATION_REVIEW.md").is_file()
+    runtime = json.loads((out_dir / "config.json").read_text(encoding="utf-8"))[
+        "runtime_settings"
+    ]
+    assert "battery_id" in runtime
+    assert "pv_kwp" not in runtime
+

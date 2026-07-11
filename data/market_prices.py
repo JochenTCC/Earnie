@@ -30,12 +30,23 @@ def normalize_price_slot(dt: datetime) -> datetime:
 
 
 def epex_to_brutto_cent(epex_price_cent: float) -> float:
-    """EPEX Cent/kWh → Endkunden-Bruttopreis laut config."""
-    fix_aufschlag = config.get("FIX_AUFSCHLAG_CENT", cast=float)
-    netzverlust = config.get("NETZVERLUST_FAKTOR", cast=float)
-    mwst_faktor = config.get("MWST_AUSTRIA_FAKTOR", cast=float)
-    brutto = (float(epex_price_cent) * netzverlust + fix_aufschlag) * mwst_faktor
-    return round(brutto, 4)
+    """EPEX Cent/kWh → Endkunden-Bruttopreis laut aufgelöstem Import-Tarif."""
+    from data.backtesting_prices import pricing_kwargs_from_resolved
+    from data.tariff_pricing import import_cent_kwh
+
+    resolved = config.get_resolved_runtime_settings()
+    kwargs = pricing_kwargs_from_resolved(resolved)
+    spec = kwargs.get("import_tariff_spec")
+    if spec is None:
+        raise ValueError(
+            "import_tariff_id erforderlich für Bezugspreis-Berechnung "
+            "(kein Legacy-awattar-Block mehr in config.json)."
+        )
+    return import_cent_kwh(
+        float(epex_price_cent),
+        spec,
+        netzentgelt_override=kwargs.get("netzentgelt_override"),
+    )
 
 
 def index_market_data_by_slot(market_data: list[dict[str, Any]]) -> dict[datetime, dict[str, Any]]:

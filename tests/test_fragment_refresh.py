@@ -11,12 +11,6 @@ from ui import fragment_refresh
 
 def _write_config(tmp_path, ui_block: dict | None) -> str:
     payload = {
-        "awattar": {
-            "url": "https://example.test",
-            "fix_aufschlag_cent": 1.0,
-            "netzverlust_faktor": 1.0,
-            "mwst_austria_faktor": 1.0,
-        },
         "system": {
             "global_timeout": 10,
             "loop_timeout": 900,
@@ -35,20 +29,14 @@ def _write_config(tmp_path, ui_block: dict | None) -> str:
             "control_cmd_name": "cmd",
         },
         "runtime_settings": {
-            "k_push_cent": 1.0,
-            "pv_tilt": 18,
-            "pv_azimuth": 0,
-            "pv_kwp": 6.0,
-            "battery_max_power_kw": 2.5,
-            "battery_efficiency": 0.95,
-            "battery_capacity_kwh": 5.0,
-            "battery_min_soc": 10.0,
-            "battery_max_soc": 100.0,
-            "threshold_power": 0.2,
-            "latitude": 47.0,
-            "longitude": 9.0,
-            "timezone_name": "Europe/Vienna",
+            "battery_id": "",
+            "pv_system_id": "",
+            "house_profile_id": "",
+            "import_tariff_id": "",
+            "export_tariff_id": "",
         },
+        "batteries": [],
+        "pv_systems": [],
         "planning_horizon": {"mode": "sunset_window"},
         "file_paths_battery_simulation": {
             "path_cons_data": "runtime/cons_data_hourly.csv",

@@ -18,7 +18,6 @@ class FeedInSettings:
     fix_cent: float
     monthly_fixed_tariffs: tuple[tuple[int, int, float], ...] | None = None
     export_tariff_spec: dict | None = None
-    legacy_awattar: dict | None = None
 
 
 def validate_feed_in_mode(mode: str) -> str:
@@ -131,7 +130,6 @@ def resolve_k_push_act(
             epex_cent,
             settings.export_tariff_spec,
             slot_datetime=slot_datetime,
-            legacy_awattar=settings.legacy_awattar,
             monthly_lookup=monthly_lookup,
         )
 
@@ -145,30 +143,36 @@ def resolve_k_push_act(
     return epex_to_feed_in_cent(epex_cent, settings.fee_factor, settings.fix_cent)
 
 
+def _export_fee_fields(export_spec: dict | None) -> tuple[float, float]:
+    if export_spec is None:
+        return 0.0, 0.0
+    export_type = str(export_spec.get("type", "")).strip().lower()
+    if export_type != FEED_IN_MODE_DYNAMIC_EPEX:
+        return 0.0, 0.0
+    if "feed_in_fee_factor" not in export_spec:
+        raise ValueError(
+            "Export-Tarif type 'dynamic_epex' erfordert feed_in_fee_factor in tariffs.json."
+        )
+    return (
+        float(export_spec["feed_in_fee_factor"]),
+        float(export_spec.get("feed_in_fix_cent", 0.0)),
+    )
+
+
 def feed_in_settings_from_dict(
     runtime: dict[str, Any],
-    awattar: dict[str, Any],
     *,
     monthly_fixed_tariffs: tuple[tuple[int, int, float], ...] | None = None,
     export_tariff_spec: dict | None = None,
 ) -> FeedInSettings:
     if "k_push_cent" not in runtime:
-        raise KeyError("feed_in_settings erfordert k_push_cent in runtime_settings bzw. Szenario.")
+        raise KeyError("feed_in_settings erfordert k_push_cent aus aufgelöstem Export-Tarif.")
     mode = validate_feed_in_mode(runtime.get("feed_in_mode", FEED_IN_MODE_FIXED))
     k_push = float(runtime["k_push_cent"])
-    if mode == FEED_IN_MODE_DYNAMIC_EPEX:
-        if "feed_in_fee_factor" not in awattar:
-            raise ValueError(
-                "feed_in_mode 'dynamic_epex' erfordert awattar.feed_in_fee_factor in config.json."
-            )
-        fee_factor = float(awattar["feed_in_fee_factor"])
-        fix_cent = float(awattar.get("feed_in_fix_cent", 0.0))
-    else:
-        fee_factor = float(awattar.get("feed_in_fee_factor", 0.0))
-        fix_cent = float(awattar.get("feed_in_fix_cent", 0.0))
     spec = export_tariff_spec
     if spec is None and runtime.get("_export_tariff_spec") is not None:
         spec = dict(runtime["_export_tariff_spec"])
+    fee_factor, fix_cent = _export_fee_fields(spec)
 
     return FeedInSettings(
         mode=mode,
@@ -177,7 +181,6 @@ def feed_in_settings_from_dict(
         fix_cent=fix_cent,
         monthly_fixed_tariffs=monthly_fixed_tariffs,
         export_tariff_spec=spec,
-        legacy_awattar=dict(awattar) if awattar else None,
     )
 
 

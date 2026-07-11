@@ -70,15 +70,10 @@ def test_ch_fixed_export():
     assert export_cent_kwh(None, tariff) == pytest.approx(12.5)
 
 
-def test_legacy_awattar_import_uses_config():
+def test_awattar_import_requires_tariff_fields():
     tariff = {"type": "awattar"}
-    legacy = {
-        "netzverlust_faktor": 1.03,
-        "fix_aufschlag_cent": 1.5,
-        "mwst_austria_faktor": 1.2,
-    }
-    # (10 * 1.03 + 1.5) * 1.2 = 14.16
-    assert import_cent_kwh(10.0, tariff, legacy_awattar=legacy) == pytest.approx(14.16)
+    with pytest.raises(ValueError, match="fix_aufschlag_cent"):
+        import_cent_kwh(10.0, tariff)
 
 
 def test_awattar_import_uses_tariff_spec():

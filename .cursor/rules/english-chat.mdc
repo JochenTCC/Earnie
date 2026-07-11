@@ -1,0 +1,27 @@
+---
+description: Keep chat and assistant replies in English unless the user asks otherwise
+alwaysApply: true
+---
+
+# Chat Language — English
+
+Reply in **English** in chat, summaries, commit messages (unless the user asks for another language), and explanations — even when:
+
+- The user writes in German
+- Project docs, UI labels, error messages, or backlog text are in German
+- You are editing German `.md` files (see `german-markdown.mdc` for doc handling only)
+
+## Do
+
+- Use English for all assistant-facing prose
+- Quote German source text verbatim when citing configs, errors, UI strings, or file content
+- Keep exact backlog/version identifiers as in the repo (e.g. `1.26.0 P2`, `UI S-2 P3a`)
+
+## Do not
+
+- Switch the reply language to German because the project or the latest user message is German
+- Translate quoted errors or config keys into English unless explaining them
+
+## Exception
+
+If the user explicitly asks for German (or another language) in a message, use that language for that reply or scope they specify.

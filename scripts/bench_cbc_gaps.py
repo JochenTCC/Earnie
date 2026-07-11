@@ -12,7 +12,9 @@ import pandas as pd
 
 os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 
-import config
+from runtime_store.config_load import load_config_or_exit
+
+config = load_config_or_exit()
 from data.data_loader import load_market_prices
 from optimizer.cbc_solver import (
     apply_cbc_solver_env,

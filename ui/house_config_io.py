@@ -182,8 +182,6 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
         spec["battery_wear"] = raw_spec["battery_wear"]
     elif existing_wear is not None:
         spec["battery_wear"] = existing_wear
-    elif data.get("battery_wear") is not None:
-        spec["battery_wear"] = dict(data["battery_wear"])
     else:
         spec["battery_wear"] = {"enabled": False}
     normalize_battery(spec, 0)

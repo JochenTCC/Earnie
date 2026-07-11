@@ -16,10 +16,12 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 
+from runtime_store.config_load import load_config_or_exit
+
+config = load_config_or_exit()
 from integrations import loxone_client
 from integrations.loxone_connectivity import loxone_env_configured, ensure_live_config
 from optimizer.filter_context import slot_in_native_window
-import config
 
 
 def _find_swimspa_filter() -> dict | None:

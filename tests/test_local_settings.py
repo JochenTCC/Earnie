@@ -18,12 +18,6 @@ def _write_minimal_config(tmp_path, system_extra: dict | None = None) -> str:
     if system_extra:
         system.update(system_extra)
     payload = {
-        "awattar": {
-            "url": "https://example.test",
-            "fix_aufschlag_cent": 1.0,
-            "netzverlust_faktor": 1.0,
-            "mwst_austria_faktor": 1.0,
-        },
         "system": system,
         "loxone_blocks": {
             "soc_name": "soc",
@@ -39,28 +33,25 @@ def _write_minimal_config(tmp_path, system_extra: dict | None = None) -> str:
             "control_cmd_name": "cmd",
         },
         "runtime_settings": {
-            "k_push_cent": 1.0,
-            "pv_tilt": 18,
-            "pv_azimuth": 0,
-            "pv_kwp": 6.0,
-            "battery_max_power_kw": 2.5,
-            "battery_efficiency": 0.95,
-            "battery_capacity_kwh": 5.0,
-            "battery_min_soc": 10.0,
-            "battery_max_soc": 100.0,
-            "threshold_power": 0.2,
-            "latitude": 47.0,
-            "longitude": 9.0,
-            "timezone_name": "Europe/Vienna",
+            "battery_id": "",
+            "pv_system_id": "",
+            "house_profile_id": "",
+            "import_tariff_id": "",
+            "export_tariff_id": "",
         },
+        "batteries": [],
+        "pv_systems": [],
         "planning_horizon": {"mode": "sunset_window"},
+        "file_paths_battery_simulation": {
+            "path_cons_data": "runtime/cons_data_hourly.csv",
+        },
     }
     path = tmp_path / "config.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
     return str(path)
 
 
-def test_loxone_silent_mode_defaults_false_without_local_settings(tmp_path, monkeypatch):
+def test_loxone_silent_mode_defaults_true_without_local_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
     config_path = _write_minimal_config(tmp_path)
     local_path = tmp_path / "missing_local_settings.json"
@@ -69,7 +60,7 @@ def test_loxone_silent_mode_defaults_false_without_local_settings(tmp_path, monk
         local_settings_path=str(local_path),
         require_loxone_credentials=False,
     )
-    assert cfg.is_loxone_silent_mode() is False
+    assert cfg.is_loxone_silent_mode() is True
 
 
 def test_loxone_silent_mode_from_local_settings(tmp_path, monkeypatch):
@@ -85,16 +76,29 @@ def test_loxone_silent_mode_from_local_settings(tmp_path, monkeypatch):
     assert cfg.is_loxone_silent_mode() is True
 
 
-def test_rejects_loxone_silent_mode_in_central_config(tmp_path, monkeypatch):
+def test_loxone_silent_mode_from_central_config(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
     config_path = _write_minimal_config(tmp_path, {"loxone_silent_mode": True})
     local_path = tmp_path / "local_settings.json"
-    with pytest.raises(ValueError, match="gehört nicht mehr in config.json"):
-        config.Config(
-            config_path=config_path,
-            local_settings_path=str(local_path),
-            require_loxone_credentials=False,
-        )
+    cfg = config.Config(
+        config_path=config_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_loxone_silent_mode() is True
+
+
+def test_loxone_silent_mode_local_settings_overrides_central_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    config_path = _write_minimal_config(tmp_path, {"loxone_silent_mode": False})
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(json.dumps({"loxone_silent_mode": True}), encoding="utf-8")
+    cfg = config.Config(
+        config_path=config_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_loxone_silent_mode() is True
 
 
 def test_bootstrap_creates_local_settings(tmp_path, monkeypatch):

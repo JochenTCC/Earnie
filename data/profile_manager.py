@@ -221,7 +221,6 @@ def _build_optimization_matrix(
         target_hours,
         **pricing_kwargs_from_resolved(
             config.get_resolved_runtime_settings(),
-            config.CONFIG._raw_config,
         ),
     )
     optimization_matrix = []
@@ -480,7 +479,6 @@ def _import_pricing_kwargs() -> dict:
 
     return pricing_kwargs_from_resolved(
         config.get_resolved_runtime_settings(),
-        config.CONFIG._raw_config,
     )
 
 

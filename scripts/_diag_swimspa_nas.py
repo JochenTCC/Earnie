@@ -13,7 +13,9 @@ import plotly.graph_objects as go
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import config
+from runtime_store.config_load import load_config_or_exit
+
+config = load_config_or_exit()
 from optimizer.targets import consumer_column_name
 from runtime_store import optimization_history
 from runtime_store.history_timeline import (

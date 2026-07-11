@@ -12,7 +12,10 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import pandas as pd
-import config
+
+from runtime_store.config_load import load_config_or_exit
+
+config = load_config_or_exit()
 import logger_config
 from data import profile_manager
 from simulation.backtesting_log import save_backtesting_log

@@ -6,21 +6,28 @@ import os
 from settings.json_io import read_json_dict
 
 
-def load_loxone_silent_mode(raw_config: dict, local_settings: dict, local_settings_path: str) -> bool:
-    if "loxone_silent_mode" in raw_config.get("system", {}):
-        raise ValueError(
-            "Kritischer Konfigurationsfehler: system.loxone_silent_mode gehört nicht mehr "
-            f"in config.json — bitte in '{local_settings_path}' setzen."
-        )
-    raw = local_settings.get("loxone_silent_mode")
-    if raw is None:
-        return False
+def _validate_loxone_silent_mode_bool(raw: object, source: str) -> bool:
     if not isinstance(raw, bool):
         raise ValueError(
-            f"Kritischer Konfigurationsfehler: loxone_silent_mode in '{local_settings_path}' "
+            f"Kritischer Konfigurationsfehler: loxone_silent_mode in '{source}' "
             "muss true oder false sein."
         )
     return raw
+
+
+def load_loxone_silent_mode(raw_config: dict, local_settings: dict, local_settings_path: str) -> bool:
+    if "loxone_silent_mode" in local_settings:
+        return _validate_loxone_silent_mode_bool(
+            local_settings.get("loxone_silent_mode"),
+            local_settings_path,
+        )
+    system = raw_config.get("system")
+    if not isinstance(system, dict):
+        return False
+    raw = system.get("loxone_silent_mode")
+    if raw is None:
+        return True
+    return _validate_loxone_silent_mode_bool(raw, "config.json (system.loxone_silent_mode)")
 
 
 def load_local_settings_document(local_settings_path: str) -> dict:

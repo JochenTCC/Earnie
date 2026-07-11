@@ -17,13 +17,12 @@ def test_bootstrap_creates_missing_files_without_overwriting(tmp_path, monkeypat
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "config.example.json").write_text(
-        json.dumps({"awattar": {"url": "https://example.test"}}),
+        json.dumps({"system": {"global_timeout": 10, "loop_timeout": 900}}),
         encoding="utf-8",
     )
     (config_dir / "config.minimal.json").write_text(
         json.dumps(
             {
-                "awattar": {"url": "https://minimal.example"},
                 "batteries": [],
                 "pv_systems": [],
                 "flexible_consumers": [],
@@ -39,7 +38,6 @@ def test_bootstrap_creates_missing_files_without_overwriting(tmp_path, monkeypat
     assert config_path.is_file()
     assert cons_data_path.is_file()
     config_payload = json.loads(config_path.read_text(encoding="utf-8"))
-    assert config_payload["awattar"]["url"] == "https://minimal.example"
     assert config_payload["batteries"] == []
 
     original_cons_data = "timestamp;total_kw;baseload_kw;pv_kw;source\n2020-01-01 00:00:00;1;1;0;measured\n"
@@ -58,7 +56,7 @@ def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypat
 
     share_dir = tmp_path / "share" / "config"
     share_dir.mkdir(parents=True)
-    example_payload = {"awattar": {"url": "https://bundled.example"}, "system": {"event_triggers": []}}
+    example_payload = {"system": {"event_triggers": []}, "market_prices": {}}
     schema_payload = {"title": "schema"}
     deviation_example_payload = {"version": 1, "rules": []}
     deviation_schema_payload = {"title": "deviation-schema"}
@@ -95,7 +93,7 @@ def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypat
     assert deviation_example_path.is_file()
     assert deviation_schema_path.is_file()
     assert deviation_rules_path.is_file()
-    assert json.loads(example_path.read_text(encoding="utf-8"))["awattar"]["url"] == "https://bundled.example"
+    assert json.loads(example_path.read_text(encoding="utf-8"))["system"]["event_triggers"] == []
     assert json.loads(schema_path.read_text(encoding="utf-8"))["title"] == "schema"
     assert json.loads(deviation_example_path.read_text(encoding="utf-8"))["version"] == 1
     assert json.loads(deviation_rules_path.read_text(encoding="utf-8"))["version"] == 1

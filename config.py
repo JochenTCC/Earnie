@@ -152,11 +152,6 @@ class Config:
             )
 
     def _load_static_params(self) -> None:
-        self.AWATTAR_URL = self._get_strict(self._raw_config, ["awattar", "url"])
-        self.FIX_AUFSCHLAG_CENT = self._get_strict(self._raw_config, ["awattar", "fix_aufschlag_cent"])
-        self.NETZVERLUST_FAKTOR = self._get_strict(self._raw_config, ["awattar", "netzverlust_faktor"])
-        self.MWST_AUSTRIA_FAKTOR = self._get_strict(self._raw_config, ["awattar", "mwst_austria_faktor"])
-
         self.GLOBAL_TIMEOUT = self._get_strict(self._raw_config, ["system", "global_timeout"])
         self.LOOP_TIMEOUT = self._get_strict(self._raw_config, ["system", "loop_timeout"])
         local_settings = self._load_local_settings_document()
@@ -243,13 +238,40 @@ class Config:
     def _lookup_runtime_value(self, resolved: dict, key: str):
         if key in resolved:
             return resolved[key]
-        runtime = self._raw_config.get("runtime_settings", {})
-        if isinstance(runtime, dict) and key in runtime:
-            return runtime[key]
         raise KeyError(
-
-            f"Kritischer Konfigurationsfehler: runtime_settings.{key} fehlt in {self.config_path}!"
+            f"Kritischer Konfigurationsfehler: aufgelöstes runtime_settings.{key} "
+            f"fehlt — prüfen Sie Entitäts-IDs in {self.config_path}."
         )
+
+    def _reject_legacy_config_blocks(self) -> None:
+        if self._raw_config.get("awattar") is not None:
+            raise ValueError(
+                "Block 'awattar' in config.json ist entfernt (1.26.0 P6). "
+                "Aufschläge gehören in tariffs.json; die API-URL wird aus "
+                "import_tariff_id (land) abgeleitet."
+            )
+        if self._raw_config.get("battery_wear") is not None:
+            raise ValueError(
+                "Globaler Block 'battery_wear' ist entfernt (1.26.0 P6). "
+                "Verschleiß pro batteries[]-Eintrag konfigurieren."
+            )
+
+    def _reject_legacy_runtime_flat_fields(self) -> None:
+        runtime = self._raw_config.get("runtime_settings", {})
+        if not isinstance(runtime, dict):
+            return
+        found = {
+            key
+            for raw_key in runtime
+            if (key := self._normalize_runtime_settings_key(raw_key))
+            in self._DEPRECATED_RUNTIME_FLAT_KEYS
+        }
+        if found:
+            raise ValueError(
+                "Deprecated flache runtime_settings-Felder: "
+                f"{', '.join(sorted(found))}. "
+                "Nutzen Sie battery_id, pv_system_id, import_tariff_id, export_tariff_id."
+            )
 
     def _resolve_runtime_settings_dict(self) -> dict:
         from house_config.scenario_resolution import resolve_runtime_settings
@@ -332,8 +354,6 @@ class Config:
     def _load_full_runtime_params(self, resolved: dict) -> None:
         feed_in_mode_raw = resolved.get("feed_in_mode")
         if feed_in_mode_raw is None:
-            feed_in_mode_raw = self._raw_config.get("runtime_settings", {}).get("feed_in_mode")
-        if feed_in_mode_raw is None:
             self.FEED_IN_MODE = "fixed"
         else:
             from data.feed_in_prices import validate_feed_in_mode
@@ -361,8 +381,14 @@ class Config:
         self._load_geo_timezone_params(resolved)
 
     def _load_dynamic_params(self) -> None:
+        self._reject_legacy_config_blocks()
+        self._reject_legacy_runtime_flat_fields()
         resolved = self._resolve_runtime_settings_dict()
         self._resolved_runtime_settings = resolved
+
+        from house_config.awattar_api import resolve_awattar_api_url
+
+        self.AWATTAR_URL = resolve_awattar_api_url(resolved)
 
         if self._should_defer_runtime_params():
             self._runtime_params_deferred = True
@@ -474,10 +500,7 @@ class Config:
 
     def get_battery_wear_cent_per_kwh(self, capacity_kwh: float) -> float:
         """Verschleiß ct/kWh Durchsatz für MILP; aus batteries[] wenn battery_id gesetzt."""
-        from optimizer.battery_wear import (
-            battery_wear_cent_per_kwh_from_config,
-            validate_battery_wear_config,
-        )
+        from optimizer.battery_wear import battery_wear_cent_per_kwh_from_config
 
         resolved = self.get_resolved_runtime_settings()
         wear_raw = resolved.get("_battery_wear")
@@ -491,9 +514,7 @@ class Config:
                 f"Batterie '{battery_id}': battery_wear fehlt in batteries[] "
                 "(Pflicht wenn battery_id gesetzt)."
             )
-
-        wear = validate_battery_wear_config(self._raw_config.get("battery_wear"))
-        return battery_wear_cent_per_kwh_from_config(wear, float(capacity_kwh))
+        return 0.0
 
     def get_swimspa_settings(self) -> dict:
         """Legacy-Hilfsfunktion: liefert den SwimSpa-Verbraucher oder Defaults."""
@@ -516,11 +537,9 @@ class Config:
             if runtime_override is not None
             else self.get_resolved_runtime_settings()
         )
-        awattar = self._raw_config.get("awattar", {})
         monthly = runtime.get("_monthly_fixed_tariffs")
         return feed_in_settings_from_dict(
             runtime,
-            awattar,
             monthly_fixed_tariffs=monthly,
         )
 
@@ -548,7 +567,6 @@ class Config:
             if runtime_override is not None
             else self.get_resolved_runtime_settings()
         )
-        awattar = self._raw_config.get("awattar", {})
         monthly = None
         export_spec = runtime.get("_export_tariff_spec")
         export_type = str(export_spec.get("type", "")).strip().lower() if export_spec else ""
@@ -563,7 +581,6 @@ class Config:
             monthly = self.get_backtesting_fixed_monthly_feed_in_rates()
         return feed_in_settings_from_dict(
             runtime,
-            awattar,
             monthly_fixed_tariffs=monthly,
         )
 
@@ -575,7 +592,7 @@ class Config:
         return self.get('GLOBAL_TIMEOUT', default=default, cast=int)
 
     def is_loxone_silent_mode(self) -> bool:
-        return bool(self.get('LOXONE_SILENT_MODE', default=False))
+        return bool(self.get('LOXONE_SILENT_MODE', default=True))
 
     def is_event_trigger_enabled(self) -> bool:
         return bool(self.get('EVENT_TRIGGER_ENABLED', default=True))

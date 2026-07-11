@@ -46,20 +46,6 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
     (config_dir / "config.json").write_text(
         json.dumps(
             {
-                "awattar": {
-                    "url": "https://api.awattar.at/v1/marketdata",
-                    "fix_aufschlag_cent": 1.5,
-                    "netzverlust_faktor": 1.03,
-                    "mwst_austria_faktor": 1.2,
-                    "feed_in_fee_factor": 0.19,
-                    "feed_in_fix_cent": 0.0,
-                },
-                "battery_wear": {
-                    "enabled": False,
-                    "replacement_cost_euro": 1500,
-                    "expected_cycles": 6000,
-                    "cycle_cost_fraction": 0.5,
-                },
                 "eauto_milp": {
                     "live_modus_a_min_remaining_kwh": 2.8,
                     "tie_break_on_epsilon": 0.001,
@@ -182,7 +168,7 @@ def test_config_loads_id_only_runtime_settings(tmp_path, monkeypatch):
     assert cfg.get_battery_wear_cent_per_kwh(5.0) == pytest.approx(2.5, rel=1e-3)
 
 
-def test_battery_wear_falls_back_to_global_when_entity_missing(tmp_path, monkeypatch):
+def test_battery_wear_requires_entity_config_when_battery_id_set(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
@@ -195,9 +181,10 @@ def test_battery_wear_falls_back_to_global_when_entity_missing(tmp_path, monkeyp
         require_loxone_credentials=False,
     )
 
-    assert cfg.get_battery_wear_cent_per_kwh(5.0) == pytest.approx(0.0)
+    with pytest.raises(ValueError, match="battery_wear fehlt"):
+        cfg.get_battery_wear_cent_per_kwh(5.0)
     resolved = cfg.get_resolved_runtime_settings()
-    assert resolved["_battery_wear"]["enabled"] is False
+    assert "_battery_wear" not in resolved
 
 
 def test_backtesting_feed_in_settings_uses_resolved_baseline(tmp_path, monkeypatch):

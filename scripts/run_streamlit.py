@@ -6,8 +6,6 @@ import argparse
 import sys
 from pathlib import Path
 
-from ui.streamlit_server import streamlit_port
-
 _APP_PATH = Path(__file__).resolve().parent.parent / "app.py"
 
 
@@ -56,7 +54,12 @@ def _run_streamlit_cli(argv: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from runtime_store.config_load import load_config_or_exit
+
+    load_config_or_exit()
+
     import logger_config
+    from ui.streamlit_server import streamlit_port
 
     logger_config.configure_utf8_stdio()
 

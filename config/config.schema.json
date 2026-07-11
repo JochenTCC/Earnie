@@ -4,28 +4,20 @@
   "title": "Energy Optimizer Konfiguration",
   "description": "JSON-Schema für config.json. In Cursor/VS Code erscheinen Beschreibungen als Hover-Hilfe, wenn \"$schema\" in config.json gesetzt ist.",
   "type": "object",
-  "properties": {
-    "$schema": {
-      "type": "string",
-      "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
-    },
-    "awattar": {
-      "$ref": "#/definitions/awattar",
-      "description": "aWATTar-API und Aufschläge für den Bezugsstrompreis (Österreich)."
-    },
-    "market_prices": {
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
+        },
+        "market_prices": {
       "$ref": "#/definitions/market_prices",
       "description": "Fehlende Day-Ahead-Slots: Spiegelung oder OLS-Prognose (Phase 3)."
     },
-    "eauto_milp": {
-      "$ref": "#/definitions/eauto_milp",
-      "description": "E-Auto MILP: Live-Schwelle Modus A/B und Tie-Break-Koeffizienten (Pflicht)."
-    },
-    "battery_wear": {
-      "$ref": "#/definitions/battery_wear",
-      "description": "Batterieverschleiß in der MILP-Zielfunktion (lineares Amortisationsmodell)."
-    },
-    "system": {
+        "eauto_milp": {
+            "$ref": "#/definitions/eauto_milp",
+            "description": "E-Auto MILP: Live-Schwelle Modus A/B und Tie-Break-Koeffizienten (Pflicht)."
+        },
+        "system": {
       "$ref": "#/definitions/system",
       "description": "HTTP-Timeouts und Intervall der Optimierungs-Schleife (main.py)."
     },
@@ -227,6 +219,10 @@
           "minimum": 1,
           "description": "Abfrageintervall in Sekunden für event_triggers zwischen regulären Optimierungsläufen."
         },
+        "loxone_silent_mode": {
+          "type": "boolean",
+          "description": "true = Loxone/Huawei/Verbraucher nur lesen, keine Schreibbefehle (Standard: true). Optional maschinenspezifisch in runtime/local_settings.json überschreibbar."
+        },
         "event_triggers": {
           "type": "array",
           "description": "Loxone-Signale, deren Änderung einen außerplanmäßigen Optimierungslauf auslöst.",
@@ -277,76 +273,8 @@
     },
     "runtime_settings": {
       "type": "object",
-      "description": "Laufzeitparameter (Echtzeit-Optimierung). Ab 1.26.0: Entitäts-IDs + Geo/Zeitzone; flache PV-/Batterie-/Tarif-Felder deprecated (Prod-Fallback bis P5).",
+      "description": "Laufzeitparameter (Echtzeit-Optimierung). Ab 1.26.0: nur Entitäts-IDs; Geo/Zeitzone über house_profile_id.",
       "properties": {
-        "k_push_cent": {
-          "type": "number",
-          "description": "Deprecated: Einspeisevergütung — nutze export_tariff_id."
-        },
-        "feed_in_mode": {
-          "type": "string",
-          "enum": ["fixed", "dynamic_epex"],
-          "description": "Deprecated: nutze export_tariff_id."
-        },
-        "pv_tilt": {
-          "type": "number",
-          "description": "Deprecated: nutze pv_system_id."
-        },
-        "pv_azimuth": {
-          "type": "number",
-          "description": "Deprecated: nutze pv_system_id."
-        },
-        "pv_kwp": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Deprecated: nutze pv_system_id."
-        },
-        "latitude": {
-          "type": "number",
-          "description": "Deprecated: nutze house_profile_id (latitude im Hausprofil)."
-        },
-        "longitude": {
-          "type": "number",
-          "description": "Deprecated: nutze house_profile_id (longitude im Hausprofil)."
-        },
-        "battery_max_power_kw": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Deprecated: nutze battery_id."
-        },
-        "battery_efficiency": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "maximum": 1,
-          "description": "Deprecated: nutze battery_id."
-        },
-        "battery_capacity_kwh": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "description": "Deprecated: nutze battery_id."
-        },
-        "battery_min_soc": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100,
-          "description": "Deprecated: nutze battery_id."
-        },
-        "battery_max_soc": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100,
-          "description": "Deprecated: nutze battery_id."
-        },
-        "threshold_power": {
-          "type": "number",
-          "exclusiveMinimum": 0,
-          "maximum": 1,
-          "description": "Deprecated: nutze battery_id."
-        },
-        "timezone_name": {
-          "type": "string",
-          "description": "Deprecated: nutze house_profile_id (timezone_name im Hausprofil)."
-        },
         "battery_id": {
           "type": "string",
           "description": "Referenz auf batteries[].id (Runtime/Baseline)."

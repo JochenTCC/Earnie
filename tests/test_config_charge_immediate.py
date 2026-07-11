@@ -8,18 +8,11 @@ import config
 
 def _minimal_charge_immediate_config() -> dict:
     return {
-        "awattar": {
-            "url": "https://api.awattar.at/v1/marketdata",
-            "fix_aufschlag_cent": 1.5,
-            "netzverlust_faktor": 1.03,
-            "mwst_austria_faktor": 1.2,
-        },
         "eauto_milp": {
             "live_modus_a_min_remaining_kwh": 2.8,
             "tie_break_on_epsilon": 0.001,
             "tie_break_time_epsilon": 0.0001,
         },
-        "battery_wear": {"enabled": False},
         "system": {"global_timeout": 10, "loop_timeout": 900},
         "loxone_blocks": {
             "soc_name": "Battery_SOC",
@@ -35,22 +28,18 @@ def _minimal_charge_immediate_config() -> dict:
             "control_cmd_name": "Control_Cmd",
         },
         "runtime_settings": {
-            "k_push_cent": 3.5,
-            "feed_in_mode": "fixed",
-            "pv_tilt": 25,
-            "pv_azimuth": 0,
-            "pv_kwp": 10.0,
-            "battery_max_power_kw": 2.5,
-            "battery_efficiency": 0.97,
-            "battery_capacity_kwh": 5.0,
-            "battery_min_soc": 10.0,
-            "battery_max_soc": 100.0,
-            "threshold_power": 0.02,
-            "latitude": 48.0,
-            "longitude": 10.0,
-            "timezone_name": "Europe/Vienna",
+            "battery_id": "",
+            "pv_system_id": "",
+            "house_profile_id": "",
+            "import_tariff_id": "",
+            "export_tariff_id": "",
         },
+        "batteries": [],
+        "pv_systems": [],
         "planning_horizon": {"mode": "sunset_window"},
+        "file_paths_battery_simulation": {
+            "path_cons_data": "runtime/cons_data_hourly.csv",
+        },
         "flexible_consumers": [
             {
                 "id": "eauto",
@@ -94,9 +83,62 @@ def _minimal_charge_immediate_config() -> dict:
 
 
 def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
-    path = tmp_path / "config.json"
-    path.write_text(json.dumps(_minimal_charge_immediate_config()), encoding="utf-8")
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "tariffs.json").write_text(
+        json.dumps(
+            {
+                "import_tariffs": [
+                    {
+                        "id": "fixed_imp",
+                        "label": "Fix",
+                        "type": "fixed_cent",
+                        "fix_cent_kwh": 37.0,
+                    }
+                ],
+                "export_tariffs": [
+                    {"id": "fixed_exp", "label": "Fix", "type": "fixed", "k_push_cent": 3.5}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (config_dir / "house_profiles.json").write_text(
+        json.dumps({"profiles": []}),
+        encoding="utf-8",
+    )
+    payload = _minimal_charge_immediate_config()
+    payload["runtime_settings"] = {
+        "battery_id": "home",
+        "pv_system_id": "roof",
+        "import_tariff_id": "fixed_imp",
+        "export_tariff_id": "fixed_exp",
+        "house_profile_id": "",
+    }
+    payload["batteries"] = [
+        {
+            "id": "home",
+            "label": "Home",
+            "battery_capacity_kwh": 5.0,
+            "battery_max_power_kw": 2.5,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.02,
+            "battery_wear": {"enabled": False},
+        }
+    ]
+    payload["pv_systems"] = [
+        {"id": "roof", "label": "Roof", "kwp": 10.0, "pv_tilt": 25, "pv_azimuth": 0}
+    ]
+    path = config_dir / "config.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        str(config_dir / "house_profiles.json"),
+    )
     config.reinit_config()
 
     eauto = next(c for c in config.get_flexible_consumers() if c["id"] == "eauto")

@@ -23,7 +23,7 @@ def test_validate_text_accepts_fixture_config():
 
 
 def test_validate_text_reports_schema_violation():
-    data, error = page_config._validate_text('{"awattar": 5}')
+    data, error = page_config._validate_text('{"system": 5}')
     assert data is None
     assert error is not None
     assert "Schema-Verletzung" in error

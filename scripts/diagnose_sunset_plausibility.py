@@ -16,7 +16,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import config
+from runtime_store.config_load import load_config_or_exit
+
+config = load_config_or_exit()
 from data.data_loader import load_market_prices
 from scripts.run_backtesting import resolve_backtesting_window
 from simulation.backtesting_horizon import (

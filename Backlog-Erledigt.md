@@ -2,6 +2,26 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 1.26.0 — Runtime entities & tariffs (release) (2026-07-11)
+
+- [x] **Release 1.26.0** — Greenfield-first P0–P4, prod migration P5, legacy removal P6; live + backtesting share ID-only `runtime_settings` resolution; `version.py` → 1.26.0
+- [x] **Acceptance** — greenfield smoke; migration draft + manual review path; no flat-field fallbacks; per-tariff aWATTar; `battery_wear` on selected battery only
+
+### Version 1.26.0 P6 — Legacy removal (2026-07-11)
+
+- [x] **P6 — Legacy removal (no fallbacks)**
+  - Removed flat-field fallback in entity/tariff resolution (`house_config/entity_resolution.py`, `config.py` `_lookup_runtime_value`)
+  - Removed global `battery_wear` and top-level `awattar` block support; pricing via `tariffs.json` only; API URL from `import_tariff_id` → `land` (`house_config/awattar_api.py`)
+  - Schema: ID-only `runtime_settings`; removed deprecated flat fields from `config.schema.json`
+  - Updated `config/config.example.json`, `config.minimal.json`, greenfield fixture, backtesting fixture to ID-only `runtime_settings`
+
+### Version 1.26.0 P5 — Prod cutover (migration, tests, docs) (2026-07-11)
+
+- [x] **Migration script** — [`house_config/migrate_runtime_entities.py`](house_config/migrate_runtime_entities.py), CLI [`scripts/migrate_runtime_entities.py`](scripts/migrate_runtime_entities.py) (`ernie-migrate-runtime`): flache `runtime_settings` → Entwurf mit ID-only refs, `batteries[]`/`pv_systems[]`, Geo auf `house_profiles.json`, `battery_wear` auf Batterie-Eintrag, aWATTar-Felder in Tarife; `MIGRATION_REVIEW.md` — manuelle Prüfung vor NAS-Deploy
+- [x] **Tests** — `tests/test_house_config.py`: Migration, Auflösungs-Parität, CLI-Entwurf
+- [x] **Docs (DE)** — [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md), [`preise.md`](docs/konfiguration/preise.md): ID-only `runtime_settings`, Migration, Konfigurations-UI
+- [x] **Backlog** — P5 ohne 7g-a (NAS-Abnahme); Follow-up: Version 1.+1 „Include tariffs.json in deploy“
+
 ### Version 1.26.0 P4 — UI live configuration (2026-07-11)
 
 - [x] **Runtime entity UI** — [`ui/config_forms.py`](ui/config_forms.py), [`ui/scenario_runtime_form.py`](ui/scenario_runtime_form.py): ID dropdowns (battery, PV, tariffs, house profile); resolved PV/battery/tariff read-only; [`ui/pages/page_config.py`](ui/pages/page_config.py) expander renamed

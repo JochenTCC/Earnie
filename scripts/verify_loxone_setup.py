@@ -10,6 +10,10 @@ from __future__ import annotations
 
 import sys
 
+from runtime_store.config_load import load_config_or_exit
+
+load_config_or_exit()
+
 from integrations.loxone_connectivity import (
     loxone_env_configured,
     verify_loxone_setup,

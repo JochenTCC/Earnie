@@ -3,7 +3,10 @@ import sys
 import time
 from datetime import datetime
 import logging
-import config
+
+from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
+
+config = load_config_or_exit()
 import logger_config
 from integrations import awattar_client, loxone_client
 from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption
@@ -365,7 +368,7 @@ if __name__ == "__main__":
     from runtime_store.persist_paths import log_file
 
     bootstrap.run()
-    config.reinit_config()
+    reinit_config_or_exit(config)
     logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
     log_config_drift(logging.getLogger("main"))
     from scripts.startup_checks import run_loxone_verify_on_startup

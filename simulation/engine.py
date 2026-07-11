@@ -239,7 +239,7 @@ def _brutto_prices_for_slots(
     return import_brutto_cent_for_slots(
         [float(p) for p in epex],
         slot_datetimes,
-        **pricing_kwargs_from_resolved(scenario_params, config.CONFIG._raw_config),
+        **pricing_kwargs_from_resolved(scenario_params),
     )
 
 
@@ -266,7 +266,7 @@ def _pricing_kwargs_from_scenario(scenario_params: dict | None) -> dict:
         return {}
     from data.backtesting_prices import pricing_kwargs_from_resolved
 
-    return pricing_kwargs_from_resolved(scenario_params, config.CONFIG._raw_config)
+    return pricing_kwargs_from_resolved(scenario_params)
 
 
 def build_historical_matrix_for_slots(

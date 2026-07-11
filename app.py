@@ -15,17 +15,18 @@ import logging
 
 import streamlit as st
 
-import config
+from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
 
-from runtime_store.dotenv_io import needs_loxone_setup, require_loxone_credentials_for_config
-from ui.setup_dotenv import render_loxone_setup_page
+config = load_config_or_exit()
+reinit_config_or_exit(config)
 
-config.reinit_config()
 from runtime_store.config_drift import (
     format_drift_message,
     load_config_drift_items,
     should_show_config_drift,
 )
+from runtime_store.dotenv_io import needs_loxone_setup, require_loxone_credentials_for_config
+from ui.setup_dotenv import render_loxone_setup_page
 from version import __version__
 from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notices
 from ui.navigation import build_navigation

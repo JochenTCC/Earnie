@@ -12,7 +12,6 @@ import sys
 import time
 
 import logger_config
-from integrations.loxone_watchdog import run_watchdog_cycle
 
 DEFAULT_INTERVAL_SEC = 60
 DEFAULT_LOG_FILE = os.path.join(
@@ -74,6 +73,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from runtime_store.config_load import load_config_or_exit
+
+    load_config_or_exit()
+
+    from integrations.loxone_watchdog import run_watchdog_cycle
+
     args = _parse_args(argv)
     if args.interval_sec < 1:
         print("--interval-sec muss mindestens 1 sein", file=sys.stderr)

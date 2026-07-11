@@ -1,22 +1,8 @@
 {
-    "awattar": {
-        "url": "https://api.awattar.at/v1/marketdata",
-        "fix_aufschlag_cent": 1.5,
-        "netzverlust_faktor": 1.03,
-        "mwst_austria_faktor": 1.2,
-        "feed_in_fee_factor": 0.19,
-        "feed_in_fix_cent": 0.0
-    },
     "eauto_milp": {
         "live_modus_a_min_remaining_kwh": 2.8,
         "tie_break_on_epsilon": 0.001,
         "tie_break_time_epsilon": 0.0001
-    },
-    "battery_wear": {
-        "enabled": true,
-        "replacement_cost_euro": 1500,
-        "expected_cycles": 6000,
-        "cycle_cost_fraction": 0.5
     },
     "system": {
         "global_timeout": 10,
@@ -39,20 +25,11 @@
         "control_cmd_name": "Control_Cmd"
     },
     "runtime_settings": {
-        "k_push_cent": 3.5,
-        "feed_in_mode": "fixed",
-        "pv_tilt": 18,
-        "pv_azimuth": 28,
-        "pv_kwp": 6.0,
-        "battery_max_power_kw": 2.5,
-        "battery_efficiency": 0.95,
-        "battery_capacity_kwh": 5.0,
-        "battery_min_soc": 10.0,
-        "battery_max_soc": 100.0,
-        "threshold_power": 0.02,
-        "latitude": 47.404,
-        "longitude": 9.743,
-        "timezone_name": "Europe/Vienna"
+        "battery_id": "test_battery",
+        "pv_system_id": "test_pv",
+        "import_tariff_id": "awattar_at",
+        "export_tariff_id": "fixed_35ct",
+        "house_profile_id": "test_home"
     },
     "batteries": [
         {

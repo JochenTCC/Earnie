@@ -7,7 +7,9 @@ import json
 import sys
 from pathlib import Path
 
-import config
+from runtime_store.config_load import load_config_or_exit
+
+config = load_config_or_exit()
 from config import CONFIG_JSON_PATH
 from data.thermal_backtest import backtest_heat_loss_kw_per_k, load_merged_history
 from data.thermal_calibration import estimate_heat_loss_kw_per_k

@@ -60,7 +60,6 @@ def _prepare_greenfield_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         encoding="utf-8",
     )
     minimal_config = {
-        "awattar": {"url": "https://greenfield.example"},
         "batteries": [],
         "pv_systems": [],
         "flexible_consumers": [],
@@ -70,7 +69,7 @@ def _prepare_greenfield_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         encoding="utf-8",
     )
     (share_dir / "config.example.json").write_text(
-        json.dumps({"awattar": {"url": "https://greenfield.example-full"}}),
+        json.dumps({"system": {"global_timeout": 10, "loop_timeout": 900}}),
         encoding="utf-8",
     )
     (share_dir / "house_profiles.minimal.json").write_text(
@@ -117,7 +116,6 @@ def test_greenfield_bootstrap_creates_expected_files(tmp_path, monkeypatch):
     assert cons_data.is_file()
 
     config_payload = json.loads(config_json.read_text(encoding="utf-8"))
-    assert config_payload["awattar"]["url"] == "https://greenfield.example"
     assert config_payload["batteries"] == []
     assert config_payload["pv_systems"] == []
     assert config_payload["flexible_consumers"] == []
@@ -145,10 +143,12 @@ def test_config_minimal_runtime_settings_id_only():
     """1.26.0 P0: Bootstrap-Vorlage ohne flache PV-/Batterie-/Tarif-Duplikate."""
     repo_root = Path(__file__).resolve().parents[1]
     minimal_path = repo_root / "config" / "config.minimal.json"
-    runtime = json.loads(minimal_path.read_text(encoding="utf-8"))["runtime_settings"]
+    minimal = json.loads(minimal_path.read_text(encoding="utf-8"))
+    runtime = minimal["runtime_settings"]
 
     assert not _RUNTIME_SETTINGS_FLAT_LEGACY_KEYS.intersection(runtime)
     assert set(runtime).issubset(_RUNTIME_SETTINGS_ID_ONLY_KEYS)
+    assert minimal["system"]["loxone_silent_mode"] is True
 
 
 def test_greenfield_config_runtime_settings_id_only():

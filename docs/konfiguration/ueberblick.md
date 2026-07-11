@@ -16,10 +16,12 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`co
 
 | Block | Zweck |
 |-------|--------|
-| `awattar` | API und Aufschläge für Bezugsstrompreis (Österreich) |
 | `system` | Timeouts für HTTP und Optimierungs-Schleife |
 | `loxone_blocks` | Zentrale Loxone-IO-Namen (Speicher, PV, Steuerung) |
-| `runtime_settings` | PV-Anlage, Batterie, Standort — **Produktiv und Live-Optimierung** |
+| `runtime_settings` | **Nur Entitäts-Referenzen** für Live-Betrieb: `battery_id`, `pv_system_id`, `import_tariff_id`, `export_tariff_id`, `house_profile_id` |
+| `batteries[]` / `pv_systems[]` | Technische Parameter für Speicher und PV (referenziert über IDs) |
+| `config/tariffs.json` | Tarif-Katalog (Bezug/Einspeise); referenziert über `import_tariff_id` / `export_tariff_id` |
+| `config/house_profiles.json` | Standort (Geo/Zeitzone) und Planungs-Verbraucher; referenziert über `house_profile_id` |
 | `file_paths_battery_simulation` | Pfade zu historischen CSVs, Preisquelle, `cons_data_hourly.csv` |
 | `flexible_consumers` | Steuerbare Verbraucher (MILP) mit Loxone-Ein-/Ausgängen |
 
@@ -27,7 +29,7 @@ Zusätzlich für Backtesting: **`config/backtesting_scenarios.json`** mit altern
 
 ## `backtesting_scenarios.json` vs. `runtime_settings`
 
-- **`runtime_settings`:** Maßgeblich für `main.py` und die App im Modus **Sunset-2-Sunset**.
+- **`runtime_settings`:** Maßgeblich für `main.py` und die App im Modus **Sunset-2-Sunset**. Enthält nur **Referenz-IDs** auf Entitäten in `config.json` / `tariffs.json` / `house_profiles.json` (keine flachen PV-/Batterie-/Tarif-/Geo-Duplikate).
 - **`backtesting_scenarios.json`:** Alternative Batterie-/PV-Konfigurationen zum Vergleich in Simulation und Backtesting (z. B. „10 kWh Speicher“). Ändern **nicht** automatisch den Produktivbetrieb. Die Baseline im Backtesting ist weiterhin `runtime_settings` aus `config.json`.
 
 ## `file_paths_battery_simulation`
@@ -55,9 +57,19 @@ Nach Minimal-Bootstrap (`flexible_consumers` leer) gilt diese Reihenfolge:
 
 Tarif-Katalog: manuell in `config/tariffs.json` (kein UI-Editor).
 
-## Sidebar in der App
+## Migration von flachen `runtime_settings` (1.26.0 P5)
 
-Im Modus **Sunset-2-Sunset** können PV-, Batterie- und Einspeiseparameter in der Sidebar geändert werden. Gespeichert wird direkt in `runtime_settings` von `config.json` — nicht in `backtesting_scenarios.json`.
+Bestehende Produktiv-Configs mit flachen Feldern (`pv_kwp`, `battery_capacity_kwh`, `k_push_cent`, Geo in `runtime_settings`) werden per Skript in ID-Referenzen überführt:
+
+```powershell
+python -m scripts.migrate_runtime_entities --input config/config.json --output-dir migrated/
+```
+
+Das Skript schreibt **Entwürfe** (`config.json`, `tariffs.json`, `house_profiles.json`, `MIGRATION_REVIEW.md`) — **manuelle Prüfung vor NAS-Deploy**. Globaler `battery_wear` wird in den gewählten `batteries[]`-Eintrag übernommen; aWATTar-Aufschläge in den passenden Tarif in `tariffs.json`. Geo/Zeitzone wandern ins referenzierte Hausprofil.
+
+## Sidebar / Seite Konfiguration
+
+Im Modus **Sunset-2-Sunset** wählt die Seite **Konfiguration** (Runtime-Szenario) Entitäten per Dropdown (`battery_id`, PV, Tarife, Hausprofil). Aufgelöste Werte (kWp, Kapazität, Vergütung) sind **read-only**; gespeichert werden nur IDs in `runtime_settings` — nicht in `backtesting_scenarios.json`.
 
 ## Weiterführend
 

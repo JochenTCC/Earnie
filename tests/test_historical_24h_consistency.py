@@ -83,7 +83,7 @@ def prices_df(historical_cons_data) -> pd.DataFrame:
 
 @pytest.fixture(scope="module")
 def scenario_params() -> dict:
-    return dict(config.CONFIG._raw_config["runtime_settings"])
+    return dict(config.get_resolved_runtime_settings())
 
 
 @requires_historical_data

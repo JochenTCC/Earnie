@@ -31,6 +31,7 @@ ernie-verify-loxone = "scripts.verify_loxone_setup:main"
 ernie-bootstrap = "scripts.bootstrap_runtime:main"
 ernie-build-image = "scripts.build_container:main"
 ernie-generate-cons-data = "scripts.generate_cons_data:main"
+ernie-migrate-runtime = "scripts.migrate_runtime_entities:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "version.__version__" }

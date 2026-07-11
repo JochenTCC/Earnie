@@ -53,9 +53,13 @@ def test_dynamic_mode_requires_epex():
 
 
 def test_feed_in_settings_from_dict_requires_fee_for_dynamic():
-    runtime = {"k_push_cent": 3.7, "feed_in_mode": "dynamic_epex"}
+    runtime = {
+        "k_push_cent": 3.7,
+        "feed_in_mode": "dynamic_epex",
+        "_export_tariff_spec": {"type": "dynamic_epex"},
+    }
     with pytest.raises(ValueError, match="feed_in_fee_factor"):
-        feed_in_settings_from_dict(runtime, {})
+        feed_in_settings_from_dict(runtime)
 
 
 def test_enrich_matrix_feed_in_prices():

@@ -2,7 +2,10 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import config
+
+from runtime_store.config_load import load_config_or_exit
+
+config = load_config_or_exit()
 from integrations import loxone_log_import
 
 # Streamlit Seitenkonfiguration

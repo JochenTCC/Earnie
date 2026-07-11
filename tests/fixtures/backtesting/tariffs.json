@@ -5,6 +5,7 @@
             "id": "awattar_at",
             "label": "aWATTar Österreich",
             "type": "awattar",
+            "land": "AT",
             "fix_aufschlag_cent": 1.5,
             "netzverlust_faktor": 1.03,
             "mwst_austria_faktor": 1.2

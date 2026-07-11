@@ -2,7 +2,9 @@
 
 ## Bezugspreis (Live)
 
-`main.py` und die App laden Stundenpreise von der aWATTar-API (`awattar.url`). Daraus wird der **Bezugspreis in Cent/kWh** berechnet:
+Live-Optimierung löst `runtime_settings.import_tariff_id` gegen [`config/tariffs.json`](../../config/tariffs.json) auf. Bei Typ `awattar` gelten die Aufschläge **am Tarif-Eintrag** (`fix_aufschlag_cent`, `netzverlust_faktor`, `mwst_austria_faktor`).
+
+Stundenpreise kommen von der aWATTar-API; die URL wird aus `import_tariff_id` → `land` abgeleitet (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
 
 ```
 Marktpreis (API)
@@ -11,20 +13,17 @@ Marktpreis (API)
   × mwst_austria_faktor   (falls konfiguriert)
 ```
 
-| Feld in `awattar` | Bedeutung |
+| Feld (Tarif `awattar` in tariffs.json) | Bedeutung |
 |-------------------|-----------|
-| `url` | API-Endpunkt (Standard Österreich) |
 | `fix_aufschlag_cent` | Fixer Aufschlag Netz/Gebühren in Cent/kWh |
 | `netzverlust_faktor` | Multiplikator für Netzverluste (z. B. 1.03) |
 | `mwst_austria_faktor` | USt-Faktor (z. B. 1.2 für 20 %) |
 
-**Live-Prod:** unverändert bis Version **1.25** (`integrations/awattar_client.py`, `data/profile_manager.py`).
+## Einspeisevergütung (Live)
 
-## Einspeisevergütung
+Live-Optimierung löst `runtime_settings.export_tariff_id` auf. Bei Typ `fixed` kommt `k_push_cent` aus dem Tarif-Eintrag in `tariffs.json`. In der UI (Seite **Konfiguration**) ist die aufgelöste Vergütung read-only; geändert wird die Tarif-Referenz, nicht mehr ein flaches `k_push_cent` in `runtime_settings`.
 
-Steht in `runtime_settings.k_push_cent` (Cent/kWh). Wird bei Einspeisung ins Netz als Erlös angesetzt — in der Sidebar als „Einspeisevergütung“ editierbar.
-
-**Hinweis:** Vergütung kann sich ändern (z. B. monatlich). Wert in `config.json` bzw. Sidebar aktuell halten.
+**Hinweis:** Vergütung kann sich ändern (z. B. monatlich). Tarif in `tariffs.json` bzw. gewählte `export_tariff_id` aktuell halten.
 
 ## Planung & Backtesting (ab 1.24.f)
 
@@ -34,7 +33,7 @@ Tarife liegen in [`config/tariffs.json`](../../config/tariffs.json) mit Root-Fel
 
 | Typ | Bedeutung |
 |-----|-----------|
-| `awattar` | Legacy AT: Aufschläge aus `config.json` → `awattar` |
+| `awattar` | Aufschläge am Tarif-Eintrag in `tariffs.json`; API-URL aus `land` |
 | `fixed_cent` | Fixer Arbeitspreis (`fix_cent_kwh`) |
 | `spot_hourly` | EPEX × (1 + `markup_percent`%) + `settlement_fee_cent_kwh` (+ optional `netzentgelt_cent_kwh` für DE) |
 | `ex_post_spot` | Wie Spot; Kennzeichnung ex-post-Abrechnung |
@@ -45,7 +44,7 @@ Tarife liegen in [`config/tariffs.json`](../../config/tariffs.json) mit Root-Fel
 | Typ | Bedeutung |
 |-----|-----------|
 | `fixed` | Konstante Vergütung (`k_push_cent`) |
-| `dynamic_epex` | Legacy: EPEX − fee_factor × \|EPEX\| + fix_cent aus `awattar` |
+| `dynamic_epex` | EPEX − `feed_in_fee_factor` × \|EPEX\| + `feed_in_fix_cent` aus Export-Tarif |
 | `spot_hourly` / `ex_post_spot` | EPEX − `settlement_fee_cent_kwh` |
 | `monthly_table` | Monatliche Fixwerte (`monthly_rates`) |
 | `monthly_float` | OeMAG-Referenzkurve skaliert mit `arbeitspreis_kwh_cent` (siehe unten) |
@@ -88,4 +87,4 @@ Für **Backtesting** (und geplante Dev-Nachrechnung): `file_paths_battery_simula
 
 ### Monatliche Fixtarife (Backtesting)
 
-In `config/backtesting_scenarios.json` kann `fixed_monthly_feed_in_rates` die aWATTar-SUNNY-Fixwerte pro Monat enthalten. Alternativ Export-Tarif-Typ `monthly_table` in `tariffs.json`. Bei Szenarien mit `feed_in_mode: "fixed"` nutzt das Backtesting diese Tabelle statt des konstanten `k_push_cent` aus dem Szenario. **Sunset-2-Sunset** (Produktiv) verwendet weiterhin `runtime_settings.k_push_cent`.
+In `config/backtesting_scenarios.json` kann `fixed_monthly_feed_in_rates` die aWATTar-SUNNY-Fixwerte pro Monat enthalten. Alternativ Export-Tarif-Typ `monthly_table` in `tariffs.json`. **Sunset-2-Sunset** (Produktiv) nutzt die aufgelöste Export-Tarif-Referenz aus `runtime_settings.export_tariff_id`.

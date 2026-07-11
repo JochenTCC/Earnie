@@ -224,10 +224,7 @@ def resolve_backtesting_slot_prices(
     return resolved
 
 
-def pricing_kwargs_from_resolved(
-    resolved: dict | None,
-    raw_config: dict | None = None,
-) -> dict:
+def pricing_kwargs_from_resolved(resolved: dict | None) -> dict:
     """Import-Tarif-Kwargs aus aufgelöstem Runtime-Szenario (Live + Backtesting)."""
     if not resolved:
         return {}
@@ -238,8 +235,6 @@ def pricing_kwargs_from_resolved(
     override = resolved.get("netzentgelt_cent_kwh")
     if override is not None:
         kwargs["netzentgelt_override"] = float(override)
-    if raw_config is not None:
-        kwargs["legacy_awattar"] = dict(raw_config.get("awattar", {}))
     return kwargs
 
 
@@ -249,7 +244,6 @@ def import_brutto_cent_for_slots(
     *,
     import_tariff_spec: dict | None = None,
     netzentgelt_override: float | None = None,
-    legacy_awattar: dict | None = None,
 ) -> list[float]:
     """EPEX Cent/kWh → Bezugspreis je Slot (Tarif-Spec oder Legacy-Brutto)."""
     from data.tariff_pricing import import_cent_kwh
@@ -263,7 +257,6 @@ def import_brutto_cent_for_slots(
                 float(p),
                 import_tariff_spec,
                 netzentgelt_override=netzentgelt_override,
-                legacy_awattar=legacy_awattar,
                 slot_datetime=slot,
             )
             for p, slot in zip(epex_values, slot_datetimes)
@@ -273,7 +266,6 @@ def import_brutto_cent_for_slots(
             float(p),
             import_tariff_spec,
             netzentgelt_override=netzentgelt_override,
-            legacy_awattar=legacy_awattar,
         )
         for p in epex_values
     ]
@@ -285,7 +277,6 @@ def enrich_slots_import_prices(
     *,
     import_tariff_spec: dict | None = None,
     netzentgelt_override: float | None = None,
-    legacy_awattar: dict | None = None,
 ) -> None:
     """Setzt k_act in resolve_market_slots-Ergebnissen aus Tarif-Spec."""
     epex_values = [float(slot["price_buy"]) for slot in slots]
@@ -294,7 +285,6 @@ def enrich_slots_import_prices(
         slot_datetimes,
         import_tariff_spec=import_tariff_spec,
         netzentgelt_override=netzentgelt_override,
-        legacy_awattar=legacy_awattar,
     )
     for slot, price in zip(slots, brutto):
         slot["k_act"] = price
@@ -308,7 +298,6 @@ def matrix_prices_from_context(
     planning_moment: datetime | None = None,
     import_tariff_spec: dict | None = None,
     netzentgelt_override: float | None = None,
-    legacy_awattar: dict | None = None,
 ) -> tuple[list[float], list[float], list[str]]:
     """EPEX- und Brutto-Preise je Slot; bei ctx=None Perfect-Foresight aus CSV."""
 
@@ -318,7 +307,6 @@ def matrix_prices_from_context(
             slot_datetimes,
             import_tariff_spec=import_tariff_spec,
             netzentgelt_override=netzentgelt_override,
-            legacy_awattar=legacy_awattar,
         )
 
     if ctx is None:

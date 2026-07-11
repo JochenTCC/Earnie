@@ -15,7 +15,9 @@ from typing import Iterable
 
 import pandas as pd
 
-import config
+from runtime_store.config_load import load_config_or_exit
+
+config = load_config_or_exit()
 from data import cons_data_store
 from data.cons_data_house_profile import (
     build_synthetic_dataframe_from_house_profile,
