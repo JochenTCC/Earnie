@@ -25,11 +25,13 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - Fix: `expected_cons_data_consumer_ids()` uses raw `config.json` IDs or full house-profile set (not `_planning_flex_consumers` merge); meta `consumer_ids` aligned on save
   - **Verify:** greenfield Scenario-Exploration → generate cons_data → success, no ID warning
 
-- [ ] **Greenfield: Loxone credential sidebar disappears before credentials saved** (greenfield smoke 2026-07-11)
-  - Fix: `loxone_setup_deferred()` until credentials saved or Betrieb unlocked; sidebar expander always rendered while deferred; expanded until saved
-  - **Verify:** navigate Hauskonfigurator ↔ Scenario-Exploration before `.env` save → expander persists
-
 ## New Bugs (Do not remove this chapter — even if empty)
+
+- [ ] **Greenfield: Loxone credential sidebar disappears before credentials saved** (greenfield smoke 2026-07-11; **re-opened 2026-07-12**)
+  - Prior fix insufficient: `loxone_setup_deferred()` + sidebar expander in `ui/setup_progress.py` — verification **failed** (expander still missing on navigation before `.env` save)
+  - **Reproduce:** greenfield — planning complete, Scenario-Exploration unlocked, no Loxone credentials saved → navigate Hauskonfigurator ↔ Scenario-Exploration → expander **"Loxone-Zugang (Live / Silent-Modus)"** must persist
+  - **Investigate:** `runtime_store/dotenv_io.py` (`loxone_setup_deferred`), `ui/setup_readiness.py` (planning unlock path), `app.py` → `render_setup_progress_notice()`
+  - **Acceptance:** expander visible on all relevant pages until credentials saved; regression test; then → *Bugfix Verifications Pending*
 
 
 ## EV: urgent rule, prod dump, PWM
