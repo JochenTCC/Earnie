@@ -1,20 +1,20 @@
 # PV & Batterie (Live-Szenario)
 
-Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation). Konfiguration über Entitäts-Referenzen im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`); technische Werte liegen in `batteries[]` und `pv_systems[]`.
+Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation). Konfiguration über Entitäts-Referenzen im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`); technische Werte liegen in **`config/components.json`** (`batteries[]`, `pv_systems[]`).
 
 | Parameter | Einheit | Quelle | Bedeutung |
 |-----------|---------|--------|-----------|
-| `kwp` | kWp | `pv_systems[]` | Installierte PV-Leistung (aufgelöst als `pv_kwp`) |
-| `pv_tilt` | ° | `pv_systems[]` | Dachneigung |
-| `pv_azimuth` | ° | `pv_systems[]` | Ausrichtung: `0` = Süd, `-90` = Ost, `90` = West |
+| `kwp` | kWp | `components.json` → `pv_systems[]` | Installierte PV-Leistung (aufgelöst als `pv_kwp`) |
+| `pv_tilt` | ° | `components.json` → `pv_systems[]` | Dachneigung |
+| `pv_azimuth` | ° | `components.json` → `pv_systems[]` | Ausrichtung: `0` = Süd, `-90` = Ost, `90` = West |
 | `latitude`, `longitude` | ° | `house_profiles.json` (via Szenario) | Standort für PV-Prognose (Forecast.Solar) |
 | `k_push_cent` | Cent/kWh | `tariffs.json` (Export-Tarif) | **Einspeisevergütung** |
-| `battery_capacity_kwh` | kWh | `batteries[]` | Nutzbare Speicherkapazität |
-| `battery_max_power_kw` | kW | `batteries[]` | Max. Lade- und Entladeleistung |
-| `battery_efficiency` | 0–1 | `batteries[]` | Roundtrip-Wirkungsgrad (Laden/Entladen) |
-| `battery_min_soc` | % | `batteries[]` | Untere SOC-Grenze (Schutz) |
-| `battery_max_soc` | % | `batteries[]` | Obere SOC-Grenze |
-| `threshold_power` | Anteil | `batteries[]` | Relativ zu `battery_max_power_kw` (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
+| `battery_capacity_kwh` | kWh | `components.json` → `batteries[]` | Nutzbare Speicherkapazität |
+| `battery_max_power_kw` | kW | `components.json` → `batteries[]` | Max. Lade- und Entladeleistung |
+| `battery_efficiency` | 0–1 | `components.json` → `batteries[]` | Roundtrip-Wirkungsgrad (Laden/Entladen) |
+| `battery_min_soc` | % | `components.json` → `batteries[]` | Untere SOC-Grenze (Schutz) |
+| `battery_max_soc` | % | `components.json` → `batteries[]` | Obere SOC-Grenze |
+| `threshold_power` | Anteil | `components.json` → `batteries[]` | Relativ zu `battery_max_power_kw` (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
 | `timezone_name` | — | `house_profiles.json` | IANA-Zeitzone für astronomische Sonnenzeiten (z. B. `Europe/Vienna`); siehe `planning_horizon` |
 
 ## End-SOC (MILP)
@@ -27,7 +27,7 @@ Es gibt **keinen** Config-Parameter mehr für die End-SOC-Randbedingung (früher
 | **Backtesting** (`--horizon-mode fixed_24h`) | End-SOC = **Anker-SOC** des Schritts (`initial_soc`; intern `terminal_soc_percent`) |
 | **Backtesting** (`--horizon-mode sunrise_window`) | Wie Live: SOC_min am Sonnenaufgang |
 
-Zusätzlich kann **`battery_wear`** niedrigere End-SOCs wirtschaftlich bestrafen (weicher Anreiz, unabhängig vom Modus). Der Block liegt am **`batteries[]`-Eintrag**, nicht mehr global in `config.json`.
+Zusätzlich kann **`battery_wear`** niedrigere End-SOCs wirtschaftlich bestrafen (weicher Anreiz, unabhängig vom Modus). Der Block liegt am **`components.json` → `batteries[]`-Eintrag**, nicht mehr global in `config.json`.
 
 Block `planning_horizon` in `config.json`:
 

@@ -22,7 +22,7 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`co
 | `ui` | Streamlit-Port, Refresh-Intervalle, optionale Dev-Seiten |
 | `loxone_blocks` | Zentrale Loxone-IO-Namen (Speicher, PV, Steuerung) |
 | `live_scenario_id` | ID des **Live-Szenarios** in `backtesting_scenarios.json` (Standard: `live`) |
-| `batteries[]` / `pv_systems[]` | Technische Parameter für Speicher und PV (referenziert über IDs) |
+| `config/components.json` | Technische Parameter für Speicher und PV (`batteries[]`, `pv_systems[]`; referenziert über IDs) |
 | `config/tariffs.json` | Tarif-Katalog (Bezug/Einspeise); referenziert über `import_tariff_id` / `export_tariff_id` |
 | `config/house_profiles.json` | Standort (Geo/Zeitzone) und Planungs-Verbraucher; referenziert über `house_profile_id` |
 | `config/backtesting_scenarios.json` | **Alle** Szenarien (Live + Varianten); einheitliches `settings`-Format |
@@ -61,7 +61,7 @@ Details zu Preisen: [Preise & aWATTar](preise.md).
 
 Nach Minimal-Bootstrap (`flexible_consumers` leer) gilt diese Reihenfolge:
 
-1. **Hauskonfigurator** — Hausprofil mit Verbrauchern, optional Jahres-CSV zum Abgleich (`total_profile_csv`), PV-Entitäten in `config.json` → `pv_systems[]`, Profile in `config/house_profiles.json`.
+1. **Hauskonfigurator** — Hausprofil mit Verbrauchern, optional Jahres-CSV zum Abgleich (`total_profile_csv`), PV-Entitäten in `config/components.json` → `pv_systems[]`, Profile in `config/house_profiles.json`.
 2. **Szenarieneditor** — Live-Szenario (Pflicht): Entitäts-Referenzen in `backtesting_scenarios.json`; Auswahl über `live_scenario_id` in `config.json`. Optionale weitere Szenarien in derselben Datei.
 3. **Scenario-Exploration** — Lauf aus der UI oder `python -m scripts.run_backtesting`; Ergebnisse in `runtime/backtesting_log.json`. Der Log enthält einen `config_fingerprint` zum Abgleich mit der aktuellen Konfiguration.
 

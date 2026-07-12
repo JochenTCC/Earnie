@@ -1,12 +1,28 @@
 # Earnie
 
 Python-basierte Energieoptimierung für Smarthome (Batterie, PV, flexible Verbraucher) mit Streamlit-UI und Produktiv-Daemon (`main.py`).
-
 GitHub-Repository: [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie) (früher `Energy-Optimizer`).
+
+!Kapitel einführen zur Funktionalität von Earnie in knappen Stichworten
 
 ## Anwender-Dokumentation
 
 Einrichtung, Konfiguration, Streamlit-Oberfläche und Loxone-Schnittstelle: **[docs/README.md](docs/README.md)**
+
+!User-Dokumente Struktur einfügen (ähnlich zu Projektstruktur)
+
+!Kapitel zu Installationsmöglichkeiten einfügen bzw. Verweis zu vorhandener Doku
+
+!Stark zusammengefasste Roadmap aus Backlog.md erstellen und einfügen
+
+
+## Lizenz
+
+Die Software ist **Source-Available** und auf **private, nicht-kommerzielle Nutzung** beschränkt. Vollständige Bedingungen: **[LICENSE.md](LICENSE.md)**.
+
+
+
+!Technische Dokumentation in separates Dokument (alles unterhalb dieser Zeile)
 
 ## Projektstruktur
 
@@ -29,7 +45,10 @@ Earnie/
 └── runtime/                 # Laufzeitdaten (CSV, JSON, Logs — gitignored)
 ```
 
+
+
 ## Lokale Entwicklung
+! Gegen Todo in Backlog.md prüfen bzgl. Deploy ohne Container
 
 ```powershell
 python -m venv .venv
@@ -40,13 +59,15 @@ python main.py
 python -m scripts.run_streamlit
 ```
 
-Kanonische Metadaten und Abhängigkeiten: **`pyproject.toml`** (`version.py` = Versionsquelle).
+Kanonische Metadaten und Abhängigkeiten: `pyproject.toml` (`version.py` = Versionsquelle).
 
 CLI nach `pip install -e .` (optional): `earnie-bootstrap`, `earnie-build-image`, `earnie-verify-loxone`, … (Legacy-Aliase: `ernie-*`).
 
 Legacy: `config.json` im Projektroot wird weiterhin unterstützt, wenn `config/config.json` fehlt.
 
 ## Container (Synology / LoxBerry / Docker)
+
+
 
 ### Image bauen (kanonisch)
 
@@ -79,11 +100,15 @@ docker compose build
 docker compose up -d
 ```
 
+
+
 ### Produktion (Synology)
 
 1. Multi-Arch-Image bauen und pushen: `python -m scripts.build_container --target all --push`
 2. Auf der NAS nur `docker-compose-synology.yml`, `config/`, `runtime/` bereitstellen
 3. `docker compose -f docker-compose-synology.yml pull && docker compose -f docker-compose-synology.yml up -d`
+
+
 
 ### Produktion (LoxBerry, RPi 4B)
 
@@ -91,18 +116,7 @@ docker compose up -d
 2. Auf dem LoxBerry nur `docker-compose-loxberry.yml`, `config/`, `runtime/` bereitstellen
 3. `docker compose -f docker-compose-loxberry.yml pull && docker compose -f docker-compose-loxberry.yml up -d`
 4. UI im LAN: `http://<loxberry-ip>:8501`
-
-### Go/No-Go LoxBerry
-
-**Go:** LoxBerry 4, Docker-Plugin, RPi 4B 64-bit, mind. 4 GB RAM, SSD empfohlen.
-
-**Risiko:** MILP-Läufe sind auf dem Pi langsamer als auf einem x86-NAS — vor Produktivbetrieb `runtime/earnie.log` prüfen.
-
-**No-Go:** 32-bit-Image, unter 2 GB RAM, Erwartung identischer MILP-Performance wie auf der Synology.
-
-Persistente Daten liegen in `./config/` (inkl. `config/.env`) und `./runtime/` — sie werden **nicht** vom Image überschrieben. Beim ersten Start legt der Entrypoint fehlende Dateien an.
-
-Details: **[docs/einrichtung/container.md](docs/einrichtung/container.md)**
+5. 
 
 ## Hinweise
 
@@ -110,6 +124,5 @@ Details: **[docs/einrichtung/container.md](docs/einrichtung/container.md)**
 - Laufzeitdaten liegen unter `runtime/` (`EARNIE_RUNTIME_DIR`, Legacy: `ENERGY_OPTIMIZER_RUNTIME_DIR`).
 - Config-Pfad überschreibbar mit `EARNIE_CONFIG_PATH` (Legacy: `ENERGY_OPTIMIZER_CONFIG_PATH`).
 
-## Lizenz
 
-Die Software ist **Source-Available** und auf **private, nicht-kommerzielle Nutzung** beschränkt. Vollständige Bedingungen: **[LICENSE.md](LICENSE.md)**.
+
