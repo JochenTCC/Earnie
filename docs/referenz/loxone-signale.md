@@ -27,14 +27,25 @@ Prüfung aller konfigurierten Signale:
 
 ## Flexible Verbraucher — pro Eintrag in `flexible_consumers[]`
 
-### Gemeinsame Signale
+### Gemeinsame Signale (SwimSpa, Wärmepumpe, Filter)
 
 | Config-Pfad | Richtung | Beispiel | Wert |
 |-------------|----------|----------|------|
 | `loxone_inputs.power_name` | Lesen | `Merkername SwimSpa kW` | kW oder 0/1 (siehe `signal_type`) |
 | `loxone_outputs.enable_name` | Schreiben | `Ernie_SwimSpa_Freigabe` | `0` gesperrt, `1` Freigabe |
 
-### E-Auto — zusätzlich unter `charging_schedule.loxone`
+### E-Auto — Schreiben unter `loxone_outputs`
+
+E-Auto nutzt **kein** `enable_name`, sondern Leistungs-Sollwert und PV-Follow-Flag:
+
+| Config-Schlüssel | Richtung | Beispiel | Wert |
+|------------------|----------|----------|------|
+| `power_setpoint_name` | Schreiben | `Ernie_EAuto_Ziel_kW` | Ziel-Ladeleistung, kW |
+| `pv_follow_name` | Schreiben | `Ernie_EAuto_pv_follow` | `0`/`1` — PV-Überschuss bevorzugen |
+
+Zusätzlich Pflichtfeld **`min_power_kw`** am Verbraucher (untere Grenze für den Sollwert).
+
+### E-Auto — Lesen unter `charging_schedule.loxone`
 
 | Config-Schlüssel | Richtung | Beispiel | Wert |
 |------------------|----------|----------|------|
@@ -45,8 +56,6 @@ Prüfung aller konfigurierten Signale:
 | `battery_capacity_kwh_name` | Lesen | `Batteriekapazität_E-Auto` | Akkukapazität, kWh (einzige Quelle für SOC→kWh) |
 | `charge_immediate_name` | Lesen | `E-Auto_SOFORT_LADEN` | `1` = Sofort-Laden (Volllast in Loxone; Earnie plant fixen Verbrauch, keine Lade-Sollwerte) |
 | `charge_immediate_remaining_name` | Lesen | `Ernie_Restzeit_Sofortladen` | Verbleibende Sofort-Ladezeit in **Sekunden** (Loxone-Countdown; `0` = abgeschlossen) |
-
-Die E-Auto-Freigabe zum Laden liegt bei `loxone_outputs.enable_name` (z. B. `Ernie_EAuto_LadeFreigabe`).
 
 ### SwimSpa-Filter — zusätzlich (`swimspa_filter`)
 
@@ -79,13 +88,12 @@ Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden)
 
 ## Beispiel-Mapping aus `config/config.example.json`
 
-| Verbraucher (`id`) | Freigabe (Schreiben) | Leistung (Lesen) |
+| Verbraucher (`id`) | Steuerung (Schreiben) | Leistung (Lesen) |
 |--------------------|----------------------|------------------|
-| `swimspa` | `Ernie_SwimSpa_Freigabe` | `Ernie_Swim-Spa-P_act` (Gesamt inkl. Filter) |
-| `swimspa_filter` | `Ernie_Swimspa_Filter_Freigabe` | `homie_bwa_spa_filter2` (binär) |
-| `eauto` | `Ernie_EAuto_LadeFreigabe` | `Ernie_EAuto_P_act` |
-
-Weitere Verbraucher (z. B. Wärmepumpe) nach demselben Muster in `flexible_consumers` ergänzen.
+| `swimspa` | `Ernie_SwimSpa_Freigabe` (0/1) | `Ernie_Swim-Spa-P_act` (Gesamt inkl. Filter) |
+| `swimspa_filter` | `Ernie_Swimspa_Filter_Freigabe` (0/1) | `homie_bwa_spa_filter2` (binär) |
+| `eauto` | `Ernie_EAuto_Ziel_kW` + `Ernie_EAuto_pv_follow` | `Ernie_EAuto_P_act` |
+| `waermepumpe` | `Ernie_WP_Freigabe` (0/1) | `Ernie_WP_P_act` |
 
 **Hinweis SwimSpa (Fall B):** `Ernie_Swim-Spa-P_act` misst Heizung **und** Filter am selben Zähler. Über `swimspa.loxone_inputs.subtract_consumer_ids: ["swimspa_filter"]` wird der Filter-Anteil vom Heizungs-Ist abgezogen (kein Doppelzählen in `flex_sum_kw`/`baseload_kw`).
 
@@ -97,6 +105,6 @@ Weitere Verbraucher (z. B. Wärmepumpe) nach demselben Muster in `flexible_consu
 | Optimierung | MILP über 24 h (15-Min-Slots intern) |
 | Schreiben | Ziel-SOC, Lade-/Entladeleistung, Steuerbefehl, Freigaben je Slot |
 
-Die App **liest** dieselben Live-Werte für Anzeige; **schreibt** keine Steuersignale (außer indirekt über Sidebar-Änderungen an `config.json`).
+Die App **liest** dieselben Live-Werte für Anzeige; **schreibt** keine Steuersignale. Konfigurationsänderungen erfolgen über die Planungs- und Echtzeit-Seiten (Hauskonfigurator, Live-Konfiguration, Manuelle Geräte).
 
 Weitere Details: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md).

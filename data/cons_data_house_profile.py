@@ -26,15 +26,35 @@ def resolve_runtime_house_profile() -> dict | None:
     return None
 
 
+def _configured_flexible_consumer_ids() -> list[str]:
+    """IDs aus config.json — ohne Planungs-Merge (_planning_flex_consumers)."""
+    raw = config.CONFIG._raw_config.get("flexible_consumers", [])
+    return [
+        str(entry["id"])
+        for entry in raw
+        if isinstance(entry, dict) and entry.get("id")
+    ]
+
+
+def _house_profile_consumer_ids(profile: dict) -> list[str]:
+    """Alle modellierten Verbraucher-IDs — identisch zur Synthese."""
+    from data.consumption_profiles import _consumer_id
+
+    return [
+        _consumer_id(consumer, index)
+        for index, consumer in enumerate(profile.get("consumers", []))
+    ]
+
+
 def expected_cons_data_consumer_ids() -> list[str]:
     """Verbraucher-IDs für cons_data: config.flexible_consumers oder Hausprofil."""
-    flex_ids = [c["id"] for c in config.get_flexible_consumers()]
+    flex_ids = _configured_flexible_consumer_ids()
     if flex_ids:
         return flex_ids
     profile = resolve_runtime_house_profile()
     if not profile:
         return []
-    return [str(c["id"]) for c in profile.get("consumers", []) if c.get("id")]
+    return _house_profile_consumer_ids(profile)
 
 
 def consumer_labels_for_ids(consumer_ids: list[str]) -> dict[str, str]:

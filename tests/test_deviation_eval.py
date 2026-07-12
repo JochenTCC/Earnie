@@ -279,6 +279,37 @@ class TestSwimspaFilterRules:
         assert events == []
 
 
+class TestRuleLevelTolerance:
+    def test_rule_power_kw_overrides_global(self, rules_doc):
+        rules_doc = dict(rules_doc)
+        rules_doc["tolerances"] = {"power_kw": 0.05}
+        rules_doc["rules"] = [
+            {
+                "id": "eauto_custom_tol",
+                "enabled": True,
+                "category": "error",
+                "priority": 50,
+                "scope": "eauto",
+                "when": ["power_mismatch_positive", "plugged_in"],
+                "params": {"power_kw": 0.5},
+                "message": "E-Auto: Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW",
+            }
+        ]
+        entry = _entry(
+            consumer_powers_kw={"eauto": 2.5},
+            consumption_snapshot={"flex_kw": {"eauto": 2.0}, "battery_kw": 0.0},
+            charging_contexts={"eauto": {"plugged_in": True}},
+        )
+        facts = build_slot_deviation_facts(entry)
+        events = evaluate_slot_deviations(facts, rules_doc)
+        assert events == []
+
+        rules_doc["rules"][0]["params"] = {"power_kw": 0.1}
+        events = evaluate_slot_deviations(facts, rules_doc)
+        assert len(events) == 1
+        assert events[0].rule_id == "eauto_custom_tol"
+
+
 class TestPredicateErrors:
     def test_unknown_predicate_raises(self, rules_doc):
         rules_doc = dict(rules_doc)

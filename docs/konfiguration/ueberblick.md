@@ -17,6 +17,9 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`co
 | Block | Zweck |
 |-------|--------|
 | `system` | Timeouts für HTTP und Optimierungs-Schleife |
+| `market_prices` | Strategie für fehlende Zukunftspreise (`forecast` / `mirror`) — siehe [Preise](preise.md) |
+| `eauto_milp` | Feintuning E-Auto-MILP (Root-Block) |
+| `ui` | Streamlit-Port, Refresh-Intervalle, optionale Dev-Seiten |
 | `loxone_blocks` | Zentrale Loxone-IO-Namen (Speicher, PV, Steuerung) |
 | `live_scenario_id` | ID des **Live-Szenarios** in `backtesting_scenarios.json` (Standard: `live`) |
 | `batteries[]` / `pv_systems[]` | Technische Parameter für Speicher und PV (referenziert über IDs) |
@@ -25,6 +28,8 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`co
 | `config/backtesting_scenarios.json` | **Alle** Szenarien (Live + Varianten); einheitliches `settings`-Format |
 | `file_paths_battery_simulation` | Pfade zu historischen CSVs, Preisquelle, `cons_data_hourly.csv` |
 | `flexible_consumers` | Steuerbare Verbraucher (MILP) mit Loxone-Ein-/Ausgängen |
+| `appliances` | Manuelle Geräte (Waschmaschine etc.) — siehe [Flexible Verbraucher](flexible-verbraucher.md) |
+| `planning_horizon` | MILP-Horizont (`sunrise_window` für Live) |
 
 Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../config/backtesting_scenarios.example.json).
 
@@ -58,7 +63,7 @@ Nach Minimal-Bootstrap (`flexible_consumers` leer) gilt diese Reihenfolge:
 
 1. **Hauskonfigurator** — Hausprofil mit Verbrauchern, optional Jahres-CSV zum Abgleich (`total_profile_csv`), PV-Entitäten in `config.json` → `pv_systems[]`, Profile in `config/house_profiles.json`.
 2. **Szenarieneditor** — Live-Szenario (Pflicht): Entitäts-Referenzen in `backtesting_scenarios.json`; Auswahl über `live_scenario_id` in `config.json`. Optionale weitere Szenarien in derselben Datei.
-3. **Scenario-Exploration** — Lauf aus der UI oder `python -m scripts.run_backtesting`; Ergebnisse in `backtesting_log.json`. Der Log enthält einen `config_fingerprint` zum Abgleich mit der aktuellen Konfiguration.
+3. **Scenario-Exploration** — Lauf aus der UI oder `python -m scripts.run_backtesting`; Ergebnisse in `runtime/backtesting_log.json`. Der Log enthält einen `config_fingerprint` zum Abgleich mit der aktuellen Konfiguration.
 
 Tarif-Katalog: manuell in `config/tariffs.json` (kein UI-Editor).
 
@@ -72,7 +77,13 @@ Bestehende Produktiv-Configs mit flachem Block `runtime_settings` in `config.jso
 python -m scripts.migrate_runtime_entities --input config/config.json --output-dir migrated/
 ```
 
-**Schritt 2 — 2.0 P6 (Live-Szenario):** Entitäts-IDs aus `runtime_settings` → Szenario `live` in `backtesting_scenarios.json`; `live_scenario_id` in `config.json`; Entfernen von `runtime_settings`, global `awattar`, global `battery_wear`. Automatisiert in [`house_config/migrate_runtime_entities.py`](../../house_config/migrate_runtime_entities.py) (`finalize_migration_for_2_0`) und im Setup-Skript unten.
+**Schritt 2 — 2.0 P6 (Live-Szenario):** Entitäts-IDs aus `runtime_settings` → Szenario `live` in `backtesting_scenarios.json`; `live_scenario_id` in `config.json`; Entfernen von `runtime_settings`, global `awattar`, global `battery_wear`. Die Funktion `finalize_migration_for_2_0` in [`house_config/migrate_runtime_entities.py`](../../house_config/migrate_runtime_entities.py) wird **nur** über das Setup-Skript aufgerufen — kein eigenständiges CLI:
+
+```powershell
+python -m scripts.setup_silent_migration_test --nas-config "\\…\config.json" --force
+```
+
+Alternativ: P5-Migration ausführen und P6-Schritte manuell nach [`silent-migration-test.md`](../einrichtung/silent-migration-test.md) durchführen.
 
 Globaler `battery_wear` wird in den gewählten `batteries[]`-Eintrag übernommen; aWATTar-Aufschläge in den passenden Tarif in `tariffs.json`. Geo/Zeitzone wandern ins referenzierte Hausprofil.
 
@@ -86,9 +97,9 @@ python -m scripts.setup_silent_migration_test `
 
 Vollständige Anleitung: [Silent Migration Test Stack](../einrichtung/silent-migration-test.md).
 
-## Seite Konfiguration
+## Seite Live-Konfiguration
 
-Im Modus **Sunset-2-Sunset** wählt die Seite **Konfiguration** (Komfort-Ansicht Live-Szenario) Entitäten per Dropdown (`battery_id`, PV, Tarife, Hausprofil). Aufgelöste Werte (kWp, Kapazität, Vergütung) sind **read-only**; gespeichert werden nur IDs im Live-Szenario in `backtesting_scenarios.json`.
+Im Abschnitt **Echtzeit-Umgebung** wählt die Seite **Live-Konfiguration** (Komfort-Ansicht Live-Szenario) Entitäten per Dropdown (`battery_id`, PV, Tarife, Hausprofil). Aufgelöste Werte (kWp, Kapazität, Vergütung) sind **read-only**; gespeichert werden nur IDs im Live-Szenario in `backtesting_scenarios.json`.
 
 ## Weiterführend
 

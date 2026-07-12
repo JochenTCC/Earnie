@@ -60,10 +60,29 @@ def test_require_loxone_credentials_for_prod_without_onboarding(tmp_path, monkey
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
+    monkeypatch.delenv("LOXONE_IP", raising=False)
+    monkeypatch.delenv("LOXONE_USER", raising=False)
+    monkeypatch.delenv("LOXONE_PASS", raising=False)
     (config_dir / "config.json").write_text(
         '{"flexible_consumers": [{"id": "swimspa"}]}',
         encoding="utf-8",
     )
+
+    assert dotenv_io.loxone_setup_deferred() is True
+    assert dotenv_io.require_loxone_credentials_for_config() is False
+
+
+def test_loxone_setup_not_deferred_when_betrieb_unlocked(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
+    (config_dir / "config.json").write_text(
+        '{"flexible_consumers": [{"id": "swimspa"}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("ui.setup_readiness._loxone_markers_complete", lambda: True)
 
     assert dotenv_io.loxone_setup_deferred() is False
     assert dotenv_io.require_loxone_credentials_for_config() is True

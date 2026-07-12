@@ -7,7 +7,7 @@
 | **Produktiv-Daemon** | `python main.py` | Liest Loxone, optimiert, schreibt Steuerwerte — läuft dauerhaft |
 | **Streamlit-App** | `python -m scripts.run_streamlit` | Cockpit, Simulation, Debugging — optional parallel |
 
-Nur `main.py` steuert die Anlage. Die App **simuliert** den 24-Stunden-Horizont und zeigt den letzten Produktiv-Durchlauf an; sie überschreibt keine Loxone-Ausgänge (außer Sidebar-Parameter, die in `config.json` geschrieben werden).
+Nur `main.py` steuert die Anlage. Die App **simuliert** den 24-Stunden-Horizont und zeigt den letzten Produktiv-Durchlauf an; sie überschreibt keine Loxone-Ausgänge. Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonfigurator, Live-Konfiguration, Manuelle Geräte), nicht über die Cockpit-Sidebar.
 
 ## Optimierungs-Takt
 
@@ -36,6 +36,9 @@ Standardverzeichnis: `runtime/` (überschreibbar mit `EARNIE_RUNTIME_DIR`, Legac
 | `optimizer_run_state.json` | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll) |
 | `optimization_history.jsonl` | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf) |
 | `live_optimization_debug.json` | Debug-Snapshot der App-Simulation (Sunset-2-Sunset) |
+| `local_settings.json` | Lokale Betriebseinstellungen (z. B. `loxone_silent_mode` für Migrations-Tests) |
+| `appliance_schedules.json` | Geplante Laufzeiten manueller Geräte |
+| `backtesting_log.json` | Ergebnis von Scenario-Exploration / `run_backtesting` |
 
 Die App liest diese Dateien **read-only** für Panels und Abgleich.
 
@@ -45,7 +48,7 @@ Die App liest diese Dateien **read-only** für Panels und Abgleich.
 |----------|---------|
 | `EARNIE_CONFIG_PATH` | Pfad zur `config.json` (Standard: `config/config.json`, Legacy: `config.json` im Root). Legacy-Alias: `ENERGY_OPTIMIZER_CONFIG_PATH`. |
 | `EARNIE_RUNTIME_DIR` | Anderes Verzeichnis für Laufzeitdaten |
-| `EARNIE_UI_MODES` | Kommagetrennt: `sunset2sunset`, `scenario_exploration` — schränkt sichtbare App-Modi ein (Prod: `sunset2sunset,scenario_exploration`; siehe [Betriebsmodi](../ui/betriebsmodi.md)) |
+| `EARNIE_UI_MODES` | Kommagetrennt: `sunset2sunset`, `scenario_exploration` — schränkt sichtbare Analyse-Seiten ein (Prod: `sunset2sunset,scenario_exploration`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
 | `EARNIE_UI_STREAMLIT_PORT` | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md)) |
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).

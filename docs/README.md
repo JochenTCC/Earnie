@@ -28,21 +28,25 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 - [Betrieb](einrichtung/betrieb.md) — `main.py` vs. App, Laufzeitdateien, Optimierungs-Takt
 - [Container](einrichtung/container.md) — Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, Migration, Config-Drift
 - [Greenfield Dev-Stack](einrichtung/greenfield-dev-stack.md) — lokale Ersteinrichtung (Port 8502) für Hauskonfigurator/Backtesting
+- [Silent Migration Test](einrichtung/silent-migration-test.md) — lokaler Migrations-Test vor NAS-Cutover (Port 8512)
 
 ### Konfiguration (`config/config.json`)
 
 - [Überblick](konfiguration/ueberblick.md) — Aufbau der Datei, Szenarien, Dateipfade
 - [PV & Batterie](konfiguration/batterie-pv.md) — Live-Szenario, Entitäts-Referenzen
-- [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe
-- [Preise & aWATTar](konfiguration/preise.md) — Bezugspreis, Einspeisevergütung, Steuern
+- [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
+- [Preise & aWATTar](konfiguration/preise.md) — Bezugspreis, Einspeisevergütung, Preis-Prognose
 
 ### Benutzeroberfläche (Streamlit)
 
-- [Betriebsmodi](ui/betriebsmodi.md) — Sunset-2-Sunset, Backtesting
+- [Betriebsmodi & Navigation](ui/betriebsmodi.md) — Seitenstruktur, Cockpit (Sunset-2-Sunset), Scenario-Exploration
 - [Charts & Panels](ui/charts.md) — Diagramme, Metriken, Sankey, Soll/Ist-Icons
-- [Spec Soll-Ist](spec/soll-ist-abweichung.md) — Regelwerk, Szenarien, Pflegehinweis (Entwickler)
 
 ### Referenz
 
-- [Streamlit-Ports](referenz/streamlit-ports.md) — Port pro Stack/Plattform (8501 Prod, 8502 Greenfield, 8503 lokal gegen NAS)
+- [Streamlit-Ports](referenz/streamlit-ports.md) — Port pro Stack/Plattform (8501 Prod, 8502 Greenfield, 8503 lokal gegen NAS, 8512 Silent Migration)
 - [Loxone-Signale](referenz/loxone-signale.md) — Tabelle aller Lesen-/Schreib-Signale
+
+### Entwickler-Specs (Englisch/technisch)
+
+- [Spec Soll-Ist](spec/soll-ist-abweichung.md) — Regelwerk, Szenarien, Pflegehinweis

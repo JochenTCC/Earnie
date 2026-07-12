@@ -48,9 +48,19 @@ def loxone_setup_deferred() -> bool:
     """
     if is_truthy("OFFLINE"):
         return False
-    from ui.setup_readiness import needs_planning_onboarding
+    if loxone_credentials_configured():
+        return False
+    from ui.setup_readiness import (
+        _loxone_markers_complete,
+        is_planning_ready,
+        needs_planning_onboarding,
+    )
 
-    return needs_planning_onboarding()
+    if needs_planning_onboarding():
+        return True
+    if is_planning_ready() and not _loxone_markers_complete():
+        return True
+    return False
 
 
 def needs_loxone_setup() -> bool:

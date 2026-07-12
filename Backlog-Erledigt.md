@@ -2,6 +2,22 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix EV urgent constraint removed (2026-07-12)
+
+- [x] **EV: urgent constraint removed** — MILP: separate `urgent >= target` constraint removed; deadline still enforced via `eligible` slots until completion time
+- [x] Observability retained (`role` post-hoc); ISO deadline parsing added
+- [x] Regression: `eauto_urgent_deferred_cheap_hours_2026-06-28`, new `eauto_urgent_deferred_cheap_hours_2026-07-09`; `xfail` removed
+- [x] **Prod acceptance** — charge cycle with deadline 07:45 uses cheap night hours (02–04); `urgent_rule_observability.eauto.role == redundant`
+
+### Version 2.0 P6a — Parallel NAS stack (silent trial) (2026-07-12)
+
+- [x] **Parallel stack** — validated `silent-migration-test/config/` + `runtime/` deployed to new NAS folder (`docker/earnie-2.0/`); legacy `docker/earnie/` unchanged (rollback)
+- [x] **Migration review** — [`silent-migration-test/config/MIGRATION_REVIEW.md`](silent-migration-test/config/MIGRATION_REVIEW.md) and entity IDs checked; migration via [`house_config/migrate_runtime_entities.py`](house_config/migrate_runtime_entities.py) (1.26.0 P5 + 2.0 P6a)
+- [x] **Compose** — distinct container names, UI port ≠ 8501 (8503), image pinned to 2.0.x
+- [x] **Silent mode** — `runtime/local_settings.json`: `{"loxone_silent_mode": true}`; legacy prod worker kept running (no dual writes)
+- [x] **Acceptance** — `validate_tariffs --check-catalog`, `startup_checks`, worker/UI on new stack; guide: [Silent Migration Test Stack](docs/einrichtung/silent-migration-test.md)
+- [x] **Scope split** — non-silent live cutover deferred to **2.+1 P6b** (not a 2.0 release gate)
+
 ### Version 2.0 P5 — Tariffs & deploy gate (2026-07-11)
 
 - [x] **Tariff plausibility** — [`house_config/tariff_plausibility.py`](house_config/tariff_plausibility.py): Normalisierung, JSON-Schema, Szenario-Referenzen; CLI [`scripts/validate_tariffs.py`](scripts/validate_tariffs.py) (`earnie-validate-tariffs`)
@@ -43,7 +59,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **Templates & schema** — `config.example.json`, `backtesting_scenarios.example.json` (`live` entry), `config.schema.json` without `runtime_settings`
 - [x] **Scripts & tests** — dev scripts default to `live`; backtesting tests use scenario id `live`; [`tests/config_fixtures.py`](tests/config_fixtures.py)
 - [x] **Docs (DE)** — [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md), [`docs/ui/betriebsmodi.md`](docs/ui/betriebsmodi.md), greenfield/container/betrieb, PV/preise specs
-- [x] **Tests** — 143 passed locally (P2 subset); `migrate_runtime_entities` output update deferred to **2.0 P6**
+- [x] **Tests** — 143 passed locally (P2 subset); `migrate_runtime_entities` output update deferred to **2.0 P6a**
 
 ### Earnie rename (2026-07-11)
 

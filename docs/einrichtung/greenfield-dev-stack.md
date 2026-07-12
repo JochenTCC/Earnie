@@ -70,7 +70,7 @@ Mit abgeschlossener Ersteinrichtung und vollständiger Planungs-Konfiguration:
 3. **Echtzeit-Umgebung** — Live-Szenario und Entitäts-Referenzen speichern.
 4. **Scenario-Exploration** — Seite erscheint nach Freischaltung; Planung starten.
 
-`ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,scenario_exploration` — Sunset-2-Sunset ist seit **1.26.0 P0** für Live-Pfad-Smoke freigeschaltet (zusammen mit Scenario-Exploration).
+`EARNIE_UI_MODES=sunset2sunset,scenario_exploration` — Sunset-2-Sunset ist seit **1.26.0 P0** für Live-Pfad-Smoke freigeschaltet (zusammen mit Scenario-Exploration). In `docker-compose-greenfield.yml` gesetzt.
 
 ## Abnahme Live-Pfad (1.26.0 P0 / 2.0 P2)
 
@@ -86,7 +86,7 @@ Ziel: Greenfield nutzt **`live_scenario_id`** + Live-Szenario in `backtesting_sc
 | 2. Live-Szenario | `greenfield/config/backtesting_scenarios.json` → Szenario `live` | Entitäts-IDs: `battery_id`, `import_tariff_id`, `export_tariff_id`, `house_profile_id`, optional `pv_system_id` — Geo/Zeitzone aus `house_profiles.json` |
 | 3. Entitäts-Auflösung | Echtzeit-Umgebung → Live-Konfiguration | JSON mit aufgelösten PV-, Batterie- und Tarifparametern aus `batteries[]`, `pv_systems[]`, `tariffs.json` |
 | 3. Live-Zyklus | `docker compose -f docker-compose-greenfield.yml logs -f optimizer-worker` | `main.py` durchläuft mindestens einen Optimierungszyklus ohne Config-Fehler |
-| 4. UI Sunset-2-Sunset | Modus **Sunset-2-Sunset** in der UI | Aufgelöste Werte (PV kWp, Batterie, Einspeisevergütung) **read-only** — keine flachen Sidebar-Edits auf Duplikat-Felder |
+| 4. UI Sunset-2-Sunset | Seite **Cockpit** | Aufgelöste Werte (PV kWp, Batterie, Einspeisevergütung) **read-only** auf **Live-Konfiguration** — keine Sidebar-Edits |
 | 5. Scenario-Exploration-Parität | Gleiche Tarif-IDs, gleiches Zeitfenster | Import/Export-cent/kWh identisch zu Live (Detail-Paritätstest folgt in **1.26.0 P3**) |
 
 ```powershell

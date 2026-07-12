@@ -12,8 +12,10 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./config/tariffs.json` | Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json` |
 | `./config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline |
 | `./config/house_profiles.json` | Hausprofile (Sidecar) |
+| `./config/deviation_rules.json` | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an) |
 | `./config/config.example.json` | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
 | `./runtime/` | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs |
+| `./runtime/local_settings.json` | Lokale Einstellungen (z. B. Silent-Mode) |
 | `./config/.env` | Loxone-Zugangsdaten |
 
 Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config/config.json`
@@ -178,7 +180,7 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker-compose-loxberry.yml`
 2. `mkdir -p config runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config/config.json`, …)
-4. `config/.env` und `config/config.json` anpassen (Loxone-Zugang, Namen, Verbraucher)
+4. `config/.env`, `config/config.json` und **`config/tariffs.json`** anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
 5. Optional: historische `cons_data` nach `runtime/cons_data_hourly.csv` kopieren
 
 ### Deploy (LoxBerry)

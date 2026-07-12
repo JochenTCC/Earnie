@@ -121,7 +121,7 @@
         },
         "params": {
           "type": "object",
-          "description": "Optionale Prädikat-Parameter (z. B. remaining_kwh_threshold).",
+          "description": "Optionale Prädikat-Parameter (z. B. remaining_kwh_threshold, power_kw für Regel-Toleranz).",
           "additionalProperties": {
             "type": ["number", "string", "boolean"]
           }

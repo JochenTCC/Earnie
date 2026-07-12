@@ -2,20 +2,20 @@
 
 Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation). Konfiguration über Entitäts-Referenzen im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`); technische Werte liegen in `batteries[]` und `pv_systems[]`.
 
-| Parameter | Einheit | Bedeutung |
-|-----------|---------|-----------|
-| `pv_kwp` | kWp | Installierte PV-Leistung |
-| `pv_tilt` | ° | Dachneigung |
-| `pv_azimuth` | ° | Ausrichtung: `0` = Süd, `-90` = Ost, `90` = West |
-| `latitude`, `longitude` | ° | Standort für PV-Prognose (Forecast.Solar) |
-| `k_push_cent` | Cent/kWh | **Einspeisevergütung** (Erlös bei Einspeisung ins Netz) |
-| `battery_capacity_kwh` | kWh | Nutzbare Speicherkapazität |
-| `battery_max_power_kw` | kW | Max. Lade- und Entladeleistung |
-| `battery_efficiency` | 0–1 | Roundtrip-Wirkungsgrad (Laden/Entladen) |
-| `battery_min_soc` | % | Untere SOC-Grenze (Schutz) |
-| `battery_max_soc` | % | Obere SOC-Grenze |
-| `threshold_power` | Anteil | Relativ zu `battery_max_power_kw` (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
-| `timezone_name` | — | IANA-Zeitzone für astronomische Sonnenzeiten (z. B. `Europe/Vienna`); siehe `planning_horizon` |
+| Parameter | Einheit | Quelle | Bedeutung |
+|-----------|---------|--------|-----------|
+| `kwp` | kWp | `pv_systems[]` | Installierte PV-Leistung (aufgelöst als `pv_kwp`) |
+| `pv_tilt` | ° | `pv_systems[]` | Dachneigung |
+| `pv_azimuth` | ° | `pv_systems[]` | Ausrichtung: `0` = Süd, `-90` = Ost, `90` = West |
+| `latitude`, `longitude` | ° | `house_profiles.json` (via Szenario) | Standort für PV-Prognose (Forecast.Solar) |
+| `k_push_cent` | Cent/kWh | `tariffs.json` (Export-Tarif) | **Einspeisevergütung** |
+| `battery_capacity_kwh` | kWh | `batteries[]` | Nutzbare Speicherkapazität |
+| `battery_max_power_kw` | kW | `batteries[]` | Max. Lade- und Entladeleistung |
+| `battery_efficiency` | 0–1 | `batteries[]` | Roundtrip-Wirkungsgrad (Laden/Entladen) |
+| `battery_min_soc` | % | `batteries[]` | Untere SOC-Grenze (Schutz) |
+| `battery_max_soc` | % | `batteries[]` | Obere SOC-Grenze |
+| `threshold_power` | Anteil | `batteries[]` | Relativ zu `battery_max_power_kw` (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
+| `timezone_name` | — | `house_profiles.json` | IANA-Zeitzone für astronomische Sonnenzeiten (z. B. `Europe/Vienna`); siehe `planning_horizon` |
 
 ## End-SOC (MILP)
 
@@ -27,7 +27,7 @@ Es gibt **keinen** Config-Parameter mehr für die End-SOC-Randbedingung (früher
 | **Backtesting** (`--horizon-mode fixed_24h`) | End-SOC = **Anker-SOC** des Schritts (`initial_soc`; intern `terminal_soc_percent`) |
 | **Backtesting** (`--horizon-mode sunrise_window`) | Wie Live: SOC_min am Sonnenaufgang |
 
-Zusätzlich kann **`battery_wear`** niedrigere End-SOCs wirtschaftlich bestrafen (weicher Anreiz, unabhängig vom Modus).
+Zusätzlich kann **`battery_wear`** niedrigere End-SOCs wirtschaftlich bestrafen (weicher Anreiz, unabhängig vom Modus). Der Block liegt am **`batteries[]`-Eintrag**, nicht mehr global in `config.json`.
 
 Block `planning_horizon` in `config.json`:
 
@@ -54,9 +54,9 @@ Beispiel (5 kWh, 1500 €, 6000 Zyklen, 50 % zyklenbedingt): **2,5 ct/kWh**.
 | `expected_cycles` | Angenommene Vollzyklen bis Ersatz |
 | `cycle_cost_fraction` | Anteil der Kosten durch Zyklen (Rest: Kalenderalterung) |
 
-## Seite Konfiguration vs. `config.json`
+## Live-Konfiguration vs. `config.json`
 
-In der App (Seite **Konfiguration**, Komfort-Ansicht Live-Szenario) werden Entitäts-Referenzen per Dropdown gewählt; die Leistungsschwelle erscheint dort in **Prozent** der max. Batterieleistung. Gespeichert wird in das Live-Szenario in `backtesting_scenarios.json`.
+In der App (Seite **Live-Konfiguration**, Abschnitt Echtzeit-Umgebung) werden Entitäts-Referenzen per Dropdown gewählt; die Leistungsschwelle erscheint dort in **Prozent** der max. Batterieleistung. Gespeichert wird in das Live-Szenario in `backtesting_scenarios.json`. PV- und Batterie-Entitäten selbst pflegt man im **Hauskonfigurator**.
 
 ## Adaptives PV-Tuning (entfallen)
 
@@ -64,4 +64,4 @@ Adaptives PV-Tuning in der Sidebar wurde mit dem UI-Modus **Sunset-2-Sunset** en
 
 ## Szenarien
 
-Zum Vergleich größerer Speicher ohne Produktiv-Änderung: `scenarios[]` in `config/backtesting_scenarios.json` (siehe [Überblick](ueberblick.md)).
+Zum Vergleich größerer Speicher ohne Produktiv-Änderung: weitere Einträge in `backtesting_scenarios.json` (siehe [Überblick](ueberblick.md)).

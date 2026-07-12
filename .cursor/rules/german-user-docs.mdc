@@ -1,0 +1,37 @@
+---
+description: User-facing documentation stays in German — scope, language, sync with code
+alwaysApply: true
+---
+
+# User Documentation — German
+
+End-user documentation is **German**. Do not translate it to English unless the user explicitly requests that.
+
+## Scope (user docs)
+
+| Path | Purpose |
+|------|---------|
+| `docs/README.md` | Anwender-Einstieg, Inhaltsverzeichnis |
+| `docs/einrichtung/` | Einrichtung, Betrieb, Container, Dev-Stacks |
+| `docs/konfiguration/` | `config.json`, Sidecars, Szenarien |
+| `docs/ui/` | Streamlit-Oberfläche, Charts, Betrieb |
+| `docs/referenz/` | Loxone-Signale, Ports, Tabellen |
+
+**Not user docs:** `docs/spec/` (Entwickler-Specs, English OK), `Backlog*.md`, root `README.md` (Entwickler).
+
+## When editing or adding user docs
+
+- Write and maintain content **in German** (headings, prose, tables).
+- Keep code identifiers, env vars, JSON keys, file paths, and CLI commands **verbatim** (often English).
+- When a feature or config changes, **update the matching user doc** in the same change set when possible.
+- Cross-link related pages; keep `docs/README.md` TOC in sync with new pages under the scope above.
+
+## Language exceptions
+
+- Brief English fragments (UI labels, proper nouns, API names) inside German docs are fine.
+- Do **not** silently anglicize whole sections or migrate user docs to English.
+
+## Relation to other rules
+
+- `german-markdown.mdc`: applies to **reading** German project markdown for implementation — **not** to translating user docs away from German.
+- `english-chat.mdc`: assistant chat stays English; user docs stay German.

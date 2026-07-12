@@ -5,11 +5,13 @@ alwaysApply: true
 
 # German Markdown in This Project
 
-Some project `.md` files may still be in German (e.g. `docs/`, `docs/spec/`, older notes). **Backlog files are in English** (`Backlog.md`, `Backlog-Bugfixes.md`, `Backlog-Erledigt.md`).
+Some project `.md` files may still be in German (e.g. `docs/spec/`, older notes). **Backlog files are in English** (`Backlog.md`, `Backlog-Bugfixes.md`, `Backlog-Erledigt.md`).
+
+**User docs** (`docs/README.md`, `docs/einrichtung/`, `docs/konfiguration/`, `docs/ui/`, `docs/referenz/`) are **intentionally German** — see `german-user-docs.mdc`. Do not offer to translate them to English; read as-is.
 
 ## When This Applies
 
-Before you **read and use** a project `.md` file for decisions, implementation, or summaries — and the file is **predominantly German** — **ask the user once**:
+Before you **read and use** a project `.md` file for decisions, implementation, or summaries — and the file is **predominantly German** and **not** in the user-doc scope above — **ask the user once**:
 
 > This file is still in German: `<path>`. Should I translate it to English first, or read it as-is?
 

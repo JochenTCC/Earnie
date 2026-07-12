@@ -1,13 +1,14 @@
 # Charts & Panels
 
-Gilt für den Produktiv-Modus **Sunset-2-Sunset** (`ui/simulation_results.py`, `ui/charts.py`, `ui/live_mode.py`). Modus-Übersicht: [Betriebsmodi](betriebsmodi.md). Der Modus **Backtesting** nutzt teils dieselben Chart-Komponenten, eigene Kosten- und Monatscharts.
+Gilt für die Seite **Cockpit** (Sunset-2-Sunset, `ui/simulation_results.py`, `ui/charts.py`, `ui/live_mode.py`). Modus-Übersicht: [Betriebsmodi](betriebsmodi.md). **Scenario-Exploration** nutzt teils dieselben Chart-Komponenten, eigene Kosten- und Monatscharts.
 
-## Seitenaufbau (Sunset-2-Sunset)
+## Seitenaufbau (Cockpit / Sunset-2-Sunset)
 
 | Bereich | Inhalt |
 |---------|--------|
-| Kopf | Seitentitel, **?** mit Modus-Scope (Sunset-2-Sunset / Backtesting) |
-| Sidebar | **Version** (Caption oben), Navigation, Betriebsparameter (PV, Batterie, Runtime) |
+| Kopf | Seitentitel, **?** mit Modus-Scope (Sunset-2-Sunset / Scenario-Exploration) |
+| Sidebar | **Version** (Caption oben), Env-/Setup-Hinweise, Fortschritt Ersteinrichtung — **keine** PV-/Batterie-Parameter (diese auf **Live-Konfiguration** / Hauskonfigurator) |
+| Menü | `st.navigation`: Abschnitte Planung, Echtzeit-Umgebung, Betrieb, Analyse |
 | Charts | Chart 1 → Navigation ←/→ → Chart 2 |
 | Darunter | Simulations-Tabelle, Energievergleich (Expander) |
 | Sankey | Live-Energiefluss (Loxone) |
@@ -147,4 +148,4 @@ Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/
 
 ## Scenario-Exploration
 
-Eigene Charts und Monatsauswertung aus `backtesting_log.json` — ohne S-2-Navigation und ohne Produktiv-Log-Merge. UI-Modus: **Scenario-Exploration** (`scenario_exploration`).
+Eigene Charts und Monatsauswertung aus `runtime/backtesting_log.json` — ohne S-2-Navigation und ohne Produktiv-Log-Merge. UI-Seite: **Scenario-Exploration** (`scenario_exploration`).

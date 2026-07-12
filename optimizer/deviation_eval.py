@@ -31,7 +31,12 @@ class DeviationEvent:
     color: str
 
 
-def _power_tolerance(tolerances: dict[str, float]) -> float:
+def _power_tolerance(
+    tolerances: dict[str, float],
+    params: dict[str, Any] | None = None,
+) -> float:
+    if params and "power_kw" in params:
+        return float(params["power_kw"])
     return float(tolerances["power_kw"])
 
 
@@ -46,12 +51,12 @@ def _power_mismatch_positive(
     scope: str,
     _rule: dict[str, Any],
     tolerances: dict[str, float],
-    _params: dict[str, Any],
+    params: dict[str, Any],
 ) -> bool:
     flex = _flex_for_scope(facts, scope)
     if flex is None:
         return False
-    tol = _power_tolerance(tolerances)
+    tol = _power_tolerance(tolerances, params)
     return flex.soll_kw > tol and (flex.soll_kw - flex.ist_kw) > tol
 
 
@@ -60,12 +65,12 @@ def _power_mismatch_any(
     scope: str,
     _rule: dict[str, Any],
     tolerances: dict[str, float],
-    _params: dict[str, Any],
+    params: dict[str, Any],
 ) -> bool:
     flex = _flex_for_scope(facts, scope)
     if flex is None:
         return False
-    tol = _power_tolerance(tolerances)
+    tol = _power_tolerance(tolerances, params)
     return abs(flex.soll_kw - flex.ist_kw) > tol
 
 
@@ -156,9 +161,9 @@ def _battery_power_below_tolerance(
     _scope: str,
     _rule: dict[str, Any],
     tolerances: dict[str, float],
-    _params: dict[str, Any],
+    params: dict[str, Any],
 ) -> bool:
-    tol = _power_tolerance(tolerances)
+    tol = _power_tolerance(tolerances, params)
     battery = facts.battery
     if battery.soll_mode == bat.MODE_ZWANGS_LADEN:
         soll = max(0.0, battery.soll_plan_kw)
@@ -182,12 +187,12 @@ def _pv_follow_scheduled(
     scope: str,
     _rule: dict[str, Any],
     tolerances: dict[str, float],
-    _params: dict[str, Any],
+    params: dict[str, Any],
 ) -> bool:
     flex = _flex_for_scope(facts, scope)
     if flex is None or flex.pv_follow_soll != 1:
         return False
-    tol = _power_tolerance(tolerances)
+    tol = _power_tolerance(tolerances, params)
     return _pv_follow_setpoint_kw(flex) > tol
 
 
@@ -196,12 +201,12 @@ def _pv_follow_power_below_tolerance(
     scope: str,
     _rule: dict[str, Any],
     tolerances: dict[str, float],
-    _params: dict[str, Any],
+    params: dict[str, Any],
 ) -> bool:
     flex = _flex_for_scope(facts, scope)
     if flex is None or flex.pv_follow_soll != 1:
         return False
-    tol = _power_tolerance(tolerances)
+    tol = _power_tolerance(tolerances, params)
     setpoint = _pv_follow_setpoint_kw(flex)
     return setpoint > tol and (setpoint - flex.ist_kw) > tol
 
@@ -221,13 +226,13 @@ def _power_ist_without_soll(
     scope: str,
     _rule: dict[str, Any],
     tolerances: dict[str, float],
-    _params: dict[str, Any],
+    params: dict[str, Any],
 ) -> bool:
     """Ist-Leistung vorhanden, obwohl kein Soll geplant war (soll ≈ 0, ist > Toleranz)."""
     flex = _flex_for_scope(facts, scope)
     if flex is None:
         return False
-    tol = _power_tolerance(tolerances)
+    tol = _power_tolerance(tolerances, params)
     return flex.soll_kw <= tol and flex.ist_kw > tol
 
 
@@ -258,13 +263,13 @@ def _ist_power_above_nominal(
     scope: str,
     _rule: dict[str, Any],
     tolerances: dict[str, float],
-    _params: dict[str, Any],
+    params: dict[str, Any],
 ) -> bool:
     """Ist-Leistung über der Nennleistung (Toleranz) — Plausibilitätswarnung."""
     flex = _flex_for_scope(facts, scope)
     if flex is None or flex.nominal_power_kw is None:
         return False
-    tol = _power_tolerance(tolerances)
+    tol = _power_tolerance(tolerances, params)
     return flex.ist_kw > flex.nominal_power_kw + tol
 
 

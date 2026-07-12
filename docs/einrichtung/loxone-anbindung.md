@@ -38,7 +38,9 @@ Konfigurierte Namen stehen in `config.json` → siehe [Loxone-Signale](../refere
 | Zwangsladeleistung | `target_charge_power_name` | kW |
 | Ziel-Entladeleistung | `target_discharge_power_name` | kW |
 | Steuerbefehl | `control_cmd_name` | `0` = Automatik, `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen |
-| Verbraucher-Freigabe | `flexible_consumers[].loxone_outputs.enable_name` | `0` = gesperrt, `1` = Freigabe |
+| Verbraucher-Freigabe | `flexible_consumers[].loxone_outputs.enable_name` | `0` = gesperrt, `1` = Freigabe (SwimSpa, Wärmepumpe, Filter) |
+| E-Auto Sollleistung | `flexible_consumers[].loxone_outputs.power_setpoint_name` | Ziel-Ladeleistung, kW |
+| E-Auto PV-Follow | `flexible_consumers[].loxone_outputs.pv_follow_name` | `0`/`1` |
 
 Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-Logik hinter diesen virtuellen Eingängen.
 

@@ -22,7 +22,7 @@ def _render_deferred_loxone_section() -> None:
     if not loxone_setup_deferred():
         return
 
-    expand = not loxone_credentials_configured() and is_planning_ready()
+    expand = not loxone_credentials_configured()
     with st.sidebar.expander("Loxone-Zugang (Live / Silent-Modus)", expanded=expand):
         st.caption(
             "Miniserver-Zugang erst für Live-Optimierung, Silent-Modus (Lesen) "
@@ -37,9 +37,9 @@ def _render_deferred_loxone_section() -> None:
 
 def render_setup_progress_notice() -> None:
     """Zeigt fehlende Einrichtungsschritte, solange Navigation eingeschränkt ist."""
+    _render_deferred_loxone_section()
     if not needs_planning_onboarding():
         return
-    _render_deferred_loxone_section()
     if is_planning_ready():
         if is_betrieb_unlocked():
             return
