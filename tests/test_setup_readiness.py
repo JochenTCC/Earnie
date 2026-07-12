@@ -25,6 +25,10 @@ def _bind_config_paths(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        str(config_dir / "components.json"),
+    )
     return config_dir
 
 
@@ -35,15 +39,18 @@ def _write(path, payload):
 
 def _minimal_config():
     return {
-        "batteries": [],
-        "pv_systems": [],
         "flexible_consumers": [],
     }
+
+
+def _empty_components():
+    return {"batteries": [], "pv_systems": []}
 
 
 def test_needs_planning_onboarding_after_minimal_bootstrap(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(config_dir / "config.json", _minimal_config())
+    _write(config_dir / "components.json", _empty_components())
 
     assert setup_readiness.needs_planning_onboarding() is True
 
@@ -53,10 +60,12 @@ def test_prod_config_skips_onboarding(tmp_path, monkeypatch):
     _write(
         config_dir / "config.json",
         {
-            "batteries": [{"id": "bat"}],
-            "pv_systems": [],
             "flexible_consumers": [{"id": "swimspa"}],
         },
+    )
+    _write(
+        config_dir / "components.json",
+        {"batteries": [{"id": "bat"}], "pv_systems": []},
     )
 
     assert setup_readiness.needs_planning_onboarding() is False
@@ -66,12 +75,10 @@ def test_prod_config_skips_onboarding(tmp_path, monkeypatch):
 
 def test_missing_house_config_items_lists_gaps(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(config_dir / "config.json", _minimal_config())
     _write(
-        config_dir / "config.json",
-        {
-            **_minimal_config(),
-            "batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}],
-        },
+        config_dir / "components.json",
+        {"batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}], "pv_systems": []},
     )
     _write(config_dir / "house_profiles.json", {"profiles": []})
 
@@ -83,6 +90,7 @@ def test_missing_house_config_items_lists_gaps(tmp_path, monkeypatch):
 def test_missing_house_config_items_lists_battery_gap(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(config_dir / "config.json", _minimal_config())
+    _write(config_dir / "components.json", _empty_components())
     _write(
         config_dir / "house_profiles.json",
         {
@@ -105,6 +113,7 @@ def test_missing_house_config_items_lists_battery_gap(tmp_path, monkeypatch):
 def test_missing_runtime_scenario_items_lists_gaps(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(config_dir / "config.json", _minimal_config())
+    _write(config_dir / "components.json", _empty_components())
     _write(
         config_dir / "house_profiles.json",
         {
@@ -149,10 +158,12 @@ def test_planning_ready_unlocks_scenario_exploration(tmp_path, monkeypatch):
         config_dir / "config.json",
         {
             "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
-            "batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}],
-            "pv_systems": [],
             "flexible_consumers": [],
         },
+    )
+    _write(
+        config_dir / "components.json",
+        {"batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}], "pv_systems": []},
     )
     _write(
         config_dir / "house_profiles.json",
@@ -209,10 +220,12 @@ def test_betrieb_unlocked_after_live_config(tmp_path, monkeypatch):
     _write(
         config_dir / "config.json",
         {
-            "batteries": [{"id": "bat"}],
-            "pv_systems": [],
             "flexible_consumers": [{"id": "swimspa"}],
         },
+    )
+    _write(
+        config_dir / "components.json",
+        {"batteries": [{"id": "bat"}], "pv_systems": []},
     )
 
     assert setup_readiness.is_betrieb_unlocked() is True
@@ -220,12 +233,10 @@ def test_betrieb_unlocked_after_live_config(tmp_path, monkeypatch):
 
 def test_scenario_editor_unlocked_after_house_config(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(config_dir / "config.json", _minimal_config())
     _write(
-        config_dir / "config.json",
-        {
-            **_minimal_config(),
-            "batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}],
-        },
+        config_dir / "components.json",
+        {"batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}], "pv_systems": []},
     )
     _write(
         config_dir / "house_profiles.json",

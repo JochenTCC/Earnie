@@ -40,8 +40,6 @@
         "control_cmd_name": "Control_Cmd"
     },
     "live_scenario_id": "live",
-    "batteries": [],
-    "pv_systems": [],
     "planning_horizon": {
         "mode": "sunrise_window"
     },

@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/components.schema.json",
+  "title": "Earnie Komponenten (Batterie & PV)",
+  "description": "JSON-Schema für components.json — batteries[] und pv_systems[] (referenziert über battery_id / pv_system_id in Szenarien).",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
+    },
+    "batteries": {
+      "type": "array",
+      "description": "Batteriespezifikationen (Mehrfach-Definition; Szenario wählt battery_id).",
+      "items": { "$ref": "#/definitions/battery_entity" }
+    },
+    "pv_systems": {
+      "type": "array",
+      "description": "PV-Anlagen (Mehrfach-Definition; Szenario wählt pv_system_id).",
+      "items": { "$ref": "#/definitions/pv_system_entity" }
+    }
+  },
+  "definitions": {
+    "battery_wear": {
+      "type": "object",
+      "description": "Verschleißkosten für Batterie-Durchsatz (Laden + Entladen) in der MILP-Zielfunktion.",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "false = kein Verschleiß-Term; true = Parameter unten erforderlich."
+        },
+        "replacement_cost_euro": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Ersatzkosten der Batterie in Euro."
+        },
+        "expected_cycles": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Angenommene Vollzyklen bis Ersatz."
+        },
+        "cycle_cost_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Anteil der Ersatzkosten, der zyklenbedingt ist."
+        }
+      }
+    },
+    "battery_entity": {
+      "type": "object",
+      "description": "Hausbatterie (nicht E-Auto — siehe flexible_consumers).",
+      "required": [
+        "id",
+        "battery_capacity_kwh",
+        "battery_max_power_kw",
+        "battery_efficiency",
+        "battery_min_soc",
+        "battery_max_soc"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "battery_capacity_kwh": { "type": "number", "exclusiveMinimum": 0 },
+        "battery_max_power_kw": { "type": "number", "exclusiveMinimum": 0 },
+        "battery_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "battery_min_soc": { "type": "number", "minimum": 0, "maximum": 100 },
+        "battery_max_soc": { "type": "number", "minimum": 0, "maximum": 100 },
+        "threshold_power": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "Relativer Anteil von battery_max_power_kw (Standard 0.02)."
+        },
+        "battery_wear": {
+          "$ref": "#/definitions/battery_wear",
+          "description": "Verschleißmodell dieser Batterie."
+        }
+      }
+    },
+    "pv_system_entity": {
+      "type": "object",
+      "description": "PV-Anlage für Prognose und Backtesting.",
+      "required": ["id", "kwp"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "kwp": { "type": "number", "exclusiveMinimum": 0 },
+        "pv_tilt": { "type": "number", "description": "Neigung in Grad." },
+        "pv_azimuth": { "type": "number", "description": "0=Süd, -90=Ost, 90=West." }
+      }
+    }
+  }
+}

@@ -8,18 +8,26 @@ import zipfile
 from pathlib import Path
 
 from runtime_store.persist_paths import (
+    resolve_backtesting_scenarios_json_path,
+    resolve_components_json_path,
     resolve_config_json_path,
     resolve_deviation_rules_json_path,
+    resolve_house_profiles_json_path,
     resolve_local_settings_json_path,
     resolve_runtime_prefixed_path,
+    resolve_tariffs_json_path,
     runtime_dir,
 )
 
 _ENV_SUFFIXES = (
     "CONFIG_PATH",
+    "COMPONENTS_PATH",
     "DEVIATION_RULES_PATH",
+    "HOUSE_PROFILES_PATH",
     "LOCAL_SETTINGS_PATH",
     "RUNTIME_DIR",
+    "TARIFFS_PATH",
+    "BACKTESTING_SCENARIOS_PATH",
 )
 
 
@@ -37,6 +45,10 @@ def collect_dump_context() -> dict[str, object]:
         "env_overrides": env_overrides,
         "resolved_paths": {
             "config_json": resolve_config_json_path(),
+            "components_json": resolve_components_json_path(),
+            "tariffs_json": resolve_tariffs_json_path(),
+            "house_profiles_json": resolve_house_profiles_json_path(),
+            "backtesting_scenarios_json": resolve_backtesting_scenarios_json_path(),
             "deviation_rules_json": resolve_deviation_rules_json_path(),
             "local_settings_json": resolve_local_settings_json_path(),
             "runtime_dir": runtime_dir(),
@@ -51,6 +63,10 @@ def iter_input_files() -> list[tuple[str, str]]:
     resolved = context["resolved_paths"]
     candidates = (
         ("inputs/config.json", resolved["config_json"]),
+        ("inputs/components.json", resolved["components_json"]),
+        ("inputs/tariffs.json", resolved["tariffs_json"]),
+        ("inputs/house_profiles.json", resolved["house_profiles_json"]),
+        ("inputs/backtesting_scenarios.json", resolved["backtesting_scenarios_json"]),
         ("inputs/deviation_rules.json", resolved["deviation_rules_json"]),
         ("inputs/local_settings.json", resolved["local_settings_json"]),
         ("inputs/price_model_coefficients.json", resolved.get("forecast_model_path")),

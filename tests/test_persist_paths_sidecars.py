@@ -7,6 +7,7 @@ from pathlib import Path
 from runtime_store.persist_paths import (
     resolve_backtesting_log_dir,
     resolve_backtesting_scenarios_json_path,
+    resolve_components_json_path,
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
 )
@@ -16,15 +17,18 @@ def test_sidecars_resolve_next_to_config_path(tmp_path, monkeypatch):
     config_dir = tmp_path / "greenfield" / "config"
     config_dir.mkdir(parents=True)
     (config_dir / "config.json").write_text("{}", encoding="utf-8")
+    (config_dir / "components.json").write_text("{}", encoding="utf-8")
     (config_dir / "tariffs.json").write_text("{}", encoding="utf-8")
     (config_dir / "house_profiles.json").write_text("{}", encoding="utf-8")
     (config_dir / "backtesting_scenarios.json").write_text("{}", encoding="utf-8")
 
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.delenv("ENERGY_OPTIMIZER_COMPONENTS_PATH", raising=False)
     monkeypatch.delenv("ENERGY_OPTIMIZER_TARIFFS_PATH", raising=False)
     monkeypatch.delenv("ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH", raising=False)
     monkeypatch.delenv("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", raising=False)
 
+    assert resolve_components_json_path() == str(config_dir / "components.json")
     assert resolve_tariffs_json_path() == str(config_dir / "tariffs.json")
     assert resolve_house_profiles_json_path() == str(config_dir / "house_profiles.json")
     assert resolve_backtesting_scenarios_json_path() == str(

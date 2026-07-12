@@ -42,6 +42,10 @@ def _bind_paths(tmp_path, monkeypatch: pytest.MonkeyPatch):
         "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        str(config_dir / "components.json"),
+    )
     return config_dir
 
 
@@ -63,8 +67,6 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
         json.dumps(
             {
                 "live_scenario_id": "live",
-                "batteries": [],
-                "pv_systems": [],
                 "flexible_consumers": [],
                 "system": {"global_timeout": 10, "loop_timeout": 900},
                 "loxone_blocks": {
@@ -84,6 +86,10 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
                 "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
             }
         ),
+        encoding="utf-8",
+    )
+    config_dir.joinpath("components.json").write_text(
+        json.dumps({"batteries": [], "pv_systems": []}),
         encoding="utf-8",
     )
     config_dir.joinpath("backtesting_scenarios.json").write_text(
@@ -120,9 +126,9 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
         }
     )
 
-    payload = json.loads(config_dir.joinpath("config.json").read_text(encoding="utf-8"))
-    assert payload["pv_systems"][0]["id"] == "dach_sued"
-    assert payload["batteries"][0]["battery_capacity_kwh"] == 5.0
+    components_payload = json.loads(config_dir.joinpath("components.json").read_text(encoding="utf-8"))
+    assert components_payload["pv_systems"][0]["id"] == "dach_sued"
+    assert components_payload["batteries"][0]["battery_capacity_kwh"] == 5.0
 
 
 def test_save_planning_tariff_selection(tmp_path, monkeypatch):
@@ -190,11 +196,13 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
         json.dumps(
             {
                 "live_scenario_id": "live",
-                "batteries": [{"id": "bat"}],
-                "pv_systems": [{"id": "pv"}],
                 "flexible_consumers": [],
             }
         ),
+        encoding="utf-8",
+    )
+    config_dir.joinpath("components.json").write_text(
+        json.dumps({"batteries": [{"id": "bat"}], "pv_systems": [{"id": "pv"}]}),
         encoding="utf-8",
     )
     config_dir.joinpath("backtesting_scenarios.json").write_text(

@@ -69,49 +69,6 @@
         "control_cmd_name": "Ernie_Steuerbefehl"
     },
     "live_scenario_id": "live",
-    "batteries": [
-        {
-            "id": "default_5kwh",
-            "label": "5 kWh Speicher",
-            "battery_capacity_kwh": 5.0,
-            "battery_max_power_kw": 2.5,
-            "battery_efficiency": 0.97,
-            "battery_min_soc": 10.0,
-            "battery_max_soc": 100.0,
-            "threshold_power": 0.05,
-            "battery_wear": {
-                "enabled": true,
-                "replacement_cost_euro": 1500,
-                "expected_cycles": 6000,
-                "cycle_cost_fraction": 0.5
-            }
-        },
-        {
-            "id": "upgrade_10kwh",
-            "label": "10 kWh Speicher",
-            "battery_capacity_kwh": 10.0,
-            "battery_max_power_kw": 5.0,
-            "battery_efficiency": 0.97,
-            "battery_min_soc": 10.0,
-            "battery_max_soc": 100.0,
-            "threshold_power": 0.02,
-            "battery_wear": {
-                "enabled": true,
-                "replacement_cost_euro": 3000,
-                "expected_cycles": 6000,
-                "cycle_cost_fraction": 0.5
-            }
-        }
-    ],
-    "pv_systems": [
-        {
-            "id": "roof_south",
-            "label": "Dach Süd 10 kWp",
-            "kwp": 10,
-            "pv_tilt": 25,
-            "pv_azimuth": 0
-        }
-    ],
     "planning_horizon": {
         "mode": "sunrise_window"
     },

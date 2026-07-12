@@ -32,7 +32,7 @@ def _render_resolved_snapshot(resolved: dict) -> None:
     """Zeigt aufgelöste PV-/Batterie-/Tarif-/Standort-Parameter read-only."""
     st.markdown("#### Aufgelöste Parameter (nur Anzeige)")
     st.caption(
-        "Technische Werte aus batteries[], pv_systems[], tariffs.json und Hausprofil. "
+        "Technische Werte aus components.json (batteries[], pv_systems[]), tariffs.json und Hausprofil. "
         "Bearbeiten im Hauskonfigurator, Szenarieneditor oder Echtzeit-Umgebung."
     )
 

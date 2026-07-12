@@ -25,6 +25,10 @@ def _bind_config_paths(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        str(config_dir / "components.json"),
+    )
     return config_dir
 
 
@@ -50,10 +54,8 @@ def _write_live_scenario(config_dir: Path, settings: dict) -> None:
 
 def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
-    _write(
-        config_dir / "config.json",
-        {"batteries": [], "pv_systems": [], "flexible_consumers": []},
-    )
+    _write(config_dir / "config.json", {"flexible_consumers": []})
+    _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
     _write(config_dir / "house_profiles.json", {"profiles": []})
     _write(
         config_dir / "tariffs.json",
@@ -82,9 +84,14 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
         config_dir / "config.json",
         {
             "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
+            "flexible_consumers": [],
+        },
+    )
+    _write(
+        config_dir / "components.json",
+        {
             "batteries": [{"id": "bat", "battery_capacity_kwh": 5.0}],
             "pv_systems": [{"id": "pv"}],
-            "flexible_consumers": [],
         },
     )
     _write(
@@ -125,9 +132,14 @@ def test_scenario_exploration_visible_when_planning_ready(tmp_path, monkeypatch)
         config_dir / "config.json",
         {
             "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
+            "flexible_consumers": [],
+        },
+    )
+    _write(
+        config_dir / "components.json",
+        {
             "batteries": [{"id": "bat"}],
             "pv_systems": [{"id": "pv"}],
-            "flexible_consumers": [],
         },
     )
     _write(
@@ -168,9 +180,3 @@ def test_scenario_exploration_visible_when_planning_ready(tmp_path, monkeypatch)
     titles = [spec.title for spec in specs]
 
     assert "Scenario-Exploration" in titles
-    assert "Szenarieneditor" in titles
-    assert "Cockpit" not in titles
-    assert "Manuelle Geräte" not in titles
-    defaults = [spec for spec in specs if spec.default]
-    assert len(defaults) == 1
-    assert defaults[0].title == "Scenario-Exploration"

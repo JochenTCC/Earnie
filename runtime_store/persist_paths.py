@@ -392,6 +392,58 @@ def resolve_house_profiles_json_path() -> str:
     )
 
 
+def bundled_components_example_file() -> str:
+    return os.path.join(bundled_config_dir(), "components.example.json")
+
+
+def bundled_components_minimal_file() -> str:
+    return os.path.join(bundled_config_dir(), "components.minimal.json")
+
+
+def bundled_components_schema_file() -> str:
+    return os.path.join(bundled_config_dir(), "components.schema.json")
+
+
+def resolve_components_template_path() -> str:
+    preferred = os.path.join("config", "components.example.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_components_example_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_components_minimal_template_path() -> str:
+    """Vorlage für neue components.json (leere Kataloge)."""
+    preferred = os.path.join("config", "components.minimal.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_components_minimal_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_components_schema_template_path() -> str:
+    preferred = os.path.join("config", "components.schema.json")
+    if os.path.isfile(preferred):
+        return preferred
+    bundled = bundled_components_schema_file()
+    if os.path.isfile(bundled):
+        return bundled
+    return preferred
+
+
+def resolve_components_json_path() -> str:
+    """Pfad zu components.json: ENV > neben config.json > config/."""
+    return _resolve_sidecar_json_path(
+        env_suffix="COMPONENTS_PATH",
+        filename="components.json",
+        default_path=os.path.join("config", "components.json"),
+    )
+
+
 def bundled_deviation_rules_example_file() -> str:
     return os.path.join(bundled_config_dir(), "deviation_rules.example.json")
 

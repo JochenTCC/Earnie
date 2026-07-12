@@ -222,7 +222,7 @@ def setup_silent_migration_test(
         tariffs_doc=tariffs,
         house_profiles_doc=profiles,
     )
-    p6_config, scenarios_doc, p6_notes = finalize_migration_for_2_0(
+    p6_config, scenarios_doc, components_doc, p6_notes = finalize_migration_for_2_0(
         p5_config,
         scenarios_template=scenarios_template,
         live_scenario_id=live_scenario_id,
@@ -248,6 +248,10 @@ def setup_silent_migration_test(
     )
     (config_out / "house_profiles.json").write_text(
         json.dumps(p5_profiles, indent=4, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    (config_out / "components.json").write_text(
+        json.dumps(components_doc, indent=4, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
     (config_out / "backtesting_scenarios.json").write_text(

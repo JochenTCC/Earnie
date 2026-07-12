@@ -29,16 +29,6 @@
       "type": "string",
       "description": "ID des Live-Szenarios in backtesting_scenarios.json (Standard: live)."
     },
-    "batteries": {
-      "type": "array",
-      "description": "Batteriespezifikationen (Mehrfach-Definition; Szenario wählt battery_id).",
-      "items": { "$ref": "#/definitions/battery_entity" }
-    },
-    "pv_systems": {
-      "type": "array",
-      "description": "PV-Anlagen (Mehrfach-Definition; Szenario wählt pv_system_id).",
-      "items": { "$ref": "#/definitions/pv_system_entity" }
-    },
     "file_paths_battery_simulation": {
       "$ref": "#/definitions/file_paths_battery_simulation",
       "description": "Pfade zu historischen CSVs, cons_data und Preisquelle."
