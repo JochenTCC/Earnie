@@ -31,8 +31,6 @@ def minimal_config_payload(
             "target_discharge_power_name": "t_discharge",
             "control_cmd_name": "cmd",
         },
-        "batteries": [],
-        "pv_systems": [],
         "planning_horizon": {"mode": "sunrise_window"},
         "file_paths_battery_simulation": {
             "path_cons_data": "runtime/cons_data_hourly.csv",
@@ -54,18 +52,31 @@ def default_live_settings() -> dict:
     }
 
 
+def minimal_components_payload(*, extra: dict | None = None) -> dict:
+    payload = {"batteries": [], "pv_systems": []}
+    if extra:
+        payload.update(extra)
+    return payload
+
+
 def write_minimal_config_tree(
     tmp_path: Path,
     *,
     config_payload: dict | None = None,
+    components_payload: dict | None = None,
     live_settings: dict | None = None,
 ) -> tuple[str, str]:
-    """Schreibt config.json und backtesting_scenarios.json; gibt Pfade zurück."""
+    """Schreibt config.json, components.json und backtesting_scenarios.json."""
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
     payload = config_payload or minimal_config_payload()
     config_path = config_dir / "config.json"
     config_path.write_text(json.dumps(payload), encoding="utf-8")
+    components_path = config_dir / "components.json"
+    components_path.write_text(
+        json.dumps(components_payload or minimal_components_payload()),
+        encoding="utf-8",
+    )
     scenarios_path = config_dir / "backtesting_scenarios.json"
     scenarios_path.write_text(
         json.dumps(

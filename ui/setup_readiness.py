@@ -6,6 +6,7 @@ from pathlib import Path
 
 from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
+    resolve_components_json_path,
     resolve_config_json_path,
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
@@ -80,7 +81,12 @@ def _tariff_id_maps_from_doc(tariffs_doc: dict) -> tuple[set[str], set[str]]:
     return import_map, export_map
 
 
-def missing_house_config_items_for(raw: dict, *, house_profiles_path: str) -> list[str]:
+def missing_house_config_items_for(
+    raw: dict,
+    *,
+    components_path: str,
+    house_profiles_path: str,
+) -> list[str]:
     """Fehlende Schritte im Hauskonfigurator (Hausprofil, Batterie)."""
     if not needs_planning_onboarding_from_raw(raw):
         return []
@@ -89,7 +95,8 @@ def missing_house_config_items_for(raw: dict, *, house_profiles_path: str) -> li
     profiles_doc = _read_json_document(house_profiles_path)
     if not _has_house_profile_in_doc(profiles_doc):
         missing.append("Hausprofil anlegen (Hauskonfigurator → Hausprofil)")
-    if not raw.get("batteries"):
+    components_doc = _read_json_document(components_path)
+    if not components_doc.get("batteries"):
         missing.append("Batterie anlegen (Hauskonfigurator → Batterien)")
     return missing
 
@@ -97,6 +104,7 @@ def missing_house_config_items_for(raw: dict, *, house_profiles_path: str) -> li
 def missing_runtime_scenario_items_for(
     raw: dict,
     *,
+    components_path: str,
     tariffs_path: str,
     house_profiles_path: str,
     backtesting_scenarios_path: str | None = None,
@@ -122,9 +130,10 @@ def missing_runtime_scenario_items_for(
         return missing
 
     battery_id = str(live_settings.get("battery_id", "") or "").strip()
+    components_doc = _read_json_document(components_path)
     batteries = {
         str(item.get("id", "")).strip()
-        for item in raw.get("batteries", [])
+        for item in components_doc.get("batteries", [])
         if isinstance(item, dict) and item.get("id")
     }
     if not battery_id or battery_id not in batteries:
@@ -151,6 +160,7 @@ def missing_runtime_scenario_items_for(
 def missing_planning_setup_items_for(
     raw: dict,
     *,
+    components_path: str,
     tariffs_path: str,
     house_profiles_path: str,
     backtesting_scenarios_path: str | None = None,
@@ -158,9 +168,11 @@ def missing_planning_setup_items_for(
     """Fehlende Schritte bis Scenario-Exploration freigeschaltet werden kann."""
     return missing_house_config_items_for(
         raw,
+        components_path=components_path,
         house_profiles_path=house_profiles_path,
     ) + missing_runtime_scenario_items_for(
         raw,
+        components_path=components_path,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
         backtesting_scenarios_path=backtesting_scenarios_path,
@@ -170,6 +182,7 @@ def missing_planning_setup_items_for(
 def is_planning_ready_for(
     raw: dict,
     *,
+    components_path: str,
     tariffs_path: str,
     house_profiles_path: str,
     backtesting_scenarios_path: str | None = None,
@@ -179,6 +192,7 @@ def is_planning_ready_for(
         return True
     return not missing_planning_setup_items_for(
         raw,
+        components_path=components_path,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
         backtesting_scenarios_path=backtesting_scenarios_path,
@@ -189,6 +203,7 @@ def missing_house_config_items() -> list[str]:
     """Fehlende Schritte im Hauskonfigurator (Hausprofil, Batterie, PV optional)."""
     return missing_house_config_items_for(
         _read_json_document(resolve_config_json_path()),
+        components_path=resolve_components_json_path(),
         house_profiles_path=resolve_house_profiles_json_path(),
     )
 
@@ -197,6 +212,7 @@ def missing_runtime_scenario_items() -> list[str]:
     """Fehlende Schritte in Echtzeit-Umgebung / Live-Szenario."""
     return missing_runtime_scenario_items_for(
         _read_json_document(resolve_config_json_path()),
+        components_path=resolve_components_json_path(),
         tariffs_path=resolve_tariffs_json_path(),
         house_profiles_path=resolve_house_profiles_json_path(),
     )
@@ -206,6 +222,7 @@ def missing_planning_setup_items() -> list[str]:
     """Fehlende Schritte bis Backtesting freigeschaltet werden kann."""
     return missing_planning_setup_items_for(
         _read_json_document(resolve_config_json_path()),
+        components_path=resolve_components_json_path(),
         tariffs_path=resolve_tariffs_json_path(),
         house_profiles_path=resolve_house_profiles_json_path(),
     )

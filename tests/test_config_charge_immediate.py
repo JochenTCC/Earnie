@@ -28,8 +28,6 @@ def _minimal_charge_immediate_config() -> dict:
             "control_cmd_name": "Control_Cmd",
         },
         "live_scenario_id": "live",
-        "batteries": [],
-        "pv_systems": [],
         "planning_horizon": {"mode": "sunrise_window"},
         "file_paths_battery_simulation": {
             "path_cons_data": "runtime/cons_data_hourly.csv",
@@ -109,24 +107,27 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
         "export_tariff_id": "fixed_exp",
         "house_profile_id": "",
     }
-    payload["batteries"] = [
-        {
-            "id": "home",
-            "label": "Home",
-            "battery_capacity_kwh": 5.0,
-            "battery_max_power_kw": 2.5,
-            "battery_efficiency": 0.97,
-            "battery_min_soc": 10.0,
-            "battery_max_soc": 100.0,
-            "threshold_power": 0.02,
-            "battery_wear": {"enabled": False},
-        }
-    ]
-    payload["pv_systems"] = [
-        {"id": "roof", "label": "Roof", "kwp": 10.0, "pv_tilt": 25, "pv_azimuth": 0}
-    ]
+    components_doc = {
+        "batteries": [
+            {
+                "id": "home",
+                "label": "Home",
+                "battery_capacity_kwh": 5.0,
+                "battery_max_power_kw": 2.5,
+                "battery_efficiency": 0.97,
+                "battery_min_soc": 10.0,
+                "battery_max_soc": 100.0,
+                "threshold_power": 0.02,
+                "battery_wear": {"enabled": False},
+            }
+        ],
+        "pv_systems": [
+            {"id": "roof", "label": "Roof", "kwp": 10.0, "pv_tilt": 25, "pv_azimuth": 0}
+        ],
+    }
     path = config_dir / "config.json"
     path.write_text(json.dumps(payload), encoding="utf-8")
+    (config_dir / "components.json").write_text(json.dumps(components_doc), encoding="utf-8")
     (config_dir / "backtesting_scenarios.json").write_text(
         json.dumps(
             {
@@ -146,6 +147,10 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
     monkeypatch.setenv(
         "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
+    )
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        str(config_dir / "components.json"),
     )
     config.reinit_config()
 

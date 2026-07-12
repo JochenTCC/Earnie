@@ -2,6 +2,17 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Version 2.0 Components — `components.json` sidecar (2026-07-12)
+
+Completes entity-catalog split from 1.26.0 / 2.0 P2: `batteries[]` and `pv_systems[]` moved from `config.json` into `config/components.json` (sidecar next to `tariffs.json`, `house_profiles.json`). Scenarios keep referencing `battery_id` / `pv_system_id` only. Hard cutover — startup error if legacy keys remain in `config.json`; no alias/fallback.
+
+- [x] **Components P1 — Sidecar infrastructure** — `config/components.schema.json`, `components.minimal.json`, `components.example.json`; [`house_config/components_store.py`](house_config/components_store.py); [`runtime_store/persist_paths.py`](runtime_store/persist_paths.py) `resolve_components_json_path()`; [`runtime_store/bootstrap.py`](runtime_store/bootstrap.py) `_bootstrap_components_json()`
+- [x] **Components P2 — Config load & scenario resolution** — `config.py` `components_path`, `get_batteries()` / `get_pv_systems()` from sidecar; `_reject_legacy_config_blocks`; [`house_config/scenario_resolution.py`](house_config/scenario_resolution.py); [`ui/setup_readiness.py`](ui/setup_readiness.py); `batteries` / `pv_systems` removed from `config.schema.json`, `config.minimal.json`, `config.example.json`
+- [x] **Components P3 — UI & editors** — [`ui/house_config_io.py`](ui/house_config_io.py) `upsert_battery` / `upsert_pv_system`; help strings in [`ui/config_forms.py`](ui/config_forms.py)
+- [x] **Components P4 — Migration & fixtures** — [`scripts/migrate_components_sidecar.py`](scripts/migrate_components_sidecar.py); [`house_config/migrate_runtime_entities.py`](house_config/migrate_runtime_entities.py) writes components sidecar; `silent-migration-test/config/` + fixtures updated
+- [x] **Components P5 — Tests, debug dumps, docs** — `tests/test_components_store.py`, `tests/test_persist_paths_sidecars.py`, planning/setup/runtime resolution tests; [`runtime_store/debug_dump_inputs.py`](runtime_store/debug_dump_inputs.py); user docs [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md), [`docs/konfiguration/batterie-pv.md`](docs/konfiguration/batterie-pv.md), [`docs/einrichtung/greenfield-dev-stack.md`](docs/einrichtung/greenfield-dev-stack.md)
+- [x] **Acceptance** — greenfield bootstrap creates empty `components.json`; Hauskonfigurator persists battery/PV there; live + Scenario-Exploration resolve entity IDs; battery-only (no PV) setup passes readiness; startup fails clearly if legacy keys remain in `config.json`
+
 ### Bugfix EV urgent constraint removed (2026-07-12)
 
 - [x] **EV: urgent constraint removed** — MILP: separate `urgent >= target` constraint removed; deadline still enforced via `eligible` slots until completion time

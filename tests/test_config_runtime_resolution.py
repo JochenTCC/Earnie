@@ -49,6 +49,10 @@ def _write_minimal_greenfield_config(config_dir) -> None:
         json.dumps({"import_tariffs": [], "export_tariffs": []}),
         encoding="utf-8",
     )
+    (config_dir / "components.json").write_text(
+        json.dumps({"batteries": [], "pv_systems": []}),
+        encoding="utf-8",
+    )
     _write_live_scenarios(config_dir, settings={
         "battery_id": "",
         "pv_system_id": "",
@@ -103,6 +107,14 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                 "file_paths_battery_simulation": {
                     "path_cons_data": "runtime/cons_data_hourly.csv"
                 },
+                "flexible_consumers": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (config_dir / "components.json").write_text(
+        json.dumps(
+            {
                 "batteries": [battery],
                 "pv_systems": [
                     {
@@ -113,7 +125,6 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                         "pv_azimuth": 180,
                     }
                 ],
-                "flexible_consumers": [],
             }
         ),
         encoding="utf-8",
@@ -180,6 +191,7 @@ def test_config_loads_id_only_live_scenario(tmp_path, monkeypatch):
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -208,6 +220,7 @@ def test_battery_wear_requires_entity_config_when_battery_id_set(tmp_path, monke
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -228,6 +241,7 @@ def test_backtesting_feed_in_settings_uses_resolved_baseline(tmp_path, monkeypat
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -248,6 +262,7 @@ def test_live_scenario_in_backtesting_scenarios(tmp_path, monkeypatch):
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -289,6 +304,7 @@ def test_config_defers_runtime_params_during_incomplete_greenfield(tmp_path, mon
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -312,6 +328,7 @@ def test_config_loads_full_params_after_planning_complete(tmp_path, monkeypatch)
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -325,9 +342,9 @@ def test_config_loads_zero_pv_without_pv_system(tmp_path, monkeypatch):
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
     _write_id_only_config(config_dir, battery_wear_enabled=False)
-    payload = json.loads((config_dir / "config.json").read_text(encoding="utf-8"))
-    payload["pv_systems"] = []
-    (config_dir / "config.json").write_text(json.dumps(payload), encoding="utf-8")
+    components_doc = json.loads((config_dir / "components.json").read_text(encoding="utf-8"))
+    components_doc["pv_systems"] = []
+    (config_dir / "components.json").write_text(json.dumps(components_doc), encoding="utf-8")
     scenarios_doc = json.loads(
         (config_dir / "backtesting_scenarios.json").read_text(encoding="utf-8")
     )
@@ -342,6 +359,7 @@ def test_config_loads_zero_pv_without_pv_system(tmp_path, monkeypatch):
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -363,6 +381,7 @@ def test_update_live_scenario_settings_accepts_id_refs_only(tmp_path, monkeypatc
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -373,6 +392,7 @@ def test_update_live_scenario_settings_accepts_id_refs_only(tmp_path, monkeypatc
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
     scenarios_doc = json.loads(
@@ -394,6 +414,7 @@ def test_update_live_scenario_settings_rejects_geo_fields(tmp_path, monkeypatch)
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -415,6 +436,7 @@ def test_update_live_scenario_settings_rejects_flat_pv_fields(tmp_path, monkeypa
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 
@@ -452,6 +474,7 @@ def test_set_live_scenario_id_persists_and_reloads(tmp_path, monkeypatch):
         backtesting_scenarios_path=str(scenarios_path),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
     assert cfg.get_live_scenario_id() == DEFAULT_LIVE_SCENARIO_ID
@@ -474,6 +497,7 @@ def test_set_live_scenario_id_rejects_unknown(tmp_path, monkeypatch):
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
+        components_path=str(config_dir / "components.json"),
         require_loxone_credentials=False,
     )
 

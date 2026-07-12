@@ -14,6 +14,7 @@ from house_config.profiles_store import (
 from house_config.tariffs_store import load_tariffs_document
 from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
+    resolve_components_json_path,
     resolve_config_json_path,
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
@@ -128,10 +129,23 @@ def _save_config_document(data: dict) -> None:
     config.reinit_config()
 
 
+def _load_components_document() -> dict:
+    from house_config.components_store import load_components_document
+
+    return load_components_document(resolve_components_json_path())
+
+
+def _save_components_document(data: dict) -> None:
+    from house_config.components_store import save_components_document
+
+    save_components_document(resolve_components_json_path(), data)
+    config.reinit_config()
+
+
 def upsert_pv_system(raw_spec: dict, *, stable_id: str = "") -> None:
     from house_config.entity_resolution import normalize_pv_system
 
-    data = _load_config_document()
+    data = _load_components_document()
     systems = list(data.get("pv_systems") or [])
     taken = {str(item.get("id", "")) for item in systems if item.get("id")}
     if stable_id:
@@ -149,13 +163,13 @@ def upsert_pv_system(raw_spec: dict, *, stable_id: str = "") -> None:
     systems = [item for item in systems if item.get("id") != entity_id]
     systems.append(spec)
     data["pv_systems"] = systems
-    _save_config_document(data)
+    _save_components_document(data)
 
 
 def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
     from house_config.entity_resolution import normalize_battery
 
-    data = _load_config_document()
+    data = _load_components_document()
     batteries = list(data.get("batteries") or [])
     taken = {str(item.get("id", "")) for item in batteries if item.get("id")}
     if stable_id:
@@ -188,7 +202,7 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
     batteries = [item for item in batteries if item.get("id") != entity_id]
     batteries.append(spec)
     data["batteries"] = batteries
-    _save_config_document(data)
+    _save_components_document(data)
 
 
 def _live_scenario_settings() -> dict:

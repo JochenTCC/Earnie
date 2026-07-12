@@ -1,6 +1,7 @@
 """Vollständige Auflösung eines Backtesting-Szenarios in flache Parameter."""
 from __future__ import annotations
 
+from house_config.components_store import load_components_document
 from house_config.entity_resolution import (
     batteries_by_id,
     pv_systems_by_id,
@@ -69,6 +70,8 @@ def resolve_scenario_settings(
     settings: dict,
     *,
     raw_config: dict,
+    components_path: str | None = None,
+    components: dict | None = None,
     tariffs_path: str,
     house_profiles_path: str,
     monthly_rates_holder: dict | None = None,
@@ -78,8 +81,12 @@ def resolve_scenario_settings(
     Liefert flaches Dict kompatibel mit simulation/engine.py.
     """
     out = dict(settings)
-    batteries = batteries_by_id(raw_config)
-    pv_systems = pv_systems_by_id(raw_config)
+    if components is None:
+        if not components_path:
+            raise ValueError("components_path oder components erforderlich.")
+        components = load_components_document(components_path)
+    batteries = batteries_by_id(components)
+    pv_systems = pv_systems_by_id(components)
     out = resolve_battery_into_settings(out, batteries)
     out = resolve_pv_into_settings(out, pv_systems)
 
@@ -163,6 +170,7 @@ def resolve_live_scenario_settings(
     raw_config: dict,
     *,
     backtesting_scenarios_path: str,
+    components_path: str,
     tariffs_path: str,
     house_profiles_path: str,
     monthly_rates_holder: dict | None = None,
@@ -180,6 +188,7 @@ def resolve_live_scenario_settings(
     return resolve_scenario_settings(
         prepared,
         raw_config=raw_config,
+        components_path=components_path,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
         monthly_rates_holder=monthly_rates_holder,
@@ -189,6 +198,8 @@ def resolve_live_scenario_settings(
 def resolve_legacy_runtime_settings(
     raw_config: dict,
     *,
+    components_path: str | None = None,
+    components: dict | None = None,
     tariffs_path: str,
     house_profiles_path: str,
     monthly_rates_holder: dict | None = None,
@@ -207,6 +218,8 @@ def resolve_legacy_runtime_settings(
     return resolve_scenario_settings(
         prepared,
         raw_config=raw_config,
+        components_path=components_path,
+        components=components,
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
         monthly_rates_holder=monthly_rates_holder,

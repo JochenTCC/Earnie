@@ -10,6 +10,7 @@ load_app_dotenv()
 
 from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
+    resolve_components_json_path,
     resolve_config_json_path,
     resolve_dotenv_path,
     resolve_house_profiles_json_path,
@@ -27,6 +28,7 @@ BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
 LOCAL_SETTINGS_JSON_PATH = resolve_local_settings_json_path()
 TARIFFS_JSON_PATH = resolve_tariffs_json_path()
 HOUSE_PROFILES_JSON_PATH = resolve_house_profiles_json_path()
+COMPONENTS_JSON_PATH = resolve_components_json_path()
 
 
 def _default_require_loxone_credentials() -> bool:
@@ -67,6 +69,7 @@ class Config:
         local_settings_path: str = LOCAL_SETTINGS_JSON_PATH,
         tariffs_path: str = TARIFFS_JSON_PATH,
         house_profiles_path: str = HOUSE_PROFILES_JSON_PATH,
+        components_path: str = COMPONENTS_JSON_PATH,
         require_loxone_credentials: bool | None = None,
     ):
         self.config_path = config_path
@@ -74,18 +77,26 @@ class Config:
         self.local_settings_path = local_settings_path
         self.tariffs_path = tariffs_path
         self.house_profiles_path = house_profiles_path
+        self.components_path = components_path
         if require_loxone_credentials is None:
             require_loxone_credentials = _default_require_loxone_credentials()
         self.require_loxone_credentials = require_loxone_credentials
         self._raw_config = None
+        self._components_doc = None
         self._runtime_params_deferred = False
         self._load_all()
 
     def _load_all(self) -> None:
         self._raw_config = self._load_json()
+        self._load_components()
         self._load_env_vars()
         self._load_static_params()
         self._load_dynamic_params()
+
+    def _load_components(self) -> None:
+        from house_config.components_store import load_components_document
+
+        self._components_doc = load_components_document(self.components_path)
 
     def _load_json(self) -> dict:
         if not os.path.exists(self.config_path):
@@ -255,6 +266,16 @@ class Config:
                 "Globaler Block 'battery_wear' ist entfernt (1.26.0 P6). "
                 "Verschleiß pro batteries[]-Eintrag konfigurieren."
             )
+        if self._raw_config.get("batteries") is not None:
+            raise ValueError(
+                "Block 'batteries' in config.json ist entfernt (2.0 Components). "
+                "Batteriespezifikationen gehören in components.json."
+            )
+        if self._raw_config.get("pv_systems") is not None:
+            raise ValueError(
+                "Block 'pv_systems' in config.json ist entfernt (2.0 Components). "
+                "PV-Anlagen gehören in components.json."
+            )
 
     def _reject_legacy_runtime_settings_block(self) -> None:
         if self._raw_config.get("runtime_settings") is not None:
@@ -273,6 +294,7 @@ class Config:
         resolved = resolve_live_scenario_settings(
             self._raw_config,
             backtesting_scenarios_path=self.backtesting_scenarios_path,
+            components_path=self.components_path,
             tariffs_path=self.tariffs_path,
             house_profiles_path=self.house_profiles_path,
             monthly_rates_holder=holder,
@@ -297,6 +319,7 @@ class Config:
 
         missing = missing_planning_setup_items_for(
             self._raw_config,
+            components_path=self.components_path,
             tariffs_path=self.tariffs_path,
             house_profiles_path=self.house_profiles_path,
             backtesting_scenarios_path=self.backtesting_scenarios_path,
@@ -317,6 +340,7 @@ class Config:
             return False
         return not is_planning_ready_for(
             self._raw_config,
+            components_path=self.components_path,
             tariffs_path=self.tariffs_path,
             house_profiles_path=self.house_profiles_path,
             backtesting_scenarios_path=self.backtesting_scenarios_path,
@@ -689,12 +713,16 @@ class Config:
     def get_batteries(self) -> list[dict]:
         from house_config.entity_resolution import batteries_by_id
 
-        return list(batteries_by_id(self._raw_config).values())
+        return list(batteries_by_id(self._components_doc).values())
 
     def get_pv_systems(self) -> list[dict]:
         from house_config.entity_resolution import pv_systems_by_id
 
-        return list(pv_systems_by_id(self._raw_config).values())
+        return list(pv_systems_by_id(self._components_doc).values())
+
+    def get_components_catalog(self) -> dict:
+        """Normalisiertes components.json (batteries[], pv_systems[])."""
+        return dict(self._components_doc)
 
     def resolve_scenario_settings_dict(self, settings: dict) -> dict:
         return self._resolve_scenario_settings_dict(settings)
@@ -706,6 +734,7 @@ class Config:
         resolved = resolve_scenario_settings(
             settings,
             raw_config=self._raw_config,
+            components_path=self.components_path,
             tariffs_path=self.tariffs_path,
             house_profiles_path=self.house_profiles_path,
             monthly_rates_holder=holder,
@@ -840,12 +869,13 @@ CONFIG = Config(require_loxone_credentials=_default_require_loxone_credentials()
 def reinit_config(require_loxone_credentials: bool | None = None) -> None:
     """Lädt die Konfiguration neu (z. B. nach Bootstrap mit neu angelegter config.json)."""
     global CONFIG, CONFIG_JSON_PATH, BACKTESTING_SCENARIOS_JSON_PATH, LOCAL_SETTINGS_JSON_PATH
-    global TARIFFS_JSON_PATH, HOUSE_PROFILES_JSON_PATH
+    global TARIFFS_JSON_PATH, HOUSE_PROFILES_JSON_PATH, COMPONENTS_JSON_PATH
     CONFIG_JSON_PATH = resolve_config_json_path()
     BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
     LOCAL_SETTINGS_JSON_PATH = resolve_local_settings_json_path()
     TARIFFS_JSON_PATH = resolve_tariffs_json_path()
     HOUSE_PROFILES_JSON_PATH = resolve_house_profiles_json_path()
+    COMPONENTS_JSON_PATH = resolve_components_json_path()
     if require_loxone_credentials is None:
         require_loxone_credentials = _default_require_loxone_credentials()
     CONFIG = Config(
@@ -854,6 +884,7 @@ def reinit_config(require_loxone_credentials: bool | None = None) -> None:
         local_settings_path=LOCAL_SETTINGS_JSON_PATH,
         tariffs_path=TARIFFS_JSON_PATH,
         house_profiles_path=HOUSE_PROFILES_JSON_PATH,
+        components_path=COMPONENTS_JSON_PATH,
         require_loxone_credentials=require_loxone_credentials,
     )
 

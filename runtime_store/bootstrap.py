@@ -26,6 +26,10 @@ from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_minimal_template_path,
     resolve_backtesting_scenarios_schema_template_path,
     resolve_backtesting_scenarios_template_path,
+    resolve_components_json_path,
+    resolve_components_minimal_template_path,
+    resolve_components_schema_template_path,
+    resolve_components_template_path,
     resolve_house_profiles_json_path,
     resolve_house_profiles_minimal_template_path,
     resolve_house_profiles_schema_template_path,
@@ -234,6 +238,32 @@ def _bootstrap_house_profiles_json() -> bool:
     )
 
 
+def _bootstrap_components_example() -> bool:
+    dest = os.path.join("config", "components.example.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_components_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_components_schema() -> bool:
+    dest = os.path.join("config", "components.schema.json")
+    return _copy_template_if_missing(
+        dest,
+        resolve_components_schema_template_path(),
+        "Image-Vorlage",
+    )
+
+
+def _bootstrap_components_json() -> bool:
+    return _copy_template_if_missing(
+        resolve_components_json_path(),
+        resolve_components_minimal_template_path(),
+        "components.minimal.json",
+    )
+
+
 def _bootstrap_deviation_rules_example() -> bool:
     dest = os.path.join("config", "deviation_rules.example.json")
     return _copy_template_if_missing(
@@ -380,6 +410,12 @@ def run() -> None:
         created.append(os.path.join("config", "house_profiles.schema.json"))
     if _bootstrap_house_profiles_json():
         created.append(resolve_house_profiles_json_path())
+    if _bootstrap_components_example():
+        created.append(os.path.join("config", "components.example.json"))
+    if _bootstrap_components_schema():
+        created.append(os.path.join("config", "components.schema.json"))
+    if _bootstrap_components_json():
+        created.append(resolve_components_json_path())
     if _bootstrap_deviation_rules_example():
         created.append(os.path.join("config", "deviation_rules.example.json"))
     if _bootstrap_deviation_rules_schema():

@@ -49,13 +49,13 @@ def _sample_ev_consumer() -> dict:
 
 
 def test_batteries_by_id_from_fixture():
-    batteries = batteries_by_id(config.CONFIG._raw_config)
+    batteries = batteries_by_id(config.CONFIG.get_components_catalog())
     assert "test_battery" in batteries
     assert batteries["test_battery"]["battery_capacity_kwh"] == 8.0
 
 
 def test_resolve_battery_into_settings():
-    batteries = batteries_by_id(config.CONFIG._raw_config)
+    batteries = batteries_by_id(config.CONFIG.get_components_catalog())
     resolved = resolve_battery_into_settings({"battery_id": "test_battery"}, batteries)
     assert resolved["battery_capacity_kwh"] == 8.0
     assert resolved["_battery_wear"]["enabled"] is True
@@ -65,7 +65,7 @@ def test_resolve_battery_into_settings():
 def test_battery_wear_cent_per_kwh_from_entity():
     from house_config.entity_resolution import battery_wear_cent_per_kwh
 
-    batteries = batteries_by_id(config.CONFIG._raw_config)
+    batteries = batteries_by_id(config.CONFIG.get_components_catalog())
     bat = batteries["test_battery"]
     wear = battery_wear_cent_per_kwh(bat)
     assert wear == pytest.approx(2.5, rel=1e-3)
@@ -74,7 +74,7 @@ def test_battery_wear_cent_per_kwh_from_entity():
 def test_resolve_pv_into_settings():
     from house_config.entity_resolution import pv_systems_by_id
 
-    pv_map = pv_systems_by_id(config.CONFIG._raw_config)
+    pv_map = pv_systems_by_id(config.CONFIG.get_components_catalog())
     resolved = resolve_pv_into_settings({"pv_system_id": "test_pv"}, pv_map)
     assert resolved["pv_kwp"] == 6.0
 
@@ -542,6 +542,7 @@ def test_scenario_resolution_includes_planning_flex(tmp_path):
     resolved = resolve_scenario_settings(
         {"house_profile_id": "home"},
         raw_config=config.CONFIG._raw_config,
+        components_path=config.CONFIG.components_path,
         tariffs_path=config.TARIFFS_JSON_PATH,
         house_profiles_path=str(path),
     )
@@ -569,6 +570,10 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
         "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
+    monkeypatch.setenv(
+        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        str(config_dir / "components.json"),
+    )
 
     (config_dir / "config.json").write_text(
         """
@@ -578,6 +583,14 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
             "loxone_blocks": {"soc_name": "Battery_SOC"},
             "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
             "planning_horizon": {"mode": "sunrise_window"},
+            "flexible_consumers": []
+        }
+        """.strip(),
+        encoding="utf-8",
+    )
+    (config_dir / "components.json").write_text(
+        """
+        {
             "batteries": [{
                 "id": "home_5kwh",
                 "label": "5 kWh",
@@ -595,8 +608,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "kwp": 10.0,
                 "pv_tilt": 30,
                 "pv_azimuth": 180
-            }],
-            "flexible_consumers": []
+            }]
         }
         """.strip(),
         encoding="utf-8",
@@ -651,6 +663,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
     resolved = resolve_live_scenario_settings(
         raw,
         backtesting_scenarios_path=str(config_dir / "backtesting_scenarios.json"),
+        components_path=str(config_dir / "components.json"),
         tariffs_path=str(config_dir / "tariffs.json"),
         house_profiles_path=str(config_dir / "house_profiles.json"),
     )
@@ -938,7 +951,7 @@ def test_finalize_migration_for_2_0_removes_legacy_blocks(tmp_path):
             }
         ],
     }
-    config_2_0, scenarios_doc, notes = finalize_migration_for_2_0(
+    config_2_0, scenarios_doc, components_doc, notes = finalize_migration_for_2_0(
         p5_config,
         scenarios_template=template,
     )
@@ -946,6 +959,9 @@ def test_finalize_migration_for_2_0_removes_legacy_blocks(tmp_path):
     assert "runtime_settings" not in config_2_0
     assert "awattar" not in config_2_0
     assert "battery_wear" not in config_2_0
+    assert "batteries" not in config_2_0
+    assert "pv_systems" not in config_2_0
+    assert components_doc["batteries"]
     assert config_2_0["live_scenario_id"] == "live"
     live = next(s for s in scenarios_doc["scenarios"] if s["id"] == "live")
     assert "battery_id" in live["settings"]
@@ -1032,17 +1048,20 @@ def test_finalize_migration_for_2_0_config_loads(tmp_path, monkeypatch):
         house_profiles_path=str(profiles_path),
     )
 
-    config_2_0, scenarios_doc, _ = finalize_migration_for_2_0(p5_config)
+    config_2_0, scenarios_doc, components_doc, _ = finalize_migration_for_2_0(p5_config)
     config_path = config_dir / "config.json"
     scenarios_path = config_dir / "backtesting_scenarios.json"
+    components_path = config_dir / "components.json"
     config_path.write_text(json.dumps(config_2_0), encoding="utf-8")
     scenarios_path.write_text(json.dumps(scenarios_doc), encoding="utf-8")
+    components_path.write_text(json.dumps(components_doc), encoding="utf-8")
 
     cfg = Config(
         config_path=str(config_path),
         backtesting_scenarios_path=str(scenarios_path),
         tariffs_path=str(tariffs_path),
         house_profiles_path=str(profiles_path),
+        components_path=str(components_path),
         require_loxone_credentials=False,
     )
 
@@ -1109,6 +1128,7 @@ def test_setup_silent_migration_test_writes_stack(tmp_path):
     assert "runtime_settings" not in config_payload
     assert config_payload.get("live_scenario_id") == "live"
     assert (config_out / "backtesting_scenarios.json").is_file()
+    assert (config_out / "components.json").is_file()
     assert (config_out / "MIGRATION_REVIEW.md").is_file()
     assert (config_out / ".env").is_file()
     assert (runtime_out / "cons_data_hourly.csv").is_file()

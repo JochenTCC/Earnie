@@ -75,7 +75,7 @@ def finalize_migration_for_2_0(
     *,
     scenarios_template: dict | None = None,
     live_scenario_id: str = "live",
-) -> tuple[dict, dict, list[str]]:
+) -> tuple[dict, dict, dict, list[str]]:
     """
     Schließt 2.0 P6 ab: Live-Szenario in backtesting_scenarios.json, legacy-Blöcke entfernen.
 
@@ -131,7 +131,38 @@ def finalize_migration_for_2_0(
     if config_out.pop("battery_wear", None) is not None:
         notes.append("Globaler Block 'battery_wear' aus config.json entfernt (1.26.0 P6).")
 
-    return config_out, scenarios_doc, notes
+    config_out, components_out = _split_components_from_config(config_out)
+    notes.append(
+        "batteries[] / pv_systems[] nach components.json verschoben (2.0 Components)."
+    )
+
+    return config_out, scenarios_doc, components_out, notes
+
+
+def _components_catalog_from_config(config: dict) -> dict:
+    batteries = config.get("batteries", [])
+    pv_systems = config.get("pv_systems", [])
+    if not isinstance(batteries, list):
+        batteries = []
+    if not isinstance(pv_systems, list):
+        pv_systems = []
+    return {"batteries": batteries, "pv_systems": pv_systems}
+
+
+def _split_components_from_config(config: dict) -> tuple[dict, dict]:
+    config_out = copy.deepcopy(config)
+    batteries = config_out.pop("batteries", [])
+    pv_systems = config_out.pop("pv_systems", [])
+    if not isinstance(batteries, list):
+        batteries = []
+    if not isinstance(pv_systems, list):
+        pv_systems = []
+    components_out = {
+        "$schema": "./components.schema.json",
+        "batteries": batteries,
+        "pv_systems": pv_systems,
+    }
+    return config_out, components_out
 
 
 def effective_runtime_values(
@@ -145,6 +176,7 @@ def effective_runtime_values(
 
     resolved = resolve_legacy_runtime_settings(
         config,
+        components=_components_catalog_from_config(config),
         tariffs_path=tariffs_path,
         house_profiles_path=house_profiles_path,
     )
@@ -166,6 +198,7 @@ def write_migration_draft(
     config: dict,
     tariffs_doc: dict,
     house_profiles_doc: dict,
+    components_doc: dict | None = None,
     notes: list[str],
 ) -> None:
     """Schreibt Entwurfsdateien und MIGRATION_REVIEW.md."""
@@ -177,6 +210,11 @@ def write_migration_draft(
         json.dumps(config, indent=4, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+    if components_doc is not None:
+        (out / "components.json").write_text(
+            json.dumps(components_doc, indent=4, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
     (out / "tariffs.json").write_text(
         json.dumps(tariffs_doc, indent=4, ensure_ascii=False) + "\n",
         encoding="utf-8",
@@ -203,8 +241,8 @@ def write_migration_draft(
             "## Nächste Schritte",
             "",
             "1. Entwurf mit produktiver Konfiguration vergleichen.",
-            "2. `tariffs.json` und `house_profiles.json` in `config/` übernehmen.",
-            "3. `config.json` → `runtime_settings` nur noch IDs prüfen.",
+            "2. `tariffs.json`, `house_profiles.json` und `components.json` in `config/` übernehmen.",
+            "3. `config.json` → nur noch Live-Referenzen prüfen (`live_scenario_id`).",
             "4. Live-Optimierung und Backtesting-Baseline testen.",
             "5. Globale Blöcke `battery_wear` und `awattar` aus config.json entfernen (P6).",
             "",

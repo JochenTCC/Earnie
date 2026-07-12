@@ -34,6 +34,10 @@ def _apply_default_test_config_env() -> None:
         "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
         str(bt_dir / "backtesting_scenarios.json"),
     )
+    os.environ.setdefault(
+        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        str(bt_dir / "components.json"),
+    )
 
 
 _apply_default_test_config_env()

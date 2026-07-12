@@ -1,0 +1,5 @@
+{
+    "$schema": "./components.schema.json",
+    "batteries": [],
+    "pv_systems": []
+}
