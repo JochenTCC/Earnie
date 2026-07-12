@@ -38,7 +38,8 @@ Nach `up` (vor manueller Ersteinrichtung) sollten u. a. vorhanden sein:
 
 | Pfad | Erwartung |
 |------|-----------|
-| `greenfield/config/config.json` | Aus `config.minimal.json` — leere `batteries`/`pv_systems`/`flexible_consumers`, `live_scenario_id: live`, Platzhalter-Loxone |
+| `greenfield/config/config.json` | Aus `config.minimal.json` — leere `flexible_consumers`, `live_scenario_id: live`, Platzhalter-Loxone |
+| `greenfield/config/components.json` | Aus `components.minimal.json` — leere `batteries`/`pv_systems` |
 | `greenfield/config/config.example.json` | Vollständiges Referenzbeispiel (Earnie) — nur zum Nachschlagen |
 | `greenfield/config/.env` | Aus `.env.example` (Platzhalter → Setup-Seite) |
 | `greenfield/runtime/local_settings.json` | z. B. `{"loxone_silent_mode": false}` |
@@ -84,7 +85,7 @@ Ziel: Greenfield nutzt **`live_scenario_id`** + Live-Szenario in `backtesting_sc
 |---------|---------|-----------|
 | 1. Config | `greenfield/config/config.json` | `live_scenario_id: live`, **kein** Block `runtime_settings` |
 | 2. Live-Szenario | `greenfield/config/backtesting_scenarios.json` → Szenario `live` | Entitäts-IDs: `battery_id`, `import_tariff_id`, `export_tariff_id`, `house_profile_id`, optional `pv_system_id` — Geo/Zeitzone aus `house_profiles.json` |
-| 3. Entitäts-Auflösung | Echtzeit-Umgebung → Live-Konfiguration | JSON mit aufgelösten PV-, Batterie- und Tarifparametern aus `batteries[]`, `pv_systems[]`, `tariffs.json` |
+| 3. Entitäts-Auflösung | Echtzeit-Umgebung → Live-Konfiguration | JSON mit aufgelösten PV-, Batterie- und Tarifparametern aus `components.json`, `tariffs.json` |
 | 3. Live-Zyklus | `docker compose -f docker-compose-greenfield.yml logs -f optimizer-worker` | `main.py` durchläuft mindestens einen Optimierungszyklus ohne Config-Fehler |
 | 4. UI Sunset-2-Sunset | Seite **Cockpit** | Aufgelöste Werte (PV kWp, Batterie, Einspeisevergütung) **read-only** auf **Live-Konfiguration** — keine Sidebar-Edits |
 | 5. Scenario-Exploration-Parität | Gleiche Tarif-IDs, gleiches Zeitfenster | Import/Export-cent/kWh identisch zu Live (Detail-Paritätstest folgt in **1.26.0 P3**) |
