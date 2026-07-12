@@ -38,17 +38,17 @@ Critical path: **P7**. Smoke-test bugs → [Backlog-Bugfixes.md](Backlog-Bugfixe
 | **`sunrise_window` rename (P4)** | Hard rename `sunset_window` **→** `sunrise_window` — no alias; internal symbols renamed; prod deploy only with P6a config migration                                                    |
 | **2.0 release gate**             | **`version.py` → `2.0.0`** after **P7** acceptance (user approval); **P6b** not required for 2.0 release                                                                                              |
 
+### Version 2.0 — smoke-test follow-ups
+
+- [ ] **Scenario-Exploration without PV** — optimization/backtesting path incomplete when `pv_system_id` unset (P1 allows battery-only; simulation/MILP gaps remain — defer to **Thermals** / **Adaptation** epics unless blocking **2.+1 P6b** live cutover)
+- [ ] **EV nominal voltage for power calculation** — configurable per EV consumer (house profile + `flexible_consumers`); replace hardcoded 230 V in A→kW conversion (`integrations/loxone_client.py`); shared helper for live and planning paths; default 230 V / 1 phase when unset
+- [ ] Move battery  and PV data into new file "components.json" and remove it from config.json.
+
 
 - [ ] **Version 2.0 P7 — Documentation & evaluations**
   - Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
   - Build additional container for Windows as pure Python environment (if that makes sense) — spike vs local venv; go/no-go note
   - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
-
-
-### Version 2.0 — smoke-test follow-ups
-
-- [ ] **Scenario-Exploration without PV** — optimization/backtesting path incomplete when `pv_system_id` unset (P1 allows battery-only; simulation/MILP gaps remain — defer to **Thermals** / **Adaptation** epics unless blocking **2.+1 P6b** live cutover)
-- [ ] **EV nominal voltage for power calculation** — configurable per EV consumer (house profile + `flexible_consumers`); replace hardcoded 230 V in A→kW conversion (`integrations/loxone_client.py`); shared helper for live and planning paths; default 230 V / 1 phase when unset
 
 ### Version 2.+1
 
