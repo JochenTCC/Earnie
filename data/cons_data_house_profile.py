@@ -3,13 +3,76 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import date, datetime, time
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
 import config
-from data.consumption_profiles import _consumer_id, modeled_consumer_kw_at_datetime
+from data.consumption_profiles import (
+    _consumer_id,
+    _modeled_hour_index,
+    modeled_consumer_kw_at_datetime,
+)
+from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.profiles_store import load_house_profiles_document
 from runtime_store.persist_paths import resolve_house_profiles_json_path
+
+if TYPE_CHECKING:
+    from data.modeled_climate import ModeledClimateContext
+
+def _parse_hourly_timestamp(ts_raw: str) -> datetime:
+    return datetime.fromisoformat(ts_raw.replace(" ", "T", 1)[:19])
+
+
+def total_kw_at_datetime(profile: dict, slot_dt: datetime) -> float:
+    """Gesamtverbrauch (kW) zum Kalenderzeitpunkt aus Hausprofil."""
+    csv_path = profile.get("total_profile_csv", "")
+    if csv_path:
+        series = load_hourly_profile_csv(csv_path)
+        hour_index = _modeled_hour_index(slot_dt)
+        if hour_index < len(series):
+            return float(series[hour_index][1])
+        return 0.0
+    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
+    baseload_kw = baseload_kwh / 8760.0
+    flex_sum = sum(
+        modeled_consumer_kw_at_datetime(consumer, slot_dt)
+        for consumer in profile.get("consumers", [])
+    )
+    return baseload_kw + flex_sum
+
+
+def hourly_kw_by_consumer_for_timestamps(
+    profile: dict,
+    timestamps: list[str],
+) -> dict[str, list[float]]:
+    """Stündlicher kW je Verbraucher + Basislast, kalenderbasiert wie cons_data-Synthese."""
+    consumers = list(profile.get("consumers", []))
+    consumer_ids = [_consumer_id(consumer, index) for index, consumer in enumerate(consumers)]
+    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
+    baseload_kw = baseload_kwh / 8760.0
+    series: dict[str, list[float]] = {cid: [] for cid in consumer_ids}
+    baseload_series: list[float] = []
+    for ts_raw in timestamps:
+        slot_dt = _parse_hourly_timestamp(ts_raw)
+        for index, cid in enumerate(consumer_ids):
+            series[cid].append(
+                modeled_consumer_kw_at_datetime(consumers[index], slot_dt)
+            )
+        baseload_series.append(baseload_kw)
+    series["baseload"] = baseload_series
+    return series
+
+
+def hourly_total_kw_for_timestamps(
+    profile: dict,
+    timestamps: list[str],
+) -> list[float]:
+    """Gesamtverbrauch (kW) je Timestamp-String, kalenderbasiert wie cons_data-Synthese."""
+    return [
+        total_kw_at_datetime(profile, _parse_hourly_timestamp(ts_raw))
+        for ts_raw in timestamps
+    ]
 
 
 def resolve_runtime_house_profile() -> dict | None:
@@ -89,9 +152,14 @@ def build_synthetic_dataframe_from_house_profile(
     end: date,
     kwp: float,
     source: str,
-    pv_kw_at_datetime: Callable[[datetime], float],
+    climate: ModeledClimateContext | None = None,
+    pv_kw_at_datetime: Callable[[datetime], float] | None = None,
 ) -> pd.DataFrame:
     """Stündliche cons_data aus modelliertem Hausprofil (Verbraucher + Basislast)."""
+    if climate is None and pv_kw_at_datetime is None:
+        from data.modeled_climate import ModeledClimateContext
+
+        climate = ModeledClimateContext.for_house_profile(profile, kwp=kwp)
     start_dt = datetime.combine(start, time(0))
     end_dt = datetime.combine(end, time(23))
     hours = int((end_dt - start_dt).total_seconds() // 3600) + 1
@@ -108,16 +176,24 @@ def build_synthetic_dataframe_from_house_profile(
     for ts in timestamps:
         slot_dt = ts.to_pydatetime()
         flex_vals = {
-            cid: modeled_consumer_kw_at_datetime(consumers[index], slot_dt)
+            cid: modeled_consumer_kw_at_datetime(
+                consumers[index],
+                slot_dt,
+                climate=climate,
+            )
             for index, cid in enumerate(consumer_ids)
         }
         flex_sum = sum(flex_vals.values())
+        if climate is not None:
+            pv_kw = climate.pv_kw_at(slot_dt)
+        else:
+            pv_kw = pv_kw_at_datetime(slot_dt)
         rows.append(
             {
                 "timestamp": ts,
                 "total_kw": round(baseload_kw + flex_sum, 3),
                 "baseload_kw": round(baseload_kw, 3),
-                "pv_kw": pv_kw_at_datetime(slot_dt),
+                "pv_kw": pv_kw,
                 "source": source,
                 **{f"{cid}_kw": round(flex_vals[cid], 3) for cid in consumer_ids},
             }

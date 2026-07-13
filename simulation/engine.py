@@ -161,7 +161,16 @@ class HistoricalDataCache:
         total_load = df_window["Total"].round(3).tolist()
         return baseload, historical_totals, total_load, hourly_flex
 
-    def get_pv_for_slots(self, slot_datetimes: list[datetime]) -> list[float]:
+    def get_pv_for_slots(
+        self,
+        slot_datetimes: list[datetime],
+        *,
+        scenario_params: dict | None = None,
+    ) -> list[float]:
+        if scenario_params is not None:
+            from data.modeled_climate import pv_kw_for_slots
+
+            return pv_kw_for_slots(slot_datetimes, scenario_params)
         self.load()
         idx = pd.DatetimeIndex(slot_datetimes)
         if self._pv_series is None or self._pv_series.empty:
@@ -319,20 +328,26 @@ def build_historical_matrix_for_slots(
         total_load, hourly_flex
     )
     if scenario_params and scenario_params.get("_house_profile"):
+        from data.modeled_climate import ModeledClimateContext
         from house_config.planning_flex_bridge import house_profile_baseload_overlay
 
         profile = scenario_params["_house_profile"]
+        climate = ModeledClimateContext.from_scenario(scenario_params)
         cons_data_consumer_ids = cache.cons_data_consumer_ids_present()
         overlay = house_profile_baseload_overlay(
             profile,
             slot_datetimes,
             historical_totals=all_consumer_totals,
             cons_data_consumer_ids=cons_data_consumer_ids,
+            climate=climate,
         )
         baseload_kw = [round(base + extra, 3) for base, extra in zip(baseload_kw, overlay)]
         historical_baseload_kwh = round(sum(baseload_kw), 3)
     stored_baseload_kwh = round(sum(baseload_stored), 3)
-    pv_profile = cache.get_pv_for_slots(slot_datetimes)
+    pv_profile = cache.get_pv_for_slots(
+        slot_datetimes,
+        scenario_params=scenario_params,
+    )
     price_ctx = (
         price_resources.at_planning_moment(planning_moment)
         if price_resources is not None and planning_moment is not None
@@ -624,7 +639,10 @@ def compute_historical_reference_costs(
     for anchor in anchors:
         slot_datetimes = window_slot_datetimes(anchor)
         _, _, total_load, _ = cache.get_window_consumption(slot_datetimes)
-        pv_profile = cache.get_pv_for_slots(slot_datetimes)
+        pv_profile = cache.get_pv_for_slots(
+            slot_datetimes,
+            scenario_params=scenario_params,
+        )
         brutto_prices = _brutto_prices_for_slots(
             prices_df,
             slot_datetimes,

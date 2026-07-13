@@ -23,8 +23,10 @@ from ui.consumption_display.aggregation import (
 from ui.consumption_display.charts import (
     stack_monthly_sum_matches_total,
     stacked_monthly_chart,
+    week_scenario_consumer_timeseries_chart,
     week_timeseries_chart,
 )
+from ui.backtesting_scenario_consumption import build_scenario_consumer_overlays
 from ui.consumption_display.navigation import (
     parse_iso_week_jump,
     parse_iso_week_number_only,
@@ -211,6 +213,44 @@ def test_week_timeseries_chart_uses_datetime_axis_and_lines():
     trace_names = {trace.name for trace in fig.data}
     assert "Ist (CSV)" in trace_names
     assert "pool" in trace_names
+
+
+def test_week_scenario_consumer_timeseries_chart_uses_consumer_color_and_scenario_dash():
+    start = datetime(2024, 3, 18, 0, 0, 0)
+    timestamps = [
+        (start + timedelta(hours=index)).strftime("%Y-%m-%d %H:%M:%S")
+        for index in range(168)
+    ]
+    profile_a = _sample_profile()
+    profile_b = {
+        "annual_kwh": 240.0,
+        "baseload_kwh": 48.0,
+        "consumers": [{"id": "other", "type": "generic", "annual_kwh": 192.0}],
+    }
+    overlay_bundle = build_scenario_consumer_overlays(
+        {
+            "a": {"_house_profile": profile_a},
+            "b": {"_house_profile": profile_b},
+        },
+        {"a": "Szenario A", "b": "Szenario B"},
+        timestamps,
+    )
+    assert overlay_bundle is not None
+    fig = week_scenario_consumer_timeseries_chart(
+        timestamps,
+        overlay_bundle,
+        iso_year=2024,
+        iso_week=12,
+    )
+    pool_traces = [trace for trace in fig.data if trace.name.endswith("— pool")]
+    assert len(pool_traces) == 2
+    assert pool_traces[0].line.color == pool_traces[1].line.color
+    assert pool_traces[0].line.dash != pool_traces[1].line.dash
+    other_traces = [trace for trace in fig.data if trace.name.endswith("— other")]
+    assert len(other_traces) == 2
+    assert other_traces[0].line.dash != other_traces[1].line.dash
+    assert max(other_traces[0].y) == 0.0
+    assert max(other_traces[1].y) > 0.0
 
 
 def test_parse_iso_week_jump_formats():

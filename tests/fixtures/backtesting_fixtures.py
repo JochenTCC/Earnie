@@ -83,6 +83,9 @@ def activate_backtesting_fixtures(monkeypatch):
     )
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
     config_module.reinit_config()
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     try:
         yield config_module
     finally:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from settings.flexible_consumers import CONSUMER_PALETTE_SIZE
 from house_config.generic_schedule import (
@@ -9,6 +10,9 @@ from house_config.generic_schedule import (
     generic_hourly_kw_for_day,
     is_fixed_start,
 )
+
+if TYPE_CHECKING:
+    from data.modeled_climate import ModeledClimateContext
 
 
 def _house_generic_consumers(house_profile: dict) -> list[dict]:
@@ -98,27 +102,28 @@ def thermal_hourly_overlay(
     slot_datetimes: list[datetime],
     *,
     skip_consumer_ids: set[str] | None = None,
+    climate: ModeledClimateContext | None = None,
 ) -> list[float]:
     """Summiert kW thermischer Verbraucher (on/off bei nominal_power_kw) je Slot."""
     thermal = _house_thermal_consumers(house_profile)
     if not thermal:
         return [0.0] * len(slot_datetimes)
-    from data.consumption_profiles import _modeled_consumer_hourly_kw
+    from data.consumption_profiles import modeled_consumer_kw_at_datetime
 
     skip = skip_consumer_ids or set()
-    profiles = [
-        _modeled_consumer_hourly_kw(consumer, hours=8760)
+    active = [
+        consumer
         for consumer in thermal
         if str(consumer.get("id") or "") not in skip
     ]
-    if not profiles:
+    if not active:
         return [0.0] * len(slot_datetimes)
-    ref_start = datetime(2023, 1, 1)
     overlay: list[float] = []
     for slot_dt in slot_datetimes:
-        naive = slot_dt.replace(tzinfo=None) if slot_dt.tzinfo else slot_dt
-        hour_index = int((naive - ref_start).total_seconds() // 3600) % 8760
-        kw = sum(profile[hour_index] for profile in profiles)
+        kw = sum(
+            modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate)
+            for consumer in active
+        )
         overlay.append(round(kw, 6))
     return overlay
 
@@ -129,6 +134,7 @@ def house_profile_baseload_overlay(
     *,
     historical_totals: dict[str, float] | None = None,
     cons_data_consumer_ids: set[str] | None = None,
+    climate: ModeledClimateContext | None = None,
 ) -> list[float]:
     """Fixe generic- und thermische Verbraucher aus Hausprofil je Slot."""
     skip_ids = _consumer_ids_with_cons_data(
@@ -141,6 +147,7 @@ def house_profile_baseload_overlay(
         house_profile,
         slot_datetimes,
         skip_consumer_ids=skip_ids,
+        climate=climate,
     )
     return [round(g + t, 6) for g, t in zip(generic, thermal)]
 

@@ -14,7 +14,12 @@ from data.backtesting_prices import (
     pricing_kwargs_from_resolved,
 )
 from data.data_loader import _monday_of_week, resolve_simulation_window
-from data.heating_need import thermal_on_off_hourly_profile, weekly_electric_kwh
+from data.heating_need import (
+    daily_electric_kwh,
+    thermal_daily_pwm_hourly_profile,
+    thermal_on_off_hourly_profile,
+    weekly_electric_kwh,
+)
 from data.market_prices import resolve_market_slots
 from house_config.planning_flex_bridge import thermal_hourly_overlay
 
@@ -113,6 +118,66 @@ def test_resolve_simulation_window_start_is_monday(monkeypatch):
     assert end.normalize() == pd.Timestamp("2025-07-09")
 
 
+def test_thermal_daily_pwm_uses_nominal_or_zero():
+    daily = [2.0] * 7
+    nominal = 2.0
+    profile = thermal_daily_pwm_hourly_profile(
+        daily,
+        nominal_power_kw=nominal,
+        hours_per_year=168,
+    )
+    assert len(profile) == 168
+    for kw in profile:
+        assert kw == pytest.approx(0.0) or kw == pytest.approx(nominal)
+    assert sum(profile[:24]) == pytest.approx(2.0, rel=1e-3)
+
+
+def test_thermal_daily_pwm_preserves_daily_kwh():
+    params = {
+        "living_area_m2": 120.0,
+        "building_class": 3,
+        "heat_pump_type": "luft",
+        "persons": 2,
+        "latitude": 48.2,
+        "longitude": 11.0,
+        "target_temp_c": 21.5,
+        "heating_limit_c": 15.0,
+    }
+    daily = daily_electric_kwh(**params)
+    profile = thermal_daily_pwm_hourly_profile(
+        daily,
+        nominal_power_kw=3.0,
+        hours_per_year=8760,
+    )
+    for day_idx, day_kwh in enumerate(daily):
+        start = day_idx * 24
+        end = start + 24
+        assert sum(profile[start:end]) == pytest.approx(day_kwh, rel=1e-3)
+
+
+def test_thermal_daily_pwm_pulse_lengths_within_one_to_four_hours():
+    daily = [12.0, 4.0, 1.5]
+    profile = thermal_daily_pwm_hourly_profile(
+        daily,
+        nominal_power_kw=3.0,
+        hours_per_year=72,
+    )
+    for day_offset in range(3):
+        day_slice = profile[day_offset * 24 : (day_offset + 1) * 24]
+        on_runs: list[int] = []
+        run = 0
+        for kw in day_slice:
+            if kw > 0.0:
+                run += 1
+            elif run:
+                on_runs.append(run)
+                run = 0
+        if run:
+            on_runs.append(run)
+        for run_hours in on_runs:
+            assert 1 <= run_hours <= 4
+
+
 def test_thermal_on_off_uses_nominal_or_zero():
     weekly = [6.0] * 52
     nominal = 3.0
@@ -172,4 +237,5 @@ def test_thermal_hourly_overlay_maps_slots():
     overlay = thermal_hourly_overlay(profile, slots)
     assert len(overlay) == 24
     assert any(kw > 0 for kw in overlay)
-    assert all(kw == pytest.approx(0.0) or kw == pytest.approx(3.0) for kw in overlay)
+    for kw in overlay:
+        assert kw == pytest.approx(0.0) or (0.0 < kw <= 3.0 + 1e-6)

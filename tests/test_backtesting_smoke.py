@@ -30,6 +30,21 @@ os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 SMOKE_DAY = date(2026, 6, 14)
 
 
+@pytest.fixture(autouse=True)
+def _mock_open_meteo_for_smoke(monkeypatch):
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
+
+
+def _smoke_scenario_without_house_overlay(runtime_scenario_params: dict) -> dict:
+    """Historische CSV hat waermepumpe_kw, kein Hausprofil-Overlay im Smoke-Test."""
+    scenario = dict(runtime_scenario_params)
+    scenario.pop("_house_profile", None)
+    scenario.pop("_planning_flex_consumers", None)
+    return scenario
+
+
 @pytest.fixture(scope="module")
 def historical_cache() -> HistoricalDataCache:
     if not CONS_DATA_FILE.is_file():
@@ -123,10 +138,11 @@ def test_backtesting_run_simulation_single_window(
     runtime_scenario_params: dict,
 ):
     day = smoke_anchor.normalize()
+    scenario = _smoke_scenario_without_house_overlay(runtime_scenario_params)
     df, plausibility, cbc_events = run_simulation(
         day,
         day,
-        runtime_scenario_params,
+        scenario,
         smoke_prices_df,
         cache=historical_cache,
         scenario_id=config.get_live_scenario_id(),
@@ -145,13 +161,15 @@ def test_backtesting_reference_costs_single_window(
     runtime_scenario_params: dict,
 ):
     day = smoke_anchor.normalize()
-    ref_settings = config.get_backtesting_feed_in_settings(runtime_override=runtime_scenario_params)
+    scenario = _smoke_scenario_without_house_overlay(runtime_scenario_params)
+    ref_settings = config.get_backtesting_feed_in_settings(runtime_override=scenario)
     df = compute_historical_reference_costs(
         day,
         day,
         smoke_prices_df,
         ref_settings,
         cache=historical_cache,
+        scenario_params=scenario,
     )
     assert len(df) == 24
     assert df["sim_cost"].notna().all()

@@ -4,9 +4,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from data.heating_need import (
+    daily_electric_kwh,
     estimate_annual_kwh,
     heating_params_from_thermal,
     weekly_electric_kwh,
@@ -54,7 +56,36 @@ def test_solar_thermal_reduces_annual_wp_demand():
     assert with_solar < without
 
 
-def test_consumer_annual_kwh_reflects_solar_thermal():
+def test_daily_electric_kwh_hourly_collector_reduces_summer_day():
+    idx = pd.date_range("2024-07-13 00:00", periods=24, freq="h")
+    hourly_temp = pd.Series([20.0] * 24, index=idx)
+    hourly_wm2 = pd.Series([600.0] * 24, index=idx)
+    params = heating_params_from_thermal(
+        {
+            **_base_thermal(),
+            "solar_thermal_area_m2": 8.0,
+            "solar_thermal_tilt_deg": 18.0,
+            "solar_thermal_azimuth_deg": 0.0,
+        }
+    )
+    without_params = {**params, "solar_thermal_area_m2": 0.0}
+    without = daily_electric_kwh(
+        **without_params,
+        hourly_temperature_c=hourly_temp,
+        hourly_collector_wm2=pd.Series(0.0, index=idx),
+    )
+    with_collector = daily_electric_kwh(
+        **params,
+        hourly_temperature_c=hourly_temp,
+        hourly_collector_wm2=hourly_wm2,
+    )
+    assert with_collector[0] < without[0]
+
+
+def test_consumer_annual_kwh_reflects_solar_thermal(monkeypatch):
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     without = consumer_annual_kwh(
         {
             "type": "thermal_annual",

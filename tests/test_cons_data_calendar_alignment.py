@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 
 from data.cons_data_house_profile import build_synthetic_dataframe_from_house_profile
+from data.modeled_climate import ModeledClimateContext
+from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 from data.profile_manager import _cons_data_to_profile_dataframe
 from house_config.planning_flex_bridge import (
     house_profile_baseload_overlay,
@@ -26,37 +28,45 @@ def _greenfield_profile() -> dict:
     return next(item for item in profiles if item["id"] == "mein_haushalt")
 
 
-def test_synthetic_haus_kw_matches_thermal_overlay_for_jan_14():
+def _mock_open_meteo_climate(monkeypatch) -> None:
+    install_open_meteo_climate_mock(monkeypatch)
+
+
+def test_synthetic_haus_kw_matches_thermal_overlay_for_jan_14(monkeypatch):
+    _mock_open_meteo_climate(monkeypatch)
     profile = _greenfield_profile()
+    climate = ModeledClimateContext.for_house_profile(profile, kwp=5.0)
     df = build_synthetic_dataframe_from_house_profile(
         profile,
         start=date(2025, 1, 14),
         end=date(2025, 1, 14),
         kwp=5.0,
         source="synthetic",
-        pv_kw_at_datetime=lambda _slot: 0.0,
+        climate=climate,
     )
     anchor = datetime(2025, 1, 15, 0, 0)
     slots = window_slot_datetimes(anchor)
-    thermal = thermal_hourly_overlay(profile, slots)
+    thermal = thermal_hourly_overlay(profile, slots, climate=climate)
     assert float(df["haus_kw"].sum()) == pytest.approx(sum(thermal), rel=1e-6)
     assert float(df["haus_kw"].sum()) > 0.0
 
 
 def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
+    _mock_open_meteo_climate(monkeypatch)
     consumer_ids = ["haus", "standard", "ev", "waschmaschine"]
     monkeypatch.setattr(
         "data.cons_data_house_profile.expected_cons_data_consumer_ids",
         lambda: consumer_ids,
     )
     profile = _greenfield_profile()
+    climate = ModeledClimateContext.for_house_profile(profile, kwp=5.0)
     df = build_synthetic_dataframe_from_house_profile(
         profile,
         start=date(2025, 1, 14),
         end=date(2025, 1, 14),
         kwp=5.0,
         source="synthetic",
-        pv_kw_at_datetime=lambda _slot: 0.0,
+        climate=climate,
     )
     anchor = datetime(2025, 1, 15, 0, 0)
     slots = window_slot_datetimes(anchor)
@@ -72,6 +82,7 @@ def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
         profile,
         slots,
         historical_totals=all_consumer_totals,
+        climate=climate,
     )
     assert sum(overlay) == pytest.approx(0.0, abs=1e-6)
     _, baseload_sum = resolve_hourly_baseload_kw(total_load, hourly_flex)
@@ -82,19 +93,21 @@ def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
 
 def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch):
     """Kein Thermik-Overlay wenn haus_kw-Spalte existiert aber am Tag 0 kWh (Heiz-Aus)."""
+    _mock_open_meteo_climate(monkeypatch)
     consumer_ids = ["haus", "standard", "ev", "waschmaschine"]
     monkeypatch.setattr(
         "data.cons_data_house_profile.expected_cons_data_consumer_ids",
         lambda: consumer_ids,
     )
     profile = _greenfield_profile()
+    climate = ModeledClimateContext.for_house_profile(profile, kwp=5.0)
     df = build_synthetic_dataframe_from_house_profile(
         profile,
         start=date(2025, 1, 14),
         end=date(2025, 1, 14),
         kwp=5.0,
         source="synthetic",
-        pv_kw_at_datetime=lambda _slot: 0.0,
+        climate=climate,
     )
     df["haus_kw"] = 0.0
     df["total_kw"] = (
@@ -120,6 +133,7 @@ def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch
         slots,
         historical_totals=all_consumer_totals,
         cons_data_consumer_ids=cons_data_ids,
+        climate=climate,
     )
     assert "haus" in cons_data_ids
     assert float(all_consumer_totals.get("haus", -1.0)) == 0.0

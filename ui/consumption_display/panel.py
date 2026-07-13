@@ -16,10 +16,15 @@ from ui.consumption_display.aggregation import annual_kwh_actual, annual_kwh_fro
 from ui.consumption_display.charts import (
     csv_validation_monthly_chart,
     stacked_monthly_chart,
+    week_scenario_consumer_timeseries_chart,
     week_timeseries_chart,
 )
 from ui.consumption_display.navigation import render_iso_week_navigation
-from ui.consumption_display.types import ConsumptionDisplayMode, ConsumptionSeriesBundle
+from ui.consumption_display.types import (
+    ConsumptionDisplayMode,
+    ConsumptionSeriesBundle,
+    ScenarioConsumerOverlayBundle,
+)
 
 
 def render_consumption_display(
@@ -33,6 +38,7 @@ def render_consumption_display(
     nav_bounds: tuple[datetime, datetime] | None = None,
     annual_kwh: float | None = None,
     actual_total_label: str = "Ist-Jahresverbrauch (CSV)",
+    scenario_consumer_overlays: ScenarioConsumerOverlayBundle | None = None,
 ) -> None:
     """Einheitliche Verbrauchsvisualisierung für drei Modi."""
     bundle = _build_bundle(
@@ -52,10 +58,21 @@ def render_consumption_display(
     )
     if week is not None:
         iso_year, iso_week = week
-        st.plotly_chart(
-            week_timeseries_chart(bundle, iso_year=iso_year, iso_week=iso_week),
-            width="stretch",
-        )
+        if scenario_consumer_overlays is not None:
+            st.plotly_chart(
+                week_scenario_consumer_timeseries_chart(
+                    bundle.timestamps,
+                    scenario_consumer_overlays,
+                    iso_year=iso_year,
+                    iso_week=iso_week,
+                ),
+                width="stretch",
+            )
+        else:
+            st.plotly_chart(
+                week_timeseries_chart(bundle, iso_year=iso_year, iso_week=iso_week),
+                width="stretch",
+            )
 
 
 def _build_bundle(

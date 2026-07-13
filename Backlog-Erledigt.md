@@ -13,11 +13,36 @@ Related topics — prioritize and work through together.
 - [x] **PWM for EV charging** — only for currents < A_min; otherwise minimum charge amount per h (count down meter, reset on each charge → at zero charge charge five minutes at minimum current)
 
 
-### cons_data PV via Open-Meteo Solar Archive (2026-07-13)
+### Version 2.0 — Unified Open-Meteo solar (2026-07-13)
 
-- [x] **Backtesting cons_data PV** — `scripts/generate_cons_data.py` uses Open-Meteo Historical Weather API (`archive-api.open-meteo.com/v1/archive`, `global_tilted_irradiance`) with resolved lat/lon/tilt/azimuth/kWp; converts W/m² → kW via `(GTI / 1000) × kWp`
-- [x] **Module** — `data/open_meteo_solar_archive.py`; monthly API chunks; fallback to legacy parabolic curve on failure or missing slots
-- [x] **Tests** — `tests/test_open_meteo_solar_archive.py`
+PV (`pv_kw`) and Solar-Kollektor (Haus Wärme) share the **same Open-Meteo archive weather** on the **same calendar hours** — no static `heating_climate_default.json` fixture, no `2023-01-01 % 8760` slot mapping, no measured Loxone PV in backtesting/synthesis paths. Commit `575c610`.
+
+**Decisions:**
+
+
+| Topic | Decision |
+| ----- | -------- |
+| PV source (backtesting + synthetic `cons_data`) | **Open-Meteo only** |
+| Open-Meteo API failure | **Fail hard** — no fixture/synthetic fallback on this path |
+| Hauskonfigurator annual preview | **Last full archive calendar year** at profile lat/lon |
+
+
+- [x] **Step 1 — Bundle + `heating_need` hourly path** — `OpenMeteoClimateBundle`, `irradiance_wm2_to_thermal_kwh`, `daily_electric_kwh(..., hourly_collector_wm2=…)`; tests with mocked HTTP
+- [x] **Step 2 — cons_data synthesis + backtesting overlay** — [`data/modeled_climate.py`](data/modeled_climate.py), [`data/cons_data_house_profile.py`](data/cons_data_house_profile.py), [`scripts/generate_cons_data.py`](scripts/generate_cons_data.py), slot-aligned thermal in [`house_config/planning_flex_bridge.py`](house_config/planning_flex_bridge.py) / [`data/consumption_profiles.py`](data/consumption_profiles.py); Open-Meteo PV in [`simulation/engine.py`](simulation/engine.py) when `scenario_params` set
+- [x] **Step 3 — Hauskonfigurator preview + cache** — `thermal_annual_kwh_from_archive()`; JSON cache under `data/cache/open_meteo/`; WP metric caption with reference year
+- [x] **Tests** — [`tests/test_open_meteo_solar_archive.py`](tests/test_open_meteo_solar_archive.py), [`tests/test_modeled_climate.py`](tests/test_modeled_climate.py), [`tests/test_heating_need_solar.py`](tests/test_heating_need_solar.py), [`tests/test_cons_data_calendar_alignment.py`](tests/test_cons_data_calendar_alignment.py); offline mock [`tests/fixtures/open_meteo_mock.py`](tests/fixtures/open_meteo_mock.py)
+
+**Smoke verification (manual, open):** *Backlog.md* → smoke-test **Phase A**.
+
+**Deferred to other chapters:** **Thermals P1a** (MILP pulse timing) · **P6b** (live `main.py` Loxone `cons_data` append cutover)
+
+
+### cons_data PV via Open-Meteo Solar Archive (2026-07-13, superseded)
+
+Superseded for SE/backtesting/synthesis by *Unified Open-Meteo solar* above. Legacy `build_open_meteo_pv_lookup` fallback curve remains only on old cons_data paths.
+
+- [x] **Backtesting cons_data PV** — initial `data/open_meteo_solar_archive.py` + `scripts/generate_cons_data.py` integration
+- [x] **Tests** — `tests/test_open_meteo_solar_archive.py` (extended in unified chapter)
 
 
 ### Smoketest bugfix — Hausprofil Bezeichnung (2026-07-12)

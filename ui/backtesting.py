@@ -31,6 +31,8 @@ from ui.backtesting_runner import (
 )
 from ui.backtesting_time_ranges import render_time_range_help
 from scripts.run_backtesting import BACKTESTING_YEAR
+from ui.backtesting_scenario_consumption import build_scenario_consumer_overlays
+from ui.consumption_display.types import ScenarioConsumerOverlayBundle
 from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
 _LEGACY_STALE_WARNING = (
@@ -397,6 +399,15 @@ def render_reference_consumption_ui(meta: dict) -> None:
             "bereitstellen."
         )
     nav_bounds = nav_bounds_from_period(period)
+    scenario_consumer_overlays: ScenarioConsumerOverlayBundle | None = None
+    scenarios, scenario_error = try_get_backtesting_scenarios()
+    if not scenario_error and scenarios:
+        labels = {**scenario_labels_map(), **meta.get("labels", {})}
+        scenario_consumer_overlays = build_scenario_consumer_overlays(
+            scenarios,
+            labels,
+            [ts.strftime("%Y-%m-%d %H:%M:%S") for ts in sliced.index],
+        )
     try:
         render_consumption_display(
             ConsumptionDisplayMode.CONS_DATA,
@@ -404,6 +415,7 @@ def render_reference_consumption_ui(meta: dict) -> None:
             cons_data=sliced,
             reset_token=str(meta.get("created_at", "")),
             nav_bounds=nav_bounds,
+            scenario_consumer_overlays=scenario_consumer_overlays,
         )
     except ValueError as exc:
         st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")

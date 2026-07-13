@@ -97,6 +97,7 @@ def _bootstrap_test_config():
     _config_module.reinit_config()
 
 
+
 @pytest.fixture(autouse=True)
 def _restore_default_test_config_after_test():
     """Nach jedem Test zurück auf Fixture-Config (tmp_path-Overrides aus Einzeltests)."""

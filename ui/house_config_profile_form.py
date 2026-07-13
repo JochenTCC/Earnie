@@ -575,11 +575,23 @@ def _render_consumer_form(
                     default_azimuth=default_pv_azimuth,
                 )
             )
-            from data.heating_need import estimate_annual_kwh, heating_params_from_thermal
+            from data.modeled_climate import thermal_annual_kwh_from_archive
 
             thermal_preview = {**item, "latitude": latitude, "longitude": longitude}
-            wp_annual = estimate_annual_kwh(**heating_params_from_thermal(thermal_preview))
+            wp_annual, ref_year = thermal_annual_kwh_from_archive(
+                thermal_preview,
+                house_profile={
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "default_pv_tilt": default_pv_tilt,
+                    "default_pv_azimuth": default_pv_azimuth,
+                },
+            )
             st.metric("Geschätzter WP-Jahresbedarf (kWh/a)", f"{wp_annual:.0f}")
+            st.caption(
+                f"Basis: Open-Meteo-Archiv {ref_year} "
+                f"({latitude:.4f}°N, {longitude:.4f}°E)"
+            )
     return item
 
 

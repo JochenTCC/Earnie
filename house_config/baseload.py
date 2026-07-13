@@ -4,6 +4,12 @@ from __future__ import annotations
 BASELOAD_MIN_FRACTION = 0.05
 
 
+def _config_ready_for_open_meteo() -> bool:
+    import config as cfg
+
+    return getattr(cfg, "CONFIG", None) is not None and hasattr(cfg, "get_planning_timezone")
+
+
 def consumer_annual_kwh(consumer: dict) -> float:
     if consumer.get("profile_csv"):
         return float(consumer.get("annual_kwh", 0.0) or 0.0)
@@ -12,9 +18,16 @@ def consumer_annual_kwh(consumer: dict) -> float:
 
         return estimate_ev_annual_kwh(consumer)
     if consumer.get("type") == "thermal_annual":
+        thermal = consumer.get("thermal") or consumer
+        lat = thermal.get("latitude")
+        lon = thermal.get("longitude")
+        if lat is not None and lon is not None and _config_ready_for_open_meteo():
+            from data.modeled_climate import thermal_annual_kwh_from_archive
+
+            annual_kwh, _year = thermal_annual_kwh_from_archive(thermal)
+            return annual_kwh
         from data.heating_need import estimate_annual_kwh, heating_params_from_thermal
 
-        thermal = consumer.get("thermal") or consumer
         return estimate_annual_kwh(**heating_params_from_thermal(thermal))
     if consumer.get("type") == "generic":
         from house_config.generic_schedule import generic_annual_kwh

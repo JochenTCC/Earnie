@@ -4,7 +4,11 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime
 
-from ui.consumption_display.types import ConsumptionSeriesBundle
+from ui.consumption_display.types import (
+    ConsumptionSeriesBundle,
+    ScenarioConsumerOverlayBundle,
+    ScenarioConsumerSeries,
+)
 from ui.consumption_validation_charts import format_iso_week_label, iso_weeks_in_series
 
 
@@ -102,6 +106,39 @@ def slice_bundle_for_month(
         if parse_timestamp(ts_raw).year == year and parse_timestamp(ts_raw).month == month
     ]
     return _slice_bundle(bundle, indices)
+
+
+def slice_scenario_consumer_overlay_bundle(
+    bundle: ScenarioConsumerOverlayBundle,
+    indices: list[int],
+) -> ScenarioConsumerOverlayBundle:
+    """Schneidet Szenario-Verbraucher-Overlays auf dieselben Stunden-Indizes."""
+    if not indices:
+        return ScenarioConsumerOverlayBundle(
+            consumer_ids=list(bundle.consumer_ids),
+            consumer_labels=dict(bundle.consumer_labels),
+            scenarios=tuple(
+                ScenarioConsumerSeries(
+                    label=scenario.label,
+                    consumer_kw={cid: [] for cid in bundle.consumer_ids},
+                )
+                for scenario in bundle.scenarios
+            ),
+        )
+    return ScenarioConsumerOverlayBundle(
+        consumer_ids=list(bundle.consumer_ids),
+        consumer_labels=dict(bundle.consumer_labels),
+        scenarios=tuple(
+            ScenarioConsumerSeries(
+                label=scenario.label,
+                consumer_kw={
+                    consumer_id: [scenario.consumer_kw[consumer_id][index] for index in indices]
+                    for consumer_id in bundle.consumer_ids
+                },
+            )
+            for scenario in bundle.scenarios
+        ),
+    )
 
 
 def slice_bundle_for_iso_week(

@@ -10,11 +10,24 @@ from ui.consumption_display.aggregation import (
     monthly_total_kwh,
     parse_timestamp,
 )
-from ui.consumption_display.types import ConsumptionSeriesBundle
+from ui.consumption_display.types import (
+    ConsumptionSeriesBundle,
+    ScenarioConsumerOverlayBundle,
+)
 from ui.consumption_validation_charts import format_iso_week_label
 
 _PV_COLOR = "#f4c430"
 _BASELOAD_KEY = "baseload"
+_SCENARIO_LINE_DASHES = ("solid", "dash", "dot", "dashdot", "longdash", "longdashdot")
+_SCENARIO_LINE_ALPHA = 0.5  # 50% transparency
+
+
+def _color_with_alpha(hex_color: str, alpha: float) -> str:
+    channels = hex_color.lstrip("#")
+    red = int(channels[0:2], 16)
+    green = int(channels[2:4], 16)
+    blue = int(channels[4:6], 16)
+    return f"rgba({red}, {green}, {blue}, {alpha})"
 
 
 def _consumer_color(consumer_id: str, index: int) -> str:
@@ -187,6 +200,58 @@ def week_timeseries_chart(
         sliced,
         title=f"Stündlicher Verlauf — {format_iso_week_label(iso_year, iso_week)}",
     )
+
+
+def week_scenario_consumer_timeseries_chart(
+    timestamps: list[str],
+    overlay_bundle: ScenarioConsumerOverlayBundle,
+    *,
+    iso_year: int,
+    iso_week: int,
+) -> go.Figure:
+    """Stündlicher Verlauf je Verbraucher × Szenario (Farbe=Verbraucher, Strich=Szenario)."""
+    from ui.consumption_display.aggregation import (
+        slice_scenario_consumer_overlay_bundle,
+    )
+
+    indices = [
+        index
+        for index, ts_raw in enumerate(timestamps)
+        if parse_timestamp(ts_raw).isocalendar()[:2] == (iso_year, iso_week)
+    ]
+    if not indices:
+        raise ValueError(f"Keine Daten für {format_iso_week_label(iso_year, iso_week)}.")
+    sliced = slice_scenario_consumer_overlay_bundle(overlay_bundle, indices)
+    x_values = [parse_timestamp(timestamps[index]) for index in indices]
+    fig = go.Figure()
+    for scenario_index, scenario in enumerate(sliced.scenarios):
+        dash = _SCENARIO_LINE_DASHES[scenario_index % len(_SCENARIO_LINE_DASHES)]
+        for consumer_index, consumer_id in enumerate(sliced.consumer_ids):
+            color = _color_with_alpha(
+                _consumer_color(consumer_id, consumer_index),
+                _SCENARIO_LINE_ALPHA,
+            )
+            consumer_label = sliced.consumer_labels.get(consumer_id, consumer_id)
+            fig.add_scatter(
+                name=f"{scenario.label} — {consumer_label}",
+                x=x_values,
+                y=scenario.consumer_kw[consumer_id],
+                mode="lines",
+                line=dict(width=2, color=color, dash=dash),
+            )
+    fig.update_layout(
+        title=f"Stündlicher Verlauf — {format_iso_week_label(iso_year, iso_week)}",
+        xaxis_title="Zeit",
+        yaxis_title="kW",
+        height=360,
+        margin=dict(l=40, r=20, t=50, b=40),
+        xaxis=dict(
+            type="date",
+            tickformat="%a %d.%m.",
+            dtick=86_400_000,
+        ),
+    )
+    return fig
 
 
 def stack_monthly_sum_matches_total(

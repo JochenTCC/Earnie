@@ -2,19 +2,24 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from typing import TYPE_CHECKING
 
 MODELED_PROFILE_REF_START = datetime(2023, 1, 1)
 MODELED_PROFILE_HOURS_PER_YEAR = 8760
 
 from data.heating_need import (
+    daily_electric_kwh,
     heating_params_from_thermal,
     hourly_profile_for_year,
-    thermal_on_off_hourly_profile,
+    thermal_daily_pwm_hourly_profile,
     weekly_electric_kwh,
 )
 from house_config.baseload import consumer_annual_kwh
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.ev_profile import ev_hourly_kw_for_day
+
+if TYPE_CHECKING:
+    from data.modeled_climate import ModeledClimateContext
 
 
 def build_hourly_kw_profile(profile: dict, *, hours: int = 8760) -> list[float]:
@@ -49,8 +54,15 @@ def _modeled_hour_index(slot_dt: datetime) -> int:
     )
 
 
-def modeled_consumer_kw_at_datetime(consumer: dict, slot_dt: datetime) -> float:
+def modeled_consumer_kw_at_datetime(
+    consumer: dict,
+    slot_dt: datetime,
+    *,
+    climate: ModeledClimateContext | None = None,
+) -> float:
     """kW für einen Verbraucher zum Kalenderzeitpunkt (wie Backtesting-Overlay)."""
+    if climate is not None and consumer.get("type") == "thermal_annual":
+        return climate.thermal_consumer_kw_at(consumer, slot_dt)
     if consumer.get("profile_csv"):
         series = load_hourly_profile_csv(consumer["profile_csv"])
         hour_index = _modeled_hour_index(slot_dt)
@@ -95,14 +107,15 @@ def _modeled_consumer_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
         return hourly
     if consumer.get("type") == "thermal_annual":
         thermal = consumer.get("thermal") or consumer
-        weekly = weekly_electric_kwh(**heating_params_from_thermal(thermal))
+        daily = daily_electric_kwh(**heating_params_from_thermal(thermal))
         nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
         if nominal > 0.0:
-            return thermal_on_off_hourly_profile(
-                weekly,
+            return thermal_daily_pwm_hourly_profile(
+                daily,
                 nominal_power_kw=nominal,
                 hours_per_year=hours,
             )
+        weekly = weekly_electric_kwh(**heating_params_from_thermal(thermal))
         return hourly_profile_for_year(weekly, hours_per_year=hours)
     if consumer.get("type") == "generic" and consumer.get("schedule"):
         from house_config.generic_schedule import generic_hourly_kw_for_day

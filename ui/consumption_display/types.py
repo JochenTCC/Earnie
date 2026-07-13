@@ -12,6 +12,23 @@ class ConsumptionDisplayMode(str, Enum):
 
 
 @dataclass(frozen=True)
+class ScenarioConsumerSeries:
+    """Stündlicher kW je Verbraucher für ein Szenario (index-aligned zu Timestamps)."""
+
+    label: str
+    consumer_kw: dict[str, list[float]]
+
+
+@dataclass(frozen=True)
+class ScenarioConsumerOverlayBundle:
+    """Alle Szenarien mit einheitlicher Verbraucher-Reihenfolge für Vergleichs-Charts."""
+
+    consumer_ids: list[str]
+    consumer_labels: dict[str, str]
+    scenarios: tuple[ScenarioConsumerSeries, ...]
+
+
+@dataclass(frozen=True)
 class ConsumptionSeriesBundle:
     """Stündliche Verbrauchsserien für Charts und Aggregation."""
 
