@@ -310,6 +310,32 @@ def test_ev_hourly_profile_only_in_charging_window():
     assert sum(hourly) > 0.0
 
 
+def test_ev_hourly_profile_charges_at_pmax_from_arrival():
+    consumer = _sample_ev_consumer()
+    weekday = date(2023, 6, 7)
+    hourly = ev_hourly_kw_for_day(consumer, weekday)
+    nominal = float(consumer["nominal_power_kw"])
+    day_sched = consumer["charging_schedule"]["weekday"]
+    from_h = int(day_sched["car_available_from_hour"])
+    ready_h = int(day_sched["ready_by_hour"])
+    active = [hour for hour, kw in enumerate(hourly) if kw > 0.0]
+    assert active
+    assert hourly[from_h] == nominal
+    partial_hours = [hour for hour, kw in enumerate(hourly) if 0.0 < kw < nominal]
+    assert len(partial_hours) <= 1
+    if partial_hours:
+        last_before_ready = (ready_h - 1) % 24
+        hour = from_h
+        last_active = from_h
+        while True:
+            if hourly[hour] > 0.0:
+                last_active = hour
+            if hour == last_before_ready:
+                break
+            hour = (hour + 1) % 24
+        assert partial_hours[0] == last_active
+
+
 def test_build_hourly_kw_profile_with_ev_consumer(tmp_path):
     import json
 

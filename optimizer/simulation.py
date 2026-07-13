@@ -296,6 +296,7 @@ def simulate_horizon(
         optimization_matrix, charging_contexts, targets = prepare_optimization_matrix(
             optimization_matrix,
             consumer_daily_targets_kwh,
+            consumers=consumers_cfg,
         )
         if consumer_daily_targets_kwh is None:
             consumer_daily_targets_kwh = targets
@@ -303,6 +304,7 @@ def simulate_horizon(
         charging_contexts = resolve_charging_contexts(
             optimization_matrix,
             consumer_daily_targets_kwh,
+            consumers=consumers_cfg,
         )
 
     chart_rows = []
@@ -317,6 +319,7 @@ def simulate_horizon(
     charging_contexts = charging_contexts or resolve_charging_contexts(
         optimization_matrix,
         consumer_daily_targets_kwh,
+        consumers=consumers_cfg,
     )
     horizon_limits = apply_horizon_charging_limits(horizon_limits, charging_contexts)
     filters = filter_contexts or resolve_filter_contexts(

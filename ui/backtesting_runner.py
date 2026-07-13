@@ -53,6 +53,15 @@ def default_progress_file_path() -> str:
     return str(Path(default_backtesting_output_dir()) / ".backtesting_progress.json")
 
 
+def auto_backtesting_workers(scenario_count: int) -> int:
+    """Parallele Worker für Szenario-Simulationen (ein Kern für UI/OS reserviert)."""
+    if scenario_count <= 1:
+        return 1
+    cpu_count = os.cpu_count() or 2
+    available = max(1, cpu_count - 1)
+    return min(scenario_count, available)
+
+
 def suggest_test_month() -> int | None:
     """Erster Monat in BACKTESTING_YEAR mit cons_data-Daten, sonst None."""
     lox_min, lox_max = profile_manager.get_cons_data_date_bounds()
@@ -119,6 +128,7 @@ def build_backtesting_command(
     end_month: int | None = None,
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
+    workers: int = 1,
 ) -> list[str]:
     script_path = backtesting_script_path()
     cmd = [
@@ -136,6 +146,8 @@ def build_backtesting_command(
         cmd.append(progress_file)
     if horizon_mode != DEFAULT_HORIZON_MODE:
         cmd.extend(["--horizon-mode", horizon_mode])
+    if workers > 1:
+        cmd.extend(["--workers", str(workers)])
     return cmd
 
 
@@ -146,6 +158,7 @@ def run_backtesting_subprocess(
     end_month: int | None = None,
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
+    workers: int = 1,
     on_progress: Callable[[dict], None] | None = None,
 ) -> tuple[int, str]:
     """Startet Backtesting offline; gibt (exit_code, kombiniertes stdout/stderr) zurück."""
@@ -164,6 +177,7 @@ def run_backtesting_subprocess(
         end_month=end_month,
         progress_file=progress_file,
         horizon_mode=horizon_mode,
+        workers=workers,
     )
     proc = subprocess.Popen(
         cmd,

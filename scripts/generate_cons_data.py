@@ -24,6 +24,7 @@ from data.cons_data_house_profile import (
     resolve_runtime_house_profile,
 )
 from data.modeled_climate import ModeledClimateContext
+from house_config.ev_profile import ev_hourly_kw_from_schedule
 from integrations import loxone_log_import
 
 SOURCE_LOXONE = cons_data_store.SOURCE_LOXONE
@@ -128,11 +129,12 @@ def _synthetic_flex_profile(consumer: dict, day: date) -> dict[int, float]:
             )
             or 0.0
         )
-        if from_h <= ready_h:
-            charge_hours = list(range(from_h, ready_h))
-        else:
-            charge_hours = list(range(from_h, 24)) + list(range(0, ready_h))
-        return _distribute_daily_kwh(daily_kwh, charge_hours, nominal)
+        return ev_hourly_kw_from_schedule(
+            from_h=from_h,
+            ready_h=ready_h,
+            daily_kwh=daily_kwh,
+            nominal_kw=nominal,
+        )
 
     daily_kwh = float(consumer.get("daily_target_kwh", nominal * 2))
     active = (

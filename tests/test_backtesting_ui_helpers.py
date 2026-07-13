@@ -16,6 +16,7 @@ from ui.backtesting import (
 )
 from ui.backtesting_runner import (
     _normalize_exit_code,
+    auto_backtesting_workers,
     backtesting_script_path,
     build_backtesting_command,
     default_backtesting_output_dir,
@@ -101,6 +102,32 @@ def test_build_backtesting_command_includes_sunrise_horizon_mode(tmp_path):
         horizon_mode="sunrise_window",
     )
     assert cmd[-2:] == ["--horizon-mode", "sunrise_window"]
+
+
+def test_auto_backtesting_workers_single_scenario():
+    assert auto_backtesting_workers(0) == 1
+    assert auto_backtesting_workers(1) == 1
+
+
+def test_auto_backtesting_workers_caps_by_scenario_count(monkeypatch):
+    monkeypatch.setattr("ui.backtesting_runner.os.cpu_count", lambda: 16)
+    assert auto_backtesting_workers(4) == 4
+
+
+def test_auto_backtesting_workers_reserves_one_core(monkeypatch):
+    monkeypatch.setattr("ui.backtesting_runner.os.cpu_count", lambda: 8)
+    assert auto_backtesting_workers(10) == 7
+
+
+def test_build_backtesting_command_includes_workers_when_parallel(tmp_path):
+    cmd = build_backtesting_command(output_dir=str(tmp_path), workers=4)
+    assert "--workers" in cmd
+    assert "4" in cmd
+
+
+def test_build_backtesting_command_omits_workers_when_sequential(tmp_path):
+    cmd = build_backtesting_command(output_dir=str(tmp_path), workers=1)
+    assert "--workers" not in cmd
 
 
 def test_suggest_test_month_from_cons_data_bounds(monkeypatch):

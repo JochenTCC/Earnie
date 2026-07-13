@@ -1,7 +1,7 @@
 """Schedule-Logik für allgemeine Verbraucher (type generic)."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time, timedelta
 
 WEEKS_PER_YEAR = 52
 DEFAULT_START_HOUR = 12
@@ -165,6 +165,61 @@ def generic_daily_target_kwh_for_day(consumer: dict, day: date) -> float:
         return 0.0
     run_count = run_weekdays_for_day(day, runs)
     return nominal * duration_h * run_count
+
+
+def generic_reference_run_end(day: date, start_hour: int, duration_h: float) -> datetime:
+    """Ende des Referenz-Laufs (start_hour + duration_h) am Kalendertag."""
+    duration_slots = max(1, int(round(duration_h)))
+    end_hour = int(start_hour) + duration_slots
+    if end_hour < 24:
+        return datetime.combine(day, time(hour=end_hour % 24))
+    return datetime.combine(day + timedelta(days=1), time(hour=end_hour % 24))
+
+
+def generic_daily_target_kwh_for_window_day(
+    consumer: dict,
+    day: date,
+    slot_datetimes: list[datetime],
+    window_end: datetime,
+) -> float:
+    """
+    Tagesenergie nur wenn der Referenz-Lauf vor window_end enden kann und
+    mindestens eine erlaubte Stunde im Fenster liegt (07:00-Anker).
+    """
+    day_kwh = generic_daily_target_kwh_for_day(consumer, day)
+    if day_kwh <= 0.0:
+        return 0.0
+    schedule = consumer.get("schedule") or {}
+    duration_h = float(schedule.get("duration_h", 0.0) or 0.0)
+    if duration_h <= 0.0:
+        return 0.0
+    start_hour = int(schedule.get("start_hour", DEFAULT_START_HOUR)) % 24
+    start_shift_h = float(schedule.get("start_shift_h", 0.0) or 0.0)
+    hours_in_window = {slot_dt.hour for slot_dt in slot_datetimes if slot_dt.date() == day}
+    if not hours_in_window:
+        return 0.0
+    allowed = generic_allowed_slot_hours(start_hour, start_shift_h, duration_h)
+    if not (hours_in_window & allowed):
+        return 0.0
+    if generic_reference_run_end(day, start_hour, duration_h) > window_end:
+        return 0.0
+    return day_kwh
+
+
+def generic_flex_target_kwh_for_window(
+    consumer: dict,
+    slot_datetimes: list[datetime],
+    window_end: datetime,
+) -> float:
+    """Summiert lieferbare Generic-Flex-kWh über alle Kalendertage im Fenster."""
+    if not slot_datetimes:
+        return 0.0
+    dates = {slot_dt.date() for slot_dt in slot_datetimes}
+    total = sum(
+        generic_daily_target_kwh_for_window_day(consumer, day, slot_datetimes, window_end)
+        for day in dates
+    )
+    return round(total, 3)
 
 
 def generic_allowed_slot_hours(

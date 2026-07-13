@@ -64,69 +64,13 @@ $env:EARNIE_BACKTESTING_SCENARIOS_PATH = "greenfield/config/backtesting_scenario
 
 
 
-### Version 2.0 — Scenario Exploration consumption model (immediate)
-
-**Goal:** Scenario Exploration (SE) compares **optimized** dispatch per scenario — baseline load from house-profile specs (default schedules), optimizer **shifts** MILP-flex start times for cost; `cons_data_hourly.csv` is **baseline / reference only**, not the simulation’s load truth.
-
-**Precursor to:** credible greenfield scenario matrix (*Backtesting Tests*, *SE higher cost with fixed tariffs*); unblocks meaningful hourly comparison when only `battery_id` / `pv_system_id` / tariffs differ.
-
-**Problem today (2026-07-13)**
-
-| Area | Current behaviour | Intended (SE / greenfield) |
-| ---- | ----------------- | -------------------------- |
-| `cons_data_hourly.csv` | Drives hourly total load, flex kWh budgets, and `historical_reference` replay (`HistoricalDataCache` in [`simulation/engine.py`](simulation/engine.py)) | **Non-optimized baseline** for display + reference € only |
-| MILP flex targets | `consumer_daily_targets_kwh` = sums of cons_data `{id}_kw` columns per 24h window | From **house profile** (`planning_flex_daily_targets` in [`house_config/planning_flex_bridge.py`](house_config/planning_flex_bridge.py) — exists, **unused** in backtesting) |
-| Flex windows | `_planning_flex_consumers` from profile (`generic_flex_window`) | Same — keep |
-| Plausibility | Optimized kWh must match cons_data historical (± tolerance) | Optimized kWh matches **profile spec** energy; timing may differ from baseline |
-| Hourly UI | Shared `cons_data` + profile overlays (`render_reference_consumption_ui`) | **Baseline vs optimized** hourly per scenario |
-| `backtesting_hourly.csv` | `sim_cost`, SoC, battery — no consumption profile | Optional: optimized hourly load columns per scenario |
-| Greenfield | `flexible_consumers: []` — only generic MILP-flex from profile; EV / thermal shapes fixed from cons_data synthesis | Shiftable consumers (incl. EV where configured) enter MILP per profile |
-
-**Observed symptom:** Two scenarios with same `house_profile_id` and only `battery_id` differing show **identical** hourly consumption (Jan 2025 test: 1411.3 kWh each; costs differ). Expected: same **total** spec energy, but battery/PV/tariff comparison — not replay of identical cons_data curves for “optimized” paths.
-
-**Design — two load paths**
-
-1. **Baseline path** — `cons_data` and/or `generic_hourly_kw_for_day` at reference `start_hour` ([`house_config/generic_schedule.py`](house_config/generic_schedule.py)): reference € (`historical_reference`), SE “Referenz-Verbrauch” chart.
-2. **Optimized path** — matrix + MILP from resolved scenario: flex targets from profile, flex windows from `_planning_flex_consumers`; `simulate_horizon` output drives optimized hourly load for plausibility and charts.
-3. **Prod / Loxone path (later):** logged cons_data remains valid **baseline** when present; SE greenfield uses synthetic baseline from profile (already how [`build_synthetic_dataframe_from_house_profile`](data/cons_data_house_profile.py) builds cons_data).
-
-**Rollout (4 steps)**
-
-- [x] **Step 1 — Targets & matrix input (engine)**
-  - SE/backtesting: `consumer_daily_targets_kwh` from `planning_flex_daily_targets` (+ config `flexible_consumers` where applicable), not cons_data window sums
-  - Baseload / fixed consumers: house-profile overlay ([`house_profile_baseload_overlay`](house_config/planning_flex_bridge.py)); do not re-derive optimized baseload from cons_data `Total`
-  - Flag or mode: `consumption_source=profile_spec` vs `logged_day` (prod replay) — default **profile_spec** for greenfield / SE
-- [x] **Step 2 — Plausibility & reference**
-  - Plausibility: optimized kWh vs **profile-spec** totals for the window (not cons_data replay)
-  - `compute_historical_reference_costs`: baseline load from profile default schedule (or cons_data when `source=loxone`); align with per-scenario tariffs (cf. *SE higher cost* Phase 2)
-- [x] **Step 3 — UI**
-  - SE hourly chart: baseline (dashed) vs optimized per scenario (solid), per consumer where useful
-  - Consumption debug table: show Δ kWh vs baseline when timing shifts but energy matches spec
-- [x] **Step 4 — Greenfield flex registration**
-  - Document / bootstrap: which profile consumer types are MILP-flex in SE (generic with `start_shift_h > 0`, EV when `charging_schedule` present) — see [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md)
-  - Ensure greenfield `mein_haushalt` exercises at least one shiftable generic + EV in test matrix (`standard`, `waschmaschine`, `ev`; scenarios `live` / `s3-no-battery`)
-
-**Acceptance**
-
-- Greenfield: `live` vs `s3-no-battery` — **same** spec total kWh, **same or shifted** flex timing depending on prices; hourly optimized chart differs from baseline when MILP moves loads; **costs** still differ by battery.
-- Two scenarios with **different** `house_profile_id` — different baseline and optimized consumption curves.
-- Prod path: logged cons_data baseline unchanged until explicit cutover item; no silent change to live `main.py` cons_data append.
-- Tests: extend [`tests/test_backtesting_critical_cases.py`](tests/test_backtesting_critical_cases.py), [`tests/test_consumption_display.py`](tests/test_consumption_display.py); fixture run with shifted `standard` / `waschmaschine` windows.
-
-**Out of scope (this chapter)**
-
-- **Thermals P1a** — thermal PWM as MILP-flex (cost shift vs fixed overlay); this chapter only fixes **generic / EV flex** and baseline vs optimized separation.
-- Re-optimizing every 15 min in SE (still one step per E-Auto anchor per [`docs/spec/planning-horizon-sunset.md`](docs/spec/planning-horizon-sunset.md)).
-
-**Related:** *Version 2.0 — smoke-test follow-ups* → Phase B (*SE higher cost*), *Backtesting Tests*.
-
-
+Scenario Exploration consumption model → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-13). Spec: [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md).
 
 ### Version 2.0
 
 Branding (Earnie rename) → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
-**Status (2026-07-13):** P1–P5, **P6a**, **Components**, and **Unified Open-Meteo solar** done (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). Open under 2.0: **P7** + EV nominal voltage + remaining smoke follow-ups. Loxone sidebar bugfix → [Backlog-Erledigt.md](Backlog-Erledigt.md); cons_data ID fix pending verification in [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+**Status (2026-07-13):** P1–P5, **P6a**, **Components**, **Unified Open-Meteo solar**, and **SE consumption model** done (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). Open under 2.0: **P7** + EV nominal voltage + smoke-test Phase A verification + Phase B plausibility/fixed-tariff investigation. Loxone sidebar bugfix → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
 Recommended order (2.0): smoke-test **Phase A** (Open-Meteo solar) → **Phase B** (*SE higher cost*) → **P7** README / evaluations → propose `version.py` → `2.0.0` (user approval). **P6b** live cutover → **2.+1** (first item after 2.0 release).
 
@@ -158,108 +102,61 @@ Components (`components.json` sidecar) → [Backlog-Erledigt.md](Backlog-Erledig
 
 
 
-#### Smoketest Findings — next actions (2026-07-12)
+#### Smoketest Findings — next actions (updated 2026-07-13)
 
-Ordered work plan after greenfield smoke. **Bugfix** items → [Backlog-Bugfixes.md](Backlog-Bugfixes.md); **UX/copy** here; **investigation** ties to *Backtesting Tests* below.
+Greenfield smoke **2026-07-12**; backtesting iteration **2026-07-13**. Completed work → [Backlog-Erledigt.md](Backlog-Erledigt.md) (Smoketest UX 2026-07-12, *Unified Open-Meteo solar*, *SE consumption model*, per-scenario reference tariffs, Jan 2025 greenfield run). **Bugfix** items → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
-**Phase A — Unified Open-Meteo solar (manual smoke, 2026-07-13)**
+**Phase A — Open-Meteo solar (manual verification)**
 
-Implementation → [Backlog-Erledigt.md](Backlog-Erledigt.md) (*Unified Open-Meteo solar*). Verify on greenfield venv (:8511) with network; reset per **Greenfield Reset** reminder at top of this file if `cons_data` is stale.
+Implementation complete. Remaining acceptance on greenfield venv (:8511); reset per **Greenfield Reset** if `cons_data` is stale.
 
-1. [ ] **Regenerate synthetic `cons_data`**
-   - Set `EARNIE_*` paths to `greenfield/config` + `greenfield/runtime`; run [`scripts/generate_cons_data.py`](scripts/generate_cons_data.py) (or bootstrap after reset)
-   - Spot-check **July 2024** in `cons_data_hourly.csv`: `pv_kw` and `haus_kw` peaks align to **2024-07** calendar hours (no 2023-modulo / wrong-season pattern)
-2. [ ] **Solar-Kollektor reduces Haus Wärme in summer**
-   - In `house_profiles.json`: set `solar_thermal_area_m2` > 0 (e.g. 8 m²) on thermal consumer; regenerate cons_data
-   - July 2024: lower midday `haus_kw` vs same profile with `solar_thermal_area_m2: 0`
-3. [ ] **Hauskonfigurator WP preview**
-   - Thermal tab: metric + caption show **Open-Meteo-Archiv {year}** at profile lat/lon
-   - Increase collector area → estimated kWh/a drops when `solar_thermal_area_m2` > 0
-4. [ ] **File cache (`data/cache/open_meteo/`)**
-   - First preview / backtesting fetch creates `*.json` cache entry; repeat run reuses cache (no API storm)
-   - Corrupt one cache file → clear error; **no** silent fixture fallback
-5. [ ] **Fail-hard (offline)**
-   - Block network or archive API; `generate_cons_data` / backtesting aborts with explicit Open-Meteo error
-6. [ ] **Backtesting smoke — July 2024**
-   - `scripts/run_backtesting.py --start-month 7 --end-month 7` with `live` + `mein_haushalt` completes
-   - PV from Open-Meteo when `scenario_params` set (not measured Loxone `pv_kw` from CSV)
+- [x] Regenerate `cons_data` + Open-Meteo cache (`data/cache/open_meteo/`) — greenfield 2026-07-13
+- [x] Backtesting smoke — **Jan 2025** `fixed_24h`, scenarios `live` + `s3-no-battery` (31 windows; optimization cheaper than reference on `awattar_at`)
+- [ ] **July 2024 calendar alignment** — spot-check `cons_data_hourly.csv`: `pv_kw` / `haus_kw` peaks on 2024-07 hours (no modulo drift)
+- [ ] **Solar-Kollektor** — `solar_thermal_area_m2` > 0 lowers summer midday `haus_kw` vs 0 m²
+- [ ] **Hauskonfigurator WP preview** — caption shows Open-Meteo archive year; collector area reduces estimated kWh/a
+- [ ] **Fail-hard (offline)** — blocked API → explicit error, no fixture fallback
+- [ ] **July 2024 backtesting month** — `--start-month 7 --end-month 7` completes
 
-**Enables:** *Backtesting Tests — Test mit Standard-Setting* climate/PV/solar-collector credibility (Haus Wärme MILP shift still **Thermals P1a**).
+Haus Wärme MILP timing → **Thermals P1a** (not Phase A).
 
-**Phase B — Scenario-Exploration credibility (fixed tariffs)**
+**Phase B — SE credibility (fixed tariffs & plausibility)**
 
-0. [ ] **SE consumption model** — baseline vs optimized load paths; see *Version 2.0 — Scenario Exploration consumption model (immediate)* above (identical hourly consumption across battery-only scenarios = architectural gap, not test failure).
+Done in code → [Backlog-Erledigt.md](Backlog-Erledigt.md): SE consumption model (`profile_spec`), per-scenario reference tariffs (`reference_by_scenario`), window-aware flex targets at 07:00 anchors.
 
-1. [ ] **SE higher cost after optimization with** `fixed_24h` **+ fixed-price tariffs** — deviations note *extra consumption*; greenfield scenario uses `fixed_25ct` / `fixed_37ct`
-  - Reproduce: scenario **without EV** and **with EV** (see *Backtesting Tests* below)
-  - Per bad window: `scripts/diag_single_window.py --anchor …`; check plausibility / deviation list vs reference (`historical_reference`)
-  - Answer: is there optimization potential with flat import prices? (expect mainly PV self-consumption / export spread, not import timing)
-  - If plausibility fails → bugfix + regression; if consumption matches but cost higher → battery wear / terminal SOC / export math
-  - **Dump for single days:** CLI exists (`diag_single_window.py`); optional follow-up: expose from SE deviation detail (not a new dump format)
-  - **Multiple scenarios for testing:** already supported in Szenarieneditor + `backtesting_scenarios.json`; document adding comparison entries (greenfield currently only `live`)
+**Open investigation** (goal: plausible kWh + explainable € on flat import):
 
+1. [ ] **Fixed-tariff scenario matrix in greenfield** — add `fixed_full`, `fixed_no_pv`, `fixed_no_battery`, `fixed_no_pv_no_battery` (`fixed_25ct` / `fixed_37ct`) from `config/backtesting_scenarios.example.json`; run `--horizon-mode fixed_24h`
+2. [ ] **Bulk classify** — per scenario: plausibility ok/total, Δ€ vs matched reference, deviation kinds; tool: `scripts/analyze_plausibility_failures.py`
+3. [ ] **Plausibility — flex under-delivery (~3 kWh)** — Jan 2025: 3–4 windows/scenario; baseload matches, flex short ~3 kWh (EV / `ready_by_hour` at 07:00 anchor); `scripts/diag_single_window.py --anchor …`
+4. [ ] **Terminal SOC / window-end MILP** — `live` window 2025-01-15→16: anchor SOC 88.5% vs end 48.5%; MILP `Infeasible` 22:00/23:00; `new_soc` from last row start SOC — SOC chain vs chart tail diverge
+5. [ ] **Fixed-tariff economics** — with matched kWh: Δ€ bounded by PV self-consumption vs export spread (~12 ct/kWh at 25/37 ct), minus round-trip loss; no import-timing arbitrage
+6. [ ] **Sanity table (one month)** — `fixed_no_pv` / `fixed_no_battery` → Δ€ ≈ 0; document conclusion for user docs / SE caption
+7. [ ] **Optional UX** — expose `diag_single_window` from SE deviation detail (CLI exists)
 
-
-##### Plan of Attack
-
-1. [ ] **SE higher cost after optimization with** `fixed_24h` **+ fixed-price tariffs** — deviations note *extra consumption*; greenfield scenario uses `fixed_25ct` / `fixed_37ct`
-  **Goal:** (1) Is simulation plausible (kWh within tolerance)? (2) If plausible, why is € worse — bug, reference mismatch, or expected economics on flat import?
-   **Phase 0 — Test matrix** (`greenfield/config/backtesting_scenarios.json`; pattern in `config/backtesting_scenarios.example.json`):
-  - [x] `fixed_full` — `fixed_25ct` / `fixed_37ct`, full house (heat + PV + battery + EV)
-  - [x] `fixed_no_pv` — `pv_system_id` unset
-  - [x] `fixed_no_battery` — `battery_id` unset
-  - [x] `fixed_no_pv_no_battery` — no battery, no EV
-  - All runs: `--horizon-mode fixed_24h` (not `sunrise_window`)
-   **Phase 1 — Bulk reproduce & classify**
-  - [ ] Run per scenario: `scripts/run_backtesting.py --horizon-mode fixed_24h --start-month 1 --end-month 12`
-  - [ ] Record: total € vs `historical_reference`, plausibility ok/total, deviation kinds (`consumption_tolerance` vs CBC)
-  - [ ] Many consumption deviations → Phase 3A; plausibility clean but € worse → Phase 3B; use `scripts/analyze_plausibility_failures.py` if needed
-    **Phase 2 — Reference fairness (do first — high leverage)**
-  - [ ] `compute_historical_reference_costs` in `scripts/run_backtesting.py` is called **without** scenario tariff context → reference uses default/live import pricing while optimized scenario uses `fixed_25ct` / `fixed_37ct`
-  - [ ] Recompute one window: reference cost **with** scenario tariffs vs optimized; if Δ€ collapses → fix is per-scenario reference tariffs (design), not MILP
-    **Phase 3A — Plausibility failures (*extra consumption*)**
-  - [ ] Per bad window: `scripts/diag_single_window.py --anchor … --scenario …`
-  - [ ] Compare historical vs optimized kWh (tolerance: 0.5 kWh or 5% — `CONSUMPTION_TOLERANCE_*` in `simulation/engine.py`); split baseload vs flex (EV + `ready_by_hour` under `fixed_24h` is regression-sensitive — cf. 1.25.d)
-  - [ ] Confirmed bug → [Backlog-Bugfixes.md](Backlog-Bugfixes.md) + pytest regression
-    **Phase 3B — Plausible but more expensive**
-  - [ ] Per 24h window decompose: consumer kWh, grid import/export kWh, import €, export €, end SOC vs start (`terminal_soc_percent` under `fixed_24h`)
-  - [ ] Expected ceiling with flat import: savings only from PV self-consumption vs export spread (~12 ct/kWh at 25/37 ct), minus battery round-trip losses — **no import-timing arbitrage**
-  - [ ] Tools: `diag_single_window.py`, window snapshots (`backtesting_window_snapshots.jsonl`), optional `scripts/analyze_benchmark_window.py`
-    **Phase 4 — Sanity table (one month)**
-  - [ ] `fixed_no_pv` / `fixed_no_battery` / `fixed_baseload_only` → Δ€ ≈ 0 expected
-  - [ ] Document answer: optimization potential with flat import = small, bounded; negative Δ€ with matched kWh may be legitimate
-    **Phase 5 — Outcomes**
-  - Consumption mismatch → bugfix + regression
-  - Reference tariff mismatch → pass resolved scenario tariffs into reference (or per-scenario reference field)
-  - Matched kWh, small negative Δ€ → close as expected; SE caption / user doc
-  - Matched kWh, large negative Δ€ → export / SOC / cost-row deep dive
-  - Optional UX: expose `diag_single_window` from SE deviation detail (no new dump format)
-   **Existing bullets (unchanged scope):**
-  - Reproduce: scenario **without EV** and **with EV** (see *Backtesting Tests* below)
-  - **Multiple scenarios:** Szenarieneditor + `backtesting_scenarios.json` (greenfield currently only `live`)
+Fixture test matrix (Phase 0) already in `tests/fixtures/backtesting/backtesting_scenarios.json`: `fixed_full`, `fixed_no_pv`, `fixed_no_battery`, `fixed_no_pv_no_battery`.
 
 **Phase C — polish (may slip to 2.+1)**
 
 1. [ ] **Speichern** always at eye level in Hauskonfigurator (sticky top bar or duplicate save on long tabs: Hausprofil / PV / Batterien) or shortkey (Ctrl-S)
 
-**Open findings (unchanged scope, tracked above)**
+**Backtesting Tests**
 
-- [ ] Backtesting Tests
-  - [ ] Test mit Standard-Setting (inkl. Haus Wärme / PV / Batterie)
-    - Optimization delivers higher costs than baseline
-    - *Climate/PV/solar-collector alignment — verify via smoke **Phase A** (Unified Open-Meteo solar, 2026-07-13)*
-    - *Blocked until **Thermals P1a** — Haus Wärme is fixed PWM overlay today; no MILP shift*
-    - *Identical consumption across scenarios with same profile — **SE consumption model** chapter (not battery/PV test failure)*
-  - [ ] Test ohne Haus Wärme
-  - [ ] Test ohne PV
-  - [ ] Test ohne Batterie
-  - [ ] Test ohne PV und Batterie
+- [ ] Test mit Standard-Setting (inkl. Haus Wärme / PV / Batterie)
+  - Jan 2025: optimization **cheaper** than reference on dynamic tariffs (`live` 107 € vs ref 192 €) — fixed-tariff case still open (Phase B)
+  - Climate/PV/solar-collector → Phase A remaining checks
+  - Haus Wärme MILP shift → **Thermals P1a** (fixed PWM overlay today)
+- [ ] Test ohne Haus Wärme
+- [ ] Test ohne PV
+- [ ] Test ohne Batterie (`s3-no-battery` partial — Jan 2025 run done; plausibility gaps remain)
+- [ ] Test ohne PV und Batterie
+
+- [ ] Use new Loxone signal "Ernie-SOC-Ist-EAuto" as comparison with inner SOC-Act calculation when EV is charging. When Loxone Signal states that SOC==100% - EV is charged completely and optimizer does not have to charge anymore.
 
 - [ ] **Version 2.0 P7 — Documentation & evaluations**
   - Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
   - Build additional container for Windows as pure Python environment (if that makes sense) — spike vs local venv; go/no-go note
   - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
-
 
 
 ### Version 2.+1
@@ -268,7 +165,7 @@ Implementation → [Backlog-Erledigt.md](Backlog-Erledigt.md) (*Unified Open-Met
   - **Stop legacy worker**; remove silent mode on new stack (delete or set `loxone_silent_mode: false` in `local_settings.json`); restart new worker
   - Switch daily use to new stack (UI port); keep old `docker/earnie/` stopped but intact for rollback window
   - Rollback: stop new containers, start legacy compose on `docker/earnie/`, UI on 8501
-  - **Live `cons_data` `pv_kw`:** keep Loxone-measured append in `main.py` until this cutover; scenario exploration / backtesting use Open-Meteo only (*Unified Open-Meteo solar*, [Backlog-Erledigt.md](Backlog-Erledigt.md))
+  - **Live** `cons_data` ****`pv_kw`**:** keep Loxone-measured append in `main.py` until this cutover; scenario exploration / backtesting use Open-Meteo only (*Unified Open-Meteo solar*, [Backlog-Erledigt.md](Backlog-Erledigt.md))
 
 
 

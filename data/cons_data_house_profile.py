@@ -45,6 +45,8 @@ def total_kw_at_datetime(profile: dict, slot_dt: datetime) -> float:
 def hourly_kw_by_consumer_for_timestamps(
     profile: dict,
     timestamps: list[str],
+    *,
+    climate: ModeledClimateContext | None = None,
 ) -> dict[str, list[float]]:
     """Stündlicher kW je Verbraucher + Basislast, kalenderbasiert wie cons_data-Synthese."""
     consumers = list(profile.get("consumers", []))
@@ -57,7 +59,11 @@ def hourly_kw_by_consumer_for_timestamps(
         slot_dt = _parse_hourly_timestamp(ts_raw)
         for index, cid in enumerate(consumer_ids):
             series[cid].append(
-                modeled_consumer_kw_at_datetime(consumers[index], slot_dt)
+                modeled_consumer_kw_at_datetime(
+                    consumers[index],
+                    slot_dt,
+                    climate=climate,
+                )
             )
         baseload_series.append(baseload_kw)
     series["baseload"] = baseload_series

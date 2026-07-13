@@ -25,6 +25,7 @@ from ui.backtesting_results_helpers import (
     format_test_run_caption,
 )
 from ui.backtesting_runner import (
+    auto_backtesting_workers,
     default_progress_file_path,
     run_backtesting_subprocess,
     suggest_test_month,
@@ -206,10 +207,20 @@ def _execute_backtesting_run(
         st.error(_format_config_error(config_error))
         return
 
-    progress_file = default_progress_file_path()
+    scenarios, _ = try_get_backtesting_scenarios()
+    scenario_count = len(scenarios or {})
+    workers = auto_backtesting_workers(scenario_count)
+    use_hourly_progress = workers == 1
+    progress_file = default_progress_file_path() if use_hourly_progress else None
+
     with st.status(status_label, expanded=True) as status:
         progress_bar = st.progress(0.0)
         progress_caption = st.empty()
+        if workers > 1:
+            progress_caption.caption(
+                f"Parallele Berechnung: {workers} Worker für {scenario_count} Szenarien "
+                "(Stundenfortschritt nur bei einem Szenario verfügbar)."
+            )
 
         def _on_progress(progress: dict) -> None:
             total = int(progress.get("total") or 0)
@@ -230,7 +241,8 @@ def _execute_backtesting_run(
             end_month=end_month,
             progress_file=progress_file,
             horizon_mode=horizon_mode,
-            on_progress=_on_progress,
+            workers=workers,
+            on_progress=_on_progress if use_hourly_progress else None,
         )
         if exit_code == 0:
             progress_bar.progress(1.0)
@@ -284,6 +296,14 @@ def render_backtesting_run_controls(
     horizon_stale = horizon_selection_stale(meta, horizon_mode)
     if horizon_stale:
         st.warning(_HORIZON_STALE_WARNING)
+    scenarios, scenario_error = try_get_backtesting_scenarios()
+    if not scenario_error and scenarios:
+        worker_count = auto_backtesting_workers(len(scenarios))
+        if worker_count > 1:
+            st.caption(
+                f"Automatisch parallele Berechnung: bis zu {worker_count} Worker "
+                f"für {len(scenarios)} Szenarien."
+            )
     col_full, col_test = st.columns(2)
     if col_full.button(
         label,

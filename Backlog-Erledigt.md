@@ -32,9 +32,29 @@ PV (`pv_kw`) and Solar-Kollektor (Haus Wärme) share the **same Open-Meteo archi
 - [x] **Step 3 — Hauskonfigurator preview + cache** — `thermal_annual_kwh_from_archive()`; JSON cache under `data/cache/open_meteo/`; WP metric caption with reference year
 - [x] **Tests** — [`tests/test_open_meteo_solar_archive.py`](tests/test_open_meteo_solar_archive.py), [`tests/test_modeled_climate.py`](tests/test_modeled_climate.py), [`tests/test_heating_need_solar.py`](tests/test_heating_need_solar.py), [`tests/test_cons_data_calendar_alignment.py`](tests/test_cons_data_calendar_alignment.py); offline mock [`tests/fixtures/open_meteo_mock.py`](tests/fixtures/open_meteo_mock.py)
 
-**Smoke verification (manual, open):** *Backlog.md* → smoke-test **Phase A**.
+**Smoke verification (manual, remaining):** *Backlog.md* → smoke-test **Phase A** (July 2024 spot-check, solar collector, fail-hard).
 
 **Deferred to other chapters:** **Thermals P1a** (MILP pulse timing) · **P6b** (live `main.py` Loxone `cons_data` append cutover)
+
+
+### Version 2.0 — Scenario Exploration consumption model (2026-07-13)
+
+Baseline vs optimized load separation for SE / greenfield backtesting. Spec: [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md).
+
+- [x] **Step 1 — Targets & matrix input** — `consumer_daily_targets_kwh` from `planning_flex_daily_targets`; baseload from house-profile overlay; `consumption_source=profile_spec` default for greenfield/SE
+- [x] **Step 2 — Plausibility & reference** — plausibility vs profile-spec totals; `compute_historical_reference_costs` with scenario tariffs; `build_per_scenario_reference_costs` + `reference_by_scenario`
+- [x] **Step 3 — UI** — baseline (dashed) vs optimized per scenario; consumption debug Δ kWh (`ui/backtesting_scenario_consumption.py`)
+- [x] **Step 4 — Greenfield flex registration** — `standard`, `waschmaschine`, `ev` MILP-flex documented; scenarios `live` / `s3-no-battery` in greenfield matrix
+- [x] **Window-aware targets** — partial-day generic/EV flex at 07:00 anchors (`generic_flex_target_kwh_for_window`, `planning_ev_daily_targets`); tests [`tests/test_generic_flex_window_targets.py`](tests/test_generic_flex_window_targets.py)
+- [x] **Tests** — [`tests/test_planning_matrix_profile_spec.py`](tests/test_planning_matrix_profile_spec.py), [`tests/test_consumption_display_integration.py`](tests/test_consumption_display_integration.py), backtesting smoke extensions
+
+**Enables:** meaningful battery/PV scenario comparison; remaining plausibility gaps → smoke-test Phase B in [`Backlog.md`](Backlog.md).
+
+
+### Smoketest backtesting — greenfield runs (2026-07-13)
+
+- [x] **Jan 2025 `fixed_24h` run** — `live` + `s3-no-battery`, 31 windows; `reference_by_scenario` populated; optimization < reference € on `awattar_at` import
+- [x] **cons_data + Open-Meteo cache** — greenfield synthesis regenerated; cache entry under `data/cache/open_meteo/`
 
 
 ### cons_data PV via Open-Meteo Solar Archive (2026-07-13, superseded)

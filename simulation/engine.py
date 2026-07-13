@@ -362,6 +362,7 @@ def build_historical_matrix_for_slots(
             profile,
             slot_datetimes,
             historical_totals=historical_totals,
+            window_end=window_end,
         )
         spec_flex_kwh = round(sum(consumer_daily_targets_kwh.values()), 3)
         spec_total_kwh = round(historical_baseload_kwh + spec_flex_kwh, 3)

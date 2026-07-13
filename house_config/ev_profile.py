@@ -66,24 +66,59 @@ def estimate_ev_annual_kwh(consumer: dict) -> float:
     return round(total, 3)
 
 
-def _charging_hours_for_day(consumer: dict, day: date) -> list[int]:
-    day_sched = _day_schedule(consumer, day)
-    from_h = int(day_sched.get("car_available_from_hour", 19)) % 24
-    ready_h = int(day_sched.get("ready_by_hour", 7)) % 24
-    return [hour for hour in range(24) if hour_in_charging_window(hour, from_h, ready_h)]
+def _charging_hours_from_arrival(from_h: int, ready_h: int) -> list[int]:
+    """Ladestunden ab car_available_from_hour (Ankunft) vorwärts bis vor ready_by_hour."""
+    from_h %= 24
+    ready_h %= 24
+    ordered: list[int] = []
+    hour = from_h
+    while True:
+        if hour_in_charging_window(hour, from_h, ready_h):
+            ordered.append(hour)
+        if hour == (ready_h - 1) % 24:
+            break
+        hour = (hour + 1) % 24
+    return ordered
 
 
 def _distribute_daily_kwh(daily_kwh: float, hours: list[int], nominal_kw: float) -> dict[int, float]:
+    """Baseline: PMax ab Ankunftsstunde vorwärts bis das Tagesziel erreicht ist."""
     if not hours or daily_kwh <= 0:
         return {hour: 0.0 for hour in range(24)}
-    per_hour = min(nominal_kw, daily_kwh / len(hours))
-    return {hour: (per_hour if hour in hours else 0.0) for hour in range(24)}
+    result = {hour: 0.0 for hour in range(24)}
+    remaining = daily_kwh
+    for hour in hours:
+        if remaining <= 0:
+            break
+        kw = min(nominal_kw, remaining)
+        result[hour] = kw
+        remaining -= kw
+    return result
+
+
+def ev_hourly_kw_from_schedule(
+    *,
+    from_h: int,
+    ready_h: int,
+    daily_kwh: float,
+    nominal_kw: float,
+) -> dict[int, float]:
+    """Stündliches kW-Dict aus Ladezeitfenster und Tagesziel (Baseline / cons_data)."""
+    hours = _charging_hours_from_arrival(from_h, ready_h)
+    return _distribute_daily_kwh(daily_kwh, hours, nominal_kw)
 
 
 def ev_hourly_kw_for_day(consumer: dict, day: date) -> list[float]:
     """Stündliches kW-Profil für einen Tag — Last nur im Ladezeitfenster."""
     daily_kwh = ev_daily_kwh(consumer, day)
     nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
-    hours = _charging_hours_for_day(consumer, day)
-    by_hour = _distribute_daily_kwh(daily_kwh, hours, nominal)
+    day_sched = _day_schedule(consumer, day)
+    from_h = int(day_sched.get("car_available_from_hour", 19)) % 24
+    ready_h = int(day_sched.get("ready_by_hour", 7)) % 24
+    by_hour = ev_hourly_kw_from_schedule(
+        from_h=from_h,
+        ready_h=ready_h,
+        daily_kwh=daily_kwh,
+        nominal_kw=nominal,
+    )
     return [by_hour[hour] for hour in range(24)]

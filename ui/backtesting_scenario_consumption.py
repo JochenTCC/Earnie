@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from data.consumption_profiles import _consumer_id
+from data.consumption_profiles import _consumer_id, modeled_consumer_kw_at_datetime
 from data.cons_data_house_profile import hourly_kw_by_consumer_for_timestamps
 from ui.consumption_display.types import (
     BaselineOptimizedOverlay,
@@ -191,6 +191,67 @@ def detect_period_timing_shift(
     return l1 >= hourly_l1_threshold_kwh
 
 
+def _climate_for_overlay(settings: dict, profile: dict):
+    """Open-Meteo-Klima nur wenn Hausprofil Koordinaten hat."""
+    if profile.get("latitude") is None or profile.get("longitude") is None:
+        return None
+    from data.modeled_climate import ModeledClimateContext
+
+    return ModeledClimateContext.from_scenario(settings)
+
+
+def _split_optimized_baseload_for_overlay(
+    profile: dict,
+    timestamps: list[str],
+    optimized_kw: dict[str, list[float]],
+    *,
+    climate,
+) -> dict[str, list[float]]:
+    """Trennt flache Grundlast von thermischem Overlay für den SE-Vergleichschart."""
+    from datetime import datetime
+
+    from house_config.planning_flex_bridge import profile_flat_baseload_kw
+
+    flat_kw = round(profile_flat_baseload_kw(profile), 4)
+    hour_count = len(timestamps)
+    result = dict(optimized_kw)
+    result[_BASELOAD_KEY] = [flat_kw] * hour_count
+
+    thermal_ids = [
+        str(consumer.get("id") or "")
+        for consumer in profile.get("consumers", [])
+        if consumer.get("type") == "thermal_annual" and consumer.get("id")
+    ]
+    if not thermal_ids:
+        return result
+
+    consumers_by_id = {
+        str(consumer.get("id") or ""): consumer
+        for consumer in profile.get("consumers", [])
+    }
+    for consumer_id in thermal_ids:
+        consumer = consumers_by_id.get(consumer_id)
+        if consumer is None:
+            continue
+        series: list[float] = []
+        for ts_raw in timestamps:
+            slot_dt = datetime.strptime(ts_raw, "%Y-%m-%d %H:%M:%S")
+            series.append(
+                round(
+                    float(
+                        modeled_consumer_kw_at_datetime(
+                            consumer,
+                            slot_dt,
+                            climate=climate,
+                        )
+                    ),
+                    4,
+                )
+            )
+        result[consumer_id] = series
+    return result
+
+
 def build_baseline_optimized_overlay(
     scenarios: dict[str, dict],
     labels: dict[str, str],
@@ -208,7 +269,12 @@ def build_baseline_optimized_overlay(
     if not hourly_log_has_consumption_columns(hourly_df):
         return None
 
-    baseline_kw = hourly_kw_by_consumer_for_timestamps(profile, timestamps)
+    climate = _climate_for_overlay(settings, profile)
+    baseline_kw = hourly_kw_by_consumer_for_timestamps(
+        profile,
+        timestamps,
+        climate=climate,
+    )
     consumer_ids = list(baseline_kw.keys())
     if _BASELOAD_KEY not in consumer_ids:
         consumer_ids.append(_BASELOAD_KEY)
@@ -218,6 +284,12 @@ def build_baseline_optimized_overlay(
         scenario_id,
         timestamps,
         consumer_ids,
+    )
+    optimized_kw = _split_optimized_baseload_for_overlay(
+        profile,
+        timestamps,
+        optimized_kw,
+        climate=climate,
     )
     return BaselineOptimizedOverlay(
         scenario_label=labels.get(scenario_id, scenario_id),

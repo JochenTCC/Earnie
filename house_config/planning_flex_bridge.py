@@ -1,7 +1,7 @@
 """Brücke Hausprofil-generic → Backtesting (fixe Blöcke + MILP-Flex)."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from settings.flexible_consumers import CONSUMER_PALETTE_SIZE
@@ -141,6 +141,8 @@ def planning_ev_daily_targets(
     flex_consumers: list[dict],
     house_profile: dict,
     slot_datetimes: list[datetime],
+    *,
+    window_end: datetime | None = None,
 ) -> dict[str, float]:
     """Tagesziele (kWh) für EV-Verbraucher im Fenster."""
     from house_config.ev_profile import ev_daily_kwh
@@ -151,12 +153,18 @@ def planning_ev_daily_targets(
     }
     if not ev_by_id:
         return {}
-    dates = {slot_dt.date() for slot_dt in slot_datetimes}
     targets: dict[str, float] = {}
     for milp_consumer in flex_consumers:
         source = ev_by_id.get(milp_consumer["id"])
         if not source:
             continue
+        if window_end is not None:
+            departure_day = window_end.date()
+            targets[milp_consumer["id"]] = round(
+                ev_daily_kwh(source, departure_day), 3
+            )
+            continue
+        dates = {slot_dt.date() for slot_dt in slot_datetimes}
         targets[milp_consumer["id"]] = round(
             sum(ev_daily_kwh(source, day) for day in dates),
             3,
@@ -282,21 +290,32 @@ def planning_flex_daily_targets(
     flex_consumers: list[dict],
     house_profile: dict,
     slot_datetimes: list[datetime],
+    *,
+    window_end: datetime | None = None,
 ) -> dict[str, float]:
     """Tagesziele (kWh) für Planungs-Flex-Verbraucher im Fenster."""
     if not flex_consumers:
         return {}
+    from house_config.generic_schedule import (
+        generic_daily_target_kwh_for_day,
+        generic_flex_target_kwh_for_window,
+    )
+
     by_id = {consumer["id"]: consumer for consumer in _house_generic_consumers(house_profile)}
     targets: dict[str, float] = {}
     dates = {slot_dt.date() for slot_dt in slot_datetimes}
+    anchor = window_end or (slot_datetimes[-1] + timedelta(hours=1) if slot_datetimes else None)
     for milp_consumer in flex_consumers:
         source = by_id.get(milp_consumer["id"])
         if not source:
             continue
-        total = sum(
-            generic_daily_target_kwh_for_day(source, day)
-            for day in dates
-        )
+        if anchor is not None:
+            total = generic_flex_target_kwh_for_window(source, slot_datetimes, anchor)
+        else:
+            total = sum(
+                generic_daily_target_kwh_for_day(source, day)
+                for day in dates
+            )
         targets[milp_consumer["id"]] = round(total, 3)
     return targets
 
@@ -344,6 +363,7 @@ def resolve_profile_spec_flex_targets(
     slot_datetimes: list[datetime],
     *,
     historical_totals: dict[str, float] | None = None,
+    window_end: datetime | None = None,
 ) -> dict[str, float]:
     """
     Flex-Zielenergie für profile_spec: Hausprofil-Generic + cons_data für reine Config-Verbraucher.
@@ -351,9 +371,19 @@ def resolve_profile_spec_flex_targets(
     if not flex_consumers:
         return {}
     profile_ids = _house_profile_consumer_ids(house_profile)
-    targets = planning_flex_daily_targets(flex_consumers, house_profile, slot_datetimes)
+    targets = planning_flex_daily_targets(
+        flex_consumers,
+        house_profile,
+        slot_datetimes,
+        window_end=window_end,
+    )
     targets.update(
-        planning_ev_daily_targets(flex_consumers, house_profile, slot_datetimes)
+        planning_ev_daily_targets(
+            flex_consumers,
+            house_profile,
+            slot_datetimes,
+            window_end=window_end,
+        )
     )
     cons_totals = historical_totals or {}
     for consumer in flex_consumers:
