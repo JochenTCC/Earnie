@@ -110,22 +110,16 @@ Greenfield smoke **2026-07-12**; backtesting iteration **2026-07-13**. Completed
 
 Done in code → [Backlog-Erledigt.md](Backlog-Erledigt.md): SE consumption model (`profile_spec`), per-scenario reference tariffs (`reference_by_scenario`), window-aware flex targets at 07:00 anchors.
 
-**Open investigation** (goal: plausible kWh + explainable € on flat import):
+Completed investigations → [Backlog-Erledigt.md](Backlog-Erledigt.md): fixed-tariff scenario matrix, bulk classify, structural flex under-delivery (`s2-kein-pv` Jan 2 & 7).
 
-1. [ ] **Fixed-tariff scenario matrix in greenfield** — `live` (full), `s2-kein-pv` (no PV), `s3-no-battery` (no battery), `s1-kein-pv-keine-battery` (no PV, no battery) with `fixed_25ct` / `fixed_37ct` in `greenfield/config/backtesting_scenarios.json`; run `--horizon-mode fixed_24h`
-  - Created all scenarios in local greenfield env
-  - Made test backtesting calculation (January 2025)
-  - Finding: `s2-kein-pv` / `s1-kein-pv-keine-battery` show higher costs than baseline that is with PV --> Take PV out of baseline
-  - Notice: "Zeitverschiebung (Energie ≈ Spec)" - what does that mean? --> More precise wording
-2. [ ] **Optional UX** — expose `diag_single_window` from SE deviation detail (CLI exists)
-3. [ ] **Bulk classify** — per scenario: plausibility ok/total, Δ€ vs matched reference, deviation kinds; tool: `scripts/analyze_plausibility_failures.py`
-4. [x] **Structural flex under-delivery (`s2-kein-pv` Jan 2 & 7)** — Phase 1 done: rolling `min_on` continuation in MILP. Spec: [`docs/spec/backtesting-plausibility-s2-kein-pv-jan-2-7.md`](docs/spec/backtesting-plausibility-s2-kein-pv-jan-2-7.md#phase-1-implementation-2026-07-13)
-
-Greenfield matrix (Phase B): `greenfield/config/backtesting_scenarios.json` — `live`, `s2-kein-pv`, `s3-no-battery`, `s1-kein-pv-keine-battery`.
+**Variable tariff scenario**
+- [ ] Check scenario results
 
 **Phase C — polish (may slip to 2.+1)**
 
-1. [ ] **Speichern** always at eye level in Hauskonfigurator (sticky top bar or duplicate save on long tabs: Hausprofil / PV / Batterien) or shortkey (Ctrl-S)
+- [ ] **Optional UX** — expose `diag_single_window` from SE deviation detail (CLI exists)
+- [ ] Add Referenz and Ohne Optimierung to table of Gesamtkosten
+- [ ] **Speichern** always at eye level in Hauskonfigurator (sticky top bar or duplicate save on long tabs: Hausprofil / PV / Batterien) or shortkey (Ctrl-S)
 
 **Backtesting Tests**
 

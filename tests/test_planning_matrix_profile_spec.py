@@ -315,6 +315,7 @@ def test_build_per_scenario_reference_costs_adds_tariff_specific_ref(
         HISTORICAL_REFERENCE_ID,
         build_per_scenario_reference_costs,
         scenario_reference_id,
+        scenario_reference_label,
     )
 
     scenarios = {
@@ -349,6 +350,7 @@ def test_build_per_scenario_reference_costs_adds_tariff_specific_ref(
     assert mapping["fixed_only"] == ref_id
     assert ref_id in extra
     assert ref_id in labels
+    assert labels[ref_id] == scenario_reference_label("Fixed")
     assert len(extra[ref_id]) == 24
 
 

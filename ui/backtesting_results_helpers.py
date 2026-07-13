@@ -7,7 +7,7 @@ import pandas as pd
 
 import config
 from scripts.run_backtesting import BACKTESTING_YEAR
-from simulation.engine import HISTORICAL_REFERENCE_ID
+from simulation.engine import HISTORICAL_REFERENCE_ID, is_scenario_reference_id
 from ui.consumption_validation_charts import cons_data_monthly_kwh
 
 _DASH = "—"
@@ -228,6 +228,27 @@ def _reference_id_for_scenario(meta: dict, scenario_id: str) -> str:
     return str(mapping.get(scenario_id) or meta.get("reference_id", HISTORICAL_REFERENCE_ID))
 
 
+def _annual_cost_row_order(meta: dict, totals: dict[str, float]) -> list[str]:
+    """Global reference first, then per-scenario references, then optimized scenarios."""
+    ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
+    scenario_ids = list(meta.get("scenario_ids", []))
+    ordered_ids = list(dict.fromkeys(scenario_ids + [sid for sid in totals if sid not in scenario_ids]))
+
+    global_refs: list[str] = []
+    scenario_refs: list[str] = []
+    optimized: list[str] = []
+    for scenario_id in ordered_ids:
+        if scenario_id not in totals:
+            continue
+        if scenario_id == ref_id:
+            global_refs.append(scenario_id)
+        elif is_scenario_reference_id(scenario_id):
+            scenario_refs.append(scenario_id)
+        else:
+            optimized.append(scenario_id)
+    return global_refs + scenario_refs + optimized
+
+
 def build_annual_cost_rows(meta: dict, ref_kwh: float | None) -> list[dict]:
     summary = meta.get("summary", {})
     totals = summary.get("total_eur", {})
@@ -235,10 +256,22 @@ def build_annual_cost_rows(meta: dict, ref_kwh: float | None) -> list[dict]:
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
 
     rows: list[dict] = []
-    for scenario_id, total_eur in totals.items():
-        if scenario_id == ref_id or str(scenario_id).startswith("ref:"):
-            continue
+    for scenario_id in _annual_cost_row_order(meta, totals):
+        total_eur = totals[scenario_id]
         label = labels.get(scenario_id, scenario_id)
+        is_reference = scenario_id == ref_id or is_scenario_reference_id(scenario_id)
+        if is_reference:
+            kwh_cell = _format_kwh(ref_kwh) if scenario_id == ref_id else _DASH
+            rows.append(
+                {
+                    "Szenario": label,
+                    "Jahres-kWh": kwh_cell,
+                    "Jahres-€": f"{total_eur:.2f}",
+                    "Δ vs. Referenz": _DASH,
+                }
+            )
+            continue
+
         scenario_ref_id = _reference_id_for_scenario(meta, scenario_id)
         ref_total = totals.get(scenario_ref_id)
         if ref_total is None and scenario_ref_id != ref_id:

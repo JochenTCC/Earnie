@@ -686,6 +686,11 @@ def scenario_reference_id(scenario_id: str) -> str:
     return f"{SCENARIO_REFERENCE_PREFIX}{scenario_id}"
 
 
+def scenario_reference_label(scenario_display: str) -> str:
+    """UI-Label für Szenario-Referenzkosten (ohne Batterie/Flex-Optimierung)."""
+    return f"Referenz ({scenario_display}) — ohne Optimierung"
+
+
 def is_scenario_reference_id(result_id: str) -> bool:
     return str(result_id).startswith(SCENARIO_REFERENCE_PREFIX)
 
@@ -835,7 +840,7 @@ def build_per_scenario_reference_costs(
             scenario_params=params,
         )
         display = labels.get(scenario_id, scenario_id)
-        extra_labels[ref_id] = f"Referenz ({display})"
+        extra_labels[ref_id] = scenario_reference_label(display)
         reference_by_scenario[scenario_id] = ref_id
 
     return extra_results, extra_labels, reference_by_scenario
