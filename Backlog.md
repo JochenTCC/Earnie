@@ -92,19 +92,19 @@ $env:EARNIE_BACKTESTING_SCENARIOS_PATH = "greenfield/config/backtesting_scenario
 
 **Rollout (4 steps)**
 
-- [ ] **Step 1 — Targets & matrix input (engine)**
+- [x] **Step 1 — Targets & matrix input (engine)**
   - SE/backtesting: `consumer_daily_targets_kwh` from `planning_flex_daily_targets` (+ config `flexible_consumers` where applicable), not cons_data window sums
   - Baseload / fixed consumers: house-profile overlay ([`house_profile_baseload_overlay`](house_config/planning_flex_bridge.py)); do not re-derive optimized baseload from cons_data `Total`
   - Flag or mode: `consumption_source=profile_spec` vs `logged_day` (prod replay) — default **profile_spec** for greenfield / SE
-- [ ] **Step 2 — Plausibility & reference**
+- [x] **Step 2 — Plausibility & reference**
   - Plausibility: optimized kWh vs **profile-spec** totals for the window (not cons_data replay)
   - `compute_historical_reference_costs`: baseline load from profile default schedule (or cons_data when `source=loxone`); align with per-scenario tariffs (cf. *SE higher cost* Phase 2)
-- [ ] **Step 3 — UI**
+- [x] **Step 3 — UI**
   - SE hourly chart: baseline (dashed) vs optimized per scenario (solid), per consumer where useful
   - Consumption debug table: show Δ kWh vs baseline when timing shifts but energy matches spec
-- [ ] **Step 4 — Greenfield flex registration**
-  - Document / bootstrap: which profile consumer types are MILP-flex in SE (generic with `start_shift_h > 0`, EV when `charging_schedule` present)
-  - Ensure greenfield `mein_haushalt` exercises at least one shiftable generic + EV in test matrix
+- [x] **Step 4 — Greenfield flex registration**
+  - Document / bootstrap: which profile consumer types are MILP-flex in SE (generic with `start_shift_h > 0`, EV when `charging_schedule` present) — see [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md)
+  - Ensure greenfield `mein_haushalt` exercises at least one shiftable generic + EV in test matrix (`standard`, `waschmaschine`, `ev`; scenarios `live` / `s3-no-battery`)
 
 **Acceptance**
 

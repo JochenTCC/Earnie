@@ -219,8 +219,15 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
 
 
 def resolve_consumer_battery_capacity_kwh(consumer: dict) -> float | None:
-    """Akkukapazität (kWh) live aus Loxone (einzige Quelle)."""
+    """Akkukapazität (kWh): Hausprofil-Bridge oder live aus Loxone."""
+    direct = consumer.get("battery_capacity_kwh")
+    if direct is not None and float(direct) > 0:
+        return float(direct)
     sched = consumer.get("charging_schedule") or {}
+    sched_cap = sched.get("battery_capacity_kwh")
+    if sched_cap is not None and float(sched_cap) > 0:
+        return float(sched_cap)
+
     lox = sched.get("loxone") or {}
     io_name = str(lox.get("battery_capacity_kwh_name", "")).strip()
     cid = consumer.get("id", "?")

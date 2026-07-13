@@ -9,7 +9,7 @@ from house_config.entity_resolution import (
     resolve_pv_into_settings,
 )
 from house_config.geo_timezone import lookup_timezone_name
-from house_config.planning_flex_bridge import split_planning_generic_consumers
+from house_config.planning_flex_bridge import collect_planning_flex_consumers
 from house_config.profiles_store import load_house_profiles_document
 from house_config.tariffs_store import (
     load_tariffs_document,
@@ -107,7 +107,7 @@ def resolve_scenario_settings(
         profile = profiles[profile_id]
         out["_house_profile"] = profile
         _apply_profile_geo(out, profile, settings)
-        _fixed, flex_consumers = split_planning_generic_consumers(profile)
+        flex_consumers = collect_planning_flex_consumers(profile)
         if flex_consumers:
             out["_planning_flex_consumers"] = flex_consumers
     _ensure_geo_defaults(out)

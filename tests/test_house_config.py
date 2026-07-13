@@ -560,6 +560,61 @@ def test_scenario_resolution_includes_planning_flex(tmp_path):
     assert any(item["id"] == "washer" for item in flex)
 
 
+def test_scenario_resolution_includes_ev_planning_flex(tmp_path):
+    import json
+
+    from house_config.scenario_resolution import resolve_scenario_settings
+
+    path = tmp_path / "house_profiles.json"
+    path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home_ev",
+                        "annual_kwh": 6000,
+                        "consumers": [
+                            {
+                                "id": "ev",
+                                "type": "ev",
+                                "label": "EV",
+                                "nominal_power_kw": 11.0,
+                                "min_power_kw": 1.4,
+                                "min_on_quarterhours": 4,
+                                "battery_capacity_kwh": 40.0,
+                                "charging_schedule": {
+                                    "weekday": {
+                                        "car_available_from_hour": 18,
+                                        "ready_by_hour": 7,
+                                        "daily_rest_soc": 60.0,
+                                    },
+                                    "weekend": {
+                                        "car_available_from_hour": 18,
+                                        "ready_by_hour": 7,
+                                        "daily_rest_soc": 30.0,
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    resolved = resolve_scenario_settings(
+        {"house_profile_id": "home_ev"},
+        raw_config=config.CONFIG._raw_config,
+        components_path=config.CONFIG.components_path,
+        tariffs_path=config.TARIFFS_JSON_PATH,
+        house_profiles_path=str(path),
+    )
+    flex = resolved.get("_planning_flex_consumers") or []
+    ev = next(item for item in flex if item["id"] == "ev")
+    assert ev["charging_schedule"]["enabled"] is True
+    assert ev["signal_type"] == "power"
+
+
 def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
     from house_config.scenario_resolution import (
         DEFAULT_LIVE_SCENARIO_ID,

@@ -132,8 +132,9 @@ def resolve_horizon_consumer_targets_kwh(
     )
     if not optimization_matrix:
         return {c["id"]: 0.0 for c in consumers_cfg}
-    logged_targets_only = (
-        optimization_matrix[0].get("consumption_mode") == "logged_day"
+    logged_targets_only = optimization_matrix[0].get("consumption_mode") in (
+        "logged_day",
+        "profile_spec",
     )
     ref_date = optimization_matrix[0].get("date")
     ref_dt = optimization_matrix[0].get("slot_datetime")
@@ -190,10 +191,10 @@ def build_applied_targets_detail(
     consumer_daily_targets_kwh: dict | None = None,
 ) -> list[dict]:
     """Bereitet die genutzten Tagesziele mit Verbrauchername und Quelle für die UI auf."""
-    logged_day = bool(
-        optimization_matrix
-        and optimization_matrix[0].get("consumption_mode") == "logged_day"
+    consumption_mode = (
+        optimization_matrix[0].get("consumption_mode") if optimization_matrix else None
     )
+    logged_day = consumption_mode == "logged_day"
     targets = resolve_applied_daily_targets(optimization_matrix, consumer_daily_targets_kwh)
     charging_contexts = resolve_charging_contexts(optimization_matrix, consumer_daily_targets_kwh)
     targets = apply_horizon_charging_limits(targets, charging_contexts)
@@ -203,6 +204,8 @@ def build_applied_targets_detail(
         ctx = charging_contexts.get(cid)
         if ctx and ctx.get("source_label"):
             source = ctx["source_label"]
+        elif consumption_mode == "profile_spec":
+            source = "Hausprofil (profile_spec)"
         elif logged_day:
             source = "geloggt (historischer Tag)"
         else:
@@ -232,14 +235,19 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
     """
     if not optimization_matrix:
         return []
-    logged_day = optimization_matrix[0].get("consumption_mode") == "logged_day"
+    consumption_mode = optimization_matrix[0].get("consumption_mode")
+    logged_day = consumption_mode == "logged_day"
+    profile_spec = consumption_mode == "profile_spec"
     consumers = config.get_flexible_consumers(optimizer_only=True)
     details = []
-    if logged_day:
+    if logged_day or profile_spec:
         row_date = optimization_matrix[0].get("date")
         from data import consumer_targets
         totals = consumer_targets.resolve_historical_consumer_daily_targets(row_date)
-        source = "geloggt (Gesamtverbrauchs-Stundenprofil)"
+        if profile_spec:
+            source = "Hausprofil (profile_spec, cons_data Referenz)"
+        else:
+            source = "geloggt (Gesamtverbrauchs-Stundenprofil)"
         for consumer in consumers:
             cid = consumer["id"]
             details.append({
@@ -288,13 +296,15 @@ def build_energy_comparison_detail(
 ) -> list[dict]:
     """Kombiniert Profil-Baseline, Ziel-Baseline und Optimierung je Verbraucher inkl. Grundlast."""
     baseload_kwh = resolve_baseload_kwh(optimization_matrix)
-    logged_day = bool(
-        optimization_matrix
-        and optimization_matrix[0].get("consumption_mode") == "logged_day"
+    consumption_mode = (
+        optimization_matrix[0].get("consumption_mode") if optimization_matrix else None
     )
-    baseload_source = (
-        "geloggt (historischer Tag)" if logged_day else "Verbrauchsprofil (consumption_profiles.csv)"
-    )
+    if consumption_mode == "profile_spec":
+        baseload_source = "Hausprofil (profile_spec)"
+    elif consumption_mode == "logged_day":
+        baseload_source = "geloggt (historischer Tag)"
+    else:
+        baseload_source = "Verbrauchsprofil (consumption_profiles.csv)"
     baseline_by_id = {
         item["id"]: item for item in build_baseline_targets_detail(optimization_matrix)
     }

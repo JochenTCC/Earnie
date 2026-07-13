@@ -31,7 +31,13 @@ from ui.backtesting_runner import (
 )
 from ui.backtesting_time_ranges import render_time_range_help
 from scripts.run_backtesting import BACKTESTING_YEAR
-from ui.backtesting_scenario_consumption import build_scenario_consumer_overlays
+from ui.backtesting_scenario_consumption import (
+    build_baseline_optimized_overlay,
+    build_scenario_consumer_overlays,
+    hourly_log_has_consumption_columns,
+)
+from ui.consumption_display.charts import week_baseline_optimized_timeseries_chart
+from ui.consumption_display.navigation import render_iso_week_navigation
 from ui.consumption_display.types import ScenarioConsumerOverlayBundle
 from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
@@ -337,6 +343,31 @@ def render_backtesting_log_caption(meta: dict) -> None:
         st.warning(caption)
 
 
+def _hourly_timestamps_for_scenario(
+    hourly_df: pd.DataFrame,
+    scenario_id: str,
+    nav_bounds: tuple | None,
+) -> list[str]:
+    part = hourly_df.loc[hourly_df["scenario_id"] == scenario_id].copy()
+    if part.empty or "ts" not in part.columns:
+        return []
+    part["ts"] = pd.to_datetime(part["ts"])
+    if nav_bounds is not None:
+        start, end = nav_bounds
+        part = part[(part["ts"] >= start) & (part["ts"] <= end)]
+    return [pd.Timestamp(ts).strftime("%Y-%m-%d %H:%M:%S") for ts in part["ts"]]
+
+
+def _optimized_scenario_ids(meta: dict, scenarios: dict[str, dict]) -> list[str]:
+    ref_id = meta.get("reference_id")
+    return [
+        scenario_id
+        for scenario_id in meta.get("scenario_ids", [])
+        if scenario_id != ref_id
+        and isinstance(scenarios.get(scenario_id, {}).get("_house_profile"), dict)
+    ]
+
+
 def _reference_kwh_for_meta(meta: dict) -> float | None:
     period = meta.get("period", {})
     if not cons_data_store.is_cons_data_populated():
@@ -355,15 +386,31 @@ def render_annual_cost_table(meta: dict) -> None:
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
-def render_scenario_consumption_table(meta: dict) -> None:
+def render_scenario_consumption_table(meta: dict, hourly_df: pd.DataFrame | None = None) -> None:
     period = meta.get("period", {})
     st.subheader(scenario_consumption_subheader(period))
     st.caption(
         "Summe der gelieferten kWh über alle 24h-Fenster im Lauf "
-        "(Grundlast + flexible Verbraucher). Positive Δ = mehr Verbrauch als historisch."
+        "(Grundlast + flexible Verbraucher). Δ ≈ 0 bei Zeitverschiebung mit gleicher Spec-Energie."
     )
     ref_kwh = _reference_kwh_for_meta(meta)
-    rows = build_scenario_consumption_rows(meta, ref_kwh)
+    scenarios, scenario_error = try_get_backtesting_scenarios()
+    timestamps: list[str] | None = None
+    if hourly_df is not None and scenarios and not scenario_error:
+        scenario_ids = _optimized_scenario_ids(meta, scenarios)
+        if scenario_ids:
+            timestamps = _hourly_timestamps_for_scenario(
+                hourly_df,
+                scenario_ids[0],
+                nav_bounds_from_period(period),
+            )
+    rows = build_scenario_consumption_rows(
+        meta,
+        ref_kwh,
+        hourly_df=hourly_df,
+        scenarios=scenarios if not scenario_error else None,
+        timestamps=timestamps,
+    )
     if not rows:
         st.info("Keine Szenarien im Log.")
         return
@@ -421,6 +468,78 @@ def render_reference_consumption_ui(meta: dict) -> None:
         st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")
 
 
+def render_optimized_consumption_ui(meta: dict, hourly_df: pd.DataFrame) -> None:
+    """Stündlicher Vergleich Profil-Baseline vs. MILP-optimiert je Szenario."""
+    if hourly_df is None or hourly_df.empty:
+        return
+    if not hourly_log_has_consumption_columns(hourly_df):
+        st.subheader("Optimierter Verbrauch vs. Profil-Baseline")
+        st.info(
+            "Stündliche Verbrauchsserien fehlen in diesem Log (älterer Lauf). "
+            "Bitte Szenarien-Explorer neu berechnen."
+        )
+        return
+
+    scenarios, scenario_error = try_get_backtesting_scenarios()
+    if scenario_error or not scenarios:
+        return
+
+    scenario_ids = _optimized_scenario_ids(meta, scenarios)
+    if not scenario_ids:
+        return
+
+    period = meta.get("period", {})
+    nav_bounds = nav_bounds_from_period(period)
+    labels = {**scenario_labels_map(), **meta.get("labels", {})}
+    timestamps = _hourly_timestamps_for_scenario(
+        hourly_df,
+        scenario_ids[0],
+        nav_bounds,
+    )
+    if not timestamps:
+        return
+
+    st.subheader("Optimierter Verbrauch vs. Profil-Baseline")
+    st.caption(
+        "Gestrichelt = Hausprofil-Spezifikation (Baseline), "
+        "durchgezogen = MILP-optimiert je Szenario."
+    )
+    selected_id = st.selectbox(
+        "Szenario",
+        scenario_ids,
+        format_func=lambda scenario_id: labels.get(scenario_id, scenario_id),
+        key="backtesting_optimized_scenario",
+    )
+    overlay = build_baseline_optimized_overlay(
+        scenarios,
+        labels,
+        selected_id,
+        timestamps,
+        hourly_df,
+    )
+    if overlay is None:
+        st.info("Keine Profil-Baseline für das gewählte Szenario.")
+        return
+
+    week = render_iso_week_navigation(
+        timestamps,
+        key_prefix="backtesting_optimized",
+        reset_token=str(meta.get("created_at", "")),
+        nav_bounds=nav_bounds,
+    )
+    if week is not None:
+        iso_year, iso_week = week
+        st.plotly_chart(
+            week_baseline_optimized_timeseries_chart(
+                timestamps,
+                overlay,
+                iso_year=iso_year,
+                iso_week=iso_week,
+            ),
+            width="stretch",
+        )
+
+
 def render_backtesting_monthly_chart(meta: dict) -> None:
     st.subheader("Monatlicher Kostenvergleich")
     monthly = meta.get("summary", {}).get("monthly_eur", {})
@@ -446,16 +565,17 @@ def _deviation_labels_map(meta: dict) -> dict[str, str]:
     return labels
 
 
-def _render_backtesting_results(meta: dict) -> None:
+def _render_backtesting_results(meta: dict, hourly_df: pd.DataFrame) -> None:
     render_backtesting_log_caption(meta)
     render_annual_cost_table(meta)
-    render_scenario_consumption_table(meta)
+    render_scenario_consumption_table(meta, hourly_df)
     render_deviation_list(
         meta,
         _deviation_labels_map(meta),
         log_dir=resolve_backtesting_log_dir(),
     )
     render_reference_consumption_ui(meta)
+    render_optimized_consumption_ui(meta, hourly_df)
     render_backtesting_monthly_chart(meta)
 
 
@@ -504,4 +624,4 @@ def render_backtesting_block() -> None:
         st.info(_HORIZON_RESULTS_HIDDEN_INFO)
         return
 
-    _render_backtesting_results(meta)
+    _render_backtesting_results(meta, _hourly)

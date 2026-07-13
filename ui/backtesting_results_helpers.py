@@ -11,6 +11,7 @@ from simulation.engine import HISTORICAL_REFERENCE_ID
 from ui.consumption_validation_charts import cons_data_monthly_kwh
 
 _DASH = "—"
+_TIMING_SHIFT_NOTE = "Zeitverschiebung (Energie ≈ Spec)"
 
 
 def is_single_month_test_run(period: dict) -> bool:
@@ -124,8 +125,54 @@ def _format_plausibility_cell(block: dict | None) -> str:
     return f"{ok}/{total} OK"
 
 
-def build_scenario_consumption_rows(meta: dict, ref_kwh: float | None) -> list[dict]:
-    """Vergleich historischer vs. optimierter kWh je Szenario (Debug-Tabelle)."""
+def _format_flex_delta_kwh(totals: dict) -> str:
+    historical = totals.get("historical_flex_kwh")
+    optimized = totals.get("optimized_flex_kwh")
+    if historical is None or optimized is None:
+        return _DASH
+    return _format_delta_kwh(round(optimized - historical, 1))
+
+
+def _timing_shift_note(
+    scenario_id: str,
+    totals: dict,
+    labels: dict[str, str],
+    *,
+    hourly_df,
+    scenarios: dict | None,
+    timestamps: list[str] | None,
+) -> str:
+    delta = totals.get("delta_kwh")
+    if delta is None or hourly_df is None or not scenarios or not timestamps:
+        return _DASH
+    from ui.backtesting_scenario_consumption import (
+        build_baseline_optimized_overlay,
+        detect_period_timing_shift,
+    )
+
+    overlay = build_baseline_optimized_overlay(
+        scenarios,
+        labels,
+        scenario_id,
+        timestamps,
+        hourly_df,
+    )
+    if overlay is None:
+        return _DASH
+    if detect_period_timing_shift(overlay.baseline_kw, overlay.optimized_kw):
+        return _TIMING_SHIFT_NOTE
+    return _DASH
+
+
+def build_scenario_consumption_rows(
+    meta: dict,
+    ref_kwh: float | None,
+    *,
+    hourly_df=None,
+    scenarios: dict | None = None,
+    timestamps: list[str] | None = None,
+) -> list[dict]:
+    """Vergleich Baseline-Spec vs. optimierter kWh je Szenario (Debug-Tabelle)."""
     labels = meta.get("labels", {})
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
     plausibility = meta.get("plausibility", {})
@@ -141,26 +188,44 @@ def build_scenario_consumption_rows(meta: dict, ref_kwh: float | None) -> list[d
         totals = (block or {}).get("consumption_totals") or {}
 
         if is_ref:
-            historical = ref_kwh
+            baseline = ref_kwh
             optimized = ref_kwh
             delta = 0.0 if ref_kwh is not None else None
+            flex_delta = _DASH
             plaus_cell = _DASH
+            note = _DASH
         else:
-            historical = totals.get("historical_kwh")
+            baseline = totals.get("historical_kwh")
             optimized = totals.get("optimized_kwh")
             delta = totals.get("delta_kwh")
+            flex_delta = _format_flex_delta_kwh(totals)
             plaus_cell = _format_plausibility_cell(block)
+            note = _timing_shift_note(
+                scenario_id,
+                totals,
+                labels,
+                hourly_df=hourly_df,
+                scenarios=scenarios,
+                timestamps=timestamps,
+            )
 
         rows.append(
             {
                 "Szenario": label,
-                "Historisch (kWh)": _format_kwh(historical),
+                "Baseline Spec (kWh)": _format_kwh(baseline),
                 "Optimiert (kWh)": _format_kwh(optimized),
-                "Δ kWh (Opt−Hist)": _format_delta_kwh(delta),
+                "Δ kWh (Opt−Baseline)": _format_delta_kwh(delta),
+                "Δ Flex (kWh)": flex_delta,
+                "Hinweis": note,
                 "Plausibilität": plaus_cell,
             }
         )
     return rows
+
+
+def _reference_id_for_scenario(meta: dict, scenario_id: str) -> str:
+    mapping = meta.get("reference_by_scenario") or {}
+    return str(mapping.get(scenario_id) or meta.get("reference_id", HISTORICAL_REFERENCE_ID))
 
 
 def build_annual_cost_rows(meta: dict, ref_kwh: float | None) -> list[dict]:
@@ -168,20 +233,23 @@ def build_annual_cost_rows(meta: dict, ref_kwh: float | None) -> list[dict]:
     totals = summary.get("total_eur", {})
     labels = meta.get("labels", {})
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
-    ref_total = totals.get(ref_id)
 
     rows: list[dict] = []
     for scenario_id, total_eur in totals.items():
+        if scenario_id == ref_id or str(scenario_id).startswith("ref:"):
+            continue
         label = labels.get(scenario_id, scenario_id)
-        is_ref = scenario_id == ref_id
-        kwh_cell = f"{ref_kwh:.0f}" if is_ref and ref_kwh is not None else _DASH
+        scenario_ref_id = _reference_id_for_scenario(meta, scenario_id)
+        ref_total = totals.get(scenario_ref_id)
+        if ref_total is None and scenario_ref_id != ref_id:
+            ref_total = totals.get(ref_id)
         delta_cell = _DASH
-        if not is_ref and ref_total is not None:
+        if ref_total is not None:
             delta_cell = f"{total_eur - ref_total:+.2f} €"
         rows.append(
             {
                 "Szenario": label,
-                "Jahres-kWh": kwh_cell,
+                "Jahres-kWh": _DASH,
                 "Jahres-€": f"{total_eur:.2f}",
                 "Δ vs. Referenz": delta_cell,
             }

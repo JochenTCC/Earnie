@@ -131,15 +131,21 @@ def _hourly_to_csv(results: dict[str, pd.DataFrame], labels: dict[str, str]) -> 
     if not frames:
         return pd.DataFrame()
     out = pd.concat(frames, ignore_index=True)
-    col_order = [
+    base_order = [
         "ts",
         "scenario_id",
         "scenario_label",
-        "sim_cost",
-        "sim_soc",
-        "batt_action_kw",
-        "steuerbefehl",
+        "consumption_kw",
+        "baseload_kw",
     ]
+    flex_cols = sorted(
+        col
+        for col in out.columns
+        if col.endswith("_kw")
+        and col not in {"consumption_kw", "baseload_kw", "batt_action_kw"}
+    )
+    tail_order = ["sim_cost", "sim_soc", "batt_action_kw", "steuerbefehl"]
+    col_order = base_order + flex_cols + tail_order
     return out[[c for c in col_order if c in out.columns]]
 
 
@@ -389,6 +395,8 @@ def save_backtesting_log(
         payload["period"]["first_ts"] = pd.Timestamp(min(all_ts)).isoformat()
         payload["period"]["last_ts"] = pd.Timestamp(max(all_ts)).isoformat()
         payload["period"]["hours"] = len(all_ts) // max(len(results), 1)
+    if period.get("reference_by_scenario"):
+        payload["reference_by_scenario"] = period["reference_by_scenario"]
 
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)

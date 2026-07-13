@@ -568,8 +568,8 @@ def _simulate_single_hour_baseline(
     pv = row["expected_p_pv"]
     flex_kw = flex_kw_override if flex_kw_override is not None else (row.get("expected_flex_kw") or {})
     has_flex_profile = any(float(v or 0.0) > 0.0 for v in flex_kw.values())
-    logged_day = row.get("consumption_mode") == "logged_day"
-    if flex_kw_override is None and logged_day and not has_flex_profile:
+    simulation_mode = row.get("consumption_mode") in ("logged_day", "profile_spec")
+    if flex_kw_override is None and simulation_mode and not has_flex_profile:
         con = float(row.get("expected_p_total", row["expected_p_act"]) or 0.0)
         total_flex_power = 0.0
         flex_kw = {}

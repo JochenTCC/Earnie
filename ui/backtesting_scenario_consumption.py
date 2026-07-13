@@ -1,14 +1,19 @@
 """Szenario-Verbrauchsserien für die Szenarien-Explorer-Visualisierung."""
 from __future__ import annotations
 
+import pandas as pd
+
 from data.consumption_profiles import _consumer_id
 from data.cons_data_house_profile import hourly_kw_by_consumer_for_timestamps
 from ui.consumption_display.types import (
+    BaselineOptimizedOverlay,
     ScenarioConsumerOverlayBundle,
     ScenarioConsumerSeries,
 )
 
 _BASELOAD_KEY = "baseload"
+_TIMING_SHIFT_ENERGY_TOLERANCE_KWH = 1.0
+_TIMING_SHIFT_HOURLY_L1_KWH = 5.0
 
 
 def _consumer_labels_from_profile(profile: dict) -> dict[str, str]:
@@ -87,4 +92,137 @@ def build_scenario_consumer_overlays(
         consumer_ids=consumer_ids,
         consumer_labels=consumer_labels,
         scenarios=aligned_scenarios,
+    )
+
+
+def _flex_kw_columns(hourly_df: pd.DataFrame) -> list[str]:
+    skip = {"consumption_kw", "baseload_kw", "batt_action_kw"}
+    return sorted(
+        col
+        for col in hourly_df.columns
+        if col.endswith("_kw") and col not in skip
+    )
+
+
+def _align_hourly_series(
+    hourly_df: pd.DataFrame,
+    scenario_id: str,
+    timestamps: list[str],
+    *,
+    value_columns: list[str],
+) -> dict[str, list[float]]:
+    part = hourly_df.loc[hourly_df["scenario_id"] == scenario_id].copy()
+    if part.empty or "ts" not in part.columns:
+        return {col: [0.0] * len(timestamps) for col in value_columns}
+    part["ts"] = pd.to_datetime(part["ts"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+    part = part.drop_duplicates(subset=["ts"], keep="last").set_index("ts")
+    aligned: dict[str, list[float]] = {}
+    for col in value_columns:
+        if col not in part.columns:
+            aligned[col] = [0.0] * len(timestamps)
+            continue
+        aligned[col] = [
+            round(float(part.loc[ts_raw, col]) if ts_raw in part.index else 0.0, 4)
+            for ts_raw in timestamps
+        ]
+    return aligned
+
+
+def optimized_kw_by_consumer_from_hourly(
+    hourly_df: pd.DataFrame,
+    scenario_id: str,
+    timestamps: list[str],
+    consumer_ids: list[str],
+) -> dict[str, list[float]]:
+    """Optimierte kW-Serien je Verbraucher aus backtesting_hourly.csv."""
+    flex_cols = _flex_kw_columns(hourly_df)
+    flex_by_id = {
+        col[: -len("_kw")]: col
+        for col in flex_cols
+    }
+    columns = ["baseload_kw", *flex_cols]
+    aligned = _align_hourly_series(
+        hourly_df,
+        scenario_id,
+        timestamps,
+        value_columns=columns,
+    )
+    by_consumer: dict[str, list[float]] = {
+        _BASELOAD_KEY: aligned.get("baseload_kw", [0.0] * len(timestamps)),
+    }
+    for consumer_id in consumer_ids:
+        if consumer_id == _BASELOAD_KEY:
+            continue
+        col = flex_by_id.get(consumer_id)
+        by_consumer[consumer_id] = (
+            aligned.get(col, [0.0] * len(timestamps)) if col else [0.0] * len(timestamps)
+        )
+    return by_consumer
+
+
+def hourly_log_has_consumption_columns(hourly_df: pd.DataFrame) -> bool:
+    return "consumption_kw" in hourly_df.columns and "baseload_kw" in hourly_df.columns
+
+
+def detect_period_timing_shift(
+    baseline_kw: dict[str, list[float]],
+    optimized_kw: dict[str, list[float]],
+    *,
+    energy_tolerance_kwh: float = _TIMING_SHIFT_ENERGY_TOLERANCE_KWH,
+    hourly_l1_threshold_kwh: float = _TIMING_SHIFT_HOURLY_L1_KWH,
+) -> bool:
+    """True wenn Gesamtenergie ≈ gleich, aber stündliche Profile abweichen."""
+    consumer_ids = set(baseline_kw) | set(optimized_kw)
+    total_b = sum(sum(baseline_kw.get(cid, [])) for cid in consumer_ids)
+    total_o = sum(sum(optimized_kw.get(cid, [])) for cid in consumer_ids)
+    if abs(total_o - total_b) > energy_tolerance_kwh:
+        return False
+    l1 = 0.0
+    for consumer_id in consumer_ids:
+        baseline_series = baseline_kw.get(consumer_id, [])
+        optimized_series = optimized_kw.get(consumer_id, [])
+        hour_count = max(len(baseline_series), len(optimized_series))
+        for index in range(hour_count):
+            baseline_value = baseline_series[index] if index < len(baseline_series) else 0.0
+            optimized_value = (
+                optimized_series[index] if index < len(optimized_series) else 0.0
+            )
+            l1 += abs(baseline_value - optimized_value)
+    return l1 >= hourly_l1_threshold_kwh
+
+
+def build_baseline_optimized_overlay(
+    scenarios: dict[str, dict],
+    labels: dict[str, str],
+    scenario_id: str,
+    timestamps: list[str],
+    hourly_df: pd.DataFrame,
+) -> BaselineOptimizedOverlay | None:
+    """Profil-Baseline (Spec) und optimierter Verbrauch für ein Szenario."""
+    settings = scenarios.get(scenario_id)
+    if not isinstance(settings, dict):
+        return None
+    profile = settings.get("_house_profile")
+    if not isinstance(profile, dict):
+        return None
+    if not hourly_log_has_consumption_columns(hourly_df):
+        return None
+
+    baseline_kw = hourly_kw_by_consumer_for_timestamps(profile, timestamps)
+    consumer_ids = list(baseline_kw.keys())
+    if _BASELOAD_KEY not in consumer_ids:
+        consumer_ids.append(_BASELOAD_KEY)
+    consumer_labels = _consumer_labels_from_profile(profile)
+    optimized_kw = optimized_kw_by_consumer_from_hourly(
+        hourly_df,
+        scenario_id,
+        timestamps,
+        consumer_ids,
+    )
+    return BaselineOptimizedOverlay(
+        scenario_label=labels.get(scenario_id, scenario_id),
+        consumer_ids=consumer_ids,
+        consumer_labels=consumer_labels,
+        baseline_kw=baseline_kw,
+        optimized_kw=optimized_kw,
     )

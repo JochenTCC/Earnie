@@ -29,6 +29,17 @@ class ScenarioConsumerOverlayBundle:
 
 
 @dataclass(frozen=True)
+class BaselineOptimizedOverlay:
+    """Profil-Baseline vs. optimierter Verbrauch für ein Szenario (gleiche Timestamps)."""
+
+    scenario_label: str
+    consumer_ids: list[str]
+    consumer_labels: dict[str, str]
+    baseline_kw: dict[str, list[float]]
+    optimized_kw: dict[str, list[float]]
+
+
+@dataclass(frozen=True)
 class ConsumptionSeriesBundle:
     """Stündliche Verbrauchsserien für Charts und Aggregation."""
 

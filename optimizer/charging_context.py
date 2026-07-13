@@ -467,7 +467,8 @@ def resolve_charging_contexts(
 
     logged_simulation = bool(
         optimization_matrix
-        and optimization_matrix[0].get("consumption_mode") == "logged_day"
+        and optimization_matrix[0].get("consumption_mode")
+        in ("logged_day", "profile_spec")
     )
     active = consumers if consumers is not None else config.get_flexible_consumers(
         optimizer_only=True

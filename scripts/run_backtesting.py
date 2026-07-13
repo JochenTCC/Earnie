@@ -32,6 +32,7 @@ from data.backtesting_prices import (
 from simulation.engine import (
     HISTORICAL_REFERENCE_ID,
     HistoricalDataCache,
+    build_per_scenario_reference_costs,
     compute_historical_reference_costs,
     list_simulation_anchors,
     print_plausibility_report,
@@ -647,6 +648,15 @@ def main(argv: list[str] | None = None):
     ref_settings = config.get_backtesting_feed_in_settings()
     scenario_labels = config.get_scenario_labels()
     labels = _all_labels(scenario_labels)
+    scenarios = config.get_backtesting_scenarios()
+    live_scenario_id = config.get_live_scenario_id()
+    live_params = scenarios.get(live_scenario_id) or (
+        next(iter(scenarios.values())) if scenarios else None
+    )
+    if live_params is not None:
+        ref_settings = config.get_backtesting_feed_in_settings(
+            runtime_override=live_params
+        )
     progress_file = args.progress_file
     total_hours = len(anchors) * 24
 
@@ -664,14 +674,31 @@ def main(argv: list[str] | None = None):
     print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
     sim_results = {
         HISTORICAL_REFERENCE_ID: compute_historical_reference_costs(
-            start, end, prices, ref_settings, cache=cache
+            start,
+            end,
+            prices,
+            ref_settings,
+            cache=cache,
+            scenario_params=live_params,
         ),
     }
+    extra_refs, extra_ref_labels, reference_by_scenario = (
+        build_per_scenario_reference_costs(
+            start,
+            end,
+            prices,
+            cache,
+            scenarios,
+            live_scenario_id=live_scenario_id,
+            scenario_labels=scenario_labels,
+        )
+    )
+    sim_results.update(extra_refs)
+    labels.update(extra_ref_labels)
     plausibility_by_scenario: dict = {}
     cbc_events_by_scenario: dict[str, list[dict]] = {}
     window_snapshots: list[dict] = []
 
-    scenarios = config.get_backtesting_scenarios()
     if args.workers == 1:
         for name, params in scenarios.items():
             display = labels.get(name, name)
@@ -742,6 +769,7 @@ def main(argv: list[str] | None = None):
         "backtesting_year": BACKTESTING_YEAR,
         "price_source": price_source,
         "price_strategy": price_strategy,
+        "reference_by_scenario": reference_by_scenario,
     }
     log_path = save_backtesting_log(
         sim_results,

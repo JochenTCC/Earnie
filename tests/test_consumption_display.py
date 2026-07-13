@@ -284,3 +284,63 @@ def test_week_index_for_iso():
     weeks = [(2024, 11), (2024, 12), (2024, 13)]
     assert week_index_for_iso(weeks, 2024, 12) == 1
     assert week_index_for_iso(weeks, 2024, 99) is None
+
+
+def test_week_baseline_optimized_timeseries_chart_dashed_vs_solid():
+    from datetime import datetime, timedelta
+
+    from ui.backtesting_scenario_consumption import build_baseline_optimized_overlay
+    from ui.consumption_display.charts import week_baseline_optimized_timeseries_chart
+
+    start = datetime(2024, 3, 18, 0, 0, 0)
+    timestamps = [
+        (start + timedelta(hours=index)).strftime("%Y-%m-%d %H:%M:%S")
+        for index in range(168)
+    ]
+    profile = _sample_profile()
+    hourly_rows = []
+    for index, ts_raw in enumerate(timestamps):
+        pool_kw = 2.0 if 40 <= index < 44 else 0.0
+        hourly_rows.append(
+            {
+                "ts": ts_raw,
+                "scenario_id": "live",
+                "consumption_kw": 0.5 + pool_kw,
+                "baseload_kw": 0.5,
+                "pool_kw": pool_kw,
+            }
+        )
+    hourly_df = pd.DataFrame(hourly_rows)
+    overlay = build_baseline_optimized_overlay(
+        {"live": {"_house_profile": profile}},
+        {"live": "Live"},
+        "live",
+        timestamps,
+        hourly_df,
+    )
+    assert overlay is not None
+    fig = week_baseline_optimized_timeseries_chart(
+        timestamps,
+        overlay,
+        iso_year=2024,
+        iso_week=12,
+    )
+    pool_baseline = next(trace for trace in fig.data if trace.name == "pool — Baseline")
+    pool_optimized = next(trace for trace in fig.data if trace.name == "pool — Optimiert")
+    assert pool_baseline.line.dash == "dash"
+    assert pool_optimized.line.dash == "solid"
+    assert pool_baseline.line.color == pool_optimized.line.color
+    assert max(pool_optimized.y) > 0.0
+
+
+def test_detect_period_timing_shift_same_energy_different_shape():
+    from ui.backtesting_scenario_consumption import detect_period_timing_shift
+
+    baseline = {"pool": [0.0] * 10 + [2.0, 2.0, 2.0, 2.0] + [0.0] * 10}
+    optimized = {"pool": [0.0] * 20 + [2.0, 2.0, 2.0, 2.0]}
+    assert detect_period_timing_shift(
+        {"pool": baseline["pool"], "baseload": [0.5] * 24},
+        {"pool": optimized["pool"], "baseload": [0.5] * 24},
+        energy_tolerance_kwh=0.1,
+        hourly_l1_threshold_kwh=5.0,
+    ) is True

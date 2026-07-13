@@ -11,6 +11,7 @@ from ui.consumption_display.aggregation import (
     parse_timestamp,
 )
 from ui.consumption_display.types import (
+    BaselineOptimizedOverlay,
     ConsumptionSeriesBundle,
     ScenarioConsumerOverlayBundle,
 )
@@ -177,6 +178,87 @@ def timeseries_chart(
         xaxis_title="Zeit",
         yaxis_title="kW",
         height=360,
+        margin=dict(l=40, r=20, t=50, b=40),
+        xaxis=dict(
+            type="date",
+            tickformat="%a %d.%m.",
+            dtick=86_400_000,
+        ),
+    )
+    return fig
+
+
+def _slice_baseline_optimized_overlay(
+    overlay: BaselineOptimizedOverlay,
+    indices: list[int],
+) -> BaselineOptimizedOverlay:
+    if not indices:
+        empty = {consumer_id: [] for consumer_id in overlay.consumer_ids}
+        return BaselineOptimizedOverlay(
+            scenario_label=overlay.scenario_label,
+            consumer_ids=list(overlay.consumer_ids),
+            consumer_labels=dict(overlay.consumer_labels),
+            baseline_kw=empty,
+            optimized_kw=dict(empty),
+        )
+    return BaselineOptimizedOverlay(
+        scenario_label=overlay.scenario_label,
+        consumer_ids=list(overlay.consumer_ids),
+        consumer_labels=dict(overlay.consumer_labels),
+        baseline_kw={
+            consumer_id: [overlay.baseline_kw[consumer_id][index] for index in indices]
+            for consumer_id in overlay.consumer_ids
+        },
+        optimized_kw={
+            consumer_id: [overlay.optimized_kw[consumer_id][index] for index in indices]
+            for consumer_id in overlay.consumer_ids
+        },
+    )
+
+
+def week_baseline_optimized_timeseries_chart(
+    timestamps: list[str],
+    overlay: BaselineOptimizedOverlay,
+    *,
+    iso_year: int,
+    iso_week: int,
+) -> go.Figure:
+    """Stündlicher Verlauf: Profil-Baseline (gestrichelt) vs. optimiert (durchgezogen)."""
+    indices = [
+        index
+        for index, ts_raw in enumerate(timestamps)
+        if parse_timestamp(ts_raw).isocalendar()[:2] == (iso_year, iso_week)
+    ]
+    if not indices:
+        raise ValueError(f"Keine Daten für {format_iso_week_label(iso_year, iso_week)}.")
+    sliced = _slice_baseline_optimized_overlay(overlay, indices)
+    x_values = [parse_timestamp(timestamps[index]) for index in indices]
+    fig = go.Figure()
+    for consumer_index, consumer_id in enumerate(sliced.consumer_ids):
+        color = _consumer_color(consumer_id, consumer_index)
+        consumer_label = sliced.consumer_labels.get(consumer_id, consumer_id)
+        fig.add_scatter(
+            name=f"{consumer_label} — Baseline",
+            x=x_values,
+            y=sliced.baseline_kw[consumer_id],
+            mode="lines",
+            line=dict(width=2, color=color, dash="dash"),
+        )
+        fig.add_scatter(
+            name=f"{consumer_label} — Optimiert",
+            x=x_values,
+            y=sliced.optimized_kw[consumer_id],
+            mode="lines",
+            line=dict(width=2, color=color, dash="solid"),
+        )
+    fig.update_layout(
+        title=(
+            f"Baseline vs. optimiert — {sliced.scenario_label} — "
+            f"{format_iso_week_label(iso_year, iso_week)}"
+        ),
+        xaxis_title="Zeit",
+        yaxis_title="kW",
+        height=380,
         margin=dict(l=40, r=20, t=50, b=40),
         xaxis=dict(
             type="date",

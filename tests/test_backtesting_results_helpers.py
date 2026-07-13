@@ -89,13 +89,39 @@ def test_build_annual_cost_rows_reference_kwh_and_delta():
         },
     }
     rows = build_annual_cost_rows(meta, ref_kwh=5000.0)
-    assert len(rows) == 2
-    ref_row = next(r for r in rows if r["Szenario"] == "Historisch")
-    assert ref_row["Jahres-kWh"] == "5000"
-    assert ref_row["Δ vs. Referenz"] == "—"
-    live_row = next(r for r in rows if r["Szenario"] == "Live")
+    assert len(rows) == 1
+    live_row = rows[0]
+    assert live_row["Szenario"] == "Live"
     assert live_row["Jahres-kWh"] == "—"
     assert live_row["Δ vs. Referenz"] == "-200.00 €"
+
+
+def test_build_annual_cost_rows_uses_per_scenario_reference():
+    from simulation.engine import scenario_reference_id
+
+    ref_id = scenario_reference_id("fixed_full")
+    meta = {
+        "reference_id": HISTORICAL_REFERENCE_ID,
+        "reference_by_scenario": {
+            "live": HISTORICAL_REFERENCE_ID,
+            "fixed_full": ref_id,
+        },
+        "labels": {
+            HISTORICAL_REFERENCE_ID: "Historisch",
+            ref_id: "Referenz (Fixed)",
+            "fixed_full": "Fixed Full",
+        },
+        "summary": {
+            "total_eur": {
+                HISTORICAL_REFERENCE_ID: 1200.0,
+                ref_id: 1100.0,
+                "fixed_full": 1050.0,
+            },
+        },
+    }
+    rows = build_annual_cost_rows(meta, ref_kwh=None)
+    fixed_row = next(r for r in rows if r["Szenario"] == "Fixed Full")
+    assert fixed_row["Δ vs. Referenz"] == "-50.00 €"
 
 
 def test_reference_consumption_subheader_test_run():
@@ -191,13 +217,64 @@ def test_build_scenario_consumption_rows_includes_reference_and_optimized():
     rows = build_scenario_consumption_rows(meta, ref_kwh=500.0)
     assert len(rows) == 2
     ref_row = next(r for r in rows if r["Szenario"] == "Historisch")
-    assert ref_row["Historisch (kWh)"] == "500.0"
+    assert ref_row["Baseline Spec (kWh)"] == "500.0"
     assert ref_row["Optimiert (kWh)"] == "500.0"
-    assert ref_row["Δ kWh (Opt−Hist)"] == "+0.0"
+    assert ref_row["Δ kWh (Opt−Baseline)"] == "+0.0"
     live_row = next(r for r in rows if r["Szenario"] == "Live")
     assert live_row["Optimiert (kWh)"] == "520.5"
-    assert live_row["Δ kWh (Opt−Hist)"] == "+20.5"
+    assert live_row["Δ kWh (Opt−Baseline)"] == "+20.5"
     assert live_row["Plausibilität"] == "29/31 OK"
+
+
+def test_build_scenario_consumption_rows_timing_shift_note(monkeypatch):
+    from ui.consumption_display.types import BaselineOptimizedOverlay
+
+    def _fake_overlay(*_args, **_kwargs):
+        return BaselineOptimizedOverlay(
+            scenario_label="Live",
+            consumer_ids=["pool"],
+            consumer_labels={"pool": "pool"},
+            baseline_kw={"pool": [2.0, 2.0, 0.0, 0.0]},
+            optimized_kw={"pool": [0.0, 0.0, 2.0, 2.0]},
+        )
+
+    monkeypatch.setattr(
+        "ui.backtesting_scenario_consumption.build_baseline_optimized_overlay",
+        _fake_overlay,
+    )
+    monkeypatch.setattr(
+        "ui.backtesting_scenario_consumption.detect_period_timing_shift",
+        lambda *_args, **_kwargs: True,
+    )
+    meta = {
+        "reference_id": HISTORICAL_REFERENCE_ID,
+        "scenario_ids": ["live"],
+        "labels": {"live": "Live"},
+        "plausibility": {
+            "live": {
+                "ok_count": 2,
+                "total_windows": 2,
+                "consumption_totals": {
+                    "historical_kwh": 100.0,
+                    "optimized_kwh": 100.0,
+                    "delta_kwh": 0.0,
+                    "historical_flex_kwh": 50.0,
+                    "optimized_flex_kwh": 50.0,
+                },
+            },
+        },
+    }
+    rows = build_scenario_consumption_rows(
+        meta,
+        ref_kwh=100.0,
+        hourly_df=pd.DataFrame({"consumption_kw": [1.0], "baseload_kw": [1.0]}),
+        scenarios={"live": {"_house_profile": {}}},
+        timestamps=["2024-01-01 00:00:00"],
+    )
+    live_row = next(row for row in rows if row["Szenario"] == "Live")
+    assert live_row["Δ kWh (Opt−Baseline)"] == "+0.0"
+    assert live_row["Δ Flex (kWh)"] == "+0.0"
+    assert live_row["Hinweis"] == "Zeitverschiebung (Energie ≈ Spec)"
 
 
 def test_scenario_consumption_subheader_test_run():

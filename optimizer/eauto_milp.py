@@ -19,7 +19,8 @@ EAUTO_MILP_PARAM_KEYS = (
 def is_logged_day_matrix(matrix: list | None) -> bool:
     if not matrix:
         return False
-    return matrix[0].get("consumption_mode") == "logged_day"
+    mode = matrix[0].get("consumption_mode")
+    return mode in ("logged_day", "profile_spec")
 
 
 def validate_eauto_milp_params(raw: dict) -> dict[str, float]:

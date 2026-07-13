@@ -14,6 +14,27 @@ from house_config.generic_schedule import (
 if TYPE_CHECKING:
     from data.modeled_climate import ModeledClimateContext
 
+PROFILE_SPEC = "profile_spec"
+LOGGED_DAY = "logged_day"
+CONSUMPTION_SOURCES = frozenset({PROFILE_SPEC, LOGGED_DAY})
+
+
+def resolve_consumption_source(scenario_params: dict | None) -> str:
+    """profile_spec = Hausprofil-Spec für Optimierung; logged_day = cons_data-Replay."""
+    if not scenario_params:
+        return LOGGED_DAY
+    explicit = str(scenario_params.get("consumption_source", "") or "").strip()
+    if explicit in CONSUMPTION_SOURCES:
+        return explicit
+    if scenario_params.get("_house_profile"):
+        return PROFILE_SPEC
+    return LOGGED_DAY
+
+
+def profile_flat_baseload_kw(house_profile: dict) -> float:
+    """Konstante Grundlast (kW) aus profile.baseload_kwh."""
+    return float(house_profile.get("baseload_kwh", 0.0) or 0.0) / 8760.0
+
 
 def _house_generic_consumers(house_profile: dict) -> list[dict]:
     return [
@@ -60,6 +81,87 @@ def planning_consumer_to_milp(consumer: dict) -> dict:
             "duration_h": duration_h,
         },
     }
+
+
+def _house_ev_consumers(house_profile: dict) -> list[dict]:
+    return [
+        consumer
+        for consumer in house_profile.get("consumers", [])
+        if consumer.get("type") == "ev" and consumer.get("charging_schedule")
+    ]
+
+
+def planning_ev_to_milp(consumer: dict) -> dict:
+    """Hausprofil-EV → flexible_consumers-Shape für MILP (ohne Loxone)."""
+    sched = consumer["charging_schedule"]
+    min_on = max(1, int(consumer.get("min_on_quarterhours", 4) or 4))
+    min_power = float(consumer.get("min_power_kw", 0.0) or 0.0)
+    capacity = float(consumer["battery_capacity_kwh"])
+    return {
+        "id": str(consumer["id"]),
+        "name": str(consumer.get("label", consumer["id"])),
+        "nominal_power_kw": float(consumer["nominal_power_kw"]),
+        "min_power_kw": min_power if min_power > 0 else None,
+        "min_on_quarterhours": min_on,
+        "signal_type": "power",
+        "log_signal_type": "power",
+        "optimizer_enabled": True,
+        "daily_target_kwh": 0.0,
+        "daily_target_source": "config",
+        "battery_capacity_kwh": capacity,
+        "charging_schedule": {
+            "enabled": True,
+            "forecast_when_absent": bool(sched.get("forecast_when_absent", True)),
+            "target_soc_percent": float(sched.get("target_soc_percent", 100.0)),
+            "charging_efficiency": float(sched.get("charging_efficiency", 0.95)),
+            "weekday": dict(sched.get("weekday") or {}),
+            "weekend": dict(sched.get("weekend") or {}),
+            "battery_capacity_kwh": capacity,
+        },
+        "path_log": "",
+        "loxone_outputs": {},
+        "loxone_inputs": {},
+        "loxone_target_kwh_name": "",
+        "loxone_target_hours_name": "",
+    }
+
+
+def planning_ev_consumers(house_profile: dict) -> list[dict]:
+    """EV-Verbraucher aus Hausprofil als MILP-flexible Verbraucher."""
+    return [planning_ev_to_milp(consumer) for consumer in _house_ev_consumers(house_profile)]
+
+
+def collect_planning_flex_consumers(house_profile: dict) -> list[dict]:
+    """Generic MILP-flex + EV für Szenario-Auflösung."""
+    _fixed, flex_generic = split_planning_generic_consumers(house_profile)
+    return flex_generic + planning_ev_consumers(house_profile)
+
+
+def planning_ev_daily_targets(
+    flex_consumers: list[dict],
+    house_profile: dict,
+    slot_datetimes: list[datetime],
+) -> dict[str, float]:
+    """Tagesziele (kWh) für EV-Verbraucher im Fenster."""
+    from house_config.ev_profile import ev_daily_kwh
+
+    ev_by_id = {
+        consumer["id"]: consumer
+        for consumer in _house_ev_consumers(house_profile)
+    }
+    if not ev_by_id:
+        return {}
+    dates = {slot_dt.date() for slot_dt in slot_datetimes}
+    targets: dict[str, float] = {}
+    for milp_consumer in flex_consumers:
+        source = ev_by_id.get(milp_consumer["id"])
+        if not source:
+            continue
+        targets[milp_consumer["id"]] = round(
+            sum(ev_daily_kwh(source, day) for day in dates),
+            3,
+        )
+    return targets
 
 
 def _house_thermal_consumers(house_profile: dict) -> list[dict]:
@@ -196,6 +298,69 @@ def planning_flex_daily_targets(
             for day in dates
         )
         targets[milp_consumer["id"]] = round(total, 3)
+    return targets
+
+
+def profile_reference_hourly_load(
+    house_profile: dict,
+    slot_datetimes: list[datetime],
+    *,
+    climate: ModeledClimateContext | None = None,
+) -> list[float]:
+    """Stündlicher Referenz-Gesamtlast (kW) aus Hausprofil-Default-Schedules."""
+    from data.consumption_profiles import modeled_consumer_kw_at_datetime
+
+    flat_kw = profile_flat_baseload_kw(house_profile)
+    loads: list[float] = []
+    for slot_dt in slot_datetimes:
+        flex_sum = sum(
+            modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate)
+            for consumer in house_profile.get("consumers", [])
+        )
+        loads.append(round(flat_kw + flex_sum, 3))
+    return loads
+
+
+def tariff_reference_fingerprint(scenario_params: dict | None) -> tuple:
+    """Vergleichsschlüssel für Referenz-Tarife (Import/Export)."""
+    if not scenario_params:
+        return ()
+    import_spec = scenario_params.get("_import_tariff_spec")
+    export_spec = scenario_params.get("_export_tariff_spec")
+    return (
+        import_spec.get("id") if isinstance(import_spec, dict) else None,
+        export_spec.get("id") if isinstance(export_spec, dict) else None,
+        scenario_params.get("import_tariff_type"),
+        scenario_params.get("import_fixed_cent_kwh"),
+        scenario_params.get("feed_in_mode"),
+        scenario_params.get("k_push_cent"),
+        scenario_params.get("monthly_fixed_feed_in_rates"),
+    )
+
+
+def resolve_profile_spec_flex_targets(
+    flex_consumers: list[dict],
+    house_profile: dict,
+    slot_datetimes: list[datetime],
+    *,
+    historical_totals: dict[str, float] | None = None,
+) -> dict[str, float]:
+    """
+    Flex-Zielenergie für profile_spec: Hausprofil-Generic + cons_data für reine Config-Verbraucher.
+    """
+    if not flex_consumers:
+        return {}
+    profile_ids = _house_profile_consumer_ids(house_profile)
+    targets = planning_flex_daily_targets(flex_consumers, house_profile, slot_datetimes)
+    targets.update(
+        planning_ev_daily_targets(flex_consumers, house_profile, slot_datetimes)
+    )
+    cons_totals = historical_totals or {}
+    for consumer in flex_consumers:
+        cid = consumer["id"]
+        if cid in profile_ids or cid in targets:
+            continue
+        targets[cid] = round(float(cons_totals.get(cid, 0.0)), 3)
     return targets
 
 
