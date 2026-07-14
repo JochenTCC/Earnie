@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
+from settings.ev_power import merge_ev_power_conversion_fields
 from settings.flexible_consumers import CONSUMER_PALETTE_SIZE
 from house_config.generic_schedule import (
     generic_daily_target_kwh_for_day,
@@ -97,6 +98,18 @@ def planning_ev_to_milp(consumer: dict) -> dict:
     min_on = max(1, int(consumer.get("min_on_quarterhours", 4) or 4))
     min_power = float(consumer.get("min_power_kw", 0.0) or 0.0)
     capacity = float(consumer["battery_capacity_kwh"])
+    charging_schedule = merge_ev_power_conversion_fields(
+        {
+            "enabled": True,
+            "forecast_when_absent": bool(sched.get("forecast_when_absent", True)),
+            "target_soc_percent": float(sched.get("target_soc_percent", 100.0)),
+            "charging_efficiency": float(sched.get("charging_efficiency", 0.95)),
+            "weekday": dict(sched.get("weekday") or {}),
+            "weekend": dict(sched.get("weekend") or {}),
+            "battery_capacity_kwh": capacity,
+        },
+        sched,
+    )
     return {
         "id": str(consumer["id"]),
         "name": str(consumer.get("label", consumer["id"])),
@@ -109,15 +122,7 @@ def planning_ev_to_milp(consumer: dict) -> dict:
         "daily_target_kwh": 0.0,
         "daily_target_source": "config",
         "battery_capacity_kwh": capacity,
-        "charging_schedule": {
-            "enabled": True,
-            "forecast_when_absent": bool(sched.get("forecast_when_absent", True)),
-            "target_soc_percent": float(sched.get("target_soc_percent", 100.0)),
-            "charging_efficiency": float(sched.get("charging_efficiency", 0.95)),
-            "weekday": dict(sched.get("weekday") or {}),
-            "weekend": dict(sched.get("weekend") or {}),
-            "battery_capacity_kwh": capacity,
-        },
+        "charging_schedule": charging_schedule,
         "path_log": "",
         "loxone_outputs": {},
         "loxone_inputs": {},

@@ -11,6 +11,7 @@ from requests.auth import HTTPBasicAuth
 
 import config
 import logging
+from settings.ev_power import kw_from_nominal_reading
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +25,6 @@ _UNIT_SUFFIXES = (
     (" h", "h"),
     ("A", "a"),
 )
-_DEFAULT_CHARGING_VOLTAGE_V = 230.0
-
-
 def _loxone_auth() -> HTTPBasicAuth:
     return HTTPBasicAuth(config.get("LOXONE_USER"), config.get("LOXONE_PASS"))
 
@@ -123,10 +121,6 @@ def fetch_filter_native_start_hour(io_name: str) -> tuple[float | None, str, str
     return hour, fmt, raw
 
 
-def _ampere_to_kw(amps: float, *, voltage_v: float, phases: int) -> float:
-    return amps * voltage_v * max(1, phases) / 1000.0
-
-
 def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
     """Holt den rohen LL.value-String live aus dem Loxone Miniserver."""
     io_name = str(io_name or "").strip()
@@ -199,12 +193,7 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
         )
         return fallback
 
-    if unit == "a":
-        voltage_v = float(lox.get("nominal_power_voltage_v", _DEFAULT_CHARGING_VOLTAGE_V))
-        phases = int(lox.get("nominal_power_phases", 1))
-        live = _ampere_to_kw(value, voltage_v=voltage_v, phases=phases)
-    else:
-        live = value
+    live = kw_from_nominal_reading(value, unit, consumer)
 
     if live <= 0:
         logger.warning(

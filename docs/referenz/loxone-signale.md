@@ -54,6 +54,8 @@ Zusätzlich Pflichtfeld **`min_power_kw`** am Verbraucher (untere Grenze für de
 | `actual_soc_name` | Lesen | `Ernie-SOC-Ist-EAuto` | Aktueller SOC, % — bei 100 % gilt Ladung als abgeschlossen |
 | `ready_by_time_name` | Lesen | `EAuto_FertigUm` | Text, z. B. Fertig-Uhrzeit |
 | `nominal_power_kw_name` | Lesen | `EAuto_MaxLeistung` | Max. Ladeleistung, kW (oder A → wird umgerechnet) |
+| `nominal_power_voltage_v` | Config | — | Nennspannung für A→kW (unter `charging_schedule` oder `charging_schedule.loxone`; Default 230 V) |
+| `nominal_power_phases` | Config | — | Phasenzahl für A→kW (1–3; Default 1) |
 | `battery_capacity_kwh_name` | Lesen | `Batteriekapazität_E-Auto` | Akkukapazität, kWh (einzige Quelle für SOC→kWh) |
 | `charge_immediate_name` | Lesen | `E-Auto_SOFORT_LADEN` | `1` = Sofort-Laden (Volllast in Loxone; Earnie plant fixen Verbrauch, keine Lade-Sollwerte) |
 | `charge_immediate_remaining_name` | Lesen | `Ernie_Restzeit_Sofortladen` | Verbleibende Sofort-Ladezeit in **Sekunden** (Loxone-Countdown; `0` = abgeschlossen) |

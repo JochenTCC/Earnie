@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from settings.ev_power import merge_ev_power_conversion_fields
+
 CONSUMER_PALETTE_SIZE = 8
 
 
@@ -158,6 +160,7 @@ def normalize_charging_schedule(raw: dict | None) -> dict | None:
         ):
             if raw["loxone"].get(key):
                 loxone[key] = str(raw["loxone"][key]).strip()
+        loxone.update(merge_ev_power_conversion_fields({}, raw["loxone"]))
     if not loxone.get("battery_capacity_kwh_name"):
         raise ValueError(
             "Kritischer Konfigurationsfehler: charging_schedule.enabled=true "
@@ -169,15 +172,18 @@ def normalize_charging_schedule(raw: dict | None) -> dict | None:
         if charging_efficiency_raw is not None
         else 0.95
     )
-    return {
-        "enabled": True,
-        "forecast_when_absent": bool(raw.get("forecast_when_absent", False)),
-        "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
-        "charging_efficiency": normalized_efficiency,
-        "weekday": normalize_day_schedule(raw.get("weekday")),
-        "weekend": normalize_day_schedule(raw.get("weekend")),
-        "loxone": loxone,
-    }
+    return merge_ev_power_conversion_fields(
+        {
+            "enabled": True,
+            "forecast_when_absent": bool(raw.get("forecast_when_absent", False)),
+            "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
+            "charging_efficiency": normalized_efficiency,
+            "weekday": normalize_day_schedule(raw.get("weekday")),
+            "weekend": normalize_day_schedule(raw.get("weekend")),
+            "loxone": loxone,
+        },
+        raw,
+    )
 
 
 def normalize_thermal_control(raw: dict | None, consumer_id: str) -> dict | None:

@@ -186,7 +186,9 @@
                     "charge_immediate_name": "E-Auto_SOFORT_LADEN",
                     "charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen",
                     "battery_capacity_kwh_name": "Batteriekapazität_E-Auto",
-                    "nominal_power_kw_name": "Ladestrom Max EAuto"
+                    "nominal_power_kw_name": "Ladestrom Max EAuto",
+                    "nominal_power_voltage_v": 230.0,
+                    "nominal_power_phases": 3
                 }
             }
         },

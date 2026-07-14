@@ -417,6 +417,22 @@ class TestSharedMeterSubtraction:
             "id": "eauto",
             "nominal_power_kw": 3.5,
             "charging_schedule": {
+                "nominal_power_voltage_v": 230.0,
+                "nominal_power_phases": 3,
+                "loxone": {
+                    "nominal_power_kw_name": "Ladestrom Max",
+                },
+            },
+        }
+        with patch.object(lc, "fetch_loxone_raw_value", return_value="16 A"):
+            live = lc.resolve_consumer_nominal_power_kw(consumer)
+        assert live == pytest.approx(11.04)
+
+    def test_resolve_nominal_power_from_ampere_loxone_level_fallback(self):
+        consumer = {
+            "id": "eauto",
+            "nominal_power_kw": 3.5,
+            "charging_schedule": {
                 "loxone": {
                     "nominal_power_kw_name": "Ladestrom Max",
                     "nominal_power_voltage_v": 230.0,

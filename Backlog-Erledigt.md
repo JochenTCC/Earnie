@@ -13,7 +13,7 @@ Related topics — prioritize and work through together.
 - [x] **PWM for EV charging** — only for currents < A_min; otherwise minimum charge amount per h (count down meter, reset on each charge → at zero charge charge five minutes at minimum current)
 
 
-### Version 2.0 — Unified Open-Meteo solar (2026-07-13)
+### Version 1.93 — Unified Open-Meteo solar (2026-07-13)
 
 PV (`pv_kw`) and Solar-Kollektor (Haus Wärme) share the **same Open-Meteo archive weather** on the **same calendar hours** — no static `heating_climate_default.json` fixture, no `2023-01-01 % 8760` slot mapping, no measured Loxone PV in backtesting/synthesis paths. Commit `575c610`.
 
@@ -34,10 +34,10 @@ PV (`pv_kw`) and Solar-Kollektor (Haus Wärme) share the **same Open-Meteo archi
 
 **Smoke verification (manual):** Phase A complete → *Smoketest Phase A — Open-Meteo solar* below.
 
-**Deferred to other chapters:** **Thermals P1a** (MILP pulse timing) · **P6b** (live `main.py` Loxone `cons_data` append cutover)
+**Deferred to other chapters:** **Thermals P1a** (MILP pulse timing, **1.98**) · **P6b** (live `main.py` Loxone `cons_data` append cutover, **1.94**)
 
 
-### Version 2.0 — Scenario Exploration consumption model (2026-07-13)
+### Version 1.93 — Scenario Exploration consumption model (2026-07-13)
 
 Baseline vs optimized load separation for SE / greenfield backtesting. Spec: [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md).
 
@@ -48,7 +48,17 @@ Baseline vs optimized load separation for SE / greenfield backtesting. Spec: [`d
 - [x] **Window-aware targets** — partial-day generic/EV flex at 07:00 anchors (`generic_flex_target_kwh_for_window`, `planning_ev_daily_targets`); tests [`tests/test_generic_flex_window_targets.py`](tests/test_generic_flex_window_targets.py)
 - [x] **Tests** — [`tests/test_planning_matrix_profile_spec.py`](tests/test_planning_matrix_profile_spec.py), [`tests/test_consumption_display_integration.py`](tests/test_consumption_display_integration.py), backtesting smoke extensions
 
-**Enables:** meaningful battery/PV scenario comparison; remaining plausibility gaps → smoke-test Phase B in [`Backlog.md`](Backlog.md).
+**Enables:** meaningful battery/PV scenario comparison; remaining plausibility gaps → smoke-test Phase B in [`Backlog-Erledigt.md`](Backlog-Erledigt.md).
+
+
+### Version 1.93 — smoke-test follow-ups (2026-07-14)
+
+Greenfield smoke **2026-07-12**; backtesting iteration **2026-07-13**; chapter closed **2026-07-14**. Related smoketest phases A–C → sections above in this archive.
+
+- [x] **Scenario-Exploration without PV** — optimization/backtesting path complete when `pv_system_id` unset (battery-only MILP/simulation gaps closed on top of P1 optional-PV baseline)
+- [x] **EV nominal voltage for power calculation** — configurable per EV consumer (`charging_schedule.nominal_power_voltage_v` / `nominal_power_phases`, house profile + `flexible_consumers`); shared helper [`settings/ev_power.py`](settings/ev_power.py) for live (`integrations/loxone_client.py`) and planning (`house_config/planning_flex_bridge.py`); default 230 V / 1 phase when unset; schemas, Hauskonfigurator UI, [`docs/referenz/loxone-signale.md`](docs/referenz/loxone-signale.md); tests [`tests/test_ev_power.py`](tests/test_ev_power.py)
+
+Components (`components.json` sidecar) → *Version 1.93 Components* above.
 
 
 ### Smoketest backtesting — greenfield runs (2026-07-13)
@@ -80,7 +90,7 @@ Greenfield matrix: `greenfield/config/backtesting_scenarios.json` — `live`, `s
   - [x] Chart 1 — house-profile flex consumers not shown separately (**investigated 2026-07-13**)
     - **Calculation OK** — snapshot/matrix columns (`Standard (kW)`, `Waschmaschine (kW)`, `EV (kW)`) and plausibility targets correct; `meta._flexible_consumers` populated
     - **UI gap** — Chart 1 uses `get_flexible_consumers(optimizer_only=True)`; bridged generics fail `consumer_has_daily_target()` → only EV rendered; hidden flex misattributed in flow-balance down-stack (thermal `haus` correctly in Grundlast)
-    - **Fix** — **2.+1 Consumers P1** (with **Thermals P1** migration); not automatic after storage consolidation alone
+    - **Fix** — **1.97 Consumers P1** (with **Thermals P1** migration, **1.96**); not automatic after storage consolidation alone
 
 
 ### Smoketest Phase C — polish follow-ups (2026-07-13)
@@ -160,9 +170,9 @@ Superseded for SE/backtesting/synthesis by *Unified Open-Meteo solar* above. Leg
 
 
 
-### Version 2.0 Components — `components.json` sidecar (2026-07-12)
+### Version 1.93 Components — `components.json` sidecar (2026-07-12)
 
-Completes entity-catalog split from 1.26.0 / 2.0 P2: `batteries[]` and `pv_systems[]` moved from `config.json` into `config/components.json` (sidecar next to `tariffs.json`, `house_profiles.json`). Scenarios keep referencing `battery_id` / `pv_system_id` only. Hard cutover — startup error if legacy keys remain in `config.json`; no alias/fallback.
+Completes entity-catalog split from 1.26.0 / 1.93 P2: `batteries[]` and `pv_systems[]` moved from `config.json` into `config/components.json` (sidecar next to `tariffs.json`, `house_profiles.json`). Scenarios keep referencing `battery_id` / `pv_system_id` only. Hard cutover — startup error if legacy keys remain in `config.json`; no alias/fallback.
 
 - [x] **Components P1 — Sidecar infrastructure** — `config/components.schema.json`, `components.minimal.json`, `components.example.json`; `[house_config/components_store.py](house_config/components_store.py)`; `[runtime_store/persist_paths.py](runtime_store/persist_paths.py)` `resolve_components_json_path()`; `[runtime_store/bootstrap.py](runtime_store/bootstrap.py)` `_bootstrap_components_json()`
 - [x] **Components P2 — Config load & scenario resolution** — `config.py` `components_path`, `get_batteries()` / `get_pv_systems()` from sidecar; `_reject_legacy_config_blocks`; `[house_config/scenario_resolution.py](house_config/scenario_resolution.py)`; `[ui/setup_readiness.py](ui/setup_readiness.py)`; `batteries` / `pv_systems` removed from `config.schema.json`, `config.minimal.json`, `config.example.json`
@@ -184,18 +194,18 @@ Completes entity-catalog split from 1.26.0 / 2.0 P2: `batteries[]` and `pv_syste
 
 
 
-### Version 2.0 P6a — Parallel NAS stack (silent trial) (2026-07-12)
+### Version 1.93 P6a — Parallel NAS stack (silent trial) (2026-07-12)
 
 - [x] **Parallel stack** — validated `silent-migration-test/config/` + `runtime/` deployed to new NAS folder (`docker/earnie-2.0/`); legacy `docker/earnie/` unchanged (rollback)
-- [x] **Migration review** — `[silent-migration-test/config/MIGRATION_REVIEW.md](silent-migration-test/config/MIGRATION_REVIEW.md)` and entity IDs checked; migration via `[house_config/migrate_runtime_entities.py](house_config/migrate_runtime_entities.py)` (1.26.0 P5 + 2.0 P6a)
+- [x] **Migration review** — `[silent-migration-test/config/MIGRATION_REVIEW.md](silent-migration-test/config/MIGRATION_REVIEW.md)` and entity IDs checked; migration via `[house_config/migrate_runtime_entities.py](house_config/migrate_runtime_entities.py)` (1.26.0 P5 + 1.93 P6a)
 - [x] **Compose** — distinct container names, UI port ≠ 8501 (8503), image pinned to 2.0.x
 - [x] **Silent mode** — `runtime/local_settings.json`: `{"loxone_silent_mode": true}`; legacy prod worker kept running (no dual writes)
 - [x] **Acceptance** — `validate_tariffs --check-catalog`, `startup_checks`, worker/UI on new stack; guide: [Silent Migration Test Stack](docs/einrichtung/silent-migration-test.md)
-- [x] **Scope split** — non-silent live cutover deferred to **2.+1 P6b** (not a 2.0 release gate)
+- [x] **Scope split** — non-silent live cutover deferred to **1.94 P6b** (not a real 2.0 release gate)
 
 
 
-### Version 2.0 P5 — Tariffs & deploy gate (2026-07-11)
+### Version 1.93 P5 — Tariffs & deploy gate (2026-07-11)
 
 - [x] **Tariff plausibility** — `[house_config/tariff_plausibility.py](house_config/tariff_plausibility.py)`: Normalisierung, JSON-Schema, Szenario-Referenzen; CLI `[scripts/validate_tariffs.py](scripts/validate_tariffs.py)` (`earnie-validate-tariffs`)
 - [x] **Runtime gates** — Scenario-Exploration UI + `[scripts/run_backtesting.py](scripts/run_backtesting.py)`; Worker-Start `[scripts/startup_checks.py](scripts/startup_checks.py)` (`EARNIE_STRICT_TARIFF_VALIDATE` in Prod-Compose)
@@ -206,7 +216,7 @@ Completes entity-catalog split from 1.26.0 / 2.0 P2: `batteries[]` and `pv_syste
 
 
 
-### Version 2.0 P4 — `sunrise_window` rename (2026-07-11)
+### Version 1.93 P4 — `sunrise_window` rename (2026-07-11)
 
 - [x] **Hard rename** — `sunset_window` → `sunrise_window` in schema, config templates, fixtures, CLI `--horizon-mode`, live `planning_horizon.mode`; no alias
 - [x] **Internal symbols** — `SUNRISE_WINDOW`, `is_sunrise_planning_horizon`, `build_sunrise_window_matrix`, `compute_sunrise_planning_at_anchor`, `log_supports_sunrise_chart_view`, `VIEW_MODE_SUNRISE`
@@ -215,18 +225,18 @@ Completes entity-catalog split from 1.26.0 / 2.0 P2: `batteries[]` and `pv_syste
 
 
 
-### Version 2.0 P3 — Configuration UI restructure (2026-07-11)
+### Version 1.93 P3 — Configuration UI restructure (2026-07-11)
 
 - [x] **Nav sections** — `Planung` (Hauskonfigurator, Szenarieneditor) + `Echtzeit-Umgebung` (`[ui/navigation.py](ui/navigation.py)`); raw JSON editor not in main nav
 - [x] **Echtzeit-Umgebung page** — `[ui/pages/page_live_environment.py](ui/pages/page_live_environment.py)`: `live_scenario_id` picker, resolved snapshot, comfort form from `[ui/config_forms.py](ui/config_forms.py)`
 - [x] **Onboarding hints** — `[ui/setup_readiness.py](ui/setup_readiness.py)` sidebar copy aligned to new page names and order
 - [x] **Tests & docs** — `tests/test_navigation_setup.py`, `tests/test_setup_readiness.py`; `[docs/einrichtung/greenfield-dev-stack.md](docs/einrichtung/greenfield-dev-stack.md)` acceptance table
-- [x] **Acceptance** — greenfield smoke: onboarding → live selection → Scenario-Exploration unlock (follow-ups → Backlog-Bugfixes.md / 2.0 smoke-test follow-ups)
+- [x] **Acceptance** — greenfield smoke: onboarding → live selection → Scenario-Exploration unlock (follow-ups → [Backlog-Erledigt.md](Backlog-Erledigt.md) *Version 1.93 — smoke-test follow-ups*)
 - [x] **Batterien tab** — entity CRUD moved to Hauskonfigurator (`[ui/pages/page_house_config.py](ui/pages/page_house_config.py)`); Szenarieneditor scenario CRUD only; onboarding copy + tests updated
 
 
 
-### Version 2.0 P1 — Optional consumers (2026-07-11)
+### Version 1.93 P1 — Optional consumers (2026-07-11)
 
 - [x] **Haus Wärme optional** — `thermal_annual` not mandatory (`[house_config/profiles_store.py](house_config/profiles_store.py)`, Hauskonfigurator)
 - [x] **PV optional** — `[ui/setup_readiness.py](ui/setup_readiness.py)`, `[ui/planning_pv_form.py](ui/planning_pv_form.py)`
@@ -236,7 +246,7 @@ Completes entity-catalog split from 1.26.0 / 2.0 P2: `batteries[]` and `pv_syste
 
 
 
-### Version 2.0 P2 — Unified scenario model (2026-07-11)
+### Version 1.93 P2 — Unified scenario model (2026-07-11)
 
 - [x] **Live baseline as normal scenario** — `live_scenario_id` in `config.json` (default `live`); unified resolution in `[house_config/scenario_resolution.py](house_config/scenario_resolution.py)`; `config.py` rejects `runtime_settings` block
 - [x] **UI mode rename** — `backtesting` → `scenario_exploration` (`[ui/mode_selector.py](ui/mode_selector.py)`, `[ui/navigation.py](ui/navigation.py)`, compose, VS Code launch); user-facing label **Scenario-Exploration**
@@ -244,13 +254,13 @@ Completes entity-catalog split from 1.26.0 / 2.0 P2: `batteries[]` and `pv_syste
 - [x] **Templates & schema** — `config.example.json`, `backtesting_scenarios.example.json` (`live` entry), `config.schema.json` without `runtime_settings`
 - [x] **Scripts & tests** — dev scripts default to `live`; backtesting tests use scenario id `live`; `[tests/config_fixtures.py](tests/config_fixtures.py)`
 - [x] **Docs (DE)** — `[docs/konfiguration/ueberblick.md](docs/konfiguration/ueberblick.md)`, `[docs/ui/betriebsmodi.md](docs/ui/betriebsmodi.md)`, greenfield/container/betrieb, PV/preise specs
-- [x] **Tests** — 143 passed locally (P2 subset); `migrate_runtime_entities` output update deferred to **2.0 P6a**
+- [x] **Tests** — 143 passed locally (P2 subset); `migrate_runtime_entities` output update deferred to **1.93 P6a**
 
 
 
 ### Earnie rename (2026-07-11)
 
-- [x] **Version 2.0 — branding** — UI/docs Ernie→Earnie; Loxone signal names (`Ernie_`*) unchanged in production config
+- [x] **Version 1.93 — branding** — UI/docs Ernie→Earnie; Loxone signal names (`Ernie_`*) unchanged in production config
 - [x] **Packaging** — `pyproject` package `earnie`; CLI `earnie-`* with legacy `ernie-`* aliases
 - [x] **Env vars** — canonical `EARNIE_`* with `ENERGY_OPTIMIZER_`* fallback (`runtime_store/env_vars.py`)
 - [x] **Docker** — `ghcr.io/jochentcc/earnie-energy` image and `earnie-`* container names; dual-tag transition (`ernie-energy` alias)

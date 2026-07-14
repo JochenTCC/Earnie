@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from optimizer.charging_context import hour_in_charging_window
+from settings.ev_power import merge_ev_power_conversion_fields
 from settings.flexible_consumers import normalize_day_schedule, target_kwh_from_rest_soc
 
 _REFERENCE_YEAR_DAYS = 365
@@ -26,13 +27,16 @@ def normalize_ev_charging_schedule(raw: dict | None) -> dict:
     weekend = normalize_day_schedule(raw.get("weekend"))
     if not weekday and not weekend:
         raise ValueError("charging_schedule erfordert weekday und/oder weekend.")
-    return {
-        "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
-        "charging_efficiency": efficiency,
-        "forecast_when_absent": bool(raw.get("forecast_when_absent", True)),
-        "weekday": weekday,
-        "weekend": weekend,
-    }
+    return merge_ev_power_conversion_fields(
+        {
+            "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
+            "charging_efficiency": efficiency,
+            "forecast_when_absent": bool(raw.get("forecast_when_absent", True)),
+            "weekday": weekday,
+            "weekend": weekend,
+        },
+        raw,
+    )
 
 
 def _day_schedule(consumer: dict, day: date) -> dict:

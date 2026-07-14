@@ -66,15 +66,15 @@ $env:EARNIE_BACKTESTING_SCENARIOS_PATH = "greenfield/config/backtesting_scenario
 
 Scenario Exploration consumption model → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-13). Spec: [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md).
 
-### Version 2.0
+### Version 1.93 — Unified scenario model (former backlog 2.0 P1–P7)
 
 Branding (Earnie rename) → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
-**Status (2026-07-13):** P1–P5, **P6a**, **Components**, **Unified Open-Meteo solar**, **SE consumption model**, and smoke-test **Phase A** done (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). Open under 2.0: **P7** + EV nominal voltage + Phase B plausibility/fixed-tariff investigation. Loxone sidebar bugfix → [Backlog-Erledigt.md](Backlog-Erledigt.md).
+**Status (2026-07-14):** P1–P5, **P6a**, **Components**, **Unified Open-Meteo solar**, **SE consumption model**, smoke-test **Phase A–C**, and **smoke-test follow-ups** done (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). **Live cutover (P6b)** → **1.99**. Loxone sidebar bugfix → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
-Recommended order (2.0): smoke-test **Phase B** (*SE higher cost*) → **P7** README / evaluations → propose `version.py` → `2.0.0` (user approval). **P6b** live cutover → **2.+1** (first item after 2.0 release).
+Recommended order: **1.94–1.97** legacy flex / thermal migration → **1.99** P6b live cutover → propose `version.py` → **`2.0.0`** (user approval; **real** 2.0 — legacy data model gone).
 
-Critical path: **fixed-tariff SE investigation**, then **P7**. Open bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+Critical path: **1.94–1.97** (especially **Consumers P1** + **Thermals P1** / **P1a**) before **1.99** P6b prod cutover. Open bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 **Decisions (2026-07-11):**
 
@@ -82,68 +82,18 @@ Critical path: **fixed-tariff SE investigation**, then **P7**. Open bugs → [Ba
 | Topic                            | Decision                                                                                                                                                                                                                |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `EARNIE_UI_MODES` key            | Hard rename `backtesting` **→** `scenario_exploration` — no alias; update compose, launch configs, docs, tests in same PR (P2)                                                                                          |
-| Scenario id `runtime_settings`   | **Remove in 2.0** — live baseline is a normal scenario entry (default id `live`) selected via `live_scenario_id` in `config.json`; update scripts/tests/fixtures in same release (P2)                                   |
+| Scenario id `runtime_settings`   | **Removed in 1.93 P2** — live baseline is a normal scenario entry (default id `live`) selected via `live_scenario_id` in `config.json`; update scripts/tests/fixtures in same release (P2)                                   |
 | Battery without PV               | **Allowed** — battery still required for MILP / planning readiness; PV optional (zero PV forecast when `pv_system_id` unset) (P1)                                                                                       |
-| **7g-a** before P6               | **Skip for 2.0** — parallel NAS stack after local silent acceptance; 7g-a remains in Packaging backlog, not a 2.0 gate                                                                                                  |
-| **P6 NAS deploy**                | **Parallel stack** — deploy validated `silent-migration-test/` to a new NAS folder; legacy `docker/earnie/` unchanged for rollback; **P6a** silent trial done; **P6b** non-silent cutover → **2.+1**                    |
+| **7g-a** before P6               | **Skip for 1.93** — parallel NAS stack after local silent acceptance; 7g-a remains in Packaging backlog, not a 1.93 gate                                                                                                  |
+| **P6 NAS deploy**                | **Parallel stack** — deploy validated `silent-migration-test/` to a new NAS folder; legacy `docker/earnie/` unchanged for rollback; **P6a** silent trial done; **P6b** non-silent cutover → **1.99** (after **1.94–1.97** migration) |
 | `sunrise_window` **rename (P4)** | Hard rename `sunset_window` **→** `sunrise_window` — no alias; internal symbols renamed; prod deploy only with P6a config migration                                                                                     |
-| **2.0 release gate**             | `version.py` **→** `2.0.0` after **P7** acceptance (user approval); **P6b** not required for 2.0 release                                                                                                                |
-| `components.json` **sidecar**    | **Hard cutover in 2.0** — `batteries[]` / `pv_systems[]` only in `config/components.json`; startup error if keys remain in `config.json`; no alias/fallback (same pattern as `runtime_settings`, global `battery_wear`) |
+| **Real 2.0 release gate**        | `version.py` **→** `2.0.0` after **1.99** P6b acceptance + legacy data model fully removed (user approval); **1.93** alone does **not** bump to `2.0.0`                                                                                                                |
+| `components.json` **sidecar**    | **Hard cutover in 1.93** — `batteries[]` / `pv_systems[]` only in `config/components.json`; startup error if keys remain in `config.json`; no alias/fallback (same pattern as `runtime_settings`, global `battery_wear`) |
 
 
 
 
-### Version 2.0 — smoke-test follow-ups
-
-Components (`components.json` sidecar) → [Backlog-Erledigt.md](Backlog-Erledigt.md).
-
-- [ ] **Scenario-Exploration without PV** — optimization/backtesting path incomplete when `pv_system_id` unset (P1 allows battery-only; simulation/MILP gaps remain)
-- [ ] **EV nominal voltage for power calculation** — configurable per EV consumer (house profile + `flexible_consumers`); replace hardcoded 230 V in A→kW conversion (`integrations/loxone_client.py`); shared helper for live and planning paths; default 230 V / 1 phase when unset
-
-
-
-#### Smoketest Findings — next actions (updated 2026-07-13)
-
-Greenfield smoke **2026-07-12**; backtesting iteration **2026-07-13**. Completed work → [Backlog-Erledigt.md](Backlog-Erledigt.md) (Smoketest UX 2026-07-12, *Unified Open-Meteo solar*, *SE consumption model*, Phase A manual verification, per-scenario reference tariffs, Jan 2025 greenfield run). **Bugfix** items → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
-
-**Phase B — SE credibility (fixed tariffs & plausibility)**
-
-Done in code → [Backlog-Erledigt.md](Backlog-Erledigt.md): SE consumption model (`profile_spec`), per-scenario reference tariffs (`reference_by_scenario`), window-aware flex targets at 07:00 anchors.
-
-Completed investigations → [Backlog-Erledigt.md](Backlog-Erledigt.md): fixed-tariff scenario matrix, bulk classify, structural flex under-delivery (`s2-kein-pv` Jan 2 & 7), variable tariff scenario (Oct 2025 deviation + Chart 1 flex UI gap).
-
-**Phase C — polish (may slip to 2.+1)**
-
-Done in code → [Backlog-Erledigt.md](Backlog-Erledigt.md): Live scenario default (Detaillierte Simulationsansicht), Hauskonfigurator sticky Speichern, Loxone `actual_soc_name` (Ernie-SOC-Ist-EAuto).
-
-- [ ] **Version 2.0 P7 — Documentation & evaluations**
-  - Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
-  - Build additional container for Windows as pure Python environment (if that makes sense) — spike vs local venv; go/no-go note
-  - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
-
-
-### Version 2.+1
-
-- [ ] **P6b — Live cutover (non-silent)** *(former 2.0 P6b; first post-2.0 prod step)*
-  - **Stop legacy worker**; remove silent mode on new stack (delete or set `loxone_silent_mode: false` in `local_settings.json`); restart new worker
-  - Switch daily use to new stack (UI port); keep old `docker/earnie/` stopped but intact for rollback window
-  - Rollback: stop new containers, start legacy compose on `docker/earnie/`, UI on 8501
-  - **Live** `cons_data` ****`pv_kw`**:** keep Loxone-measured append in `main.py` until this cutover; scenario exploration / backtesting use Open-Meteo only (*Unified Open-Meteo solar*, [Backlog-Erledigt.md](Backlog-Erledigt.md))
-
-
-
-### Version 2.+1 — Quality epic / post-migration cleanup
-
-After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26.0 data model (1.26.0 P6 removed runtime fallbacks; this epic mops up the rest)
-
-- [ ] Evaluate option for code coverage testing and identification of deprecated code / tests (especially due to substantial data model change) / obsolete patches because of legacy data model
-- [ ] Thorough code review and refactoring
-- [ ] Search for deprecated and unnecessary files and remove them
-- [ ] Evaluate option for automated UI testing
-
-
-
-### Version 2.+1
+### Version 1.94
 
 - [ ] **SwimSpa case B — follow-up review historical power & Loxone separation**
   - Check whether historical SwimSpa power logs (`thermal_control.history_logs.power_csv` = `..._SwimSpa_Leistung_...csv`, source `Ernie_Swim-Spa-P_act`) also contain the **filter share** (case B). If yes: assess impact on **thermal model calibration** (`heat_loss_kw_per_k` etc.) — filter (~0.18 kW) would be misinterpreted as heating power.
@@ -152,11 +102,11 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
 
 
 
-### Version 2.+1
+### Version 1.95
 
 - [ ] **Thermals P1** — Isolated single-node models
   - **Follow-up (1.26.0 P0 smoke, decision #11):** legacy RC / `thermal_control` models (SwimSpa, freezer, etc.) from `flexible_consumers` — not in 1.26.0 P3b
-  - **Migrate existing consumers** — move prod entries from `config.json` → `flexible_consumers[]` into `house_profiles.json` (`profiles[].consumers[]`) where they belong in the planning model; keep live Loxone/MILP bindings explicit (no duplicate Hausprofil clutter); migration script or one-time cutover doc alongside new thermal schema (follow-up to **2.0 P6a** silent migration test)
+  - **Migrate existing consumers** — move prod entries from `config.json` → `flexible_consumers[]` into `house_profiles.json` (`profiles[].consumers[]`) where they belong in the planning model; keep live Loxone/MILP bindings explicit (no duplicate Hausprofil clutter); migration script or one-time cutover doc alongside new thermal schema (follow-up to **1.93 P6a** silent migration test)
   - **Chart/Sankey gate:** **Consumers P1** must pass before prod cutover — bridged house-profile MILP-flex must remain visible in Chart 1 and Sankey (parity with today's prod `flexible_consumers[]` entries)
   - Variable heat paths (against infinity); replaces single-path special case in `optimizer/thermal_model.py`
   - **Freezer** (former 0.+1 Prio2) — second isolated reference model; acceptance: calibration/backtest against historical Loxone CSV logs
@@ -164,7 +114,7 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
 
 
 
-### Version 2.+1
+### Version 1.96
 
 - [ ] **Consumers P1 — Unified flex discovery (planning model → Chart 1 / Sankey)**
   - **Problem:** Planning/simulation already resolve MILP-flex from house profiles (`_planning_flex_consumers`, snapshot `meta._flexible_consumers`); Chart 1 / Sankey still discover flex via `config.get_flexible_consumers(optimizer_only=True)` → bridged generics (`daily_target_kwh: 0`, window-resolved targets) excluded; SE greenfield shows EV only (smoketest 2026-07-13)
@@ -187,7 +137,7 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
 
 
 
-### Version 2.+1
+### Version 1.97
 
 - [ ] **Thermals P1a — Haus Wärme MILP flex bridge** *(design 2026-07-13)*
   - **Smoketest finding (Phase A, 2026-07-13):** Haus Wärme MILP **timing** belongs here, not Open-Meteo solar — fixed PWM overlay today (`thermal_daily_pwm_hourly_profile`).
@@ -236,6 +186,42 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
   - **Enables:** meaningful *Backtesting Tests — Test mit Standard-Setting (inkl. Haus Wärme)* (smoke follow-ups); replaces fixed P3b overlay path when `optimizer_flex: true`.
 
 
+### Version 1.99 — Live cutover (former P6b)
+
+- [ ] **P6b — Live cutover (non-silent)** *(former backlog 2.0 P6b; **1.99** — prod cutover after **1.94–1.97** migration)*
+  - **Stop legacy worker**; remove silent mode on new stack (delete or set `loxone_silent_mode: false` in `local_settings.json`); restart new worker
+  - Switch daily use to new stack (UI port); keep old `docker/earnie/` stopped but intact for rollback window
+  - Rollback: stop new containers, start legacy compose on `docker/earnie/`, UI on 8501
+  - **Live** `cons_data` **`pv_kw`:** keep Loxone-measured append in `main.py` until this cutover; scenario exploration / backtesting use Open-Meteo only (*Unified Open-Meteo solar*, [Backlog-Erledigt.md](Backlog-Erledigt.md))
+
+
+## Real Version 2.0 — legacy data model removed
+
+### Version 2.0
+
+**Goal:** All legacy data model gone — prod `flexible_consumers[]` migrated into `house_profiles.json`; Chart 1 / Sankey / MILP use the house-profile bridge only; no `config.json` runtime entity fallbacks.
+
+**Prerequisite chain:** **1.93** (unified scenario + smoke-test closure) → **1.94–1.97** (SwimSpa review, **Consumers P1**, **Thermals P1** / **P1a**) → **1.99** P6b live cutover.
+
+**Release gate:** Propose `version.py` → **`2.0.0`** after **1.99** P6b acceptance (user approval). SemVer `2.0.0` marks the **real** 2.0 — not the former backlog **1.93 P1–P7** cycle.
+
+### Version 2.+1 — Quality epic / post-migration cleanup
+
+After **real** 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26.0 data model (1.26.0 P6 removed runtime fallbacks; this epic mops up the rest)
+
+- [ ] Evaluate option for code coverage testing and identification of deprecated code / tests (especially due to substantial data model change) / obsolete patches because of legacy data model
+- [ ] Thorough code review and refactoring
+- [ ] Search for deprecated and unnecessary files and remove them
+- [ ] Evaluate option for automated UI testing
+
+
+### Version 2.+1
+
+- [ ] **Documentation & evaluations** *(former 1.93 P7 / former backlog 1.99 docs)*
+  - Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
+  - Build additional container for Windows as pure Python environment (if that makes sense) — spike vs local venv; go/no-go note
+  - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
+
 
 ### Version 2.+1
 
@@ -271,7 +257,7 @@ After 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26
 
 ### Version 2.+1 — Epics **Adaptation** & **Thermals** (architecture first)
 
-Recommended order: **SwimSpa case B** (optional precursor) → **Thermals P1a** (Haus Wärme MILP flex bridge) → **Thermals P1** (RC single-node models) → **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P2 → Thermals P3 → Adaptation P4**
+Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P2 → Thermals P3 → Adaptation P4** (precursors **SwimSpa case B**, **Consumers P1**, **Thermals P1**, **Thermals P1a** → **1.94–1.97**, before **1.99** live cutover / real 2.0)
 
 - [ ] **Adaptation P1** — Generic adaptation model (skeleton)
   - Common structure for parameter adaptation of various forecast models:
@@ -343,8 +329,8 @@ Recommended order: **SwimSpa case B** (optional precursor) → **Thermals P1a** 
 ### Version 2.+1
 
 - [ ] **Optional: live planning horizon switchable via** `config.json` (`planning_horizon.mode`: `fixed_24h` | `sunrise_window`)
-  - **Prerequisite:** Version 2.0 P4 rename done (`sunrise_window` in schema/code/docs)
-  - After 2.0 rename: live only `sunrise_window` today; backtesting already supports both modes — live branching still to implement (`main.py`, `profile_manager`, UI chart, aWATTar window)
+  - **Prerequisite:** **1.93 P4** rename done (`sunrise_window` in schema/code/docs)
+  - After **1.93 P4** rename: live only `sunrise_window` today; backtesting already supports both modes — live branching still to implement (`main.py`, `profile_manager`, UI chart, aWATTar window)
   - Mode `fixed_24h`**:** end-SOC behavior **fixed in mode** — economically equivalent to former `battery_end_soc_equals_start: true` (start SOC at horizon end), **or** introduce hard equality constraint via existing `battery_wear` penalty that appropriately "punishes" lower end SOC (choose one variant, not both in parallel)
   - Mode `sunrise_window`**:** unchanged **SOC_min at sunrise** (hard)
   - Extend spec, live tests for both modes
@@ -369,7 +355,7 @@ Recommended open order: **7e** → **7g**
 - [ ] **7g — Local dev stacks (staging, from 1.25)**
   **Scope:** Additional container stacks on **local dev PC** — **not** greenfield (**1.24.c**), **not** pytest fixture configs, **not** data sync (`7e`). `config/` remains untouched on image updates.
   **Phases:** 7g-a silent (prod Loxone) → 7g-b simulated (later).
-  **Not a Version 2.0 gate** — P6a (NAS silent stack) done; 7g-a remains useful post-2.0 for local staging.
+  **Not a real Version 2.0 gate** — P6a (NAS silent stack) done; 7g-a remains useful post-**2.0** for local staging.
   **Acceptance:** silent stack reads productive Loxone instance, does not write (`loxone_silent_mode: true`); simulated stack only after Loxone simulator.
   - [ ] **7g-a — Silent stack** (prod Loxone, deploy-safe)
     - Own compose folder: separate `config/` + `runtime/`, distinct `container_name` and UI port

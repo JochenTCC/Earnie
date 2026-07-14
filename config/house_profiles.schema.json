@@ -33,6 +33,17 @@
                 "target_soc_percent": { "type": "number", "minimum": 0, "maximum": 100 },
                 "charging_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
                 "forecast_when_absent": { "type": "boolean" },
+                "nominal_power_voltage_v": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "description": "Nennspannung für A→kW-Umrechnung (Default 230 V)."
+                },
+                "nominal_power_phases": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3,
+                    "description": "Phasenzahl für A→kW-Umrechnung (Default 1)."
+                },
                 "weekday": { "$ref": "#/definitions/day_schedule" },
                 "weekend": { "$ref": "#/definitions/day_schedule" }
             }

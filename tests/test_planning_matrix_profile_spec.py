@@ -223,6 +223,23 @@ def test_planning_ev_to_milp_matches_prod_shape():
     assert bridged[0]["charging_schedule"]["weekday"]["daily_rest_soc"] == 60.0
 
 
+def test_planning_ev_to_milp_preserves_power_conversion_config():
+    from house_config.planning_flex_bridge import planning_ev_to_milp
+
+    ev = {
+        **EV_PROFILE["consumers"][0],
+        "charging_schedule": {
+            **EV_PROFILE["consumers"][0]["charging_schedule"],
+            "nominal_power_voltage_v": 400.0,
+            "nominal_power_phases": 3,
+        },
+    }
+    milp = planning_ev_to_milp(ev)
+    sched = milp["charging_schedule"]
+    assert sched["nominal_power_voltage_v"] == pytest.approx(400.0)
+    assert sched["nominal_power_phases"] == 3
+
+
 def test_planning_ev_daily_targets_from_profile():
     from house_config.planning_flex_bridge import (
         planning_ev_consumers,

@@ -686,6 +686,17 @@
           "maximum": 1,
           "description": "Angenommener Lade-Wirkungsgrad (Netz-/Zählerenergie → Akku), Standard 0,95. Ladeziel kWh = (target_soc_percent − Rest-SOC) / 100 × Akkukapazität (Loxone) / charging_efficiency."
         },
+        "nominal_power_voltage_v": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Nennspannung für A→kW-Umrechnung bei Loxone-Merker in Ampere (Default 230 V)."
+        },
+        "nominal_power_phases": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Phasenzahl für A→kW-Umrechnung (Default 1)."
+        },
         "weekday": {
           "$ref": "#/definitions/charging_day_schedule",
           "description": "Montag–Freitag."
@@ -721,6 +732,17 @@
             "nominal_power_kw_name": {
               "type": "string",
               "description": "Max. Ladeleistung in kW (live gelesen für die Optimierung; Fallback: nominal_power_kw in config)."
+            },
+            "nominal_power_voltage_v": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Nennspannung für A→kW-Umrechnung, wenn nominal_power_kw_name Ampere liefert (Fallback: charging_schedule.nominal_power_voltage_v, Default 230 V)."
+            },
+            "nominal_power_phases": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3,
+              "description": "Phasenzahl für A→kW-Umrechnung (Fallback: charging_schedule.nominal_power_phases, Default 1)."
             },
             "battery_capacity_kwh_name": {
               "type": "string",
