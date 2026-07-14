@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from runtime_store.env_vars import is_explicit_offline
 from runtime_store.dotenv_io import loxone_credentials_configured, loxone_setup_deferred
 from ui.setup_dotenv import render_loxone_credentials_form, render_loxone_verify_results
 from ui.setup_readiness import (
@@ -17,21 +18,31 @@ from ui.setup_readiness import (
 )
 
 
+def should_show_loxone_sidebar() -> bool:
+    """Sidebar wenn Zugang fehlt (deferred) oder Merker-Test mit hinterlegter .env."""
+    if is_explicit_offline():
+        return False
+    if loxone_credentials_configured():
+        return True
+    return loxone_setup_deferred()
+
+
 def render_deferred_loxone_sidebar() -> None:
-    """Sidebar-Expander für Loxone-.env (unabhängig von Planungs-Hinweisen)."""
-    if not loxone_setup_deferred():
+    """Sidebar-Expander für Loxone-.env und Merker-Test (unabhängig von Planungs-Hinweisen)."""
+    if not should_show_loxone_sidebar():
         return
 
-    expand = not loxone_credentials_configured()
+    credentials_ready = loxone_credentials_configured()
+    expand = not credentials_ready
     with st.sidebar.expander("Loxone-Zugang (Live / Silent-Modus)", expanded=expand):
-        st.caption(
-            "Miniserver-Zugang erst für Live-Optimierung, Silent-Modus (Lesen) "
-            "oder Merker-Test erforderlich — nicht für Planung/Backtesting."
-        )
-        if loxone_credentials_configured():
+        if credentials_ready:
             st.success("Zugangsdaten hinterlegt.")
             render_loxone_verify_results()
         else:
+            st.caption(
+                "Miniserver-Zugang erst für Live-Optimierung, Silent-Modus (Lesen) "
+                "oder Merker-Test erforderlich — nicht für Planung/Backtesting."
+            )
             render_loxone_credentials_form(form_key="loxone_sidebar_form")
 
 

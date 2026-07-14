@@ -18,17 +18,15 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`co
 |-------|--------|
 | `system` | Timeouts für HTTP und Optimierungs-Schleife |
 | `market_prices` | Strategie für fehlende Zukunftspreise (`forecast` / `mirror`) — siehe [Preise](preise.md) |
-| `eauto_milp` | Feintuning E-Auto-MILP (Root-Block) |
 | `ui` | Streamlit-Port, Refresh-Intervalle, optionale Dev-Seiten |
 | `loxone_blocks` | Zentrale Loxone-IO-Namen (Speicher, PV, Steuerung) |
 | `live_scenario_id` | ID des **Live-Szenarios** in `backtesting_scenarios.json` (Standard: `live`) |
 | `config/components.json` | Technische Parameter für Speicher und PV (`batteries[]`, `pv_systems[]`; referenziert über IDs) |
 | `config/tariffs.json` | Tarif-Katalog (Bezug/Einspeise); referenziert über `import_tariff_id` / `export_tariff_id` |
-| `config/house_profiles.json` | Standort (Geo/Zeitzone) und Planungs-Verbraucher; referenziert über `house_profile_id` |
+| `config/house_profiles.json` | Standort (Geo/Zeitzone), Planungs-Verbraucher (EV, Wärmepumpe, Waschmaschine …); referenziert über `house_profile_id` |
 | `config/backtesting_scenarios.json` | **Alle** Szenarien (Live + Varianten); einheitliches `settings`-Format |
 | `file_paths_battery_simulation` | Pfade zu historischen CSVs, Preisquelle, `cons_data_hourly.csv` |
-| `flexible_consumers` | Steuerbare Verbraucher (MILP) mit Loxone-Ein-/Ausgängen |
-| `appliances` | Manuelle Geräte (Waschmaschine etc.) — siehe [Flexible Verbraucher](flexible-verbraucher.md) |
+| `flexible_consumers` | Legacy: steuerbare Verbraucher (MILP) mit Loxone-Ein-/Ausgängen — ab **2.0** leer; Live-Verbraucher in `house_profiles.json` |
 | `planning_horizon` | MILP-Horizont (`sunrise_window` für Live) |
 
 Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../config/backtesting_scenarios.example.json).

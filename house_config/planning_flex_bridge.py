@@ -195,6 +195,15 @@ def planning_thermal_rc_to_milp(consumer: dict) -> dict:
     heat_paths = rc.get("heat_paths")
     if isinstance(heat_paths, list) and heat_paths:
         entry["thermal_control"]["heat_paths"] = heat_paths
+    loxone_inputs = consumer.get("loxone_inputs")
+    if isinstance(loxone_inputs, dict) and loxone_inputs:
+        entry["loxone_inputs"] = dict(loxone_inputs)
+    loxone_outputs = consumer.get("loxone_outputs")
+    if isinstance(loxone_outputs, dict) and loxone_outputs:
+        entry["loxone_outputs"] = dict(loxone_outputs)
+    profile_loxone = (consumer.get("thermal_control") or {}).get("loxone")
+    if isinstance(profile_loxone, dict) and profile_loxone:
+        entry["thermal_control"]["loxone"] = dict(profile_loxone)
     if legacy_id:
         entry["legacy_id"] = legacy_id
     return entry

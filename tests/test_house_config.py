@@ -314,6 +314,105 @@ def test_ev_consumer_normalization(tmp_path):
     assert "loxone" not in ev.get("charging_schedule", {})
 
 
+def test_house_profile_save_preserves_loxone_bindings(tmp_path):
+    from house_config.profiles_store import save_house_profiles_document
+    from ui.house_config_profile_form import _merge_passthrough_consumer_fields
+
+    path = tmp_path / "house_profiles.json"
+    ev_original = {
+        "id": "ev",
+        "label": "Smart",
+        "type": "ev",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "min_on_quarterhours": 1,
+        "battery_capacity_kwh": 17.0,
+        "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
+        "loxone_inputs": {"power_name": "Ernie_EAuto_P_act"},
+        "charging_schedule": {
+            "target_soc_percent": 100.0,
+            "charging_efficiency": 0.95,
+            "forecast_when_absent": True,
+            "loxone": {
+                "plugged_in_name": "Ernie_EAuto_Da",
+                "charge_enable_name": "Ernie_EAuto_Freigabe",
+            },
+            "weekday": {
+                "car_available_from_hour": 18,
+                "ready_by_hour": 7,
+                "daily_rest_soc": 30.0,
+            },
+            "weekend": {
+                "car_available_from_hour": 20,
+                "ready_by_hour": 12,
+                "daily_rest_soc": 50.0,
+            },
+        },
+    }
+    spa_original = {
+        "id": "swimspa",
+        "label": "SwimSpa",
+        "type": "thermal_rc",
+        "nominal_power_kw": 2.8,
+        "loxone_outputs": {"enable_name": "Ernie_SwimSpa_Freigabe"},
+        "loxone_inputs": {"power_name": "Ernie_Swim-Spa-P_act", "signal_type": "analog"},
+        "thermal_control": {"loxone": {"heating_active_name": "homie_bwa_spa_heating"}},
+        "thermal_rc": {
+            "water_volume_liters": 5900.0,
+            "setpoint_c": 35.0,
+            "tolerance_c": 1.0,
+            "heat_loss_kw_per_k": 0.02,
+            "heating_efficiency": 0.99,
+        },
+    }
+    ev_edited = {
+        "id": "ev",
+        "label": "Smart",
+        "type": "ev",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "min_on_quarterhours": 1,
+        "battery_capacity_kwh": 17.0,
+        "charging_schedule": dict(ev_original["charging_schedule"]),
+    }
+    ev_edited["charging_schedule"].pop("loxone", None)
+    spa_edited = {
+        "id": "swimspa",
+        "label": "SwimSpa",
+        "type": "thermal_rc",
+        "nominal_power_kw": 2.8,
+        "thermal_rc": dict(spa_original["thermal_rc"]),
+    }
+    merged = [
+        _merge_passthrough_consumer_fields(ev_original, ev_edited),
+        _merge_passthrough_consumer_fields(spa_original, spa_edited),
+    ]
+    save_house_profiles_document(
+        str(path),
+        {
+            "profiles": [
+                {
+                    "id": "example_efh",
+                    "label": "Test",
+                    "annual_kwh": 11000.0,
+                    "latitude": 47.404,
+                    "longitude": 9.743,
+                    "consumers": merged,
+                }
+            ]
+        },
+    )
+    doc = load_house_profiles_document(str(path))
+    consumers = doc["profiles"]["example_efh"]["consumers"]
+    ev = next(item for item in consumers if item["id"] == "ev")
+    spa = next(item for item in consumers if item["id"] == "swimspa")
+    assert ev["loxone_outputs"]["power_setpoint_name"] == "Ernie_EAuto_Ziel_kW"
+    assert ev["loxone_inputs"]["power_name"] == "Ernie_EAuto_P_act"
+    assert ev["charging_schedule"]["loxone"]["plugged_in_name"] == "Ernie_EAuto_Da"
+    assert spa["loxone_outputs"]["enable_name"] == "Ernie_SwimSpa_Freigabe"
+    assert spa["thermal_control"]["loxone"]["heating_active_name"] == "homie_bwa_spa_heating"
+
+
 def test_ev_annual_kwh_from_charging_schedule():
     consumer = _sample_ev_consumer()
     annual = estimate_ev_annual_kwh(consumer)
@@ -628,6 +727,76 @@ def test_planning_thermal_rc_to_milp_bridge():
     ids = {entry["id"] for entry in flex}
     assert "swimspa" in ids
     assert "swimspa_filter" in ids
+
+
+def test_consumer_annual_kwh_thermal_rc_with_geo():
+    consumer = {
+        "id": "swimspa",
+        "type": "thermal_rc",
+        "nominal_power_kw": 2.8,
+        "thermal_rc": {
+            "water_volume_liters": 5900.0,
+            "setpoint_c": 36.5,
+            "tolerance_c": 1.0,
+            "heat_loss_kw_per_k": 0.07,
+            "heating_efficiency": 0.99,
+            "latitude": 47.404,
+            "longitude": 9.743,
+            "timezone_name": "Europe/Vienna",
+        },
+    }
+    annual = consumer_annual_kwh(consumer)
+    assert annual > 1000.0
+    assert annual < consumer["nominal_power_kw"] * 8760
+
+
+def test_silent_migration_profile_includes_swimspa_annual():
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "silent-migration-test"
+        / "config"
+        / "house_profiles.json"
+    )
+    if not path.is_file():
+        pytest.skip("silent-migration-test profile not present")
+    doc = load_house_profiles_document(str(path))
+    profile = doc["profiles"]["example_efh"]
+    swimspa = next(c for c in profile["consumers"] if c["id"] == "swimspa")
+    annual = consumer_annual_kwh(swimspa)
+    assert annual > 0.0
+    baseload = compute_baseload_kwh(profile["annual_kwh"], profile["consumers"])
+    assert baseload["consumer_kwh"] > profile["annual_kwh"] * 0.5
+
+
+def test_inject_profile_geo_adds_thermal_rc_coordinates():
+    from ui.house_config_profile_form import _inject_profile_geo
+
+    consumers = [
+        {
+            "id": "swimspa",
+            "type": "thermal_rc",
+            "nominal_power_kw": 2.8,
+            "thermal_rc": {
+                "water_volume_liters": 5900.0,
+                "setpoint_c": 36.5,
+                "tolerance_c": 1.0,
+                "heat_loss_kw_per_k": 0.07,
+                "heating_efficiency": 0.99,
+            },
+        }
+    ]
+    enriched = _inject_profile_geo(
+        consumers,
+        47.404,
+        9.743,
+        timezone_name="Europe/Vienna",
+    )
+    rc = enriched[0]["thermal_rc"]
+    assert rc["latitude"] == pytest.approx(47.404)
+    assert rc["longitude"] == pytest.approx(9.743)
+    assert rc["timezone_name"] == "Europe/Vienna"
+    annual = consumer_annual_kwh(enriched[0])
+    assert annual > 0.0
 
 
 def test_generic_flex_allowed_hours():

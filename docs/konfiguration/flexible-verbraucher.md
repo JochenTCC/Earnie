@@ -67,7 +67,7 @@ Ladeziel in kWh (vereinfacht, Kapazität nur aus Loxone):
 
 `nominal_power_kw_name` überschreibt zur Laufzeit die konfigurierte `nominal_power_kw`, wenn der Merker lesbar ist.
 
-Block **`eauto_milp`** in `config.json` (Root): Feintuning der MILP-Heuristik (`live_modus_a_min_remaining_kwh`, Tie-Break-Parameter) — siehe Schema.
+Block **`charging_schedule.milp`** am EV-Verbraucher in `house_profiles.json`: Feintuning der MILP-Heuristik (`live_modus_a_min_remaining_kwh`, Tie-Break-Parameter) — siehe Schema.
 
 ## SwimSpa-Filter: `filter_schedule` und `loxone_remaining_hours`
 
@@ -83,16 +83,16 @@ Getrennter Verbraucher `swimspa_filter` (Heizung bleibt `swimspa` mit `daily_tar
 
 Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`loxone_outputs.enable_name`). Spec: [SwimSpa Filter](../spec/swimspa-filter.md).
 
-## Manuelle Geräte (`appliances[]`)
+## Manuelle Geräte (Hausprofil, `type: generic`)
 
-Getrennt von `flexible_consumers`: Waschmaschine, Trockner usw. mit fester Laufzeit. Konfiguration in `config.json` → `appliances[]`; Planung über die Seite **Manuelle Geräte**; Persistenz in `runtime/appliance_schedules.json`. Geplante Laufzeiten erscheinen in Chart 1 (Flow-Balance).
+Ab **2.0** keine separate `appliances[]` in `config.json` mehr: Waschmaschine, Trockner usw. als **`generic`-Verbraucher** in `house_profiles.json` (optional `appliance_recommendation` für Loxone-Leistung und Empfehlungsmodus). Planung über die Seite **Manuelle Geräte**; Persistenz in `runtime/appliance_schedules.json`. Geplante Laufzeiten erscheinen in Chart 1 (Flow-Balance).
 
 | Feld | Bedeutung |
 |------|-----------|
-| `id`, `name` | Kennung und Anzeigename |
-| `power_source` | `loxone` oder `manual` |
-| `loxone_power_name` | Bei `loxone`: Ist-Leistungsmerker |
-| `default_power_kw`, `default_runtime_h` | Standard für manuelle Planung |
+| `id`, `label` | Kennung und Anzeigename |
+| `appliance_recommendation.power_source` | `loxone` oder `manual` |
+| `appliance_recommendation.loxone_power_name` | Bei `loxone`: Ist-Leistungsmerker |
+| `appliance_recommendation.default_power_kw`, `default_runtime_h` | Standard für manuelle Planung |
 
 ## Baseline in der UI
 

@@ -33,6 +33,16 @@ def consumer_annual_kwh(consumer: dict) -> float:
         from house_config.generic_schedule import generic_annual_kwh
 
         return generic_annual_kwh(consumer)
+    if consumer.get("type") == "thermal_rc":
+        rc = consumer.get("thermal_rc") or consumer
+        lat = rc.get("latitude")
+        lon = rc.get("longitude")
+        if lat is not None and lon is not None and _config_ready_for_open_meteo():
+            from house_config.thermal_rc_profile import estimate_thermal_rc_annual_kwh
+
+            annual_kwh, _year = estimate_thermal_rc_annual_kwh(consumer)
+            return annual_kwh
+        return float(consumer.get("annual_kwh", 0.0) or 0.0)
     return float(consumer.get("annual_kwh", 0.0) or 0.0)
 
 

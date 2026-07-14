@@ -4,7 +4,11 @@ from __future__ import annotations
 import streamlit as st
 
 import config
-from integrations.loxone_connectivity import loxone_env_configured, verify_loxone_setup
+from integrations.loxone_connectivity import (
+    LoxoneCheck,
+    loxone_env_configured,
+    verify_loxone_setup,
+)
 from runtime_store.dotenv_io import validate_loxone_credentials, write_loxone_dotenv
 from runtime_store.dotenv_loader import load_app_dotenv
 from runtime_store.persist_paths import resolve_dotenv_path
@@ -48,21 +52,15 @@ def render_loxone_credentials_form(*, form_key: str = "loxone_setup_form") -> No
     st.rerun()
 
 
-def render_loxone_verify_results() -> None:
-    """Führt verify_loxone_setup aus und zeigt Ergebnisse (Sidebar/Expander)."""
+def run_loxone_setup_verify() -> tuple[bool, list[LoxoneCheck]]:
+    """Liest alle konfigurierten Loxone-Merker (wie scripts.verify_loxone_setup)."""
     if not loxone_env_configured():
-        st.caption("Zuerst Miniserver-Zugang speichern.")
-        return
-    if not st.button("Loxone-Merker testen", key="loxone_verify_button"):
-        return
+        raise ValueError("Loxone-Zugangsdaten fehlen.")
+    return verify_loxone_setup()
 
-    with st.spinner("Lese konfigurierte Merker vom Miniserver …"):
-        try:
-            ok, results = verify_loxone_setup()
-        except (FileNotFoundError, ValueError, KeyError) as exc:
-            st.error(f"Prüfung abgebrochen: {exc}")
-            return
 
+def display_loxone_verify_results(ok: bool, results: list[LoxoneCheck]) -> None:
+    """Zeigt Ergebnisse von run_loxone_setup_verify in Streamlit."""
     for item in results:
         target = f" ({item.io_name})" if item.io_name else ""
         line = f"**{item.label}**{target}: {item.detail}"
@@ -79,6 +77,24 @@ def render_loxone_verify_results() -> None:
             1 for item in results if not item.passed and item.severity != "warning"
         )
         st.error(f"{failed} von {len(results)} Prüfungen fehlgeschlagen.")
+
+
+def render_loxone_verify_results(*, button_key: str = "loxone_verify_button") -> None:
+    """Button + Anzeige für run_loxone_setup_verify (Sidebar/Expander)."""
+    if not loxone_env_configured():
+        st.caption("Zuerst Miniserver-Zugang speichern.")
+        return
+    if not st.button("Loxone-Merker testen", key=button_key):
+        return
+
+    with st.spinner("Lese konfigurierte Merker vom Miniserver …"):
+        try:
+            ok, results = run_loxone_setup_verify()
+        except (FileNotFoundError, ValueError, KeyError) as exc:
+            st.error(f"Prüfung abgebrochen: {exc}")
+            return
+
+    display_loxone_verify_results(ok, results)
 
 
 def render_loxone_setup_page() -> None:

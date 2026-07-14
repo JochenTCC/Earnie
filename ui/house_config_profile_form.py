@@ -32,6 +32,40 @@ _SESSION_CONSUMERS_KEY = "house_profile_consumers"
 _SESSION_SELECT_PENDING_KEY = "house_profile_select_pending"
 _SESSION_FILE_STAMP_KEY = "house_profile_file_stamp"
 
+_PASSTHROUGH_CONSUMER_KEYS = (
+    "loxone_inputs",
+    "loxone_outputs",
+    "legacy_id",
+    "optimizer_flex",
+    "thermal_flex_window",
+    "max_on_quarterhours",
+    "max_pulses_per_day",
+    "min_on_quarterhours",
+    "heating_power_threshold_kw",
+    "actual_temp_step_c",
+    "thermal_control",
+    "appliance_recommendation",
+    "profile_csv",
+)
+
+
+def _merge_passthrough_consumer_fields(original: dict, edited: dict) -> dict:
+    merged = dict(edited)
+    for key in _PASSTHROUGH_CONSUMER_KEYS:
+        if key not in original or key in merged:
+            continue
+        value = original[key]
+        merged[key] = dict(value) if isinstance(value, dict) else value
+    orig_sched = original.get("charging_schedule")
+    if isinstance(orig_sched, dict):
+        loxone = orig_sched.get("loxone")
+        if isinstance(loxone, dict):
+            sched = dict(merged.get("charging_schedule") or {})
+            if "loxone" not in sched:
+                sched["loxone"] = dict(loxone)
+                merged["charging_schedule"] = sched
+    return merged
+
 
 def _scoped_key(session_scope: str, base: str) -> str:
     return f"{session_scope}__{base}"
@@ -258,7 +292,7 @@ def _resolve_consumer_ids(consumers: list[dict], edited: list[dict]) -> list[dic
             consumer_id = stable_id
         else:
             consumer_id = slug_id(label or "verbraucher", existing=taken)
-        item = dict(item)
+        item = _merge_passthrough_consumer_fields(original, dict(item))
         item["id"] = consumer_id
         item["label"] = label or consumer_id
         taken.add(consumer_id)
@@ -390,7 +424,13 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
     return item
 
 
-def _inject_profile_geo(consumers: list[dict], latitude: float, longitude: float) -> list[dict]:
+def _inject_profile_geo(
+    consumers: list[dict],
+    latitude: float,
+    longitude: float,
+    *,
+    timezone_name: str | None = None,
+) -> list[dict]:
     enriched: list[dict] = []
     for consumer in consumers:
         item = dict(consumer)
@@ -398,6 +438,13 @@ def _inject_profile_geo(consumers: list[dict], latitude: float, longitude: float
             item = dict(item)
             item["latitude"] = latitude
             item["longitude"] = longitude
+        elif item.get("type") == "thermal_rc":
+            rc = dict(item.get("thermal_rc") or {})
+            rc["latitude"] = latitude
+            rc["longitude"] = longitude
+            if timezone_name:
+                rc["timezone_name"] = timezone_name
+            item["thermal_rc"] = rc
         enriched.append(item)
     return enriched
 
@@ -415,12 +462,12 @@ def _render_location_fields(*, session_scope: str) -> dict:
         format="%.4f",
         key=_scoped_key(session_scope, "house_profile_longitude"),
     )
+    timezone_name = "Europe/Vienna"
     try:
         from house_config.geo_timezone import lookup_timezone_name
 
-        st.caption(
-            f"Zeitzone (abgeleitet): **{lookup_timezone_name(float(latitude), float(longitude))}**"
-        )
+        timezone_name = lookup_timezone_name(float(latitude), float(longitude))
+        st.caption(f"Zeitzone (abgeleitet): **{timezone_name}**")
     except ValueError as exc:
         st.warning(str(exc))
     col_c, col_d = st.columns(2)
@@ -441,6 +488,7 @@ def _render_location_fields(*, session_scope: str) -> dict:
     return {
         "latitude": float(latitude),
         "longitude": float(longitude),
+        "timezone_name": timezone_name,
         "default_pv_tilt": float(default_pv_tilt),
         "default_pv_azimuth": float(default_pv_azimuth),
     }
@@ -941,6 +989,7 @@ def render_house_profile_tab() -> None:
         resolved,
         location["latitude"],
         location["longitude"],
+        timezone_name=str(location.get("timezone_name") or ""),
     )
     preview = preview_baseload(annual_kwh, resolved_for_preview)
     st.metric("Verbraucher-Summe (kWh/a)", f"{preview['consumer_kwh']:.0f}")
