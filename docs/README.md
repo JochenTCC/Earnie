@@ -14,7 +14,7 @@ Für Entwickler (Projektstruktur, Tests, Container) siehe [README.md](../README.
    python -m scripts.verify_loxone_setup
    ```
 5. **Produktivbetrieb starten:** `python main.py` (Optimierung im 15-Minuten-Takt).
-6. **Cockpit öffnen:** `python -m scripts.run_streamlit` (Port: `ui.streamlit_port` in config.json, Standard 8501)
+6. **Monitor öffnen:** `python -m scripts.run_streamlit` (Port: `ui.streamlit_port` in config.json, Standard 8501)
 
 Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `config/config.json` `"$schema": "./config.schema.json"` gesetzt ist.
 
@@ -39,8 +39,9 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 ### Benutzeroberfläche (Streamlit)
 
-- [Betriebsmodi & Navigation](ui/betriebsmodi.md) — Seitenstruktur, Cockpit (Sunset-2-Sunset), Scenario-Exploration
+- [Betriebsmodi & Navigation](ui/betriebsmodi.md) — Seitenstruktur, Monitor (Sunset-2-Sunset), Scenario-Exploration
 - [Charts & Panels](ui/charts.md) — Diagramme, Metriken, Sankey, Soll/Ist-Icons
+- [Loxone-Kommunikation](ui/loxone-kommunikation.md) — Debug-Seite: Live-Lesen, Schreib-Nachverfolgung (Cutover 1.99)
 
 ### Referenz
 

@@ -39,7 +39,7 @@ class PageSpec:
 
 
 def _planning_page_specs(*, house_config_default: bool) -> list[PageSpec]:
-    from ui.pages import page_house_config, page_live_environment, page_scenario_editor
+    from ui.pages import page_house_config, page_live_environment, page_loxone_debug, page_scenario_editor
 
     specs = [
         PageSpec(
@@ -61,14 +61,23 @@ def _planning_page_specs(*, house_config_default: bool) -> list[PageSpec]:
                 "scenario-editor",
             )
         )
-    specs.append(
-        PageSpec(
-            page_live_environment.render,
-            "Live-Konfiguration",
-            "⚡",
-            SECTION_ECHTZEIT,
-            "live-environment",
-        )
+    specs.extend(
+        [
+            PageSpec(
+                page_live_environment.render,
+                "Live-Konfiguration",
+                "⚡",
+                SECTION_ECHTZEIT,
+                "live-environment",
+            ),
+            PageSpec(
+                page_loxone_debug.render,
+                "Loxone-Kommunikation",
+                "🔗",
+                SECTION_ECHTZEIT,
+                "loxone-debug",
+            ),
+        ]
     )
     return specs
 
@@ -97,7 +106,7 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
             [
                 PageSpec(
                     page_cockpit.render,
-                    "Cockpit",
+                    "Monitor",
                     "🔋",
                     "Betrieb",
                     "cockpit",

@@ -21,7 +21,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending
 
+- [ ] **EV FertigUm when fully charged (plugged in)** — `fetch_loxone_charging_context` omits FertigUm when `actual_soc_name` reports charge complete; unplug re-reads FertigUm via absent forecast. Fix in `optimizer/charging_context.py`; tests `test_charging_context.py::TestPluggedInChargeComplete`.
+- [ ] **SoC BL Ziel segment before Jetzt (Chart 1)** — dotted baseline trace no longer extends into the quarter-hour before the Jetzt marker; anchored at log-SOC via `_anchor_baseline_soc_at_now` in `ui/chart_soc.py`; test `test_baseline_soc_has_no_points_before_now`.
 
 ## New Bugs (Do not remove this chapter — even if empty)
-
-- [ ] All data is missing when switching in Hauskonfigurator from Hausprofil to PV-Anlage (same with Batterien)

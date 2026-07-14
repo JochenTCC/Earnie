@@ -347,6 +347,34 @@ def _apply_soc_current_hour_ramps(
     return line_x, line_y
 
 
+def _anchor_baseline_soc_at_now(
+    line_x: pd.Series,
+    line_y: pd.Series,
+    chart_now: datetime | None,
+    soc_at_now: float | None,
+) -> tuple[pd.Series, pd.Series]:
+    """BL-Ziel beginnt am Jetzt-Marker — keine Spur davor."""
+    if chart_now is None or soc_at_now is None:
+        return line_x, line_y
+    ts_now = pd.Timestamp(chart_now)
+    kept: list[tuple[datetime, float]] = [(chart_now, float(soc_at_now))]
+    for x_val, y_val in zip(line_x, line_y):
+        if pd.Timestamp(x_val) <= ts_now:
+            continue
+        kept.append((pd.Timestamp(x_val).to_pydatetime(), float(y_val)))
+    kept.sort(key=lambda pair: pd.Timestamp(pair[0]))
+    merged: list[tuple[datetime, float]] = []
+    for point in kept:
+        if merged and pd.Timestamp(merged[-1][0]) == pd.Timestamp(point[0]):
+            merged[-1] = point
+        else:
+            merged.append(point)
+    if not merged:
+        return line_x, line_y
+    times, values = zip(*merged)
+    return _chart_time_series(list(times)), pd.Series(values, dtype=float)
+
+
 def _soc_hover_labels_for_times(
     times: pd.Series,
     uhrzeit: pd.Series,
@@ -593,20 +621,8 @@ def add_baseline_soc_traces(
                     matched_baseline_df.iloc[-1],
                     battery_params=battery_params,
                 )
-            ramp_before: tuple[datetime, float, datetime, float] | None = None
             ramp_after: tuple[datetime, float, datetime, float] | None = None
             if chart_now is not None:
-                ramp_before = _current_hour_soc_ramp_before_now(
-                    matched_axis,
-                    matched_baseline_df["Simulierter SoC (%)"],
-                    matched_baseline_df,
-                    chart_now,
-                    abs_start,
-                    abs_end,
-                    history_slot_count,
-                    y_at_now=soc_at_now,
-                    battery_params=battery_params,
-                )
                 ramp_after = _current_hour_soc_ramp(
                     matched_axis,
                     matched_baseline_df["Simulierter SoC (%)"],
@@ -631,7 +647,10 @@ def add_baseline_soc_traces(
             if matched_x.empty:
                 continue
             matched_x, matched_y = _apply_soc_current_hour_ramps(
-                matched_x, matched_y, ramp_before, ramp_after,
+                matched_x, matched_y, None, ramp_after,
+            )
+            matched_x, matched_y = _anchor_baseline_soc_at_now(
+                matched_x, matched_y, chart_now, soc_at_now,
             )
             hover_labels = _soc_hover_labels_for_times(
                 matched_x,

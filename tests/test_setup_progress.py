@@ -54,23 +54,19 @@ def test_render_deferred_loxone_sidebar_renders_expander_when_deferred(monkeypat
     assert sidebar.calls == [("Loxone-Zugang (Live / Silent-Modus)", True)]
 
 
-def test_render_deferred_loxone_sidebar_shows_verify_when_credentials_ready(monkeypatch):
+def test_render_deferred_loxone_sidebar_shows_hint_when_credentials_ready(monkeypatch):
     sidebar = _FakeSidebar()
-    verify_calls: list[object] = []
+    caption_calls: list[str] = []
     monkeypatch.setattr(setup_progress.st, "sidebar", sidebar)
     monkeypatch.setattr(setup_progress, "should_show_loxone_sidebar", lambda: True)
     monkeypatch.setattr(setup_progress, "loxone_credentials_configured", lambda: True)
     monkeypatch.setattr(setup_progress.st, "success", lambda _msg: None)
-    monkeypatch.setattr(
-        setup_progress,
-        "render_loxone_verify_results",
-        lambda **kwargs: verify_calls.append(kwargs),
-    )
+    monkeypatch.setattr(setup_progress.st, "caption", lambda msg: caption_calls.append(msg))
 
     setup_progress.render_deferred_loxone_sidebar()
 
     assert sidebar.calls == [("Loxone-Zugang (Live / Silent-Modus)", False)]
-    assert verify_calls == [{}]
+    assert any("Loxone-Kommunikation" in msg for msg in caption_calls)
 
 
 def test_render_setup_progress_notice_does_not_gate_loxone_sidebar(monkeypatch):

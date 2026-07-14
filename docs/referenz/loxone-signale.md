@@ -51,7 +51,7 @@ Zusätzlich Pflichtfeld **`min_power_kw`** am Verbraucher (untere Grenze für de
 |------------------|----------|----------|------|
 | `plugged_in_name` | Lesen | `EAuto_Angeschlossen` | `1` = angeschlossen |
 | `soc_at_plug_in_name` | Lesen | `EAuto_SOC_bei_Anschluss` | Rest-SOC, % |
-| `actual_soc_name` | Lesen | `Ernie-SOC-Ist-EAuto` | Aktueller SOC, % — bei 100 % gilt Ladung als abgeschlossen |
+| `actual_soc_name` | Lesen | `Ernie-SOC-Ist-EAuto` | Aktueller SOC, % — bei Erreichen von `target_soc_percent` gilt Ladung als abgeschlossen; solange das Auto angeschlossen ist, wird `ready_by_time_name` (FertigUm) dann ignoriert. Nach Abhängen wird FertigUm wieder ausgewertet (sofern nicht abgelaufen). |
 | `ready_by_time_name` | Lesen | `EAuto_FertigUm` | Text, z. B. Fertig-Uhrzeit |
 | `nominal_power_kw_name` | Lesen | `EAuto_MaxLeistung` | Max. Ladeleistung, kW (oder A → wird umgerechnet) |
 | `nominal_power_voltage_v` | Config | — | Nennspannung für A→kW (unter `charging_schedule` oder `charging_schedule.loxone`; Default 230 V) |

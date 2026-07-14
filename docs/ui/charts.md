@@ -1,8 +1,8 @@
 # Charts & Panels
 
-Gilt für die Seite **Cockpit** (Sunset-2-Sunset, `ui/simulation_results.py`, `ui/charts.py`, `ui/live_mode.py`). Modus-Übersicht: [Betriebsmodi](betriebsmodi.md). **Scenario-Exploration** nutzt teils dieselben Chart-Komponenten, eigene Kosten- und Monatscharts.
+Gilt für die Seite **Monitor** (Sunset-2-Sunset, `ui/simulation_results.py`, `ui/charts.py`, `ui/live_mode.py`). Modus-Übersicht: [Betriebsmodi](betriebsmodi.md). **Scenario-Exploration** nutzt teils dieselben Chart-Komponenten, eigene Kosten- und Monatscharts.
 
-## Seitenaufbau (Cockpit / Sunset-2-Sunset)
+## Seitenaufbau (Monitor / Sunset-2-Sunset)
 
 | Bereich | Inhalt |
 |---------|--------|
@@ -58,14 +58,14 @@ Entladen → Last ← verbleibende Entladung
 
 **PV im grauen Bereich:** Eine Prognose-Linie (Forecast.Solar-Wert **vor** Live-Overlay, Feld `forecast_pv_kw` im Log) über alle Zonen; PV-Balken (Flow-Balance ↑) nutzen im Log **Ist** (`PV-Ist (kW)` aus `consumption_snapshot.pv_kw`). Abweichung sichtbar ab dem nächsten Worker-Lauf nach dem Fix; ältere Log-Einträge können identische Werte haben (früher wurde Ist fälschlich als Prognose geloggt).
 
-**Legende (Cockpit Chart 1/2):** Plotly-`showlegend` ist aus; unter dem Chart ein ausklappbares HTML-`<details>` mit Farbfeldern auf allen Viewports (`ui/chart_legend_mobile.py`, `margin.b` = 0). Kein toter Legendenstreifen im Chart.
+**Legende (Monitor Chart 1/2):** Plotly-`showlegend` ist aus; unter dem Chart ein ausklappbares HTML-`<details>` mit Farbfeldern auf allen Viewports (`ui/chart_legend_mobile.py`, `margin.b` = 0). Kein toter Legendenstreifen im Chart.
 
 **Rechte Y-Achse (0–100, skaliert):**
 
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
 | SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/chart_colors.py`) | Simulierter Batterie-SOC |
-| SoC BL Ziel | Dieselbe Farbe, gestrichelt | Referenz-SOC (Baseline) |
+| SoC BL Ziel | Dieselbe Farbe, gestrichelt ab **Jetzt** (nicht davor) | Referenz-SOC (Baseline); Anker = Log-SOC am Jetzt-Marker |
 | Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 
 **Hintergrundzonen** (Details im **?** der Chart-1-Überschrift): grau = Vergangenheit (Log), neutral = laufende Stunde, grün = extrapolierte Preise bis Fensterrand.

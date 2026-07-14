@@ -11,6 +11,7 @@ from requests.auth import HTTPBasicAuth
 
 import config
 import logging
+from integrations.loxone_comm_trace import LoxoneWriteRecord
 from settings.ev_power import kw_from_nominal_reading
 from settings.flexible_consumers import runtime_consumer_id
 
@@ -587,6 +588,32 @@ def fetch_flexible_consumers_live_kw(
     ).kw
 
 
+def _send_loxone_value_traced(input_name: str, value: float) -> LoxoneWriteRecord:
+    """Sendet einen Steuerwert und liefert Erfolg plus Zeitstempel."""
+    io_name = str(input_name or "").strip()
+    written_at = datetime.now().isoformat(timespec="seconds")
+    if not io_name:
+        return LoxoneWriteRecord(io_name="", value=float(value), success=False, written_at=written_at)
+
+    url = f"http://{config.get('LOXONE_IP')}/dev/sps/io/{io_name}/{value}"
+    timeout_val = config.get_global_timeout(default=5)
+
+    try:
+        response = requests.get(
+            url,
+            auth=_loxone_auth(),
+            timeout=timeout_val,
+        )
+        response.raise_for_status()
+        print(f"   ↳ Loxone API: {io_name} erfolgreich auf {value} gesetzt.")
+        return LoxoneWriteRecord(io_name=io_name, value=float(value), success=True, written_at=written_at)
+    except requests.exceptions.Timeout:
+        print(f"🚨 Loxone-Fehler: Timeout ({timeout_val}s) beim Senden an {io_name}.")
+    except requests.exceptions.RequestException as e:
+        print(f"🚨 Loxone-Fehler: Fehler beim Senden an {io_name}: {e}")
+    return LoxoneWriteRecord(io_name=io_name, value=float(value), success=False, written_at=written_at)
+
+
 def send_loxone_value(input_name: str, value: float) -> bool:
     """
     Sendet einen berechneten Steuerwert an einen Virtuellen Eingang des Loxone Miniservers.
@@ -598,23 +625,7 @@ def send_loxone_value(input_name: str, value: float) -> bool:
     Returns:
         bool: True bei Erfolg, False bei Fehlern.
     """
-    url = f"http://{config.get('LOXONE_IP')}/dev/sps/io/{input_name}/{value}"
-    timeout_val = config.get_global_timeout(default=5)
-
-    try:
-        response = requests.get(
-            url,
-            auth=_loxone_auth(),
-            timeout=timeout_val,
-        )
-        response.raise_for_status()
-        print(f"   ↳ Loxone API: {input_name} erfolgreich auf {value} gesetzt.")
-        return True
-    except requests.exceptions.Timeout:
-        print(f"🚨 Loxone-Fehler: Timeout ({timeout_val}s) beim Senden an {input_name}.")
-    except requests.exceptions.RequestException as e:
-        print(f"🚨 Loxone-Fehler: Fehler beim Senden an {input_name}: {e}")
-    return False
+    return _send_loxone_value_traced(input_name, value).success
 
 
 def fetch_loxone_csv_file(local_path: str = "live_consumption.csv") -> Optional[str]:
@@ -863,16 +874,18 @@ def _write_flexible_consumer_output(
     consumer_pv_follow: dict[str, int] | None = None,
     *,
     send: bool,
-) -> None:
+) -> list[LoxoneWriteRecord]:
     """Schreibt Freigabe/kW-Sollwert/pv_follow an Loxone und/oder in den Snapshot."""
     values = _flexible_consumer_output_values(
         consumer, consumer_powers, charging_contexts, consumer_pv_follow
     )
+    records: list[LoxoneWriteRecord] = []
     if send:
         for io_name, value in values.items():
-            send_loxone_value(io_name, value)
+            records.append(_send_loxone_value_traced(io_name, value))
     if snapshot is not None:
         snapshot.update(values)
+    return records
 
 
 def build_sent_loxone_snapshot(
@@ -905,7 +918,9 @@ def build_sent_loxone_snapshot(
     return snapshot
 
 
-def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: float):
+def send_huawei_modbus_states(
+    mode: int, target_power_kw: float, target_soc: float
+) -> list[LoxoneWriteRecord]:
     """Übersetzt Optimierungsmodi und schreibt Huawei-Steuerwerte an Loxone."""
     charge_kw, discharge_kw, control_cmd = map_huawei_modbus_values(mode, target_power_kw)
 
@@ -917,23 +932,33 @@ def send_huawei_modbus_states(mode: int, target_power_kw: float, target_soc: flo
         control_cmd,
     )
 
-    send_loxone_value(config.get("LOXONE_TARGET_SOC_NAME"), target_soc)
-    send_loxone_value(config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw)
-    send_loxone_value(config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw)
-    send_loxone_value(config.get("LOXONE_CONTROL_CMD_NAME"), control_cmd)
+    records: list[LoxoneWriteRecord] = []
+    for cfg_name, value in (
+        (config.get("LOXONE_TARGET_SOC_NAME"), target_soc),
+        (config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw),
+        (config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
+        (config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
+    ):
+        if cfg_name:
+            records.append(_send_loxone_value_traced(str(cfg_name), float(value)))
+    return records
 
 
 def send_flexible_consumer_states(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,
     consumer_pv_follow: dict[str, int] | None = None,
-) -> None:
+) -> list[LoxoneWriteRecord]:
     """Sendet Freigabe (0/1), kW-Sollwert und optional pv_follow an Loxone."""
     contexts = charging_contexts or {}
+    records: list[LoxoneWriteRecord] = []
     for consumer in config.get_flexible_consumers(optimizer_only=True):
-        _write_flexible_consumer_output(
-            consumer, consumer_powers, contexts, None, consumer_pv_follow, send=True
+        records.extend(
+            _write_flexible_consumer_output(
+                consumer, consumer_powers, contexts, None, consumer_pv_follow, send=True
+            )
         )
+    return records
 
 
 def _read_optional_temp_c(io_name: str) -> float | None:

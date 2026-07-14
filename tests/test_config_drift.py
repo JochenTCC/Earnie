@@ -76,6 +76,27 @@ def test_find_config_drift_no_legacy_blocks_for_2_0_migrated_config():
     assert items == []
 
 
+def test_find_config_drift_ignores_legacy_blocks_when_example_stale_2_0_actual():
+    """Stale config.example.json (pre-2.0) must not drift against migrated live config."""
+    example = {
+        "eauto_milp": {"live_modus_a_min_remaining_kwh": 2.8},
+        "batteries": [{"id": "default_5kwh"}],
+        "pv_systems": [{"id": "roof_south"}],
+        "appliances": [{"id": "waschmaschine"}],
+        "system": {"global_timeout": 10, "loxone_silent_mode": True, "event_triggers": []},
+        "flexible_consumers": [],
+        "live_scenario_id": "live",
+    }
+    actual = {
+        "system": {"global_timeout": 10, "event_triggers": []},
+        "flexible_consumers": [],
+        "live_scenario_id": "live",
+    }
+
+    items = find_config_drift(example, actual)
+    assert items == []
+
+
 def test_repo_example_matches_silent_migration_config_shape():
     """Regression: migrated silent-migration config must not drift against config.example.json."""
     from pathlib import Path

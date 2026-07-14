@@ -37,7 +37,7 @@ logger = logging.getLogger("app")
 
 
 st.set_page_config(
-    page_title="Earnie Energy Control Center",
+    page_title="Earnie Monitor",
     page_icon="🔋",
     layout="wide",
 )

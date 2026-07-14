@@ -25,6 +25,7 @@
 | Haus Wärme | MILP-Puls-Timing vs. PWM-Referenz |
 | Chart 1 / Sankey | Alle Prod-Flex-Segmente sichtbar (Consumers P1) |
 | Geräte | WM/Trockner/GS-Segmente wenn **1.96d** migriert |
+| Loxone-Kommunikation | Seite **Echtzeit-Umgebung → Loxone-Kommunikation**: Live-Lesen OK, Schreibvorgänge erfolgreich (nur wenn Silent-Modus aus) — siehe [`docs/ui/loxone-kommunikation.md`](../ui/loxone-kommunikation.md) |
 
 ## Release
 

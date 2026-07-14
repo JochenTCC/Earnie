@@ -14,6 +14,18 @@ from .persist_paths import config_example_file, resolve_config_json_path
 _SKIP_KEYS = frozenset({"$schema"})
 _FLEXIBLE_CONSUMERS_KEY = "flexible_consumers"
 
+# In 2.0 these live in sidecars (components.json, house_profiles.json, local_settings.json).
+_LEGACY_ROOT_KEYS_RELOCATED_2_0 = frozenset({
+    "eauto_milp",
+    "batteries",
+    "pv_systems",
+    "appliances",
+    "runtime_settings",
+    "awattar",
+    "battery_wear",
+})
+_LEGACY_SYSTEM_KEYS_RELOCATED_2_0 = frozenset({"loxone_silent_mode"})
+
 
 @dataclass(frozen=True)
 class ConfigDriftItem:
@@ -90,10 +102,38 @@ def _find_missing_flexible_consumers(
     return missing
 
 
+def _is_2_0_migrated_config(actual: dict[str, Any]) -> bool:
+    return bool(str(actual.get("live_scenario_id", "") or "").strip())
+
+
+def _prepare_example_for_drift(
+    example: dict[str, Any],
+    actual: dict[str, Any],
+) -> dict[str, Any]:
+    """Drop example keys relocated to sidecars so stale config.example.json does not false-alarm."""
+    if not _is_2_0_migrated_config(actual):
+        return example
+    filtered = {
+        key: value
+        for key, value in example.items()
+        if key not in _LEGACY_ROOT_KEYS_RELOCATED_2_0
+    }
+    system = filtered.get("system")
+    if isinstance(system, dict):
+        filtered = dict(filtered)
+        filtered["system"] = {
+            key: value
+            for key, value in system.items()
+            if key not in _LEGACY_SYSTEM_KEYS_RELOCATED_2_0
+        }
+    return filtered
+
+
 def find_config_drift(
     example: dict[str, Any],
     actual: dict[str, Any],
 ) -> list[ConfigDriftItem]:
+    example = _prepare_example_for_drift(example, actual)
     return _find_missing_in_object(example, actual, prefix="")
 
 

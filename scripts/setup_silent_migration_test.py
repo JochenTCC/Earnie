@@ -24,6 +24,7 @@ DEFAULT_OUTPUT = ROOT / "silent-migration-test"
 
 _SCHEMA_FILES = (
     "config.schema.json",
+    "components.schema.json",
     "tariffs.schema.json",
     "house_profiles.schema.json",
     "backtesting_scenarios.schema.json",

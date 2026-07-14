@@ -9,6 +9,7 @@ from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
 config = load_config_or_exit()
 import logger_config
 from integrations import awattar_client, loxone_client
+from integrations.loxone_comm_trace import serialize_write_records
 from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption
 from data.feed_in_prices import k_push_act_for_matrix_row
 from runtime_store import run_state, optimization_history
@@ -222,13 +223,15 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "Silent-Modus: Steuerwerte (Huawei-Modbus, flexible Verbraucher) "
             "werden nicht an Loxone gesendet."
         )
+        loxone_writes: list[dict] | None = None
     else:
         logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
-        loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)
+        huawei_writes = loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)
         logger.info("📤 Sende flexible Verbraucher-Sollwerte an Loxone...")
-        loxone_client.send_flexible_consumer_states(
+        flex_writes = loxone_client.send_flexible_consumer_states(
             consumer_powers, charging_contexts, consumer_pv_follow
         )
+        loxone_writes = serialize_write_records(huawei_writes + flex_writes)
 
     if live_power is None:
         live_power = loxone_client.fetch_loxone_live_power()
@@ -319,6 +322,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
             "event_trigger_snapshot": event_trigger_snapshot,
             "loxone_sent": loxone_sent,
+            "loxone_writes": loxone_writes,
             "soc_percent": round(float(current_soc), 2),
             "pv_delta_kwh": round(float(pv_delta), 4),
             "market_price_cent": round(float(current_market_item["price_buy"]), 4),
@@ -375,11 +379,13 @@ if __name__ == "__main__":
     logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
     log_config_drift(logging.getLogger("main"))
     from scripts.startup_checks import (
+        run_live_scenario_entity_check_on_startup,
         run_loxone_verify_on_startup,
         run_tariff_plausibility_on_startup,
     )
 
     run_tariff_plausibility_on_startup()
+    run_live_scenario_entity_check_on_startup()
     run_loxone_verify_on_startup()
     try:
         ensure_single_instance("main")

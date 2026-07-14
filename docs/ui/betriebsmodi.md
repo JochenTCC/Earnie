@@ -6,11 +6,11 @@ Die Streamlit-App nutzt **`st.navigation`** mit Seiten in Abschnitten — **kein
 EARNIE_UI_MODES=sunset2sunset,scenario_exploration
 ```
 
-Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Cockpit**) und **Scenario-Exploration** zur Verfügung (optional **Preis-Prognose (Dev)**). Gültige Keys: `sunset2sunset`, `scenario_exploration`, `price_forecast` — **kein** Alias `live`, `historical` oder `backtesting`. Der frühere Key `backtesting` ist umbenannt; bei alter Env-Konfiguration erscheint ein Sidebar-Hinweis. Details zum Deployment: [Betrieb](../einrichtung/betrieb.md).
+Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monitor**) und **Scenario-Exploration** zur Verfügung (optional **Preis-Prognose (Dev)**). Gültige Keys: `sunset2sunset`, `scenario_exploration`, `price_forecast` — **kein** Alias `live`, `historical` oder `backtesting`. Der frühere Key `backtesting` ist umbenannt; bei alter Env-Konfiguration erscheint ein Sidebar-Hinweis. Details zum Deployment: [Betrieb](../einrichtung/betrieb.md).
 
 | Key | Seite | Abschnitt | Produktion |
 |-----|-------|-----------|------------|
-| `sunset2sunset` | **Cockpit** | Betrieb | ja (Hauptansicht) |
+| `sunset2sunset` | **Monitor** | Betrieb | ja (Hauptansicht) |
 | `scenario_exploration` | **Scenario-Exploration** | Analyse | optional (Dev) |
 | `price_forecast` | **Preis-Prognose (Dev)** | Analyse | Dev-only |
 
@@ -20,7 +20,7 @@ Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, 
 
 | Abschnitt | Seiten |
 |-----------|--------|
-| **Betrieb** | Cockpit, Manuelle Geräte |
+| **Betrieb** | Monitor, Manuelle Geräte |
 | **Analyse** | Scenario-Exploration (wenn freigeschaltet), Preis-Prognose (Dev), Verbraucheranalyse |
 | **Planung** | Hauskonfigurator, Szenarieneditor |
 | **Echtzeit-Umgebung** | Live-Konfiguration |
@@ -29,7 +29,7 @@ Während der Greenfield-Ersteinrichtung sind zunächst nur **Planung** und **Ech
 
 Spezifikation: [UI Sunset-2-Sunset](../spec/ui-sunset2sunset.md) (v0.6.2). Chart- und Panel-Details: [Charts & Panels](charts.md).
 
-## Sunset-2-Sunset (Seite Cockpit)
+## Sunset-2-Sunset (Seite Monitor)
 
 **Zweck:** Einheitliches Produktiv-Cockpit ohne Grenze zwischen Live und Historie. Vergangenheit aus dem Produktiv-Log (`optimization_history.jsonl`), Gegenwart und Vorausschau aus der Live-MILP — in zwei benachbarten Sonnenaufgang-Segmenten navigierbar.
 
@@ -111,7 +111,7 @@ Geplant (Dev-only): Nachrechnung eines beliebigen Kalendertags — ersetzt den f
 
 | Früher | Status |
 |--------|--------|
-| **Echtzeit** | Ersetzt durch **Sunset-2-Sunset** / Seite **Cockpit** |
+| **Echtzeit** | Ersetzt durch **Sunset-2-Sunset** / Seite **Monitor** |
 | **Historischer Tag** | Entfernt; Nachrechnung folgt in **Scenario-Exploration** (Dev-only) |
 | Button **Produktiv-Archiv** | Entfernt; Vergangenheit über ←-Navigation in SA-Zyklen |
 | Sidebar **Betriebsmodus** (Radio) | Entfernt; Seiten-Navigation über `st.navigation` |

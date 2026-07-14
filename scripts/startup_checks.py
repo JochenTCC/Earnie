@@ -94,6 +94,61 @@ def run_loxone_verify_on_startup() -> None:
     logger.error("%s Optimierung startet trotzdem.", message)
 
 
+def run_live_scenario_entity_check_on_startup() -> None:
+    """Prüft, dass das Live-Szenario Entitäts-IDs enthält (kein Bootstrap-Minimalstand)."""
+    from house_config.scenario_resolution import find_scenario_settings, get_live_scenario_id
+    from runtime_store.config_load import load_config_or_exit
+
+    config = load_config_or_exit()
+    raw = getattr(config, "_raw_config", None)
+    if not isinstance(raw, dict):
+        return
+    scenario_id = get_live_scenario_id(raw)
+    try:
+        settings = find_scenario_settings(
+            resolve_backtesting_scenarios_json_path(),
+            scenario_id,
+        )
+    except ValueError as exc:
+        logger.error(
+            "Live-Szenario-Startup-Prüfung: %s "
+            "Bitte backtesting_scenarios.json deployen "
+            "(scripts/deploy_silent_migration_to_nas.py).",
+            exc,
+        )
+        if _env_flag("STRICT_TARIFF_VALIDATE"):
+            raise SystemExit(1) from exc
+        return
+
+    missing = [
+        key
+        for key in (
+            "battery_id",
+            "pv_system_id",
+            "import_tariff_id",
+            "export_tariff_id",
+            "house_profile_id",
+        )
+        if not str(settings.get(key, "") or "").strip()
+    ]
+    if not missing:
+        logger.info(
+            "Live-Szenario-Startup-Prüfung: '%s' mit Entitäts-IDs vorhanden.",
+            scenario_id,
+        )
+        return
+
+    message = (
+        f"Live-Szenario '{scenario_id}' unvollständig (Bootstrap-Minimalstand?): "
+        f"fehlende IDs: {', '.join(missing)}. "
+        "Bitte scripts/deploy_silent_migration_to_nas.py ausführen."
+    )
+    if _env_flag("STRICT_TARIFF_VALIDATE"):
+        logger.error("%s Abbruch (EARNIE_STRICT_TARIFF_VALIDATE).", message)
+        raise SystemExit(1)
+    logger.error("%s Optimierung startet trotzdem.", message)
+
+
 def run_tariff_plausibility_on_startup() -> None:
     """
     Validiert tariffs.json und Szenario-Referenzen beim Worker-Start.
@@ -134,6 +189,7 @@ def main() -> int:
     cfg.reinit_config()
     logger_config.setup_logging(log_file=log_file(), level=logging.INFO)
     run_tariff_plausibility_on_startup()
+    run_live_scenario_entity_check_on_startup()
     run_loxone_verify_on_startup()
     return 0
 

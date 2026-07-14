@@ -31,7 +31,7 @@ Critical path before **1.99** P6b prod cutover: **1.95–1.97** ✓ → [Backlog
 _Completed → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.95 — Thermals P1 (2026-07-14)._
 
 
-### Version 1.96
+### Version 1.98
 
 _Completed → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.96 — Consumers P1 (2026-07-14)._
 
@@ -48,7 +48,7 @@ Silent-stack debug sessions (Hausconfig, Chart 1, `main.py` SwimSpa, config drif
 ### Version 1.99 — Live cutover (former P6b)
 
 - [ ] **P6b** — Non-silent NAS live cutover — Phase **1.99** in plan. **Prerequisite:** your sign-off after manual validation ([Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation); runbook [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md).
-- [ ] Set up debug page for Loxone communication showing read data with last update, whether data was sent to Loxone successfully (with value and timestamp — when silentmode==false)
+- Loxone debug page → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.99 — Loxone debug UI (2026-07-14).
 - [ ] File structure hygiene
   - Own directory for docker container stuff
   - Own directory for backlog stuff

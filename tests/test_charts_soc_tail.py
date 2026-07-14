@@ -330,6 +330,57 @@ def test_baseline_soc_meets_optimized_soc_at_now():
     assert bl_at_now[now] == pytest.approx(soc_at_now[now])
 
 
+def test_baseline_soc_has_no_points_before_now():
+    """SoC BL Ziel beginnt am Jetzt-Marker, nicht im vorherigen Viertel."""
+    import plotly.graph_objects as go
+
+    now = datetime(2026, 6, 15, 14, 37, tzinfo=_TZ)
+    slots = [
+        datetime(2026, 6, 15, 14, 0, tzinfo=_TZ),
+        datetime(2026, 6, 15, 14, 15, tzinfo=_TZ),
+        datetime(2026, 6, 15, 14, 30, tzinfo=_TZ),
+        datetime(2026, 6, 15, 14, 45, tzinfo=_TZ),
+        datetime(2026, 6, 15, 15, 0, tzinfo=_TZ),
+    ]
+    optimized_df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [40.0, 41.0, 60.0, 60.0, 60.0],
+        "Geplante Batterie-Aktion (kW)": [0.0, 2.0, 0.0, 0.0, 0.0],
+        "Preis extrapoliert": [False] * 5,
+    })
+    baseline_df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [55.0, 55.0, 70.0, 70.0, 70.0],
+        "Geplante Batterie-Aktion (kW)": [0.0] * 5,
+        "Preis extrapoliert": [False] * 5,
+    })
+    axis = ChartSlotAxis.from_dataframe(optimized_df)
+    history_slot_count = 2
+    soc_at_now = _soc_at_chart_now(
+        axis, optimized_df, now, history_slot_count,
+    )
+    fig = go.Figure()
+    add_baseline_soc_traces(
+        fig,
+        baseline_df,
+        history_slot_count=history_slot_count,
+        chart_now=now,
+        soc_at_now=soc_at_now,
+    )
+    bl_trace = next(trace for trace in fig.data if trace.name == "SoC BL Ziel")
+    xs = [
+        pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ)
+        for x in bl_trace.x
+    ]
+    first_milp = datetime(2026, 6, 15, 14, 30, tzinfo=_TZ)
+    assert first_milp not in xs
+    assert all(x >= now for x in xs)
+    assert xs[0] == now
+    assert bl_trace.y[0] == pytest.approx(soc_at_now)
+
+
 def test_battery_bar_times_nudged_past_slot_center():
     axis = _hourly_axis(1)
     bar_x = _battery_bar_times(axis, slice(None)).iloc[0]

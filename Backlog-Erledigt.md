@@ -3,6 +3,15 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 1.99 — Loxone debug UI (2026-07-14)
+
+Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — cutover validation tooling. Runbook [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md).
+
+- [x] **Loxone-Kommunikation debug page** — Streamlit page **Echtzeit-Umgebung → Loxone-Kommunikation**: live read table with timestamps (fragment refresh), last-run write trace (`loxone_writes` in `optimizer_run_state.json` when not silent; intended `loxone_sent` in silent mode); `integrations/loxone_comm_trace.py`, traced sends in `loxone_client.py` / `main.py` (`ui/loxone_debug.py`, `ui/pages/page_loxone_debug.py`, `ui/navigation.py`; tests `tests/test_loxone_debug.py`, `tests/test_main_loxone_writes.py`, `tests/test_loxone_client.py`, navigation tests)
+- [x] **Sidebar Merker test → debug page** — removed **Loxone-Merker testen** from sidebar expander; button on debug page; sidebar hint to **Loxone-Kommunikation** (`ui/setup_progress.py`, `ui/loxone_debug.py`; test `tests/test_setup_progress.py`)
+- [x] **User doc** — [`docs/ui/loxone-kommunikation.md`](docs/ui/loxone-kommunikation.md); TOC + cutover checklist cross-links
+
+
 ### Version 1.96 — Consumers P1 (2026-07-14)
 
 Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — Phase **1.96** (P1a–P1d) + **1.96d** silent-stack prod migration.

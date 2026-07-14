@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, time
 
 import config
 from integrations import loxone_client
+from optimizer.ev_soc_tracking import loxone_reports_charge_complete
 
 _LOXONE_WEEKDAY_NAMES = {
     "montag": 0,
@@ -310,6 +311,18 @@ def _loxone_inactive_context(source_label: str) -> dict:
     }
 
 
+def _loxone_plugged_in_complete_context() -> dict:
+    """Angeschlossen, Ladeziel erreicht (Ist-SOC) — FertigUm wird nicht verwendet."""
+    return {
+        "active": False,
+        "plugged_in": True,
+        "deadline": None,
+        "target_kwh": 0.0,
+        "use_time_window": False,
+        "source_label": "loxone (angeschlossen, Ladung abgeschlossen — FertigUm ignoriert)",
+    }
+
+
 def _loxone_absent_forecast_context(consumer: dict, horizon_start: datetime) -> dict:
     ready_raw = _loxone_ready_raw(consumer)
     loxone_deadline = parse_loxone_ready_by_time(ready_raw, horizon_start)
@@ -362,6 +375,8 @@ def fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> di
         if sched.get("forecast_when_absent"):
             return _loxone_absent_forecast_context(consumer, horizon_start)
         return _loxone_inactive_context("loxone (nicht angeschlossen)")
+    if loxone_reports_charge_complete(consumer):
+        return _loxone_plugged_in_complete_context()
     ready_raw = _loxone_ready_raw(consumer)
     deadline = parse_loxone_ready_by_time(ready_raw, horizon_start)
     soc_val = (

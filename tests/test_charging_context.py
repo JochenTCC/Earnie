@@ -34,6 +34,7 @@ def _eauto_consumer(*, forecast_when_absent: bool = True) -> dict:
                 "plugged_in_name": "Ernie_EAuto_Da",
                 "ready_by_time_name": "Ernie_EAuto_FertigUm",
                 "soc_at_plug_in_name": "Rest-SOC",
+                "actual_soc_name": "Ernie-SOC-Ist-EAuto",
                 "battery_capacity_kwh_name": "Batteriekapazität_E-Auto",
             },
         },
@@ -202,7 +203,7 @@ class TestLoxoneAbsentForecast:
       with patch.object(
           cc.loxone_client,
           "fetch_loxone_generic_value",
-          side_effect=[1, 50.0],
+          side_effect=[1, 50.0, 50.0],
       ), patch.object(
           cc.loxone_client,
           "fetch_loxone_raw_value",
@@ -214,7 +215,83 @@ class TestLoxoneAbsentForecast:
       assert ctx["plugged_in"] is True
       assert ctx.get("anticipated") is None
       assert ctx["use_time_window"] is False
+      assert ctx["deadline"] == datetime(2026, 6, 23, 7, 0)
       assert "angeschlossen" in ctx["source_label"]
+
+
+class TestPluggedInChargeComplete:
+  def test_plugged_in_full_soc_omits_fertig_um(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 6, 22, 17, 0)
+      with patch.object(
+          cc, "loxone_reports_charge_complete", return_value=True
+      ), patch.object(
+          cc.loxone_client,
+          "fetch_loxone_generic_value",
+          return_value=1,
+      ), _patch_eauto_capacity():
+          ctx = cc.fetch_loxone_charging_context(consumer, horizon)
+
+      assert ctx["active"] is False
+      assert ctx["plugged_in"] is True
+      assert ctx["deadline"] is None
+      assert ctx["target_kwh"] == 0.0
+      assert "abgeschlossen" in ctx["source_label"]
+      assert "FertigUm ignoriert" in ctx["source_label"]
+
+  def test_plugged_in_needs_charge_keeps_fertig_um(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 6, 22, 17, 0)
+      with patch.object(
+          cc, "loxone_reports_charge_complete", return_value=False
+      ), patch.object(
+          cc.loxone_client,
+          "fetch_loxone_generic_value",
+          side_effect=[1, 80.0, 50.0],
+      ), patch.object(
+          cc.loxone_client,
+          "fetch_loxone_raw_value",
+          return_value="Morgen, 07:00",
+      ), _patch_eauto_capacity():
+          ctx = cc.fetch_loxone_charging_context(consumer, horizon)
+
+      assert ctx["active"] is True
+      assert ctx["plugged_in"] is True
+      assert ctx["deadline"] == datetime(2026, 6, 23, 7, 0)
+      assert ctx["target_kwh"] is not None
+      assert ctx["target_kwh"] > 0
+
+  def test_unplug_after_complete_reactivates_fertig_um(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 6, 22, 17, 0)
+      with patch.object(
+          cc, "loxone_reports_charge_complete", return_value=True
+      ), patch.object(
+          cc.loxone_client,
+          "fetch_loxone_generic_value",
+          return_value=1,
+      ), _patch_eauto_capacity():
+          plugged_ctx = cc.fetch_loxone_charging_context(consumer, horizon)
+
+      assert plugged_ctx["active"] is False
+      assert plugged_ctx["deadline"] is None
+
+      with patch.object(
+          cc.loxone_client,
+          "fetch_loxone_generic_value",
+          return_value=0,
+      ), patch.object(
+          cc.loxone_client,
+          "fetch_loxone_raw_value",
+          return_value="Morgen, 16:03",
+      ), _patch_eauto_capacity():
+          absent_ctx = cc.fetch_loxone_charging_context(consumer, horizon)
+
+      assert absent_ctx["active"] is True
+      assert absent_ctx["anticipated"] is True
+      assert absent_ctx["plugged_in"] is False
+      assert absent_ctx["deadline"] == datetime(2026, 6, 23, 16, 3)
+      assert "FertigUm Loxone" in absent_ctx["source_label"]
 
 
 class TestEligibleIndices:

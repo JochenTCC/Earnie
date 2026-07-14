@@ -75,7 +75,7 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
     specs = build_page_specs(["scenario_exploration"])
     titles = [spec.title for spec in specs]
 
-    assert titles == ["Hauskonfigurator", "Live-Konfiguration"]
+    assert titles == ["Hauskonfigurator", "Live-Konfiguration", "Loxone-Kommunikation"]
 
 
 def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
@@ -122,7 +122,7 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
     specs = build_page_specs(["scenario_exploration"])
     titles = [spec.title for spec in specs]
 
-    assert titles == ["Hauskonfigurator", "Szenarieneditor", "Live-Konfiguration"]
+    assert titles == ["Hauskonfigurator", "Szenarieneditor", "Live-Konfiguration", "Loxone-Kommunikation"]
     assert "Scenario-Exploration" not in titles
 
 
