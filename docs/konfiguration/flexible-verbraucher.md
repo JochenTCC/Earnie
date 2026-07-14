@@ -44,9 +44,10 @@ Bei `daily_target_source: thermal` steuert das RC-Modell das Tagesenergieziel au
 | `thermal_control.setpoint_c` / `tolerance_c` | Soll-Temperatur und Band |
 | `thermal_control.water_volume_liters` | Wasservolumen |
 | `thermal_control.heat_loss_kw_per_k` | Wärmeverlust pro Kelvin |
-| `thermal_control.loxone` | Merker für Ist-/Soll-/Außentemperatur |
+| `thermal_control.loxone` | Merker für Ist-/Soll-/Außentemperatur und optional `heating_active_name` (binär, Fall B) |
+| `thermal_control.history_logs` | CSV-Pfade für Kalibrierung; optional `heating_active_csv` / `filter_active_csv` statt reiner Leistungsschwelle |
 
-Details in `config/config.example.json` und Schema.
+Bei SwimSpa **Fall B** (Gesamtzähler): `power_csv` = Gesamtleistung; Heizleistung für Kalibrierung/Backtest aus `heating_active_csv` (+ optional `filter_active_csv`) ableiten. Live: `heating_active_name` (`homie_bwa_spa_heating`). Details: [Loxone-Signale](../referenz/loxone-signale.md), [SwimSpa Filter](../spec/swimspa-filter.md).
 
 ## E-Auto: `charging_schedule`
 

@@ -938,7 +938,7 @@ def _read_optional_temp_c(io_name: str) -> float | None:
 
 def fetch_thermal_readings(consumer: dict) -> dict:
     """
-    Liest Ist-/Soll-/Außen-Temperatur und Toleranz für thermal_control.
+    Liest Ist-/Soll-/Außen-Temperatur, Toleranz und optional Heiz-Indikator für thermal_control.
     Config-Fallbacks werden nur genutzt, wenn der jeweilige Merker leer ist.
     """
     thermal = consumer.get("thermal_control") or {}
@@ -963,10 +963,20 @@ def fetch_thermal_readings(consumer: dict) -> dict:
         if thermal.get("tolerance_c") is None:
             missing.append("tolerance_c_name")
 
+    heating_active = None
+    heating_io = str(lox.get("heating_active_name", "") or "").strip()
+    if heating_io:
+        raw = fetch_loxone_generic_value(heating_io)
+        if raw is None:
+            missing.append("heating_active_name")
+        else:
+            heating_active = raw >= 0.5
+
     return {
         "actual_c": actual,
         "setpoint_c": setpoint,
         "ambient_c": ambient,
         "tolerance_c": tolerance,
+        "heating_active": heating_active,
         "missing_signals": missing,
     }

@@ -487,7 +487,7 @@
         "heating_power_threshold_kw": {
           "type": "number",
           "minimum": 0,
-          "description": "Leistungsschwelle in kW: Werte darüber gelten als Heizung (für Historien-Kalibrierung)."
+          "description": "Fallback-Leistungsschwelle in kW, wenn heating_active_csv fehlt: Werte darüber gelten als Heizung."
         },
         "actual_temp_step_c": {
           "type": "number",
@@ -500,17 +500,32 @@
           "properties": {
             "actual_temp_csv": { "type": "string" },
             "ambient_temp_csv": { "type": "string" },
-            "power_csv": { "type": "string" }
+            "power_csv": {
+              "type": "string",
+              "description": "Gesamtzähler kW (Fall B: Heizung + Filter + sonstige Lasten am selben Zähler)."
+            },
+            "heating_active_csv": {
+              "type": "string",
+              "description": "Optional: binärer Heiz-Indikator (0/1), z. B. homie_bwa_spa_heating — bevorzugt für Kalibrierung/Backtest."
+            },
+            "filter_active_csv": {
+              "type": "string",
+              "description": "Optional: binärer Filter-Indikator (0/1), z. B. homie_bwa_spa_filter2 — Filteranteil von Heizleistung abziehen."
+            }
           }
         },
         "loxone": {
           "type": "object",
-          "description": "Live-Temperaturen aus Loxone (Lesen). Einheiten werden abgeschnitten.",
+          "description": "Live-Temperaturen und Heiz-Indikator aus Loxone (Lesen). Einheiten werden abgeschnitten.",
           "properties": {
             "actual_temp_name": { "type": "string", "description": "Ist-Temperatur °C" },
             "setpoint_temp_name": { "type": "string", "description": "Soll-Temperatur °C" },
             "ambient_temp_name": { "type": "string", "description": "Umgebungs-/Außentemperatur °C (Live)" },
-            "tolerance_c_name": { "type": "string", "description": "Erlaubte Abweichung vom Soll in °C" }
+            "tolerance_c_name": { "type": "string", "description": "Erlaubte Abweichung vom Soll in °C" },
+            "heating_active_name": {
+              "type": "string",
+              "description": "Binärer Heiz-Indikator (0/1), z. B. homie_bwa_spa_heating — Fall B: Heizleistung nur wenn aktiv."
+            }
           }
         }
       }

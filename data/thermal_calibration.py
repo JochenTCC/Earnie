@@ -5,7 +5,7 @@ import math
 
 import pandas as pd
 
-from .loxone_csv_timeseries import load_hourly_series, load_power_hourly
+from data.thermal_power import load_thermal_history_merged
 from optimizer.thermal_model import capacity_kwh_per_k_from_volume
 
 
@@ -19,6 +19,7 @@ def estimate_heat_loss_kw_per_k(
     *,
     water_volume_liters: float,
     heating_power_threshold_kw: float,
+    filter_nominal_kw: float = 0.18,
     min_flat_hours: int = 12,
     min_samples: int = 20,
 ) -> tuple[float, dict]:
@@ -26,27 +27,23 @@ def estimate_heat_loss_kw_per_k(
     Schätzt U (kW/K) aus Abkühlphasen ohne Heizung.
     Returns (U, detail_dict).
     """
-    actual_path = history_logs.get("actual_temp_csv", "")
-    ambient_path = history_logs.get("ambient_temp_csv", "")
-    power_path = history_logs.get("power_csv", "")
-    if not actual_path or not ambient_path or not power_path:
-        raise ValueError(
-            "history_logs benötigt actual_temp_csv, ambient_temp_csv und power_csv für die Kalibrierung."
-        )
+    merged = load_thermal_history_merged(
+        history_logs,
+        heating_threshold_kw=heating_power_threshold_kw,
+        filter_nominal_kw=filter_nominal_kw,
+    )
+    attribution = merged.attrs.get("heating_attribution", "threshold")
 
-    ist = load_hourly_series(actual_path)
-    ambient = load_hourly_series(ambient_path)
-    power = load_power_hourly(power_path)
-    merged = pd.DataFrame({"ist": ist, "ambient": ambient, "power": power}).dropna()
-    if merged.empty:
-        raise ValueError("Keine überlappenden Stunden in den Historien-CSV-Dateien.")
-
-    merged["stuck"] = _mark_stuck_hours(merged["ist"], min_flat_hours)
+    merged["stuck"] = _mark_stuck_hours(merged["ist_c"], min_flat_hours)
     merged = merged[~merged["stuck"]].copy()
-    merged["dT"] = merged["ist"].diff()
+    merged["dT"] = merged["ist_c"].diff()
     merged["dt_h"] = merged.index.to_series().diff().dt.total_seconds() / 3600.0
+    if attribution == "indicator":
+        cooling_mask = merged["heating_kw"] <= 0.0
+    else:
+        cooling_mask = merged["power_kw"] < heating_power_threshold_kw
     cooling = merged[
-        (merged["power"] < heating_power_threshold_kw)
+        cooling_mask
         & (merged["dt_h"] == 1.0)
         & (merged["dT"] <= -0.25)
     ].copy()
@@ -54,7 +51,7 @@ def estimate_heat_loss_kw_per_k(
         raise ValueError("Keine geeigneten Abkühlphasen für die U-Schätzung gefunden.")
 
     capacity = capacity_kwh_per_k_from_volume(water_volume_liters)
-    cooling["deltaT"] = cooling["ist"] - cooling["ambient"]
+    cooling["deltaT"] = cooling["ist_c"] - cooling["ambient_c"]
     cooling = cooling[cooling["deltaT"] > 5.0]
     cooling["rate_k_per_h"] = cooling["dT"] / cooling["dt_h"]
     cooling["U"] = (-cooling["rate_k_per_h"] * capacity) / cooling["deltaT"]
@@ -75,5 +72,6 @@ def estimate_heat_loss_kw_per_k(
         "u_p75_kw_per_k": round(float(samples.quantile(0.75)), 5),
         "merged_hours": int(len(merged)),
         "cooling_events": int(len(cooling)),
+        "heating_attribution": attribution,
     }
     return u_value, detail

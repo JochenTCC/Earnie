@@ -246,6 +246,15 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
                 io_name = tlox.get(key, "")
                 if io_name:
                     checks.append((label, io_name, {}))
+            heating_name = tlox.get("heating_active_name", "")
+            if heating_name:
+                checks.append(
+                    (
+                        f"Verbraucher {cid} Heiz-Indikator",
+                        heating_name,
+                        {"validate": _binary_valid},
+                    )
+                )
 
     for trigger in config.get_event_triggers():
         label = trigger.get("label") or trigger["id"]

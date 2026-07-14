@@ -31,11 +31,12 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 | Lesen | `homie_bwa_spa_filter1durationhours` | Dauer natives Fenster in **Stunden** (Float) |
 | Lesen | `homie_bwa_spa_filter2` | Filter läuft (binär 0/1) → Ist-Leistung 0 / 0,18 kW |
 | Lesen | `homie_bwa_spa_filter1` | Autonome/native Filtersteuerung (binär 0/1) — Fallback wenn `filter2` = 0 |
+| Lesen | `homie_bwa_spa_heating` | Heizung aktiv (binär 0/1) — thermische Zuordnung auf Gesamtzähler (Fall B) |
 | Schreiben | `Ernie_Swimspa_Filter_Freigabe` | Earnie-Freigabe für **zusätzlichen** Filterlauf (`0`/`1`) |
 
 `homie_bwa_spa_filter2` erfasst jeden Filterlauf (nativ + Earnie) — für Logging, Soll-Ist und Delivery-Tracking.
 
-**Gemeinsame Leistungsmessung (Fall B, Live-Abnahme bestätigt):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistungsaufnahme des SwimSpa (Heizung **inkl.** Filter und sonstige Pumpen am selben Zähler). Die Chart-Spalte **SwimSpa** zeigt den **Rest** nach Abzug bekannter Binär-Lasten (Heizung + „Allgemein“ — weitere Pumpen nicht einzeln modelliert). Der Filter-Anteil (~0,18 kW) wird über `subtract_consumer_ids` abgezogen. Korrektur in `resolve_flexible_consumers_live_power` nur bei echtem Zählerwert (nicht MILP-Fallback). Invariante: `swimspa_ist + swimspa_filter_ist = Gesamtmessung`.
+**Gemeinsame Leistungsmessung (Fall B, Live-Abnahme bestätigt):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistungsaufnahme (Heizung, Filter, Jets/weitere Pumpen). Chart **SwimSpa** = Rest nach Abzug bekannter Binär-Lasten (Filter via `subtract_consumer_ids`). Thermisches Modell und Historien-Kalibrierung nutzen **`homie_bwa_spa_heating`** (live + optional `heating_active_csv`), nicht Leistungsschwelle allein. Korrektur in `resolve_flexible_consumers_live_power` nur bei echtem Zählerwert. Invariante Energiebilanz: `swimspa_ist + swimspa_filter_ist = Gesamtmessung`.
 
 ### Chart-Ist (seit v1.22.3)
 

@@ -42,6 +42,11 @@ def test_patch_is_idempotent(tmp_path: Path):
                             "power_name": "Ernie_Swim-Spa-P_act",
                             "subtract_consumer_ids": ["swimspa_filter"],
                         },
+                        "thermal_control": {
+                            "loxone": {
+                                "heating_active_name": "homie_bwa_spa_heating",
+                            },
+                        },
                     },
                     patch_mod.SWIMSPA_FILTER_BLOCK,
                 ]
@@ -88,6 +93,39 @@ def test_shared_meter_patch_idempotent(tmp_path: Path):
     ]
     assert patch_mod.patch_swimspa_shared_meter(consumers) is False
     assert consumers[0]["loxone_inputs"]["subtract_consumer_ids"] == ["swimspa_filter"]
+
+
+def test_patch_adds_heating_active_name_to_swimspa(tmp_path: Path):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "flexible_consumers": [
+                    {
+                        "id": "swimspa",
+                        "thermal_control": {"loxone": {}},
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    data = patch_mod._load_config(config_path)
+    assert patch_mod.patch_config(data) is True
+    loxone = data["flexible_consumers"][0]["thermal_control"]["loxone"]
+    assert loxone["heating_active_name"] == "homie_bwa_spa_heating"
+
+
+def test_heating_indicator_patch_idempotent():
+    consumers = [
+        {
+            "id": "swimspa",
+            "thermal_control": {
+                "loxone": {"heating_active_name": "homie_bwa_spa_heating"},
+            },
+        }
+    ]
+    assert patch_mod.patch_swimspa_heating_indicator(consumers) is False
 
 
 def test_patch_adds_native_filter_signal_to_swimspa_filter(tmp_path: Path):

@@ -110,7 +110,8 @@
                     "actual_temp_name": "homie_bwa_spa_currenttemperature",
                     "setpoint_temp_name": "SwimSpa_Temp_Soll",
                     "ambient_temp_name": "Außentemperatur",
-                    "tolerance_c_name": "SwimSpa_Max_Temp_Delta"
+                    "tolerance_c_name": "SwimSpa_Max_Temp_Delta",
+                    "heating_active_name": "homie_bwa_spa_heating"
                 }
             }
         },

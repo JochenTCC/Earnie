@@ -4,7 +4,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import config
 from data.outdoor_forecast import get_outdoor_forecast_with_fallback
+from data.thermal_power import resolve_live_heating_power_kw
 from integrations import loxone_client
 from optimizer.thermal_model import (
     ThermalBand,
@@ -43,6 +45,24 @@ def _resolve_heat_loss(thermal: dict) -> float:
     if configured < 0:
         raise ValueError("heat_loss_kw_per_k muss >= 0 sein.")
     return configured
+
+
+def _resolve_subtracted_filter_kw(consumer: dict) -> float:
+    subtract_ids = (consumer.get("loxone_inputs") or {}).get("subtract_consumer_ids") or []
+    if not subtract_ids:
+        return 0.0
+    total = 0.0
+    for sub_id in subtract_ids:
+        sub = next(
+            (c for c in config.get_flexible_consumers() if c.get("id") == sub_id),
+            None,
+        )
+        if sub is None:
+            continue
+        measured = loxone_client._read_consumer_meter_kw(sub)
+        if measured is not None:
+            total += float(measured)
+    return total
 
 
 def _build_thermal_plan(consumer: dict, *, horizon: int = 24):
@@ -156,6 +176,19 @@ def build_thermal_observability(
         snapshot["baseline_target_kwh"] = round(float(baseline_target_kwh), 3)
     if readings.get("missing_signals"):
         snapshot["missing_signals"] = readings["missing_signals"]
+    if readings.get("heating_active") is not None:
+        snapshot["readings_c"]["heating_active"] = readings["heating_active"]
+        total_kw = loxone_client._read_consumer_meter_kw(consumer)
+        heating_kw = resolve_live_heating_power_kw(
+            total_kw=total_kw,
+            filter_kw=_resolve_subtracted_filter_kw(consumer),
+            heating_active=readings["heating_active"],
+        )
+        if heating_kw is not None:
+            snapshot["readings_kw"] = {
+                "total": total_kw,
+                "heating": heating_kw,
+            }
     return snapshot
 
 

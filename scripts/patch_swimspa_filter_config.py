@@ -114,6 +114,20 @@ def patch_swimspa_shared_meter(consumers: list) -> bool:
     return False
 
 
+def patch_swimspa_heating_indicator(consumers: list) -> bool:
+    """Ergänzt homie_bwa_spa_heating als thermal_control.loxone.heating_active_name (idempotent)."""
+    for item in consumers:
+        if item.get("id") != "swimspa":
+            continue
+        thermal = item.setdefault("thermal_control", {})
+        loxone = thermal.setdefault("loxone", {})
+        if loxone.get("heating_active_name") == "homie_bwa_spa_heating":
+            return False
+        loxone["heating_active_name"] = "homie_bwa_spa_heating"
+        return True
+    return False
+
+
 def patch_config(data: dict) -> bool:
     consumers = data.get("flexible_consumers")
     if not isinstance(consumers, list):
@@ -123,7 +137,8 @@ def patch_config(data: dict) -> bool:
         data["flexible_consumers"] = patched
     meter_changed = patch_swimspa_shared_meter(data["flexible_consumers"])
     signal_changed = patch_native_filter_signal(data["flexible_consumers"])
-    return changed or meter_changed or signal_changed
+    heating_changed = patch_swimspa_heating_indicator(data["flexible_consumers"])
+    return changed or meter_changed or signal_changed or heating_changed
 
 
 def main() -> int:

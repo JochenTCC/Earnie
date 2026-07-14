@@ -73,6 +73,18 @@ Ergänzende Filterlaufzeit; nativer Duty-Cycle läuft unabhängig. Spec: [swimsp
 | `filter_schedule.loxone.native_start_hour_name` | Lesen | `homie_bwa_spa_filter1hour` | Start-Stunde natives Fenster (0–23) |
 | `filter_schedule.loxone.native_duration_hours_name` | Lesen | `homie_bwa_spa_filter1durationhours` | Dauer natives Fenster, **Stunden** (Float) |
 
+### SwimSpa Heizung — `thermal_control.loxone` (`swimspa`)
+
+Gemeinsamer Gesamtzähler (Fall B); Heizung wird über binären Indikator erkannt, nicht über separaten kW-Merker:
+
+| Config-Pfad | Richtung | Beispiel | Wert |
+|-------------|----------|----------|------|
+| `thermal_control.loxone.heating_active_name` | Lesen | `homie_bwa_spa_heating` | `0`/`1` — Heizung aktiv |
+| `thermal_control.history_logs.heating_active_csv` | Offline | Loxone-CSV-Export | Optional — bevorzugt für `tune_thermal_model` |
+| `thermal_control.history_logs.filter_active_csv` | Offline | Loxone-CSV-Export | Optional — Filteranteil von Heizleistung abziehen |
+
+Jets und weitere Pumpen am Gesamtzähler bleiben unmodelliert (Restlast). Filter weiterhin über `swimspa_filter` und `subtract_consumer_ids`.
+
 `verify_loxone_setup` prüft diese Merker, wenn `filter_schedule.enabled: true` bzw. `daily_target_source: loxone_remaining_hours`.
 
 ## Event-Trigger (`system.event_triggers`)
@@ -98,7 +110,7 @@ Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden)
 | `eauto` | `Ernie_EAuto_Ziel_kW` + `Ernie_EAuto_pv_follow` | `Ernie_EAuto_P_act` |
 | `waermepumpe` | `Ernie_WP_Freigabe` (0/1) | `Ernie_WP_P_act` |
 
-**Hinweis SwimSpa (Fall B):** `Ernie_Swim-Spa-P_act` misst Heizung **und** Filter am selben Zähler. Über `swimspa.loxone_inputs.subtract_consumer_ids: ["swimspa_filter"]` wird der Filter-Anteil vom Heizungs-Ist abgezogen (kein Doppelzählen in `flex_sum_kw`/`baseload_kw`).
+**Hinweis SwimSpa (Fall B):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistung (Heizung, Filter, Jets/weitere Pumpen). Filter-Anteil: `subtract_consumer_ids` + `homie_bwa_spa_filter*`. Heizung für thermisches Modell/Kalibrierung: `homie_bwa_spa_heating` (`thermal_control.loxone.heating_active_name`) — kein separater Heiz-kW-Merker in Loxone.
 
 ## Lesen vs. Schreiben in `main.py`
 

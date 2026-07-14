@@ -246,12 +246,19 @@ def normalize_thermal_control(raw: dict | None, consumer_id: str) -> dict | None
             "setpoint_temp_name",
             "ambient_temp_name",
             "tolerance_c_name",
+            "heating_active_name",
         ):
             if raw["loxone"].get(key):
                 loxone[key] = str(raw["loxone"][key]).strip()
     history_logs = {}
     if isinstance(raw.get("history_logs"), dict):
-        for key in ("actual_temp_csv", "ambient_temp_csv", "power_csv"):
+        for key in (
+            "actual_temp_csv",
+            "ambient_temp_csv",
+            "power_csv",
+            "heating_active_csv",
+            "filter_active_csv",
+        ):
             path = str(raw["history_logs"].get(key, "")).strip()
             if path:
                 history_logs[key] = path

@@ -4,6 +4,18 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 
 
+### SwimSpa case B — indicator-based attribution (2026-07-14)
+
+Backlog **1.94** — shared total meter + binary indicators (no separate Loxone heating-kW marker). Spec/docs: [swimspa-filter.md](docs/spec/swimspa-filter.md), [loxone-signale.md](docs/referenz/loxone-signale.md).
+
+- [x] **Decision documented** — keep `Ernie_Swim-Spa-P_act` (heating + filter + jets/other); filter via `homie_bwa_spa_filter*`, heating via `homie_bwa_spa_heating`; jets unmodelled residual
+- [x] **Live wiring** — `thermal_control.loxone.heating_active_name`, `fetch_thermal_readings`, thermal observability (`readings_kw.heating`), `verify_loxone_setup`; `patch_swimspa_filter_config` idempotent for heating indicator
+- [x] **Historical calibration** — `data/thermal_power.py`; `tune_thermal_model` / backtest prefer `heating_active_csv` (+ optional `filter_active_csv`); threshold fallback when indicator CSVs absent
+- [x] **Config/schema/docs** — `config.example.json`, `config.schema.json`, `flexible-verbraucher.md`
+- [x] **Migration notes** — Thermals P1 + real 2.0 binding table in `Backlog.md`
+
+
+
 ## EV: urgent rule, prod dump, PWM
 Related topics — prioritize and work through together.
 

@@ -63,7 +63,6 @@ $env:EARNIE_BACKTESTING_SCENARIOS_PATH = "greenfield/config/backtesting_scenario
 ## Feature Backlog
 
 
-
 Scenario Exploration consumption model → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-13). Spec: [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md).
 
 ### Version 1.93 — Unified scenario model (former backlog 2.0 P1–P7)
@@ -92,21 +91,12 @@ Critical path: **1.94–1.97** (especially **Consumers P1** + **Thermals P1** / 
 
 
 
-
-### Version 1.94
-
-- [ ] **SwimSpa case B — follow-up review historical power & Loxone separation**
-  - Check whether historical SwimSpa power logs (`thermal_control.history_logs.power_csv` = `..._SwimSpa_Leistung_...csv`, source `Ernie_Swim-Spa-P_act`) also contain the **filter share** (case B). If yes: assess impact on **thermal model calibration** (`heat_loss_kw_per_k` etc.) — filter (~0.18 kW) would be misinterpreted as heating power.
-  - **Fundamental question:** Should heating/filter separation happen **directly in Loxone** (separate heating power marker without filter) instead of software-side via `subtract_consumer_ids`? Advantage: consistent live **and** historical data at the source.
-  - Reference: case B correction (live actual) already implemented; thermal calibration see **Thermals P1** (Swim-Spa)
-
-
-
 ### Version 1.95
 
 - [ ] **Thermals P1** — Isolated single-node models
   - **Follow-up (1.26.0 P0 smoke, decision #11):** legacy RC / `thermal_control` models (SwimSpa, freezer, etc.) from `flexible_consumers` — not in 1.26.0 P3b
   - **Migrate existing consumers** — move prod entries from `config.json` → `flexible_consumers[]` into `house_profiles.json` (`profiles[].consumers[]`) where they belong in the planning model; keep live Loxone/MILP bindings explicit (no duplicate Hausprofil clutter); migration script or one-time cutover doc alongside new thermal schema (follow-up to **1.93 P6a** silent migration test)
+  - **SwimSpa Fall B bindings (from 1.94)** — preserve on bridged/migrated consumer: total meter `Ernie_Swim-Spa-P_act`, `subtract_consumer_ids: ["swimspa_filter"]`, separate `swimspa_filter` entry, `thermal_control.loxone.heating_active_name` (`homie_bwa_spa_heating`), optional `history_logs.heating_active_csv` / `filter_active_csv` for calibration; jets/other pumps remain unmodelled residual on shared meter
   - **Chart/Sankey gate:** **Consumers P1** must pass before prod cutover — bridged house-profile MILP-flex must remain visible in Chart 1 and Sankey (parity with today's prod `flexible_consumers[]` entries)
   - Variable heat paths (against infinity); replaces single-path special case in `optimizer/thermal_model.py`
   - **Freezer** (former 0.+1 Prio2) — second isolated reference model; acceptance: calibration/backtest against historical Loxone CSV logs
@@ -201,7 +191,17 @@ Critical path: **1.94–1.97** (especially **Consumers P1** + **Thermals P1** / 
 
 **Goal:** All legacy data model gone — prod `flexible_consumers[]` migrated into `house_profiles.json`; Chart 1 / Sankey / MILP use the house-profile bridge only; no `config.json` runtime entity fallbacks.
 
-**Prerequisite chain:** **1.93** (unified scenario + smoke-test closure) → **1.94–1.97** (SwimSpa review, **Consumers P1**, **Thermals P1** / **P1a**) → **1.99** P6b live cutover.
+**Loxone binding migration (SwimSpa + filter, from 1.94):** When moving `swimspa` / `swimspa_filter` into the house-profile bridge, carry over explicitly — do not re-derive from defaults:
+
+| Legacy `flexible_consumers[]` | House-profile / bridged MILP | Loxone / history |
+|------------------------------|------------------------------|------------------|
+| `swimspa` | thermal RC consumer + live flex | `Ernie_Swim-Spa-P_act` (total meter), `subtract_consumer_ids: ["swimspa_filter"]`, `thermal_control.loxone.heating_active_name`: `homie_bwa_spa_heating` |
+| `swimspa_filter` | separate MILP flex | `homie_bwa_spa_filter1/2`, `Ernie_Swimspa_Filter_*`, `filter_schedule` |
+| `thermal_control.history_logs` | same paths on migrated thermal block | `power_csv` = total meter; optional `heating_active_csv`, `filter_active_csv` for calibration |
+
+Jets/other loads on the shared meter stay **unmodelled** (residual); indicator-based heating attribution from **1.94** remains the contract for thermal calibration.
+
+**Prerequisite chain:** **1.93** (unified scenario + smoke-test closure) → **1.94–1.97** (SwimSpa indicator attribution ✓, **Consumers P1**, **Thermals P1** / **P1a**) → **1.99** P6b live cutover.
 
 **Release gate:** Propose `version.py` → **`2.0.0`** after **1.99** P6b acceptance (user approval). SemVer `2.0.0` marks the **real** 2.0 — not the former backlog **1.93 P1–P7** cycle.
 
@@ -257,7 +257,7 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 ### Version 2.+1 — Epics **Adaptation** & **Thermals** (architecture first)
 
-Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P2 → Thermals P3 → Adaptation P4** (precursors **SwimSpa case B**, **Consumers P1**, **Thermals P1**, **Thermals P1a** → **1.94–1.97**, before **1.99** live cutover / real 2.0)
+Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P2 → Thermals P3 → Adaptation P4** (precursors **Consumers P1**, **Thermals P1**, **Thermals P1a** → **1.95–1.97**, before **1.99** live cutover / real 2.0)
 
 - [ ] **Adaptation P1** — Generic adaptation model (skeleton)
   - Common structure for parameter adaptation of various forecast models:

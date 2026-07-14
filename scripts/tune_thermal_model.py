@@ -78,11 +78,19 @@ def main(argv: list[str] | None = None) -> int:
 
     thermal = consumer["thermal_control"]
     history_logs = thermal.get("history_logs") or {}
+    filter_nominal = 0.18
+    filter_consumer = next(
+        (c for c in config.get_flexible_consumers() if c.get("id") == "swimspa_filter"),
+        None,
+    )
+    if filter_consumer is not None:
+        filter_nominal = float(filter_consumer.get("nominal_power_kw", filter_nominal) or filter_nominal)
     try:
         u_calibrated, cal_detail = estimate_heat_loss_kw_per_k(
             history_logs,
             water_volume_liters=thermal["water_volume_liters"],
             heating_power_threshold_kw=thermal["heating_power_threshold_kw"],
+            filter_nominal_kw=filter_nominal,
         )
     except (OSError, ValueError) as exc:
         print(f"Kalibrierung fehlgeschlagen: {exc}", file=sys.stderr)
@@ -102,7 +110,11 @@ def main(argv: list[str] | None = None) -> int:
     }
 
     try:
-        merged = load_merged_history(history_logs)
+        merged = load_merged_history(
+            history_logs,
+            heating_threshold_kw=thermal["heating_power_threshold_kw"],
+            filter_nominal_kw=filter_nominal,
+        )
         report["backtest_configured"] = backtest_heat_loss_kw_per_k(
             merged,
             water_volume_liters=thermal["water_volume_liters"],
