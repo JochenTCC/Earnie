@@ -19,9 +19,9 @@ Scenario Exploration consumption model → [Backlog-Erledigt.md](Backlog-Erledig
 
 Version **1.93** (unified scenario model) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-14). **Live cutover (P6b)** → **1.99**.
 
-Recommended order: **1.95–1.96** legacy flex / thermal migration (**1.97** ✓) → **1.99** P6b live cutover → propose `version.py` → **`2.0.0`** (user approval; **real** 2.0 — legacy data model gone).
+Recommended order: **1.95–1.96** legacy flex / thermal migration (**1.96** ✓ · **1.97** ✓) → **1.99** P6b live cutover → propose `version.py` → **`2.0.0`** (user approval; **real** 2.0 — legacy data model gone).
 
-Critical path: **1.95–1.96** (especially **Consumers P1** + **Thermals P1**) before **1.99** P6b prod cutover — **1.97** ✓ → [Backlog-Erledigt.md](Backlog-Erledigt.md). Open bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+Critical path before **1.99** P6b prod cutover: **1.95–1.97** ✓ → [Backlog-Erledigt.md](Backlog-Erledigt.md). Open bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 **Implementation plan (1.95–1.99):** [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — prod consumer matrix, phased deliverables, acceptance, NAS cutover runbook. Track progress there; chapters below are index only.
 
@@ -33,8 +33,7 @@ _Completed → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.95 — Th
 
 ### Version 1.96
 
-- [ ] **Consumers P1** — Unified flex discovery (planning model → Chart 1 / Sankey) — Phase **1.96** in plan (P1a–P1d)
-- [ ] **1.96d prod migration** — run `migrate_flex_consumers` on NAS/silent stack; confirm `appliances[]` retired in prod config (code → [Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — suggested next steps)
+_Completed → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.96 — Consumers P1 (2026-07-14)._
 
 ### Execution of plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md)
 
@@ -46,12 +45,10 @@ Suggested next steps (SE progress, diag tooling, 1.96d code, cutover runbook) �
 
 Silent-stack debug sessions (Hausconfig, Chart 1, `main.py` SwimSpa, config drift) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Silent-stack debug sessions (2026-07-14). Open regressions → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
-- [ ] **Bugfix `config.reload` circular import** — `ev_profile` → `optimizer.charging_context` → `optimizer/__init__` → `config` breaks Streamlit fragments on `reload_runtime_config()` (countdown, Sankey); lazy import or move `hour_in_charging_window` out of optimizer package
-
 ### Version 1.99 — Live cutover (former P6b)
 
-- [ ] **P6b** — Non-silent NAS live cutover — Phase **1.99** in plan. **Prerequisite:** your sign-off after manual validation ([Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation); runbook [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md). Open migration: **1.96** / **1.96d prod**.
-- [ ] Set up debug page for Loxone communication showing read data with last update, whether data was sent to Loxone successfully (with value and ++++++++++++++++++++++++++++++++++++++++timestamp — when silentmode==false)
+- [ ] **P6b** — Non-silent NAS live cutover — Phase **1.99** in plan. **Prerequisite:** your sign-off after manual validation ([Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation); runbook [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md).
+- [ ] Set up debug page for Loxone communication showing read data with last update, whether data was sent to Loxone successfully (with value and timestamp — when silentmode==false)
 - [ ] File structure hygiene
   - Own directory for docker container stuff
   - Own directory for backlog stuff
@@ -63,7 +60,7 @@ Silent-stack debug sessions (Hausconfig, Chart 1, `main.py` SwimSpa, config drif
 
 **Goal:** Legacy data model gone — see plan end state and [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md).
 
-**Prerequisite chain:** **1.93** ✓ → **1.95–1.96** (+ **1.96d prod**) → **1.99** P6b → propose `version.py` **`2.0.0`** (user approval). **1.97** ✓ → [Backlog-Erledigt.md](Backlog-Erledigt.md).
+**Prerequisite chain:** **1.93** ✓ → **1.95–1.97** ✓ → **1.99** P6b → propose `version.py` **`2.0.0`** (user approval) → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
 - [ ] Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
 
@@ -114,7 +111,7 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 ### Version 2.+1 — Epics **Adaptation** & **Thermals** (architecture first)
 
-Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P2 → Thermals P3 → Adaptation P4** (precursors **Consumers P1**, **Thermals P1**, **Thermals P1a** → **1.95–1.97**; **P1a** ✓ Erledigt; before **1.99** live cutover / real 2.0)
+Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P2 → Thermals P3 → Adaptation P4** (precursors **Consumers P1**, **Thermals P1**, **Thermals P1a** → **1.95–1.97** ✓; before **1.99** live cutover / real 2.0)
 
 - [ ] **Adaptation P1** — Generic adaptation model (skeleton)
   - Common structure for parameter adaptation of various forecast models:

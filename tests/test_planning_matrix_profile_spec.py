@@ -217,10 +217,65 @@ def test_planning_ev_to_milp_matches_prod_shape():
     assert milp["daily_target_source"] == "config"
     assert milp["charging_schedule"]["enabled"] is True
     assert milp["battery_capacity_kwh"] == 40.0
-    assert "loxone" not in milp["charging_schedule"]
+    assert "loxone" not in EV_PROFILE["consumers"][0].get("charging_schedule", {})
+    assert milp["loxone_inputs"] == {}
     bridged = planning_ev_consumers(EV_PROFILE)
     assert len(bridged) == 1
     assert bridged[0]["charging_schedule"]["weekday"]["daily_rest_soc"] == 60.0
+
+
+def test_planning_ev_to_milp_copies_loxone_bindings_from_profile():
+    from house_config.planning_flex_bridge import planning_ev_to_milp
+
+    ev = {
+        "id": "ev",
+        "label": "Smart",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "min_on_quarterhours": 1,
+        "battery_capacity_kwh": 17.0,
+        "legacy_id": "eauto",
+        "charging_schedule": {
+            "target_soc_percent": 100.0,
+            "charging_efficiency": 0.95,
+            "weekday": {"car_available_from_hour": 18, "ready_by_hour": 7},
+            "weekend": {"car_available_from_hour": 20, "ready_by_hour": 12},
+            "loxone": {"plugged_in_name": "Ernie_EAuto_Da"},
+            "milp": {
+                "live_modus_a_min_remaining_kwh": 2.8,
+                "tie_break_on_epsilon": 0.001,
+                "tie_break_time_epsilon": 0.0001,
+            },
+        },
+        "loxone_inputs": {"power_name": "Ernie_EAuto_P_act"},
+        "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
+    }
+    milp = planning_ev_to_milp(ev)
+    assert milp["loxone_inputs"]["power_name"] == "Ernie_EAuto_P_act"
+    assert milp["loxone_outputs"]["power_setpoint_name"] == "Ernie_EAuto_Ziel_kW"
+    assert milp["charging_schedule"]["loxone"]["plugged_in_name"] == "Ernie_EAuto_Da"
+    assert milp["legacy_id"] == "eauto"
+    assert milp["charging_schedule"]["milp"]["live_modus_a_min_remaining_kwh"] == pytest.approx(2.8)
+
+
+def test_planning_ev_to_milp_requires_milp_when_power_setpoint_configured():
+    from house_config.planning_flex_bridge import planning_ev_to_milp
+
+    ev = {
+        "id": "ev",
+        "label": "Smart",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "min_on_quarterhours": 1,
+        "battery_capacity_kwh": 17.0,
+        "charging_schedule": {
+            "weekday": {"car_available_from_hour": 18, "ready_by_hour": 7},
+            "weekend": {"car_available_from_hour": 20, "ready_by_hour": 12},
+        },
+        "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
+    }
+    with pytest.raises(ValueError, match="charging_schedule.milp fehlt"):
+        planning_ev_to_milp(ev)
 
 
 def test_planning_ev_to_milp_preserves_power_conversion_config():

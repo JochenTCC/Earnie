@@ -93,7 +93,7 @@ def _house_ev_consumers(house_profile: dict) -> list[dict]:
 
 
 def planning_ev_to_milp(consumer: dict) -> dict:
-    """Hausprofil-EV → flexible_consumers-Shape für MILP (ohne Loxone)."""
+    """Hausprofil-EV → flexible_consumers-Shape für MILP; Live-Loxone aus Profil."""
     sched = consumer["charging_schedule"]
     min_on = max(1, int(consumer.get("min_on_quarterhours", 4) or 4))
     min_power = float(consumer.get("min_power_kw", 0.0) or 0.0)
@@ -110,6 +110,9 @@ def planning_ev_to_milp(consumer: dict) -> dict:
         },
         sched,
     )
+    sched_loxone = sched.get("loxone")
+    if isinstance(sched_loxone, dict) and sched_loxone:
+        charging_schedule["loxone"] = dict(sched_loxone)
     milp_raw = sched.get("milp")
     if isinstance(milp_raw, dict) and milp_raw:
         charging_schedule["milp"] = dict(milp_raw)
@@ -132,6 +135,19 @@ def planning_ev_to_milp(consumer: dict) -> dict:
         "loxone_target_kwh_name": "",
         "loxone_target_hours_name": "",
     }
+    loxone_inputs = consumer.get("loxone_inputs")
+    if isinstance(loxone_inputs, dict) and loxone_inputs:
+        result["loxone_inputs"] = dict(loxone_inputs)
+    loxone_outputs = consumer.get("loxone_outputs")
+    if isinstance(loxone_outputs, dict) and loxone_outputs:
+        result["loxone_outputs"] = dict(loxone_outputs)
+    setpoint_name = str((result.get("loxone_outputs") or {}).get("power_setpoint_name", "")).strip()
+    if setpoint_name and not charging_schedule.get("milp"):
+        raise ValueError(
+            f"Hausprofil-EV '{consumer['id']}': charging_schedule.milp fehlt "
+            "(live_modus_a_min_remaining_kwh, tie_break_on_epsilon, tie_break_time_epsilon) — "
+            "Pflicht bei loxone_outputs.power_setpoint_name."
+        )
     legacy_id = normalize_legacy_id(consumer, str(consumer["id"]))
     if legacy_id:
         result["legacy_id"] = legacy_id
