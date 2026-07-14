@@ -126,3 +126,29 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
     reinit_config()
     with pytest.raises(KeyError, match="waschmaschine"):
         config.update_appliance_defaults("waschmaschine", power_kw=2.0, runtime_h=2.0)
+
+
+def test_recommendation_appliances_from_house_profile():
+    from settings.appliances import recommendation_appliances_from_profile
+
+    profile = {
+        "id": "example_efh",
+        "consumers": [
+            {
+                "id": "waschmaschine",
+                "label": "Waschmaschine",
+                "type": "generic",
+                "nominal_power_kw": 2.0,
+                "appliance_recommendation": {
+                    "power_source": "manual",
+                    "default_power_kw": 2.0,
+                    "default_runtime_h": 2.0,
+                },
+            }
+        ],
+    }
+    appliances = recommendation_appliances_from_profile(profile)
+    assert len(appliances) == 1
+    assert appliances[0]["id"] == "waschmaschine"
+    assert appliances[0]["name"] == "Waschmaschine"
+    assert appliances[0]["default_runtime_h"] == 2.0

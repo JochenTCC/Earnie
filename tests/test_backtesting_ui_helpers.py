@@ -7,6 +7,10 @@ import os
 from datetime import date
 
 from scripts.run_backtesting import BACKTESTING_YEAR, _write_progress_file
+from simulation.backtesting_progress import (
+    read_progress_snapshot,
+    worker_progress_path,
+)
 from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
 from ui.backtesting import (
     horizon_selection_stale,
@@ -177,6 +181,22 @@ def test_write_progress_file_falls_back_on_windows_replace_error(monkeypatch, tm
     assert replace_calls["count"] == 3
     loaded = read_progress_file(path)
     assert loaded == payload
+
+
+def test_read_progress_snapshot_aggregates_worker_files(tmp_path):
+    progress_dir = str(tmp_path / ".backtesting_progress")
+    _write_progress_file(
+        worker_progress_path(progress_dir, "runtime"),
+        {"current": 3, "total": 10, "scenario": "Runtime", "phase": "simulation"},
+    )
+    _write_progress_file(
+        worker_progress_path(progress_dir, "fixed"),
+        {"current": 7, "total": 10, "scenario": "Fix", "phase": "simulation"},
+    )
+    snapshot = read_progress_snapshot(progress_dir)
+    assert set(snapshot) == {"Runtime", "Fix"}
+    assert snapshot["Runtime"]["current"] == 3
+    assert snapshot["Fix"]["current"] == 7
 
 
 def test_run_backtesting_module_import_does_not_force_offline(monkeypatch):

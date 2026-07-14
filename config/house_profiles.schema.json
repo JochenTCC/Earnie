@@ -19,6 +19,16 @@
                 "start_shift_h": { "type": "number", "minimum": 0, "maximum": 12 }
             }
         },
+        "appliance_recommendation": {
+            "type": "object",
+            "description": "Empfehlungsmodus (Waschmaschine/Trockner/GS) — 1.96d",
+            "properties": {
+                "power_source": { "enum": ["loxone", "manual"] },
+                "loxone_power_name": { "type": "string" },
+                "default_power_kw": { "type": "number", "minimum": 0 },
+                "default_runtime_h": { "type": "number", "exclusiveMinimum": 0 }
+            }
+        },
         "day_schedule": {
             "type": "object",
             "properties": {
@@ -90,6 +100,7 @@
                 "annual_kwh": { "type": "number" },
                 "profile_csv": { "type": "string" },
                 "schedule": { "$ref": "#/definitions/schedule" },
+                "appliance_recommendation": { "$ref": "#/definitions/appliance_recommendation" },
                 "min_power_kw": { "type": "number", "minimum": 0 },
                 "min_on_quarterhours": { "type": "integer", "minimum": 0 },
                 "battery_capacity_kwh": { "type": "number", "exclusiveMinimum": 0 },

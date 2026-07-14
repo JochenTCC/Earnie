@@ -64,8 +64,9 @@ def render() -> None:
     appliances = config.get_appliances()
     if not appliances:
         st.info(
-            "Keine manuellen Geräte konfiguriert — 'appliances'-Block in "
-            "config.json ergänzen (siehe config.example.json)."
+            "Keine manuellen Geräte konfiguriert — type:generic mit "
+            "appliance_recommendation im Hausprofil oder Legacy-Block "
+            "'appliances' in config.json (siehe config.example.json)."
         )
         return
     st.caption(

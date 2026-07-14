@@ -49,6 +49,34 @@ def test_migrate_prod_consumers_places_thermal_annual_first():
     assert consumers[0]["id"] == "wp_heating"
 
 
+def test_migrate_prod_consumers_unifies_appliances_into_profile():
+    config = {
+        **_legacy_config(),
+        "appliances": [
+            {
+                "id": "waschmaschine",
+                "name": "Waschmaschine",
+                "power_source": "manual",
+                "default_power_kw": 2.0,
+                "default_runtime_h": 2.0,
+            }
+        ],
+    }
+    migrated_config, profiles, status = migrate_prod_consumers(
+        config,
+        {"profiles": [{"id": "example_efh", "consumers": []}]},
+    )
+    assert "appliances" not in migrated_config
+    wm = next(
+        consumer
+        for consumer in profiles["profiles"][0]["consumers"]
+        if consumer["id"] == "waschmaschine"
+    )
+    assert wm["type"] == "generic"
+    assert wm["appliance_recommendation"]["power_source"] == "manual"
+    assert any(row.get("status") == "retired-config-block" for row in status)
+
+
 def test_migrate_prod_consumers_is_idempotent():
     config, profiles, _ = migrate_prod_consumers(
         _legacy_config(),

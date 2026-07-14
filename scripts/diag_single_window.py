@@ -112,11 +112,12 @@ def _load_anchor_by_hour_offset(
     resolve_backtesting_window,
     HistoricalDataCache,
     list_simulation_anchors,
+    backtesting_year: int,
 ) -> tuple[datetime, int, list[datetime]]:
     sim_cfg = config.get_file_paths_battery_simulation()
     start, end = resolve_backtesting_window(
-        pd.Timestamp(2025, start_month, 1),
-        pd.Timestamp(2025, end_month, 1),
+        pd.Timestamp(backtesting_year, start_month, 1),
+        pd.Timestamp(backtesting_year, end_month, 1),
         sim_cfg.get("price_range", "last_12_months"),
         sim_cfg["path_consumption"],
         sim_cfg["path_production"],
@@ -428,7 +429,7 @@ def main() -> None:
 
     config = load_config_or_exit()
     from data.data_loader import load_market_prices
-    from scripts.run_backtesting import resolve_backtesting_window
+    from scripts.run_backtesting import BACKTESTING_YEAR, resolve_backtesting_window
     from simulation.engine import (
         HistoricalDataCache,
         _flexible_consumers_from_scenario,
@@ -452,6 +453,7 @@ def main() -> None:
             resolve_backtesting_window=resolve_backtesting_window,
             HistoricalDataCache=HistoricalDataCache,
             list_simulation_anchors=list_simulation_anchors,
+            backtesting_year=BACKTESTING_YEAR,
         )
         print(
             f"Fortschritt {args.hour_offset}/{len(anchors) * 24} h "

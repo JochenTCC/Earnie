@@ -41,6 +41,11 @@ from simulation.engine import (
     window_anchor_for_date,
     window_slot_datetimes,
 )
+from simulation.backtesting_progress import (
+    clear_progress_dir,
+    prepare_progress_dir,
+    worker_progress_path,
+)
 from simulation.horizon_mode import (
     DEFAULT_HORIZON_MODE,
     FIXED_24H,
@@ -205,7 +210,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--progress-file",
         metavar="PFAD",
-        help="JSON-Datei für UI-Fortschritt (current/total/scenario/phase).",
+        help=(
+            "Fortschrittsverzeichnis für UI (pro Worker eine JSON-Datei); "
+            "Legacy: einzelne *.json-Datei → Sibling .backtesting_workers/."
+        ),
     )
     return parser
 
@@ -265,8 +273,9 @@ def _run_scenario_worker(
     )
     snapshots: list[dict] = []
     display = progress_label or name
+    worker_path = worker_progress_path(progress_file, name)
     on_progress = (
-        _make_progress_printer(display, progress_file) if progress_file else None
+        _make_progress_printer(display, worker_path) if worker_path else None
     )
     df_result, plausibility, cbc_events = run_simulation(
         start,
@@ -675,8 +684,9 @@ def main(argv: list[str] | None = None):
     total_hours = len(anchors) * 24
 
     if progress_file:
+        prepare_progress_dir(progress_file)
         _write_progress_file(
-            progress_file,
+            worker_progress_path(progress_file, "_reference"),
             {
                 "current": 0,
                 "total": total_hours,
@@ -724,7 +734,10 @@ def main(argv: list[str] | None = None):
                 params,
                 prices,
                 cache=cache,
-                on_progress=_make_progress_printer(display, progress_file),
+                on_progress=_make_progress_printer(
+                    display,
+                    worker_progress_path(progress_file, name),
+                ),
                 scenario_id=name,
                 horizon_mode=horizon_mode,
                 price_resources=price_resources,
@@ -796,7 +809,7 @@ def main(argv: list[str] | None = None):
         window_snapshots=window_snapshots,
     )
     if progress_file:
-        Path(progress_file).unlink(missing_ok=True)
+        clear_progress_dir(progress_file)
     print(f"\nBacktesting-Log gespeichert: {log_path}")
 
 

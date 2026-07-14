@@ -110,6 +110,15 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     if consumer_type == "generic":
         spec["schedule"] = _normalize_schedule(raw.get("schedule"), consumer=raw)
         spec["annual_kwh"] = generic_annual_kwh(spec)
+        rec = raw.get("appliance_recommendation")
+        if isinstance(rec, dict):
+            from settings import appliances as appliance_settings
+
+            spec["appliance_recommendation"] = appliance_settings.normalize_appliance_recommendation_block(
+                rec,
+                consumer_id=consumer_id,
+                nominal_power_kw=spec["nominal_power_kw"],
+            )
     elif consumer_type == "ev":
         battery_capacity = float(raw.get("battery_capacity_kwh", 0.0) or 0.0)
         if battery_capacity <= 0:

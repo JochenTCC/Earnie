@@ -200,27 +200,31 @@ def _execute_backtesting_run(
     progress_file = default_progress_file_path()
 
     with st.status(status_label, expanded=True) as status:
-        progress_bar = st.progress(0.0)
-        progress_caption = st.empty()
-        if workers > 1:
-            progress_caption.caption(
-                f"Parallele Berechnung: {workers} Worker für {scenario_count} Szenarien "
-                "(Fortschritt zeigt das aktuell laufende Szenario)."
-            )
+        progress_host = st.empty()
 
-        def _on_progress(progress: dict) -> None:
-            total = int(progress.get("total") or 0)
-            current = int(progress.get("current") or 0)
-            scenario = str(progress.get("scenario") or "")
-            phase = str(progress.get("phase") or "")
-            if total > 0:
-                progress_bar.progress(min(current / total, 1.0))
-            if phase == "reference":
-                progress_caption.caption(f"Referenz: {scenario}")
-            elif total > 0:
-                progress_caption.caption(f"{scenario}: {current}/{total} h")
-            else:
-                progress_caption.caption(scenario or "Szenarien-Explorer läuft…")
+        def _on_progress(snapshot: dict) -> None:
+            if not snapshot:
+                return
+            with progress_host.container():
+                if workers > 1:
+                    st.caption(
+                        f"Parallele Berechnung: {workers} Worker · "
+                        f"{len(snapshot)} aktive Szenarien"
+                    )
+                for scenario in sorted(snapshot):
+                    progress = snapshot[scenario]
+                    total = int(progress.get("total") or 0)
+                    current = int(progress.get("current") or 0)
+                    phase = str(progress.get("phase") or "")
+                    if total > 0:
+                        st.caption(scenario)
+                        st.progress(min(current / total, 1.0))
+                        if phase == "reference":
+                            st.caption(f"{scenario}: Referenz")
+                        else:
+                            st.caption(f"{scenario}: {current}/{total} h")
+                    else:
+                        st.caption(scenario or "Szenarien-Explorer läuft…")
 
         exit_code, output = run_backtesting_subprocess(
             start_month=start_month,
@@ -231,7 +235,6 @@ def _execute_backtesting_run(
             on_progress=_on_progress,
         )
         if exit_code == 0:
-            progress_bar.progress(1.0)
             status.update(label="Szenarien-Explorer abgeschlossen", state="complete")
             load_backtesting_data.clear()
             st.rerun()

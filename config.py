@@ -481,10 +481,20 @@ class Config:
         return consumers
 
     def get_appliances(self) -> list[dict]:
-        """Manuelle Geräte für den Empfehlungsmodus (rein beratend, kein MILP)."""
-        return appliance_settings.normalize_appliance_list(
-            self._raw_config.get("appliances", [])
-        )
+        """Manuelle Geräte für den Empfehlungsmodus (Hausprofil, Fallback config appliances[])."""
+        resolved = self.get_resolved_runtime_settings()
+        profile = resolved.get("_house_profile")
+        if isinstance(profile, dict):
+            profile_appliances = appliance_settings.recommendation_appliances_from_profile(
+                profile
+            )
+            if profile_appliances:
+                return profile_appliances
+        legacy = self._raw_config.get("appliances")
+        if isinstance(legacy, list) and legacy:
+            appliance_settings.warn_legacy_appliances_block()
+            return appliance_settings.normalize_appliance_list(legacy)
+        return []
 
     def update_appliance_defaults(
         self,
@@ -494,6 +504,25 @@ class Config:
         runtime_h: float,
     ) -> None:
         """Persistiert Nennleistung und Laufzeit-Vorbelegung für ein manuelles Gerät."""
+        resolved = self.get_resolved_runtime_settings()
+        profile = resolved.get("_house_profile")
+        profile_id = str((profile or {}).get("id", "")).strip()
+        if profile_id and isinstance(profile, dict):
+            consumers = profile.get("consumers") or []
+            if any(
+                isinstance(item, dict)
+                and str(item.get("id", "")).strip() == appliance_id
+                and isinstance(item.get("appliance_recommendation"), dict)
+                for item in consumers
+            ):
+                appliance_settings.update_appliance_defaults_in_house_profile(
+                    self.house_profiles_path,
+                    profile_id,
+                    appliance_id,
+                    power_kw=power_kw,
+                    runtime_h=runtime_h,
+                )
+                return
         self._raw_config = appliance_settings.update_appliance_defaults_in_file(
             self.config_path,
             appliance_id,

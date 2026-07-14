@@ -3,6 +3,21 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Research items (2026-07-14)
+
+- [x] **Review Smart Energy app** for comparison
+- [x] **Review other providers** with flexible prices
+
+
+### Version 1.97 — Thermals P1a (2026-07-14)
+
+Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — Phase **1.97**.
+
+- [x] **Haus Wärme MILP flex bridge** — `planning_thermal_to_milp`, `thermal_annual` daily targets, pulse constraints (`optimizer/thermal_flex_context.py`, `house_config/planning_flex_bridge.py`)
+- [x] **Retire prod `waermepumpe`** from `flexible_consumers[]` — `wp_heating` + `legacy_id: waermepumpe` via `migrate_flex_consumers`
+- [x] **Tests** — `tests/test_thermal_flex_bridge.py`, `tests/test_price_pipeline_p3.py`
+
+
 ### NAS migration plan — manual validation (2026-07-14)
 
 Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — execution block *Validation* (greenfield / Scenario Exploration).
@@ -26,6 +41,16 @@ Full-year Scenario Exploration (`live`, greenfield): sole MILP failure on **2026
 
 - [x] **Agent skill** — `.cursor/skills/windows-unicode-console/SKILL.md` (`PYTHONIOENCODING` / `PYTHONUTF8` before shell Python on Windows)
 - [x] **pytest** — `tests/conftest.py` reconfigures stdout/stderr to UTF-8 at import (→, subscripts, umlauts)
+
+
+### NAS migration plan — suggested next steps (2026-07-14)
+
+Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md).
+
+- [x] **SE per-worker progress** — `.backtesting_progress/` directory with one JSON per worker; Streamlit shows a bar per active scenario (`simulation/backtesting_progress.py`, `scripts/run_backtesting.py`, `ui/backtesting.py`)
+- [x] **diag_single_window `--hour-offset`** — anchor window uses `BACKTESTING_YEAR` instead of hardcoded 2025
+- [x] **1.96d appliances unify (code)** — `appliance_recommendation` on house-profile `generic` consumers; `get_appliances()` reads profile first; `migrate_flex_consumers` retires `appliances[]`; legacy schedule key remap (`settings/appliances.py`, `runtime_store/appliance_schedules.py`). **Follow-up (open):** prod migration on NAS → [Backlog.md](Backlog.md) **1.96d prod migration**
+- [x] **1.99 P6b cutover runbook** — [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md)
 
 
 ### 1.96 — migration validation minor changes (2026-07-14)

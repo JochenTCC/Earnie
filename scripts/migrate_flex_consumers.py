@@ -111,22 +111,25 @@ def _build_wp_consumer(waermepumpe: dict, wp_profile: dict | None) -> dict:
 
 
 def _generic_from_appliance(appliance: dict) -> dict:
+    default_power = float(appliance.get("default_power_kw", 1.0))
+    default_runtime = float(appliance.get("default_runtime_h", 1.0))
     return {
         "id": str(appliance["id"]),
         "label": str(appliance.get("name", appliance["id"])),
         "type": "generic",
-        "nominal_power_kw": float(appliance.get("default_power_kw", 1.0)),
-        "annual_kwh": round(
-            float(appliance.get("default_power_kw", 1.0))
-            * float(appliance.get("default_runtime_h", 1.0))
-            * 52,
-            1,
-        ),
+        "nominal_power_kw": default_power,
+        "annual_kwh": round(default_power * default_runtime * 52, 1),
         "schedule": {
             "runs_per_week": 2,
-            "duration_h": float(appliance.get("default_runtime_h", 1.0)),
+            "duration_h": default_runtime,
             "start_hour": 12,
             "start_shift_h": 4.0,
+        },
+        "appliance_recommendation": {
+            "power_source": str(appliance.get("power_source", "manual")),
+            "loxone_power_name": str(appliance.get("loxone_power_name", "")),
+            "default_power_kw": default_power,
+            "default_runtime_h": default_runtime,
         },
     }
 
@@ -203,7 +206,17 @@ def migrate_prod_consumers(
         aid = str(appliance["id"])
         consumers = [c for c in consumers if c.get("id") != aid]
         consumers.append(_generic_from_appliance(appliance))
-        status.append({"id": aid, "phase": "1.96d", "status": "profile-row", "blocker": "Appliances unify"})
+        status.append({"id": aid, "phase": "1.96d", "status": "migrated"})
+
+    if config_out.get("appliances"):
+        config_out.pop("appliances", None)
+        status.append(
+            {
+                "id": "appliances[]",
+                "phase": "1.96d",
+                "status": "retired-config-block",
+            }
+        )
 
     profile["consumers"] = _order_migrated_consumers(consumers)
     if isinstance(profiles, dict):

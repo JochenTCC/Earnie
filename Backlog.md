@@ -8,8 +8,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
-- [x] Review Smart Energy app for comparison
-- [x] Review other providers with flexible prices
 - [ ] Adapt business plan
 - [ ] **Outreach (not software):** Ask for interested parties in loxforum / reddit — post under “my project”; take interesting chart snapshots (loxforum admins contacted re. best place)
 
@@ -21,26 +19,24 @@ Scenario Exploration consumption model → [Backlog-Erledigt.md](Backlog-Erledig
 
 Version **1.93** (unified scenario model) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-14). **Live cutover (P6b)** → **1.99**.
 
-Recommended order: **1.95–1.97** legacy flex / thermal migration → **1.99** P6b live cutover → propose `version.py` → **`2.0.0`** (user approval; **real** 2.0 — legacy data model gone).
+Recommended order: **1.95–1.96** legacy flex / thermal migration (**1.97** ✓) → **1.99** P6b live cutover → propose `version.py` → **`2.0.0`** (user approval; **real** 2.0 — legacy data model gone).
 
-Critical path: **1.95–1.97** (especially **Consumers P1** + **Thermals P1** / **P1a**) before **1.99** P6b prod cutover. Open bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+Critical path: **1.95–1.96** (especially **Consumers P1** + **Thermals P1**) before **1.99** P6b prod cutover — **1.97** ✓ → [Backlog-Erledigt.md](Backlog-Erledigt.md). Open bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 **Implementation plan (1.95–1.99):** [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — prod consumer matrix, phased deliverables, acceptance, NAS cutover runbook. Track progress there; chapters below are index only.
 
 
 ### Version 1.95
 
-- [ ] **Thermals P1** — Isolated single-node models + NAS prod consumer migration (Phases **1.95a–c** in plan)
-  - `legacy_id` bridge; **`eauto_milp` → `charging_schedule.milp`** on EV house-profile consumer
-  - `thermal_rc` schema + SwimSpa/filter bridge; variable heat paths; Freezer reference + CSV backtest
-  - `migrate_flex_consumers` script (landed); `silent-migration-test/` NAS **2.0** sync via `setup_silent_migration_test --force` (landed)
+- [ ] **Thermals P1** — Isolated single-node models + NAS prod consumer migration (Phases **1.95a–c** in plan) — core bridge landed → [Backlog-Erledigt.md](Backlog-Erledigt.md) (migrate_flex, SwimSpa 1.94, silent stack)
+  - Freezer reference model + CSV backtest (second `thermal_rc` fixture)
   - **Gate:** Chart/Sankey parity → **Consumers P1 (1.96)** before prod cutover
 
 
 ### Version 1.96
 
 - [ ] **Consumers P1** — Unified flex discovery (planning model → Chart 1 / Sankey) — Phase **1.96** in plan (P1a–P1d)
-- [ ] **Consumers P1d extension — Appliances unify** — Phase **1.96d** in plan: retire `appliances[]`; WM/Trockner/GS → `generic` house-profile consumers (2.0 gate)
+- [ ] **1.96d prod migration** — run `migrate_flex_consumers` on NAS/silent stack; confirm `appliances[]` retired in prod config (code → [Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — suggested next steps)
 
 ### Execution of plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md)
 
@@ -48,24 +44,12 @@ Silent local abnahme stack → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-
 
 Manual validation (dynamic tariff, fixed tariff Δ€, SE `live`) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation (2026-07-14).
 
-#### Minor changes
-- [ ] Show a progress bar for each worker in SE
-- [ ] `diag_single_window --hour-offset`: price year still hardcoded 2025 (`_load_anchor_by_hour_offset`; `--anchor` path fixed)
-
-#### Suggested next steps
-
-- [ ] Continue with **1.96d** (appliances unify) or prep **1.99** P6b cutover runbook
-- [ ] **1.99** prod cutover after your sign-off (manual validation block done → [Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation (2026-07-14))
-
-### Version 1.97
-
-- [x] **Thermals P1a** — Haus Wärme MILP flex bridge; retire prod `waermepumpe` from `flexible_consumers[]` — Phase **1.97** in plan
-
+Suggested next steps (SE progress, diag tooling, 1.96d code, cutover runbook) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — suggested next steps (2026-07-14).
 
 ### Version 1.99 — Live cutover (former P6b)
 
-- [ ] **P6b** — Non-silent NAS live cutover after **1.95–1.97** — Phase **1.99** in plan (operational runbook, manual acceptance, `2.0.0` proposal)
-- [ ] Set up debug page for Loxone communication showing read data with last update, whether data was sent to Loxone successfully (with value and timestamp — when silentmode==false)
+- [ ] **P6b** — Non-silent NAS live cutover — Phase **1.99** in plan. **Prerequisite:** your sign-off after manual validation ([Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation); runbook [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md). Open migration: **1.95** / **1.96** / **1.96d prod**.
+- [ ] Set up debug page for Loxone communication showing read data with last update, whether data was sent to Loxone successfully (with value and ++++++++++++++++++++++++++++++++++++++++timestamp — when silentmode==false)
 - [ ] File structure hygiene
   - Own directory for docker container stuff
   - Own directory for backlog stuff
@@ -77,7 +61,7 @@ Manual validation (dynamic tariff, fixed tariff Δ€, SE `live`) → [Backlog-E
 
 **Goal:** Legacy data model gone — see plan end state and [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md).
 
-**Prerequisite chain:** **1.93** ✓ → **1.95–1.97** → **1.99** P6b → propose `version.py` **`2.0.0`** (user approval).
+**Prerequisite chain:** **1.93** ✓ → **1.95–1.96** (+ **1.96d prod**) → **1.99** P6b → propose `version.py` **`2.0.0`** (user approval). **1.97** ✓ → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
 - [ ] Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
 
@@ -121,13 +105,13 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 - [ ] **Recommendation mode smart/adaptive devices** (follow-up to recommendation mode manual devices)
   - Adaptive re runtime/energy per run; smart devices instead of manual input
-  - Adaptation algo maintains `appliances[].default_power_kw` from Loxone power markers (`loxone_power_name`) — reserved so far, no live use
+  - Adaptation algo maintains `appliance_recommendation.default_power_kw` from Loxone power markers (`loxone_power_name`) on house-profile generics — reserved so far, no live use
   - Dishwasher power possibly via Hue
 
 
 ### Version 2.+1 — Epics **Adaptation** & **Thermals** (architecture first)
 
-Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P2 → Thermals P3 → Adaptation P4** (precursors **Consumers P1**, **Thermals P1**, **Thermals P1a** → **1.95–1.97**, before **1.99** live cutover / real 2.0)
+Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P2 → Thermals P3 → Adaptation P4** (precursors **Consumers P1**, **Thermals P1**, **Thermals P1a** → **1.95–1.97**; **P1a** ✓ Erledigt; before **1.99** live cutover / real 2.0)
 
 - [ ] **Adaptation P1** — Generic adaptation model (skeleton)
   - Common structure for parameter adaptation of various forecast models:

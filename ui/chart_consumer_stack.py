@@ -29,6 +29,11 @@ from ui.chart_slot_axis import _safe_float, _safe_int_flag
 _CONSUMER_BAR_OPACITY = 0.65
 
 
+def _recommendation_appliances() -> list[dict]:
+    """Empfehlungsgeräte (Hausprofil oder Legacy appliances[])."""
+    return config.get_appliances()
+
+
 def _chart_flex_consumers(*, optimizer_only: bool = True) -> list[dict]:
     """Resolved flex list (config + house-profile planning merge)."""
     from simulation.engine import resolved_flexible_consumers
@@ -144,7 +149,7 @@ def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
         col = consumer_column_name(consumer)
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((consumer, col))
-    for appliance in config.get_appliances():
+    for appliance in _recommendation_appliances():
         col = appliance_column_name(appliance)
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((appliance_as_chart_consumer(appliance), col))
@@ -159,7 +164,7 @@ def _appliance_horizon_energy_kwh(
     """Geplante Energie (kWh) manueller Geräte über SA₀…SA₂."""
     from runtime_store.appliance_schedules import purge_expired
 
-    appliances = config.get_appliances()
+    appliances = _recommendation_appliances()
     energy = {appliance["id"]: 0.0 for appliance in appliances}
     if not appliances:
         return energy
@@ -209,7 +214,7 @@ def _consumer_horizon_energy_kwh(
     """Geplante Flex-Energie (kWh) je Verbraucher über SA₀…SA₂."""
     consumers = _chart_flex_consumers()
     energy = {consumer["id"]: 0.0 for consumer in consumers}
-    for appliance in config.get_appliances():
+    for appliance in _recommendation_appliances():
         energy[appliance["id"]] = 0.0
     if matrix and chart_window is not None:
         horizon_start = normalize_hour_slot(chart_window.sa0)
@@ -269,7 +274,7 @@ def _consumer_stack_order_ids(
         return _STACK_ORDER_BY_SA0[cache_key]
     stack_entries = [
         *_chart_flex_consumers(),
-        *(appliance_as_chart_consumer(appliance) for appliance in config.get_appliances()),
+        *(appliance_as_chart_consumer(appliance) for appliance in _recommendation_appliances()),
     ]
     ordered = sorted(
         stack_entries,

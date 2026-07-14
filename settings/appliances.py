@@ -1,7 +1,13 @@
 """Normalisierung und Persistenz manueller Geräte (appliances)."""
 from __future__ import annotations
 
+import logging
+
 from settings.json_io import read_json_dict, write_json_dict
+
+logger = logging.getLogger(__name__)
+
+_LEGACY_APPLIANCES_WARNED = False
 
 
 def optional_positive(value, appliance_id: str, field: str, *, allow_zero: bool):
@@ -78,6 +84,176 @@ def normalize_appliance_list(raw: list) -> list[dict]:
         seen.add(spec["id"])
         appliances.append(spec)
     return appliances
+
+
+def warn_legacy_appliances_block() -> None:
+    global _LEGACY_APPLIANCES_WARNED
+    if _LEGACY_APPLIANCES_WARNED:
+        return
+    _LEGACY_APPLIANCES_WARNED = True
+    logger.warning(
+        "config.json 'appliances[]' ist veraltet — Verbraucher mit "
+        "appliance_recommendation ins Hausprofil migrieren (1.96d)."
+    )
+
+
+def reject_legacy_appliances_block(raw_config: dict) -> None:
+    """2.0 gate: root appliances[] must not be present."""
+    if raw_config.get("appliances"):
+        raise ValueError(
+            "Block 'appliances' in config.json ist entfernt (2.0). "
+            "Empfehlungsgeräte als type:generic mit appliance_recommendation "
+            "im Hausprofil konfigurieren."
+        )
+
+
+def normalize_appliance_recommendation_block(
+    raw: dict | None,
+    *,
+    consumer_id: str,
+    nominal_power_kw: float,
+) -> dict | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
+            "appliance_recommendation muss ein Objekt sein."
+        )
+    power_source = str(raw.get("power_source", "manual")).strip().lower()
+    if power_source not in ("loxone", "manual"):
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
+            "appliance_recommendation.power_source muss 'loxone' oder 'manual' sein."
+        )
+    loxone_power_name = str(raw.get("loxone_power_name", "")).strip()
+    if power_source == "loxone" and not loxone_power_name:
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
+            "appliance_recommendation.power_source=loxone erfordert loxone_power_name."
+        )
+    default_runtime_h = optional_positive(
+        raw.get("default_runtime_h"),
+        consumer_id,
+        "appliance_recommendation.default_runtime_h",
+        allow_zero=False,
+    )
+    default_power_kw = optional_positive(
+        raw.get("default_power_kw", nominal_power_kw),
+        consumer_id,
+        "appliance_recommendation.default_power_kw",
+        allow_zero=True,
+    )
+    if power_source == "loxone" and not default_power_kw:
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
+            "appliance_recommendation erfordert default_power_kw > 0 bei power_source=loxone."
+        )
+    return {
+        "power_source": power_source,
+        "loxone_power_name": loxone_power_name,
+        "default_power_kw": default_power_kw,
+        "default_runtime_h": default_runtime_h or 2.0,
+    }
+
+
+def appliance_from_profile_consumer(consumer: dict) -> dict:
+    rec = consumer.get("appliance_recommendation")
+    if not isinstance(rec, dict):
+        raise ValueError(
+            f"Hausprofil-Verbraucher '{consumer.get('id')}': appliance_recommendation fehlt."
+        )
+    consumer_id = str(consumer["id"])
+    normalized = normalize_appliance_recommendation_block(
+        rec,
+        consumer_id=consumer_id,
+        nominal_power_kw=float(consumer.get("nominal_power_kw", 0.0) or 0.0),
+    )
+    if normalized is None:
+        raise ValueError(
+            f"Hausprofil-Verbraucher '{consumer_id}': appliance_recommendation fehlt."
+        )
+    legacy_id = str(consumer.get("legacy_id", "")).strip()
+    spec = {
+        "id": consumer_id,
+        "name": str(consumer.get("label", consumer_id)),
+        "power_source": normalized["power_source"],
+        "loxone_power_name": normalized["loxone_power_name"],
+        "default_power_kw": normalized["default_power_kw"],
+        "default_runtime_h": normalized["default_runtime_h"],
+    }
+    if legacy_id and legacy_id != consumer_id:
+        spec["legacy_id"] = legacy_id
+    return spec
+
+
+def recommendation_appliances_from_profile(house_profile: dict) -> list[dict]:
+    consumers = house_profile.get("consumers") or []
+    appliances: list[dict] = []
+    for raw in consumers:
+        if not isinstance(raw, dict):
+            continue
+        if str(raw.get("type", "")).strip().lower() != "generic":
+            continue
+        if not isinstance(raw.get("appliance_recommendation"), dict):
+            continue
+        appliances.append(appliance_from_profile_consumer(raw))
+    return appliances
+
+
+def update_appliance_defaults_in_house_profile(
+    house_profiles_path: str,
+    profile_id: str,
+    appliance_id: str,
+    *,
+    power_kw: float,
+    runtime_h: float,
+) -> dict:
+    if power_kw < 0:
+        raise ValueError(
+            f"update_appliance_defaults: power_kw muss >= 0 sein (erhalten: {power_kw})."
+        )
+    if runtime_h <= 0:
+        raise ValueError(
+            f"update_appliance_defaults: runtime_h muss > 0 sein (erhalten: {runtime_h})."
+        )
+    data = read_json_dict(house_profiles_path)
+    profiles = data.get("profiles", [])
+    if isinstance(profiles, dict):
+        profile = profiles.get(profile_id)
+    else:
+        profile = next((item for item in profiles if item.get("id") == profile_id), None)
+    if profile is None:
+        raise KeyError(
+            f"update_appliance_defaults: unbekannte house_profile_id '{profile_id}'."
+        )
+    consumers = profile.get("consumers") or []
+    target_index = None
+    for index, item in enumerate(consumers):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("id", "")).strip() == appliance_id:
+            target_index = index
+            break
+    if target_index is None:
+        raise KeyError(
+            f"update_appliance_defaults: unbekannte appliance_id '{appliance_id}'."
+        )
+    entry = dict(consumers[target_index])
+    entry["nominal_power_kw"] = float(power_kw)
+    rec = dict(entry.get("appliance_recommendation") or {})
+    rec["default_power_kw"] = float(power_kw)
+    rec["default_runtime_h"] = float(runtime_h)
+    normalize_appliance_recommendation_block(
+        rec,
+        consumer_id=appliance_id,
+        nominal_power_kw=float(power_kw),
+    )
+    entry["appliance_recommendation"] = rec
+    consumers[target_index] = entry
+    profile["consumers"] = consumers
+    write_json_dict(house_profiles_path, data)
+    return data
 
 
 def normalize_appliance_recommendation(raw: dict | None) -> dict:

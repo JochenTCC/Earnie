@@ -1,7 +1,6 @@
 """Subprocess-Start für scripts/run_backtesting aus der Streamlit-UI."""
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
@@ -14,6 +13,12 @@ from typing import Callable, TextIO
 from data import profile_manager
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from scripts.run_backtesting import BACKTESTING_YEAR
+from simulation.backtesting_progress import (
+    clear_progress_dir,
+    prepare_progress_dir,
+    read_progress_file,
+    read_progress_snapshot,
+)
 from simulation.horizon_mode import DEFAULT_HORIZON_MODE
 
 _FAILURE_MARKERS = (
@@ -50,7 +55,7 @@ def default_backtesting_output_dir() -> str:
 
 
 def default_progress_file_path() -> str:
-    return str(Path(default_backtesting_output_dir()) / ".backtesting_progress.json")
+    return str(Path(default_backtesting_output_dir()) / ".backtesting_progress")
 
 
 def auto_backtesting_workers(scenario_count: int) -> int:
@@ -114,17 +119,6 @@ def _drain_subprocess_stdout(pipe: TextIO | None, chunks: list[str]) -> None:
         pipe.close()
 
 
-def read_progress_file(path: str) -> dict | None:
-    """Liest Fortschritts-JSON; None wenn nicht vorhanden oder ungültig."""
-    progress_path = Path(path)
-    if not progress_path.is_file():
-        return None
-    try:
-        return json.loads(progress_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-
-
 def build_backtesting_command(
     *,
     output_dir: str,
@@ -163,7 +157,7 @@ def run_backtesting_subprocess(
     progress_file: str | None = None,
     horizon_mode: str = DEFAULT_HORIZON_MODE,
     workers: int = 1,
-    on_progress: Callable[[dict], None] | None = None,
+    on_progress: Callable[[dict[str, dict]], None] | None = None,
 ) -> tuple[int, str]:
     """Startet Backtesting offline; gibt (exit_code, kombiniertes stdout/stderr) zurück."""
     log_dir = default_backtesting_output_dir() if output_dir is None else output_dir
@@ -173,7 +167,7 @@ def run_backtesting_subprocess(
         return 1, message
 
     if progress_file:
-        Path(progress_file).unlink(missing_ok=True)
+        prepare_progress_dir(progress_file)
 
     cmd = build_backtesting_command(
         output_dir=log_dir,
@@ -202,14 +196,12 @@ def run_backtesting_subprocess(
     stdout_reader.start()
     while proc.poll() is None:
         if progress_file and on_progress is not None:
-            progress = read_progress_file(progress_file)
-            if progress is not None:
-                on_progress(progress)
+            on_progress(read_progress_snapshot(progress_file))
         time.sleep(_PROGRESS_POLL_SEC)
 
     stdout_reader.join(timeout=5.0)
     output = "".join(stdout_chunks)
     exit_code = _normalize_exit_code(proc.returncode or 0, output)
     if progress_file:
-        Path(progress_file).unlink(missing_ok=True)
+        clear_progress_dir(progress_file)
     return exit_code, output
