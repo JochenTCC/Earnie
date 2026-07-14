@@ -1,0 +1,520 @@
+"""Backtesting-Auswertung und UI-Start aus scripts/run_backtesting.py."""
+from __future__ import annotations
+
+import streamlit as st
+import pandas as pd
+
+import config
+from data import cons_data_store
+from runtime_store.persist_paths import resolve_backtesting_log_dir
+from simulation import backtesting_log
+from simulation.backtesting_fingerprint import fingerprint_for_current_config
+from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNRISE_WINDOW
+from ui.backtesting_charts import scenario_monthly_cost_chart
+from ui.backtesting_cons_data import render_cons_data_section
+from ui.backtesting_deviation_list import render_deviation_list
+from ui.backtesting_results_helpers import (
+    build_annual_cost_rows,
+    build_scenario_consumption_rows,
+    nav_bounds_from_period,
+    reference_kwh_for_period,
+    scenario_consumption_subheader,
+    format_test_run_caption,
+)
+from ui.backtesting_runner import (
+    auto_backtesting_workers,
+    default_progress_file_path,
+    run_backtesting_subprocess,
+    suggest_test_month,
+)
+from ui.backtesting_time_ranges import render_time_range_help
+from scripts.run_backtesting import BACKTESTING_YEAR
+_LEGACY_STALE_WARNING = (
+    "Älterer Szenarien-Explorer-Lauf ohne Konfigurations-Fingerabdruck — "
+    "bitte einmal neu berechnen."
+)
+_MISMATCH_STALE_WARNING = (
+    "Gespeicherter Szenarien-Explorer-Lauf passt nicht zur aktuellen Konfiguration. "
+    "Bitte neu berechnen."
+)
+_STALE_CAPTION = (
+    "Die aktuelle Konfiguration weicht vom gespeicherten Lauf ab. "
+    "Ergebnisse unten sind veraltet."
+)
+_HORIZON_STALE_WARNING = (
+    "Der gewählte Planungshorizont weicht vom gespeicherten Szenarien-Explorer-Lauf ab. "
+    "Die Ergebnisse unten sind ungültig — bitte neu berechnen oder die "
+    "ursprüngliche Horizont-Auswahl wiederherstellen."
+)
+_HORIZON_RESULTS_HIDDEN_INFO = (
+    "Gespeicherte Ergebnisse sind ausgeblendet: Der gewählte Planungshorizont "
+    "weicht vom letzten Lauf ab. Zur Anzeige die ursprüngliche Auswahl "
+    "wiederherstellen oder neu berechnen."
+)
+_BACKTESTING_LOG_ANCHOR_KEY = "_backtesting_log_anchor"
+
+
+@st.cache_data(ttl=60, show_spinner="Lade Szenarien-Explorer-Log...")
+def load_backtesting_data():
+    return backtesting_log.load_backtesting_log()
+
+
+def scenario_labels_map() -> dict[str, str]:
+    return config.get_scenario_labels()
+
+
+def try_get_backtesting_scenarios() -> tuple[dict[str, dict] | None, str | None]:
+    """Löst Szenarien auf; bei Konfigurationsfehler (None, Fehlermeldung)."""
+    try:
+        return config.get_backtesting_scenarios(), None
+    except ValueError as exc:
+        return None, str(exc)
+
+
+def validate_backtesting_config() -> str | None:
+    """None wenn auflösbar, sonst Fehlermeldung für die UI."""
+    from house_config.tariff_plausibility import (
+        collect_tariff_plausibility_errors,
+        format_tariff_plausibility_errors,
+    )
+    from runtime_store.persist_paths import (
+        resolve_backtesting_scenarios_json_path,
+        resolve_tariffs_json_path,
+        resolve_tariffs_schema_template_path,
+    )
+
+    tariff_errors = collect_tariff_plausibility_errors(
+        tariffs_path=resolve_tariffs_json_path(),
+        scenarios_path=resolve_backtesting_scenarios_json_path(),
+        schema_path=resolve_tariffs_schema_template_path(),
+    )
+    if tariff_errors:
+        return format_tariff_plausibility_errors(tariff_errors)
+
+    _, error = try_get_backtesting_scenarios()
+    return error
+
+
+def log_stale_reason(meta: dict) -> str | None:
+    """'legacy' | 'mismatch' wenn veraltet, sonst None."""
+    stored = meta.get("config_fingerprint")
+    if not stored:
+        return "legacy"
+    period = meta.get("period")
+    try:
+        current = fingerprint_for_current_config(period=period)
+    except ValueError:
+        return "mismatch"
+    if stored != current:
+        return "mismatch"
+    return None
+
+
+def log_matches_current_config(meta: dict) -> bool:
+    return log_stale_reason(meta) is None
+
+
+def _format_config_error(message: str) -> str:
+    if "export_tariff_id" in message or "import_tariff_id" in message:
+        return (
+            f"{message}\n\n"
+            "Prüfe im **Szenarieneditor → Runtime**, ob Bezugs- und Einspeisetarif "
+            "noch im Tarifkatalog existieren (Tarif-IDs wurden mit 1.24.f teils umbenannt, "
+            "z. B. `awattar_sunny_float` → `dynamic_epex`)."
+        )
+    return message
+
+
+def _format_backtesting_run_error(output: str) -> str | None:
+    if "cons_data_hourly.csv" in output:
+        return (
+            "Szenarien-Explorer benötigt Verbrauchsdaten in `cons_data_hourly.csv` "
+            f"unter `{resolve_backtesting_log_dir()}` (bzw. dem in der Config "
+            "konfigurierten `path_cons_data`). "
+            "Für Greenfield: Daten per `scripts/generate_cons_data.py` erzeugen "
+            "oder aus `runtime/` übernehmen."
+        )
+    if "No module named scripts" in output:
+        return (
+            "Szenarien-Explorer-Subprocess konnte das Skript nicht starten. "
+            "Streamlit neu starten; unter VS Code `subProcess: false` in launch.json "
+            "verwenden (bereits für Greenfield-Launch gesetzt)."
+        )
+    return None
+
+
+def render_configured_scenarios() -> None:
+    st.subheader("Konfigurierte Szenarien")
+    scenarios, error = try_get_backtesting_scenarios()
+    if error:
+        st.error(_format_config_error(error))
+        return
+    labels = scenario_labels_map()
+    for scenario_id in scenarios:
+        st.write(f"- **{labels.get(scenario_id, scenario_id)}** (`{scenario_id}`)")
+
+
+_HORIZON_MODE_LABELS = {
+    FIXED_24H: "24h (Standard, E-Auto-Anker)",
+    SUNRISE_WINDOW: "Sunrise Now→SA₂ (SOC_min am Sonnenaufgang)",
+}
+
+
+def log_horizon_mode(meta: dict | None) -> str | None:
+    if meta is None:
+        return None
+    return meta.get("period", {}).get("horizon_mode", FIXED_24H)
+
+
+def horizon_selection_stale(meta: dict | None, selected_horizon: str) -> bool:
+    log_horizon = log_horizon_mode(meta)
+    if log_horizon is None:
+        return False
+    return selected_horizon != log_horizon
+
+
+def sync_horizon_selectbox_from_log(meta: dict) -> None:
+    """Bindet die Planungshorizont-Auswahl an den gespeicherten Backtesting-Lauf."""
+    anchor = str(meta.get("created_at", ""))
+    if st.session_state.get(_BACKTESTING_LOG_ANCHOR_KEY) == anchor:
+        return
+    st.session_state.backtesting_horizon_mode = log_horizon_mode(meta)
+    st.session_state[_BACKTESTING_LOG_ANCHOR_KEY] = anchor
+
+
+def _execute_backtesting_run(
+    *,
+    start_month: int | None = None,
+    end_month: int | None = None,
+    status_label: str,
+    horizon_mode: str = DEFAULT_HORIZON_MODE,
+) -> None:
+    config_error = validate_backtesting_config()
+    if config_error:
+        st.error(_format_config_error(config_error))
+        return
+
+    scenarios, _ = try_get_backtesting_scenarios()
+    scenario_count = len(scenarios or {})
+    workers = auto_backtesting_workers(scenario_count)
+    use_hourly_progress = workers == 1
+    progress_file = default_progress_file_path() if use_hourly_progress else None
+
+    with st.status(status_label, expanded=True) as status:
+        progress_bar = st.progress(0.0)
+        progress_caption = st.empty()
+        if workers > 1:
+            progress_caption.caption(
+                f"Parallele Berechnung: {workers} Worker für {scenario_count} Szenarien "
+                "(Stundenfortschritt nur bei einem Szenario verfügbar)."
+            )
+
+        def _on_progress(progress: dict) -> None:
+            total = int(progress.get("total") or 0)
+            current = int(progress.get("current") or 0)
+            scenario = str(progress.get("scenario") or "")
+            phase = str(progress.get("phase") or "")
+            if total > 0:
+                progress_bar.progress(min(current / total, 1.0))
+            if phase == "reference":
+                progress_caption.caption(f"Referenz: {scenario}")
+            elif total > 0:
+                progress_caption.caption(f"{scenario}: {current}/{total} h")
+            else:
+                progress_caption.caption(scenario or "Szenarien-Explorer läuft…")
+
+        exit_code, output = run_backtesting_subprocess(
+            start_month=start_month,
+            end_month=end_month,
+            progress_file=progress_file,
+            horizon_mode=horizon_mode,
+            workers=workers,
+            on_progress=_on_progress if use_hourly_progress else None,
+        )
+        if exit_code == 0:
+            progress_bar.progress(1.0)
+            status.update(label="Szenarien-Explorer abgeschlossen", state="complete")
+            load_backtesting_data.clear()
+            st.rerun()
+        else:
+            status.update(label="Szenarien-Explorer fehlgeschlagen", state="error")
+            hint = _format_backtesting_run_error(output)
+            if hint:
+                st.error(hint)
+            st.error(f"Exit-Code {exit_code}")
+            tail = output[-8000:] if len(output) > 8000 else output
+            if tail:
+                st.code(tail)
+
+
+def render_backtesting_run_controls(
+    *,
+    log_exists: bool,
+    log_stale: bool,
+    stale_reason: str | None,
+    cons_data_ready: bool,
+    meta: dict | None = None,
+) -> bool:
+    """Rendert Start-Steuerung. True wenn Horizont-Auswahl vom Log abweicht."""
+    label = "Szenarien-Explorer neu berechnen" if log_exists else "Szenarien-Explorer starten"
+    log_period = meta.get("period") if meta else None
+    render_time_range_help(key="backtesting_time_ranges_run", log_period=log_period)
+    test_month = suggest_test_month()
+    if log_exists and meta is not None:
+        sync_horizon_selectbox_from_log(meta)
+    selectbox_index = 0
+    if "backtesting_horizon_mode" not in st.session_state:
+        log_horizon = log_horizon_mode(meta) if log_exists else None
+        if log_horizon == SUNRISE_WINDOW:
+            selectbox_index = 1
+    horizon_mode = st.selectbox(
+        "Planungshorizont",
+        options=[FIXED_24H, SUNRISE_WINDOW],
+        format_func=lambda mode: _HORIZON_MODE_LABELS[mode],
+        index=selectbox_index,
+        key="backtesting_horizon_mode",
+        help=(
+            "24h: Referenzmodus für Jahresvergleiche. "
+            "Sunrise: wie Live-Optimierung (Jetzt→SA₂); Voraussetzung für SA-Zonen in Chart1/2. "
+            "Bei vorhandenem Lauf entspricht die Auswahl dem gespeicherten Horizont; "
+            "eine Änderung macht die Ergebnisse ungültig bis zur Neuberechnung."
+        ),
+    )
+    horizon_stale = horizon_selection_stale(meta, horizon_mode)
+    if horizon_stale:
+        st.warning(_HORIZON_STALE_WARNING)
+    scenarios, scenario_error = try_get_backtesting_scenarios()
+    if not scenario_error and scenarios:
+        worker_count = auto_backtesting_workers(len(scenarios))
+        if worker_count > 1:
+            st.caption(
+                f"Automatisch parallele Berechnung: bis zu {worker_count} Worker "
+                f"für {len(scenarios)} Szenarien."
+            )
+    col_full, col_test = st.columns(2)
+    if col_full.button(
+        label,
+        type="primary",
+        key="backtesting_run_btn",
+        disabled=not cons_data_ready,
+    ):
+        _execute_backtesting_run(
+            status_label="Szenarien-Explorer läuft…",
+            horizon_mode=horizon_mode,
+        )
+
+    test_disabled = not cons_data_ready or test_month is None
+    if col_test.button(
+        "Szenarien-Explorer-Berechnung testen",
+        type="secondary",
+        key="backtesting_test_run_btn",
+        disabled=test_disabled,
+    ):
+        st.warning(
+            "Testlauf (1 Monat) überschreibt das bestehende Szenarien-Explorer-Log."
+        )
+        _execute_backtesting_run(
+            start_month=test_month,
+            end_month=test_month,
+            status_label=f"Szenarien-Explorer-Testlauf (Monat {test_month}/{BACKTESTING_YEAR})…",
+            horizon_mode=horizon_mode,
+        )
+    if not cons_data_ready:
+        st.caption(
+            "Szenarien-Explorer ist deaktiviert, bis gültige Verbrauchsdaten in "
+            "`cons_data_hourly.csv` vorhanden sind (siehe Abschnitt oben)."
+        )
+    elif test_month is None:
+        st.caption(
+            "Testlauf deaktiviert: keine cons_data-Daten im Szenarien-Explorer-Basisjahr."
+        )
+    if log_stale:
+        st.caption(_STALE_CAPTION)
+    return horizon_stale
+
+
+def render_backtesting_log_caption(meta: dict) -> None:
+    st.subheader("Szenarien-Explorer-Log")
+    st.caption(f"Ergebnisdatei: `{backtesting_log.backtesting_log_json_path()}`")
+    created = meta.get("created_at", "")[:19].replace("T", " ")
+    period = meta.get("period", {})
+    horizon = period.get("horizon_mode", FIXED_24H)
+    st.caption(
+        f"Erstellt: {created} UTC · "
+        f"Zeitraum: {period.get('start', '?')} – {period.get('end', '?')} "
+        f"({period.get('windows', '?')} Fenster) · "
+        f"Horizont: {_HORIZON_MODE_LABELS.get(horizon, horizon)}"
+    )
+    caption = format_test_run_caption(period)
+    if caption:
+        st.warning(caption)
+
+
+def _hourly_timestamps_for_scenario(
+    hourly_df: pd.DataFrame,
+    scenario_id: str,
+    nav_bounds: tuple | None,
+) -> list[str]:
+    part = hourly_df.loc[hourly_df["scenario_id"] == scenario_id].copy()
+    if part.empty or "ts" not in part.columns:
+        return []
+    part["ts"] = pd.to_datetime(part["ts"])
+    if nav_bounds is not None:
+        start, end = nav_bounds
+        part = part[(part["ts"] >= start) & (part["ts"] <= end)]
+    return [pd.Timestamp(ts).strftime("%Y-%m-%d %H:%M:%S") for ts in part["ts"]]
+
+
+def _optimized_scenario_ids(meta: dict, scenarios: dict[str, dict]) -> list[str]:
+    ref_id = meta.get("reference_id")
+    return [
+        scenario_id
+        for scenario_id in meta.get("scenario_ids", [])
+        if scenario_id != ref_id
+        and isinstance(scenarios.get(scenario_id, {}).get("_house_profile"), dict)
+    ]
+
+
+def _reference_kwh_for_meta(meta: dict) -> float | None:
+    period = meta.get("period", {})
+    if not cons_data_store.is_cons_data_populated():
+        return None
+    cons_df = cons_data_store.load_cons_data()
+    return reference_kwh_for_period(cons_df, period)
+
+
+def render_annual_cost_table(meta: dict) -> None:
+    st.subheader("Gesamtkosten")
+    ref_kwh = _reference_kwh_for_meta(meta)
+    rows = build_annual_cost_rows(meta, ref_kwh)
+    if not rows:
+        st.info("Keine Gesamtkosten im Log.")
+        return
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+
+
+def render_scenario_consumption_table(meta: dict, hourly_df: pd.DataFrame | None = None) -> None:
+    period = meta.get("period", {})
+    st.subheader(scenario_consumption_subheader(period))
+    st.caption(
+        "Summe der gelieferten kWh über alle 24h-Fenster im Lauf "
+        "(Grundlast + flexible Verbraucher). Δ ≈ 0 bei zeitlicher Lastverschiebung mit gleicher Spec-Energie."
+    )
+    ref_kwh = _reference_kwh_for_meta(meta)
+    scenarios, scenario_error = try_get_backtesting_scenarios()
+    timestamps: list[str] | None = None
+    if hourly_df is not None and scenarios and not scenario_error:
+        scenario_ids = _optimized_scenario_ids(meta, scenarios)
+        if scenario_ids:
+            timestamps = _hourly_timestamps_for_scenario(
+                hourly_df,
+                scenario_ids[0],
+                nav_bounds_from_period(period),
+            )
+    rows = build_scenario_consumption_rows(
+        meta,
+        ref_kwh,
+        hourly_df=hourly_df,
+        scenarios=scenarios if not scenario_error else None,
+        timestamps=timestamps,
+    )
+    if not rows:
+        st.info("Keine Szenarien im Log.")
+        return
+    has_totals = any(
+        row["Optimiert (kWh)"] != "—"
+        for row in rows
+        if row["Plausibilität"] != "—"
+    )
+    if not has_totals:
+        st.info(
+            "Verbrauchssummen fehlen in diesem Log (älterer Lauf). "
+            "Bitte Szenarien-Explorer neu berechnen."
+        )
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+
+
+def render_backtesting_monthly_chart(meta: dict) -> None:
+    st.subheader("Monatlicher Kostenvergleich")
+    monthly = meta.get("summary", {}).get("monthly_eur", {})
+    if not monthly:
+        st.info("Keine Monatswerte im Log.")
+        return
+    df = pd.DataFrame(monthly).T.round(2)
+    chart_columns = [
+        col for col in df.columns if not col.startswith("Einsparung")
+    ]
+    if not chart_columns:
+        return
+    chart_monthly = {
+        month: {col: float(df.loc[month, col]) for col in chart_columns}
+        for month in df.index
+    }
+    st.plotly_chart(scenario_monthly_cost_chart(chart_monthly), width="stretch")
+
+
+def _deviation_labels_map(meta: dict) -> dict[str, str]:
+    labels = scenario_labels_map()
+    labels.update(meta.get("labels", {}))
+    return labels
+
+
+def _render_backtesting_results(meta: dict, hourly_df: pd.DataFrame) -> None:
+    render_backtesting_log_caption(meta)
+    render_annual_cost_table(meta)
+    render_backtesting_monthly_chart(meta)
+    render_scenario_consumption_table(meta, hourly_df)
+    render_deviation_list(
+        meta,
+        _deviation_labels_map(meta),
+        log_dir=resolve_backtesting_log_dir(),
+        hourly_df=hourly_df,
+    )
+
+
+def render_backtesting_block() -> None:
+    log_exists = backtesting_log.log_exists()
+    meta: dict | None = None
+    log_stale = False
+    stale_reason: str | None = None
+
+    if log_exists:
+        try:
+            meta, _hourly = load_backtesting_data()
+            stale_reason = log_stale_reason(meta)
+            log_stale = stale_reason is not None
+        except Exception as exc:
+            st.error(f"Szenarien-Explorer-Log konnte nicht geladen werden: {exc}")
+            log_exists = False
+
+    cons_ready = render_cons_data_section()
+
+    render_configured_scenarios()
+
+    if log_exists and meta is not None and log_stale:
+        warning = (
+            _LEGACY_STALE_WARNING if stale_reason == "legacy" else _MISMATCH_STALE_WARNING
+        )
+        st.warning(warning)
+
+    horizon_stale = render_backtesting_run_controls(
+        log_exists=log_exists,
+        log_stale=log_stale,
+        stale_reason=stale_reason,
+        cons_data_ready=cons_ready,
+        meta=meta,
+    )
+
+    if not log_exists or meta is None:
+        if not log_exists:
+            st.info(
+                "Noch kein Szenarien-Explorer-Lauf vorhanden. "
+                "Starte die Berechnung mit dem Button oben."
+            )
+        return
+
+    if horizon_stale:
+        st.info(_HORIZON_RESULTS_HIDDEN_INFO)
+        return
+
+    _render_backtesting_results(meta, _hourly)

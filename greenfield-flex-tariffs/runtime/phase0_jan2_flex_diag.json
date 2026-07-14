@@ -1,0 +1,3782 @@
+[
+  {
+    "scenario_id": "s2-kein-pv",
+    "anchor": "2025-01-02T07:00:00",
+    "targets": {
+      "standard": 6.0,
+      "waschmaschine": 3.0,
+      "ev": 16.842
+    },
+    "spec_flex_targets": {
+      "standard": 6.0,
+      "waschmaschine": 3.0,
+      "ev": 16.842
+    },
+    "hour_traces": [
+      {
+        "hour": 0,
+        "uhrzeit": "01.01. 07:00",
+        "soc_start": 50.0,
+        "soc_end": 50.0,
+        "steuerbefehl": "Entladesperre aktiv",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 42.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 18,
+            "eligible_slots": [
+              "01-01 07:00",
+              "01-01 08:00",
+              "01-01 09:00",
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 18.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 1,
+        "uhrzeit": "01.01. 08:00",
+        "soc_start": 50.0,
+        "soc_end": 50.0,
+        "steuerbefehl": "Entladesperre aktiv",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 42.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 17,
+            "eligible_slots": [
+              "01-01 08:00",
+              "01-01 09:00",
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 17.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 2,
+        "uhrzeit": "01.01. 09:00",
+        "soc_start": 50.0,
+        "soc_end": 50.0,
+        "steuerbefehl": "Entladesperre aktiv",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 42.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 16,
+            "eligible_slots": [
+              "01-01 09:00",
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 16.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 3,
+        "uhrzeit": "01.01. 10:00",
+        "soc_start": 50.0,
+        "soc_end": 48.6,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 42.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 15,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 15.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 4,
+        "uhrzeit": "01.01. 11:00",
+        "soc_start": 48.6,
+        "soc_end": 47.2,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 39.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 14.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 5,
+        "uhrzeit": "01.01. 12:00",
+        "soc_start": 47.2,
+        "soc_end": 45.8,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 12,
+            "eligible_slots": [
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 36.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 13.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 6,
+        "uhrzeit": "01.01. 13:00",
+        "soc_start": 45.8,
+        "soc_end": 44.4,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 11,
+            "eligible_slots": [
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 33.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 12,
+            "eligible_slots": [
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 12.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 7,
+        "uhrzeit": "01.01. 14:00",
+        "soc_start": 44.4,
+        "soc_end": 43.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 10,
+            "eligible_slots": [
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 30.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 11,
+            "eligible_slots": [
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 11.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 8,
+        "uhrzeit": "01.01. 15:00",
+        "soc_start": 43.0,
+        "soc_end": 41.6,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 9,
+            "eligible_slots": [
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 27.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 10,
+            "eligible_slots": [
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 10.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 9,
+        "uhrzeit": "01.01. 16:00",
+        "soc_start": 41.6,
+        "soc_end": 50.0,
+        "steuerbefehl": "Zwangsladen (0.433 kW)",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 8,
+            "eligible_slots": [
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 24.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 9,
+            "eligible_slots": [
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 9.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 10,
+        "uhrzeit": "01.01. 17:00",
+        "soc_start": 50.0,
+        "soc_end": 50.0,
+        "steuerbefehl": "Entladesperre aktiv",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 7,
+            "eligible_slots": [
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 21.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 8,
+            "eligible_slots": [
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 8.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 11,
+        "uhrzeit": "01.01. 18:00",
+        "soc_start": 50.0,
+        "soc_end": 48.6,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 6,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 18.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 7,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 7.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 12,
+        "uhrzeit": "01.01. 19:00",
+        "soc_start": 48.6,
+        "soc_end": 47.2,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 12,
+            "eligible_slots": [
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 132.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 5,
+            "eligible_slots": [
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 15.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 6,
+            "eligible_slots": [
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 6.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 13,
+        "uhrzeit": "01.01. 20:00",
+        "soc_start": 47.2,
+        "soc_end": 47.2,
+        "steuerbefehl": "Entladesperre aktiv",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 11,
+            "eligible_slots": [
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 121.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 4,
+            "eligible_slots": [
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 12.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 5,
+            "eligible_slots": [
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 5.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 3.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 14,
+        "uhrzeit": "01.01. 21:00",
+        "soc_start": 47.2,
+        "soc_end": 47.2,
+        "steuerbefehl": "Entladesperre aktiv",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 10,
+            "eligible_slots": [
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 110.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 3,
+            "eligible_slots": [
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 9.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 4,
+            "eligible_slots": [
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 4.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        }
+      },
+      {
+        "hour": 15,
+        "uhrzeit": "01.01. 22:00",
+        "soc_start": 47.2,
+        "soc_end": 45.8,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 9,
+            "eligible_slots": [
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 99.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 2,
+            "eligible_slots": [
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 6.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 3,
+            "eligible_slots": [
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 3.0,
+            "effective_target_kwh": 2.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 16,
+        "uhrzeit": "01.01. 23:00",
+        "soc_start": 45.8,
+        "soc_end": 44.4,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 8,
+            "eligible_slots": [
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 88.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 3.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 2,
+            "eligible_slots": [
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 2.0,
+            "effective_target_kwh": 2.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 17,
+        "uhrzeit": "02.01. 00:00",
+        "soc_start": 44.4,
+        "soc_end": 43.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 7,
+            "eligible_slots": [
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 77.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 0,
+            "eligible_slots": [],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 0.0,
+            "effective_target_kwh": 0.0,
+            "target_gap_kwh": 3.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 1.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 18,
+        "uhrzeit": "02.01. 01:00",
+        "soc_start": 43.0,
+        "soc_end": 41.6,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 6,
+            "eligible_slots": [
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 66.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 0,
+            "eligible_slots": [],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 0.0,
+            "effective_target_kwh": 0.0,
+            "target_gap_kwh": 3.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 1.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 19,
+        "uhrzeit": "02.01. 02:00",
+        "soc_start": 41.6,
+        "soc_end": 40.2,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 5,
+            "eligible_slots": [
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 55.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 0,
+            "eligible_slots": [],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 0.0,
+            "effective_target_kwh": 0.0,
+            "target_gap_kwh": 3.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 1.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 20,
+        "uhrzeit": "02.01. 03:00",
+        "soc_start": 40.2,
+        "soc_end": 38.8,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 4,
+            "eligible_slots": [
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 44.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 0,
+            "eligible_slots": [],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 0.0,
+            "effective_target_kwh": 0.0,
+            "target_gap_kwh": 3.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 1.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 21,
+        "uhrzeit": "02.01. 04:00",
+        "soc_start": 38.8,
+        "soc_end": 38.8,
+        "steuerbefehl": "Entladesperre aktiv",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 3,
+            "eligible_slots": [
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 33.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 0,
+            "eligible_slots": [],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 0.0,
+            "effective_target_kwh": 0.0,
+            "target_gap_kwh": 3.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 1.0
+          }
+        },
+        "flex_kw": {
+          "ev": 11.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 22,
+        "uhrzeit": "02.01. 05:00",
+        "soc_start": 38.8,
+        "soc_end": 50.0,
+        "steuerbefehl": "Zwangsladen (0.577 kW)",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 3.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 2,
+            "eligible_slots": [
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 22.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 0,
+            "eligible_slots": [],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 0.0,
+            "effective_target_kwh": 0.0,
+            "target_gap_kwh": 3.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 1.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 23,
+        "uhrzeit": "02.01. 06:00",
+        "soc_start": 50.0,
+        "soc_end": 50.0,
+        "steuerbefehl": "Entladesperre aktiv",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 3.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 11.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 0,
+            "eligible_slots": [],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 0.0,
+            "effective_target_kwh": 0.0,
+            "target_gap_kwh": 3.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 1.0
+          }
+        },
+        "flex_kw": {
+          "ev": 5.84,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        }
+      }
+    ],
+    "delivered_flex": {
+      "ev": 16.84,
+      "standard": 3.0,
+      "waschmaschine": 2.0
+    },
+    "end_soc": 50.0
+  },
+  {
+    "scenario_id": "live",
+    "anchor": "2025-01-02T07:00:00",
+    "targets": {
+      "standard": 6.0,
+      "waschmaschine": 3.0,
+      "ev": 16.842
+    },
+    "spec_flex_targets": {
+      "standard": 6.0,
+      "waschmaschine": 3.0,
+      "ev": 16.842
+    },
+    "hour_traces": [
+      {
+        "hour": 0,
+        "uhrzeit": "01.01. 07:00",
+        "soc_start": 50.0,
+        "soc_end": 10.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 42.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 18,
+            "eligible_slots": [
+              "01-01 07:00",
+              "01-01 08:00",
+              "01-01 09:00",
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 18.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 1,
+        "uhrzeit": "01.01. 08:00",
+        "soc_start": 10.0,
+        "soc_end": 10.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 42.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 17,
+            "eligible_slots": [
+              "01-01 08:00",
+              "01-01 09:00",
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 17.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 2,
+        "uhrzeit": "01.01. 09:00",
+        "soc_start": 10.0,
+        "soc_end": 10.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 42.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 16,
+            "eligible_slots": [
+              "01-01 09:00",
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 16.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 3,
+        "uhrzeit": "01.01. 10:00",
+        "soc_start": 10.0,
+        "soc_end": 23.6,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 42.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 15,
+            "eligible_slots": [
+              "01-01 10:00",
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 15.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 4,
+        "uhrzeit": "01.01. 11:00",
+        "soc_start": 23.6,
+        "soc_end": 72.1,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 39.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 14,
+            "eligible_slots": [
+              "01-01 11:00",
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 14.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 5,
+        "uhrzeit": "01.01. 12:00",
+        "soc_start": 72.1,
+        "soc_end": 100.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 6.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 6.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 12,
+            "eligible_slots": [
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 36.0,
+            "effective_target_kwh": 6.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 12:00",
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 13.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 3.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 6,
+        "uhrzeit": "01.01. 13:00",
+        "soc_start": 100.0,
+        "soc_end": 100.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 11,
+            "eligible_slots": [
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 33.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 12,
+            "eligible_slots": [
+              "01-01 13:00",
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 12.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 7,
+        "uhrzeit": "01.01. 14:00",
+        "soc_start": 100.0,
+        "soc_end": 100.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 3.0,
+          "waschmaschine": 3.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 2,
+            "generic_flex": true,
+            "eligible_count": 10,
+            "eligible_slots": [
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00"
+            ],
+            "max_kw": 3.0,
+            "max_deliverable_kwh": 30.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 3.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 11,
+            "eligible_slots": [
+              "01-01 14:00",
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 11.0,
+            "effective_target_kwh": 3.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 3.0,
+          "waschmaschine": 1.0
+        }
+      },
+      {
+        "hour": 8,
+        "uhrzeit": "01.01. 15:00",
+        "soc_start": 100.0,
+        "soc_end": 100.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 0.0,
+          "waschmaschine": 2.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 2.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 10,
+            "eligible_slots": [
+              "01-01 15:00",
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 10.0,
+            "effective_target_kwh": 2.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        }
+      },
+      {
+        "hour": 9,
+        "uhrzeit": "01.01. 16:00",
+        "soc_start": 100.0,
+        "soc_end": 100.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 9,
+            "eligible_slots": [
+              "01-01 16:00",
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 9.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 10,
+        "uhrzeit": "01.01. 17:00",
+        "soc_start": 100.0,
+        "soc_end": 100.0,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 8,
+            "eligible_slots": [
+              "01-01 17:00",
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 8.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 11,
+        "uhrzeit": "01.01. 18:00",
+        "soc_start": 100.0,
+        "soc_end": 48.5,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 16.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 16.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 13,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 143.0,
+            "effective_target_kwh": 16.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 7,
+            "eligible_slots": [
+              "01-01 18:00",
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 7.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 11.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 12,
+        "uhrzeit": "01.01. 19:00",
+        "soc_start": 48.5,
+        "soc_end": 47.1,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 12,
+            "eligible_slots": [
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 132.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 6,
+            "eligible_slots": [
+              "01-01 19:00",
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 6.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 13,
+        "uhrzeit": "01.01. 20:00",
+        "soc_start": 47.1,
+        "soc_end": 45.7,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 11,
+            "eligible_slots": [
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 121.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 5,
+            "eligible_slots": [
+              "01-01 20:00",
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 5.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 14,
+        "uhrzeit": "01.01. 21:00",
+        "soc_start": 45.7,
+        "soc_end": 44.3,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 10,
+            "eligible_slots": [
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 110.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 4,
+            "eligible_slots": [
+              "01-01 21:00",
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 4.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 15,
+        "uhrzeit": "01.01. 22:00",
+        "soc_start": 44.3,
+        "soc_end": 42.9,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 9,
+            "eligible_slots": [
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 99.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 3,
+            "eligible_slots": [
+              "01-01 22:00",
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 3.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 16,
+        "uhrzeit": "01.01. 23:00",
+        "soc_start": 42.9,
+        "soc_end": 41.5,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 8,
+            "eligible_slots": [
+              "01-01 23:00",
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 88.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 2,
+            "eligible_slots": [
+              "01-01 23:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 2.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 17,
+        "uhrzeit": "02.01. 00:00",
+        "soc_start": 41.5,
+        "soc_end": 50.0,
+        "steuerbefehl": "Zwangsladen (0.438 kW)",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 7,
+            "eligible_slots": [
+              "01-02 00:00",
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 77.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 18,
+        "uhrzeit": "02.01. 01:00",
+        "soc_start": 50.0,
+        "soc_end": 48.6,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 6,
+            "eligible_slots": [
+              "01-02 01:00",
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 66.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 19,
+        "uhrzeit": "02.01. 02:00",
+        "soc_start": 48.6,
+        "soc_end": 47.2,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 5,
+            "eligible_slots": [
+              "01-02 02:00",
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 55.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 20,
+        "uhrzeit": "02.01. 03:00",
+        "soc_start": 47.2,
+        "soc_end": 45.8,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 4,
+            "eligible_slots": [
+              "01-02 03:00",
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 44.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 21,
+        "uhrzeit": "02.01. 04:00",
+        "soc_start": 45.8,
+        "soc_end": 44.4,
+        "steuerbefehl": "Automatikbetrieb",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 3,
+            "eligible_slots": [
+              "01-02 04:00",
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 33.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 22,
+        "uhrzeit": "02.01. 05:00",
+        "soc_start": 44.4,
+        "soc_end": 50.0,
+        "steuerbefehl": "Zwangsladen (0.289 kW)",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 2,
+            "eligible_slots": [
+              "01-02 05:00",
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 22.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 0.0,
+          "standard": 0.0,
+          "waschmaschine": 0.0
+        }
+      },
+      {
+        "hour": 23,
+        "uhrzeit": "02.01. 06:00",
+        "soc_start": 50.0,
+        "soc_end": 50.0,
+        "steuerbefehl": "Entladesperre aktiv",
+        "remaining_kwh": {
+          "ev": 5.842,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        },
+        "delivery_diag": {
+          "ev": {
+            "planned": true,
+            "remaining_kwh": 5.842,
+            "min_on_hours": 1,
+            "generic_flex": false,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 11.0,
+            "max_deliverable_kwh": 11.0,
+            "effective_target_kwh": 5.842,
+            "target_gap_kwh": 0.0
+          },
+          "standard": {
+            "planned": false,
+            "remaining_kwh": 0.0,
+            "min_on_hours": 2,
+            "generic_flex": true
+          },
+          "waschmaschine": {
+            "planned": true,
+            "remaining_kwh": 1.0,
+            "min_on_hours": 3,
+            "generic_flex": true,
+            "eligible_count": 1,
+            "eligible_slots": [
+              "01-02 06:00"
+            ],
+            "max_kw": 1.0,
+            "max_deliverable_kwh": 1.0,
+            "effective_target_kwh": 1.0,
+            "target_gap_kwh": 0.0
+          }
+        },
+        "flex_kw": {
+          "ev": 5.84,
+          "standard": 0.0,
+          "waschmaschine": 1.0
+        }
+      }
+    ],
+    "delivered_flex": {
+      "ev": 16.84,
+      "standard": 6.0,
+      "waschmaschine": 3.0
+    },
+    "end_soc": 50.0
+  }
+]
