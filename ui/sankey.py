@@ -29,6 +29,14 @@ from ui.chart_colors import (
 _MIN_FLOW_KW = produktiv.MIN_REAL_FLOW_KW
 
 
+def _flex_kw_for_consumer(flex_kw: dict, consumer: dict) -> float:
+    """Lookup live kW by runtime id (legacy_id) with fallback to canonical id."""
+    from settings.flexible_consumers import runtime_consumer_id
+
+    runtime_id = runtime_consumer_id(consumer)
+    return float(flex_kw.get(runtime_id, flex_kw.get(consumer["id"], 0.0)) or 0.0)
+
+
 def _grid_label(grid_kw: float) -> str:
     if grid_kw >= 0:
         return f"🔌 Stromnetz (Bezug: {grid_kw:.2f} kW)"
@@ -135,7 +143,6 @@ def _prepare_sankey_data(
     links = _SankeyLinks()
 
     if breakdown:
-        from settings.flexible_consumers import runtime_consumer_id
         from simulation.engine import resolved_flexible_consumers
 
         consumers = resolved_flexible_consumers(
@@ -147,10 +154,7 @@ def _prepare_sankey_data(
         flex_labels = [
             _flex_label(
                 consumer,
-                float(
-                    flex_kw.get(runtime_consumer_id(consumer), flex_kw.get(consumer["id"], 0.0))
-                    or 0.0
-                ),
+                _flex_kw_for_consumer(flex_kw, consumer),
                 main_state,
             )
             for consumer in consumers
@@ -165,7 +169,7 @@ def _prepare_sankey_data(
         overlay = produktiv.has_produktiv_run(main_state)
         for consumer in consumers:
             node_color = consumer_chart_color(consumer)
-            live_kw = float((breakdown.get("flex_kw") or {}).get(consumer["id"], 0.0) or 0.0)
+            live_kw = _flex_kw_for_consumer(breakdown.get("flex_kw") or {}, consumer)
             if overlay:
                 node_color = produktiv.flex_node_color(
                     node_color,
@@ -185,7 +189,7 @@ def _prepare_sankey_data(
                 hover=f"Grundlast: {breakdown['baseload_kw']:.2f} kW",
             )
         for i, consumer in enumerate(consumers):
-            live_kw = float((breakdown.get("flex_kw") or {}).get(consumer["id"], 0.0) or 0.0)
+            live_kw = _flex_kw_for_consumer(breakdown.get("flex_kw") or {}, consumer)
             link_kw, is_placeholder = produktiv.flex_sankey_link(
                 live_kw,
                 consumer["id"],

@@ -42,3 +42,4 @@ CONF_Businessplan/
 
 # Lokale Test-Metriken (JUnit-Historie, Coverage, health-report)
 .pytest_cache/test-metrics/
+debug-*.log

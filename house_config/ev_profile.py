@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from optimizer.charging_context import hour_in_charging_window
 from settings.ev_power import merge_ev_power_conversion_fields
 from settings.flexible_consumers import normalize_day_schedule, target_kwh_from_rest_soc
 
@@ -87,6 +86,8 @@ def estimate_ev_annual_kwh(consumer: dict) -> float:
 
 def _charging_hours_from_arrival(from_h: int, ready_h: int) -> list[int]:
     """Ladestunden ab car_available_from_hour (Ankunft) vorwärts bis vor ready_by_hour."""
+    from optimizer.charging_context import hour_in_charging_window
+
     from_h %= 24
     ready_h %= 24
     ordered: list[int] = []

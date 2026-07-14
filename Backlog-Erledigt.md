@@ -3,9 +3,22 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 1.96 — Consumers P1 (2026-07-14)
+
+Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — Phase **1.96** (P1a–P1d) + **1.96d** silent-stack prod migration.
+
+- [x] **P1a — Resolved flex registry** — `simulation.engine.resolved_flexible_consumers()`; `consumer_has_daily_target()` for `generic_flex_window`, `thermal_annual`, EV `charging_schedule` (`settings/flexible_consumers.py`)
+- [x] **P1b — Backtesting Chart 1** — display bundle / `flex_consumers_from_snapshot` → `chart_flex_consumers_context`; bridged generics in down-stack (`ui/backtesting_display_bundle.py`, `ui/chart_consumer_stack.py`)
+- [x] **P1c — Live cockpit + Sankey** — Chart 1 + Sankey use resolved flex when `house_profile_id` set; Sankey `flex_kw` via `runtime_consumer_id` / `legacy_id` (`ui/sankey.py`, `ui/charts.py`)
+- [x] **P1d — Tests & docs** — `tests/test_chart_consumer_stack.py`; [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md) UI discovery section
+- [x] **Bugfix `config.reload` circular import** — lazy `hour_in_charging_window` import in `house_config/ev_profile.py` (Sankey/countdown fragments on `reload_runtime_config()`)
+- [x] **EV bridge Loxone passthrough** — `planning_ev_to_milp` copies `loxone_inputs` / `loxone_outputs` / `charging_schedule.loxone` from house profile (`house_config/planning_flex_bridge.py`; tests `tests/test_planning_matrix_profile_spec.py`)
+- [x] **1.96d prod migration (silent stack)** — `migrate_flex_consumers` on `silent-migration-test`; `appliances[]` retired; WM/Trockner/GS as profile `generic` consumers; manual Chart 1 / Sankey parity confirmed
+
+
 ### Silent-stack debug sessions (2026-07-14)
 
-Local abnahme stack (`silent-migration-test`, Streamlit `:8512`, `main.py`). Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md). Open follow-ups → [Backlog.md](Backlog.md) § Version 1.96 / **1.99**; [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+Local abnahme stack (`silent-migration-test`, Streamlit `:8512`, `main.py`). Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md). Open follow-ups → [Backlog.md](Backlog.md) § **1.99**; [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 - [x] **Betrieb / Cockpit unlock after 2.0 migration** — empty root `flexible_consumers[]` wrongly triggered greenfield onboarding → Cockpit hidden while `main.py` ran; `needs_planning_onboarding` now treats house-profile consumers with Loxone wiring as live stack (`ui/setup_readiness.py`, `ui/setup_progress.py`; tests `tests/test_setup_readiness.py`, `tests/test_setup_progress.py`)
 - [x] **Config drift false positives** — `config/config.example.json` still had pre-2.0 keys (`eauto_milp`, `appliances[]`, `system.loxone_silent_mode`) → 3 drift items vs migrated silent stack; examples aligned to 2.0 shape (`config.example.json`, `config.minimal.json`, `config/house_profiles.example.json`; tests `tests/test_config_drift.py`, `tests/test_greenfield_bootstrap.py`; docs [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md))
@@ -74,7 +87,7 @@ Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-mi
 
 - [x] **SE per-worker progress** — `.backtesting_progress/` directory with one JSON per worker; Streamlit shows a bar per active scenario (`simulation/backtesting_progress.py`, `scripts/run_backtesting.py`, `ui/backtesting.py`)
 - [x] **diag_single_window `--hour-offset`** — anchor window uses `BACKTESTING_YEAR` instead of hardcoded 2025
-- [x] **1.96d appliances unify (code)** — `appliance_recommendation` on house-profile `generic` consumers; `get_appliances()` reads profile first; `migrate_flex_consumers` retires `appliances[]`; legacy schedule key remap (`settings/appliances.py`, `runtime_store/appliance_schedules.py`). **Follow-up (open):** prod migration on NAS → [Backlog.md](Backlog.md) **1.96d prod migration**
+- [x] **1.96d appliances unify (code)** — `appliance_recommendation` on house-profile `generic` consumers; `get_appliances()` reads profile first; `migrate_flex_consumers` retires `appliances[]`; legacy schedule key remap (`settings/appliances.py`, `runtime_store/appliance_schedules.py`). Silent-stack prod migration → § Version 1.96 — Consumers P1
 - [x] **1.99 P6b cutover runbook** — [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md)
 
 
@@ -223,7 +236,7 @@ Greenfield matrix: `greenfield/config/backtesting_scenarios.json` — `live`, `s
   - [x] Chart 1 — house-profile flex consumers not shown separately (**investigated 2026-07-13**)
     - **Calculation OK** — snapshot/matrix columns (`Standard (kW)`, `Waschmaschine (kW)`, `EV (kW)`) and plausibility targets correct; `meta._flexible_consumers` populated
     - **UI gap** — Chart 1 uses `get_flexible_consumers(optimizer_only=True)`; bridged generics fail `consumer_has_daily_target()` → only EV rendered; hidden flex misattributed in flow-balance down-stack (thermal `haus` correctly in Grundlast)
-    - **Fix** — **1.97 Consumers P1** (with **Thermals P1** migration, **1.96**); not automatic after storage consolidation alone
+    - **Fix** — **1.96 Consumers P1** (with **Thermals P1** migration); not automatic after storage consolidation alone
 
 
 ### Smoketest Phase C — polish follow-ups (2026-07-13)
