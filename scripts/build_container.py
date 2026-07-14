@@ -38,8 +38,8 @@ def _run_deploy_tariff_gate() -> None:
         scenarios_path=str(REPO_ROOT / "config" / "backtesting_scenarios.example.json"),
         schema_path=str(REPO_ROOT / "config" / "tariffs.schema.json"),
         check_catalog=True,
-        import_json=str(REPO_ROOT / "stromtarife_dach_kombiniert.json"),
-        export_json=str(REPO_ROOT / "einspeisetarife_dach_erweitert.json"),
+        import_json=str(REPO_ROOT / "docs" / "spec" / "stromtarife_dach_kombiniert.json"),
+        export_json=str(REPO_ROOT / "docs" / "spec" / "einspeisetarife_dach_erweitert.json"),
     )
     if errors:
         detail = "\n".join(f"  - {item}" for item in errors)
