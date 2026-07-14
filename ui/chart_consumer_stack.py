@@ -19,6 +19,7 @@ from optimizer.targets import (
     consumer_immediate_charge_column_name,
     consumer_pv_follow_column_name,
 )
+from runtime_store.history_timeline import PV_IST_COLUMN
 from ui.chart_colors import (
     COLOR_STEER_BASELINE,
     COLOR_STEER_DEFAULT,
@@ -38,6 +39,7 @@ _CHART_FLEX_OVERRIDE: ContextVar[list[dict] | None] = ContextVar(
 _RESERVED_KW_COLUMNS = frozenset(
     {
         "PV-Prognose (kW)",
+        PV_IST_COLUMN,
         "Verbrauch-Prognose (kW)",
         "Netzbezug (kW)",
         "Geplante Batterie-Aktion (kW)",

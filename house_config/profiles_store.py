@@ -17,20 +17,37 @@ from house_config.generic_schedule import (
 CONSUMER_TYPES = frozenset({"generic", "thermal_annual", "ev", "thermal_rc"})
 
 
+def _copy_loxone_binding(raw: dict, spec: dict) -> None:
+    loxone_inputs = raw.get("loxone_inputs")
+    if isinstance(loxone_inputs, dict) and loxone_inputs:
+        spec["loxone_inputs"] = dict(loxone_inputs)
+    loxone_outputs = raw.get("loxone_outputs")
+    if isinstance(loxone_outputs, dict) and loxone_outputs:
+        spec["loxone_outputs"] = dict(loxone_outputs)
+
+
+def _thermal_rc_source(raw: dict) -> dict:
+    nested = raw.get("thermal_rc")
+    if isinstance(nested, dict):
+        return nested
+    return raw
+
+
 def _normalize_thermal_rc(raw: dict, index: int, profile_id: str) -> dict:
-    volume = float(raw.get("water_volume_liters", 0.0) or 0.0)
+    source = _thermal_rc_source(raw)
+    volume = float(source.get("water_volume_liters", 0.0) or 0.0)
     if volume <= 0:
         raise ValueError(
             f"profiles '{profile_id}' consumers[{index}]: "
             "water_volume_liters muss > 0 sein."
         )
-    efficiency = float(raw.get("heating_efficiency", 0.0) or 0.0)
+    efficiency = float(source.get("heating_efficiency", 0.0) or 0.0)
     if not 0.0 < efficiency <= 1.0:
         raise ValueError(
             f"profiles '{profile_id}' consumers[{index}]: "
             "heating_efficiency muss zwischen 0 (exklusiv) und 1 liegen."
         )
-    heat_loss = raw.get("heat_loss_kw_per_k")
+    heat_loss = source.get("heat_loss_kw_per_k")
     if heat_loss is None:
         raise ValueError(
             f"profiles '{profile_id}' consumers[{index}]: heat_loss_kw_per_k fehlt."
@@ -41,8 +58,8 @@ def _normalize_thermal_rc(raw: dict, index: int, profile_id: str) -> dict:
             f"profiles '{profile_id}' consumers[{index}]: "
             "heat_loss_kw_per_k muss >= 0 sein."
         )
-    setpoint = raw.get("setpoint_c")
-    tolerance = raw.get("tolerance_c")
+    setpoint = source.get("setpoint_c")
+    tolerance = source.get("tolerance_c")
     if setpoint is None or tolerance is None:
         raise ValueError(
             f"profiles '{profile_id}' consumers[{index}]: "
@@ -55,7 +72,7 @@ def _normalize_thermal_rc(raw: dict, index: int, profile_id: str) -> dict:
         "heat_loss_kw_per_k": heat_loss,
         "heating_efficiency": efficiency,
     }
-    extra_paths = raw.get("heat_paths")
+    extra_paths = source.get("heat_paths")
     if isinstance(extra_paths, list) and extra_paths:
         block["heat_paths"] = extra_paths
     return block
@@ -130,6 +147,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
         spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 0) or 0))
         spec["battery_capacity_kwh"] = battery_capacity
         spec["charging_schedule"] = normalize_ev_charging_schedule(raw.get("charging_schedule"))
+        _copy_loxone_binding(raw, spec)
     if consumer_type == "thermal_annual":
         hwb_raw = raw.get("hwb_kwh_m2")
         hwb_value = float(hwb_raw) if hwb_raw not in (None, "") else 0.0
@@ -157,6 +175,19 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
             spec["max_pulses_per_day"] = max(1, int(raw.get("max_pulses_per_day", 4) or 4))
     elif consumer_type == "thermal_rc":
         spec["thermal_rc"] = _normalize_thermal_rc(raw, index, profile_id)
+        min_on = raw.get("min_on_quarterhours")
+        if min_on is not None:
+            spec["min_on_quarterhours"] = max(0, int(min_on) or 0)
+        if raw.get("heating_power_threshold_kw") is not None:
+            spec["heating_power_threshold_kw"] = float(raw["heating_power_threshold_kw"])
+        if raw.get("actual_temp_step_c") is not None:
+            spec["actual_temp_step_c"] = float(raw["actual_temp_step_c"])
+        _copy_loxone_binding(raw, spec)
+        thermal_control = raw.get("thermal_control")
+        if isinstance(thermal_control, dict):
+            loxone = thermal_control.get("loxone")
+            if isinstance(loxone, dict) and loxone:
+                spec["thermal_control"] = {"loxone": dict(loxone)}
     legacy_id = str(raw.get("legacy_id", "")).strip()
     if legacy_id and legacy_id != consumer_id:
         spec["legacy_id"] = legacy_id
@@ -200,6 +231,10 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
             consumer["thermal"]["latitude"] = latitude
             consumer["thermal"]["longitude"] = longitude
+        if consumer["type"] == "thermal_rc" and consumer.get("thermal_rc"):
+            consumer["thermal_rc"]["latitude"] = latitude
+            consumer["thermal_rc"]["longitude"] = longitude
+            consumer["thermal_rc"]["timezone_name"] = timezone_name
         if consumer["id"] in seen:
             raise ValueError(
                 f"profiles '{profile_id}': doppelte consumer id '{consumer['id']}'."
@@ -306,11 +341,35 @@ def _serialize_consumer(consumer: dict) -> dict:
         out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 0)
         out["battery_capacity_kwh"] = consumer["battery_capacity_kwh"]
         out["charging_schedule"] = consumer["charging_schedule"]
+        if consumer.get("loxone_inputs"):
+            out["loxone_inputs"] = dict(consumer["loxone_inputs"])
+        if consumer.get("loxone_outputs"):
+            out["loxone_outputs"] = dict(consumer["loxone_outputs"])
+        if consumer.get("legacy_id"):
+            out["legacy_id"] = consumer["legacy_id"]
     if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
         thermal = dict(consumer["thermal"])
         thermal.pop("latitude", None)
         thermal.pop("longitude", None)
         out.update(thermal)
+    elif consumer["type"] == "thermal_rc":
+        rc = consumer.get("thermal_rc")
+        if isinstance(rc, dict):
+            out["thermal_rc"] = dict(rc)
+        if consumer.get("min_on_quarterhours") is not None:
+            out["min_on_quarterhours"] = consumer["min_on_quarterhours"]
+        if consumer.get("heating_power_threshold_kw") is not None:
+            out["heating_power_threshold_kw"] = consumer["heating_power_threshold_kw"]
+        if consumer.get("actual_temp_step_c") is not None:
+            out["actual_temp_step_c"] = consumer["actual_temp_step_c"]
+        if consumer.get("loxone_inputs"):
+            out["loxone_inputs"] = dict(consumer["loxone_inputs"])
+        if consumer.get("loxone_outputs"):
+            out["loxone_outputs"] = dict(consumer["loxone_outputs"])
+        if consumer.get("thermal_control"):
+            out["thermal_control"] = dict(consumer["thermal_control"])
+        if consumer.get("legacy_id"):
+            out["legacy_id"] = consumer["legacy_id"]
     return out
 
 

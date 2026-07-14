@@ -51,3 +51,45 @@ def test_should_show_config_drift_true_after_live_config(monkeypatch):
         lambda: False,
     )
     assert should_show_config_drift() is True
+
+
+def test_find_config_drift_no_legacy_blocks_for_2_0_migrated_config():
+    """2.0 configs omit root eauto_milp, appliances[], system.loxone_silent_mode."""
+    example = {
+        "market_prices": {"missing_price_strategy": "forecast"},
+        "system": {"global_timeout": 10, "event_triggers": []},
+        "flexible_consumers": [],
+        "live_scenario_id": "live",
+    }
+    actual = {
+        "market_prices": {"missing_price_strategy": "forecast"},
+        "system": {
+            "global_timeout": 10,
+            "event_trigger_enabled": True,
+            "event_triggers": [],
+        },
+        "flexible_consumers": [],
+        "live_scenario_id": "live",
+    }
+
+    items = find_config_drift(example, actual)
+    assert items == []
+
+
+def test_repo_example_matches_silent_migration_config_shape():
+    """Regression: migrated silent-migration config must not drift against config.example.json."""
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    example_path = repo_root / "config" / "config.example.json"
+    silent_path = repo_root / "silent-migration-test" / "config" / "config.json"
+    if not silent_path.is_file():
+        import pytest
+
+        pytest.skip("silent-migration-test/config/config.json nicht vorhanden")
+
+    import json
+
+    example = json.loads(example_path.read_text(encoding="utf-8"))
+    actual = json.loads(silent_path.read_text(encoding="utf-8"))
+    assert find_config_drift(example, actual) == []

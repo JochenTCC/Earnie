@@ -44,9 +44,13 @@ Manual validation (dynamic tariff, fixed tariff Δ€, SE `live`) → [Backlog-E
 
 Suggested next steps (SE progress, diag tooling, 1.96d code, cutover runbook) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — suggested next steps (2026-07-14).
 
+Silent-stack debug sessions (Hausconfig, Chart 1, `main.py` SwimSpa, config drift) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Silent-stack debug sessions (2026-07-14). Open regressions → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+
+- [ ] **Bugfix `config.reload` circular import** — `ev_profile` → `optimizer.charging_context` → `optimizer/__init__` → `config` breaks Streamlit fragments on `reload_runtime_config()` (countdown, Sankey); lazy import or move `hour_in_charging_window` out of optimizer package
+
 ### Version 1.99 — Live cutover (former P6b)
 
-- [ ] **P6b** — Non-silent NAS live cutover — Phase **1.99** in plan. **Prerequisite:** your sign-off after manual validation ([Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation); runbook [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md). Open migration: **1.95** / **1.96** / **1.96d prod**.
+- [ ] **P6b** — Non-silent NAS live cutover — Phase **1.99** in plan. **Prerequisite:** your sign-off after manual validation ([Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation); runbook [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md). Open migration: **1.96** / **1.96d prod**.
 - [ ] Set up debug page for Loxone communication showing read data with last update, whether data was sent to Loxone successfully (with value and ++++++++++++++++++++++++++++++++++++++++timestamp — when silentmode==false)
 - [ ] File structure hygiene
   - Own directory for docker container stuff
@@ -81,6 +85,7 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 ### Version 2.+1
 
+- [ ] Make main.py controllable from streamlit.app (Checks must be included if main.py is runnin already, if necessary change spec / doc and put it in one container as deamon or so)
 - [ ] **Debug dump phase 2 — sharpen dump formats and reproduction**
   - Goal: a debug dump should make a case **traceable and as reproducible as possible** later without searching prod files again
   - Clearly separate dump types:

@@ -321,6 +321,29 @@ def test_needs_planning_onboarding_true_for_empty_flex_list():
     )
 
 
+def test_needs_planning_onboarding_false_for_migrated_profile_loxone():
+    profiles_doc = {
+        "profiles": [
+            {
+                "id": "example_efh",
+                "consumers": [
+                    {
+                        "id": "ev",
+                        "loxone_inputs": {"power_name": "Ernie_EAuto_P_act"},
+                    }
+                ],
+            }
+        ]
+    }
+    assert (
+        setup_readiness.needs_planning_onboarding_from_raw(
+            {"flexible_consumers": [], "live_scenario_id": "live"},
+            profiles_doc=profiles_doc,
+        )
+        is False
+    )
+
+
 def test_betrieb_unlocked_after_live_config(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(

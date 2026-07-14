@@ -28,8 +28,47 @@ def _read_json_document(path: str) -> dict:
     return {}
 
 
-def needs_planning_onboarding_from_raw(raw: dict) -> bool:
+def _config_has_legacy_flex_entries(raw: dict) -> bool:
+    flex = raw.get("flexible_consumers")
+    return isinstance(flex, list) and len(flex) > 0
+
+
+def _consumer_has_live_loxone_wiring(consumer: dict) -> bool:
+    if consumer.get("loxone_inputs") or consumer.get("loxone_outputs"):
+        return True
+    charging = consumer.get("charging_schedule")
+    if isinstance(charging, dict) and isinstance(charging.get("loxone"), dict):
+        if charging["loxone"]:
+            return True
+    thermal = consumer.get("thermal_control")
+    if isinstance(thermal, dict) and isinstance(thermal.get("loxone"), dict):
+        if thermal["loxone"]:
+            return True
+    return False
+
+
+def _house_profile_has_live_loxone_consumers(profiles_doc: dict) -> bool:
+    """Post-migration 2.0: flex consumers live in house_profiles with Loxone wiring."""
+    for _profile_id, profile in _iter_profiles_from_doc(profiles_doc):
+        consumers = profile.get("consumers", [])
+        if not isinstance(consumers, list):
+            continue
+        for consumer in consumers:
+            if isinstance(consumer, dict) and _consumer_has_live_loxone_wiring(consumer):
+                return True
+    return False
+
+
+def needs_planning_onboarding_from_raw(
+    raw: dict,
+    *,
+    profiles_doc: dict | None = None,
+) -> bool:
     """True nach Minimal-Bootstrap (keine Live-Verbraucher in config.json)."""
+    if _config_has_legacy_flex_entries(raw):
+        return False
+    if profiles_doc is not None and _house_profile_has_live_loxone_consumers(profiles_doc):
+        return False
     flex = raw.get("flexible_consumers")
     if isinstance(flex, list):
         return len(flex) == 0
@@ -39,7 +78,8 @@ def needs_planning_onboarding_from_raw(raw: dict) -> bool:
 def needs_planning_onboarding() -> bool:
     """True nach Minimal-Bootstrap (keine Live-Verbraucher in config.json)."""
     raw = _read_json_document(resolve_config_json_path())
-    return needs_planning_onboarding_from_raw(raw)
+    profiles_doc = _read_json_document(resolve_house_profiles_json_path())
+    return needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc)
 
 
 def _iter_profiles_from_doc(doc: dict):
@@ -91,11 +131,11 @@ def missing_house_config_items_for(
     house_profiles_path: str,
 ) -> list[str]:
     """Fehlende Schritte im Hauskonfigurator (Hausprofil, Batterie)."""
-    if not needs_planning_onboarding_from_raw(raw):
+    profiles_doc = _read_json_document(house_profiles_path)
+    if not needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc):
         return []
 
     missing: list[str] = []
-    profiles_doc = _read_json_document(house_profiles_path)
     if not _has_house_profile_in_doc(profiles_doc):
         missing.append("Hausprofil anlegen (Hauskonfigurator → Hausprofil)")
     components_doc = _read_json_document(components_path)
@@ -113,7 +153,8 @@ def missing_runtime_scenario_items_for(
     backtesting_scenarios_path: str | None = None,
 ) -> list[str]:
     """Fehlende Schritte für Live-Szenario und Echtzeit-Umgebung."""
-    if not needs_planning_onboarding_from_raw(raw):
+    profiles_doc = _read_json_document(house_profiles_path)
+    if not needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc):
         return []
 
     from house_config.scenario_resolution import (
@@ -151,7 +192,6 @@ def missing_runtime_scenario_items_for(
     if not export_id or export_id not in export_map:
         missing.append("Einspeisetarif wählen (Echtzeit-Umgebung)")
 
-    profiles_doc = _read_json_document(house_profiles_path)
     profile_id = str(live_settings.get("house_profile_id", "") or "").strip()
     if not profile_id:
         profile_id = _default_house_profile_id_from_doc(profiles_doc)
@@ -191,7 +231,8 @@ def is_planning_ready_for(
     backtesting_scenarios_path: str | None = None,
 ) -> bool:
     """Alle Mindestanforderungen für Scenario-Exploration erfüllt (explizite Pfade)."""
-    if not needs_planning_onboarding_from_raw(raw):
+    profiles_doc = _read_json_document(house_profiles_path)
+    if not needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc):
         return True
     return not missing_planning_setup_items_for(
         raw,

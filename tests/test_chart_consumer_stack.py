@@ -320,6 +320,27 @@ def test_chart_stack_discovers_bridged_generics_with_bundle_context(monkeypatch)
     assert "Standard" in names
 
 
+def test_pv_ist_column_not_discovered_as_flex_consumer(monkeypatch):
+    """PV-Ist (kW) is a log snapshot column, not a flex down-segment."""
+    from runtime_store.history_timeline import PV_IST_COLUMN
+    from ui.chart_flow_balance import build_flow_balance_slots_from_df
+
+    monkeypatch.setattr(config, "get_flexible_consumers", lambda optimizer_only=False: [])
+    df = pd.DataFrame(
+        {
+            "PV-Prognose (kW)": [2.0],
+            "Verbrauch-Prognose (kW)": [1.0],
+            "Netzbezug (kW)": [0.0],
+            "Geplante Batterie-Aktion (kW)": [0.0],
+            PV_IST_COLUMN: [3.5],
+        }
+    )
+    with chart_flex_consumers_context([]):
+        active = _active_consumer_bar_columns(df)
+    assert active == []
+    build_flow_balance_slots_from_df(df, flex_consumers=active)
+
+
 def test_chart_stack_fallback_kw_column_when_not_in_registry(monkeypatch):
     monkeypatch.setattr(config, "get_flexible_consumers", lambda optimizer_only=False: [])
     df = pd.DataFrame({"EV (kW)": [3.0, 0.0]})

@@ -111,6 +111,10 @@ class ModeledClimateContext:
         default_factory=dict,
         repr=False,
     )
+    _thermal_rc_year_profiles: dict[tuple[str, int], list[float]] = field(
+        default_factory=dict,
+        repr=False,
+    )
 
     @classmethod
     def for_house_profile(cls, profile: dict, *, kwp: float) -> ModeledClimateContext:
@@ -243,6 +247,23 @@ class ModeledClimateContext:
 
     def thermal_consumer_kw_at(self, consumer: dict, slot_dt: datetime) -> float:
         profile = self._thermal_hourly_profile_for_year(consumer, slot_dt.year)
+        return float(profile[_slot_hour_index_in_year(slot_dt)])
+
+    def _thermal_rc_hourly_profile_for_year(self, consumer: dict, year: int) -> list[float]:
+        from house_config.thermal_rc_profile import thermal_rc_hourly_kw_from_ambient
+
+        consumer_id = str(consumer.get("id") or consumer.get("label") or "thermal_rc")
+        key = (consumer_id, year)
+        if key in self._thermal_rc_year_profiles:
+            return self._thermal_rc_year_profiles[key]
+
+        bundle = self._bundle_for_calendar_year(year)
+        profile = thermal_rc_hourly_kw_from_ambient(consumer, bundle.temperature_c)
+        self._thermal_rc_year_profiles[key] = profile
+        return profile
+
+    def thermal_rc_consumer_kw_at(self, consumer: dict, slot_dt: datetime) -> float:
+        profile = self._thermal_rc_hourly_profile_for_year(consumer, slot_dt.year)
         return float(profile[_slot_hour_index_in_year(slot_dt)])
 
     def seed_year_bundle(self, year: int, bundle: OpenMeteoClimateBundle) -> None:

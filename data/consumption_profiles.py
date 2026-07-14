@@ -63,6 +63,8 @@ def modeled_consumer_kw_at_datetime(
     """kW für einen Verbraucher zum Kalenderzeitpunkt (wie Backtesting-Overlay)."""
     if climate is not None and consumer.get("type") == "thermal_annual":
         return climate.thermal_consumer_kw_at(consumer, slot_dt)
+    if climate is not None and consumer.get("type") == "thermal_rc":
+        return climate.thermal_rc_consumer_kw_at(consumer, slot_dt)
     if consumer.get("profile_csv"):
         series = load_hourly_profile_csv(consumer["profile_csv"])
         hour_index = _modeled_hour_index(slot_dt)
@@ -79,6 +81,13 @@ def modeled_consumer_kw_at_datetime(
             hours=MODELED_PROFILE_HOURS_PER_YEAR,
         )
         return float(profile[_modeled_hour_index(slot_dt)])
+    if consumer.get("type") == "thermal_rc":
+        profile = _modeled_consumer_hourly_kw(
+            consumer,
+            hours=MODELED_PROFILE_HOURS_PER_YEAR,
+        )
+        hour_index = _modeled_hour_index(slot_dt)
+        return float(profile[hour_index]) if hour_index < len(profile) else 0.0
     if consumer.get("type") == "generic" and consumer.get("schedule"):
         from house_config.generic_schedule import generic_hourly_kw_for_day
 
@@ -117,6 +126,40 @@ def _modeled_consumer_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
             )
         weekly = weekly_electric_kwh(**heating_params_from_thermal(thermal))
         return hourly_profile_for_year(weekly, hours_per_year=hours)
+    if consumer.get("type") == "thermal_rc":
+        from house_config.thermal_rc_profile import thermal_rc_hourly_kw_from_ambient
+
+        rc = consumer.get("thermal_rc") or consumer
+        lat = rc.get("latitude")
+        lon = rc.get("longitude")
+        if lat is not None and lon is not None:
+            import config as _cfg
+
+            if getattr(_cfg, "CONFIG", None) is not None:
+                from data.open_meteo_solar_archive import (
+                    build_open_meteo_climate_bundle_for_year,
+                    last_full_archive_year,
+                )
+
+                year = last_full_archive_year()
+                bundle = build_open_meteo_climate_bundle_for_year(
+                    year,
+                    lat=float(lat),
+                    lon=float(lon),
+                    timezone=str(rc.get("timezone_name") or _cfg.get_planning_timezone()),
+                    surfaces=[],
+                )
+                profile = thermal_rc_hourly_kw_from_ambient(
+                    consumer,
+                    bundle.temperature_c,
+                )
+                if len(profile) >= hours:
+                    return profile[:hours]
+                pad = profile[-1] if profile else 0.0
+                return profile + [pad] * (hours - len(profile))
+        consumer_kwh = consumer_annual_kwh(consumer)
+        add_kw = consumer_kwh / max(1, hours)
+        return [add_kw] * hours
     if consumer.get("type") == "generic" and consumer.get("schedule"):
         from house_config.generic_schedule import generic_hourly_kw_for_day
 

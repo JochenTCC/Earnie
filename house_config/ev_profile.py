@@ -48,6 +48,9 @@ def normalize_ev_charging_schedule(raw: dict | None) -> dict:
     milp = normalize_ev_milp_block(raw.get("milp"))
     if milp:
         result["milp"] = milp
+    loxone = raw.get("loxone")
+    if isinstance(loxone, dict) and loxone:
+        result["loxone"] = dict(loxone)
     return result
 
 

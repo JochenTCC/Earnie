@@ -150,7 +150,9 @@ def test_config_minimal_live_scenario_id_only():
 
     assert "runtime_settings" not in minimal
     assert minimal.get("live_scenario_id") == "live"
-    assert minimal["system"]["loxone_silent_mode"] is True
+    assert "eauto_milp" not in minimal
+    assert "appliances" not in minimal
+    assert "loxone_silent_mode" not in minimal.get("system", {})
 
     scenarios_path = repo_root / "config" / "backtesting_scenarios.minimal.json"
     scenarios = json.loads(scenarios_path.read_text(encoding="utf-8"))

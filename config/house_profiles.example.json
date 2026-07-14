@@ -43,7 +43,76 @@
                             "car_available_from_hour": 20,
                             "ready_by_hour": 9,
                             "daily_rest_soc": 30.0
+                        },
+                        "milp": {
+                            "live_modus_a_min_remaining_kwh": 2.8,
+                            "tie_break_on_epsilon": 0.001,
+                            "tie_break_time_epsilon": 0.0001
                         }
+                    },
+                    "loxone_inputs": {
+                        "power_name": "Ernie_EAuto_P_act"
+                    },
+                    "loxone_outputs": {
+                        "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
+                        "pv_follow_name": "Ernie_EAuto_pv_follow"
+                    },
+                    "legacy_id": "eauto"
+                },
+                {
+                    "id": "waschmaschine",
+                    "label": "Waschmaschine",
+                    "type": "generic",
+                    "nominal_power_kw": 2.0,
+                    "annual_kwh": 520.0,
+                    "schedule": {
+                        "runs_per_week": 5,
+                        "duration_h": 2.0,
+                        "start_hour": 15,
+                        "start_shift_h": 4.0
+                    },
+                    "appliance_recommendation": {
+                        "power_source": "loxone",
+                        "loxone_power_name": "Leistung Waschmaschine",
+                        "default_power_kw": 2.0,
+                        "default_runtime_h": 2.0
+                    }
+                },
+                {
+                    "id": "trockner",
+                    "label": "Trockner",
+                    "type": "generic",
+                    "nominal_power_kw": 2.5,
+                    "annual_kwh": 390.0,
+                    "schedule": {
+                        "runs_per_week": 3,
+                        "duration_h": 1.5,
+                        "start_hour": 16,
+                        "start_shift_h": 4.0
+                    },
+                    "appliance_recommendation": {
+                        "power_source": "loxone",
+                        "loxone_power_name": "Leistung Trockner",
+                        "default_power_kw": 2.5,
+                        "default_runtime_h": 1.5
+                    }
+                },
+                {
+                    "id": "geschirrspueler",
+                    "label": "Geschirrspüler",
+                    "type": "generic",
+                    "nominal_power_kw": 1.2,
+                    "annual_kwh": 374.0,
+                    "schedule": {
+                        "runs_per_week": 6,
+                        "duration_h": 2.5,
+                        "start_hour": 12,
+                        "start_shift_h": 8.0
+                    },
+                    "appliance_recommendation": {
+                        "power_source": "manual",
+                        "default_power_kw": 1.2,
+                        "default_runtime_h": 2.5
                     }
                 }
             ]

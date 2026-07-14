@@ -3,6 +3,19 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Silent-stack debug sessions (2026-07-14)
+
+Local abnahme stack (`silent-migration-test`, Streamlit `:8512`, `main.py`). Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md). Open follow-ups → [Backlog.md](Backlog.md) § Version 1.96 / **1.99**; [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+
+- [x] **Betrieb / Cockpit unlock after 2.0 migration** — empty root `flexible_consumers[]` wrongly triggered greenfield onboarding → Cockpit hidden while `main.py` ran; `needs_planning_onboarding` now treats house-profile consumers with Loxone wiring as live stack (`ui/setup_readiness.py`, `ui/setup_progress.py`; tests `tests/test_setup_readiness.py`, `tests/test_setup_progress.py`)
+- [x] **Config drift false positives** — `config/config.example.json` still had pre-2.0 keys (`eauto_milp`, `appliances[]`, `system.loxone_silent_mode`) → 3 drift items vs migrated silent stack; examples aligned to 2.0 shape (`config.example.json`, `config.minimal.json`, `config/house_profiles.example.json`; tests `tests/test_config_drift.py`, `tests/test_greenfield_bootstrap.py`; docs [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md))
+- [x] **Hauskonfigurator Loxone bindings stripped on save** — form rebuild + `profiles_store` dropped `loxone_inputs` / `loxone_outputs` / `charging_schedule.loxone` / `thermal_control.loxone`; passthrough merge + EV normalize preserve bindings (`ui/house_config_profile_form.py`, `house_config/profiles_store.py`, `house_config/ev_profile.py`; test `test_house_profile_save_preserves_loxone_bindings`)
+- [x] **Bugfix SwimSpa `main.py` — Ist-Temperatur** — bridged `thermal_rc` lacked Loxone thermal wiring at runtime; restored SwimSpa bindings in silent stack + copy profile Loxone fields through `planning_flex_bridge` (`silent-migration-test/config/house_profiles.json`, `house_config/planning_flex_bridge.py`, `house_config/profiles_store.py`)
+- [x] **Bugfix `thermal_rc` nested save round-trip** — UI saves nested `thermal_rc.*` only; `_normalize_thermal_rc` read top-level → `water_volume_liters` 0 on save; normalize/serialize from `_thermal_rc_source` (`house_config/profiles_store.py`)
+- [x] **Bugfix `thermal_rc` annual consumption 0 kWh** — no `thermal_rc` branch in `consumer_annual_kwh` / hourly profile builders → SwimSpa omitted from totals; RC model path + UI geo injection for preview (`house_config/thermal_rc_profile.py`, `house_config/baseload.py`, `data/consumption_profiles.py`, `data/modeled_climate.py`, `ui/house_config_profile_form.py`; tests `test_consumer_annual_kwh_thermal_rc_with_geo`, `test_silent_migration_profile_includes_swimspa_annual`, `test_inject_profile_geo_adds_thermal_rc_coordinates`)
+- [x] **Bugfix Chart 1 PV-Ist flex discovery** — `PV-Ist (kW)` log column discovered as synthetic flex consumer `pv_ist` → `chart_color_index fehlt`; reserved column via `PV_IST_COLUMN` (`ui/chart_consumer_stack.py`; test `test_pv_ist_column_not_discovered_as_flex_consumer`)
+
+
 ### Version 1.95 — Thermals P1 (2026-07-14)
 
 Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — Phases **1.95a–c**. Core bridge (migrate_flex, SwimSpa 1.94, silent stack) → prior Erledigt entries.
