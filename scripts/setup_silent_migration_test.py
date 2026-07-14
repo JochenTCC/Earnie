@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import shutil
 import sys
 from pathlib import Path
 
 from house_config.migrate_runtime_entities import (
+    RUNTIME_ID_KEYS,
+    RUNTIME_STRIP_KEYS,
     finalize_migration_for_2_0,
     migrate_runtime_entities,
+    _split_components_from_config,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,7 +76,14 @@ def _copy_dotenv(config_dir: Path, config_out: Path, notes: list[str]) -> None:
             "Loxone-Zugangsdaten manuell nach silent-migration-test/config/.env legen."
         )
         return
-    shutil.copy2(src, config_out / ".env")
+    try:
+        shutil.copy2(src, config_out / ".env")
+    except OSError as exc:
+        notes.append(
+            f".env von NAS nicht lesbar ({exc}) — "
+            "Loxone-Zugangsdaten manuell nach silent-migration-test/config/.env legen."
+        )
+        return
     notes.append("config/.env von NAS lokal kopiert (Streamlit kann Credentials speichern).")
 
 
@@ -181,6 +192,83 @@ def _write_review(
     (config_out / "MIGRATION_REVIEW.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def _resolve_tariffs_for_silent_test(tariffs_path: Path) -> tuple[dict, list[str]]:
+    """Prod-NAS liefert oft nur ein Tarif-Subset — für Tests den Repo-Katalog nutzen."""
+    notes: list[str] = []
+    repo_tariffs = ROOT / "config" / "tariffs.json"
+    if tariffs_path.is_file():
+        nas_doc = _read_json(tariffs_path)
+    else:
+        nas_doc = {"import_tariffs": [], "export_tariffs": []}
+    nas_import = len(nas_doc.get("import_tariffs", []))
+    nas_export = len(nas_doc.get("export_tariffs", []))
+    if repo_tariffs.is_file() and (nas_import < 10 or nas_export < 8):
+        notes.append(
+            f"tariffs.json aus Repo-Katalog übernommen "
+            f"(NAS-Subset: {nas_import} Import, {nas_export} Export)."
+        )
+        return _read_json(repo_tariffs), notes
+    notes.append("tariffs.json von NAS übernommen.")
+    return nas_doc, notes
+
+
+def _find_live_scenario_settings(scenarios_doc: dict, live_id: str) -> dict:
+    scenarios = scenarios_doc.get("scenarios", [])
+    if not isinstance(scenarios, list):
+        return {}
+    for item in scenarios:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("id", "")).strip() != live_id:
+            continue
+        settings = item.get("settings", {})
+        if isinstance(settings, dict):
+            return settings
+    return {}
+
+
+def _nas_already_migrated(config: dict) -> bool:
+    """True wenn NAS bereits live_scenario_id hat (2.0) oder nur ID-runtime_settings."""
+    if str(config.get("live_scenario_id", "")).strip():
+        return True
+    runtime = config.get("runtime_settings")
+    if not isinstance(runtime, dict):
+        return False
+    flat_remaining = [key for key in RUNTIME_STRIP_KEYS if key in runtime]
+    if flat_remaining:
+        return False
+    return any(str(runtime.get(key, "")).strip() for key in RUNTIME_ID_KEYS)
+
+
+def _sync_from_migrated_nas(
+    *,
+    config: dict,
+    tariffs: dict,
+    profiles: dict,
+    scenarios_doc: dict | None,
+    live_scenario_id: str,
+) -> tuple[dict, dict, dict, dict, dict, list[str], list[str]]:
+    """Kopiert bereits migrierte NAS-Config (2.0) und splittet components.json."""
+    p5_notes = ["NAS bereits 2.0 — Sidecars direkt übernommen (kein P5-Lauf)."]
+    p6_notes: list[str] = []
+    live_id = str(config.get("live_scenario_id") or live_scenario_id).strip() or "live"
+    scenarios_out = copy.deepcopy(scenarios_doc or {"scenarios": []})
+    live_settings = _find_live_scenario_settings(scenarios_out, live_id)
+    if not live_settings:
+        raise ValueError(
+            f"Live-Szenario '{live_id}' nicht in backtesting_scenarios.json gefunden."
+        )
+    config_out, components_doc = _split_components_from_config(config)
+    if config.get("batteries") or config.get("pv_systems"):
+        p6_notes.append(
+            "batteries[] / pv_systems[] nach components.json verschoben (2.0 Components)."
+        )
+    else:
+        p6_notes.append("components.json aus NAS-config erzeugt.")
+    p6_notes.append(f"Live-Szenario '{live_id}' aus backtesting_scenarios.json übernommen.")
+    return config_out, tariffs, profiles, scenarios_out, components_doc, p5_notes, p6_notes
+
+
 def setup_silent_migration_test(
     *,
     nas_config: Path,
@@ -213,27 +301,47 @@ def setup_silent_migration_test(
     if not profiles_path.is_file():
         profiles_path = ROOT / "config" / "house_profiles.json"
 
-    tariffs = _read_json(tariffs_path)
+    tariffs, tariff_notes = _resolve_tariffs_for_silent_test(tariffs_path)
     profiles = _read_json(profiles_path)
     scenarios_template = _read_json_optional(config_dir / "backtesting_scenarios.json")
 
-    p5_config, p5_tariffs, p5_profiles, p5_notes = migrate_runtime_entities(
-        config,
-        tariffs_doc=tariffs,
-        house_profiles_doc=profiles,
-    )
-    p6_config, scenarios_doc, components_doc, p6_notes = finalize_migration_for_2_0(
-        p5_config,
-        scenarios_template=scenarios_template,
-        live_scenario_id=live_scenario_id,
-    )
-
-    runtime_settings_before = p5_config.get("runtime_settings", {})
-    live_settings = {
-        key: runtime_settings_before[key]
-        for key in runtime_settings_before
-        if str(runtime_settings_before.get(key, "")).strip()
-    }
+    if _nas_already_migrated(config):
+        (
+            p6_config,
+            p5_tariffs,
+            p5_profiles,
+            scenarios_doc,
+            components_doc,
+            p5_notes,
+            p6_notes,
+        ) = _sync_from_migrated_nas(
+            config=config,
+            tariffs=tariffs,
+            profiles=profiles,
+            scenarios_doc=scenarios_template,
+            live_scenario_id=live_scenario_id,
+        )
+        live_settings = _find_live_scenario_settings(
+            scenarios_doc,
+            str(p6_config.get("live_scenario_id") or live_scenario_id).strip() or "live",
+        )
+    else:
+        p5_config, p5_tariffs, p5_profiles, p5_notes = migrate_runtime_entities(
+            config,
+            tariffs_doc=tariffs,
+            house_profiles_doc=profiles,
+        )
+        p6_config, scenarios_doc, components_doc, p6_notes = finalize_migration_for_2_0(
+            p5_config,
+            scenarios_template=scenarios_template,
+            live_scenario_id=live_scenario_id,
+        )
+        runtime_settings_before = p5_config.get("runtime_settings", {})
+        live_settings = {
+            key: runtime_settings_before[key]
+            for key in runtime_settings_before
+            if str(runtime_settings_before.get(key, "")).strip()
+        }
 
     config_out.mkdir(parents=True, exist_ok=True)
     runtime_out.mkdir(parents=True, exist_ok=True)
@@ -267,7 +375,7 @@ def setup_silent_migration_test(
 
     _copy_schemas(config_out)
 
-    copy_notes: list[str] = []
+    copy_notes: list[str] = list(tariff_notes)
     _copy_dotenv(config_dir, config_out, copy_notes)
     _copy_runtime_files(runtime_src, runtime_out, copy_notes)
 

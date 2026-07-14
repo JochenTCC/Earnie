@@ -41,7 +41,12 @@ def _patch_config_flex_ids(monkeypatch, ids: list[str]) -> None:
     monkeypatch.setattr(
         config.CONFIG,
         "_raw_config",
-        {"flexible_consumers": [{"id": consumer_id} for consumer_id in ids]},
+        {
+            "flexible_consumers": [
+                {"id": consumer_id, "chart_color_index": index % 8}
+                for index, consumer_id in enumerate(ids)
+            ]
+        },
     )
 
 

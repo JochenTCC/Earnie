@@ -24,7 +24,7 @@ def is_logged_day_matrix(matrix: list | None) -> bool:
 
 
 def validate_eauto_milp_params(raw: dict) -> dict[str, float]:
-    """Validiert eauto_milp aus config.json; wirft bei fehlenden/ungültigen Werten."""
+    """Validiert MILP-Parameter (root eauto_milp oder charging_schedule.milp)."""
     if not isinstance(raw, dict):
         raise ValueError(
             "Kritischer Konfigurationsfehler: Block 'eauto_milp' fehlt oder ist ungültig."
@@ -56,26 +56,62 @@ def validate_eauto_milp_params(raw: dict) -> dict[str, float]:
     }
 
 
-def eauto_modus_a_active(
+def is_ev_milp_consumer(consumer: dict) -> bool:
+    """EV mit power_setpoint und aktivem charging_schedule."""
+    if not uses_power_setpoint(consumer):
+        return False
+    sched = consumer.get("charging_schedule")
+    return bool(sched and sched.get("enabled"))
+
+
+def milp_params_from_consumer(
+    consumer: dict,
+    root_fallback: dict | None = None,
+) -> dict[str, float] | None:
+    """MILP-Parameter aus charging_schedule.milp oder root eauto_milp (Legacy)."""
+    if not is_ev_milp_consumer(consumer):
+        return None
+    sched = consumer.get("charging_schedule") or {}
+    milp_raw = sched.get("milp")
+    if isinstance(milp_raw, dict) and milp_raw:
+        return validate_eauto_milp_params(milp_raw)
+    if root_fallback:
+        return validate_eauto_milp_params(root_fallback)
+    return None
+
+
+def build_ev_milp_params_by_id(
+    consumers: list,
+    root_fallback: dict[str, float] | None,
+) -> dict[str, dict[str, float]]:
+    result: dict[str, dict[str, float]] = {}
+    for consumer in consumers:
+        params = milp_params_from_consumer(consumer, root_fallback)
+        if params is not None:
+            result[str(consumer["id"])] = params
+    return result
+
+
+def ev_modus_a_active(
     consumer: dict,
     matrix: list | None,
     remaining_kwh: float,
     params: dict[str, float],
 ) -> bool:
     """Live Modus A: kontinuierlicher power_setpoint wenn remaining über Schwelle."""
-    if consumer.get("id") != "eauto" or is_logged_day_matrix(matrix):
+    if not is_ev_milp_consumer(consumer) or is_logged_day_matrix(matrix):
         return False
     return remaining_kwh > params["live_modus_a_min_remaining_kwh"] + 1e-9
 
 
-def eauto_in_modus_b(
+def ev_in_modus_b(
     consumer: dict,
     matrix: list | None,
     remaining_kwh: float,
     params: dict[str, float] | None,
 ) -> bool:
     """Backtesting immer Modus B; Live wenn remaining ≤ Schwelle."""
-    if consumer.get("id") != "eauto":
+    if not is_ev_milp_consumer(consumer):
         return False
     if is_logged_day_matrix(matrix):
         return True
@@ -86,7 +122,12 @@ def eauto_in_modus_b(
         )
     if remaining_kwh <= 1e-9:
         return False
-    return not eauto_modus_a_active(consumer, matrix, remaining_kwh, params)
+    return not ev_modus_a_active(consumer, matrix, remaining_kwh, params)
+
+
+# Backward-compatible aliases
+eauto_modus_a_active = ev_modus_a_active
+eauto_in_modus_b = ev_in_modus_b
 
 
 def milp_uses_power_setpoint(
@@ -98,7 +139,7 @@ def milp_uses_power_setpoint(
     """True, wenn der MILP kontinuierliche kW-Variablen (power_setpoint) nutzt."""
     if not uses_power_setpoint(consumer):
         return False
-    if consumer.get("id") != "eauto":
+    if not is_ev_milp_consumer(consumer):
         return True
     if is_logged_day_matrix(matrix):
         return False
@@ -106,7 +147,7 @@ def milp_uses_power_setpoint(
         raise ValueError(
             "eauto_milp-Konfiguration fehlt für Live E-Auto-Optimierung."
         )
-    return eauto_modus_a_active(consumer, matrix, remaining_kwh, params)
+    return ev_modus_a_active(consumer, matrix, remaining_kwh, params)
 
 
 def milp_binary_charge_kw(
@@ -116,7 +157,7 @@ def milp_binary_charge_kw(
     params: dict[str, float] | None,
 ) -> float:
     """Feste kW pro Einschalt-Stunde im binären MILP-Modus."""
-    if consumer.get("id") == "eauto" and not milp_uses_power_setpoint(
+    if is_ev_milp_consumer(consumer) and not milp_uses_power_setpoint(
         consumer, matrix, remaining_kwh, params
     ):
         _, max_kw = power_limits_kw(consumer)
@@ -124,26 +165,32 @@ def milp_binary_charge_kw(
     return float(consumer["nominal_power_kw"])
 
 
-def eauto_modus_b_uses_milp(
+def ev_modus_b_uses_milp(
     consumer: dict,
     matrix: list | None,
     remaining_kwh: float,
     params: dict[str, float] | None,
 ) -> bool:
-    """True, wenn E-Auto in Modus B über MILP (remaining > P_nom) geplant wird."""
-    if not eauto_in_modus_b(consumer, matrix, remaining_kwh, params):
+    """True, wenn EV in Modus B über MILP (remaining > P_nom) geplant wird."""
+    if not ev_in_modus_b(consumer, matrix, remaining_kwh, params):
         return False
     _, max_kw = power_limits_kw(consumer)
     return remaining_kwh > max_kw + 1e-9
 
 
-def eauto_preset_charge_kw(consumer: dict, remaining_kwh: float) -> float:
+eauto_modus_b_uses_milp = ev_modus_b_uses_milp
+
+
+def ev_preset_charge_kw(consumer: dict, remaining_kwh: float) -> float:
     """kW für eine Preset-Stunde: clamp(remaining, P_min, P_nom)."""
     min_kw, max_kw = power_limits_kw(consumer)
     return max(min_kw, min(remaining_kwh, max_kw))
 
 
-def _eauto_cheapest_eligible_index(
+eauto_preset_charge_kw = ev_preset_charge_kw
+
+
+def _ev_cheapest_eligible_index(
     matrix: list[dict[str, Any]],
     consumer: dict,
     schedule_indices: list[int],
@@ -161,7 +208,7 @@ def _eauto_cheapest_eligible_index(
     return min(eligible, key=lambda t: float(matrix[t]["k_act"]))
 
 
-def eauto_preset_power_now(
+def ev_preset_power_now(
     matrix: list[dict[str, Any]],
     consumer: dict,
     remaining_kwh: float,
@@ -176,16 +223,19 @@ def eauto_preset_power_now(
     0.0: Preset-Modus, aber noch nicht die günstigste Stunde.
     >0: Preset-Laden jetzt mit clamp(remaining, P_min, P_nom).
     """
-    if not eauto_in_modus_b(consumer, matrix, remaining_kwh, params):
+    if not ev_in_modus_b(consumer, matrix, remaining_kwh, params):
         return None
-    if eauto_modus_b_uses_milp(consumer, matrix, remaining_kwh, params):
+    if ev_modus_b_uses_milp(consumer, matrix, remaining_kwh, params):
         return None
-    slot = _eauto_cheapest_eligible_index(
+    slot = _ev_cheapest_eligible_index(
         matrix, consumer, schedule_indices, charging_context
     )
     if slot is None or slot != 0:
         return 0.0
-    return eauto_preset_charge_kw(consumer, remaining_kwh)
+    return ev_preset_charge_kw(consumer, remaining_kwh)
+
+
+eauto_preset_power_now = ev_preset_power_now
 
 
 def split_eauto_preset(
@@ -194,14 +244,15 @@ def split_eauto_preset(
     remaining: dict[str, float],
     schedule_indices: list[int],
     charging_contexts: dict[str, dict],
-    params: dict[str, float] | None,
+    root_milp_fallback: dict[str, float] | None,
 ) -> tuple[dict[str, float], list]:
-    """Trennt Preset-E-Auto (außerhalb MILP) von MILP-Verbrauchern."""
+    """Trennt Preset-EV (außerhalb MILP) von MILP-Verbrauchern."""
     preset_now: dict[str, float] = {}
     milp_consumers: list = []
     for consumer in planned_consumers:
         cid = consumer["id"]
-        preset = eauto_preset_power_now(
+        params = milp_params_from_consumer(consumer, root_milp_fallback)
+        preset = ev_preset_power_now(
             matrix,
             consumer,
             remaining.get(cid, 0.0),

@@ -12,6 +12,7 @@ from requests.auth import HTTPBasicAuth
 import config
 import logging
 from settings.ev_power import kw_from_nominal_reading
+from settings.flexible_consumers import runtime_consumer_id
 
 logger = logging.getLogger(__name__)
 
@@ -485,7 +486,7 @@ def _subtract_shared_meter_loads(
     corrected = dict(result)
     for consumer in consumers:
         subtract_ids = (consumer.get("loxone_inputs") or {}).get("subtract_consumer_ids") or []
-        cid = consumer["id"]
+        cid = runtime_consumer_id(consumer)
         if not subtract_ids or cid not in measured_ids or cid not in corrected:
             continue
         deduction = sum(float(result.get(sub_id, 0.0) or 0.0) for sub_id in subtract_ids)
@@ -524,23 +525,29 @@ def resolve_flexible_consumers_live_power(
     measured_ids: set[str] = set()
 
     for consumer in source:
-        cid = consumer["id"]
-        fallback = float(fallbacks.get(cid, 0.0) or 0.0)
+        runtime_id = runtime_consumer_id(consumer)
+        canonical_id = consumer["id"]
+        fallback = float(
+            fallbacks.get(runtime_id, fallbacks.get(canonical_id, 0.0)) or 0.0
+        )
         io_name = (consumer.get("loxone_inputs") or {}).get("power_name", "")
         measured = _read_consumer_meter_kw(consumer)
         if measured is not None:
-            measured_ids.add(cid)
-            result[cid] = round(float(measured), 3)
+            measured_ids.add(runtime_id)
+            result[runtime_id] = round(float(measured), 3)
             if io_name:
                 logger.debug(
-                    "Loxone Live-Leistung %s: %.3f kW (%s)", cid, result[cid], io_name
+                    "Loxone Live-Leistung %s: %.3f kW (%s)",
+                    runtime_id,
+                    result[runtime_id],
+                    io_name,
                 )
         else:
-            result[cid] = round(fallback, 3)
+            result[runtime_id] = round(fallback, 3)
             if io_name:
                 logger.warning(
                     "Loxone: Keine Live-Leistung für '%s' (%s), Fallback %s kW",
-                    cid,
+                    runtime_id,
                     io_name,
                     fallback,
                 )

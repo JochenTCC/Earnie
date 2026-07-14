@@ -31,6 +31,7 @@ from optimizer.targets import (
     consumer_pv_follow_column_name,
 )
 
+from ui.chart_consumer_stack import _chart_flex_consumers
 from ui.flow_balance_allocate import FlowAllocation, allocate_slot_flows
 from ui.chart_colors import (
     COLOR_BASELOAD,
@@ -669,7 +670,7 @@ def add_flow_balance_traces(
 
 def _default_flex_pairs(row: Mapping[str, Any]) -> list[tuple[dict, str]]:
     pairs: list[tuple[dict, str]] = []
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in _chart_flex_consumers():
         column = consumer_column_name(consumer)
         if _safe_float(row.get(column)) > 0:
             pairs.append((consumer, column))

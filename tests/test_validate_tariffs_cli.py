@@ -17,9 +17,9 @@ def test_validate_tariffs_cli_ok_on_repo_catalog():
             "--skip-scenarios",
             "--check-catalog",
             "--import-json",
-            str(root / "stromtarife_dach_kombiniert.json"),
+            str(root / "docs" / "spec" / "stromtarife_dach_kombiniert.json"),
             "--export-json",
-            str(root / "einspeisetarife_dach_erweitert.json"),
+            str(root / "docs" / "spec" / "einspeisetarife_dach_erweitert.json"),
         ]
     )
     assert code == 0

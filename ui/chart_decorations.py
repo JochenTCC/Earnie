@@ -5,11 +5,10 @@ import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-import config
 import pandas as pd
 import plotly.graph_objects as go
 
-from data.planning_window import UiChartWindow
+from ui.chart_consumer_stack import _chart_flex_consumers
 from optimizer.deviation_eval import DeviationEvent
 from runtime_store.history_timeline import SLOT_MISSING
 from ui.chart_colors import (
@@ -82,7 +81,7 @@ def _mask_missing_log_slots(
         "Simulierter SoC (%)",
         "Strompreis (Cent/kWh)",
     ]
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in _chart_flex_consumers():
         numeric_cols.append(f"{consumer['name']} (kW)")
     for index, quality in enumerate(slot_qualities):
         if quality != SLOT_MISSING:
@@ -215,7 +214,7 @@ def _power_chart_ymax(df: pd.DataFrame) -> float:
         "Geplante Batterie-Aktion (kW)",
         "Netzbezug (kW)",
     ]
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in _chart_flex_consumers():
         columns.append(f"{consumer['name']} (kW)")
     peak = 0.0
     for column in columns:

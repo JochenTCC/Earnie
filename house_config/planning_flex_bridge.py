@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from settings.ev_power import merge_ev_power_conversion_fields
-from settings.flexible_consumers import CONSUMER_PALETTE_SIZE
+from settings.flexible_consumers import CONSUMER_PALETTE_SIZE, normalize_legacy_id
 from house_config.generic_schedule import (
     generic_daily_target_kwh_for_day,
     generic_hourly_kw_for_day,
@@ -110,7 +110,10 @@ def planning_ev_to_milp(consumer: dict) -> dict:
         },
         sched,
     )
-    return {
+    milp_raw = sched.get("milp")
+    if isinstance(milp_raw, dict) and milp_raw:
+        charging_schedule["milp"] = dict(milp_raw)
+    result = {
         "id": str(consumer["id"]),
         "name": str(consumer.get("label", consumer["id"])),
         "nominal_power_kw": float(consumer["nominal_power_kw"]),
@@ -129,6 +132,10 @@ def planning_ev_to_milp(consumer: dict) -> dict:
         "loxone_target_kwh_name": "",
         "loxone_target_hours_name": "",
     }
+    legacy_id = normalize_legacy_id(consumer, str(consumer["id"]))
+    if legacy_id:
+        result["legacy_id"] = legacy_id
+    return result
 
 
 def planning_ev_consumers(house_profile: dict) -> list[dict]:
@@ -136,10 +143,113 @@ def planning_ev_consumers(house_profile: dict) -> list[dict]:
     return [planning_ev_to_milp(consumer) for consumer in _house_ev_consumers(house_profile)]
 
 
+def _house_thermal_rc_consumers(house_profile: dict) -> list[dict]:
+    return [
+        consumer
+        for consumer in house_profile.get("consumers", [])
+        if consumer.get("type") == "thermal_rc"
+    ]
+
+
+def _thermal_rc_params(consumer: dict) -> dict:
+    nested = consumer.get("thermal_rc")
+    if isinstance(nested, dict):
+        return nested
+    return consumer
+
+
+def planning_thermal_rc_to_milp(consumer: dict) -> dict:
+    """Hausprofil thermal_rc → MILP-flex mit thermal_control (Loxone via legacy overlay)."""
+    rc = _thermal_rc_params(consumer)
+    min_on = max(4, int(consumer.get("min_on_quarterhours", 8) or 8))
+    legacy_id = str(consumer.get("legacy_id") or "").strip() or None
+    entry = {
+        "id": str(consumer["id"]),
+        "name": str(consumer.get("label", consumer["id"])),
+        "nominal_power_kw": float(consumer.get("nominal_power_kw", 2.8) or 2.8),
+        "min_on_quarterhours": min_on,
+        "daily_target_kwh": 0.0,
+        "daily_target_source": "thermal",
+        "signal_type": "power",
+        "log_signal_type": "power",
+        "optimizer_enabled": True,
+        "path_log": "",
+        "loxone_outputs": {},
+        "loxone_inputs": {},
+        "thermal_control": {
+            "enabled": True,
+            "mode": "active",
+            "setpoint_c": float(rc["setpoint_c"]),
+            "tolerance_c": float(rc["tolerance_c"]),
+            "water_volume_liters": float(rc["water_volume_liters"]),
+            "heat_loss_kw_per_k": float(rc["heat_loss_kw_per_k"]),
+            "heating_efficiency": float(rc["heating_efficiency"]),
+            "heating_power_threshold_kw": float(
+                consumer.get("heating_power_threshold_kw", 2.0) or 2.0
+            ),
+            "actual_temp_step_c": float(consumer.get("actual_temp_step_c", 0.5) or 0.5),
+            "loxone": {},
+            "history_logs": {},
+        },
+    }
+    heat_paths = rc.get("heat_paths")
+    if isinstance(heat_paths, list) and heat_paths:
+        entry["thermal_control"]["heat_paths"] = heat_paths
+    if legacy_id:
+        entry["legacy_id"] = legacy_id
+    return entry
+
+
+SWIMSPA_FILTER_BRIDGE_DEFAULTS: dict = {
+    "id": "swimspa_filter",
+    "legacy_id": "swimspa_filter",
+    "name": "SwimSpa Filter",
+    "nominal_power_kw": 0.18,
+    "daily_target_kwh": 0.36,
+    "daily_target_source": "loxone_remaining_hours",
+    "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
+    "signal_type": "binary",
+    "min_on_quarterhours": 2,
+    "optimizer_enabled": True,
+    "path_log": "",
+    "loxone_outputs": {"enable_name": "Ernie_Swimspa_Filter_Freigabe"},
+    "loxone_inputs": {
+        "power_name": "homie_bwa_spa_filter2",
+        "alternate_binary_power_name": "homie_bwa_spa_filter1",
+        "signal_type": "binary",
+    },
+    "filter_schedule": {
+        "enabled": True,
+        "loxone": {
+            "native_start_hour_name": "homie_bwa_spa_filter1hour",
+            "native_duration_hours_name": "homie_bwa_spa_filter1durationhours",
+        },
+        "config_fallback": {
+            "native_start_hour": 10,
+            "native_duration_hours": 4.0,
+        },
+    },
+}
+
+
+def planning_filter_to_milp(bindings: dict | None = None) -> dict:
+    """Bridge-only SwimSpa-Filter (kein Hausprofil-Row)."""
+    entry = dict(SWIMSPA_FILTER_BRIDGE_DEFAULTS)
+    if bindings:
+        entry = _deep_merge_dict(entry, bindings)
+    return entry
+
+
+def planning_thermal_rc_consumers(house_profile: dict) -> list[dict]:
+    return [planning_thermal_rc_to_milp(consumer) for consumer in _house_thermal_rc_consumers(house_profile)]
+
+
 def collect_planning_flex_consumers(house_profile: dict) -> list[dict]:
-    """Generic MILP-flex + EV für Szenario-Auflösung."""
+    """Generic MILP-flex + EV + thermal_rc (+ Filter-Bridge bei thermal_rc)."""
     _fixed, flex_generic = split_planning_generic_consumers(house_profile)
-    return flex_generic + planning_ev_consumers(house_profile)
+    thermal = planning_thermal_rc_consumers(house_profile)
+    filters = [planning_filter_to_milp()] if thermal else []
+    return flex_generic + planning_ev_consumers(house_profile) + thermal + filters
 
 
 def planning_ev_daily_targets(
@@ -434,22 +544,84 @@ def _allocate_chart_color_index(used: set[int], consumer_id: str) -> int:
     return sum(ord(char) for char in consumer_id) % CONSUMER_PALETTE_SIZE
 
 
+def _deep_merge_dict(base: dict, overlay: dict) -> dict:
+    """Merge overlay onto base; nested dicts merged recursively."""
+    merged = dict(base)
+    for key, value in overlay.items():
+        if (
+            key in merged
+            and isinstance(merged[key], dict)
+            and isinstance(value, dict)
+        ):
+            merged[key] = _deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+_LIVE_OVERLAY_KEYS = (
+    "loxone_inputs",
+    "loxone_outputs",
+    "thermal_control",
+    "filter_schedule",
+    "chart_color_index",
+    "path_log",
+    "loxone_target_kwh_name",
+    "loxone_target_hours_name",
+)
+
+
+def _overlay_legacy_consumer(planning: dict, base: dict) -> dict:
+    """Live fields from legacy base entry onto canonical planning row."""
+    entry = dict(planning)
+    for key in _LIVE_OVERLAY_KEYS:
+        base_val = base.get(key)
+        if base_val is None:
+            continue
+        if key in entry and isinstance(entry.get(key), dict) and isinstance(base_val, dict):
+            entry[key] = _deep_merge_dict(base_val, entry[key])
+        else:
+            entry[key] = base_val
+    base_cs = base.get("charging_schedule") or {}
+    if base_cs:
+        entry_cs = dict(entry.get("charging_schedule") or {})
+        base_lox = base_cs.get("loxone") or {}
+        if base_lox:
+            entry_cs["loxone"] = _deep_merge_dict(
+                base_lox,
+                entry_cs.get("loxone") or {},
+            )
+        for cs_key in ("enabled", "forecast_when_absent", "target_soc_percent", "charging_efficiency"):
+            if cs_key in base_cs and cs_key not in entry_cs:
+                entry_cs[cs_key] = base_cs[cs_key]
+        for day_key in ("weekday", "weekend"):
+            if base_cs.get(day_key) and not entry_cs.get(day_key):
+                entry_cs[day_key] = dict(base_cs[day_key])
+        entry["charging_schedule"] = _deep_merge_dict(base_cs, entry_cs)
+    if entry.get("chart_color_index") is None and base.get("chart_color_index") is not None:
+        entry["chart_color_index"] = base["chart_color_index"]
+    return entry
+
+
 def merge_flexible_consumers(
     base_consumers: list[dict],
     planning_consumers: list[dict],
 ) -> list[dict]:
-    """Config-Verbraucher + Planungs-Verbraucher ohne ID-Kollision."""
-    merged = list(base_consumers)
-    taken = {consumer["id"] for consumer in base_consumers}
-    used_indices = _used_chart_color_indices(base_consumers)
+    """Config-Verbraucher + Planungs-Verbraucher; legacy_id overlay when ids differ."""
+    merged_map: dict[str, dict] = {c["id"]: dict(c) for c in base_consumers}
+    used_indices = _used_chart_color_indices(list(merged_map.values()))
     for consumer in planning_consumers:
-        if consumer["id"] in taken:
-            continue
         entry = dict(consumer)
+        canonical_id = str(entry["id"])
+        legacy_id = str(entry.get("legacy_id") or "").strip()
+        if legacy_id and legacy_id in merged_map and legacy_id != canonical_id:
+            entry = _overlay_legacy_consumer(entry, merged_map[legacy_id])
+            del merged_map[legacy_id]
+        if canonical_id in merged_map:
+            continue
         if entry.get("chart_color_index") is None:
-            index = _allocate_chart_color_index(used_indices, str(entry["id"]))
+            index = _allocate_chart_color_index(used_indices, canonical_id)
             entry["chart_color_index"] = index
             used_indices.add(index)
-        merged.append(entry)
-        taken.add(entry["id"])
-    return merged
+        merged_map[canonical_id] = entry
+    return list(merged_map.values())

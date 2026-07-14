@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 import config
+from settings.flexible_consumers import runtime_consumer_id
 from data.consumption_profiles import (
     _consumer_id,
     _modeled_hour_index,
@@ -97,7 +98,10 @@ def resolve_runtime_house_profile() -> dict | None:
 
 
 def _configured_flexible_consumer_ids() -> list[str]:
-    """IDs aus config.json — ohne Planungs-Merge (_planning_flex_consumers)."""
+    """IDs aus aufgelösten flex-Verbrauchern (runtime keys für cons_data-Spalten)."""
+    consumers = config.get_flexible_consumers()
+    if consumers:
+        return [runtime_consumer_id(c) for c in consumers]
     raw = config.CONFIG._raw_config.get("flexible_consumers", [])
     return [
         str(entry["id"])
@@ -129,14 +133,14 @@ def expected_cons_data_consumer_ids() -> list[str]:
 
 def consumer_labels_for_ids(consumer_ids: list[str]) -> dict[str, str]:
     labels = {cid: cid for cid in consumer_ids}
-    config_by_id = {
-        str(c["id"]): str(c.get("name") or c["id"])
+    config_by_runtime_id = {
+        runtime_consumer_id(c): str(c.get("name") or c["id"])
         for c in config.get_flexible_consumers()
         if c.get("id")
     }
     for cid in consumer_ids:
-        if cid in config_by_id:
-            labels[cid] = config_by_id[cid]
+        if cid in config_by_runtime_id:
+            labels[cid] = config_by_runtime_id[cid]
     profile = resolve_runtime_house_profile()
     if not profile:
         return labels
@@ -146,7 +150,7 @@ def consumer_labels_for_ids(consumer_ids: list[str]) -> dict[str, str]:
         if c.get("id")
     }
     for cid in consumer_ids:
-        if cid not in config_by_id:
+        if cid not in config_by_runtime_id:
             labels[cid] = by_id.get(cid, labels[cid])
     return labels
 

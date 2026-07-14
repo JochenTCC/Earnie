@@ -11,6 +11,14 @@ _REFERENCE_YEAR_DAYS = 365
 _REFERENCE_YEAR_START = date(2023, 1, 1)
 
 
+def normalize_ev_milp_block(raw: dict | None) -> dict | None:
+    if not isinstance(raw, dict) or not raw:
+        return None
+    from optimizer.eauto_milp import validate_eauto_milp_params
+
+    return validate_eauto_milp_params(raw)
+
+
 def normalize_ev_charging_schedule(raw: dict | None) -> dict:
     if not isinstance(raw, dict):
         raise ValueError("ev-Verbraucher erfordert charging_schedule.")
@@ -27,7 +35,7 @@ def normalize_ev_charging_schedule(raw: dict | None) -> dict:
     weekend = normalize_day_schedule(raw.get("weekend"))
     if not weekday and not weekend:
         raise ValueError("charging_schedule erfordert weekday und/oder weekend.")
-    return merge_ev_power_conversion_fields(
+    result = merge_ev_power_conversion_fields(
         {
             "target_soc_percent": float(raw.get("target_soc_percent", 100.0) or 100.0),
             "charging_efficiency": efficiency,
@@ -37,6 +45,10 @@ def normalize_ev_charging_schedule(raw: dict | None) -> dict:
         },
         raw,
     )
+    milp = normalize_ev_milp_block(raw.get("milp"))
+    if milp:
+        result["milp"] = milp
+    return result
 
 
 def _day_schedule(consumer: dict, day: date) -> dict:

@@ -14,7 +14,51 @@ from house_config.generic_schedule import (
     normalize_generic_schedule,
 )
 
-CONSUMER_TYPES = frozenset({"generic", "thermal_annual", "ev"})
+CONSUMER_TYPES = frozenset({"generic", "thermal_annual", "ev", "thermal_rc"})
+
+
+def _normalize_thermal_rc(raw: dict, index: int, profile_id: str) -> dict:
+    volume = float(raw.get("water_volume_liters", 0.0) or 0.0)
+    if volume <= 0:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers[{index}]: "
+            "water_volume_liters muss > 0 sein."
+        )
+    efficiency = float(raw.get("heating_efficiency", 0.0) or 0.0)
+    if not 0.0 < efficiency <= 1.0:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers[{index}]: "
+            "heating_efficiency muss zwischen 0 (exklusiv) und 1 liegen."
+        )
+    heat_loss = raw.get("heat_loss_kw_per_k")
+    if heat_loss is None:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers[{index}]: heat_loss_kw_per_k fehlt."
+        )
+    heat_loss = float(heat_loss)
+    if heat_loss < 0:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers[{index}]: "
+            "heat_loss_kw_per_k muss >= 0 sein."
+        )
+    setpoint = raw.get("setpoint_c")
+    tolerance = raw.get("tolerance_c")
+    if setpoint is None or tolerance is None:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers[{index}]: "
+            "setpoint_c und tolerance_c sind Pflicht für thermal_rc."
+        )
+    block: dict = {
+        "water_volume_liters": volume,
+        "setpoint_c": float(setpoint),
+        "tolerance_c": float(tolerance),
+        "heat_loss_kw_per_k": heat_loss,
+        "heating_efficiency": efficiency,
+    }
+    extra_paths = raw.get("heat_paths")
+    if isinstance(extra_paths, list) and extra_paths:
+        block["heat_paths"] = extra_paths
+    return block
 
 
 def _read_json(path: str) -> dict:
@@ -53,7 +97,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     if consumer_type not in CONSUMER_TYPES:
         raise ValueError(
             f"profiles '{profile_id}' consumers[{index}]: "
-            f"type muss generic, thermal_annual oder ev sein."
+            f"type muss generic, thermal_annual, ev oder thermal_rc sein."
         )
     label = str(raw.get("label", consumer_id)).strip() or consumer_id
     spec: dict = {
@@ -93,6 +137,11 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
         }
         if hwb_value > 0:
             spec["thermal"]["hwb_kwh_m2"] = hwb_value
+    elif consumer_type == "thermal_rc":
+        spec["thermal_rc"] = _normalize_thermal_rc(raw, index, profile_id)
+    legacy_id = str(raw.get("legacy_id", "")).strip()
+    if legacy_id and legacy_id != consumer_id:
+        spec["legacy_id"] = legacy_id
     return spec
 
 

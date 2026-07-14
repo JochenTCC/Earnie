@@ -208,6 +208,25 @@ def _flexible_consumers_from_scenario(scenario_params: dict | None) -> list:
     return merge_flexible_consumers(base, planning)
 
 
+def resolved_flexible_consumers(
+    scenario_params: dict | None = None,
+    *,
+    optimizer_only: bool = False,
+) -> list:
+    """Unified flex registry: config.json + planning merge (Chart 1 / Sankey / MILP)."""
+    if scenario_params is None:
+        return config.get_flexible_consumers(optimizer_only=optimizer_only)
+    if optimizer_only:
+        return _flexible_consumers_from_scenario(scenario_params)
+    base = config.get_flexible_consumers(optimizer_only=False)
+    planning = scenario_params.get("_planning_flex_consumers") or []
+    if not planning:
+        return base
+    from house_config.planning_flex_bridge import merge_flexible_consumers
+
+    return merge_flexible_consumers(base, planning)
+
+
 def _charging_schedule_consumer() -> dict | None:
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         sched = consumer.get("charging_schedule")

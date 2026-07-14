@@ -65,160 +65,73 @@ $env:EARNIE_BACKTESTING_SCENARIOS_PATH = "greenfield/config/backtesting_scenario
 
 Scenario Exploration consumption model → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-13). Spec: [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md).
 
-### Version 1.93 — Unified scenario model (former backlog 2.0 P1–P7)
+Version **1.93** (unified scenario model) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-14). **Live cutover (P6b)** → **1.99**.
 
-Branding (Earnie rename) → [Backlog-Erledigt.md](Backlog-Erledigt.md).
+Recommended order: **1.95–1.97** legacy flex / thermal migration → **1.99** P6b live cutover → propose `version.py` → **`2.0.0`** (user approval; **real** 2.0 — legacy data model gone).
 
-**Status (2026-07-14):** P1–P5, **P6a**, **Components**, **Unified Open-Meteo solar**, **SE consumption model**, smoke-test **Phase A–C**, and **smoke-test follow-ups** done (see [Backlog-Erledigt.md](Backlog-Erledigt.md)). **Live cutover (P6b)** → **1.99**. Loxone sidebar bugfix → [Backlog-Erledigt.md](Backlog-Erledigt.md).
+Critical path: **1.95–1.97** (especially **Consumers P1** + **Thermals P1** / **P1a**) before **1.99** P6b prod cutover. Open bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
-Recommended order: **1.94–1.97** legacy flex / thermal migration → **1.99** P6b live cutover → propose `version.py` → **`2.0.0`** (user approval; **real** 2.0 — legacy data model gone).
-
-Critical path: **1.94–1.97** (especially **Consumers P1** + **Thermals P1** / **P1a**) before **1.99** P6b prod cutover. Open bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
-
-**Decisions (2026-07-11):**
-
-
-| Topic                            | Decision                                                                                                                                                                                                                |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EARNIE_UI_MODES` key            | Hard rename `backtesting` **→** `scenario_exploration` — no alias; update compose, launch configs, docs, tests in same PR (P2)                                                                                          |
-| Scenario id `runtime_settings`   | **Removed in 1.93 P2** — live baseline is a normal scenario entry (default id `live`) selected via `live_scenario_id` in `config.json`; update scripts/tests/fixtures in same release (P2)                                   |
-| Battery without PV               | **Allowed** — battery still required for MILP / planning readiness; PV optional (zero PV forecast when `pv_system_id` unset) (P1)                                                                                       |
-| **7g-a** before P6               | **Skip for 1.93** — parallel NAS stack after local silent acceptance; 7g-a remains in Packaging backlog, not a 1.93 gate                                                                                                  |
-| **P6 NAS deploy**                | **Parallel stack** — deploy validated `silent-migration-test/` to a new NAS folder; legacy `docker/earnie/` unchanged for rollback; **P6a** silent trial done; **P6b** non-silent cutover → **1.99** (after **1.94–1.97** migration) |
-| `sunrise_window` **rename (P4)** | Hard rename `sunset_window` **→** `sunrise_window` — no alias; internal symbols renamed; prod deploy only with P6a config migration                                                                                     |
-| **Real 2.0 release gate**        | `version.py` **→** `2.0.0` after **1.99** P6b acceptance + legacy data model fully removed (user approval); **1.93** alone does **not** bump to `2.0.0`                                                                                                                |
-| `components.json` **sidecar**    | **Hard cutover in 1.93** — `batteries[]` / `pv_systems[]` only in `config/components.json`; startup error if keys remain in `config.json`; no alias/fallback (same pattern as `runtime_settings`, global `battery_wear`) |
-
+**Implementation plan (1.95–1.99):** [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — prod consumer matrix, phased deliverables, acceptance, NAS cutover runbook. Track progress there; chapters below are index only.
 
 
 ### Version 1.95
 
-- [ ] **Thermals P1** — Isolated single-node models
-  - **Follow-up (1.26.0 P0 smoke, decision #11):** legacy RC / `thermal_control` models (SwimSpa, freezer, etc.) from `flexible_consumers` — not in 1.26.0 P3b
-  - **Migrate existing consumers** — move prod entries from `config.json` → `flexible_consumers[]` into `house_profiles.json` (`profiles[].consumers[]`) where they belong in the planning model; keep live Loxone/MILP bindings explicit (no duplicate Hausprofil clutter); migration script or one-time cutover doc alongside new thermal schema (follow-up to **1.93 P6a** silent migration test)
-  - **SwimSpa Fall B bindings (from 1.94)** — preserve on bridged/migrated consumer: total meter `Ernie_Swim-Spa-P_act`, `subtract_consumer_ids: ["swimspa_filter"]`, separate `swimspa_filter` entry, `thermal_control.loxone.heating_active_name` (`homie_bwa_spa_heating`), optional `history_logs.heating_active_csv` / `filter_active_csv` for calibration; jets/other pumps remain unmodelled residual on shared meter
-  - **Chart/Sankey gate:** **Consumers P1** must pass before prod cutover — bridged house-profile MILP-flex must remain visible in Chart 1 and Sankey (parity with today's prod `flexible_consumers[]` entries)
-  - Variable heat paths (against infinity); replaces single-path special case in `optimizer/thermal_model.py`
-  - **Freezer** (former 0.+1 Prio2) — second isolated reference model; acceptance: calibration/backtest against historical Loxone CSV logs
-  - Prerequisite for cost-shiftable house heating: **Thermals P1a** (below); RC SwimSpa path remains separate
-
+- [ ] **Thermals P1** — Isolated single-node models + NAS prod consumer migration (Phases **1.95a–c** in plan)
+  - `legacy_id` bridge; **`eauto_milp` → `charging_schedule.milp`** on EV house-profile consumer
+  - `thermal_rc` schema + SwimSpa/filter bridge; variable heat paths; Freezer reference + CSV backtest
+  - `migrate_flex_consumers` script (landed); `silent-migration-test/` NAS **2.0** sync via `setup_silent_migration_test --force` (landed)
+  - **Gate:** Chart/Sankey parity → **Consumers P1 (1.96)** before prod cutover
 
 
 ### Version 1.96
 
-- [ ] **Consumers P1 — Unified flex discovery (planning model → Chart 1 / Sankey)**
-  - **Problem:** Planning/simulation already resolve MILP-flex from house profiles (`_planning_flex_consumers`, snapshot `meta._flexible_consumers`); Chart 1 / Sankey still discover flex via `config.get_flexible_consumers(optimizer_only=True)` → bridged generics (`daily_target_kwh: 0`, window-resolved targets) excluded; SE greenfield shows EV only (smoketest 2026-07-13)
-  - **Scope:** Not solved by moving definitions to `house_profiles.json` alone — fix discovery/registry so UI uses the **same resolved flex list** as MILP/backtesting
-  - **Blocks / pairs with:** **Thermals P1** prod migration cutover; prerequisite for **Thermals P1a** (Haus Wärme as own flex segment, not only Grundlast overlay)
-  - **Consumers P1a — Resolved flex registry**
-    - Shared helper for scenario-resolved MILP-flex (= `_flexible_consumers_from_scenario()` shape; backtesting: snapshot `meta._flexible_consumers`)
-    - Extend `consumer_has_daily_target()` (or chart-specific bypass): `generic_flex_window`, `daily_target_source: thermal_annual`, EV charging schedule — chart discovery must not depend on static `daily_target_kwh > 0` in bridged entries
-  - **Consumers P1b — Backtesting Chart 1**
-    - `build_backtesting_display_bundle` / `OptimizationDisplayBundle`: pass resolved flex consumers into chart path
-    - `ordered_active_consumers_for_stack` / flow-balance: use bundle list; fallback — any `{name} (kW)` column with horizon sum > 0
-    - Acceptance: greenfield `live` / `mein_haushalt` window → distinct **Standard**, **Waschmaschine**, **EV** down-segments; no fake PV-export for omitted flex
-  - **Consumers P1c — Live Cockpit + Sankey parity**
-    - Sunset-2-Sunset Chart 1 when `house_profile_id` set (same registry as backtesting)
-    - Sankey flex nodes (`ui/sankey.py`) use resolved list, not config-only filter
-  - **Consumers P1d — Tests & docs**
-    - Tests: `tests/test_chart_consumer_stack.py` (empty `flexible_consumers`, bridged generics); backtesting display bundle or flow-balance regression
-    - Docs: `docs/spec/scenario-exploration-consumption.md` — UI discovery vs MILP path; cross-link in **Thermals P1** migration checklist
-  - **Touches:** `ui/chart_consumer_stack.py`, `ui/charts.py`, `ui/backtesting_display_bundle.py`, `ui/simulation_results.py`, `settings/flexible_consumers.py`, `simulation/engine.py` (optional export of resolved-flex helper)
+- [ ] **Consumers P1** — Unified flex discovery (planning model → Chart 1 / Sankey) — Phase **1.96** in plan (P1a–P1d)
+- [ ] **Consumers P1d extension — Appliances unify** — Phase **1.96d** in plan: retire `appliances[]`; WM/Trockner/GS → `generic` house-profile consumers (2.0 gate)
 
+### Execution of plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md)
+
+Silent local abnahme stack → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-14).
+
+#### Suggested next steps
+
+- [ ] Continue with **1.97 Thermals P1a** (WP MILP bridge) or **1.96d** (appliances unify)
+- [ ] **1.99** prod cutover only after extended silent validation + your sign-off
+- [ ] Copy prod `.env` locally if NAS `config/.env` is not readable from Windows (see `MIGRATION_REVIEW.md`)
 
 
 ### Version 1.97
 
-- [ ] **Thermals P1a — Haus Wärme MILP flex bridge** *(design 2026-07-13)*
-  - **Smoketest finding (Phase A, 2026-07-13):** Haus Wärme MILP **timing** belongs here, not Open-Meteo solar — fixed PWM overlay today (`thermal_daily_pwm_hourly_profile`).
-  - **Problem:** `thermal_annual` („Haus Wärme“) is modeled as a **fixed** hourly PWM overlay (`thermal_daily_pwm_hourly_profile` → `thermal_hourly_overlay` → `expected_p_act`). Pulse **timing** is deterministic; MILP optimizes battery and other flex loads **around** it but cannot shift heating to cheaper hours. Production `waermepumpe` in `flexible_consumers[]` is a **separate** path (`daily_target_source: historical`) and is skipped when `flexible_consumers` is non-empty (`profile_manager` overlay gate).
-  - **Goal:** Daily heating **energy** from the existing HDD/climate model (`daily_electric_kwh`); MILP chooses **when** to run 1–4 h ON pulses at `nominal_power_kw` to minimize cost (same semantics as other binary flex consumers).
-  - **Prerequisite (done):** *Unified Open-Meteo solar* — shared Open-Meteo archive for HDD + solar-collector inputs ([Backlog-Erledigt.md](Backlog-Erledigt.md)); this chapter only adds MILP **pulse timing** flex (not climate/solar input alignment).
-  - **Out of scope (Thermals P2+):** building RC model, room-temperature feedback, sub-hourly 0.5 h pulses, setpoint-only indirect control (see *Heat pump Prio3* below).
-  - **Design — split demand vs schedule**
-    - **Demand:** keep `daily_electric_kwh()` / `heating_params_from_thermal()` as daily kWh budget per calendar day (climate HDD, warm water, solar thermal, JAZ).
-    - **Schedule:** remove fixed placement from baseload when MILP flex is active; MILP allocates binary ON slots instead of `thermal_daily_pwm_hourly_profile()`.
-  - **Design — bridge** (`house_config/planning_flex_bridge.py`)
-    - New `planning_thermal_to_milp(consumer) -> dict` (mirror `planning_consumer_to_milp` for generic):
-      - `id`, `name`/`label`, `nominal_power_kw`, `min_power_kw` (= nominal), `signal_type: binary`, `optimizer_enabled: true`
-      - `min_on_quarterhours: 4` (1 h minimum ON at hourly MILP resolution)
-      - `daily_target_source: thermal_annual` (new resolver type)
-      - `thermal_flex_window` (optional): default full day `{start_hour: 0, duration_h: 24}`; later restrictable (e.g. avoid night noise)
-    - Extend `split_planning_generic_consumers` or add `split_planning_thermal_consumers(house_profile) -> list[dict]`; merge via existing `merge_flexible_consumers`.
-    - Scenario resolution (`scenario_resolution.py`): append thermal MILP entries to `_planning_flex_consumers` alongside generic flex.
-  - **Design — daily target** (`data/consumer_targets.py`)
-    - New branch `daily_target_source == thermal_annual`: for slot date `D`, target kWh = `daily_electric_kwh(...)[day_index]` (day-of-year from climate series; backtesting uses slot calendar, live uses today).
-    - Horizon spanning midnight: sum per calendar day inside window (same pattern as `planning_flex_daily_targets`).
-  - **Design — MILP constraints** (`optimizer/milp_consumers.py` + new `optimizer/thermal_flex_context.py`)
-    - Per calendar day within horizon: `sum(on[t] * nominal_kw) >= daily_target_kwh(day)` (existing delivery constraint, day-bounded indices).
-    - **Max contiguous ON:** 4 h — new constraint on `consumer_on` runs (complement to `min_on_quarterhours`).
-    - **Optional max pulses/day:** e.g. ≤ 4 runs to preserve PWM character (prevent single 8 h block when budget allows).
-    - Values: only `0` or `nominal_power_kw` (binary flex; partial-hour tail only on last slot of a pulse if budget remainder < nominal — same as current PWM tail).
-  - **Design — overlay / double-counting**
-    - `house_profile_baseload_overlay` / `thermal_hourly_overlay`: **skip** `thermal_annual` consumers that are bridged to MILP (same mechanism as `skip_consumer_ids` for cons_data columns).
-    - `profile_manager._apply_house_profile_baseload_overlay`: when thermal is MILP-flex, thermal kW comes from MILP plan in flex sum, not fixed overlay.
-    - Backtesting `simulation/engine.py`: unchanged merge path — thermal energy in flex totals, not baseload adjustment.
-  - **Design — house profile schema** (`house_profiles.schema.json`, Hauskonfigurator)
-    - Optional on `thermal_annual` consumer: `optimizer_flex: true` (default `true` when `nominal_power_kw > 0`; `false` keeps current fixed PWM overlay for comparison/backward compat).
-    - Optional `thermal_flex_window` object (same shape as generic `schedule` window fields).
-  - **Design — live Loxone / prod migration**
-    - Greenfield: single source in `house_profiles.json`; `flexible_consumers: []` — thermal flex via bridge only.
-    - Prod cutover: migrate `waermepumpe` from `flexible_consumers[]` → house-profile consumer + retain `loxone_outputs`/`loxone_inputs` on bridged MILP entry (explicit binding table in migration doc); no duplicate IDs.
-    - `house_config/migrate_runtime_entities.py`: map legacy `waermepumpe` → `thermal_annual` flex bridge when `house_profile_id` set.
-  - **Design — tests & acceptance**
-    - Unit: daily kWh preserved per day; pulse runs ∈ [1, 4] h; only 0 or nominal kW.
-    - Backtesting with **dynamic** import tariff: MILP shifts heating away from expensive hours vs fixed PWM reference (same daily kWh).
-    - Backtesting with **fixed** import tariff: Δ€ from heating timing ≈ 0 (sanity, aligns with SE fixed-tariff investigation).
-    - Plausibility: optimized total kWh within tolerance; no baseload+flex double count.
-    - **Chart 1:** with **Consumers P1** done — distinct **Haus Wärme** (or label) flex segment when `optimizer_flex: true`; not only Grundlast (`Verbrauch-Prognose`)
-    - Regression: `tests/test_price_pipeline_p3.py`, new `tests/test_thermal_flex_bridge.py`.
-  - **Touches (estimate):** `planning_flex_bridge.py`, `scenario_resolution.py`, `consumer_targets.py`, `milp_consumers.py`, `thermal_flex_context.py` (new), `consumption_profiles.py` (overlay skip), `profile_manager.py`, `house_profiles.schema.json`, `ui/house_config_profile_form.py`, docs `flexible-verbraucher.md` (cross-link); Chart 1 via **Consumers P1**
-  - **Enables:** meaningful *Backtesting Tests — Test mit Standard-Setting (inkl. Haus Wärme)* (smoke follow-ups); replaces fixed P3b overlay path when `optimizer_flex: true`.
+- [ ] **Thermals P1a** — Haus Wärme MILP flex bridge; retire prod `waermepumpe` from `flexible_consumers[]` — Phase **1.97** in plan
 
 
 ### Version 1.99 — Live cutover (former P6b)
 
-- [ ] **P6b — Live cutover (non-silent)** *(former backlog 2.0 P6b; **1.99** — prod cutover after **1.94–1.97** migration)*
-  - **Stop legacy worker**; remove silent mode on new stack (delete or set `loxone_silent_mode: false` in `local_settings.json`); restart new worker
-  - Switch daily use to new stack (UI port); keep old `docker/earnie/` stopped but intact for rollback window
-  - Rollback: stop new containers, start legacy compose on `docker/earnie/`, UI on 8501
-  - **Live** `cons_data` **`pv_kw`:** keep Loxone-measured append in `main.py` until this cutover; scenario exploration / backtesting use Open-Meteo only (*Unified Open-Meteo solar*, [Backlog-Erledigt.md](Backlog-Erledigt.md))
-
+- [ ] **P6b** — Non-silent NAS live cutover after **1.95–1.97** — Phase **1.99** in plan (operational runbook, manual acceptance, `2.0.0` proposal)
 
 ## Real Version 2.0 — legacy data model removed
 
 ### Version 2.0
 
-**Goal:** All legacy data model gone — prod `flexible_consumers[]` migrated into `house_profiles.json`; Chart 1 / Sankey / MILP use the house-profile bridge only; no `config.json` runtime entity fallbacks.
+**Goal:** Legacy data model gone — see plan end state and [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md).
 
-**Loxone binding migration (SwimSpa + filter, from 1.94):** When moving `swimspa` / `swimspa_filter` into the house-profile bridge, carry over explicitly — do not re-derive from defaults:
+**Prerequisite chain:** **1.93** ✓ → **1.95–1.97** → **1.99** P6b → propose `version.py` **`2.0.0`** (user approval).
 
-| Legacy `flexible_consumers[]` | House-profile / bridged MILP | Loxone / history |
-|------------------------------|------------------------------|------------------|
-| `swimspa` | thermal RC consumer + live flex | `Ernie_Swim-Spa-P_act` (total meter), `subtract_consumer_ids: ["swimspa_filter"]`, `thermal_control.loxone.heating_active_name`: `homie_bwa_spa_heating` |
-| `swimspa_filter` | separate MILP flex | `homie_bwa_spa_filter1/2`, `Ernie_Swimspa_Filter_*`, `filter_schedule` |
-| `thermal_control.history_logs` | same paths on migrated thermal block | `power_csv` = total meter; optional `heating_active_csv`, `filter_active_csv` for calibration |
-
-Jets/other loads on the shared meter stay **unmodelled** (residual); indicator-based heating attribution from **1.94** remains the contract for thermal calibration.
-
-**Prerequisite chain:** **1.93** (unified scenario + smoke-test closure) → **1.94–1.97** (SwimSpa indicator attribution ✓, **Consumers P1**, **Thermals P1** / **P1a**) → **1.99** P6b live cutover.
-
-**Release gate:** Propose `version.py` → **`2.0.0`** after **1.99** P6b acceptance (user approval). SemVer `2.0.0` marks the **real** 2.0 — not the former backlog **1.93 P1–P7** cycle.
-
-### Version 2.+1 — Quality epic / post-migration cleanup
+- [ ] Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
 
 After **real** 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26.0 data model (1.26.0 P6 removed runtime fallbacks; this epic mops up the rest)
+
+
+
+
+### Version 2.+1 — Quality epic / post-migration cleanup
 
 - [ ] Evaluate option for code coverage testing and identification of deprecated code / tests (especially due to substantial data model change) / obsolete patches because of legacy data model
 - [ ] Thorough code review and refactoring
 - [ ] Search for deprecated and unnecessary files and remove them
 - [ ] Evaluate option for automated UI testing
 
-
-### Version 2.+1
-
 - [ ] **Documentation & evaluations** *(former 1.93 P7 / former backlog 1.99 docs)*
-  - Expand README with motivation / benefits — sensible order of use; less technical background than install/configuration hints
+
   - Build additional container for Windows as pure Python environment (if that makes sense) — spike vs local venv; go/no-go note
   - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
 
