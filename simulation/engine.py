@@ -227,6 +227,32 @@ def resolved_flexible_consumers(
     return merge_flexible_consumers(base, planning)
 
 
+def flex_consumers_for_backtesting_scenario(scenario_id: str) -> list:
+    """Resolved flex list for a backtesting scenario_id (Chart 1 / Sankey)."""
+    scenarios = config.get_backtesting_scenarios()
+    scenario_params = scenarios.get(scenario_id)
+    if not scenario_params:
+        return resolved_flexible_consumers(None, optimizer_only=False)
+    return resolved_flexible_consumers(scenario_params, optimizer_only=False)
+
+
+def flex_consumers_from_snapshot(snapshot: dict) -> list:
+    """
+    Flex registry for backtesting display: MILP meta snapshot first, else scenario resolve.
+    """
+    meta = snapshot.get("meta") or {}
+    stored = meta.get("_flexible_consumers")
+    if isinstance(stored, list) and stored:
+        return stored
+    scenario_id = str(snapshot.get("scenario_id", "") or "").strip()
+    if scenario_id:
+        return flex_consumers_for_backtesting_scenario(scenario_id)
+    return resolved_flexible_consumers(
+        config.get_resolved_runtime_settings(),
+        optimizer_only=False,
+    )
+
+
 def _charging_schedule_consumer() -> dict | None:
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         sched = consumer.get("charging_schedule")

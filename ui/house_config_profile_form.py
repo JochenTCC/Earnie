@@ -26,7 +26,7 @@ from ui.house_config_io import (
 )
 from ui.house_config_sticky_save import sticky_save_bar
 
-CONSUMER_TYPE_OPTIONS = ["generic", "thermal_annual", "ev"]
+CONSUMER_TYPE_OPTIONS = ["generic", "thermal_annual", "thermal_rc", "ev"]
 _SESSION_SYNC_KEY = "house_profile_sync_id"
 _SESSION_CONSUMERS_KEY = "house_profile_consumers"
 _SESSION_SELECT_PENDING_KEY = "house_profile_select_pending"
@@ -446,6 +446,55 @@ def _render_location_fields(*, session_scope: str) -> dict:
     }
 
 
+def _render_thermal_rc_fields(
+    consumer: dict,
+    index: int,
+    *,
+    session_scope: str,
+) -> dict:
+    rc = consumer.get("thermal_rc") if isinstance(consumer.get("thermal_rc"), dict) else consumer
+    return {
+        "thermal_rc": {
+            "water_volume_liters": st.number_input(
+                "Thermisches Volumen (Liter)",
+                min_value=1.0,
+                value=float(rc.get("water_volume_liters", 6000.0) or 6000.0),
+                step=100.0,
+                key=_scoped_key(session_scope, f"hc_rc_vol_{index}"),
+            ),
+            "setpoint_c": st.number_input(
+                "Solltemperatur (°C)",
+                value=float(rc.get("setpoint_c", 36.5)),
+                step=0.5,
+                key=_scoped_key(session_scope, f"hc_rc_set_{index}"),
+            ),
+            "tolerance_c": st.number_input(
+                "Toleranz (± °C)",
+                min_value=0.0,
+                value=float(rc.get("tolerance_c", 1.0) or 1.0),
+                step=0.1,
+                key=_scoped_key(session_scope, f"hc_rc_tol_{index}"),
+            ),
+            "heat_loss_kw_per_k": st.number_input(
+                "Wärmeverlust U (kW/K)",
+                min_value=0.0,
+                value=float(rc.get("heat_loss_kw_per_k", 0.1) or 0.1),
+                format="%.4f",
+                step=0.001,
+                key=_scoped_key(session_scope, f"hc_rc_u_{index}"),
+            ),
+            "heating_efficiency": st.number_input(
+                "Heizwirkungsgrad",
+                min_value=0.01,
+                max_value=1.0,
+                value=float(rc.get("heating_efficiency", 0.95) or 0.95),
+                step=0.01,
+                key=_scoped_key(session_scope, f"hc_rc_eff_{index}"),
+            ),
+        },
+    }
+
+
 def _render_thermal_solar_fields(
     thermal: dict,
     index: int,
@@ -539,6 +588,8 @@ def _render_consumer_form(
             item.update(generic_fields)
         elif c_type == "ev":
             item.update(_render_ev_fields(consumer, index, session_scope=session_scope))
+        elif c_type == "thermal_rc":
+            item.update(_render_thermal_rc_fields(consumer, index, session_scope=session_scope))
         else:
             thermal = consumer.get("thermal") or consumer
             item["living_area_m2"] = st.number_input(

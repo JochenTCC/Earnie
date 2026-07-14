@@ -36,7 +36,7 @@ from simulation.backtesting_snapshots import (
     load_window_snapshot,
     snapshot_supports_sunrise_view,
 )
-from simulation.engine import _scenario_to_battery_params
+from simulation.engine import _scenario_to_battery_params, flex_consumers_from_snapshot
 from simulation.horizon_mode import BACKTESTING_STEP_HOURS, FIXED_24H, SUNRISE_WINDOW
 from ui.chart_context import LiveChartContext
 from ui.history_navigation import s2_zone_help_text
@@ -509,6 +509,7 @@ def build_backtesting_display_bundle(
             segment_index,
         )
         header_help = s2_zone_help_text()
+    flex = flex_consumers_from_snapshot(snapshot)
     return build_optimization_display_bundle(
         savings_info,
         optimized_df,
@@ -521,6 +522,7 @@ def build_backtesting_display_bundle(
         chart_header_label=header_label,
         chart_header_help=header_help,
         backtesting_chart=True,
+        flex_consumers=tuple(flex),
     )
 
 

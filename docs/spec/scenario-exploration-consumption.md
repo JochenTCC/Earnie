@@ -27,6 +27,22 @@ Profile consumers are merged into `flexible_consumers` via `_planning_flex_consu
 
 Greenfield `config.json` keeps `flexible_consumers: []`; shiftable loads come from the house profile.
 
+## UI flex discovery (Chart 1 / Sankey / MILP)
+
+All three paths share one resolved flex list via `simulation.engine.resolved_flexible_consumers()`:
+
+| Context | Resolution |
+| ------- | ------------ |
+| **MILP / backtesting matrix** | `_planning_flex_consumers` merged with `config.json` `flexible_consumers` (`merge_flexible_consumers`) |
+| **Live cockpit / Sankey** | `resolved_flexible_consumers(config.get_resolved_runtime_settings())` when `house_profile_id` is set |
+| **Backtesting Chart 1** | Snapshot `meta._flexible_consumers` (MILP run), else `flex_consumers_from_snapshot()` → scenario resolve |
+
+Backtesting display bundles carry `flex_consumers` into Chart 1 via `chart_flex_consumers_context` so segments match the simulated scenario, not the live runtime profile.
+
+If a `{name} (kW)` column has energy but is missing from the registry, Chart 1 falls back to discovering it from the dataframe (legacy snapshots / partial migration).
+
+NAS consumer migration checklist: [`docs/spec/nas-consumer-migration-1.95-1.99.md`](nas-consumer-migration-1.95-1.99.md) (Phases 1.95–1.99).
+
 ### EV bridge vs prod `flexible_consumers`
 
 Bridged EV entries mirror prod shape (`signal_type: power`, `daily_target_source: config`, `charging_schedule.enabled: true`) but omit Loxone I/O. Capacity is read from `battery_capacity_kwh` on the consumer or `charging_schedule.battery_capacity_kwh` via `resolve_consumer_battery_capacity_kwh()` before falling back to Loxone.
@@ -58,5 +74,7 @@ Battery is never part of reference economics; PV follows the resolved scenario, 
 ## Related modules
 
 - `house_config/planning_flex_bridge.py` — bridges, targets, consumption source
-- `simulation/engine.py` — `build_historical_matrix_for_slots`, plausibility
+- `simulation/engine.py` — `resolved_flexible_consumers`, `flex_consumers_from_snapshot`, plausibility
+- `ui/chart_consumer_stack.py` — Chart 1 stack order and flex discovery
+- `ui/backtesting_display_bundle.py` — passes resolved flex into backtesting Chart 1
 - `ui/backtesting_scenario_consumption.py` — baseline vs optimized charts

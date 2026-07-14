@@ -30,6 +30,7 @@ def backtest_heat_loss_kw_per_k(
     heat_loss_kw_per_k: float,
     heating_efficiency: float,
     min_flat_hours: int = 12,
+    extra_heat_paths: list[dict] | None = None,
 ) -> dict:
     """
     Simuliert Ist-Temp. stündlich (Start = gemessene Ist-Temp.) und vergleicht mit Log.
@@ -72,6 +73,7 @@ def backtest_heat_loss_kw_per_k(
                     capacity_kwh_per_k=capacity,
                     heat_loss_kw_per_k=heat_loss_kw_per_k,
                     heating_efficiency=heating_efficiency,
+                    extra_heat_paths=extra_heat_paths,
                 )
         sim_temps.append(sim)
         errors.append(sim - float(row["ist_c"]))

@@ -1,30 +1,22 @@
 """Tests für thermischen Historien-Backtest."""
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from data.thermal_backtest import backtest_heat_loss_kw_per_k, load_merged_history
-
-FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "thermal"
-
-
-def _history_logs() -> dict[str, str]:
-    actual = next(FIXTURE_DIR.glob("*currenttemperature*"), None)
-    ambient = next(FIXTURE_DIR.glob("*Einfahrt*"), None)
-    power = next(FIXTURE_DIR.glob("*Verbrauchsz*"), None)
-    if not actual or not ambient or not power:
-        pytest.skip("Thermische CSV-Fixtures fehlen")
-    return {
-        "actual_temp_csv": str(actual),
-        "ambient_temp_csv": str(ambient),
-        "power_csv": str(power),
-    }
+from tests.fixtures.thermal_rc_reference import swimspa_history_logs
 
 
-def test_backtest_runs_on_fixtures():
-    merged = load_merged_history(_history_logs())
+@pytest.fixture(scope="module")
+def swimspa_logs() -> dict[str, str]:
+    try:
+        return swimspa_history_logs()
+    except FileNotFoundError as exc:
+        pytest.skip(str(exc))
+
+
+def test_backtest_runs_on_fixtures(swimspa_logs):
+    merged = load_merged_history(swimspa_logs)
     result = backtest_heat_loss_kw_per_k(
         merged,
         water_volume_liters=6000,

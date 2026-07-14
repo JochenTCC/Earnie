@@ -3,6 +3,18 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 1.95 — Thermals P1 (2026-07-14)
+
+Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — Phases **1.95a–c**. Core bridge (migrate_flex, SwimSpa 1.94, silent stack) → prior Erledigt entries.
+
+- [x] **1.95a** — `legacy_id` bridge + EV MILP on house-profile consumer (`planning_flex_bridge`, `eauto_milp`, tests)
+- [x] **1.95b** — `type: thermal_rc` schema/bridge, SwimSpa/filter bindings, variable heat paths (`optimizer/thermal_model.py`, `data/thermal_power.py`)
+- [x] **1.95c** — `scripts/migrate_flex_consumers.py` + silent-stack integration
+- [x] **Freezer reference model** — second `thermal_rc` fixture (`tests/fixtures/thermal_rc_reference.py`, Freezer CSVs, calibration warming phases, `tests/test_thermal_rc_freezer.py`)
+- [x] **UI** — `thermal_rc` fields in Hauskonfigurator (`ui/house_config_profile_form.py`)
+- [x] **Gate (documented):** Chart/Sankey parity → **Consumers P1 (1.96)** before prod cutover
+
+
 ### Research items (2026-07-14)
 
 - [x] **Review Smart Energy app** for comparison

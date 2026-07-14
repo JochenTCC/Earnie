@@ -357,7 +357,7 @@ def test_default_additional_consumer_is_generic():
 def test_consumer_type_options_thermal_only_on_first():
     assert "thermal_annual" in _consumer_type_options(0)
     assert "thermal_annual" not in _consumer_type_options(1)
-    assert _consumer_type_options(1) == ["generic", "ev"]
+    assert _consumer_type_options(1) == ["generic", "thermal_rc", "ev"]
 
 
 def test_profile_rejects_thermal_on_second_consumer(tmp_path):

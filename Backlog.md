@@ -28,9 +28,7 @@ Critical path: **1.95–1.96** (especially **Consumers P1** + **Thermals P1**) b
 
 ### Version 1.95
 
-- [ ] **Thermals P1** — Isolated single-node models + NAS prod consumer migration (Phases **1.95a–c** in plan) — core bridge landed → [Backlog-Erledigt.md](Backlog-Erledigt.md) (migrate_flex, SwimSpa 1.94, silent stack)
-  - Freezer reference model + CSV backtest (second `thermal_rc` fixture)
-  - **Gate:** Chart/Sankey parity → **Consumers P1 (1.96)** before prod cutover
+_Completed → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.95 — Thermals P1 (2026-07-14)._
 
 
 ### Version 1.96

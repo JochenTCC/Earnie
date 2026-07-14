@@ -1,6 +1,8 @@
 """Gestapelte Verbraucher-Balken und Stack-Reihenfolge."""
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 
 import config
@@ -28,18 +30,77 @@ from ui.chart_slot_axis import _safe_float, _safe_int_flag
 
 _CONSUMER_BAR_OPACITY = 0.65
 
+_CHART_FLEX_OVERRIDE: ContextVar[list[dict] | None] = ContextVar(
+    "chart_flex_override",
+    default=None,
+)
 
-def _recommendation_appliances() -> list[dict]:
-    """Empfehlungsgeräte (Hausprofil oder Legacy appliances[])."""
-    return config.get_appliances()
+_RESERVED_KW_COLUMNS = frozenset(
+    {
+        "PV-Prognose (kW)",
+        "Verbrauch-Prognose (kW)",
+        "Netzbezug (kW)",
+        "Geplante Batterie-Aktion (kW)",
+        "Ist Batterie-Leistung (kW)",
+    }
+)
+
+
+@contextmanager
+def chart_flex_consumers_context(flex_consumers: list[dict] | None):
+    """Override resolved flex registry for Chart 1 / flow-balance (backtesting bundle)."""
+    token = _CHART_FLEX_OVERRIDE.set(
+        list(flex_consumers) if flex_consumers is not None else None
+    )
+    try:
+        yield
+    finally:
+        _CHART_FLEX_OVERRIDE.reset(token)
+
+
+def _recommendation_appliances(flex_consumers: list[dict]) -> list[dict]:
+    """Manual recommendation appliances not already shown as MILP-flex segments."""
+    flex_ids = {consumer["id"] for consumer in flex_consumers}
+    return [appliance for appliance in config.get_appliances() if appliance["id"] not in flex_ids]
 
 
 def _chart_flex_consumers(*, optimizer_only: bool = True) -> list[dict]:
     """Resolved flex list (config + house-profile planning merge)."""
+    override = _CHART_FLEX_OVERRIDE.get()
+    if override is not None:
+        return list(override)
     from simulation.engine import resolved_flexible_consumers
 
     scenario = config.get_resolved_runtime_settings()
     return resolved_flexible_consumers(scenario, optimizer_only=optimizer_only)
+
+
+def _discovered_flex_columns(
+    df: pd.DataFrame,
+    known_columns: set[str],
+    flex_consumers: list[dict],
+) -> list[tuple[dict, str]]:
+    """Fallback: any ``{name} (kW)`` column with horizon sum > 0 not yet registered."""
+    known_names = {consumer["name"] for consumer in flex_consumers}
+    discovered: list[tuple[dict, str]] = []
+    for column in df.columns:
+        if column in known_columns or column in _RESERVED_KW_COLUMNS:
+            continue
+        if not str(column).endswith(" (kW)"):
+            continue
+        name = str(column)[: -len(" (kW)")]
+        if name in known_names:
+            continue
+        if df[column].fillna(0.0).sum() <= 0:
+            continue
+        consumer_id = name.lower().replace(" ", "_").replace("-", "_")
+        discovered.append(
+            (
+                {"id": consumer_id, "name": name},
+                column,
+            )
+        )
+    return discovered
 
 
 _CONSUMER_PV_FOLLOW_PATTERN = "/"
@@ -144,15 +205,21 @@ def get_bar_colors(df: pd.DataFrame) -> list[str]:
 
 def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
     """Verbraucher-Spalten mit sichtbaren Planwerten (> 0 kWh über den Tag)."""
-    active = []
-    for consumer in _chart_flex_consumers():
+    flex_consumers = _chart_flex_consumers()
+    active: list[tuple[dict, str]] = []
+    known_columns: set[str] = set()
+    for consumer in flex_consumers:
         col = consumer_column_name(consumer)
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((consumer, col))
-    for appliance in _recommendation_appliances():
+            known_columns.add(col)
+    for appliance in _recommendation_appliances(flex_consumers):
         col = appliance_column_name(appliance)
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((appliance_as_chart_consumer(appliance), col))
+            known_columns.add(col)
+    for consumer, col in _discovered_flex_columns(df, known_columns, flex_consumers):
+        active.append((consumer, col))
     return active
 
 
@@ -164,7 +231,7 @@ def _appliance_horizon_energy_kwh(
     """Geplante Energie (kWh) manueller Geräte über SA₀…SA₂."""
     from runtime_store.appliance_schedules import purge_expired
 
-    appliances = _recommendation_appliances()
+    appliances = _recommendation_appliances(_chart_flex_consumers())
     energy = {appliance["id"]: 0.0 for appliance in appliances}
     if not appliances:
         return energy
@@ -214,7 +281,7 @@ def _consumer_horizon_energy_kwh(
     """Geplante Flex-Energie (kWh) je Verbraucher über SA₀…SA₂."""
     consumers = _chart_flex_consumers()
     energy = {consumer["id"]: 0.0 for consumer in consumers}
-    for appliance in _recommendation_appliances():
+    for appliance in _recommendation_appliances(consumers):
         energy[appliance["id"]] = 0.0
     if matrix and chart_window is not None:
         horizon_start = normalize_hour_slot(chart_window.sa0)
@@ -274,7 +341,10 @@ def _consumer_stack_order_ids(
         return _STACK_ORDER_BY_SA0[cache_key]
     stack_entries = [
         *_chart_flex_consumers(),
-        *(appliance_as_chart_consumer(appliance) for appliance in _recommendation_appliances()),
+        *(
+            appliance_as_chart_consumer(appliance)
+            for appliance in _recommendation_appliances(_chart_flex_consumers())
+        ),
     ]
     ordered = sorted(
         stack_entries,

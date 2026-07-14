@@ -1,9 +1,12 @@
 """Tests für thermisches RC-Modell."""
 from __future__ import annotations
 
+import pytest
+
 from optimizer.thermal_model import (
     ThermalBand,
     capacity_kwh_per_k_from_volume,
+    compute_heat_loss_kw,
     plan_minimum_heating,
     simulate_next_temp_c,
 )
@@ -63,3 +66,28 @@ def test_plan_warm_day_less_than_cold_day():
         heating_efficiency=0.95,
     )
     assert warm.required_kwh <= cold.required_kwh
+
+
+def test_compute_heat_loss_extra_path_against_fixed_reference():
+    loss = compute_heat_loss_kw(
+        36.0,
+        10.0,
+        heat_loss_kw_per_k=0.01,
+        extra_paths=[{"heat_loss_kw_per_k": 0.005, "reference": "fixed", "reference_temp_c": 15.0}],
+    )
+    assert loss == pytest.approx(0.01 * 26.0 + 0.005 * 21.0)
+
+
+def test_freezer_reference_band_below_ambient():
+    band = ThermalBand(setpoint_c=-18.0, tolerance_c=2.0)
+    assert band.max_c == -16.0
+    capacity = capacity_kwh_per_k_from_volume(350)
+    warmed = simulate_next_temp_c(
+        -18.0,
+        22.0,
+        0.0,
+        capacity_kwh_per_k=capacity,
+        heat_loss_kw_per_k=0.003,
+        heating_efficiency=0.85,
+    )
+    assert warmed > -18.0

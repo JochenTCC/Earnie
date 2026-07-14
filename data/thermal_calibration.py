@@ -39,23 +39,28 @@ def estimate_heat_loss_kw_per_k(
     merged["dT"] = merged["ist_c"].diff()
     merged["dt_h"] = merged.index.to_series().diff().dt.total_seconds() / 3600.0
     if attribution == "indicator":
-        cooling_mask = merged["heating_kw"] <= 0.0
+        idle_mask = merged["heating_kw"] <= 0.0
     else:
-        cooling_mask = merged["power_kw"] < heating_power_threshold_kw
-    cooling = merged[
-        cooling_mask
-        & (merged["dt_h"] == 1.0)
-        & (merged["dT"] <= -0.25)
-    ].copy()
-    if cooling.empty:
-        raise ValueError("Keine geeigneten Abkühlphasen für die U-Schätzung gefunden.")
+        idle_mask = merged["power_kw"] < heating_power_threshold_kw
+    hourly = merged[idle_mask & (merged["dt_h"] == 1.0)].copy()
+    if hourly.empty:
+        raise ValueError("Keine geeigneten Ruhephasen für die U-Schätzung gefunden.")
 
     capacity = capacity_kwh_per_k_from_volume(water_volume_liters)
+    hourly["rate_k_per_h"] = hourly["dT"] / hourly["dt_h"]
+
+    cooling = hourly[hourly["dT"] <= -0.25].copy()
     cooling["deltaT"] = cooling["ist_c"] - cooling["ambient_c"]
     cooling = cooling[cooling["deltaT"] > 5.0]
-    cooling["rate_k_per_h"] = cooling["dT"] / cooling["dt_h"]
     cooling["U"] = (-cooling["rate_k_per_h"] * capacity) / cooling["deltaT"]
-    samples = cooling["U"][(cooling["U"] > 0) & (cooling["U"] < 1.0)]
+
+    warming = hourly[hourly["dT"] >= 0.25].copy()
+    warming["deltaT"] = warming["ambient_c"] - warming["ist_c"]
+    warming = warming[warming["deltaT"] > 5.0]
+    warming["U"] = (warming["rate_k_per_h"] * capacity) / warming["deltaT"]
+
+    samples = pd.concat([cooling["U"], warming["U"]], ignore_index=True)
+    samples = samples[(samples > 0) & (samples < 1.0)]
     if len(samples) < min_samples:
         raise ValueError(
             f"Zu wenige U-Stichproben ({len(samples)}); mindestens {min_samples} erforderlich."
@@ -72,6 +77,7 @@ def estimate_heat_loss_kw_per_k(
         "u_p75_kw_per_k": round(float(samples.quantile(0.75)), 5),
         "merged_hours": int(len(merged)),
         "cooling_events": int(len(cooling)),
+        "warming_events": int(len(warming)),
         "heating_attribution": attribution,
     }
     return u_value, detail

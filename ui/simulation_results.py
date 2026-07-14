@@ -17,7 +17,7 @@ from runtime_store.history_timeline import (
     SLOT_MISSING,
     SLOT_PRESENT,
 )
-from ui.chart_consumer_stack import _chart_flex_consumers
+from ui.chart_consumer_stack import _chart_flex_consumers, chart_flex_consumers_context
 from ui.chart_context import (
     LiveChartContext,
     SLOT_MILP,
@@ -68,6 +68,7 @@ class OptimizationDisplayBundle:
     simulation_table_title: str | None
     optimization_matrix: list[dict] | None = None
     battery_params: dict | None = None
+    flex_consumers: tuple[dict, ...] | None = None
 
 
 def build_optimization_display_bundle(
@@ -83,6 +84,7 @@ def build_optimization_display_bundle(
     chart_header_label: str | None = None,
     chart_header_help: str | None = None,
     backtesting_chart: bool = False,
+    flex_consumers: tuple[dict, ...] | None = None,
 ) -> OptimizationDisplayBundle:
     if matched_baseline_df is None and savings_info.get("matched_baseline_rows"):
         matched_baseline_df = pd.DataFrame(savings_info["matched_baseline_rows"])
@@ -215,6 +217,13 @@ def build_optimization_display_bundle(
         simulation_table_title=simulation_table_title,
         optimization_matrix=optimization_matrix,
         battery_params=battery_params,
+        flex_consumers=flex_consumers,
+    )
+
+
+def _bundle_flex_context(bundle: OptimizationDisplayBundle):
+    return chart_flex_consumers_context(
+        list(bundle.flex_consumers) if bundle.flex_consumers else None
     )
 
 
@@ -223,23 +232,24 @@ def render_optimization_chart1(
     *,
     chart_key: str = "live_power_soc_chart",
 ) -> None:
-    render_power_soc_chart(
-        bundle.display_df,
-        bundle.baseline_df,
-        bundle.display_matched,
-        chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
-        chart_now=bundle.chart_context.zone_reference if bundle.chart_context else None,
-        chart_zones=bundle.chart_zones,
-        sun_markers=bundle.sun_markers,
-        slot_qualities=bundle.chart_qualities,
-        history_slot_count=bundle.history_slot_count,
-        chart_key=chart_key,
-        chart_header_label=bundle.chart_header_label,
-        chart_header_help=bundle.chart_header_help,
-        slot_deviation_events=bundle.slot_deviation_events,
-        optimization_matrix=bundle.optimization_matrix,
-        battery_params=bundle.battery_params,
-    )
+    with _bundle_flex_context(bundle):
+        render_power_soc_chart(
+            bundle.display_df,
+            bundle.baseline_df,
+            bundle.display_matched,
+            chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
+            chart_now=bundle.chart_context.zone_reference if bundle.chart_context else None,
+            chart_zones=bundle.chart_zones,
+            sun_markers=bundle.sun_markers,
+            slot_qualities=bundle.chart_qualities,
+            history_slot_count=bundle.history_slot_count,
+            chart_key=chart_key,
+            chart_header_label=bundle.chart_header_label,
+            chart_header_help=bundle.chart_header_help,
+            slot_deviation_events=bundle.slot_deviation_events,
+            optimization_matrix=bundle.optimization_matrix,
+            battery_params=bundle.battery_params,
+        )
 
 
 def render_optimization_chart2(
@@ -267,16 +277,17 @@ def render_optimization_chart2(
 
 
 def render_optimization_results_tail(bundle: OptimizationDisplayBundle) -> None:
-    if bundle.simulation_table_title:
-        table_title = bundle.simulation_table_title
-        if bundle.chart_context is not None:
-            table_title = "📋 Simulations-Details (Sunset-2-Sunset-Fenster)"
-        render_simulation_details(
-            bundle.table_df,
-            title=table_title,
-            slot_qualities=bundle.table_qualities,
-            gap_notice=bundle.table_gap_notice,
-        )
+    with _bundle_flex_context(bundle):
+        if bundle.simulation_table_title:
+            table_title = bundle.simulation_table_title
+            if bundle.chart_context is not None:
+                table_title = "📋 Simulations-Details (Sunset-2-Sunset-Fenster)"
+            render_simulation_details(
+                bundle.table_df,
+                title=table_title,
+                slot_qualities=bundle.table_qualities,
+                gap_notice=bundle.table_gap_notice,
+            )
     render_applied_targets(bundle.savings_info)
 
 

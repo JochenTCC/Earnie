@@ -6,6 +6,7 @@ from data.heating_need import specific_heating_kwh_m2
 CONSUMER_TYPE_LABELS = {
     "generic": "Allgemein",
     "thermal_annual": "Haus Wärme",
+    "thermal_rc": "Temperatur (RC)",
     "ev": "E-Auto",
 }
 

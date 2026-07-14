@@ -6,12 +6,18 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import plotly.graph_objects as go
+import pytest
 
 import config
 from data.planning_window import UiChartWindow, UiChartZone, UiChartZones
+from house_config.planning_flex_bridge import merge_flexible_consumers, planning_consumer_to_milp
 from ui.chart_colors import (
     CONSUMER_CHART_SATURATION_MUTED,
     consumer_chart_color,
+)
+from ui.chart_consumer_stack import (
+    _active_consumer_bar_columns,
+    chart_flex_consumers_context,
 )
 from ui.chart_flow_balance import (
     KIND_FLEX,
@@ -265,3 +271,72 @@ def test_flex_bar_colors_use_zone_saturation(monkeypatch):
     assert live_spec.legend_color == full_color
     assert len(history_spec.x) == 1
     assert len(live_spec.x) == 1
+
+
+def test_resolved_flex_from_empty_config_and_planning_bridge(monkeypatch):
+    """Bridged house-profile generics appear when config flexible_consumers is empty."""
+    monkeypatch.setattr(config, "get_flexible_consumers", lambda optimizer_only=False: [])
+    profile_generic = {
+        "id": "standard",
+        "label": "Standard",
+        "type": "generic",
+        "nominal_power_kw": 0.3,
+        "schedule": {
+            "runs_per_week": 7,
+            "duration_h": 24.0,
+            "start_hour": 0,
+            "start_shift_h": 6.0,
+        },
+    }
+    planning = [planning_consumer_to_milp(profile_generic)]
+    scenario = {"_planning_flex_consumers": planning}
+    from simulation.engine import resolved_flexible_consumers
+
+    merged = resolved_flexible_consumers(scenario, optimizer_only=False)
+    assert len(merged) == 1
+    assert merged[0]["id"] == "standard"
+
+
+def test_chart_stack_discovers_bridged_generics_with_bundle_context(monkeypatch):
+    monkeypatch.setattr(config, "get_flexible_consumers", lambda optimizer_only=False: [])
+    profile_generic = {
+        "id": "waschmaschine",
+        "label": "Waschmaschine",
+        "type": "generic",
+        "nominal_power_kw": 2.0,
+        "schedule": {
+            "runs_per_week": 7,
+            "duration_h": 2.0,
+            "start_hour": 14,
+            "start_shift_h": 8.0,
+        },
+    }
+    flex = merge_flexible_consumers([], [planning_consumer_to_milp(profile_generic)])
+    df = pd.DataFrame({"Waschmaschine (kW)": [1.5, 0.0], "Standard (kW)": [0.3, 0.3]})
+    with chart_flex_consumers_context(flex):
+        active = _active_consumer_bar_columns(df)
+    names = {consumer["name"] for consumer, _ in active}
+    assert "Waschmaschine" in names
+    assert "Standard" in names
+
+
+def test_chart_stack_fallback_kw_column_when_not_in_registry(monkeypatch):
+    monkeypatch.setattr(config, "get_flexible_consumers", lambda optimizer_only=False: [])
+    df = pd.DataFrame({"EV (kW)": [3.0, 0.0]})
+    with chart_flex_consumers_context([]):
+        active = _active_consumer_bar_columns(df)
+    assert len(active) == 1
+    assert active[0][1] == "EV (kW)"
+    assert active[0][0]["name"] == "EV"
+
+
+def test_flex_consumers_from_snapshot_prefers_meta_list(monkeypatch):
+    monkeypatch.setattr(config, "get_flexible_consumers", lambda optimizer_only=False: [])
+    stored = [{"id": "ev", "name": "EV", "optimizer_enabled": True}]
+    snapshot = {
+        "scenario_id": "live",
+        "meta": {"_flexible_consumers": stored},
+    }
+    from simulation.engine import flex_consumers_from_snapshot
+
+    assert flex_consumers_from_snapshot(snapshot) == stored
