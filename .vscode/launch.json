@@ -126,6 +126,53 @@
       "justMyCode": false
     },
     {
+      "name": "validate_tariffs (Silent Migration Test)",
+      "type": "python",
+      "request": "launch",
+      "module": "scripts.validate_tariffs",
+      "args": ["--check-catalog"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "EARNIE_CONFIG_PATH": "${workspaceFolder}/silent-migration-test/config/config.json",
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/silent-migration-test/runtime",
+        "EARNIE_DOTENV_PATH": "${workspaceFolder}/silent-migration-test/config/.env",
+        "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/silent-migration-test/runtime/local_settings.json",
+        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/silent-migration-test/config/house_profiles.json",
+        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/silent-migration-test/config/tariffs.json",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/silent-migration-test/config/backtesting_scenarios.json"
+      },
+      "justMyCode": false,
+      "presentation": {
+        "group": "silent-migration",
+        "order": 1
+      }
+    },
+    {
+      "name": "startup_checks (Silent Migration Test)",
+      "type": "python",
+      "request": "launch",
+      "module": "scripts.startup_checks",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "EARNIE_CONFIG_PATH": "${workspaceFolder}/silent-migration-test/config/config.json",
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/silent-migration-test/runtime",
+        "EARNIE_DOTENV_PATH": "${workspaceFolder}/silent-migration-test/config/.env",
+        "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/silent-migration-test/runtime/local_settings.json",
+        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/silent-migration-test/config/house_profiles.json",
+        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/silent-migration-test/config/tariffs.json",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/silent-migration-test/config/backtesting_scenarios.json",
+        "EARNIE_VERIFY_LOXONE_ON_START": "1",
+        "EARNIE_STRICT_TARIFF_VALIDATE": "1"
+      },
+      "justMyCode": false,
+      "presentation": {
+        "group": "silent-migration",
+        "order": 2
+      }
+    },
+    {
       "name": "main.py (Silent Migration Test)",
       "type": "python",
       "request": "launch",
@@ -143,7 +190,11 @@
         "EARNIE_VERIFY_LOXONE_ON_START": "1",
         "EARNIE_STRICT_TARIFF_VALIDATE": "1"
       },
-      "justMyCode": false
+      "justMyCode": false,
+      "presentation": {
+        "group": "silent-migration",
+        "order": 3
+      }
     },
     {
       "name": "Streamlit app.py (Silent Migration :8512)",
@@ -165,7 +216,11 @@
       },
       "subProcess": false,
       "console": "integratedTerminal",
-      "justMyCode": false
+      "justMyCode": false,
+      "presentation": {
+        "group": "silent-migration",
+        "order": 4
+      }
     },
     {
       "name": "Streamlit app.py (nach 15s, Silent Migration :8512)",
@@ -188,7 +243,11 @@
       },
       "subProcess": false,
       "console": "integratedTerminal",
-      "justMyCode": false
+      "justMyCode": false,
+      "presentation": {
+        "group": "silent-migration",
+        "order": 5
+      }
     }
   ],
   "compounds": [

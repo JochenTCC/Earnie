@@ -45,7 +45,37 @@
                     "description": "Phasenzahl für A→kW-Umrechnung (Default 1)."
                 },
                 "weekday": { "$ref": "#/definitions/day_schedule" },
-                "weekend": { "$ref": "#/definitions/day_schedule" }
+                "weekend": { "$ref": "#/definitions/day_schedule" },
+                "milp": {
+                    "type": "object",
+                    "properties": {
+                        "live_modus_a_min_remaining_kwh": { "type": "number", "exclusiveMinimum": 0 },
+                        "tie_break_on_epsilon": { "type": "number", "minimum": 0 },
+                        "tie_break_time_epsilon": { "type": "number", "minimum": 0 }
+                    }
+                }
+            }
+        },
+        "thermal_rc_params": {
+            "type": "object",
+            "required": ["water_volume_liters", "setpoint_c", "tolerance_c", "heat_loss_kw_per_k", "heating_efficiency"],
+            "properties": {
+                "water_volume_liters": { "type": "number", "exclusiveMinimum": 0 },
+                "setpoint_c": { "type": "number" },
+                "tolerance_c": { "type": "number", "minimum": 0 },
+                "heat_loss_kw_per_k": { "type": "number", "minimum": 0 },
+                "heating_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+                "heat_paths": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "heat_loss_kw_per_k": { "type": "number", "minimum": 0 },
+                            "reference": { "enum": ["ambient", "fixed"] },
+                            "reference_temp_c": { "type": "number" }
+                        }
+                    }
+                }
             }
         },
         "consumer": {
@@ -54,7 +84,8 @@
             "properties": {
                 "id": { "type": "string" },
                 "label": { "type": "string" },
-                "type": { "enum": ["generic", "thermal_annual", "ev"] },
+                "legacy_id": { "type": "string" },
+                "type": { "enum": ["generic", "thermal_annual", "ev", "thermal_rc"] },
                 "nominal_power_kw": { "type": "number" },
                 "annual_kwh": { "type": "number" },
                 "profile_csv": { "type": "string" },
@@ -63,6 +94,12 @@
                 "min_on_quarterhours": { "type": "integer", "minimum": 0 },
                 "battery_capacity_kwh": { "type": "number", "exclusiveMinimum": 0 },
                 "charging_schedule": { "$ref": "#/definitions/ev_charging_schedule" },
+                "thermal_rc": { "$ref": "#/definitions/thermal_rc_params" },
+                "water_volume_liters": { "type": "number", "exclusiveMinimum": 0 },
+                "setpoint_c": { "type": "number" },
+                "tolerance_c": { "type": "number", "minimum": 0 },
+                "heat_loss_kw_per_k": { "type": "number", "minimum": 0 },
+                "heating_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
                 "living_area_m2": { "type": "number" },
                 "building_class": { "type": "integer", "minimum": 1, "maximum": 4 },
                 "hwb_kwh_m2": {

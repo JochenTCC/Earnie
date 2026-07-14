@@ -12,6 +12,19 @@
             "battery_wear": {
                 "enabled": false
             }
+        },
+        {
+            "id": "speicher_5kwh",
+            "label": "Speicher 5kWh",
+            "battery_capacity_kwh": 5.0,
+            "battery_max_power_kw": 2.5,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05,
+            "battery_wear": {
+                "enabled": false
+            }
         }
     ],
     "pv_systems": [
@@ -21,6 +34,13 @@
             "kwp": 10.0,
             "pv_tilt": 20.0,
             "pv_azimuth": -10.0
+        },
+        {
+            "id": "dach_sued_2",
+            "label": "Dach Süd",
+            "kwp": 9.5,
+            "pv_tilt": 30.0,
+            "pv_azimuth": 0.0
         }
     ]
 }

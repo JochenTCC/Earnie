@@ -47,7 +47,7 @@ def _build_milp_model(
     planned_consumers: list,
     fixed_flex_kw_t0: float,
     remaining_by_consumer: dict[str, float],
-    eauto_milp_params: dict[str, float] | None,
+    ev_milp_params_by_id: dict[str, dict[str, float]],
     consumer_continue_on: dict[str, bool] | None = None,
 ) -> MilpHorizonModel:
     min_soc = battery_params["min_soc"]
@@ -90,8 +90,9 @@ def _build_milp_model(
     for consumer in planned_consumers:
         cid = consumer["id"]
         rem = remaining_by_consumer.get(cid, 0.0)
+        ev_params = ev_milp_params_by_id.get(cid)
         consumer_milp_charge_kw[cid] = milp_binary_charge_kw(
-            consumer, matrix, rem, eauto_milp_params
+            consumer, matrix, rem, ev_params
         )
         _add_consumer_power_variables(
             prob,
@@ -103,7 +104,7 @@ def _build_milp_model(
             consumer_p_fixed,
             consumer_pv_follow,
             rem,
-            eauto_milp_params,
+            ev_params,
             continue_on=bool(continue_on.get(cid, False)),
         )
 
@@ -193,7 +194,7 @@ def _add_milp_objective(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
     fallback_k_push: float,
-    eauto_milp_params: dict[str, float] | None,
+    ev_milp_params_by_id: dict[str, dict[str, float]],
     *,
     wear_cent_per_kwh: float,
 ) -> None:
@@ -210,11 +211,13 @@ def _add_milp_objective(
             for t in range(model.horizon)
         )
     tie_break = 0.0
-    if eauto_milp_params and "eauto" in model.consumer_on:
-        on_vars = model.consumer_on["eauto"]
-        eps_on = eauto_milp_params["tie_break_on_epsilon"]
-        eps_time = eauto_milp_params["tie_break_time_epsilon"]
-        tie_break = eps_on * pulp.lpSum(on_vars) + eps_time * pulp.lpSum(
+    for cid, ev_params in (ev_milp_params_by_id or {}).items():
+        if cid not in model.consumer_on:
+            continue
+        on_vars = model.consumer_on[cid]
+        eps_on = ev_params["tie_break_on_epsilon"]
+        eps_time = ev_params["tie_break_time_epsilon"]
+        tie_break += eps_on * pulp.lpSum(on_vars) + eps_time * pulp.lpSum(
             t * on_vars[t] for t in range(len(on_vars))
         )
     model.prob += energy_cost + wear_cost + tie_break

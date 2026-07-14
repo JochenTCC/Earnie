@@ -8,6 +8,26 @@ from settings.ev_power import merge_ev_power_conversion_fields
 CONSUMER_PALETTE_SIZE = 8
 
 
+def runtime_consumer_id(consumer: dict) -> str:
+    """Live/cons_data/state key — legacy_id when bridged, else canonical id."""
+    legacy = str(consumer.get("legacy_id") or "").strip()
+    if legacy:
+        return legacy
+    return str(consumer["id"])
+
+
+def normalize_legacy_id(raw: dict, consumer_id: str) -> str | None:
+    legacy = str(raw.get("legacy_id", "")).strip()
+    if not legacy:
+        return None
+    if legacy == consumer_id:
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
+            "legacy_id muss sich von id unterscheiden."
+        )
+    return legacy
+
+
 def normalize_day_schedule(block: dict | None) -> dict:
     if not isinstance(block, dict):
         return {}
@@ -352,7 +372,7 @@ def normalize_consumer(raw: dict) -> dict:
             f"Kritischer Konfigurationsfehler: flexible_consumers Eintrag '{consumer_id}' "
             "benötigt min_power_kw bei power_setpoint_name."
         )
-    return {
+    result = {
         "id": consumer_id,
         "name": str(raw.get("name", raw["id"])),
         "chart_color_index": normalize_chart_color_index(raw, consumer_id),
@@ -375,11 +395,19 @@ def normalize_consumer(raw: dict) -> dict:
         "thermal_control": thermal_control,
         "filter_schedule": normalize_filter_schedule(raw.get("filter_schedule"), consumer_id),
     }
+    legacy_id = normalize_legacy_id(raw, consumer_id)
+    if legacy_id:
+        result["legacy_id"] = legacy_id
+    return result
 
 
 def consumer_has_daily_target(consumer: dict) -> bool:
-    sched = consumer.get("charging_schedule")
+    if consumer.get("generic_flex_window"):
+        return True
     target_source = consumer.get("daily_target_source", "config")
+    if target_source == "thermal_annual":
+        return True
+    sched = consumer.get("charging_schedule")
     if sched and sched.get("enabled"):
         if target_source == "historical":
             return bool(consumer.get("path_log"))

@@ -3,6 +3,16 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Silent migration test — local abnahme (2026-07-14)
+
+Backlog path **1.93 P6a** / plan **1.99** prerequisite — prod NAS already on **2.0** entity model (`live_scenario_id`, `components.json` sidecar). Docs: [`docs/einrichtung/silent-migration-test.md`](docs/einrichtung/silent-migration-test.md), [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md).
+
+- [x] **`setup_silent_migration_test`** — NAS **2.0** direct sync (no P5 `runtime_settings`); split `batteries[]`/`pv_systems[]` → `components.json`; repo DACH tariff catalog when NAS has prod subset; graceful `.env` copy on permission denied
+- [x] **VS Code** — silent-migration launch configs (`validate_tariffs`, `startup_checks`, `main.py`, Streamlit `:8512`); all `EARNIE_*` paths local under `silent-migration-test/`
+- [x] **Local validation** — `validate_tariffs --check-catalog`, `startup_checks` (tariffs + 36× Loxone read), `main.py` optimization loop, Streamlit Chart 1 in silent mode
+- [x] **Import fixes** — `data/cons_data_house_profile.py` (`import config`); `ui/chart_decorations.py` (`import pandas as pd`)
+- [x] **Config drift** — silent-migration `config.json` aligned with `config.example.json` (`loxone_silent_mode`, SwimSpa `heating_active_name`, EV `actual_soc_name` + nominal voltage/phases)
+
 
 ### SwimSpa case B — indicator-based attribution (2026-07-14)
 
@@ -70,7 +80,30 @@ Greenfield smoke **2026-07-12**; backtesting iteration **2026-07-13**; chapter c
 - [x] **Scenario-Exploration without PV** — optimization/backtesting path complete when `pv_system_id` unset (battery-only MILP/simulation gaps closed on top of P1 optional-PV baseline)
 - [x] **EV nominal voltage for power calculation** — configurable per EV consumer (`charging_schedule.nominal_power_voltage_v` / `nominal_power_phases`, house profile + `flexible_consumers`); shared helper [`settings/ev_power.py`](settings/ev_power.py) for live (`integrations/loxone_client.py`) and planning (`house_config/planning_flex_bridge.py`); default 230 V / 1 phase when unset; schemas, Hauskonfigurator UI, [`docs/referenz/loxone-signale.md`](docs/referenz/loxone-signale.md); tests [`tests/test_ev_power.py`](tests/test_ev_power.py)
 
-Components (`components.json` sidecar) → *Version 1.93 Components* above.
+Components (`components.json` sidecar) → *Version 1.93 Components* below.
+
+
+### Version 1.93 — Unified scenario model (closure) (2026-07-14)
+
+Former backlog **2.0 P1–P7**; chapter closed **2026-07-14**. Implementation phases → sections below in this archive (P1–P5, P6a, Components, Open-Meteo solar, SE consumption model, smoke-test A–C, follow-ups). Branding → *Earnie rename* below.
+
+- [x] **P1–P5, P6a, Components, Open-Meteo solar, SE consumption model** — done
+- [x] **Smoke-test Phase A–C + follow-ups** — done (2026-07-12 … 2026-07-14)
+- [x] **Deferred:** **P6b live cutover** → [Backlog.md](Backlog.md) **1.99**; legacy flex/thermal migration → **1.95–1.97**
+
+**Decisions (2026-07-11, retained for reference):**
+
+
+| Topic | Decision |
+| ----- | -------- |
+| `EARNIE_UI_MODES` key | Hard rename `backtesting` **→** `scenario_exploration` — no alias (P2) |
+| Scenario id `runtime_settings` | **Removed in 1.93 P2** — live baseline via `live_scenario_id` (default `live`) (P2) |
+| Battery without PV | **Allowed** — battery required for MILP; PV optional (P1) |
+| **7g-a** before P6 | **Skip for 1.93** — parallel NAS after local silent acceptance; 7g-a stays in Packaging backlog |
+| **P6 NAS deploy** | **Parallel stack** — P6a silent trial done; **P6b** → **1.99** (after **1.95–1.97**) |
+| `sunrise_window` rename (P4) | Hard rename `sunset_window` **→** `sunrise_window` — no alias |
+| **Real 2.0 release gate** | `version.py` **→** `2.0.0` after **1.99** P6b + legacy data model removed (user approval) |
+| `components.json` sidecar | **Hard cutover in 1.93** — `batteries[]` / `pv_systems[]` only in sidecar; startup error if keys remain in `config.json` |
 
 
 ### Smoketest backtesting — greenfield runs (2026-07-13)

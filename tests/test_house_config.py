@@ -557,6 +557,79 @@ def test_merge_flexible_consumers_assigns_chart_color_index():
     assert herd["chart_color_index"] == 1
 
 
+def test_merge_flexible_consumers_legacy_id_overlay():
+    from house_config.planning_flex_bridge import merge_flexible_consumers
+
+    base = [
+        {
+            "id": "eauto",
+            "name": "E-Auto Legacy",
+            "chart_color_index": 2,
+            "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
+            "loxone_inputs": {"power_name": "Ernie_EAuto_P_act"},
+            "charging_schedule": {
+                "enabled": True,
+                "loxone": {"plugged_in_name": "Ernie_EAuto_Da"},
+            },
+        }
+    ]
+    planning = [
+        {
+            "id": "ev",
+            "legacy_id": "eauto",
+            "name": "Smart",
+            "nominal_power_kw": 3.5,
+            "charging_schedule": {"enabled": True, "weekday": {"daily_rest_soc": 30.0}},
+        }
+    ]
+    merged = merge_flexible_consumers(base, planning)
+    assert len(merged) == 1
+    ev = merged[0]
+    assert ev["id"] == "ev"
+    assert ev["legacy_id"] == "eauto"
+    assert ev["chart_color_index"] == 2
+    assert ev["loxone_outputs"]["power_setpoint_name"] == "Ernie_EAuto_Ziel_kW"
+    assert ev["charging_schedule"]["loxone"]["plugged_in_name"] == "Ernie_EAuto_Da"
+
+
+def test_runtime_consumer_id_for_cons_data():
+    from settings.flexible_consumers import runtime_consumer_id
+
+    assert runtime_consumer_id({"id": "ev", "legacy_id": "eauto"}) == "eauto"
+    assert runtime_consumer_id({"id": "swimspa"}) == "swimspa"
+
+
+def test_planning_thermal_rc_to_milp_bridge():
+    from house_config.planning_flex_bridge import (
+        collect_planning_flex_consumers,
+        planning_thermal_rc_to_milp,
+    )
+
+    consumer = {
+        "id": "swimspa",
+        "legacy_id": "swimspa",
+        "label": "SwimSpa",
+        "type": "thermal_rc",
+        "nominal_power_kw": 2.8,
+        "thermal_rc": {
+            "water_volume_liters": 6000,
+            "setpoint_c": 36.5,
+            "tolerance_c": 1.0,
+            "heat_loss_kw_per_k": 0.1,
+            "heating_efficiency": 0.95,
+        },
+    }
+    milp = planning_thermal_rc_to_milp(consumer)
+    assert milp["daily_target_source"] == "thermal"
+    assert milp["thermal_control"]["enabled"] is True
+    assert milp["legacy_id"] == "swimspa"
+    profile = {"consumers": [consumer]}
+    flex = collect_planning_flex_consumers(profile)
+    ids = {entry["id"] for entry in flex}
+    assert "swimspa" in ids
+    assert "swimspa_filter" in ids
+
+
 def test_generic_flex_allowed_hours():
     from house_config.generic_schedule import generic_allowed_slot_hours
 

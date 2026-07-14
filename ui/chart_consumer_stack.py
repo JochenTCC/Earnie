@@ -29,6 +29,14 @@ from ui.chart_slot_axis import _safe_float, _safe_int_flag
 _CONSUMER_BAR_OPACITY = 0.65
 
 
+def _chart_flex_consumers(*, optimizer_only: bool = True) -> list[dict]:
+    """Resolved flex list (config + house-profile planning merge)."""
+    from simulation.engine import resolved_flexible_consumers
+
+    scenario = config.get_resolved_runtime_settings()
+    return resolved_flexible_consumers(scenario, optimizer_only=optimizer_only)
+
+
 _CONSUMER_PV_FOLLOW_PATTERN = "/"
 
 
@@ -82,7 +90,7 @@ def _consumer_bar_marker(
 
 
 def _chart_has_immediate_charge_bars(df: pd.DataFrame) -> bool:
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in _chart_flex_consumers():
         imm_col = consumer_immediate_charge_column_name(consumer)
         power_col = f"{consumer['name']} (kW)"
         if imm_col not in df.columns or power_col not in df.columns:
@@ -94,7 +102,7 @@ def _chart_has_immediate_charge_bars(df: pd.DataFrame) -> bool:
 
 
 def _chart_has_pv_follow_bars(df: pd.DataFrame) -> bool:
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in _chart_flex_consumers():
         pv_col = consumer_pv_follow_column_name(consumer)
         power_col = f"{consumer['name']} (kW)"
         if pv_col not in df.columns or power_col not in df.columns:
@@ -132,7 +140,7 @@ def get_bar_colors(df: pd.DataFrame) -> list[str]:
 def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
     """Verbraucher-Spalten mit sichtbaren Planwerten (> 0 kWh über den Tag)."""
     active = []
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in _chart_flex_consumers():
         col = consumer_column_name(consumer)
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((consumer, col))
@@ -199,7 +207,7 @@ def _consumer_horizon_energy_kwh(
     df: pd.DataFrame,
 ) -> dict[str, float]:
     """Geplante Flex-Energie (kWh) je Verbraucher über SA₀…SA₂."""
-    consumers = config.get_flexible_consumers(optimizer_only=True)
+    consumers = _chart_flex_consumers()
     energy = {consumer["id"]: 0.0 for consumer in consumers}
     for appliance in config.get_appliances():
         energy[appliance["id"]] = 0.0
@@ -260,7 +268,7 @@ def _consumer_stack_order_ids(
     if cache_key in _STACK_ORDER_BY_SA0:
         return _STACK_ORDER_BY_SA0[cache_key]
     stack_entries = [
-        *config.get_flexible_consumers(optimizer_only=True),
+        *_chart_flex_consumers(),
         *(appliance_as_chart_consumer(appliance) for appliance in config.get_appliances()),
     ]
     ordered = sorted(

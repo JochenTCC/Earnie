@@ -135,12 +135,22 @@ def _prepare_sankey_data(
     links = _SankeyLinks()
 
     if breakdown:
-        consumers = config.get_flexible_consumers()
+        from settings.flexible_consumers import runtime_consumer_id
+        from simulation.engine import resolved_flexible_consumers
+
+        consumers = resolved_flexible_consumers(
+            config.get_resolved_runtime_settings(),
+            optimizer_only=False,
+        )
+        flex_kw = breakdown.get("flex_kw") or {}
         lbl_baseload = f"🏠 Grundlast ({breakdown['baseload_kw']:.2f} kW)"
         flex_labels = [
             _flex_label(
                 consumer,
-                float((breakdown.get("flex_kw") or {}).get(consumer["id"], 0.0) or 0.0),
+                float(
+                    flex_kw.get(runtime_consumer_id(consumer), flex_kw.get(consumer["id"], 0.0))
+                    or 0.0
+                ),
                 main_state,
             )
             for consumer in consumers
@@ -225,7 +235,9 @@ def _sankey_height(breakdown: dict | None, main_state: dict | None) -> int:
         return 280
     overlay = produktiv.has_produktiv_run(main_state)
     per_consumer = 40 if overlay else 25
-    return 300 + len(config.get_flexible_consumers()) * per_consumer
+    from ui.chart_consumer_stack import _chart_flex_consumers
+
+    return 300 + len(_chart_flex_consumers(optimizer_only=False)) * per_consumer
 
 
 def _create_live_flow_sankey(

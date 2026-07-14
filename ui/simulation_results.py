@@ -17,6 +17,7 @@ from runtime_store.history_timeline import (
     SLOT_MISSING,
     SLOT_PRESENT,
 )
+from ui.chart_consumer_stack import _chart_flex_consumers
 from ui.chart_context import (
     LiveChartContext,
     SLOT_MILP,
@@ -350,7 +351,7 @@ def _simulation_table_column_order(columns: list[str]) -> list[str]:
     flex_kw: list[str] = []
     immediate: list[str] = []
     pv_follow: list[str] = []
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in _chart_flex_consumers():
         power_col = consumer_column_name(consumer)
         if power_col in columns:
             flex_kw.append(power_col)

@@ -55,6 +55,27 @@ def _eauto_consumer() -> dict:
         "min_power_kw": 1.4,
         "min_on_quarterhours": 1,
         "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
+        "charging_schedule": {"enabled": True},
+    }
+
+
+def _ev_consumer_canonical() -> dict:
+    return {
+        "id": "ev",
+        "legacy_id": "eauto",
+        "name": "E-Auto",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "min_on_quarterhours": 1,
+        "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
+        "charging_schedule": {
+            "enabled": True,
+            "milp": {
+                "live_modus_a_min_remaining_kwh": 2.8,
+                "tie_break_on_epsilon": 0.001,
+                "tie_break_time_epsilon": 0.0001,
+            },
+        },
     }
 
 
@@ -122,7 +143,7 @@ class TestEautoMilpModeSelection:
             [_eauto_consumer()],
             0.0,
             {"eauto": 7.0},
-            params,
+            {"eauto": params},
         )
         assert is_logged_day_matrix(_matrix(logged_day=True))
         assert "eauto" not in model.consumer_p
@@ -139,7 +160,7 @@ class TestEautoMilpModeSelection:
             [_eauto_consumer()],
             0.0,
             {"eauto": 7.0},
-            params,
+            {"eauto": params},
         )
         assert "eauto" in model.consumer_p
         assert len(model.consumer_p["eauto"]) == 4
@@ -237,7 +258,7 @@ class TestEautoBacktestingPreset:
             [],
             1.4,
             {"eauto": 1.0},
-            _eauto_milp_params(),
+            {"eauto": _eauto_milp_params()},
         )
         assert "eauto" not in model.consumer_on
         model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
@@ -264,11 +285,11 @@ class TestEautoTieBreak:
             [_eauto_consumer()],
             0.0,
             {"eauto": 7.0},
-            params,
+            {"eauto": params},
         )
         from optimizer.milp import _add_consumer_delivery_constraints, _add_milp_objective
 
-        _add_milp_objective(model, matrix, 3.5, params, wear_cent_per_kwh=0.0)
+        _add_milp_objective(model, matrix, 3.5, {"eauto": params}, wear_cent_per_kwh=0.0)
         _add_consumer_delivery_constraints(
             model,
             matrix,

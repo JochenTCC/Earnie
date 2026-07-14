@@ -153,7 +153,7 @@ def test_reference_consumption_subheader_full_year():
 def test_cons_data_has_flex_energy_false_without_consumer_columns(monkeypatch):
     monkeypatch.setattr(
         "ui.backtesting_results_helpers.config.get_flexible_consumers",
-        lambda: [{"id": "eauto"}],
+        lambda optimizer_only=False: [{"id": "eauto"}],
     )
     df = _sample_cons_df()
     assert cons_data_has_flex_energy(df) is False
@@ -162,7 +162,7 @@ def test_cons_data_has_flex_energy_false_without_consumer_columns(monkeypatch):
 def test_cons_data_has_flex_energy_true_with_consumer_data(monkeypatch):
     monkeypatch.setattr(
         "ui.backtesting_results_helpers.config.get_flexible_consumers",
-        lambda: [{"id": "eauto"}],
+        lambda optimizer_only=False: [{"id": "eauto"}],
     )
     df = _sample_cons_df()
     df["eauto_kw"] = 0.5

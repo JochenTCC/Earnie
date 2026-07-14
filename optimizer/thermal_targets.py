@@ -96,6 +96,7 @@ def _build_thermal_plan(consumer: dict, *, horizon: int = 24):
         capacity_kwh_per_k=capacity,
         heat_loss_kw_per_k=heat_loss_kw_per_k,
         heating_efficiency=float(thermal["heating_efficiency"]),
+        extra_heat_paths=thermal.get("heat_paths"),
     )
     return plan, band, readings, ambient_forecast, ambient_source, capacity, heat_loss_kw_per_k
 

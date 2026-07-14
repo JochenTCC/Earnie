@@ -8,7 +8,11 @@ import config
 from . import battery as bat
 from .cbc_events import record_cbc_event, update_cbc_milp_context_from_row
 from .cbc_solver import solve_with_strict_fallback
-from .eauto_milp import split_eauto_preset
+from .eauto_milp import (
+    build_ev_milp_params_by_id,
+    split_eauto_preset,
+    validate_eauto_milp_params,
+)
 from .filter_context import resolve_filter_contexts
 from .milp_consumers import (
     _add_consumer_delivery_constraints,
@@ -48,6 +52,13 @@ def _active_consumers(consumers: list | None) -> list:
     if consumers is not None:
         return consumers
     return config.get_flexible_consumers(optimizer_only=True)
+
+
+def _optional_root_eauto_milp() -> dict[str, float] | None:
+    raw = config.CONFIG._raw_config.get("eauto_milp")
+    if not raw:
+        return None
+    return validate_eauto_milp_params(raw)
 
 
 def _remaining_kwh_by_consumer(
@@ -118,15 +129,15 @@ def milp_optimizer(
         contexts,
         filters,
     )
-    has_eauto = any(c.get("id") == "eauto" for c in planned_consumers)
-    eauto_milp_params = config.get_eauto_milp_params() if has_eauto else None
+    root_milp_fallback = _optional_root_eauto_milp()
+    ev_milp_by_id = build_ev_milp_params_by_id(planned_consumers, root_milp_fallback)
     preset_powers, milp_consumers = split_eauto_preset(
         planned_consumers,
         matrix[:horizon],
         remaining,
         schedule_indices,
         contexts,
-        eauto_milp_params,
+        root_milp_fallback,
     )
     fixed_flex_kw_t0 = sum(preset_powers.values())
 
@@ -138,7 +149,7 @@ def milp_optimizer(
         milp_consumers,
         fixed_flex_kw_t0,
         remaining,
-        eauto_milp_params,
+        ev_milp_by_id,
         consumer_continue_on=consumer_continue_on,
     )
     wear_cent_per_kwh = 0.0
@@ -150,7 +161,7 @@ def milp_optimizer(
         model,
         matrix,
         fallback_k_push,
-        eauto_milp_params,
+        ev_milp_by_id,
         wear_cent_per_kwh=wear_cent_per_kwh,
     )
     _add_consumer_delivery_constraints(

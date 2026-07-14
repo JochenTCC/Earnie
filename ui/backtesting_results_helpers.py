@@ -61,7 +61,10 @@ def reference_consumption_subheader(period: dict) -> str:
 
 
 def _flex_kw_columns(cons_df: pd.DataFrame) -> list[str]:
-    configured = [f"{c['id']}_kw" for c in config.get_flexible_consumers()]
+    from settings.flexible_consumers import runtime_consumer_id
+    from ui.chart_consumer_stack import _chart_flex_consumers
+
+    configured = [f"{runtime_consumer_id(c)}_kw" for c in _chart_flex_consumers(optimizer_only=False)]
     if configured:
         matched = [col for col in configured if col in cons_df.columns]
         if matched:
