@@ -14,10 +14,10 @@ Der große Hebel für Einsparungen ist das geschickte Timing all dieser Verbrauc
 Statt fester Regeln (wie bei anderen Lösungen) berechnet **Earnie** einen **24-48 Stunden-Plan** unter Berücksichtigung von Strompreisen, PV-Prognose, Wettervorhersagen für den Standort des Hauses, Speicherzustand und Gerätebedarf. Ein dauerhaft laufender Daemon (`main.py`) setzt den Plan in [Loxone](https://www.loxone.com/dede/) um; eine übersichtliche Web-Oberfläche zeigt Soll/Ist und hilft bei Konfiguration und Analyse.
 
 
-| Komponente        | Rolle                                                                      |
-| ----------------- | -------------------------------------------------------------------------- |
-| `main.py`         | Liest [Loxone](https://www.loxone.com/dede/), optimiert, schreibt Steuerwerte — läuft dauerhaft            |
-| **[Streamlit](https://streamlit.io/)-App** | Cockpit, Planung, Simulation — optional parallel; steuert die Anlage nicht |
+| Komponente                                 | Rolle                                                                                           |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `main.py`                                  | Liest [Loxone](https://www.loxone.com/dede/), optimiert, schreibt Steuerwerte — läuft dauerhaft |
+| **[Streamlit](https://streamlit.io/)-App** | Cockpit, Planung, Simulation — optional parallel; steuert die Anlage nicht                      |
 
 
 Details: [Betrieb](docs/einrichtung/betrieb.md)
@@ -68,7 +68,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 - [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) oder PC (weitere Systeme folgen bei Bedarf)
 - Persistente Laufzeitdaten für Nachvollziehbarkeit und Debug-Dumps
 
-![Earnie Monitor](docs/earnie-monitoring.png)
+Earnie Monitor
 
 *Earnie Monitor: Kompletter Optimierungs-Horizont mit Energiefluss, SOC und Verbraucherverhalten.*
 
@@ -90,12 +90,12 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 Einrichtung, Konfiguration, [Streamlit](https://streamlit.io/)-Oberfläche und [Loxone](https://www.loxone.com/dede/)-Schnittstelle: **[docs/README.md](docs/README.md)**
 
 
-| Bereich                | Kapitel                                                                                                                                                                                                                                                                 |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Einrichtung**        | [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Greenfield](docs/einrichtung/greenfield-dev-stack.md) · [Silent Migration](docs/einrichtung/silent-migration-test.md) |
-| **Konfiguration**      | [Überblick](docs/konfiguration/ueberblick.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md)                                                        |
-| **Benutzeroberfläche** | [Betriebsmodi](docs/ui/betriebsmodi.md) · [Charts](docs/ui/charts.md) · [Loxone-Kommunikation](docs/ui/loxone-kommunikation.md)                                                                                                                                         |
-| **Referenz**           | [Streamlit-Ports](docs/referenz/streamlit-ports.md) · [Loxone-Signale](docs/referenz/loxone-signale.md)                                                                                                                                                                 |
+| Bereich                | Kapitel                                                                                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Einrichtung**        | [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md)                                                                   |
+| **Konfiguration**      | [Überblick](docs/konfiguration/ueberblick.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md) |
+| **Benutzeroberfläche** | [Betriebsmodi](docs/ui/betriebsmodi.md) · [Charts](docs/ui/charts.md) · [Loxone-Kommunikation](docs/ui/loxone-kommunikation.md)                                                                                  |
+| **Referenz**           | [Loxone-Signale](docs/referenz/loxone-signale.md)                                                                                                                                                                |
 
 
 
@@ -103,11 +103,10 @@ Einrichtung, Konfiguration, [Streamlit](https://streamlit.io/)-Oberfläche und [
 ## Installation und Betrieb
 
 
-| Weg                              | Für wen                          | Detail                                                                               |
-| -------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------ |
-| **Docker (empfohlen Prod)**      | [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/) | [docs/einrichtung/container.md](docs/einrichtung/container.md)                       |
-| **Lokal (Dev / ohne Container)** | Entwickler, Tests                | [DEVELOPER.md](DEVELOPER.md)                                                         |
-| **Greenfield**                   | Ersteinrichtung Hauskonfigurator | [docs/einrichtung/greenfield-dev-stack.md](docs/einrichtung/greenfield-dev-stack.md) |
+| Weg                              | Für wen                                                                      | Detail                                                         |
+| -------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **Docker (empfohlen Prod)**      | [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/) | [docs/einrichtung/container.md](docs/einrichtung/container.md) |
+| **Lokal (Dev / ohne Container)** | Entwickler, Tests                                                            | [DEVELOPER.md](DEVELOPER.md)                                   |
 
 
 

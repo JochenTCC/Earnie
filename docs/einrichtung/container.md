@@ -2,23 +2,25 @@
 
 **Streamlit-Ports aller Stacks:** [streamlit-ports.md](../referenz/streamlit-ports.md)
 
-**Docker-Artefakte:** [`docker/README.md`](../../docker/README.md) — Dockerfile, Compose-Dateien und Build-Skripte liegen unter `docker/`. Compose-Befehle immer vom Repo-Root mit `--project-directory .`.
+**Docker-Artefakte:** `[docker/README.md](../../docker/README.md)` — Dockerfile, Compose-Dateien und Build-Skripte liegen unter `docker/`. Compose-Befehle immer vom Repo-Root mit `--project-directory .`.
 
 ## Persistente Daten
 
 Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Updates:
 
-| Mount (Host) | Inhalt |
-|--------------|--------|
-| `./config/config.json` | Haus-Konfiguration (wird nie überschrieben) |
-| `./config/tariffs.json` | Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json` |
-| `./config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline |
-| `./config/house_profiles.json` | Hausprofile (Sidecar) |
-| `./config/deviation_rules.json` | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an) |
-| `./config/config.example.json` | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
-| `./runtime/` | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs |
-| `./runtime/local_settings.json` | Lokale Einstellungen (z. B. Silent-Mode) |
-| `./config/.env` | Loxone-Zugangsdaten |
+
+| Mount (Host)                          | Inhalt                                                                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `./config/config.json`                | Haus-Konfiguration (wird nie überschrieben)                                                                             |
+| `./config/tariffs.json`               | Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json`                                                            |
+| `./config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline                                                                                           |
+| `./config/house_profiles.json`        | Hausprofile (Sidecar)                                                                                                   |
+| `./config/deviation_rules.json`       | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an)                                                                    |
+| `./config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
+| `./runtime/`                          | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs                                                                   |
+| `./runtime/local_settings.json`       | Lokale Einstellungen (z. B. Silent-Mode)                                                                                |
+| `./config/.env`                       | Loxone-Zugangsdaten                                                                                                     |
+
 
 Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config/config.json`
 
@@ -27,8 +29,10 @@ Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config/config.json`
 1. Projektordner mit `docker/compose/synology.yml` anlegen (auf der NAS oft als `compose.yaml` kopiert)
 2. `mkdir -p config runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config.json`, `tariffs.json`, weitere Sidecars, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
-4. `config/.env`, `config/config.json` und **`config/tariffs.json`** anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
+4. `config/.env`, `config/config.json` und `config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
 5. Optional: historische `cons_data` aus Dev nach `runtime/cons_data_hourly.csv` kopieren
+
+
 
 ## Config-Updates nach Programm-Upgrade
 
@@ -37,6 +41,8 @@ Neue Einträge in `config/config.example.json` werden **nicht** automatisch in d
 - Beim Start von `main.py`: Hinweis im Log
 - In der Streamlit-App: gelbes Banner mit fehlenden Pfaden und Beispielwerten
 - Fehlende Keys manuell in `config/config.json` ergänzen
+
+
 
 ## Bootstrap manuell
 
@@ -127,6 +133,8 @@ Manifest prüfen:
 docker manifest inspect ghcr.io/jochentcc/earnie-energy:latest
 ```
 
+
+
 ### 2. Deploy (Synology)
 
 Im Projektordner auf der NAS (nur Compose + persistente Daten, kein Quellcode nötig):
@@ -149,11 +157,13 @@ Der **optimizer-worker** führt beim Start automatisch Tarif-Plausibilität und 
 
 Optional:
 
-| Variable | Wirkung |
-|----------|---------|
-| `EARNIE_VERIFY_LOXONE_ON_START=0` | Prüfung aus |
-| `EARNIE_SKIP_LOXONE_VERIFY=1` | Prüfung aus |
-| `EARNIE_STRICT_LOXONE_VERIFY=1` | Container startet nicht, wenn eine Prüfung fehlschlägt |
+
+| Variable                          | Wirkung                                                |
+| --------------------------------- | ------------------------------------------------------ |
+| `EARNIE_VERIFY_LOXONE_ON_START=0` | Prüfung aus                                            |
+| `EARNIE_SKIP_LOXONE_VERIFY=1`     | Prüfung aus                                            |
+| `EARNIE_STRICT_LOXONE_VERIFY=1`   | Container startet nicht, wenn eine Prüfung fehlschlägt |
+
 
 Manuell (z. B. nach Config-Änderung ohne Neustart):
 
@@ -178,19 +188,25 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 
 ## LoxBerry (RPi 4B, arm64)
 
+
+
 ### Voraussetzungen
 
 - LoxBerry **4.x** (64-bit), Raspberry Pi 4B
 - Docker-Plugin installiert und aktiv
 - Empfohlen: mind. **4 GB RAM**, SSD statt reiner SD-Karte
 
+
+
 ### Erstinstallation
 
 1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker/compose/loxberry.yml`
 2. `mkdir -p config runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config/config.json`, …)
-4. `config/.env`, `config/config.json` und **`config/tariffs.json`** anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
+4. `config/.env`, `config/config.json` und `config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
 5. Optional: historische `cons_data` nach `runtime/cons_data_hourly.csv` kopieren
+
+
 
 ### Deploy (LoxBerry)
 
@@ -211,74 +227,14 @@ Von außen gibt es keinen eingebauten Reverse Proxy wie bei Synology DSM. Extern
 
 ### Go/No-Go (LoxBerry)
 
-| Kriterium | Go | No-Go |
-|-----------|-----|-------|
-| LoxBerry-Version | 4.x, Docker-Plugin aktiv | LoxBerry 3.x oder ohne Docker |
-| Architektur | 64-bit (aarch64) | 32-bit-Image |
-| RAM | mind. 4 GB empfohlen | unter 2 GB |
-| Speicher | SSD empfohlen | nur langsame SD ohne Puffer |
+
+| Kriterium        | Go                                       | No-Go                                      |
+| ---------------- | ---------------------------------------- | ------------------------------------------ |
+| LoxBerry-Version | 4.x, Docker-Plugin aktiv                 | LoxBerry 3.x oder ohne Docker              |
+| Architektur      | 64-bit (aarch64)                         | 32-bit-Image                               |
+| RAM              | mind. 4 GB empfohlen                     | unter 2 GB                                 |
+| Speicher         | SSD empfohlen                            | nur langsame SD ohne Puffer                |
 | MILP-Performance | langsamer als NAS akzeptabel, Log prüfen | Erwartung identischer Laufzeit wie x86-NAS |
 
+
 Vor Produktivbetrieb: Worker-Log (`runtime/earnie.log`) auf CBC-Timing und Startfehler prüfen. Optionaler Follow-up: natives `coinor-cbc` im Image für kürzere MILP-Läufe.
-
-## Streamlit-UI extern (Synology Reverse Proxy)
-
-Produktion nutzt zwei Compose-Services:
-
-| Service | Rolle | Port nach außen |
-|---------|--------|-----------------|
-| `optimizer-worker` | `python main.py` (Steuerung) | — |
-| `optimizer-ui` | Streamlit Sunset-2-Sunset-Cockpit | **8501** nur im LAN (Compose-Mapping) |
-
-Im Hausnetz: `http://<NAS-IP>:8501`
-
-Von außen: HTTPS über den **Synology Reverse Proxy** (kein direktes Freigeben von Port 8501 in der Fritzbox).
-
-### Voraussetzungen
-
-1. **Let's-Encrypt-Zertifikat** in der DSM für den externen Hostnamen (z. B. `*.myfritz.net` oder `*.synology.me`)
-2. **Fritzbox:** Port **80** und **443** → NAS-IP (80 für Zertifikatserneuerung)
-3. **DSM-HTTPS** idealerweise auf Port **5001**, nicht 443 — sonst Konflikt mit dem Reverse Proxy
-4. Bei myfritz: **IPv6 für Dynamic DNS deaktivieren**, falls Let's Encrypt die Domain nicht validieren kann (AAAA-Eintrag)
-
-### Reverse-Proxy-Regel (DSM)
-
-**Systemsteuerung → Anmeldeportal → Erweitert → Reverse Proxy**
-
-| | Quelle | Ziel |
-|--|--------|------|
-| Protokoll | HTTPS | HTTP |
-| Hostname | externer Hostname | `127.0.0.1` |
-| Port | 443 | 8501 |
-
-- Tab **Erweitert:** Let's-Encrypt-Zertifikat zuweisen
-- Tab **Benutzerdefinierte Kopfzeile → Erstellen → WebSocket** (für Streamlit)
-
-Optional: **Zugriffssteuerungsprofil** mit DSM-Anmeldung — Streamlit hat keine eigene Login-Abfrage.
-
-### Streamlit hinter dem Proxy
-
-`docker/compose/synology.yml` startet die UI mit Proxy-tauglichen Flags:
-
-```yaml
-command: >
-  python -m scripts.run_streamlit
-  --
-  --server.enableCORS false
-  --server.enableXsrfProtection false
-```
-
-Port in `config/config.json` → `ui.streamlit_port` (Standard 8501). Das Compose-Mapping `ports` muss denselben Wert verwenden.
-
-Nach Änderung an der Compose-Datei: `docker compose --project-directory . -f docker/compose/synology.yml up -d optimizer-ui` (kein neues Image nötig).
-
-Produktion: `EARNIE_UI_MODES=sunset2sunset,scenario_exploration` (in `docker/compose/synology.yml` am Service `optimizer-ui`). Nur Sunset-2-Sunset ohne Scenario-Exploration: `sunset2sunset`. Details: [Betriebsmodi](../ui/betriebsmodi.md).
-
-### Typische Probleme
-
-| Symptom | Prüfen |
-|---------|--------|
-| Seite von außen nicht erreichbar | Fritzbox **443 → NAS**; DSM nicht auf 443 |
-| 502 Bad Gateway | `earnie-optimizer-ui` läuft? `http://<NAS-IP>:8501` im LAN |
-| UI leer / verbindet nicht | WebSocket-Header am Reverse Proxy |
-| Let's Encrypt schlägt fehl | Port 80 erreichbar; IPv6/AAAA bei myfritz; ggf. Synology DDNS |

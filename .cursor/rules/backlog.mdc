@@ -21,7 +21,7 @@ alwaysApply: false
 * **Partially Completed:** For incomplete epics, only the remaining open phases/items remain in the source file.
 
 
-**backlog/Backlog-Erledigt.md:** * **References:** Reference tables (e.g., log files) remain permanently under **Reference** in `backlog/Backlog.md`.
+**backlog/Backlog-Erledigt.md:** * **References:** Operational reference tables (e.g., log files under `runtime/`) belong in user docs — see `docs/einrichtung/betrieb.md` § Log- und Historiendateien, not in `backlog/Backlog.md`.
 
 * **Archive Format (`backlog/Backlog-Erledigt.md`):**
 
