@@ -2,12 +2,14 @@
 
 ## Zwei Einstiegspunkte
 
-| Komponente | Befehl | Rolle |
-|------------|--------|-------|
-| **Produktiv-Daemon** | `python main.py` | Liest Loxone, optimiert, schreibt Steuerwerte — läuft dauerhaft |
-| **Streamlit-App** | `python -m scripts.run_streamlit` | Cockpit, Simulation, Debugging — optional parallel |
 
-Nur `main.py` steuert die Anlage. Die App **zeigt** den von `main.py` berechneten 24-Stunden-Horizont an (persistiert in `live_optimization_debug.json`); sie überschreibt keine Loxone-Ausgänge. Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonfigurator, Live-Konfiguration, Manuelle Geräte), nicht über die Cockpit-Sidebar.
+| Komponente           | Befehl                            | Rolle                                                                               |
+| -------------------- | --------------------------------- | ----------------------------------------------------------------------------------- |
+| **Produktiv-Daemon** | `python main.py`                  | Liest Loxone, optimiert, schreibt Steuerwerte — läuft dauerhaft                     |
+| **Streamlit-App**    | `python -m scripts.run_streamlit` | Cockpit, Anzeige der letzten Optimierung von main.py, Debugging — optional parallel |
+
+
+Nur `main.py` steuert die Anlage. Die App **zeigt** den von `main.py` berechneten 24-48 Stunden-Horizont an (persistiert in `live_optimization_debug.json`); sie überschreibt keine Loxone-Ausgänge. Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonfigurator, Live-Konfiguration, Manuelle Geräte).
 
 ## Optimierungs-Takt
 
@@ -25,37 +27,57 @@ Countdown und letzter Lauf werden unten in der App angezeigt (siehe [Charts & Pa
 
 Standardverzeichnis: `runtime/` (überschreibbar mit `EARNIE_RUNTIME_DIR`, Legacy: `ENERGY_OPTIMIZER_RUNTIME_DIR`).
 
-| Datei | Inhalt |
-|-------|--------|
-| `cons_data_hourly.csv` | Stündliche Verbrauchs- und PV-Basis (von `main.py` gepflegt) |
-| `flexible_consumers_state.json` | Tagesenergie je Flex-Verbraucher |
-| `pv_counter_state.json` | PV-Zählerstand für Stunden-Delta |
-| `cons_data_pending.json` | Pending-Puffer für cons_data-Samples |
-| `consumption_profiles.csv` | Berechnete Grundlast-Profile |
-| `earnie.log` | Rotierendes Python-Log |
-| `optimizer_run_state.json` | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll) |
-| `optimization_history.jsonl` | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf) |
-| `live_optimization_debug.json` | Anzeige-Snapshot des Sunset-2-Sunset-Cockpits (von `main.py` geschrieben, von der App gelesen) |
-| `local_settings.json` | Lokale Betriebseinstellungen (z. B. `loxone_silent_mode`, `chart_debug_capture_enabled`) |
-| `appliance_schedules.json` | Geplante Laufzeiten manueller Geräte |
-| `backtesting_log.json` | Ergebnis von Scenario-Exploration / `run_backtesting` |
+
+| Datei                           | Inhalt                                                                                       |
+| ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `cons_data_hourly.csv`          | Stündliche Verbrauchs- und PV-Basis (von `main.py` gepflegt)                                 |
+| `flexible_consumers_state.json` | Tagesenergie je Flex-Verbraucher                                                             |
+| `pv_counter_state.json`         | PV-Zählerstand für Stunden-Delta                                                             |
+| `cons_data_pending.json`        | Pending-Puffer für cons_data-Samples                                                         |
+| `consumption_profiles.csv`      | Berechnete Grundlast-Profile                                                                 |
+| `earnie.log`                    | Rotierendes Python-Log von main.py                                                           |
+| `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll)           |
+| `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf)                               |
+| `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
+| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `loxone_silent_mode`, `chart_debug_capture_enabled`)     |
+| `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
+| `backtesting_log.json`          | Ergebnis von Scenario-Exploration / `run_backtesting`                                        |
+
 
 Die App liest diese Dateien **read-only** für Panels und Abgleich.
 
+### Log- und Historiendateien
+
+Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-06):
+
+
+| Datei                                | Status                         | Hinweis                                                       |
+| ------------------------------------ | ------------------------------ | ------------------------------------------------------------- |
+| `optimization_history.jsonl`         | **kanonisch**                  | Produktiv-Historie (eine JSON-Zeile pro Optimierungslauf)     |
+| `earnie.log`                         | **aktiv**                      | Rotierendes Python-Log von `main.py` (5×5 MB, 5 Archive)      |
+| `optimizer_run_state.json`           | **aktiv**                      | Letzter erfolgreicher `main.py`-Durchlauf                     |
+| `live_optimization_debug.json`       | **aktiv**                      | 24h-Anzeige-Snapshot für die Streamlit-App                    |
+| `system_history_log.csv`             | **Legacy, nur Lesen**          | Archivieren, sobald `optimization_history.jsonl` ausreicht    |
+| `pv_accuracy_log.csv`                | **Lesen aktiv, Schreiben aus** | Bestehende Einträge noch lesbar; Neuschreiben deaktiviert     |
+| `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis von Scenario-Exploration — nicht für Produktiv-NAS   |
+
+
 ## Umgebungsvariablen (optional)
 
-| Variable | Wirkung |
-|----------|---------|
-| `EARNIE_CONFIG_PATH` | Pfad zur `config.json` (Standard: `config/config.json`, Legacy: `config.json` im Root). Legacy-Alias: `ENERGY_OPTIMIZER_CONFIG_PATH`. |
-| `EARNIE_RUNTIME_DIR` | Anderes Verzeichnis für Laufzeitdaten |
-| `EARNIE_UI_MODES` | Kommagetrennt: `sunset2sunset`, `scenario_exploration` — schränkt sichtbare Analyse-Seiten ein (Prod: `sunset2sunset,scenario_exploration`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
-| `EARNIE_UI_STREAMLIT_PORT` | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md)) |
-| `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Chart-Debug speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). Legacy-Alias: `ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED`. |
+
+| Variable                                | Wirkung                                                                                                                                                                                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `EARNIE_CONFIG_PATH`                    | Pfad zur `config.json` (Standard: `config/config.json`, Legacy: `config.json` im Root). Legacy-Alias: `ENERGY_OPTIMIZER_CONFIG_PATH`.                                                                                                |
+| `EARNIE_RUNTIME_DIR`                    | Anderes Verzeichnis für Laufzeitdaten                                                                                                                                                                                                |
+| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset`, `scenario_exploration` — schränkt sichtbare Analyse-Seiten ein (Prod: `sunset2sunset,scenario_exploration`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
+| `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |
+| `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Chart-Debug speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). Legacy-Alias: `ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED`.                                  |
+
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).
 
 ## Typische Betriebsfehler
 
-- **Zwei `main.py`-Instanzen:** Steuerwerte können sich gegenseitig überschreiben — nur eine Produktiv-Instanz betreiben.
 - **App zeigt alte Werte:** `optimizer_run_state.json` fehlt oder `main.py` läuft nicht — Kopfzeile im Sankey „Energiefluss (Live)“ prüfen.
 - **Keine aWATTar-Preise:** Simulation bricht in der App mit Fehlermeldung ab; Netzwerk oder API prüfen.
+

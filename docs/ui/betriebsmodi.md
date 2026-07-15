@@ -109,14 +109,3 @@ Ersparnis-, Kosten-Kennzahlen und Energievergleich beziehen sich auf **Jetzt →
 
 Geplant (Dev-only): Nachrechnung eines beliebigen Kalendertags — ersetzt den früheren Modus **Historischer Tag**.
 
-## Entfallene Modi
-
-| Früher | Status |
-|--------|--------|
-| **Echtzeit** | Ersetzt durch **Sunset-2-Sunset** / Seite **Monitor** |
-| **Historischer Tag** | Entfernt; Nachrechnung folgt in **Scenario-Exploration** (Dev-only) |
-| Button **Produktiv-Archiv** | Entfernt; Vergangenheit über ←-Navigation in SA-Zyklen |
-| Sidebar **Betriebsmodus** (Radio) | Entfernt; Seiten-Navigation über `st.navigation` |
-| `EARNIE_UI_MODES=live` | Ungültig — Prod: `sunset2sunset,scenario_exploration` |
-| `…,backtesting` | Umbenannt → `scenario_exploration`; Sidebar-Hinweis bei alter Konfiguration |
-| `…,historical` | Ungültig; Sidebar-Hinweis bei alter Konfiguration |
