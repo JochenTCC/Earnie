@@ -11,6 +11,8 @@ def _legacy_config() -> dict:
                 "id": "waermepumpe",
                 "name": "Wärmepumpe",
                 "nominal_power_kw": 1.6,
+                "loxone_inputs": {"power_name": "Ernie_WP_P_act"},
+                "loxone_outputs": {"enable_name": "Ernie_WP_Freigabe"},
             },
             {
                 "id": "eauto",
@@ -47,6 +49,8 @@ def test_migrate_prod_consumers_places_thermal_annual_first():
     consumers = profiles["profiles"][0]["consumers"]
     assert consumers[0]["type"] == "thermal_annual"
     assert consumers[0]["id"] == "wp_heating"
+    assert consumers[0]["loxone_outputs"]["enable_name"] == "Ernie_WP_Freigabe"
+    assert consumers[0]["loxone_inputs"]["power_name"] == "Ernie_WP_P_act"
 
 
 def test_migrate_prod_consumers_unifies_appliances_into_profile():
@@ -86,3 +90,52 @@ def test_migrate_prod_consumers_is_idempotent():
     assert config2.get("flexible_consumers") == config.get("flexible_consumers")
     assert profiles2 == profiles
     assert status2 == []
+
+
+def test_migrate_backfills_wp_loxone_when_missing():
+    from scripts.migrate_flex_consumers import backfill_wp_loxone_in_profiles
+
+    profiles = {
+        "profiles": [
+            {
+                "id": "example_efh",
+                "consumers": [
+                    {
+                        "id": "wp_heating",
+                        "type": "thermal_annual",
+                        "nominal_power_kw": 1.6,
+                    }
+                ],
+            }
+        ]
+    }
+    out, patched = backfill_wp_loxone_in_profiles(profiles)
+    assert patched == ["wp_heating"]
+    wp = out["profiles"][0]["consumers"][0]
+    assert wp["legacy_id"] == "waermepumpe"
+    assert wp["loxone_outputs"]["enable_name"] == "Ernie_WP_Freigabe"
+    assert wp["loxone_inputs"]["power_name"] == "Ernie_WP_P_act"
+
+
+def test_migrate_prod_consumers_repairs_wp_loxone_without_legacy_flex():
+    config, profiles, status = migrate_prod_consumers(
+        {"flexible_consumers": [], "appliances": []},
+        {
+            "profiles": [
+                {
+                    "id": "example_efh",
+                    "consumers": [
+                        {
+                            "id": "wp_heating",
+                            "type": "thermal_annual",
+                            "nominal_power_kw": 1.6,
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    wp = profiles["profiles"][0]["consumers"][0]
+    assert wp["loxone_outputs"]["enable_name"] == "Ernie_WP_Freigabe"
+    assert any(row.get("status") == "wp-loxone-backfill" for row in status)
+    assert config.get("flexible_consumers") == []

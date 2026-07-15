@@ -57,6 +57,9 @@ def add_power_traces(
     chart_window: UiChartWindow | None = None,
     chart_zones=None,
 ) -> None:
+    from house_config.known_chart_display import apply_known_generic_to_dataframe
+
+    df = apply_known_generic_to_dataframe(df)
     active_consumers = ordered_active_consumers_for_stack(
         df,
         matrix=matrix,

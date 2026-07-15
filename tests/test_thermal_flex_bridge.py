@@ -31,6 +31,8 @@ def _wp_consumer() -> dict:
         "persons": 2,
         "target_temp_c": 21.5,
         "heating_limit_c": 15.0,
+        "loxone_inputs": {"power_name": "Ernie_WP_P_act"},
+        "loxone_outputs": {"enable_name": "Ernie_WP_Freigabe"},
     }
 
 
@@ -60,6 +62,17 @@ def test_planning_thermal_to_milp_bridge():
     assert milp["signal_type"] == "binary"
     assert milp["min_on_quarterhours"] == 4
     assert milp["max_on_quarterhours"] == 16
+    assert milp["loxone_outputs"]["enable_name"] == "Ernie_WP_Freigabe"
+    assert milp["loxone_inputs"]["power_name"] == "Ernie_WP_P_act"
+
+
+def test_planning_thermal_to_milp_without_loxone_stays_empty():
+    consumer = _wp_consumer()
+    del consumer["loxone_inputs"]
+    del consumer["loxone_outputs"]
+    milp = planning_thermal_to_milp(consumer)
+    assert milp["loxone_outputs"] == {}
+    assert milp["loxone_inputs"] == {}
 
 
 def test_collect_planning_flex_includes_wp_heating():

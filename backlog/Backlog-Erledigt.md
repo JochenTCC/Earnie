@@ -3,6 +3,19 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Chart 1 generic `known` consumers (2026-07-15)
+
+- [x] **Chart 1 — generic `known` consumers as separate Down-traces** — still Grundlast for optimization (`house_profile_baseload_overlay`); display peels schedule kW into named columns (`house_config/known_chart_display.py`, `_finalize_chart_rows_for_display`, Chart 1 stack in `ui/chart_consumer_stack.py`); tests `tests/test_known_chart_display.py`
+- [x] **Live verification** — Monitor Chart 1 shows Kochen/Fernsehen (and peers) as separate bars, not only inside Grundlast
+
+
+### Bugfix Chart 2 SA₁→SA₂ empty curves (2026-07-15)
+
+- [x] **Chart 2 SA₁→SA₂ not populated** — persisted live snapshot omitted hourly cost/consumption series and often `planning_matrix`; `savings_info_from_snapshot` now recomputes hourlies from simulation/matched rows and falls back matrix from `simulation_rows` (`runtime_store/live_display_loader.py`); regression via `chart_debug_review/chart_debug_20260715_191843` in `tests/test_live_display_loader.py`
+
+_Effort: 32.657.443 Cursor tokens (2.669.630 excl. cache · CSV open window after 1.99 through 2026-07-15 21:09)_
+
+
 ### Version 2.0 — README expansion (2026-07-15)
 
 - [x] Expand README with motivation / benefits / features — sensible order of use; less technical background than install/configuration hints
@@ -98,7 +111,7 @@ Suggested next steps (SE progress, diag tooling, 1.96d code, cutover runbook) �
 
 Silent-stack debug sessions (Hausconfig, Chart 1, `main.py` SwimSpa, config drift) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Silent-stack debug sessions (2026-07-14). Open regressions → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
-**2026-07-15 session:** Generic `earnie_role` + consumer-roles follow-up → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Generic `earnie_role` + Consumer roles follow-up. UI architecture (Cockpit from `main.py` snapshot, matched-baseline SoC BL Ziel fixes, forecast.solar 429) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-15 sections). PV tuning removal + Simulations-Details columns → [Backlog-Erledigt.md](Backlog-Erledigt.md) § PV tuning removal. Live verification pending → [Backlog-Bugfixes.md](Backlog-Bugfixes.md) § Bugfix Verifications Pending.
+**2026-07-15 session:** Generic `earnie_role` + consumer-roles follow-up → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Generic `earnie_role` + Consumer roles follow-up. UI architecture (Cockpit from `main.py` snapshot, matched-baseline SoC BL Ziel fixes, forecast.solar 429) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-15 sections). PV tuning removal + Simulations-Details columns → [Backlog-Erledigt.md](Backlog-Erledigt.md) § PV tuning removal. Bugfix live verifications (S-2 navigation, Cockpit persistence, EV FertigUm, SoC BL Ziel segment) ✓ (2026-07-15).
 
 
 ### Bugfix SoC BL Ziel matched baseline (silent stack) (2026-07-15)
@@ -117,8 +130,7 @@ _NAS earnie deploy + prod CSV regen: pending._
 ### Bugfix Earnie Monitor S-2 chart navigation (2026-07-15)
 
 - [x] **SA₀→SA₁ → SA₁→SA₂ navigation showed stale charts** — snapshot display cache key omitted `cycle_offset` / `segment_index`; `_refresh_snapshot_bundle` skipped rebuild after **→**. Fix: include `s2:{cycle_offset}:{segment_index}` in `_snapshot_cache_key` (`ui/live_mode.py`); test `tests/test_live_mode_snapshot_cache.py`.
-
-_Live verification: pending (Earnie Monitor **→** / **←** between segments)._
+- [x] **Live verification** — **→** switches both charts to SA₁→SA₂; **←** returns to SA₀→SA₁.
 
 
 ### Bugfix forecast.solar 429 Retry-At (2026-07-15)
@@ -137,15 +149,13 @@ _Live verification: pending (trigger 429 during debug run, confirm log line `Nä
 ### Bugfix SoC BL Ziel segment before Jetzt (Chart 1) (2026-07-15)
 
 - [x] **Dotted baseline trace extended into quarter-hour before Jetzt** — matched-baseline SoC segment no longer drawn left of the Jetzt marker; anchor at log-SOC via `_anchor_baseline_soc_at_now` (`ui/chart_soc.py`); test `tests/test_charts_soc_tail.py::test_baseline_soc_has_no_points_before_now`.
-
-_Live verification: pending (Chart 1 Jetzt marker vs dotted SoC BL Ziel tail on silent stack / NAS)._
+- [x] **Live verification** — dotted SoC BL Ziel baseline stops at Jetzt marker (Chart 1).
 
 
 ### Bugfix EV FertigUm when fully charged (plugged in) (2026-07-15)
 
 - [x] **`fetch_loxone_charging_context` ignores FertigUm when charge complete** — plugged-in + `actual_soc_name` at target → `_loxone_plugged_in_complete_context()` (`optimizer/charging_context.py`); unplug re-reads FertigUm via absent forecast; tests `tests/test_charging_context.py::TestPluggedInChargeComplete`; docs [`docs/referenz/loxone-signale.md`](../docs/referenz/loxone-signale.md).
-
-_Live verification: pending (plugged-in full SOC on NAS; unplug → FertigUm forecast path)._
+- [x] **Live verification** — plugged-in full SOC ignores FertigUm; unplug restores absent-forecast path.
 
 
 ### Bugfix UI: Cockpit from main.py persistence (2026-07-15)
@@ -160,8 +170,7 @@ Plan [`.cursor/plans/ui_relies_on_main.py_a1f9f67e.plan.md`](../.cursor/plans/ui
 - [x] **Help text** — `ui/main_py_sync.py`, `ui/countdown.py` (no “Fallback mit Altplan nach 30 s”)
 - [x] **Tests** — `tests/test_schedule.py`, `tests/test_live_display_loader.py`, `tests/test_main_py_sync_ui.py`, `tests/test_main_loxone_writes.py` (debug snapshot on run)
 - [x] **Docs** — [`docs/einrichtung/betrieb.md`](../docs/einrichtung/betrieb.md), [`docs/ui/betriebsmodi.md`](../docs/ui/betriebsmodi.md), [`docs/spec/ui-sunset2sunset.md`](../docs/spec/ui-sunset2sunset.md) v0.8.0, [`docs/spec/ui-menu-structure.md`](../docs/spec/ui-menu-structure.md) §6
-
-_Prod/live verification: pending (silent stack / NAS)._
+- [x] **Live verification** — Cockpit + Manuelle Geräte after one `main.py` quarter-hour run on silent stack / NAS.
 
 
 ### Bugfix Hauskonfigurator Verschiebung 0.0 (2026-07-15)
@@ -1171,7 +1180,7 @@ Spec: [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md). Goal: cost-opt
 
 ### Consumer colors P1 — NAS deploy cleanup (2026-07-07)
 
-- [x] **Reverted temporary local** `chart_color_index` **test** — local `config/config.json` removed; NAS path `ENERGY_OPTIMIZER_CONFIG_PATH=\\DS-KO-DO-2\docker\energy_optimizer\config\config.json` authoritative again, local override no longer active
+- [x] **Reverted temporary local** `chart_color_index` **test** — local `config/config.json` removed; NAS path `ENERGY_OPTIMIZER_CONFIG_PATH` per `.env.example` authoritative again, local override no longer active
 
 
 
@@ -1490,7 +1499,7 @@ Spec: [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md). Goal: cost-opt
 ### Configuration dev/prod (2026-07-04)
 
 - [x] **Central** `config.json` **addressable via NAS path**
-  - Path via `ENERGY_OPTIMIZER_CONFIG_PATH` (in `.env`, see `.env.example`); dev example: `\\DS-KO-DO-2\docker\energy_optimizer\config\config.json`
+  - Path via `ENERGY_OPTIMIZER_CONFIG_PATH` (in `.env`, see `.env.example`)
   - Fallback unchanged: `config/config.json` → legacy `config.json` in project root
   - Docker/Synology: volume `./config` → `config/config.json` in container
 - [x] `loxone_silent_mode` **moved to local file**

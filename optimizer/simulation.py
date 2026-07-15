@@ -87,9 +87,10 @@ def _finalize_chart_rows_for_display(
     *,
     flex_live_kw: dict[str, float] | None = None,
 ) -> None:
-    """Chart-Darstellung: Sofort-Laden und manuelle Geräte als Flex-Spuren."""
+    """Chart-Darstellung: Sofort-Laden, manuelle Geräte und known-Generics als Flex-Spuren."""
     from .charge_immediate import apply_immediate_charge_to_chart_rows
     from .appliance_schedule import apply_appliance_schedules_to_chart_rows
+    from house_config.known_chart_display import apply_known_generic_to_chart_rows
 
     apply_immediate_charge_to_chart_rows(
         chart_rows,
@@ -97,6 +98,7 @@ def _finalize_chart_rows_for_display(
         flex_live_kw=flex_live_kw,
     )
     apply_appliance_schedules_to_chart_rows(chart_rows)
+    apply_known_generic_to_chart_rows(chart_rows)
 
 
 def _format_chart_uhrzeit(row: dict) -> str:

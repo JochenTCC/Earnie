@@ -54,6 +54,8 @@ Entladen → Last ← verbleibende Entladung
 
 **Flexible Verbraucher** (gestapelte Down-Segmente): Farbe aus fester **8er-Palette** in `ui/chart_colors.py` (`CONSUMER_PALETTE`, Hue **260→40**, S≈90, L≈50). In `config.json` je Verbraucher **`chart_color_index`** (0–7), nicht mehr freies Hex. Auflösung zentral über `consumer_chart_color()` — Chart 1 und Sankey nutzen dieselben Vollfarben.
 
+**Generic `earnie_role: known`:** In der Optimierung Teil der Grundlast-Overlay; in Chart 1 werden die geplanten Stundenleistungen **sichtbar** aus `Verbrauch-Prognose` in eigene Down-Segmente (z. B. Kochen, Fernsehen) herausgezogen — analog zu manuellen Geräten (`house_config/known_chart_display.py`).
+
 **Zonenabhängige Sättigung (nur Chart-1-Flex-Balken):** Grauer Bereich (Vergangenheit) volle Palette-Sättigung; neutraler Bereich (laufender Plan) und grüner Bereich (Preis-Prognose) gemeinsam gedämpft (`CONSUMER_CHART_SATURATION_MUTED`, derzeit 0,6). Slot → Zone über `chart_zone_kind_for_slot_start()` / `UiChartZones`; Legende bleibt in Vollfarbe (`visible='legendonly'`). Sankey unverändert volle Sättigung.
 
 **PV im grauen Bereich:** Eine Prognose-Linie (Forecast.Solar-Wert **vor** Live-Overlay, Feld `forecast_pv_kw` im Log) über alle Zonen; PV-Balken (Flow-Balance ↑) nutzen im Log **Ist** (`PV-Ist (kW)` aus `consumption_snapshot.pv_kw`). Abweichung sichtbar ab dem nächsten Worker-Lauf nach dem Fix; ältere Log-Einträge können identische Werte haben (früher wurde Ist fälschlich als Prognose geloggt).

@@ -25,7 +25,9 @@ Prüfung aller konfigurierten Signale:
 | `target_discharge_power_name` | Schreiben | `Ernie_Ziel_Entladeleistung` | Ziel-Entladeleistung, kW |
 | `control_cmd_name` | Schreiben | `Ernie_Steuerbefehl` | `0` Automatik, `1` Zwangsladen, `2` Zwangs-Entladen |
 
-## Flexible Verbraucher — pro Eintrag in `flexible_consumers[]`
+## Flexible Verbraucher — Hausprofil bzw. `flexible_consumers[]`
+
+Live-Steuerung kommt aus dem aktiven Hausprofil (`house_profiles.json`, Typen `thermal_annual` / `thermal_rc` / `ev`) und wird bei Bedarf mit Legacy-Einträgen in `flexible_consumers[]` über `legacy_id` überlagert. Wärmepumpe: Profil-id `wp_heating`, `legacy_id` typisch `waermepumpe`, Freigabe `loxone_outputs.enable_name` → z. B. `Ernie_WP_Freigabe`.
 
 ### Gemeinsame Signale (SwimSpa, Wärmepumpe, Filter)
 
@@ -108,7 +110,7 @@ Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden)
 | `swimspa` | `Ernie_SwimSpa_Freigabe` (0/1) | `Ernie_Swim-Spa-P_act` (Gesamt inkl. Filter) |
 | `swimspa_filter` | `Ernie_Swimspa_Filter_Freigabe` (0/1) | `homie_bwa_spa_filter2` (binär) |
 | `eauto` | `Ernie_EAuto_Ziel_kW` + `Ernie_EAuto_pv_follow` | `Ernie_EAuto_P_act` |
-| `waermepumpe` | `Ernie_WP_Freigabe` (0/1) | `Ernie_WP_P_act` |
+| `wp_heating` (`legacy_id` `waermepumpe`) | `Ernie_WP_Freigabe` (0/1) | `Ernie_WP_P_act` |
 
 **Hinweis SwimSpa (Fall B):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistung (Heizung, Filter, Jets/weitere Pumpen). Filter-Anteil: `subtract_consumer_ids` + `homie_bwa_spa_filter*`. Heizung für thermisches Modell/Kalibrierung: `homie_bwa_spa_heating` (`thermal_control.loxone.heating_active_name`) — kein separater Heiz-kW-Merker in Loxone.
 

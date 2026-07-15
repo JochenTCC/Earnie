@@ -370,6 +370,19 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path):
             "heating_efficiency": 0.99,
         },
     }
+    wp_original = {
+        "id": "wp_heating",
+        "legacy_id": "waermepumpe",
+        "label": "Wärmepumpe",
+        "type": "thermal_annual",
+        "nominal_power_kw": 1.6,
+        "living_area_m2": 157.0,
+        "building_class": 2,
+        "heat_pump_type": "erde",
+        "persons": 2,
+        "loxone_inputs": {"power_name": "Ernie_WP_P_act"},
+        "loxone_outputs": {"enable_name": "Ernie_WP_Freigabe"},
+    }
     ev_edited = {
         "id": "ev",
         "label": "Smart",
@@ -389,7 +402,18 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path):
         "nominal_power_kw": 2.8,
         "thermal_rc": dict(spa_original["thermal_rc"]),
     }
+    wp_edited = {
+        "id": "wp_heating",
+        "label": "Wärmepumpe",
+        "type": "thermal_annual",
+        "nominal_power_kw": 1.6,
+        "living_area_m2": 157.0,
+        "building_class": 2,
+        "heat_pump_type": "erde",
+        "persons": 2,
+    }
     merged = [
+        _merge_passthrough_consumer_fields(wp_original, wp_edited),
         _merge_passthrough_consumer_fields(ev_original, ev_edited),
         _merge_passthrough_consumer_fields(spa_original, spa_edited),
     ]
@@ -410,8 +434,12 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path):
     )
     doc = load_house_profiles_document(str(path))
     consumers = doc["profiles"]["example_efh"]["consumers"]
+    wp = next(item for item in consumers if item["id"] == "wp_heating")
     ev = next(item for item in consumers if item["id"] == "ev")
     spa = next(item for item in consumers if item["id"] == "swimspa")
+    assert wp["legacy_id"] == "waermepumpe"
+    assert wp["loxone_outputs"]["enable_name"] == "Ernie_WP_Freigabe"
+    assert wp["loxone_inputs"]["power_name"] == "Ernie_WP_P_act"
     assert ev["loxone_outputs"]["power_setpoint_name"] == "Ernie_EAuto_Ziel_kW"
     assert ev["loxone_inputs"]["power_name"] == "Ernie_EAuto_P_act"
     assert ev["charging_schedule"]["loxone"]["plugged_in_name"] == "Ernie_EAuto_Da"

@@ -30,6 +30,12 @@ SWIMSPA_THERMAL_BINDINGS = {
     },
 }
 
+WP_LOXONE_BINDINGS = {
+    "legacy_id": "waermepumpe",
+    "loxone_inputs": {"power_name": "Ernie_WP_P_act"},
+    "loxone_outputs": {"enable_name": "Ernie_WP_Freigabe"},
+}
+
 
 def _load_json(path: Path) -> dict:
     for encoding in ("utf-8-sig", "utf-8", "cp1252"):
@@ -146,7 +152,7 @@ def _build_swimspa_consumer(swimspa: dict) -> dict:
 
 def _build_wp_consumer(waermepumpe: dict, wp_profile: dict | None) -> dict:
     base = wp_profile or {}
-    return {
+    entry = {
         "id": "wp_heating",
         "legacy_id": "waermepumpe",
         "label": str(waermepumpe.get("name", "Wärmepumpe")),
@@ -169,6 +175,67 @@ def _build_wp_consumer(waermepumpe: dict, wp_profile: dict | None) -> dict:
             if key in base
         },
     }
+    loxone_inputs = waermepumpe.get("loxone_inputs")
+    if isinstance(loxone_inputs, dict) and loxone_inputs:
+        entry["loxone_inputs"] = dict(loxone_inputs)
+    elif isinstance(base.get("loxone_inputs"), dict) and base["loxone_inputs"]:
+        entry["loxone_inputs"] = dict(base["loxone_inputs"])
+    else:
+        entry["loxone_inputs"] = dict(WP_LOXONE_BINDINGS["loxone_inputs"])
+    loxone_outputs = waermepumpe.get("loxone_outputs")
+    if isinstance(loxone_outputs, dict) and loxone_outputs:
+        entry["loxone_outputs"] = dict(loxone_outputs)
+    elif isinstance(base.get("loxone_outputs"), dict) and base["loxone_outputs"]:
+        entry["loxone_outputs"] = dict(base["loxone_outputs"])
+    else:
+        entry["loxone_outputs"] = dict(WP_LOXONE_BINDINGS["loxone_outputs"])
+    return entry
+
+
+def _wp_needs_loxone_backfill(consumer: dict) -> bool:
+    if str(consumer.get("id", "")).strip() != "wp_heating":
+        return False
+    if str(consumer.get("type", "")).strip().lower() != "thermal_annual":
+        return False
+    enable = str((consumer.get("loxone_outputs") or {}).get("enable_name", "")).strip()
+    return not enable
+
+
+def backfill_wp_loxone_in_profiles(
+    house_profiles: dict,
+    *,
+    profile_id: str = PROFILE_ID,
+) -> tuple[dict, list[str]]:
+    """Restore WP Loxone markers when migration left wp_heating without enable_name."""
+    profiles_out = deepcopy(house_profiles)
+    profiles = profiles_out.get("profiles", [])
+    patched_ids: list[str] = []
+
+    def _patch_consumers(consumers: list[dict]) -> None:
+        for consumer in consumers:
+            if not _wp_needs_loxone_backfill(consumer):
+                continue
+            consumer["legacy_id"] = str(
+                consumer.get("legacy_id") or WP_LOXONE_BINDINGS["legacy_id"]
+            )
+            if not isinstance(consumer.get("loxone_inputs"), dict) or not consumer[
+                "loxone_inputs"
+            ]:
+                consumer["loxone_inputs"] = dict(WP_LOXONE_BINDINGS["loxone_inputs"])
+            consumer["loxone_outputs"] = dict(WP_LOXONE_BINDINGS["loxone_outputs"])
+            patched_ids.append(str(consumer.get("id", "wp_heating")))
+
+    if isinstance(profiles, dict):
+        profile = profiles.get(profile_id)
+        if isinstance(profile, dict):
+            _patch_consumers(profile.setdefault("consumers", []))
+    elif isinstance(profiles, list):
+        for profile in profiles:
+            if str(profile.get("id", "")).strip() != profile_id:
+                continue
+            _patch_consumers(profile.setdefault("consumers", []))
+            break
+    return profiles_out, patched_ids
 
 
 def _generic_from_appliance(appliance: dict) -> dict:
@@ -294,6 +361,18 @@ def migrate_prod_consumers(
         for entry in flex_list
         if str(entry.get("id", "")) not in set(strip_flex_ids)
     ]
+    profiles_out, wp_patched = backfill_wp_loxone_in_profiles(
+        profiles_out, profile_id=profile_id
+    )
+    for consumer_id in wp_patched:
+        status.append(
+            {
+                "id": consumer_id,
+                "legacy_id": "waermepumpe",
+                "phase": "1.97",
+                "status": "wp-loxone-backfill",
+            }
+        )
     return config_out, profiles_out, status
 
 
