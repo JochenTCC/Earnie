@@ -139,11 +139,19 @@ def test_recommendation_appliances_from_house_profile():
                 "label": "Waschmaschine",
                 "type": "generic",
                 "nominal_power_kw": 2.0,
+                "earnie_role": "manual",
+                "schedule": {
+                    "runs_per_week": 5,
+                    "duration_h": 2.0,
+                    "start_hour": 15,
+                    "start_shift_h": 4.0,
+                },
                 "appliance_recommendation": {
-                    "power_source": "manual",
+                    "power_source": "loxone",
                     "default_power_kw": 2.0,
                     "default_runtime_h": 2.0,
                 },
+                "loxone_inputs": {"power_name": "Leistung Waschmaschine"},
             }
         ],
     }
@@ -152,3 +160,5 @@ def test_recommendation_appliances_from_house_profile():
     assert appliances[0]["id"] == "waschmaschine"
     assert appliances[0]["name"] == "Waschmaschine"
     assert appliances[0]["default_runtime_h"] == 2.0
+    assert appliances[0]["recommendation_horizon_h"] == 4
+    assert appliances[0]["loxone_inputs"] == {"power_name": "Leistung Waschmaschine"}

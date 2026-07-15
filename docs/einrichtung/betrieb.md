@@ -7,7 +7,7 @@
 | **Produktiv-Daemon** | `python main.py` | Liest Loxone, optimiert, schreibt Steuerwerte — läuft dauerhaft |
 | **Streamlit-App** | `python -m scripts.run_streamlit` | Cockpit, Simulation, Debugging — optional parallel |
 
-Nur `main.py` steuert die Anlage. Die App **simuliert** den 24-Stunden-Horizont und zeigt den letzten Produktiv-Durchlauf an; sie überschreibt keine Loxone-Ausgänge. Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonfigurator, Live-Konfiguration, Manuelle Geräte), nicht über die Cockpit-Sidebar.
+Nur `main.py` steuert die Anlage. Die App **zeigt** den von `main.py` berechneten 24-Stunden-Horizont an (persistiert in `live_optimization_debug.json`); sie überschreibt keine Loxone-Ausgänge. Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonfigurator, Live-Konfiguration, Manuelle Geräte), nicht über die Cockpit-Sidebar.
 
 ## Optimierungs-Takt
 
@@ -17,7 +17,7 @@ Nur `main.py` steuert die Anlage. Die App **simuliert** den 24-Stunden-Horizont 
 - `system.event_poll_interval_sec` (Standard `60`): Abfrageintervall für `event_triggers` zwischen den regulären Läufen
 - `system.event_triggers`: Liste der Loxone-Signale (binary/text) – siehe `config.schema.json`
 - `system.loop_timeout` in `config.json`: maximale Wartezeit zwischen Durchläufen in Sekunden (Standard 900 = 15 Min.)
-- Die App aktualisiert die Live-Simulation ca. **1 Minute nach** dem Viertelstunden-Wechsel, damit `main.py` zuerst laufen kann
+- Die App lädt den Cockpit-Snapshot nach dem Viertelstunden-Wechsel, sobald `main.py` den aktuellen Slot abgeschlossen hat (typisch wenige Sekunden)
 
 Countdown und letzter Lauf werden unten in der App angezeigt (siehe [Charts & Panels](../ui/charts.md)).
 
@@ -35,8 +35,8 @@ Standardverzeichnis: `runtime/` (überschreibbar mit `EARNIE_RUNTIME_DIR`, Legac
 | `earnie.log` | Rotierendes Python-Log |
 | `optimizer_run_state.json` | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll) |
 | `optimization_history.jsonl` | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf) |
-| `live_optimization_debug.json` | Debug-Snapshot der App-Simulation (Sunset-2-Sunset) |
-| `local_settings.json` | Lokale Betriebseinstellungen (z. B. `loxone_silent_mode` für Migrations-Tests) |
+| `live_optimization_debug.json` | Anzeige-Snapshot des Sunset-2-Sunset-Cockpits (von `main.py` geschrieben, von der App gelesen) |
+| `local_settings.json` | Lokale Betriebseinstellungen (z. B. `loxone_silent_mode`, `chart_debug_capture_enabled`) |
 | `appliance_schedules.json` | Geplante Laufzeiten manueller Geräte |
 | `backtesting_log.json` | Ergebnis von Scenario-Exploration / `run_backtesting` |
 
@@ -50,6 +50,7 @@ Die App liest diese Dateien **read-only** für Panels und Abgleich.
 | `EARNIE_RUNTIME_DIR` | Anderes Verzeichnis für Laufzeitdaten |
 | `EARNIE_UI_MODES` | Kommagetrennt: `sunset2sunset`, `scenario_exploration` — schränkt sichtbare Analyse-Seiten ein (Prod: `sunset2sunset,scenario_exploration`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
 | `EARNIE_UI_STREAMLIT_PORT` | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md)) |
+| `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Chart-Debug speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). Legacy-Alias: `ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED`. |
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).
 

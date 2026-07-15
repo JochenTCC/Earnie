@@ -100,6 +100,53 @@ def _patch_main_core(monkeypatch, *, silent: bool):
     monkeypatch.setattr(main_module.optimizer, "calculate_optimization_savings", lambda *a, **k: None)
 
 
+def _sample_savings_info():
+    return {
+        "baseline_cost_euro": 10.0,
+        "optimized_cost_euro": 8.0,
+        "savings_euro": 2.0,
+        "matched_baseline_cost_euro": 9.0,
+        "savings_matched_euro": 1.0,
+        "baseline_consumption_kwh": 5.0,
+        "matched_baseline_consumption_kwh": 4.5,
+        "optimized_consumption_kwh": 4.0,
+        "baseload_kwh": 1.0,
+        "optimized_rows": [{"hour": 10, "Netzbezug (kWh)": 1.0}],
+        "baseline_rows": [{"hour": 10}],
+        "matched_baseline_rows": [],
+        "applied_targets": [],
+        "energy_comparison": [],
+    }
+
+
+def test_main_persists_live_optimization_debug_snapshot(monkeypatch):
+    _patch_main_core(monkeypatch, silent=True)
+    monkeypatch.setattr(
+        main_module.optimizer,
+        "calculate_optimization_savings",
+        lambda *a, **k: _sample_savings_info(),
+    )
+    monkeypatch.setattr(main_module.optimizer, "build_savings_snapshot", lambda info: {"savings_matched_euro": 1.0})
+    monkeypatch.setattr(main_module.optimizer, "overlay_main_run_on_rows", lambda rows, _state: rows)
+    saved_debug: list[dict] = []
+    monkeypatch.setattr(
+        main_module.live_optimization_debug,
+        "save_debug_snapshot",
+        lambda payload, **_: saved_debug.append(payload),
+    )
+    monkeypatch.setattr(main_module.run_state, "save_run_state", lambda _payload: None)
+
+    main_module.main(run_trigger=build_run_trigger(TRIGGER_QUARTER_HOUR))
+
+    assert saved_debug
+    payload = saved_debug[0]
+    assert payload["source"] == "main.py"
+    assert payload["sync_reason"] == "main_synced"
+    assert payload.get("planning_matrix")
+    assert payload.get("planning_window")
+    assert payload.get("simulation_rows")
+
+
 def test_main_run_state_includes_loxone_writes_when_not_silent(monkeypatch):
     _patch_main_core(monkeypatch, silent=False)
     saved: list[dict] = []

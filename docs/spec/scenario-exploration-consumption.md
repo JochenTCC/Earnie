@@ -20,8 +20,9 @@ Profile consumers are merged into `flexible_consumers` via `_planning_flex_consu
 
 | Profile `type` | MILP-flex when | Bridge function | MILP mechanism |
 | -------------- | -------------- | --------------- | -------------- |
-| `generic` | `schedule.start_shift_h > 0` | `planning_consumer_to_milp` | `generic_flex_window` |
-| `generic` | `schedule.start_shift_h == 0` | — (fixed overlay only) | — |
+| `generic` | `earnie_role: flex` | `planning_consumer_to_milp` | `generic_flex_window` |
+| `generic` | `earnie_role: known` | — (fixed overlay only) | — |
+| `generic` | `earnie_role: manual` | — (recommendation page + runtime schedule inject) | — |
 | `ev` | `charging_schedule` present | `planning_ev_to_milp` | `charging_schedule` + deadline |
 | `thermal_annual` | — | — | Fixed overlay (`house_profile_baseload_overlay`) |
 

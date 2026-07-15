@@ -10,7 +10,8 @@
       "env": {
         "EARNIE_RUNTIME_DIR": "\\\\DS-KO-DO-2\\docker\\earnie\\runtime",
         "EARNIE_CONFIG_PATH": "\\\\DS-KO-DO-2\\docker\\earnie\\config\\config.json",
-        "EARNIE_UI_STREAMLIT_PORT": "8503"
+        "EARNIE_UI_STREAMLIT_PORT": "8503",
+        "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1"
       },
       "subProcess": false,
       "console": "integratedTerminal",
@@ -58,7 +59,8 @@
         "EARNIE_VERIFY_LOXONE_ON_START": "1",
         "EARNIE_STRICT_TARIFF_VALIDATE": "1",
         "EARNIE_UI_MODES": "sunset2sunset,scenario_exploration",
-        "EARNIE_UI_STREAMLIT_PORT": "8512"
+        "EARNIE_UI_STREAMLIT_PORT": "8512",
+        "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1"
       },
       "subProcess": false,
       "console": "integratedTerminal",
@@ -86,7 +88,8 @@
         "EARNIE_VERIFY_LOXONE_ON_START": "1",
         "EARNIE_STRICT_TARIFF_VALIDATE": "1",
         "EARNIE_UI_MODES": "sunset2sunset,scenario_exploration",
-        "EARNIE_UI_STREAMLIT_PORT": "8512"
+        "EARNIE_UI_STREAMLIT_PORT": "8512",
+        "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1"
       },
       "subProcess": false,
       "console": "integratedTerminal",

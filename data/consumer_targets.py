@@ -12,6 +12,7 @@ import pandas as pd
 
 import config
 from integrations import loxone_client
+from settings.flexible_consumers import flex_kw_lookup
 from . import profile_manager
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,7 @@ def _resolve_single_consumer_daily_target_kwh(
             day_rows = [row for row in matrix if row.get("date") == target_date]
             if day_rows and any(row.get("expected_flex_kw") for row in day_rows):
                 return sum(
-                    float((row.get("expected_flex_kw") or {}).get(cid, 0.0))
+                    flex_kw_lookup(row.get("expected_flex_kw"), consumer)
                     for row in day_rows
                 )
         totals = _historical_totals_for_date(target_date, cache)
@@ -163,8 +164,7 @@ def resolve_horizon_flex_targets_kwh(matrix: list) -> dict[str, float]:
     for row in matrix:
         flex = row.get("expected_flex_kw") or {}
         for consumer in consumers:
-            cid = consumer["id"]
-            totals[cid] += float(flex.get(cid, 0.0) or 0.0)
+            totals[consumer["id"]] += flex_kw_lookup(flex, consumer)
     return {cid: round(kwh, 3) for cid, kwh in totals.items()}
 
 

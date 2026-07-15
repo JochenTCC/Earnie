@@ -13,6 +13,7 @@ def _eauto_consumer() -> dict:
     return {
         "id": "eauto",
         "name": "E-Auto",
+        "type": "ev",
         "nominal_power_kw": 3.5,
         "min_power_kw": 1.4,
         "daily_target_source": "loxone",
@@ -172,7 +173,39 @@ class TestMainStateFallback:
             },
         }
         labels = ci.merge_immediate_charging_labels({}, main_state)
-        assert labels == ["eauto: 3.479 kW live (Sofort-Laden)"]
+        assert labels == ["E-Auto: 3.479 kW live (Sofort-Laden)"]
+
+    def test_merge_labels_with_ev_legacy_id(self):
+        consumer = {
+            "id": "ev",
+            "legacy_id": "eauto",
+            "name": "Smart",
+            "charging_schedule": {
+                "enabled": True,
+                "loxone": {"charge_immediate_name": "E-Auto_SOFORT_LADEN"},
+            },
+        }
+        main_state = {
+            "event_trigger_snapshot": {
+                "eauto_charge_immediate": True,
+                "eauto_plugged_in": True,
+            },
+            "flex_live_kw": {"eauto": 3.479},
+            "charging_contexts": {
+                "ev": {
+                    "active": True,
+                    "plugged_in": True,
+                    "target_kwh": 11.5,
+                }
+            },
+        }
+        with patch.object(
+            ci.config,
+            "get_flexible_consumers",
+            return_value=[consumer],
+        ):
+            labels = ci.immediate_charging_labels_from_main_state(main_state)
+        assert labels == ["Smart: 3.479 kW live (Sofort-Laden)"]
 
     def test_labels_show_loxone_remaining_hours(self):
         contexts = {
@@ -205,7 +238,9 @@ class TestChartDisplay:
                 "immediate_horizon_hours": 3,
             }
         }
-        ci.apply_immediate_charge_chart_display(chart_row, 0, contexts)
+        consumer = _eauto_consumer()
+        with patch.object(ci.config, "get_flexible_consumers", return_value=[consumer]):
+            ci.apply_immediate_charge_chart_display(chart_row, 0, contexts)
         assert chart_row["E-Auto (kW)"] == 3.5
         assert chart_row["E-Auto sofort_laden"] == 1
         assert chart_row["Verbrauch-Prognose (kW)"] == pytest.approx(4.5)

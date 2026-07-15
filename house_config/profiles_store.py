@@ -5,6 +5,14 @@ import json
 import os
 
 from house_config.baseload import compute_baseload_kwh
+from house_config.earnie_role import (
+    DEFAULT_MANUAL_HORIZON_H,
+    EARNIE_ROLE_FLEX,
+    EARNIE_ROLE_KNOWN,
+    EARNIE_ROLE_MANUAL,
+    EARNIE_ROLES,
+    infer_earnie_role_from_legacy,
+)
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.ev_profile import normalize_ev_charging_schedule
 from house_config.geo_timezone import lookup_timezone_name
@@ -24,6 +32,29 @@ def _copy_loxone_binding(raw: dict, spec: dict) -> None:
     loxone_outputs = raw.get("loxone_outputs")
     if isinstance(loxone_outputs, dict) and loxone_outputs:
         spec["loxone_outputs"] = dict(loxone_outputs)
+
+
+def _legacy_loxone_power_name(raw: dict) -> str:
+    rec = raw.get("appliance_recommendation")
+    if isinstance(rec, dict):
+        return str(rec.get("loxone_power_name", "")).strip()
+    return ""
+
+
+def _loxone_power_name_from_raw(raw: dict) -> str:
+    inputs = raw.get("loxone_inputs")
+    if isinstance(inputs, dict):
+        name = str(inputs.get("power_name", "")).strip()
+        if name:
+            return name
+    return _legacy_loxone_power_name(raw)
+
+
+def _set_generic_loxone_inputs(spec: dict, power_name: str) -> None:
+    if power_name:
+        spec["loxone_inputs"] = {"power_name": power_name}
+    else:
+        spec.pop("loxone_inputs", None)
 
 
 def _thermal_rc_source(raw: dict) -> dict:
@@ -104,6 +135,78 @@ def _normalize_schedule(raw: dict | None, *, consumer: dict) -> dict | None:
     return normalize_generic_schedule(schedule_input)
 
 
+def _normalize_earnie_role(
+    spec: dict,
+    raw: dict,
+    *,
+    consumer_id: str,
+    profile_id: str,
+    index: int,
+) -> None:
+    """Setzt earnie_role und abhängige Felder für generic-Verbraucher."""
+    schedule = spec.get("schedule")
+    if not schedule:
+        spec.pop("earnie_role", None)
+        spec.pop("appliance_recommendation", None)
+        return
+
+    explicit = str(raw.get("earnie_role", "") or "").strip().lower()
+    if explicit in EARNIE_ROLES:
+        role = explicit
+    else:
+        role = infer_earnie_role_from_legacy({**raw, "schedule": schedule})
+
+    spec["earnie_role"] = role
+
+    if role == EARNIE_ROLE_KNOWN:
+        schedule["start_shift_h"] = 0.0
+        spec.pop("appliance_recommendation", None)
+        _set_generic_loxone_inputs(spec, _loxone_power_name_from_raw(raw))
+        return
+
+    if role == EARNIE_ROLE_FLEX:
+        shift = float(schedule.get("start_shift_h", 0.0) or 0.0)
+        if shift <= 0:
+            raise ValueError(
+                f"profiles '{profile_id}' consumers[{index}] '{consumer_id}': "
+                "earnie_role=flex erfordert schedule.start_shift_h > 0."
+            )
+        spec.pop("appliance_recommendation", None)
+        return
+
+    from settings import appliances as appliance_settings
+
+    shift = float(schedule.get("start_shift_h", 0.0) or 0.0)
+    if shift < 1:
+        schedule["start_shift_h"] = DEFAULT_MANUAL_HORIZON_H
+    rec = raw.get("appliance_recommendation")
+    if isinstance(rec, dict):
+        rec_input = dict(rec)
+    else:
+        rec_input = {
+            "power_source": "manual",
+            "default_power_kw": spec["nominal_power_kw"],
+            "default_runtime_h": float(schedule.get("duration_h", 2.0) or 2.0),
+        }
+    power_source = str(rec_input.get("power_source", "manual")).strip().lower()
+    power_name = _loxone_power_name_from_raw(raw)
+    if power_source == "loxone" and not power_name:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers[{index}] '{consumer_id}': "
+            "earnie_role=manual mit power_source=loxone erfordert loxone_inputs.power_name."
+        )
+    if power_source == "loxone":
+        _set_generic_loxone_inputs(spec, power_name)
+    else:
+        spec.pop("loxone_inputs", None)
+    spec["appliance_recommendation"] = appliance_settings.normalize_appliance_recommendation_block(
+        rec_input,
+        consumer_id=consumer_id,
+        nominal_power_kw=spec["nominal_power_kw"],
+        loxone_power_name=power_name if power_source == "loxone" else "",
+    )
+
+
 def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     if not isinstance(raw, dict):
         raise ValueError(f"profiles '{profile_id}' consumers[{index}] muss ein Objekt sein.")
@@ -127,15 +230,13 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     if consumer_type == "generic":
         spec["schedule"] = _normalize_schedule(raw.get("schedule"), consumer=raw)
         spec["annual_kwh"] = generic_annual_kwh(spec)
-        rec = raw.get("appliance_recommendation")
-        if isinstance(rec, dict):
-            from settings import appliances as appliance_settings
-
-            spec["appliance_recommendation"] = appliance_settings.normalize_appliance_recommendation_block(
-                rec,
-                consumer_id=consumer_id,
-                nominal_power_kw=spec["nominal_power_kw"],
-            )
+        _normalize_earnie_role(
+            spec,
+            raw,
+            consumer_id=consumer_id,
+            profile_id=profile_id,
+            index=index,
+        )
     elif consumer_type == "ev":
         battery_capacity = float(raw.get("battery_capacity_kwh", 0.0) or 0.0)
         if battery_capacity <= 0:
@@ -336,6 +437,15 @@ def _serialize_consumer(consumer: dict) -> dict:
         out["annual_kwh"] = consumer.get("annual_kwh", 0.0)
         if consumer.get("schedule"):
             out["schedule"] = consumer["schedule"]
+        if consumer.get("earnie_role"):
+            out["earnie_role"] = consumer["earnie_role"]
+        rec = consumer.get("appliance_recommendation")
+        if isinstance(rec, dict):
+            out["appliance_recommendation"] = dict(rec)
+        if consumer.get("loxone_inputs"):
+            out["loxone_inputs"] = dict(consumer["loxone_inputs"])
+        if consumer.get("legacy_id"):
+            out["legacy_id"] = consumer["legacy_id"]
     elif consumer["type"] == "ev":
         out["min_power_kw"] = consumer.get("min_power_kw", 0.0)
         out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 0)

@@ -66,15 +66,33 @@ def load_ui_fragment_refresh_sec(raw_config: dict, key: str, default: int) -> in
     return value
 
 
+def _validate_ui_bool(raw: object, source: str) -> bool:
+    if not isinstance(raw, bool):
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: {source} muss true oder false sein."
+        )
+    return raw
+
+
 def load_ui_bool(raw_config: dict, key: str, default: bool) -> bool:
     raw = raw_config.get("ui", {}).get(key)
     if raw is None:
         return default
-    if not isinstance(raw, bool):
-        raise ValueError(
-            f"Kritischer Konfigurationsfehler: ui.{key} muss true oder false sein."
+    return _validate_ui_bool(raw, f"ui.{key}")
+
+
+def load_ui_chart_debug_capture_enabled(
+    raw_config: dict,
+    local_settings: dict,
+    local_settings_path: str,
+) -> bool:
+    """Chart-Debug-ZIP: local_settings.json überschreibt ui.chart_debug_capture_enabled."""
+    if "chart_debug_capture_enabled" in local_settings:
+        return _validate_ui_bool(
+            local_settings.get("chart_debug_capture_enabled"),
+            f"{local_settings_path} (chart_debug_capture_enabled)",
         )
-    return raw
+    return load_ui_bool(raw_config, "chart_debug_capture_enabled", False)
 
 
 def load_ui_streamlit_port(raw_config: dict) -> int:

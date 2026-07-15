@@ -76,6 +76,29 @@ def test_loxone_silent_mode_local_settings_overrides_central_config(tmp_path, mo
     assert cfg.is_loxone_silent_mode() is True
 
 
+def test_chart_debug_capture_local_settings_overrides_config(tmp_path, monkeypatch):
+    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
+    config_path, scenarios_path = write_minimal_config_tree(
+        tmp_path,
+        config_payload=minimal_config_payload(
+            extra={"ui": {"chart_debug_capture_enabled": False}}
+        ),
+    )
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(
+        json.dumps({"chart_debug_capture_enabled": True}),
+        encoding="utf-8",
+    )
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.get_ui_chart_debug_capture_enabled() is True
+
+
 def test_bootstrap_creates_local_settings(tmp_path, monkeypatch):
     from runtime_store import bootstrap
 

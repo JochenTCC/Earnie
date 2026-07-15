@@ -26,6 +26,7 @@ from ui.house_config_profile_form import (
     _default_consumer,
     _flatten_consumer_for_edit,
     _profile_session_scope,
+    _schedule_defaults,
     _seed_profile_widget_state,
     _sync_profile_session,
 )
@@ -663,3 +664,15 @@ def test_upsert_two_consumers_roundtrip(tmp_path, monkeypatch):
     consumers = doc["profiles"]["home"]["consumers"]
     assert len(consumers) == 2
     assert {consumer["id"] for consumer in consumers} == {"pool", "ev"}
+
+
+def test_schedule_defaults_preserves_zero_start_shift_h():
+    defaults = _schedule_defaults(
+        {
+            "runs_per_week": 7,
+            "duration_h": 2.0,
+            "start_hour": 18,
+            "start_shift_h": 0.0,
+        }
+    )
+    assert defaults["start_shift_h"] == 0.0

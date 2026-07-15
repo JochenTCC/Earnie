@@ -438,7 +438,11 @@ def setup_silent_migration_test(
 
     local_settings = runtime_out / "local_settings.json"
     local_settings.write_text(
-        json.dumps({"loxone_silent_mode": True}, indent=4) + "\n",
+        json.dumps(
+            {"loxone_silent_mode": True, "chart_debug_capture_enabled": True},
+            indent=4,
+        )
+        + "\n",
         encoding="utf-8",
     )
 

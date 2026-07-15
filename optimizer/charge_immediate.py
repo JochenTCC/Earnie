@@ -10,6 +10,12 @@ import config
 from integrations import loxone_client
 from optimizer.consumer_power import power_limits_kw
 from optimizer.event_trigger import parse_binary_value
+from settings.flexible_consumers import (
+    flex_kw_lookup,
+    flex_kw_pop_for_consumer,
+    flex_kw_to_canonical,
+    runtime_consumer_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +210,7 @@ def apply_immediate_charge_to_matrix(
         for t in range(min(hours, horizon)):
             row = updated[t]
             flex = dict(row.get("expected_flex_kw") or {})
-            flex_eauto = float(flex.pop(cid, 0.0) or 0.0)
+            flex_eauto = flex_kw_pop_for_consumer(flex, consumer)
             add_kw = _fixed_kw_for_slot(
                 t, max_kw=max_kw, current_kw=current_kw, flex_eauto=flex_eauto
             )
@@ -222,7 +228,7 @@ def live_flex_kw_from_matrix(matrix: list) -> dict[str, float] | None:
     flex = matrix[0].get("expected_flex_kw")
     if not isinstance(flex, dict) or not flex:
         return None
-    return dict(flex)
+    return flex_kw_to_canonical(flex, config.get_flexible_consumers(optimizer_only=True))
 
 
 def prepare_optimization_matrix(
@@ -297,8 +303,8 @@ def apply_immediate_charge_chart_display(
         ctx = charging_contexts.get(cid) or {}
         kw = immediate_charge_kw_for_hour(hour_index, ctx)
         if hour_index == 0 and flex_live_kw is not None and ctx.get("immediate_charge"):
-            live = flex_live_kw.get(cid)
-            if live is not None and float(live) >= charging_power_threshold_kw():
+            live = flex_kw_lookup(flex_live_kw, consumer)
+            if live >= charging_power_threshold_kw():
                 kw = max(kw, float(live))
         power_col = consumer_column_name(consumer)
         if kw <= 1e-6:
@@ -364,30 +370,55 @@ def immediate_charging_labels(contexts: dict[str, dict]) -> list[str]:
     return labels
 
 
+def _immediate_charge_consumer() -> dict | None:
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        if charge_immediate_io_name(consumer):
+            return consumer
+    return None
+
+
+def _trigger_snapshot_flag(
+    snap: dict,
+    consumer: dict,
+    suffix: str,
+) -> bool | None:
+    runtime_id = runtime_consumer_id(consumer)
+    canonical_id = str(consumer["id"])
+    for key in (f"{runtime_id}_{suffix}", f"{canonical_id}_{suffix}"):
+        if key in snap:
+            return bool(snap[key])
+    return None
+
+
 def immediate_charging_labels_from_main_state(main_state: dict | None) -> list[str]:
     """Fallback-Labels aus main.py run_state (Event-Trigger + Live-Leistung)."""
     if not main_state:
         return []
+    consumer = _immediate_charge_consumer()
+    if consumer is None:
+        return []
     snap = main_state.get("event_trigger_snapshot") or {}
-    if not snap.get("eauto_charge_immediate"):
+    if not _trigger_snapshot_flag(snap, consumer, "charge_immediate"):
         return []
-    if snap.get("eauto_plugged_in") is False:
+    if _trigger_snapshot_flag(snap, consumer, "plugged_in") is False:
         return []
-    ctx = (main_state.get("charging_contexts") or {}).get("eauto") or {}
+    cid = str(consumer["id"])
+    ctx = (main_state.get("charging_contexts") or {}).get(cid) or {}
     if ctx.get("immediate_charge"):
-        return immediate_charging_labels({"eauto": ctx})
-    flex_kw = (main_state.get("flex_live_kw") or {}).get("eauto")
+        return immediate_charging_labels({cid: ctx})
+    flex_kw = flex_kw_lookup(main_state.get("flex_live_kw") or {}, consumer)
     threshold = charging_power_threshold_kw()
     target_kwh = ctx.get("target_kwh")
-    if flex_kw is not None and float(flex_kw) < threshold:
+    if flex_kw < threshold:
         if target_kwh is None or float(target_kwh) <= threshold:
             return []
-    kw = round(float(flex_kw), 3) if flex_kw is not None else None
+    kw = round(flex_kw, 3) if flex_kw > 0 else None
     if kw is None:
         kw = ctx.get("immediate_charge_kw")
+    label = consumer.get("name") or cid
     if kw is None:
-        return ["eauto: Sofort-Laden (Volllast)"]
-    return [f"eauto: {kw} kW live (Sofort-Laden)"]
+        return [f"{label}: Sofort-Laden (Volllast)"]
+    return [f"{label}: {kw} kW live (Sofort-Laden)"]
 
 
 def merge_immediate_charging_labels(

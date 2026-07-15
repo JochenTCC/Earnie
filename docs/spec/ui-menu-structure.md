@@ -36,7 +36,7 @@ Backlog-Einträge mit `*` = später, hier nur als **funktionsloses Mockup**.
 | Dev-/Nebenmodi | als Menüpunkte, weiter per config/Env gegated |
 | Startgüte | reine Stromkosten (€) je möglicher Startzeit |
 | Loxone-Merker | neue Config-Felder (`Leistung Waschmaschine`, `Leistung Trockner`) |
-| Empfehlungshorizont | fest 6 h |
+| Empfehlungshorizont | je Gerät aus Hausprofil (`schedule.start_shift_h` bei `earnie_role: manual`) |
 | Geschirrspüler-Leistung | manuelles Eingabefeld in der UI |
 
 ## 4. Navigations-Architektur
@@ -69,9 +69,9 @@ Wrappt den bisherigen Sunset-2-Sunset-Block: `render_optimization_savings_and_ch
 
 Pro Gerät (Waschmaschine, Trockner, Geschirrspüler):
 
-1. **Leistung:** Waschmaschine/Trockner aus Loxone-Merker (`loxone_client.fetch_loxone_generic_value`); Geschirrspüler manuelles Eingabefeld.
-2. **Laufzeit** wird vom Nutzer eingegeben.
-3. Über die **nächsten 6 h** wird für jeden möglichen Startslot die Stromkosten des Laufs berechnet → **günstigste Startzeit** + **Startgüte** (Kosten in €, plus Ersparnis vs. „sofort starten").
+1. **Leistung & Laufzeit:** aus Hausprofil (`appliance_recommendation`); optionaler Loxone-Merker in `loxone_inputs.power_name` (noch keine Live-Abfrage).
+2. **Empfehlungshorizont:** je Gerät aus Hausprofil (`schedule.start_shift_h` bei `earnie_role: manual`).
+3. Über den **Empfehlungshorizont** wird für jeden möglichen Startslot die Stromkosten des Laufs berechnet → **günstigste Startzeit** + **Startgüte** (Kosten in €, plus Ersparnis vs. „sofort starten").
 4. Rein **beratend** — kein Loxone-Schaltsignal.
 
 ### 5.3 Konfiguration (Z. 17, Roh-JSON-Editor)
@@ -98,7 +98,7 @@ Umzug in eine eigene Seite; bleibt per `ui.price_forecast_page_enabled` / `ENERG
 
 Für ein Gerät mit Leistung `P` (kW) und Laufzeit `d` (in 15-min-Slots):
 
-1. Nächste 6 h aus der Planning-Matrix holen (Preis + PV je Slot, via `profile_manager.build_live_planning_matrix`).
+1. Nächste *h* (Empfehlungshorizont je Gerät) aus der **persistierten Planungsmatrix** im letzten `live_optimization_debug.json` (geschrieben von `main.py`; kein Live-Matrix-Build in der UI).
 2. Für jeden möglichen Startslot `s` die Laufkosten über die `d` Slots ab `s` summieren:
    `Kosten(s) = Σ P × slot_dauer_h × Netzpreis`, wobei PV-gedeckter Anteil den Netzbezug (und damit die Kosten) reduziert.
 3. **Günstigste Startzeit** = Slot mit minimalen Kosten.

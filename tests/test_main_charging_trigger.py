@@ -189,3 +189,28 @@ def test_run_payload_forecast_pv_kw_uses_pre_overlay_matrix(monkeypatch):
 
     assert saved[0]["forecast_pv_kw"] == 2.5
     assert saved[0]["consumption_snapshot"]["pv_kw"] == 4.2
+
+
+def test_regular_run_continues_when_pv_delta_unavailable(monkeypatch):
+    _patch_main_dependencies(monkeypatch)
+    register = MagicMock()
+    cons_data = MagicMock(return_value=0)
+    saved: list[dict] = []
+
+    monkeypatch.setattr(main_module.pv_tuner, "get_pv_delta_peek", MagicMock(return_value=None))
+    monkeypatch.setattr(main_module.pv_tuner, "get_pv_delta_and_update", MagicMock(return_value=None))
+    monkeypatch.setattr(main_module.optimizer, "register_consumer_delivery", register)
+    monkeypatch.setattr(main_module.cons_data_store, "record_and_maybe_flush", cons_data)
+    monkeypatch.setattr(
+        main_module.run_state,
+        "save_run_state",
+        lambda payload: saved.append(payload),
+    )
+    monkeypatch.setattr(main_module.optimization_history, "append_production_run", lambda _p: None)
+
+    main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
+
+    register.assert_called_once()
+    cons_data.assert_called_once()
+    assert cons_data.call_args.kwargs["pv_kwh_interval"] == 0.0
+    assert saved[0]["pv_delta_kwh"] == 0.0

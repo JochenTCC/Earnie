@@ -41,12 +41,17 @@ def simulation_settings_fingerprint() -> str:
 
 
 def invalidate_live_optimization_cache() -> None:
-    """Erzwingt Neuberechnung der Live-24h-Simulation."""
+    """Erzwingt Neuladen der Cockpit-Anzeige (Snapshot oder opt-in Simulation)."""
     for key in (
         "live_optimization_cache_key",
+        "live_opt_in_cache_key",
+        "live_display_snapshot_cache_key",
         "live_optimization_df",
         "live_savings_info",
+        "live_optimization_matrix",
+        "live_planning_window",
         "live_display_bundle",
+        "live_opt_in_simulation_confirmed",
     ):
         st.session_state.pop(key, None)
 

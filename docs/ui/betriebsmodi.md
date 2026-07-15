@@ -31,7 +31,7 @@ Spezifikation: [UI Sunset-2-Sunset](../spec/ui-sunset2sunset.md) (v0.6.2). Chart
 
 ## Sunset-2-Sunset (Seite Monitor)
 
-**Zweck:** Einheitliches Produktiv-Cockpit ohne Grenze zwischen Live und Historie. Vergangenheit aus dem Produktiv-Log (`optimization_history.jsonl`), Gegenwart und Vorausschau aus der Live-MILP — in zwei benachbarten Sonnenaufgang-Segmenten navigierbar.
+**Zweck:** Einheitliches Produktiv-Cockpit ohne Grenze zwischen Live und Historie. Vergangenheit aus dem Produktiv-Log (`optimization_history.jsonl`), Gegenwart und Vorausschau aus dem **Produktiv-Snapshot** (`live_optimization_debug.json`, geschrieben von `main.py`) — in zwei benachbarten Sonnenaufgang-Segmenten navigierbar.
 
 **Ersetzt:** die früheren Modi **Echtzeit** und **Historischer Tag** sowie den Button **Produktiv-Archiv**. Es gibt **keine Nachrechnung** beliebiger Kalendertage im S-2-Modus (geplant als Dev-Feature in Scenario-Exploration).
 
@@ -66,10 +66,12 @@ Beschriftung z. B. „SA₀→SA₁ (Live)“ / „SA₁→SA₂ (Vorausschau)
 | Bereich | Quelle |
 |---------|--------|
 | Vergangenheit (grau) | Produktiv-Log, 15-Min-Slots |
-| Laufende Stunde | Live-MILP + `main.py`-Overlay (Auflösung ab x:15: 15 min) |
-| Vorausschau (neutral/grün) | Live-MILP bis Fensterrand SA₁ bzw. SA₂ |
+| Laufende Stunde | Produktiv-Snapshot Stunde 0 (Overlay bereits in `main.py` angewendet; Auflösung ab x:15: 15 min) |
+| Vorausschau (neutral/grün) | Produktiv-Snapshot bis Fensterrand SA₁ bzw. SA₂ |
 
-Stunde 0 der Simulation = Werte aus dem **Produktiv-Durchlauf** (`optimizer_run_state.json`), sofern zum aktuellen Viertelstunden-Slot passend. Fehlende Log-Slots bleiben **leer** (orange markiert, kein Hold-Forward).
+Stunde 0 stammt aus dem **Produktiv-Durchlauf** (`main.py` → `live_optimization_debug.json`). Fehlende Log-Slots bleiben **leer** (orange markiert, kein Hold-Forward).
+
+**main.py aus:** Snapshot ≤ 1 h alt → Anzeige mit Hinweis; älter → optional **einmalige** UI-Simulation (opt-in, kein forecast.solar im Normalbetrieb).
 
 ### Live-Szenario (Entitäts-Referenzen)
 

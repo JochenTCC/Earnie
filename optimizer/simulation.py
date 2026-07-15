@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 
 import config
+from settings.flexible_consumers import flex_kw_lookup
 from .cbc_events import (
     begin_cbc_event_collection,
     cbc_event_collection_active,
@@ -31,6 +32,7 @@ from .targets import (
     consumer_pv_follow_column_name,
     resolve_baseload_kwh,
     resolve_horizon_consumer_targets_kwh,
+    resolve_matched_baseline_horizon_targets,
 )
 
 from data.price_forecast_live import is_extrapolated_source
@@ -644,7 +646,7 @@ def build_matched_flex_kw_per_hour(
             if t not in eligible:
                 continue
             flex = row.get("expected_flex_kw") or {}
-            profile_sums[cid] += float(flex.get(cid, 0.0) or 0.0)
+            profile_sums[cid] += flex_kw_lookup(flex, consumer)
 
     per_hour: list[dict[str, float]] = []
     for t, row in enumerate(rows):
@@ -659,7 +661,7 @@ def build_matched_flex_kw_per_hour(
                 continue
             eligible_count = len(eligible)
             profile_sum = profile_sums[cid]
-            profile_val = float(flex.get(cid, 0.0) or 0.0)
+            profile_val = flex_kw_lookup(flex, consumer)
             if profile_sum > 1e-6:
                 hour_flex[cid] = profile_val * (target / profile_sum)
             elif target > 0 and eligible_count > 0:
@@ -884,10 +886,15 @@ def calculate_optimization_savings(
         targets,
     )
     horizon_targets = apply_horizon_charging_limits(horizon_targets, charging_contexts)
+    matched_targets = resolve_matched_baseline_horizon_targets(
+        matrix,
+        targets,
+        charging_contexts,
+    )
     matched_baseline_rows = simulate_matched_baseline_horizon(
         matrix,
         initial_soc,
-        horizon_targets,
+        matched_targets,
         charging_contexts,
     )
     sell_price_cent = None

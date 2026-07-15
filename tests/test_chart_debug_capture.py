@@ -21,12 +21,16 @@ from runtime_store.chart_debug_capture import (
 from ui.chart_context import build_live_chart_context
 from ui.simulation_results import OptimizationDisplayBundle, build_optimization_display_bundle
 
+from tests.config_fixtures import minimal_config_payload, write_minimal_config_tree
+
 _TZ = ZoneInfo("Europe/Vienna")
 _CONFIG_ENV_KEYS = (
     "ENERGY_OPTIMIZER_CONFIG_PATH",
     "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
     "ENERGY_OPTIMIZER_OFFLINE",
     "ENERGY_OPTIMIZER_RUNTIME_DIR",
+    "ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED",
+    "ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH",
 )
 
 
@@ -36,8 +40,7 @@ def _chart_debug_config(tmp_path, monkeypatch, *, enabled: bool):
     prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
     monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
-    from tests.config_fixtures import minimal_config_payload, write_minimal_config_tree
-
+    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
         config_payload=minimal_config_payload(
@@ -99,6 +102,37 @@ def test_chart_debug_capture_config_enabled(tmp_path, monkeypatch):
     with _chart_debug_config(tmp_path, monkeypatch, enabled=True):
         assert config.get_ui_chart_debug_capture_enabled() is True
         assert resolve_output_dir().endswith("chart_debug")
+
+
+def test_chart_debug_capture_env_overrides_config(tmp_path, monkeypatch):
+    with _chart_debug_config(tmp_path, monkeypatch, enabled=False):
+        monkeypatch.setenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", "1")
+        assert config.get_ui_chart_debug_capture_enabled() is True
+
+
+def test_chart_debug_capture_local_settings_override(tmp_path, monkeypatch):
+    prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
+    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
+    config_path, scenarios_path = write_minimal_config_tree(tmp_path)
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(
+        json.dumps({"chart_debug_capture_enabled": True}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", config_path)
+    monkeypatch.setenv("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", scenarios_path)
+    monkeypatch.setenv("ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH", str(local_path))
+    config.reinit_config()
+    try:
+        assert config.get_ui_chart_debug_capture_enabled() is True
+    finally:
+        for key, value in prev.items():
+            if value is None:
+                monkeypatch.delenv(key, raising=False)
+            else:
+                monkeypatch.setenv(key, value)
+        config.reinit_config()
 
 
 def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):

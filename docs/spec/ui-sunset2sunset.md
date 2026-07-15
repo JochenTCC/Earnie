@@ -1,12 +1,12 @@
 # Spezifikation: UI-Modus „Sunset-2-Sunset“
 
-**Version:** 0.7.0  
+**Version:** 0.8.0  
 **Status:** Epic abgeschlossen (2026-07-05); Phasen 1–4 umgesetzt (P4a–P4c Docs & Tests; P4d entfallen)  
-**Ersetzt:** Streamlit-Modi „Echtzeit“ und „Historischer Tag“, Button „Produktiv-Archiv“, getrennte Live/History-Umschaltung
+**Ersetzt:** Streamlit-Modi „Echtzeit“ und „Historischer Tag“, Button „Produktiv-Archiv“, getrennte Live/History-Umschaltung, UI-seitige Standard-Live-MILP
 
 ## 1. Ziel
 
-Ein einheitlicher Produktiv-Cockpit-Modus ohne Grenze zwischen Live und Historie: Vergangenheit aus dem Produktiv-Log, Gegenwart und Vorausschau aus der Live-MILP — in zwei benachbarten Sonnenaufgang-Segmenten navigierbar.
+Ein einheitlicher Produktiv-Cockpit-Modus ohne Grenze zwischen Live und Historie: Vergangenheit aus dem Produktiv-Log, Gegenwart und Vorausschau aus dem **Produktiv-Snapshot** (`live_optimization_debug.json`, geschrieben von `main.py`) — in zwei benachbarten Sonnenaufgang-Segmenten navigierbar.
 
 **Keine Nachrechnung** im S-2-Modus (beliebiger Kalendertag → später Backtesting, Dev-only).
 
@@ -71,9 +71,9 @@ Grün ersetzt die bisherige Zone „Vorausschau nach SOC-Anker“ (Phase 4 `plan
 | Bereich | Quelle | Auflösung |
 |---------|--------|-----------|
 | Vollständig vergangene Stunden | `optimization_history.jsonl` (via `history_timeline`) | 15 min (Log-Ist) |
-| Laufende Stunde, vor x:15 | Live-MILP Stunde 0 + `main.py`-Overlay | 1 h (wie bisher Echtzeit; Anteile bis x:15 unsichtbar) |
-| Laufende Stunde, ab x:15 | Log (abgeschlossene Viertelstunden) + MILP Stunde 0 (verbleibende Viertelstunden) | 15 min |
-| Ab nächster voller Stunde | Live-MILP + `main.py`-Overlay | 1 h |
+| Laufende Stunde, vor x:15 | Produktiv-Snapshot Stunde 0 (`live_optimization_debug.json`) | 1 h (Overlay in main.py; Anteile bis x:15 unsichtbar) |
+| Laufende Stunde, ab x:15 | Log (abgeschlossene Viertelstunden) + Snapshot Stunde 0 (verbleibende Viertelstunden) | 15 min |
+| Ab nächster voller Stunde | Produktiv-Snapshot | 1 h |
 
 ### Laufende Stunde ab x:15
 

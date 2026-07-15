@@ -5,6 +5,13 @@ import os
 
 import streamlit as st
 
+from house_config.earnie_role import (
+    DEFAULT_MANUAL_HORIZON_H,
+    EARNIE_ROLE_FLEX,
+    EARNIE_ROLE_KNOWN,
+    EARNIE_ROLE_MANUAL,
+    resolve_earnie_role,
+)
 from house_config.generic_schedule import (
     DEFAULT_START_HOUR,
     MAX_START_SHIFT_H,
@@ -44,9 +51,15 @@ _PASSTHROUGH_CONSUMER_KEYS = (
     "heating_power_threshold_kw",
     "actual_temp_step_c",
     "thermal_control",
-    "appliance_recommendation",
     "profile_csv",
 )
+
+_EARNIE_ROLE_LABELS = {
+    EARNIE_ROLE_KNOWN: "Bekannt (Grundlast)",
+    EARNIE_ROLE_FLEX: "Gesteuert (Optimierung)",
+    EARNIE_ROLE_MANUAL: "Manuelles Gerät",
+}
+_EARNIE_ROLE_OPTIONS = [EARNIE_ROLE_KNOWN, EARNIE_ROLE_FLEX, EARNIE_ROLE_MANUAL]
 
 
 def _merge_passthrough_consumer_fields(original: dict, edited: dict) -> dict:
@@ -58,12 +71,18 @@ def _merge_passthrough_consumer_fields(original: dict, edited: dict) -> dict:
         merged[key] = dict(value) if isinstance(value, dict) else value
     orig_sched = original.get("charging_schedule")
     if isinstance(orig_sched, dict):
+        sched = dict(merged.get("charging_schedule") or {})
+        sched_updated = False
         loxone = orig_sched.get("loxone")
-        if isinstance(loxone, dict):
-            sched = dict(merged.get("charging_schedule") or {})
-            if "loxone" not in sched:
-                sched["loxone"] = dict(loxone)
-                merged["charging_schedule"] = sched
+        if isinstance(loxone, dict) and "loxone" not in sched:
+            sched["loxone"] = dict(loxone)
+            sched_updated = True
+        milp = orig_sched.get("milp")
+        if isinstance(milp, dict) and milp and "milp" not in sched:
+            sched["milp"] = dict(milp)
+            sched_updated = True
+        if sched_updated:
+            merged["charging_schedule"] = sched
     return merged
 
 
@@ -96,11 +115,100 @@ def _default_additional_consumer() -> dict:
 
 def _schedule_defaults(sched: dict) -> dict:
     migrated = migrate_start_flexibility(dict(sched))
+    raw_shift = migrated.get("start_shift_h")
+    coerced_shift = 12.0 if raw_shift is None else float(raw_shift)
     return {
         "duration_h": float(migrated.get("duration_h", 2.0) or 2.0),
         "start_hour": int(migrated.get("start_hour", DEFAULT_START_HOUR)) % 24,
-        "start_shift_h": float(migrated.get("start_shift_h", 12.0) or 12.0),
+        "start_shift_h": coerced_shift,
     }
+
+
+def _loxone_inputs_from_consumer(consumer: dict) -> dict:
+    inputs = consumer.get("loxone_inputs")
+    if isinstance(inputs, dict):
+        return dict(inputs)
+    rec = consumer.get("appliance_recommendation") or {}
+    legacy = str(rec.get("loxone_power_name", "")).strip()
+    if legacy:
+        return {"power_name": legacy}
+    return {}
+
+
+def _render_power_source_fields(
+    consumer: dict,
+    index: int,
+    *,
+    session_scope: str,
+    key_prefix: str,
+) -> tuple[str, dict | None]:
+    """Leistungsquelle + optional loxone_inputs.power_name."""
+    inputs = _loxone_inputs_from_consumer(consumer)
+    rec = consumer.get("appliance_recommendation") or {}
+    has_marker = bool(str(inputs.get("power_name", "")).strip())
+    default_source = "loxone" if (
+        str(rec.get("power_source", "")).lower() == "loxone" or has_marker
+    ) else "manual"
+    power_source = st.selectbox(
+        "Leistungsquelle",
+        options=["manual", "loxone"],
+        index=0 if default_source != "loxone" else 1,
+        format_func=lambda value: (
+            "Aus Profil (Nennleistung)" if value == "manual" else "Loxone-Merker"
+        ),
+        key=_scoped_key(session_scope, f"{key_prefix}_src_{index}"),
+    )
+    if power_source != "loxone":
+        return power_source, None
+    st.caption(
+        "Merker wird für künftige Live-Adaption gespeichert; "
+        "Grundlast/Empfehlung nutzen weiterhin Nennleistung aus dem Profil."
+    )
+    power_name = st.text_input(
+        "Loxone-Merker (Leistung)",
+        value=str(inputs.get("power_name", "")),
+        key=_scoped_key(session_scope, f"{key_prefix}_merker_{index}"),
+    )
+    marker = str(power_name).strip()
+    return power_source, {"power_name": marker} if marker else None
+
+
+def _render_manual_appliance_fields(
+    consumer: dict,
+    index: int,
+    nominal: float,
+    duration_h: float,
+    *,
+    session_scope: str,
+) -> tuple[dict, dict | None]:
+    rec = consumer.get("appliance_recommendation") or {}
+    power_source, loxone_inputs = _render_power_source_fields(
+        consumer,
+        index,
+        session_scope=session_scope,
+        key_prefix="hc_app",
+    )
+    default_power = float(rec.get("default_power_kw", nominal) or nominal)
+    default_runtime = float(rec.get("default_runtime_h", duration_h) or duration_h)
+    default_power_kw = st.number_input(
+        "Standard-Leistung (kW)",
+        min_value=0.0,
+        value=default_power,
+        key=_scoped_key(session_scope, f"hc_app_pwr_{index}"),
+    )
+    default_runtime_h = st.number_input(
+        "Standard-Laufzeit (h)",
+        min_value=0.1,
+        value=default_runtime,
+        step=0.25,
+        key=_scoped_key(session_scope, f"hc_app_rt_{index}"),
+    )
+    block: dict = {
+        "power_source": power_source,
+        "default_power_kw": float(default_power_kw),
+        "default_runtime_h": float(default_runtime_h),
+    }
+    return block, loxone_inputs
 
 
 def _render_generic_fields(
@@ -139,16 +247,60 @@ def _render_generic_fields(
         value=defaults["start_hour"],
         key=_scoped_key(session_scope, f"hc_start_{index}"),
     )
-    start_shift_h = st.number_input(
-        "Verschiebung (± h)",
-        min_value=0.0,
-        max_value=MAX_START_SHIFT_H,
-        value=min(MAX_START_SHIFT_H, defaults["start_shift_h"]),
-        step=0.5,
-        key=_scoped_key(session_scope, f"hc_shift_{index}"),
+    current_role = resolve_earnie_role(consumer)
+    if current_role not in _EARNIE_ROLE_OPTIONS:
+        current_role = EARNIE_ROLE_KNOWN
+    earnie_role = st.selectbox(
+        "Earnie-Berücksichtigung",
+        options=_EARNIE_ROLE_OPTIONS,
+        index=_EARNIE_ROLE_OPTIONS.index(current_role),
+        format_func=lambda value: _EARNIE_ROLE_LABELS[value],
+        key=_scoped_key(session_scope, f"hc_earnie_role_{index}"),
     )
-    st.caption(format_start_window_caption(int(start_hour), float(start_shift_h)))
-    st.caption("Bei 12 h Verschiebung ist der Startzeitpunkt vollständig frei.")
+    item["earnie_role"] = earnie_role
+    start_shift_h = 0.0
+    if earnie_role == EARNIE_ROLE_FLEX:
+        start_shift_h = st.number_input(
+            "Verschiebung (± h)",
+            min_value=0.5,
+            max_value=MAX_START_SHIFT_H,
+            value=max(0.5, min(MAX_START_SHIFT_H, defaults["start_shift_h"] or 12.0)),
+            step=0.5,
+            key=_scoped_key(session_scope, f"hc_shift_{index}"),
+        )
+        st.caption(format_start_window_caption(int(start_hour), float(start_shift_h)))
+        st.caption("Bei 12 h Verschiebung ist der Startzeitpunkt vollständig frei.")
+    elif earnie_role == EARNIE_ROLE_MANUAL:
+        horizon_default = defaults["start_shift_h"] if defaults["start_shift_h"] >= 1 else DEFAULT_MANUAL_HORIZON_H
+        start_shift_h = st.number_input(
+            "Empfehlungshorizont (h)",
+            min_value=1.0,
+            max_value=MAX_START_SHIFT_H,
+            value=min(MAX_START_SHIFT_H, float(horizon_default)),
+            step=0.5,
+            key=_scoped_key(session_scope, f"hc_horizon_{index}"),
+        )
+        st.caption(
+            "Maximaler Vorschau-Horizont auf der Seite „Manuelle Geräte“ "
+            "für die Startzeit-Empfehlung."
+        )
+        appliance_rec, loxone_inputs = _render_manual_appliance_fields(
+            consumer,
+            index,
+            nominal,
+            float(duration_h),
+            session_scope=session_scope,
+        )
+        item["appliance_recommendation"] = appliance_rec
+        item["loxone_inputs"] = loxone_inputs or {}
+    elif earnie_role == EARNIE_ROLE_KNOWN:
+        _, loxone_inputs = _render_power_source_fields(
+            consumer,
+            index,
+            session_scope=session_scope,
+            key_prefix="hc_known",
+        )
+        item["loxone_inputs"] = loxone_inputs or {}
     item["schedule"] = {
         "runs_per_week": runs,
         "duration_h": float(duration_h),

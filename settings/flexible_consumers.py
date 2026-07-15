@@ -16,6 +16,51 @@ def runtime_consumer_id(consumer: dict) -> str:
     return str(consumer["id"])
 
 
+def profile_column_id(consumer: dict) -> str:
+    """Column name in flexible_consumer_profiles.csv (legacy when bridged)."""
+    return runtime_consumer_id(consumer)
+
+
+def charging_context_lookup(contexts: dict | None, consumer: dict) -> dict:
+    """Lookup persisted charging_contexts by runtime or canonical consumer id."""
+    if not contexts:
+        return {}
+    runtime_id = runtime_consumer_id(consumer)
+    canonical_id = str(consumer["id"])
+    ctx = contexts.get(runtime_id) or contexts.get(canonical_id) or {}
+    return ctx if isinstance(ctx, dict) else {}
+
+
+def flex_kw_lookup(flex: dict | None, consumer: dict) -> float:
+    """Lookup live/matrix flex kW by runtime id with fallback to canonical id."""
+    if not flex:
+        return 0.0
+    runtime_id = runtime_consumer_id(consumer)
+    canonical_id = str(consumer["id"])
+    return float(flex.get(runtime_id, flex.get(canonical_id, 0.0)) or 0.0)
+
+
+def flex_kw_to_canonical(
+    flex: dict | None,
+    consumers: list[dict],
+) -> dict[str, float]:
+    """Map a runtime- or mixed-key flex dict to canonical consumer ids."""
+    return {
+        str(consumer["id"]): round(flex_kw_lookup(flex, consumer), 6)
+        for consumer in consumers
+    }
+
+
+def flex_kw_pop_for_consumer(flex: dict, consumer: dict) -> float:
+    """Remove and return flex kW for consumer (runtime and canonical keys)."""
+    runtime_id = runtime_consumer_id(consumer)
+    canonical_id = str(consumer["id"])
+    value = float(flex.pop(runtime_id, 0.0) or 0.0)
+    if canonical_id != runtime_id:
+        value = max(value, float(flex.pop(canonical_id, 0.0) or 0.0))
+    return value
+
+
 def normalize_legacy_id(raw: dict, consumer_id: str) -> str | None:
     legacy = str(raw.get("legacy_id", "")).strip()
     if not legacy:

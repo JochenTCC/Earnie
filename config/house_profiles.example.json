@@ -65,6 +65,7 @@
                     "type": "generic",
                     "nominal_power_kw": 2.0,
                     "annual_kwh": 520.0,
+                    "earnie_role": "manual",
                     "schedule": {
                         "runs_per_week": 5,
                         "duration_h": 2.0,
@@ -73,9 +74,11 @@
                     },
                     "appliance_recommendation": {
                         "power_source": "loxone",
-                        "loxone_power_name": "Leistung Waschmaschine",
                         "default_power_kw": 2.0,
                         "default_runtime_h": 2.0
+                    },
+                    "loxone_inputs": {
+                        "power_name": "Leistung Waschmaschine"
                     }
                 },
                 {
@@ -84,6 +87,7 @@
                     "type": "generic",
                     "nominal_power_kw": 2.5,
                     "annual_kwh": 390.0,
+                    "earnie_role": "manual",
                     "schedule": {
                         "runs_per_week": 3,
                         "duration_h": 1.5,
@@ -92,9 +96,11 @@
                     },
                     "appliance_recommendation": {
                         "power_source": "loxone",
-                        "loxone_power_name": "Leistung Trockner",
                         "default_power_kw": 2.5,
                         "default_runtime_h": 1.5
+                    },
+                    "loxone_inputs": {
+                        "power_name": "Leistung Trockner"
                     }
                 },
                 {
@@ -103,6 +109,7 @@
                     "type": "generic",
                     "nominal_power_kw": 1.2,
                     "annual_kwh": 374.0,
+                    "earnie_role": "manual",
                     "schedule": {
                         "runs_per_week": 6,
                         "duration_h": 2.5,

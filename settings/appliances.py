@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from house_config.earnie_role import is_earnie_manual, manual_recommendation_horizon_h
 from settings.json_io import read_json_dict, write_json_dict
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,7 @@ def normalize_appliance_recommendation_block(
     *,
     consumer_id: str,
     nominal_power_kw: float,
+    loxone_power_name: str = "",
 ) -> dict | None:
     if raw is None:
         return None
@@ -126,11 +128,11 @@ def normalize_appliance_recommendation_block(
             f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
             "appliance_recommendation.power_source muss 'loxone' oder 'manual' sein."
         )
-    loxone_power_name = str(raw.get("loxone_power_name", "")).strip()
-    if power_source == "loxone" and not loxone_power_name:
+    marker = str(loxone_power_name or raw.get("loxone_power_name", "")).strip()
+    if power_source == "loxone" and not marker:
         raise ValueError(
             f"Kritischer Konfigurationsfehler: consumers '{consumer_id}': "
-            "appliance_recommendation.power_source=loxone erfordert loxone_power_name."
+            "power_source=loxone erfordert loxone_inputs.power_name."
         )
     default_runtime_h = optional_positive(
         raw.get("default_runtime_h"),
@@ -151,10 +153,21 @@ def normalize_appliance_recommendation_block(
         )
     return {
         "power_source": power_source,
-        "loxone_power_name": loxone_power_name,
         "default_power_kw": default_power_kw,
         "default_runtime_h": default_runtime_h or 2.0,
     }
+
+
+def _loxone_power_name_from_consumer(consumer: dict) -> str:
+    inputs = consumer.get("loxone_inputs")
+    if isinstance(inputs, dict):
+        name = str(inputs.get("power_name", "")).strip()
+        if name:
+            return name
+    rec = consumer.get("appliance_recommendation")
+    if isinstance(rec, dict):
+        return str(rec.get("loxone_power_name", "")).strip()
+    return ""
 
 
 def appliance_from_profile_consumer(consumer: dict) -> dict:
@@ -164,10 +177,12 @@ def appliance_from_profile_consumer(consumer: dict) -> dict:
             f"Hausprofil-Verbraucher '{consumer.get('id')}': appliance_recommendation fehlt."
         )
     consumer_id = str(consumer["id"])
+    loxone_power_name = _loxone_power_name_from_consumer(consumer)
     normalized = normalize_appliance_recommendation_block(
         rec,
         consumer_id=consumer_id,
         nominal_power_kw=float(consumer.get("nominal_power_kw", 0.0) or 0.0),
+        loxone_power_name=loxone_power_name,
     )
     if normalized is None:
         raise ValueError(
@@ -178,12 +193,14 @@ def appliance_from_profile_consumer(consumer: dict) -> dict:
         "id": consumer_id,
         "name": str(consumer.get("label", consumer_id)),
         "power_source": normalized["power_source"],
-        "loxone_power_name": normalized["loxone_power_name"],
         "default_power_kw": normalized["default_power_kw"],
         "default_runtime_h": normalized["default_runtime_h"],
     }
+    if loxone_power_name:
+        spec["loxone_inputs"] = {"power_name": loxone_power_name}
     if legacy_id and legacy_id != consumer_id:
         spec["legacy_id"] = legacy_id
+    spec["recommendation_horizon_h"] = manual_recommendation_horizon_h(consumer)
     return spec
 
 
@@ -195,7 +212,7 @@ def recommendation_appliances_from_profile(house_profile: dict) -> list[dict]:
             continue
         if str(raw.get("type", "")).strip().lower() != "generic":
             continue
-        if not isinstance(raw.get("appliance_recommendation"), dict):
+        if not is_earnie_manual(raw):
             continue
         appliances.append(appliance_from_profile_consumer(raw))
     return appliances
@@ -244,10 +261,12 @@ def update_appliance_defaults_in_house_profile(
     rec = dict(entry.get("appliance_recommendation") or {})
     rec["default_power_kw"] = float(power_kw)
     rec["default_runtime_h"] = float(runtime_h)
+    loxone_power_name = _loxone_power_name_from_consumer(entry)
     normalize_appliance_recommendation_block(
         rec,
         consumer_id=appliance_id,
         nominal_power_kw=float(power_kw),
+        loxone_power_name=loxone_power_name,
     )
     entry["appliance_recommendation"] = rec
     consumers[target_index] = entry

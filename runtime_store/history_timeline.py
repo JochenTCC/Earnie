@@ -22,6 +22,7 @@ from optimizer.targets import (
     consumer_immediate_charge_column_name,
     consumer_pv_follow_column_name,
 )
+from settings.flexible_consumers import charging_context_lookup
 
 from . import optimization_history
 
@@ -290,8 +291,7 @@ def _immediate_charge_flags_from_entry(entry: dict[str, Any] | None) -> dict[str
     contexts = (entry or {}).get("charging_contexts") or {}
     flags: dict[str, int] = {}
     for consumer in config.get_flexible_consumers(optimizer_only=True):
-        cid = consumer["id"]
-        ctx = contexts.get(cid) or {}
+        ctx = charging_context_lookup(contexts, consumer)
         flags[consumer_immediate_charge_column_name(consumer)] = (
             1 if ctx.get("immediate_charge") else 0
         )

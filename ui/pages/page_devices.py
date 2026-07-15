@@ -1,8 +1,8 @@
-"""Manuelle Geräte: Empfehlungsmodus (günstigste Startzeit im 6-h-Horizont).
+"""Manuelle Geräte: Empfehlungsmodus (günstigste Startzeit im Empfehlungshorizont).
 
-Rein beratend (Schritt 3b, Backlog Z. 27): pro Gerät wird die Leistung
-(Loxone-Merker oder manuelles Eingabefeld) und die Laufzeit erfasst und
-darüber die günstigste Startstunde nach Netzbezugskosten ermittelt.
+Rein beratend: Nennleistung und Laufzeit kommen aus dem Hausprofil (Hauskonfigurator).
+Pro Gerät wird die günstigste Startstunde nach Netzbezugskosten im konfigurierten
+Empfehlungshorizont ermittelt.
 """
 from __future__ import annotations
 
@@ -11,8 +11,7 @@ import streamlit as st
 
 import config
 from config import reinit_config
-from data import profile_manager
-from integrations import awattar_client
+from optimizer import schedule as optimization_schedule
 from optimizer.appliance_recommendation import (
     STAR_MAX,
     DEFAULT_HORIZON_H,
@@ -21,27 +20,44 @@ from optimizer.appliance_recommendation import (
     recommend_start_times,
 )
 from runtime_store import appliance_schedules
+from runtime_store.live_display_loader import (
+    is_persisted_display_fresh,
+    load_live_display_snapshot,
+    planning_matrix_from_snapshot,
+    snapshot_age_seconds,
+    snapshot_completed_at,
+)
 from ui.chart_colors import COLOR_COST_SAVINGS, COLOR_COST_SAVINGS_NEGATIVE
 from ui.help_hint import render_page_title_with_help
 from ui.runtime_config import invalidate_live_optimization_cache
 
 _DEVICES_HELP = (
     "Empfehlungsmodus für manuelle Geräte (Waschmaschine, Trockner, "
-    "Geschirrspüler): günstigste Startstunde im nächsten 6-h-Horizont nach "
-    "reinen Netzbezugskosten. Optional kann eine Startstunde in die "
-    "nächste Optimierung einfließen (Nennleistung × Laufzeit)."
+    "Geschirrspüler): günstigste Startstunde im konfigurierten "
+    "Empfehlungshorizont (Hausprofil) nach reinen Netzbezugskosten. "
+    "Optional kann eine Startstunde in die nächste Optimierung einfließen "
+    "(Nennleistung × Laufzeit)."
 )
 _DEFAULT_RUNTIME_H = 2.0
 _DELTA_COLUMN = "Delta"
 _DELTA_EPS = 0.005
-_PLAN_ACTIVE_INPUT_HINT = (
-    "Plan aktiv — zuerst Häkchen entfernen, um Leistung/Laufzeit zu ändern."
-)
 
 
-def _appliance_inputs_disabled(active: dict | None) -> bool:
-    """Nennleistung/Laufzeit sperren, solange ein Optimierungsplan aktiv ist."""
-    return active is not None
+def _appliance_power_kw(appliance: dict) -> float:
+    return float(appliance.get("default_power_kw") or 0.0)
+
+
+def _appliance_runtime_h(appliance: dict) -> float:
+    return float(appliance.get("default_runtime_h") or _DEFAULT_RUNTIME_H)
+
+
+def _appliance_loxone_power_name(appliance: dict) -> str:
+    inputs = appliance.get("loxone_inputs")
+    if isinstance(inputs, dict):
+        name = str(inputs.get("power_name", "")).strip()
+        if name:
+            return name
+    return str(appliance.get("loxone_power_name", "")).strip()
 
 
 def _delta_to_best_eur(cost_eur: float, best_cost_eur: float) -> float:
@@ -65,12 +81,14 @@ def render() -> None:
     if not appliances:
         st.info(
             "Keine manuellen Geräte konfiguriert — type:generic mit "
-            "appliance_recommendation im Hausprofil oder Legacy-Block "
+            "earnie_role: manual im Hausprofil oder Legacy-Block "
             "'appliances' in config.json (siehe config.example.json)."
         )
         return
     st.caption(
-        f"Horizont {DEFAULT_HORIZON_H} h · Häkchen in der Tabelle = Optimierungsplan."
+        "Empfehlungshorizont je Gerät aus dem Hausprofil · "
+        "Nennleistung/Laufzeit im Hauskonfigurator · "
+        "Häkchen in der Tabelle = Optimierungsplan."
     )
     matrix = _load_planning_matrix()
     if not matrix:
@@ -82,21 +100,35 @@ def render() -> None:
 
 
 def _load_planning_matrix() -> list | None:
-    """Stündliche Live-Planungsmatrix (Preis je Slot) oder None mit Fehlermeldung."""
-    try:
-        window = profile_manager.compute_live_planning_window()
-        market_data = awattar_client.fetch_awattar_prices(planning_end=window.end)
-    except Exception as exc:  # noqa: BLE001 — UI: jede Datenquelle als Fehler zeigen
-        st.error(f"Planungsdaten konnten nicht geladen werden: {exc}")
+    """Letzte Planungsmatrix aus main.py-Persistenz (kein Live-Matrix-Build)."""
+    snapshot = load_live_display_snapshot()
+    if snapshot is None:
+        st.info("Warte auf ersten main.py-Durchlauf — keine Planungsdaten verfügbar.")
         return None
-    if not market_data:
-        st.error("aWATTar-Börsenpreise konnten nicht geladen werden.")
+
+    completed = snapshot_completed_at(snapshot)
+    matrix = planning_matrix_from_snapshot(snapshot)
+    if not matrix:
+        st.warning("Persistierter Snapshot enthält keine Planungsmatrix.")
         return None
-    try:
-        return profile_manager.build_live_planning_matrix(market_data, window)
-    except Exception as exc:  # noqa: BLE001
-        st.error(f"Planungsmatrix konnte nicht erstellt werden: {exc}")
-        return None
+
+    age_sec = snapshot_age_seconds(completed)
+    age_min = int(age_sec // 60) if age_sec is not None else None
+    label = completed[:16].replace("T", " ") if completed else "unbekannt"
+
+    if is_persisted_display_fresh(completed):
+        st.caption(
+            f"Planungsdaten vom letzten main.py-Lauf (**{label}**"
+            + (f", vor {age_min} min" if age_min is not None else "")
+            + ")."
+        )
+    else:
+        st.warning(
+            f"Daten veraltet — main.py seit **{label}** nicht aktiv "
+            f"(>{optimization_schedule.PERSISTED_DISPLAY_MAX_AGE_SECONDS // 3600} h). "
+            "Empfehlungen basieren auf dem letzten bekannten Plan."
+        )
+    return matrix
 
 
 def _star_threshold_settings() -> StarThresholdSettings:
@@ -155,58 +187,31 @@ def _render_star_threshold_settings() -> None:
 
 def _render_appliance(appliance: dict, matrix: list) -> None:
     st.markdown(f"#### {appliance['name']}")
-    appliance_id = appliance["id"]
-    default_kw = float(appliance.get("default_power_kw") or 0.0)
-    default_runtime = float(appliance.get("default_runtime_h") or _DEFAULT_RUNTIME_H)
-    active = appliance_schedules.active_schedule_for(appliance_id)
-    inputs_disabled = _appliance_inputs_disabled(active)
-    with st.form(key=f"appliance_form_{appliance_id}"):
-        col_power, col_runtime = st.columns(2)
-        power_kw = col_power.number_input(
-            "Nennleistung (kW)",
-            min_value=0.0,
-            value=default_kw,
-            step=0.1,
-            key=f"appliance_power_{appliance_id}",
-            disabled=inputs_disabled,
-        )
-        runtime_h = col_runtime.number_input(
-            "Laufzeit (h)",
-            min_value=0.25,
-            value=default_runtime,
-            step=0.25,
-            key=f"appliance_runtime_{appliance_id}",
-            disabled=inputs_disabled,
-        )
-        if inputs_disabled:
-            st.caption(_PLAN_ACTIVE_INPUT_HINT)
-        elif appliance["power_source"] == "loxone" and default_kw > 0:
-            hint = f"Hinweis: {default_kw:.2f} kW (aus Config"
-            merker = appliance.get("loxone_power_name")
-            if merker:
-                hint += f"; Merker '{merker}' für spätere Adaption"
-            col_power.caption(f"{hint})")
-        save_defaults = st.form_submit_button(
-            "In config.json speichern",
-            disabled=inputs_disabled,
-        )
-    if save_defaults:
-        _save_appliance_defaults(appliance_id, power_kw, runtime_h)
-    if power_kw is None or power_kw <= 0:
-        st.warning("Keine gültige Leistung — Empfehlung nicht möglich.")
+    power_kw = _appliance_power_kw(appliance)
+    runtime_h = _appliance_runtime_h(appliance)
+    horizon_h = _recommendation_horizon_h(appliance)
+    st.caption(
+        f"Nennleistung: **{power_kw:.2f} kW** · Laufzeit: **{runtime_h:.2f} h** · "
+        f"Empfehlungshorizont: **{horizon_h} h** (Hausprofil)"
+    )
+    if appliance.get("power_source") == "loxone":
+        merker = _appliance_loxone_power_name(appliance)
+        if merker:
+            st.caption(
+                f"Loxone-Merker: `{merker}` (für künftige Live-Adaption; "
+                "Empfehlung nutzt Nennleistung aus dem Profil)"
+            )
+    if power_kw <= 0:
+        st.warning("Keine gültige Leistung im Hausprofil — Empfehlung nicht möglich.")
         return
     _render_recommendation(appliance, matrix, power_kw, runtime_h)
 
 
-def _save_appliance_defaults(appliance_id: str, power_kw: float, runtime_h: float) -> None:
-    try:
-        config.update_appliance_defaults(
-            appliance_id, power_kw=float(power_kw), runtime_h=float(runtime_h)
-        )
-        reinit_config()
-        st.success("Parameter in config.json gespeichert.")
-    except Exception as exc:  # noqa: BLE001 — UI-Feedback
-        st.error(f"Speichern fehlgeschlagen: {exc}")
+def _recommendation_horizon_h(appliance: dict) -> int:
+    horizon = appliance.get("recommendation_horizon_h")
+    if horizon is not None:
+        return max(1, int(horizon))
+    return DEFAULT_HORIZON_H
 
 
 def _render_recommendation(
@@ -216,12 +221,13 @@ def _render_recommendation(
     runtime_h: float,
 ) -> None:
     appliance_id = appliance["id"]
+    horizon_h = _recommendation_horizon_h(appliance)
     try:
         rec = recommend_start_times(
             matrix,
             power_kw,
             runtime_h,
-            horizon_h=DEFAULT_HORIZON_H,
+            horizon_h=horizon_h,
             star_settings=_star_threshold_settings(),
         )
     except ValueError as exc:

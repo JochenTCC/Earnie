@@ -34,7 +34,7 @@ def _render_countdown_captions() -> None:
     remaining = max(0, int(optimization_schedule.seconds_until_next_quarter_hour()))
     poll_sec = main_sync_poll_interval_sec()
     completed = (main_state or {}).get("completed_at")
-    _, _, retry_sec, fallback_sec = optimization_schedule.live_simulation_readiness(
+    _, _, retry_sec, sync_wait_sec, _ = optimization_schedule.live_simulation_readiness(
         completed,
         poll_sec=poll_sec,
     )
@@ -45,7 +45,7 @@ def _render_countdown_captions() -> None:
         f"🔄 **Optimierungs-Takt:** Viertelstunden (:00 / :15 / :30 / :45) | "
         f"⏱️ Letzter Lauf ({sync_label}): **{last_time}**"
     )
-    sync_hint = sync_footer_caption(retry_sec, fallback_sec)
+    sync_hint = sync_footer_caption(retry_sec, sync_wait_sec)
     render_status_with_help(
         f"⏳ **Nächster main.py-Takt:** `{next_run.strftime('%H:%M')}` "
         f"(in `{remaining}` s){sync_hint}",

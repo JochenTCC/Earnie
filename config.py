@@ -191,10 +191,12 @@ class Config:
             "main_sync_poll_sec",
             15,
         )
-        self.UI_CHART_DEBUG_CAPTURE_ENABLED = system_settings.load_ui_bool(
-            self._raw_config,
-            "chart_debug_capture_enabled",
-            False,
+        self.UI_CHART_DEBUG_CAPTURE_ENABLED = (
+            system_settings.load_ui_chart_debug_capture_enabled(
+                self._raw_config,
+                local_settings,
+                self.local_settings_path,
+            )
         )
         self.UI_CHART_DEBUG_CAPTURE_DIR = system_settings.load_ui_chart_debug_capture_dir(
             self._raw_config
@@ -670,6 +672,10 @@ class Config:
         return int(self.get("UI_MAIN_SYNC_POLL_SEC", default=15))
 
     def get_ui_chart_debug_capture_enabled(self) -> bool:
+        from runtime_store.env_vars import is_truthy
+
+        if is_truthy("UI_CHART_DEBUG_CAPTURE_ENABLED"):
+            return True
         return bool(self.get("UI_CHART_DEBUG_CAPTURE_ENABLED", default=False))
 
     def get_ui_chart_debug_capture_dir(self) -> str:

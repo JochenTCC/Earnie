@@ -14,6 +14,7 @@ from data.planning_window import (
     history_log_end_exclusive,
     normalize_hour_slot,
     normalize_planning_hour_slot,
+    parse_row_slot_datetime,
     ui_chart_zones,
 )
 from runtime_store import optimization_history
@@ -188,12 +189,7 @@ def build_live_chart_context(
 
 
 def _row_slot(row: dict) -> datetime | None:
-    slot = row.get("slot_datetime")
-    if slot is None:
-        return None
-    if isinstance(slot, datetime):
-        return normalize_hour_slot(slot)
-    return None
+    return parse_row_slot_datetime(row)
 
 
 def matrix_indices_for_chart(
@@ -236,8 +232,12 @@ def align_rows_to_chart_slots(
             by_slot[slot] = row
     aligned: list[dict] = []
     for slot in chart.slot_datetimes:
-        if slot in by_slot:
-            aligned.append(by_slot[slot])
+        hour = normalize_hour_slot(slot)
+        if hour in by_slot:
+            row = dict(by_slot[hour])
+            row["slot_datetime"] = slot
+            row["Uhrzeit"] = slot.strftime("%d.%m. %H:%M")
+            aligned.append(row)
         else:
             aligned.append(_empty_chart_row(slot))
     return aligned

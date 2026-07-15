@@ -649,9 +649,10 @@ def add_baseline_soc_traces(
             matched_x, matched_y = _apply_soc_current_hour_ramps(
                 matched_x, matched_y, None, ramp_after,
             )
-            matched_x, matched_y = _anchor_baseline_soc_at_now(
-                matched_x, matched_y, chart_now, soc_at_now,
-            )
+            if index == 0:
+                matched_x, matched_y = _anchor_baseline_soc_at_now(
+                    matched_x, matched_y, chart_now, soc_at_now,
+                )
             hover_labels = _soc_hover_labels_for_times(
                 matched_x,
                 matched_baseline_df["Uhrzeit"],

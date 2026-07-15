@@ -246,6 +246,43 @@ def test_build_chart_display_merges_history_and_milp(history_files):
     )
 
 
+def test_build_chart_display_merges_history_and_milp_with_iso_string_slots(history_files):
+    """Persistierte Snapshots liefern slot_datetime als ISO-String (main.py JSON)."""
+    now = _dt(2026, 6, 15, 14, 30)
+    chart_context = build_live_chart_context(0, 0, now=now)
+    log_slot = chart_context.chart_window.start.replace(
+        hour=chart_context.chart_window.start.hour + 1
+    )
+    _write_jsonl(history_files, [_entry(log_slot, soc_percent=33.0)])
+
+    hour_zero = _dt(2026, 6, 15, 14, 0)
+    sim_rows = [
+        {
+            "slot_datetime": slot.isoformat(timespec="seconds"),
+            "Uhrzeit": slot.strftime("%d.%m. %H:%M"),
+            "Strompreis (Cent/kWh)": 12.0,
+            "Preis extrapoliert": False,
+            "PV-Prognose (kW)": 1.0,
+            "Verbrauch-Prognose (kW)": 0.5,
+            "Geplante Batterie-Aktion (kW)": 0.0,
+            "Netzbezug (kW)": 0.0,
+            "Simulierter SoC (%)": 60.0,
+            "Steuerbefehl": "Automatik",
+        }
+        for slot in chart_context.chart_window.slot_datetimes
+        if slot >= hour_zero
+    ]
+
+    display = build_chart_display_context(chart_context, sim_rows)
+    milp_rows = [
+        row
+        for row, quality in zip(display.rows, display.slot_qualities)
+        if quality == SLOT_MILP
+    ]
+    assert milp_rows
+    assert any(row.get("Simulierter SoC (%)") == 60.0 for row in milp_rows)
+
+
 def test_build_chart_display_quarter_soll_from_milp_hour_zero(history_files):
     now = _dt(2026, 6, 15, 14, 45)
     chart_context = build_live_chart_context(0, 0, now=now)
@@ -310,6 +347,22 @@ def test_entry_to_chart_row_feed_in_fallback_without_k_push_act(history_files):
 
 
 def test_entry_to_chart_row_includes_milp_table_columns(history_files):
+    from optimizer.targets import consumer_immediate_charge_column_name
+    from settings.flexible_consumers import runtime_consumer_id
+
+    ev = next(
+        (
+            consumer
+            for consumer in config.get_flexible_consumers(optimizer_only=True)
+            if (consumer.get("charging_schedule") or {}).get("enabled")
+        ),
+        None,
+    )
+    if ev is None:
+        pytest.skip("Kein EV in der Test-Config.")
+    ev_col = consumer_immediate_charge_column_name(ev)
+    ev_ctx_id = runtime_consumer_id(ev)
+
     window_start = _dt(2026, 6, 15, 10, 0)
     _write_jsonl(
         history_files,
@@ -318,7 +371,7 @@ def test_entry_to_chart_row_includes_milp_table_columns(history_files):
                 window_start,
                 k_push_act=6.0,
                 charging_contexts={
-                    "eauto": {"immediate_charge": True, "immediate_charge_kw": 3.5},
+                    ev_ctx_id: {"immediate_charge": True, "immediate_charge_kw": 3.5},
                 },
             ),
         ],
@@ -329,10 +382,8 @@ def test_entry_to_chart_row_includes_milp_table_columns(history_files):
     )
     row = result.rows[0]
     assert row["Einspeisevergütung (Cent/kWh)"] == 6.0
-    eauto_col = next(
-        key for key in row if key.startswith("E-Auto") and key.endswith("sofort_laden")
-    )
-    assert row[eauto_col] == 1
+    assert ev_col in row
+    assert row[ev_col] == 1
 
 
 def test_build_chart_display_past_cycle_is_history_only(history_files):

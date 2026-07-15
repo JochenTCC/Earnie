@@ -91,8 +91,8 @@ Ab **2.0** keine separate `appliances[]` in `config.json` mehr: Waschmaschine, T
 |------|-----------|
 | `id`, `label` | Kennung und Anzeigename |
 | `appliance_recommendation.power_source` | `loxone` oder `manual` |
-| `appliance_recommendation.loxone_power_name` | Bei `loxone`: Ist-Leistungsmerker |
-| `appliance_recommendation.default_power_kw`, `default_runtime_h` | Standard für manuelle Planung |
+| `loxone_inputs.power_name` | Bei `loxone`: Ist-Leistungsmerker (`known` und `manual`) |
+| `appliance_recommendation.default_power_kw`, `default_runtime_h` | Standard für Empfehlungsmodus (Seite liest nur aus Hausprofil) |
 
 ## Baseline in der UI
 
@@ -100,3 +100,28 @@ In Charts und Tabellen:
 
 - **BL Profil:** historisches Verbrauchsmuster ohne Verschiebung
 - **BL Ziel:** gleiche Tagesenergie wie die Optimierung, aber ohne zeitliche Verschiebung (Vergleich „was wäre ohne Optimierung“)
+
+## Hausprofil: Generic-Verbraucher und `earnie_role`
+
+Im Hausprofil (`house_profiles.json`, `type: generic`) steuert **`earnie_role`** (Standard: **`known`**) die Berücksichtigung in der Live-Optimierung:
+
+| `earnie_role` | Bedeutung | `start_shift_h` |
+|---------------|-----------|-----------------|
+| `known` | Geplante Laufzeiten werden zur **Grundlast** (`expected_p_act`) addiert — nicht als MILP-Flex | wird auf `0` gesetzt (fester Start) |
+| `flex` | Optimierbare Flex-Last (MILP) | Verschiebungsfenster (± h) |
+| `manual` | **Manuelles Gerät** — Planung auf **Betrieb → Manuelle Geräte**; Laufzeit kommt aus Nutzerplan (`appliance_schedules.json`) | **Empfehlungshorizont (h)** für die Startzeit-Tabelle |
+
+Einrichtung im **Hauskonfigurator** unter „Earnie-Berücksichtigung“. Thermische Verbraucher (SwimSpa, Wärmepumpe) und E-Auto sind hiervon unberührt.
+
+### Leistungsquelle (Loxone-Merker)
+
+Bei `earnie_role: known` oder `manual` kann optional eine **Loxone-Leistungsquelle** konfiguriert werden:
+
+| Feld | Bedeutung |
+|------|-----------|
+| `loxone_inputs.power_name` | Loxone-Merker für Ist-Leistung (einheitlich für `known` und `manual`) |
+| `appliance_recommendation.power_source` | `manual` oder `loxone` (nur bei `manual`) |
+| `appliance_recommendation.default_power_kw` | Nennleistung für Empfehlung/Grundlast |
+| `appliance_recommendation.default_runtime_h` | Standard-Laufzeit (nur bei `manual`) |
+
+Der Merker wird gespeichert; Live-Abfrage und Adaption der Nennleistung folgen in **Version 2.+1**. Bis dahin nutzt die Grundlast-Overlay bzw. die Startzeit-Empfehlung die Werte aus dem Profil.

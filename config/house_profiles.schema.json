@@ -19,12 +19,25 @@
                 "start_shift_h": { "type": "number", "minimum": 0, "maximum": 12 }
             }
         },
+        "earnie_role": {
+            "type": "string",
+            "enum": ["known", "flex", "manual"],
+            "default": "known",
+            "description": "Wie Earnie diesen generic-Verbraucher berücksichtigt."
+        },
+        "loxone_inputs": {
+            "type": "object",
+            "description": "Optionaler Loxone-Leistungsmerker (known/manual generic).",
+            "properties": {
+                "power_name": { "type": "string" },
+                "signal_type": { "type": "string", "enum": ["power", "binary"] }
+            }
+        },
         "appliance_recommendation": {
             "type": "object",
             "description": "Empfehlungsmodus (Waschmaschine/Trockner/GS) — 1.96d",
             "properties": {
                 "power_source": { "enum": ["loxone", "manual"] },
-                "loxone_power_name": { "type": "string" },
                 "default_power_kw": { "type": "number", "minimum": 0 },
                 "default_runtime_h": { "type": "number", "exclusiveMinimum": 0 }
             }
@@ -100,6 +113,8 @@
                 "annual_kwh": { "type": "number" },
                 "profile_csv": { "type": "string" },
                 "schedule": { "$ref": "#/definitions/schedule" },
+                "earnie_role": { "$ref": "#/definitions/earnie_role" },
+                "loxone_inputs": { "$ref": "#/definitions/loxone_inputs" },
                 "appliance_recommendation": { "$ref": "#/definitions/appliance_recommendation" },
                 "min_power_kw": { "type": "number", "minimum": 0 },
                 "min_on_quarterhours": { "type": "integer", "minimum": 0 },

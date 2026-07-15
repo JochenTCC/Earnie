@@ -1,4 +1,5 @@
 # profile_manager.py
+import logging
 import os
 import pandas as pd
 from datetime import datetime, timedelta, date, time
@@ -15,6 +16,8 @@ from runtime_store.persist_paths import (
     flexible_consumer_profiles_file,
     total_consumption_profiles_file,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _cons_data_to_profile_dataframe(cons_df: pd.DataFrame) -> pd.DataFrame:
@@ -57,6 +60,36 @@ def _load_profile_source_dataframe() -> pd.DataFrame | None:
     return load_cons_data_profile_dataframe()
 
 
+def _flex_profile_export_spec(df: pd.DataFrame) -> tuple[list[str], dict[str, str]]:
+    """
+    Spalten aus dem cons_data-Profil-DF für flexible_consumer_profiles.csv.
+
+    Nutzt cons_data-Labels (nicht config.name) und schreibt runtime CSV-Spalten
+    (legacy_id wenn gesetzt). Verbraucher ohne cons_data-Spalte werden übersprungen.
+    """
+    from data.cons_data_house_profile import (
+        consumer_labels_for_ids,
+        expected_cons_data_consumer_ids,
+    )
+    from settings.flexible_consumers import profile_column_id, runtime_consumer_id
+
+    cons_ids = set(expected_cons_data_consumer_ids())
+    label_cols: list[str] = []
+    rename_to_csv: dict[str, str] = {}
+    for consumer in config.get_flexible_consumers():
+        runtime_id = runtime_consumer_id(consumer)
+        canonical_id = str(consumer["id"])
+        if runtime_id not in cons_ids and canonical_id not in cons_ids:
+            continue
+        lookup_id = runtime_id if runtime_id in cons_ids else canonical_id
+        label = consumer_labels_for_ids([lookup_id]).get(lookup_id)
+        if not label or label not in df.columns:
+            continue
+        label_cols.append(label)
+        rename_to_csv[label] = profile_column_id(consumer)
+    return label_cols, rename_to_csv
+
+
 def generate_consumption_profile() -> bool:
     """Berechnet Verbrauchsprofile aus cons_data_hourly.csv."""
     try:
@@ -83,19 +116,15 @@ def generate_consumption_profile() -> bool:
         total_profile['Consumption'] = total_profile['Consumption'].round(3)
         total_profile.to_csv(total_consumption_profiles_file(), index=False, sep=';')
 
-        flex_cols = [c["id"] for c in config.get_flexible_consumers()]
-        if flex_cols:
-            flex_profile = df.groupby(['Month', 'Weekday', 'Hour'])[
-                [c["name"] for c in config.get_flexible_consumers()]
+        label_cols, rename_to_csv = _flex_profile_export_spec(df)
+        if label_cols:
+            flex_profile = df.groupby(["Month", "Weekday", "Hour"])[
+                label_cols
             ].mean().reset_index()
-            rename_map = {
-                consumer["name"]: consumer["id"]
-                for consumer in config.get_flexible_consumers()
-            }
-            flex_profile.rename(columns=rename_map, inplace=True)
-            for cid in flex_cols:
-                flex_profile[cid] = flex_profile[cid].round(3)
-            flex_profile.to_csv(flexible_consumer_profiles_file(), index=False, sep=';')
+            flex_profile.rename(columns=rename_to_csv, inplace=True)
+            for csv_col in rename_to_csv.values():
+                flex_profile[csv_col] = flex_profile[csv_col].round(3)
+            flex_profile.to_csv(flexible_consumer_profiles_file(), index=False, sep=";")
 
         print(
             "[OK] 'consumption_profiles.csv', 'total_consumption_profiles.csv' "
@@ -107,19 +136,64 @@ def generate_consumption_profile() -> bool:
         return False
 
 
+def _flex_profile_needs_regeneration() -> bool:
+    """True wenn flexible_consumer_profiles.csv fehlt oder keine Verbraucher-Spalten hat."""
+    flex_path = flexible_consumer_profiles_file()
+    if not config.get_flexible_consumers():
+        return False
+    if not os.path.exists(flex_path):
+        return True
+    try:
+        header = pd.read_csv(flex_path, sep=";", nrows=0).columns.tolist()
+    except Exception:
+        return True
+    data_cols = {col for col in header if col not in {"Month", "Weekday", "Hour"}}
+    if not data_cols or data_cols == {"Consumption"}:
+        return True
+    from settings.flexible_consumers import profile_column_id
+
+    expected = {
+        profile_column_id(consumer)
+        for consumer in config.get_flexible_consumers()
+    }
+    expected.update(str(consumer["id"]) for consumer in config.get_flexible_consumers())
+    return not data_cols.intersection(expected)
+
+
+def _flex_profile_status_message() -> str:
+    """Kurzstatus für Logs: Spalten in flexible_consumer_profiles.csv."""
+    flex_path = flexible_consumer_profiles_file()
+    if not os.path.exists(flex_path):
+        return "flexible_consumer_profiles.csv fehlt"
+    try:
+        header = pd.read_csv(flex_path, sep=";", nrows=0).columns.tolist()
+    except Exception as exc:
+        return f"flexible_consumer_profiles.csv nicht lesbar ({exc})"
+    data_cols = sorted(
+        col for col in header if col not in {"Month", "Weekday", "Hour", "Consumption"}
+    )
+    if not data_cols:
+        return "flexible_consumer_profiles.csv ohne Verbraucher-Spalten"
+    return f"flexible_consumer_profiles.csv OK ({len(data_cols)} Spalten: {', '.join(data_cols[:6])}{'…' if len(data_cols) > 6 else ''})"
+
+
 def check_and_update_profile_if_new_month() -> None:
     """Überprüft, ob ein neuer Monat begonnen hat, und triggert ggf. das Profil-Update."""
     profile_path = consumption_profiles_file()
     should_update = False
+    update_reason = ""
     
     if not os.path.exists(profile_path):
-        print("[info] Kein Verbrauchsprofil gefunden. Initialisiere erste Berechnung...")
+        update_reason = "consumption_profiles.csv fehlt"
         should_update = True
     elif not os.path.exists(total_consumption_profiles_file()):
-        print("[info] Gesamtverbrauchsprofil fehlt. Initialisiere Profil-Update...")
+        update_reason = "total_consumption_profiles.csv fehlt"
         should_update = True
     elif not os.path.exists(flexible_consumer_profiles_file()) and config.get_flexible_consumers():
-        print("[info] Flexible-Verbraucherprofil fehlt. Initialisiere Profil-Update...")
+        update_reason = "flexible_consumer_profiles.csv fehlt"
+        should_update = True
+    elif _flex_profile_needs_regeneration():
+        update_reason = "flexible_consumer_profiles.csv unvollständig oder veraltet"
         should_update = True
     else:
         file_time = os.path.getmtime(profile_path)
@@ -127,11 +201,18 @@ def check_and_update_profile_if_new_month() -> None:
         current_date = datetime.now()
         
         if file_date.month != current_date.month or file_date.year != current_date.year:
-            print(f"[info] Neuer Monat erkannt (Letztes Profil von: {file_date.strftime('%d.%m.%Y')}).")
+            update_reason = (
+                f"neuer Monat (letztes Profil {file_date.strftime('%d.%m.%Y')})"
+            )
             should_update = True
             
     if should_update:
+        print(f"[info] Profil-Update: {update_reason}.")
+        logger.info("Profil-Update: %s", update_reason)
         generate_consumption_profile()
+    else:
+        status = _flex_profile_status_message()
+        logger.info("Profil-Check: %s — kein Update nötig.", status)
 
 
 def _load_hourly_profile(target_hours: List, profile_path: str, column: str = "Consumption") -> List[float]:
@@ -170,15 +251,19 @@ def _apply_house_profile_baseload_overlay(
     target_hours: List,
     baseload: List[float],
 ) -> List[float]:
-    """Hausprofil-Overlay auf Grundlast (Greenfield ohne flexible_consumers)."""
-    if config.CONFIG._raw_config.get("flexible_consumers"):
-        return baseload
+    """Generic-Verbraucher mit earnie_role=known aus Hausprofil auf Grundlast."""
     profile = config.get_resolved_runtime_settings().get("_house_profile")
     if not profile:
         return baseload
-    from house_config.planning_flex_bridge import house_profile_baseload_overlay
+    from house_config.planning_flex_bridge import (
+        fixed_generic_hourly_overlay,
+        house_profile_baseload_overlay,
+    )
 
-    overlay = house_profile_baseload_overlay(profile, target_hours)
+    if config.CONFIG._raw_config.get("flexible_consumers"):
+        overlay = fixed_generic_hourly_overlay(profile, target_hours)
+    else:
+        overlay = house_profile_baseload_overlay(profile, target_hours)
     return [round(base + extra, 3) for base, extra in zip(baseload, overlay)]
 
 
@@ -252,6 +337,8 @@ def _build_optimization_matrix(
 
 def _load_flexible_consumer_hourly_profiles(target_hours: List) -> dict[str, List[float]]:
     """Lädt stündliche Profilwerte je flexiblem Verbraucher für die Zielstunden."""
+    from settings.flexible_consumers import profile_column_id
+
     consumers = config.get_flexible_consumers()
     profiles = {consumer["id"]: [] for consumer in consumers}
     profile_path = flexible_consumer_profiles_file()
@@ -261,14 +348,22 @@ def _load_flexible_consumer_hourly_profiles(target_hours: List) -> dict[str, Lis
 
     try:
         df_profiles = pd.read_csv(profile_path, sep=';')
-        consumer_ids = [c["id"] for c in consumers if c["id"] in df_profiles.columns]
+        csv_columns = set(df_profiles.columns)
+        column_by_consumer: dict[str, str] = {}
+        for consumer in consumers:
+            cid = str(consumer["id"])
+            runtime_col = profile_column_id(consumer)
+            if runtime_col in csv_columns:
+                column_by_consumer[cid] = runtime_col
+            elif cid in csv_columns:
+                column_by_consumer[cid] = cid
         lookup = {
-            cid: df_profiles.set_index(['Month', 'Weekday', 'Hour'])[cid].to_dict()
-            for cid in consumer_ids
+            cid: df_profiles.set_index(['Month', 'Weekday', 'Hour'])[col].to_dict()
+            for cid, col in column_by_consumer.items()
         }
         hour_fallback = {
-            cid: df_profiles.groupby('Hour')[cid].mean().to_dict()
-            for cid in consumer_ids
+            cid: df_profiles.groupby('Hour')[col].mean().to_dict()
+            for cid, col in column_by_consumer.items()
         }
         for dt in target_hours:
             key = (dt.month, dt.weekday(), dt.hour)
@@ -338,6 +433,21 @@ def build_live_planning_matrix(market_data: list, window) -> list:
             cid: flex_profiles[cid][i]
             for cid in flex_profiles
         }
+
+    flex_horizon_sums = {
+        cid: round(sum(values), 2)
+        for cid, values in flex_profiles.items()
+        if round(sum(values), 2) > 0.0
+    }
+    if flex_horizon_sums:
+        logger.info(
+            "Flex-Profile im Planungshorizont (kWh): %s",
+            ", ".join(f"{cid}={kwh}" for cid, kwh in sorted(flex_horizon_sums.items())),
+        )
+    else:
+        logger.warning(
+            "Flex-Profile im Planungshorizont sind leer — SoC BL Ziel kann zu hoch sein."
+        )
 
     mirrored_share = market_prices.mirrored_price_share(
         [

@@ -347,6 +347,11 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path):
                 "ready_by_hour": 12,
                 "daily_rest_soc": 50.0,
             },
+            "milp": {
+                "live_modus_a_min_remaining_kwh": 2.8,
+                "tie_break_on_epsilon": 0.001,
+                "tie_break_time_epsilon": 0.0001,
+            },
         },
     }
     spa_original = {
@@ -376,6 +381,7 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path):
         "charging_schedule": dict(ev_original["charging_schedule"]),
     }
     ev_edited["charging_schedule"].pop("loxone", None)
+    ev_edited["charging_schedule"].pop("milp", None)
     spa_edited = {
         "id": "swimspa",
         "label": "SwimSpa",
@@ -409,6 +415,8 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path):
     assert ev["loxone_outputs"]["power_setpoint_name"] == "Ernie_EAuto_Ziel_kW"
     assert ev["loxone_inputs"]["power_name"] == "Ernie_EAuto_P_act"
     assert ev["charging_schedule"]["loxone"]["plugged_in_name"] == "Ernie_EAuto_Da"
+    assert ev["charging_schedule"]["milp"]["live_modus_a_min_remaining_kwh"] == pytest.approx(2.8)
+    assert ev["charging_schedule"]["milp"]["tie_break_on_epsilon"] == pytest.approx(0.001)
     assert spa["loxone_outputs"]["enable_name"] == "Ernie_SwimSpa_Freigabe"
     assert spa["thermal_control"]["loxone"]["heating_active_name"] == "homie_bwa_spa_heating"
 

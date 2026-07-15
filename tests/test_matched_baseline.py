@@ -1,6 +1,8 @@
 """Tests für Profil- und Ziel-Baseline in der Simulation."""
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from optimizer.simulation import (
     build_matched_flex_kw_per_hour,
     delivered_flex_kwh_from_rows,
@@ -39,6 +41,52 @@ def test_build_matched_flex_scales_to_target():
     assert abs(swimspa_sum - 6.0) < 0.01
     assert abs(eauto_sum - 12.0) < 0.01
     assert all(hour["swimspa"] == 0.0 for hour in per_hour[12:])
+
+
+def test_build_matched_flex_reads_legacy_matrix_keys():
+    matrix = [
+        {
+            "hour": h,
+            "expected_p_pv": 1.0,
+            "expected_p_act": 0.5,
+            "k_act": 20.0,
+            "expected_flex_kw": {
+                "swimspa": 1.0 if h < 12 else 0.0,
+                "eauto": 0.5,
+            },
+        }
+        for h in range(24)
+    ]
+    targets = {"swimspa": 6.0, "ev": 12.0}
+    consumers = [
+        {"id": "swimspa", "name": "SwimSpa"},
+        {"id": "ev", "legacy_id": "eauto", "name": "Smart"},
+    ]
+    with patch(
+        "optimizer.simulation.config.get_flexible_consumers",
+        return_value=consumers,
+    ):
+        per_hour = build_matched_flex_kw_per_hour(matrix, targets)
+
+    ev_sum = sum(hour["ev"] for hour in per_hour)
+    assert abs(ev_sum - 12.0) < 0.01
+
+
+def test_baseline_horizon_lower_soc_with_matrix_flex():
+    matrix = [
+        {
+            "hour": h,
+            "expected_p_pv": 1.5,
+            "expected_p_act": 0.2,
+            "k_act": 20.0,
+            "expected_flex_kw": {"swimspa": 1.2},
+        }
+        for h in range(8)
+    ]
+    with_flex = simulate_baseline_horizon(matrix, 50.0)
+    no_flex_matrix = [{**row, "expected_flex_kw": {}} for row in matrix]
+    without_flex = simulate_baseline_horizon(no_flex_matrix, 50.0)
+    assert without_flex[-1]["Simulierter SoC (%)"] > with_flex[-1]["Simulierter SoC (%)"]
 
 
 def test_matched_baseline_covers_matrix_beyond_24_hours():
@@ -193,6 +241,49 @@ def _eauto_historical_consumer() -> dict:
         },
         "thermal_control": None,
     }
+
+
+def test_matched_baseline_uses_profile_targets_for_config_appliances(monkeypatch):
+    """Config-Appliances mit Profil aber Ziel 0: BL Ziel nutzt Profil-Energie."""
+    from datetime import date, datetime
+
+    from optimizer.targets import resolve_matched_baseline_horizon_targets
+
+    matrix = [
+        {
+            "hour": 12,
+            "date": date(2026, 7, 16),
+            "slot_datetime": datetime(2026, 7, 16, 12, 0),
+            "expected_p_pv": 1.0,
+            "expected_p_act": 0.5,
+            "k_act": 20.0,
+            "expected_flex_kw": {"waschmaschine": 2.0},
+            "consumption_mode": "forecast",
+        }
+    ]
+    consumers = [
+        {
+            "id": "waschmaschine",
+            "name": "Waschmaschine",
+            "daily_target_source": "config",
+            "daily_target_kwh": 0.0,
+            "optimizer_enabled": True,
+        }
+    ]
+
+    def _flex_consumers(*, optimizer_only: bool = False):
+        return consumers if optimizer_only else consumers
+
+    monkeypatch.setattr(
+        "optimizer.targets.config.get_flexible_consumers",
+        _flex_consumers,
+    )
+    monkeypatch.setattr(
+        "data.consumer_targets.config.get_flexible_consumers",
+        _flex_consumers,
+    )
+    matched = resolve_matched_baseline_horizon_targets(matrix, None, None)
+    assert matched.get("waschmaschine") == 2.0
 
 
 def test_matched_eauto_profile_shape_scaled_to_current_target():

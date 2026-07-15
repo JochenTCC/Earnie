@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, time
 import config
 from integrations import loxone_client
 from optimizer.ev_soc_tracking import loxone_reports_charge_complete
+from settings.flexible_consumers import flex_kw_lookup
 
 _LOXONE_WEEKDAY_NAMES = {
     "montag": 0,
@@ -500,7 +501,7 @@ def resolve_charging_contexts(
             consumer_daily_targets_kwh,
             logged_simulation,
         )
-        live_kw = (live_flex_kw or {}).get(cid)
+        live_kw = flex_kw_lookup(live_flex_kw, consumer)
         contexts[cid] = ci.enrich_context_with_immediate_charge(
             consumer,
             contexts[cid],

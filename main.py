@@ -10,9 +10,11 @@ config = load_config_or_exit()
 import logger_config
 from integrations import awattar_client, loxone_client
 from integrations.loxone_comm_trace import serialize_write_records
-from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption
+from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption, pv_forecast
 from data.feed_in_prices import k_push_act_for_matrix_row
 from runtime_store import run_state, optimization_history
+from runtime_store import live_optimization_debug
+from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
 from optimizer.thermal_targets import collect_thermal_observability
@@ -85,23 +87,29 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     else:
         pv_delta = pv_tuner.get_pv_delta_and_update()
     if pv_delta is None:
-        if event_run:
-            logger.warning(
-                "Event-Lauf: Kein PV-Stunden-Delta verfügbar – Optimierung läuft ohne PV-Tuning."
-            )
-            pv_delta = 0.0
-        else:
-            logger.warning(
-                "⚠️ Tuning/Optimierungsdurchlauf für diese Stunde ausgesetzt "
-                "(Warten auf valides Delta)."
-            )
-            return
+        logger.warning(
+            "Kein PV-Zähler-Delta verfügbar — cons_data nutzt 0.0 kWh für dieses Intervall."
+        )
+        pv_delta = 0.0
 
-    logger.info("📊 Tatsächlicher PV-Ertrag der letzten Stunde: %.3f kWh", pv_delta)
+    logger.info("PV-Zähler-Delta (letztes Intervall): %.3f kWh", pv_delta)
 
     optimization_matrix = profile_manager.build_live_planning_matrix(
         market_data, planning_window
     )
+    pv_api_status = pv_forecast.get_api_status()
+    if pv_api_status["retry_at"]:
+        logger.warning(
+            "forecast.solar Rate-Limit (HTTP 429): Nächster API-Aufruf erlaubt ab %s "
+            "(PV-Quelle: %s, Cache: %s).",
+            pv_api_status["retry_at"],
+            pv_api_status["source"],
+            "ja" if pv_api_status["cache_available"] else "nein",
+        )
+    elif pv_api_status["using_synthetic_fallback"]:
+        logger.warning(
+            "forecast.solar: Synthetischer PV-Fallback aktiv (keine API-Daten)."
+        )
     from data.planning_window import sunrise_anchor_slot_index
 
     sunrise_soc_min_index = sunrise_anchor_slot_index(planning_window)
@@ -275,6 +283,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     )
 
     savings_snapshot = None
+    savings_info = None
     try:
         savings_info = optimizer.calculate_optimization_savings(
             optimization_matrix,
@@ -361,6 +370,37 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "current_hour": int(current_hour),
         }
         run_state.save_run_state(run_payload)
+        if savings_info:
+            try:
+                overlaid_rows = optimizer.overlay_main_run_on_rows(
+                    savings_info["optimized_rows"],
+                    run_payload,
+                )
+                debug_payload = live_optimization_debug.build_debug_payload(
+                    savings_info,
+                    overlaid_rows,
+                    savings_info["baseline_rows"],
+                    kind="live",
+                    initial_soc=float(current_soc),
+                    main_state=run_payload,
+                    quarter_hour_slot=optimization_schedule.quarter_hour_slot_key(),
+                    sync_reason="main_synced",
+                    optimized_rows_raw=savings_info["optimized_rows"],
+                    matched_baseline_rows=savings_info.get("matched_baseline_rows"),
+                    source="main.py",
+                    planning_matrix=optimization_matrix,
+                    planning_window=serialize_planning_window(planning_window),
+                )
+                live_optimization_debug.save_debug_snapshot(debug_payload)
+                logger.info(
+                    "live_optimization_debug: Anzeige-Snapshot gespeichert (%d Sim-Zeilen).",
+                    len(overlaid_rows),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "live_optimization_debug: Snapshot konnte nicht gespeichert werden: %s",
+                    exc,
+                )
         try:
             optimization_history.append_production_run(run_payload)
         except OSError as exc:

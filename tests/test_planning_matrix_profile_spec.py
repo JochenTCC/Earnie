@@ -39,6 +39,7 @@ HOUSE_PROFILE = {
             "label": "Washer",
             "type": "generic",
             "nominal_power_kw": 2.0,
+            "earnie_role": "flex",
             "schedule": {
                 "runs_per_week": 7,
                 "duration_h": 2.0,
@@ -51,6 +52,7 @@ HOUSE_PROFILE = {
             "label": "Oven",
             "type": "generic",
             "nominal_power_kw": 1.5,
+            "earnie_role": "known",
             "schedule": {
                 "runs_per_week": 3,
                 "duration_h": 1.0,

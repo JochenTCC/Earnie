@@ -31,10 +31,9 @@ _MIN_FLOW_KW = produktiv.MIN_REAL_FLOW_KW
 
 def _flex_kw_for_consumer(flex_kw: dict, consumer: dict) -> float:
     """Lookup live kW by runtime id (legacy_id) with fallback to canonical id."""
-    from settings.flexible_consumers import runtime_consumer_id
+    from settings.flexible_consumers import flex_kw_lookup
 
-    runtime_id = runtime_consumer_id(consumer)
-    return float(flex_kw.get(runtime_id, flex_kw.get(consumer["id"], 0.0)) or 0.0)
+    return flex_kw_lookup(flex_kw, consumer)
 
 
 def _grid_label(grid_kw: float) -> str:

@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 from settings.ev_power import merge_ev_power_conversion_fields
 from settings.flexible_consumers import CONSUMER_PALETTE_SIZE, normalize_legacy_id
+from house_config.earnie_role import is_earnie_flex, is_earnie_known
 from house_config.generic_schedule import (
     generic_daily_target_kwh_for_day,
     generic_hourly_kw_for_day,
-    is_fixed_start,
 )
 
 if TYPE_CHECKING:
@@ -48,14 +48,13 @@ def _house_generic_consumers(house_profile: dict) -> list[dict]:
 def split_planning_generic_consumers(
     house_profile: dict,
 ) -> tuple[list[dict], list[dict]]:
-    """Teilt generic-Verbraucher in fixe (shift=0) und MILP-flexible."""
+    """Teilt generic-Verbraucher in bekannte (Grundlast) und MILP-flexible."""
     fixed: list[dict] = []
     flex: list[dict] = []
     for consumer in _house_generic_consumers(house_profile):
-        schedule = consumer["schedule"]
-        if is_fixed_start(float(schedule.get("start_shift_h", 0.0) or 0.0)):
+        if is_earnie_known(consumer):
             fixed.append(consumer)
-        else:
+        elif is_earnie_flex(consumer):
             flex.append(planning_consumer_to_milp(consumer))
     return fixed, flex
 

@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import config
 from integrations import loxone_client
 from optimizer.filter_context import filter_schedule_enabled
+from settings.flexible_consumers import flex_kw_to_canonical
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,10 @@ def apply_live_snapshot_to_matrix(
     row = updated[hour_index]
     row["expected_p_act"] = snapshot["baseload_kw"]
     row["expected_p_total"] = snapshot["house_kw"]
-    row["expected_flex_kw"] = dict(snapshot["flex_kw"])
+    row["expected_flex_kw"] = flex_kw_to_canonical(
+        snapshot["flex_kw"],
+        config.get_flexible_consumers(),
+    )
     row["expected_p_pv"] = snapshot["pv_kw"]
     row["consumption_mode"] = "live_snapshot"
     return updated

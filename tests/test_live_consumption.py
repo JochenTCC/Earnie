@@ -64,6 +64,33 @@ def test_fetch_live_consumption_snapshot_uses_ui_flex_resolution():
     assert snapshot["baseload_kw"] == 0.32
 
 
+def test_apply_live_snapshot_maps_runtime_flex_to_canonical_ids():
+    matrix = [
+        {
+            "hour": 8,
+            "expected_p_act": 0.5,
+            "expected_flex_kw": {"ev": 0.0},
+            "expected_p_pv": 1.0,
+        }
+    ]
+    snapshot = {
+        "baseload_kw": 0.3,
+        "house_kw": 1.7,
+        "flex_kw": {"eauto": 1.4},
+        "pv_kw": 2.0,
+    }
+    consumer = {
+        "id": "ev",
+        "legacy_id": "eauto",
+        "name": "Smart",
+    }
+    with patch.object(lc.config, "get_flexible_consumers", return_value=[consumer]):
+        updated = lc.apply_live_snapshot_to_matrix(matrix, snapshot, hour_index=0)
+
+    assert updated[0]["expected_flex_kw"] == {"ev": 1.4}
+    assert updated[0]["consumption_mode"] == "live_snapshot"
+
+
 def test_filter_contexts_for_ui_uses_config_fallback_without_main_state():
     consumer = {
         "id": "swimspa_filter",

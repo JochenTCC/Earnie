@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from optimizer.targets import consumer_immediate_charge_column_name
 from runtime_store.history_timeline import SLOT_MISSING, SLOT_PRESENT
 from ui.simulation_results import (
     _simulation_table_column_order,
@@ -52,3 +53,10 @@ def test_simulation_table_column_order_puts_flex_kw_after_uhrzeit():
         "Netzbezug (kW)",
     ])
     assert cols[:4] == ["Uhrzeit", "Datenquelle", "SwimSpa (kW)", "E-Auto (kW)"]
+
+
+def test_consumer_immediate_charge_column_name_by_type():
+    ev = {"name": "E-Auto", "type": "ev"}
+    generic = {"name": "SwimSpa", "type": "generic"}
+    assert consumer_immediate_charge_column_name(ev) == "E-Auto sofort_laden"
+    assert consumer_immediate_charge_column_name(generic) == "SwimSpa Aktiv"

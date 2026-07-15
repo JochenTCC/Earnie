@@ -9,6 +9,12 @@ from typing import Any
 
 PROFILE_ID = "example_efh"
 
+DEFAULT_EV_MILP = {
+    "live_modus_a_min_remaining_kwh": 2.8,
+    "tie_break_on_epsilon": 0.001,
+    "tie_break_time_epsilon": 0.0001,
+}
+
 SWIMSPA_THERMAL_BINDINGS = {
     "loxone_outputs": {"enable_name": "Ernie_SwimSpa_Freigabe"},
     "loxone_inputs": {
@@ -51,9 +57,10 @@ def _flex_by_id(config: dict) -> dict[str, dict]:
 
 def _build_ev_consumer(eauto: dict, eauto_milp: dict | None) -> dict:
     sched = deepcopy(eauto.get("charging_schedule") or {})
-    if eauto_milp:
-        sched["milp"] = dict(eauto_milp)
-    return {
+    milp_source = dict(eauto_milp) if isinstance(eauto_milp, dict) and eauto_milp else dict(DEFAULT_EV_MILP)
+    if not sched.get("milp"):
+        sched["milp"] = milp_source
+    entry = {
         "id": "ev",
         "legacy_id": "eauto",
         "label": str(eauto.get("name", "E-Auto")),
@@ -64,6 +71,60 @@ def _build_ev_consumer(eauto: dict, eauto_milp: dict | None) -> dict:
         "battery_capacity_kwh": 17.0,
         "charging_schedule": sched,
     }
+    loxone_inputs = eauto.get("loxone_inputs")
+    if isinstance(loxone_inputs, dict) and loxone_inputs:
+        entry["loxone_inputs"] = dict(loxone_inputs)
+    loxone_outputs = eauto.get("loxone_outputs")
+    if isinstance(loxone_outputs, dict) and loxone_outputs:
+        entry["loxone_outputs"] = dict(loxone_outputs)
+    return entry
+
+
+def _ev_needs_milp_backfill(consumer: dict) -> bool:
+    if consumer.get("type") != "ev":
+        return False
+    setpoint = str((consumer.get("loxone_outputs") or {}).get("power_setpoint_name", "")).strip()
+    if not setpoint:
+        return False
+    milp = (consumer.get("charging_schedule") or {}).get("milp")
+    return not (isinstance(milp, dict) and milp)
+
+
+def backfill_ev_milp_in_profiles(
+    house_profiles: dict,
+    *,
+    profile_id: str = PROFILE_ID,
+    milp_defaults: dict | None = None,
+) -> tuple[dict, list[str]]:
+    """Add charging_schedule.milp to migrated EV rows missing it (1.95c gap)."""
+    profiles_out = deepcopy(house_profiles)
+    profiles = profiles_out.get("profiles", [])
+    patched_ids: list[str] = []
+    milp = dict(milp_defaults or DEFAULT_EV_MILP)
+
+    def _patch_consumers(consumers: list[dict]) -> None:
+        for consumer in consumers:
+            if not _ev_needs_milp_backfill(consumer):
+                continue
+            sched = dict(consumer.get("charging_schedule") or {})
+            sched["milp"] = dict(milp)
+            consumer["charging_schedule"] = sched
+            patched_ids.append(str(consumer.get("id", "ev")))
+
+    if isinstance(profiles, dict):
+        profile = profiles.get(profile_id)
+        if isinstance(profile, dict):
+            consumers = profile.setdefault("consumers", [])
+            _patch_consumers(consumers)
+    elif isinstance(profiles, list):
+        for profile in profiles:
+            if str(profile.get("id", "")).strip() != profile_id:
+                continue
+            consumers = profile.setdefault("consumers", [])
+            _patch_consumers(consumers)
+            break
+
+    return profiles_out, patched_ids
 
 
 def _build_swimspa_consumer(swimspa: dict) -> dict:
@@ -113,7 +174,8 @@ def _build_wp_consumer(waermepumpe: dict, wp_profile: dict | None) -> dict:
 def _generic_from_appliance(appliance: dict) -> dict:
     default_power = float(appliance.get("default_power_kw", 1.0))
     default_runtime = float(appliance.get("default_runtime_h", 1.0))
-    return {
+    power_source = str(appliance.get("power_source", "manual"))
+    consumer = {
         "id": str(appliance["id"]),
         "label": str(appliance.get("name", appliance["id"])),
         "type": "generic",
@@ -123,15 +185,19 @@ def _generic_from_appliance(appliance: dict) -> dict:
             "runs_per_week": 2,
             "duration_h": default_runtime,
             "start_hour": 12,
-            "start_shift_h": 4.0,
+            "start_shift_h": 6.0,
         },
+        "earnie_role": "manual",
         "appliance_recommendation": {
-            "power_source": str(appliance.get("power_source", "manual")),
-            "loxone_power_name": str(appliance.get("loxone_power_name", "")),
+            "power_source": power_source,
             "default_power_kw": default_power,
             "default_runtime_h": default_runtime,
         },
     }
+    loxone_name = str(appliance.get("loxone_power_name", "")).strip()
+    if loxone_name and power_source == "loxone":
+        consumer["loxone_inputs"] = {"power_name": loxone_name}
+    return consumer
 
 
 def _order_migrated_consumers(consumers: list[dict]) -> list[dict]:
@@ -251,13 +317,33 @@ def _render_migration_review(status_rows: list[dict]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Migrate NAS flex consumers to house profile.")
-    parser.add_argument("--config", type=Path, required=True)
+    parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--house-profiles", type=Path, required=True)
     parser.add_argument("--profile-id", default=PROFILE_ID)
     parser.add_argument("--migration-review", type=Path, default=None)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--backfill-ev-milp",
+        action="store_true",
+        help="Only add charging_schedule.milp to profile EV rows that have power_setpoint_name.",
+    )
     args = parser.parse_args()
 
+    if args.backfill_ev_milp:
+        profiles_doc = _load_json(args.house_profiles)
+        profiles_out, patched = backfill_ev_milp_in_profiles(
+            profiles_doc,
+            profile_id=args.profile_id,
+        )
+        if args.dry_run:
+            print(json.dumps({"patched": patched}, indent=2))
+            return
+        _write_json(args.house_profiles, profiles_out)
+        print(f"Backfilled charging_schedule.milp for: {patched or '(none)'}")
+        return
+
+    if not args.config:
+        parser.error("--config is required unless --backfill-ev-milp is set")
     config = _load_json(args.config)
     profiles_doc = _load_json(args.house_profiles)
     config_out, profiles_out, status = migrate_prod_consumers(

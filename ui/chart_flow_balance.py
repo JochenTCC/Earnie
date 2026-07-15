@@ -22,12 +22,13 @@ import pandas as pd
 import plotly.graph_objects as go
 
 import config
-from data.planning_window import UiChartZones, chart_zone_kind_for_slot_start
+from data.planning_window import UiChartZones, chart_zone_kind_for_slot_start, parse_chart_row_slot_datetime
 from optimizer import battery as bat
 from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN, PV_IST_COLUMN
 from optimizer.targets import (
     consumer_column_name,
     consumer_immediate_charge_column_name,
+    consumer_immediate_charge_hover_label,
     consumer_pv_follow_column_name,
 )
 
@@ -514,9 +515,13 @@ def flow_balance_plotly_trace_specs(
         row = df.iloc[index] if df is not None else None
         slot_start = None
         if row is not None and "slot_datetime" in row.index:
-            slot_start = row["slot_datetime"]
-            if hasattr(slot_start, "to_pydatetime"):
-                slot_start = slot_start.to_pydatetime()
+            slot_start = parse_chart_row_slot_datetime(row.to_dict())
+            if slot_start is None:
+                raw_slot = row["slot_datetime"]
+                if hasattr(raw_slot, "to_pydatetime"):
+                    slot_start = raw_slot.to_pydatetime()
+                elif isinstance(raw_slot, datetime):
+                    slot_start = raw_slot
         bar_width_ms = (
             axis.bar_width_ms(FLOW_BALANCE_BAR_WIDTH_FRACTION, index)
             if axis is not None
@@ -688,7 +693,8 @@ def _flex_hover_lines(
     if pv_follow_col in row:
         lines.append(f"pv_follow: {_safe_int_flag(row.get(pv_follow_col, 0))}")
     if immediate_col in row:
-        lines.append(f"sofort_laden: {_safe_int_flag(row.get(immediate_col, 0))}")
+        label = consumer_immediate_charge_hover_label(consumer)
+        lines.append(f"{label}: {_safe_int_flag(row.get(immediate_col, 0))}")
     if not lines and column in row:
         return ()
     return tuple(lines)
@@ -781,6 +787,7 @@ def _accumulate_slot_traces(
                 flex_meta = (
                     _safe_int_flag(row.get(pv_col, 0)) if pv_col in row else 0,
                     _safe_int_flag(row.get(imm_col, 0)) if imm_col in row else 0,
+                    consumer_immediate_charge_hover_label(consumer),
                 )
             if zone_kind is not None:
                 saturation = consumer_chart_saturation_for_zone(zone_kind)
@@ -860,6 +867,8 @@ def _append_stack_bucket(
         bucket["customdata"].append(
             (time_label, segment.kw, segment.label, flex_meta[0], flex_meta[1])
         )
+        if len(flex_meta) >= 3:
+            bucket["immediate_hover_label"] = flex_meta[2]
     else:
         bucket["customdata"].append((time_label, segment.kw, segment.label))
     bucket["pattern_shapes"].append(pattern_shape)
@@ -882,10 +891,11 @@ def _bucket_specs_to_trace_specs(
                 pattern_shapes,
                 _FLEX_BAR_OPACITY,
             )
+            imm_label = bucket.get("immediate_hover_label", "sofort_laden")
             hovertemplate = (
-                "Uhrzeit: %{customdata[0]}<br>%{customdata[2]}: "
-                "%{customdata[1]:.2f} kW<br>pv_follow: %{customdata[3]}<br>"
-                "sofort_laden: %{customdata[4]}<extra></extra>"
+                f"Uhrzeit: %{{customdata[0]}}<br>%{{customdata[2]}}: "
+                f"%{{customdata[1]:.2f}} kW<br>pv_follow: %{{customdata[3]}}<br>"
+                f"{imm_label}: %{{customdata[4]}}<extra></extra>"
             )
             legend_color = segment.color
         else:

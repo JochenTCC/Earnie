@@ -7,6 +7,7 @@ from typing import Any
 import streamlit as st
 
 import config
+from integrations import loxone_client
 from runtime_store.chart_debug_capture import read_zip_bytes, write_capture_zip
 from ui.charts import build_power_soc_chart_figure
 from ui.history_navigation import get_s2_cycle_offset, get_s2_segment_index
@@ -62,15 +63,18 @@ def render_chart_debug_capture_controls(
         return
 
     st.caption(
-        "Chart-Debug: Plot-Quelldaten als ZIP sichern (Konfiguration: "
-        "`ui.chart_debug_capture_enabled` in config.json)."
+        "Chart-Debug: Plot-Quelldaten als ZIP sichern "
+        "(config.json, `runtime/local_settings.json` oder `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED=1`)."
     )
     if st.button("Chart-Debug speichern", key="chart_debug_capture_btn"):
         try:
+            capture_live_power = live_power
+            if capture_live_power is None:
+                capture_live_power = loxone_client.fetch_loxone_live_power()
             zip_path = write_capture_zip(
                 bundle,
                 current_soc=current_soc,
-                live_power=live_power,
+                live_power=capture_live_power,
                 session_meta=_session_meta(),
                 chart1_plotly_json=_chart1_plotly_json(bundle),
             )

@@ -11,49 +11,50 @@ _MAX_SEC = optimization_schedule.APP_MAIN_SYNC_MAX_WAIT_SECONDS
 
 MAIN_PY_SYNC_HELP = (
     "**main.py** führt die Produktiv-Optimierung zu Viertelstunden-Takten aus "
-    "(:00 / :15 / :30 / :45).\n\n"
-    "Die App aktualisiert Chart und Simulation, sobald der Lauf für den "
-    "**aktuellen Slot** abgeschlossen ist (typisch wenige Sekunden). "
-    "Während des Wartens prüft die App in kurzen Abständen erneut. "
-    f"Spätestens nach **{_MAX_SEC} s** Fallback wird mit dem letzten Plan fortgefahren."
+    "(:00 / :15 / :30 / :45) und speichert den Anzeige-Snapshot für das Cockpit.\n\n"
+    "Die App zeigt diese Daten an, sobald der Lauf für den **aktuellen Slot** "
+    "abgeschlossen ist (typisch wenige Sekunden). Während des Wartens prüft die App "
+    "in kurzen Abständen erneut. "
+    f"Bis **{_MAX_SEC} s** wird der **letzte bekannte Plan** angezeigt — "
+    "ohne eigene Live-Simulation."
 )
 
 
 def main_py_sync_status_message(
     retry_sec: int,
-    fallback_sec: int,
+    sync_wait_sec: int,
     reason: str,
 ) -> str:
     _ = reason
-    fallback_hint = (
-        f" (Fallback mit Altplan nach **{fallback_sec} s**)"
-        if fallback_sec > 0
+    wait_hint = (
+        f" (zeigt letzten Plan bis Sync, max. **{sync_wait_sec} s**)"
+        if sync_wait_sec > 0
         else ""
     )
     return (
         f"⏳ **Warte auf main.py** für den aktuellen Viertelstunden-Slot. "
-        f"Nächster Abgleich **spätestens in {retry_sec} s**{fallback_hint}."
+        f"Nächster Abgleich **spätestens in {retry_sec} s**{wait_hint}."
     )
 
 
-def sync_footer_caption(retry_sec: int, fallback_sec: int) -> str:
-    if retry_sec <= 0 and fallback_sec <= 0:
+def sync_footer_caption(retry_sec: int, sync_wait_sec: int) -> str:
+    if retry_sec <= 0 and sync_wait_sec <= 0:
         return " · **App-Sync** bereit"
     parts: list[str] = []
     if retry_sec > 0:
         parts.append(f"Abgleich spätestens in `{retry_sec}` s")
-    if fallback_sec > 0:
-        parts.append(f"Fallback nach `{fallback_sec}` s")
+    if sync_wait_sec > 0:
+        parts.append(f"Wartefenster `{sync_wait_sec}` s")
     return " · **App-Sync:** " + " · ".join(parts)
 
 
 @st.fragment(run_every=MAIN_SYNC_POLL_RUN_EVERY)
 def poll_main_py_sync_if_pending() -> None:
-    """Leichtgewichtiger Abgleich mit run_state; voller Rerun bei Sync oder Fallback."""
+    """Leichtgewichtiger Abgleich mit run_state; voller Rerun bei Slot-Sync."""
     main_state = run_state.load_run_state()
     completed = (main_state or {}).get("completed_at")
     poll = main_sync_poll_interval_sec()
-    ready, _, _, _ = optimization_schedule.live_simulation_readiness(
+    ready, _, _, _, _ = optimization_schedule.live_simulation_readiness(
         completed,
         poll_sec=poll,
     )

@@ -3,6 +3,117 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### New features — Generic `earnie_role` (known / flex / manual) (2026-07-15)
+
+Plan [`.cursor/plans/earnie_consumer_roles_1dc94070.plan.md`](../.cursor/plans/earnie_consumer_roles_1dc94070.plan.md) — consolidates „Manuelles Gerät“, „known by Earnie“, and „controlled by Earnie (flex)“; supersedes the `start_shift_h=0` proxy ([Backlog-Erledigt.md](Backlog-Erledigt.md) § New features — fixed generic Grundlast in live optimization).
+
+- [x] **`earnie_role` on generic consumers** — `known` (default, Grundlast overlay) / `flex` (MILP shift window) / `manual` (Betrieb → Manuelle Geräte); schema + `house_config/profiles_store.py` normalization with legacy inference
+- [x] **Backend routing** — `house_config/earnie_role.py`, `split_planning_generic_consumers` by role; manual appliances excluded from MILP; `recommendation_horizon_h` on runtime appliance spec
+- [x] **Hauskonfigurator UI** — „Earnie-Berücksichtigung“ selectbox; Verschiebung (flex) vs Empfehlungshorizont (manual); `known` hides shift and persists `start_shift_h: 0`
+- [x] **Manuelle Geräte** — per-device recommendation horizon from Hausprofil (`ui/pages/page_devices.py`)
+- [x] **Migration & examples** — `scripts/migrate_flex_consumers.py` sets `earnie_role: manual`; `config/house_profiles.example.json` updated
+- [x] **Tests & docs** — `tests/test_earnie_role.py` and related updates; [`docs/konfiguration/flexible-verbraucher.md`](../docs/konfiguration/flexible-verbraucher.md), [`docs/spec/scenario-exploration-consumption.md`](../docs/spec/scenario-exploration-consumption.md)
+
+_Live verification: pending (Hauskonfigurator save on existing profiles to persist explicit roles)._
+
+
+### New features — Consumer roles follow-up (loxone_inputs + Manuelle Geräte) (2026-07-15)
+
+Plan [`.cursor/plans/consumer_roles_follow-up_08c02579.plan.md`](../.cursor/plans/consumer_roles_follow-up_08c02579.plan.md) — follow-up to Generic `earnie_role`.
+
+- [x] **Unified Loxone Leistungsquelle** — `loxone_inputs.power_name` for `earnie_role: known` and `manual`; legacy `appliance_recommendation.loxone_power_name` migrates on normalize; schema + `profiles_store` + `settings/appliances.py`
+- [x] **Hauskonfigurator** — shared Leistungsquelle UI for `known` and `manual`; marker stored in `loxone_inputs`
+- [x] **Manuelle Geräte read-only** — Nennleistung/Laufzeit from Hausprofil only; per-device Empfehlungshorizont; no save form on page
+- [x] **Examples & migration** — `house_profiles.example.json`, `migrate_flex_consumers.py`
+- [x] **Tests & docs** — `test_earnie_role.py`, `test_appliance_config.py`, `test_page_devices_display.py`; [`docs/konfiguration/flexible-verbraucher.md`](../docs/konfiguration/flexible-verbraucher.md), [`docs/spec/ui-menu-structure.md`](../docs/spec/ui-menu-structure.md)
+
+
+### New features — PV tuning removal + Simulations-Details columns (2026-07-15)
+
+- [x] **Remove adaptive PV tuning** — forecast vectors no longer scaled by `calculate_tuning_factor` (`data/pv_forecast.py`); optimization no longer aborts when PV counter delta unavailable (`main.py`); `pv_tuner.py` trimmed to counter delta only (Adaptation P2 replaces full path); UI already clean (`app.py`, UI S-2 P1)
+- [x] **Simulations-Details column rename** — non-EV immediate-charge columns `{name} Aktiv`; EV keeps `{name} sofort_laden` (`optimizer/targets.py`, `ui/simulation_results.py`, `ui/chart_flow_balance.py`); tests updated
+
+
+### Bugfix SoC BL Ziel matched baseline (silent stack) (2026-07-15)
+
+Plan [`.cursor/plans/soc_bl_ziel_debug_handoff_20260715.md`](../.cursor/plans/soc_bl_ziel_debug_handoff_20260715.md) — inflated SoC BL Ziel on earnie silent stack vs legacy reference.
+
+- [x] **Flex CSV export / regen** — export grouped by display label broke column lookup (`SwimSpa Filter`); regen via `profile_column_id()` / `runtime_consumer_id`; INFO `Profil-Check` / `Flex-Profile im Planungshorizont` (`data/profile_manager.py`; tests `tests/test_profile_manager_flex_export.py`, `tests/test_profile_manager_flex_bridge.py`)
+- [x] **ID bridge `ev` / `eauto`** — `expected_flex_kw` and live flex dicts normalized to canonical ids (`settings/flexible_consumers.py`; boundaries in `data/live_consumption.py`, `optimizer/charging_context.py`, `optimizer/charge_immediate.py`, `optimizer/__init__.py`, `data/consumer_targets.py`; tests `tests/test_flexible_consumers_bridge.py`, `tests/test_live_consumption.py`)
+- [x] **Matched baseline horizon targets** — config appliances with `daily_target_kwh=0` use profile-sum targets in BL Ziel (`resolve_matched_baseline_horizon_targets` in `optimizer/targets.py`; test `tests/test_matched_baseline.py::test_matched_baseline_uses_profile_targets_for_config_appliances`)
+- [x] **Cockpit reads main.py snapshot** — Chart 1 SoC BL Ziel from `matched_baseline_rows` in `live_optimization_debug.json` (no default UI Live-MILP); see [Backlog-Erledigt.md](Backlog-Erledigt.md) § Bugfix UI: Cockpit from main.py persistence (2026-07-15)
+- [x] **Silent-stack verification** — Wed noon BL Ziel model-consistent; Thu 13:00 **42%** with appliance profile (matched baseline); Simulation-Details table correctly shows optimized MILP (separate path) — caption follow-up → [Backlog.md](Backlog.md) New features
+
+_NAS earnie deploy + prod CSV regen: pending._
+
+
+### Bugfix Earnie Monitor S-2 chart navigation (2026-07-15)
+
+- [x] **SA₀→SA₁ → SA₁→SA₂ navigation showed stale charts** — snapshot display cache key omitted `cycle_offset` / `segment_index`; `_refresh_snapshot_bundle` skipped rebuild after **→**. Fix: include `s2:{cycle_offset}:{segment_index}` in `_snapshot_cache_key` (`ui/live_mode.py`); test `tests/test_live_mode_snapshot_cache.py`.
+
+_Live verification: pending (Earnie Monitor **→** / **←** between segments)._
+
+
+### Bugfix forecast.solar 429 Retry-At (2026-07-15)
+
+Plan [`.cursor/plans/forecast.solar_retry-at_72a2f487.plan.md`](../.cursor/plans/forecast.solar_retry-at_72a2f487.plan.md) — respect rate-limit retry timestamp; debug log in `main.py` (429 mitigation during debug runs).
+
+- [x] **Parse Retry-At on HTTP 429** — `X-Ratelimit-Retry-At` header or JSON `message.ratelimit.retry-at`; skip HTTP until timestamp passed (`data/pv_forecast.py`)
+- [x] **Fix `_LAST_API_CALL` only on 200** — failed/429 requests no longer block retries for 15 min
+- [x] **`get_api_status()`** — exposes `retry_at`, `source`, `cache_available`, `using_synthetic_fallback`
+- [x] **main.py debug log** — WARNING with next allowed API call when rate-limited or synthetic PV fallback active
+- [x] **Tests** — `tests/test_pv_forecast.py` (429 header/body, retry blocking, 15-min cache, `_LAST_API_CALL` regression)
+
+_Live verification: pending (trigger 429 during debug run, confirm log line `Nächster API-Aufruf erlaubt ab …`)._
+
+
+### Bugfix SoC BL Ziel segment before Jetzt (Chart 1) (2026-07-15)
+
+- [x] **Dotted baseline trace extended into quarter-hour before Jetzt** — matched-baseline SoC segment no longer drawn left of the Jetzt marker; anchor at log-SOC via `_anchor_baseline_soc_at_now` (`ui/chart_soc.py`); test `tests/test_charts_soc_tail.py::test_baseline_soc_has_no_points_before_now`.
+
+_Live verification: pending (Chart 1 Jetzt marker vs dotted SoC BL Ziel tail on silent stack / NAS)._
+
+
+### Bugfix EV FertigUm when fully charged (plugged in) (2026-07-15)
+
+- [x] **`fetch_loxone_charging_context` ignores FertigUm when charge complete** — plugged-in + `actual_soc_name` at target → `_loxone_plugged_in_complete_context()` (`optimizer/charging_context.py`); unplug re-reads FertigUm via absent forecast; tests `tests/test_charging_context.py::TestPluggedInChargeComplete`; docs [`docs/referenz/loxone-signale.md`](../docs/referenz/loxone-signale.md).
+
+_Live verification: pending (plugged-in full SOC on NAS; unplug → FertigUm forecast path)._
+
+
+### Bugfix UI: Cockpit from main.py persistence (2026-07-15)
+
+Plan [`.cursor/plans/ui_relies_on_main.py_a1f9f67e.plan.md`](../.cursor/plans/ui_relies_on_main.py_a1f9f67e.plan.md) — architecture revision: no default UI Live-MILP / forecast.solar (429 mitigation).
+
+- [x] **main.py writes display snapshot** — after `calculate_optimization_savings`, hour-0 overlay via `overlay_main_run_on_rows`, persist `live_optimization_debug.json` with `source: main.py`, `planning_matrix`, `planning_window` (`main.py`, `runtime_store/live_optimization_debug.py`)
+- [x] **UI reads persisted snapshot** — `runtime_store/live_display_loader.py`; `build_optimization_display_bundle_from_snapshot` in `ui/simulation_results.py`
+- [x] **Cockpit (`ui/live_mode.py`)** — snapshot by default; `wait_main` shows last plan; `main_down` + fresh snapshot (≤ 1 h) with notice; stale/missing → opt-in **Einmalige Simulation starten** only
+- [x] **Manuelle Geräte (`ui/pages/page_devices.py`)** — last-known `planning_matrix` from snapshot; no live matrix build
+- [x] **Sync semantics** — `live_simulation_readiness`: `main_synced` / `wait_main` / `main_down`; removed auto-`fallback` UI MILP (`optimizer/schedule.py`, `PERSISTED_DISPLAY_MAX_AGE_SECONDS = 3600`)
+- [x] **Help text** — `ui/main_py_sync.py`, `ui/countdown.py` (no “Fallback mit Altplan nach 30 s”)
+- [x] **Tests** — `tests/test_schedule.py`, `tests/test_live_display_loader.py`, `tests/test_main_py_sync_ui.py`, `tests/test_main_loxone_writes.py` (debug snapshot on run)
+- [x] **Docs** — [`docs/einrichtung/betrieb.md`](../docs/einrichtung/betrieb.md), [`docs/ui/betriebsmodi.md`](../docs/ui/betriebsmodi.md), [`docs/spec/ui-sunset2sunset.md`](../docs/spec/ui-sunset2sunset.md) v0.8.0, [`docs/spec/ui-menu-structure.md`](../docs/spec/ui-menu-structure.md) §6
+
+_Prod/live verification: pending (silent stack / NAS)._
+
+
+### Bugfix Hauskonfigurator Verschiebung 0.0 (2026-07-15)
+
+- [x] **Verschiebung (± h) showed 12 h when `start_shift_h` was 0.0** — `_schedule_defaults` treated `0.0` as falsy via `or 12.0`; only default to 12 when key is missing (`None`). Fix in `ui/house_config_profile_form.py`; test `tests/test_planning_editors.py::test_schedule_defaults_preserves_zero_start_shift_h`.
+
+
+### Bugfix EV MILP stripped on Hauskonfigurator save (2026-07-15)
+
+- [x] **MILP settings lost when editing EV consumers** — `_render_ev_fields` rebuilds `charging_schedule` from UI widgets only; `_merge_passthrough_consumer_fields` preserved `charging_schedule.loxone` but not `milp` → save dropped `live_modus_a_min_remaining_kwh` / tie-break epsilons; downstream `planning_ev_to_milp` abort (`charging_schedule.milp fehlt` when `power_setpoint_name` set). Fix: passthrough merge copies `charging_schedule.milp` like `loxone` (`ui/house_config_profile_form.py`); test `tests/test_house_config.py::test_house_profile_save_preserves_loxone_bindings`; silent-migration-test verified.
+
+
+### New features — fixed generic Grundlast in live optimization (2026-07-15)
+
+Superseded by **Generic `earnie_role`** ([Backlog-Erledigt.md](Backlog-Erledigt.md) § New features — Generic `earnie_role` (2026-07-15)).
+
+- [x] **Fixed-start generic → Grundlast (live)** — `type: generic` with `start_shift_h: 0` from `_house_profile` added to `expected_p_act` via `fixed_generic_hourly_overlay` even when root `flexible_consumers[]` is set; greenfield path unchanged (full `house_profile_baseload_overlay`); tests `tests/test_profile_manager_baseload_overlay.py`; user doc [`docs/konfiguration/flexible-verbraucher.md`](docs/konfiguration/flexible-verbraucher.md)
+
+
 ### Version 1.99 — File structure hygiene (2026-07-14)
 
 - [x] **Docker bundle** — `docker/` with `Dockerfile`, `entrypoint.sh`, `compose/{dev,synology,loxberry,greenfield}.yml`, `build-container.ps1`, `docker/README.md`; build context stays repo root; `.dockerignore` remains at root

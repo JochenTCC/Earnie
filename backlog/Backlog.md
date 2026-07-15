@@ -10,6 +10,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [ ] Adapt business plan
 - [ ] **Outreach (not software):** Ask for interested parties in loxforum / reddit — post under “my project”; take interesting chart snapshots (loxforum admins contacted re. best place)
+  - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
 
 
@@ -46,10 +47,19 @@ Suggested next steps (SE progress, diag tooling, 1.96d code, cutover runbook) �
 
 Silent-stack debug sessions (Hausconfig, Chart 1, `main.py` SwimSpa, config drift) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Silent-stack debug sessions (2026-07-14). Open regressions → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+**2026-07-15 session (uncommitted):** Generic `earnie_role` + consumer-roles follow-up → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Generic `earnie_role` + Consumer roles follow-up. UI architecture (Cockpit from `main.py` snapshot, matched-baseline SoC BL Ziel fixes, forecast.solar 429) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-15 sections). PV tuning removal + Simulations-Details columns → [Backlog-Erledigt.md](Backlog-Erledigt.md) § PV tuning removal. Live verification pending → [Backlog-Bugfixes.md](Backlog-Bugfixes.md) § Bugfix Verifications Pending.
+
+
+### New features
+
+- [ ] Make appropriate information accessible to user about where differences between optimized SOC and BL SOC Ziel come from to give him explanation (prove plausability)
+
+
 ### Version 1.99 — Live cutover (former P6b)
 
 - [ ] **P6b** — Non-silent NAS live cutover — Phase **1.99** in plan. **Prerequisite:** your sign-off after manual validation ([Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation); runbook [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md).
 - Loxone debug page → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.99 — Loxone debug UI (2026-07-14).
+
 
 ## Real Version 2.0 — legacy data model removed
 
@@ -69,12 +79,10 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 - [ ] Evaluate option for code coverage testing and identification of deprecated code / tests (especially due to substantial data model change) / obsolete patches because of legacy data model
 - [ ] Thorough code review and refactoring (with proper KPIs)
 - [ ] Search for deprecated and unnecessary files and remove them
+  - Code for migration from V 1.x to 2.0 is not needed anymore
 - [ ] Evaluate option for automated UI testing
-
 - [ ] **Documentation & evaluations** *(former 1.93 P7 / former backlog 1.99 docs)*
 
-  - Build additional container for Windows as pure Python environment (if that makes sense) — spike vs local venv; go/no-go note
-  - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
 
 
 ### Version 2.+1
@@ -96,15 +104,16 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 ### Version 2.+1
 
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
-  - Consumers can be marked as "controlled by Earnie" or just "known by Earnie"
-    - "controlled by Earnie": Earnie is controlling consumer either directly or as "Manuelle Geräte"
-    - "known by Earnie": Earnie knows about scheduled consumption and adds it to predicted "Grundlast" for optimization 
+- Consumer role model (`earnie_role`: known / flex / manual) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Generic `earnie_role` (2026-07-15); nested inner consumers remain open
+- [ ] Check if removing constraint for SOC at end of horizon changes simulation resulst in backtesting
+
 
 ### Version 2.+1
 
 - [ ] **Recommendation mode smart/adaptive devices** (follow-up to recommendation mode manual devices)
   - Adaptive re runtime/energy per run; smart devices instead of manual input
-  - Adaptation algo maintains `appliance_recommendation.default_power_kw` from Loxone power markers (`loxone_power_name`) on house-profile generics — reserved so far, no live use
+  - Adaptation algo maintains `appliance_recommendation.default_power_kw` from Loxone power markers (`loxone_inputs.power_name`) on house-profile generics — reserved so far, no live use
+  - Use Loxone power markers also for Sankey-Diagram for further differentation of defined consumers
   - Dishwasher power possibly via Hue
 
 
@@ -126,8 +135,8 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
 ### Version 2.+1
 
 - [ ] **Adaptation P2** — PV adaptation (new approach) — first pilot on Adaptation P1
-  - Replaces sidebar PV tuning (removed with UI Sunset-2-Sunset); see `runtime/pv_accuracy_log.csv`
-  - Replace or integrate old `pv_tuner` path into Adaptation P1
+  - Sidebar PV tuning removed (UI S-2 P1 + 2026-07-15 code path) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § PV tuning removal; see `runtime/pv_accuracy_log.csv`
+  - Replace or integrate old `pv_tuner` path into Adaptation P1 (`pv_tuner.py` counter delta only)
 
 
 

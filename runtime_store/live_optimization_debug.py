@@ -1,7 +1,8 @@
 """
-live_optimization_debug.py – Persistierter Debug-Snapshot der App-24h-Simulation.
+live_optimization_debug.py – Persistierter Debug-Snapshot der Live-Optimierung.
 
-Nur app.py schreibt; manuelle Analyse kann die JSON-Datei lesen.
+main.py schreibt den Produktiv-Snapshot; app.py liest ihn für Cockpit und
+Manuelle Geräte. Opt-in UI-Simulation kann optional mit source=app.py überschreiben.
 """
 from __future__ import annotations
 
@@ -121,6 +122,22 @@ def _json_safe(obj: Any) -> Any:
     return obj
 
 
+def load_debug_snapshot(*, kind: str = "live", path: str | None = None) -> dict[str, Any] | None:
+    """Letzten Debug-Snapshot laden; None wenn Datei fehlt oder ungültig."""
+    targets = [path] if path else _candidate_paths(kind)
+    for target in targets:
+        if not os.path.isfile(target):
+            continue
+        try:
+            with open(target, encoding="utf-8") as handle:
+                data = json.load(handle)
+            if isinstance(data, dict):
+                return data
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("live_optimization_debug: Lesen von %s fehlgeschlagen: %s", target, exc)
+    return None
+
+
 def build_debug_payload(
     savings_info: dict[str, Any],
     optimized_rows: list[dict],
@@ -135,12 +152,15 @@ def build_debug_payload(
     target_date: str | None = None,
     historical_meta: dict[str, Any] | None = None,
     matched_baseline_rows: list[dict] | None = None,
+    source: str = "app.py",
+    planning_matrix: list[dict] | None = None,
+    planning_window: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Gemeinsamer Snapshot für Debug und Nachrechnen."""
     main_summary = _main_run_summary(main_state)
     payload: dict[str, Any] = {
         "completed_at": datetime.now().isoformat(timespec="seconds"),
-        "source": "app.py",
+        "source": source,
         "simulation_kind": kind,
         "initial_soc_percent": round(float(initial_soc), 2),
         "savings": _savings_summary(savings_info),
@@ -156,6 +176,10 @@ def build_debug_payload(
         payload["simulation_rows_raw"] = optimized_rows_raw or optimized_rows
         payload["main_run"] = main_summary
         payload["main_run_completed_at"] = main_summary.get("completed_at")
+        if planning_matrix is not None:
+            payload["planning_matrix"] = planning_matrix
+        if planning_window is not None:
+            payload["planning_window"] = planning_window
     else:
         payload["target_date"] = target_date
         payload["historical_meta"] = historical_meta or {}

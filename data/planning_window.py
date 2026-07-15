@@ -99,6 +99,42 @@ def normalize_hour_slot(moment: datetime) -> datetime:
     return moment.replace(minute=0, second=0, microsecond=0)
 
 
+def parse_row_slot_datetime(row: dict) -> datetime | None:
+    """slot_datetime aus Chart-/Matrix-Zeile (datetime, ISO-String oder Timestamp)."""
+    parsed = _parse_row_slot_datetime_raw(row)
+    if parsed is None:
+        return None
+    import config
+
+    return normalize_planning_hour_slot(parsed, config.get_planning_timezone())
+
+
+def parse_chart_row_slot_datetime(row: dict) -> datetime | None:
+    """Quarter-hour slot_datetime for Chart-1 rows (timezone-aligned, sub-hour preserved)."""
+    parsed = _parse_row_slot_datetime_raw(row)
+    if parsed is None:
+        return None
+    import config
+
+    return align_to_planning_timezone(parsed, config.get_planning_timezone())
+
+
+def _parse_row_slot_datetime_raw(row: dict) -> datetime | None:
+    slot = row.get("slot_datetime")
+    if slot is None:
+        return None
+    if isinstance(slot, datetime):
+        return slot
+    if isinstance(slot, str):
+        try:
+            return datetime.fromisoformat(slot)
+        except ValueError:
+            return None
+    if hasattr(slot, "to_pydatetime"):
+        return slot.to_pydatetime()
+    return None
+
+
 def align_to_planning_timezone(moment: datetime, timezone_name: str) -> datetime:
     """Naive lokale Zeit → timezone-aware; aware → Planungszeitzone."""
     tz = _require_tz(timezone_name)
@@ -393,10 +429,7 @@ def slot_index_at_or_before(slots: tuple[datetime, ...], moment: datetime) -> in
 
 
 def _row_slot_datetime(row: dict) -> datetime | None:
-    slot = row.get("slot_datetime")
-    if isinstance(slot, datetime):
-        return normalize_hour_slot(slot)
-    return None
+    return parse_row_slot_datetime(row)
 
 
 def first_extrapolated_slot(

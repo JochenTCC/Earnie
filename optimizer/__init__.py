@@ -11,6 +11,7 @@ import json
 import os
 
 import config
+from settings.flexible_consumers import flex_kw_lookup
 from . import schedule
 from .charge_immediate import (
     apply_immediate_charge_to_matrix,
@@ -259,7 +260,7 @@ def get_consumer_remaining_kwh(
             already = 0.0
         elif is_charging_session_context(consumer, ctx):
             booked = session_delivered_kwh(sessions, cid)
-            live_kw = (live_flex_kw or {}).get(cid)
+            live_kw = flex_kw_lookup(live_flex_kw, consumer)
             session = sessions.get(cid)
             already, note = assess_session_delivery(
                 consumer,
@@ -322,7 +323,7 @@ def register_consumer_delivery(
     for consumer in active:
         cid = consumer["id"]
         planned_kw = float(consumer_powers.get(cid, 0.0) or 0.0)
-        live_kw = (live_flex_kw or {}).get(cid)
+        live_kw = flex_kw_lookup(live_flex_kw, consumer)
         sent_kw = (sent_flex_kw or {}).get(cid)
         ctx = (charging_contexts or {}).get(cid)
         power_kw = booking_power_kw(

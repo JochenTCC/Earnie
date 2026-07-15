@@ -9,7 +9,9 @@ from optimizer.appliance_recommendation import recommend_start_times
 from ui.chart_colors import COLOR_COST_SAVINGS, COLOR_COST_SAVINGS_NEGATIVE
 from ui.pages.page_devices import (
     _DELTA_COLUMN,
-    _appliance_inputs_disabled,
+    _appliance_loxone_power_name,
+    _appliance_power_kw,
+    _appliance_runtime_h,
     _delta_cell_color,
     _delta_to_best_eur,
     _recommendation_dataframe,
@@ -47,16 +49,20 @@ def test_delta_column_label_is_compact() -> None:
     assert _DELTA_COLUMN == "Delta"
 
 
-@pytest.mark.parametrize(
-    ("active", "expected"),
-    [
-        (None, False),
-        ({}, True),
-        ({"power_kw": 2.0}, True),
-    ],
-)
-def test_appliance_inputs_disabled(active, expected: bool) -> None:
-    assert _appliance_inputs_disabled(active) is expected
+def test_appliance_power_runtime_helpers() -> None:
+    appliance = {
+        "default_power_kw": 2.0,
+        "default_runtime_h": 1.5,
+        "loxone_inputs": {"power_name": "Leistung Waschmaschine"},
+    }
+    assert _appliance_power_kw(appliance) == pytest.approx(2.0)
+    assert _appliance_runtime_h(appliance) == pytest.approx(1.5)
+    assert _appliance_loxone_power_name(appliance) == "Leistung Waschmaschine"
+
+
+def test_appliance_loxone_power_name_legacy_fallback() -> None:
+    appliance = {"loxone_power_name": "Legacy Merker"}
+    assert _appliance_loxone_power_name(appliance) == "Legacy Merker"
 
 
 def test_recommendation_dataframe_delta_to_best() -> None:

@@ -1,9 +1,10 @@
 """Zielenergie-Auflösung und UI-Detail-Builder für flexible Verbraucher."""
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import date, datetime, time
 
 import config
+from settings.flexible_consumers import flex_kw_lookup
 from .charging_context import (
     apply_horizon_charging_limits,
     resolve_charging_contexts,
@@ -19,7 +20,20 @@ def consumer_pv_follow_column_name(consumer: dict) -> str:
 
 
 def consumer_immediate_charge_column_name(consumer: dict) -> str:
-    return f"{consumer['name']} sofort_laden"
+    if _consumer_is_ev(consumer):
+        return f"{consumer['name']} sofort_laden"
+    return f"{consumer['name']} Aktiv"
+
+
+def consumer_immediate_charge_hover_label(consumer: dict) -> str:
+    return "sofort_laden" if _consumer_is_ev(consumer) else "Aktiv"
+
+
+def _consumer_is_ev(consumer: dict) -> bool:
+    if consumer.get("type") == "ev":
+        return True
+    sched = consumer.get("charging_schedule")
+    return bool(sched and sched.get("enabled"))
 
 
 def min_delivery_kwh(consumer: dict) -> float:
@@ -92,6 +106,42 @@ def resolve_daily_target_kwh(
     return float(resolved.get(cid, consumer.get("daily_target_kwh", 0.0)))
 
 
+def resolve_thermal_annual_horizon_kwh(
+    consumer: dict,
+    optimization_matrix: list | None,
+) -> float:
+    """Summe der HDD-Tagesziele über alle Kalendertage im Planungshorizont."""
+    if not optimization_matrix:
+        return 0.0
+    profile = config.get_resolved_runtime_settings().get("_house_profile")
+    if not profile:
+        return 0.0
+    from house_config.planning_flex_bridge import _house_thermal_consumers
+    from optimizer.thermal_flex_context import thermal_daily_kwh_for_date
+
+    thermal_by_id = {
+        str(item["id"]): item for item in _house_thermal_consumers(profile)
+    }
+    source = thermal_by_id.get(str(consumer["id"]))
+    if not source:
+        return 0.0
+    total = 0.0
+    dates = sorted(
+        {
+            row.get("date")
+            for row in optimization_matrix
+            if row.get("date") is not None
+        }
+    )
+    for day in dates:
+        if not isinstance(day, date):
+            continue
+        kwh = thermal_daily_kwh_for_date(source, profile, day)
+        if kwh > 0.0:
+            total += kwh
+    return float(total)
+
+
 def resolve_horizon_target_kwh(
     consumer: dict,
     consumer_daily_targets_kwh: dict | None,
@@ -99,7 +149,16 @@ def resolve_horizon_target_kwh(
     logged_targets_only: bool = False,
     ref_datetime: datetime | None = None,
     horizon_flex_kwh: float | None = None,
+    optimization_matrix: list | None = None,
 ) -> float:
+    source = consumer.get("daily_target_source", "config")
+    if source == "thermal" and not logged_targets_only:
+        from optimizer.thermal_targets import resolve_thermal_daily_target_kwh
+
+        horizon = max(1, len(optimization_matrix or []))
+        return float(resolve_thermal_daily_target_kwh(consumer, horizon=horizon))
+    if source == "thermal_annual" and not logged_targets_only:
+        return resolve_thermal_annual_horizon_kwh(consumer, optimization_matrix)
     return resolve_daily_target_kwh(
         consumer,
         consumer_daily_targets_kwh,
@@ -168,11 +227,49 @@ def resolve_horizon_consumer_targets_kwh(
                     if horizon_flex_targets is not None
                     else None
                 ),
+                optimization_matrix=optimization_matrix,
             ),
             3,
         )
         for c in consumers_cfg
     }
+
+
+def resolve_matched_baseline_horizon_targets(
+    optimization_matrix: list,
+    consumer_daily_targets_kwh: dict | None = None,
+    charging_contexts: dict[str, dict] | None = None,
+) -> dict[str, float]:
+    """
+    Horizont-Ziele für BL-Ziel-Simulation.
+
+    Verbraucher mit daily_target_source=config und daily_target_kwh=0, aber
+    Profil-Energie im Horizont, erhalten die Profil-Summe als Ziel — sonst
+    fehlt Flex-Konkurrenz in der Batterie-Simulation (inflated SoC BL Ziel).
+    EV/Ladeplan und explizite Config-Ziele bleiben unverändert.
+    """
+    from data import consumer_targets
+
+    targets = resolve_horizon_consumer_targets_kwh(
+        optimization_matrix,
+        consumer_daily_targets_kwh,
+    )
+    contexts = charging_contexts or {}
+    targets = apply_horizon_charging_limits(targets, contexts)
+    profile_totals = consumer_targets.resolve_horizon_flex_targets_kwh(
+        optimization_matrix
+    )
+    for consumer in config.get_flexible_consumers(optimizer_only=True):
+        cid = consumer["id"]
+        if (consumer.get("charging_schedule") or {}).get("enabled"):
+            continue
+        if consumer.get("daily_target_source", "config") != "config":
+            continue
+        explicit = float(consumer.get("daily_target_kwh", 0.0) or 0.0)
+        profile_total = float(profile_totals.get(cid, 0.0) or 0.0)
+        if explicit <= 0 and profile_total > 0 and float(targets.get(cid, 0.0) or 0.0) <= 0:
+            targets[cid] = round(profile_total, 3)
+    return targets
 
 
 def resolve_applied_daily_targets(
@@ -261,8 +358,8 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
     flex_sums = {consumer["id"]: 0.0 for consumer in consumers}
     for row in optimization_matrix:
         flex = row.get("expected_flex_kw") or {}
-        for cid in flex_sums:
-            flex_sums[cid] += float(flex.get(cid, 0.0) or 0.0)
+        for consumer in consumers:
+            flex_sums[consumer["id"]] += flex_kw_lookup(flex, consumer)
     has_profile_flex = any(v > 0 for v in flex_sums.values())
     source = (
         "Verbrauchsprofil (flexible_consumer_profiles.csv)"

@@ -66,9 +66,11 @@ def test_consumer_bar_pattern_shapes_immediate_charge_uses_karo():
     assert shapes == ["+", "+", ""]
 
 
-def test_chart_has_immediate_charge_bars():
+def test_chart_has_immediate_charge_bars(monkeypatch):
     from ui.charts import _chart_has_immediate_charge_bars
 
+    ev = {"name": "E-Auto", "type": "ev", "id": "eauto"}
+    monkeypatch.setattr("ui.chart_consumer_stack._chart_flex_consumers", lambda **_: [ev])
     df = pd.DataFrame({
         "E-Auto (kW)": [3.5, 0.0],
         "E-Auto sofort_laden": [1, 0],
@@ -388,6 +390,60 @@ def test_battery_bar_times_nudged_past_slot_center():
     nudged = axis.at(0, 0.5 + 0.05).iloc[0]
     assert bar_x == nudged
     assert bar_x > center
+
+
+def test_baseline_soc_extrap_segment_has_no_jetzt_shortcut():
+    """Later SoC BL Ziel segments must not re-anchor at Jetzt (no diagonal shortcut)."""
+    import plotly.graph_objects as go
+
+    now = datetime(2026, 7, 15, 12, 15, tzinfo=_TZ)
+    slots = [
+        datetime(2026, 7, 15, hour, 0, tzinfo=_TZ) for hour in range(6, 24)
+    ]
+    slots += [
+        datetime(2026, 7, 16, hour, 0, tzinfo=_TZ) for hour in range(0, 7)
+    ]
+    extrap_start = len(slots) - 8
+    soc_values = [
+        20.0 + (index % 10) * 8.0 for index in range(len(slots))
+    ]
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": soc_values,
+        "Geplante Batterie-Aktion (kW)": [0.0] * len(slots),
+        "Preis extrapoliert": [
+            index >= extrap_start for index in range(len(slots))
+        ],
+    })
+    axis = ChartSlotAxis.from_dataframe(df)
+    history_slot_count = 4
+    soc_at_now = 40.0
+    fig = go.Figure()
+    add_baseline_soc_traces(
+        fig,
+        df,
+        extrap_start=extrap_start,
+        extrap_end=len(slots),
+        history_slot_count=history_slot_count,
+        chart_now=now,
+        soc_at_now=soc_at_now,
+    )
+    bl_traces = [trace for trace in fig.data if trace.name == "SoC BL Ziel"]
+    assert len(bl_traces) >= 2
+    for trace in bl_traces[1:]:
+        xs = [
+            pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ)
+            for x in trace.x
+        ]
+        assert now not in xs, (
+            "extrapolation segment must not include Jetzt anchor"
+        )
+        if len(xs) >= 2:
+            gap_hours = (xs[1] - xs[0]).total_seconds() / 3600.0
+            assert gap_hours <= 1.5, (
+                "segment must not jump from Jetzt to distant slot"
+            )
 
 
 def test_cost_summary_annotations_include_totals_and_savings_sign():

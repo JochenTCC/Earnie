@@ -10,7 +10,7 @@ import pandas as pd
 import config
 from data.planning_window import ui_chart_zones
 from optimizer.deviation_eval import DeviationEvent
-from optimizer.targets import consumer_column_name
+from optimizer.targets import consumer_column_name, consumer_immediate_charge_column_name
 from runtime_store import live_optimization_debug
 from runtime_store import optimization_history
 from runtime_store.history_timeline import (
@@ -121,11 +121,12 @@ def build_optimization_display_bundle(
                     chart_context.chart_window,
                 )
             )
-    elif chart_context is not None and optimization_matrix is not None:
+    elif chart_context is not None:
         merge_active = True
+        matrix_rows = optimization_matrix or []
         savings_view = savings_view_for_chart(
             savings_info,
-            optimization_matrix,
+            matrix_rows,
             chart_context.chart_window,
         )
         display_ctx = build_chart_display_context(
@@ -150,7 +151,7 @@ def build_optimization_display_bundle(
         savings_view = build_display_savings_series(
             display_ctx,
             savings_view,
-            optimization_matrix,
+            matrix_rows,
             chart_context.chart_window,
             savings_info=savings_info,
         )
@@ -218,6 +219,51 @@ def build_optimization_display_bundle(
         optimization_matrix=optimization_matrix,
         battery_params=battery_params,
         flex_consumers=flex_consumers,
+    )
+
+
+def build_optimization_display_bundle_from_snapshot(
+    snapshot: dict,
+    *,
+    cycle_offset: int,
+    segment_index: int,
+    now=None,
+    simulation_table_title: str | None = "📋 Simulations-Details (Nächste 24 Stunden)",
+) -> OptimizationDisplayBundle | None:
+    """Display-Bundle aus main.py-Persistenz ohne MILP-Neuberechnung."""
+    from runtime_store.live_display_loader import (
+        planning_matrix_from_snapshot,
+        planning_window_from_snapshot,
+        savings_info_from_snapshot,
+    )
+    from ui.chart_context import build_live_chart_context, live_now
+
+    savings_info = savings_info_from_snapshot(snapshot)
+    optimized_rows = savings_info.get("optimized_rows") or []
+    if not optimized_rows:
+        return None
+    optimized_df = pd.DataFrame(optimized_rows)
+    baseline_df = pd.DataFrame(savings_info.get("baseline_rows") or [])
+    matched_rows = savings_info.get("matched_baseline_rows") or []
+    matched_baseline_df = pd.DataFrame(matched_rows) if matched_rows else None
+    optimization_matrix = planning_matrix_from_snapshot(snapshot) or None
+    planning_window = planning_window_from_snapshot(snapshot)
+    moment = now if now is not None else live_now()
+    chart_context = build_live_chart_context(
+        cycle_offset,
+        segment_index,
+        now=moment,
+        planning_window=planning_window,
+        sim_rows=optimized_rows,
+    )
+    return build_optimization_display_bundle(
+        savings_info,
+        optimized_df,
+        baseline_df,
+        matched_baseline_df,
+        simulation_table_title=simulation_table_title,
+        chart_context=chart_context,
+        optimization_matrix=optimization_matrix,
     )
 
 
@@ -366,7 +412,7 @@ def _simulation_table_column_order(columns: list[str]) -> list[str]:
         power_col = consumer_column_name(consumer)
         if power_col in columns:
             flex_kw.append(power_col)
-        imm_col = f"{consumer['name']} sofort_laden"
+        imm_col = consumer_immediate_charge_column_name(consumer)
         if imm_col in columns:
             immediate.append(imm_col)
         pv_col = f"{consumer['name']} pv_follow"
