@@ -274,6 +274,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
             spec["max_on_quarterhours"] = max(4, int(raw.get("max_on_quarterhours", 16) or 16))
         if "max_pulses_per_day" in raw:
             spec["max_pulses_per_day"] = max(1, int(raw.get("max_pulses_per_day", 4) or 4))
+        _copy_loxone_binding(raw, spec)
     elif consumer_type == "thermal_rc":
         spec["thermal_rc"] = _normalize_thermal_rc(raw, index, profile_id)
         min_on = raw.get("min_on_quarterhours")
@@ -462,6 +463,12 @@ def _serialize_consumer(consumer: dict) -> dict:
         thermal.pop("latitude", None)
         thermal.pop("longitude", None)
         out.update(thermal)
+        if consumer.get("loxone_inputs"):
+            out["loxone_inputs"] = dict(consumer["loxone_inputs"])
+        if consumer.get("loxone_outputs"):
+            out["loxone_outputs"] = dict(consumer["loxone_outputs"])
+        if consumer.get("legacy_id"):
+            out["legacy_id"] = consumer["legacy_id"]
     elif consumer["type"] == "thermal_rc":
         rc = consumer.get("thermal_rc")
         if isinstance(rc, dict):

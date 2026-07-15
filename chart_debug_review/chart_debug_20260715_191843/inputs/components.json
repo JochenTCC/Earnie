@@ -1,0 +1,30 @@
+{
+    "$schema": "./components.schema.json",
+    "batteries": [
+        {
+            "id": "5_0_kwh_speicher",
+            "label": "Hausbatterie 5 kWh (Prod)",
+            "battery_capacity_kwh": 5.0,
+            "battery_max_power_kw": 2.5,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05,
+            "battery_wear": {
+                "enabled": true,
+                "replacement_cost_euro": 1500,
+                "expected_cycles": 6000,
+                "cycle_cost_fraction": 0.5
+            }
+        }
+    ],
+    "pv_systems": [
+        {
+            "id": "dach_sued",
+            "label": "Dach Süd",
+            "kwp": 6.0,
+            "pv_tilt": 18.0,
+            "pv_azimuth": 26.0
+        }
+    ]
+}

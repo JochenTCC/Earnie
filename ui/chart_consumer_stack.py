@@ -66,6 +66,24 @@ def _recommendation_appliances(flex_consumers: list[dict]) -> list[dict]:
     return [appliance for appliance in config.get_appliances() if appliance["id"] not in flex_ids]
 
 
+def _chart_known_generics(flex_consumers: list[dict] | None = None) -> list[dict]:
+    """House-profile known generics as Chart-1 stack entries (not MILP flex)."""
+    from house_config.known_chart_display import chart_known_generics
+    from house_config.planning_flex_bridge import _used_chart_color_indices
+
+    flex = flex_consumers if flex_consumers is not None else _chart_flex_consumers()
+    used = _used_chart_color_indices(flex)
+    for appliance in _recommendation_appliances(flex):
+        raw = appliance.get("chart_color_index")
+        if raw is None:
+            continue
+        try:
+            used.add(int(raw))
+        except (TypeError, ValueError):
+            continue
+    return chart_known_generics(used_color_indices=used)
+
+
 def _chart_flex_consumers(*, optimizer_only: bool = True) -> list[dict]:
     """Resolved flex list (config + house-profile planning merge)."""
     override = _CHART_FLEX_OVERRIDE.get()
@@ -220,6 +238,11 @@ def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((appliance_as_chart_consumer(appliance), col))
             known_columns.add(col)
+    for consumer in _chart_known_generics(flex_consumers):
+        col = consumer_column_name(consumer)
+        if col in df.columns and df[col].fillna(0.0).sum() > 0:
+            active.append((consumer, col))
+            known_columns.add(col)
     for consumer, col in _discovered_flex_columns(df, known_columns, flex_consumers):
         active.append((consumer, col))
     return active
@@ -275,6 +298,32 @@ def clear_consumer_stack_order_cache() -> None:
     _STACK_ORDER_BY_SA0.clear()
 
 
+def _known_energy_from_df(
+    df: pd.DataFrame,
+    chart_window: UiChartWindow | None,
+    known_consumers: list[dict],
+) -> dict[str, float]:
+    """Sum known chart columns from the (already peeled) display DataFrame."""
+    energy = {consumer["id"]: 0.0 for consumer in known_consumers}
+    if not known_consumers or df is None or df.empty:
+        return energy
+    horizon_start = horizon_end = None
+    if chart_window is not None:
+        horizon_start = normalize_hour_slot(chart_window.sa0)
+        horizon_end = normalize_hour_slot(chart_window.sa2)
+    for _, row in df.iterrows():
+        slot = row.get("slot_datetime")
+        if isinstance(slot, datetime) and horizon_start is not None:
+            slot = normalize_hour_slot(slot)
+            if not (horizon_start <= slot <= horizon_end):
+                continue
+        for consumer in known_consumers:
+            col = consumer_column_name(consumer)
+            if col in df.columns:
+                energy[consumer["id"]] += float(row.get(col, 0.0) or 0.0)
+    return energy
+
+
 def _consumer_horizon_energy_kwh(
     matrix: list[dict] | None,
     chart_window: UiChartWindow | None,
@@ -282,9 +331,12 @@ def _consumer_horizon_energy_kwh(
 ) -> dict[str, float]:
     """Geplante Flex-Energie (kWh) je Verbraucher über SA₀…SA₂."""
     consumers = _chart_flex_consumers()
+    known_consumers = _chart_known_generics(consumers)
     energy = {consumer["id"]: 0.0 for consumer in consumers}
     for appliance in _recommendation_appliances(consumers):
         energy[appliance["id"]] = 0.0
+    for consumer in known_consumers:
+        energy[consumer["id"]] = 0.0
     if matrix and chart_window is not None:
         horizon_start = normalize_hour_slot(chart_window.sa0)
         horizon_end = normalize_hour_slot(chart_window.sa2)
@@ -301,6 +353,10 @@ def _consumer_horizon_energy_kwh(
         appliance_energy = _appliance_horizon_energy_kwh(matrix, chart_window, df)
         for appliance_id, kwh in appliance_energy.items():
             energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
+        for consumer_id, kwh in _known_energy_from_df(
+            df, chart_window, known_consumers
+        ).items():
+            energy[consumer_id] = kwh
         return energy
     if chart_window is not None:
         horizon_start = normalize_hour_slot(chart_window.sa0)
@@ -318,6 +374,10 @@ def _consumer_horizon_energy_kwh(
         appliance_energy = _appliance_horizon_energy_kwh(None, chart_window, df)
         for appliance_id, kwh in appliance_energy.items():
             energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
+        for consumer_id, kwh in _known_energy_from_df(
+            df, chart_window, known_consumers
+        ).items():
+            energy[consumer_id] = kwh
         return energy
     for consumer in consumers:
         col = consumer_column_name(consumer)
@@ -326,6 +386,10 @@ def _consumer_horizon_energy_kwh(
     appliance_energy = _appliance_horizon_energy_kwh(matrix, chart_window, df)
     for appliance_id, kwh in appliance_energy.items():
         energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
+    for consumer_id, kwh in _known_energy_from_df(
+        df, chart_window, known_consumers
+    ).items():
+        energy[consumer_id] = kwh
     return energy
 
 
@@ -341,12 +405,14 @@ def _consumer_stack_order_ids(
 ) -> tuple[str, ...]:
     if cache_key in _STACK_ORDER_BY_SA0:
         return _STACK_ORDER_BY_SA0[cache_key]
+    flex = _chart_flex_consumers()
     stack_entries = [
-        *_chart_flex_consumers(),
+        *flex,
         *(
             appliance_as_chart_consumer(appliance)
-            for appliance in _recommendation_appliances(_chart_flex_consumers())
+            for appliance in _recommendation_appliances(flex)
         ),
+        *_chart_known_generics(flex),
     ]
     ordered = sorted(
         stack_entries,

@@ -1,0 +1,212 @@
+{
+    "profiles": [
+        {
+            "id": "example_efh",
+            "label": "Schützenstraße 7c",
+            "annual_kwh": 11000.0,
+            "total_profile_csv": "config/uploads/example_efh_schuetzenstrasse_7c_verbrauch_jahresmittel.csv",
+            "consumers": [
+                {
+                    "id": "wp_heating",
+                    "legacy_id": "waermepumpe",
+                    "label": "Wärmepumpe",
+                    "type": "thermal_annual",
+                    "nominal_power_kw": 1.6,
+                    "living_area_m2": 157.0,
+                    "building_class": 2,
+                    "heat_pump_type": "erde",
+                    "persons": 2,
+                    "target_temp_c": 21.5,
+                    "heating_limit_c": 15.0,
+                    "solar_thermal_area_m2": 6.0,
+                    "solar_thermal_tilt_deg": 18.0,
+                    "solar_thermal_azimuth_deg": 26.0,
+                    "hwb_kwh_m2": 40.0,
+                    "loxone_inputs": {
+                        "power_name": "Ernie_WP_P_act"
+                    },
+                    "loxone_outputs": {
+                        "enable_name": "Ernie_WP_Freigabe"
+                    }
+                },
+                {
+                    "id": "ev",
+                    "label": "Smart",
+                    "type": "ev",
+                    "nominal_power_kw": 3.5,
+                    "min_power_kw": 1.4,
+                    "min_on_quarterhours": 1,
+                    "battery_capacity_kwh": 17.0,
+                    "charging_schedule": {
+                        "target_soc_percent": 100.0,
+                        "charging_efficiency": 0.96,
+                        "forecast_when_absent": true,
+                        "weekday": {
+                            "car_available_from_hour": 18,
+                            "ready_by_hour": 7,
+                            "daily_rest_soc": 30.0
+                        },
+                        "weekend": {
+                            "car_available_from_hour": 20,
+                            "ready_by_hour": 12,
+                            "daily_rest_soc": 50.0
+                        },
+                        "nominal_power_voltage_v": 220.0,
+                        "nominal_power_phases": 1,
+                        "milp": {
+                            "live_modus_a_min_remaining_kwh": 2.8,
+                            "tie_break_on_epsilon": 0.001,
+                            "tie_break_time_epsilon": 0.0001
+                        },
+                        "loxone": {
+                            "plugged_in_name": "Ernie_EAuto_Da",
+                            "ready_by_time_name": "Ernie_EAuto_FertigUm",
+                            "soc_at_plug_in_name": "Rest-SOC",
+                            "actual_soc_name": "Ernie-SOC-Ist-EAuto",
+                            "charge_immediate_name": "E-Auto_SOFORT_LADEN",
+                            "charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen",
+                            "battery_capacity_kwh_name": "Batteriekapazität_E-Auto",
+                            "nominal_power_kw_name": "Ladestrom Max EAuto"
+                        }
+                    },
+                    "loxone_inputs": {
+                        "power_name": "Ernie_EAuto_P_act"
+                    },
+                    "loxone_outputs": {
+                        "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
+                        "pv_follow_name": "Ernie_EAuto_pv_follow"
+                    },
+                    "legacy_id": "eauto"
+                },
+                {
+                    "id": "swimspa",
+                    "label": "SwimSpa",
+                    "type": "thermal_rc",
+                    "nominal_power_kw": 2.8,
+                    "thermal_rc": {
+                        "water_volume_liters": 5900.0,
+                        "setpoint_c": 35.0,
+                        "tolerance_c": 1.0,
+                        "heat_loss_kw_per_k": 0.021,
+                        "heating_efficiency": 0.99,
+                        "latitude": 47.404,
+                        "longitude": 9.743,
+                        "timezone_name": "Europe/Vienna"
+                    },
+                    "min_on_quarterhours": 8,
+                    "loxone_inputs": {
+                        "power_name": "Ernie_Swim-Spa-P_act",
+                        "subtract_consumer_ids": [
+                            "swimspa_filter"
+                        ]
+                    },
+                    "loxone_outputs": {
+                        "enable_name": "Ernie_SwimSpa_Freigabe"
+                    },
+                    "thermal_control": {
+                        "loxone": {
+                            "actual_temp_name": "homie_bwa_spa_currenttemperature",
+                            "setpoint_temp_name": "SwimSpa_Temp_Soll",
+                            "ambient_temp_name": "Außentemperatur",
+                            "tolerance_c_name": "SwimSpa_Max_Temp_Delta",
+                            "heating_active_name": "homie_bwa_spa_heating"
+                        }
+                    }
+                },
+                {
+                    "id": "waschmaschine",
+                    "label": "Waschmaschine",
+                    "type": "generic",
+                    "nominal_power_kw": 0.6,
+                    "annual_kwh": 468.0,
+                    "schedule": {
+                        "runs_per_week": 5,
+                        "duration_h": 3.0,
+                        "start_hour": 15,
+                        "start_shift_h": 4.0
+                    },
+                    "earnie_role": "manual",
+                    "appliance_recommendation": {
+                        "power_source": "manual",
+                        "loxone_power_name": "",
+                        "default_power_kw": 0.6,
+                        "default_runtime_h": 3.0
+                    }
+                },
+                {
+                    "id": "trockner",
+                    "label": "Trockner",
+                    "type": "generic",
+                    "nominal_power_kw": 1.0,
+                    "annual_kwh": 312.0,
+                    "schedule": {
+                        "runs_per_week": 3,
+                        "duration_h": 2.0,
+                        "start_hour": 16,
+                        "start_shift_h": 4.0
+                    },
+                    "earnie_role": "manual",
+                    "appliance_recommendation": {
+                        "power_source": "manual",
+                        "loxone_power_name": "",
+                        "default_power_kw": 1.0,
+                        "default_runtime_h": 2.0
+                    }
+                },
+                {
+                    "id": "geschirrspueler",
+                    "label": "Geschirrspüler",
+                    "type": "generic",
+                    "nominal_power_kw": 0.35,
+                    "annual_kwh": 327.59999999999997,
+                    "schedule": {
+                        "runs_per_week": 6,
+                        "duration_h": 3.0,
+                        "start_hour": 12,
+                        "start_shift_h": 8.0
+                    },
+                    "earnie_role": "manual",
+                    "appliance_recommendation": {
+                        "power_source": "manual",
+                        "loxone_power_name": "",
+                        "default_power_kw": 0.35,
+                        "default_runtime_h": 3.0
+                    }
+                },
+                {
+                    "id": "kochen",
+                    "label": "Kochen",
+                    "type": "generic",
+                    "nominal_power_kw": 2.0,
+                    "annual_kwh": 728.0,
+                    "schedule": {
+                        "runs_per_week": 7,
+                        "duration_h": 1.0,
+                        "start_hour": 19,
+                        "start_shift_h": 0.0
+                    },
+                    "earnie_role": "known"
+                },
+                {
+                    "id": "fernsehen",
+                    "label": "Fernsehen",
+                    "type": "generic",
+                    "nominal_power_kw": 0.2,
+                    "annual_kwh": 436.8000000000001,
+                    "schedule": {
+                        "runs_per_week": 7,
+                        "duration_h": 6.0,
+                        "start_hour": 18,
+                        "start_shift_h": 0.0
+                    },
+                    "earnie_role": "known"
+                }
+            ],
+            "latitude": 47.404,
+            "longitude": 9.743,
+            "timezone_name": "Europe/Vienna",
+            "default_pv_tilt": 18.0,
+            "default_pv_azimuth": 26.0
+        }
+    ]
+}

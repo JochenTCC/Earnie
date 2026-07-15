@@ -38,10 +38,11 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 - [ ] Make main.py controllable from streamlit.app (Checks must be included if main.py is runnin already, if necessary change spec / doc and put it in one container as deamon or so)
 - [ ] **Debug dump phase 2 — sharpen dump formats and reproduction**
-  - Goal: a debug dump should make a case **traceable and as reproducible as possible** later without searching prod files again
-  - Clearly separate dump types:
+  - Goal: a debug dump should make a case **traceable and as reproducible as possible** later without searching prod files again - important for productive systems elsewhere 
+  - One dump for all:
     - **Chart debug dump** for UI/display bugs
     - **Prod dump archive** for domain/optimizer-related failure cases
+    - Dump can be triggered in UI (former only Chart Debug Dump)
   - Per dump type define:
     - required files
     - optional additional files
@@ -52,14 +53,15 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 ### Version 2.+1
 
+- [ ] Add a German documentation about how to use Earnie from a user perspective (after installation is done)
 - [ ] Make appropriate information accessible to user about where differences between optimized SOC and BL SOC Ziel come from to give him explanation (prove plausability)
 - [ ] Check if removing constraint for SOC at end of horizon changes simulation resulst in backtesting
-- [ ] Find EPEX API to have provider independant tariff calculation
+- [ ] Find EPEX API to have provider independent tariff calculation
 
 
 ### Version 2.+1
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
-- Consumer role model (`earnie_role`: known / flex / manual) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Generic `earnie_role` (2026-07-15); nested inner consumers remain open
+  - Move Loxone markers to data model - remove flat definition in config.json where possible
 
 
 ### Version 2.+1
@@ -71,8 +73,6 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 
 ### Version 2.+1 — Epics **Adaptation** & **Thermals** (architecture first)
-
-Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Thermals P2 → Thermals P3 → Adaptation P4** (precursors **Consumers P1**, **Thermals P1**, **Thermals P1a** → **1.95–1.97** ✓; **1.99** P6b ✓)
 
 - [ ] **Adaptation P1** — Generic adaptation model (skeleton)
   - Common structure for parameter adaptation of various forecast models:
@@ -99,7 +99,7 @@ Recommended order: **Adaptation P1 → Adaptation P2 → Adaptation P3 → Therm
 
 - [ ] **Thermals P2** — Coupled single-node models
   - House ↔ heat storage ↔ solar system
-  - House parameters from energy certificate (`C:\Users\joche\Documents\Hausbau\Hausbau_Köhler_Schreyögg\Energieausweis_komplett_EFH-Köhler_Dornbirn-2014.pdf`)
+  - House parameters from energy certificate (`EXAMPLE:/local/reference/energy-certificate.pdf` — not in repo)
   - Prepare air conditioning as thermal consumer
 - [ ] **Thermals P3** — Thermal parameter adaptation (on Adaptation P1)
   - `heat_loss_kw_per_k` and further linear model parameters; horizon per consumer (24 h / 1 year)

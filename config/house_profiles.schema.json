@@ -27,10 +27,23 @@
         },
         "loxone_inputs": {
             "type": "object",
-            "description": "Optionaler Loxone-Leistungsmerker (known/manual generic).",
+            "description": "Optionaler Loxone-Leistungsmerker (known/manual generic, thermal, EV).",
             "properties": {
                 "power_name": { "type": "string" },
-                "signal_type": { "type": "string", "enum": ["power", "binary"] }
+                "signal_type": { "type": "string", "enum": ["power", "binary"] },
+                "subtract_consumer_ids": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                }
+            }
+        },
+        "loxone_outputs": {
+            "type": "object",
+            "description": "Steuer-Signale an Loxone (Freigabe und/oder kW-Sollwert).",
+            "properties": {
+                "enable_name": { "type": "string" },
+                "power_setpoint_name": { "type": "string" },
+                "pv_follow_name": { "type": "string" }
             }
         },
         "appliance_recommendation": {
@@ -115,6 +128,7 @@
                 "schedule": { "$ref": "#/definitions/schedule" },
                 "earnie_role": { "$ref": "#/definitions/earnie_role" },
                 "loxone_inputs": { "$ref": "#/definitions/loxone_inputs" },
+                "loxone_outputs": { "$ref": "#/definitions/loxone_outputs" },
                 "appliance_recommendation": { "$ref": "#/definitions/appliance_recommendation" },
                 "min_power_kw": { "type": "number", "minimum": 0 },
                 "min_on_quarterhours": { "type": "integer", "minimum": 0 },

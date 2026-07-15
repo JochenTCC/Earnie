@@ -363,6 +363,12 @@ def planning_thermal_to_milp(consumer: dict) -> dict:
     window = consumer.get("thermal_flex_window")
     if isinstance(window, dict) and window:
         entry["thermal_flex_window"] = dict(window)
+    loxone_inputs = consumer.get("loxone_inputs")
+    if isinstance(loxone_inputs, dict) and loxone_inputs:
+        entry["loxone_inputs"] = dict(loxone_inputs)
+    loxone_outputs = consumer.get("loxone_outputs")
+    if isinstance(loxone_outputs, dict) and loxone_outputs:
+        entry["loxone_outputs"] = dict(loxone_outputs)
     legacy_id = normalize_legacy_id(consumer, str(consumer["id"]))
     if legacy_id:
         entry["legacy_id"] = legacy_id
