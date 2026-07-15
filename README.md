@@ -1,132 +1,136 @@
 # Earnie
 
-Python-basierte Energieoptimierung für Smarthome (Batterie, PV, flexible Verbraucher) mit Streamlit-UI und Produktiv-Daemon (`main.py`).
-GitHub-Repository: [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie) (früher `Energy-Optimizer`).
+**Earnie** optimiert den Energiefluss in einem Smart-Home: Speicher, PV und Verbraucher mit wählbaren Schaltzeiten werden im 15-Minuten-Takt so optimiert, dass Stromkosten sinken und der Eigenverbrauch steigt. Seine Stärke spielt **Earnie** vor allem im Zusammenhang mit sogenannten [SPOT-Tarifen (im DACH-Raum)](https://www.epexspot.com/) aus. Eine umfangreiche Oberfläche zeigt genau, was **Earnie** gemacht und geplant hat.
+Und wenn Sie vorab wissen wollen, wie hoch das Einsparpotenzial ist, kann **Earnie** das für Sie vorab auch für ein ganzes Jahr hochrechnen - Und das auch ganz ohne Smart-Home.
+Earnie funktioniert unabhängig von Energie- und / oder Systemlieferanten für maximale Unabhängigkeit.
 
-!Kapitel einführen zur Funktionalität von Earnie in knappen Stichworten
+GitHub-Repository: [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie).
+
+## Was ist Earnie?
+
+**Earnie** richtet sich an Hausbesitzer, die Kosten beim Stromverbrauch minimieren möchten, insbesondere bei [SPOT-Tarifen](https://www.epexspot.com/). Er optimiert in einem variablen Zeitfenster (von max. 48h) die Verbräuche und Erträge so, dass die Kosten minimal sind. Das funktioniert am besten bei Häusern mit einer PV-Anlage, Batteriespeicher und Verbrauchern, die per Smart-Home gesteuert werden können (also smarter Wechselrichter, smarte Wallbox für das E-Auto, smarte Wärmepumpe und andere Geräte). Bisher kommuniziert **Earnie** mit diesen Systemen über eine [Loxone](https://www.loxone.com/dede/)-Haus-Automation — das kann aber auch um beliebige andere Systeme erweitert werden. Für andere Geräte, die noch nicht smart sind, kann **Earnie** Empfehlungen für den besten Start-Zeitpunkt geben.
+Der große Hebel für Einsparungen ist das geschickte Timing all dieser Verbraucher und der intelligente Einsatz des Batteriespeichers als Puffer.
+
+Statt fester Regeln (wie bei anderen Lösungen) berechnet **Earnie** einen **24-48 Stunden-Plan** unter Berücksichtigung von Strompreisen, PV-Prognose, Wettervorhersagen für den Standort des Hauses, Speicherzustand und Gerätebedarf. Ein dauerhaft laufender Daemon (`main.py`) setzt den Plan in [Loxone](https://www.loxone.com/dede/) um; eine übersichtliche Web-Oberfläche zeigt Soll/Ist und hilft bei Konfiguration und Analyse.
+
+
+| Komponente        | Rolle                                                                      |
+| ----------------- | -------------------------------------------------------------------------- |
+| `main.py`         | Liest [Loxone](https://www.loxone.com/dede/), optimiert, schreibt Steuerwerte — läuft dauerhaft            |
+| **[Streamlit](https://streamlit.io/)-App** | Cockpit, Planung, Simulation — optional parallel; steuert die Anlage nicht |
+
+
+Details: [Betrieb](docs/einrichtung/betrieb.md)
+
+## Was bringt Earnie?
+
+- **Günstiger laden und heizen** — Nutzung günstiger Stunden und PV-Überschuss statt Flatrate-Denken
+- **Speicher sinnvoll nutzen** — SOC-Ziele und Entladestrategie im Tagesverlauf, nicht nur „voll/leer“
+- **Flexible Geräte intelligent einplanen** — EV, Wärmepumpe, SwimSpa-Filter, manuelle Geräte mit Empfehlungen
+- **Transparenz** — Monitor (Sunset-2-Sunset): Vergangenheit, Live-Snapshot und Vorausschau in einem Cockpit
+- **What-if ohne Risiko** — Szenario-Exploration vergleicht Varianten, ohne den Produktivbetrieb zu ändern und unnötige oder falsche Investitionen zu tätigen oder sich für den falschen Stromtarif zu entscheiden
+
+
+
+## Funktionen
+
+
+
+### Optimierung und Steuerung
+
+- Ganzheitliche Optimierung im 15-Minuten-Takt. für Speicher und Verbraucher, deren Aktivierung von Earnie oder dem Benutzer gewählt werden kann.
+- Dynamische Strompreise (z. B. [aWATTar](https://www.awattar.at/)) und Preis-Prognose (über die veröffentlichten Preise hinaus)
+- PV-Erzeugungsprognose über [Open-Meteo](https://open-meteo.com/)-Wetterdaten und Grundlast-Modell mit Berücksichtigung der Temperaturen
+
+
+
+### Verbraucher
+
+- E-Auto über Wallbox (Smarthome sagt an, wann das E-Auto voll sein soll, Earnie kümmert sich um den Rest) 
+- Wärmepumpe (mit Wärmemodell des Hauses, das den Wärmebedarf anhand der Wetterdaten voraussagt und in die Optimierung mit einfließen lässt)
+- Pool (auch mit Wärmemodell, wie bei der Wärmepumpe) - Filter können auch bedarfsgerecht aktiviret werden
+- Generische Geräte (Waschmaschine, Trockner, Geschirrspüler, ...)
+
+
+
+### Oberfläche (Weboberfläche über [Streamlit](https://streamlit.io/))
+
+- **Monitor** (mit vollem Optimierungs-Horizont) — Energiefluss, SOC-Verlauf der Batterie, Verbraucherverhalten, Lade-Kontrolle der Batterie von Earnie
+- **Hauskonfigurator / Szenarieneditor** — Umfangreiche Konfiguration des Hauses mit allen Verbrauchern zur Planung und Szenario-Exploration
+- **Manuelle Geräte** — Laufzeiten mithilfe von Earnie planen und Empfehlungen annehmen
+- **Scenario-Exploration** — Szenarien vergleichen (Was-Wäre-Wenn Analysen)
+- **Verbraucheranalyse** — autonom vs. Earnie-initiiert
+
+
+
+### Betrieb
+
+- [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) oder PC (weitere Systeme folgen bei Bedarf)
+- Persistente Laufzeitdaten für Nachvollziehbarkeit und Debug-Dumps
+
+Earnie Monitor — Sunset-2-Sunset
+
+*Monitor-Cockpit: Kompletter Optimierungs-Horizont mit Energiefluss, SOC und Verbraucherverhalten.*
+
+## Typischer Ablauf
+
+1. **Voraussetzungen klären** — [Loxone](https://www.loxone.com/dede/)-Miniserver, PV + Speicher, verschiebbare Verbraucher, optional dynamischer Tarif
+2. **Deployment wählen** — Container ([Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/)) oder lokaler Betrieb → [Container](docs/einrichtung/container.md) · [Betrieb](docs/einrichtung/betrieb.md)
+3. **Konfiguration anlegen** — `config/config.json` aus Vorlage, Loxone-Zugang, Merker-Namen → [Erste Schritte](docs/README.md#erste-schritte)
+4. **Was-wäre-wenn-Analyse** — Mit Erstkonfiguration klären, ob sich ein Gesamtsystem und Earnie im produktiven Einsatz lohnen
+5. **Verbindung zu Smarthome** — `python -m scripts.verify_loxone_setup`
+6. **Produktiv starten** — `python main.py` dauerhaft (**nur eine Instanz**)
+7. **Monitor öffnen** — [Streamlit](https://streamlit.io/) auf Port 8501 (Standard, siehe `ui.streamlit_port`)
+8. **Feintuning** — Hausprofil, Szenarien, flexible Verbraucher über Planungs- und Betriebsseiten
+
+Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Ersteinrichtung) · [Silent Migration Test](docs/einrichtung/silent-migration-test.md) (Cutover-Test)
 
 ## Anwender-Dokumentation
 
-Einrichtung, Konfiguration, Streamlit-Oberfläche und Loxone-Schnittstelle: **[docs/README.md](docs/README.md)**
+Einrichtung, Konfiguration, [Streamlit](https://streamlit.io/)-Oberfläche und [Loxone](https://www.loxone.com/dede/)-Schnittstelle: **[docs/README.md](docs/README.md)**
 
-!User-Dokumente Struktur einfügen (ähnlich zu Projektstruktur)
 
-!Kapitel zu Installationsmöglichkeiten einfügen bzw. Verweis zu vorhandener Doku
+| Bereich                | Kapitel                                                                                                                                                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Einrichtung**        | [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Greenfield](docs/einrichtung/greenfield-dev-stack.md) · [Silent Migration](docs/einrichtung/silent-migration-test.md) |
+| **Konfiguration**      | [Überblick](docs/konfiguration/ueberblick.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md)                                                        |
+| **Benutzeroberfläche** | [Betriebsmodi](docs/ui/betriebsmodi.md) · [Charts](docs/ui/charts.md) · [Loxone-Kommunikation](docs/ui/loxone-kommunikation.md)                                                                                                                                         |
+| **Referenz**           | [Streamlit-Ports](docs/referenz/streamlit-ports.md) · [Loxone-Signale](docs/referenz/loxone-signale.md)                                                                                                                                                                 |
 
-!Stark zusammengefasste Roadmap aus backlog/Backlog.md erstellen und einfügen
 
+
+
+## Installation und Betrieb
+
+
+| Weg                              | Für wen                          | Detail                                                                               |
+| -------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------ |
+| **Docker (empfohlen Prod)**      | [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/) | [docs/einrichtung/container.md](docs/einrichtung/container.md)                       |
+| **Lokal (Dev / ohne Container)** | Entwickler, Tests                | [DEVELOPER.md](DEVELOPER.md)                                                         |
+| **Greenfield**                   | Ersteinrichtung Hauskonfigurator | [docs/einrichtung/greenfield-dev-stack.md](docs/einrichtung/greenfield-dev-stack.md) |
+
+
+
+
+## Roadmap (Kurz)
+
+- **2.0** — Stabilisiertes Datenmodell; klarer Projekteinstieg (dieses README)
+- **Adaptation** — PV- und thermische Parameter-Anpassung über die Zeit
+- **Thermals** — Gekoppelte Haus-/Speicher-/Solar-Modelle
+- **Smartere Geräte-Empfehlungen** — adaptive Leistung und Laufzeit für Haushaltsgeräte
+- **Debug dumps phase 2** — reproduzierbare Chart-/Prod-Fehlerarchive
+- **Streamlit-Steuerung von** `main.py` — einheitlichere Bedienung im [Docker](https://www.docker.com/)-Container
+
+Earnie wird weitgehend mit Hilfe von [Cursor](https://cursor.com/) entwickelt.
+
+Vollständige Roadmap → **[backlog/Backlog.md](backlog/Backlog.md)**
 
 ## Lizenz
 
 Die Software ist **Source-Available** und auf **private, nicht-kommerzielle Nutzung** beschränkt. Vollständige Bedingungen: **[LICENSE.md](LICENSE.md)**.
 
+## Für Entwickler
 
+Unterstützung ist sehr willkommen - vor allem bei der Einbindung weiterer Systeme und beim Ausprobieren :-).
 
-!Technische Dokumentation in separates Dokument (alles unterhalb dieser Zeile)
-
-## Projektstruktur
-
-```
-Earnie/
-├── main.py, app.py          # Einstiegspunkte (bleiben in der Wurzel)
-├── config.py                # Konfigurations-Loader
-├── docker/                  # Dockerfile, Compose, Build-Skripte (siehe docker/README.md)
-├── backlog/                 # Roadmap (Backlog.md, Backlog-Bugfixes.md, Backlog-Erledigt.md)
-├── config/
-│   ├── config.json          # Haus-Konfiguration (gitignored, persistent)
-│   ├── config.example.json  # Vorlage für neue Installationen
-│   └── config.schema.json   # JSON-Schema (Editor-Hover)
-├── optimizer/               # MILP, Simulation, Ladekontext, Facade
-├── integrations/            # Loxone, Awattar, Log-Import
-├── data/                    # Profile, Verbrauch, PV-Prognose
-├── simulation/              # Backtesting-Engine
-├── runtime_store/           # JSON-Persistenz, Bootstrap, Config-Drift
-├── ui/                      # Streamlit-Komponenten
-├── scripts/                 # CLI (bootstrap, migrate, generate_cons_data, …)
-├── tests/
-└── runtime/                 # Laufzeitdaten (CSV, JSON, Logs — gitignored)
-```
-
-
-
-Roadmap → **[backlog/Backlog.md](backlog/Backlog.md)**
-
-## Lokale Entwicklung
-! Gegen Todo in backlog/Backlog.md prüfen bzgl. Deploy ohne Container
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements-dev.txt
-python -m pytest
-python main.py
-python -m scripts.run_streamlit
-```
-
-Kanonische Metadaten und Abhängigkeiten: `pyproject.toml` (`version.py` = Versionsquelle).
-
-CLI nach `pip install -e .` (optional): `earnie-bootstrap`, `earnie-build-image`, `earnie-verify-loxone`, … (Legacy-Aliase: `ernie-*`).
-
-Legacy: `config.json` im Projektroot wird weiterhin unterstützt, wenn `config/config.json` fehlt.
-
-## Container (Synology / LoxBerry / Docker)
-
-
-
-### Image bauen (kanonisch)
-
-```powershell
-# Windows – Wrapper
-.\docker\build-container.ps1
-
-# plattformübergreifend (Standard: Synology amd64)
-python -m scripts.build_container
-```
-
-Standard-Tags: `ghcr.io/jochentcc/earnie-energy:latest` und `ghcr.io/jochentcc/earnie-energy:<version>` (aus `version.py`). Übergangsweise zusätzlich `ernie-energy`-Tags.
-
-Registry-Push:
-
-```powershell
-# Nur Synology (amd64)
-.\docker\build-container.ps1 --target synology --push
-
-# Release Synology + LoxBerry (Multi-Arch-Manifest)
-.\docker\build-container.ps1 --target all --push
-```
-
-Weitere Optionen: `--target` (`synology` | `loxberry` | `all`), `--tag`, `--platform`, `--no-cache`, `--dockerfile`, `--context`.
-
-### Lokal starten (Dev)
-
-```powershell
-docker compose --project-directory . -f docker/compose/dev.yml build
-docker compose --project-directory . -f docker/compose/dev.yml up -d
-```
-
-
-
-### Produktion (Synology)
-
-1. Multi-Arch-Image bauen und pushen: `python -m scripts.build_container --target all --push`
-2. Auf der NAS nur `docker/compose/synology.yml` (oft als `compose.yaml` kopiert), `config/`, `runtime/` bereitstellen
-3. `docker compose --project-directory . -f docker/compose/synology.yml pull; docker compose --project-directory . -f docker/compose/synology.yml up -d`
-
-
-
-### Produktion (LoxBerry, RPi 4B)
-
-1. Multi-Arch-Image bauen und pushen (siehe oben)
-2. Auf dem LoxBerry nur `docker/compose/loxberry.yml`, `config/`, `runtime/` bereitstellen
-3. `docker compose --project-directory . -f docker/compose/loxberry.yml pull; docker compose --project-directory . -f docker/compose/loxberry.yml up -d`
-4. UI im LAN: `http://<loxberry-ip>:8501`
-5. 
-
-## Hinweise
-
-- `config/config.json` (oder Legacy `config.json`) ist lokal und gitignored.
-- Laufzeitdaten liegen unter `runtime/` (`EARNIE_RUNTIME_DIR`, Legacy: `ENERGY_OPTIMIZER_RUNTIME_DIR`).
-- Config-Pfad überschreibbar mit `EARNIE_CONFIG_PATH` (Legacy: `ENERGY_OPTIMIZER_CONFIG_PATH`).
-
-
-
+Projektstruktur, lokale Entwicklung, Container-Build und technische Hinweise: **[DEVELOPER.md](DEVELOPER.md)**

@@ -2,7 +2,7 @@
 
 Diese Dokumentation richtet sich an Betreiber von Earnie: Einrichtung, Konfiguration, Streamlit-Oberfläche und die Schnittstelle zum Loxone Miniserver.
 
-Für Entwickler (Projektstruktur, Tests, Container) siehe [README.md](../README.md) im Projektroot.
+Für Entwickler (Projektstruktur, Tests, Container) siehe [DEVELOPER.md](../DEVELOPER.md).
 
 ## Erste Schritte
 

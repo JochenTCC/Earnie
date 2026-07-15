@@ -416,11 +416,23 @@ def build_live_planning_matrix(market_data: list, window) -> list:
     """Baut die Live-Optimierungsmatrix für ein Sunset-Planungsfenster."""
     check_and_update_profile_if_new_month()
     target_hours = list(window.slot_datetimes)
+    slot_count = len(target_hours)
+    logger.info(
+        "Matrix-Aufbau: %d Slots (%s → %s)",
+        slot_count,
+        target_hours[0].strftime("%Y-%m-%d %H:%M"),
+        target_hours[-1].strftime("%Y-%m-%d %H:%M"),
+    )
 
+    logger.info("Matrix-Aufbau: Grundlast-Profil laden …")
     forecast_consumption = _load_consumption_profile(target_hours)
+    logger.info("Matrix-Aufbau: Gesamtverbrauchs-Profil laden …")
     forecast_total = _load_total_consumption_profile(target_hours)
+    logger.info("Matrix-Aufbau: Flexible Verbraucher-Profile laden …")
     flex_profiles = _load_flexible_consumer_hourly_profiles(target_hours)
+    logger.info("Matrix-Aufbau: PV-Prognose laden …")
     forecast_pv = pv_forecast.get_hourly_pv_forecast_for_hours(target_hours)
+    logger.info("Matrix-Aufbau: Optimierungsmatrix zusammenstellen …")
     optimization_matrix = _build_optimization_matrix(
         market_data,
         forecast_consumption,

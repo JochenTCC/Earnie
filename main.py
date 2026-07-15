@@ -538,11 +538,11 @@ if __name__ == "__main__":
                 next_trigger = event_trigger
 
         except Exception as e:
-            msg = f"🚨 Unerwarteter Fehler während des Durchlaufs: {e}"
-            if logger.handlers:
-                logger.exception(msg)
-            else:
-                print(msg)
-
-            print("🔄 Skript läuft weiter. Schneller Wiederholungsversuch in 60 Sekunden...")
+            logger.exception(
+                "🚨 Unerwarteter Fehler während des Durchlaufs: %s", e
+            )
+            print(
+                "🔄 Skript läuft weiter. Schneller Wiederholungsversuch in 60 Sekunden...",
+                flush=True,
+            )
             time.sleep(60)

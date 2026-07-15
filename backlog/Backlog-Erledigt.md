@@ -3,6 +3,13 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 2.0 — README expansion (2026-07-15)
+
+- [x] Expand README with motivation / benefits / features — sensible order of use; less technical background than install/configuration hints
+- [x] Extract developer content to [DEVELOPER.md](../DEVELOPER.md); product-first [README.md](../README.md)
+- [x] Monitor screenshot in `docs/assets/monitor-sunset2sunset.png`; cross-link update in [docs/README.md](../docs/README.md)
+
+
 ### New features — Generic `earnie_role` (known / flex / manual) (2026-07-15)
 
 Plan [`.cursor/plans/earnie_consumer_roles_1dc94070.plan.md`](../.cursor/plans/earnie_consumer_roles_1dc94070.plan.md) — consolidates „Manuelles Gerät“, „known by Earnie“, and „controlled by Earnie (flex)“; supersedes the `start_shift_h=0` proxy ([Backlog-Erledigt.md](Backlog-Erledigt.md) § New features — fixed generic Grundlast in live optimization).
@@ -32,6 +39,66 @@ Plan [`.cursor/plans/consumer_roles_follow-up_08c02579.plan.md`](../.cursor/plan
 
 - [x] **Remove adaptive PV tuning** — forecast vectors no longer scaled by `calculate_tuning_factor` (`data/pv_forecast.py`); optimization no longer aborts when PV counter delta unavailable (`main.py`); `pv_tuner.py` trimmed to counter delta only (Adaptation P2 replaces full path); UI already clean (`app.py`, UI S-2 P1)
 - [x] **Simulations-Details column rename** — non-EV immediate-charge columns `{name} Aktiv`; EV keeps `{name} sofort_laden` (`optimizer/targets.py`, `ui/simulation_results.py`, `ui/chart_flow_balance.py`); tests updated
+
+
+### Version 1.99 — Live cutover (P6b) (2026-07-15)
+
+Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — Phase **1.99** prod cutover. Runbook [`docs/einrichtung/nas-live-cutover-1.99.md`](docs/einrichtung/nas-live-cutover-1.99.md). Prerequisite: [Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation (2026-07-14).
+
+- [x] **P6b — Non-silent NAS live cutover** — legacy `docker/earnie/` stopped; prod on migrated 2.0 stack with `loxone_silent_mode: false`; manual acceptance per runbook (SwimSpa, EV, Haus Wärme, Chart 1/Sankey, Loxone-Kommunikation writes)
+
+Loxone debug page → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.99 — Loxone debug UI (2026-07-14).
+
+**Next:** propose `version.py` **`2.0.0`** (user approval) → [Backlog.md](Backlog.md) § Version 2.0.
+
+
+### Version 2.0 — release gate context (2026-07-15)
+
+Archived from [Backlog.md](Backlog.md).
+
+**Goal:** Legacy data model gone — see plan end state and [`docs/spec/nas-consumer-migration-1.95-1.99.md`](../docs/spec/nas-consumer-migration-1.95-1.99.md).
+
+**Prerequisite chain:** **1.93** ✓ → **1.95–1.97** ✓ → **1.99** P6b ✓ → propose `version.py` **`2.0.0`** (user approval).
+
+Open → [Backlog.md](Backlog.md) § Version 2.0 (Expand README; post-release cleanup in **2.+1** chapters).
+
+
+### NAS consumer migration — feature backlog index (2026-07-15)
+
+Archived from [Backlog.md](Backlog.md) when migration **1.95–1.99** closed (P6b live cutover ✓).
+
+Scenario Exploration consumption model → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-13). Spec: [`docs/spec/scenario-exploration-consumption.md`](../docs/spec/scenario-exploration-consumption.md).
+
+Version **1.93** (unified scenario model) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-14). **1.99** live cutover (P6b) ✓ (2026-07-15).
+
+Recommended order: **1.95–1.96** legacy flex / thermal migration (**1.96** ✓ · **1.97** ✓) · **1.99** P6b live cutover ✓ → propose `version.py` → **`2.0.0`** (user approval; **real** 2.0 — legacy data model gone).
+
+Critical path **1.95–1.97** ✓ · **1.99** P6b ✓ → [Backlog-Erledigt.md](Backlog-Erledigt.md). Open bugs → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+
+**Implementation plan (1.95–1.99):** [`docs/spec/nas-consumer-migration-1.95-1.99.md`](../docs/spec/nas-consumer-migration-1.95-1.99.md) — prod consumer matrix, phased deliverables, acceptance, NAS cutover runbook.
+
+
+### Version 1.95
+
+_Completed → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.95 — Thermals P1 (2026-07-14)._
+
+
+### Version 1.98
+
+_Completed → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.96 — Consumers P1 (2026-07-14)._
+
+
+### Execution of plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](../docs/spec/nas-consumer-migration-1.95-1.99.md)
+
+Silent local abnahme stack → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-14).
+
+Manual validation (dynamic tariff, fixed tariff Δ€, SE `live`) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — manual validation (2026-07-14).
+
+Suggested next steps (SE progress, diag tooling, 1.96d code, cutover runbook) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § NAS migration plan — suggested next steps (2026-07-14).
+
+Silent-stack debug sessions (Hausconfig, Chart 1, `main.py` SwimSpa, config drift) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Silent-stack debug sessions (2026-07-14). Open regressions → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+
+**2026-07-15 session:** Generic `earnie_role` + consumer-roles follow-up → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Generic `earnie_role` + Consumer roles follow-up. UI architecture (Cockpit from `main.py` snapshot, matched-baseline SoC BL Ziel fixes, forecast.solar 429) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-15 sections). PV tuning removal + Simulations-Details columns → [Backlog-Erledigt.md](Backlog-Erledigt.md) § PV tuning removal. Live verification pending → [Backlog-Bugfixes.md](Backlog-Bugfixes.md) § Bugfix Verifications Pending.
 
 
 ### Bugfix SoC BL Ziel matched baseline (silent stack) (2026-07-15)
@@ -145,7 +212,7 @@ Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-mi
 
 ### Silent-stack debug sessions (2026-07-14)
 
-Local abnahme stack (`silent-migration-test`, Streamlit `:8512`, `main.py`). Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md). Open follow-ups → [Backlog.md](Backlog.md) § **1.99**; [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
+Local abnahme stack (`silent-migration-test`, Streamlit `:8512`, `main.py`). Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md). Open follow-ups → [Backlog.md](Backlog.md) § **Version 2.0**; [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 - [x] **Betrieb / Cockpit unlock after 2.0 migration** — empty root `flexible_consumers[]` wrongly triggered greenfield onboarding → Cockpit hidden while `main.py` ran; `needs_planning_onboarding` now treats house-profile consumers with Loxone wiring as live stack (`ui/setup_readiness.py`, `ui/setup_progress.py`; tests `tests/test_setup_readiness.py`, `tests/test_setup_progress.py`)
 - [x] **Config drift false positives** — `config/config.example.json` still had pre-2.0 keys (`eauto_milp`, `appliances[]`, `system.loxone_silent_mode`) → 3 drift items vs migrated silent stack; examples aligned to 2.0 shape (`config.example.json`, `config.minimal.json`, `config/house_profiles.example.json`; tests `tests/test_config_drift.py`, `tests/test_greenfield_bootstrap.py`; docs [`docs/konfiguration/ueberblick.md`](docs/konfiguration/ueberblick.md))
@@ -317,7 +384,7 @@ Former backlog **2.0 P1–P7**; chapter closed **2026-07-14**. Implementation ph
 
 - [x] **P1–P5, P6a, Components, Open-Meteo solar, SE consumption model** — done
 - [x] **Smoke-test Phase A–C + follow-ups** — done (2026-07-12 … 2026-07-14)
-- [x] **Deferred:** **P6b live cutover** → [Backlog.md](Backlog.md) **1.99**; legacy flex/thermal migration → **1.95–1.97**
+- [x] **Deferred:** **P6b live cutover** → [Backlog-Erledigt.md](Backlog-Erledigt.md) § Version 1.99 — Live cutover (P6b) (2026-07-15); legacy flex/thermal migration → **1.95–1.97**
 
 **Decisions (2026-07-11, retained for reference):**
 
@@ -328,9 +395,9 @@ Former backlog **2.0 P1–P7**; chapter closed **2026-07-14**. Implementation ph
 | Scenario id `runtime_settings` | **Removed in 1.93 P2** — live baseline via `live_scenario_id` (default `live`) (P2) |
 | Battery without PV | **Allowed** — battery required for MILP; PV optional (P1) |
 | **7g-a** before P6 | **Skip for 1.93** — parallel NAS after local silent acceptance; 7g-a stays in Packaging backlog |
-| **P6 NAS deploy** | **Parallel stack** — P6a silent trial done; **P6b** → **1.99** (after **1.95–1.97**) |
+| **P6 NAS deploy** | **Done** — P6a silent trial; **P6b** live cutover ✓ (2026-07-15) |
 | `sunrise_window` rename (P4) | Hard rename `sunset_window` **→** `sunrise_window` — no alias |
-| **Real 2.0 release gate** | `version.py` **→** `2.0.0` after **1.99** P6b + legacy data model removed (user approval) |
+| **Real 2.0 release gate** | `version.py` **→** `2.0.0` after **1.99** P6b ✓ + legacy data model removed (user approval) |
 | `components.json` sidecar | **Hard cutover in 1.93** — `batteries[]` / `pv_systems[]` only in sidecar; startup error if keys remain in `config.json` |
 
 
