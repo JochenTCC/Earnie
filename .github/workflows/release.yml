@@ -43,9 +43,6 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Version gate OK: ${ACTUAL}"
 
-      - name: Tariff deploy-gate
-        run: python -m scripts.validate_tariffs --check-catalog
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -61,6 +58,7 @@ jobs:
 
       - name: Build and push multi-arch image
         run: python -m scripts.build_container --target all --push
+        # Tariff deploy-gate runs inside build_container when --push is set.
 
       - name: Prepare release notes
         id: notes
