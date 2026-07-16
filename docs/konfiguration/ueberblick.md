@@ -33,12 +33,12 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus `[co
 
 Vorlage für Szenarien: `[backtesting_scenarios.example.json](../../config/backtesting_scenarios.example.json)`.
 
-## Szenarien (Live und Scenario-Exploration)
+## Szenarien (Live und Szenario-Explorer)
 
 - `live_scenario_id` in `config.json` wählt das Live-Szenario (Standard-ID: `live`).
 - `backtesting_scenarios.json` enthält **alle** Szenarien im gleichen Format (`id`, `label`, `settings` mit Entitäts-Referenzen oder — für What-if — flachen Parametern).
-- **Live-Betrieb** (`main.py`, Modus **Sunset-2-Sunset**) und **Scenario-Exploration** lösen dasselbe Live-Szenario über `[house_config/scenario_resolution.py](../../house_config/scenario_resolution.py)` auf.
-- Weitere Szenarien in derselben Datei dienen nur dem Vergleich in Scenario-Exploration; sie ändern den Produktivbetrieb nicht.
+- **Live-Betrieb** (`main.py`, Modus **Sunset-2-Sunset**) und **Szenario-Explorer** lösen dasselbe Live-Szenario über `[house_config/scenario_resolution.py](../../house_config/scenario_resolution.py)` auf.
+- Weitere Szenarien in derselben Datei dienen nur dem Vergleich in Szenario-Explorer; sie ändern den Produktivbetrieb nicht.
 
 
 

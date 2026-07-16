@@ -3,15 +3,15 @@
 Die Streamlit-App nutzt **`st.navigation`** mit Seiten in Abschnitten — **kein** Sidebar-Radio „Betriebsmodus“ mehr. Welche Seiten sichtbar sind, steuert die Umgebungsvariable **`EARNIE_UI_MODES`** (Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`).
 
 ```text
-EARNIE_UI_MODES=sunset2sunset,scenario_exploration
+EARNIE_UI_MODES=sunset2sunset,scenario_explorer
 ```
 
-Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monitor**) und **Scenario-Exploration** zur Verfügung (optional **Preis-Prognose (Dev)**). Gültige Keys: `sunset2sunset`, `scenario_exploration`, `price_forecast` — **kein** Alias `live`, `historical` oder `backtesting`. Der frühere Key `backtesting` ist umbenannt; bei alter Env-Konfiguration erscheint ein Sidebar-Hinweis. Details zum Deployment: [Betrieb](../einrichtung/betrieb.md).
+Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monitor**) und **Szenario-Explorer** zur Verfügung (optional **Preis-Prognose (Dev)**). Gültige Keys: `sunset2sunset`, `scenario_explorer`, `price_forecast` — **kein** Alias `live` oder `historical`. Frühere Keys `backtesting` und `scenario_exploration` sind umbenannt; bei alter Env-Konfiguration erscheint ein Sidebar-Hinweis. Details zum Deployment: [Betrieb](../einrichtung/betrieb.md).
 
 | Key | Seite | Abschnitt | Produktion |
 |-----|-------|-----------|------------|
 | `sunset2sunset` | **Monitor** | Betrieb | ja (Hauptansicht) |
-| `scenario_exploration` | **Scenario-Exploration** | Analyse | optional (Dev) |
+| `scenario_explorer` | **Szenario-Explorer** | Analyse | optional (Dev) |
 | `price_forecast` | **Preis-Prognose (Dev)** | Analyse | Dev-only |
 
 Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarieneditor**, **Live-Konfiguration**, **Manuelle Geräte**, **Verbraucheranalyse** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`).
@@ -21,7 +21,7 @@ Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, 
 | Abschnitt | Seiten |
 |-----------|--------|
 | **Betrieb** | Monitor, Manuelle Geräte |
-| **Analyse** | Scenario-Exploration (wenn freigeschaltet), Preis-Prognose (Dev), Verbraucheranalyse |
+| **Analyse** | Szenario-Explorer (wenn freigeschaltet), Preis-Prognose (Dev), Verbraucheranalyse |
 | **Planung** | Hauskonfigurator, Szenarieneditor |
 | **Echtzeit-Umgebung** | Live-Konfiguration |
 
@@ -33,7 +33,7 @@ Spezifikation: [UI Sunset-2-Sunset](../spec/ui-sunset2sunset.md) (v0.6.2). Chart
 
 **Zweck:** Einheitliches Produktiv-Cockpit ohne Grenze zwischen Live und Historie. Vergangenheit aus dem Produktiv-Log (`optimization_history.jsonl`), Gegenwart und Vorausschau aus dem **Produktiv-Snapshot** (`live_optimization_debug.json`, geschrieben von `main.py`) — in zwei benachbarten Sonnenaufgang-Segmenten navigierbar.
 
-**Ersetzt:** die früheren Modi **Echtzeit** und **Historischer Tag** sowie den Button **Produktiv-Archiv**. Es gibt **keine Nachrechnung** beliebiger Kalendertage im S-2-Modus (geplant als Dev-Feature in Scenario-Exploration).
+**Ersetzt:** die früheren Modi **Echtzeit** und **Historischer Tag** sowie den Button **Produktiv-Archiv**. Es gibt **keine Nachrechnung** beliebiger Kalendertage im S-2-Modus (geplant als Dev-Feature in Szenario-Explorer).
 
 ### Sonnenaufgang-Anker SA₀, SA₁, SA₂
 
@@ -94,7 +94,7 @@ Details: [Charts & Panels](charts.md).
 
 Ersparnis-, Kosten-Kennzahlen und Energievergleich beziehen sich auf **Jetzt → SA₂** (voller MILP-Planungshorizont). Die Chart-Segmente SA₀→SA₁ und SA₁→SA₂ sind **Darstellungsfenster** — kumulierte Kurven darin sind Ausschnitte, keine eigene Matching-Periode.
 
-## Scenario-Exploration
+## Szenario-Explorer
 
 **Zweck:** Langzeit-Auswertung aus dem Log von `scripts/run_backtesting.py` (`runtime/backtesting_log.json`).
 

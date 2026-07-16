@@ -21,6 +21,7 @@ from .engine import (
     CONSUMPTION_TOLERANCE_REL,
     HISTORICAL_REFERENCE_ID,
     PlausibilityReport,
+    PlausibilityResult,
 )
 from .backtesting_snapshots import (
     BACKTESTING_WINDOW_SNAPSHOTS_JSONL,
@@ -179,26 +180,46 @@ def _plausibility_failure_cases(
     return cases
 
 
-def _cbc_event_cases(cbc_events_by_scenario: dict[str, list[dict]]) -> list[dict]:
+def _plausibility_lookup(
+    plausibility_by_scenario: dict[str, PlausibilityReport],
+) -> dict[tuple[str, str], PlausibilityResult]:
+    lookup: dict[tuple[str, str], PlausibilityResult] = {}
+    for scenario_id, report in plausibility_by_scenario.items():
+        for result in report.results:
+            lookup[(scenario_id, result.window_end.isoformat())] = result
+    return lookup
+
+
+def _cbc_event_cases(
+    cbc_events_by_scenario: dict[str, list[dict]],
+    *,
+    plausibility_lookup: dict[tuple[str, str], PlausibilityResult] | None = None,
+) -> list[dict]:
     cases: list[dict] = []
     for scenario_id, events in cbc_events_by_scenario.items():
         for event in events:
-            cases.append(
-                {
-                    "kind": str(event.get("event", "cbc_unknown")),
-                    "scenario_id": scenario_id,
-                    "window_anchor": event.get("window_anchor"),
-                    "slot_datetime": event.get("slot_datetime"),
-                    "simulation_hour_index": event.get("simulation_hour_index"),
-                    "milp_hour": event.get("milp_hour"),
-                    "consumer_targets_kwh": event.get("consumer_targets_kwh"),
-                    "strict_limit_sec": event.get("strict_limit_sec"),
-                    "strict_elapsed_sec": event.get("strict_elapsed_sec"),
-                    "strict_status": event.get("strict_status"),
-                    "final_status": event.get("final_status"),
-                    "gap_rel": event.get("gap_rel"),
-                }
-            )
+            case = {
+                "kind": str(event.get("event", "cbc_unknown")),
+                "scenario_id": scenario_id,
+                "window_anchor": event.get("window_anchor"),
+                "slot_datetime": event.get("slot_datetime"),
+                "simulation_hour_index": event.get("simulation_hour_index"),
+                "milp_hour": event.get("milp_hour"),
+                "consumer_targets_kwh": event.get("consumer_targets_kwh"),
+                "strict_limit_sec": event.get("strict_limit_sec"),
+                "strict_elapsed_sec": event.get("strict_elapsed_sec"),
+                "strict_status": event.get("strict_status"),
+                "final_status": event.get("final_status"),
+                "gap_rel": event.get("gap_rel"),
+            }
+            if plausibility_lookup is not None:
+                plaus = plausibility_lookup.get(
+                    (scenario_id, str(event.get("window_anchor") or ""))
+                )
+                if plaus is not None:
+                    case["window_consumption_diff_kwh"] = plaus.diff_kwh
+                    case["window_consumption_ok"] = plaus.ok
+            cases.append(case)
     return cases
 
 
@@ -258,9 +279,15 @@ def build_critical_cases(
     cbc_events_by_scenario: dict[str, list[dict]] | None = None,
 ) -> list[dict]:
     """Vereinigt Verbrauchstoleranz-Verletzungen und CBC-/MILP-Ereignisse."""
+    plausibility_lookup = _plausibility_lookup(plausibility_by_scenario)
     cases = _plausibility_failure_cases(plausibility_by_scenario)
     if cbc_events_by_scenario:
-        cases.extend(_cbc_event_cases(cbc_events_by_scenario))
+        cases.extend(
+            _cbc_event_cases(
+                cbc_events_by_scenario,
+                plausibility_lookup=plausibility_lookup,
+            )
+        )
     return sorted(cases, key=_critical_case_sort_key)
 
 

@@ -85,8 +85,13 @@ def test_deviation_cases_for_display_preserves_sort_order():
 def test_format_deviation_delta_kwh():
     plaus = {"kind": "consumption_tolerance", "diff_kwh": 1.25}
     cbc = {"kind": "strict_slow"}
+    cbc_with_window = {
+        "kind": "milp_no_optimal",
+        "window_consumption_diff_kwh": 0.006,
+    }
     assert format_deviation_delta_kwh(plaus) == "+1.25"
     assert format_deviation_delta_kwh(cbc) == "—"
+    assert format_deviation_delta_kwh(cbc_with_window) == "+0.01"
 
 
 def test_kind_label_known_and_unknown():
@@ -138,3 +143,9 @@ def test_default_active_scenario_falls_back_when_live_missing():
 def test_deviation_marker_for_case():
     assert deviation_marker_for_case(None) == ""
     assert deviation_marker_for_case({"kind": "strict_slow"}) == "🔴"
+    assert (
+        deviation_marker_for_case(
+            {"kind": "strict_fallback", "window_consumption_ok": True}
+        )
+        == "🟡"
+    )

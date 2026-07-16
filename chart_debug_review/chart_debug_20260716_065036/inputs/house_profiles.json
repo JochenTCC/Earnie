@@ -8,7 +8,6 @@
             "consumers": [
                 {
                     "id": "wp_heating",
-                    "legacy_id": "waermepumpe",
                     "label": "Wärmepumpe",
                     "type": "thermal_annual",
                     "nominal_power_kw": 1.6,
@@ -27,7 +26,8 @@
                     },
                     "loxone_outputs": {
                         "enable_name": "Ernie_WP_Freigabe"
-                    }
+                    },
+                    "legacy_id": "waermepumpe"
                 },
                 {
                     "id": "ev",
@@ -128,7 +128,6 @@
                     "earnie_role": "manual",
                     "appliance_recommendation": {
                         "power_source": "manual",
-                        "loxone_power_name": "",
                         "default_power_kw": 0.6,
                         "default_runtime_h": 3.0
                     }
@@ -148,7 +147,6 @@
                     "earnie_role": "manual",
                     "appliance_recommendation": {
                         "power_source": "manual",
-                        "loxone_power_name": "",
                         "default_power_kw": 1.0,
                         "default_runtime_h": 2.0
                     }
@@ -168,7 +166,6 @@
                     "earnie_role": "manual",
                     "appliance_recommendation": {
                         "power_source": "manual",
-                        "loxone_power_name": "",
                         "default_power_kw": 0.35,
                         "default_runtime_h": 3.0
                     }
@@ -177,8 +174,8 @@
                     "id": "kochen",
                     "label": "Kochen",
                     "type": "generic",
-                    "nominal_power_kw": 2.0,
-                    "annual_kwh": 728.0,
+                    "nominal_power_kw": 1.5,
+                    "annual_kwh": 546.0,
                     "schedule": {
                         "runs_per_week": 7,
                         "duration_h": 1.0,

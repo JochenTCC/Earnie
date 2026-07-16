@@ -66,14 +66,16 @@ class TestAbsentAvailability:
   def test_resolve_absent_same_day_past_slot_uses_next_scheduled(self):
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 22, 21, 0)
-      assert cc.resolve_absent_availability(horizon, consumer) == cc.next_scheduled_availability(
-          horizon, consumer
-      )
+      with patch.object(cc, "_loxone_ready_raw", return_value=None):
+          assert cc.resolve_absent_availability(
+              horizon, consumer
+          ) == cc.next_scheduled_availability(horizon, consumer)
 
   def test_resolve_absent_overnight_window_still_returns_horizon(self):
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 23, 6, 0)  # Dienstag vor ready_by_hour, Fenster von Montag noch offen
-      assert cc.resolve_absent_availability(horizon, consumer) == horizon
+      with patch.object(cc, "_loxone_ready_raw", return_value=None):
+          assert cc.resolve_absent_availability(horizon, consumer) == horizon
 
   def test_resolve_absent_with_timezone_aware_horizon(self):
       from zoneinfo import ZoneInfo
@@ -81,7 +83,8 @@ class TestAbsentAvailability:
       consumer = _eauto_consumer()
       tz = ZoneInfo("Europe/Vienna")
       horizon = datetime(2026, 6, 23, 6, 0, tzinfo=tz)
-      result = cc.resolve_absent_availability(horizon, consumer)
+      with patch.object(cc, "_loxone_ready_raw", return_value=None):
+          result = cc.resolve_absent_availability(horizon, consumer)
       assert result == horizon
       assert result.tzinfo == tz
 
@@ -356,3 +359,42 @@ class TestEligibleIndices:
       assert not any(
           matrix[i]["slot_datetime"] >= datetime(2026, 6, 23, 16, 3) for i in eligible
       )
+
+
+class TestConfigPathFertigUm:
+    def _config_consumer(self) -> dict:
+        consumer = _eauto_consumer()
+        consumer["daily_target_source"] = "config"
+        return consumer
+
+    def test_fertig_um_later_overrides_config_ready_by_hour(self):
+        consumer = self._config_consumer()
+        horizon = datetime(2026, 7, 16, 2, 0)
+        matrix = _hour_matrix(horizon, 24)
+        with patch.object(
+            cc, "_loxone_ready_raw", return_value="Heute, 14:00"
+        ), _patch_eauto_capacity():
+            ctx = cc.resolve_charging_context(
+                consumer, matrix, None, logged_simulation=False
+            )
+        assert ctx["deadline"] == datetime(2026, 7, 16, 14, 0)
+        assert ctx["use_time_window"] is False
+        assert "FertigUm" in ctx["source_label"]
+        eligible = cc.consumer_charging_eligible_indices(
+            matrix, consumer, list(range(24)), ctx
+        )
+        hours = [matrix[i]["slot_datetime"].hour for i in eligible]
+        assert 10 in hours
+        assert 13 in hours
+        assert 14 not in hours
+
+    def test_without_fertig_um_keeps_config_window(self):
+        consumer = self._config_consumer()
+        horizon = datetime(2026, 7, 16, 2, 0)
+        matrix = _hour_matrix(horizon, 24)
+        with patch.object(cc, "_loxone_ready_raw", return_value=None), _patch_eauto_capacity():
+            ctx = cc.resolve_charging_context(
+                consumer, matrix, None, logged_simulation=False
+            )
+        assert ctx["deadline"] == datetime(2026, 7, 16, 7, 0)
+        assert ctx["use_time_window"] is True

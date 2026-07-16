@@ -9,6 +9,7 @@ import pytest
 os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 
 from simulation.baseload_validation import (
+    baseload_kwh_from_chart_rows,
     derive_historical_baseload_kwh,
     resolve_hourly_baseload_kw,
 )
@@ -34,6 +35,19 @@ class TestResolveHourlyBaseload:
     def test_requires_equal_length(self):
         with pytest.raises(ValueError, match="gleich lang"):
             resolve_hourly_baseload_kw([1.0, 2.0], [1.0])
+
+
+class TestBaseloadFromChartRows:
+    def test_includes_known_generic_columns_after_chart_peel(self):
+        rows = [
+            {"Verbrauch-Prognose (kW)": 0.063, "Fernsehen (kW)": 0.2, "Smart (kW)": 1.0},
+            {"Verbrauch-Prognose (kW)": 0.063, "Kochen (kW)": 2.0, "Smart (kW)": 1.0},
+        ]
+        flex = [{"id": "ev", "name": "Smart"}]
+        assert baseload_kwh_from_chart_rows(rows) == pytest.approx(0.126)
+        assert baseload_kwh_from_chart_rows(rows, flexible_consumers=flex) == pytest.approx(
+            2.326
+        )
 
 
 class TestValidateWindowConsumption:
@@ -108,3 +122,28 @@ class TestPlanningFlexPlausibility:
         result = validate_window_consumption(rows, meta)
         assert result.ok
         assert result.optimized_flex_kwh == pytest.approx(5.6)
+
+    def test_ok_when_known_generics_peeled_from_baseload_column(self):
+        meta = {
+            "window_end": datetime(2025, 12, 15, 7, 0),
+            "consumption_source": "profile_spec",
+            "spec_total_kwh": 12.712,
+            "spec_baseload_kwh": 4.712,
+            "spec_flex_targets_kwh": {"ev": 8.0},
+            "historical_total_kwh": 12.712,
+            "baseload_kwh": 4.712,
+            "consumer_daily_targets_kwh": {"ev": 8.0},
+            "_flexible_consumers": [{"id": "ev", "name": "Smart"}],
+        }
+        rows = [
+            {
+                "Verbrauch-Prognose (kW)": 2.512,
+                "Fernsehen (kW)": 0.2,
+                "Kochen (kW)": 2.0,
+                "Smart (kW)": 8.0,
+            }
+        ]
+        result = validate_window_consumption(rows, meta)
+        assert result.ok
+        assert result.baseload_diff_kwh == pytest.approx(0.0, abs=0.05)
+        assert result.flex_diff_kwh == pytest.approx(0.0, abs=0.05)

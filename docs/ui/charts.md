@@ -1,12 +1,12 @@
 # Charts & Panels
 
-Gilt für die Seite **Monitor** (Sunset-2-Sunset, `ui/simulation_results.py`, `ui/charts.py`, `ui/live_mode.py`). Modus-Übersicht: [Betriebsmodi](betriebsmodi.md). **Scenario-Exploration** nutzt teils dieselben Chart-Komponenten, eigene Kosten- und Monatscharts.
+Gilt für die Seite **Monitor** (Sunset-2-Sunset, `ui/simulation_results.py`, `ui/charts.py`, `ui/live_mode.py`). Modus-Übersicht: [Betriebsmodi](betriebsmodi.md). **Szenario-Explorer** nutzt teils dieselben Chart-Komponenten, eigene Kosten- und Monatscharts.
 
 ## Seitenaufbau (Monitor / Sunset-2-Sunset)
 
 | Bereich | Inhalt |
 |---------|--------|
-| Kopf | Seitentitel, **?** mit Modus-Scope (Sunset-2-Sunset / Scenario-Exploration) |
+| Kopf | Seitentitel, **?** mit Modus-Scope (Sunset-2-Sunset / Szenario-Explorer) |
 | Sidebar | **Version** (Caption oben), Env-/Setup-Hinweise, Fortschritt Ersteinrichtung — **keine** PV-/Batterie-Parameter (diese auf **Live-Konfiguration** / Hauskonfigurator) |
 | Menü | `st.navigation`: Abschnitte Planung, Echtzeit-Umgebung, Betrieb, Analyse |
 | Charts | Chart 1 → Navigation ←/→ → Chart 2 |
@@ -148,6 +148,6 @@ Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/
 | **Optimierungs-Takt** | Viertelstunden; letzter Lauf main.py/App |
 | **Nächster main.py-Takt** | Countdown + **?** (Sync-Erklärung) |
 
-## Scenario-Exploration
+## Szenario-Explorer
 
-Eigene Charts und Monatsauswertung aus `runtime/backtesting_log.json` — ohne S-2-Navigation und ohne Produktiv-Log-Merge. UI-Seite: **Scenario-Exploration** (`scenario_exploration`).
+Eigene Charts und Monatsauswertung aus `runtime/backtesting_log.json` — ohne S-2-Navigation und ohne Produktiv-Log-Merge. UI-Seite: **Szenario-Explorer** (`scenario_explorer`).

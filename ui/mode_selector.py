@@ -5,10 +5,10 @@ import config
 import streamlit as st
 from runtime_store.env_vars import read_env
 
-UI_MODE_KEYS = ("sunset2sunset", "scenario_exploration", "price_forecast")
+UI_MODE_KEYS = ("sunset2sunset", "scenario_explorer", "price_forecast")
 UI_MODE_LABELS = {
     "sunset2sunset": "Sunset-2-Sunset",
-    "scenario_exploration": "Scenario-Exploration",
+    "scenario_explorer": "Szenario-Explorer",
     "price_forecast": "Preis-Prognose (Dev)",
 }
 
@@ -22,15 +22,15 @@ def _mode_keys_from_env(raw: str) -> list[str]:
 def get_enabled_ui_mode_keys() -> list[str]:
     """
     Aktivierte UI-Modus-Schlüssel aus EARNIE_UI_MODES
-    (kommagetrennt: sunset2sunset,scenario_exploration,price_forecast).
+    (kommagetrennt: sunset2sunset,scenario_explorer,price_forecast).
 
-    Ohne Env-Variable: Sunset-2-Sunset und Scenario-Exploration; Preis-Prognose nur wenn
+    Ohne Env-Variable: Sunset-2-Sunset und Szenario-Explorer; Preis-Prognose nur wenn
     ui.price_forecast_page_enabled in config.json true ist (Standard: false).
     """
     raw = read_env("UI_MODES")
     if raw:
         return _mode_keys_from_env(raw)
-    keys = ["sunset2sunset", "scenario_exploration"]
+    keys = ["sunset2sunset", "scenario_explorer"]
     if config.get_ui_price_forecast_page_enabled():
         keys.append("price_forecast")
     return keys
@@ -49,12 +49,17 @@ def render_ui_mode_env_notices() -> None:
     requested = {part.strip().lower() for part in raw.split(",") if part.strip()}
     if "historical" in requested:
         st.sidebar.info(
-            "Modus „Historischer Tag“ entfällt — Nachrechnung folgt in Scenario-Exploration."
+            "Modus „Historischer Tag“ entfällt — Nachrechnung folgt in Szenario-Explorer."
         )
     if "backtesting" in requested:
         st.sidebar.info(
             "Modus „Backtesting“ umbenannt — nutzen Sie "
-            "`scenario_exploration` in EARNIE_UI_MODES."
+            "`scenario_explorer` in EARNIE_UI_MODES."
+        )
+    if "scenario_exploration" in requested:
+        st.sidebar.info(
+            "Modus-Schlüssel `scenario_exploration` umbenannt — nutzen Sie "
+            "`scenario_explorer` in EARNIE_UI_MODES."
         )
     if requested and not any(part in UI_MODE_LABELS for part in requested):
         st.sidebar.warning(

@@ -1,9 +1,38 @@
-"""Shared helpers for Szenarien-Explorer backtesting progress (CLI + Streamlit UI)."""
+"""Shared helpers for Szenario-Explorer backtesting progress (CLI + Streamlit UI)."""
 from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
+
+from simulation.engine import scenario_reference_label
+
+_SCENARIO_REFERENCE_SUFFIX = " — ohne Optimierung"
+
+
+def sort_progress_snapshot_keys(
+    labels: Iterable[str],
+    *,
+    historical_reference_label: str,
+    live_scenario_label: str,
+) -> list[str]:
+    """UI order: historical ref, live ref, other refs, then optimized scenarios."""
+    live_reference_label = scenario_reference_label(live_scenario_label)
+
+    def rank(label: str) -> tuple[int, str]:
+        if label == historical_reference_label:
+            return (0, label)
+        if label == live_reference_label:
+            return (1, label)
+        if (
+            label.startswith("Referenz (")
+            and label.endswith(_SCENARIO_REFERENCE_SUFFIX)
+        ):
+            return (2, label)
+        return (3, label)
+
+    return sorted(labels, key=rank)
 
 
 def resolve_progress_dir(progress_path: str | None) -> Path | None:

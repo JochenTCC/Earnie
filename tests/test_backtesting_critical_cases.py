@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+
 from simulation.backtesting_log import (
     build_critical_cases,
     dedupe_critical_cases_by_window,
@@ -41,6 +43,32 @@ def test_build_critical_cases_merges_plausibility_and_cbc():
     summary = summarize_critical_cases(cases)
     assert summary["total"] == 2
     assert summary["distinct_windows"] == 2
+
+
+def test_build_critical_cases_attaches_window_consumption_to_cbc():
+    report = PlausibilityReport()
+    report.add(
+        PlausibilityResult(
+            window_end=datetime(2025, 9, 28, 10, 0, 0),
+            historical_kwh=20.0,
+            optimized_kwh=20.01,
+            diff_kwh=0.01,
+            ok=True,
+        )
+    )
+    cbc = {
+        "live": [
+            {
+                "event": "milp_no_optimal",
+                "window_anchor": "2025-09-28T10:00:00",
+                "final_status": "Infeasible",
+            }
+        ]
+    }
+    cases = build_critical_cases({"live": report}, cbc)
+    milp = next(c for c in cases if c["kind"] == "milp_no_optimal")
+    assert milp["window_consumption_diff_kwh"] == pytest.approx(0.01)
+    assert milp["window_consumption_ok"] is True
 
 
 def test_extract_critical_cases_from_legacy_meta():

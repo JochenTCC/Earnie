@@ -152,7 +152,7 @@ def test_missing_runtime_scenario_items_lists_gaps(tmp_path, monkeypatch):
     assert "Bezugstarif wählen (Echtzeit-Umgebung)" in missing
 
 
-def test_planning_ready_unlocks_scenario_exploration(tmp_path, monkeypatch):
+def test_planning_ready_unlocks_scenario_explorer(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(
         config_dir / "config.json",
@@ -216,7 +216,7 @@ def test_planning_ready_unlocks_scenario_exploration(tmp_path, monkeypatch):
 
 
 def test_loxone_sidebar_deferred_after_planning_unlock(tmp_path, monkeypatch):
-    """Greenfield: Scenario-Exploration frei, aber Loxone-.env noch Platzhalter."""
+    """Greenfield: Szenario-Explorer frei, aber Loxone-.env noch Platzhalter."""
     from runtime_store import dotenv_io
     from runtime_store.dotenv_io import format_loxone_dotenv
     from runtime_store.dotenv_loader import load_app_dotenv

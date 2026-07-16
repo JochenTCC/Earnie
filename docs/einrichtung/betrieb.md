@@ -41,7 +41,7 @@ Standardverzeichnis: `runtime/` (überschreibbar mit `EARNIE_RUNTIME_DIR`, Legac
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
 | `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `loxone_silent_mode`, `chart_debug_capture_enabled`)     |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
-| `backtesting_log.json`          | Ergebnis von Scenario-Exploration / `run_backtesting`                                        |
+| `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`                                        |
 
 
 Die App liest diese Dateien **read-only** für Panels und Abgleich.
@@ -59,7 +59,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `live_optimization_debug.json`       | **aktiv**                      | 24h-Anzeige-Snapshot für die Streamlit-App                    |
 | `system_history_log.csv`             | **Legacy, nur Lesen**          | Archivieren, sobald `optimization_history.jsonl` ausreicht    |
 | `pv_accuracy_log.csv`                | **Lesen aktiv, Schreiben aus** | Bestehende Einträge noch lesbar; Neuschreiben deaktiviert     |
-| `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis von Scenario-Exploration — nicht für Produktiv-NAS   |
+| `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis von Szenario-Explorer — nicht für Produktiv-NAS   |
 
 
 ## Umgebungsvariablen (optional)
@@ -69,12 +69,52 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `EARNIE_CONFIG_PATH`                    | Pfad zur `config.json` (Standard: `config/config.json`, Legacy: `config.json` im Root). Legacy-Alias: `ENERGY_OPTIMIZER_CONFIG_PATH`.                                                                                                |
 | `EARNIE_RUNTIME_DIR`                    | Anderes Verzeichnis für Laufzeitdaten                                                                                                                                                                                                |
-| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset`, `scenario_exploration` — schränkt sichtbare Analyse-Seiten ein (Prod: `sunset2sunset,scenario_exploration`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
+| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset`, `scenario_explorer` — schränkt sichtbare Analyse-Seiten ein (Prod: `sunset2sunset,scenario_explorer`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |
-| `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Chart-Debug speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). Legacy-Alias: `ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED`.                                  |
+| `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). Legacy-Alias: `ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED`.                                  |
 
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).
+
+## Debug-Dump (Chart / Prod)
+
+Zum Nachvollziehen von Anzeige- oder Optimizer-Problemen ohne erneutes Durchsuchen der Produktivdateien. Aktivierung wie oben (`ui.chart_debug_capture_enabled`, `local_settings.json` oder Env-Variable). Im Live-Cockpit: Dump-Typ wählen, speichern, ZIP herunterladen.
+
+| Dump-Typ | Zweck | Pflicht-Laufzeitdateien | Optionale Laufzeitdateien |
+| -------- | ----- | ----------------------- | ------------------------- |
+| **Chart** | UI-/Chart-Bugs | `runtime/optimization_history_window.jsonl` (Chart-Fenster ± 2 h) | `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json` |
+| **Prod** | Domain-/Optimizer-Fälle | `runtime/optimization_history.jsonl` (vollständig) | wie Chart, zusätzlich `pv_counter_state.json` |
+
+Gemeinsam in jedem ZIP:
+
+- `manifest.json` — `schema_version: 2`, `dump_type`, App-Version, Env-Overrides, aufgelöste Pfade; Chart-Payload unter `chart`, Prod-Metadaten unter `prod` (Titel/Symptom optional)
+- `inputs/*` — aktive `config.json`, Sidecars, optional Preis-Modell und `cons_data_hourly.csv`
+- `README.txt` — Kurzbeschreibung der Struktur
+
+Dateiname: `debug_dump_chart_…` bzw. `debug_dump_prod_…` unter `runtime/chart_debug/` (oder `ui.chart_debug_capture_dir`).
+
+### Replay (teilautomatisch)
+
+```bash
+python -m scripts.replay_debug_dump path/to/debug_dump_chart_….zip
+python -m scripts.replay_debug_dump path/to/debug_dump_prod_….zip --html-out /tmp/chart1.html
+```
+
+Prüft Pflichtdateien und führt einen Smoke-Pfad aus (Chart: Chart-1-Neuaufbau aus `display_rows`; Prod: Historie parsen und State-Dateien melden). Alte Chart-Debug-ZIPs mit `schema_version: 1` werden als Chart-Dump erkannt.
+
+### Prod-Dump als Regression-Fixture
+
+Ein gespeichertes Prod-ZIP kann nach `tests/fixtures/prod_dumps/<id>/` übernommen werden:
+
+```bash
+python scripts/archive_prod_dump.py \
+  --id mein_fall_2026-07-16 \
+  --title "Kurzbeschreibung" \
+  --symptom "Beobachtetes Fehlerbild" \
+  --source runtime/chart_debug/debug_dump_prod_….zip
+```
+
+Details: `tests/fixtures/prod_dumps/README.md`.
 
 ## Typische Betriebsfehler
 

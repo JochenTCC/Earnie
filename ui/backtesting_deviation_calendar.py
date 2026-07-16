@@ -77,6 +77,8 @@ def anchor_for_calendar_date(cell_date: date) -> datetime:
 def case_severity(case: dict) -> str:
     kind = str(case.get("kind", ""))
     if kind in _RED_KINDS:
+        if case.get("window_consumption_ok") is True:
+            return SEVERITY_YELLOW
         return SEVERITY_RED
     if kind == "consumption_tolerance":
         diff = abs(float(case.get("diff_kwh") or 0.0))
@@ -315,7 +317,8 @@ def render_deviation_calendar(
 
     st.caption(
         "Legende: ⚪ ohne Abweichung · 🟡 Verbrauchstoleranz (≤ "
-        f"{CONSUMPTION_TOLERANCE_KWH:g} kWh) · 🟠 darüber · 🔴 CBC/MILP · "
+        f"{CONSUMPTION_TOLERANCE_KWH:g} kWh) / CBC-Marker bei feasiblem 24h-Ergebnis · "
+        "🟠 darüber · 🔴 CBC/MILP mit echtem Problem · "
         "ausgegraut = außerhalb Lauf"
     )
 

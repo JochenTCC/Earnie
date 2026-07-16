@@ -8,7 +8,7 @@ from ui.backtesting import render_backtesting_block
 from ui.help_hint import render_page_title_with_help
 
 _BACKTESTING_HELP = (
-    "Szenarien-Explorer: Berechnung aus der Konfiguration starten und Ergebnisse auswerten "
+    "Szenario-Explorer: Berechnung aus der Konfiguration starten und Ergebnisse auswerten "
     "(Referenz ohne Optimierung vs. optimierte Szenarien). "
     "Läuft offline via `scripts.run_backtesting`."
 )
@@ -16,7 +16,7 @@ _BACKTESTING_HELP = (
 
 def render() -> None:
     render_page_title_with_help(
-        "📊 Szenarien-Explorer",
+        "📊 Szenario-Explorer",
         _BACKTESTING_HELP,
         key="backtesting_scope_help",
     )

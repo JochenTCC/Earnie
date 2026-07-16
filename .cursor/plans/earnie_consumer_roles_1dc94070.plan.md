@@ -160,7 +160,7 @@ Add German UI (when `runs_per_week > 0`):
 **Docs (German):**
 
 - [docs/konfiguration/flexible-verbraucher.md](docs/konfiguration/flexible-verbraucher.md) — replace § "fixe Generic-Verbraucher" with `earnie_role` table; document Verschiebung dual meaning (flex window vs manual horizon).
-- [docs/spec/scenario-exploration-consumption.md](docs/spec/scenario-exploration-consumption.md) — role-based MILP table.
+- [docs/spec/scenario-explorer-consumption.md](docs/spec/scenario-explorer-consumption.md) — role-based MILP table.
 
 **Page devices:** update captions/help in [ui/pages/page_devices.py](ui/pages/page_devices.py) for per-device horizon.
 

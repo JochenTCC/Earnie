@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/backtesting_scenarios.schema.json",
   "title": "Earnie Backtesting-Szenarien",
-  "description": "Szenarien für Scenario-Exploration und Live-Betrieb (live_scenario_id in config.json).",
+  "description": "Szenarien für Szenario-Explorer und Live-Betrieb (live_scenario_id in config.json).",
   "type": "object",
   "required": ["scenarios"],
   "properties": {

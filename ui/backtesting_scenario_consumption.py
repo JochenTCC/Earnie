@@ -1,4 +1,4 @@
-"""Szenario-Verbrauchsserien für die Szenarien-Explorer-Visualisierung."""
+"""Szenario-Verbrauchsserien für die Szenario-Explorer-Visualisierung."""
 from __future__ import annotations
 
 import pandas as pd

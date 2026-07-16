@@ -49,4 +49,4 @@ services:
     volumes: *persist-volumes
     environment:
       <<: *common-env
-      EARNIE_UI_MODES: sunset2sunset,scenario_exploration
+      EARNIE_UI_MODES: sunset2sunset,scenario_explorer

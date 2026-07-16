@@ -30,7 +30,38 @@ def _dir_with_history(path: Path) -> Path | None:
     return None
 
 
-def _resolve_source_dir(source: Path) -> Path:
+def _read_capture_manifest(extract_root: Path) -> dict | None:
+    path = extract_root / "manifest.json"
+    if not path.is_file():
+        return None
+    with open(path, encoding="utf-8") as handle:
+        data = json.load(handle)
+    return data if isinstance(data, dict) else None
+
+
+def _copy_inputs_from_extract(extract_root: Path, target: Path) -> list[str]:
+    """Copy inputs/ from a unified dump extract into the fixture folder."""
+    inputs_dir = extract_root / "inputs"
+    if not inputs_dir.is_dir():
+        return []
+    copied: list[str] = []
+    for path in sorted(inputs_dir.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(extract_root).as_posix()
+        dest = target / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, dest)
+        copied.append(rel)
+    return copied
+
+
+def _resolve_source_dir(source: Path) -> tuple[Path, Path | None, dict | None]:
+    """
+    Resolve history directory.
+
+    Returns (history_dir, extract_root_or_None, capture_manifest_or_None).
+    """
     if source.is_dir():
         for candidate in (
             source,
@@ -40,7 +71,8 @@ def _resolve_source_dir(source: Path) -> Path:
         ):
             found = _dir_with_history(candidate)
             if found is not None:
-                return found
+                manifest = _read_capture_manifest(source)
+                return found, source if manifest else None, manifest
         raise FileNotFoundError(
             f"Kein optimization_history.jsonl unter {source} "
             "(erwartet Ordner, runtime/, data/, _full/ oder .zip)"
@@ -52,6 +84,7 @@ def _resolve_source_dir(source: Path) -> Path:
         target.mkdir(parents=True)
         with zipfile.ZipFile(source, "r") as archive:
             archive.extractall(target)
+        manifest = _read_capture_manifest(target)
         for candidate in (
             target,
             target / "runtime",
@@ -59,7 +92,7 @@ def _resolve_source_dir(source: Path) -> Path:
         ):
             found = _dir_with_history(candidate)
             if found is not None:
-                return found
+                return found, target, manifest
         raise FileNotFoundError(
             f"Kein optimization_history.jsonl in {source} "
             "(ZIP mit runtime/ oder flachem Ordner erwartet)"
@@ -120,7 +153,7 @@ def archive_prod_dump(
         shutil.rmtree(target)
     target.mkdir(parents=True)
 
-    source_dir = _resolve_source_dir(source)
+    source_dir, extract_root, capture_manifest = _resolve_source_dir(source)
     copied: list[str] = []
     for name in ARCHIVE_FILES:
         src = source_dir / name
@@ -128,7 +161,19 @@ def archive_prod_dump(
             continue
         shutil.copy2(src, target / name)
         copied.append(name)
-    copied.extend(copy_inputs_to_directory(target))
+
+    input_roots: list[Path] = []
+    if extract_root is not None:
+        input_roots.append(extract_root)
+    input_roots.extend((source_dir, source_dir.parent))
+    dumped_inputs: list[str] = []
+    for root in input_roots:
+        dumped_inputs = _copy_inputs_from_extract(root, target)
+        if dumped_inputs:
+            copied.extend(dumped_inputs)
+            break
+    if not dumped_inputs:
+        copied.extend(copy_inputs_to_directory(target))
 
     if "optimization_history.jsonl" not in copied:
         raise FileNotFoundError(
@@ -136,17 +181,35 @@ def archive_prod_dump(
         )
 
     dump_context = collect_dump_context()
+    env_overrides = dump_context["env_overrides"]
+    resolved_paths = dump_context["resolved_paths"]
+    resolved_app_version = app_version
+    resolved_title = title
+    resolved_symptom = symptom
+    if isinstance(capture_manifest, dict):
+        if not resolved_app_version:
+            resolved_app_version = str(capture_manifest.get("app_version") or "")
+        prod = capture_manifest.get("prod")
+        if isinstance(prod, dict):
+            if not resolved_title and prod.get("title"):
+                resolved_title = str(prod["title"])
+            if not resolved_symptom and prod.get("symptom"):
+                resolved_symptom = str(prod["symptom"])
+        if capture_manifest.get("env_overrides"):
+            env_overrides = capture_manifest["env_overrides"]
+        if capture_manifest.get("resolved_paths"):
+            resolved_paths = capture_manifest["resolved_paths"]
 
     _write_manifest(
         target,
         case_id=case_id,
-        title=title,
-        symptom=symptom,
-        app_version=app_version,
+        title=resolved_title,
+        symptom=resolved_symptom,
+        app_version=resolved_app_version,
         recorded_at=recorded_at,
         files=copied,
-        env_overrides=dump_context["env_overrides"],
-        resolved_paths=dump_context["resolved_paths"],
+        env_overrides=env_overrides,
+        resolved_paths=resolved_paths,
         regression=regression or {},
     )
     return target
@@ -154,7 +217,10 @@ def archive_prod_dump(
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Produktiv-Dump nach tests/fixtures/prod_dumps/ archivieren",
+        description=(
+            "Produktiv-Dump nach tests/fixtures/prod_dumps/ archivieren "
+            "(Ordner, NAS-ZIP oder unified debug_dump_prod_*.zip)"
+        ),
     )
     parser.add_argument("--id", required=True, help="Eindeutige Fall-Kennung (Ordnername)")
     parser.add_argument("--title", required=True, help="Kurzbeschreibung")

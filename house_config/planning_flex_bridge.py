@@ -679,8 +679,34 @@ def _used_chart_color_indices(consumers: list[dict]) -> set[int]:
     return used
 
 
-def _allocate_chart_color_index(used: set[int], consumer_id: str) -> int:
-    for index in range(CONSUMER_PALETTE_SIZE):
+# Historical Chart-1 / Sankey indices (Consumer colors P1): violet→…→orange palette.
+# Used when config.json has no flexible_consumers row to overlay from.
+_DEFAULT_CHART_COLOR_INDEX_BY_ID: dict[str, int] = {
+    "swimspa": 0,
+    "swimspa_filter": 1,
+    "eauto": 2,
+    "ev": 2,
+    "waermepumpe": 7,
+    "wp_heating": 7,
+}
+
+# Prefer violet/blue/cyan/orange over mid-palette greens (indices 3–6) for auto-assign.
+_CHART_COLOR_ALLOCATION_ORDER: tuple[int, ...] = (0, 1, 2, 7, 6, 3, 5, 4)
+
+
+def _allocate_chart_color_index(
+    used: set[int],
+    consumer_id: str,
+    *,
+    legacy_id: str | None = None,
+) -> int:
+    for key in (consumer_id, legacy_id):
+        if not key:
+            continue
+        preferred = _DEFAULT_CHART_COLOR_INDEX_BY_ID.get(str(key))
+        if preferred is not None and preferred not in used:
+            return preferred
+    for index in _CHART_COLOR_ALLOCATION_ORDER:
         if index not in used:
             return index
     return sum(ord(char) for char in consumer_id) % CONSUMER_PALETTE_SIZE
@@ -762,7 +788,11 @@ def merge_flexible_consumers(
         if canonical_id in merged_map:
             continue
         if entry.get("chart_color_index") is None:
-            index = _allocate_chart_color_index(used_indices, canonical_id)
+            index = _allocate_chart_color_index(
+                used_indices,
+                canonical_id,
+                legacy_id=legacy_id or None,
+            )
             entry["chart_color_index"] = index
             used_indices.add(index)
         merged_map[canonical_id] = entry

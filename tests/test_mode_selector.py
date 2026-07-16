@@ -13,7 +13,7 @@ def test_default_modes_exclude_historical_and_price_forecast(monkeypatch):
         lambda: False,
     )
     modes = get_enabled_ui_modes()
-    assert modes == ["Sunset-2-Sunset", "Scenario-Exploration"]
+    assert modes == ["Sunset-2-Sunset", "Szenario-Explorer"]
     assert "Historischer Tag" not in modes
     assert "Preis-Prognose (Dev)" not in modes
 
@@ -26,23 +26,23 @@ def test_price_forecast_mode_when_config_enabled(monkeypatch):
     )
     assert get_enabled_ui_modes() == [
         "Sunset-2-Sunset",
-        "Scenario-Exploration",
+        "Szenario-Explorer",
         "Preis-Prognose (Dev)",
     ]
 
 
 def test_prod_modes_from_env(monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_UI_MODES", "sunset2sunset,scenario_exploration")
-    assert get_enabled_ui_modes() == ["Sunset-2-Sunset", "Scenario-Exploration"]
+    monkeypatch.setenv("ENERGY_OPTIMIZER_UI_MODES", "sunset2sunset,scenario_explorer")
+    assert get_enabled_ui_modes() == ["Sunset-2-Sunset", "Szenario-Explorer"]
 
 
 def test_historical_in_env_is_ignored(monkeypatch):
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_UI_MODES", "sunset2sunset,historical,scenario_exploration"
+        "ENERGY_OPTIMIZER_UI_MODES", "sunset2sunset,historical,scenario_explorer"
     )
     modes = get_enabled_ui_modes()
     assert "Historischer Tag" not in modes
-    assert modes == ["Sunset-2-Sunset", "Scenario-Exploration"]
+    assert modes == ["Sunset-2-Sunset", "Szenario-Explorer"]
 
 
 def test_ui_mode_keys_has_no_historical():

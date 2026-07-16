@@ -41,6 +41,10 @@ def test_anchor_for_calendar_date_matches_engine():
 def test_case_severity_red_yellow_orange():
     assert case_severity({"kind": "strict_slow"}) == SEVERITY_RED
     assert case_severity({"kind": "milp_no_optimal"}) == SEVERITY_RED
+    assert (
+        case_severity({"kind": "strict_fallback", "window_consumption_ok": True})
+        == SEVERITY_YELLOW
+    )
     tol = CONSUMPTION_TOLERANCE_KWH
     assert case_severity({"kind": "consumption_tolerance", "diff_kwh": tol}) == SEVERITY_YELLOW
     assert case_severity({"kind": "consumption_tolerance", "diff_kwh": tol + 0.01}) == SEVERITY_ORANGE
@@ -52,6 +56,14 @@ def test_worst_severity_across_cases():
         {"kind": "strict_slow"},
     ]
     assert worst_severity(cases) == SEVERITY_RED
+
+
+def test_worst_severity_keeps_feasible_cbc_yellow():
+    cases = [
+        {"kind": "consumption_tolerance", "diff_kwh": 0.1},
+        {"kind": "strict_fallback", "window_consumption_ok": True},
+    ]
+    assert worst_severity(cases) == SEVERITY_YELLOW
 
 
 def test_build_index_multi_scenario_same_day():
@@ -81,6 +93,26 @@ def test_build_index_multi_scenario_same_day():
     assert cell.in_run is True
     assert cell.severity == SEVERITY_RED
     assert set(cell.cases_by_scenario.keys()) == {"live", "s2-kein-pv"}
+
+
+def test_build_index_marks_feasible_cbc_day_yellow():
+    day = date(2025, 3, 1)
+    anchor = anchor_for_calendar_date(day)
+    anchor_iso = normalize_window_anchor_key(anchor)
+    meta = _sample_meta(start="2025-03-01", end="2025-03-31")
+    cases = [
+        {
+            "kind": "milp_no_optimal",
+            "scenario_id": "live",
+            "window_anchor": anchor_iso,
+            "window_consumption_ok": True,
+            "window_consumption_diff_kwh": 0.006,
+        }
+    ]
+    index = build_deviation_calendar_index(meta, cases, run_anchors=[anchor])
+    cell = index[day]
+    assert cell.in_run is True
+    assert cell.severity == SEVERITY_YELLOW
 
 
 def test_build_index_test_month_bounds():

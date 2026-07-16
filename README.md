@@ -58,7 +58,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 - **Monitor** (mit vollem Optimierungs-Horizont) — Energiefluss, SOC-Verlauf der Batterie, Verbraucherverhalten, Lade-Kontrolle der Batterie von Earnie
 - **Hauskonfigurator / Szenarieneditor** — Umfangreiche Konfiguration des Hauses mit allen Verbrauchern zur Planung und Szenario-Exploration
 - **Manuelle Geräte** — Laufzeiten mithilfe von Earnie planen und Empfehlungen annehmen
-- **Scenario-Exploration** — Szenarien vergleichen (Was-Wäre-Wenn Analysen)
+- **Szenario-Explorer** — Szenarien vergleichen (Was-Wäre-Wenn Analysen)
 - **Verbraucheranalyse** — autonom vs. Earnie-initiiert
 
 
@@ -117,7 +117,6 @@ Einrichtung, Konfiguration, [Streamlit](https://streamlit.io/)-Oberfläche und [
 - **Adaptation** — PV- und thermische Parameter-Anpassung über die Zeit
 - **Thermals** — Gekoppelte Haus-/Speicher-/Solar-Modelle
 - **Smartere Geräte-Empfehlungen** — adaptive Leistung und Laufzeit für Haushaltsgeräte
-- **Debug dumps phase 2** — reproduzierbare Chart-/Prod-Fehlerarchive
 - **Streamlit-Steuerung von** `main.py` — einheitlichere Bedienung im [Docker](https://www.docker.com/)-Container
 
 Earnie wird weitgehend mit Hilfe von [Cursor](https://cursor.com/) entwickelt.

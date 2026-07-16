@@ -78,7 +78,7 @@ Replace all `!Kapitel…` / `!User…` / `!Stark…` / `!Technische…` placehol
 1. **One-liner** — expand current line 3 into outcome-focused sentence (PV + Speicher + flexible Verbraucher, 15-min Takt, Loxone, Streamlit).
 2. **Was ist Earnie?** — 3 short paragraphs: target audience, what the optimizer does (24h plan, prices/PV/SOC), split `main.py` vs Streamlit roles (align with [docs/einrichtung/betrieb.md](docs/einrichtung/betrieb.md)).
 3. **Was bringt Earnie?** — 5–6 outcome bullets (cost, storage, flex devices, transparency/S-2, scenario what-if, Loxone-native).
-4. **Funktionen** — grouped bullets (Optimierung, Verbraucher inkl. `earnie_role` known/flex/manual, UI pages, Betrieb). Use current terminology: **Monitor / Sunset-2-Sunset**, **Scenario-Exploration** — not legacy “Echtzeit/Historisch”.
+4. **Funktionen** — grouped bullets (Optimierung, Verbraucher inkl. `earnie_role` known/flex/manual, UI pages, Betrieb). Use current terminology: **Monitor / Sunset-2-Sunset**, **Szenario-Explorer** — not legacy “Echtzeit/Historisch”.
 5. **Typischer Ablauf** — numbered 7-step operator journey (prerequisites → deployment choice → config → verify → `main.py` → Streamlit → tuning). Each step links to the matching doc page; **no** full command blocks except the single verify hint if needed.
 6. **Screenshot** — `![Earnie Monitor — Sunset-2-Sunset](docs/assets/monitor-sunset2sunset.png)` with one-line caption.
 7. **Anwender-Dokumentation** — compact link tree mirroring [docs/README.md](docs/README.md) TOC (Einrichtung / Konfiguration / UI / Referenz); keep existing pointer to `docs/README.md` as primary entry.

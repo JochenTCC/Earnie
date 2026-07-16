@@ -3,6 +3,46 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix SE baseline progress + parallel workers (2026-07-16)
+
+- [x] **SE baseline/reference progress bar** — reference simulations report hourly progress (`phase: reference`) via per-worker JSON snapshots; Streamlit shows per-task bars including historical reference (`scripts/run_backtesting.py` `_run_reference_worker`, `ui/backtesting.py`)
+- [x] **Run-time progress feedback** — active tasks show `current/total h` (and `Referenz` label for baseline phase) during parallel runs
+- [x] **Worker count matches all parallel tasks** — `count_backtesting_parallel_tasks` = main reference + per-scenario extra references + optimized scenarios; `auto_backtesting_workers` uses `min(task_count, cpu_count − 1)`; references run in the same `ProcessPoolExecutor` as scenarios (`ui/backtesting_runner.py`, `_run_parallel_backtesting`); test `test_count_backtesting_parallel_tasks_includes_reference`
+
+
+### Bugfix Detaillierte Simulationsansicht CBC severity (2026-07-16)
+
+- [x] **Detaillierte Simulationsansicht marks feasible CBC/MILP windows yellow instead of red** — backtesting critical cases now carry the window plausibility result (`window_consumption_ok`, `window_consumption_diff_kwh`); `ui/backtesting_deviation_calendar.py` classifies `strict_fallback` / `milp_no_optimal` / `strict_slow` as yellow when the 24h result stayed within tolerance, otherwise red; deviation detail keeps showing the actual 24h Δ kWh for CBC cases
+- [x] **Runtime verification** — March 2025 silent-migration-test rerun (`written_at 2026-07-16T10:37:17`) shows 31/31 plausibility OK; former red windows `2025-03-01T12:00:00` and `2025-03-15T12:00:00` remain CBC/MILP events but classify yellow because the 24h result is feasible (`Δ ≈ +0.01 kWh`)
+
+
+### Debug dump phase 2 — unified archive + replay (2026-07-16)
+
+- [x] **Unified debug dump (schema v2)** — one ZIP layout with `dump_type: chart | prod`; shared `inputs/` via `runtime_store/debug_dump_inputs.py`; writer `runtime_store/debug_dump_archive.py`; chart payload under `manifest.chart`, prod metadata under `manifest.prod`
+- [x] **UI trigger for both types** — Cockpit „Debug-Dump speichern“ with Chart/Prod selector (optional title/symptom for prod); same enable gate `ui.chart_debug_capture_enabled` / env / local_settings
+- [x] **Required/optional files per profile** — chart: `optimization_history_window.jsonl` (±2 h); prod: full `optimization_history.jsonl`; optional runtime state files documented in ZIP README + [`docs/einrichtung/betrieb.md`](../docs/einrichtung/betrieb.md)
+- [x] **Partial replay** — `python -m scripts.replay_debug_dump` (chart Chart-1 rebuild smoke; prod history/state smoke; schema v1 chart ZIPs still accepted)
+- [x] **Fixture promotion** — `scripts/archive_prod_dump.py` ingests unified `debug_dump_prod_*.zip` (prefers dump `inputs/`); [`tests/fixtures/prod_dumps/README.md`](../tests/fixtures/prod_dumps/README.md) updated
+- [x] **Tests** — `tests/test_debug_dump_archive.py`; chart capture tests updated for schema v2 filenames
+
+
+### Bugfix Chart 1 EV as Einspeisung (PV) (2026-07-16)
+
+- [x] **Chart 1 — EV charging shown as Einspeisung (PV)** — history→chart flex lookup used canonical id `ev` while live log keys (`flex_measured_ids`, `flex_live_kw`, `consumption_snapshot.flex_kw`) still use `legacy_id` `eauto`, so `Smart (kW)` was `None` and residual grid import was labeled surplus PV export; `_consumer_kw_from_entry` now bridges runtime/canonical ids via `runtime_consumer_id` / `flex_kw_lookup` (`runtime_store/history_timeline.py`); test `tests/test_history_timeline.py::test_entry_to_chart_row_bridges_legacy_measured_flex_id`; dump `chart_debug_review/chart_debug_20260716_065036`
+- [x] **Live verification** — Chart 1 night window shows Smart bars instead of Einspeisung (PV)
+
+
+### Bugfix Hauskonfigurator / Szenarieneditor stale widget state (2026-07-16)
+
+- [x] **Hauskonfigurator / Szenarieneditor stale widget state after page navigation** — Bezeichnung empty and entity fields showed defaults (`— keine —` / implausible values) after switching pages; disk data unchanged. Fix: `_widget_state_missing` reseed in `_sync_pv_session`, `_sync_scenario_session`, `_sync_battery_session` (Hausprofil already had `_profile_widget_state_missing`). Tests: `test_sync_pv_session_reseeds_when_widget_keys_missing`, `test_sync_scenario_session_reseeds_when_widget_keys_missing`, `test_sync_battery_session_reseeds_when_widget_keys_missing`
+- [x] **Live verification** — PV, Batterie, and Szenarieneditor fields show saved values after page navigation (prod)
+
+
+### Bugfix Loxone marker Ernie_WP_Freigabe not sent (2026-07-15)
+
+- [x] **Loxone marker `Ernie_WP_Freigabe` not sent anymore** — heat-pump enable output restored via house-profile `wp_heating` / `loxone_outputs.enable_name` (migration/bridge keeps marker wired); live verification confirms marker is sent again
+
+
 ### Bugfix Chart 1 generic `known` consumers (2026-07-15)
 
 - [x] **Chart 1 — generic `known` consumers as separate Down-traces** — still Grundlast for optimization (`house_profile_baseload_overlay`); display peels schedule kW into named columns (`house_config/known_chart_display.py`, `_finalize_chart_rows_for_display`, Chart 1 stack in `ui/chart_consumer_stack.py`); tests `tests/test_known_chart_display.py`
@@ -32,7 +72,7 @@ Plan [`.cursor/plans/earnie_consumer_roles_1dc94070.plan.md`](../.cursor/plans/e
 - [x] **Hauskonfigurator UI** — „Earnie-Berücksichtigung“ selectbox; Verschiebung (flex) vs Empfehlungshorizont (manual); `known` hides shift and persists `start_shift_h: 0`
 - [x] **Manuelle Geräte** — per-device recommendation horizon from Hausprofil (`ui/pages/page_devices.py`)
 - [x] **Migration & examples** — `scripts/migrate_flex_consumers.py` sets `earnie_role: manual`; `config/house_profiles.example.json` updated
-- [x] **Tests & docs** — `tests/test_earnie_role.py` and related updates; [`docs/konfiguration/flexible-verbraucher.md`](../docs/konfiguration/flexible-verbraucher.md), [`docs/spec/scenario-exploration-consumption.md`](../docs/spec/scenario-exploration-consumption.md)
+- [x] **Tests & docs** — `tests/test_earnie_role.py` and related updates; [`docs/konfiguration/flexible-verbraucher.md`](../docs/konfiguration/flexible-verbraucher.md), [`docs/spec/scenario-explorer-consumption.md`](../docs/spec/scenario-explorer-consumption.md)
 
 _Live verification: pending (Hauskonfigurator save on existing profiles to persist explicit roles)._
 
@@ -80,7 +120,7 @@ Open → [Backlog.md](Backlog.md) § Version 2.0 (Expand README; post-release cl
 
 Archived from [Backlog.md](Backlog.md) when migration **1.95–1.99** closed (P6b live cutover ✓).
 
-Scenario Exploration consumption model → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-13). Spec: [`docs/spec/scenario-exploration-consumption.md`](../docs/spec/scenario-exploration-consumption.md).
+Szenario-Explorer consumption model → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-13). Spec: [`docs/spec/scenario-explorer-consumption.md`](../docs/spec/scenario-explorer-consumption.md).
 
 Version **1.93** (unified scenario model) → [Backlog-Erledigt.md](Backlog-Erledigt.md) (2026-07-14). **1.99** live cutover (P6b) ✓ (2026-07-15).
 
@@ -213,7 +253,7 @@ Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-mi
 - [x] **P1a — Resolved flex registry** — `simulation.engine.resolved_flexible_consumers()`; `consumer_has_daily_target()` for `generic_flex_window`, `thermal_annual`, EV `charging_schedule` (`settings/flexible_consumers.py`)
 - [x] **P1b — Backtesting Chart 1** — display bundle / `flex_consumers_from_snapshot` → `chart_flex_consumers_context`; bridged generics in down-stack (`ui/backtesting_display_bundle.py`, `ui/chart_consumer_stack.py`)
 - [x] **P1c — Live cockpit + Sankey** — Chart 1 + Sankey use resolved flex when `house_profile_id` set; Sankey `flex_kw` via `runtime_consumer_id` / `legacy_id` (`ui/sankey.py`, `ui/charts.py`)
-- [x] **P1d — Tests & docs** — `tests/test_chart_consumer_stack.py`; [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md) UI discovery section
+- [x] **P1d — Tests & docs** — `tests/test_chart_consumer_stack.py`; [`docs/spec/scenario-explorer-consumption.md`](docs/spec/scenario-explorer-consumption.md) UI discovery section
 - [x] **Bugfix `config.reload` circular import** — lazy `hour_in_charging_window` import in `house_config/ev_profile.py` (Sankey/countdown fragments on `reload_runtime_config()`)
 - [x] **EV bridge Loxone passthrough** — `planning_ev_to_milp` copies `loxone_inputs` / `loxone_outputs` / `charging_schedule.loxone` from house profile (`house_config/planning_flex_bridge.py`; tests `tests/test_planning_matrix_profile_spec.py`)
 - [x] **1.96d prod migration (silent stack)** — `migrate_flex_consumers` on `silent-migration-test`; `appliances[]` retired; WM/Trockner/GS as profile `generic` consumers; manual Chart 1 / Sankey parity confirmed
@@ -261,7 +301,7 @@ Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-mi
 
 ### NAS migration plan — manual validation (2026-07-14)
 
-Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — execution block *Validation* (greenfield / Scenario Exploration).
+Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — execution block *Validation* (greenfield / Szenario-Explorer).
 
 - [x] **Dynamic tariff** — heating shifts vs PWM reference (`haus` thermal, `optimizer_flex=false`; optional retest with `optimizer_flex=true`)
 - [x] **Full-year SE `live`** — 2026-05-14 EV deadline / MILP Infeasible resolved (→ § Bugfix EV Modus B preset deadline); optional full SE re-run to confirm `failed_count: 0`
@@ -270,7 +310,7 @@ Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-mi
 
 ### Bugfix EV Modus B preset deadline (2026-07-14)
 
-Full-year Scenario Exploration (`live`, greenfield): sole MILP failure on **2026-05-14** — `Infeasible` at 06:00, **−5.84 kWh** EV gap (other flex on target).
+Full-year Szenario-Explorer (`live`, greenfield): sole MILP failure on **2026-05-14** — `Infeasible` at 06:00, **−5.84 kWh** EV gap (other flex on target).
 
 - [x] **Root cause** — after MILP partial delivery (11 kWh at 18:00), Modus B preset charged only when `t=0` was the cheapest eligible hour; 5.84 kWh tail never delivered overnight → last-hour MILP infeasible
 - [x] **Fix** — `ev_preset_power_now` also charges under deadline pressure (`must_start`) or when remaining eligible slots ≤ delivery slots needed (`optimizer/eauto_milp.py`)
@@ -296,7 +336,7 @@ Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-mi
 
 ### 1.96 — migration validation minor changes (2026-07-14)
 
-Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — UX and tooling around silent stack and Szenarien-Explorer.
+Plan [`docs/spec/nas-consumer-migration-1.95-1.99.md`](docs/spec/nas-consumer-migration-1.95-1.99.md) — UX and tooling around silent stack and Szenario-Explorer.
 
 - [x] **migrate_flex_consumers** — integrated in `setup_silent_migration_test`; `thermal_annual` ordered first; local silent stack migrated + `startup_checks` OK
 - [x] **Chart 1 Haus Wärme** — `wp_heating` MILP display name via `planning_thermal_to_milp` → „Haus Wärme“
@@ -363,9 +403,9 @@ PV (`pv_kw`) and Solar-Kollektor (Haus Wärme) share the **same Open-Meteo archi
 **Deferred to other chapters:** **Thermals P1a** (MILP pulse timing, **1.98**) · **P6b** (live `main.py` Loxone `cons_data` append cutover, **1.94**)
 
 
-### Version 1.93 — Scenario Exploration consumption model (2026-07-13)
+### Version 1.93 — Szenario-Explorer consumption model (2026-07-13)
 
-Baseline vs optimized load separation for SE / greenfield backtesting. Spec: [`docs/spec/scenario-exploration-consumption.md`](docs/spec/scenario-exploration-consumption.md).
+Baseline vs optimized load separation for SE / greenfield backtesting. Spec: [`docs/spec/scenario-explorer-consumption.md`](docs/spec/scenario-explorer-consumption.md).
 
 - [x] **Step 1 — Targets & matrix input** — `consumer_daily_targets_kwh` from `planning_flex_daily_targets`; baseload from house-profile overlay; `consumption_source=profile_spec` default for greenfield/SE
 - [x] **Step 2 — Plausibility & reference** — plausibility vs profile-spec totals; `compute_historical_reference_costs` with scenario tariffs; `build_per_scenario_reference_costs` + `reference_by_scenario`
@@ -381,7 +421,7 @@ Baseline vs optimized load separation for SE / greenfield backtesting. Spec: [`d
 
 Greenfield smoke **2026-07-12**; backtesting iteration **2026-07-13**; chapter closed **2026-07-14**. Related smoketest phases A–C → sections above in this archive.
 
-- [x] **Scenario-Exploration without PV** — optimization/backtesting path complete when `pv_system_id` unset (battery-only MILP/simulation gaps closed on top of P1 optional-PV baseline)
+- [x] **Szenario-Explorer without PV** — optimization/backtesting path complete when `pv_system_id` unset (battery-only MILP/simulation gaps closed on top of P1 optional-PV baseline)
 - [x] **EV nominal voltage for power calculation** — configurable per EV consumer (`charging_schedule.nominal_power_voltage_v` / `nominal_power_phases`, house profile + `flexible_consumers`); shared helper [`settings/ev_power.py`](settings/ev_power.py) for live (`integrations/loxone_client.py`) and planning (`house_config/planning_flex_bridge.py`); default 230 V / 1 phase when unset; schemas, Hauskonfigurator UI, [`docs/referenz/loxone-signale.md`](docs/referenz/loxone-signale.md); tests [`tests/test_ev_power.py`](tests/test_ev_power.py)
 
 Components (`components.json` sidecar) → *Version 1.93 Components* below.
@@ -400,7 +440,7 @@ Former backlog **2.0 P1–P7**; chapter closed **2026-07-14**. Implementation ph
 
 | Topic | Decision |
 | ----- | -------- |
-| `EARNIE_UI_MODES` key | Hard rename `backtesting` **→** `scenario_exploration` — no alias (P2) |
+| `EARNIE_UI_MODES` key | Hard rename `backtesting` **→** `scenario_explorer` — no alias (P2) |
 | Scenario id `runtime_settings` | **Removed in 1.93 P2** — live baseline via `live_scenario_id` (default `live`) (P2) |
 | Battery without PV | **Allowed** — battery required for MILP; PV optional (P1) |
 | **7g-a** before P6 | **Skip for 1.93** — parallel NAS after local silent acceptance; 7g-a stays in Packaging backlog |
@@ -480,7 +520,7 @@ Superseded for SE/backtesting/synthesis by *Unified Open-Meteo solar* above. Leg
 
 ### Smoketest bugfix — Hausprofil Bezeichnung (2026-07-12)
 
-- [x] **Bezeichnung** empty when switching Scenario-Exploration → Hauskonfigurator — greenfield smoke 2026-07-12
+- [x] **Bezeichnung** empty when switching Szenario-Explorer → Hauskonfigurator — greenfield smoke 2026-07-12
 - [x] **Fix:** `_sync_profile_session` re-seeds scoped widget state when keys are dropped after page navigation (`_profile_widget_state_missing` in `ui/house_config_profile_form.py`)
 - [x] **Tests:** `tests/test_planning_editors.py` (`test_sync_profile_session_reseeds_when_widget_keys_missing`, `test_seed_profile_widget_state_uses_existing_annual_kwh`)
 
@@ -492,9 +532,9 @@ Superseded for SE/backtesting/synthesis by *Unified Open-Meteo solar* above. Leg
 - [x] **Tests:** `tests/test_scenario_form_helpers.py`, `tests/test_planning_editors.py` (`test_upsert_scenario_appends_new_entry`)
 
 
-### Smoketest UX — Szenarien-Explorer copy (2026-07-12)
+### Smoketest UX — Szenario-Explorer copy (2026-07-12)
 
-- [x] **Rename user-visible "Backtesting" → "Szenarien-Explorer"** — `ui/pages/page_backtesting.py`, `ui/backtesting.py` (page title, buttons, status, warnings, log captions); file/script/module names unchanged
+- [x] **Rename user-visible "Backtesting" → "Szenario-Explorer"** — `ui/pages/page_backtesting.py`, `ui/backtesting.py` (page title, buttons, status, warnings, log captions); file/script/module names unchanged
 
 
 ### Smoketest UX — remove Auflösung testen (2026-07-12)
@@ -512,10 +552,10 @@ Superseded for SE/backtesting/synthesis by *Unified Open-Meteo solar* above. Leg
 ### Bugfix Greenfield Loxone credential sidebar (2026-07-12)
 
 - [x] **Greenfield: Loxone credential sidebar disappears before credentials saved** — greenfield smoke 2026-07-11; re-opened and **verified 2026-07-12**
-- [x] **Root cause:** `scripts/run_backtesting.py` set `ENERGY_OPTIMIZER_OFFLINE=1` at **import** time when Scenario-Exploration loaded; next rerun `loxone_setup_deferred()` returned false → sidebar expander hidden
+- [x] **Root cause:** `scripts/run_backtesting.py` set `ENERGY_OPTIMIZER_OFFLINE=1` at **import** time when Szenario-Explorer loaded; next rerun `loxone_setup_deferred()` returned false → sidebar expander hidden
 - [x] **Fix:** `OFFLINE` only when backtesting runs as `__main__` + explicit flag in `ui/backtesting_runner._subprocess_env()`; `render_deferred_loxone_sidebar()` from `app.py` (decoupled from setup notices); hardened `loxone_setup_deferred()` / explicit empty `flexible_consumers` check in `ui/setup_readiness.py`
 - [x] **Tests:** `tests/test_setup_progress.py`, `tests/test_setup_readiness.py`, `tests/test_backtesting_ui_helpers.py` (`test_run_backtesting_module_import_does_not_force_offline`)
-- [x] **Acceptance:** greenfield — navigate Scenario-Exploration ↔ Szenarieneditor ↔ Hauskonfigurator before `.env` save; expander **"Loxone-Zugang (Live / Silent-Modus)"** persists until credentials saved
+- [x] **Acceptance:** greenfield — navigate Szenario-Explorer ↔ Szenarieneditor ↔ Hauskonfigurator before `.env` save; expander **"Loxone-Zugang (Live / Silent-Modus)"** persists until credentials saved
 
 
 
@@ -528,7 +568,7 @@ Completes entity-catalog split from 1.26.0 / 1.93 P2: `batteries[]` and `pv_syst
 - [x] **Components P3 — UI & editors** — `[ui/house_config_io.py](ui/house_config_io.py)` `upsert_battery` / `upsert_pv_system`; help strings in `[ui/config_forms.py](ui/config_forms.py)`
 - [x] **Components P4 — Migration & fixtures** — `[scripts/migrate_components_sidecar.py](scripts/migrate_components_sidecar.py)`; `[house_config/migrate_runtime_entities.py](house_config/migrate_runtime_entities.py)` writes components sidecar; `silent-migration-test/config/` + fixtures updated
 - [x] **Components P5 — Tests, debug dumps, docs** — `tests/test_components_store.py`, `tests/test_persist_paths_sidecars.py`, planning/setup/runtime resolution tests; `[runtime_store/debug_dump_inputs.py](runtime_store/debug_dump_inputs.py)`; user docs `[docs/konfiguration/ueberblick.md](docs/konfiguration/ueberblick.md)`, `[docs/konfiguration/batterie-pv.md](docs/konfiguration/batterie-pv.md)`, `[docs/einrichtung/greenfield-dev-stack.md](docs/einrichtung/greenfield-dev-stack.md)`
-- [x] **Acceptance** — greenfield bootstrap creates empty `components.json`; Hauskonfigurator persists battery/PV there; live + Scenario-Exploration resolve entity IDs; battery-only (no PV) setup passes readiness; startup fails clearly if legacy keys remain in `config.json`
+- [x] **Acceptance** — greenfield bootstrap creates empty `components.json`; Hauskonfigurator persists battery/PV there; live + Szenario-Explorer resolve entity IDs; battery-only (no PV) setup passes readiness; startup fails clearly if legacy keys remain in `config.json`
 
 
 
@@ -538,7 +578,7 @@ Completes entity-catalog split from 1.26.0 / 1.93 P2: `batteries[]` and `pv_syst
 - [x] Observability retained (`role` post-hoc); ISO deadline parsing added
 - [x] Regression: `eauto_urgent_deferred_cheap_hours_2026-06-28`, new `eauto_urgent_deferred_cheap_hours_2026-07-09`; `xfail` removed
 - [x] **Prod acceptance** — charge cycle with deadline 07:45 uses cheap night hours (02–04); `urgent_rule_observability.eauto.role == redundant`
-- [x] **Scenario-Exploration: cons_data ID mismatch after regenerate** (greenfield smoke 2026-07-11)
+- [x] **Szenario-Explorer: cons_data ID mismatch after regenerate** (greenfield smoke 2026-07-11)
   - Fix: `expected_cons_data_consumer_ids()` uses raw `config.json` IDs or full house-profile set (not `_planning_flex_consumers` merge); meta `consumer_ids` aligned on save
 
 
@@ -557,7 +597,7 @@ Completes entity-catalog split from 1.26.0 / 1.93 P2: `batteries[]` and `pv_syst
 ### Version 1.93 P5 — Tariffs & deploy gate (2026-07-11)
 
 - [x] **Tariff plausibility** — `[house_config/tariff_plausibility.py](house_config/tariff_plausibility.py)`: Normalisierung, JSON-Schema, Szenario-Referenzen; CLI `[scripts/validate_tariffs.py](scripts/validate_tariffs.py)` (`earnie-validate-tariffs`)
-- [x] **Runtime gates** — Scenario-Exploration UI + `[scripts/run_backtesting.py](scripts/run_backtesting.py)`; Worker-Start `[scripts/startup_checks.py](scripts/startup_checks.py)` (`EARNIE_STRICT_TARIFF_VALIDATE` in Prod-Compose)
+- [x] **Runtime gates** — Szenario-Explorer UI + `[scripts/run_backtesting.py](scripts/run_backtesting.py)`; Worker-Start `[scripts/startup_checks.py](scripts/startup_checks.py)` (`EARNIE_STRICT_TARIFF_VALIDATE` in Prod-Compose)
 - [x] **Deploy gate** — `[scripts/build_container.py](scripts/build_container.py)` prüft vor `--push`; `[tools/convert_dach_tariffs.py](tools/convert_dach_tariffs.py)` `--check` für DACH-Vollständigkeit
 - [x] **Catalog** — DACH-Quellen abgedeckt; `fixed_37ct` (Greenfield-Beispiel) in `[config/tariffs.json](config/tariffs.json)`
 - [x] **Deploy docs** — `[docs/einrichtung/container.md](docs/einrichtung/container.md)`, `[docker-compose-synology.yml](docker-compose-synology.yml)`, `[docker-compose-loxberry.yml](docker-compose-loxberry.yml)`: `tariffs.json` Sidecar + Strict-Validate
@@ -580,7 +620,7 @@ Completes entity-catalog split from 1.26.0 / 1.93 P2: `batteries[]` and `pv_syst
 - [x] **Echtzeit-Umgebung page** — `[ui/pages/page_live_environment.py](ui/pages/page_live_environment.py)`: `live_scenario_id` picker, resolved snapshot, comfort form from `[ui/config_forms.py](ui/config_forms.py)`
 - [x] **Onboarding hints** — `[ui/setup_readiness.py](ui/setup_readiness.py)` sidebar copy aligned to new page names and order
 - [x] **Tests & docs** — `tests/test_navigation_setup.py`, `tests/test_setup_readiness.py`; `[docs/einrichtung/greenfield-dev-stack.md](docs/einrichtung/greenfield-dev-stack.md)` acceptance table
-- [x] **Acceptance** — greenfield smoke: onboarding → live selection → Scenario-Exploration unlock (follow-ups → [Backlog-Erledigt.md](Backlog-Erledigt.md) *Version 1.93 — smoke-test follow-ups*)
+- [x] **Acceptance** — greenfield smoke: onboarding → live selection → Szenario-Explorer unlock (follow-ups → [Backlog-Erledigt.md](Backlog-Erledigt.md) *Version 1.93 — smoke-test follow-ups*)
 - [x] **Batterien tab** — entity CRUD moved to Hauskonfigurator (`[ui/pages/page_house_config.py](ui/pages/page_house_config.py)`); Szenarieneditor scenario CRUD only; onboarding copy + tests updated
 
 
@@ -598,7 +638,7 @@ Completes entity-catalog split from 1.26.0 / 1.93 P2: `batteries[]` and `pv_syst
 ### Version 1.93 P2 — Unified scenario model (2026-07-11)
 
 - [x] **Live baseline as normal scenario** — `live_scenario_id` in `config.json` (default `live`); unified resolution in `[house_config/scenario_resolution.py](house_config/scenario_resolution.py)`; `config.py` rejects `runtime_settings` block
-- [x] **UI mode rename** — `backtesting` → `scenario_exploration` (`[ui/mode_selector.py](ui/mode_selector.py)`, `[ui/navigation.py](ui/navigation.py)`, compose, VS Code launch); user-facing label **Scenario-Exploration**
+- [x] **UI mode rename** — `backtesting` → `scenario_explorer` (`[ui/mode_selector.py](ui/mode_selector.py)`, `[ui/navigation.py](ui/navigation.py)`, compose, VS Code launch); user-facing label **Szenario-Explorer**
 - [x] **Szenarieneditor** — unified editor (`[ui/pages/page_scenario_editor.py](ui/pages/page_scenario_editor.py)`); removed orphaned `ui/scenario_runtime_form.py`; live scenario via `[ui/house_config_io.py](ui/house_config_io.py)`
 - [x] **Templates & schema** — `config.example.json`, `backtesting_scenarios.example.json` (`live` entry), `config.schema.json` without `runtime_settings`
 - [x] **Scripts & tests** — dev scripts default to `live`; backtesting tests use scenario id `live`; `[tests/config_fixtures.py](tests/config_fixtures.py)`

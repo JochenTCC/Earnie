@@ -29,7 +29,7 @@ Im Browser: `http://localhost:8502`
 2. **UI: Loxone-Zugang** — Formular aus [`ui/setup_dotenv.py`](../../ui/setup_dotenv.py); Platzhalter in `config/.env` reichen nicht.
 3. **Dummy-Zugangsdaten** — Für Greenfield ohne echte Miniserver-Anbindung z. B. IP `192.168.178.99`, beliebiger Benutzer/Passwort eintragen und **Speichern**.
 4. **Planungs-Konfiguration** — Navigationsabschnitte **Planung** (Hauskonfigurator, nach Freischaltung Szenarieneditor) und **Echtzeit-Umgebung** (Live-Konfiguration). Im Hauskonfigurator: **Hausprofil**, **PV-Anlage**, **Batterien**. Im Szenarieneditor: Szenarien. In der Echtzeit-Umgebung: Live-Szenario wählen (`live_scenario_id`) und Entitäts-Referenzen speichern. Sidebar zeigt fehlende Schritte. Während der Planung erscheint **kein** Config-Drift-Hinweis zu `flexible_consumers` aus `config.example.json`.
-5. **Scenario-Exploration** — Nach vollständiger Planungs-Konfiguration erscheint die Scenario-Exploration-Seite.
+5. **Szenario-Explorer** — Nach vollständiger Planungs-Konfiguration erscheint die Szenario-Explorer-Seite.
 6. **Worker** — `earnie-greenfield-worker` läuft weiter; Loxone-Startup-Prüfung ist deaktiviert (`EARNIE_VERIFY_LOXONE_ON_START=0`).
 
 ## Checkliste — erwartete Dateien nach erstem Start
@@ -69,15 +69,15 @@ Mit abgeschlossener Ersteinrichtung und vollständiger Planungs-Konfiguration:
 1. **Hauskonfigurator** — Tabs Hausprofil (thermischer Verbraucher „Haus Wärme“, auto-IDs), PV, Batterien; Grundlast-Vorschau prüfen.
 2. **Szenarieneditor** — Szenario pflegen.
 3. **Echtzeit-Umgebung** — Live-Szenario und Entitäts-Referenzen speichern.
-4. **Scenario-Exploration** — Seite erscheint nach Freischaltung; Planung starten.
+4. **Szenario-Explorer** — Seite erscheint nach Freischaltung; Planung starten.
 
-`EARNIE_UI_MODES=sunset2sunset,scenario_exploration` — Sunset-2-Sunset ist seit **1.26.0 P0** für Live-Pfad-Smoke freigeschaltet (zusammen mit Scenario-Exploration). In `docker/compose/greenfield.yml` gesetzt.
+`EARNIE_UI_MODES=sunset2sunset,scenario_explorer` — Sunset-2-Sunset ist seit **1.26.0 P0** für Live-Pfad-Smoke freigeschaltet (zusammen mit Szenario-Explorer). In `docker/compose/greenfield.yml` gesetzt.
 
 ## Abnahme Live-Pfad (1.26.0 P0 / 2.0 P2)
 
-Ziel: Greenfield nutzt **`live_scenario_id`** + Live-Szenario in `backtesting_scenarios.json` (Entitäts-Referenzen, keine flachen PV-/Batterie-/Tarif-Duplikate in `config.json`). Live-Optimierung und Scenario-Exploration nutzen dieselbe Auflösungslogik.
+Ziel: Greenfield nutzt **`live_scenario_id`** + Live-Szenario in `backtesting_scenarios.json` (Entitäts-Referenzen, keine flachen PV-/Batterie-/Tarif-Duplikate in `config.json`). Live-Optimierung und Szenario-Explorer nutzen dieselbe Auflösungslogik.
 
-**Voraussetzung:** Ab **1.26.0 P2** nutzt `_load_dynamic_params()` dieselbe Auflösung wie Scenario-Exploration; ab **2.0 P2** entfällt `runtime_settings` in `config.json`.
+**Voraussetzung:** Ab **1.26.0 P2** nutzt `_load_dynamic_params()` dieselbe Auflösung wie Szenario-Explorer; ab **2.0 P2** entfällt `runtime_settings` in `config.json`.
 
 ### Checkliste (nach 2.0 P2)
 
@@ -88,7 +88,7 @@ Ziel: Greenfield nutzt **`live_scenario_id`** + Live-Szenario in `backtesting_sc
 | 3. Entitäts-Auflösung | Echtzeit-Umgebung → Live-Konfiguration | JSON mit aufgelösten PV-, Batterie- und Tarifparametern aus `components.json`, `tariffs.json` |
 | 3. Live-Zyklus | `docker compose --project-directory . -f docker/compose/greenfield.yml logs -f optimizer-worker` | `main.py` durchläuft mindestens einen Optimierungszyklus ohne Config-Fehler |
 | 4. UI Sunset-2-Sunset | Seite **Cockpit** | Aufgelöste Werte (PV kWp, Batterie, Einspeisevergütung) **read-only** auf **Live-Konfiguration** — keine Sidebar-Edits |
-| 5. Scenario-Exploration-Parität | Gleiche Tarif-IDs, gleiches Zeitfenster | Import/Export-cent/kWh identisch zu Live (Detail-Paritätstest folgt in **1.26.0 P3**) |
+| 5. Szenario-Explorer-Parität | Gleiche Tarif-IDs, gleiches Zeitfenster | Import/Export-cent/kWh identisch zu Live (Detail-Paritätstest folgt in **1.26.0 P3**) |
 
 ```powershell
 docker compose --project-directory . -f docker/compose/greenfield.yml up -d --build

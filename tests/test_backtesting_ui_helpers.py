@@ -23,6 +23,7 @@ from ui.backtesting_runner import (
     auto_backtesting_workers,
     backtesting_script_path,
     build_backtesting_command,
+    count_backtesting_parallel_tasks,
     default_backtesting_output_dir,
     read_progress_file,
     suggest_test_month,
@@ -108,12 +109,12 @@ def test_build_backtesting_command_includes_sunrise_horizon_mode(tmp_path):
     assert cmd[-2:] == ["--horizon-mode", "sunrise_window"]
 
 
-def test_auto_backtesting_workers_single_scenario():
+def test_auto_backtesting_workers_single_task():
     assert auto_backtesting_workers(0) == 1
     assert auto_backtesting_workers(1) == 1
 
 
-def test_auto_backtesting_workers_caps_by_scenario_count(monkeypatch):
+def test_auto_backtesting_workers_caps_by_task_count(monkeypatch):
     monkeypatch.setattr("ui.backtesting_runner.os.cpu_count", lambda: 16)
     assert auto_backtesting_workers(4) == 4
 
@@ -121,6 +122,44 @@ def test_auto_backtesting_workers_caps_by_scenario_count(monkeypatch):
 def test_auto_backtesting_workers_reserves_one_core(monkeypatch):
     monkeypatch.setattr("ui.backtesting_runner.os.cpu_count", lambda: 8)
     assert auto_backtesting_workers(10) == 7
+
+
+def test_sort_progress_snapshot_keys_live_reference_second():
+    from scripts.run_backtesting import HISTORICAL_REFERENCE_LABEL
+    from simulation.backtesting_progress import sort_progress_snapshot_keys
+    from simulation.engine import scenario_reference_label
+
+    live_ref = scenario_reference_label("Live")
+    ordered = sort_progress_snapshot_keys(
+        [
+            live_ref,
+            "Mit 10 kWh Speicher",
+            HISTORICAL_REFERENCE_LABEL,
+            "Live",
+            "Referenz (Fixed) — ohne Optimierung",
+        ],
+        historical_reference_label=HISTORICAL_REFERENCE_LABEL,
+        live_scenario_label="Live",
+    )
+    assert ordered == [
+        HISTORICAL_REFERENCE_LABEL,
+        live_ref,
+        "Referenz (Fixed) — ohne Optimierung",
+        "Live",
+        "Mit 10 kWh Speicher",
+    ]
+
+
+def test_count_backtesting_parallel_tasks_includes_reference(monkeypatch):
+    monkeypatch.setattr(
+        "simulation.engine.plan_per_scenario_reference_tasks",
+        lambda scenarios, *, live_scenario_id, scenario_labels=None: (
+            {},
+            {},
+            [("ref:pv", {}, "Referenz (PV)")],
+        ),
+    )
+    assert count_backtesting_parallel_tasks({"a": {}, "b": {}}, live_scenario_id="a") == 4
 
 
 def test_build_backtesting_command_includes_workers_when_parallel(tmp_path):

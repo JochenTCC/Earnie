@@ -18,31 +18,6 @@
       "justMyCode": false
     },
     {
-      "name": "main.py (Silent Migration Test)",
-      "type": "python",
-      "request": "launch",
-      "program": "${workspaceFolder}/main.py",
-      "cwd": "${workspaceFolder}",
-      "console": "integratedTerminal",
-      "env": {
-        "EARNIE_CONFIG_PATH": "${workspaceFolder}/silent-migration-test/config/config.json",
-        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/silent-migration-test/runtime",
-        "EARNIE_DOTENV_PATH": "${workspaceFolder}/silent-migration-test/config/.env",
-        "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/silent-migration-test/runtime/local_settings.json",
-        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/silent-migration-test/config/house_profiles.json",
-        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/silent-migration-test/config/tariffs.json",
-        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/silent-migration-test/config/backtesting_scenarios.json",
-        "EARNIE_VERIFY_LOXONE_ON_START": "1",
-        "EARNIE_STRICT_TARIFF_VALIDATE": "1",
-        "EARNIE_UI_STREAMLIT_PORT": "8512"
-      },
-      "justMyCode": false,
-      "presentation": {
-        "group": "silent-migration",
-        "order": 3
-      }
-    },
-    {
       "name": "Streamlit app.py (Silent Migration :8512)",
       "type": "python",
       "request": "launch",
@@ -58,7 +33,7 @@
         "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/silent-migration-test/config/backtesting_scenarios.json",
         "EARNIE_VERIFY_LOXONE_ON_START": "1",
         "EARNIE_STRICT_TARIFF_VALIDATE": "1",
-        "EARNIE_UI_MODES": "sunset2sunset,scenario_exploration",
+        "EARNIE_UI_MODES": "sunset2sunset,scenario_explorer",
         "EARNIE_UI_STREAMLIT_PORT": "8512",
         "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1"
       },
@@ -69,45 +44,6 @@
         "group": "silent-migration",
         "order": 4
       }
-    },
-    {
-      "name": "Streamlit app.py (nach 15s, Silent Migration :8512)",
-      "type": "python",
-      "request": "launch",
-      "preLaunchTask": "wait: 15s vor Streamlit",
-      "module": "scripts.run_streamlit",
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "EARNIE_CONFIG_PATH": "${workspaceFolder}/silent-migration-test/config/config.json",
-        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/silent-migration-test/runtime",
-        "EARNIE_DOTENV_PATH": "${workspaceFolder}/silent-migration-test/config/.env",
-        "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/silent-migration-test/runtime/local_settings.json",
-        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/silent-migration-test/config/house_profiles.json",
-        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/silent-migration-test/config/tariffs.json",
-        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/silent-migration-test/config/backtesting_scenarios.json",
-        "EARNIE_VERIFY_LOXONE_ON_START": "1",
-        "EARNIE_STRICT_TARIFF_VALIDATE": "1",
-        "EARNIE_UI_MODES": "sunset2sunset,scenario_exploration",
-        "EARNIE_UI_STREAMLIT_PORT": "8512",
-        "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1"
-      },
-      "subProcess": false,
-      "console": "integratedTerminal",
-      "justMyCode": false,
-      "presentation": {
-        "group": "silent-migration",
-        "order": 5
-      }
-    }
-  ],
-  "compounds": [
-    {
-      "name": "main.py + Streamlit (Silent Migration :8512)",
-      "configurations": [
-        "main.py (Silent Migration Test)",
-        "Streamlit app.py (nach 15s, Silent Migration :8512)"
-      ],
-      "stopAll": true
     }
   ]
 }

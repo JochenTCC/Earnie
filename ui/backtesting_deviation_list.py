@@ -81,12 +81,15 @@ def deviation_cases_for_display(meta: dict) -> list[dict]:
 
 
 def format_deviation_delta_kwh(case: dict) -> str:
-    if case.get("kind") != "consumption_tolerance":
-        return _DASH
-    diff = case.get("diff_kwh")
-    if diff is None:
-        return _DASH
-    return f"{float(diff):+.2f}"
+    if case.get("kind") == "consumption_tolerance":
+        diff = case.get("diff_kwh")
+        if diff is None:
+            return _DASH
+        return f"{float(diff):+.2f}"
+    window_diff = case.get("window_consumption_diff_kwh")
+    if window_diff is not None:
+        return f"{float(window_diff):+.2f}"
+    return _DASH
 
 
 def case_to_plausibility_failure(case: dict) -> dict:
@@ -142,6 +145,8 @@ def _render_cbc_facts_caption(case: dict) -> None:
     status = case.get("strict_status") or case.get("final_status")
     if status:
         facts.append(f"Status: {status}")
+    if case.get("window_consumption_ok") is True:
+        facts.append("24h-Gesamtverbrauch: innerhalb Toleranz")
     targets = _format_consumer_targets(case.get("consumer_targets_kwh"))
     if targets:
         facts.append(f"Verbraucherziele: {targets}")

@@ -65,10 +65,16 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
     st.session_state[_scoped_key(session_scope, "planning_battery_threshold")] = threshold_percent
 
 
+def _battery_widget_state_missing(session_scope: str) -> bool:
+    """True when sync metadata exists but scoped widget keys were dropped (e.g. page navigation)."""
+    return _scoped_key(session_scope, "planning_battery_label") not in st.session_state
+
+
 def _sync_battery_session(session_scope: str, existing: dict, *, file_stamp: str) -> None:
     scope_changed = st.session_state.get(_SESSION_SYNC_KEY) != session_scope
     file_changed = st.session_state.get(_SESSION_FILE_STAMP_KEY) != file_stamp
-    if scope_changed or file_changed:
+    widget_state_missing = _battery_widget_state_missing(session_scope)
+    if scope_changed or file_changed or widget_state_missing:
         _clear_scoped_widget_keys(session_scope)
         _seed_battery_widget_state(session_scope, existing)
         st.session_state[_SESSION_SYNC_KEY] = session_scope

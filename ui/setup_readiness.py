@@ -208,7 +208,7 @@ def missing_planning_setup_items_for(
     house_profiles_path: str,
     backtesting_scenarios_path: str | None = None,
 ) -> list[str]:
-    """Fehlende Schritte bis Scenario-Exploration freigeschaltet werden kann."""
+    """Fehlende Schritte bis Szenario-Explorer freigeschaltet werden kann."""
     return missing_house_config_items_for(
         raw,
         components_path=components_path,
@@ -230,7 +230,7 @@ def is_planning_ready_for(
     house_profiles_path: str,
     backtesting_scenarios_path: str | None = None,
 ) -> bool:
-    """Alle Mindestanforderungen für Scenario-Exploration erfüllt (explizite Pfade)."""
+    """Alle Mindestanforderungen für Szenario-Explorer erfüllt (explizite Pfade)."""
     profiles_doc = _read_json_document(house_profiles_path)
     if not needs_planning_onboarding_from_raw(raw, profiles_doc=profiles_doc):
         return True

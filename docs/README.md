@@ -39,7 +39,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 ### Benutzeroberfläche (Streamlit)
 
-- [Betriebsmodi & Navigation](ui/betriebsmodi.md) — Seitenstruktur, Monitor (Sunset-2-Sunset), Scenario-Exploration
+- [Betriebsmodi & Navigation](ui/betriebsmodi.md) — Seitenstruktur, Monitor (Sunset-2-Sunset), Szenario-Explorer
 - [Charts & Panels](ui/charts.md) — Diagramme, Metriken, Sankey, Soll/Ist-Icons
 - [Loxone-Kommunikation](ui/loxone-kommunikation.md) — Debug-Seite: Live-Lesen, Schreib-Nachverfolgung (Cutover 1.99)
 

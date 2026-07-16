@@ -1,4 +1,4 @@
-"""Szenarieneditor: Live-Szenario und weitere Scenario-Exploration-Varianten."""
+"""Szenarieneditor: Live-Szenario und weitere Szenario-Explorer-Varianten."""
 from __future__ import annotations
 
 import streamlit as st
@@ -40,7 +40,7 @@ from ui.scenario_form_helpers import (
 )
 
 _HELP = (
-    "Live-Szenario (Pflicht für Echtzeit und Scenario-Exploration) und optionale "
+    "Live-Szenario (Pflicht für Echtzeit und Szenario-Explorer) und optionale "
     "weitere Varianten. Batterie-Entitäten legst du im Hauskonfigurator an; "
     "Speichert Szenarien nach `config/backtesting_scenarios.json`; Live-Auswahl über "
     "`live_scenario_id` in `config.json`."
@@ -126,6 +126,11 @@ def _seed_scenario_widget_state(
     )
 
 
+def _scenario_widget_state_missing(session_scope: str) -> bool:
+    """True when sync metadata exists but scoped widget keys were dropped (e.g. page navigation)."""
+    return scoped_widget_key(session_scope, "scenario_label") not in st.session_state
+
+
 def _sync_scenario_session(
     session_scope: str,
     scenario: dict,
@@ -139,7 +144,8 @@ def _sync_scenario_session(
 ) -> None:
     scope_changed = st.session_state.get(_SESSION_SYNC_KEY) != session_scope
     file_changed = st.session_state.get(_SESSION_FILE_STAMP_KEY) != file_stamp
-    if scope_changed or file_changed:
+    widget_state_missing = _scenario_widget_state_missing(session_scope)
+    if scope_changed or file_changed or widget_state_missing:
         clear_scoped_widget_keys(session_scope)
         _seed_scenario_widget_state(
             session_scope,
@@ -241,7 +247,7 @@ def _render_scenarios_tab() -> None:
     live_id = config.get_live_scenario_id()
     st.subheader("Szenarien")
     st.caption(
-        f"Live-Szenario (aktuell: `{live_id}`) ist die Baseline für Scenario-Exploration "
+        f"Live-Szenario (aktuell: `{live_id}`) ist die Baseline für Szenario-Explorer "
         "und Echtzeit-Betrieb. Standort und Zeitzone kommen aus dem Hausprofil."
     )
 

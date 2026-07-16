@@ -72,7 +72,7 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
         },
     )
 
-    specs = build_page_specs(["scenario_exploration"])
+    specs = build_page_specs(["scenario_explorer"])
     titles = [spec.title for spec in specs]
 
     assert titles == ["Hauskonfigurator", "Live-Konfiguration", "Loxone-Kommunikation"]
@@ -119,14 +119,14 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
         },
     )
 
-    specs = build_page_specs(["scenario_exploration"])
+    specs = build_page_specs(["scenario_explorer"])
     titles = [spec.title for spec in specs]
 
     assert titles == ["Hauskonfigurator", "Szenarieneditor", "Live-Konfiguration", "Loxone-Kommunikation"]
-    assert "Scenario-Exploration" not in titles
+    assert "Szenario-Explorer" not in titles
 
 
-def test_scenario_exploration_visible_when_planning_ready(tmp_path, monkeypatch):
+def test_scenario_explorer_visible_when_planning_ready(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(
         config_dir / "config.json",
@@ -176,7 +176,7 @@ def test_scenario_exploration_visible_when_planning_ready(tmp_path, monkeypatch)
         },
     )
 
-    specs = build_page_specs(["scenario_exploration"])
+    specs = build_page_specs(["scenario_explorer"])
     titles = [spec.title for spec in specs]
 
-    assert "Scenario-Exploration" in titles
+    assert "Szenario-Explorer" in titles

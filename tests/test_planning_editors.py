@@ -457,6 +457,129 @@ def test_sync_profile_session_reseeds_when_widget_keys_missing():
     assert session["mein_haushalt__house_annual_kwh"] == 4500.0
 
 
+def test_sync_pv_session_reseeds_when_widget_keys_missing():
+    class _Session(dict):
+        pass
+
+    session = _Session(
+        {
+            "planning_pv_sync_id": "dach_sued",
+            "planning_pv_file_stamp": "path:123",
+        }
+    )
+    existing = {
+        "id": "dach_sued",
+        "label": "Dach Süd",
+        "pv_kwp": 6.0,
+        "pv_tilt": 18.0,
+        "pv_azimuth": 26.0,
+    }
+    import ui.planning_pv_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        form._sync_pv_session(
+            "dach_sued",
+            existing,
+            file_stamp="path:123",
+            profiles={},
+            default_profile={},
+        )
+    finally:
+        form.st.session_state = original
+
+    assert session["dach_sued__planning_pv_label"] == "Dach Süd"
+    assert session["dach_sued__planning_pv_kwp"] == 6.0
+    assert session["dach_sued__planning_pv_tilt"] == 18
+    assert session["dach_sued__planning_pv_azimuth"] == 26
+
+
+def test_sync_battery_session_reseeds_when_widget_keys_missing():
+    class _Session(dict):
+        pass
+
+    session = _Session(
+        {
+            "planning_battery_sync_id": "5_0_kwh_speicher",
+            "planning_battery_file_stamp": "path:123",
+        }
+    )
+    existing = {
+        "id": "5_0_kwh_speicher",
+        "label": "Hausbatterie 5 kWh",
+        "battery_capacity_kwh": 5.0,
+        "battery_max_power_kw": 2.5,
+        "battery_efficiency": 0.97,
+        "battery_min_soc": 10.0,
+        "battery_max_soc": 100.0,
+        "threshold_power": 0.05,
+    }
+    import ui.planning_battery_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        form._sync_battery_session("5_0_kwh_speicher", existing, file_stamp="path:123")
+    finally:
+        form.st.session_state = original
+
+    assert session["5_0_kwh_speicher__planning_battery_label"] == "Hausbatterie 5 kWh"
+    assert session["5_0_kwh_speicher__planning_battery_capacity"] == 5.0
+    assert session["5_0_kwh_speicher__planning_battery_power"] == 2.5
+
+
+def test_sync_scenario_session_reseeds_when_widget_keys_missing():
+    class _Session(dict):
+        pass
+
+    session = _Session(
+        {
+            "scenario_editor_sync_id": "live",
+            "scenario_editor_file_stamp": "path:123",
+        }
+    )
+    scenario = {
+        "id": "live",
+        "label": "Live",
+        "settings": {
+            "house_profile_id": "example_efh",
+            "battery_id": "5_0_kwh_speicher",
+            "pv_system_id": "dach_sued",
+            "import_tariff_id": "awattar_at",
+            "export_tariff_id": "monthly_sunny",
+        },
+    }
+    profiles = {
+        "example_efh": {"id": "example_efh", "label": "Schützenstraße 7c"},
+    }
+    batteries = [{"id": "5_0_kwh_speicher", "label": "Hausbatterie 5 kWh"}]
+    pv_systems = [{"id": "dach_sued", "label": "Dach Süd"}]
+    import_tariffs = [{"id": "awattar_at", "label": "aWATTar"}]
+    export_tariffs = [{"id": "monthly_sunny", "label": "Monatliche SUNNY"}]
+    import ui.pages.page_scenario_editor as editor
+
+    original = editor.st.session_state
+    editor.st.session_state = session
+    try:
+        editor._sync_scenario_session(
+            "live",
+            scenario,
+            file_stamp="path:123",
+            profiles=profiles,
+            batteries=batteries,
+            pv_systems=pv_systems,
+            import_tariffs=import_tariffs,
+            export_tariffs=export_tariffs,
+        )
+    finally:
+        editor.st.session_state = original
+
+    assert session["live__scenario_label"] == "Live"
+    assert "example_efh" in session["live__scenario_profile"]
+    assert "dach_sued" in session["live__scenario_pv"]
+
+
 def test_seed_pv_widget_state_uses_profile_defaults_for_new_system():
     class _Session(dict):
         pass

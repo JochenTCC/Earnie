@@ -1,4 +1,4 @@
-# Scenario Exploration — consumption model (Version 2.0)
+# Szenario-Explorer — consumption model (Version 2.0)
 
 Developer reference for SE / greenfield backtesting load paths.
 

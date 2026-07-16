@@ -2,7 +2,7 @@
 
 Das Env-/Config-Gating (ENERGY_OPTIMIZER_UI_MODES, ui.price_forecast_page_enabled)
 steuert nur noch, welche Seiten registriert werden. Cockpit, Manuelle Geräte und
-die Planungs-/Echtzeit-Seiten sind immer verfügbar; Scenario-Exploration und
+die Planungs-/Echtzeit-Seiten sind immer verfügbar; Szenario-Explorer und
 Preis-Prognose (Dev) folgen dem bisherigen Modus-Gating.
 
 Nach Minimal-Bootstrap (Greenfield) sind bis zur vollständigen Planungs-Konfiguration
@@ -122,18 +122,18 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
             ]
         )
 
-    scenario_exploration_allowed = (
-        "scenario_exploration" in enabled_mode_keys and is_planning_ready()
+    scenario_explorer_allowed = (
+        "scenario_explorer" in enabled_mode_keys and is_planning_ready()
     )
     analyse_default = not betrieb_unlocked
-    if scenario_exploration_allowed:
+    if scenario_explorer_allowed:
         specs.append(
             PageSpec(
                 page_backtesting.render,
-                "Scenario-Exploration",
+                "Szenario-Explorer",
                 "📊",
                 "Analyse",
-                "scenario-exploration",
+                "scenario-explorer",
                 default=analyse_default,
             )
         )

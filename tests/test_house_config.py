@@ -689,7 +689,74 @@ def test_merge_flexible_consumers_assigns_chart_color_index():
     planning = [{"id": "herd_kochen", "name": "Herd (Kochen)"}]
     merged = merge_flexible_consumers(base, planning)
     herd = next(item for item in merged if item["id"] == "herd_kochen")
+    # First free in non-green-preferring order after 0: index 1
     assert herd["chart_color_index"] == 1
+
+
+def test_merge_empty_base_uses_historical_chart_color_indices():
+    """Planning-only merge (no config.json flex) must keep P1 SwimSpa/EV/WP colors."""
+    from house_config.planning_flex_bridge import (
+        collect_planning_flex_consumers,
+        merge_flexible_consumers,
+    )
+
+    profile = {
+        "consumers": [
+            {
+                "id": "wp_heating",
+                "legacy_id": "waermepumpe",
+                "label": "WP",
+                "type": "thermal_annual",
+                "nominal_power_kw": 1.6,
+                "living_area_m2": 120.0,
+                "building_class": 2,
+                "heat_pump_type": "erde",
+                "persons": 2,
+                "target_temp_c": 21.5,
+                "heating_limit_c": 15.0,
+            },
+            {
+                "id": "ev",
+                "legacy_id": "eauto",
+                "label": "EV",
+                "type": "ev",
+                "nominal_power_kw": 3.5,
+                "battery_capacity_kwh": 17.0,
+                "charging_schedule": {
+                    "weekday": {
+                        "car_available_from_hour": 18,
+                        "ready_by_hour": 7,
+                        "daily_rest_soc": 40.0,
+                    },
+                    "weekend": {
+                        "car_available_from_hour": 20,
+                        "ready_by_hour": 9,
+                        "daily_rest_soc": 30.0,
+                    },
+                },
+            },
+            {
+                "id": "swimspa",
+                "label": "SwimSpa",
+                "type": "thermal_rc",
+                "nominal_power_kw": 2.8,
+                "thermal_rc": {
+                    "water_volume_liters": 6000.0,
+                    "setpoint_c": 36.0,
+                    "tolerance_c": 1.0,
+                    "heat_loss_kw_per_k": 0.1,
+                    "heating_efficiency": 0.95,
+                },
+            },
+        ]
+    }
+    planning = collect_planning_flex_consumers(profile)
+    merged = merge_flexible_consumers([], planning)
+    by_id = {item["id"]: item["chart_color_index"] for item in merged}
+    assert by_id["swimspa"] == 0
+    assert by_id["swimspa_filter"] == 1
+    assert by_id["ev"] == 2
+    assert by_id["wp_heating"] == 7
 
 
 def test_merge_flexible_consumers_legacy_id_overlay():

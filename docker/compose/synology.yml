@@ -31,7 +31,7 @@
 #
 # Auf der NAS liegt die Datei oft als compose.yaml — Inhalt aus diesem File übernehmen.
 #
-# UI: EARNIE_UI_MODES=sunset2sunset,scenario_exploration (Prod); Dev ohne Variable = Standard-Modi.
+# UI: EARNIE_UI_MODES=sunset2sunset,scenario_explorer (Prod); Dev ohne Variable = Standard-Modi.
 
 version: "3.8"
 
@@ -71,5 +71,5 @@ services:
     volumes: *persist-volumes
     environment:
       <<: *common-env
-      EARNIE_UI_MODES: sunset2sunset,scenario_exploration
+      EARNIE_UI_MODES: sunset2sunset,scenario_explorer
       EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED: "1"

@@ -174,7 +174,7 @@ Apply to `silent-migration-test/config/` first; validate silent-test launch (`MI
 ### P1d — Tests & docs
 
 - `tests/test_chart_consumer_stack.py` (empty `flexible_consumers`, bridged generics); display bundle / flow-balance regression.
-- `docs/spec/scenario-exploration-consumption.md` — UI discovery vs MILP path; cross-link migration checklist.
+- `docs/spec/scenario-explorer-consumption.md` — UI discovery vs MILP path; cross-link migration checklist.
 
 ---
 

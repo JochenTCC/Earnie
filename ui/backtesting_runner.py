@@ -58,13 +58,28 @@ def default_progress_file_path() -> str:
     return str(Path(default_backtesting_output_dir()) / ".backtesting_progress")
 
 
-def auto_backtesting_workers(scenario_count: int) -> int:
-    """Parallele Worker für Szenario-Simulationen (ein Kern für UI/OS reserviert)."""
-    if scenario_count <= 1:
+def count_backtesting_parallel_tasks(
+    scenarios: dict[str, dict],
+    *,
+    live_scenario_id: str,
+) -> int:
+    """Parallele Tasks: Haupt-Referenz + Extra-Referenzen + optimierte Szenarien."""
+    from simulation.engine import plan_per_scenario_reference_tasks
+
+    _, _, extra_specs = plan_per_scenario_reference_tasks(
+        scenarios,
+        live_scenario_id=live_scenario_id,
+    )
+    return 1 + len(extra_specs) + len(scenarios)
+
+
+def auto_backtesting_workers(parallel_task_count: int) -> int:
+    """Parallele Worker für Referenz + Szenario-Simulationen (ein Kern reserviert)."""
+    if parallel_task_count <= 1:
         return 1
     cpu_count = os.cpu_count() or 2
     available = max(1, cpu_count - 1)
-    return min(scenario_count, available)
+    return min(parallel_task_count, available)
 
 
 def suggest_test_month() -> int | None:

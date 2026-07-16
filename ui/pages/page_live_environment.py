@@ -6,7 +6,7 @@ from ui.help_hint import render_page_title_with_help
 
 _HELP = (
     "Wählt das Live-Szenario (`live_scenario_id` in `config.json`) und pflegt "
-    "die Entitäts-Referenzen für Echtzeit-Optimierung und die Scenario-Exploration-Baseline. "
+    "die Entitäts-Referenzen für Echtzeit-Optimierung und die Szenario-Explorer-Baseline. "
     "Batterie-Entitäten legst du im Hauskonfigurator an; weitere Szenarien im Szenarieneditor."
 )
 

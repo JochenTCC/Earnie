@@ -15,9 +15,9 @@ Ein einheitlicher Produktiv-Cockpit-Modus ohne Grenze zwischen Live und Historie
 | Modus | Key | Prod |
 |-------|-----|------|
 | Sunset-2-Sunset | `sunset2sunset` | ja |
-| Scenario-Exploration | `scenario_exploration` | optional Dev |
+| Szenario-Explorer | `scenario_explorer` | optional Dev |
 
-`ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,scenario_exploration` (Prod). Kein Alias `live` oder `backtesting`.
+`ENERGY_OPTIMIZER_UI_MODES=sunset2sunset,scenario_explorer` (Prod). Kein Alias `live`, `backtesting` oder `scenario_exploration`.
 
 **Sidebar:** Live-Szenario (PV-, Batterie-, Einspeiseparameter über Entitäts-Referenzen) — **ohne** adaptives PV-Tuning (entfernen; neuer Adaptions-Ansatz separat im Backlog).
 

@@ -11,12 +11,22 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Adapt business plan
 - [ ] **Outreach (not software):** Ask for interested parties in loxforum / reddit — post under “my project”; take interesting chart snapshots (loxforum admins contacted re. best place)
   - loxforum -> done
-  - reddit (is there a suitalbe community?)
-  - Evaluate running Scenario-Exploration as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility
+  - Facebook groups (e.g. Loxone Smart Home Community)
+  - Evaluate running Szenario-Explorer as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility  
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
 
 
 ## Feature Backlog
+
+### Minor changes in Version 1.99
+
+- [ ] Rearrange Verbrauchsvergleich (Debug) table
+  - Add a column (Verbrauch ohne PV und Speicher)
+  - Change name of column "Baseline Spec kWh" to "Reference (Live) - ohne Optimierung [kWh]"
+  - Change name of column "delta kWh (Opt-Baseline)" to "delta kWh (Ref. ohne Optimierung)"
+  - Remove rows for "Historisch (ohne Optimierung, ohne PV/Batterie)" and "Referenz (Live) — ohne Optimierung"
+  - Write consumption of scenario "Historisch ..." in all cells of colum "Verbrauch ohne PV und Speicher"
+  - Write consumption of scenario "Reference (Live) - ohne Optimierung [kWh]" in all cells of column with this name
 
 
 ## Real Version 2.0 — legacy data model removed
@@ -28,7 +38,15 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 ### Version 2.+1 — Quality epic / post-migration cleanup
 
+- [ ] Pimp README.md with snapshots
 - [ ] Evaluate option for code coverage testing and identification of deprecated code / tests (especially due to substantial data model change) / obsolete patches because of legacy data model
+  - **Planning (three deliverables):**
+    - **Coverage baseline** — run coverage on migrated core packages; identify weakly covered modules that changed most in the 2.0 data model
+    - **Legacy test audit** — review tests flagged by legacy symbols and `scripts/test_health_report.py`; decide keep, rewrite, or delete
+    - **Obsolete patch audit** — search for compatibility code, fallback paths, and migration-only branches from pre-1.26.0 model
+  - **Tooling already in repo:** `pytest-cov` / `coverage.py` (`pyproject.toml`), `scripts/test_health_report.py` (JUnit history, coverage triage, legacy hints), optional `mutmut` (`mutmut.ini`)
+  - **Recommended additions (minimal, high value):** `vulture` (unused code / dead migration helpers), `pytest-deadfixtures` (orphaned fixtures after model change)
+  - **Workflow:** weekly or pre-release: `test_health_report run --coverage` → `test_health_report report`; supplement with `vulture` and targeted `rg` on known legacy symbols; manual review only — never auto-delete flagged tests
 - [ ] Thorough code review and refactoring (with proper KPIs)
 - [ ] Search for deprecated and unnecessary files and remove them
   - Code for migration from V 1.x to 2.0 is not needed anymore
@@ -36,19 +54,9 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 ### Version 2.+1
 
+- [ ] Make editors more compact: Parameter name and entry field side by side
+- [ ] Add a hint text to SE that there is no guarantee for the results
 - [ ] Make main.py controllable from streamlit.app (Checks must be included if main.py is runnin already, if necessary change spec / doc and put it in one container as deamon or so)
-- [ ] **Debug dump phase 2 — sharpen dump formats and reproduction**
-  - Goal: a debug dump should make a case **traceable and as reproducible as possible** later without searching prod files again - important for productive systems elsewhere 
-  - One dump for all:
-    - **Chart debug dump** for UI/display bugs
-    - **Prod dump archive** for domain/optimizer-related failure cases
-    - Dump can be triggered in UI (former only Chart Debug Dump)
-  - Per dump type define:
-    - required files
-    - optional additional files
-    - manifest fields / schema
-  - Evaluate whether a **replay/recalculation path** from a dump should be documented or partially automated
-  - Add further inputs only if proven relevant for real failure cases
 
 
 ### Version 2.+1
@@ -57,9 +65,12 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 - [ ] Make appropriate information accessible to user about where differences between optimized SOC and BL SOC Ziel come from to give him explanation (prove plausability)
 - [ ] Check if removing constraint for SOC at end of horizon changes simulation resulst in backtesting
 - [ ] Find EPEX API to have provider independent tariff calculation
+- [ ] Improve cost calculation by adding monthly fees etc.
+- [ ] Improve performance of Scenario Explorer (reduce aborting time for CBC issues? - other ideas?)
 
 
 ### Version 2.+1
+
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
   - Move Loxone markers to data model - remove flat definition in config.json where possible
 
@@ -84,7 +95,6 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
   - **Precursor (done):** *Unified Open-Meteo solar* — shared archive bundle ([Backlog-Erledigt.md](Backlog-Erledigt.md))
 
 
-
 ### Version 2.+1
 
 - [ ] **Adaptation P2** — PV adaptation (new approach) — first pilot on Adaptation P1
@@ -92,7 +102,6 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
   - Replace or integrate old `pv_tuner` path into Adaptation P1 (`pv_tuner.py` counter delta only)
 - [ ] **Adaptation P3** — Adaptation algorithm (PV pilot)
   - Concrete update loop on Adaptation P2; thermal models remain **linear** (thermal adaptation only in Thermals P3)
-
 
 
 ### Version 2.+1
@@ -105,17 +114,14 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
   - `heat_loss_kw_per_k` and further linear model parameters; horizon per consumer (24 h / 1 year)
 
 
-
 ### Version 2.+1
 
 - [ ] **Adaptation P4** — UI visualization adaptation algos (after Adaptation P3 and Thermals P3)
 
 
-
 ### Version 2.+1
 
 - [ ] Generic EV model — for better reusability
-
 
 
 ### Version 2.+1

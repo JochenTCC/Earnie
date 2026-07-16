@@ -461,13 +461,26 @@ def resolve_charging_context(
     target_kwh = config.Config.target_kwh_from_rest_soc(
         consumer, rest_soc, capacity_kwh=capacity_kwh
     )
+    config_deadline = deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour"))
+    ready_raw = _loxone_ready_raw(consumer)
+    deadline, from_loxone = resolve_charging_deadline(
+        consumer, horizon_start, horizon_start, ready_raw=ready_raw
+    )
+    # FertigUm overrides config ready_by_hour; drop config hour-window so later
+    # deadlines (e.g. 14:00) are actually eligible for planning/charging.
+    use_time_window = not from_loxone
+    if from_loxone:
+        source_label = "config.json (daily_rest_soc → kWh, FertigUm Loxone)"
+    else:
+        source_label = "config.json (daily_rest_soc → kWh)"
+        deadline = config_deadline
     return {
         "active": True,
-        "deadline": deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour")),
+        "deadline": deadline,
         "target_kwh": round(target_kwh, 3) if target_kwh is not None else None,
-        "use_time_window": True,
+        "use_time_window": use_time_window,
         "config_day_schedule": day_sched,
-        "source_label": "config.json (daily_rest_soc → kWh)",
+        "source_label": source_label,
     }
 
 

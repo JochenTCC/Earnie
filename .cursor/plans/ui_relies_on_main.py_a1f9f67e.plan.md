@@ -161,7 +161,7 @@ After refactor, these UI paths must **not** import/call `profile_manager.build_l
 
 Opt-in simulation may still use them (explicit user action only).
 
-**Unchanged:** Backtesting, Scenario-Exploration, price forecast dev page — separate modes, out of scope unless you want them restricted too.
+**Unchanged:** Backtesting, Szenario-Explorer, price forecast dev page — separate modes, out of scope unless you want them restricted too.
 
 ### 7. Tests
 
@@ -201,5 +201,5 @@ Add to [backlog/Backlog-Bugfixes.md](backlog/Backlog-Bugfixes.md) (or agreed cha
 ## Out of scope (unless you ask)
 
 - Removing adaptive PV tuning from main.py (separate backlog item)
-- Changing backtesting / scenario exploration simulation paths
+- Changing backtesting / Szenario-Explorer simulation paths
 - Cross-process file-based forecast.solar cache (unnecessary once UI stops calling API)

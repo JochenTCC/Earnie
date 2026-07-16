@@ -21,7 +21,12 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending
 
+- [ ] **EV FertigUm ignored on config path** — house-profile EV (`daily_target_source=config`) kept `ready_by_hour` deadline and ignored `Ernie_EAuto_FertigUm`; later FertigUm still forced early charge (`must_start` for old deadline). Fix: `resolve_charging_context` uses `resolve_charging_deadline` (FertigUm wins, `use_time_window=False`); tests `TestConfigPathFertigUm`. Dump: `chart_debug_review/chart_debug_20260716_065036`. Live check: change FertigUm later while EV needs charge → `charging_contexts.ev.deadline` matches new time, no early force-charge for old deadline.
+
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] **Hauskonfigurator | PV-Anlage** — Bezeichnung empty; parameters show unplausible values (data not loaded or shown correctly)
-- [ ] Loxone marker "Ernie_WP_Freigabe" is not sent anymore
+- [ ] Is color palette for consumers in Charts (Earnie Monitor) used still the same as defined in the past
+
+- [ ] Order of scenarios in Monatlicher Kostenvergleich bar chart should be the same as in Gesamtkosten and Verbrauchsvergleich
+
+- [ ] Check if there is a special issue on weekends, when time-to-be ready is set to 12:00 (Start/ End-SOC constraints)

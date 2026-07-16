@@ -185,17 +185,24 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
             session_meta={"s2_cycle_offset": 0},
             captured_at=datetime(2026, 7, 5, 23, 0, 5),
         )
-    assert zip_path.endswith("chart_debug_20260705_230005.zip")
+    assert zip_path.endswith("debug_dump_chart_20260705_230005.zip")
     with zipfile.ZipFile(zip_path) as archive:
         names = set(archive.namelist())
         assert "manifest.json" in names
         assert "README.txt" in names
+        assert "runtime/optimization_history_window.jsonl" in names
         manifest = json.loads(archive.read("manifest.json"))
-        assert manifest["live_soc_percent"] == 20.5
-        assert manifest["display_rows"]
-        assert "Simulierter SoC (%)" in manifest["display_rows"][0]
-        assert manifest["session_meta"]["s2_cycle_offset"] == 0
-        assert manifest["chart_context"] is not None
+        assert manifest["schema_version"] == 2
+        assert manifest["dump_type"] == "chart"
+        chart = manifest["chart"]
+        assert chart["live_soc_percent"] == 20.5
+        assert chart["display_rows"]
+        assert "Simulierter SoC (%)" in chart["display_rows"][0]
+        assert chart["session_meta"]["s2_cycle_offset"] == 0
+        assert chart["chart_context"] is not None
+        assert "runtime/optimization_history_window.jsonl" in manifest["files"][
+            "required_present"
+        ]
         assert "inputs/config.json" in names
         assert "inputs/deviation_rules.json" in names
         assert "inputs/price_model_coefficients.json" in names
@@ -246,4 +253,6 @@ def test_build_capture_payload_json_safe(tmp_path, monkeypatch):
             session_meta=None,
             chart1_plotly_json=None,
         )
+    assert payload["dump_type"] == "chart"
+    assert payload["chart"]["live_soc_percent"] == 19.0
     assert payload["live_soc_percent"] == 19.0

@@ -51,9 +51,52 @@ def resolve_hourly_baseload_kw(
     return scaled, round(target_baseload, 3)
 
 
-def baseload_kwh_from_chart_rows(rows: list[dict]) -> float:
-    """Summiert die Grundlast-Spalte über Simulationszeilen."""
-    return round(
-        sum(float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0) for row in rows),
-        3,
-    )
+_CHART_RESERVED_KW_COLUMNS = frozenset(
+    {
+        "PV-Prognose (kW)",
+        "PV-Ist (kW)",
+        "Verbrauch-Prognose (kW)",
+        "Geplante Batterie-Aktion (kW)",
+        "Netzbezug (kW)",
+    }
+)
+
+
+def _flex_chart_column_names(flexible_consumers: list | None) -> set[str]:
+    if not flexible_consumers:
+        return set()
+    from optimizer.targets import consumer_column_name
+
+    return {consumer_column_name(consumer) for consumer in flexible_consumers}
+
+
+def baseload_kwh_from_chart_rows(
+    rows: list[dict],
+    *,
+    flexible_consumers: list | None = None,
+) -> float:
+    """
+    Summiert Grundlast über Simulationszeilen.
+
+    Mit ``flexible_consumers`` werden known-Generic-Spalten nach Chart-1-Peel
+    mitgezählt (alles außer reservierten und Flex-Spalten).
+    """
+    if not rows:
+        return 0.0
+    if flexible_consumers is None:
+        return round(
+            sum(float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0) for row in rows),
+            3,
+        )
+
+    flex_cols = _flex_chart_column_names(flexible_consumers)
+    total = 0.0
+    for row in rows:
+        total += float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+        for key, value in row.items():
+            if not key.endswith(" (kW)"):
+                continue
+            if key in _CHART_RESERVED_KW_COLUMNS or key in flex_cols:
+                continue
+            total += float(value or 0.0)
+    return round(total, 3)

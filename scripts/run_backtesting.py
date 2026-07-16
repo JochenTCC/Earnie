@@ -36,6 +36,7 @@ from simulation.engine import (
     build_per_scenario_reference_costs,
     compute_historical_reference_costs,
     list_simulation_anchors,
+    plan_per_scenario_reference_tasks,
     print_plausibility_report,
     run_simulation,
     window_anchor_for_date,
@@ -244,6 +245,46 @@ def _resolve_price_paths(args) -> tuple[Path | None, Path | None]:
     return dataset, model
 
 
+def _run_reference_worker(
+    ref_id: str,
+    start_iso: str,
+    end_iso: str,
+    prices: pd.DataFrame,
+    scenario_params: dict | None,
+    progress_file: str | None,
+    progress_label: str,
+    worker_key: str,
+) -> tuple[str, pd.DataFrame]:
+    """Top-Level-Worker für Referenzkosten (ProcessPoolExecutor, Windows spawn)."""
+    from simulation.engine import compute_historical_reference_costs, HistoricalDataCache
+
+    start = pd.Timestamp(start_iso)
+    end = pd.Timestamp(end_iso)
+    cache = HistoricalDataCache()
+    cache.load()
+    ref_settings = (
+        config.get_backtesting_feed_in_settings(runtime_override=scenario_params)
+        if scenario_params is not None
+        else config.get_backtesting_feed_in_settings()
+    )
+    worker_path = worker_progress_path(progress_file, worker_key)
+    on_progress = (
+        _make_progress_printer(progress_label, worker_path, phase="reference")
+        if worker_path
+        else None
+    )
+    df_result = compute_historical_reference_costs(
+        start,
+        end,
+        prices,
+        ref_settings,
+        cache=cache,
+        scenario_params=scenario_params,
+        on_progress=on_progress,
+    )
+    return ref_id, df_result
+
+
 def _run_scenario_worker(
     name: str,
     params: dict,
@@ -292,7 +333,8 @@ def _run_scenario_worker(
     return name, df_result, plausibility, cbc_events, snapshots
 
 
-def _run_scenarios_parallel(
+def _run_parallel_backtesting(
+    reference_specs: list[tuple[str, dict | None, str, str]],
     scenarios: dict[str, dict],
     labels: dict[str, str],
     start: pd.Timestamp,
@@ -305,6 +347,7 @@ def _run_scenarios_parallel(
     forecast_model_path: str | None,
     progress_file: str | None = None,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, object], dict[str, list[dict]], list[dict]]:
+    ref_results: dict[str, pd.DataFrame] = {}
     sim_results: dict[str, pd.DataFrame] = {}
     plausibility_by_scenario: dict[str, object] = {}
     cbc_events_by_scenario: dict[str, list[dict]] = {}
@@ -312,40 +355,71 @@ def _run_scenarios_parallel(
     start_iso = start.isoformat()
     end_iso = end.isoformat()
 
-    print(f"Simuliere {len(scenarios)} Szenarien parallel ({workers} Worker)...")
+    ref_count = len(reference_specs)
+    sim_count = len(scenarios)
+    print(
+        f"Parallele Berechnung: {ref_count} Referenz(en) + {sim_count} Szenarien "
+        f"({workers} Worker)..."
+    )
     with ProcessPoolExecutor(max_workers=workers) as pool:
-        futures = {
-            pool.submit(
-                _run_scenario_worker,
-                name,
-                dict(params),
-                start_iso,
-                end_iso,
-                prices,
-                horizon_mode,
-                price_strategy,
-                feature_dataset_path,
-                forecast_model_path,
-                progress_file,
-                labels.get(name, name),
-            ): name
-            for name, params in scenarios.items()
-        }
+        futures: dict = {}
+        for ref_id, params, label, worker_key in reference_specs:
+            futures[
+                pool.submit(
+                    _run_reference_worker,
+                    ref_id,
+                    start_iso,
+                    end_iso,
+                    prices,
+                    dict(params) if params is not None else None,
+                    progress_file,
+                    label,
+                    worker_key,
+                )
+            ] = ("ref", ref_id, label)
+        for name, params in scenarios.items():
+            futures[
+                pool.submit(
+                    _run_scenario_worker,
+                    name,
+                    dict(params),
+                    start_iso,
+                    end_iso,
+                    prices,
+                    horizon_mode,
+                    price_strategy,
+                    feature_dataset_path,
+                    forecast_model_path,
+                    progress_file,
+                    labels.get(name, name),
+                )
+            ] = ("sim", name, labels.get(name, name))
         for future in as_completed(futures):
-            name = futures[future]
-            display = labels.get(name, name)
+            kind, name, display = futures[future]
             try:
-                result_name, df_result, plausibility, cbc_events, snapshots = future.result()
+                if kind == "ref":
+                    result_name, df_result = future.result()
+                    ref_results[result_name] = df_result
+                else:
+                    result_name, df_result, plausibility, cbc_events, snapshots = (
+                        future.result()
+                    )
+                    sim_results[result_name] = df_result
+                    plausibility_by_scenario[result_name] = plausibility
+                    cbc_events_by_scenario[result_name] = cbc_events
+                    window_snapshots.extend(snapshots)
             except Exception as exc:
                 raise RuntimeError(
-                    f"Szenario '{display}' ({name}) fehlgeschlagen: {exc}"
+                    f"{'Referenz' if kind == 'ref' else 'Szenario'} "
+                    f"'{display}' ({name}) fehlgeschlagen: {exc}"
                 ) from exc
-            sim_results[result_name] = df_result
-            plausibility_by_scenario[result_name] = plausibility
-            cbc_events_by_scenario[result_name] = cbc_events
-            window_snapshots.extend(snapshots)
             print(f"  Fertig: {display}")
-    return sim_results, plausibility_by_scenario, cbc_events_by_scenario, window_snapshots
+    return (
+        {**ref_results, **sim_results},
+        plausibility_by_scenario,
+        cbc_events_by_scenario,
+        window_snapshots,
+    )
 
 
 _PROGRESS_WRITE_MIN_INTERVAL_SEC = 1.0
@@ -389,7 +463,12 @@ def _write_progress_file(path: str | None, payload: dict) -> None:
                 pass
 
 
-def _make_progress_printer(scenario_name: str, progress_file: str | None = None):
+def _make_progress_printer(
+    scenario_name: str,
+    progress_file: str | None = None,
+    *,
+    phase: str = "simulation",
+):
     """Gibt eine Callback-Funktion für die Fortschrittsanzeige im Terminal zurück."""
     last_write_at = 0.0
     last_written_current = -1
@@ -422,7 +501,7 @@ def _make_progress_printer(scenario_name: str, progress_file: str | None = None)
                 "current": current,
                 "total": total,
                 "scenario": scenario_name,
-                "phase": "simulation",
+                "phase": phase,
             },
         )
         last_write_at = now
@@ -682,48 +761,72 @@ def main(argv: list[str] | None = None):
     )
     progress_file = args.progress_file
     total_hours = len(anchors) * 24
+    reference_by_scenario, extra_ref_labels, extra_ref_specs = (
+        plan_per_scenario_reference_tasks(
+            scenarios,
+            live_scenario_id=live_scenario_id,
+            scenario_labels=scenario_labels,
+        )
+    )
+    labels.update(extra_ref_labels)
+    reference_specs: list[tuple[str, dict | None, str, str]] = [
+        (
+            HISTORICAL_REFERENCE_ID,
+            reference_params,
+            HISTORICAL_REFERENCE_LABEL,
+            "_reference",
+        ),
+        *[
+            (ref_id, params, label, ref_id)
+            for ref_id, params, label in extra_ref_specs
+        ],
+    ]
 
     if progress_file:
         prepare_progress_dir(progress_file)
-        _write_progress_file(
-            worker_progress_path(progress_file, "_reference"),
-            {
-                "current": 0,
-                "total": total_hours,
-                "scenario": HISTORICAL_REFERENCE_LABEL,
-                "phase": "reference",
-            },
-        )
+        for _ref_id, _params, label, worker_key in reference_specs:
+            _write_progress_file(
+                worker_progress_path(progress_file, worker_key),
+                {
+                    "current": 0,
+                    "total": total_hours,
+                    "scenario": label,
+                    "phase": "reference",
+                },
+            )
 
-    print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
-    sim_results = {
-        HISTORICAL_REFERENCE_ID: compute_historical_reference_costs(
+    plausibility_by_scenario: dict = {}
+    cbc_events_by_scenario: dict[str, list[dict]] = {}
+    window_snapshots: list[dict] = []
+    sim_results: dict[str, pd.DataFrame] = {}
+
+    if args.workers == 1:
+        print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
+        ref_progress_path = worker_progress_path(progress_file, "_reference")
+        ref_progress = _make_progress_printer(
+            HISTORICAL_REFERENCE_LABEL, ref_progress_path, phase="reference"
+        )
+        sim_results[HISTORICAL_REFERENCE_ID] = compute_historical_reference_costs(
             start,
             end,
             prices,
             ref_settings,
             cache=cache,
             scenario_params=reference_params,
-        ),
-    }
-    extra_refs, extra_ref_labels, reference_by_scenario = (
-        build_per_scenario_reference_costs(
-            start,
-            end,
-            prices,
-            cache,
-            scenarios,
-            live_scenario_id=live_scenario_id,
-            scenario_labels=scenario_labels,
+            on_progress=ref_progress,
         )
-    )
-    sim_results.update(extra_refs)
-    labels.update(extra_ref_labels)
-    plausibility_by_scenario: dict = {}
-    cbc_events_by_scenario: dict[str, list[dict]] = {}
-    window_snapshots: list[dict] = []
-
-    if args.workers == 1:
+        extra_refs, _extra_labels, reference_by_scenario = (
+            build_per_scenario_reference_costs(
+                start,
+                end,
+                prices,
+                cache,
+                scenarios,
+                live_scenario_id=live_scenario_id,
+                scenario_labels=scenario_labels,
+            )
+        )
+        sim_results.update(extra_refs)
         for name, params in scenarios.items():
             display = labels.get(name, name)
             print(f"Simuliere Szenario: '{display}'...")
@@ -749,25 +852,22 @@ def main(argv: list[str] | None = None):
             window_snapshots.extend(scenario_snapshots)
             print_plausibility_report(plausibility)
     else:
-        parallel_results, parallel_plausibility, parallel_cbc, parallel_snapshots = (
-            _run_scenarios_parallel(
-            scenarios,
-            labels,
-            start,
-            end,
-            prices,
-            args.workers,
-            horizon_mode,
-            price_strategy,
-            feature_dataset_str,
-            forecast_model_str,
-            progress_file=progress_file,
+        sim_results, plausibility_by_scenario, cbc_events_by_scenario, window_snapshots = (
+            _run_parallel_backtesting(
+                reference_specs,
+                scenarios,
+                labels,
+                start,
+                end,
+                prices,
+                args.workers,
+                horizon_mode,
+                price_strategy,
+                feature_dataset_str,
+                forecast_model_str,
+                progress_file=progress_file,
+            )
         )
-        )
-        sim_results.update(parallel_results)
-        plausibility_by_scenario.update(parallel_plausibility)
-        cbc_events_by_scenario.update(parallel_cbc)
-        window_snapshots.extend(parallel_snapshots)
         for name in scenarios:
             print_plausibility_report(plausibility_by_scenario[name])
 

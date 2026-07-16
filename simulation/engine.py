@@ -778,6 +778,7 @@ def compute_historical_reference_costs(
     cache: HistoricalDataCache | None = None,
     *,
     scenario_params: dict | None = None,
+    on_progress=None,
 ) -> pd.DataFrame:
     """
     Referenzkosten: Referenz-Verbrauch + Szenario-PV, verrechnet mit Szenario-Tarifen,
@@ -800,6 +801,8 @@ def compute_historical_reference_costs(
             runtime_override=scenario_params
         )
 
+    total_hours = len(anchors) * 24
+    hours_done = 0
     for anchor in anchors:
         slot_datetimes = window_slot_datetimes(anchor)
         total_load = resolve_reference_hourly_load(
@@ -828,10 +831,76 @@ def compute_historical_reference_costs(
             costs.append(
                 _hour_cost_without_optimization(load, pv, price, k_push)
             )
+            hours_done += 1
+            if on_progress is not None:
+                on_progress(hours_done, total_hours)
 
     df_res = pd.DataFrame({"sim_cost": costs}, index=pd.DatetimeIndex(timestamps))
     df_res.index.name = "ts"
     return df_res
+
+
+def plan_per_scenario_reference_tasks(
+    scenarios: dict[str, dict],
+    *,
+    live_scenario_id: str,
+    scenario_labels: dict[str, str] | None = None,
+) -> tuple[dict[str, str], dict[str, str], list[tuple[str, dict, str]]]:
+    """
+    Plant Szenario-Referenzen ohne Simulation.
+
+    Returns:
+        reference_by_scenario, extra_labels, extra_specs
+        extra_specs: [(ref_id, scenario_params, display_label), ...]
+    """
+    from house_config.entity_resolution import strip_assets_for_reference
+    from house_config.planning_flex_bridge import reference_fingerprint
+
+    labels = scenario_labels or {}
+    live_params = scenarios.get(live_scenario_id)
+    if live_params is None and scenarios:
+        live_params = next(iter(scenarios.values()))
+    baseline_params = (
+        strip_assets_for_reference(live_params) if live_params is not None else None
+    )
+    baseline_fp = reference_fingerprint(baseline_params)
+    live_fp = reference_fingerprint(live_params) if live_params is not None else ()
+    live_ref_id = (
+        scenario_reference_id(live_scenario_id) if live_scenario_id else None
+    )
+    live_ref_registered = False
+
+    reference_by_scenario: dict[str, str] = {}
+    extra_labels: dict[str, str] = {}
+    extra_specs: list[tuple[str, dict, str]] = []
+    fp_to_ref_id: dict[tuple, str] = {}
+
+    for scenario_id, params in scenarios.items():
+        fp = reference_fingerprint(params)
+        if fp == baseline_fp:
+            reference_by_scenario[scenario_id] = HISTORICAL_REFERENCE_ID
+            continue
+        if live_ref_id and fp == live_fp:
+            reference_by_scenario[scenario_id] = live_ref_id
+            if not live_ref_registered and live_params is not None:
+                display = labels.get(live_scenario_id, live_scenario_id)
+                extra_labels[live_ref_id] = scenario_reference_label(display)
+                extra_specs.append(
+                    (live_ref_id, dict(live_params), extra_labels[live_ref_id])
+                )
+                live_ref_registered = True
+            continue
+        if fp in fp_to_ref_id:
+            reference_by_scenario[scenario_id] = fp_to_ref_id[fp]
+            continue
+        ref_id = scenario_reference_id(scenario_id)
+        fp_to_ref_id[fp] = ref_id
+        display = labels.get(scenario_id, scenario_id)
+        extra_labels[ref_id] = scenario_reference_label(display)
+        extra_specs.append((ref_id, dict(params), extra_labels[ref_id]))
+        reference_by_scenario[scenario_id] = ref_id
+
+    return reference_by_scenario, extra_labels, extra_specs
 
 
 def build_per_scenario_reference_costs(
@@ -852,33 +921,13 @@ def build_per_scenario_reference_costs(
 
     Returns: (zusätzliche Referenz-DataFrames, Labels, scenario_id → reference_id)
     """
-    from house_config.entity_resolution import strip_assets_for_reference
-    from house_config.planning_flex_bridge import reference_fingerprint
-
-    labels = scenario_labels or {}
-    live_params = scenarios.get(live_scenario_id)
-    if live_params is None and scenarios:
-        live_params = next(iter(scenarios.values()))
-    baseline_params = (
-        strip_assets_for_reference(live_params) if live_params is not None else None
+    reference_by_scenario, extra_labels, extra_specs = plan_per_scenario_reference_tasks(
+        scenarios,
+        live_scenario_id=live_scenario_id,
+        scenario_labels=scenario_labels,
     )
-    baseline_fp = reference_fingerprint(baseline_params)
-
-    reference_by_scenario: dict[str, str] = {}
     extra_results: dict[str, pd.DataFrame] = {}
-    extra_labels: dict[str, str] = {}
-    fp_to_ref_id: dict[tuple, str] = {}
-
-    for scenario_id, params in scenarios.items():
-        fp = reference_fingerprint(params)
-        if fp == baseline_fp:
-            reference_by_scenario[scenario_id] = HISTORICAL_REFERENCE_ID
-            continue
-        if fp in fp_to_ref_id:
-            reference_by_scenario[scenario_id] = fp_to_ref_id[fp]
-            continue
-        ref_id = scenario_reference_id(scenario_id)
-        fp_to_ref_id[fp] = ref_id
+    for ref_id, params, _label in extra_specs:
         ref_settings = config.get_backtesting_feed_in_settings(runtime_override=params)
         extra_results[ref_id] = compute_historical_reference_costs(
             start,
@@ -888,9 +937,6 @@ def build_per_scenario_reference_costs(
             cache=cache,
             scenario_params=params,
         )
-        display = labels.get(scenario_id, scenario_id)
-        extra_labels[ref_id] = scenario_reference_label(display)
-        reference_by_scenario[scenario_id] = ref_id
 
     return extra_results, extra_labels, reference_by_scenario
 
@@ -945,7 +991,10 @@ def validate_window_consumption(
         _plausibility_reference_values(meta, flexible_consumers)
     )
 
-    optimized_baseload = baseload_kwh_from_chart_rows(chart_rows)
+    optimized_baseload = baseload_kwh_from_chart_rows(
+        chart_rows,
+        flexible_consumers=flexible_consumers,
+    )
     delivered_flex = _delivered_flex_kwh_from_rows(
         chart_rows,
         flexible_consumers=flexible_consumers,

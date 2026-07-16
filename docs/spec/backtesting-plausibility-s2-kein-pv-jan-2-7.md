@@ -1,12 +1,12 @@
 # Backtesting plausibility — `s2-kein-pv` Jan 2 & Jan 7 (structural)
 
-Developer research note for greenfield Scenario Exploration (SE) Phase B.
+Developer research note for greenfield Szenario-Explorer (SE) Phase B.
 
 **Date:** 2026-07-13  
 **Backtest:** January 2025, `fixed_24h`, greenfield env  
 **Scenario:** `s2-kein-pv` — 5 kWh battery, no PV, `mein_haushalt`, `profile_spec`, tariffs `fixed_25ct` / `fixed_37ct`
 
-Related: [scenario-exploration-consumption.md](scenario-exploration-consumption.md), `backlog/Backlog.md` Phase B.
+Related: [scenario-explorer-consumption.md](scenario-explorer-consumption.md), `backlog/Backlog.md` Phase B.
 
 ---
 

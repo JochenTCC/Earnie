@@ -176,7 +176,7 @@ def resolve_live_scenario_settings(
     monthly_rates_holder: dict | None = None,
 ) -> dict:
     """
-    Löst das Live-Szenario (live_scenario_id) für Echtzeit und Scenario-Exploration auf.
+    Löst das Live-Szenario (live_scenario_id) für Echtzeit und Szenario-Explorer auf.
     Erfordert Entitäts-IDs im Szenario (keine flachen Legacy-Felder in config.json).
     """
     scenario_id = get_live_scenario_id(raw_config)

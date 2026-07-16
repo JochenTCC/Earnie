@@ -249,6 +249,13 @@ class ModeledClimateContext:
         profile = self._thermal_hourly_profile_for_year(consumer, slot_dt.year)
         return float(profile[_slot_hour_index_in_year(slot_dt)])
 
+    def _thermal_rc_archive_year(self, year: int) -> int:
+        from data.open_meteo_solar_archive import archive_latest_complete_date
+
+        if date(year, 12, 31) <= archive_latest_complete_date():
+            return year
+        return last_full_archive_year(reference=date(year, 1, 1))
+
     def _thermal_rc_hourly_profile_for_year(self, consumer: dict, year: int) -> list[float]:
         from house_config.thermal_rc_profile import thermal_rc_hourly_kw_from_ambient
 
@@ -257,8 +264,12 @@ class ModeledClimateContext:
         if key in self._thermal_rc_year_profiles:
             return self._thermal_rc_year_profiles[key]
 
-        bundle = self._bundle_for_calendar_year(year)
+        archive_year = self._thermal_rc_archive_year(year)
+        bundle = self._bundle_for_calendar_year(archive_year)
         profile = thermal_rc_hourly_kw_from_ambient(consumer, bundle.temperature_c)
+        if len(profile) < 8760:
+            pad = profile[-1] if profile else 0.0
+            profile = profile + [pad] * (8760 - len(profile))
         self._thermal_rc_year_profiles[key] = profile
         return profile
 

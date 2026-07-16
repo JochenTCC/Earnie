@@ -9,6 +9,7 @@ from data import cons_data_store
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation import backtesting_log
 from simulation.backtesting_fingerprint import fingerprint_for_current_config
+from simulation.backtesting_progress import sort_progress_snapshot_keys
 from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNRISE_WINDOW
 from ui.backtesting_charts import scenario_monthly_cost_chart
 from ui.backtesting_cons_data import render_cons_data_section
@@ -23,18 +24,19 @@ from ui.backtesting_results_helpers import (
 )
 from ui.backtesting_runner import (
     auto_backtesting_workers,
+    count_backtesting_parallel_tasks,
     default_progress_file_path,
     run_backtesting_subprocess,
     suggest_test_month,
 )
 from ui.backtesting_time_ranges import render_time_range_help
-from scripts.run_backtesting import BACKTESTING_YEAR
+from scripts.run_backtesting import BACKTESTING_YEAR, HISTORICAL_REFERENCE_LABEL
 _LEGACY_STALE_WARNING = (
-    "Älterer Szenarien-Explorer-Lauf ohne Konfigurations-Fingerabdruck — "
+    "Älterer Szenario-Explorer-Lauf ohne Konfigurations-Fingerabdruck — "
     "bitte einmal neu berechnen."
 )
 _MISMATCH_STALE_WARNING = (
-    "Gespeicherter Szenarien-Explorer-Lauf passt nicht zur aktuellen Konfiguration. "
+    "Gespeicherter Szenario-Explorer-Lauf passt nicht zur aktuellen Konfiguration. "
     "Bitte neu berechnen."
 )
 _STALE_CAPTION = (
@@ -42,7 +44,7 @@ _STALE_CAPTION = (
     "Ergebnisse unten sind veraltet."
 )
 _HORIZON_STALE_WARNING = (
-    "Der gewählte Planungshorizont weicht vom gespeicherten Szenarien-Explorer-Lauf ab. "
+    "Der gewählte Planungshorizont weicht vom gespeicherten Szenario-Explorer-Lauf ab. "
     "Die Ergebnisse unten sind ungültig — bitte neu berechnen oder die "
     "ursprüngliche Horizont-Auswahl wiederherstellen."
 )
@@ -54,7 +56,7 @@ _HORIZON_RESULTS_HIDDEN_INFO = (
 _BACKTESTING_LOG_ANCHOR_KEY = "_backtesting_log_anchor"
 
 
-@st.cache_data(ttl=60, show_spinner="Lade Szenarien-Explorer-Log...")
+@st.cache_data(ttl=60, show_spinner="Lade Szenario-Explorer-Log...")
 def load_backtesting_data():
     return backtesting_log.load_backtesting_log()
 
@@ -128,7 +130,7 @@ def _format_config_error(message: str) -> str:
 def _format_backtesting_run_error(output: str) -> str | None:
     if "cons_data_hourly.csv" in output:
         return (
-            "Szenarien-Explorer benötigt Verbrauchsdaten in `cons_data_hourly.csv` "
+            "Szenario-Explorer benötigt Verbrauchsdaten in `cons_data_hourly.csv` "
             f"unter `{resolve_backtesting_log_dir()}` (bzw. dem in der Config "
             "konfigurierten `path_cons_data`). "
             "Für Greenfield: Daten per `scripts/generate_cons_data.py` erzeugen "
@@ -136,7 +138,7 @@ def _format_backtesting_run_error(output: str) -> str | None:
         )
     if "No module named scripts" in output:
         return (
-            "Szenarien-Explorer-Subprocess konnte das Skript nicht starten. "
+            "Szenario-Explorer-Subprocess konnte das Skript nicht starten. "
             "Streamlit neu starten; unter VS Code `subProcess: false` in launch.json "
             "verwenden (bereits für Greenfield-Launch gesetzt)."
         )
@@ -195,9 +197,15 @@ def _execute_backtesting_run(
         return
 
     scenarios, _ = try_get_backtesting_scenarios()
-    scenario_count = len(scenarios or {})
-    workers = auto_backtesting_workers(scenario_count)
+    live_scenario_id = config.get_live_scenario_id()
+    parallel_task_count = count_backtesting_parallel_tasks(
+        scenarios or {},
+        live_scenario_id=live_scenario_id,
+    )
+    workers = auto_backtesting_workers(parallel_task_count)
     progress_file = default_progress_file_path()
+    scenario_labels = config.get_scenario_labels()
+    live_scenario_label = scenario_labels.get(live_scenario_id, live_scenario_id)
 
     with st.status(status_label, expanded=True) as status:
         progress_host = st.empty()
@@ -206,25 +214,36 @@ def _execute_backtesting_run(
             if not snapshot:
                 return
             with progress_host.container():
+                active_entries = [
+                    progress
+                    for progress in snapshot.values()
+                    if int(progress.get("total") or 0) <= 0
+                    or int(progress.get("current") or 0) < int(progress.get("total") or 0)
+                ]
                 if workers > 1:
                     st.caption(
                         f"Parallele Berechnung: {workers} Worker · "
-                        f"{len(snapshot)} aktive Szenarien"
+                        f"{len(active_entries)} aktive Tasks"
                     )
-                for scenario in sorted(snapshot):
+                ordered_scenarios = sort_progress_snapshot_keys(
+                    snapshot.keys(),
+                    historical_reference_label=HISTORICAL_REFERENCE_LABEL,
+                    live_scenario_label=live_scenario_label,
+                )
+                for scenario in ordered_scenarios:
                     progress = snapshot[scenario]
                     total = int(progress.get("total") or 0)
                     current = int(progress.get("current") or 0)
                     phase = str(progress.get("phase") or "")
                     if total > 0:
-                        st.caption(scenario)
-                        st.progress(min(current / total, 1.0))
                         if phase == "reference":
-                            st.caption(f"{scenario}: Referenz")
+                            label = f"{scenario} — Referenz"
                         else:
-                            st.caption(f"{scenario}: {current}/{total} h")
+                            label = f"{scenario} — {current}/{total} h"
+                        st.caption(label)
+                        st.progress(min(current / total, 1.0))
                     else:
-                        st.caption(scenario or "Szenarien-Explorer läuft…")
+                        st.caption(scenario or "Szenario-Explorer läuft…")
 
         exit_code, output = run_backtesting_subprocess(
             start_month=start_month,
@@ -235,11 +254,11 @@ def _execute_backtesting_run(
             on_progress=_on_progress,
         )
         if exit_code == 0:
-            status.update(label="Szenarien-Explorer abgeschlossen", state="complete")
+            status.update(label="Szenario-Explorer abgeschlossen", state="complete")
             load_backtesting_data.clear()
             st.rerun()
         else:
-            status.update(label="Szenarien-Explorer fehlgeschlagen", state="error")
+            status.update(label="Szenario-Explorer fehlgeschlagen", state="error")
             hint = _format_backtesting_run_error(output)
             if hint:
                 st.error(hint)
@@ -258,7 +277,7 @@ def render_backtesting_run_controls(
     meta: dict | None = None,
 ) -> bool:
     """Rendert Start-Steuerung. True wenn Horizont-Auswahl vom Log abweicht."""
-    label = "Szenarien-Explorer neu berechnen" if log_exists else "Szenarien-Explorer starten"
+    label = "Szenario-Explorer neu berechnen" if log_exists else "Szenario-Explorer starten"
     log_period = meta.get("period") if meta else None
     render_time_range_help(key="backtesting_time_ranges_run", log_period=log_period)
     test_month = suggest_test_month()
@@ -287,11 +306,17 @@ def render_backtesting_run_controls(
         st.warning(_HORIZON_STALE_WARNING)
     scenarios, scenario_error = try_get_backtesting_scenarios()
     if not scenario_error and scenarios:
-        worker_count = auto_backtesting_workers(len(scenarios))
+        live_scenario_id = config.get_live_scenario_id()
+        parallel_task_count = count_backtesting_parallel_tasks(
+            scenarios,
+            live_scenario_id=live_scenario_id,
+        )
+        worker_count = auto_backtesting_workers(parallel_task_count)
         if worker_count > 1:
             st.caption(
                 f"Automatisch parallele Berechnung: bis zu {worker_count} Worker "
-                f"für {len(scenarios)} Szenarien."
+                f"für {parallel_task_count} Tasks "
+                f"({len(scenarios)} optimierte Szenarien + Referenzberechnungen)."
             )
     col_full, col_test = st.columns(2)
     if col_full.button(
@@ -301,34 +326,34 @@ def render_backtesting_run_controls(
         disabled=not cons_data_ready,
     ):
         _execute_backtesting_run(
-            status_label="Szenarien-Explorer läuft…",
+            status_label="Szenario-Explorer läuft…",
             horizon_mode=horizon_mode,
         )
 
     test_disabled = not cons_data_ready or test_month is None
     if col_test.button(
-        "Szenarien-Explorer-Berechnung testen",
+        "Szenario-Explorer-Berechnung testen",
         type="secondary",
         key="backtesting_test_run_btn",
         disabled=test_disabled,
     ):
         st.warning(
-            "Testlauf (1 Monat) überschreibt das bestehende Szenarien-Explorer-Log."
+            "Testlauf (1 Monat) überschreibt das bestehende Szenario-Explorer-Log."
         )
         _execute_backtesting_run(
             start_month=test_month,
             end_month=test_month,
-            status_label=f"Szenarien-Explorer-Testlauf (Monat {test_month}/{BACKTESTING_YEAR})…",
+            status_label=f"Szenario-Explorer-Testlauf (Monat {test_month}/{BACKTESTING_YEAR})…",
             horizon_mode=horizon_mode,
         )
     if not cons_data_ready:
         st.caption(
-            "Szenarien-Explorer ist deaktiviert, bis gültige Verbrauchsdaten in "
+            "Szenario-Explorer ist deaktiviert, bis gültige Verbrauchsdaten in "
             "`cons_data_hourly.csv` vorhanden sind (siehe Abschnitt oben)."
         )
     elif test_month is None:
         st.caption(
-            "Testlauf deaktiviert: keine cons_data-Daten im Szenarien-Explorer-Basisjahr."
+            "Testlauf deaktiviert: keine cons_data-Daten im Szenario-Explorer-Basisjahr."
         )
     if log_stale:
         st.caption(_STALE_CAPTION)
@@ -336,7 +361,7 @@ def render_backtesting_run_controls(
 
 
 def render_backtesting_log_caption(meta: dict) -> None:
-    st.subheader("Szenarien-Explorer-Log")
+    st.subheader("Szenario-Explorer-Log")
     st.caption(f"Ergebnisdatei: `{backtesting_log.backtesting_log_json_path()}`")
     created = meta.get("created_at", "")[:19].replace("T", " ")
     period = meta.get("period", {})
@@ -431,7 +456,7 @@ def render_scenario_consumption_table(meta: dict, hourly_df: pd.DataFrame | None
     if not has_totals:
         st.info(
             "Verbrauchssummen fehlen in diesem Log (älterer Lauf). "
-            "Bitte Szenarien-Explorer neu berechnen."
+            "Bitte Szenario-Explorer neu berechnen."
         )
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
@@ -486,7 +511,7 @@ def render_backtesting_block() -> None:
             stale_reason = log_stale_reason(meta)
             log_stale = stale_reason is not None
         except Exception as exc:
-            st.error(f"Szenarien-Explorer-Log konnte nicht geladen werden: {exc}")
+            st.error(f"Szenario-Explorer-Log konnte nicht geladen werden: {exc}")
             log_exists = False
 
     cons_ready = render_cons_data_section()
@@ -510,7 +535,7 @@ def render_backtesting_block() -> None:
     if not log_exists or meta is None:
         if not log_exists:
             st.info(
-                "Noch kein Szenarien-Explorer-Lauf vorhanden. "
+                "Noch kein Szenario-Explorer-Lauf vorhanden. "
                 "Starte die Berechnung mit dem Button oben."
             )
         return

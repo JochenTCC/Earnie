@@ -466,3 +466,45 @@ def test_build_per_scenario_reference_costs_pv_variant(
     assert mapping["live"] == live_ref_id
     assert mapping["no_battery"] == live_ref_id
     assert live_ref_id in extra
+
+
+def test_plan_per_scenario_reference_tasks_battery_variant_uses_live_ref():
+    from simulation.engine import (
+        HISTORICAL_REFERENCE_ID,
+        plan_per_scenario_reference_tasks,
+        scenario_reference_id,
+        scenario_reference_label,
+    )
+
+    shared = {
+        "_import_tariff_spec": {"id": "awattar_at", "type": "awattar"},
+        "_export_tariff_spec": {"id": "monthly_sunny", "type": "fixed", "k_push_cent": 0.0},
+        "feed_in_mode": "fixed",
+        "k_push_cent": 0.0,
+        "import_tariff_type": "awattar",
+        "pv_kwp": 6.0,
+    }
+    scenarios = {
+        "mit_10_kwh_speicher": {
+            **shared,
+            "battery_capacity_kwh": 10.0,
+        },
+        "live": {
+            **shared,
+            "battery_capacity_kwh": 5.0,
+        },
+    }
+    labels = {"live": "Live", "mit_10_kwh_speicher": "Mit 10 kWh Speicher"}
+    _ref_by, extra_labels, extra_specs = plan_per_scenario_reference_tasks(
+        scenarios,
+        live_scenario_id="live",
+        scenario_labels=labels,
+    )
+    live_ref_id = scenario_reference_id("live")
+    assert _ref_by["live"] == live_ref_id
+    assert _ref_by["mit_10_kwh_speicher"] == live_ref_id
+    assert extra_specs == [
+        (live_ref_id, scenarios["live"], scenario_reference_label("Live")),
+    ]
+    assert HISTORICAL_REFERENCE_ID not in _ref_by.values()
+    assert extra_labels[live_ref_id] == scenario_reference_label("Live")

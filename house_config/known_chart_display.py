@@ -66,14 +66,20 @@ def chart_known_generics(
     used |= _used_chart_color_indices(fixed)
     result: list[dict] = []
     for consumer in fixed:
+        consumer_id = str(consumer["id"])
+        legacy_id = str(consumer.get("legacy_id") or "").strip() or None
         raw = consumer.get("chart_color_index")
         if raw is None:
-            index = _allocate_chart_color_index(used, str(consumer["id"]))
+            index = _allocate_chart_color_index(
+                used, consumer_id, legacy_id=legacy_id
+            )
         else:
             try:
                 index = int(raw)
             except (TypeError, ValueError):
-                index = _allocate_chart_color_index(used, str(consumer["id"]))
+                index = _allocate_chart_color_index(
+                    used, consumer_id, legacy_id=legacy_id
+                )
         used.add(index)
         result.append(known_as_chart_consumer(consumer, chart_color_index=index))
     return result

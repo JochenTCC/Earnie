@@ -22,7 +22,11 @@ from optimizer.targets import (
     consumer_immediate_charge_column_name,
     consumer_pv_follow_column_name,
 )
-from settings.flexible_consumers import charging_context_lookup
+from settings.flexible_consumers import (
+    charging_context_lookup,
+    flex_kw_lookup,
+    runtime_consumer_id,
+)
 
 from . import optimization_history
 
@@ -265,22 +269,39 @@ def _netzbezug_kw_from_entry(entry: dict[str, Any], row: dict[str, Any]) -> floa
     )
 
 
+def _flex_dict_has_consumer(flex: dict[str, Any] | None, consumer: dict[str, Any]) -> bool:
+    if not flex:
+        return False
+    runtime_id = runtime_consumer_id(consumer)
+    canonical_id = str(consumer["id"])
+    return runtime_id in flex or canonical_id in flex
+
+
+def _consumer_is_measured(measured_ids: Any, consumer: dict[str, Any]) -> bool:
+    """True if measured_ids lists runtime and/or canonical consumer id."""
+    if measured_ids is None:
+        return True
+    runtime_id = runtime_consumer_id(consumer)
+    canonical_id = str(consumer["id"])
+    return runtime_id in measured_ids or canonical_id in measured_ids
+
+
 def _consumer_kw_from_entry(
     entry: dict[str, Any],
-    consumer_id: str,
+    consumer: dict[str, Any],
 ) -> float | None:
     """Flex-Leistung für Chart/Tabelle im Produktiv-Log — Ist, nicht MILP-Soll."""
     measured_ids = entry.get("flex_measured_ids")
-    if measured_ids is not None and consumer_id not in measured_ids:
+    if not _consumer_is_measured(measured_ids, consumer):
         return None
 
     snapshot = entry.get("consumption_snapshot") or {}
     flex_kw = snapshot.get("flex_kw") or {}
-    if consumer_id in flex_kw:
-        return float(flex_kw[consumer_id] or 0.0)
+    if _flex_dict_has_consumer(flex_kw, consumer):
+        return float(flex_kw_lookup(flex_kw, consumer))
     live = entry.get("flex_live_kw") or {}
-    if consumer_id in live:
-        return float(live[consumer_id] or 0.0)
+    if _flex_dict_has_consumer(live, consumer):
+        return float(flex_kw_lookup(live, consumer))
     if measured_ids is not None:
         return None
     return 0.0
@@ -340,12 +361,13 @@ def entry_to_chart_row(
     }
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         cid = consumer["id"]
-        flex_kw = _consumer_kw_from_entry(entry, cid)
+        flex_kw = _consumer_kw_from_entry(entry, consumer)
         row[consumer_column_name(consumer)] = (
             round(flex_kw, 2) if flex_kw is not None else None
         )
         if uses_pv_follow(consumer):
-            pv_follow = (entry.get("consumer_pv_follow") or {}).get(cid, 0)
+            pv_follow_map = entry.get("consumer_pv_follow") or {}
+            pv_follow = pv_follow_map.get(cid, pv_follow_map.get(runtime_consumer_id(consumer), 0))
             row[consumer_pv_follow_column_name(consumer)] = int(pv_follow or 0)
     if snapshot.get("pv_kw") is not None:
         row[PV_IST_COLUMN] = round(float(snapshot["pv_kw"]), 3)

@@ -29,7 +29,7 @@
 #   docker compose --project-directory . -f docker/compose/loxberry.yml pull
 #   docker compose --project-directory . -f docker/compose/loxberry.yml up -d
 #
-# UI: EARNIE_UI_MODES=sunset2sunset,scenario_exploration (Prod); Dev ohne Variable = Standard-Modi.
+# UI: EARNIE_UI_MODES=sunset2sunset,scenario_explorer (Prod); Dev ohne Variable = Standard-Modi.
 # UI im LAN: http://<loxberry-ip>:8501 (kein DSM Reverse Proxy – extern nur mit eigenem Proxy/VPN).
 
 version: "3.8"
@@ -69,4 +69,4 @@ services:
     volumes: *persist-volumes
     environment:
       <<: *common-env
-      EARNIE_UI_MODES: sunset2sunset,scenario_exploration
+      EARNIE_UI_MODES: sunset2sunset,scenario_explorer
