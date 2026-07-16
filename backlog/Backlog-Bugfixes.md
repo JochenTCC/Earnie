@@ -26,3 +26,4 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## New Bugs (Do not remove this chapter — even if empty)
 
 - [ ] Check if there is a special issue on weekends, when time-to-be ready is set to 12:00 (Start/ End-SOC constraints)
+- [ ] Error in Monitor on mobile: TypeError: Failed to fetch dynamically imported module: https://ernie.famkoehler-dornbirn.ipv64.net/static/js/Selectbox.IGsNeZFC
