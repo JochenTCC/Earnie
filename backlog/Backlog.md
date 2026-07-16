@@ -13,10 +13,22 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - loxforum -> done
   - Facebook groups (e.g. Loxone Smart Home Community)
   - Evaluate running Szenario-Explorer as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility  
+- [ ] Check if Loxone's Energiemonitor provides statistics to import in Earnie  
+  - Energiemonitor logs statistics
+  - [ ] Check how data looks like
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
 
 
 ## Feature Backlog
+
+
+### Version 2.+1
+- [ ] Order of progress bars in SE shall not change during execution of scenario simulation
+- [ ] Order of alls SE results (tables, charts)
+  - 1. Historisch - ohne Optimierung
+  - 2. Live - Ohne Optimierung
+  - 3.- Other PV-settings - Ohne Optimierung
+  - x.- Repeat order from 2., 3. ... - Optimiert
 
 ### Version 2.+1 — Quality epic / post-migration cleanup
 
@@ -36,8 +48,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.+1
 
-- [ ] Make editors more compact: Parameter name and entry field side by side
-- [ ] Add a hint text to SE that there is no guarantee for the results
 - [ ] Make main.py controllable from streamlit.app (Checks must be included if main.py is runnin already, if necessary change spec / doc and put it in one container as deamon or so)
 
 

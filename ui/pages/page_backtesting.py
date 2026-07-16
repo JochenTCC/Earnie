@@ -13,6 +13,12 @@ _BACKTESTING_HELP = (
     "Läuft offline via `scripts.run_backtesting`."
 )
 
+_RESULTS_DISCLAIMER = (
+    "Ergebnisse sind Modellrechnungen. Es gibt keine Garantie, "
+    "dass Live-Einsparungen exakt den Simulationen entsprechen "
+    "(Wetter, Verhalten, Tarifdetails, Hardwaregrenzen)."
+)
+
 
 def render() -> None:
     render_page_title_with_help(
@@ -20,5 +26,6 @@ def render() -> None:
         _BACKTESTING_HELP,
         key="backtesting_scope_help",
     )
+    st.info(_RESULTS_DISCLAIMER)
     st.caption(f"Konfiguration: `{config.CONFIG.config_path}`")
     render_backtesting_block()

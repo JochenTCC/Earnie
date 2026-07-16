@@ -32,6 +32,13 @@ from ui.house_config_io import (
     upsert_house_profile,
 )
 from ui.house_config_sticky_save import sticky_save_bar
+from ui.form_layout import (
+    WIDE_LABEL_RATIOS,
+    labeled_checkbox,
+    labeled_number_input,
+    labeled_selectbox,
+    labeled_text_input,
+)
 
 CONSUMER_TYPE_OPTIONS = ["generic", "thermal_annual", "thermal_rc", "ev"]
 _SESSION_SYNC_KEY = "house_profile_sync_id"
@@ -149,7 +156,7 @@ def _render_power_source_fields(
     default_source = "loxone" if (
         str(rec.get("power_source", "")).lower() == "loxone" or has_marker
     ) else "manual"
-    power_source = st.selectbox(
+    power_source = labeled_selectbox(
         "Leistungsquelle",
         options=["manual", "loxone"],
         index=0 if default_source != "loxone" else 1,
@@ -164,7 +171,7 @@ def _render_power_source_fields(
         "Merker wird für künftige Live-Adaption gespeichert; "
         "Grundlast/Empfehlung nutzen weiterhin Nennleistung aus dem Profil."
     )
-    power_name = st.text_input(
+    power_name = labeled_text_input(
         "Loxone-Merker (Leistung)",
         value=str(inputs.get("power_name", "")),
         key=_scoped_key(session_scope, f"{key_prefix}_merker_{index}"),
@@ -190,13 +197,13 @@ def _render_manual_appliance_fields(
     )
     default_power = float(rec.get("default_power_kw", nominal) or nominal)
     default_runtime = float(rec.get("default_runtime_h", duration_h) or duration_h)
-    default_power_kw = st.number_input(
+    default_power_kw = labeled_number_input(
         "Standard-Leistung (kW)",
         min_value=0.0,
         value=default_power,
         key=_scoped_key(session_scope, f"hc_app_pwr_{index}"),
     )
-    default_runtime_h = st.number_input(
+    default_runtime_h = labeled_number_input(
         "Standard-Laufzeit (h)",
         min_value=0.1,
         value=default_runtime,
@@ -220,7 +227,7 @@ def _render_generic_fields(
 ) -> dict:
     sched = consumer.get("schedule") or {}
     defaults = _schedule_defaults(sched)
-    runs = st.number_input(
+    runs = labeled_number_input(
         "Läufe pro Woche",
         min_value=0,
         value=int(sched.get("runs_per_week", 0)),
@@ -233,24 +240,25 @@ def _render_generic_fields(
     if runs <= 0:
         item["annual_kwh"] = 0.0
         return item
-    duration_h = st.number_input(
+    duration_h = labeled_number_input(
         "Nenndauer pro Lauf (h)",
         min_value=0.1,
         value=defaults["duration_h"],
         step=0.25,
         key=_scoped_key(session_scope, f"hc_duration_{index}"),
     )
-    start_hour = st.number_input(
+    start_hour = labeled_number_input(
         "Referenz-Startzeit (Stunde)",
         min_value=0,
         max_value=23,
         value=defaults["start_hour"],
+        ratios=WIDE_LABEL_RATIOS,
         key=_scoped_key(session_scope, f"hc_start_{index}"),
     )
     current_role = resolve_earnie_role(consumer)
     if current_role not in _EARNIE_ROLE_OPTIONS:
         current_role = EARNIE_ROLE_KNOWN
-    earnie_role = st.selectbox(
+    earnie_role = labeled_selectbox(
         "Earnie-Berücksichtigung",
         options=_EARNIE_ROLE_OPTIONS,
         index=_EARNIE_ROLE_OPTIONS.index(current_role),
@@ -260,7 +268,7 @@ def _render_generic_fields(
     item["earnie_role"] = earnie_role
     start_shift_h = 0.0
     if earnie_role == EARNIE_ROLE_FLEX:
-        start_shift_h = st.number_input(
+        start_shift_h = labeled_number_input(
             "Verschiebung (± h)",
             min_value=0.5,
             max_value=MAX_START_SHIFT_H,
@@ -272,7 +280,7 @@ def _render_generic_fields(
         st.caption("Bei 12 h Verschiebung ist der Startzeitpunkt vollständig frei.")
     elif earnie_role == EARNIE_ROLE_MANUAL:
         horizon_default = defaults["start_shift_h"] if defaults["start_shift_h"] >= 1 else DEFAULT_MANUAL_HORIZON_H
-        start_shift_h = st.number_input(
+        start_shift_h = labeled_number_input(
             "Empfehlungshorizont (h)",
             min_value=1.0,
             max_value=MAX_START_SHIFT_H,
@@ -473,26 +481,29 @@ def _render_day_schedule(
     session_scope: str,
 ) -> dict:
     return {
-        "car_available_from_hour": st.number_input(
+        "car_available_from_hour": labeled_number_input(
             f"{prefix}: Ankunft ab (Stunde)",
             min_value=0,
             max_value=23,
             value=int(block.get("car_available_from_hour", 18)),
+            ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_ev_{prefix}_from_{index}"),
         ),
-        "ready_by_hour": st.number_input(
+        "ready_by_hour": labeled_number_input(
             f"{prefix}: Fertig bis (Stunde)",
             min_value=0,
             max_value=23,
             value=int(block.get("ready_by_hour", 7)),
+            ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_ev_{prefix}_ready_{index}"),
         ),
-        "daily_rest_soc": st.number_input(
+        "daily_rest_soc": labeled_number_input(
             f"{prefix}: Rest-SOC (%)",
             min_value=0.0,
             max_value=100.0,
             value=float(block.get("daily_rest_soc", 30.0)),
             step=1.0,
+            ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_ev_{prefix}_soc_{index}"),
         ),
     }
@@ -501,19 +512,20 @@ def _render_day_schedule(
 def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict:
     sched = dict(consumer.get("charging_schedule") or {})
     item: dict = {
-        "min_power_kw": st.number_input(
+        "min_power_kw": labeled_number_input(
             "Mindestleistung (kW)",
             min_value=0.0,
             value=float(consumer.get("min_power_kw", 1.4)),
             key=_scoped_key(session_scope, f"hc_ev_min_{index}"),
         ),
-        "min_on_quarterhours": st.number_input(
+        "min_on_quarterhours": labeled_number_input(
             "Mindest-Ladedauer (Viertelstunden)",
             min_value=0,
             value=int(consumer.get("min_on_quarterhours", 4)),
+            ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_ev_min_qh_{index}"),
         ),
-        "battery_capacity_kwh": st.number_input(
+        "battery_capacity_kwh": labeled_number_input(
             "Akkukapazität (kWh)",
             min_value=0.1,
             value=float(consumer.get("battery_capacity_kwh", 60.0)),
@@ -522,14 +534,14 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
         ),
     }
     item["charging_schedule"] = {
-        "target_soc_percent": st.number_input(
+        "target_soc_percent": labeled_number_input(
             "Ziel-SOC (%)",
             min_value=0.0,
             max_value=100.0,
             value=float(sched.get("target_soc_percent", 100.0)),
             key=_scoped_key(session_scope, f"hc_ev_target_soc_{index}"),
         ),
-        "charging_efficiency": st.number_input(
+        "charging_efficiency": labeled_number_input(
             "Lade-Wirkungsgrad",
             min_value=0.01,
             max_value=1.0,
@@ -537,21 +549,22 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
             step=0.01,
             key=_scoped_key(session_scope, f"hc_ev_eff_{index}"),
         ),
-        "forecast_when_absent": st.checkbox(
+        "forecast_when_absent": labeled_checkbox(
             "Prognose bei Abwesenheit",
             value=bool(sched.get("forecast_when_absent", True)),
             key=_scoped_key(session_scope, f"hc_ev_forecast_{index}"),
         ),
-        "nominal_power_voltage_v": st.number_input(
+        "nominal_power_voltage_v": labeled_number_input(
             "Nennspannung (V) für A→kW",
             min_value=100.0,
             max_value=500.0,
             value=float(sched.get("nominal_power_voltage_v", 230.0)),
             step=1.0,
+            ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_ev_voltage_{index}"),
             help="Nur relevant, wenn der Lademerker Ampere liefert. Standard: 230 V.",
         ),
-        "nominal_power_phases": st.number_input(
+        "nominal_power_phases": labeled_number_input(
             "Phasen für A→kW",
             min_value=1,
             max_value=3,
@@ -604,16 +617,18 @@ def _inject_profile_geo(
 def _render_location_fields(*, session_scope: str) -> dict:
     st.subheader("Standort")
     col_a, col_b = st.columns(2)
-    latitude = col_a.number_input(
-        "Breitengrad",
-        format="%.4f",
-        key=_scoped_key(session_scope, "house_profile_latitude"),
-    )
-    longitude = col_b.number_input(
-        "Längengrad",
-        format="%.4f",
-        key=_scoped_key(session_scope, "house_profile_longitude"),
-    )
+    with col_a:
+        latitude = labeled_number_input(
+            "Breitengrad",
+            format="%.4f",
+            key=_scoped_key(session_scope, "house_profile_latitude"),
+        )
+    with col_b:
+        longitude = labeled_number_input(
+            "Längengrad",
+            format="%.4f",
+            key=_scoped_key(session_scope, "house_profile_longitude"),
+        )
     timezone_name = "Europe/Vienna"
     try:
         from house_config.geo_timezone import lookup_timezone_name
@@ -623,20 +638,22 @@ def _render_location_fields(*, session_scope: str) -> dict:
     except ValueError as exc:
         st.warning(str(exc))
     col_c, col_d = st.columns(2)
-    default_pv_tilt = col_c.number_input(
-        "PV-Default Neigung (°)",
-        min_value=0,
-        max_value=90,
-        help="Vorschlag für neue PV-Anlage im Tab PV-Anlage (überschreibbar).",
-        key=_scoped_key(session_scope, "house_profile_default_pv_tilt"),
-    )
-    default_pv_azimuth = col_d.number_input(
-        "PV-Default Azimut (°)",
-        min_value=-180,
-        max_value=180,
-        help="0 = Süd, -90 = Ost, 90 = West. Überschreibbar im Tab PV-Anlage.",
-        key=_scoped_key(session_scope, "house_profile_default_pv_azimuth"),
-    )
+    with col_c:
+        default_pv_tilt = labeled_number_input(
+            "PV-Default Neigung (°)",
+            min_value=0,
+            max_value=90,
+            help="Vorschlag für neue PV-Anlage im Tab PV-Anlage (überschreibbar).",
+            key=_scoped_key(session_scope, "house_profile_default_pv_tilt"),
+        )
+    with col_d:
+        default_pv_azimuth = labeled_number_input(
+            "PV-Default Azimut (°)",
+            min_value=-180,
+            max_value=180,
+            help="0 = Süd, -90 = Ost, 90 = West. Überschreibbar im Tab PV-Anlage.",
+            key=_scoped_key(session_scope, "house_profile_default_pv_azimuth"),
+        )
     return {
         "latitude": float(latitude),
         "longitude": float(longitude),
@@ -655,27 +672,28 @@ def _render_thermal_rc_fields(
     rc = consumer.get("thermal_rc") if isinstance(consumer.get("thermal_rc"), dict) else consumer
     return {
         "thermal_rc": {
-            "water_volume_liters": st.number_input(
+            "water_volume_liters": labeled_number_input(
                 "Thermisches Volumen (Liter)",
                 min_value=1.0,
                 value=float(rc.get("water_volume_liters", 6000.0) or 6000.0),
                 step=100.0,
+                ratios=WIDE_LABEL_RATIOS,
                 key=_scoped_key(session_scope, f"hc_rc_vol_{index}"),
             ),
-            "setpoint_c": st.number_input(
+            "setpoint_c": labeled_number_input(
                 "Solltemperatur (°C)",
                 value=float(rc.get("setpoint_c", 36.5)),
                 step=0.5,
                 key=_scoped_key(session_scope, f"hc_rc_set_{index}"),
             ),
-            "tolerance_c": st.number_input(
+            "tolerance_c": labeled_number_input(
                 "Toleranz (± °C)",
                 min_value=0.0,
                 value=float(rc.get("tolerance_c", 1.0) or 1.0),
                 step=0.1,
                 key=_scoped_key(session_scope, f"hc_rc_tol_{index}"),
             ),
-            "heat_loss_kw_per_k": st.number_input(
+            "heat_loss_kw_per_k": labeled_number_input(
                 "Wärmeverlust U (kW/K)",
                 min_value=0.0,
                 value=float(rc.get("heat_loss_kw_per_k", 0.1) or 0.1),
@@ -683,7 +701,7 @@ def _render_thermal_rc_fields(
                 step=0.001,
                 key=_scoped_key(session_scope, f"hc_rc_u_{index}"),
             ),
-            "heating_efficiency": st.number_input(
+            "heating_efficiency": labeled_number_input(
                 "Heizwirkungsgrad",
                 min_value=0.01,
                 max_value=1.0,
@@ -706,26 +724,29 @@ def _render_thermal_solar_fields(
     tilt_fallback = int(thermal.get("solar_thermal_tilt_deg", default_tilt))
     azimuth_fallback = int(thermal.get("solar_thermal_azimuth_deg", default_azimuth))
     return {
-        "solar_thermal_area_m2": st.number_input(
+        "solar_thermal_area_m2": labeled_number_input(
             "Solar-Kollektor Fläche (m²)",
             min_value=0.0,
             value=float(thermal.get("solar_thermal_area_m2", 0.0) or 0.0),
             step=1.0,
+            ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_solar_area_{index}"),
         ),
-        "solar_thermal_tilt_deg": st.number_input(
+        "solar_thermal_tilt_deg": labeled_number_input(
             "Solar-Kollektor Neigung (°)",
             min_value=0,
             max_value=90,
             value=tilt_fallback,
+            ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_solar_tilt_{index}"),
         ),
-        "solar_thermal_azimuth_deg": st.number_input(
+        "solar_thermal_azimuth_deg": labeled_number_input(
             "Solar-Kollektor Azimut (°)",
             min_value=-180,
             max_value=180,
             value=azimuth_fallback,
             help="0 = Süd, -90 = Ost, 90 = West",
+            ratios=WIDE_LABEL_RATIOS,
             key=_scoped_key(session_scope, f"hc_solar_azimuth_{index}"),
         ),
     }
@@ -758,19 +779,19 @@ def _render_consumer_form(
                 "Typ „Haus Wärme“ ist nur für Verbraucher 1 erlaubt. "
                 "Bitte einen anderen Typ wählen."
             )
-        c_type = st.selectbox(
+        c_type = labeled_selectbox(
             "Typ",
             options=type_options,
             index=_type_index(current_type, type_options),
             format_func=lambda value: CONSUMER_TYPE_LABELS.get(value, value),
             key=_scoped_key(session_scope, f"hc_type_{index}"),
         )
-        c_label = st.text_input(
-            "Bezeichnung", value=consumer.get("label", ""), key=_scoped_key(session_scope, f"hc_label_{index}")
+        c_label = labeled_text_input(
+            "Bezeichnung",
+            value=consumer.get("label", ""),
+            key=_scoped_key(session_scope, f"hc_label_{index}"),
         )
-        if consumer.get("id"):
-            st.caption(f"Verbraucher-ID: `{consumer['id']}`")
-        nominal = st.number_input(
+        nominal = labeled_number_input(
             "Nennleistung (kW)",
             min_value=0.0,
             value=float(consumer.get("nominal_power_kw", 0.0)),
@@ -792,21 +813,21 @@ def _render_consumer_form(
             item.update(_render_thermal_rc_fields(consumer, index, session_scope=session_scope))
         else:
             thermal = consumer.get("thermal") or consumer
-            item["living_area_m2"] = st.number_input(
+            item["living_area_m2"] = labeled_number_input(
                 "Wohnfläche (m²)",
                 min_value=0.0,
                 value=float(thermal.get("living_area_m2", 120.0)),
                 key=_scoped_key(session_scope, f"hc_area_{index}"),
             )
             building_class = int(thermal.get("building_class", 3))
-            item["building_class"] = st.selectbox(
+            item["building_class"] = labeled_selectbox(
                 "Gebäudeklasse",
                 options=[1, 2, 3, 4],
                 index=max(0, min(3, building_class - 1)),
                 format_func=building_class_option_label,
                 key=_scoped_key(session_scope, f"hc_class_{index}"),
             )
-            use_exact_hwb = st.checkbox(
+            use_exact_hwb = labeled_checkbox(
                 "Genaue HWB-Angabe",
                 value=bool(float(thermal.get("hwb_kwh_m2", 0.0) or 0.0) > 0),
                 key=_scoped_key(session_scope, f"hc_hwb_use_{index}"),
@@ -817,20 +838,20 @@ def _render_consumer_form(
                 default_hwb = float(thermal.get("hwb_kwh_m2", 0.0) or 0.0)
                 if default_hwb <= 0:
                     default_hwb = specific_heating_kwh_m2(int(item["building_class"]))
-                item["hwb_kwh_m2"] = st.number_input(
+                item["hwb_kwh_m2"] = labeled_number_input(
                     "HWB (kWh/m²a)",
                     min_value=0.1,
                     value=default_hwb,
                     step=1.0,
                     key=_scoped_key(session_scope, f"hc_hwb_{index}"),
                 )
-            item["heat_pump_type"] = st.selectbox(
+            item["heat_pump_type"] = labeled_selectbox(
                 "WP-Typ",
                 options=["luft", "erde"],
                 index=0 if thermal.get("heat_pump_type") != "erde" else 1,
                 key=_scoped_key(session_scope, f"hc_wp_{index}"),
             )
-            item["persons"] = st.number_input(
+            item["persons"] = labeled_number_input(
                 "Personen",
                 min_value=0,
                 value=int(thermal.get("persons", 2)),
@@ -932,7 +953,7 @@ def _render_consumption_csv_section(
     if session_key not in st.session_state:
         st.session_state[session_key] = str(existing.get("total_profile_csv", "") or "").strip()
 
-    csv_path = st.text_input(
+    csv_path = labeled_text_input(
         "CSV-Pfad",
         value=st.session_state[session_key],
         key=f"house_profile_csv_input_{preview_id}",
@@ -1008,28 +1029,32 @@ def _perform_house_profile_save(
         label=label,
         profile_ids=set(profile_ids),
     )
-    upsert_house_profile(
-        {
-            "id": profile_id,
-            "label": label.strip() or profile_id,
-            "annual_kwh": float(annual_kwh),
-            "latitude": location["latitude"],
-            "longitude": location["longitude"],
-            "default_pv_tilt": location["default_pv_tilt"],
-            "default_pv_azimuth": location["default_pv_azimuth"],
-            "consumers": resolved,
-            "total_profile_csv": st.session_state.get(
-                f"house_profile_csv_path_{preview_id}",
-                existing.get("total_profile_csv", ""),
-            ),
-        }
-    )
+    try:
+        upsert_house_profile(
+            {
+                "id": profile_id,
+                "label": label.strip() or profile_id,
+                "annual_kwh": float(annual_kwh),
+                "latitude": location["latitude"],
+                "longitude": location["longitude"],
+                "default_pv_tilt": location["default_pv_tilt"],
+                "default_pv_azimuth": location["default_pv_azimuth"],
+                "consumers": resolved,
+                "total_profile_csv": st.session_state.get(
+                    f"house_profile_csv_path_{preview_id}",
+                    existing.get("total_profile_csv", ""),
+                ),
+            }
+        )
+    except ValueError as exc:
+        st.error(str(exc))
+        return
     saved_profile = load_house_profiles().get("profiles", {}).get(profile_id, {})
     st.session_state[_SESSION_SELECT_PENDING_KEY] = profile_id
     st.session_state[_SESSION_FILE_STAMP_KEY] = _house_profiles_file_stamp()
     st.session_state[_SESSION_SYNC_KEY] = None
     st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(saved_profile)
-    st.success(f"Profil '{profile_id}' gespeichert.")
+    st.success("Profil gespeichert.")
     st.rerun()
 
 
@@ -1073,18 +1098,26 @@ def render_house_profile_tab() -> None:
     profile_ids = sorted(profile_map.keys())
     profile_options = ["— neu —", *profile_ids]
     initial_index = _initial_profile_index(profile_ids)
+
+    def _profile_option_label(option: str) -> str:
+        if option == "— neu —":
+            return option
+        return str(profile_map.get(option, {}).get("label") or option)
+
     if initial_index is not None:
-        selected_id = st.selectbox(
+        selected_id = labeled_selectbox(
             "Profil",
             options=profile_options,
             index=initial_index,
             key="house_profile_select",
+            format_func=_profile_option_label,
         )
     else:
-        selected_id = st.selectbox(
+        selected_id = labeled_selectbox(
             "Profil",
             options=profile_options,
             key="house_profile_select",
+            format_func=_profile_option_label,
         )
     is_new = selected_id == "— neu —"
     existing = profile_map.get(selected_id, {}) if not is_new else {}
@@ -1093,7 +1126,7 @@ def render_house_profile_tab() -> None:
     file_stamp = _house_profiles_file_stamp()
     _sync_profile_session(session_scope, existing, file_stamp=file_stamp)
 
-    label = st.text_input(
+    label = labeled_text_input(
         "Bezeichnung",
         key=_scoped_key(session_scope, "house_profile_label"),
     )
@@ -1103,9 +1136,8 @@ def render_house_profile_tab() -> None:
         label=label,
         profile_ids=set(profile_ids),
     )
-    st.caption(f"Profil-ID: `{preview_id}`")
 
-    annual_kwh = st.number_input(
+    annual_kwh = labeled_number_input(
         "Jahresverbrauch (kWh/a)",
         min_value=0.0,
         step=100.0,

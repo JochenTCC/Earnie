@@ -86,7 +86,7 @@ SOC       = hart SOC_min am Sonnenaufgang innerhalb des MILP
 Simulation= rollierend max. 24 h pro Schritt (wie fixed_24h; kein Durchsimulieren bis SA₂)
 Output    = erste 24 h ab t_now   (Kosten/SoC-Kette wie bisher)
 Daten     = historische Ist-Verbräuche/PV aus cons_data_hourly.csv
-Geo/Zeit  = latitude/longitude aus aufgelöstem Live-Szenario (Hausprofil oder Szenario-Override)
+Geo/Zeit  = latitude/longitude aus aufgelöstem Live-Szenario (Hausprofil)
 ```
 
 **Performance:** Volle SA₂-Matrix (typ. ~40–48 h) würde pro Schritt mehr MILP-Läufe

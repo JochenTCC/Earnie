@@ -23,7 +23,7 @@
             "label": "Live",
             "settings": {
                 "battery_id": "default_5kwh",
-                "pv_system_id": "roof_south",
+                "pv_system_ids": ["roof_south"],
                 "import_tariff_id": "awattar_at",
                 "export_tariff_id": "fixed_37ct",
                 "house_profile_id": "example_efh"
@@ -43,9 +43,7 @@
                 "battery_capacity_kwh": 5.0,
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
-                "threshold_power": 0.02,
-                "latitude": 48,
-                "longitude": 10
+                "threshold_power": 0.02
             }
         },
         {
@@ -62,9 +60,7 @@
                 "battery_capacity_kwh": 10.0,
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
-                "threshold_power": 0.02,
-                "latitude": 48,
-                "longitude": 10
+                "threshold_power": 0.02
             }
         },
         {
@@ -81,9 +77,7 @@
                 "battery_capacity_kwh": 10.0,
                 "battery_min_soc": 10.0,
                 "battery_max_soc": 100.0,
-                "threshold_power": 0.02,
-                "latitude": 48,
-                "longitude": 10
+                "threshold_power": 0.02
             }
         },
         {
@@ -91,13 +85,10 @@
             "label": "10 kWh + monatliche Einspeise (Entitäten-Referenzen)",
             "settings": {
                 "battery_id": "upgrade_10kwh",
-                "pv_system_id": "roof_south",
+                "pv_system_ids": ["roof_south"],
                 "import_tariff_id": "awattar_at",
                 "export_tariff_id": "monthly_sunny",
-                "house_profile_id": "example_efh",
-                "latitude": 48,
-                "longitude": 10,
-                "timezone_name": "Europe/Vienna"
+                "house_profile_id": "example_efh"
             }
         }
     ]

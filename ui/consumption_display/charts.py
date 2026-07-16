@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import plotly.graph_objects as go
 
-from ui.chart_colors import COLOR_BASELOAD, CONSUMER_PALETTE
+from ui.chart_colors import COLOR_BASELOAD, CONSUMER_PALETTE, PV_YELLOW_PALETTE
 from ui.consumption_display.aggregation import (
     monthly_kwh_by_consumer,
+    monthly_kwh_from_series,
     monthly_pv_kwh,
     monthly_total_kwh,
     parse_timestamp,
@@ -17,7 +18,7 @@ from ui.consumption_display.types import (
 )
 from ui.consumption_validation_charts import format_iso_week_label
 
-_PV_COLOR = "#f4c430"
+_PV_COLOR = PV_YELLOW_PALETTE[0]
 _BASELOAD_KEY = "baseload"
 _SCENARIO_LINE_DASHES = ("solid", "dash", "dot", "dashdot", "longdash", "longdashdot")
 _SCENARIO_LINE_ALPHA = 0.5  # 50% transparency
@@ -29,6 +30,14 @@ def _color_with_alpha(hex_color: str, alpha: float) -> str:
     green = int(channels[2:4], 16)
     blue = int(channels[4:6], 16)
     return f"rgba({red}, {green}, {blue}, {alpha})"
+
+
+def _pv_yellow(index: int) -> str:
+    return PV_YELLOW_PALETTE[index % len(PV_YELLOW_PALETTE)]
+
+
+def _config_has_multiple_pvs(config_key: str) -> bool:
+    return "+" in config_key
 
 
 def _consumer_color(consumer_id: str, index: int) -> str:
@@ -52,10 +61,9 @@ def stacked_monthly_chart(
     *,
     title: str = "Monatsverbrauch (kWh)",
 ) -> go.Figure:
-    """Gestapelte Monatsbalken je Verbraucher + Basislast; PV separat."""
+    """Gestapelte Monatsbalken je Verbraucher + Basislast; PV als Config-Summen."""
     months = sorted(monthly_total_kwh(bundle).keys())
     by_month = monthly_kwh_by_consumer(bundle)
-    pv_monthly = monthly_pv_kwh(bundle)
     fig = go.Figure()
     stack_keys = _stack_keys(bundle)
     for index, key in enumerate(stack_keys):
@@ -68,15 +76,36 @@ def stacked_monthly_chart(
             label = _consumer_label(bundle, key)
             color = _consumer_color(key, index)
         fig.add_bar(name=label, x=months, y=values, marker_color=color)
-    if pv_monthly:
-        fig.add_scatter(
-            name="PV-Erzeugung",
-            x=months,
-            y=[pv_monthly.get(month, 0.0) for month in months],
-            mode="lines+markers",
-            line=dict(color=_PV_COLOR, width=2),
-            yaxis="y",
-        )
+
+    if bundle.pv_by_config:
+        if not months:
+            month_keys: set[str] = set()
+            for series in bundle.pv_by_config.values():
+                month_keys.update(monthly_kwh_from_series(series, bundle.timestamps))
+            months = sorted(month_keys)
+        for index, (config_id, series) in enumerate(bundle.pv_by_config.items()):
+            pv_monthly = monthly_kwh_from_series(series, bundle.timestamps)
+            label = bundle.pv_config_labels.get(config_id) or config_id
+            fig.add_scatter(
+                name=label,
+                x=months,
+                y=[pv_monthly.get(month, 0.0) for month in months],
+                mode="lines+markers",
+                line=dict(color=_pv_yellow(index), width=2),
+                yaxis="y",
+            )
+    else:
+        pv_monthly = monthly_pv_kwh(bundle)
+        if pv_monthly:
+            fig.add_scatter(
+                name="PV-Erzeugung",
+                x=months,
+                y=[pv_monthly.get(month, 0.0) for month in months],
+                mode="lines+markers",
+                line=dict(color=_PV_COLOR, width=2),
+                yaxis="y",
+            )
+
     fig.update_layout(
         barmode="stack",
         title=title,
@@ -157,7 +186,31 @@ def timeseries_chart(
             mode="lines",
             line=dict(width=1.5, color=color),
         )
-    if bundle.pv is not None:
+    pv_color_index = 0
+    if bundle.pv_by_system:
+        for system_id, values in bundle.pv_by_system.items():
+            label = bundle.pv_system_labels.get(system_id) or system_id
+            fig.add_scatter(
+                name=label,
+                x=x_values,
+                y=values,
+                mode="lines",
+                line=dict(color=_pv_yellow(pv_color_index), width=2),
+            )
+            pv_color_index += 1
+        for config_id, values in bundle.pv_by_config.items():
+            if not _config_has_multiple_pvs(config_id):
+                continue
+            label = bundle.pv_config_labels.get(config_id) or config_id
+            fig.add_scatter(
+                name=label,
+                x=x_values,
+                y=values,
+                mode="lines",
+                line=dict(color=_pv_yellow(pv_color_index), width=2.5, dash="dash"),
+            )
+            pv_color_index += 1
+    elif bundle.pv is not None:
         fig.add_scatter(
             name="PV-Erzeugung",
             x=x_values,

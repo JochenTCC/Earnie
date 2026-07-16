@@ -77,8 +77,8 @@ def resolve_scenario_settings(
     monthly_rates_holder: dict | None = None,
 ) -> dict:
     """
-    Löst battery_id, pv_system_id, import/export_tariff_id und house_profile_id auf.
-    Liefert flaches Dict kompatibel mit simulation/engine.py.
+    Löst battery_id, pv_system_ids (oder Legacy pv_system_id), import/export_tariff_id
+    und house_profile_id auf. Liefert flaches Dict kompatibel mit simulation/engine.py.
     """
     out = dict(settings)
     if components is None:
@@ -106,7 +106,7 @@ def resolve_scenario_settings(
             raise ValueError(f"Unbekannte house_profile_id '{profile_id}'.")
         profile = profiles[profile_id]
         out["_house_profile"] = profile
-        _apply_profile_geo(out, profile, settings)
+        _apply_profile_geo(out, profile)
         flex_consumers = collect_planning_flex_consumers(profile)
         if flex_consumers:
             out["_planning_flex_consumers"] = flex_consumers
@@ -127,21 +127,16 @@ def _ensure_geo_defaults(out: dict) -> None:
         )
 
 
-def _apply_profile_geo(out: dict, profile: dict, source_settings: dict) -> None:
-    """Geo/Zeitzone aus Hausprofil; explizite Szenario-Overrides bleiben erhalten."""
-    if "latitude" not in source_settings:
-        out["latitude"] = float(profile["latitude"])
-    if "longitude" not in source_settings:
-        out["longitude"] = float(profile["longitude"])
-    if "timezone_name" not in source_settings or not str(
-        source_settings.get("timezone_name", "") or ""
-    ).strip():
-        out["timezone_name"] = str(profile.get("timezone_name", "") or "").strip()
-        if not out["timezone_name"]:
-            out["timezone_name"] = lookup_timezone_name(
-                float(out.get("latitude", profile["latitude"])),
-                float(out.get("longitude", profile["longitude"])),
-            )
+def _apply_profile_geo(out: dict, profile: dict) -> None:
+    """Geo/Zeitzone immer aus Hausprofil (Szenario-lat/lon/timezone werden ignoriert)."""
+    out["latitude"] = float(profile["latitude"])
+    out["longitude"] = float(profile["longitude"])
+    out["timezone_name"] = str(profile.get("timezone_name", "") or "").strip()
+    if not out["timezone_name"]:
+        out["timezone_name"] = lookup_timezone_name(
+            float(out["latitude"]),
+            float(out["longitude"]),
+        )
 
 
 def _prepare_live_scenario_settings(

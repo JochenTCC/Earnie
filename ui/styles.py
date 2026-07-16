@@ -5,7 +5,7 @@ import streamlit as st
 
 
 def inject_compact_numeric_css() -> None:
-    """Kleinere Schrift für Metrik-Zahlen und Tabellen."""
+    """Kleinere Schrift für Metrik-Zahlen und Tabellen; Number-Input ohne ±-Stepper."""
     st.markdown(
         """
         <style>
@@ -20,6 +20,13 @@ def inject_compact_numeric_css() -> None:
         }
         div[data-testid="stDataFrame"] div[data-testid="stTable"] {
             font-size: 0.8rem;
+        }
+        /* Hide Streamlit number_input increment/decrement buttons */
+        [data-testid="stNumberInput"] button {
+            display: none !important;
+        }
+        [data-testid="stNumberInput"] [data-baseweb="button-group"] {
+            display: none !important;
         }
         </style>
         """,

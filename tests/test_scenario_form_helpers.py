@@ -53,6 +53,14 @@ def test_options_builds_labels_and_mapping():
     assert mapping["Dach (pv1)"] == "pv1"
 
 
+def test_format_entity_option_strips_id_suffix():
+    from ui.scenario_form_helpers import format_entity_option
+
+    assert format_entity_option("Dach (pv1)") == "Dach"
+    assert format_entity_option(NONE_LABEL) == NONE_LABEL
+    assert format_entity_option("— noch keine batterie —") == "— noch keine batterie —"
+
+
 def test_default_label_index_finds_id():
     options = ["— keine —", "Batterie (bat)"]
     assert default_label_index(options, "bat") == 1
@@ -129,13 +137,10 @@ def test_scenario_form_is_dirty_when_label_changed():
         scoped_widget_key("live", "scenario_label"): "Geändert",
         scoped_widget_key("live", "scenario_profile"): "— keine —",
         scoped_widget_key("live", "scenario_battery"): "— keine —",
-        scoped_widget_key("live", "scenario_pv"): "— keine —",
+        scoped_widget_key("live", "scenario_pv"): [],
         scoped_widget_key("live", "scenario_import"): "— keine —",
         scoped_widget_key("live", "scenario_export"): "— keine —",
         scoped_widget_key("live", "scenario_netzentgelt"): 0.0,
-        scoped_widget_key("live", "scenario_lat"): 48.0,
-        scoped_widget_key("live", "scenario_lon"): 10.0,
-        scoped_widget_key("live", "scenario_geo_override"): False,
     }
     store_scenario_form_baseline(
         session,
@@ -158,13 +163,10 @@ def test_scenario_form_is_clean_when_matching_baseline():
         scoped_widget_key("live", "scenario_label"): "Live",
         scoped_widget_key("live", "scenario_profile"): "— keine —",
         scoped_widget_key("live", "scenario_battery"): "— keine —",
-        scoped_widget_key("live", "scenario_pv"): "— keine —",
+        scoped_widget_key("live", "scenario_pv"): [],
         scoped_widget_key("live", "scenario_import"): "— keine —",
         scoped_widget_key("live", "scenario_export"): "— keine —",
         scoped_widget_key("live", "scenario_netzentgelt"): 0.0,
-        scoped_widget_key("live", "scenario_lat"): 48.0,
-        scoped_widget_key("live", "scenario_lon"): 10.0,
-        scoped_widget_key("live", "scenario_geo_override"): False,
     }
     store_scenario_form_baseline(
         session,
@@ -188,13 +190,10 @@ def test_read_scenario_form_snapshot_resolves_entity_ids():
         scoped_widget_key("live", "scenario_label"): "Live",
         scoped_widget_key("live", "scenario_profile"): "— keine —",
         scoped_widget_key("live", "scenario_battery"): "Speicher (bat1)",
-        scoped_widget_key("live", "scenario_pv"): "— keine —",
+        scoped_widget_key("live", "scenario_pv"): [],
         scoped_widget_key("live", "scenario_import"): "— keine —",
         scoped_widget_key("live", "scenario_export"): "— keine —",
         scoped_widget_key("live", "scenario_netzentgelt"): 0.0,
-        scoped_widget_key("live", "scenario_lat"): 48.0,
-        scoped_widget_key("live", "scenario_lon"): 10.0,
-        scoped_widget_key("live", "scenario_geo_override"): False,
     }
     snapshot = read_scenario_form_snapshot(
         session,
@@ -211,13 +210,56 @@ def test_read_scenario_form_snapshot_resolves_entity_ids():
 def test_build_scenario_settings_omits_zero_netzentgelt():
     settings = build_scenario_settings(
         battery_id="",
-        pv_system_id="",
+        pv_system_ids=[],
         import_tariff_id="imp",
         export_tariff_id="exp",
         house_profile_id="home",
         netzentgelt_cent_kwh_override=0.0,
     )
     assert "netzentgelt_cent_kwh_override" not in settings
+    assert "pv_system_ids" not in settings
+
+
+def test_build_scenario_settings_stores_pv_system_ids():
+    settings = build_scenario_settings(
+        battery_id="bat",
+        pv_system_ids=["a", "b"],
+        import_tariff_id="imp",
+        export_tariff_id="exp",
+        house_profile_id="home",
+    )
+    assert settings["pv_system_ids"] == ["a", "b"]
+    assert "pv_system_id" not in settings
+
+
+def test_normalize_scenario_form_snapshot_legacy_pv_system_id():
+    snapshot = normalize_scenario_form_snapshot(
+        {
+            "label": "Live",
+            "settings": {"pv_system_id": "roof", "battery_id": "bat1"},
+        },
+    )
+    assert snapshot["settings"]["pv_system_ids"] == ["roof"]
+    assert "pv_system_id" not in snapshot["settings"]
+
+
+def test_normalize_scenario_form_snapshot_strips_geo_override():
+    snapshot = normalize_scenario_form_snapshot(
+        {
+            "label": "Live",
+            "settings": {
+                "battery_id": "bat1",
+                "house_profile_id": "home",
+                "latitude": 1.0,
+                "longitude": 2.0,
+                "timezone_name": "UTC",
+            },
+        },
+    )
+    assert snapshot["settings"] == {
+        "battery_id": "bat1",
+        "house_profile_id": "home",
+    }
 
 
 def test_normalize_scenario_form_snapshot_keeps_label_and_settings():

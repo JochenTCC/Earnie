@@ -7,10 +7,25 @@ import streamlit as st
 
 from house_config.id_slug import slug_id
 from runtime_store.persist_paths import resolve_backtesting_scenarios_json_path
+from ui.form_layout import labeled_multiselect, labeled_selectbox
 
 NONE_LABEL = "— keine —"
 EMPTY_PLACEHOLDER_PREFIX = "— noch keine"
 NEW_SCENARIO_OPTION = "— neu —"
+
+
+def entity_human_label(item: dict) -> str:
+    """User-facing entity name without technical id."""
+    return str(item.get("label") or item.get("id") or "").strip() or str(item.get("id", ""))
+
+
+def format_entity_option(option: str) -> str:
+    """Strip trailing `` (id)`` from entity option keys for display."""
+    if option == NONE_LABEL or option.startswith(EMPTY_PLACEHOLDER_PREFIX):
+        return option
+    if option.endswith(")") and " (" in option:
+        return option[: option.rfind(" (")]
+    return option
 
 
 def options_for_entities(
@@ -24,7 +39,8 @@ def options_for_entities(
         labels.append(NONE_LABEL)
         mapping[NONE_LABEL] = ""
     for item in items:
-        label = f"{item.get('label', item['id'])} ({item['id']})"
+        human = entity_human_label(item)
+        label = f"{human} ({item['id']})"
         labels.append(label)
         mapping[label] = item["id"]
     return labels, mapping
@@ -95,6 +111,57 @@ def seed_entity_select_state(
     st.session_state[scoped_widget_key(session_scope, key_base)] = labels[idx]
 
 
+def labels_for_entity_ids(items: list[dict], entity_ids: list[str]) -> list[str]:
+    """Map entity ids to display labels (order preserved, unknown ids skipped)."""
+    labels, mapping = options_for_entities(items, allow_none=False)
+    id_to_label = {entity_id: label for label, entity_id in mapping.items()}
+    return [id_to_label[entity_id] for entity_id in entity_ids if entity_id in id_to_label]
+
+
+def seed_entity_multiselect_state(
+    session_scope: str,
+    key_base: str,
+    items: list[dict],
+    current_ids: list[str] | None,
+) -> None:
+    st.session_state[scoped_widget_key(session_scope, key_base)] = labels_for_entity_ids(
+        items,
+        list(current_ids or []),
+    )
+
+
+def render_entity_multiselect(
+    label: str,
+    items: list[dict],
+    *,
+    key: str,
+    current_ids: list[str] | None = None,
+) -> list[str]:
+    """Multiselect for entities; returns selected display labels."""
+    labels, _mapping = options_for_entities(items, allow_none=False)
+    if not labels:
+        placeholder = f"{EMPTY_PLACEHOLDER_PREFIX} {label.lower()} —"
+        labeled_multiselect(
+            label,
+            options=[placeholder],
+            disabled=True,
+            key=key,
+            format_func=format_entity_option,
+        )
+        return []
+    if key not in st.session_state:
+        st.session_state[key] = labels_for_entity_ids(items, list(current_ids or []))
+    return list(
+        labeled_multiselect(
+            label,
+            options=labels,
+            key=key,
+            format_func=format_entity_option,
+        )
+        or []
+    )
+
+
 def new_scenario_template(live_id: str, scenarios: list[dict]) -> dict:
     """Defaults for a new scenario — clone live settings when available."""
     live = next((item for item in scenarios if item.get("id") == live_id), None)
@@ -125,54 +192,44 @@ def scenario_baseline_key(session_scope: str) -> str:
 def build_scenario_settings(
     *,
     battery_id: str,
-    pv_system_id: str,
+    pv_system_ids: list[str] | None = None,
     import_tariff_id: str,
     export_tariff_id: str,
     house_profile_id: str,
-    latitude: float | None = None,
-    longitude: float | None = None,
     netzentgelt_cent_kwh_override: float | None = None,
 ) -> dict:
     settings: dict = {}
     if battery_id:
         settings["battery_id"] = battery_id
-    if pv_system_id:
-        settings["pv_system_id"] = pv_system_id
+    cleaned_pv = [
+        str(item or "").strip()
+        for item in (pv_system_ids or [])
+        if str(item or "").strip()
+    ]
+    if cleaned_pv:
+        settings["pv_system_ids"] = cleaned_pv
     if import_tariff_id:
         settings["import_tariff_id"] = import_tariff_id
     if export_tariff_id:
         settings["export_tariff_id"] = export_tariff_id
     if house_profile_id:
         settings["house_profile_id"] = house_profile_id
-    if latitude is not None:
-        settings["latitude"] = float(latitude)
-    if longitude is not None:
-        settings["longitude"] = float(longitude)
     if netzentgelt_cent_kwh_override is not None and netzentgelt_cent_kwh_override > 0.0:
         settings["netzentgelt_cent_kwh_override"] = float(netzentgelt_cent_kwh_override)
     return settings
 
 
 def normalize_scenario_form_snapshot(scenario: dict) -> dict:
+    from house_config.entity_resolution import normalize_pv_system_ids
+
+    raw_settings = scenario.get("settings", {}) or {}
     settings = build_scenario_settings(
-        battery_id=str(scenario.get("settings", {}).get("battery_id", "") or "").strip(),
-        pv_system_id=str(scenario.get("settings", {}).get("pv_system_id", "") or "").strip(),
-        import_tariff_id=str(scenario.get("settings", {}).get("import_tariff_id", "") or "").strip(),
-        export_tariff_id=str(scenario.get("settings", {}).get("export_tariff_id", "") or "").strip(),
-        house_profile_id=str(scenario.get("settings", {}).get("house_profile_id", "") or "").strip(),
-        latitude=(
-            float(scenario["settings"]["latitude"])
-            if "latitude" in scenario.get("settings", {})
-            else None
-        ),
-        longitude=(
-            float(scenario["settings"]["longitude"])
-            if "longitude" in scenario.get("settings", {})
-            else None
-        ),
-        netzentgelt_cent_kwh_override=scenario.get("settings", {}).get(
-            "netzentgelt_cent_kwh_override"
-        ),
+        battery_id=str(raw_settings.get("battery_id", "") or "").strip(),
+        pv_system_ids=normalize_pv_system_ids(raw_settings),
+        import_tariff_id=str(raw_settings.get("import_tariff_id", "") or "").strip(),
+        export_tariff_id=str(raw_settings.get("export_tariff_id", "") or "").strip(),
+        house_profile_id=str(raw_settings.get("house_profile_id", "") or "").strip(),
+        netzentgelt_cent_kwh_override=raw_settings.get("netzentgelt_cent_kwh_override"),
     )
     return {
         "label": str(scenario.get("label", "") or "").strip(),
@@ -198,29 +255,22 @@ def read_scenario_form_snapshot(
 
     profile_pick = session_state.get(scoped_widget_key(session_scope, "scenario_profile"))
     battery_pick = session_state.get(scoped_widget_key(session_scope, "scenario_battery"))
-    pv_pick = session_state.get(scoped_widget_key(session_scope, "scenario_pv"))
+    pv_picks = session_state.get(scoped_widget_key(session_scope, "scenario_pv")) or []
     import_pick = session_state.get(scoped_widget_key(session_scope, "scenario_import"))
     export_pick = session_state.get(scoped_widget_key(session_scope, "scenario_export"))
-    use_geo_override = bool(
-        session_state.get(scoped_widget_key(session_scope, "scenario_geo_override"), False)
-    )
+
+    if isinstance(pv_picks, str):
+        pv_picks = [pv_picks]
+    pv_system_ids = [
+        lookup_entity_id(pv_map, pick) for pick in pv_picks if lookup_entity_id(pv_map, pick)
+    ]
 
     settings = build_scenario_settings(
         battery_id=lookup_entity_id(bat_map, battery_pick),
-        pv_system_id=lookup_entity_id(pv_map, pv_pick),
+        pv_system_ids=pv_system_ids,
         import_tariff_id=lookup_entity_id(imp_map, import_pick),
         export_tariff_id=lookup_entity_id(exp_map, export_pick),
         house_profile_id=lookup_entity_id(prof_map, profile_pick),
-        latitude=(
-            float(session_state.get(scoped_widget_key(session_scope, "scenario_lat"), 0.0))
-            if use_geo_override
-            else None
-        ),
-        longitude=(
-            float(session_state.get(scoped_widget_key(session_scope, "scenario_lon"), 0.0))
-            if use_geo_override
-            else None
-        ),
         netzentgelt_cent_kwh_override=float(
             session_state.get(scoped_widget_key(session_scope, "scenario_netzentgelt"), 0.0) or 0.0
         ),
@@ -283,13 +333,25 @@ def render_entity_selectbox(
     labels, _mapping = options_for_entities(items, allow_none=allow_none)
     if not labels:
         placeholder = f"{EMPTY_PLACEHOLDER_PREFIX} {label.lower()} —"
-        st.selectbox(label, options=[placeholder], disabled=True, key=key)
+        labeled_selectbox(
+            label,
+            options=[placeholder],
+            disabled=True,
+            key=key,
+            format_func=format_entity_option,
+        )
         return None
     if key in st.session_state:
-        return st.selectbox(label, options=labels, key=key)
-    return st.selectbox(
+        return labeled_selectbox(
+            label,
+            options=labels,
+            key=key,
+            format_func=format_entity_option,
+        )
+    return labeled_selectbox(
         label,
         options=labels,
         index=default_label_index(labels, current_id),
         key=key,
+        format_func=format_entity_option,
     )

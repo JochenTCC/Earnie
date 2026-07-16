@@ -135,6 +135,33 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
     assert components_payload["batteries"][0]["battery_capacity_kwh"] == 5.0
 
 
+def test_upsert_pv_rejects_duplicate_label(tmp_path, monkeypatch):
+    config_dir = _bind_paths(tmp_path, monkeypatch)
+    monkeypatch.setattr("ui.house_config_io.config.reinit_config", lambda **kwargs: None)
+    config_dir.joinpath("components.json").write_text(
+        json.dumps(
+            {
+                "batteries": [],
+                "pv_systems": [
+                    {
+                        "id": "dach_sued",
+                        "label": "Dach Süd",
+                        "kwp": 10.0,
+                        "pv_tilt": 18.0,
+                        "pv_azimuth": 0.0,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="bereits vergeben"):
+        upsert_pv_system(
+            {"label": "dach süd", "kwp": 5.0, "pv_tilt": 20, "pv_azimuth": 0},
+            stable_id="",
+        )
+
+
 def test_upsert_scenario_appends_new_entry(tmp_path, monkeypatch):
     config_dir = _bind_paths(tmp_path, monkeypatch)
     monkeypatch.setattr("ui.house_config_io.config.reinit_config", lambda **kwargs: None)
@@ -577,7 +604,7 @@ def test_sync_scenario_session_reseeds_when_widget_keys_missing():
 
     assert session["live__scenario_label"] == "Live"
     assert "example_efh" in session["live__scenario_profile"]
-    assert "dach_sued" in session["live__scenario_pv"]
+    assert session["live__scenario_pv"] == ["Dach Süd (dach_sued)"]
 
 
 def test_seed_pv_widget_state_uses_profile_defaults_for_new_system():

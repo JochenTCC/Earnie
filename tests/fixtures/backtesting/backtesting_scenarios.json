@@ -7,7 +7,7 @@
             "label": "Live",
             "settings": {
                 "battery_id": "test_battery",
-                "pv_system_id": "test_pv",
+                "pv_system_ids": ["test_pv"],
                 "import_tariff_id": "fixed_25ct",
                 "export_tariff_id": "fixed_37ct",
                 "house_profile_id": "test_home"
@@ -38,12 +38,9 @@
             "label": "Entitäten-Referenzen Test",
             "settings": {
                 "battery_id": "test_battery",
-                "pv_system_id": "test_pv",
+                "pv_system_ids": ["test_pv"],
                 "export_tariff_id": "monthly_test",
-                "house_profile_id": "test_home",
-                "latitude": 47.404,
-                "longitude": 9.743,
-                "timezone_name": "Europe/Vienna"
+                "house_profile_id": "test_home"
             }
         }
     ]

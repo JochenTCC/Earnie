@@ -75,7 +75,7 @@ def _validate_source(source: Path) -> list[str]:
     live = _live_scenario_settings(scenarios_path)
     for key in (
         "battery_id",
-        "pv_system_id",
+        "pv_system_ids",
         "import_tariff_id",
         "export_tariff_id",
         "house_profile_id",

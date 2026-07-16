@@ -49,6 +49,10 @@ class ConsumptionSeriesBundle:
     pv: list[float] | None = None
     actual_total: list[float] | None = None
     consumer_labels: dict[str, str] = field(default_factory=dict)
+    pv_by_system: dict[str, list[float]] = field(default_factory=dict)
+    pv_system_labels: dict[str, str] = field(default_factory=dict)
+    pv_by_config: dict[str, list[float]] = field(default_factory=dict)
+    pv_config_labels: dict[str, str] = field(default_factory=dict)
 
     def hour_count(self) -> int:
         return len(self.timestamps)

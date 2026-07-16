@@ -122,6 +122,17 @@ _HSL_WHITE = (0.0, 0.0, 100.0)
 _ALPHA_WHITE = 1.0
 
 COLOR_PV = color_from_hsl(*_HSL_PV, _ALPHA_PV)
+# Verbrauchsdaten (SE): modeled PV overlays — yellowish only (no consumer hues).
+PV_YELLOW_PALETTE: tuple[str, ...] = (
+    "#f4c430",  # gold (legacy cons_data PV)
+    "#e6b800",  # amber
+    "#ffd966",  # light gold
+    "#c9a227",  # mustard
+    "#daa520",  # goldenrod
+    "#f0e68c",  # khaki
+    "#ffcc33",  # bright amber
+    "#b8860b",  # dark goldenrod
+)
 COLOR_GRID = color_from_hsl(*_HSL_GRID, _ALPHA_GRID)
 COLOR_BASELOAD = color_from_hsl(*_HSL_BASELOAD, _ALPHA_BASELOAD)
 COLOR_BATTERY = color_from_hsl(*_HSL_BATTERY, _ALPHA_BATTERY)

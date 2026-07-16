@@ -3,6 +3,31 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### SE results disclaimer (2026-07-16)
+
+- [x] Add a hint text to SE that there is no guarantee for the results — `st.info` on Szenario-Explorer (`ui/pages/page_backtesting.py`); wording aligned with Benutzer-Handbuch
+
+
+### Compact editors (2026-07-16)
+
+- [x] **Make editors more compact** — label|field side by side via `ui/form_layout.py` (`labeled_*` + `label_visibility="collapsed"`); rolled through SE, House Config (PV/Batterie/Hausprofil + nested consumers), Live entity pickers (`scenario_form_helpers`)
+  - Follow-ups in same pass: hide entity-ID captions/select suffixes; hide number-input ± steppers (CSS); unique Bezeichnung on save (`house_config/label_uniqueness.py`)
+
+
+### Multi-PV scenarios (2026-07-16)
+
+- [x] **Enable Scenarios with multiple PVs** — `pv_system_ids[]` in scenario settings; resolve → `_planning_pv_systems` + summed `pv_kwp`
+  - [x] Similar to consumers in Hauskonfigurator — SE/Live multiselect; HK PV tab **Entfernen**
+  - [x] Multiple PVs counted in production — `ModeledClimateContext` multi-surface sum; live `pv_forecast` N× forecast.solar, sum for MILP
+  - [x] Weekly SE charts: per-PV traces; other charts: sum only (`pv_by_system` / `pv_kw_by_system_for_slots`)
+  - [x] Loxone yielded energy remains plant sum (no per-PV markers) — unchanged, matches model
+
+
+### Standort-Override removed (2026-07-16)
+
+- [x] **Standort-Override can be removed** — Scenario Editor no longer offers lat/lon override; `resolve_scenario_settings` always takes geo/timezone from `house_profile_id`; form save/normalize strips leftover scenario `latitude`/`longitude`/`timezone_name`; schema + example/fixture cleanup; tests in `test_scenario_form_helpers.py` / `test_house_config.py`
+
+
 ### Version 2.0.0 — GitHub Release + tag automation (2026-07-16)
 
 - [x] **Real 2.0.0 release** — `version.py` `2.0.0`; annotated tag `v2.0.0`; GitHub Release notes; multi-arch GHCR (`earnie-energy` / legacy `ernie-energy`)

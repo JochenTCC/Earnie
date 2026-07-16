@@ -86,6 +86,34 @@ def test_resolve_pv_into_settings():
     pv_map = pv_systems_by_id(config.CONFIG.get_components_catalog())
     resolved = resolve_pv_into_settings({"pv_system_id": "test_pv"}, pv_map)
     assert resolved["pv_kwp"] == 6.0
+    assert len(resolved["_planning_pv_systems"]) == 1
+    assert resolved["_planning_pv_systems"][0]["id"] == "test_pv"
+
+
+def test_resolve_pv_into_settings_multi():
+    from house_config.entity_resolution import pv_systems_by_id
+
+    pv_map = {
+        "a": {
+            "id": "a",
+            "label": "A",
+            "pv_kwp": 4.0,
+            "pv_tilt": 20.0,
+            "pv_azimuth": 0.0,
+        },
+        "b": {
+            "id": "b",
+            "label": "B",
+            "pv_kwp": 6.0,
+            "pv_tilt": 30.0,
+            "pv_azimuth": -90.0,
+        },
+    }
+    resolved = resolve_pv_into_settings({"pv_system_ids": ["a", "b"]}, pv_map)
+    assert resolved["pv_kwp"] == 10.0
+    assert [item["id"] for item in resolved["_planning_pv_systems"]] == ["a", "b"]
+    assert "pv_tilt" not in resolved
+    assert "pv_system_ids" not in resolved
 
 
 def test_resolve_pv_into_settings_without_id():
@@ -93,7 +121,9 @@ def test_resolve_pv_into_settings_without_id():
 
     resolved = resolve_pv_into_settings({"battery_id": "bat"}, {})
     assert resolved["pv_kwp"] == ZERO_PV_FLAT["pv_kwp"]
+    assert resolved["_planning_pv_systems"] == []
     assert "pv_system_id" not in resolved
+    assert "pv_system_ids" not in resolved
 
 
 def test_strip_assets_for_reference():
@@ -957,6 +987,46 @@ def test_scenario_resolution_includes_planning_flex(tmp_path):
     assert resolved.get("_house_profile") is not None
     flex = resolved.get("_planning_flex_consumers") or []
     assert any(item["id"] == "washer" for item in flex)
+
+
+def test_scenario_resolution_ignores_geo_override(tmp_path):
+    import json
+
+    from house_config.scenario_resolution import resolve_scenario_settings
+
+    path = tmp_path / "house_profiles.json"
+    path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home",
+                        "annual_kwh": 5000,
+                        "latitude": 47.404,
+                        "longitude": 9.743,
+                        "timezone_name": "Europe/Vienna",
+                        "consumers": [],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    resolved = resolve_scenario_settings(
+        {
+            "house_profile_id": "home",
+            "latitude": 1.0,
+            "longitude": 2.0,
+            "timezone_name": "UTC",
+        },
+        raw_config=config.CONFIG._raw_config,
+        components_path=config.CONFIG.components_path,
+        tariffs_path=config.TARIFFS_JSON_PATH,
+        house_profiles_path=str(path),
+    )
+    assert resolved["latitude"] == pytest.approx(47.404)
+    assert resolved["longitude"] == pytest.approx(9.743)
+    assert resolved["timezone_name"] == "Europe/Vienna"
 
 
 def test_scenario_resolution_includes_ev_planning_flex(tmp_path):
