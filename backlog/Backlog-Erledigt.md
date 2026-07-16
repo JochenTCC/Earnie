@@ -3,6 +3,14 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 2.0.0 — GitHub Release + tag automation (2026-07-16)
+
+- [x] **Real 2.0.0 release** — `version.py` `2.0.0`; annotated tag `v2.0.0`; GitHub Release notes; multi-arch GHCR (`earnie-energy` / legacy `ernie-energy`)
+- [x] **Tag-triggered CI** — `.github/workflows/release.yml` (version gate, tariff gate, buildx push, `gh release create`); notes in `.github/release-notes/v2.0.0.md`
+- [x] **Docs / session skill** — release runbook in `DEVELOPER.md`, pointer in `docs/einrichtung/container.md`, session-abschluss Phase 2 → push tag (local `--push` fallback)
+- [x] Post-release cleanup (dead code / obsolete tests / migration leftovers) remains open under [Backlog.md](Backlog.md) § Version 2.+1 — Quality epic
+
+
 ### Bugfix Monatlicher Kostenvergleich bar order (2026-07-16)
 
 - [x] **Monatlicher Kostenvergleich bar order** — bars follow Gesamtkosten order (historisch → scenario refs e.g. Referenz (Live) → optimized) via `ordered_monthly_chart_labels` + `scenario_order` on `scenario_monthly_cost_chart`; tests in `test_backtesting_charts.py` / `test_backtesting_results_helpers.py`; verified on SE page after reload

@@ -58,6 +58,8 @@ Legt nur fehlende Dateien an; bestehende bleiben unverändert.
 
 Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/arm64` für LoxBerry). Beide Hosts referenzieren denselben Tag `ghcr.io/jochentcc/earnie-energy:latest`.
 
+**Veröffentlichte Images** kommen von GitHub Releases: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release.yml`](../../.github/workflows/release.yml) und pusht u. a. `ghcr.io/jochentcc/earnie-energy:X.Y.Z` sowie `:latest`. Details für Entwickler: [DEVELOPER.md](../../DEVELOPER.md) § Release.
+
 ### Einmaliges buildx-Setup (Entwicklungsrechner)
 
 Für Multi-Arch-Builds von Windows/Linux:

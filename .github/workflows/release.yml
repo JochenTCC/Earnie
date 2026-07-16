@@ -1,0 +1,100 @@
+# Tag-triggered release: multi-arch Docker → ghcr.io + GitHub Release.
+# Trigger: push annotated tag matching vMAJOR.MINOR.PATCH (e.g. v2.0.0).
+# Prerequisite: version.py __version__ must equal the tag without the leading "v".
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Version gate (tag must match version.py)
+        id: version
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          EXPECTED="${TAG#v}"
+          ACTUAL="$(python -c 'from version import __version__; print(__version__)')"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::version.py is '${ACTUAL}' but tag is '${TAG}' (expected '${EXPECTED}')"
+            exit 1
+          fi
+          echo "version=${ACTUAL}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Version gate OK: ${ACTUAL}"
+
+      - name: Tariff deploy-gate
+        run: python -m scripts.validate_tariffs --check-catalog
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch image
+        run: python -m scripts.build_container --target all --push
+
+      - name: Prepare release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          NOTES_FILE=".github/release-notes/${TAG}.md"
+          OUT="${RUNNER_TEMP}/release-notes.md"
+          if [ -f "$NOTES_FILE" ]; then
+            cp "$NOTES_FILE" "$OUT"
+          else
+            {
+              echo "## Earnie ${VERSION}"
+              echo ""
+              echo "### Docker images"
+              echo ""
+              echo "- \`ghcr.io/jochentcc/earnie-energy:${VERSION}\`"
+              echo "- \`ghcr.io/jochentcc/earnie-energy:latest\`"
+              echo "- Legacy aliases: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\` / \`:latest\`"
+              echo ""
+              echo "Deploy: [docs/einrichtung/container.md](https://github.com/${{ github.repository }}/blob/main/docs/einrichtung/container.md)"
+              echo ""
+              echo "Multi-arch: \`linux/amd64\` (Synology / Proxmox) · \`linux/arm64\` (LoxBerry)."
+            } > "$OUT"
+          fi
+          echo "path=${OUT}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "Earnie ${{ steps.version.outputs.version }}" \
+            --notes-file "${{ steps.notes.outputs.path }}" \
+            --latest

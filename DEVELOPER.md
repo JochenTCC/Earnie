@@ -56,13 +56,28 @@ Windows-Wrapper: `.\docker\build-container.ps1`
 
 Standard-Tags: `ghcr.io/jochentcc/earnie-energy:latest` und `ghcr.io/jochentcc/earnie-energy:<version>` (aus `version.py`). Übergangsweise zusätzlich `ernie-energy`-Tags.
 
-### Registry-Push (Release)
+### Release (tag → GitHub Actions)
+
+**Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release.yml`) builds the multi-arch image to GHCR and creates the GitHub Release.
+
+```powershell
+# After version.py == X.Y.Z is on origin/main:
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+- Tag must match `version.py` exactly (`v2.0.0` ↔ `__version__ = "2.0.0"`); mismatch fails the workflow.
+- Optional notes: `.github/release-notes/vX.Y.Z.md` (else a short default body).
+- Images: `ghcr.io/jochentcc/earnie-energy:X.Y.Z` and `:latest` (+ legacy `ernie-energy` aliases).
+- **GHCR visibility (one-time):** after the first Actions push, in GitHub → Packages → `earnie-energy` / `ernie-energy` → link to this repo and set **Public** if anonymous `docker pull` is required.
+
+**Fallback** (CI down / emergency): local multi-arch push:
 
 ```powershell
 python -m scripts.build_container --target all --push
 ```
 
-Weitere Optionen: `--target` (`synology` | `loxberry` | `all`), `--tag`, `--platform`, `--no-cache` — siehe [docker/README.md](docker/README.md).
+Weitere Build-Optionen: `--target` (`synology` | `loxberry` | `all`), `--tag`, `--platform`, `--no-cache` — siehe [docker/README.md](docker/README.md).
 
 ### Lokal starten (Dev)
 
@@ -72,7 +87,7 @@ docker compose --project-directory . -f docker/compose/dev.yml up -d --build
 
 ### Produktion (Synology / LoxBerry / Proxmox LXC)
 
-1. Multi-Arch-Image bauen und pushen (siehe oben)
+1. Publish a tagged release (see above) — or fallback local `--push`
 2. Auf der Zielplattform nur Compose-Datei (`docker/compose/synology.yml`, `loxberry.yml` oder `proxmox.yml`), `config/` und `runtime/` bereitstellen
 3. `docker compose --project-directory . -f docker/compose/<stack>.yml pull`
 4. `docker compose --project-directory . -f docker/compose/<stack>.yml up -d`

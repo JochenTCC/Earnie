@@ -7,8 +7,9 @@ cd "$ROOT"
 
 STAGED="$(git diff --cached --name-only | tr -d '\r')"
 if [ -n "$STAGED" ]; then
-  if ! echo "$STAGED" | grep -qvE '\.md$|^docs/|^\.cursor/'; then
-    echo "pre-commit: Nur Doku geändert (*.md, docs/, .cursor/) — pytest übersprungen."
+  # Skip full suite for docs / Cursor / GitHub workflow+notes / hook tooling only.
+  if ! echo "$STAGED" | grep -qvE '\.md$|^docs/|^\.cursor/|^\.github/|^\.githooks/'; then
+    echo "pre-commit: Nur Doku/Workflow/Hooks geändert — pytest übersprungen."
     exit 0
   fi
 fi

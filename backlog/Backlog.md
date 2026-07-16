@@ -18,16 +18,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature Backlog
 
-## Real Version 2.0 — legacy data model removed
-
-### Version 2.0
-
-After **real** 2.0 release: dead code, obsolete tests, and leftover patches from pre-1.26.0 data model (1.26.0 P6 removed runtime fallbacks; this epic mops up the rest)
-
-
 ### Version 2.+1 — Quality epic / post-migration cleanup
 
 - [ ] Evaluate option for code coverage testing and identification of deprecated code / tests (especially due to substantial data model change) / obsolete patches because of legacy data model
+  - **Context:** after real 2.0.0 release — mop up dead code, obsolete tests, leftover patches from pre-1.26.0 data model (1.26.0 P6 removed runtime fallbacks)
   - **Planning (three deliverables):**
     - **Coverage baseline** — run coverage on migrated core packages; identify weakly covered modules that changed most in the 2.0 data model
     - **Legacy test audit** — review tests flagged by legacy symbols and `scripts/test_health_report.py`; decide keep, rewrite, or delete

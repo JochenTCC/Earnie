@@ -3,10 +3,9 @@ name: session-abschluss
 description: >-
   Ends a development session: maintain backlog/Backlog.md, backlog/Backlog-Bugfixes.md, and
   backlog/Backlog-Erledigt.md,
-  commit and push all open changes, optionally build a Docker image
-  and push it to ghcr.io.
-  Use for "end session", "backlog sync", "commit and push", or
-  an explicit request to conclude the session.
+  commit and push all open changes, optionally publish a version tag
+  (GitHub Actions → GHCR + GitHub Release; local Docker push as fallback).
+  Use for "end session", "backlog sync", "commit and push", or an explicit request to conclude the session.
 ---
 
 # Session Conclusion
@@ -91,17 +90,18 @@ Briefly summarize:
 - Push status
 - Excluded files (if any)
 
-Close with:
+Close with (when a release seems appropriate):
 
-> Should I now build the Docker image and push it to ghcr.io?
+> Should I create and push tag `vX.Y.Z` so GitHub Actions publishes Docker + the GitHub Release?
+> (Fallback: local `python -m scripts.build_container --target all --push` if CI is skipped.)
 
 **Do not** automatically proceed to Phase 2.
 
 ---
 
-## Phase 2 — Build & push Docker (on request only)
+## Phase 2 — Publish release (on request only)
 
-Start **only** on explicit "Yes" / "build Docker" / "push image" after Phase 1.
+Start **only** on explicit "Yes" / "tag release" / "push tag" / "build Docker" after Phase 1.
 
 ### 1. Check version
 
@@ -111,42 +111,44 @@ During an active MINOR cycle (`1.24.a` … `1.24.g`, release `1.24.0`): **no aut
 
 If a release seems appropriate: **once** suggest (target version + rationale) and ask the user. On "no" or no response: leave unchanged.
 
-### 2. Build & push
+Ensure `version.py` is committed and pushed on `origin/main` before tagging.
 
-Canonical command for release (Synology + LoxBerry, multi-arch):
+### 2. Primary: push version tag (CI)
+
+Creates the GitHub Release and multi-arch GHCR images via `.github/workflows/release.yml`:
+
+```powershell
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+- Tag must match `version.py` (`v2.0.0` ↔ `2.0.0`).
+- Optional notes file: `.github/release-notes/vX.Y.Z.md`
+- Watch Actions; confirm Release page and GHCR tags.
+
+### 3. Fallback: local build & push
+
+Only if the user asks to skip CI or Actions is unavailable:
 
 ```powershell
 python -m scripts.build_container --target all --push
 ```
 
-Synology only (amd64):
+Synology only (amd64): `python -m scripts.build_container --target synology --push`  
+Windows wrapper: `.\docker\build-container.ps1 --target all --push`
 
-```powershell
-python -m scripts.build_container --target synology --push
-```
+Prerequisites for local push: Docker running; for `--target all` buildx set up; `docker login ghcr.io`; wait for hook confirmation on push.
 
-Alternative Windows wrapper: `.\docker\build-container.ps1 --target all --push`
-
-Default tags:
-
-- `ghcr.io/jochentcc/earnie-energy:latest`
-- `ghcr.io/jochentcc/earnie-energy:<version>` from `version.py`
-
-Details: `docs/einrichtung/container.md`
-
-### 3. Prerequisites
-
-- Docker is running; for `--target all`: `docker buildx create --use` (once, see container.md)
-- `docker login ghcr.io` successful — on auth error stop and give guidance
-- Hook may mark `docker push` for confirmation — wait for user approval
+Default tags: `ghcr.io/jochentcc/earnie-energy:latest` and `:<version>` from `version.py` (+ legacy `ernie-energy`). Details: `docs/einrichtung/container.md` · `DEVELOPER.md`.
 
 ### 4. Phase 2 report
 
-- Built/pushed tags
+- Tag pushed / Actions run URL (or local built/pushed tags)
 - Version from `version.py`
 - Deploy notes:
   - Synology: `docker compose --project-directory . -f docker/compose/synology.yml pull && ... up -d`
   - LoxBerry: `docker compose --project-directory . -f docker/compose/loxberry.yml pull && ... up -d`
+  - Proxmox: `docker compose --project-directory . -f docker/compose/proxmox.yml pull && ... up -d`
 
 ---
 
@@ -155,4 +157,4 @@ Details: `docs/einrichtung/container.md`
 - No empty commits
 - No force push without explicit user instruction
 - No commit of secrets or gitignored runtime files
-- On hook prompt for `docker push`: wait for user decision
+- On hook prompt for `docker push` or tag push: wait for user decision
