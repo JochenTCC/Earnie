@@ -341,6 +341,8 @@ def render_entity_selectbox(
             format_func=format_entity_option,
         )
         return None
+    if key in st.session_state and st.session_state[key] not in labels:
+        del st.session_state[key]
     if key in st.session_state:
         return labeled_selectbox(
             label,

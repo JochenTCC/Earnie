@@ -165,6 +165,7 @@ def test_ordered_monthly_chart_labels_matches_gesamtkosten():
     live_ref_label = scenario_reference_label("Live")
     meta = {
         "reference_id": HISTORICAL_REFERENCE_ID,
+        "live_scenario_id": "live",
         "scenario_ids": [HISTORICAL_REFERENCE_ID, live_ref_id, "live", "fixed_full"],
         "labels": {
             HISTORICAL_REFERENCE_ID: "Historisch (ohne Optimierung)",
@@ -188,6 +189,51 @@ def test_ordered_monthly_chart_labels_matches_gesamtkosten():
         live_ref_label,
         "Live",
         "Fixed Full",
+    ]
+
+
+def test_ordered_monthly_chart_labels_other_ref_before_live_optimized():
+    from simulation.engine import scenario_reference_id, scenario_reference_label
+
+    live_ref_id = scenario_reference_id("live")
+    other_ref_id = scenario_reference_id("pv_sued")
+    live_ref_label = scenario_reference_label("Live")
+    other_ref_label = scenario_reference_label("PV Süd")
+    # Completion-shuffled scenario_ids: other ref before live ref, optimized before live
+    meta = {
+        "reference_id": HISTORICAL_REFERENCE_ID,
+        "live_scenario_id": "live",
+        "scenario_ids": [
+            HISTORICAL_REFERENCE_ID,
+            other_ref_id,
+            live_ref_id,
+            "pv_sued",
+            "live",
+        ],
+        "labels": {
+            HISTORICAL_REFERENCE_ID: "Historisch",
+            live_ref_id: live_ref_label,
+            other_ref_id: other_ref_label,
+            "live": "Live",
+            "pv_sued": "PV Süd",
+        },
+        "summary": {
+            "total_eur": {
+                HISTORICAL_REFERENCE_ID: 1200.0,
+                live_ref_id: 1100.0,
+                other_ref_id: 1150.0,
+                "live": 1000.0,
+                "pv_sued": 980.0,
+            },
+        },
+    }
+    present = ["PV Süd", "Live", other_ref_label, live_ref_label, "Historisch"]
+    assert ordered_monthly_chart_labels(meta, present) == [
+        "Historisch",
+        live_ref_label,
+        other_ref_label,
+        "Live",
+        "PV Süd",
     ]
 
 

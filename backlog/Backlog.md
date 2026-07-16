@@ -11,7 +11,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Adapt business plan
 - [ ] **Outreach (not software):** Ask for interested parties in loxforum / reddit — post under “my project”; take interesting chart snapshots (loxforum admins contacted re. best place)
   - loxforum -> done
-  - Facebook groups (e.g. Loxone Smart Home Community)
+  - Facebook groups
+    - Loxone Konfigurationsbereich
+    - Loxone D-A-CH
+    - Loxone Deutschland
   - Evaluate running Szenario-Explorer as "web app" in Streamlit Community Cloud — secrets, no Loxone, demo feasibility  
 - [ ] Check if Loxone's Energiemonitor provides statistics to import in Earnie  
   - Energiemonitor logs statistics
@@ -21,14 +24,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature Backlog
 
-
-### Version 2.+1
-- [ ] Order of progress bars in SE shall not change during execution of scenario simulation
-- [ ] Order of alls SE results (tables, charts)
-  - 1. Historisch - ohne Optimierung
-  - 2. Live - Ohne Optimierung
-  - 3.- Other PV-settings - Ohne Optimierung
-  - x.- Repeat order from 2., 3. ... - Optimiert
 
 ### Version 2.+1 — Quality epic / post-migration cleanup
 
@@ -59,7 +54,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Find EPEX API to have provider independent tariff calculation
 - [ ] Review current tariffs - use https://www.e-control.at/referenzmarktwert and docs\referenz\.~lock.Oeko_RefMrktPr.csv# as anchor point
 - [ ] Improve cost calculation by adding monthly fees etc.
-- [ ] Improve performance of Scenario Explorer (reduce aborting time for CBC issues? - other ideas?)
+- [ ] Improve performance of Scenario Explorer (ideas?)
 
 
 ### Version 2.+1

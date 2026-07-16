@@ -150,6 +150,60 @@ def test_sort_progress_snapshot_keys_live_reference_second():
     ]
 
 
+def test_sort_progress_snapshot_keys_preferred_order_beats_alpha():
+    from simulation.backtesting_progress import sort_progress_snapshot_keys
+
+    preferred = [
+        "Historisch",
+        "Referenz (Live) — ohne Optimierung",
+        "Referenz (PV Süd) — ohne Optimierung",
+        "Live",
+        "AAA Extra",
+    ]
+    shuffled = [
+        "AAA Extra",
+        "Live",
+        "Referenz (PV Süd) — ohne Optimierung",
+        "Historisch",
+        "Referenz (Live) — ohne Optimierung",
+    ]
+    assert sort_progress_snapshot_keys(shuffled, preferred_order=preferred) == preferred
+
+
+def test_ordered_backtesting_result_ids_live_first():
+    from simulation.backtesting_progress import ordered_backtesting_result_ids
+    from simulation.engine import HISTORICAL_REFERENCE_ID, scenario_reference_id
+
+    live_ref = scenario_reference_id("live")
+    other_ref = scenario_reference_id("pv_sued")
+    scenarios = {"pv_sued": {}, "live": {}, "battery": {}}
+    # Shuffled extra_ref_ids as if completion-ordered
+    ordered = ordered_backtesting_result_ids(
+        scenarios,
+        live_scenario_id="live",
+        extra_ref_ids=[other_ref, live_ref],
+    )
+    assert ordered == [
+        HISTORICAL_REFERENCE_ID,
+        live_ref,
+        other_ref,
+        "live",
+        "pv_sued",
+        "battery",
+    ]
+
+
+def test_reorder_results_by_ids_appends_unknown():
+    from simulation.backtesting_progress import reorder_results_by_ids
+
+    results = {"b": 2, "a": 1, "orphan": 9}
+    assert list(reorder_results_by_ids(results, ["a", "b"]).keys()) == [
+        "a",
+        "b",
+        "orphan",
+    ]
+
+
 def test_count_backtesting_parallel_tasks_includes_reference(monkeypatch):
     monkeypatch.setattr(
         "simulation.engine.plan_per_scenario_reference_tasks",

@@ -13,11 +13,12 @@ from ui.house_config_io import (
     load_house_profiles,
     save_runtime_scenario_refs,
 )
-from ui.planning_tariff_form import (
-    _EXPORT_TYPE_LABELS,
-    _IMPORT_TYPE_LABELS,
-    _tariff_meta_caption,
-    _type_caption,
+from ui.tariff_filter_helpers import (
+    EXPORT_TYPE_LABELS,
+    IMPORT_TYPE_LABELS,
+    render_tariff_filter_row,
+    tariff_meta_caption,
+    type_caption,
 )
 from ui.runtime_config import invalidate_live_optimization_cache
 from ui.form_layout import labeled_selectbox
@@ -93,20 +94,20 @@ def _render_resolved_snapshot(resolved: dict) -> None:
     if import_spec:
         st.caption(
             "Bezug: "
-            + _type_caption(import_spec, _IMPORT_TYPE_LABELS)
+            + type_caption(import_spec, IMPORT_TYPE_LABELS)
             + (
-                f" · {_tariff_meta_caption(import_spec)}"
-                if _tariff_meta_caption(import_spec)
+                f" · {tariff_meta_caption(import_spec)}"
+                if tariff_meta_caption(import_spec)
                 else ""
             )
         )
     if export_spec:
         st.caption(
             "Einspeise: "
-            + _type_caption(export_spec, _EXPORT_TYPE_LABELS)
+            + type_caption(export_spec, EXPORT_TYPE_LABELS)
             + (
-                f" · {_tariff_meta_caption(export_spec)}"
-                if _tariff_meta_caption(export_spec)
+                f" · {tariff_meta_caption(export_spec)}"
+                if tariff_meta_caption(export_spec)
                 else ""
             )
         )
@@ -140,6 +141,25 @@ def render_runtime_entity_form_body() -> None:
     if not profiles:
         st.warning("Zuerst ein Hausprofil im Hauskonfigurator anlegen.")
 
+    current_import_id = str(refs.get("import_tariff_id") or "").strip() or None
+    current_export_id = str(refs.get("export_tariff_id") or "").strip() or None
+    st.caption("Filter Bezugstarife")
+    filtered_imports = render_tariff_filter_row(
+        key_prefix="config_runtime_import_filter",
+        tariffs=import_tariffs,
+        kind="import",
+        current_id=current_import_id,
+        label_prefix="Bezug ",
+    )
+    st.caption("Filter Einspeisetarife")
+    filtered_exports = render_tariff_filter_row(
+        key_prefix="config_runtime_export_filter",
+        tariffs=export_tariffs,
+        kind="export",
+        current_id=current_export_id,
+        label_prefix="Einspeise ",
+    )
+
     with st.form("runtime_entity_form"):
         battery_pick = render_entity_selectbox(
             "Batterie",
@@ -155,15 +175,15 @@ def render_runtime_entity_form_body() -> None:
         )
         imp_pick = render_entity_selectbox(
             "Bezugstarif",
-            import_tariffs,
+            filtered_imports,
             key="config_runtime_import",
-            current_id=refs.get("import_tariff_id"),
+            current_id=current_import_id,
         )
         exp_pick = render_entity_selectbox(
             "Einspeisetarif",
-            export_tariffs,
+            filtered_exports,
             key="config_runtime_export",
-            current_id=refs.get("export_tariff_id"),
+            current_id=current_export_id,
         )
         prof_pick = render_entity_selectbox(
             "Hausprofil",

@@ -44,7 +44,9 @@ from simulation.engine import (
 )
 from simulation.backtesting_progress import (
     clear_progress_dir,
+    ordered_backtesting_result_ids,
     prepare_progress_dir,
+    reorder_results_by_ids,
     worker_progress_path,
 )
 from simulation.horizon_mode import (
@@ -269,7 +271,12 @@ def _run_reference_worker(
     )
     worker_path = worker_progress_path(progress_file, worker_key)
     on_progress = (
-        _make_progress_printer(progress_label, worker_path, phase="reference")
+        _make_progress_printer(
+            progress_label,
+            worker_path,
+            phase="reference",
+            result_id=ref_id,
+        )
         if worker_path
         else None
     )
@@ -316,7 +323,9 @@ def _run_scenario_worker(
     display = progress_label or name
     worker_path = worker_progress_path(progress_file, name)
     on_progress = (
-        _make_progress_printer(display, worker_path) if worker_path else None
+        _make_progress_printer(display, worker_path, result_id=name)
+        if worker_path
+        else None
     )
     df_result, plausibility, cbc_events = run_simulation(
         start,
@@ -468,6 +477,7 @@ def _make_progress_printer(
     progress_file: str | None = None,
     *,
     phase: str = "simulation",
+    result_id: str | None = None,
 ):
     """Gibt eine Callback-Funktion für die Fortschrittsanzeige im Terminal zurück."""
     last_write_at = 0.0
@@ -495,15 +505,15 @@ def _make_progress_printer(
             and now - last_write_at < _PROGRESS_WRITE_MIN_INTERVAL_SEC
         ):
             return
-        _write_progress_file(
-            progress_file,
-            {
-                "current": current,
-                "total": total,
-                "scenario": scenario_name,
-                "phase": phase,
-            },
-        )
+        payload = {
+            "current": current,
+            "total": total,
+            "scenario": scenario_name,
+            "phase": phase,
+        }
+        if result_id is not None:
+            payload["result_id"] = result_id
+        _write_progress_file(progress_file, payload)
         last_write_at = now
         last_written_current = current
 
@@ -784,7 +794,7 @@ def main(argv: list[str] | None = None):
 
     if progress_file:
         prepare_progress_dir(progress_file)
-        for _ref_id, _params, label, worker_key in reference_specs:
+        for ref_id, _params, label, worker_key in reference_specs:
             _write_progress_file(
                 worker_progress_path(progress_file, worker_key),
                 {
@@ -792,6 +802,18 @@ def main(argv: list[str] | None = None):
                     "total": total_hours,
                     "scenario": label,
                     "phase": "reference",
+                    "result_id": ref_id,
+                },
+            )
+        for name in scenarios:
+            _write_progress_file(
+                worker_progress_path(progress_file, name),
+                {
+                    "current": 0,
+                    "total": total_hours,
+                    "scenario": labels.get(name, name),
+                    "phase": "simulation",
+                    "result_id": name,
                 },
             )
 
@@ -804,7 +826,10 @@ def main(argv: list[str] | None = None):
         print(f"Berechne Referenz '{HISTORICAL_REFERENCE_LABEL}'...")
         ref_progress_path = worker_progress_path(progress_file, "_reference")
         ref_progress = _make_progress_printer(
-            HISTORICAL_REFERENCE_LABEL, ref_progress_path, phase="reference"
+            HISTORICAL_REFERENCE_LABEL,
+            ref_progress_path,
+            phase="reference",
+            result_id=HISTORICAL_REFERENCE_ID,
         )
         sim_results[HISTORICAL_REFERENCE_ID] = compute_historical_reference_costs(
             start,
@@ -840,6 +865,7 @@ def main(argv: list[str] | None = None):
                 on_progress=_make_progress_printer(
                     display,
                     worker_progress_path(progress_file, name),
+                    result_id=name,
                 ),
                 scenario_id=name,
                 horizon_mode=horizon_mode,
@@ -871,6 +897,13 @@ def main(argv: list[str] | None = None):
         for name in scenarios:
             print_plausibility_report(plausibility_by_scenario[name])
 
+    ordered_ids = ordered_backtesting_result_ids(
+        scenarios,
+        live_scenario_id=live_scenario_id,
+        extra_ref_ids=[ref_id for ref_id, _params, _label in extra_ref_specs],
+    )
+    sim_results = reorder_results_by_ids(sim_results, ordered_ids)
+
     _print_cbc_events_summary(cbc_events_by_scenario, labels)
 
     critical_cases = build_critical_cases(
@@ -898,6 +931,7 @@ def main(argv: list[str] | None = None):
         "price_source": price_source,
         "price_strategy": price_strategy,
         "reference_by_scenario": reference_by_scenario,
+        "live_scenario_id": live_scenario_id,
     }
     log_path = save_backtesting_log(
         sim_results,

@@ -9,7 +9,12 @@ from data import cons_data_store
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation import backtesting_log
 from simulation.backtesting_fingerprint import fingerprint_for_current_config
-from simulation.backtesting_progress import sort_progress_snapshot_keys
+from simulation.backtesting_progress import (
+    ordered_backtesting_result_ids,
+    ordered_progress_labels,
+    sort_progress_snapshot_keys,
+)
+from simulation.engine import HISTORICAL_REFERENCE_ID, plan_per_scenario_reference_tasks
 from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNRISE_WINDOW
 from ui.backtesting_charts import scenario_monthly_cost_chart
 from ui.backtesting_cons_data import render_cons_data_section
@@ -206,7 +211,24 @@ def _execute_backtesting_run(
     workers = auto_backtesting_workers(parallel_task_count)
     progress_file = default_progress_file_path()
     scenario_labels = config.get_scenario_labels()
-    live_scenario_label = scenario_labels.get(live_scenario_id, live_scenario_id)
+    _, extra_ref_labels, extra_ref_specs = plan_per_scenario_reference_tasks(
+        scenarios or {},
+        live_scenario_id=live_scenario_id,
+        scenario_labels=scenario_labels,
+    )
+    labels_for_order = {
+        HISTORICAL_REFERENCE_ID: HISTORICAL_REFERENCE_LABEL,
+        **scenario_labels,
+        **extra_ref_labels,
+    }
+    preferred_progress_labels = ordered_progress_labels(
+        ordered_backtesting_result_ids(
+            scenarios or {},
+            live_scenario_id=live_scenario_id,
+            extra_ref_ids=[ref_id for ref_id, _params, _label in extra_ref_specs],
+        ),
+        labels_for_order,
+    )
 
     with st.status(status_label, expanded=True) as status:
         progress_host = st.empty()
@@ -228,8 +250,7 @@ def _execute_backtesting_run(
                     )
                 ordered_scenarios = sort_progress_snapshot_keys(
                     snapshot.keys(),
-                    historical_reference_label=HISTORICAL_REFERENCE_LABEL,
-                    live_scenario_label=live_scenario_label,
+                    preferred_order=preferred_progress_labels,
                 )
                 for scenario in ordered_scenarios:
                     progress = snapshot[scenario]

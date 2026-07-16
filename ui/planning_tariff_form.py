@@ -14,46 +14,22 @@ from ui.house_config_io import (
     tariffs_json_path,
 )
 from ui.form_layout import labeled_selectbox
+from ui.tariff_filter_helpers import (
+    EXPORT_TYPE_LABELS,
+    IMPORT_TYPE_LABELS,
+    tariff_meta_caption,
+    type_caption,
+)
 
-_IMPORT_TYPE_LABELS = {
-    "awattar": "aWATTar (EPEX + Aufschlag aus tariffs.json)",
-    "fixed_cent": "Fixpreis Bezug",
-    "spot_hourly": "Spot stündlich",
-    "ex_post_spot": "Spot ex-post",
-    "monthly_market": "Monatsmarkt",
-    "monthly_table": "Monatstabelle Bezug",
-}
-
-_EXPORT_TYPE_LABELS = {
-    "fixed": "Fixpreis Einspeise",
-    "dynamic_epex": "Dynamisch EPEX (Legacy)",
-    "monthly_table": "Monatstabelle",
-    "spot_hourly": "Spot stündlich",
-    "ex_post_spot": "Spot ex-post",
-}
+# Backward-compatible aliases for existing UI imports.
+_IMPORT_TYPE_LABELS = IMPORT_TYPE_LABELS
+_EXPORT_TYPE_LABELS = EXPORT_TYPE_LABELS
+_type_caption = type_caption
+_tariff_meta_caption = tariff_meta_caption
 
 
 def _tariff_label(tariff: dict) -> str:
     return str(tariff.get("label") or tariff.get("id", ""))
-
-
-def _type_caption(tariff: dict, labels: dict[str, str]) -> str:
-    tariff_type = str(tariff.get("type", "")).strip().lower()
-    return labels.get(tariff_type, tariff_type or "unbekannt")
-
-
-def _tariff_meta_caption(tariff: dict) -> str:
-    parts: list[str] = []
-    land = tariff.get("land")
-    currency = tariff.get("currency")
-    if land:
-        parts.append(f"Land: {land}")
-    if currency:
-        parts.append(f"Währung: {currency}")
-    notes = tariff.get("notes")
-    if notes:
-        parts.append(str(notes))
-    return " · ".join(parts)
 
 
 def render_tariff_selection_tab() -> None:

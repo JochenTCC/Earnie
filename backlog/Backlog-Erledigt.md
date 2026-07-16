@@ -3,6 +3,23 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Tariff filters Land + type (2026-07-16)
+
+- [x] **Tariff filter Land + Typ** — `ui/tariff_filter_helpers.py`; Bezugs-/Einspeisetarif pickers in Szenarieneditor + Live-Konfiguration; cascading Typ after Land; current selection kept if outside filters; tests in `test_tariff_filter_helpers.py`; note in `docs/konfiguration/ueberblick.md`
+- [x] **Region filter (`einzugsbereich`)** — closed without implementation (not in `tariffs.json` catalog; Land + Typ sufficient for now)
+
+
+### SE progress and result order (2026-07-16)
+
+- [x] Order of progress bars in SE shall not change during execution of scenario simulation — pre-seed all worker progress files; sort by canonical preferred order
+- [x] Order of all SE results (tables, charts)
+  - 1. Historisch - ohne Optimierung
+  - 2. Live - Ohne Optimierung
+  - 3.- Other PV-settings - Ohne Optimierung
+  - x.- Repeat order from 2., 3. ... - Optimiert
+  - Canonical `ordered_backtesting_result_ids` / reorder before `save_backtesting_log`; Live-first in `_annual_cost_row_order`
+
+
 ### SE results disclaimer (2026-07-16)
 
 - [x] Add a hint text to SE that there is no guarantee for the results — `st.info` on Szenario-Explorer (`ui/pages/page_backtesting.py`); wording aligned with Benutzer-Handbuch

@@ -11,6 +11,7 @@ from simulation.engine import (
     HISTORICAL_REFERENCE_ID,
     SCENARIO_REFERENCE_PREFIX,
     is_scenario_reference_id,
+    scenario_reference_id,
 )
 from ui.consumption_validation_charts import cons_data_monthly_kwh
 
@@ -240,10 +241,20 @@ def _reference_id_for_scenario(meta: dict, scenario_id: str) -> str:
 
 
 def _annual_cost_row_order(meta: dict, totals: dict[str, float]) -> list[str]:
-    """Global reference first, then per-scenario references, then optimized scenarios."""
+    """Historical → Live ref → other refs → Live optimized → other optimized."""
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
     scenario_ids = list(meta.get("scenario_ids", []))
-    ordered_ids = list(dict.fromkeys(scenario_ids + [sid for sid in totals if sid not in scenario_ids]))
+    ordered_ids = list(
+        dict.fromkeys(scenario_ids + [sid for sid in totals if sid not in scenario_ids])
+    )
+
+    live_id = meta.get("live_scenario_id")
+    if not live_id:
+        try:
+            live_id = config.get_live_scenario_id()
+        except Exception:
+            live_id = None
+    live_ref = scenario_reference_id(str(live_id)) if live_id else None
 
     global_refs: list[str] = []
     scenario_refs: list[str] = []
@@ -257,6 +268,11 @@ def _annual_cost_row_order(meta: dict, totals: dict[str, float]) -> list[str]:
             scenario_refs.append(scenario_id)
         else:
             optimized.append(scenario_id)
+
+    if live_ref and live_ref in scenario_refs:
+        scenario_refs = [live_ref] + [r for r in scenario_refs if r != live_ref]
+    if live_id and live_id in optimized:
+        optimized = [live_id] + [s for s in optimized if s != live_id]
     return global_refs + scenario_refs + optimized
 
 

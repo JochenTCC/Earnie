@@ -424,6 +424,8 @@ def save_backtesting_log(
         payload["period"]["hours"] = len(all_ts) // max(len(results), 1)
     if period.get("reference_by_scenario"):
         payload["reference_by_scenario"] = period["reference_by_scenario"]
+    if period.get("live_scenario_id"):
+        payload["live_scenario_id"] = period["live_scenario_id"]
 
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)

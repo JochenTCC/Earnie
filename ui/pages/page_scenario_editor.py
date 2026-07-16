@@ -16,11 +16,12 @@ from ui.house_config_io import (
     load_tariffs_catalog_meta,
     upsert_scenario,
 )
-from ui.planning_tariff_form import (
-    _EXPORT_TYPE_LABELS,
-    _IMPORT_TYPE_LABELS,
-    _tariff_meta_caption,
-    _type_caption,
+from ui.tariff_filter_helpers import (
+    EXPORT_TYPE_LABELS,
+    IMPORT_TYPE_LABELS,
+    render_tariff_filter_row,
+    tariff_meta_caption,
+    type_caption,
 )
 from ui.scenario_form_helpers import (
     NEW_SCENARIO_OPTION,
@@ -336,37 +337,68 @@ def _render_scenarios_tab() -> None:
         pv_systems,
         key=scoped_widget_key(session_scope, "scenario_pv"),
     )
+    scenario_settings = scenario_template.get("settings") or {}
+    current_import_id = str(scenario_settings.get("import_tariff_id") or "").strip() or None
+    current_export_id = str(scenario_settings.get("export_tariff_id") or "").strip() or None
+    import_key = scoped_widget_key(session_scope, "scenario_import")
+    export_key = scoped_widget_key(session_scope, "scenario_export")
+    if import_key in st.session_state:
+        current_import_id = (
+            lookup_entity_id(imp_map, st.session_state.get(import_key)) or current_import_id
+        )
+    if export_key in st.session_state:
+        current_export_id = (
+            lookup_entity_id(exp_map, st.session_state.get(export_key)) or current_export_id
+        )
+    st.caption("Filter Bezugstarife")
+    filtered_imports = render_tariff_filter_row(
+        key_prefix=scoped_widget_key(session_scope, "scenario_import_filter"),
+        tariffs=import_tariffs,
+        kind="import",
+        current_id=current_import_id,
+        label_prefix="Bezug ",
+    )
+    st.caption("Filter Einspeisetarife")
+    filtered_exports = render_tariff_filter_row(
+        key_prefix=scoped_widget_key(session_scope, "scenario_export_filter"),
+        tariffs=export_tariffs,
+        kind="export",
+        current_id=current_export_id,
+        label_prefix="Einspeise ",
+    )
     imp_pick = render_entity_selectbox(
         "Bezugstarif",
-        import_tariffs,
+        filtered_imports,
         allow_none=True,
-        key=scoped_widget_key(session_scope, "scenario_import"),
+        key=import_key,
+        current_id=current_import_id,
     )
     exp_pick = render_entity_selectbox(
         "Einspeisetarif",
-        export_tariffs,
+        filtered_exports,
         allow_none=True,
-        key=scoped_widget_key(session_scope, "scenario_export"),
+        key=export_key,
+        current_id=current_export_id,
     )
     selected_import = lookup_entity_id(imp_map, imp_pick)
     selected_export = lookup_entity_id(exp_map, exp_pick)
     if selected_import:
         import_tariff = next(t for t in import_tariffs if t["id"] == selected_import)
         st.caption(
-            f"Bezug: {_type_caption(import_tariff, _IMPORT_TYPE_LABELS)}"
+            f"Bezug: {type_caption(import_tariff, IMPORT_TYPE_LABELS)}"
             + (
-                f" · {_tariff_meta_caption(import_tariff)}"
-                if _tariff_meta_caption(import_tariff)
+                f" · {tariff_meta_caption(import_tariff)}"
+                if tariff_meta_caption(import_tariff)
                 else ""
             )
         )
     if selected_export:
         export_tariff = next(t for t in export_tariffs if t["id"] == selected_export)
         st.caption(
-            f"Einspeise: {_type_caption(export_tariff, _EXPORT_TYPE_LABELS)}"
+            f"Einspeise: {type_caption(export_tariff, EXPORT_TYPE_LABELS)}"
             + (
-                f" · {_tariff_meta_caption(export_tariff)}"
-                if _tariff_meta_caption(export_tariff)
+                f" · {tariff_meta_caption(export_tariff)}"
+                if tariff_meta_caption(export_tariff)
                 else ""
             )
         )
