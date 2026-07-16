@@ -8,7 +8,7 @@ Konfiguration im Container/venv: `config.json` → `ui.streamlit_port` oder `EAR
 
 | Port | Stack / Betrieb | Plattform | Worker | UI-Zugriff | Compose / Start |
 |------|-----------------|-----------|--------|------------|-----------------|
-| **8501** | **Produktion** | Synology NAS, LoxBerry | `optimizer-worker` auf dem Gerät | LAN: `http://<host>:8501`; Synology extern: HTTPS :443 → Reverse Proxy → 8501 | `docker/compose/synology.yml`, `docker/compose/loxberry.yml` |
+| **8501** | **Produktion** | Synology NAS, LoxBerry, Proxmox LXC | `optimizer-worker` auf dem Gerät | LAN: `http://<host>:8501`; Synology extern: HTTPS :443 → Reverse Proxy → 8501 | `docker/compose/synology.yml`, `docker/compose/loxberry.yml`, `docker/compose/proxmox.yml` |
 | **8501** | **Lokaler Dev-Stack (Docker)** | Windows/Linux Dev-PC | `earnie-optimizer-worker` (lokal) | `http://localhost:8501` | `docker/compose/dev.yml` (`8501:8501`) |
 | **8501** | **Lokal ohne Docker (venv)** | Dev-PC (venv) | `python main.py` (lokal) | `http://localhost:8501` (Standard `ui.streamlit_port`) | `python -m scripts.run_streamlit`, VS Code „Streamlit app.py (:8501 lokal)“ |
 | **8502** | **Greenfield (Docker)** | Dev-PC (Docker) | `earnie-greenfield-worker` | `http://localhost:8502` | `docker/compose/greenfield.yml` (`8502:8501`) |
@@ -46,5 +46,6 @@ Konkrete Ports für 7g werden beim Umsetzen hier ergänzt.
 ## Siehe auch
 
 - [Container](../einrichtung/container.md) — Deployment Synology/LoxBerry
+- [Proxmox LXC](../einrichtung/proxmox-lxc.md) — LXC + Docker Compose
 - [Greenfield Dev-Stack](../einrichtung/greenfield-dev-stack.md)
 - [Betrieb](../einrichtung/betrieb.md) — `main.py` vs. Streamlit

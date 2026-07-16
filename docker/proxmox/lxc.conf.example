@@ -1,0 +1,33 @@
+# Proxmox LXC example for Earnie (Docker-in-LXC).
+# Copy values into a new CT via UI or pct, or merge into /etc/pve/lxc/<VMID>.conf
+# Adjust: VMID, storage, bridge, IP, hostname. Docs: docs/einrichtung/proxmox-lxc.md
+#
+# Required for Docker inside an unprivileged CT:
+#   features: nesting=1,keyctl=1
+#
+# Create (example on Proxmox host):
+#   pct create 120 local:vztmpl/debian-12-standard_12.7-1_amd64.tar.zst \
+#     --hostname earnie --cores 2 --memory 2048 --swap 512 \
+#     --rootfs local-lvm:8 --net0 name=eth0,bridge=vmbr0,ip=dhcp \
+#     --features nesting=1,keyctl=1 --unprivileged 1 --onboot 1 \
+#     --ostype debian --tags earnie;home-automation
+#   pct start 120
+#   pct enter 120
+#   # then run docker/proxmox/bootstrap.sh inside the CT
+
+arch: amd64
+cores: 2
+memory: 2048
+swap: 512
+hostname: earnie
+ostype: debian
+# rootfs: local-lvm:8
+# net0: name=eth0,bridge=vmbr0,firewall=1,ip=dhcp
+# Optional static IP:
+# net0: name=eth0,bridge=vmbr0,firewall=1,ip=192.168.1.120/24,gw=192.168.1.1
+features: nesting=1,keyctl=1
+onboot: 1
+unprivileged: 1
+tags: earnie;home-automation
+# Optional: bind-mount host data into the CT (create host path first):
+# mp0: /mnt/pve/data/earnie,mp=/opt/earnie

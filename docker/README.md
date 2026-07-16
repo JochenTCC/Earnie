@@ -25,6 +25,7 @@ Immer vom **Repo-Root** mit `--project-directory .`, damit Volume-Pfade (`./conf
 | Lokaler Dev | `docker/compose/dev.yml` | 8501 |
 | Synology (Prod) | `docker/compose/synology.yml` | 8501 |
 | LoxBerry (Prod) | `docker/compose/loxberry.yml` | 8501 |
+| Proxmox LXC (Prod) | `docker/compose/proxmox.yml` | 8501 |
 | Greenfield | `docker/compose/greenfield.yml` | 8502 |
 
 ```powershell
@@ -45,3 +46,5 @@ Früher lagen `Dockerfile`, `docker-compose*.yml` und `docker-entrypoint.sh` im 
 **Synology NAS:** Die produktive Datei heißt auf dem Gerät oft `compose.yaml`. Nach einem Repo-Update Inhalt aus `docker/compose/synology.yml` dorthin kopieren und `docker compose pull && docker compose up -d` ausführen.
 
 **LoxBerry:** Entsprechend `docker/compose/loxberry.yml` verwenden.
+
+**Proxmox LXC:** `docker/compose/proxmox.yml` plus LXC-Hilfen unter `docker/proxmox/` — Anleitung: [`docs/einrichtung/proxmox-lxc.md`](../docs/einrichtung/proxmox-lxc.md).

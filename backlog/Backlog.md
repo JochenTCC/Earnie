@@ -18,17 +18,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature Backlog
 
-### Minor changes in Version 1.99
-
-- [ ] Rearrange Verbrauchsvergleich (Debug) table
-  - Add a column (Verbrauch ohne PV und Speicher)
-  - Change name of column "Baseline Spec kWh" to "Reference (Live) - ohne Optimierung [kWh]"
-  - Change name of column "delta kWh (Opt-Baseline)" to "delta kWh (Ref. ohne Optimierung)"
-  - Remove rows for "Historisch (ohne Optimierung, ohne PV/Batterie)" and "Referenz (Live) — ohne Optimierung"
-  - Write consumption of scenario "Historisch ..." in all cells of colum "Verbrauch ohne PV und Speicher"
-  - Write consumption of scenario "Reference (Live) - ohne Optimierung [kWh]" in all cells of column with this name
-
-
 ## Real Version 2.0 — legacy data model removed
 
 ### Version 2.0
@@ -38,7 +27,6 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 
 ### Version 2.+1 — Quality epic / post-migration cleanup
 
-- [ ] Pimp README.md with snapshots
 - [ ] Evaluate option for code coverage testing and identification of deprecated code / tests (especially due to substantial data model change) / obsolete patches because of legacy data model
   - **Planning (three deliverables):**
     - **Coverage baseline** — run coverage on migrated core packages; identify weakly covered modules that changed most in the 2.0 data model
@@ -65,6 +53,7 @@ After **real** 2.0 release: dead code, obsolete tests, and leftover patches from
 - [ ] Make appropriate information accessible to user about where differences between optimized SOC and BL SOC Ziel come from to give him explanation (prove plausability)
 - [ ] Check if removing constraint for SOC at end of horizon changes simulation resulst in backtesting
 - [ ] Find EPEX API to have provider independent tariff calculation
+- [ ] Review current tariffs - use https://www.e-control.at/referenzmarktwert and docs\referenz\.~lock.Oeko_RefMrktPr.csv# as anchor point
 - [ ] Improve cost calculation by adding monthly fees etc.
 - [ ] Improve performance of Scenario Explorer (reduce aborting time for CBC issues? - other ideas?)
 

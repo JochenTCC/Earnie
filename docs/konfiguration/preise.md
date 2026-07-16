@@ -4,23 +4,21 @@
 
 Das muss überarbeitet werden: Preisermittlung unabhängig von aWATTar machen
 
-Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `[config/tariffs.json](../../config/tariffs.json)` auf. Bei Typ `awattar` gelten die Aufschläge **am Tarif-Eintrag** (`fix_aufschlag_cent`, `netzverlust_faktor`, `mwst_austria_faktor`).
+Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `[config/tariffs.json](../../config/tariffs.json)` auf. Bei Typ `awattar` gelten dieselben Aufschläge wie bei Spot-Tarifen **am Tarif-Eintrag** (`settlement_fee_cent_kwh`, `markup_percent`, `vat_percent` / `prices_include_vat`).
 
 Stundenpreise kommen von der aWATTar-API; die URL wird aus `import_tariff_id` → `land` abgeleitet (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
 
 ```
-Marktpreis (API)
-  × netzverlust_faktor
-  + fix_aufschlag_cent
-  × mwst_austria_faktor   (falls konfiguriert)
+(Marktpreis (API) × (1 + markup_percent/100) + settlement_fee_cent_kwh)
+  × (1 + vat_percent/100)   falls prices_include_vat = false
 ```
 
 
 | Feld (Tarif `awattar` in tariffs.json) | Bedeutung                                   |
 | -------------------------------------- | ------------------------------------------- |
-| `fix_aufschlag_cent`                   | Fixer Aufschlag Netz/Gebühren in Cent/kWh   |
-| `netzverlust_faktor`                   | Multiplikator für Netzverluste (z. B. 1.03) |
-| `mwst_austria_faktor`                  | USt-Faktor (z. B. 1.2 für 20 %)             |
+| `settlement_fee_cent_kwh`              | Fixer Aufschlag Netz/Gebühren in Cent/kWh   |
+| `markup_percent`                       | Prozentualer Aufschlag (z. B. 3 ≈ Netzverlust) |
+| `vat_percent` / `prices_include_vat`   | USt (z. B. 20 % bei `prices_include_vat=false`) |
 
 
 
@@ -88,19 +86,20 @@ tools/convert_dach_tariffs.py --check
 
 ### monthly_float — OeMAG-Referenz vs. aWATTar-SUNNY
 
-Zwei getrennte Monatstabellen in `backtesting_scenarios.json`:
+Referenzdaten für `monthly_float` in `backtesting_scenarios.json`:
 
 
 | Feld                               | Zweck                                                                      |
 | ---------------------------------- | -------------------------------------------------------------------------- |
 | `oemag_monthly_feed_in_rates`      | 12 bekannte OeMAG-Gesetzliche-Marktpreise (Referenzkurve)                  |
 | `monthly_float_reference_cent_kwh` | Nenner für Skalierung (OeMAG `arbeitspreis_kwh_cent`, z. B. 7,15)          |
-| `fixed_monthly_feed_in_rates`      | aWATTar-SUNNY / Legacy `feed_in_mode=fixed` (Jun/Jul 2026: 3,60 / 6,46 ct) |
 
 
 Export-Tarif-Typ `monthly_float` in `tariffs.json`: Skalierung pro Monat  
 `OeMAG_Monat × arbeitspreis_kwh_cent / 7,15 − settlement_fee_cent_kwh` (min. 0).  
 Berechnung: `[data/monthly_float_rates.py](../../data/monthly_float_rates.py)`.
+
+aWATTar-SUNNY-Fixwerte liegen als Export-Tarif-Typ `monthly_table` in `tariffs.json` (z. B. `monthly_sunny`).
 
 ## Fehlende Zukunftspreise (Live)
 
@@ -126,4 +125,4 @@ Für **Backtesting** (und geplante Dev-Nachrechnung): `file_paths_battery_simula
 
 ### Monatliche Fixtarife (Backtesting)
 
-In `config/backtesting_scenarios.json` kann `fixed_monthly_feed_in_rates` die aWATTar-SUNNY-Fixwerte pro Monat enthalten. Alternativ Export-Tarif-Typ `monthly_table` in `tariffs.json`. **Sunset-2-Sunset** (Produktiv) nutzt die aufgelöste Export-Tarif-Referenz aus dem Live-Szenario.
+Export-Tarif-Typ `monthly_table` in `tariffs.json` liefert die Monatswerte (`monthly_rates`). **Sunset-2-Sunset** (Produktiv) nutzt die aufgelöste Export-Tarif-Referenz aus dem Live-Szenario.

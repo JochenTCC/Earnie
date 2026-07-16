@@ -25,10 +25,11 @@ from house_config.planning_flex_bridge import thermal_hourly_overlay
 
 VIENNA = ZoneInfo("Europe/Vienna")
 
-_LEGACY_AWATTAR = {
-    "netzverlust_faktor": 1.03,
-    "fix_aufschlag_cent": 1.5,
-    "mwst_austria_faktor": 1.2,
+_AWATTAR_SURCHARGES = {
+    "settlement_fee_cent_kwh": 1.5,
+    "markup_percent": 3.0,
+    "prices_include_vat": False,
+    "vat_percent": 20.0,
 }
 
 
@@ -37,7 +38,7 @@ def _resolved_awattar() -> dict:
         "_import_tariff_spec": {
             "id": "awattar_at",
             "type": "awattar",
-            **{k: v for k, v in _LEGACY_AWATTAR.items()},
+            **_AWATTAR_SURCHARGES,
         },
         "_export_tariff_spec": {
             "id": "dynamic_epex",

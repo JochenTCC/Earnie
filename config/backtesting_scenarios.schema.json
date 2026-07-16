@@ -54,32 +54,6 @@
       "exclusiveMinimum": 0,
       "description": "OeMAG arbeitspreis_kwh_cent als Nenner für monthly_float-Skalierung (z. B. 7.15)."
     },
-    "fixed_monthly_feed_in_rates": {
-      "type": "array",
-      "description": "Monatliche aWATTar-SUNNY-Fixtarife (Cent/kWh netto) für feed_in_mode=fixed im Backtesting — nicht OeMAG.",
-      "items": {
-        "type": "object",
-        "required": ["year", "month", "tariff_cent_kwh"],
-        "properties": {
-          "year": {
-            "type": "integer",
-            "minimum": 2000,
-            "description": "Kalenderjahr des Tarifs."
-          },
-          "month": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 12,
-            "description": "Kalendermonat (1–12)."
-          },
-          "tariff_cent_kwh": {
-            "type": "number",
-            "exclusiveMinimum": 0,
-            "description": "Einspeisevergütung in Cent/kWh (netto) für diesen Monat."
-          }
-        }
-      }
-    },
     "scenarios": {
       "type": "array",
       "description": "Alle Szenarien inkl. Live-Baseline (Standard-ID: live, gewählt via live_scenario_id).",

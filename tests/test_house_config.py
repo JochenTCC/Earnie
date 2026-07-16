@@ -221,8 +221,10 @@ def test_awattar_tariff_spec_includes_surcharges():
     root = Path(__file__).resolve().parents[1]
     doc = load_tariffs_document(str(root / "config" / "tariffs.json"))
     awattar = doc["import_tariffs"]["awattar_at"]
-    assert awattar["fix_aufschlag_cent"] == pytest.approx(1.5)
-    assert awattar["netzverlust_faktor"] == pytest.approx(1.03)
+    assert awattar["settlement_fee_cent_kwh"] == pytest.approx(1.5)
+    assert awattar["markup_percent"] == pytest.approx(3.0)
+    assert awattar["vat_percent"] == pytest.approx(20.0)
+    assert awattar.get("prices_include_vat") is False
     dynamic = doc["export_tariffs"]["dynamic_epex"]
     assert dynamic["feed_in_fee_factor"] == pytest.approx(0.19)
 

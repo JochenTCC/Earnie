@@ -605,19 +605,9 @@ class Config:
             monthly_fixed_tariffs=monthly,
         )
 
-    def get_backtesting_fixed_monthly_feed_in_rates(
-        self,
-    ) -> tuple[tuple[int, int, float], ...] | None:
-        from data.feed_in_prices import validate_fixed_monthly_feed_in_rates
-
-        raw = self._load_backtesting_scenarios_document().get("fixed_monthly_feed_in_rates")
-        if raw is None:
-            return None
-        return validate_fixed_monthly_feed_in_rates(raw)
-
     def get_backtesting_feed_in_settings(self, runtime_override: dict | None = None):
         """Einspeise-Settings für Backtesting inkl. monatlicher Fixtarife."""
-        from data.feed_in_prices import FEED_IN_MODE_FIXED, feed_in_settings_from_dict, validate_feed_in_mode
+        from data.feed_in_prices import feed_in_settings_from_dict
         from data.monthly_float_rates import (
             build_monthly_float_lookup,
             load_monthly_float_reference_cent,
@@ -639,8 +629,6 @@ class Config:
             monthly = build_monthly_float_lookup(oemag_rates, reference_cent, export_spec)
         elif runtime.get("_monthly_fixed_tariffs") is not None:
             monthly = runtime["_monthly_fixed_tariffs"]
-        elif validate_feed_in_mode(runtime.get("feed_in_mode", FEED_IN_MODE_FIXED)) == FEED_IN_MODE_FIXED:
-            monthly = self.get_backtesting_fixed_monthly_feed_in_rates()
         return feed_in_settings_from_dict(
             runtime,
             monthly_fixed_tariffs=monthly,

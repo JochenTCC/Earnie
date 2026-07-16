@@ -5,9 +5,11 @@
             "id": "awattar_at",
             "label": "aWATTar Österreich (EPEX + Aufschlag)",
             "type": "awattar",
-            "fix_aufschlag_cent": 1.5,
-            "netzverlust_faktor": 1.03,
-            "mwst_austria_faktor": 1.2
+            "land": "AT",
+            "settlement_fee_cent_kwh": 1.5,
+            "markup_percent": 3.0,
+            "prices_include_vat": false,
+            "vat_percent": 20.0
         },
         {
             "id": "fixed_25ct",
