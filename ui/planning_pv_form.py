@@ -8,12 +8,14 @@ import streamlit as st
 from house_config.id_slug import slug_id
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import (
+    delete_pv_system,
     get_runtime_scenario_refs,
     list_pv_systems,
     load_house_profiles,
     upsert_pv_system,
 )
 from ui.house_config_sticky_save import sticky_save_bar
+from ui.form_layout import labeled_number_input, labeled_selectbox, labeled_text_input
 
 _SESSION_SYNC_KEY = "planning_pv_sync_id"
 _SESSION_FILE_STAMP_KEY = "planning_pv_file_stamp"
@@ -137,9 +139,10 @@ def _apply_pending_pv_select() -> None:
 def _initial_pv_index(system_ids: list[str]) -> int | None:
     if "planning_pv_select" in st.session_state:
         return None
-    pv_id = str(get_runtime_scenario_refs().get("pv_system_id", "") or "").strip()
-    if pv_id in system_ids:
-        return system_ids.index(pv_id) + 1
+    refs = get_runtime_scenario_refs().get("pv_system_ids") or []
+    for pv_id in refs:
+        if pv_id in system_ids:
+            return system_ids.index(pv_id) + 1
     return None
 
 
@@ -156,15 +159,27 @@ def render_pv_planning_tab() -> None:
     system_ids = sorted(system_map.keys())
     options = ["— neu —", *system_ids]
     initial_index = _initial_pv_index(system_ids)
+
+    def _pv_option_label(option: str) -> str:
+        if option == "— neu —":
+            return option
+        return str(system_map.get(option, {}).get("label") or option)
+
     if initial_index is not None:
-        selected = st.selectbox(
+        selected = labeled_selectbox(
             "PV-Anlage",
             options=options,
             index=initial_index,
             key="planning_pv_select",
+            format_func=_pv_option_label,
         )
     else:
-        selected = st.selectbox("PV-Anlage", options=options, key="planning_pv_select")
+        selected = labeled_selectbox(
+            "PV-Anlage",
+            options=options,
+            key="planning_pv_select",
+            format_func=_pv_option_label,
+        )
     is_new = selected == "— neu —"
     existing = system_map.get(selected, {}) if not is_new else {}
 
@@ -180,20 +195,18 @@ def render_pv_planning_tab() -> None:
         default_profile=default_profile,
     )
 
-    label = st.text_input(
+    label = labeled_text_input(
         "Bezeichnung",
         key=_scoped_key(session_scope, "planning_pv_label"),
     )
     stable_id = "" if is_new else str(existing.get("id", ""))
-    if stable_id:
-        st.caption(f"Anlagen-ID: `{stable_id}`")
 
     if is_new and profiles:
         profile_ids = sorted(profiles.keys())
         profile_labels = {
-            pid: f"{profiles[pid].get('label', pid)} ({pid})" for pid in profile_ids
+            pid: str(profiles[pid].get("label") or pid) for pid in profile_ids
         }
-        profile_pick = st.selectbox(
+        profile_pick = labeled_selectbox(
             "Defaults aus Hausprofil",
             options=profile_ids,
             format_func=lambda pid: profile_labels[pid],
@@ -208,19 +221,19 @@ def render_pv_planning_tab() -> None:
             f"— im Formular überschreibbar."
         )
 
-    kwp = st.number_input(
+    kwp = labeled_number_input(
         "Leistung (kWp)",
         min_value=0.1,
         step=0.1,
         key=_scoped_key(session_scope, "planning_pv_kwp"),
     )
-    tilt = st.number_input(
+    tilt = labeled_number_input(
         "Dachneigung (°)",
         min_value=0,
         max_value=90,
         key=_scoped_key(session_scope, "planning_pv_tilt"),
     )
-    azimuth = st.number_input(
+    azimuth = labeled_number_input(
         "Ausrichtung Azimut (°)",
         min_value=-180,
         max_value=180,
@@ -232,17 +245,34 @@ def render_pv_planning_tab() -> None:
     if st.button("PV-Anlage speichern", type="primary", key="planning_pv_save"):
         taken = {sid for sid in system_ids if sid != stable_id}
         entity_id = stable_id.strip() or slug_id(label or "pv_anlage", existing=taken)
-        upsert_pv_system(
-            {
-                "label": label,
-                "kwp": kwp,
-                "pv_tilt": float(tilt),
-                "pv_azimuth": float(azimuth),
-            },
-            stable_id=stable_id,
-        )
-        st.session_state[_SESSION_SELECT_PENDING_KEY] = entity_id
-        st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
-        st.session_state[_SESSION_SYNC_KEY] = None
-        st.success("PV-Anlage gespeichert.")
-        st.rerun()
+        try:
+            upsert_pv_system(
+                {
+                    "label": label,
+                    "kwp": kwp,
+                    "pv_tilt": float(tilt),
+                    "pv_azimuth": float(azimuth),
+                },
+                stable_id=stable_id,
+            )
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            st.session_state[_SESSION_SELECT_PENDING_KEY] = entity_id
+            st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
+            st.session_state[_SESSION_SYNC_KEY] = None
+            st.success("PV-Anlage gespeichert.")
+            st.rerun()
+
+    if not is_new and stable_id:
+        if st.button("PV-Anlage entfernen", key="planning_pv_delete"):
+            try:
+                delete_pv_system(stable_id)
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                st.session_state[_SESSION_SELECT_PENDING_KEY] = "— neu —"
+                st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
+                st.session_state[_SESSION_SYNC_KEY] = None
+                st.success("PV-Anlage entfernt.")
+                st.rerun()

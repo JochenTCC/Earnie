@@ -2,13 +2,22 @@
 
 Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation). Konfiguration über Entitäts-Referenzen im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`); technische Werte liegen in `config/components.json` (`batteries[]`, `pv_systems[]`).
 
+Ein Szenario kann **mehrere PV-Anlagen** referenzieren (`pv_system_ids`). Die Prognose und die Optimierung nutzen die **Summe** aller Anlagen.
+
+Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
+
+- **Monatschart:** eine Serie pro **eindeutiger PV-Konfiguration** über alle Szenarien (Summe der Anlagen in dieser Konfiguration). Legende = mit „ + “ verbundene Bezeichnungen, z. B. „Dach Süd“ oder „Dach Nord + Dach Süd“.
+- **Wochenchart:** eine Serie pro **eindeutiger PV-Anlage** plus zusätzlich die Mehrfach-Konfigurations-Summen wie im Monatschart (Einzelanlagen-Konfigurationen werden nicht doppelt gezeichnet).
+- Farbe der PV-Linien: gelbliche Palette. Die historische Summe aus `cons_data` („PV Ist“) wird in diesen Charts **nicht** angezeigt.
+
 
 | Parameter               | Einheit  | Quelle                               | Bedeutung                                                                                                                             |
 | ----------------------- | -------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `kwp`                   | kWp      | `components.json` → `pv_systems[]`   | Installierte PV-Leistung (aufgelöst als `pv_kwp`)                                                                                     |
-| `pv_tilt`               | °        | `components.json` → `pv_systems[]`   | Dachneigung                                                                                                                           |
-| `pv_azimuth`            | °        | `components.json` → `pv_systems[]`   | Ausrichtung: `0` = Süd, `-90` = Ost, `90` = West                                                                                      |
-| `latitude`, `longitude` | °        | `house_profiles.json` (via Szenario) | Standort für PV-Prognose (Forecast.Solar)                                                                                             |
+| `pv_system_ids`         | —        | Szenario → `components.json`         | Eine oder mehrere Referenzen auf `pv_systems[].id`                                                                                    |
+| `kwp`                   | kWp      | `components.json` → `pv_systems[]`   | Installierte PV-Leistung je Anlage; aufgelöst als Summe `pv_kwp`                                                                      |
+| `pv_tilt`               | °        | `components.json` → `pv_systems[]`   | Dachneigung **je Anlage** (bei mehreren Anlagen keine einzelne Globalneigung)                                                         |
+| `pv_azimuth`            | °        | `components.json` → `pv_systems[]`   | Ausrichtung je Anlage: `0` = Süd, `-90` = Ost, `90` = West                                                                            |
+| `latitude`, `longitude` | °        | `house_profiles.json` (via Szenario) | Standort für PV-Prognose (Forecast.Solar / Open-Meteo)                                                                                |
 | `k_push_cent`           | Cent/kWh | `tariffs.json` (Export-Tarif)        | **Einspeisevergütung**                                                                                                                |
 | `battery_capacity_kwh`  | kWh      | `components.json` → `batteries[]`    | Nutzbare Speicherkapazität                                                                                                            |
 | `battery_max_power_kw`  | kW       | `components.json` → `batteries[]`    | Max. Lade- und Entladeleistung                                                                                                        |
@@ -19,6 +28,7 @@ Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimi
 | `timezone_name`         | —        | `house_profiles.json`                | IANA-Zeitzone für astronomische Sonnenzeiten (z. B. `Europe/Vienna`); siehe `planning_horizon`                                        |
 
 
+Loxone liefert die erzeugte Energie weiterhin als **Summe** aller Anlagen (`pv_counter_name` / `pv_power_name`).
 
 
 ## SOC-Verhalten
@@ -56,8 +66,8 @@ Beispiel (5 kWh, 1500 €, 6000 Zyklen, 50 % zyklenbedingt): **2,5 ct/kWh**.
 
 ## Live-Konfiguration vs. `config.json`
 
-In der App (Seite **Live-Konfiguration**, Abschnitt Echtzeit-Umgebung) werden Entitäts-Referenzen per Dropdown gewählt. Gespeichert wird das Live-Szenario in `backtesting_scenarios.json`. PV- und Batterie-Entitäten selbst pflegt man im **Hauskonfigurator**.
+In der App (Seite **Live-Konfiguration**, Abschnitt Echtzeit-Umgebung) werden Entitäts-Referenzen gewählt (PV als Mehrfachauswahl). Gespeichert wird das Live-Szenario in `backtesting_scenarios.json`. PV- und Batterie-Entitäten selbst pflegt man im **Hauskonfigurator**.
 
 ## Szenarien
 
-Zum Vergleich von Varianten zur Live-Konfiguration (größerer Speicher, größere PV-Anlage, anderer Strom-Tarif, ...) ohne Produktiv-Änderung: weitere Einträge in `backtesting_scenarios.json` (siehe [Überblick](ueberblick.md)).
+Zum Vergleich von Varianten zur Live-Konfiguration (größerer Speicher, mehrere PV-Anlagen, anderer Strom-Tarif, ...) ohne Produktiv-Änderung: weitere Einträge in `backtesting_scenarios.json` (siehe [Überblick](ueberblick.md)).

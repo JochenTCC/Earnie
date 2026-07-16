@@ -120,17 +120,19 @@ def run_live_scenario_entity_check_on_startup() -> None:
             raise SystemExit(1) from exc
         return
 
-    missing = [
-        key
-        for key in (
-            "battery_id",
-            "pv_system_id",
-            "import_tariff_id",
-            "export_tariff_id",
-            "house_profile_id",
-        )
-        if not str(settings.get(key, "") or "").strip()
-    ]
+    missing = []
+    if not str(settings.get("battery_id", "") or "").strip():
+        missing.append("battery_id")
+    pv_ids = settings.get("pv_system_ids")
+    legacy_pv = str(settings.get("pv_system_id", "") or "").strip()
+    has_pv = (isinstance(pv_ids, list) and any(str(x or "").strip() for x in pv_ids)) or bool(
+        legacy_pv
+    )
+    if not has_pv:
+        missing.append("pv_system_ids")
+    for key in ("import_tariff_id", "export_tariff_id", "house_profile_id"):
+        if not str(settings.get(key, "") or "").strip():
+            missing.append(key)
     if not missing:
         logger.info(
             "Live-Szenario-Startup-Prüfung: '%s' mit Entitäts-IDs vorhanden.",

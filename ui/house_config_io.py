@@ -97,12 +97,18 @@ def load_tariffs_catalog_meta() -> dict:
 
 
 def upsert_house_profile(profile: dict) -> None:
+    from house_config.label_uniqueness import assert_unique_label, assert_unique_labels_in_list
+
     path = resolve_house_profiles_json_path()
     if os.path.isfile(path):
         raw = read_json_document(path)
         profiles = list(raw.get("profiles", []))
     else:
         profiles = []
+    profile_id = str(profile.get("id", "")).strip()
+    assert_unique_label(profile.get("label"), profiles, exclude_id=profile_id)
+    consumers = list(profile.get("consumers") or [])
+    assert_unique_labels_in_list(consumers)
     profiles = [p for p in profiles if p.get("id") != profile["id"]]
     profiles.append(profile)
     save_house_profiles_document(path, {"profiles": profiles})
@@ -147,6 +153,7 @@ def _save_components_document(data: dict) -> None:
 
 def upsert_pv_system(raw_spec: dict, *, stable_id: str = "") -> None:
     from house_config.entity_resolution import normalize_pv_system
+    from house_config.label_uniqueness import assert_unique_label
 
     data = _load_components_document()
     systems = list(data.get("pv_systems") or [])
@@ -155,6 +162,7 @@ def upsert_pv_system(raw_spec: dict, *, stable_id: str = "") -> None:
         taken.discard(stable_id)
     label = str(raw_spec.get("label", "")).strip()
     entity_id = stable_id.strip() or slug_id(label or "pv_anlage", existing=taken)
+    assert_unique_label(label or entity_id, systems, exclude_id=entity_id)
     spec = {
         "id": entity_id,
         "label": label or entity_id,
@@ -169,8 +177,47 @@ def upsert_pv_system(raw_spec: dict, *, stable_id: str = "") -> None:
     _save_components_document(data)
 
 
+def delete_pv_system(entity_id: str) -> None:
+    """Remove a PV system from components.json and scrub scenario references."""
+    from house_config.entity_resolution import normalize_pv_system_ids
+
+    target = str(entity_id or "").strip()
+    if not target:
+        raise ValueError("PV-Anlagen-ID fehlt.")
+    data = _load_components_document()
+    systems = list(data.get("pv_systems") or [])
+    remaining = [item for item in systems if str(item.get("id", "")).strip() != target]
+    if len(remaining) == len(systems):
+        raise ValueError(f"Unbekannte PV-Anlage '{target}'.")
+    data["pv_systems"] = remaining
+    _save_components_document(data)
+
+    doc = load_backtesting_scenarios_raw()
+    changed = False
+    for scenario in doc.get("scenarios") or []:
+        if not isinstance(scenario, dict):
+            continue
+        settings = scenario.get("settings")
+        if not isinstance(settings, dict):
+            continue
+        ids = normalize_pv_system_ids(settings)
+        if target not in ids:
+            continue
+        cleaned = [pv_id for pv_id in ids if pv_id != target]
+        settings.pop("pv_system_id", None)
+        if cleaned:
+            settings["pv_system_ids"] = cleaned
+        else:
+            settings.pop("pv_system_ids", None)
+        changed = True
+    if changed:
+        save_backtesting_scenarios(doc)
+        config.reinit_config()
+
+
 def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
     from house_config.entity_resolution import normalize_battery
+    from house_config.label_uniqueness import assert_unique_label
 
     data = _load_components_document()
     batteries = list(data.get("batteries") or [])
@@ -179,6 +226,7 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
         taken.discard(stable_id)
     label = str(raw_spec.get("label", "")).strip()
     entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
+    assert_unique_label(label or entity_id, batteries, exclude_id=entity_id)
     spec = {
         "id": entity_id,
         "label": label or entity_id,
@@ -242,10 +290,12 @@ def save_planning_tariff_selection(import_tariff_id: str, export_tariff_id: str)
 
 def get_live_scenario_refs() -> dict:
     """Entitäts-Referenzen des Live-Szenarios aus backtesting_scenarios.json."""
+    from house_config.entity_resolution import normalize_pv_system_ids
+
     settings = _live_scenario_settings()
     return {
         "battery_id": str(settings.get("battery_id", "") or "").strip(),
-        "pv_system_id": str(settings.get("pv_system_id", "") or "").strip(),
+        "pv_system_ids": normalize_pv_system_ids(settings),
         "import_tariff_id": str(settings.get("import_tariff_id", "") or "").strip(),
         "export_tariff_id": str(settings.get("export_tariff_id", "") or "").strip(),
         "house_profile_id": str(settings.get("house_profile_id", "") or "").strip(),
@@ -260,16 +310,17 @@ def get_runtime_scenario_refs() -> dict:
 def save_live_scenario_refs(
     *,
     battery_id: str,
-    pv_system_id: str,
+    pv_system_ids: list[str],
     import_tariff_id: str,
     export_tariff_id: str,
     house_profile_id: str,
 ) -> None:
     """Speichert Entitäts-Referenzen für das Live-Szenario."""
+    cleaned = [str(item or "").strip() for item in pv_system_ids if str(item or "").strip()]
     config.update_live_scenario_settings(
         {
             "battery_id": battery_id.strip(),
-            "pv_system_id": pv_system_id.strip(),
+            "pv_system_ids": cleaned,
             "import_tariff_id": import_tariff_id.strip(),
             "export_tariff_id": export_tariff_id.strip(),
             "house_profile_id": house_profile_id.strip(),
@@ -285,7 +336,7 @@ def save_live_scenario_id(scenario_id: str) -> None:
 def save_runtime_scenario_refs(
     *,
     battery_id: str,
-    pv_system_id: str,
+    pv_system_ids: list[str],
     import_tariff_id: str,
     export_tariff_id: str,
     house_profile_id: str,
@@ -293,7 +344,7 @@ def save_runtime_scenario_refs(
     """Alias für save_live_scenario_refs (API-Stabilität)."""
     save_live_scenario_refs(
         battery_id=battery_id,
-        pv_system_id=pv_system_id,
+        pv_system_ids=pv_system_ids,
         import_tariff_id=import_tariff_id,
         export_tariff_id=export_tariff_id,
         house_profile_id=house_profile_id,
@@ -301,8 +352,12 @@ def save_runtime_scenario_refs(
 
 
 def upsert_scenario(scenario: dict) -> None:
+    from house_config.label_uniqueness import assert_unique_label
+
     doc = load_backtesting_scenarios_raw()
-    scenarios = doc.get("scenarios", [])
+    scenarios = list(doc.get("scenarios", []))
+    scenario_id = str(scenario.get("id", "")).strip()
+    assert_unique_label(scenario.get("label"), scenarios, exclude_id=scenario_id)
     updated = [s for s in scenarios if s.get("id") != scenario["id"]]
     updated.append(scenario)
     doc["scenarios"] = updated

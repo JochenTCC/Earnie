@@ -22,9 +22,41 @@ def strip_assets_for_reference(params: dict) -> dict:
     out = dict(params)
     out.update(ZERO_BATTERY_FLAT)
     out.update(ZERO_PV_FLAT)
-    for key in ("battery_id", "pv_system_id", "_battery_wear"):
+    for key in (
+        "battery_id",
+        "pv_system_id",
+        "pv_system_ids",
+        "_battery_wear",
+        "_planning_pv_systems",
+    ):
         out.pop(key, None)
     return out
+
+
+def normalize_pv_system_ids(settings: dict) -> list[str]:
+    """Normalize legacy ``pv_system_id`` and ``pv_system_ids`` to a unique id list."""
+    ids: list[str] = []
+    raw_list = settings.get("pv_system_ids")
+    if isinstance(raw_list, list):
+        for item in raw_list:
+            pv_id = str(item or "").strip()
+            if pv_id and pv_id not in ids:
+                ids.append(pv_id)
+    legacy = str(settings.get("pv_system_id", "") or "").strip()
+    if legacy and legacy not in ids:
+        ids.append(legacy)
+    return ids
+
+
+def planning_pv_entry(pv: dict) -> dict:
+    """Stable planning-shape entry for a resolved PV system."""
+    return {
+        "id": pv["id"],
+        "label": pv["label"],
+        "pv_kwp": float(pv["pv_kwp"]),
+        "pv_tilt": float(pv["pv_tilt"]),
+        "pv_azimuth": float(pv["pv_azimuth"]),
+    }
 
 
 def normalize_battery(raw: dict, index: int) -> dict:
@@ -157,22 +189,35 @@ def resolve_battery_into_settings(
 
 
 def resolve_pv_into_settings(settings: dict, pv_systems: dict[str, dict]) -> dict:
-    """Ersetzt pv_system_id durch flache PV-Felder (falls gesetzt)."""
+    """Resolve ``pv_system_ids`` (or legacy ``pv_system_id``) into planning + flat fields.
+
+    Injects ``_planning_pv_systems`` (one entry per selected system). Sets ``pv_kwp``
+    to the sum of selected systems. When exactly one system is selected, also sets
+    ``pv_tilt`` / ``pv_azimuth`` for legacy single-surface callers.
+    """
     out = dict(settings)
-    pv_id = out.pop("pv_system_id", None)
-    if not pv_id:
+    pv_ids = normalize_pv_system_ids(out)
+    out.pop("pv_system_id", None)
+    out.pop("pv_system_ids", None)
+
+    if not pv_ids:
+        out["_planning_pv_systems"] = []
         if "pv_kwp" not in out:
             out.update(ZERO_PV_FLAT)
         return out
-    pv_id = str(pv_id).strip()
-    if pv_id not in pv_systems:
-        raise ValueError(f"Unbekannte pv_system_id '{pv_id}'.")
-    pv = pv_systems[pv_id]
-    out.update(
-        {
-            "pv_kwp": pv["pv_kwp"],
-            "pv_tilt": pv["pv_tilt"],
-            "pv_azimuth": pv["pv_azimuth"],
-        }
-    )
+
+    planning: list[dict] = []
+    for pv_id in pv_ids:
+        if pv_id not in pv_systems:
+            raise ValueError(f"Unbekannte pv_system_id '{pv_id}'.")
+        planning.append(planning_pv_entry(pv_systems[pv_id]))
+
+    out["_planning_pv_systems"] = planning
+    out["pv_kwp"] = sum(float(item["pv_kwp"]) for item in planning)
+    if len(planning) == 1:
+        out["pv_tilt"] = float(planning[0]["pv_tilt"])
+        out["pv_azimuth"] = float(planning[0]["pv_azimuth"])
+    else:
+        out.pop("pv_tilt", None)
+        out.pop("pv_azimuth", None)
     return out

@@ -62,6 +62,46 @@ def test_from_scenario_overrides_pv_tilt():
     assert climate.lat == 47.5
 
 
+def test_from_scenario_sums_multiple_pv_systems():
+    profile = _profile()
+    surface_a = TiltedSurface(tilt_deg=20.0, azimuth_deg=0.0)
+    surface_b = TiltedSurface(tilt_deg=30.0, azimuth_deg=-90.0)
+    slot = datetime(2024, 7, 13, 13, 0)
+    bundle = OpenMeteoClimateBundle(
+        temperature_c=pd.Series([22.0], index=pd.DatetimeIndex([slot])),
+        tilted_wm2={
+            surface_a: pd.Series([800.0], index=pd.DatetimeIndex([slot])),
+            surface_b: pd.Series([400.0], index=pd.DatetimeIndex([slot])),
+        },
+    )
+    scenario = {
+        "_house_profile": profile,
+        "_planning_pv_systems": [
+            {
+                "id": "a",
+                "label": "Süd",
+                "pv_kwp": 10.0,
+                "pv_tilt": 20.0,
+                "pv_azimuth": 0.0,
+            },
+            {
+                "id": "b",
+                "label": "Ost",
+                "pv_kwp": 5.0,
+                "pv_tilt": 30.0,
+                "pv_azimuth": -90.0,
+            },
+        ],
+    }
+    climate = ModeledClimateContext.from_scenario(scenario)
+    climate.seed_year_bundle(2024, bundle)
+    assert climate.pv_kwp == 15.0
+    assert climate.pv_kw_at(slot) == pytest.approx(10.0)  # 8 + 2
+    by_system = climate.pv_kw_by_system_for_slots([slot])
+    assert by_system["a"][0] == pytest.approx(8.0)
+    assert by_system["b"][0] == pytest.approx(2.0)
+
+
 def test_thermal_annual_kwh_from_archive(monkeypatch):
     from data.modeled_climate import thermal_annual_kwh_from_archive
     from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock

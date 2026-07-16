@@ -2,6 +2,8 @@
 
 Diese Dokumentation richtet sich an Betreiber von Earnie: Einrichtung, Konfiguration, Streamlit-Oberfläche und die Schnittstelle zum Loxone Miniserver.
 
+**Einstieg aus Anwendersicht (Handbuch):** [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md)
+
 Für Entwickler (Projektstruktur, Tests, Container) siehe [DEVELOPER.md](../DEVELOPER.md).
 
 ## Erste Schritte
@@ -21,6 +23,10 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 **Container-Betrieb (Synology / LoxBerry / Proxmox LXC):** [Container](einrichtung/container.md) · [Proxmox LXC](einrichtung/proxmox-lxc.md)
 
 ## Inhaltsverzeichnis
+
+### Benutzer-Handbuch
+
+- [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md) — Überblick, Einrichtung Was-wäre-wenn, Loxone, Live-Betrieb (Entwurf)
 
 ### Einrichtung
 

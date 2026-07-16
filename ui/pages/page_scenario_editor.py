@@ -5,6 +5,7 @@ import streamlit as st
 
 import config
 from ui.help_hint import render_page_title_with_help
+from ui.form_layout import WIDE_LABEL_RATIOS, labeled_number_input, labeled_selectbox, labeled_text_input
 from ui.house_config_io import (
     list_batteries,
     list_export_tariffs,
@@ -29,12 +30,14 @@ from ui.scenario_form_helpers import (
     lookup_entity_id,
     new_scenario_template,
     options_for_entities,
+    render_entity_multiselect,
     render_entity_selectbox,
     render_profile_geo_caption,
     resolve_scenario_id,
     scenario_form_is_dirty,
     scenario_session_scope,
     scoped_widget_key,
+    seed_entity_multiselect_state,
     seed_entity_select_state,
     store_scenario_form_baseline,
 )
@@ -90,12 +93,13 @@ def _seed_scenario_widget_state(
         settings.get("battery_id"),
         allow_none=True,
     )
-    seed_entity_select_state(
+    from house_config.entity_resolution import normalize_pv_system_ids
+
+    seed_entity_multiselect_state(
         session_scope,
         "scenario_pv",
         pv_systems,
-        settings.get("pv_system_id"),
-        allow_none=True,
+        normalize_pv_system_ids(settings),
     )
     seed_entity_select_state(
         session_scope,
@@ -113,16 +117,6 @@ def _seed_scenario_widget_state(
     )
     st.session_state[scoped_widget_key(session_scope, "scenario_netzentgelt")] = float(
         settings.get("netzentgelt_cent_kwh_override", 0.0) or 0.0
-    )
-    profile = profiles.get(str(settings.get("house_profile_id", "") or "").strip(), {})
-    st.session_state[scoped_widget_key(session_scope, "scenario_lat")] = float(
-        settings.get("latitude", profile.get("latitude", 48.0))
-    )
-    st.session_state[scoped_widget_key(session_scope, "scenario_lon")] = float(
-        settings.get("longitude", profile.get("longitude", 10.0))
-    )
-    st.session_state[scoped_widget_key(session_scope, "scenario_geo_override")] = (
-        "latitude" in settings or "longitude" in settings
     )
 
 
@@ -175,6 +169,7 @@ def _ensure_active_scenario_select(default_pick: str) -> None:
 def _resolve_scenario_selection(
     *,
     scenario_ids: list[str],
+    scenario_labels: dict[str, str],
     live_id: str,
     profiles: dict[str, dict],
     batteries: list[dict],
@@ -193,10 +188,16 @@ def _resolve_scenario_selection(
             st.session_state[_SESSION_SYNC_KEY] = None
             st.rerun()
 
-    st.selectbox(
+    def _scenario_option_label(option: str) -> str:
+        if option == NEW_SCENARIO_OPTION:
+            return option
+        return scenario_labels.get(option, option)
+
+    labeled_selectbox(
         "Szenario",
         options=[NEW_SCENARIO_OPTION, *scenario_ids],
         key="scenario_select",
+        format_func=_scenario_option_label,
     )
     requested = st.session_state["scenario_select"]
     active = st.session_state[_SESSION_ACTIVE_SELECT_KEY]
@@ -247,7 +248,7 @@ def _render_scenarios_tab() -> None:
     live_id = config.get_live_scenario_id()
     st.subheader("Szenarien")
     st.caption(
-        f"Live-Szenario (aktuell: `{live_id}`) ist die Baseline für Szenario-Explorer "
+        "Live-Szenario ist die Baseline für Szenario-Explorer "
         "und Echtzeit-Betrieb. Standort und Zeitzone kommen aus dem Hausprofil."
     )
 
@@ -255,6 +256,11 @@ def _render_scenarios_tab() -> None:
     scenarios_doc = load_backtesting_scenarios_raw()
     scenarios = scenarios_doc.get("scenarios", [])
     scenario_ids = [s.get("id", "") for s in scenarios]
+    scenario_labels = {
+        str(s.get("id", "")).strip(): str(s.get("label") or s.get("id") or "").strip()
+        for s in scenarios
+        if str(s.get("id", "")).strip()
+    }
 
     batteries = list_batteries()
     pv_systems = list_pv_systems()
@@ -264,6 +270,7 @@ def _render_scenarios_tab() -> None:
 
     selected = _resolve_scenario_selection(
         scenario_ids=scenario_ids,
+        scenario_labels=scenario_labels,
         live_id=live_id,
         profiles=profiles,
         batteries=batteries,
@@ -292,19 +299,12 @@ def _render_scenarios_tab() -> None:
     )
 
     if existing and str(existing.get("id", "")).strip() == live_id:
-        st.info(f"Dies ist das Live-Szenario (`live_scenario_id`: `{live_id}`).")
+        st.info("Dies ist das Live-Szenario.")
 
-    label = st.text_input(
+    label = labeled_text_input(
         "Bezeichnung",
         key=scoped_widget_key(session_scope, "scenario_label"),
     )
-    preview_id = resolve_scenario_id(
-        is_new=is_new,
-        existing_id=stable_scenario_id,
-        label=label,
-        scenario_ids=set(scenario_ids),
-    )
-    st.caption(f"Szenario-ID: `{preview_id}`")
 
     _, prof_map = options_for_entities(list(profiles.values()), allow_none=True)
     _, bat_map = options_for_entities(batteries, allow_none=True)
@@ -331,10 +331,9 @@ def _render_scenarios_tab() -> None:
         allow_none=True,
         key=scoped_widget_key(session_scope, "scenario_battery"),
     )
-    pv_pick = render_entity_selectbox(
-        "PV-Anlage",
+    pv_picks = render_entity_multiselect(
+        "PV-Anlagen",
         pv_systems,
-        allow_none=True,
         key=scoped_widget_key(session_scope, "scenario_pv"),
     )
     imp_pick = render_entity_selectbox(
@@ -380,30 +379,13 @@ def _render_scenarios_tab() -> None:
             "ex_post_spot",
             "monthly_market",
         }:
-            netzentgelt_override = st.number_input(
+            netzentgelt_override = labeled_number_input(
                 "Netzentgelt-Override (Cent/kWh, DE-Spot)",
                 min_value=0.0,
                 step=0.1,
+                ratios=WIDE_LABEL_RATIOS,
                 key=scoped_widget_key(session_scope, "scenario_netzentgelt"),
             )
-
-    with st.expander("Standort-Override (optional, Backtesting)", expanded=False):
-        st.caption(
-            "Nur für What-if-Szenarien. Leer lassen = Standort/Zeitzone aus Hausprofil."
-        )
-        col_a, col_b = st.columns(2)
-        latitude = col_a.number_input(
-            "Breitengrad (Override)",
-            key=scoped_widget_key(session_scope, "scenario_lat"),
-        )
-        longitude = col_b.number_input(
-            "Längengrad (Override)",
-            key=scoped_widget_key(session_scope, "scenario_lon"),
-        )
-        use_geo_override = st.checkbox(
-            "Standort-Override in Szenario speichern",
-            key=scoped_widget_key(session_scope, "scenario_geo_override"),
-        )
 
     if st.button(
         "Szenario speichern",
@@ -418,27 +400,33 @@ def _render_scenarios_tab() -> None:
             scenario_ids=set(scenario_ids),
         )
         if not save_id:
-            st.error("Szenario-ID konnte nicht abgeleitet werden — bitte Bezeichnung prüfen.")
+            st.error("Szenario konnte nicht gespeichert werden — bitte Bezeichnung prüfen.")
         else:
-            upsert_scenario(
-                {
-                    "id": save_id,
-                    "label": str(label or "").strip() or save_id,
-                    "settings": build_scenario_settings(
-                        battery_id=lookup_entity_id(bat_map, battery_pick),
-                        pv_system_id=lookup_entity_id(pv_map, pv_pick),
-                        import_tariff_id=lookup_entity_id(imp_map, imp_pick),
-                        export_tariff_id=lookup_entity_id(exp_map, exp_pick),
-                        house_profile_id=lookup_entity_id(prof_map, prof_pick),
-                        latitude=latitude if use_geo_override else None,
-                        longitude=longitude if use_geo_override else None,
-                        netzentgelt_cent_kwh_override=netzentgelt_override,
-                    ),
-                }
-            )
-            st.session_state[_SESSION_SELECT_PENDING_KEY] = save_id
-            st.success(f"Szenario '{save_id}' gespeichert.")
-            st.rerun()
+            try:
+                upsert_scenario(
+                    {
+                        "id": save_id,
+                        "label": str(label or "").strip() or save_id,
+                        "settings": build_scenario_settings(
+                            battery_id=lookup_entity_id(bat_map, battery_pick),
+                            pv_system_ids=[
+                                lookup_entity_id(pv_map, pick)
+                                for pick in pv_picks
+                                if lookup_entity_id(pv_map, pick)
+                            ],
+                            import_tariff_id=lookup_entity_id(imp_map, imp_pick),
+                            export_tariff_id=lookup_entity_id(exp_map, exp_pick),
+                            house_profile_id=lookup_entity_id(prof_map, prof_pick),
+                            netzentgelt_cent_kwh_override=netzentgelt_override,
+                        ),
+                    }
+                )
+            except ValueError as exc:
+                st.error(str(exc))
+            else:
+                st.session_state[_SESSION_SELECT_PENDING_KEY] = save_id
+                st.success("Szenario gespeichert.")
+                st.rerun()
 
 
 def render() -> None:

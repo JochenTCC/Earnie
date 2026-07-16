@@ -373,6 +373,7 @@ class Config:
 
     def _load_deferred_runtime_params(self, resolved: dict) -> None:
         self.FEED_IN_MODE = "fixed"
+        self._planning_pv_systems = []
         self._load_geo_timezone_params(resolved)
 
     def _load_full_runtime_params(self, resolved: dict) -> None:
@@ -388,6 +389,12 @@ class Config:
         self.PV_TILT = float(resolved.get("pv_tilt", 0.0) or 0.0)
         self.PV_AZIMUTH = float(resolved.get("pv_azimuth", 0.0) or 0.0)
         self.PV_KWP = float(resolved.get("pv_kwp", 0.0) or 0.0)
+        planning_pv = resolved.get("_planning_pv_systems")
+        self._planning_pv_systems = (
+            [dict(item) for item in planning_pv]
+            if isinstance(planning_pv, list)
+            else []
+        )
         self.BATTERY_MAX_POWER_KW = float(
             self._lookup_runtime_value(resolved, "battery_max_power_kw")
         )
@@ -438,6 +445,24 @@ class Config:
         if value is None:
             value = default
         return cast(value) if cast and value is not None else value
+
+    def get_planning_pv_systems(self) -> list[dict]:
+        """Resolved PV systems from the live scenario (empty when deferred/bootstrap)."""
+        systems = getattr(self, "_planning_pv_systems", None)
+        if isinstance(systems, list) and systems:
+            return [dict(item) for item in systems]
+        kwp = float(getattr(self, "PV_KWP", 0.0) or 0.0)
+        if kwp <= 0.0:
+            return []
+        return [
+            {
+                "id": "pv",
+                "label": "PV",
+                "pv_kwp": kwp,
+                "pv_tilt": float(getattr(self, "PV_TILT", 0.0) or 0.0),
+                "pv_azimuth": float(getattr(self, "PV_AZIMUTH", 0.0) or 0.0),
+            }
+        ]
 
     def get_runtime_settings(self) -> dict:
         return {
@@ -784,6 +809,7 @@ class Config:
     _RUNTIME_REF_KEYS = frozenset({
         "battery_id",
         "pv_system_id",
+        "pv_system_ids",
         "import_tariff_id",
         "export_tariff_id",
         "house_profile_id",
@@ -854,6 +880,9 @@ class Config:
                     f"Szenario-Referenzparameter (Live-Szenario '{live_id}')."
                 )
             settings[key] = value
+
+        if "pv_system_ids" in new_settings:
+            settings.pop("pv_system_id", None)
 
         write_json_dict(self.backtesting_scenarios_path, doc)
         self._load_dynamic_params()
@@ -1056,6 +1085,10 @@ def get_batteries() -> list[dict]:
 
 def get_pv_systems() -> list[dict]:
     return CONFIG.get_pv_systems()
+
+
+def get_planning_pv_systems() -> list[dict]:
+    return CONFIG.get_planning_pv_systems()
 
 
 def get_backtesting_cbc_gap_rel() -> float:

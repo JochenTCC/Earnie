@@ -9,6 +9,12 @@ from house_config.id_slug import slug_id
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import get_runtime_scenario_refs, list_batteries, upsert_battery
 from ui.house_config_sticky_save import sticky_save_bar
+from ui.form_layout import (
+    WIDE_LABEL_RATIOS,
+    labeled_number_input,
+    labeled_selectbox,
+    labeled_text_input,
+)
 
 _SESSION_SYNC_KEY = "planning_battery_sync_id"
 _SESSION_FILE_STAMP_KEY = "planning_battery_file_stamp"
@@ -106,15 +112,27 @@ def render_battery_planning_tab() -> None:
     battery_ids = sorted(battery_map.keys())
     options = ["— neu —", *battery_ids]
     initial_index = _initial_battery_index(battery_ids)
+
+    def _battery_option_label(option: str) -> str:
+        if option == "— neu —":
+            return option
+        return str(battery_map.get(option, {}).get("label") or option)
+
     if initial_index is not None:
-        selected = st.selectbox(
+        selected = labeled_selectbox(
             "Batterie",
             options=options,
             index=initial_index,
             key="planning_battery_select",
+            format_func=_battery_option_label,
         )
     else:
-        selected = st.selectbox("Batterie", options=options, key="planning_battery_select")
+        selected = labeled_selectbox(
+            "Batterie",
+            options=options,
+            key="planning_battery_select",
+            format_func=_battery_option_label,
+        )
     is_new = selected == "— neu —"
     existing = battery_map.get(selected, {}) if not is_new else {}
 
@@ -122,46 +140,45 @@ def render_battery_planning_tab() -> None:
     file_stamp = _config_file_stamp()
     _sync_battery_session(session_scope, existing, file_stamp=file_stamp)
 
-    label = st.text_input(
+    label = labeled_text_input(
         "Bezeichnung",
         key=_scoped_key(session_scope, "planning_battery_label"),
     )
     stable_id = "" if is_new else str(existing.get("id", ""))
-    if stable_id:
-        st.caption(f"Batterie-ID: `{stable_id}`")
 
-    capacity = st.number_input(
+    capacity = labeled_number_input(
         "Kapazität (kWh)",
         min_value=0.1,
         step=0.5,
         key=_scoped_key(session_scope, "planning_battery_capacity"),
     )
-    max_power = st.number_input(
+    max_power = labeled_number_input(
         "Max. Lade-/Entladeleistung (kW)",
         min_value=0.1,
         step=0.1,
+        ratios=WIDE_LABEL_RATIOS,
         key=_scoped_key(session_scope, "planning_battery_power"),
     )
-    efficiency = st.number_input(
+    efficiency = labeled_number_input(
         "Wirkungsgrad",
         min_value=0.5,
         max_value=1.0,
         step=0.01,
         key=_scoped_key(session_scope, "planning_battery_efficiency"),
     )
-    min_soc = st.number_input(
+    min_soc = labeled_number_input(
         "Minimaler SoC (%)",
         min_value=0.0,
         max_value=100.0,
         key=_scoped_key(session_scope, "planning_battery_min_soc"),
     )
-    max_soc = st.number_input(
+    max_soc = labeled_number_input(
         "Maximaler SoC (%)",
         min_value=0.0,
         max_value=100.0,
         key=_scoped_key(session_scope, "planning_battery_max_soc"),
     )
-    threshold_percent = st.number_input(
+    threshold_percent = labeled_number_input(
         "Leistungs-Schwelle (%)",
         min_value=1.0,
         max_value=100.0,
@@ -173,20 +190,24 @@ def render_battery_planning_tab() -> None:
     if st.button("Batterie speichern", type="primary", key="planning_battery_save"):
         taken = {bid for bid in battery_ids if bid != stable_id}
         entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
-        upsert_battery(
-            {
-                "label": label,
-                "battery_capacity_kwh": capacity,
-                "battery_max_power_kw": max_power,
-                "battery_efficiency": efficiency,
-                "battery_min_soc": min_soc,
-                "battery_max_soc": max_soc,
-                "threshold_power": threshold_percent / 100.0,
-            },
-            stable_id=stable_id,
-        )
-        st.session_state[_SESSION_SELECT_PENDING_KEY] = entity_id
-        st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
-        st.session_state[_SESSION_SYNC_KEY] = None
-        st.success("Batterie gespeichert.")
-        st.rerun()
+        try:
+            upsert_battery(
+                {
+                    "label": label,
+                    "battery_capacity_kwh": capacity,
+                    "battery_max_power_kw": max_power,
+                    "battery_efficiency": efficiency,
+                    "battery_min_soc": min_soc,
+                    "battery_max_soc": max_soc,
+                    "threshold_power": threshold_percent / 100.0,
+                },
+                stable_id=stable_id,
+            )
+        except ValueError as exc:
+            st.error(str(exc))
+        else:
+            st.session_state[_SESSION_SELECT_PENDING_KEY] = entity_id
+            st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
+            st.session_state[_SESSION_SYNC_KEY] = None
+            st.success("Batterie gespeichert.")
+            st.rerun()

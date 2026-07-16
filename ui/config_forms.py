@@ -20,9 +20,11 @@ from ui.planning_tariff_form import (
     _type_caption,
 )
 from ui.runtime_config import invalidate_live_optimization_cache
+from ui.form_layout import labeled_selectbox
 from ui.scenario_form_helpers import (
     lookup_entity_id,
     options_for_entities,
+    render_entity_multiselect,
     render_entity_selectbox,
     render_profile_geo_caption,
 )
@@ -42,9 +44,23 @@ def _render_resolved_snapshot(resolved: dict) -> None:
     geo_cols[2].metric("Zeitzone", str(resolved.get("timezone_name", "Europe/Vienna")))
 
     pv_cols = st.columns(3)
+    planning = resolved.get("_planning_pv_systems") or []
     pv_cols[0].metric("PV Leistung (kWp)", f"{float(resolved.get('pv_kwp', 0.0)):.2f}")
-    pv_cols[1].metric("Dachneigung (°)", f"{float(resolved.get('pv_tilt', 0.0)):.0f}")
-    pv_cols[2].metric("Ausrichtung Azimut (°)", f"{float(resolved.get('pv_azimuth', 0.0)):.0f}")
+    if len(planning) == 1:
+        pv_cols[1].metric("Dachneigung (°)", f"{float(resolved.get('pv_tilt', 0.0)):.0f}")
+        pv_cols[2].metric(
+            "Ausrichtung Azimut (°)",
+            f"{float(resolved.get('pv_azimuth', 0.0)):.0f}",
+        )
+    elif len(planning) > 1:
+        pv_cols[1].metric("PV-Anlagen", str(len(planning)))
+        labels = ", ".join(
+            str(item.get("label") or item.get("id") or "?") for item in planning
+        )
+        pv_cols[2].caption(labels)
+    else:
+        pv_cols[1].metric("Dachneigung (°)", "—")
+        pv_cols[2].metric("Ausrichtung Azimut (°)", "—")
 
     bat_cols = st.columns(4)
     bat_cols[0].metric(
@@ -131,12 +147,11 @@ def render_runtime_entity_form_body() -> None:
             key="config_runtime_battery",
             current_id=refs.get("battery_id"),
         )
-        pv_pick = render_entity_selectbox(
-            "PV-Anlage",
+        pv_picks = render_entity_multiselect(
+            "PV-Anlagen",
             pv_systems,
-            allow_none=True,
             key="config_runtime_pv",
-            current_id=refs.get("pv_system_id"),
+            current_ids=list(refs.get("pv_system_ids") or []),
         )
         imp_pick = render_entity_selectbox(
             "Bezugstarif",
@@ -175,7 +190,11 @@ def render_runtime_entity_form_body() -> None:
             else:
                 save_runtime_scenario_refs(
                     battery_id=battery_id,
-                    pv_system_id=lookup_entity_id(pv_map, pv_pick),
+                    pv_system_ids=[
+                        lookup_entity_id(pv_map, pick)
+                        for pick in pv_picks
+                        if lookup_entity_id(pv_map, pick)
+                    ],
                     import_tariff_id=import_id,
                     export_tariff_id=export_id,
                     house_profile_id=profile_id,
@@ -217,27 +236,26 @@ def _render_live_scenario_id_picker() -> None:
         for item in scenarios
     }
     current = config.get_live_scenario_id()
-    pick = st.selectbox(
+    pick = labeled_selectbox(
         "Live-Szenario",
         options=scenario_ids,
         index=scenario_ids.index(current) if current in scenario_ids else 0,
-        format_func=lambda sid: f"{sid} — {labels.get(sid, sid)}",
+        format_func=lambda sid: labels.get(sid, sid),
         key="live_environment_scenario_picker",
     )
     if pick != current:
         if st.button("Als Live-Szenario übernehmen", type="primary"):
             save_live_scenario_id(pick)
             invalidate_live_optimization_cache()
-            st.success(f"Live-Szenario auf `{pick}` gesetzt.")
+            st.success("Live-Szenario übernommen.")
             st.rerun()
     else:
-        st.caption(f"Aktives Live-Szenario: `{current}` (`config.json` → `live_scenario_id`).")
+        st.caption("Aktives Live-Szenario (siehe Auswahl oben).")
 
 
 def render_live_environment_section() -> None:
     """Echtzeit-Umgebung: Live-Szenario wählen, Entitäts-Referenzen, Auflösung read-only."""
     _render_live_scenario_id_picker()
-    live_id = config.get_live_scenario_id()
     if config.is_runtime_params_deferred():
         st.info(
             "PV- und Batterie-Parameter werden nach Abschluss der Planungs-Konfiguration "
@@ -248,7 +266,7 @@ def render_live_environment_section() -> None:
         return
 
     st.markdown(
-        f"Entitäts-Referenzen für das Live-Szenario **`{live_id}`** in "
+        "Entitäts-Referenzen für das Live-Szenario in "
         "`backtesting_scenarios.json`. Standort und Zeitzone kommen aus dem Hausprofil."
     )
     render_runtime_entity_form_body()

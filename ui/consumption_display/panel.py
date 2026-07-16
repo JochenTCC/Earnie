@@ -11,6 +11,7 @@ from ui.consumption_display.adapters import (
     bundle_from_cons_data,
     bundle_from_csv_validation,
     bundle_from_modeled_profile,
+    with_modeled_pv_from_all_scenarios,
 )
 from ui.consumption_display.aggregation import annual_kwh_actual, annual_kwh_from_bundle
 from ui.consumption_display.charts import (
@@ -39,6 +40,8 @@ def render_consumption_display(
     annual_kwh: float | None = None,
     actual_total_label: str = "Ist-Jahresverbrauch (CSV)",
     scenario_consumer_overlays: ScenarioConsumerOverlayBundle | None = None,
+    scenarios_for_pv: dict[str, dict] | None = None,
+    live_scenario_id: str | None = None,
 ) -> None:
     """Einheitliche Verbrauchsvisualisierung für drei Modi."""
     bundle = _build_bundle(
@@ -47,6 +50,12 @@ def render_consumption_display(
         csv_series=csv_series,
         cons_data=cons_data,
     )
+    if scenarios_for_pv is not None:
+        bundle = with_modeled_pv_from_all_scenarios(
+            bundle,
+            scenarios_for_pv,
+            live_scenario_id=live_scenario_id,
+        )
     token = reset_token if reset_token is not None else str(bundle.hour_count())
     _render_metrics(mode, bundle, annual_kwh=annual_kwh, actual_total_label=actual_total_label)
     _render_monthly_chart(mode, bundle, csv_series=csv_series)

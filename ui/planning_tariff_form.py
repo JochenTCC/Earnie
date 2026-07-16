@@ -13,6 +13,7 @@ from ui.house_config_io import (
     save_planning_tariff_selection,
     tariffs_json_path,
 )
+from ui.form_layout import labeled_selectbox
 
 _IMPORT_TYPE_LABELS = {
     "awattar": "aWATTar (EPEX + Aufschlag aus tariffs.json)",
@@ -78,7 +79,7 @@ def render_tariff_selection_tab() -> None:
     import_index = import_ids.index(current_import) if current_import in import_ids else 0
     export_index = export_ids.index(current_export) if current_export in export_ids else 0
 
-    import_pick = st.selectbox(
+    import_pick = labeled_selectbox(
         "Bezugstarif",
         options=import_ids,
         index=import_index,
@@ -91,7 +92,7 @@ def render_tariff_selection_tab() -> None:
     if meta_caption:
         st.caption(meta_caption)
 
-    export_pick = st.selectbox(
+    export_pick = labeled_selectbox(
         "Einspeisetarif",
         options=export_ids,
         index=export_index,

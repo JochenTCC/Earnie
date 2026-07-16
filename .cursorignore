@@ -46,3 +46,5 @@ chart_debug/
 !greenfield/runtime/cons_data_hourly.csv
 !greenfield/runtime/backtesting_cbc_events.jsonl
 !greenfield/runtime/backtesting_window_snapshots.jsonl
+# --- Vertraulich / Projektunterlagen ---
+docs/Loxone EMS Projekt.pdf

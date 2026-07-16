@@ -60,12 +60,15 @@ def pv_surface_from_profile(
 
 def _surfaces_for_profile(
     profile: dict | None,
-    pv_surface: TiltedSurface,
+    pv_surfaces: list[TiltedSurface],
 ) -> list[TiltedSurface]:
-    surfaces = [pv_surface]
+    surfaces = list(pv_surfaces)
+    seen = {
+        (round(surface.tilt_deg, 3), round(surface.azimuth_deg, 3))
+        for surface in surfaces
+    }
     if not profile:
         return surfaces
-    seen = {(round(pv_surface.tilt_deg, 3), round(pv_surface.azimuth_deg, 3))}
     for consumer in profile.get("consumers", []):
         if consumer.get("type") != "thermal_annual":
             continue
@@ -82,6 +85,93 @@ def _surfaces_for_profile(
     return surfaces
 
 
+@dataclass(frozen=True)
+class ModeledPvSystem:
+    """One PV array (surface + kWp) for modeled production."""
+
+    id: str
+    label: str
+    surface: TiltedSurface
+    kwp: float
+
+
+def _planning_systems_from_scenario(scenario_params: dict) -> list[ModeledPvSystem]:
+    planning = scenario_params.get("_planning_pv_systems")
+    if isinstance(planning, list) and planning:
+        systems: list[ModeledPvSystem] = []
+        for index, item in enumerate(planning):
+            if not isinstance(item, dict):
+                continue
+            pv_id = str(item.get("id") or f"pv_{index}").strip() or f"pv_{index}"
+            label = str(item.get("label") or pv_id).strip() or pv_id
+            systems.append(
+                ModeledPvSystem(
+                    id=pv_id,
+                    label=label,
+                    surface=TiltedSurface(
+                        tilt_deg=float(item.get("pv_tilt", 0.0) or 0.0),
+                        azimuth_deg=float(item.get("pv_azimuth", 0.0) or 0.0),
+                    ),
+                    kwp=float(item.get("pv_kwp", 0.0) or 0.0),
+                )
+            )
+        if systems:
+            return systems
+
+    profile = scenario_params.get("_house_profile")
+    if not isinstance(profile, dict):
+        profile = None
+    kwp = float(scenario_params.get("pv_kwp", 0.0) or 0.0)
+    surface = pv_surface_from_profile(
+        profile,
+        pv_tilt=(
+            float(scenario_params["pv_tilt"])
+            if "pv_tilt" in scenario_params
+            else None
+        ),
+        pv_azimuth=(
+            float(scenario_params["pv_azimuth"])
+            if "pv_azimuth" in scenario_params
+            else None
+        ),
+    )
+    if kwp <= 0.0 and "pv_tilt" not in scenario_params and "pv_azimuth" not in scenario_params:
+        return []
+    return [
+        ModeledPvSystem(
+            id="pv",
+            label="PV",
+            surface=surface,
+            kwp=kwp,
+        )
+    ]
+
+
+def _single_system(
+    *,
+    profile: dict | None,
+    kwp: float,
+    pv_tilt: float | None = None,
+    pv_azimuth: float | None = None,
+    system_id: str = "pv",
+    label: str = "PV",
+) -> list[ModeledPvSystem]:
+    if float(kwp) <= 0.0:
+        return []
+    return [
+        ModeledPvSystem(
+            id=system_id,
+            label=label,
+            surface=pv_surface_from_profile(
+                profile,
+                pv_tilt=pv_tilt,
+                pv_azimuth=pv_azimuth,
+            ),
+            kwp=float(kwp),
+        )
+    ]
+
+
 def _slot_hour_index_in_year(slot_dt: datetime) -> int:
     year_start = datetime(slot_dt.year, 1, 1)
     naive = slot_dt.replace(tzinfo=None) if slot_dt.tzinfo else slot_dt
@@ -96,8 +186,7 @@ class ModeledClimateContext:
     lat: float
     lon: float
     timezone: str
-    pv_surface: TiltedSurface
-    pv_kwp: float
+    pv_systems: list[ModeledPvSystem] = field(default_factory=list)
     house_profile: dict | None = None
     _range_bundles: dict[tuple[date, date], OpenMeteoClimateBundle] = field(
         default_factory=dict,
@@ -116,18 +205,31 @@ class ModeledClimateContext:
         repr=False,
     )
 
+    @property
+    def pv_kwp(self) -> float:
+        return sum(float(system.kwp) for system in self.pv_systems)
+
+    @property
+    def pv_surface(self) -> TiltedSurface:
+        if self.pv_systems:
+            return self.pv_systems[0].surface
+        return pv_surface_from_profile(self.house_profile)
+
+    def _pv_surfaces(self) -> list[TiltedSurface]:
+        if self.pv_systems:
+            return [system.surface for system in self.pv_systems]
+        return [self.pv_surface]
+
     @classmethod
     def for_house_profile(cls, profile: dict, *, kwp: float) -> ModeledClimateContext:
         lat = float(profile["latitude"])
         lon = float(profile["longitude"])
         timezone = str(profile.get("timezone_name") or config.get_planning_timezone())
-        pv_surface = pv_surface_from_profile(profile)
         return cls(
             lat=lat,
             lon=lon,
             timezone=timezone,
-            pv_surface=pv_surface,
-            pv_kwp=float(kwp),
+            pv_systems=_single_system(profile=profile, kwp=kwp),
             house_profile=profile,
         )
 
@@ -141,31 +243,31 @@ class ModeledClimateContext:
             lat=lat,
             lon=lon,
             timezone=timezone,
-            pv_surface=pv_surface_from_profile(None),
-            pv_kwp=resolved_kwp,
+            pv_systems=_single_system(profile=None, kwp=resolved_kwp),
             house_profile=None,
         )
 
     @classmethod
     def from_scenario(cls, scenario_params: dict) -> ModeledClimateContext:
         profile = scenario_params.get("_house_profile")
-        if isinstance(profile, dict):
-            kwp = float(scenario_params.get("pv_kwp", 0.0) or 0.0)
-            ctx = cls.for_house_profile(profile, kwp=kwp)
+        if not isinstance(profile, dict):
+            profile = None
+        systems = _planning_systems_from_scenario(scenario_params)
+        if profile is not None:
+            lat = float(profile["latitude"])
+            lon = float(profile["longitude"])
+            timezone = str(profile.get("timezone_name") or config.get_planning_timezone())
         else:
-            ctx = cls.from_config(
-                kwp=float(scenario_params.get("pv_kwp", 0.0) or 0.0),
-            )
-        if "pv_tilt" in scenario_params:
-            ctx.pv_surface = TiltedSurface(
-                tilt_deg=float(scenario_params["pv_tilt"]),
-                azimuth_deg=float(scenario_params.get("pv_azimuth", ctx.pv_surface.azimuth_deg)),
-            )
-        elif "pv_azimuth" in scenario_params:
-            ctx.pv_surface = TiltedSurface(
-                tilt_deg=ctx.pv_surface.tilt_deg,
-                azimuth_deg=float(scenario_params["pv_azimuth"]),
-            )
+            lat = float(config.get("LATITUDE", cast=float))
+            lon = float(config.get("LONGITUDE", cast=float))
+            timezone = str(config.get_planning_timezone())
+        ctx = cls(
+            lat=lat,
+            lon=lon,
+            timezone=timezone,
+            pv_systems=systems,
+            house_profile=profile,
+        )
         if "latitude" in scenario_params:
             ctx.lat = float(scenario_params["latitude"])
         if "longitude" in scenario_params:
@@ -181,7 +283,7 @@ class ModeledClimateContext:
                 lat=self.lat,
                 lon=self.lon,
                 timezone=self.timezone,
-                surfaces=_surfaces_for_profile(self.house_profile, self.pv_surface),
+                surfaces=_surfaces_for_profile(self.house_profile, self._pv_surfaces()),
             )
         return self._year_bundles[year]
 
@@ -194,16 +296,44 @@ class ModeledClimateContext:
                 lat=self.lat,
                 lon=self.lon,
                 timezone=self.timezone,
-                surfaces=_surfaces_for_profile(self.house_profile, self.pv_surface),
+                surfaces=_surfaces_for_profile(self.house_profile, self._pv_surfaces()),
             )
         return self._range_bundles[key]
 
     def pv_kw_at(self, slot_dt: datetime) -> float:
         bundle = self._bundle_for_calendar_year(slot_dt.year)
-        return bundle.pv_kw_at(self.pv_surface, self.pv_kwp, slot_dt)
+        total = 0.0
+        for system in self.pv_systems:
+            total += bundle.pv_kw_at(system.surface, system.kwp, slot_dt)
+        return total
 
     def pv_kw_for_slots(self, slot_datetimes: list[datetime]) -> list[float]:
         return [self.pv_kw_at(slot_dt) for slot_dt in slot_datetimes]
+
+    def pv_kw_by_system_for_slots(
+        self,
+        slot_datetimes: list[datetime],
+    ) -> dict[str, list[float]]:
+        """Per-system kW series keyed by PV system id (for weekly charts)."""
+        if not self.pv_systems:
+            return {}
+        by_year: dict[int, OpenMeteoClimateBundle] = {}
+        result: dict[str, list[float]] = {
+            system.id: [] for system in self.pv_systems
+        }
+        for slot_dt in slot_datetimes:
+            year = slot_dt.year
+            if year not in by_year:
+                by_year[year] = self._bundle_for_calendar_year(year)
+            bundle = by_year[year]
+            for system in self.pv_systems:
+                result[system.id].append(
+                    bundle.pv_kw_at(system.surface, system.kwp, slot_dt)
+                )
+        return result
+
+    def pv_system_labels(self) -> dict[str, str]:
+        return {system.id: system.label for system in self.pv_systems}
 
     def _thermal_hourly_profile_for_year(self, consumer: dict, year: int) -> list[float]:
         consumer_id = str(consumer.get("id") or consumer.get("label") or "thermal")

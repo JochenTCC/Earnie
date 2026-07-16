@@ -8,7 +8,7 @@ import config
 # GLOBALE CACHE-VARIABLEN (Für Rate-Limiting & API-Schonung)
 # =========================================================================
 _LAST_API_CALL: Optional[datetime] = None
-_CACHED_HOURLY_WATTS: Optional[dict] = None
+_CACHED_HOURLY_WATTS_BY_URL: dict[str, dict] = {}
 _RATE_LIMIT_RETRY_AT: Optional[datetime] = None
 _LAST_FETCH_SOURCE: str = "api"
 _USING_SYNTHETIC_FALLBACK: bool = False
@@ -47,7 +47,7 @@ def get_api_status() -> dict:
     return {
         "retry_at": retry_at.isoformat() if retry_at else None,
         "source": _LAST_FETCH_SOURCE,
-        "cache_available": _CACHED_HOURLY_WATTS is not None,
+        "cache_available": bool(_CACHED_HOURLY_WATTS_BY_URL),
         "using_synthetic_fallback": _USING_SYNTHETIC_FALLBACK,
     }
 
@@ -58,10 +58,11 @@ def _set_fetch_source(source: str) -> None:
 
 
 def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
-    """Prüft Cache-Gültigkeit und holt ggf. neue API-Daten."""
-    global _LAST_API_CALL, _CACHED_HOURLY_WATTS, _RATE_LIMIT_RETRY_AT
+    """Prüft Cache-Gültigkeit und holt ggf. neue API-Daten (Cache pro URL)."""
+    global _LAST_API_CALL, _RATE_LIMIT_RETRY_AT
 
     now_time = datetime.now()
+    cached = _CACHED_HOURLY_WATTS_BY_URL.get(url)
 
     if _RATE_LIMIT_RETRY_AT and now_time < _RATE_LIMIT_RETRY_AT:
         _set_fetch_source("rate_limited")
@@ -69,18 +70,19 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
             f"[cache] forecast.solar Rate-Limit aktiv bis "
             f"{_RATE_LIMIT_RETRY_AT.isoformat()}. Nutze lokalen Cache."
         )
-        return _CACHED_HOURLY_WATTS
+        return cached
 
     if _RATE_LIMIT_RETRY_AT and now_time >= _RATE_LIMIT_RETRY_AT:
         _RATE_LIMIT_RETRY_AT = None
 
     if _LAST_API_CALL and (now_time - _LAST_API_CALL) < timedelta(minutes=15):
-        _set_fetch_source("cache")
-        print(
-            "[cache] forecast.solar-Schutz: Letzter API-Aufruf vor weniger als 15 min. "
-            "Nutze lokalen Cache."
-        )
-        return _CACHED_HOURLY_WATTS
+        if cached is not None:
+            _set_fetch_source("cache")
+            print(
+                "[cache] forecast.solar-Schutz: Letzter API-Aufruf vor weniger als 15 min. "
+                "Nutze lokalen Cache."
+            )
+            return cached
 
     try:
         response = requests.get(url, timeout=config.get_global_timeout())
@@ -94,12 +96,12 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
                 f"[FEHLER] forecast.solar Rate-Limit (HTTP 429). "
                 f"Nächster API-Aufruf erlaubt ab {retry_msg}. Nutze Fallback."
             )
-            return _CACHED_HOURLY_WATTS
+            return cached
 
         response.raise_for_status()
         data = response.json()
         hourly_watts = data.get("result", {}).get("watts", {})
-        _CACHED_HOURLY_WATTS = hourly_watts
+        _CACHED_HOURLY_WATTS_BY_URL[url] = hourly_watts
         _LAST_API_CALL = now_time
         _RATE_LIMIT_RETRY_AT = None
         _set_fetch_source("api")
@@ -161,41 +163,90 @@ def _generate_seasonal_fallback(target_hours: list, kwp: float) -> list:
     return pv_vector
 
 
+def _forecast_one_system(
+    *,
+    lat: float,
+    lon: float,
+    tilt: float,
+    azimuth: float,
+    kwp: float,
+    target_hours: list,
+) -> tuple[list[float], bool]:
+    """Returns (vector, used_api). used_api False means seasonal fallback."""
+    if kwp <= 0.0:
+        return [0.0] * len(target_hours), True
+
+    url = f"https://api.forecast.solar/estimate/{lat}/{lon}/{tilt}/{azimuth}/{kwp}"
+    hourly_watts = _check_and_fetch_api_data(url, kwp)
+    if hourly_watts:
+        pv_vector, success = _map_hourly_data_to_vector(hourly_watts, target_hours)
+        if success:
+            return pv_vector, True
+        print(
+            "[WARN] API-/Cache-Daten empfangen, aber keine passenden Zeitstempel für "
+            f"die {len(target_hours)} Zielstunden gefunden. Nutze Fallback."
+        )
+    return _generate_seasonal_fallback(target_hours, kwp), False
+
+
+def _sum_vectors(vectors: list[list[float]], length: int) -> list[float]:
+    total = [0.0] * length
+    for vector in vectors:
+        for idx, value in enumerate(vector):
+            total[idx] = round(total[idx] + float(value), 3)
+    return total
+
+
 def get_hourly_pv_forecast_for_hours(target_hours: list) -> List[float]:
     """
     PV-Prognose (kW) für die übergebenen Stunden-Slots.
-    Nutzt forecast.solar API-Daten oder saisonalen Fallback ohne Korrekturfaktor.
+    Summiert forecast.solar-Abrufe über alle Live-Szenario-PV-Anlagen.
     """
     global _USING_SYNTHETIC_FALLBACK
 
     if not target_hours:
         raise ValueError("get_hourly_pv_forecast_for_hours erfordert mindestens eine Zielstunde.")
 
-    lat = config.get("LATITUDE", cast=float)
-    lon = config.get("LONGITUDE", cast=float)
-    tilt = config.get("PV_TILT", cast=float)
-    azimuth = config.get("PV_AZIMUTH", cast=float)
-    kwp = config.get("PV_KWP", cast=float)
-
-    url = f"https://api.forecast.solar/estimate/{lat}/{lon}/{tilt}/{azimuth}/{kwp}"
-    hourly_watts = _check_and_fetch_api_data(url, kwp)
-
-    if hourly_watts:
-        pv_vector, success = _map_hourly_data_to_vector(hourly_watts, target_hours)
-        if success:
+    lat = float(config.get("LATITUDE", cast=float))
+    lon = float(config.get("LONGITUDE", cast=float))
+    systems = config.get_planning_pv_systems()
+    if not systems:
+        kwp = float(config.get("PV_KWP", cast=float) or 0.0)
+        if kwp <= 0.0:
             _USING_SYNTHETIC_FALLBACK = False
-            return pv_vector
-        print(
-            "[WARN] API-/Cache-Daten empfangen, aber keine passenden Zeitstempel für "
-            f"die {len(target_hours)} Zielstunden gefunden. Nutze Fallback."
-        )
+            return [0.0] * len(target_hours)
+        systems = [
+            {
+                "id": "pv",
+                "label": "PV",
+                "pv_kwp": kwp,
+                "pv_tilt": float(config.get("PV_TILT", cast=float) or 0.0),
+                "pv_azimuth": float(config.get("PV_AZIMUTH", cast=float) or 0.0),
+            }
+        ]
 
-    _USING_SYNTHETIC_FALLBACK = True
-    pv_vector = _generate_seasonal_fallback(target_hours, kwp)
-    print(
-        f"[info] Synthetischer PV-Fallback-Vektor generiert "
-        f"(Saisonaler Max-Peak: {max(pv_vector):.2f} kW)."
-    )
+    vectors: list[list[float]] = []
+    any_fallback = False
+    for system in systems:
+        vector, used_api = _forecast_one_system(
+            lat=lat,
+            lon=lon,
+            tilt=float(system.get("pv_tilt", 0.0) or 0.0),
+            azimuth=float(system.get("pv_azimuth", 0.0) or 0.0),
+            kwp=float(system.get("pv_kwp", 0.0) or 0.0),
+            target_hours=target_hours,
+        )
+        vectors.append(vector)
+        if not used_api:
+            any_fallback = True
+
+    _USING_SYNTHETIC_FALLBACK = any_fallback
+    pv_vector = _sum_vectors(vectors, len(target_hours))
+    if any_fallback:
+        print(
+            f"[info] Synthetischer PV-Fallback (teilweise/gesamt) — "
+            f"Summen-Max: {max(pv_vector):.2f} kW über {len(systems)} Anlage(n)."
+        )
     return pv_vector
 
 

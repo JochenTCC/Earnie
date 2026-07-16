@@ -40,6 +40,9 @@ config/.env
 # Vertraulich — Businessplan (lokal)
 CONF_Businessplan/
 
+# Vertraulich — Loxone EMS Projektunterlagen (lokal)
+docs/Loxone EMS Projekt.pdf
+
 # Lokale Test-Metriken (JUnit-Historie, Coverage, health-report)
 .pytest_cache/test-metrics/
 debug-*.log

@@ -9,6 +9,9 @@ from ui.backtesting_results_helpers import cons_data_has_flex_energy
 from ui.backtesting_time_ranges import cons_data_section_caption, render_time_range_help
 from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
+import config
+from house_config.scenario_resolution import DEFAULT_LIVE_SCENARIO_ID
+
 _MATCH_OK = "Passt zur aktuellen Konfiguration (Verbraucher-IDs und Hausprofil)."
 _MATCH_MISSING_META = "Prüfung nicht möglich (keine Meta-Datei)."
 _MATCH_ID_MISMATCH = (
@@ -85,11 +88,20 @@ def render_cons_data_section() -> bool:
                 "messbaren Werte (nur Basislast). Bitte Daten neu generieren."
             )
         try:
+            scenarios_for_pv = None
+            live_id = None
+            try:
+                scenarios_for_pv = config.get_backtesting_scenarios()
+                live_id = config.get_live_scenario_id() or DEFAULT_LIVE_SCENARIO_ID
+            except Exception:
+                scenarios_for_pv = None
             render_consumption_display(
                 ConsumptionDisplayMode.CONS_DATA,
                 key_prefix="backtesting_cons_data",
                 cons_data=df,
                 reset_token=str(df.index.max()),
+                scenarios_for_pv=scenarios_for_pv,
+                live_scenario_id=live_id,
             )
         except ValueError as exc:
             st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")

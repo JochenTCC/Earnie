@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/components.schema.json",
   "title": "Earnie Komponenten (Batterie & PV)",
-  "description": "JSON-Schema für components.json — batteries[] und pv_systems[] (referenziert über battery_id / pv_system_id in Szenarien).",
+  "description": "JSON-Schema für components.json — batteries[] und pv_systems[] (referenziert über battery_id / pv_system_ids in Szenarien).",
   "type": "object",
   "properties": {
     "$schema": {
@@ -16,7 +16,7 @@
     },
     "pv_systems": {
       "type": "array",
-      "description": "PV-Anlagen (Mehrfach-Definition; Szenario wählt pv_system_id).",
+      "description": "PV-Anlagen (Mehrfach-Definition; Szenario wählt pv_system_ids[]).",
       "items": { "$ref": "#/definitions/pv_system_entity" }
     }
   },

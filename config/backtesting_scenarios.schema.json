@@ -78,10 +78,18 @@
         },
         "settings": {
           "type": "object",
-          "description": "Parameter-Override (flache Felder oder Referenzen auf Entitäten).",
+          "description": "Parameter-Override (flache Felder oder Referenzen auf Entitäten). Standort/Zeitzone kommen aus dem Hausprofil (house_profile_id), nicht aus settings.",
           "properties": {
             "battery_id": { "type": "string", "description": "Referenz auf batteries[].id in config.json." },
-            "pv_system_id": { "type": "string", "description": "Referenz auf pv_systems[].id in config.json." },
+            "pv_system_ids": {
+              "type": "array",
+              "description": "Referenzen auf pv_systems[].id in components.json (Mehrfach-Auswahl).",
+              "items": { "type": "string" }
+            },
+            "pv_system_id": {
+              "type": "string",
+              "description": "Veraltet — Einzelreferenz; wird beim Laden zu pv_system_ids normalisiert."
+            },
             "import_tariff_id": { "type": "string", "description": "Referenz auf import_tariffs[].id in tariffs.json." },
             "export_tariff_id": { "type": "string", "description": "Referenz auf export_tariffs[].id in tariffs.json." },
             "house_profile_id": { "type": "string", "description": "Referenz auf profiles[].id in house_profiles.json." },
@@ -98,9 +106,7 @@
             "battery_capacity_kwh": { "type": "number" },
             "battery_min_soc": { "type": "number" },
             "battery_max_soc": { "type": "number" },
-            "threshold_power": { "type": "number" },
-            "latitude": { "type": "number" },
-            "longitude": { "type": "number" }
+            "threshold_power": { "type": "number" }
           }
         }
       }
