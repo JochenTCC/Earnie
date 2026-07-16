@@ -25,8 +25,4 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Is color palette for consumers in Charts (Earnie Monitor) used still the same as defined in the past
-
-- [ ] Order of scenarios in Monatlicher Kostenvergleich bar chart should be the same as in Gesamtkosten and Verbrauchsvergleich
-
 - [ ] Check if there is a special issue on weekends, when time-to-be ready is set to 12:00 (Start/ End-SOC constraints)

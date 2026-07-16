@@ -1,6 +1,8 @@
-# Container-Betrieb (Synology / LoxBerry / Docker)
+# Container-Betrieb (Synology / LoxBerry / Proxmox / Docker)
 
 **Streamlit-Ports aller Stacks:** [streamlit-ports.md](../referenz/streamlit-ports.md)
+
+**Proxmox VE (LXC + Docker Compose):** [proxmox-lxc.md](proxmox-lxc.md)
 
 **Docker-Artefakte:** `[docker/README.md](../../docker/README.md)` — Dockerfile, Compose-Dateien und Build-Skripte liegen unter `docker/`. Compose-Befehle immer vom Repo-Root mit `--project-directory .`.
 
@@ -238,3 +240,19 @@ Von außen gibt es keinen eingebauten Reverse Proxy wie bei Synology DSM. Extern
 
 
 Vor Produktivbetrieb: Worker-Log (`runtime/earnie.log`) auf CBC-Timing und Startfehler prüfen. Optionaler Follow-up: natives `coinor-cbc` im Image für kürzere MILP-Läufe.
+
+## Proxmox LXC (amd64)
+
+Unprivileged LXC mit Docker (`nesting=1`, `keyctl=1`), Compose [`docker/compose/proxmox.yml`](../../docker/compose/proxmox.yml), Bootstrap und `pct`-Beispiel: [proxmox-lxc.md](proxmox-lxc.md).
+
+Kurzform nach CT-Erstellung:
+
+```bash
+pct enter <VMID>
+# Bootstrap (siehe proxmox-lxc.md) → /opt/earnie mit compose.yaml
+cd /opt/earnie
+docker compose --project-directory . -f compose.yaml pull
+docker compose --project-directory . -f compose.yaml up -d
+```
+
+UI: `http://<lxc-ip>:8501`

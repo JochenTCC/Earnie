@@ -31,38 +31,38 @@ def validate_feed_in_mode(mode: str) -> str:
 
 
 def validate_fixed_monthly_feed_in_rates(raw: list) -> tuple[tuple[int, int, float], ...]:
-    """Validiert fixed_monthly_feed_in_rates aus backtesting_scenarios.json."""
+    """Validiert Monatstarife (year/month/tariff_cent_kwh), z. B. monthly_table oder OeMAG."""
     if not isinstance(raw, list) or not raw:
         raise ValueError(
-            "fixed_monthly_feed_in_rates muss ein nicht-leeres Array sein."
+            "monthly_rates muss ein nicht-leeres Array sein."
         )
     seen: set[tuple[int, int]] = set()
     entries: list[tuple[int, int, float]] = []
     for index, item in enumerate(raw):
         if not isinstance(item, dict):
             raise ValueError(
-                f"fixed_monthly_feed_in_rates[{index}] muss ein Objekt sein."
+                f"monthly_rates[{index}] muss ein Objekt sein."
             )
         for key in ("year", "month", "tariff_cent_kwh"):
             if key not in item:
                 raise ValueError(
-                    f"fixed_monthly_feed_in_rates[{index}]: '{key}' fehlt."
+                    f"monthly_rates[{index}]: '{key}' fehlt."
                 )
         year = int(item["year"])
         month = int(item["month"])
         tariff = float(item["tariff_cent_kwh"])
         if month < 1 or month > 12:
             raise ValueError(
-                f"fixed_monthly_feed_in_rates[{index}]: month muss 1–12 sein."
+                f"monthly_rates[{index}]: month muss 1–12 sein."
             )
         if tariff <= 0.0:
             raise ValueError(
-                f"fixed_monthly_feed_in_rates[{index}]: tariff_cent_kwh muss > 0 sein."
+                f"monthly_rates[{index}]: tariff_cent_kwh muss > 0 sein."
             )
         key = (year, month)
         if key in seen:
             raise ValueError(
-                f"fixed_monthly_feed_in_rates: doppelter Eintrag für {year}-{month:02d}."
+                f"monthly_rates: doppelter Eintrag für {year}-{month:02d}."
             )
         seen.add(key)
         entries.append((year, month, tariff))
@@ -84,7 +84,7 @@ def _fixed_tariff_for_slot(
         return float(settings.k_push_cent)
     if slot_datetime is None:
         raise ValueError(
-            "feed_in_mode 'fixed' mit fixed_monthly_feed_in_rates erfordert "
+            "feed_in_mode 'fixed' mit Monatstariftabelle erfordert "
             "slot_datetime pro Matrix-Zeile bzw. Stunde."
         )
     lookup = monthly_fixed_tariff_lookup(tariffs)
@@ -92,7 +92,7 @@ def _fixed_tariff_for_slot(
     if key not in lookup:
         raise ValueError(
             f"Kein fixer Einspeisetarif für {key[0]}-{key[1]:02d} in "
-            "fixed_monthly_feed_in_rates (backtesting_scenarios.json)."
+            "monthly_rates (Export-Tarif monthly_table / monthly_float)."
         )
     return lookup[key]
 

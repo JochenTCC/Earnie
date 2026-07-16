@@ -11,6 +11,10 @@ GitHub-Repository: [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie).
 **Earnie** richtet sich an Hausbesitzer, die Kosten beim Stromverbrauch minimieren möchten, insbesondere bei [SPOT-Tarifen](https://www.epexspot.com/). Er optimiert in einem variablen Zeitfenster (von max. 48h) die Verbräuche und Erträge so, dass die Kosten minimal sind. Das funktioniert am besten bei Häusern mit einer PV-Anlage, Batteriespeicher und Verbrauchern, die per Smart-Home gesteuert werden können (also smarter Wechselrichter, smarte Wallbox für das E-Auto, smarte Wärmepumpe und andere Geräte). Bisher kommuniziert **Earnie** mit diesen Systemen über eine [Loxone](https://www.loxone.com/dede/)-Haus-Automation — das kann aber auch um beliebige andere Systeme erweitert werden. Für andere Geräte, die noch nicht smart sind, kann **Earnie** Empfehlungen für den besten Start-Zeitpunkt geben.
 Der große Hebel für Einsparungen ist das geschickte Timing all dieser Verbraucher und der intelligente Einsatz des Batteriespeichers als Puffer.
 
+![Was-Wäre-Wenn-Analyse](docs\assets\Monatliche-Stromkosten.png)
+*Was-Wäre-Wenn-Analyse: Vorab schon sehen, was eine andere Konfiguration sparen könnte*
+
+
 Statt fester Regeln (wie bei anderen Lösungen) berechnet **Earnie** einen **24-48 Stunden-Plan** unter Berücksichtigung von Strompreisen, PV-Prognose, Wettervorhersagen für den Standort des Hauses, Speicherzustand und Gerätebedarf. Ein dauerhaft laufender Daemon (`main.py`) setzt den Plan in [Loxone](https://www.loxone.com/dede/) um; eine übersichtliche Web-Oberfläche zeigt Soll/Ist und hilft bei Konfiguration und Analyse.
 
 
@@ -65,17 +69,16 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 ### Betrieb
 
-- [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) oder PC (weitere Systeme folgen bei Bedarf)
+- [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox](https://www.proxmox.com/) LXC oder PC (weitere Systeme folgen bei Bedarf)
 - Persistente Laufzeitdaten für Nachvollziehbarkeit und Debug-Dumps
 
-Earnie Monitor
-
+![Earnie Monitor](docs\assets\Live-Monitoring-Chart1-2.png)
 *Earnie Monitor: Kompletter Optimierungs-Horizont mit Energiefluss, SOC und Verbraucherverhalten.*
 
 ## Typischer Ablauf
 
 1. **Voraussetzungen klären** — [Loxone](https://www.loxone.com/dede/)-Miniserver, PV + Speicher, verschiebbare Verbraucher, optional dynamischer Tarif
-2. **Deployment wählen** — Container ([Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/)) oder lokaler Betrieb → [Container](docs/einrichtung/container.md) · [Betrieb](docs/einrichtung/betrieb.md)
+2. **Deployment wählen** — Container ([Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox LXC](docs/einrichtung/proxmox-lxc.md)) oder lokaler Betrieb → [Container](docs/einrichtung/container.md) · [Betrieb](docs/einrichtung/betrieb.md)
 3. **Konfiguration anlegen** — `config/config.json` aus Vorlage, Loxone-Zugang, Merker-Namen → [Erste Schritte](docs/README.md#erste-schritte)
 4. **Was-wäre-wenn-Analyse** — Mit Erstkonfiguration klären, ob sich ein Gesamtsystem und Earnie im produktiven Einsatz lohnen
 5. **Verbindung zu Smarthome** — `python -m scripts.verify_loxone_setup`
@@ -92,7 +95,7 @@ Einrichtung, Konfiguration, [Streamlit](https://streamlit.io/)-Oberfläche und [
 
 | Bereich                | Kapitel                                                                                                                                                                                                          |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Einrichtung**        | [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md)                                                                   |
+| **Einrichtung**        | [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Proxmox LXC](docs/einrichtung/proxmox-lxc.md)                                                                   |
 | **Konfiguration**      | [Überblick](docs/konfiguration/ueberblick.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md) |
 | **Benutzeroberfläche** | [Betriebsmodi](docs/ui/betriebsmodi.md) · [Charts](docs/ui/charts.md) · [Loxone-Kommunikation](docs/ui/loxone-kommunikation.md)                                                                                  |
 | **Referenz**           | [Loxone-Signale](docs/referenz/loxone-signale.md)                                                                                                                                                                |
@@ -105,7 +108,7 @@ Einrichtung, Konfiguration, [Streamlit](https://streamlit.io/)-Oberfläche und [
 
 | Weg                              | Für wen                                                                      | Detail                                                         |
 | -------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Docker (empfohlen Prod)**      | [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/) | [docs/einrichtung/container.md](docs/einrichtung/container.md) |
+| **Docker (empfohlen Prod)**      | [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/), [Proxmox](https://www.proxmox.com/) LXC | [docs/einrichtung/container.md](docs/einrichtung/container.md) · [proxmox-lxc.md](docs/einrichtung/proxmox-lxc.md) |
 | **Lokal (Dev / ohne Container)** | Entwickler, Tests                                                            | [DEVELOPER.md](DEVELOPER.md)                                   |
 
 

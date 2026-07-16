@@ -1,0 +1,64 @@
+# Proxmox LXC (amd64) – Produktions-Compose (vorgefertigtes Multi-Arch-Image)
+#
+# Läuft in einem LXC-Container mit Docker (nesting=1). Siehe docs/einrichtung/proxmox-lxc.md
+# und docker/proxmox/ (LXC-Beispielkonfig + Bootstrap).
+#
+# Persistente Daten (überleben Image-Updates):
+#   ./config/config.json   – Haus-Konfiguration (wird nie überschrieben)
+#   ./config/tariffs.json  – Tarif-Katalog (Sidecar; wird nie überschrieben)
+#   ./config/backtesting_scenarios.json, house_profiles.json – weitere Sidecars
+#   ./config/.env          – Loxone-Zugangsdaten
+#   ./runtime/             – cons_data, Zustands-JSONs, Profile, Logs
+#
+# Erstinstallation (typisch /opt/earnie/ im LXC):
+#   1. Ordner anlegen: mkdir -p config runtime
+#   2. Diese Datei als compose.yaml ablegen (oder -f docker/compose/proxmox.yml)
+#   3. Container starten – fehlende Dateien legt der Entrypoint an
+#   4. config/.env und config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
+#   5. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
+#
+# Nach Änderungen an config/config.json: Container optimizer-worker neu starten.
+# Nach Code-Änderungen: Image pullen, dann:
+#   docker compose --project-directory . -f docker/compose/proxmox.yml pull
+#   docker compose --project-directory . -f docker/compose/proxmox.yml up -d
+#
+# UI im LAN: http://<lxc-ip>:8501 (extern nur mit eigenem Proxy/VPN).
+
+version: "3.8"
+
+x-persist-volumes: &persist-volumes
+  - ./config:/app/config
+  - ./runtime:/app/runtime
+
+x-common-env: &common-env
+  TZ: Europe/Vienna
+  EARNIE_CONFIG_PATH: config/config.json
+  EARNIE_STRICT_TARIFF_VALIDATE: "1"
+  # Loxone-Smoke-Test beim Worker-Start (nach pull/up); siehe scripts/startup_checks.py
+  EARNIE_VERIFY_LOXONE_ON_START: "1"
+
+services:
+  optimizer-worker:
+    image: ghcr.io/jochentcc/earnie-energy:latest
+    container_name: earnie-optimizer-worker
+    command: python main.py
+    restart: unless-stopped
+    volumes: *persist-volumes
+    environment:
+      <<: *common-env
+
+  optimizer-ui:
+    image: ghcr.io/jochentcc/earnie-energy:latest
+    container_name: earnie-optimizer-ui
+    command: >
+      python -m scripts.run_streamlit
+      --
+      --server.enableCORS false
+      --server.enableXsrfProtection false
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes: *persist-volumes
+    environment:
+      <<: *common-env
+      EARNIE_UI_MODES: sunset2sunset,scenario_explorer

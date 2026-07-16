@@ -17,10 +17,11 @@ from ui.backtesting_deviation_list import render_deviation_list
 from ui.backtesting_results_helpers import (
     build_annual_cost_rows,
     build_scenario_consumption_rows,
+    format_test_run_caption,
     nav_bounds_from_period,
+    ordered_monthly_chart_labels,
     reference_kwh_for_period,
     scenario_consumption_subheader,
-    format_test_run_caption,
 )
 from ui.backtesting_runner import (
     auto_backtesting_workers,
@@ -473,11 +474,15 @@ def render_backtesting_monthly_chart(meta: dict) -> None:
     ]
     if not chart_columns:
         return
+    chart_columns = ordered_monthly_chart_labels(meta, chart_columns)
     chart_monthly = {
         month: {col: float(df.loc[month, col]) for col in chart_columns}
         for month in df.index
     }
-    st.plotly_chart(scenario_monthly_cost_chart(chart_monthly), width="stretch")
+    st.plotly_chart(
+        scenario_monthly_cost_chart(chart_monthly, scenario_order=chart_columns),
+        width="stretch",
+    )
 
 
 def _deviation_labels_map(meta: dict) -> dict[str, str]:

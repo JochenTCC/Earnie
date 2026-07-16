@@ -40,23 +40,6 @@ def _apply_vat(
     return float(price_cent) * (1.0 + float(vat_percent) / 100.0)
 
 
-def _legacy_awattar_brutto(epex_cent: float, awattar_cfg: dict[str, Any]) -> float:
-    netzverlust = float(awattar_cfg["netzverlust_faktor"])
-    fix_aufschlag = float(awattar_cfg["fix_aufschlag_cent"])
-    mwst_faktor = float(awattar_cfg["mwst_austria_faktor"])
-    return round((float(epex_cent) * netzverlust + fix_aufschlag) * mwst_faktor, 4)
-
-
-def _awattar_import_cfg(tariff: dict[str, Any]) -> dict[str, Any]:
-    keys = ("netzverlust_faktor", "fix_aufschlag_cent", "mwst_austria_faktor")
-    if all(key in tariff for key in keys):
-        return {key: float(tariff[key]) for key in keys}
-    raise ValueError(
-        "Tarif type 'awattar' erfordert fix_aufschlag_cent, netzverlust_faktor "
-        "und mwst_austria_faktor im Tarif-Eintrag (tariffs.json)."
-    )
-
-
 def _awattar_export_cfg(tariff: dict[str, Any]) -> dict[str, Any]:
     if "feed_in_fee_factor" not in tariff:
         raise ValueError(
@@ -111,9 +94,11 @@ def import_cent_kwh(
     """EPEX Cent/kWh → Bezugspreis Cent/kWh laut Tarif-Spec."""
     tariff_type = str(tariff.get("type", "")).strip().lower()
     if tariff_type == IMPORT_LEGACY_AWATTAR:
-        return _legacy_awattar_brutto(
+        # Same surcharge model as spot_hourly (settlement_fee / markup / VAT).
+        return _spot_import_cent(
             epex_cent,
-            _awattar_import_cfg(tariff),
+            tariff,
+            netzentgelt_override=netzentgelt_override,
         )
     if tariff_type == IMPORT_MONTHLY:
         if slot_datetime is None:

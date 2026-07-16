@@ -3,6 +3,44 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Monatlicher Kostenvergleich bar order (2026-07-16)
+
+- [x] **Monatlicher Kostenvergleich bar order** — bars follow Gesamtkosten order (historisch → scenario refs e.g. Referenz (Live) → optimized) via `ordered_monthly_chart_labels` + `scenario_order` on `scenario_monthly_cost_chart`; tests in `test_backtesting_charts.py` / `test_backtesting_results_helpers.py`; verified on SE page after reload
+
+
+### Bugfix Earnie Monitor consumer color palette (2026-07-16)
+
+- [x] **Consumer colors in Charts (Earnie Monitor)** — verified still the same as defined: fixed 8-color `CONSUMER_PALETTE` / `chart_color_index` via `consumer_chart_color()` in `ui/chart_colors.py` (Chart 1 + Sankey); unchanged from Consumer colors P1 (2026-07-07)
+
+
+### Proxmox LXC deployment (2026-07-16)
+
+- [x] **Proxmox LXC + Docker Compose** — `docker/compose/proxmox.yml`, bootstrap/lxc example under `docker/proxmox/`; user doc [`docs/einrichtung/proxmox-lxc.md`](../docs/einrichtung/proxmox-lxc.md); cross-links in `docs/README.md`, `docs/einrichtung/container.md`, `DEVELOPER.md`, `README.md`, `docker/README.md`, streamlit-ports
+
+
+### Feed-in: scenario fixed monthly rates removed (2026-07-16)
+
+- [x] **Drop `fixed_monthly_feed_in_rates` from backtesting scenarios** — rates come from export tariff `monthly_table` / `monthly_float` only; schema + example cleaned; `Config.get_backtesting_feed_in_settings` / `get_backtesting_fixed_monthly_feed_in_rates` path removed; SUNNY `monthly_rates` updated in `config/tariffs.json`; docs `docs/konfiguration/preise.md`
+
+
+### Version 2.0 — README snapshots (2026-07-16)
+
+- [x] Pimp README.md with snapshots
+
+
+### Minor changes in Version 1.99 (2026-07-16)
+
+- [x] Rearrange Verbrauchsvergleich (Debug) table
+  - Add a column (Verbrauch ohne PV und Speicher)
+  - Change name of column "Baseline Spec kWh" to "Reference (Live) - ohne Optimierung [kWh]"
+  - Change name of column "delta kWh (Opt-Baseline)" to "delta kWh (Ref. ohne Optimierung)"
+  - Remove rows for "Historisch (ohne Optimierung, ohne PV/Batterie)" and "Referenz (Live) — ohne Optimierung"
+  - Write consumption of scenario "Historisch ..." in all cells of column "Verbrauch ohne PV und Speicher"
+  - Write consumption of scenario "Reference (Live) - ohne Optimierung [kWh]" in all cells of column with this name
+- [x] Modify Gesamtkosten table
+  - Fill all cells of column "Jahres-kWh" with appropriate values
+
+
 ### Bugfix SE baseline progress + parallel workers (2026-07-16)
 
 - [x] **SE baseline/reference progress bar** — reference simulations report hourly progress (`phase: reference`) via per-worker JSON snapshots; Streamlit shows per-task bars including historical reference (`scripts/run_backtesting.py` `_run_reference_worker`, `ui/backtesting.py`)

@@ -42,9 +42,9 @@ CLI nach `pip install -e .` (optional): `earnie-bootstrap`, `earnie-build-image`
 
 Legacy: `config.json` im Projektroot wird weiterhin unterstützt, wenn `config/config.json` fehlt.
 
-## Container (Synology / LoxBerry / Docker)
+## Container (Synology / LoxBerry / Proxmox / Docker)
 
-Ausführliche Anleitung für Betreiber: [docs/einrichtung/container.md](docs/einrichtung/container.md) · Compose-Stacks und Build-Kontext: [docker/README.md](docker/README.md)
+Ausführliche Anleitung für Betreiber: [docs/einrichtung/container.md](docs/einrichtung/container.md) · Proxmox LXC: [docs/einrichtung/proxmox-lxc.md](docs/einrichtung/proxmox-lxc.md) · Compose-Stacks und Build-Kontext: [docker/README.md](docker/README.md)
 
 ### Image bauen
 
@@ -70,13 +70,15 @@ Weitere Optionen: `--target` (`synology` | `loxberry` | `all`), `--tag`, `--plat
 docker compose --project-directory . -f docker/compose/dev.yml up -d --build
 ```
 
-### Produktion (Synology / LoxBerry)
+### Produktion (Synology / LoxBerry / Proxmox LXC)
 
 1. Multi-Arch-Image bauen und pushen (siehe oben)
-2. Auf der Zielplattform nur Compose-Datei (`docker/compose/synology.yml` bzw. `loxberry.yml`), `config/` und `runtime/` bereitstellen
+2. Auf der Zielplattform nur Compose-Datei (`docker/compose/synology.yml`, `loxberry.yml` oder `proxmox.yml`), `config/` und `runtime/` bereitstellen
 3. `docker compose --project-directory . -f docker/compose/<stack>.yml pull`
 4. `docker compose --project-directory . -f docker/compose/<stack>.yml up -d`
 5. UI im LAN: `http://<host-ip>:8501`
+
+Proxmox: LXC mit `nesting=1`/`keyctl=1`, optional `docker/proxmox/bootstrap.sh` — siehe [proxmox-lxc.md](docs/einrichtung/proxmox-lxc.md).
 
 ## Hinweise
 

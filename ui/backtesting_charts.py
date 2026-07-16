@@ -4,12 +4,21 @@ from __future__ import annotations
 import plotly.graph_objects as go
 
 
-def scenario_monthly_cost_chart(monthly_eur: dict[str, dict[str, float]]) -> go.Figure:
+def scenario_monthly_cost_chart(
+    monthly_eur: dict[str, dict[str, float]],
+    *,
+    scenario_order: list[str] | None = None,
+) -> go.Figure:
     """Gruppierter Monats-Kostenvergleich je Szenario (nicht gestapelt)."""
     months = sorted(monthly_eur.keys())
-    scenario_labels = sorted(
-        {label for values in monthly_eur.values() for label in values}
-    )
+    present = {label for values in monthly_eur.values() for label in values}
+    if scenario_order is None:
+        scenario_labels = sorted(present)
+    else:
+        scenario_labels = [label for label in scenario_order if label in present]
+        for label in sorted(present):
+            if label not in scenario_labels:
+                scenario_labels.append(label)
     fig = go.Figure()
     for label in scenario_labels:
         values = [monthly_eur.get(month, {}).get(label, 0.0) for month in months]

@@ -88,7 +88,7 @@ def test_k_push_act_for_matrix_row_uses_fallback():
     assert k_push_act_for_matrix_row(row, 3.5) == 3.5
 
 
-def test_fixed_mode_uses_monthly_tariff_from_backtesting_table():
+def test_fixed_mode_uses_monthly_tariff_table():
     tariffs = validate_fixed_monthly_feed_in_rates([
         {"year": 2026, "month": 6, "tariff_cent_kwh": 3.60},
         {"year": 2026, "month": 7, "tariff_cent_kwh": 6.46},
