@@ -63,6 +63,8 @@ services:
     command: >
       python -m scripts.run_streamlit
       --
+      --server.port 8501
+      --server.address 0.0.0.0
       --server.enableCORS false
       --server.enableXsrfProtection false
     restart: unless-stopped
