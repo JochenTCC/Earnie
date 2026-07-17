@@ -18,6 +18,32 @@
       "justMyCode": false
     },
     {
+      "name": "main.py (Greenfield)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": {
+        "EARNIE_CONFIG_PATH": "${workspaceFolder}/greenfield/config/config.json",
+        "EARNIE_RUNTIME_DIR": "${workspaceFolder}/greenfield/runtime",
+        "EARNIE_DOTENV_PATH": "${workspaceFolder}/greenfield/config/.env",
+        "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/greenfield/runtime/local_settings.json",
+        "EARNIE_HOUSE_PROFILES_PATH": "${workspaceFolder}/greenfield/config/house_profiles.json",
+        "EARNIE_COMPONENTS_PATH": "${workspaceFolder}/greenfield/config/components.json",
+        "EARNIE_TARIFFS_PATH": "${workspaceFolder}/greenfield/config/tariffs.json",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH": "${workspaceFolder}/greenfield/config/backtesting_scenarios.json",
+        "EARNIE_VERIFY_LOXONE_ON_START": "0",
+        "EARNIE_STRICT_TARIFF_VALIDATE": "1",
+        "EARNIE_UI_STREAMLIT_PORT": "8511"
+      },
+      "justMyCode": false,
+      "presentation": {
+        "group": "greenfield",
+        "order": 1
+      }
+    },
+    {
       "name": "main.py (Silent Migration Test)",
       "type": "python",
       "request": "launch",

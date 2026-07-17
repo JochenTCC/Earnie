@@ -333,6 +333,7 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
             consumer["thermal"]["latitude"] = latitude
             consumer["thermal"]["longitude"] = longitude
+            consumer["thermal"]["timezone_name"] = timezone_name
         if consumer["type"] == "thermal_rc" and consumer.get("thermal_rc"):
             consumer["thermal_rc"]["latitude"] = latitude
             consumer["thermal_rc"]["longitude"] = longitude

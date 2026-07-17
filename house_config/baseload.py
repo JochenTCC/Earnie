@@ -5,9 +5,15 @@ BASELOAD_MIN_FRACTION = 0.05
 
 
 def _config_ready_for_open_meteo() -> bool:
-    import config as cfg
+    """True when config.CONFIG is fully constructed (avoid circular import during Config())."""
+    import sys
 
-    return getattr(cfg, "CONFIG", None) is not None and hasattr(cfg, "get_planning_timezone")
+    cfg = sys.modules.get("config")
+    if cfg is None:
+        return False
+    return getattr(cfg, "CONFIG", None) is not None and callable(
+        getattr(cfg, "get_planning_timezone", None)
+    )
 
 
 def consumer_annual_kwh(consumer: dict) -> float:
@@ -21,6 +27,8 @@ def consumer_annual_kwh(consumer: dict) -> float:
         thermal = consumer.get("thermal") or consumer
         lat = thermal.get("latitude")
         lon = thermal.get("longitude")
+        # Open-Meteo only after Config() finished — during profile normalize inside
+        # Config.__init__, modeled_climate → config is a circular import.
         if lat is not None and lon is not None and _config_ready_for_open_meteo():
             from data.modeled_climate import thermal_annual_kwh_from_archive
 

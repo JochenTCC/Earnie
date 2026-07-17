@@ -24,16 +24,6 @@ backtesting_log.json
 backtesting_cbc_events.jsonl
 backtesting_logs/
 
-# --- Verbrauchs-/Historiendaten & Logs ---
-*.csv
-!tests/fixtures/**/*.csv
-Historical-Data/
-data/cache/
-*.log
-energy_optimizer.log
-system_history_log.csv
-chart_debug/
-
 # --- Produktiv-Dumps (lokal; Archiv unter tests/fixtures/prod_dumps/ bleibt für Regression) ---
 # Enthält u. a. cons_data_hourly.csv und energy_optimizer.log aus NAS/runtime.zip
 !tests/fixtures/prod_dumps/**/live_optimization_debug.json

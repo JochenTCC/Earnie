@@ -37,6 +37,9 @@ RUN mkdir -p share/config \
     && cp config/house_profiles.example.json share/config/house_profiles.example.json \
     && cp config/house_profiles.minimal.json share/config/house_profiles.minimal.json \
     && cp config/house_profiles.schema.json share/config/house_profiles.schema.json \
+    && cp config/components.example.json share/config/components.example.json \
+    && cp config/components.minimal.json share/config/components.minimal.json \
+    && cp config/components.schema.json share/config/components.schema.json \
     && cp config/deviation_rules.example.json share/config/deviation_rules.example.json \
     && cp config/deviation_rules.schema.json share/config/deviation_rules.schema.json \
     && cp runtime/local_settings.example.json share/config/local_settings.example.json \

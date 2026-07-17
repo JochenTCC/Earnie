@@ -191,3 +191,20 @@ def test_climate_fixture_has_radiation():
     temps, radiation = load_climate_daily(lat=48.2, lon=11.0)
     assert len(temps) >= 364
     assert len(radiation) >= 364
+
+
+def test_climate_fixture_resolves_committed_path(tmp_path, monkeypatch):
+    """Docker/CI has no data/cache/; committed data/fixtures/ must still load."""
+    from data import heating_need
+
+    cache = tmp_path / "cache" / "heating_climate_default.json"
+    fixtures = Path("data/fixtures/heating_climate_default.json")
+    assert fixtures.is_file()
+    monkeypatch.setattr(
+        heating_need,
+        "_CLIMATE_CACHE_CANDIDATES",
+        (cache, fixtures),
+    )
+    temps, radiation = heating_need.load_climate_daily()
+    assert len(temps) >= 364
+    assert len(radiation) >= 364

@@ -85,9 +85,21 @@ def _align_live_feature_index(frame: pd.DataFrame) -> pd.DataFrame:
 
 def _archive_latest_complete_day() -> date:
     """Letzter Kalendertag mit vollständigen Open-Meteo/Energy-Charts-Archivdaten."""
-    import config
+    import sys
+    from zoneinfo import ZoneInfo
 
-    tz = ZoneInfo(config.get_planning_timezone())
+    tz_name = "UTC"
+    cfg = sys.modules.get("config")
+    if (
+        cfg is not None
+        and getattr(cfg, "CONFIG", None) is not None
+        and callable(getattr(cfg, "get_planning_timezone", None))
+    ):
+        try:
+            tz_name = str(cfg.get_planning_timezone())
+        except Exception:
+            tz_name = "UTC"
+    tz = ZoneInfo(tz_name)
     return datetime.now(tz).date() - timedelta(days=1)
 
 

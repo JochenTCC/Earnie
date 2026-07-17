@@ -88,6 +88,16 @@ def test_entry_to_chart_row_prefers_consumption_snapshot():
     assert row["Uhrzeit"] == "11:00"
 
 
+def _swimspa_consumer() -> dict:
+    return {
+        "id": "swimspa",
+        "name": "SwimSpa",
+        "type": "swimspa",
+        "nominal_power_kw": 3.0,
+        "chart_color_index": 1,
+    }
+
+
 def test_entry_to_chart_row_line_and_bar_pv_sources_differ():
     entry = _entry(
         datetime(2026, 6, 26, 11, 0, 0),
@@ -103,10 +113,15 @@ def test_entry_to_chart_row_line_and_bar_pv_sources_differ():
     assert pv_bar.kw == pytest.approx(3.5)
 
 
-    import config
+def test_entry_to_chart_row_uses_measured_flex_live(monkeypatch):
     from optimizer.targets import consumer_column_name
 
-    swimspa = next(c for c in config.get_flexible_consumers(optimizer_only=True) if c["id"] == "swimspa")
+    swimspa = _swimspa_consumer()
+    monkeypatch.setattr(
+        history_timeline.config,
+        "get_flexible_consumers",
+        lambda optimizer_only=False: [swimspa],
+    )
     entry = _entry(
         datetime(2026, 6, 26, 11, 0, 0),
         consumer_powers_kw={"swimspa": 2.8},
@@ -117,11 +132,15 @@ def test_entry_to_chart_row_line_and_bar_pv_sources_differ():
     assert row[consumer_column_name(swimspa)] == pytest.approx(0.07)
 
 
-def test_entry_to_chart_row_omits_unmeasured_flex():
-    import config
+def test_entry_to_chart_row_omits_unmeasured_flex(monkeypatch):
     from optimizer.targets import consumer_column_name
 
-    swimspa = next(c for c in config.get_flexible_consumers(optimizer_only=True) if c["id"] == "swimspa")
+    swimspa = _swimspa_consumer()
+    monkeypatch.setattr(
+        history_timeline.config,
+        "get_flexible_consumers",
+        lambda optimizer_only=False: [swimspa],
+    )
     entry = _entry(
         datetime(2026, 6, 26, 11, 0, 0),
         consumer_powers_kw={"swimspa": 2.8},

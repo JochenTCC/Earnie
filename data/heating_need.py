@@ -13,7 +13,10 @@ _BUILDING_KWH_M2 = {1: 15.0, 2: 45.0, 3: 80.0, 4: 130.0}
 _JAZ = {"luft": 3.5, "erde": 4.3}
 _SOLAR_THERMAL_EFFICIENCY = 0.40
 SOLAR_THERMAL_EFFICIENCY = _SOLAR_THERMAL_EFFICIENCY
-_CLIMATE_CACHE = Path("data/cache/heating_climate_default.json")
+_CLIMATE_CACHE_CANDIDATES = (
+    Path("data/cache/heating_climate_default.json"),
+    Path("data/fixtures/heating_climate_default.json"),
+)
 
 
 def specific_heating_kwh_m2(
@@ -159,6 +162,13 @@ def _parse_climate_daily(data: dict) -> tuple[list[float], list[float]]:
     return [float(t) for t in temps], [float(r) for r in radiation]
 
 
+def _resolve_climate_fixture_path() -> Path | None:
+    for path in _CLIMATE_CACHE_CANDIDATES:
+        if path.is_file():
+            return path
+    return None
+
+
 def load_climate_fixture() -> list[float]:
     temps, _ = load_climate_daily()
     return temps
@@ -167,12 +177,13 @@ def load_climate_fixture() -> list[float]:
 def load_climate_daily(*, lat: float | None = None, lon: float | None = None) -> tuple[list[float], list[float]]:
     """Lädt Tages-Temperaturen und Globalstrahlung (Offline-Fixture)."""
     del lat, lon
-    if not _CLIMATE_CACHE.is_file():
+    fixture_path = _resolve_climate_fixture_path()
+    if fixture_path is None:
         raise FileNotFoundError(
-            f"Klimadaten-Fixture fehlt: {_CLIMATE_CACHE}. "
-            "Für Tests data/cache/heating_climate_default.json anlegen."
+            "Klimadaten-Fixture fehlt: data/fixtures/heating_climate_default.json "
+            "(optional auch data/cache/heating_climate_default.json)."
         )
-    with _CLIMATE_CACHE.open(encoding="utf-8") as handle:
+    with fixture_path.open(encoding="utf-8") as handle:
         return _parse_climate_daily(json.load(handle))
 
 
