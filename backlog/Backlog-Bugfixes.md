@@ -22,7 +22,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## Bugfix Verifications Pending
 
 - [ ] **EV FertigUm ignored on config path** — house-profile EV (`daily_target_source=config`) kept `ready_by_hour` deadline and ignored `Ernie_EAuto_FertigUm`; later FertigUm still forced early charge (`must_start` for old deadline). Fix: `resolve_charging_context` uses `resolve_charging_deadline` (FertigUm wins, `use_time_window=False`); tests `TestConfigPathFertigUm`. Dump: `chart_debug_review/chart_debug_20260716_065036`. Live check: change FertigUm later while EV needs charge → `charging_contexts.ev.deadline` matches new time, no early force-charge for old deadline.
-- [ ] **Monitor mobile chunk load (hostname)** — `TypeError: Failed to fetch dynamically imported module` for old `/static/js/TextInput.*` / `Selectbox.*` hashes. LAN IP works; hostname serves current chunks as JS but obsolete hashes return `index.html`. Cause: phone cache after Streamlit upgrade. Mitigation in `2.1.0-alpha.2`: `ui/chunk_load_recovery.py` one-shot reload + temporary `ui/chunk_load_debug.py` probe. Live check on Synology via hostname: UI recovers without clearing site data; then remove debug probe.
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
