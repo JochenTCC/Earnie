@@ -5,7 +5,12 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### Community pre-release 2.1.0-alpha.2 (2026-07-17)
 
-- [x] **Bump + Synology debug image** — `version.py` → `2.1.0-alpha.2`; chunk-load recovery + temporary debug probe for hostname Monitor failures; tagged pre-release (no `:latest`)
+- [x] **Bump + Synology debug image** — `version.py` → `2.1.0-alpha.2`; chunk-load recovery for hostname Monitor failures; tagged pre-release (no `:latest`)
+
+
+### Bugfix Monitor mobile chunk load (2026-07-17)
+
+- [x] **Hostname Monitor `Failed to fetch dynamically imported module`** — phone kept stale Streamlit `/static/js` chunk hashes after upgrade (LAN IP OK; obsolete hashes returned `index.html`). Fix: one-shot reload in `ui/chunk_load_recovery.py`; temporary debug probe removed after live verification
 
 
 ### Synology UI Streamlit bind (2026-07-17)
