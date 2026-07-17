@@ -189,12 +189,14 @@ def archive_prod_dump(
     if isinstance(capture_manifest, dict):
         if not resolved_app_version:
             resolved_app_version = str(capture_manifest.get("app_version") or "")
-        prod = capture_manifest.get("prod")
-        if isinstance(prod, dict):
-            if not resolved_title and prod.get("title"):
-                resolved_title = str(prod["title"])
-            if not resolved_symptom and prod.get("symptom"):
-                resolved_symptom = str(prod["symptom"])
+        meta = capture_manifest.get("meta")
+        if not isinstance(meta, dict):
+            meta = capture_manifest.get("prod")
+        if isinstance(meta, dict):
+            if not resolved_title and meta.get("title"):
+                resolved_title = str(meta["title"])
+            if not resolved_symptom and meta.get("symptom"):
+                resolved_symptom = str(meta["symptom"])
         if capture_manifest.get("env_overrides"):
             env_overrides = capture_manifest["env_overrides"]
         if capture_manifest.get("resolved_paths"):
@@ -219,7 +221,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Produktiv-Dump nach tests/fixtures/prod_dumps/ archivieren "
-            "(Ordner, NAS-ZIP oder unified debug_dump_prod_*.zip)"
+            "(Ordner, NAS-ZIP oder debug_dump_*.zip)"
         ),
     )
     parser.add_argument("--id", required=True, help="Eindeutige Fall-Kennung (Ordnername)")

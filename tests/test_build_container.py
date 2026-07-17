@@ -9,12 +9,37 @@ from scripts import build_container as bc
 from version import __version__
 
 
-def test_default_tags_include_latest_and_version():
+def test_default_tags_follow_version_py():
+    """``default_tags()`` without args mirrors ``version.__version__`` (latest only if official)."""
     tags = bc.default_tags()
-    assert "ghcr.io/jochentcc/earnie-energy:latest" in tags
     assert f"ghcr.io/jochentcc/earnie-energy:{__version__}" in tags
-    assert "ghcr.io/jochentcc/ernie-energy:latest" in tags
     assert f"ghcr.io/jochentcc/ernie-energy:{__version__}" in tags
+    if bc.is_prerelease_version(__version__):
+        assert "ghcr.io/jochentcc/earnie-energy:latest" not in tags
+        assert "ghcr.io/jochentcc/ernie-energy:latest" not in tags
+    else:
+        assert "ghcr.io/jochentcc/earnie-energy:latest" in tags
+        assert "ghcr.io/jochentcc/ernie-energy:latest" in tags
+
+
+def test_is_prerelease_version():
+    assert bc.is_prerelease_version("2.2.0-alpha.1") is True
+    assert bc.is_prerelease_version("2.2.0-rc.1") is True
+    assert bc.is_prerelease_version("2.2.0") is False
+
+
+def test_default_tags_prerelease_omits_latest():
+    tags = bc.default_tags("2.2.0-alpha.1")
+    assert tags == [
+        "ghcr.io/jochentcc/earnie-energy:2.2.0-alpha.1",
+        "ghcr.io/jochentcc/ernie-energy:2.2.0-alpha.1",
+    ]
+
+
+def test_default_tags_official_includes_latest():
+    tags = bc.default_tags("2.2.0")
+    assert "ghcr.io/jochentcc/earnie-energy:latest" in tags
+    assert "ghcr.io/jochentcc/earnie-energy:2.2.0" in tags
 
 
 def test_build_command_assembles_docker_args(tmp_path):

@@ -10,7 +10,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-import pytest
 
 import config
 from runtime_store.chart_debug_capture import (
@@ -171,6 +170,10 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
         model_path.parent.mkdir(parents=True, exist_ok=True)
         model_path.write_text('{"version": 2, "coefficients": {}}', encoding="utf-8")
         cons_data_path.write_text("timestamp;total_kw;baseload_kw;pv_kw;source\n", encoding="utf-8")
+        (tmp_path / "runtime" / "optimization_history.jsonl").write_text(
+            '{"written_at":"2026-07-05T23:00:00"}\n',
+            encoding="utf-8",
+        )
         config_path = Path(os.environ["ENERGY_OPTIMIZER_CONFIG_PATH"])
         cfg = json.loads(config_path.read_text(encoding="utf-8"))
         cfg["market_prices"] = {"forecast_model_path": "runtime/price_model_coefficients.json"}
@@ -185,22 +188,23 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
             session_meta={"s2_cycle_offset": 0},
             captured_at=datetime(2026, 7, 5, 23, 0, 5),
         )
-    assert zip_path.endswith("debug_dump_chart_20260705_230005.zip")
+    assert zip_path.endswith("debug_dump_20260705_230005.zip")
     with zipfile.ZipFile(zip_path) as archive:
         names = set(archive.namelist())
         assert "manifest.json" in names
         assert "README.txt" in names
-        assert "runtime/optimization_history_window.jsonl" in names
+        assert "runtime/optimization_history.jsonl" in names
+        assert "runtime/optimization_history_window.jsonl" not in names
         manifest = json.loads(archive.read("manifest.json"))
-        assert manifest["schema_version"] == 2
-        assert manifest["dump_type"] == "chart"
+        assert manifest["schema_version"] == 3
+        assert manifest["dump_type"] == "debug"
         chart = manifest["chart"]
         assert chart["live_soc_percent"] == 20.5
         assert chart["display_rows"]
         assert "Simulierter SoC (%)" in chart["display_rows"][0]
         assert chart["session_meta"]["s2_cycle_offset"] == 0
         assert chart["chart_context"] is not None
-        assert "runtime/optimization_history_window.jsonl" in manifest["files"][
+        assert "runtime/optimization_history.jsonl" in manifest["files"][
             "required_present"
         ]
         assert "inputs/config.json" in names
@@ -253,6 +257,7 @@ def test_build_capture_payload_json_safe(tmp_path, monkeypatch):
             session_meta=None,
             chart1_plotly_json=None,
         )
-    assert payload["dump_type"] == "chart"
+    assert payload["dump_type"] == "debug"
+    assert payload["schema_version"] == 3
     assert payload["chart"]["live_soc_percent"] == 19.0
     assert payload["live_soc_percent"] == 19.0

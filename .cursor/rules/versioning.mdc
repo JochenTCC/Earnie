@@ -5,11 +5,13 @@ alwaysApply: true
 
 # Versioning (version.py)
 
-Format: **MAJOR.MINOR.PATCH** (Semantic Versioning in `version.py`) — **no letter suffix**.
+Format: **MAJOR.MINOR.PATCH** (Semantic Versioning in `version.py`).
+
+Optional **pre-release** suffix for community test builds only: `MAJOR.MINOR.PATCH-alpha.N` or `MAJOR.MINOR.PATCH-rc.N` (e.g. `2.2.0-alpha.1`). No backlog letter suffixes (`.a`, `.b`) in `version.py`.
 
 ## Principle: user approval (required)
 
-- **Never change `version.py` without explicit user confirmation** — not at session end, not for bugfixes, not when a backlog chapter is completed.
+- **Never change `version.py` without explicit user confirmation** — not at session end, not for bugfixes, not when a backlog chapter is completed, not for alpha/rc bumps.
 - Instead: **propose** (target version + brief rationale) and **ask**.
 - On rejection or no response: leave `version.py` **unchanged**.
 - Commit messages may reference backlog chapters (`hausconfig: 1.24.f …`) — that does **not** replace an automatic version bump.
@@ -19,10 +21,18 @@ Format: **MAJOR.MINOR.PATCH** (Semantic Versioning in `version.py`) — **no let
 | Level | File / location | Notation | Purpose |
 |-------|-----------------|----------|---------|
 | **Release state** | `version.py` | `1.24.0` | Published app/container version (only after user approval) |
+| **Pre-release** | `version.py` | `2.2.0-alpha.1` | Community test build on `main` (GitHub Pre-release; no `:latest`) |
 | **Development step** | `backlog/Backlog.md` | `1.24.f` | Sub-step in the MINOR cycle (planning/progress) |
 
 - Letter chapters (`.a`, `.b`, … `.g`) and the release chapter (`.0`) exist **only in the backlog**, not in `version.py`.
 - Backlog progress (moving chapters to `backlog/Backlog-Erledigt.md`) is **independent** of `version.py`.
+
+## Pre-releases (alpha / rc)
+
+- Publish from **`main`**: approve bump → commit → push → annotated tag `vX.Y.Z-alpha.N` (must match `version.py`).
+- CI (`.github/workflows/release.yml`): GitHub Release with `--prerelease` (not `--latest`); GHCR only `:<version>` (no `:latest`) via `scripts/build_container.default_tags`.
+- Leave the pre-release string on `main` until the next approved bump (`alpha.N+1`, `rc.N`, or final `X.Y.Z`). Do **not** bump back to the previous official version after tagging.
+- Backlog letters stay planning-only; do not invent backlog IDs like `2.2.0-alpha.1`.
 
 ## MINOR cycle: no automatic increment
 
@@ -31,6 +41,7 @@ While working on the **same MINOR cycle** — i.e. backlog chapters `MAJOR.MINOR
 - **Do not automatically bump `version.py`** — neither MINOR nor PATCH.
 - Completing individual letter chapters does **not** justify a PATCH (+1).
 - Example: while `1.24.c` … `1.24.g` and `1.24.0` are in the backlog → `version.py` stays e.g. `1.24.0`, **not** `1.24.1` … `1.24.3`.
+- Mid-cycle community builds use pre-releases of the **target** release (e.g. `2.2.0-alpha.1` while backlog still has `2.2.a` …), not PATCH bumps of the previous official version.
 
 **After the entire MINOR cycle is complete** (all chapters of that MINOR number done): **suggest** a version bump only and ask the user (typical: next chapter is `1.25.0` → `1.25.0`; or PATCH on last state — user decides).
 
@@ -40,6 +51,7 @@ While working on the **same MINOR cycle** — i.e. backlog chapters `MAJOR.MINOR
 |----------|-------------------|----------|
 | Entire MINOR cycle complete, release desired | `MAJOR.MINOR.0` or next MINOR | User |
 | Next MINOR chapter complete (e.g. `1.25.0`) | `1.25.0` | User |
+| Community test build desired | `X.Y.Z-alpha.N` or `X.Y.Z-rc.N` | User |
 | Bugfix complete | PATCH +1 | User |
 | `### Version N.+1` complete | MINOR +1, PATCH = 0 | User |
 | Cycle start: set target MINOR once | e.g. `1.24.0` | User |
@@ -50,6 +62,6 @@ No fixed automation like "`.a` → MINOR", "`.b` → PATCH" — that mapping doe
 
 - Maintain backlog as usual (`backlog.mdc`).
 - **No** silent version bump at session end.
-- If a release seems appropriate: ask once; otherwise skip.
+- If a release or community pre-release seems appropriate: ask once (official vs alpha/rc); otherwise skip.
 
-Commit message may include the version if the user set it: `… (v1.24.0)`.
+Commit message may include the version if the user set it: `… (v1.24.0)` or `… (v2.2.0-alpha.1)`.

@@ -3,6 +3,31 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Community pre-release path + 2.1.0-alpha.1 (2026-07-17)
+
+- [x] **Pre-release SemVer on `main`** — `version.py` may hold `X.Y.Z-alpha.N` / `-rc.N`; rules/skill (`versioning.mdc`, session-abschluss) guide A/B/C/D publish choices
+- [x] **CI / tags** — `release.yml` detects `-` → `--prerelease` (no `--latest`); `build_container.default_tags` omits `:latest` for pre-releases; docs in `DEVELOPER.md` / `docs/einrichtung/container.md`
+- [x] **First community build** — `version.py` → `2.1.0-alpha.1` (multi-PV, compact editors, SE order/disclaimer, tariff Land/Typ filters, debug dump schema v3, Hauskonfigurator PV-switch fix)
+
+
+### Bugfix Debug-Dump download + dialog close (2026-07-17)
+
+- [x] **„ZIP erstellen und herunterladen“ saved but did not download / left dialog open** — `st.components.v1.html` / `st.download_button` inside `@st.dialog` could not both download and dismiss the modal; dialog now saves + `st.rerun()` like „ZIP erstellen“, then auto-download on the main page via `st.html(..., unsafe_allow_javascript=True)` (`ui/chart_debug_capture.py`); verified in Monitor UI
+
+
+### Debug dump schema v3 — single type (2026-07-17)
+
+- [x] **Unified dump type `debug` (schema v3)** — dropped Chart/Prod split; one ZIP `debug_dump_YYYYMMDD_HHMMSS.zip` with full `optimization_history.jsonl`, optional `manifest.chart` when Live bundle present, `manifest.meta` (title/symptom/case_id); writer/normalize/validate in `runtime_store/debug_dump_archive.py`; legacy v1 chart and v2 chart/prod still readable
+- [x] **UI dialog** — Cockpit „Debug-Dump speichern“ → dialog with optional Titel/Symptom; „ZIP erstellen“ or „ZIP erstellen und herunterladen“ (save + browser download in one step); no Dump-Typ selector (`ui/chart_debug_capture.py`)
+- [x] **Replay / fixture promotion** — `scripts/replay_debug_dump.py` for `debug` (+ legacy chart/prod); `scripts/archive_prod_dump.py` reads `manifest.meta` (fallback `prod`)
+- [x] **Docs / tests** — [`docs/einrichtung/betrieb.md`](../docs/einrichtung/betrieb.md), [`tests/fixtures/prod_dumps/README.md`](../tests/fixtures/prod_dumps/README.md); `tests/test_debug_dump_archive.py` / `test_chart_debug_capture.py`
+
+
+### Bugfix Hauskonfigurator PV switch tab jump (2026-07-17)
+
+- [x] **PV switch jumped to Hausprofil** — switching PV in Hauskonfigurator reset `st.tabs` to Hausprofil; replaced with session-keyed `st.segmented_control` + conditional section render in `ui/pages/page_house_config.py`; verified in UI
+
+
 ### Tariff filters Land + type (2026-07-16)
 
 - [x] **Tariff filter Land + Typ** — `ui/tariff_filter_helpers.py`; Bezugs-/Einspeisetarif pickers in Szenarieneditor + Live-Konfiguration; cascading Typ after Land; current selection kept if outside filters; tests in `test_tariff_filter_helpers.py`; note in `docs/konfiguration/ueberblick.md`

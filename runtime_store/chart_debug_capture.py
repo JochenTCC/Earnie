@@ -1,5 +1,5 @@
 """
-chart_debug_capture.py – Chart-Profil-Payload und Kompatibilitaets-API fuer Debug-Dumps.
+chart_debug_capture.py – Chart-Payload und Kompatibilitaets-API fuer Debug-Dumps.
 """
 from __future__ import annotations
 
@@ -9,7 +9,8 @@ from typing import Any
 
 import config
 from runtime_store.debug_dump_archive import (
-    DUMP_TYPE_CHART,
+    DUMP_TYPE_DEBUG,
+    DUMP_SCHEMA_VERSION,
     read_zip_bytes,
     resolve_output_dir,
     write_debug_dump_zip,
@@ -18,7 +19,7 @@ from runtime_store.debug_dump_inputs import collect_dump_context
 from runtime_store.live_optimization_debug import _json_safe
 from runtime_store import run_state
 
-# Legacy alias; new dumps use schema v2 via debug_dump_archive.
+# Legacy alias; new dumps use schema v3 via debug_dump_archive.
 CAPTURE_SCHEMA_VERSION = 1
 
 
@@ -149,7 +150,7 @@ def build_chart_section(
     session_meta: dict[str, Any] | None,
     chart1_plotly_json: str | None,
 ) -> dict[str, Any]:
-    """Chart-profile payload nested under manifest['chart'] (schema v2)."""
+    """Chart payload nested under manifest['chart'] (schema v3)."""
     return _json_safe(
         {
             "live_soc_percent": current_soc,
@@ -190,7 +191,7 @@ def build_capture_payload(
     """
     Serialisiert Chart-Zustand.
 
-    Schema-v2-Form mit dump_type/chart; Tests und Replay nutzen normalize_manifest.
+    Schema-v3-Form mit dump_type/chart; Tests und Replay nutzen normalize_manifest.
     """
     dump_context = collect_dump_context()
     chart = build_chart_section(
@@ -202,13 +203,14 @@ def build_capture_payload(
     )
     return _json_safe(
         {
-            "schema_version": 2,
-            "dump_type": DUMP_TYPE_CHART,
+            "schema_version": DUMP_SCHEMA_VERSION,
+            "dump_type": DUMP_TYPE_DEBUG,
             "captured_at": datetime.now().isoformat(timespec="seconds"),
             "app_version": _read_app_version(),
             "env_overrides": dump_context["env_overrides"],
             "resolved_paths": dump_context["resolved_paths"],
             "chart": chart,
+            "meta": {"title": "", "symptom": "", "case_id": ""},
             # Flat aliases for older test helpers still reading top-level keys.
             **chart,
         }
@@ -222,9 +224,12 @@ def write_capture_zip(
     live_power: dict[str, Any] | None = None,
     session_meta: dict[str, Any] | None = None,
     chart1_plotly_json: str | None = None,
+    title: str = "",
+    symptom: str = "",
+    case_id: str = "",
     captured_at: datetime | None = None,
 ) -> str:
-    """Write a chart-profile debug dump ZIP. Returns absolute path."""
+    """Write a unified debug dump ZIP with chart payload. Returns absolute path."""
     chart_payload = build_chart_section(
         bundle,
         current_soc=current_soc,
@@ -232,13 +237,11 @@ def write_capture_zip(
         session_meta=session_meta,
         chart1_plotly_json=chart1_plotly_json,
     )
-    chart_context = bundle.chart_context
-    chart_window = chart_context.chart_window if chart_context else None
     return write_debug_dump_zip(
-        DUMP_TYPE_CHART,
         chart_payload=chart_payload,
-        chart_window_start=chart_window.start if chart_window else None,
-        chart_window_end=chart_window.end if chart_window else None,
+        title=title,
+        symptom=symptom,
+        case_id=case_id,
         captured_at=captured_at,
     )
 

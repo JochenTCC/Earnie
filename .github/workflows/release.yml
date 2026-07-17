@@ -1,6 +1,8 @@
 # Tag-triggered release: multi-arch Docker → ghcr.io + GitHub Release.
-# Trigger: push annotated tag matching vMAJOR.MINOR.PATCH (e.g. v2.0.0).
+# Trigger: push annotated tag matching vMAJOR.MINOR.PATCH or SemVer pre-release
+#   (e.g. v2.0.0, v2.2.0-alpha.1).
 # Prerequisite: version.py __version__ must equal the tag without the leading "v".
+# Pre-releases (version contains "-"): GitHub --prerelease, no --latest, no Docker :latest.
 
 name: Release
 
@@ -39,9 +41,15 @@ jobs:
             echo "::error::version.py is '${ACTUAL}' but tag is '${TAG}' (expected '${EXPECTED}')"
             exit 1
           fi
+          if [[ "$ACTUAL" == *-* ]]; then
+            PRERELEASE=true
+          else
+            PRERELEASE=false
+          fi
           echo "version=${ACTUAL}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Version gate OK: ${ACTUAL}"
+          echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
+          echo "Version gate OK: ${ACTUAL} (prerelease=${PRERELEASE})"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -62,6 +70,7 @@ jobs:
       - name: Build and push multi-arch image
         run: python -m scripts.build_container --target all --push
         # Tariff deploy-gate runs inside build_container when --push is set.
+        # default_tags() omits :latest when version.py is a SemVer pre-release.
 
       - name: Prepare release notes
         id: notes
@@ -69,6 +78,7 @@ jobs:
           set -euo pipefail
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
+          PRERELEASE="${{ steps.version.outputs.prerelease }}"
           NOTES_FILE=".github/release-notes/${TAG}.md"
           OUT="${RUNNER_TEMP}/release-notes.md"
           if [ -f "$NOTES_FILE" ]; then
@@ -77,11 +87,22 @@ jobs:
             {
               echo "## Earnie ${VERSION}"
               echo ""
-              echo "### Docker images"
-              echo ""
-              echo "- \`ghcr.io/jochentcc/earnie-energy:${VERSION}\`"
-              echo "- \`ghcr.io/jochentcc/earnie-energy:latest\`"
-              echo "- Legacy aliases: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\` / \`:latest\`"
+              if [ "$PRERELEASE" = "true" ]; then
+                echo "### Pre-release (community test)"
+                echo ""
+                echo "This is **not** an official release. Do not use \`:latest\` — pin the version tag."
+                echo ""
+                echo "### Docker images"
+                echo ""
+                echo "- \`ghcr.io/jochentcc/earnie-energy:${VERSION}\`"
+                echo "- Legacy alias: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\`"
+              else
+                echo "### Docker images"
+                echo ""
+                echo "- \`ghcr.io/jochentcc/earnie-energy:${VERSION}\`"
+                echo "- \`ghcr.io/jochentcc/earnie-energy:latest\`"
+                echo "- Legacy aliases: \`ghcr.io/jochentcc/ernie-energy:${VERSION}\` / \`:latest\`"
+              fi
               echo ""
               echo "Deploy: [docs/einrichtung/container.md](https://github.com/${{ github.repository }}/blob/main/docs/einrichtung/container.md)"
               echo ""
@@ -95,7 +116,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "Earnie ${{ steps.version.outputs.version }}" \
-            --notes-file "${{ steps.notes.outputs.path }}" \
-            --latest
+          ARGS=(
+            "${{ steps.version.outputs.tag }}"
+            --title "Earnie ${{ steps.version.outputs.version }}"
+            --notes-file "${{ steps.notes.outputs.path }}"
+          )
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
+            ARGS+=(--prerelease)
+          else
+            ARGS+=(--latest)
+          fi
+          gh release create "${ARGS[@]}"

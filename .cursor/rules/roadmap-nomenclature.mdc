@@ -11,7 +11,7 @@ alwaysApply: true
 
 * **Placeholders:** Future minors that are not yet numbered are designated as `N.+1` (e.g., `2.+1`).
 
-* **`version.py` vs. Backlog:** `version.py` contains only the SemVer (without letters). Changes to `version.py` **always** require explicit user approval (no automatic increment).
+* **`version.py` vs. Backlog:** `version.py` holds SemVer (`X.Y.Z` or pre-release `X.Y.Z-alpha.N` / `-rc.N`) — not backlog letters (`.a`, `.b`). Changes to `version.py` **always** require explicit user approval (no automatic increment).
 
 * **Granularity:** Backlog letter (`1.24.a`) = Entire chapter/feature block. Incremental steps within this process utilize the Step level (`P3a`).
 

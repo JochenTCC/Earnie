@@ -76,42 +76,46 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).
 
-## Debug-Dump (Chart / Prod)
+## Debug-Dump
 
-Zum Nachvollziehen von Anzeige- oder Optimizer-Problemen ohne erneutes Durchsuchen der Produktivdateien. Aktivierung wie oben (`ui.chart_debug_capture_enabled`, `local_settings.json` oder Env-Variable). Im Live-Cockpit: Dump-Typ wählen, speichern, ZIP herunterladen.
+Zum Nachvollziehen von Anzeige- oder Optimizer-Problemen ohne erneutes Durchsuchen der Produktivdateien. Aktivierung wie oben (`ui.chart_debug_capture_enabled`, `local_settings.json` oder Env-Variable). Im Live-Cockpit: „Debug-Dump speichern“ → Dialog mit optionalem Titel/Symptom → „ZIP erstellen“ (nur speichern) oder „ZIP erstellen und herunterladen“ (speichern und Browser-Download in einem Schritt).
 
-| Dump-Typ | Zweck | Pflicht-Laufzeitdateien | Optionale Laufzeitdateien |
-| -------- | ----- | ----------------------- | ------------------------- |
-| **Chart** | UI-/Chart-Bugs | `runtime/optimization_history_window.jsonl` (Chart-Fenster ± 2 h) | `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json` |
-| **Prod** | Domain-/Optimizer-Fälle | `runtime/optimization_history.jsonl` (vollständig) | wie Chart, zusätzlich `pv_counter_state.json` |
+Ein Dump enthält immer die volle Optimierungshistorie und die aktiven Inputs. Die Chart-UI-Payload wird mitgeschrieben, wenn die Live-Anzeige (Display-Bundle) vorhanden ist; sonst nur Historie/Inputs (Hinweis in der UI).
+
+| Inhalt | Pflicht / optional |
+| ------ | ------------------ |
+| `runtime/optimization_history.jsonl` | Pflicht (vollständig) |
+| `optimizer_run_state.json`, `live_optimization_debug.json`, `flexible_consumers_state.json`, `pv_counter_state.json` | Optional, falls vorhanden |
+| `manifest.chart` | Optional (nur mit Live-Anzeige) |
+| Titel / Symptom | Optional (`manifest.meta`) |
 
 Gemeinsam in jedem ZIP:
 
-- `manifest.json` — `schema_version: 2`, `dump_type`, App-Version, Env-Overrides, aufgelöste Pfade; Chart-Payload unter `chart`, Prod-Metadaten unter `prod` (Titel/Symptom optional)
+- `manifest.json` — `schema_version: 3`, `dump_type: debug`, App-Version, Env-Overrides, aufgelöste Pfade; optional `chart`, immer `meta` (Titel/Symptom/case_id)
 - `inputs/*` — aktive `config.json`, Sidecars, optional Preis-Modell und `cons_data_hourly.csv`
 - `README.txt` — Kurzbeschreibung der Struktur
 
-Dateiname: `debug_dump_chart_…` bzw. `debug_dump_prod_…` unter `runtime/chart_debug/` (oder `ui.chart_debug_capture_dir`).
+Dateiname: `debug_dump_YYYYMMDD_HHMMSS.zip` unter `runtime/chart_debug/` (oder `ui.chart_debug_capture_dir`). Alte ZIPs `debug_dump_chart_*` / `debug_dump_prod_*` (schema v1/v2) bleiben lesbar für Replay und Fixture-Promotion.
 
 ### Replay (teilautomatisch)
 
 ```bash
-python -m scripts.replay_debug_dump path/to/debug_dump_chart_….zip
-python -m scripts.replay_debug_dump path/to/debug_dump_prod_….zip --html-out /tmp/chart1.html
+python -m scripts.replay_debug_dump path/to/debug_dump_….zip
+python -m scripts.replay_debug_dump path/to/debug_dump_….zip --html-out /tmp/chart1.html
 ```
 
-Prüft Pflichtdateien und führt einen Smoke-Pfad aus (Chart: Chart-1-Neuaufbau aus `display_rows`; Prod: Historie parsen und State-Dateien melden). Alte Chart-Debug-ZIPs mit `schema_version: 1` werden als Chart-Dump erkannt.
+Prüft Pflichtdateien und führt einen Smoke-Pfad aus (Historie parsen; bei vorhandenem `chart.display_rows` zusätzlich Chart-1-Neuaufbau). Alte Chart-/Prod-Debug-ZIPs und `schema_version: 1` werden weiterhin erkannt.
 
 ### Prod-Dump als Regression-Fixture
 
-Ein gespeichertes Prod-ZIP kann nach `tests/fixtures/prod_dumps/<id>/` übernommen werden:
+Ein gespeichertes Debug-ZIP kann nach `tests/fixtures/prod_dumps/<id>/` übernommen werden:
 
 ```bash
 python scripts/archive_prod_dump.py \
   --id mein_fall_2026-07-16 \
   --title "Kurzbeschreibung" \
   --symptom "Beobachtetes Fehlerbild" \
-  --source runtime/chart_debug/debug_dump_prod_….zip
+  --source runtime/chart_debug/debug_dump_….zip
 ```
 
 Details: `tests/fixtures/prod_dumps/README.md`.

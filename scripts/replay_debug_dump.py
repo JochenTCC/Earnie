@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Partial replay / validation for unified debug-dump ZIPs (chart + prod)."""
+"""Partial replay / validation for unified debug-dump ZIPs (schema v3 + legacy)."""
 from __future__ import annotations
 
 import argparse
@@ -12,6 +12,7 @@ import pandas as pd
 
 from runtime_store.debug_dump_archive import (
     DUMP_TYPE_CHART,
+    DUMP_TYPE_DEBUG,
     DUMP_TYPE_PROD,
     DUMP_TYPES,
     extract_dump_to_dir,
@@ -70,11 +71,14 @@ def _replay_chart(root: Path, manifest: dict[str, Any], *, html_out: Path | None
         battery_params=chart.get("battery_params"),
     )
     window_path = root / "runtime" / "optimization_history_window.jsonl"
-    window_entries = _load_jsonl(window_path)
+    history_path = root / "runtime" / "optimization_history.jsonl"
+    history_entries = _load_jsonl(history_path) if history_path.is_file() else []
+    window_entries = _load_jsonl(window_path) if window_path.is_file() else []
     plotly = chart.get("chart1_plotly")
     print(
         "OK chart replay: "
         f"display_rows={len(display_rows)} "
+        f"history_entries={len(history_entries)} "
         f"history_window_entries={len(window_entries)} "
         f"chart1_plotly={'yes' if plotly else 'no'} "
         f"traces={len(fig.data)}"
@@ -86,7 +90,17 @@ def _replay_chart(root: Path, manifest: dict[str, Any], *, html_out: Path | None
     return 0
 
 
-def _replay_prod(root: Path, manifest: dict[str, Any]) -> int:
+def _meta_from_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    meta = manifest.get("meta")
+    if isinstance(meta, dict):
+        return meta
+    prod = manifest.get("prod")
+    if isinstance(prod, dict):
+        return prod
+    return {}
+
+
+def _replay_history(root: Path, manifest: dict[str, Any]) -> int:
     history_path = root / "runtime" / "optimization_history.jsonl"
     # Fixture promotion / extracted flat layout may place history at root.
     if not history_path.is_file():
@@ -97,7 +111,7 @@ def _replay_prod(root: Path, manifest: dict[str, Any]) -> int:
     if not entries:
         print("FAIL: optimization_history.jsonl empty or unreadable")
         return 1
-    prod = manifest.get("prod") or {}
+    meta = _meta_from_manifest(manifest)
     state_names = (
         "flexible_consumers_state.json",
         "optimizer_run_state.json",
@@ -111,12 +125,24 @@ def _replay_prod(root: Path, manifest: dict[str, Any]) -> int:
                 present.append(name)
                 break
     print(
-        "OK prod replay: "
+        "OK history replay: "
         f"history_entries={len(entries)} "
-        f"title={prod.get('title')!r} "
-        f"symptom={prod.get('symptom')!r} "
+        f"title={meta.get('title')!r} "
+        f"symptom={meta.get('symptom')!r} "
         f"state_files={present}"
     )
+    return 0
+
+
+def _replay_debug(root: Path, manifest: dict[str, Any], *, html_out: Path | None) -> int:
+    history_rc = _replay_history(root, manifest)
+    if history_rc != 0:
+        return history_rc
+    chart = manifest.get("chart") or {}
+    if chart.get("display_rows"):
+        return _replay_chart(root, manifest, html_out=html_out)
+    if html_out is not None:
+        print("NOTE: --html-out ignored (no chart.display_rows in dump)")
     return 0
 
 
@@ -134,10 +160,12 @@ def replay_debug_dump(
         f"Dump root={root} schema_version={manifest.get('schema_version')} "
         f"dump_type={resolved} app_version={manifest.get('app_version')}"
     )
+    if resolved == DUMP_TYPE_DEBUG:
+        return _replay_debug(root, manifest, html_out=html_out)
     if resolved == DUMP_TYPE_CHART:
         return _replay_chart(root, manifest, html_out=html_out)
     if resolved == DUMP_TYPE_PROD:
-        return _replay_prod(root, manifest)
+        return _replay_history(root, manifest)
     print(f"FAIL: unsupported dump_type {resolved!r}")
     return 1
 
@@ -155,13 +183,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--dump-type",
         choices=DUMP_TYPES,
         default=None,
-        help="Override dump_type from manifest",
+        help="Override dump_type from manifest (debug|chart|prod)",
     )
     parser.add_argument(
         "--html-out",
         type=Path,
         default=None,
-        help="Optional Chart 1 HTML output (chart dumps only)",
+        help="Optional Chart 1 HTML output when chart.display_rows is present",
     )
     parser.add_argument(
         "--extract-dir",

@@ -11,6 +11,7 @@ When the user wants to **end session**, **backlog sync**, **commit and push**, o
 2. **Phase 1:** Maintain `backlog/Backlog.md` / `backlog/Backlog-Bugfixes.md` / `backlog/Backlog-Erledigt.md` → commit all approved open changes → push
 3. **`version.py`:** change only after explicit user approval (see `versioning.mdc`) — no automatic bump at session end
 4. For local or possibly temporary files **ask first** (e.g. personal VS Code settings, local paths)
-5. **Phase 2** (Docker build/push) **only** after explicit confirmation — never automatically
+5. After Phase 1: present the skill’s **Publish decision guide** (**A** skip / **B** pre-release / **C** official / **D** bump then publish) with live `version.py` and one recommended choice
+6. **Phase 2** (tag / Docker) **only** after the user picks B, C, or D→B/C — never automatically
 
 Commit and push approval is implied by the end-session request; still do not commit secrets or gitignored files.

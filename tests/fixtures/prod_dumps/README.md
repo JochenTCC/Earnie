@@ -6,8 +6,8 @@ Versionierte Snapshots von Produktiv-Fällen, in denen ein Fehler aufgefallen is
 
 ### A) Unified Debug-Dump aus der UI (empfohlen)
 
-1. Im Live-Cockpit Debug-Dump aktivieren und Typ **Prod** wählen (optional Titel/Symptom).
-2. ZIP speichern (`runtime/chart_debug/debug_dump_prod_YYYYMMDD_HHMMSS.zip`).
+1. Im Live-Cockpit Debug-Dump aktivieren, „Debug-Dump speichern“ drücken, im Dialog optional Titel/Symptom, dann „ZIP erstellen“ oder „ZIP erstellen und herunterladen“ (letzteres startet den Browser-Download sofort).
+2. ZIP landet unter `runtime/chart_debug/debug_dump_YYYYMMDD_HHMMSS.zip`.
 3. Als Fixture archivieren:
 
 ```bash
@@ -15,15 +15,15 @@ python scripts/archive_prod_dump.py \
   --id eauto_deadline_missed_2026-06-27 \
   --title "E-Auto nicht voll bis Fertig-Uhrzeit" \
   --symptom "Nur ~6.6 kWh geladen statt 16 kWh bis 09:30" \
-  --source runtime/chart_debug/debug_dump_prod_….zip
+  --source runtime/chart_debug/debug_dump_….zip
 ```
 
-Inputs und Historie kommen aus dem ZIP; CLI-Titel/Symptom überschreiben die Dump-Metadaten.
+Inputs und Historie kommen aus dem ZIP; CLI-Titel/Symptom überschreiben die Dump-Metadaten (`manifest.meta`, ggf. legacy `manifest.prod`).
 
 Vorab prüfen:
 
 ```bash
-python -m scripts.replay_debug_dump runtime/chart_debug/debug_dump_prod_….zip
+python -m scripts.replay_debug_dump runtime/chart_debug/debug_dump_….zip
 ```
 
 ### B) NAS-Kopie (klassisch)
@@ -55,16 +55,18 @@ tests/fixtures/prod_dumps/<fall-id>/
 Große Dateien (`cons_data_hourly.csv`, `earnie.log`) werden nicht versioniert;
 sie bleiben im lokalen Capture-ZIP bzw. `runtime-prod/` zur manuellen Analyse.
 
-## Capture-ZIP (schema v2, dump_type=prod)
+## Capture-ZIP (schema v3, dump_type=debug)
 
 ```
-debug_dump_prod_YYYYMMDD_HHMMSS.zip
-  manifest.json
+debug_dump_YYYYMMDD_HHMMSS.zip
+  manifest.json              # meta + optional chart
   README.txt
   inputs/…
   runtime/optimization_history.jsonl   # Pflicht
   runtime/*.json                       # optional
 ```
+
+Alte `debug_dump_chart_*` / `debug_dump_prod_*` (schema v1/v2) bleiben für Replay und Archivierung lesbar.
 
 ## Fixture manifest.json
 

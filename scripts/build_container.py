@@ -50,10 +50,24 @@ def _run_deploy_tariff_gate() -> None:
     print("Deploy-Gate: Tarifkatalog OK.")
 
 
-def default_tags() -> list[str]:
+def is_prerelease_version(version: str) -> bool:
+    """True for SemVer pre-releases (e.g. 2.2.0-alpha.1, 2.2.0-rc.1)."""
+    return "-" in version
+
+
+def default_tags(version: str | None = None) -> list[str]:
+    """Default GHCR tags for *version* (defaults to ``version.__version__``).
+
+    Official releases get ``:latest`` and ``:<version>`` (plus legacy aliases).
+    Pre-releases get only ``:<version>`` so ``:latest`` stays on the last official build.
+    """
+    ver = __version__ if version is None else version
+    include_latest = not is_prerelease_version(ver)
     tags: list[str] = []
     for image in (DEFAULT_REGISTRY_IMAGE, LEGACY_REGISTRY_IMAGE):
-        tags.extend([f"{image}:latest", f"{image}:{__version__}"])
+        if include_latest:
+            tags.append(f"{image}:latest")
+        tags.append(f"{image}:{ver}")
     return tags
 
 
@@ -136,7 +150,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="append",
         dest="tags",
         metavar="IMAGE:TAG",
-        help=f"Image-Tag (mehrfach). Ohne Angabe: {DEFAULT_REGISTRY_IMAGE}:latest und :{__version__}",
+        help=(
+            "Image-Tag (mehrfach). Ohne Angabe: "
+            f"{DEFAULT_REGISTRY_IMAGE}:<version> und ggf. :latest "
+            "(kein :latest bei SemVer-Pre-Releases in version.py)"
+        ),
     )
     parser.add_argument(
         "--target",

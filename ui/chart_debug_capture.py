@@ -1,6 +1,7 @@
-"""Streamlit-Steuerung: Debug-Dump-ZIP (Chart oder Prod) speichern."""
+"""Streamlit-Steuerung: Debug-Dump-ZIP speichern."""
 from __future__ import annotations
 
+import base64
 import logging
 from typing import Any
 
@@ -12,11 +13,7 @@ from runtime_store.chart_debug_capture import (
     build_chart_section,
     read_zip_bytes,
 )
-from runtime_store.debug_dump_archive import (
-    DUMP_TYPE_CHART,
-    DUMP_TYPE_PROD,
-    write_debug_dump_zip,
-)
+from runtime_store.debug_dump_archive import write_debug_dump_zip
 from ui.charts import build_power_soc_chart_figure
 from ui.history_navigation import get_s2_cycle_offset, get_s2_segment_index
 from ui.simulation_results import SESSION_LIVE_DISPLAY_BUNDLE
@@ -24,10 +21,9 @@ from ui.simulation_results import SESSION_LIVE_DISPLAY_BUNDLE
 logger = logging.getLogger("app")
 
 _SESSION_LAST_CAPTURE_PATH = "chart_debug_last_capture_path"
-_DUMP_TYPE_LABELS = {
-    "Chart (UI/Anzeige)": DUMP_TYPE_CHART,
-    "Prod (Optimizer/Domain)": DUMP_TYPE_PROD,
-}
+_SESSION_META_PROMPT = "chart_debug_meta_prompt"
+_SESSION_SAVE_MESSAGE = "chart_debug_save_message"
+_SESSION_AUTO_DOWNLOAD = "chart_debug_auto_download"
 
 
 def _session_meta() -> dict[str, Any]:
@@ -61,33 +57,123 @@ def _chart1_plotly_json(bundle) -> str | None:
         return None
 
 
-def _save_chart_dump(bundle, current_soc: float | None, live_power: dict[str, Any] | None) -> str:
-    capture_live_power = live_power
-    if capture_live_power is None:
-        capture_live_power = loxone_client.fetch_loxone_live_power()
-    chart_payload = build_chart_section(
-        bundle,
-        current_soc=current_soc,
-        live_power=capture_live_power,
-        session_meta=_session_meta(),
-        chart1_plotly_json=_chart1_plotly_json(bundle),
-    )
-    chart_context = bundle.chart_context
-    chart_window = chart_context.chart_window if chart_context else None
+def _save_debug_dump(
+    bundle,
+    current_soc: float | None,
+    live_power: dict[str, Any] | None,
+    *,
+    title: str,
+    symptom: str,
+) -> str:
+    chart_payload = None
+    if bundle is not None:
+        capture_live_power = live_power
+        if capture_live_power is None:
+            capture_live_power = loxone_client.fetch_loxone_live_power()
+        chart_payload = build_chart_section(
+            bundle,
+            current_soc=current_soc,
+            live_power=capture_live_power,
+            session_meta=_session_meta(),
+            chart1_plotly_json=_chart1_plotly_json(bundle),
+        )
     return write_debug_dump_zip(
-        DUMP_TYPE_CHART,
         chart_payload=chart_payload,
-        chart_window_start=chart_window.start if chart_window else None,
-        chart_window_end=chart_window.end if chart_window else None,
-    )
-
-
-def _save_prod_dump(*, title: str, symptom: str) -> str:
-    return write_debug_dump_zip(
-        DUMP_TYPE_PROD,
         title=title.strip(),
         symptom=symptom.strip(),
     )
+
+
+def _zip_file_name(zip_path: str) -> str:
+    return zip_path.split("/")[-1].split("\\")[-1]
+
+
+def _trigger_browser_download(data: bytes, file_name: str) -> None:
+    """Start download in the main document (st.html is not iframed)."""
+    b64 = base64.b64encode(data).decode("ascii")
+    safe_name = (
+        file_name.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "").replace("\r", "")
+    )
+    st.html(
+        f"""
+        <script>
+        (function() {{
+          const a = document.createElement('a');
+          a.href = 'data:application/zip;base64,{b64}';
+          a.download = '{safe_name}';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        }})();
+        </script>
+        """,
+        unsafe_allow_javascript=True,
+    )
+
+
+def _close_dialog() -> None:
+    st.session_state[_SESSION_META_PROMPT] = False
+    st.session_state.pop(_SESSION_AUTO_DOWNLOAD, None)
+
+
+def _finish_save(
+    zip_path: str,
+    *,
+    start_download: bool,
+) -> None:
+    """Persist result, close dialog, optional auto-download on next main-page render."""
+    st.session_state[_SESSION_LAST_CAPTURE_PATH] = zip_path
+    st.session_state[_SESSION_META_PROMPT] = False
+    st.session_state[_SESSION_SAVE_MESSAGE] = (
+        "ok",
+        f"Debug-Dump gespeichert: `{zip_path}`",
+    )
+    if start_download:
+        st.session_state[_SESSION_AUTO_DOWNLOAD] = zip_path
+    else:
+        st.session_state.pop(_SESSION_AUTO_DOWNLOAD, None)
+    st.rerun()
+
+
+@st.dialog("Debug-Dump")
+def _debug_dump_meta_dialog(
+    bundle,
+    current_soc: float | None,
+    live_power: dict[str, Any] | None,
+) -> None:
+    st.caption("Titel und Symptom sind optional und landen in manifest.meta.")
+    st.text_input("Titel (optional)", key="debug_dump_title")
+    st.text_area("Symptom (optional)", key="debug_dump_symptom")
+    col_create, col_download = st.columns(2)
+    with col_create:
+        create_only = st.button("ZIP erstellen", key="chart_debug_confirm_btn")
+    with col_download:
+        # Same pattern as create_only (closes dialog). Download runs on main page via st.html.
+        create_and_download = st.button(
+            "ZIP erstellen und herunterladen",
+            type="primary",
+            key="chart_debug_confirm_download_btn",
+        )
+    if st.button("Abbrechen", key="chart_debug_cancel_btn"):
+        _close_dialog()
+        st.rerun()
+    if not create_only and not create_and_download:
+        return
+
+    title = str(st.session_state.get("debug_dump_title") or "")
+    symptom = str(st.session_state.get("debug_dump_symptom") or "")
+    try:
+        zip_path = _save_debug_dump(
+            bundle,
+            current_soc,
+            live_power,
+            title=title,
+            symptom=symptom,
+        )
+        _finish_save(zip_path, start_download=bool(create_and_download))
+    except (OSError, FileNotFoundError, ValueError) as exc:
+        logger.exception("Debug-Dump-Speichern fehlgeschlagen")
+        st.error(f"Debug-Dump konnte nicht gespeichert werden: {exc}")
 
 
 def render_chart_debug_capture_controls(
@@ -95,61 +181,45 @@ def render_chart_debug_capture_controls(
     live_power: dict[str, Any] | None = None,
 ) -> None:
     """
-    Zeigt Speichern-Button und Download, wenn ui.chart_debug_capture_enabled gesetzt ist.
+    Zeigt Speichern-Button, wenn ui.chart_debug_capture_enabled gesetzt ist.
+
+    Dialog speichert und schließt per st.rerun(); optionaler Download danach
+    über st.html (Haupt-DOM, kein iframe).
     """
     if not config.get_ui_chart_debug_capture_enabled():
         return
 
     bundle = st.session_state.get(SESSION_LIVE_DISPLAY_BUNDLE)
     st.caption(
-        "Debug-Dump: Chart- oder Prod-Archiv als ZIP sichern "
-        "(config.json, `runtime/local_settings.json` oder `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED=1`)."
+        "Debug-Dump: Archiv als ZIP sichern (volle Historie, optional Chart-Payload; "
+        "config.json, `runtime/local_settings.json` oder "
+        "`EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED=1`)."
     )
-    type_label = st.selectbox(
-        "Dump-Typ",
-        options=list(_DUMP_TYPE_LABELS.keys()),
-        key="debug_dump_type_select",
-    )
-    dump_type = _DUMP_TYPE_LABELS[type_label]
+    if bundle is None:
+        st.info("Ohne Live-Anzeige: Dump ohne Chart-Payload (nur Historie/Inputs).")
 
-    title = ""
-    symptom = ""
-    if dump_type == DUMP_TYPE_PROD:
-        title = st.text_input("Titel (optional)", key="debug_dump_prod_title", value="")
-        symptom = st.text_area("Symptom (optional)", key="debug_dump_prod_symptom", value="")
+    save_message = st.session_state.pop(_SESSION_SAVE_MESSAGE, None)
+    if isinstance(save_message, tuple) and len(save_message) == 2:
+        kind, text = save_message
+        if kind == "ok":
+            st.success(text)
+        else:
+            st.error(text)
 
-    can_save_chart = dump_type == DUMP_TYPE_CHART and bundle is not None
-    can_save_prod = dump_type == DUMP_TYPE_PROD
-    if dump_type == DUMP_TYPE_CHART and bundle is None:
-        st.info("Chart-Dump benötigt die aktuelle Live-Anzeige (Bundle fehlt).")
+    auto_path = st.session_state.pop(_SESSION_AUTO_DOWNLOAD, None)
+    if auto_path:
+        try:
+            _trigger_browser_download(
+                read_zip_bytes(str(auto_path)),
+                _zip_file_name(str(auto_path)),
+            )
+        except OSError as exc:
+            st.error(f"ZIP-Download fehlgeschlagen: {exc}")
+            logger.exception("Debug-Dump-Auto-Download fehlgeschlagen")
 
     if st.button("Debug-Dump speichern", key="chart_debug_capture_btn"):
-        if dump_type == DUMP_TYPE_CHART and not can_save_chart:
-            st.error("Chart-Dump nicht möglich: Live-Anzeige fehlt.")
-            return
-        if dump_type == DUMP_TYPE_PROD and not can_save_prod:
-            st.error("Prod-Dump nicht möglich.")
-            return
-        try:
-            if dump_type == DUMP_TYPE_CHART:
-                zip_path = _save_chart_dump(bundle, current_soc, live_power)
-            else:
-                zip_path = _save_prod_dump(title=title, symptom=symptom)
-            st.session_state[_SESSION_LAST_CAPTURE_PATH] = zip_path
-            st.success(f"Debug-Dump gespeichert: `{zip_path}`")
-        except (OSError, FileNotFoundError, ValueError) as exc:
-            st.error(f"Debug-Dump konnte nicht gespeichert werden: {exc}")
-            logger.exception("Debug-Dump-Speichern fehlgeschlagen")
+        st.session_state[_SESSION_META_PROMPT] = True
+        st.session_state.pop(_SESSION_AUTO_DOWNLOAD, None)
 
-    zip_path = st.session_state.get(_SESSION_LAST_CAPTURE_PATH)
-    if zip_path:
-        try:
-            st.download_button(
-                label="Debug-Dump ZIP herunterladen",
-                data=read_zip_bytes(zip_path),
-                file_name=zip_path.split("/")[-1].split("\\")[-1],
-                mime="application/zip",
-                key="chart_debug_download_btn",
-            )
-        except OSError:
-            st.session_state.pop(_SESSION_LAST_CAPTURE_PATH, None)
+    if st.session_state.get(_SESSION_META_PROMPT):
+        _debug_dump_meta_dialog(bundle, current_soc, live_power)

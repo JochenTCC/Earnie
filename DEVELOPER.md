@@ -54,21 +54,27 @@ python -m scripts.build_container
 
 Windows-Wrapper: `.\docker\build-container.ps1`
 
-Standard-Tags: `ghcr.io/jochentcc/earnie-energy:latest` und `ghcr.io/jochentcc/earnie-energy:<version>` (aus `version.py`). Übergangsweise zusätzlich `ernie-energy`-Tags.
+Standard-Tags from `version.py`: official → `:latest` and `:<version>`; SemVer pre-release (`-alpha.N` / `-rc.N`) → `:<version>` only. Legacy `ernie-energy` aliases follow the same rule.
 
 ### Release (tag → GitHub Actions)
 
 **Primary path:** bump `version.py` (user approval only), commit + push `main`, then push an annotated tag. CI (`.github/workflows/release.yml`) builds the multi-arch image to GHCR and creates the GitHub Release.
 
 ```powershell
-# After version.py == X.Y.Z is on origin/main:
+# Official — after version.py == X.Y.Z is on origin/main:
 git tag -a vX.Y.Z -m "Release vX.Y.Z"
 git push origin vX.Y.Z
+
+# Community pre-release — after version.py == X.Y.Z-alpha.N on origin/main:
+git tag -a vX.Y.Z-alpha.N -m "Pre-release vX.Y.Z-alpha.N"
+git push origin vX.Y.Z-alpha.N
 ```
 
-- Tag must match `version.py` exactly (`v2.0.0` ↔ `__version__ = "2.0.0"`); mismatch fails the workflow.
-- Optional notes: `.github/release-notes/vX.Y.Z.md` (else a short default body).
-- Images: `ghcr.io/jochentcc/earnie-energy:X.Y.Z` and `:latest` (+ legacy `ernie-energy` aliases).
+- Tag must match `version.py` exactly (`v2.0.0` ↔ `__version__ = "2.0.0"`; `v2.2.0-alpha.1` ↔ `2.2.0-alpha.1`); mismatch fails the workflow.
+- Optional notes: `.github/release-notes/vX.Y.Z.md` or `vX.Y.Z-alpha.N.md` (else a short default body).
+- Official: GitHub Latest Release; images `:<version>` and `:latest` (+ legacy aliases).
+- Pre-release (`-` in version): GitHub Pre-release (not Latest); images `:<version>` only (no `:latest`).
+- Publish from `main`; leave the pre-release string on `main` until the next approved bump.
 - **GHCR auth for Actions:** store a classic PAT with `write:packages` (and `read:packages`) as repo secret `GHCR_TOKEN`. Without it, `GITHUB_TOKEN` only works if each package (`earnie-energy`, `ernie-energy`) grants this repository **Write** under Package settings → Manage Actions access. Also set packages **Public** if anonymous `docker pull` is required.
 
 **Fallback** (CI down / emergency): local multi-arch push:

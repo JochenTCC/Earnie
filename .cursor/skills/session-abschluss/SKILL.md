@@ -3,8 +3,9 @@ name: session-abschluss
 description: >-
   Ends a development session: maintain backlog/Backlog.md, backlog/Backlog-Bugfixes.md, and
   backlog/Backlog-Erledigt.md,
-  commit and push all open changes, optionally publish a version tag
-  (GitHub Actions → GHCR + GitHub Release; local Docker push as fallback).
+  commit and push all open changes, then guide the user through publish choices
+  (A skip / B community pre-release / C official / D bump version.py first)
+  before any tag (GitHub Actions → GHCR + GitHub Release; local Docker push as fallback).
   Use for "end session", "backlog sync", "commit and push", or an explicit request to conclude the session.
 ---
 
@@ -81,7 +82,7 @@ git push
 
 On failure (upstream, auth): state the cause, do not blindly retry.
 
-### 6. Phase 1 report
+### 6. Phase 1 report + publish decision guide
 
 Briefly summarize:
 
@@ -90,41 +91,85 @@ Briefly summarize:
 - Push status
 - Excluded files (if any)
 
-Close with (when a release seems appropriate):
-
-> Should I create and push tag `vX.Y.Z` so GitHub Actions publishes Docker + the GitHub Release?
-> (Fallback: local `python -m scripts.build_container --target all --push` if CI is skipped.)
+Then **always** present the publish decision guide below (read `version.py` first; fill in concrete values). Do **not** skip this block after Phase 1 — even if publish seems unlikely; the user may still choose **D**.
 
 **Do not** automatically proceed to Phase 2.
 
 ---
 
-## Phase 2 — Publish release (on request only)
+## Publish decision guide (present to the user)
 
-Start **only** on explicit "Yes" / "tag release" / "push tag" / "build Docker" after Phase 1.
+After Phase 1, show this decision block with **live values** substituted:
+
+```text
+### Publish? (choose one)
+
+Current version.py: <ACTUAL>
+Channel if tagged as-is: Official | Pre-release
+(main is the publish branch — no separate alpha branch)
+
+A) Skip publish — stop here (default if unsure)
+B) Community pre-release — GitHub Pre-release + GHCR :<version> only (no :latest)
+C) Official release — GitHub Latest + GHCR :<version> and :latest
+D) Bump version.py first, then publish (you approve the new string)
+
+If B or C with current version: I will tag v<ACTUAL> on main after your OK.
+If D: propose the exact new version string and wait for approval before editing version.py.
+```
+
+### How to choose (tell the user briefly)
+
+| Choice | Use when | Effect |
+|--------|----------|--------|
+| **A** | Dev-only session; not ready for community/prod | No tag, no GHCR update |
+| **B** | Community / forum testers should try a build; prod `:latest` must stay | Pre-release Release; pin `ghcr.io/jochentcc/earnie-energy:<version>` |
+| **C** | Feature set is ready for everyone on `:latest` | Latest Release; Synology/LoxBerry/Proxmox compose can pull `:latest` |
+| **D** | Need a new number first (e.g. start `X.Y.Z-alpha.1`, bump `alpha.N`→`alpha.N+1`, or go to final `X.Y.Z`) | Edit `version.py` only after explicit approval → commit → push → then B or C |
+
+### Agent rules for the guide
+
+1. Read `version.py`. Detect pre-release with `-` in the string (`2.2.0-alpha.1` → B path; `2.2.0` → C path).
+2. Suggest **one** recommended letter (**A** / **B** / **C** / **D**) with a one-line rationale from this session (e.g. “infra for alphas landed → recommend **B** once `version.py` is the intended alpha string”).
+3. If `version.py` is already a pre-release and the user wants community test: recommend **B** (tag as-is), not a silent bump.
+4. If mid MINOR backlog cycle and community test is desired: recommend **D** then **B** with target `X.Y.Z-alpha.N` of the *upcoming* release — not a PATCH on the last official.
+5. Never bump `version.py` or push a tag until the user picks a letter (or equivalent clear wording: “publish alpha”, “official release”, “skip”).
+6. After **D**: propose exact string → wait → edit → commit → push → re-show the guide with the new `version.py` → user picks **B** or **C** (or **A**).
+
+---
+
+## Phase 2 — Publish (only after user picks B, C, or D→B/C)
+
+Start **only** on explicit **B** / **C** / “publish alpha” / “official release” / “tag …” after Phase 1 (and after any approved **D** bump is on `origin/main`).
+
+### Checklist before tagging (confirm with user)
+
+- [ ] `version.py` on `origin/main` equals the intended tag without `v`
+- [ ] Channel correct: `-` in version → pre-release (**B**); clean `X.Y.Z` → official (**C**)
+- [ ] Optional notes file exists or default notes are OK: `.github/release-notes/v….md`
+- [ ] User confirmed tag name (e.g. `v2.1.0-alpha.1` or `v2.1.0`)
 
 ### 1. Check version
 
 Read `version.py`. **Never change without explicit user approval** (see `versioning.mdc`).
 
-During an active MINOR cycle (`1.24.a` … `1.24.g`, release `1.24.0`): **no automatic bump** — also do not "reset" or catch up PATCH.
-
-If a release seems appropriate: **once** suggest (target version + rationale) and ask the user. On "no" or no response: leave unchanged.
-
-Ensure `version.py` is committed and pushed on `origin/main` before tagging.
+Prefer publishing from `main`. After an alpha/rc tag, leave that pre-release string on `main` until the next approved bump — do **not** bump back to the previous official version.
 
 ### 2. Primary: push version tag (CI)
 
-Creates the GitHub Release and multi-arch GHCR images via `.github/workflows/release.yml`:
-
 ```powershell
+# B — community pre-release
+git tag -a vX.Y.Z-alpha.N -m "Pre-release vX.Y.Z-alpha.N"
+git push origin vX.Y.Z-alpha.N
+
+# C — official
 git tag -a vX.Y.Z -m "Release vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-- Tag must match `version.py` (`v2.0.0` ↔ `2.0.0`).
-- Optional notes file: `.github/release-notes/vX.Y.Z.md`
-- Watch Actions; confirm Release page and GHCR tags.
+- Tag must match `version.py` exactly.
+- **B:** Actions → `--prerelease`, GHCR `:<version>` only  
+- **C:** Actions → `--latest`, GHCR `:<version>` + `:latest`  
+- Watch Actions; confirm Release page (Pre-release vs Latest) and GHCR tags
 
 ### 3. Fallback: local build & push
 
@@ -134,21 +179,18 @@ Only if the user asks to skip CI or Actions is unavailable:
 python -m scripts.build_container --target all --push
 ```
 
-Synology only (amd64): `python -m scripts.build_container --target synology --push`  
-Windows wrapper: `.\docker\build-container.ps1 --target all --push`
+Default tags follow `version.py` (pre-release omits `:latest`). Details: `docs/einrichtung/container.md` · `DEVELOPER.md`.
 
-Prerequisites for local push: Docker running; for `--target all` buildx set up; `docker login ghcr.io`; wait for hook confirmation on push.
+### 4. Phase 2 report (guide the user after publish)
 
-Default tags: `ghcr.io/jochentcc/earnie-energy:latest` and `:<version>` from `version.py` (+ legacy `ernie-energy`). Details: `docs/einrichtung/container.md` · `DEVELOPER.md`.
-
-### 4. Phase 2 report
-
-- Tag pushed / Actions run URL (or local built/pushed tags)
-- Version from `version.py`
-- Deploy notes:
-  - Synology: `docker compose --project-directory . -f docker/compose/synology.yml pull && ... up -d`
-  - LoxBerry: `docker compose --project-directory . -f docker/compose/loxberry.yml pull && ... up -d`
-  - Proxmox: `docker compose --project-directory . -f docker/compose/proxmox.yml pull && ... up -d`
+- Tag pushed / Actions run URL
+- Channel + `version.py` value
+- **If B (pre-release):** tell testers to pin  
+  `ghcr.io/jochentcc/earnie-energy:<version>`  
+  (Compose with `:latest` is unchanged — last official)
+- **If C (official):** deploy with usual compose pull of `:latest` or `:<version>`
+  - Synology / LoxBerry / Proxmox: `docker compose --project-directory . -f docker/compose/<host>.yml pull` then `up -d`
+- Remind: next session end will ask **A/B/C/D** again; alpha stays on `main` until the next approved bump
 
 ---
 

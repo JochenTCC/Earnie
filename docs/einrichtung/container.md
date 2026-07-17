@@ -60,6 +60,8 @@ Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/a
 
 **Veröffentlichte Images** kommen von GitHub Releases: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release.yml`](../../.github/workflows/release.yml) und pusht u. a. `ghcr.io/jochentcc/earnie-energy:X.Y.Z` sowie `:latest`. Details für Entwickler: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
+**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und nur den Image-Tag `:<version>` — **nicht** `:latest`. Zum Testen den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.2.0-alpha.1`. Compose-Dateien mit `:latest` bleiben auf der letzten offiziellen Version.
+
 ### Einmaliges buildx-Setup (Entwicklungsrechner)
 
 Für Multi-Arch-Builds von Windows/Linux:
@@ -108,12 +110,10 @@ python -m scripts.validate_tariffs --tariffs config/tariffs.json --check-catalog
 
 Bei Fehlern bricht der Worker mit `EARNIE_STRICT_TARIFF_VALIDATE=1` ab (siehe Compose).
 
-Erzeugt standardmäßig vier Tags (kanonisch + Legacy-Alias für Übergang):
+Erzeugt standardmäßig Tags aus `version.py` (kanonisch + Legacy-Alias für Übergang):
 
-- `ghcr.io/jochentcc/earnie-energy:latest`
-- `ghcr.io/jochentcc/earnie-energy:<version>` (aus `version.py`)
-- `ghcr.io/jochentcc/ernie-energy:latest` (Legacy-Alias, gleicher Digest)
-- `ghcr.io/jochentcc/ernie-energy:<version>` (Legacy-Alias)
+- Offizielle Version (`X.Y.Z`): `:latest` und `:<version>` für `earnie-energy` und Legacy `ernie-energy`
+- Vorabversion (`X.Y.Z-alpha.N` / `-rc.N`): nur `:<version>` (kein `:latest`)
 
 Nach `docker login ghcr.io`:
 
