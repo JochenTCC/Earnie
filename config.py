@@ -12,17 +12,17 @@ from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
     resolve_components_json_path,
     resolve_config_json_path,
-    resolve_dotenv_path,
     resolve_house_profiles_json_path,
     resolve_local_settings_json_path,
     resolve_tariffs_json_path,
 )
 from settings import appliances as appliance_settings
+from settings import config_loaders
 from settings import flexible_consumers as fc_settings
-from settings import legacy_config_gates
+from settings import live_scenario
 from settings import scenarios as scenario_settings
 from settings import system_settings
-from settings.json_io import read_json_dict, write_json_dict
+from settings.json_io import read_json_dict
 
 CONFIG_JSON_PATH = resolve_config_json_path()
 BACKTESTING_SCENARIOS_JSON_PATH = resolve_backtesting_scenarios_json_path()
@@ -64,6 +64,13 @@ class Config:
     )
     _load_event_poll_interval_sec = staticmethod(system_settings.load_event_poll_interval_sec)
     _normalize_event_trigger = staticmethod(system_settings.normalize_event_trigger)
+    _validate_threshold_power = staticmethod(config_loaders.validate_threshold_power)
+    _normalize_runtime_settings_key = staticmethod(
+        live_scenario.normalize_runtime_settings_key
+    )
+    _RUNTIME_REF_KEYS = live_scenario.RUNTIME_REF_KEYS
+    _DEPRECATED_RUNTIME_GEO_KEYS = live_scenario.DEPRECATED_RUNTIME_GEO_KEYS
+    _DEPRECATED_RUNTIME_FLAT_KEYS = live_scenario.DEPRECATED_RUNTIME_FLAT_KEYS
 
     def __init__(
         self,
@@ -118,178 +125,35 @@ class Config:
                 f"Kritischer Fehler: '{self.config_path}' konnte nicht gelesen werden: {e}"
             ) from e
 
-    def _get_strict(self, source: dict, keys_path: list) -> any:
-        current = source
-        for key in keys_path:
-            if not isinstance(current, dict) or key not in current:
-                raise KeyError(
-                    f"Kritischer Konfigurationsfehler: Der Parameter '{'.'.join(keys_path)}' fehlt in {self.config_path}!"
-                )
-            current = current[key]
-        return current
-
-    @staticmethod
-    def _validate_threshold_power(value) -> float:
-        rel = float(value)
-        if rel <= 0.0 or rel > 1.0:
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: runtime_settings.threshold_power "
-                "muss ein relativer Anteil zwischen 0 (exklusiv) und 1 (inklusiv) sein."
-            )
-        return rel
-
-    def _load_local_settings_document(self) -> dict:
-        path = self.local_settings_path
-        if not os.path.isfile(path):
-            return {}
-        try:
-            return read_json_dict(path)
-        except json.JSONDecodeError as e:
-            raise ValueError(
-                f"Kritischer Fehler: '{path}' enthält ungültiges JSON: {e}"
-            ) from e
-
     def _load_event_triggers(self) -> list[dict]:
         return system_settings.load_event_triggers(self._raw_config)
 
     def _load_env_vars(self) -> None:
-        self.LOXONE_IP = os.getenv("LOXONE_IP")
-        self.LOXONE_USER = os.getenv("LOXONE_USER")
-        self.LOXONE_PASS = os.getenv("LOXONE_PASS")
-
-        if self.require_loxone_credentials and not all([self.LOXONE_IP, self.LOXONE_USER, self.LOXONE_PASS]):
-            missing = [k for k in ["LOXONE_IP", "LOXONE_USER", "LOXONE_PASS"] if not os.getenv(k)]
-            dotenv_path = resolve_dotenv_path()
-            raise ValueError(
-                f"Kritischer Fehler: Fehlende sensible Daten in '{dotenv_path}': "
-                f"{', '.join(missing)}"
-            )
+        config_loaders.apply_attrs(
+            self,
+            config_loaders.load_env_vars(
+                require_loxone_credentials=self.require_loxone_credentials
+            ),
+        )
 
     def _load_static_params(self) -> None:
-        self._load_system_and_ui_params()
-        self._load_loxone_block_params()
-        self._load_sim_path_params()
-
-    def _load_system_and_ui_params(self) -> None:
-        self.GLOBAL_TIMEOUT = self._get_strict(self._raw_config, ["system", "global_timeout"])
-        self.LOOP_TIMEOUT = self._get_strict(self._raw_config, ["system", "loop_timeout"])
-        local_settings = self._load_local_settings_document()
-        self.LOXONE_SILENT_MODE = system_settings.load_loxone_silent_mode(
-            self._raw_config,
-            local_settings,
-            self.local_settings_path,
-        )
-        self.EVENT_TRIGGER_ENABLED = system_settings.load_event_trigger_enabled(self._raw_config)
-        self.EVENT_POLL_INTERVAL_SEC = system_settings.load_event_poll_interval_sec(self._raw_config)
-        self.EVENT_TRIGGERS = self._load_event_triggers()
-        self.UI_FRAGMENT_REFRESH_CHARTS_SEC = system_settings.load_ui_fragment_refresh_sec(
-            self._raw_config,
-            "fragment_refresh_charts_sec",
-            60,
-        )
-        self.UI_FRAGMENT_REFRESH_STATUS_SEC = system_settings.load_ui_fragment_refresh_sec(
-            self._raw_config,
-            "fragment_refresh_status_sec",
-            10,
-        )
-        self.UI_MAIN_SYNC_POLL_SEC = system_settings.load_ui_fragment_refresh_sec(
-            self._raw_config,
-            "main_sync_poll_sec",
-            15,
-        )
-        self.UI_CHART_DEBUG_CAPTURE_ENABLED = (
-            system_settings.load_ui_chart_debug_capture_enabled(
+        config_loaders.apply_attrs(
+            self,
+            config_loaders.load_system_and_ui_params(
                 self._raw_config,
-                local_settings,
-                self.local_settings_path,
-            )
+                local_settings_path=self.local_settings_path,
+                event_triggers=self._load_event_triggers(),
+                config_path=self.config_path,
+            ),
         )
-        self.UI_CHART_DEBUG_CAPTURE_DIR = system_settings.load_ui_chart_debug_capture_dir(
-            self._raw_config
+        config_loaders.apply_attrs(
+            self,
+            config_loaders.load_loxone_block_params(self._raw_config, self.config_path),
         )
-        self.UI_STREAMLIT_PORT = system_settings.load_ui_streamlit_port(self._raw_config)
-        self.UI_PRICE_FORECAST_PAGE_ENABLED = system_settings.load_ui_bool(
-            self._raw_config,
-            "price_forecast_page_enabled",
-            False,
+        config_loaders.apply_attrs(
+            self,
+            config_loaders.load_sim_path_params(self._raw_config),
         )
-
-    def _load_loxone_block_params(self) -> None:
-        self.LOXONE_SOC_NAME = self._get_strict(self._raw_config, ["loxone_blocks", "soc_name"])
-        self.LOXONE_PV_COUNTER_NAME = self._get_strict(
-            self._raw_config, ["loxone_blocks", "pv_counter_name"]
-        )
-        self.LOXONE_LOG_FILENAME = self._get_strict(
-            self._raw_config, ["loxone_blocks", "log_filename"]
-        )
-        self.PV_TUNING_LOG_FILE = self._get_strict(
-            self._raw_config, ["loxone_blocks", "pv_tuning_log_file"]
-        )
-        self.LOXONE_PV_POWER_NAME = self._get_strict(
-            self._raw_config, ["loxone_blocks", "pv_power_name"]
-        )
-        self.LOXONE_BATTERY_POWER_NAME = self._get_strict(
-            self._raw_config, ["loxone_blocks", "battery_power_name"]
-        )
-        self.LOXONE_GRID_POWER_NAME = self._get_strict(
-            self._raw_config, ["loxone_blocks", "grid_power_name"]
-        )
-        self.LOXONE_TARGET_SOC_NAME = self._get_strict(
-            self._raw_config, ["loxone_blocks", "target_soc_name"]
-        )
-        self.LOXONE_TARGET_CHARGE_POWER_NAME = self._get_strict(
-            self._raw_config, ["loxone_blocks", "target_charge_power_name"]
-        )
-        self.LOXONE_TARGET_DISCHARGE_POWER_NAME = self._get_strict(
-            self._raw_config, ["loxone_blocks", "target_discharge_power_name"]
-        )
-        self.LOXONE_CONTROL_CMD_NAME = self._get_strict(
-            self._raw_config, ["loxone_blocks", "control_cmd_name"]
-        )
-
-    def _load_sim_path_params(self) -> None:
-        sim_paths = self._raw_config.get("file_paths_battery_simulation", {})
-        self.PATH_CONSUMPTION = sim_paths.get("path_consumption", "")
-        self.PATH_CONSUMPTION_TOTAL = self.PATH_CONSUMPTION
-        self.PATH_PRODUCTION = sim_paths.get("path_production", "")
-        self.PATH_PRICE = sim_paths.get("path_price", "")
-        self.PATH_CONS_DATA = sim_paths.get("path_cons_data", "runtime/cons_data_hourly.csv")
-        self.CONS_DATA_RETENTION_MONTHS = sim_paths.get("cons_data_retention_months", 24)
-        self.CONS_DATA_WRITE_MODE = sim_paths.get("cons_data_write_mode", "hourly")
-        self.PRICE_SOURCE = sim_paths.get("price_source", "csv")
-        self.PRICE_PROVIDER = sim_paths.get("price_provider", "awattar")
-        self.PRICE_RANGE = sim_paths.get("price_range", "last_12_months")
-        self.ENERGY_CHARTS_BZN = sim_paths.get("energy_charts_bzn", "DE-LU")
-
-    def _lookup_runtime_value(self, resolved: dict, key: str):
-        if key in resolved:
-            return resolved[key]
-        raise KeyError(
-            f"Kritischer Konfigurationsfehler: aufgelöstes runtime_settings.{key} "
-            f"fehlt — prüfen Sie Entitäts-IDs in {self.config_path}."
-        )
-
-    def _reject_legacy_config_blocks(self) -> None:
-        legacy_config_gates.reject_legacy_config_blocks(self._raw_config)
-
-    def _reject_legacy_runtime_settings_block(self) -> None:
-        legacy_config_gates.reject_legacy_runtime_settings_block(self._raw_config)
-
-    def _resolve_live_scenario_settings_dict(self) -> dict:
-        from house_config.scenario_resolution import resolve_live_scenario_settings
-
-        holder: dict = {}
-        resolved = resolve_live_scenario_settings(
-            self._raw_config,
-            backtesting_scenarios_path=self.backtesting_scenarios_path,
-            components_path=self.components_path,
-            tariffs_path=self.tariffs_path,
-            house_profiles_path=self.house_profiles_path,
-            monthly_rates_holder=holder,
-        )
-        if holder.get("_monthly_fixed_tariffs") is not None:
-            resolved["_monthly_fixed_tariffs"] = holder["_monthly_fixed_tariffs"]
-        return resolved
 
     def get_resolved_runtime_settings(self) -> dict:
         """Aufgelöstes Runtime-Szenario (Entitäts-IDs → flache Parameter)."""
@@ -301,117 +165,27 @@ class Config:
 
     def require_runtime_params_loaded(self) -> None:
         """Erzwingt vollständig aufgelöste PV-/Batterie-/Tarif-Parameter (Live-Optimierung)."""
-        if not self._runtime_params_deferred:
-            return
-        from ui.setup_readiness import missing_planning_setup_items_for
-
-        missing = missing_planning_setup_items_for(
-            self._raw_config,
+        live_scenario.require_runtime_params_loaded(
+            deferred=self._runtime_params_deferred,
+            raw_config=self._raw_config,
             components_path=self.components_path,
             tariffs_path=self.tariffs_path,
             house_profiles_path=self.house_profiles_path,
             backtesting_scenarios_path=self.backtesting_scenarios_path,
         )
-        detail = "; ".join(missing) if missing else "unbekannte Lücken"
-        raise RuntimeError(
-            "Planungs-Konfiguration unvollständig — Optimierung nicht möglich. "
-            f"Fehlende Schritte: {detail}"
-        )
-
-    def _should_defer_runtime_params(self) -> bool:
-        from ui.setup_readiness import (
-            is_planning_ready_for,
-            needs_planning_onboarding_from_raw,
-        )
-
-        if not needs_planning_onboarding_from_raw(self._raw_config):
-            return False
-        return not is_planning_ready_for(
-            self._raw_config,
-            components_path=self.components_path,
-            tariffs_path=self.tariffs_path,
-            house_profiles_path=self.house_profiles_path,
-            backtesting_scenarios_path=self.backtesting_scenarios_path,
-        )
-
-    def _load_planning_horizon_mode(self) -> None:
-        planning_raw = self._raw_config.get("planning_horizon", {})
-        if not isinstance(planning_raw, dict):
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: Block 'planning_horizon' ist ungültig."
-            )
-        mode_raw = planning_raw.get("mode")
-        if mode_raw is None:
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: planning_horizon.mode fehlt in config.json."
-            )
-        self.PLANNING_HORIZON_MODE = str(mode_raw)
-
-    def _load_geo_timezone_params(self, resolved: dict) -> None:
-        self.LATITUDE = float(self._lookup_runtime_value(resolved, "latitude"))
-        self.LONGITUDE = float(self._lookup_runtime_value(resolved, "longitude"))
-        self.PLANNING_TIMEZONE = str(
-            self._lookup_runtime_value(resolved, "timezone_name")
-        )
-        self._load_planning_horizon_mode()
-
-    def _load_deferred_runtime_params(self, resolved: dict) -> None:
-        self.FEED_IN_MODE = "fixed"
-        self._planning_pv_systems = []
-        self._load_geo_timezone_params(resolved)
-
-    def _load_full_runtime_params(self, resolved: dict) -> None:
-        feed_in_mode_raw = resolved.get("feed_in_mode")
-        if feed_in_mode_raw is None:
-            self.FEED_IN_MODE = "fixed"
-        else:
-            from data.feed_in_prices import validate_feed_in_mode
-
-            self.FEED_IN_MODE = validate_feed_in_mode(feed_in_mode_raw)
-
-        self.K_PUSH_CENT = float(self._lookup_runtime_value(resolved, "k_push_cent"))
-        self.PV_TILT = float(resolved.get("pv_tilt", 0.0) or 0.0)
-        self.PV_AZIMUTH = float(resolved.get("pv_azimuth", 0.0) or 0.0)
-        self.PV_KWP = float(resolved.get("pv_kwp", 0.0) or 0.0)
-        planning_pv = resolved.get("_planning_pv_systems")
-        self._planning_pv_systems = (
-            [dict(item) for item in planning_pv]
-            if isinstance(planning_pv, list)
-            else []
-        )
-        self.BATTERY_MAX_POWER_KW = float(
-            self._lookup_runtime_value(resolved, "battery_max_power_kw")
-        )
-        self.BATTERY_EFFICIENCY = float(
-            self._lookup_runtime_value(resolved, "battery_efficiency")
-        )
-        self.BATTERY_CAPACITY_KWH = float(
-            self._lookup_runtime_value(resolved, "battery_capacity_kwh")
-        )
-        self.BATTERY_MIN_SOC = float(self._lookup_runtime_value(resolved, "battery_min_soc"))
-        self.BATTERY_MAX_SOC = float(self._lookup_runtime_value(resolved, "battery_max_soc"))
-        self.THRESHOLD_POWER = self._validate_threshold_power(
-            self._lookup_runtime_value(resolved, "threshold_power")
-        )
-        self._load_geo_timezone_params(resolved)
 
     def _load_dynamic_params(self) -> None:
-        self._reject_legacy_config_blocks()
-        self._reject_legacy_runtime_settings_block()
-        resolved = self._resolve_live_scenario_settings_dict()
-        self._resolved_runtime_settings = resolved
-
-        from house_config.awattar_api import resolve_awattar_api_url
-
-        self.AWATTAR_URL = resolve_awattar_api_url(resolved)
-
-        if self._should_defer_runtime_params():
-            self._runtime_params_deferred = True
-            self._load_deferred_runtime_params(resolved)
-            return
-
-        self._runtime_params_deferred = False
-        self._load_full_runtime_params(resolved)
+        config_loaders.apply_attrs(
+            self,
+            config_loaders.load_dynamic_params(
+                self._raw_config,
+                config_path=self.config_path,
+                backtesting_scenarios_path=self.backtesting_scenarios_path,
+                components_path=self.components_path,
+                tariffs_path=self.tariffs_path,
+                house_profiles_path=self.house_profiles_path,
+            ),
+        )
 
     def get_planning_timezone(self) -> str:
         return str(self.PLANNING_TIMEZONE)
@@ -432,69 +206,30 @@ class Config:
 
     def get_planning_pv_systems(self) -> list[dict]:
         """Resolved PV systems from the live scenario (empty when deferred/bootstrap)."""
-        systems = getattr(self, "_planning_pv_systems", None)
-        if isinstance(systems, list) and systems:
-            return [dict(item) for item in systems]
-        kwp = float(getattr(self, "PV_KWP", 0.0) or 0.0)
-        if kwp <= 0.0:
-            return []
-        return [
-            {
-                "id": "pv",
-                "label": "PV",
-                "pv_kwp": kwp,
-                "pv_tilt": float(getattr(self, "PV_TILT", 0.0) or 0.0),
-                "pv_azimuth": float(getattr(self, "PV_AZIMUTH", 0.0) or 0.0),
-            }
-        ]
+        return live_scenario.get_planning_pv_systems(
+            planning_pv_systems=getattr(self, "_planning_pv_systems", None),
+            pv_kwp=float(getattr(self, "PV_KWP", 0.0) or 0.0),
+            pv_tilt=float(getattr(self, "PV_TILT", 0.0) or 0.0),
+            pv_azimuth=float(getattr(self, "PV_AZIMUTH", 0.0) or 0.0),
+        )
 
     def get_runtime_settings(self) -> dict:
-        return {
-            'PV_KWP': self.get('PV_KWP', cast=float),
-            'PV_TILT': self.get('PV_TILT', cast=float),
-            'PV_AZIMUTH': self.get('PV_AZIMUTH', cast=float),
-            'K_PUSH_CENT': self.get('K_PUSH_CENT', cast=float),
-            'BATTERY_CAPACITY_KWH': self.get('BATTERY_CAPACITY_KWH', cast=float),
-            'BATTERY_MIN_SOC': self.get('BATTERY_MIN_SOC', cast=float),
-            'BATTERY_MAX_SOC': self.get('BATTERY_MAX_SOC', cast=float),
-            'BATTERY_MAX_POWER_KW': self.get('BATTERY_MAX_POWER_KW', cast=float),
-            'THRESHOLD_POWER': self.get('THRESHOLD_POWER', cast=float),
-        }
+        return live_scenario.runtime_settings_snapshot(self.get)
 
     def get_battery_params(self) -> dict:
-        return {
-            'battery_capacity_kwh': self.get('BATTERY_CAPACITY_KWH', cast=float),
-            'min_soc': self.get('BATTERY_MIN_SOC', cast=float),
-            'max_soc': self.get('BATTERY_MAX_SOC', cast=float),
-            'max_power_kw': self.get('BATTERY_MAX_POWER_KW', cast=float),
-            'efficiency': self.get('BATTERY_EFFICIENCY', cast=float),
-        }
+        return live_scenario.battery_params_snapshot(self.get)
 
     def get_flexible_consumers(self, optimizer_only: bool = False) -> list:
         """Lädt alle konfigurierten flexiblen Verbraucher."""
-        consumers = [
-            fc_settings.normalize_consumer(raw)
-            for raw in self._raw_config.get("flexible_consumers", [])
-        ]
-        resolved = self.get_resolved_runtime_settings()
-        planning = resolved.get("_planning_flex_consumers") or []
-        if planning:
-            from house_config.planning_flex_bridge import merge_flexible_consumers
-
-            consumers = merge_flexible_consumers(consumers, planning)
-        if optimizer_only:
-            return [
-                c for c in consumers
-                if c["optimizer_enabled"]
-                and c["nominal_power_kw"] > 0
-                and fc_settings.consumer_has_daily_target(c)
-            ]
-        return consumers
+        return fc_settings.load_flexible_consumers(
+            self._raw_config,
+            self.get_resolved_runtime_settings(),
+            optimizer_only=optimizer_only,
+        )
 
     def get_appliances(self) -> list[dict]:
         """Manuelle Geräte für den Empfehlungsmodus (aus Hausprofil appliance_recommendation)."""
-        resolved = self.get_resolved_runtime_settings()
-        profile = resolved.get("_house_profile")
+        profile = self.get_resolved_runtime_settings().get("_house_profile")
         if isinstance(profile, dict):
             return appliance_settings.recommendation_appliances_from_profile(profile)
         return []
@@ -507,28 +242,9 @@ class Config:
         runtime_h: float,
     ) -> None:
         """Persistiert Nennleistung und Laufzeit-Vorbelegung für ein manuelles Gerät."""
-        resolved = self.get_resolved_runtime_settings()
-        profile = resolved.get("_house_profile")
-        profile_id = str((profile or {}).get("id", "")).strip()
-        if not profile_id or not isinstance(profile, dict):
-            raise ValueError(
-                "update_appliance_defaults: kein Hausprofil geladen — "
-                "Geräte gehören ins Hausprofil (appliance_recommendation)."
-            )
-        consumers = profile.get("consumers") or []
-        if not any(
-            isinstance(item, dict)
-            and str(item.get("id", "")).strip() == appliance_id
-            and isinstance(item.get("appliance_recommendation"), dict)
-            for item in consumers
-        ):
-            raise KeyError(
-                f"update_appliance_defaults: unbekannte appliance_id '{appliance_id}' "
-                f"im Hausprofil '{profile_id}'."
-            )
-        appliance_settings.update_appliance_defaults_in_house_profile(
+        appliance_settings.update_appliance_defaults_from_resolved(
+            self.get_resolved_runtime_settings(),
             self.house_profiles_path,
-            profile_id,
             appliance_id,
             power_kw=power_kw,
             runtime_h=runtime_h,
@@ -549,75 +265,34 @@ class Config:
 
     def get_battery_wear_cent_per_kwh(self, capacity_kwh: float) -> float:
         """Verschleiß ct/kWh Durchsatz für MILP; aus batteries[] wenn battery_id gesetzt."""
-        from optimizer.battery_wear import battery_wear_cent_per_kwh_from_config
-
-        resolved = self.get_resolved_runtime_settings()
-        wear_raw = resolved.get("_battery_wear")
-        if wear_raw is not None:
-            return battery_wear_cent_per_kwh_from_config(wear_raw, float(capacity_kwh))
-
-        live_id = self.get_live_scenario_id()
-        from house_config.scenario_resolution import find_scenario_settings
-
-        try:
-            live_settings = find_scenario_settings(
-                self.backtesting_scenarios_path,
-                live_id,
-            )
-        except ValueError:
-            return 0.0
-        battery_id = str(live_settings.get("battery_id", "") or "").strip()
-        if battery_id:
-            raise ValueError(
-                f"Live-Szenario '{live_id}': battery_wear fehlt in batteries[] "
-                "(Pflicht wenn battery_id gesetzt)."
-            )
-        return 0.0
+        return live_scenario.get_battery_wear_cent_per_kwh(
+            resolved=self.get_resolved_runtime_settings(),
+            live_scenario_id=self.get_live_scenario_id(),
+            backtesting_scenarios_path=self.backtesting_scenarios_path,
+            capacity_kwh=capacity_kwh,
+        )
 
     def get_push_price_cent(self) -> float:
         return self.get('K_PUSH_CENT', cast=float)
 
     def get_feed_in_settings(self, runtime_override: dict | None = None):
-        from data.feed_in_prices import feed_in_settings_from_dict
-
         runtime = (
             runtime_override
             if runtime_override is not None
             else self.get_resolved_runtime_settings()
         )
-        monthly = runtime.get("_monthly_fixed_tariffs")
-        return feed_in_settings_from_dict(
-            runtime,
-            monthly_fixed_tariffs=monthly,
-        )
+        return live_scenario.get_feed_in_settings(runtime)
 
     def get_backtesting_feed_in_settings(self, runtime_override: dict | None = None):
         """Einspeise-Settings für Backtesting inkl. monatlicher Fixtarife."""
-        from data.feed_in_prices import feed_in_settings_from_dict
-        from data.monthly_float_rates import (
-            build_monthly_float_lookup,
-            load_monthly_float_reference_cent,
-            load_oemag_monthly_reference_rates,
-        )
-
         runtime = (
             runtime_override
             if runtime_override is not None
             else self.get_resolved_runtime_settings()
         )
-        monthly = None
-        export_spec = runtime.get("_export_tariff_spec")
-        export_type = str(export_spec.get("type", "")).strip().lower() if export_spec else ""
-        if export_type == "monthly_float":
-            scenarios_doc = self._load_backtesting_scenarios_document()
-            oemag_rates = load_oemag_monthly_reference_rates(scenarios_doc)
-            reference_cent = load_monthly_float_reference_cent(scenarios_doc)
-            monthly = build_monthly_float_lookup(oemag_rates, reference_cent, export_spec)
-        elif runtime.get("_monthly_fixed_tariffs") is not None:
-            monthly = runtime["_monthly_fixed_tariffs"]
-        return feed_in_settings_from_dict(
+        return live_scenario.get_backtesting_feed_in_settings(
             runtime,
-            monthly_fixed_tariffs=monthly,
+            load_scenarios_document=self._load_backtesting_scenarios_document,
         )
 
     def get_threshold_power(self) -> float:
@@ -666,18 +341,7 @@ class Config:
 
     def get_file_paths_battery_simulation(self) -> dict:
         """Gibt den Block file_paths_battery_simulation aus der JSON-Struktur zurück."""
-        return {
-            "path_consumption": self.PATH_CONSUMPTION,
-            "path_production": self.PATH_PRODUCTION,
-            "path_price": self.PATH_PRICE,
-            "path_cons_data": self.PATH_CONS_DATA,
-            "cons_data_retention_months": self.CONS_DATA_RETENTION_MONTHS,
-            "cons_data_write_mode": self.CONS_DATA_WRITE_MODE,
-            "price_source": self.PRICE_SOURCE,
-            "price_provider": self.PRICE_PROVIDER,
-            "price_range": self.PRICE_RANGE,
-            "energy_charts_bzn": self.ENERGY_CHARTS_BZN,
-        }
+        return live_scenario.file_paths_battery_simulation_snapshot(self)
 
     def get_scenario_settings(self) -> dict:
         """Lädt Szenario-Parameter als {id: settings}-Dict (Abwärtskompatibilität)."""
@@ -739,27 +403,20 @@ class Config:
         return self._resolve_scenario_settings_dict(settings)
 
     def _resolve_scenario_settings_dict(self, settings: dict) -> dict:
-        from house_config.scenario_resolution import resolve_scenario_settings
-
-        holder: dict = {}
-        resolved = resolve_scenario_settings(
+        return live_scenario.resolve_scenario_settings_dict(
             settings,
             raw_config=self._raw_config,
             components_path=self.components_path,
             tariffs_path=self.tariffs_path,
             house_profiles_path=self.house_profiles_path,
-            monthly_rates_holder=holder,
         )
-        if holder.get("_monthly_fixed_tariffs") is not None:
-            resolved["_monthly_fixed_tariffs"] = holder["_monthly_fixed_tariffs"]
-        return resolved
 
     def get_backtesting_scenarios(self) -> dict[str, dict]:
         """Alle aufgelösten Szenarien aus backtesting_scenarios.json."""
-        return {
-            scenario["id"]: self._resolve_scenario_settings_dict(scenario["settings"])
-            for scenario in self.get_scenarios()
-        }
+        return live_scenario.get_backtesting_scenarios(
+            self.get_scenarios(),
+            resolve_settings=self._resolve_scenario_settings_dict,
+        )
 
     def get_value(self, name: str, default=None, cast=None):
         return self.get(name, default=default, cast=cast)
@@ -767,98 +424,22 @@ class Config:
     def reload(self) -> None:
         self._load_all()
 
-    _RUNTIME_REF_KEYS = frozenset({
-        "battery_id",
-        "pv_system_id",
-        "pv_system_ids",
-        "import_tariff_id",
-        "export_tariff_id",
-        "house_profile_id",
-    })
-    _DEPRECATED_RUNTIME_GEO_KEYS = frozenset({
-        "latitude",
-        "longitude",
-        "timezone_name",
-    })
-    _DEPRECATED_RUNTIME_FLAT_KEYS = frozenset({
-        "k_push_cent",
-        "feed_in_mode",
-        "pv_tilt",
-        "pv_azimuth",
-        "pv_kwp",
-        "battery_max_power_kw",
-        "battery_efficiency",
-        "battery_capacity_kwh",
-        "battery_min_soc",
-        "battery_max_soc",
-        "threshold_power",
-    })
-
-    @staticmethod
-    def _normalize_runtime_settings_key(key: str) -> str:
-        return str(key).strip().lower()
-
     def update_live_scenario_settings(self, new_settings: dict) -> None:
         """Aktualisiert Entitäts-Referenzen im Live-Szenario (backtesting_scenarios.json)."""
-        doc = read_json_dict(self.backtesting_scenarios_path)
-        scenarios = doc.get("scenarios")
-        if not isinstance(scenarios, list):
-            raise ValueError(
-                f"'{self.backtesting_scenarios_path}' benötigt ein 'scenarios'-Array."
-            )
-
-        live_id = self.get_live_scenario_id()
-        entry = None
-        for item in scenarios:
-            if isinstance(item, dict) and str(item.get("id", "") or "").strip() == live_id:
-                entry = item
-                break
-        if entry is None:
-            raise ValueError(
-                f"Unbekanntes Live-Szenario '{live_id}' in '{self.backtesting_scenarios_path}'."
-            )
-        settings = entry.get("settings")
-        if not isinstance(settings, dict):
-            raise ValueError(
-                f"Live-Szenario '{live_id}' benötigt ein 'settings'-Objekt."
-            )
-
-        for raw_key, value in new_settings.items():
-            key = self._normalize_runtime_settings_key(raw_key)
-            if key in self._DEPRECATED_RUNTIME_FLAT_KEYS:
-                raise KeyError(
-                    f"Sicherheitsfehler: '{raw_key}' ist ein deprecated flaches Feld — "
-                    "bearbeiten Sie batteries[], pv_systems[] oder tariffs.json."
-                )
-            if key in self._DEPRECATED_RUNTIME_GEO_KEYS:
-                raise KeyError(
-                    f"Sicherheitsfehler: '{raw_key}' gehört zum Hausprofil — "
-                    "bearbeiten Sie latitude/longitude/timezone_name in house_profiles.json."
-                )
-            if key not in self._RUNTIME_REF_KEYS:
-                raise KeyError(
-                    f"Sicherheitsfehler: '{raw_key}' ist kein zulässiger "
-                    f"Szenario-Referenzparameter (Live-Szenario '{live_id}')."
-                )
-            settings[key] = value
-
-        if "pv_system_ids" in new_settings:
-            settings.pop("pv_system_id", None)
-
-        write_json_dict(self.backtesting_scenarios_path, doc)
+        live_scenario.update_live_scenario_settings(
+            backtesting_scenarios_path=self.backtesting_scenarios_path,
+            live_scenario_id=self.get_live_scenario_id(),
+            new_settings=new_settings,
+        )
         self._load_dynamic_params()
 
     def set_live_scenario_id(self, scenario_id: str) -> None:
         """Setzt live_scenario_id in config.json (Szenario muss existieren)."""
-        from house_config.scenario_resolution import find_scenario_settings
-
-        normalized = str(scenario_id or "").strip()
-        if not normalized:
-            raise ValueError("live_scenario_id darf nicht leer sein.")
-        find_scenario_settings(self.backtesting_scenarios_path, normalized)
-        raw = read_json_dict(self.config_path)
-        raw["live_scenario_id"] = normalized
-        write_json_dict(self.config_path, raw)
+        live_scenario.set_live_scenario_id(
+            config_path=self.config_path,
+            backtesting_scenarios_path=self.backtesting_scenarios_path,
+            scenario_id=scenario_id,
+        )
         self._load_all()
 
     def update_runtime_settings(self, new_settings: dict) -> None:

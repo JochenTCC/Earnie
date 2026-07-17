@@ -14,7 +14,8 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **Remove V1→2.0 migration toolchain** — deleted `migrate_runtime_entities`, `migrate_flex_consumers`, `migrate_components_sidecar`, silent-migration setup/deploy, `patch_swimspa_filter_config`, `resolve_legacy_runtime_settings`, related tests/docs/launch configs/`migrated/`; kept live `legacy_id` bridges + dump/history readers
 - [x] **Hard-reject soft pre-1.26 / root fallbacks** — root `eauto_milp` / `appliances[]` fail on load (`settings/legacy_config_gates.py`); MILP only from `charging_schedule.milp`; removed `get_swimspa_settings` / `get_eauto_milp_params` / `PATH_*` aliases; schema + fixtures updated
 - [x] **Legacy test / fixture audit** — removed dead `fixture_prices_df`; protected `test_loxone_integration.py`; health report skips missing test files; mock-heavy unit tests kept (manual triage)
-- [x] **KPI refactor (bounded)** — split `_load_static_params`; removed unused `spa_cfg`; gates extracted; full `config.py` file split deferred → [Backlog.md](Backlog.md) § Version 2.2 follow-ups
+- [x] **KPI refactor (bounded)** — split `_load_static_params`; removed unused `spa_cfg`; gates extracted; full `config.py` file split deferred → follow-up below
+- [x] **Split `config.py` further** — extracted `settings/config_loaders.py` + `settings/live_scenario.py` (plus flex/appliance load helpers); `config.py` ~492 code LOC (was ~872; hard limit 600); public `import config` facade unchanged
 
 
 ### Synology UI Streamlit bind (2026-07-17)

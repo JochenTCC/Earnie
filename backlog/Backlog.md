@@ -29,14 +29,13 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ### Version 2.2 — Quality epic / post-migration cleanup
 
 - [ ] Add a German documentation about how to use Earnie from a user perspective (after installation is done)
-- [ ] **Follow-up:** Split `config.py` further (still ~872 LOC; core hard limit 600) — extract static/load helpers beyond `settings/legacy_config_gates.py`
 - [ ] **Follow-up (optional):** Rewrite mock-heavy `tests/test_main_charging_trigger.py` / `tests/test_main_loxone_writes.py` when `main.py` orchestration changes or a live bug proves mocks too coarse
 - [ ] **Follow-up (optional):** Widen `mutmut.ini` to one post-cleanup hotspot module (not a release gate)
 
 ### Version 2.+1
 
 - [ ] Make main.py controllable from streamlit.app (Checks must be included if main.py is runnin already, if necessary change spec / doc and put it in one container as deamon or so)
-- [ ] Reactive possibility to link historical data to consumers as .csv-file
+- [ ] Reactivate possibility to link historical data to consumers as .csv-file
   - Define column structure of csv-file for overall consumption 
   - Add input possibility to UI für csv-file and a check if it should be substracted from overall consumption log (if not checked, the synthetic usage profil is used instead)
   - Add a normalization function to import csv-files with fitting column structure
@@ -48,6 +47,17 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Change plotting respectively
     - In the plotting area (Verbrauchsprofil) the user can decide to see all consumers at once (present mode) or each consumer solely that are instrumented with a csv-file to adopt usage profile (for scheduling in live mode)
   - Settings must be used correctly in Scenario Explorer (using synthetic or real profiles)
+
+
+### Version 2.+1
+
+- [ ] Make interface to smarthome loxone agnostic
+  - Redefine Loxone Markers --> Smarthome Markers that are suitable to multiple standards like MQTT or Matter
+  - Create architecture for a connector approach that bridges a common internal Earnie interface to specific Smarthome interfaces
+  - Refactor existing Loxone HTTP communication to new Loxone<>Earnie-connector
+  - Create specification for other Smarthome connectors
+  - 
+
 
 ### Version 2.+1
 

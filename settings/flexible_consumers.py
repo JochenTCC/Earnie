@@ -496,3 +496,29 @@ def consumer_by_id(raw_config: dict, consumer_id: str) -> dict | None:
 def consumer_path(raw_config: dict, consumer_id: str, default: str = "") -> str:
     consumer = consumer_by_id(raw_config, consumer_id)
     return consumer.get("path_log", default) if consumer else default
+
+
+def load_flexible_consumers(
+    raw_config: dict,
+    resolved: dict,
+    *,
+    optimizer_only: bool = False,
+) -> list:
+    """Lädt alle konfigurierten flexiblen Verbraucher (inkl. Planning-Bridge)."""
+    consumers = [
+        normalize_consumer(raw)
+        for raw in raw_config.get("flexible_consumers", [])
+    ]
+    planning = resolved.get("_planning_flex_consumers") or []
+    if planning:
+        from house_config.planning_flex_bridge import merge_flexible_consumers
+
+        consumers = merge_flexible_consumers(consumers, planning)
+    if optimizer_only:
+        return [
+            c for c in consumers
+            if c["optimizer_enabled"]
+            and c["nominal_power_kw"] > 0
+            and consumer_has_daily_target(c)
+        ]
+    return consumers

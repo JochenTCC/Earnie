@@ -302,3 +302,39 @@ def update_appliance_recommendation_in_file(
     data["appliance_recommendation"] = merged
     write_json_dict(config_path, data)
     return data
+
+
+def update_appliance_defaults_from_resolved(
+    resolved: dict,
+    house_profiles_path: str,
+    appliance_id: str,
+    *,
+    power_kw: float,
+    runtime_h: float,
+) -> None:
+    """Validiert Hausprofil-Kontext und persistiert Geräte-Defaults."""
+    profile = resolved.get("_house_profile")
+    profile_id = str((profile or {}).get("id", "")).strip()
+    if not profile_id or not isinstance(profile, dict):
+        raise ValueError(
+            "update_appliance_defaults: kein Hausprofil geladen — "
+            "Geräte gehören ins Hausprofil (appliance_recommendation)."
+        )
+    consumers = profile.get("consumers") or []
+    if not any(
+        isinstance(item, dict)
+        and str(item.get("id", "")).strip() == appliance_id
+        and isinstance(item.get("appliance_recommendation"), dict)
+        for item in consumers
+    ):
+        raise KeyError(
+            f"update_appliance_defaults: unbekannte appliance_id '{appliance_id}' "
+            f"im Hausprofil '{profile_id}'."
+        )
+    update_appliance_defaults_in_house_profile(
+        house_profiles_path,
+        profile_id,
+        appliance_id,
+        power_kw=power_kw,
+        runtime_h=runtime_h,
+    )
