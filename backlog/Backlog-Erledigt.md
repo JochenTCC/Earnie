@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Community pre-release 2.1.0-alpha.2 (2026-07-17)
+
+- [x] **Bump + Synology debug image** — `version.py` → `2.1.0-alpha.2`; chunk-load recovery + temporary debug probe for hostname Monitor failures; tagged pre-release (no `:latest`)
+
+
 ### Synology UI Streamlit bind (2026-07-17)
 
 - [x] **Synology compose UI listen address** — `optimizer-ui` now passes `--server.port 8501` and `--server.address 0.0.0.0` so Streamlit is reachable on the published host port (`docker/compose/synology.yml`)
