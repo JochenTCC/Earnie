@@ -25,4 +25,3 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] **EV charge planned while not connected** — Earnie schedules/tries to charge Smart although the car is not connected. Local dump (not in repo): `chart_debug_review/debug_dump_20260717_105429` (meta title/symptom from Cockpit).
