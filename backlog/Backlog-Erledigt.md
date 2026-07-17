@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix EV FertigUm ignored on config path (2026-07-17)
+
+- [x] **EV FertigUm ignored on config path** — house-profile EV (`daily_target_source=config`) kept `ready_by_hour` deadline and ignored `Ernie_EAuto_FertigUm`; later FertigUm still forced early charge (`must_start` for old deadline). Fix: `resolve_charging_context` uses `resolve_charging_deadline` (FertigUm wins, `use_time_window=False`); tests `TestConfigPathFertigUm`. Dump: `chart_debug_review/chart_debug_20260716_065036`. Live verified: changing FertigUm later while EV needs charge updates `charging_contexts.ev.deadline`; no early force-charge for the old deadline.
+
+
 ### Bugfix Greenfield Loxone SoC 404 (2026-07-17)
 
 - [x] **Greenfield live abort: `Battery_SOC` 404** — after Live-Konfiguration, worker called real Miniserver with placeholder `loxone_blocks` from `config.minimal.json` (`Battery_SOC` → HTTP 404, „Kein Zugriff auf Loxone SoC“); aligned `greenfield/config/config.json` `loxone_blocks` to Earnie/Miniserver names (e.g. `B004-Battery_SOC`); verified local greenfield silent run
