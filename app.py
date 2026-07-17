@@ -28,6 +28,7 @@ from runtime_store.config_drift import (
 from runtime_store.dotenv_io import needs_loxone_setup, require_loxone_credentials_for_config
 from ui.setup_dotenv import render_loxone_setup_page
 from version import __version__
+from ui.chunk_load_recovery import inject_chunk_load_recovery
 from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notices
 from ui.navigation import build_navigation
 from ui.setup_progress import render_deferred_loxone_sidebar, render_setup_progress_notice
@@ -64,6 +65,7 @@ def main() -> None:
         st.stop()
 
     config.reinit_config(require_loxone_credentials=require_loxone_credentials_for_config())
+    inject_chunk_load_recovery()
     inject_compact_numeric_css()
     inject_help_hint_css()
     _render_sidebar_version()

@@ -21,6 +21,22 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **German user handbook** — `docs/user-manual/Benutzer-Handbuch-Earnie.md` improved (post-install user perspective)
 
 
+### Bugfix EV charge while not connected (2026-07-17)
+
+- [x] **EV charge planned while not connected** — Earnie scheduled/sent Smart charge setpoints although the car was unplugged (`eauto_plugged_in: false` but `Ernie_EAuto_Ziel_kW` > 0). Dump: `chart_debug_review/debug_dump_20260717_105429` (config-path charging context `active` without `plugged_in`/`anticipated`). Live verified fixed.
+
+
+### Community pre-release 2.1.0-alpha.2 (2026-07-17)
+
+- [x] **Bump + Synology debug image** — `version.py` → `2.1.0-alpha.2`; chunk-load recovery for hostname Monitor failures; tagged pre-release (no `:latest`)
+
+
+### Bugfix Monitor mobile chunk load (2026-07-17)
+
+- [x] **Hostname Monitor `Failed to fetch dynamically imported module`** — phone kept stale Streamlit `/static/js` chunk hashes after upgrade (LAN IP OK; obsolete hashes returned `index.html`). Fix: one-shot reload in `ui/chunk_load_recovery.py`; temporary debug probe removed after live verification
+
+
+
 ### Synology UI Streamlit bind (2026-07-17)
 
 - [x] **Synology compose UI listen address** — `optimizer-ui` now passes `--server.port 8501` and `--server.address 0.0.0.0` so Streamlit is reachable on the published host port (`docker/compose/synology.yml`)

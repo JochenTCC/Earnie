@@ -25,4 +25,3 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Error in Monitor on mobile: TypeError: Failed to fetch dynamically imported module: https://ernie.famkoehler-dornbirn.ipv64.net/static/js/Selectbox.IGsNeZFC
