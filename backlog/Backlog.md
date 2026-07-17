@@ -50,7 +50,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] Add a German documentation about how to use Earnie from a user perspective (after installation is done)
 - [ ] Make appropriate information accessible to user about where differences between optimized SOC and BL SOC Ziel come from to give him explanation (prove plausability)
-- [ ] Check if removing constraint for SOC at end of horizon changes simulation resulst in backtesting
+- [ ] Check if removing constraint for SOC at end of horizon changes simulation results in backtesting
+- [ ] Check if there is a special issue on weekends, when time-to-be ready is set to 12:00 (Start/ End-SOC constraints)
 - [ ] Find EPEX API to have provider independent tariff calculation
 - [ ] Review current tariffs - use https://www.e-control.at/referenzmarktwert and docs\referenz\.~lock.Oeko_RefMrktPr.csv# as anchor point
 - [ ] Improve cost calculation by adding monthly fees etc.
