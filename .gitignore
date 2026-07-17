@@ -11,6 +11,8 @@ config/remote_backtesting.json
 *.pyc
 __pycache__/
 *.egg-info/
+build/
+dist/
 # Laufzeit-/Zustandsdateien (JSON)
 flexible_consumers_state.json
 !tests/fixtures/prod_dumps/**/flexible_consumers_state.json
