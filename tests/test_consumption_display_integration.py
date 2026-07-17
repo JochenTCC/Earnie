@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pandas as pd
+import pytest
 
 from ui.consumption_comparison_panel import render_consumption_comparison_panel
 from ui.consumption_display import ConsumptionDisplayMode
@@ -29,7 +30,9 @@ def test_csv_validation_bundle_from_house_config_inputs():
     bundle = bundle_from_csv_validation(series, _sample_profile())
     assert bundle.actual_total == [2.0, 3.0]
     assert "pool" in bundle.consumer_series
-    assert bundle.baseload == [24.0, 24.0]
+    # Metric baseload as constant kW (÷ 8760), not residual / len(series).
+    assert bundle.baseload[0] == pytest.approx(48.0 / 8760.0)
+    assert bundle.baseload[1] == pytest.approx(48.0 / 8760.0)
 
 
 def test_cons_data_bundle_for_backtesting_section():

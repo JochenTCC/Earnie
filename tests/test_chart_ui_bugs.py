@@ -21,11 +21,13 @@ from ui.charts import (
     _hour_prices_from_df,
     _zone_right_edge,
     add_baseline_soc_traces,
+    add_export_price_on_soc_axis_trace,
     add_optimized_soc_trace,
     add_price_on_soc_axis_trace,
     build_sun_markers,
     render_cumulative_cost_chart,
 )
+from ui.chart_trace_segments import _EXPORT_PRICE_COLUMN
 from runtime_store.history_timeline import SLOT_MISSING
 
 LAT = 47.404
@@ -331,6 +333,62 @@ def test_price_trace_bridges_extrapolation_start():
     assert len(ys) == 2
     assert 25.0 in ys
     assert 30.0 in ys
+
+
+def test_export_price_trace_dashed_orange_hv_alignment():
+    """Einspeisepreis: gestrichelt orange, HV an Stundenrändern, y2."""
+    slots = _mixed_resolution_slots()[:8]
+    rows = []
+    for index, slot in enumerate(slots):
+        rows.append({
+            "slot_datetime": slot,
+            "Uhrzeit": slot.strftime("%d.%m. %H:%M"),
+            "Simulierter SoC (%)": 40.0,
+            "Geplante Batterie-Aktion (kW)": 0.0,
+            "Strompreis (Cent/kWh)": 20.0 + index,
+            _EXPORT_PRICE_COLUMN: 8.0 + index * 0.5,
+            "Preis extrapoliert": False,
+        })
+    df = pd.DataFrame(rows)
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_export_price_on_soc_axis_trace(fig, df, axis)
+    export_trace = next(trace for trace in fig.data if trace.name == "Einspeisepreis")
+    assert export_trace.line.color == "orange"
+    assert export_trace.line.dash == "dash"
+    assert export_trace.yaxis == "y2"
+    for hour, price in _hour_prices_from_df(df, column=_EXPORT_PRICE_COLUMN):
+        left_idx = next(
+            idx for idx, slot in enumerate(slots)
+            if pd.Timestamp(slot).tz_convert(_TZ) == pd.Timestamp(hour).tz_convert(_TZ)
+        )
+        expected_left = pd.Timestamp(
+            axis.legacy_index_time(left_idx - 0.5)
+        ).tz_convert(_TZ)
+        price_points = [
+            _trace_x_vienna(x)
+            for x, y in zip(export_trace.x, export_trace.y)
+            if float(y) == price
+        ]
+        assert expected_left in price_points, (
+            f"Einspeisepreis {price} Cent für {hour} erwartet ab {expected_left}, "
+            f"gefunden {price_points[:4]}"
+        )
+
+
+def test_export_price_trace_skipped_when_column_missing():
+    """Ohne Einspeisevergütung-Spalte keine Trace."""
+    slots = [_dt(2026, 7, 5, hour, 0) for hour in (20, 21)]
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Strompreis (Cent/kWh)": [20.0, 22.0],
+        "Preis extrapoliert": [False, False],
+    })
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_export_price_on_soc_axis_trace(fig, df, axis)
+    assert not any(trace.name == "Einspeisepreis" for trace in fig.data)
 
 
 def test_soc_trace_bridges_extrapolation_start():

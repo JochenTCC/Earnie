@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Chart 1 export tariff line (2026-07-17)
+
+- [x] **Add export tariff into Chart 1 of Monitor** — dashed orange `Einspeisepreis` HV steps on right axis `y2` (Cent/kWh, same scale as import `Preis`); column `Einspeisevergütung (Cent/kWh)`; helpers parameterized in `ui/chart_trace_segments.py`; `add_export_price_on_soc_axis_trace` in `ui/chart_soc.py`; docs `docs/ui/charts.md`; tests in `test_chart_ui_bugs.py`
+
+
 ### Streamlit control of main.py + single container (2026-07-17)
 
 - [x] **Make main.py controllable from Streamlit** — lifecycle Start/Stop/Restart on **Echtzeit-Umgebung → Optimierer-Dienst**; `runtime_store/main_daemon.py` + `probe_instance` / `main.pid` sidecar (Windows-safe); `EARNIE_AUTO_START_MAIN` in `scripts.run_streamlit`; Docker collapsed to one service `earnie` (all compose files + Dockerfile CMD); docs updated

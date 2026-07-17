@@ -17,8 +17,10 @@ def bundle_from_modeled_profile(
     *,
     hours: int | None = None,
 ) -> ConsumptionSeriesBundle:
+    # UI "Verbrauchsprofil (Modell)": never use meter residual from total_profile_csv.
+    model_profile = {**profile, "total_profile_csv": ""}
     resolved_hours = hours if hours is not None else 8760
-    by_consumer = build_modeled_hourly_kw_by_consumer(profile, hours=resolved_hours)
+    by_consumer = build_modeled_hourly_kw_by_consumer(model_profile, hours=resolved_hours)
     baseload = by_consumer.pop("baseload")
     timestamps = _hourly_timestamps(resolved_hours)
     labels = _consumer_labels_from_profile(profile)
@@ -34,16 +36,20 @@ def bundle_from_csv_validation(
     series: list[tuple[str, float]],
     profile: dict,
 ) -> ConsumptionSeriesBundle:
-    hours = len(series)
-    modeled = bundle_from_modeled_profile(profile, hours=hours)
-    actual_total = [float(kw) for _, kw in series]
+    """Ist = CSV; Modell = independent profile (not meter residual)."""
+    from data.consumption_profiles import build_modeled_kw_for_timestamps
+
     timestamps = [ts for ts, _ in series]
+    actual_total = [float(kw) for _, kw in series]
+    by_consumer = build_modeled_kw_for_timestamps(profile, timestamps)
+    baseload = by_consumer.pop("baseload")
+    labels = _consumer_labels_from_profile(profile)
     return ConsumptionSeriesBundle(
         timestamps=timestamps,
-        consumer_series=modeled.consumer_series,
-        baseload=modeled.baseload,
+        consumer_series=by_consumer,
+        baseload=baseload,
         actual_total=actual_total,
-        consumer_labels=modeled.consumer_labels,
+        consumer_labels=labels,
     )
 
 

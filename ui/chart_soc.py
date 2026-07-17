@@ -26,6 +26,7 @@ from ui.chart_slot_axis import (
     _safe_float,
 )
 from ui.chart_trace_segments import (
+    _EXPORT_PRICE_COLUMN,
     _hour_prices_from_df,
     _hourly_price_hover_labels,
     _hourly_price_hv_xy,
@@ -684,13 +685,19 @@ def add_price_on_soc_axis_trace(
     yaxis: str = "y2",
     extrap_start: int | None = None,
     extrap_end: int | None = None,
+    *,
+    column: str = "Strompreis (Cent/kWh)",
+    name: str = "Preis",
+    line: dict | None = None,
+    hover_label: str = "Preis",
 ) -> None:
-    """Strompreis auf der SoC-Achse — stündliche Stufen, an Slot-Rändern ausgerichtet."""
+    """Preis auf der SoC-Achse — stündliche Stufen, an Slot-Rändern ausgerichtet."""
     del extrap_start, extrap_end
-    line_x, line_y = _hourly_price_hv_xy(axis, df)
+    line_style = line if line is not None else dict(color="red", width=2.5, shape="hv")
+    line_x, line_y = _hourly_price_hv_xy(axis, df, column=column)
     if line_x.empty:
         return
-    hour_prices = _hour_prices_from_df(df)
+    hour_prices = _hour_prices_from_df(df, column=column)
     customdata: list[float] = []
     hour_idx = 0
     for x in line_x:
@@ -705,17 +712,40 @@ def add_price_on_soc_axis_trace(
     fig.add_trace(go.Scatter(
         x=line_x,
         y=line_y,
-        name="Preis",
+        name=name,
         showlegend=True,
         mode="lines",
-        line=dict(color="red", width=2.5, shape="hv"),
+        line=line_style,
         opacity=1.0,
         yaxis=yaxis,
-        text=_hourly_price_hover_labels(df, line_x),
+        text=_hourly_price_hover_labels(df, line_x, column=column),
         customdata=customdata,
         hovertemplate=(
-            "Uhrzeit: %{text}<br>Preis: %{customdata:.2f} Cent/kWh"
+            f"Uhrzeit: %{{text}}<br>{hover_label}: %{{customdata:.2f}} Cent/kWh"
             "<extra></extra>"
         ),
     ))
+
+
+def add_export_price_on_soc_axis_trace(
+    fig: go.Figure,
+    df: pd.DataFrame,
+    axis: ChartSlotAxis,
+    yaxis: str = "y2",
+    extrap_start: int | None = None,
+    extrap_end: int | None = None,
+) -> None:
+    """Einspeisevergütung auf der SoC-Achse — gestrichelte orange Stufen."""
+    add_price_on_soc_axis_trace(
+        fig,
+        df,
+        axis,
+        yaxis=yaxis,
+        extrap_start=extrap_start,
+        extrap_end=extrap_end,
+        column=_EXPORT_PRICE_COLUMN,
+        name="Einspeisepreis",
+        line=dict(color="orange", width=2.5, dash="dash", shape="hv"),
+        hover_label="Einspeisepreis",
+    )
 

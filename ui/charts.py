@@ -34,6 +34,7 @@ from ui.chart_slot_axis import ChartSlotAxis, _chart_xaxis_config
 from ui.chart_soc import (
     add_baseline_soc_traces,
     add_entladesperre_soc_band_traces,
+    add_export_price_on_soc_axis_trace,
     add_optimized_soc_trace,
     add_price_on_soc_axis_trace,
     _soc_at_chart_now,
@@ -152,6 +153,9 @@ def build_power_soc_chart_figure(
             battery_params=battery_params,
         )
     add_price_on_soc_axis_trace(
+        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
+    )
+    add_export_price_on_soc_axis_trace(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
     )
 
@@ -581,6 +585,7 @@ from ui.chart_soc import (
     _soc_y_at_moment,
     add_baseline_soc_traces,
     add_entladesperre_soc_band_traces,
+    add_export_price_on_soc_axis_trace,
     add_optimized_soc_trace,
     add_price_on_soc_axis_trace,
 )

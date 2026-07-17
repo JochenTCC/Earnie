@@ -59,6 +59,7 @@ _PASSTHROUGH_CONSUMER_KEYS = (
     "actual_temp_step_c",
     "thermal_control",
     "profile_csv",
+    "use_profile_csv",
 )
 
 _EARNIE_ROLE_LABELS = {
@@ -883,7 +884,175 @@ def _render_consumer_form(
                 f"Basis: Open-Meteo-Archiv {ref_year} "
                 f"({latitude:.4f}°N, {longitude:.4f}°E)"
             )
+        item.update(
+            _render_consumer_profile_csv_fields(
+                consumer,
+                index,
+                session_scope=session_scope,
+                nominal_power_kw=float(nominal),
+            )
+        )
     return item
+
+
+def _digital_csv_decision_key(session_scope: str, index: int, path: str) -> str:
+    return _scoped_key(session_scope, f"hc_digital_csv_decision_{index}_{path}")
+
+
+def _ensure_consumer_csv_normalized(
+    path: str,
+    *,
+    digital_scale_kw: float | None = None,
+) -> None:
+    from house_config.consumption_csv import load_hourly_profile_csv, normalize_profile_csv_file
+
+    if digital_scale_kw is not None:
+        normalize_profile_csv_file(path, digital_scale_kw=digital_scale_kw)
+        return
+    try:
+        load_hourly_profile_csv(path)
+    except ValueError:
+        normalize_profile_csv_file(path)
+
+
+def _render_digital_csv_scale_prompt(
+    path: str,
+    *,
+    index: int,
+    session_scope: str,
+    nominal_power_kw: float,
+) -> None:
+    """Ask once whether to multiply a digital 0/1 CSV by nominal power."""
+    from house_config.consumption_csv import profile_csv_looks_digital
+
+    decision_key = _digital_csv_decision_key(session_scope, index, path)
+    decision = st.session_state.get(decision_key)
+    if decision == "yes":
+        return
+    if decision == "no":
+        try:
+            _ensure_consumer_csv_normalized(path)
+        except (ValueError, OSError, FileNotFoundError) as exc:
+            st.warning(f"CSV noch nicht normalisierbar: {exc}")
+        return
+    try:
+        looks_digital = profile_csv_looks_digital(path)
+    except (ValueError, OSError, FileNotFoundError) as exc:
+        st.warning(f"CSV noch nicht normalisierbar: {exc}")
+        return
+    if not looks_digital:
+        try:
+            _ensure_consumer_csv_normalized(path)
+        except (ValueError, OSError, FileNotFoundError) as exc:
+            st.warning(f"CSV noch nicht normalisierbar: {exc}")
+        return
+    st.info(
+        f"Digitales Ein/Aus-Signal (0/1) erkannt. "
+        f"Mit Nennleistung **{nominal_power_kw:.3f} kW** multiplizieren?"
+    )
+    col_yes, col_no = st.columns(2)
+    with col_yes:
+        if st.button(
+            "Ja, mit Nennleistung multiplizieren",
+            key=_scoped_key(session_scope, f"hc_digital_yes_{index}"),
+        ):
+            if nominal_power_kw <= 0.0:
+                st.error("Nennleistung muss > 0 kW sein, um zu skalieren.")
+            else:
+                try:
+                    _ensure_consumer_csv_normalized(
+                        path, digital_scale_kw=nominal_power_kw
+                    )
+                    st.session_state[decision_key] = "yes"
+                    st.success(
+                        f"CSV mit {nominal_power_kw:.3f} kW skaliert und gespeichert."
+                    )
+                    st.rerun()
+                except (ValueError, OSError, FileNotFoundError) as exc:
+                    st.error(f"Skalierung fehlgeschlagen: {exc}")
+    with col_no:
+        if st.button(
+            "Nein, Werte unverändert lassen",
+            key=_scoped_key(session_scope, f"hc_digital_no_{index}"),
+        ):
+            try:
+                _ensure_consumer_csv_normalized(path)
+                st.session_state[decision_key] = "no"
+                st.rerun()
+            except (ValueError, OSError, FileNotFoundError) as exc:
+                st.error(f"Normalisierung fehlgeschlagen: {exc}")
+
+
+def _render_consumer_profile_csv_fields(
+    consumer: dict,
+    index: int,
+    *,
+    session_scope: str,
+    nominal_power_kw: float,
+) -> dict:
+    """Historisches Verbraucher-CSV + use_profile_csv-Flag."""
+    from pathlib import Path
+
+    st.markdown("**Historisches Verbrauchsprofil (CSV)**")
+    st.caption(
+        "Gleiches Format wie Jahres-CSV (`timestamp;power_kw`). "
+        "Wenn aktiv: echtes Profil statt Synthese, Abzug von der Gesamt-CSV. "
+        "Digitale 0/1-Signale: beim Import optional × Nennleistung."
+    )
+    path_key = _scoped_key(session_scope, f"hc_profile_csv_path_{index}")
+    if path_key not in st.session_state:
+        st.session_state[path_key] = str(consumer.get("profile_csv", "") or "").strip()
+    csv_path = labeled_text_input(
+        "CSV-Pfad (Verbraucher)",
+        value=st.session_state[path_key],
+        key=_scoped_key(session_scope, f"hc_profile_csv_input_{index}"),
+    )
+    st.session_state[path_key] = csv_path.strip()
+    upload = st.file_uploader(
+        "Verbraucher-CSV hochladen",
+        type=["csv"],
+        key=_scoped_key(session_scope, f"hc_profile_csv_upload_{index}"),
+    )
+    consumer_slug = slug_id(str(consumer.get("id") or consumer.get("label") or f"c{index}"))
+    profile_slug = slug_id(str(st.session_state.get("house_profile_select") or "profile"))
+    if upload is not None:
+        try:
+            saved = save_profile_consumption_csv(
+                profile_slug,
+                upload.getvalue(),
+                upload.name,
+                consumer_id=consumer_slug or f"c{index}",
+            )
+            st.session_state[path_key] = saved
+            decision_key = _digital_csv_decision_key(session_scope, index, saved)
+            st.session_state.pop(decision_key, None)
+            st.success(f"CSV gespeichert: `{saved}`")
+        except (ValueError, OSError, FileNotFoundError) as exc:
+            st.error(f"CSV ungültig: {exc}")
+    if st.button(
+        "Verbraucher-CSV entfernen",
+        key=_scoped_key(session_scope, f"hc_profile_csv_clear_{index}"),
+    ):
+        st.session_state[path_key] = ""
+        st.rerun()
+    active = st.session_state[path_key]
+    if active and Path(active).is_file():
+        _render_digital_csv_scale_prompt(
+            active,
+            index=index,
+            session_scope=session_scope,
+            nominal_power_kw=nominal_power_kw,
+        )
+    use_csv = labeled_checkbox(
+        "Aus Gesamt-CSV abziehen / echtes Profil nutzen",
+        value=bool(consumer.get("use_profile_csv", False)),
+        key=_scoped_key(session_scope, f"hc_use_profile_csv_{index}"),
+        help="Aktiv: CSV-Last statt Synthese; Abzug von total_profile_csv für die Rest-Grundlast.",
+    )
+    return {
+        "profile_csv": active,
+        "use_profile_csv": bool(use_csv and active),
+    }
 
 
 def _apply_pending_profile_select() -> None:
@@ -910,19 +1079,42 @@ def _render_modeled_consumption_section(
     resolved: list[dict],
     preview: dict,
 ) -> None:
+    from house_config.consumption_csv import consumer_uses_profile_csv
     from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
+    st.subheader("Verbrauchsprofil (Modell)")
+    st.caption("Modelliertes Hausprofil — ohne Ist-CSV und ohne cons_data.")
+    view_mode = st.radio(
+        "Anzeige",
+        options=["all", "csv_only"],
+        format_func=lambda value: (
+            "Alle Verbraucher"
+            if value == "all"
+            else "Nur CSV-instrumentierte Verbraucher"
+        ),
+        horizontal=True,
+        key=f"house_profile_model_view_{preview_id}",
+    )
+    consumers = list(resolved)
+    if view_mode == "csv_only":
+        consumers = [c for c in consumers if consumer_uses_profile_csv(c)]
+        if not consumers:
+            st.info(
+                "Keine Verbraucher mit aktivem historischen CSV "
+                "(`use_profile_csv`). Wechseln Sie zu „Alle Verbraucher“ "
+                "oder laden Sie ein CSV und aktivieren Sie den Abzug."
+            )
+            return
     modeled_profile = {
         "annual_kwh": annual_kwh,
         "baseload_kwh": preview["baseload_kwh"],
-        "consumers": resolved,
+        "consumers": consumers,
+        # Intentionally omit total_profile_csv: Modell uses metric baseload, not meter residual.
     }
     reset_token = (
-        f"{preview_id}:{annual_kwh:.0f}:{preview['consumer_kwh']:.0f}:"
-        f"{preview['baseload_kwh']:.0f}"
+        f"{preview_id}:{view_mode}:{annual_kwh:.0f}:{preview['consumer_kwh']:.0f}:"
+        f"{preview['baseload_kwh']:.0f}:{len(consumers)}"
     )
-    st.subheader("Verbrauchsprofil (Modell)")
-    st.caption("Modelliertes Hausprofil — ohne Ist-CSV und ohne cons_data.")
     render_consumption_display(
         ConsumptionDisplayMode.MODELED_PROFILE,
         key_prefix=f"house_profile_model_{preview_id}",
@@ -941,11 +1133,15 @@ def _render_consumption_csv_section(
 ) -> None:
     from pathlib import Path
 
-    from house_config.consumption_csv import load_hourly_profile_csv
+    from house_config.consumption_csv import (
+        load_hourly_profile_csv,
+        normalize_profile_csv_file,
+    )
 
     st.subheader("Jahres-Verbrauchs-CSV (optional)")
     st.caption(
-        "Format: `timestamp;power_kw` (stündlich). "
+        "Kanonisch: `timestamp;power_kw` (stündlich, ≥12 Monate). "
+        "Loxone-CSV (Datum;Zeit oder kombiniert; Wert/Leistung) wird beim Import konvertiert. "
         "Zum Abgleich Ist-Verbrauch vs. modellierte Konfiguration."
     )
 
@@ -973,10 +1169,9 @@ def _render_consumption_csv_section(
                 upload.getvalue(),
                 upload.name,
             )
-            load_hourly_profile_csv(saved_path)
             st.session_state[session_key] = saved_path
-            st.success(f"CSV gespeichert: `{saved_path}`")
-        except (ValueError, OSError) as exc:
+            st.success(f"CSV gespeichert und normalisiert: `{saved_path}`")
+        except (ValueError, OSError, FileNotFoundError) as exc:
             st.error(f"CSV ungültig: {exc}")
 
     if st.button("CSV-Zuordnung entfernen", key=f"house_profile_csv_clear_{preview_id}"):
@@ -995,17 +1190,51 @@ def _render_consumption_csv_section(
             "annual_kwh": annual_kwh,
             "baseload_kwh": preview["baseload_kwh"],
             "consumers": resolved,
+            "total_profile_csv": active_path,
         }
-        series = load_hourly_profile_csv(active_path)
+        try:
+            series = load_hourly_profile_csv(active_path)
+        except ValueError:
+            series = normalize_profile_csv_file(active_path)
+        from house_config.baseload import trim_baseload_floor_to_match_ist
         from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
+        from ui.consumption_display.adapters import bundle_from_csv_validation
+        from ui.consumption_display.aggregation import (
+            annual_kwh_actual,
+            annual_kwh_from_bundle,
+        )
 
+        # Consumer-only model (baseload 0) → trim floor so Modell matches Ist (≥ 1 %).
+        zero_bl_profile = {**modeled_profile, "baseload_kwh": 0.0}
+        probe = bundle_from_csv_validation(series, zero_bl_profile)
+        ist_annual = annual_kwh_actual(probe)
+        model_consumers = annual_kwh_from_bundle(probe)
+        trimmed = trim_baseload_floor_to_match_ist(
+            float(annual_kwh),
+            resolved,
+            ist_annual,
+            model_consumer_kwh=model_consumers,
+        )
+        modeled_profile = {
+            **modeled_profile,
+            "baseload_kwh": trimmed["baseload_kwh"],
+        }
+        st.caption(
+            f"Grundlast an Ist angepasst: {trimmed['baseload_kwh']:.0f} kWh/a "
+            f"(Ziel Ist {trimmed['ist_annual_kwh']:.0f} kWh; "
+            f"effektive Untergrenze {100.0 * trimmed['floor_fraction']:.2f} %, "
+            f"mindestens 1 %)."
+        )
         render_consumption_display(
             ConsumptionDisplayMode.CSV_VALIDATION,
             key_prefix=f"house_profile_csv_{preview_id}",
             profile=modeled_profile,
             csv_series=series,
             annual_kwh=float(annual_kwh),
-            reset_token=active_path,
+            reset_token=(
+                f"{active_path}:{trimmed['baseload_kwh']:.3f}:"
+                f"{trimmed['ist_annual_kwh']:.3f}"
+            ),
         )
     except (ValueError, OSError) as exc:
         st.error(f"CSV konnte nicht ausgewertet werden: {exc}")
@@ -1176,11 +1405,19 @@ def render_house_profile_tab() -> None:
         timezone_name=str(location.get("timezone_name") or ""),
     )
     preview = preview_baseload(annual_kwh, resolved_for_preview)
+    csv_session_key = f"house_profile_csv_path_{preview_id}"
+    preview["total_profile_csv"] = str(
+        st.session_state.get(
+            csv_session_key,
+            existing.get("total_profile_csv", ""),
+        )
+        or ""
+    ).strip()
     st.metric("Verbraucher-Summe (kWh/a)", f"{preview['consumer_kwh']:.0f}")
     st.metric("Grundlast (kWh/a)", f"{preview['baseload_kwh']:.0f}")
     st.caption(
         f"Roh-Differenz {preview['raw_baseload_kwh']:.0f} kWh/a; "
-        f"Untergrenze 5 % = {preview['baseload_min_kwh']:.0f} kWh/a"
+        f"Untergrenze 2 % = {preview['baseload_min_kwh']:.0f} kWh/a"
     )
 
     _render_house_profile_save(

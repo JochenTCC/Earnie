@@ -128,7 +128,7 @@ def planning_ev_to_milp(consumer: dict) -> dict:
         "daily_target_source": "config",
         "battery_capacity_kwh": capacity,
         "charging_schedule": charging_schedule,
-        "path_log": "",
+        "path_historical_log": "",
         "loxone_outputs": {},
         "loxone_inputs": {},
         "loxone_target_kwh_name": "",
@@ -188,7 +188,7 @@ def planning_thermal_rc_to_milp(consumer: dict) -> dict:
         "signal_type": "power",
         "log_signal_type": "power",
         "optimizer_enabled": True,
-        "path_log": "",
+        "path_historical_log": "",
         "loxone_outputs": {},
         "loxone_inputs": {},
         "thermal_control": {
@@ -235,7 +235,7 @@ SWIMSPA_FILTER_BRIDGE_DEFAULTS: dict = {
     "signal_type": "binary",
     "min_on_quarterhours": 2,
     "optimizer_enabled": True,
-    "path_log": "",
+    "path_historical_log": "",
     "loxone_outputs": {"enable_name": "Ernie_Swimspa_Filter_Freigabe"},
     "loxone_inputs": {
         "power_name": "homie_bwa_spa_filter2",
@@ -356,7 +356,7 @@ def planning_thermal_to_milp(consumer: dict) -> dict:
         "signal_type": "binary",
         "log_signal_type": "binary",
         "optimizer_enabled": True,
-        "path_log": "",
+        "path_historical_log": "",
         "loxone_outputs": {},
         "loxone_inputs": {},
     }
@@ -733,7 +733,7 @@ _LIVE_OVERLAY_KEYS = (
     "thermal_control",
     "filter_schedule",
     "chart_color_index",
-    "path_log",
+    "path_historical_log",
     "loxone_target_kwh_name",
     "loxone_target_hours_name",
 )

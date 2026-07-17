@@ -196,11 +196,41 @@ def _slice_bundle(bundle: ConsumptionSeriesBundle, indices: list[int]) -> Consum
     )
 
 
+HOURS_PER_YEAR = 8760
+
+
+def slice_bundle_trailing_hours(
+    bundle: ConsumptionSeriesBundle,
+    *,
+    hours: int = HOURS_PER_YEAR,
+) -> ConsumptionSeriesBundle:
+    """Keep the last ``hours`` samples (default: one year of hourly data)."""
+    count = bundle.hour_count()
+    if count <= hours:
+        return bundle
+    start = count - hours
+    return _slice_bundle(bundle, list(range(start, count)))
+
+
+def trailing_year_period_label(bundle: ConsumptionSeriesBundle) -> str | None:
+    """Human-readable start–end of the trailing-year window used for Jahres metrics."""
+    window = slice_bundle_trailing_hours(bundle)
+    if not window.timestamps:
+        return None
+    return f"{window.timestamps[0]} … {window.timestamps[-1]}"
+
+
 def annual_kwh_from_bundle(bundle: ConsumptionSeriesBundle) -> float:
-    return sum(monthly_total_kwh(bundle).values())
+    """Sum model energy over the trailing 12 months (8760 h), not the full CSV horizon."""
+    window = slice_bundle_trailing_hours(bundle)
+    return sum(monthly_total_kwh(window).values())
 
 
 def annual_kwh_actual(bundle: ConsumptionSeriesBundle) -> float:
+    """Sum Ist energy over the trailing 12 months (8760 h), not the full CSV horizon."""
     if bundle.actual_total is None:
         return 0.0
-    return sum(monthly_kwh_from_series(bundle.actual_total, bundle.timestamps).values())
+    window = slice_bundle_trailing_hours(bundle)
+    if window.actual_total is None:
+        return 0.0
+    return sum(monthly_kwh_from_series(window.actual_total, window.timestamps).values())

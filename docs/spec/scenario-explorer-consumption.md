@@ -70,6 +70,19 @@ Per-scenario mapping (`build_per_scenario_reference_costs`):
 
 Battery is never part of reference economics; PV follows the resolved scenario, not always live's PV.
 
+## House-profile historical CSV (`profile_csv` / `use_profile_csv`)
+
+Per-consumer historical power series live on the house profile (not live `path_historical_log`):
+
+| Key | Effect |
+| --- | ------ |
+| `profile_csv` | Path to normalized `timestamp;power_kw` (≥12 months after import) |
+| `use_profile_csv` | `true` → use CSV load instead of synthetic schedule/model **and** subtract that series from `total_profile_csv` when residual baseload is computed |
+
+Scenario Explorer overlays and synthetic `cons_data` generation (`build_synthetic_dataframe_from_house_profile`, `hourly_kw_by_consumer_for_timestamps`) honor these flags the same way as the Hauskonfigurator. There is no separate SE toggle.
+
+When `total_profile_csv` is set, `total_kw` comes from that series; baseload residual = total − Σ(consumers with `use_profile_csv`).
+
 ## Related modules
 
 - `house_config/planning_flex_bridge.py` — bridges, targets, consumption source

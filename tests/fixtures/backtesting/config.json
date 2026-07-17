@@ -39,7 +39,7 @@
             "daily_target_kwh": 8.0,
             "daily_target_source": "historical",
             "min_on_quarterhours": 1,
-            "path_log": "tests/fixtures/backtesting/swimspa.csv",
+            "path_historical_log": "tests/fixtures/backtesting/swimspa.csv",
             "signal_type": "power",
             "optimizer_enabled": true,
             "loxone_outputs": {
@@ -57,7 +57,7 @@
             "min_power_kw": 1.4,
             "daily_target_source": "loxone",
             "min_on_quarterhours": 1,
-            "path_log": "tests/fixtures/backtesting/eauto.csv",
+            "path_historical_log": "tests/fixtures/backtesting/eauto.csv",
             "signal_type": "power",
             "optimizer_enabled": true,
             "loxone_outputs": {
@@ -106,7 +106,7 @@
             "daily_target_kwh": 4.0,
             "daily_target_source": "historical",
             "min_on_quarterhours": 2,
-            "path_log": "tests/fixtures/backtesting/waermepumpe.csv",
+            "path_historical_log": "tests/fixtures/backtesting/waermepumpe.csv",
             "signal_type": "power",
             "log_signal_type": "binary",
             "optimizer_enabled": true,

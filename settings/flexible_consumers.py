@@ -436,7 +436,9 @@ def normalize_consumer(raw: dict) -> dict:
         "loxone_target_kwh_name": str(raw.get("loxone_target_kwh_name", "")).strip(),
         "loxone_target_hours_name": str(raw.get("loxone_target_hours_name", "")).strip(),
         "min_on_quarterhours": max(1, int(raw.get("min_on_quarterhours", raw.get("min_on_hours", 1) * 4))),
-        "path_log": str(raw.get("path_log", "")),
+        "path_historical_log": str(
+            raw.get("path_historical_log") or raw.get("path_log", "")
+        ).strip(),
         "signal_type": str(raw.get("signal_type", "power")),
         "log_signal_type": str(
             raw.get("log_signal_type") or raw.get("signal_type", "power")
@@ -473,7 +475,7 @@ def consumer_has_daily_target(consumer: dict) -> bool:
     sched = consumer.get("charging_schedule")
     if sched and sched.get("enabled"):
         if target_source == "historical":
-            return bool(consumer.get("path_log"))
+            return bool(consumer.get("path_historical_log"))
         if target_source == "loxone":
             return True
         capacity = float(sched.get("battery_capacity_kwh", 0.0) or 0.0)
@@ -495,7 +497,7 @@ def consumer_by_id(raw_config: dict, consumer_id: str) -> dict | None:
 
 def consumer_path(raw_config: dict, consumer_id: str, default: str = "") -> str:
     consumer = consumer_by_id(raw_config, consumer_id)
-    return consumer.get("path_log", default) if consumer else default
+    return consumer.get("path_historical_log", default) if consumer else default
 
 
 def load_flexible_consumers(

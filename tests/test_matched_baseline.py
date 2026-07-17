@@ -216,7 +216,7 @@ def _eauto_historical_consumer() -> dict:
         "daily_target_source": "historical",
         "loxone_target_kwh_name": "",
         "min_on_quarterhours": 4,
-        "path_log": "",
+        "path_historical_log": "",
         "signal_type": "power",
         "log_signal_type": "power",
         "optimizer_enabled": True,

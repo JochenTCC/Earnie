@@ -20,7 +20,7 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 | `Sollstunden`-Semantik | Verbleibende Filter-Stunden (Schuldenstand), Float (Live-Format noch verifizieren) |
 | Natives Fenster | Start-Stunde + Dauer aus Loxone (nicht Start/Ende) |
 | Mindestlaufzeit Earnie | 30 min gewünscht; MILP plant stündlich → effektiv **1 h**-Slots |
-| Backtesting | Kein `path_log`; fiktives natives Fenster über `config_fallback` |
+| Backtesting | Kein `path_historical_log`; fiktives natives Fenster über `config_fallback` |
 
 ## 3. Loxone-Signale
 
@@ -125,7 +125,7 @@ Earnie (pro 15-Min-Slot):
 
 ## 8. Backtesting / Offline
 
-- Kein historisches Filter-Log (`path_log` entfällt).
+- Kein historisches Filter-Log (`path_historical_log` entfällt).
 - `filter_schedule.config_fallback` für festes natives Fenster.
 - Optional fiktiver Schuldenwert in Config für Offline-Tests.
 

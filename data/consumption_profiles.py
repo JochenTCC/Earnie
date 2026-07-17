@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 MODELED_PROFILE_REF_START = datetime(2023, 1, 1)
@@ -15,7 +16,7 @@ from data.heating_need import (
     weekly_electric_kwh,
 )
 from house_config.baseload import consumer_annual_kwh
-from house_config.consumption_csv import load_hourly_profile_csv
+from house_config.consumption_csv import consumer_uses_profile_csv, load_hourly_profile_csv
 from house_config.ev_profile import ev_hourly_kw_for_day
 
 if TYPE_CHECKING:
@@ -54,6 +55,26 @@ def _modeled_hour_index(slot_dt: datetime) -> int:
     )
 
 
+def _parse_profile_timestamp(ts_raw: str) -> datetime:
+    return datetime.fromisoformat(ts_raw.replace(" ", "T", 1)[:19])
+
+
+def _timestamp_hour_key(slot_dt: datetime) -> str:
+    naive = slot_dt.replace(tzinfo=None) if slot_dt.tzinfo else slot_dt
+    naive = naive.replace(minute=0, second=0, microsecond=0)
+    return naive.strftime("%Y-%m-%d %H:%M:%S")
+
+
+@lru_cache(maxsize=32)
+def _csv_kw_lookup(path: str) -> dict[str, float]:
+    return {ts: float(kw) for ts, kw in load_hourly_profile_csv(path)}
+
+
+def csv_kw_at_datetime(path: str, slot_dt: datetime) -> float:
+    """kW from a historical CSV at the calendar hour (0 if missing)."""
+    return float(_csv_kw_lookup(path).get(_timestamp_hour_key(slot_dt), 0.0))
+
+
 def modeled_consumer_kw_at_datetime(
     consumer: dict,
     slot_dt: datetime,
@@ -65,12 +86,8 @@ def modeled_consumer_kw_at_datetime(
         return climate.thermal_consumer_kw_at(consumer, slot_dt)
     if climate is not None and consumer.get("type") == "thermal_rc":
         return climate.thermal_rc_consumer_kw_at(consumer, slot_dt)
-    if consumer.get("profile_csv"):
-        series = load_hourly_profile_csv(consumer["profile_csv"])
-        hour_index = _modeled_hour_index(slot_dt)
-        if hour_index < len(series):
-            return float(series[hour_index][1])
-        return 0.0
+    if consumer_uses_profile_csv(consumer):
+        return csv_kw_at_datetime(consumer["profile_csv"], slot_dt)
     if consumer.get("type") == "ev":
         naive = slot_dt.replace(tzinfo=None) if slot_dt.tzinfo else slot_dt
         day_hourly = ev_hourly_kw_for_day(consumer, naive.date())
@@ -100,13 +117,12 @@ def modeled_consumer_kw_at_datetime(
 
 def _modeled_consumer_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     hourly = [0.0] * hours
-    if consumer.get("profile_csv"):
-        series = load_hourly_profile_csv(consumer["profile_csv"])
-        for index, (_, kw) in enumerate(series):
-            if index >= hours:
-                break
-            hourly[index] = float(kw)
-        return hourly
+    if consumer_uses_profile_csv(consumer):
+        path = consumer["profile_csv"]
+        return [
+            csv_kw_at_datetime(path, MODELED_PROFILE_REF_START + timedelta(hours=i))
+            for i in range(hours)
+        ]
     if consumer.get("type") == "ev":
         start_day = date(2023, 1, 1)
         for hour_index in range(hours):
@@ -180,15 +196,123 @@ def build_modeled_hourly_kw_by_consumer(
     hours: int = 8760,
 ) -> dict[str, list[float]]:
     """Stündliche kW je Verbraucher; Key ``baseload`` für Grundlast."""
-    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
-    baseload_kw = baseload_kwh / max(1, hours)
-    result: dict[str, list[float]] = {"baseload": [baseload_kw] * hours}
+    csv_path = str(profile.get("total_profile_csv", "") or "").strip()
+    if csv_path:
+        return _by_consumer_aligned_to_total_csv(profile, csv_path, hours=hours)
+    result: dict[str, list[float]] = {}
     for index, consumer in enumerate(profile.get("consumers", [])):
         result[_consumer_id(consumer, index)] = _modeled_consumer_hourly_kw(
             consumer,
             hours=hours,
         )
+    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
+    baseload_kw = baseload_kwh / max(1, hours)
+    result["baseload"] = [baseload_kw] * hours
     return result
+
+
+def build_modeled_kw_for_timestamps(
+    profile: dict,
+    timestamps: list[str],
+) -> dict[str, list[float]]:
+    """Independent model on calendar hours — ignores ``total_profile_csv``.
+
+    Uses metric ``baseload_kwh`` as constant kW (÷ 8760), not meter residual.
+    """
+    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
+    baseload_kw = baseload_kwh / MODELED_PROFILE_HOURS_PER_YEAR
+    result: dict[str, list[float]] = {}
+    for index, consumer in enumerate(profile.get("consumers", [])):
+        cid = _consumer_id(consumer, index)
+        result[cid] = [
+            modeled_consumer_kw_at_datetime(consumer, _parse_profile_timestamp(ts))
+            for ts in timestamps
+        ]
+    result["baseload"] = [baseload_kw] * len(timestamps)
+    return result
+
+
+def _by_consumer_aligned_to_total_csv(
+    profile: dict,
+    csv_path: str,
+    *,
+    hours: int,
+) -> dict[str, list[float]]:
+    """Consumer + residual baseload on the total_profile_csv timeline."""
+    series = load_hourly_profile_csv(csv_path)
+    rows = list(series[:hours])
+    if len(rows) < hours:
+        pad_ts, pad_kw = rows[-1] if rows else ("1970-01-01 00:00:00", 0.0)
+        start = _parse_profile_timestamp(pad_ts)
+        while len(rows) < hours:
+            start = start + timedelta(hours=1)
+            rows.append((start.strftime("%Y-%m-%d %H:%M:%S"), float(pad_kw)))
+    timestamps = [ts for ts, _ in rows]
+    total = [float(kw) for _, kw in rows]
+    result: dict[str, list[float]] = {}
+    for index, consumer in enumerate(profile.get("consumers", [])):
+        cid = _consumer_id(consumer, index)
+        if consumer_uses_profile_csv(consumer):
+            lookup = _csv_kw_lookup(consumer["profile_csv"])
+            result[cid] = [float(lookup.get(ts, 0.0)) for ts in timestamps]
+        else:
+            result[cid] = [
+                modeled_consumer_kw_at_datetime(
+                    consumer, _parse_profile_timestamp(ts)
+                )
+                for ts in timestamps
+            ]
+    result["baseload"] = _residual_baseload_from_aligned(
+        csv_path,
+        profile,
+        result,
+        total=total,
+    )
+    return result
+
+
+def _residual_baseload_from_aligned(
+    csv_path: str,
+    profile: dict,
+    consumer_series: dict[str, list[float]],
+    *,
+    total: list[float],
+) -> list[float]:
+    """total − Σ(all stacked consumers); clip at 0 with warning count.
+
+    Subtract every consumer series shown alongside baseload (CSV-instrumented
+    and synthetic). Otherwise residual still contains non-CSV loads that are
+    also stacked separately → double-counted energy / inflated Basislast.
+    """
+    import logging
+
+    hours = len(total)
+    subtract_ids = {
+        cid
+        for cid in consumer_series
+        if cid != "baseload"
+    }
+    baseload: list[float] = []
+    clipped = 0
+    for hour in range(hours):
+        flex_sum = sum(
+            float(consumer_series[cid][hour])
+            for cid in subtract_ids
+            if cid in consumer_series and hour < len(consumer_series[cid])
+        )
+        residual = float(total[hour]) - flex_sum
+        if residual < 0.0:
+            clipped += 1
+            residual = 0.0
+        baseload.append(residual)
+    if clipped:
+        logging.getLogger(__name__).warning(
+            "total_profile_csv residual clipped to 0 in %s of %s hours (%s).",
+            clipped,
+            hours,
+            csv_path,
+        )
+    return baseload
 
 
 def build_modeled_hourly_kw_profile(profile: dict, *, hours: int = 8760) -> list[float]:

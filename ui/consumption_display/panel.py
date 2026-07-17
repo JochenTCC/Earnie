@@ -119,6 +119,14 @@ def _render_metrics(
         col_a, col_b = st.columns(2)
         col_a.metric(actual_total_label, f"{actual_total:.0f} kWh")
         col_b.metric("Modell-Jahresverbrauch", f"{model_total:.0f} kWh")
+        from ui.consumption_display.aggregation import trailing_year_period_label
+
+        period = trailing_year_period_label(bundle)
+        if period and bundle.hour_count() > 8760:
+            st.caption(
+                f"Jahreskennzahlen: letzte 8760 Stunden ({period}). "
+                "Monats-/Wochencharts nutzen weiterhin die gesamte CSV."
+            )
         if annual_kwh is not None and annual_kwh > 0:
             if abs(actual_total - annual_kwh) / annual_kwh > 0.15:
                 st.info(

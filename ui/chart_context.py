@@ -211,6 +211,7 @@ def _empty_chart_row(slot: datetime) -> dict:
         "slot_datetime": slot,
         "Uhrzeit": slot.strftime("%d.%m. %H:%M"),
         "Strompreis (Cent/kWh)": None,
+        "Einspeisevergütung (Cent/kWh)": None,
         "Preis extrapoliert": False,
         "PV-Prognose (kW)": 0.0,
         "Verbrauch-Prognose (kW)": 0.0,

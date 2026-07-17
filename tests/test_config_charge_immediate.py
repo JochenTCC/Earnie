@@ -36,7 +36,7 @@ def _minimal_charge_immediate_config() -> dict:
                 "min_power_kw": 1.4,
                 "daily_target_source": "config",
                 "min_on_quarterhours": 4,
-                "path_log": "pfad/zum/eauto-log.csv",
+                "path_historical_log": "pfad/zum/eauto-log.csv",
                 "signal_type": "power",
                 "optimizer_enabled": True,
                 "charging_schedule": {

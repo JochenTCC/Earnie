@@ -24,9 +24,9 @@ Einträge in `flexible_consumers[]` sind zeitlich verschiebbare Lasten (SwimSpa,
 | `daily_target_kwh`    | Festes 24h-Ziel in kWh (bei `daily_target_source: config`)                                                                                                                                                                                               |
 | `daily_target_source` | `config` = fester Wert / `charging_schedule`; `historical` = Profil aus Vergangenheit; `loxone` = Live-Merker in kWh; `loxone_remaining_hours` = Live-Schulden in Stunden × `nominal_power_kw` (SwimSpa-Filter); `thermal` = RC-Modell (SwimSpa-Heizung) |
 | `min_on_quarterhours` | Mindestlaufzeit pro Einschaltung in 15-Minuten-Slots                                                                                                                                                                                                     |
-| `path_log`            | Loxone-CSV für historische Profile und Backtesting                                                                                                                                                                                                       |
+| `path_historical_log` | Loxone-CSV für historische Profile und Backtesting (Offline → `cons_data`). Beim Laden noch Alias `path_log` möglich                                                                                                                                   |
 | `signal_type`         | `power` (kW) oder `binary` (Ein/Aus × `nominal_power_kw`)                                                                                                                                                                                                |
-| `log_signal_type`     | Optional: anderes Format nur für `path_log`                                                                                                                                                                                                              |
+| `log_signal_type`     | Optional: anderes Format nur für `path_historical_log`                                                                                                                                                                                                  |
 
 
 
@@ -94,7 +94,7 @@ Getrennter Verbraucher `swimspa_filter` (Heizung bleibt `swimspa` mit `daily_tar
 | `loxone_target_hours_name`        | Loxone-Merker für verbleibende Filter-Schulden in **Stunden** (Float)                           |
 | `filter_schedule.enabled`         | `true` = natives Duty-Cycle-Fenster sperrt MILP-Slots                                           |
 | `filter_schedule.loxone`          | `native_start_hour_name`, `native_duration_hours_name` — natives Fenster `[Start, Start+Dauer)` |
-| `filter_schedule.config_fallback` | Festes Fenster für Backtesting/Offline (kein `path_log`)                                        |
+| `filter_schedule.config_fallback` | Festes Fenster für Backtesting/Offline (kein `path_historical_log`)                             |
 
 
 Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`loxone_outputs.enable_name`). Spec: [SwimSpa Filter](../spec/swimspa-filter.md).

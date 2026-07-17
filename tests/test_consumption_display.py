@@ -344,3 +344,28 @@ def test_detect_period_timing_shift_same_energy_different_shape():
         energy_tolerance_kwh=0.1,
         hourly_l1_threshold_kwh=5.0,
     ) is True
+
+
+def test_annual_metrics_use_trailing_8760_hours_not_full_horizon():
+    from ui.consumption_display.aggregation import (
+        annual_kwh_actual,
+        annual_kwh_from_bundle,
+    )
+    from ui.consumption_display.types import ConsumptionSeriesBundle
+
+    hours = 8760 + 1000
+    start = datetime(2023, 1, 1)
+    timestamps = [
+        (start + timedelta(hours=i)).strftime("%Y-%m-%d %H:%M:%S") for i in range(hours)
+    ]
+    # First 1000 h at 10 kW, last 8760 h at 1 kW → trailing year = 8760 kWh
+    actual = [10.0] * 1000 + [1.0] * 8760
+    baseload = list(actual)
+    bundle = ConsumptionSeriesBundle(
+        timestamps=timestamps,
+        consumer_series={},
+        baseload=baseload,
+        actual_total=actual,
+    )
+    assert annual_kwh_actual(bundle) == pytest.approx(8760.0)
+    assert annual_kwh_from_bundle(bundle) == pytest.approx(8760.0)

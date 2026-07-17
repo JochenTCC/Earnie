@@ -55,12 +55,12 @@ def load_and_resample_csv(filepath: str, is_wp: bool = False, wp_power: float = 
 
 
 def load_consumer_series(consumer: dict) -> pd.Series:
-    """Zeitreihe eines flexiblen Verbrauchers aus path_log (log_signal_type)."""
+    """Zeitreihe eines flexiblen Verbrauchers aus path_historical_log (log_signal_type)."""
     log_signal = consumer.get("log_signal_type") or consumer.get("signal_type", "power")
     is_binary = log_signal == "binary"
     nominal = float(consumer.get("nominal_power_kw", 1.6))
     return load_and_resample_csv(
-        consumer.get("path_log", ""),
+        consumer.get("path_historical_log") or consumer.get("path_log", ""),
         is_wp=is_binary,
         wp_power=nominal,
     )

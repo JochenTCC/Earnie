@@ -97,7 +97,9 @@ def normalize_generic_schedule(raw: dict | None) -> dict | None:
 
 
 def generic_annual_kwh(consumer: dict) -> float:
-    if consumer.get("profile_csv"):
+    from house_config.consumption_csv import consumer_uses_profile_csv
+
+    if consumer_uses_profile_csv(consumer):
         return float(consumer.get("annual_kwh", 0.0) or 0.0)
     schedule = consumer.get("schedule")
     if not schedule:

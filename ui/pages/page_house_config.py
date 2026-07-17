@@ -18,7 +18,7 @@ def _help_text() -> str:
         "Backtesting-Planung: Hausprofil mit Verbrauchern, PV-Anlage und Batterie-Entitäten. "
         "Szenarien und Live-Zuordnung (Tarife, Entitäts-Referenzen) in Szenarieneditor bzw. "
         "Echtzeit-Umgebung. "
-        "Grundlast = max(5 % Jahresverbrauch, Jahresverbrauch − Summe Verbraucher)."
+        "Grundlast = max(2 % Jahresverbrauch, Jahresverbrauch − Summe Verbraucher)."
     )
 
 

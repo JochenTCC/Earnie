@@ -117,13 +117,22 @@ def _bar_widths_ms(
     ]
 
 
-def _hour_prices_from_df(df: pd.DataFrame) -> list[tuple[datetime, float]]:
+_IMPORT_PRICE_COLUMN = "Strompreis (Cent/kWh)"
+_EXPORT_PRICE_COLUMN = "Einspeisevergütung (Cent/kWh)"
+
+
+def _hour_prices_from_df(
+    df: pd.DataFrame,
+    column: str = _IMPORT_PRICE_COLUMN,
+) -> list[tuple[datetime, float]]:
     """Ein Preis pro volle Stunde (chronologisch), bevorzugt Wert am Stunden-Slot."""
+    if column not in df.columns:
+        return []
     by_hour: dict[datetime, float] = {}
     for _, row in df.iterrows():
         slot = pd.Timestamp(row["slot_datetime"]).to_pydatetime()
         hour = normalize_hour_slot(slot)
-        price = _optional_float(row.get("Strompreis (Cent/kWh)"))
+        price = _optional_float(row.get(column))
         if price is None:
             continue
         if slot == hour or hour not in by_hour:
@@ -142,13 +151,14 @@ def _hour_prices_from_df(df: pd.DataFrame) -> list[tuple[datetime, float]]:
 def _hourly_price_hv_xy(
     axis: ChartSlotAxis,
     df: pd.DataFrame,
+    column: str = _IMPORT_PRICE_COLUMN,
 ) -> tuple[pd.Series, pd.Series]:
     """
     Preis-Treppe mit Stufen nur an Stundengrenzen (Spec: stündlicher Marktpreis).
 
     Bei gemischter 15-min/1-h-Achse spannt jede Stufe die volle Stundenbreite auf der Achse.
     """
-    hour_prices = _hour_prices_from_df(df)
+    hour_prices = _hour_prices_from_df(df, column=column)
     if not hour_prices:
         return _empty_chart_time_series(), _EMPTY_FLOAT_SERIES
     points_x: list[datetime] = []
@@ -181,9 +191,10 @@ def _hourly_price_hv_xy(
 def _hourly_price_hover_labels(
     df: pd.DataFrame,
     line_x: pd.Series,
+    column: str = _IMPORT_PRICE_COLUMN,
 ) -> list[str]:
     """Hover-Uhrzeit je Punkt entlang der stündlichen Preis-Treppe."""
-    hour_prices = _hour_prices_from_df(df)
+    hour_prices = _hour_prices_from_df(df, column=column)
     if not hour_prices or line_x.empty:
         return []
     labels: list[str] = []

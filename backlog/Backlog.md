@@ -41,13 +41,16 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Change plotting respectively
     - In the plotting area (Verbrauchsprofil) the user can decide to see all consumers at once (present mode) or each consumer solely that are instrumented with a csv-file to adopt usage profile (for scheduling in live mode)
   - Settings must be used correctly in Scenario Explorer (using synthetic or real profiles)
+- [] When csv-File is a digital signal the normalization function automatically multiplies it with nominal power (after confirmation by user)
+  - During inspection of csv-file, the user is asked for multiplying
 
 
 ### Version 2.+1 - Become Loxone agnostic
 
 - [ ] Make interface to smarthome loxone agnostic
-  - **Goal:** Get into contact with more Smarthome freaks that are willing to build connections to their specific hardware
+  - **Goal:** Get into contact with more Smarthome "nerds" that are willing to build connections to their specific hardware
   - Redefine Loxone Markers --> Smarthome Markers that are suitable to multiple standards like MQTT or Matter
+  - Make proper assignments to already used Marker to consumers, inverter, heating etc. in data model and make it editable in UI
   - Create architecture for a connector approach that bridges a common generic internal Earnie interface to specific Smarthome interfaces
   - Refactor existing Loxone HTTP communication to new Loxone<>Earnie-connector
   - Create specification for other Smarthome connectors to internal Earnie interface
@@ -65,6 +68,12 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Find EPEX API to have provider independent tariff calculation
 - [ ] Review current tariffs - use https://www.e-control.at/referenzmarktwert and docs\referenz\.~lock.Oeko_RefMrktPr.csv# as anchor point
 - [ ] Improve cost calculation by adding monthly fees etc.
+- [ ] Enhance page "Verbraucheranalyse" to "Analyse Verbrauch & Kosten"
+  - Visualize usage of consumers on a weekly basis compared to historical price and PV 
+  - Show if power came from PV, battery or grid
+  - Visualize cost for each usage
+  - Visualize total cost per week / month / year (validation against invoices) 
+  - Visualize battery usage as sum of energy flow (maybe established charts exist?)
 - [ ] Improve performance of Scenario Explorer (ideas?)
 
 

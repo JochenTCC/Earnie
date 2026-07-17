@@ -568,9 +568,9 @@
           "minimum": 1,
           "description": "Mindestlaufzeit pro Einschaltung in 15-Minuten-Slots."
         },
-        "path_log": {
+        "path_historical_log": {
           "type": "string",
-          "description": "CSV-Pfad zum Loxone-Verbrauchslog (für historical und Backtesting)."
+          "description": "CSV-Pfad zum historischen Loxone-Verbrauchslog (Offline/cons_data, Backtesting). Legacy-Alias beim Laden: path_log."
         },
         "signal_type": {
           "type": "string",
@@ -580,7 +580,7 @@
         "log_signal_type": {
           "type": "string",
           "enum": ["power", "binary"],
-          "description": "Optional: Interpretation von path_log (z. B. binary für altes Loxone-Log, während signal_type=power für Live-Messung)."
+          "description": "Optional: Interpretation von path_historical_log (z. B. binary für altes Loxone-Log, während signal_type=power für Live-Messung)."
         },
         "optimizer_enabled": {
           "type": "boolean",

@@ -41,6 +41,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 - [Überblick](konfiguration/ueberblick.md) — Aufbau der Datei, Szenarien, Dateipfade
 - [PV & Batterie](konfiguration/batterie-pv.md) — Live-Szenario, Entitäts-Referenzen
 - [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
+- [Historische Verbrauchs-CSV](konfiguration/verbrauchs-csv.md) — Hausprofil Gesamt-/Verbraucher-CSV, Normalisierung, Loxone-Import
 - [Preise & aWATTar](konfiguration/preise.md) — Bezugspreis, Einspeisevergütung, Preis-Prognose
 
 ### Benutzeroberfläche (Streamlit)

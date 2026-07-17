@@ -117,16 +117,36 @@ def upsert_house_profile(profile: dict) -> None:
     cons_data_store.invalidate_cons_data_meta()
 
 
-def save_profile_consumption_csv(profile_id: str, content: bytes, filename: str) -> str:
-    """Speichert hochgeladene Verbrauchs-CSV unter config/uploads/."""
+def save_profile_consumption_csv(
+    profile_id: str,
+    content: bytes,
+    filename: str,
+    *,
+    consumer_id: str = "",
+    normalize: bool = True,
+    min_hours: int = 8760,
+) -> str:
+    """Speichert Verbrauchs-CSV unter config/uploads/; optional normalisiert."""
+    from house_config.consumption_csv import (
+        MIN_HOURS_FULL_YEAR,
+        normalize_profile_csv_file,
+    )
+
     uploads_dir = Path("config") / "uploads"
     uploads_dir.mkdir(parents=True, exist_ok=True)
     safe_name = Path(filename).name or "consumption.csv"
     if not safe_name.lower().endswith(".csv"):
         safe_name = f"{safe_name}.csv"
-    target = uploads_dir / f"{profile_id}_{safe_name}"
+    prefix = profile_id
+    if consumer_id:
+        prefix = f"{profile_id}_{consumer_id}"
+    target = uploads_dir / f"{prefix}_{safe_name}"
     target.write_bytes(content)
-    return target.as_posix()
+    path = target.as_posix()
+    if normalize:
+        hours = min_hours if min_hours > 0 else MIN_HOURS_FULL_YEAR
+        normalize_profile_csv_file(path, min_hours=hours)
+    return path
 
 
 def _load_config_document() -> dict:

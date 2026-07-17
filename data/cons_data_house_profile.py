@@ -10,18 +10,19 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 import config
-from settings.flexible_consumers import normalize_consumer, runtime_consumer_id
 from data.consumption_profiles import (
     _consumer_id,
-    _modeled_hour_index,
+    csv_kw_at_datetime,
     modeled_consumer_kw_at_datetime,
 )
-from house_config.consumption_csv import load_hourly_profile_csv
+from house_config.consumption_csv import consumer_uses_profile_csv
 from house_config.profiles_store import load_house_profiles_document
 from runtime_store.persist_paths import resolve_house_profiles_json_path
+from settings.flexible_consumers import normalize_consumer, runtime_consumer_id
 
 if TYPE_CHECKING:
     from data.modeled_climate import ModeledClimateContext
+
 
 def _parse_hourly_timestamp(ts_raw: str) -> datetime:
     return datetime.fromisoformat(ts_raw.replace(" ", "T", 1)[:19])
@@ -31,18 +32,15 @@ def total_kw_at_datetime(profile: dict, slot_dt: datetime) -> float:
     """Gesamtverbrauch (kW) zum Kalenderzeitpunkt aus Hausprofil."""
     csv_path = profile.get("total_profile_csv", "")
     if csv_path:
-        series = load_hourly_profile_csv(csv_path)
-        hour_index = _modeled_hour_index(slot_dt)
-        if hour_index < len(series):
-            return float(series[hour_index][1])
-        return 0.0
+        return csv_kw_at_datetime(csv_path, slot_dt)
+    by_consumer = {}
+    for index, consumer in enumerate(profile.get("consumers", [])):
+        by_consumer[_consumer_id(consumer, index)] = modeled_consumer_kw_at_datetime(
+            consumer, slot_dt
+        )
     baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
     baseload_kw = baseload_kwh / 8760.0
-    flex_sum = sum(
-        modeled_consumer_kw_at_datetime(consumer, slot_dt)
-        for consumer in profile.get("consumers", [])
-    )
-    return baseload_kw + flex_sum
+    return baseload_kw + sum(by_consumer.values())
 
 
 def hourly_kw_by_consumer_for_timestamps(
@@ -54,21 +52,31 @@ def hourly_kw_by_consumer_for_timestamps(
     """Stündlicher kW je Verbraucher + Basislast, kalenderbasiert wie cons_data-Synthese."""
     consumers = list(profile.get("consumers", []))
     consumer_ids = [_consumer_id(consumer, index) for index, consumer in enumerate(consumers)]
-    baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
-    baseload_kw = baseload_kwh / 8760.0
     series: dict[str, list[float]] = {cid: [] for cid in consumer_ids}
     baseload_series: list[float] = []
+    csv_path = str(profile.get("total_profile_csv", "") or "").strip()
     for ts_raw in timestamps:
         slot_dt = _parse_hourly_timestamp(ts_raw)
+        flex_vals = {}
         for index, cid in enumerate(consumer_ids):
-            series[cid].append(
-                modeled_consumer_kw_at_datetime(
-                    consumers[index],
-                    slot_dt,
-                    climate=climate,
-                )
+            kw = modeled_consumer_kw_at_datetime(
+                consumers[index],
+                slot_dt,
+                climate=climate,
             )
-        baseload_series.append(baseload_kw)
+            flex_vals[cid] = kw
+            series[cid].append(kw)
+        if csv_path:
+            total = total_kw_at_datetime(profile, slot_dt)
+            subtract = sum(
+                flex_vals[cid]
+                for index, cid in enumerate(consumer_ids)
+                if consumer_uses_profile_csv(consumers[index])
+            )
+            baseload_series.append(max(0.0, total - subtract))
+        else:
+            baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
+            baseload_series.append(baseload_kwh / 8760.0)
     series["baseload"] = baseload_series
     return series
 
@@ -112,10 +120,10 @@ def _configured_flexible_consumer_ids() -> list[str]:
 
 def _house_profile_consumer_ids(profile: dict) -> list[str]:
     """Alle modellierten Verbraucher-IDs — identisch zur Synthese."""
-    from data.consumption_profiles import _consumer_id
+    from data.consumption_profiles import _consumer_id as cid_fn
 
     return [
-        _consumer_id(consumer, index)
+        cid_fn(consumer, index)
         for index, consumer in enumerate(profile.get("consumers", []))
     ]
 
@@ -193,10 +201,11 @@ def build_synthetic_dataframe_from_house_profile(
         raise ValueError("Ungültiger Zeitraum für cons_data-Synthese.")
 
     baseload_kwh = float(profile.get("baseload_kwh", 0.0) or 0.0)
-    baseload_kw = baseload_kwh / 8760.0
+    default_baseload_kw = baseload_kwh / 8760.0
     consumers = list(profile.get("consumers", []))
     consumer_ids = [_consumer_id(consumer, index) for index, consumer in enumerate(consumers)]
     timestamps = pd.date_range(start_dt, periods=hours, freq="h")
+    csv_path = str(profile.get("total_profile_csv", "") or "").strip()
 
     rows: list[dict] = []
     for ts in timestamps:
@@ -210,6 +219,17 @@ def build_synthetic_dataframe_from_house_profile(
             for index, cid in enumerate(consumer_ids)
         }
         flex_sum = sum(flex_vals.values())
+        if csv_path:
+            total_kw = total_kw_at_datetime(profile, slot_dt)
+            subtract = sum(
+                flex_vals[cid]
+                for index, cid in enumerate(consumer_ids)
+                if consumer_uses_profile_csv(consumers[index])
+            )
+            hour_baseload = max(0.0, total_kw - subtract)
+        else:
+            hour_baseload = default_baseload_kw
+            total_kw = hour_baseload + flex_sum
         if climate is not None:
             pv_kw = climate.pv_kw_at(slot_dt)
         else:
@@ -217,8 +237,8 @@ def build_synthetic_dataframe_from_house_profile(
         rows.append(
             {
                 "timestamp": ts,
-                "total_kw": round(baseload_kw + flex_sum, 3),
-                "baseload_kw": round(baseload_kw, 3),
+                "total_kw": round(total_kw, 3),
+                "baseload_kw": round(hour_baseload, 3),
                 "pv_kw": pv_kw,
                 "source": source,
                 **{f"{cid}_kw": round(flex_vals[cid], 3) for cid in consumer_ids},

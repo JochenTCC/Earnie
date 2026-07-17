@@ -185,7 +185,31 @@ def test_scenario_entity_resolution():
 
 def test_baseload_minimum_fraction():
     result = compute_baseload_kwh(4000, [{"annual_kwh": 3900, "type": "generic"}])
-    assert result["baseload_kwh"] >= 200.0
+    assert result["baseload_min_kwh"] == pytest.approx(80.0)
+    assert result["baseload_kwh"] == pytest.approx(100.0)
+    # Floor applies when raw residual is below 2 %.
+    floored = compute_baseload_kwh(4000, [{"annual_kwh": 3950, "type": "generic"}])
+    assert floored["raw_baseload_kwh"] == pytest.approx(50.0)
+    assert floored["baseload_kwh"] == pytest.approx(80.0)
+
+
+def test_trim_baseload_floor_to_match_ist():
+    from house_config.baseload import trim_baseload_floor_to_match_ist
+
+    consumers = [{"annual_kwh": 9000, "type": "generic"}]
+    # Ist leaves 800 kWh for baseload; 2% of 10000=200 would be lower — use ideal 800.
+    matched = trim_baseload_floor_to_match_ist(10000, consumers, ist_annual_kwh=9800)
+    assert matched["baseload_kwh"] == pytest.approx(800.0)
+    assert matched["floor_fraction"] == pytest.approx(0.08)
+    # Ist leaves only 50 kWh → clamp to 1 % floor (100 kWh).
+    floored = trim_baseload_floor_to_match_ist(10000, consumers, ist_annual_kwh=9050)
+    assert floored["ideal_baseload_kwh"] == pytest.approx(50.0)
+    assert floored["baseload_kwh"] == pytest.approx(100.0)
+    assert floored["floor_fraction"] == pytest.approx(0.01)
+    with pytest.raises(ValueError, match="1 %"):
+        trim_baseload_floor_to_match_ist(
+            10000, consumers, 9000, min_floor_fraction=0.005
+        )
 
 
 def test_consumer_annual_kwh_flat_thermal():

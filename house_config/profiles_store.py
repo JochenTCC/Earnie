@@ -226,6 +226,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
         "type": consumer_type,
         "nominal_power_kw": float(raw.get("nominal_power_kw", 0.0) or 0.0),
         "profile_csv": str(raw.get("profile_csv", "")).strip(),
+        "use_profile_csv": bool(raw.get("use_profile_csv", False)),
     }
     if consumer_type == "generic":
         spec["schedule"] = _normalize_schedule(raw.get("schedule"), consumer=raw)
@@ -435,6 +436,8 @@ def _serialize_consumer(consumer: dict) -> dict:
     }
     if consumer.get("profile_csv"):
         out["profile_csv"] = consumer["profile_csv"]
+    if consumer.get("use_profile_csv"):
+        out["use_profile_csv"] = True
     if consumer["type"] == "generic":
         out["annual_kwh"] = consumer.get("annual_kwh", 0.0)
         if consumer.get("schedule"):

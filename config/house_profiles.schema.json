@@ -125,6 +125,10 @@
                 "nominal_power_kw": { "type": "number" },
                 "annual_kwh": { "type": "number" },
                 "profile_csv": { "type": "string" },
+                "use_profile_csv": {
+                    "type": "boolean",
+                    "description": "true = historisches Profil nutzen und von Gesamt-CSV abziehen; false = synthetisches Modell."
+                },
                 "schedule": { "$ref": "#/definitions/schedule" },
                 "earnie_role": { "$ref": "#/definitions/earnie_role" },
                 "loxone_inputs": { "$ref": "#/definitions/loxone_inputs" },
