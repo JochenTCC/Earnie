@@ -31,7 +31,7 @@ Countdown und letzter Lauf werden unten in der App angezeigt (siehe [Charts & Pa
 
 ## Laufzeitdateien (`runtime/`)
 
-Standardverzeichnis: `runtime/` (überschreibbar mit `EARNIE_RUNTIME_DIR`, Legacy: `ENERGY_OPTIMIZER_RUNTIME_DIR`).
+Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_PATH` bzw. abgeleitet aus `EARNIE_ENV_PATH`; Legacy: `EARNIE_RUNTIME_DIR` / `ENERGY_OPTIMIZER_RUNTIME_PATH`).
 
 
 | Datei                           | Inhalt                                                                                       |
@@ -74,8 +74,9 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 
 | Variable                                | Wirkung                                                                                                                                                                                                                              |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `EARNIE_CONFIG_PATH`                    | Pfad zur `config.json` (Standard: `config/config.json`, Legacy: `config.json` im Root). Legacy-Alias: `ENERGY_OPTIMIZER_CONFIG_PATH`.                                                                                                |
-| `EARNIE_RUNTIME_DIR`                    | Anderes Verzeichnis für Laufzeitdaten                                                                                                                                                                                                |
+| `EARNIE_ENV_PATH`                       | Wurzelverzeichnis für Persistenz (Standard: `earnie_env`). Daraus leiten sich `…/config` und `…/runtime` ab, sofern nicht separat gesetzt. Legacy-Alias: `ENERGY_OPTIMIZER_ENV_PATH`.                                                                      |
+| `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; Legacy: `config/`). Enthält `config.json`, Sidecars, `.env`, `uploads/`. Legacy-Alias: `ENERGY_OPTIMIZER_CONFIG_PATH`. (Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert.) |
+| `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; Legacy-Ordner: `runtime`). Legacy-Alias: `ENERGY_OPTIMIZER_RUNTIME_PATH` bzw. alt `EARNIE_RUNTIME_DIR`.                                                                                      |
 | `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset`, `scenario_explorer` — schränkt sichtbare Analyse-Seiten ein (Prod: `sunset2sunset,scenario_explorer`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |
 | `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). Legacy-Alias: `ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED`.                                  |

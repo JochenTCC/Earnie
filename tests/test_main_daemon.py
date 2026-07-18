@@ -18,7 +18,7 @@ from runtime_store.single_instance import (
 
 
 def test_probe_free_when_no_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path))
     probe = probe_instance("main")
     assert probe.busy is False
     assert probe.pid is None
@@ -28,7 +28,7 @@ def test_probe_free_when_no_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 def test_probe_busy_while_lock_held(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path))
     lock = SingleInstanceLock("main")
     lock.acquire()
     try:
@@ -42,7 +42,7 @@ def test_probe_busy_while_lock_held(
 def test_status_stopped_and_running(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path))
     assert main_daemon.status().state == "stopped"
 
     lock = SingleInstanceLock("main")
@@ -59,7 +59,7 @@ def test_status_stopped_and_running(
 def test_start_raises_when_already_running(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path))
     lock = SingleInstanceLock("main")
     lock.acquire()
     try:
@@ -73,7 +73,7 @@ def test_start_stop_with_stub_script(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Spawn a stub that acquires main.lock like main.py, then stop it."""
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path))
     root = Path(__file__).resolve().parents[1]
     stub = tmp_path / "stub_main.py"
     stub.write_text(
@@ -90,7 +90,7 @@ def test_start_stop_with_stub_script(
     )
 
     env = os.environ.copy()
-    env["ENERGY_OPTIMIZER_RUNTIME_DIR"] = str(tmp_path)
+    env["ENERGY_OPTIMIZER_RUNTIME_PATH"] = str(tmp_path)
     env["PYTHONPATH"] = str(root)
     proc = subprocess.Popen(
         [sys.executable, str(stub)],
@@ -128,7 +128,7 @@ def test_start_stop_with_stub_script(
 def test_maybe_auto_start_respects_env(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path))
     monkeypatch.delenv("EARNIE_AUTO_START_MAIN", raising=False)
     monkeypatch.delenv("ENERGY_OPTIMIZER_AUTO_START_MAIN", raising=False)
     assert main_daemon.maybe_auto_start() is None

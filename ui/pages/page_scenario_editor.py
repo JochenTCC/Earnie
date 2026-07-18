@@ -448,54 +448,59 @@ def _render_scenarios_tab() -> None:
                 key=scoped_widget_key(session_scope, "scenario_netzentgelt"),
             )
 
-    if st.button(
-        "Szenario speichern",
-        type="primary",
-        key="scenario_save",
-        disabled=required_lists_empty,
-    ):
-        save_id = resolve_scenario_id(
-            is_new=is_new,
-            existing_id=stable_scenario_id,
-            label=str(label or "").strip(),
-            scenario_ids=set(scenario_ids),
-        )
-        if not save_id:
-            st.error("Szenario konnte nicht gespeichert werden — bitte Bezeichnung prüfen.")
-        else:
-            try:
-                upsert_scenario(
-                    {
-                        "id": save_id,
-                        "label": str(label or "").strip() or save_id,
-                        "settings": build_scenario_settings(
-                            battery_id=lookup_entity_id(bat_map, battery_pick),
-                            pv_system_ids=[
-                                lookup_entity_id(pv_map, pick)
-                                for pick in pv_picks
-                                if lookup_entity_id(pv_map, pick)
-                            ],
-                            import_tariff_id=lookup_entity_id(imp_map, imp_pick),
-                            export_tariff_id=lookup_entity_id(exp_map, exp_pick),
-                            house_profile_id=lookup_entity_id(prof_map, prof_pick),
-                            netzentgelt_cent_kwh_override=netzentgelt_override,
-                            use_imported_pv=bool(
-                                st.session_state.get(
-                                    scoped_widget_key(
-                                        session_scope, "scenario_use_imported_pv"
-                                    ),
-                                    False,
-                                )
-                            ),
-                        ),
-                    }
-                )
-            except ValueError as exc:
-                st.error(str(exc))
-            else:
-                st.session_state[_SESSION_SELECT_PENDING_KEY] = save_id
-                st.success("Szenario gespeichert.")
-                st.rerun()
+    from ui.auto_persist import auto_persist
+
+    save_id = resolve_scenario_id(
+        is_new=is_new,
+        existing_id=stable_scenario_id,
+        label=str(label or "").strip(),
+        scenario_ids=set(scenario_ids),
+    )
+    ready = (
+        not required_lists_empty
+        and bool(save_id)
+        and bool(str(label or "").strip())
+    )
+    settings = build_scenario_settings(
+        battery_id=lookup_entity_id(bat_map, battery_pick),
+        pv_system_ids=[
+            lookup_entity_id(pv_map, pick)
+            for pick in pv_picks
+            if lookup_entity_id(pv_map, pick)
+        ],
+        import_tariff_id=lookup_entity_id(imp_map, imp_pick),
+        export_tariff_id=lookup_entity_id(exp_map, exp_pick),
+        house_profile_id=lookup_entity_id(prof_map, prof_pick),
+        netzentgelt_cent_kwh_override=netzentgelt_override,
+        use_imported_pv=bool(
+            st.session_state.get(
+                scoped_widget_key(session_scope, "scenario_use_imported_pv"),
+                False,
+            )
+        ),
+    )
+    payload = {
+        "id": save_id,
+        "label": str(label or "").strip() or save_id,
+        "settings": settings,
+    }
+
+    def _save_scenario() -> None:
+        try:
+            upsert_scenario(payload)
+        except ValueError as exc:
+            st.error(str(exc))
+            return
+        if is_new:
+            st.session_state[_SESSION_SELECT_PENDING_KEY] = save_id
+            st.rerun()
+
+    auto_persist(
+        state_key=f"scenario::{save_id}",
+        payload=payload,
+        save=_save_scenario,
+        ready=ready,
+    )
 
 
 def render() -> None:

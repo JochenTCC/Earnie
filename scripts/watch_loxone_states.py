@@ -12,11 +12,11 @@ import sys
 import time
 
 import logger_config
-from runtime_store.env_vars import read_env_or
+from runtime_store.env_vars import read_runtime_path_or
 
 DEFAULT_INTERVAL_SEC = 60
 DEFAULT_LOG_FILE = os.path.join(
-    read_env_or("RUNTIME_DIR", "runtime"),
+    read_runtime_path_or("runtime"),
     "loxone_watchdog.log",
 )
 

@@ -26,11 +26,11 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Feature Backlog
 
 ### Version 2.+1 - Save / Load configurations (also needed for web-service)  
-- [ ] Move folders ./config and ./runtime into a common directory "./earnie_env" (analog to local env "greenfield" or "silent-migration-test")
+- [x] Move folders ./config and ./runtime into a common directory "./earnie_env" (analog to local env "greenfield")
   - Change all code and existing settings accordingly
   - Non-version relevant todo: Change local launch.json accordingly
-- Auto-Save after any changes in Hauskonfigurator or Szenarieneditor
-- [ ] Add a section in sidebar to save and load complete config data
+- [x] Auto-Save after any changes in Hauskonfigurator or Szenarieneditor
+- [x] Add a section in sidebar to save and load complete config data
   - Relevant files (collected as zip-file):
     - backtesting_scenarios.json
     - config.json
@@ -38,8 +38,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - deviation_rules.json
     - house_profiles.json
     - tariffs.json
+    - uploads/ (CSV profile files)
   - For safe import / export each json-File must have a tag to document the version of used data model in Earnie at time of saving
   - Earnie has an internal mapping from date-model version to decide whether data model of zip file suits to current version or whether an conversion method is available (later implementations)
+- [x] Update docs  
 - [ ] Check running Szenario-Explorer as "web app" in Streamlit Community Cloud or assess possibilities for a own server (on hosttech)
 
 ### Version 2.+1 - Become Loxone agnostic and standardize communication

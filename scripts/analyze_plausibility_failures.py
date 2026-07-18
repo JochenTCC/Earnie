@@ -40,7 +40,7 @@ def _apply_stack_env(config_dir: Path, runtime_dir: Path | None) -> None:
     config_dir = config_dir.resolve()
     os.environ["EARNIE_CONFIG_PATH"] = str(config_dir / "config.json")
     if runtime_dir is not None:
-        os.environ["EARNIE_RUNTIME_DIR"] = str(runtime_dir.resolve())
+        os.environ["EARNIE_RUNTIME_PATH"] = str(runtime_dir.resolve())
     dotenv = config_dir / ".env"
     if dotenv.is_file():
         os.environ["EARNIE_DOTENV_PATH"] = str(dotenv)

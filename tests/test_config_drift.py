@@ -97,20 +97,20 @@ def test_find_config_drift_ignores_legacy_blocks_when_example_stale_2_0_actual()
     assert items == []
 
 
-def test_repo_example_matches_silent_migration_config_shape():
-    """Regression: migrated silent-migration config must not drift against config.example.json."""
+def test_repo_example_matches_earnie_env_config_shape():
+    """Regression: live earnie_env config must not drift against config.example.json."""
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[1]
-    example_path = repo_root / "config" / "config.example.json"
-    silent_path = repo_root / "silent-migration-test" / "config" / "config.json"
-    if not silent_path.is_file():
+    example_path = repo_root / "earnie_env" / "config" / "config.example.json"
+    live_path = repo_root / "earnie_env" / "config" / "config.json"
+    if not live_path.is_file():
         import pytest
 
-        pytest.skip("silent-migration-test/config/config.json nicht vorhanden")
+        pytest.skip("earnie_env/config/config.json nicht vorhanden")
 
     import json
 
     example = json.loads(example_path.read_text(encoding="utf-8"))
-    actual = json.loads(silent_path.read_text(encoding="utf-8"))
+    actual = json.loads(live_path.read_text(encoding="utf-8"))
     assert find_config_drift(example, actual) == []

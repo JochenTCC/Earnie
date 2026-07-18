@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 def _apply_greenfield_env() -> None:
     os.environ["EARNIE_CONFIG_PATH"] = str(GREENFIELD_CONFIG / "config.json")
-    os.environ["EARNIE_RUNTIME_DIR"] = str(GREENFIELD_RUNTIME)
+    os.environ["EARNIE_RUNTIME_PATH"] = str(GREENFIELD_RUNTIME)
     for suffix, name in (
         ("COMPONENTS_PATH", "components.json"),
         ("HOUSE_PROFILES_PATH", "house_profiles.json"),

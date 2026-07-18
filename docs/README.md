@@ -8,9 +8,9 @@ Für Entwickler (Projektstruktur, Tests, Container) siehe [DEVELOPER.md](../DEVE
 
 ## Erste Schritte
 
-1. **Konfiguration:** `config/config.example.json` → `config/config.json` (lokal, nicht committen). Alternativ legt `python -m scripts.bootstrap_runtime` die Datei beim ersten Start an.
-2. **Loxone-Zugang:** `.env.example` → `config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `config/.env` an).
-3. **Merker-Namen** in `config/config.json` unter `loxone_blocks` und `flexible_consumers` anpassen (siehe [Loxone-Signale](referenz/loxone-signale.md)).
+1. **Konfiguration:** `earnie_env/config/config.example.json` → `earnie_env/config/config.json` (lokal, nicht committen). Alternativ legt `python -m scripts.bootstrap_runtime` die Datei beim ersten Start an.
+2. **Loxone-Zugang:** `.env.example` → `earnie_env/config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `.env` im Config-Volume an).
+3. **Merker-Namen** in `earnie_env/config/config.json` unter `loxone_blocks` und `flexible_consumers` anpassen (siehe [Loxone-Signale](referenz/loxone-signale.md)).
 4. **Verbindung prüfen:**
    ```powershell
    python -m scripts.verify_loxone_setup
@@ -18,7 +18,7 @@ Für Entwickler (Projektstruktur, Tests, Container) siehe [DEVELOPER.md](../DEVE
 5. **Produktivbetrieb:** Docker-Container starten (UI + `main.py` Auto-Start) oder lokal `python main.py` / UI **Optimierer-Dienst**.
 6. **Monitor öffnen:** `python -m scripts.run_streamlit` (Port: `ui.streamlit_port` in config.json, Standard 8501)
 
-Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `config/config.json` `"$schema": "./config.schema.json"` gesetzt ist.
+Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `config.json` `"$schema": "./config.schema.json"` gesetzt ist.
 
 **Container-Betrieb (Synology / LoxBerry / Proxmox LXC):** [Container](einrichtung/container.md) · [Proxmox LXC](einrichtung/proxmox-lxc.md)
 
@@ -36,9 +36,10 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 - [Proxmox LXC](einrichtung/proxmox-lxc.md) — Unprivileged LXC mit Docker Compose (Port 8501)
 - [Greenfield Dev-Stack](einrichtung/greenfield-dev-stack.md) — lokale Ersteinrichtung (Port 8502) für Hauskonfigurator/Backtesting
 
-### Konfiguration (`config/config.json`)
+### Konfiguration (`earnie_env/config/config.json`)
 
 - [Überblick](konfiguration/ueberblick.md) — Aufbau der Datei, Szenarien, Dateipfade
+- [Speichern / Laden](konfiguration/speichern-laden.md) — `earnie_env`, Auto-Save, ZIP-Export/Import
 - [PV & Batterie](konfiguration/batterie-pv.md) — Live-Szenario, Entitäts-Referenzen
 - [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
 - [Historische Verbrauchs-CSV](konfiguration/verbrauchs-csv.md) — Hausprofil Gesamt-/Verbraucher-CSV, Normalisierung, Loxone-Import

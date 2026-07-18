@@ -48,7 +48,7 @@ def _prepare_greenfield_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
     monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
 
     share_dir = tmp_path / "share" / "config"
@@ -145,7 +145,7 @@ def test_greenfield_bootstrap_creates_expected_files(tmp_path, monkeypatch):
 def test_config_minimal_live_scenario_id_only():
     """2.0 P2: Bootstrap-Vorlage ohne runtime_settings; Live-Szenario in backtesting_scenarios.json."""
     repo_root = Path(__file__).resolve().parents[1]
-    minimal_path = repo_root / "config" / "config.minimal.json"
+    minimal_path = repo_root / "earnie_env" / "config" / "config.minimal.json"
     minimal = json.loads(minimal_path.read_text(encoding="utf-8"))
 
     assert "runtime_settings" not in minimal
@@ -154,7 +154,7 @@ def test_config_minimal_live_scenario_id_only():
     assert "appliances" not in minimal
     assert "loxone_silent_mode" not in minimal.get("system", {})
 
-    scenarios_path = repo_root / "config" / "backtesting_scenarios.minimal.json"
+    scenarios_path = repo_root / "earnie_env" / "config" / "backtesting_scenarios.minimal.json"
     scenarios = json.loads(scenarios_path.read_text(encoding="utf-8"))
     live = next(s for s in scenarios["scenarios"] if s["id"] == "live")
     assert set(live["settings"]) <= {

@@ -1,16 +1,16 @@
 # Konfiguration — Überblick
 
-Die zentrale Datei ist `config/config.json`. Als Startpunkt dient `[config/config.example.json](../../config/config.example.json)`.
+Die zentrale Datei ist `earnie_env/config/config.json`. Als Startpunkt dient [`earnie_env/config/config.example.json`](../../earnie_env/config/config.example.json). Siehe auch [Speichern / Laden](speichern-laden.md).
 
 ## Schema und Editor-Hilfe
 
-Am Dateianfang von `config/config.json`:
+Am Dateianfang von `config.json`:
 
 ```json
 "$schema": "./config.schema.json"
 ```
 
-In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus `[config/config.schema.json](../../config/config.schema.json)`. Ausführlichere Zusammenhänge stehen in den folgenden Kapiteln dieser Dokumentation.
+In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`earnie_env/config/config.schema.json`](../../earnie_env/config/config.schema.json). Ausführlichere Zusammenhänge stehen in den folgenden Kapiteln dieser Dokumentation.
 
 ## Hauptblöcke
 
@@ -22,16 +22,16 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus `[co
 | `ui`                                | Streamlit-Port, Refresh-Intervalle, optionale Dev-Seiten                                                                     |
 | `loxone_blocks`                     | Zentrale Loxone-IO-Namen (Speicher, PV, Steuerung)                                                                           |
 | `live_scenario_id`                  | ID des **Live-Szenarios** in `backtesting_scenarios.json` (Standard: `live`)                                                 |
-| `config/components.json`            | Technische Parameter für Speicher und PV (`batteries[]`, `pv_systems[]`; referenziert über IDs)                              |
-| `config/tariffs.json`               | Tarif-Katalog (Bezug/Einspeise); referenziert über `import_tariff_id` / `export_tariff_id`                                   |
-| `config/house_profiles.json`        | Standort (Geo/Zeitzone), Planungs-Verbraucher (EV, Wärmepumpe, Waschmaschine …); referenziert über `house_profile_id`        |
-| `config/backtesting_scenarios.json` | **Alle** Szenarien (Live + Varianten); einheitliches `settings`-Format                                                       |
+| `earnie_env/config/components.json`            | Technische Parameter für Speicher und PV (`batteries[]`, `pv_systems[]`; referenziert über IDs)                              |
+| `earnie_env/config/tariffs.json`               | Tarif-Katalog (Bezug/Einspeise); referenziert über `import_tariff_id` / `export_tariff_id`                                   |
+| `earnie_env/config/house_profiles.json`        | Standort (Geo/Zeitzone), Planungs-Verbraucher (EV, Wärmepumpe, Waschmaschine …); referenziert über `house_profile_id`        |
+| `earnie_env/config/backtesting_scenarios.json` | **Alle** Szenarien (Live + Varianten); einheitliches `settings`-Format                                                       |
 | `file_paths_battery_simulation`     | Pfade zu historischen CSVs, Preisquelle, `cons_data_hourly.csv`                                                              |
 | `flexible_consumers`                | Legacy: steuerbare Verbraucher (MILP) mit Loxone-Ein-/Ausgängen — ab **2.0** leer; Live-Verbraucher in `house_profiles.json` |
 | `planning_horizon`                  | MILP-Horizont (`sunrise_window` für Live)                                                                                    |
 
 
-Vorlage für Szenarien: `[backtesting_scenarios.example.json](../../config/backtesting_scenarios.example.json)`.
+Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../earnie_env/config/backtesting_scenarios.example.json).
 
 ## Szenarien (Live und Szenario-Explorer)
 

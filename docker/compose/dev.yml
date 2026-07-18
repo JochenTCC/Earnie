@@ -2,16 +2,16 @@
 #   docker compose --project-directory . -f docker/compose/dev.yml up -d --build
 #
 # Ein Container: Streamlit + auto-start von main.py (EARNIE_AUTO_START_MAIN=1).
-# Nach Änderungen an config/config.json: Container neu starten.
+# Nach Änderungen an earnie_env/config/config.json: Container neu starten.
 version: '3.8'
 
 x-persist-volumes: &persist-volumes
-  - ./config:/app/config
-  - ./runtime:/app/runtime
+  - ./earnie_env/config:/app/config
+  - ./earnie_env/runtime:/app/runtime
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  EARNIE_CONFIG_PATH: config/config.json
+  EARNIE_CONFIG_PATH: config
   EARNIE_VERIFY_LOXONE_ON_START: "1"
   EARNIE_AUTO_START_MAIN: "1"
 
@@ -24,7 +24,7 @@ services:
     build: *build
     container_name: earnie
     restart: unless-stopped
-    # Host-Port muss ui.streamlit_port in config/config.json entsprechen (Standard: 8501).
+    # Host-Port muss ui.streamlit_port in earnie_env/config/config.json entsprechen (Standard: 8501).
     ports:
       - "8501:8501"
     volumes: *persist-volumes

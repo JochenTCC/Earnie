@@ -8,7 +8,7 @@ import streamlit as st
 from house_config.id_slug import slug_id
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import get_runtime_scenario_refs, list_batteries, upsert_battery
-from ui.house_config_sticky_save import sticky_save_bar
+from ui.auto_persist import auto_persist
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     labeled_number_input,
@@ -186,10 +186,21 @@ def render_battery_planning_tab() -> None:
         key=_scoped_key(session_scope, "planning_battery_threshold"),
     )
 
-    sticky_save_bar()
-    if st.button("Batterie speichern", type="primary", key="planning_battery_save"):
-        taken = {bid for bid in battery_ids if bid != stable_id}
-        entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
+    ready = bool(str(label or "").strip()) and float(capacity or 0) > 0
+    taken = {bid for bid in battery_ids if bid != stable_id}
+    entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
+    payload = {
+        "id": entity_id,
+        "label": label,
+        "battery_capacity_kwh": capacity,
+        "battery_max_power_kw": max_power,
+        "battery_efficiency": efficiency,
+        "battery_min_soc": min_soc,
+        "battery_max_soc": max_soc,
+        "threshold_power": threshold_percent / 100.0,
+    }
+
+    def _save_battery() -> None:
         try:
             upsert_battery(
                 {
@@ -205,9 +216,16 @@ def render_battery_planning_tab() -> None:
             )
         except ValueError as exc:
             st.error(str(exc))
-        else:
+            return
+        st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
+        if is_new:
             st.session_state[_SESSION_SELECT_PENDING_KEY] = entity_id
-            st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
             st.session_state[_SESSION_SYNC_KEY] = None
-            st.success("Batterie gespeichert.")
             st.rerun()
+
+    auto_persist(
+        state_key=f"planning_battery::{entity_id}",
+        payload=payload,
+        save=_save_battery,
+        ready=ready,
+    )

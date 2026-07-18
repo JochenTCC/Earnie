@@ -454,12 +454,12 @@ def format_display_data_basis_caption(
     """Markdown für ausgeklappte Datenbasis: Runtime, Merge-Pfad, Flex-Soll."""
     if log_source.env_runtime_dir:
         runtime_note = (
-            f"`EARNIE_RUNTIME_DIR` = `{log_source.env_runtime_dir}` "
+            f"`EARNIE_RUNTIME_PATH` = `{log_source.env_runtime_dir}` "
             f"(aufgelöst: `{log_source.runtime_dir}`)"
         )
     else:
         runtime_note = (
-            "Keine `EARNIE_RUNTIME_DIR` gesetzt — "
+            "Keine `EARNIE_RUNTIME_PATH` gesetzt — "
             f"Standard `{log_source.runtime_dir}`"
         )
     if log_source.history_exists:

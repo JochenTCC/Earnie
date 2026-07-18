@@ -20,7 +20,7 @@ Dockerfile: `docker/Dockerfile` · Entrypoint: `docker/entrypoint.sh`
 
 Jeder Stack hat **einen** Service `earnie` (Streamlit + Auto-Start von `main.py` via `EARNIE_AUTO_START_MAIN=1`).
 
-Immer vom **Repo-Root** mit `--project-directory .`, damit Volume-Pfade (`./config`, `./runtime`, `./greenfield/...`) korrekt aufgelöst werden:
+Immer vom **Repo-Root** mit `--project-directory .`, damit Volume-Pfade (`./earnie_env/config`, `./earnie_env/runtime`, `./greenfield/...`) korrekt aufgelöst werden:
 
 | Stack | Datei | Port (UI) |
 |-------|-------|-----------|

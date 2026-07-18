@@ -68,7 +68,7 @@ def test_get_forecast_model_path_resolves_runtime_prefix(monkeypatch, tmp_path):
     nas_runtime.mkdir()
     model_file = nas_runtime / "price_model_coefficients.json"
     model_file.write_text("{}", encoding="utf-8")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(nas_runtime))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(nas_runtime))
 
     with patch(
         "config.Config._read_json_dict",

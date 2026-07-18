@@ -36,6 +36,8 @@ def test_save_profile_consumption_csv_overwrites_same_path(
         normalize=False,
     )
     assert first == second == "config/uploads/mein_haus_verbrauch.csv"
-    assert Path(first).read_bytes() == b"b"
-    uploads = list((tmp_path / "config" / "uploads").glob("*.csv"))
+    from runtime_store.persist_paths import resolve_config_prefixed_path, resolve_uploads_dir
+
+    assert Path(resolve_config_prefixed_path(first)).read_bytes() == b"b"
+    uploads = list(Path(resolve_uploads_dir()).glob("*.csv"))
     assert len(uploads) == 1

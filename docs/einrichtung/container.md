@@ -13,25 +13,25 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 
 | Mount (Host)                          | Inhalt                                                                                                                  |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `./config/config.json`                | Haus-Konfiguration (wird nie überschrieben)                                                                             |
-| `./config/tariffs.json`               | Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json`                                                            |
-| `./config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline                                                                                           |
-| `./config/house_profiles.json`        | Hausprofile (Sidecar)                                                                                                   |
-| `./config/deviation_rules.json`       | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an)                                                                    |
-| `./config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
-| `./runtime/`                          | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs                                                                   |
-| `./runtime/local_settings.json`       | Lokale Einstellungen (z. B. Silent-Mode)                                                                                |
-| `./config/.env`                       | Loxone-Zugangsdaten                                                                                                     |
+| `./earnie_env/config/config.json`                | Haus-Konfiguration (wird nie überschrieben)                                                                             |
+| `./earnie_env/config/tariffs.json`               | Tarif-Katalog (Bezug/Einspeise); Sidecar neben `config.json`                                                            |
+| `./earnie_env/config/backtesting_scenarios.json` | Szenarien inkl. Live-Baseline                                                                                           |
+| `./earnie_env/config/house_profiles.json`        | Hausprofile (Sidecar)                                                                                                   |
+| `./earnie_env/config/deviation_rules.json`       | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an)                                                                    |
+| `./earnie_env/config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
+| `./earnie_env/runtime/`                          | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs                                                                   |
+| `./earnie_env/runtime/local_settings.json`       | Lokale Einstellungen (z. B. Silent-Mode)                                                                                |
+| `./earnie_env/config/.env`                       | Loxone-Zugangsdaten                                                                                                     |
 
 
-Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config/config.json`
+Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config` (Config-Verzeichnis im Container, gemountet als `/app/config`)
 
 ## Erstinstallation (NAS)
 
 1. Projektordner mit `docker/compose/synology.yml` anlegen (auf der NAS oft als `compose.yaml` kopiert)
-2. `mkdir -p config runtime`
-3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config.json`, `tariffs.json`, weitere Sidecars, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
-4. `config/.env`, `config/config.json` und `config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
+2. `mkdir -p earnie_env/config earnie_env/runtime`
+3. Container starten — der **Entrypoint** legt fehlende Dateien an (`.env`, `config.json`, `tariffs.json`, weitere Sidecars, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
+4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
 5. Optional: historische `cons_data` aus Dev nach `runtime/cons_data_hourly.csv` kopieren
 
 
@@ -205,9 +205,9 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 ### Erstinstallation
 
 1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker/compose/loxberry.yml`
-2. `mkdir -p config runtime`
+2. `mkdir -p earnie_env/config earnie_env/runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config/config.json`, …)
-4. `config/.env`, `config/config.json` und `config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
+4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
 5. Optional: historische `cons_data` nach `runtime/cons_data_hourly.csv` kopieren
 
 

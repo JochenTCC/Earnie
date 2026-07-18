@@ -11,10 +11,10 @@ from typing import IO, TextIO
 logger = logging.getLogger(__name__)
 
 
-from runtime_store.env_vars import read_env_or
+from runtime_store.env_vars import read_runtime_path_or
 
 def _runtime_dir() -> str:
-    return read_env_or("RUNTIME_DIR", "runtime")
+    return read_runtime_path_or("runtime")
 
 
 class SingleInstanceError(RuntimeError):

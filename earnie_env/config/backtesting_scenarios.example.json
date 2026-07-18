@@ -1,20 +1,69 @@
 {
     "$schema": "./backtesting_scenarios.schema.json",
-    "cbc_gap_rel": 0.10,
+    "earnie_data_model": 1,
+    "cbc_gap_rel": 0.1,
     "cbc_strict_time_limit_sec": 3,
     "oemag_monthly_feed_in_rates": [
-        {"year": 2025, "month": 7,  "tariff_cent_kwh": 5.965},
-        {"year": 2025, "month": 8,  "tariff_cent_kwh": 5.9},
-        {"year": 2025, "month": 9,  "tariff_cent_kwh": 7.1},
-        {"year": 2025, "month": 10, "tariff_cent_kwh": 9.008},
-        {"year": 2025, "month": 11, "tariff_cent_kwh": 8.7},
-        {"year": 2025, "month": 12, "tariff_cent_kwh": 8.7},
-        {"year": 2026, "month": 1,  "tariff_cent_kwh": 8.842},
-        {"year": 2026, "month": 2,  "tariff_cent_kwh": 8.457},
-        {"year": 2026, "month": 3,  "tariff_cent_kwh": 5.72},
-        {"year": 2026, "month": 4,  "tariff_cent_kwh": 6.772},
-        {"year": 2026, "month": 5,  "tariff_cent_kwh": 6.772},
-        {"year": 2026, "month": 6,  "tariff_cent_kwh": 6.772}
+        {
+            "year": 2025,
+            "month": 7,
+            "tariff_cent_kwh": 5.965
+        },
+        {
+            "year": 2025,
+            "month": 8,
+            "tariff_cent_kwh": 5.9
+        },
+        {
+            "year": 2025,
+            "month": 9,
+            "tariff_cent_kwh": 7.1
+        },
+        {
+            "year": 2025,
+            "month": 10,
+            "tariff_cent_kwh": 9.008
+        },
+        {
+            "year": 2025,
+            "month": 11,
+            "tariff_cent_kwh": 8.7
+        },
+        {
+            "year": 2025,
+            "month": 12,
+            "tariff_cent_kwh": 8.7
+        },
+        {
+            "year": 2026,
+            "month": 1,
+            "tariff_cent_kwh": 8.842
+        },
+        {
+            "year": 2026,
+            "month": 2,
+            "tariff_cent_kwh": 8.457
+        },
+        {
+            "year": 2026,
+            "month": 3,
+            "tariff_cent_kwh": 5.72
+        },
+        {
+            "year": 2026,
+            "month": 4,
+            "tariff_cent_kwh": 6.772
+        },
+        {
+            "year": 2026,
+            "month": 5,
+            "tariff_cent_kwh": 6.772
+        },
+        {
+            "year": 2026,
+            "month": 6,
+            "tariff_cent_kwh": 6.772
+        }
     ],
     "monthly_float_reference_cent_kwh": 7.15,
     "scenarios": [
@@ -23,7 +72,9 @@
             "label": "Live",
             "settings": {
                 "battery_id": "default_5kwh",
-                "pv_system_ids": ["roof_south"],
+                "pv_system_ids": [
+                    "roof_south"
+                ],
                 "import_tariff_id": "awattar_at",
                 "export_tariff_id": "fixed_37ct",
                 "house_profile_id": "example_efh"
@@ -85,7 +136,9 @@
             "label": "10 kWh + monatliche Einspeise (Entitäten-Referenzen)",
             "settings": {
                 "battery_id": "upgrade_10kwh",
-                "pv_system_ids": ["roof_south"],
+                "pv_system_ids": [
+                    "roof_south"
+                ],
                 "import_tariff_id": "awattar_at",
                 "export_tariff_id": "monthly_sunny",
                 "house_profile_id": "example_efh"

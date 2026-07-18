@@ -18,6 +18,7 @@ from runtime_store.persist_paths import (
     resolve_config_json_path,
     resolve_house_profiles_json_path,
     resolve_tariffs_json_path,
+    resolve_uploads_dir,
 )
 from settings.json_io import read_json_dict, write_json_dict
 
@@ -32,6 +33,9 @@ def read_json_document(path: str) -> dict:
 
 
 def write_json_document(path: str, data: dict) -> None:
+    from runtime_store.data_model import stamp_data_model
+
+    stamp_data_model(data)
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_suffix(target.suffix + ".tmp")
@@ -173,18 +177,19 @@ def save_profile_consumption_csv(
     min_hours: int = 8760,
     role: str = "",
 ) -> str:
-    """Speichert Verbrauchs-CSV unter config/uploads/; optional normalisiert.
+    """Speichert Verbrauchs-CSV unter uploads/ neben der aktiven Config; optional normalisiert.
 
     ``role`` (z. B. ``pv``, ``verbrauch``) wird in den Dateinamen eingefügt.
     Re-uploads overwrite the same path (one CSV per role / consumer).
     ``filename`` is kept for API compatibility; it does not affect the target name.
+    Returns a portable ``config/uploads/…`` path for storage in house profiles.
     """
     from house_config.consumption_csv import (
         MIN_HOURS_FULL_YEAR,
         normalize_profile_csv_file,
     )
 
-    uploads_dir = Path("config") / "uploads"
+    uploads_dir = Path(resolve_uploads_dir())
     uploads_dir.mkdir(parents=True, exist_ok=True)
     # Ignore original upload filename so re-uploads overwrite one stable path.
     _ = filename
@@ -192,11 +197,11 @@ def save_profile_consumption_csv(
         profile_id, consumer_id=consumer_id, role=role
     )
     target.write_bytes(content)
-    path = target.as_posix()
+    portable = f"config/uploads/{target.name}"
     if normalize:
         hours = min_hours if min_hours > 0 else MIN_HOURS_FULL_YEAR
-        normalize_profile_csv_file(path, min_hours=hours)
-    return path
+        normalize_profile_csv_file(portable, min_hours=hours)
+    return portable
 
 
 def save_energiemonitor_profile_csvs(
@@ -206,13 +211,13 @@ def save_energiemonitor_profile_csvs(
     *,
     min_hours: int = 8760,
 ) -> dict[str, str]:
-    """Import Energiemonitor upload → canonical Verbrauch (+ optional PV) under config/uploads/."""
+    """Import Energiemonitor upload → canonical Verbrauch (+ optional PV) under uploads/."""
     from house_config.consumption_csv import (
         MIN_HOURS_FULL_YEAR,
         import_energiemonitor_to_canonical,
     )
 
-    uploads_dir = Path("config") / "uploads"
+    uploads_dir = Path(resolve_uploads_dir())
     uploads_dir.mkdir(parents=True, exist_ok=True)
     safe_name = Path(filename).name or "energiemonitor.csv"
     if not safe_name.lower().endswith(".csv"):
@@ -220,8 +225,10 @@ def save_energiemonitor_profile_csvs(
     raw_path = uploads_dir / f"{profile_id}_energiemonitor_raw_{safe_name}"
     raw_path.write_bytes(content)
     hours = min_hours if min_hours > 0 else MIN_HOURS_FULL_YEAR
-    verbrauch_dest = (uploads_dir / f"{profile_id}_energiemonitor_verbrauch.csv").as_posix()
-    produktion_dest = (uploads_dir / f"{profile_id}_energiemonitor_produktion.csv").as_posix()
+    verbrauch_name = f"{profile_id}_energiemonitor_verbrauch.csv"
+    produktion_name = f"{profile_id}_energiemonitor_produktion.csv"
+    verbrauch_dest = f"config/uploads/{verbrauch_name}"
+    produktion_dest = f"config/uploads/{produktion_name}"
     return import_energiemonitor_to_canonical(
         raw_path.as_posix(),
         verbrauch_dest=verbrauch_dest,

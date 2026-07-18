@@ -84,7 +84,7 @@ def test_backtesting_script_path_points_to_run_backtesting():
 
 
 def test_default_backtesting_output_dir_uses_runtime_dir(monkeypatch, tmp_path):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "gf-runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "gf-runtime"))
     assert default_backtesting_output_dir() == str(tmp_path / "gf-runtime")
 
 

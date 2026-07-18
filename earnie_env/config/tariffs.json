@@ -1,5 +1,6 @@
 {
     "$schema": "./tariffs.schema.json",
+    "earnie_data_model": 1,
     "catalog_as_of": "2026",
     "import_tariffs": [
         {

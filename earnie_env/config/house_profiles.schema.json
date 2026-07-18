@@ -1,0 +1,455 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/house_profiles.schema.json",
+  "title": "Earnie Hausprofile",
+  "type": "object",
+  "properties": {
+    "profiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/profile"
+      }
+    },
+    "earnie_data_model": {
+      "type": "integer",
+      "const": 1,
+      "description": "Earnie data-model version for config pack import/export."
+    }
+  },
+  "definitions": {
+    "schedule": {
+      "type": "object",
+      "properties": {
+        "runs_per_week": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duration_h": {
+          "type": "number",
+          "minimum": 0
+        },
+        "start_hour": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 23
+        },
+        "start_shift_h": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 12
+        }
+      }
+    },
+    "earnie_role": {
+      "type": "string",
+      "enum": [
+        "known",
+        "flex",
+        "manual"
+      ],
+      "default": "known",
+      "description": "Wie Earnie diesen generic-Verbraucher berücksichtigt."
+    },
+    "loxone_inputs": {
+      "type": "object",
+      "description": "Optionaler Loxone-Leistungsmerker (known/manual generic, thermal, EV).",
+      "properties": {
+        "power_name": {
+          "type": "string"
+        },
+        "signal_type": {
+          "type": "string",
+          "enum": [
+            "power",
+            "binary"
+          ]
+        },
+        "subtract_consumer_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "loxone_outputs": {
+      "type": "object",
+      "description": "Steuer-Signale an Loxone (Freigabe und/oder kW-Sollwert).",
+      "properties": {
+        "enable_name": {
+          "type": "string"
+        },
+        "power_setpoint_name": {
+          "type": "string"
+        },
+        "pv_follow_name": {
+          "type": "string"
+        }
+      }
+    },
+    "appliance_recommendation": {
+      "type": "object",
+      "description": "Empfehlungsmodus (Waschmaschine/Trockner/GS) — 1.96d",
+      "properties": {
+        "power_source": {
+          "enum": [
+            "loxone",
+            "manual"
+          ]
+        },
+        "default_power_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "default_runtime_h": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "day_schedule": {
+      "type": "object",
+      "properties": {
+        "car_available_from_hour": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 23
+        },
+        "ready_by_hour": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 23
+        },
+        "daily_rest_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "ev_charging_schedule": {
+      "type": "object",
+      "properties": {
+        "target_soc_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "charging_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "forecast_when_absent": {
+          "type": "boolean"
+        },
+        "nominal_power_voltage_v": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Nennspannung für A→kW-Umrechnung (Default 230 V)."
+        },
+        "nominal_power_phases": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "Phasenzahl für A→kW-Umrechnung (Default 1)."
+        },
+        "weekday": {
+          "$ref": "#/definitions/day_schedule"
+        },
+        "weekend": {
+          "$ref": "#/definitions/day_schedule"
+        },
+        "milp": {
+          "type": "object",
+          "properties": {
+            "live_modus_a_min_remaining_kwh": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "tie_break_on_epsilon": {
+              "type": "number",
+              "minimum": 0
+            },
+            "tie_break_time_epsilon": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "thermal_rc_params": {
+      "type": "object",
+      "required": [
+        "water_volume_liters",
+        "setpoint_c",
+        "tolerance_c",
+        "heat_loss_kw_per_k",
+        "heating_efficiency"
+      ],
+      "properties": {
+        "water_volume_liters": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "setpoint_c": {
+          "type": "number"
+        },
+        "tolerance_c": {
+          "type": "number",
+          "minimum": 0
+        },
+        "heat_loss_kw_per_k": {
+          "type": "number",
+          "minimum": 0
+        },
+        "heating_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "heat_paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "heat_loss_kw_per_k": {
+                "type": "number",
+                "minimum": 0
+              },
+              "reference": {
+                "enum": [
+                  "ambient",
+                  "fixed"
+                ]
+              },
+              "reference_temp_c": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "consumer": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "legacy_id": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "generic",
+            "thermal_annual",
+            "ev",
+            "thermal_rc"
+          ]
+        },
+        "nominal_power_kw": {
+          "type": "number"
+        },
+        "annual_kwh": {
+          "type": "number"
+        },
+        "profile_csv": {
+          "type": "string"
+        },
+        "use_profile_csv": {
+          "type": "boolean",
+          "description": "true = historisches Profil nutzen und von Gesamt-CSV abziehen; false = synthetisches Modell."
+        },
+        "schedule": {
+          "$ref": "#/definitions/schedule"
+        },
+        "earnie_role": {
+          "$ref": "#/definitions/earnie_role"
+        },
+        "loxone_inputs": {
+          "$ref": "#/definitions/loxone_inputs"
+        },
+        "loxone_outputs": {
+          "$ref": "#/definitions/loxone_outputs"
+        },
+        "appliance_recommendation": {
+          "$ref": "#/definitions/appliance_recommendation"
+        },
+        "min_power_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "min_on_quarterhours": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "battery_capacity_kwh": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "charging_schedule": {
+          "$ref": "#/definitions/ev_charging_schedule"
+        },
+        "thermal_rc": {
+          "$ref": "#/definitions/thermal_rc_params"
+        },
+        "water_volume_liters": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "setpoint_c": {
+          "type": "number"
+        },
+        "tolerance_c": {
+          "type": "number",
+          "minimum": 0
+        },
+        "heat_loss_kw_per_k": {
+          "type": "number",
+          "minimum": 0
+        },
+        "heating_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "living_area_m2": {
+          "type": "number"
+        },
+        "building_class": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "hwb_kwh_m2": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Optional: genauer Heizwärmebedarf HWB in kWh/m²a (überschreibt Gebäudeklasse)."
+        },
+        "heat_pump_type": {
+          "enum": [
+            "luft",
+            "erde"
+          ]
+        },
+        "persons": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_temp_c": {
+          "type": "number"
+        },
+        "heating_limit_c": {
+          "type": "number"
+        },
+        "solar_thermal_area_m2": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Kollektorfläche in m² (0 = kein Solarthermie-Kollektor)."
+        },
+        "solar_thermal_tilt_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 90,
+          "description": "Neigung Solar-Kollektor: 0° flach, 90° Fassade."
+        },
+        "solar_thermal_azimuth_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "description": "Ausrichtung Solar-Kollektor: 0° Süd, -90° Ost, 90° West."
+        },
+        "optimizer_flex": {
+          "type": "boolean",
+          "description": "True: MILP-Pulse statt PWM-Overlay (Standard bei nominal_power_kw > 0)."
+        },
+        "thermal_flex_window": {
+          "type": "object",
+          "description": "Optionales Tagesfenster für MILP-Pulse (start_hour, duration_h, start_shift_h)."
+        },
+        "max_on_quarterhours": {
+          "type": "integer",
+          "minimum": 4,
+          "description": "Max. Einschaltdauer pro Block in Viertelstunden (Standard 16 = 4 h)."
+        },
+        "max_pulses_per_day": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Max. Einschalt-Blöcke pro Kalendertag (Standard 4)."
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": [
+        "id",
+        "annual_kwh"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "annual_kwh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "latitude": {
+          "type": "number",
+          "description": "Breitengrad (Standort Heizung/PV)."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "Längengrad (Standort Heizung/PV)."
+        },
+        "timezone_name": {
+          "type": "string",
+          "description": "Optional, abgeleitet aus latitude/longitude beim Laden — nicht manuell pflegen."
+        },
+        "default_pv_tilt": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 90,
+          "description": "Vorschlag Dachneigung für neue PV-Anlage (überschreibbar)."
+        },
+        "default_pv_azimuth": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "description": "Vorschlag PV-Azimut für neue PV-Anlage (überschreibbar)."
+        },
+        "total_profile_csv": {
+          "type": "string"
+        },
+        "pv_profile_csv": {
+          "type": "string",
+          "description": "Optionaler Pfad zu kanonischem PV-Ertragsprofil (timestamp;power_kw)."
+        },
+        "historical_csv_source": {
+          "type": "string",
+          "enum": [
+            "separate",
+            "energiemonitor"
+          ],
+          "description": "Importmodus: getrennte CSVs oder Loxone-Energiemonitor."
+        },
+        "consumers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/consumer"
+          }
+        }
+      }
+    }
+  }
+}

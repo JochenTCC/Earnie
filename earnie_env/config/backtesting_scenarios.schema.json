@@ -4,7 +4,9 @@
   "title": "Earnie Backtesting-Szenarien",
   "description": "Szenarien für Szenario-Explorer und Live-Betrieb (live_scenario_id in config.json).",
   "type": "object",
-  "required": ["scenarios"],
+  "required": [
+    "scenarios"
+  ],
   "properties": {
     "$schema": {
       "type": "string",
@@ -28,7 +30,11 @@
       "maxItems": 12,
       "items": {
         "type": "object",
-        "required": ["year", "month", "tariff_cent_kwh"],
+        "required": [
+          "year",
+          "month",
+          "tariff_cent_kwh"
+        ],
         "properties": {
           "year": {
             "type": "integer",
@@ -60,13 +66,22 @@
       "items": {
         "$ref": "#/definitions/scenario"
       }
+    },
+    "earnie_data_model": {
+      "type": "integer",
+      "const": 1,
+      "description": "Earnie data-model version for config pack import/export."
     }
   },
   "definitions": {
     "scenario": {
       "type": "object",
       "description": "Benanntes Szenario für Simulation/Backtesting.",
-      "required": ["id", "label", "settings"],
+      "required": [
+        "id",
+        "label",
+        "settings"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -80,37 +95,74 @@
           "type": "object",
           "description": "Parameter-Override (flache Felder oder Referenzen auf Entitäten). Standort/Zeitzone kommen aus dem Hausprofil (house_profile_id), nicht aus settings.",
           "properties": {
-            "battery_id": { "type": "string", "description": "Referenz auf batteries[].id in config.json." },
+            "battery_id": {
+              "type": "string",
+              "description": "Referenz auf batteries[].id in config.json."
+            },
             "pv_system_ids": {
               "type": "array",
               "description": "Referenzen auf pv_systems[].id in components.json (Mehrfach-Auswahl).",
-              "items": { "type": "string" }
+              "items": {
+                "type": "string"
+              }
             },
             "pv_system_id": {
               "type": "string",
               "description": "Veraltet — Einzelreferenz; wird beim Laden zu pv_system_ids normalisiert."
             },
-            "import_tariff_id": { "type": "string", "description": "Referenz auf import_tariffs[].id in tariffs.json." },
-            "export_tariff_id": { "type": "string", "description": "Referenz auf export_tariffs[].id in tariffs.json." },
-            "house_profile_id": { "type": "string", "description": "Referenz auf profiles[].id in house_profiles.json." },
+            "import_tariff_id": {
+              "type": "string",
+              "description": "Referenz auf import_tariffs[].id in tariffs.json."
+            },
+            "export_tariff_id": {
+              "type": "string",
+              "description": "Referenz auf export_tariffs[].id in tariffs.json."
+            },
+            "house_profile_id": {
+              "type": "string",
+              "description": "Referenz auf profiles[].id in house_profiles.json."
+            },
             "use_imported_pv": {
               "type": "boolean",
               "description": "Wenn true: Szenario-Explorer nutzt Hausprofil-pv_profile_csv statt PV aus Wetterdaten (Open-Meteo)."
             },
-            "k_push_cent": { "type": "number" },
+            "k_push_cent": {
+              "type": "number"
+            },
             "feed_in_mode": {
               "type": "string",
-              "enum": ["fixed", "dynamic_epex"]
+              "enum": [
+                "fixed",
+                "dynamic_epex"
+              ]
             },
-            "pv_tilt": { "type": "number" },
-            "pv_azimuth": { "type": "number" },
-            "pv_kwp": { "type": "number" },
-            "battery_max_power_kw": { "type": "number" },
-            "battery_efficiency": { "type": "number" },
-            "battery_capacity_kwh": { "type": "number" },
-            "battery_min_soc": { "type": "number" },
-            "battery_max_soc": { "type": "number" },
-            "threshold_power": { "type": "number" }
+            "pv_tilt": {
+              "type": "number"
+            },
+            "pv_azimuth": {
+              "type": "number"
+            },
+            "pv_kwp": {
+              "type": "number"
+            },
+            "battery_max_power_kw": {
+              "type": "number"
+            },
+            "battery_efficiency": {
+              "type": "number"
+            },
+            "battery_capacity_kwh": {
+              "type": "number"
+            },
+            "battery_min_soc": {
+              "type": "number"
+            },
+            "battery_max_soc": {
+              "type": "number"
+            },
+            "threshold_power": {
+              "type": "number"
+            }
           }
         }
       }

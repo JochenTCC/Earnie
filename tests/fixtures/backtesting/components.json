@@ -25,5 +25,6 @@
             "pv_tilt": 18,
             "pv_azimuth": 28
         }
-    ]
+    ],
+    "earnie_data_model": 1
 }

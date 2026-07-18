@@ -15,6 +15,8 @@ from runtime_store.file_metadata import (
     stamp_payload,
 )
 from runtime_store.persist_paths import (
+    config_dir,
+    config_path,
     cons_data_pending_file,
     consumer_state_file,
     consumption_profiles_file,
@@ -42,8 +44,10 @@ from runtime_store.persist_paths import (
     resolve_config_minimal_template_path,
     resolve_config_schema_template_path,
     resolve_config_template_path,
+    resolve_deviation_rules_json_path,
     resolve_deviation_rules_schema_template_path,
     resolve_deviation_rules_template_path,
+    resolve_dotenv_path,
     resolve_dotenv_template_path,
     resolve_local_settings_json_path,
     resolve_local_settings_template_path,
@@ -51,7 +55,6 @@ from runtime_store.persist_paths import (
     total_consumption_profiles_file,
 )
 
-_CANONICAL_DOTENV = os.path.join("config", ".env")
 _LEGACY_DOTENV = ".env"
 
 logger = logging.getLogger(__name__)
@@ -121,7 +124,7 @@ def _copy_template_if_missing(dest_path: str, source_path: str, label: str) -> b
 
 
 def _bootstrap_config_example() -> bool:
-    dest = os.path.join("config", "config.example.json")
+    dest = config_path("config.example.json")
     return _copy_template_if_missing(
         dest,
         resolve_config_template_path(),
@@ -130,7 +133,7 @@ def _bootstrap_config_example() -> bool:
 
 
 def _bootstrap_config_schema() -> bool:
-    dest = os.path.join("config", "config.schema.json")
+    dest = config_path("config.schema.json")
     return _copy_template_if_missing(
         dest,
         resolve_config_schema_template_path(),
@@ -159,7 +162,7 @@ def _bootstrap_config_json() -> bool:
 
 
 def _bootstrap_backtesting_scenarios_example() -> bool:
-    dest = os.path.join("config", "backtesting_scenarios.example.json")
+    dest = config_path("backtesting_scenarios.example.json")
     return _copy_template_if_missing(
         dest,
         resolve_backtesting_scenarios_template_path(),
@@ -168,7 +171,7 @@ def _bootstrap_backtesting_scenarios_example() -> bool:
 
 
 def _bootstrap_backtesting_scenarios_schema() -> bool:
-    dest = os.path.join("config", "backtesting_scenarios.schema.json")
+    dest = config_path("backtesting_scenarios.schema.json")
     return _copy_template_if_missing(
         dest,
         resolve_backtesting_scenarios_schema_template_path(),
@@ -187,7 +190,7 @@ def _bootstrap_backtesting_scenarios_json() -> bool:
 
 
 def _bootstrap_tariffs_example() -> bool:
-    dest = os.path.join("config", "tariffs.example.json")
+    dest = config_path("tariffs.example.json")
     return _copy_template_if_missing(
         dest,
         resolve_tariffs_template_path(),
@@ -196,7 +199,7 @@ def _bootstrap_tariffs_example() -> bool:
 
 
 def _bootstrap_tariffs_schema() -> bool:
-    dest = os.path.join("config", "tariffs.schema.json")
+    dest = config_path("tariffs.schema.json")
     return _copy_template_if_missing(
         dest,
         resolve_tariffs_schema_template_path(),
@@ -213,7 +216,7 @@ def _bootstrap_tariffs_json() -> bool:
 
 
 def _bootstrap_house_profiles_example() -> bool:
-    dest = os.path.join("config", "house_profiles.example.json")
+    dest = config_path("house_profiles.example.json")
     return _copy_template_if_missing(
         dest,
         resolve_house_profiles_template_path(),
@@ -222,7 +225,7 @@ def _bootstrap_house_profiles_example() -> bool:
 
 
 def _bootstrap_house_profiles_schema() -> bool:
-    dest = os.path.join("config", "house_profiles.schema.json")
+    dest = config_path("house_profiles.schema.json")
     return _copy_template_if_missing(
         dest,
         resolve_house_profiles_schema_template_path(),
@@ -239,7 +242,7 @@ def _bootstrap_house_profiles_json() -> bool:
 
 
 def _bootstrap_components_example() -> bool:
-    dest = os.path.join("config", "components.example.json")
+    dest = config_path("components.example.json")
     return _copy_template_if_missing(
         dest,
         resolve_components_template_path(),
@@ -248,7 +251,7 @@ def _bootstrap_components_example() -> bool:
 
 
 def _bootstrap_components_schema() -> bool:
-    dest = os.path.join("config", "components.schema.json")
+    dest = config_path("components.schema.json")
     return _copy_template_if_missing(
         dest,
         resolve_components_schema_template_path(),
@@ -265,7 +268,7 @@ def _bootstrap_components_json() -> bool:
 
 
 def _bootstrap_deviation_rules_example() -> bool:
-    dest = os.path.join("config", "deviation_rules.example.json")
+    dest = config_path("deviation_rules.example.json")
     return _copy_template_if_missing(
         dest,
         resolve_deviation_rules_template_path(),
@@ -274,7 +277,7 @@ def _bootstrap_deviation_rules_example() -> bool:
 
 
 def _bootstrap_deviation_rules_schema() -> bool:
-    dest = os.path.join("config", "deviation_rules.schema.json")
+    dest = config_path("deviation_rules.schema.json")
     return _copy_template_if_missing(
         dest,
         resolve_deviation_rules_schema_template_path(),
@@ -283,7 +286,7 @@ def _bootstrap_deviation_rules_schema() -> bool:
 
 
 def _bootstrap_deviation_rules_json() -> bool:
-    rules_path = os.path.join("config", "deviation_rules.json")
+    rules_path = resolve_deviation_rules_json_path()
     template_path = resolve_deviation_rules_template_path()
     return _copy_template_if_missing(
         rules_path,
@@ -360,20 +363,21 @@ def _warn_legacy_dotenv_directory() -> None:
 
 def _bootstrap_dotenv() -> bool:
     _warn_legacy_dotenv_directory()
-    if not _is_missing_file(_CANONICAL_DOTENV):
+    canonical = resolve_dotenv_path()
+    if not _is_missing_file(canonical):
         return False
-    if os.path.isfile(_LEGACY_DOTENV):
-        _ensure_parent_dir(_CANONICAL_DOTENV)
-        shutil.copyfile(_LEGACY_DOTENV, _CANONICAL_DOTENV)
+    if os.path.isfile(_LEGACY_DOTENV) and canonical != _LEGACY_DOTENV:
+        _ensure_parent_dir(canonical)
+        shutil.copyfile(_LEGACY_DOTENV, canonical)
         logger.info(
             "bootstrap: %s aus Legacy %s migriert – bitte Loxone-Zugangsdaten prüfen.",
-            _CANONICAL_DOTENV,
+            canonical,
             _LEGACY_DOTENV,
         )
         return True
     template_path = resolve_dotenv_template_path()
     return _copy_template_if_missing(
-        _CANONICAL_DOTENV,
+        canonical,
         template_path,
         ".env.example",
     )
@@ -382,50 +386,50 @@ def _bootstrap_dotenv() -> bool:
 def run() -> None:
     """Fehlende Laufzeitdateien anlegen; bestehende Dateien bleiben unverändert."""
     _ensure_directory(runtime_dir())
-    _ensure_directory(os.path.join("config"))
+    _ensure_directory(config_dir())
 
     created: list[str] = []
 
     if _bootstrap_config_example():
-        created.append(os.path.join("config", "config.example.json"))
+        created.append(config_path("config.example.json"))
     if _bootstrap_config_schema():
-        created.append(os.path.join("config", "config.schema.json"))
+        created.append(config_path("config.schema.json"))
     if _bootstrap_config_json():
         created.append(resolve_config_json_path())
     if _bootstrap_backtesting_scenarios_example():
-        created.append(os.path.join("config", "backtesting_scenarios.example.json"))
+        created.append(config_path("backtesting_scenarios.example.json"))
     if _bootstrap_backtesting_scenarios_schema():
-        created.append(os.path.join("config", "backtesting_scenarios.schema.json"))
+        created.append(config_path("backtesting_scenarios.schema.json"))
     if _bootstrap_backtesting_scenarios_json():
         created.append(resolve_backtesting_scenarios_json_path())
     if _bootstrap_tariffs_example():
-        created.append(os.path.join("config", "tariffs.example.json"))
+        created.append(config_path("tariffs.example.json"))
     if _bootstrap_tariffs_schema():
-        created.append(os.path.join("config", "tariffs.schema.json"))
+        created.append(config_path("tariffs.schema.json"))
     if _bootstrap_tariffs_json():
         created.append(resolve_tariffs_json_path())
     if _bootstrap_house_profiles_example():
-        created.append(os.path.join("config", "house_profiles.example.json"))
+        created.append(config_path("house_profiles.example.json"))
     if _bootstrap_house_profiles_schema():
-        created.append(os.path.join("config", "house_profiles.schema.json"))
+        created.append(config_path("house_profiles.schema.json"))
     if _bootstrap_house_profiles_json():
         created.append(resolve_house_profiles_json_path())
     if _bootstrap_components_example():
-        created.append(os.path.join("config", "components.example.json"))
+        created.append(config_path("components.example.json"))
     if _bootstrap_components_schema():
-        created.append(os.path.join("config", "components.schema.json"))
+        created.append(config_path("components.schema.json"))
     if _bootstrap_components_json():
         created.append(resolve_components_json_path())
     if _bootstrap_deviation_rules_example():
-        created.append(os.path.join("config", "deviation_rules.example.json"))
+        created.append(config_path("deviation_rules.example.json"))
     if _bootstrap_deviation_rules_schema():
-        created.append(os.path.join("config", "deviation_rules.schema.json"))
+        created.append(config_path("deviation_rules.schema.json"))
     if _bootstrap_deviation_rules_json():
-        created.append(os.path.join("config", "deviation_rules.json"))
+        created.append(resolve_deviation_rules_json_path())
     if _bootstrap_local_settings_json():
         created.append(resolve_local_settings_json_path())
     if _bootstrap_dotenv():
-        created.append(_CANONICAL_DOTENV)
+        created.append(resolve_dotenv_path())
     if _bootstrap_cons_data_csv():
         created.append(default_cons_data_file())
     if _bootstrap_cons_data_pending():

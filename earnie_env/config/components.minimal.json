@@ -1,5 +1,6 @@
 {
     "$schema": "./components.schema.json",
+    "earnie_data_model": 1,
     "batteries": [],
     "pv_systems": []
 }

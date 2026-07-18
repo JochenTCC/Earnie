@@ -12,7 +12,7 @@ from runtime_store import bootstrap
 def test_bootstrap_creates_missing_files_without_overwriting(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
 
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -52,7 +52,7 @@ def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypat
     """NAS-Szenario: ./config-Volume enthält nur config.json, Vorlagen liegen im Image."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
 
     share_dir = tmp_path / "share" / "config"
     share_dir.mkdir(parents=True)
@@ -102,7 +102,7 @@ def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypat
 def test_bootstrap_rejects_directory_instead_of_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     (config_dir / "config.example.json").write_text("{}", encoding="utf-8")
@@ -115,7 +115,7 @@ def test_bootstrap_rejects_directory_instead_of_file(tmp_path, monkeypatch):
 def test_bootstrap_creates_dotenv_from_template(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
 
     share_dir = tmp_path / "share" / "config"
     share_dir.mkdir(parents=True)
@@ -140,7 +140,7 @@ def test_bootstrap_creates_dotenv_from_template(tmp_path, monkeypatch):
 def test_bootstrap_migrates_legacy_root_dotenv(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
 
     config_dir = tmp_path / "config"
     config_dir.mkdir()

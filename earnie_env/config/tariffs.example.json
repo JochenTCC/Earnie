@@ -1,5 +1,6 @@
 {
     "$schema": "./tariffs.schema.json",
+    "earnie_data_model": 1,
     "import_tariffs": [
         {
             "id": "awattar_at",
@@ -22,9 +23,21 @@
             "label": "Monatliche Bezugspreise (Beispiel)",
             "type": "monthly_table",
             "monthly_rates": [
-                {"year": 2025, "month": 1, "tariff_cent_kwh": 22.0},
-                {"year": 2025, "month": 6, "tariff_cent_kwh": 18.0},
-                {"year": 2025, "month": 12, "tariff_cent_kwh": 24.0}
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 22.0
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 18.0
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 24.0
+                }
             ]
         }
     ],
@@ -47,9 +60,21 @@
             "label": "Monatliche SUNNY-Fixwerte",
             "type": "monthly_table",
             "monthly_rates": [
-                {"year": 2025, "month": 1, "tariff_cent_kwh": 9.73},
-                {"year": 2025, "month": 6, "tariff_cent_kwh": 5.86},
-                {"year": 2025, "month": 12, "tariff_cent_kwh": 8.70}
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 9.73
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 5.86
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 8.7
+                }
             ]
         }
     ]

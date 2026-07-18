@@ -422,10 +422,13 @@ def _serialize_profile(profile: dict) -> dict:
 
 
 def save_house_profiles_document(path: str, doc: dict) -> None:
+    from runtime_store.data_model import stamp_data_model
+
     normalized = normalize_house_profiles_document(doc)
     serializable = {
         "profiles": [_serialize_profile(p) for p in normalized["profiles"].values()]
     }
+    stamp_data_model(serializable)
     target = os.path.abspath(path)
     os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
     tmp = target + ".tmp"

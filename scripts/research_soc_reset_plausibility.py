@@ -15,7 +15,7 @@ RUNTIME_DIR = ROOT / "greenfield/runtime"
 
 os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 os.environ["EARNIE_CONFIG_PATH"] = str(CONFIG_DIR / "config.json")
-os.environ["EARNIE_RUNTIME_DIR"] = str(RUNTIME_DIR)
+os.environ["EARNIE_RUNTIME_PATH"] = str(RUNTIME_DIR)
 for suffix, name in (
     ("COMPONENTS_PATH", "components.json"),
     ("HOUSE_PROFILES_PATH", "house_profiles.json"),

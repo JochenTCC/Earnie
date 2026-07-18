@@ -1713,7 +1713,7 @@ Spec: [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md). Goal: cost-opt
 
 ### Dev environment NAS production log (2026-07-04)
 
-- [x] **VS Code launch “Streamlit app.py (NAS Produktiv-Log)”** — `ENERGY_OPTIMIZER_RUNTIME_DIR` and `ENERGY_OPTIMIZER_CONFIG_PATH` to NAS paths (`.vscode/launch.json`)
+- [x] **VS Code launch “Streamlit app.py (NAS Produktiv-Log)”** — `ENERGY_OPTIMIZER_RUNTIME_PATH` and `ENERGY_OPTIMIZER_CONFIG_PATH` to NAS paths (`.vscode/launch.json`)
 - [x] **Local production runtime cleaned up** — accidental use of local logs excluded; historical EV baseline test skips without local `cons_data`
 
 

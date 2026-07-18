@@ -49,7 +49,10 @@ def estimate_annual_kwh_from_profile_csv(path: str) -> float:
 
 def load_hourly_profile_csv(path: str) -> list[tuple[str, float]]:
     """Liest bereits kanonisches stündliches Profil; liefert (ISO-timestamp, kW)-Paare."""
-    file_path = Path(path)
+    from runtime_store.persist_paths import resolve_config_prefixed_path
+
+    resolved = resolve_config_prefixed_path(path)
+    file_path = Path(resolved)
     if not file_path.is_file():
         raise FileNotFoundError(f"Profil-CSV nicht gefunden: {path}")
     rows: list[tuple[str, float]] = []
@@ -137,7 +140,9 @@ def profile_csv_looks_digital(path: str) -> bool:
 
 def write_canonical_hourly_csv(path: str, rows: list[tuple[str, float]]) -> None:
     """Write canonical hourly CSV (UTF-8, semicolon)."""
-    target = Path(path)
+    from runtime_store.persist_paths import resolve_config_prefixed_path
+
+    target = Path(resolve_config_prefixed_path(path))
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle, delimiter=";")

@@ -34,7 +34,7 @@ _CONFIG_ENV_KEYS = (
     "ENERGY_OPTIMIZER_CONFIG_PATH",
     "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
     "ENERGY_OPTIMIZER_OFFLINE",
-    "ENERGY_OPTIMIZER_RUNTIME_DIR",
+    "ENERGY_OPTIMIZER_RUNTIME_PATH",
     "ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED",
     "ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH",
 )
@@ -44,7 +44,7 @@ _CONFIG_ENV_KEYS = (
 def _dump_config(tmp_path, monkeypatch):
     prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
     monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
     monkeypatch.delenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,

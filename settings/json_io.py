@@ -22,6 +22,9 @@ def read_json_dict(path: str) -> dict:
 
 
 def write_json_dict(path: str, data: dict) -> None:
+    from runtime_store.data_model import stamp_data_model
+
+    stamp_data_model(data)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
         f.write("\n")

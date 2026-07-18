@@ -18,6 +18,16 @@ def read_env_or(suffix: str, default: str) -> str:
     return value if value else default
 
 
+def read_runtime_path() -> str:
+    """``EARNIE_RUNTIME_PATH`` with legacy ``EARNIE_RUNTIME_DIR`` fallback."""
+    return read_env("RUNTIME_PATH") or read_env("RUNTIME_DIR")
+
+
+def read_runtime_path_or(default: str) -> str:
+    value = read_runtime_path()
+    return value if value else default
+
+
 def is_truthy(suffix: str) -> bool:
     return read_env(suffix) == "1"
 

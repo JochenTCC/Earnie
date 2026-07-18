@@ -57,7 +57,7 @@ def test_archive_prod_dump_includes_resolved_inputs(tmp_path, monkeypatch):
     monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_path))
     monkeypatch.setenv("ENERGY_OPTIMIZER_DEVIATION_RULES_PATH", str(rules_path))
     monkeypatch.setenv("ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH", str(local_settings_path))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(archive_script, "FIXTURES_ROOT", tmp_path / "fixtures")
 

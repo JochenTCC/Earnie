@@ -22,7 +22,7 @@ def _configure_console_utf8() -> None:
 _configure_console_utf8()
 
 ROOT = Path(__file__).resolve().parents[1]
-DOTENV_PATHS = (ROOT / "config" / ".env", ROOT / ".env")
+DOTENV_PATHS = (ROOT / "earnie_env" / "config" / ".env", ROOT / ".env")
 DEFAULT_TEST_CONFIG_PATH = ROOT / "tests" / "fixtures" / "backtesting" / "config.json"
 _USE_LIVE_CONFIG_ENV = "ENERGY_OPTIMIZER_TEST_USE_LIVE_CONFIG"
 
@@ -124,7 +124,9 @@ def _loxone_integration_enabled() -> bool:
     if os.getenv(_USE_LIVE_CONFIG_ENV) != "1":
         return False
     if not (
-        (ROOT / "config.json").is_file() or (ROOT / "config" / "config.json").is_file()
+        (ROOT / "config.json").is_file()
+        or (ROOT / "earnie_env" / "config" / "config.json").is_file()
+        or (ROOT / "config" / "config.json").is_file()
     ):
         return False
     _load_dotenv_for_tests()

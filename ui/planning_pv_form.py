@@ -14,7 +14,7 @@ from ui.house_config_io import (
     load_house_profiles,
     upsert_pv_system,
 )
-from ui.house_config_sticky_save import sticky_save_bar
+from ui.auto_persist import auto_persist
 from ui.form_layout import labeled_number_input, labeled_selectbox, labeled_text_input
 
 _SESSION_SYNC_KEY = "planning_pv_sync_id"
@@ -241,10 +241,18 @@ def render_pv_planning_tab() -> None:
         key=_scoped_key(session_scope, "planning_pv_azimuth"),
     )
 
-    sticky_save_bar()
-    if st.button("PV-Anlage speichern", type="primary", key="planning_pv_save"):
-        taken = {sid for sid in system_ids if sid != stable_id}
-        entity_id = stable_id.strip() or slug_id(label or "pv_anlage", existing=taken)
+    ready = bool(str(label or "").strip()) and float(kwp or 0) > 0
+    taken = {sid for sid in system_ids if sid != stable_id}
+    entity_id = stable_id.strip() or slug_id(label or "pv_anlage", existing=taken)
+    payload = {
+        "id": entity_id,
+        "label": label,
+        "kwp": kwp,
+        "pv_tilt": float(tilt),
+        "pv_azimuth": float(azimuth),
+    }
+
+    def _save_pv() -> None:
         try:
             upsert_pv_system(
                 {
@@ -257,12 +265,19 @@ def render_pv_planning_tab() -> None:
             )
         except ValueError as exc:
             st.error(str(exc))
-        else:
+            return
+        st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
+        if is_new:
             st.session_state[_SESSION_SELECT_PENDING_KEY] = entity_id
-            st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
             st.session_state[_SESSION_SYNC_KEY] = None
-            st.success("PV-Anlage gespeichert.")
             st.rerun()
+
+    auto_persist(
+        state_key=f"planning_pv::{entity_id}",
+        payload=payload,
+        save=_save_pv,
+        ready=ready,
+    )
 
     if not is_new and stable_id:
         if st.button("PV-Anlage entfernen", key="planning_pv_delete"):

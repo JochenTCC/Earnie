@@ -12,19 +12,30 @@
     "batteries": {
       "type": "array",
       "description": "Batteriespezifikationen (Mehrfach-Definition; Szenario wählt battery_id).",
-      "items": { "$ref": "#/definitions/battery_entity" }
+      "items": {
+        "$ref": "#/definitions/battery_entity"
+      }
     },
     "pv_systems": {
       "type": "array",
       "description": "PV-Anlagen (Mehrfach-Definition; Szenario wählt pv_system_ids[]).",
-      "items": { "$ref": "#/definitions/pv_system_entity" }
+      "items": {
+        "$ref": "#/definitions/pv_system_entity"
+      }
+    },
+    "earnie_data_model": {
+      "type": "integer",
+      "const": 1,
+      "description": "Earnie data-model version for config pack import/export."
     }
   },
   "definitions": {
     "battery_wear": {
       "type": "object",
       "description": "Verschleißkosten für Batterie-Durchsatz (Laden + Entladen) in der MILP-Zielfunktion.",
-      "required": ["enabled"],
+      "required": [
+        "enabled"
+      ],
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -60,13 +71,35 @@
         "battery_max_soc"
       ],
       "properties": {
-        "id": { "type": "string" },
-        "label": { "type": "string" },
-        "battery_capacity_kwh": { "type": "number", "exclusiveMinimum": 0 },
-        "battery_max_power_kw": { "type": "number", "exclusiveMinimum": 0 },
-        "battery_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-        "battery_min_soc": { "type": "number", "minimum": 0, "maximum": 100 },
-        "battery_max_soc": { "type": "number", "minimum": 0, "maximum": 100 },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "battery_capacity_kwh": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "battery_max_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "battery_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "battery_min_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "battery_max_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
         "threshold_power": {
           "type": "number",
           "exclusiveMinimum": 0,
@@ -82,13 +115,29 @@
     "pv_system_entity": {
       "type": "object",
       "description": "PV-Anlage für Prognose und Backtesting.",
-      "required": ["id", "kwp"],
+      "required": [
+        "id",
+        "kwp"
+      ],
       "properties": {
-        "id": { "type": "string" },
-        "label": { "type": "string" },
-        "kwp": { "type": "number", "exclusiveMinimum": 0 },
-        "pv_tilt": { "type": "number", "description": "Neigung in Grad." },
-        "pv_azimuth": { "type": "number", "description": "0=Süd, -90=Ost, 90=West." }
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "kwp": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pv_tilt": {
+          "type": "number",
+          "description": "Neigung in Grad."
+        },
+        "pv_azimuth": {
+          "type": "number",
+          "description": "0=Süd, -90=Ost, 90=West."
+        }
       }
     }
   }

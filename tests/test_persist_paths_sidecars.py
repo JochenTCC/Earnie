@@ -37,7 +37,7 @@ def test_sidecars_resolve_next_to_config_path(tmp_path, monkeypatch):
 
 
 def test_backtesting_log_dir_uses_runtime_dir(monkeypatch, tmp_path):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
     assert resolve_backtesting_log_dir() == str(tmp_path / "runtime")
 
 

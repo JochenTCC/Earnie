@@ -23,9 +23,9 @@ from .persist_paths import legacy_history_csv_file
 
 logger = logging.getLogger(__name__)
 
-from runtime_store.env_vars import read_env, read_env_or
+from runtime_store.env_vars import read_runtime_path, read_runtime_path_or
 
-RUNTIME_DIR = read_env_or("RUNTIME_DIR", "runtime")
+RUNTIME_DIR = read_runtime_path_or("runtime")
 HISTORY_FILENAME = "optimization_history.jsonl"
 HISTORY_FILE = os.path.join(RUNTIME_DIR, HISTORY_FILENAME)
 LEGACY_CSV_FILE = legacy_history_csv_file()
@@ -441,7 +441,7 @@ def describe_production_log_source() -> ProductionLogSourceInfo:
         history_mtime = datetime.fromtimestamp(stat.st_mtime)
     return ProductionLogSourceInfo(
         runtime_dir=runtime_dir,
-        env_runtime_dir=read_env("RUNTIME_DIR"),
+        env_runtime_dir=read_runtime_path(),
         history_file=history_file,
         history_exists=history_exists,
         history_size_bytes=history_size,

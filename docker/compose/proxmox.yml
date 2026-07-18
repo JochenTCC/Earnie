@@ -4,21 +4,21 @@
 # und docker/proxmox/ (LXC-Beispielkonfig + Bootstrap).
 #
 # Persistente Daten (überleben Image-Updates):
-#   ./config/config.json   – Haus-Konfiguration (wird nie überschrieben)
-#   ./config/tariffs.json  – Tarif-Katalog (Sidecar; wird nie überschrieben)
-#   ./config/backtesting_scenarios.json, house_profiles.json – weitere Sidecars
-#   ./config/.env          – Loxone-Zugangsdaten
-#   ./runtime/             – cons_data, Zustands-JSONs, Profile, Logs
+#   ./earnie_env/config/config.json   – Haus-Konfiguration (wird nie überschrieben)
+#   ./earnie_env/config/tariffs.json  – Tarif-Katalog (Sidecar; wird nie überschrieben)
+#   ./earnie_env/config/backtesting_scenarios.json, house_profiles.json – weitere Sidecars
+#   ./earnie_env/config/.env          – Loxone-Zugangsdaten
+#   ./earnie_env/runtime/  – cons_data, Zustands-JSONs, Profile, Logs
 #
 # Erstinstallation (typisch /opt/earnie/ im LXC):
 #   1. Ordner anlegen: mkdir -p config runtime
 #   2. Diese Datei als compose.yaml ablegen (oder -f docker/compose/proxmox.yml)
 #   3. Container starten – fehlende Dateien legt der Entrypoint an
-#   4. config/.env und config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
+#   4. config/.env und earnie_env/config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
 #   5. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
 #
 # Ein Container: Streamlit-UI startet main.py automatisch (EARNIE_AUTO_START_MAIN=1).
-# Nach Änderungen an config/config.json: Container neu starten.
+# Nach Änderungen an earnie_env/config/config.json: Container neu starten.
 # Nach Code-Änderungen: Image pullen, dann:
 #   docker compose --project-directory . -f docker/compose/proxmox.yml pull
 #   docker compose --project-directory . -f docker/compose/proxmox.yml up -d
@@ -28,12 +28,12 @@
 version: "3.8"
 
 x-persist-volumes: &persist-volumes
-  - ./config:/app/config
-  - ./runtime:/app/runtime
+  - ./earnie_env/config:/app/config
+  - ./earnie_env/runtime:/app/runtime
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  EARNIE_CONFIG_PATH: config/config.json
+  EARNIE_CONFIG_PATH: config
   EARNIE_STRICT_TARIFF_VALIDATE: "1"
   # Loxone-Smoke-Test beim main.py-Start (nach pull/up); siehe scripts/startup_checks.py
   EARNIE_VERIFY_LOXONE_ON_START: "1"

@@ -57,10 +57,23 @@
             "label": "Monatliche Testwerte",
             "type": "monthly_table",
             "monthly_rates": [
-                {"year": 2025, "month": 1, "tariff_cent_kwh": 9.0},
-                {"year": 2025, "month": 6, "tariff_cent_kwh": 5.0},
-                {"year": 2025, "month": 12, "tariff_cent_kwh": 8.0}
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 9.0
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 5.0
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 8.0
+                }
             ]
         }
-    ]
+    ],
+    "earnie_data_model": 1
 }

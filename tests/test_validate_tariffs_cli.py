@@ -11,9 +11,9 @@ def test_validate_tariffs_cli_ok_on_repo_catalog():
     code = vt.main(
         [
             "--tariffs",
-            str(root / "config" / "tariffs.json"),
+            str(root / "earnie_env" / "config" / "tariffs.json"),
             "--schema",
-            str(root / "config" / "tariffs.schema.json"),
+            str(root / "earnie_env" / "config" / "tariffs.schema.json"),
             "--skip-scenarios",
             "--check-catalog",
             "--import-json",

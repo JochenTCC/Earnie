@@ -18,8 +18,8 @@ def _missing_config_message(config_path: str) -> str:
         lines.append(f"  EARNIE_CONFIG_PATH={env_path!r}")
     else:
         lines.append(
-            "  Prüfen Sie EARNIE_CONFIG_PATH in config/.env "
-            "oder legen Sie config/config.json an."
+            "  Prüfen Sie EARNIE_CONFIG_PATH / EARNIE_ENV_PATH "
+            "oder legen Sie earnie_env/config/config.json an."
         )
     return "\n".join(lines)
 

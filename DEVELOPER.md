@@ -104,8 +104,8 @@ Proxmox: LXC mit `nesting=1`/`keyctl=1`, optional `docker/proxmox/bootstrap.sh` 
 ## Hinweise
 
 - `config/config.json` (oder Legacy `config.json`) ist lokal und gitignored.
-- Laufzeitdaten liegen unter `runtime/` (`EARNIE_RUNTIME_DIR`, Legacy: `ENERGY_OPTIMIZER_RUNTIME_DIR`).
-- Config-Pfad überschreibbar mit `EARNIE_CONFIG_PATH` (Legacy: `ENERGY_OPTIMIZER_CONFIG_PATH`).
+- Laufzeitdaten liegen unter `runtime/` (`EARNIE_RUNTIME_PATH`, Legacy: `ENERGY_OPTIMIZER_RUNTIME_PATH`).
+- Persistenz-Wurzel: `EARNIE_ENV_PATH` (Default `earnie_env`). Config-Verzeichnis: `EARNIE_CONFIG_PATH` (Default `{ENV_PATH}/config`; Legacy-Alias `ENERGY_OPTIMIZER_CONFIG_PATH`). Laufzeit: `EARNIE_RUNTIME_PATH` bzw. `{ENV_PATH}/runtime`.
 
 ## Roadmap
 

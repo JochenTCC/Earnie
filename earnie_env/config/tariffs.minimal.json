@@ -1,5 +1,6 @@
 {
     "$schema": "./tariffs.schema.json",
+    "earnie_data_model": 1,
     "import_tariffs": [],
     "export_tariffs": []
 }

@@ -4,16 +4,16 @@
   "title": "Earnie Konfiguration",
   "description": "JSON-Schema für config.json. In Cursor/VS Code erscheinen Beschreibungen als Hover-Hilfe, wenn \"$schema\" in config.json gesetzt ist.",
   "type": "object",
-    "properties": {
-        "$schema": {
-            "type": "string",
-            "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
-        },
-        "market_prices": {
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
+    },
+    "market_prices": {
       "$ref": "#/definitions/market_prices",
       "description": "Fehlende Day-Ahead-Slots: Spiegelung oder OLS-Prognose (Phase 3)."
     },
-        "system": {
+    "system": {
       "$ref": "#/definitions/system",
       "description": "HTTP-Timeouts und Intervall der Optimierungs-Schleife (main.py)."
     },
@@ -42,6 +42,11 @@
     },
     "appliance_recommendation": {
       "$ref": "#/definitions/appliance_recommendation"
+    },
+    "earnie_data_model": {
+      "type": "integer",
+      "const": 1,
+      "description": "Earnie data-model version for config pack import/export."
     }
   },
   "definitions": {
@@ -84,7 +89,10 @@
       "properties": {
         "missing_price_strategy": {
           "type": "string",
-          "enum": ["mirror", "forecast"],
+          "enum": [
+            "mirror",
+            "forecast"
+          ],
           "default": "forecast",
           "description": "mirror = gleiche Uhrzeit zurück; forecast = OLS aus EU-Wetter/Erzeugung."
         },
@@ -123,7 +131,9 @@
     "battery_wear": {
       "type": "object",
       "description": "Verschleißkosten für Batterie-Durchsatz (Laden + Entladen) in der MILP-Zielfunktion.",
-      "required": ["enabled"],
+      "required": [
+        "enabled"
+      ],
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -150,7 +160,12 @@
     "event_trigger": {
       "type": "object",
       "description": "Ein Loxone-Signal als Event-Trigger für main.py.",
-      "required": ["id", "loxone_name", "signal_type", "on_change"],
+      "required": [
+        "id",
+        "loxone_name",
+        "signal_type",
+        "on_change"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -162,7 +177,11 @@
         },
         "signal_type": {
           "type": "string",
-          "enum": ["binary", "text", "analog"],
+          "enum": [
+            "binary",
+            "text",
+            "analog"
+          ],
           "description": "binary: 0/1-Merker; text: Textwert; analog: numerischer Wert (z. B. Rest-SOC in %)."
         },
         "on_change": {
@@ -262,13 +281,35 @@
         "battery_max_soc"
       ],
       "properties": {
-        "id": { "type": "string" },
-        "label": { "type": "string" },
-        "battery_capacity_kwh": { "type": "number", "exclusiveMinimum": 0 },
-        "battery_max_power_kw": { "type": "number", "exclusiveMinimum": 0 },
-        "battery_efficiency": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
-        "battery_min_soc": { "type": "number", "minimum": 0, "maximum": 100 },
-        "battery_max_soc": { "type": "number", "minimum": 0, "maximum": 100 },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "battery_capacity_kwh": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "battery_max_power_kw": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "battery_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "battery_min_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "battery_max_soc": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
         "threshold_power": {
           "type": "number",
           "exclusiveMinimum": 0,
@@ -284,13 +325,29 @@
     "pv_system_entity": {
       "type": "object",
       "description": "PV-Anlage für Prognose und Backtesting.",
-      "required": ["id", "kwp"],
+      "required": [
+        "id",
+        "kwp"
+      ],
       "properties": {
-        "id": { "type": "string" },
-        "label": { "type": "string" },
-        "kwp": { "type": "number", "exclusiveMinimum": 0 },
-        "pv_tilt": { "type": "number", "description": "Neigung in Grad." },
-        "pv_azimuth": { "type": "number", "description": "0=Süd, -90=Ost, 90=West." }
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "kwp": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pv_tilt": {
+          "type": "number",
+          "description": "Neigung in Grad."
+        },
+        "pv_azimuth": {
+          "type": "number",
+          "description": "0=Süd, -90=Ost, 90=West."
+        }
       }
     },
     "planning_horizon": {
@@ -299,11 +356,15 @@
       "properties": {
         "mode": {
           "type": "string",
-          "enum": ["sunrise_window"],
+          "enum": [
+            "sunrise_window"
+          ],
           "description": "sunrise_window: Jetzt→SA₁ + SA₁→SA₂ mit SOC_min am Sonnenaufgang."
         }
       },
-      "required": ["mode"]
+      "required": [
+        "mode"
+      ]
     },
     "file_paths_battery_simulation": {
       "type": "object",
@@ -332,7 +393,9 @@
         },
         "cons_data_write_mode": {
           "type": "string",
-          "enum": ["hourly"],
+          "enum": [
+            "hourly"
+          ],
           "description": "Schreibmodus für cons_data (derzeit nur hourly)."
         },
         "price_source": {
@@ -437,7 +500,10 @@
     "thermal_control": {
       "type": "object",
       "description": "Thermisches RC-Modell für temperaturgeführte Verbraucher (z. B. SwimSpa). mode=observe: nur Prognose/Vergleich, keine Steuerungsumstellung.",
-      "required": ["enabled", "mode"],
+      "required": [
+        "enabled",
+        "mode"
+      ],
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -445,7 +511,10 @@
         },
         "mode": {
           "type": "string",
-          "enum": ["observe", "active"],
+          "enum": [
+            "observe",
+            "active"
+          ],
           "description": "observe = Phase 0: Ziel nur loggen und mit aktuellem daily_target vergleichen; active = thermisches Ziel steuert die Optimierung (Phase 1)."
         },
         "setpoint_c": {
@@ -463,7 +532,10 @@
           "description": "Wasservolumen in Litern für die Wärmekapazität C (Pflicht wenn enabled)."
         },
         "heat_loss_kw_per_k": {
-          "type": ["number", "null"],
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0,
           "description": "Wärmeleitwert U in kW/K (Verlust nach außen). Pflicht für Berechnung; null = ggf. aus history_logs kalibrieren."
         },
@@ -487,8 +559,12 @@
           "type": "object",
           "description": "Optionale Loxone-CSV-Pfade für Offline-Kalibrierung von U (scripts/calibrate_thermal_loss.py).",
           "properties": {
-            "actual_temp_csv": { "type": "string" },
-            "ambient_temp_csv": { "type": "string" },
+            "actual_temp_csv": {
+              "type": "string"
+            },
+            "ambient_temp_csv": {
+              "type": "string"
+            },
             "power_csv": {
               "type": "string",
               "description": "Gesamtzähler kW (Fall B: Heizung + Filter + sonstige Lasten am selben Zähler)."
@@ -507,10 +583,22 @@
           "type": "object",
           "description": "Live-Temperaturen und Heiz-Indikator aus Loxone (Lesen). Einheiten werden abgeschnitten.",
           "properties": {
-            "actual_temp_name": { "type": "string", "description": "Ist-Temperatur °C" },
-            "setpoint_temp_name": { "type": "string", "description": "Soll-Temperatur °C" },
-            "ambient_temp_name": { "type": "string", "description": "Umgebungs-/Außentemperatur °C (Live)" },
-            "tolerance_c_name": { "type": "string", "description": "Erlaubte Abweichung vom Soll in °C" },
+            "actual_temp_name": {
+              "type": "string",
+              "description": "Ist-Temperatur °C"
+            },
+            "setpoint_temp_name": {
+              "type": "string",
+              "description": "Soll-Temperatur °C"
+            },
+            "ambient_temp_name": {
+              "type": "string",
+              "description": "Umgebungs-/Außentemperatur °C (Live)"
+            },
+            "tolerance_c_name": {
+              "type": "string",
+              "description": "Erlaubte Abweichung vom Soll in °C"
+            },
             "heating_active_name": {
               "type": "string",
               "description": "Binärer Heiz-Indikator (0/1), z. B. homie_bwa_spa_heating — Fall B: Heizleistung nur wenn aktiv."
@@ -521,7 +609,12 @@
     },
     "flexible_consumer": {
       "type": "object",
-      "required": ["id", "name", "nominal_power_kw", "chart_color_index"],
+      "required": [
+        "id",
+        "name",
+        "nominal_power_kw",
+        "chart_color_index"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -552,7 +645,13 @@
         },
         "daily_target_source": {
           "type": "string",
-          "enum": ["config", "historical", "loxone", "loxone_remaining_hours", "thermal"],
+          "enum": [
+            "config",
+            "historical",
+            "loxone",
+            "loxone_remaining_hours",
+            "thermal"
+          ],
           "description": "Quelle des 24h-Ziels (kWh): config = daily_target_kwh bzw. bei charging_schedule daily_rest_soc; historical = in Echtzeit Summe aus flexible_consumer_profiles.csv über den 24h-Horizont (wie Baseline), bei historischer Tages-Simulation geloggte CSV-Summen; loxone = Live-Merker in kWh (bei E-Auto: charging_schedule.loxone); loxone_remaining_hours = Live-Schulden in Stunden × nominal_power_kw (z. B. SwimSpa-Filter); thermal = RC-Modell (thermal_control.mode=active, Live-Loxone)."
         },
         "loxone_target_kwh_name": {
@@ -574,12 +673,18 @@
         },
         "signal_type": {
           "type": "string",
-          "enum": ["power", "binary"],
+          "enum": [
+            "power",
+            "binary"
+          ],
           "description": "power = Leistungsprofil in kW; binary = Ein/Aus-Signal (Live und Logs, sofern log_signal_type nicht gesetzt)."
         },
         "log_signal_type": {
           "type": "string",
-          "enum": ["power", "binary"],
+          "enum": [
+            "power",
+            "binary"
+          ],
           "description": "Optional: Interpretation von path_historical_log (z. B. binary für altes Loxone-Log, während signal_type=power für Live-Messung)."
         },
         "optimizer_enabled": {
@@ -600,7 +705,10 @@
             },
             "signal_type": {
               "type": "string",
-              "enum": ["power", "binary"],
+              "enum": [
+                "power",
+                "binary"
+              ],
               "description": "Optional: überschreibt signal_type nur für die Live-Abfrage in main.py."
             },
             "alternate_binary_power_name": {
@@ -609,7 +717,9 @@
             },
             "subtract_consumer_ids": {
               "type": "array",
-              "items": { "type": "string" },
+              "items": {
+                "type": "string"
+              },
               "description": "Optional: Misst power_name die Gesamtleistung mehrerer Lasten am selben Zähler (z. B. SwimSpa-Heizung inkl. Filter), werden die hier gelisteten consumer_ids vom Live-Ist abgezogen — nur wenn der Wert wirklich vom Zähler stammt (nicht Fallback)."
             }
           }
@@ -628,7 +738,9 @@
     "filter_schedule": {
       "type": "object",
       "description": "Natives Filter-Duty-Cycle-Fenster (z. B. SwimSpa-Filter): Ernie plant ergänzende Laufzeit nur außerhalb [Start, Start+Dauer).",
-      "required": ["enabled"],
+      "required": [
+        "enabled"
+      ],
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -670,7 +782,9 @@
     "charging_schedule": {
       "type": "object",
       "description": "Ladezeitfenster und Zielenergie für das E-Auto (oder andere zeitgebundene Lader).",
-      "required": ["enabled"],
+      "required": [
+        "enabled"
+      ],
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -767,7 +881,11 @@
     "appliance": {
       "type": "object",
       "description": "Manuelles Gerät für den Empfehlungsmodus (Waschmaschine, Trockner, Geschirrspüler).",
-      "required": ["id", "name", "power_source"],
+      "required": [
+        "id",
+        "name",
+        "power_source"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -779,7 +897,10 @@
         },
         "power_source": {
           "type": "string",
-          "enum": ["loxone", "manual"],
+          "enum": [
+            "loxone",
+            "manual"
+          ],
           "description": "manual: Leistung im UI-Eingabefeld (Vorbelegung default_power_kw). loxone: Nennleistung aus default_power_kw für die Kostenbewertung; loxone_power_name ist für den späteren Adaptionsalgo reserviert (keine Live-Abfrage)."
         },
         "loxone_power_name": {

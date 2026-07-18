@@ -1,5 +1,6 @@
 {
     "$schema": "./config.schema.json",
+    "earnie_data_model": 1,
     "market_prices": {
         "missing_price_strategy": "forecast",
         "forecast_model_path": "data/cache/price_model_coefficients.json"

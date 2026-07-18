@@ -12,7 +12,7 @@ from runtime_store.single_instance import SingleInstanceLock
 
 
 def test_acquire_and_release(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path))
     lock = SingleInstanceLock("test-service")
     lock.acquire()
     assert lock.lock_path == str(tmp_path / "test-service.lock")
@@ -20,9 +20,9 @@ def test_acquire_and_release(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_second_process_is_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path))
     env = os.environ.copy()
-    env["ENERGY_OPTIMIZER_RUNTIME_DIR"] = str(tmp_path)
+    env["ENERGY_OPTIMIZER_RUNTIME_PATH"] = str(tmp_path)
     holder_code = """
 import os, sys, time
 from runtime_store.single_instance import ensure_single_instance
@@ -60,7 +60,7 @@ def test_probe_instance_free_and_busy(
 ) -> None:
     from runtime_store.single_instance import probe_instance
 
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(tmp_path))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path))
     free = probe_instance("probe-svc")
     assert free.busy is False
 

@@ -1,20 +1,20 @@
 # Synology Container Manager – Produktions-Compose (vorgefertigtes Image)
 #
 # Persistente Daten (überleben Image-Updates):
-#   ./config/config.json   – Haus-Konfiguration (wird nie überschrieben)
-#   ./config/tariffs.json  – Tarif-Katalog (Sidecar; wird nie überschrieben)
-#   ./config/backtesting_scenarios.json, house_profiles.json – weitere Sidecars
-#   ./config/.env          – Loxone-Zugangsdaten
-#   ./runtime/             – cons_data, Zustands-JSONs, Profile, Logs
+#   ./earnie_env/config/config.json   – Haus-Konfiguration (wird nie überschrieben)
+#   ./earnie_env/config/tariffs.json  – Tarif-Katalog (Sidecar; wird nie überschrieben)
+#   ./earnie_env/config/backtesting_scenarios.json, house_profiles.json – weitere Sidecars
+#   ./earnie_env/config/.env          – Loxone-Zugangsdaten
+#   ./earnie_env/runtime/  – cons_data, Zustands-JSONs, Profile, Logs
 #
 # Erstinstallation:
 #   1. Ordner anlegen: mkdir -p config runtime
 #   2. Container starten – fehlende Dateien legt der Entrypoint an (config/.env, config.json)
-#   3. config/.env und config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
+#   3. config/.env und earnie_env/config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
 #   4. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
 #
 # Migration von älterem Layout (Dateien im Projektordner):
-#   mv config.json config/config.json
+#   mv config.json earnie_env/config/config.json
 #   mv .env config/.env   # falls Zugangsdaten noch im Projektroot lagen
 #   Optional fehlen auf dem Volume: config.example.json / config.schema.json –
 #   der Entrypoint kopiert sie aus share/config/ im Image (für config_drift).
@@ -22,10 +22,10 @@
 #   mv flexible_consumers_state.json pv_counter_state.json cons_data_pending.json runtime/ 2>/dev/null || true
 #   mv consumption_profiles.csv total_consumption_profiles.csv flexible_consumer_profiles.csv runtime/ 2>/dev/null || true
 #   mv earnie.log system_history_log.csv runtime/ 2>/dev/null || true
-#   In config/config.json: "path_cons_data": "runtime/cons_data_hourly.csv"
+#   In earnie_env/config/config.json: "path_cons_data": "runtime/cons_data_hourly.csv"
 #
 # Ein Container: Streamlit-UI startet main.py automatisch (EARNIE_AUTO_START_MAIN=1).
-# Nach Änderungen an config/config.json: Container neu starten.
+# Nach Änderungen an earnie_env/config/config.json: Container neu starten.
 # Nach Code-Änderungen: Image bauen/pushen (docs/einrichtung/container.md), dann auf der NAS:
 #   docker compose --project-directory . -f docker/compose/synology.yml pull
 #   docker compose --project-directory . -f docker/compose/synology.yml up -d
@@ -37,12 +37,12 @@
 version: "3.8"
 
 x-persist-volumes: &persist-volumes
-  - ./config:/app/config
-  - ./runtime:/app/runtime
+  - ./earnie_env/config:/app/config
+  - ./earnie_env/runtime:/app/runtime
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  EARNIE_CONFIG_PATH: config/config.json
+  EARNIE_CONFIG_PATH: config
   # Tarif-Plausibilität beim main.py-Start; siehe scripts/startup_checks.py
   EARNIE_STRICT_TARIFF_VALIDATE: "1"
   # Loxone-Smoke-Test beim main.py-Start (nach pull/up); siehe scripts/startup_checks.py

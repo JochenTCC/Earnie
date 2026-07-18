@@ -15,7 +15,7 @@ def test_describe_production_log_source(tmp_path, monkeypatch):
     runtime.mkdir()
     history = runtime / "optimization_history.jsonl"
     history.write_text('{"completed_at": "2026-07-04T09:00:00"}\n', encoding="utf-8")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_DIR", str(runtime))
+    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(runtime))
     monkeypatch.setattr(
         optimization_history,
         "RUNTIME_DIR",

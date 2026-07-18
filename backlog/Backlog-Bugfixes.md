@@ -1,4 +1,4 @@
-# Open Bugs
+﻿# Open Bugs
 
 Completed items → [Backlog-Erledigt.md](Backlog-Erledigt.md) (sections `### Bugfix …` / regressions)
 
@@ -23,6 +23,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] Numer of hours shall be 8760h - SE is simulating 8800h
 
 ## Organizational Changes - no bugs (but still no development issue)
-- [ ] remove silent-migration-test folder and update launch.json accordingly. Also remove any scripts that are "linked" to this folder
+
+- [x] remove silent-migration-test folder and update launch.json accordingly. Also remove any scripts that are "linked" to this folder

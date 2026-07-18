@@ -2,10 +2,14 @@
 .env
 .env.*
 !.env.example
+earnie_env/config/.env
+earnie_env/config/config.json
 config/.env
 config.json
 config/config.json
+earnie_env/runtime/
 runtime/
+!earnie_env/runtime/local_settings.example.json
 !runtime/local_settings.example.json
 *.csv
 *.log

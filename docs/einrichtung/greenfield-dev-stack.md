@@ -14,7 +14,7 @@ mkdir greenfield\config, greenfield\runtime
 docker compose --project-directory . -f docker/compose/greenfield.yml up -d --build
 ```
 
-Persistente Daten liegen nur unter `greenfield/config/` und `greenfield/runtime/` — der normale Dev-Stack (`docker/compose/dev.yml` mit `./config` und `./runtime`) bleibt unberührt.
+Persistente Daten liegen nur unter `greenfield/config/` und `greenfield/runtime/` — der normale Dev-Stack (`docker/compose/dev.yml` mit `./earnie_env/config` und `./earnie_env/runtime`) bleibt unberührt.
 
 | Service | Container | Host-Port |
 |---------|-----------|-----------|

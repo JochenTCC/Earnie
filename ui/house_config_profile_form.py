@@ -32,7 +32,7 @@ from ui.house_config_io import (
     single_csv_upload,
     upsert_house_profile,
 )
-from ui.house_config_sticky_save import sticky_save_bar
+from ui.auto_persist import auto_persist
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
     labeled_checkbox,
@@ -1159,7 +1159,8 @@ def _perform_house_profile_save(
     resolved: list[dict],
     existing: dict,
     preview_id: str,
-) -> None:
+    from_auto: bool = False,
+) -> str | None:
     profile_id = _resolve_profile_id(
         is_new=is_new,
         existing_id=stable_profile_id,
@@ -1187,14 +1188,22 @@ def _perform_house_profile_save(
         )
     except ValueError as exc:
         st.error(str(exc))
-        return
-    saved_profile = load_house_profiles().get("profiles", {}).get(profile_id, {})
-    st.session_state[_SESSION_SELECT_PENDING_KEY] = profile_id
+        return None
     st.session_state[_SESSION_FILE_STAMP_KEY] = _house_profiles_file_stamp()
-    st.session_state[_SESSION_SYNC_KEY] = None
-    st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(saved_profile)
-    st.success("Profil gespeichert.")
-    st.rerun()
+    if is_new:
+        saved_profile = load_house_profiles().get("profiles", {}).get(profile_id, {})
+        st.session_state[_SESSION_SELECT_PENDING_KEY] = profile_id
+        st.session_state[_SESSION_SYNC_KEY] = None
+        st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(saved_profile)
+        st.rerun()
+    elif not from_auto:
+        saved_profile = load_house_profiles().get("profiles", {}).get(profile_id, {})
+        st.session_state[_SESSION_SELECT_PENDING_KEY] = profile_id
+        st.session_state[_SESSION_SYNC_KEY] = None
+        st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(saved_profile)
+        st.success("Profil gespeichert.")
+        st.rerun()
+    return profile_id
 
 
 def _render_house_profile_save(
@@ -1211,12 +1220,34 @@ def _render_house_profile_save(
     existing: dict,
     preview_id: str,
 ) -> None:
-    sticky_save_bar()
-    if st.button(
-        "Profil speichern",
-        type="primary",
-        key=_scoped_key(session_scope, f"house_profile_save{key_suffix}"),
-    ):
+    from ui.auto_persist import auto_persist
+    from ui.house_config_historical_csv import historical_csv_save_fields
+
+    ready = bool(str(label or "").strip()) and location.get("latitude") is not None
+    if not ready:
+        return
+    hist = historical_csv_save_fields(preview_id, existing)
+    profile_id = _resolve_profile_id(
+        is_new=is_new,
+        existing_id=stable_profile_id,
+        label=label,
+        profile_ids=set(profile_ids),
+    )
+    payload = {
+        "id": profile_id,
+        "label": label.strip() or profile_id,
+        "annual_kwh": float(annual_kwh),
+        "latitude": location["latitude"],
+        "longitude": location["longitude"],
+        "default_pv_tilt": location["default_pv_tilt"],
+        "default_pv_azimuth": location["default_pv_azimuth"],
+        "consumers": resolved,
+        "total_profile_csv": hist["total_profile_csv"],
+        "pv_profile_csv": hist["pv_profile_csv"],
+        "historical_csv_source": hist["historical_csv_source"],
+    }
+
+    def _save() -> None:
         _perform_house_profile_save(
             is_new=is_new,
             stable_profile_id=stable_profile_id,
@@ -1227,7 +1258,15 @@ def _render_house_profile_save(
             resolved=resolved,
             existing=existing,
             preview_id=preview_id,
+            from_auto=True,
         )
+
+    auto_persist(
+        state_key=f"house_profile::{session_scope}::{profile_id}",
+        payload=payload,
+        save=_save,
+        ready=ready,
+    )
 
 
 def render_house_profile_tab() -> None:

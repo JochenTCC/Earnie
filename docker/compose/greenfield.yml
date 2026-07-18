@@ -22,7 +22,7 @@ x-persist-volumes: &persist-volumes
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  EARNIE_CONFIG_PATH: config/config.json
+  EARNIE_CONFIG_PATH: config
   # Kein Loxone-Smoke-Test — Greenfield nutzt Dummy-Zugangsdaten aus der Ersteinrichtung.
   EARNIE_VERIFY_LOXONE_ON_START: "0"
   EARNIE_AUTO_START_MAIN: "1"

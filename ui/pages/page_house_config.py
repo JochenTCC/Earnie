@@ -5,7 +5,6 @@ import streamlit as st
 
 from ui.help_hint import render_page_title_with_help
 from ui.house_config_profile_form import render_house_profile_tab
-from ui.house_config_sticky_save import ensure_sticky_save_css
 from ui.planning_battery_form import render_battery_planning_tab
 from ui.planning_pv_form import render_pv_planning_tab
 
@@ -23,7 +22,6 @@ def _help_text() -> str:
 
 
 def render() -> None:
-    ensure_sticky_save_css()
     render_page_title_with_help("🏠 Hauskonfigurator", _help_text(), key="house_config_help")
 
     if _HOUSE_CONFIG_TAB_KEY not in st.session_state:

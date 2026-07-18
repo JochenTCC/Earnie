@@ -88,11 +88,14 @@ def _serialize_pv_system(spec: dict) -> dict:
 
 
 def save_components_document(path: str, doc: dict) -> None:
+    from runtime_store.data_model import stamp_data_model
+
     normalized = normalize_components_document(doc)
     serializable = {
         "batteries": [_serialize_battery(item) for item in normalized["batteries"]],
         "pv_systems": [_serialize_pv_system(item) for item in normalized["pv_systems"]],
     }
+    stamp_data_model(serializable)
     target = os.path.abspath(path)
     os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
     tmp = target + ".tmp"
