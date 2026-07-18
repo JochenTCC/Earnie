@@ -10,7 +10,7 @@ Für Entwickler (Projektstruktur, Tests, Container) siehe [DEVELOPER.md](../DEVE
 
 1. **Konfiguration:** `earnie_env/config/config.example.json` → `earnie_env/config/config.json` (lokal, nicht committen). Alternativ legt `python -m scripts.bootstrap_runtime` die Datei beim ersten Start an.
 2. **Loxone-Zugang:** `.env.example` → `earnie_env/config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `.env` im Config-Volume an).
-3. **Merker-Namen** in `earnie_env/config/config.json` unter `loxone_blocks` und `flexible_consumers` anpassen (siehe [Loxone-Signale](referenz/loxone-signale.md)).
+3. **Merker-Namen** in `earnie_env/config/config.json` unter `loxone_blocks` und in den Verbrauchern des Hausprofils (`house_profiles.json`) anpassen (siehe [Loxone-Signale](referenz/loxone-signale.md)). Legacy-`flexible_consumers` in `config.json` nur noch bei Bedarf.
 4. **Verbindung prüfen:**
    ```powershell
    python -m scripts.verify_loxone_setup

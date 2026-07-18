@@ -69,13 +69,13 @@ Kurzfassung der typischen Wege:
 
 | Weg | Für wen | Hinweis |
 |-----|---------|---------|
-| **Docker (empfohlen Produktiv)** | Synology NAS, LoxBerry, Proxmox LXC, PC | Persistente Ordner `config/` und `runtime/` außerhalb des Images |
+| **Docker (empfohlen Produktiv)** | Synology NAS, LoxBerry, Proxmox LXC, PC | Persistente Ordner `earnie_env/config/` und `earnie_env/runtime/` außerhalb des Images |
 | **Greenfield / Ersteinrichtung** | Erste Was-wäre-wenn-Tests lokal | Eigener Stack, oft Port **8502** — getrennt vom Produktivsystem |
 | **Lokal ohne Container** | Entwickler, Tests | siehe [DEVELOPER.md](../../DEVELOPER.md) |
 
 **Typischer Ablauf (Docker):**
 
-1. Projekt bzw. Compose-Datei bereitstellen, Verzeichnisse `config/` und `runtime/` anlegen.  
+1. Projekt bzw. Compose-Datei bereitstellen, Verzeichnisse `earnie_env/config/` und `earnie_env/runtime/` anlegen.  
 2. Container starten — fehlende Dateien werden beim ersten Start angelegt (Bootstrap).  
 3. Oberfläche im Browser öffnen (Produktiv oft Port **8501**, siehe [Streamlit-Ports](../referenz/streamlit-ports.md)).  
 4. Loxone-Zugang hinterlegen (falls Live geplant) und mit dem Hauskonfigurator fortfahren.
@@ -112,6 +112,10 @@ Ein **Hausprofil** beschreibt Standort und „Wer lebt / was verbraucht hier“:
 - **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen)
 
 Legen Sie zuerst ein Profil an und ergänzen Sie danach die Geräte. Ohne Standort und sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig. Je mehr Freiheiten sie Earnie beim Verschieben der Aktivierung der verschiedenen Verbraucher geben, umso höher sind die Einsparungspotenziale.
+
+Optional: **Historische Jahresprofile (CSV)** — Gesamtverbrauch, optional PV und Verbraucher — für Ist-vs-Modell und realistischere Explorer-Rechnungen. Details: [Historische Verbrauchs-CSV](../konfiguration/verbrauchs-csv.md).
+
+Änderungen im Hauskonfigurator und Szenarieneditor werden **automatisch gespeichert**. Komplette Config-Pakete (ZIP) exportieren/importieren Sie in der Sidebar unter **„Konfiguration speichern / laden“** — siehe [Speichern / Laden](../konfiguration/speichern-laden.md).
 
 #### Haus-Wärme
 
@@ -205,7 +209,13 @@ Tarife wählen Sie aus dem Tarifkatalog (Bezug/Einspeise). Details zu Preisen: [
 
 Unter **Analyse → Szenario-Explorer** (erscheint nach ausreichender Planungs-Konfiguration).
 
-Hier analysieren Sie **Langzeitvergleiche** im Zeitraum der letzen 12 Monate (für Teszwecke kann auch nur der Monat März analysiert werden) zwischen Referenz (Als Referenz wird immer das "nackte Haus" ohne PV und Speicher berechnet und zusätzlich jedes Szenari ohne Optimierung durch Earnie) und Ihren Szenarien. Das ist **kein** tägliches Live-Cockpit und ändert keine Steuerwerte an Loxone.
+Hier analysieren Sie **Langzeitvergleiche** typischerweise über die letzten 12 Monate (für Tests auch kürzer, z. B. nur März) zwischen Referenzen und Ihren Szenarien:
+
+- **Historisch** — „nacktes Haus“ ohne PV und ohne Speicher (Live-Tarife, Last ohne Flex-Optimierung)  
+- **pro Szenario ohne Optimierung** — gleiche Lastlogik wie das Szenario, aber ohne Earnie-Verschiebung (bei PV-Szenarien inkl. deren PV-Ertrag)  
+- **optimierte Szenarien** — mit Earnie-Planung (Batterie/Flex, sofern im Szenario vorhanden)
+
+Das ist **kein** tägliches Live-Cockpit und ändert keine Steuerwerte an Loxone.
 
 > Hinweis: Ergebnisse sind Modellrechnungen. Es gibt **keine Garantie**, dass Live-Einsparungen exakt den Simulationen entsprechen (Wetter, Verhalten, Tarifdetails, Hardwaregrenzen).
 
@@ -224,7 +234,7 @@ Im Explorer bzw. zugehörigen Schritten können Sie Verbrauchsverläufe erzeugen
 2. Rechnung starten (kann je nach Umfang länger dauern).  
 3. Warten, bis die Auswertung fertig ist; Ergebnisse landen in der Laufzeitablage für den Explorer.
 
-Die Referenzökonomie vergleicht typischerweise „Last am gewählten Tarif **ohne** Batterieoptimierung“; Szenarien mit PV rechnen mit dem jeweiligen PV-Ertrag. Batterie ist Teil der **optimierten** Variante, nicht der reinen Referenz. (!!!Das muss gecheckt werden)
+Die Zeile **Historisch** rechnet die Last am Live-Tarif **ohne** PV und **ohne** Batterie. Pro Szenario gibt es zusätzlich eine Referenz ohne Optimierung (bei PV-Szenarien mit dem PV-Ertrag dieses Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante — nicht zur Historisch-Zeile.
 
 #### Ergebnisse des Szenario-Explorers
 
@@ -270,9 +280,10 @@ Wenn die Was-wäre-wenn-Analyse überzeugt, folgt die Anbindung an die Smarthome
    - Batterie: SOC, Leistungen, PV-Leistung  
    - Steuerung: Ziel-SOC, Lade-/Entlade-Soll, Steuerbefehl (Automatik / Zwang)  
    - Verbraucher: Ist-Leistung lesen; Freigabe 0/1 oder E-Auto-Leistungs-Soll schreiben  
-   - E-Auto: angesteckt, Fertig-Zeit, Rest-SOC, Kapazität, …  (!!! Hier muss angegeben werden, wo die konkreten Merker zu finden sind)
-3. Optional **FTP-Verbrauchslog** für historische Daten.  (!!! Streichen - wo ist der Bezug zum Code?)
-4. Namen in Earnie hinterlegen (Live-Konfiguration / Config) — **exakt** wie im Smarthome-System.  
+   - E-Auto: angesteckt, Fertig-Zeit, Rest-SOC, Kapazität, …  
+   Konkrete Beispielnamen und Config-Schlüssel: [Loxone-Signale](../referenz/loxone-signale.md). Zentrale Merker unter `loxone_blocks` in `config.json`; Verbraucher-Merker im Hausprofil (`house_profiles.json`) bzw. Legacy in `flexible_consumers[]`.  
+3. Optional **FTP-Verbrauchslog** für historische Offline-Daten (`loxone_blocks.log_filename`, Miniserver-Ordner `log/`) — siehe [Loxone-Anbindung](../einrichtung/loxone-anbindung.md#ftp-verbrauchslog). Für Jahresprofile im Hauskonfigurator nutzen Sie eher CSV-Upload / Energiemonitor ([Verbrauchs-CSV](../konfiguration/verbrauchs-csv.md)).  
+4. Namen in Earnie hinterlegen (Hauskonfigurator / Live-Konfiguration) — **exakt** wie im Smarthome-System.  
 
 Earnie liest Smarthome-Werte oft als Text mit Einheit (z. B. `3.5 kW`) ein; die Einheit wird ignoriert.
 
@@ -318,7 +329,7 @@ Einheitliches Cockpit über **Vergangenheit, Jetzt und Vorausschau** — navigie
 
 Typische Inhalte:
 
-- **Chart 1:** Leistungen, Energieflüsse (PV, Netz, Batterie, Flex-Verbraucher), SOC, Preis  (!!! Muss noch detaillierter beschrieben werden)
+- **Chart 1:** Leistungen und Energieflüsse (PV, Netz, Batterie, Flex-Verbraucher als gestapelte Balken), SoC und Preis — graue Zone = Historie, neutral = laufender Plan, grün = Preisprognose; Details und Fluss-Algorithmus: [Charts & Panels](../ui/charts.md#chart-1-leistung-soc--preis)  
 - **Chart 2:** Vergleich der verbrauchten Energie und der Kosten zwischen Basis (ohne Optimierung) und mit Eingriff von Earnie  
 - **Sankey:** aktueller Energiefluss aus Live-Daten  
 - **Tabelle & Energievergleich:** Rohdaten und Baseline vs. Optimierung  

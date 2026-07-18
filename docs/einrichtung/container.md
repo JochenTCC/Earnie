@@ -32,17 +32,17 @@ Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config` (Config-Verzeichnis im
 2. `mkdir -p earnie_env/config earnie_env/runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`.env`, `config.json`, `tariffs.json`, weitere Sidecars, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
 4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
-5. Optional: historische `cons_data` aus Dev nach `runtime/cons_data_hourly.csv` kopieren
+5. Optional: historische `cons_data` aus Dev nach `earnie_env/runtime/cons_data_hourly.csv` kopieren
 
 
 
 ## Config-Updates nach Programm-Upgrade
 
-Neue Einträge in `config/config.example.json` werden **nicht** automatisch in die Anwender-Config geschrieben.
+Neue Einträge in `earnie_env/config/config.example.json` (bzw. Image-Vorlage unter `share/config/`) werden **nicht** automatisch in die Anwender-Config geschrieben.
 
 - Beim Start von `main.py`: Hinweis im Log
 - In der Streamlit-App: gelbes Banner mit fehlenden Pfaden und Beispielwerten
-- Fehlende Keys manuell in `config/config.json` ergänzen
+- Fehlende Keys manuell in `earnie_env/config/config.json` ergänzen
 
 
 
@@ -96,7 +96,7 @@ python -m scripts.build_container --target loxberry
 python -m scripts.build_container --target all --push
 ```
 
-Vor `--push` prüft der Build automatisch den gebündelten Tarifkatalog (`config/tariffs.json`: Schema, Beispiel-Szenario-Referenzen, DACH-Vollständigkeit). Manuell:
+Vor `--push` prüft der Build automatisch den gebündelten Tarifkatalog (`earnie_env/config/tariffs.json` bzw. Image-`share/config/`: Schema, Beispiel-Szenario-Referenzen, DACH-Vollständigkeit). Manuell:
 
 ```powershell
 python -m scripts.validate_tariffs --check-catalog
@@ -105,7 +105,7 @@ python -m scripts.validate_tariffs --check-catalog
 Auf der NAS vor dem ersten Prod-Cutover (Backlog **2.0 P6**) die produktive Sidecar-Datei prüfen:
 
 ```powershell
-python -m scripts.validate_tariffs --tariffs config/tariffs.json --check-catalog
+python -m scripts.validate_tariffs --tariffs earnie_env/config/tariffs.json --check-catalog
 ```
 
 Bei Fehlern bricht `main.py` mit `EARNIE_STRICT_TARIFF_VALIDATE=1` ab (siehe Compose).
@@ -184,7 +184,7 @@ docker compose --project-directory . -f docker/compose/dev.yml build
 docker compose --project-directory . -f docker/compose/dev.yml up -d
 ```
 
-Nutzt `docker/compose/dev.yml` mit lokalem Build und denselben Mounts (`config/`, `runtime/`).
+Nutzt `docker/compose/dev.yml` mit lokalem Build und denselben Mounts (`./earnie_env/config` → `/app/config`, `./earnie_env/runtime` → `/app/runtime`).
 
 ### Greenfield Dev-Stack (Ersteinrichtung)
 
@@ -206,9 +206,9 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 
 1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker/compose/loxberry.yml`
 2. `mkdir -p earnie_env/config earnie_env/runtime`
-3. Container starten — der **Entrypoint** legt fehlende Dateien an (`config/.env`, `config/config.json`, …)
+3. Container starten — der **Entrypoint** legt fehlende Dateien an (`earnie_env/config/.env`, `config.json`, … im gemounteten Volume)
 4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
-5. Optional: historische `cons_data` nach `runtime/cons_data_hourly.csv` kopieren
+5. Optional: historische `cons_data` nach `earnie_env/runtime/cons_data_hourly.csv` kopieren
 
 
 

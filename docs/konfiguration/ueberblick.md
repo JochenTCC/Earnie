@@ -66,7 +66,10 @@ Im Abschnitt **Echtzeit-Umgebung** wählt die Seite **Live-Konfiguration** (Komf
 
 ## Weiterführend
 
+- [Speichern / Laden](speichern-laden.md)
 - [PV & Batterie](batterie-pv.md)
 - [Flexible Verbraucher](flexible-verbraucher.md)
+- [Historische Verbrauchs-CSV](verbrauchs-csv.md)
+- [Preise & aWATTar](preise.md)
 - [Loxone-Signale](../referenz/loxone-signale.md)
 

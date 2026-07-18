@@ -156,6 +156,6 @@ Port-Übersicht aller Stacks: [streamlit-ports.md](../referenz/streamlit-ports.m
 | Stack | Zweck |
 |-------|--------|
 | **Greenfield** (diese Datei) | Ersteinrichtung, leere Volumes, Port 8502 |
-| `docker/compose/dev.yml` | Lokaler Dev mit bestehendem `config/` + `runtime/` |
+| `docker/compose/dev.yml` | Lokaler Dev mit `./earnie_env/config` + `./earnie_env/runtime` |
 | **7g Silent** | Prod-Loxone lesen, `loxone_silent_mode` |
 | **7g Simuliert** | Synthetisches Haus (nach Loxone-Simulator) |

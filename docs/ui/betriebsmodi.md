@@ -14,7 +14,9 @@ Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monit
 | `scenario_explorer` | **Szenario-Explorer** | Analyse | optional (Dev) |
 | `price_forecast` | **Preis-Prognose (Dev)** | Analyse | Dev-only |
 
-Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarieneditor**, **Live-Konfiguration**, **Manuelle Geräte**, **Verbraucheranalyse** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`).
+Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarieneditor**, **Live-Konfiguration**, **Optimierer-Dienst**, **Loxone-Kommunikation**, **Manuelle Geräte**, **Verbraucheranalyse** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`).
+
+In der Sidebar: App-Version, Setup-Hinweise und **„Konfiguration speichern / laden“** (ZIP-Export/Import der Config-Sidecars und `uploads/` — siehe [Speichern / Laden](../konfiguration/speichern-laden.md)).
 
 ### Navigationsabschnitte (nach vollständiger Einrichtung)
 
@@ -23,7 +25,7 @@ Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, 
 | **Betrieb** | Monitor, Manuelle Geräte |
 | **Analyse** | Szenario-Explorer (wenn freigeschaltet), Preis-Prognose (Dev), Verbraucheranalyse |
 | **Planung** | Hauskonfigurator, Szenarieneditor |
-| **Echtzeit-Umgebung** | Live-Konfiguration |
+| **Echtzeit-Umgebung** | Live-Konfiguration, Optimierer-Dienst, Loxone-Kommunikation |
 
 Während der Greenfield-Ersteinrichtung sind zunächst nur **Planung** und **Echtzeit-Umgebung** sichtbar.
 

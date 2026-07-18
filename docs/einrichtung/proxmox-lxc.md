@@ -1,6 +1,6 @@
 # Proxmox LXC + Docker Compose
 
-Earnie auf einem **Proxmox VE**-Host in einem **unprivileged LXC** mit Docker Compose — gleiches Image und gleiche Persistenz wie Synology/LoxBerry (`config/`, `runtime/`, UI-Port **8501**).
+Earnie auf einem **Proxmox VE**-Host in einem **unprivileged LXC** mit Docker Compose — gleiches Image und gleiche Persistenz wie Synology/LoxBerry (`earnie_env/config/`, `earnie_env/runtime/`, UI-Port **8501**).
 
 **Compose:** [`docker/compose/proxmox.yml`](../../docker/compose/proxmox.yml)  
 **LXC-Hilfen:** [`docker/proxmox/`](../../docker/proxmox/)  
@@ -44,7 +44,7 @@ Optional Persistenz auf dem Host (Pfad zuerst anlegen):
 mp0: /mnt/pve/data/earnie,mp=/opt/earnie
 ```
 
-Dann liegen `config/` und `runtime/` auf dem Host-Storage und überleben CT-Neuaufbau.
+Dann liegen `earnie_env/config/` und `earnie_env/runtime/` auf dem Host-Storage und überleben CT-Neuaufbau.
 
 ## 2. Bootstrap im LXC
 
@@ -74,8 +74,8 @@ Privates GHCR-Image: vor `pull` im CT `echo "$TOKEN" | docker login ghcr.io -u U
 
 Wie bei Synology/LoxBerry:
 
-1. `config/.env` — Loxone-Zugang  
-2. `config/config.json`, `config/tariffs.json` — Haus und Tarife  
+1. `earnie_env/config/.env` — Loxone-Zugang  
+2. `earnie_env/config/config.json`, `earnie_env/config/tariffs.json` — Haus und Tarife  
 3. Container neu starten nach Config-Änderungen:
 
 ```bash
@@ -94,7 +94,7 @@ docker compose --project-directory . -f compose.yaml up -d
 ```
 
 UI: `http://<lxc-ip>:8501`  
-Log: `runtime/earnie.log` bzw. `docker compose … logs -f earnie`
+Log: `earnie_env/runtime/earnie.log` bzw. `docker compose … logs -f earnie`
 
 ## UI-Zugriff
 
@@ -106,7 +106,7 @@ Im Hausnetz Port **8501**. Extern nur über Reverse Proxy, VPN o. Ä. — nicht 
 |-----------|----|-------|
 | Nesting | `nesting=1` + `keyctl=1` | Docker startet nicht / keine Nested Container |
 | Architektur | amd64 CT | arm64-CT ohne passendes Image-Manifest |
-| Persistenz | `config/` + `runtime/` außerhalb des Images | nur flüchtige Rootfs ohne Backup |
+| Persistenz | `earnie_env/config/` + `earnie_env/runtime/` außerhalb des Images | nur flüchtige Rootfs ohne Backup |
 | MILP | CBC-Läufe im Log ok | dauerhafte Timeouts bei zu wenig RAM/CPU |
 
 ## Siehe auch

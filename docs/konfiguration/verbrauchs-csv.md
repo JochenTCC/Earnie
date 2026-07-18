@@ -17,7 +17,7 @@ timestamp;power_kw
 | Länge | Nach Import mindestens **8760 Stunden** (ca. 12 Monate) |
 | Abtastung | Beliebig; beim Import → stündlich (Mittelwert bei dichteren Daten, Interpolation bei lückenhaften) |
 
-Beim Upload schreibt Earnie eine normalisierte Datei unter `config/uploads/`. Pro Rolle (Gesamtverbrauch, PV, je Verbraucher) gibt es **genau eine** Datei — ein erneuter Upload überschreibt denselben Pfad.
+Beim Upload schreibt Earnie eine normalisierte Datei unter `earnie_env/config/uploads/` (im Container: `config/uploads/`). Pro Rolle (Gesamtverbrauch, PV, je Verbraucher) gibt es **genau eine** Datei — ein erneuter Upload überschreibt denselben Pfad.
 
 ## Importmodus (Hausprofil)
 

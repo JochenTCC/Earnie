@@ -1,6 +1,6 @@
 # PV & Batterie (Live-Szenario)
 
-Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation). Konfiguration über Entitäts-Referenzen im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`); technische Werte liegen in `config/components.json` (`batteries[]`, `pv_systems[]`).
+Diese Parameter beschreiben die physische Anlage und fließen in die MILP-Optimierung ein (Live und Simulation). Konfiguration über Entitäts-Referenzen im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`); technische Werte liegen in `earnie_env/config/components.json` (`batteries[]`, `pv_systems[]`).
 
 Ein Szenario kann **mehrere PV-Anlagen** referenzieren (`pv_system_ids`). Die Prognose und die Optimierung nutzen die **Summe** aller Anlagen.
 

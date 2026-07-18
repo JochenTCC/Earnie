@@ -1,6 +1,8 @@
 # Flexible Verbraucher
 
-Einträge in `flexible_consumers[]` sind zeitlich verschiebbare Lasten (SwimSpa, E-Auto, Wärmepumpe). Die Optimierung entscheidet **wann** sie laufen, nicht ob die Anlage technisch kann — die Freigabe an Loxone ist ein 0/1-Signal (E-Auto: Leistungs-Sollwert + PV-Follow).
+Ab **2.0** liegen steuerbare Verbraucher (SwimSpa, E-Auto, Wärmepumpe, Filter, Generics) primär im **Hausprofil** (`earnie_env/config/house_profiles.json`). Der Block `flexible_consumers[]` in `config.json` ist **Legacy** (meist leer) und wird nur noch bei Bedarf über `legacy_id` mit dem Profil überlagert.
+
+Die Optimierung entscheidet **wann** sie laufen, nicht ob die Anlage technisch kann — die Freigabe an Loxone ist ein 0/1-Signal (E-Auto: Leistungs-Sollwert + PV-Follow). Die Feldnamen unten gelten für die aufgelöste Flex-Struktur (Profil-Bridge bzw. Legacy-Eintrag).
 
 ## Pflichtfelder (je Verbraucher)
 

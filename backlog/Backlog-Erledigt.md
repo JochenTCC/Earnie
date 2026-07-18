@@ -3,6 +3,14 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 2.+1 — Save / Load configurations (2026-07-18)
+
+- [x] Move `./config` and `./runtime` into `./earnie_env` (analog greenfield); code/settings/env vars updated; Compose mounts Host-`earnie_env` → `/app/config` + `/app/runtime`
+- [x] Auto-Save after valid changes in Hauskonfigurator / Szenarieneditor
+- [x] Sidebar **Konfiguration speichern / laden** — ZIP of `config.json`, sidecars (`backtesting_scenarios`, `components`, `deviation_rules`, `house_profiles`, `tariffs`), `uploads/`; `earnie_data_model` tag + compatibility check (converters later); `.env` excluded
+- [x] Update docs — `docs/konfiguration/speichern-laden.md`, German user-doc path sync (`earnie_env`), handbook/UI notes
+
+
 ### Bugfix min_on_quarterhours SwimSpa / Wärmepumpe (2026-07-18)
 
 - [x] **min_on_quarterhours not visible for SwimSpa / missing for Wärmepumpe** — Hauskonfigurator field for `thermal_rc` + `thermal_annual`; normalize/serialize for WP; default `4` in `house_profiles.json`; verified live
