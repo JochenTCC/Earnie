@@ -23,7 +23,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Numer of hours shall be 8760h - SE is simulating 8800h
+- [ ] Number of hours shall be 8760h - SE is simulating 8800h
 
 ## Organizational Changes - no bugs (but still no development issue)
 

@@ -14,6 +14,28 @@ from runtime_store.data_model import DataModelError
 
 logger = logging.getLogger(__name__)
 
+_EDITOR_SESSION_PREFIXES = (
+    "house_profile_",
+    "scenario_editor_",
+    "planning_pv_",
+    "planning_battery_",
+    "_auto_persist_fp::",
+)
+
+
+def _clear_session_after_config_import() -> None:
+    """Drop editor/live UI state so imported JSON is not masked by stale widgets."""
+    from ui.chart_consumer_stack import clear_consumer_stack_order_cache
+    from ui.simulation_results import SESSION_LIVE_DISPLAY_BUNDLE
+
+    clear_consumer_stack_order_cache()
+    st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
+    for key in list(st.session_state.keys()):
+        if not isinstance(key, str):
+            continue
+        if any(key.startswith(prefix) for prefix in _EDITOR_SESSION_PREFIXES):
+            del st.session_state[key]
+
 
 def render_config_pack_sidebar() -> None:
     with st.sidebar.expander("Konfiguration speichern / laden", expanded=False):
@@ -51,5 +73,6 @@ def render_config_pack_sidebar() -> None:
                 logger.warning("config pack import rejected: %s", exc)
             else:
                 st.success(f"Importiert: {len(written)} Datei(en).")
+                _clear_session_after_config_import()
                 st.cache_data.clear()
                 st.rerun()

@@ -99,9 +99,18 @@ def _discovered_flex_columns(
     df: pd.DataFrame,
     known_columns: set[str],
     flex_consumers: list[dict],
+    *,
+    used_color_indices: set[int] | None = None,
 ) -> list[tuple[dict, str]]:
     """Fallback: any ``{name} (kW)`` column with horizon sum > 0 not yet registered."""
+    from house_config.planning_flex_bridge import (
+        _allocate_chart_color_index,
+        _used_chart_color_indices,
+    )
+
     known_names = {consumer["name"] for consumer in flex_consumers}
+    used = set(used_color_indices or ())
+    used |= _used_chart_color_indices(flex_consumers)
     discovered: list[tuple[dict, str]] = []
     for column in df.columns:
         if column in known_columns or column in _RESERVED_KW_COLUMNS:
@@ -114,9 +123,15 @@ def _discovered_flex_columns(
         if df[column].fillna(0.0).sum() <= 0:
             continue
         consumer_id = name.lower().replace(" ", "_").replace("-", "_")
+        index = _allocate_chart_color_index(used, consumer_id)
+        used.add(index)
         discovered.append(
             (
-                {"id": consumer_id, "name": name},
+                {
+                    "id": consumer_id,
+                    "name": name,
+                    "chart_color_index": index,
+                },
                 column,
             )
         )
@@ -225,9 +240,12 @@ def get_bar_colors(df: pd.DataFrame) -> list[str]:
 
 def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
     """Verbraucher-Spalten mit sichtbaren Planwerten (> 0 kWh über den Tag)."""
+    from house_config.planning_flex_bridge import _used_chart_color_indices
+
     flex_consumers = _chart_flex_consumers()
     active: list[tuple[dict, str]] = []
     known_columns: set[str] = set()
+    used_indices = _used_chart_color_indices(flex_consumers)
     for consumer in flex_consumers:
         col = consumer_column_name(consumer)
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
@@ -238,12 +256,25 @@ def _active_consumer_bar_columns(df: pd.DataFrame) -> list[tuple[dict, str]]:
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((appliance_as_chart_consumer(appliance), col))
             known_columns.add(col)
-    for consumer in _chart_known_generics(flex_consumers):
+            raw = appliance.get("chart_color_index")
+            if raw is not None:
+                try:
+                    used_indices.add(int(raw))
+                except (TypeError, ValueError):
+                    pass
+    known_generics = _chart_known_generics(flex_consumers)
+    used_indices |= _used_chart_color_indices(known_generics)
+    for consumer in known_generics:
         col = consumer_column_name(consumer)
         if col in df.columns and df[col].fillna(0.0).sum() > 0:
             active.append((consumer, col))
             known_columns.add(col)
-    for consumer, col in _discovered_flex_columns(df, known_columns, flex_consumers):
+    for consumer, col in _discovered_flex_columns(
+        df,
+        known_columns,
+        flex_consumers,
+        used_color_indices=used_indices,
+    ):
         active.append((consumer, col))
     return active
 

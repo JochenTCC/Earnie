@@ -349,6 +349,27 @@ def test_chart_stack_fallback_kw_column_when_not_in_registry(monkeypatch):
     assert len(active) == 1
     assert active[0][1] == "EV (kW)"
     assert active[0][0]["name"] == "EV"
+    assert active[0][0]["chart_color_index"] is not None
+
+
+def test_discovered_fernsehen_column_gets_chart_color(monkeypatch):
+    """Leftover known-generic columns must not crash flex_bar_chart_color."""
+    from ui.chart_colors import flex_bar_chart_color
+
+    monkeypatch.setattr(config, "get_flexible_consumers", lambda optimizer_only=False: [])
+    monkeypatch.setattr(
+        "config.get_resolved_runtime_settings",
+        lambda: {},
+    )
+    df = pd.DataFrame({"Fernsehen (kW)": [0.2, 0.2]})
+    with chart_flex_consumers_context([]):
+        active = _active_consumer_bar_columns(df)
+    assert len(active) == 1
+    consumer, column = active[0]
+    assert column == "Fernsehen (kW)"
+    assert consumer["id"] == "fernsehen"
+    assert isinstance(consumer["chart_color_index"], int)
+    assert flex_bar_chart_color(consumer).startswith("#")
 
 
 def test_flex_consumers_from_snapshot_prefers_meta_list(monkeypatch):

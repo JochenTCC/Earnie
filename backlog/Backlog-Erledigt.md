@@ -3,6 +3,10 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix config ZIP import UI / chart_color_index (2026-07-18)
+
+- [x] Config pack import left stale Hauskonfigurator/live session state when the imported profile had more consumers; Live Chart 1 crashed on discovered columns (e.g. `fernsehen`) missing `chart_color_index`. Clear editor/live session on import; allocate palette indices for discovered flex columns.
+
 ### Bugfix SE profile_spec Jahres Verbrauch vs Historisch (2026-07-18)
 
 - [x] **Investigate Gesamtkosten Jahres Verbrauch gap Historisch vs others** — root cause: `profile_spec` omitted CSV `thermal_rc` / used schedule targets for CSV EV·WP, and excluded `earnie_role: manual` from overlay; fix: CSV before climate, CSV thermal_rc → overlay, CSV EV/WP window targets, manuals as fixed overlay like known (recommendation UI unchanged); docs + tests; verified live (~11600 vs Historisch ~11700)
