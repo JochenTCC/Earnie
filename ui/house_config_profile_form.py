@@ -48,6 +48,8 @@ CONSUMER_TYPE_OPTIONS = ["generic", "thermal_annual", "thermal_rc", "ev"]
 _SESSION_SYNC_KEY = "house_profile_sync_id"
 _SESSION_CONSUMERS_KEY = "house_profile_consumers"
 _SESSION_SELECT_PENDING_KEY = "house_profile_select_pending"
+_SESSION_SELECTED_ID_KEY = "house_profile_selected_id"
+_NEW_PROFILE_OPTION = "— neu —"
 _SESSION_FILE_STAMP_KEY = "house_profile_file_stamp"
 
 _PASSTHROUGH_CONSUMER_KEYS = (
@@ -115,8 +117,11 @@ def _default_consumer() -> dict:
 
 
 def _default_additional_consumer() -> dict:
+    from house_config.label_uniqueness import allocate_unique_label
+
+    existing = list(st.session_state.get(_SESSION_CONSUMERS_KEY, []))
     return {
-        "label": "Verbraucher",
+        "label": allocate_unique_label("Verbraucher", existing),
         "type": "generic",
         "nominal_power_kw": 1.0,
         "schedule": {
@@ -392,7 +397,14 @@ def _clear_scoped_widget_keys(session_scope: str) -> None:
             del st.session_state[key]
 
 
-def _seed_profile_widget_state(session_scope: str, existing: dict) -> None:
+def _seed_profile_widget_state(
+    session_scope: str,
+    existing: dict,
+    *,
+    siblings: list[dict] | None = None,
+) -> None:
+    from house_config.label_uniqueness import allocate_unique_label
+
     if existing:
         label = str(existing.get("label", "Mein Haushalt"))
         annual_kwh = float(existing.get("annual_kwh", 4500.0))
@@ -401,7 +413,7 @@ def _seed_profile_widget_state(session_scope: str, existing: dict) -> None:
         default_pv_tilt = int(existing.get("default_pv_tilt", 25))
         default_pv_azimuth = int(existing.get("default_pv_azimuth", 0))
     else:
-        label = "Mein Haushalt"
+        label = allocate_unique_label("Mein Haushalt", siblings or [])
         annual_kwh = 4500.0
         latitude = 48.2
         longitude = 11.0
@@ -420,13 +432,19 @@ def _profile_widget_state_missing(session_scope: str) -> bool:
     return _scoped_key(session_scope, "house_profile_label") not in st.session_state
 
 
-def _sync_profile_session(session_scope: str, existing: dict, *, file_stamp: str) -> list[dict]:
+def _sync_profile_session(
+    session_scope: str,
+    existing: dict,
+    *,
+    file_stamp: str,
+    siblings: list[dict] | None = None,
+) -> list[dict]:
     scope_changed = st.session_state.get(_SESSION_SYNC_KEY) != session_scope
     file_changed = st.session_state.get(_SESSION_FILE_STAMP_KEY) != file_stamp
     widget_state_missing = _profile_widget_state_missing(session_scope)
     if scope_changed or file_changed or widget_state_missing:
         _clear_scoped_widget_keys(session_scope)
-        _seed_profile_widget_state(session_scope, existing)
+        _seed_profile_widget_state(session_scope, existing, siblings=siblings)
         st.session_state[_SESSION_SYNC_KEY] = session_scope
         st.session_state[_SESSION_FILE_STAMP_KEY] = file_stamp
         st.session_state[_SESSION_CONSUMERS_KEY] = _consumers_from_existing(existing)
@@ -764,6 +782,16 @@ def _render_thermal_solar_fields(
     }
 
 
+def _consumer_expander_title(consumer: dict, index: int, *, session_scope: str) -> str:
+    """Prefer live Bezeichnung widget state so expander header updates for every type."""
+    label_key = _scoped_key(session_scope, f"hc_label_{index}")
+    live = st.session_state.get(label_key)
+    if live is None:
+        live = consumer.get("label")
+    title = str(live or "").strip() or f"Verbraucher {index + 1}"
+    return f"Verbraucher {index + 1}: {title}"
+
+
 def _render_consumer_form(
     consumer: dict,
     index: int,
@@ -774,11 +802,13 @@ def _render_consumer_form(
     default_pv_tilt: float = 18.0,
     default_pv_azimuth: float = 0.0,
 ) -> dict:
-    title = consumer.get("label") or f"Verbraucher {index + 1}"
+    expander_title = _consumer_expander_title(
+        consumer, index, session_scope=session_scope
+    )
     # Expand first consumer only when it has no saved id yet (new/empty form).
     has_saved_data = bool(str(consumer.get("id") or "").strip())
     with st.expander(
-        f"Verbraucher {index + 1}: {title}",
+        expander_title,
         expanded=index == 0 and not has_saved_data,
     ):
         cols = st.columns([5, 1])
@@ -1052,7 +1082,13 @@ def _render_consumer_profile_csv_fields(
         help="Nur eine CSV-Datei je Verbraucher.",
     )
     consumer_slug = slug_id(str(consumer.get("id") or consumer.get("label") or f"c{index}"))
-    profile_slug = slug_id(str(st.session_state.get("house_profile_select") or "profile"))
+    profile_slug = slug_id(
+        str(
+            st.session_state.get(_SESSION_SELECTED_ID_KEY)
+            or st.session_state.get("house_profile_select")
+            or "profile"
+        )
+    )
     if upload is not None:
         try:
             saved = save_profile_consumption_csv(
@@ -1105,6 +1141,51 @@ def _render_consumer_profile_csv_fields(
         "profile_csv": active,
         "use_profile_csv": bool(use_csv),
     }
+
+
+def _profile_display_label(profile_map: dict, profile_id: str) -> str:
+    return str(profile_map.get(profile_id, {}).get("label") or profile_id)
+
+
+def _profile_select_choices(
+    profile_map: dict, profile_ids: list[str]
+) -> tuple[list[str], dict[str, str]]:
+    """Build selectbox options from live labels (not format_func) so UI refreshes."""
+    displays = [_NEW_PROFILE_OPTION]
+    id_by_display = {_NEW_PROFILE_OPTION: _NEW_PROFILE_OPTION}
+    for profile_id in profile_ids:
+        display = _profile_display_label(profile_map, profile_id)
+        if display in id_by_display:
+            display = f"{display} ({profile_id})"
+        displays.append(display)
+        id_by_display[display] = profile_id
+    return displays, id_by_display
+
+
+def _align_profile_select_session(
+    profile_map: dict,
+    profile_ids: list[str],
+    id_by_display: dict[str, str],
+) -> None:
+    """Rewrite selectbox session value when Bezeichnung/labels change on disk."""
+    current = st.session_state.get("house_profile_select")
+    if current is not None and str(current) in id_by_display:
+        mapped = id_by_display[str(current)]
+        if mapped != _NEW_PROFILE_OPTION:
+            st.session_state[_SESSION_SELECTED_ID_KEY] = mapped
+        return
+
+    selected_id = st.session_state.get(_SESSION_SELECTED_ID_KEY)
+    if selected_id in profile_ids:
+        st.session_state["house_profile_select"] = _profile_display_label(
+            profile_map, str(selected_id)
+        )
+        return
+    if current is not None and str(current) in profile_ids:
+        st.session_state[_SESSION_SELECTED_ID_KEY] = str(current)
+        st.session_state["house_profile_select"] = _profile_display_label(
+            profile_map, str(current)
+        )
 
 
 def _apply_pending_profile_select() -> None:
@@ -1255,7 +1336,6 @@ def _perform_house_profile_save(
 def _render_house_profile_save(
     *,
     session_scope: str,
-    key_suffix: str,
     is_new: bool,
     stable_profile_id: str,
     label: str,
@@ -1307,12 +1387,15 @@ def _render_house_profile_save(
             from_auto=True,
         )
 
-    auto_persist(
+    wrote = auto_persist(
         state_key=f"house_profile::{session_scope}::{profile_id}",
         payload=payload,
         save=_save,
         ready=ready,
     )
+    # Refresh Profil dropdown labels from disk (auto-save previously skipped st.rerun).
+    if wrote:
+        st.rerun()
 
 
 def render_house_profile_tab() -> None:
@@ -1320,35 +1403,37 @@ def render_house_profile_tab() -> None:
     profiles_doc = load_house_profiles()
     profile_map = profiles_doc.get("profiles", {})
     profile_ids = sorted(profile_map.keys())
-    profile_options = ["— neu —", *profile_ids]
+    profile_options, id_by_display = _profile_select_choices(profile_map, profile_ids)
+    _align_profile_select_session(profile_map, profile_ids, id_by_display)
     initial_index = _initial_profile_index(profile_ids)
 
-    def _profile_option_label(option: str) -> str:
-        if option == "— neu —":
-            return option
-        return str(profile_map.get(option, {}).get("label") or option)
-
     if initial_index is not None:
-        selected_id = labeled_selectbox(
+        selected_display = labeled_selectbox(
             "Profil",
             options=profile_options,
             index=initial_index,
             key="house_profile_select",
-            format_func=_profile_option_label,
         )
     else:
-        selected_id = labeled_selectbox(
+        selected_display = labeled_selectbox(
             "Profil",
             options=profile_options,
             key="house_profile_select",
-            format_func=_profile_option_label,
         )
-    is_new = selected_id == "— neu —"
+    selected_id = id_by_display.get(str(selected_display), str(selected_display))
+    is_new = selected_id == _NEW_PROFILE_OPTION
     existing = profile_map.get(selected_id, {}) if not is_new else {}
     stable_profile_id = str(existing.get("id", "")).strip()
     session_scope = _profile_session_scope(selected_id, is_new=is_new)
+    if not is_new:
+        st.session_state[_SESSION_SELECTED_ID_KEY] = selected_id
     file_stamp = _house_profiles_file_stamp()
-    _sync_profile_session(session_scope, existing, file_stamp=file_stamp)
+    _sync_profile_session(
+        session_scope,
+        existing,
+        file_stamp=file_stamp,
+        siblings=list(profile_map.values()),
+    )
 
     label = labeled_text_input(
         "Bezeichnung",
@@ -1392,7 +1477,16 @@ def render_house_profile_tab() -> None:
         )
         for index, consumer in enumerate(consumers)
     ]
-    resolved = _resolve_consumer_ids(consumers, edited)
+    # Keep session list Bezeichnung/type in sync so titles stay correct after save.
+    synced_consumers = []
+    for index, original in enumerate(consumers):
+        merged = dict(original)
+        if index < len(edited):
+            merged["label"] = edited[index].get("label", original.get("label"))
+            merged["type"] = edited[index].get("type", original.get("type"))
+        synced_consumers.append(merged)
+    st.session_state[_SESSION_CONSUMERS_KEY] = synced_consumers
+    resolved = _resolve_consumer_ids(synced_consumers, edited)
     resolved_for_preview = _inject_profile_geo(
         resolved,
         location["latitude"],
@@ -1417,7 +1511,6 @@ def render_house_profile_tab() -> None:
 
     _render_house_profile_save(
         session_scope=session_scope,
-        key_suffix="",
         is_new=is_new,
         stable_profile_id=stable_profile_id,
         label=label,
@@ -1446,7 +1539,6 @@ def render_house_profile_tab() -> None:
 
     _render_house_profile_save(
         session_scope=session_scope,
-        key_suffix="_bottom",
         is_new=is_new,
         stable_profile_id=stable_profile_id,
         label=label,

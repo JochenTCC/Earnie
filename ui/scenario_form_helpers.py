@@ -59,6 +59,7 @@ def options_for_entities(
     *,
     allow_none: bool = False,
 ) -> tuple[list[str], dict[str, str]]:
+    """Build Bezeichnung options (display→id). No ``format_func`` — labels are the options."""
     labels: list[str] = []
     mapping: dict[str, str] = {}
     if allow_none:
@@ -66,17 +67,29 @@ def options_for_entities(
         mapping[NONE_LABEL] = ""
     for item in items:
         human = entity_human_label(item)
-        label = f"{human} ({item['id']})"
-        labels.append(label)
-        mapping[label] = item["id"]
+        display = human
+        if display in mapping:
+            display = f"{human} ({item['id']})"
+        labels.append(display)
+        mapping[display] = item["id"]
     return labels, mapping
 
 
-def default_label_index(options: list[str], item_id: str | None) -> int:
+def default_label_index(
+    options: list[str],
+    item_id: str | None,
+    mapping: dict[str, str] | None = None,
+) -> int:
     if not item_id or not options:
         return 0
+    if mapping:
+        for index, opt in enumerate(options):
+            if mapping.get(opt) == item_id:
+                return index
     for index, opt in enumerate(options):
         if opt.endswith(f"({item_id})"):
+            return index
+        if opt == item_id:
             return index
     return 0
 
@@ -85,6 +98,35 @@ def lookup_entity_id(mapping: dict[str, str], pick: str | None) -> str:
     if pick is None:
         return ""
     return mapping.get(pick, "")
+
+
+def _rematch_entity_option(
+    current: str,
+    labels: list[str],
+    mapping: dict[str, str],
+) -> str | None:
+    """Map a stale widget value (old Bezeichnung or legacy ``Label (id)``) to a current option."""
+    if current in labels:
+        return current
+    for display, entity_id in mapping.items():
+        if not entity_id:
+            continue
+        if current == entity_id or current.endswith(f"({entity_id})"):
+            return display
+        # Legacy format_func era: option was id, display was label — already handled above
+    return None
+
+
+def format_entity_option(option: str) -> str:
+    """Strip trailing `` (id)`` from legacy entity option keys for display.
+
+    Prefer Bezeichnung-as-option (no format_func). Kept for back-compat callers/tests.
+    """
+    if option == NONE_LABEL or option.startswith(EMPTY_PLACEHOLDER_PREFIX):
+        return option
+    if option.endswith(")") and " (" in option:
+        return option[: option.rfind(" (")]
+    return option
 
 
 def render_profile_geo_caption(profile: dict) -> None:
@@ -130,10 +172,10 @@ def seed_entity_select_state(
     *,
     allow_none: bool = False,
 ) -> None:
-    labels, _ = options_for_entities(items, allow_none=allow_none)
+    labels, mapping = options_for_entities(items, allow_none=allow_none)
     if not labels:
         return
-    idx = default_label_index(labels, current_id)
+    idx = default_label_index(labels, current_id, mapping)
     st.session_state[scoped_widget_key(session_scope, key_base)] = labels[idx]
 
 
@@ -164,7 +206,7 @@ def render_entity_multiselect(
     current_ids: list[str] | None = None,
 ) -> list[str]:
     """Multiselect for entities; returns selected display labels."""
-    labels, _mapping = options_for_entities(items, allow_none=False)
+    labels, mapping = options_for_entities(items, allow_none=False)
     if not labels:
         placeholder = f"{EMPTY_PLACEHOLDER_PREFIX} {label.lower()} —"
         labeled_multiselect(
@@ -172,17 +214,22 @@ def render_entity_multiselect(
             options=[placeholder],
             disabled=True,
             key=key,
-            format_func=format_entity_option,
         )
         return []
-    if key not in st.session_state:
+    if key in st.session_state:
+        rematched = [
+            matched
+            for raw in list(st.session_state.get(key) or [])
+            if (matched := _rematch_entity_option(str(raw), labels, mapping)) is not None
+        ]
+        st.session_state[key] = rematched
+    else:
         st.session_state[key] = labels_for_entity_ids(items, list(current_ids or []))
     return list(
         labeled_multiselect(
             label,
             options=labels,
             key=key,
-            format_func=format_entity_option,
         )
         or []
     )
@@ -190,13 +237,16 @@ def render_entity_multiselect(
 
 def new_scenario_template(live_id: str, scenarios: list[dict]) -> dict:
     """Defaults for a new scenario — clone live settings when available."""
+    from house_config.label_uniqueness import allocate_unique_label
+
+    label = allocate_unique_label("Mein Szenario", scenarios)
     live = next((item for item in scenarios if item.get("id") == live_id), None)
     if live:
         return {
-            "label": "Mein Szenario",
+            "label": label,
             "settings": dict(live.get("settings", {})),
         }
-    return {"label": "Mein Szenario", "settings": {}}
+    return {"label": label, "settings": {}}
 
 
 def resolve_scenario_id(
@@ -363,7 +413,7 @@ def render_entity_selectbox(
     current_id: str | None = None,
 ) -> str | None:
     """Selectbox für Entitäten; bei leerer Liste deaktivierter Platzhalter, Rückgabe None."""
-    labels, _mapping = options_for_entities(items, allow_none=allow_none)
+    labels, mapping = options_for_entities(items, allow_none=allow_none)
     if not labels:
         placeholder = f"{EMPTY_PLACEHOLDER_PREFIX} {label.lower()} —"
         labeled_selectbox(
@@ -371,22 +421,23 @@ def render_entity_selectbox(
             options=[placeholder],
             disabled=True,
             key=key,
-            format_func=format_entity_option,
         )
         return None
-    if key in st.session_state and st.session_state[key] not in labels:
-        del st.session_state[key]
+    if key in st.session_state:
+        rematched = _rematch_entity_option(str(st.session_state[key]), labels, mapping)
+        if rematched is None:
+            del st.session_state[key]
+        elif rematched != st.session_state[key]:
+            st.session_state[key] = rematched
     if key in st.session_state:
         return labeled_selectbox(
             label,
             options=labels,
             key=key,
-            format_func=format_entity_option,
         )
     return labeled_selectbox(
         label,
         options=labels,
-        index=default_label_index(labels, current_id),
+        index=default_label_index(labels, current_id, mapping),
         key=key,
-        format_func=format_entity_option,
     )

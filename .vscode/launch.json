@@ -35,11 +35,6 @@
         "EARNIE_UI_STREAMLIT_PORT": "8501",
         "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1",
         "EARNIE_AUTO_START_MAIN": "1",
-        "EARNIE_ENV_PATH": "earnie_env",
-        "EARNIE_CONFIG_PATH": "earnie_env/config",
-        "EARNIE_RUNTIME_PATH": "earnie_env/runtime",
-        "EARNIE_DOTENV_PATH": "earnie_env/config/.env",
-        "EARNIE_LOCAL_SETTINGS_PATH": "earnie_env/runtime/local_settings.json"
       },
       "subProcess": false,
       "console": "integratedTerminal",
@@ -146,6 +141,29 @@
       "presentation": {
         "group": "greenfield",
         "order": 3
+      }
+    },
+    {
+      "name": "Streamlit app.py (chart_debug_review :8502)",
+      "type": "python",
+      "request": "launch",
+      "module": "scripts.run_streamlit",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "EARNIE_CONFIG_PATH": "chart_debug_review/earnie_config_20260719_050759",
+        "EARNIE_RUNTIME_PATH": "${workspaceFolder}/chart_debug_review/runtime",
+        "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/chart_debug_review/runtime/local_settings.json",
+        "EARNIE_UI_STREAMLIT_PORT": "8502",
+        "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1",
+        "EARNIE_AUTO_START_MAIN": "0",
+        "EARNIE_VERIFY_LOXONE_ON_START": "0"
+      },
+      "subProcess": false,
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "presentation": {
+        "group": "chart_debug",
+        "order": 1
       }
     }
   ],

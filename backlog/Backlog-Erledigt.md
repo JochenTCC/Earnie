@@ -3,6 +3,25 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix shared Land tariff filter (2026-07-19)
+
+- [x] **"Bezug Land" / "Einspeise Land" must not differ** — single shared **Land** filter for Bezug + Einspeise in Szenarieneditor and Live-Konfiguration; separate Typ filters kept; `render_shared_land_filter` + `render_tariff_type_filter` in `ui/tariff_filter_helpers.py`; docs `docs/konfiguration/ueberblick.md`; tests `lands_union` — verified live
+
+
+### Bugfix Bezeichnung dropdown / unique defaults (2026-07-19)
+
+- [x] **Bezeichnung not updated in entity/select dropdowns after change** — Streamlit `format_func` kept stale labels when option IDs stayed the same; options are now Bezeichnung strings (`ui/label_select.py`) for Hausprofil, PV, Batterie, Szenario, entity pickers, Tarife, Live-Szenario; auto-persist triggers `st.rerun()`; Verbraucher expander titles use live widget state — verified live
+- [x] **Unique Bezeichnung defaults** — `allocate_unique_label` for new Hausprofil / PV / Batterie / Szenario / extra Verbraucher (`Mein Haushalt 2`, …) — verified live
+
+
+### Version 2.2.0 — Banner der Wahrheit A + light B (2026-07-19)
+
+- [x] Attribution banner in UI (`ui/truth_banner.py`): Earnie, non-commercial note, official repo, version; sidebar + main; also on Loxone setup path
+- [x] Best-effort unofficial origin labeling (`EARNIE_BUILD_ORIGIN` / git remote); calm when origin unknown (Docker/SCC)
+- [x] LICENSE §4.3 keep banner; handbook note; tests `tests/test_truth_banner.py`
+- [x] Layer C deferred to `2.+1` (signed builds / registry) — not implemented
+
+
 ### Version 2.+1 — Offline demo seed for Community Cloud (2026-07-18)
 
 - [x] `EARNIE_OFFLINE=1`: bootstrap fills empty live-scenario entity IDs from catalogs (`runtime_store/offline_demo_seed.py`); never overwrites non-empty refs

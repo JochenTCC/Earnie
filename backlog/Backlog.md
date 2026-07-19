@@ -27,12 +27,20 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.2.0
 
-- [ ] Build Szenario-Explorer as "web app" in Streamlit Community Cloud (SCC)
+- [x] Build Szenario-Explorer as "web app" in Streamlit Community Cloud (SCC)
   - Precursor (done): `EARNIE_OFFLINE` live-scenario demo seed — [Backlog-Erledigt.md](Backlog-Erledigt.md)
   - Site config split (done): private `Earnie-env-home` + junction; public templates/catalog in `share/config/` (incl. `tariffs.json`); see [private-env.md](../docs/einrichtung/private-env.md)
   - New EARNIE_UI_MODES "live_environment" to enable / disable "Echtzeitumgebung"
 - [ ] Merge streamlitcloud branch with main, when app is working on SCC
+- [x] Implement a first version of "Banner der Wahrheit", that can't be removed in a fork
 - [ ] Finalize Version 2.2.0 after test usage and make a release
+
+### Version 2.+1
+
+- [ ] Clarify how user could get a one-time registry that is bound to their hardware
+  - What are the technical prerequisites to make that running?
+- [ ] **Banner der Wahrheit — Layer C (deferred):** signed official builds / GHCR attestation + startup verifier; tie to hardware registry. Enforces attribution on *official* distribution only — not source forks. See plan outline (A + light B shipped in 2.2.0).
+- [ ] Insert a secured 
 
 ### Version 2.+1 - Become Loxone agnostic and standardize communication
 
@@ -59,6 +67,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Check if there is a special issue on weekends, when time-to-be ready is set to 12:00 (Start/ End-SOC constraints)
 - [ ] Find EPEX API to have provider independent tariff calculation
 - [ ] Review current tariffs - use https://www.e-control.at/referenzmarktwert and docs\referenz\.~lock.Oeko_RefMrktPr.csv# as anchor point
+- [ ] Remove usage of "oemag_monthly_feed_in_rates" in backtesting_scenarios.json for monthly export tariffs. They must own their own complete data. Consider thac as design change if needed. Add data of "oemag_monthly_feed_in_rates" as sample in tariffs.json. Remove entry "oemag_monthly_feed_in_rates" in backtesting_scenarios.json.
 - [ ] Improve cost calculation by adding monthly fees etc.
 - [ ] Enhance page "Verbraucheranalyse" to "Analyse Verbrauch & Kosten"
   - Visualize usage of consumers on a weekly basis compared to historical price and PV 

@@ -63,6 +63,24 @@ def find_duplicate_labels(items: list[dict]) -> list[str]:
     return duplicates
 
 
+def allocate_unique_label(
+    base: Any,
+    items: list[dict],
+    *,
+    exclude_id: str | None = None,
+) -> str:
+    """Return ``base``, or ``base 2``, ``base 3``, … until unique among ``items``."""
+    root = normalize_entity_label(base) or "Entity"
+    if find_conflicting_label(root, items, exclude_id=exclude_id) is None:
+        return root
+    n = 2
+    while True:
+        candidate = f"{root} {n}"
+        if find_conflicting_label(candidate, items, exclude_id=exclude_id) is None:
+            return candidate
+        n += 1
+
+
 def assert_unique_label(
     label: Any,
     items: list[dict],

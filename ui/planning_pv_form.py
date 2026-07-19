@@ -16,10 +16,17 @@ from ui.house_config_io import (
 )
 from ui.auto_persist import auto_persist
 from ui.form_layout import labeled_number_input, labeled_selectbox, labeled_text_input
+from ui.label_select import (
+    NEW_OPTION,
+    align_label_select_session,
+    label_select_choices,
+    resolve_label_select,
+)
 
 _SESSION_SYNC_KEY = "planning_pv_sync_id"
 _SESSION_FILE_STAMP_KEY = "planning_pv_file_stamp"
 _SESSION_SELECT_PENDING_KEY = "planning_pv_select_pending"
+_SESSION_SELECTED_ID_KEY = "planning_pv_selected_id"
 
 
 def _scoped_key(session_scope: str, base: str) -> str:
@@ -53,8 +60,15 @@ def _profile_pv_defaults(profile: dict) -> tuple[float, float]:
 
 
 def _apply_profile_pv_defaults(session_scope: str, profiles: dict[str, dict]) -> None:
-    profile_id = st.session_state.get(_scoped_key(session_scope, "planning_pv_defaults_profile"))
-    if not profile_id or profile_id not in profiles:
+    raw = st.session_state.get(_scoped_key(session_scope, "planning_pv_defaults_profile"))
+    profile_id = str(raw or "").strip()
+    if profile_id not in profiles:
+        # Bezeichnung option → id
+        for pid, profile in profiles.items():
+            if str(profile.get("label") or pid) == profile_id:
+                profile_id = pid
+                break
+    if profile_id not in profiles:
         return
     tilt, azimuth = _profile_pv_defaults(profiles[profile_id])
     st.session_state[_scoped_key(session_scope, "planning_pv_tilt")] = int(tilt)
@@ -78,6 +92,8 @@ def _seed_pv_widget_state(
     profiles: dict[str, dict],
     default_profile: dict,
 ) -> None:
+    from house_config.label_uniqueness import allocate_unique_label
+
     default_tilt, default_azimuth = _profile_pv_defaults(default_profile)
     if existing:
         label = str(existing.get("label", "Dach Süd"))
@@ -85,7 +101,7 @@ def _seed_pv_widget_state(
         tilt = int(existing.get("pv_tilt", existing.get("tilt", default_tilt)))
         azimuth = int(existing.get("pv_azimuth", existing.get("azimuth", default_azimuth)))
     else:
-        label = "Dach Süd"
+        label = allocate_unique_label("Dach Süd", list_pv_systems())
         kwp = 10.0
         tilt = int(default_tilt)
         azimuth = int(default_azimuth)
@@ -157,31 +173,34 @@ def render_pv_planning_tab() -> None:
     _apply_pending_pv_select()
     system_map = _pv_by_id()
     system_ids = sorted(system_map.keys())
-    options = ["— neu —", *system_ids]
+    options, id_by_display = label_select_choices(system_map, system_ids)
+    align_label_select_session(
+        select_key="planning_pv_select",
+        selected_id_key=_SESSION_SELECTED_ID_KEY,
+        entity_map=system_map,
+        entity_ids=system_ids,
+        id_by_display=id_by_display,
+    )
     initial_index = _initial_pv_index(system_ids)
 
-    def _pv_option_label(option: str) -> str:
-        if option == "— neu —":
-            return option
-        return str(system_map.get(option, {}).get("label") or option)
-
     if initial_index is not None:
-        selected = labeled_selectbox(
+        selected_display = labeled_selectbox(
             "PV-Anlage",
             options=options,
             index=initial_index,
             key="planning_pv_select",
-            format_func=_pv_option_label,
         )
     else:
-        selected = labeled_selectbox(
+        selected_display = labeled_selectbox(
             "PV-Anlage",
             options=options,
             key="planning_pv_select",
-            format_func=_pv_option_label,
         )
-    is_new = selected == "— neu —"
+    selected = resolve_label_select(selected_display, id_by_display)
+    is_new = selected == NEW_OPTION
     existing = system_map.get(selected, {}) if not is_new else {}
+    if not is_new:
+        st.session_state[_SESSION_SELECTED_ID_KEY] = selected
 
     profiles = load_house_profiles().get("profiles", {})
     default_profile = _default_profile_for_pv(profiles)
@@ -203,17 +222,24 @@ def render_pv_planning_tab() -> None:
 
     if is_new and profiles:
         profile_ids = sorted(profiles.keys())
-        profile_labels = {
-            pid: str(profiles[pid].get("label") or pid) for pid in profile_ids
-        }
-        profile_pick = labeled_selectbox(
+        profile_options, profile_id_by_display = label_select_choices(
+            profiles, profile_ids, new_option=None
+        )
+        profile_key = _scoped_key(session_scope, "planning_pv_defaults_profile")
+        # Legacy session may hold a profile id — map to Bezeichnung option.
+        raw_profile = st.session_state.get(profile_key)
+        if raw_profile in profiles and raw_profile not in profile_id_by_display:
+            st.session_state[profile_key] = str(
+                profiles[raw_profile].get("label") or raw_profile
+            )
+        profile_pick_display = labeled_selectbox(
             "Defaults aus Hausprofil",
-            options=profile_ids,
-            format_func=lambda pid: profile_labels[pid],
-            key=_scoped_key(session_scope, "planning_pv_defaults_profile"),
+            options=profile_options,
+            key=profile_key,
             on_change=_apply_profile_pv_defaults,
             args=(session_scope, profiles),
         )
+        profile_pick = resolve_label_select(profile_pick_display, profile_id_by_display)
         picked = profiles[profile_pick]
         st.caption(
             f"Vorschlag Neigung/Azimut aus Profil "
@@ -272,12 +298,14 @@ def render_pv_planning_tab() -> None:
             st.session_state[_SESSION_SYNC_KEY] = None
             st.rerun()
 
-    auto_persist(
+    wrote = auto_persist(
         state_key=f"planning_pv::{entity_id}",
         payload=payload,
         save=_save_pv,
         ready=ready,
     )
+    if wrote:
+        st.rerun()
 
     if not is_new and stable_id:
         if st.button("PV-Anlage entfernen", key="planning_pv_delete"):
@@ -286,7 +314,7 @@ def render_pv_planning_tab() -> None:
             except ValueError as exc:
                 st.error(str(exc))
             else:
-                st.session_state[_SESSION_SELECT_PENDING_KEY] = "— neu —"
+                st.session_state[_SESSION_SELECT_PENDING_KEY] = NEW_OPTION
                 st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
                 st.session_state[_SESSION_SYNC_KEY] = None
                 st.success("PV-Anlage entfernt.")

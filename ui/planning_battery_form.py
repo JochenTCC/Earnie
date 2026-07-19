@@ -15,10 +15,17 @@ from ui.form_layout import (
     labeled_selectbox,
     labeled_text_input,
 )
+from ui.label_select import (
+    NEW_OPTION,
+    align_label_select_session,
+    label_select_choices,
+    resolve_label_select,
+)
 
 _SESSION_SYNC_KEY = "planning_battery_sync_id"
 _SESSION_FILE_STAMP_KEY = "planning_battery_file_stamp"
 _SESSION_SELECT_PENDING_KEY = "planning_battery_select_pending"
+_SESSION_SELECTED_ID_KEY = "planning_battery_selected_id"
 
 
 def _scoped_key(session_scope: str, base: str) -> str:
@@ -45,6 +52,8 @@ def _clear_scoped_widget_keys(session_scope: str) -> None:
 
 
 def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
+    from house_config.label_uniqueness import allocate_unique_label
+
     if existing:
         label = str(existing.get("label", "5 kWh Speicher"))
         capacity = float(existing.get("battery_capacity_kwh", 5.0))
@@ -54,7 +63,7 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         max_soc = float(existing.get("battery_max_soc", 100.0))
         threshold_percent = float(existing.get("threshold_power", 0.05)) * 100.0
     else:
-        label = "5 kWh Speicher"
+        label = allocate_unique_label("5 kWh Speicher", list_batteries())
         capacity = 5.0
         max_power = 2.5
         efficiency = 0.97
@@ -110,31 +119,34 @@ def render_battery_planning_tab() -> None:
     _apply_pending_battery_select()
     battery_map = _battery_by_id()
     battery_ids = sorted(battery_map.keys())
-    options = ["— neu —", *battery_ids]
+    options, id_by_display = label_select_choices(battery_map, battery_ids)
+    align_label_select_session(
+        select_key="planning_battery_select",
+        selected_id_key=_SESSION_SELECTED_ID_KEY,
+        entity_map=battery_map,
+        entity_ids=battery_ids,
+        id_by_display=id_by_display,
+    )
     initial_index = _initial_battery_index(battery_ids)
 
-    def _battery_option_label(option: str) -> str:
-        if option == "— neu —":
-            return option
-        return str(battery_map.get(option, {}).get("label") or option)
-
     if initial_index is not None:
-        selected = labeled_selectbox(
+        selected_display = labeled_selectbox(
             "Batterie",
             options=options,
             index=initial_index,
             key="planning_battery_select",
-            format_func=_battery_option_label,
         )
     else:
-        selected = labeled_selectbox(
+        selected_display = labeled_selectbox(
             "Batterie",
             options=options,
             key="planning_battery_select",
-            format_func=_battery_option_label,
         )
-    is_new = selected == "— neu —"
+    selected = resolve_label_select(selected_display, id_by_display)
+    is_new = selected == NEW_OPTION
     existing = battery_map.get(selected, {}) if not is_new else {}
+    if not is_new:
+        st.session_state[_SESSION_SELECTED_ID_KEY] = selected
 
     session_scope = _battery_session_scope(selected, is_new=is_new)
     file_stamp = _config_file_stamp()
@@ -223,9 +235,11 @@ def render_battery_planning_tab() -> None:
             st.session_state[_SESSION_SYNC_KEY] = None
             st.rerun()
 
-    auto_persist(
+    wrote = auto_persist(
         state_key=f"planning_battery::{entity_id}",
         payload=payload,
         save=_save_battery,
         ready=ready,
     )
+    if wrote:
+        st.rerun()

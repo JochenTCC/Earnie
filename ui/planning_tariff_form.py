@@ -5,6 +5,7 @@ import os
 
 import streamlit as st
 
+from ui.form_layout import labeled_selectbox
 from ui.house_config_io import (
     get_planning_tariff_selection,
     list_export_tariffs,
@@ -13,7 +14,11 @@ from ui.house_config_io import (
     save_planning_tariff_selection,
     tariffs_json_path,
 )
-from ui.form_layout import labeled_selectbox
+from ui.label_select import (
+    align_label_select_session,
+    label_select_choices,
+    resolve_label_select,
+)
 from ui.tariff_filter_helpers import (
     EXPORT_TYPE_LABELS,
     IMPORT_TYPE_LABELS,
@@ -30,6 +35,54 @@ _tariff_meta_caption = tariff_meta_caption
 
 def _tariff_label(tariff: dict) -> str:
     return str(tariff.get("label") or tariff.get("id", ""))
+
+
+def _render_tariff_picker(
+    *,
+    title: str,
+    tariffs: list[dict],
+    current_id: str,
+    select_key: str,
+    selected_id_key: str,
+    type_labels: dict,
+) -> str:
+    tariff_map = {item["id"]: item for item in tariffs}
+    tariff_ids = [item["id"] for item in tariffs]
+    options, id_by_display = label_select_choices(
+        tariff_map, tariff_ids, new_option=None
+    )
+    if selected_id_key not in st.session_state and current_id in tariff_map:
+        st.session_state[selected_id_key] = current_id
+    align_label_select_session(
+        select_key=select_key,
+        selected_id_key=selected_id_key,
+        entity_map=tariff_map,
+        entity_ids=tariff_ids,
+        id_by_display=id_by_display,
+        new_option=None,
+    )
+    if select_key not in st.session_state:
+        index = tariff_ids.index(current_id) if current_id in tariff_ids else 0
+        pick_display = labeled_selectbox(
+            title,
+            options=options,
+            index=index,
+            key=select_key,
+        )
+    else:
+        pick_display = labeled_selectbox(
+            title,
+            options=options,
+            key=select_key,
+        )
+    pick = resolve_label_select(pick_display, id_by_display)
+    st.session_state[selected_id_key] = pick
+    tariff = tariff_map[pick]
+    st.caption(f"Typ: {_type_caption(tariff, type_labels)}")
+    meta_caption = _tariff_meta_caption(tariff)
+    if meta_caption:
+        st.caption(meta_caption)
+    return pick
 
 
 def render_tariff_selection_tab() -> None:
@@ -50,36 +103,22 @@ def render_tariff_selection_tab() -> None:
         return
 
     current_import, current_export = get_planning_tariff_selection()
-    import_ids = [item["id"] for item in imports]
-    export_ids = [item["id"] for item in exports]
-    import_index = import_ids.index(current_import) if current_import in import_ids else 0
-    export_index = export_ids.index(current_export) if current_export in export_ids else 0
-
-    import_pick = labeled_selectbox(
-        "Bezugstarif",
-        options=import_ids,
-        index=import_index,
-        format_func=lambda tariff_id: _tariff_label(next(t for t in imports if t["id"] == tariff_id)),
-        key="planning_import_tariff",
+    import_pick = _render_tariff_picker(
+        title="Bezugstarif",
+        tariffs=imports,
+        current_id=current_import,
+        select_key="planning_import_tariff",
+        selected_id_key="planning_import_tariff_id",
+        type_labels=_IMPORT_TYPE_LABELS,
     )
-    import_tariff = next(item for item in imports if item["id"] == import_pick)
-    st.caption(f"Typ: {_type_caption(import_tariff, _IMPORT_TYPE_LABELS)}")
-    meta_caption = _tariff_meta_caption(import_tariff)
-    if meta_caption:
-        st.caption(meta_caption)
-
-    export_pick = labeled_selectbox(
-        "Einspeisetarif",
-        options=export_ids,
-        index=export_index,
-        format_func=lambda tariff_id: _tariff_label(next(t for t in exports if t["id"] == tariff_id)),
-        key="planning_export_tariff",
+    export_pick = _render_tariff_picker(
+        title="Einspeisetarif",
+        tariffs=exports,
+        current_id=current_export,
+        select_key="planning_export_tariff",
+        selected_id_key="planning_export_tariff_id",
+        type_labels=_EXPORT_TYPE_LABELS,
     )
-    export_tariff = next(item for item in exports if item["id"] == export_pick)
-    st.caption(f"Typ: {_type_caption(export_tariff, _EXPORT_TYPE_LABELS)}")
-    meta_caption = _tariff_meta_caption(export_tariff)
-    if meta_caption:
-        st.caption(meta_caption)
 
     st.info(
         "Neue Tarife werden nicht in der UI angelegt. "

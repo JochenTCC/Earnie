@@ -26,9 +26,15 @@ from ui.house_config_io import (
 from ui.tariff_filter_helpers import (
     EXPORT_TYPE_LABELS,
     IMPORT_TYPE_LABELS,
-    render_tariff_filter_row,
+    render_shared_land_filter,
+    render_tariff_type_filter,
     tariff_meta_caption,
     type_caption,
+)
+from ui.label_select import (
+    label_select_choices,
+    refresh_label_select_display,
+    resolve_label_select,
 )
 from ui.scenario_form_helpers import (
     NEW_SCENARIO_OPTION,
@@ -200,18 +206,27 @@ def _resolve_scenario_selection(
             st.session_state[_SESSION_SYNC_KEY] = None
             st.rerun()
 
-    def _scenario_option_label(option: str) -> str:
-        if option == NEW_SCENARIO_OPTION:
-            return option
-        return scenario_labels.get(option, option)
+    scenario_map = {
+        sid: {"id": sid, "label": scenario_labels.get(sid, sid)} for sid in scenario_ids
+    }
+    options, id_by_display = label_select_choices(
+        scenario_map, scenario_ids, new_option=NEW_SCENARIO_OPTION
+    )
+    refresh_label_select_display(
+        select_key="scenario_select",
+        selected_id=st.session_state.get(_SESSION_ACTIVE_SELECT_KEY),
+        entity_map=scenario_map,
+        entity_ids=scenario_ids,
+        id_by_display=id_by_display,
+        new_option=NEW_SCENARIO_OPTION,
+    )
 
     labeled_selectbox(
         "Szenario",
-        options=[NEW_SCENARIO_OPTION, *scenario_ids],
+        options=options,
         key="scenario_select",
-        format_func=_scenario_option_label,
     )
-    requested = st.session_state["scenario_select"]
+    requested = resolve_label_select(st.session_state["scenario_select"], id_by_display)
     active = st.session_state[_SESSION_ACTIVE_SELECT_KEY]
 
     if requested == active and st.session_state.get(_SESSION_SWITCH_TARGET_KEY) is None:
@@ -380,19 +395,26 @@ def _render_scenarios_tab() -> None:
         current_export_id = (
             lookup_entity_id(exp_map, st.session_state.get(export_key)) or current_export_id
         )
+    shared_land = render_shared_land_filter(
+        key=scoped_widget_key(session_scope, "scenario_tariff_land"),
+        import_tariffs=import_tariffs,
+        export_tariffs=export_tariffs,
+    )
     st.caption("Filter Bezugstarife")
-    filtered_imports = render_tariff_filter_row(
+    filtered_imports = render_tariff_type_filter(
         key_prefix=scoped_widget_key(session_scope, "scenario_import_filter"),
         tariffs=import_tariffs,
         kind="import",
+        land=shared_land,
         current_id=current_import_id,
         label_prefix="Bezug ",
     )
     st.caption("Filter Einspeisetarife")
-    filtered_exports = render_tariff_filter_row(
+    filtered_exports = render_tariff_type_filter(
         key_prefix=scoped_widget_key(session_scope, "scenario_export_filter"),
         tariffs=export_tariffs,
         kind="export",
+        land=shared_land,
         current_id=current_export_id,
         label_prefix="Einspeise ",
     )
@@ -496,12 +518,14 @@ def _render_scenarios_tab() -> None:
             st.session_state[_SESSION_SELECT_PENDING_KEY] = save_id
             st.rerun()
 
-    auto_persist(
+    wrote = auto_persist(
         state_key=f"scenario::{save_id}",
         payload=payload,
         save=_save_scenario,
         ready=ready,
     )
+    if wrote:
+        st.rerun()
 
     if not is_new and stable_scenario_id and stable_scenario_id != live_id:
         if st.button("Szenario entfernen", key="scenario_delete"):

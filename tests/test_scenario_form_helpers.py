@@ -21,18 +21,18 @@ from ui.scenario_form_helpers import (
 
 
 def test_lookup_entity_id_none_returns_empty():
-    mapping = {"Label (bat)": "bat"}
+    mapping = {"Label": "bat"}
     assert lookup_entity_id(mapping, None) == ""
 
 
 def test_lookup_entity_id_unknown_returns_empty():
-    mapping = {"Label (bat)": "bat"}
+    mapping = {"Label": "bat"}
     assert lookup_entity_id(mapping, "unbekannt") == ""
 
 
 def test_lookup_entity_id_resolves_label():
-    mapping = {"Meine Batterie (bat1)": "bat1"}
-    assert lookup_entity_id(mapping, "Meine Batterie (bat1)") == "bat1"
+    mapping = {"Meine Batterie": "bat1"}
+    assert lookup_entity_id(mapping, "Meine Batterie") == "bat1"
 
 
 def test_options_empty_without_allow_none():
@@ -50,8 +50,19 @@ def test_options_empty_with_allow_none():
 def test_options_builds_labels_and_mapping():
     items = [{"id": "pv1", "label": "Dach"}]
     labels, mapping = options_for_entities(items)
-    assert labels == ["Dach (pv1)"]
-    assert mapping["Dach (pv1)"] == "pv1"
+    assert labels == ["Dach"]
+    assert mapping["Dach"] == "pv1"
+
+
+def test_options_disambiguates_duplicate_labels():
+    items = [
+        {"id": "a", "label": "Dach"},
+        {"id": "b", "label": "Dach"},
+    ]
+    labels, mapping = options_for_entities(items)
+    assert labels == ["Dach", "Dach (b)"]
+    assert mapping["Dach"] == "a"
+    assert mapping["Dach (b)"] == "b"
 
 
 def test_format_entity_option_strips_id_suffix():
@@ -63,12 +74,13 @@ def test_format_entity_option_strips_id_suffix():
 
 
 def test_default_label_index_finds_id():
-    options = ["— keine —", "Batterie (bat)"]
-    assert default_label_index(options, "bat") == 1
+    options = ["— keine —", "Batterie"]
+    mapping = {"— keine —": "", "Batterie": "bat"}
+    assert default_label_index(options, "bat", mapping) == 1
 
 
 def test_default_label_index_missing_returns_zero():
-    options = ["Batterie (bat)"]
+    options = ["Batterie"]
     assert default_label_index(options, "missing") == 0
 
 
@@ -190,7 +202,7 @@ def test_read_scenario_form_snapshot_resolves_entity_ids():
     session = {
         scoped_widget_key("live", "scenario_label"): "Live",
         scoped_widget_key("live", "scenario_profile"): "— keine —",
-        scoped_widget_key("live", "scenario_battery"): "Speicher (bat1)",
+        scoped_widget_key("live", "scenario_battery"): "Speicher",
         scoped_widget_key("live", "scenario_pv"): [],
         scoped_widget_key("live", "scenario_import"): "— keine —",
         scoped_widget_key("live", "scenario_export"): "— keine —",

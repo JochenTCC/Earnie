@@ -16,7 +16,8 @@ from ui.house_config_io import (
 from ui.tariff_filter_helpers import (
     EXPORT_TYPE_LABELS,
     IMPORT_TYPE_LABELS,
-    render_tariff_filter_row,
+    render_shared_land_filter,
+    render_tariff_type_filter,
     tariff_meta_caption,
     type_caption,
 )
@@ -144,19 +145,26 @@ def render_runtime_entity_form_body() -> None:
 
     current_import_id = str(refs.get("import_tariff_id") or "").strip() or None
     current_export_id = str(refs.get("export_tariff_id") or "").strip() or None
+    shared_land = render_shared_land_filter(
+        key="config_runtime_tariff_land",
+        import_tariffs=import_tariffs,
+        export_tariffs=export_tariffs,
+    )
     st.caption("Filter Bezugstarife")
-    filtered_imports = render_tariff_filter_row(
+    filtered_imports = render_tariff_type_filter(
         key_prefix="config_runtime_import_filter",
         tariffs=import_tariffs,
         kind="import",
+        land=shared_land,
         current_id=current_import_id,
         label_prefix="Bezug ",
     )
     st.caption("Filter Einspeisetarife")
-    filtered_exports = render_tariff_filter_row(
+    filtered_exports = render_tariff_type_filter(
         key_prefix="config_runtime_export_filter",
         tariffs=export_tariffs,
         kind="export",
+        land=shared_land,
         current_id=current_export_id,
         label_prefix="Einspeise ",
     )
@@ -261,13 +269,36 @@ def _render_live_scenario_id_picker() -> None:
         live_scenario_id=current,
         labels=labels,
     )
-    pick = labeled_selectbox(
+    scenario_map = {
+        sid: {"id": sid, "label": labels.get(sid, sid)} for sid in scenario_ids
+    }
+    from ui.label_select import (
+        align_label_select_session,
+        label_select_choices,
+        resolve_label_select,
+    )
+
+    options, id_by_display = label_select_choices(
+        scenario_map, scenario_ids, new_option=None
+    )
+    align_label_select_session(
+        select_key="live_environment_scenario_picker",
+        selected_id_key="live_environment_scenario_picker_id",
+        entity_map=scenario_map,
+        entity_ids=scenario_ids,
+        id_by_display=id_by_display,
+        new_option=None,
+    )
+    if "live_environment_scenario_picker_id" not in st.session_state and current in scenario_ids:
+        st.session_state["live_environment_scenario_picker_id"] = current
+        st.session_state["live_environment_scenario_picker"] = labels.get(current, current)
+    pick_display = labeled_selectbox(
         "Live-Szenario",
-        options=scenario_ids,
-        index=scenario_ids.index(current) if current in scenario_ids else 0,
-        format_func=lambda sid: labels.get(sid, sid),
+        options=options,
         key="live_environment_scenario_picker",
     )
+    pick = resolve_label_select(pick_display, id_by_display)
+    st.session_state["live_environment_scenario_picker_id"] = pick
     if pick != current:
         if st.button("Als Live-Szenario übernehmen", type="primary"):
             save_live_scenario_id(pick)

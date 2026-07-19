@@ -663,8 +663,8 @@ def test_sync_scenario_session_reseeds_when_widget_keys_missing():
         editor.st.session_state = original
 
     assert session["live__scenario_label"] == "Live"
-    assert "example_efh" in session["live__scenario_profile"]
-    assert session["live__scenario_pv"] == ["Dach Süd (dach_sued)"]
+    assert session["live__scenario_profile"] == "Schützenstraße 7c"
+    assert session["live__scenario_pv"] == ["Dach Süd"]
 
 
 def test_seed_pv_widget_state_uses_profile_defaults_for_new_system():

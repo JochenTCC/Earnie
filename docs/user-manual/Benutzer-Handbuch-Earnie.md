@@ -53,6 +53,12 @@ Die Software wird „wie besehen“ bereitgestellt. Eingriffe in Speicher und Gr
 
 Vollständige Bedingungen: [LICENSE.md](../../LICENSE.md).
 
+### Banner der Wahrheit
+
+In der Oberfläche erscheint ein kurzes Attributions-Banner (Name, nicht-kommerzieller Hinweis, Link zum offiziellen Repository, Version). Es kennzeichnet Earnie und die Nutzungsbedingungen.
+
+Bei erkennbar inoffiziellen oder geänderten Builds (z. B. abweichende Git-Remote) kann zusätzlich ein Warnhinweis erscheinen. Das Banner ist bewusst sichtbar gehalten; es ist **nicht** technisch fälschungssicher.
+
 ### Support
 
 - **Projekt & Issues:** [GitHub — JochenTCC/Earnie](https://github.com/JochenTCC/Earnie)  

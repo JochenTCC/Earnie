@@ -34,6 +34,7 @@ Diese Software wird als "Source-Available" (Quelloffen, aber mit Nutzungsbeschr�
 ### § 4 Weitergabe und Abspaltungen (Forks)
 1. Bei der Weitergabe des Quellcodes oder von Modifikationen muss dieser Lizenztext zwingend und unverändert mitgeführt werden.
 2. Abspaltungen (Forks) im öffentlichen Raum (z. B. auf GitHub) müssen unter exakt denselben Bedingungen (Source-Available, Non-Commercial) geführt werden. Es ist untersagt, die Lizenz bei einem Fork zu ändern.
+3. Öffentliche Forks und Weitergaben müssen das in der Anwendung sichtbare Attributions-Banner („Banner der Wahrheit“) beibehalten und dürfen dessen Inhalt in der Aussage nicht entstellen oder entfernen.
 
 ---
 

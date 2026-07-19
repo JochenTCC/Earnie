@@ -27,7 +27,6 @@ from runtime_store.config_drift import (
 )
 from runtime_store.dotenv_io import needs_loxone_setup, require_loxone_credentials_for_config
 from ui.setup_dotenv import render_loxone_setup_page
-from version import __version__
 from ui.chunk_load_recovery import inject_chunk_load_recovery
 from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notices
 from ui.navigation import build_navigation
@@ -39,6 +38,7 @@ from ui.styles import (
     inject_help_hint_css,
     inject_single_file_uploader_css,
 )
+from ui.truth_banner import render_truth_banner
 
 logger = logging.getLogger("app")
 
@@ -48,10 +48,6 @@ st.set_page_config(
     page_icon="🔋",
     layout="wide",
 )
-
-
-def _render_sidebar_version() -> None:
-    st.sidebar.caption(f"Version {__version__}")
 
 
 def _render_drift_warning() -> None:
@@ -67,6 +63,7 @@ def _render_drift_warning() -> None:
 
 def main() -> None:
     if needs_loxone_setup():
+        render_truth_banner(where="sidebar")
         render_loxone_setup_page()
         st.stop()
 
@@ -76,12 +73,13 @@ def main() -> None:
     inject_help_hint_css()
     inject_single_file_uploader_css()
     inject_checkbox_highlight_css()
-    _render_sidebar_version()
+    render_truth_banner(where="sidebar")
     render_ui_mode_env_notices()
     render_config_pack_sidebar()
     render_deferred_loxone_sidebar()
     render_setup_progress_notice()
     _render_drift_warning()
+    render_truth_banner(where="main")
 
     navigation = build_navigation(get_enabled_ui_mode_keys())
     navigation.run()
