@@ -3,20 +3,21 @@
 Die Streamlit-App nutzt **`st.navigation`** mit Seiten in Abschnitten — **kein** Sidebar-Radio „Betriebsmodus“ mehr. Welche Seiten sichtbar sind, steuert die Umgebungsvariable **`EARNIE_UI_MODES`** (Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`).
 
 ```text
-EARNIE_UI_MODES=sunset2sunset,scenario_explorer
+EARNIE_UI_MODES=sunset2sunset,scenario_explorer,live_environment
 ```
 
-Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monitor**) und **Szenario-Explorer** zur Verfügung (optional **Preis-Prognose (Dev)**). Gültige Keys: `sunset2sunset`, `scenario_explorer`, `price_forecast` — **kein** Alias `live` oder `historical`. Frühere Keys `backtesting` und `scenario_exploration` sind umbenannt; bei alter Env-Konfiguration erscheint ein Sidebar-Hinweis. Details zum Deployment: [Betrieb](../einrichtung/betrieb.md).
+Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monitor**), **Szenario-Explorer** und **Echtzeit-Umgebung** zur Verfügung (optional **Preis-Prognose (Dev)**). Gültige Keys: `sunset2sunset`, `scenario_explorer`, `live_environment`, `price_forecast` — **kein** Alias `live` oder `historical`. Frühere Keys `backtesting` und `scenario_exploration` sind umbenannt; bei alter Env-Konfiguration erscheint ein Sidebar-Hinweis. Details zum Deployment: [Betrieb](../einrichtung/betrieb.md).
 
 | Key | Seite | Abschnitt | Produktion |
 |-----|-------|-----------|------------|
 | `sunset2sunset` | **Monitor**, **Manuelle Geräte** | Betrieb | ja (Hauptansicht; ohne Key kein Betrieb-Abschnitt) |
 | `scenario_explorer` | **Szenario-Explorer** | Analyse | optional (Dev / Community Cloud) |
+| `live_environment` | **Live-Konfiguration**, **Optimierer-Dienst**, **Loxone-Kommunikation** | Echtzeit-Umgebung | ja (Prod; ohne Key kein Echtzeit-Abschnitt) |
 | `price_forecast` | **Preis-Prognose (Dev)** | Analyse | Dev-only |
 
-Beispiel Community Cloud (nur Analyse): `EARNIE_UI_MODES=scenario_explorer` — Betrieb entfällt.
+Beispiel Community Cloud (nur Analyse): `EARNIE_UI_MODES=scenario_explorer` — Betrieb und Echtzeit-Umgebung entfallen.
 
-Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarieneditor**, **Live-Konfiguration**, **Optimierer-Dienst**, **Loxone-Kommunikation**, **Verbraucheranalyse** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`).
+Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarieneditor**, **Verbraucheranalyse** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`).
 
 In der Sidebar: App-Version, Setup-Hinweise und **„Konfiguration speichern / laden“** (ZIP-Export/Import der Config-Sidecars und `uploads/` — siehe [Speichern / Laden](../konfiguration/speichern-laden.md)).
 

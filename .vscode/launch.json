@@ -108,7 +108,7 @@
         "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/greenfield/runtime/local_settings.json",
         "EARNIE_VERIFY_LOXONE_ON_START": "0",
         "EARNIE_STRICT_TARIFF_VALIDATE": "1",
-        "EARNIE_UI_MODES": "sunset2sunset,scenario_explorer",
+        "EARNIE_UI_MODES": "sunset2sunset,scenario_explorer,live_environment",
         "EARNIE_UI_STREAMLIT_PORT": "8511",
         "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1",
         "EARNIE_AUTO_START_MAIN": "0"
@@ -135,7 +135,7 @@
         "EARNIE_LOCAL_SETTINGS_PATH": "${workspaceFolder}/greenfield/runtime/local_settings.json",
         "EARNIE_VERIFY_LOXONE_ON_START": "0",
         "EARNIE_STRICT_TARIFF_VALIDATE": "1",
-        "EARNIE_UI_MODES": "sunset2sunset,scenario_explorer",
+        "EARNIE_UI_MODES": "sunset2sunset,scenario_explorer,live_environment",
         "EARNIE_UI_STREAMLIT_PORT": "8511",
         "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1",
         "EARNIE_AUTO_START_MAIN": "1"

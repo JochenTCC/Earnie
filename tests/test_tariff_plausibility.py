@@ -111,8 +111,8 @@ def test_validate_tariffs_against_schema_rejects_invalid_structure(tmp_path):
 
 def test_repo_tariffs_pass_plausibility_and_schema():
     root = Path(__file__).resolve().parents[1]
-    tariffs_path = root / "earnie_env" / "config" / "tariffs.json"
-    schema_path = root / "earnie_env" / "config" / "tariffs.schema.json"
+    tariffs_path = root / "share" / "config" / "tariffs.json"
+    schema_path = root / "share" / "config" / "tariffs.schema.json"
     errors = collect_tariff_plausibility_errors(
         tariffs_path=str(tariffs_path),
         scenarios_path=None,

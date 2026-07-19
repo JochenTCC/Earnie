@@ -3,13 +3,15 @@ from __future__ import annotations
 
 from ui.navigation import build_page_specs
 
+_FULL_MODES = ["sunset2sunset", "scenario_explorer", "live_environment"]
+
 
 def _titles(keys: list[str]) -> list[str]:
     return [spec.title for spec in build_page_specs(keys)]
 
 
 def test_default_pages_include_core_and_scenario_explorer():
-    titles = _titles(["sunset2sunset", "scenario_explorer"])
+    titles = _titles(_FULL_MODES)
     assert "Monitor" in titles
     assert "Manuelle Geräte" in titles
     assert "Szenario-Explorer" in titles
@@ -20,42 +22,47 @@ def test_default_pages_include_core_and_scenario_explorer():
 
 
 def test_price_forecast_page_only_when_enabled():
-    with_pf = _titles(["sunset2sunset", "scenario_explorer", "price_forecast"])
+    with_pf = _titles([*_FULL_MODES, "price_forecast"])
     assert "Preis-Prognose (Dev)" in with_pf
 
 
 def test_only_sunset_hides_dev_and_scenario_explorer():
-    titles = _titles(["sunset2sunset"])
+    titles = _titles(["sunset2sunset", "live_environment"])
     assert "Monitor" in titles
+    assert "Live-Konfiguration" in titles
     assert "Szenario-Explorer" not in titles
     assert "Preis-Prognose (Dev)" not in titles
 
 
-def test_scenario_explorer_only_hides_betrieb():
+def test_scenario_explorer_only_hides_betrieb_and_echtzeit():
     titles = _titles(["scenario_explorer"])
     assert "Monitor" not in titles
     assert "Manuelle Geräte" not in titles
+    assert "Live-Konfiguration" not in titles
+    assert "Optimierer-Dienst" not in titles
+    assert "Loxone-Kommunikation" not in titles
     assert "Szenario-Explorer" in titles
+    assert "Hauskonfigurator" in titles
     defaults = [spec for spec in build_page_specs(["scenario_explorer"]) if spec.default]
     assert len(defaults) == 1
     assert defaults[0].title == "Szenario-Explorer"
 
 
 def test_cockpit_is_single_default():
-    specs = build_page_specs(["sunset2sunset", "scenario_explorer"])
+    specs = build_page_specs(_FULL_MODES)
     defaults = [spec for spec in specs if spec.default]
     assert len(defaults) == 1
     assert defaults[0].title == "Monitor"
 
 
 def test_url_paths_are_unique():
-    specs = build_page_specs(["sunset2sunset", "scenario_explorer", "price_forecast"])
+    specs = build_page_specs([*_FULL_MODES, "price_forecast"])
     url_paths = [spec.url_path for spec in specs]
     assert len(url_paths) == len(set(url_paths))
 
 
 def test_sections_are_assigned():
-    specs = build_page_specs(["sunset2sunset", "scenario_explorer", "price_forecast"])
+    specs = build_page_specs([*_FULL_MODES, "price_forecast"])
     sections = {spec.title: spec.section for spec in specs}
     assert sections["Monitor"] == "Betrieb"
     assert sections["Manuelle Geräte"] == "Betrieb"

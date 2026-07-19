@@ -15,7 +15,7 @@ from optimizer import battery as bat
 from runtime_store import history_timeline, optimization_history
 from ui.chart_context import SLOT_MILP, build_chart_display_context, build_live_chart_context
 
-RULES_PATH = Path("earnie_env/config") / "deviation_rules.example.json"
+RULES_PATH = Path("share/config") / "deviation_rules.example.json"
 TZ = ZoneInfo("Europe/Vienna")
 NOW = datetime(2026, 7, 5, 10, 7, 30, tzinfo=TZ)
 

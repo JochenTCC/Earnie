@@ -70,7 +70,7 @@ Mit abgeschlossener Ersteinrichtung und vollständiger Planungs-Konfiguration:
 3. **Echtzeit-Umgebung** — Live-Szenario und Entitäts-Referenzen speichern.
 4. **Szenario-Explorer** — Seite erscheint nach Freischaltung; Planung starten.
 
-`EARNIE_UI_MODES=sunset2sunset,scenario_explorer` — Sunset-2-Sunset ist seit **1.26.0 P0** für Live-Pfad-Smoke freigeschaltet (zusammen mit Szenario-Explorer). In `docker/compose/greenfield.yml` gesetzt.
+`EARNIE_UI_MODES=sunset2sunset,scenario_explorer,live_environment` — Sunset-2-Sunset ist seit **1.26.0 P0** für Live-Pfad-Smoke freigeschaltet (zusammen mit Szenario-Explorer und Echtzeit-Umgebung). In `docker/compose/greenfield.yml` gesetzt.
 
 ## Abnahme Live-Pfad (1.26.0 P0 / 2.0 P2)
 
