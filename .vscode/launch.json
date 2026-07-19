@@ -51,9 +51,9 @@
       "module": "scripts.run_streamlit",
       "cwd": "${workspaceFolder}",
       "env": {
-        "EARNIE_ENV_PATH": "\\\\DS-KO-DO-2\\docker\\earnie",
-        "EARNIE_RUNTIME_PATH": "\\\\DS-KO-DO-2\\docker\\earnie\\runtime",
-        "EARNIE_CONFIG_PATH": "\\\\DS-KO-DO-2\\docker\\earnie\\config",
+        "EARNIE_ENV_PATH": "\\\\YOUR-NAS\\docker\\earnie",
+        "EARNIE_RUNTIME_PATH": "\\\\YOUR-NAS\\docker\\earnie\\runtime",
+        "EARNIE_CONFIG_PATH": "\\\\YOUR-NAS\\docker\\earnie\\config",
         "EARNIE_UI_STREAMLIT_PORT": "8503",
         "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED": "1",
         "EARNIE_AUTO_START_MAIN": "0"

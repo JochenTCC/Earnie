@@ -14,6 +14,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **Unique Bezeichnung defaults** — `allocate_unique_label` for new Hausprofil / PV / Batterie / Szenario / extra Verbraucher (`Mein Haushalt 2`, …) — verified live
 
 
+### Version 2.2.0 — Sanitize private NAS hostname (2026-07-19)
+
+- [x] Replace `DS-KO-DO-2` with dummy `YOUR-NAS` in `.env.example`, `.vscode/launch.json`, `share/config/remote_backtesting.example.json`, `scripts/_diag_swimspa_nas.py`, plan note; example SSH host/user/path also dummy placeholders
+
+
 ### Version 2.2.0 — Banner der Wahrheit A + light B (2026-07-19)
 
 - [x] Attribution banner in UI (`ui/truth_banner.py`): Earnie, non-commercial note, official repo, version; sidebar + main; also on Loxone setup path

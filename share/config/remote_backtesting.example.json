@@ -1,8 +1,8 @@
 {
     "$schema": "./remote_backtesting.schema.json",
     "_comment": "Kopie nach config/remote_backtesting.json (gitignored) und Host/Pfade anpassen.",
-    "share_root": "\\\\DS-KO-DO-2\\home\\Ernie\\backtesting-sync",
-    "remote_share_root": "\\\\DS-KO-DO-2\\home\\Ernie\\backtesting-sync",
+    "share_root": "\\\\YOUR-NAS\\home\\Ernie\\backtesting-sync",
+    "remote_share_root": "\\\\YOUR-NAS\\home\\Ernie\\backtesting-sync",
     "sync_paths": [
         "config/config.json",
         "config/backtesting_scenarios.json",
@@ -15,11 +15,11 @@
         "backtesting_hourly.csv"
     ],
     "ssh": {
-        "host": "192.168.178.137",
-        "user": "Jochen",
+        "host": "192.168.1.100",
+        "user": "your-user",
         "port": 22,
         "identity_file": "",
-        "remote_repo": "C:/Users/joche/Documents/Smarthome/Python/Energy-Optimizer",
+        "remote_repo": "C:/path/to/Earnie",
         "python": "python",
         "shell": "powershell"
     }
