@@ -1,14 +1,15 @@
 """Seiten-Registry für die native Menüstruktur (st.navigation / st.Page).
 
-Das Env-/Config-Gating (ENERGY_OPTIMIZER_UI_MODES, ui.price_forecast_page_enabled)
-steuert nur noch, welche Seiten registriert werden. Cockpit, Manuelle Geräte und
-die Planungs-/Echtzeit-Seiten sind immer verfügbar; Szenario-Explorer und
-Preis-Prognose (Dev) folgen dem bisherigen Modus-Gating.
+Das Env-/Config-Gating (EARNIE_UI_MODES / ENERGY_OPTIMIZER_UI_MODES,
+ui.price_forecast_page_enabled) steuert, welche Seiten registriert werden:
+Betrieb (Monitor, Manuelle Geräte) braucht ``sunset2sunset``; Szenario-Explorer
+und Preis-Prognose (Dev) folgen ihren Keys. Planungs-/Echtzeit-Seiten bleiben
+über Setup-Readiness gesteuert.
 
 Nach Minimal-Bootstrap (Greenfield) sind bis zur vollständigen Planungs-Konfiguration
 nur Hauskonfigurator und Echtzeit-Umgebung sichtbar (Szenarieneditor nach Hausprofil).
-Danach wird Analyse freigeschaltet; Betrieb (Cockpit, Manuelle Geräte) erst nach
-vollständiger Loxone-Merker-Konfiguration.
+Danach wird Analyse freigeschaltet; Betrieb erst nach vollständiger
+Loxone-Merker-Konfiguration und wenn ``sunset2sunset`` in EARNIE_UI_MODES steht.
 """
 from __future__ import annotations
 
@@ -113,8 +114,10 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
     )
 
     specs: list[PageSpec] = []
-    betrieb_unlocked = is_betrieb_unlocked()
-    if betrieb_unlocked:
+    betrieb_shown = (
+        is_betrieb_unlocked() and "sunset2sunset" in enabled_mode_keys
+    )
+    if betrieb_shown:
         specs.extend(
             [
                 PageSpec(
@@ -138,7 +141,7 @@ def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
     scenario_explorer_allowed = (
         "scenario_explorer" in enabled_mode_keys and is_planning_ready()
     )
-    analyse_default = not betrieb_unlocked
+    analyse_default = not betrieb_shown
     if scenario_explorer_allowed:
         specs.append(
             PageSpec(

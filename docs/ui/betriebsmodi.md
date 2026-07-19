@@ -10,11 +10,13 @@ Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monit
 
 | Key | Seite | Abschnitt | Produktion |
 |-----|-------|-----------|------------|
-| `sunset2sunset` | **Monitor** | Betrieb | ja (Hauptansicht) |
-| `scenario_explorer` | **Szenario-Explorer** | Analyse | optional (Dev) |
+| `sunset2sunset` | **Monitor**, **Manuelle Geräte** | Betrieb | ja (Hauptansicht; ohne Key kein Betrieb-Abschnitt) |
+| `scenario_explorer` | **Szenario-Explorer** | Analyse | optional (Dev / Community Cloud) |
 | `price_forecast` | **Preis-Prognose (Dev)** | Analyse | Dev-only |
 
-Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarieneditor**, **Live-Konfiguration**, **Optimierer-Dienst**, **Loxone-Kommunikation**, **Manuelle Geräte**, **Verbraucheranalyse** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`).
+Beispiel Community Cloud (nur Analyse): `EARNIE_UI_MODES=scenario_explorer` — Betrieb entfällt.
+
+Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarieneditor**, **Live-Konfiguration**, **Optimierer-Dienst**, **Loxone-Kommunikation**, **Verbraucheranalyse** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`).
 
 In der Sidebar: App-Version, Setup-Hinweise und **„Konfiguration speichern / laden“** (ZIP-Export/Import der Config-Sidecars und `uploads/` — siehe [Speichern / Laden](../konfiguration/speichern-laden.md)).
 

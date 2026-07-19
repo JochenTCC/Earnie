@@ -31,6 +31,16 @@ def test_only_sunset_hides_dev_and_scenario_explorer():
     assert "Preis-Prognose (Dev)" not in titles
 
 
+def test_scenario_explorer_only_hides_betrieb():
+    titles = _titles(["scenario_explorer"])
+    assert "Monitor" not in titles
+    assert "Manuelle Geräte" not in titles
+    assert "Szenario-Explorer" in titles
+    defaults = [spec for spec in build_page_specs(["scenario_explorer"]) if spec.default]
+    assert len(defaults) == 1
+    assert defaults[0].title == "Szenario-Explorer"
+
+
 def test_cockpit_is_single_default():
     specs = build_page_specs(["sunset2sunset", "scenario_explorer"])
     defaults = [spec for spec in specs if spec.default]
