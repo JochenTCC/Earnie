@@ -3,6 +3,21 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix SE EV Jahres Verbrauch vs Historisch (2026-07-20)
+
+- [x] **consumption mismatch in SE with `chart_debug_review/earnie_config_20260719_081454`** — non-CSV `planning_ev_daily_targets` used uncapped SOC `ev_daily_kwh` (~44 kWh/d) while Historisch/synthetic used power-capped hourly (~13 kWh/d at `nominal_power_kw=1`); fix: slot-modeled window kWh (same as CSV EV / thermal); verified live (Historisch ≈ Referenz)
+
+
+### Bugfix SE monthly_float OeMAG rates missing (2026-07-20)
+
+- [x] **Error during SE with `chart_debug_review/earnie_config_20260719_050759`** — `get_backtesting_feed_in_settings` raised because `oemag_monthly_feed_in_rates` / `monthly_float_reference_cent_kwh` missing while live export was `monthly_float`; rates + reference cent added to pack (and `earnie_env`) `backtesting_scenarios.json` — verified live
+
+
+### Bugfix SE Verbrauchsdaten warning wording (2026-07-20)
+
+- [x] **Warning still said „Backtesting“** — empty cons_data warning in `ui/backtesting_cons_data.py` now: „… bevor du Szenario-Explorer startest.“
+
+
 ### Bugfix shared Land tariff filter (2026-07-19)
 
 - [x] **"Bezug Land" / "Einspeise Land" must not differ** — single shared **Land** filter for Bezug + Einspeise in Szenarieneditor and Live-Konfiguration; separate Typ filters kept; `render_shared_land_filter` + `render_tariff_type_filter` in `ui/tariff_filter_helpers.py`; docs `docs/konfiguration/ueberblick.md`; tests `lands_union` — verified live

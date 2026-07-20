@@ -1,0 +1,66 @@
+{
+  "id": "greenfield_like",
+  "label": "Greenfield-like smoke",
+  "annual_kwh": 10000.0,
+  "baseload_kwh": 876.0,
+  "latitude": 48.2,
+  "longitude": 11.0,
+  "timezone_name": "Europe/Berlin",
+  "consumers": [
+    {
+      "id": "haus",
+      "label": "Haus",
+      "type": "thermal_annual",
+      "nominal_power_kw": 5.0,
+      "living_area_m2": 120.0,
+      "building_class": 3,
+      "heat_pump_type": "luft",
+      "persons": 2,
+      "target_temp_c": 21.5,
+      "heating_limit_c": 15.0,
+      "solar_thermal_area_m2": 0.0,
+      "solar_thermal_tilt_deg": 25.0,
+      "solar_thermal_azimuth_deg": 0.0,
+      "timezone_name": "Europe/Berlin",
+      "min_on_quarterhours": 4
+    },
+    {
+      "id": "ev",
+      "label": "EV",
+      "type": "ev",
+      "nominal_power_kw": 11.0,
+      "min_power_kw": 1.4,
+      "min_on_quarterhours": 4,
+      "battery_capacity_kwh": 40.0,
+      "charging_schedule": {
+        "target_soc_percent": 100.0,
+        "charging_efficiency": 0.95,
+        "forecast_when_absent": true,
+        "weekday": {
+          "car_available_from_hour": 18,
+          "ready_by_hour": 7,
+          "daily_rest_soc": 60.0
+        },
+        "weekend": {
+          "car_available_from_hour": 18,
+          "ready_by_hour": 7,
+          "daily_rest_soc": 30.0
+        }
+      }
+    },
+    {
+      "id": "rest",
+      "label": "Rest",
+      "type": "generic",
+      "nominal_power_kw": 1.0,
+      "annual_kwh": 3000.0,
+      "earnie_role": "known",
+      "schedule": {
+        "runs_per_week": 7,
+        "duration_h": 10.0,
+        "start_hour": 9,
+        "start_shift_h": 0.0
+      }
+    }
+  ]
+}

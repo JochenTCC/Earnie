@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+import pytest
+
 from house_config.generic_schedule import (
     generic_daily_target_kwh_for_day,
     generic_flex_target_kwh_for_window,
@@ -68,12 +70,16 @@ def test_planning_flex_daily_targets_infer_window_end_from_slots():
     assert targets["standard"] == 6.0
 
 
-def test_planning_ev_target_uses_departure_day_only():
+def test_planning_ev_target_uses_window_modeled_kwh():
+    """EV targets follow power-capped hourly schedule (not uncapped SOC-only)."""
+    from house_config.planning_flex_bridge import _consumer_window_kwh
+
     anchor = datetime(2025, 1, 6, 7, 0)
     slots = window_slot_datetimes(anchor)
     profile = {"consumers": [EV_CONSUMER]}
     flex = [{"id": "ev"}]
     targets = planning_ev_daily_targets(flex, profile, slots, window_end=anchor)
+    assert targets["ev"] == pytest.approx(_consumer_window_kwh(EV_CONSUMER, slots))
     naive_kwh = sum(
         __import__("house_config.ev_profile", fromlist=["ev_daily_kwh"]).ev_daily_kwh(
             EV_CONSUMER, day
@@ -81,4 +87,39 @@ def test_planning_ev_target_uses_departure_day_only():
         for day in {slot.date() for slot in slots}
     )
     assert targets["ev"] > 0.0
-    assert targets["ev"] < naive_kwh
+    assert targets["ev"] <= naive_kwh
+
+
+def test_planning_ev_target_caps_to_nominal_power_window():
+    """Low nominal_power must not inflate profile_spec vs Historisch."""
+    from house_config.ev_profile import ev_daily_kwh
+    from house_config.planning_flex_bridge import _consumer_window_kwh
+
+    weak = {
+        **EV_CONSUMER,
+        "nominal_power_kw": 1.0,
+        "battery_capacity_kwh": 60.0,
+        "charging_schedule": {
+            **EV_CONSUMER["charging_schedule"],
+            "weekday": {
+                "car_available_from_hour": 18,
+                "ready_by_hour": 7,
+                "daily_rest_soc": 30.0,
+            },
+            "weekend": {
+                "car_available_from_hour": 18,
+                "ready_by_hour": 7,
+                "daily_rest_soc": 30.0,
+            },
+        },
+    }
+    anchor = datetime(2025, 3, 1, 7, 0)
+    slots = window_slot_datetimes(anchor)
+    targets = planning_ev_daily_targets(
+        [{"id": "ev"}], {"consumers": [weak]}, slots, window_end=anchor
+    )
+    modeled = _consumer_window_kwh(weak, slots)
+    soc = ev_daily_kwh(weak, anchor.date())
+    assert targets["ev"] == pytest.approx(modeled)
+    assert targets["ev"] < soc
+    assert targets["ev"] == pytest.approx(13.0)

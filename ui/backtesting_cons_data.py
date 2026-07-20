@@ -50,7 +50,7 @@ def render_cons_data_section() -> bool:
     if not populated:
         st.warning(
             "Keine gültigen Verbrauchsdaten vorhanden. "
-            "Generiere die Datei aus der Hauskonfiguration, bevor du Backtesting startest."
+            "Generiere die Datei aus der Hauskonfiguration, bevor du Szenario-Explorer startest."
         )
     else:
         df = cons_data_store.load_cons_data(path)

@@ -32,8 +32,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Site config split (done): private `Earnie-env-home` + junction; public templates/catalog in `share/config/` (incl. `tariffs.json`); see [private-env.md](../docs/einrichtung/private-env.md)
   - New EARNIE_UI_MODES "live_environment" to enable / disable "Echtzeitumgebung"
 - [x] Remove any references to DS-KO-DOLS (`DS-KO-DO-2`) in all files and replace it by dummies
-- [ ] Merge streamlitcloud branch with main, when app is working on SCC
 - [x] Implement a first version of "Banner der Wahrheit", that can't be removed in a fork
+- [ ] Merge streamlitcloud branch with main, when app is working on SCC
 - [ ] Finalize Version 2.2.0 after test usage and make a release
 
 ### Version 2.+1

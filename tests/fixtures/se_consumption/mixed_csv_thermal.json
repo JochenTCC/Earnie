@@ -1,0 +1,40 @@
+{
+  "id": "mixed_csv_thermal",
+  "label": "CSV thermal_rc + known generic",
+  "annual_kwh": 8000.0,
+  "baseload_kwh": 876.0,
+  "latitude": 48.2,
+  "longitude": 11.0,
+  "timezone_name": "Europe/Berlin",
+  "consumers": [
+    {
+      "id": "swimspa",
+      "label": "SwimSpa",
+      "type": "thermal_rc",
+      "nominal_power_kw": 2.8,
+      "use_profile_csv": true,
+      "profile_csv": "",
+      "thermal_rc": {
+        "setpoint_c": 38.0,
+        "tolerance_c": 1.0,
+        "water_volume_liters": 5000.0,
+        "heat_loss_kw_per_k": 0.05,
+        "heating_efficiency": 1.0
+      }
+    },
+    {
+      "id": "rest",
+      "label": "Rest",
+      "type": "generic",
+      "nominal_power_kw": 1.0,
+      "annual_kwh": 1500.0,
+      "earnie_role": "known",
+      "schedule": {
+        "runs_per_week": 7,
+        "duration_h": 6.0,
+        "start_hour": 10,
+        "start_shift_h": 0.0
+      }
+    }
+  ]
+}

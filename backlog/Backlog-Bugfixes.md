@@ -24,8 +24,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Error during SE with ".\chart_debug_review\earnie_config_20260719_050759"
-
 
 ## Organizational Changes - no bugs (but still no development issue)
 
