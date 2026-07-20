@@ -62,3 +62,6 @@ debug-*.log
 
 # Lokale Debug-Dump-Extrakte unter chart_debug_review/ (promoted chart_debug_* bleibt versionierbar)
 chart_debug_review/debug_dump_*/
+
+# Local VS Code / Cursor launch configs (machine-specific)
+.vscode/launch.json
