@@ -127,6 +127,28 @@ def _append_return_flows(links: _SankeyLinks, data: dict, system_idx: int) -> No
         )
 
 
+def _real_sink_sum_kw(
+    data: dict,
+    breakdown: dict,
+    consumers: list[dict],
+) -> float:
+    """Sum of real Sankey sinks (no Soll-placeholders)."""
+    total = 0.0
+    baseload = float(breakdown.get("baseload_kw") or 0.0)
+    if baseload > _MIN_FLOW_KW:
+        total += baseload
+    flex_kw = breakdown.get("flex_kw") or {}
+    for consumer in consumers:
+        live_kw = _flex_kw_for_consumer(flex_kw, consumer)
+        if live_kw > _MIN_FLOW_KW:
+            total += live_kw
+    if data["grid"] < -_MIN_FLOW_KW:
+        total += abs(data["grid"])
+    if data["battery"] < -_MIN_FLOW_KW:
+        total += abs(data["battery"])
+    return total
+
+
 def _prepare_sankey_data(
     data: dict,
     current_soc: float,
@@ -187,12 +209,14 @@ def _prepare_sankey_data(
                 breakdown["baseload_kw"],
                 hover=f"Grundlast: {breakdown['baseload_kw']:.2f} kW",
             )
+        sink_sum_kw = _real_sink_sum_kw(data, breakdown, consumers)
         for i, consumer in enumerate(consumers):
             live_kw = _flex_kw_for_consumer(breakdown.get("flex_kw") or {}, consumer)
             link_kw, is_placeholder = produktiv.flex_sankey_link(
                 live_kw,
                 consumer["id"],
                 main_state,
+                sink_sum_kw,
             )
             if link_kw is None:
                 continue

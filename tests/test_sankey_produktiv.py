@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+import pytest
+
 from ui import sankey_produktiv as produktiv
 
 
@@ -44,21 +46,46 @@ def test_caption_keeps_soll_hint_when_stale():
 
 
 def test_flex_sankey_link_uses_placeholder_when_inactive_with_soll():
-    link_kw, is_placeholder = produktiv.flex_sankey_link(0.0, "eauto", _state())
-    assert link_kw == produktiv.SOLL_PLACEHOLDER_FLOW_KW
+    sink_sum = 1.0
+    link_kw, is_placeholder = produktiv.flex_sankey_link(
+        0.0, "eauto", _state(), sink_sum
+    )
+    assert link_kw == produktiv.soll_placeholder_flow_kw(sink_sum)
+    assert link_kw == pytest.approx(0.05)
     assert is_placeholder is True
+
+
+def test_flex_sankey_link_placeholder_scales_with_sink_sum():
+    sink_sum = 2.0
+    link_kw, is_placeholder = produktiv.flex_sankey_link(
+        0.0, "eauto", _state(), sink_sum
+    )
+    assert link_kw == pytest.approx(0.10)
+    assert is_placeholder is True
+
+
+def test_flex_sankey_link_no_placeholder_when_sink_sum_tiny():
+    link_kw, is_placeholder = produktiv.flex_sankey_link(
+        0.0, "eauto", _state(), sink_sum_kw=0.1
+    )
+    assert link_kw is None
+    assert is_placeholder is False
 
 
 def test_flex_sankey_link_no_link_without_soll():
     state = _state()
     state["consumer_powers_kw"] = {"eauto": 0.0}
-    link_kw, is_placeholder = produktiv.flex_sankey_link(0.0, "eauto", state)
+    link_kw, is_placeholder = produktiv.flex_sankey_link(
+        0.0, "eauto", state, sink_sum_kw=1.0
+    )
     assert link_kw is None
     assert is_placeholder is False
 
 
 def test_flex_sankey_link_live_when_drawing():
-    link_kw, is_placeholder = produktiv.flex_sankey_link(3.5, "eauto", _state())
+    link_kw, is_placeholder = produktiv.flex_sankey_link(
+        3.5, "eauto", _state(), sink_sum_kw=1.0
+    )
     assert link_kw == 3.5
     assert is_placeholder is False
 
