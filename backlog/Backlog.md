@@ -1,4 +1,4 @@
-﻿🗺️ Project Roadmap & Backlog
+﻿# Project Roadmap & Backlog
 
 Completed items → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
@@ -25,11 +25,37 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature Backlog
 
+
 ### Version 2.2.0
 
-- [ ] Build Szenario-Explorer as "web app" in Streamlit Community Cloud
+- [x] Build Szenario-Explorer as "web app" in Streamlit Community Cloud (SCC)
   - Precursor (done): `EARNIE_OFFLINE` live-scenario demo seed — [Backlog-Erledigt.md](Backlog-Erledigt.md)
+  - Site config split (done): private `Earnie-env-home` + junction; public templates/catalog in `share/config/` (incl. `tariffs.json`); see [private-env.md](../docs/einrichtung/private-env.md)
+  - New EARNIE_UI_MODES "live_environment" to enable / disable "Echtzeitumgebung"
+- [x] Remove any references to DS-KO-DOLS (`DS-KO-DO-2`) in all files and replace it by dummies
+- [x] Implement a first version of "Banner der Wahrheit", that can't be removed in a fork
+- [x] Add a hint "Nicht optional, da ansonsten identisch mit Nicht optimierter Referenz" on subpage Batterien
+- [x] Add a warning at SE at Gesamtkosten und -Verbrauch, when overall consumptions differ more than 5% from Live-Referenz (Hinweis column) with hint to send a config dump to TechCreaCon via Info / About contact.
+- [x] Reorder sidebar
+    - Deactivate "Verbraucheranalyse" when there is no live connection to smarthome (stub page notice)
+    - Hide "Verbraucheranalyse" when EARNIE_UI_MODES does not include "live_environment"
+    - Move "Verbraucheranalyse" into "Live-Cockpit" (at the bottom)
+    - Rename section "Planung" into "Konfiguration"
+    - Move Szenario-Explorer into section "Konfiguration" (above Live-Konfiguration)
+    - Remove section "Analyse"
+    - Move "Live-Konfiguration" into section "Konfiguration"; hide when `live_environment` not in modes (always usable when shown)
+    - Rename section "Betrieb" into "Live-Cockpit"
+- [x] Make a complete info section in sidebar (including version and Banner der Wahrheit + contacting formular with Topic, Description and attachments to mail@techcreacon.com)
+- [ ] Merge streamlitcloud branch with main, when app is working on SCC
 - [ ] Finalize Version 2.2.0 after test usage and make a release
+  - Update German Docs
+
+### Version 2.+1
+
+- [ ] Clarify how user could get a one-time registry that is bound to their hardware
+  - What are the technical prerequisites to make that running?
+- [ ] **Banner der Wahrheit — Layer C (deferred):** signed official builds / GHCR attestation + startup verifier; tie to hardware registry. Enforces attribution on *official* distribution only — not source forks. See plan outline (A + light B shipped in 2.2.0).
+- [ ] Insert a secured 
 
 ### Version 2.+1 - Become Loxone agnostic and standardize communication
 
@@ -56,6 +82,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Check if there is a special issue on weekends, when time-to-be ready is set to 12:00 (Start/ End-SOC constraints)
 - [ ] Find EPEX API to have provider independent tariff calculation
 - [ ] Review current tariffs - use https://www.e-control.at/referenzmarktwert and docs\referenz\.~lock.Oeko_RefMrktPr.csv# as anchor point
+- [ ] Remove usage of "oemag_monthly_feed_in_rates" in backtesting_scenarios.json for monthly export tariffs. They must own their own complete data. Consider thac as design change if needed. Add data of "oemag_monthly_feed_in_rates" as sample in tariffs.json. Remove entry "oemag_monthly_feed_in_rates" in backtesting_scenarios.json.
 - [ ] Improve cost calculation by adding monthly fees etc.
 - [ ] Enhance page "Verbraucheranalyse" to "Analyse Verbrauch & Kosten"
   - Visualize usage of consumers on a weekly basis compared to historical price and PV 

@@ -157,6 +157,37 @@ def _max_pulses_per_day(consumer: dict) -> int:
     return THERMAL_MAX_PULSES_PER_DAY
 
 
+def _prorate_thermal_day_target_kwh(full_day_kwh: float, day_slots: int) -> float:
+    """Scale full-calendar HDD kWh to the fraction of the day present in the horizon.
+
+    Midnight-spanning SE windows otherwise apply two full HDD days (infeasible with
+    max consecutive ON) while profile_spec Jahres Verbrauch uses one window total.
+    """
+    if day_slots <= 0 or full_day_kwh <= 0.0:
+        return 0.0
+    if day_slots >= 24:
+        return float(full_day_kwh)
+    return round(float(full_day_kwh) * (day_slots / 24.0), 3)
+
+
+def _max_on_slots_with_limits(
+    day_slots: int,
+    *,
+    max_hours: int,
+    max_pulses: int,
+) -> int:
+    """Upper bound on ON hours under consecutive-ON and pulse caps."""
+    if day_slots <= 0 or max_hours < 1 or max_pulses < 1:
+        return 0
+    by_pulses = max_hours * max_pulses
+    if day_slots <= max_hours:
+        return min(day_slots, by_pulses)
+    # Need ≥1 OFF between pulses; max ON in N slots with run-length ≤ H.
+    gaps_needed = max(0, (day_slots - 1) // (max_hours + 1))
+    by_consecutive = day_slots - gaps_needed
+    return min(day_slots, by_pulses, by_consecutive)
+
+
 def add_max_on_duration_constraints(
     prob: pulp.LpProblem,
     on_vars: list,
@@ -249,7 +280,15 @@ def add_thermal_flex_constraints(
                 continue
             _, max_kw = power_limits_kw(consumer)
             max_deliverable = _max_deliverable_kwh(consumer, day_indices)
-            effective = min(float(target_kwh), max_deliverable)
+            day_slots = len(day_indices)
+            prorated = _prorate_thermal_day_target_kwh(float(target_kwh), day_slots)
+            op_slots = _max_on_slots_with_limits(
+                day_slots, max_hours=max_hours, max_pulses=max_pulses
+            )
+            op_max_kwh = op_slots * float(max_kw)
+            effective = min(prorated, max_deliverable, op_max_kwh)
+            if effective <= 1e-9:
+                continue
             add_max_pulses_per_day_constraints(
                 model.prob,
                 on_vars,

@@ -5,10 +5,12 @@
 config.py
 config.json
 !tests/fixtures/backtesting/config.json
-earnie_env/config/config.json
-earnie_env/config/backtesting_scenarios.json
-earnie_env/config/remote_backtesting.json
-# Legacy paths (pre-earnie_env) — keep ignored if still present locally
+# Site-specific config (private repo / local junction) — templates live in share/config/
+earnie_env/config/*
+!earnie_env/config/.gitkeep
+earnie_env_alpha/config/*
+!earnie_env_alpha/config/.gitkeep
+earnie_env/config.bak-*/# Legacy paths (pre-earnie_env) — keep ignored if still present locally
 config/config.json
 config/backtesting_scenarios.json
 config/remote_backtesting.json
@@ -28,6 +30,8 @@ optimizer_run_state.json
 !tests/fixtures/prod_dumps/**/optimizer_run_state.json
 earnie_env/runtime/*
 !earnie_env/runtime/local_settings.example.json
+earnie_env_alpha/runtime/*
+!earnie_env_alpha/runtime/.gitkeep
 runtime/*
 !runtime/local_settings.example.json
 greenfield/
@@ -43,7 +47,6 @@ energy_optimizer.log
 system_history_log.csv
 runtime_settings.json
 .env
-earnie_env/config/.env
 config/.env
 # Vertraulich — Businessplan (lokal)
 CONF_Businessplan/

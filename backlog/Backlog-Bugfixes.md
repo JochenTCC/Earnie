@@ -21,6 +21,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty)
 
+- [ ] **EV charge while unplugged (config path)** — house-profile EV (`daily_target_source=config`) sent `Ernie_EAuto_Ziel_kW` > 0 with `eauto_plugged_in: false`; config path now sets `anticipated`/`plugged_in` like Loxone path (`optimizer/charging_context.py::_config_path_with_plugged_in`). Dump: `chart_debug_review/debug_dump_20260720_094034`. Dump repro OK — live acceptance pending.
 
 ## New Bugs (Do not remove this chapter — even if empty)
 

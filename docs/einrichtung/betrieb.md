@@ -9,13 +9,13 @@
 | **Produktiv-Daemon** | `python main.py`                  | Liest Loxone, optimiert, schreibt Steuerwerte — läuft dauerhaft (auch als Kind der Streamlit-App) |
 
 
-Nur `main.py` steuert die Anlage (Loxone-Schreibvorgänge). Die App **zeigt** den berechneten 24–48-Stunden-Horizont (`live_optimization_debug.json`) und kann den Daemon unter **Echtzeit-Umgebung → Optimierer-Dienst** starten, stoppen und neu starten. Vor dem Start prüft Earnie `runtime/main.lock` (bereits laufende Instanz).
+Nur `main.py` steuert die Anlage (Loxone-Schreibvorgänge). Die App **zeigt** den berechneten 24–48-Stunden-Horizont (`live_optimization_debug.json`) und kann den Daemon unter **Daemon Control → Optimierer-Dienst** starten, stoppen und neu starten. Vor dem Start prüft Earnie `runtime/main.lock` (bereits laufende Instanz).
 
 **Docker (empfohlen):** Ein Container (`earnie`). Die UI startet `main.py` automatisch, wenn `EARNIE_AUTO_START_MAIN=1` gesetzt ist (Standard in den Compose-Dateien).
 
 **Lokal (venv / VS Code):** `main.py` und Streamlit können getrennt laufen. Auto-Start ist aus, solange `EARNIE_AUTO_START_MAIN` nicht auf `1` steht — so bleibt Debugging von `main.py` exklusiv.
 
-Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonfigurator, Live-Konfiguration, Manuelle Geräte).
+Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonfigurator, Live-Konfiguration, Manuelle Geräte). Hausbezogene Persistenz lokal bzw. im privaten Repo: [Private Haus-Config](private-env.md).
 
 ## Optimierungs-Takt
 
@@ -77,7 +77,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_ENV_PATH`                       | Wurzelverzeichnis für Persistenz (Standard: `earnie_env`). Daraus leiten sich `…/config` und `…/runtime` ab, sofern nicht separat gesetzt. Legacy-Alias: `ENERGY_OPTIMIZER_ENV_PATH`.                                                                      |
 | `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; Legacy: `config/`). Enthält `config.json`, Sidecars, `.env`, `uploads/`. Legacy-Alias: `ENERGY_OPTIMIZER_CONFIG_PATH`. (Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert.) |
 | `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; Legacy-Ordner: `runtime`). Legacy-Alias: `ENERGY_OPTIMIZER_RUNTIME_PATH` bzw. alt `EARNIE_RUNTIME_DIR`.                                                                                      |
-| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset`, `scenario_explorer` — schränkt sichtbare Analyse-Seiten ein (Prod: `sunset2sunset,scenario_explorer`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
+| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Live-Cockpit), `scenario_explorer`, `live_environment` (Daemon Control / Live-Konfiguration), `price_forecast` (Prod: `sunset2sunset,scenario_explorer,live_environment`; Cloud nur Explorer: `scenario_explorer`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |
 | `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). Legacy-Alias: `ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED`.                                  |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls nicht schon laufend (Docker-Compose setzt das). Ohne Variable / lokal aus.                                                                              |

@@ -21,7 +21,7 @@ from optimizer.deviation_facts import build_slot_deviation_facts
 from optimizer.deviation_rules import load_deviation_rules, validate_deviation_rules_document
 from runtime_store.history_timeline import SLOT_MISSING, SLOT_PRESENT
 
-RULES_PATH = Path("earnie_env/config") / "deviation_rules.example.json"
+RULES_PATH = Path("share/config") / "deviation_rules.example.json"
 
 
 @pytest.fixture

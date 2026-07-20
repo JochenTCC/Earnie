@@ -2,6 +2,8 @@
 
 Earnie speichert die Haus- und Szenario-Konfiguration unter `earnie_env/config/` (Laufzeitdaten unter `earnie_env/runtime/`). Ältere Installationen mit `./config` und `./runtime` bleiben über Umgebungsvariablen oder Legacy-Pfade nutzbar — für neue Setups gilt `earnie_env/`.
 
+Hausbezogene JSON/CSVs sind **nicht** Teil des öffentlichen Earnie-Repos (privates Repo / Junction); der veröffentlichte Tarifkatalog liegt unter `share/config/tariffs.json`. Details: [Private Haus-Config](../einrichtung/private-env.md). Das Sidebar-ZIP bleibt der portable Transfer zwischen Installationen.
+
 ## Auto-Speichern
 
 Im **Hauskonfigurator** und **Szenarieneditor** werden gültige Änderungen automatisch auf die Festplatte geschrieben (kein separater Speichern-Button). Unvollständige Formulare (z. B. leere Bezeichnung) werden nicht persistiert. Im Szenarieneditor können gespeicherte Nicht-Live-Szenarien mit **Szenario entfernen** gelöscht werden (das aktuelle Live-Szenario ist geschützt).

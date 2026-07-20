@@ -38,7 +38,7 @@ def _write_live_scenarios(config_dir, *, settings: dict | None = None) -> None:
 def _write_minimal_greenfield_config(config_dir) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     payload = json.loads(
-        (repo_root / "earnie_env" / "config" / "config.minimal.json").read_text(encoding="utf-8")
+        (repo_root / "share" / "config" / "config.minimal.json").read_text(encoding="utf-8")
     )
     (config_dir / "config.json").write_text(json.dumps(payload), encoding="utf-8")
     (config_dir / "house_profiles.json").write_text(

@@ -25,7 +25,7 @@ Besonders wirksam ist Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar),
 | **Was-wäre-wenn (ohne Smart-Home)** | Haus und Varianten konfigurieren, Jahresvergleich rechnen — z. B. ob sich Speicher, größere PV oder ein Spot-Tarif lohnen |
 | **Live-Betrieb (mit Loxone)** | Dauerhaft optimieren und Sollwerte an die Hausautomation schreiben; Monitor zeigt Plan und Ist |
 
-Nur der Hintergrunddienst (`main.py`) steuert die Anlage. Die Web-Oberfläche (Streamlit) ist das **Cockpit**: Anzeige, Konfiguration und Analyse — und unter **Echtzeit-Umgebung → Optimierer-Dienst** Start/Stop/Neustart des Daemons. Die Oberfläche selbst schreibt keine Steuerbefehle an Loxone.
+Nur der Hintergrunddienst (`main.py`) steuert die Anlage. Die Web-Oberfläche (Streamlit) ist das **Cockpit**: Anzeige, Konfiguration und Analyse — und unter **Daemon Control → Optimierer-Dienst** Start/Stop/Neustart des Daemons. Die Oberfläche selbst schreibt keine Steuerbefehle an Loxone.
 
 ### Voraussetzungen
 
@@ -53,8 +53,15 @@ Die Software wird „wie besehen“ bereitgestellt. Eingriffe in Speicher und Gr
 
 Vollständige Bedingungen: [LICENSE.md](../../LICENSE.md).
 
+### Banner der Wahrheit
+
+In der Sidebar unter **Info / About** (unten; und zusätzlich im Hauptbereich) erscheint ein kurzes Attributions-Banner (Name, nicht-kommerzieller Hinweis, Link zum offiziellen Repository, Version). Es kennzeichnet Earnie und die Nutzungsbedingungen.
+
+Bei erkennbar inoffiziellen oder geänderten Builds (z. B. abweichende Git-Remote) kann zusätzlich ein Warnhinweis erscheinen. Das Banner ist bewusst sichtbar gehalten; es ist **nicht** technisch fälschungssicher.
+
 ### Support
 
+- **Kontakt in der App:** Sidebar **Info / About** — Thema, Beschreibung, optional Anhänge; **Informationen in ZIP sammeln**, dann **E-Mail schreiben** und die ZIP-Datei manuell anhängen (wird nicht automatisch angehängt) an `mail@techcreacon.com`
 - **Projekt & Issues:** [GitHub — JochenTCC/Earnie](https://github.com/JochenTCC/Earnie)  
 - **Community:** z. B. Diskussionen im Loxone-Umfeld (loxforum u. Ä.)  
 - **Technische Doku:** [docs/README.md](../README.md)  
@@ -82,7 +89,7 @@ Kurzfassung der typischen Wege:
 
 Details: [Container](../einrichtung/container.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md).
 
-Nach dem Start erscheinen in der Navigation zunächst vor allem **Planung** und **Echtzeit-Umgebung**. Weitere Seiten (Monitor, Szenario-Explorer, …) werden freigeschaltet, sobald die Einrichtung weit genug ist.
+Nach dem Start erscheinen in der Navigation zunächst vor allem **Konfiguration** und **Daemon Control**. Weitere Seiten (Monitor, Szenario-Explorer, …) werden freigeschaltet, sobald die Einrichtung weit genug ist.
 
 ---
 
@@ -99,7 +106,7 @@ Empfohlene Reihenfolge:
 
 ### Hauskonfigurator
 
-Unter **Planung → Hauskonfigurator** pflegen Sie die baulichen und technischen Bausteine Ihres Haushalts. Gespeichert werden Kataloge (Hausprofile, Komponenten), die später von Szenarien **referenziert** werden — nicht alles doppelt in einer einzigen Datei.
+Unter **Konfiguration → Hauskonfigurator** pflegen Sie die baulichen und technischen Bausteine Ihres Haushalts. Gespeichert werden Kataloge (Hausprofile, Komponenten), die später von Szenarien **referenziert** werden — nicht alles doppelt in einer einzigen Datei.
 
 In der Sidebar sehen Sie fehlende Schritte der Ersteinrichtung.
 
@@ -186,7 +193,7 @@ Im Live-Betrieb steuert Earnie Ziel-SOC und Lade-/Entlade-Sollwerte über das Sm
 
 ### Szenarien-Editor
 
-Unter **Planung → Szenarieneditor** bauen Sie **Varianten** Ihres Haushalts, ohne den Live-Betrieb zu ändern.
+Unter **Konfiguration → Szenarieneditor** bauen Sie **Varianten** Ihres Haushalts, ohne den Live-Betrieb zu ändern.
 
 Ein Szenario verknüpft typischerweise:
 
@@ -207,7 +214,7 @@ Tarife wählen Sie aus dem Tarifkatalog (Bezug/Einspeise). Details zu Preisen: [
 
 ### Szenario-Explorer (Was-Wäre-Wenn-Analyse)
 
-Unter **Analyse → Szenario-Explorer** (erscheint nach ausreichender Planungs-Konfiguration).
+Unter **Konfiguration → Szenario-Explorer** (erscheint nach ausreichender Planungs-Konfiguration).
 
 Hier analysieren Sie **Langzeitvergleiche** typischerweise über die letzten 12 Monate (für Tests auch kürzer, z. B. nur März) zwischen Referenzen und Ihren Szenarien:
 
@@ -240,14 +247,16 @@ Die Zeile **Historisch** rechnet die Last am Live-Tarif **ohne** PV und **ohne**
 
 Auswertung u. a.:
 
-- **Gesamtkosten** (Tabelle: Jahres Verbrauch, Jahres Kosten, Δ vs. Live-Referenz)  
+- **Gesamtkosten und -Verbrauch** (Tabelle: Jahres Verbrauch, Jahres Kosten, Δ vs. Live-Referenz, Hinweis)  
 - **Kostenvergleich** monatlich (Referenz vs. optimierte Szenarien)  
 - **Monatsverläufe** und Plausibilitätsansichten  
 - Charts zu Leistung, Verbrauch und PV je nach gewählter Ansicht  
 
 Nutzen Sie die Ergebnisse als **Entscheidungsgrundlage** (Investition, Tarif), nicht als exakte Prognose der nächsten Stromrechnung. Es wird keine Gewähr dafür übernommen, dass die Ergebnisse genau so eintreffen werden.
 
-##### Gesamtkosten: Jahres Verbrauch [kWh]
+<a id="gesamtkosten-jahres-verbrauch-kwh"></a>
+
+##### Gesamtkosten und -Verbrauch: Jahres Verbrauch [kWh]
 
 Die Spalte zeigt **nicht überall dieselbe Datenquelle**. Deshalb kann die Zeile **Historisch** andere kWh-Werte haben als Referenz- und Optimierungszeilen — das ist kein Anzeigefehler, sondern Absicht.
 
@@ -264,7 +273,7 @@ Die Spalte zeigt **nicht überall dieselbe Datenquelle**. Deshalb kann die Zeile
 3. **PV und Batterie** ändern die Spalte „Jahres Verbrauch“ nicht: gezählt wird der **Hausverbrauch** (Last), nicht Netzbezug nach Abzug von PV/Speicher.  
 4. **Kleine Differenzen** zwischen Referenz und Optimierung derselben Szenario-Familie sind normal (Lastverschiebung, Toleranz der Plausibilitätsprüfung).
 
-Zum Abgleich Ist vs. Modell: Hauskonfigurator / Verbrauchs-CSV und die Debug-Tabelle **Verbrauchsvergleich** im Explorer. Technische Details: [Betriebsmodi — Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten--jahres-verbrauch), [Historische Verbrauchs-CSV](../konfiguration/verbrauchs-csv.md).
+Zum Abgleich Ist vs. Modell: Hauskonfigurator / Verbrauchs-CSV und die Tabellen **Gesamtkosten und -Verbrauch** sowie **Verbrauchsvergleich** im Explorer. Weicht der Jahresverbrauch einer Zeile um **mehr als 5%** von der **Live-Referenz** ab, erscheint in der Spalte **Hinweis** eine Warnung — dann Config-Dump über **Info / About → Kontakt** an TechCreaCon senden. Technische Details: [Betriebsmodi — Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch), [Historische Verbrauchs-CSV](../konfiguration/verbrauchs-csv.md).
 
 
 ---
@@ -291,7 +300,7 @@ Signalübersicht: [Loxone-Signale](../referenz/loxone-signale.md) · Anbindung: 
 
 ### Live-Konfiguration
 
-Unter **Echtzeit-Umgebung → Live-Konfiguration**:
+Unter **Konfiguration → Live-Konfiguration**:
 
 - welches Szenario **live** gilt (`live_scenario_id`)  
 - welche Entitäten (Hausprofil, Batterie, PV, Tarife) daran hängen  
@@ -302,7 +311,7 @@ Damit nutzen Live-Optimierung und Szenario-Explorer dieselbe Auflösungslogik.
 
 ### Loxone-Kommunikation
 
-Unter **Echtzeit-Umgebung → Loxone-Kommunikation** (Debug / Abnahme):
+Unter **Daemon Control → Loxone-Kommunikation** (Debug / Abnahme):
 
 - **Live-Lesen:** alle konfigurierten Merker werden periodisch vom Smarthome System eingelesen.  
 - **Letzte Schreibvorgänge:** was `main.py` zuletzt gesendet hat (Erfolg ja/nein)  
@@ -319,11 +328,11 @@ Cutover-Checkliste: Lesen OK → Schreiben Erfolg → Monitor/Sankey plausibel. 
 
 Im Produktivbetrieb läuft der Optimierer dauerhaft (im Docker-Container automatisch mit der UI, oder lokal als `python main.py`) als Daemon und arbeitet im **15-Minuten-Takt** (zusätzlich bei konfigurierten Ereignissen).
 
-Unter **Echtzeit-Umgebung → Optimierer-Dienst** können Sie den Daemon starten, stoppen oder neu starten. Die Oberfläche zeigt den aktuellen Plan; Loxone-Schreibvorgänge kommen weiterhin nur von `main.py`.
+Unter **Daemon Control → Optimierer-Dienst** können Sie den Daemon starten, stoppen oder neu starten. Die Oberfläche zeigt den aktuellen Plan; Loxone-Schreibvorgänge kommen weiterhin nur von `main.py`.
 
-### Earnie Monitor
+### Monitor
 
-Unter **Betrieb → Monitor** (Sunset-2-Sunset):
+Unter **Live-Cockpit → Monitor** (Sunset-2-Sunset):
 
 Einheitliches Cockpit über **Vergangenheit, Jetzt und Vorausschau** — navigierbar in Sonnenaufgangs-Fenstern (ca. 24 h Segmente). Die Anzeige erfolgt von Sonnenaufgang (SA_x) zu Sonnenaufgang (SA_x+1), da dies auch der Zeithorizont für die Optimierung von Earnie ist. Dieses Intervall ist überaus sinnvoll, da üblicherweise ein vorhandener Speicher dort am wenigsten Energie eingespeichert hat. (Sollte dies nicht der Fall sein, ist die Batterie möglicherweise zu groß gewählt ...)
 
@@ -345,16 +354,16 @@ Charts im Detail: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](..
 
 ### Manuelle Geräte
 
-Unter **Betrieb → Manuelle Geräte** für Verbraucher mit Rolle **manuell**:
+Unter **Live-Cockpit → Manuelle Geräte** für Verbraucher mit Rolle **manuell**:
 
 - Laufzeiten planen bzw. Earnie-**Startempfehlungen** nutzen  
 - angenommene Leistung und Dauer aus dem Hausprofil  
 
 Geplante Läufe (mit einem Check versehen) erscheinen im Monitor (Chart 1) und fließen in die Optimierung der übrigen Lasten ein. Ideal für Geräte ohne smarte Freigabe, bei denen Sie den Start selbst setzen.
 
-### Verbraucher-Analyse (Noch nicht implementiert)
+### Verbraucheranalyse
 
-Unter **Analyse → Verbraucheranalyse**:
+Unter **Live-Cockpit → Verbraucheranalyse** (nur wenn der UI-Modus `live_environment` aktiv ist und eine Live-Verbindung zur Smarthome-Steuerung besteht; sonst Hinweis auf der Seite):
 
 Auswertung, welcher Verbrauch **autonom** (Haus/Loxone ohne Earnie-Plan) und welcher **earnie-initiiert** bzw. verschoben war. Hilft zu prüfen, ob Freigaben und Pläne greifen und wo noch Potenzial liegt.
 

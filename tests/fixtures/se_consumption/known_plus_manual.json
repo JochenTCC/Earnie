@@ -1,0 +1,39 @@
+{
+  "id": "known_plus_manual",
+  "label": "Known + manual overlay",
+  "annual_kwh": 6000.0,
+  "baseload_kwh": 876.0,
+  "latitude": 48.2,
+  "longitude": 11.0,
+  "timezone_name": "Europe/Berlin",
+  "consumers": [
+    {
+      "id": "rest",
+      "label": "Rest",
+      "type": "generic",
+      "nominal_power_kw": 1.0,
+      "annual_kwh": 2000.0,
+      "earnie_role": "known",
+      "schedule": {
+        "runs_per_week": 7,
+        "duration_h": 8.0,
+        "start_hour": 8,
+        "start_shift_h": 0.0
+      }
+    },
+    {
+      "id": "dishwasher",
+      "label": "Dishwasher",
+      "type": "generic",
+      "nominal_power_kw": 2.0,
+      "annual_kwh": 300.0,
+      "earnie_role": "manual",
+      "schedule": {
+        "runs_per_week": 7,
+        "duration_h": 2.0,
+        "start_hour": 20,
+        "start_shift_h": 0.0
+      }
+    }
+  ]
+}

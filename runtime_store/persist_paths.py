@@ -411,6 +411,11 @@ def bundled_tariffs_example_file() -> str:
     return os.path.join(bundled_config_dir(), "tariffs.example.json")
 
 
+def bundled_tariffs_catalog_file() -> str:
+    """Published full tariff catalog under share/config/tariffs.json."""
+    return os.path.join(bundled_config_dir(), "tariffs.json")
+
+
 def bundled_tariffs_minimal_file() -> str:
     return os.path.join(bundled_config_dir(), "tariffs.minimal.json")
 
@@ -427,6 +432,19 @@ def resolve_tariffs_template_path() -> str:
     if os.path.isfile(bundled):
         return bundled
     return preferred
+
+
+def resolve_tariffs_catalog_template_path() -> str:
+    """Full public catalog for seeding site tariffs.json (prefer share/config)."""
+    preferred = _preferred_or_legacy_file("tariffs.json")
+    # Preferred path is the live site file — only use it as a *template* if we are
+    # not about to bootstrap that same path. Callers should prefer bundled catalog.
+    bundled = bundled_tariffs_catalog_file()
+    if os.path.isfile(bundled):
+        return bundled
+    if os.path.isfile(preferred):
+        return preferred
+    return bundled
 
 
 def resolve_tariffs_minimal_template_path() -> str:

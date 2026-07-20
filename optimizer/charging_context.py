@@ -434,6 +434,41 @@ def historical_charging_context(
     }
 
 
+def _config_path_with_plugged_in(
+    result: dict,
+    consumer: dict,
+    sched: dict,
+    horizon_start: datetime,
+    ready_raw: str | None,
+) -> dict:
+    """Attach Loxone plugged_in; suppress live output when absent (anticipated)."""
+    lox = sched.get("loxone") or {}
+    plug_name = lox.get("plugged_in_name")
+    if not plug_name:
+        return result
+    plugged_val = loxone_client.fetch_loxone_generic_value(plug_name)
+    plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
+    if plugged_in:
+        out = dict(result)
+        out["plugged_in"] = True
+        return out
+    if not sched.get("forecast_when_absent"):
+        return _loxone_inactive_context("config (nicht angeschlossen)")
+    out = dict(result)
+    out["plugged_in"] = False
+    out["anticipated"] = True
+    available_from = resolve_absent_availability(
+        horizon_start, consumer, ready_raw=ready_raw
+    )
+    if available_from is not None:
+        out["available_from"] = available_from
+    if "FertigUm" in str(out.get("source_label") or ""):
+        out["source_label"] = "config.json (abwesend, Prognose + FertigUm Loxone)"
+    else:
+        out["source_label"] = "config.json (abwesend, Prognose)"
+    return out
+
+
 def resolve_charging_context(
     consumer: dict,
     matrix: list,
@@ -474,7 +509,7 @@ def resolve_charging_context(
     else:
         source_label = "config.json (daily_rest_soc → kWh)"
         deadline = config_deadline
-    return {
+    result = {
         "active": True,
         "deadline": deadline,
         "target_kwh": round(target_kwh, 3) if target_kwh is not None else None,
@@ -482,6 +517,9 @@ def resolve_charging_context(
         "config_day_schedule": day_sched,
         "source_label": source_label,
     }
+    return _config_path_with_plugged_in(
+        result, consumer, sched, horizon_start, ready_raw
+    )
 
 
 def resolve_charging_contexts(

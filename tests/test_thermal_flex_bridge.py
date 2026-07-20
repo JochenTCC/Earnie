@@ -153,6 +153,78 @@ def test_planning_thermal_daily_targets_cross_midnight_is_slot_energy(monkeypatc
     assert expected < full_days * 0.75
 
 
+def test_prorate_thermal_day_target_scales_partial_days():
+    from optimizer.thermal_flex_context import (
+        _max_on_slots_with_limits,
+        _prorate_thermal_day_target_kwh,
+    )
+
+    assert _prorate_thermal_day_target_kwh(14.14, 24) == pytest.approx(14.14)
+    assert _prorate_thermal_day_target_kwh(14.14, 17) == pytest.approx(
+        round(14.14 * 17 / 24, 3)
+    )
+    assert _prorate_thermal_day_target_kwh(14.751, 7) == pytest.approx(
+        round(14.751 * 7 / 24, 3)
+    )
+    # 7 slots, max consecutive 4: cannot turn all 7 ON
+    assert _max_on_slots_with_limits(7, max_hours=4, max_pulses=4) < 7
+
+
+def test_thermal_milp_cross_midnight_window_is_feasible(monkeypatch):
+    """Partial calendar days in a 07:00 window must not make MILP Infeasible."""
+    from datetime import timedelta
+
+    from data.modeled_climate import ModeledClimateContext
+    from optimizer.cbc_solver import solve_with_strict_fallback
+    from optimizer.milp import _add_milp_objective
+    from optimizer.milp_consumers import filter_feasible_consumers
+    from optimizer.milp_horizon import _build_milp_model
+    from optimizer.thermal_flex_context import add_thermal_flex_constraints
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
+    profile = _house_profile()
+    consumer = planning_thermal_to_milp(_wp_consumer())
+    anchor = datetime(2025, 3, 1, 7, 0)
+    matrix = []
+    for offset in range(24):
+        slot = anchor - timedelta(hours=24 - offset)
+        matrix.append(
+            {
+                "hour": slot.hour,
+                "date": slot.date(),
+                "slot_datetime": slot,
+                "k_act": 10.0,
+                "price_buy": 0.10,
+                "expected_p_act": 0.5,
+                "expected_p_pv": 0.0,
+                "consumption_mode": "profile_spec",
+            }
+        )
+    climate = ModeledClimateContext.for_house_profile(profile, kwp=0.0)
+    contexts = resolve_thermal_flex_contexts(
+        matrix, [consumer], profile, climate=climate
+    )
+    assert len(contexts[consumer["id"]]["daily_targets"]) == 2
+    remaining = {consumer["id"]: 14.0}
+    battery = {
+        "min_soc": 10.0,
+        "max_soc": 100.0,
+        "max_power_kw": 5.0,
+        "battery_capacity_kwh": 10.0,
+        "efficiency": 0.95,
+    }
+    planned = filter_feasible_consumers(
+        [consumer], remaining, matrix, list(range(24)), False, {}, {}
+    )
+    model = _build_milp_model(
+        matrix, 24, battery, 50.0, planned, 0.0, remaining, {}
+    )
+    _add_milp_objective(model, matrix, 3.5, {}, wear_cent_per_kwh=0.0)
+    add_thermal_flex_constraints(model, matrix, list(range(24)), contexts)
+    assert solve_with_strict_fallback(model.prob, msg=False) == "Optimal"
+
+
 def test_thermal_milp_chooses_cheaper_hours():
     import pulp
 

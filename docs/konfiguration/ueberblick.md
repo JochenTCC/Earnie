@@ -1,6 +1,6 @@
 # Konfiguration — Überblick
 
-Die zentrale Datei ist `earnie_env/config/config.json`. Als Startpunkt dient [`earnie_env/config/config.example.json`](../../earnie_env/config/config.example.json). Siehe auch [Speichern / Laden](speichern-laden.md).
+Die zentrale Datei ist `earnie_env/config/config.json`. Als Startpunkt dient [`share/config/config.example.json`](../../share/config/config.example.json) (Bootstrap kopiert fehlende Dateien). Siehe auch [Speichern / Laden](speichern-laden.md) und [Private Haus-Config](../einrichtung/private-env.md).
 
 ## Schema und Editor-Hilfe
 
@@ -10,7 +10,7 @@ Am Dateianfang von `config.json`:
 "$schema": "./config.schema.json"
 ```
 
-In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`earnie_env/config/config.schema.json`](../../earnie_env/config/config.schema.json). Ausführlichere Zusammenhänge stehen in den folgenden Kapiteln dieser Dokumentation.
+In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`share/config/config.schema.json`](../../share/config/config.schema.json). Ausführlichere Zusammenhänge stehen in den folgenden Kapiteln dieser Dokumentation.
 
 ## Hauptblöcke
 
@@ -23,7 +23,7 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`ea
 | `loxone_blocks`                     | Zentrale Loxone-IO-Namen (Speicher, PV, Steuerung)                                                                           |
 | `live_scenario_id`                  | ID des **Live-Szenarios** in `backtesting_scenarios.json` (Standard: `live`)                                                 |
 | `earnie_env/config/components.json`            | Technische Parameter für Speicher und PV (`batteries[]`, `pv_systems[]`; referenziert über IDs)                              |
-| `earnie_env/config/tariffs.json`               | Tarif-Katalog (Bezug/Einspeise); referenziert über `import_tariff_id` / `export_tariff_id`                                   |
+| `earnie_env/config/tariffs.json`               | Laufzeit-Tarifkatalog (Bezug/Einspeise); Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json) |
 | `earnie_env/config/house_profiles.json`        | Standort (Geo/Zeitzone), Planungs-Verbraucher (EV, Wärmepumpe, Waschmaschine …); referenziert über `house_profile_id`        |
 | `earnie_env/config/backtesting_scenarios.json` | **Alle** Szenarien (Live + Varianten); einheitliches `settings`-Format                                                       |
 | `file_paths_battery_simulation`     | Pfade zu historischen CSVs, Preisquelle, `cons_data_hourly.csv`                                                              |
@@ -31,7 +31,7 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`ea
 | `planning_horizon`                  | MILP-Horizont (`sunrise_window` für Live)                                                                                    |
 
 
-Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../earnie_env/config/backtesting_scenarios.example.json).
+Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../share/config/backtesting_scenarios.example.json).
 
 ## Szenarien (Live und Szenario-Explorer)
 
@@ -62,7 +62,7 @@ Details zu Preisen: [Preise & aWATTar](preise.md).
 
 ## Seite Live-Konfiguration
 
-Im Abschnitt **Echtzeit-Umgebung** wählt die Seite **Live-Konfiguration** (Komfort-Ansicht Live-Szenario) Entitäten per Dropdown (`battery_id`, PV, Tarife, Hausprofil). Vor den Tarif-Dropdowns gibt es Filter nach **Land** (`land`: AT/DE/CH) und **Typ**; dasselbe gilt im **Szenarieneditor**. Ein Regionsfilter ist noch nicht verfügbar. Aufgelöste Werte (kWp, Kapazität, Vergütung) sind **read-only**; gespeichert werden nur IDs im Live-Szenario in `backtesting_scenarios.json`.
+Im Abschnitt **Konfiguration** wählt die Seite **Live-Konfiguration** (Komfort-Ansicht Live-Szenario) Entitäten per Dropdown (`battery_id`, PV, Tarife, Hausprofil). Vor den Tarif-Dropdowns gibt es einen gemeinsamen Filter **Land** (`land`: AT/DE/CH) für Bezug und Einspeise sowie getrennte **Typ**-Filter; dasselbe gilt im **Szenarieneditor**. Ein Regionsfilter ist noch nicht verfügbar. Aufgelöste Werte (kWp, Kapazität, Vergütung) sind **read-only**; gespeichert werden nur IDs im Live-Szenario in `backtesting_scenarios.json`.
 
 ## Weiterführend
 

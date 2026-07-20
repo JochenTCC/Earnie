@@ -4,6 +4,7 @@ from __future__ import annotations
 from ui.tariff_filter_helpers import (
     filter_tariffs,
     lands_present,
+    lands_union,
     types_present,
     with_current_tariff,
 )
@@ -45,6 +46,12 @@ def test_filter_land_excludes_missing_land() -> None:
 def test_lands_and_types_present() -> None:
     assert lands_present(_SAMPLE) == ["AT", "DE"]
     assert types_present(_SAMPLE) == ["fixed", "fixed_cent", "spot_hourly"]
+
+
+def test_lands_union_across_catalogs() -> None:
+    imports = [{"id": "a", "land": "AT"}, {"id": "b", "land": "DE"}]
+    exports = [{"id": "c", "land": "CH"}, {"id": "d", "land": "AT"}]
+    assert lands_union(imports, exports) == ["AT", "CH", "DE"]
 
 
 def test_types_present_after_land_cascade() -> None:

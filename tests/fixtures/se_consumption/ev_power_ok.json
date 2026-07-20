@@ -1,0 +1,35 @@
+{
+  "id": "ev_power_ok",
+  "label": "EV power OK",
+  "annual_kwh": 8000.0,
+  "baseload_kwh": 876.0,
+  "latitude": 48.2,
+  "longitude": 11.0,
+  "timezone_name": "Europe/Berlin",
+  "consumers": [
+    {
+      "id": "ev",
+      "label": "EV",
+      "type": "ev",
+      "nominal_power_kw": 11.0,
+      "min_power_kw": 1.4,
+      "min_on_quarterhours": 4,
+      "battery_capacity_kwh": 40.0,
+      "charging_schedule": {
+        "target_soc_percent": 100.0,
+        "charging_efficiency": 0.95,
+        "forecast_when_absent": true,
+        "weekday": {
+          "car_available_from_hour": 18,
+          "ready_by_hour": 7,
+          "daily_rest_soc": 60.0
+        },
+        "weekend": {
+          "car_available_from_hour": 18,
+          "ready_by_hour": 7,
+          "daily_rest_soc": 30.0
+        }
+      }
+    }
+  ]
+}

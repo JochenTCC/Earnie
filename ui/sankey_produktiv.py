@@ -12,10 +12,18 @@ from ui.chart_colors import (
 PRODUKTIV_RUN_FRESH_SEC = 120
 KW_TOLERANCE = 0.02
 MIN_REAL_FLOW_KW = 0.01
-SOLL_PLACEHOLDER_FLOW_KW = 0.05
+SOLL_PLACEHOLDER_FRACTION = 0.05
 FLEX_MISMATCH_COLOR = SANKEY_FLEX_MISMATCH_COLOR
 _DEFAULT_LINK_COLOR = SANKEY_DEFAULT_LINK_COLOR
 _SOLL_PLACEHOLDER_LINK_COLOR = SANKEY_SOLL_PLACEHOLDER_LINK_COLOR
+
+
+def soll_placeholder_flow_kw(sink_sum_kw: float) -> float | None:
+    """Placeholder link width: 5% of real sink sum; None if not drawable."""
+    placeholder = float(sink_sum_kw) * SOLL_PLACEHOLDER_FRACTION
+    if placeholder <= MIN_REAL_FLOW_KW:
+        return None
+    return placeholder
 
 
 def mode_label(mode: int) -> str:
@@ -110,12 +118,14 @@ def flex_sankey_link(
     live_kw: float,
     consumer_id: str,
     state: dict | None,
+    sink_sum_kw: float,
 ) -> tuple[float | None, bool]:
     """
     Sankey-Link für einen Flex-Verbraucher.
 
     Gibt (link_kw, is_soll_placeholder) zurück. link_kw=None → kein sichtbarer Link.
-    Platzhalter-Band nur zur Knoten-Sichtbarkeit wenn live≈0, Soll>0.
+    Platzhalter-Band (5% der realen Sink-Summe) nur zur Knoten-Sichtbarkeit
+    wenn live≈0, Soll>0.
     """
     live = float(live_kw or 0.0)
     if live > MIN_REAL_FLOW_KW:
@@ -124,7 +134,10 @@ def flex_sankey_link(
         return None, False
     soll = _soll_flex_kw(state, consumer_id)
     if soll > MIN_REAL_FLOW_KW:
-        return SOLL_PLACEHOLDER_FLOW_KW, True
+        placeholder = soll_placeholder_flow_kw(sink_sum_kw)
+        if placeholder is None:
+            return None, False
+        return placeholder, True
     return None, False
 
 

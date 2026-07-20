@@ -1,0 +1,53 @@
+# Synology Container Manager – Alpha / Community Pre-release
+#
+# Parallel zu Produktion (docker/compose/synology_productive.yml):
+#   - Host-Port 8511 (Prod bleibt 8501)
+#   - Eigene Volumes unter ./earnie_env_alpha/ (kein Teilen mit Prod)
+#   - Image-Tag pinnen (kein :latest) — an version.py / GitHub Pre-release anpassen
+#
+# Warnung: Nicht zwei Daemonen mit Schreibzugriff auf denselben Miniserver laufen lassen,
+# ohne Silent-Mode / klare Absprache. Alpha hat eigenen .env unter earnie_env_alpha/config/.
+#
+# Start (Repo-Root bzw. NAS-Projektordner):
+#   mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime
+#   docker compose --project-directory . -f docker/compose/synology-alpha.yml pull
+#   docker compose --project-directory . -f docker/compose/synology-alpha.yml up -d
+#
+# UI: http://<host>:8511
+# Ports: docs/referenz/streamlit-ports.md
+
+name: earnie-alpha
+
+version: "3.8"
+
+x-persist-volumes: &persist-volumes
+  - ./earnie_env_alpha/config:/app/config
+  - ./earnie_env_alpha/runtime:/app/runtime
+
+x-common-env: &common-env
+  TZ: Europe/Vienna
+  EARNIE_CONFIG_PATH: config
+  EARNIE_STRICT_TARIFF_VALIDATE: "1"
+  EARNIE_VERIFY_LOXONE_ON_START: "1"
+  EARNIE_AUTO_START_MAIN: "1"
+
+services:
+  earnie-alpha:
+    # Pre-release only — bump when a new alpha/rc is published (matches version.py).
+    image: ghcr.io/jochentcc/earnie-energy:2.2.0-alpha.5
+    container_name: earnie-alpha
+    command: >
+      python -m scripts.run_streamlit
+      --
+      --server.port 8501
+      --server.address 0.0.0.0
+      --server.enableCORS false
+      --server.enableXsrfProtection false
+    restart: unless-stopped
+    ports:
+      - "8511:8501"
+    volumes: *persist-volumes
+    environment:
+      <<: *common-env
+      EARNIE_UI_MODES: sunset2sunset,live_environment
+      EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED: "1"

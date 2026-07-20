@@ -1,6 +1,6 @@
 # Loxone-Signale — Referenz
 
-Alle Namen sind **Beispiele** aus [`earnie_env/config/config.example.json`](../../earnie_env/config/config.example.json). In der eigenen `earnie_env/config/config.json` (bzw. den Sidecars `house_profiles.json`) müssen sie exakt den virtuellen Eingängen und Merkern im Loxone Miniserver entsprechen.
+Alle Namen sind **Beispiele** aus [`share/config/config.example.json`](../../share/config/config.example.json). In der eigenen `earnie_env/config/config.json` (bzw. den Sidecars `house_profiles.json`) müssen sie exakt den virtuellen Eingängen und Merkern im Loxone Miniserver entsprechen.
 
 Prüfung aller konfigurierten Signale:
 
@@ -103,7 +103,7 @@ Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden)
 
 `verify_loxone_setup` prüft alle konfigurierten Trigger zusätzlich.
 
-## Beispiel-Mapping aus `earnie_env/config/config.example.json`
+## Beispiel-Mapping aus `share/config/config.example.json`
 
 | Verbraucher (`id`) | Steuerung (Schreiben) | Leistung (Lesen) |
 |--------------------|----------------------|------------------|

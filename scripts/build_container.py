@@ -32,12 +32,12 @@ def _run_deploy_tariff_gate() -> None:
     """Deploy-Gate: gebündelter Tarifkatalog muss plausibel und vollständig sein."""
     from scripts.validate_tariffs import run_validation
 
-    config_dir = REPO_ROOT / "earnie_env" / "config"
-    tariffs_path = str(config_dir / "tariffs.json")
+    share_config = REPO_ROOT / "share" / "config"
+    tariffs_path = str(share_config / "tariffs.json")
     errors = run_validation(
         tariffs_path=tariffs_path,
-        scenarios_path=str(config_dir / "backtesting_scenarios.example.json"),
-        schema_path=str(config_dir / "tariffs.schema.json"),
+        scenarios_path=str(share_config / "backtesting_scenarios.example.json"),
+        schema_path=str(share_config / "tariffs.schema.json"),
         check_catalog=True,
         import_json=str(REPO_ROOT / "docs" / "spec" / "stromtarife_dach_kombiniert.json"),
         export_json=str(REPO_ROOT / "docs" / "spec" / "einspeisetarife_dach_erweitert.json"),

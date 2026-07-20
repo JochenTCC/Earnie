@@ -24,24 +24,8 @@ COPY . .
 
 RUN sed -i 's/\r$//' docker/entrypoint.sh && chmod +x docker/entrypoint.sh
 
+# Templates + public tariffs catalog live in share/config/ (git). Supplement runtime/.env examples.
 RUN mkdir -p share/config \
-    && cp earnie_env/config/config.example.json share/config/config.example.json \
-    && cp earnie_env/config/config.minimal.json share/config/config.minimal.json \
-    && cp earnie_env/config/config.schema.json share/config/config.schema.json \
-    && cp earnie_env/config/backtesting_scenarios.example.json share/config/backtesting_scenarios.example.json \
-    && cp earnie_env/config/backtesting_scenarios.minimal.json share/config/backtesting_scenarios.minimal.json \
-    && cp earnie_env/config/backtesting_scenarios.schema.json share/config/backtesting_scenarios.schema.json \
-    && cp earnie_env/config/tariffs.example.json share/config/tariffs.example.json \
-    && cp earnie_env/config/tariffs.minimal.json share/config/tariffs.minimal.json \
-    && cp earnie_env/config/tariffs.schema.json share/config/tariffs.schema.json \
-    && cp earnie_env/config/house_profiles.example.json share/config/house_profiles.example.json \
-    && cp earnie_env/config/house_profiles.minimal.json share/config/house_profiles.minimal.json \
-    && cp earnie_env/config/house_profiles.schema.json share/config/house_profiles.schema.json \
-    && cp earnie_env/config/components.example.json share/config/components.example.json \
-    && cp earnie_env/config/components.minimal.json share/config/components.minimal.json \
-    && cp earnie_env/config/components.schema.json share/config/components.schema.json \
-    && cp earnie_env/config/deviation_rules.example.json share/config/deviation_rules.example.json \
-    && cp earnie_env/config/deviation_rules.schema.json share/config/deviation_rules.schema.json \
     && cp earnie_env/runtime/local_settings.example.json share/config/local_settings.example.json \
     && cp .env.example share/config/.env.example
 

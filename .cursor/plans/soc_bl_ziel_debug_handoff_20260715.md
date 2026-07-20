@@ -3,7 +3,7 @@
 **Session date:** 2026-07-15 (updated same day, ~10:45)  
 **Status:** **Closed** (2026-07-15) — silent-stack verified; archived → `backlog/Backlog-Erledigt.md` § Bugfix SoC BL Ziel matched baseline  
 **App version during debug:** 1.98.1  
-**Environment:** `silent-migration-test` (local copy of `\\DS-KO-DO-2\docker\earnie`)
+**Environment:** `silent-migration-test` (local copy of `\\YOUR-NAS\docker\earnie`)
 
 ---
 

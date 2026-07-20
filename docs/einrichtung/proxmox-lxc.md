@@ -2,7 +2,8 @@
 
 Earnie auf einem **Proxmox VE**-Host in einem **unprivileged LXC** mit Docker Compose — gleiches Image und gleiche Persistenz wie Synology/LoxBerry (`earnie_env/config/`, `earnie_env/runtime/`, UI-Port **8501**).
 
-**Compose:** [`docker/compose/proxmox.yml`](../../docker/compose/proxmox.yml)  
+**Compose (Prod):** [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml)  
+**Compose (Alpha, Port 8511):** [`docker/compose/proxmox-alpha.yml`](../../docker/compose/proxmox-alpha.yml)  
 **LXC-Hilfen:** [`docker/proxmox/`](../../docker/proxmox/)  
 **Ports:** [streamlit-ports.md](../referenz/streamlit-ports.md)  
 **Allgemeiner Container-Betrieb:** [container.md](container.md)
@@ -56,14 +57,14 @@ chmod +x /tmp/bootstrap.sh
 /tmp/bootstrap.sh
 ```
 
-Ohne Internetzugriff auf Raw-GitHub: `docker/compose/proxmox.yml` als `/opt/earnie/compose.yaml` und `bootstrap.sh` manuell kopieren (z. B. `pct push`).
+Ohne Internetzugriff auf Raw-GitHub: `docker/compose/proxmox_productive.yml` als `/opt/earnie/compose.yaml` und `bootstrap.sh` manuell kopieren (z. B. `pct push`).
 
 Skript-Standardverzeichnis: **`/opt/earnie`**. Umgebungsvariablen:
 
 | Variable | Bedeutung | Default |
 |----------|-----------|---------|
 | `EARNIE_DIR` | Installationsverzeichnis | `/opt/earnie` |
-| `COMPOSE_URL` | URL der Compose-Datei | Raw `…/docker/compose/proxmox.yml` |
+| `COMPOSE_URL` | URL der Compose-Datei | Raw `…/docker/compose/proxmox_productive.yml` |
 | `IMAGE` | Image-Hinweis in der Ausgabe | `ghcr.io/jochentcc/earnie-energy:latest` |
 
 Falls `docker info` fehlschlägt: Features prüfen, CT neu starten (`pct reboot <VMID>`).

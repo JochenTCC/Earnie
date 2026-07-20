@@ -323,9 +323,12 @@ def planning_ev_daily_targets(
     *,
     window_end: datetime | None = None,
 ) -> dict[str, float]:
-    """Tagesziele (kWh) für EV-Verbraucher im Fenster."""
-    from house_config.ev_profile import ev_daily_kwh
+    """Window kWh for EV flex — same power-capped schedule as cons_data / Historisch.
 
+    SOC-only ``ev_daily_kwh`` can exceed what ``nominal_power_kw`` delivers in the
+    charging window; using slot-modeled energy keeps profile_spec Jahres Verbrauch
+    aligned with synthetic Historisch (same pattern as thermal_annual).
+    """
     ev_by_id = {
         consumer["id"]: consumer
         for consumer in _house_ev_consumers(house_profile)
@@ -337,20 +340,7 @@ def planning_ev_daily_targets(
         source = ev_by_id.get(milp_consumer["id"])
         if not source:
             continue
-        if consumer_uses_profile_csv(source):
-            targets[milp_consumer["id"]] = _consumer_window_kwh(source, slot_datetimes)
-            continue
-        if window_end is not None:
-            departure_day = window_end.date()
-            targets[milp_consumer["id"]] = round(
-                ev_daily_kwh(source, departure_day), 3
-            )
-            continue
-        dates = {slot_dt.date() for slot_dt in slot_datetimes}
-        targets[milp_consumer["id"]] = round(
-            sum(ev_daily_kwh(source, day) for day in dates),
-            3,
-        )
+        targets[milp_consumer["id"]] = _consumer_window_kwh(source, slot_datetimes)
     return targets
 
 

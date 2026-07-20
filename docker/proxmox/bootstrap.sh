@@ -5,7 +5,7 @@
 set -euo pipefail
 
 EARNIE_DIR="${EARNIE_DIR:-/opt/earnie}"
-COMPOSE_URL="${COMPOSE_URL:-https://raw.githubusercontent.com/JochenTCC/Earnie/main/docker/compose/proxmox.yml}"
+COMPOSE_URL="${COMPOSE_URL:-https://raw.githubusercontent.com/JochenTCC/Earnie/main/docker/compose/proxmox_productive.yml}"
 IMAGE="${IMAGE:-ghcr.io/jochentcc/earnie-energy:latest}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -31,7 +31,9 @@ mkdir -p "${EARNIE_DIR}/config" "${EARNIE_DIR}/runtime"
 cd "${EARNIE_DIR}"
 
 if [[ ! -f compose.yaml ]]; then
-  if [[ -f /tmp/proxmox.yml ]]; then
+  if [[ -f /tmp/proxmox_productive.yml ]]; then
+    cp /tmp/proxmox_productive.yml compose.yaml
+  elif [[ -f /tmp/proxmox.yml ]]; then
     cp /tmp/proxmox.yml compose.yaml
   else
     echo "==> Downloading compose from ${COMPOSE_URL}"
@@ -48,4 +50,4 @@ echo "Earnie is starting."
 echo "  Edit:  ${EARNIE_DIR}/config/.env and ${EARNIE_DIR}/config/config.json"
 echo "  UI:    http://$(hostname -I 2>/dev/null | awk '{print $1}'):8501"
 echo "  Logs:  docker compose -f ${EARNIE_DIR}/compose.yaml logs -f"
-echo "  After config edits: docker compose -f ${EARNIE_DIR}/compose.yaml restart earnie"
+echo "  After config edits: docker compose -f ${EARNIE_DIR}/compose.yaml restart earnie-productive"

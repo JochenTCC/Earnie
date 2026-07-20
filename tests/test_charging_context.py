@@ -373,6 +373,8 @@ class TestConfigPathFertigUm:
         matrix = _hour_matrix(horizon, 24)
         with patch.object(
             cc, "_loxone_ready_raw", return_value="Heute, 14:00"
+        ), patch.object(
+            cc.loxone_client, "fetch_loxone_generic_value", return_value=1
         ), _patch_eauto_capacity():
             ctx = cc.resolve_charging_context(
                 consumer, matrix, None, logged_simulation=False
@@ -380,6 +382,7 @@ class TestConfigPathFertigUm:
         assert ctx["deadline"] == datetime(2026, 7, 16, 14, 0)
         assert ctx["use_time_window"] is False
         assert "FertigUm" in ctx["source_label"]
+        assert ctx.get("plugged_in") is True
         eligible = cc.consumer_charging_eligible_indices(
             matrix, consumer, list(range(24)), ctx
         )
@@ -392,9 +395,45 @@ class TestConfigPathFertigUm:
         consumer = self._config_consumer()
         horizon = datetime(2026, 7, 16, 2, 0)
         matrix = _hour_matrix(horizon, 24)
-        with patch.object(cc, "_loxone_ready_raw", return_value=None), _patch_eauto_capacity():
+        with patch.object(cc, "_loxone_ready_raw", return_value=None), patch.object(
+            cc.loxone_client, "fetch_loxone_generic_value", return_value=1
+        ), _patch_eauto_capacity():
             ctx = cc.resolve_charging_context(
                 consumer, matrix, None, logged_simulation=False
             )
         assert ctx["deadline"] == datetime(2026, 7, 16, 7, 0)
         assert ctx["use_time_window"] is True
+        assert ctx.get("plugged_in") is True
+
+    def test_unplugged_with_forecast_sets_anticipated(self):
+        consumer = self._config_consumer()
+        horizon = datetime(2026, 7, 20, 9, 30)
+        matrix = _hour_matrix(horizon, 24)
+        with patch.object(
+            cc, "_loxone_ready_raw", return_value="Morgen, 08:45"
+        ), patch.object(
+            cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+        ), _patch_eauto_capacity():
+            ctx = cc.resolve_charging_context(
+                consumer, matrix, None, logged_simulation=False
+            )
+        assert ctx["active"] is True
+        assert ctx.get("plugged_in") is False
+        assert ctx.get("anticipated") is True
+        assert cc.suppresses_live_charging_output(ctx) is True
+        assert ctx["target_kwh"] > 0
+
+    def test_unplugged_without_forecast_inactive(self):
+        consumer = self._config_consumer()
+        consumer["charging_schedule"]["forecast_when_absent"] = False
+        horizon = datetime(2026, 7, 20, 9, 30)
+        matrix = _hour_matrix(horizon, 24)
+        with patch.object(
+            cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+        ), _patch_eauto_capacity():
+            ctx = cc.resolve_charging_context(
+                consumer, matrix, None, logged_simulation=False
+            )
+        assert ctx["active"] is False
+        assert ctx.get("plugged_in") is False
+        assert ctx.get("target_kwh", 0) == 0

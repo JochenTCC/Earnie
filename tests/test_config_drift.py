@@ -102,7 +102,7 @@ def test_repo_example_matches_earnie_env_config_shape():
     from pathlib import Path
 
     repo_root = Path(__file__).resolve().parents[1]
-    example_path = repo_root / "earnie_env" / "config" / "config.example.json"
+    example_path = repo_root / "share" / "config" / "config.example.json"
     live_path = repo_root / "earnie_env" / "config" / "config.json"
     if not live_path.is_file():
         import pytest

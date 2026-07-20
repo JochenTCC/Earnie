@@ -24,9 +24,9 @@ services:
     build: *build
     container_name: earnie
     restart: unless-stopped
-    # Host-Port muss ui.streamlit_port in earnie_env/config/config.json entsprechen (Standard: 8501).
+    # Host 8521 → Container 8501 (ui.streamlit_port im Container bleibt 8501).
     ports:
-      - "8501:8501"
+      - "8521:8501"
     volumes: *persist-volumes
     environment:
       <<: *common-env

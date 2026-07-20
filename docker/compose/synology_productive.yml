@@ -1,4 +1,4 @@
-# Synology Container Manager – Produktions-Compose (vorgefertigtes Image)
+# Synology Container Manager – Produktions-Compose (vorgefertigtes Image :latest)
 #
 # Persistente Daten (überleben Image-Updates):
 #   ./earnie_env/config/config.json   – Haus-Konfiguration (wird nie überschrieben)
@@ -8,31 +8,28 @@
 #   ./earnie_env/runtime/  – cons_data, Zustands-JSONs, Profile, Logs
 #
 # Erstinstallation:
-#   1. Ordner anlegen: mkdir -p config runtime
+#   1. Ordner anlegen: mkdir -p earnie_env/config earnie_env/runtime
 #   2. Container starten – fehlende Dateien legt der Entrypoint an (config/.env, config.json)
 #   3. config/.env und earnie_env/config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
 #   4. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
 #
-# Migration von älterem Layout (Dateien im Projektordner):
-#   mv config.json earnie_env/config/config.json
-#   mv .env config/.env   # falls Zugangsdaten noch im Projektroot lagen
-#   Optional fehlen auf dem Volume: config.example.json / config.schema.json –
-#   der Entrypoint kopiert sie aus share/config/ im Image (für config_drift).
-#   mv cons_data_hourly.csv cons_data_hourly.meta.json runtime/ 2>/dev/null || true
-#   mv flexible_consumers_state.json pv_counter_state.json cons_data_pending.json runtime/ 2>/dev/null || true
-#   mv consumption_profiles.csv total_consumption_profiles.csv flexible_consumer_profiles.csv runtime/ 2>/dev/null || true
-#   mv earnie.log system_history_log.csv runtime/ 2>/dev/null || true
-#   In earnie_env/config/config.json: "path_cons_data": "runtime/cons_data_hourly.csv"
+# Migration vom alten Dateinamen synology.yml / Container „earnie“:
+#   docker stop earnie; docker rm earnie
+#   dann diese Datei als compose.yaml nutzen und up -d (neuer Name: earnie-productive)
 #
 # Ein Container: Streamlit-UI startet main.py automatisch (EARNIE_AUTO_START_MAIN=1).
 # Nach Änderungen an earnie_env/config/config.json: Container neu starten.
 # Nach Code-Änderungen: Image bauen/pushen (docs/einrichtung/container.md), dann auf der NAS:
-#   docker compose --project-directory . -f docker/compose/synology.yml pull
-#   docker compose --project-directory . -f docker/compose/synology.yml up -d
+#   docker compose --project-directory . -f docker/compose/synology_productive.yml pull
+#   docker compose --project-directory . -f docker/compose/synology_productive.yml up -d
+#
+# Community Pre-release parallel: docker/compose/synology-alpha.yml (Port 8511, earnie_env_alpha/).
 #
 # Auf der NAS liegt die Datei oft als compose.yaml — Inhalt aus diesem File übernehmen.
 #
-# UI: EARNIE_UI_MODES=sunset2sunset,scenario_explorer (Prod); Dev ohne Variable = Standard-Modi.
+# UI: EARNIE_UI_MODES=sunset2sunset,scenario_explorer,live_environment (Prod); Dev ohne Variable = Standard-Modi.
+
+name: earnie-productive
 
 version: "3.8"
 
@@ -50,9 +47,9 @@ x-common-env: &common-env
   EARNIE_AUTO_START_MAIN: "1"
 
 services:
-  earnie:
+  earnie-productive:
     image: ghcr.io/jochentcc/earnie-energy:latest
-    container_name: earnie
+    container_name: earnie-productive
     command: >
       python -m scripts.run_streamlit
       --
@@ -66,5 +63,5 @@ services:
     volumes: *persist-volumes
     environment:
       <<: *common-env
-      EARNIE_UI_MODES: sunset2sunset,scenario_explorer
+      EARNIE_UI_MODES: sunset2sunset,live_environment
       EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED: "1"

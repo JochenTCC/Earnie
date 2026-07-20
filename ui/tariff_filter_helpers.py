@@ -54,6 +54,14 @@ def lands_present(tariffs: list[dict]) -> list[str]:
     return sorted(lands)
 
 
+def lands_union(*tariff_lists: list[dict]) -> list[str]:
+    """Sorted unique lands across multiple tariff catalogs (import + export)."""
+    combined: list[dict] = []
+    for tariffs in tariff_lists:
+        combined.extend(tariffs)
+    return lands_present(combined)
+
+
 def types_present(tariffs: list[dict]) -> list[str]:
     types = {
         str(item.get("type") or "").strip().lower()
@@ -116,37 +124,40 @@ def _format_type_option(type_key: str, labels: dict[str, str]) -> str:
     return labels.get(type_key, type_key)
 
 
-def render_tariff_filter_row(
+def render_shared_land_filter(
+    *,
+    key: str,
+    import_tariffs: list[dict],
+    export_tariffs: list[dict],
+) -> str | None:
+    """Single Land selectbox for import and export. Returns None if Alle."""
+    land_options = [ALL_FILTER, *lands_union(import_tariffs, export_tariffs)]
+    land_pick = st.selectbox("Land", options=land_options, key=key)
+    return None if land_pick == ALL_FILTER else land_pick
+
+
+def render_tariff_type_filter(
     *,
     key_prefix: str,
     tariffs: list[dict],
     kind: Literal["import", "export"],
+    land: str | None = None,
     current_id: str | None = None,
     label_prefix: str = "",
 ) -> list[dict]:
-    """Render Land + Typ filters; return filtered tariffs (current kept if needed)."""
+    """Render Typ filter (after shared Land); return filtered tariffs."""
     type_labels = _type_labels_for(kind)
-    land_options = [ALL_FILTER, *lands_present(tariffs)]
-    land_col, type_col = st.columns(2)
-    with land_col:
-        land_pick = st.selectbox(
-            f"{label_prefix}Land".strip(),
-            options=land_options,
-            key=f"{key_prefix}_land",
-        )
-    land_filter = None if land_pick == ALL_FILTER else land_pick
-    after_land = filter_tariffs(tariffs, land=land_filter)
+    after_land = filter_tariffs(tariffs, land=land)
     type_options = [ALL_FILTER, *types_present(after_land)]
     type_key = f"{key_prefix}_type"
     if type_key in st.session_state and st.session_state[type_key] not in type_options:
         st.session_state[type_key] = ALL_FILTER
-    with type_col:
-        type_pick = st.selectbox(
-            f"{label_prefix}Typ".strip(),
-            options=type_options,
-            key=type_key,
-            format_func=lambda t: _format_type_option(t, type_labels),
-        )
+    type_pick = st.selectbox(
+        f"{label_prefix}Typ".strip(),
+        options=type_options,
+        key=type_key,
+        format_func=lambda t: _format_type_option(t, type_labels),
+    )
     type_filter = None if type_pick == ALL_FILTER else type_pick
     filtered = filter_tariffs(after_land, tariff_type=type_filter)
     result, outside = with_current_tariff(filtered, tariffs, current_id)

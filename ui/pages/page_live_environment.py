@@ -1,4 +1,4 @@
-"""Echtzeit-Umgebung: Live-Szenario wählen und Entitäts-Referenzen für den Echtzeitbetrieb."""
+"""Konfiguration: Live-Szenario wählen und Entitäts-Referenzen für den Echtzeitbetrieb."""
 from __future__ import annotations
 
 from ui.config_forms import render_live_environment_section

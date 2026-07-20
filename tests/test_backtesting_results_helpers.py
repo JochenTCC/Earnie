@@ -12,6 +12,7 @@ from ui.backtesting_results_helpers import (
     build_annual_cost_rows,
     build_scenario_consumption_rows,
     cons_data_has_flex_energy,
+    exceeds_live_reference_rel,
     format_test_run_caption,
     is_single_month_test_run,
     nav_bounds_from_period,
@@ -120,6 +121,9 @@ def test_build_annual_cost_rows_reference_kwh_and_delta():
     assert live_row["Jahres Verbrauch [kWh]"] == "4800.0"
     assert live_row["Jahres Kosten [€]"] == "1000.00 €"
     assert live_row["Δ vs Referenz [€]"] == "-100.00 €"
+    assert live_ref_row["Hinweis"] == "—"
+    assert live_row["Hinweis"] == "—"
+    assert ref_row["Hinweis"] == "—"
 
 
 def test_build_annual_cost_rows_delta_always_vs_live_reference():
@@ -375,11 +379,69 @@ def test_build_scenario_consumption_rows_optimized_only_with_constant_refs():
     assert live_row["Optimiert (kWh)"] == "520.5"
     assert live_row["Δ kWh (Ref. ohne Optimierung)"] == "+20.5"
     assert live_row["Plausibilität"] == "29/31 OK"
+    assert live_row["Hinweis"] == "—"
     fixed_row = rows[1]
     assert fixed_row["Ohne PV und Speicher [kWh]"] == "490.0"
     assert fixed_row["Reference (Live) - ohne Optimierung [kWh]"] == "500.0"
     assert fixed_row["Optimiert (kWh)"] == "510.0"
     assert fixed_row["Δ kWh (Ref. ohne Optimierung)"] == "+10.0"
+    assert fixed_row["Hinweis"] == "—"
+
+
+def test_exceeds_live_reference_rel_threshold():
+    assert exceeds_live_reference_rel(520.0, 500.0) is False  # 4%
+    assert exceeds_live_reference_rel(525.1, 500.0) is True  # >5%
+    assert exceeds_live_reference_rel(474.9, 500.0) is True
+    assert exceeds_live_reference_rel(None, 500.0) is False
+    assert exceeds_live_reference_rel(10.0, 0.0) is True
+    assert exceeds_live_reference_rel(0.0, 0.0) is False
+
+
+def test_build_annual_cost_rows_deviation_hint():
+    from simulation.engine import scenario_reference_id, scenario_reference_label
+
+    live_ref_id = scenario_reference_id("live")
+    live_ref_label = scenario_reference_label("Live")
+    meta = {
+        "reference_id": HISTORICAL_REFERENCE_ID,
+        "live_scenario_id": "live",
+        "scenario_ids": [HISTORICAL_REFERENCE_ID, live_ref_id, "live", "fixed_full"],
+        "labels": {
+            HISTORICAL_REFERENCE_ID: "Historisch",
+            live_ref_id: live_ref_label,
+            "live": "Live",
+            "fixed_full": "Fixed Full",
+        },
+        "summary": {
+            "total_eur": {
+                HISTORICAL_REFERENCE_ID: 1200.0,
+                live_ref_id: 1100.0,
+                "live": 1000.0,
+                "fixed_full": 980.0,
+            },
+        },
+        "plausibility": {
+            "live": {
+                "consumption_totals": {
+                    "historical_kwh": 500.0,
+                    "optimized_kwh": 510.0,
+                },
+            },
+            "fixed_full": {
+                "consumption_totals": {
+                    "historical_kwh": 500.0,
+                    "optimized_kwh": 540.0,
+                },
+            },
+        },
+    }
+    rows = build_annual_cost_rows(meta, ref_kwh=490.0)
+    by_label = {row["Szenario"]: row for row in rows}
+    assert by_label[live_ref_label]["Hinweis"] == "—"
+    assert by_label["Live"]["Hinweis"] == "—"
+    assert by_label["Historisch"]["Hinweis"] == "—"
+    assert "Config-Dump" in by_label["Fixed Full"]["Hinweis"]
+    assert "Live-Referenz" in by_label["Fixed Full"]["Hinweis"]
 
 
 def test_build_scenario_consumption_rows_timing_shift_note(monkeypatch):

@@ -53,7 +53,7 @@ def test_synthetic_haus_kw_matches_thermal_overlay_for_jan_14(monkeypatch):
 
 def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
     _mock_open_meteo_climate(monkeypatch)
-    consumer_ids = ["haus", "standard", "ev", "waschmaschine"]
+    consumer_ids = ["haus", "ev", "rest"]
     monkeypatch.setattr(
         "data.cons_data_house_profile.expected_cons_data_consumer_ids",
         lambda: consumer_ids,
@@ -75,7 +75,7 @@ def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
     cache._pv_series = df["pv_kw"]
     _, hist_totals, total_load, hourly_flex = cache.get_window_consumption(
         slots,
-        flex_consumer_ids=["standard", "waschmaschine"],
+        flex_consumer_ids=["ev", "rest"],
     )
     _, all_consumer_totals, _, _ = cache.get_window_consumption(slots)
     overlay = house_profile_baseload_overlay(
@@ -94,7 +94,7 @@ def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
 def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch):
     """Kein Thermik-Overlay wenn haus_kw-Spalte existiert aber am Tag 0 kWh (Heiz-Aus)."""
     _mock_open_meteo_climate(monkeypatch)
-    consumer_ids = ["haus", "standard", "ev", "waschmaschine"]
+    consumer_ids = ["haus", "ev", "rest"]
     monkeypatch.setattr(
         "data.cons_data_house_profile.expected_cons_data_consumer_ids",
         lambda: consumer_ids,
@@ -112,9 +112,8 @@ def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch
     df["haus_kw"] = 0.0
     df["total_kw"] = (
         df["baseload_kw"].astype(float)
-        + df["standard_kw"].astype(float)
         + df["ev_kw"].astype(float)
-        + df["waschmaschine_kw"].astype(float)
+        + df["rest_kw"].astype(float)
     ).round(3)
 
     anchor = datetime(2025, 1, 15, 0, 0)
@@ -124,7 +123,7 @@ def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch
     cache._pv_series = df["pv_kw"]
     _, hist_totals, total_load, hourly_flex = cache.get_window_consumption(
         slots,
-        flex_consumer_ids=["standard", "waschmaschine"],
+        flex_consumer_ids=["ev", "rest"],
     )
     _, all_consumer_totals, _, _ = cache.get_window_consumption(slots)
     cons_data_ids = cache.cons_data_consumer_ids_present()

@@ -475,7 +475,7 @@ def _reference_kwh_for_meta(meta: dict) -> float | None:
 
 
 def render_annual_cost_table(meta: dict) -> None:
-    st.subheader("Gesamtkosten")
+    st.subheader("Gesamtkosten und -Verbrauch")
     ref_kwh = _reference_kwh_for_meta(meta)
     rows = build_annual_cost_rows(meta, ref_kwh)
     if not rows:
@@ -487,6 +487,8 @@ def render_annual_cost_table(meta: dict) -> None:
         "`cons_data` (Zähler). Bei Referenz- und Optimierungszeilen Summe aus dem "
         "Hausprofil-Modell bzw. der gelieferten Optimierungsenergie — "
         "Abweichungen zu Historisch sind erwartbar, wenn Ist ≠ Modell. "
+        "Abweichung >5% vs. Live-Referenz → Warnung in Spalte Hinweis "
+        "(Config-Dump über Info / About → Kontakt). "
         "Details: Benutzer-Handbuch → Szenario-Explorer."
     )
 

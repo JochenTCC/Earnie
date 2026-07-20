@@ -106,3 +106,4 @@ When synthesizing `cons_data`, `total_kw` = metric baseload + Σ(consumers).
 - `ui/chart_consumer_stack.py` — Chart 1 stack order and flex discovery
 - `ui/backtesting_display_bundle.py` — passes resolved flex into backtesting Chart 1
 - `ui/backtesting_scenario_consumption.py` — baseline vs optimized charts
+- `tests/fixtures/se_consumption/` — static mini house profiles + `tests/test_se_consumption_invariants.py` (profile_spec window ≈ hourly Historisch-style load; `thermal_pulse_tight` also covers MILP feasibility for 1 kW Haus+EV overnight)

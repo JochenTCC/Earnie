@@ -3,6 +3,63 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Docker compose Alpha / Productive + Streamlit ports (2026-07-20)
+
+- [x] Split host compose into `*_productive.yml` (`earnie-productive`, :8501) and `*-alpha.yml` (`earnie-alpha`, :8511, `earnie_env_alpha/`)
+- [x] Align ports scheme B: local Docker :8521, local venv :8531, greenfield venv :8532 (`docs/referenz/streamlit-ports.md`, `dev.yml`, `.vscode/launch.json`)
+- [x] Docs/README/proxmox bootstrap updated; session-abschluss Alpha compose sync rule
+- [x] `.gitignore` for `earnie_env_alpha` config/runtime
+
+
+### Bugfix config import page jump to SE (2026-07-20)
+
+- [x] **After „Importieren und neu laden“ (and other cases) app jumped to SE** — live verification: current page preserved after import (no auto-switch to Szenario-Explorer)
+
+
+### Bugfix SE Live vs Referenz Jahres Verbrauch (2026-07-20)
+
+- [x] **Live ≈½ Referenz after 1 month** (`chart_debug_review/earnie_config_20260719_081454`) — thermal MILP applied full HDD targets to each calendar day in midnight-spanning 07:00 windows → Infeasible with `max_on_quarterhours=16` → Automatik fallback (only last ~4 h EV+Haus); fix: prorate thermal day targets + operational ON-slot cap (`optimizer/thermal_flex_context.py`); mini-scenario `thermal_pulse_tight`; verified live (Referenz ≈ Live ≈1092 kWh)
+
+
+### Bugfix SE EV Jahres Verbrauch vs Historisch (2026-07-20)
+
+- [x] **consumption mismatch in SE with `chart_debug_review/earnie_config_20260719_081454`** — non-CSV `planning_ev_daily_targets` used uncapped SOC `ev_daily_kwh` (~44 kWh/d) while Historisch/synthetic used power-capped hourly (~13 kWh/d at `nominal_power_kw=1`); fix: slot-modeled window kWh (same as CSV EV / thermal); verified live (Historisch ≈ Referenz)
+
+
+### Bugfix SE monthly_float OeMAG rates missing (2026-07-20)
+
+- [x] **Error during SE with `chart_debug_review/earnie_config_20260719_050759`** — `get_backtesting_feed_in_settings` raised because `oemag_monthly_feed_in_rates` / `monthly_float_reference_cent_kwh` missing while live export was `monthly_float`; rates + reference cent added to pack (and `earnie_env`) `backtesting_scenarios.json` — verified live
+
+
+### Bugfix SE Verbrauchsdaten warning wording (2026-07-20)
+
+- [x] **Warning still said „Backtesting“** — empty cons_data warning in `ui/backtesting_cons_data.py` now: „… bevor du Szenario-Explorer startest.“
+
+
+### Bugfix shared Land tariff filter (2026-07-19)
+
+- [x] **"Bezug Land" / "Einspeise Land" must not differ** — single shared **Land** filter for Bezug + Einspeise in Szenarieneditor and Live-Konfiguration; separate Typ filters kept; `render_shared_land_filter` + `render_tariff_type_filter` in `ui/tariff_filter_helpers.py`; docs `docs/konfiguration/ueberblick.md`; tests `lands_union` — verified live
+
+
+### Bugfix Bezeichnung dropdown / unique defaults (2026-07-19)
+
+- [x] **Bezeichnung not updated in entity/select dropdowns after change** — Streamlit `format_func` kept stale labels when option IDs stayed the same; options are now Bezeichnung strings (`ui/label_select.py`) for Hausprofil, PV, Batterie, Szenario, entity pickers, Tarife, Live-Szenario; auto-persist triggers `st.rerun()`; Verbraucher expander titles use live widget state — verified live
+- [x] **Unique Bezeichnung defaults** — `allocate_unique_label` for new Hausprofil / PV / Batterie / Szenario / extra Verbraucher (`Mein Haushalt 2`, …) — verified live
+
+
+### Version 2.2.0 — Sanitize private NAS hostname (2026-07-19)
+
+- [x] Replace `DS-KO-DO-2` with dummy `YOUR-NAS` in `.env.example`, `.vscode/launch.json`, `share/config/remote_backtesting.example.json`, `scripts/_diag_swimspa_nas.py`, plan note; example SSH host/user/path also dummy placeholders
+
+
+### Version 2.2.0 — Banner der Wahrheit A + light B (2026-07-19)
+
+- [x] Attribution banner in UI (`ui/truth_banner.py`): Earnie, non-commercial note, official repo, version; sidebar + main; also on Loxone setup path
+- [x] Best-effort unofficial origin labeling (`EARNIE_BUILD_ORIGIN` / git remote); calm when origin unknown (Docker/SCC)
+- [x] LICENSE §4.3 keep banner; handbook note; tests `tests/test_truth_banner.py`
+- [x] Layer C deferred to `2.+1` (signed builds / registry) — not implemented
+
+
 ### Version 2.+1 — Offline demo seed for Community Cloud (2026-07-18)
 
 - [x] `EARNIE_OFFLINE=1`: bootstrap fills empty live-scenario entity IDs from catalogs (`runtime_store/offline_demo_seed.py`); never overwrites non-empty refs

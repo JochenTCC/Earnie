@@ -8,22 +8,24 @@ Konfiguration im Container/venv: `config.json` → `ui.streamlit_port` oder `EAR
 
 | Port | Stack / Betrieb | Plattform | Daemon (`main.py`) | UI-Zugriff | Compose / Start |
 |------|-----------------|-----------|--------------------|------------|-----------------|
-| **8501** | **Produktion** | Synology NAS, LoxBerry, Proxmox LXC | im Container `earnie` (Auto-Start) | LAN: `http://<host>:8501`; Synology extern: HTTPS :443 → Reverse Proxy → 8501 | `docker/compose/synology.yml`, `docker/compose/loxberry.yml`, `docker/compose/proxmox.yml` |
-| **8501** | **Lokaler Dev-Stack (Docker)** | Windows/Linux Dev-PC | im Container `earnie` (Auto-Start) | `http://localhost:8501` | `docker/compose/dev.yml` (`8501:8501`) |
-| **8501** | **Lokal ohne Docker (venv)** | Dev-PC (venv) | `python main.py` (lokal) oder UI **Optimierer-Dienst** | `http://localhost:8501` (Standard `ui.streamlit_port`) | `python -m scripts.run_streamlit`, VS Code „Streamlit app.py (:8501 lokal)“ |
+| **8501** | **Produktion** | Synology NAS, LoxBerry, Proxmox LXC | im Container `earnie-productive` (Auto-Start) | LAN: `http://<host>:8501`; Synology extern: HTTPS :443 → Reverse Proxy → 8501 | `docker/compose/synology_productive.yml`, `loxberry_productive.yml`, `proxmox_productive.yml` |
+| **8511** | **Alpha** | Synology NAS, LoxBerry, Proxmox LXC | im Container `earnie-alpha` (Auto-Start) | LAN: `http://<host>:8511` | `docker/compose/synology-alpha.yml`, `loxberry-alpha.yml`, `proxmox-alpha.yml` (Volumes: `earnie_env_alpha/`) |
+| **8521** | **Lokaler Dev-Stack (Docker)** | Windows/Linux Dev-PC | im Container `earnie` (Auto-Start) | `http://localhost:8521` | `docker/compose/dev.yml` (`8521:8501`) |
+| **8531** | **Lokal ohne Docker (venv)** | Dev-PC (venv) | `python main.py` (lokal) oder UI **Optimierer-Dienst** | `http://localhost:8531` (`EARNIE_UI_STREAMLIT_PORT`; Schema-Default im Container bleibt 8501) | `python -m scripts.run_streamlit`, VS Code „Streamlit app.py (:8531 lokal)“ |
 | **8502** | **Greenfield (Docker)** | Dev-PC (Docker) | im Container `earnie-greenfield` (Auto-Start) | `http://localhost:8502` | `docker/compose/greenfield.yml` (`8502:8501`) |
-| **8511** | **Greenfield (venv)** | Dev-PC (venv) | `python main.py` mit `greenfield/config` | `http://localhost:8511` | VS Code „Streamlit app.py (LOKAL, Greenfield :8511)“ |
-| **8503** | **Lokal gegen NAS-Daten** | Dev-PC (venv) | **auf der NAS** (im Prod-Container `earnie`) | `http://localhost:8503` | VS Code „Streamlit app.py (NAS :8503)“ — liest `config`/`runtime` per UNC/SMB von der NAS |
+| **8532** | **Greenfield (venv)** | Dev-PC (venv) | `python main.py` mit `greenfield/config` | `http://localhost:8532` | VS Code „Streamlit app.py (Greenfield :8532)“ |
+| **8503** | **Lokal gegen NAS-Daten** | Dev-PC (venv) | **auf der NAS** (im Prod-Container `earnie-productive`) | `http://localhost:8503` | VS Code „Streamlit app.py (NAS :8503)“ — liest `config`/`runtime` per UNC/SMB von der NAS |
 
 ## Parallelbetrieb auf dem Dev-PC
 
 Typisch gleichzeitig möglich:
 
-- NAS-Produktion unter `http://<nas-ip>:8501` (remote)
-- Greenfield unter `http://localhost:8502` (Docker) oder `8511` (venv)
+- NAS-Produktion unter `http://<nas-ip>:8501` und optional Alpha unter `http://<nas-ip>:8511` (remote; getrennte Volumes)
+- Lokaler Dev-Stack Docker unter `http://localhost:8521` und/oder venv unter `http://localhost:8531`
+- Greenfield unter `http://localhost:8502` (Docker) oder `http://localhost:8532` (venv)
 - Lokales Cockpit gegen NAS-Log unter `http://localhost:8503` (nur UI lokal, Daemon bleibt auf der NAS)
 
-**Nicht** parallel starten: zwei Prozesse auf dem **selben** Host-Port (z. B. zwei venv-Streamlit-Instanzen beide auf 8501).
+**Nicht** parallel starten: zwei Prozesse auf dem **selben** Host-Port (z. B. zwei venv-Streamlit-Instanzen beide auf 8531).
 
 ## Umgebungsvariable
 

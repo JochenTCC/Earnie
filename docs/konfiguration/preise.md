@@ -4,7 +4,7 @@ Live-Bezugspreise kommen heute über Tarif-Einträge vom Typ `awattar` (API AT/D
 
 ## Bezugspreis (Live)
 
-Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen [`earnie_env/config/tariffs.json`](../../earnie_env/config/tariffs.json) auf. Bei Typ `awattar` gelten dieselben Aufschläge wie bei Spot-Tarifen **am Tarif-Eintrag** (`settlement_fee_cent_kwh`, `markup_percent`, `vat_percent` / `prices_include_vat`).
+Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `earnie_env/config/tariffs.json` auf (Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json)). Bei Typ `awattar` gelten dieselben Aufschläge wie bei Spot-Tarifen **am Tarif-Eintrag** (`settlement_fee_cent_kwh`, `markup_percent`, `vat_percent` / `prices_include_vat`).
 
 Stundenpreise kommen von der aWATTar-API; die URL wird aus `import_tariff_id` → `land` abgeleitet (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
 
@@ -31,7 +31,7 @@ Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Typ `f
 
 ## Planung & Backtesting (ab 1.24.f)
 
-Tarife liegen in [`earnie_env/config/tariffs.json`](../../earnie_env/config/tariffs.json) mit Root-Feld `catalog_as_of` (Stand der Tarifliste). Szenarien in `backtesting_scenarios.json` referenzieren `import_tariff_id` und `export_tariff_id`.
+Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/config/tariffs.json) mit Root-Feld `catalog_as_of`. Zur Laufzeit nutzt Earnie `earnie_env/config/tariffs.json` (Bootstrap kopiert den Katalog bei Bedarf). Szenarien in `backtesting_scenarios.json` referenzieren `import_tariff_id` und `export_tariff_id`.
 
 ### Import-Typen
 

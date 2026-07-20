@@ -28,7 +28,7 @@ Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config` (Config-Verzeichnis im
 
 ## Erstinstallation (NAS)
 
-1. Projektordner mit `docker/compose/synology.yml` anlegen (auf der NAS oft als `compose.yaml` kopiert)
+1. Projektordner mit `docker/compose/synology_productive.yml` anlegen (auf der NAS oft als `compose.yaml` kopiert)
 2. `mkdir -p earnie_env/config earnie_env/runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`.env`, `config.json`, `tariffs.json`, weitere Sidecars, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
 4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
@@ -38,7 +38,7 @@ Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config` (Config-Verzeichnis im
 
 ## Config-Updates nach Programm-Upgrade
 
-Neue Einträge in `earnie_env/config/config.example.json` (bzw. Image-Vorlage unter `share/config/`) werden **nicht** automatisch in die Anwender-Config geschrieben.
+Neue Einträge in `share/config/config.example.json` (Image-Vorlage) werden **nicht** automatisch in die Anwender-Config geschrieben.
 
 - Beim Start von `main.py`: Hinweis im Log
 - In der Streamlit-App: gelbes Banner mit fehlenden Pfaden und Beispielwerten
@@ -60,7 +60,23 @@ Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/a
 
 **Veröffentlichte Images** kommen von GitHub Releases: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release.yml`](../../.github/workflows/release.yml) und pusht u. a. `ghcr.io/jochentcc/earnie-energy:X.Y.Z` sowie `:latest`. Details für Entwickler: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
-**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und nur den Image-Tag `:<version>` — **nicht** `:latest`. Zum Testen den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.2.0-alpha.1`. Compose-Dateien mit `:latest` bleiben auf der letzten offiziellen Version.
+**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und nur den Image-Tag `:<version>` — **nicht** `:latest`. Zum Testen den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.2.0-alpha.5`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
+
+### Alpha parallel zur Produktion (Port 8511)
+
+Eigene Compose-Dateien (nicht in der Prod-YAML): `docker/compose/synology-alpha.yml`, `loxberry-alpha.yml`, `proxmox-alpha.yml`.
+
+- Container `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`
+- Compose-Projektname `earnie-alpha` (kollidiert nicht mit Prod `earnie-productive`)
+- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.2.0-alpha.5`)
+
+```powershell
+mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime
+docker compose --project-directory . -f docker/compose/synology-alpha.yml pull
+docker compose --project-directory . -f docker/compose/synology-alpha.yml up -d
+```
+
+UI: `http://<host>:8511`. Ports: [streamlit-ports.md](../referenz/streamlit-ports.md). **Nicht** zwei Daemonen mit Schreibzugriff auf denselben Miniserver ohne Silent-Mode / Absprache.
 
 ### Einmaliges buildx-Setup (Entwicklungsrechner)
 
@@ -96,7 +112,7 @@ python -m scripts.build_container --target loxberry
 python -m scripts.build_container --target all --push
 ```
 
-Vor `--push` prüft der Build automatisch den gebündelten Tarifkatalog (`earnie_env/config/tariffs.json` bzw. Image-`share/config/`: Schema, Beispiel-Szenario-Referenzen, DACH-Vollständigkeit). Manuell:
+Vor `--push` prüft der Build automatisch den gebündelten Tarifkatalog (`share/config/tariffs.json`: Schema, Beispiel-Szenario-Referenzen, DACH-Vollständigkeit). Manuell:
 
 ```powershell
 python -m scripts.validate_tariffs --check-catalog
@@ -105,7 +121,7 @@ python -m scripts.validate_tariffs --check-catalog
 Auf der NAS vor dem ersten Prod-Cutover (Backlog **2.0 P6**) die produktive Sidecar-Datei prüfen:
 
 ```powershell
-python -m scripts.validate_tariffs --tariffs earnie_env/config/tariffs.json --check-catalog
+python -m scripts.validate_tariffs --tariffs share/config/tariffs.json --check-catalog
 ```
 
 Bei Fehlern bricht `main.py` mit `EARNIE_STRICT_TARIFF_VALIDATE=1` ab (siehe Compose).
@@ -144,8 +160,8 @@ docker manifest inspect ghcr.io/jochentcc/earnie-energy:latest
 Im Projektordner auf der NAS (nur Compose + persistente Daten, kein Quellcode nötig):
 
 ```bash
-docker compose --project-directory . -f docker/compose/synology.yml pull
-docker compose --project-directory . -f docker/compose/synology.yml up -d
+docker compose --project-directory . -f docker/compose/synology_productive.yml pull
+docker compose --project-directory . -f docker/compose/synology_productive.yml up -d
 ```
 
 Auf der NAS (nur `compose.yaml` im Projektordner, ohne Repo-Checkout):
@@ -175,7 +191,7 @@ Manuell (z. B. nach Config-Änderung ohne Neustart):
 python -m scripts.verify_loxone_setup
 ```
 
-`docker/compose/synology.yml` referenziert `ghcr.io/jochentcc/earnie-energy:latest`.
+`docker/compose/synology_productive.yml` referenziert `ghcr.io/jochentcc/earnie-energy:latest`.
 
 ### 3. Lokaler Test vor dem NAS-Deploy
 
@@ -204,7 +220,7 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 
 ### Erstinstallation
 
-1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker/compose/loxberry.yml`
+1. Projektordner anlegen (z. B. `/opt/earnie-energy/`) mit `docker/compose/loxberry_productive.yml`
 2. `mkdir -p earnie_env/config earnie_env/runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`earnie_env/config/.env`, `config.json`, … im gemounteten Volume)
 4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
@@ -217,11 +233,11 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 Im Projektordner auf dem LoxBerry (nur Compose + persistente Daten, kein Quellcode nötig):
 
 ```bash
-docker compose --project-directory . -f docker/compose/loxberry.yml pull
-docker compose --project-directory . -f docker/compose/loxberry.yml up -d
+docker compose --project-directory . -f docker/compose/loxberry_productive.yml pull
+docker compose --project-directory . -f docker/compose/loxberry_productive.yml up -d
 ```
 
-`docker/compose/loxberry.yml` referenziert dasselbe Multi-Arch-Image wie Synology; Docker wählt automatisch `linux/arm64`.
+`docker/compose/loxberry_productive.yml` referenziert dasselbe Multi-Arch-Image wie Synology; Docker wählt automatisch `linux/arm64`.
 
 ### UI-Zugriff
 
@@ -245,7 +261,7 @@ Vor Produktivbetrieb: Daemon-Log (`runtime/earnie.log`) auf CBC-Timing und Start
 
 ## Proxmox LXC (amd64)
 
-Unprivileged LXC mit Docker (`nesting=1`, `keyctl=1`), Compose [`docker/compose/proxmox.yml`](../../docker/compose/proxmox.yml), Bootstrap und `pct`-Beispiel: [proxmox-lxc.md](proxmox-lxc.md).
+Unprivileged LXC mit Docker (`nesting=1`, `keyctl=1`), Compose [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml), Bootstrap und `pct`-Beispiel: [proxmox-lxc.md](proxmox-lxc.md).
 
 Kurzform nach CT-Erstellung:
 

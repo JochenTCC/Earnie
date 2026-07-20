@@ -134,7 +134,7 @@ Im Hausprofil (`house_profiles.json`, `type: generic`) steuert `earnie_role` (St
 | ------------- | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | `known`       | Geplante Laufzeiten werden zur **Grundlast** (`expected_p_act`) addiert — nicht als MILP-Flex                               | wird auf `0` gesetzt (fester Start)                   |
 | `flex`        | Optimierbare Flex-Last (MILP)                                                                                               | Verschiebungsfenster (± h)                            |
-| `manual`      | **Manuelles Gerät** — Planung auf **Betrieb → Manuelle Geräte**; Start-Empfehlungen. In **Live-Planung und Szenario-Explorer** fließt die **Profil-Default-Schedule** wie bei `known` als fixe Grundlast ein (Annahme: Nutzer startet wie empfohlen). Nicht MILP-Flex. | **Empfehlungshorizont (h)** für die Startzeit-Tabelle |
+| `manual`      | **Manuelles Gerät** — Planung auf **Live-Cockpit → Manuelle Geräte**; Start-Empfehlungen. In **Live-Planung und Szenario-Explorer** fließt die **Profil-Default-Schedule** wie bei `known` als fixe Grundlast ein (Annahme: Nutzer startet wie empfohlen). Nicht MILP-Flex. | **Empfehlungshorizont (h)** für die Startzeit-Tabelle |
 
 
 Einrichtung im **Hauskonfigurator** unter „Earnie-Berücksichtigung“. Thermische Verbraucher (SwimSpa, Wärmepumpe) und E-Auto sind hiervon unberührt.

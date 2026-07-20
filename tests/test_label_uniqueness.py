@@ -57,6 +57,21 @@ def test_assert_unique_labels_in_list_raises() -> None:
         assert_unique_labels_in_list(items)
 
 
+def test_allocate_unique_label_appends_number() -> None:
+    from house_config.label_uniqueness import allocate_unique_label
+
+    items = [{"id": "a", "label": "Mein Haushalt"}]
+    assert allocate_unique_label("Mein Haushalt", items) == "Mein Haushalt 2"
+    items.append({"id": "b", "label": "Mein Haushalt 2"})
+    assert allocate_unique_label("Mein Haushalt", items) == "Mein Haushalt 3"
+
+
+def test_allocate_unique_label_keeps_free_base() -> None:
+    from house_config.label_uniqueness import allocate_unique_label
+
+    assert allocate_unique_label("Mein Haushalt", []) == "Mein Haushalt"
+
+
 def test_duplicate_label_message_quotes_label() -> None:
     assert "Dach" in duplicate_label_message("Dach")
     assert "eindeutige" in duplicate_label_message("Dach")

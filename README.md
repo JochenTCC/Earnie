@@ -83,7 +83,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 4. **Was-wäre-wenn-Analyse** — Mit Erstkonfiguration klären, ob sich ein Gesamtsystem und Earnie im produktiven Einsatz lohnen
 5. **Verbindung zu Smarthome** — `python -m scripts.verify_loxone_setup`
 6. **Produktiv starten** — `python main.py` dauerhaft (**nur eine Instanz**)
-7. **Monitor öffnen** — [Streamlit](https://streamlit.io/) auf Port 8501 (Standard, siehe `ui.streamlit_port`)
+7. **Monitor öffnen** — [Streamlit](https://streamlit.io/); Port je Stack: [Streamlit-Ports](docs/referenz/streamlit-ports.md) (Prod **8501**, lokal venv typisch **8531**)
 8. **Feintuning** — Hausprofil, Szenarien, flexible Verbraucher über Planungs- und Betriebsseiten
 
 Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Ersteinrichtung)

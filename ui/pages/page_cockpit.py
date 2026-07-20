@@ -12,7 +12,7 @@ from ui.main_py_sync import poll_main_py_sync_if_pending
 from ui.runtime_config import reload_runtime_config
 from ui.sankey import render_live_power_flow
 
-_PAGE_TITLE = "🔋 Earnie Monitor"
+_PAGE_TITLE = "🔋 Monitor"
 _COCKPIT_HELP = (
     "Produktiv-Cockpit **Sunset-2-Sunset**: Vergangenheit und Vorausschau "
     "in zwei Sonnenaufgang-Segmenten (SA₀→SA₁, SA₁→SA₂)."

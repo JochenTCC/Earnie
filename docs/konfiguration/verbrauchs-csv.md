@@ -71,7 +71,7 @@ Pro Verbraucher:
 
 Szenario-Explorer und synthetische `cons_data_hourly.csv` nutzen dieselbe **konfigurierte** Grundlast wie Verbrauchsprofil (Modell): `baseload_kwh / 8760` (nicht den Meter-Rest aus der Gesamt-CSV).
 
-Im Szenario-Explorer (Tabelle **Gesamtkosten**) kommt die Spalte **Jahres Verbrauch** der Zeile **Historisch** aus dem Ist-Zähler (`cons_data`); die übrigen Zeilen aus dem Hausprofil-Modell. Siehe [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).
+Im Szenario-Explorer (Tabelle **Gesamtkosten und -Verbrauch**) kommt die Spalte **Jahres Verbrauch** der Zeile **Historisch** aus dem Ist-Zähler (`cons_data`); die übrigen Zeilen aus dem Hausprofil-Modell. Siehe [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).
 
 ### Digitale Ein/Aus-Signale (0/1)
 

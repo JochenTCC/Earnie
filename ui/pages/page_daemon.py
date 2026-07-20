@@ -1,4 +1,4 @@
-"""Echtzeit-Umgebung: Start/Stop/Restart des main.py-Optimierer-Dienstes."""
+"""Daemon Control: Start/Stop/Restart des main.py-Optimierer-Dienstes."""
 from __future__ import annotations
 
 import streamlit as st

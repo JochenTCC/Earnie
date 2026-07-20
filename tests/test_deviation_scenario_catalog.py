@@ -11,7 +11,7 @@ from optimizer import battery as bat
 from optimizer.deviation_eval import evaluate_entry_deviations
 from optimizer.deviation_rules import load_deviation_rules
 
-RULES_PATH = "earnie_env/config/deviation_rules.example.json"
+RULES_PATH = "share/config/deviation_rules.example.json"
 
 
 def _entry(**extra) -> dict:

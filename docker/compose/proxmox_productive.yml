@@ -1,4 +1,4 @@
-# Proxmox LXC (amd64) – Produktions-Compose (vorgefertigtes Multi-Arch-Image)
+# Proxmox LXC (amd64) – Produktions-Compose (vorgefertigtes Multi-Arch-Image :latest)
 #
 # Läuft in einem LXC-Container mit Docker (nesting=1). Siehe docs/einrichtung/proxmox-lxc.md
 # und docker/proxmox/ (LXC-Beispielkonfig + Bootstrap).
@@ -11,19 +11,27 @@
 #   ./earnie_env/runtime/  – cons_data, Zustands-JSONs, Profile, Logs
 #
 # Erstinstallation (typisch /opt/earnie/ im LXC):
-#   1. Ordner anlegen: mkdir -p config runtime
-#   2. Diese Datei als compose.yaml ablegen (oder -f docker/compose/proxmox.yml)
+#   1. Ordner anlegen: mkdir -p earnie_env/config earnie_env/runtime
+#   2. Diese Datei als compose.yaml ablegen (oder -f docker/compose/proxmox_productive.yml)
 #   3. Container starten – fehlende Dateien legt der Entrypoint an
 #   4. config/.env und earnie_env/config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
 #   5. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
 #
+# Migration vom alten Dateinamen proxmox.yml / Container „earnie“:
+#   docker stop earnie; docker rm earnie
+#   dann up -d mit dieser Datei (neuer Name: earnie-productive)
+#
 # Ein Container: Streamlit-UI startet main.py automatisch (EARNIE_AUTO_START_MAIN=1).
 # Nach Änderungen an earnie_env/config/config.json: Container neu starten.
 # Nach Code-Änderungen: Image pullen, dann:
-#   docker compose --project-directory . -f docker/compose/proxmox.yml pull
-#   docker compose --project-directory . -f docker/compose/proxmox.yml up -d
+#   docker compose --project-directory . -f docker/compose/proxmox_productive.yml pull
+#   docker compose --project-directory . -f docker/compose/proxmox_productive.yml up -d
+#
+# Community Pre-release parallel: docker/compose/proxmox-alpha.yml (Port 8511, earnie_env_alpha/).
 #
 # UI im LAN: http://<lxc-ip>:8501 (extern nur mit eigenem Proxy/VPN).
+
+name: earnie-productive
 
 version: "3.8"
 
@@ -40,9 +48,9 @@ x-common-env: &common-env
   EARNIE_AUTO_START_MAIN: "1"
 
 services:
-  earnie:
+  earnie-productive:
     image: ghcr.io/jochentcc/earnie-energy:latest
-    container_name: earnie
+    container_name: earnie-productive
     command: >
       python -m scripts.run_streamlit
       --
@@ -54,4 +62,4 @@ services:
     volumes: *persist-volumes
     environment:
       <<: *common-env
-      EARNIE_UI_MODES: sunset2sunset,scenario_explorer
+      EARNIE_UI_MODES: sunset2sunset,live_environment

@@ -145,7 +145,7 @@ def test_greenfield_bootstrap_creates_expected_files(tmp_path, monkeypatch):
 def test_config_minimal_live_scenario_id_only():
     """2.0 P2: Bootstrap-Vorlage ohne runtime_settings; Live-Szenario in backtesting_scenarios.json."""
     repo_root = Path(__file__).resolve().parents[1]
-    minimal_path = repo_root / "earnie_env" / "config" / "config.minimal.json"
+    minimal_path = repo_root / "share" / "config" / "config.minimal.json"
     minimal = json.loads(minimal_path.read_text(encoding="utf-8"))
 
     assert "runtime_settings" not in minimal
@@ -154,7 +154,7 @@ def test_config_minimal_live_scenario_id_only():
     assert "appliances" not in minimal
     assert "loxone_silent_mode" not in minimal.get("system", {})
 
-    scenarios_path = repo_root / "earnie_env" / "config" / "backtesting_scenarios.minimal.json"
+    scenarios_path = repo_root / "share" / "config" / "backtesting_scenarios.minimal.json"
     scenarios = json.loads(scenarios_path.read_text(encoding="utf-8"))
     live = next(s for s in scenarios["scenarios"] if s["id"] == "live")
     assert set(live["settings"]) <= {

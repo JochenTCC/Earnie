@@ -94,7 +94,7 @@ docker compose --project-directory . -f docker/compose/dev.yml up -d --build
 ### Produktion (Synology / LoxBerry / Proxmox LXC)
 
 1. Publish a tagged release (see above) — or fallback local `--push`
-2. Auf der Zielplattform nur Compose-Datei (`docker/compose/synology.yml`, `loxberry.yml` oder `proxmox.yml`), `config/` und `runtime/` bereitstellen
+2. Auf der Zielplattform nur Compose-Datei (`docker/compose/synology_productive.yml`, `loxberry_productive.yml` oder `proxmox_productive.yml`), `config/` und `runtime/` bereitstellen
 3. `docker compose --project-directory . -f docker/compose/<stack>.yml pull`
 4. `docker compose --project-directory . -f docker/compose/<stack>.yml up -d`
 5. UI im LAN: `http://<host-ip>:8501`

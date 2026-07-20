@@ -6,6 +6,7 @@ description: >-
   commit and push all open changes, then guide the user through publish choices
   (A skip / B community pre-release / C official / D bump version.py first)
   before any tag (GitHub Actions → GHCR + GitHub Release; local Docker push as fallback).
+  On version bump / pre-release publish, sync docker/compose/*-alpha.yml image tags to version.py.
   Use for "end session", "backlog sync", "commit and push", or an explicit request to conclude the session.
 ---
 
@@ -122,9 +123,9 @@ If D: propose the exact new version string and wait for approval before editing 
 | Choice | Use when | Effect |
 |--------|----------|--------|
 | **A** | Dev-only session; not ready for community/prod | No tag, no GHCR update |
-| **B** | Community / forum testers should try a build; prod `:latest` must stay | Pre-release Release; pin `ghcr.io/jochentcc/earnie-energy:<version>` |
-| **C** | Feature set is ready for everyone on `:latest` | Latest Release; Synology/LoxBerry/Proxmox compose can pull `:latest` |
-| **D** | Need a new number first (e.g. start `X.Y.Z-alpha.1`, bump `alpha.N`→`alpha.N+1`, or go to final `X.Y.Z`) | Edit `version.py` only after explicit approval → commit → push → then B or C |
+| **B** | Community / forum testers should try a build; prod `:latest` must stay | Pre-release Release; pin `ghcr.io/jochentcc/earnie-energy:<version>`; alpha compose files must match |
+| **C** | Feature set is ready for everyone on `:latest` | Latest Release; `*_productive.yml` can pull `:latest` |
+| **D** | Need a new number first (e.g. start `X.Y.Z-alpha.1`, bump `alpha.N`→`alpha.N+1`, or go to final `X.Y.Z`) | Edit `version.py` only after explicit approval → sync alpha compose if pre-release → commit → push → then B or C |
 
 ### Agent rules for the guide
 
@@ -133,7 +134,39 @@ If D: propose the exact new version string and wait for approval before editing 
 3. If `version.py` is already a pre-release and the user wants community test: recommend **B** (tag as-is), not a silent bump.
 4. If mid MINOR backlog cycle and community test is desired: recommend **D** then **B** with target `X.Y.Z-alpha.N` of the *upcoming* release — not a PATCH on the last official.
 5. Never bump `version.py` or push a tag until the user picks a letter (or equivalent clear wording: “publish alpha”, “official release”, “skip”).
-6. After **D**: propose exact string → wait → edit → commit → push → re-show the guide with the new `version.py` → user picks **B** or **C** (or **A**).
+6. After **D**: propose exact string → wait → edit `version.py` → **run Alpha compose sync** (below) when the new string is a pre-release → commit (include synced YAML) → push → re-show the guide with the new `version.py` → user picks **B** or **C** (or **A**).
+7. Before **B**: **run Alpha compose sync** (or verify already matching). Do not tag until the three `*-alpha.yml` files pin `version.py`.
+
+---
+
+## Alpha compose sync (`version.py` → `*-alpha.yml`)
+
+Keep community Alpha stacks pointing at the current pre-release image.
+
+**Files (always all three):**
+
+- `docker/compose/synology-alpha.yml`
+- `docker/compose/loxberry-alpha.yml`
+- `docker/compose/proxmox-alpha.yml`
+
+**When to run**
+
+| Trigger | Action |
+|---------|--------|
+| **D** bump — new `version.py` contains `-` (alpha/rc) | Set each file’s `image:` to `ghcr.io/jochentcc/earnie-energy:<version.py>` |
+| **D** bump — new `version.py` is clean `X.Y.Z` (official) | **Do not** change alpha compose (leave last pre-release pin); `*_productive.yml` stay on `:latest` |
+| Before **B** publish | Verify all three `image:` lines equal `ghcr.io/jochentcc/earnie-energy:<version.py>`; if not, sync, then commit + push before tagging |
+| **C** / **A** | No alpha compose edit required |
+
+**How**
+
+1. Read `__version__` from `version.py` (no `v` prefix).
+2. Replace the image line in each alpha compose file with exactly:  
+   `image: ghcr.io/jochentcc/earnie-energy:<version>`  
+   (preserve indentation; only change the tag after the last `:`).
+3. If `docs/einrichtung/container.md` (or similar) hardcodes an example pre-release tag for Alpha, update that example to the same `<version>` in the same change set.
+4. Include the synced files in the **same commit** as the `version.py` bump when doing **D**; for a late fix before **B**, a small follow-up commit is OK.
+5. Never point alpha compose at `:latest`. Never edit `*_productive.yml` image tags in this sync (they stay `:latest`).
 
 ---
 
@@ -145,6 +178,7 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 
 - [ ] `version.py` on `origin/main` equals the intended tag without `v`
 - [ ] Channel correct: `-` in version → pre-release (**B**); clean `X.Y.Z` → official (**C**)
+- [ ] **If B:** all three `docker/compose/*-alpha.yml` have `image: ghcr.io/jochentcc/earnie-energy:<version.py>`
 - [ ] Optional notes file exists or default notes are OK: `.github/release-notes/v….md`
 - [ ] User confirmed tag name (e.g. `v2.1.0-alpha.1` or `v2.1.0`)
 
@@ -153,6 +187,8 @@ Start **only** on explicit **B** / **C** / “publish alpha” / “official rel
 Read `version.py`. **Never change without explicit user approval** (see `versioning.mdc`).
 
 Prefer publishing from `main`. After an alpha/rc tag, leave that pre-release string on `main` until the next approved bump — do **not** bump back to the previous official version.
+
+If publishing **B** and alpha compose is out of date: run **Alpha compose sync**, commit, push, then continue.
 
 ### 2. Primary: push version tag (CI)
 
@@ -185,11 +221,13 @@ Default tags follow `version.py` (pre-release omits `:latest`). Details: `docs/e
 
 - Tag pushed / Actions run URL
 - Channel + `version.py` value
-- **If B (pre-release):** tell testers to pin  
-  `ghcr.io/jochentcc/earnie-energy:<version>`  
-  (Compose with `:latest` is unchanged — last official)
+- **If B (pre-release):**
+  - Testers: `docker compose --project-directory . -f docker/compose/<host>-alpha.yml pull` then `up -d`  
+    (Synology / LoxBerry / Proxmox: `synology-alpha.yml` / `loxberry-alpha.yml` / `proxmox-alpha.yml` — already pin `:<version>`)
+  - Or pin manually: `ghcr.io/jochentcc/earnie-energy:<version>`
+  - Prod `*_productive.yml` with `:latest` is unchanged — last official
 - **If C (official):** deploy with usual compose pull of `:latest` or `:<version>`
-  - Synology / LoxBerry / Proxmox: `docker compose --project-directory . -f docker/compose/<host>.yml pull` then `up -d`
+  - Synology / LoxBerry / Proxmox: `docker compose --project-directory . -f docker/compose/<host>_productive.yml pull` then `up -d`
 - Remind: next session end will ask **A/B/C/D** again; alpha stays on `main` until the next approved bump
 
 ---

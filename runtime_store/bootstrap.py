@@ -36,6 +36,7 @@ from runtime_store.persist_paths import (
     resolve_house_profiles_minimal_template_path,
     resolve_house_profiles_schema_template_path,
     resolve_house_profiles_template_path,
+    resolve_tariffs_catalog_template_path,
     resolve_tariffs_json_path,
     resolve_tariffs_minimal_template_path,
     resolve_tariffs_schema_template_path,
@@ -208,10 +209,18 @@ def _bootstrap_tariffs_schema() -> bool:
 
 
 def _bootstrap_tariffs_json() -> bool:
+    """Seed site tariffs.json from public catalog, else example, else minimal."""
+    dest = resolve_tariffs_json_path()
+    catalog = resolve_tariffs_catalog_template_path()
+    if os.path.isfile(catalog) and os.path.normpath(catalog) != os.path.normpath(dest):
+        return _copy_template_if_missing(dest, catalog, "share/config/tariffs.json")
+    example = resolve_tariffs_template_path()
+    if os.path.isfile(example) and os.path.normpath(example) != os.path.normpath(dest):
+        return _copy_template_if_missing(dest, example, "tariffs.example.json")
     return _copy_template_if_missing(
-        resolve_tariffs_json_path(),
-        resolve_tariffs_template_path(),
-        "tariffs.example.json",
+        dest,
+        resolve_tariffs_minimal_template_path(),
+        "tariffs.minimal.json",
     )
 
 
