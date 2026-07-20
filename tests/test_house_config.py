@@ -241,7 +241,7 @@ def test_tariffs_document_fixture():
 
 def test_dach_tariffs_catalog():
     root = Path(__file__).resolve().parents[1]
-    doc = load_tariffs_document(str(root / "earnie_env" / "config" / "tariffs.json"))
+    doc = load_tariffs_document(str(root / "share" / "config" / "tariffs.json"))
     assert doc.get("catalog_as_of") == "2026"
     assert len(doc["import_tariffs"]) == 33
     assert len(doc["export_tariffs"]) == 13
@@ -273,7 +273,7 @@ def test_import_monthly_table_tariff_normalization():
 
 def test_awattar_tariff_spec_includes_surcharges():
     root = Path(__file__).resolve().parents[1]
-    doc = load_tariffs_document(str(root / "earnie_env" / "config" / "tariffs.json"))
+    doc = load_tariffs_document(str(root / "share" / "config" / "tariffs.json"))
     awattar = doc["import_tariffs"]["awattar_at"]
     assert awattar["settlement_fee_cent_kwh"] == pytest.approx(1.5)
     assert awattar["markup_percent"] == pytest.approx(3.0)
@@ -328,7 +328,7 @@ def test_tariff_netzentgelt_override_resolution():
 
 def test_monthly_float_export_tariff_resolution():
     root = Path(__file__).resolve().parents[1]
-    doc = load_tariffs_document(str(root / "earnie_env" / "config" / "tariffs.json"))
+    doc = load_tariffs_document(str(root / "share" / "config" / "tariffs.json"))
     oemag = doc["export_tariffs"].get("at_oemag_gesetzlicher_marktpreis")
     assert oemag is not None
     assert oemag["type"] == "monthly_float"

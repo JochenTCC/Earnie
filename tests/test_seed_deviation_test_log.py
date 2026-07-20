@@ -10,7 +10,7 @@ from optimizer.deviation_rules import load_deviation_rules
 from scripts.seed_deviation_test_log import build_deviation_test_entries, seed_deviation_test_log
 
 TZ = ZoneInfo("Europe/Vienna")
-RULES_PATH = "earnie_env/config/deviation_rules.json"
+RULES_PATH = "share/config/deviation_rules.example.json"
 
 
 def test_build_deviation_test_entries_scenario_count():

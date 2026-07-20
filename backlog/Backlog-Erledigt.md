@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 2.2.0 — Merge streamlitcloud → main (2026-07-20)
+
+- [x] Merge `streamlitcloud` into `main` (PR #6) — Community Cloud / offline SE, sidebar, Banner, Alpha/productive compose
+
+
 ### Docker compose Alpha / Productive + Streamlit ports (2026-07-20)
 
 - [x] Split host compose into `*_productive.yml` (`earnie-productive`, :8501) and `*-alpha.yml` (`earnie-alpha`, :8511, `earnie_env_alpha/`)

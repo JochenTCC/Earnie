@@ -46,7 +46,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - Move "Live-Konfiguration" into section "Konfiguration"; hide when `live_environment` not in modes (always usable when shown)
     - Rename section "Betrieb" into "Live-Cockpit"
 - [x] Make a complete info section in sidebar (including version and Banner der Wahrheit + contacting formular with Topic, Description and attachments to mail@techcreacon.com)
-- [ ] Merge streamlitcloud branch with main, when app is working on SCC
+- [x] Merge streamlitcloud branch with main, when app is working on SCC
 - [ ] Finalize Version 2.2.0 after test usage and make a release
   - Update German Docs
 
