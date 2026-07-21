@@ -230,7 +230,7 @@ def test_build_backtesting_command_omits_workers_when_sequential(tmp_path):
 def test_suggest_test_month_from_cons_data_bounds(monkeypatch):
     monkeypatch.setattr(
         "ui.backtesting_runner.profile_manager.get_cons_data_date_bounds",
-        lambda: (date(2025, 3, 10), date(2025, 8, 1)),
+        lambda: (date(2026, 3, 10), date(2026, 8, 1)),
     )
     assert suggest_test_month() == 3
 
@@ -238,7 +238,7 @@ def test_suggest_test_month_from_cons_data_bounds(monkeypatch):
 def test_suggest_test_month_prefers_march_over_january(monkeypatch):
     monkeypatch.setattr(
         "ui.backtesting_runner.profile_manager.get_cons_data_date_bounds",
-        lambda: (date(2025, 1, 1), date(2025, 12, 31)),
+        lambda: (date(2026, 1, 1), date(2026, 12, 31)),
     )
     assert suggest_test_month() == 3
 
@@ -246,7 +246,7 @@ def test_suggest_test_month_prefers_march_over_january(monkeypatch):
 def test_suggest_test_month_none_without_overlap(monkeypatch):
     monkeypatch.setattr(
         "ui.backtesting_runner.profile_manager.get_cons_data_date_bounds",
-        lambda: (date(2024, 1, 1), date(2024, 12, 31)),
+        lambda: (date(2025, 1, 1), date(2025, 12, 31)),
     )
     assert suggest_test_month() is None
 
@@ -316,7 +316,7 @@ def test_migrate_oemag_template_fill_when_keys_missing(tmp_path, monkeypatch):
     modified = bootstrap._migrate_oemag_data_model_v2()
     assert str(tariffs) in modified
     doc = read_json_dict(str(tariffs))
-    assert len(doc["oemag_monthly_feed_in_rates"]) == 12
+    assert len(doc["oemag_monthly_feed_in_rates"]) >= 12
     assert doc["monthly_float_reference_cent_kwh"] == 7.15
     assert doc["earnie_data_model"] == 2
     assert bootstrap._migrate_oemag_data_model_v2() == []
@@ -355,4 +355,4 @@ def test_run_backtesting_module_import_does_not_force_offline(monkeypatch):
     importlib.reload(rb)
     assert os.environ.get("ENERGY_OPTIMIZER_OFFLINE") is None
     assert os.environ.get("EARNIE_OFFLINE") is None
-    assert BACKTESTING_YEAR == 2025
+    assert BACKTESTING_YEAR == 2026

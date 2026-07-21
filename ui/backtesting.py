@@ -238,40 +238,6 @@ def _execute_backtesting_run(
         ),
         labels_for_order,
     )
-    # #region agent log
-    try:
-        import json as _json, time as _time
-        from runtime_store.cloud_demo import get_session_env_root, is_cloud_demo
-        from runtime_store.persist_paths import (
-            resolve_backtesting_scenarios_json_path,
-            runtime_dir,
-        )
-
-        with open("debug-7d4f32.log", "a", encoding="utf-8") as _f:
-            _f.write(
-                _json.dumps(
-                    {
-                        "sessionId": "7d4f32",
-                        "hypothesisId": "F",
-                        "location": "backtesting.py:_execute_backtesting_run",
-                        "message": "SE run start parent",
-                        "data": {
-                            "cloud": is_cloud_demo(),
-                            "session_root": get_session_env_root(),
-                            "scenario_ids": list((scenarios or {}).keys()),
-                            "preferred_progress_labels": preferred_progress_labels,
-                            "progress_file": progress_file,
-                            "runtime_dir": runtime_dir(),
-                            "scenarios_path": resolve_backtesting_scenarios_json_path(),
-                        },
-                        "timestamp": int(_time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
-    # #endregion
 
     with st.status(status_label, expanded=True) as status:
         progress_host = st.empty()
@@ -279,36 +245,6 @@ def _execute_backtesting_run(
         def _on_progress(snapshot: dict) -> None:
             if not snapshot:
                 return
-            # #region agent log
-            try:
-                import json as _json, time as _time
-
-                with open("debug-7d4f32.log", "a", encoding="utf-8") as _f:
-                    _f.write(
-                        _json.dumps(
-                            {
-                                "sessionId": "7d4f32",
-                                "runId": "post-fix",
-                                "hypothesisId": "F",
-                                "location": "backtesting.py:_on_progress",
-                                "message": "progress snapshot keys",
-                                "data": {
-                                    "keys": list(snapshot.keys()),
-                                    "preferred": preferred_progress_labels,
-                                    "ghost_vs_preferred": [
-                                        k
-                                        for k in snapshot.keys()
-                                        if k not in preferred_progress_labels
-                                    ],
-                                },
-                                "timestamp": int(_time.time() * 1000),
-                            }
-                        )
-                        + "\n"
-                    )
-            except Exception:
-                pass
-            # #endregion
             with progress_host.container():
                 active_entries = [
                     progress

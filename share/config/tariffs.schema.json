@@ -22,9 +22,8 @@
     },
     "oemag_monthly_feed_in_rates": {
       "$ref": "#/definitions/monthly_rates",
-      "description": "OeMAG Gesetzlicher Marktpreis (Referenz für monthly_float): genau 12 Monate Cent/kWh netto.",
-      "minItems": 12,
-      "maxItems": 12
+      "description": "OeMAG Gesetzlicher Marktpreis (Referenz für monthly_float): mindestens 12 Monate Cent/kWh netto; länger erlaubt für SE-Zeiträume.",
+      "minItems": 12
     },
     "monthly_float_reference_cent_kwh": {
       "type": "number",

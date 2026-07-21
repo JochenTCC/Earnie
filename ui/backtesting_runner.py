@@ -139,44 +139,7 @@ def _subprocess_env() -> dict[str, str]:
             del env[key]
     existing = env.get("PYTHONPATH", "").strip()
     env["PYTHONPATH"] = f"{root}{os.pathsep}{existing}" if existing else root
-    session = _apply_cloud_session_env(env)
-    # #region agent log
-    try:
-        import json as _json, time as _time
-        from runtime_store.cloud_demo import is_cloud_demo
-
-        with open("debug-7d4f32.log", "a", encoding="utf-8") as _f:
-            _f.write(
-                _json.dumps(
-                    {
-                        "sessionId": "7d4f32",
-                        "runId": "post-fix",
-                        "hypothesisId": "F",
-                        "location": "backtesting_runner.py:_subprocess_env",
-                        "message": "subprocess env before launch",
-                        "data": {
-                            "cloud": is_cloud_demo(),
-                            "session_root": session,
-                            "env_path": env.get("EARNIE_ENV_PATH")
-                            or env.get("ENERGY_OPTIMIZER_ENV_PATH"),
-                            "config_path": env.get("EARNIE_CONFIG_PATH")
-                            or env.get("ENERGY_OPTIMIZER_CONFIG_PATH"),
-                            "passes_session_as_env_path": bool(
-                                session
-                                and (
-                                    env.get("EARNIE_ENV_PATH") == session
-                                    or env.get("ENERGY_OPTIMIZER_ENV_PATH") == session
-                                )
-                            ),
-                        },
-                        "timestamp": int(_time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
-    # #endregion
+    _apply_cloud_session_env(env)
     return env
 
 

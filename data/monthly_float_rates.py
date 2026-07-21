@@ -3,13 +3,15 @@ from __future__ import annotations
 
 from data.feed_in_prices import validate_fixed_monthly_feed_in_rates
 
-REQUIRED_OEMAG_MONTHS = 12
+MIN_OEMAG_MONTHS = 12
+# Backwards-compatible alias (tests / callers may still import the old name).
+REQUIRED_OEMAG_MONTHS = MIN_OEMAG_MONTHS
 
 
 def load_oemag_monthly_reference_rates(
     tariffs_doc: dict,
 ) -> tuple[tuple[int, int, float], ...]:
-    """Lädt und validiert die 12-monatige OeMAG-Referenzkurve."""
+    """Lädt und validiert die OeMAG-Referenzkurve (mindestens 12 Monate)."""
     raw = tariffs_doc.get("oemag_monthly_feed_in_rates")
     if raw is None:
         raise ValueError(
@@ -17,9 +19,9 @@ def load_oemag_monthly_reference_rates(
             "(erforderlich für monthly_float Export-Tarife)."
         )
     rates = validate_fixed_monthly_feed_in_rates(raw)
-    if len(rates) != REQUIRED_OEMAG_MONTHS:
+    if len(rates) < MIN_OEMAG_MONTHS:
         raise ValueError(
-            f"oemag_monthly_feed_in_rates muss genau {REQUIRED_OEMAG_MONTHS} Einträge "
+            f"oemag_monthly_feed_in_rates muss mindestens {MIN_OEMAG_MONTHS} Einträge "
             f"haben, nicht {len(rates)}."
         )
     return rates

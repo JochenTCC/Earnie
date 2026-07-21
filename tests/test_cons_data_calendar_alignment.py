@@ -28,6 +28,13 @@ def _greenfield_profile() -> dict:
     return next(item for item in profiles if item["id"] == "mein_haushalt")
 
 
+def _thermal_consumer_id(profile: dict) -> str:
+    for consumer in profile.get("consumers") or []:
+        if consumer.get("type") == "thermal_annual":
+            return str(consumer["id"])
+    raise AssertionError("greenfield profile missing thermal_annual consumer")
+
+
 def _mock_open_meteo_climate(monkeypatch) -> None:
     install_open_meteo_climate_mock(monkeypatch)
 
@@ -35,6 +42,8 @@ def _mock_open_meteo_climate(monkeypatch) -> None:
 def test_synthetic_haus_kw_matches_thermal_overlay_for_jan_14(monkeypatch):
     _mock_open_meteo_climate(monkeypatch)
     profile = _greenfield_profile()
+    thermal_id = _thermal_consumer_id(profile)
+    thermal_col = f"{thermal_id}_kw"
     climate = ModeledClimateContext.for_house_profile(profile, kwp=5.0)
     df = build_synthetic_dataframe_from_house_profile(
         profile,
@@ -47,18 +56,19 @@ def test_synthetic_haus_kw_matches_thermal_overlay_for_jan_14(monkeypatch):
     anchor = datetime(2025, 1, 15, 0, 0)
     slots = window_slot_datetimes(anchor)
     thermal = thermal_hourly_overlay(profile, slots, climate=climate)
-    assert float(df["haus_kw"].sum()) == pytest.approx(sum(thermal), rel=1e-6)
-    assert float(df["haus_kw"].sum()) > 0.0
+    assert float(df[thermal_col].sum()) == pytest.approx(sum(thermal), rel=1e-6)
+    assert float(df[thermal_col].sum()) > 0.0
 
 
 def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
     _mock_open_meteo_climate(monkeypatch)
-    consumer_ids = ["haus", "ev", "rest"]
+    profile = _greenfield_profile()
+    thermal_id = _thermal_consumer_id(profile)
+    consumer_ids = [thermal_id, "ev", "rest"]
     monkeypatch.setattr(
         "data.cons_data_house_profile.expected_cons_data_consumer_ids",
         lambda: consumer_ids,
     )
-    profile = _greenfield_profile()
     climate = ModeledClimateContext.for_house_profile(profile, kwp=5.0)
     df = build_synthetic_dataframe_from_house_profile(
         profile,
@@ -92,14 +102,16 @@ def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
 
 
 def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch):
-    """Kein Thermik-Overlay wenn haus_kw-Spalte existiert aber am Tag 0 kWh (Heiz-Aus)."""
+    """Kein Thermik-Overlay wenn thermal Spalte existiert aber am Tag 0 kWh (Heiz-Aus)."""
     _mock_open_meteo_climate(monkeypatch)
-    consumer_ids = ["haus", "ev", "rest"]
+    profile = _greenfield_profile()
+    thermal_id = _thermal_consumer_id(profile)
+    thermal_col = f"{thermal_id}_kw"
+    consumer_ids = [thermal_id, "ev", "rest"]
     monkeypatch.setattr(
         "data.cons_data_house_profile.expected_cons_data_consumer_ids",
         lambda: consumer_ids,
     )
-    profile = _greenfield_profile()
     climate = ModeledClimateContext.for_house_profile(profile, kwp=5.0)
     df = build_synthetic_dataframe_from_house_profile(
         profile,
@@ -109,15 +121,19 @@ def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch
         source="synthetic",
         climate=climate,
     )
-    df["haus_kw"] = 0.0
-    # Profile may only synthesize haus_kw; ensure expected flex columns exist.
+    df[thermal_col] = 0.0
+    # Profile may only synthesize thermal col; ensure expected flex columns exist.
     for cid in consumer_ids:
         col = f"{cid}_kw"
         if col not in df.columns:
             df[col] = 0.0
     df["total_kw"] = (
         df["baseload_kw"].astype(float)
-        + sum(df[f"{cid}_kw"].astype(float) for cid in consumer_ids if cid != "haus")
+        + sum(
+            df[f"{cid}_kw"].astype(float)
+            for cid in consumer_ids
+            if cid != thermal_id
+        )
     ).round(3)
 
     anchor = datetime(2025, 1, 15, 0, 0)
@@ -138,8 +154,8 @@ def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch
         cons_data_consumer_ids=cons_data_ids,
         climate=climate,
     )
-    assert "haus" in cons_data_ids
-    assert float(all_consumer_totals.get("haus", -1.0)) == 0.0
+    assert thermal_id in cons_data_ids
+    assert float(all_consumer_totals.get(thermal_id, -1.0)) == 0.0
     assert sum(overlay) == pytest.approx(0.0, abs=1e-6)
     _, baseload_sum = resolve_hourly_baseload_kw(total_load, hourly_flex)
     optimized_total = baseload_sum + sum(overlay) + sum(hist_totals.values())

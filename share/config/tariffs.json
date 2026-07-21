@@ -5,6 +5,36 @@
     "oemag_monthly_feed_in_rates": [
         {
             "year": 2025,
+            "month": 1,
+            "tariff_cent_kwh": 9.73
+        },
+        {
+            "year": 2025,
+            "month": 2,
+            "tariff_cent_kwh": 9.73
+        },
+        {
+            "year": 2025,
+            "month": 3,
+            "tariff_cent_kwh": 6.007
+        },
+        {
+            "year": 2025,
+            "month": 4,
+            "tariff_cent_kwh": 5.855
+        },
+        {
+            "year": 2025,
+            "month": 5,
+            "tariff_cent_kwh": 5.855
+        },
+        {
+            "year": 2025,
+            "month": 6,
+            "tariff_cent_kwh": 5.855
+        },
+        {
+            "year": 2025,
             "month": 7,
             "tariff_cent_kwh": 5.965
         },

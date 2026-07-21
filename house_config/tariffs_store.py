@@ -278,7 +278,15 @@ def resolve_export_tariff_into_settings(
         out["feed_in_mode"] = "fixed"
         out["k_push_cent"] = float(out.get("k_push_cent", 0.0) or 0.0)
         if monthly_rates_holder is not None:
-            monthly_rates_holder["_monthly_fixed_tariffs"] = tariff["monthly_rates"]
+            rates = tariff["monthly_rates"]
+            # Normalized catalog: tuple[(y,m,cent),...]; raw JSON: list[dict].
+            if isinstance(rates, tuple) and (
+                not rates or isinstance(rates[0], tuple)
+            ):
+                validated = rates
+            else:
+                validated = validate_fixed_monthly_feed_in_rates(rates)
+            monthly_rates_holder["_monthly_fixed_tariffs"] = validated
     elif tariff["type"] == "monthly_float":
         out["feed_in_mode"] = "fixed"
         out["k_push_cent"] = float(out.get("k_push_cent", 0.0) or 0.0)

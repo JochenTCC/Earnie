@@ -43,14 +43,23 @@ def _tariffs_doc() -> dict:
 def test_load_oemag_requires_twelve_months():
     doc = _tariffs_doc()
     rates = load_oemag_monthly_reference_rates(doc)
-    assert len(rates) == REQUIRED_OEMAG_MONTHS
+    assert len(rates) >= REQUIRED_OEMAG_MONTHS
 
 
 def test_load_oemag_rejects_wrong_count():
     doc = _tariffs_doc()
     doc["oemag_monthly_feed_in_rates"] = doc["oemag_monthly_feed_in_rates"][:6]
-    with pytest.raises(ValueError, match="genau 12"):
+    with pytest.raises(ValueError, match="mindestens 12"):
         load_oemag_monthly_reference_rates(doc)
+
+
+def test_load_oemag_allows_more_than_twelve_months():
+    doc = _tariffs_doc()
+    extra = {"year": 2025, "month": 6, "tariff_cent_kwh": 5.855}
+    doc["oemag_monthly_feed_in_rates"] = [extra, *doc["oemag_monthly_feed_in_rates"]]
+    rates = load_oemag_monthly_reference_rates(doc)
+    assert len(rates) == 13
+    assert rates[0][:2] == (2025, 6)
 
 
 def test_oemag_identity_scaling():

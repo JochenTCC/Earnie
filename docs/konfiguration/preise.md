@@ -92,7 +92,7 @@ Referenzdaten für `monthly_float` in `tariffs.json`
 
 | Feld                               | Zweck                                                                      |
 | ---------------------------------- | -------------------------------------------------------------------------- |
-| `oemag_monthly_feed_in_rates`      | 12 bekannte OeMAG-Gesetzliche-Marktpreise (Referenzkurve)                  |
+| `oemag_monthly_feed_in_rates`      | ≥12 bekannte OeMAG-Gesetzliche-Marktpreise (Referenzkurve; länger für SE-Zeiträume) |
 | `monthly_float_reference_cent_kwh` | Nenner für Skalierung (OeMAG `arbeitspreis_kwh_cent`, z. B. 7,15)          |
 
 

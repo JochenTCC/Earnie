@@ -57,7 +57,7 @@ from simulation.horizon_mode import (
 )
 
 HISTORICAL_REFERENCE_LABEL = "Historisch (ohne Optimierung, ohne PV/Batterie)"
-BACKTESTING_YEAR = 2025
+BACKTESTING_YEAR = 2026
 MONTH_ARG_HELP = f"Monatsnummer 1–12 (Basisjahr {BACKTESTING_YEAR})"
 
 
@@ -759,47 +759,6 @@ def main(argv: list[str] | None = None):
     labels = _all_labels(scenario_labels)
     scenarios = config.get_backtesting_scenarios()
     live_scenario_id = config.get_live_scenario_id()
-    # #region agent log
-    try:
-        import json as _json, time as _time
-        from runtime_store.cloud_demo import get_session_env_root, is_cloud_demo
-        from runtime_store.persist_paths import (
-            env_root,
-            resolve_backtesting_scenarios_json_path,
-        )
-        from settings.json_io import read_json_dict as _read_json_dict
-
-        _sc_path = resolve_backtesting_scenarios_json_path()
-        _sc_doc = _read_json_dict(_sc_path) if os.path.isfile(_sc_path) else {}
-        _tariffs_path = getattr(config, "tariffs_path", "") or ""
-        _tariffs_doc = _read_json_dict(_tariffs_path) if os.path.isfile(_tariffs_path) else {}
-        with open("debug-7d4f32.log", "a", encoding="utf-8") as _f:
-            _f.write(
-                _json.dumps(
-                    {
-                        "sessionId": "7d4f32",
-                        "runId": "post-fix",
-                        "hypothesisId": "F",
-                        "location": "run_backtesting.py:main_scenarios",
-                        "message": "subprocess loaded scenarios",
-                        "data": {
-                            "cloud": is_cloud_demo(),
-                            "session_root": get_session_env_root(),
-                            "env_root": env_root(),
-                            "scenarios_path": _sc_path,
-                            "scenario_ids": list(scenarios.keys()),
-                            "live_scenario_id": live_scenario_id,
-                            "earnie_env_path": os.environ.get("EARNIE_ENV_PATH"),
-                            "has_oemag": "oemag_monthly_feed_in_rates" in _tariffs_doc,
-                        },
-                        "timestamp": int(_time.time() * 1000),
-                    }
-                )
-                + "\n"
-            )
-    except Exception:
-        pass
-    # #endregion
     live_params = scenarios.get(live_scenario_id) or (
         next(iter(scenarios.values())) if scenarios else None
     )

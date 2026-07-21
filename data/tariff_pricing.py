@@ -172,7 +172,18 @@ def export_cent_kwh(
             )
         key = (slot_datetime.year, slot_datetime.month)
         if key not in monthly_lookup:
-            raise ValueError(f"Kein Monatseintrag für {key[0]}-{key[1]:02d} im Export-Tarif.")
+            if monthly_lookup:
+                first_y, first_m = min(monthly_lookup)
+                last_y, last_m = max(monthly_lookup)
+                available = (
+                    f" verfügbar: {first_y}-{first_m:02d} … {last_y}-{last_m:02d}"
+                    f" ({len(monthly_lookup)} Monate)"
+                )
+            else:
+                available = " (Lookup leer)"
+            raise ValueError(
+                f"Kein Monatseintrag für {key[0]}-{key[1]:02d} im Export-Tarif.{available}."
+            )
         price = monthly_lookup[key]
     elif tariff_type == "dynamic_epex":
         if epex_cent is None:
