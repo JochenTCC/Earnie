@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 
 from data.monthly_float_rates import (
     REQUIRED_OEMAG_MONTHS,
     build_monthly_float_lookup,
+    load_econtrol_referenzmarktwert_pv_monthly,
     load_monthly_float_reference_cent,
     load_oemag_monthly_reference_rates,
 )
@@ -77,9 +79,9 @@ def test_energie_ag_scaling_with_settlement():
     assert june_2026 == (2026, 6, pytest.approx(expected, rel=1e-4))
 
 
-def test_export_cent_kwh_monthly_float_lookup():
+def test_export_cent_kwh_monthly_table_from_seed_lookup():
     tariff = {
-        "type": "monthly_float",
+        "type": "monthly_table",
         "arbeitspreis_kwh_cent": 7.15,
         "prices_include_vat": True,
         "vat_percent": 0.0,
@@ -95,6 +97,17 @@ def test_export_cent_kwh_monthly_float_lookup():
         slot_datetime=slot,
         monthly_lookup=lookup,
     ) == pytest.approx(6.772)
+
+
+def test_load_econtrol_referenzmarktwert_pv():
+    root = Path(__file__).resolve().parents[1]
+    import json
+
+    doc = json.loads((root / "share" / "config" / "tariffs.json").read_text(encoding="utf-8"))
+    rates = load_econtrol_referenzmarktwert_pv_monthly(doc)
+    assert len(rates) >= 12
+    june = next(item for item in rates if item[:2] == (2026, 6))
+    assert june[2] == pytest.approx(5.55)
 
 
 def test_load_monthly_float_reference_cent_required():

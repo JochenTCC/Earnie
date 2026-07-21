@@ -22,18 +22,23 @@
     },
     "oemag_monthly_feed_in_rates": {
       "$ref": "#/definitions/monthly_rates",
-      "description": "OeMAG Gesetzlicher Marktpreis (Referenz für monthly_float): mindestens 12 Monate Cent/kWh netto; länger erlaubt für SE-Zeiträume.",
+      "description": "OeMAG Gesetzlicher Marktpreis (Wartungs-Referenzkurve fuer Monats-Einspeisetarife): mindestens 12 Monate Cent/kWh netto; laenger erlaubt fuer SE-Zeitraeume.",
       "minItems": 12
     },
     "monthly_float_reference_cent_kwh": {
       "type": "number",
       "exclusiveMinimum": 0,
-      "description": "OeMAG arbeitspreis_kwh_cent als Nenner für monthly_float-Skalierung (z. B. 7.15)."
+      "description": "Historischer OeMAG-Nenner fuer Katalog-Seeds (z. B. 7.15). Runtime nutzt owned monthly_rates."
     },
     "earnie_data_model": {
       "type": "integer",
       "const": 3,
       "description": "Earnie data-model version for config pack import/export."
+    },
+    "econtrol_referenzmarktwert_pv_monthly": {
+      "$ref": "#/definitions/monthly_rates",
+      "description": "E-Control Referenzmarktwert PV gemaess §13 EAG (Wartungs-Referenzkurve): mindestens 12 Monate Cent/kWh; z. B. fuer VKW PV-Einspeisetarif Flex.",
+      "minItems": 12
     }
   },
   "definitions": {
@@ -210,7 +215,6 @@
               "enum": [
                 "fixed",
                 "monthly_table",
-                "monthly_float",
                 "dynamic_epex",
                 "spot_hourly",
                 "ex_post_spot"
@@ -218,11 +222,6 @@
             },
             "k_push_cent": {
               "type": "number"
-            },
-            "arbeitspreis_kwh_cent": {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "description": "Referenz-Arbeitspreis für monthly_float-Skalierung (Cent/kWh)."
             },
             "monthly_rates": {
               "$ref": "#/definitions/monthly_rates"

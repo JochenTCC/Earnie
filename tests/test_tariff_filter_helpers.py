@@ -20,9 +20,9 @@ _SAMPLE = [
 
 _EXPORT_MONTHLY = [
     {"id": "sunny", "land": "AT", "type": "monthly_table", "label": "SUNNY"},
-    {"id": "oemag", "land": "AT", "type": "monthly_float", "label": "OeMAG"},
+    {"id": "oemag", "land": "AT", "type": "monthly_table", "label": "OeMAG"},
     {"id": "at_spot", "land": "AT", "type": "spot_hourly", "label": "AT Spot"},
-    {"id": "de_float", "land": "DE", "type": "monthly_float", "label": "DE Float"},
+    {"id": "de_float", "land": "DE", "type": "monthly_table", "label": "DE Float"},
 ]
 
 
@@ -75,21 +75,16 @@ def test_export_types_present_collapses_monthly() -> None:
     ]
 
 
-def test_export_filter_monthly_includes_float_and_table() -> None:
+def test_export_filter_monthly_table() -> None:
     result = filter_tariffs(
         _EXPORT_MONTHLY, tariff_type="monthly_table", kind="export"
     )
     assert [item["id"] for item in result] == ["sunny", "oemag", "de_float"]
-    result_float = filter_tariffs(
-        _EXPORT_MONTHLY, tariff_type="monthly_float", kind="export"
-    )
-    assert [item["id"] for item in result_float] == ["sunny", "oemag", "de_float"]
 
 
-def test_export_monthly_ui_labels_match() -> None:
-    assert EXPORT_TYPE_LABELS["monthly_table"] == EXPORT_TYPE_LABELS["monthly_float"]
-    assert type_caption({"type": "monthly_float"}, EXPORT_TYPE_LABELS) == "Monatspreis"
+def test_export_monthly_ui_label() -> None:
     assert type_caption({"type": "monthly_table"}, EXPORT_TYPE_LABELS) == "Monatspreis"
+    assert EXPORT_TYPE_LABELS["monthly_table"] == "Monatspreis"
 
 
 def test_with_current_inside_filters() -> None:

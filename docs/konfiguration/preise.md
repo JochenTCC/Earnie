@@ -1,12 +1,14 @@
 # Preise & aWATTar
 
-Live-Bezugspreise kommen heute über Tarif-Einträge vom Typ `awattar` (API AT/DE). Weitere Import-Typen und providerunabhängige EPEX-Anbindung sind im Backlog vorgesehen — die Felder und Auflösung unten gelten bereits für den Tarifkatalog.
+Live-Bezugspreise kommen über Tarif-Einträge vom Typ `awattar` (API AT/DE) oder über Spot-Tarife mit Day-Ahead-Marktpreis. Providerunabhängige EPEX-Daten für Planung/Backtesting kommen standardmäßig von **Energy-Charts** (AT/DE/CH); aWATTar bleibt Fallback bzw. Live-Typ `awattar`.
+
+Quellen und rechtliche Anker: [Tarife — Quellen](../referenz/tarife-quellen.md), [OeMAG & Referenzmarktwert](../referenz/oemag-referenzmarktwert.md).
 
 ## Bezugspreis (Live)
 
 Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `earnie_env/config/tariffs.json` auf (Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json)). Bei Typ `awattar` gelten dieselben Aufschläge wie bei Spot-Tarifen **am Tarif-Eintrag** (`settlement_fee_cent_kwh`, `markup_percent`, `vat_percent` / `prices_include_vat`).
 
-Stundenpreise kommen von der aWATTar-API; die URL wird aus `import_tariff_id` → `land` abgeleitet (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
+Stundenpreise für Typ `awattar` kommen von der aWATTar-API; die URL wird aus `import_tariff_id` → `land` abgeleitet (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
 
 ```
 (Marktpreis (API) × (1 + markup_percent/100) + settlement_fee_cent_kwh)
@@ -55,8 +57,7 @@ Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/
 | `fixed`                        | Konstante Vergütung (`k_push_cent`)                                        |
 | `dynamic_epex`                 | EPEX − `feed_in_fee_factor` × |EPEX| + `feed_in_fix_cent` aus Export-Tarif |
 | `spot_hourly` / `ex_post_spot` | EPEX − `settlement_fee_cent_kwh`                                           |
-| `monthly_table`                | Monatliche Fixwerte (`monthly_rates`)                                      |
-| `monthly_float`                | OeMAG-Referenzkurve skaliert mit `arbeitspreis_kwh_cent` (siehe unten)     |
+| `monthly_table`                | Monatskonstante Vergütung (`monthly_rates` am Tarif)                       |
 
 
 Berechnung: `[data/tariff_pricing.py](../../data/tariff_pricing.py)` (`import_cent_kwh`, `export_cent_kwh`). Die MILP-Matrix nutzt `k_act` (Bezug) und `k_push_act` (Einspeise) je Stunde.
@@ -64,14 +65,14 @@ Berechnung: `[data/tariff_pricing.py](../../data/tariff_pricing.py)` (`import_ce
 ### Marktzonen (Backtesting)
 
 
-| Land (`land`) | Zone  | Datenquelle (API)                            |
-| ------------- | ----- | -------------------------------------------- |
-| AT            | AT    | aWATTar AT                                   |
-| DE            | DE-LU | Energy-Charts oder optional `api.awattar.de` |
-| CH            | CH    | Energy-Charts                                |
+| Land (`land`) | Zone  | Datenquelle (API)                                      |
+| ------------- | ----- | ------------------------------------------------------ |
+| AT            | AT    | Energy-Charts (`bzn=AT`); Fallback aWATTar AT           |
+| DE            | DE-LU | Energy-Charts oder optional `api.awattar.de`           |
+| CH            | CH    | Energy-Charts                                          |
 
 
-`simulation/engine.py` und `data/backtesting_prices.py` werten `_import_tariff_spec` / `_export_tariff_spec` aus der Szenario-Auflösung aus.
+`simulation/engine.py` und `data/backtesting_prices.py` werten `_import_tariff_spec` / `_export_tariff_spec` aus der Szenario-Auflösung aus. Day-Ahead-Daten: [Energy-Charts](https://energy-charts.info) (Fraunhofer ISE), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 DACH-Katalog importieren: `tools/convert_dach_tariffs.py` aus `stromtarife_dach_kombiniert.json` + `einspeisetarife_dach_erweitert.json`.
 
@@ -84,23 +85,24 @@ tools/convert_dach_tariffs.py --check
 
 
 
-### monthly_float — OeMAG-Referenz vs. aWATTar-SUNNY
+### Monatspreis (`monthly_table`) — OeMAG / RefMarkt vs. aWATTar-SUNNY
 
-Referenzdaten für `monthly_float` in `tariffs.json`
-(seit Datenmodell v2; Bootstrap migriert ältere `backtesting_scenarios.json`-Einträge):
-
-
-| Feld                               | Zweck                                                                      |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| `oemag_monthly_feed_in_rates`      | ≥12 bekannte OeMAG-Gesetzliche-Marktpreise (Referenzkurve; länger für SE-Zeiträume) |
-| `monthly_float_reference_cent_kwh` | Nenner für Skalierung (OeMAG `arbeitspreis_kwh_cent`, z. B. 7,15)          |
+Monatskonstante Einspeisetarife tragen **eigene** `monthly_rates`. Shared-Kurven in `tariffs.json` dienen der Katalog-Wartung (Seeds):
 
 
-Export-Tarif-Typ `monthly_float` in `tariffs.json`: Skalierung pro Monat  
-`OeMAG_Monat × arbeitspreis_kwh_cent / 7,15 − settlement_fee_cent_kwh` (min. 0).  
-Berechnung: `[data/monthly_float_rates.py](../../data/monthly_float_rates.py)`.
+| Feld                                   | Zweck                                                                 |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| `oemag_monthly_feed_in_rates`          | ≥12 OeMAG-Gesetzliche-Marktpreise (Wartungskurve; länger für SE)      |
+| `monthly_float_reference_cent_kwh`     | Historischer Nenner für OeMAG-proportionale Seeds (z. B. 7,15)        |
+| `econtrol_referenzmarktwert_pv_monthly`| ≥12 E-Control Referenzmarktwert PV (§ 13 EAG; z. B. VKW Flex-Seed)    |
 
-aWATTar-SUNNY-Fixwerte liegen als Export-Tarif-Typ `monthly_table` in `tariffs.json` (z. B. `monthly_sunny`).
+
+Seed-Formel (nur Wartung, nicht Runtime):  
+`OeMAG_Monat × arbeitspreis / monthly_float_reference_cent_kwh − settlement_fee` (min. 0) — Hilfsfunktion in `[data/monthly_float_rates.py](../../data/monthly_float_rates.py)`.
+
+Rechtliche Abgrenzung OeMAG vs. RefMarkt: [oemag-referenzmarktwert.md](../referenz/oemag-referenzmarktwert.md).
+
+aWATTar-SUNNY-Fixwerte liegen ebenfalls als `monthly_table` (z. B. `monthly_sunny`).
 
 ## Fehlende Zukunftspreise (Live)
 

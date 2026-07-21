@@ -40,12 +40,12 @@
         {
             "year": 2025,
             "month": 8,
-            "tariff_cent_kwh": 5.9
+            "tariff_cent_kwh": 5.892
         },
         {
             "year": 2025,
             "month": 9,
-            "tariff_cent_kwh": 7.1
+            "tariff_cent_kwh": 5.892
         },
         {
             "year": 2025,
@@ -55,12 +55,12 @@
         {
             "year": 2025,
             "month": 11,
-            "tariff_cent_kwh": 8.7
+            "tariff_cent_kwh": 9.167
         },
         {
             "year": 2025,
             "month": 12,
-            "tariff_cent_kwh": 8.7
+            "tariff_cent_kwh": 9.167
         },
         {
             "year": 2026,
@@ -95,5 +95,67 @@
     ],
     "monthly_float_reference_cent_kwh": 7.15,
     "import_tariffs": [],
-    "export_tariffs": []
+    "export_tariffs": [],
+    "econtrol_referenzmarktwert_pv_monthly": [
+        {
+            "year": 2025,
+            "month": 7,
+            "tariff_cent_kwh": 5.91
+        },
+        {
+            "year": 2025,
+            "month": 8,
+            "tariff_cent_kwh": 3.21
+        },
+        {
+            "year": 2025,
+            "month": 9,
+            "tariff_cent_kwh": 4.84
+        },
+        {
+            "year": 2025,
+            "month": 10,
+            "tariff_cent_kwh": 8.85
+        },
+        {
+            "year": 2025,
+            "month": 11,
+            "tariff_cent_kwh": 10.24
+        },
+        {
+            "year": 2025,
+            "month": 12,
+            "tariff_cent_kwh": 11.26
+        },
+        {
+            "year": 2026,
+            "month": 1,
+            "tariff_cent_kwh": 13.95
+        },
+        {
+            "year": 2026,
+            "month": 2,
+            "tariff_cent_kwh": 8.16
+        },
+        {
+            "year": 2026,
+            "month": 3,
+            "tariff_cent_kwh": 5.94
+        },
+        {
+            "year": 2026,
+            "month": 4,
+            "tariff_cent_kwh": 1.7
+        },
+        {
+            "year": 2026,
+            "month": 5,
+            "tariff_cent_kwh": 3.76
+        },
+        {
+            "year": 2026,
+            "month": 6,
+            "tariff_cent_kwh": 5.55
+        }
+    ]
 }

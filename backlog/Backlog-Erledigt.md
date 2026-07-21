@@ -3,6 +3,14 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.3.a — Tariff hygiene (good-enough €) (2026-07-21)
+
+- [x] Provider-independent AT Day-Ahead via Energy-Charts (`bzn=AT`), aWATTar fallback
+- [x] OeMAG 2025 hygiene + `econtrol_referenzmarktwert_pv_monthly`; docs `docs/referenz/oemag-referenzmarktwert.md` + `tarife-quellen.md`
+- [x] VKW Strom Dynamisch (import) + PV Dynamisch/Flex (export) in tariff catalog
+- [x] Unify export `monthly_float` → `monthly_table` with owned `monthly_rates`; shared curves as maintenance seeds
+
+
 ### SE data-model hygiene + month horizon + v3 path-pair (2026-07-21)
 
 - [x] Rename `file_paths_battery_simulation` → `scenario_explorer_conf` (kept in `config.json`; accessors `get_scenario_explorer_conf`; legacy key rejected; `earnie_data_model` → **3**)

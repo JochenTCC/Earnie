@@ -132,12 +132,11 @@ def test_de_spot_ch_fix_scenario_pricing():
     assert k_push_act == pytest.approx(12.5)
 
 
-def test_monthly_float_export_uses_lookup():
+def test_monthly_table_export_uses_lookup():
     from datetime import datetime
 
     tariff = {
-        "type": "monthly_float",
-        "arbeitspreis_kwh_cent": 7.15,
+        "type": "monthly_table",
         "prices_include_vat": True,
         "vat_percent": 0.0,
     }

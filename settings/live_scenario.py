@@ -110,21 +110,10 @@ def get_backtesting_feed_in_settings(
 ):
     """Einspeise-Settings für Backtesting inkl. monatlicher Fixtarife."""
     from data.feed_in_prices import feed_in_settings_from_dict
-    from data.monthly_float_rates import (
-        build_monthly_float_lookup,
-        load_monthly_float_reference_cent,
-        load_oemag_monthly_reference_rates,
-    )
 
+    _ = (load_scenarios_document, load_tariffs_document)
     monthly = None
-    export_spec = runtime.get("_export_tariff_spec")
-    export_type = str(export_spec.get("type", "")).strip().lower() if export_spec else ""
-    if export_type == "monthly_float":
-        tariffs_doc = load_tariffs_document()
-        oemag_rates = load_oemag_monthly_reference_rates(tariffs_doc)
-        reference_cent = load_monthly_float_reference_cent(tariffs_doc)
-        monthly = build_monthly_float_lookup(oemag_rates, reference_cent, export_spec)
-    elif runtime.get("_monthly_fixed_tariffs") is not None:
+    if runtime.get("_monthly_fixed_tariffs") is not None:
         monthly = runtime["_monthly_fixed_tariffs"]
     return feed_in_settings_from_dict(
         runtime,

@@ -260,6 +260,7 @@ def _bootstrap_backtesting_scenarios_json() -> bool:
 _OEMAG_SHARED_TARIFF_KEYS = (
     "oemag_monthly_feed_in_rates",
     "monthly_float_reference_cent_kwh",
+    "econtrol_referenzmarktwert_pv_monthly",
 )
 _OEMAG_DATA_MODEL_V2 = 2
 

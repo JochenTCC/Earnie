@@ -22,7 +22,6 @@ EXPORT_TYPES = frozenset(
     {
         "fixed",
         "monthly_table",
-        "monthly_float",
         "dynamic_epex",
         "spot_hourly",
         "ex_post_spot",
@@ -172,12 +171,6 @@ def _export_tariff_spec(raw: dict, index: int) -> dict:
                 f"export_tariffs[{index}] ('{tariff_id}'): monthly_rates fehlt."
             )
         spec["monthly_rates"] = validate_fixed_monthly_feed_in_rates(rates)
-    elif tariff_type == "monthly_float":
-        if "arbeitspreis_kwh_cent" not in raw:
-            raise ValueError(
-                f"export_tariffs[{index}] ('{tariff_id}'): arbeitspreis_kwh_cent fehlt."
-            )
-        spec["arbeitspreis_kwh_cent"] = float(raw["arbeitspreis_kwh_cent"])
     elif tariff_type == "dynamic_epex":
         _copy_awattar_export_fields(raw, spec)
     elif tariff_type in {"spot_hourly", "ex_post_spot"}:
@@ -289,9 +282,6 @@ def resolve_export_tariff_into_settings(
             else:
                 validated = validate_fixed_monthly_feed_in_rates(rates)
             monthly_rates_holder["_monthly_fixed_tariffs"] = validated
-    elif tariff["type"] == "monthly_float":
-        out["feed_in_mode"] = "fixed"
-        out["k_push_cent"] = float(out.get("k_push_cent", 0.0) or 0.0)
     return out
 
 

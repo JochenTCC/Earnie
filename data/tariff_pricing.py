@@ -11,7 +11,6 @@ IMPORT_FIXED = "fixed_cent"
 IMPORT_MONTHLY = "monthly_table"
 EXPORT_FIXED = "fixed"
 EXPORT_MONTHLY = "monthly_table"
-EXPORT_MONTHLY_FLOAT = "monthly_float"
 
 MARKET_ZONE_BY_LAND = {
     "AT": "AT",
@@ -165,7 +164,7 @@ def export_cent_kwh(
         if "k_push_cent" not in tariff:
             raise ValueError("Export-Tarif type 'fixed' erfordert k_push_cent.")
         price = float(tariff["k_push_cent"])
-    elif tariff_type in {EXPORT_MONTHLY, EXPORT_MONTHLY_FLOAT}:
+    elif tariff_type == EXPORT_MONTHLY:
         if monthly_lookup is None or slot_datetime is None:
             raise ValueError(
                 f"Export-Tarif type '{tariff_type}' erfordert slot_datetime und monthly_lookup."

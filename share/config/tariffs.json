@@ -41,12 +41,12 @@
         {
             "year": 2025,
             "month": 8,
-            "tariff_cent_kwh": 5.9
+            "tariff_cent_kwh": 5.892
         },
         {
             "year": 2025,
             "month": 9,
-            "tariff_cent_kwh": 7.1
+            "tariff_cent_kwh": 5.892
         },
         {
             "year": 2025,
@@ -56,12 +56,12 @@
         {
             "year": 2025,
             "month": 11,
-            "tariff_cent_kwh": 8.7
+            "tariff_cent_kwh": 9.167
         },
         {
             "year": 2025,
             "month": 12,
-            "tariff_cent_kwh": 8.7
+            "tariff_cent_kwh": 9.167
         },
         {
             "year": 2026,
@@ -469,6 +469,18 @@
             "prices_include_vat": true,
             "vat_percent": 8.1,
             "fix_cent_kwh": 26.4
+        },
+        {
+            "id": "at_vkw_strom_dynamisch",
+            "label": "VKW — Strom Dynamisch",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 1.2,
+            "markup_percent": 0.0,
+            "prices_include_vat": false,
+            "vat_percent": 20.0,
+            "notes": "Vorarlberg (ohne Kleinwalsertal). EPEX Spot AT Day-Ahead + 1,20 ct netto; USt 20 %. Quelle: vkw.at/produkte/strom/strom-dynamisch"
         }
     ],
     "export_tariffs": [
@@ -501,54 +513,418 @@
         {
             "id": "at_oemag_gesetzlicher_marktpreis",
             "label": "OeMAG — Gesetzlicher Marktpreis",
-            "type": "monthly_float",
+            "type": "monthly_table",
             "land": "AT",
             "currency": "EUR",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
             "prices_include_vat": true,
             "vat_percent": 0.0,
-            "notes": "Gesetzlicher Quartals- bzw. Monatsmarktpreis nach § 13 ÖSG. Konstanter Festpreis pro Kalendermonat, Abrechnung ex-post.",
-            "arbeitspreis_kwh_cent": 7.15
+            "notes": "Gesetzlicher Quartals- bzw. Monatsmarktpreis nach § 13 ÖSG. Konstanter Festpreis pro Kalendermonat, Abrechnung ex-post. Seed: OeMAG×7.15/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_rates": [
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 9.73
+                },
+                {
+                    "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 9.73
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 6.007
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 5.855
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 5.855
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 5.855
+                },
+                {
+                    "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 5.965
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 5.892
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 5.892
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 9.008
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 9.167
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 9.167
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 8.842
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 8.457
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 5.72
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 6.772
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 6.772
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 6.772
+                }
+            ]
         },
         {
             "id": "at_energie_ag_ober_sterreich_team_sonne_float",
             "label": "Energie AG Oberösterreich — Team Sonne Float",
-            "type": "monthly_float",
+            "type": "monthly_table",
             "land": "AT",
             "currency": "EUR",
             "settlement_fee_cent_kwh": 1.5,
             "markup_percent": 0.0,
             "prices_include_vat": true,
             "vat_percent": 0.0,
-            "notes": "Kopplung an den monatlichen PV-Referenzmarktwert nach § 13 EAG abzueglich Bearbeitungsgebuehr. Untergrenze bei 0 Cent.",
-            "arbeitspreis_kwh_cent": 5.85
+            "notes": "Kopplung an den monatlichen PV-Referenzmarktwert nach § 13 EAG abzueglich Bearbeitungsgebuehr. Untergrenze bei 0 Cent. Seed: OeMAG×5.85/7.15−1.5 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_rates": [
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 6.4609
+                },
+                {
+                    "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 6.4609
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 3.4148
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 3.2905
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 3.2905
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 3.2905
+                },
+                {
+                    "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 3.3805
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 3.3207
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 3.3207
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 5.8702
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 6.0003
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 6.0003
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 5.7344
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 5.4194
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 3.18
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 4.0407
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 4.0407
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 4.0407
+                }
+            ]
         },
         {
             "id": "at_evn_evn_sonnenstrom_garant_float",
             "label": "EVN — EVN SonnenStrom Garant Float",
-            "type": "monthly_float",
+            "type": "monthly_table",
             "land": "AT",
             "currency": "EUR",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
             "prices_include_vat": true,
             "vat_percent": 0.0,
-            "notes": "Monatlich angepasster Einspeisetarif basierend auf den Großhandelspreisen des Vormonats. Flat über den Tag.",
-            "arbeitspreis_kwh_cent": 6.4
+            "notes": "Monatlich angepasster Einspeisetarif basierend auf den Großhandelspreisen des Vormonats. Flat über den Tag. Seed: OeMAG×6.4/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_rates": [
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 8.7094
+                },
+                {
+                    "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 8.7094
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 5.3769
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 5.2408
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 5.2408
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 5.2408
+                },
+                {
+                    "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 5.3393
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 5.274
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 5.274
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 8.0631
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 8.2054
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 8.2054
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 7.9145
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 7.5699
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 5.12
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 6.0617
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 6.0617
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 6.0617
+                }
+            ]
         },
         {
             "id": "at_wien_energie_optima_sonnenstrom_float",
             "label": "Wien Energie — OPTIMA SonnenStrom Float",
-            "type": "monthly_float",
+            "type": "monthly_table",
             "land": "AT",
             "currency": "EUR",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
             "prices_include_vat": true,
             "vat_percent": 0.0,
-            "notes": "Monatlicher Index-Einspeisetarif. Verrechnung erfolgt starr pro Monat ohne Intraday-Volatilitaet.",
-            "arbeitspreis_kwh_cent": 6.95
+            "notes": "Monatlicher Index-Einspeisetarif. Verrechnung erfolgt starr pro Monat ohne Intraday-Volatilitaet. Seed: OeMAG×6.95/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_rates": [
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 9.4578
+                },
+                {
+                    "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 9.4578
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 5.839
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 5.6912
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 5.6912
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 5.6912
+                },
+                {
+                    "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 5.7981
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 5.7272
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 5.7272
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 8.756
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 8.9106
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 8.9106
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 8.5947
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 8.2204
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 5.56
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 6.5826
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 6.5826
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 6.5826
+                }
+            ]
         },
         {
             "id": "at_verbund_v_strom_sonneneinspeisung_fix",
@@ -592,15 +968,106 @@
         {
             "id": "de_tibber_tibber_einspeisung_monats_marktwert",
             "label": "Tibber — Tibber Einspeisung (Monats-Marktwert)",
-            "type": "monthly_float",
+            "type": "monthly_table",
             "land": "DE",
             "currency": "EUR",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
             "prices_include_vat": true,
             "vat_percent": 0.0,
-            "notes": "Gibt den monatlich ermittelten solaren Marktwert der Netzbetreiber (Netztransparenz) direkt an den Kunden weiter.",
-            "arbeitspreis_kwh_cent": 6.1
+            "notes": "Gibt den monatlich ermittelten solaren Marktwert der Netzbetreiber (Netztransparenz) direkt an den Kunden weiter. Seed: OeMAG×6.1/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
+            "monthly_rates": [
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 8.3011
+                },
+                {
+                    "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 8.3011
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 5.1249
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 4.9952
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 4.9952
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 4.9952
+                },
+                {
+                    "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 5.089
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 5.0267
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 5.0267
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 7.6851
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 7.8208
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 7.8208
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 7.5435
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 7.2151
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 4.88
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 5.7775
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 5.7775
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 5.7775
+                }
+            ]
         },
         {
             "id": "ch_ekz_elektrizitaetswerke_des_kantons_zuerich_ekz_ruecklieferung_fix",
@@ -727,6 +1194,154 @@
                     "tariff_cent_kwh": 6.46
                 }
             ]
+        },
+        {
+            "id": "at_vkw_pv_dynamisch",
+            "label": "VKW — PV-Einspeisetarif Dynamisch",
+            "type": "spot_hourly",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.6,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
+            "notes": "Vorarlberg. EPEX Spot AT Day-Ahead − 0,60 ct netto. Quelle: vkw.at/pv-einspeisetarif-dynamisch"
+        },
+        {
+            "id": "at_vkw_pv_flex",
+            "label": "VKW — PV-Einspeisetarif Flex",
+            "type": "monthly_table",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.6,
+            "markup_percent": 0.0,
+            "prices_include_vat": true,
+            "vat_percent": 20.0,
+            "monthly_rates": [
+                {
+                    "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 5.31
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 2.61
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 4.24
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 8.25
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 9.64
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 10.66
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 13.35
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 7.56
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 5.34
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 1.1
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 3.16
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 4.95
+                }
+            ],
+            "notes": "Vorarlberg, bis 100 kWp. RefMarkt PV (§13 EAG) − 0,60 ct. Seed aus econtrol_referenzmarktwert_pv_monthly. Quelle: vkw.at/pv-einspeisetarif-flex"
+        }
+    ],
+    "econtrol_referenzmarktwert_pv_monthly": [
+        {
+            "year": 2025,
+            "month": 7,
+            "tariff_cent_kwh": 5.91
+        },
+        {
+            "year": 2025,
+            "month": 8,
+            "tariff_cent_kwh": 3.21
+        },
+        {
+            "year": 2025,
+            "month": 9,
+            "tariff_cent_kwh": 4.84
+        },
+        {
+            "year": 2025,
+            "month": 10,
+            "tariff_cent_kwh": 8.85
+        },
+        {
+            "year": 2025,
+            "month": 11,
+            "tariff_cent_kwh": 10.24
+        },
+        {
+            "year": 2025,
+            "month": 12,
+            "tariff_cent_kwh": 11.26
+        },
+        {
+            "year": 2026,
+            "month": 1,
+            "tariff_cent_kwh": 13.95
+        },
+        {
+            "year": 2026,
+            "month": 2,
+            "tariff_cent_kwh": 8.16
+        },
+        {
+            "year": 2026,
+            "month": 3,
+            "tariff_cent_kwh": 5.94
+        },
+        {
+            "year": 2026,
+            "month": 4,
+            "tariff_cent_kwh": 1.7
+        },
+        {
+            "year": 2026,
+            "month": 5,
+            "tariff_cent_kwh": 3.76
+        },
+        {
+            "year": 2026,
+            "month": 6,
+            "tariff_cent_kwh": 5.55
         }
     ]
 }

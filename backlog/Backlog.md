@@ -65,11 +65,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and demos — invoice-grade bill reconciliation is explicitly out of scope (nice-to-have later). Includes a thin marker/data-model prep for later SAM work (`2.4`), not the connector rewrite.
 
-- [ ] **2.3.a — Tariff hygiene (good-enough €)**
-  - Find EPEX API to have provider independent tariff calculation
-  - Review current tariffs - use https://www.e-control.at/referenzmarktwert and `docs/referenz/` OeMAG/RefMrkt anchors
-    - Add vkw variable tariffs
-  - Shared OeMAG reference already lives in `tariffs.json` (data-model v2). Remaining: unify export `monthly_float` and `monthly_table` in the data model (one month-constant type with owned `monthly_rates`; migrate/trim catalog entries that only differ by scale-vs-table). UI already treats both as one Typ (“Monatspreis”); calculation paths stay distinct until this unify.
 - [ ] **2.3.b — Approximate cost model (monthly fees)**
   - Improve cost calculation by adding monthly fees etc.
   - Label fees as approximate where needed; no requirement to match real invoices

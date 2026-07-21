@@ -1,6 +1,9 @@
 # data_loader.py
+import logging
 import pandas as pd
 import requests
+
+logger = logging.getLogger(__name__)
 
 ENERGY_CHARTS_PRICE_URL = "https://api.energy-charts.info/price"
 DEFAULT_ENERGY_CHARTS_BZN = "DE-LU"
@@ -161,7 +164,22 @@ def load_market_prices(
 
     if source == 'api':
         if zone == MARKET_ZONE_AT:
-            df_prices = fetch_awattar_prices(start, end, awattar_url, timeout=timeout)
+            provider = sim_cfg.get('price_provider', 'energy_charts')
+            if provider == 'awattar':
+                df_prices = fetch_awattar_prices(start, end, awattar_url, timeout=timeout)
+            else:
+                try:
+                    df_prices = fetch_energy_charts_prices(
+                        start, end, bzn=MARKET_ZONE_AT, timeout=timeout
+                    )
+                except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
+                    logger.warning(
+                        "Energy-Charts AT failed (%s); falling back to aWATTar",
+                        exc,
+                    )
+                    df_prices = fetch_awattar_prices(
+                        start, end, awattar_url, timeout=timeout
+                    )
         elif zone == MARKET_ZONE_DE:
             provider = sim_cfg.get('price_provider', 'energy_charts')
             if provider == 'awattar':

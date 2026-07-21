@@ -54,7 +54,7 @@ def _export_type(entry: dict) -> str:
     if legacy:
         return legacy
     if entry["tarif_typ"] == "monthly_float":
-        return "monthly_float"
+        return "monthly_table"
     if entry["tarif_typ"] == "fix":
         return "fixed"
     hint = str(entry.get("hinweis", "")).lower()
@@ -120,8 +120,12 @@ def convert_export(entry: dict) -> dict:
     }
     if tariff_type == "fixed":
         item["k_push_cent"] = float(entry["arbeitspreis_kwh_cent"])
-    elif tariff_type == "monthly_float":
-        item["arbeitspreis_kwh_cent"] = float(entry["arbeitspreis_kwh_cent"])
+    elif tariff_type == "monthly_table" and entry.get("tarif_typ") == "monthly_float":
+        # Owned rates live in share/config/tariffs.json; DACH source only has scale params.
+        item["notes"] = (
+            str(item.get("notes") or "")
+            + " (monthly_table: monthly_rates im Katalog pflegen; DACH-Quelle hatte monthly_float)."
+        ).strip()
     return item
 
 
