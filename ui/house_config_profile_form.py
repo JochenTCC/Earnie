@@ -807,9 +807,11 @@ def _render_consumer_form(
     )
     # Expand first consumer only when it has no saved id yet (new/empty form).
     has_saved_data = bool(str(consumer.get("id") or "").strip())
+    # Stable key keeps open/closed state across Bezeichnung title changes + auto_persist rerun.
     with st.expander(
         expander_title,
         expanded=index == 0 and not has_saved_data,
+        key=_scoped_key(session_scope, f"hc_consumer_expander_{index}"),
     ):
         cols = st.columns([5, 1])
         with cols[1]:

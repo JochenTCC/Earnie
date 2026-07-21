@@ -39,8 +39,8 @@ def is_explicit_offline() -> bool:
 
 def is_planning_offline_gated() -> bool:
     """
-    Greenfield stays offline until Live-Konfiguration is saved
-    (live scenario + entity refs in backtesting_scenarios.json).
+    Greenfield stays offline until the Live scenario is complete
+    (entity refs in backtesting_scenarios.json via Szenarieneditor).
     """
     from ui.setup_readiness import (
         is_live_configuration_complete,
@@ -55,7 +55,7 @@ def is_planning_offline_gated() -> bool:
 def is_effective_offline() -> bool:
     """
     True when live Loxone paths must stay offline: explicit env flag or
-    incomplete Live-Konfiguration during greenfield onboarding.
+    incomplete Live scenario during greenfield onboarding.
     """
     if is_explicit_offline():
         return True

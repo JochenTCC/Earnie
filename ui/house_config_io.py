@@ -542,9 +542,20 @@ def upsert_scenario(scenario: dict) -> None:
     doc = load_backtesting_scenarios_raw()
     scenarios = list(doc.get("scenarios", []))
     scenario_id = str(scenario.get("id", "")).strip()
-    assert_unique_label(scenario.get("label"), scenarios, exclude_id=scenario_id)
-    updated = [s for s in scenarios if s.get("id") != scenario["id"]]
-    updated.append(scenario)
+    live_id = str(config.get_live_scenario_id() or "").strip()
+    payload = dict(scenario)
+    if live_id and scenario_id == live_id:
+        existing = next(
+            (item for item in scenarios if str(item.get("id", "")).strip() == live_id),
+            None,
+        )
+        if existing is not None:
+            payload["label"] = str(
+                existing.get("label") or existing.get("id") or live_id
+            ).strip()
+    assert_unique_label(payload.get("label"), scenarios, exclude_id=scenario_id)
+    updated = [s for s in scenarios if s.get("id") != payload["id"]]
+    updated.append(payload)
     doc["scenarios"] = updated
     save_backtesting_scenarios(doc)
 
@@ -556,10 +567,7 @@ def delete_scenario(scenario_id: str) -> None:
         raise ValueError("Szenario-ID fehlt.")
     live_id = str(config.get_live_scenario_id() or "").strip()
     if live_id and target == live_id:
-        raise ValueError(
-            "Das Live-Szenario kann nicht entfernt werden. "
-            "Wähle zuerst ein anderes Live-Szenario unter Live-Konfiguration."
-        )
+        raise ValueError("Das Live-Szenario kann nicht entfernt werden.")
     doc = load_backtesting_scenarios_raw()
     scenarios = list(doc.get("scenarios", []))
     remaining = [

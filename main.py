@@ -483,9 +483,9 @@ if __name__ == "__main__":
 
         if is_planning_offline_gated():
             logger.warning(
-                "Live-Konfiguration unvollständig (Planung offline). "
-                "Bitte in der Streamlit-UI (Port %s) Live-Konfiguration abschließen "
-                "(Live-Szenario + Entitäts-Referenzen speichern). "
+                "Live-Szenario unvollständig (Planung offline). "
+                "Bitte in der Streamlit-UI (Port %s) das Live-Szenario im "
+                "Szenarieneditor vervollständigen (Entitäts-Referenzen speichern). "
                 "Erneuter Versuch in %s Sekunden.",
                 config.get_ui_streamlit_port(),
                 _SETUP_WAIT_SEC,

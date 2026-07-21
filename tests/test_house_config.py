@@ -300,6 +300,7 @@ def test_export_tariff_id_alias_awattar_sunny_float():
         tariffs,
     )
     assert resolved["feed_in_mode"] == "dynamic_epex"
+    assert resolved["k_push_cent"] == pytest.approx(0.0)
     assert resolved["_export_tariff_spec"]["id"] == "dynamic_epex"
 
 

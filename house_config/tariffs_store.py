@@ -271,6 +271,8 @@ def resolve_export_tariff_into_settings(
         out["k_push_cent"] = tariff["k_push_cent"]
     elif tariff["type"] == "dynamic_epex":
         out["feed_in_mode"] = "dynamic_epex"
+        # Placeholder for Config/FeedInSettings; price comes from EPEX + fee fields.
+        out["k_push_cent"] = float(out.get("k_push_cent", 0.0) or 0.0)
     elif tariff["type"] in {"spot_hourly", "ex_post_spot"}:
         out["feed_in_mode"] = "dynamic_epex"
         out["k_push_cent"] = float(out.get("k_push_cent", 0.0) or 0.0)

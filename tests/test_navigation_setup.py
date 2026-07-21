@@ -77,7 +77,6 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
 
     assert titles == [
         "Hauskonfigurator",
-        "Live-Konfiguration",
         "Optimierer-Dienst",
         "Loxone-Kommunikation",
     ]
@@ -130,11 +129,11 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
     assert titles == [
         "Hauskonfigurator",
         "Szenarieneditor",
-        "Live-Konfiguration",
         "Optimierer-Dienst",
         "Loxone-Kommunikation",
     ]
     assert "Szenario-Explorer" not in titles
+    assert "Live-Konfiguration" not in titles
 
 
 def test_scenario_explorer_visible_when_planning_ready(tmp_path, monkeypatch):

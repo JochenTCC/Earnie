@@ -337,6 +337,45 @@ def test_delete_scenario_rejects_live(tmp_path, monkeypatch):
         delete_scenario("live")
 
 
+def test_upsert_scenario_keeps_live_label(tmp_path, monkeypatch):
+    config_dir = _bind_paths(tmp_path, monkeypatch)
+    monkeypatch.setattr("ui.house_config_io.config.reinit_config", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "ui.house_config_io.config.get_live_scenario_id",
+        lambda: "live",
+    )
+    config_dir.joinpath("config.json").write_text(
+        json.dumps(minimal_config_payload()),
+        encoding="utf-8",
+    )
+    config_dir.joinpath("backtesting_scenarios.json").write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "id": "live",
+                        "label": "Live",
+                        "settings": default_live_settings(),
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    upsert_scenario(
+        {
+            "id": "live",
+            "label": "Umbenannt",
+            "settings": default_live_settings(),
+        }
+    )
+
+    saved = load_backtesting_scenarios_raw()
+    live = next(item for item in saved["scenarios"] if item["id"] == "live")
+    assert live["label"] == "Live"
+
+
 def test_save_planning_tariff_selection(tmp_path, monkeypatch):
     config_dir = _bind_paths(tmp_path, monkeypatch)
     config_dir.joinpath("config.json").write_text(
@@ -736,6 +775,57 @@ def test_sync_scenario_session_reseeds_when_widget_keys_missing():
     assert session["live__scenario_label"] == "Live"
     assert session["live__scenario_profile"] == "Schützenstraße 7c"
     assert session["live__scenario_pv"] == ["Dach Süd"]
+
+
+def test_sync_scenario_file_changed_preserves_land_filter():
+    class _Session(dict):
+        pass
+
+    session = _Session(
+        {
+            "scenario_editor_sync_id": "live",
+            "scenario_editor_file_stamp": "path:123",
+            "live__scenario_label": "Live",
+            "live__scenario_tariff_land": "DE",
+            "live__scenario_import_filter_type": "Alle",
+            "live__scenario_export_filter_type": "Alle",
+            "live__scenario_profile": "Schützenstraße 7c",
+        }
+    )
+    scenario = {
+        "id": "live",
+        "label": "Live",
+        "settings": {
+            "house_profile_id": "example_efh",
+            "import_tariff_id": "awattar_at",
+            "export_tariff_id": "monthly_sunny",
+        },
+    }
+    profiles = {
+        "example_efh": {"id": "example_efh", "label": "Schützenstraße 7c"},
+    }
+    import ui.pages.page_scenario_editor as editor
+
+    original = editor.st.session_state
+    editor.st.session_state = session
+    try:
+        editor._sync_scenario_session(
+            "live",
+            scenario,
+            file_stamp="path:456",
+            profiles=profiles,
+            batteries=[],
+            pv_systems=[],
+            import_tariffs=[{"id": "awattar_at", "label": "aWATTar"}],
+            export_tariffs=[{"id": "monthly_sunny", "label": "Monatliche SUNNY"}],
+        )
+    finally:
+        editor.st.session_state = original
+
+    assert session["live__scenario_tariff_land"] == "DE"
+    assert session["live__scenario_import_filter_type"] == "Alle"
+    assert session["live__scenario_export_filter_type"] == "Alle"
+    assert session["scenario_editor_file_stamp"] == "path:456"
 
 
 def test_seed_pv_widget_state_uses_profile_defaults_for_new_system():

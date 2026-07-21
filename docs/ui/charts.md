@@ -7,7 +7,7 @@ Gilt für die Seite **Monitor** (Sunset-2-Sunset, `ui/simulation_results.py`, `u
 | Bereich | Inhalt |
 |---------|--------|
 | Kopf | Seitentitel, **?** mit Modus-Scope (Sunset-2-Sunset / Szenario-Explorer) |
-| Sidebar | Env-/Setup-Hinweise, Fortschritt Ersteinrichtung, **Konfiguration speichern / laden** (ZIP); unten **Info / About** (Banner / Version / Kontakt) — **keine** PV-/Batterie-Parameter (diese auf **Live-Konfiguration** / Hauskonfigurator) |
+| Sidebar | Env-/Setup-Hinweise, Fortschritt Ersteinrichtung, **Konfiguration speichern / laden** (ZIP); unten **Info / About** (Banner / Version / Kontakt) — **keine** PV-/Batterie-Parameter (diese auf **Szenarieneditor** / Hauskonfigurator) |
 | Menü | `st.navigation`: Abschnitte Live-Cockpit, Konfiguration, Daemon Control |
 | Charts | Chart 1 → Navigation ←/→ → Chart 2 |
 | Darunter | Simulations-Tabelle, Energievergleich (Expander) |

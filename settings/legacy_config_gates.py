@@ -41,6 +41,6 @@ def reject_legacy_runtime_settings_block(raw_config: dict) -> None:
 
         raise ValueError(
             "Block 'runtime_settings' in config.json ist entfernt (2.0 P2). "
-            "Live-Konfiguration als Szenario in backtesting_scenarios.json "
+            "Live-Szenario als Eintrag in backtesting_scenarios.json "
             f"(live_scenario_id, Standard: '{DEFAULT_LIVE_SCENARIO_ID}')."
         )

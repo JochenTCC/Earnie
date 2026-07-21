@@ -292,20 +292,20 @@ Wenn die Was-wäre-wenn-Analyse überzeugt, folgt die Anbindung an die Smarthome
    - E-Auto: angesteckt, Fertig-Zeit, Rest-SOC, Kapazität, …  
    Konkrete Beispielnamen und Config-Schlüssel: [Loxone-Signale](../referenz/loxone-signale.md). Zentrale Merker unter `loxone_blocks` in `config.json`; Verbraucher-Merker im Hausprofil (`house_profiles.json`) bzw. Legacy in `flexible_consumers[]`.  
 3. Optional **FTP-Verbrauchslog** für historische Offline-Daten (`loxone_blocks.log_filename`, Miniserver-Ordner `log/`) — siehe [Loxone-Anbindung](../einrichtung/loxone-anbindung.md#ftp-verbrauchslog). Für Jahresprofile im Hauskonfigurator nutzen Sie eher CSV-Upload / Energiemonitor ([Verbrauchs-CSV](../konfiguration/verbrauchs-csv.md)).  
-4. Namen in Earnie hinterlegen (Hauskonfigurator / Live-Konfiguration) — **exakt** wie im Smarthome-System.  
+4. Namen in Earnie hinterlegen (Hauskonfigurator / Szenarieneditor) — **exakt** wie im Smarthome-System.  
 
 Earnie liest Smarthome-Werte oft als Text mit Einheit (z. B. `3.5 kW`) ein; die Einheit wird ignoriert.
 
 Signalübersicht: [Loxone-Signale](../referenz/loxone-signale.md) · Anbindung: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md).
 
-### Live-Konfiguration
+### Live-Szenario (Szenarieneditor)
 
-Unter **Konfiguration → Live-Konfiguration**:
+Unter **Konfiguration → Szenarieneditor**:
 
-- welches Szenario **live** gilt (`live_scenario_id`)  
+- welches Szenario **live** gilt (`live_scenario_id` in `config.json`, Standard: `live`)  
 - welche Entitäten (Hausprofil, Batterie, PV, Tarife) daran hängen  
 
-Aufgelöste Zahlen (kWp, Kapazität, Vergütung in ct/kWh) sind meist **nur Anzeige**. Geändert werden die Referenzen bzw. die Kataloge im Hauskonfigurator / Szenarieneditor.
+Die **Bezeichnung** des Live-Szenarios ist fest (nicht umbenennbar / nicht löschbar). Entitäts-Referenzen und Kataloge ändern Sie im Szenarieneditor bzw. Hauskonfigurator.
 
 Damit nutzen Live-Optimierung und Szenario-Explorer dieselbe Auflösungslogik.
 
@@ -376,7 +376,7 @@ Auswertung, welcher Verbrauch **autonom** (Haus/Loxone ohne Earnie-Plan) und wel
 3. Szenarieneditor: Live-Szenario + Vergleichsvarianten  
 4. Szenario-Explorer: Verbrauch prüfen, Rechnung, Ergebnisse bewerten  
 5. Loxone vorbereiten und Zugang speichern  
-6. Live-Konfiguration + Loxone-Kommunikation (Silent → Live)  
+6. Live-Szenario im Szenarieneditor + Loxone-Kommunikation (Silent → Live)  
 7. Daemon dauerhaft laufen lassen, Monitor beobachten, Feintuning  
 
 Bei Unklarheiten in der Konfiguration: Hover-Hilfe in `config.json` (Schema) und die Kapitel unter [docs/README.md](../README.md).

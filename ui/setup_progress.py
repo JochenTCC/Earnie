@@ -57,7 +57,8 @@ def render_setup_progress_notice() -> None:
             return
         st.sidebar.success(
             "Planungs-Konfiguration vollständig — Analyse ist freigeschaltet. "
-            "Betrieb folgt nach Loxone-Anbindung (Sidebar)."
+            "Live-Cockpit folgt nach korrekter Loxone-Merker-Konfiguration "
+            "(**Daemon Control → Loxone-Kommunikation**)."
         )
         return
     if not is_setup_navigation_restricted():
@@ -69,7 +70,7 @@ def render_setup_progress_notice() -> None:
         lines.append("**Hauskonfigurator:**")
         lines.extend(f"- {item}" for item in house_missing)
     if is_house_config_ready() and runtime_missing:
-        lines.append("**Echtzeit-Umgebung:**")
+        lines.append("**Szenarieneditor (Live-Szenario):**")
         lines.extend(f"- {item}" for item in runtime_missing)
     if not lines:
         missing = missing_planning_setup_items()

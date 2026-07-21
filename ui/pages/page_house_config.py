@@ -15,8 +15,7 @@ _HOUSE_CONFIG_TABS = ("Hausprofil", "PV-Anlagen", "Batterien")
 def _help_text() -> str:
     return (
         "Backtesting-Planung: Hausprofil mit Verbrauchern, PV-Anlagen und Batterie-Entitäten. "
-        "Szenarien und Live-Zuordnung (Tarife, Entitäts-Referenzen) in Szenarieneditor bzw. "
-        "Live-Konfiguration. "
+        "Szenarien und Live-Zuordnung (Tarife, Entitäts-Referenzen) im Szenarieneditor. "
         "Grundlast = max(2 % Jahresverbrauch, Jahresverbrauch − Summe Verbraucher)."
     )
 

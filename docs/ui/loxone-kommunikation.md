@@ -1,13 +1,19 @@
 # Loxone-Kommunikation (Debug-Seite)
 
-Die Seite **Loxone-Kommunikation** unter **Echtzeit-Umgebung** zeigt den Live-Zustand aller konfigurierten Loxone-Merker und die Schreibvorgänge des letzten Produktiv-Laufs von `main.py`.
+Die Seite **Loxone-Kommunikation** unter **Daemon Control** zeigt den Live-Zustand aller konfigurierten Loxone-Merker und die Schreibvorgänge des letzten Produktiv-Laufs von `main.py`.
 
 ## Aufruf
 
 1. Streamlit starten: `python -m scripts.run_streamlit`
-2. Navigation: **Echtzeit-Umgebung → Loxone-Kommunikation**
+2. Navigation: **Daemon Control → Loxone-Kommunikation**
 
 Die Seite ist auch während der Einrichtung sichtbar (eingeschränkte Navigation), sobald Loxone-Zugangsdaten in `config/.env` hinterlegt sind.
+
+## Live-Cockpit noch gesperrt (Greenfield)
+
+Nach abgeschlossener Planungs-Konfiguration (Hauskonfigurator + Live-Szenario im Szenarieneditor) erscheint **Szenario-Explorer**, aber **Live-Cockpit** (Monitor / Manuelle Geräte) bleibt bewusst ausgeblendet, solange die Loxone-Merker für den Live-Betrieb nicht vollständig und korrekt sind.
+
+Auf dieser Seite erscheint dann ein Hinweis. Nutzen Sie **Loxone-Merker testen** und die Tabelle **Live-Lesen**, um Platzhalter oder falsche Namen in `loxone_blocks` (`config.json`) und in den Verbraucher-Merkern des Hausprofils zu korrigieren. Erst danach wird der Abschnitt Live-Cockpit freigeschaltet.
 
 ## Bereiche der Seite
 

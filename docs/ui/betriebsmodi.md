@@ -12,7 +12,7 @@ Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monit
 |-----|-------|-----------|------------|
 | `sunset2sunset` | **Monitor**, **Manuelle Geräte** | Live-Cockpit | ja (Hauptansicht; ohne Key kein Live-Cockpit-Abschnitt) |
 | `scenario_explorer` | **Szenario-Explorer** | Konfiguration | optional (Dev / Community Cloud) |
-| `live_environment` | **Live-Konfiguration** (Konfiguration), **Optimierer-Dienst**, **Loxone-Kommunikation**, **Verbraucheranalyse** (Live-Cockpit) | Konfiguration / Daemon Control / Live-Cockpit | ja (Prod; ohne Key kein Live-/Daemon-Anteil) |
+| `live_environment` | **Optimierer-Dienst**, **Loxone-Kommunikation**, **Verbraucheranalyse** (Live-Cockpit) | Daemon Control / Live-Cockpit | ja (Prod; ohne Key kein Live-/Daemon-Anteil) |
 | `price_forecast` | **Preis-Prognose (Dev)** | Live-Cockpit | Dev-only |
 
 Beispiel Community Cloud (nur Szenario-Explorer): `EARNIE_UI_MODES=scenario_explorer` — Live-Cockpit und Daemon Control entfallen.
@@ -26,10 +26,10 @@ In der Sidebar (unten): Abschnitt **Info / About** (Banner der Wahrheit, Version
 | Abschnitt | Seiten |
 |-----------|--------|
 | **Live-Cockpit** | Monitor, Manuelle Geräte, Verbraucheranalyse (bei `live_environment`), Preis-Prognose (Dev) |
-| **Konfiguration** | Hauskonfigurator, Szenarieneditor, Szenario-Explorer (wenn freigeschaltet), Live-Konfiguration (bei `live_environment`) |
+| **Konfiguration** | Hauskonfigurator, Szenarieneditor, Szenario-Explorer (wenn freigeschaltet) |
 | **Daemon Control** | Optimierer-Dienst, Loxone-Kommunikation |
 
-Während der Greenfield-Ersteinrichtung sind zunächst nur **Konfiguration** und **Daemon Control** sichtbar (Live-Konfiguration wird für die Ersteinrichtung auch ohne `live_environment` in der Env erzwungen).
+Während der Greenfield-Ersteinrichtung sind zunächst nur **Konfiguration** und **Daemon Control** sichtbar (Daemon-Seiten werden für die Ersteinrichtung auch ohne `live_environment` in der Env erzwungen).
 
 Spezifikation: [UI Sunset-2-Sunset](../spec/ui-sunset2sunset.md) (v0.6.2). Chart- und Panel-Details: [Charts & Panels](charts.md).
 
@@ -79,7 +79,7 @@ Stunde 0 stammt aus dem **Produktiv-Durchlauf** (`main.py` → `live_optimizatio
 
 ### Live-Szenario (Entitäts-Referenzen)
 
-PV-, Batterie- und Einspeise-Parameter werden über Entitäts-IDs im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`) konfiguriert — Seite **Live-Konfiguration** oder **Szenarieneditor**. **Kein** adaptives PV-Tuning mehr — neuer Adaptions-Ansatz separat im Backlog.
+PV-, Batterie- und Einspeise-Parameter werden über Entitäts-IDs im **Live-Szenario** (`backtesting_scenarios.json`, gewählt via `live_scenario_id` in `config.json`) konfiguriert — Seite **Szenarieneditor**. **Kein** adaptives PV-Tuning mehr — neuer Adaptions-Ansatz separat im Backlog.
 
 ### Panels
 

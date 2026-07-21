@@ -287,7 +287,7 @@ def is_runtime_scenario_ready() -> bool:
 
 
 def is_live_configuration_complete() -> bool:
-    """Live-Konfiguration gespeichert (Live-Szenario + Entitäts-Referenzen)."""
+    """Live-Szenario vollständig (Entitäts-Referenzen im Szenarieneditor)."""
     return is_runtime_scenario_ready()
 
 

@@ -2,9 +2,10 @@
 
 Das Env-/Config-Gating (EARNIE_UI_MODES / ENERGY_OPTIMIZER_UI_MODES)
 steuert, welche Seiten registriert werden: Live-Cockpit (Monitor, Manuelle Geräte)
-braucht ``sunset2sunset``; Live-Konfiguration und Daemon Control brauchen
-``live_environment``; Szenario-Explorer und Preis-Prognose (Dev) folgen ihren
-Keys. Konfigurations-Seiten bleiben über Setup-Readiness gesteuert.
+braucht ``sunset2sunset``; Daemon Control braucht ``live_environment``;
+Szenario-Explorer und Preis-Prognose (Dev) folgen ihren Keys.
+Konfigurations-Seiten bleiben über Setup-Readiness gesteuert.
+Das Live-Szenario wird im Szenarieneditor gepflegt (``live_scenario_id``).
 
 Nach Minimal-Bootstrap (Greenfield) sind bis zur vollständigen Planungs-
 Konfiguration nur Hauskonfigurator und ggf. Daemon Control sichtbar
@@ -30,8 +31,9 @@ SECTION_ECHTZEIT = "Daemon Control"
 
 _VA_OFFLINE_NOTICE = (
     "Verbraucheranalyse ist ohne Live-Verbindung zur Smarthome-Steuerung "
-    "nicht verfügbar (EARNIE_OFFLINE oder unvollständige Live-Konfiguration). "
-    "Bitte Live-Konfiguration abschließen bzw. Offline-Modus deaktivieren."
+    "nicht verfügbar (EARNIE_OFFLINE oder unvollständiges Live-Szenario). "
+    "Bitte Live-Szenario im Szenarieneditor vervollständigen bzw. "
+    "Offline-Modus deaktivieren."
 )
 
 
@@ -95,18 +97,6 @@ def _konfiguration_core_specs(*, house_config_default: bool) -> list[PageSpec]:
     return specs
 
 
-def _live_konfiguration_spec() -> PageSpec:
-    from ui.pages import page_live_environment
-
-    return PageSpec(
-        page_live_environment.render,
-        "Live-Konfiguration",
-        "⚡",
-        SECTION_KONFIGURATION,
-        "live-environment",
-    )
-
-
 def _echtzeit_page_specs() -> list[PageSpec]:
     from ui.pages import page_daemon, page_loxone_debug
 
@@ -137,18 +127,17 @@ def _append_konfiguration_and_echtzeit(
     scenario_explorer: PageSpec | None = None,
 ) -> None:
     specs.extend(_konfiguration_core_specs(house_config_default=house_config_default))
-    show_live = force_echtzeit or "live_environment" in enabled_mode_keys
+    show_daemon = force_echtzeit or "live_environment" in enabled_mode_keys
     if scenario_explorer is not None:
         specs.append(scenario_explorer)
-    if show_live:
-        specs.append(_live_konfiguration_spec())
+    if show_daemon:
         specs.extend(_echtzeit_page_specs())
 
 
 def _restricted_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
-    # Onboarding always needs Live-Konfiguration / daemon / Loxone pages,
-    # even when EARNIE_UI_MODES is explorer-only (no live_environment key).
-    # Community Cloud demo stays config-only (no forced Live/Daemon).
+    # Onboarding always needs daemon / Loxone pages, even when EARNIE_UI_MODES
+    # is explorer-only (no live_environment key). Community Cloud demo stays
+    # config-only (no forced Daemon).
     from runtime_store.cloud_demo import is_cloud_demo
 
     specs: list[PageSpec] = []

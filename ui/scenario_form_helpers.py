@@ -157,10 +157,23 @@ def backtesting_scenarios_file_stamp() -> str:
         return os.path.abspath(path)
 
 
-def clear_scoped_widget_keys(session_scope: str) -> None:
+# UI-only tariff filters — not part of scenario payload; keep across file reloads.
+SCENARIO_FILTER_KEY_BASES = (
+    "scenario_tariff_land",
+    "scenario_import_filter_type",
+    "scenario_export_filter_type",
+)
+
+
+def clear_scoped_widget_keys(
+    session_scope: str,
+    *,
+    preserve_keys: set[str] | None = None,
+) -> None:
     prefix = f"{session_scope}__"
+    keep = preserve_keys or set()
     for key in list(st.session_state.keys()):
-        if isinstance(key, str) and key.startswith(prefix):
+        if isinstance(key, str) and key.startswith(prefix) and key not in keep:
             del st.session_state[key]
 
 

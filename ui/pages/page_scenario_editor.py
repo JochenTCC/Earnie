@@ -35,6 +35,7 @@ from ui.label_select import (
 )
 from ui.scenario_form_helpers import (
     NEW_SCENARIO_OPTION,
+    SCENARIO_FILTER_KEY_BASES,
     backtesting_scenarios_file_stamp,
     build_scenario_settings,
     clear_scoped_widget_keys,
@@ -56,9 +57,9 @@ from ui.scenario_form_helpers import (
 
 _HELP = (
     "Live-Szenario (Pflicht für Echtzeit und Szenario-Explorer) und optionale "
-    "weitere Varianten. Batterie-Entitäten legst du im Hauskonfigurator an; "
-    "Speichert Szenarien nach `config/backtesting_scenarios.json`; Live-Auswahl über "
-    "`live_scenario_id` in `config.json`."
+    "weitere Varianten. Batterie-Entitäten legst du im Hauskonfigurator an. "
+    "Speichert Szenarien nach `config/backtesting_scenarios.json`. "
+    "Die Bezeichnung des Live-Szenarios ist fest; Entitäts-Referenzen sind editierbar."
 )
 
 _SESSION_SYNC_KEY = "scenario_editor_sync_id"
@@ -155,7 +156,15 @@ def _sync_scenario_session(
     file_changed = st.session_state.get(_SESSION_FILE_STAMP_KEY) != file_stamp
     widget_state_missing = _scenario_widget_state_missing(session_scope)
     if scope_changed or file_changed or widget_state_missing:
-        clear_scoped_widget_keys(session_scope)
+        preserve: set[str] = set()
+        # Own auto_persist / external reload must not wipe Land/Typ filters.
+        if file_changed and not scope_changed and not widget_state_missing:
+            preserve = {
+                scoped_widget_key(session_scope, base)
+                for base in SCENARIO_FILTER_KEY_BASES
+                if scoped_widget_key(session_scope, base) in st.session_state
+            }
+        clear_scoped_widget_keys(session_scope, preserve_keys=preserve)
         _seed_scenario_widget_state(
             session_scope,
             scenario,
@@ -326,12 +335,18 @@ def _render_scenarios_tab() -> None:
     )
 
     if existing and str(existing.get("id", "")).strip() == live_id:
-        st.info("Dies ist das Live-Szenario.")
+        st.info(
+            "Dies ist das Live-Szenario. Die Bezeichnung kann nicht geändert werden."
+        )
 
+    is_live = bool(existing) and str(existing.get("id", "")).strip() == live_id
     label = labeled_text_input(
         "Bezeichnung",
         key=scoped_widget_key(session_scope, "scenario_label"),
+        disabled=is_live,
     )
+    if is_live and existing:
+        label = str(existing.get("label") or existing.get("id") or "").strip()
 
     _, prof_map = options_for_entities(list(profiles.values()), allow_none=True)
     _, bat_map = options_for_entities(batteries, allow_none=True)
@@ -518,6 +533,9 @@ def _render_scenarios_tab() -> None:
         ready=ready,
     )
     if wrote:
+        # Avoid treating our own write as file_changed (would clear Land/Typ filters).
+        st.session_state[_SESSION_FILE_STAMP_KEY] = backtesting_scenarios_file_stamp()
+        store_scenario_form_baseline(st.session_state, session_scope, payload)
         st.rerun()
 
     if not is_new and stable_scenario_id and stable_scenario_id != live_id:

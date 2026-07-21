@@ -122,6 +122,6 @@ Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden)
 | Optimierung | MILP über 24 h (15-Min-Slots intern) |
 | Schreiben | Ziel-SOC, Lade-/Entladeleistung, Steuerbefehl, Freigaben je Slot |
 
-Die App **liest** dieselben Live-Werte für Anzeige; **schreibt** keine Steuersignale. Konfigurationsänderungen erfolgen über die Planungs- und Echtzeit-Seiten (Hauskonfigurator, Live-Konfiguration, Manuelle Geräte).
+Die App **liest** dieselben Live-Werte für Anzeige; **schreibt** keine Steuersignale. Konfigurationsänderungen erfolgen über die Planungs- und Echtzeit-Seiten (Hauskonfigurator, Szenarieneditor, Manuelle Geräte).
 
 Weitere Details: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md).

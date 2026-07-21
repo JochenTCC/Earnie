@@ -18,7 +18,7 @@ def test_default_pages_include_core_and_scenario_explorer():
     assert "Manuelle Geräte" in titles
     assert "Szenario-Explorer" in titles
     assert "Verbraucheranalyse" in titles
-    assert "Live-Konfiguration" in titles
+    assert "Live-Konfiguration" not in titles
     assert "Loxone-Kommunikation" in titles
     assert "Preis-Prognose (Dev)" not in titles
 
@@ -31,8 +31,9 @@ def test_price_forecast_page_only_when_enabled():
 def test_only_sunset_hides_dev_and_scenario_explorer():
     titles = _titles(["sunset2sunset", "live_environment"])
     assert "Monitor" in titles
-    assert "Live-Konfiguration" in titles
+    assert "Optimierer-Dienst" in titles
     assert "Verbraucheranalyse" in titles
+    assert "Live-Konfiguration" not in titles
     assert "Szenario-Explorer" not in titles
     assert "Preis-Prognose (Dev)" not in titles
 
@@ -57,6 +58,7 @@ def test_verbraucheranalyse_hidden_without_live_environment():
     assert "Monitor" in titles
     assert "Verbraucheranalyse" not in titles
     assert "Live-Konfiguration" not in titles
+    assert "Optimierer-Dienst" not in titles
 
 
 def test_cockpit_is_single_default():
@@ -81,7 +83,7 @@ def test_sections_are_assigned():
     assert sections["Preis-Prognose (Dev)"] == "Live-Cockpit"
     assert sections["Szenario-Explorer"] == "Konfiguration"
     assert sections["Hauskonfigurator"] == "Konfiguration"
-    assert sections["Live-Konfiguration"] == "Konfiguration"
+    assert "Live-Konfiguration" not in sections
     assert sections["Loxone-Kommunikation"] == "Daemon Control"
     assert "Analyse" not in {s.section for s in specs}
     assert "Planung" not in {s.section for s in specs}
@@ -94,11 +96,12 @@ def test_betrieb_order_price_forecast_after_verbraucheranalyse():
     assert betrieb.index("Verbraucheranalyse") < betrieb.index("Preis-Prognose (Dev)")
 
 
-def test_konfiguration_order_explorer_before_live_konfig():
+def test_konfiguration_order_explorer_last_when_unlocked():
     specs = build_page_specs(_FULL_MODES)
     konfig = [s.title for s in specs if s.section == "Konfiguration"]
-    assert konfig[-1] == "Live-Konfiguration"
-    assert konfig.index("Szenario-Explorer") < konfig.index("Live-Konfiguration")
+    assert "Live-Konfiguration" not in konfig
+    assert konfig[-1] == "Szenario-Explorer"
+    assert konfig.index("Hauskonfigurator") < konfig.index("Szenario-Explorer")
 
 
 def test_wrap_offline_stub_shows_notice(monkeypatch):

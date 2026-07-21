@@ -3,6 +3,16 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Hauskonfigurator Verbraucher expander on Bezeichnung (2026-07-21)
+
+- [x] **Verbraucher editor collapsed after Bezeichnung change (e.g. E-Auto)** — expander title includes live Bezeichnung but had no stable `key`, so Streamlit remounted it collapsed on rename + auto_persist `st.rerun()`; fixed with `key=hc_consumer_expander_{index}`; verified live
+
+
+### Bugfix Remove Live-Konfiguration page (2026-07-21)
+
+- [x] **Remove Live-Konfiguration page** — page + `ui/config_forms.py` removed; nav no longer registers it; Live scenario Bezeichnung locked (UI + `upsert_scenario`); delete already blocked; docs updated to Szenarieneditor; greenfield: Live-Cockpit stays gated on Loxone markers with notice on **Loxone-Kommunikation**; verified live
+
+
 ### Version 2.2.0 — SCC per-session Greenfield (2026-07-21)
 
 - [x] **App on Streamlit cloud should start always with Greenfield** — `EARNIE_CLOUD_DEMO=1`: per-browser-session temp env (`runtime_store/cloud_demo.py`), session-aware `persist_paths`, skip offline seed, restricted nav opens Hauskonfigurator without Live/Daemon, German intro banner; docs `private-env.md` / `betrieb.md`; tests `tests/test_cloud_demo.py`
@@ -13,14 +23,29 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **Debug-Dump ZIP: `optimization_history.jsonl` fehlt (NAS/Docker)** — dump used baked `earnie_env/runtime` while history lives on volume `/app/runtime`; fixed via `resolve_history_src()` fallback + `EARNIE_RUNTIME_PATH: runtime` in compose; verified live (alpha.8, local IP and reverse proxy)
 
 
+### Bugfix Manual WM/Trockner phantom Chart-1 bars (2026-07-21)
+
+- [x] **Manual WM/Trockner phantom Chart-1 bars** — `apply_known_generic_to_chart_rows` peeled assumed weekly `earnie_role: manual` schedules into named bars (`phantom_kw` when live baseload lacked that energy). Fix: peel only `known`; manuals via `appliance_schedules.json` only (`house_config/known_chart_display.py`). Dump: `chart_debug_review/debug_dump_20260720_171718`; verified live
+
+
+### Bugfix oemag_monthly_feed_in_rates in tariffs.json (2026-07-21)
+
+- [x] **`oemag_monthly_feed_in_rates` moved to `tariffs.json`** — shared OeMAG reference + `monthly_float_reference_cent_kwh` now live in `tariffs*.json` (not `backtesting_scenarios`); bootstrap migrates v1→v2 (copy/strip/stamp); verified live
+
+
 ### Bugfix SE monthly_float missing month (2026-07-21)
 
 - [x] **SE `Kein Monatseintrag für 2025-02 im Export-Tarif`** — OeMAG curve was only Jul 2025–Jun 2026 while SE needed earlier months; extended `oemag_monthly_feed_in_rates` (≥12 months allowed), clearer range error; verified live
 
 
+### Bugfix scenario editor Land filter reset on auto_persist (2026-07-21)
+
+- [x] **Country filter in scenario editor must also filter export tariffs** — regression: `Land` reset to `Alle` after tariff auto-save because `file_changed` cleared scoped widgets; fix: refresh file stamp + baseline after own write, preserve Land/Typ filter keys on file reload (`page_scenario_editor.py`, `scenario_form_helpers.py`); test `test_sync_scenario_file_changed_preserves_land_filter`; verified live
+
+
 ### Bugfix scenario editor Land filter for export tariffs (2026-07-21)
 
-- [x] **Country filter in scenario editor must also filter export tariffs** — shared `Land` already applied to both Bezug and Einspeise via `render_shared_land_filter` + `render_tariff_type_filter(..., land=shared_land)` (`ui/tariff_filter_helpers.py`, Szenarieneditor); verified live
+- [x] **Country filter in scenario editor must also filter export tariffs** — shared `Land` already applied to both Bezug and Einspeise via `render_shared_land_filter` + `render_tariff_type_filter(..., land=shared_land)` (`ui/tariff_filter_helpers.py`, Szenarieneditor); verified live (later regression: Land reset on auto_persist — see chapter above)
 
 
 ### Bugfix cloud-demo ghost scenarios (2026-07-21)

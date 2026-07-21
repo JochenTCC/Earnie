@@ -10,7 +10,6 @@ import streamlit as st
 
 import config
 from runtime_store.persist_paths import config_schema_file, resolve_config_json_path
-from ui.config_forms import render_system_parameter_section
 from ui.help_hint import render_page_title_with_help
 
 _EDITOR_KEY = "config_json_editor"
@@ -103,9 +102,9 @@ def render() -> None:
     render_page_title_with_help("⚙️ Konfiguration", _CONFIG_HELP, key="config_scope_help")
     path = resolve_config_json_path()
     st.caption(f"Datei: `{path}`")
-
-    with st.expander("Komfort-Ansicht: Live-Szenario (Entitäts-Referenzen)", expanded=False):
-        render_system_parameter_section()
+    st.caption(
+        "Live-Szenario und Entitäts-Referenzen pflegen Sie im **Szenarieneditor**."
+    )
 
     st.subheader("Roh-JSON-Editor")
     try:

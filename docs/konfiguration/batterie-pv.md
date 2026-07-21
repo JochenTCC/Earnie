@@ -64,10 +64,10 @@ Beispiel (5 kWh, 1500 €, 6000 Zyklen, 50 % zyklenbedingt): **2,5 ct/kWh**.
 
 
 
-## Live-Konfiguration vs. `config.json`
+## Live-Szenario vs. `config.json`
 
-In der App (Seite **Live-Konfiguration**, Abschnitt Konfiguration) werden Entitäts-Referenzen gewählt (PV als Mehrfachauswahl). Gespeichert wird das Live-Szenario in `backtesting_scenarios.json`. PV- und Batterie-Entitäten selbst pflegt man im **Hauskonfigurator**.
+In der App (Seite **Szenarieneditor**) werden Entitäts-Referenzen für das Live-Szenario gewählt (PV als Mehrfachauswahl). Gespeichert wird das Live-Szenario in `backtesting_scenarios.json` (`live_scenario_id` in `config.json`, Standard: `live`). PV- und Batterie-Entitäten selbst pflegt man im **Hauskonfigurator**. Die Bezeichnung des Live-Szenarios ist fest.
 
 ## Szenarien
 
-Zum Vergleich von Varianten zur Live-Konfiguration (größerer Speicher, mehrere PV-Anlagen, anderer Strom-Tarif, ...) ohne Produktiv-Änderung: weitere Einträge in `backtesting_scenarios.json` (siehe [Überblick](ueberblick.md)).
+Zum Vergleich von Varianten zum Live-Szenario (größerer Speicher, mehrere PV-Anlagen, anderer Strom-Tarif, ...) ohne Produktiv-Änderung: weitere Einträge in `backtesting_scenarios.json` (siehe [Überblick](ueberblick.md)).

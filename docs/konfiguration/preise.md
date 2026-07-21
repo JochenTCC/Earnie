@@ -25,7 +25,7 @@ Stundenpreise kommen von der aWATTar-API; die URL wird aus `import_tariff_id` �
 
 ## Einspeisevergütung (Live)
 
-Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Typ `fixed` kommt `k_push_cent` aus dem Tarif-Eintrag in `tariffs.json`. In der UI (Seite **Live-Konfiguration**) ist die aufgelöste Vergütung read-only; geändert wird die Tarif-Referenz im Live-Szenario.
+Live-Optimierung löst die `export_tariff_id` des Live-Szenarios auf. Bei Typ `fixed` kommt `k_push_cent` aus dem Tarif-Eintrag in `tariffs.json`. Geändert wird die Tarif-Referenz im Live-Szenario im **Szenarieneditor**.
 
 **Hinweis:** Vergütung kann sich ändern (z. B. monatlich). Tarif in `tariffs.json` bzw. gewählte `export_tariff_id` aktuell halten.
 
