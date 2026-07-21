@@ -8,6 +8,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **App on Streamlit cloud should start always with Greenfield** — `EARNIE_CLOUD_DEMO=1`: per-browser-session temp env (`runtime_store/cloud_demo.py`), session-aware `persist_paths`, skip offline seed, restricted nav opens Hauskonfigurator without Live/Daemon, German intro banner; docs `private-env.md` / `betrieb.md`; tests `tests/test_cloud_demo.py`
 
 
+### Bugfix Debug-Dump ZIP optimization_history (2026-07-21)
+
+- [x] **Debug-Dump ZIP: `optimization_history.jsonl` fehlt (NAS/Docker)** — dump used baked `earnie_env/runtime` while history lives on volume `/app/runtime`; fixed via `resolve_history_src()` fallback + `EARNIE_RUNTIME_PATH: runtime` in compose; verified live (alpha.8, local IP and reverse proxy)
+
+
 ### Bugfix SE monthly_float missing month (2026-07-21)
 
 - [x] **SE `Kein Monatseintrag für 2025-02 im Export-Tarif`** — OeMAG curve was only Jul 2025–Jun 2026 while SE needed earlier months; extended `oemag_monthly_feed_in_rates` (≥12 months allowed), clearer range error; verified live
