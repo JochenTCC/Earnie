@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Chart 1 PV *:00 seasonal spikes (2026-07-21)
+
+- [x] **Chart 1 PV forecast spikes at *:00** — dump `chart_debug_review/debug_dump_20260721_165852`: gray-area `forecast_pv_kw` at *:00 matched seasonal synthetic (`kwp=6` summer) while :15/:30/:45 used forecast.solar. Fix: keep warm API cache on timeout/HTTP/429 instead of discarding it (`data/pv_forecast.py`); tests in `tests/test_pv_forecast.py`. Closed for now (user); intermittent failure-path live proof not pursued.
+
+
 ### Bugfix Hauskonfigurator Verbraucher expander on Bezeichnung (2026-07-21)
 
 - [x] **Verbraucher editor collapsed after Bezeichnung change (e.g. E-Auto)** — expander title includes live Bezeichnung but had no stable `key`, so Streamlit remounted it collapsed on rename + auto_persist `st.rerun()`; fixed with `key=hc_consumer_expander_{index}`; verified live

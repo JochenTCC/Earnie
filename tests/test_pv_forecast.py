@@ -13,7 +13,7 @@ from data import pv_forecast as pf
 @pytest.fixture(autouse=True)
 def reset_pv_forecast_state():
     pf._LAST_API_CALL = None
-    pf._CACHED_HOURLY_WATTS = None
+    pf._CACHED_HOURLY_WATTS_BY_URL = {}
     pf._RATE_LIMIT_RETRY_AT = None
     pf._LAST_FETCH_SOURCE = "api"
     pf._USING_SYNTHETIC_FALLBACK = False
@@ -163,6 +163,44 @@ def test_http_error_does_not_update_last_api_call(get_mock, _config_mock, _timeo
 
     assert pf._LAST_API_CALL is None
     assert pf.get_api_status()["using_synthetic_fallback"] is True
+
+
+@patch("data.pv_forecast.config.get_global_timeout", return_value=10)
+@patch("data.pv_forecast.config.get", side_effect=_config_get_side_effect)
+@patch("data.pv_forecast.requests.get")
+def test_timeout_with_warm_cache_keeps_api_values(get_mock, _config_mock, _timeout_mock):
+    """Nach erfolgreichem Abruf darf Timeout nicht in saisonalen Fallback kippen."""
+    get_mock.return_value = _ok_response()
+    first = pf.get_hourly_pv_forecast_for_hours(_target_hours())
+    assert first == [1.0, 2.0, 3.0]
+    assert pf.get_api_status()["using_synthetic_fallback"] is False
+
+    pf._LAST_API_CALL = datetime.now() - timedelta(minutes=20)
+    get_mock.side_effect = requests.exceptions.Timeout()
+
+    second = pf.get_hourly_pv_forecast_for_hours(_target_hours())
+
+    assert second == [1.0, 2.0, 3.0]
+    assert pf.get_api_status()["using_synthetic_fallback"] is False
+    assert pf.get_api_status()["source"] == "cache_after_error"
+
+
+@patch("data.pv_forecast.config.get_global_timeout", return_value=10)
+@patch("data.pv_forecast.config.get", side_effect=_config_get_side_effect)
+@patch("data.pv_forecast.requests.get")
+def test_429_with_warm_cache_keeps_api_values(get_mock, _config_mock, _timeout_mock):
+    get_mock.return_value = _ok_response()
+    pf.get_hourly_pv_forecast_for_hours(_target_hours())
+
+    pf._LAST_API_CALL = datetime.now() - timedelta(minutes=20)
+    retry_at = datetime.now() + timedelta(hours=1)
+    get_mock.return_value = _429_response(header=retry_at.isoformat())
+
+    result = pf.get_hourly_pv_forecast_for_hours(_target_hours())
+
+    assert result == [1.0, 2.0, 3.0]
+    assert pf.get_api_status()["using_synthetic_fallback"] is False
+    assert pf.get_api_status()["source"] == "cache_after_error"
 
 
 def test_parse_retry_at_prefers_header():

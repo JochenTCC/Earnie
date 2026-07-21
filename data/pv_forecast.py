@@ -57,6 +57,25 @@ def _set_fetch_source(source: str) -> None:
     _LAST_FETCH_SOURCE = source
 
 
+def _return_cached_or_none(
+    cached: Optional[dict],
+    *,
+    reason: str,
+    empty_source: str = "error_no_cache",
+) -> Optional[dict]:
+    """Bei Abruf-Fehler Cache behalten (kein saisonaler Fallback trotz Warm-Cache)."""
+    if cached:
+        _set_fetch_source("cache_after_error")
+        print(
+            f"[cache] forecast.solar {reason} — nutze letzten erfolgreichen Cache "
+            f"({len(cached)} Zeitstempel)."
+        )
+        return cached
+    _set_fetch_source(empty_source)
+    print(f"[FEHLER] forecast.solar {reason} — kein Cache, späterer Fallback.")
+    return None
+
+
 def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
     """Prüft Cache-Gültigkeit und holt ggf. neue API-Daten (Cache pro URL)."""
     global _LAST_API_CALL, _RATE_LIMIT_RETRY_AT
@@ -90,17 +109,21 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
             retry_at = _parse_retry_at(response)
             if retry_at:
                 _RATE_LIMIT_RETRY_AT = retry_at
-            _set_fetch_source("rate_limited")
             retry_msg = retry_at.isoformat() if retry_at else "unbekannt"
             print(
                 f"[FEHLER] forecast.solar Rate-Limit (HTTP 429). "
-                f"Nächster API-Aufruf erlaubt ab {retry_msg}. Nutze Fallback."
+                f"Nächster API-Aufruf erlaubt ab {retry_msg}."
             )
-            return cached
+            return _return_cached_or_none(
+                cached, reason="HTTP 429", empty_source="rate_limited"
+            )
 
         response.raise_for_status()
         data = response.json()
         hourly_watts = data.get("result", {}).get("watts", {})
+        if not hourly_watts:
+            print("[FEHLER] forecast.solar: leeres watts-Ergebnis.")
+            return _return_cached_or_none(cached, reason="leeres watts")
         _CACHED_HOURLY_WATTS_BY_URL[url] = hourly_watts
         _LAST_API_CALL = now_time
         _RATE_LIMIT_RETRY_AT = None
@@ -108,15 +131,15 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
         return hourly_watts
     except requests.exceptions.Timeout:
         print(
-            f"[FEHLER] Timeout beim PV-Forecast ({config.get_global_timeout()}s überschritten). "
-            "Nutze Fallback."
+            f"[FEHLER] Timeout beim PV-Forecast ({config.get_global_timeout()}s überschritten)."
         )
+        return _return_cached_or_none(cached, reason="Timeout")
     except requests.exceptions.HTTPError as http_err:
-        print(f"[FEHLER] HTTP-Fehler beim PV-Forecast-Abruf: {http_err}. Nutze Fallback.")
+        print(f"[FEHLER] HTTP-Fehler beim PV-Forecast-Abruf: {http_err}.")
+        return _return_cached_or_none(cached, reason=f"HTTPError:{http_err}")
     except Exception as e:
-        print(f"[FEHLER] Unerwarteter Fehler beim PV-Forecast: {e}. Nutze Fallback.")
-
-    return None
+        print(f"[FEHLER] Unerwarteter Fehler beim PV-Forecast: {e}.")
+        return _return_cached_or_none(cached, reason=f"Exception:{e}")
 
 
 def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[list, bool]:
