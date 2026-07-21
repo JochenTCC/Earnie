@@ -319,7 +319,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.limit > 0:
         failures = failures[: args.limit]
 
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     if args.log.is_file():
         meta_log, _ = load_backtesting_log(str(args.log.parent))
         period = meta_log.get("period", {})
@@ -332,8 +332,6 @@ def main(argv: list[str] | None = None) -> None:
         start_default,
         end_default,
         sim_cfg.get("price_range", "last_12_months"),
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
     )
     cache = HistoricalDataCache()
     cache.load()

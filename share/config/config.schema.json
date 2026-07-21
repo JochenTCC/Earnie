@@ -25,9 +25,9 @@
       "type": "string",
       "description": "ID des Live-Szenarios in backtesting_scenarios.json (Standard: live)."
     },
-    "file_paths_battery_simulation": {
-      "$ref": "#/definitions/file_paths_battery_simulation",
-      "description": "Pfade zu historischen CSVs, cons_data und Preisquelle."
+    "scenario_explorer_conf": {
+      "$ref": "#/definitions/scenario_explorer_conf",
+      "description": "Szenario-Explorer / Backtesting: Pfade zu historischen CSVs, cons_data und Preisquelle."
     },
     "loxone_blocks": {
       "$ref": "#/definitions/loxone_blocks",
@@ -35,17 +35,18 @@
     },
     "flexible_consumers": {
       "type": "array",
-      "description": "Steuerbare Verbraucher für die MILP-Optimierung.",
+      "description": "Legacy-Overlay für steuerbare Verbraucher; ab 2.0 normalerweise leer — Live-Verbraucher liegen im Hausprofil (house_profiles.json).",
       "items": {
         "$ref": "#/definitions/flexible_consumer"
       }
     },
     "appliance_recommendation": {
-      "$ref": "#/definitions/appliance_recommendation"
+      "$ref": "#/definitions/appliance_recommendation",
+      "description": "Globale Sterne-/Schwellen-Parameter für Manuelle Geräte (keine Geräte-Definitionen)."
     },
     "earnie_data_model": {
       "type": "integer",
-      "const": 2,
+      "const": 3,
       "description": "Earnie data-model version for config pack import/export."
     }
   },
@@ -366,25 +367,17 @@
         "mode"
       ]
     },
-    "file_paths_battery_simulation": {
+    "scenario_explorer_conf": {
       "type": "object",
-      "description": "Dateipfade und Preisquelle für Historie, cons_data und Backtesting.",
+      "description": "Szenario-Explorer / Backtesting: cons_data-Pfad und Preisquelle. Simulationszeitraum = 12 Kalendermonate bis zum letzten vollständigen Monat in cons_data.",
       "properties": {
-        "path_consumption": {
-          "type": "string",
-          "description": "CSV mit historischem Gesamtverbrauch (Loxone-Export)."
-        },
-        "path_production": {
-          "type": "string",
-          "description": "CSV mit historischer PV-Produktion (Loxone-Export)."
-        },
         "path_price": {
           "type": "string",
           "description": "CSV mit historischen Börsenstrompreisen (Energy-Charts o. ä.)."
         },
         "path_cons_data": {
           "type": "string",
-          "description": "Stündliche Verbrauchs-/PV-Basisdatei (von main.py gepflegt)."
+          "description": "Stündliche Verbrauchs-/PV-Basisdatei (von main.py gepflegt); liefert auch den SE-Gesamtzeitraum."
         },
         "cons_data_retention_months": {
           "type": "integer",
@@ -408,7 +401,7 @@
         },
         "price_range": {
           "type": "string",
-          "description": "Zeitraum für historische Preise (z. B. last_12_months)."
+          "description": "Kennung für den SE-Zeitraum (last_12_months = 12 Kalendermonate ab letztem vollständigen cons_data-Monat rückwärts)."
         },
         "energy_charts_bzn": {
           "type": "string",

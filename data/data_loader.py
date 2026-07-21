@@ -1,6 +1,4 @@
 # data_loader.py
-import os
-
 import pandas as pd
 import requests
 
@@ -13,83 +11,54 @@ MARKET_ZONE_CH = "CH"
 VALID_MARKET_ZONES = frozenset({MARKET_ZONE_AT, MARKET_ZONE_DE, MARKET_ZONE_CH})
 
 
-def _ensure_csv_exists(path: str) -> None:
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"CSV-Datei nicht gefunden: {path}")
-
-
-def _load_and_merge_loxone_data(cons_path, prod_path):
-    """
-    Lädt die historischen Loxone-Verbrauchs- und Produktionsdaten
-    und führt sie über den Zeitstempel zusammen.
-    """
-    _ensure_csv_exists(cons_path)
-    _ensure_csv_exists(prod_path)
-
-    df_cons = pd.read_csv(cons_path, sep=';', decimal=',', parse_dates=['Datum/Uhrzeit'], dayfirst=True)
-    df_prod = pd.read_csv(prod_path, sep=';', decimal=',', parse_dates=['Datum/Uhrzeit'], dayfirst=True)
-
-    df_cons.rename(columns={'Leistung Verbrauch [kW]': 'load', 'Datum/Uhrzeit': 'ts'}, inplace=True)
-    df_prod.rename(columns={'Leistung Produktion [kW]': 'pv', 'Datum/Uhrzeit': 'ts'}, inplace=True)
-
-    return pd.merge(df_cons, df_prod, on='ts')
-
-
-def get_loxone_time_bounds(cons_path: str, prod_path: str) -> tuple[pd.Timestamp, pd.Timestamp]:
-    """Gibt den minimalen und maximalen Zeitstempel der Loxone-Logs zurück."""
-    df = _load_and_merge_loxone_data(cons_path, prod_path)
-    return df['ts'].min(), df['ts'].max()
-
-
 def _monday_of_week(ts: pd.Timestamp) -> pd.Timestamp:
     """Montag der Kalenderwoche, die ts enthält (ISO: Montag = Wochenstart)."""
     return ts.normalize() - pd.Timedelta(days=int(ts.dayofweek))
 
 
-# Inclusive calendar days for last_12_months / loxone_logs (365 × 24 h = 8760).
-_SIMULATION_YEAR_DAYS = 365
+_SIMULATION_MONTHS = 12
+
+
+def last_complete_month_end(data_max: pd.Timestamp) -> pd.Timestamp:
+    """Last day of the most recent complete calendar month on or before data_max."""
+    data_max = pd.Timestamp(data_max).normalize()
+    month_end = data_max + pd.offsets.MonthEnd(0)
+    if data_max == month_end.normalize():
+        return data_max
+    return (data_max - pd.offsets.MonthBegin(1) - pd.Timedelta(days=1)).normalize()
 
 
 def resolve_simulation_window(
-    range_mode: str,
-    cons_path: str,
-    prod_path: str,
+    range_mode: str = "last_12_months",
 ) -> tuple[pd.Timestamp, pd.Timestamp]:
     """
-    Ermittelt das Simulationsfenster.
+    Overall SE/backtesting span from cons_data bounds (month-aligned).
 
-    - last_12_months: rollierende 365 Kalendertage bis heute (inkl. Endtag → 8760 h)
-    - loxone_logs: gleiche 365-Tage-Regel, begrenzt auf Loxone-Log-Zeitraum
+    End = last day of the most recent complete calendar month in cons_data.
+    Start = first day of the month 11 months earlier (12 inclusive months),
+    clipped to cons_data min. Day iteration stays chronological (oldest→newest).
+
+    ``range_mode`` is kept for call-site compatibility; bounds always use cons_data
+    (``loxone_logs`` is no longer a separate path-pair mode).
     """
-    today = pd.Timestamp.now().normalize()
-    year_span = pd.Timedelta(days=_SIMULATION_YEAR_DAYS - 1)
+    del range_mode  # API compat; bounds are always cons_data month-aligned
+    from data.profile_manager import get_cons_data_date_bounds
 
-    if range_mode == "loxone_logs":
-        lox_start, lox_end = get_loxone_time_bounds(cons_path, prod_path)
-        end = min(lox_end.normalize(), today)
-        start = max(lox_start.normalize(), end - year_span)
-    else:
-        end = today
-        start = end - year_span
+    data_min, data_max = get_cons_data_date_bounds()
+    if data_min is None or data_max is None:
+        raise ValueError(
+            "Kein Zeitraum für die Simulation: cons_data_hourly.csv fehlt oder ist leer."
+        )
 
+    end = last_complete_month_end(pd.Timestamp(data_max))
+    start = (end.to_period("M") - (_SIMULATION_MONTHS - 1)).to_timestamp().normalize()
+    start = max(start, pd.Timestamp(data_min).normalize())
+    if start > end:
+        raise ValueError(
+            "Kein gültiger Simulationszeitraum: cons_data deckt keinen "
+            "vollständigen Kalendermonat ab."
+        )
     return start, end
-
-
-def create_averaged_profile(cons_path, prod_path, before: pd.Timestamp):
-    """
-    Erstellt ein gemitteltes Last- und Erzeugungsprofil aus Loxone-Daten
-    vor dem Simulationsfenster, gruppiert nach Monat, Tag, Stunde und Minute.
-    """
-    df = _load_and_merge_loxone_data(cons_path, prod_path)
-    df = df[df['ts'] < before].copy()
-
-    df['month'] = df['ts'].dt.month
-    df['day'] = df['ts'].dt.day
-    df['hour'] = df['ts'].dt.hour
-    df['minute'] = df['ts'].dt.minute
-
-    group_cols = ['month', 'day', 'hour', 'minute']
-    return df.groupby(group_cols)[['load', 'pv']].mean().reset_index()
 
 
 def _prices_to_dataframe(timestamps: pd.Series, prices_eur_mwh: pd.Series) -> pd.DataFrame:

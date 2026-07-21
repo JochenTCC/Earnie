@@ -114,13 +114,11 @@ def _load_anchor_by_hour_offset(
     list_simulation_anchors,
     backtesting_year: int,
 ) -> tuple[datetime, int, list[datetime]]:
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     start, end = resolve_backtesting_window(
         pd.Timestamp(backtesting_year, start_month, 1),
         pd.Timestamp(backtesting_year, end_month, 1),
         sim_cfg.get("price_range", "last_12_months"),
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
     )
     cache = HistoricalDataCache()
     cache.load()
@@ -316,7 +314,7 @@ def _run_scenario(
 
     scenario_params = _scenario_params(scenario_id, config)
     flex_consumers = _flexible_consumers_from_scenario(scenario_params)
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     feed_in = config.get_backtesting_feed_in_settings(runtime_override=scenario_params)
 
     print(f"\n{'=' * 72}")
@@ -462,7 +460,7 @@ def main() -> None:
     else:
         raise SystemExit("Bitte --hour-offset oder --anchor angeben.")
 
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     price_start_month, price_end_month = _price_window_for_anchor(
         anchor, args.start_month, args.end_month
     )
@@ -471,8 +469,6 @@ def main() -> None:
         pd.Timestamp(price_year, price_start_month, 1),
         pd.Timestamp(price_year, price_end_month, 1),
         sim_cfg.get("price_range", "last_12_months"),
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
     )
     prices = load_market_prices(
         start,

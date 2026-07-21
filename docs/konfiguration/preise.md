@@ -122,7 +122,7 @@ Spec: [Preis-Prognose (Dev)](../spec/price-forecast-renewables.md).
 
 ## Historische Preise
 
-Für **Backtesting** (und geplante Dev-Nachrechnung): `file_paths_battery_simulation.price_source`, `price_provider`, `price_range` und ggf. `path_price` (Energy-Charts-CSV, Zone `energy_charts_bzn`).
+Für **Backtesting** (und geplante Dev-Nachrechnung): `scenario_explorer_conf.price_source`, `price_provider`, `price_range` und ggf. `path_price` (Energy-Charts-CSV, Zone `energy_charts_bzn`). Der Simulations-Gesamtzeitraum kommt aus `cons_data` (12 Kalendermonate bis zum letzten vollständigen Monat), nicht aus ehemaligen Loxone-Pfadpaaren.
 
 ### Monatliche Fixtarife (Backtesting)
 

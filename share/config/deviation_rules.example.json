@@ -1,6 +1,6 @@
 {
     "$schema": "./deviation_rules.schema.json",
-    "earnie_data_model": 2,
+    "earnie_data_model": 3,
     "version": 1,
     "tolerances": {
         "power_kw": 0.05,

@@ -29,7 +29,7 @@ def test_get_output_path_uses_runtime_dir_for_standard_config(monkeypatch, tmp_p
 
     with patch.object(
         cons_data_store.config,
-        "get_file_paths_battery_simulation",
+        "get_scenario_explorer_conf",
         return_value={"path_cons_data": "runtime/cons_data_hourly.csv"},
     ):
         assert cons_data_store.get_output_path() == str(nas_runtime / "cons_data_hourly.csv")

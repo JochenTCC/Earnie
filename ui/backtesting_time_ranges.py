@@ -11,10 +11,8 @@ from data.data_loader import resolve_simulation_window
 
 _PRICE_RANGE_DESCRIPTIONS = {
     "last_12_months": (
-        "rollierende 365 Kalendertage bis heute (8760 h; ein Fenster pro Tag)"
-    ),
-    "loxone_logs": (
-        "letzte 365 Kalendertage innerhalb der Loxone-Logs (ebenfalls 8760 h)"
+        "12 Kalendermonate bis zum letzten vollständigen Monat in cons_data "
+        "(ein Fenster pro Tag, chronologisch)"
     ),
 }
 
@@ -24,17 +22,12 @@ def configured_retention_months() -> int:
 
 
 def configured_price_range() -> str:
-    sim = config.get_file_paths_battery_simulation()
+    sim = config.get_scenario_explorer_conf()
     return str(sim.get("price_range", "last_12_months"))
 
 
 def default_simulation_window() -> tuple[date, date]:
-    sim = config.get_file_paths_battery_simulation()
-    start, end = resolve_simulation_window(
-        configured_price_range(),
-        sim["path_consumption"],
-        sim["path_production"],
-    )
+    start, end = resolve_simulation_window(configured_price_range())
     return start.date(), end.date()
 
 

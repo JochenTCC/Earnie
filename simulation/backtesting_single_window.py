@@ -71,15 +71,13 @@ def _price_month_bounds(anchor: datetime, period: dict) -> tuple[int, int]:
 
 
 def _load_prices_for_anchor(anchor: datetime, period: dict) -> pd.DataFrame:
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     year = int(period.get("backtesting_year") or anchor.year)
     price_start, price_end = _price_month_bounds(anchor, period)
     start, end = resolve_backtesting_window(
         pd.Timestamp(year, price_start, 1),
         pd.Timestamp(year, price_end, 1),
         sim_cfg.get("price_range", "last_12_months"),
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
     )
     return load_market_prices(
         start,

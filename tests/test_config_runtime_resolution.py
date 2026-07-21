@@ -99,7 +99,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                     "control_cmd_name": "Control_Cmd",
                 },
                 "planning_horizon": {"mode": "sunrise_window"},
-                "file_paths_battery_simulation": {
+                "scenario_explorer_conf": {
                     "path_cons_data": "runtime/cons_data_hourly.csv"
                 },
                 "flexible_consumers": [],

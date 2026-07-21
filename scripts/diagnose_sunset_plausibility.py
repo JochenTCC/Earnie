@@ -98,13 +98,11 @@ def _hourly_baseload_rows(chart_rows: list[dict]) -> list[dict]:
 
 
 def _setup_cache_prices_scenario():
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     start, end = resolve_backtesting_window(
         pd.Timestamp(2025, 1, 1),
         pd.Timestamp(2026, 1, 1),
         sim_cfg.get("price_range", "last_12_months"),
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
     )
     cache = HistoricalDataCache()
     cache.load()

@@ -94,6 +94,12 @@ python -m scripts.export_historical_test_csvs --out-dir Historical-Data/export-t
 
 Optional: `--cons-data`, `--from`, `--to`. Die Dateien sind Loxone-kompatibel und lassen sich im Hauskonfigurator (getrennte CSVs bzw. Energiemonitor) wieder einlesen. Es sind mindestens 8760 Stunden nötig.
 
-## Abgrenzung Live-Loxone
+## Abgrenzung Live-Loxone und CSV-Ebenen
 
-Das Feld `path_historical_log` in `config.json` (flexible Verbraucher) gehört zum Offline-Weg Loxone-Log → `cons_data_hourly.csv` und ist unabhängig von den Hausprofil-CSVs.
+| Ebene | Ort | Zweck |
+| ----- | --- | ----- |
+| Runtime | `scenario_explorer_conf.path_cons_data` → `cons_data_hourly.csv` | Live + Szenario-Explorer |
+| Hausmodell | `house_profiles`: `total_profile_csv`, `pv_profile_csv`, `profile_csv` | Planung, Ist-vs-Modell, Synthese |
+| Offline-Flex-Log | `path_historical_log` am Verbraucher (Legacy-Overlay / Profil) | Einzelserie → cons_data |
+
+Das Feld `path_historical_log` (flexible Verbraucher / Hausprofil) gehört zum Offline-Weg Loxone-Log → `cons_data_hourly.csv` und ist unabhängig von den Hausprofil-Jahres-CSVs. Die früheren Keys `path_consumption` / `path_production` in `config.json` sind entfernt (data-model v3).

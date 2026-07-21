@@ -32,7 +32,7 @@ def minimal_config_payload(
             "control_cmd_name": "cmd",
         },
         "planning_horizon": {"mode": "sunrise_window"},
-        "file_paths_battery_simulation": {
+        "scenario_explorer_conf": {
             "path_cons_data": "runtime/cons_data_hourly.csv",
         },
         "flexible_consumers": [],

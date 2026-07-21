@@ -29,9 +29,11 @@ Enthaltene Dateien:
 
 **Nicht** enthalten: `config/.env` (Loxone-Zugangsdaten bleiben lokal).
 
-Jedes JSON trägt das Feld `earnie_data_model` (aktuell `2`; Import akzeptiert weiterhin `1` und stuft beim Laden/Schreiben auf `2` hoch). Beim Import prüft Earnie die Kompatibilität; unbekannte Versionen werden abgelehnt.
+Jedes JSON trägt das Feld `earnie_data_model` (aktuell `3`; Import akzeptiert weiterhin `1` und `2` und stuft beim Laden/Schreiben auf `3` hoch). Beim Import prüft Earnie die Kompatibilität; unbekannte Versionen werden abgelehnt.
 
 **Datenmodell v2:** Die gemeinsame OeMAG-Referenzkurve (`oemag_monthly_feed_in_rates`, `monthly_float_reference_cent_kwh`) liegt in `tariffs.json` (nicht mehr in `backtesting_scenarios.json`). Beim Start migriert Bootstrap OeMAG-Keys und setzt `earnie_data_model` auf allen Pack-/Template-JSONs auf die aktuelle Version.
+
+**Datenmodell v3:** In `config.json` heißt der frühere Block `file_paths_battery_simulation` jetzt `scenario_explorer_conf`. Ein automatischer Rename-Helper (v2→v3) ist noch ausstehend — bis dahin lehnt Earnie den alten Schlüssel ab.
 
 ## Migration von `./config` + `./runtime`
 

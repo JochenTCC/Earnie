@@ -38,7 +38,7 @@ SOURCE_MEASURED = "measured"
 
 
 def get_output_path() -> str:
-    sim = config.get_file_paths_battery_simulation()
+    sim = config.get_scenario_explorer_conf()
     configured = sim.get("path_cons_data")
     if not configured:
         return default_cons_data_file()
@@ -46,7 +46,7 @@ def get_output_path() -> str:
 
 
 def get_retention_months() -> int:
-    sim = config.get_file_paths_battery_simulation()
+    sim = config.get_scenario_explorer_conf()
     value = sim.get("cons_data_retention_months", 24)
     try:
         return max(0, int(value))
@@ -56,7 +56,7 @@ def get_retention_months() -> int:
 
 def get_write_mode() -> str:
     """hourly | daily – wie gemessene Stunden in die CSV geschrieben werden."""
-    sim = config.get_file_paths_battery_simulation()
+    sim = config.get_scenario_explorer_conf()
     mode = str(sim.get("cons_data_write_mode", "hourly")).strip().lower()
     return mode if mode in ("hourly", "daily") else "hourly"
 

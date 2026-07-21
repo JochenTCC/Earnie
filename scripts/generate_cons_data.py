@@ -41,39 +41,12 @@ build_hour_row_from_measurements = cons_data_store.build_hour_row_from_measureme
 
 
 def build_from_loxone() -> pd.DataFrame | None:
-    """Liest Loxone-CSVs und liefert stündliche Mittelwerte im generischen Format."""
-    path_total = config.get("PATH_CONSUMPTION_TOTAL", cast=str)
-    if not path_total or not os.path.exists(path_total):
-        print(f"[WARN] Kein Gesamtverbrauchs-Log gefunden: {path_total!r}")
-        return None
-
-    s_total = loxone_log_import.load_and_resample_csv(path_total)
-    if s_total.empty:
-        print("[WARN] Gesamtverbrauchs-Zeitreihe ist leer.")
-        return None
-
-    df = loxone_log_import.build_flexible_consumer_dataframe(s_total)
-    df = loxone_log_import.compute_baseload(df)
-
-    out = pd.DataFrame(index=df.index)
-    out["total_kw"] = df["Total"].round(3)
-    out["baseload_kw"] = df["BaseLoad"].round(3)
-    for consumer in config.get_flexible_consumers():
-        out[f"{consumer['id']}_kw"] = df[consumer["name"]].round(3)
-
-    path_prod = config.get("PATH_PRODUCTION", cast=str)
-    if path_prod and os.path.exists(path_prod):
-        s_pv = loxone_log_import.load_and_resample_csv(path_prod)
-        out["pv_kw"] = s_pv.reindex(out.index, fill_value=0.0).round(3)
-    else:
-        out["pv_kw"] = 0.0
-
-    out["source"] = SOURCE_LOXONE
+    """Legacy one-shot: raw Loxone path pair removed (v3). Use main.py / house CSVs."""
     print(
-        f"[OK] Loxone-Daten geladen: {out.index.min()} -> {out.index.max()} "
-        f"({len(out)} Stunden)"
+        "[WARN] build_from_loxone: path_consumption/path_production wurden entfernt. "
+        "cons_data pflegt main.py; Hausprofil-CSVs im Hauskonfigurator."
     )
-    return cons_data_store._normalize_cons_dataframe(out)
+    return None
 
 
 def _synthetic_baseload_kw(hour: int, weekday: int, month: int) -> float:

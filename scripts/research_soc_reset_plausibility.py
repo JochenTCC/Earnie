@@ -60,13 +60,11 @@ if SCENARIO_ID not in scenarios:
     raise SystemExit(f"Scenario {SCENARIO_ID} not in config")
 scenario_params = dict(scenarios[SCENARIO_ID])
 
-sim_cfg = config.get_file_paths_battery_simulation()
+sim_cfg = config.get_scenario_explorer_conf()
 start, end = resolve_backtesting_window(
     START_MONTH,
     END_MONTH,
     sim_cfg.get("price_range", "last_12_months"),
-    sim_cfg["path_consumption"],
-    sim_cfg["path_production"],
 )
 cache = HistoricalDataCache()
 cache.load()

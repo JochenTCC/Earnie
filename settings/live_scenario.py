@@ -297,10 +297,8 @@ def battery_params_snapshot(get_attr: Callable[..., Any]) -> dict:
     }
 
 
-def file_paths_battery_simulation_snapshot(obj: Any) -> dict:
+def scenario_explorer_conf_snapshot(obj: Any) -> dict:
     return {
-        "path_consumption": obj.PATH_CONSUMPTION,
-        "path_production": obj.PATH_PRODUCTION,
         "path_price": obj.PATH_PRICE,
         "path_cons_data": obj.PATH_CONS_DATA,
         "cons_data_retention_months": obj.CONS_DATA_RETENTION_MONTHS,

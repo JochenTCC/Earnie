@@ -3,6 +3,15 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### SE data-model hygiene + month horizon + v3 path-pair (2026-07-21)
+
+- [x] Rename `file_paths_battery_simulation` → `scenario_explorer_conf` (kept in `config.json`; accessors `get_scenario_explorer_conf`; legacy key rejected; `earnie_data_model` → **3**)
+- [x] Data-model hygiene after `scenario_explorer_conf` rename — three CSV layers in schema/docs; root `appliance_recommendation` = scoring; `flexible_consumers: []` Legacy overlay
+- [x] Soft migrate — `resolve_simulation_window` month-aligned from cons_data (last complete month, 12 months back); drop `path_consumption`/`path_production` / `loxone_logs` bounds
+- [x] Define SE overall horizon on recent complete cons_data month (then backwards for span); day iteration stays chronological (SoC chain)
+- [x] Migration helper v2→v3 — bootstrap + `ensure_compatible` rename block / strip path pair / stamp 3; fail-fast gate for leftover path keys; schema/docs omit pair
+
+
 ### Bugfix Hauskonfigurator Verbraucher expander on Bezeichnung (2026-07-21)
 
 - [x] **Verbraucher editor collapsed after Bezeichnung change (e.g. E-Auto)** — expander title includes live Bezeichnung but had no stable `key`, so Streamlit remounted it collapsed on rename + auto_persist `st.rerun()`; fixed with `key=hc_consumer_expander_{index}`; verified live

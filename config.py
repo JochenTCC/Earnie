@@ -340,9 +340,9 @@ class Config:
     def get_event_triggers(self) -> list[dict]:
         return list(self.EVENT_TRIGGERS)
 
-    def get_file_paths_battery_simulation(self) -> dict:
-        """Gibt den Block file_paths_battery_simulation aus der JSON-Struktur zurück."""
-        return live_scenario.file_paths_battery_simulation_snapshot(self)
+    def get_scenario_explorer_conf(self) -> dict:
+        """Gibt den Block scenario_explorer_conf aus der JSON-Struktur zurück."""
+        return live_scenario.scenario_explorer_conf_snapshot(self)
 
     def get_scenario_settings(self) -> dict:
         """Lädt Szenario-Parameter als {id: settings}-Dict (Abwärtskompatibilität)."""
@@ -593,8 +593,8 @@ def get_event_triggers() -> list[dict]:
     return CONFIG.get_event_triggers()
 
 
-def get_file_paths_battery_simulation() -> dict:
-    return CONFIG.get_file_paths_battery_simulation()
+def get_scenario_explorer_conf() -> dict:
+    return CONFIG.get_scenario_explorer_conf()
 
 
 def get_scenario_settings() -> dict:

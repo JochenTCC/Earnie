@@ -101,13 +101,11 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _resolve_anchor(hour_offset: int, start_month: int, end_month: int) -> datetime:
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     start, end = resolve_backtesting_window(
         pd.Timestamp(2025, start_month, 1),
         pd.Timestamp(2025, end_month, 1),
         sim_cfg.get("price_range", "last_12_months"),
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
     )
     cache = HistoricalDataCache()
     cache.load()
@@ -298,13 +296,11 @@ def main() -> None:
     scenario_params = dict(config.get_backtesting_scenarios()[args.scenario])
     anchor = _resolve_anchor(args.hour_offset, args.start_month, args.end_month)
 
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     start, end = resolve_backtesting_window(
         pd.Timestamp(2025, args.start_month, 1),
         pd.Timestamp(2025, args.end_month, 1),
         sim_cfg.get("price_range", "last_12_months"),
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
     )
     prices = load_market_prices(
         start,

@@ -8,7 +8,6 @@ import pytest
 
 from optimizer import battery as bat
 from scripts.run_backtesting import (
-    BACKTESTING_YEAR,
     _parse_month,
     resolve_backtesting_window,
 )
@@ -50,9 +49,15 @@ def _horizon_end_soc_from_hourly(
 
 
 class TestParseMonth:
-    def test_parses_valid_month(self):
+    def test_parses_valid_month(self, monkeypatch):
+        from datetime import date
+
+        monkeypatch.setattr(
+            "data.profile_manager.get_cons_data_date_bounds",
+            lambda: (date(2026, 1, 1), date(2026, 6, 25)),
+        )
         ts = _parse_month("6")
-        assert ts == pd.Timestamp(BACKTESTING_YEAR, 6, 1)
+        assert ts == pd.Timestamp(2026, 6, 1)
 
     def test_rejects_invalid_month(self):
         import argparse
@@ -76,12 +81,10 @@ class TestResolveBacktestingWindow:
             start,
             end,
             "last_12_months",
-            "tests/fixtures/backtesting/cons_data_hourly.csv",
-            "unused.csv",
         )
         assert resolved_start.month == 6
         assert resolved_end.month == 6
-        assert resolved_start.year == BACKTESTING_YEAR
+        assert resolved_start.year == 2026
         assert resolved_start <= resolved_end
 
     def test_june_2026_clamped_to_fixture_data(self, monkeypatch):
@@ -96,8 +99,6 @@ class TestResolveBacktestingWindow:
             start,
             end,
             "last_12_months",
-            "tests/fixtures/backtesting/cons_data_hourly.csv",
-            "unused.csv",
         )
         assert resolved_start == pd.Timestamp("2026-06-01")
         assert resolved_end == pd.Timestamp("2026-06-25")
@@ -109,8 +110,6 @@ class TestResolveBacktestingWindow:
                 start,
                 None,
                 "last_12_months",
-                "tests/fixtures/backtesting/cons_data_hourly.csv",
-                "unused.csv",
             )
 
     def test_rejects_start_after_end_month(self):
@@ -121,8 +120,6 @@ class TestResolveBacktestingWindow:
                 start,
                 end,
                 "last_12_months",
-                "tests/fixtures/backtesting/cons_data_hourly.csv",
-                "unused.csv",
             )
 
 

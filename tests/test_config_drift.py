@@ -7,7 +7,7 @@ from runtime_store.config_drift import find_config_drift, should_show_config_dri
 def test_find_config_drift_reports_missing_top_level_and_nested_keys():
     example = {
         "market_prices": {"missing_price_strategy": "forecast"},
-        "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+        "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data_hourly.csv"},
         "flexible_consumers": [
             {
                 "id": "eauto",
@@ -23,7 +23,7 @@ def test_find_config_drift_reports_missing_top_level_and_nested_keys():
     paths = {item.path for item in items}
 
     assert "market_prices" in paths
-    assert "file_paths_battery_simulation" in paths
+    assert "scenario_explorer_conf" in paths
     assert "flexible_consumers[id=eauto].charging_schedule" in paths
 
 

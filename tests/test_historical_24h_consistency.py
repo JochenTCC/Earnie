@@ -68,7 +68,7 @@ def historical_cache(historical_cons_data) -> HistoricalDataCache:
 
 @pytest.fixture(scope="module")
 def prices_df(historical_cons_data) -> pd.DataFrame:
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     idx = cons_data_store.load_cons_data(historical_cons_data)
     start = pd.Timestamp(idx.index.min()).normalize()
     end = pd.Timestamp(idx.index.max()).normalize() + pd.Timedelta(days=1)

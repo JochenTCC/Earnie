@@ -36,7 +36,7 @@ def test_archive_prod_dump_includes_resolved_inputs(tmp_path, monkeypatch):
         config_path,
         {
             "market_prices": {"forecast_model_path": "runtime/price_model_coefficients.json"},
-            "file_paths_battery_simulation": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+            "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data_hourly.csv"},
             "runtime_settings": {"battery_capacity_kwh": 5.0},
         },
     )

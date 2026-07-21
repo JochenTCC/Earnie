@@ -606,7 +606,7 @@ def _import_pricing_kwargs() -> dict:
 
 def _get_historical_epex_and_brutto_prices_for_day(target_date: date) -> tuple[list[float], list[float]]:
     """Lädt EPEX- und Brutto-Bezugspreise (Cent/kWh) für 24 Stunden eines Tages."""
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     start = pd.Timestamp(target_date)
     end = start
 

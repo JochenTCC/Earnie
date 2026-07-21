@@ -5,6 +5,25 @@ from settings import appliances as appliance_settings
 
 
 def reject_legacy_config_blocks(raw_config: dict) -> None:
+    if raw_config.get("file_paths_battery_simulation") is not None:
+        raise ValueError(
+            "Block 'file_paths_battery_simulation' in config.json wurde umbenannt zu "
+            "'scenario_explorer_conf'."
+        )
+    sim = raw_config.get("scenario_explorer_conf")
+    if isinstance(sim, dict):
+        leftover = [
+            key
+            for key in ("path_consumption", "path_production")
+            if key in sim
+        ]
+        if leftover:
+            raise ValueError(
+                "In scenario_explorer_conf sind entfernt: "
+                + ", ".join(repr(k) for k in leftover)
+                + ". Zeitraumgrenzen kommen aus cons_data / Hausprofil-CSVs "
+                "(data-model v3)."
+            )
     if raw_config.get("awattar") is not None:
         raise ValueError(
             "Block 'awattar' in config.json ist entfernt (1.26.0 P6). "

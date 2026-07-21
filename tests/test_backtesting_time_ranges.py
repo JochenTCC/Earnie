@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import date
 
-import pandas as pd
-
 from ui.backtesting_time_ranges import (
     build_time_range_help_lines,
     cons_data_section_caption,
@@ -26,32 +24,25 @@ def test_configured_retention_months_from_sim_config(monkeypatch):
 
 def test_configured_price_range_default(monkeypatch):
     monkeypatch.setattr(
-        "ui.backtesting_time_ranges.config.get_file_paths_battery_simulation",
+        "ui.backtesting_time_ranges.config.get_scenario_explorer_conf",
         lambda: {"price_range": "last_12_months"},
     )
     assert configured_price_range() == "last_12_months"
-    assert describe_price_range("last_12_months") == (
-        "rollierende 365 Kalendertage bis heute (8760 h; ein Fenster pro Tag)"
-    )
+    assert "12 Kalendermonate" in describe_price_range("last_12_months")
 
 
-def test_default_simulation_window_last_12_months(monkeypatch):
-    fixed_today = pd.Timestamp("2026-07-10")
+def test_default_simulation_window_month_aligned(monkeypatch):
     monkeypatch.setattr(
-        "ui.backtesting_time_ranges.config.get_file_paths_battery_simulation",
-        lambda: {
-            "price_range": "last_12_months",
-            "path_consumption": "c.csv",
-            "path_production": "p.csv",
-        },
+        "ui.backtesting_time_ranges.config.get_scenario_explorer_conf",
+        lambda: {"price_range": "last_12_months"},
     )
     monkeypatch.setattr(
-        "data.data_loader.pd.Timestamp.now",
-        lambda: fixed_today,
+        "data.profile_manager.get_cons_data_date_bounds",
+        lambda: (date(2025, 1, 15), date(2026, 6, 25)),
     )
     start, end = default_simulation_window()
-    assert end == date(2026, 7, 10)
-    assert start == date(2025, 7, 11)
+    assert end == date(2026, 5, 31)
+    assert start == date(2025, 6, 1)
 
 
 def test_build_time_range_help_lines_without_log(monkeypatch):

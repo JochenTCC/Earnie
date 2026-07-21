@@ -12,7 +12,6 @@ from typing import Callable, TextIO
 
 from data import profile_manager
 from runtime_store.persist_paths import resolve_backtesting_log_dir
-from scripts.run_backtesting import BACKTESTING_YEAR
 from simulation.backtesting_progress import (
     clear_progress_dir,
     prepare_progress_dir,
@@ -84,15 +83,18 @@ def auto_backtesting_workers(parallel_task_count: int) -> int:
 
 def suggest_test_month() -> int | None:
     """Monat für Testlauf: März wenn Daten vorhanden, sonst erster überlappender Monat."""
+    from scripts.run_backtesting import backtesting_base_year
+
     lox_min, lox_max = profile_manager.get_cons_data_date_bounds()
     if lox_min is None or lox_max is None:
         return None
-    year_start = date(BACKTESTING_YEAR, 1, 1)
-    year_end = date(BACKTESTING_YEAR, 12, 31)
+    year = backtesting_base_year()
+    year_start = date(year, 1, 1)
+    year_end = date(year, 12, 31)
     if lox_max < year_start or lox_min > year_end:
         return None
-    march_start = date(BACKTESTING_YEAR, 3, 1)
-    march_end = date(BACKTESTING_YEAR, 3, 31)
+    march_start = date(year, 3, 1)
+    march_end = date(year, 3, 31)
     if lox_max >= march_start and lox_min <= march_end:
         return 3
     overlap_start = max(lox_min, year_start)

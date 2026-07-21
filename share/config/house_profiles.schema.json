@@ -12,7 +12,7 @@
     },
     "earnie_data_model": {
       "type": "integer",
-      "const": 2,
+      "const": 3,
       "description": "Earnie data-model version for config pack import/export."
     }
   },

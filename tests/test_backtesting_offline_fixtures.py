@@ -69,7 +69,7 @@ def test_fixture_config_loads_without_production_cons_data(
 
     del backtesting_fixtures
     monkeypatch.chdir(FIXTURES_ROOT.parents[2])
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     assert sim_cfg["path_cons_data"] == "tests/fixtures/backtesting/cons_data_hourly.csv"
     cache = load_fixture_cache()
     assert cache._consumption_df is not None

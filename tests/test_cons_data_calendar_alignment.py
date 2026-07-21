@@ -25,7 +25,10 @@ def _greenfield_profile() -> dict:
     if not path.is_file():
         pytest.skip("greenfield house_profiles.json not available")
     profiles = json.loads(path.read_text(encoding="utf-8"))["profiles"]
-    return next(item for item in profiles if item["id"] == "mein_haushalt")
+    match = next((item for item in profiles if item["id"] == "mein_haushalt"), None)
+    if match is None:
+        pytest.skip("greenfield profile mein_haushalt not available")
+    return match
 
 
 def _thermal_consumer_id(profile: dict) -> str:

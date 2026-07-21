@@ -130,7 +130,7 @@ def _resolve_forecast_model_path(config_doc: dict) -> str:
 
 
 def _resolve_cons_data_path(config_doc: dict) -> str:
-    block = config_doc.get("file_paths_battery_simulation")
+    block = config_doc.get("scenario_explorer_conf")
     if not isinstance(block, dict):
         return ""
     configured = str(block.get("path_cons_data") or "").strip()

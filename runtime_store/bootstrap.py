@@ -372,6 +372,45 @@ def _migrate_oemag_data_model_v2() -> list[str]:
     return modified
 
 
+def _migrate_config_data_model_v3() -> list[str]:
+    """
+    Rename file_paths_battery_simulation → scenario_explorer_conf and strip
+    path_consumption / path_production on disk config (+ example/minimal).
+    """
+    from runtime_store.data_model import (
+        CURRENT_DATA_MODEL,
+        is_config_document,
+        migrate_config_document_to_v3,
+    )
+    from settings.json_io import read_json_dict, write_json_dict
+
+    candidates = [
+        resolve_config_json_path(),
+        config_path("config.example.json"),
+        config_path("config.minimal.json"),
+    ]
+    modified: list[str] = []
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+        doc = read_json_dict(path)
+        if not isinstance(doc, dict) or not is_config_document(doc):
+            continue
+        changed = migrate_config_document_to_v3(doc)
+        if _read_data_model_version(doc) < CURRENT_DATA_MODEL:
+            doc["earnie_data_model"] = CURRENT_DATA_MODEL
+            changed = True
+        if changed:
+            write_json_dict(path, doc)
+            modified.append(path)
+    if modified:
+        logger.info(
+            "bootstrap: config data-model v3 migration (rename/strip) → %s",
+            ", ".join(modified),
+        )
+    return modified
+
+
 def _pack_json_stamp_candidates() -> list[str]:
     """Live pack JSONs plus local example/minimal sidecars that carry earnie_data_model."""
     paths = [
@@ -658,6 +697,8 @@ def run() -> None:
     if _bootstrap_tariffs_json():
         created.append(resolve_tariffs_json_path())
     for path in _migrate_oemag_data_model_v2():
+        created.append(path)
+    for path in _migrate_config_data_model_v3():
         created.append(path)
     if _bootstrap_house_profiles_example():
         created.append(config_path("house_profiles.example.json"))

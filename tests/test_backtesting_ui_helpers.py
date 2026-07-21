@@ -243,12 +243,21 @@ def test_suggest_test_month_prefers_march_over_january(monkeypatch):
     assert suggest_test_month() == 3
 
 
-def test_suggest_test_month_none_without_overlap(monkeypatch):
+def test_suggest_test_month_none_without_bounds(monkeypatch):
+    """Year tracks cons_data max, so a full calendar year always overlaps; None only if empty."""
+    monkeypatch.setattr(
+        "ui.backtesting_runner.profile_manager.get_cons_data_date_bounds",
+        lambda: (None, None),
+    )
+    assert suggest_test_month() is None
+
+
+def test_suggest_test_month_uses_cons_data_year(monkeypatch):
     monkeypatch.setattr(
         "ui.backtesting_runner.profile_manager.get_cons_data_date_bounds",
         lambda: (date(2025, 1, 1), date(2025, 12, 31)),
     )
-    assert suggest_test_month() is None
+    assert suggest_test_month() == 3
 
 
 def test_write_and_read_progress_file(tmp_path):
@@ -294,6 +303,7 @@ def test_read_progress_snapshot_aggregates_worker_files(tmp_path):
 
 def test_migrate_oemag_template_fill_when_keys_missing(tmp_path, monkeypatch):
     from runtime_store import bootstrap
+    from runtime_store.data_model import CURRENT_DATA_MODEL
     from settings.json_io import read_json_dict
 
     config_dir = tmp_path / "config"
@@ -318,7 +328,7 @@ def test_migrate_oemag_template_fill_when_keys_missing(tmp_path, monkeypatch):
     doc = read_json_dict(str(tariffs))
     assert len(doc["oemag_monthly_feed_in_rates"]) >= 12
     assert doc["monthly_float_reference_cent_kwh"] == 7.15
-    assert doc["earnie_data_model"] == 2
+    assert doc["earnie_data_model"] == CURRENT_DATA_MODEL
     assert bootstrap._migrate_oemag_data_model_v2() == []
 
 

@@ -23,7 +23,7 @@
     "planning_horizon": {
         "mode": "sunrise_window"
     },
-    "file_paths_battery_simulation": {
+    "scenario_explorer_conf": {
         "path_cons_data": "tests/fixtures/backtesting/cons_data_hourly.csv",
         "cons_data_retention_months": 24,
         "cons_data_write_mode": "hourly",

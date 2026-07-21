@@ -56,13 +56,11 @@ def main() -> None:
     args = _parse_args()
     config = load_config_or_exit()
     params = dict(config.get_backtesting_scenarios()["live"])
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     start, end = resolve_backtesting_window(
         pd.Timestamp("2025-07-14"),
         pd.Timestamp("2026-07-14"),
         sim_cfg.get("price_range", "last_12_months"),
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
     )
     cache = HistoricalDataCache()
     cache.load()

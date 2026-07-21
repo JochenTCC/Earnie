@@ -32,13 +32,11 @@ from simulation.engine import (
 
 
 def _load_window(hour_offset: int = 1392):
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     start, end = resolve_backtesting_window(
         pd.Timestamp(2025, 8, 1),
         pd.Timestamp(2025, 9, 1),
         sim_cfg.get("price_range", "last_12_months"),
-        sim_cfg["path_consumption"],
-        sim_cfg["path_production"],
     )
     cache = HistoricalDataCache()
     cache.load()

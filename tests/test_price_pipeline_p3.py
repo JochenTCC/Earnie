@@ -108,16 +108,37 @@ def test_monday_of_week_snaps_to_monday():
     assert monday.date().isoformat() == "2025-07-07"
 
 
-def test_resolve_simulation_window_is_365_inclusive_days(monkeypatch):
+def test_resolve_simulation_window_month_aligned_from_cons_data(monkeypatch):
+    from datetime import date
+
     monkeypatch.setattr(
-        pd.Timestamp,
-        "now",
-        classmethod(lambda cls, tz=None: pd.Timestamp("2025-07-09")),
+        "data.profile_manager.get_cons_data_date_bounds",
+        lambda: (date(2025, 1, 10), date(2026, 6, 25)),
     )
-    start, end = resolve_simulation_window("last_12_months", "", "")
-    assert end.normalize() == pd.Timestamp("2025-07-09")
-    assert start.normalize() == pd.Timestamp("2024-07-10")
-    assert (end.normalize() - start.normalize()).days + 1 == 365
+    start, end = resolve_simulation_window("last_12_months")
+    assert end.normalize() == pd.Timestamp("2026-05-31")
+    assert start.normalize() == pd.Timestamp("2025-06-01")
+
+
+def test_resolve_simulation_window_complete_month_end(monkeypatch):
+    from datetime import date
+
+    monkeypatch.setattr(
+        "data.profile_manager.get_cons_data_date_bounds",
+        lambda: (date(2025, 7, 1), date(2026, 6, 30)),
+    )
+    start, end = resolve_simulation_window()
+    assert end.normalize() == pd.Timestamp("2026-06-30")
+    assert start.normalize() == pd.Timestamp("2025-07-01")
+
+
+def test_resolve_simulation_window_empty_cons_data(monkeypatch):
+    monkeypatch.setattr(
+        "data.profile_manager.get_cons_data_date_bounds",
+        lambda: (None, None),
+    )
+    with pytest.raises(ValueError, match="cons_data"):
+        resolve_simulation_window()
 
 
 def test_thermal_daily_pwm_uses_nominal_or_zero():

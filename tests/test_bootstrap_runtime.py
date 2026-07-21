@@ -164,7 +164,7 @@ def test_bootstrap_upgrades_stale_schema_from_bundled(tmp_path, monkeypatch):
         json.dumps(
             {
                 "properties": {
-                    "earnie_data_model": {"const": 2},
+                    "earnie_data_model": {"const": 3},
                     "oemag_monthly_feed_in_rates": {"type": "array"},
                 }
             }
@@ -176,7 +176,7 @@ def test_bootstrap_upgrades_stale_schema_from_bundled(tmp_path, monkeypatch):
     config_dir.mkdir(parents=True)
     (config_dir / "config.json").write_text("{}", encoding="utf-8")
     (config_dir / "tariffs.json").write_text(
-        json.dumps({"earnie_data_model": 2, "import_tariffs": [], "export_tariffs": []}),
+        json.dumps({"earnie_data_model": 3, "import_tariffs": [], "export_tariffs": []}),
         encoding="utf-8",
     )
     (config_dir / "tariffs.schema.json").write_text(
@@ -187,7 +187,7 @@ def test_bootstrap_upgrades_stale_schema_from_bundled(tmp_path, monkeypatch):
     bootstrap.run()
 
     schema = json.loads((config_dir / "tariffs.schema.json").read_text(encoding="utf-8"))
-    assert schema["properties"]["earnie_data_model"]["const"] == 2
+    assert schema["properties"]["earnie_data_model"]["const"] == 3
     assert "oemag_monthly_feed_in_rates" in schema["properties"]
 
 

@@ -37,6 +37,42 @@ def _preferred_dotenv() -> str:
     return os.path.join(_preferred_config_dir(), ".env")
 
 
+def _env_path_explicit() -> bool:
+    """True when EARNIE_ENV_PATH / ENERGY_OPTIMIZER_ENV_PATH is set in the process env."""
+    for key in ("EARNIE_ENV_PATH", "ENERGY_OPTIMIZER_ENV_PATH"):
+        raw = os.environ.get(key)
+        if raw is not None and str(raw).strip():
+            return True
+    return False
+
+
+def _path_is_under(path: str, root: str) -> bool:
+    try:
+        abs_path = os.path.abspath(path)
+        abs_root = os.path.abspath(root)
+        return os.path.commonpath([abs_path, abs_root]) == abs_root
+    except (ValueError, OSError):
+        return False
+
+
+def _effective_config_path_env() -> str:
+    """
+    CONFIG_PATH from env, ignored when an explicit ENV_PATH scopes the tree
+    and CONFIG_PATH points outside that root (e.g. leftover NAS redirect in
+    legacy config/.env while launch sets EARNIE_ENV_PATH=earnie_env).
+    """
+    env = read_env("CONFIG_PATH")
+    if not env:
+        return ""
+    if not _env_path_explicit():
+        return env
+    root = env_root()
+    cfg_dir = _config_dir_from_config_path_env(env)
+    if _path_is_under(cfg_dir, root):
+        return env
+    return ""
+
+
 def _is_legacy_config_file_path(raw: str) -> bool:
     """True if CONFIG_PATH still points at a *.json file (pre-directory semantics)."""
     base = os.path.basename(raw.replace("\\", "/"))
@@ -277,7 +313,7 @@ def resolve_config_json_path() -> str:
     session = get_session_env_root()
     if session:
         return os.path.join(session, "config", "config.json")
-    env = read_env("CONFIG_PATH")
+    env = _effective_config_path_env()
     if env:
         if _is_legacy_config_file_path(env):
             return env
@@ -296,7 +332,7 @@ def resolve_config_json_path() -> str:
 
 def _config_directory_from_env() -> str | None:
     """Config-Verzeichnis aus CONFIG_PATH-ENV, sonst None."""
-    env = read_env("CONFIG_PATH")
+    env = _effective_config_path_env()
     if not env:
         return None
     return _config_dir_from_config_path_env(env)
@@ -669,6 +705,14 @@ def resolve_dotenv_path() -> str:
     if env:
         return env
     preferred_dotenv = _preferred_dotenv()
+    # Explicit ENV_PATH (launch.json / greenfield): stay inside that tree.
+    # Do not fall back to legacy config/.env (often still points at NAS).
+    if _env_path_explicit():
+        if os.path.isfile(preferred_dotenv):
+            return preferred_dotenv
+        if os.path.isfile(_LEGACY_DOTENV):
+            return _LEGACY_DOTENV
+        return preferred_dotenv
     config_directory = _config_directory_from_env()
     if config_directory:
         co_located = os.path.join(config_directory, ".env")
@@ -681,10 +725,11 @@ def resolve_dotenv_path() -> str:
             return co_located
     if os.path.isfile(preferred_dotenv):
         return preferred_dotenv
-    if os.path.isfile(_LEGACY_DOTENV_IN_CONFIG):
-        return _LEGACY_DOTENV_IN_CONFIG
+    # Prefer repo-root .env over legacy config/.env when preferred is missing.
     if os.path.isfile(_LEGACY_DOTENV):
         return _LEGACY_DOTENV
+    if os.path.isfile(_LEGACY_DOTENV_IN_CONFIG):
+        return _LEGACY_DOTENV_IN_CONFIG
     if config_directory:
         return os.path.join(config_directory, ".env")
     return preferred_dotenv

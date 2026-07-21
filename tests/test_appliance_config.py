@@ -116,6 +116,7 @@ def test_root_eauto_milp_block_rejected(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "block_key,block_value",
     [
+        ("file_paths_battery_simulation", {"path_cons_data": "runtime/cons_data_hourly.csv"}),
         ("awattar", {}),
         ("battery_wear", {"enabled": False}),
         ("batteries", []),
@@ -134,6 +135,21 @@ def test_reject_legacy_config_blocks_allows_clean_config():
     from settings.legacy_config_gates import reject_legacy_config_blocks
 
     reject_legacy_config_blocks({"system": {"global_timeout": 10}})
+
+
+def test_reject_path_consumption_production_in_scenario_explorer_conf():
+    from settings.legacy_config_gates import reject_legacy_config_blocks
+
+    with pytest.raises(ValueError, match="path_consumption"):
+        reject_legacy_config_blocks(
+            {
+                "scenario_explorer_conf": {
+                    "path_cons_data": "runtime/cons_data_hourly.csv",
+                    "path_consumption": "c.csv",
+                    "path_production": "p.csv",
+                }
+            }
+        )
 
 
 def test_reject_legacy_runtime_settings_block_unit():

@@ -70,8 +70,12 @@ def _maybe_auto_start_main() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from runtime_store import bootstrap
     from runtime_store.config_load import load_config_or_exit
+    from runtime_store.dotenv_loader import load_app_dotenv
 
+    load_app_dotenv()
+    bootstrap.run()
     load_config_or_exit()
 
     import logger_config

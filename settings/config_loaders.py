@@ -120,12 +120,8 @@ def load_loxone_block_params(raw_config: dict, config_path: str) -> dict[str, An
 
 
 def load_sim_path_params(raw_config: dict) -> dict[str, Any]:
-    sim_paths = raw_config.get("file_paths_battery_simulation", {})
-    path_consumption = sim_paths.get("path_consumption", "")
+    sim_paths = raw_config.get("scenario_explorer_conf", {})
     return {
-        "PATH_CONSUMPTION": path_consumption,
-        "PATH_CONSUMPTION_TOTAL": path_consumption,
-        "PATH_PRODUCTION": sim_paths.get("path_production", ""),
         "PATH_PRICE": sim_paths.get("path_price", ""),
         "PATH_CONS_DATA": sim_paths.get("path_cons_data", "runtime/cons_data_hourly.csv"),
         "CONS_DATA_RETENTION_MONTHS": sim_paths.get("cons_data_retention_months", 24),

@@ -69,7 +69,7 @@ def smoke_anchor(historical_cache: HistoricalDataCache) -> pd.Timestamp:
 
 @pytest.fixture(scope="module")
 def smoke_prices_df(smoke_anchor: pd.Timestamp) -> pd.DataFrame:
-    sim_cfg = config.get_file_paths_battery_simulation()
+    sim_cfg = config.get_scenario_explorer_conf()
     start = smoke_anchor.normalize() - pd.Timedelta(days=1)
     end = smoke_anchor.normalize() + pd.Timedelta(days=2)
     return load_market_prices(

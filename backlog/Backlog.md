@@ -65,9 +65,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and demos — invoice-grade bill reconciliation is explicitly out of scope (nice-to-have later). Includes a thin marker/data-model prep for later SAM work (`2.4`), not the connector rewrite.
 
-- [ ] Check if file_paths_battery_simulation should be kept in config.json
-  - Also check for other entities
-- [ ] Define SE overall horizon not on current day, but on the recent month (and then backwards)
 - [ ] **2.3.a — Tariff hygiene (good-enough €)**
   - Find EPEX API to have provider independent tariff calculation
   - Review current tariffs - use https://www.e-control.at/referenzmarktwert and `docs/referenz/` OeMAG/RefMrkt anchors

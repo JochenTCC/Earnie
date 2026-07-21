@@ -1,6 +1,6 @@
 {
     "$schema": "./config.schema.json",
-    "earnie_data_model": 2,
+    "earnie_data_model": 3,
     "market_prices": {
         "missing_price_strategy": "forecast",
         "forecast_model_path": "data/cache/price_model_coefficients.json"
@@ -44,7 +44,7 @@
         "pct_stars_4": 10.0,
         "pct_stars_1": 30.0
     },
-    "file_paths_battery_simulation": {
+    "scenario_explorer_conf": {
         "path_cons_data": "runtime/cons_data_hourly.csv",
         "cons_data_retention_months": 24,
         "cons_data_write_mode": "hourly",
