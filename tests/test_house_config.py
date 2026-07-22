@@ -712,6 +712,38 @@ def test_generic_hourly_profile_fixed_start():
     assert sum(hourly) == pytest.approx(2.0)
 
 
+def test_generic_hourly_profile_fractional_duration_uses_duty_cycle():
+    """Swimspa Jets: 2.65 kW × 0.25 h → hour average 0.6625 kW, not full nominal."""
+    from datetime import date
+
+    from house_config.generic_schedule import (
+        generic_daily_target_kwh_for_day,
+        generic_hourly_kw_for_day,
+        generic_reference_run_end,
+    )
+
+    consumer = {
+        "id": "swimspa_jets",
+        "label": "Swimspa Jets",
+        "type": "generic",
+        "nominal_power_kw": 2.65,
+        "schedule": {
+            "runs_per_week": 7,
+            "duration_h": 0.25,
+            "start_hour": 20,
+            "start_shift_h": 0.0,
+        },
+    }
+    day = date(2026, 7, 6)
+    hourly = generic_hourly_kw_for_day(consumer, day)
+    assert hourly[20] == pytest.approx(2.65 * 0.25)
+    assert sum(hourly) == pytest.approx(generic_daily_target_kwh_for_day(consumer, day))
+    assert sum(h for i, h in enumerate(hourly) if i != 20) == pytest.approx(0.0)
+    end = generic_reference_run_end(day, 20, 0.25)
+    assert end.hour == 20
+    assert end.minute == 15
+
+
 def test_build_hourly_kw_profile_generic_blocks(tmp_path):
     import json
 

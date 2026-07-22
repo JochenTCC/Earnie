@@ -234,6 +234,7 @@ def test_build_capture_payload_json_safe(tmp_path, monkeypatch):
             baseline_df=pd.DataFrame(),
             display_df=pd.DataFrame([{"slot_datetime": now, "Simulierter SoC (%)": 19.0}]),
             display_matched=None,
+            display_same_flex=None,
             savings_view={},
             table_df=pd.DataFrame(),
             table_qualities=None,

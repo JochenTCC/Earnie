@@ -587,10 +587,70 @@ def add_baseline_soc_traces(
     soc_at_now: float | None = None,
     battery_params: dict | None = None,
 ) -> None:
-    if matched_baseline_df is None or matched_baseline_df.empty:
+    add_anchored_counterfactual_soc_traces(
+        fig,
+        matched_baseline_df,
+        name="SoC BL Ziel",
+        dash="dot",
+        yaxis=yaxis,
+        extrap_start=extrap_start,
+        extrap_end=extrap_end,
+        chart_now=chart_now,
+        history_slot_count=history_slot_count,
+        soc_at_now=soc_at_now,
+        battery_params=battery_params,
+    )
+
+
+def add_same_flex_soc_traces(
+    fig: go.Figure,
+    same_flex_df: pd.DataFrame | None,
+    yaxis: str = "y2",
+    extrap_start: int | None = None,
+    extrap_end: int | None = None,
+    chart_now: datetime | None = None,
+    history_slot_count: int | None = None,
+    soc_at_now: float | None = None,
+    battery_params: dict | None = None,
+) -> None:
+    """SoC bei Opt-Last: optimierte Flex-Zeiten, Batterie nur PV-Überschuss."""
+    add_anchored_counterfactual_soc_traces(
+        fig,
+        same_flex_df,
+        name="SoC bei Opt-Last",
+        dash="dashdot",
+        line_width=2.0,
+        opacity=0.85,
+        yaxis=yaxis,
+        extrap_start=extrap_start,
+        extrap_end=extrap_end,
+        chart_now=chart_now,
+        history_slot_count=history_slot_count,
+        soc_at_now=soc_at_now,
+        battery_params=battery_params,
+    )
+
+
+def add_anchored_counterfactual_soc_traces(
+    fig: go.Figure,
+    soc_df: pd.DataFrame | None,
+    *,
+    name: str,
+    dash: str,
+    line_width: float = 2.5,
+    opacity: float = 1.0,
+    yaxis: str = "y2",
+    extrap_start: int | None = None,
+    extrap_end: int | None = None,
+    chart_now: datetime | None = None,
+    history_slot_count: int | None = None,
+    soc_at_now: float | None = None,
+    battery_params: dict | None = None,
+) -> None:
+    if soc_df is None or soc_df.empty:
         return
-    matched_axis = ChartSlotAxis.from_dataframe(matched_baseline_df)
-    length = len(matched_baseline_df)
+    matched_axis = ChartSlotAxis.from_dataframe(soc_df)
+    length = len(soc_df)
     if history_slot_count is not None and history_slot_count >= length:
         return
     split_points: list[tuple[int, int]] = []
@@ -619,15 +679,15 @@ def add_baseline_soc_traces(
             seg_tail = None
             if abs_end == length:
                 seg_tail = _soc_tail_y_from_row(
-                    matched_baseline_df.iloc[-1],
+                    soc_df.iloc[-1],
                     battery_params=battery_params,
                 )
             ramp_after: tuple[datetime, float, datetime, float] | None = None
             if chart_now is not None:
                 ramp_after = _current_hour_soc_ramp(
                     matched_axis,
-                    matched_baseline_df["Simulierter SoC (%)"],
-                    matched_baseline_df,
+                    soc_df["Simulierter SoC (%)"],
+                    soc_df,
                     chart_now,
                     abs_start,
                     abs_end,
@@ -638,7 +698,7 @@ def add_baseline_soc_traces(
             seg_tail_for_line = None if ramp_after is not None else seg_tail
             matched_x, matched_y = _segment_connected_line_xy(
                 matched_axis,
-                matched_baseline_df["Simulierter SoC (%)"],
+                soc_df["Simulierter SoC (%)"],
                 abs_start,
                 abs_end,
                 tail_y=seg_tail_for_line,
@@ -656,26 +716,26 @@ def add_baseline_soc_traces(
                 )
             hover_labels = _soc_hover_labels_for_times(
                 matched_x,
-                matched_baseline_df["Uhrzeit"],
+                soc_df["Uhrzeit"],
                 matched_axis.starts,
             )
             show_legend = index == 0
             fig.add_trace(go.Scatter(
                 x=matched_x,
                 y=matched_y,
-                name="SoC BL Ziel",
+                name=name,
                 showlegend=show_legend,
-            mode="lines",
-            line=dict(color=COLOR_SOC, width=2.5, dash="dot"),
-            opacity=1.0,
-            yaxis=yaxis,
-            connectgaps=False,
-            customdata=hover_labels,
-            hovertemplate=(
-                "Uhrzeit: %{customdata}<br>%{fullData.name}: "
-                "%{y:.1f}<extra></extra>"
-            ),
-        ))
+                mode="lines",
+                line=dict(color=COLOR_SOC, width=line_width, dash=dash),
+                opacity=opacity,
+                yaxis=yaxis,
+                connectgaps=False,
+                customdata=hover_labels,
+                hovertemplate=(
+                    "Uhrzeit: %{customdata}<br>%{fullData.name}: "
+                    "%{y:.1f}<extra></extra>"
+                ),
+            ))
 
 
 def add_price_on_soc_axis_trace(

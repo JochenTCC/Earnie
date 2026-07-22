@@ -160,6 +160,7 @@ def _store_opt_in_display_bundle(
         matched_baseline_df,
         chart_context=chart_context,
         optimization_matrix=matrix,
+        show_soc_plausibility=True,
     )
 
 

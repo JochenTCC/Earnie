@@ -107,6 +107,7 @@ def savings_info_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     savings = snapshot.get("savings") or {}
     optimized_rows = snapshot.get("simulation_rows") or []
     matched_rows = snapshot.get("matched_baseline_rows") or []
+    same_flex_rows = snapshot.get("baseline_same_flex_rows") or []
     savings_info = {
         "baseline_cost_euro": savings.get("baseline_cost_euro"),
         "matched_baseline_cost_euro": savings.get("matched_baseline_cost_euro"),
@@ -120,6 +121,7 @@ def savings_info_from_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "optimized_rows": optimized_rows,
         "baseline_rows": snapshot.get("baseline_rows") or [],
         "matched_baseline_rows": matched_rows,
+        "baseline_same_flex_rows": same_flex_rows,
         "applied_targets": snapshot.get("applied_targets") or [],
         "energy_comparison": snapshot.get("energy_comparison") or [],
     }

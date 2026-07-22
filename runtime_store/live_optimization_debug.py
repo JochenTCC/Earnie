@@ -155,12 +155,16 @@ def build_debug_payload(
     target_date: str | None = None,
     historical_meta: dict[str, Any] | None = None,
     matched_baseline_rows: list[dict] | None = None,
+    baseline_same_flex_rows: list[dict] | None = None,
     source: str = "app.py",
     planning_matrix: list[dict] | None = None,
     planning_window: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Gemeinsamer Snapshot für Debug und Nachrechnen."""
     main_summary = _main_run_summary(main_state)
+    same_flex = baseline_same_flex_rows
+    if same_flex is None:
+        same_flex = savings_info.get("baseline_same_flex_rows") or []
     payload: dict[str, Any] = {
         "completed_at": datetime.now().isoformat(timespec="seconds"),
         "source": source,
@@ -172,6 +176,7 @@ def build_debug_payload(
         "simulation_rows": optimized_rows,
         "baseline_rows": baseline_rows,
         "matched_baseline_rows": matched_baseline_rows or [],
+        "baseline_same_flex_rows": same_flex or [],
     }
     if kind == "live":
         payload["quarter_hour_slot"] = quarter_hour_slot

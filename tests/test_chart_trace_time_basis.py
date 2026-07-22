@@ -91,10 +91,12 @@ def test_chart1_pv_uses_slot_center_anchor():
     pv = next(t for t in fig.data if t.name == "PV")
 
     for index, slot in enumerate(slots):
-        pv_value = float(df.iloc[index]["PV-Prognose (kW)"])
+        pv_kw = float(df.iloc[index]["PV-Prognose (kW)"])
+        hours = axis.slot_duration(index).total_seconds() / 3600.0
+        pv_kwh = pv_kw * hours
         expected_start = _slot_start(axis, index)
         expected_center = _slot_center(axis, index)
-        pv_points = _points_at_y(pv, pv_value)
+        pv_points = _points_at_y(pv, pv_kwh)
         assert expected_center in [p[0] for p in pv_points], f"PV Slot {slot}"
         assert expected_start not in [p[0] for p in pv_points], (
             f"PV bewusst Slotmitte, nicht Beginn ({slot})"

@@ -387,6 +387,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                     sync_reason="main_synced",
                     optimized_rows_raw=savings_info["optimized_rows"],
                     matched_baseline_rows=savings_info.get("matched_baseline_rows"),
+                    baseline_same_flex_rows=savings_info.get(
+                        "baseline_same_flex_rows"
+                    ),
                     source="main.py",
                     planning_matrix=optimization_matrix,
                     planning_window=serialize_planning_window(planning_window),

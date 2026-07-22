@@ -1,11 +1,13 @@
 """Schedule-Logik für allgemeine Verbraucher (type generic)."""
 from __future__ import annotations
 
+import math
 from datetime import date, datetime, time, timedelta
 
 WEEKS_PER_YEAR = 52
 DEFAULT_START_HOUR = 12
 MAX_START_SHIFT_H = 12.0
+_EPS = 1e-9
 LEGACY_FLEX_TO_SHIFT = {
     "fixed": 0.0,
     "day": 12.0,
@@ -128,11 +130,28 @@ def run_weekdays_for_day(day: date, runs_per_week: int) -> int:
     return 0
 
 
+def _duration_hour_weights(duration_h: float) -> list[float]:
+    """
+    Anteil je Stundenslot für einen Lauf der Dauer ``duration_h``.
+
+    Beispiel: 0.25 → [0.25]; 1.5 → [1.0, 0.5]; 2.0 → [1.0, 1.0].
+    Summe der Gewichte = duration_h (Energie = nominal × Summe).
+    """
+    if duration_h <= _EPS:
+        return []
+    full_hours = int(math.floor(duration_h + _EPS))
+    remainder = duration_h - full_hours
+    weights = [1.0] * full_hours
+    if remainder > _EPS:
+        weights.append(remainder)
+    return weights
+
+
 def _apply_run_block(hourly: list[float], start_hour: int, duration_h: float, power_kw: float) -> None:
-    duration_slots = max(1, int(round(duration_h)))
-    for offset in range(duration_slots):
+    """Schreibt mittlere Leistung (kW) so dass Summe(kW) = power_kw × duration_h."""
+    for offset, weight in enumerate(_duration_hour_weights(duration_h)):
         hour = (start_hour + offset) % 24
-        hourly[hour] += power_kw
+        hourly[hour] += power_kw * weight
 
 
 def generic_hourly_kw_for_day(consumer: dict, day: date) -> list[float]:
@@ -171,11 +190,8 @@ def generic_daily_target_kwh_for_day(consumer: dict, day: date) -> float:
 
 def generic_reference_run_end(day: date, start_hour: int, duration_h: float) -> datetime:
     """Ende des Referenz-Laufs (start_hour + duration_h) am Kalendertag."""
-    duration_slots = max(1, int(round(duration_h)))
-    end_hour = int(start_hour) + duration_slots
-    if end_hour < 24:
-        return datetime.combine(day, time(hour=end_hour % 24))
-    return datetime.combine(day + timedelta(days=1), time(hour=end_hour % 24))
+    start = datetime.combine(day, time(hour=int(start_hour) % 24))
+    return start + timedelta(hours=max(0.0, float(duration_h)))
 
 
 def generic_daily_target_kwh_for_window_day(
@@ -230,10 +246,12 @@ def generic_allowed_slot_hours(
     duration_h: float,
 ) -> frozenset[int]:
     """Stunden 0–23, in denen der Lauf liegen darf (Start im Fenster, Dauer im selben Tag)."""
-    duration_slots = max(1, int(round(duration_h)))
+    weights = _duration_hour_weights(duration_h)
+    if not weights:
+        return frozenset()
     allowed: set[int] = set()
     for start in eligible_start_hours(start_hour, start_shift_h):
-        for offset in range(duration_slots):
+        for offset in range(len(weights)):
             hour = start + offset
             if hour < 24:
                 allowed.add(hour)

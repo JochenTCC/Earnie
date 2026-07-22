@@ -81,8 +81,8 @@ def _s2_segment_label(now: datetime | None) -> tuple[int, int, int, str]:
     return cycle_offset, segment_index, max_cycle, label
 
 
-def s2_zone_help_text() -> str:
-    return (
+def s2_zone_help_text(*, include_soc_plausibility: bool = False) -> str:
+    base = (
         "Hintergrund: grau = Vergangenheit · neutral = aktuelle Stunde · "
         "grün = extrapolierte Preise · "
         "Navigation: «←» / «→» Zyklus, «Heute» Live-Fenster, "
@@ -91,6 +91,18 @@ def s2_zone_help_text() -> str:
         "▲ Hinweis (gelb) · ◆ Warnung (orange) · ⬡ Fehler (rot). "
         "Hover zeigt Kategorie und Erläuterung. "
         "Regeln: `config/deviation_rules.json`."
+    )
+    if not include_soc_plausibility:
+        return base
+    return (
+        base
+        + "\n\n**SoC-Plausibilität (ab Jetzt):** "
+        "SoC BL Ziel = gleiche Flex-Energie wie die Optimierung, aber Profilform "
+        "und Batterie nur aus PV-Überschuss. "
+        "SoC bei Opt-Last = Optimierungs-Lastzeiten bei derselben Batterieregel "
+        "(zeigt Lastverschiebung). "
+        "Abstand Opt-Last → SoC = andere Batteriestrategie (z. B. Netzladen/Entladen). "
+        "Umrandete Flex-Balken (Original-Schedule) = wo Flex laut BL-Ziel gelaufen wäre."
     )
 
 

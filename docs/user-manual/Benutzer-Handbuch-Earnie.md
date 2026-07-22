@@ -350,6 +350,41 @@ Grüner Bereich = Die Preise sind noch nicht bekannt, aber das interne Preismode
 
 Kennzahlen zur Ersparnis beziehen sich auf den **vollen Planungshorizont** (Jetzt bis übernächster Sonnenaufgang), nicht nur auf das gerade sichtbare Chart-Segment.
 
+#### Chart 1: Die drei SoC-Linien (Plausibilität)
+
+Im Live-Monitor können ab **Jetzt** drei SoC-Verläufe liegen. Sie beantworten verschiedene Fragen — **SoC bei Opt-Last** ist keine zweite Optimierung, sondern eine Gegenprobe.
+
+| Linie | Flex-Last (E-Auto, …) | Hausbatterie | Was sie zeigt |
+|-------|------------------------|--------------|---------------|
+| **SoC** (durchgezogen) | wie von Earnie geplant | smarte MILP-Strategie (Netzladen, Entladen, Halten, …) | der eigentliche Plan |
+| **SoC BL Ziel** (gestrichelt) | gleiche Energie wie Opt, aber **Profilform** (ohne Preis-Lastverschiebung) | nur **PV-Überschuss** (einfache Regel) | Referenz ohne Lastverschiebung und ohne smarte Batterie |
+| **SoC bei Opt-Last** (strichpunktiert) | **dieselben Stunden** wie die Optimierung | ebenfalls nur **PV-Überschuss** | isoliert die Batteriestrategie von der Lastverschiebung |
+
+Kurz gesagt:
+
+```text
+SoC BL Ziel:     Profil-Flex  +  Batterie nur PV-Überschuss
+SoC bei Opt-Last: Opt-Flex    +  Batterie nur PV-Überschuss
+SoC:             Opt-Flex    +  smarte Batterie
+```
+
+**Abstände lesen**
+
+- **BL Ziel → Opt-Last:** vor allem **wann** Flex läuft (z. B. E-Auto in günstige Nachtstunden verschoben).  
+- **Opt-Last → SoC:** vor allem **wie** die Hausbatterie gesteuert wird (Netzladen, gezieltes Entladen, Entladesperre, …).
+
+Umrandete Flex-Balken (**Original-Schedule**, nur Kanten) zeigen, wo Flex laut BL-Ziel gelaufen wäre; gefüllte Flex-Balken bleiben der Optimierungsplan.
+
+**Beispiel Abend/Nacht (typisch)**
+
+Gleiche E-Auto-Energie insgesamt, aber unterschiedliche Zeiten:
+
+- **BL Ziel** lädt abends im „üblichen“ Fenster → bei wenig PV entlädt die einfache Batterieregel stark → SoC BL Ziel kann früh auf die Untergrenze fallen.  
+- **Opt-Last** hat in denselben Abendstunden oft **noch kein** E-Auto (Last liegt später) → SoC bei Opt-Last bleibt höher und fällt erst, wenn die Opt-Last startet; dann deckt die PV-Überschuss-Regel das E-Auto möglichst aus dem Speicher.  
+- **SoC** kann schon **vor** dem verschobenen E-Auto deutlich unter Opt-Last liegen, wenn die smarte Batterie am Nachmittag/Abend anders entladen oder gehalten hat — das ist Batteriestrategie, nicht die Abend-Lastverschiebung. Startet das E-Auto nachts, bezieht die Optimierung es oft stärker aus dem **Netz**, während Opt-Last stärker aus dem Speicher nachzieht.
+
+Technische Kurzfassung und Linienfarben: [Charts & Panels — Chart 1](../ui/charts.md#chart-1-leistung-soc--preis).
+
 Charts im Detail: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md).
 
 ### Manuelle Geräte

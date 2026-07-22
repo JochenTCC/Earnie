@@ -3,6 +3,16 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.3.c — Plan / SOC plausibility (2026-07-22)
+
+- [x] Live Monitor Chart 1: explain SoC vs **SoC BL Ziel** (Lastverschiebung + Batteriestrategie) via caption/`?` + German handbook section
+- [x] Third SOC line **SoC bei Opt-Last** from `baseline_same_flex_rows` (opt flex, BL battery), Jetzt onward
+- [x] Ghost outline bars (**Original-Schedule**) for matched/BL-Ziel flex vs filled optimized bars
+- [x] Chart-1 docs (`docs/ui/charts.md`); flow-balance bar heights in **kWh** (`kW × slot duration`); ghost filter `< 1 kWh`
+- [x] Known-generic duty cycle: fractional `duration_h` (e.g. Swimspa Jets) → average kW so Chart energy matches `nominal × planned duration`
+- MILP research (terminal SOC / weekend ready-by / variable sample time) remains open under **2.3ca** in [Backlog.md](Backlog.md)
+
+
 ### 2.3.b — Approximate cost model (monthly fees) (2026-07-22)
 
 - [x] Optional `monthly_fee_eur` on import/export tariffs; SE `total_eur` / `monthly_eur` add one full fee per calendar month (not MILP / not hourly `sim_cost`)

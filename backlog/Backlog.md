@@ -19,13 +19,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and demos — invoice-grade bill reconciliation is explicitly out of scope (nice-to-have later). Includes a thin marker/data-model prep for later SAM work (`2.4`), not the connector rewrite.
 
-- [ ] **2.3.c — Plan / SOC plausibility**
-  - Make appropriate information accessible to user about where differences between optimized SOC and BL SOC Ziel come from (prove plausibility)
-    - One reason is moved consumption from "standard" EV charging
-    - Are there other reasons?
-    - Idea for visualization: Draw "ghost bars" for scheduled EV charging as not color-filled bars (just thick edges)
-  - Check if removing constraint for SOC at end of horizon changes simulation results in backtesting
+- [ ] **2.3ca — Tuning MILP for SE and Live**
+  - Check if removing constraint for SOC at end of horizon changes simulation results in backtesting for both fixed_24h and sunset2sunset
   - Check if there is a special issue on weekends, when time-to-be-ready is set to 12:00 (Start/End-SOC constraints) in SE optimization
+  - Check if non-constant sample time would be possible for online MILP (15 min for next 3hours, 1h in rest of neutral area, 2hours for green area)
 - [ ] **2.3.d — Verbraucheranalyse → Analyse Verbrauch & Kosten**
   - Visualize usage of consumers on a weekly basis compared to historical price and PV
   - Show if power came from PV, battery or grid

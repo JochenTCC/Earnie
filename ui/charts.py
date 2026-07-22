@@ -37,6 +37,7 @@ from ui.chart_soc import (
     add_export_price_on_soc_axis_trace,
     add_optimized_soc_trace,
     add_price_on_soc_axis_trace,
+    add_same_flex_soc_traces,
     _soc_at_chart_now,
 )
 from ui.chart_trace_segments import _extrapolation_bounds
@@ -57,6 +58,9 @@ def add_power_traces(
     matrix: list[dict] | None = None,
     chart_window: UiChartWindow | None = None,
     chart_zones=None,
+    matched_baseline_df: pd.DataFrame | None = None,
+    show_soc_plausibility: bool = False,
+    history_slot_count: int | None = None,
 ) -> None:
     from house_config.known_chart_display import apply_known_generic_to_dataframe
 
@@ -71,6 +75,7 @@ def add_power_traces(
 
     from ui.chart_flow_balance import (
         add_flow_balance_traces,
+        add_matched_flex_ghost_traces,
         build_flow_balance_slots_from_df,
     )
 
@@ -85,6 +90,13 @@ def add_power_traces(
         flex_consumers=active_consumers,
         chart_zones=chart_zones,
     )
+    if show_soc_plausibility:
+        add_matched_flex_ghost_traces(
+            fig,
+            matched_baseline_df,
+            axis,
+            history_slot_count=history_slot_count,
+        )
 
 
 def build_power_soc_chart_figure(
@@ -92,6 +104,8 @@ def build_power_soc_chart_figure(
     baseline_df: pd.DataFrame | None = None,
     matched_baseline_df: pd.DataFrame | None = None,
     *,
+    same_flex_df: pd.DataFrame | None = None,
+    show_soc_plausibility: bool = False,
     chart_title: str | None = None,
     show_baseline_soc: bool = True,
     chart_window: UiChartWindow | None = None,
@@ -127,6 +141,9 @@ def build_power_soc_chart_figure(
         matrix=optimization_matrix,
         chart_window=chart_window,
         chart_zones=chart_zones,
+        matched_baseline_df=matched_baseline_df,
+        show_soc_plausibility=show_soc_plausibility,
+        history_slot_count=history_slot_count,
     )
     add_entladesperre_soc_band_traces(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
@@ -152,6 +169,17 @@ def build_power_soc_chart_figure(
             soc_at_now=soc_at_now,
             battery_params=battery_params,
         )
+        if show_soc_plausibility:
+            add_same_flex_soc_traces(
+                fig,
+                same_flex_df,
+                extrap_start=extrap_start,
+                extrap_end=extrap_end,
+                chart_now=chart_now,
+                history_slot_count=history_slot_count,
+                soc_at_now=soc_at_now,
+                battery_params=battery_params,
+            )
     add_price_on_soc_axis_trace(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
     )
@@ -175,7 +203,7 @@ def build_power_soc_chart_figure(
         title=layout_title,
         xaxis=_chart_xaxis_config(axis, range_start=range_start),
         barmode="overlay",
-        yaxis=dict(title="Leistung (kW)", side="left"),
+        yaxis=dict(title="Energie (kWh)", side="left"),
         yaxis2=dict(
             title="SoC (%) / Preis (Cent/kWh)",
             side="right",
@@ -193,6 +221,8 @@ def render_power_soc_chart(
     baseline_df: pd.DataFrame | None = None,
     matched_baseline_df: pd.DataFrame | None = None,
     *,
+    same_flex_df: pd.DataFrame | None = None,
+    show_soc_plausibility: bool = False,
     chart_title: str | None = None,
     show_baseline_soc: bool = True,
     chart_key: str | None = None,
@@ -219,6 +249,8 @@ def render_power_soc_chart(
         df,
         baseline_df,
         matched_baseline_df,
+        same_flex_df=same_flex_df,
+        show_soc_plausibility=show_soc_plausibility,
         chart_title=chart_title,
         show_baseline_soc=show_baseline_soc,
         chart_window=chart_window,
@@ -588,6 +620,7 @@ from ui.chart_soc import (
     add_export_price_on_soc_axis_trace,
     add_optimized_soc_trace,
     add_price_on_soc_axis_trace,
+    add_same_flex_soc_traces,
 )
 
 __all__ = [

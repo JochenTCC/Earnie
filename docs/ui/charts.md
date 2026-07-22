@@ -20,11 +20,11 @@ Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdo
 
 **Überschrift:** Segment-Label (z. B. „SA₀→SA₁ (Live) · Datumsbereich“) mit **?** (Hintergrundzonen grau/neutral/grün, Navigation).
 
-**Linke Y-Achse (kW):**
+**Linke Y-Achse (kWh):** Balkenhöhe = Energie pro Slot (`kW × Slotdauer`). Bei gemischter Auflösung (15 min nahe „Jetzt“, später 1 h) sind kurze Slots entsprechend niedriger.
 
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
-| PV | Gelbe Linie | PV-Prognose (durchgängig grau/neutral/grün) |
+| PV | Gelbe Linie | PV-Prognose als Slot-Energie (kWh = kW × Slotdauer; durchgängig grau/neutral/grün) |
 | Energiebilanz | Rauf/Runter-Balken (gestapelt) | **↑ kräftig** PV (gelb), Netzbezug (blau); **↓ kräftig** Grundlast (braun), Flex; **gedämpft** Batterie→Last grün, Netz→Batterie cyan, PV→Batterie gelb-grün, PV→Netz blassgelb — Up- und Down-Säule gleich hoch |
 
 ### Rauf/Runter-Algorithmus (Wasserfall)
@@ -68,8 +68,11 @@ Entladen → Last ← verbleibende Entladung
 |------|-------------|-----------|
 | SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/chart_colors.py`) | Simulierter Batterie-SOC |
 | SoC BL Ziel | Dieselbe Farbe, gestrichelt ab **Jetzt** (nicht davor) | Referenz-SOC (Baseline); Anker = Log-SOC am Jetzt-Marker |
+| SoC bei Opt-Last | Dieselbe Farbe, strichpunktiert ab **Jetzt** (nur Live-Monitor) | Zwischen-Gegenprobe: Optimierungs-Lastzeiten, Batterie nur PV-Überschuss (`baseline_same_flex_rows`) |
 | Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 | Einspeisepreis (orange, gestrichelt) | Einspeisevergütung skaliert | Hover: Cent/kWh |
+
+**SoC-Plausibilität (Live-Monitor):** Abstand **SoC BL Ziel → SoC bei Opt-Last** kommt vor allem von Lastverschiebung (Flex/E-Auto anders zeitlich platziert). Abstand **SoC bei Opt-Last → SoC** kommt von der Batteriestrategie (Netzladen, Entladen, Halten). Umrandete Flex-Balken (**Original-Schedule**, nur Kanten, keine Füllung) zeigen, wo Flex laut BL-Ziel gelaufen wäre — gefüllte Flex-Balken bleiben die Optimierung. Ghost-Segmente unter **1 kWh** pro Slot werden nicht gezeichnet.
 
 **Hintergrundzonen** (Details im **?** der Chart-1-Überschrift): grau = Vergangenheit (Log), neutral = laufende Stunde, grün = extrapolierte Preise bis Fensterrand.
 
