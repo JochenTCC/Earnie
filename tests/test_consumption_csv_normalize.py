@@ -50,17 +50,60 @@ def test_normalize_15min_mean(tmp_path: Path) -> None:
     assert rows[0][1] == pytest.approx(1.0)
 
 
-def test_normalize_sparse_interpolate(tmp_path: Path) -> None:
+def test_normalize_15min_energy_conserved() -> None:
+    """Regular 15-min samples: hour mean equals mean of four samples when hour is closed."""
+    from data.loxone_csv_timeseries import resample_to_hourly_zoh
+
+    start = datetime(2023, 1, 1)
+    powers = [2.0, 4.0, 6.0, 8.0]
+    idx = [start + timedelta(minutes=15 * i) for i in range(4)]
+    # Close the hour so ZOH covers :45–:59 (same pattern as continuous meter logs).
+    idx.append(start + timedelta(hours=1))
+    series = pd.Series(powers + [powers[-1]], index=pd.DatetimeIndex(idx))
+    hourly = resample_to_hourly_zoh(series)
+    assert hourly.loc[start] == pytest.approx(sum(powers) / 4.0)
+    # Mean kW over 1 h equals ∫P·dt for that hour (kWh).
+    assert float(hourly.loc[start]) == pytest.approx(sum(p * 0.25 for p in powers))
+
+
+def test_normalize_irregular_pulse_zoh_energy() -> None:
+    """Event log: 10 min at 3.5 kW then off → hour mean = 3.5 * 10/60, not 1.75."""
+    from data.loxone_csv_timeseries import resample_to_hourly_zoh
+
+    idx = pd.to_datetime(
+        ["2023-06-01 12:00:00", "2023-06-01 12:10:00", "2023-06-01 13:00:00"]
+    )
+    series = pd.Series([3.5, 0.0, 0.0], index=idx)
+    hourly = resample_to_hourly_zoh(series)
+    assert hourly.loc["2023-06-01 12:00:00"] == pytest.approx(3.5 * 10 / 60)
+    assert hourly.loc["2023-06-01 12:00:00"] != pytest.approx(1.75)
+
+
+def test_normalize_sparse_zoh_holds(tmp_path: Path) -> None:
+    """Sparse samples: gaps hold last value (ZOH), not linear midpoints."""
     path = tmp_path / "sparse.csv"
     start = datetime(2023, 1, 1)
     lines = ["timestamp;power_kw"]
-    # every 2 hours for a full year+ → interpolate to hourly
+    # every 2 hours for a full year+ → ZOH fills intervening hours at 2.0
     for i in range((MIN_HOURS_FULL_YEAR // 2) + 2):
         ts = start + timedelta(hours=2 * i)
         lines.append(f"{ts.strftime('%Y-%m-%d %H:%M:%S')};2.0")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     rows = load_and_normalize_profile_csv(str(path))
     assert len(rows) >= MIN_HOURS_FULL_YEAR
+    assert rows[0][1] == pytest.approx(2.0)
+    assert rows[1][1] == pytest.approx(2.0)
+
+
+def test_resample_sparse_gap_holds_constant() -> None:
+    from data.loxone_csv_timeseries import resample_to_hourly_zoh
+
+    idx = pd.to_datetime(["2023-01-01 00:00:00", "2023-01-01 03:00:00"])
+    series = pd.Series([4.0, 4.0], index=idx)
+    hourly = resample_to_hourly_zoh(series)
+    assert hourly.loc["2023-01-01 00:00:00"] == pytest.approx(4.0)
+    assert hourly.loc["2023-01-01 01:00:00"] == pytest.approx(4.0)
+    assert hourly.loc["2023-01-01 02:00:00"] == pytest.approx(4.0)
 
 
 def test_normalize_sign_flip(tmp_path: Path) -> None:

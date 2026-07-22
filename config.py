@@ -359,6 +359,9 @@ class Config:
     def get_backtesting_cbc_gap_rel(self) -> float:
         return scenario_settings.get_backtesting_cbc_gap_rel(self.backtesting_scenarios_path)
 
+    def get_backtesting_commit_hours(self) -> int:
+        return scenario_settings.get_backtesting_commit_hours(self.backtesting_scenarios_path)
+
     def get_backtesting_cbc_strict_time_limit_sec(self) -> float:
         return scenario_settings.get_backtesting_cbc_strict_time_limit_sec(
             self.backtesting_scenarios_path
@@ -631,6 +634,10 @@ def get_planning_pv_systems() -> list[dict]:
 
 def get_backtesting_cbc_gap_rel() -> float:
     return CONFIG.get_backtesting_cbc_gap_rel()
+
+
+def get_backtesting_commit_hours() -> int:
+    return CONFIG.get_backtesting_commit_hours()
 
 
 def get_backtesting_cbc_strict_time_limit_sec() -> float:

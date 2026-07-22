@@ -18,6 +18,11 @@
       "exclusiveMaximum": 1,
       "description": "Relativer CBC-MIP-Gap für Backtesting (z. B. 0.10 = 10 %). Fehlt der Wert, gilt 10 %."
     },
+    "commit_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "MILP commit-K für Szenario-Explorer/Backtesting: alle N Stunden neu lösen (1 = stündliches Re-Opt; Fensterlänge z. B. 24 = open-loop). Fehlt der Wert, gilt 24."
+    },
     "cbc_strict_time_limit_sec": {
       "type": "number",
       "minimum": 0,

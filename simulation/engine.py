@@ -722,6 +722,7 @@ def _simulate_anchor_step(
         simulation_hour_offset=hours_done if collect_cbc else None,
         sunrise_soc_min_index=sunrise_soc_min_index,
         flexible_consumers=_flexible_consumers_from_scenario(scenario_params),
+        commit_hours=config.get_backtesting_commit_hours(),
     )
     full_rows: list[dict] | None = None
     full_matrix: list[dict] | None = None
@@ -735,6 +736,7 @@ def _simulate_anchor_step(
             simulation_hour_offset=None,
             sunrise_soc_min_index=sunrise_soc_min_index,
             flexible_consumers=_flexible_consumers_from_scenario(scenario_params),
+            commit_hours=config.get_backtesting_commit_hours(),
         )
         full_matrix = matrix_full
     chart_rows, matrix = _apply_backtesting_step(

@@ -168,14 +168,15 @@ def render_configured_scenarios() -> None:
 
 
 _HORIZON_MODE_LABELS = {
-    FIXED_24H: "24h (Standard, E-Auto-Anker)",
-    SUNRISE_WINDOW: "Sunrise Now→SA₂ (SOC_min am Sonnenaufgang)",
+    FIXED_24H: "24h (E-Auto-Anker)",
+    SUNRISE_WINDOW: "Sunrise Now→SA₂ (Standard, wie Live)",
 }
 
 
 def log_horizon_mode(meta: dict | None) -> str | None:
     if meta is None:
         return None
+    # Missing key = legacy runs before horizon_mode was persisted (were fixed_24h).
     return meta.get("period", {}).get("horizon_mode", FIXED_24H)
 
 
@@ -314,11 +315,11 @@ def render_backtesting_run_controls(
     test_month = suggest_test_month()
     if log_exists and meta is not None:
         sync_horizon_selectbox_from_log(meta)
-    selectbox_index = 0
+    selectbox_index = [FIXED_24H, SUNRISE_WINDOW].index(DEFAULT_HORIZON_MODE)
     if "backtesting_horizon_mode" not in st.session_state:
         log_horizon = log_horizon_mode(meta) if log_exists else None
-        if log_horizon == SUNRISE_WINDOW:
-            selectbox_index = 1
+        if log_horizon in (FIXED_24H, SUNRISE_WINDOW):
+            selectbox_index = [FIXED_24H, SUNRISE_WINDOW].index(log_horizon)
     horizon_mode = st.selectbox(
         "Planungshorizont",
         options=[FIXED_24H, SUNRISE_WINDOW],
@@ -326,8 +327,8 @@ def render_backtesting_run_controls(
         index=selectbox_index,
         key="backtesting_horizon_mode",
         help=(
+            "Sunrise (Standard): wie Live-Optimierung (Jetzt→SA₂); Voraussetzung für SA-Zonen in Chart1/2. "
             "24h: Referenzmodus für Jahresvergleiche. "
-            "Sunrise: wie Live-Optimierung (Jetzt→SA₂); Voraussetzung für SA-Zonen in Chart1/2. "
             "Bei vorhandenem Lauf entspricht die Auswahl dem gespeicherten Horizont; "
             "eine Änderung macht die Ergebnisse ungültig bis zur Neuberechnung."
         ),

@@ -10,6 +10,7 @@ import os
 import pandas as pd
 
 import config
+from data.loxone_csv_timeseries import resample_to_hourly_zoh
 
 
 def load_and_resample_csv(filepath: str, is_wp: bool = False, wp_power: float = 1.6) -> pd.Series:
@@ -43,11 +44,10 @@ def load_and_resample_csv(filepath: str, is_wp: bool = False, wp_power: float = 
         df.set_index("timestamp", inplace=True)
         df = df[~df.index.duplicated(keep="last")]
 
-        s_minutely = df["value"].resample("1min").ffill()
+        series = df["value"]
         if is_wp:
-            s_minutely = s_minutely * wp_power
-
-        return s_minutely.resample("1h").mean()
+            series = series * wp_power
+        return resample_to_hourly_zoh(series)
 
     except Exception as e:
         print(f"[WARN] Fehler beim Verarbeiten von {filepath}: {e}")

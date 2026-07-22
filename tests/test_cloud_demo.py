@@ -106,6 +106,18 @@ def test_is_cloud_demo_env(monkeypatch):
     assert cloud_demo.is_cloud_demo() is True
 
 
+def test_get_session_env_root_bare_mode_skips_streamlit(monkeypatch):
+    """Without CLOUD_DEMO, never probe Streamlit (CLI / backtesting)."""
+    monkeypatch.delenv("EARNIE_CLOUD_DEMO", raising=False)
+    monkeypatch.delenv("ENERGY_OPTIMIZER_CLOUD_DEMO", raising=False)
+    assert cloud_demo.get_session_env_root() is None
+
+
+def test_get_session_env_root_cloud_demo_without_script_ctx(monkeypatch):
+    monkeypatch.setenv("EARNIE_CLOUD_DEMO", "1")
+    assert cloud_demo.get_session_env_root() is None
+
+
 def test_session_env_root_overrides_persist_paths(tmp_path, monkeypatch):
     monkeypatch.delenv("EARNIE_CLOUD_DEMO", raising=False)
     session = tmp_path / "sess_a"
@@ -127,11 +139,17 @@ def test_ensure_cloud_session_env_creates_and_reuses(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_CLOUD_DEMO", "1")
     fake_state: dict = {}
     fake_st = SimpleNamespace(session_state=fake_state)
-    monkeypatch.setattr(cloud_demo, "st", fake_st, raising=False)
-    # ensure imports streamlit inside — patch the module it imports
     import sys
 
     monkeypatch.setitem(sys.modules, "streamlit", fake_st)
+
+    def fake_get_root() -> str | None:
+        root = fake_state.get(cloud_demo.SESSION_ENV_KEY)
+        if isinstance(root, str) and root.strip():
+            return root.strip()
+        return None
+
+    monkeypatch.setattr(cloud_demo, "get_session_env_root", fake_get_root)
 
     first = cloud_demo.ensure_cloud_session_env()
     assert first is not None

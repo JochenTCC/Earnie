@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING, Any
 
 from . import battery as bat
 from .consumer_power import uses_pv_follow
-from .milp_consumers import _planned_consumer_kwh
+from .milp_consumers import (
+    _consumer_powers_at,
+    _consumer_pv_follow_at_all,
+    _planned_consumer_kwh,
+)
 
 if TYPE_CHECKING:
     from .milp_horizon import MilpHorizonModel
@@ -14,18 +18,64 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _var_value_at_zero(variables: list) -> float:
-    value = variables[0].varValue
+def _var_value_at(variables: list, hour_index: int) -> float:
+    value = variables[hour_index].varValue
     return value if value is not None else 0.0
 
 
-def _extract_milp_plan(model: MilpHorizonModel) -> dict[str, float]:
+def _var_value_at_zero(variables: list) -> float:
+    return _var_value_at(variables, 0)
+
+
+def _extract_milp_plan_at(model: MilpHorizonModel, hour_index: int) -> dict[str, float]:
     return {
-        "p_grid_buy": _var_value_at_zero(model.p_grid_buy),
-        "p_grid_sell": _var_value_at_zero(model.p_grid_sell),
-        "p_charge": _var_value_at_zero(model.p_charge),
-        "p_discharge": _var_value_at_zero(model.p_discharge),
+        "p_grid_buy": _var_value_at(model.p_grid_buy, hour_index),
+        "p_grid_sell": _var_value_at(model.p_grid_sell, hour_index),
+        "p_charge": _var_value_at(model.p_charge, hour_index),
+        "p_discharge": _var_value_at(model.p_discharge, hour_index),
     }
+
+
+def _extract_milp_plan(model: MilpHorizonModel) -> dict[str, float]:
+    return _extract_milp_plan_at(model, 0)
+
+
+def extract_horizon_schedule(
+    model: MilpHorizonModel,
+    battery_params: dict,
+    preset_powers_t0: dict[str, float] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Extrahiert den vollen MILP-Stundenplan (Batterie + Flex) nach einem Solve.
+
+    Slot 0 enthält optional EV-Preset-Leistungen (außerhalb der MILP-Variablen).
+    """
+    min_soc = float(battery_params["min_soc"])
+    max_soc = float(battery_params["max_soc"])
+    capacity = float(battery_params["battery_capacity_kwh"])
+    presets = preset_powers_t0 or {}
+    slots: list[dict[str, Any]] = []
+    for t in range(model.horizon):
+        milp_plan = _extract_milp_plan_at(model, t)
+        consumer_powers, _ = _consumer_powers_at(model, t)
+        if t == 0 and presets:
+            consumer_powers = {**consumer_powers, **presets}
+        e_val = model.e_batt[t].varValue
+        planned_soc = bat.planned_soc_percent_from_energy(
+            float(e_val) if e_val is not None else 0.0,
+            capacity,
+            min_soc,
+            max_soc,
+        )
+        slots.append(
+            {
+                "milp_plan": milp_plan,
+                "consumer_powers": consumer_powers,
+                "consumer_pv_follow": _consumer_pv_follow_at_all(model, t),
+                "planned_soc_percent": planned_soc,
+            }
+        )
+    return slots
 
 
 def _log_milp_decision(

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from data.loxone_csv_timeseries import load_loxone_value_hourly
+from data.loxone_csv_timeseries import load_loxone_value_hourly, resample_to_hourly_zoh
 
 logger = logging.getLogger(__name__)
 
@@ -357,14 +357,5 @@ def _normalize_consumption_sign(series: pd.Series, *, source: str) -> pd.Series:
 
 
 def _resample_to_hourly(series: pd.Series) -> pd.Series:
-    if series.empty:
-        return series
-    deltas = series.index.to_series().diff().dropna()
-    median_delta = deltas.median() if not deltas.empty else pd.Timedelta(hours=1)
-    if pd.isna(median_delta):
-        median_delta = pd.Timedelta(hours=1)
-    if median_delta <= pd.Timedelta(hours=1):
-        hourly = series.resample("1h").mean()
-    else:
-        hourly = series.resample("1h").mean().interpolate(method="time")
-    return hourly.dropna()
+    """Zero-order hold to 1 min, then hourly mean (= ∫P dt / 1h)."""
+    return resample_to_hourly_zoh(series)

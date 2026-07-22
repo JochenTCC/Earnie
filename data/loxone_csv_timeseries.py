@@ -118,6 +118,16 @@ def _parse_combined_timestamps(df: pd.DataFrame) -> pd.DatetimeIndex:
     return timestamps
 
 
+def resample_to_hourly_zoh(series: pd.Series) -> pd.Series:
+    """Zero-order hold to 1 min, then hourly mean (= ∫P dt / 1h)."""
+    cleaned = series.dropna().sort_index()
+    cleaned = cleaned[~cleaned.index.duplicated(keep="last")]
+    if cleaned.empty:
+        return cleaned
+    minutely = cleaned.resample("1min").ffill()
+    return minutely.resample("1h").mean().dropna()
+
+
 def _series_to_hourly(
     df: pd.DataFrame,
     timestamps: pd.Series | pd.DatetimeIndex,
@@ -130,9 +140,7 @@ def _series_to_hourly(
         name=str(df.columns[value_column]),
     )
     series = series[~series.index.isna()].sort_index()
-    series = series[~series.index.duplicated(keep="last")]
-    series = series.dropna()
-    return series.resample("1h").mean()
+    return resample_to_hourly_zoh(series)
 
 
 def _looks_like_date_only(text: str) -> bool:

@@ -37,11 +37,21 @@ from .milp_horizon import (
     _build_milp_model,
     _terminal_soc_energy_kwh,
 )
-from .milp_result import _extract_milp_plan, _log_milp_decision
+from .milp_result import (
+    _extract_milp_plan,
+    _log_milp_decision,
+    extract_horizon_schedule,
+)
 
 logger = logging.getLogger(__name__)
 
 _AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, {}, EMPTY_MILP_PLAN, {})
+_FALLBACK_SCHEDULE_SLOT = {
+    "milp_plan": dict(EMPTY_MILP_PLAN),
+    "consumer_powers": {},
+    "consumer_pv_follow": {},
+    "planned_soc_percent": None,
+}
 
 
 def _day_indices(matrix: list[dict[str, Any]], horizon: int) -> list[int]:
@@ -101,39 +111,30 @@ def _resolve_thermal_flex_contexts(
     )
 
 
-def milp_optimizer(
+def _solve_milp_to_model(
     matrix: list[dict[str, Any]],
-    current_hour: int,
     current_soc: float,
-    battery_params: dict | None = None,
-    k_push: float | None = None,
-    verbose: bool = True,
-    consumers: list | None = None,
-    consumer_remaining_kwh: dict[str, float] | None = None,
-    spa_remaining_kwh: float | None = None,
-    flex_indices: list[int] | None = None,
-    charging_contexts: dict[str, dict] | None = None,
-    filter_contexts: dict[str, dict] | None = None,
-    terminal_soc_percent: float | None = None,
-    sunrise_soc_min_index: int | None = None,
-    consumer_continue_on: dict[str, bool] | None = None,
-    thermal_flex_contexts: dict[str, dict] | None = None,
-) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]:
-    """
-    Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
-    Optimiert Batterie und alle konfigurierten flexible_consumers gemeinsam per MILP.
-    Rückgabe: (mode, target_power, target_soc, {consumer_id: leistung_kw},
-               {consumer_id: pv_follow 0|1}, milp_plan, urgent_observability)
-    """
+    battery_params: dict,
+    k_push: float,
+    verbose: bool,
+    consumers: list | None,
+    consumer_remaining_kwh: dict[str, float] | None,
+    spa_remaining_kwh: float | None,
+    flex_indices: list[int] | None,
+    charging_contexts: dict[str, dict] | None,
+    filter_contexts: dict[str, dict] | None,
+    terminal_soc_percent: float | None,
+    sunrise_soc_min_index: int | None,
+    consumer_continue_on: dict[str, bool] | None,
+    thermal_flex_contexts: dict[str, dict] | None,
+) -> tuple[MilpHorizonModel, dict[str, float], dict[str, float], list[int], dict, dict] | None:
+    """Baut und löst das MILP; None wenn nicht optimal / leere Matrix."""
     if not matrix:
         logger.error("MILP: Optimierungsmatrix ist leer.")
-        return _AUTOMATIK_FALLBACK
+        return None
 
-    battery_params = battery_params or config.get_battery_params()
-    fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
     active = _active_consumers(consumers)
     remaining = _remaining_kwh_by_consumer(active, consumer_remaining_kwh, spa_remaining_kwh)
-
     horizon = len(matrix)
     day_indices = _day_indices(matrix, horizon)
     schedule_indices = flex_indices if flex_indices is not None else day_indices
@@ -160,15 +161,13 @@ def milp_optimizer(
         schedule_indices,
         contexts,
     )
-    fixed_flex_kw_t0 = sum(preset_powers.values())
-
     model = _build_milp_model(
         matrix,
         horizon,
         battery_params,
         current_soc,
         milp_consumers,
-        fixed_flex_kw_t0,
+        sum(preset_powers.values()),
         remaining,
         ev_milp_by_id,
         consumer_continue_on=consumer_continue_on,
@@ -181,7 +180,7 @@ def milp_optimizer(
     _add_milp_objective(
         model,
         matrix,
-        fallback_k_push,
+        k_push,
         ev_milp_by_id,
         wear_cent_per_kwh=wear_cent_per_kwh,
     )
@@ -202,16 +201,11 @@ def milp_optimizer(
         consumer_continue_on,
         filter_contexts=filters,
     )
-    thermal_contexts = _resolve_thermal_flex_contexts(
-        matrix[:horizon],
-        active,
-        thermal_flex_contexts,
-    )
     add_thermal_flex_constraints(
         model,
         matrix[:horizon],
         schedule_indices,
-        thermal_contexts,
+        _resolve_thermal_flex_contexts(matrix[:horizon], active, thermal_flex_contexts),
         consumer_continue_on=consumer_continue_on,
     )
     if sunrise_soc_min_index is not None:
@@ -236,8 +230,57 @@ def milp_optimizer(
     status = solve_with_strict_fallback(model.prob, msg=False, verbose=verbose)
     if status != "Optimal":
         record_cbc_event("milp_no_optimal", final_status=status)
+        return None
+    return model, preset_powers, remaining, schedule_indices, contexts, filters
+
+
+def milp_optimizer(
+    matrix: list[dict[str, Any]],
+    current_hour: int,
+    current_soc: float,
+    battery_params: dict | None = None,
+    k_push: float | None = None,
+    verbose: bool = True,
+    consumers: list | None = None,
+    consumer_remaining_kwh: dict[str, float] | None = None,
+    spa_remaining_kwh: float | None = None,
+    flex_indices: list[int] | None = None,
+    charging_contexts: dict[str, dict] | None = None,
+    filter_contexts: dict[str, dict] | None = None,
+    terminal_soc_percent: float | None = None,
+    sunrise_soc_min_index: int | None = None,
+    consumer_continue_on: dict[str, bool] | None = None,
+    thermal_flex_contexts: dict[str, dict] | None = None,
+) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]:
+    """
+    Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
+    Optimiert Batterie und alle konfigurierten flexible_consumers gemeinsam per MILP.
+    Rückgabe: (mode, target_power, target_soc, {consumer_id: leistung_kw},
+               {consumer_id: pv_follow 0|1}, milp_plan, urgent_observability)
+    """
+    battery_params = battery_params or config.get_battery_params()
+    fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
+    solved = _solve_milp_to_model(
+        matrix,
+        current_soc,
+        battery_params,
+        fallback_k_push,
+        verbose,
+        consumers,
+        consumer_remaining_kwh,
+        spa_remaining_kwh,
+        flex_indices,
+        charging_contexts,
+        filter_contexts,
+        terminal_soc_percent,
+        sunrise_soc_min_index,
+        consumer_continue_on,
+        thermal_flex_contexts,
+    )
+    if solved is None:
         return _AUTOMATIK_FALLBACK
 
+    model, preset_powers, remaining, schedule_indices, contexts, filters = solved
     milp_plan = _extract_milp_plan(model)
     consumer_powers, total_flex_power = _consumer_powers_now(model)
     consumer_powers.update(preset_powers)
@@ -252,7 +295,6 @@ def milp_optimizer(
         current_soc,
         battery_params,
     )
-
     urgent_observability = _collect_urgent_rule_observability(
         model,
         matrix,
@@ -262,7 +304,6 @@ def milp_optimizer(
         filters,
     )
     _log_urgent_rule_observability(urgent_observability)
-
     if verbose:
         _log_milp_decision(
             current_hour,
@@ -277,7 +318,6 @@ def milp_optimizer(
             target_power,
             target_soc,
         )
-
     return (
         mode,
         target_power,
@@ -287,6 +327,53 @@ def milp_optimizer(
         milp_plan,
         urgent_observability,
     )
+
+
+def milp_horizon_schedule(
+    matrix: list[dict[str, Any]],
+    current_soc: float,
+    battery_params: dict | None = None,
+    k_push: float | None = None,
+    verbose: bool = False,
+    consumers: list | None = None,
+    consumer_remaining_kwh: dict[str, float] | None = None,
+    spa_remaining_kwh: float | None = None,
+    flex_indices: list[int] | None = None,
+    charging_contexts: dict[str, dict] | None = None,
+    filter_contexts: dict[str, dict] | None = None,
+    terminal_soc_percent: float | None = None,
+    sunrise_soc_min_index: int | None = None,
+    consumer_continue_on: dict[str, bool] | None = None,
+    thermal_flex_contexts: dict[str, dict] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Ein CBC-Solve über die Matrix; Rückgabe: Stundenplan-Slots für Open-Loop / commit-K.
+
+    Bei leerer Matrix oder nicht-optimalem Solve: ein Fallback-Slot (Automatik).
+    """
+    battery_params = battery_params or config.get_battery_params()
+    fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
+    solved = _solve_milp_to_model(
+        matrix,
+        current_soc,
+        battery_params,
+        fallback_k_push,
+        verbose,
+        consumers,
+        consumer_remaining_kwh,
+        spa_remaining_kwh,
+        flex_indices,
+        charging_contexts,
+        filter_contexts,
+        terminal_soc_percent,
+        sunrise_soc_min_index,
+        consumer_continue_on,
+        thermal_flex_contexts,
+    )
+    if solved is None:
+        return [dict(_FALLBACK_SCHEDULE_SLOT)]
+    model, preset_powers, _, _, _, _ = solved
+    return extract_horizon_schedule(model, battery_params, preset_powers)
 
 
 # Re-Exports für Tests und interne Aufrufer (API-Stabilität).
@@ -302,6 +389,7 @@ __all__ = [
     "EMPTY_MILP_PLAN",
     "add_min_on_time_constraints",
     "filter_feasible_consumers",
+    "milp_horizon_schedule",
     "milp_optimizer",
     "_add_consumer_delivery_constraints",
     "_add_milp_objective",

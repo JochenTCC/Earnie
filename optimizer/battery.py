@@ -125,15 +125,30 @@ def discharge_kw_for_hourly_soc(
     return round(clamp_power(energy_kwh * efficiency, max_power_kw), 3)
 
 
-def _derive_control_from_milp(
-    model,
-    matrix: list,
+def planned_soc_percent_from_energy(
+    e_batt_kwh: float,
+    battery_capacity_kwh: float,
+    min_soc: float,
+    max_soc: float,
+) -> float:
+    """SoC (%) aus MILP-Energiezustand, geclampt auf Batteriegrenzen."""
+    if battery_capacity_kwh <= 0.0:
+        return round(float(min_soc), 1)
+    return round(
+        max(min_soc, min(max_soc, (e_batt_kwh / battery_capacity_kwh) * 100.0)),
+        1,
+    )
+
+
+def derive_control_from_milp_plan(
     milp_plan: dict[str, float],
-    consumer_powers: dict[str, float],
+    matrix_row: dict,
     total_flex_power: float,
     current_soc: float,
+    planned_soc: float,
     battery_params: dict,
 ) -> tuple[int, float, float]:
+    """Leitet Loxone-Modus/Leistung aus MILP-Planwerten einer Stunde ab."""
     min_soc = battery_params["min_soc"]
     max_soc = battery_params["max_soc"]
     max_power = battery_params["max_power_kw"]
@@ -146,15 +161,8 @@ def _derive_control_from_milp(
     opt_charge = milp_plan["p_charge"]
     opt_discharge = milp_plan["p_discharge"]
     opt_grid_buy = milp_plan["p_grid_buy"]
-    p_pv_0 = matrix[0]["expected_p_pv"]
-    p_con_0 = matrix[0]["expected_p_act"]
-    net_pv_surplus = p_pv_0 - p_con_0 - total_flex_power
-    planned_soc = round(
-        max(
-            min_soc,
-            min(max_soc, (model.e_batt[0].varValue / battery_capacity) * 100.0),
-        ),
-        1,
+    net_pv_surplus = (
+        matrix_row["expected_p_pv"] - matrix_row["expected_p_act"] - total_flex_power
     )
 
     mode = MODE_AUTOMATIK
@@ -201,3 +209,33 @@ def _derive_control_from_milp(
         target_soc = round(current_soc, 1)
 
     return mode, target_power, target_soc
+
+
+def _derive_control_from_milp(
+    model,
+    matrix: list,
+    milp_plan: dict[str, float],
+    consumer_powers: dict[str, float],
+    total_flex_power: float,
+    current_soc: float,
+    battery_params: dict,
+    hour_index: int = 0,
+) -> tuple[int, float, float]:
+    min_soc = battery_params["min_soc"]
+    max_soc = battery_params["max_soc"]
+    battery_capacity = battery_params["battery_capacity_kwh"]
+    e_val = model.e_batt[hour_index].varValue
+    planned_soc = planned_soc_percent_from_energy(
+        float(e_val) if e_val is not None else 0.0,
+        battery_capacity,
+        min_soc,
+        max_soc,
+    )
+    return derive_control_from_milp_plan(
+        milp_plan,
+        matrix[hour_index],
+        total_flex_power,
+        current_soc,
+        planned_soc,
+        battery_params,
+    )

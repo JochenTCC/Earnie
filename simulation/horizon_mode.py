@@ -4,7 +4,8 @@ from __future__ import annotations
 FIXED_24H = "fixed_24h"
 SUNRISE_WINDOW = "sunrise_window"
 VALID_HORIZON_MODES = (FIXED_24H, SUNRISE_WINDOW)
-DEFAULT_HORIZON_MODE = FIXED_24H
+# SE default: sunset2sunset / Live-aligned sunrise window (not fixed_24h).
+DEFAULT_HORIZON_MODE = SUNRISE_WINDOW
 BACKTESTING_STEP_HOURS = 24
 
 

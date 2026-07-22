@@ -102,6 +102,30 @@ def get_backtesting_cbc_gap_rel(backtesting_scenarios_path: str) -> float:
     return gap
 
 
+# SE default: open-loop over a typical 24 h window (Live savings keep simulate_horizon K=1).
+DEFAULT_BACKTESTING_COMMIT_HOURS = 24
+
+
+def get_backtesting_commit_hours(backtesting_scenarios_path: str) -> int:
+    """
+    Commit-K für SE/Backtesting: alle N Stunden neu lösen (1 = stündliches MPC).
+
+    Fehlt der Schlüssel, gilt DEFAULT_BACKTESTING_COMMIT_HOURS (24 = open-loop).
+    Für stündliches Re-Opt explizit 1 setzen.
+    """
+    doc = load_backtesting_scenarios_document(backtesting_scenarios_path)
+    raw = doc.get("commit_hours")
+    if raw is None:
+        return DEFAULT_BACKTESTING_COMMIT_HOURS
+    hours = int(raw)
+    if hours < 1:
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: commit_hours muss >= 1 sein, "
+            f"nicht {hours!r} in '{backtesting_scenarios_path}'."
+        )
+    return hours
+
+
 def get_backtesting_cbc_strict_time_limit_sec(backtesting_scenarios_path: str) -> float:
     """
     Zeitlimit (Sekunden) für den Strict-CBC-Versuch vor gapRel-Fallback.

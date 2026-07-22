@@ -467,42 +467,64 @@ def _add_consumer_delivery_constraints(
         model.prob += _delivery_energy_expr(model, consumer, eligible) >= effective_target
 
 
-def _consumer_pv_follow_now(model: MilpHorizonModel, consumer: dict) -> int:
+def _consumer_pv_follow_at(model: MilpHorizonModel, consumer: dict, hour_index: int) -> int:
     cid = consumer["id"]
     if not uses_pv_follow(consumer) or cid not in model.consumer_pv_follow:
         return 0
-    value = model.consumer_pv_follow[cid][0].varValue
+    value = model.consumer_pv_follow[cid][hour_index].varValue
     return 1 if value is not None and value > 0.5 else 0
 
 
-def _consumer_pv_follow_now_all(model: MilpHorizonModel) -> dict[str, int]:
+def _consumer_pv_follow_now(model: MilpHorizonModel, consumer: dict) -> int:
+    return _consumer_pv_follow_at(model, consumer, 0)
+
+
+def _consumer_pv_follow_at_all(
+    model: MilpHorizonModel, hour_index: int
+) -> dict[str, int]:
     result: dict[str, int] = {}
     for consumer in model.planned_consumers:
         cid = consumer["id"]
-        result[cid] = _consumer_pv_follow_now(model, consumer)
+        result[cid] = _consumer_pv_follow_at(model, consumer, hour_index)
     return result
 
 
-def _consumer_power_now(model: MilpHorizonModel, consumer: dict) -> float:
+def _consumer_pv_follow_now_all(model: MilpHorizonModel) -> dict[str, int]:
+    return _consumer_pv_follow_at_all(model, 0)
+
+
+def _consumer_power_at(
+    model: MilpHorizonModel, consumer: dict, hour_index: int
+) -> float:
     cid = consumer["id"]
     if cid in model.consumer_p:
-        value = model.consumer_p[cid][0].varValue
+        value = model.consumer_p[cid][hour_index].varValue
         return max(0.0, float(value)) if value is not None else 0.0
-    on_val = model.consumer_on[cid][0].varValue
+    on_val = model.consumer_on[cid][hour_index].varValue
     if on_val is not None and on_val > 0.5:
         return float(model.consumer_milp_charge_kw[cid])
     return 0.0
 
 
-def _consumer_powers_now(model: MilpHorizonModel) -> tuple[dict[str, float], float]:
+def _consumer_power_now(model: MilpHorizonModel, consumer: dict) -> float:
+    return _consumer_power_at(model, consumer, 0)
+
+
+def _consumer_powers_at(
+    model: MilpHorizonModel, hour_index: int
+) -> tuple[dict[str, float], float]:
     consumer_powers: dict[str, float] = {}
     total_flex_power = 0.0
     for consumer in model.planned_consumers:
         cid = consumer["id"]
-        power = round(_consumer_power_now(model, consumer), 3)
+        power = round(_consumer_power_at(model, consumer, hour_index), 3)
         consumer_powers[cid] = power
         total_flex_power += power
     return consumer_powers, total_flex_power
+
+
+def _consumer_powers_now(model: MilpHorizonModel) -> tuple[dict[str, float], float]:
+    return _consumer_powers_at(model, 0)
 
 
 def _planned_consumer_kwh(model: MilpHorizonModel, consumer: dict) -> float:

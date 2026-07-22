@@ -35,7 +35,16 @@ def get_session_env_root() -> str | None:
     """Absolute per-session env root, or None when not in a cloud demo session."""
     if _test_session_env_root:
         return _test_session_env_root
+    # CLI / workers: never touch Streamlit session_state (avoids ScriptRunContext spam).
+    if not is_cloud_demo():
+        return None
     try:
+        from streamlit.runtime.scriptrunner_utils.script_run_context import (
+            get_script_run_ctx,
+        )
+
+        if get_script_run_ctx(suppress_warning=True) is None:
+            return None
         import streamlit as st
 
         root = st.session_state.get(SESSION_ENV_KEY)

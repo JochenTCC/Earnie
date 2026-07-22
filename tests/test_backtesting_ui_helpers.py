@@ -101,12 +101,12 @@ def test_build_backtesting_command_includes_month_and_progress(tmp_path):
     assert "--horizon-mode" not in cmd
 
 
-def test_build_backtesting_command_includes_sunrise_horizon_mode(tmp_path):
+def test_build_backtesting_command_includes_fixed_24h_horizon_mode(tmp_path):
     cmd = build_backtesting_command(
         output_dir=str(tmp_path),
-        horizon_mode="sunrise_window",
+        horizon_mode="fixed_24h",
     )
-    assert cmd[-2:] == ["--horizon-mode", "sunrise_window"]
+    assert cmd[-2:] == ["--horizon-mode", "fixed_24h"]
 
 
 def test_auto_backtesting_workers_single_task():

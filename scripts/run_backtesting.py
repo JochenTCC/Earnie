@@ -183,8 +183,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_HORIZON_MODE,
         help=(
             "Planungshorizont für die Optimierung: "
-            f"'{FIXED_24H}' (24h/E-Auto-Anker, Standard) oder "
-            f"'{SUNRISE_WINDOW}' (Jetzt→SA₂, SOC_min am Sonnenaufgang)."
+            f"'{SUNRISE_WINDOW}' (Jetzt→SA₂, SE-Standard, wie Live) oder "
+            f"'{FIXED_24H}' (24h/E-Auto-Anker, Vergleich)."
         ),
     )
     parser.add_argument(

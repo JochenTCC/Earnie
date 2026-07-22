@@ -15,7 +15,7 @@ timestamp;power_kw
 | Zeitstempel | ISO-ähnlich `YYYY-MM-DD HH:MM:SS` |
 | Leistung | Verbrauch bzw. PV-Ertrag in **kW**, positiv |
 | Länge | Nach Import mindestens **8760 Stunden** (ca. 12 Monate) |
-| Abtastung | Beliebig; beim Import → stündlich (Mittelwert bei dichteren Daten, Interpolation bei lückenhaften) |
+| Abtastung | Beliebig; beim Import → stündlich (Zero-Order-Hold auf 1‑Minuten-Raster, dann Stundenmittel = ∫P·dt / 1 h; Lücken halten den letzten Wert bis zum nächsten Sample) |
 
 Beim Upload schreibt Earnie eine normalisierte Datei unter `earnie_env/config/uploads/` (im Container: `config/uploads/`). Pro Rolle (Gesamtverbrauch, PV, je Verbraucher) gibt es **genau eine** Datei — ein erneuter Upload überschreibt denselben Pfad.
 

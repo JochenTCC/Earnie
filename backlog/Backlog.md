@@ -19,8 +19,25 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and demos — invoice-grade bill reconciliation is explicitly out of scope (nice-to-have later). Includes a thin marker/data-model prep for later SAM work (`2.4`), not the connector rewrite.
 
-- [ ] **2.3ca — Tuning MILP for SE and Live**
+- [ ] **2.3.c.0a — SE: one MILP per window (or commit-K) instead of hourly re-solve**
+  - **Goal:** Cut SE wall time; largest expected gain vs scenario-only parallelization
+  - Today `simulate_horizon` re-solves CBC every hour on `matrix[i:]` (~24× per day window) even though SE has perfect foresight (prices/PV/load fixed for the window — unlike Live)
+  - Implement open-loop apply of one full-window MILP, or commit first **K** hours then re-solve (tunable K); **Live stays** on periodic re-opt
+  - A/B on a known year log: € / SoC / flex delivery vs current hourly rolling for `fixed_24h` and `sunrise_window`
+  - Document SE policy (perfect-foresight open-loop / commit-K) vs Live MPC in spec; optional note under SE UI/docs that SE is not Live re-opt parity
+  - [x] **TAKEAWAY** — SE defaults: `sunrise_window` (sunset2sunset) + `commit_hours=24`
+  - [ ] There might be an issue again with different overall consumption over scenarios
+- [ ] **2.3.c.0b — Trial: HiGHS vs CBC for SE**
+  - **Trial only** — measure before adopting
+  - Bench wall time and €/plan delta vs CBC on the same SE window set (short month + a few hard battery/`sunrise_window` days)
+  - Decide: SE-only HiGHS, optional Live, or keep CBC; keep env/config switch so CBC remains fallback
+- [ ] **2.3.c.1 — Trial: fast paths for reference / trivial windows**
+  - **Trial focused on reference calculations** (Historisch / scenario refs) and obvious no-MIP cases
+  - Ensure reference/baseline paths do not pay full MILP cost; skip or cheap-path when no battery and no remaining flex (or equivalent trivial state)
+  - Gate so optimized € path is unchanged unless a short A/B shows acceptable delta; report speedup on a multi-scenario SE run
+- [ ] **2.3.c.2 — Tuning MILP for SE and Live**
   - Check if removing constraint for SOC at end of horizon changes simulation results in backtesting for both fixed_24h and sunset2sunset
+  - Trial SE `sunrise_window` without 24 h truncate: simulate full now→SA₂ (~40–48 h) per step; book costs only for the non-overlapping first day (t_now→SA₁ or first 24 h); hand off simulated SoC at SA₁ as start SoC for the next day’s ~48 h run — **no hard SOC_min at SA₁** (same direction as removing end-of-horizon SOC constraint above; keep min/max only)
   - Check if there is a special issue on weekends, when time-to-be-ready is set to 12:00 (Start/End-SOC constraints) in SE optimization
   - Check if non-constant sample time would be possible for online MILP (15 min for next 3hours, 1h in rest of neutral area, 2hours for green area)
 - [ ] **2.3.d — Verbraucheranalyse → Analyse Verbrauch & Kosten**
@@ -33,7 +50,7 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
   - SE progress bars: show ETA (“time left until finished”) during scenario simulation
     - Reopened from Erledigt 2026-07-16 — requested with baseline progress; only `current/total h` shipped, not ETA
   - Order of progress bars in SE shall not change during execution of scenario simulation — previous fix (pre-seed worker progress files + sort by canonical preferred order) does not hold; reopen from Erledigt 2026-07-16
-  - Improve performance of Scenario Explorer (ideas?)
+  - SE calculation speed → **2.3.c.0a** / **2.3.c.0b** / **2.3.c.1** (not duplicated here)
 - [ ] **2.3.f — Thin marker / data-model prep (SAM optionality)**
   - **Goal:** Cheap prep for `2.4` without connector framework, MQTT/Matter, or Loxone HTTP rewrite
   - Clarify marker ↔ role assignments (consumers, inverter, heating, battery, EV, …) in data model / schema naming toward generic “smarthome markers” (docs + structure; keep Loxone as sole live backend)
