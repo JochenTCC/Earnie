@@ -19,6 +19,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 - After successful verification: remove from this chapter → `Backlog-Erledigt.md` (`### Bugfix …`) with `- [x]`.
 - If verification fails: return to open bugfix chapter or formulate follow-up; document PATCH if applicable, but do not archive as done.
 
+
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
 

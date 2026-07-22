@@ -9,17 +9,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [ ] Adapt business plan
-- [ ] **Outreach (not software):** Ask for interested parties in loxforum / reddit — post under “my project”; take interesting chart snapshots (loxforum admins contacted re. best place)
-  - loxforum -> done
-  - Facebook groups
-    - Loxone Konfigurationsbereich
-    - Loxone D-A-CH --> done
-    - Loxone Deutschland --> done
-    - Loxone Bauherren
-  - Photovoltaik-Forum --> done (more to follow)  
-    - Last post (Communication\Post-Photovoltaik-Forum_Optimale-Erweiterung.md) was moved to "Bezugsstrom, Stromanbieter, Stromvergleich" --> create a different post with similar content but better title
-    - Creat a post with comparison of different tariffs (SPOT; fixed; monthly)
-  - Contact IoBroker-Community and HomeAssistant (when Best Interface is found — after **2.4.a** / connector spec)
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
 
 
@@ -49,9 +38,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [x] Merge streamlitcloud branch with main, when app is working on SCC
 - [x] Add a CONTRIBUTING.md document in German
 - [x] Add [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://earnie.streamlit.app) into README.md
-- [ ] Add link to Streamlit in Posts
-  - Photovoltaik-Forum - Done
-  - LoxForum
 - [x] Perform a SE for posts
 - [x] Add a link to Manual in Info
 - [x] Test if sunset2set-Mode is working in SE brings better results than fixed_24h
@@ -118,6 +104,8 @@ Year-2+ SAM expansion (KNX / Home Assistant / IoBroker when a second connector i
   - Enhance JSON schemas to standardized interfaces between devices (heat pump, battery, EV, consumers, …) as templates for a library of communication interfaces between smarthome system and Earnie
   - Build a Loxone library as counterpart to those templates for quick interface configuration
   - Prepare similar templates for other standards (see above)
+- [ ] Integrate a MCP-based automatic communication-definition (see also Entwicklungsplan\MCP-Interfacing-für-Earnie.md) in Loxone-Kommunikation page
+
 - [ ] **2.4.d — Donate**
   - Add a Donate feature into sidebar
 - [ ] **2.4.0 — Release**
