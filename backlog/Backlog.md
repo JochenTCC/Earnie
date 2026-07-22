@@ -19,7 +19,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and demos — invoice-grade bill reconciliation is explicitly out of scope (nice-to-have later). Includes a thin marker/data-model prep for later SAM work (`2.4`), not the connector rewrite.
 
-- [ ] **2.3.c.0a — SE: one MILP per window (or commit-K) instead of hourly re-solve**
+- [x] **2.3.c.0a — SE: one MILP per window (or commit-K) instead of hourly re-solve**
   - **Goal:** Cut SE wall time; largest expected gain vs scenario-only parallelization
   - Today `simulate_horizon` re-solves CBC every hour on `matrix[i:]` (~24× per day window) even though SE has perfect foresight (prices/PV/load fixed for the window — unlike Live)
   - Implement open-loop apply of one full-window MILP, or commit first **K** hours then re-solve (tunable K); **Live stays** on periodic re-opt
