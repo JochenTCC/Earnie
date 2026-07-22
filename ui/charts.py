@@ -203,7 +203,7 @@ def build_power_soc_chart_figure(
         title=layout_title,
         xaxis=_chart_xaxis_config(axis, range_start=range_start),
         barmode="overlay",
-        yaxis=dict(title="Energie (kWh)", side="left"),
+        yaxis=dict(title="Leistung (kW)", side="left"),
         yaxis2=dict(
             title="SoC (%) / Preis (Cent/kWh)",
             side="right",

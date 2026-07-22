@@ -416,21 +416,9 @@ def _add_pv_trace(
     pv_kw: pd.Series,
     uhrzeit: pd.Series,
 ) -> None:
-    """PV-Verlauf mit gelber Fläche — Anker in der Slotmitte, glatte Interpolation.
-
-    Y-Werte sind Slot-Energie (kWh = kW × Slotdauer), analog zu den Flow-Balance-Balken.
-    """
-    slot_hours = [
-        axis.slot_duration(index).total_seconds() / 3600.0
-        for index in range(len(pv_kw))
-    ]
-    pv_kwh = pv_kw.astype(float) * pd.Series(slot_hours, index=pv_kw.index)
+    """PV-Verlauf mit gelber Fläche — Anker in der Slotmitte, glatte Interpolation."""
     pv_x, pv_y = _extended_line_xy(
-        axis, pv_kwh, anchor_fraction=_LINE_ANCHOR_SLOT_CENTER
-    )
-    hover = _line_hover(uhrzeit, ".2f")
-    hover["hovertemplate"] = (
-        "Uhrzeit: %{customdata}<br>%{fullData.name}: %{y:.2f} kWh<extra></extra>"
+        axis, pv_kw, anchor_fraction=_LINE_ANCHOR_SLOT_CENTER
     )
     fig.add_trace(go.Scatter(
         x=pv_x,
@@ -440,6 +428,6 @@ def _add_pv_trace(
         fill="tozeroy",
         fillcolor=CHART_PV_FILL_COLOR,
         yaxis="y",
-        **hover,
+        **_line_hover(uhrzeit, ".2f"),
     ))
 

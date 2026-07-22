@@ -37,7 +37,7 @@ def build_flow_balance_preview_figure() -> go.Figure:
         title="Chart 1 — Rauf/Runter-Szenarien A–H (Vorschau)",
         xaxis=_chart_xaxis_config(axis),
         barmode="overlay",
-        yaxis=dict(title="Energie (kWh)", side="left"),
+        yaxis=dict(title="Leistung (kW)", side="left"),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
         margin=dict(l=40, r=40, t=60, b=110),
         height=520,

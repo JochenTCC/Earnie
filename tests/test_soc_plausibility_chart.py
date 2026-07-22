@@ -145,12 +145,13 @@ def test_ghost_bars_from_matched_flex(monkeypatch):
     assert ghost
     assert ghost[0].marker.line.width == 2.5
     assert "rgba(0,0,0,0)" in str(ghost[0].marker.color)
-    # Hourly slots: 3.5 kW × 1 h = 3.5 kWh (above 1 kWh cutoff)
+    # Hourly slots: height is power (kW); energy filter uses kW × 1 h
     assert abs(ghost[0].y[0]) == pytest.approx(3.5)
-    assert "kWh" in ghost[0].hovertemplate
+    assert "kW" in ghost[0].hovertemplate
+    assert "kWh" not in ghost[0].hovertemplate
 
 
-def test_ghost_bars_skipped_below_one_kwh(monkeypatch):
+def test_ghost_bars_skipped_below_one_kwh_equivalent(monkeypatch):
     ev = {"id": "eauto", "name": "E-Auto", "type": "ev", "chart_color_index": 0}
     monkeypatch.setattr(
         "ui.chart_flow_balance._chart_flex_consumers",

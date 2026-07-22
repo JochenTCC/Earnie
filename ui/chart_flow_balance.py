@@ -527,11 +527,6 @@ def flow_balance_plotly_trace_specs(
             if axis is not None
             else 0.0
         )
-        slot_hours = (
-            axis.slot_duration(index).total_seconds() / 3600.0
-            if axis is not None
-            else 1.0
-        )
         _accumulate_slot_traces(
             buckets,
             slot,
@@ -540,7 +535,6 @@ def flow_balance_plotly_trace_specs(
             row=row,
             flex_consumers=flex_consumers,
             bar_width_ms=bar_width_ms,
-            slot_hours=slot_hours,
             chart_zones=chart_zones,
             slot_start=slot_start,
         )
@@ -734,7 +728,6 @@ def _accumulate_slot_traces(
     row: pd.Series | None = None,
     flex_consumers: Sequence[tuple[Mapping[str, Any], str]] | None = None,
     bar_width_ms: float,
-    slot_hours: float = 1.0,
     chart_zones: UiChartZones | None = None,
     slot_start: datetime | None = None,
 ) -> None:
@@ -753,7 +746,6 @@ def _accumulate_slot_traces(
         ):
             zone_kind = chart_zone_kind_for_slot_start(slot_start, chart_zones)
             bar_color = chart1_pv_color_for_zone(zone_kind)
-        energy_kwh = segment.kw * slot_hours
         _append_stack_bucket(
             buckets,
             segment,
@@ -761,12 +753,12 @@ def _accumulate_slot_traces(
             time_label,
             direction="up",
             cumulative=cumulative_up,
-            energy_kwh=energy_kwh,
+            power_kw=segment.kw,
             bar_width_ms=bar_width_ms,
             zone_kind=zone_kind,
             bar_color=bar_color,
         )
-        cumulative_up += energy_kwh
+        cumulative_up += segment.kw
 
     cumulative_down = 0.0
     for segment in slot.down:
@@ -806,7 +798,6 @@ def _accumulate_slot_traces(
                 )
         elif segment.kind == KIND_BASELOAD and zone_kind is not None:
             bar_color = chart1_baseload_color_for_zone(zone_kind)
-        energy_kwh = segment.kw * slot_hours
         _append_stack_bucket(
             buckets,
             segment,
@@ -814,14 +805,14 @@ def _accumulate_slot_traces(
             time_label,
             direction="down",
             cumulative=cumulative_down,
-            energy_kwh=energy_kwh,
+            power_kw=segment.kw,
             pattern_shape=pattern_shape,
             flex_meta=flex_meta,
             bar_width_ms=bar_width_ms,
             zone_kind=zone_kind,
             bar_color=bar_color,
         )
-        cumulative_down += energy_kwh
+        cumulative_down += segment.kw
 
 
 def _bucket_key(segment: FlowBalanceSegment, *, zone_kind: str | None = None) -> str:
@@ -848,7 +839,7 @@ def _append_stack_bucket(
     *,
     direction: Direction,
     cumulative: float,
-    energy_kwh: float,
+    power_kw: float,
     pattern_shape: str = "",
     flex_meta: tuple[Any, ...] = (),
     bar_width_ms: float,
@@ -870,19 +861,19 @@ def _append_stack_bucket(
     )
     if bar_color is not None:
         bucket["bar_color"] = bar_color
-    signed_height = energy_kwh if direction == "up" else -energy_kwh
+    signed_height = power_kw if direction == "up" else -power_kw
     signed_base = cumulative if direction == "up" else -cumulative
     bucket["x"].append(x_val)
     bucket["y"].append(signed_height)
     bucket["base"].append(signed_base)
     if segment.kind == KIND_FLEX and flex_meta:
         bucket["customdata"].append(
-            (time_label, energy_kwh, segment.label, flex_meta[0], flex_meta[1])
+            (time_label, power_kw, segment.label, flex_meta[0], flex_meta[1])
         )
         if len(flex_meta) >= 3:
             bucket["immediate_hover_label"] = flex_meta[2]
     else:
-        bucket["customdata"].append((time_label, energy_kwh, segment.label))
+        bucket["customdata"].append((time_label, power_kw, segment.label))
     bucket["pattern_shapes"].append(pattern_shape)
     bucket["widths"].append(bar_width_ms)
 
@@ -906,7 +897,7 @@ def _bucket_specs_to_trace_specs(
             imm_label = bucket.get("immediate_hover_label", "sofort_laden")
             hovertemplate = (
                 f"Uhrzeit: %{{customdata[0]}}<br>%{{customdata[2]}}: "
-                f"%{{customdata[1]:.2f}} kWh<br>pv_follow: %{{customdata[3]}}<br>"
+                f"%{{customdata[1]:.2f}} kW<br>pv_follow: %{{customdata[3]}}<br>"
                 f"{imm_label}: %{{customdata[4]}}<extra></extra>"
             )
             legend_color = segment.color
@@ -914,7 +905,7 @@ def _bucket_specs_to_trace_specs(
             marker = {"color": bar_color}
             hovertemplate = (
                 "Uhrzeit: %{customdata[0]}<br>%{customdata[2]}: "
-                "%{customdata[1]:.2f} kWh<extra></extra>"
+                "%{customdata[1]:.2f} kW<extra></extra>"
             )
             legend_color = None
         opacity = _MUTED_BAR_OPACITY if segment.muted else _BRIGHT_BAR_OPACITY
@@ -962,6 +953,7 @@ def _flex_kw_pairs(row: Mapping[str, Any]) -> list[tuple[str, float]]:
 
 
 _GHOST_LINE_WIDTH = 2.5
+# Skip outline segments whose energy equivalent (kW × slot hours) is below this.
 _GHOST_MIN_KWH = 1.0
 
 
@@ -976,9 +968,9 @@ def add_matched_flex_ghost_traces(
     """
     Umrandete (nicht gefüllte) Flex-Balken für Original-Schedule (BL-Ziel-Lastzeiten).
 
-    Stackt nur die Matched-Baseline-Flex-Energie (kWh) ab ``history_slot_count``
-    nach unten — unabhängig vom optimierten Stack. Segmente unter
-    ``_GHOST_MIN_KWH`` werden weggelassen.
+    Stackt nur die Matched-Baseline-Flex-Leistung (kW) ab ``history_slot_count``
+    nach unten — unabhängig vom optimierten Stack. Segmente mit
+    Energie-Äquivalent unter ``_GHOST_MIN_KWH`` (kW × Slotdauer) werden weggelassen.
     """
     if matched_baseline_df is None or matched_baseline_df.empty:
         return
@@ -1010,8 +1002,7 @@ def add_matched_flex_ghost_traces(
             kw = _safe_float(row.get(column))
             if kw <= 1e-9:
                 continue
-            kwh = kw * slot_hours
-            if kwh < _GHOST_MIN_KWH:
+            if kw * slot_hours < _GHOST_MIN_KWH:
                 continue
             cid = str(consumer.get("id", "")) or column
             label = str(consumer.get("name", consumer.get("id", column)))
@@ -1029,11 +1020,11 @@ def add_matched_flex_ghost_traces(
                 },
             )
             bucket["x"].append(x_val)
-            bucket["y"].append(-kwh)
+            bucket["y"].append(-kw)
             bucket["base"].append(-cumulative)
-            bucket["customdata"].append((time_label, kwh, label))
+            bucket["customdata"].append((time_label, kw, label))
             bucket["widths"].append(bar_width_ms)
-            cumulative += kwh
+            cumulative += kw
 
     legend_shown = False
     for bucket in buckets.values():
@@ -1058,7 +1049,7 @@ def add_matched_flex_ghost_traces(
                 customdata=bucket["customdata"],
                 hovertemplate=(
                     "Uhrzeit: %{customdata[0]}<br>Original-Schedule %{customdata[2]}: "
-                    "%{customdata[1]:.2f} kWh<extra></extra>"
+                    "%{customdata[1]:.2f} kW<extra></extra>"
                 ),
             )
         )

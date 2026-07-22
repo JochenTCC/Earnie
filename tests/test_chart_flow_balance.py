@@ -365,8 +365,8 @@ def test_flow_balance_bar_widths_follow_per_slot_resolution() -> None:
     assert baseload.width[4] == hour_ms
 
 
-def test_flow_balance_bar_heights_scale_with_slot_energy_kwh() -> None:
-    """Gleiche kW → Balkenhöhe proportional zur Slotdauer (15 min vs. 1 h)."""
+def test_flow_balance_bar_heights_are_power_kw_not_slot_energy() -> None:
+    """Gleiche kW → gleiche Balkenhöhe (15 min und 1 h); Breite trägt die Dauer."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
@@ -394,11 +394,10 @@ def test_flow_balance_bar_heights_scale_with_slot_energy_kwh() -> None:
     slot_models = build_flow_balance_slots_from_df(df, flex_consumers=flex)
     traces, _ = flow_balance_plotly_traces(df, slot_models, axis, 0, len(df), flex_consumers=flex)
     pv_trace = next(t for t in traces if isinstance(t, go.Bar) and t.name == "PV")
-    # 4 kW × 0.25 h = 1 kWh; 4 kW × 1 h = 4 kWh
-    assert abs(pv_trace.y[0]) == pytest.approx(1.0)
+    assert abs(pv_trace.y[0]) == pytest.approx(4.0)
     assert abs(pv_trace.y[4]) == pytest.approx(4.0)
-    assert abs(pv_trace.y[4]) == pytest.approx(4.0 * abs(pv_trace.y[0]))
-    assert "kWh" in pv_trace.hovertemplate
+    assert "kW" in pv_trace.hovertemplate
+    assert "kWh" not in pv_trace.hovertemplate
 
 
 def test_chart1_pv_and_baseload_use_zone_muted_colors() -> None:
