@@ -127,7 +127,7 @@ def _stable_upload_csv_name(
     consumer_id: str = "",
     role: str = "",
 ) -> str:
-    """One canonical filename per profile role / consumer (overwrite on re-upload)."""
+    """Fallback filename per profile role / consumer when upload name is missing."""
     prefix = str(profile_id or "profile").strip() or "profile"
     consumer = str(consumer_id or "").strip()
     role_part = str(role or "").strip()
@@ -136,6 +136,19 @@ def _stable_upload_csv_name(
     if role_part:
         return f"{prefix}_{role_part}.csv"
     return f"{prefix}_verbrauch.csv"
+
+
+def _resampled_upload_csv_name(filename: str, *, fallback: str) -> str:
+    """Build ``{original_stem}_resampled.csv`` from the uploaded basename."""
+    basename = Path(str(filename or "").strip()).name
+    if not basename:
+        return fallback
+    stem = Path(basename).stem.strip()
+    if not stem or stem in (".", ".."):
+        return fallback
+    if stem.lower().endswith("_resampled"):
+        return f"{stem}.csv"
+    return f"{stem}_resampled.csv"
 
 
 def single_csv_upload(
@@ -226,9 +239,9 @@ def save_profile_consumption_csv(
 ) -> str:
     """Speichert Verbrauchs-CSV unter uploads/ neben der aktiven Config; optional normalisiert.
 
-    ``role`` (z. B. ``pv``, ``verbrauch``) wird in den Dateinamen eingefügt.
-    Re-uploads overwrite the same path (one CSV per role / consumer).
-    ``filename`` is kept for API compatibility; it does not affect the target name.
+    Target name is ``{original_stem}_resampled.csv`` (basename only). If ``filename``
+    is empty/invalid, falls back to a stable ``{profile}_{role|consumer}.csv`` name.
+    Same original basename re-uploaded overwrites that resampled file.
     Returns a portable ``config/uploads/…`` path for storage in house profiles.
     """
     from house_config.consumption_csv import (
@@ -238,11 +251,10 @@ def save_profile_consumption_csv(
 
     uploads_dir = Path(resolve_uploads_dir())
     uploads_dir.mkdir(parents=True, exist_ok=True)
-    # Ignore original upload filename so re-uploads overwrite one stable path.
-    _ = filename
-    target = uploads_dir / _stable_upload_csv_name(
+    fallback = _stable_upload_csv_name(
         profile_id, consumer_id=consumer_id, role=role
     )
+    target = uploads_dir / _resampled_upload_csv_name(filename, fallback=fallback)
     target.write_bytes(content)
     portable = f"config/uploads/{target.name}"
     if normalize:

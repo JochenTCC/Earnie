@@ -98,7 +98,9 @@ def render_historical_csv_section(
     active_path = str(st.session_state.get(keys["verbrauch"], "") or "").strip()
     if not active_path:
         return
-    if not Path(active_path).is_file():
+    from runtime_store.persist_paths import resolve_config_prefixed_path
+
+    if not Path(resolve_config_prefixed_path(active_path)).is_file():
         st.warning(f"Verbrauchs-CSV nicht gefunden: `{active_path}`")
         return
     _render_ist_vs_modell(

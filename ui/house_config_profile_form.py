@@ -1321,13 +1321,16 @@ def _render_consumer_profile_csv_fields(
         )
         st.rerun()
     active = st.session_state[path_key]
-    if active and Path(active).is_file():
-        _render_digital_csv_scale_prompt(
-            active,
-            index=index,
-            session_scope=session_scope,
-            nominal_power_kw=nominal_power_kw,
-        )
+    if active:
+        from runtime_store.persist_paths import resolve_config_prefixed_path
+
+        if Path(resolve_config_prefixed_path(active)).is_file():
+            _render_digital_csv_scale_prompt(
+                active,
+                index=index,
+                session_scope=session_scope,
+                nominal_power_kw=nominal_power_kw,
+            )
     if active:
         use_csv = labeled_checkbox(
             "Aus Gesamt-CSV abziehen / echtes Profil nutzen",

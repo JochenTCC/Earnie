@@ -22,8 +22,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **Verbrauch CSV import path + `_resampled` name** — existence check uses `resolve_config_prefixed_path`; upload target `{original}_resampled.csv` (e.g. `BEZUG-2025-22.7.2026_resampled.csv`); was: false “nicht gefunden” on `config/uploads/…` + stable `{profile}_verbrauch.csv` name
+
 
 ## New Bugs (Do not remove this chapter — even if empty)
-
 
 ## Organizational Changes - no bugs (but still no development issue)
