@@ -33,6 +33,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - German docs polish carry-over → open `2.3.0` in [Backlog.md](Backlog.md)
 
 
+### Bugfix legacy export monthly_float abort (2026-07-22)
+
+- [x] **Streamlit abort: `export_tariffs[…]` unknown type `monthly_float`** — soft-migrate on load + bootstrap persist to `monthly_table` with OeMAG-seeded `monthly_rates`; live packs still on pre-2.3.a catalog no longer crash
+
+
 ### Bugfix Verbraucher expander Bezeichnung label refresh (2026-07-22)
 
 - [x] **Changed Bezeichnung in Verbraucher Edit is not updating the collapse label instantly (on first Verbraucher)** — already fixed via `_consumer_expander_title` (live `hc_label_*` session) + stable `hc_consumer_expander_{index}` key; re-verified live (not reproducible); runtime logs showed title matching Bezeichnung on rename for Verbraucher 1 and 2

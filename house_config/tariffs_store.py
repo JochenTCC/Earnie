@@ -190,6 +190,79 @@ def _normalize_export_tariff(raw: dict, index: int) -> dict:
     return _export_tariff_spec(raw, index)
 
 
+def _seed_monthly_rates_from_float(
+    raw: dict,
+    index: int,
+    *,
+    oemag_rates: tuple,
+    reference_cent: float,
+) -> list:
+    """Build owned monthly_rates for a legacy monthly_float export row."""
+    from data.monthly_float_rates import build_monthly_float_lookup
+
+    tariff_id = str(raw.get("id", "")).strip() or f"index_{index}"
+    if "arbeitspreis_kwh_cent" not in raw:
+        raise ValueError(
+            f"export_tariffs[{index}] ('{tariff_id}'): legacy monthly_float "
+            "braucht monthly_rates oder arbeitspreis_kwh_cent."
+        )
+    lookup = build_monthly_float_lookup(oemag_rates, reference_cent, raw)
+    return [
+        {"year": year, "month": month, "tariff_cent_kwh": cent}
+        for year, month, cent in lookup
+    ]
+
+
+def migrate_export_monthly_float_in_doc(doc: dict) -> list[str]:
+    """
+    In-place soft migrate: export type monthly_float → monthly_table.
+
+    Existing monthly_rates are kept; otherwise rates are seeded from the
+    shared OeMAG curve × arbeitspreis_kwh_cent (− settlement_fee).
+    Returns migrated tariff ids.
+    """
+    from data.monthly_float_rates import (
+        load_monthly_float_reference_cent,
+        load_oemag_monthly_reference_rates,
+    )
+
+    exports = doc.get("export_tariffs")
+    if not isinstance(exports, list):
+        return []
+    needs_seed = any(
+        isinstance(item, dict)
+        and str(item.get("type", "")).strip().lower() == "monthly_float"
+        and not (
+            isinstance(item.get("monthly_rates"), list) and item.get("monthly_rates")
+        )
+        for item in exports
+    )
+    oemag_rates = None
+    reference_cent = None
+    if needs_seed:
+        oemag_rates = load_oemag_monthly_reference_rates(doc)
+        reference_cent = load_monthly_float_reference_cent(doc)
+    migrated: list[str] = []
+    for index, item in enumerate(exports):
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("type", "")).strip().lower() != "monthly_float":
+            continue
+        tariff_id = str(item.get("id", "")).strip() or f"index_{index}"
+        rates = item.get("monthly_rates")
+        if not (isinstance(rates, list) and rates):
+            item["monthly_rates"] = _seed_monthly_rates_from_float(
+                item,
+                index,
+                oemag_rates=oemag_rates,
+                reference_cent=reference_cent,
+            )
+        item["type"] = "monthly_table"
+        item.pop("arbeitspreis_kwh_cent", None)
+        migrated.append(tariff_id)
+    return migrated
+
+
 def normalize_tariffs_document(doc: dict) -> dict:
     if not isinstance(doc, dict):
         raise ValueError("tariffs.json muss ein Objekt sein.")
@@ -199,6 +272,7 @@ def normalize_tariffs_document(doc: dict) -> dict:
         raise ValueError("import_tariffs muss ein Array sein.")
     if not isinstance(exports_raw, list):
         raise ValueError("export_tariffs muss ein Array sein.")
+    migrate_export_monthly_float_in_doc(doc)
     imports: dict[str, dict] = {}
     for index, item in enumerate(imports_raw):
         spec = _normalize_import_tariff(item, index)

@@ -373,6 +373,29 @@ def _migrate_oemag_data_model_v2() -> list[str]:
     return modified
 
 
+def _migrate_export_monthly_float() -> list[str]:
+    """Persist legacy export monthly_float → monthly_table on live tariffs.json."""
+    tariffs_path = resolve_tariffs_json_path()
+    if not os.path.isfile(tariffs_path):
+        return []
+    from house_config.tariffs_store import migrate_export_monthly_float_in_doc
+    from settings.json_io import read_json_dict, write_json_dict
+
+    tariffs = read_json_dict(tariffs_path)
+    if not isinstance(tariffs, dict):
+        return []
+    migrated = migrate_export_monthly_float_in_doc(tariffs)
+    if not migrated:
+        return []
+    write_json_dict(tariffs_path, tariffs)
+    logger.info(
+        "bootstrap: migrated export monthly_float → monthly_table (%s) → %s",
+        ",".join(migrated),
+        tariffs_path,
+    )
+    return [tariffs_path]
+
+
 def _migrate_config_data_model_v3() -> list[str]:
     """
     Rename file_paths_battery_simulation → scenario_explorer_conf and strip
@@ -698,6 +721,8 @@ def run() -> None:
     if _bootstrap_tariffs_json():
         created.append(resolve_tariffs_json_path())
     for path in _migrate_oemag_data_model_v2():
+        created.append(path)
+    for path in _migrate_export_monthly_float():
         created.append(path)
     for path in _migrate_config_data_model_v3():
         created.append(path)

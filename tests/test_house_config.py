@@ -273,6 +273,35 @@ def test_import_monthly_table_tariff_normalization():
     assert len(doc["import_tariffs"]["monthly_import"]["monthly_rates"]) == 1
 
 
+def test_legacy_export_monthly_float_soft_migrates():
+    from house_config.tariffs_store import normalize_tariffs_document
+
+    oemag = [
+        {"year": 2025, "month": i, "tariff_cent_kwh": 7.15} for i in range(1, 13)
+    ]
+    doc = normalize_tariffs_document(
+        {
+            "monthly_float_reference_cent_kwh": 7.15,
+            "oemag_monthly_feed_in_rates": oemag,
+            "import_tariffs": [],
+            "export_tariffs": [
+                {
+                    "id": "legacy_float",
+                    "label": "Legacy Float",
+                    "type": "monthly_float",
+                    "land": "AT",
+                    "settlement_fee_cent_kwh": 0.5,
+                    "arbeitspreis_kwh_cent": 7.15,
+                }
+            ],
+        }
+    )
+    export = doc["export_tariffs"]["legacy_float"]
+    assert export["type"] == "monthly_table"
+    assert len(export["monthly_rates"]) == 12
+    assert "arbeitspreis_kwh_cent" not in export
+
+
 def test_awattar_tariff_spec_includes_surcharges():
     root = Path(__file__).resolve().parents[1]
     doc = load_tariffs_document(str(root / "share" / "config" / "tariffs.json"))
