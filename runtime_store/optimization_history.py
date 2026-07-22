@@ -19,18 +19,21 @@ import pandas as pd
 import config
 from data.planning_window import align_to_planning_timezone
 from .file_metadata import OPTIMIZATION_HISTORY_SCHEMA, stamp_payload, strip_metadata
-from .persist_paths import legacy_history_csv_file
+from .persist_paths import legacy_history_csv_file, runtime_dir as persist_runtime_dir
 
 logger = logging.getLogger(__name__)
 
-from runtime_store.env_vars import read_runtime_path, read_runtime_path_or
+from runtime_store.env_vars import read_runtime_path
 
-RUNTIME_DIR = read_runtime_path_or("runtime")
 HISTORY_FILENAME = "optimization_history.jsonl"
+# Module attrs are patchable in tests; init via persist_paths so EARNIE_ENV_PATH
+# alone resolves to {ENV_PATH}/runtime (not cwd-relative "runtime/").
+RUNTIME_DIR = persist_runtime_dir()
 HISTORY_FILE = os.path.join(RUNTIME_DIR, HISTORY_FILENAME)
 LEGACY_CSV_FILE = legacy_history_csv_file()
 
 _JSONL_HISTORY_CACHE: tuple[tuple[int, int], list[dict[str, Any]]] | None = None
+_JSONL_HISTORY_CACHE_PATH: str | None = None
 
 _LEGACY_CSV_COLUMNS = (
     "Timestamp",
@@ -72,16 +75,28 @@ def _ensure_parent_dir(path: str) -> None:
         os.makedirs(parent, exist_ok=True)
 
 
+def resolved_runtime_dir() -> str:
+    """Active runtime dir (ENV_PATH / RUNTIME_PATH); honors test monkeypatch of RUNTIME_DIR."""
+    return RUNTIME_DIR
+
+
 def history_file_path() -> str:
+    """Active history JSONL path; honors test monkeypatch of HISTORY_FILE."""
     return HISTORY_FILE
+
+
+def legacy_csv_path() -> str:
+    """Active legacy CSV path; honors test monkeypatch of LEGACY_CSV_FILE."""
+    return LEGACY_CSV_FILE
 
 
 def append_production_run(payload: dict[str, Any]) -> None:
     """Hängt einen main.py-Durchlauf an die JSONL-Historie an."""
+    path = history_file_path()
     entry = stamp_payload(dict(payload), schema_version=OPTIMIZATION_HISTORY_SCHEMA)
-    _ensure_parent_dir(HISTORY_FILE)
+    _ensure_parent_dir(path)
     line = json.dumps(entry, ensure_ascii=False)
-    with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+    with open(path, "a", encoding="utf-8") as f:
         f.write(line)
         f.write("\n")
 
@@ -168,16 +183,21 @@ def _row_from_json_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def _load_jsonl_history() -> list[dict[str, Any]]:
-    global _JSONL_HISTORY_CACHE
-    if not os.path.isfile(HISTORY_FILE):
+    global _JSONL_HISTORY_CACHE, _JSONL_HISTORY_CACHE_PATH
+    path = history_file_path()
+    if not os.path.isfile(path):
         return []
-    stat = os.stat(HISTORY_FILE)
+    stat = os.stat(path)
     cache_key = (int(stat.st_mtime_ns), int(stat.st_size))
-    if _JSONL_HISTORY_CACHE is not None and _JSONL_HISTORY_CACHE[0] == cache_key:
+    if (
+        _JSONL_HISTORY_CACHE is not None
+        and _JSONL_HISTORY_CACHE_PATH == path
+        and _JSONL_HISTORY_CACHE[0] == cache_key
+    ):
         return list(_JSONL_HISTORY_CACHE[1])
     rows: list[dict[str, Any]] = []
     try:
-        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             for line_no, line in enumerate(f, start=1):
                 text = line.strip()
                 if not text:
@@ -188,7 +208,7 @@ def _load_jsonl_history() -> list[dict[str, Any]]:
                     logger.warning(
                         "optimization_history: Zeile %s in %s ungültig: %s",
                         line_no,
-                        HISTORY_FILE,
+                        path,
                         exc,
                     )
                     continue
@@ -198,8 +218,9 @@ def _load_jsonl_history() -> list[dict[str, Any]]:
                 if row is not None:
                     rows.append(row)
     except OSError as exc:
-        logger.warning("optimization_history: %s konnte nicht gelesen werden: %s", HISTORY_FILE, exc)
+        logger.warning("optimization_history: %s konnte nicht gelesen werden: %s", path, exc)
     _JSONL_HISTORY_CACHE = (cache_key, rows)
+    _JSONL_HISTORY_CACHE_PATH = path
     return rows
 
 
@@ -249,12 +270,13 @@ def _read_legacy_csv(path: str) -> pd.DataFrame:
 
 
 def _load_legacy_csv_history() -> list[dict[str, Any]]:
-    if not os.path.isfile(LEGACY_CSV_FILE):
+    path = legacy_csv_path()
+    if not os.path.isfile(path):
         return []
     try:
-        df = _read_legacy_csv(LEGACY_CSV_FILE)
+        df = _read_legacy_csv(path)
     except (OSError, UnicodeDecodeError) as exc:
-        logger.warning("optimization_history: %s konnte nicht gelesen werden: %s", LEGACY_CSV_FILE, exc)
+        logger.warning("optimization_history: %s konnte nicht gelesen werden: %s", path, exc)
         return []
 
     rows: list[dict[str, Any]] = []
@@ -426,12 +448,13 @@ def describe_production_log_source() -> ProductionLogSourceInfo:
     """
     Beschreibt, welche Datei die UI für den Produktiv-Log liest.
 
-    Entspricht ``HISTORY_FILE`` / ``RUNTIME_DIR`` zum Zeitpunkt des Aufrufs
-    (Modul-Import cached die Pfade nicht — Streamlit-Reload übernimmt neue Env).
+    Nutzt die gleichen Modul-Pfade wie die Loader (``HISTORY_FILE`` / ``RUNTIME_DIR``),
+    die über ``persist_paths.runtime_dir()`` initialisiert werden (``EARNIE_ENV_PATH``
+    oder ``EARNIE_RUNTIME_PATH``).
     """
-    runtime_dir = os.path.abspath(RUNTIME_DIR)
-    history_file = os.path.abspath(HISTORY_FILE)
-    legacy_csv = os.path.abspath(LEGACY_CSV_FILE)
+    runtime_dir = os.path.abspath(resolved_runtime_dir())
+    history_file = os.path.abspath(history_file_path())
+    legacy_csv = os.path.abspath(legacy_csv_path())
     history_exists = os.path.isfile(history_file)
     history_size: int | None = None
     history_mtime: datetime | None = None
@@ -441,7 +464,7 @@ def describe_production_log_source() -> ProductionLogSourceInfo:
         history_mtime = datetime.fromtimestamp(stat.st_mtime)
     return ProductionLogSourceInfo(
         runtime_dir=runtime_dir,
-        env_runtime_dir=read_runtime_path(),
+        env_runtime_dir=read_runtime_path() or None,
         history_file=history_file,
         history_exists=history_exists,
         history_size_bytes=history_size,

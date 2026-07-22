@@ -12,19 +12,21 @@ from datetime import datetime
 from typing import Any
 
 from .file_metadata import RUN_STATE_SCHEMA, read_schema_version, stamp_payload
+from .persist_paths import runtime_path
 
 logger = logging.getLogger(__name__)
 
-from runtime_store.env_vars import read_runtime_path_or
-
-RUNTIME_DIR = read_runtime_path_or("runtime")
 RUN_STATE_FILENAME = "optimizer_run_state.json"
-RUN_STATE_FILE = os.path.join(RUNTIME_DIR, RUN_STATE_FILENAME)
 LEGACY_RUN_STATE_PATH = RUN_STATE_FILENAME
 
 
+def _run_state_file() -> str:
+    """Call-time path so EARNIE_ENV_PATH alone resolves under env_root/runtime."""
+    return runtime_path(RUN_STATE_FILENAME)
+
+
 def _candidate_paths() -> list[str]:
-    return [RUN_STATE_FILE, LEGACY_RUN_STATE_PATH]
+    return [_run_state_file(), LEGACY_RUN_STATE_PATH]
 
 
 def _ensure_parent_dir(path: str) -> None:

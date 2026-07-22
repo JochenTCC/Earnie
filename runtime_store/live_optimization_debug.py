@@ -20,13 +20,10 @@ from .file_metadata import (
 
 logger = logging.getLogger(__name__)
 
-from runtime_store.env_vars import read_runtime_path_or
+from runtime_store.persist_paths import runtime_path
 
-RUNTIME_DIR = read_runtime_path_or("runtime")
-DEBUG_FILES = {
-    "live": os.path.join(RUNTIME_DIR, "live_optimization_debug.json"),
-    "historical_day": os.path.join(RUNTIME_DIR, "historical_optimization_debug.json"),
-}
+DEBUG_LIVE_FILENAME = "live_optimization_debug.json"
+DEBUG_HISTORICAL_FILENAME = "historical_optimization_debug.json"
 LEGACY_DEBUG_PATH = "live_optimization_debug.json"
 
 _MAIN_RUN_KEYS = (
@@ -47,8 +44,14 @@ _MAIN_RUN_KEYS = (
 )
 
 
+def _debug_file(kind: str) -> str:
+    """Call-time path so EARNIE_ENV_PATH alone resolves under env_root/runtime."""
+    name = DEBUG_LIVE_FILENAME if kind == "live" else DEBUG_HISTORICAL_FILENAME
+    return runtime_path(name)
+
+
 def _candidate_paths(kind: str) -> list[str]:
-    primary = DEBUG_FILES.get(kind, DEBUG_FILES["live"])
+    primary = _debug_file(kind)
     if kind == "live":
         return [primary, LEGACY_DEBUG_PATH]
     return [primary]

@@ -174,7 +174,7 @@ def build_chart_section(
             "savings_view": _json_safe(dict(bundle.savings_view)),
             "savings_summary": _json_safe(_savings_summary(bundle.savings_info)),
             "chart1_plotly": json.loads(chart1_plotly_json) if chart1_plotly_json else None,
-            "run_state": _read_json_file(run_state.RUN_STATE_FILE),
+            "run_state": _read_json_file(run_state._run_state_file()),
             "battery_params": config.get_battery_params(),
         }
     )

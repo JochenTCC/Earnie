@@ -9,56 +9,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [ ] Adapt business plan
-- [ ] **Outreach (not software):** Ask for interested parties in loxforum / reddit — post under “my project”; take interesting chart snapshots (loxforum admins contacted re. best place)
-  - loxforum -> done
-  - Facebook groups
-    - Loxone Konfigurationsbereich
-    - Loxone D-A-CH --> done
-    - Loxone Deutschland --> done
-    - Loxone Bauherren
-  - Photovoltaik-Forum --> done (more to follow)  
-    - Last post (Communication\Post-Photovoltaik-Forum_Optimale-Erweiterung.md) was moved to "Bezugsstrom, Stromanbieter, Stromvergleich" --> create a different post with similar content but better title
-    - Creat a post with comparison of different tariffs (SPOT; fixed; monthly)
-  - Contact IoBroker-Community and HomeAssistant (when Best Interface is found — after **2.4.a** / connector spec)
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
 
 
 ## Feature Backlog
-
-
-### Version 2.2.0
-
-- [x] Build Szenario-Explorer as "web app" in Streamlit Community Cloud (SCC)
-  - Precursor (done): `EARNIE_OFFLINE` live-scenario demo seed — [Backlog-Erledigt.md](Backlog-Erledigt.md)
-  - Site config split (done): private `Earnie-env-home` + junction; public templates/catalog in `share/config/` (incl. `tariffs.json`); see [private-env.md](../docs/einrichtung/private-env.md)
-  - New EARNIE_UI_MODES "live_environment" to enable / disable "Echtzeitumgebung"
-- [x] Remove any references to DS-KO-DOLS (`DS-KO-DO-2`) in all files and replace it by dummies
-- [x] Implement a first version of "Banner der Wahrheit", that can't be removed in a fork
-- [x] Add a hint "Nicht optional, da ansonsten identisch mit Nicht optimierter Referenz" on subpage Batterien
-- [x] Add a warning at SE at Gesamtkosten und -Verbrauch, when overall consumptions differ more than 5% from Live-Referenz (Hinweis column) with hint to send a config dump to TechCreaCon via Info / About contact.
-- [x] Reorder sidebar
-    - Deactivate "Verbraucheranalyse" when there is no live connection to smarthome (stub page notice)
-    - Hide "Verbraucheranalyse" when EARNIE_UI_MODES does not include "live_environment"
-    - Move "Verbraucheranalyse" into "Live-Cockpit" (at the bottom)
-    - Rename section "Planung" into "Konfiguration"
-    - Move Szenario-Explorer into section "Konfiguration" (above Live-Konfiguration)
-    - Remove section "Analyse"
-    - Move "Live-Konfiguration" into section "Konfiguration"; hide when `live_environment` not in modes (always usable when shown)
-    - Rename section "Betrieb" into "Live-Cockpit"
-- [x] Make a complete info section in sidebar (including version and Banner der Wahrheit + contacting formular with Topic, Description and attachments to mail@techcreacon.com)
-- [x] Merge streamlitcloud branch with main, when app is working on SCC
-- [x] Add a CONTRIBUTING.md document in German
-- [x] Add [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://earnie.streamlit.app) into README.md
-- [ ] Add link to Streamlit in Posts
-  - Photovoltaik-Forum - Done
-  - LoxForum
-- [x] Perform a SE for posts
-- [x] Add a link to Manual in Info
-- [x] Test if sunset2set-Mode is working in SE brings better results than fixed_24h
-  - Results are better, but computing effort is much higher
-- [x] In Scenario Editor show parameters of selected tariffs and give a hint that user must check if data is correct (there is no guarantee for correctness) and monthly fixed fees are not part of the calculation yet
-- [ ] Finalize Version 2.2.0 after test usage and make a release
-  - Update German Docs
 
 
 ### Version 2.3 — Enhance consumer visualization and cost analysis - sharpen tariffs handling
@@ -89,7 +43,7 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
   - Make existing marker→entity assignments editable in UI where already used
   - **Out of scope here:** connector architecture, Loxone HTTP extraction, third-party connector spec, device-template library (→ `2.4`); full nested structures (→ nested-models `2.+1`)
 - [ ] **2.3.0 — Release**
-  - Finalize after test usage; update German docs as needed
+  - Finalize after test usage; update German docs as needed (carry-over from 2.2.0 finalize)
 
 
 ### Version 2.4 — Become Loxone agnostic and standardize communication (SAM expansion)
@@ -107,6 +61,8 @@ Year-2+ SAM expansion (KNX / Home Assistant / IoBroker when a second connector i
   - Enhance JSON schemas to standardized interfaces between devices (heat pump, battery, EV, consumers, …) as templates for a library of communication interfaces between smarthome system and Earnie
   - Build a Loxone library as counterpart to those templates for quick interface configuration
   - Prepare similar templates for other standards (see above)
+- [ ] Integrate a MCP-based automatic communication-definition (see also Entwicklungsplan\MCP-Interfacing-für-Earnie.md) in Loxone-Kommunikation page
+
 - [ ] **2.4.d — Donate**
   - Add a Donate feature into sidebar
 - [ ] **2.4.0 — Release**

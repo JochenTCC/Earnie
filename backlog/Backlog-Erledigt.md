@@ -27,6 +27,27 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] Migration helper v2→v3 — bootstrap + `ensure_compatible` rename block / strip path pair / stamp 3; fail-fast gate for leftover path keys; schema/docs omit pair
 
 
+### Version 2.2.0 — Official release (2026-07-22)
+
+- [x] **Finalize Version 2.2.0 after test usage and make a release** — `version.py` `2.2.0`; tag `v2.2.0` (GitHub Latest + GHCR `2.2.0` / `:latest`); chapter archived from open backlog
+  - German docs polish carry-over → open `2.3.0` in [Backlog.md](Backlog.md)
+
+
+### Bugfix Verbraucher expander Bezeichnung label refresh (2026-07-22)
+
+- [x] **Changed Bezeichnung in Verbraucher Edit is not updating the collapse label instantly (on first Verbraucher)** — already fixed via `_consumer_expander_title` (live `hc_label_*` session) + stable `hc_consumer_expander_{index}` key; re-verified live (not reproducible); runtime logs showed title matching Bezeichnung on rename for Verbraucher 1 and 2
+
+
+### Bugfix NAS Chart 1 history without EARNIE_RUNTIME_PATH (2026-07-21)
+
+- [x] **NAS launch: Chart 1 Monitor missing past data without `EARNIE_RUNTIME_PATH`** — `optimization_history` / `run_state` / `live_optimization_debug` / `single_instance` bound runtime via `read_runtime_path_or("runtime")` (ignored `EARNIE_ENV_PATH`); now use `persist_paths.runtime_dir()` / `runtime_path()` so `{ENV_PATH}/runtime` alone loads NAS `optimization_history.jsonl`; regression test; verified live on NAS :8503
+
+
+### Bugfix Chart 1 PV *:00 seasonal spikes (2026-07-21)
+
+- [x] **Chart 1 PV forecast spikes at *:00** — dump `chart_debug_review/debug_dump_20260721_165852`: gray-area `forecast_pv_kw` at *:00 matched seasonal synthetic (`kwp=6` summer) while :15/:30/:45 used forecast.solar. Fix: keep warm API cache on timeout/HTTP/429 instead of discarding it (`data/pv_forecast.py`); tests in `tests/test_pv_forecast.py`. Closed for now (user); intermittent failure-path live proof not pursued.
+
+
 ### Bugfix Hauskonfigurator Verbraucher expander on Bezeichnung (2026-07-21)
 
 - [x] **Verbraucher editor collapsed after Bezeichnung change (e.g. E-Auto)** — expander title includes live Bezeichnung but had no stable `key`, so Streamlit remounted it collapsed on rename + auto_persist `st.rerun()`; fixed with `key=hc_consumer_expander_{index}`; verified live

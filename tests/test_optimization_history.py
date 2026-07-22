@@ -128,3 +128,36 @@ def test_run_trigger_label_from_jsonl(tmp_path, monkeypatch):
     labels = list(df["run_trigger_label"])
     assert "Viertelstunde" in labels
     assert "eauto_plugged_in" in labels
+
+
+def test_history_file_follows_env_path_without_runtime_path(tmp_path, monkeypatch):
+    """Chart 1 / JSONL must use {EARNIE_ENV_PATH}/runtime without EARNIE_RUNTIME_PATH."""
+    from pathlib import Path
+
+    from runtime_store.persist_paths import runtime_dir as persist_runtime_dir
+
+    stack = tmp_path / "nas_env"
+    (stack / "runtime").mkdir(parents=True)
+    history = stack / "runtime" / "optimization_history.jsonl"
+    history.write_text(
+        '{"completed_at": "2026-07-21T12:00:00", "soc_percent": 50.0, "mode": 0}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EARNIE_ENV_PATH", str(stack))
+    for key in (
+        "EARNIE_RUNTIME_PATH",
+        "ENERGY_OPTIMIZER_RUNTIME_PATH",
+        "EARNIE_RUNTIME_DIR",
+        "ENERGY_OPTIMIZER_RUNTIME_DIR",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    runtime = persist_runtime_dir()
+    assert Path(runtime).resolve() == (stack / "runtime").resolve()
+    # Same formula as module import init after the fix
+    monkeypatch.setattr(oh, "RUNTIME_DIR", runtime)
+    monkeypatch.setattr(oh, "HISTORY_FILE", str(Path(runtime) / oh.HISTORY_FILENAME))
+    monkeypatch.setattr(oh, "LEGACY_CSV_FILE", str(tmp_path / "missing_legacy.csv"))
+    assert Path(oh.history_file_path()).resolve() == history.resolve()
+    df = oh.load_optimization_history(days_back=None)
+    assert len(df) == 1
