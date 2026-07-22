@@ -284,6 +284,30 @@ def _terminal_soc_for_commit(
     return horizon_terminal_soc
 
 
+def _flex_indices_for_book_hours(
+    remaining_len: int,
+    hour_index: int,
+    flex_book_hours: int | None,
+) -> list[int]:
+    """
+    Flex-eligible indices relative to remaining_slice.
+
+    flex_book_hours=None: all remaining hours (Live / truncated SE).
+    Otherwise only absolute hours [0, flex_book_hours) — so open-loop full-horizon
+    trials cannot park flex past the booked SE slice.
+    """
+    if flex_book_hours is None:
+        return list(range(remaining_len))
+    if flex_book_hours < 1:
+        raise ValueError(
+            f"flex_book_hours must be >= 1 when set (got {flex_book_hours})."
+        )
+    booked_left = flex_book_hours - hour_index
+    if booked_left <= 0:
+        return []
+    return list(range(min(booked_left, remaining_len)))
+
+
 def _cap_flex_delivery(
     chart_row: dict,
     consumers_cfg: list,
@@ -446,18 +470,24 @@ def simulate_horizon(
     sunrise_soc_min_index: int | None = None,
     flexible_consumers: list | None = None,
     commit_hours: int = 1,
+    disable_horizon_soc_anchor: bool = False,
+    flex_book_hours: int | None = None,
 ) -> list:
     """
     Simuliert einen Optimierungshorizont über die gesamte Matrix.
 
     commit_hours=1: stündliches Re-Solve (Live-Savings / MPC).
     commit_hours=N: alle N Stunden neu lösen und den Plan open-loop anwenden (SE).
+    disable_horizon_soc_anchor: keine Terminal-/Sonnenaufgangs-SOC-Gleichheit (Trial).
+    flex_book_hours: Flex nur in den ersten N Absolutstunden (Trial full SA_0-->SA_2).
     """
     if commit_hours < 1:
         raise ValueError(
             f"commit_hours must be >= 1 (got {commit_hours}). "
             "Use 1 for hourly re-opt or len(matrix) for open-loop."
         )
+    if disable_horizon_soc_anchor:
+        sunrise_soc_min_index = None
     consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
     if not matrix_prepared:
         from .charge_immediate import prepare_optimization_matrix
@@ -499,7 +529,12 @@ def simulate_horizon(
     )
     delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
     generic_flex_run: dict[str, dict] = {}
-    horizon_terminal_soc = None if sunrise_soc_min_index is not None else initial_soc
+    if disable_horizon_soc_anchor:
+        horizon_terminal_soc = None
+    else:
+        horizon_terminal_soc = (
+            None if sunrise_soc_min_index is not None else initial_soc
+        )
     commit_buffer: list[dict] = []
     buffer_pos = 0
     own_cbc_collection = not cbc_event_collection_active()
@@ -522,6 +557,11 @@ def simulate_horizon(
                 {"generic_flex_run": generic_flex_run},
                 consumers_cfg,
             )
+            flex_indices = _flex_indices_for_book_hours(
+                len(remaining_slice),
+                i,
+                flex_book_hours,
+            )
             if commit_hours <= 1:
                 terminal_soc_percent = _terminal_soc_for_commit(
                     commit_hours, len(remaining_slice), horizon_terminal_soc
@@ -535,7 +575,7 @@ def simulate_horizon(
                     verbose=verbose,
                     consumer_remaining_kwh=remaining,
                     spa_remaining_kwh=None,
-                    flex_indices=list(range(len(remaining_slice))),
+                    flex_indices=flex_indices,
                     charging_contexts=charging_contexts,
                     filter_contexts=filters,
                     terminal_soc_percent=terminal_soc_percent,
@@ -562,7 +602,7 @@ def simulate_horizon(
                         verbose=verbose,
                         consumers=consumers_cfg,
                         consumer_remaining_kwh=remaining,
-                        flex_indices=list(range(len(remaining_slice))),
+                        flex_indices=flex_indices,
                         charging_contexts=charging_contexts,
                         filter_contexts=filters,
                         terminal_soc_percent=terminal_soc_percent,
@@ -601,7 +641,7 @@ def simulate_horizon(
             if summary:
                 logger.info(summary)
             clear_cbc_milp_context()
-    if sunrise_soc_min_index is None:
+    if sunrise_soc_min_index is None and not disable_horizon_soc_anchor:
         sim_soc = _apply_forced_grid_recharge_at_horizon_end(
             chart_rows,
             sim_soc,

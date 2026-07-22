@@ -14,7 +14,6 @@ from data import profile_manager
 from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation.backtesting_progress import (
     clear_progress_dir,
-    prepare_progress_dir,
     read_progress_file,
     read_progress_snapshot,
 )
@@ -213,9 +212,6 @@ def run_backtesting_subprocess(
     if not script_path.is_file():
         message = f"Backtesting-Skript fehlt: {script_path}"
         return 1, message
-
-    if progress_file:
-        prepare_progress_dir(progress_file)
 
     cmd = build_backtesting_command(
         output_dir=log_dir,

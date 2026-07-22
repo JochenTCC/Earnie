@@ -136,7 +136,7 @@ Rohdaten-Tabelle aller Slots im sichtbaren S-2-Fenster (15-min Log + MILP); Spal
 
 ## Expander: Energievergleich Baseline vs. Optimierung
 
-Tabelle je flexiblem Verbraucher über Horizont Jetzt→SA₂:
+Tabelle je flexiblem Verbraucher über Horizont SA_0-->SA_2:
 
 - **BL Profil**, **BL Ziel**, **Optimierung** (kWh)
 

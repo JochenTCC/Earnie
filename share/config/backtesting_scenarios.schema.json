@@ -33,6 +33,14 @@
       "enum": ["cbc", "highs"],
       "description": "MILP-Backend für Szenario-Explorer/Backtesting (highs Standard; cbc Fallback). Env EARNIE_MILP_SOLVER hat Vorrang."
     },
+    "disable_horizon_soc_anchor": {
+      "type": "boolean",
+      "description": "Trial: keine harte End-SoC-/Sonnenaufgangs-SOC_min-Gleichheit (nur min/max). Standard false."
+    },
+    "sunrise_full_horizon_trial": {
+      "type": "boolean",
+      "description": "SE sunrise_window: MILP auf voller SA_0-->SA_2-Matrix; bucht nur die ersten 24 h; Flex auf gebuchten Slice; ohne harte SA₁-SOC_min. Standard true; false = Truncate vor MILP (alt)."
+    },
     "scenarios": {
       "type": "array",
       "description": "Alle Szenarien inkl. Live-Baseline (Standard-ID: live, gewählt via live_scenario_id).",

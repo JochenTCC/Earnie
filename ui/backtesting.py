@@ -1,6 +1,8 @@
 """Backtesting-Auswertung und UI-Start aus scripts/run_backtesting.py."""
 from __future__ import annotations
 
+import time
+
 import streamlit as st
 import pandas as pd
 
@@ -10,9 +12,10 @@ from runtime_store.persist_paths import resolve_backtesting_log_dir
 from simulation import backtesting_log
 from simulation.backtesting_fingerprint import fingerprint_for_current_config
 from simulation.backtesting_progress import (
+    ProgressEtaTracker,
+    build_progress_display_rows,
+    format_progress_bar_caption,
     ordered_backtesting_result_ids,
-    ordered_progress_labels,
-    sort_progress_snapshot_keys,
 )
 from simulation.engine import HISTORICAL_REFERENCE_ID, plan_per_scenario_reference_tasks
 from simulation.horizon_mode import DEFAULT_HORIZON_MODE, FIXED_24H, SUNRISE_WINDOW
@@ -231,51 +234,60 @@ def _execute_backtesting_run(
         **scenario_labels,
         **extra_ref_labels,
     }
-    preferred_progress_labels = ordered_progress_labels(
-        ordered_backtesting_result_ids(
-            scenarios or {},
-            live_scenario_id=live_scenario_id,
-            extra_ref_ids=[ref_id for ref_id, _params, _label in extra_ref_specs],
-        ),
-        labels_for_order,
+    preferred_progress_ids = ordered_backtesting_result_ids(
+        scenarios or {},
+        live_scenario_id=live_scenario_id,
+        extra_ref_ids=[ref_id for ref_id, _params, _label in extra_ref_specs],
     )
+    eta_tracker = ProgressEtaTracker()
 
     with st.status(status_label, expanded=True) as status:
         progress_host = st.empty()
 
         def _on_progress(snapshot: dict) -> None:
-            if not snapshot:
+            rows = build_progress_display_rows(
+                preferred_progress_ids,
+                snapshot,
+                labels_for_order,
+            )
+            if not rows:
                 return
+            now = time.monotonic()
             with progress_host.container():
-                active_entries = [
-                    progress
-                    for progress in snapshot.values()
-                    if int(progress.get("total") or 0) <= 0
-                    or int(progress.get("current") or 0) < int(progress.get("total") or 0)
-                ]
+                active_count = sum(
+                    1
+                    for row in rows
+                    if row["placeholder"]
+                    or row["total"] <= 0
+                    or row["current"] < row["total"]
+                )
                 if workers > 1:
                     st.caption(
                         f"Parallele Berechnung: {workers} Worker · "
-                        f"{len(active_entries)} aktive Tasks"
+                        f"{active_count} aktive Tasks"
                     )
-                ordered_scenarios = sort_progress_snapshot_keys(
-                    snapshot.keys(),
-                    preferred_order=preferred_progress_labels,
-                )
-                for scenario in ordered_scenarios:
-                    progress = snapshot[scenario]
-                    total = int(progress.get("total") or 0)
-                    current = int(progress.get("current") or 0)
-                    phase = str(progress.get("phase") or "")
-                    if total > 0:
-                        if phase == "reference":
-                            label = f"{scenario} — Referenz"
-                        else:
-                            label = f"{scenario} — {current}/{total} h"
-                        st.caption(label)
-                        st.progress(min(current / total, 1.0))
+                for row in rows:
+                    eta_sec = None
+                    if not row["placeholder"] and row["total"] > 0:
+                        eta_sec = eta_tracker.update(
+                            row["result_id"],
+                            current=row["current"],
+                            total=row["total"],
+                            now_monotonic=now,
+                        )
+                    caption = format_progress_bar_caption(
+                        label=row["label"],
+                        current=row["current"],
+                        total=row["total"],
+                        phase=row["phase"],
+                        placeholder=row["placeholder"],
+                        eta_seconds=eta_sec,
+                    )
+                    st.caption(caption)
+                    if row["placeholder"] or row["total"] <= 0:
+                        st.progress(0.0)
                     else:
-                        st.caption(scenario or "Szenario-Explorer läuft…")
+                        st.progress(min(row["current"] / row["total"], 1.0))
 
         exit_code, output = run_backtesting_subprocess(
             start_month=start_month,
@@ -327,7 +339,7 @@ def render_backtesting_run_controls(
         index=selectbox_index,
         key="backtesting_horizon_mode",
         help=(
-            "Sunrise (Standard): wie Live-Optimierung (Jetzt→SA₂); Voraussetzung für SA-Zonen in Chart1/2. "
+            "Sunrise (Standard): wie Live-Optimierung (SA_0-->SA_2); Voraussetzung für SA-Zonen in Chart1/2. "
             "24h: Referenzmodus für Jahresvergleiche. "
             "Bei vorhandenem Lauf entspricht die Auswahl dem gespeicherten Horizont; "
             "eine Änderung macht die Ergebnisse ungültig bis zur Neuberechnung."

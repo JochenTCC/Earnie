@@ -183,7 +183,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_HORIZON_MODE,
         help=(
             "Planungshorizont für die Optimierung: "
-            f"'{SUNRISE_WINDOW}' (Jetzt→SA₂, SE-Standard, wie Live) oder "
+            f"'{SUNRISE_WINDOW}' (SA_0-->SA_2, SE-Standard, wie Live) oder "
             f"'{FIXED_24H}' (24h/E-Auto-Anker, Vergleich)."
         ),
     )
@@ -759,7 +759,7 @@ def main(argv: list[str] | None = None):
         )
     else:
         print(
-            f"  {len(anchors)} Schritte à 24h Output; MILP Jetzt→SA₂ pro Schritt "
+            f"  {len(anchors)} Schritte à 24h Output; MILP SA_0-->SA_2 pro Schritt "
             f"(SOC_min am Sonnenaufgang)"
         )
 

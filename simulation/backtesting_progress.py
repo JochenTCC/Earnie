@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -14,8 +15,174 @@ from simulation.engine import (
 )
 
 _SCENARIO_REFERENCE_SUFFIX = " — ohne Optimierung"
+_ETA_MIN_ELAPSED_SEC = 5.0
 
 T = TypeVar("T")
+
+
+def progress_entry_key(payload: Mapping[str, object], *, fallback: str = "active") -> str:
+    """Stable snapshot key: prefer result_id, else scenario label / fallback."""
+    result_id = payload.get("result_id")
+    if result_id is not None and str(result_id).strip():
+        return str(result_id)
+    scenario = payload.get("scenario")
+    if scenario is not None and str(scenario).strip():
+        return str(scenario)
+    return fallback
+
+
+def estimate_remaining_seconds(
+    *,
+    current: int,
+    total: int,
+    delta_current: int,
+    delta_t_sec: float,
+    min_elapsed_sec: float = _ETA_MIN_ELAPSED_SEC,
+) -> float | None:
+    """Estimate seconds left from recent hour progress; None if not yet reliable."""
+    if total <= 0 or current <= 0 or current >= total:
+        return None
+    if delta_current <= 0 or delta_t_sec < min_elapsed_sec:
+        return None
+    rate = delta_current / delta_t_sec
+    if rate <= 0 or not math.isfinite(rate):
+        return None
+    remaining = (total - current) / rate
+    if remaining < 0 or not math.isfinite(remaining):
+        return None
+    return remaining
+
+
+def format_eta_caption(seconds: float | None) -> str | None:
+    """German short ETA fragment, e.g. 'noch ~8 Min'. None if unavailable."""
+    if seconds is None or not math.isfinite(seconds) or seconds < 0:
+        return None
+    if seconds < 60:
+        return f"noch ~{max(1, int(round(seconds)))}s"
+    minutes = int(round(seconds / 60.0))
+    if minutes < 60:
+        return f"noch ~{minutes} Min"
+    hours, rem_min = divmod(minutes, 60)
+    if rem_min == 0:
+        return f"noch ~{hours} Std"
+    return f"noch ~{hours} Std {rem_min} Min"
+
+
+def build_progress_display_rows(
+    preferred_ids: Iterable[str],
+    snapshot: Mapping[str, Mapping[str, object]],
+    labels: Mapping[str, str],
+) -> list[dict]:
+    """
+    Fixed-order progress rows for preferred result ids.
+
+    Missing snapshot entries become placeholders (Wartend…, progress 0).
+    """
+    rows: list[dict] = []
+    for result_id in preferred_ids:
+        progress = snapshot.get(result_id)
+        label = labels.get(result_id, result_id)
+        if progress is None:
+            rows.append(
+                {
+                    "result_id": result_id,
+                    "label": label,
+                    "current": 0,
+                    "total": 0,
+                    "phase": "",
+                    "placeholder": True,
+                }
+            )
+            continue
+        rows.append(
+            {
+                "result_id": result_id,
+                "label": str(progress.get("scenario") or label),
+                "current": int(progress.get("current") or 0),
+                "total": int(progress.get("total") or 0),
+                "phase": str(progress.get("phase") or ""),
+                "placeholder": False,
+            }
+        )
+    return rows
+
+
+def format_progress_bar_caption(
+    *,
+    label: str,
+    current: int,
+    total: int,
+    phase: str,
+    placeholder: bool,
+    eta_seconds: float | None = None,
+) -> str:
+    """Caption text for one SE progress bar (hours + optional ETA)."""
+    if placeholder or total <= 0:
+        return f"{label} — Wartend…"
+    eta = format_eta_caption(eta_seconds)
+    if phase == "reference":
+        base = f"{label} — Referenz"
+    else:
+        base = f"{label} — {current}/{total} h"
+    if eta:
+        return f"{base} · {eta}"
+    return base
+
+
+class ProgressEtaTracker:
+    """Per-task ETA from monotonic samples of current/total hours."""
+
+    def __init__(self, *, min_elapsed_sec: float = _ETA_MIN_ELAPSED_SEC) -> None:
+        self._min_elapsed_sec = min_elapsed_sec
+        self._samples: dict[str, tuple[int, float]] = {}
+        self._eta: dict[str, float] = {}
+        self._eta_at: dict[str, float] = {}
+
+    def update(
+        self,
+        result_id: str,
+        *,
+        current: int,
+        total: int,
+        now_monotonic: float,
+    ) -> float | None:
+        if total <= 0 or current >= total:
+            self._eta.pop(result_id, None)
+            self._eta_at.pop(result_id, None)
+            self._samples[result_id] = (current, now_monotonic)
+            return None
+
+        prev = self._samples.get(result_id)
+        if prev is None:
+            self._samples[result_id] = (current, now_monotonic)
+            return None
+
+        prev_current, prev_t = prev
+        if current < prev_current:
+            self._samples[result_id] = (current, now_monotonic)
+            self._eta.pop(result_id, None)
+            self._eta_at.pop(result_id, None)
+            return None
+
+        if current > prev_current:
+            eta = estimate_remaining_seconds(
+                current=current,
+                total=total,
+                delta_current=current - prev_current,
+                delta_t_sec=now_monotonic - prev_t,
+                min_elapsed_sec=self._min_elapsed_sec,
+            )
+            if eta is not None:
+                self._samples[result_id] = (current, now_monotonic)
+                self._eta[result_id] = eta
+                self._eta_at[result_id] = now_monotonic
+            # else: keep anchor so elapsed time can accumulate across fast steps
+
+        stored = self._eta.get(result_id)
+        stored_at = self._eta_at.get(result_id)
+        if stored is None or stored_at is None:
+            return None
+        return max(0.0, stored - (now_monotonic - stored_at))
 
 
 def ordered_backtesting_result_ids(
@@ -161,14 +328,13 @@ def read_progress_file(path: str) -> dict | None:
 
 
 def read_progress_snapshot(progress_path: str) -> dict[str, dict]:
-    """All worker progress entries keyed by scenario label."""
+    """All worker progress entries keyed by result_id (fallback: scenario label)."""
     path = Path(progress_path)
     if path.suffix.lower() == ".json" and path.is_file():
         payload = read_progress_file(str(path))
         if payload is None:
             return {}
-        key = str(payload.get("scenario") or "active")
-        return {key: payload}
+        return {progress_entry_key(payload): payload}
 
     progress_dir = resolve_progress_dir(progress_path)
     if progress_dir is None or not progress_dir.is_dir():
@@ -179,6 +345,6 @@ def read_progress_snapshot(progress_path: str) -> dict[str, dict]:
         payload = read_progress_file(str(file_path))
         if payload is None:
             continue
-        key = str(payload.get("scenario") or file_path.stem)
+        key = progress_entry_key(payload, fallback=file_path.stem)
         snapshot[key] = payload
     return snapshot

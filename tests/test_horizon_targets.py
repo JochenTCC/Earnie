@@ -1,4 +1,4 @@
-"""Tests für Planungshorizont-Ziele (Jetzt→SA₂, nicht nur 24 h)."""
+"""Tests für Planungshorizont-Ziele (SA_0-->SA_2, nicht nur 24 h)."""
 from __future__ import annotations
 
 from optimizer.targets import (

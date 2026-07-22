@@ -37,16 +37,18 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
   - Ensure reference/baseline paths do not pay full MILP cost; skip or cheap-path when no battery and no remaining flex (or equivalent trivial state)
   - Gate so optimized € path is unchanged unless a short A/B shows acceptable delta; report speedup on a multi-scenario SE run
   - [x] **TAKEAWAY** — Historisch/`ref:*` already closed-form (regression-tested). Optimized path skips solver when `battery_capacity_kwh<=0` and remaining flex=0 (`ENERGY_OPTIMIZER_MILP_TRIVIAL_FAST_PATH`, default on). Fixture A/B: dEUR=0 on battery+flex and no-battery/zero-flex; measurable wall speedup on trivial windows (`python -m scripts.ab_se_trivial_fast_path`)
-- [ ] **2.3.c.2 — Tuning MILP for SE and Live**
+- [x] **2.3.c.2 — Tuning MILP for SE and Live**
   - Check if removing constraint for SOC at end of horizon changes simulation results in backtesting for both fixed_24h and sunset2sunset
-  - Trial SE `sunrise_window` without 24 h truncate: simulate full now→SA₂ (~40–48 h) per step; book costs only for the non-overlapping first day (t_now→SA₁ or first 24 h); hand off simulated SoC at SA₁ as start SoC for the next day’s ~48 h run — **no hard SOC_min at SA₁** (same direction as removing end-of-horizon SOC constraint above; keep min/max only)
-  - Check if there is a special issue on weekends, when time-to-be-ready is set to 12:00 (Start/End-SOC constraints) in SE optimization
+  - Trial SE `sunrise_window` without 24 h truncate: simulate full SA_0-->SA_2 (~40–48 h) per step; book costs only for the non-overlapping first day (t_now-->SA_1 or first 24 h); hand off simulated SoC at SA_1 as start SoC for the next day’s ~48 h run — **no hard SOC_min at SA_1** (same direction as removing end-of-horizon SOC constraint above; keep min/max only)
   - Check if non-constant sample time would be possible for online MILP (15 min for next 3hours, 1h in rest of neutral area, 2hours for green area)
-- [ ] **2.3.d — Scenario Explorer polish**
-  - SE progress bars: show ETA (“time left until finished”) during scenario simulation
-    - Reopened from Erledigt 2026-07-16 — requested with baseline progress; only `current/total h` shipped, not ETA
-  - Order of progress bars in SE shall not change during execution of scenario simulation — previous fix (pre-seed worker progress files + sort by canonical preferred order) does not hold; reopen from Erledigt 2026-07-16
-  - SE calculation speed → **2.3.c.0a** / **2.3.c.0b** / **2.3.c.1** (not duplicated here)
+  - [x] **TAKEAWAY (SOC anchors)** — last12m (`2025-07-01`–`2026-06-30`). Flag `disable_horizon_soc_anchor`. Small € win on `sunrise_window`; mixed on `fixed_24h`. **Keep product anchors on**. Artifacts: `backtesting_logs/soc_anchor_ab_last12m/`
+  - [x] **TAKEAWAY (full SA_0-->SA_2)** — Flag `sunrise_full_horizon_trial`. Large € delta but plausibility collapsed (~127/365) from flex deferred past booked 24 h. **Keep SE truncate** as default. Artifacts: `backtesting_logs/sunrise_full_ab_last12m/`
+  - [x] **TAKEAWAY (variable sample time)** — **hard — defer** (implicit `dt ≡ 1 h`; Live already re-opts ~15 min on hourly plan)
+- [x] **2.3.c.3 — Full SA_0-->SA_2: force flex into booked slice**
+  - Root cause of 2.3.c.2 plaus collapse: generic flex eligible on day-2 hours; open-loop satisfies 24 h targets after the book cut
+  - Clamp consumer `flex_indices` to first `BACKTESTING_STEP_HOURS` via `flex_book_hours` when `sunrise_full_horizon_trial` is on (battery/PV still see full matrix)
+  - A/B last12m truncated vs full+flexbook; gate: plaus ≈ truncated before reconsidering product path
+  - [x] **TAKEAWAY** — last12m (`2025-07-01`–`2026-06-30`, 8 workers). Plaus **restored** to 344/365 (= truncated) on all four scenarios. € Δ vs truncated ≈ −7…−18 €/y (Live −10 €); wall ~398s vs ~423s. Broken run without flexbook had −136…−175 € with collapsed plaus — those “savings” were flex deferred past booking. **Product default (user 2026-07-22):** `sunrise_full_horizon_trial` **true** (full SA_0-->SA_2 + flexbook + free SOC anchors); set `false` for old truncate-before-MILP. Artifacts: `backtesting_logs/sunrise_full_flexbook_ab_last12m/`
 
 - [ ] Streamlit Rollout (Pre-Release)
 

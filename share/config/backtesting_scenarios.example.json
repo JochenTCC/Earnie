@@ -4,6 +4,7 @@
     "cbc_gap_rel": 0.1,
     "commit_hours": 24,
     "cbc_strict_time_limit_sec": 3,
+    "sunrise_full_horizon_trial": true,
     "scenarios": [
         {
             "id": "live",

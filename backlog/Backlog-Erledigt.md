@@ -3,6 +3,13 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.3.d — Scenario Explorer polish (2026-07-22)
+
+- [x] SE progress bars: ETA (“time left until finished”) during scenario simulation — `ProgressEtaTracker` / caption helpers in `simulation/backtesting_progress.py`; UI in `ui/backtesting.py` (reopened from 2026-07-16 baseline progress)
+- [x] Stable progress-bar order during run — snapshot keyed by `result_id`; fixed preferred-id slots with placeholders; drop UI-side `prepare_progress_dir` before spawn (`ui/backtesting_runner.py`)
+- [x] SE calculation speed deferred to **2.3.c.0a** / **2.3.c.0b** / **2.3.c.1** (not duplicated here)
+
+
 ### 2.3.c — Plan / SOC plausibility (2026-07-22)
 
 - [x] Live Monitor Chart 1: explain SoC vs **SoC BL Ziel** (Lastverschiebung + Batteriestrategie) via caption/`?` + German handbook section
@@ -401,7 +408,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - 3.- Other PV-settings - Ohne Optimierung
   - x.- Repeat order from 2., 3. ... - Optimiert
   - Canonical `ordered_backtesting_result_ids` / reorder before `save_backtesting_log`; Live-first in `_annual_cost_row_order`
-  - Progress-bar order during run: reopened in `Backlog-Bugfixes.md` (fix did not hold)
+  - Progress-bar order during run: closed in **2.3.d** (2026-07-22)
 
 
 ### SE results disclaimer (2026-07-16)
@@ -479,7 +486,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **SE baseline/reference progress bar** — reference simulations report hourly progress (`phase: reference`) via per-worker JSON snapshots; Streamlit shows per-task bars including historical reference (`scripts/run_backtesting.py` `_run_reference_worker`, `ui/backtesting.py`)
 - [x] **Run-time progress feedback** — active tasks show `current/total h` (and `Referenz` label for baseline phase) during parallel runs
-  - ETA (“time left until finished”): reopened in [Backlog.md](Backlog.md) Feature Backlog (not implemented)
+  - ETA (“time left until finished”): closed in **2.3.d** (2026-07-22)
 - [x] **Worker count matches all parallel tasks** — `count_backtesting_parallel_tasks` = main reference + per-scenario extra references + optimized scenarios; `auto_backtesting_workers` uses `min(task_count, cpu_count − 1)`; references run in the same `ProcessPoolExecutor` as scenarios (`ui/backtesting_runner.py`, `_run_parallel_backtesting`); test `test_count_backtesting_parallel_tasks_includes_reference`
 
 

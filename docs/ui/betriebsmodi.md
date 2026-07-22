@@ -114,7 +114,7 @@ Ersparnis-, Kosten-Kennzahlen und Energievergleich beziehen sich auf **Jetzt →
 **Hinweis Re-Opt:** Der Szenario-Explorer steuert die MILP-Commit-Weite über
 `commit_hours` in `backtesting_scenarios.json` (Standard **24** ≈ open-loop; **1** = stündlich).
 Das ist nicht dasselbe wie die periodische Live-Re-Optimierung — kein 1:1-Paritätsnachweis
-zum Live-MPC. Standard-Horizont ist `sunrise_window` (Sunset-2-Sunset / Jetzt→SA₂).
+zum Live-MPC. Standard-Horizont ist `sunrise_window` (Sunset-2-Sunset / SA_0-->SA_2).
 
 Geplant (Dev-only): Nachrechnung eines beliebigen Kalendertags — ersetzt den früheren Modus **Historischer Tag**.
 

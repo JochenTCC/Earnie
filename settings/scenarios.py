@@ -168,3 +168,27 @@ def get_backtesting_milp_solver(backtesting_scenarios_path: str) -> str:
             f"'{backtesting_scenarios_path}'."
         )
     return name
+
+
+def get_backtesting_disable_horizon_soc_anchor(backtesting_scenarios_path: str) -> bool:
+    """
+    Trial: drop terminal end-SoC and sunrise SOC_min equality (keep min/max only).
+
+    Optional top-level ``disable_horizon_soc_anchor`` in backtesting_scenarios.json.
+    Default False (product behaviour unchanged).
+    """
+    doc = load_backtesting_scenarios_document(backtesting_scenarios_path)
+    return bool(doc.get("disable_horizon_soc_anchor", False))
+
+
+def get_backtesting_sunrise_full_horizon_trial(backtesting_scenarios_path: str) -> bool:
+    """
+    SE sunrise_window: MILP on full SA_0-->SA_2; book first 24 h; flex clamped to book.
+
+    Optional top-level ``sunrise_full_horizon_trial`` in backtesting_scenarios.json.
+    Default True (product SE path). Set false to restore pre-2.3.c.3 truncate-before-MILP.
+    """
+    doc = load_backtesting_scenarios_document(backtesting_scenarios_path)
+    if "sunrise_full_horizon_trial" not in doc:
+        return True
+    return bool(doc.get("sunrise_full_horizon_trial"))

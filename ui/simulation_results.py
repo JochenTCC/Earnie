@@ -396,7 +396,7 @@ def render_applied_targets(savings: dict) -> None:
 
     with st.expander("⚡ Energievergleich Baseline vs. Optimierung"):
         st.caption(
-            "Horizont Jetzt→SA₂ (voller MILP-Plan). BL Profil: historisches Flex-Profil. "
+            "Horizont SA_0-->SA_2 (voller MILP-Plan). BL Profil: historisches Flex-Profil. "
             "BL Ziel: gleiche Energie wie die Optimierung (Profil skaliert), ohne Lastverschiebung."
         )
 

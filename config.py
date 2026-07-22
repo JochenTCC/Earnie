@@ -372,6 +372,16 @@ class Config:
             self.backtesting_scenarios_path
         )
 
+    def get_backtesting_disable_horizon_soc_anchor(self) -> bool:
+        return scenario_settings.get_backtesting_disable_horizon_soc_anchor(
+            self.backtesting_scenarios_path
+        )
+
+    def get_backtesting_sunrise_full_horizon_trial(self) -> bool:
+        return scenario_settings.get_backtesting_sunrise_full_horizon_trial(
+            self.backtesting_scenarios_path
+        )
+
     def _load_backtesting_scenarios_entries(self) -> list:
         return scenario_settings.load_backtesting_scenarios_entries(
             self.backtesting_scenarios_path,
@@ -651,6 +661,14 @@ def get_backtesting_cbc_strict_time_limit_sec() -> float:
 
 def get_backtesting_milp_solver() -> str:
     return CONFIG.get_backtesting_milp_solver()
+
+
+def get_backtesting_disable_horizon_soc_anchor() -> bool:
+    return CONFIG.get_backtesting_disable_horizon_soc_anchor()
+
+
+def get_backtesting_sunrise_full_horizon_trial() -> bool:
+    return CONFIG.get_backtesting_sunrise_full_horizon_trial()
 
 
 def get_value(name: str, default=None, cast=None):

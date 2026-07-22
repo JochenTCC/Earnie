@@ -6,6 +6,8 @@ import json
 import os
 from datetime import date
 
+import pytest
+
 from scripts.run_backtesting import BACKTESTING_YEAR, _write_progress_file
 from simulation.backtesting_progress import (
     read_progress_snapshot,
@@ -299,6 +301,154 @@ def test_read_progress_snapshot_aggregates_worker_files(tmp_path):
     assert set(snapshot) == {"Runtime", "Fix"}
     assert snapshot["Runtime"]["current"] == 3
     assert snapshot["Fix"]["current"] == 7
+
+
+def test_read_progress_snapshot_keys_by_result_id(tmp_path):
+    progress_dir = str(tmp_path / ".backtesting_progress")
+    _write_progress_file(
+        worker_progress_path(progress_dir, "live"),
+        {
+            "current": 3,
+            "total": 10,
+            "scenario": "Live Display",
+            "phase": "simulation",
+            "result_id": "live",
+        },
+    )
+    _write_progress_file(
+        worker_progress_path(progress_dir, "hist"),
+        {
+            "current": 1,
+            "total": 10,
+            "scenario": "Historisch",
+            "phase": "reference",
+            "result_id": "historical",
+        },
+    )
+    snapshot = read_progress_snapshot(progress_dir)
+    assert set(snapshot) == {"live", "historical"}
+    assert snapshot["live"]["scenario"] == "Live Display"
+
+
+def test_build_progress_display_rows_placeholders_keep_order():
+    from simulation.backtesting_progress import build_progress_display_rows
+
+    preferred = ["historical", "live", "battery"]
+    snapshot = {
+        "battery": {
+            "current": 2,
+            "total": 10,
+            "scenario": "Battery",
+            "phase": "simulation",
+            "result_id": "battery",
+        }
+    }
+    labels = {
+        "historical": "Historisch",
+        "live": "Live",
+        "battery": "Battery",
+    }
+    rows = build_progress_display_rows(preferred, snapshot, labels)
+    assert [r["result_id"] for r in rows] == preferred
+    assert rows[0]["placeholder"] is True
+    assert rows[1]["placeholder"] is True
+    assert rows[2]["placeholder"] is False
+    assert rows[2]["current"] == 2
+
+
+def test_estimate_remaining_seconds_and_format_eta():
+    from simulation.backtesting_progress import (
+        estimate_remaining_seconds,
+        format_eta_caption,
+        format_progress_bar_caption,
+    )
+
+    assert estimate_remaining_seconds(
+        current=0, total=10, delta_current=1, delta_t_sec=10.0
+    ) is None
+    assert estimate_remaining_seconds(
+        current=2, total=10, delta_current=0, delta_t_sec=10.0
+    ) is None
+    assert estimate_remaining_seconds(
+        current=2, total=10, delta_current=1, delta_t_sec=2.0
+    ) is None
+    eta = estimate_remaining_seconds(
+        current=2, total=10, delta_current=2, delta_t_sec=10.0
+    )
+    assert eta == pytest.approx(40.0)
+    assert estimate_remaining_seconds(
+        current=10, total=10, delta_current=1, delta_t_sec=10.0
+    ) is None
+
+    assert format_eta_caption(None) is None
+    assert format_eta_caption(-1) is None
+    assert format_eta_caption(12) == "noch ~12s"
+    assert format_eta_caption(8 * 60) == "noch ~8 Min"
+    assert format_eta_caption(2 * 3600) == "noch ~2 Std"
+    assert format_eta_caption(2 * 3600 + 15 * 60) == "noch ~2 Std 15 Min"
+
+    assert (
+        format_progress_bar_caption(
+            label="Live",
+            current=0,
+            total=0,
+            phase="",
+            placeholder=True,
+        )
+        == "Live — Wartend…"
+    )
+    assert (
+        format_progress_bar_caption(
+            label="Live",
+            current=12,
+            total=240,
+            phase="simulation",
+            placeholder=False,
+            eta_seconds=8 * 60,
+        )
+        == "Live — 12/240 h · noch ~8 Min"
+    )
+    assert (
+        format_progress_bar_caption(
+            label="Historisch",
+            current=5,
+            total=100,
+            phase="reference",
+            placeholder=False,
+            eta_seconds=30,
+        )
+        == "Historisch — Referenz · noch ~30s"
+    )
+
+
+def test_progress_eta_tracker_keeps_last_eta_until_advance():
+    from simulation.backtesting_progress import ProgressEtaTracker
+
+    tracker = ProgressEtaTracker(min_elapsed_sec=5.0)
+    assert tracker.update("live", current=0, total=100, now_monotonic=0.0) is None
+    assert tracker.update("live", current=0, total=100, now_monotonic=3.0) is None
+    eta = tracker.update("live", current=10, total=100, now_monotonic=10.0)
+    assert eta == pytest.approx(90.0)
+    # Wall-clock countdown between progress advances
+    assert tracker.update("live", current=10, total=100, now_monotonic=12.0) == pytest.approx(
+        88.0
+    )
+    assert tracker.update("live", current=100, total=100, now_monotonic=50.0) is None
+
+
+def test_progress_eta_tracker_accumulates_fast_steps():
+    from simulation.backtesting_progress import ProgressEtaTracker
+
+    tracker = ProgressEtaTracker(min_elapsed_sec=5.0)
+    assert tracker.update("ref", current=0, total=100, now_monotonic=0.0) is None
+    # Sub-threshold advances must keep the original anchor
+    assert tracker.update("ref", current=1, total=100, now_monotonic=1.0) is None
+    assert tracker.update("ref", current=2, total=100, now_monotonic=2.0) is None
+    eta = tracker.update("ref", current=5, total=100, now_monotonic=5.0)
+    assert eta == pytest.approx(95.0)
+    assert tracker.update("ref", current=5, total=100, now_monotonic=6.0) == pytest.approx(
+        94.0
+    )
 
 
 def test_migrate_oemag_template_fill_when_keys_missing(tmp_path, monkeypatch):

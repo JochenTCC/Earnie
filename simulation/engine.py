@@ -14,6 +14,7 @@ from data.market_prices import epex_prices_for_slots
 from optimizer import (
     simulate_horizon,
     horizon_end_soc_from_chart_rows,
+    horizon_end_soc_percent,
     _calculate_step_cost_euro_from_row,
     _delivered_flex_kwh_from_rows,
     _total_consumption_kwh_from_rows,
@@ -599,7 +600,7 @@ def build_sunrise_window_matrix(
     price_resources: BacktestingPriceResources | None = None,
 ) -> tuple[list[dict], dict, int, list[dict]]:
     """
-    Sunrise-MILP-Matrix (Jetzt→SA₂) für einen Backtesting-Schritt ab Anker−24h.
+    Sunrise-MILP-Matrix (SA_0-->SA_2) für einen Backtesting-Schritt ab Anker−24h.
 
     Returns: (24h-Schritt-Matrix, Meta, sunrise_soc_min_index, volle Planungsmatrix)
     """
@@ -636,8 +637,14 @@ def build_sunrise_window_matrix(
     meta["planning_horizon_hours"] = len(full_slots)
     meta["sunrise_anchor"] = planning_window.sunrise_anchor
     meta["step_slot_datetimes"] = step_slots
-    matrix = truncate_matrix_for_step_simulation(list(matrix_full), sunrise_index)
-    overlay_step_consumption_on_matrix(matrix, step_matrix)
+    matrix_full = list(matrix_full)
+    # Overlay step baseload onto matching slots of the full matrix (in-place),
+    # then truncate for the default SE money path.
+    overlay_step_consumption_on_matrix(
+        matrix_full[:BACKTESTING_STEP_HOURS],
+        step_matrix,
+    )
+    matrix = truncate_matrix_for_step_simulation(matrix_full, sunrise_index)
     return matrix, meta, effective_sunrise_soc_min_index(sunrise_index), matrix_full
 
 
@@ -697,6 +704,9 @@ def _simulate_anchor_step(
     """Ein Backtesting-Schritt (24h Output) für fixed_24h oder sunrise_window."""
     sunrise_soc_min_index = None
     matrix_full: list[dict] | None = None
+    disable_soc_anchor = config.get_backtesting_disable_horizon_soc_anchor()
+    full_horizon_trial = config.get_backtesting_sunrise_full_horizon_trial()
+    step_start_soc = float(sim_soc)
     if horizon_mode == SUNRISE_WINDOW:
         matrix, meta, sunrise_soc_min_index, matrix_full = build_sunrise_window_matrix(
             anchor,
@@ -706,6 +716,10 @@ def _simulate_anchor_step(
             feed_in_settings,
             price_resources=price_resources,
         )
+        if full_horizon_trial and matrix_full is not None:
+            matrix = list(matrix_full)
+            sunrise_soc_min_index = None
+            disable_soc_anchor = True
     else:
         matrix, meta = build_historical_window_matrix(
             anchor,
@@ -714,6 +728,12 @@ def _simulate_anchor_step(
             feed_in_settings=feed_in_settings,
             scenario_params=scenario_params,
         )
+
+    commit_hours = config.get_backtesting_commit_hours()
+    flex_book_hours: int | None = None
+    if full_horizon_trial and horizon_mode == SUNRISE_WINDOW:
+        commit_hours = len(matrix)
+        flex_book_hours = BACKTESTING_STEP_HOURS
 
     chart_rows = simulate_horizon(
         matrix,
@@ -724,7 +744,9 @@ def _simulate_anchor_step(
         simulation_hour_offset=hours_done if collect_cbc else None,
         sunrise_soc_min_index=sunrise_soc_min_index,
         flexible_consumers=_flexible_consumers_from_scenario(scenario_params),
-        commit_hours=config.get_backtesting_commit_hours(),
+        commit_hours=commit_hours,
+        disable_horizon_soc_anchor=disable_soc_anchor,
+        flex_book_hours=flex_book_hours,
     )
     full_rows: list[dict] | None = None
     full_matrix: list[dict] | None = None
@@ -738,13 +760,20 @@ def _simulate_anchor_step(
             simulation_hour_offset=None,
             sunrise_soc_min_index=sunrise_soc_min_index,
             flexible_consumers=_flexible_consumers_from_scenario(scenario_params),
-            commit_hours=config.get_backtesting_commit_hours(),
+            commit_hours=commit_hours,
+            disable_horizon_soc_anchor=disable_soc_anchor,
+            flex_book_hours=flex_book_hours,
         )
         full_matrix = matrix_full
     chart_rows, matrix = _apply_backtesting_step(
         chart_rows, matrix, meta, horizon_mode=horizon_mode
     )
     end_soc = horizon_end_soc_from_chart_rows(chart_rows)
+    if end_soc is None:
+        # Full-horizon trial: _horizon_end_soc sits on SA₂; recompute booked-slice end.
+        end_soc = horizon_end_soc_percent(
+            chart_rows, step_start_soc, battery_params
+        )
     new_soc = (
         end_soc
         if end_soc is not None
@@ -1160,7 +1189,7 @@ def run_simulation(
 
     horizon_mode:
       - fixed_24h: [Anker−24h, Anker), SOC frei am Fensterende (E-Auto-Anker)
-      - sunrise_window: MILP Jetzt→SA₂, SOC_min am Sonnenaufgang; Output weiter 24h/Schritt
+      - sunrise_window: MILP SA_0-->SA_2, SOC_min am Sonnenaufgang; Output weiter 24h/Schritt
     """
     horizon_mode = parse_horizon_mode(horizon_mode)
     if horizon_mode == SUNRISE_WINDOW:

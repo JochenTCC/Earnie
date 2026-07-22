@@ -1,4 +1,4 @@
-"""Backtesting: Matrixbau und Sunset-Schritte (Jetzt→SA₂, SOC_min am Sonnenaufgang)."""
+"""Backtesting: Matrixbau und Sunset-Schritte (SA_0-->SA_2, SOC_min am Sonnenaufgang)."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -89,7 +89,7 @@ def truncate_matrix_for_step_simulation(
     """
     Kürzt die Sunset-Matrix auf den 24h-Output-Schritt.
 
-    Volle Jetzt→SA₂-Matrix (typ. ~40–48 h) würde simulate_horizon pro Extra-Stunde
+    Volle SA_0-->SA_2-Matrix (typ. ~40–48 h) würde simulate_horizon pro Extra-Stunde
     ein zusätzliches MILP lösen, obwohl Backtesting nur 24 h ausgibt.
     """
     if len(matrix) <= BACKTESTING_STEP_HOURS:
