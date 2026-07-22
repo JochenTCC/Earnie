@@ -10,7 +10,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] Ghost outline bars (**Original-Schedule**) for matched/BL-Ziel flex vs filled optimized bars
 - [x] Chart-1 docs (`docs/ui/charts.md`); flow-balance bar heights in **kWh** (`kW × slot duration`); ghost filter `< 1 kWh`
 - [x] Known-generic duty cycle: fractional `duration_h` (e.g. Swimspa Jets) → average kW so Chart energy matches `nominal × planned duration`
-- MILP research (terminal SOC / weekend ready-by / variable sample time) remains open under **2.3.c.2** in [Backlog.md](Backlog.md); SE speed-up trials ahead of that: **2.3.c.0a** / **2.3.c.0b** / **2.3.c.1**
+- MILP research (terminal SOC / weekend ready-by / variable sample time) remains open under **2.3.c.2** in [Backlog.md](Backlog.md); SE speed-up: **2.3.c.0a** / **2.3.c.0b** (TAKEAWAYs), **2.3.c.1** done (trivial MILP fast path + ref non-MILP guard)
 
 
 ### 2.3.b — Approximate cost model (monthly fees) (2026-07-22)

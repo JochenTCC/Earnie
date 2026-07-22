@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 import config
@@ -45,6 +46,8 @@ from .milp_result import (
 
 logger = logging.getLogger(__name__)
 
+ENV_MILP_TRIVIAL_FAST_PATH = "ENERGY_OPTIMIZER_MILP_TRIVIAL_FAST_PATH"
+
 _AUTOMATIK_FALLBACK = (0, 0.0, 99.0, {}, {}, EMPTY_MILP_PLAN, {})
 _FALLBACK_SCHEDULE_SLOT = {
     "milp_plan": dict(EMPTY_MILP_PLAN),
@@ -52,6 +55,56 @@ _FALLBACK_SCHEDULE_SLOT = {
     "consumer_pv_follow": {},
     "planned_soc_percent": None,
 }
+
+
+def milp_trivial_fast_path_enabled() -> bool:
+    """Env gate: unset/1 = on; 0/false/off/no = always solve (A/B baseline)."""
+    raw = os.environ.get(ENV_MILP_TRIVIAL_FAST_PATH)
+    if raw is None or str(raw).strip() == "":
+        return True
+    return str(raw).strip().lower() not in ("0", "false", "off", "no")
+
+
+def is_trivial_milp_window(
+    battery_params: dict,
+    remaining_kwh: dict[str, float] | None,
+) -> bool:
+    """True when no battery capacity and no remaining flex energy to schedule."""
+    capacity = float(battery_params.get("battery_capacity_kwh", 0.0) or 0.0)
+    if capacity > 0.0:
+        return False
+    rem = remaining_kwh or {}
+    return all(float(v or 0.0) <= 0.0 for v in rem.values())
+
+
+def trivial_horizon_schedule(n: int) -> list[dict[str, Any]]:
+    """Automatik / empty-flex slots — no solver (2.3.c.1 trivial window)."""
+    if n < 0:
+        raise ValueError(f"trivial schedule length must be >= 0 (got {n})")
+    return [dict(_FALLBACK_SCHEDULE_SLOT) for _ in range(n)]
+
+
+def _try_trivial_milp_skip(
+    matrix: list[dict[str, Any]],
+    battery_params: dict,
+    consumers: list | None,
+    consumer_remaining_kwh: dict[str, float] | None,
+    spa_remaining_kwh: float | None,
+) -> dict[str, float] | None:
+    """
+    If trivial fast path applies, return resolved remaining; else None.
+    Caller must not invoke the solver when this returns a dict.
+    """
+    if not matrix or not milp_trivial_fast_path_enabled():
+        return None
+    active = _active_consumers(consumers)
+    remaining = _remaining_kwh_by_consumer(
+        active, consumer_remaining_kwh, spa_remaining_kwh
+    )
+    if not is_trivial_milp_window(battery_params, remaining):
+        return None
+    logger.debug("MILP trivial fast path (no battery, no remaining flex)")
+    return remaining
 
 
 def _day_indices(matrix: list[dict[str, Any]], horizon: int) -> list[int]:
@@ -259,6 +312,25 @@ def milp_optimizer(
                {consumer_id: pv_follow 0|1}, milp_plan, urgent_observability)
     """
     battery_params = battery_params or config.get_battery_params()
+    if (
+        _try_trivial_milp_skip(
+            matrix,
+            battery_params,
+            consumers,
+            consumer_remaining_kwh,
+            spa_remaining_kwh,
+        )
+        is not None
+    ):
+        return (
+            0,
+            0.0,
+            round(float(current_soc), 1),
+            {},
+            {},
+            dict(EMPTY_MILP_PLAN),
+            {},
+        )
     fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
     solved = _solve_milp_to_model(
         matrix,
@@ -352,6 +424,17 @@ def milp_horizon_schedule(
     Bei leerer Matrix oder nicht-optimalem Solve: ein Fallback-Slot (Automatik).
     """
     battery_params = battery_params or config.get_battery_params()
+    if (
+        _try_trivial_milp_skip(
+            matrix,
+            battery_params,
+            consumers,
+            consumer_remaining_kwh,
+            spa_remaining_kwh,
+        )
+        is not None
+    ):
+        return trivial_horizon_schedule(len(matrix))
     fallback_k_push = k_push if k_push is not None else config.get_push_price_cent()
     solved = _solve_milp_to_model(
         matrix,
@@ -387,10 +470,14 @@ _derive_control_from_milp = bat._derive_control_from_milp
 __all__ = [
     "MilpHorizonModel",
     "EMPTY_MILP_PLAN",
+    "ENV_MILP_TRIVIAL_FAST_PATH",
     "add_min_on_time_constraints",
     "filter_feasible_consumers",
+    "is_trivial_milp_window",
     "milp_horizon_schedule",
     "milp_optimizer",
+    "milp_trivial_fast_path_enabled",
+    "trivial_horizon_schedule",
     "_add_consumer_delivery_constraints",
     "_add_milp_objective",
     "_add_sunrise_soc_min_constraint",

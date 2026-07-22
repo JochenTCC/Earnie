@@ -111,6 +111,13 @@ ein Schritt pro E-Auto-Anker reicht für den Horizont-Vergleich; Live-Prod bleib
 
 A/B K=1 vs open-loop (Fixtures): `python -m scripts.ab_se_commit_hours`
 
+**Trivial MILP fast path (2.3.c.1):** When `battery_capacity_kwh <= 0` and all
+remaining flex targets are 0, `milp_horizon_schedule` / `milp_optimizer` skip the
+solver and return Automatik / empty-flex slots (grid = load − PV). Gate:
+`ENERGY_OPTIMIZER_MILP_TRIVIAL_FAST_PATH` (default on; `0` = always solve for A/B).
+Historisch / `ref:*` costs stay closed-form (`_hour_cost_without_optimization`) and
+never call MILP. A/B: `python -m scripts.ab_se_trivial_fast_path`
+
 ### 4.3 Vergleichslauf
 
 ```bash

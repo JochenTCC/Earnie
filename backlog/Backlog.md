@@ -32,10 +32,11 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
   - Bench wall time and €/plan delta vs CBC on the same SE window set (short month + a 12 months / defaults from above)
   - Decide: SE-only HiGHS, optional Live, or keep CBC; keep env/config switch so CBC remains fallback
   - [x] **TAKEAWAY** — Differences negligible → **HiGHS is the new default** (Live + SE). CBC remains fallback via `EARNIE_MILP_SOLVER=cbc` / SE `milp_solver`. Artifacts: `backtesting_logs/solver_ab_m03`, `solver_ab_last12m`.
-- [ ] **2.3.c.1 — Trial: fast paths for reference / trivial windows**
+- [x] **2.3.c.1 — Trial: fast paths for reference / trivial windows**
   - **Trial focused on reference calculations** (Historisch / scenario refs) and obvious no-MIP cases
   - Ensure reference/baseline paths do not pay full MILP cost; skip or cheap-path when no battery and no remaining flex (or equivalent trivial state)
   - Gate so optimized € path is unchanged unless a short A/B shows acceptable delta; report speedup on a multi-scenario SE run
+  - [x] **TAKEAWAY** — Historisch/`ref:*` already closed-form (regression-tested). Optimized path skips solver when `battery_capacity_kwh<=0` and remaining flex=0 (`ENERGY_OPTIMIZER_MILP_TRIVIAL_FAST_PATH`, default on). Fixture A/B: dEUR=0 on battery+flex and no-battery/zero-flex; measurable wall speedup on trivial windows (`python -m scripts.ab_se_trivial_fast_path`)
 - [ ] **2.3.c.2 — Tuning MILP for SE and Live**
   - Check if removing constraint for SOC at end of horizon changes simulation results in backtesting for both fixed_24h and sunset2sunset
   - Trial SE `sunrise_window` without 24 h truncate: simulate full now→SA₂ (~40–48 h) per step; book costs only for the non-overlapping first day (t_now→SA₁ or first 24 h); hand off simulated SoC at SA₁ as start SoC for the next day’s ~48 h run — **no hard SOC_min at SA₁** (same direction as removing end-of-horizon SOC constraint above; keep min/max only)
