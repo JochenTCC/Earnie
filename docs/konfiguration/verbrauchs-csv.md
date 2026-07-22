@@ -1,6 +1,8 @@
 # Historische Verbrauchs-CSV (Hausprofil)
 
-Im **Hauskonfigurator** können Sie Jahresverbrauchs-Zeitreihen als CSV hinterlegen — für das gesamte Haus und optional je Verbraucher. Zusätzlich kann ein **PV-Ertragsprofil** (Summe aller Anlagen) importiert werden.
+Im **Hauskonfigurator** können Sie Jahresverbrauchs-Zeitreihen als CSV hinterlegen — für das gesamte Haus und optional je Verbraucher. Mit Jahresverbrauch ist dabei die Summe aller Leistungen gemeint, die im Haus tatsächlich verbraucht wurden, egal woher die Leistung gespeist wurde (also aus dem Netz, der PV-Anlage oder der Batterie).
+
+Zusätzlich kann ein **PV-Ertragsprofil** (Summe aller Anlagen) importiert werden. Auch hier ist die gesamte Leistung gemeint, die von den PV-Anlagen erzeugt wurde, egal ob sie direkt verbraucht, in der Batterie gespeichert oder ins Netz eingespeist wurde.
 
 ## Kanonisches Format
 
@@ -9,24 +11,28 @@ timestamp;power_kw
 2023-01-01 00:00:00;3.177
 ```
 
-| Regel | Bedeutung |
-| ----- | --------- |
-| Trennzeichen | Semikolon (`;`) |
-| Zeitstempel | ISO-ähnlich `YYYY-MM-DD HH:MM:SS` |
-| Leistung | Verbrauch bzw. PV-Ertrag in **kW**, positiv |
-| Länge | Nach Import mindestens **8760 Stunden** (ca. 12 Monate) |
-| Abtastung | Beliebig; beim Import → stündlich (Zero-Order-Hold auf 1‑Minuten-Raster, dann Stundenmittel = ∫P·dt / 1 h; Lücken halten den letzten Wert bis zum nächsten Sample) |
 
-Beim Upload schreibt Earnie eine normalisierte Datei unter `earnie_env/config/uploads/` (im Container: `config/uploads/`). Pro Rolle (Gesamtverbrauch, PV, je Verbraucher) gibt es **genau eine** Datei — ein erneuter Upload überschreibt denselben Pfad.
+| Regel        | Bedeutung                                                                                                                                                          |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Trennzeichen | Semikolon (`;`)                                                                                                                                                    |
+| Zeitstempel  | ISO-ähnlich `YYYY-MM-DD HH:MM:SS`                                                                                                                                  |
+| Leistung     | Verbrauch bzw. PV-Ertrag in **kW**, positiv                                                                                                                        |
+| Länge        | Nach Import mindestens **8760 Stunden** (ca. 12 Monate)                                                                                                            |
+| Abtastung    | Beliebig; beim Import → stündlich (Zero-Order-Hold auf 1‑Minuten-Raster, dann Stundenmittel = ∫P·dt / 1 h; Lücken halten den letzten Wert bis zum nächsten Sample) |
+
+
+Beim Upload schreibt Earnie eine **normalisierte** Datei unter `earnie_env/config/uploads/` (im Container: `config/uploads/`). Der Dateiname leitet sich vom Original ab: `{Originalname}_resampled.csv` (z. B. `BEZUG-2025-22.7.2026_resampled.csv`). Ein erneuter Upload derselben Originaldatei überschreibt diese resampled-Datei; ein anderer Originalname erzeugt eine neue Datei (der Profil-Pfad zeigt dann auf die neue).
 
 ## Importmodus (Hausprofil)
 
 Unter **Historische Jahresprofile (CSV)** wählen Sie:
 
-| Modus | Inhalt |
-| ----- | ------ |
-| **Getrennte CSVs** | Verbrauch (für Ist-vs-Modell) und optional PV-Ertrag als eigene Dateien |
+
+| Modus                     | Inhalt                                                                                                                        |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Getrennte CSVs**        | Verbrauch (für Ist-vs-Modell) und optional PV-Ertrag als eigene Dateien                                                       |
 | **Loxone Energiemonitor** | Eine Statistik-Datei; Spalten `Leistung Verbrauch [kW]` (Pflicht) und `Leistung Produktion [kW]` (optional) werden übernommen |
+
 
 Ignoriert beim Energiemonitor-Import: `Leistung Energieversorger`, `Leistung Batterie`, `Ladestand Batterie` (SOC wird nicht importiert) sowie Zähler-Spalten.
 
@@ -38,10 +44,12 @@ Exportierte Loxone-Dateien (eine Leistungsserie) werden beim Import erkannt und 
 
 Akzeptierte Layouts:
 
-| Layout | Beispiel-Kopfzeile | Wertspalte |
-| ------ | ------------------ | ---------- |
-| Getrennt Datum + Zeit | `Datum;Zeit;Wert` oder `Datum;Zeit;Wert;Leistung` | Spalte **`Leistung`**, falls vorhanden; sonst die **letzte** Spalte nach Datum/Zeit |
-| Kombinierter Zeitstempel | `Datum/Uhrzeit;Wert` bzw. `dd.mm.YYYY HH:MM:SS;…` | Spalte **`Leistung`**, falls vorhanden; sonst die letzte Spalte |
+
+| Layout                   | Beispiel-Kopfzeile                                | Wertspalte                                                                      |
+| ------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Getrennt Datum + Zeit    | `Datum;Zeit;Wert` oder `Datum;Zeit;Wert;Leistung` | Spalte `Leistung`, falls vorhanden; sonst die **letzte** Spalte nach Datum/Zeit |
+| Kombinierter Zeitstempel | `Datum/Uhrzeit;Wert` bzw. `dd.mm.YYYY HH:MM:SS;…` | Spalte `Leistung`, falls vorhanden; sonst die letzte Spalte                     |
+
 
 Dreispaltige Digitalsignale (`Datum;Zeit;0/1`) sind zulässig; beim Verbraucher-Import kann optional mit der Nennleistung skaliert werden (siehe unten).
 
@@ -96,10 +104,12 @@ Optional: `--cons-data`, `--from`, `--to`. Die Dateien sind Loxone-kompatibel un
 
 ## Abgrenzung Live-Loxone und CSV-Ebenen
 
-| Ebene | Ort | Zweck |
-| ----- | --- | ----- |
-| Runtime | `scenario_explorer_conf.path_cons_data` → `cons_data_hourly.csv` | Live + Szenario-Explorer |
-| Hausmodell | `house_profiles`: `total_profile_csv`, `pv_profile_csv`, `profile_csv` | Planung, Ist-vs-Modell, Synthese |
-| Offline-Flex-Log | `path_historical_log` am Verbraucher (Legacy-Overlay / Profil) | Einzelserie → cons_data |
+
+| Ebene            | Ort                                                                    | Zweck                            |
+| ---------------- | ---------------------------------------------------------------------- | -------------------------------- |
+| Runtime          | `scenario_explorer_conf.path_cons_data` → `cons_data_hourly.csv`       | Live + Szenario-Explorer         |
+| Hausmodell       | `house_profiles`: `total_profile_csv`, `pv_profile_csv`, `profile_csv` | Planung, Ist-vs-Modell, Synthese |
+| Offline-Flex-Log | `path_historical_log` am Verbraucher (Legacy-Overlay / Profil)         | Einzelserie → cons_data          |
+
 
 Das Feld `path_historical_log` (flexible Verbraucher / Hausprofil) gehört zum Offline-Weg Loxone-Log → `cons_data_hourly.csv` und ist unabhängig von den Hausprofil-Jahres-CSVs. Die früheren Keys `path_consumption` / `path_production` in `config.json` sind entfernt (data-model v3).
