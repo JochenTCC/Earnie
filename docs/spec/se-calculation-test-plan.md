@@ -65,7 +65,7 @@ Path **B** (meter residual Basislast) requires `total_profile_csv` **and** every
 # 1) Materialize cell overlays + descriptors
 python -m scripts.se_calc_test_matrix --cells M0,M1,M2
 
-# 2) SE runs (Live only, year 2025 months)
+# 2) SE runs (Live only, year 2025 months; workers default = max useful)
 python -m scripts.se_calc_test_run --cells M0,M1,M2 --months 1,4,7,10 --year 2025
 
 # 3) Compare + write results
@@ -87,7 +87,7 @@ CLI note: stock `scripts/run_backtesting.py` maps `--start-month` to the cons_da
 
 Filled by `scripts/se_calc_test_compare.py`.
 
-**Notes from this run:** M0 ≡ M1 for Live-ref/optimized (path **A** ignores `total_profile_csv` for Basislast). M2 shifts Live-ref when thermal/EV CSV overlays are on. Summary: 1 warn, 0 hard_fail (warn = actual vs Live-ref >5%, not auto-fail).
+**Notes from this run:** Re-run after Live `export_tariff_id` fix (`monthly_sunny` → `at_tiwag_tiwag_einspeisung_fix`); SE runner uses max useful workers (`3` for Live-only). M0 ≡ M1 for Live-ref/optimized (path **A** ignores `total_profile_csv` for Basislast). M2 shifts Live-ref when thermal/EV CSV overlays are on. Summary: 1 warn, 0 hard_fail (warn = actual vs Live-ref >5%, not auto-fail). kWh table unchanged vs prior run (tariff mainly affects €).
 
 | Cell | Month | Actual kWh | Live-ref kWh | Optimized kWh | Δ act/ref | Δ opt/ref | Status | Notes |
 | ---- | ----- | ---------- | ------------ | ------------- | --------- | --------- | ------ | ----- |

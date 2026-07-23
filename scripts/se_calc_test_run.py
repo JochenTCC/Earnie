@@ -1,6 +1,8 @@
 """Run SE (Live only) for matrix cells × seasonal months.
 
 Forces --year via patched backtesting_base_year (stock CLI uses cons_data max year).
+Uses max useful ProcessPool workers: min(CPU, parallel jobs). Live-only ≈ 3 jobs
+(historisch + ref:live + live).
 
 Examples:
   python -m scripts.se_calc_test_run --cells M0,M1,M2 --months 1,4,7,10 --year 2025
@@ -18,6 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# Live-only SE: historisch + per-scenario ref + live scenario.
+_DEFAULT_PARALLEL_JOBS = 3
+
 
 def _configure_console_utf8() -> None:
     if hasattr(sys.stdout, "reconfigure"):
@@ -31,6 +36,11 @@ def _python_exe() -> str:
     if venv.is_file():
         return str(venv)
     return sys.executable
+
+
+def _max_useful_workers(*, parallel_jobs: int) -> int:
+    cpu = os.cpu_count() or 1
+    return max(1, min(cpu, max(1, parallel_jobs)))
 
 
 def _child_env(cell_meta: dict) -> dict[str, str]:
@@ -49,7 +59,14 @@ def _child_env(cell_meta: dict) -> dict[str, str]:
     return env
 
 
-def _run_internal(cell: str, year: int, month: int, output_dir: Path) -> int:
+def _run_internal(
+    cell: str,
+    year: int,
+    month: int,
+    output_dir: Path,
+    *,
+    workers: int,
+) -> int:
     """In-process: patch year, then call run_backtesting.main()."""
     output_dir.mkdir(parents=True, exist_ok=True)
     import scripts.run_backtesting as rb
@@ -65,7 +82,7 @@ def _run_internal(cell: str, year: int, month: int, output_dir: Path) -> int:
         "--output-dir",
         str(output_dir),
         "--workers",
-        "1",
+        str(workers),
     ]
     try:
         rb.main()
@@ -83,6 +100,7 @@ def _run_cell_month(
     cell: str,
     year: int,
     month: int,
+    workers: int,
 ) -> int:
     from scripts.se_calc_test_common import run_output_dir
 
@@ -101,8 +119,13 @@ def _run_cell_month(
         str(month),
         "--output-dir",
         str(out),
+        "--workers",
+        str(workers),
     ]
-    print(f"\n=== SE calc {cell} {year}-{month:02d} → {out} ===")
+    print(
+        f"\n=== SE calc {cell} {year}-{month:02d} workers={workers} → {out} ===",
+        flush=True,
+    )
     proc = subprocess.run(
         cmd,
         cwd=str(ROOT),
@@ -134,11 +157,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cells", default=",".join(PRIORITIZED_CELLS))
     parser.add_argument("--months", default="1,4,7,10")
     parser.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="0 = auto max useful (min(CPU, parallel jobs))",
+    )
+    parser.add_argument(
+        "--parallel-jobs",
+        type=int,
+        default=_DEFAULT_PARALLEL_JOBS,
+        help="Expected top-level jobs (refs + scenarios) for auto workers",
+    )
+    parser.add_argument(
         "--skip-materialize",
         action="store_true",
         help="Reuse existing matrix_descriptors.json",
     )
     args = parser.parse_args(argv)
+
+    workers = (
+        args.workers
+        if args.workers > 0
+        else _max_useful_workers(parallel_jobs=args.parallel_jobs)
+    )
 
     if args.internal:
         if not args.cell or args.month is None or not args.output_dir:
@@ -149,6 +190,7 @@ def main(argv: list[str] | None = None) -> int:
             args.year,
             args.month,
             Path(args.output_dir),
+            workers=workers,
         )
 
     cell_ids = parse_csv_ids(args.cells, PRIORITIZED_CELLS)
@@ -157,6 +199,12 @@ def main(argv: list[str] | None = None) -> int:
         descriptors = load_json(DESCRIPTORS_PATH)
     else:
         descriptors = materialize_cells(cell_ids)
+
+    print(
+        f"SE calc matrix workers={workers} "
+        f"(parallel_jobs={args.parallel_jobs}, cpu={os.cpu_count() or 1})",
+        flush=True,
+    )
 
     failures: list[str] = []
     for cell_id in cell_ids:
@@ -176,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
                 cell=cell_id,
                 year=args.year,
                 month=month,
+                workers=workers,
             )
             if code != 0:
                 failures.append(f"{cell_id} {args.year}-{month:02d} exit={code}")

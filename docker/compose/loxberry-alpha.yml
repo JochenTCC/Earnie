@@ -36,7 +36,7 @@ x-common-env: &common-env
 services:
   earnie-alpha:
     # Pre-release only — bump when a new alpha/rc is published (matches version.py).
-    image: ghcr.io/jochentcc/earnie-energy:2.3.0-alpha.1
+    image: ghcr.io/jochentcc/earnie-energy:2.3.0-alpha.3
     container_name: earnie-alpha
     command: >
       python -m scripts.run_streamlit

@@ -3,11 +3,24 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Pre-release 2.3.0-alpha.3 (2026-07-23)
+
+- [x] Pre-release `2.3.0-alpha.3` for SCC / community test (GHCR `:<version>` only; alpha compose pinned)
+
+
+### SE calc test max workers (2026-07-23)
+
+- [x] `scripts/se_calc_test_run.py`: default `--workers` = max useful (`min(CPU, parallel jobs)`), Live-only ≈ 3
+- [x] Cursor rule `.cursor/rules/backtesting-max-workers.mdc` for SE / backtesting worker choice
+- [x] Spec note in `docs/spec/se-calculation-test-plan.md` after Live `export_tariff_id` re-run
+
+
 ### Energieflussmonitor → Hausprofil blueprint research (2026-07-23)
 
 - [x] Research whether own Loxone Energieflussmonitor + Zähler setup can blueprint Verbraucher-Konfiguration in Hausprofil (incl. CSVs)
   - **A (process blueprint):** yes — map Netz/Erzeuger/Speicher/Verbraucher/Rest → `grid_profile_csv` / `pv_profile_csv` / `battery_profile_csv` / consumer `profile_csv` + Basislast residual; plan `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
   - **C (auto-create consumers + CSV attach):** not officially feasible now (no structure export) — deferred under Version **2.4** MCP item in [Backlog.md](Backlog.md)
+  - **Follow-up abandoned (same day):** HK multi-column Energieflussmonitor CSV import + exclusive Zähler↔Verbraucher mapping (plan `.cursor/plans/efm_meter_mapping_ui_9107b317.plan.md`, branch `feature/efm-meter-mapping-ui` deleted) — Loxone EFM does **not** export a multi-column Statistik-CSV with all Leistungsflüsse; idea was a dead end. Manual per-series / Energiemonitor (alt) / Bilanz remains the CSV path.
 
 
 ### SE calculation test plan (2026-07-23)

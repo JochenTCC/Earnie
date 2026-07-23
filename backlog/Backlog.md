@@ -19,14 +19,13 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and demos — invoice-grade bill reconciliation is explicitly out of scope (nice-to-have later). Thin marker/data-model prep for SAM (`2.3.f`) is done; connector rewrite remains `2.4`. SE MILP speed/tuning (`2.3.c.0a`–`2.3.c.3`) → [Backlog-Erledigt.md](Backlog-Erledigt.md). CSV / Basislast / earnie_role alignment → [Backlog-Erledigt.md](Backlog-Erledigt.md).
 
-- [ ] Pre release 2.3.0-alpha.3 for SCC
-
 - [x] Add Energieflussmonitor Baustein and Zähler to my own Loxone Config to be able to test csv-data-export
   - Research (done) → [Backlog-Erledigt.md](Backlog-Erledigt.md); process blueprint plan `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`; auto-sync deferred under **2.4** MCP
+  - **Note (2026-07-23):** Loxone Energieflussmonitor does **not** export a multi-column Statistik-CSV with all Leistungsflüsse. A planned HK import mode + exclusive Zähler↔Verbraucher mapping (plan `.cursor/plans/efm_meter_mapping_ui_9107b317.plan.md`, branch `feature/efm-meter-mapping-ui`) was **abandoned** — keep using per-series CSV / existing Energiemonitor (alter Baustein) / Bilanz workflows.
 
 
 - [ ] **2.3.0 — Release**
-  - Finalize after test usage; update German docs as needed (carry-over from 2.2.0 finalize)
+  - Finalize after SCC / community test of `2.3.0-alpha.3`; update German docs as needed (carry-over from 2.2.0 finalize)
 
 
 ### Version 2.4 — Become Loxone agnostic and standardize communication (SAM expansion)
@@ -44,6 +43,7 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
   - Prepare similar templates for other standards (see above)
 - [ ] Integrate a MCP-based automatic communication-definition (see also `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §3.1; dedicated `MCP-Interfacing-für-Earnie.md` not present) in Loxone-Kommunikation page
   - [ ] **Research / follow-up:** Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths (interpretation C). Blocked today by no official Loxone structure export; revisit with MCP structure-scan / connector work. Manual process blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
+    - Also: EFM has **no multi-column Statistik export** of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23; see note under 2.3 EFM Baustein item).
 
 - [ ] **2.4.d — Donate**
   - Add a Donate feature into sidebar

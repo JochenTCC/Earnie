@@ -1,0 +1,24 @@
+---
+description: Use maximum useful ProcessPool workers for SE / backtesting runs
+alwaysApply: true
+---
+
+# Backtesting / SE — maximum useful workers
+
+When starting `scripts/run_backtesting.py` (including SE calc matrix / one-off year runs):
+
+- **Always pass `--workers N`** with the largest *useful* N — never default to `1` unless the user asks for sequential debug.
+- Parallelism is **across top-level jobs** (historical/reference tasks + each scenario), **not** across windows inside one scenario.
+- Compute:
+
+```text
+N = min(CPU logical count, number of parallel jobs)
+parallel jobs ≈ len(reference_specs) + len(scenarios)
+```
+
+Typical Live-only year: ~3 jobs → `--workers 3` (or `min(cpu, 3)`).  
+Multi-scenario: match job count (e.g. 4 scenarios + refs → often 5–6), capped by CPU.
+
+- On Windows, ensure worker children see the intended env (`EARNIE_ENV_PATH`, and do **not** leave stale `EARNIE_HOUSE_PROFILES_PATH` / `EARNIE_BACKTESTING_SCENARIOS_PATH` pointing at `se_calc_test/cells/…` overlays).
+- Prefer `os.cpu_count()` (logical) for the CPU cap.
+- **Windows spawn:** run via a real module (`python -m scripts.…`), not `python -c "…"`, so `ProcessPoolExecutor` workers start reliably.
