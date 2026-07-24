@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/backtesting_scenarios.schema.json",
   "title": "Earnie Backtesting-Szenarien",
-  "description": "Szenarien fÃ¼r Szenario-Explorer und Live-Betrieb (live_scenario_id in config.json).",
+  "description": "Szenarien für Szenario-Explorer und Live-Betrieb (live_scenario_id in config.json).",
   "type": "object",
   "required": [
     "scenarios"
@@ -10,28 +10,28 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "description": "Verweis auf diese Schema-Datei fÃ¼r Editor-Hilfen."
+      "description": "Verweis auf diese Schema-Datei für Editor-Hilfen."
     },
     "cbc_gap_rel": {
       "type": "number",
       "exclusiveMinimum": 0,
       "exclusiveMaximum": 1,
-      "description": "Relativer CBC-MIP-Gap fÃ¼r Backtesting (z. B. 0.10 = 10 %). Fehlt der Wert, gilt 10 %."
+      "description": "Relativer CBC-MIP-Gap für Backtesting (z. B. 0.10 = 10 %). Fehlt der Wert, gilt 10 %."
     },
     "commit_hours": {
       "type": "integer",
       "minimum": 1,
-      "description": "MILP commit-K fÃ¼r Szenario-Explorer/Backtesting: alle N Stunden neu lÃ¶sen (1 = stÃ¼ndliches Re-Opt; FensterlÃ¤nge z. B. 24 = open-loop). Fehlt der Wert, gilt 24."
+      "description": "MILP commit-K für Szenario-Explorer/Backtesting: alle N Stunden neu lösen (1 = stündliches Re-Opt; Fensterlänge z. B. 24 = open-loop). Fehlt der Wert, gilt 24."
     },
     "cbc_strict_time_limit_sec": {
       "type": "number",
       "minimum": 0,
-      "description": "Sekunden fÃ¼r Strict-CBC vor gapRel-Fallback (0 = Strict Ã¼berspringen). Standard: 3."
+      "description": "Sekunden für Strict-CBC vor gapRel-Fallback (0 = Strict überspringen). Standard: 3."
     },
     "milp_solver": {
       "type": "string",
       "enum": ["cbc", "highs"],
-      "description": "MILP-Backend fÃ¼r Szenario-Explorer/Backtesting (highs Standard; cbc Fallback). Env EARNIE_MILP_SOLVER hat Vorrang."
+      "description": "MILP-Backend für Szenario-Explorer/Backtesting (highs Standard; cbc Fallback). Env EARNIE_MILP_SOLVER hat Vorrang."
     },
     "disable_horizon_soc_anchor": {
       "type": "boolean",
@@ -39,11 +39,11 @@
     },
     "sunrise_full_horizon_trial": {
       "type": "boolean",
-      "description": "SE sunrise_window: MILP auf voller SA_0-->SA_2-Matrix; bucht nur die ersten 24 h; Flex auf gebuchten Slice; ohne harte SAâ‚-SOC_min. Standard true; false = Truncate vor MILP (alt)."
+      "description": "Deprecated shim (ignored by engine). sunrise_window always MILPs SA_0-->SA_2 and books [SA_1, SA_2)."
     },
     "scenarios": {
       "type": "array",
-      "description": "Alle Szenarien inkl. Live-Baseline (Standard-ID: live, gewÃ¤hlt via live_scenario_id).",
+      "description": "Alle Szenarien inkl. Live-Baseline (Standard-ID: live, gewählt via live_scenario_id).",
       "items": {
         "$ref": "#/definitions/scenario"
       }
@@ -57,7 +57,7 @@
   "definitions": {
     "scenario": {
       "type": "object",
-      "description": "Benanntes Szenario fÃ¼r Simulation/Backtesting.",
+      "description": "Benanntes Szenario für Simulation/Backtesting.",
       "required": [
         "id",
         "label",
@@ -76,9 +76,13 @@
           "type": "boolean",
           "description": "Wenn false, wird das Szenario im Szenario-Explorer nicht berechnet. Standard true wenn fehlend."
         },
+        "own_reference": {
+          "type": "boolean",
+          "description": "Wenn true: eigene Nicht-Opt-Referenz. Wenn false: Live-Ref/Historisch teilen. Fehlt: Auto (Tarif+pv_kwp-Heuristik)."
+        },
         "settings": {
           "type": "object",
-          "description": "Parameter-Override (flache Felder oder Referenzen auf EntitÃ¤ten). Standort/Zeitzone kommen aus dem Hausprofil (house_profile_id), nicht aus settings.",
+          "description": "Parameter-Override (flache Felder oder Referenzen auf Entitäten). Standort/Zeitzone kommen aus dem Hausprofil (house_profile_id), nicht aus settings.",
           "properties": {
             "battery_id": {
               "type": "string",
@@ -93,7 +97,7 @@
             },
             "pv_system_id": {
               "type": "string",
-              "description": "Veraltet â€” Einzelreferenz; wird beim Laden zu pv_system_ids normalisiert."
+              "description": "Veraltet — Einzelreferenz; wird beim Laden zu pv_system_ids normalisiert."
             },
             "import_tariff_id": {
               "type": "string",

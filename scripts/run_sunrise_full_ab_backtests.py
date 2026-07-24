@@ -1,13 +1,10 @@
-"""Year A/B: truncated sunrise_window vs full SA_0-->SA_2 + flex_book (2.3.c.3).
+"""DEPRECATED: A/B for sunrise_full_horizon_trial (superseded by sunrise-booked steps).
 
-Default period: last 12 complete calendar months in cons_data.
-Baseline arm forces sunrise_full_horizon_trial=false (old truncate);
-full arm uses true (product default since 2026-07-22).
+Product `sunrise_window` always MILPs SA₀→SA₂ and books [SA₁, SA₂). The
+`sunrise_full_horizon_trial` flag is ignored by the engine; both arms of this
+script now behave the same. Kept for historical artifact paths only.
 
-Example:
-  python -m scripts.run_sunrise_full_ab_backtests
-  python -m scripts.run_sunrise_full_ab_backtests --output-root backtesting_logs/sunrise_full_flexbook_ab_last12m
-  python -m scripts.run_sunrise_full_ab_backtests --skip-runs
+Prefer docs/spec/planning-horizon-sunset.md §4.2.
 """
 from __future__ import annotations
 

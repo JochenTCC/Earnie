@@ -60,7 +60,7 @@ def test_critical_high_eauto_window_completes(
     fixture_scenario,
     wide_prices_df,
 ):
-    """E-Auto-lastiger Tag: MILP muss durchlaufen (kein Hänger, 24h Ergebnis)."""
+    """E-Auto-lastiger Tag: MILP muss durchlaufen (kein Hänger)."""
     day = pd.Timestamp(HIGH_EAUTO_DAY)
     anchor = window_anchor_for_date(HIGH_EAUTO_DAY)
     _, totals, _, _ = fixture_cache.get_window_consumption(
@@ -76,7 +76,8 @@ def test_critical_high_eauto_window_completes(
         cache=fixture_cache,
         scenario_id="fixture_5kwh_fixed",
     )
-    assert len(df) == 24
+    # Sunrise book ~24h; SA₀→SA₁ foresight flex may add hours for EV delivery.
+    assert 23 <= len(df) <= 48
     assert df["sim_cost"].notna().all()
     assert df["sim_soc"].between(0.0, 100.0).all()
     assert isinstance(cbc_events, list)

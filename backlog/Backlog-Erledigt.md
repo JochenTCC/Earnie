@@ -3,6 +3,17 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### SK UI polish — static list + 2×3 matrix (2026-07-24)
+
+- [x] Szenario selection: dropdown → static list; ↑/↓ in same row right of the list
+- [x] 2×3 edit matrix (tariff-edit style): Bezeichnung / Aktiv für SE / Eigene Referenz; Hausprofil / Batterie / PV
+
+
+### Remove SoC bei Opt-Last chart curve (2026-07-24)
+
+- [x] Drop third Live Chart-1 SOC line **SoC bei Opt-Last** (UI/docs/tests); keep `baseline_same_flex_rows` for cost paths
+
+
 ### SK scenario order + own_reference (2026-07-24)
 
 - [x] Scenarios order editable in SK (↑/↓; `scenarios[]` array order; Live pinned first) for user-centric SE visualization
@@ -113,6 +124,14 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] Greenfield: first click on subpage **Hausprofil** raised `StreamlitAPIException` — `st.session_state.house_config_active_tab` cannot be modified after widget with key `house_config_active_tab` is instantiated (`page_house_config.py`); verified live
 
 
+### 2.3.g — SE sunrise-booked steps (ready_by → SA₂) (2026-07-24)
+
+- [x] **`sunrise_window` product path** — one SE step per ready_by day; SA₂ = first sunrise after ready_by; MILP SA₀→SA₂; book **[SA₁, SA₂)**; SoC chain at sunrise junctions; `charging_anchor = ready_by`
+- [x] **Eliminates 7↔10 wall-clock gaps/overlaps** — abutting sunrise books independent of ready_by hour (length = astronomy/DST only)
+- [x] **Subsumes `sunrise_full_horizon_trial`** — flag kept as deprecated config shim (ignored by engine); flex_book + SA₁ SoC hold are the default
+- [x] Progress / CSV on booked hours (not `N×24`); docs: `planning-horizon-sunset.md` §4.2, SE user notes
+- [x] Tests: `tests/test_sunrise_book_steps.py`; horizon-mode / flex_book adaptations
+
 ### 2.3.c.0a–2.3.c.3 — SE MILP speed & tuning (2026-07-23)
 
 - [x] **2.3.c.0a — SE: one MILP per window (or commit-K) instead of hourly re-solve**
@@ -128,7 +147,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - **TAKEAWAY (variable sample time)** — **hard — defer** (implicit `dt ≡ 1 h`; Live already re-opts ~15 min on hourly plan)
 - [x] **2.3.c.3 — Full SA_0-->SA_2: force flex into booked slice**
   - Clamp `flex_indices` via `flex_book_hours` when full-horizon trial on
-  - **TAKEAWAY** — last12m plaus restored 344/365; € Δ ≈ −7…−18 €/y vs truncated. **Product default:** `sunrise_full_horizon_trial` **true** (full SA_0-->SA_2 + flexbook + free SOC anchors). Artifacts: `backtesting_logs/sunrise_full_flexbook_ab_last12m/`
+  - **TAKEAWAY** — last12m plaus restored 344/365; € Δ ≈ −7…−18 €/y vs truncated. **Product default (then):** `sunrise_full_horizon_trial` **true** (full SA_0-->SA_2 + flexbook + free SOC anchors). **Superseded by 2.3.g** (sunrise-booked [SA₁, SA₂) steps). Artifacts: `backtesting_logs/sunrise_full_flexbook_ab_last12m/`
 
 
 ### Energy-counter CSV import (PV / Verbrauch / consumers) (2026-07-23)

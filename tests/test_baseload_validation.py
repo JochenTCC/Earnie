@@ -107,21 +107,22 @@ class TestPlanningFlexPlausibility:
         delivered = delivered_flex_kwh_from_rows(rows, flexible_consumers=planning)
         assert delivered["swimspa"] == pytest.approx(5.6)
 
-    def test_validate_uses_meta_flexible_consumers(self):
-        planning = [{"id": "swimspa", "name": "Swimspa"}]
+    def test_validate_uses_stashed_full_horizon_flex(self):
+        planning = [{"id": "ev", "name": "Smart"}]
         meta = {
-            "window_end": datetime(2025, 7, 12, 0, 0),
-            "historical_total_kwh": 10.0,
-            "baseload_kwh": 4.4,
-            "historical_totals": {"swimspa": 5.6},
+            "window_end": datetime(2026, 3, 3, 7, 0),
+            "historical_total_kwh": 30.0,
+            "baseload_kwh": 22.0,
+            "historical_totals": {"ev": 8.0},
             "_flexible_consumers": planning,
+            "plausibility_optimized_flex_kwh": 8.0,
         }
-        rows = [
-            {"Verbrauch-Prognose (kW)": 4.4, "Swimspa (kW)": 5.6},
-        ]
+        # Book rows only show WP-less / no EV (as after SA₁ cut).
+        rows = [{"Verbrauch-Prognose (kW)": 22.0, "Smart (kW)": 0.0}]
         result = validate_window_consumption(rows, meta)
         assert result.ok
-        assert result.optimized_flex_kwh == pytest.approx(5.6)
+        assert result.optimized_flex_kwh == pytest.approx(8.0)
+        assert result.flex_diff_kwh == pytest.approx(0.0, abs=0.05)
 
     def test_ok_when_known_generics_peeled_from_baseload_column(self):
         meta = {

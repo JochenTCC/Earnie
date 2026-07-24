@@ -51,7 +51,6 @@ class OptimizationDisplayBundle:
     baseline_df: pd.DataFrame
     display_df: pd.DataFrame
     display_matched: pd.DataFrame | None
-    display_same_flex: pd.DataFrame | None
     savings_view: dict
     table_df: pd.DataFrame
     table_qualities: tuple[str, ...] | None
@@ -79,7 +78,6 @@ def build_optimization_display_bundle(
     baseline_df: pd.DataFrame,
     matched_baseline_df: pd.DataFrame | None = None,
     *,
-    same_flex_df: pd.DataFrame | None = None,
     simulation_table_title: str | None = "📋 Simulations-Details (Nächste 24 Stunden)",
     chart_context: LiveChartContext | None = None,
     optimization_matrix: list | None = None,
@@ -92,13 +90,10 @@ def build_optimization_display_bundle(
 ) -> OptimizationDisplayBundle:
     if matched_baseline_df is None and savings_info.get("matched_baseline_rows"):
         matched_baseline_df = pd.DataFrame(savings_info["matched_baseline_rows"])
-    if same_flex_df is None and savings_info.get("baseline_same_flex_rows"):
-        same_flex_df = pd.DataFrame(savings_info["baseline_same_flex_rows"])
 
     savings_view = savings_info
     display_df = optimized_df
     display_matched = matched_baseline_df
-    display_same_flex = same_flex_df
     table_df = display_df
     table_qualities: tuple[str, ...] | None = None
     table_gap_notice: str | None = None
@@ -125,13 +120,6 @@ def build_optimization_display_bundle(
             display_matched = pd.DataFrame(
                 align_rows_to_chart_slots(
                     matched_baseline_df.to_dict("records"),
-                    chart_context.chart_window,
-                )
-            )
-        if same_flex_df is not None:
-            display_same_flex = pd.DataFrame(
-                align_rows_to_chart_slots(
-                    same_flex_df.to_dict("records"),
                     chart_context.chart_window,
                 )
             )
@@ -189,19 +177,6 @@ def build_optimization_display_bundle(
                 )
         elif display_ctx.history_only:
             display_matched = None
-        if same_flex_df is not None and not display_ctx.history_only:
-            display_same_flex = pd.DataFrame(
-                align_rows_to_display_slots(
-                    same_flex_df.to_dict("records"),
-                    display_ctx.slot_datetimes,
-                )
-            )
-            if chart_qualities is not None:
-                display_same_flex = _mask_missing_log_slots(
-                    display_same_flex, chart_qualities
-                )
-        elif display_ctx.history_only:
-            display_same_flex = None
         sun_markers = build_sun_markers(
             chart_context.chart_window,
             chart_context.now,
@@ -230,7 +205,6 @@ def build_optimization_display_bundle(
         baseline_df=baseline_df,
         display_df=display_df,
         display_matched=display_matched,
-        display_same_flex=display_same_flex,
         savings_view=savings_view,
         table_df=table_df,
         table_qualities=table_qualities,
@@ -277,8 +251,6 @@ def build_optimization_display_bundle_from_snapshot(
     baseline_df = pd.DataFrame(savings_info.get("baseline_rows") or [])
     matched_rows = savings_info.get("matched_baseline_rows") or []
     matched_baseline_df = pd.DataFrame(matched_rows) if matched_rows else None
-    same_flex_rows = savings_info.get("baseline_same_flex_rows") or []
-    same_flex_df = pd.DataFrame(same_flex_rows) if same_flex_rows else None
     optimization_matrix = planning_matrix_from_snapshot(snapshot) or None
     planning_window = planning_window_from_snapshot(snapshot)
     moment = now if now is not None else live_now()
@@ -294,7 +266,6 @@ def build_optimization_display_bundle_from_snapshot(
         optimized_df,
         baseline_df,
         matched_baseline_df,
-        same_flex_df=same_flex_df,
         simulation_table_title=simulation_table_title,
         chart_context=chart_context,
         optimization_matrix=optimization_matrix,
@@ -318,7 +289,6 @@ def render_optimization_chart1(
             bundle.display_df,
             bundle.baseline_df,
             bundle.display_matched,
-            same_flex_df=bundle.display_same_flex,
             show_soc_plausibility=bundle.show_soc_plausibility,
             chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
             chart_now=bundle.chart_context.zone_reference if bundle.chart_context else None,

@@ -34,7 +34,7 @@ On a full year of historical backtesting with **perfect foresight** prices, **`s
 From `simulation/engine.py`:
 
 - **`fixed_24h`:** MILP on `[anchor−24h, anchor)`; SOC free at window end (EV-style anchor).
-- **`sunrise_window`:** MILP from now → **SA₂** (second sunrise); hard **SOC_min** at the next sunrise; chart/backtest **output still 24 h per step**.
+- **`sunrise_window`:** MILP **SA₀→SA₂** for each ready_by day; **book [SA₁, SA₂)** (sunrise→sunrise, DST-aware ~24 h); SoC chained at sunrise junctions; `charging_anchor = ready_by`. (Historical note: older runs booked ready_by-aligned 24 h with truncate / `sunrise_full_horizon_trial`.)
 
 The sunset2set log file name maps to internal id `sunrise_window` (not a separate JSON enum value).
 

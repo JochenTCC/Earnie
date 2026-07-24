@@ -165,20 +165,29 @@ def _add_terminal_soc_constraint(model: MilpHorizonModel, e_terminal: float) -> 
     model.prob += model.e_batt[model.horizon - 1] == e_terminal
 
 
+def _add_soc_equality_constraint(
+    model: MilpHorizonModel,
+    slot_index: int,
+    e_kwh: float,
+) -> None:
+    """SOC at slot_index equals e_kwh (sunrise floor or SE SA₁ carry-in)."""
+    if model.horizon < 1:
+        return
+    if slot_index < 0 or slot_index >= model.horizon:
+        raise ValueError(
+            f"soc equality index {slot_index} liegt außerhalb des Horizonts "
+            f"(0..{model.horizon - 1})."
+        )
+    model.prob += model.e_batt[slot_index] == e_kwh
+
+
 def _add_sunrise_soc_min_constraint(
     model: MilpHorizonModel,
     sunrise_index: int,
     e_min_kwh: float,
 ) -> None:
     """SOC am Sonnenaufgang-Slot = SOC_min (Live Sunset-Horizont)."""
-    if model.horizon < 1:
-        return
-    if sunrise_index < 0 or sunrise_index >= model.horizon:
-        raise ValueError(
-            f"sunrise_soc_min_index {sunrise_index} liegt außerhalb des Horizonts "
-            f"(0..{model.horizon - 1})."
-        )
-    model.prob += model.e_batt[sunrise_index] == e_min_kwh
+    _add_soc_equality_constraint(model, sunrise_index, e_min_kwh)
 
 
 def _terminal_soc_energy_kwh(

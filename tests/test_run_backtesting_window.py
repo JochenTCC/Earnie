@@ -16,6 +16,7 @@ from simulation.engine import (
     list_simulation_anchors,
     run_simulation,
 )
+from simulation.horizon_mode import FIXED_24H
 from tests.fixtures.backtesting_fixtures import (
     SOC_CHAIN_END_DAY,
     SOC_CHAIN_START_DAY,
@@ -141,6 +142,7 @@ class TestSocChainTwoWindows:
         anchors = list_simulation_anchors(start, end, cache)
         assert len(anchors) == 2, f"Erwartet 2 Fenster, erhalten: {anchors}"
 
+        # fixed_24h: stable 24h abutting windows (sunrise chain covered in horizon/book tests).
         df, plausibility, _ = run_simulation(
             start,
             end,
@@ -148,6 +150,7 @@ class TestSocChainTwoWindows:
             prices,
             cache=cache,
             initial_soc=50.0,
+            horizon_mode=FIXED_24H,
         )
         assert len(df) == 48
         assert plausibility.failed == []

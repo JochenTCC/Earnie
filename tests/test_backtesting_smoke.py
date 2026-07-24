@@ -147,7 +147,8 @@ def test_backtesting_run_simulation_single_window(
         cache=historical_cache,
         scenario_id=config.get_live_scenario_id(),
     )
-    assert len(df) == 24
+    # Sunrise book ~24h; optional SA₀→SA₁ foresight flex may extend the series.
+    assert 23 <= len(df) <= 48
     assert plausibility.failed == []
     assert df["sim_cost"].notna().all()
     assert isinstance(cbc_events, list)

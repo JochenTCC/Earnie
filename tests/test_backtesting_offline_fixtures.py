@@ -102,7 +102,8 @@ def test_run_simulation_single_window_on_fixture(
         cache=fixture_cache,
         scenario_id="fixture_5kwh_fixed",
     )
-    assert len(df) == 24
+    # Sunrise book ~24h; foresight flex may add SA₀→SA₁ hours.
+    assert 23 <= len(df) <= 48
     assert plausibility.failed == []
     assert df["sim_cost"].notna().all()
     assert isinstance(cbc_events, list)

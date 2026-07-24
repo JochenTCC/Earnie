@@ -602,35 +602,6 @@ def add_baseline_soc_traces(
     )
 
 
-def add_same_flex_soc_traces(
-    fig: go.Figure,
-    same_flex_df: pd.DataFrame | None,
-    yaxis: str = "y2",
-    extrap_start: int | None = None,
-    extrap_end: int | None = None,
-    chart_now: datetime | None = None,
-    history_slot_count: int | None = None,
-    soc_at_now: float | None = None,
-    battery_params: dict | None = None,
-) -> None:
-    """SoC bei Opt-Last: optimierte Flex-Zeiten, Batterie nur PV-Überschuss."""
-    add_anchored_counterfactual_soc_traces(
-        fig,
-        same_flex_df,
-        name="SoC bei Opt-Last",
-        dash="dashdot",
-        line_width=2.0,
-        opacity=0.85,
-        yaxis=yaxis,
-        extrap_start=extrap_start,
-        extrap_end=extrap_end,
-        chart_now=chart_now,
-        history_slot_count=history_slot_count,
-        soc_at_now=soc_at_now,
-        battery_params=battery_params,
-    )
-
-
 def add_anchored_counterfactual_soc_traces(
     fig: go.Figure,
     soc_df: pd.DataFrame | None,

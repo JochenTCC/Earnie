@@ -39,7 +39,7 @@
     },
     "sunrise_full_horizon_trial": {
       "type": "boolean",
-      "description": "SE sunrise_window: MILP auf voller SA_0-->SA_2-Matrix; bucht nur die ersten 24 h; Flex auf gebuchten Slice; ohne harte SA₁-SOC_min. Standard true; false = Truncate vor MILP (alt)."
+      "description": "Deprecated shim (ignored by engine). sunrise_window always MILPs SA_0-->SA_2 and books [SA_1, SA_2)."
     },
     "scenarios": {
       "type": "array",

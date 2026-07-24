@@ -70,11 +70,10 @@ Entladen → Last ← verbleibende Entladung
 |------|-------------|-----------|
 | SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/chart_colors.py`) | Simulierter Batterie-SOC |
 | SoC BL Ziel | Dieselbe Farbe, gestrichelt ab **Jetzt** (nicht davor) | Referenz-SOC (Baseline); Anker = Log-SOC am Jetzt-Marker |
-| SoC bei Opt-Last | Dieselbe Farbe, strichpunktiert ab **Jetzt** (nur Live-Monitor) | Zwischen-Gegenprobe: Optimierungs-Lastzeiten, Batterie nur PV-Überschuss (`baseline_same_flex_rows`) |
 | Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 | Einspeisepreis (orange, gestrichelt) | Einspeisevergütung skaliert | Hover: Cent/kWh |
 
-**SoC-Plausibilität (Live-Monitor):** Abstand **SoC BL Ziel → SoC bei Opt-Last** kommt vor allem von Lastverschiebung (Flex/E-Auto anders zeitlich platziert). Abstand **SoC bei Opt-Last → SoC** kommt von der Batteriestrategie (Netzladen, Entladen, Halten). Umrandete Flex-Balken (**Original-Schedule**, nur Kanten, keine Füllung) zeigen, wo Flex laut BL-Ziel gelaufen wäre — gefüllte Flex-Balken bleiben die Optimierung. Ghost-Segmente mit Energie-Äquivalent unter **1 kWh** (`kW × Slotdauer`) werden nicht gezeichnet.
+**SoC-Plausibilität (Live-Monitor):** Abstand **SoC BL Ziel → SoC** kommt von Lastverschiebung (Flex/E-Auto anders zeitlich platziert) und/oder der Batteriestrategie (Netzladen, Entladen, Halten). Umrandete Flex-Balken (**Original-Schedule**, nur Kanten, keine Füllung) zeigen, wo Flex laut BL-Ziel gelaufen wäre — gefüllte Flex-Balken bleiben die Optimierung. Ghost-Segmente mit Energie-Äquivalent unter **1 kWh** (`kW × Slotdauer`) werden nicht gezeichnet.
 
 **Hintergrundzonen** (Details im **?** der Chart-1-Überschrift): grau = Vergangenheit (Log), neutral = laufende Stunde, grün = extrapolierte Preise bis Fensterrand.
 

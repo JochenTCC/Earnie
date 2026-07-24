@@ -180,6 +180,8 @@ def _solve_milp_to_model(
     sunrise_soc_min_index: int | None,
     consumer_continue_on: dict[str, bool] | None,
     thermal_flex_contexts: dict[str, dict] | None,
+    soc_hold_index: int | None = None,
+    soc_hold_percent: float | None = None,
 ) -> tuple[MilpHorizonModel, dict[str, float], dict[str, float], list[int], dict, dict] | None:
     """Baut und löst das MILP; None wenn nicht optimal / leere Matrix."""
     if not matrix:
@@ -261,7 +263,18 @@ def _solve_milp_to_model(
         _resolve_thermal_flex_contexts(matrix[:horizon], active, thermal_flex_contexts),
         consumer_continue_on=consumer_continue_on,
     )
-    if sunrise_soc_min_index is not None:
+    if soc_hold_index is not None and soc_hold_percent is not None:
+        e_hold = (float(soc_hold_percent) / 100.0) * battery_params[
+            "battery_capacity_kwh"
+        ]
+        _add_sunrise_soc_min_constraint(model, soc_hold_index, e_hold)
+        if verbose:
+            logger.info(
+                "MILP SOC-Hold: Slot %d = %.1f %%",
+                soc_hold_index,
+                float(soc_hold_percent),
+            )
+    elif sunrise_soc_min_index is not None:
         e_min = (battery_params["min_soc"] / 100.0) * battery_params["battery_capacity_kwh"]
         _add_sunrise_soc_min_constraint(model, sunrise_soc_min_index, e_min)
         if verbose:
@@ -304,6 +317,8 @@ def milp_optimizer(
     sunrise_soc_min_index: int | None = None,
     consumer_continue_on: dict[str, bool] | None = None,
     thermal_flex_contexts: dict[str, dict] | None = None,
+    soc_hold_index: int | None = None,
+    soc_hold_percent: float | None = None,
 ) -> tuple[int, float, float, dict[str, float], dict[str, int], dict[str, float], dict[str, dict]]:
     """
     Berechnet den optimalen Betriebsmodus und die Ziel-Leistung für den Loxone Miniserver.
@@ -348,6 +363,8 @@ def milp_optimizer(
         sunrise_soc_min_index,
         consumer_continue_on,
         thermal_flex_contexts,
+        soc_hold_index=soc_hold_index,
+        soc_hold_percent=soc_hold_percent,
     )
     if solved is None:
         return _AUTOMATIK_FALLBACK
@@ -417,6 +434,8 @@ def milp_horizon_schedule(
     sunrise_soc_min_index: int | None = None,
     consumer_continue_on: dict[str, bool] | None = None,
     thermal_flex_contexts: dict[str, dict] | None = None,
+    soc_hold_index: int | None = None,
+    soc_hold_percent: float | None = None,
 ) -> list[dict[str, Any]]:
     """
     Ein CBC-Solve über die Matrix; Rückgabe: Stundenplan-Slots für Open-Loop / commit-K.
@@ -452,6 +471,8 @@ def milp_horizon_schedule(
         sunrise_soc_min_index,
         consumer_continue_on,
         thermal_flex_contexts,
+        soc_hold_index=soc_hold_index,
+        soc_hold_percent=soc_hold_percent,
     )
     if solved is None:
         return [dict(_FALLBACK_SCHEDULE_SLOT)]

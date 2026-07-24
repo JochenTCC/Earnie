@@ -1,4 +1,4 @@
-"""Tests for Live Monitor SOC plausibility (2.3.c): same-flex SOC + ghost bars."""
+"""Tests for Live Monitor SOC plausibility: BL Ziel SOC + ghost bars."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -83,14 +83,12 @@ def test_savings_info_from_snapshot_missing_same_flex_is_empty():
     assert info["baseline_same_flex_rows"] == []
 
 
-def test_same_flex_soc_trace_when_plausibility_enabled():
+def test_chart_has_bl_ziel_not_opt_last_when_plausibility_enabled():
     opt = _slot_df(soc=50.0)
     matched = _slot_df(soc=45.0)
-    same_flex = _slot_df(soc=48.0)
     fig = build_power_soc_chart_figure(
         opt,
         matched_baseline_df=matched,
-        same_flex_df=same_flex,
         show_soc_plausibility=True,
         history_slot_count=1,
         chart_now=opt["slot_datetime"].iloc[1].to_pydatetime(),
@@ -98,31 +96,7 @@ def test_same_flex_soc_trace_when_plausibility_enabled():
     names = {trace.name for trace in fig.data if isinstance(trace, go.Scatter)}
     assert "SoC" in names
     assert "SoC BL Ziel" in names
-    assert "SoC bei Opt-Last" in names
-
-
-def test_same_flex_soc_trace_skipped_when_missing_or_disabled():
-    opt = _slot_df(soc=50.0)
-    matched = _slot_df(soc=45.0)
-    fig_off = build_power_soc_chart_figure(
-        opt,
-        matched_baseline_df=matched,
-        same_flex_df=_slot_df(soc=48.0),
-        show_soc_plausibility=False,
-    )
-    names_off = {trace.name for trace in fig_off.data if isinstance(trace, go.Scatter)}
-    assert "SoC bei Opt-Last" not in names_off
-
-    fig_missing = build_power_soc_chart_figure(
-        opt,
-        matched_baseline_df=matched,
-        same_flex_df=None,
-        show_soc_plausibility=True,
-    )
-    names_missing = {
-        trace.name for trace in fig_missing.data if isinstance(trace, go.Scatter)
-    }
-    assert "SoC bei Opt-Last" not in names_missing
+    assert "SoC bei Opt-Last" not in names
 
 
 def test_ghost_bars_from_matched_flex(monkeypatch):
@@ -182,5 +156,6 @@ def test_s2_zone_help_includes_soc_plausibility_when_requested():
     plain = s2_zone_help_text()
     assert "SoC-Plausibilität" not in plain
     rich = s2_zone_help_text(include_soc_plausibility=True)
-    assert "SoC bei Opt-Last" in rich
-    assert "BL-Ziel" in rich
+    assert "SoC BL Ziel" in rich
+    assert "SoC bei Opt-Last" not in rich
+    assert "Original-Schedule" in rich

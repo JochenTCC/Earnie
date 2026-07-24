@@ -148,11 +148,18 @@ def _simulate_single_hour_optimizer(
     matrix_hour_index: int,
     flexible_consumers: list | None = None,
     consumer_continue_on: dict[str, bool] | None = None,
+    soc_hold_index: int | None = None,
+    soc_hold_percent: float | None = None,
 ) -> tuple[float, dict, int, float]:
     """Simuliert eine einzelne Stunde im optimierten Pfad (Huawei-Logik für die Batterie)."""
     h = row["hour"]
     rel_sunrise = _relative_sunrise_index(
         sunrise_soc_min_index,
+        matrix_hour_index,
+        len(remaining_matrix),
+    )
+    rel_hold = _relative_sunrise_index(
+        soc_hold_index,
         matrix_hour_index,
         len(remaining_matrix),
     )
@@ -173,6 +180,8 @@ def _simulate_single_hour_optimizer(
         terminal_soc_percent=terminal_soc_percent,
         sunrise_soc_min_index=rel_sunrise,
         consumer_continue_on=consumer_continue_on,
+        soc_hold_index=rel_hold,
+        soc_hold_percent=soc_hold_percent if rel_hold is not None else None,
     )
     return _chart_row_from_controls(
         row,
@@ -288,13 +297,13 @@ def _flex_indices_for_book_hours(
     remaining_len: int,
     hour_index: int,
     flex_book_hours: int | None,
+    flex_book_start: int = 0,
 ) -> list[int]:
     """
     Flex-eligible indices relative to remaining_slice.
 
     flex_book_hours=None: all remaining hours (Live / truncated SE).
-    Otherwise only absolute hours [0, flex_book_hours) — so open-loop full-horizon
-    trials cannot park flex past the booked SE slice.
+    Otherwise only absolute hours [flex_book_start, flex_book_start + flex_book_hours).
     """
     if flex_book_hours is None:
         return list(range(remaining_len))
@@ -302,10 +311,16 @@ def _flex_indices_for_book_hours(
         raise ValueError(
             f"flex_book_hours must be >= 1 when set (got {flex_book_hours})."
         )
-    booked_left = flex_book_hours - hour_index
-    if booked_left <= 0:
-        return []
-    return list(range(min(booked_left, remaining_len)))
+    if flex_book_start < 0:
+        raise ValueError(
+            f"flex_book_start must be >= 0 (got {flex_book_start})."
+        )
+    book_end = flex_book_start + flex_book_hours
+    return [
+        index
+        for index in range(remaining_len)
+        if flex_book_start <= hour_index + index < book_end
+    ]
 
 
 def _cap_flex_delivery(
@@ -472,14 +487,19 @@ def simulate_horizon(
     commit_hours: int = 1,
     disable_horizon_soc_anchor: bool = False,
     flex_book_hours: int | None = None,
+    flex_book_start: int = 0,
+    soc_hold_index: int | None = None,
+    soc_hold_percent: float | None = None,
 ) -> list:
     """
     Simuliert einen Optimierungshorizont über die gesamte Matrix.
 
     commit_hours=1: stündliches Re-Solve (Live-Savings / MPC).
     commit_hours=N: alle N Stunden neu lösen und den Plan open-loop anwenden (SE).
-    disable_horizon_soc_anchor: keine Terminal-/Sonnenaufgangs-SOC-Gleichheit (Trial).
-    flex_book_hours: Flex nur in den ersten N Absolutstunden (Trial full SA_0-->SA_2).
+    disable_horizon_soc_anchor: keine Terminal-/Sonnenaufgangs-SOC_min-Gleichheit.
+    flex_book_hours / flex_book_start: Flex nur in Absolutstunden
+    [flex_book_start, flex_book_start + flex_book_hours).
+    soc_hold_*: optional hard SoC equality (SE SA₁ carry-in); survives disable_horizon_soc_anchor.
     """
     if commit_hours < 1:
         raise ValueError(
@@ -561,6 +581,7 @@ def simulate_horizon(
                 len(remaining_slice),
                 i,
                 flex_book_hours,
+                flex_book_start,
             )
             if commit_hours <= 1:
                 terminal_soc_percent = _terminal_soc_for_commit(
@@ -583,11 +604,18 @@ def simulate_horizon(
                     matrix_hour_index=i,
                     flexible_consumers=consumers_cfg,
                     consumer_continue_on=continue_on,
+                    soc_hold_index=soc_hold_index,
+                    soc_hold_percent=soc_hold_percent,
                 )
             else:
                 if buffer_pos >= len(commit_buffer):
                     rel_sunrise = _relative_sunrise_index(
                         sunrise_soc_min_index,
+                        i,
+                        len(remaining_slice),
+                    )
+                    rel_hold = _relative_sunrise_index(
+                        soc_hold_index,
                         i,
                         len(remaining_slice),
                     )
@@ -608,6 +636,10 @@ def simulate_horizon(
                         terminal_soc_percent=terminal_soc_percent,
                         sunrise_soc_min_index=rel_sunrise,
                         consumer_continue_on=continue_on,
+                        soc_hold_index=rel_hold,
+                        soc_hold_percent=(
+                            soc_hold_percent if rel_hold is not None else None
+                        ),
                     )
                     commit_buffer = schedule[:commit_hours]
                     buffer_pos = 0

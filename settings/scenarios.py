@@ -187,10 +187,10 @@ def get_backtesting_disable_horizon_soc_anchor(backtesting_scenarios_path: str) 
 
 def get_backtesting_sunrise_full_horizon_trial(backtesting_scenarios_path: str) -> bool:
     """
-    SE sunrise_window: MILP on full SA_0-->SA_2; book first 24 h; flex clamped to book.
+    Deprecated shim (pre-sunrise-book SE).
 
-    Optional top-level ``sunrise_full_horizon_trial`` in backtesting_scenarios.json.
-    Default True (product SE path). Set false to restore pre-2.3.c.3 truncate-before-MILP.
+    Sunrise_window now always MILPs SA₀→SA₂ and books [SA₁, SA₂). The flag is
+    ignored by the engine; kept so older configs still load.
     """
     doc = load_backtesting_scenarios_document(backtesting_scenarios_path)
     if "sunrise_full_horizon_trial" not in doc:

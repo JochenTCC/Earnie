@@ -366,10 +366,15 @@ def _annual_cost_hinweis(
     scenario_id: str,
     *,
     live_id: str | None,
+    ref_id: str,
     kwh_value: float | None,
     live_ref_kwh: float | None,
 ) -> str:
+    # Live-Referenz and Historisch (Ist-Zähler) are baselines, not optimized runs.
+    # Historisch vs model Live-ref often differs when meter ≠ Hausprofil — not a sim bug.
     if _is_live_reference_row(scenario_id, live_id):
+        return _DASH
+    if scenario_id == ref_id:
         return _DASH
     if exceeds_live_reference_rel(kwh_value, live_ref_kwh):
         return _CONSUMPTION_DEVIATION_HINT
@@ -400,6 +405,7 @@ def build_annual_cost_rows(meta: dict, ref_kwh: float | None) -> list[dict]:
         hinweis = _annual_cost_hinweis(
             scenario_id,
             live_id=live_id,
+            ref_id=ref_id,
             kwh_value=kwh_value,
             live_ref_kwh=live_ref_kwh,
         )

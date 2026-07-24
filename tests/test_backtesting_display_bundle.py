@@ -118,16 +118,16 @@ class TestBacktestingDisplayBundle:
     def test_build_backtesting_display_bundle_sunrise_uses_full_rows(self):
         snapshots = self._collect_snapshots(SUNRISE_WINDOW)
         snapshot = snapshots[0]
-        assert len(snapshot["chart_rows_24h"]) == 24
+        book_n = len(snapshot["chart_rows_24h"])
+        assert 23 <= book_n <= 25
         assert snapshot.get("chart_rows_full") is not None
-        assert len(snapshot["chart_rows_full"]) > 24
-        bundle_24h = build_backtesting_display_bundle(snapshot, view_mode=VIEW_MODE_24H)
+        assert len(snapshot["chart_rows_full"]) > book_n
+        # Sunrise books [SA₁, SA₂); 24h view expects Anker−24h — only sunrise view applies.
         bundle_sunrise = build_backtesting_display_bundle(
             snapshot,
             view_mode=VIEW_MODE_SUNRISE,
             segment_index=0,
         )
-        assert not bundle_24h.display_df.empty
         assert not bundle_sunrise.display_df.empty
         assert bundle_sunrise.chart_context is not None
         anchor = snapshot["window_anchor"]

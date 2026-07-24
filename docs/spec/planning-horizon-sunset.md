@@ -75,41 +75,41 @@ MILP-Horizont: 24 h (identisch zum Output-Fenster)
 
 Kein Config-Schalter für End-SOC; Verhalten ist fest im Modus verankert (früher `battery_end_soc_equals_start`, entfernt).
 
-### 4.2 Modus `sunrise_window` (SE-Standard, wie Live-Prod)
+### 4.2 Modus `sunrise_window` (SE-Standard: ready_by → SA₂ book)
 
-Pro Backtesting-Schritt (weiterhin **24 h Output** pro E-Auto-Anker, fairer Vergleich):
+Pro SE-Schritt **ein ready_by-Tag** (Abfahrt/Anker wie `window_anchor_for_date`). Buchungslänge = **ein Sonnenaufgang→nächster Sonnenaufgang** (Astronomie/DST, typ. ~24 h, 23–25 um Zeitumstellung) — **nicht** abhängig von `ready_by_hour` 07 vs 10; die Uhrzeit wählt nur, welcher SA₂ gilt (erster Sonnenaufgang strikt nach ready_by).
 
 ```
-t_now     = Anker − 24h          (Fensterstart wie fixed_24h)
-MILP      = Jetzt → SA₂          (SA₂ = Sonnenaufgang, vgl. §2.1 / UI-Spec)
-SOC       = hart SOC_min am Sonnenaufgang innerhalb des MILP
-Simulation= rollierend max. 24 h pro Schritt (wie fixed_24h; kein Durchsimulieren bis SA₂)
-Output    = erste 24 h ab t_now   (Kosten/SoC-Kette wie bisher)
+ready_by  = Anker des Tages (weekday/weekend ready_by_hour)
+SA₂       = next_sunrise_after(ready_by)
+SA₁       = previous_sunrise_before(SA₂)
+SA₀       = previous_sunrise_before(SA₁)
+MILP      = SA₀ → SA₂   (volle Sunrise-Matrix; charging_anchor = ready_by)
+Book      = [SA₁, SA₂)  (Kosten / CSV / Progress / SoC-Kette)
+SOC in    = SoC an SA₁ = End-SoC an SA₂ des vorherigen Sunrise-Schritts
+            (hartes SoC-Hold am Slot vor SA₁; kein terminal end=start am ready_by;
+             kein SOC_min an SA₂ in SE v1)
+Flex      = nur im Book-Slice (flex_book_start / flex_book_hours)
 Daten     = historische Ist-Verbräuche/PV aus cons_data_hourly.csv
 Geo/Zeit  = latitude/longitude aus aufgelöstem Live-Szenario (Hausprofil)
 ```
 
-**Performance:** Volle SA₂-Matrix (typ. ~40–48 h) würde pro Schritt mehr MILP-Läufe
-in `simulate_horizon` erzeugen als nötig; Backtesting kürzt daher auf 24 h Simulations-Tiefe.
-Der Sonnenaufgang-Index liegt im Sommer-Halbjahr stets innerhalb dieser 24 h.
+Aufeinanderfolgende Schritte buchen **aneinanderstoßende** Sunrise-Intervalle — auch wenn ready_by von 07→10 oder 10→07 springt (kein Wanduhr-Gap/Overlap wie früher bei [ready_by−24h, ready_by)).
 
-**Code-Stand:** Backtesting und Live nutzen bis zur Umsetzung von §2.4 noch `sunset_2` als Matrix-Ende.
+`sunrise_full_horizon_trial` ist ein **Deprecated-Shim** (Config wird noch geladen, Engine ignoriert den Schalter); das Produktverhalten ist immer MILP SA₀→SA₂ + Book [SA₁, SA₂).
 
 **SE vs Live (Re-Opt-Policy):** Scenario Explorer / Backtesting hat innerhalb des Fensters
-**perfekte Voraussicht** (Preise/PV/Last fest). Die Commit-Weite steuert
-`commit_hours` in `backtesting_scenarios.json` (Standard **24** = ein MILP open-loop;
-**1** = stündliches Re-Solve). Live-Steuerung bleibt periodisches Re-Opt
+**perfekte Voraussicht** (Preise/PV/Last fest). SE-Sunrise setzt `commit_hours` auf die volle MILP-Länge (ein Solve pro Schritt). Live-Steuerung bleibt periodisches Re-Opt
 (ein Solve pro Zyklus in `main.py`); Live-Savings/Forecast behält stündliches Rolling
 (`simulate_horizon` Default `commit_hours=1`). Huawei-SoC-Anwendung kann vom MILP-`e_batt`
-abweichen — SE ist bewusst **kein** Live-MPC-Parität.
+abweichen — SE ist bewusst **kein** Live-MPC-Parität. Live-MPC-Horizont (Jetzt→SA₂, SOC_min am nächsten SA) bleibt unverändert.
 
-**Abweichung zu Live:** Re-Optimierung nur einmal pro Anker-Schritt außen (nicht alle 15 min);
-innerhalb des Schritts je nach `commit_hours`.
+**Abweichung zu Live:** Re-Optimierung nur einmal pro Anker-Schritt außen (nicht alle 15 min).
 **Bewusst kein Ziel:** rollierende oder viertelstündliche Re-Optimierung im Backtesting —
-ein Schritt pro E-Auto-Anker reicht für den Horizont-Vergleich; Live-Prod bleibt 15-min-Roll.
-**Bewusst kein Ziel:** stündliches Durchrollen der vollen SA₂-Matrix in `simulate_horizon`.
+ein Schritt pro E-Auto-Anker; Live-Prod bleibt 15-min-Roll.
+**Breaking SE:** Jahres-€ und Stunden-CSV vs. alter `sunrise_window` (ready_by-alignierte 24h-Bücher) verschieben sich erwartbar.
 
-A/B K=1 vs open-loop (Fixtures): `python -m scripts.ab_se_commit_hours`
+A/B K=1 vs open-loop (Fixtures, fixed_24h / ältere Pfade): `python -m scripts.ab_se_commit_hours`
 
 **Trivial MILP fast path (2.3.c.1):** When `battery_capacity_kwh <= 0` and all
 remaining flex targets are 0, `milp_horizon_schedule` / `milp_optimizer` skip the

@@ -444,6 +444,46 @@ def test_build_annual_cost_rows_deviation_hint():
     assert "Live-Referenz" in by_label["Fixed Full"]["Hinweis"]
 
 
+def test_historisch_exempt_from_live_reference_kwh_hint():
+    """Ist-Zähler Historisch may differ >5% from model Live-ref without a sim warning."""
+    from simulation.engine import scenario_reference_id, scenario_reference_label
+
+    live_ref_id = scenario_reference_id("live")
+    live_ref_label = scenario_reference_label("Live")
+    meta = {
+        "reference_id": HISTORICAL_REFERENCE_ID,
+        "live_scenario_id": "live",
+        "scenario_ids": [HISTORICAL_REFERENCE_ID, live_ref_id, "live"],
+        "labels": {
+            HISTORICAL_REFERENCE_ID: "Historisch",
+            live_ref_id: live_ref_label,
+            "live": "Live",
+        },
+        "summary": {
+            "total_eur": {
+                HISTORICAL_REFERENCE_ID: 1200.0,
+                live_ref_id: 1100.0,
+                "live": 1000.0,
+            },
+        },
+        "plausibility": {
+            "live": {
+                "consumption_totals": {
+                    "historical_kwh": 1111.7,
+                    "optimized_kwh": 1104.0,
+                },
+            },
+        },
+    }
+    rows = build_annual_cost_rows(meta, ref_kwh=1186.4)
+    by_label = {row["Szenario"]: row for row in rows}
+    assert by_label["Historisch"]["Jahres Verbrauch [kWh]"] == "1186.4"
+    assert by_label[live_ref_label]["Jahres Verbrauch [kWh]"] == "1111.7"
+    assert by_label["Historisch"]["Hinweis"] == "—"
+    assert by_label[live_ref_label]["Hinweis"] == "—"
+    assert by_label["Live"]["Hinweis"] == "—"
+
+
 def test_build_scenario_consumption_rows_timing_shift_note(monkeypatch):
     from ui.consumption_display.types import BaselineOptimizedOverlay
 

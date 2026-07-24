@@ -116,7 +116,9 @@ Ersparnis-, Kosten-Kennzahlen und Energievergleich beziehen sich auf **Jetzt →
 **Hinweis Re-Opt:** Der Szenario-Explorer steuert die MILP-Commit-Weite über
 `commit_hours` in `backtesting_scenarios.json` (Standard **24** ≈ open-loop; **1** = stündlich).
 Das ist nicht dasselbe wie die periodische Live-Re-Optimierung — kein 1:1-Paritätsnachweis
-zum Live-MPC. Standard-Horizont ist `sunrise_window` (Sunset-2-Sunset / SA_0-->SA_2).
+zum Live-MPC. Standard-Horizont ist `sunrise_window`: MILP SA₀→SA₂, gebucht wird jeweils
+**[SA₁, SA₂)** (Sonnenaufgang→nächster Sonnenaufgang) je ready_by-Tag; SoC verkettet an den
+Sunrise-Übergängen. `fixed_24h` bleibt als Vergleichsmodus (ready_by-alignierte 24h-Fenster).
 
 Geplant (Dev-only): Nachrechnung eines beliebigen Kalendertags — ersetzt den früheren Modus **Historischer Tag**.
 
@@ -129,7 +131,7 @@ Tabelle **Gesamtkosten und -Verbrauch**: Spalten `Szenario`, `Jahres Verbrauch [
 | Zeile | kWh-Quelle |
 | ----- | ---------- |
 | `historical_reference` (Historisch) | `reference_kwh_for_period` → Summe `cons_data` `total_kw` über `meta.period` |
-| Szenario-Referenz (`ref__…`) | `plausibility[<parent>].consumption_totals.historical_kwh` (Summe der 24h-Fenster) |
+| Szenario-Referenz (`ref__…`) | `plausibility[<parent>].consumption_totals.historical_kwh` (Summe der gebuchten Fenster) |
 | Optimiertes Szenario | `plausibility[<id>].consumption_totals.optimized_kwh` |
 
 Mit Hausprofil ist `consumption_source` typisch `profile_spec`: Fenster-Referenz = Spec-Last (Jahresverbrauch/Zeitpläne), nicht der Zähler. Historisch bleibt bewusst am Ist-Zähler — Abweichungen zu den übrigen Zeilen sind erwartbar, wenn Ist ≠ Modell. Kurzfassung in der UI-Caption unter der Tabelle; Anwendertext: [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).

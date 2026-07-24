@@ -98,11 +98,12 @@ class TestSunriseBacktestingRun:
             initial_soc=50.0,
             horizon_mode=SUNRISE_WINDOW,
         )
-        assert len(df) == 48
+        # Two abutting sunrise books (~24h each; DST/astronomy may vary ±1h).
+        assert 44 <= len(df) <= 52
         assert plausibility.failed == []
         assert df["sim_soc"].notna().all()
 
-    def test_fixed_and_sunrise_produce_same_output_length(self):
+    def test_fixed_and_sunrise_near_same_output_length(self):
         cache = load_fixture_cache()
         scenario = fixture_scenario_params()
         prices = build_synthetic_prices_df(
@@ -118,7 +119,8 @@ class TestSunriseBacktestingRun:
         df_sunrise, _, _ = run_simulation(
             start, end, scenario, prices, cache=cache, horizon_mode=SUNRISE_WINDOW
         )
-        assert len(df_fixed) == len(df_sunrise) == 48
+        assert len(df_fixed) == 48
+        assert abs(len(df_sunrise) - len(df_fixed)) <= 4
 
 
 class TestSunriseHorizonSizing:
@@ -149,7 +151,7 @@ class TestSunriseHorizonSizing:
                 outside += 1
         assert outside == 0, "Sommer-Fixture: Sonnenaufgang erwartet innerhalb 24h"
 
-    def test_truncation_limits_simulation_to_output_step(self):
+    def test_book_slice_shorter_than_full_milp_matrix(self):
         scenario = fixture_scenario_params()
         cache = load_fixture_cache()
         prices = build_synthetic_prices_df(
@@ -157,14 +159,18 @@ class TestSunriseHorizonSizing:
             pd.Timestamp(SOC_CHAIN_END_DAY),
         )
         anchor = window_anchor_for_date(SOC_CHAIN_START_DAY)
-        matrix, meta, sunrise_index, _matrix_full = build_sunrise_window_matrix(
+        matrix, meta, sa1_index, matrix_full = build_sunrise_window_matrix(
             anchor, cache, prices, scenario
         )
-        assert meta["planning_horizon_hours"] > BACKTESTING_STEP_HOURS
-        assert len(matrix) == BACKTESTING_STEP_HOURS
+        assert meta["planning_horizon_hours"] == len(matrix_full)
+        assert len(matrix_full) > len(matrix)
+        assert len(matrix) == meta["book_hours"]
+        assert 23 <= len(matrix) <= 25
+        assert sa1_index == meta["sa1_index"]
+        assert meta["ready_by"] == anchor
 
-    def test_sunrise_output_baseload_matches_fixed_window(self):
-        """24h-Grundlast in Sunrise-Matrix = fixed_24h (Plausibilitäts-Regression)."""
+    def test_sunrise_book_slots_differ_from_fixed_ready_by_window(self):
+        """Sunrise books [SA₁, SA₂); fixed_24h books [ready_by−24h, ready_by)."""
         scenario = fixture_scenario_params()
         cache = load_fixture_cache()
         prices = build_synthetic_prices_df(
@@ -172,23 +178,18 @@ class TestSunriseHorizonSizing:
             pd.Timestamp(SOC_CHAIN_END_DAY),
         )
         anchor = window_anchor_for_date(SOC_CHAIN_START_DAY)
-        fixed_matrix, fixed_meta = build_historical_window_matrix(
+        fixed_matrix, _fixed_meta = build_historical_window_matrix(
             anchor, cache, prices
         )
         sunrise_matrix, sunrise_meta, _, _matrix_full = build_sunrise_window_matrix(
             anchor, cache, prices, scenario
         )
-        fixed_sum = round(sum(float(r["expected_p_act"]) for r in fixed_matrix), 3)
-        sunrise_sum = round(sum(float(r["expected_p_act"]) for r in sunrise_matrix), 3)
-        assert sunrise_sum == fixed_sum
-        assert sunrise_meta["baseload_kwh"] == fixed_meta["baseload_kwh"]
-        for fixed_row, sunrise_row in zip(fixed_matrix, sunrise_matrix):
-            assert float(sunrise_row["expected_p_act"]) == pytest.approx(
-                float(fixed_row["expected_p_act"])
-            )
-            assert float(sunrise_row["expected_p_total"]) == pytest.approx(
-                float(fixed_row["expected_p_total"])
-            )
+        fixed_slots = [r["slot_datetime"] for r in fixed_matrix]
+        sunrise_slots = [r["slot_datetime"] for r in sunrise_matrix]
+        assert sunrise_slots != fixed_slots
+        assert sunrise_meta["sa1"] is not None
+        assert sunrise_meta["sa2"] is not None
+        assert all(row.get("charging_anchor") == anchor for row in sunrise_matrix)
 
 
 class TestOverlayStepConsumption:

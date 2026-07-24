@@ -19,6 +19,7 @@ from optimizer import (
     _delivered_flex_kwh_from_rows,
     _total_consumption_kwh_from_rows,
 )
+from optimizer.targets import consumer_column_name
 from simulation.baseload_validation import (
     baseload_kwh_from_chart_rows,
     derive_historical_baseload_kwh,
@@ -30,6 +31,7 @@ from simulation.backtesting_horizon import (
     geo_params_from_scenario,
     naive_backtesting_slot,
     overlay_step_consumption_on_matrix,
+    resolve_sunrise_book_step_for_scenario,
     step_slot_datetimes,
     truncate_matrix_for_step_simulation,
     window_start_before_anchor,
@@ -656,26 +658,22 @@ def build_sunrise_window_matrix(
     scenario_params: dict,
     feed_in_settings: feed_in_prices.FeedInSettings | None = None,
     price_resources: BacktestingPriceResources | None = None,
-) -> tuple[list[dict], dict, int, list[dict]]:
+) -> tuple[list[dict], dict, int | None, list[dict]]:
     """
-    Sunrise-MILP-Matrix (SA_0-->SA_2) für einen Backtesting-Schritt ab Anker−24h.
+    Sunrise-MILP-Matrix SA₀→SA₂ for ready_by ``anchor``; book meta = [SA₁, SA₂).
 
-    Returns: (24h-Schritt-Matrix, Meta, sunrise_soc_min_index, volle Planungsmatrix)
+    Returns: (book-slice matrix, meta, sa1_index in full matrix, full MILP matrix)
     """
-    planning_window, sunrise_index = compute_sunrise_planning_at_anchor(
-        anchor, scenario_params
-    )
-    _, _, tz_name = geo_params_from_scenario(scenario_params)
-    planning_moment = window_start_before_anchor(anchor, tz_name)
-    step_slots = step_slot_datetimes(anchor, tz_name)
-    full_slots = [naive_backtesting_slot(dt) for dt in planning_window.slot_datetimes]
+    step = resolve_sunrise_book_step_for_scenario(anchor, scenario_params)
+    book_slots = [naive_backtesting_slot(dt) for dt in step.book_slots]
+    milp_slots = [naive_backtesting_slot(dt) for dt in step.milp_slots]
     matrix_kwargs = {
         "price_resources": price_resources,
-        "planning_moment": planning_moment,
+        "planning_moment": step.sa0,
         "scenario_params": scenario_params,
     }
-    step_matrix, meta = build_historical_matrix_for_slots(
-        step_slots,
+    book_matrix, meta = build_historical_matrix_for_slots(
+        book_slots,
         cache,
         prices_df,
         window_end=anchor,
@@ -684,7 +682,7 @@ def build_sunrise_window_matrix(
         **matrix_kwargs,
     )
     matrix_full, _full_meta = build_historical_matrix_for_slots(
-        full_slots,
+        milp_slots,
         cache,
         prices_df,
         window_end=anchor,
@@ -692,18 +690,18 @@ def build_sunrise_window_matrix(
         charging_anchor=anchor,
         **matrix_kwargs,
     )
-    meta["planning_horizon_hours"] = len(full_slots)
-    meta["sunrise_anchor"] = planning_window.sunrise_anchor
-    meta["step_slot_datetimes"] = step_slots
     matrix_full = list(matrix_full)
-    # Overlay step baseload onto matching slots of the full matrix (in-place),
-    # then truncate for the default SE money path.
-    overlay_step_consumption_on_matrix(
-        matrix_full[:BACKTESTING_STEP_HOURS],
-        step_matrix,
-    )
-    matrix = truncate_matrix_for_step_simulation(matrix_full, sunrise_index)
-    return matrix, meta, effective_sunrise_soc_min_index(sunrise_index), matrix_full
+    overlay_step_consumption_on_matrix(matrix_full, book_matrix)
+    meta["planning_horizon_hours"] = len(milp_slots)
+    meta["sunrise_anchor"] = step.sa1
+    meta["step_slot_datetimes"] = book_slots
+    meta["ready_by"] = anchor
+    meta["sa0"] = naive_backtesting_slot(step.sa0)
+    meta["sa1"] = naive_backtesting_slot(step.sa1)
+    meta["sa2"] = naive_backtesting_slot(step.sa2)
+    meta["sa1_index"] = step.sa1_index
+    meta["book_hours"] = step.book_hours
+    return book_matrix, meta, step.sa1_index, matrix_full
 
 
 def _apply_backtesting_step(
@@ -713,27 +711,79 @@ def _apply_backtesting_step(
     *,
     horizon_mode: str,
 ) -> tuple[list[dict], list[dict]]:
-    """Schneidet Chart-Zeilen auf den 24h-Backtesting-Schritt zu."""
+    """Schneidet Chart-Zeilen auf den gebuchten Sunrise-/fixed-Schritt zu."""
     if horizon_mode == FIXED_24H:
         return chart_rows, matrix
-    step_slots = {
-        normalize_hour_slot(slot)
-        for slot in meta.get("step_slot_datetimes", [])
-    }
+    raw_slots = meta.get("step_slot_datetimes", [])
+    step_slots = {naive_backtesting_slot(slot) for slot in raw_slots}
     if not step_slots:
         raise ValueError("Sunset-Backtesting: step_slot_datetimes fehlen in meta.")
 
     indices = [
         index
         for index, row in enumerate(matrix)
-        if normalize_hour_slot(row["slot_datetime"]) in step_slots
+        if naive_backtesting_slot(row["slot_datetime"]) in step_slots
     ]
-    if len(indices) != BACKTESTING_STEP_HOURS:
+    if len(indices) != len(step_slots):
         raise ValueError(
-            f"Sunset-Schritt: erwartet {BACKTESTING_STEP_HOURS} Slots, "
-            f"gefunden {len(indices)}."
+            f"Sunrise-Schritt: erwartet {len(step_slots)} Slots, gefunden {len(indices)}."
         )
     return [chart_rows[i] for i in indices], [matrix[i] for i in indices]
+
+
+def _stash_sunrise_full_horizon_flex(
+    meta: dict,
+    full_chart_rows: list[dict],
+    flexible_consumers: list,
+) -> None:
+    """
+    Deadline-Flex (EV) may land in SA₀→SA₁ foresight; book cut drops those hours.
+
+    Stash full-horizon flex for plausibility and foresight rows for CSV merge.
+    """
+    delivered = _delivered_flex_kwh_from_rows(
+        full_chart_rows,
+        flexible_consumers=flexible_consumers,
+    )
+    meta["plausibility_optimized_flex_kwh"] = round(
+        sum(float(v) for v in delivered.values()), 3
+    )
+    sa1 = naive_backtesting_slot(meta["sa1"])
+    foresight: list[dict] = []
+    for row in full_chart_rows:
+        slot = naive_backtesting_slot(row["slot_datetime"])
+        if slot >= sa1:
+            continue
+        flex_kw = sum(
+            float(row.get(consumer_column_name(consumer), 0.0) or 0.0)
+            for consumer in flexible_consumers
+        )
+        if flex_kw > 1e-6:
+            foresight.append(row)
+    meta["foresight_flex_rows"] = foresight
+
+
+def _merge_foresight_flex_into_series(
+    all_chart_rows: list[dict],
+    all_timestamps: list,
+    foresight_rows: list[dict],
+) -> None:
+    """Overwrite prior book hours with foresight flex (same slot) so EV energy is kept."""
+    if not foresight_rows:
+        return
+    by_ts = {
+        naive_backtesting_slot(ts): index for index, ts in enumerate(all_timestamps)
+    }
+    for row in foresight_rows:
+        slot = naive_backtesting_slot(row["slot_datetime"])
+        index = by_ts.get(slot)
+        if index is None:
+            all_chart_rows.append(row)
+            all_timestamps.append(row["slot_datetime"])
+            by_ts[slot] = len(all_timestamps) - 1
+        else:
+            all_chart_rows[index] = row
+            all_timestamps[index] = row["slot_datetime"]
 
 
 def _simulate_anchor_step(
@@ -759,14 +809,19 @@ def _simulate_anchor_step(
     list[dict] | None,
     int | None,
 ]:
-    """Ein Backtesting-Schritt (24h Output) für fixed_24h oder sunrise_window."""
+    """Ein Backtesting-Schritt für fixed_24h oder sunrise_window (ready_by → SA₂ book)."""
     sunrise_soc_min_index = None
     matrix_full: list[dict] | None = None
     disable_soc_anchor = config.get_backtesting_disable_horizon_soc_anchor()
-    full_horizon_trial = config.get_backtesting_sunrise_full_horizon_trial()
     step_start_soc = float(sim_soc)
+    soc_hold_index: int | None = None
+    soc_hold_percent: float | None = None
+    flex_book_hours: int | None = None
+    flex_book_start = 0
+    commit_hours = config.get_backtesting_commit_hours()
+
     if horizon_mode == SUNRISE_WINDOW:
-        matrix, meta, sunrise_soc_min_index, matrix_full = build_sunrise_window_matrix(
+        book_matrix, meta, sa1_index, matrix_full = build_sunrise_window_matrix(
             anchor,
             cache,
             prices_df,
@@ -774,10 +829,17 @@ def _simulate_anchor_step(
             feed_in_settings,
             price_resources=price_resources,
         )
-        if full_horizon_trial and matrix_full is not None:
-            matrix = list(matrix_full)
-            sunrise_soc_min_index = None
-            disable_soc_anchor = True
+        matrix = list(matrix_full)
+        # Product path: full SA₀→SA₂ MILP, book [SA₁, SA₂), SoC hold at SA₁ start.
+        disable_soc_anchor = True
+        sunrise_soc_min_index = None
+        flex_book_start = int(sa1_index)
+        flex_book_hours = int(meta["book_hours"])
+        commit_hours = len(matrix)
+        if sa1_index > 0:
+            soc_hold_index = int(sa1_index) - 1
+            soc_hold_percent = step_start_soc
+        # Initial SoC at SA₀: use carry-in (equality at SA₁ keeps night net-neutral).
     else:
         matrix, meta = build_historical_window_matrix(
             anchor,
@@ -786,12 +848,6 @@ def _simulate_anchor_step(
             feed_in_settings=feed_in_settings,
             scenario_params=scenario_params,
         )
-
-    commit_hours = config.get_backtesting_commit_hours()
-    flex_book_hours: int | None = None
-    if full_horizon_trial and horizon_mode == SUNRISE_WINDOW:
-        commit_hours = len(matrix)
-        flex_book_hours = BACKTESTING_STEP_HOURS
 
     chart_rows = simulate_horizon(
         matrix,
@@ -805,38 +861,34 @@ def _simulate_anchor_step(
         commit_hours=commit_hours,
         disable_horizon_soc_anchor=disable_soc_anchor,
         flex_book_hours=flex_book_hours,
+        flex_book_start=flex_book_start,
+        soc_hold_index=soc_hold_index,
+        soc_hold_percent=soc_hold_percent,
     )
+    flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
+    if horizon_mode == SUNRISE_WINDOW:
+        _stash_sunrise_full_horizon_flex(meta, chart_rows, flexible_consumers)
     full_rows: list[dict] | None = None
     full_matrix: list[dict] | None = None
     if collect_full_horizon and matrix_full is not None:
-        full_rows = simulate_horizon(
-            matrix_full,
-            sim_soc,
-            battery_params=battery_params,
-            verbose=False,
-            consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
-            simulation_hour_offset=None,
-            sunrise_soc_min_index=sunrise_soc_min_index,
-            flexible_consumers=_flexible_consumers_from_scenario(scenario_params),
-            commit_hours=commit_hours,
-            disable_horizon_soc_anchor=disable_soc_anchor,
-            flex_book_hours=flex_book_hours,
-        )
+        full_rows = list(chart_rows)
         full_matrix = matrix_full
     chart_rows, matrix = _apply_backtesting_step(
         chart_rows, matrix, meta, horizon_mode=horizon_mode
     )
-    end_soc = horizon_end_soc_from_chart_rows(chart_rows)
-    if end_soc is None:
-        # Full-horizon trial: _horizon_end_soc sits on SA₂; recompute booked-slice end.
-        end_soc = horizon_end_soc_percent(
-            chart_rows, step_start_soc, battery_params
+    if horizon_mode == SUNRISE_WINDOW and chart_rows:
+        new_soc = float(chart_rows[-1]["Simulierter SoC (%)"])
+    else:
+        end_soc = horizon_end_soc_from_chart_rows(chart_rows)
+        if end_soc is None:
+            end_soc = horizon_end_soc_percent(
+                chart_rows, step_start_soc, battery_params
+            )
+        new_soc = (
+            end_soc
+            if end_soc is not None
+            else float(chart_rows[-1]["Simulierter SoC (%)"])
         )
-    new_soc = (
-        end_soc
-        if end_soc is not None
-        else float(chart_rows[-1]["Simulierter SoC (%)"])
-    )
     return (
         chart_rows,
         matrix,
@@ -1233,6 +1285,9 @@ def validate_window_consumption(
         flexible_consumers=flexible_consumers,
     )
     optimized_flex = round(sum(delivered_flex.values()), 3)
+    # Sunrise: deadline-flex often sits in SA₀→SA₁ foresight (book cut drops it).
+    if meta.get("plausibility_optimized_flex_kwh") is not None:
+        optimized_flex = round(float(meta["plausibility_optimized_flex_kwh"]), 3)
     optimized_kwh = round(optimized_baseload + optimized_flex, 3)
 
     baseload_ok = _consumption_within_tolerance(
@@ -1365,7 +1420,13 @@ def run_simulation(
         config.get_backtesting_cbc_strict_time_limit_sec()
     )
     solver_token = set_milp_solver_override(config.get_backtesting_milp_solver())
-    total_hours = len(anchors) * BACKTESTING_STEP_HOURS
+    if horizon_mode == SUNRISE_WINDOW:
+        total_hours = sum(
+            resolve_sunrise_book_step_for_scenario(anchor, scenario_params).book_hours
+            for anchor in anchors
+        )
+    else:
+        total_hours = len(anchors) * BACKTESTING_STEP_HOURS
     hours_done = 0
     sim_soc = initial_soc
 
@@ -1446,6 +1507,11 @@ def run_simulation(
                         )
                     )
 
+            foresight_flex = list(meta.pop("foresight_flex_rows", []) or [])
+            if foresight_flex:
+                _merge_foresight_flex_into_series(
+                    all_chart_rows, all_timestamps, foresight_flex
+                )
             all_chart_rows.extend(chart_rows)
             all_timestamps.extend(row["slot_datetime"] for row in matrix)
 
