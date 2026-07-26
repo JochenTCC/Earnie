@@ -3,6 +3,14 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 2.3 — Enhance consumer visualization and cost analysis - sharpen tariffs handling (2026-07-26)
+
+Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and demos — invoice-grade bill reconciliation out of scope. Thin marker/data-model prep for SAM (`2.3.f`) done; connector rewrite remains `2.4`. Letter steps (`2.3.c`–`2.3.g`, CSV/Basislast, UI polish, EFM, Land/`supplier_id`, SE/SK polish, VKW Duo, …) archived under their own sections below / earlier in this file.
+
+- [x] **2.3.0 — Release**
+  - Finalize after SCC / community test of `2.3.0-alpha.3`; update German docs as needed (carry-over from 2.2.0 finalize)
+
+
 ### Bugfix HK Leistungsprofil labels (2026-07-26)
 
 - [x] Replace Verbrauchsprofil / Historische Jahresprofile / PV-Ertrag UI labels with Leistungsprofil / Lastprofil / PV-Erzeugungsprofil [kW]; Gesamtverbräuche → Gesamt-Lastverhalten; Energiemonitor/Bilanz radio wording; clear buttons shortened; power-preferred + kWh-counter import hint; German user docs (Profil = kW, Verbrauch/Erzeugung = kWh)

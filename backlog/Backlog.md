@@ -8,19 +8,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
-- [ ] Adapt business plan
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
 
 
 ## Feature Backlog
-
-
-### Version 2.3 — Enhance consumer visualization and cost analysis - sharpen tariffs handling
-
-Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and demos — invoice-grade bill reconciliation is explicitly out of scope (nice-to-have later). Thin marker/data-model prep for SAM (`2.3.f`) is done; connector rewrite remains `2.4`. SE MILP speed/tuning (`2.3.c.0a`–`2.3.c.3`) → [Backlog-Erledigt.md](Backlog-Erledigt.md). **SE sunrise-booked steps** (`2.3.g`) → [Backlog-Erledigt.md](Backlog-Erledigt.md). CSV / Basislast / earnie_role alignment → [Backlog-Erledigt.md](Backlog-Erledigt.md). UI polish → [Backlog-Erledigt.md](Backlog-Erledigt.md). Energieflussmonitor Baustein / CSV research → [Backlog-Erledigt.md](Backlog-Erledigt.md). Basislast Jahres-/Monats-Rest radio → [Backlog-Erledigt.md](Backlog-Erledigt.md). Mandatory Land + `supplier_id` monthly fees → [Backlog-Erledigt.md](Backlog-Erledigt.md). SE / SK polish (Standort row, rename SK, Verbrauchsdaten fingerprint, season-mirror, scenario `enabled`) → [Backlog-Erledigt.md](Backlog-Erledigt.md). SK scenario order + `own_reference` → [Backlog-Erledigt.md](Backlog-Erledigt.md). SK UI polish (static list + 2×3 entity matrix) → [Backlog-Erledigt.md](Backlog-Erledigt.md). VKW Strom Duo catalog + `monthly_table` triples → [Backlog-Erledigt.md](Backlog-Erledigt.md).
-
-- [ ] **2.3.0 — Release**
-  - Finalize after SCC / community test of `2.3.0-alpha.3`; update German docs as needed (carry-over from 2.2.0 finalize)
 
 
 ### Version 2.4 — Become Loxone agnostic and standardize communication (SAM expansion)
