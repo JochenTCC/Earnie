@@ -3,6 +3,13 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### VKW Strom Duo catalog + monthly_table triples (2026-07-26)
+
+- [x] Catalog import tariff `at_vkw_strom_duo` (`monthly_table` blended winter/summer rates; monthly fee 3,00 € netto)
+- [x] `tariff_pricing._monthly_table_lookup` accepts normalized `(year, month, cent)` triples; clearer missing-month errors
+- [x] Docs `tarife-quellen.md`; catalog count test + pricing unit test
+
+
 ### SK UI polish — static list + 2×3 matrix (2026-07-24)
 
 - [x] Szenario selection: dropdown → static list; ↑/↓ in same row right of the list
