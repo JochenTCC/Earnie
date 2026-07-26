@@ -1,12 +1,12 @@
 # Preise & aWATTar
 
-**Nachrechnen für Anwender:** [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) — Schritt-für-Schritt Bezugs-/Einspeisepreis und SE-Monatsgebühr.
+**Nachrechnen für Anwender:** [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md) — Schritt-für-Schritt Bezugs-/Einspeisepreis, SE-Fixkosten und Fake-Jahresrechnung.
 
 Live-Bezugspreise kommen über Spot-Tarife (`spot_hourly` u. a.) mit Day-Ahead-Marktpreis. Providerunabhängige EPEX-Daten für Planung/Backtesting kommen standardmäßig von **Energy-Charts** (AT/DE/CH); aWATTar bleibt API-Fallback. Die aWATTar-API-URL wird aus `import_tariff_id` → `land` abgeleitet (nicht aus dem Tarif-`type`).
 
 Quellen und rechtliche Anker: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md), [OeMAG & Referenzmarktwert](../referenz/oemag-referenzmarktwert.md).
 
-**Monatsgebühr (`monthly_fee_eur`):** optionale Näherung in EUR/Monat am Tarif (netto/brutto wie `prices_include_vat`). Wird nur in den **Szenario-Explorer**-Gesamt-/Monatskosten addiert (eine volle Gebühr pro Kalendermonat), nicht in Live-MILP und nicht in stündlichen `sim_cost`. Pflichtfeld **`supplier_id`**: gleiche Anbieter → Gebühr einmal (`max`), unterschiedliche Anbieter → Summe.
+**Fixkosten (SE only):** `monthly_fee_eur` (Lieferant-Grundpreis; Deduplizierung über `supplier_id`), optional `grid_monthly_fee_eur` / `metering_monthly_fee_eur` / `other_monthly_fee_eur` (einmal je Hausanschluss aus Bezug, sonst Einspeise). Netto/brutto wie `prices_include_vat`. Nur in **Szenario-Explorer**-Gesamt-/Monatskosten und in Fake-Jahresrechnungen unter `{Log}/invoices/`, nicht in Live-MILP und nicht in stündlichen `sim_cost`. Details: [tarife-quellen.md](../referenz/tarife-quellen.md) §4.
 
 **Land am Hausprofil:** Im Hauskonfigurator (Standort) wird `land` (`AT`/`DE`/`CH`) gespeichert. Der Szenarienkonfigurator-Filter **Land** ist Pflicht (kein „Alle“) und wird aus dem gewählten Hausprofil vorbelegt.
 

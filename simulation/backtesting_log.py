@@ -28,6 +28,7 @@ from .backtesting_snapshots import (
     remove_window_snapshots_jsonl,
     write_window_snapshots_jsonl,
 )
+from .period_clip import clip_results_map_to_period
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +155,16 @@ def _hourly_to_csv(results: dict[str, pd.DataFrame], labels: dict[str, str]) -> 
         if col.endswith("_kw")
         and col not in {"consumption_kw", "baseload_kw", "batt_action_kw"}
     )
-    tail_order = ["sim_cost", "sim_soc", "batt_action_kw", "steuerbefehl"]
+    tail_order = [
+        "sim_cost",
+        "import_cost_eur",
+        "export_earn_eur",
+        "import_kwh",
+        "export_kwh",
+        "sim_soc",
+        "batt_action_kw",
+        "steuerbefehl",
+    ]
     col_order = base_order + flex_cols + tail_order
     return out[[c for c in col_order if c in out.columns]]
 
@@ -373,12 +383,18 @@ def save_backtesting_log(
     config_fingerprint: str | None = None,
     window_snapshots: list[dict] | None = None,
     monthly_fee_by_scenario: dict[str, float] | None = None,
+    fee_breakdown_by_scenario: dict[str, dict[str, float]] | None = None,
 ) -> str:
     """Schreibt Metadaten (JSON) und Stundenwerte (CSV). Gibt den JSON-Pfad zurück."""
     target_dir = _DEFAULT_LOG_DIR if log_dir is None else log_dir
     os.makedirs(target_dir, exist_ok=True)
     json_path = os.path.join(target_dir, BACKTESTING_LOG_JSON)
     csv_path = os.path.join(target_dir, BACKTESTING_HOURLY_CSV)
+
+    period_start = period.get("start")
+    period_end = period.get("end")
+    if period_start and period_end:
+        results = clip_results_map_to_period(results, period_start, period_end)
 
     hourly_df = _hourly_to_csv(results, labels)
     hourly_df.to_csv(csv_path, index=False, sep=";", decimal=",")
@@ -391,6 +407,14 @@ def save_backtesting_log(
                 if stamp.tzinfo is not None:
                     stamp = stamp.tz_localize(None)
                 all_ts.append(stamp)
+
+    fee_breakdown_payload = {
+        sid: {
+            key: float(value)
+            for key, value in (fee_breakdown_by_scenario.get(sid) or {}).items()
+        }
+        for sid in results
+    } if fee_breakdown_by_scenario else {}
 
     payload = stamp_payload(
         {
@@ -406,6 +430,7 @@ def save_backtesting_log(
             }
             if monthly_fee_by_scenario
             else {},
+            "fee_breakdown_by_scenario": fee_breakdown_payload,
             "plausibility": {
                 sid: _serialize_plausibility(rep)
                 for sid, rep in plausibility_by_scenario.items()

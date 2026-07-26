@@ -11,10 +11,15 @@ Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration/Typen) �
 | Energiepreis Bezug (€/kWh × Netzbezug) | ja | ja |
 | Einspeisevergütung (€/kWh × Netzeinspeisung) | ja | ja |
 | Aufschläge am Tarif (`settlement_fee_cent_kwh`, `markup_percent`, USt) | ja | ja |
-| **Monatsgebühr** (`monthly_fee_eur`, Näherung) | **nein** | **ja** (nach Aggregation) |
-| Vollständige Netz-Grundpreise, Messstellengebühr, Abgabenstack der Rechnung | nein | nein |
+| **Lieferant-Grundpreis** (`monthly_fee_eur`, Näherung) | **nein** | **ja** (nach Aggregation) |
+| **Netzentgelt-Grundpreis** (`grid_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
+| **Messstellengebühr** (`metering_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
+| **Sonstige Fixkosten** (`other_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
+| PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/Konzessionsabgabe | nein | nein |
 
 Earnie liefert **gute-genug-€** für Vergleiche und Demos — **keine** Abrechnung gegen echte Stromrechnungen. Katalogwerte können unvollständig oder veraltet sein; bitte die Parameter im Szenarienkonfigurator prüfen.
+
+Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Markdown unter `{Log-Ordner}/invoices/{szenario_id}_jahresrechnung.md` (Bezug/Einspeisung getrennt, Fixkosten ausgewiesen, Tarifnamen im Kopf).
 
 ## 2. Bezugspreis Schritt für Schritt
 
@@ -64,26 +69,43 @@ Vergütung ≈ EPEX − **0,60** Cent/kWh (netto laut Produktseite). Bei Börse 
 
 Details zu Typen und JSON: [Preise & aWATTar](../konfiguration/preise.md).
 
-## 4. Monatsgebühr in den SE-Gesamtkosten
+## 4. Fixkosten in den SE-Gesamtkosten
+
+### Lieferant-Grundpreis
 
 - Feld im Katalog: `monthly_fee_eur` (optional; fehlt = 0).
-- Pflichtfeld **`supplier_id`** (Stromlieferant-Slug): gleiche Anbieter bei Bezug und Einspeise teilen sich **eine** Monatsgebühr (`max` der beiden Werte), unterschiedliche Anbieter werden **addiert**.
-- **Netto oder brutto** wie beim Tarif: gleiche Basis wie `prices_include_vat` (netto, wenn Preise ohne USt geführt werden).
-- Pro **Kalendermonat** im SE-Zeitraum (monatsweise aus `cons_data`): **eine volle** Monatsgebühr je Anbieter-Gruppe — keine anteilige Kürzung.
-- Jahres-/Gesamtwert: Summe der Monatsgebühren über alle Monate + Summe der Stunden-Energiekosten.
-- **Nicht** in Live-MILP, **nicht** in den stündlichen `sim_cost`-Kurven.
+- Pflichtfeld **`supplier_id`** (Stromlieferant-Slug): gleiche Anbieter bei Bezug und Einspeise teilen sich **eine** Gebühr (`max` der beiden Werte), unterschiedliche Anbieter werden **addiert**.
 
-In der UI: Szenario-Explorer → Gesamtkosten und Monatliche Stromkosten (Hinweis „Näherung Monatsgebühren“, wenn Gebühren vorhanden).
+### Hausanschluss-Fixkosten (einmal je Szenario)
+
+| Feld | Bedeutung |
+| ---- | --------- |
+| `grid_monthly_fee_eur` | Netznutzungs-/Netzentgelt-Grundpreis |
+| `metering_monthly_fee_eur` | Messstellenbetrieb / Zählergebühr |
+| `other_monthly_fee_eur` | Sonstige Fixkosten (z. B. bekannte Abgabenpauschale) |
+
+Regel: Wert aus dem **Bezugstarif**; fehlt er dort, aus dem Einspeisetarif — **nicht** Summe aus beiden. PLZ-/Netzgebiet-Tabellen sind nicht hinterlegt; fehlende Werte = 0.
+
+### Gemeinsame Regeln
+
+- **Netto oder brutto** wie beim Tarif: gleiche Basis wie `prices_include_vat`.
+- Pro **Kalendermonat** im SE-Zeitraum: **eine volle** Gebühr — keine anteilige Kürzung.
+- Jahres-/Gesamtwert: Summe aller Fixkosten über alle Monate + volumetrische Energiekosten (Bezug minus Einspeiseerlös).
+- **Nicht** in Live-MILP, **nicht** in den stündlichen `sim_cost`-Kurven.
+- Optional volumetrisch: `netzentgelt_cent_kwh` fließt in den Bezugs-Arbeitspreis (wenn gesetzt).
+
+In der UI: Szenario-Explorer → Gesamtkosten und Monatliche Stromkosten (Hinweis „Näherung Monatsgebühren“, wenn Gebühren vorhanden). Fake-Jahresrechnung: siehe §1.
 
 ## 5. Katalogparameter prüfen
 
-Im Szenarienkonfigurator erscheint nach Tarifwahl eine **read-only-Vorschau** (Land, `supplier_id`, Aufschläge, USt-Flag, ggf. Monatsgebühr ca.).
+Im Szenarienkonfigurator erscheint nach Tarifwahl eine **read-only-Vorschau** (Land, `supplier_id`, Aufschläge, USt-Flag, ggf. Lieferant-/Netz-/Messstellen-Fixkosten ca.).
 
 Prüfen Sie insbesondere:
 
 - Stimmen Aufschlag und USt-Flag mit dem Tarifblatt des Anbieters überein?
-- Ist eine Monatsgebühr hinterlegt, die Sie erwarten — oder fehlt sie (dann 0 in der SE-Rechnung)?
-- Bei gleichem Anbieter (z. B. aWATTar Bezug + SUNNY): erscheint die Gebühr nur **einmal**?
+- Ist ein Lieferant-Grundpreis hinterlegt, den Sie erwarten — oder fehlt er (dann 0 in der SE-Rechnung)?
+- Bei gleichem Anbieter (z. B. aWATTar Bezug + SUNNY): erscheint die Lieferant-Gebühr nur **einmal**?
+- Netz-/Messstellenwerte sind oft netzgebietsspezifisch — ohne Katalogeintrag bleiben sie 0.
 - Es gibt **keine Garantie** für Vollständigkeit oder Aktualität des Katalogs.
 
 Nachrechnen der Formeln: diese Seite. Technisches Mapping: [preise.md](../konfiguration/preise.md).

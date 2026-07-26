@@ -21,7 +21,8 @@ import logger_config
 from data import profile_manager
 from simulation.backtesting_log import save_backtesting_log
 from simulation.backtesting_log import build_critical_cases, summarize_critical_cases
-from simulation.monthly_fees import monthly_fees_by_result_id
+from simulation.monthly_fees import fee_breakdowns_by_result_id
+from simulation.se_invoice_markdown import write_se_invoices
 from data.data_loader import load_market_prices, resolve_simulation_window
 from data.backtesting_prices import (
     MISSING_PRICE_STRATEGY_FORECAST,
@@ -971,12 +972,16 @@ def main(argv: list[str] | None = None):
         period_meta["imported_pv_scenario_ids"] = used_pv
     if missing_pv:
         period_meta["imported_pv_missing_scenario_ids"] = missing_pv
-    monthly_fee_by_scenario = monthly_fees_by_result_id(
+    fee_breakdown_by_scenario = fee_breakdowns_by_result_id(
         scenarios=scenarios,
         historical_params=reference_params,
         historical_id=HISTORICAL_REFERENCE_ID,
         extra_ref_specs=extra_ref_specs,
     )
+    monthly_fee_by_scenario = {
+        sid: breakdown.total_monthly_eur
+        for sid, breakdown in fee_breakdown_by_scenario.items()
+    }
     log_path = save_backtesting_log(
         sim_results,
         labels,
@@ -986,10 +991,28 @@ def main(argv: list[str] | None = None):
         cbc_events_by_scenario=cbc_events_by_scenario,
         window_snapshots=window_snapshots,
         monthly_fee_by_scenario=monthly_fee_by_scenario,
+        fee_breakdown_by_scenario={
+            sid: breakdown.as_dict()
+            for sid, breakdown in fee_breakdown_by_scenario.items()
+        },
+    )
+    invoice_paths = write_se_invoices(
+        log_dir=os.path.dirname(log_path) or args.output_dir or ".",
+        results=sim_results,
+        labels=labels,
+        fee_breakdown_by_scenario=fee_breakdown_by_scenario,
+        scenarios=scenarios,
+        historical_params=reference_params,
+        historical_id=HISTORICAL_REFERENCE_ID,
+        extra_ref_specs=extra_ref_specs,
+        period_start=start.date().isoformat(),
+        period_end=end.date().isoformat(),
     )
     if progress_file:
         clear_progress_dir(progress_file)
     print(f"\nBacktesting-Log gespeichert: {log_path}")
+    if invoice_paths:
+        print(f"Fake-Jahresrechnungen: {len(invoice_paths)} Dateien unter invoices/")
 
 
 if __name__ == "__main__":

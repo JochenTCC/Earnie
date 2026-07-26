@@ -122,7 +122,28 @@ def _append_common_meta(rows: list[tuple[str, str]], tariff: dict) -> None:
         rows,
         tariff,
         "monthly_fee_eur",
-        "Monatsgebühr (ca.)",
+        "Lieferant-Grundpreis (ca.)",
+        suffix=" €/Monat",
+    )
+    _append_if_present(
+        rows,
+        tariff,
+        "grid_monthly_fee_eur",
+        "Netzentgelt-Grundpreis (ca.)",
+        suffix=" €/Monat",
+    )
+    _append_if_present(
+        rows,
+        tariff,
+        "metering_monthly_fee_eur",
+        "Messstellengebühr (ca.)",
+        suffix=" €/Monat",
+    )
+    _append_if_present(
+        rows,
+        tariff,
+        "other_monthly_fee_eur",
+        "Sonstige Fixkosten (ca.)",
         suffix=" €/Monat",
     )
     supplier_id = tariff.get("supplier_id")

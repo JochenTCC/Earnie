@@ -52,7 +52,6 @@ _SUNRISE_SEGMENT_LABELS = {
     1: "SA₁→SA₂",
 }
 
-
 def _backtesting_sunrise_header_label(
     window_anchor: str,
     tz_name: str,

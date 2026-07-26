@@ -46,9 +46,9 @@ _WEEKDAY_HEADERS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 _SESSION_DATE_KEY = "backtesting_calendar_date"
 _SESSION_MONTH_KEY = "backtesting_calendar_month"
 _DAY_MARKER = {
-    SEVERITY_NONE: "⚪",
-    SEVERITY_YELLOW: "🟡",
-    SEVERITY_ORANGE: "🟠",
+    SEVERITY_NONE: "🟢",
+    SEVERITY_YELLOW: "⚪",
+    SEVERITY_ORANGE: "🟡",
     SEVERITY_RED: "🔴",
 }
 
@@ -292,7 +292,7 @@ def _render_month(
                 if not cell.in_run:
                     st.button(str(day), disabled=True, key=f"cal_off_{cell_date.isoformat()}")
                     continue
-                marker = _DAY_MARKER.get(cell.severity, "⚪")
+                marker = _DAY_MARKER.get(cell.severity, "🟢")
                 label = f"{marker}{day}"
                 is_selected = selected_date == cell_date
                 if st.button(
@@ -316,9 +316,9 @@ def render_deviation_calendar(
     st.session_state[_SESSION_MONTH_KEY] = visible_month
 
     st.caption(
-        "Legende: ⚪ ohne Abweichung · 🟡 Verbrauchstoleranz (≤ "
+        "Legende: 🟢 ohne Abweichung · ⚪ Verbrauchstoleranz (≤ "
         f"{CONSUMPTION_TOLERANCE_KWH:g} kWh) / CBC-Marker bei feasiblem 24h-Ergebnis · "
-        "🟠 darüber · 🔴 CBC/MILP mit echtem Problem · "
+        "🟡 darüber · 🔴 CBC/MILP mit echtem Problem · "
         "ausgegraut = außerhalb Lauf"
     )
 

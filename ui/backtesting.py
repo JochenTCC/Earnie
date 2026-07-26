@@ -611,10 +611,10 @@ def render_annual_cost_table(meta: dict) -> None:
     fee_map = meta.get("monthly_fee_by_scenario") or {}
     has_fees = any(float(v or 0) > 0 for v in fee_map.values())
     fee_note = (
-        " Jahres-/Monatskosten inkl. **Näherung Monatsgebühren** aus dem Tarifkatalog "
-        "(nicht Live-MILP). "
+        " Jahres-/Monatskosten inkl. **Näherung Fixkosten** aus dem Tarifkatalog "
+        "(nicht Live-MILP). Fake-Jahresrechnungen: Ordner `invoices/` neben dem Log. "
         if has_fees
-        else " "
+        else " Fake-Jahresrechnungen: Ordner `invoices/` neben dem Log. "
     )
     st.caption(
         "**Jahres Verbrauch:** Bei „Historisch“ Summe des Ist-Verbrauchs aus "
@@ -693,7 +693,7 @@ def render_backtesting_monthly_chart(meta: dict) -> None:
     fee_map = meta.get("monthly_fee_by_scenario") or {}
     if any(float(v or 0) > 0 for v in fee_map.values()):
         st.caption(
-            "Monatswerte inkl. Näherung Monatsgebühren (eine volle Gebühr pro "
+            "Monatswerte inkl. Näherung Fixkosten (eine volle Gebühr pro "
             "Kalendermonat). Nachrechnen: Tarife und Preise nachrechnen."
         )
 

@@ -147,5 +147,12 @@ def test_deviation_marker_for_case():
         deviation_marker_for_case(
             {"kind": "strict_fallback", "window_consumption_ok": True}
         )
+        == "⚪"
+    )
+    assert (
+        deviation_marker_for_case(
+            {"kind": "consumption_tolerance", "diff_kwh": 0.6}
+        )
         == "🟡"
     )
+    assert deviation_marker_for_case({"kind": "unknown"}) == "🟢"

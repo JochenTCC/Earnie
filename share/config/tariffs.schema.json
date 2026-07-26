@@ -81,7 +81,22 @@
         "monthly_fee_eur": {
           "type": "number",
           "minimum": 0,
-          "description": "Approximate monthly standing charge in EUR/month (net if prices_include_vat is false, else gross). Used in Scenario Explorer totals only."
+          "description": "Lieferant Grundpreis EUR/month (net if prices_include_vat is false, else gross). SE totals and fake invoices only."
+        },
+        "grid_monthly_fee_eur": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Netznutzungs-/Netzentgelt-Grundpreis EUR/month (household; once per scenario from import, else export). SE totals and fake invoices only."
+        },
+        "metering_monthly_fee_eur": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Messstellenbetrieb / Zaehlergebuehr EUR/month (household; once per scenario). SE totals and fake invoices only."
+        },
+        "other_monthly_fee_eur": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Residual fixed fees EUR/month (e.g. known Abgabenpauschale; household; once per scenario). SE totals and fake invoices only."
         },
         "supplier_id": {
           "type": "string",

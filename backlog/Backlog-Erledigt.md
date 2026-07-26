@@ -3,6 +3,33 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Detaillierte Simulationsansicht render profiling (2026-07-26)
+
+- [x] Profiled SE detail view: bottleneck was `_run_anchors_for_meta` rescanning cons_data via `list_simulation_anchors` (~90–150 s per Streamlit rerun)
+- [x] Derive in-run anchors from already-loaded `hourly_df` (+ session cache, cons_data fallback); overview ~65 ms / charts total ~228 ms
+- [x] Test: `test_run_anchors_from_hourly_uses_last_slot_presence`
+
+
+### 2.3.1 Detaillierte Simulationsansicht colors (2026-07-26)
+
+- [x] Calendar severity markers remapped: 🟢 ohne Abweichung · ⚪ Verbrauchstoleranz / feasible CBC · 🟡 darüber · 🔴 CBC/MILP Problem (`ui/backtesting_deviation_calendar.py`)
+
+
+### Bugfix SE sunrise_window spill months / fees > 12 (2026-07-26)
+
+- [x] Clip SE/backtesting result hours to period `[start, end]` (`simulation/period_clip.py`); applied in `save_backtesting_log` and Fake-Jahresrechnung (not in `run_simulation` — book-window hours stay intact)
+- [x] Monthly fees only for in-scope months (12 for last-12-months), not sunrise/fixed_24h spill stubs
+- [x] Test: `test_clip_results_drops_spill_months_for_fees`
+
+
+### 2.3.1 Fake SE annual invoices (2026-07-26)
+
+- [x] Per-scenario German markdown Fake-Jahresrechnung after SE (`{log}/invoices/{id}_jahresrechnung.md`) with tariff names
+- [x] Import/export € + kWh split; monthly table with Verbrauch (info), Bezug, Einspeisung; year totals
+- [x] DACH fixed-fee schema slots (`grid_monthly_fee_eur`, `metering_monthly_fee_eur`, `other_monthly_fee_eur`) + Lieferant `monthly_fee_eur`; SE fee breakdown in log
+- [x] Docs (`tarife-quellen.md`, `preise.md`, Handbuch) + tariff preview + tests
+
+
 ### Version 2.3 — Enhance consumer visualization and cost analysis - sharpen tariffs handling (2026-07-26)
 
 Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and demos — invoice-grade bill reconciliation out of scope. Thin marker/data-model prep for SAM (`2.3.f`) done; connector rewrite remains `2.4`. Letter steps (`2.3.c`–`2.3.g`, CSV/Basislast, UI polish, EFM, Land/`supplier_id`, SE/SK polish, VKW Duo, …) archived under their own sections below / earlier in this file.

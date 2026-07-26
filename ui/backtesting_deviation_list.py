@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import streamlit as st
@@ -10,7 +10,12 @@ import streamlit as st
 import config
 
 from simulation.backtesting_log import extract_critical_cases, summarize_critical_cases
-from simulation.engine import HISTORICAL_REFERENCE_ID, HistoricalDataCache, list_simulation_anchors
+from simulation.engine import (
+    HISTORICAL_REFERENCE_ID,
+    HistoricalDataCache,
+    list_simulation_anchors,
+    window_anchor_for_date,
+)
 from ui.backtesting_deviation_calendar import (
     build_deviation_calendar_index,
     cases_for_date_and_scenario,
@@ -220,7 +225,6 @@ def _render_deviation_charts(
         chart_key=f"backtesting_price_savings_{chart_suffix}",
     )
 
-
 def _optimized_scenario_ids(meta: dict) -> list[str]:
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
     return [
@@ -230,7 +234,51 @@ def _optimized_scenario_ids(meta: dict) -> list[str]:
     ]
 
 
-def _run_anchors_for_meta(meta: dict) -> list[datetime]:
+_SESSION_RUN_ANCHORS_KEY = "backtesting_deviation_run_anchors"
+
+
+def _run_anchors_cache_key(meta: dict) -> tuple:
+    period = meta.get("period") or {}
+    return (
+        str(period.get("start")),
+        str(period.get("end")),
+        str(period.get("backtesting_year")),
+        str(meta.get("created_at") or ""),
+        str(meta.get("config_fingerprint") or ""),
+    )
+
+
+def _run_anchors_from_hourly(
+    meta: dict,
+    hourly_df: pd.DataFrame,
+) -> list[datetime] | None:
+    """In-run anchors from already-loaded hourly log (avoids cons_data rescan)."""
+    bounds = nav_bounds_from_period(meta.get("period") or {})
+    if bounds is None or hourly_df is None or hourly_df.empty:
+        return None
+    if "ts" not in hourly_df.columns:
+        return None
+    start, end = bounds
+    part = hourly_df
+    if "scenario_id" in hourly_df.columns:
+        part = hourly_df[hourly_df["scenario_id"] != HISTORICAL_REFERENCE_ID]
+    if part.empty:
+        return None
+    ts_set = {pd.Timestamp(value) for value in pd.to_datetime(part["ts"])}
+    anchors: list[datetime] = []
+    for day in pd.date_range(
+        pd.Timestamp(start).normalize(),
+        pd.Timestamp(end).normalize(),
+        freq="D",
+    ):
+        anchor = window_anchor_for_date(day.date())
+        last_slot = pd.Timestamp(anchor - timedelta(hours=1))
+        if last_slot in ts_set:
+            anchors.append(anchor)
+    return anchors
+
+
+def _run_anchors_via_cons_data(meta: dict) -> list[datetime]:
     bounds = nav_bounds_from_period(meta.get("period") or {})
     if bounds is None:
         return []
@@ -239,6 +287,32 @@ def _run_anchors_for_meta(meta: dict) -> list[datetime]:
     return list_simulation_anchors(pd.Timestamp(start), pd.Timestamp(end), cache)
 
 
+def _run_anchors_for_meta(
+    meta: dict,
+    hourly_df: pd.DataFrame | None = None,
+) -> list[datetime]:
+    cache_key = _run_anchors_cache_key(meta)
+    cached = st.session_state.get(_SESSION_RUN_ANCHORS_KEY)
+    if isinstance(cached, dict) and cached.get("key") == cache_key:
+        anchors = cached.get("anchors")
+        if isinstance(anchors, list):
+            return anchors
+
+    if hourly_df is not None:
+        from_hourly = _run_anchors_from_hourly(meta, hourly_df)
+        if from_hourly is not None:
+            st.session_state[_SESSION_RUN_ANCHORS_KEY] = {
+                "key": cache_key,
+                "anchors": from_hourly,
+            }
+            return from_hourly
+
+    anchors = _run_anchors_via_cons_data(meta)
+    st.session_state[_SESSION_RUN_ANCHORS_KEY] = {
+        "key": cache_key,
+        "anchors": anchors,
+    }
+    return anchors
 
 def _default_active_scenario(
     scenario_options: list[str],
@@ -366,7 +440,7 @@ def render_deviation_list(
 ) -> None:
     st.subheader("Detaillierte Simulationsansicht")
 
-    run_anchors = _run_anchors_for_meta(meta)
+    run_anchors = _run_anchors_for_meta(meta, hourly_df)
     if not run_anchors:
         st.info("Keine Simulationsfenster im Backtesting-Zeitraum.")
         return

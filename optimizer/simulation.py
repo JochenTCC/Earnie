@@ -743,25 +743,43 @@ def delivered_flex_kwh_from_rows(
     return totals
 
 
+def _grid_kw_from_row(row: dict) -> float:
+    """Netzbezug (kW): positiv = Bezug, negativ = Einspeisung."""
+    if "Netzbezug (kW)" in row:
+        return float(row["Netzbezug (kW)"])
+    p_con = row["Verbrauch-Prognose (kW)"] + flexible_consumer_power_kw(row)
+    p_pv = row["PV-Prognose (kW)"]
+    batt_action = row["Geplante Batterie-Aktion (kW)"]
+    return float(p_con - p_pv + batt_action)
+
+
+def calculate_step_cost_parts_from_row(
+    row: dict,
+    sell_price_cent: float | None = None,
+) -> tuple[float, float, float, float, float]:
+    """Import/export split for one sim hour.
+
+    Returns ``(import_cost_eur, export_earn_eur, net_eur, import_kwh, export_kwh)``.
+    ``export_earn_eur`` and ``export_kwh`` are non-negative; ``net_eur = import − export``.
+    """
+    price_cent = row["Strompreis (Cent/kWh)"]
+    sell_cent = resolve_sell_price_cent(row, sell_price_cent)
+    p_grid = _grid_kw_from_row(row)
+    if p_grid >= 0:
+        import_kwh = float(p_grid)
+        import_eur = import_kwh * float(price_cent) / 100.0
+        return import_eur, 0.0, import_eur, import_kwh, 0.0
+    export_kwh = float(-p_grid)
+    export_eur = export_kwh * float(sell_cent) / 100.0
+    return 0.0, export_eur, -export_eur, 0.0, export_kwh
+
+
 def calculate_step_cost_euro_from_row(
     row: dict,
     sell_price_cent: float | None = None,
 ) -> float:
     """Berechnet die Stromkosten einer einzelnen Simulationsstunde in Euro."""
-    p_con = row["Verbrauch-Prognose (kW)"] + flexible_consumer_power_kw(row)
-    price_cent = row["Strompreis (Cent/kWh)"]
-    sell_cent = resolve_sell_price_cent(row, sell_price_cent)
-    if "Netzbezug (kW)" in row:
-        p_grid = float(row["Netzbezug (kW)"])
-    else:
-        p_pv = row["PV-Prognose (kW)"]
-        batt_action = row["Geplante Batterie-Aktion (kW)"]
-        p_grid = p_con - p_pv + batt_action
-    if p_grid >= 0:
-        step_cents = p_grid * price_cent
-    else:
-        step_cents = p_grid * sell_cent
-    return step_cents / 100.0
+    return calculate_step_cost_parts_from_row(row, sell_price_cent)[2]
 
 
 def calculate_cost_euro_from_rows(rows: list, sell_price_cent: float | None = None) -> float:

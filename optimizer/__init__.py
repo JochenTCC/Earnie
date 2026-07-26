@@ -60,6 +60,7 @@ from .simulation import (
     calculate_optimization_savings,
     build_savings_snapshot,
     calculate_step_cost_euro_from_row as _calculate_step_cost_euro_from_row,
+    calculate_step_cost_parts_from_row as _calculate_step_cost_parts_from_row,
     delivered_flex_kwh_from_rows as _delivered_flex_kwh_from_rows,
     flexible_consumer_power_kw as _flexible_consumer_power_kw,
     simulate_24h_horizon,
@@ -131,6 +132,7 @@ __all__ = [
     # Von optimization_consistency / simulation_engine genutzt:
     "_apply_soc_change",
     "_calculate_step_cost_euro_from_row",
+    "_calculate_step_cost_parts_from_row",
     "_delivered_flex_kwh_from_rows",
     "_flexible_consumer_power_kw",
     "_total_consumption_kwh_from_rows",

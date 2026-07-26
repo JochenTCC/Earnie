@@ -180,3 +180,24 @@ def test_month_with_most_deviation_days():
     from ui.backtesting_deviation_calendar import month_with_most_deviation_days
 
     assert month_with_most_deviation_days(index, year=2025) == 3
+
+
+def test_run_anchors_from_hourly_uses_last_slot_presence():
+    import pandas as pd
+    from datetime import timedelta
+
+    from ui.backtesting_deviation_list import _run_anchors_from_hourly
+
+    day = date(2025, 3, 15)
+    anchor = window_anchor_for_date(day)
+    last_slot = anchor - timedelta(hours=1)
+    meta = _sample_meta(start="2025-03-15", end="2025-03-16")
+    hourly = pd.DataFrame(
+        {
+            "ts": [last_slot, last_slot],
+            "scenario_id": ["live", HISTORICAL_REFERENCE_ID],
+        }
+    )
+    anchors = _run_anchors_from_hourly(meta, hourly)
+    assert anchors == [anchor]
+    assert _run_anchors_from_hourly(meta, pd.DataFrame(columns=["ts", "scenario_id"])) is None

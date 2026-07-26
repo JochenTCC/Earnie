@@ -15,7 +15,7 @@ from optimizer import (
     simulate_horizon,
     horizon_end_soc_from_chart_rows,
     horizon_end_soc_percent,
-    _calculate_step_cost_euro_from_row,
+    _calculate_step_cost_parts_from_row,
     _delivered_flex_kwh_from_rows,
     _total_consumption_kwh_from_rows,
 )
@@ -900,6 +900,26 @@ def _simulate_anchor_step(
     )
 
 
+def _hour_cost_parts_without_optimization(
+    load_kw: float,
+    pv_kw: float,
+    price_cent: float,
+    k_push_cent: float,
+) -> tuple[float, float, float, float, float]:
+    """Import/export split without optimization (no battery, no flex).
+
+    Returns ``(import_cost_eur, export_earn_eur, net_eur, import_kwh, export_kwh)``.
+    """
+    p_grid = float(load_kw) - float(pv_kw)
+    if p_grid >= 0:
+        import_kwh = float(p_grid)
+        import_eur = import_kwh * float(price_cent) / 100.0
+        return import_eur, 0.0, import_eur, import_kwh, 0.0
+    export_kwh = float(-p_grid)
+    export_eur = export_kwh * float(k_push_cent) / 100.0
+    return 0.0, export_eur, -export_eur, 0.0, export_kwh
+
+
 def _hour_cost_without_optimization(
     load_kw: float,
     pv_kw: float,
@@ -910,10 +930,9 @@ def _hour_cost_without_optimization(
     Stromkosten einer Stunde ohne Optimierung:
     historischer Verbrauch minus PV, keine Batterie, kein Flex-Scheduling.
     """
-    p_grid = float(load_kw) - float(pv_kw)
-    if p_grid >= 0:
-        return p_grid * price_cent / 100.0
-    return p_grid * k_push_cent / 100.0
+    return _hour_cost_parts_without_optimization(
+        load_kw, pv_kw, price_cent, k_push_cent
+    )[2]
 
 
 HISTORICAL_REFERENCE_ID = "historical_reference"
@@ -985,6 +1004,11 @@ def compute_historical_reference_costs(
 
     timestamps: list[datetime] = []
     costs: list[float] = []
+    import_costs: list[float] = []
+    export_earns: list[float] = []
+    import_kwhs: list[float] = []
+    export_kwhs: list[float] = []
+    consumption_kws: list[float] = []
     ref_settings = feed_in_settings
     if scenario_params is not None:
         ref_settings = config.get_backtesting_feed_in_settings(
@@ -1018,14 +1042,30 @@ def compute_historical_reference_costs(
             k_push = feed_in_prices.resolve_k_push_act(
                 epex, ref_settings, slot_datetime=slot_dt
             )
-            costs.append(
-                _hour_cost_without_optimization(load, pv, price, k_push)
+            import_eur, export_eur, net_eur, import_kwh, export_kwh = (
+                _hour_cost_parts_without_optimization(load, pv, price, k_push)
             )
+            costs.append(net_eur)
+            import_costs.append(import_eur)
+            export_earns.append(export_eur)
+            import_kwhs.append(import_kwh)
+            export_kwhs.append(export_kwh)
+            consumption_kws.append(float(load))
             hours_done += 1
             if on_progress is not None:
                 on_progress(hours_done, total_hours)
 
-    df_res = pd.DataFrame({"sim_cost": costs}, index=pd.DatetimeIndex(timestamps))
+    df_res = pd.DataFrame(
+        {
+            "sim_cost": costs,
+            "import_cost_eur": import_costs,
+            "export_earn_eur": export_earns,
+            "import_kwh": import_kwhs,
+            "export_kwh": export_kwhs,
+            "consumption_kw": consumption_kws,
+        },
+        index=pd.DatetimeIndex(timestamps),
+    )
     df_res.index.name = "ts"
     return df_res
 
@@ -1529,12 +1569,17 @@ def run_simulation(
         all_chart_rows,
         flexible_consumers,
     )
+    cost_parts = [
+        _calculate_step_cost_parts_from_row(row) for row in all_chart_rows
+    ]
     df_res = pd.DataFrame(
         {
             **consumption_columns,
-            "sim_cost": [
-                _calculate_step_cost_euro_from_row(row) for row in all_chart_rows
-            ],
+            "sim_cost": [parts[2] for parts in cost_parts],
+            "import_cost_eur": [parts[0] for parts in cost_parts],
+            "export_earn_eur": [parts[1] for parts in cost_parts],
+            "import_kwh": [parts[3] for parts in cost_parts],
+            "export_kwh": [parts[4] for parts in cost_parts],
             "sim_soc": [row["Simulierter SoC (%)"] for row in all_chart_rows],
             "batt_action_kw": [row["Geplante Batterie-Aktion (kW)"] for row in all_chart_rows],
             "steuerbefehl": [row["Steuerbefehl"] for row in all_chart_rows],
