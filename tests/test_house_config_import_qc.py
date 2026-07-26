@@ -29,7 +29,10 @@ def _rows(hours: int, *, start: datetime | None = None) -> list[tuple[str, float
 def test_import_power_qc_figure_has_traces() -> None:
     fig = import_power_qc_figure(_rows(24), _rows(24, start=datetime(2024, 1, 1, 12)))
     assert len(fig.data) == 2
-    assert [t.name for t in fig.data] == ["PV-Ertrag", "Verbrauch (Gesamt)"]
+    assert [t.name for t in fig.data] == [
+        "PV-Erzeugungsprofil [kW]",
+        "Lastprofil [kW] (Gesamt)",
+    ]
     assert fig.layout.legend.y is not None
     assert fig.layout.legend.y < 0
     assert all(getattr(t.line, "shape", None) == "hv" for t in fig.data)
@@ -43,10 +46,10 @@ def test_import_power_qc_figure_balance_components() -> None:
         grid_rows=_rows(24),
     )
     assert [t.name for t in fig.data] == [
-        "PV-Ertrag",
+        "PV-Erzeugungsprofil [kW]",
         "Batterie",
         "Netz",
-        "Verbrauch (Gesamt)",
+        "Lastprofil [kW] (Gesamt)",
     ]
     assert all(getattr(t.line, "shape", None) == "hv" for t in fig.data)
 
@@ -63,7 +66,7 @@ def test_balance_gesamt_for_chart_derives_when_complete() -> None:
     ]
     fig = import_power_qc_figure(total, pv, battery_rows=batt, grid_rows=grid)
     assert len(fig.data) == 4
-    assert fig.data[-1].name == "Verbrauch (Gesamt)"
+    assert fig.data[-1].name == "Lastprofil [kW] (Gesamt)"
 
 
 def test_balance_gesamt_for_chart_skips_incomplete() -> None:

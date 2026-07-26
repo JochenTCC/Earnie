@@ -60,7 +60,7 @@ Vorlage für Szenarien: [`backtesting_scenarios.example.json`](../../share/confi
 **Drei CSV-Ebenen (nicht vermischen):**
 
 1. **`path_cons_data`** — Runtime-Brennstoff für Live und Szenario-Explorer  
-2. **Hausprofil-CSVs** (`total_profile_csv` / `pv_profile_csv` / `profile_csv`) — Planung / Ist-vs-Modell (siehe [Historische Verbrauchs-CSV](verbrauchs-csv.md))  
+2. **Hausprofil-CSVs** (`total_profile_csv` / `pv_profile_csv` / `profile_csv`) — Planung / Ist-vs-Modell (siehe [Historische Leistungsprofil-CSV](verbrauchs-csv.md))  
 3. **`path_consumption` / `path_production`** — entfernt (data-model v3); früher rohe Loxone-Paar-CSVs nur für Zeitraumgrenzen  
 
 Details zu Preisen: [Preise & aWATTar](preise.md).
@@ -75,7 +75,7 @@ Im Abschnitt **Konfiguration** pflegt der **Szenarienkonfigurator** das Live-Sze
 - [Speichern / Laden](speichern-laden.md)
 - [PV & Batterie](batterie-pv.md)
 - [Flexible Verbraucher](flexible-verbraucher.md)
-- [Historische Verbrauchs-CSV](verbrauchs-csv.md)
+- [Historische Leistungsprofil-CSV](verbrauchs-csv.md)
 - [Preise & aWATTar](preise.md)
 - [Loxone-Signale](../referenz/loxone-signale.md)
 

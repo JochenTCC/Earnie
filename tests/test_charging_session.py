@@ -84,6 +84,63 @@ class TestChargingSessionState:
 
         assert "eauto" not in state["charging_sessions"]
 
+    def test_fulfilled_session_survives_deadline_as_plug_latch(self):
+        consumer = _eauto_consumer()
+        contexts = {
+            "eauto": {
+                "active": True,
+                "plugged_in": True,
+                "deadline": datetime(2026, 6, 28, 9, 30),
+                "target_kwh": 10.0,
+            }
+        }
+        raw = {
+            "date": "2026-06-27",
+            "delivered": {},
+            "charging_sessions": {
+                "eauto": {
+                    "target_kwh": 10.0,
+                    "delivered_kwh": 10.0,
+                    "deadline": "2026-06-27T09:30:00",
+                }
+            },
+            "plug_cycle_fulfilled": {},
+        }
+        state = cs.normalize_consumer_state(
+            raw,
+            "2026-06-27",
+            contexts,
+            {"eauto": consumer},
+            now=datetime(2026, 6, 27, 10, 0),
+        )
+        assert "eauto" not in state["charging_sessions"]
+        assert state["plug_cycle_fulfilled"].get("eauto") is True
+
+    def test_unplug_clears_plug_cycle_fulfilled(self):
+        consumer = _eauto_consumer()
+        contexts = {
+            "eauto": {
+                "active": False,
+                "plugged_in": False,
+                "deadline": None,
+                "target_kwh": 0.0,
+            }
+        }
+        raw = {
+            "date": "2026-06-27",
+            "delivered": {},
+            "charging_sessions": {},
+            "plug_cycle_fulfilled": {"eauto": True},
+        }
+        state = cs.normalize_consumer_state(
+            raw,
+            "2026-06-27",
+            contexts,
+            {"eauto": consumer},
+            now=datetime(2026, 6, 27, 10, 0),
+        )
+        assert "eauto" not in state["plug_cycle_fulfilled"]
+
 
 class TestDeadlineHelpers:
     def test_schedule_indices_cross_midnight(self):

@@ -99,7 +99,7 @@ PAGE_DOCS: dict[str, PageDocs] = {
                 "docs/konfiguration/flexible-verbraucher.md",
             ),
             DocLink(
-                "Historische Verbrauchs-CSV",
+                "Historische Leistungsprofil-CSV",
                 "docs/konfiguration/verbrauchs-csv.md",
             ),
         ),

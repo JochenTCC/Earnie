@@ -120,7 +120,7 @@ Ein **Hausprofil** beschreibt Standort und „Wer lebt / was verbraucht hier“:
 
 Legen Sie zuerst ein Profil an und ergänzen Sie danach die Geräte. Ohne Standort und sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig. Je mehr Freiheiten sie Earnie beim Verschieben der Aktivierung der verschiedenen Verbraucher geben, umso höher sind die Einsparungspotenziale.
 
-Optional: **Historische Jahresprofile (CSV)** — Gesamtverbrauch (direkt oder als **Bilanz** aus PV + Batterie + Netz), optional PV und Verbraucher — für Ist-vs-Modell und realistischere Explorer-Rechnungen. Pro Verbraucher: Checkbox **„Von Basis-Last abziehen“** steuert, ob die CSV-Last die Synthese ersetzt und von der Basislast abgezogen wird (Rollen: Bekannt / Gesteuert / Manuelles Gerät — siehe [Historische Verbrauchs-CSV](../konfiguration/verbrauchs-csv.md)). Unter **Gesamtverbräuche** können Sie die Basislast als **Jahres-Rest gleichmäßig** oder **Monats-Rest je Monat** wählen — letzteres gilt auch für den Szenario-Explorer (Pfad A), solange nicht alle steuerbaren Verbraucher ein CSV haben (Pfad B).
+Optional: **Historische Jahres-Leistungsprofile [kW] (CSV)** — Lastprofil (direkt oder als **Bilanz** aus PV + Batterie + Netz), optional PV-Erzeugungsprofil und Verbraucher — für Ist-vs-Modell und realistischere Explorer-Rechnungen. Pro Verbraucher: Checkbox **„Von Basis-Last abziehen“** steuert, ob die CSV-Last die Synthese ersetzt und von der Basislast abgezogen wird (Rollen: Bekannt / Gesteuert / Manuelles Gerät — siehe [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Unter **Gesamt-Lastverhalten** können Sie die Basislast als **Jahres-Rest gleichmäßig** oder **Monats-Rest je Monat** wählen — letzteres gilt auch für den Szenario-Explorer (Pfad A), solange nicht alle steuerbaren Verbraucher ein CSV haben (Pfad B).
 
 Änderungen im Hauskonfigurator und Szenarienkonfigurator werden **automatisch gespeichert**. Komplette Config-Pakete (ZIP) exportieren/importieren Sie in der Sidebar unter **„Konfiguration speichern / laden“** — siehe [Speichern / Laden](../konfiguration/speichern-laden.md).
 
@@ -276,7 +276,7 @@ Die Spalte zeigt **nicht überall dieselbe Datenquelle**. Deshalb kann die Zeile
 3. **PV und Batterie** ändern die Spalte „Jahres Verbrauch“ nicht: gezählt wird der **Hausverbrauch** (Last), nicht Netzbezug nach Abzug von PV/Speicher.  
 4. **Kleine Differenzen** zwischen Referenz und Optimierung derselben Szenario-Familie sind normal (Lastverschiebung, Toleranz der Plausibilitätsprüfung).
 
-Zum Abgleich Ist vs. Modell: Hauskonfigurator / Verbrauchs-CSV und die Tabellen **Gesamtkosten und -Verbrauch** sowie **Verbrauchsvergleich** im Explorer. Weicht der Jahresverbrauch einer Zeile um **mehr als 5%** von der **Live-Referenz** ab, erscheint in der Spalte **Hinweis** eine Warnung — dann Config-Dump über **Info / About → Kontakt** an TechCreaCon senden. Technische Details: [Betriebsmodi — Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch), [Historische Verbrauchs-CSV](../konfiguration/verbrauchs-csv.md).
+Zum Abgleich Ist vs. Modell: Hauskonfigurator / Leistungsprofil-CSV und die Tabellen **Gesamtkosten und -Verbrauch** sowie **Verbrauchsvergleich** im Explorer. Weicht der Jahresverbrauch einer Zeile um **mehr als 5%** von der **Live-Referenz** ab, erscheint in der Spalte **Hinweis** eine Warnung — dann Config-Dump über **Info / About → Kontakt** an TechCreaCon senden. Technische Details: [Betriebsmodi — Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch), [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md).
 
 
 ---
@@ -294,7 +294,7 @@ Wenn die Was-wäre-wenn-Analyse überzeugt, folgt die Anbindung an die Smarthome
    - Verbraucher: Ist-Leistung lesen; Freigabe 0/1 oder E-Auto-Leistungs-Soll schreiben  
    - E-Auto: angesteckt, Fertig-Zeit, Rest-SOC, Kapazität, …  
    Konkrete Beispielnamen und Config-Schlüssel: [Loxone-Signale](../referenz/loxone-signale.md). Zentrale Merker unter `loxone_blocks` in `config.json`; Verbraucher-Merker im Hausprofil (`house_profiles.json`) bzw. Legacy in `flexible_consumers[]`.  
-3. Optional **FTP-Verbrauchslog** für historische Offline-Daten (`loxone_blocks.log_filename`, Miniserver-Ordner `log/`) — siehe [Loxone-Anbindung](../einrichtung/loxone-anbindung.md#ftp-verbrauchslog). Für Jahresprofile im Hauskonfigurator nutzen Sie eher CSV-Upload / Energiemonitor ([Verbrauchs-CSV](../konfiguration/verbrauchs-csv.md)).  
+3. Optional **FTP-Verbrauchslog** für historische Offline-Daten (`loxone_blocks.log_filename`, Miniserver-Ordner `log/`) — siehe [Loxone-Anbindung](../einrichtung/loxone-anbindung.md#ftp-verbrauchslog). Für Jahres-Leistungsprofile im Hauskonfigurator nutzen Sie eher CSV-Upload / Energiemonitor ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)).  
 4. Namen in Earnie hinterlegen (Hauskonfigurator / Szenarienkonfigurator) — **exakt** wie im Smarthome-System.  
 
 Earnie liest Smarthome-Werte oft als Text mit Einheit (z. B. `3.5 kW`) ein; die Einheit wird ignoriert.

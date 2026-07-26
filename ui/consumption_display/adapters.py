@@ -17,7 +17,7 @@ def bundle_from_modeled_profile(
     *,
     hours: int | None = None,
 ) -> ConsumptionSeriesBundle:
-    # UI "Verbrauchsprofil (Modell)": never use meter residual from total_profile_csv.
+    # UI "Leistungsprofil (Modell)": never use meter residual from total_profile_csv.
     model_profile = {**profile, "total_profile_csv": ""}
     resolved_hours = hours if hours is not None else 8760
     by_consumer = build_modeled_hourly_kw_by_consumer(model_profile, hours=resolved_hours)

@@ -242,6 +242,48 @@ class TestPluggedInChargeComplete:
       assert "abgeschlossen" in ctx["source_label"]
       assert "FertigUm ignoriert" in ctx["source_label"]
 
+  def test_config_path_plugged_in_full_soc_latches_complete(self):
+      consumer = _eauto_consumer()
+      consumer["daily_target_source"] = "config"
+      matrix = [
+          {
+              "slot_datetime": datetime(2026, 6, 22, 17, 0),
+              "hour": 17,
+              "date": datetime(2026, 6, 22).date(),
+          }
+      ]
+      with patch.object(
+          cc, "loxone_reports_charge_complete", return_value=True
+      ), patch.object(
+          cc.loxone_client,
+          "fetch_loxone_generic_value",
+          return_value=1,
+      ), patch.object(
+          cc, "_loxone_ready_raw", return_value="Morgen, 07:00"
+      ), _patch_eauto_capacity():
+          ctx = cc.resolve_charging_context(
+              consumer, matrix, None, logged_simulation=False
+          )
+
+      assert ctx["active"] is False
+      assert ctx["plugged_in"] is True
+      assert ctx["target_kwh"] == 0.0
+      assert "abgeschlossen" in ctx["source_label"]
+
+  def test_plug_cycle_fulfilled_disables_active_context(self):
+      contexts = {
+          "ev": {
+              "active": True,
+              "plugged_in": True,
+              "deadline": datetime(2026, 6, 23, 7, 0),
+              "target_kwh": 8.0,
+          }
+      }
+      out = cc.apply_plug_cycle_fulfilled_contexts(contexts, {"ev": True})
+      assert out["ev"]["active"] is False
+      assert out["ev"]["target_kwh"] == 0.0
+      assert "Plug-Zyklus erfüllt" in out["ev"]["source_label"]
+
   def test_plugged_in_needs_charge_keeps_fertig_um(self):
       consumer = _eauto_consumer()
       horizon = datetime(2026, 6, 22, 17, 0)

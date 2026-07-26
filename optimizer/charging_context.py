@@ -1,6 +1,7 @@
 """Ladekontext und Zeitfenster für flexible Verbraucher (Loxone, Config, Historie)."""
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, time
 
 import config
@@ -324,6 +325,20 @@ def _loxone_plugged_in_complete_context() -> dict:
     }
 
 
+def _plugged_in_fulfilled_context() -> dict:
+    """Angeschlossen, Sessionziel in diesem Plug-Zyklus bereits erfüllt."""
+    return {
+        "active": False,
+        "plugged_in": True,
+        "deadline": None,
+        "target_kwh": 0.0,
+        "use_time_window": False,
+        "source_label": (
+            "session (angeschlossen, Ladeziel im Plug-Zyklus erfüllt — FertigUm ignoriert)"
+        ),
+    }
+
+
 def _loxone_absent_forecast_context(consumer: dict, horizon_start: datetime) -> dict:
     ready_raw = _loxone_ready_raw(consumer)
     loxone_deadline = parse_loxone_ready_by_time(ready_raw, horizon_start)
@@ -517,9 +532,47 @@ def resolve_charging_context(
         "config_day_schedule": day_sched,
         "source_label": source_label,
     }
-    return _config_path_with_plugged_in(
+    out = _config_path_with_plugged_in(
         result, consumer, sched, horizon_start, ready_raw
     )
+    if out.get("plugged_in") and loxone_reports_charge_complete(consumer):
+        return _loxone_plugged_in_complete_context()
+    return out
+
+
+def _load_plug_cycle_fulfilled_flags() -> dict[str, bool]:
+    """Leichtgewichtiger Read des Plug-Zyklus-Latch aus flexible_consumers_state."""
+    try:
+        from runtime_store.persist_paths import consumer_state_file
+
+        path = consumer_state_file()
+        with open(path, encoding="utf-8") as fh:
+            raw = json.load(fh)
+        fulfilled = raw.get("plug_cycle_fulfilled") or {}
+        if not isinstance(fulfilled, dict):
+            return {}
+        return {str(cid): True for cid, flag in fulfilled.items() if flag}
+    except Exception:
+        return {}
+
+
+def apply_plug_cycle_fulfilled_contexts(
+    contexts: dict[str, dict],
+    fulfilled: dict[str, bool] | None,
+) -> dict[str, dict]:
+    """Deaktiviert Ladekontext solange Plug-Zyklus bereits erfüllt und angesteckt."""
+    if not fulfilled:
+        return contexts
+    out = dict(contexts)
+    for cid, ctx in contexts.items():
+        if not fulfilled.get(cid):
+            continue
+        if ctx.get("plugged_in") is not True:
+            continue
+        if ctx.get("immediate_charge"):
+            continue
+        out[cid] = _plugged_in_fulfilled_context()
+    return out
 
 
 def resolve_charging_contexts(
@@ -528,6 +581,7 @@ def resolve_charging_contexts(
     *,
     live_flex_kw: dict[str, float] | None = None,
     consumers: list | None = None,
+    plug_cycle_fulfilled: dict[str, bool] | None = None,
 ) -> dict[str, dict]:
     """Ladekontext je Verbraucher mit charging_schedule für den Optimierungshorizont."""
     from . import charge_immediate as ci
@@ -559,7 +613,12 @@ def resolve_charging_contexts(
             live_kw=live_kw,
             horizon=horizon,
         )
-    return contexts
+    fulfilled = (
+        plug_cycle_fulfilled
+        if plug_cycle_fulfilled is not None
+        else _load_plug_cycle_fulfilled_flags()
+    )
+    return apply_plug_cycle_fulfilled_contexts(contexts, fulfilled)
 
 
 def hours_needed_to_deliver(remaining_kwh: float, max_kw: float) -> float:

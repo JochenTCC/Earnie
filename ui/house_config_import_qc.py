@@ -123,12 +123,12 @@ def import_power_qc_figure(
     Bilanz imports typically pass PV / Batterie / Netz plus derived Gesamtverbrauch.
     """
     fig = go.Figure()
-    _add_power_trace(fig, name="PV-Ertrag", rows=pv_rows, color=_PV_COLOR)
+    _add_power_trace(fig, name="PV-Erzeugungsprofil [kW]", rows=pv_rows, color=_PV_COLOR)
     _add_power_trace(fig, name="Batterie", rows=battery_rows, color=COLOR_BATTERY)
     _add_power_trace(fig, name="Netz", rows=grid_rows, color=COLOR_GRID)
     _add_power_trace(
         fig,
-        name="Verbrauch (Gesamt)",
+        name="Lastprofil [kW] (Gesamt)",
         rows=verbrauch_rows,
         color=COLOR_BASELOAD,
         width=2.0,
@@ -223,7 +223,7 @@ def render_import_power_qc(
             )
         else:
             st.caption(
-                "Verbrauch (Gesamt) aus Bilanz berechnet: "
+                "Lastprofil [kW] (Gesamt) aus Bilanz berechnet: "
                 "`P_Ges = P_PV + P_Batt + P_Grid`."
             )
     if (
@@ -233,7 +233,7 @@ def render_import_power_qc(
         and grid_rows is None
     ):
         if verbrauch_path:
-            st.warning(f"Verbrauchs-CSV nicht gefunden: `{verbrauch_path}`")
+            st.warning(f"Lastprofil-CSV nicht gefunden: `{verbrauch_path}`")
         if pv_path:
             st.warning(f"PV-CSV nicht gefunden: `{pv_path}`")
         if battery_path:

@@ -1384,7 +1384,7 @@ def _render_consumer_profile_csv_fields(
     """Historisches Verbraucher-CSV + use_profile_csv-Flag."""
     from pathlib import Path
 
-    st.markdown("**Historisches Verbrauchsprofil (CSV)**")
+    st.markdown("**Historisches Leistungsprofil [kW] (CSV)**")
     st.caption(
         "Gleiches Format wie Jahres-CSV (`timestamp;power_kw`). "
         "Wenn aktiv („Von Basis-Last abziehen“): CSV-Last statt Synthese; "

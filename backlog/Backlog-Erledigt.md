@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix HK Leistungsprofil labels (2026-07-26)
+
+- [x] Replace Verbrauchsprofil / Historische Jahresprofile / PV-Ertrag UI labels with Leistungsprofil / Lastprofil / PV-Erzeugungsprofil [kW]; Gesamtverbräuche → Gesamt-Lastverhalten; Energiemonitor/Bilanz radio wording; clear buttons shortened; power-preferred + kWh-counter import hint; German user docs (Profil = kW, Verbrauch/Erzeugung = kWh)
+
+
 ### VKW Strom Duo catalog + monthly_table triples (2026-07-26)
 
 - [x] Catalog import tariff `at_vkw_strom_duo` (`monthly_table` blended winter/summer rates; monthly fee 3,00 € netto)

@@ -52,7 +52,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 - [Speichern / Laden](konfiguration/speichern-laden.md) — `earnie_env`, Auto-Save, ZIP-Export/Import
 - [PV & Batterie](konfiguration/batterie-pv.md) — Live-Szenario, Entitäts-Referenzen
 - [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
-- [Historische Verbrauchs-CSV](konfiguration/verbrauchs-csv.md) — Hausprofil Gesamt-/Verbraucher-CSV, Normalisierung, Loxone-Import
+- [Historische Leistungsprofil-CSV](konfiguration/verbrauchs-csv.md) — Hausprofil Last-/PV-/Verbraucher-Leistungsprofile, Normalisierung, Loxone-Import
 - [Preise & aWATTar](konfiguration/preise.md) — Bezugspreis, Einspeisevergütung, Preis-Prognose
 
 

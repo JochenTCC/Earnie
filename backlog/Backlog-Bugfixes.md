@@ -22,11 +22,11 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **EV still connected after charge → re-planned full charge** — config-path house-profile EVs now honor Ist-SOC complete; `plug_cycle_fulfilled` latch survives deadline purge while plugged (cleared on unplug). Real SOC (or equivalent complete signal) remains necessary when Earnie has no fulfillment memory and Rest-/Ist-SOC stay stuck at plug-in values. Tests: `tests/test_charging_session.py`, `tests/test_charging_context.py::TestPluggedInChargeComplete`. Live verify: finish a session, stay plugged past FertigUm → no new EV target.
+
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] SOC line shows a vertical part near 11:00. Here is the dump: "chart_debug_review\debug_dump_20260724_110005"
-- [ ] faulty Recognition of still connected EV (since last charging) is not leading to a proper scheduling (because EV is still fully charged but Earnie thinks that it must be charged again). Problem in the actual setting ist, that there is no trustable information about the real SOC of EV. Are there still possibilities for improvement or is real SOC a necessity?
 - [ ] Do a profiling on rendering of "Detaillierte Simulationsansicht" - look for speed up potentials
 
 

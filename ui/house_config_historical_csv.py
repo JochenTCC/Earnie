@@ -1,4 +1,4 @@
-"""Hauskonfigurator: historische Jahresprofile (Verbrauch / PV / Energiemonitor / Bilanz)."""
+"""Hauskonfigurator: historische Jahres-Leistungsprofile (Last / PV / Energiemonitor / Bilanz)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,11 +20,16 @@ _SOURCE_SEPARATE = "separate"
 _SOURCE_ENERGIEMONITOR = "energiemonitor"
 _SOURCE_BALANCE = "balance"
 _SOURCE_LABELS = {
-    _SOURCE_SEPARATE: "Getrennte CSVs (Verbrauch + optional PV-Ertrag)",
-    _SOURCE_ENERGIEMONITOR: (
-        "Loxone Energiemonitor (PV + Batterie + Netz + Verbrauch)"
+    _SOURCE_SEPARATE: (
+        "Getrennte CSVs (Lastprofil + optional PV-Erzeugungsprofil)"
     ),
-    _SOURCE_BALANCE: "Bilanz (PV + Batterie + Netz → Verbrauch)",
+    _SOURCE_ENERGIEMONITOR: (
+        "Loxone Energiemonitor - Leistungsprofile "
+        "(PV + Batterie + Netz + Last)"
+    ),
+    _SOURCE_BALANCE: (
+        "Bilanz - Leistungsprofile (PV + Batterie + Netz → Last)"
+    ),
 }
 _VALID_SOURCES = frozenset(_SOURCE_LABELS)
 
@@ -114,19 +119,22 @@ def render_historical_csv_section(
     resolved: list[dict],
     preview: dict,
 ) -> None:
-    """CSV imports (collapsible) + always-visible Gesamtverbräuche charts."""
+    """CSV imports (collapsible) + always-visible Gesamt-Lastverhalten charts."""
     init_historical_csv_session(preview_id, existing)
     keys = session_keys(preview_id)
 
-    st.subheader("Historische Jahresprofile")
+    st.subheader("Historische Jahres-Leistungsprofile [kW]")
     st.caption(
         "Optional — für Ist-vs-Modell, Bilanz-Import und realistischere "
         "Explorer-Rechnungen. Ohne CSV gilt nur das modellierte Hausprofil."
     )
-    with st.expander("Historische Jahresprofile (CSV)", expanded=True):
+    with st.expander("Historische Jahres-Leistungsprofile [kW] (CSV)", expanded=True):
         st.caption(
-            "Verbrauch (für Ist in Gesamtverbräuche) und optional PV-Ertrag. "
-            "Kanonisch: `timestamp;power_kw` (stündlich). "
+            "Lastprofil [kW] (für Ist in Gesamt-Lastverhalten) und optional "
+            "PV-Erzeugungsprofil [kW]. "
+            "Bevorzugt: Leistungsdaten (`timestamp;power_kw`, stündlich). "
+            "Energiezähler [kWh] (kumuliert) werden ebenfalls akzeptiert und "
+            "automatisch in mittlere Leistung [kW] umgerechnet. "
             "Kurze Serien sind für visuelle Kontrolle erlaubt; "
             "Szenario-Explorer braucht ≥12 Monate, sonst synthetische Werte. "
             "Alternativ: Bilanz aus PV + Batterie + Netz "
@@ -242,9 +250,9 @@ def _render_gesamtverbraeuche(
     from runtime_store.persist_paths import resolve_config_prefixed_path
     from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
 
-    st.subheader("Gesamtverbräuche")
+    st.subheader("Gesamt-Lastverhalten")
     st.caption(
-        "Monatsverbrauch und stündlicher Verlauf. Mit Gesamtverbrauch-CSV "
+        "Monatsverbrauch und stündlicher Verlauf. Mit Lastprofil-CSV "
         "(direkt, Energiemonitor oder Bilanz): Ist vs. Modell; "
         "ohne CSV nur das modellierte Hausprofil."
     )
@@ -254,7 +262,7 @@ def _render_gesamtverbraeuche(
         if Path(resolve_config_prefixed_path(active_path)).is_file():
             has_ist = True
         else:
-            st.warning(f"Verbrauchs-CSV nicht gefunden: `{active_path}`")
+            st.warning(f"Lastprofil-CSV nicht gefunden: `{active_path}`")
 
     if has_ist:
         _render_ist_vs_modell(
@@ -348,7 +356,7 @@ def _render_component_upload(
         )
     with clear_col:
         clear = st.button(
-            f"{label}-Zuordnung entfernen",
+            "Zuordnung entfernen",
             key=f"{path_key}_clear",
         )
     if upload is not None:
@@ -416,21 +424,21 @@ def _save_signed_component_csv(
 
 
 def _render_separate_mode(preview_id: str, keys: dict[str, str]) -> None:
-    st.markdown("**Verbrauch (Gesamt)**")
+    st.markdown("**Lastprofil [kW] (Gesamt)**")
     _render_component_upload(
         preview_id=preview_id,
         path_key=keys["verbrauch"],
-        label="Verbrauch",
+        label="Lastprofil",
         role="verbrauch",
-        help_path="Relativer Pfad, z. B. config/uploads/mein_haushalt_verbrauch.csv",
+        help_path="Relativer Pfad, z. B. config/uploads/mein_haushalt_lastprofil.csv",
     )
-    st.markdown("**PV-Ertrag (optional, Summe aller Anlagen)**")
+    st.markdown("**PV-Erzeugungsprofil [kW] (optional, Summe aller Anlagen)**")
     _render_component_upload(
         preview_id=preview_id,
         path_key=keys["pv"],
-        label="PV-Ertrag",
+        label="PV",
         role="pv",
-        help_path="Optional. Relativer Pfad zum PV-Jahresprofil.",
+        help_path="Optional. Relativer Pfad zum PV-Erzeugungsprofil.",
     )
 
 
@@ -439,14 +447,14 @@ def _render_balance_mode(preview_id: str, keys: dict[str, str]) -> None:
         "**Bilanz:** `P_Ges = P_PV + P_Batt + P_Grid`. "
         "Positiv bei Batterie/Netz = Leistung **in** das Haussystem "
         "(Entladen / Netzbezug). Negativ = Laden / Einspeisung. "
-        "Sobald alle drei Serien vorliegen, wird der Verbrauch automatisch "
+        "Sobald alle drei Serien vorliegen, wird das Lastprofil automatisch "
         "abgeleitet und als Gesamt-CSV gespeichert."
     )
     invert_pv_key = f"house_profile_balance_invert_pv_{preview_id}"
     invert_batt_key = f"house_profile_balance_invert_batt_{preview_id}"
     invert_grid_key = f"house_profile_balance_invert_grid_{preview_id}"
 
-    st.markdown("**PV-Ertrag (Pflicht)**")
+    st.markdown("**PV-Erzeugungsprofil [kW] (Pflicht)**")
     _render_component_upload(
         preview_id=preview_id,
         path_key=keys["pv"],
@@ -495,7 +503,9 @@ def _render_balance_mode(preview_id: str, keys: dict[str, str]) -> None:
     )
 
     if st.session_state.get(keys["verbrauch"]):
-        st.caption(f"Abgeleiteter Verbrauch: `{st.session_state[keys['verbrauch']]}`")
+        st.caption(
+            f"Abgeleitetes Lastprofil: `{st.session_state[keys['verbrauch']]}`"
+        )
 
 
 def _maybe_persist_balance_total(
@@ -550,9 +560,9 @@ def _maybe_persist_balance_total(
 def _render_energiemonitor_mode(preview_id: str, keys: dict[str, str]) -> None:
     st.caption(
         "Erwartete Spalten: `Leistung Verbrauch [kW]` (Pflicht, direkt als "
-        "Gesamtverbrauch), optional `Leistung Produktion [kW]` (PV), "
+        "Lastprofil), optional `Leistung Produktion [kW]` (PV), "
         "`Leistung Batterie` und `Leistung Energieversorger [kW]` (Netz). "
-        "Verbrauch wird nicht aus Bilanz berechnet. SOC wird ignoriert."
+        "Lastprofil wird nicht aus Bilanz berechnet. SOC wird ignoriert."
     )
     em_upload_base = f"house_profile_em_csv_upload_{preview_id}"
     em_nonce = f"house_profile_em_csv_upload_nonce_{preview_id}"
@@ -575,7 +585,7 @@ def _render_energiemonitor_mode(preview_id: str, keys: dict[str, str]) -> None:
         )
     with clear_col:
         clear = st.button(
-            "Energiemonitor-Zuordnung entfernen",
+            "Zuordnung entfernen",
             key=f"house_profile_em_csv_clear_{preview_id}",
         )
     if upload is not None:
@@ -597,7 +607,7 @@ def _render_energiemonitor_mode(preview_id: str, keys: dict[str, str]) -> None:
             st.session_state[battery_input_key] = battery
             st.session_state[keys["grid"]] = grid
             st.session_state[grid_input_key] = grid
-            msg = f"Verbrauch: `{total}`"
+            msg = f"Lastprofil: `{total}`"
             if pv:
                 msg += f"; PV: `{pv}`"
             else:
@@ -617,9 +627,9 @@ def _render_energiemonitor_mode(preview_id: str, keys: dict[str, str]) -> None:
             st.error(f"Energiemonitor-CSV ungültig: {exc}")
 
     if st.session_state.get(keys["verbrauch"]):
-        st.caption(f"Verbrauch: `{st.session_state[keys['verbrauch']]}`")
+        st.caption(f"Lastprofil: `{st.session_state[keys['verbrauch']]}`")
     if st.session_state.get(keys["pv"]):
-        st.caption(f"PV-Ertrag: `{st.session_state[keys['pv']]}`")
+        st.caption(f"PV-Erzeugungsprofil: `{st.session_state[keys['pv']]}`")
     if st.session_state.get(keys["battery"]):
         st.caption(f"Batterie: `{st.session_state[keys['battery']]}`")
     if st.session_state.get(keys["grid"]):
@@ -754,7 +764,7 @@ def _render_ist_vs_modell(
             help=(
                 "Jahres-Rest: konstante Grundlast (SE-Pfad A flat). "
                 "Monats-Rest: pro Kalendermonat Ist − Verbraucher (≥ 0) — "
-                "gilt für Gesamtverbräuche-Charts und SE-Pfad A, wenn eine "
+                "gilt für Gesamt-Lastverhalten-Charts und SE-Pfad A, wenn eine "
                 "Gesamt-CSV vorhanden ist. SE-Pfad B (alle Gesteuert/Manual "
                 "mit CSV) bleibt der stündliche Meter-Rest."
             ),

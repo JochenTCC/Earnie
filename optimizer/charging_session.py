@@ -8,6 +8,8 @@ from integrations import loxone_client
 
 from .charging_context import charging_schedule_enabled
 
+SESSION_FULFILL_EPSILON_KWH = 0.05
+
 
 def _plug_in_rest_soc_percent(consumer: dict) -> float | None:
     sched = consumer.get("charging_schedule") or {}
@@ -43,12 +45,53 @@ def is_charging_session_context(consumer: dict, ctx: dict | None) -> bool:
     return isinstance(deadline, dt.datetime) and target is not None and float(target) > 0
 
 
-def purge_expired_sessions(sessions: dict[str, dict], now: dt.datetime) -> None:
-    """Entfernt Sessions, deren Deadline erreicht oder überschritten ist."""
+def session_target_fulfilled(session: dict[str, Any] | None) -> bool:
+    """True wenn gebuchte Energie das Session-Ziel (fast) erreicht hat."""
+    if not session:
+        return False
+    target = float(session.get("target_kwh") or 0.0)
+    if target <= SESSION_FULFILL_EPSILON_KWH:
+        return False
+    delivered = float(session.get("delivered_kwh") or 0.0)
+    return delivered >= target - SESSION_FULFILL_EPSILON_KWH
+
+
+def purge_expired_sessions(
+    sessions: dict[str, dict],
+    now: dt.datetime,
+) -> set[str]:
+    """Entfernt abgelaufene Sessions; liefert IDs die beim Purge erfüllt waren."""
+    fulfilled_purged: set[str] = set()
     for cid in list(sessions):
         deadline = _parse_deadline(sessions[cid].get("deadline"))
         if deadline is not None and now >= deadline:
+            if session_target_fulfilled(sessions[cid]):
+                fulfilled_purged.add(cid)
             del sessions[cid]
+    return fulfilled_purged
+
+
+def sync_plug_cycle_fulfilled(
+    fulfilled: dict[str, bool],
+    charging_contexts: dict[str, dict],
+    sessions: dict[str, dict],
+    *,
+    fulfilled_from_purge: set[str] | None = None,
+) -> dict[str, bool]:
+    """
+    Latch: Ziel erreicht → erfüllt bis Unplug; Unplug löscht den Latch.
+    Überlebt Deadline-Purge, solange das Auto angesteckt bleibt.
+    """
+    out = {cid: True for cid, flag in fulfilled.items() if flag}
+    for cid in fulfilled_from_purge or ():
+        out[cid] = True
+    for cid, session in sessions.items():
+        if session_target_fulfilled(session):
+            out[cid] = True
+    for cid, ctx in charging_contexts.items():
+        if ctx.get("plugged_in") is False:
+            out.pop(cid, None)
+    return out
 
 
 def sync_charging_sessions(
@@ -56,12 +99,21 @@ def sync_charging_sessions(
     charging_contexts: dict[str, dict],
     consumers_by_id: dict[str, dict],
     now: dt.datetime,
-) -> None:
+    *,
+    plug_cycle_fulfilled: dict[str, bool] | None = None,
+) -> set[str]:
     """Legt Sessions an oder aktualisiert Ziel/Deadline; entfernt abgelaufene."""
-    purge_expired_sessions(sessions, now)
+    fulfilled_from_purge = purge_expired_sessions(sessions, now)
+    latched = {
+        cid
+        for cid, flag in (plug_cycle_fulfilled or {}).items()
+        if flag
+    } | set(fulfilled_from_purge)
     for cid, ctx in charging_contexts.items():
         consumer = consumers_by_id.get(cid)
         if consumer is None or not is_charging_session_context(consumer, ctx):
+            continue
+        if cid in latched and ctx.get("plugged_in") is True:
             continue
         deadline = ctx["deadline"]
         target = round(float(ctx["target_kwh"]), 3)
@@ -82,6 +134,7 @@ def sync_charging_sessions(
             }
             if plug_soc is not None:
                 sessions[cid]["plug_in_rest_soc_percent"] = round(plug_soc, 2)
+    return fulfilled_from_purge
 
 
 def session_delivered_kwh(sessions: dict[str, dict], consumer_id: str) -> float:
@@ -121,10 +174,29 @@ def normalize_consumer_state(
     if not isinstance(sessions, dict):
         sessions = {}
 
+    fulfilled_raw = dict(raw.get("plug_cycle_fulfilled") or {})
+    if not isinstance(fulfilled_raw, dict):
+        fulfilled_raw = {}
+    fulfilled = {str(cid): True for cid, flag in fulfilled_raw.items() if flag}
+
     if charging_contexts:
-        sync_charging_sessions(sessions, charging_contexts, consumers_by_id, current)
+        purged_fulfilled = sync_charging_sessions(
+            sessions,
+            charging_contexts,
+            consumers_by_id,
+            current,
+            plug_cycle_fulfilled=fulfilled,
+        )
+        fulfilled = sync_plug_cycle_fulfilled(
+            fulfilled,
+            charging_contexts,
+            sessions,
+            fulfilled_from_purge=purged_fulfilled,
+        )
     else:
-        purge_expired_sessions(sessions, current)
+        purged_fulfilled = purge_expired_sessions(sessions, current)
+        for cid in purged_fulfilled:
+            fulfilled[cid] = True
 
     delivered = dict(raw.get("delivered") or {})
     if not isinstance(delivered, dict):
@@ -144,4 +216,5 @@ def normalize_consumer_state(
         "delivered": delivered,
         "charging_sessions": sessions,
         "generic_flex_run": generic_flex_run,
+        "plug_cycle_fulfilled": fulfilled,
     }

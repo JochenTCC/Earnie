@@ -28,6 +28,8 @@ from .charging_session import (
     is_charging_session_context,
     normalize_consumer_state,
     session_delivered_kwh,
+    session_target_fulfilled,
+    sync_plug_cycle_fulfilled,
 )
 from .delivery_tracking import (
     assess_session_delivery,
@@ -354,6 +356,19 @@ def register_consumer_delivery(
     state["delivered"] = delivered
     state["charging_sessions"] = sessions
     state["generic_flex_run"] = generic_flex_run
+    fulfilled = dict(state.get("plug_cycle_fulfilled") or {})
+    for consumer in active:
+        cid = consumer["id"]
+        ctx = (charging_contexts or {}).get(cid)
+        if session_target_fulfilled(sessions.get(cid)):
+            fulfilled[cid] = True
+        if (ctx or {}).get("plugged_in") is False:
+            fulfilled.pop(cid, None)
+    state["plug_cycle_fulfilled"] = sync_plug_cycle_fulfilled(
+        fulfilled,
+        charging_contexts or {},
+        sessions,
+    )
     _save_consumer_state(state)
     return compliance
 
