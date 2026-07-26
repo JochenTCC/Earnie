@@ -7,6 +7,7 @@ description: >-
   (A skip / B community pre-release / C official / D bump version.py first)
   before any tag (GitHub Actions → GHCR + GitHub Release; local Docker push as fallback).
   On version bump / pre-release publish, sync docker/compose/*-alpha.yml image tags to version.py.
+  After a successful tag (B or C), reset branch streamlitcloud to that release tag and push.
   Use for "end session", "backlog sync", "commit and push", or an explicit request to conclude the session.
 ---
 
@@ -207,7 +208,25 @@ git push origin vX.Y.Z
 - **C:** Actions → `--latest`, GHCR `:<version>` + `:latest`  
 - Watch Actions; confirm Release page (Pre-release vs Latest) and GHCR tags
 
-### 3. Fallback: local build & push
+### 3. Reset `streamlitcloud` to the release tag
+
+After the tag is on `origin`, point **`streamlitcloud`** at that tag so the cloud branch matches the just-published release (no extra commits ahead/behind the tag).
+
+```powershell
+# <TAG> = e.g. v2.3.0 or v2.3.0-alpha.5 (must match the tag just pushed)
+git fetch origin tag <TAG>
+git checkout streamlitcloud
+git reset --hard <TAG>
+git push --force-with-lease origin streamlitcloud
+git checkout main
+```
+
+- Run for **both B and C** (any successful Phase 2 tag).
+- Prefer `--force-with-lease` over bare `--force`. This is the **approved** force-update for `streamlitcloud` in this workflow only — do not use it on `main`.
+- If the lease rejects (remote moved): stop, show divergence, ask the user before retrying.
+- Mention the reset in the Phase 2 report.
+
+### 4. Fallback: local build & push
 
 Only if the user asks to skip CI or Actions is unavailable:
 
@@ -217,10 +236,11 @@ python -m scripts.build_container --target all --push
 
 Default tags follow `version.py` (pre-release omits `:latest`). Details: `docs/einrichtung/container.md` · `DEVELOPER.md`.
 
-### 4. Phase 2 report (guide the user after publish)
+### 5. Phase 2 report (guide the user after publish)
 
 - Tag pushed / Actions run URL
 - Channel + `version.py` value
+- `streamlitcloud` reset to the release tag (or note if skipped/failed)
 - **If B (pre-release):**
   - Testers: `docker compose --project-directory . -f docker/compose/<host>-alpha.yml pull` then `up -d`  
     (Synology / LoxBerry / Proxmox: `synology-alpha.yml` / `loxberry-alpha.yml` / `proxmox-alpha.yml` — already pin `:<version>`)
@@ -235,6 +255,6 @@ Default tags follow `version.py` (pre-release omits `:latest`). Details: `docs/e
 ## Error handling
 
 - No empty commits
-- No force push without explicit user instruction
+- No force push without explicit user instruction — **exception:** `streamlitcloud` reset to the release tag in Phase 2 §3 (`--force-with-lease` only)
 - No commit of secrets or gitignored runtime files
 - On hook prompt for `docker push` or tag push: wait for user decision
