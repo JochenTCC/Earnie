@@ -99,6 +99,19 @@ def test_import_monthly_table_uses_slot_month():
     assert import_cent_kwh(99.0, tariff, slot_datetime=slot) == pytest.approx(18.0)
 
 
+def test_import_monthly_table_accepts_normalized_triples():
+    from datetime import datetime
+
+    tariff = {
+        "type": "monthly_table",
+        "monthly_rates": ((2025, 6, 18.0), (2025, 12, 24.0)),
+        "prices_include_vat": True,
+        "vat_percent": 0.0,
+    }
+    slot = datetime(2025, 12, 1, 0, 0)
+    assert import_cent_kwh(99.0, tariff, slot_datetime=slot) == pytest.approx(24.0)
+
+
 def test_spot_export_with_fee_factor_matches_sunny_spot():
     tariff = {
         "type": "spot_hourly",

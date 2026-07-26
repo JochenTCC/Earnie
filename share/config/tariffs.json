@@ -521,6 +521,157 @@
             "notes": "Vorarlberg (ohne Kleinwalsertal). EPEX Spot AT Day-Ahead + 1,20 ct netto; USt 20 %. Monatsgebühr 3,60 € brutto (36 €/Jahr netto × 1,20). Quelle: vkw.at/produkte/strom/strom-dynamisch",
             "monthly_fee_eur": 3.6,
             "supplier_id": "vkw"
+        },
+        {
+            "id": "at_vkw_strom_duo",
+            "label": "VKW — Strom Duo",
+            "type": "monthly_table",
+            "land": "AT",
+            "currency": "EUR",
+            "settlement_fee_cent_kwh": 0.0,
+            "markup_percent": 0.0,
+            "prices_include_vat": false,
+            "vat_percent": 20.0,
+            "monthly_fee_eur": 3.0,
+            "monthly_rates": [
+                {
+                    "year": 2025,
+                    "month": 1,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2025,
+                    "month": 2,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2025,
+                    "month": 3,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2025,
+                    "month": 4,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2025,
+                    "month": 5,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2025,
+                    "month": 6,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2025,
+                    "month": 7,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2025,
+                    "month": 8,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2025,
+                    "month": 9,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2025,
+                    "month": 10,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2025,
+                    "month": 11,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2025,
+                    "month": 12,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2026,
+                    "month": 1,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2026,
+                    "month": 2,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2026,
+                    "month": 3,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2026,
+                    "month": 4,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2026,
+                    "month": 5,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2026,
+                    "month": 6,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2026,
+                    "month": 7,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2026,
+                    "month": 8,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2026,
+                    "month": 9,
+                    "tariff_cent_kwh": 9.15
+                },
+                {
+                    "year": 2026,
+                    "month": 10,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2026,
+                    "month": 11,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2026,
+                    "month": 12,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2027,
+                    "month": 1,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2027,
+                    "month": 2,
+                    "tariff_cent_kwh": 9.4
+                },
+                {
+                    "year": 2027,
+                    "month": 3,
+                    "tariff_cent_kwh": 9.4
+                }
+            ],
+            "notes": "Vorarlberg (ohne Kleinwalsertal). Fixpreis Strom Duo inkl. Sonderrabatt bis 31.03.2027. Normaltarif 9,40 ct netto; reduzierter Sommertarif 8,40 ct netto (1.4.–30.9., taeglich 10–16 Uhr). Als monthly_table: Okt–Mar = 9,40; Apr–Sep = 9,15 (75%×9,40 + 25%×8,40; flache Tageslast, Fenster 6/24 h). Offiziell ab 01.04.2026; fruehere Monate mit Normaltarif fuer SE-Kontinuitaet. Grundpreis 36 EUR/Jahr netto (3,00 EUR/Monat). Quelle: vkw.at/produkte/strom/strom-duo, Preisblatt Stand 04/2026.",
+            "supplier_id": "vkw"
         }
     ],
     "export_tariffs": [

@@ -39,13 +39,29 @@ def _apply_vat(
 
 
 def _monthly_table_lookup(tariff: dict[str, Any]) -> dict[tuple[int, int], float]:
+    """Build (year, month) → cent/kWh from catalog rows or normalized triples.
+
+    Accepts:
+    - list of ``{year, month, tariff_cent_kwh}`` (JSON / tests)
+    - sequence of ``(year, month, cent)`` from ``validate_fixed_monthly_feed_in_rates``
+    """
     rates = tariff.get("monthly_rates")
-    if not isinstance(rates, list):
+    if not isinstance(rates, (list, tuple)) or not rates:
         raise ValueError("Tarif type 'monthly_table' erfordert monthly_rates.")
-    return {
-        (int(row["year"]), int(row["month"])): float(row["tariff_cent_kwh"])
-        for row in rates
-    }
+    lookup: dict[tuple[int, int], float] = {}
+    for index, row in enumerate(rates):
+        if isinstance(row, dict):
+            lookup[(int(row["year"]), int(row["month"]))] = float(
+                row["tariff_cent_kwh"]
+            )
+            continue
+        if isinstance(row, (tuple, list)) and len(row) >= 3:
+            lookup[(int(row[0]), int(row[1]))] = float(row[2])
+            continue
+        raise ValueError(
+            f"monthly_rates[{index}] muss Objekt oder (year, month, cent) sein."
+        )
+    return lookup
 
 
 def _spot_import_cent(
@@ -87,7 +103,18 @@ def import_cent_kwh(
         lookup = _monthly_table_lookup(tariff)
         key = (slot_datetime.year, slot_datetime.month)
         if key not in lookup:
-            raise ValueError(f"Kein Monatseintrag für {key[0]}-{key[1]:02d} im Import-Tarif.")
+            if lookup:
+                first_y, first_m = min(lookup)
+                last_y, last_m = max(lookup)
+                available = (
+                    f" verfügbar: {first_y}-{first_m:02d} … {last_y}-{last_m:02d}"
+                    f" ({len(lookup)} Monate)"
+                )
+            else:
+                available = " (Lookup leer)"
+            raise ValueError(
+                f"Kein Monatseintrag für {key[0]}-{key[1]:02d} im Import-Tarif.{available}."
+            )
         price = lookup[key]
         return round(
             _apply_vat(

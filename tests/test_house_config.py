@@ -276,10 +276,11 @@ def test_dach_tariffs_catalog():
     root = Path(__file__).resolve().parents[1]
     doc = load_tariffs_document(str(root / "share" / "config" / "tariffs.json"))
     assert doc.get("catalog_as_of") == "2026"
-    assert len(doc["import_tariffs"]) == 34
+    assert len(doc["import_tariffs"]) == 35
     assert len(doc["export_tariffs"]) == 16
     assert "awattar_at" in doc["import_tariffs"]
     assert "at_vkw_strom_dynamisch" in doc["import_tariffs"]
+    assert "at_vkw_strom_duo" in doc["import_tariffs"]
     assert "dynamic_epex" in doc["export_tariffs"]
     assert "at_vkw_pv_flex" in doc["export_tariffs"]
     assert doc["export_tariffs"]["at_oemag_gesetzlicher_marktpreis"]["type"] == "monthly_table"
