@@ -2,6 +2,7 @@
 
 **Purpose:** Local lab stack for **2.4.b** (OpenEMS EHAL prototype).  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §2.2, §2.5 Phase 2, §2.6; backlog `2.4.b`.  
+**EHAL wire contract (frozen):** [`docs/spec/ehal.md`](ehal.md) — schemas in `share/ehal/`, Python package `ehal`. Adapters must emit/consume only that contract.  
 **Goal:** Run `openems-edge` so Earnie can talk **network API only** (REST/WS) — Separate Works / AGPL shield. No OpenEMS source or libraries in Earnie repos.  
 **Host IP:** `192.168.178.34`
 
@@ -17,6 +18,8 @@
 
 ---
 
+
+
 ## Preferred platform
 
 - [x] **Primary:** Raspberry Pi 4 (4 GB min; **8 GB preferred**) or Pi 5 — matches Entwicklungsplan (“Pi 4 + Docker Compose”)
@@ -29,6 +32,8 @@
 
 ---
 
+
+
 ## 1. Host preparation
 
 - [x] Install Docker Engine + Compose plugin ([docs.docker.com](https://docs.docker.com/engine/install/))
@@ -36,6 +41,8 @@
 - [x] Confirm architecture is `amd64` or `arm64` (`ls`  → `x86_64` / `aarch64`)
 
 ---
+
+
 
 ## 2. OpenEMS Edge + UI (Docker Compose)
 
@@ -83,22 +90,21 @@ volumes:
   openems-ui-log:
 ```
 
-**Port map check (`docker ps`):** REST **8084** must be on **`openems_edge`**, not on `openems_ui`. Example of a wrong layout (causes connect-then-reset on `:8084`):
+**Port map check (**`docker ps`**):** REST **8084** must be on `openems_edge`, not on `openems_ui`. Example of a wrong layout (causes connect-then-reset on `:8084`):
 
 ```text
 openems_edge  … 8080->8080, 8085->8085          # missing 8084
 openems_ui    … 8084->8084, 8088->80, …         # 8084 wrongly here → nginx, not REST
 ```
 
-Fix in `docker-compose.yml`: put `8084:8084` under **`openems-edge` only**; remove `8084` from `openems-ui`. Then `docker compose up -d` and confirm:
+Fix in `docker-compose.yml`: put `8084:8084` under `openems-edge` **only**; remove `8084` from `openems-ui`. Then `docker compose up -d` and confirm:
 
 ```text
 openems_edge  … 8080->8080, 8084->8084, 8085->8085
 openems_ui    … 8088->80, 8443->443
 ```
 
-
-**UI 404 on `:8088` (Felix on `:8080` OK):** Edge is fine; UI nginx config is usually broken or stale (common after the first failed bind on 443). Fix on the host:
+**UI 404 on** `:8088` **(Felix on** `:8080` **OK):** Edge is fine; UI nginx config is usually broken or stale (common after the first failed bind on 443). Fix on the host:
 
 ```bash
 docker compose stop openems-ui
@@ -113,19 +119,21 @@ docker logs openems_ui
 Also set `WEBSOCKET_HOST=192.168.178.34` (as above). In Felix, ensure **Controller Api Websocket** exists with port `8085`. Check websocket: `curl -sI http://192.168.178.34:8085` → expect something like `404 WebSocket Upgrade Failure` (means the port is alive).
 
 - [x] `docker compose up -d`
-- [x] Confirm both containers are up: `docker ps` (expect `openems_edge` with `0.0.0.0:8080->8080`, `8085->8085`; `openems_ui` with `8088->80`)
-- [ ] Reach **OpenEMS UI**: `http://192.168.178.34:8088/`
+- [x] Confirm both containers are up: `docker ps` (expect `openems_edge` with `8080`, `8084`, `8085`; `openems_ui` with `8088->80`)
+- [x] Reach **OpenEMS UI**: `http://192.168.178.34:8088/`
   - **guest** (default password / leave as suggested): OK for live view / monitoring only
   - **admin** (password `admin`): needed for Settings → **Install components**, simulator setup, and API controllers — use this for the lab
   - Prefer UI → Settings → **Install components** for lab config once logged in as admin
 - [x] Reach Felix (exact path): `http://192.168.178.34:8080/system/console/configMgr`
   - Credentials: `admin` / `admin`
   - If the browser login dialog fails (esp. Edge/Chrome): try Firefox, or `http://admin:admin@192.168.178.34:8080/system/console/configMgr`
-  - Bare `/system/console` may **404**; use `**/system/console/configMgr`**
-- [ ] If UI still 404 after volume recreate: paste `docker logs openems_ui` / `docker ps` and recheck port map `8088:80`
+  - Bare `/system/console` may **404**; use **`/system/console/configMgr`**
+- [x] UI reachable on `:8088` (port map fixed; `8084` on Edge only)
 - [ ] Pin image tags once a known-good release is chosen (avoid silent `latest` drift)
 
 ---
+
+
 
 ## 3. Simulated plant (no real hardware)
 
@@ -137,6 +145,8 @@ Install via UI (admin) → Settings → **Install components**, or via Felix `co
 - [x] **Scheduler All Alphabetically** — ID `scheduler0` (create if missing)
 - [x] **Controller Debug Log** — ID `ctrlDebugLog0` (optional; helpful for sanity checks)
 - [x] **Controller Api Websocket** — port `8085` (required for UI ↔ Edge) under [http://192.168.178.34:8080/system/console/configMgr](http://192.168.178.34:8080/system/console/configMgr)
+
+
 
 ### 3.2 Simulators — minimal Earnie plant (grid + PV + battery)
 
@@ -157,22 +167,33 @@ Install via UI (admin) → Settings → **Install components**, or via Felix `co
   - ID e.g. `ctrlBalancing0`  
   - **Optional for Earnie API tests:** only needed so the simulated battery actually charges/discharges; telemetry channels exist without it
 
+
+
 ### 3.3 Earnie network API (not Simulators)
 
-- [ ] **Controller Api Rest/Json Read-Write** — factory `Controller.Api.Rest.ReadWrite`  
-  - Port **8084** (default); publish `8084:8084` in compose (see above) then `docker compose up -d`  
+- [x] **Controller Api Rest/Json Read-Write** — factory `Controller.Api.Rest.ReadWrite`  
+  - Port **8084** (default); publish `8084:8084` under **`openems-edge` only** (not UI) then `docker compose up -d`  
   - Felix search: `Rest` / `Controller.Api.Rest.ReadWrite`  
   - Auth: Basic; username often `x`, password = OpenEMS user password (`user` = guest, `admin` = admin)
+
+
 
 ### 3.4 Optional later
 
 - [ ] Simulated **EVCS** — only when testing `set_evcs_max_current` / `evcs_active_power`
-- [ ] Skip for now: Backend, Influx, real Modbus/OEM devices, Simulator App (batch JSON-RPC) unless needed
+- [x] Skip for now: Backend, Influx, real Modbus/OEM devices, Simulator App (batch JSON-RPC) unless needed
+
+
 
 ### 3.5 Sanity check — REST from another machine (e.g. your PC)
 
 Docs: [API REST](https://openems.github.io/openems.io/openems/latest/edge/controller.d/io.openems.edge.controller.api.rest.html)  
 Base: `http://192.168.178.34:8084/rest` — use password `admin` for write tests.
+
+**Verified 2026-07-27 (PC → lab):**
+- Read `_sum/GridActivePower` → JSON OK (e.g. `value: -77`; OpenEMS: − = sell-to-grid)
+- Write `ess0/SetActivePowerEquals` `{"value": 1000}` → `{}` / 200
+- Read `ess0/ActivePower` → `value: 1000` (discharge)
 
 #### Read (grid / PV / SoC)
 
@@ -194,35 +215,38 @@ Expect JSON with a numeric `"value"` (W or %). Optional dump:
 curl -u x:admin "http://192.168.178.34:8084/rest/channel/.*/Active.*Power"
 ```
 
-- [ ] Confirm **read** of grid / PV / SoC returns JSON with values (not 401/404/connection refused)
+- [x] Confirm **read** of grid / PV / SoC returns JSON with values (not 401/404/connection refused)
+
+
 
 #### Write (ESS limit / power setpoint)
 
 Prefer a limit channel (EHAL-like) or equals setpoint:
 
-```bash
-# Discharge limit example (W) — channel names can vary; list first if unsure:
-curl -u x:admin "http://192.168.178.34:8084/rest/channel/ess0/.*"
-
-# Direct power setpoint (common on ManagedSymmetricEss); sign: + discharge / − charge (confirm on your Edge)
-curl -X POST -u x:admin -H "Content-Type: application/json" -d "{\"value\": 1000}" ^
-  http://192.168.178.34:8084/rest/channel/ess0/SetActivePowerEquals
+```powershell
+# PowerShell (use curl.exe + single-quoted JSON body)
+curl.exe -X POST -u x:admin -H "Content-Type: application/json" -d '{"value": 1000}' http://192.168.178.34:8084/rest/channel/ess0/SetActivePowerEquals
 
 # Limit-style (if present):
-curl -X POST -u x:admin -H "Content-Type: application/json" -d "{\"value\": 2000}" ^
-  http://192.168.178.34:8084/rest/channel/ess0/SetActivePowerLessOrEquals
-curl -X POST -u x:admin -H "Content-Type: application/json" -d "{\"value\": -2000}" ^
-  http://192.168.178.34:8084/rest/channel/ess0/SetActivePowerGreaterOrEquals
+curl.exe -X POST -u x:admin -H "Content-Type: application/json" -d '{"value": 2000}' http://192.168.178.34:8084/rest/channel/ess0/SetActivePowerLessOrEquals
+curl.exe -X POST -u x:admin -H "Content-Type: application/json" -d '{"value": -2000}' http://192.168.178.34:8084/rest/channel/ess0/SetActivePowerGreaterOrEquals
 ```
 
-(On Linux/macOS use `\` line continuations instead of `^`.)
+```bash
+# Linux / Pi SSH (bash)
+curl -X POST -u x:admin -H "Content-Type: application/json" \
+  -d '{"value": 1000}' \
+  http://127.0.0.1:8084/rest/channel/ess0/SetActivePowerEquals
+```
+
+(On PowerShell, `curl` alone is `Invoke-WebRequest` — always use `curl.exe`. Do **not** use `\"` escaping inside PowerShell double quotes for the JSON body.)
 
 Success: HTTP **200**. Then re-read `ess0/ActivePower` / UI monitor.
 
 #### OEM-style write lock (negativtest)
 
-- [ ] Confirm **write** of at least one ESS setpoint returns 200  
-- [ ] Simulate lock / no-write: temporarily use **`Controller.Api.Rest.ReadOnly`** instead of ReadWrite (or POST with guest password `user` if writes are denied) → expect **403** / error JSON; note that Earnie adapter must log + set `supports_ess_write=false` / degrade
+- [x] Confirm **write** of at least one ESS setpoint returns 200  
+- [ ] Simulate lock / no-write: temporarily use `Controller.Api.Rest.ReadOnly` instead of ReadWrite (or POST with guest password `user` if writes are denied) → expect **403** / error JSON; note that Earnie adapter must log + set `supports_ess_write=false` / degrade
 
 PowerShell one-liner alternative for read:
 
@@ -230,7 +254,9 @@ PowerShell one-liner alternative for read:
 curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 ```
 
-### Target channels → EHAL (Entwicklungsplan §2.4.1)
+
+
+### Target channels → EHAL (frozen contract: [`ehal.md`](ehal.md); Entwicklungsplan §2.4.1)
 
 
 | EHAL field                      | OpenEMS (prototype)                                   |
@@ -247,6 +273,8 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 
 ---
 
+
+
 ## 4. Compliance checklist (binding for 2.4.b)
 
 - [ ] OpenEMS runs only as **separate container** — not linked into Earnie Python
@@ -256,6 +284,8 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 
 ---
 
+
+
 ## 5. Earnie side (after OpenEMS lab is green)
 
 - [ ] Reference Compose sketch: `earnie-core` + `openems-edge` (same host `192.168.178.34` or LAN)
@@ -263,9 +293,11 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 - [ ] Map minimal field set above; Live/optimizer consume **only** EHAL
 - [ ] Negativtests: write lock → log + UI hint; capability degrade
 
-*(Implementation belongs to backlog* `2.4.a` */* `2.4.b` *— this file is the platform TODO.)*
+*(Implementation belongs to backlog* `2.4.b` *— this file is the platform TODO. EHAL schemas are frozen under* `2.4.a` */* [`ehal.md`](ehal.md)*.)*
 
 ---
+
+
 
 ## Out of scope for this platform TODO
 
@@ -275,6 +307,8 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 - MQTT/Matter as first-class hubs
 
 ---
+
+
 
 ## Quick references
 

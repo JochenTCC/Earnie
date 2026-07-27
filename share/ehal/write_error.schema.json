@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/ehal/write_error.schema.json",
+  "title": "EHAL Write-Error-Telemetry (M1)",
+  "description": "Emitted when setpoint writes fail. Pair with flipping supports_ess_write / supports_evcs_current.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "ts",
+    "adapter_id",
+    "failed_fields",
+    "message",
+    "retryable"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "ts": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapter_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "failed_fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "set_ess_charge_power_limit",
+          "set_ess_discharge_power_limit",
+          "set_evcs_max_current"
+        ]
+      },
+      "uniqueItems": true,
+      "description": "EHAL setpoint field names that failed."
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable summary for logs / UI hint."
+    },
+    "hub_status": {
+      "type": ["string", "null"],
+      "description": "Optional hub HTTP/RPC status or code."
+    },
+    "retryable": {
+      "type": "boolean",
+      "description": "Whether a later write may succeed."
+    }
+  },
+  "additionalProperties": false
+}

@@ -13,22 +13,20 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature Backlog
 
+### Version 2.3.2 -- Feature Addition
+
+- [ ] Check possibilties to get quarterly hour EPEX prices and change optimization to 15 min slots
+
 ### Version 2.4 — EHAL foundation & DACH docking (OpenEMS + HA/evcc)
 
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 (Phases 1–2b / M1–M1.5)  
 **Goal:** Freeze **EHAL** and prove a Loxone-free southbound path. Earnie Core remains the sole 48h optimizer; hardware I/O only via EHAL (telemetry + setpoints + capability flags).  
 **Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume.  
 **Deferred to 2.5:** Loxone-EHAL extraction, MCP onboarding, multi-system field test with Loxone, device-profile library slice.  
-**Naming:** Establish **EHAL** in backlog/docs/release notes. Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
+**Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) — thin Docker wrapper over existing `loxberry_productive` compose; not a native host install.  
+**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-- [ ] **2.4.a — EHAL specification (Phase 1 / M1 spec)**
-  - Freeze universal JSON schemas: Telemetry-API, Setpoint-API, Capability-Flags (`supports_ess_write`, `supports_evcs_current`, …)
-  - Freeze sign convention once (`+` = grid import, `−` = export); adapters normalize sources
-  - Define min update interval (e.g. 60 s), error/degrade behavior on failed writes
-  - Contract: optimizer / Live path consume **only** EHAL — no OpenEMS/HA/Loxone types in the math core
-  - Publish connector-author spec + CONTRIBUTING outline (adapter contract)
-  - **Out of scope:** MQTT/Matter as first-class hubs; Loxone refactor (→ 2.5)
 - [ ] **2.4.b — OpenEMS EHAL prototype (Phase 2 / M1)**
   - Python OpenEMS adapter via **network API only** (REST/WS)
   - Docker Compose: `earnie-core` + **`openems-edge`** (lab reference stack)
@@ -44,10 +42,22 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Entity → EHAL mapping UI (Human-in-the-Loop); optional LLM assist can wait for 2.5 parity with MCP
   - Contract-tests: identical schedules vs OpenEMS when only adapter config is switched
   - German user docs: DACH install path A2 (default) vs B (existing HA)
+- [ ] **2.4.d — LoxBerry plugin Scope A MVP (thin Docker wrapper)**
+  - **Goal:** Install/manage existing Earnie container from LoxBerry Plugin Admin — no native Python/Streamlit/MILP on the host
+  - **Prerequisite:** LoxBerry **4.x** (arm64) + **Docker plugin**; reuse `docker/compose/loxberry_productive.yml` / GHCR multi-arch image
+  - Plugin skeleton: `plugin.cfg`, icons, German strings, standard LB dirs (`config` / `data` / `log` / `bin` / `webfrontend`)
+  - `postinstall` / upgrade / uninstall: require Docker plugin; create persistent dirs for `earnie_env/config` + `earnie_env/runtime`; `docker compose pull` + `up -d`; preserve volumes across plugin upgrades
+  - Daemon or cron: keep container healthy / restart if stopped
+  - Minimal LB WebUI: container status, start/stop, link to Streamlit (`:8501`), show installed image/plugin version
+  - `release.cfg` (and optional prerelease) so LB can auto-update the **plugin ZIP**; document image-tag story (plugin version ↔ `ghcr.io/…/earnie-energy:<tag>`)
+  - German user docs: plugin path vs manual compose; point to Go/No-Go (RAM ≥4 GB, SSD preferred)
+  - Acceptance: fresh LB 4.x install from ZIP → container running → UI reachable; upgrade preserves config/runtime; uninstall leaves data policy documented
+  - **Out of scope (later polish / other versions):** native host install; HA/evcc/OpenEMS sidecars on the Pi; Miniserver prefill into `.env`; alpha/prod channel switcher; Streamlit iframe embed; full LoxWiki store listing polish beyond MVP
 - [ ] **2.4.0 — Release**
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA+evcc path proven in lab (contract-tests)
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
   - Loxone production path still on pre-EHAL code until **2.5** (no forced Loxone cutover in 2.4.0)
+  - LoxBerry Scope A MVP (`2.4.d`) shippable with this release or as late add-on in the same MINOR cycle (does not block EHAL freeze)
 
 
 ### Version 2.5 — Loxone on EHAL, MCP & multi-system field test

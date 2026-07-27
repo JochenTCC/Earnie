@@ -3,6 +3,16 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.a EHAL specification (2026-07-27)
+
+- [x] **2.4.a — EHAL specification (Phase 1 / M1 spec)** — Freeze Telemetry / Setpoint / Capability-Flags (+ Write-Error) JSON Schemas (`share/ehal/`), thin Python package `ehal`, connector-author spec [`docs/spec/ehal.md`](../docs/spec/ehal.md), CONTRIBUTING adapter outline; sign/units/60 s/degrade frozen; no Live/Loxone wiring (→ 2.4.b / 2.5)
+
+
+### Bugfix EPEX tariff VAT / monthly fees (2026-07-27)
+
+- [x] **EPEX tariff VAT / monthly fees** — Spot tariffs store settlement + `monthly_fee_eur` **net** with `prices_include_vat: false`; export `monthly_table` (+ VKW PV Dynamisch) use `vat_percent: 0` (ohne USt). Catalogs: `share/config/tariffs.json`, `earnie_env`, `earnie_env_se_m2`. Docs: `tarife-quellen.md` §3/§4/§7, `preise.md`
+
+
 ### Bugfix Detaillierte Simulationsansicht day UX + SA preselect (2026-07-27)
 
 - [x] **Detaillierte Simulationsansicht day-change / UX** — Δ% in header; default SA₁→SA₂; ⚪ = ≤5% rel.; snapshot JSONL mtime index + session bundle cache (`bundle_ms` ~170→~18 warm)

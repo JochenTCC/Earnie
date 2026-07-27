@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/ehal/capabilities.schema.json",
+  "title": "EHAL Capability-Flags (M1)",
+  "description": "Adapter write capabilities. Graceful degrade when false (read-only hubs, OEM locks).",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "ts",
+    "adapter_id",
+    "supports_ess_write",
+    "supports_evcs_current"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "ts": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapter_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supports_ess_write": {
+      "type": "boolean",
+      "description": "ESS charge/discharge limit setpoints can be written."
+    },
+    "supports_evcs_current": {
+      "type": "boolean",
+      "description": "set_evcs_max_current can be written."
+    }
+  },
+  "additionalProperties": false
+}

@@ -46,11 +46,23 @@ Technischer Einstieg: **[DEVELOPER.md](DEVELOPER.md)** (venv, pytest, Container,
 
 **Hotfixes für bereits getaggte Builds** (während `main` weiterläuft): Playbook [docs/spec/branching-hotfix-playbook.md](docs/spec/branching-hotfix-playbook.md) — Standard bleibt Fix auf `main`; kurzlebige `hotfix/…`-Branches nur bei dringendem Patch vom Release-Tag.
 
-### 3. Eigene Schnittstellen (Open-Source-Option)
+### 3. EHAL-Connectoren (Adapter)
 
-Nicht alles ist Teil des standardisierten Basis-Setups (z. B. individuelle Pool-, Klima- oder Sonderanlagen). Technisch versierte Nutzer dürfen den Local Core und vorhandene Schnittstellen nutzen, um **eigene Logiken** anzubinden — unter derselben Lizenz.
+Southbound-Anbindungen laufen über den **Earnie Hardware Access Layer (EHAL)** — normiertes JSON für Telemetrie, Setpoints und Capability-Flags.
 
-Später sollen generische Connector-Specs und Templates die Arbeit erleichtern (Roadmap: Loxone-agnostisch werden). Bis dahin: bestehende Loxone-/Config-Muster und Issues als Ausgangspunkt.
+**Verbindliche Spec (Englisch):** [docs/spec/ehal.md](docs/spec/ehal.md) · JSON-Schemas: `share/ehal/` · Python: Paket `ehal`.
+
+Adapter-Vertrag (Kurzfassung):
+
+- Nur **übersetzen**: Hub-Kanäle/Entities → dieselben EHAL-Strukturen; keine Hub-Typen im Optimizer/MILP-Kern.
+- **Vorzeichen und Einheiten** im Adapter normalisieren (`+` = Netzbezug, Leistung in **W**, EVCS-Setpoint in **A**).
+- **Capability-Flags** melden; bei fehlgeschlagenen Writes degradieren (loggen, Nutzerhinweis, Write-Error-Telemetry) — siehe Spec.
+- Anbindung nur über **Netzwerk-API** (REST/WS); keine Hub-Quelltexte oder Libraries in Earnie-Repos (Separate Works, z. B. OpenEMS/AGPL).
+- Setpoints = **Grenzen/Fahrpläne**; Echtzeitregelung bleibt im Subsystem.
+
+Roadmap: OpenEMS-Prototyp (`2.4.b`), HA+evcc (`2.4.c`), Loxone-EHAL (`2.5`). Bis Loxone auf EHAL liegt, bleibt der produktive Loxone-Pfad pre-EHAL.
+
+Nicht alles ist Teil des Basis-Setups (z. B. individuelle Pool-, Klima- oder Sonderanlagen). Technisch versierte Nutzer dürfen den Local Core und vorhandene Schnittstellen nutzen, um **eigene Logiken** anzubinden — unter derselben Lizenz; neue Hubs idealerweise als EHAL-Adapter.
 
 ### 4. Hardware-Profile und Datenbeitrag
 

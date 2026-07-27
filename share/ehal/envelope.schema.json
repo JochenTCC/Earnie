@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/ehal/envelope.schema.json",
+  "title": "EHAL envelope (M1)",
+  "description": "Shared envelope for Telemetry, Setpoint, Capabilities, and Write-Error documents. schema_version M1 = 1; ts is ISO-8601 with timezone.",
+  "type": "object",
+  "required": ["schema_version", "ts", "adapter_id"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "EHAL wire schema version (M1 freeze = 1)."
+    },
+    "ts": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO-8601 timestamp with timezone (Z or offset). Prefer UTC."
+    },
+    "adapter_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable adapter instance identifier."
+    }
+  },
+  "additionalProperties": true
+}

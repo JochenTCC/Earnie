@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/ehal/telemetry.schema.json",
+  "title": "EHAL Telemetry-API (M1)",
+  "description": "Normalized plant telemetry. Power in W; ess_soc in %; grid + = import, − = export; ess_power + = discharge, − = charge (OpenEMS-aligned).",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "ts",
+    "adapter_id",
+    "grid_power_active",
+    "pv_production_active",
+    "ess_soc"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "ts": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adapter_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "grid_power_active": {
+      "type": "number",
+      "description": "PCC active power in W. + = import, − = export."
+    },
+    "pv_production_active": {
+      "type": "number",
+      "minimum": 0,
+      "description": "PV production in W (≥ 0)."
+    },
+    "ess_soc": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Home battery State of Charge in %."
+    },
+    "ess_power": {
+      "type": ["number", "null"],
+      "description": "Optional ESS active power in W. + = discharge, − = charge."
+    },
+    "evcs_active_power": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Optional EVCS charge power in W (≥ 0)."
+    }
+  },
+  "additionalProperties": false
+}
