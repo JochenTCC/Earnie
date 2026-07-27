@@ -154,7 +154,7 @@
             "feed_in_fee_factor": 0.19,
             "feed_in_fix_cent": 0.0,
             "monthly_fee_eur": 4.79,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 0.0,
             "supplier_id": "awattar_at"
         },

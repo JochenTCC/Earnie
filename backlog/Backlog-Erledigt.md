@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.b OpenEMS EHAL prototype (2026-07-27)
+
+- [x] **2.4.b — OpenEMS EHAL prototype (Phase 2 / M1)** — REST-only `integrations/openems_adapter.py` + thin Live bridge `integrations/ehal_live.py` (`ehal.backend=openems`); lab Compose [`docker/compose/openems-lab.yml`](../docker/compose/openems-lab.yml); write-lock degrade → `runtime/ehal_write_error.json` + Streamlit hint; config schema/snippet; mocked tests; no OpenEMS libs in-repo (→ 2.4.c / 2.5)
+
+
 ### 2.4.a EHAL specification (2026-07-27)
 
 - [x] **2.4.a — EHAL specification (Phase 1 / M1 spec)** — Freeze Telemetry / Setpoint / Capability-Flags (+ Write-Error) JSON Schemas (`share/ehal/`), thin Python package `ehal`, connector-author spec [`docs/spec/ehal.md`](../docs/spec/ehal.md), CONTRIBUTING adapter outline; sign/units/60 s/degrade frozen; no Live/Loxone wiring (→ 2.4.b / 2.5)

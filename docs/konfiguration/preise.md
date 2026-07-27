@@ -6,7 +6,7 @@ Live-Bezugspreise kommen über Spot-Tarife (`spot_hourly` u. a.) mit Day-Ahead-M
 
 Quellen und rechtliche Anker: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md), [OeMAG & Referenzmarktwert](../referenz/oemag-referenzmarktwert.md).
 
-**Fixkosten (SE only):** `monthly_fee_eur` (Lieferant-Grundpreis; Deduplizierung über `supplier_id`), optional `grid_monthly_fee_eur` / `metering_monthly_fee_eur` / `other_monthly_fee_eur` (einmal je Hausanschluss aus Bezug, sonst Einspeise). Netto/brutto wie `prices_include_vat`. Nur in **Szenario-Explorer**-Gesamt-/Monatskosten und in Fake-Jahresrechnungen unter `{Log}/invoices/`, nicht in Live-MILP und nicht in stündlichen `sim_cost`. Details: [tarife-quellen.md](../referenz/tarife-quellen.md) §4.
+**Fixkosten (SE only):** `monthly_fee_eur` (Lieferant-Grundpreis; Deduplizierung über `supplier_id`), optional `grid_monthly_fee_eur` / `metering_monthly_fee_eur` / `other_monthly_fee_eur` (einmal je Hausanschluss aus Bezug, sonst Einspeise). Bei **EPEX-/Spot-Tarifen** immer **netto** speichern und `prices_include_vat` = false (gleiche Basis wie Settlement/Markup); Festpreise: Netto/brutto wie `prices_include_vat`. Nur in **Szenario-Explorer**-Gesamt-/Monatskosten und in Fake-Jahresrechnungen unter `{Log}/invoices/`, nicht in Live-MILP und nicht in stündlichen `sim_cost`. Details: [tarife-quellen.md](../referenz/tarife-quellen.md) §4.
 
 **Land am Hausprofil:** Im Hauskonfigurator (Standort) wird `land` (`AT`/`DE`/`CH`) gespeichert. Der Szenarienkonfigurator-Filter **Land** ist Pflicht (kein „Alle“) und wird aus dem gewählten Hausprofil vorbelegt.
 

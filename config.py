@@ -152,6 +152,10 @@ class Config:
         )
         config_loaders.apply_attrs(
             self,
+            config_loaders.load_ehal_params(self._raw_config),
+        )
+        config_loaders.apply_attrs(
+            self,
             config_loaders.load_sim_path_params(self._raw_config),
         )
 
@@ -305,6 +309,9 @@ class Config:
 
     def is_loxone_silent_mode(self) -> bool:
         return bool(self.get('LOXONE_SILENT_MODE', default=True))
+
+    def is_ehal_openems_backend(self) -> bool:
+        return str(self.get("EHAL_BACKEND") or "").strip().lower() == "openems"
 
     def is_event_trigger_enabled(self) -> bool:
         return bool(self.get('EVENT_TRIGGER_ENABLED', default=True))
@@ -573,6 +580,10 @@ def get_global_timeout(default: int = 5) -> int:
 
 def is_loxone_silent_mode() -> bool:
     return CONFIG.is_loxone_silent_mode()
+
+
+def is_ehal_openems_backend() -> bool:
+    return CONFIG.is_ehal_openems_backend()
 
 
 def is_event_trigger_enabled() -> bool:

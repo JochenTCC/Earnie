@@ -68,7 +68,8 @@
           "type": "number"
         },
         "prices_include_vat": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "If false, volumetric cent fields are net and VAT is applied via vat_percent. EPEX/spot tariffs: always false; store settlement and monthly fees net."
         },
         "vat_percent": {
           "type": "number",
@@ -81,7 +82,7 @@
         "monthly_fee_eur": {
           "type": "number",
           "minimum": 0,
-          "description": "Lieferant Grundpreis EUR/month (net if prices_include_vat is false, else gross). SE totals and fake invoices only."
+          "description": "Lieferant Grundpreis EUR/month. For EPEX/spot: always net (with prices_include_vat false). For fixed: net if prices_include_vat false, else gross. SE totals and fake invoices only."
         },
         "grid_monthly_fee_eur": {
           "type": "number",

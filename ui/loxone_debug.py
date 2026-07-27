@@ -85,10 +85,29 @@ def write_summary_text(writes: list[dict[str, Any]]) -> str:
 
 def render_status_strip(main_state: dict | None) -> None:
     silent = config.is_loxone_silent_mode()
-    if silent:
+    openems = config.is_ehal_openems_backend()
+    if openems:
+        if silent:
+            st.warning(
+                "**Silent-Modus aktiv** — EHAL/OpenEMS-Setpoints werden nicht gesendet."
+            )
+        else:
+            st.success("**OpenEMS-EHAL** — `main.py` sendet M1-Setpoints an OpenEMS REST.")
+    elif silent:
         st.warning("**Silent-Modus aktiv** — Steuerwerte werden nicht an Loxone gesendet.")
     else:
         st.success("**Live-Modus** — `main.py` sendet Steuerwerte an Loxone.")
+
+    render_ehal_write_error_banner()
+
+    if openems:
+        if not has_produktiv_run(main_state):
+            st.info("Noch kein Produktiv-Durchlauf von **main.py** — Schreib-Historie leer.")
+            return
+        completed = main_state.get("completed_at", "?")
+        age_txt = _format_age_text(run_state.age_seconds(main_state))
+        st.caption(f"Letzter **main.py**-Lauf: **{completed}** · vor **{age_txt}**")
+        return
 
     if not loxone_env_configured():
         st.warning(
@@ -104,6 +123,22 @@ def render_status_strip(main_state: dict | None) -> None:
     completed = main_state.get("completed_at", "?")
     age_txt = _format_age_text(run_state.age_seconds(main_state))
     st.caption(f"Letzter **main.py**-Lauf: **{completed}** · vor **{age_txt}**")
+
+
+def render_ehal_write_error_banner() -> None:
+    """Show last EHAL Write-Error-Telemetry from runtime/ehal_write_error.json."""
+    from integrations.ehal_live import load_write_error
+
+    error = load_write_error()
+    if not error:
+        return
+    fields = ", ".join(error.get("failed_fields") or [])
+    hub = error.get("hub_status")
+    hub_txt = f" (Hub-Status: {hub})" if hub else ""
+    st.error(
+        f"**EHAL Schreibfehler** — {error.get('message', 'unbekannt')} "
+        f"| Felder: {fields or '—'}{hub_txt}"
+    )
 
 
 @st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
@@ -130,6 +165,12 @@ def _render_live_reads_fragment() -> None:
 
 def render_live_reads_section() -> None:
     st.subheader("Live-Lesen")
+    if config.is_ehal_openems_backend():
+        st.info(
+            "Backend **OpenEMS/EHAL** — Merker-Lesen unten ist Loxone-spezifisch und "
+            "für diesen Modus nicht maßgeblich. SoC/Leistung kommen über EHAL REST."
+        )
+        return
     render_loxone_verify_results(button_key="loxone_debug_verify_button")
     st.caption("Tabelle unten aktualisiert sich automatisch (ca. alle 10 Sekunden).")
     if st.button("Jetzt aktualisieren", key="loxone_debug_refresh_reads"):

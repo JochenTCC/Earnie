@@ -119,6 +119,26 @@ def load_loxone_block_params(raw_config: dict, config_path: str) -> dict[str, An
     }
 
 
+def load_ehal_params(raw_config: dict) -> dict[str, Any]:
+    """Optional ehal block; missing/empty backend keeps legacy Loxone Live I/O."""
+    ehal = raw_config.get("ehal")
+    if not isinstance(ehal, dict):
+        ehal = {}
+    backend = str(ehal.get("backend") or "").strip().lower()
+    if backend in ("", "loxone", "none"):
+        backend = ""
+    openems = ehal.get("openems") if isinstance(ehal.get("openems"), dict) else {}
+    return {
+        "EHAL_BACKEND": backend or None,
+        "EHAL_ADAPTER_ID": str(ehal.get("adapter_id") or "openems-lab"),
+        "EHAL_OPENEMS_BASE_URL": str(openems.get("base_url") or "").strip(),
+        "EHAL_OPENEMS_USERNAME": str(openems.get("username") or "x"),
+        "EHAL_OPENEMS_PASSWORD": str(openems.get("password") or "admin"),
+        "EHAL_OPENEMS_ESS_COMPONENT": str(openems.get("ess_component") or "ess0"),
+        "EHAL_OPENEMS_EVCS_COMPONENT": str(openems.get("evcs_component") or "evcs0"),
+    }
+
+
 def load_sim_path_params(raw_config: dict) -> dict[str, Any]:
     sim_paths = raw_config.get("scenario_explorer_conf", {})
     return {

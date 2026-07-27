@@ -129,7 +129,7 @@ Also set `WEBSOCKET_HOST=192.168.178.34` (as above). In Felix, ensure **Controll
   - If the browser login dialog fails (esp. Edge/Chrome): try Firefox, or `http://admin:admin@192.168.178.34:8080/system/console/configMgr`
   - Bare `/system/console` may **404**; use **`/system/console/configMgr`**
 - [x] UI reachable on `:8088` (port map fixed; `8084` on Edge only)
-- [ ] Pin image tags once a known-good release is chosen (avoid silent `latest` drift)
+- [ ] Pin image tags once a known-good release is chosen (avoid silent `latest` drift) — reference Compose uses **`2026.7.0`** (`docker/compose/openems-lab.yml`); re-pin after lab validation if Edge was started earlier with `latest`
 
 ---
 
@@ -178,9 +178,12 @@ Install via UI (admin) → Settings → **Install components**, or via Felix `co
 
 
 
-### 3.4 Optional later
+### 3.4 Simulated EVCS (required for 2.4.b)
 
-- [ ] Simulated **EVCS** — only when testing `set_evcs_max_current` / `evcs_active_power`
+- [x] **Simulator Evcs** — ID `evcs0` (factory e.g. `Simulator.Evcs` / UI **Simulators → Evcs**)
+  - Lab verified 2026-07-27: `evcs0/ActivePower` (RO, W), `evcs0/Status`, `evcs0/SetChargePowerLimit` (RW, **W**)
+  - EHAL `set_evcs_max_current` is in **A**; Earnie adapter converts A→W via house-profile voltage/phases before writing `SetChargePowerLimit`
+  - `evcs0/ChargePower` may be absent — use `ActivePower` for `evcs_active_power`
 - [x] Skip for now: Backend, Influx, real Modbus/OEM devices, Simulator App (batch JSON-RPC) unless needed
 
 
@@ -246,7 +249,7 @@ Success: HTTP **200**. Then re-read `ess0/ActivePower` / UI monitor.
 #### OEM-style write lock (negativtest)
 
 - [x] Confirm **write** of at least one ESS setpoint returns 200  
-- [ ] Simulate lock / no-write: temporarily use `Controller.Api.Rest.ReadOnly` instead of ReadWrite (or POST with guest password `user` if writes are denied) → expect **403** / error JSON; note that Earnie adapter must log + set `supports_ess_write=false` / degrade
+- [ ] Simulate lock / no-write on lab (optional manual): `Controller.Api.Rest.ReadOnly` or guest password `user` → expect **403**; Earnie adapter unit-tested for 403 → log + `supports_ess_write=false` + `runtime/ehal_write_error.json` / UI hint
 
 PowerShell one-liner alternative for read:
 
@@ -264,11 +267,11 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 | `grid_power_active`             | `_sum/GridActivePower` (normalize sign: `+` = import) |
 | `pv_production_active`          | `_sum/ProductionActivePower`                          |
 | `ess_soc`                       | `ess0/Soc` / `_sum/EssSoc`                            |
-| `ess_power` (optional)          | ESS Active Power                                      |
-| `evcs_active_power`             | EVCS/EVSE channels                                    |
-| `set_ess_charge_power_limit`    | e.g. `SetActivePowerGreaterOrEquals` / Equals         |
-| `set_ess_discharge_power_limit` | e.g. `SetActivePowerLessOrEquals`                     |
-| `set_evcs_max_current`          | EVCS Max Current                                      |
+| `ess_power` (optional)          | `ess0/ActivePower` / `_sum/EssActivePower` (+ = discharge) |
+| `evcs_active_power`             | `evcs0/ActivePower` (W, ≥ 0)                              |
+| `set_ess_charge_power_limit`    | `ess0/SetActivePowerGreaterOrEquals` (value = −|W|)       |
+| `set_ess_discharge_power_limit` | `ess0/SetActivePowerLessOrEquals` (value = +|W|)          |
+| `set_evcs_max_current`          | A→W then `evcs0/SetChargePowerLimit` (W)                  |
 
 
 ---
@@ -277,10 +280,10 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 
 ## 4. Compliance checklist (binding for 2.4.b)
 
-- [ ] OpenEMS runs only as **separate container** — not linked into Earnie Python
-- [ ] No OpenEMS source fragments or jars copied into Energy-Optimizer / Earnie repos
-- [ ] Earnie ↔ OpenEMS = network only (REST / WebSocket / JSON-RPC)
-- [ ] Adapter reports capability flags (`supports_ess_write`, …) and degrades on failed writes
+- [x] OpenEMS runs only as **separate container** — not linked into Earnie Python (`docker/compose/openems-lab.yml`)
+- [x] No OpenEMS source fragments or jars copied into Energy-Optimizer / Earnie repos
+- [x] Earnie ↔ OpenEMS = network only (REST; WS optional later)
+- [x] Adapter reports capability flags (`supports_ess_write`, …) and degrades on failed writes (`integrations/openems_adapter.py`)
 
 ---
 
@@ -288,12 +291,12 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 
 ## 5. Earnie side (after OpenEMS lab is green)
 
-- [ ] Reference Compose sketch: `earnie-core` + `openems-edge` (same host `192.168.178.34` or LAN)
-- [ ] Python OpenEMS-EHAL adapter (network client only) → Edge at `192.168.178.34:8085` / REST as configured
-- [ ] Map minimal field set above; Live/optimizer consume **only** EHAL
-- [ ] Negativtests: write lock → log + UI hint; capability degrade
+- [x] Reference Compose: [`docker/compose/openems-lab.yml`](../../docker/compose/openems-lab.yml) (`earnie` + `openems-edge` + `openems-ui`; backlog “earnie-core” = `earnie` service)
+- [x] Python OpenEMS-EHAL adapter (network client only) — `integrations/openems_adapter.py` + `integrations/ehal_live.py`
+- [x] Map minimal field set above; Live consumes EHAL under `ehal.backend=openems` (see `share/config/ehal.openems.snippet.json`)
+- [x] Negativtests: write lock → log + UI hint + capability degrade (unit-tested with mocked HTTP 403; lab: guest password / ReadOnly REST)
 
-*(Implementation belongs to backlog* `2.4.b` *— this file is the platform TODO. EHAL schemas are frozen under* `2.4.a` */* [`ehal.md`](ehal.md)*.)*
+*(Implementation: backlog `2.4.b`. EHAL schemas frozen under `2.4.a` / [`ehal.md`](ehal.md).)*
 
 ---
 

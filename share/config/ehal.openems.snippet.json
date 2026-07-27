@@ -1,0 +1,13 @@
+{
+  "ehal": {
+    "backend": "openems",
+    "adapter_id": "openems-lab",
+    "openems": {
+      "base_url": "http://openems-edge:8084",
+      "username": "x",
+      "password": "admin",
+      "ess_component": "ess0",
+      "evcs_component": "evcs0"
+    }
+  }
+}

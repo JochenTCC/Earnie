@@ -67,6 +67,15 @@ def render() -> None:
         "Keine Loxone-Schreibvorgänge von dieser Seite."
     )
 
+    from integrations.ehal_live import load_write_error
+
+    ehal_err = load_write_error()
+    if ehal_err:
+        st.warning(
+            f"EHAL Schreibfehler: {ehal_err.get('message', '?')} "
+            f"({', '.join(ehal_err.get('failed_fields') or [])})"
+        )
+
     daemon = status()
     _render_status(daemon)
 

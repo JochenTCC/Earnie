@@ -27,6 +27,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
+ 
+- [ ] Gesamtverbrauch is not the same in table "Gesamtkosten und -Verbrauch" in SE and faked invoice - why? 
 
 
 ## Organizational Changes - no bugs (but still no development issue)

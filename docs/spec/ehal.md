@@ -162,9 +162,18 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 
 - MQTT / Matter as first-class hubs
 - Loxone-EHAL extraction (**2.5**)
-- OpenEMS / HA adapter implementation and Compose (**2.4.b** / **2.4.c**)
+- HA adapter implementation (**2.4.c**)
 - Loxone extras as first-class EHAL fields: `target_soc`, `control_cmd`, flex enable, EV **kW** setpoint (remain pre-EHAL / **2.5**)
 - Modbus hardware-profile library (Entwicklungsplan M2 / M4)
+
+## Implementation notes (2.4.b OpenEMS)
+
+- Adapter: `integrations/openems_adapter.py` (REST only). Live façade: `integrations/ehal_live.py`.
+- Compose lab: `docker/compose/openems-lab.yml`. Config snippet: `share/config/ehal.openems.snippet.json`.
+- Cadence: Core still expects ≥ 60 s telemetry refresh; adapter may poll faster.
+- EVCS: EHAL `set_evcs_max_current` (A) → OpenEMS `evcs0/SetChargePowerLimit` (W) via house-profile V/phases.
+- Southbound silent gate: reuse `loxone_silent_mode` for OpenEMS writes as well.
+- Write failures → `runtime/ehal_write_error.json` + UI banner on Loxone-Kommunikation / Daemon page.
 
 ## Connector-author checklist
 

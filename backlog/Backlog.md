@@ -24,16 +24,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume.  
 **Deferred to 2.5:** Loxone-EHAL extraction, MCP onboarding, multi-system field test with Loxone, device-profile library slice.  
 **Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) — thin Docker wrapper over existing `loxberry_productive` compose; not a native host install.  
-**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
+**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-- [ ] **2.4.b — OpenEMS EHAL prototype (Phase 2 / M1)**
-  - Python OpenEMS adapter via **network API only** (REST/WS)
-  - Docker Compose: `earnie-core` + **`openems-edge`** (lab reference stack)
-  - Map minimal field set (`grid_power_active`, `pv_production_active`, `ess_soc`, optional `ess_power`, `evcs_active_power`, ESS charge/discharge limits, `set_evcs_max_current`)
-  - Negativtests: OEM write locks → log + UI hint; capability flags degrade gracefully
-  - **Compliance (binding):** no OpenEMS source/libs in Earnie repos — Separate Works / AGPL shield (`Entwicklungsplan` §2.6)
-  - Acceptance: LP/Live speaks only EHAL under OpenEMS Compose config
 - [ ] **2.4.c — HA-EHAL + evcc under HA (Phase 2b / M1.5, DACH default)**
   - One production **HA-EHAL-Adapter** (WS/REST); prefer stable HA entities from evcc (lab-only direct evcc optional)
   - Reference Compose: `earnie-core` + Home Assistant + evcc
@@ -86,6 +79,25 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **2.5.0 — Release**
   - Ship when: Loxone on EHAL without regression, MCP mapping usable (human-in-the-loop), Phase-4 field test passed
   - First community non-Loxone pilot may already exist from 2.4; 2.5.0 is the “all three southbounds” release
+
+
+### Version 2.6 — Investigate full migration to 15‑min slots (former B)
+
+**Context:** Day-Ahead clearing is 15‑min MTU since ~2025-10-01. Earnie already fetches Energy-Charts (free, CC BY 4.0; native 15‑min after go-live) but `normalize_price_slot` floors to the hour — MILP still assumes `dt ≡ 1 h`. Official EPEX SFTP/MATS stays out of scope (paid; external use = license quote). aWATTar remains hourly fallback only. Prior deferral: **2.3.c.2** takeaway *variable sample time — hard*. Related open check: **2.3.2**.
+
+**Scope of this chapter:** Investigate and decide whether/how to run the **full** optimizer on 15‑min slots (option B), not only “prices only” averaging (A) or hybrid grids (C).
+
+- [ ] **2.6.a — Data & tariff fidelity**
+  - Confirm Energy-Charts 15‑min coverage (AT/DE-LU/CH) vs pre-2025-10 hourly history; mixed-resolution handling
+  - Map which catalog tariffs settle on ¼‑h EPEX vs hourly average; document billing vs plan mismatch if MILP stays hourly
+  - Keep official EPEX unconnected unless a paid/internal use case appears
+- [ ] **2.6.b — MILP / horizon impact study**
+  - Explicit `dt_h` (0.25): battery SoC, wear, import/export cost, EV/thermal/generic (`min_on_quarterhours` as real slots)
+  - Size estimate: ~4× variables on sunset→sunset; HiGHS/CBC solve time Live vs SE (`sunrise_window` / commit-K)
+  - List breakages: `cons_data_hourly`, PV/price forecasts, charts (today mixed 15‑min log + 1‑h MILP), Loxone write cadence
+- [ ] **2.6.c — Go / no-go + backlog split**
+  - Decide: full B vs stay hourly + optional A (store QH prices for SE/billing only) vs hybrid C
+  - If go: carve implementation phases into this MINOR (or successor); if no-go: archive rationale and close **2.3.2** accordingly
 
 
 ### Version 2.+1 — Improve "security" against violating License agreements

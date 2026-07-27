@@ -9,6 +9,7 @@ from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
 config = load_config_or_exit()
 import logger_config
 from integrations import awattar_client, loxone_client
+from integrations import ehal_live
 from integrations.loxone_comm_trace import serialize_write_records
 from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption, pv_forecast
 from data.feed_in_prices import k_push_act_for_matrix_row
@@ -54,15 +55,23 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     else:
         logger.info("--- Earnie Live-Abfrage gestartet (v%s) ---", __version__)
     if config.is_loxone_silent_mode():
-        logger.warning(
-            "Loxone Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf den Miniserver."
-        )
+        if ehal_live.is_openems_backend():
+            logger.warning(
+                "Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf OpenEMS (EHAL)."
+            )
+        else:
+            logger.warning(
+                "Loxone Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf den Miniserver."
+            )
 
     profile_manager.check_and_update_profile_if_new_month()
 
-    current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
+    current_soc = ehal_live.read_ess_soc()
     if current_soc is None:
-        logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
+        if ehal_live.is_openems_backend():
+            logger.error("Optimierung abgebrochen: Kein Zugriff auf EHAL/OpenEMS SoC.")
+        else:
+            logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
         return
 
     config.is_sunrise_planning_horizon()
@@ -115,10 +124,13 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     sunrise_soc_min_index = sunrise_anchor_slot_index(planning_window)
     pv_forecast_kw_for_log = float(optimization_matrix[0]["expected_p_pv"])
 
-    live_power = loxone_client.fetch_loxone_live_power()
+    live_power = ehal_live.read_live_power_kw()
     flex_kw_for_matrix: dict[str, float] = {}
     if live_power:
-        flex_kw_for_matrix = loxone_client.fetch_flexible_consumers_live_kw()
+        if ehal_live.is_openems_backend():
+            flex_kw_for_matrix = {}
+        else:
+            flex_kw_for_matrix = loxone_client.fetch_flexible_consumers_live_kw()
         matrix_snapshot = live_consumption.build_consumption_snapshot(
             live_power, flex_kw_for_matrix
         )
@@ -133,7 +145,10 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
 
     current_hour = datetime.now().hour
     targets = consumer_targets.resolve_consumer_daily_targets(matrix=optimization_matrix)
-    live_consumers = loxone_client.consumers_with_live_nominal_power()
+    if ehal_live.is_openems_backend():
+        live_consumers = config.get_flexible_consumers()
+    else:
+        live_consumers = loxone_client.consumers_with_live_nominal_power()
     baseline_targets = consumer_targets.resolve_historical_baseline_targets_kwh(
         matrix=optimization_matrix,
     )
@@ -227,11 +242,26 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     current_market_item = optimization_matrix[0]
 
     if config.is_loxone_silent_mode():
-        logger.info(
-            "Silent-Modus: Steuerwerte (Huawei-Modbus, flexible Verbraucher) "
-            "werden nicht an Loxone gesendet."
-        )
+        if ehal_live.is_openems_backend():
+            logger.info(
+                "Silent-Modus: Steuerwerte (EHAL/OpenEMS ESS+EVCS) werden nicht gesendet."
+            )
+        else:
+            logger.info(
+                "Silent-Modus: Steuerwerte (Huawei-Modbus, flexible Verbraucher) "
+                "werden nicht an Loxone gesendet."
+            )
         loxone_writes: list[dict] | None = None
+    elif ehal_live.is_openems_backend():
+        logger.info("📤 Sende EHAL ESS-Limits an OpenEMS...")
+        err_ess = ehal_live.write_ess_limits_from_huawei(mode, target_power)
+        logger.info("📤 Sende EHAL EVCS-Maxstrom an OpenEMS...")
+        err_evcs = ehal_live.write_evcs_max_current_from_consumers(
+            consumer_powers, charging_contexts
+        )
+        if err_ess is None and err_evcs is None:
+            ehal_live.clear_write_error()
+        loxone_writes = None
     else:
         logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
         huawei_writes = loxone_client.send_huawei_modbus_states(mode, target_power, target_soc)
@@ -242,20 +272,30 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         loxone_writes = serialize_write_records(huawei_writes + flex_writes)
 
     if live_power is None:
-        live_power = loxone_client.fetch_loxone_live_power()
+        live_power = ehal_live.read_live_power_kw()
     total_kw = live_power["house"] if live_power else None
     from optimizer.charging_context import matrix_slot_datetime
 
-    live_flex = loxone_client.resolve_flexible_consumers_live_power(
-        fallbacks=consumer_powers,
-        consumers=live_consumers,
-        filter_contexts=filter_contexts,
-        slot_datetime=matrix_slot_datetime(optimization_matrix, 0),
-    )
-    flex_kw = live_flex.kw
-    flex_chart_kw = live_flex.chart_kw
+    if ehal_live.is_openems_backend():
+        flex_kw = {c["id"]: 0.0 for c in live_consumers}
+        flex_chart_kw = dict(flex_kw)
+        live_flex_measured: set[str] = set()
+    else:
+        live_flex = loxone_client.resolve_flexible_consumers_live_power(
+            fallbacks=consumer_powers,
+            consumers=live_consumers,
+            filter_contexts=filter_contexts,
+            slot_datetime=matrix_slot_datetime(optimization_matrix, 0),
+        )
+        flex_kw = live_flex.kw
+        flex_chart_kw = live_flex.chart_kw
+        live_flex_measured = live_flex.measured_ids
     logger.info("cons_data Flex live (kW): %s", flex_kw)
-    logger.info("Chart-Ist Flex (kW): %s | gemessen: %s", flex_chart_kw, sorted(live_flex.measured_ids))
+    logger.info(
+        "Chart-Ist Flex (kW): %s | gemessen: %s",
+        flex_chart_kw,
+        sorted(live_flex_measured),
+    )
 
     loxone_sent = loxone_client.build_sent_loxone_snapshot(
         mode,
@@ -361,7 +401,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 k: int(v) for k, v in consumer_pv_follow.items()
             },
             "flex_live_kw": flex_chart_kw,
-            "flex_measured_ids": sorted(live_flex.measured_ids),
+            "flex_measured_ids": sorted(live_flex_measured),
             "delivery_compliance": delivery_compliance,
             "delivery_plausibility": delivery_plausibility,
             "thermal_observability": thermal_observability,

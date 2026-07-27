@@ -52,3 +52,11 @@ def kw_from_nominal_reading(value: float, unit: str | None, consumer: dict) -> f
         voltage_v, phases = ev_nominal_power_conversion(consumer)
         return ampere_to_kw(value, voltage_v=voltage_v, phases=phases)
     return value
+
+
+def kw_to_ampere(kw: float, *, voltage_v: float, phases: int) -> float:
+    """Inverse of ampere_to_kw for EHAL set_evcs_max_current."""
+    denom = float(voltage_v) * max(1, int(phases))
+    if denom <= 0:
+        raise ValueError("voltage_v * phases must be > 0 for kW→A conversion")
+    return float(kw) * 1000.0 / denom

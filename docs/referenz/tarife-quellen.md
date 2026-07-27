@@ -68,7 +68,9 @@ Je nach Export-Tariftyp:
 
 ### Beispiel: VKW PV-Einspeisetarif Dynamisch
 
-Vergütung ≈ EPEX − **0,60** Cent/kWh (netto laut Produktseite). Bei Börse 10,00 Cent/kWh → **9,40 Cent/kWh**.
+Vergütung ≈ EPEX − **0,60** Cent/kWh (**ohne USt** laut Produktseite). Bei Börse 10,00 Cent/kWh → **9,40 Cent/kWh** (kein ×1,20 — Katalog: `prices_include_vat` false, `vat_percent` 0).
+
+Gleiches USt-Muster für `at_vkw_pv_flex` (`monthly_table`) und die meisten sonstigen Einspeise-Monats-/Spot-Tarife (OeMAG-Familie, SUNNY): Vergütung **ohne** USt-Aufschlag.
 
 Details zu Typen und JSON: [Preise & aWATTar](../konfiguration/preise.md).
 
@@ -91,7 +93,8 @@ Regel: Wert aus dem **Bezugstarif**; fehlt er dort, aus dem Einspeisetarif — *
 
 ### Gemeinsame Regeln
 
-- **Netto oder brutto** wie beim Tarif: gleiche Basis wie `prices_include_vat`.
+- **EPEX-/Spot-Tarife:** `prices_include_vat` = nein; volumetrische Aufschläge **und** `monthly_fee_eur` immer **netto** speichern (USt nur über `vat_percent` auf den Arbeitspreis).
+- **Festpreis-Tarife:** Netto oder brutto wie `prices_include_vat` (oft brutto/`true`).
 - Pro **Kalendermonat** im SE-Zeitraum: **eine volle** Gebühr — keine anteilige Kürzung.
 - Jahres-/Gesamtwert: Summe aller Fixkosten über alle Monate + volumetrische Energiekosten (Bezug minus Einspeiseerlös).
 - **Nicht** in Live-MILP, **nicht** in den stündlichen `sim_cost`-Kurven.
@@ -157,13 +160,13 @@ Transparenz zur Katalogpflege: Abgleich öffentlicher Quellen mit `tariffs.json`
 | Katalog-ID | `monthly_fee_eur` | Basis | Quelle |
 | ---------- | ----------------- | ----- | ------ |
 | `awattar_at` | 4,79 | netto | [awattar.at/tariffs/hourly](https://www.awattar.at/tariffs/hourly) |
-| `at_vkw_strom_dynamisch` | 3,60 | brutto | [vkw.at Strom Dynamisch](https://www.vkw.at/produkte/strom/strom-dynamisch) (36 €/Jahr netto × 1,20 USt) |
+| `at_vkw_strom_dynamisch` | 3,00 | netto | [vkw.at Strom Dynamisch](https://www.vkw.at/produkte/strom/strom-dynamisch) (36 €/Jahr netto) |
 | `at_vkw_strom_duo` | 3,00 | netto | [vkw.at Strom Duo](https://www.vkw.at/produkte/strom/strom-duo) (36 €/Jahr netto) |
-| `at_smartenergy_smartcontrol` | 2,99 | brutto | [smartenergy.at/smartcontrol](https://smartenergy.at/smartcontrol) |
-| `at_spotty_smart_active` | 2,40 | brutto | Spotty / Vergleichsportale (ca. 2,00 netto) |
-| `at_verbund_v_strom_spot` | 4,79 | brutto | Selectra / Verbund-Grundpreis (ca.) |
-| `de_tibber_tibber_dynamic` | 5,99 | brutto | [Tibber Support](https://support.tibber.com/de/articles/12310314-grund-und-arbeitspreis-bei-tibber) |
-| `de_awattar_de_hourly_de` | 4,58 | wie veröffentlicht | [awattar.de HOURLY](https://www.awattar.de/tariffs/hourly) (ggf. PLZ-abhängig) |
+| `at_smartenergy_smartcontrol` | 2,49 | netto | [smartenergy.at/smartcontrol](https://smartenergy.at/smartcontrol) (2,99 brutto) |
+| `at_spotty_smart_active` | 2,00 | netto | Spotty-Rechnung / Portale (2,40 brutto) |
+| `at_verbund_v_strom_spot` | 3,99 | netto | Selectra / Verbund-Grundpreis (ca. 4,79 brutto) |
+| `de_tibber_tibber_dynamic` | 5,03 | netto | [Tibber Support](https://support.tibber.com/de/articles/12310314-grund-und-arbeitspreis-bei-tibber) (5,99 inkl. MwSt.) |
+| `de_awattar_de_hourly_de` | 4,58 | netto (Näherung) | [awattar.de HOURLY](https://www.awattar.de/tariffs/hourly) (ggf. PLZ-abhängig) |
 
 **Falle:** Manche Vergleichsportale behaupten für aWATTar AT „kein Grundpreis“ — das widerspricht der offiziellen aWATTar-Seite.
 
@@ -173,10 +176,10 @@ Transparenz zur Katalogpflege: Abgleich öffentlicher Quellen mit `tariffs.json`
 | -- | ------- | ------- | ------ |
 | `awattar_at` | 1,5 ct + 3 % Markup, netto | Tarifblatt enthält 3 %; Marketingseite oft ohne 3 % | Match (Katalog vollständiger) |
 | `at_vkw_strom_dynamisch` | 1,2 ct netto | Offiziell +1,20 ct netto | Match |
-| `at_vkw_pv_dynamisch` / `at_vkw_pv_flex` | Abschlag 0,6; USt-Flag korrigiert auf netto | Offiziell ohne USt | Fix in 2.3.b |
-| `at_smartenergy_smartcontrol` | 1,44 ct inkl. USt | Offiziell 1,44 inkl. | Match |
-| `at_spotty_smart_active` | 1,79 ct inkl. | ≈ 1,49 netto × 1,2 | Match |
-| `de_tibber_tibber_dynamic` | 2,15 ct | Support 2,15 ct | Match |
+| `at_vkw_pv_dynamisch` / `at_vkw_pv_flex` | Abschlag 0,6; `vat_percent` 0 (ohne USt) | Offiziell ohne USt | Match |
+| `at_smartenergy_smartcontrol` | 1,20 ct netto (`prices_include_vat` false) | Offiziell 1,20 netto / 1,44 inkl. | Match |
+| `at_spotty_smart_active` | 1,49 ct netto | ≈ 1,79 inkl. / 1,2 | Match |
+| `de_tibber_tibber_dynamic` | 1,81 ct netto | Support 2,15 ct brutto / 1,19 | Match |
 | `at_verbund_v_strom_spot` | 1,3 + 4 % | Selectra eher Fix-ct; Formel unsicher | Offen — nur Monatsgebühr geseedet |
 | `de_awattar_de_hourly_de` | 2,25 + 3 % | Seite betont EPEX+3 %; 2,25 unklar | Offen — Monatsgebühr ca. 4,58 |
 

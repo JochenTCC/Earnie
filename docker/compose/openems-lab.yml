@@ -1,0 +1,87 @@
+# OpenEMS lab stack (2.4.b) — Earnie + OpenEMS Edge/UI (Separate Works / AGPL shield)
+#
+# Earnie talks to OpenEMS over REST only (port 8084). No OpenEMS libs in the Earnie image.
+#
+# First start:
+#   mkdir openems_lab\config openems_lab\runtime
+#   # Seed openems_lab/config from greenfield/example; set ehal.backend=openems
+#   # and ehal.openems.base_url=http://openems-edge:8084
+#   docker compose --project-directory . -f docker/compose/openems-lab.yml up -d --build
+#
+# UI:
+#   Earnie Streamlit: http://localhost:8503
+#   OpenEMS UI:       http://localhost:8088  (set OPENEMS_UI_WEBSOCKET_HOST to LAN IP for browsers)
+#   Felix:            http://localhost:8080/system/console/configMgr
+#   REST:             http://localhost:8084/rest/...
+#
+# Stop (volumes retained):
+#   docker compose --project-directory . -f docker/compose/openems-lab.yml down
+#
+# Lab checklist: docs/spec/openems-testing-platform-todo.md
+
+version: "3.8"
+
+x-persist-volumes: &persist-volumes
+  - ./openems_lab/config:/app/config
+  - ./openems_lab/runtime:/app/runtime
+
+x-common-env: &common-env
+  TZ: Europe/Vienna
+  EARNIE_CONFIG_PATH: config
+  EARNIE_RUNTIME_PATH: runtime
+  EARNIE_VERIFY_LOXONE_ON_START: "0"
+  EARNIE_AUTO_START_MAIN: "1"
+
+x-build: &build
+  context: .
+  dockerfile: docker/Dockerfile
+
+services:
+  # Backlog "earnie-core" = this single Streamlit + main container
+  earnie:
+    build: *build
+    container_name: earnie-openems-lab
+    restart: unless-stopped
+    ports:
+      - "8503:8501"
+    volumes: *persist-volumes
+    environment:
+      <<: *common-env
+      EARNIE_UI_MODES: sunset2sunset,live_environment
+    depends_on:
+      - openems-edge
+
+  openems-edge:
+    image: openems/edge:2026.7.0
+    container_name: openems_edge
+    hostname: openems_edge
+    restart: unless-stopped
+    volumes:
+      - openems-edge-conf:/var/opt/openems/config:rw
+      - openems-edge-data:/var/opt/openems/data:rw
+    ports:
+      - "8080:8080"
+      - "8084:8084"
+      - "8085:8085"
+
+  openems-ui:
+    image: openems/ui-edge:2026.7.0
+    container_name: openems_ui
+    hostname: openems_ui
+    restart: unless-stopped
+    volumes:
+      - openems-ui-conf:/etc/nginx:rw
+      - openems-ui-log:/var/log/nginx:rw
+    environment:
+      # Browser must resolve this host — LAN IP of the Docker host (not the service name)
+      - WEBSOCKET_HOST=${OPENEMS_UI_WEBSOCKET_HOST:-192.168.178.34}
+      - WEBSOCKET_PORT=8085
+    ports:
+      - "8088:80"
+      - "8443:443"
+
+volumes:
+  openems-edge-conf:
+  openems-edge-data:
+  openems-ui-conf:
+  openems-ui-log:

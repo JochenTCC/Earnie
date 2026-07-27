@@ -102,9 +102,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.44,
+            "settlement_fee_cent_kwh": 1.2,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "tiwag"
         },
@@ -114,9 +114,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.56,
+            "settlement_fee_cent_kwh": 1.3,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "aae_naturstrom"
         },
@@ -126,9 +126,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.6,
+            "settlement_fee_cent_kwh": 1.3333,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "pullstrom"
         },
@@ -138,11 +138,11 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.44,
+            "settlement_fee_cent_kwh": 1.2,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
-            "monthly_fee_eur": 2.99,
+            "monthly_fee_eur": 2.49,
             "supplier_id": "smartenergy"
         },
         {
@@ -151,9 +151,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.8,
+            "settlement_fee_cent_kwh": 1.5,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "oekostrom"
         },
@@ -163,11 +163,11 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.79,
+            "settlement_fee_cent_kwh": 1.49,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
-            "monthly_fee_eur": 2.4,
+            "monthly_fee_eur": 2.0,
             "supplier_id": "spotty"
         },
         {
@@ -176,9 +176,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.44,
+            "settlement_fee_cent_kwh": 1.2,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "energie_steiermark"
         },
@@ -188,9 +188,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.92,
+            "settlement_fee_cent_kwh": 1.6,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "elektrizitaetswerk_perg"
         },
@@ -200,9 +200,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.9,
+            "settlement_fee_cent_kwh": 1.5833,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "hofer_gruenstrom"
         },
@@ -214,10 +214,10 @@
             "currency": "EUR",
             "settlement_fee_cent_kwh": 1.3,
             "markup_percent": 4.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
-            "monthly_fee_eur": 4.79,
-            "notes": "Monatsgebuehr ca. 4,79 EUR brutto (Naeherung). Volumetrische Formel (1,3 ct + 4% Markup) vs. Anbieter-Tarifblatt noch zu klaeren.",
+            "monthly_fee_eur": 3.99,
+            "notes": "Monatsgebuehr ca. 3,99 EUR netto / 4,79 EUR brutto (Naeherung). Volumetrische Formel (1,3 ct + 4% Markup) vs. Anbieter-Tarifblatt noch zu klaeren.",
             "supplier_id": "verbund"
         },
         {
@@ -226,9 +226,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.8,
+            "settlement_fee_cent_kwh": 1.5,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "wuesterstrom"
         },
@@ -250,9 +250,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.42,
+            "settlement_fee_cent_kwh": 1.1833,
             "markup_percent": 7.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "wien_energie"
         },
@@ -262,9 +262,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 2.34,
+            "settlement_fee_cent_kwh": 1.95,
             "markup_percent": 3.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "avia_energy"
         },
@@ -287,9 +287,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 3.0,
+            "settlement_fee_cent_kwh": 2.5,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "energie_ag_oberoesterreich"
         },
@@ -299,9 +299,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 3.48,
+            "settlement_fee_cent_kwh": 2.9,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "wels_strom"
         },
@@ -311,9 +311,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 3.6,
+            "settlement_fee_cent_kwh": 3.0,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "stadtwerke_klagenfurt"
         },
@@ -323,9 +323,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 5.4,
+            "settlement_fee_cent_kwh": 4.5,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "schlau_pv_gmbh"
         },
@@ -335,9 +335,9 @@
             "type": "spot_hourly",
             "land": "AT",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 9.816,
+            "settlement_fee_cent_kwh": 8.18,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 20.0,
             "supplier_id": "energie_steiermark_first_energy"
         },
@@ -347,11 +347,11 @@
             "type": "spot_hourly",
             "land": "DE",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 2.15,
+            "settlement_fee_cent_kwh": 1.81,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 19.0,
-            "monthly_fee_eur": 5.99,
+            "monthly_fee_eur": 5.03,
             "supplier_id": "tibber"
         },
         {
@@ -360,9 +360,9 @@
             "type": "spot_hourly",
             "land": "DE",
             "currency": "EUR",
-            "settlement_fee_cent_kwh": 1.2,
+            "settlement_fee_cent_kwh": 1.0084,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 19.0,
             "supplier_id": "eprimo"
         },
@@ -388,7 +388,7 @@
             "currency": "CHF",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 8.1,
             "supplier_id": "ekz_elektrizitaetswerke_des_kantons_zuerich"
         },
@@ -400,7 +400,7 @@
             "currency": "CHF",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 8.1,
             "supplier_id": "groupe_e"
         },
@@ -518,8 +518,8 @@
             "markup_percent": 0.0,
             "prices_include_vat": false,
             "vat_percent": 20.0,
-            "notes": "Vorarlberg (ohne Kleinwalsertal). EPEX Spot AT Day-Ahead + 1,20 ct netto; USt 20 %. Monatsgebühr 3,60 € brutto (36 €/Jahr netto × 1,20). Quelle: vkw.at/produkte/strom/strom-dynamisch",
-            "monthly_fee_eur": 3.6,
+            "notes": "Vorarlberg (ohne Kleinwalsertal). EPEX Spot AT Day-Ahead + 1,20 ct netto; USt 20 %. Monatsgebuehr 3,00 EUR netto (36 EUR/Jahr netto). Quelle: vkw.at/produkte/strom/strom-dynamisch",
+            "monthly_fee_eur": 3.0,
             "supplier_id": "vkw"
         },
         {
@@ -683,7 +683,7 @@
             "currency": "EUR",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 0.0,
             "feed_in_fee_factor": 0.19,
             "feed_in_fix_cent": 0.0,
@@ -699,7 +699,7 @@
             "currency": "EUR",
             "settlement_fee_cent_kwh": 1.2,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Stuendlich dynamischer Einspeisetarif abzueglich fixer Servicepauschale pro kWh.",
             "supplier_id": "smartenergy"
@@ -712,7 +712,7 @@
             "currency": "EUR",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Gesetzlicher Quartals- bzw. Monatsmarktpreis nach § 13 ÖSG. Konstanter Festpreis pro Kalendermonat, Abrechnung ex-post. Seed: OeMAG×7.15/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
             "monthly_rates": [
@@ -817,7 +817,7 @@
             "currency": "EUR",
             "settlement_fee_cent_kwh": 1.5,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Kopplung an den monatlichen PV-Referenzmarktwert nach § 13 EAG abzueglich Bearbeitungsgebuehr. Untergrenze bei 0 Cent. Seed: OeMAG×5.85/7.15−1.5 (Wartung: shared oemag_monthly_feed_in_rates).",
             "monthly_rates": [
@@ -922,7 +922,7 @@
             "currency": "EUR",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Monatlich angepasster Einspeisetarif basierend auf den Großhandelspreisen des Vormonats. Flat über den Tag. Seed: OeMAG×6.4/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
             "monthly_rates": [
@@ -1027,7 +1027,7 @@
             "currency": "EUR",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Monatlicher Index-Einspeisetarif. Verrechnung erfolgt starr pro Monat ohne Intraday-Volatilitaet. Seed: OeMAG×6.95/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
             "monthly_rates": [
@@ -1174,7 +1174,7 @@
             "currency": "EUR",
             "settlement_fee_cent_kwh": 0.0,
             "markup_percent": 0.0,
-            "prices_include_vat": true,
+            "prices_include_vat": false,
             "vat_percent": 0.0,
             "notes": "Gibt den monatlich ermittelten solaren Marktwert der Netzbetreiber (Netztransparenz) direkt an den Kunden weiter. Seed: OeMAG×6.1/7.15 (Wartung: shared oemag_monthly_feed_in_rates).",
             "monthly_rates": [
@@ -1284,121 +1284,6 @@
             "notes": "Regulierter Standard-Festpreis fuer die Energie-Rueckspeisung im Kanton Zuerich.",
             "k_push_cent": 12.5,
             "supplier_id": "ekz_elektrizitaetswerke_des_kantons_zuerich"
-        },
-        {
-            "id": "fixed_37ct",
-            "label": "Fix 3,7 ct/kWh Einspeise (Beispiel/Greenfield)",
-            "type": "fixed",
-            "k_push_cent": 3.7,
-            "supplier_id": "fix_3_7_ct_kwh_einspeise_beispiel_greenfield"
-        },
-        {
-            "id": "monthly_sunny",
-            "label": "aWATTar - SUNNY (Monatlich)",
-            "type": "monthly_table",
-            "monthly_rates": [
-                {
-                    "year": 2024,
-                    "month": 12,
-                    "tariff_cent_kwh": 7.78
-                },
-                {
-                    "year": 2025,
-                    "month": 1,
-                    "tariff_cent_kwh": 7.78
-                },
-                {
-                    "year": 2025,
-                    "month": 2,
-                    "tariff_cent_kwh": 7.78
-                },
-                {
-                    "year": 2025,
-                    "month": 3,
-                    "tariff_cent_kwh": 4.81
-                },
-                {
-                    "year": 2025,
-                    "month": 4,
-                    "tariff_cent_kwh": 4.69
-                },
-                {
-                    "year": 2025,
-                    "month": 5,
-                    "tariff_cent_kwh": 4.69
-                },
-                {
-                    "year": 2025,
-                    "month": 6,
-                    "tariff_cent_kwh": 4.69
-                },
-                {
-                    "year": 2025,
-                    "month": 7,
-                    "tariff_cent_kwh": 4.78
-                },
-                {
-                    "year": 2025,
-                    "month": 8,
-                    "tariff_cent_kwh": 4.71
-                },
-                {
-                    "year": 2025,
-                    "month": 9,
-                    "tariff_cent_kwh": 4.71
-                },
-                {
-                    "year": 2025,
-                    "month": 10,
-                    "tariff_cent_kwh": 5.5
-                },
-                {
-                    "year": 2025,
-                    "month": 11,
-                    "tariff_cent_kwh": 6.96
-                },
-                {
-                    "year": 2025,
-                    "month": 12,
-                    "tariff_cent_kwh": 6.96
-                },
-                {
-                    "year": 2026,
-                    "month": 1,
-                    "tariff_cent_kwh": 6.0
-                },
-                {
-                    "year": 2026,
-                    "month": 2,
-                    "tariff_cent_kwh": 5.68
-                },
-                {
-                    "year": 2026,
-                    "month": 3,
-                    "tariff_cent_kwh": 4.34
-                },
-                {
-                    "year": 2026,
-                    "month": 4,
-                    "tariff_cent_kwh": 4.48
-                },
-                {
-                    "year": 2026,
-                    "month": 5,
-                    "tariff_cent_kwh": 4.72
-                },
-                {
-                    "year": 2026,
-                    "month": 6,
-                    "tariff_cent_kwh": 3.6
-                },
-                {
-                    "year": 2026,
-                    "month": 7,
-                    "tariff_cent_kwh": 6.46
-                }
-            ],
-            "supplier_id": "awattar_at"
         },
         {
             "id": "monthly_sunny_web_recherche",
@@ -1538,8 +1423,8 @@
             "settlement_fee_cent_kwh": 0.6,
             "markup_percent": 0.0,
             "prices_include_vat": false,
-            "vat_percent": 20.0,
-            "notes": "Vorarlberg. EPEX Spot AT Day-Ahead − 0,60 ct netto. Quelle: vkw.at/pv-einspeisetarif-dynamisch",
+            "vat_percent": 0.0,
+            "notes": "Vorarlberg. EPEX Spot AT Day-Ahead − 0,60 ct, ohne USt. Quelle: vkw.at/pv-einspeisetarif-dynamisch",
             "supplier_id": "vkw"
         },
         {
@@ -1551,7 +1436,7 @@
             "settlement_fee_cent_kwh": 0.6,
             "markup_percent": 0.0,
             "prices_include_vat": false,
-            "vat_percent": 20.0,
+            "vat_percent": 0.0,
             "monthly_rates": [
                 {
                     "year": 2025,
@@ -1614,7 +1499,7 @@
                     "tariff_cent_kwh": 4.95
                 }
             ],
-            "notes": "Vorarlberg, bis 100 kWp. RefMarkt PV (§13 EAG) − 0,60 ct. Seed aus econtrol_referenzmarktwert_pv_monthly. Quelle: vkw.at/pv-einspeisetarif-flex",
+            "notes": "Vorarlberg, bis 100 kWp. RefMarkt PV (§13 EAG) − 0,60 ct, ohne USt. Seed aus econtrol_referenzmarktwert_pv_monthly. Quelle: vkw.at/pv-einspeisetarif-flex",
             "supplier_id": "vkw"
         }
     ],

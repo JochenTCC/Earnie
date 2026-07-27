@@ -33,6 +33,10 @@
       "$ref": "#/definitions/loxone_blocks",
       "description": "Merker- und Virtuelle-Eingang-Namen des Loxone Miniservers (Lesen/Schreiben)."
     },
+    "ehal": {
+      "$ref": "#/definitions/ehal",
+      "description": "Optional southbound backend. Missing/loxone = legacy Loxone Live I/O; openems = EHAL via OpenEMS REST (2.4.b)."
+    },
     "flexible_consumers": {
       "type": "array",
       "description": "Legacy-Overlay für steuerbare Verbraucher; ab 2.0 normalerweise leer — Live-Verbraucher liegen im Hausprofil (house_profiles.json).",
@@ -475,6 +479,48 @@
           "description": "Rolle Schreiben: Huawei-Steuerbefehl (Register 47100): 0=Automatik, 1=Zwangsladen/Entladesperre, 2=Zwangs-Entladen."
         }
       }
+    },
+    "ehal": {
+      "type": "object",
+      "description": "Earnie Hardware Access Layer southbound selector (optional).",
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": ["openems", "loxone", "none"],
+          "description": "openems = Live M1 via OpenEMS REST; omit/loxone/none = legacy Loxone path."
+        },
+        "adapter_id": {
+          "type": "string",
+          "description": "Stable adapter instance id (EHAL envelope)."
+        },
+        "openems": {
+          "type": "object",
+          "description": "OpenEMS Edge REST connection (2.4.b).",
+          "properties": {
+            "base_url": {
+              "type": "string",
+              "description": "REST base, e.g. http://openems-edge:8084"
+            },
+            "username": {
+              "type": "string",
+              "description": "Basic-auth username (often x)."
+            },
+            "password": {
+              "type": "string",
+              "description": "Basic-auth password (OpenEMS user password)."
+            },
+            "ess_component": {
+              "type": "string",
+              "description": "ESS component id (default ess0)."
+            },
+            "evcs_component": {
+              "type": "string",
+              "description": "EVCS component id (default evcs0)."
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "loxone_outputs": {
       "type": "object",
