@@ -9,7 +9,6 @@ import pulp
 from optimizer.milp import (
     _add_milp_objective,
     _add_pv_only_charge_through_sunrise,
-    _add_sunrise_soc_min_constraint,
     _build_milp_model,
 )
 from optimizer.simulation import simulate_horizon
@@ -39,7 +38,8 @@ def _battery_params() -> dict:
     }
 
 
-def test_sunrise_soc_min_constraint_holds():
+def test_sunrise_without_hard_eq_keeps_soc_above_min():
+    """Live no longer forces e_batt[SA] == SOC_min; residual SoC may remain."""
     start_soc = 70.0
     battery_params = _battery_params()
     matrix = _price_matrix(hours=30)
@@ -48,19 +48,17 @@ def test_sunrise_soc_min_constraint_holds():
         matrix, 30, battery_params, start_soc, [], 0.0, {}, None
     )
     _add_milp_objective(model, matrix, 3.5, None, wear_cent_per_kwh=0.0)
-    e_min = (battery_params["min_soc"] / 100.0) * battery_params["battery_capacity_kwh"]
-    _add_sunrise_soc_min_constraint(model, sunrise_index, e_min)
+    _add_pv_only_charge_through_sunrise(model, matrix, sunrise_index)
 
     model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
     assert pulp.LpStatus[model.prob.status] == "Optimal"
 
     sunrise_energy = model.e_batt[sunrise_index].varValue
-    end_energy = model.e_batt[-1].varValue
-    e_start = (start_soc / 100.0) * battery_params["battery_capacity_kwh"]
+    e_min = (battery_params["min_soc"] / 100.0) * battery_params["battery_capacity_kwh"]
     assert sunrise_energy is not None
-    assert end_energy is not None
-    assert abs(sunrise_energy - e_min) < 1e-4
-    assert abs(end_energy - e_start) > 0.05
+    assert sunrise_energy + 1e-4 >= e_min
+    # Without hard equality, overnight residual need not be dumped to e_min.
+    assert sunrise_energy > e_min + 0.05
 
 
 def test_pv_only_charge_blocks_night_grid_charge_before_sunrise():
@@ -95,8 +93,6 @@ def test_pv_only_charge_blocks_night_grid_charge_before_sunrise():
         matrix, 3, battery_params, 40.0, [], 0.0, {}, None
     )
     _add_milp_objective(model, matrix, 5.0, {}, wear_cent_per_kwh=0.0)
-    e_min = (battery_params["min_soc"] / 100.0) * battery_params["battery_capacity_kwh"]
-    _add_sunrise_soc_min_constraint(model, 1, e_min)
     _add_pv_only_charge_through_sunrise(model, matrix, 1)
     model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
     assert pulp.LpStatus[model.prob.status] == "Optimal"
@@ -105,7 +101,7 @@ def test_pv_only_charge_blocks_night_grid_charge_before_sunrise():
 
 
 def test_hourly_mpc_no_soc_spike_before_sunrise_with_ev():
-    """Regression: dump SOC jump at SA₁ from night grid charge then forced dump."""
+    """No night grid charge spike; no forced dump to SOC_min at SA₁."""
     tz = ZoneInfo("Europe/Vienna")
     start = datetime(2026, 7, 27, 2, 0, tzinfo=tz)
     prices = [12.7, 11.9, 11.4, 18.7, 17.4]
@@ -166,4 +162,5 @@ def test_hourly_mpc_no_soc_spike_before_sunrise_with_ev():
     )
     socs = [float(row["Simulierter SoC (%)"]) for row in rows]
     assert max(socs) < 35.0
-    assert abs(socs[3] - 10.0) < 0.2 or abs(socs[4] - 10.0) < 0.2
+    # Residual SoC must not be forced to min_soc solely by the SA₁ anchor.
+    assert socs[3] >= 15.0

@@ -203,8 +203,14 @@ def _add_sunrise_soc_min_constraint(
     sunrise_index: int,
     e_min_kwh: float,
 ) -> None:
-    """SOC am Sonnenaufgang-Slot = SOC_min (Live Sunset-Horizont)."""
-    _add_soc_equality_constraint(model, sunrise_index, e_min_kwh)
+    """
+    Legacy no-op: ``e_batt`` already has lowBound=e_min every slot.
+
+    Hard ``e_batt[sunrise] == SOC_min`` forced dumping residual evening SoC at SA₁
+    (Chart jump ~20%→10%). Live uses PV-only charge through sunrise instead; SE
+    SA₁ carry-in uses ``_add_soc_equality_constraint``.
+    """
+    del model, sunrise_index, e_min_kwh
 
 
 def _add_pv_only_charge_through_sunrise(

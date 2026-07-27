@@ -27,6 +27,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
+- [ ] Follow .\docs\spec\openems-lab-setup.md to setup openems-lab on Raspberry
+
 - [ ] **2.4.c — HA-EHAL + evcc under HA (Phase 2b / M1.5, DACH default)**
   - One production **HA-EHAL-Adapter** (WS/REST); prefer stable HA entities from evcc (lab-only direct evcc optional)
   - Reference Compose: `earnie-core` + Home Assistant + evcc

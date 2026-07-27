@@ -3,6 +3,12 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix SoC spike at SA₁ (2026-07-27)
+
+- [x] **SoC spike at SA₁ (night grid charge → forced dump)** — Live hourly MPC charged before sunrise SOC_min for later EV, then re-opt moved EV and forced export. Mitigations: (1) PV-only charge through sunrise; (2) drop hard `e_batt[SA₁]==SOC_min` (residual dump; floor stays via bounds). Spec: `docs/spec/planning-horizon-sunset.md`. Tests: `tests/test_milp_sunrise_soc.py`. Live verified (NAS main + Chart 1).
+- [x] **Chart 1 SA₀→SA₁ flat last-hour SoC** — live current-hour ramp cleared horizon SoC tail (`seg_tail_for_line=None`); keep end-of-hour tail so 05:00→06:00 slope shows. Fix: `ui/chart_soc.py`; test: `tests/test_charts_soc_tail.py::test_horizon_soc_tail_kept_when_current_hour_ramp_active`
+
+
 ### 2.4.b OpenEMS EHAL prototype (2026-07-27)
 
 - [x] **2.4.b — OpenEMS EHAL prototype (Phase 2 / M1)** — REST-only `integrations/openems_adapter.py` + thin Live bridge `integrations/ehal_live.py` (`ehal.backend=openems`); lab Compose [`docker/compose/openems-lab.yml`](../docker/compose/openems-lab.yml); write-lock degrade → `runtime/ehal_write_error.json` + Streamlit hint; config schema/snippet; mocked tests; no OpenEMS libs in-repo (→ 2.4.c / 2.5)

@@ -4,7 +4,12 @@
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §2.2, §2.5 Phase 2, §2.6; backlog `2.4.b`.  
 **EHAL wire contract (frozen):** [`docs/spec/ehal.md`](ehal.md) — schemas in `share/ehal/`, Python package `ehal`. Adapters must emit/consume only that contract.  
 **Goal:** Run `openems-edge` so Earnie can talk **network API only** (REST/WS) — Separate Works / AGPL shield. No OpenEMS source or libraries in Earnie repos.  
-**Host IP:** `192.168.178.34`
+**Host IP:** `192.168.178.34` (Pi lab; on a Dev-PC use that machine’s LAN IP / `localhost`)
+
+**Combined Compose + Earnie ↔ OpenEMS setup (step-by-step):** [`openems-lab-setup.md`](openems-lab-setup.md) — use this when `earnie-openems-lab` + Edge + UI are already up but not configured for communication.  
+German pointer: [`docs/einrichtung/openems-lab.md`](../einrichtung/openems-lab.md).
+
+This TODO remains the **OpenEMS plant / REST channel** checklist (first verified on Raspberry Pi).
 
 
 | Service                   | URL                                                                                                        |
@@ -291,10 +296,13 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 
 ## 5. Earnie side (after OpenEMS lab is green)
 
+**Operator guide (config + communication checks):** [`openems-lab-setup.md`](openems-lab-setup.md)
+
 - [x] Reference Compose: [`docker/compose/openems-lab.yml`](../../docker/compose/openems-lab.yml) (`earnie` + `openems-edge` + `openems-ui`; backlog “earnie-core” = `earnie` service)
 - [x] Python OpenEMS-EHAL adapter (network client only) — `integrations/openems_adapter.py` + `integrations/ehal_live.py`
 - [x] Map minimal field set above; Live consumes EHAL under `ehal.backend=openems` (see `share/config/ehal.openems.snippet.json`)
 - [x] Negativtests: write lock → log + UI hint + capability degrade (unit-tested with mocked HTTP 403; lab: guest password / ReadOnly REST)
+- [ ] Lab acceptance on combined Compose: follow [`openems-lab-setup.md`](openems-lab-setup.md) §4 (Earnie reads SoC via `openems-edge:8084`)
 
 *(Implementation: backlog `2.4.b`. EHAL schemas frozen under `2.4.a` / [`ehal.md`](ehal.md).)*
 

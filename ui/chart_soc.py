@@ -544,9 +544,10 @@ def add_optimized_soc_trace(
                     history_slot_count,
                     battery_params=battery_params,
                 )
-            seg_tail_for_line = None if ramp_after is not None else seg_tail
+            # Keep horizon end-of-hour SoC even when the current-hour ramp is active.
+            # Clearing tail_y here drew a flat last hour (start SoC repeated to 06:00).
             soc_x, soc_y = _segment_connected_line_xy(
-                axis, soc, abs_start, abs_end, tail_y=seg_tail_for_line,
+                axis, soc, abs_start, abs_end, tail_y=seg_tail,
                 step_line=False,
             )
             if soc_x.empty:
@@ -666,13 +667,13 @@ def add_anchored_counterfactual_soc_traces(
                     y_at_now=soc_at_now,
                     battery_params=battery_params,
                 )
-            seg_tail_for_line = None if ramp_after is not None else seg_tail
+            # Same as optimized SoC: do not drop horizon tail when ramp_after is set.
             matched_x, matched_y = _segment_connected_line_xy(
                 matched_axis,
                 soc_df["Simulierter SoC (%)"],
                 abs_start,
                 abs_end,
-                tail_y=seg_tail_for_line,
+                tail_y=seg_tail,
                 step_line=False,
                 bridge_left=(index > 0),
             )

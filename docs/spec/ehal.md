@@ -4,7 +4,8 @@
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 §2.2, §2.5 Phase 1, §2.6  
 **Schemas:** [`share/ehal/`](../../share/ehal/)  
 **Python:** [`ehal/`](../../ehal/)  
-**Lab mapping (OpenEMS):** [`openems-testing-platform-todo.md`](openems-testing-platform-todo.md)
+**Lab mapping (OpenEMS):** [`openems-testing-platform-todo.md`](openems-testing-platform-todo.md)  
+**Lab setup (Compose + Earnie ↔ OpenEMS):** [`openems-lab-setup.md`](openems-lab-setup.md)
 
 ## Purpose and naming
 
@@ -169,7 +170,7 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 ## Implementation notes (2.4.b OpenEMS)
 
 - Adapter: `integrations/openems_adapter.py` (REST only). Live façade: `integrations/ehal_live.py`.
-- Compose lab: `docker/compose/openems-lab.yml`. Config snippet: `share/config/ehal.openems.snippet.json`.
+- Compose lab: `docker/compose/openems-lab.yml`. Config snippet: `share/config/ehal.openems.snippet.json`. Step-by-step: [`openems-lab-setup.md`](openems-lab-setup.md).
 - Cadence: Core still expects ≥ 60 s telemetry refresh; adapter may poll faster.
 - EVCS: EHAL `set_evcs_max_current` (A) → OpenEMS `evcs0/SetChargePowerLimit` (W) via house-profile V/phases.
 - Southbound silent gate: reuse `loxone_silent_mode` for OpenEMS writes as well.

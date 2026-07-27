@@ -13,8 +13,10 @@ Gemeinsame Anker-Benennung mit [UI Sunset-2-Sunset](ui-sunset2sunset.md): **SA�
 
 ### Annahmen (gesichert)
 
-- Batterie ist zum **Sonnenaufgang** praktisch leer (`SOC ≈ SOC_min`).
-- Nachtladung aus dem Netz ist wirtschaftlich irrelevant (5 kWh, 6 kWp PV).
+- Batterie **darf** zum Sonnenaufgang SOC_min erreichen (untere Schranke); hartes
+  `e_batt[t_SR] == SOC_min` entfällt (erzwang sonst Rest-SoC-Dump ~20%→10% in Chart 1).
+- Nachtladung aus dem Netz ist wirtschaftlich irrelevant (5 kWh, 6 kWp PV) und wird
+  bis inkl. SA₁-Slot per PV-only-Charge-Constraint unterbunden.
 - Nach dem SOC-Anker-Sonnenaufgang ist der zweite „Sonnenumlauf“ bis Horizontende **frei** (Entscheidung A).
 
 ## 2. Planungsfenster (MILP)
@@ -23,7 +25,7 @@ Gemeinsame Anker-Benennung mit [UI Sunset-2-Sunset](ui-sunset2sunset.md): **SA�
 
 ```
 Horizont:   t_now  →  SA₂     (zweiter Sonnenaufgang im S-2-Sinne, identisch UI-Segment SA₁→SA₂ Ende)
-SOC-Anker:  t_SR   = erster Sonnenaufgang mit t_SR > t_now   (hart SOC_min)
+SOC-Anker:  t_SR   = erster Sonnenaufgang mit t_SR > t_now   (Floor via Bounds + PV-only charge)
 ```
 
 - **SA₂:** übernächster Sonnenaufgang gemäß `compute_sunrise_anchors()` in `data/planning_window.py` (gleiche Logik wie UI).
@@ -36,7 +38,7 @@ SOC-Anker:  t_SR   = erster Sonnenaufgang mit t_SR > t_now   (hart SOC_min)
 
 | Slot | Regel |
 |------|--------|
-| `t_sunrise` = erster Sonnenaufgang mit `t_sunrise > t_now` | `e_batt[t] == SOC_min` (hart) |
+| `t_sunrise` = erster Sonnenaufgang mit `t_sunrise > t_now` | `e_batt[t] >= SOC_min` (Bounds) + `p_charge[t] <= PV` für `t <= t_sunrise` (kein hartes `==`) |
 | Übrige Slots inkl. Horizontende SA₂ | nur min/max-SOC |
 
 ### 2.3 Slot-Granularität
@@ -154,7 +156,7 @@ Offen (Backlog): [UI Sunset-2-Sunset](ui-sunset2sunset.md) (SA₁→SA₂-Segmen
 ## 7. Akzeptanzkriterien
 
 1. Fensterberechnung korrekt für 10:00 / 17:00 / 22:00 (SA₁, SA₂, `t_sunrise`).
-2. MILP: `e_batt[t_sunrise] ≈ SOC_min`.
+2. MILP: `e_batt[t_sunrise] >= SOC_min` (Bounds); kein hartes `==`; PV-only charge bis inkl. `t_sunrise`.
 3. Zweiter Zyklus nach Sonnenaufgang ohne End-SOC-Constraint.
 4. UI-Zonen: grau / neutral / grün gemäß Abschnitt 3.
 5. Backtesting `fixed_24h`: SOC-Kette über Fenstergrenzen unverändert.

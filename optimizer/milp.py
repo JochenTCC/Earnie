@@ -34,6 +34,7 @@ from .milp_horizon import (
     MilpHorizonModel,
     _add_milp_objective,
     _add_pv_only_charge_through_sunrise,
+    _add_soc_equality_constraint,
     _add_sunrise_soc_min_constraint,
     _add_terminal_soc_constraint,
     _build_milp_model,
@@ -271,7 +272,7 @@ def _solve_milp_to_model(
         e_hold = (float(soc_hold_percent) / 100.0) * battery_params[
             "battery_capacity_kwh"
         ]
-        _add_sunrise_soc_min_constraint(model, soc_hold_index, e_hold)
+        _add_soc_equality_constraint(model, soc_hold_index, e_hold)
         if verbose:
             logger.info(
                 "MILP SOC-Hold: Slot %d = %.1f %%",
@@ -279,14 +280,12 @@ def _solve_milp_to_model(
                 float(soc_hold_percent),
             )
     elif sunrise_soc_min_index is not None:
-        e_min = (battery_params["min_soc"] / 100.0) * battery_params["battery_capacity_kwh"]
-        _add_sunrise_soc_min_constraint(model, sunrise_soc_min_index, e_min)
+        # Floor already via e_batt lowBound; do not force == SOC_min (residual dump).
         _add_pv_only_charge_through_sunrise(model, matrix, sunrise_soc_min_index)
         if verbose:
             logger.info(
-                "MILP SOC-Anker Sonnenaufgang: Slot %d = %.1f %%",
+                "MILP SOC-Anker Sonnenaufgang: Slot %d PV-only charge (no hard SOC_min eq)",
                 sunrise_soc_min_index,
-                battery_params["min_soc"],
             )
     elif e_terminal := _terminal_soc_energy_kwh(battery_params, terminal_soc_percent):
         _add_terminal_soc_constraint(model, e_terminal)

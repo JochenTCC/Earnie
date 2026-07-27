@@ -446,6 +446,40 @@ def test_baseline_soc_extrap_segment_has_no_jetzt_shortcut():
             )
 
 
+def test_horizon_soc_tail_kept_when_current_hour_ramp_active():
+    """Live ramp must not flatten the SA₁ end-of-hour SoC (05:00→06:00 slope)."""
+    import plotly.graph_objects as go
+
+    now = datetime(2026, 7, 27, 20, 20, tzinfo=_TZ)
+    start = datetime(2026, 7, 27, 19, 0, tzinfo=_TZ)
+    slots = [start + timedelta(hours=index) for index in range(11)]
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [80.0] * 10 + [30.8],
+        "Geplante Batterie-Aktion (kW)": [0.0] * 10 + [-0.52],
+    })
+    axis = ChartSlotAxis.from_dataframe(df)
+    tail_y = _soc_tail_y_from_row(df.iloc[-1])
+    assert tail_y is not None
+    assert tail_y < 30.8
+
+    fig = go.Figure()
+    add_optimized_soc_trace(
+        fig, df, axis, history_slot_count=1, chart_now=now,
+    )
+    milp_trace = [trace for trace in fig.data if trace.name == "SoC"][-1]
+    ys = {
+        pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ): float(y)
+        for x, y in zip(milp_trace.x, milp_trace.y)
+    }
+    t_start = datetime(2026, 7, 28, 5, 0, tzinfo=_TZ)
+    t_end = datetime(2026, 7, 28, 6, 0, tzinfo=_TZ)
+    assert ys[t_start] == pytest.approx(30.8)
+    assert ys[t_end] == pytest.approx(tail_y)
+    assert ys[t_end] < ys[t_start]
+
+
 def test_cost_summary_annotations_include_totals_and_savings_sign():
     annotations = _cost_summary_annotations(12.34, 11.50)
     assert len(annotations) == 3

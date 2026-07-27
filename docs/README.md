@@ -42,6 +42,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 - [Container](einrichtung/container.md) — Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, Migration, Config-Drift
 - [Proxmox LXC](einrichtung/proxmox-lxc.md) — Unprivileged LXC mit Docker Compose (Port 8501)
 - [Greenfield Dev-Stack](einrichtung/greenfield-dev-stack.md) — lokale Ersteinrichtung (Port 8502) für Hauskonfigurator/Backtesting
+- [OpenEMS-Lab](einrichtung/openems-lab.md) — Earnie + OpenEMS Edge/UI (Port 8503); Kommunikationscheck in der Spec
 - [Private Haus-Config](einrichtung/private-env.md) — privates Repo + Junction; öffentliche Vorlagen/Tarife unter `share/config/`
 
 
@@ -67,7 +68,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 ### Referenz
 
-- [Streamlit-Ports](referenz/streamlit-ports.md) — Port pro Stack/Plattform (8501 Prod, 8521/8531 lokal, 8502/8532 Greenfield, 8503 lokal gegen NAS)
+- [Streamlit-Ports](referenz/streamlit-ports.md) — Port pro Stack/Plattform (8501 Prod, 8521/8531 lokal, 8502/8532 Greenfield, 8503 OpenEMS-Lab, …)
 - [Loxone-Signale](referenz/loxone-signale.md) — Tabelle aller Lesen-/Schreib-Signale
 - [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) — OeMAG-Marktpreis vs. E-Control RefMarkt PV
 - [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) — Bezugs-/Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung; Quellen und Katalog-Audit
