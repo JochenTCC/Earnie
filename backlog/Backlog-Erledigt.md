@@ -13,6 +13,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] **2.4.a — EHAL specification (Phase 1 / M1 spec)** — Freeze Telemetry / Setpoint / Capability-Flags (+ Write-Error) JSON Schemas (`share/ehal/`), thin Python package `ehal`, connector-author spec [`docs/spec/ehal.md`](../docs/spec/ehal.md), CONTRIBUTING adapter outline; sign/units/60 s/degrade frozen; no Live/Loxone wiring (→ 2.4.b / 2.5)
 
 
+### Bugfix SE Fake-Jahresrechnung Verbrauch vs Gesamtkosten (2026-07-27)
+
+- [x] **SE Fake-Jahresrechnung Verbrauch ≠ Gesamtkosten Jahres Verbrauch** — Invoice used `sum(consumption_kw)` (sunrise gaps/overlaps); SE used window plausibility totals. Shared `simulation/jahres_verbrauch.py`; invoices get `verbrauch_info_kwh_by_scenario` from the same map. Tests: `tests/test_monthly_fees.py`
+
+
 ### Bugfix EPEX tariff VAT / monthly fees (2026-07-27)
 
 - [x] **EPEX tariff VAT / monthly fees** — Spot tariffs store settlement + `monthly_fee_eur` **net** with `prices_include_vat: false`; export `monthly_table` (+ VKW PV Dynamisch) use `vat_percent: 0` (ohne USt). Catalogs: `share/config/tariffs.json`, `earnie_env`, `earnie_env_se_m2`. Docs: `tarife-quellen.md` §3/§4/§7, `preise.md`

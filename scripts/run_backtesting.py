@@ -21,6 +21,8 @@ import logger_config
 from data import profile_manager
 from simulation.backtesting_log import save_backtesting_log
 from simulation.backtesting_log import build_critical_cases, summarize_critical_cases
+from simulation.backtesting_log import consumption_totals_from_report
+from simulation.jahres_verbrauch import jahres_verbrauch_map
 from simulation.monthly_fees import fee_breakdowns_by_result_id
 from simulation.se_invoice_markdown import write_se_invoices
 from data.data_loader import load_market_prices, resolve_simulation_window
@@ -996,6 +998,28 @@ def main(argv: list[str] | None = None):
             for sid, breakdown in fee_breakdown_by_scenario.items()
         },
     )
+    plausibility_payload = {
+        sid: {"consumption_totals": consumption_totals_from_report(rep)}
+        for sid, rep in plausibility_by_scenario.items()
+        if getattr(rep, "results", None)
+    }
+    ref_kwh = None
+    try:
+        from data import cons_data_store
+        from simulation.jahres_verbrauch import historical_ref_kwh_for_period
+
+        ref_kwh = historical_ref_kwh_for_period(
+            cons_data_store.load_cons_data(),
+            period_meta,
+        )
+    except Exception as exc:
+        logging.warning("Jahres Verbrauch (Historisch) für Invoice nicht berechenbar: %s", exc)
+    verbrauch_info = jahres_verbrauch_map(
+        list(sim_results.keys()),
+        reference_id=HISTORICAL_REFERENCE_ID,
+        ref_kwh=ref_kwh,
+        plausibility=plausibility_payload,
+    )
     invoice_paths = write_se_invoices(
         log_dir=os.path.dirname(log_path) or args.output_dir or ".",
         results=sim_results,
@@ -1007,6 +1031,7 @@ def main(argv: list[str] | None = None):
         extra_ref_specs=extra_ref_specs,
         period_start=start.date().isoformat(),
         period_end=end.date().isoformat(),
+        verbrauch_info_kwh_by_scenario=verbrauch_info,
     )
     if progress_file:
         clear_progress_dir(progress_file)

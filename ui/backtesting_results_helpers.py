@@ -10,10 +10,10 @@ from scripts.run_backtesting import BACKTESTING_YEAR
 from simulation.engine import (
     CONSUMPTION_TOLERANCE_REL,
     HISTORICAL_REFERENCE_ID,
-    SCENARIO_REFERENCE_PREFIX,
     is_scenario_reference_id,
     scenario_reference_id,
 )
+from simulation.jahres_verbrauch import jahres_verbrauch_kwh
 from ui.consumption_validation_charts import cons_data_monthly_kwh
 
 _DASH = "—"
@@ -192,22 +192,6 @@ def _live_reference_kwh(plausibility: dict, ref_kwh: float | None) -> float | No
     return ref_kwh
 
 
-def _parent_id_from_scenario_reference(scenario_id: str) -> str | None:
-    if not is_scenario_reference_id(scenario_id):
-        return None
-    return str(scenario_id)[len(SCENARIO_REFERENCE_PREFIX) :]
-
-
-def _consumption_totals_kwh(
-    plausibility: dict,
-    scenario_id: str,
-    key: str,
-) -> float | None:
-    totals = (plausibility.get(scenario_id) or {}).get("consumption_totals") or {}
-    value = totals.get(key)
-    return None if value is None else float(value)
-
-
 def build_scenario_consumption_rows(
     meta: dict,
     ref_kwh: float | None,
@@ -331,12 +315,12 @@ def _jahres_kwh_value(
     ref_kwh: float | None,
     plausibility: dict,
 ) -> float | None:
-    if scenario_id == ref_id:
-        return None if ref_kwh is None else float(ref_kwh)
-    parent_id = _parent_id_from_scenario_reference(scenario_id)
-    if parent_id is not None:
-        return _consumption_totals_kwh(plausibility, parent_id, "historical_kwh")
-    return _consumption_totals_kwh(plausibility, scenario_id, "optimized_kwh")
+    return jahres_verbrauch_kwh(
+        scenario_id,
+        reference_id=ref_id,
+        ref_kwh=ref_kwh,
+        plausibility=plausibility,
+    )
 
 
 def _jahres_kwh_for_row(

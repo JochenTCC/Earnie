@@ -211,7 +211,9 @@ def _hinweise_lines() -> list[str]:
         "## Hinweise",
         "",
         "- Näherung für Plausibilität im Szenario-Explorer — **keine** echte Stromrechnung.",
-        "- Verbrauch (Hauslast inkl. Flex) ist nur Info und geht **nicht** in die Rechnungssumme ein.",
+        "- Verbrauch (Info) = Jahres Verbrauch aus der SE-Tabelle Gesamtkosten "
+        "(nicht Summe der Stunden-CSV; bei Sunrise können die Werte abweichen).",
+        "- Verbrauch geht **nicht** in die Rechnungssumme ein.",
         "- Ø Tarif Cent/kWh: arithmetisches Mittel der stündlichen Tarifpreise "
         "über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`).",
         "- Ø Ist Cent/kWh: `Energiekosten € / Netzenergie kWh × 100` "
@@ -233,8 +235,13 @@ def render_scenario_invoice_markdown(
     fees: ScenarioFeeBreakdown,
     import_spec: dict | None,
     export_spec: dict | None,
+    verbrauch_info_kwh: float | None = None,
 ) -> str:
-    """Build one German fake-Jahresrechnung markdown body."""
+    """Build one German fake-Jahresrechnung markdown body.
+
+    ``verbrauch_info_kwh`` should match SE Gesamtkosten Jahres Verbrauch when set;
+    otherwise falls back to summing hourly ``consumption_kw`` (legacy).
+    """
     (
         import_cost,
         export_earn,
@@ -250,7 +257,11 @@ def render_scenario_invoice_markdown(
     export_year = float(export_earn.sum()) if not df.empty else 0.0
     import_kwh_year = float(import_kwh.sum()) if not df.empty else 0.0
     export_kwh_year = float(export_kwh.sum()) if not df.empty else 0.0
-    consumption_kwh_year = float(consumption_kwh.sum()) if not df.empty else 0.0
+    hourly_consumption_year = float(consumption_kwh.sum()) if not df.empty else 0.0
+    if verbrauch_info_kwh is not None:
+        consumption_kwh_year = float(verbrauch_info_kwh)
+    else:
+        consumption_kwh_year = hourly_consumption_year
     total_year = import_year - export_year + fees.total_monthly_eur * month_count
 
     lines = [
@@ -345,11 +356,17 @@ def write_se_invoices(
     extra_ref_specs: list[tuple[str, dict | None, str]] | None = None,
     period_start: str | None = None,
     period_end: str | None = None,
+    verbrauch_info_kwh_by_scenario: dict[str, float] | None = None,
 ) -> list[str]:
-    """Write one markdown invoice per result scenario under ``log_dir/invoices/``."""
+    """Write one markdown invoice per result scenario under ``log_dir/invoices/``.
+
+    Pass ``verbrauch_info_kwh_by_scenario`` from ``jahres_verbrauch_map`` so
+    Verbrauch (Info) matches SE Gesamtkosten Jahres Verbrauch.
+    """
     invoice_dir = os.path.join(log_dir, "invoices")
     os.makedirs(invoice_dir, exist_ok=True)
     written: list[str] = []
+    verbrauch_map = verbrauch_info_kwh_by_scenario or {}
     for scenario_id, df in results.items():
         frame = df if isinstance(df, pd.DataFrame) else pd.DataFrame()
         if period_start and period_end and not frame.empty:
@@ -368,6 +385,7 @@ def write_se_invoices(
             export_spec = params.get("_export_tariff_spec")
         fees = fee_breakdown_by_scenario.get(scenario_id) or ScenarioFeeBreakdown()
         label = labels.get(scenario_id, scenario_id)
+        verbrauch_info = verbrauch_map.get(scenario_id)
         body = render_scenario_invoice_markdown(
             scenario_id=scenario_id,
             label=label,
@@ -375,6 +393,7 @@ def write_se_invoices(
             fees=fees,
             import_spec=import_spec if isinstance(import_spec, dict) else None,
             export_spec=export_spec if isinstance(export_spec, dict) else None,
+            verbrauch_info_kwh=verbrauch_info,
         )
         path = os.path.join(
             invoice_dir, f"{_safe_filename(label)}_jahresrechnung.md"

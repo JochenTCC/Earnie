@@ -334,6 +334,28 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
     assert "Einspeiseerlös" in body
     assert "Verbrauch (Info)" in body
     assert "## Bezug" in body
+    assert "| Verbrauch (Info) | 192.0 kWh |" in body  # 24*8 fallback
+    body_aligned = render_scenario_invoice_markdown(
+        scenario_id="live",
+        label="Live",
+        df=df,
+        fees=fees,
+        import_spec={
+            "id": "awattar_at",
+            "label": "aWATTar HOURLY",
+            "type": "spot_hourly",
+            "settlement_fee_cent_kwh": 1.5,
+        },
+        export_spec={
+            "id": "dynamic_epex",
+            "label": "SUNNY SPOT",
+            "type": "spot_hourly",
+            "feed_in_fee_factor": 0.19,
+        },
+        verbrauch_info_kwh=10680.3,
+    )
+    assert "| Verbrauch (Info) | 10680.3 kWh |" in body_aligned
+    assert "## Bezug" in body_aligned
     assert "## Einspeisung" in body
     assert "| Monat | Bezug kWh | Bezug € | Ø Tarif Cent/kWh | Ø Ist Cent/kWh |" in body
     assert "| Monat | Einspeisung kWh | Einspeisung € | Ø Tarif Cent/kWh | Ø Ist Cent/kWh |" in body
