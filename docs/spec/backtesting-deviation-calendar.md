@@ -9,7 +9,7 @@ Replace the deviation table (`st.dataframe`) with a **12-month calendar navigato
 | Calendar bounds | Show **Jan–Dec** of `period.backtesting_year` (default `BACKTESTING_YEAR`). Days outside `period.start`…`period.end` are **disabled** (gray). Test-month runs show one active month. |
 | Day key | Calendar cell date → `window_anchor_for_date(date)` → ISO anchor string (same rule as engine; EV `ready_by_hour` vs midnight-next-day). |
 | In-run days | Date has a matching anchor in `list_simulation_anchors` for the log period (skip zero-load days). |
-| Colors (worst wins if multiple scenarios) | **Red** — `milp_no_optimal`, `strict_slow`, `strict_fallback`. **Yellow** — `consumption_tolerance` with `diff_kwh ≤ ε` (ε = `CONSUMPTION_TOLERANCE_KWH`, 0.5 kWh). **Orange** — `consumption_tolerance` with `diff_kwh > ε`. **Neutral** — in-run, no deviation. **Disabled** — outside run or no anchor. |
+| Colors (worst wins if multiple scenarios) | **Red** — `milp_no_optimal`, `strict_slow`, `strict_fallback`. **Yellow (⚪)** — `consumption_tolerance` with relative `|diff|/historical ≤ CONSUMPTION_TOLERANCE_REL` (5%); abs `CONSUMPTION_TOLERANCE_KWH` (0.5 kWh) only when `historical_kwh` missing/≤0. **Orange** — `consumption_tolerance` above that. Feasible CBC with `window_consumption_ok` stays yellow. **Neutral** — in-run, no deviation. **Disabled** — outside run or no anchor. |
 | Multi-scenario | Cell color = **worst** severity across scenarios. Detail area: **scenario checkbox list**. |
 | Charts | Keep existing `render_deviation_detail` / SA-segment toggle for `sunset_window` logs. |
 | Table | **Removed**; metadata (Art, Δ kWh, Szenario) stays in detail header/captions. |

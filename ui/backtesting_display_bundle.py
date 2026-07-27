@@ -1,7 +1,8 @@
 """OptimizationDisplayBundle für Backtesting-Abweichungsfenster (1.25.f)."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+import os
 
 import pandas as pd
 import streamlit as st
@@ -47,10 +48,54 @@ from ui.simulation_results import (
 
 VIEW_MODE_24H = "24h"
 VIEW_MODE_SUNRISE = "sunrise"
+_SA_SEGMENT_FORESIGHT = "SA₀→SA₁"
+_SA_SEGMENT_BOOK = "SA₁→SA₂"
+
+
+def sa_segment_date_overlap_hours(
+    snapshot: dict,
+    selected_date: date,
+) -> tuple[int, int]:
+    """Hours of chart SA segments that fall on selected_date: (SA₀→SA₁, SA₁→SA₂)."""
+    window_anchor = snapshot.get("window_anchor")
+    if not window_anchor:
+        return 0, 0
+    try:
+        lat, lon, tz_name = _geo_from_snapshot(snapshot)
+        anchor_dt = _parse_window_anchor(str(window_anchor), tz_name)
+        planning_moment = window_start_before_anchor(anchor_dt, tz_name)
+        foresight = _backtesting_sunrise_segment_window(
+            planning_moment, 0, lat, lon, tz_name
+        )
+        book = _backtesting_sunrise_segment_window(
+            planning_moment, 1, lat, lon, tz_name
+        )
+    except (ValueError, TypeError, KeyError):
+        return 0, 0
+    foresight_hours = sum(
+        1 for slot in foresight.slot_datetimes if slot.date() == selected_date
+    )
+    book_hours = sum(
+        1 for slot in book.slot_datetimes if slot.date() == selected_date
+    )
+    return foresight_hours, book_hours
+
+
+def preferred_sa_segment_toggle(snapshot: dict, selected_date: date) -> str:
+    """Preselect SA segment with more hourly overlap on the selected calendar date."""
+    foresight_hours, book_hours = sa_segment_date_overlap_hours(
+        snapshot, selected_date
+    )
+    if foresight_hours > book_hours:
+        return _SA_SEGMENT_FORESIGHT
+    return _SA_SEGMENT_BOOK
+
+
 _SUNRISE_SEGMENT_LABELS = {
-    0: "SA₀→SA₁",
-    1: "SA₁→SA₂",
+    0: _SA_SEGMENT_FORESIGHT,
+    1: _SA_SEGMENT_BOOK,
 }
+
 
 def _backtesting_sunrise_header_label(
     window_anchor: str,
@@ -562,6 +607,7 @@ def log_supports_sunrise_chart_view(meta: dict) -> bool:
 
 
 _ON_DEMAND_CACHE_KEY = "backtesting_on_demand_snapshots"
+_BUNDLE_CACHE_KEY = "backtesting_display_bundle_cache"
 
 
 def _on_demand_snapshot_cache() -> dict[tuple[str, str, str], dict]:
@@ -569,6 +615,14 @@ def _on_demand_snapshot_cache() -> dict[tuple[str, str, str], dict]:
     if not isinstance(cache, dict):
         cache = {}
         st.session_state[_ON_DEMAND_CACHE_KEY] = cache
+    return cache
+
+
+def _display_bundle_cache() -> dict[tuple, OptimizationDisplayBundle]:
+    cache = st.session_state.get(_BUNDLE_CACHE_KEY)
+    if not isinstance(cache, dict):
+        cache = {}
+        st.session_state[_BUNDLE_CACHE_KEY] = cache
     return cache
 
 
@@ -586,6 +640,19 @@ def resolve_backtesting_display_bundle(
     Snapshot aus JSONL, sonst on-demand Einzelfenster-Simulation (Session-Cache).
     """
     log_horizon = meta.get("period", {}).get("horizon_mode", FIXED_24H)
+    bundle_key = (
+        os.path.abspath(log_dir),
+        str(window_anchor),
+        str(scenario_id),
+        str(view_mode),
+        int(segment_index),
+        str(log_horizon),
+    )
+    bundle_cache = _display_bundle_cache()
+    cached = bundle_cache.get(bundle_key)
+    if cached is not None:
+        return cached
+
     bundle = load_backtesting_display_bundle(
         log_dir,
         window_anchor,
@@ -594,35 +661,36 @@ def resolve_backtesting_display_bundle(
         segment_index=segment_index,
         log_horizon_mode=log_horizon,
     )
+    if bundle is None:
+        from simulation.backtesting_single_window import (
+            cache_key_for_window,
+            initial_soc_for_anchor,
+            simulate_window_snapshot,
+        )
+
+        cache_key = cache_key_for_window(window_anchor, scenario_id, log_horizon)
+        snapshot_cache = _on_demand_snapshot_cache()
+        snapshot = snapshot_cache.get(cache_key)
+        if snapshot is None:
+            anchor_dt = pd.Timestamp(window_anchor).to_pydatetime()
+            initial_soc = initial_soc_for_anchor(anchor_dt, scenario_id, hourly_df)
+            with st.spinner("Fenster wird berechnet…"):
+                snapshot = simulate_window_snapshot(
+                    anchor_dt,
+                    scenario_id,
+                    meta,
+                    initial_soc=initial_soc,
+                    horizon_mode=log_horizon,
+                )
+            snapshot_cache[cache_key] = snapshot
+            from simulation.backtesting_snapshots import append_window_snapshot
+
+            append_window_snapshot(log_dir, snapshot)
+        bundle = build_backtesting_display_bundle(
+            snapshot,
+            view_mode=view_mode,
+            segment_index=segment_index,
+        )
     if bundle is not None:
-        return bundle
-
-    from simulation.backtesting_single_window import (
-        cache_key_for_window,
-        initial_soc_for_anchor,
-        simulate_window_snapshot,
-    )
-
-    cache_key = cache_key_for_window(window_anchor, scenario_id, log_horizon)
-    snapshot_cache = _on_demand_snapshot_cache()
-    snapshot = snapshot_cache.get(cache_key)
-    if snapshot is None:
-        anchor_dt = pd.Timestamp(window_anchor).to_pydatetime()
-        initial_soc = initial_soc_for_anchor(anchor_dt, scenario_id, hourly_df)
-        with st.spinner("Fenster wird berechnet…"):
-            snapshot = simulate_window_snapshot(
-                anchor_dt,
-                scenario_id,
-                meta,
-                initial_soc=initial_soc,
-                horizon_mode=log_horizon,
-            )
-        snapshot_cache[cache_key] = snapshot
-        from simulation.backtesting_snapshots import append_window_snapshot
-
-        append_window_snapshot(log_dir, snapshot)
-    return build_backtesting_display_bundle(
-        snapshot,
-        view_mode=view_mode,
-        segment_index=segment_index,
-    )
+        bundle_cache[bundle_key] = bundle
+    return bundle

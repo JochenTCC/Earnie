@@ -19,7 +19,7 @@ from optimizer.eauto_milp import (
     milp_uses_power_setpoint,
     validate_eauto_milp_params,
 )
-from optimizer.milp import _build_milp_model, milp_optimizer
+from optimizer.milp import _build_milp_model, milp_horizon_schedule, milp_optimizer
 
 
 def _matrix(hours: int = 6, *, logged_day: bool = False) -> list[dict]:
@@ -258,6 +258,54 @@ class TestEautoBacktestingPreset:
             charging_contexts={},
         )
         assert powers["eauto"] == 1.4
+
+    def test_logged_day_open_loop_places_preset_at_cheapest_not_t0(self):
+        """SE sunrise open-loop: small EV target must land on cheapest eligible hour."""
+        from datetime import datetime, timedelta
+
+        start = datetime(2025, 2, 3, 7, 0)
+        matrix = []
+        for index in range(24):
+            slot = start + timedelta(hours=index)
+            price = 5.0 if slot.hour in (2, 3, 4) else 40.0
+            matrix.append(
+                {
+                    "hour": slot.hour,
+                    "date": slot.date(),
+                    "slot_datetime": slot,
+                    "charging_anchor": datetime(2025, 2, 4, 7),
+                    "consumption_mode": "profile_spec",
+                    "expected_p_pv": 0.0,
+                    "expected_p_act": 0.5,
+                    "k_act": price,
+                }
+            )
+        consumer = _eauto_consumer()
+        ctx = {
+            "active": True,
+            "deadline": datetime(2025, 2, 4, 7),
+            "target_kwh": 1.44,
+            "use_time_window": True,
+            "config_day_schedule": {
+                "car_available_from_hour": 18,
+                "ready_by_hour": 7,
+            },
+        }
+        schedule = milp_horizon_schedule(
+            matrix,
+            current_soc=50.0,
+            battery_params=_battery_params(),
+            k_push=3.5,
+            verbose=False,
+            consumers=[consumer],
+            consumer_remaining_kwh={"eauto": 1.44},
+            charging_contexts={"eauto": ctx},
+        )
+        powers = [float(slot["consumer_powers"].get("eauto", 0.0)) for slot in schedule]
+        assert sum(powers) == pytest.approx(1.44, abs=0.01)
+        assert powers[0] == 0.0
+        # hour 2 is first cheapest eligible night slot (index 19 from 07:00 start)
+        assert powers[19] == pytest.approx(1.44, abs=0.01)
 
     def test_live_small_target_uses_preset(self):
         _, _, _, powers, _, _, _ = milp_optimizer(

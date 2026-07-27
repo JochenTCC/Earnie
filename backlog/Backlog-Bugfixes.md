@@ -23,10 +23,10 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
 - [ ] **EV still connected after charge → re-planned full charge** — config-path house-profile EVs now honor Ist-SOC complete; `plug_cycle_fulfilled` latch survives deadline purge while plugged (cleared on unplug). Real SOC (or equivalent complete signal) remains necessary when Earnie has no fulfillment memory and Rest-/Ist-SOC stay stuck at plug-in values. Tests: `tests/test_charging_session.py`, `tests/test_charging_context.py::TestPluggedInChargeComplete`. Live verify: finish a session, stay plugged past FertigUm → no new EV target.
+- [ ] **SoC spike at SA₁ (night grid charge → forced dump)** — Live hourly MPC charged before sunrise SOC_min for later EV, then re-opt moved EV and forced export; fix: PV-only charge through sunrise slot (`_add_pv_only_charge_through_sunrise`). Tests: `tests/test_milp_sunrise_soc.py`. Live: Chart 1 SoC near SA₁ with overnight EV — no 19→50→10 jump.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
-
 
 
 ## Organizational Changes - no bugs (but still no development issue)

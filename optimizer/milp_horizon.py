@@ -39,13 +39,29 @@ class MilpHorizonModel:
     consumer_milp_charge_kw: dict[str, float]
 
 
+def _normalize_fixed_flex_by_t(
+    fixed_flex_kw_t0_or_by_t: float | dict[int, float] | None,
+) -> dict[int, float]:
+    """Accept legacy t0 float or hour→kW map for preset flex outside MILP vars."""
+    if fixed_flex_kw_t0_or_by_t is None:
+        return {}
+    if isinstance(fixed_flex_kw_t0_or_by_t, (int, float)):
+        value = float(fixed_flex_kw_t0_or_by_t)
+        return {0: value} if value > 1e-12 else {}
+    return {
+        int(slot): float(power)
+        for slot, power in fixed_flex_kw_t0_or_by_t.items()
+        if float(power) > 1e-12
+    }
+
+
 def _build_milp_model(
     matrix: list[dict[str, Any]],
     horizon: int,
     battery_params: dict,
     current_soc: float,
     planned_consumers: list,
-    fixed_flex_kw_t0: float,
+    fixed_flex_kw_t0_or_by_t: float | dict[int, float],
     remaining_by_consumer: dict[str, float],
     ev_milp_params_by_id: dict[str, dict[str, float]],
     consumer_continue_on: dict[str, bool] | None = None,
@@ -108,10 +124,11 @@ def _build_milp_model(
             continue_on=bool(continue_on.get(cid, False)),
         )
 
+    fixed_flex_by_t = _normalize_fixed_flex_by_t(fixed_flex_kw_t0_or_by_t)
     for t in range(horizon):
         p_pv = matrix[t]["expected_p_pv"]
         p_con = matrix[t]["expected_p_act"]
-        fixed_flex = fixed_flex_kw_t0 if t == 0 else 0.0
+        fixed_flex = float(fixed_flex_by_t.get(t, 0.0))
         p_flex = fixed_flex + pulp.lpSum(
             _flex_power_at_t(
                 consumer,
@@ -188,6 +205,28 @@ def _add_sunrise_soc_min_constraint(
 ) -> None:
     """SOC am Sonnenaufgang-Slot = SOC_min (Live Sunset-Horizont)."""
     _add_soc_equality_constraint(model, sunrise_index, e_min_kwh)
+
+
+def _add_pv_only_charge_through_sunrise(
+    model: MilpHorizonModel,
+    matrix: list[dict[str, Any]],
+    sunrise_index: int,
+) -> None:
+    """
+    No grid-charged battery increase through the sunrise SOC_min slot.
+
+    Hourly MPC otherwise charges before SA₁ for later flex, then re-opts the flex
+    away and is forced to export to meet SOC_min (SoC spike at SA₁). Spec assumes
+    night grid charge is economically irrelevant for this battery size.
+    """
+    if model.horizon < 1:
+        return
+    last = min(sunrise_index, model.horizon - 1)
+    if last < 0:
+        return
+    for t in range(last + 1):
+        pv_cap = max(0.0, float(matrix[t].get("expected_p_pv", 0.0) or 0.0))
+        model.prob += model.p_charge[t] <= pv_cap
 
 
 def _terminal_soc_energy_kwh(

@@ -40,26 +40,49 @@ def _extract_milp_plan(model: MilpHorizonModel) -> dict[str, float]:
     return _extract_milp_plan_at(model, 0)
 
 
+def _normalize_preset_by_slot(
+    preset_powers_t0_or_by_slot: dict[str, float] | dict[int, dict[str, float]] | None,
+) -> dict[int, dict[str, float]]:
+    """Legacy t0 map {cid: kW} or hour→{cid: kW}."""
+    if not preset_powers_t0_or_by_slot:
+        return {}
+    sample_key = next(iter(preset_powers_t0_or_by_slot))
+    sample_val = preset_powers_t0_or_by_slot[sample_key]
+    if isinstance(sample_val, dict):
+        return {
+            int(slot): {str(cid): float(power) for cid, power in powers.items()}
+            for slot, powers in preset_powers_t0_or_by_slot.items()
+        }
+    return {
+        0: {
+            str(cid): float(power)
+            for cid, power in preset_powers_t0_or_by_slot.items()
+        }
+    }
+
+
 def extract_horizon_schedule(
     model: MilpHorizonModel,
     battery_params: dict,
-    preset_powers_t0: dict[str, float] | None = None,
+    preset_powers_t0_or_by_slot: dict[str, float] | dict[int, dict[str, float]] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Extrahiert den vollen MILP-Stundenplan (Batterie + Flex) nach einem Solve.
 
-    Slot 0 enthält optional EV-Preset-Leistungen (außerhalb der MILP-Variablen).
+    EV-Preset-Leistungen (außerhalb der MILP-Variablen) werden je Slot gemerged —
+    Live meist nur Slot 0; SE open-loop am günstigsten eligible Slot.
     """
     min_soc = float(battery_params["min_soc"])
     max_soc = float(battery_params["max_soc"])
     capacity = float(battery_params["battery_capacity_kwh"])
-    presets = preset_powers_t0 or {}
+    presets_by_slot = _normalize_preset_by_slot(preset_powers_t0_or_by_slot)
     slots: list[dict[str, Any]] = []
     for t in range(model.horizon):
         milp_plan = _extract_milp_plan_at(model, t)
         consumer_powers, _ = _consumer_powers_at(model, t)
-        if t == 0 and presets:
-            consumer_powers = {**consumer_powers, **presets}
+        slot_presets = presets_by_slot.get(t)
+        if slot_presets:
+            consumer_powers = {**consumer_powers, **slot_presets}
         e_val = model.e_batt[t].varValue
         planned_soc = bat.planned_soc_percent_from_energy(
             float(e_val) if e_val is not None else 0.0,

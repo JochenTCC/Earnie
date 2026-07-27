@@ -161,6 +161,8 @@ def _hourly_to_csv(results: dict[str, pd.DataFrame], labels: dict[str, str]) -> 
         "export_earn_eur",
         "import_kwh",
         "export_kwh",
+        "k_act",
+        "k_push_act",
         "sim_soc",
         "batt_action_kw",
         "steuerbefehl",

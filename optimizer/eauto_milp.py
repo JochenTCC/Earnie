@@ -285,30 +285,100 @@ def ev_preset_power_now(
 eauto_preset_power_now = ev_preset_power_now
 
 
+def ev_preset_horizon_placement(
+    matrix: list[dict[str, Any]],
+    consumer: dict,
+    remaining_kwh: float,
+    schedule_indices: list[int],
+    charging_context: dict | None,
+    params: dict[str, float] | None,
+) -> tuple[int, float] | None:
+    """
+    Open-loop SE/logged_day: place Modus-B preset at cheapest eligible hour.
+
+    None → keep consumer in MILP. (slot, kw) → fixed flex outside MILP at slot.
+    Unlike Live ``ev_preset_power_now``, never returns a wait-at-t0 (0.0) drop.
+    """
+    if not ev_in_modus_b(consumer, matrix, remaining_kwh, params):
+        return None
+    if ev_modus_b_uses_milp(consumer, matrix, remaining_kwh, params):
+        return None
+    slot = _ev_cheapest_eligible_index(
+        matrix, consumer, schedule_indices, charging_context
+    )
+    if slot is None:
+        return None
+    power = ev_preset_charge_kw(consumer, remaining_kwh)
+    if power <= 1e-9:
+        return None
+    return slot, power
+
+
+eauto_preset_horizon_placement = ev_preset_horizon_placement
+
+
+def _record_preset_slot(
+    preset_by_slot: dict[int, dict[str, float]],
+    slot: int,
+    consumer_id: str,
+    power: float,
+) -> None:
+    bucket = preset_by_slot.setdefault(slot, {})
+    bucket[consumer_id] = float(power)
+
+
 def split_eauto_preset(
     planned_consumers: list,
     matrix: list[dict[str, Any]],
     remaining: dict[str, float],
     schedule_indices: list[int],
     charging_contexts: dict[str, dict],
-) -> tuple[dict[str, float], list]:
-    """Trennt Preset-EV (außerhalb MILP) von MILP-Verbrauchern."""
-    preset_now: dict[str, float] = {}
+) -> tuple[dict[int, dict[str, float]], list]:
+    """
+    Trenne Preset-EV (außerhalb MILP) von MILP-Verbrauchern.
+
+    Returns
+    -------
+    preset_by_slot:
+        hour-index → {consumer_id: kW}. Live/rolling only fills slot 0 when
+        charging now; logged_day/profile_spec open-loop places at the cheapest
+        eligible hour so SE sunrise commit_hours=H still delivers small EV targets.
+    milp_consumers:
+        consumers that stay inside the MILP.
+    """
+    preset_by_slot: dict[int, dict[str, float]] = {}
     milp_consumers: list = []
+    logged = is_logged_day_matrix(matrix)
     for consumer in planned_consumers:
         cid = consumer["id"]
         params = milp_params_from_consumer(consumer)
+        rem = remaining.get(cid, 0.0)
+        ctx = charging_contexts.get(cid)
+        if logged and is_ev_milp_consumer(consumer):
+            placement = ev_preset_horizon_placement(
+                matrix, consumer, rem, schedule_indices, ctx, params
+            )
+            if placement is None:
+                if ev_in_modus_b(consumer, matrix, rem, params) and not ev_modus_b_uses_milp(
+                    consumer, matrix, rem, params
+                ):
+                    continue
+                milp_consumers.append(consumer)
+                continue
+            slot, power = placement
+            _record_preset_slot(preset_by_slot, slot, cid, power)
+            continue
         preset = ev_preset_power_now(
             matrix,
             consumer,
-            remaining.get(cid, 0.0),
+            rem,
             schedule_indices,
-            charging_contexts.get(cid),
+            ctx,
             params,
         )
         if preset is None:
             milp_consumers.append(consumer)
             continue
         if preset > 1e-9:
-            preset_now[cid] = preset
-    return preset_now, milp_consumers
+            _record_preset_slot(preset_by_slot, 0, cid, preset)
+    return preset_by_slot, milp_consumers

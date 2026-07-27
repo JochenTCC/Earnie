@@ -170,6 +170,34 @@ def test_append_window_snapshot_appends_once(tmp_path):
     assert loaded["kind"] == "on_demand"
 
 
+def test_load_window_snapshot_reuses_mtime_index(tmp_path, monkeypatch):
+    chart_rows, matrix = _sample_rows()
+    snapshot = build_window_snapshot(
+        window_anchor=datetime(2026, 6, 23, 7, 0),
+        scenario_id="live",
+        horizon_mode=FIXED_24H,
+        kind="consumption_tolerance",
+        initial_soc=50.0,
+        meta={"window_end": datetime(2026, 6, 23, 7, 0), "historical_total_kwh": 10.0},
+        chart_rows_24h=chart_rows,
+        matrix_24h=matrix,
+    )
+    write_window_snapshots_jsonl(str(tmp_path), [snapshot])
+    calls = {"n": 0}
+    import simulation.backtesting_snapshots as snapshots_mod
+
+    real = snapshots_mod.load_all_window_snapshots
+
+    def counting(log_dir):
+        calls["n"] += 1
+        return real(log_dir)
+
+    monkeypatch.setattr(snapshots_mod, "load_all_window_snapshots", counting)
+    assert load_window_snapshot(str(tmp_path), "2026-06-23T07:00:00", "live") is not None
+    assert load_window_snapshot(str(tmp_path), "2026-06-23T07:00:00", "live") is not None
+    assert calls["n"] == 1
+
+
 def test_remove_window_snapshots_jsonl_deletes_stale_file(tmp_path):
     stale = tmp_path / BACKTESTING_WINDOW_SNAPSHOTS_JSONL
     stale.write_text("{}\n", encoding="utf-8")

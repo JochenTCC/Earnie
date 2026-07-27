@@ -216,6 +216,33 @@ def test_resolve_chart_view_modes():
     ) == (VIEW_MODE_SUNRISE, 1)
 
 
+def test_preferred_sa_segment_prefers_more_date_overlap():
+    from datetime import date
+
+    from ui.backtesting_display_bundle import preferred_sa_segment_toggle
+
+    snapshot = {
+        "window_anchor": "2026-03-26T07:00:00",
+        "geo": {
+            "latitude": 47.404,
+            "longitude": 9.743,
+            "timezone": "Europe/Vienna",
+        },
+        "meta": {},
+    }
+    # Selected calendar day overlaps SA₁→SA₂ more than SA₀→SA₁.
+    assert preferred_sa_segment_toggle(snapshot, date(2026, 3, 26)) == "SA₁→SA₂"
+
+
+def test_preferred_sa_segment_defaults_to_book_when_overlap_unavailable():
+    from datetime import date
+
+    from ui.backtesting_display_bundle import preferred_sa_segment_toggle
+
+    snapshot = {"meta": {}, "chart_rows_full": []}
+    assert preferred_sa_segment_toggle(snapshot, date(2026, 3, 26)) == "SA₁→SA₂"
+
+
 def test_format_backtesting_window_range_matches_anchor_minus_24h():
     label = format_backtesting_window_range(
         "2025-01-06T00:00:00",

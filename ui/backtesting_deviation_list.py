@@ -29,8 +29,10 @@ from ui.backtesting_display_bundle import (
     VIEW_MODE_SUNRISE,
     format_backtesting_window_range,
     log_supports_sunrise_chart_view,
+    preferred_sa_segment_toggle,
     resolve_backtesting_display_bundle,
 )
+from simulation.backtesting_snapshots import load_window_snapshot
 from ui.backtesting_results_helpers import nav_bounds_from_period
 from ui.simulation_results import (
     render_optimization_chart1,
@@ -85,15 +87,28 @@ def deviation_cases_for_display(meta: dict) -> list[dict]:
     return dedupe_critical_cases_by_window(filtered)
 
 
+def _format_deviation_pct(diff_kwh: float, historical_kwh: object | None) -> str | None:
+    if historical_kwh is None:
+        return None
+    hist = float(historical_kwh)
+    if hist <= 0:
+        return None
+    return f"{100.0 * float(diff_kwh) / hist:+.1f}%"
+
+
 def format_deviation_delta_kwh(case: dict) -> str:
     if case.get("kind") == "consumption_tolerance":
         diff = case.get("diff_kwh")
         if diff is None:
             return _DASH
-        return f"{float(diff):+.2f}"
+        delta = f"{float(diff):+.2f}"
+        pct = _format_deviation_pct(float(diff), case.get("historical_kwh"))
+        return f"{delta} ({pct})" if pct else delta
     window_diff = case.get("window_consumption_diff_kwh")
     if window_diff is not None:
-        return f"{float(window_diff):+.2f}"
+        delta = f"{float(window_diff):+.2f}"
+        pct = _format_deviation_pct(float(window_diff), case.get("historical_kwh"))
+        return f"{delta} ({pct})" if pct else delta
     return _DASH
 
 
@@ -171,14 +186,33 @@ def _resolve_chart_view(
     return VIEW_MODE_SUNRISE, segment_index
 
 
-def _render_sa_segment_toggle(meta: dict) -> str:
+def _render_sa_segment_toggle(
+    meta: dict,
+    *,
+    log_dir: str,
+    window_anchor: str,
+    scenario_id: str,
+    selected_date: date,
+) -> str:
     if not log_supports_sunrise_chart_view(meta):
         return "SA₀→SA₁"
+    segment_key = "backtesting_deviation_sa_segment"
+    window_key = "backtesting_deviation_sa_segment_window"
+    scope = f"{window_anchor}|{scenario_id}|{selected_date.isoformat()}"
+    if st.session_state.get(window_key) != scope:
+        st.session_state[window_key] = scope
+        snapshot = load_window_snapshot(log_dir, window_anchor, scenario_id)
+        preferred = (
+            preferred_sa_segment_toggle(snapshot, selected_date)
+            if snapshot is not None
+            else "SA₁→SA₂"
+        )
+        st.session_state[segment_key] = preferred
     return st.radio(
         "SA-Segment",
         options=["SA₀→SA₁", "SA₁→SA₂"],
         horizontal=True,
-        key="backtesting_deviation_sa_segment",
+        key=segment_key,
     )
 
 
@@ -224,6 +258,7 @@ def _render_deviation_charts(
         bundle,
         chart_key=f"backtesting_price_savings_{chart_suffix}",
     )
+
 
 def _optimized_scenario_ids(meta: dict) -> list[str]:
     ref_id = meta.get("reference_id", HISTORICAL_REFERENCE_ID)
@@ -508,7 +543,13 @@ def render_deviation_list(
         )
         return
 
-    segment_toggle = _render_sa_segment_toggle(meta)
+    segment_toggle = _render_sa_segment_toggle(
+        meta,
+        log_dir=log_dir,
+        window_anchor=window_anchor,
+        scenario_id=scenario_id,
+        selected_date=selected_date,
+    )
     render_deviation_detail(
         case,
         labels_map,
@@ -519,3 +560,4 @@ def render_deviation_list(
         scenario_id=scenario_id,
         segment_toggle=segment_toggle,
     )
+

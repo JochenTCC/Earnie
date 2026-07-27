@@ -33,6 +33,7 @@ from .milp_horizon import (
     EMPTY_MILP_PLAN,
     MilpHorizonModel,
     _add_milp_objective,
+    _add_pv_only_charge_through_sunrise,
     _add_sunrise_soc_min_constraint,
     _add_terminal_soc_constraint,
     _build_milp_model,
@@ -209,20 +210,23 @@ def _solve_milp_to_model(
         filters,
     )
     ev_milp_by_id = build_ev_milp_params_by_id(planned_consumers)
-    preset_powers, milp_consumers = split_eauto_preset(
+    preset_by_slot, milp_consumers = split_eauto_preset(
         planned_consumers,
         matrix[:horizon],
         remaining,
         schedule_indices,
         contexts,
     )
+    fixed_flex_by_t = {
+        slot: sum(powers.values()) for slot, powers in preset_by_slot.items()
+    }
     model = _build_milp_model(
         matrix,
         horizon,
         battery_params,
         current_soc,
         milp_consumers,
-        sum(preset_powers.values()),
+        fixed_flex_by_t,
         remaining,
         ev_milp_by_id,
         consumer_continue_on=consumer_continue_on,
@@ -277,6 +281,7 @@ def _solve_milp_to_model(
     elif sunrise_soc_min_index is not None:
         e_min = (battery_params["min_soc"] / 100.0) * battery_params["battery_capacity_kwh"]
         _add_sunrise_soc_min_constraint(model, sunrise_soc_min_index, e_min)
+        _add_pv_only_charge_through_sunrise(model, matrix, sunrise_soc_min_index)
         if verbose:
             logger.info(
                 "MILP SOC-Anker Sonnenaufgang: Slot %d = %.1f %%",
@@ -297,7 +302,7 @@ def _solve_milp_to_model(
     if status != "Optimal":
         record_cbc_event("milp_no_optimal", final_status=status)
         return None
-    return model, preset_powers, remaining, schedule_indices, contexts, filters
+    return model, preset_by_slot, remaining, schedule_indices, contexts, filters
 
 
 def milp_optimizer(
@@ -369,11 +374,12 @@ def milp_optimizer(
     if solved is None:
         return _AUTOMATIK_FALLBACK
 
-    model, preset_powers, remaining, schedule_indices, contexts, filters = solved
+    model, preset_by_slot, remaining, schedule_indices, contexts, filters = solved
     milp_plan = _extract_milp_plan(model)
     consumer_powers, total_flex_power = _consumer_powers_now(model)
-    consumer_powers.update(preset_powers)
-    total_flex_power += sum(preset_powers.values())
+    preset_t0 = preset_by_slot.get(0, {})
+    consumer_powers.update(preset_t0)
+    total_flex_power += sum(preset_t0.values())
     consumer_pv_follow = _consumer_pv_follow_now_all(model)
     mode, target_power, target_soc = bat._derive_control_from_milp(
         model,
@@ -476,14 +482,15 @@ def milp_horizon_schedule(
     )
     if solved is None:
         return [dict(_FALLBACK_SCHEDULE_SLOT)]
-    model, preset_powers, _, _, _, _ = solved
-    return extract_horizon_schedule(model, battery_params, preset_powers)
+    model, preset_by_slot, _, _, _, _ = solved
+    return extract_horizon_schedule(model, battery_params, preset_by_slot)
 
 
 # Re-Exports für Tests und interne Aufrufer (API-Stabilität).
 _add_consumer_delivery_constraints = _add_consumer_delivery_constraints
 _add_milp_objective = _add_milp_objective
 _add_sunrise_soc_min_constraint = _add_sunrise_soc_min_constraint
+_add_pv_only_charge_through_sunrise = _add_pv_only_charge_through_sunrise
 _add_terminal_soc_constraint = _add_terminal_soc_constraint
 _build_milp_model = _build_milp_model
 _derive_control_from_milp = bat._derive_control_from_milp
@@ -501,6 +508,7 @@ __all__ = [
     "trivial_horizon_schedule",
     "_add_consumer_delivery_constraints",
     "_add_milp_objective",
+    "_add_pv_only_charge_through_sunrise",
     "_add_sunrise_soc_min_constraint",
     "_add_terminal_soc_constraint",
     "_build_milp_model",

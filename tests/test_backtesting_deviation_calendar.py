@@ -45,6 +45,27 @@ def test_case_severity_red_yellow_orange():
         case_severity({"kind": "strict_fallback", "window_consumption_ok": True})
         == SEVERITY_YELLOW
     )
+    # White (yellow severity) uses relative 5%; abs 0.5 only when historical missing.
+    assert (
+        case_severity(
+            {
+                "kind": "consumption_tolerance",
+                "diff_kwh": 1.0,
+                "historical_kwh": 100.0,
+            }
+        )
+        == SEVERITY_YELLOW
+    )
+    assert (
+        case_severity(
+            {
+                "kind": "consumption_tolerance",
+                "diff_kwh": 6.0,
+                "historical_kwh": 100.0,
+            }
+        )
+        == SEVERITY_ORANGE
+    )
     tol = CONSUMPTION_TOLERANCE_KWH
     assert case_severity({"kind": "consumption_tolerance", "diff_kwh": tol}) == SEVERITY_YELLOW
     assert case_severity({"kind": "consumption_tolerance", "diff_kwh": tol + 0.01}) == SEVERITY_ORANGE

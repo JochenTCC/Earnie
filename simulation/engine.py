@@ -1009,6 +1009,8 @@ def compute_historical_reference_costs(
     import_kwhs: list[float] = []
     export_kwhs: list[float] = []
     consumption_kws: list[float] = []
+    k_act_values: list[float] = []
+    k_push_values: list[float] = []
     ref_settings = feed_in_settings
     if scenario_params is not None:
         ref_settings = config.get_backtesting_feed_in_settings(
@@ -1051,6 +1053,8 @@ def compute_historical_reference_costs(
             import_kwhs.append(import_kwh)
             export_kwhs.append(export_kwh)
             consumption_kws.append(float(load))
+            k_act_values.append(float(price))
+            k_push_values.append(float(k_push))
             hours_done += 1
             if on_progress is not None:
                 on_progress(hours_done, total_hours)
@@ -1063,6 +1067,8 @@ def compute_historical_reference_costs(
             "import_kwh": import_kwhs,
             "export_kwh": export_kwhs,
             "consumption_kw": consumption_kws,
+            "k_act": k_act_values,
+            "k_push_act": k_push_values,
         },
         index=pd.DatetimeIndex(timestamps),
     )
@@ -1580,6 +1586,15 @@ def run_simulation(
             "export_earn_eur": [parts[1] for parts in cost_parts],
             "import_kwh": [parts[3] for parts in cost_parts],
             "export_kwh": [parts[4] for parts in cost_parts],
+            "k_act": [
+                float(row["Strompreis (Cent/kWh)"]) for row in all_chart_rows
+            ],
+            "k_push_act": [
+                float(row["Einspeisevergütung (Cent/kWh)"])
+                if "Einspeisevergütung (Cent/kWh)" in row
+                else float("nan")
+                for row in all_chart_rows
+            ],
             "sim_soc": [row["Simulierter SoC (%)"] for row in all_chart_rows],
             "batt_action_kw": [row["Geplante Batterie-Aktion (kW)"] for row in all_chart_rows],
             "steuerbefehl": [row["Steuerbefehl"] for row in all_chart_rows],

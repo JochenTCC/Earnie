@@ -268,6 +268,8 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
             "import_kwh": [10.0] * 12 + [0.0] * 12,
             "export_kwh": [0.0] * 12 + [5.0] * 12,
             "consumption_kw": [8.0] * 24,
+            "k_act": [20.0] * 12 + [10.0] * 12,
+            "k_push_act": [5.0] * 12 + [8.0] * 12,
         },
         index=idx,
     )
@@ -287,12 +289,16 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
                 "_import_tariff_spec": {
                     "id": "awattar_at",
                     "label": "aWATTar HOURLY",
+                    "type": "spot_hourly",
                     "supplier_id": "awattar_at",
+                    "settlement_fee_cent_kwh": 1.5,
                 },
                 "_export_tariff_spec": {
                     "id": "dynamic_epex",
                     "label": "SUNNY SPOT",
+                    "type": "spot_hourly",
                     "supplier_id": "awattar_at",
+                    "feed_in_fee_factor": 0.19,
                 },
             }
         },
@@ -300,7 +306,7 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
         historical_id="historical_reference",
     )
     assert len(paths) == 1
-    text = (tmp_path / "invoices" / "live_jahresrechnung.md").read_text(encoding="utf-8")
+    text = (tmp_path / "invoices" / "Live_jahresrechnung.md").read_text(encoding="utf-8")
     assert "Fake-Jahresrechnung — Live" in text
     assert "aWATTar HOURLY" in text
     assert "SUNNY SPOT" in text
@@ -311,11 +317,32 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
         label="Live",
         df=df,
         fees=fees,
-        import_spec={"id": "awattar_at", "label": "aWATTar HOURLY"},
-        export_spec={"id": "dynamic_epex", "label": "SUNNY SPOT"},
+        import_spec={
+            "id": "awattar_at",
+            "label": "aWATTar HOURLY",
+            "type": "spot_hourly",
+            "settlement_fee_cent_kwh": 1.5,
+        },
+        export_spec={
+            "id": "dynamic_epex",
+            "label": "SUNNY SPOT",
+            "type": "spot_hourly",
+            "feed_in_fee_factor": 0.19,
+        },
     )
     assert "Energiebezug" in body
     assert "Einspeiseerlös" in body
     assert "Verbrauch (Info)" in body
-    assert "| Monat | Verbrauch kWh | Bezug kWh | Bezug € | Einspeisung kWh | Einspeisung € |" in body
-    assert "| 2025-01 | 192.0 | 120.0 | 12.00 | 60.0 | 6.00 |" in body
+    assert "## Bezug" in body
+    assert "## Einspeisung" in body
+    assert "| Monat | Bezug kWh | Bezug € | Ø Tarif Cent/kWh | Ø Ist Cent/kWh |" in body
+    assert "| Monat | Einspeisung kWh | Einspeisung € | Ø Tarif Cent/kWh | Ø Ist Cent/kWh |" in body
+    # Ø Tarif Bezug = (12*20 + 12*10)/24 = 15; Ø Ist = 12€/120kWh*100 = 10
+    assert "| 2025-01 | 120.0 | 12.00 | 15.00 | 10.00 |" in body
+    # Ø Tarif Einspeisung = (12*5 + 12*8)/24 = 6.5; Ø Ist = 6€/60kWh*100 = 10
+    assert "| 2025-01 | 60.0 | 6.00 | 6.50 | 10.00 |" in body
+    assert "| **Jahr** | **120.0** | **12.00** | **15.00** | **10.00** |" in body
+    assert "## Katalogparameter Bezug" in body
+    assert "## Katalogparameter Einspeisung" in body
+    assert "Abwicklungsgebühr" in body
+    assert "Einspeise-Gebührenfaktor" in body

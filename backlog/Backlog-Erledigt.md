@@ -3,6 +3,19 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Detaillierte Simulationsansicht day UX + SA preselect (2026-07-27)
+
+- [x] **Detaillierte Simulationsansicht day-change / UX** — Δ% in header; default SA₁→SA₂; ⚪ = ≤5% rel.; snapshot JSONL mtime index + session bundle cache (`bundle_ms` ~170→~18 warm)
+- [x] **SA segment preselect by date overlap** — on Charts & Diagnose laden, prefer SA₀→SA₁ vs SA₁→SA₂ by hourly overlap with the selected calendar date (`preferred_sa_segment_toggle`)
+
+
+### Bugfix SE Detail Chart missing Smart EV (2026-07-27)
+
+- [x] Small EV Modus-B presets in SE open-loop (`logged_day`/`profile_spec`) place at cheapest eligible hour across horizon (`optimizer/eauto_milp.py`), not only slot 0
+- [x] SA segment auto-preselect prefers the segment with more flex energy so deadline-EV in SA₀→SA₁ is visible (`preferred_sa_segment_toggle`)
+- [x] Tests: `test_eauto_milp_mode.py` (open-loop cheapest hour), `test_backtesting_display_bundle.py` (segment preference)
+
+
 ### Bugfix Detaillierte Simulationsansicht render profiling (2026-07-26)
 
 - [x] Profiled SE detail view: bottleneck was `_run_anchors_for_meta` rescanning cons_data via `list_simulation_anchors` (~90–150 s per Streamlit rerun)
@@ -24,8 +37,9 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.3.1 Fake SE annual invoices (2026-07-26)
 
-- [x] Per-scenario German markdown Fake-Jahresrechnung after SE (`{log}/invoices/{id}_jahresrechnung.md`) with tariff names
+- [x] Per-scenario German markdown Fake-Jahresrechnung after SE (`{log}/invoices/{label}_jahresrechnung.md`) with tariff names
 - [x] Import/export € + kWh split; monthly table with Verbrauch (info), Bezug, Einspeisung; year totals
+- [x] Separate Bezug/Einspeisung monthly tables with Ø Tarif (`Summe(k_act)/N`) and Ø Ist (`€/kWh×100`); catalog parameter tables at end; persist `k_act`/`k_push_act` on SE results
 - [x] DACH fixed-fee schema slots (`grid_monthly_fee_eur`, `metering_monthly_fee_eur`, `other_monthly_fee_eur`) + Lieferant `monthly_fee_eur`; SE fee breakdown in log
 - [x] Docs (`tarife-quellen.md`, `preise.md`, Handbuch) + tariff preview + tests
 

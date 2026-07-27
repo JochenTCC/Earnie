@@ -10,7 +10,11 @@ import streamlit as st
 from scripts.run_backtesting import BACKTESTING_YEAR
 from simulation.backtesting_log import KIND_CRITICALITY_ORDER
 from simulation.backtesting_snapshots import normalize_window_anchor_key
-from simulation.engine import CONSUMPTION_TOLERANCE_KWH, window_anchor_for_date
+from simulation.engine import (
+    CONSUMPTION_TOLERANCE_KWH,
+    CONSUMPTION_TOLERANCE_REL,
+    window_anchor_for_date,
+)
 from ui.backtesting_results_helpers import nav_bounds_from_period
 
 SEVERITY_NONE = "none"
@@ -82,6 +86,11 @@ def case_severity(case: dict) -> str:
         return SEVERITY_RED
     if kind == "consumption_tolerance":
         diff = abs(float(case.get("diff_kwh") or 0.0))
+        hist = case.get("historical_kwh")
+        if hist is not None and float(hist) > 0:
+            if (diff / float(hist)) <= CONSUMPTION_TOLERANCE_REL:
+                return SEVERITY_YELLOW
+            return SEVERITY_ORANGE
         if diff <= CONSUMPTION_TOLERANCE_KWH:
             return SEVERITY_YELLOW
         return SEVERITY_ORANGE
@@ -317,7 +326,7 @@ def render_deviation_calendar(
 
     st.caption(
         "Legende: 🟢 ohne Abweichung · ⚪ Verbrauchstoleranz (≤ "
-        f"{CONSUMPTION_TOLERANCE_KWH:g} kWh) / CBC-Marker bei feasiblem 24h-Ergebnis · "
+        f"{CONSUMPTION_TOLERANCE_REL:.0%}) / CBC-Marker bei feasiblem 24h-Ergebnis · "
         "🟡 darüber · 🔴 CBC/MILP mit echtem Problem · "
         "ausgegraut = außerhalb Lauf"
     )

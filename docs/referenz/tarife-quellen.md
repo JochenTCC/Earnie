@@ -19,7 +19,10 @@ Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration/Typen) �
 
 Earnie liefert **gute-genug-€** für Vergleiche und Demos — **keine** Abrechnung gegen echte Stromrechnungen. Katalogwerte können unvollständig oder veraltet sein; bitte die Parameter im Szenarienkonfigurator prüfen.
 
-Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Markdown unter `{Log-Ordner}/invoices/{szenario_id}_jahresrechnung.md` (Bezug/Einspeisung getrennt, Fixkosten ausgewiesen, Tarifnamen im Kopf).
+Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Markdown unter `{Log-Ordner}/invoices/{szenario_label}_jahresrechnung.md` (Dateiname aus der Szenario-Bezeichnung; Bezug/Einspeisung getrennt mit Ø Tarif- und Ø Ist-Preis, Fixkosten ausgewiesen, Tarifnamen im Kopf, Katalogparameter am Ende).
+
+- **Ø Tarif Cent/kWh:** arithmetisches Mittel der stündlichen Tarifpreise über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`).
+- **Ø Ist Cent/kWh:** `Energiekosten € / Netzenergie kWh × 100`.
 
 ## 2. Bezugspreis Schritt für Schritt
 

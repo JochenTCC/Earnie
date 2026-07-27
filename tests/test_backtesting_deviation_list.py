@@ -83,15 +83,22 @@ def test_deviation_cases_for_display_preserves_sort_order():
 
 
 def test_format_deviation_delta_kwh():
-    plaus = {"kind": "consumption_tolerance", "diff_kwh": 1.25}
+    plaus = {
+        "kind": "consumption_tolerance",
+        "diff_kwh": 1.25,
+        "historical_kwh": 25.0,
+    }
     cbc = {"kind": "strict_slow"}
     cbc_with_window = {
         "kind": "milp_no_optimal",
         "window_consumption_diff_kwh": 0.006,
     }
-    assert format_deviation_delta_kwh(plaus) == "+1.25"
+    assert format_deviation_delta_kwh(plaus) == "+1.25 (+5.0%)"
     assert format_deviation_delta_kwh(cbc) == "—"
     assert format_deviation_delta_kwh(cbc_with_window) == "+0.01"
+    assert format_deviation_delta_kwh(
+        {"kind": "consumption_tolerance", "diff_kwh": 1.93}
+    ) == "+1.93"
 
 
 def test_kind_label_known_and_unknown():
@@ -151,7 +158,21 @@ def test_deviation_marker_for_case():
     )
     assert (
         deviation_marker_for_case(
-            {"kind": "consumption_tolerance", "diff_kwh": 0.6}
+            {
+                "kind": "consumption_tolerance",
+                "diff_kwh": 0.6,
+                "historical_kwh": 100.0,
+            }
+        )
+        == "⚪"
+    )
+    assert (
+        deviation_marker_for_case(
+            {
+                "kind": "consumption_tolerance",
+                "diff_kwh": 6.0,
+                "historical_kwh": 100.0,
+            }
         )
         == "🟡"
     )
