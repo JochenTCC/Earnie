@@ -1,0 +1,39 @@
+# LoxBerry plugin compose — productive Earnie container (Scope A).
+# REPLACELBPDATADIR is rewritten by the LoxBerry installer to the plugin data dir.
+#
+# Image: always :latest (plugin SemVer is independent). Pull via earnie_ctl.sh pull.
+# Persist: earnie_env/config + earnie_env/runtime under the plugin data directory.
+# Do not run alongside a manual /opt/earnie-energy stack (same container_name).
+
+name: earnie-productive
+
+version: "3.8"
+
+x-persist-volumes: &persist-volumes
+  - REPLACELBPDATADIR/earnie_env/config:/app/config
+  - REPLACELBPDATADIR/earnie_env/runtime:/app/runtime
+
+x-common-env: &common-env
+  TZ: Europe/Vienna
+  EARNIE_CONFIG_PATH: config
+  EARNIE_RUNTIME_PATH: runtime
+  EARNIE_STRICT_TARIFF_VALIDATE: "1"
+  EARNIE_VERIFY_LOXONE_ON_START: "1"
+  EARNIE_AUTO_START_MAIN: "1"
+
+services:
+  earnie-productive:
+    image: ghcr.io/jochentcc/earnie-energy:latest
+    container_name: earnie-productive
+    command: >
+      python -m scripts.run_streamlit
+      --
+      --server.enableCORS false
+      --server.enableXsrfProtection false
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes: *persist-volumes
+    environment:
+      <<: *common-env
+      EARNIE_UI_MODES: sunset2sunset,live_environment

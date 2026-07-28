@@ -15,62 +15,37 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 ## Feature Backlog
 
 
-### Version 2.4 — EHAL foundation & DACH docking (OpenEMS + HA/evcc)
+### Version 2.4 — EHAL foundation, DACH docking & Loxone on EHAL
 
-**Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 (Phases 1–2b / M1–M1.5)  
-**Goal:** Freeze **EHAL** and prove a Loxone-free southbound path. Earnie Core remains the sole 48h optimizer; hardware I/O only via EHAL (telemetry + setpoints + capability flags).  
-**Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume.  
-**Deferred to 2.5:** Loxone-EHAL extraction, MCP onboarding, multi-system field test with Loxone, device-profile library slice.  
-**Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) — thin Docker wrapper over existing `loxberry_productive` compose; not a native host install.  
+**Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 (Phases 1–4 / M1–M2)  
+**Goal:** Freeze **EHAL**, prove Loxone-free southbounds (OpenEMS + HA/evcc), move production Loxone onto EHAL, add MCP one-click mapping, and prove config-only switch across all three. Earnie Core remains the sole 48h optimizer; hardware I/O only via EHAL (telemetry + setpoints + capability flags).  
+**Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume; **Loxone** = production path via EHAL (`2.4.e`–`2.4.h`).  
+**Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) done — thin Docker wrapper in `packaging/loxberry/` (not a native host install).  
 **Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-- [ ] **Follow-up — Lab HA ↔ evcc entity exposure** (deferred from 2.4.c smoke)
-  - Prove MQTT discovery and/or marq24 ha-evcc (`http://evcc:7070`) so stable `sensor`/`number` entities appear in HA; map them in Earnie HITL (Path A helpers already smoke-tested)
-- [ ] **2.4.d — LoxBerry plugin Scope A MVP (thin Docker wrapper)**
-  - **Goal:** Install/manage existing Earnie container from LoxBerry Plugin Admin — no native Python/Streamlit/MILP on the host
-  - **Prerequisite:** LoxBerry **4.x** (arm64) + **Docker plugin**; reuse `docker/compose/loxberry_productive.yml` / GHCR multi-arch image
-  - Plugin skeleton: `plugin.cfg`, icons, German strings, standard LB dirs (`config` / `data` / `log` / `bin` / `webfrontend`)
-  - `postinstall` / upgrade / uninstall: require Docker plugin; create persistent dirs for `earnie_env/config` + `earnie_env/runtime`; `docker compose pull` + `up -d`; preserve volumes across plugin upgrades
-  - Daemon or cron: keep container healthy / restart if stopped
-  - Minimal LB WebUI: container status, start/stop, link to Streamlit (`:8501`), show installed image/plugin version
-  - `release.cfg` (and optional prerelease) so LB can auto-update the **plugin ZIP**; document image-tag story (plugin version ↔ `ghcr.io/…/earnie-energy:<tag>`)
-  - German user docs: plugin path vs manual compose; point to Go/No-Go (RAM ≥4 GB, SSD preferred)
-  - Acceptance: fresh LB 4.x install from ZIP → container running → UI reachable; upgrade preserves config/runtime; uninstall leaves data policy documented
-  - **Out of scope (later polish / other versions):** native host install; HA/evcc/OpenEMS sidecars on the Pi; Miniserver prefill into `.env`; alpha/prod channel switcher; Streamlit iframe embed; full LoxWiki store listing polish beyond MVP
-- [ ] **2.4.0 — Release**
-  - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke); live HA↔evcc entity coupling optional follow-up before messaging A2 as fully wired
-  - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
-  - Loxone production path still on pre-EHAL code until **2.5** (no forced Loxone cutover in 2.4.0)
-  - LoxBerry Scope A MVP (`2.4.d`) shippable with this release or as late add-on in the same MINOR cycle (does not block EHAL freeze)
-
-
-### Version 2.5 — Loxone on EHAL, MCP & multi-system field test
-
-**Strategic source:** same Entwicklungsplan (Phase 3–4 / M2)  
-**Prerequisite:** 2.4 EHAL freeze + OpenEMS + HA/evcc adapters exist.  
-**Goal:** Move production Loxone onto EHAL; add MCP one-click mapping; prove config-only switch across OpenEMS ↔ HA+evcc ↔ Loxone.
-
-- [ ] **2.5.a — Loxone-EHAL adapter extraction (Phase 3)**
+- [ ] **2.4.e — Loxone-EHAL adapter extraction (Phase 3)** *(was 2.5.a)*
   - Refactor existing Loxone HTTP/marker path into **Loxone-EHAL-Adapter** (markers/blocks → same EHAL structures as OpenEMS/HA)
   - Keep practical compatibility with `loxone_*` keys where possible (full nesting remains `2.+1`)
   - Acceptance: Live/optimizer unchanged for current Loxone installs after cutover
-- [ ] **2.5.b — Loxone MCP one-click mapping + structure research (§3.1)**
+- [ ] **2.4.f — Loxone MCP one-click mapping + structure research (§3.1)** *(was 2.5.b)*
   - MCP client: structure scan → LLM propose → Streamlit preview with confidence → write config after confirm
   - Map onto **EHAL fields** (not only legacy flat markers)
   - **Research / follow-up:** Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths (interpretation C). Blocked today by no official Loxone structure export; revisit with MCP structure-scan. Manual blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
     - EFM has **no** multi-column Statistik export of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23)
-- [ ] **2.5.c — Device / hardware profile schemas (M2 slice; bounty later)**
+- [ ] **2.4.g — Device / hardware profile schemas (M2 slice; bounty later)** *(was 2.5.c)*
   - EHAL-facing device role templates (battery, EVCS, PV, consumers, …) as adapter mapping aids
   - Optional: first JSON outline for SunSpec / proprietary Modbus profiles (feeds future Path D / M4 bounty)
   - Loxone library as counterpart templates (Baustein/marker recipes → EHAL)
   - **Defer:** full Community Bounty engine = Entwicklungsplan **M4** (later version)
-- [ ] **2.5.d — Multi-system field test (Phase 4)**
+- [ ] **2.4.h — Multi-system field test (Phase 4)** *(was 2.5.d)*
   - Prove system-agnostic core: OpenEMS ↔ HA+evcc ↔ Loxone by **config switch only**
   - Docs for connector authors; update German user docs for adapter choice including Loxone-on-EHAL
-- [ ] **2.5.0 — Release**
-  - Ship when: Loxone on EHAL without regression, MCP mapping usable (human-in-the-loop), Phase-4 field test passed
-  - First community non-Loxone pilot may already exist from 2.4; 2.5.0 is the “all three southbounds” release
+- [ ] **2.4.0 — Release**
+  - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; MCP mapping usable (human-in-the-loop); Phase-4 field test (`2.4.h`) passed
+  - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
+  - “All three southbounds” release: OpenEMS ↔ HA+evcc ↔ Loxone via config switch
+  - LoxBerry Scope A MVP (`2.4.d`) is implemented; ship plugin ZIP with this release when ready (hardware install acceptance optional)
 
 
 ### Version 2.+1 — Improve "security" against violating License agreements
@@ -104,7 +79,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] For manual consumers take also PV into account - not just tariffs (check)
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
   - Move Loxone markers to data model - remove flat definition in config.json where possible
-  - **Note:** Thin marker↔role prep and UI editability are in **2.3.f**; EHAL core / DACH adapters in **2.4**; Loxone-EHAL extraction in **2.5**. This chapter owns nesting / structure, not the EHAL interface rewrite.
+  - **Note:** Thin marker↔role prep and UI editability are in **2.3.f**; EHAL core / DACH adapters / Loxone-EHAL extraction in **2.4** (`2.4.e`). This chapter owns nesting / structure, not the EHAL interface rewrite.
 - [ ] **Recommendation mode smart/adaptive devices** (follow-up to recommendation mode manual devices)
   - Adaptive re runtime/energy per run; smart devices instead of manual input
   - Adaptation algo maintains `appliance_recommendation.default_power_kw` from Loxone power markers (`loxone_inputs.power_name`) on house-profile generics — reserved so far, no live use

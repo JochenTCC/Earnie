@@ -30,7 +30,7 @@ isProject: false
 
 ## Decisions (locked)
 
-- **Mapping UI = full HITL (1A):** HA entity scan (`sensor` / `number` / `select`) + Streamlit mapping table → write `ehal.ha.entities` on confirm. No LLM (deferred to 2.5 MCP parity).
+- **Mapping UI = full HITL (1A):** HA entity scan (`sensor` / `number` / `select`) + Streamlit mapping table → write `ehal.ha.entities` on confirm. No LLM (deferred to 2.4.f MCP parity).
 - **Transport = REST-first:** poll HA states + call services (`number.set_value`, etc.). No HA WebSocket client in 2.4.c (same pattern as OpenEMS REST-only in `2.4.b`).
 - **One production adapter:** Earnie talks only to Home Assistant; prefer stable HA entities that evcc exposes. Lab-only direct-evcc adapter stays **out of scope**.
 - **Contract-tests:** mocked fixture parity — same EHAL telemetry/setpoints through `ehal_live` helpers yield identical Live-shaped outputs when only `ehal.backend` / hub block switches (OpenEMS vs HA). No live dual-hub plant required for CI.
@@ -159,7 +159,7 @@ English: extend [`docs/spec/ehal.md`](docs/spec/ehal.md) HA adapter notes; mark 
 - HA WebSocket state subscription
 - Direct evcc REST/MQTT adapter
 - LLM-assisted mapping (2.5)
-- Loxone-EHAL extraction (2.5.a)
+- Loxone-EHAL extraction (2.4.e)
 - Expanding M1 EHAL fields (HP/flex/`target_soc`)
 - `version.py` bump (ask separately if a community alpha is desired)
 

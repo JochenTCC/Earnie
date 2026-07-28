@@ -48,7 +48,10 @@ Daten aus `runtime/optimizer_run_state.json` des letzten `main.py`-Laufs.
 
 ### HA Entity → EHAL Mapping
 
-Nur bei Backend **Home Assistant**: Entities scannen, Telemetrie-/Setpoint-Felder zuweisen, speichern. Details: [Home Assistant + evcc](../einrichtung/ha-evcc.md).
+Nur bei Backend **Home Assistant**: Entities scannen, Telemetrie-/Setpoint-Felder zuweisen, speichern.
+
+- Überblick / HITL: [Home Assistant + evcc](../einrichtung/ha-evcc.md) (Abschnitt *Wenn marq24 / evcc bereits in HA verbunden ist*)
+- Lab-Abnahme inkl. Stub-Werte und Tabelle: [HA-Lab Spec §5.1](../spec/ha-lab-setup.md#51-after-marq24-ha-evcc-is-connected-lab-follow-up)
 
 ### Anlagen-Merker / Event-Trigger
 

@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.d LoxBerry plugin Scope A MVP (2026-07-28)
+
+- [x] **2.4.d — LoxBerry plugin Scope A MVP (thin Docker wrapper)** — In-repo [`packaging/loxberry/`](../packaging/loxberry/) (plugin `0.1.0`): hooks + systemd + compose for `ghcr.io/jochentcc/earnie-energy:latest`, minimal Plugin Admin UI, healthcheck, `release.cfg` stubs; German docs [`docs/einrichtung/loxberry-plugin.md`](../docs/einrichtung/loxberry-plugin.md); uninstall keeps `earnie_env` policy documented. Hardware ZIP install on LB 4.x still optional for live acceptance.
+
+
 ### EHAL-Com unified smarthome connection (2026-07-28)
 
 - [x] **EHAL-Com** — Renamed Loxone-Com; removed sidebar Loxone credentials; backend selector (Loxone / HA / OpenEMS) + connection forms; backend-aware first-run; EHAL Live-Lesen telemetry + `ehal_writes` Live-Schreiben parity; German docs (`docs/ui/ehal-com.md`)
@@ -11,7 +16,8 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 ### 2.4.c HA-EHAL + evcc under HA (2026-07-28)
 
 - [x] **2.4.c — HA-EHAL + evcc under HA (Phase 2b / M1.5, DACH default)** — REST-only `integrations/ha_adapter.py` + Live bridge; Compose [`docker/compose/ha-lab.yml`](../docker/compose/ha-lab.yml) (Earnie :8506 + HA :8123 + evcc :7070); HITL entity→EHAL mapping UI; exclusivity/Modbus docs ([`docs/spec/ha-lab-setup.md`](../docs/spec/ha-lab-setup.md), [`docs/einrichtung/ha-evcc.md`](../docs/einrichtung/ha-evcc.md)); contract-tests vs OpenEMS; lab stub `ha_lab/evcc/evcc.yaml` (demo charger)
-- [x] **HA lab smoke (Path A helpers)** — Earnie ↔ HA REST via helpers / LLAT path exercised; **not** tested: live HA↔evcc coupling (MQTT discovery or marq24 ha-evcc entity exposure) — follow-up left open in [`Backlog.md`](Backlog.md)
+- [x] **HA lab smoke (Path A helpers)** — Earnie ↔ HA REST via helpers / LLAT path exercised
+- [x] **Follow-up — Lab HA ↔ evcc entity exposure** — marq24 ha-evcc (`http://evcc:7070`) entities in HA; mapped in Earnie HITL; Compose `hacs-init` + docs §5.1 / [`ha-evcc.md`](../docs/einrichtung/ha-evcc.md) (MQTT discovery path documented as alternative, not required once marq24 is connected)
 
 
 ### Bugfix SoC spike at SA₁ (2026-07-27)
@@ -22,13 +28,13 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.4.b OpenEMS EHAL prototype (2026-07-27)
 
-- [x] **2.4.b — OpenEMS EHAL prototype (Phase 2 / M1)** — REST-only `integrations/openems_adapter.py` + thin Live bridge `integrations/ehal_live.py` (`ehal.backend=openems`); lab Compose [`docker/compose/openems-lab.yml`](../docker/compose/openems-lab.yml); write-lock degrade → `runtime/ehal_write_error.json` + Streamlit hint; config schema/snippet; mocked tests; no OpenEMS libs in-repo (→ 2.4.c / 2.5)
+- [x] **2.4.b — OpenEMS EHAL prototype (Phase 2 / M1)** — REST-only `integrations/openems_adapter.py` + thin Live bridge `integrations/ehal_live.py` (`ehal.backend=openems`); lab Compose [`docker/compose/openems-lab.yml`](../docker/compose/openems-lab.yml); write-lock degrade → `runtime/ehal_write_error.json` + Streamlit hint; config schema/snippet; mocked tests; no OpenEMS libs in-repo (→ 2.4.c / 2.4.e)
 - [x] **OpenEMS lab acceptance (combined Compose)** — Pi/lab host `192.168.178.34`: Earnie ↔ OpenEMS REST communication verified per [`docs/spec/openems-lab-setup.md`](../docs/spec/openems-lab-setup.md); Live-Cockpit Loxone-marker gate still stubbed (expected)
 
 
 ### 2.4.a EHAL specification (2026-07-27)
 
-- [x] **2.4.a — EHAL specification (Phase 1 / M1 spec)** — Freeze Telemetry / Setpoint / Capability-Flags (+ Write-Error) JSON Schemas (`share/ehal/`), thin Python package `ehal`, connector-author spec [`docs/spec/ehal.md`](../docs/spec/ehal.md), CONTRIBUTING adapter outline; sign/units/60 s/degrade frozen; no Live/Loxone wiring (→ 2.4.b / 2.5)
+- [x] **2.4.a — EHAL specification (Phase 1 / M1 spec)** — Freeze Telemetry / Setpoint / Capability-Flags (+ Write-Error) JSON Schemas (`share/ehal/`), thin Python package `ehal`, connector-author spec [`docs/spec/ehal.md`](../docs/spec/ehal.md), CONTRIBUTING adapter outline; sign/units/60 s/degrade frozen; no Live/Loxone wiring (→ 2.4.b / 2.4.e)
 
 
 ### Bugfix SE Fake-Jahresrechnung Verbrauch vs Gesamtkosten (2026-07-27)

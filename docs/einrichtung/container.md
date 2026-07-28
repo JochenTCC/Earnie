@@ -208,7 +208,7 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 
 ## LoxBerry (RPi 4B, arm64)
 
-
+**Empfohlen für die meisten Nutzer:** Installation über das [LoxBerry-Plugin (Scope A)](loxberry-plugin.md) (ZIP in der Plugin-Verwaltung). Die Abschnitte unten beschreiben die **manuelle** Compose-Installation unter z. B. `/opt/earnie-energy/` — nicht parallel zum Plugin betreiben (gleicher Container-Name `earnie-productive`, Port 8501).
 
 ### Voraussetzungen
 

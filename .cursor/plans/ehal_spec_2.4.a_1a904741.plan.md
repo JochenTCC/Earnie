@@ -36,8 +36,8 @@ isProject: false
 |-------|------|------|
 | Grid / PV / ESS / EVCS (M1 minimal) | **Light check in 2.4.a** | Confirm frozen names/units/signs align with OpenEMS `_sum/*`, `ess0/*`, EVCS MaxCurrent so the freeze is implementable |
 | Same, deep channel map + lab writes | **2.4.b** | Full REST/WS mapping, Compose, OEM write-lock Negativtests, capability degrade |
-| Heatpump | **Not 2.4** | No HP fields in M1 EHAL; later Thermals / flex-consumer EHAL extension (and/or **2.5.c** device-role templates) |
-| Generic consumer | **Not 2.4** | Today Loxone flex markers; EHAL consumer roles after Loxone extraction / device profiles (**2.5.a / 2.5.c**) |
+| Heatpump | **Not 2.4.a** | No HP fields in M1 EHAL; later Thermals / flex-consumer EHAL extension (and/or **2.4.g** device-role templates) |
+| Generic consumer | **Not 2.4.a** | Today Loxone flex markers; EHAL consumer roles after Loxone extraction / device profiles (**2.4.e / 2.4.g**) |
 
 So: **2.4.a** only does a desk-check against OpenEMS docs/`docs/spec/openems-testing-platform-todo.md` for the eight M1 fields — not a full OpenEMS device-catalog architecture review.
 
@@ -52,7 +52,7 @@ flowchart LR
     OpenEMSAdapter[OpenEMS adapter]
     Compose[earnie-core plus openems-edge]
   end
-  subgraph later [2.5 plus]
+  subgraph later [2.4.e plus]
     HA[HA plus evcc]
     Lox[Loxone-EHAL]
     Profiles[Device role templates HP consumer]
@@ -75,7 +75,7 @@ flowchart LR
 Canonical Phase-1 freeze covering:
 
 - Purpose / naming (**EHAL**, not “SAM”)
-- Contract: optimizer / Live consume **only** EHAL types; no OpenEMS/HA/Loxone types in math core (Loxone production path stays pre-EHAL until **2.5** — stated explicitly)
+- Contract: optimizer / Live consume **only** EHAL types; no OpenEMS/HA/Loxone types in math core (Loxone production path stays pre-EHAL until **2.4.e** — stated explicitly)
 - Telemetry-API, Setpoint-API, Capability-Flags field tables (required vs optional, units, signs)
 - Envelope: timestamp (`ts` ISO-8601 or epoch ms — pick one and freeze), adapter id, schema version
 - Min update interval (60 s), stale/missing-field behavior

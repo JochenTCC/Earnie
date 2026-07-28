@@ -8,7 +8,7 @@ Konfiguration im Container/venv: `config.json` → `ui.streamlit_port` oder `EAR
 
 | Port | Stack / Betrieb | Plattform | Daemon (`main.py`) | UI-Zugriff | Compose / Start |
 |------|-----------------|-----------|--------------------|------------|-----------------|
-| **8501** | **Produktion** | Synology NAS, LoxBerry, Proxmox LXC | im Container `earnie-productive` (Auto-Start) | LAN: `http://<host>:8501`; Synology extern: HTTPS :443 → Reverse Proxy → 8501 | `docker/compose/synology_productive.yml`, `loxberry_productive.yml`, `proxmox_productive.yml` |
+| **8501** | **Produktion** | Synology NAS, LoxBerry, Proxmox LXC | im Container `earnie-productive` (Auto-Start) | LAN: `http://<host>:8501`; Synology extern: HTTPS :443 → Reverse Proxy → 8501 | `docker/compose/synology_productive.yml`, `loxberry_productive.yml`, `proxmox_productive.yml`; LoxBerry auch via [Plugin](../einrichtung/loxberry-plugin.md) |
 | **8511** | **Alpha** | Synology NAS, LoxBerry, Proxmox LXC | im Container `earnie-alpha` (Auto-Start) | LAN: `http://<host>:8511` | `docker/compose/synology-alpha.yml`, `loxberry-alpha.yml`, `proxmox-alpha.yml` (Volumes: `earnie_env_alpha/`) |
 | **8521** | **Lokaler Dev-Stack (Docker)** | Windows/Linux Dev-PC | im Container `earnie` (Auto-Start) | `http://localhost:8521` | `docker/compose/dev.yml` (`8521:8501`) |
 | **8531** | **Lokal ohne Docker (venv)** | Dev-PC (venv) | `python main.py` (lokal) oder UI **Optimierer-Dienst** | `http://localhost:8531` (`EARNIE_UI_STREAMLIT_PORT`; Schema-Default im Container bleibt 8501) | `python -m scripts.run_streamlit`, VS Code „Streamlit app.py (:8531 lokal)“ |

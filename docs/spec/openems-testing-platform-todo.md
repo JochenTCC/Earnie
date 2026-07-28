@@ -313,7 +313,7 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 ## Out of scope for this platform TODO
 
 - Home Assistant + evcc (**2.4.c** / A2 DACH default) — implemented: `docker/compose/ha-lab.yml`, [`ha-lab-setup.md`](ha-lab-setup.md)
-- Loxone-EHAL extraction (**2.5**)
+- Loxone-EHAL extraction (**2.4.e**)
 - Real FEMS/OEM hardware (optional later; expect write locks)
 - MQTT/Matter as first-class hubs
 

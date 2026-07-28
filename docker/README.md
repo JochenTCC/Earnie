@@ -35,6 +35,8 @@ Immer vom **Repo-Root** mit `--project-directory .`, damit Volume-Pfade (`./earn
 
 Port-Übersicht (venv, NAS-UI): [`docs/referenz/streamlit-ports.md`](../docs/referenz/streamlit-ports.md)
 
+LoxBerry **Plugin** (Scope A, ZIP-Install): [`packaging/loxberry/`](../packaging/loxberry/) · Anwenderdok: [`docs/einrichtung/loxberry-plugin.md`](../docs/einrichtung/loxberry-plugin.md)
+
 ```powershell
 docker compose --project-directory . -f docker/compose/dev.yml up -d --build
 docker compose --project-directory . -f docker/compose/greenfield.yml up -d --build

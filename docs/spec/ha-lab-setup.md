@@ -279,12 +279,14 @@ HACS: copy upstream `custom_components/evcc_intg` into that same tree yourself.
      `entity_id`s**; do not assume the placeholders in
      [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json).
 
-6. **Map in Earnie (§5)**
+6. **Map in Earnie (§5 / §5.1)**
    - Prefer stable entities that survive HA/evcc restarts.
    - Reads: grid W, PV W, SoC % (required); ESS power / EVCS power optional.
    - Writes (if present): charge/discharge limits, loadpoint max current.
    - Sign: EHAL grid **+** = import, ESS **+** = discharge; use mapping **negate**
      if the integration’s sign differs.
+   - When the integration is already green: follow **§5.1** (copy IDs → HITL →
+     accept table).
 
 7. **Earnie-mode cautions**
    - Do **not** use HA automations that write the same setpoint entities Earnie owns.
@@ -377,7 +379,65 @@ Silent gate: `loxone_silent_mode` also blocks HA setpoint writes (same as OpenEM
 8. **Telemetrie testen** → expect validated JSON (SoC, powers).  
 9. **Mapping speichern** → writes `ehal` into `config.json` and reloads runtime config.
 
-LLM-assisted proposals are **out of scope** until **2.5**.
+LLM-assisted proposals are **out of scope** until **2.4.f**.
+
+### 5.1 After marq24 ha-evcc is connected (lab follow-up)
+
+Use this when HACS + **evcc☀️🚘- Solar Charging** are already installed and the
+integration reaches `http://evcc:7070` (§3.5 Option 2). Goal: stable HA
+`sensor`/`number` entities mapped in Earnie (Path A helpers smoke is **not**
+enough for this follow-up).
+
+**A — Copy exact `entity_id`s from HA**
+
+1. HA → **Developer tools → States**. Filter by the name you gave the
+   integration (often `evcc`) or by `evcc`.
+2. Prefer entities that survive HA/evcc restarts (integration device entities,
+   not one-off helpers).
+3. With the committed lab stub (`ha_lab/evcc/evcc.yaml`), expect **const**
+   values (grid/PV/charge power **0 W**, battery SoC **50 %**). That is enough
+   to prove the path; non-zero values need real meters or a richer stub.
+4. Typical roles (names **vary** by integration version and the unique name you
+   chose — **never** paste snippet placeholders blindly):
+
+| Role | Domain | What to look for in States |
+| --- | --- | --- |
+| Grid power | `sensor` | site / grid power (W or kW) |
+| PV power | `sensor` | PV / solar power |
+| Battery SoC | `sensor` | battery SoC (%) |
+| Battery power | `sensor` | battery power (optional) |
+| Loadpoint charge power | `sensor` | loadpoint / charge power (optional) |
+| Max charge current | `number` | loadpoint max current (A) — write path |
+| Battery charge/discharge limits | `number` | only if the integration exposes them |
+
+[`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) shows **example**
+IDs only (`sensor.evcc_grid_power`, …).
+
+**B — Map in Earnie HITL (§5 steps 1–9)**
+
+1. Earnie http://localhost:8506 → **EHAL-Com** → **HA Entity → EHAL Mapping**.
+2. URL inside Compose: `http://homeassistant:8123` + LLAT (§2).
+3. **Entities scannen** → assign at least the three required reads
+   (`grid_power_active`, `pv_production_active`, `ess_soc`).
+4. Optional: `ess_power`, `evcs_active_power`, `set_evcs_max_current` (and ESS
+   limit numbers if present).
+5. Sign: EHAL grid **+** = import, ESS **+** = discharge. If marq24 uses the
+   opposite convention, set that field to **negate**.
+6. **Telemetrie testen** → SoC ~50 and powers ~0 with the lab stub is **OK**.
+7. **Mapping speichern**.
+
+**C — Accept (follow-up done)**
+
+| Check | Pass |
+| --- | --- |
+| HA States shows mapped `entity_id`s | yes |
+| HITL **Telemetrie testen** returns SoC (+ powers) | yes |
+| `ha_lab/config/config.json` has `ehal.backend=ha` and those entity IDs | yes |
+| Live / logs: no “Kein Zugriff auf EHAL SoC” (§6.3) | yes |
+| Optimizer exclusivity still true (§3.6) | yes |
+
+Write setpoints remain optional for this follow-up; keep silent mode **on**
+until you intentionally test writes (§6.4).
 
 ---
 
@@ -440,6 +500,6 @@ Bind mounts (`ha_lab/…`) are kept. To factory-reset HA only, remove files unde
 
 - HA WebSocket state subscription (REST poll only in 2.4.c)
 - Direct evcc REST/MQTT adapter from Earnie (lab-only option deferred)
-- LLM-assisted mapping (**2.5**)
-- Loxone-EHAL extraction (**2.5.a**)
+- LLM-assisted mapping (**2.4.f**)
+- Loxone-EHAL extraction (**2.4.e**)
 - Production Path B hardening beyond “point Earnie at existing HA URL + mapping UI”

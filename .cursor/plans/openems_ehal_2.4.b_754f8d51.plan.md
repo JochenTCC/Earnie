@@ -27,7 +27,7 @@ isProject: false
 
 ## Decisions (locked)
 
-- **Live depth = thin M1 bridge:** under `ehal.backend=openems`, Live swaps only SOC / live power / ESS limit writes (+ new EVCS Amp setpoint). Flex consumers, `target_soc`, `control_cmd`, PV-counter, FTP stay Loxone-only / unused in this mode. Default (missing backend) remains today’s Loxone path until **2.5.a**.
+- **Live depth = thin M1 bridge:** under `ehal.backend=openems`, Live swaps only SOC / live power / ESS limit writes (+ new EVCS Amp setpoint). Flex consumers, `target_soc`, `control_cmd`, PV-counter, FTP stay Loxone-only / unused in this mode. Default (missing backend) remains today’s Loxone path until **2.4.e**.
 - **EVCS = lab now:** install OpenEMS **Simulator Evcs** (`evcs0`) and exercise `evcs_active_power` + `set_evcs_max_current` in acceptance.
 - **Transport = REST first** on Edge `:8084` (already verified). No OpenEMS WebSocket client required for M1 acceptance; JSON-RPC/WS remains optional later.
 - **Compliance:** HTTP client only (`urllib`/`requests` already in stack). No OpenEMS jars, source, or Python bindings in Earnie repos.
@@ -130,7 +130,7 @@ Missing `ess_soc` → abort Live (same as today).
 
 ## Explicit non-goals
 
-- HA/evcc (**2.4.c**), Loxone-EHAL extraction (**2.5.a**), flex-consumer / HP EHAL fields, MQTT, `version.py` bump, WebSocket OpenEMS client.
+- HA/evcc (**2.4.c**), Loxone-EHAL extraction (**2.4.e**), flex-consumer / HP EHAL fields, MQTT, `version.py` bump, WebSocket OpenEMS client.
 
 ## Acceptance
 

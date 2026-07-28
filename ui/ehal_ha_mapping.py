@@ -87,7 +87,7 @@ def render_ehal_ha_mapping_section() -> None:
     """Entity-scan + HITL mapping; persists ehal.ha into config.json."""
     st.caption(
         "Human-in-the-Loop: Entities scannen, EHAL-Felder zuweisen, speichern. "
-        "LLM-Vorschläge folgen in 2.5. Bevorzugt stabile Entities von evcc unter HA."
+        "LLM-Vorschläge folgen in 2.4.f. Bevorzugt stabile Entities von evcc unter HA."
     )
 
     data = load_main_config()

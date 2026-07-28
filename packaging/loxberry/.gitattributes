@@ -1,0 +1,11 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.cfg text eol=lf
+*.yml text eol=lf
+*.service text eol=lf
+*.php text eol=lf
+*.ini text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.svg text eol=lf
+healthcheck text eol=lf

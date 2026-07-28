@@ -1,0 +1,35 @@
+#!/bin/bash
+# LoxBerry plugin healthcheck.
+# Args: title | check
+# Status codes: 5=OK, 4=WARN, 3=ERROR
+# https://wiki.loxberry.de/entwickler/entwicker_tipps_und_tricks/integrate_your_plugin_to_loxberry27s_healthcheck
+
+set -u
+
+ARG="${1:-}"
+CONTAINER="earnie-productive"
+
+case "$ARG" in
+  title)
+    echo "Earnie Energy"
+    exit 0
+    ;;
+  check)
+    STATE="$(docker inspect -f '{{.State.Status}}' "$CONTAINER" 2>/dev/null || true)"
+    if [ "$STATE" = "running" ]; then
+      echo "Earnie container is running."
+      exit 5
+    fi
+    SVC="$(systemctl show --value --property ActiveState earnie 2>/dev/null || true)"
+    if [ "$SVC" = "active" ]; then
+      echo "Systemd unit active but container state is '${STATE:-unknown}'."
+      exit 4
+    fi
+    echo "Earnie container is not running (state=${STATE:-missing})."
+    exit 3
+    ;;
+  *)
+    echo "Usage: $0 title|check" >&2
+    exit 1
+    ;;
+esac

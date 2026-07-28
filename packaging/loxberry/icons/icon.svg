@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Earnie">
+  <rect width="128" height="128" rx="24" fill="#1B4D3E"/>
+  <path d="M32 78 L48 52 L64 66 L80 40 L96 58" fill="none" stroke="#F4C95D" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="96" cy="36" r="10" fill="#F4C95D"/>
+  <text x="64" y="108" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700" fill="#E8F0EC">Earnie</text>
+</svg>

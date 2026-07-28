@@ -24,7 +24,7 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 | Hub isolation | No OpenEMS, Home Assistant, evcc, or Loxone types in the math core |
 | Adapter duty | Map hub channels/entities → EHAL; normalize signs and units inside the adapter |
 | Transport | Network only (REST / WebSocket / JSON). No linking or copying hub source into Earnie repos (Separate Works / AGPL shield for OpenEMS) |
-| Loxone today | Production Loxone path stays **pre-EHAL** until **2.5.a**; this freeze does not force cutover |
+| Loxone today | Production Loxone path stays **pre-EHAL** until **2.4.e**; this freeze does not force cutover |
 
 ## Schema version and envelope
 
@@ -157,16 +157,16 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 
 | Class | When |
 |-------|------|
-| Heatpump | Not in M1 EHAL; later Thermals / flex-consumer extension and/or **2.5.c** device-role templates |
-| Generic consumer | Today Loxone flex markers; EHAL consumer roles with **2.5.a** / **2.5.c** |
+| Heatpump | Not in M1 EHAL; later Thermals / flex-consumer extension and/or **2.4.g** device-role templates |
+| Generic consumer | Today Loxone flex markers; EHAL consumer roles with **2.4.e** / **2.4.g** |
 
 ## Out of scope (this freeze)
 
 - MQTT / Matter as first-class hubs
-- Loxone-EHAL extraction (**2.5**)
+- Loxone-EHAL extraction (**2.4.e**)
 - HA WebSocket state subscription / direct evcc REST adapter (deferred; REST HA path is **2.4.c**)
-- Loxone extras as first-class EHAL fields: `target_soc`, `control_cmd`, flex enable, EV **kW** setpoint (remain pre-EHAL / **2.5**)
-- Modbus hardware-profile library (Entwicklungsplan M2 / M4)
+- Loxone extras as first-class EHAL fields: `target_soc`, `control_cmd`, flex enable, EV **kW** setpoint (remain pre-EHAL / **2.4.e**)
+- Modbus hardware-profile library (Entwicklungsplan M2 / M4; first slice **2.4.g**)
 
 ## Implementation notes (2.4.b OpenEMS)
 

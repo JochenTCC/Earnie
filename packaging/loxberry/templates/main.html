@@ -1,0 +1,47 @@
+<div class="lb-main">
+  <section class="lb-section">
+    <h2><?php echo htmlspecialchars($L['MAIN.HEADING_STATUS']); ?></h2>
+    <table class="lb-table">
+      <tr>
+        <th><?php echo htmlspecialchars($L['MAIN.PLUGIN_VERSION']); ?></th>
+        <td><?php echo htmlspecialchars($version); ?></td>
+      </tr>
+      <tr>
+        <th><?php echo htmlspecialchars($L['MAIN.SERVICE_STATUS']); ?></th>
+        <td><code><?php echo htmlspecialchars($svc); ?></code></td>
+      </tr>
+      <tr>
+        <th><?php echo htmlspecialchars($L['MAIN.CONTAINER_STATUS']); ?></th>
+        <td><code><?php echo htmlspecialchars($ctr); ?></code></td>
+      </tr>
+      <tr>
+        <th><?php echo htmlspecialchars($L['MAIN.IMAGE_TAG']); ?></th>
+        <td><code><?php echo htmlspecialchars($image); ?></code></td>
+      </tr>
+    </table>
+
+    <form method="post" action="index.php" style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:0.5rem;">
+      <button type="submit" name="action" value="start" class="lb-btn"><?php echo htmlspecialchars($L['MAIN.BTN_START']); ?></button>
+      <button type="submit" name="action" value="stop" class="lb-btn"><?php echo htmlspecialchars($L['MAIN.BTN_STOP']); ?></button>
+      <button type="submit" name="action" value="restart" class="lb-btn"><?php echo htmlspecialchars($L['MAIN.BTN_RESTART']); ?></button>
+      <button type="submit" name="action" value="pull" class="lb-btn"><?php echo htmlspecialchars($L['MAIN.BTN_PULL']); ?></button>
+    </form>
+  </section>
+
+  <section class="lb-section" style="margin-top:1.5rem;">
+    <h2><?php echo htmlspecialchars($L['MAIN.HEADING_UI']); ?></h2>
+    <p><?php echo htmlspecialchars($L['MAIN.UI_DESC']); ?></p>
+    <p><a class="lb-btn" href="<?php echo htmlspecialchars($uiurl); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($L['MAIN.BTN_OPEN_UI']); ?></a>
+      <code><?php echo htmlspecialchars($uiurl); ?></code></p>
+  </section>
+
+  <section class="lb-section" style="margin-top:1.5rem;">
+    <h2><?php echo htmlspecialchars($L['MAIN.HEADING_HINTS']); ?></h2>
+    <ul>
+      <li><?php echo htmlspecialchars($L['MAIN.HINT_GONOGO']); ?></li>
+      <li><?php echo htmlspecialchars($L['MAIN.HINT_PULL']); ?></li>
+      <li><?php echo htmlspecialchars($L['MAIN.HINT_DATA']); ?></li>
+      <li><?php echo htmlspecialchars($L['MAIN.HINT_MANUAL']); ?></li>
+    </ul>
+  </section>
+</div>
