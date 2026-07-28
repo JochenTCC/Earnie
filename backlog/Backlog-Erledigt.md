@@ -12,6 +12,7 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 ### 2.4.b OpenEMS EHAL prototype (2026-07-27)
 
 - [x] **2.4.b — OpenEMS EHAL prototype (Phase 2 / M1)** — REST-only `integrations/openems_adapter.py` + thin Live bridge `integrations/ehal_live.py` (`ehal.backend=openems`); lab Compose [`docker/compose/openems-lab.yml`](../docker/compose/openems-lab.yml); write-lock degrade → `runtime/ehal_write_error.json` + Streamlit hint; config schema/snippet; mocked tests; no OpenEMS libs in-repo (→ 2.4.c / 2.5)
+- [x] **OpenEMS lab acceptance (combined Compose)** — Pi/lab host `192.168.178.34`: Earnie ↔ OpenEMS REST communication verified per [`docs/spec/openems-lab-setup.md`](../docs/spec/openems-lab-setup.md); Live-Cockpit Loxone-marker gate still stubbed (expected)
 
 
 ### 2.4.a EHAL specification (2026-07-27)

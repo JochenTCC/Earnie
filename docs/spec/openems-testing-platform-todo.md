@@ -302,7 +302,7 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 - [x] Python OpenEMS-EHAL adapter (network client only) — `integrations/openems_adapter.py` + `integrations/ehal_live.py`
 - [x] Map minimal field set above; Live consumes EHAL under `ehal.backend=openems` (see `share/config/ehal.openems.snippet.json`)
 - [x] Negativtests: write lock → log + UI hint + capability degrade (unit-tested with mocked HTTP 403; lab: guest password / ReadOnly REST)
-- [ ] Lab acceptance on combined Compose: follow [`openems-lab-setup.md`](openems-lab-setup.md) §4 (Earnie reads SoC via `openems-edge:8084`)
+- [x] Lab acceptance on combined Compose: follow [`openems-lab-setup.md`](openems-lab-setup.md) §4 (Earnie reads SoC via `openems-edge:8084`)
 
 *(Implementation: backlog `2.4.b`. EHAL schemas frozen under `2.4.a` / [`ehal.md`](ehal.md).)*
 

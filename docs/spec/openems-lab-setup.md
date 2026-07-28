@@ -46,8 +46,8 @@ Host/PC ──► :8080 ──► openems_edge (Felix configMgr)
 | Audience                              | OpenEMS REST base URL                                                                   |
 | ------------------------------------- | --------------------------------------------------------------------------------------- |
 | Earnie **inside** Compose             | `http://openems-edge:8084` (service name — **not** `localhost`, **not** `openems_edge`) |
-| curl / browser on the **Docker host** | `http://127.0.0.1:8084` or `http://localhost:8084`                                      |
-| Another PC on the LAN                 | `http://<HOST_LAN_IP>:8084` (example historically: `192.168.178.34`)                    |
+| curl / browser on the **Docker host** | `http://192.168.178.34:8084`                                                            |
+| Another PC on the LAN                 | `http://192.168.178.34:8084` (lab host LAN IP)                                          |
 
 
 **Volumes (bind mounts from repo root):**
@@ -84,11 +84,11 @@ openems_ui    … 8088->80, 8443->443
 earnie-openems-lab … 8503->8501
 ```
 
-- [x] Stop any older Earnie stack that also binds **8501** / confuses you (`ernie-optimizer-ui`, etc.). Lab UI is **[http://localhost:8503](http://localhost:8503)**.
-- [ ] Set `OPENEMS_UI_WEBSOCKET_HOST` to the **LAN IP of the Docker host** (browser must reach Edge WS). Default in Compose may still be `192.168.178.34` — override if your PC/Pi IP differs:
+- [x] Stop any older Earnie stack that also binds **8501** / confuses you (`ernie-optimizer-ui`, etc.). Lab UI is **[http://192.168.178.34:8503](http://192.168.178.34:8503)**.
+- [ ] Set `OPENEMS_UI_WEBSOCKET_HOST` to the **LAN IP of the Docker host** (browser must reach Edge WS). Lab default: `192.168.178.34` — override if your PC/Pi IP differs:
 
 ```powershell
-$env:OPENEMS_UI_WEBSOCKET_HOST = "<YOUR_LAN_IP>"
+$env:OPENEMS_UI_WEBSOCKET_HOST = "192.168.178.34"
 docker compose --project-directory . -f docker/compose/openems-lab.yml up -d
 ```
 
@@ -163,7 +163,7 @@ Config is loaded at process start — editing JSON alone is not enough.
 
 ### 1.5 Live planning (needed for a full Live cycle)
 
-SoC read from OpenEMS is enough to prove the adapter path. A **full** optimization cycle still needs a usable Live scenario (house profile, battery, tariffs) — same idea as [Greenfield](../einrichtung/greenfield-dev-stack.md): complete Hauskonfigurator + Live scenario under **[http://localhost:8503](http://localhost:8503)**. Without that, Live may fail later for planning reasons even when OpenEMS REST works.
+SoC read from OpenEMS is enough to prove the adapter path. A **full** optimization cycle still needs a usable Live scenario (house profile, battery, tariffs) — same idea as [Greenfield](../einrichtung/greenfield-dev-stack.md): complete Hauskonfigurator + Live scenario under **[http://192.168.178.34:8503](http://192.168.178.34:8503)**. Without that, Live may fail later for planning reasons even when OpenEMS REST works.
 
 ---
 
@@ -173,8 +173,8 @@ SoC read from OpenEMS is enough to prove the adapter path. A **full** optimizati
 
 Edge named volumes start **empty** on a new host. If this Edge was never configured (or volumes were recreated), install the plant again.
 
-**UI:** [http://localhost:8088/](http://localhost:8088/) — login **admin** / **admin** (Settings → Install components).  
-**Felix:** [http://localhost:8080/system/console/configMgr](http://localhost:8080/system/console/configMgr) — **admin** / **admin**.
+**UI:** [http://192.168.178.34:8088/](http://192.168.178.34:8088/) — login **admin** / **admin** (Settings → Install components).  
+**Felix:** [http://192.168.178.34:8080/system/console/configMgr](http://192.168.178.34:8080/system/console/configMgr) — **admin** / **admin**.
 
 Install in order (IDs matter). Full checklist and channel notes: `[openems-testing-platform-todo.md](openems-testing-platform-todo.md)` §3.
 
@@ -227,11 +227,11 @@ Use `curl.exe` on Windows PowerShell (`curl` alone is `Invoke-WebRequest`).
 ### 3.1 Host → Edge REST (OpenEMS alone)
 
 ```powershell
-curl.exe -u x:admin http://127.0.0.1:8084/rest/channel/_sum/GridActivePower
-curl.exe -u x:admin http://127.0.0.1:8084/rest/channel/_sum/ProductionActivePower
-curl.exe -u x:admin http://127.0.0.1:8084/rest/channel/_sum/EssSoc
-curl.exe -u x:admin http://127.0.0.1:8084/rest/channel/ess0/Soc
-curl.exe -u x:admin http://127.0.0.1:8084/rest/channel/evcs0/ActivePower
+curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
+curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/ProductionActivePower
+curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/EssSoc
+curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/ess0/Soc
+curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/evcs0/ActivePower
 ```
 
 **Pass:** JSON with a numeric `"value"`.  
@@ -240,8 +240,8 @@ curl.exe -u x:admin http://127.0.0.1:8084/rest/channel/evcs0/ActivePower
 Optional write (admin):
 
 ```powershell
-curl.exe -X POST -u x:admin -H "Content-Type: application/json" -d '{"value": 1000}' http://127.0.0.1:8084/rest/channel/ess0/SetActivePowerEquals
-curl.exe -u x:admin http://127.0.0.1:8084/rest/channel/ess0/ActivePower
+curl.exe -X POST -u x:admin -H "Content-Type: application/json" -d '{"value": 1000}' http://192.168.178.34:8084/rest/channel/ess0/SetActivePowerEquals
+curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/ess0/ActivePower
 ```
 
 
@@ -283,7 +283,7 @@ docker compose --project-directory . -f docker/compose/openems-lab.yml logs -f e
 | `Silent-Modus aktiv: … ohne Schreibzugriffe auf OpenEMS` | Reads OK; writes gated                                      |
 
 
-UI: **[http://localhost:8503](http://localhost:8503)** → Daemon / Loxone-Kommunikation — watch for EHAL write-error banner (`runtime/ehal_write_error.json`).
+UI: **[http://192.168.178.34:8503](http://192.168.178.34:8503)** → Daemon / Loxone-Kommunikation — watch for EHAL write-error banner (`runtime/ehal_write_error.json`).
 
 ### 3.4 Optional: adapter smoke from inside Earnie
 

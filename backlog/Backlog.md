@@ -9,13 +9,11 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
+- [ ] Check possibilities to get quarterly-hour EPEX prices and change optimization to 15 min slots
 
 
 ## Feature Backlog
 
-### Version 2.3.2 -- Feature Addition
-
-- [ ] Check possibilties to get quarterly hour EPEX prices and change optimization to 15 min slots
 
 ### Version 2.4 — EHAL foundation & DACH docking (OpenEMS + HA/evcc)
 
@@ -26,8 +24,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) — thin Docker wrapper over existing `loxberry_productive` compose; not a native host install.  
 **Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
-
-- [ ] Follow .\docs\spec\openems-lab-setup.md to setup openems-lab on Raspberry
 
 - [ ] **2.4.c — HA-EHAL + evcc under HA (Phase 2b / M1.5, DACH default)**
   - One production **HA-EHAL-Adapter** (WS/REST); prefer stable HA entities from evcc (lab-only direct evcc optional)
