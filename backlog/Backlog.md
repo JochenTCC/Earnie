@@ -28,6 +28,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths after structure compare-all (`2.4.f`) yields a chosen source
   - Manual blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
   - EFM has **no** multi-column Statistik export of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23)
+- [ ] **2.4.i**
+  - Clarify how user could get a one-time registry that is bound to their hardware
+  - What are the technical prerequisites to make that running?
+  - **Banner der Wahrheit — Layer C (deferred):** signed official builds / GHCR attestation + startup verifier; tie to hardware registry. Enforces attribution on *official* distribution only — not source forks. See plan outline (A + light B shipped in 2.2.0).
 - [ ] **2.4.0 — Release**
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
@@ -36,28 +40,21 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - **Note:** EFM auto-sync (`2.4.i`) is not a hard gate for `2.4.0`
 
 
-### Version 2.+1 — Improve "security" against violating License agreements
-
-- [ ] Clarify how user could get a one-time registry that is bound to their hardware
-  - What are the technical prerequisites to make that running?
-- [ ] **Banner der Wahrheit — Layer C (deferred):** signed official builds / GHCR attestation + startup verifier; tie to hardware registry. Enforces attribution on *official* distribution only — not source forks. See plan outline (A + light B shipped in 2.2.0).
-
-
-### Version 2.+1 — Investigate full migration to 15‑min slots (former B)
+### Version 2.5 — Investigate full migration to 15‑min slots (former B)
 
 **Context:** Day-Ahead clearing is 15‑min MTU since ~2025-10-01. Earnie already fetches Energy-Charts (free, CC BY 4.0; native 15‑min after go-live) but `normalize_price_slot` floors to the hour — MILP still assumes `dt ≡ 1 h`. Official EPEX SFTP/MATS stays out of scope (paid; external use = license quote). aWATTar remains hourly fallback only. Prior deferral: **2.3.c.2** takeaway *variable sample time — hard*. Related open check: **2.3.2**.
 
 **Scope of this chapter:** Investigate and decide whether/how to run the **full** optimizer on 15‑min slots (option B), not only “prices only” averaging (A) or hybrid grids (C).
 
-- [ ] **2.6.a — Data & tariff fidelity**
+- [ ] **2.5.a — Data & tariff fidelity**
   - Confirm Energy-Charts 15‑min coverage (AT/DE-LU/CH) vs pre-2025-10 hourly history; mixed-resolution handling
   - Map which catalog tariffs settle on ¼‑h EPEX vs hourly average; document billing vs plan mismatch if MILP stays hourly
   - Keep official EPEX unconnected unless a paid/internal use case appears
-- [ ] **2.6.b — MILP / horizon impact study**
+- [ ] **2.5.b — MILP / horizon impact study**
   - Explicit `dt_h` (0.25): battery SoC, wear, import/export cost, EV/thermal/generic (`min_on_quarterhours` as real slots)
   - Size estimate: ~4× variables on sunset→sunset; HiGHS/CBC solve time Live vs SE (`sunrise_window` / commit-K)
   - List breakages: `cons_data_hourly`, PV/price forecasts, charts (today mixed 15‑min log + 1‑h MILP), Loxone write cadence
-- [ ] **2.6.c — Go / no-go + backlog split**
+- [ ] **2.5.c — Go / no-go + backlog split**
   - Decide: full B vs stay hourly + optional A (store QH prices for SE/billing only) vs hybrid C
   - If go: carve implementation phases into this MINOR (or successor); if no-go: archive rationale and close **2.3.2** accordingly
 
