@@ -13,6 +13,18 @@ def test_normalize_backend_defaults_to_loxone():
     assert ehal_setup.normalize_backend("openems") == "openems"
 
 
+def test_load_ehal_params_defaults_to_loxone_backend():
+    from settings.config_loaders import load_ehal_params
+
+    empty = load_ehal_params({})
+    assert empty["EHAL_BACKEND"] == "loxone"
+    assert empty["EHAL_ADAPTER_ID"] == "loxone-home"
+
+    explicit = load_ehal_params({"ehal": {"backend": "loxone", "adapter_id": "prod"}})
+    assert explicit["EHAL_BACKEND"] == "loxone"
+    assert explicit["EHAL_ADAPTER_ID"] == "prod"
+
+
 def test_hub_credentials_ha_and_openems(tmp_path, monkeypatch):
     config_path = tmp_path / "config.json"
     monkeypatch.setattr(

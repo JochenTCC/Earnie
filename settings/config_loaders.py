@@ -120,20 +120,27 @@ def load_loxone_block_params(raw_config: dict, config_path: str) -> dict[str, An
 
 
 def load_ehal_params(raw_config: dict) -> dict[str, Any]:
-    """Optional ehal block; missing/empty backend keeps legacy Loxone Live I/O."""
+    """Optional ehal block; missing/empty/none backend defaults to Loxone-EHAL."""
     ehal = raw_config.get("ehal")
     if not isinstance(ehal, dict):
         ehal = {}
     backend = str(ehal.get("backend") or "").strip().lower()
     if backend in ("", "loxone", "none"):
-        backend = ""
+        backend = "loxone"
+    elif backend not in ("ha", "openems"):
+        backend = "loxone"
     openems = ehal.get("openems") if isinstance(ehal.get("openems"), dict) else {}
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
     entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}
     sign = ha.get("sign") if isinstance(ha.get("sign"), dict) else {}
-    default_adapter = "ha-home" if backend == "ha" else "openems-lab"
+    if backend == "ha":
+        default_adapter = "ha-home"
+    elif backend == "openems":
+        default_adapter = "openems-lab"
+    else:
+        default_adapter = "loxone-home"
     return {
-        "EHAL_BACKEND": backend or None,
+        "EHAL_BACKEND": backend,
         "EHAL_ADAPTER_ID": str(ehal.get("adapter_id") or default_adapter),
         "EHAL_OPENEMS_BASE_URL": str(openems.get("base_url") or "").strip(),
         "EHAL_OPENEMS_USERNAME": str(openems.get("username") or "x"),

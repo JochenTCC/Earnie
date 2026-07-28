@@ -35,7 +35,7 @@
     },
     "ehal": {
       "$ref": "#/definitions/ehal",
-      "description": "Optional southbound backend. Missing/loxone = legacy Loxone Live I/O; openems = OpenEMS REST (2.4.b); ha = Home Assistant REST (2.4.c)."
+      "description": "Optional southbound backend. Missing/loxone/none = Loxone-EHAL (M1 plant via loxone_adapter); openems = OpenEMS REST; ha = Home Assistant REST."
     },
     "flexible_consumers": {
       "type": "array",
@@ -487,7 +487,7 @@
         "backend": {
           "type": "string",
           "enum": ["openems", "ha", "loxone", "none"],
-          "description": "openems = Live M1 via OpenEMS REST; ha = Home Assistant REST (2.4.c); omit/loxone/none = legacy Loxone path."
+          "description": "openems = Live M1 via OpenEMS REST; ha = Home Assistant REST; omit/loxone/none = Loxone-EHAL (M1 telemetry; flex/Huawei extras still via loxone_client)."
         },
         "adapter_id": {
           "type": "string",

@@ -24,7 +24,7 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 | Hub isolation | No OpenEMS, Home Assistant, evcc, or Loxone types in the math core |
 | Adapter duty | Map hub channels/entities → EHAL; normalize signs and units inside the adapter |
 | Transport | Network only (REST / WebSocket / JSON). No linking or copying hub source into Earnie repos (Separate Works / AGPL shield for OpenEMS) |
-| Loxone today | Production Loxone path stays **pre-EHAL** until **2.4.e**; this freeze does not force cutover |
+| Loxone today | Default `ehal.backend=loxone` uses [`integrations/loxone_adapter.py`](../../integrations/loxone_adapter.py) for M1 plant telemetry; Huawei extras + flex remain on `loxone_client` (not first-class EHAL fields) |
 
 ## Schema version and envelope
 
@@ -158,14 +158,13 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 | Class | When |
 |-------|------|
 | Heatpump | Not in M1 EHAL; later Thermals / flex-consumer extension and/or **2.4.g** device-role templates |
-| Generic consumer | Today Loxone flex markers; EHAL consumer roles with **2.4.e** / **2.4.g** |
+| Generic consumer | Today Loxone flex markers (still pre-EHAL after **2.4.e**); EHAL consumer roles with **2.4.g** |
 
 ## Out of scope (this freeze)
 
 - MQTT / Matter as first-class hubs
-- Loxone-EHAL extraction (**2.4.e**)
 - HA WebSocket state subscription / direct evcc REST adapter (deferred; REST HA path is **2.4.c**)
-- Loxone extras as first-class EHAL fields: `target_soc`, `control_cmd`, flex enable, EV **kW** setpoint (remain pre-EHAL / **2.4.e**)
+- Loxone extras as first-class EHAL fields: `target_soc`, `control_cmd`, flex enable, EV **kW** setpoint (remain on `loxone_client` after **2.4.e** M1 extraction)
 - Modbus hardware-profile library (Entwicklungsplan M2 / M4; first slice **2.4.g**)
 
 ## Implementation notes (2.4.b OpenEMS)
@@ -187,6 +186,15 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 - Setpoints: typically `number.set_value` on mapped entities (Amps for EVCS; W for ESS limits).
 - Optimizer exclusivity + single Modbus writer: see German checklist in `ha-evcc.md`.
 - Same Live façade / write-error path as OpenEMS (`is_ehal_network_backend()`).
+
+## Implementation notes (2.4.e Loxone)
+
+- Adapter: `integrations/loxone_adapter.py` (HTTP markers via `loxone_client`). Live façade: `integrations/ehal_live.py` (`get_adapter()` includes Loxone).
+- Default config: missing/`none`/`loxone` → `EHAL_BACKEND=loxone`, `adapter_id` default `loxone-home`. Marker names stay on `loxone_blocks.*` / `LOXONE_*` (no nesting rewrite).
+- Telemetry: kW markers → W; Loxone battery **+charge** → EHAL `ess_power` **+discharge** (`× −1000`); grid pass-through as EHAL `+` import.
+- Capabilities: `supports_ess_write` when charge/discharge markers exist; **`supports_evcs_current=false`** (EV stays on flex `power_setpoint_name`).
+- Live writes for Loxone: still `send_huawei_modbus_states` + `send_flexible_consumer_states` (`is_ehal_network_backend()` remains openems|ha only). Adapter `write_setpoints` maps ESS limits for contract/future use; does **not** replace `target_soc` / `control_cmd`.
+- Extras still outside M1 EHAL: `target_soc`, `control_cmd`, flex enable, EV kW, FTP/PV-counter, optimizer marker reads (EV/thermal/events).
 
 ## Connector-author checklist
 

@@ -69,7 +69,14 @@ def test_live_power_identical_when_only_backend_switches():
         config_mock.get.side_effect = _config_side_effect("ha")
         ha_power = ehal_live.read_live_power_kw()
 
-    assert openems_power == ha_power
+    ehal_live.reset_adapter_cache()
+    with patch("integrations.ehal_live.config") as config_mock, patch(
+        "integrations.ehal_live.get_loxone_adapter", return_value=adapter
+    ):
+        config_mock.get.side_effect = _config_side_effect("loxone")
+        loxone_power = ehal_live.read_live_power_kw()
+
+    assert openems_power == ha_power == loxone_power
     assert openems_power is not None
     assert openems_power["pv"] == 2.0
     assert openems_power["grid"] == 1.0
@@ -128,4 +135,14 @@ def test_is_ehal_network_backend_for_ha(config_mock):
     config_mock.get.side_effect = _config_side_effect("ha")
     assert ehal_live.is_ha_backend() is True
     assert ehal_live.is_ehal_network_backend() is True
+    assert ehal_live.is_openems_backend() is False
+
+
+@patch("integrations.ehal_live.config")
+def test_loxone_backend_is_not_network_backend(config_mock):
+    ehal_live.reset_adapter_cache()
+    config_mock.get.side_effect = _config_side_effect("loxone")
+    assert ehal_live.is_loxone_backend() is True
+    assert ehal_live.is_ehal_network_backend() is False
+    assert ehal_live.is_ha_backend() is False
     assert ehal_live.is_openems_backend() is False

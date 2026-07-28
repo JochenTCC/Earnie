@@ -82,8 +82,8 @@ def test_run_payload_forecast_pv_kw_uses_pre_overlay_matrix(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        main_module.loxone_client,
-        "fetch_loxone_live_power",
+        main_module.ehal_live,
+        "read_live_power_kw",
         lambda: {"house": 1.0, "pv": 4.2, "grid": 0.0, "battery": 0.0},
     )
     monkeypatch.setattr(main_module.pv_tuner, "get_pv_delta_peek", MagicMock(return_value=1.5))

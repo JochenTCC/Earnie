@@ -49,6 +49,32 @@ def test_read_live_power_kw_ha_backend(config_mock, adapter_factory):
     assert power["battery"] == -0.5
 
 
+@patch("integrations.ehal_live.get_loxone_adapter")
+@patch("integrations.ehal_live.config")
+def test_read_live_power_kw_loxone_backend(config_mock, adapter_factory):
+    ehal_live.reset_adapter_cache()
+    config_mock.get.side_effect = lambda key, default=None: {
+        "EHAL_BACKEND": "loxone",
+    }.get(key, default)
+    adapter = MagicMock()
+    adapter.read_telemetry.return_value = {
+        "schema_version": EHAL_SCHEMA_VERSION,
+        "ts": "2026-07-28T12:00:00Z",
+        "adapter_id": "loxone-home",
+        "grid_power_active": 1000.0,
+        "pv_production_active": 2000.0,
+        "ess_soc": 50.0,
+        "ess_power": 500.0,
+    }
+    adapter_factory.return_value = adapter
+    power = ehal_live.read_live_power_kw()
+    assert power is not None
+    assert power["pv"] == 2.0
+    assert power["battery"] == -0.5
+    assert ehal_live.is_loxone_backend() is True
+    assert ehal_live.is_ehal_network_backend() is False
+
+
 @patch("integrations.ehal_live.get_openems_adapter")
 @patch("integrations.ehal_live.config")
 def test_read_live_power_kw_sign(config_mock, adapter_factory):

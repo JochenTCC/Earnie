@@ -7,7 +7,8 @@ Patched (non-exhaustive of all main imports, but enough for a silent/full run):
   config.reload_config / is_loxone_silent_mode / is_sunrise_planning_horizon /
   get_event_triggers / get_battery_params
   profile_manager (month check, planning window, matrix)
-  loxone_client (SoC, live power, flex kw, resolve live power, snapshot, consumers)
+  loxone_client (flex kw, resolve live power, snapshot, consumers)
+  ehal_live.read_ess_soc / read_live_power_kw
   awattar_client.fetch_awattar_prices
   consumer_targets.resolve_consumer_daily_targets
   optimizer.prepare_optimization_matrix / get_consumer_remaining_kwh /
@@ -68,9 +69,9 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
         sample_planning_window,
     )
     monkeypatch.setattr(
-        main_module.loxone_client,
-        "fetch_loxone_generic_value",
-        lambda _name: 50.0,
+        main_module.ehal_live,
+        "read_ess_soc",
+        lambda: 50.0,
     )
     monkeypatch.setattr(
         main_module.awattar_client,
@@ -91,7 +92,7 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
             }
         ],
     )
-    monkeypatch.setattr(main_module.loxone_client, "fetch_loxone_live_power", lambda: None)
+    monkeypatch.setattr(main_module.ehal_live, "read_live_power_kw", lambda: None)
     monkeypatch.setattr(
         main_module.consumer_targets,
         "resolve_consumer_daily_targets",

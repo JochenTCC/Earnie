@@ -55,7 +55,7 @@ Nur bei Backend **Home Assistant**: Entities scannen, Telemetrie-/Setpoint-Felde
 
 ### Anlagen-Merker / Event-Trigger
 
-Loxone-Rollen (`loxone_blocks`, `system.event_triggers`) — für Legacy-Live und künftiges Loxone-EHAL. Bei HA/OpenEMS im Expander (standardmäßig zugeklappt). Siehe [Loxone-Signale](../referenz/loxone-signale.md).
+Loxone-Rollen (`loxone_blocks`, `system.event_triggers`) — Anlagen-Merker für den Loxone-EHAL-Adapter (M1) und Flex-/Extra-Marker. Bei HA/OpenEMS im Expander (standardmäßig zugeklappt). Siehe [Loxone-Signale](../referenz/loxone-signale.md).
 
 ## Silent-Modus vs. Live-Modus
 

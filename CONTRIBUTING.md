@@ -60,7 +60,7 @@ Adapter-Vertrag (Kurzfassung):
 - Anbindung nur über **Netzwerk-API** (REST/WS); keine Hub-Quelltexte oder Libraries in Earnie-Repos (Separate Works, z. B. OpenEMS/AGPL).
 - Setpoints = **Grenzen/Fahrpläne**; Echtzeitregelung bleibt im Subsystem.
 
-Roadmap: OpenEMS-Prototyp (`2.4.b`), HA+evcc (`2.4.c`), Loxone-EHAL (`2.5`). Bis Loxone auf EHAL liegt, bleibt der produktive Loxone-Pfad pre-EHAL.
+Roadmap: OpenEMS-Prototyp (`2.4.b`), HA+evcc (`2.4.c`), Loxone-EHAL M1 (`2.4.e`). Flex/`target_soc`/`control_cmd` bleiben vorerst auf `loxone_client` (kein Schema-Erweiterung in `2.4.e`).
 
 Nicht alles ist Teil des Basis-Setups (z. B. individuelle Pool-, Klima- oder Sonderanlagen). Technisch versierte Nutzer dürfen den Local Core und vorhandene Schnittstellen nutzen, um **eigene Logiken** anzubinden — unter derselben Lizenz; neue Hubs idealerweise als EHAL-Adapter.
 

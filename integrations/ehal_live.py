@@ -1,4 +1,4 @@
-"""Thin Live façade: OpenEMS/HA EHAL backends vs legacy Loxone path."""
+"""Thin Live façade: OpenEMS/HA/Loxone EHAL adapters for plant I/O."""
 from __future__ import annotations
 
 import json
@@ -11,6 +11,7 @@ import config
 from ehal import EHAL_SCHEMA_VERSION, EhalWriteError, validate_write_error
 from integrations import loxone_client
 from integrations.ha_adapter import HaAdapter, HaConfig, HaHttpError
+from integrations.loxone_adapter import LoxoneAdapter, LoxoneAdapterError, LoxoneConfig
 from integrations.openems_adapter import OpenemsAdapter, OpenemsConfig, OpenemsHttpError
 from runtime_store.persist_paths import runtime_path
 from settings.ev_power import ev_nominal_power_conversion, kw_to_ampere
@@ -21,6 +22,7 @@ WRITE_ERROR_FILENAME = "ehal_write_error.json"
 
 _openems_adapter: OpenemsAdapter | None = None
 _ha_adapter: HaAdapter | None = None
+_loxone_adapter: LoxoneAdapter | None = None
 
 
 class _EhalNetworkAdapter(Protocol):
@@ -42,7 +44,13 @@ def is_ha_backend() -> bool:
     return str(config.get("EHAL_BACKEND") or "").strip().lower() == "ha"
 
 
+def is_loxone_backend() -> bool:
+    backend = str(config.get("EHAL_BACKEND") or "").strip().lower()
+    return backend in ("", "loxone")
+
+
 def is_ehal_network_backend() -> bool:
+    """True for OpenEMS/HA only (skips Loxone flex / Huawei extras write path)."""
     return is_openems_backend() or is_ha_backend()
 
 
@@ -143,25 +151,63 @@ def get_ha_adapter() -> HaAdapter:
     return _ha_adapter
 
 
+def get_loxone_adapter() -> LoxoneAdapter:
+    global _loxone_adapter
+    cfg = LoxoneConfig(
+        adapter_id=str(config.get("EHAL_ADAPTER_ID") or "loxone-home"),
+        soc_name=str(config.get("LOXONE_SOC_NAME") or ""),
+        pv_power_name=str(config.get("LOXONE_PV_POWER_NAME") or ""),
+        battery_power_name=str(config.get("LOXONE_BATTERY_POWER_NAME") or ""),
+        grid_power_name=str(config.get("LOXONE_GRID_POWER_NAME") or ""),
+        charge_power_name=str(config.get("LOXONE_TARGET_CHARGE_POWER_NAME") or ""),
+        discharge_power_name=str(
+            config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME") or ""
+        ),
+        timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
+    )
+    if _loxone_adapter is not None and _loxone_adapter.cfg != cfg:
+        _loxone_adapter = None
+    if _loxone_adapter is None:
+        _loxone_adapter = LoxoneAdapter(cfg)
+    return _loxone_adapter
+
+
 def get_network_adapter() -> _EhalNetworkAdapter:
+    """OpenEMS or HA adapter (raises if Loxone backend)."""
     if is_ha_backend():
         return get_ha_adapter()
-    return get_openems_adapter()
+    if is_openems_backend():
+        return get_openems_adapter()
+    raise ValueError("get_network_adapter requires ehal.backend openems or ha")
+
+
+def get_adapter() -> _EhalNetworkAdapter:
+    """Active EHAL adapter including Loxone (default production path)."""
+    if is_ha_backend():
+        return get_ha_adapter()
+    if is_openems_backend():
+        return get_openems_adapter()
+    return get_loxone_adapter()
 
 
 def reset_adapter_cache() -> None:
     """Test helper: drop cached adapter instances."""
-    global _openems_adapter, _ha_adapter
+    global _openems_adapter, _ha_adapter, _loxone_adapter
     _openems_adapter = None
     _ha_adapter = None
+    _loxone_adapter = None
 
 
 def read_ess_soc() -> float | None:
-    if not is_ehal_network_backend():
-        return loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     try:
-        telemetry = get_network_adapter().read_telemetry()
-    except (OpenemsHttpError, HaHttpError, ValueError, OSError) as exc:
+        telemetry = get_adapter().read_telemetry()
+    except (
+        OpenemsHttpError,
+        HaHttpError,
+        LoxoneAdapterError,
+        ValueError,
+        OSError,
+    ) as exc:
         logger.error("EHAL SoC read failed: %s", exc)
         return None
     return float(telemetry["ess_soc"])
@@ -169,11 +215,15 @@ def read_ess_soc() -> float | None:
 
 def read_live_power_kw() -> dict[str, float] | None:
     """Return Live power dict (kW) in Loxone-compatible signs (+ battery = charge)."""
-    if not is_ehal_network_backend():
-        return loxone_client.fetch_loxone_live_power()
     try:
-        telemetry = get_network_adapter().read_telemetry()
-    except (OpenemsHttpError, HaHttpError, ValueError, OSError) as exc:
+        telemetry = get_adapter().read_telemetry()
+    except (
+        OpenemsHttpError,
+        HaHttpError,
+        LoxoneAdapterError,
+        ValueError,
+        OSError,
+    ) as exc:
         logger.error("EHAL live power read failed: %s", exc)
         return None
 
