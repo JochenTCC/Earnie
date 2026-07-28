@@ -3,6 +3,16 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.f Loxone one-click mapping core (2026-07-28)
+
+- [x] **2.4.f — Loxone one-click mapping + structure research (§3.1) — core** *(was 2.5.b)* — Structure **compare-all** `integrations/loxone_structure.py` (LoxAPP3.json + HTTP probe + MCP 17.1 `tools/list`; no first-wins cascade); EHAL↔`loxone_blocks` + optional Ollama `integrations/loxone_ehal_mapping.py`; HITL `ui/ehal_loxone_mapping.py` on EHAL-Com; docs [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) + [`docs/spec/ehal.md`](../docs/spec/ehal.md). Production structure source TBD after lab. EFM interpretation C remains open in [Backlog.md](Backlog.md).
+
+
+### 2.4.e Loxone-EHAL adapter extraction (2026-07-28)
+
+- [x] **2.4.e — Loxone-EHAL adapter extraction (Phase 3)** *(was 2.5.a)* — `integrations/loxone_adapter.py` emits M1 EHAL telemetry/setpoints/capabilities from `loxone_blocks` / `LOXONE_*` markers; default `ehal.backend=loxone` via `ehal_live.get_adapter()`; Huawei extras + flex remain on `loxone_client` (`is_ehal_network_backend` still openems|ha only). Spec notes in [`docs/spec/ehal.md`](../docs/spec/ehal.md); tests: `test_loxone_adapter.py`, contract/live/setup + main harness.
+
+
 ### 2.4.d LoxBerry plugin Scope A MVP (2026-07-28)
 
 - [x] **2.4.d — LoxBerry plugin Scope A MVP (thin Docker wrapper)** — In-repo [`packaging/loxberry/`](../packaging/loxberry/) (plugin `0.1.0`): hooks + systemd + compose for `ghcr.io/jochentcc/earnie-energy:latest`, minimal Plugin Admin UI, healthcheck, `release.cfg` stubs; German docs [`docs/einrichtung/loxberry-plugin.md`](../docs/einrichtung/loxberry-plugin.md); uninstall keeps `earnie_env` policy documented. Hardware ZIP install on LB 4.x still optional for live acceptance.

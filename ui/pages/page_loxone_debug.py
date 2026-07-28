@@ -75,12 +75,19 @@ def render() -> None:
         with st.expander("HA Entity → EHAL Mapping", expanded=True):
             render_ehal_ha_mapping_section()
 
+    if backend == BACKEND_LOXONE:
+        from ui.ehal_loxone_mapping import render_ehal_loxone_mapping_section
+
+        with st.expander("Loxone Struktur → EHAL Mapping", expanded=True):
+            render_ehal_loxone_mapping_section()
+
     with st.expander(
         "Loxone Anlagen-Merker / Event-Trigger",
         expanded=(backend == BACKEND_LOXONE),
     ):
         if backend != BACKEND_LOXONE:
             st.caption(
-                "Loxone-Marker — für Legacy-Live und künftiges Loxone-EHAL (2.5)."
+                "Loxone-Marker — für Loxone-EHAL und Flex-/Extras; "
+                "One-Click-Mapping oben bei Backend Loxone."
             )
         render_marker_config_editors()

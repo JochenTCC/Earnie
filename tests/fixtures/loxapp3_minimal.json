@@ -1,0 +1,47 @@
+{
+  "lastModified": "2026-07-28 12:00:00",
+  "rooms": {
+    "room-energy": {"name": "Energie"}
+  },
+  "cats": {
+    "cat-status": {"name": "Status"}
+  },
+  "controls": {
+    "uuid-pv": {
+      "name": "PV_Leistung_kW",
+      "type": "InfoOnlyAnalog",
+      "room": "room-energy",
+      "cat": "cat-status"
+    },
+    "uuid-grid": {
+      "name": "Netz_Leistung",
+      "type": "InfoOnlyAnalog",
+      "room": "room-energy",
+      "cat": "cat-status"
+    },
+    "uuid-soc": {
+      "name": "Batterie_SoC",
+      "type": "InfoOnlyAnalog",
+      "room": "room-energy",
+      "cat": "cat-status"
+    },
+    "uuid-bat": {
+      "name": "Batterie_Leistung",
+      "type": "InfoOnlyAnalog",
+      "room": "room-energy",
+      "cat": "cat-status"
+    },
+    "uuid-charge": {
+      "name": "Ziel_Ladeleistung",
+      "type": "Slider",
+      "room": "room-energy",
+      "cat": "cat-status"
+    },
+    "uuid-light": {
+      "name": "Wohnzimmer Licht",
+      "type": "Switch",
+      "room": "room-energy",
+      "cat": "cat-status"
+    }
+  }
+}

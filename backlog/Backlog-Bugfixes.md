@@ -28,5 +28,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## New Bugs (Do not remove this chapter — even if empty)
  
 - [ ] Displaying annual consumption of consumer in expander isn't updated after editing parameters
+- [ ] Loxberry Plugin - Button "Stop" is not working - manual stop works and Container-Status shows this
 
 ## Organizational Changes - no bugs (but still no development issue)

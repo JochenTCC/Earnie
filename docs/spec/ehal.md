@@ -196,6 +196,14 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 - Live writes for Loxone: still `send_huawei_modbus_states` + `send_flexible_consumer_states` (`is_ehal_network_backend()` remains openems|ha only). Adapter `write_setpoints` maps ESS limits for contract/future use; does **not** replace `target_soc` / `control_cmd`.
 - Extras still outside M1 EHAL: `target_soc`, `control_cmd`, flex enable, EV kW, FTP/PV-counter, optimizer marker reads (EV/thermal/events).
 
+## Implementation notes (2.4.f Loxone one-click mapping)
+
+- Onboarding helper **inside** the Loxone-EHAL path — not a live I/O replacement. Spec: Entwicklungsplan §3.1.
+- Structure scan (`integrations/loxone_structure.py`): **research compare-all** — LoxAPP3.json, HTTP marker probe, and optional official **MCP 17.1** `tools/list` each run as independent variants (default: all). UI shows comparison; mapping names default to **union**. No production winner locked yet — decide after lab data. `sources=(…)` may restrict variants for tests only.
+- HITL UI: `ui/ehal_loxone_mapping.py` on EHAL-Com (backend Loxone). Proposals as EHAL fields; confirm writes flat `loxone_blocks` via `save_main_config`.
+- Optional LLM: local **Ollama** HTTP (`/api/chat`, JSON). Not bundled in Earnie image / LoxBerry ZIP. Without Ollama: heuristic propose + manual selects.
+- EFM interpretation C (meter tree → Hausprofil consumers/CSV): deferred until structure path is lab-proven; manual blueprint remains `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`.
+
 ## Connector-author checklist
 
 1. Translate hub entities → EHAL only; no hub types in Core.

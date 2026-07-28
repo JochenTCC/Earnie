@@ -1,0 +1,244 @@
+"""EHAL field ↔ loxone_blocks mapping helpers + optional Ollama propose (2.4.f)."""
+from __future__ import annotations
+
+import json
+import logging
+import re
+from typing import Any
+
+import requests
+
+logger = logging.getLogger(__name__)
+
+TELEMETRY_REQUIRED = ("grid_power_active", "pv_production_active", "ess_soc")
+TELEMETRY_OPTIONAL = ("ess_power", "evcs_active_power")
+SETPOINT_FIELDS = (
+    "set_ess_charge_power_limit",
+    "set_ess_discharge_power_limit",
+    "set_evcs_max_current",
+)
+EHAL_MAP_FIELDS = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + SETPOINT_FIELDS
+EXTRAS_FIELDS = ("target_soc_name", "control_cmd_name")
+
+EHAL_TO_BLOCKS: dict[str, str] = {
+    "ess_soc": "soc_name",
+    "pv_production_active": "pv_power_name",
+    "ess_power": "battery_power_name",
+    "grid_power_active": "grid_power_name",
+    "set_ess_charge_power_limit": "target_charge_power_name",
+    "set_ess_discharge_power_limit": "target_discharge_power_name",
+}
+
+FIELD_LABELS: dict[str, str] = {
+    "grid_power_active": "Netzleistung (W, +Bezug)",
+    "pv_production_active": "PV-Produktion (W)",
+    "ess_soc": "Batterie-SoC (%)",
+    "ess_power": "Batterieleistung (W, +Entladung)",
+    "evcs_active_power": "Wallbox-Leistung (W)",
+    "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
+    "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
+    "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
+    "target_soc_name": "Loxone-Extras: Ziel-SOC",
+    "control_cmd_name": "Loxone-Extras: Steuerbefehl",
+}
+
+_HINTS: dict[str, tuple[str, ...]] = {
+    "grid_power_active": ("netz", "grid", "bezug", "energieversorger"),
+    "pv_production_active": ("pv", "produktion", "solar", "erzeug"),
+    "ess_soc": ("soc", "ladezustand", "batterie soc", "akku soc"),
+    "ess_power": ("batterie", "speicher", "akku", "ess"),
+    "evcs_active_power": ("wallbox", "evcs", "e-auto", "eauto", "ladung leistung"),
+    "set_ess_charge_power_limit": ("ladeleistung", "charge", "zwangslade"),
+    "set_ess_discharge_power_limit": ("entlade", "discharge"),
+    "set_evcs_max_current": ("maxstrom", "max current", "ladestrom"),
+    "target_soc_name": ("ziel-soc", "target soc", "soll-soc"),
+    "control_cmd_name": ("steuerbefehl", "control_cmd", "huawei", "modbus cmd"),
+}
+
+
+def ehal_mapping_to_loxone_blocks(
+    ehal_map: dict[str, str],
+    *,
+    extras: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Translate EHAL field → marker map into loxone_blocks role keys."""
+    blocks: dict[str, str] = {}
+    for field, marker in ehal_map.items():
+        role = EHAL_TO_BLOCKS.get(field)
+        name = str(marker or "").strip()
+        if role and name:
+            blocks[role] = name
+    for role, marker in (extras or {}).items():
+        name = str(marker or "").strip()
+        if role in EXTRAS_FIELDS and name:
+            blocks[role] = name
+    return blocks
+
+
+def merge_loxone_blocks(
+    existing: dict[str, Any] | None,
+    updates: dict[str, str],
+) -> dict[str, Any]:
+    """Merge mapping updates into existing loxone_blocks (preserve unrelated keys)."""
+    out = dict(existing or {}) if isinstance(existing, dict) else {}
+    for key, value in updates.items():
+        if str(value).strip():
+            out[key] = str(value).strip()
+    return out
+
+
+def heuristic_propose(
+    names: list[str],
+    *,
+    fields: tuple[str, ...] = EHAL_MAP_FIELDS + EXTRAS_FIELDS,
+) -> dict[str, dict[str, Any]]:
+    """Name-hint matching without LLM; confidence 0.35–0.75."""
+    proposals: dict[str, dict[str, Any]] = {}
+    lowered = [(n, n.lower()) for n in names if str(n).strip()]
+    for field in fields:
+        hints = _HINTS.get(field, ())
+        best_name = ""
+        best_score = 0.0
+        for name, low in lowered:
+            score = _hint_score(low, hints)
+            if score > best_score:
+                best_score = score
+                best_name = name
+        if best_name and best_score >= 0.35:
+            proposals[field] = {
+                "marker_name": best_name,
+                "confidence": round(min(0.75, best_score), 2),
+                "source": "heuristic",
+            }
+    return proposals
+
+
+def _hint_score(low_name: str, hints: tuple[str, ...]) -> float:
+    score = 0.0
+    for hint in hints:
+        if hint in low_name:
+            score = max(score, 0.55 + 0.05 * min(len(hint), 4))
+    return score
+
+
+def ollama_reachable(
+    base_url: str = "http://127.0.0.1:11434",
+    *,
+    timeout_sec: float = 2.0,
+) -> bool:
+    url = str(base_url or "").rstrip("/") + "/api/tags"
+    try:
+        response = requests.get(url, timeout=timeout_sec)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def propose_with_ollama(
+    names: list[str],
+    *,
+    base_url: str = "http://127.0.0.1:11434",
+    model: str = "llama3.2",
+    timeout_sec: float = 60.0,
+    fields: tuple[str, ...] = EHAL_MAP_FIELDS + EXTRAS_FIELDS,
+) -> dict[str, dict[str, Any]]:
+    """Ask Ollama for JSON proposals; empty dict on failure."""
+    if not names:
+        return {}
+    prompt = _build_propose_prompt(names, fields)
+    url = str(base_url or "").rstrip("/") + "/api/chat"
+    body = {
+        "model": model,
+        "stream": False,
+        "format": "json",
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You map Loxone Miniserver control names to Earnie EHAL fields. "
+                    "Reply with JSON only."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+    }
+    try:
+        response = requests.post(url, json=body, timeout=timeout_sec)
+        response.raise_for_status()
+        payload = response.json()
+    except (requests.RequestException, OSError, ValueError) as exc:
+        logger.info("Ollama propose failed: %s", exc)
+        return {}
+    content = ""
+    if isinstance(payload, dict):
+        msg = payload.get("message")
+        if isinstance(msg, dict):
+            content = str(msg.get("content") or "")
+        if not content:
+            content = str(payload.get("response") or "")
+    return parse_ollama_proposals(content, allowed_names=set(names), fields=fields)
+
+
+def _build_propose_prompt(names: list[str], fields: tuple[str, ...]) -> str:
+    sample = names[:200]
+    return (
+        "Given Loxone control names and EHAL target fields, propose the best "
+        "marker_name for each field (or omit if unsure).\n"
+        f"Fields: {list(fields)}\n"
+        f"Names: {sample}\n"
+        'Return JSON: {"mappings":[{"field":"...","marker_name":"...","confidence":0.0}]}\n'
+        "confidence is 0..1."
+    )
+
+
+def parse_ollama_proposals(
+    content: str,
+    *,
+    allowed_names: set[str],
+    fields: tuple[str, ...],
+) -> dict[str, dict[str, Any]]:
+    """Parse LLM JSON into field → {marker_name, confidence, source}."""
+    data = _extract_json_object(content)
+    if not data:
+        return {}
+    rows = data.get("mappings")
+    if not isinstance(rows, list):
+        rows = data.get("proposals") if isinstance(data.get("proposals"), list) else []
+    allowed_fields = set(fields)
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        field = str(row.get("field") or "").strip()
+        marker = str(row.get("marker_name") or row.get("name") or "").strip()
+        if field not in allowed_fields or marker not in allowed_names:
+            continue
+        try:
+            confidence = float(row.get("confidence", 0.5))
+        except (TypeError, ValueError):
+            confidence = 0.5
+        confidence = max(0.0, min(1.0, confidence))
+        out[field] = {
+            "marker_name": marker,
+            "confidence": round(confidence, 2),
+            "source": "ollama",
+        }
+    return out
+
+
+def _extract_json_object(content: str) -> dict[str, Any] | None:
+    text = str(content or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else None
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if not match:
+            return None
+        try:
+            parsed = json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
