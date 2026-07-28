@@ -27,5 +27,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
  
+- [ ] Displaying annual consumption of consumer in expander isn't updated after editing parameters
 
 ## Organizational Changes - no bugs (but still no development issue)
