@@ -1,0 +1,30 @@
+{
+  "role_id": "evcs",
+  "label": "Wallbox (EVCS)",
+  "description": "EV charge point active power and optional max-current setpoint.",
+  "status": "m1",
+  "ehal_fields": [
+    {
+      "field": "evcs_active_power",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Optional W; charge power ≥ 0 when present."
+    },
+    {
+      "field": "set_evcs_max_current",
+      "required": false,
+      "kind": "setpoint",
+      "notes": "Max EV charge current in A."
+    },
+    {
+      "field": "supports_evcs_current",
+      "required": true,
+      "kind": "capability",
+      "notes": "Loxone M1 typically false (EV stays on flex kW setpoint)."
+    }
+  ],
+  "capability_expectations": {
+    "supports_evcs_current": true
+  },
+  "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."
+}

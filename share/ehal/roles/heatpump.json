@@ -1,0 +1,21 @@
+{
+  "role_id": "heatpump",
+  "label": "Wärmepumpe (Stub)",
+  "description": "Forward-looking template. Not in M1 EHAL; later Thermals / flex-consumer. Today: thermal_annual consumer with enable freigabe.",
+  "status": "stub",
+  "ehal_fields": [
+    {
+      "field": "flex.power_name",
+      "required": false,
+      "kind": "stub",
+      "notes": "loxone_inputs.power_name on thermal_annual consumer (e.g. wp_heating)."
+    },
+    {
+      "field": "flex.enable_name",
+      "required": false,
+      "kind": "stub",
+      "notes": "loxone_outputs.enable_name — SG-Ready / Freigabe (e.g. Ernie_WP_Freigabe)."
+    }
+  ],
+  "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signale.md and Thermals backlog."
+}

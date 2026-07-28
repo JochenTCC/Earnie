@@ -157,15 +157,30 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 
 | Class | When |
 |-------|------|
-| Heatpump | Not in M1 EHAL; later Thermals / flex-consumer extension and/or **2.4.g** device-role templates |
-| Generic consumer | Today Loxone flex markers (still pre-EHAL after **2.4.e**); EHAL consumer roles with **2.4.g** |
+| Heatpump | Not in M1 EHAL wire; **2.4.g** ships a stub role template (`share/ehal/roles/heatpump.json`); later Thermals / flex-consumer may promote fields |
+| Generic consumer | Today Loxone flex markers (still pre-EHAL after **2.4.e**); **2.4.g** stub role + Loxone recipe (`share/ehal/roles/consumer.json`, `share/loxone/recipes/consumer.json`) |
+
+## Device roles and hardware profiles (2.4.g)
+
+M2 schema slice — **mapping aids / contribution seeds**, not a new Live I/O path. Full Community Bounty engine remains Entwicklungsplan **M4**.
+
+| Artifact | Path | Purpose |
+|----------|------|---------|
+| Device-role schema | [`share/ehal/device_roles.schema.json`](../../share/ehal/device_roles.schema.json) | Groups M1 fields by role (`grid`, `pv`, `ess`, `evcs`; stubs `consumer`, `heatpump`) |
+| Role instances | [`share/ehal/roles/`](../../share/ehal/roles/) | One JSON per `role_id` |
+| Hardware-profile schema | [`share/hardware_profiles/hardware_profile.schema.json`](../../share/hardware_profiles/hardware_profile.schema.json) | SunSpec / proprietary Modbus outline → EHAL bindings |
+| Outline examples | [`share/hardware_profiles/examples/`](../../share/hardware_profiles/examples/) | `sunspec_inverter_ess.outline.json`, `huawei_via_loxone.outline.json` |
+| Loxone recipes | [`share/loxone/recipes/`](../../share/loxone/recipes/) | JSON Merker / Baustein tips → `loxone_blocks` (no `.loxone` binary) |
+| Python loader | [`ehal/profiles.py`](../../ehal/profiles.py) | `list_*` / `load_*` + HITL `role_field_labels` / `group_fields_by_role` |
+
+**Rules:** Do not invent new M1 wire fields here. Stub roles use `kind: stub`. Huawei `target_soc` / `control_cmd` stay `loxone_extra:*` in hardware outlines. HITL on EHAL-Com groups mapping rows by role label; confirm/save behavior unchanged.
 
 ## Out of scope (this freeze)
 
 - MQTT / Matter as first-class hubs
 - HA WebSocket state subscription / direct evcc REST adapter (deferred; REST HA path is **2.4.c**)
 - Loxone extras as first-class EHAL fields: `target_soc`, `control_cmd`, flex enable, EV **kW** setpoint (remain on `loxone_client` after **2.4.e** M1 extraction)
-- Modbus hardware-profile library (Entwicklungsplan M2 / M4; first slice **2.4.g**)
+- Community Bounty engine / ARP scan / profile upload (Entwicklungsplan **M4**). First Modbus/SunSpec **outline** schemas shipped in **2.4.g** under `share/hardware_profiles/` — not a runtime Modbus client.
 
 ## Implementation notes (2.4.b OpenEMS)
 
@@ -200,9 +215,15 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 
 - Onboarding helper **inside** the Loxone-EHAL path — not a live I/O replacement. Spec: Entwicklungsplan §3.1.
 - Structure scan (`integrations/loxone_structure.py`): **research compare-all** — LoxAPP3.json, HTTP marker probe, and optional official **MCP 17.1** `tools/list` each run as independent variants (default: all). UI shows comparison; mapping names default to **union**. No production winner locked yet — decide after lab data. `sources=(…)` may restrict variants for tests only.
-- HITL UI: `ui/ehal_loxone_mapping.py` on EHAL-Com (backend Loxone). Proposals as EHAL fields; confirm writes flat `loxone_blocks` via `save_main_config`.
+- HITL UI: `ui/ehal_loxone_mapping.py` on EHAL-Com (backend Loxone). Proposals as EHAL fields; confirm writes flat `loxone_blocks` via `save_main_config`. Field rows grouped by device role (**2.4.g**).
 - Optional LLM: local **Ollama** HTTP (`/api/chat`, JSON). Not bundled in Earnie image / LoxBerry ZIP. Without Ollama: heuristic propose + manual selects.
-- EFM interpretation C (meter tree → Hausprofil consumers/CSV): deferred until structure path is lab-proven; manual blueprint remains `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`.
+- EFM interpretation C (meter tree → Hausprofil consumers/CSV): backlog **2.4.i**; manual blueprint remains `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`.
+
+## Implementation notes (2.4.g device / hardware profiles)
+
+- Schemas + examples only for Live; adapters keep hardcoded maps.
+- HITL labels/grouping via `ehal.profiles.role_field_labels` / `group_fields_by_role` (Loxone + HA mapping UIs).
+- Contribution entry: [CONTRIBUTING.md](../../CONTRIBUTING.md) §4.
 
 ## Connector-author checklist
 

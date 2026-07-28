@@ -21,26 +21,22 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Goal:** Freeze **EHAL**, prove Loxone-free southbounds (OpenEMS + HA/evcc), move production Loxone onto EHAL, add MCP one-click mapping, and prove config-only switch across all three. Earnie Core remains the sole 48h optimizer; hardware I/O only via EHAL (telemetry + setpoints + capability flags).  
 **Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume; **Loxone** = production path via EHAL (`2.4.e`–`2.4.h`).  
 **Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) done — thin Docker wrapper in `packaging/loxberry/` (not a native host install).  
-**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e` done; `2.4.f` core one-click mapping shipped — EFM C follow-up open). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
+**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-- [ ] **2.4.f — EFM auto-sync follow-up (after structure path)** *(remainder of was 2.5.b / §3.1)*
-  - Core compare-all mapping (LoxAPP3 + HTTP probe + MCP 17.1, optional Ollama, HITL → `loxone_blocks`) → [Backlog-Erledigt.md](Backlog-Erledigt.md); production structure source TBD after lab
-  - **Open:** Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths (interpretation C). Manual blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
-    - EFM has **no** multi-column Statistik export of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23)
-- [ ] **2.4.g — Device / hardware profile schemas (M2 slice; bounty later)** *(was 2.5.c)*
-  - EHAL-facing device role templates (battery, EVCS, PV, consumers, …) as adapter mapping aids
-  - Optional: first JSON outline for SunSpec / proprietary Modbus profiles (feeds future Path D / M4 bounty)
-  - Loxone library as counterpart templates (Baustein/marker recipes → EHAL)
-  - **Defer:** full Community Bounty engine = Entwicklungsplan **M4** (later version)
 - [ ] **2.4.h — Multi-system field test (Phase 4)** *(was 2.5.d)*
   - Prove system-agnostic core: OpenEMS ↔ HA+evcc ↔ Loxone by **config switch only**
   - Docs for connector authors; update German user docs for adapter choice including Loxone-on-EHAL
+- [ ] **2.4.i — EFM auto-sync (interpretation C)** *(follow-up from 2.4.f / §3.1)*
+  - Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths after structure compare-all (`2.4.f`) yields a chosen source
+  - Manual blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
+  - EFM has **no** multi-column Statistik export of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23)
 - [ ] **2.4.0 — Release**
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 field test (`2.4.h`) passed
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
   - “All three southbounds” release: OpenEMS ↔ HA+evcc ↔ Loxone via config switch
   - LoxBerry Scope A MVP (`2.4.d`) is implemented; ship plugin ZIP with this release when ready (hardware install acceptance optional)
+  - **Note:** EFM auto-sync (`2.4.i`) is not a hard gate for `2.4.0`
 
 
 ### Version 2.+1 — Improve "security" against violating License agreements

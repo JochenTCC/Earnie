@@ -48,21 +48,21 @@ Daten aus `runtime/optimizer_run_state.json` des letzten `main.py`-Laufs.
 
 ### HA Entity → EHAL Mapping
 
-Nur bei Backend **Home Assistant**: Entities scannen, Telemetrie-/Setpoint-Felder zuweisen, speichern.
+Nur bei Backend **Home Assistant**: Entities scannen, Telemetrie-/Setpoint-Felder zuweisen, speichern. Die Felder sind nach **Geräterollen** gruppiert (Netz / PV / Batterie / Wallbox; Vorlagen unter `share/ehal/roles/`).
 
 - Überblick / HITL: [Home Assistant + evcc](../einrichtung/ha-evcc.md) (Abschnitt *Wenn marq24 / evcc bereits in HA verbunden ist*)
 - Lab-Abnahme inkl. Stub-Werte und Tabelle: [HA-Lab Spec §5.1](../spec/ha-lab-setup.md#51-after-marq24-ha-evcc-is-connected-lab-follow-up)
 
 ### Loxone Struktur → EHAL Mapping
 
-Nur bei Backend **Loxone**: One-Click-Assistent (Backlog **2.4.f** / Entwicklungsplan §3.1).
+Nur bei Backend **Loxone**: One-Click-Assistent (Backlog **2.4.f** / Entwicklungsplan §3.1). Mapping-Zeilen sind nach Geräterollen gruppiert (gleiche Rollen-Vorlagen wie HA; Merker-Rezepte: `share/loxone/recipes/`).
 
 1. **Alle Quellen testen** — Research-Vergleich (noch keine feste Produktions-Quelle): parallel/sequentiell **LoxAPP3.json**, **HTTP-Probe** bereits konfigurierter Merker und optional **Loxone MCP 17.1** (Base-URL). Die UI zeigt eine Vergleichstabelle (ok, Anzahl Namen, vollständig, Fehler, MCP-Tools). Mapping-Dropdowns nutzen standardmäßig die **Union** aller Namen; optional Filter auf eine Einzelquelle.
 2. **Optional KI-Vorschlag** — lokales [Ollama](https://ollama.com/) (`http://127.0.0.1:11434`, Modell z. B. `llama3.2`). Ollama ist **nicht** im Earnie-Container / LoxBerry-Plugin enthalten; ohne Ollama bleiben Heuristik-Vorschläge und manuelle Auswahl nutzbar.
-3. **Human-in-the-Loop** — EHAL-Felder (Telemetrie/Setpoints) und Loxone-Extras zuweisen; Konfidenzwerte bei Vorschlägen.
+3. **Human-in-the-Loop** — EHAL-Felder (Telemetrie/Setpoints, rollengruppiert) und Loxone-Extras zuweisen; Konfidenzwerte bei Vorschlägen.
 4. **Speichern** — schreibt flache `loxone_blocks` in `config.json` (Live-kompatibel), nicht ein verschachteltes `ehal.loxone.entities`.
 
-**Energieflussmonitor → Hausprofil (Interpretation C):** Auto-Sync von Zählerbaum → Verbraucher/CSV-Pfade bleibt **Follow-up**, sobald der Quellenvergleich eine stabile Wahl erlaubt. Manueller Blueprint: siehe Plan `energieflussmonitor_hausprofil_blueprint_a` im Repo.
+**Energieflussmonitor → Hausprofil (Interpretation C):** Auto-Sync von Zählerbaum → Verbraucher/CSV-Pfade = Backlog **2.4.i** (nach Quellenwahl aus `2.4.f`). Manueller Blueprint: siehe Plan `energieflussmonitor_hausprofil_blueprint_a` im Repo.
 
 ### Anlagen-Merker / Event-Trigger
 

@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/ehal/device_roles.schema.json",
+  "title": "EHAL Device Role Template (2.4.g)",
+  "description": "Groups M1 EHAL fields by device role for adapter mapping aids. Does not extend the Live wire contract. Units/signs follow docs/spec/ehal.md. Stub roles (consumer, heatpump) may list future/flex fields with kind=stub.",
+  "type": "object",
+  "required": ["role_id", "label", "description", "ehal_fields"],
+  "properties": {
+    "role_id": {
+      "type": "string",
+      "enum": ["grid", "pv", "ess", "evcs", "consumer", "heatpump"]
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["m1", "stub"],
+      "default": "m1",
+      "description": "m1 = maps Live EHAL fields; stub = forward-looking (no first-class M1 wire fields yet)."
+    },
+    "ehal_fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["field", "required", "kind"],
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1,
+            "description": "M1 EHAL field name, or stub identifier (e.g. flex.enable_name) when kind=stub."
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["telemetry", "setpoint", "capability", "stub"]
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "capability_expectations": {
+      "type": "object",
+      "properties": {
+        "supports_ess_write": { "type": "boolean" },
+        "supports_evcs_current": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "unit_sign_notes": {
+      "type": "string",
+      "description": "Pointer to frozen EHAL conventions; do not redefine math."
+    }
+  },
+  "additionalProperties": false
+}

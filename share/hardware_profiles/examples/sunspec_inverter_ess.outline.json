@@ -1,0 +1,82 @@
+{
+  "vendor": "SunSpec",
+  "model": "Generic inverter + ESS (outline)",
+  "protocol": "sunspec",
+  "status": "outline",
+  "notes": "Placeholder seed for Path D / M4. Not a full SunSpec model dump. Point names are illustrative.",
+  "sunspec_models": [
+    {
+      "model_id": 101,
+      "name": "Inverter (single phase)",
+      "notes": "Typical PV active power / AC watts."
+    },
+    {
+      "model_id": 802,
+      "name": "Battery",
+      "notes": "Typical SoC and battery power."
+    },
+    {
+      "model_id": 203,
+      "name": "AC Meter",
+      "notes": "Optional PCC / grid meter."
+    }
+  ],
+  "registers": [
+    {
+      "address": 40084,
+      "type": "int16",
+      "name": "W",
+      "scale": 1,
+      "unit": "W",
+      "direction": "read",
+      "notes": "Illustrative SunSpec W point (model 101)."
+    },
+    {
+      "address": 40258,
+      "type": "uint16",
+      "name": "SoC",
+      "scale": 1,
+      "unit": "%",
+      "direction": "read",
+      "notes": "Illustrative battery SoC (model 802)."
+    },
+    {
+      "address": 40260,
+      "type": "int16",
+      "name": "WBat",
+      "scale": 1,
+      "unit": "W",
+      "direction": "read",
+      "notes": "Illustrative battery power; sign must be normalized to EHAL (+discharge)."
+    }
+  ],
+  "ehal_bindings": [
+    {
+      "source": "W",
+      "ehal_field": "pv_production_active",
+      "scale": 1,
+      "negate": false,
+      "transform_note": "Ensure ≥ 0 production."
+    },
+    {
+      "source": "SoC",
+      "ehal_field": "ess_soc",
+      "scale": 1,
+      "negate": false
+    },
+    {
+      "source": "WBat",
+      "ehal_field": "ess_power",
+      "scale": 1,
+      "negate": false,
+      "transform_note": "Normalize hub sign to EHAL +discharge / −charge."
+    },
+    {
+      "source": "AC_Meter_W",
+      "ehal_field": "grid_power_active",
+      "scale": 1,
+      "negate": false,
+      "transform_note": "Normalize to EHAL +import / −export."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "role_id": "consumer",
+  "label": "Flex-Verbraucher (Stub)",
+  "description": "Forward-looking template. M1 EHAL has no first-class consumer fields; Live still uses house-profile loxone_inputs/outputs and flex markers.",
+  "status": "stub",
+  "ehal_fields": [
+    {
+      "field": "flex.power_name",
+      "required": false,
+      "kind": "stub",
+      "notes": "House-profile loxone_inputs.power_name — read power or binary state."
+    },
+    {
+      "field": "flex.enable_name",
+      "required": false,
+      "kind": "stub",
+      "notes": "House-profile loxone_outputs.enable_name — enable/freigabe write."
+    },
+    {
+      "field": "flex.power_setpoint_name",
+      "required": false,
+      "kind": "stub",
+      "notes": "EV-style loxone_outputs.power_setpoint_name (kW) — not M1 set_evcs_max_current."
+    }
+  ],
+  "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signale.md § Flexible Verbraucher."
+}

@@ -70,7 +70,18 @@ Die Weiterentwicklung hängt stark davon ab, dass unbekannte Geräte (Wechselric
 
 Laut `LICENSE.md` § 3: Bei Hardware ohne offizielles Profil bist du zur Kooperation eingeladen — **anonymisierte** technische Parameter und Konfigurationsdaten (ohne personenbezogene Daten).
 
-**Geplant (noch nicht produktiv):** ein Community-**Hardware-Bounty**-Verfahren — Einreichung neuer, verifizierter Geräteprofile gegen eine Entschädigung (Höhe/Form noch offen bzw. projektspezifisch definiert; siehe `LICENSE.md` § 3 / `[PARAM_DATA_COMPENSATION]`). Bis die Bounty-Engine steht: Profile und Hinweise gern über Info / About oder GitHub Issues.
+**Beitragsformat (2.4.g, Schema-Slice):**
+
+| Was | Wo |
+|-----|-----|
+| EHAL-Geräterollen (Mapping-Hilfen) | `share/ehal/roles/` + Schema `share/ehal/device_roles.schema.json` |
+| Modbus / SunSpec-Outline (Pfad D-Seed) | `share/hardware_profiles/` (+ `examples/`) |
+| Loxone Merker-Rezepte (JSON, kein `.loxone`) | `share/loxone/recipes/` |
+| Loader / Validierung | Python-Paket `ehal.profiles` |
+
+Neue Profile bitte als JSON gegen die jeweiligen Schemas validieren (siehe Tests `tests/test_ehal_profiles.py`). Spec: [docs/spec/ehal.md](docs/spec/ehal.md) Abschnitt *Device roles and hardware profiles*.
+
+**Geplant (noch nicht produktiv):** ein Community-**Hardware-Bounty**-Verfahren (Entwicklungsplan **M4**) — Einreichung neuer, verifizierter Geräteprofile gegen eine Entschädigung (Höhe/Form noch offen bzw. projektspezifisch definiert; siehe `LICENSE.md` § 3 / `[PARAM_DATA_COMPENSATION]`). Bis die Bounty-Engine steht: Profile und Hinweise gern über Info / About oder GitHub Issues.
 
 ---
 

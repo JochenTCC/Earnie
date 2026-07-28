@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/loxone/recipes/recipe.schema.json",
+  "title": "Loxone Merker / Baustein Recipe (2.4.g)",
+  "description": "JSON-only counterpart templates: recommended Merker names and loxone_blocks keys per EHAL device role. Not a .loxone Config binary. See docs/referenz/loxone-signale.md.",
+  "type": "object",
+  "required": ["role_id", "label", "recommended_markers"],
+  "properties": {
+    "role_id": {
+      "type": "string",
+      "enum": ["grid", "pv", "ess", "evcs", "consumer", "heatpump"]
+    },
+    "label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baustein_notes": {
+      "type": "string",
+      "description": "Text tips for Virtual Status / Memory / Marker layout — not importable Config."
+    },
+    "recommended_markers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["loxone_blocks_key", "suggested_name"],
+        "properties": {
+          "ehal_field": {
+            "type": "string",
+            "description": "M1 EHAL field when applicable."
+          },
+          "loxone_extra": {
+            "type": "string",
+            "description": "Non-EHAL extra key (e.g. target_soc_name) when ehal_field is absent."
+          },
+          "loxone_blocks_key": {
+            "type": "string",
+            "minLength": 1
+          },
+          "suggested_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "anyOf": [
+          { "required": ["ehal_field"] },
+          { "required": ["loxone_extra"] }
+        ]
+      }
+    },
+    "reference": {
+      "type": "string",
+      "description": "Doc path for signal reference."
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,15 @@
+{
+  "role_id": "pv",
+  "label": "PV",
+  "description": "Photovoltaic production active power.",
+  "status": "m1",
+  "ehal_fields": [
+    {
+      "field": "pv_production_active",
+      "required": true,
+      "kind": "telemetry",
+      "notes": "W; production ≥ 0."
+    }
+  ],
+  "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."
+}

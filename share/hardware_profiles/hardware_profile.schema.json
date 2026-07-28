@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/hardware_profiles/hardware_profile.schema.json",
+  "title": "Hardware Profile Outline (2.4.g / Path D seed)",
+  "description": "JSON outline for SunSpec or proprietary Modbus profiles mapping toward EHAL fields. Outline/example only — no Modbus client, ARP scan, or bounty upload in this chapter (M4).",
+  "type": "object",
+  "required": ["vendor", "model", "protocol", "status", "ehal_bindings"],
+  "properties": {
+    "vendor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol": {
+      "type": "string",
+      "enum": ["sunspec", "proprietary"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["outline", "example"],
+      "description": "outline = placeholder seed; example = illustrative but not production-validated."
+    },
+    "notes": {
+      "type": "string"
+    },
+    "sunspec_models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["model_id", "name"],
+        "properties": {
+          "model_id": { "type": "integer" },
+          "name": { "type": "string", "minLength": 1 },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "registers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["address", "type", "name"],
+        "properties": {
+          "address": { "type": "integer", "minimum": 0 },
+          "type": {
+            "type": "string",
+            "enum": ["uint16", "int16", "uint32", "int32", "string", "bitfield16"]
+          },
+          "name": { "type": "string", "minLength": 1 },
+          "scale": { "type": "number" },
+          "unit": { "type": "string" },
+          "direction": {
+            "type": "string",
+            "enum": ["read", "write", "readwrite"]
+          },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "ehal_bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["source", "ehal_field"],
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Register name, SunSpec point id, or logical source label."
+          },
+          "ehal_field": {
+            "type": "string",
+            "minLength": 1,
+            "description": "M1 EHAL field, or loxone_extra:* for non-EHAL extras."
+          },
+          "scale": { "type": "number" },
+          "negate": { "type": "boolean" },
+          "transform_note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

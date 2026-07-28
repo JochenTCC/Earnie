@@ -1,0 +1,20 @@
+{
+  "role_id": "evcs",
+  "label": "Wallbox (EVCS)",
+  "baustein_notes": "EHAL_TO_BLOCKS has no plant keys for evcs_active_power / set_evcs_max_current today. Loxone M1 sets supports_evcs_current=false; EV control stays on house-profile flex (loxone_inputs.power_name / loxone_outputs.power_setpoint_name). Suggested Merker names below are documentation aids for a future mapping key — not written by current HITL save.",
+  "recommended_markers": [
+    {
+      "ehal_field": "evcs_active_power",
+      "loxone_blocks_key": "(none — use Hausprofil loxone_inputs.power_name)",
+      "suggested_name": "Ernie_Wallbox_Leistung",
+      "notes": "Telemetry optional on EHAL; Live EV power typically via Hausprofil EV consumer."
+    },
+    {
+      "ehal_field": "set_evcs_max_current",
+      "loxone_blocks_key": "(none — use Hausprofil loxone_outputs.power_setpoint_name in kW)",
+      "suggested_name": "Ernie_EAuto_Ziel_kW",
+      "notes": "M1 Ampere setpoint usually unmapped on Loxone; flex uses kW setpoint instead."
+    }
+  ],
+  "reference": "docs/referenz/loxone-signale.md"
+}

@@ -3,9 +3,14 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
-### 2.4.f Loxone one-click mapping core (2026-07-28)
+### 2.4.g Device / hardware profile schemas (2026-07-28)
 
-- [x] **2.4.f — Loxone one-click mapping + structure research (§3.1) — core** *(was 2.5.b)* — Structure **compare-all** `integrations/loxone_structure.py` (LoxAPP3.json + HTTP probe + MCP 17.1 `tools/list`; no first-wins cascade); EHAL↔`loxone_blocks` + optional Ollama `integrations/loxone_ehal_mapping.py`; HITL `ui/ehal_loxone_mapping.py` on EHAL-Com; docs [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) + [`docs/spec/ehal.md`](../docs/spec/ehal.md). Production structure source TBD after lab. EFM interpretation C remains open in [Backlog.md](Backlog.md).
+- [x] **2.4.g — Device / hardware profile schemas (M2 slice; bounty later)** *(was 2.5.c)* — EHAL device-role templates (`share/ehal/device_roles.schema.json`, `share/ehal/roles/`); Modbus/SunSpec outline (`share/hardware_profiles/`); Loxone JSON Merker recipes (`share/loxone/recipes/`); loader `ehal/profiles.py` + `tests/test_ehal_profiles.py`; HITL role grouping on EHAL-Com; docs [`docs/spec/ehal.md`](../docs/spec/ehal.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md) §4, [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md). Full Community Bounty engine deferred to Entwicklungsplan **M4**.
+
+
+### 2.4.f Loxone one-click mapping + structure research (2026-07-28)
+
+- [x] **2.4.f — Loxone one-click mapping + structure research (§3.1)** *(was 2.5.b)* — Structure **compare-all** `integrations/loxone_structure.py` (LoxAPP3.json + HTTP probe + MCP 17.1 `tools/list`; no first-wins cascade); EHAL↔`loxone_blocks` + optional Ollama `integrations/loxone_ehal_mapping.py`; HITL `ui/ehal_loxone_mapping.py` on EHAL-Com; docs [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) + [`docs/spec/ehal.md`](../docs/spec/ehal.md). Production structure source TBD after lab. EFM interpretation C split to open **2.4.i**.
 
 
 ### 2.4.e Loxone-EHAL adapter extraction (2026-07-28)

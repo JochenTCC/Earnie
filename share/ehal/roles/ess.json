@@ -1,0 +1,42 @@
+{
+  "role_id": "ess",
+  "label": "Batterie (ESS)",
+  "description": "Home battery SoC, optional power, and charge/discharge limit setpoints.",
+  "status": "m1",
+  "ehal_fields": [
+    {
+      "field": "ess_soc",
+      "required": true,
+      "kind": "telemetry",
+      "notes": "SoC in % (0…100)."
+    },
+    {
+      "field": "ess_power",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Optional W; + = discharge, − = charge (OpenEMS-aligned)."
+    },
+    {
+      "field": "set_ess_charge_power_limit",
+      "required": false,
+      "kind": "setpoint",
+      "notes": "Max charge power magnitude in W."
+    },
+    {
+      "field": "set_ess_discharge_power_limit",
+      "required": false,
+      "kind": "setpoint",
+      "notes": "Max discharge power magnitude in W."
+    },
+    {
+      "field": "supports_ess_write",
+      "required": true,
+      "kind": "capability",
+      "notes": "True when charge/discharge limit writes are available."
+    }
+  ],
+  "capability_expectations": {
+    "supports_ess_write": true
+  },
+  "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."
+}

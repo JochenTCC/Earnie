@@ -1,0 +1,44 @@
+{
+  "role_id": "ess",
+  "label": "Batterie (ESS)",
+  "baustein_notes": "SoC as %, battery power often kW with Loxone +charge (adapter inverts to EHAL +discharge). Huawei extras (Ziel-SOC, Steuerbefehl) remain on loxone_client — not M1 EHAL.",
+  "recommended_markers": [
+    {
+      "ehal_field": "ess_soc",
+      "loxone_blocks_key": "soc_name",
+      "suggested_name": "Ernie_Batterie_SoC",
+      "notes": "SoC in %."
+    },
+    {
+      "ehal_field": "ess_power",
+      "loxone_blocks_key": "battery_power_name",
+      "suggested_name": "Ernie_Batterie_Leistung",
+      "notes": "Optional; kW, typically +charge in Loxone."
+    },
+    {
+      "ehal_field": "set_ess_charge_power_limit",
+      "loxone_blocks_key": "target_charge_power_name",
+      "suggested_name": "Ernie_Ladegrenze",
+      "notes": "Optional write marker for charge limit."
+    },
+    {
+      "ehal_field": "set_ess_discharge_power_limit",
+      "loxone_blocks_key": "target_discharge_power_name",
+      "suggested_name": "Ernie_Entladegrenze",
+      "notes": "Optional write marker for discharge limit."
+    },
+    {
+      "loxone_extra": "target_soc_name",
+      "loxone_blocks_key": "target_soc_name",
+      "suggested_name": "Ernie_Ziel_SoC",
+      "notes": "Loxone-Extra — Huawei target SoC; not M1 EHAL."
+    },
+    {
+      "loxone_extra": "control_cmd_name",
+      "loxone_blocks_key": "control_cmd_name",
+      "suggested_name": "Ernie_Steuerbefehl",
+      "notes": "Loxone-Extra — Huawei control command; not M1 EHAL."
+    }
+  ],
+  "reference": "docs/referenz/loxone-signale.md"
+}

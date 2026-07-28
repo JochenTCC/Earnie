@@ -8,6 +8,7 @@ import streamlit as st
 import config
 from integrations.ehal_live import reset_adapter_cache
 from integrations.loxone_client import fetch_loxone_raw_value
+from ehal.profiles import group_fields_by_role, role_group_label
 from integrations.loxone_ehal_mapping import (
     EHAL_TO_BLOCKS,
     EXTRAS_FIELDS,
@@ -161,36 +162,41 @@ def render_ehal_loxone_mapping_section() -> None:
     )
     options = _name_options(rows, [v for v in reverse_current.values() if v])
 
-    st.markdown("**Telemetrie (EHAL)**")
     ehal_map: dict[str, str] = {}
-    for field in TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL:
-        prop = proposals.get(field) or {}
-        default = str(prop.get("marker_name") or reverse_current.get(field) or "")
-        conf = prop.get("confidence")
-        mapped = _select_marker(
-            field,
-            current=default if default in options else reverse_current.get(field, ""),
-            options=options,
-            required=field in TELEMETRY_REQUIRED,
-            confidence=float(conf) if conf is not None else None,
-        )
-        if mapped:
-            ehal_map[field] = mapped
+    telemetry_fields = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL
+    for role_id, fields in group_fields_by_role(telemetry_fields):
+        caption = role_group_label(role_id) if role_id != "other" else "Weitere Telemetrie"
+        st.markdown(f"**{caption}** (Telemetrie)")
+        for field in fields:
+            prop = proposals.get(field) or {}
+            default = str(prop.get("marker_name") or reverse_current.get(field) or "")
+            conf = prop.get("confidence")
+            mapped = _select_marker(
+                field,
+                current=default if default in options else reverse_current.get(field, ""),
+                options=options,
+                required=field in TELEMETRY_REQUIRED,
+                confidence=float(conf) if conf is not None else None,
+            )
+            if mapped:
+                ehal_map[field] = mapped
 
-    st.markdown("**Setpoints (EHAL)**")
-    for field in SETPOINT_FIELDS:
-        prop = proposals.get(field) or {}
-        default = str(prop.get("marker_name") or reverse_current.get(field) or "")
-        conf = prop.get("confidence")
-        mapped = _select_marker(
-            field,
-            current=default if default in options else reverse_current.get(field, ""),
-            options=options,
-            required=False,
-            confidence=float(conf) if conf is not None else None,
-        )
-        if mapped:
-            ehal_map[field] = mapped
+    for role_id, fields in group_fields_by_role(SETPOINT_FIELDS):
+        caption = role_group_label(role_id) if role_id != "other" else "Weitere Setpoints"
+        st.markdown(f"**{caption}** (Setpoints)")
+        for field in fields:
+            prop = proposals.get(field) or {}
+            default = str(prop.get("marker_name") or reverse_current.get(field) or "")
+            conf = prop.get("confidence")
+            mapped = _select_marker(
+                field,
+                current=default if default in options else reverse_current.get(field, ""),
+                options=options,
+                required=False,
+                confidence=float(conf) if conf is not None else None,
+            )
+            if mapped:
+                ehal_map[field] = mapped
 
     st.markdown("**Loxone-Extras** (nicht M1-EHAL)")
     extras: dict[str, str] = {}

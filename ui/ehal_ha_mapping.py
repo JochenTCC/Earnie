@@ -5,6 +5,7 @@ from typing import Any
 
 import streamlit as st
 
+from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
 from integrations.ehal_live import reset_adapter_cache
 from integrations.ha_adapter import (
     SETPOINT_FIELDS,
@@ -20,16 +21,7 @@ _NONE = "— nicht gemappt —"
 _SESSION_SCAN = "ehal_ha_scan_entities"
 _SESSION_SCAN_ERROR = "ehal_ha_scan_error"
 
-_FIELD_LABELS: dict[str, str] = {
-    "grid_power_active": "Netzleistung (W, +Bezug)",
-    "pv_production_active": "PV-Produktion (W)",
-    "ess_soc": "Batterie-SoC (%)",
-    "ess_power": "Batterieleistung (W, +Entladung)",
-    "evcs_active_power": "Wallbox-Leistung (W)",
-    "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
-    "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
-    "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
-}
+_FIELD_LABELS: dict[str, str] = role_field_labels()
 
 _SIGN_FIELDS = ("grid_power_active", "ess_power")
 
@@ -144,37 +136,33 @@ def render_ehal_ha_mapping_section() -> None:
         {str(v) for v in current["entities"].values() if str(v).strip()}
     )
 
-    st.markdown("**Telemetrie**")
     entities: dict[str, str] = {}
-    for field in TELEMETRY_REQUIRED:
-        mapped = _select_entity(
-            field,
-            current=str(current["entities"].get(field) or ""),
-            options=options,
-            required=True,
-        )
-        if mapped:
-            entities[field] = mapped
-    for field in TELEMETRY_OPTIONAL:
-        mapped = _select_entity(
-            field,
-            current=str(current["entities"].get(field) or ""),
-            options=options,
-            required=False,
-        )
-        if mapped:
-            entities[field] = mapped
+    telemetry_fields = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL
+    for role_id, fields in group_fields_by_role(telemetry_fields):
+        caption = role_group_label(role_id) if role_id != "other" else "Weitere Telemetrie"
+        st.markdown(f"**{caption}** (Telemetrie)")
+        for field in fields:
+            mapped = _select_entity(
+                field,
+                current=str(current["entities"].get(field) or ""),
+                options=options,
+                required=field in TELEMETRY_REQUIRED,
+            )
+            if mapped:
+                entities[field] = mapped
 
-    st.markdown("**Setpoints**")
-    for field in SETPOINT_FIELDS:
-        mapped = _select_entity(
-            field,
-            current=str(current["entities"].get(field) or ""),
-            options=options,
-            required=False,
-        )
-        if mapped:
-            entities[field] = mapped
+    for role_id, fields in group_fields_by_role(SETPOINT_FIELDS):
+        caption = role_group_label(role_id) if role_id != "other" else "Weitere Setpoints"
+        st.markdown(f"**{caption}** (Setpoints)")
+        for field in fields:
+            mapped = _select_entity(
+                field,
+                current=str(current["entities"].get(field) or ""),
+                options=options,
+                required=False,
+            )
+            if mapped:
+                entities[field] = mapped
 
     st.markdown("**Vorzeichen** (nur wenn HA-Entity nicht EHAL-konform ist)")
     sign: dict[str, str] = {}

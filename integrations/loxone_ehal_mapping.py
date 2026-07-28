@@ -29,18 +29,24 @@ EHAL_TO_BLOCKS: dict[str, str] = {
     "set_ess_discharge_power_limit": "target_discharge_power_name",
 }
 
-FIELD_LABELS: dict[str, str] = {
-    "grid_power_active": "Netzleistung (W, +Bezug)",
-    "pv_production_active": "PV-Produktion (W)",
-    "ess_soc": "Batterie-SoC (%)",
-    "ess_power": "Batterieleistung (W, +Entladung)",
-    "evcs_active_power": "Wallbox-Leistung (W)",
-    "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
-    "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
-    "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
-    "target_soc_name": "Loxone-Extras: Ziel-SOC",
-    "control_cmd_name": "Loxone-Extras: Steuerbefehl",
-}
+# Prefer ehal.profiles (2.4.g); keep local fallback if import fails in odd envs.
+try:
+    from ehal.profiles import role_field_labels as _role_field_labels
+
+    FIELD_LABELS: dict[str, str] = _role_field_labels()
+except ImportError:  # pragma: no cover
+    FIELD_LABELS = {
+        "grid_power_active": "Netzleistung (W, +Bezug)",
+        "pv_production_active": "PV-Produktion (W)",
+        "ess_soc": "Batterie-SoC (%)",
+        "ess_power": "Batterieleistung (W, +Entladung)",
+        "evcs_active_power": "Wallbox-Leistung (W)",
+        "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
+        "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
+        "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
+        "target_soc_name": "Loxone-Extras: Ziel-SOC",
+        "control_cmd_name": "Loxone-Extras: Steuerbefehl",
+    }
 
 _HINTS: dict[str, tuple[str, ...]] = {
     "grid_power_active": ("netz", "grid", "bezug", "energieversorger"),

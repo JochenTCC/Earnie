@@ -1,0 +1,14 @@
+{
+  "role_id": "grid",
+  "label": "Netz (PCC)",
+  "baustein_notes": "Virtual Status or Memory holding grid active power in kW (Earnie converts to W). Prefer a stable Merker name; Live addresses names, not UUIDs.",
+  "recommended_markers": [
+    {
+      "ehal_field": "grid_power_active",
+      "loxone_blocks_key": "grid_power_name",
+      "suggested_name": "Ernie_Netzleistung",
+      "notes": "kW; + = Bezug. Maps to EHAL grid_power_active (W)."
+    }
+  ],
+  "reference": "docs/referenz/loxone-signale.md"
+}
