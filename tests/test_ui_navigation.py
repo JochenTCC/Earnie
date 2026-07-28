@@ -19,7 +19,7 @@ def test_default_pages_include_core_and_scenario_explorer():
     assert "Szenario-Explorer" in titles
     assert "Analyse Verbrauch & Kosten" in titles
     assert "Live-Konfiguration" not in titles
-    assert "Loxone-Com" in titles
+    assert "EHAL-Com" in titles
     assert "Preis-Prognose (Dev)" not in titles
 
 
@@ -45,7 +45,7 @@ def test_scenario_explorer_only_hides_betrieb_and_echtzeit():
     assert "Analyse Verbrauch & Kosten" not in titles
     assert "Live-Konfiguration" not in titles
     assert "Optimierer-Dienst" not in titles
-    assert "Loxone-Com" not in titles
+    assert "EHAL-Com" not in titles
     assert "Szenario-Explorer" in titles
     assert "Hauskonfigurator" in titles
     defaults = [spec for spec in build_page_specs(["scenario_explorer"]) if spec.default]
@@ -84,7 +84,7 @@ def test_sections_are_assigned():
     assert sections["Szenario-Explorer"] == "Konfiguration"
     assert sections["Hauskonfigurator"] == "Konfiguration"
     assert "Live-Konfiguration" not in sections
-    assert sections["Loxone-Com"] == "Daemon Control"
+    assert sections["EHAL-Com"] == "Daemon Control"
     assert "Analyse" not in {s.section for s in specs}
     assert "Planung" not in {s.section for s in specs}
     assert "Betrieb" not in {s.section for s in specs}

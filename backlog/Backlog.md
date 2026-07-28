@@ -25,14 +25,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-- [ ] **2.4.c — HA-EHAL + evcc under HA (Phase 2b / M1.5, DACH default)**
-  - One production **HA-EHAL-Adapter** (WS/REST); prefer stable HA entities from evcc (lab-only direct evcc optional)
-  - Reference Compose: `earnie-core` + Home Assistant + evcc
-  - **Optimizer exclusivity:** disable/subordinate hub-local surplus/spot strategies; document checklist
-  - **Modbus rule:** exactly one writing southbound owner per physical bus/device
-  - Entity → EHAL mapping UI (Human-in-the-Loop); optional LLM assist can wait for 2.5 parity with MCP
-  - Contract-tests: identical schedules vs OpenEMS when only adapter config is switched
-  - German user docs: DACH install path A2 (default) vs B (existing HA)
+- [ ] **Follow-up — Lab HA ↔ evcc entity exposure** (deferred from 2.4.c smoke)
+  - Prove MQTT discovery and/or marq24 ha-evcc (`http://evcc:7070`) so stable `sensor`/`number` entities appear in HA; map them in Earnie HITL (Path A helpers already smoke-tested)
 - [ ] **2.4.d — LoxBerry plugin Scope A MVP (thin Docker wrapper)**
   - **Goal:** Install/manage existing Earnie container from LoxBerry Plugin Admin — no native Python/Streamlit/MILP on the host
   - **Prerequisite:** LoxBerry **4.x** (arm64) + **Docker plugin**; reuse `docker/compose/loxberry_productive.yml` / GHCR multi-arch image
@@ -45,7 +39,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Acceptance: fresh LB 4.x install from ZIP → container running → UI reachable; upgrade preserves config/runtime; uninstall leaves data policy documented
   - **Out of scope (later polish / other versions):** native host install; HA/evcc/OpenEMS sidecars on the Pi; Miniserver prefill into `.env`; alpha/prod channel switcher; Streamlit iframe embed; full LoxWiki store listing polish beyond MVP
 - [ ] **2.4.0 — Release**
-  - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA+evcc path proven in lab (contract-tests)
+  - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke); live HA↔evcc entity coupling optional follow-up before messaging A2 as fully wired
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
   - Loxone production path still on pre-EHAL code until **2.5** (no forced Loxone cutover in 2.4.0)
   - LoxBerry Scope A MVP (`2.4.d`) shippable with this release or as late add-on in the same MINOR cycle (does not block EHAL freeze)
@@ -79,7 +73,14 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - First community non-Loxone pilot may already exist from 2.4; 2.5.0 is the “all three southbounds” release
 
 
-### Version 2.6 — Investigate full migration to 15‑min slots (former B)
+### Version 2.+1 — Improve "security" against violating License agreements
+
+- [ ] Clarify how user could get a one-time registry that is bound to their hardware
+  - What are the technical prerequisites to make that running?
+- [ ] **Banner der Wahrheit — Layer C (deferred):** signed official builds / GHCR attestation + startup verifier; tie to hardware registry. Enforces attribution on *official* distribution only — not source forks. See plan outline (A + light B shipped in 2.2.0).
+
+
+### Version 2.+1 — Investigate full migration to 15‑min slots (former B)
 
 **Context:** Day-Ahead clearing is 15‑min MTU since ~2025-10-01. Earnie already fetches Energy-Charts (free, CC BY 4.0; native 15‑min after go-live) but `normalize_price_slot` floors to the hour — MILP still assumes `dt ≡ 1 h`. Official EPEX SFTP/MATS stays out of scope (paid; external use = license quote). aWATTar remains hourly fallback only. Prior deferral: **2.3.c.2** takeaway *variable sample time — hard*. Related open check: **2.3.2**.
 
@@ -96,13 +97,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **2.6.c — Go / no-go + backlog split**
   - Decide: full B vs stay hourly + optional A (store QH prices for SE/billing only) vs hybrid C
   - If go: carve implementation phases into this MINOR (or successor); if no-go: archive rationale and close **2.3.2** accordingly
-
-
-### Version 2.+1 — Improve "security" against violating License agreements
-
-- [ ] Clarify how user could get a one-time registry that is bound to their hardware
-  - What are the technical prerequisites to make that running?
-- [ ] **Banner der Wahrheit — Layer C (deferred):** signed official builds / GHCR attestation + startup verifier; tie to hardware registry. Enforces attribution on *official* distribution only — not source forks. See plan outline (A + light B shipped in 2.2.0).
 
 
 ### Version 2.+1 — Introducing nested data models

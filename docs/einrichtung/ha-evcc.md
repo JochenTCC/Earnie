@@ -35,7 +35,7 @@ Persistenz Earnie: `ha_lab/config/` und `ha_lab/runtime/`. HA-Konfiguration: `ha
 
 1. In Home Assistant ein **Long-Lived Access Token** anlegen.
 2. Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) in `config.json` übernehmen bzw. in der UI setzen.
-3. Streamlit-Seite **Loxone-Com** → Expander **HA Entity → EHAL Mapping**: Entities scannen, EHAL-Felder zuweisen, speichern.
+3. Streamlit-Seite **EHAL-Com** → Expander **HA Entity → EHAL Mapping**: Entities scannen, EHAL-Felder zuweisen, speichern.
 4. Optional **Telemetrie testen**. LLM-gestützte Vorschläge folgen in Version **2.5**.
 
 ## Optimizer-Exklusivität (Checkliste)

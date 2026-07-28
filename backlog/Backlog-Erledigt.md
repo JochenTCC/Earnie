@@ -3,6 +3,17 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### EHAL-Com unified smarthome connection (2026-07-28)
+
+- [x] **EHAL-Com** — Renamed Loxone-Com; removed sidebar Loxone credentials; backend selector (Loxone / HA / OpenEMS) + connection forms; backend-aware first-run; EHAL Live-Lesen telemetry + `ehal_writes` Live-Schreiben parity; German docs (`docs/ui/ehal-com.md`)
+
+
+### 2.4.c HA-EHAL + evcc under HA (2026-07-28)
+
+- [x] **2.4.c — HA-EHAL + evcc under HA (Phase 2b / M1.5, DACH default)** — REST-only `integrations/ha_adapter.py` + Live bridge; Compose [`docker/compose/ha-lab.yml`](../docker/compose/ha-lab.yml) (Earnie :8506 + HA :8123 + evcc :7070); HITL entity→EHAL mapping UI; exclusivity/Modbus docs ([`docs/spec/ha-lab-setup.md`](../docs/spec/ha-lab-setup.md), [`docs/einrichtung/ha-evcc.md`](../docs/einrichtung/ha-evcc.md)); contract-tests vs OpenEMS; lab stub `ha_lab/evcc/evcc.yaml` (demo charger)
+- [x] **HA lab smoke (Path A helpers)** — Earnie ↔ HA REST via helpers / LLAT path exercised; **not** tested: live HA↔evcc coupling (MQTT discovery or marq24 ha-evcc entity exposure) — follow-up left open in [`Backlog.md`](Backlog.md)
+
+
 ### Bugfix SoC spike at SA₁ (2026-07-27)
 
 - [x] **SoC spike at SA₁ (night grid charge → forced dump)** — Live hourly MPC charged before sunrise SOC_min for later EV, then re-opt moved EV and forced export. Mitigations: (1) PV-only charge through sunrise; (2) drop hard `e_batt[SA₁]==SOC_min` (residual dump; floor stays via bounds). Spec: `docs/spec/planning-horizon-sunset.md`. Tests: `tests/test_milp_sunrise_soc.py`. Live verified (NAS main + Chart 1).

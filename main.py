@@ -241,6 +241,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
 
     current_market_item = optimization_matrix[0]
 
+    ehal_writes: list[dict] | None = None
     if config.is_loxone_silent_mode():
         if ehal_live.is_ehal_network_backend():
             logger.info(
@@ -255,13 +256,16 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     elif ehal_live.is_ehal_network_backend():
         backend = "HA" if ehal_live.is_ha_backend() else "OpenEMS"
         logger.info("Sende EHAL ESS-Limits an %s...", backend)
-        err_ess = ehal_live.write_ess_limits_from_huawei(mode, target_power)
+        err_ess, ess_records = ehal_live.write_ess_limits_from_huawei(
+            mode, target_power
+        )
         logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)
-        err_evcs = ehal_live.write_evcs_max_current_from_consumers(
+        err_evcs, evcs_records = ehal_live.write_evcs_max_current_from_consumers(
             consumer_powers, charging_contexts
         )
         if err_ess is None and err_evcs is None:
             ehal_live.clear_write_error()
+        ehal_writes = list(ess_records) + list(evcs_records)
         loxone_writes = None
     else:
         logger.info("📤 Sende gemappte Huawei-Modbus-Werte an Loxone...")
@@ -373,6 +377,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "event_trigger_snapshot": event_trigger_snapshot,
             "loxone_sent": loxone_sent,
             "loxone_writes": loxone_writes,
+            "ehal_writes": ehal_writes,
             "soc_percent": round(float(current_soc), 2),
             "pv_delta_kwh": round(float(pv_delta), 4),
             "market_price_cent": round(float(current_market_item["price_buy"]), 4),

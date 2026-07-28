@@ -8,6 +8,8 @@
 #   # copy ha_lab/evcc/evcc.example.yaml → ha_lab/evcc/evcc.yaml and edit
 #   docker compose --project-directory . -f docker/compose/ha-lab.yml up -d --build
 #   # Create HA long-lived token; map entities in Streamlit Loxone-Com expander
+#   # HACS files are downloaded by hacs-init into ha_lab/homeassistant/custom_components/hacs
+#   # Then in HA UI: Settings → Devices & services → Add integration → HACS (+ GitHub OAuth)
 #
 # UI:
 #   Earnie Streamlit: http://localhost:8506
@@ -52,6 +54,38 @@ services:
     depends_on:
       - homeassistant
 
+  # Container install has no Supervisor add-on store — seed HACS into the HA config volume.
+  # Idempotent: skips when custom_components/hacs/manifest.json already exists.
+  # Does not complete GitHub OAuth; add the HACS integration once in the HA UI after boot.
+  hacs-init:
+    image: alpine:3.20
+    container_name: earnie_hacs_init
+    volumes:
+      - ./ha_lab/homeassistant:/config
+    environment:
+      TZ: Europe/Vienna
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if [ -f /config/custom_components/hacs/manifest.json ]; then
+          echo "HACS already present — skip download"
+          exit 0
+        fi
+        echo "Installing HACS into /config/custom_components/hacs ..."
+        apk add --no-cache ca-certificates wget unzip >/dev/null
+        mkdir -p /config/custom_components
+        cd /config/custom_components
+        wget -q -O hacs.zip \
+          https://github.com/hacs/integration/releases/latest/download/hacs.zip
+        rm -rf hacs
+        mkdir hacs
+        unzip -q hacs.zip -d hacs
+        rm -f hacs.zip
+        test -f hacs/manifest.json
+        echo "HACS download complete"
+    restart: "no"
+
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:2025.7.0
     container_name: earnie_homeassistant
@@ -63,6 +97,9 @@ services:
       TZ: Europe/Vienna
     ports:
       - "8123:8123"
+    depends_on:
+      hacs-init:
+        condition: service_completed_successfully
 
   evcc:
     image: evcc/evcc:0.207.0

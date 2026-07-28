@@ -12,7 +12,7 @@ Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monit
 |-----|-------|-----------|------------|
 | `sunset2sunset` | **Monitor**, **Manuelle Geräte** | Live-Cockpit | ja (Hauptansicht; ohne Key kein Live-Cockpit-Abschnitt) |
 | `scenario_explorer` | **Szenario-Explorer** | Konfiguration | optional (Dev / Community Cloud) |
-| `live_environment` | **Optimierer-Dienst**, **Loxone-Com**, **Analyse Verbrauch & Kosten** (Live-Cockpit) | Daemon Control / Live-Cockpit | ja (Prod; ohne Key kein Live-/Daemon-Anteil) |
+| `live_environment` | **Optimierer-Dienst**, **EHAL-Com**, **Analyse Verbrauch & Kosten** (Live-Cockpit) | Daemon Control / Live-Cockpit | ja (Prod; ohne Key kein Live-/Daemon-Anteil) |
 | `price_forecast` | **Preis-Prognose (Dev)** | Live-Cockpit | Dev-only |
 
 Beispiel Community Cloud (nur Szenario-Explorer): `EARNIE_UI_MODES=scenario_explorer` — Live-Cockpit und Daemon Control entfallen.
@@ -27,7 +27,7 @@ In der Sidebar (unten): Abschnitt **Info / About** (Banner der Wahrheit, Version
 |-----------|--------|
 | **Live-Cockpit** | Monitor, Manuelle Geräte, Analyse Verbrauch & Kosten (bei `live_environment`), Preis-Prognose (Dev) |
 | **Konfiguration** | Hauskonfigurator, Szenarienkonfigurator, Szenario-Explorer (wenn freigeschaltet) |
-| **Daemon Control** | Optimierer-Dienst, Loxone-Com |
+| **Daemon Control** | Optimierer-Dienst, EHAL-Com |
 
 Während der Greenfield-Ersteinrichtung sind zunächst nur **Konfiguration** und **Daemon Control** sichtbar (Daemon-Seiten werden für die Ersteinrichtung auch ohne `live_environment` in der Env erzwungen).
 

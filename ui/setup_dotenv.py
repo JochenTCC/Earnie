@@ -1,4 +1,4 @@
-"""Loxone-Zugangsdaten in config/.env eintragen (Setup-Seite oder Sidebar)."""
+"""Smarthome-Zugangsdaten: Loxone (.env) oder EHAL-Hub (config.json)."""
 from __future__ import annotations
 
 import streamlit as st
@@ -11,7 +11,18 @@ from integrations.loxone_connectivity import (
 )
 from runtime_store.dotenv_io import validate_loxone_credentials, write_loxone_dotenv
 from runtime_store.dotenv_loader import load_app_dotenv
+from runtime_store.ehal_setup import (
+    BACKEND_HA,
+    BACKEND_LOXONE,
+    BACKEND_OPENEMS,
+    backend_label,
+)
 from runtime_store.persist_paths import resolve_dotenv_path
+from ui.ehal_connection import (
+    render_backend_selector,
+    render_ha_connection_form,
+    render_openems_connection_form,
+)
 from version import __version__
 
 
@@ -80,9 +91,12 @@ def display_loxone_verify_results(ok: bool, results: list[LoxoneCheck]) -> None:
 
 
 def render_loxone_verify_results(*, button_key: str = "loxone_verify_button") -> None:
-    """Button + Anzeige für run_loxone_setup_verify (Sidebar/Expander)."""
+    """Button + Anzeige für run_loxone_setup_verify."""
     if not loxone_env_configured():
-        st.caption("Zuerst Miniserver-Zugang speichern.")
+        st.caption(
+            "Zuerst Miniserver-Zugang speichern (Abschnitt **Anbindung** oben "
+            "oder Ersteinrichtung)."
+        )
         return
     if not st.button("Smarthome-Merker testen", key=button_key):
         return
@@ -97,12 +111,29 @@ def render_loxone_verify_results(*, button_key: str = "loxone_verify_button") ->
     display_loxone_verify_results(ok, results)
 
 
-def render_loxone_setup_page() -> None:
-    """Volle Setup-Seite (Prod-Ersteinrichtung ohne Greenfield-Planungsphase)."""
-    st.title("Ersteinrichtung: Loxone-Zugang")
+def render_hub_credentials(*, key_prefix: str, backend: str) -> None:
+    """Show the credential form for the selected backend."""
+    if backend == BACKEND_LOXONE:
+        render_loxone_credentials_form(form_key=f"{key_prefix}_loxone_form")
+    elif backend == BACKEND_HA:
+        render_ha_connection_form(form_key=f"{key_prefix}_ha_form")
+    elif backend == BACKEND_OPENEMS:
+        render_openems_connection_form(form_key=f"{key_prefix}_openems_form")
+
+
+def render_ehal_setup_page() -> None:
+    """Blocking first-run: pick backend, then enter matching credentials."""
+    st.title("Ersteinrichtung: Smarthome-Anbindung")
     st.caption(f"Version {__version__}")
     st.info(
-        "Bitte Miniserver-Zugangsdaten eintragen. Der Optimizer-Worker startet "
-        "automatisch, sobald die Datei gespeichert ist."
+        "Bitte Backend wählen und Zugangsdaten eintragen. Der Optimizer-Worker "
+        "startet automatisch, sobald die Verbindung gespeichert ist."
     )
-    render_loxone_credentials_form()
+    backend = render_backend_selector(key_prefix="ehal_setup")
+    st.markdown(f"**Zugang: {backend_label(backend)}**")
+    render_hub_credentials(key_prefix="ehal_setup", backend=backend)
+
+
+def render_loxone_setup_page() -> None:
+    """Backward-compatible alias for the backend-aware first-run page."""
+    render_ehal_setup_page()

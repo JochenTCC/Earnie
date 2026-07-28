@@ -1,4 +1,4 @@
-"""Loxone-Com: Live-Lese- und Schreib-Debug für die Streamlit-UI."""
+"""EHAL-Com: Live-Lese- und Schreib-Debug für die Streamlit-UI."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -46,6 +46,20 @@ def build_read_rows(checks: list[LoxoneCheck], read_at: str) -> list[dict[str, s
     return rows
 
 
+def build_telemetry_rows(telemetry: dict[str, Any], read_at: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for field, value in sorted(telemetry.items()):
+        rows.append(
+            {
+                "EHAL-Feld": str(field),
+                "Wert": str(value),
+                "Status": "OK",
+                "Zuletzt gelesen": read_at,
+            }
+        )
+    return rows
+
+
 def build_write_rows_from_trace(writes: list[dict[str, Any]]) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for entry in writes:
@@ -55,6 +69,21 @@ def build_write_rows_from_trace(writes: list[dict[str, Any]]) -> list[dict[str, 
                 "Wert": str(entry.get("value", "")),
                 "Erfolg": "Ja" if entry.get("success") else "Nein",
                 "Gesendet um": str(entry.get("written_at") or "—"),
+            }
+        )
+    return rows
+
+
+def build_ehal_write_rows(writes: list[dict[str, Any]]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for entry in writes:
+        rows.append(
+            {
+                "EHAL-Feld": str(entry.get("field") or "—"),
+                "Wert": str(entry.get("value", "")),
+                "Erfolg": "Ja" if entry.get("success") else "Nein",
+                "Gesendet um": str(entry.get("written_at") or "—"),
+                "Meldung": str(entry.get("message") or ""),
             }
         )
     return rows
@@ -114,8 +143,8 @@ def render_status_strip(main_state: dict | None) -> None:
 
     if not loxone_env_configured():
         st.warning(
-            "Loxone-Zugangsdaten fehlen. Tragen Sie IP, Benutzer und Passwort in der "
-            "Sidebar unter **Loxone-Zugang** ein."
+            "Loxone-Zugangsdaten fehlen. Tragen Sie IP, Benutzer und Passwort unter "
+            "**Anbindung** auf dieser Seite ein."
         )
         return
 
@@ -166,15 +195,56 @@ def _render_live_reads_fragment() -> None:
         st.dataframe(rows, use_container_width=True, hide_index=True)
 
 
+@st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
+def _render_ehal_telemetry_fragment() -> None:
+    reload_runtime_config()
+    read_at = datetime.now().isoformat(timespec="seconds")
+    from integrations.ehal_live import get_network_adapter, read_live_power_kw
+    from integrations.ha_adapter import HaHttpError
+    from integrations.openems_adapter import OpenemsHttpError
+
+    try:
+        telemetry = get_network_adapter().read_telemetry()
+    except (OpenemsHttpError, HaHttpError, ValueError, OSError) as exc:
+        st.error(f"EHAL-Telemetrie fehlgeschlagen: {exc}")
+        return
+
+    st.caption(f"EHAL-Telemetrie · Stand **{read_at}**")
+    st.dataframe(
+        build_telemetry_rows(dict(telemetry), read_at),
+        use_container_width=True,
+        hide_index=True,
+    )
+    power = read_live_power_kw()
+    if power:
+        st.caption(
+            f"Live-Leistung (kW): PV {power['pv']} · Haus {power['house']} · "
+            f"Batterie {power['battery']} · Netz {power['grid']}"
+        )
+
+
 def render_live_reads_section() -> None:
     st.subheader("Live-Lesen")
     if config.is_ehal_network_backend():
         hub = "HA" if config.is_ehal_ha_backend() else "OpenEMS"
-        st.info(
-            f"Backend **{hub}/EHAL** — Merker-Lesen unten ist Loxone-spezifisch und "
-            "für diesen Modus nicht maßgeblich. SoC/Leistung kommen über EHAL REST."
-        )
+        st.caption(f"Backend **{hub}/EHAL** — Telemetrie über REST.")
+        if st.button("Verbindung testen", key="ehal_debug_test_connection"):
+            from integrations.ehal_live import get_network_adapter
+            from integrations.ha_adapter import HaHttpError
+            from integrations.openems_adapter import OpenemsHttpError
+
+            try:
+                telemetry = get_network_adapter().read_telemetry()
+                st.success(f"Verbindung OK — {len(dict(telemetry))} Felder gelesen.")
+                st.json(dict(telemetry))
+            except (OpenemsHttpError, HaHttpError, ValueError, OSError) as exc:
+                st.error(f"Verbindungstest fehlgeschlagen: {exc}")
+        st.caption("Tabelle unten aktualisiert sich automatisch (ca. alle 10 Sekunden).")
+        if st.button("Jetzt aktualisieren", key="ehal_debug_refresh_reads"):
+            st.rerun()
+        _render_ehal_telemetry_fragment()
         return
+
     render_loxone_verify_results(button_key="loxone_debug_verify_button")
     st.caption("Tabelle unten aktualisiert sich automatisch (ca. alle 10 Sekunden).")
     if st.button("Jetzt aktualisieren", key="loxone_debug_refresh_reads"):
@@ -194,6 +264,35 @@ def render_last_writes_section(main_state: dict | None) -> None:
 
     completed_at = str(main_state.get("completed_at") or "—")
     loxone_sent = main_state.get("loxone_sent") or {}
+    ehal_writes = main_state.get("ehal_writes")
+
+    if config.is_ehal_network_backend():
+        if silent_run or ehal_writes is None:
+            st.info("Silent-Modus beim letzten Lauf — keine EHAL-Schreibvorgänge.")
+            if loxone_sent:
+                st.caption("Geplante Sollwerte (nicht gesendet):")
+                st.dataframe(
+                    build_intended_write_rows(loxone_sent, completed_at),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            return
+        if not ehal_writes:
+            st.caption("Letzter Lauf ohne EHAL-Schreibdatensätze.")
+            return
+        summary = write_summary_text(ehal_writes)
+        failed = [entry for entry in ehal_writes if not entry.get("success")]
+        if failed:
+            st.error(summary)
+        else:
+            st.success(summary)
+        st.dataframe(
+            build_ehal_write_rows(ehal_writes),
+            use_container_width=True,
+            hide_index=True,
+        )
+        return
+
     loxone_writes = main_state.get("loxone_writes")
 
     if silent_run or loxone_writes is None:
@@ -248,6 +347,7 @@ def render_last_run_snapshot_expander(main_state: dict | None) -> None:
                 "flex_measured_ids": main_state.get("flex_measured_ids"),
                 "event_trigger_snapshot": main_state.get("event_trigger_snapshot"),
                 "consumption_snapshot": main_state.get("consumption_snapshot"),
+                "ehal_writes": main_state.get("ehal_writes"),
             }
         )
 

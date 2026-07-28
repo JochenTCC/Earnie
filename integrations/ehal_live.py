@@ -194,35 +194,47 @@ def read_live_power_kw() -> dict[str, float] | None:
     }
 
 
-def write_ess_limits_from_huawei(mode: int, target_power_kw: float) -> EhalWriteError | None:
+def write_ess_limits_from_huawei(
+    mode: int, target_power_kw: float
+) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
     """Map Huawei-style mode/power to EHAL ESS limits (skip target_soc / control_cmd)."""
     charge_kw, discharge_kw, _cmd = loxone_client.map_huawei_modbus_values(
         mode, target_power_kw
     )
     adapter = get_network_adapter()
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    charge_w = max(0.0, float(charge_kw) * 1000.0)
+    discharge_w = max(0.0, float(discharge_kw) * 1000.0)
     setpoint: dict[str, Any] = {
         "schema_version": EHAL_SCHEMA_VERSION,
         "ts": ts,
         "adapter_id": adapter.cfg.adapter_id,
-        "set_ess_charge_power_limit": max(0.0, float(charge_kw) * 1000.0),
-        "set_ess_discharge_power_limit": max(0.0, float(discharge_kw) * 1000.0),
+        "set_ess_charge_power_limit": charge_w,
+        "set_ess_discharge_power_limit": discharge_w,
     }
     error = adapter.write_setpoints(setpoint)
     if error is not None:
         persist_write_error(error)
-    return error
+    records = build_ehal_write_records(
+        {
+            "set_ess_charge_power_limit": charge_w,
+            "set_ess_discharge_power_limit": discharge_w,
+        },
+        written_at=ts,
+        error=error,
+    )
+    return error, records
 
 
 def write_evcs_max_current_from_consumers(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict] | None = None,
-) -> EhalWriteError | None:
+) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
     """Write set_evcs_max_current from first EV consumer planned power (kW→A)."""
     consumer = _first_ev_consumer()
     if consumer is None:
         logger.info("EHAL: no EV consumer configured — skip EVCS setpoint")
-        return None
+        return None, []
 
     cid = consumer["id"]
     planned_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
@@ -237,21 +249,56 @@ def write_evcs_max_current_from_consumers(
     adapter = get_network_adapter()
     if not adapter.capabilities()["supports_evcs_current"]:
         logger.info("EHAL: supports_evcs_current=false — skip EVCS write")
-        return None
+        return None, []
 
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    amps_out = max(0.0, amps)
     setpoint = {
         "schema_version": EHAL_SCHEMA_VERSION,
         "ts": ts,
         "adapter_id": adapter.cfg.adapter_id,
-        "set_evcs_max_current": max(0.0, amps),
+        "set_evcs_max_current": amps_out,
     }
     error = adapter.write_setpoints(
         setpoint, evcs_voltage_v=voltage_v, evcs_phases=phases
     )
     if error is not None:
         persist_write_error(error)
-    return error
+    records = build_ehal_write_records(
+        {"set_evcs_max_current": amps_out},
+        written_at=ts,
+        error=error,
+    )
+    return error, records
+
+
+def build_ehal_write_records(
+    fields: dict[str, float],
+    *,
+    written_at: str,
+    error: EhalWriteError | None,
+) -> list[dict[str, Any]]:
+    """Compact write trace rows for optimizer_run_state.ehal_writes."""
+    failed = set(error.get("failed_fields") or []) if error else set()
+    message = str(error.get("message") or "") if error else ""
+    rows: list[dict[str, Any]] = []
+    for field, value in fields.items():
+        if error is None:
+            ok = True
+        elif failed:
+            ok = field not in failed
+        else:
+            ok = False
+        rows.append(
+            {
+                "field": field,
+                "value": value,
+                "success": ok,
+                "written_at": written_at,
+                "message": "" if ok else message,
+            }
+        )
+    return rows
 
 
 def _first_ev_consumer() -> dict | None:

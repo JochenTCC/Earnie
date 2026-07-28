@@ -63,7 +63,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 - [Betriebsmodi & Navigation](ui/betriebsmodi.md) — Seitenstruktur, Monitor (Sunset-2-Sunset), Szenario-Explorer
 - [Charts & Panels](ui/charts.md) — Diagramme, Metriken, Sankey, Soll/Ist-Icons
-- [Loxone-Com](ui/loxone-kommunikation.md) — Debug-Seite: Live-Lesen, Live-Schreiben (Cutover 1.99)
+- [EHAL-Com](ui/ehal-com.md) — Anbindung & Debug: Loxone / HA / OpenEMS, Live-Lesen, Live-Schreiben
 
 
 

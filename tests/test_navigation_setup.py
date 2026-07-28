@@ -78,7 +78,7 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
     assert titles == [
         "Hauskonfigurator",
         "Optimierer-Dienst",
-        "Loxone-Com",
+        "EHAL-Com",
     ]
 
 
@@ -130,7 +130,7 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
         "Hauskonfigurator",
         "Szenarienkonfigurator",
         "Optimierer-Dienst",
-        "Loxone-Com",
+        "EHAL-Com",
     ]
     assert "Szenario-Explorer" not in titles
     assert "Live-Konfiguration" not in titles

@@ -61,12 +61,14 @@ def loxone_setup_deferred() -> bool:
 
 
 def needs_loxone_setup() -> bool:
-    """True wenn die App auf der Loxone-Setup-Seite blockieren soll."""
+    """True wenn die App auf der Hub-Setup-Seite blockieren soll."""
     if is_effective_offline():
         return False
     if loxone_setup_deferred():
         return False
-    return not loxone_credentials_configured()
+    from runtime_store.ehal_setup import hub_credentials_configured
+
+    return not hub_credentials_configured()
 
 
 def require_loxone_credentials_for_config() -> bool:
@@ -74,6 +76,10 @@ def require_loxone_credentials_for_config() -> bool:
     if is_effective_offline():
         return False
     if loxone_setup_deferred():
+        return False
+    from runtime_store.ehal_setup import is_network_backend
+
+    if is_network_backend():
         return False
     return True
 

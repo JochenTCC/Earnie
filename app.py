@@ -30,11 +30,11 @@ from runtime_store.config_drift import (
     should_show_config_drift,
 )
 from runtime_store.dotenv_io import needs_loxone_setup, require_loxone_credentials_for_config
-from ui.setup_dotenv import render_loxone_setup_page
+from ui.setup_dotenv import render_ehal_setup_page
 from ui.chunk_load_recovery import inject_chunk_load_recovery
 from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notices
 from ui.navigation import build_navigation
-from ui.setup_progress import render_deferred_loxone_sidebar, render_setup_progress_notice
+from ui.setup_progress import render_setup_progress_notice
 from ui.config_pack import render_config_pack_sidebar
 from ui.info_sidebar import render_info_sidebar
 from ui.styles import (
@@ -69,7 +69,7 @@ def _render_drift_warning() -> None:
 
 def main() -> None:
     if needs_loxone_setup():
-        render_loxone_setup_page()
+        render_ehal_setup_page()
         render_info_sidebar()
         st.stop()
 
@@ -82,7 +82,6 @@ def main() -> None:
     inject_checkbox_highlight_css()
     render_ui_mode_env_notices()
     render_config_pack_sidebar()
-    render_deferred_loxone_sidebar()
     render_setup_progress_notice()
     _render_drift_warning()
     render_cloud_demo_intro()

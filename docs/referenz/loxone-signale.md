@@ -23,7 +23,7 @@ Prüfung aller konfigurierten Signale:
 | SwimSpa-Filter (Bridge) | optional `swimspa_filter_bindings` am `thermal_rc`-Verbraucher (sonst Bridge-Defaults) | `loxone_target_hours_name`, Filter-`power_name` / `enable_name`, `filter_schedule.loxone.*` |
 | Generic (known/manual) | Hausprofil | optional `loxone_inputs.power_name` |
 
-Bearbeitung in der UI: Verbraucher-Merker im **Hauskonfigurator**; Anlagen-Merker und Event-Trigger unter **Daemon Control → Loxone-Com**.
+Bearbeitung in der UI: Verbraucher-Merker im **Hauskonfigurator**; Anlagen-Merker und Event-Trigger unter **Daemon Control → EHAL-Com**.
 
 ## Zentrale Signale (`loxone_blocks`)
 

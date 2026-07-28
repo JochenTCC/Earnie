@@ -312,18 +312,19 @@ Die **Bezeichnung** des Live-Szenarios ist fest (nicht umbenennbar / nicht lösc
 
 Damit nutzen Live-Optimierung und Szenario-Explorer dieselbe Auflösungslogik.
 
-### Loxone-Com
+### EHAL-Com
 
-Unter **Daemon Control → Loxone-Com** (Debug / Abnahme):
+Unter **Daemon Control → EHAL-Com** (Anbindung / Debug / Abnahme):
 
-- **Live-Lesen:** alle konfigurierten Merker werden periodisch vom Smarthome System eingelesen.  
+- **Anbindung:** Backend wählen (Loxone / Home Assistant / OpenEMS) und Zugangsdaten speichern  
+- **Live-Lesen:** Merker (Loxone) bzw. EHAL-Telemetrie (HA/OpenEMS), periodisch aktualisiert  
 - **Live-Schreiben:** was `main.py` zuletzt gesendet hat (Erfolg ja/nein)  
-- **Silent-Modus:** Earnie berechnet und zeigt Sollwerte, **schreibt aber nicht** an die Smarthome Steuerung — sinnvoll für Tests
+- **Silent-Modus:** Earnie berechnet und zeigt Sollwerte, **schreibt aber nicht** an den Hub — sinnvoll für Tests  
 - **Live-Modus:** Schreiben aktiv — erst nach erfolgreicher Lesekontrolle umschalten  
 
-Prüfungen auch per Skript: `python -m scripts.verify_loxone_setup`.
+Prüfungen Loxone auch per Skript: `python -m scripts.verify_loxone_setup`.
 
-Cutover-Checkliste: Lesen OK → Schreiben Erfolg → Monitor/Sankey plausibel. Details: [Loxone-Com](../ui/loxone-kommunikation.md).
+Cutover-Checkliste: Lesen OK → Schreiben Erfolg → Monitor/Sankey plausibel. Details: [EHAL-Com](../ui/ehal-com.md).
 
 ---
 
@@ -413,7 +414,7 @@ Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur wenn der UI-Modus `li
 3. Szenarienkonfigurator: Live-Szenario + Vergleichsvarianten  
 4. Szenario-Explorer: Verbrauch prüfen, Rechnung, Ergebnisse bewerten  
 5. Loxone vorbereiten und Zugang speichern  
-6. Live-Szenario im Szenarienkonfigurator + Loxone-Com (Silent → Live)  
+6. Live-Szenario im Szenarienkonfigurator + EHAL-Com (Silent → Live)  
 7. Daemon dauerhaft laufen lassen, Monitor beobachten, Feintuning  
 
 Bei Unklarheiten in der Konfiguration: Hover-Hilfe in `config.json` (Schema) und die Kapitel unter [docs/README.md](../README.md).

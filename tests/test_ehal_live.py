@@ -96,8 +96,10 @@ def test_write_ess_limits_persists_error(config_mock, adapter_factory, persist_m
         "hub_status": "403",
     }
     adapter_factory.return_value = adapter
-    error = ehal_live.write_ess_limits_from_huawei(1, 1.5)
+    error, records = ehal_live.write_ess_limits_from_huawei(1, 1.5)
     assert error is not None
+    assert records
+    assert records[0]["success"] is False
     persist_mock.assert_called_once()
     args = adapter.write_setpoints.call_args[0][0]
     assert args["set_ess_charge_power_limit"] == 1500.0

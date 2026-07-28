@@ -24,7 +24,7 @@ NAV_DOC_PAGE_KEYS: frozenset[str] = frozenset(
         "scenario-editor",
         "scenario-explorer",
         "optimizer-daemon",
-        "loxone-debug",
+        "ehal-com",
     }
 )
 
@@ -148,19 +148,23 @@ PAGE_DOCS: dict[str, PageDocs] = {
             ),
         ),
     ),
-    "loxone-debug": PageDocs(
+    "ehal-com": PageDocs(
         primary=_handbook(
-            "Loxone-Com (Benutzer-Handbuch)",
-            "loxone-com",
+            "EHAL-Com (Benutzer-Handbuch)",
+            "ehal-com",
         ),
         secondaries=(
             DocLink(
-                "Loxone-Com (UI)",
-                "docs/ui/loxone-kommunikation.md",
+                "EHAL-Com (UI)",
+                "docs/ui/ehal-com.md",
             ),
             DocLink(
                 "Home Assistant + evcc (A2/B)",
                 "docs/einrichtung/ha-evcc.md",
+            ),
+            DocLink(
+                "OpenEMS-Lab",
+                "docs/einrichtung/openems-lab.md",
             ),
         ),
     ),

@@ -71,7 +71,7 @@ python -m scripts.verify_loxone_setup
 
 Jede Prüfung meldet `[OK]` oder `[FEHLER]` mit IO-Name und Detailtext. Typische Fehler: falscher Merkername, Benutzer ohne Rechte, Wert außerhalb des erwarteten Bereichs (z. B. Freigabe ≠ 0/1).
 
-Die Verbindung kann auch bequem über die Web-Oberfläche auf der Seite "Loxone-Com" geprüft werden.
+Die Verbindung kann auch bequem über die Web-Oberfläche auf der Seite **EHAL-Com** (Anbindung) geprüft werden.
 
 ## Datenfluss (Überblick)
 

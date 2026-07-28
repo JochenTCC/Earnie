@@ -110,10 +110,10 @@ def _echtzeit_page_specs() -> list[PageSpec]:
         ),
         PageSpec(
             page_loxone_debug.render,
-            "Loxone-Com",
+            "EHAL-Com",
             "🔗",
             SECTION_ECHTZEIT,
-            "loxone-debug",
+            "ehal-com",
         ),
     ]
 
@@ -135,7 +135,7 @@ def _append_konfiguration_and_echtzeit(
 
 
 def _restricted_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
-    # Onboarding always needs daemon / Loxone pages, even when EARNIE_UI_MODES
+    # Onboarding always needs daemon / EHAL-Com pages, even when EARNIE_UI_MODES
     # is explorer-only (no live_environment key). Community Cloud demo stays
     # config-only (no forced Daemon).
     from runtime_store.cloud_demo import is_cloud_demo
