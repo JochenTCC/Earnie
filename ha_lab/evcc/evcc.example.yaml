@@ -1,0 +1,46 @@
+# evcc Earnie-mode lab template (2.4.c) — copy to ha_lab/evcc/evcc.yaml
+#
+# Optimizer exclusivity: do NOT enable surplus / smart-cost planners here.
+# Earnie owns 48h schedules; evcc only exposes meters / wallbox / battery I/O
+# into Home Assistant (MQTT discovery or HA integration).
+#
+# Edit site / meters / loadpoints for your lab hardware or simulators.
+# Keep network: mqtt (or HA plugin) so entities appear in Home Assistant.
+
+network:
+  schema: http
+  host: evcc
+  port: 7070
+
+log: info
+
+# No site tariff planner for Earnie mode — leave tariffs empty or diagnostic-only.
+# tariffs: {}
+
+# Example placeholders — replace with lab meters / charger.
+# meters:
+#   - name: grid
+#     type: template
+#     template: demo-meter
+#   - name: pv
+#     type: template
+#     template: demo-meter
+#   - name: battery
+#     type: template
+#     template: demo-battery
+
+# chargers:
+#   - name: wallbox
+#     type: template
+#     template: demo-charger
+
+# loadpoints:
+#   - title: Lab
+#     charger: wallbox
+#     mode: now
+#     # Earnie sets max current via HA number entity — do not run pv/min/smart modes
+#     # that fight Earnie setpoints.
+
+# mqtt:
+#   broker: homeassistant:1883
+#   topic: evcc

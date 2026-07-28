@@ -55,9 +55,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     else:
         logger.info("--- Earnie Live-Abfrage gestartet (v%s) ---", __version__)
     if config.is_loxone_silent_mode():
-        if ehal_live.is_openems_backend():
+        if ehal_live.is_ehal_network_backend():
             logger.warning(
-                "Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf OpenEMS (EHAL)."
+                "Silent-Modus aktiv: Optimierung ohne Schreibzugriffe auf EHAL-Southbound."
             )
         else:
             logger.warning(
@@ -68,8 +68,8 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
 
     current_soc = ehal_live.read_ess_soc()
     if current_soc is None:
-        if ehal_live.is_openems_backend():
-            logger.error("Optimierung abgebrochen: Kein Zugriff auf EHAL/OpenEMS SoC.")
+        if ehal_live.is_ehal_network_backend():
+            logger.error("Optimierung abgebrochen: Kein Zugriff auf EHAL SoC.")
         else:
             logger.error("Optimierung abgebrochen: Kein Zugriff auf Loxone SoC.")
         return
@@ -127,7 +127,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     live_power = ehal_live.read_live_power_kw()
     flex_kw_for_matrix: dict[str, float] = {}
     if live_power:
-        if ehal_live.is_openems_backend():
+        if ehal_live.is_ehal_network_backend():
             flex_kw_for_matrix = {}
         else:
             flex_kw_for_matrix = loxone_client.fetch_flexible_consumers_live_kw()
@@ -145,7 +145,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
 
     current_hour = datetime.now().hour
     targets = consumer_targets.resolve_consumer_daily_targets(matrix=optimization_matrix)
-    if ehal_live.is_openems_backend():
+    if ehal_live.is_ehal_network_backend():
         live_consumers = config.get_flexible_consumers()
     else:
         live_consumers = loxone_client.consumers_with_live_nominal_power()
@@ -242,9 +242,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     current_market_item = optimization_matrix[0]
 
     if config.is_loxone_silent_mode():
-        if ehal_live.is_openems_backend():
+        if ehal_live.is_ehal_network_backend():
             logger.info(
-                "Silent-Modus: Steuerwerte (EHAL/OpenEMS ESS+EVCS) werden nicht gesendet."
+                "Silent-Modus: Steuerwerte (EHAL ESS+EVCS) werden nicht gesendet."
             )
         else:
             logger.info(
@@ -252,10 +252,11 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 "werden nicht an Loxone gesendet."
             )
         loxone_writes: list[dict] | None = None
-    elif ehal_live.is_openems_backend():
-        logger.info("📤 Sende EHAL ESS-Limits an OpenEMS...")
+    elif ehal_live.is_ehal_network_backend():
+        backend = "HA" if ehal_live.is_ha_backend() else "OpenEMS"
+        logger.info("Sende EHAL ESS-Limits an %s...", backend)
         err_ess = ehal_live.write_ess_limits_from_huawei(mode, target_power)
-        logger.info("📤 Sende EHAL EVCS-Maxstrom an OpenEMS...")
+        logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)
         err_evcs = ehal_live.write_evcs_max_current_from_consumers(
             consumer_powers, charging_contexts
         )
@@ -276,7 +277,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     total_kw = live_power["house"] if live_power else None
     from optimizer.charging_context import matrix_slot_datetime
 
-    if ehal_live.is_openems_backend():
+    if ehal_live.is_ehal_network_backend():
         flex_kw = {c["id"]: 0.0 for c in live_consumers}
         flex_chart_kw = dict(flex_kw)
         live_flex_measured: set[str] = set()

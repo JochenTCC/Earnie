@@ -16,6 +16,7 @@ Konfiguration im Container/venv: `config.json` → `ui.streamlit_port` oder `EAR
 | **8532** | **Greenfield (venv)** | Dev-PC (venv) | `python main.py` mit `greenfield/config` | `http://localhost:8532` | VS Code „Streamlit app.py (Greenfield :8532)“ |
 | **8503** | **OpenEMS-Lab (Docker)** | Dev-PC / Pi (Docker) | im Container `earnie-openems-lab` (Auto-Start) | `http://localhost:8503` | `docker/compose/openems-lab.yml` (`8503:8501`); Setup: [openems-lab](../einrichtung/openems-lab.md) |
 | **8504** | **Lokal gegen NAS-Daten** | Dev-PC (venv) | **auf der NAS** (im Prod-Container `earnie-productive`) | `http://localhost:8504` | VS Code „Streamlit app.py (NAS)“ — liest `config`/`runtime` per UNC/SMB von der NAS (früher oft :8503; Port freigeben wegen OpenEMS-Lab) |
+| **8506** | **HA + evcc Lab (Docker)** | Dev-PC / Pi (Docker) | im Container `earnie-ha-lab` (Auto-Start) | `http://localhost:8506` | `docker/compose/ha-lab.yml` (`8506:8501`); Setup: [ha-evcc](../einrichtung/ha-evcc.md) |
 
 ## Parallelbetrieb auf dem Dev-PC
 
@@ -25,6 +26,7 @@ Typisch gleichzeitig möglich:
 - Lokaler Dev-Stack Docker unter `http://localhost:8521` und/oder venv unter `http://localhost:8531`
 - Greenfield unter `http://localhost:8502` (Docker) oder `http://localhost:8532` (venv)
 - OpenEMS-Lab unter `http://localhost:8503` (Docker; Earnie + OpenEMS)
+- HA + evcc Lab unter `http://localhost:8506` (Docker; Earnie + Home Assistant + evcc)
 - Optional: lokales Cockpit gegen NAS-Log unter `http://localhost:8504` (nur UI lokal, Daemon bleibt auf der NAS)
 
 **Nicht** parallel starten: zwei Prozesse auf dem **selben** Host-Port (z. B. zwei venv-Streamlit-Instanzen beide auf 8531).

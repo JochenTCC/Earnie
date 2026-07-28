@@ -49,4 +49,8 @@ def render() -> None:
     st.caption(f"Konfiguration: `{config.CONFIG.config_path}`")
     _render_cockpit_locked_notice()
     render_loxone_debug_block()
+    from ui.ehal_ha_mapping import render_ehal_ha_mapping_section
+
+    with st.expander("HA Entity → EHAL Mapping (2.4.c)", expanded=config.is_ehal_ha_backend()):
+        render_ehal_ha_mapping_section()
     render_marker_config_editors()

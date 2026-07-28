@@ -5,7 +5,8 @@
 **Schemas:** [`share/ehal/`](../../share/ehal/)  
 **Python:** [`ehal/`](../../ehal/)  
 **Lab mapping (OpenEMS):** [`openems-testing-platform-todo.md`](openems-testing-platform-todo.md)  
-**Lab setup (Compose + Earnie ↔ OpenEMS):** [`openems-lab-setup.md`](openems-lab-setup.md)
+**Lab setup (Compose + Earnie ↔ OpenEMS):** [`openems-lab-setup.md`](openems-lab-setup.md)  
+**Lab setup (Compose + Earnie ↔ HA + evcc):** [`ha-lab-setup.md`](ha-lab-setup.md)
 
 ## Purpose and naming
 
@@ -163,7 +164,7 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 
 - MQTT / Matter as first-class hubs
 - Loxone-EHAL extraction (**2.5**)
-- HA adapter implementation (**2.4.c**)
+- HA WebSocket state subscription / direct evcc REST adapter (deferred; REST HA path is **2.4.c**)
 - Loxone extras as first-class EHAL fields: `target_soc`, `control_cmd`, flex enable, EV **kW** setpoint (remain pre-EHAL / **2.5**)
 - Modbus hardware-profile library (Entwicklungsplan M2 / M4)
 
@@ -175,6 +176,17 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 - EVCS: EHAL `set_evcs_max_current` (A) → OpenEMS `evcs0/SetChargePowerLimit` (W) via house-profile V/phases.
 - Southbound silent gate: reuse `loxone_silent_mode` for OpenEMS writes as well.
 - Write failures → `runtime/ehal_write_error.json` + UI banner on Loxone-Kommunikation / Daemon page.
+
+## Implementation notes (2.4.c Home Assistant + evcc)
+
+- Adapter: `integrations/ha_adapter.py` (REST only: `/api/states`, `/api/services/...`). Prefer HA entities from evcc.
+- Config: `ehal.backend=ha` + `ehal.ha` (`base_url`, `token`, `entities`, optional `sign`). Snippet: `share/config/ehal.ha.snippet.json`.
+- Compose lab: `docker/compose/ha-lab.yml` (Earnie :8506 + HA :8123 + evcc :7070). Setup: [`ha-lab-setup.md`](ha-lab-setup.md). German A2/B: [`../einrichtung/ha-evcc.md`](../einrichtung/ha-evcc.md).
+- HITL mapping UI: Streamlit Loxone-Com expander → `ui/ehal_ha_mapping.py` (entity scan → persist mapping; no LLM in 2.4.c).
+- Sign mode per field: `ehal` (already aligned) or `negate`. Units: kW states converted to W.
+- Setpoints: typically `number.set_value` on mapped entities (Amps for EVCS; W for ESS limits).
+- Optimizer exclusivity + single Modbus writer: see German checklist in `ha-evcc.md`.
+- Same Live façade / write-error path as OpenEMS (`is_ehal_network_backend()`).
 
 ## Connector-author checklist
 

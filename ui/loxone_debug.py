@@ -85,14 +85,17 @@ def write_summary_text(writes: list[dict[str, Any]]) -> str:
 
 def render_status_strip(main_state: dict | None) -> None:
     silent = config.is_loxone_silent_mode()
-    openems = config.is_ehal_openems_backend()
-    if openems:
+    ehal_net = config.is_ehal_network_backend()
+    if ehal_net:
+        hub = "HA" if config.is_ehal_ha_backend() else "OpenEMS"
         if silent:
             st.warning(
-                "**Silent-Modus aktiv** — EHAL/OpenEMS-Setpoints werden nicht gesendet."
+                f"**Silent-Modus aktiv** — EHAL/{hub}-Setpoints werden nicht gesendet."
             )
         else:
-            st.success("**OpenEMS-EHAL** — `main.py` sendet M1-Setpoints an OpenEMS REST.")
+            st.success(
+                f"**{hub}-EHAL** — `main.py` sendet M1-Setpoints an {hub} REST."
+            )
     elif silent:
         st.warning("**Silent-Modus aktiv** — Steuerwerte werden nicht an Loxone gesendet.")
     else:
@@ -100,7 +103,7 @@ def render_status_strip(main_state: dict | None) -> None:
 
     render_ehal_write_error_banner()
 
-    if openems:
+    if ehal_net:
         if not has_produktiv_run(main_state):
             st.info("Noch kein Produktiv-Durchlauf von **main.py** — Schreib-Historie leer.")
             return
@@ -165,9 +168,10 @@ def _render_live_reads_fragment() -> None:
 
 def render_live_reads_section() -> None:
     st.subheader("Live-Lesen")
-    if config.is_ehal_openems_backend():
+    if config.is_ehal_network_backend():
+        hub = "HA" if config.is_ehal_ha_backend() else "OpenEMS"
         st.info(
-            "Backend **OpenEMS/EHAL** — Merker-Lesen unten ist Loxone-spezifisch und "
+            f"Backend **{hub}/EHAL** — Merker-Lesen unten ist Loxone-spezifisch und "
             "für diesen Modus nicht maßgeblich. SoC/Leistung kommen über EHAL REST."
         )
         return

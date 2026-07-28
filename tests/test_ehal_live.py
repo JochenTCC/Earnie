@@ -22,6 +22,31 @@ def test_is_openems_backend(config_mock):
         "EHAL_BACKEND": "openems",
     }.get(key, default)
     assert ehal_live.is_openems_backend() is True
+    assert ehal_live.is_ehal_network_backend() is True
+
+
+@patch("integrations.ehal_live.get_ha_adapter")
+@patch("integrations.ehal_live.config")
+def test_read_live_power_kw_ha_backend(config_mock, adapter_factory):
+    ehal_live.reset_adapter_cache()
+    config_mock.get.side_effect = lambda key, default=None: {
+        "EHAL_BACKEND": "ha",
+    }.get(key, default)
+    adapter = MagicMock()
+    adapter.read_telemetry.return_value = {
+        "schema_version": EHAL_SCHEMA_VERSION,
+        "ts": "2026-07-28T12:00:00Z",
+        "adapter_id": "ha-home",
+        "grid_power_active": 1000.0,
+        "pv_production_active": 2000.0,
+        "ess_soc": 50.0,
+        "ess_power": 500.0,
+    }
+    adapter_factory.return_value = adapter
+    power = ehal_live.read_live_power_kw()
+    assert power is not None
+    assert power["pv"] == 2.0
+    assert power["battery"] == -0.5
 
 
 @patch("integrations.ehal_live.get_openems_adapter")

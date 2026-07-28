@@ -35,7 +35,7 @@
     },
     "ehal": {
       "$ref": "#/definitions/ehal",
-      "description": "Optional southbound backend. Missing/loxone = legacy Loxone Live I/O; openems = EHAL via OpenEMS REST (2.4.b)."
+      "description": "Optional southbound backend. Missing/loxone = legacy Loxone Live I/O; openems = OpenEMS REST (2.4.b); ha = Home Assistant REST (2.4.c)."
     },
     "flexible_consumers": {
       "type": "array",
@@ -486,8 +486,8 @@
       "properties": {
         "backend": {
           "type": "string",
-          "enum": ["openems", "loxone", "none"],
-          "description": "openems = Live M1 via OpenEMS REST; omit/loxone/none = legacy Loxone path."
+          "enum": ["openems", "ha", "loxone", "none"],
+          "description": "openems = Live M1 via OpenEMS REST; ha = Home Assistant REST (2.4.c); omit/loxone/none = legacy Loxone path."
         },
         "adapter_id": {
           "type": "string",
@@ -516,6 +516,35 @@
             "evcs_component": {
               "type": "string",
               "description": "EVCS component id (default evcs0)."
+            }
+          }
+        },
+        "ha": {
+          "type": "object",
+          "description": "Home Assistant REST connection (2.4.c); prefer stable entities from evcc.",
+          "properties": {
+            "base_url": {
+              "type": "string",
+              "description": "HA REST base, e.g. http://homeassistant:8123"
+            },
+            "token": {
+              "type": "string",
+              "description": "Long-lived access token (Bearer)."
+            },
+            "entities": {
+              "type": "object",
+              "description": "Map EHAL M1 field name → HA entity_id.",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "sign": {
+              "type": "object",
+              "description": "Per-field sign mode: ehal (already EHAL-aligned) or negate.",
+              "additionalProperties": {
+                "type": "string",
+                "enum": ["ehal", "negate"]
+              }
             }
           }
         }

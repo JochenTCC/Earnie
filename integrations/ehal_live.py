@@ -1,15 +1,16 @@
-"""Thin Live façade: OpenEMS EHAL backend vs legacy Loxone path."""
+"""Thin Live façade: OpenEMS/HA EHAL backends vs legacy Loxone path."""
 from __future__ import annotations
 
 import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Protocol
 
 import config
 from ehal import EHAL_SCHEMA_VERSION, EhalWriteError, validate_write_error
 from integrations import loxone_client
+from integrations.ha_adapter import HaAdapter, HaConfig, HaHttpError
 from integrations.openems_adapter import OpenemsAdapter, OpenemsConfig, OpenemsHttpError
 from runtime_store.persist_paths import runtime_path
 from settings.ev_power import ev_nominal_power_conversion, kw_to_ampere
@@ -18,11 +19,31 @@ logger = logging.getLogger(__name__)
 
 WRITE_ERROR_FILENAME = "ehal_write_error.json"
 
-_adapter: OpenemsAdapter | None = None
+_openems_adapter: OpenemsAdapter | None = None
+_ha_adapter: HaAdapter | None = None
+
+
+class _EhalNetworkAdapter(Protocol):
+    def read_telemetry(self) -> dict[str, Any]: ...
+
+    def write_setpoints(self, setpoint: dict[str, Any], **kwargs: Any) -> EhalWriteError | None: ...
+
+    def capabilities(self) -> dict[str, Any]: ...
+
+    @property
+    def cfg(self) -> Any: ...
 
 
 def is_openems_backend() -> bool:
     return str(config.get("EHAL_BACKEND") or "").strip().lower() == "openems"
+
+
+def is_ha_backend() -> bool:
+    return str(config.get("EHAL_BACKEND") or "").strip().lower() == "ha"
+
+
+def is_ehal_network_backend() -> bool:
+    return is_openems_backend() or is_ha_backend()
 
 
 def write_error_path() -> str:
@@ -66,7 +87,7 @@ def load_write_error() -> EhalWriteError | None:
 
 
 def get_openems_adapter() -> OpenemsAdapter:
-    global _adapter
+    global _openems_adapter
     base_url = str(config.get("EHAL_OPENEMS_BASE_URL") or "").strip()
     if not base_url:
         raise ValueError(
@@ -82,38 +103,78 @@ def get_openems_adapter() -> OpenemsAdapter:
         evcs_component=str(config.get("EHAL_OPENEMS_EVCS_COMPONENT") or "evcs0"),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
     )
-    if _adapter is not None and _adapter.cfg != cfg:
-        _adapter = None
-    if _adapter is None:
-        _adapter = OpenemsAdapter(cfg)
-    return _adapter
+    if _openems_adapter is not None and _openems_adapter.cfg != cfg:
+        _openems_adapter = None
+    if _openems_adapter is None:
+        _openems_adapter = OpenemsAdapter(cfg)
+    return _openems_adapter
+
+
+def get_ha_adapter() -> HaAdapter:
+    global _ha_adapter
+    base_url = str(config.get("EHAL_HA_BASE_URL") or "").strip()
+    token = str(config.get("EHAL_HA_TOKEN") or "").strip()
+    if not base_url:
+        raise ValueError(
+            "ehal.backend=ha requires ehal.ha.base_url (EHAL_HA_BASE_URL)."
+        )
+    if not token:
+        raise ValueError(
+            "ehal.backend=ha requires ehal.ha.token (EHAL_HA_TOKEN)."
+        )
+    entities = config.get("EHAL_HA_ENTITIES") or {}
+    if not isinstance(entities, dict):
+        entities = {}
+    sign = config.get("EHAL_HA_SIGN") or {}
+    if not isinstance(sign, dict):
+        sign = {}
+    cfg = HaConfig(
+        base_url=base_url,
+        token=token,
+        adapter_id=str(config.get("EHAL_ADAPTER_ID") or "ha-home"),
+        entities={str(k): str(v) for k, v in entities.items()},
+        sign={str(k): str(v) for k, v in sign.items()},
+        timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
+    )
+    if _ha_adapter is not None and _ha_adapter.cfg != cfg:
+        _ha_adapter = None
+    if _ha_adapter is None:
+        _ha_adapter = HaAdapter(cfg)
+    return _ha_adapter
+
+
+def get_network_adapter() -> _EhalNetworkAdapter:
+    if is_ha_backend():
+        return get_ha_adapter()
+    return get_openems_adapter()
 
 
 def reset_adapter_cache() -> None:
-    """Test helper: drop cached adapter instance."""
-    global _adapter
-    _adapter = None
+    """Test helper: drop cached adapter instances."""
+    global _openems_adapter, _ha_adapter
+    _openems_adapter = None
+    _ha_adapter = None
 
 
 def read_ess_soc() -> float | None:
-    if not is_openems_backend():
+    if not is_ehal_network_backend():
         return loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     try:
-        telemetry = get_openems_adapter().read_telemetry()
-    except (OpenemsHttpError, ValueError, OSError) as exc:
-        logger.error("EHAL/OpenEMS SoC read failed: %s", exc)
+        telemetry = get_network_adapter().read_telemetry()
+    except (OpenemsHttpError, HaHttpError, ValueError, OSError) as exc:
+        logger.error("EHAL SoC read failed: %s", exc)
         return None
     return float(telemetry["ess_soc"])
 
 
 def read_live_power_kw() -> dict[str, float] | None:
     """Return Live power dict (kW) in Loxone-compatible signs (+ battery = charge)."""
-    if not is_openems_backend():
+    if not is_ehal_network_backend():
         return loxone_client.fetch_loxone_live_power()
     try:
-        telemetry = get_openems_adapter().read_telemetry()
-    except (OpenemsHttpError, ValueError, OSError) as exc:
-        logger.error("EHAL/OpenEMS live power read failed: %s", exc)
+        telemetry = get_network_adapter().read_telemetry()
+    except (OpenemsHttpError, HaHttpError, ValueError, OSError) as exc:
+        logger.error("EHAL live power read failed: %s", exc)
         return None
 
     pv = max(0.0, float(telemetry["pv_production_active"]) / 1000.0)
@@ -138,7 +199,7 @@ def write_ess_limits_from_huawei(mode: int, target_power_kw: float) -> EhalWrite
     charge_kw, discharge_kw, _cmd = loxone_client.map_huawei_modbus_values(
         mode, target_power_kw
     )
-    adapter = get_openems_adapter()
+    adapter = get_network_adapter()
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     setpoint: dict[str, Any] = {
         "schema_version": EHAL_SCHEMA_VERSION,
@@ -160,7 +221,7 @@ def write_evcs_max_current_from_consumers(
     """Write set_evcs_max_current from first EV consumer planned power (kW→A)."""
     consumer = _first_ev_consumer()
     if consumer is None:
-        logger.info("OpenEMS EHAL: no EV consumer configured — skip EVCS setpoint")
+        logger.info("EHAL: no EV consumer configured — skip EVCS setpoint")
         return None
 
     cid = consumer["id"]
@@ -173,9 +234,9 @@ def write_evcs_max_current_from_consumers(
 
     voltage_v, phases = ev_nominal_power_conversion(consumer)
     amps = kw_to_ampere(planned_kw, voltage_v=voltage_v, phases=phases)
-    adapter = get_openems_adapter()
+    adapter = get_network_adapter()
     if not adapter.capabilities()["supports_evcs_current"]:
-        logger.info("OpenEMS EHAL: supports_evcs_current=false — skip EVCS write")
+        logger.info("EHAL: supports_evcs_current=false — skip EVCS write")
         return None
 
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")

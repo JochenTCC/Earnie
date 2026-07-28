@@ -313,6 +313,12 @@ class Config:
     def is_ehal_openems_backend(self) -> bool:
         return str(self.get("EHAL_BACKEND") or "").strip().lower() == "openems"
 
+    def is_ehal_ha_backend(self) -> bool:
+        return str(self.get("EHAL_BACKEND") or "").strip().lower() == "ha"
+
+    def is_ehal_network_backend(self) -> bool:
+        return self.is_ehal_openems_backend() or self.is_ehal_ha_backend()
+
     def is_event_trigger_enabled(self) -> bool:
         return bool(self.get('EVENT_TRIGGER_ENABLED', default=True))
 
@@ -584,6 +590,14 @@ def is_loxone_silent_mode() -> bool:
 
 def is_ehal_openems_backend() -> bool:
     return CONFIG.is_ehal_openems_backend()
+
+
+def is_ehal_ha_backend() -> bool:
+    return CONFIG.is_ehal_ha_backend()
+
+
+def is_ehal_network_backend() -> bool:
+    return CONFIG.is_ehal_network_backend()
 
 
 def is_event_trigger_enabled() -> bool:

@@ -43,6 +43,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 - [Proxmox LXC](einrichtung/proxmox-lxc.md) — Unprivileged LXC mit Docker Compose (Port 8501)
 - [Greenfield Dev-Stack](einrichtung/greenfield-dev-stack.md) — lokale Ersteinrichtung (Port 8502) für Hauskonfigurator/Backtesting
 - [OpenEMS-Lab](einrichtung/openems-lab.md) — Earnie + OpenEMS Edge/UI (Port 8503); Kommunikationscheck in der Spec
+- [Home Assistant + evcc](einrichtung/ha-evcc.md) — DACH-Pfad A2 (Compose, Port 8506) vs Pfad B (bestehendes HA); Optimizer-Exklusivität / Modbus
 - [Private Haus-Config](einrichtung/private-env.md) — privates Repo + Junction; öffentliche Vorlagen/Tarife unter `share/config/`
 
 

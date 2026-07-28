@@ -33,7 +33,7 @@ This TODO remains the **OpenEMS plant / REST channel** checklist (first verified
 - [x] SSH access; stable LAN IP `**192.168.178.34**`
 - [ ] Storage: USB SSD preferred over SD for Compose volumes (optional early on)
 
-**Later on same host (not required for first OpenEMS bring-up):** `earnie-core`; then **2.4.c** Home Assistant + evcc.
+**Later on same host (not required for first OpenEMS bring-up):** `earnie-core`; then **2.4.c** Home Assistant + evcc — see [`ha-lab-setup.md`](ha-lab-setup.md) / `docker/compose/ha-lab.yml`.
 
 ---
 
@@ -312,7 +312,7 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 
 ## Out of scope for this platform TODO
 
-- Home Assistant + evcc (**2.4.c** / A2 DACH default)
+- Home Assistant + evcc (**2.4.c** / A2 DACH default) — implemented: `docker/compose/ha-lab.yml`, [`ha-lab-setup.md`](ha-lab-setup.md)
 - Loxone-EHAL extraction (**2.5**)
 - Real FEMS/OEM hardware (optional later; expect write locks)
 - MQTT/Matter as first-class hubs

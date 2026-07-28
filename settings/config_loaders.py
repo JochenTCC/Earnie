@@ -128,14 +128,30 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     if backend in ("", "loxone", "none"):
         backend = ""
     openems = ehal.get("openems") if isinstance(ehal.get("openems"), dict) else {}
+    ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
+    entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}
+    sign = ha.get("sign") if isinstance(ha.get("sign"), dict) else {}
+    default_adapter = "ha-home" if backend == "ha" else "openems-lab"
     return {
         "EHAL_BACKEND": backend or None,
-        "EHAL_ADAPTER_ID": str(ehal.get("adapter_id") or "openems-lab"),
+        "EHAL_ADAPTER_ID": str(ehal.get("adapter_id") or default_adapter),
         "EHAL_OPENEMS_BASE_URL": str(openems.get("base_url") or "").strip(),
         "EHAL_OPENEMS_USERNAME": str(openems.get("username") or "x"),
         "EHAL_OPENEMS_PASSWORD": str(openems.get("password") or "admin"),
         "EHAL_OPENEMS_ESS_COMPONENT": str(openems.get("ess_component") or "ess0"),
         "EHAL_OPENEMS_EVCS_COMPONENT": str(openems.get("evcs_component") or "evcs0"),
+        "EHAL_HA_BASE_URL": str(ha.get("base_url") or "").strip(),
+        "EHAL_HA_TOKEN": str(ha.get("token") or "").strip(),
+        "EHAL_HA_ENTITIES": {
+            str(key): str(value).strip()
+            for key, value in entities.items()
+            if str(value).strip()
+        },
+        "EHAL_HA_SIGN": {
+            str(key): str(value).strip().lower()
+            for key, value in sign.items()
+            if str(value).strip()
+        },
     }
 
 

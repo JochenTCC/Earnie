@@ -158,6 +158,10 @@ PAGE_DOCS: dict[str, PageDocs] = {
                 "Loxone-Com (UI)",
                 "docs/ui/loxone-kommunikation.md",
             ),
+            DocLink(
+                "Home Assistant + evcc (A2/B)",
+                "docs/einrichtung/ha-evcc.md",
+            ),
         ),
     ),
     "price-forecast": PageDocs(

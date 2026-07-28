@@ -1,0 +1,80 @@
+# HA + evcc lab stack (2.4.c) — Earnie + Home Assistant + evcc (Separate Works)
+#
+# Earnie talks to Home Assistant over REST only (port 8123). Prefer HA entities
+# that evcc exposes — no direct evcc API from Earnie in this compose.
+#
+# First start:
+#   mkdir ha_lab\config ha_lab\runtime ha_lab\homeassistant ha_lab\evcc
+#   # copy ha_lab/evcc/evcc.example.yaml → ha_lab/evcc/evcc.yaml and edit
+#   docker compose --project-directory . -f docker/compose/ha-lab.yml up -d --build
+#   # Create HA long-lived token; map entities in Streamlit Loxone-Com expander
+#
+# UI:
+#   Earnie Streamlit: http://localhost:8506
+#   Home Assistant:   http://localhost:8123
+#   evcc UI:          http://localhost:7070
+#
+# Stop (volumes retained for HA; host dirs for Earnie/evcc):
+#   docker compose --project-directory . -f docker/compose/ha-lab.yml down
+#
+# Setup: docs/spec/ha-lab-setup.md
+# German: docs/einrichtung/ha-evcc.md
+
+version: "3.8"
+
+x-persist-volumes: &persist-volumes
+  - ./ha_lab/config:/app/config
+  - ./ha_lab/runtime:/app/runtime
+
+x-common-env: &common-env
+  TZ: Europe/Vienna
+  EARNIE_CONFIG_PATH: config
+  EARNIE_RUNTIME_PATH: runtime
+  EARNIE_VERIFY_LOXONE_ON_START: "0"
+  EARNIE_AUTO_START_MAIN: "1"
+
+x-build: &build
+  context: .
+  dockerfile: docker/Dockerfile
+
+services:
+  # Backlog "earnie-core" = this single Streamlit + main container
+  earnie:
+    build: *build
+    container_name: earnie-ha-lab
+    restart: unless-stopped
+    ports:
+      - "8506:8501"
+    volumes: *persist-volumes
+    environment:
+      <<: *common-env
+      EARNIE_UI_MODES: sunset2sunset,live_environment
+    depends_on:
+      - homeassistant
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2025.7.0
+    container_name: earnie_homeassistant
+    hostname: homeassistant
+    restart: unless-stopped
+    volumes:
+      - ./ha_lab/homeassistant:/config
+    environment:
+      TZ: Europe/Vienna
+    ports:
+      - "8123:8123"
+
+  evcc:
+    image: evcc/evcc:0.207.0
+    container_name: earnie_evcc
+    hostname: evcc
+    restart: unless-stopped
+    command: ["evcc", "-c", "/etc/evcc.yaml"]
+    volumes:
+      - ./ha_lab/evcc/evcc.yaml:/etc/evcc.yaml:ro
+    environment:
+      TZ: Europe/Vienna
+    ports:
+      - "7070:7070"
+    depends_on:
+      - homeassistant
