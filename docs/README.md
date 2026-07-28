@@ -1,6 +1,6 @@
 # Earnie — Anwender-Dokumentation
 
-Diese Dokumentation richtet sich an Betreiber von Earnie: Einrichtung, Konfiguration, Streamlit-Oberfläche und die Schnittstelle zum Loxone Miniserver.
+Diese Dokumentation richtet sich an Betreiber von Earnie: Einrichtung, Konfiguration, Streamlit-Oberfläche und die Smarthome-Anbindung (Loxone, Home Assistant/evcc oder OpenEMS).
 
 **Einstieg aus Anwendersicht (Handbuch):** [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md)
 
@@ -12,9 +12,9 @@ Zum Ausprobieren des Szenarien-eExplorers ohne Intallation:
 ## Erste Schritte
 
 1. **Konfiguration:** `share/config/config.example.json` → Bootstrap legt `earnie_env/config/config.json` an (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime`. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
-2. **Loxone-Zugang:** `.env.example` → `earnie_env/config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `.env` im Config-Volume an).
-3. **Merker-Namen** in `earnie_env/config/config.json` unter `loxone_blocks` und in den Verbrauchern des Hausprofils (`house_profiles.json`) anpassen (siehe [Loxone-Signale](referenz/loxone-signale.md)). Legacy-`flexible_consumers` in `config.json` nur noch bei Bedarf.
-4. **Verbindung prüfen:**
+2. **Smarthome-Backend wählen:** [Adapter wählen](einrichtung/adapter-wahl.md) (Default Loxone; alternativ HA+evcc oder OpenEMS-Lab). Bei Loxone: `.env.example` → `earnie_env/config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `.env` im Config-Volume an).
+3. **Feld-Mapping:** Bei Loxone Merker in `loxone_blocks` / Hausprofil ([Loxone-Signale](referenz/loxone-signale.md)); bei HA Entity→EHAL auf [EHAL-Com](ui/ehal-com.md). Legacy-`flexible_consumers` in `config.json` nur noch bei Bedarf.
+4. **Verbindung prüfen:** EHAL-Com (Live-Lesen) bzw. bei Loxone:
   ```powershell
    python -m scripts.verify_loxone_setup
   ```
@@ -37,6 +37,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 ### Einrichtung
 
+- [Adapter wählen](einrichtung/adapter-wahl.md) — Loxone / HA+evcc / OpenEMS über `ehal.backend` (Config-Umschaltung)
 - [Loxone-Anbindung](einrichtung/loxone-anbindung.md) — HTTP-Schnittstelle, FTP-Log, Prüfskript
 - [Betrieb](einrichtung/betrieb.md) — `main.py` vs. App, Laufzeitdateien, Optimierungs-Takt
 - [Container](einrichtung/container.md) — Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, Migration, Config-Drift

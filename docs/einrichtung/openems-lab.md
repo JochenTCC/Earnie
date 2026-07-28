@@ -1,6 +1,6 @@
 # OpenEMS-Lab (Earnie ↔ OpenEMS)
 
-Lokaler Compose-Stack für den OpenEMS-EHAL-Prototyp (**2.4.b**): Earnie + OpenEMS Edge + OpenEMS UI.
+Lokaler Compose-Stack für den OpenEMS-EHAL-Prototyp (**2.4.b**): Earnie + OpenEMS Edge + OpenEMS UI. Einordnung gegenüber Loxone und HA+evcc: [Adapter wählen](adapter-wahl.md).
 
 | Service | URL |
 | --- | --- |

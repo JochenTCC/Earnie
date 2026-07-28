@@ -2,7 +2,7 @@
 
 Produktiver Southbound für Gerätevolumen in DACH: Earnie spricht den **HA-EHAL-Adapter** (REST) an. **evcc** läuft als Sidecar unter Home Assistant und liefert typische Wallbox-/Zähler-/WR-Entities — Earnie schreibt auf **stabile HA-Entities**, nicht parallel direkt gegen die evcc-API.
 
-Entwickler-Setup (Compose, Token, Mapping): [HA-Lab Spec](../spec/ha-lab-setup.md).
+Vergleich Loxone / HA / OpenEMS und Umschaltung: [Adapter wählen](adapter-wahl.md). Entwickler-Setup (Compose, Token, Mapping): [HA-Lab Spec](../spec/ha-lab-setup.md).
 
 ## Pfad A2 (Default) vs Pfad B
 

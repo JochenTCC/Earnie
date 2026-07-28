@@ -225,6 +225,16 @@ M2 schema slice — **mapping aids / contribution seeds**, not a new Live I/O pa
 - HITL labels/grouping via `ehal.profiles.role_field_labels` / `group_fields_by_role` (Loxone + HA mapping UIs).
 - Contribution entry: [CONTRIBUTING.md](../../CONTRIBUTING.md) §4.
 
+## Phase 4 / 2.4.h — multi-system config-switch proof
+
+Acceptance for **2.4.h** (docs + automated proof):
+
+- Mocked three-way contract: `tests/test_ehal_contract_backends.py` — same Core-facing `read_live_power_kw` for `openems` / `ha` / `loxone`; `get_adapter()` routing by `EHAL_BACKEND` only; ESS setpoint parity for network backends; documented Loxone write asymmetry (`is_ehal_network_backend` = openems|ha only; Live ESS/flex still via `loxone_client`).
+- German operator docs: [docs/einrichtung/adapter-wahl.md](../einrichtung/adapter-wahl.md).
+- Connector recipe expanded in [CONTRIBUTING.md](../../CONTRIBUTING.md) §3 and the checklist below.
+
+Optional live lab matrix (Compose OpenEMS/HA + prod Loxone HITL) remains a soft check for release **2.4.0**, not a gate for this chapter.
+
 ## Connector-author checklist
 
 1. Translate hub entities → EHAL only; no hub types in Core.
@@ -233,4 +243,11 @@ M2 schema slice — **mapping aids / contribution seeds**, not a new Live I/O pa
 4. Network API only; separate containers from Earnie Core.
 5. Setpoints = limits; leave realtime control to the hub.
 6. Validate outgoing/incoming documents with `share/ehal/*.schema.json` or `ehal.validate_*`.
-7. See also [CONTRIBUTING.md](../../CONTRIBUTING.md) § Connector / EHAL adapters.
+7. **Config switch only:** Core must work when only `ehal.backend` (+ hub credentials/mapping) changes — extend `tests/test_ehal_contract_backends.py`.
+8. **Touch list for a new hub:**
+   - `integrations/<hub>_adapter.py` (`read_telemetry` / `write_setpoints` / `capabilities`)
+   - `integrations/ehal_live.py` (`is_*_backend`, `get_*_adapter`, `get_adapter`)
+   - `settings/config_loaders.py` (`load_ehal_params`), `runtime_store/ehal_setup.py`, and usually `ui/ehal_connection.py`
+   - Unit tests + contract-test cases
+9. Mapping aids (roles / Loxone recipes / hardware-profile outlines) → §4 / `ehal.profiles` — not Live I/O.
+10. See also [CONTRIBUTING.md](../../CONTRIBUTING.md) §3.

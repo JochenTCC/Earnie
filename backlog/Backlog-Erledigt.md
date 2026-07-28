@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.h Multi-system field test (2026-07-28)
+
+- [x] **2.4.h — Multi-system field test (Phase 4)** *(was 2.5.d)* — Automated config-switch proof OpenEMS ↔ HA+evcc ↔ Loxone (`tests/test_ehal_contract_backends.py`: routing, power parity, ESS write asymmetry, capabilities); German adapter choice [`docs/einrichtung/adapter-wahl.md`](../docs/einrichtung/adapter-wahl.md); expanded connector recipe [`CONTRIBUTING.md`](../CONTRIBUTING.md) §3 + [`docs/spec/ehal.md`](../docs/spec/ehal.md). Live compose/HITL deferred (soft check for `2.4.0`).
+
+
 ### 2.4.g Device / hardware profile schemas (2026-07-28)
 
 - [x] **2.4.g — Device / hardware profile schemas (M2 slice; bounty later)** *(was 2.5.c)* — EHAL device-role templates (`share/ehal/device_roles.schema.json`, `share/ehal/roles/`); Modbus/SunSpec outline (`share/hardware_profiles/`); Loxone JSON Merker recipes (`share/loxone/recipes/`); loader `ehal/profiles.py` + `tests/test_ehal_profiles.py`; HITL role grouping on EHAL-Com; docs [`docs/spec/ehal.md`](../docs/spec/ehal.md), [`CONTRIBUTING.md`](../CONTRIBUTING.md) §4, [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md). Full Community Bounty engine deferred to Entwicklungsplan **M4**.

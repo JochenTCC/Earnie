@@ -480,7 +480,7 @@ Map a read-only `sensor` as a setpoint entity (or revoke token write rights) →
 
 ## 7. Config switch vs OpenEMS
 
-Same Earnie Core: change only `ehal.backend` (`ha` vs `openems`) and the matching hub block. Mocked parity: `tests/test_ehal_contract_openems_ha.py`.
+Same Earnie Core: change only `ehal.backend` (`ha` vs `openems` vs `loxone`) and the matching hub block. Mocked parity: `tests/test_ehal_contract_backends.py`.
 
 Do **not** run OpenEMS lab and HA lab on the same host ports without remapping.
 

@@ -1,11 +1,11 @@
-"""Contract parity: OpenEMS vs HA adapters through ehal_live (config switch only)."""
+"""Contract parity: OpenEMS / HA / Loxone via ehal_live (config switch only)."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ehal import EHAL_SCHEMA_VERSION
+from ehal import EHAL_SCHEMA_VERSION, validate_capabilities
 from integrations import ehal_live
 
 
@@ -18,6 +18,14 @@ _FIXTURE_TELEMETRY = {
     "ess_soc": 50.0,
     "ess_power": 500.0,
     "evcs_active_power": 1200.0,
+}
+
+_FIXTURE_CAPABILITIES = {
+    "schema_version": EHAL_SCHEMA_VERSION,
+    "ts": "2026-07-28T12:00:00Z",
+    "adapter_id": "contract",
+    "supports_ess_write": True,
+    "supports_evcs_current": True,
 }
 
 
@@ -84,6 +92,28 @@ def test_live_power_identical_when_only_backend_switches():
     assert openems_power["house"] == pytest.approx(2.5)
 
 
+def test_get_adapter_routes_by_ehal_backend_only():
+    ehal_live.reset_adapter_cache()
+    openems = MagicMock(name="openems")
+    ha = MagicMock(name="ha")
+    loxone = MagicMock(name="loxone")
+
+    cases = (
+        ("openems", "integrations.ehal_live.get_openems_adapter", openems),
+        ("ha", "integrations.ehal_live.get_ha_adapter", ha),
+        ("loxone", "integrations.ehal_live.get_loxone_adapter", loxone),
+        ("", "integrations.ehal_live.get_loxone_adapter", loxone),
+    )
+    for backend, factory_path, expected in cases:
+        ehal_live.reset_adapter_cache()
+        with patch("integrations.ehal_live.config") as config_mock, patch(
+            factory_path, return_value=expected
+        ) as factory:
+            config_mock.get.side_effect = _config_side_effect(backend)
+            assert ehal_live.get_adapter() is expected
+            factory.assert_called_once()
+
+
 def test_ess_setpoint_payload_identical_when_only_backend_switches():
     ehal_live.reset_adapter_cache()
     captured: list[dict] = []
@@ -127,6 +157,46 @@ def test_ess_setpoint_payload_identical_when_only_backend_switches():
         == ha_sp["set_ess_discharge_power_limit"]
     )
     assert openems_sp["set_ess_charge_power_limit"] == 1500.0
+
+
+def test_loxone_ess_write_uses_non_network_path():
+    """Loxone Live writes stay on loxone_client; façade ESS helper requires network backend."""
+    ehal_live.reset_adapter_cache()
+    with patch("integrations.ehal_live.config") as config_mock, patch(
+        "integrations.ehal_live.loxone_client.map_huawei_modbus_values",
+        return_value=(1.5, 0.0, 0),
+    ) as map_mock, patch(
+        "integrations.ehal_live.get_loxone_adapter"
+    ) as get_loxone:
+        config_mock.get.side_effect = _config_side_effect("loxone")
+        assert ehal_live.is_ehal_network_backend() is False
+        with pytest.raises(ValueError, match="openems or ha"):
+            ehal_live.write_ess_limits_from_huawei(1, 1.5)
+        map_mock.assert_called_once_with(1, 1.5)
+        get_loxone.assert_not_called()
+
+
+def test_capabilities_validate_for_all_backends():
+    ehal_live.reset_adapter_cache()
+    adapter = MagicMock()
+    adapter.capabilities.return_value = dict(_FIXTURE_CAPABILITIES)
+
+    factories = (
+        ("openems", "integrations.ehal_live.get_openems_adapter"),
+        ("ha", "integrations.ehal_live.get_ha_adapter"),
+        ("loxone", "integrations.ehal_live.get_loxone_adapter"),
+    )
+    for backend, factory_path in factories:
+        ehal_live.reset_adapter_cache()
+        with patch("integrations.ehal_live.config") as config_mock, patch(
+            factory_path, return_value=adapter
+        ):
+            config_mock.get.side_effect = _config_side_effect(backend)
+            caps = ehal_live.get_adapter().capabilities()
+            out = validate_capabilities(caps)
+            assert out["supports_ess_write"] is True
+            assert out["supports_evcs_current"] is True
+            assert out["adapter_id"] == "contract"
 
 
 @patch("integrations.ehal_live.config")

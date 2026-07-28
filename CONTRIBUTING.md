@@ -52,15 +52,23 @@ Southbound-Anbindungen laufen über den **Earnie Hardware Access Layer (EHAL)** 
 
 **Verbindliche Spec (Englisch):** [docs/spec/ehal.md](docs/spec/ehal.md) · JSON-Schemas: `share/ehal/` · Python: Paket `ehal`.
 
-Adapter-Vertrag (Kurzfassung):
+**Adapter-Vertrag:**
 
 - Nur **übersetzen**: Hub-Kanäle/Entities → dieselben EHAL-Strukturen; keine Hub-Typen im Optimizer/MILP-Kern.
 - **Vorzeichen und Einheiten** im Adapter normalisieren (`+` = Netzbezug, Leistung in **W**, EVCS-Setpoint in **A**).
 - **Capability-Flags** melden; bei fehlgeschlagenen Writes degradieren (loggen, Nutzerhinweis, Write-Error-Telemetry) — siehe Spec.
-- Anbindung nur über **Netzwerk-API** (REST/WS); keine Hub-Quelltexte oder Libraries in Earnie-Repos (Separate Works, z. B. OpenEMS/AGPL).
+- Anbindung nur über **Netzwerk-API** (REST/WS/HTTP); keine Hub-Quelltexte oder Libraries in Earnie-Repos (Separate Works, z. B. OpenEMS/AGPL).
 - Setpoints = **Grenzen/Fahrpläne**; Echtzeitregelung bleibt im Subsystem.
+- Umschaltung **nur über Config** (`ehal.backend` + Hub-Block) — Core/MILP unverändert. Nachweis: `tests/test_ehal_contract_backends.py` (`2.4.h`).
 
-Roadmap: OpenEMS-Prototyp (`2.4.b`), HA+evcc (`2.4.c`), Loxone-EHAL M1 (`2.4.e`). Flex/`target_soc`/`control_cmd` bleiben vorerst auf `loxone_client` (kein Schema-Erweiterung in `2.4.e`).
+**Rezept für einen neuen Hub-Adapter:**
+
+1. `integrations/<hub>_adapter.py` mit `read_telemetry()`, `write_setpoints()`, `capabilities()` — Dokumente gegen M1-Schemas via `ehal.validate_*` emittieren (Vorbilder: `openems_adapter.py`, `ha_adapter.py`, `loxone_adapter.py`).
+2. In [`integrations/ehal_live.py`](integrations/ehal_live.py) verdrahten: `is_<hub>_backend()`, `get_<hub>_adapter()`, Zweig in `get_adapter()`; bei Bedarf Setup-Keys in `settings/config_loaders.py` (`load_ehal_params`), `runtime_store/ehal_setup.py` und UI unter `ui/ehal_connection.py`.
+3. Unit-Tests für den Adapter; Config-Switch-Parität in `tests/test_ehal_contract_backends.py` erweitern.
+4. Mapping-Hilfen (Rollen/Rezepte) gehören in §4 — sie sind **keine** Live-I/O-Engine.
+
+Referenz-Backends: OpenEMS (`2.4.b`), HA+evcc (`2.4.c`), Loxone-EHAL M1 (`2.4.e`); automatisierter Multi-Backend-Nachweis (`2.4.h`). Flex/`target_soc`/`control_cmd` bleiben vorerst auf `loxone_client` (kein Schema-Erweiterung in `2.4.e`).
 
 Nicht alles ist Teil des Basis-Setups (z. B. individuelle Pool-, Klima- oder Sonderanlagen). Technisch versierte Nutzer dürfen den Local Core und vorhandene Schnittstellen nutzen, um **eigene Logiken** anzubinden — unter derselben Lizenz; neue Hubs idealerweise als EHAL-Adapter.
 

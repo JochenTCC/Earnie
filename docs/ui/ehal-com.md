@@ -19,7 +19,7 @@ Oben wählen Sie das **Smarthome-Backend**:
 | Home Assistant | `config.json` → `ehal.ha` | URL, Long-Lived Token; darunter Entity→EHAL-Mapping |
 | OpenEMS | `config.json` → `ehal.openems` | Base-URL, Benutzer, Passwort, ESS-/EVCS-Komponenten |
 
-`ehal.backend` steuert den Live-Pfad in `main.py` (Loxone-HTTP vs. EHAL-REST).
+`ehal.backend` steuert den Live-Pfad in `main.py` (Loxone-HTTP vs. EHAL-REST). Welche Backend-Wahl wann sinnvoll ist: [Adapter wählen](../einrichtung/adapter-wahl.md).
 
 ## Live-Cockpit noch gesperrt (Greenfield)
 

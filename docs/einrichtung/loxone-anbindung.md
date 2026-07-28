@@ -2,6 +2,8 @@
 
 Earnie kommuniziert mit dem Loxone Miniserver über **HTTP** (Lesen und Schreiben von Werten) und optional **FTP** (Verbrauchs-Logdateien). Die konkrete Schaltlogik in Loxone (Wechselrichter (Batteriespeicher), Wallbox, Pool, ...) liegt außerhalb von Earnie — der Optimizer liefert Sollwerte und Freigaben.
 
+Andere Hubs (HA+evcc, OpenEMS): [Adapter wählen](adapter-wahl.md).
+
 ## Zugangsdaten (`config/.env`)
 
 
