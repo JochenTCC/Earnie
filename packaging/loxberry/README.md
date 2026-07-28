@@ -6,7 +6,13 @@ Plugin SemVer (`plugin.cfg` `VERSION`) is **independent** of Earnie `version.py`
 
 ## Manual ZIP for Plugin Admin
 
-From the repo root (Unix/macOS or Git Bash), package **only** this directory so `plugin.cfg` is at the ZIP root:
+Package **only** this directory so `plugin.cfg` is at the ZIP root. Paths inside the archive **must use `/` (forward slashes)**. LoxBerry’s Linux `unzip` fails with `appears to use backslashes as path separators` if the ZIP was built with Windows-style `\`.
+
+**Do not use** PowerShell `Compress-Archive` — it writes `\` separators and install aborts.
+
+### Unix / macOS / Git Bash (recommended)
+
+From the repo root:
 
 ```bash
 cd packaging/loxberry
@@ -14,10 +20,19 @@ zip -r ../../../earnie-loxberry-plugin-0.1.0.zip . \
   -x "*.git*" -x "*~" -x "*.DS_Store"
 ```
 
-PowerShell (repo root):
+### Windows — 7-Zip (repo root)
 
 ```powershell
-Compress-Archive -Path packaging\loxberry\* -DestinationPath earnie-loxberry-plugin-0.1.0.zip -Force
+Remove-Item .\earnie-loxberry-plugin-0.1.0.zip -ErrorAction SilentlyContinue
+& "C:\Program Files\7-Zip\7z.exe" a -tzip .\earnie-loxberry-plugin-0.1.0.zip .\packaging\loxberry\* `
+  "-x!*.git*" "-x!*~" "-x!*.DS_Store"
+```
+
+### Windows — Git Bash
+
+```bash
+cd packaging/loxberry
+zip -r ../../../earnie-loxberry-plugin-0.1.0.zip . -x "*.git*" -x "*~" -x "*.DS_Store"
 ```
 
 Install the ZIP under LoxBerry → Plugin Management → Install from ZIP.
