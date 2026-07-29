@@ -54,7 +54,6 @@ class TestCollectReadChecks:
             "LOXONE_PV_POWER_NAME": "PV",
             "LOXONE_BATTERY_POWER_NAME": "BAT",
             "LOXONE_GRID_POWER_NAME": "GRID",
-            "LOXONE_PV_COUNTER_NAME": "CNT",
             "LOXONE_CONSUMERS_POWER_NAME": "",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "CHG",
             "LOXONE_CONTROL_CMD_NAME": "CMD",

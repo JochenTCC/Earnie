@@ -30,7 +30,7 @@ def _env_flag(suffix: str, *, default: bool = False) -> bool:
 
 def run_loxone_verify_on_startup() -> None:
     """
-    Liest alle konfigurierten Loxone-IOs (ohne FTP/Roundtrip).
+    Liest alle konfigurierten Loxone-IOs (ohne Roundtrip).
 
     Standard: einmal pro Worker-Start nach Deploy/Neustart.
     Fehler werden geloggt; der Betrieb läuft weiter.

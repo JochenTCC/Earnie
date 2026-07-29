@@ -491,6 +491,37 @@ def _config_path_with_plugged_in(
     return out
 
 
+def _config_path_apply_live_ist_soc(
+    out: dict,
+    consumer: dict,
+    *,
+    capacity_kwh: float | None,
+    limit_soc: float,
+    from_loxone: bool,
+) -> dict:
+    """Plugged-in config path: energy from Ist-SOC (not daily_rest_soc forecast)."""
+    if out.get("plugged_in") is not True:
+        return out
+    if loxone_reports_charge_complete(consumer):
+        return _loxone_plugged_in_complete_context()
+    soc_val = fetch_loxone_actual_soc_percent(consumer)
+    if soc_val is None:
+        return out
+    target_kwh = config.Config.target_kwh_from_rest_soc(
+        consumer,
+        soc_val,
+        capacity_kwh=capacity_kwh,
+        limit_soc_percent=limit_soc,
+    )
+    updated = dict(out)
+    updated["target_kwh"] = round(target_kwh, 3) if target_kwh is not None else None
+    if from_loxone:
+        updated["source_label"] = "config.json (Ist-SOC → kWh, FertigUm Loxone)"
+    else:
+        updated["source_label"] = "config.json (Ist-SOC → kWh)"
+    return updated
+
+
 def resolve_charging_context(
     consumer: dict,
     matrix: list,
@@ -546,8 +577,13 @@ def resolve_charging_context(
     out = _config_path_with_plugged_in(
         result, consumer, sched, horizon_start, ready_raw
     )
-    if out.get("plugged_in") and loxone_reports_charge_complete(consumer):
-        return _loxone_plugged_in_complete_context()
+    out = _config_path_apply_live_ist_soc(
+        out,
+        consumer,
+        capacity_kwh=capacity_kwh,
+        limit_soc=limit_soc,
+        from_loxone=from_loxone,
+    )
     return out
 
 

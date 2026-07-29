@@ -419,64 +419,40 @@
     },
     "loxone_blocks": {
       "type": "object",
-      "description": "Zentrale Smarthome-Merker-Rollen für Speicher, PV und Steuerbefehle (Adresse = String; Backend derzeit Loxone).",
-      "required": [
-        "soc_name",
-        "pv_counter_name",
-        "log_filename",
-        "pv_tuning_log_file",
-        "pv_power_name",
-        "battery_power_name",
-        "grid_power_name",
-        "target_soc_name",
-        "target_charge_power_name",
-        "target_discharge_power_name",
-        "control_cmd_name"
-      ],
+      "description": "Optional legacy plant marker roles. Prefer house_profiles plant.ehal_bindings (2.4.k). FTP log / PV-tuning keys removed in 2.4.m.",
+      "additionalProperties": false,
       "properties": {
         "soc_name": {
           "type": "string",
-          "description": "Rolle Lesen: aktueller Batterie-SOC in %."
-        },
-        "pv_counter_name": {
-          "type": "string",
-          "description": "Rolle Lesen: PV-Zählerstand kumuliert in kWh (PV-Tuning)."
-        },
-        "log_filename": {
-          "type": "string",
-          "description": "FTP-Logdateiname auf dem Miniserver (kein Live-Merker)."
-        },
-        "pv_tuning_log_file": {
-          "type": "string",
-          "description": "Lokale CSV für adaptives PV-Tuning (Prognose vs. Ist). Schreiben derzeit in main.py nicht angebunden."
+          "description": "Legacy Lesen Batterie-SOC % — bevorzugt plant.ehal_bindings.sens_ess_soc."
         },
         "pv_power_name": {
           "type": "string",
-          "description": "Rolle Lesen: aktuelle PV-Leistung in kW."
+          "description": "Legacy Lesen PV-Leistung — bevorzugt plant.ehal_bindings.sens_pv_production_active."
         },
         "battery_power_name": {
           "type": "string",
-          "description": "Rolle Lesen: aktuelle Batterieleistung in kW (+ laden, − entladen)."
+          "description": "Legacy Lesen Batterieleistung — bevorzugt plant.ehal_bindings.sens_ess_power."
         },
         "grid_power_name": {
           "type": "string",
-          "description": "Rolle Lesen: aktuelle Netzleistung in kW."
-        },
-        "target_soc_name": {
-          "type": "string",
-          "description": "Rolle Schreiben: Ziel-SOC in %."
+          "description": "Legacy Lesen Netzleistung — bevorzugt plant.ehal_bindings.sens_grid_power_active."
         },
         "target_charge_power_name": {
           "type": "string",
-          "description": "Rolle Schreiben: Zwangsladeleistung in kW."
+          "description": "Legacy Schreiben Ladegrenze — bevorzugt plant.ehal_bindings.set_ess_charge_power_limit."
         },
         "target_discharge_power_name": {
           "type": "string",
-          "description": "Rolle Schreiben: Ziel-Entladeleistung in kW."
+          "description": "Legacy Schreiben Entladegrenze — bevorzugt plant.ehal_bindings.set_ess_discharge_power_limit."
         },
         "control_cmd_name": {
           "type": "string",
-          "description": "Rolle Schreiben: Huawei-Steuerbefehl (Register 47100): 0=Automatik, 1=Zwangsladen/Entladesperre, 2=Zwangs-Entladen."
+          "description": "Legacy Schreiben ESS-Modus — bevorzugt plant.ehal_bindings.set_ess_mode."
+        },
+        "consumers_power_name": {
+          "type": "string",
+          "description": "Legacy Lesen Hauslast — bevorzugt plant.ehal_bindings.sens_power_consumers."
         }
       }
     },

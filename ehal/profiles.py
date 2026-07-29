@@ -70,7 +70,6 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "flex.power_name": "Flex Leistung / Zustand",
     "flex.enable_name": "Flex Freigabe",
     "flex.power_setpoint_name": "Flex Leistungs-Sollwert",
-    "target_soc_name": "Loxone-Extras: Ziel-SOC",
 }
 
 # Field → device role_id for HITL grouping (M1 plant roles only).

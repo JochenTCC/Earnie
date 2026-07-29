@@ -55,23 +55,22 @@ class TestVerifyAndRestore:
         assert mismatches == []
         mock_send.assert_not_called()
 
-    def test_corrects_soc_outside_tolerance(self):
-        expected = {"Ernie_Ziel_SoC": 80.0}
+    def test_corrects_charge_power_outside_tolerance(self):
+        expected = {"Ernie_Ziel_LadeLeistung": 2.0}
         with patch.object(
-            wd.loxone_client, "fetch_loxone_generic_value", return_value=79.0
+            wd.loxone_client, "fetch_loxone_generic_value", return_value=1.8
         ), patch.object(wd.config, "get_flexible_consumers", return_value=[]), patch.object(
             wd.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_TARGET_SOC_NAME": "Ernie_Ziel_SoC",
                 "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
             }.get(name, "")
         ), patch.object(wd.loxone_client, "send_loxone_value", return_value=True) as mock_send:
             mismatches = wd.verify_and_restore_loxone_states(expected)
 
         assert len(mismatches) == 1
-        assert mismatches[0].expected == 80.0
-        assert mismatches[0].actual == 79.0
+        assert mismatches[0].expected == 2.0
+        assert mismatches[0].actual == 1.8
         assert mismatches[0].corrected is True
-        mock_send.assert_called_once_with("Ernie_Ziel_SoC", 80.0)
+        mock_send.assert_called_once_with("Ernie_Ziel_LadeLeistung", 2.0)
 
     def test_read_failure_is_reported_without_send(self):
         expected = {"Ernie_Steuerbefehl": 1.0}

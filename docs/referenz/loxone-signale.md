@@ -20,7 +20,6 @@ Prüfung aller konfigurierten Signale:
 | Event-Trigger (Verbraucher) | `consumers[].event_triggers[]` | gleiches Schema, Scope = Consumer-Entity |
 | Wärmepumpe / Flex / Thermal | `consumers[].ehal_bindings` | `flex.power_name`, `flex.enable_name`, `flex.power_setpoint_name` |
 | E-Auto (`ev`) | `consumers[].ehal_bindings` | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*` |
-| FTP-/Log-Extras | `config.json` → `loxone_blocks` (nur Nicht-Anlagen-Schlüssel) | `log_filename`, `pv_tuning_log_file` |
 
 Bearbeitung in der UI: **nur** unter **Daemon Control → EHAL-Com → Loxone Struktur → EHAL Mapping** (Entity wählen). Der Hauskonfigurator editiert keine Merker-Adressen mehr.
 
@@ -37,7 +36,7 @@ Bearbeitung in der UI: **nur** unter **Daemon Control → EHAL-Com → Loxone St
 | `set_ess_discharge_power_limit` | Schreiben | `Ernie_Ziel_Entladeleistung` | Max. Entladeleistung |
 | `set_ess_mode` | Schreiben | `Ernie_Steuerbefehl` | ESS-Modus / Huawei-Steuerbefehl |
 
-Legacy-Rollenamen (`soc_name`, `pv_power_name`, …) in `loxone_blocks` werden beim Migrate nach `plant.ehal_bindings` übernommen und danach aus der Config entfernt. FTP-Log: weiterhin `loxone_blocks.log_filename` (z. B. `Verbrauch.csv`).
+Legacy-Rollenamen (`soc_name`, `pv_power_name`, …) in `loxone_blocks` werden beim Migrate nach `plant.ehal_bindings` übernommen und danach aus der Config entfernt (leeres `loxone_blocks` entfällt; **2.4.m**).
 
 ## Flexible Verbraucher — `ehal_bindings` am Consumer
 

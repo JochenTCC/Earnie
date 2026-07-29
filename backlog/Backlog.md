@@ -23,7 +23,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Goal:** Freeze **EHAL**, prove Loxone-free southbounds (OpenEMS + HA/evcc), move production Loxone onto EHAL, add MCP one-click mapping, and prove config-only switch across all three. Earnie Core remains the sole 48h optimizer; hardware I/O only via EHAL (telemetry + setpoints + capability flags).  
 **Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume; **Loxone** = production path via EHAL (`2.4.e`–`2.4.h`).  
 **Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) done — thin Docker wrapper in `packaging/loxberry/` (not a native host install).  
-**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
+**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.m` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
 Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://connect.loxonecloud.com/504F94A1137C)
@@ -31,10 +31,12 @@ Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://conn
 - [ ] **2.4.l — EFM auto-sync (interpretation C)** *(follow-up from 2.4.f / §3.1)*
   - Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths
   - Manual blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
-  - Loxone MCP interfaces recognizes all "Zähler Bausteine" from loxone config - so chances are good to identify consumers. To be clarified if consumer's actual power can be mapped to Earnie consumers. CSV must be exported manually by user, but "mapping" to these files could be done by same assignment from Loxone's "Zähler Bausteine" and Earnie consumers. 
+  - Loxone MCP interfaces recognizes all "Zähler Bausteine" (with control_bind) from loxone config - so chances are good to identify consumers. To be clarified if consumer's actual power can be mapped to Earnie consumers. CSV must be exported manually by user, but "mapping" to these files could be done by same assignment from Loxone's "Zähler Bausteine" and Earnie consumers. 
   - EFM has **no** multi-column Statistik export of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23)
 
 - [ ] **2.4.0 — Release**
+  - Make a code coverage test
+  - Make a test coverage test to identify obsolete tests
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
   - “All three southbounds” release: OpenEMS ↔ HA+evcc ↔ Loxone via config switch

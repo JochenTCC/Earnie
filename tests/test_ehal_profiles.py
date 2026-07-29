@@ -54,15 +54,12 @@ def test_all_hardware_profiles_validate() -> None:
         assert doc["ehal_bindings"]
 
 
-def test_huawei_outline_keeps_extras_out_of_m1() -> None:
+def test_huawei_outline_maps_control_cmd_to_set_ess_mode() -> None:
     doc = load_hardware_profile("huawei_via_loxone.outline")
-    extras = [
-        b["ehal_field"]
-        for b in doc["ehal_bindings"]
-        if str(b["ehal_field"]).startswith("loxone_extra:")
-    ]
-    assert "loxone_extra:target_soc_name" in extras
-    assert "loxone_extra:control_cmd_name" in extras
+    fields = {b["ehal_field"] for b in doc["ehal_bindings"]}
+    assert "set_ess_mode" in fields
+    assert not any(str(f).startswith("loxone_extra:") for f in fields)
+    assert "loxone_extra:target_soc_name" not in fields
 
 
 def test_all_loxone_recipes_validate() -> None:
@@ -104,11 +101,10 @@ def test_group_fields_by_role_order() -> None:
         "sens_ess_soc",
         "sens_grid_power_active",
         "set_evcs_max_current",
-        "target_soc_name",
         "sens_pv_production_active",
     )
     groups = group_fields_by_role(fields)
-    assert [g[0] for g in groups] == ["grid", "pv", "ess", "evcs", "other"]
+    assert [g[0] for g in groups] == ["grid", "pv", "ess", "evcs"]
     assert groups[0][1] == ["sens_grid_power_active"]
     assert field_role_id("sens_ess_soc") == "ess"
 

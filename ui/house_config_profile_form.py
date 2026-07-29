@@ -829,8 +829,80 @@ def _render_thermal_solar_fields(
     }
 
 
-def _consumer_expander_title(consumer: dict, index: int, *, session_scope: str) -> str:
-    """Prefer live Bezeichnung widget state so expander header updates for every type."""
+def _live_consumer_for_annual(
+    consumer: dict,
+    index: int,
+    *,
+    session_scope: str,
+) -> dict:
+    """Overlay live widget values onto consumer so expander kWh/a matches edits."""
+    preview = dict(consumer)
+    nom_key = _scoped_key(session_scope, f"hc_nom_{index}")
+    if nom_key in st.session_state:
+        preview["nominal_power_kw"] = float(st.session_state[nom_key])
+    type_key = _scoped_key(session_scope, f"hc_type_{index}")
+    if type_key in st.session_state:
+        preview["type"] = st.session_state[type_key]
+    c_type = str(preview.get("type", "generic"))
+    if c_type == "generic":
+        sched = dict(preview.get("schedule") or {})
+        runs_key = _scoped_key(session_scope, f"hc_runs_{index}")
+        dur_key = _scoped_key(session_scope, f"hc_duration_{index}")
+        if runs_key in st.session_state:
+            sched["runs_per_week"] = int(st.session_state[runs_key])
+        if dur_key in st.session_state:
+            sched["duration_h"] = float(st.session_state[dur_key])
+        preview["schedule"] = sched
+    elif c_type == "thermal_annual":
+        for field, key_suffix, cast in (
+            ("living_area_m2", f"hc_area_{index}", float),
+            ("building_class", f"hc_class_{index}", int),
+            ("persons", f"hc_persons_{index}", int),
+            ("heat_pump_type", f"hc_wp_{index}", str),
+            ("hwb_kwh_m2", f"hc_hwb_{index}", float),
+        ):
+            key = _scoped_key(session_scope, key_suffix)
+            if key in st.session_state:
+                preview[field] = cast(st.session_state[key])
+    elif c_type == "ev":
+        for field, key_suffix, cast in (
+            ("battery_capacity_kwh", f"hc_ev_cap_{index}", float),
+            ("min_power_kw", f"hc_ev_min_{index}", float),
+        ):
+            key = _scoped_key(session_scope, key_suffix)
+            if key in st.session_state:
+                preview[field] = cast(st.session_state[key])
+        sched = dict(preview.get("charging_schedule") or {})
+        for field, key_suffix, cast in (
+            ("target_soc_percent", f"hc_ev_target_soc_{index}", float),
+            ("charging_efficiency", f"hc_ev_eff_{index}", float),
+        ):
+            key = _scoped_key(session_scope, key_suffix)
+            if key in st.session_state:
+                sched[field] = cast(st.session_state[key])
+        preview["charging_schedule"] = sched
+    elif c_type == "thermal_rc":
+        rc = dict(preview.get("thermal_rc") or {})
+        for field, key_suffix, cast in (
+            ("water_volume_liters", f"hc_rc_vol_{index}", float),
+            ("setpoint_c", f"hc_rc_set_{index}", float),
+            ("tolerance_c", f"hc_rc_tol_{index}", float),
+            ("heat_loss_kw_per_k", f"hc_rc_u_{index}", float),
+            ("heating_efficiency", f"hc_rc_eff_{index}", float),
+        ):
+            key = _scoped_key(session_scope, key_suffix)
+            if key in st.session_state:
+                rc[field] = cast(st.session_state[key])
+        preview["thermal_rc"] = rc
+    return preview
+
+
+def _consumer_expander_title(consumer: dict, index: int, *, session_scope: str) -> tuple[str, float]:
+    """Prefer live Bezeichnung/params so expander header updates for every type.
+
+    Returns ``(title, annual_kwh)`` — annual is also used to remount the expander
+    when kWh/a changes (stable keys alone can leave a stale label in the UI).
+    """
     from house_config.baseload import consumer_annual_kwh
 
     label_key = _scoped_key(session_scope, f"hc_label_{index}")
@@ -838,11 +910,12 @@ def _consumer_expander_title(consumer: dict, index: int, *, session_scope: str) 
     if live is None:
         live = consumer.get("label")
     title = str(live or "").strip() or f"Verbraucher {index + 1}"
+    preview = _live_consumer_for_annual(consumer, index, session_scope=session_scope)
     try:
-        annual = float(consumer_annual_kwh(consumer))
+        annual = float(consumer_annual_kwh(preview))
     except (TypeError, ValueError, OSError):
-        annual = float(consumer.get("annual_kwh", 0.0) or 0.0)
-    return f"Verbraucher {index + 1}: {title} — {annual:.0f} kWh/a"
+        annual = float(preview.get("annual_kwh", 0.0) or 0.0)
+    return f"Verbraucher {index + 1}: {title} — {annual:.0f} kWh/a", annual
 
 
 def _render_consumer_form(
@@ -855,12 +928,19 @@ def _render_consumer_form(
     default_pv_tilt: float = 18.0,
     default_pv_azimuth: float = 0.0,
 ) -> dict:
-    expander_title = _consumer_expander_title(
+    expander_title, annual = _consumer_expander_title(
         consumer, index, session_scope=session_scope
     )
     # Expand first consumer only when it has no saved id yet (new/empty form).
     has_saved_data = bool(str(consumer.get("id") or "").strip())
-    # Stable key keeps open/closed state across Bezeichnung title changes + auto_persist rerun.
+    default_expanded = index == 0 and not has_saved_data
+    # Stable open-state across label/annual remounts; annual in key forces label refresh.
+    open_key = _scoped_key(session_scope, f"hc_consumer_exp_open_{index}")
+    exp_key = _scoped_key(
+        session_scope, f"hc_consumer_expander_{index}_{int(round(annual))}"
+    )
+    if exp_key not in st.session_state and open_key in st.session_state:
+        st.session_state[exp_key] = bool(st.session_state[open_key])
     exp_col, remove_col = st.columns([4, 1], vertical_alignment="top")
     with remove_col:
         if st.button(
@@ -872,11 +952,15 @@ def _render_consumer_form(
             st.session_state[_SESSION_CONSUMERS_KEY] = consumers
             st.rerun()
     with exp_col:
-        with st.expander(
+        exp = st.expander(
             expander_title,
-            expanded=index == 0 and not has_saved_data,
-            key=_scoped_key(session_scope, f"hc_consumer_expander_{index}"),
-        ):
+            expanded=bool(st.session_state.get(exp_key, default_expanded)),
+            key=exp_key,
+            on_change="rerun",
+        )
+        if exp.open is not None:
+            st.session_state[open_key] = bool(exp.open)
+        with exp:
             return _render_consumer_form_body(
                 consumer,
                 index,
@@ -1582,15 +1666,16 @@ def render_house_profile_tab() -> None:
         )
         for index, consumer in enumerate(consumers)
     ]
-    # Keep session list Bezeichnung/type/annual in sync so expander titles stay correct.
+    # Keep session list in sync with edited fields so expander titles
+    # (consumer_annual_kwh from schedule/nominal/thermal) stay correct next run.
     synced_consumers = []
     for index, original in enumerate(consumers):
-        merged = dict(original)
         if index < len(edited):
-            merged["label"] = edited[index].get("label", original.get("label"))
-            merged["type"] = edited[index].get("type", original.get("type"))
-            if "annual_kwh" in edited[index]:
-                merged["annual_kwh"] = edited[index]["annual_kwh"]
+            merged = _merge_passthrough_consumer_fields(original, dict(edited[index]))
+            if original.get("id"):
+                merged["id"] = original["id"]
+        else:
+            merged = dict(original)
         synced_consumers.append(merged)
     st.session_state[_SESSION_CONSUMERS_KEY] = synced_consumers
     resolved = _resolve_consumer_ids(synced_consumers, edited)

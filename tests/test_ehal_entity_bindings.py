@@ -22,7 +22,6 @@ def test_migrate_loxone_blocks_to_plant():
             "grid_power_name": "Grid_P",
             "control_cmd_name": "Cmd",
             "log_filename": "log.csv",
-            "pv_counter_name": "PV_kWh",
         }
     )
     assert bindings["sens_ess_soc"] == "Battery_SOC"
@@ -189,9 +188,7 @@ def test_ensure_migrated_and_strip_triggers():
     assert new_house["plant"]["event_triggers"][0]["id"] == "plug"
     stripped = strip_migrated_config_keys(new_config)
     assert stripped["system"]["event_triggers"] == []
-    assert "soc_name" not in stripped["loxone_blocks"]
-    assert "grid_power_name" not in stripped["loxone_blocks"]
-    assert stripped["loxone_blocks"]["log_filename"] == "Verbrauch.csv"
+    assert "loxone_blocks" not in stripped
 
 
 def test_load_event_triggers_migrates_from_config():
@@ -217,13 +214,9 @@ def test_load_loxone_block_params_prefers_plant_bindings(tmp_path):
     config = {
         "loxone_blocks": {
             "soc_name": "Old_SOC",
-            "pv_counter_name": "pv",
-            "log_filename": "log.csv",
-            "pv_tuning_log_file": "pv.csv",
             "pv_power_name": "pv_act",
             "battery_power_name": "bat",
             "grid_power_name": "grid",
-            "target_soc_name": "t_soc",
             "target_charge_power_name": "t_charge",
             "target_discharge_power_name": "t_discharge",
             "control_cmd_name": "cmd",
@@ -245,20 +238,41 @@ def test_load_loxone_block_params_prefers_plant_bindings(tmp_path):
     params = load_loxone_block_params(config, str(tmp_path / "config.json"), house_doc=house)
     assert params["LOXONE_SOC_NAME"] == "New_SOC"
     assert params["LOXONE_GRID_POWER_NAME"] == "Plant_Grid"
-    assert params["LOXONE_LOG_FILENAME"] == "log.csv"
+    assert "LOXONE_LOG_FILENAME" not in params
+    assert "PV_TUNING_LOG_FILE" not in params
+
+
+def test_load_loxone_block_params_without_removed_extras(tmp_path):
+    """pv_counter_name / target_soc_name / FTP / PV-tuning are removed from the loader surface."""
+    config = {"loxone_blocks": {}}
+    house = {
+        "plant": {
+            "ehal_bindings": {
+                "sens_ess_soc": "SOC",
+                "sens_grid_power_active": "Grid",
+                "sens_pv_production_active": "PV",
+                "sens_ess_power": "Bat",
+                "set_ess_charge_power_limit": "Ch",
+                "set_ess_discharge_power_limit": "Dis",
+                "set_ess_mode": "Cmd",
+            }
+        }
+    }
+    params = load_loxone_block_params(config, str(tmp_path / "config.json"), house_doc=house)
+    assert "LOXONE_PV_COUNTER_NAME" not in params
+    assert "LOXONE_TARGET_SOC_NAME" not in params
+    assert "LOXONE_LOG_FILENAME" not in params
+    assert "PV_TUNING_LOG_FILE" not in params
+    assert params["LOXONE_SOC_NAME"] == "SOC"
 
 
 def test_load_loxone_block_params_no_dual_read_when_plant_set(tmp_path):
     config = {
         "loxone_blocks": {
             "soc_name": "Old_SOC",
-            "pv_counter_name": "pv",
-            "log_filename": "log.csv",
-            "pv_tuning_log_file": "pv.csv",
             "pv_power_name": "pv_act",
             "battery_power_name": "bat",
             "grid_power_name": "grid",
-            "target_soc_name": "t_soc",
             "target_charge_power_name": "t_charge",
             "target_discharge_power_name": "t_discharge",
             "control_cmd_name": "cmd",

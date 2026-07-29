@@ -20,13 +20,12 @@ def test_ehal_mapping_to_loxone_blocks():
             "sens_evcs_active_power": "ignored-no-block-key",
             "set_ess_mode": "Steuerbefehl",
         },
-        extras={"target_soc_name": "Ziel_SOC", "control_cmd_name": ""},
+        extras={"control_cmd_name": ""},
     )
     assert blocks == {
         "soc_name": "Batterie_SoC",
         "pv_power_name": "PV_Leistung_kW",
         "control_cmd_name": "Steuerbefehl",
-        "target_soc_name": "Ziel_SOC",
     }
 
 
@@ -45,12 +44,12 @@ def test_ehal_mapping_dual_read_legacy_keys():
 
 def test_merge_preserves_unrelated_keys():
     merged = merge_loxone_blocks(
-        {"soc_name": "old", "log_filename": "live.csv"},
+        {"soc_name": "old", "grid_power_name": "live_grid"},
         {"soc_name": "new", "pv_power_name": "PV"},
     )
     assert merged["soc_name"] == "new"
     assert merged["pv_power_name"] == "PV"
-    assert merged["log_filename"] == "live.csv"
+    assert merged["grid_power_name"] == "live_grid"
 
 
 def test_heuristic_propose_energy_names():

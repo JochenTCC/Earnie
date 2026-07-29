@@ -20,7 +20,7 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`sh
 | `system`                            | Timeouts für HTTP und Optimierungs-Schleife                                                                                  |
 | `market_prices`                     | Strategie für fehlende Zukunftspreise (`forecast` / `mirror`) — siehe [Preise](preise.md)                                    |
 | `ui`                                | Streamlit-Port, Refresh-Intervalle, optionale Dev-Seiten                                                                     |
-| `loxone_blocks`                     | Zentrale Loxone-IO-Namen (Speicher, PV, Steuerung)                                                                           |
+| `loxone_blocks`                     | Optional: Legacy-Loxone-Rollen (bevorzugt `plant.ehal_bindings`)                                                              |
 | `live_scenario_id`                  | ID des **Live-Szenarios** in `backtesting_scenarios.json` (Standard: `live`)                                                 |
 | `earnie_env/config/components.json`            | Technische Parameter für Speicher und PV (`batteries[]`, `pv_systems[]`; referenziert über IDs)                              |
 | `earnie_env/config/tariffs.json`               | Laufzeit-Tarifkatalog (Bezug/Einspeise); Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json) |

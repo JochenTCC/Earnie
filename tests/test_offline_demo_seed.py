@@ -50,13 +50,9 @@ def _prepare_cloud_like(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
             "planning_horizon": {"mode": "sunrise_window"},
             "loxone_blocks": {
                 "soc_name": "Battery_SOC",
-                "pv_counter_name": "PV_Counter",
-                "log_filename": "Verbrauch.csv",
-                "pv_tuning_log_file": "runtime/pv_accuracy_log.csv",
                 "pv_power_name": "PV_Act",
                 "battery_power_name": "Battery_Act",
                 "grid_power_name": "Grid_Act",
-                "target_soc_name": "Target_SoC",
                 "target_charge_power_name": "Target_Charge",
                 "target_discharge_power_name": "Target_Discharge",
                 "control_cmd_name": "Control_Cmd",

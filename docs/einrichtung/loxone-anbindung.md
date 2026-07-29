@@ -45,24 +45,18 @@ Konfigurierte Namen stehen in `config.json` → siehe [Loxone-Signale](../refere
 
 | Signal               | Konfiguration                                             | Wirkung (Schnittstelle)                                                 |
 | -------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Ziel-SOC             | `target_soc_name`                                         | Virtueller Eingang, %                                                   |
-| Zwangsladeleistung   | `target_charge_power_name`                                | kW                                                                      |
-| Ziel-Entladeleistung | `target_discharge_power_name`                             | kW                                                                      |
-| Steuerbefehl         | `control_cmd_name`                                        | `0` = Automatik, `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen |
-| Verbraucher-Freigabe | `flexible_consumers[].loxone_outputs.enable_name`         | `0` = gesperrt, `1` = Freigabe (SwimSpa, Wärmepumpe, Filter)            |
-| E-Auto Sollleistung  | `flexible_consumers[].loxone_outputs.power_setpoint_name` | Ziel-Ladeleistung, kW                                                   |
-| E-Auto PV-Follow     | `flexible_consumers[].loxone_outputs.pv_follow_name`      | `0`/`1`                                                                 |
+| Zwangsladeleistung   | `plant.ehal_bindings.set_ess_charge_power_limit` (Legacy: `target_charge_power_name`) | kW                                                                      |
+| Ziel-Entladeleistung | `plant.ehal_bindings.set_ess_discharge_power_limit` (Legacy: `target_discharge_power_name`) | kW                                                                      |
+| Steuerbefehl / ESS-Modus | `plant.ehal_bindings.set_ess_mode` (Legacy: `control_cmd_name`) | `0` = Automatik, `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen |
+| Verbraucher-Freigabe | `flexible_consumers[].loxone_outputs.enable_name` / `ehal_bindings.flex.enable_name` | `0` = gesperrt, `1` = Freigabe (SwimSpa, Wärmepumpe, Filter)            |
+| E-Auto Sollstrom     | `ehal_bindings.set_evcs_max_current` (Legacy: `power_setpoint_name`) | Ziel-Ladestrom / -leistung                                              |
+| E-Auto PV-Follow     | `ehal_bindings.pv_follow_name` / `set_evcs_mode`          | `0`/`1` bzw. Modus                                                      |
+
+`target_soc_name` (Ziel-SOC) und `pv_counter_name` (kumulierte PV-kWh) wurden in **2.4.j** entfernt (ESS über Grenzen + `set_ess_mode`; PV-Intervallenergie aus ∫ `sens_pv_production_active`).
+Das frühere Miniserver-FTP-Verbrauchslog (`loxone_blocks.log_filename`) und das PV-Tuning-Log entfallen in **2.4.m** — historische Verbrauchsdaten kommen über CSV-Upload / Energiemonitor bzw. `cons_data`.
 
 
 Die Umsetzung in der Anlage (wann tatsächlich geladen wird) obliegt der Loxone-Logik hinter diesen virtuellen Eingängen.
-
-## FTP (Verbrauchslog)
-
-- Dateiname: `loxone_blocks.log_filename` (z. B. `Verbrauch.csv`)
-- Pfad auf dem Miniserver: Verzeichnis `log/`
-- Verwendung: Import historischer Verbrauchsdaten, Aufbau von `cons_data_hourly.csv`
-
-
 
 ## Verbindung prüfen
 

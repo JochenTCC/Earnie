@@ -28,7 +28,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `timezone_name`         | —        | `house_profiles.json`                | IANA-Zeitzone für astronomische Sonnenzeiten (z. B. `Europe/Vienna`); siehe `planning_horizon`                                        |
 
 
-Loxone liefert die erzeugte Energie weiterhin als **Summe** aller Anlagen (`pv_counter_name` / `pv_power_name`).
+Live-PV-Leistung kommt über `plant.ehal_bindings.sens_pv_production_active` (Legacy: `pv_power_name`). Die Intervallenergie für `cons_data` (`pv_kwh_interval`) wird aus der Leistung integriert — ein kumulativer Loxone-PV-Zähler wird nicht mehr verwendet.
 
 
 ## SOC-Verhalten

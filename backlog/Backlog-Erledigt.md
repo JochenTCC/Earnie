@@ -3,6 +3,16 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Hausprofil Verbraucher expander kWh/a (2026-07-29)
+
+- [x] **Displaying annual consumption of consumer in expander isn't updated after editing parameters** — expander title now overlays live widget values, session syncs full edited consumer fields, and expander `key` includes rounded annual kWh so Streamlit refreshes the label while open/closed state is preserved separately (`ui/house_config_profile_form.py`).
+
+
+### 2.4.m Remove obsolete FTP log + PV-tuning config (2026-07-29)
+
+- [x] **2.4.m** — Dropped `loxone_blocks.log_filename` / `pv_tuning_log_file` (schema, examples, env configs); removed `fetch_loxone_csv_file` + loader attrs; strip drops empty `loxone_blocks`; German docs updated (consumption via CSV/cons_data; no Miniserver FTP).
+
+
 ### EHAL-Com Live-Lesen / Live-Schreiben EHAL columns (2026-07-29)
 
 - [x] Update Chapter "Live-Lesen" in EHAL-Com with EHAL value names and actual mapping to smarthome backend — Live-Lesen only `sens_*`/`get_*` (no PV-Zähler / `set_*`); Live-Schreiben `set_*` with columns EHAL-Feld + Mapping; UI [`ui/loxone_debug.py`](../ui/loxone_debug.py), probes [`integrations/loxone_connectivity.py`](../integrations/loxone_connectivity.py), helpers [`integrations/ehal_debug_mapping.py`](../integrations/ehal_debug_mapping.py); German [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md)
@@ -2445,6 +2455,10 @@ Spec: [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md). Goal: cost-opt
 - [x] **Dynamic feed-in (Awattar SUNNY Spot)** + MILP `k_push_act` from matrix
 
 
+
+### Bugfix EV config-path Ist-SOC ignored when plugged in (2026-07-29)
+
+- [x] Config-path (`daily_target_source=config`) used `daily_rest_soc` for energy even while plugged in with 99% Ist-SOC → planned full charge. Fix: `_config_path_apply_live_ist_soc` overrides `target_kwh` with live Ist-SOC when plugged. Test: `test_charging_context.py::TestPluggedInChargeComplete::test_config_path_plugged_in_uses_ist_soc_not_daily_rest`.
 
 ### Older milestones (brief)
 

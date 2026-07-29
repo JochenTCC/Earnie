@@ -39,7 +39,7 @@ def is_config_document(doc: dict[str, Any]) -> bool:
     """True when ``doc`` looks like config.json (not tariffs/house_profiles/…)."""
     if _SIM_BLOCK in doc or _LEGACY_SIM_BLOCK in doc:
         return True
-    return "live_scenario_id" in doc and "loxone_blocks" in doc
+    return "live_scenario_id" in doc
 
 
 def migrate_config_document_to_v3(doc: dict[str, Any]) -> bool:

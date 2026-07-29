@@ -31,7 +31,7 @@
           },
           "loxone_extra": {
             "type": "string",
-            "description": "Non-EHAL extra key (e.g. target_soc_name) when ehal_field is absent."
+            "description": "Non-EHAL extra key when ehal_field is absent (rare; prefer ehal_field)."
           },
           "loxone_blocks_key": {
             "type": "string",

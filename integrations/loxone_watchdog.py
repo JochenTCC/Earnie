@@ -11,7 +11,6 @@ from runtime_store import run_state
 
 logger = logging.getLogger(__name__)
 
-SOC_TOLERANCE_PERCENT = 0.1
 POWER_TOLERANCE_KW = 0.05
 
 
@@ -62,8 +61,6 @@ def _tolerance_for_io(
         return 0.0
     if io_name in flex_setpoint_names:
         return POWER_TOLERANCE_KW
-    if io_name == config.get("LOXONE_TARGET_SOC_NAME"):
-        return SOC_TOLERANCE_PERCENT
     return POWER_TOLERANCE_KW
 
 

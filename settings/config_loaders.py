@@ -102,14 +102,10 @@ def load_system_and_ui_params(
 
 _LOXONE_BLOCK_ATTRS: tuple[tuple[str, str, str | None], ...] = (
     ("LOXONE_SOC_NAME", "soc_name", "sens_ess_soc"),
-    ("LOXONE_PV_COUNTER_NAME", "pv_counter_name", None),
-    ("LOXONE_LOG_FILENAME", "log_filename", None),
-    ("PV_TUNING_LOG_FILE", "pv_tuning_log_file", None),
     ("LOXONE_PV_POWER_NAME", "pv_power_name", "sens_pv_production_active"),
     ("LOXONE_BATTERY_POWER_NAME", "battery_power_name", "sens_ess_power"),
     ("LOXONE_GRID_POWER_NAME", "grid_power_name", "sens_grid_power_active"),
     ("LOXONE_CONSUMERS_POWER_NAME", "consumers_power_name", "sens_power_consumers"),
-    ("LOXONE_TARGET_SOC_NAME", "target_soc_name", None),
     ("LOXONE_TARGET_CHARGE_POWER_NAME", "target_charge_power_name", "set_ess_charge_power_limit"),
     ("LOXONE_TARGET_DISCHARGE_POWER_NAME", "target_discharge_power_name", "set_ess_discharge_power_limit"),
     ("LOXONE_CONTROL_CMD_NAME", "control_cmd_name", "set_ess_mode"),
@@ -143,7 +139,10 @@ def _resolve_loxone_block_value(
             if isinstance(blocks, dict):
                 return str(blocks.get(block_key) or "")
             return ""
-    return get_strict(raw_config, ["loxone_blocks", block_key], config_path)
+    blocks = raw_config.get("loxone_blocks")
+    if isinstance(blocks, dict) and block_key in blocks:
+        return blocks[block_key]
+    return ""
 
 
 def load_loxone_block_params(

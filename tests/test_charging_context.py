@@ -270,6 +270,36 @@ class TestPluggedInChargeComplete:
       assert ctx["target_kwh"] == 0.0
       assert "abgeschlossen" in ctx["source_label"]
 
+  def test_config_path_plugged_in_uses_ist_soc_not_daily_rest(self):
+      """99% Ist-SOC must not plan a full charge from daily_rest_soc (e.g. 20%)."""
+      consumer = _eauto_consumer()
+      consumer["daily_target_source"] = "config"
+      horizon = datetime(2026, 6, 22, 17, 0)
+      matrix = _hour_matrix(horizon, 24)
+
+      def _io(name: str):
+          if name == "Ernie_EAuto_Da":
+              return 1
+          if name == "Ernie-SOC-Ist-EAuto":
+              return 99.0
+          return None
+
+      with patch.object(
+          cc.loxone_client, "fetch_loxone_generic_value", side_effect=_io
+      ), patch.object(
+          cc, "_loxone_ready_raw", return_value="Morgen, 07:00"
+      ), _patch_eauto_capacity():
+          ctx = cc.resolve_charging_context(
+              consumer, matrix, None, logged_simulation=False
+          )
+
+      # From 99%→100% @ 16 kWh / 0.9 eff ≈ 0.178 kWh; daily_rest 20% would be ~14 kWh
+      assert ctx["plugged_in"] is True
+      assert ctx["active"] is True
+      assert ctx["target_kwh"] == pytest.approx(0.178, abs=0.01)
+      assert "Ist-SOC" in ctx["source_label"]
+      assert ctx["target_kwh"] < 1.0
+
   def test_plug_cycle_fulfilled_disables_active_context(self):
       contexts = {
           "ev": {

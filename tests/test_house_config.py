@@ -1460,7 +1460,7 @@ def test_assemble_filter_bindings_shape():
     assert bindings["filter_schedule"]["loxone"]["native_start_hour_name"] == "Start"
 
 
-def test_save_main_config_roundtrip_strips_triggers_keeps_log(tmp_path, monkeypatch):
+def test_save_main_config_roundtrip_strips_triggers_and_blocks(tmp_path, monkeypatch):
     import json
 
     from house_config.ehal_bindings import strip_migrated_config_keys
@@ -1474,13 +1474,11 @@ def test_save_main_config_roundtrip_strips_triggers_keeps_log(tmp_path, monkeypa
                 "system": {"event_triggers": []},
                 "loxone_blocks": {
                     "soc_name": "Old_SOC",
-                    "pv_counter_name": "Old_PV_C",
                     "log_filename": "Verbrauch.csv",
                     "pv_tuning_log_file": "runtime/pv_accuracy_log.csv",
                     "pv_power_name": "Old_PV",
                     "battery_power_name": "Old_Bat",
                     "grid_power_name": "Old_Grid",
-                    "target_soc_name": "Old_TSoc",
                     "target_charge_power_name": "Old_TCh",
                     "target_discharge_power_name": "Old_TDis",
                     "control_cmd_name": "Old_Cmd",
@@ -1515,5 +1513,4 @@ def test_save_main_config_roundtrip_strips_triggers_keeps_log(tmp_path, monkeypa
     save_main_config(strip_migrated_config_keys(data))
     reloaded = json.loads(config_path.read_text(encoding="utf-8"))
     assert reloaded["system"]["event_triggers"] == []
-    assert "soc_name" not in reloaded["loxone_blocks"]
-    assert reloaded["loxone_blocks"]["log_filename"] == "Verbrauch.csv"
+    assert "loxone_blocks" not in reloaded

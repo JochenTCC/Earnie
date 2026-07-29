@@ -543,7 +543,6 @@ class TestBuildSentSnapshot:
             }
         ]
         config_map = {
-            "LOXONE_TARGET_SOC_NAME": "Ernie_Ziel_SoC",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
             "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
@@ -583,7 +582,6 @@ class TestBuildSentSnapshot:
             }
         ]
         config_map = {
-            "LOXONE_TARGET_SOC_NAME": "Ernie_Ziel_SoC",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
             "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
@@ -622,7 +620,6 @@ class TestBuildSentSnapshot:
             }
         ]
         config_map = {
-            "LOXONE_TARGET_SOC_NAME": "Ernie_Ziel_SoC",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
             "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
@@ -660,7 +657,6 @@ class TestBuildSentSnapshot:
             }
         ]
         config_map = {
-            "LOXONE_TARGET_SOC_NAME": "Ernie_Ziel_SoC",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
             "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
@@ -707,7 +703,6 @@ class TestBuildSentSnapshot:
             }
         ]
         config_map = {
-            "LOXONE_TARGET_SOC_NAME": "Ernie_Ziel_SoC",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
             "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
@@ -733,7 +728,6 @@ class TestBuildSentSnapshot:
 class TestSendHuaweiAndConsumers:
     def test_send_huawei_modbus_states_returns_three_records(self):
         names = {
-            "LOXONE_TARGET_SOC_NAME": "SoC",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
             "LOXONE_CONTROL_CMD_NAME": "Cmd",
@@ -754,7 +748,6 @@ class TestSendHuaweiAndConsumers:
 
     def test_send_huawei_modbus_states_calls_ess_outputs_only(self):
         names = {
-            "LOXONE_TARGET_SOC_NAME": "SoC",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
             "LOXONE_CONTROL_CMD_NAME": "Cmd",
@@ -789,62 +782,3 @@ class TestSendHuaweiAndConsumers:
             lc.send_flexible_consumer_states({"hidden": 1.0})
 
         mock_send.assert_not_called()
-
-
-class TestFetchLoxoneCsvFile:
-    def test_ftp_download_success(self, tmp_path):
-        local_path = str(tmp_path / "live_consumption.csv")
-
-        class FakeFTP:
-            def __init__(self, host, timeout):
-                self.host = host
-
-            def login(self, user, passwd):
-                self.user = user
-                self.passwd = passwd
-
-            def cwd(self, path):
-                assert path == "log"
-
-            def retrbinary(self, cmd, callback):
-                callback(b"timestamp;value\n")
-
-            def quit(self):
-                pass
-
-        with patch.object(lc, "FTP", FakeFTP), patch.object(
-            lc.config, "get", side_effect=lambda name, **kw: {
-                "LOXONE_IP": "192.168.0.10",
-                "LOXONE_USER": "lox",
-                "LOXONE_PASS": "pw",
-                "LOXONE_LOG_FILENAME": "Verbrauch.csv",
-            }[name]
-        ):
-            result = lc.fetch_loxone_csv_file(local_path)
-
-        assert result == local_path
-        assert (tmp_path / "live_consumption.csv").read_bytes() == b"timestamp;value\n"
-
-    def test_ftp_error_returns_none_and_removes_partial_file(self, tmp_path):
-        local_path = str(tmp_path / "partial.csv")
-        (tmp_path / "partial.csv").write_text("partial", encoding="utf-8")
-
-        class FailingFTP:
-            def __init__(self, host, timeout):
-                pass
-
-            def login(self, user, passwd):
-                raise OSError("connection refused")
-
-            def quit(self):
-                pass
-
-            def close(self):
-                pass
-
-        with patch.object(lc, "FTP", FailingFTP), patch.object(
-            lc.config, "get", return_value="x"
-        ):
-            assert lc.fetch_loxone_csv_file(local_path) is None
-
-        assert not os.path.exists(local_path)

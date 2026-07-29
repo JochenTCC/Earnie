@@ -28,13 +28,9 @@ LOXONE_BLOCKS_FIELDS: tuple[tuple[str, str], ...] = (
     ("pv_power_name", "PV-Leistung (Lesen)"),
     ("battery_power_name", "Batterie-Leistung (Lesen)"),
     ("grid_power_name", "Netz-Leistung (Lesen)"),
-    ("pv_counter_name", "PV-Zähler (Lesen)"),
-    ("target_soc_name", "Ziel-SOC (Schreiben)"),
     ("target_charge_power_name", "Ziel-Ladeleistung (Schreiben)"),
     ("target_discharge_power_name", "Ziel-Entladeleistung (Schreiben)"),
     ("control_cmd_name", "Steuerbefehl (Schreiben)"),
-    ("log_filename", "FTP-Logdateiname"),
-    ("pv_tuning_log_file", "PV-Tuning-Log (lokal)"),
 )
 
 

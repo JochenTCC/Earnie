@@ -78,5 +78,6 @@ def render() -> None:
     if backend == BACKEND_LOXONE:
         from ui.ehal_loxone_mapping import render_ehal_loxone_mapping_section
 
-        with st.expander("Loxone Struktur → EHAL Mapping", expanded=True):
+        st.subheader("Loxone Struktur → EHAL Mapping")
+        with st.expander("Mapping-Tabelle", expanded=True):
             render_ehal_loxone_mapping_section()

@@ -3,7 +3,6 @@ import math
 import os
 from dataclasses import dataclass
 from datetime import datetime
-from ftplib import FTP, all_errors as ftp_errors
 from typing import Optional
 
 import requests
@@ -609,54 +608,6 @@ def send_loxone_value(input_name: str, value: float) -> bool:
         bool: True bei Erfolg, False bei Fehlern.
     """
     return _send_loxone_value_traced(input_name, value).success
-
-
-def fetch_loxone_csv_file(local_path: str = "live_consumption.csv") -> Optional[str]:
-    """
-    Lädt die historische CSV-Logdatei über FTP vom Miniserver herunter.
-    Wird für die regelmäßige Neuerstellung des Verbrauchsprofils benötigt.
-
-    Args:
-        local_path (str): Lokaler Zielpfad für die temporär gespeicherte Datei.
-
-    Returns:
-        Optional[str]: Der lokale Dateipfad bei Erfolg, None bei Fehlern.
-    """
-    remote_filename = config.get("LOXONE_LOG_FILENAME")
-    print(f"🌐 FTP-Verbindung: Verbinde mit Miniserver ({config.get('LOXONE_IP')})...")
-
-    ftp = None
-    try:
-        ftp = FTP(config.get("LOXONE_IP"), timeout=15)
-        ftp.login(user=config.get("LOXONE_USER"), passwd=config.get("LOXONE_PASS"))
-        ftp.cwd("log")
-
-        print(f"📥 FTP-Download: Downloade '{remote_filename}'...")
-        with open(local_path, "wb") as local_file:
-            ftp.retrbinary(f"RETR {remote_filename}", local_file.write)
-
-        print(f"   ↳ FTP: Logdatei erfolgreich unter '{local_path}' gesichert.")
-        return local_path
-
-    except ftp_errors as e:
-        print(f"🚨 Loxone-FTP-Fehler: Problem bei der FTP-Übertragung: {e}")
-        if os.path.exists(local_path):
-            try:
-                os.remove(local_path)
-            except OSError:
-                pass
-    except Exception as e:
-        print(f"🚨 Loxone-FTP-Fehler: Unerwarteter Systemfehler beim FTP-Download: {e}")
-    finally:
-        if ftp:
-            try:
-                ftp.quit()
-            except Exception:
-                try:
-                    ftp.close()
-                except Exception:
-                    pass
-    return None
 
 
 def fetch_loxone_live_power() -> Optional[dict]:

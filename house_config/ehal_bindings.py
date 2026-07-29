@@ -311,10 +311,13 @@ def _migrate_all_consumers(house: dict) -> bool:
 
 
 _PLANT_BLOCK_KEYS: frozenset[str] = frozenset(BLOCKS_TO_EHAL.keys())
+_OBSOLETE_BLOCK_KEYS: frozenset[str] = frozenset(
+    {"log_filename", "pv_tuning_log_file"}
+)
 
 
 def strip_migrated_config_keys(config_doc: dict | None) -> dict:
-    """Clear ``system.event_triggers`` and plant markers from ``loxone_blocks``."""
+    """Clear ``system.event_triggers``; drop migrated/obsolete ``loxone_blocks`` keys."""
     config = copy.deepcopy(config_doc) if isinstance(config_doc, dict) else {}
     system = dict(config.get("system") or {}) if isinstance(config.get("system"), dict) else {}
     if "event_triggers" in system:
@@ -322,11 +325,16 @@ def strip_migrated_config_keys(config_doc: dict | None) -> dict:
         config["system"] = system
     blocks = config.get("loxone_blocks")
     if isinstance(blocks, dict):
-        config["loxone_blocks"] = {
+        remaining = {
             key: value
             for key, value in blocks.items()
             if str(key) not in _PLANT_BLOCK_KEYS
+            and str(key) not in _OBSOLETE_BLOCK_KEYS
         }
+        if remaining:
+            config["loxone_blocks"] = remaining
+        else:
+            config.pop("loxone_blocks", None)
     return config
 
 

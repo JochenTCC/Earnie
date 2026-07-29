@@ -3,7 +3,7 @@
   "model": "Luna / inverter via Loxone markers (outline)",
   "protocol": "proprietary",
   "status": "outline",
-  "notes": "Seeded from Earnie Loxone path: Live still writes via loxone_client.send_huawei_modbus_states (target_soc + control_cmd). Those are Loxone extras, not M1 EHAL fields. Register addresses are illustrative placeholders for a future Path D direct-Modbus profile.",
+  "notes": "Seeded from Earnie Loxone path: Live writes ESS via charge/discharge limits + set_ess_mode (control_cmd). Ziel-SOC write removed in 2.4.j. Register addresses are illustrative placeholders for a future Path D direct-Modbus profile.",
   "registers": [
     {
       "address": 47000,
@@ -12,7 +12,7 @@
       "scale": 1,
       "unit": "%",
       "direction": "read",
-      "notes": "Placeholder — today read via Loxone Merker (soc_name)."
+      "notes": "Placeholder — today read via Loxone Merker (soc_name / sens_ess_soc)."
     },
     {
       "address": 47001,
@@ -24,22 +24,13 @@
       "notes": "Placeholder — Loxone marker often in kW with +charge; EHAL needs W and +discharge."
     },
     {
-      "address": 47100,
-      "type": "uint16",
-      "name": "Target_SoC",
-      "scale": 1,
-      "unit": "%",
-      "direction": "write",
-      "notes": "Mapped today via loxone_blocks.target_soc_name — not an EHAL M1 field."
-    },
-    {
       "address": 47101,
       "type": "uint16",
       "name": "Control_Cmd",
       "scale": 1,
       "unit": "",
       "direction": "write",
-      "notes": "Mapped today via loxone_blocks.control_cmd_name — not an EHAL M1 field."
+      "notes": "Mapped via set_ess_mode / control_cmd_name."
     },
     {
       "address": 47102,
@@ -48,7 +39,7 @@
       "scale": 1,
       "unit": "W",
       "direction": "write",
-      "notes": "Future EHAL set_ess_charge_power_limit; Loxone M1 maps via target_charge_power_name when present."
+      "notes": "EHAL set_ess_charge_power_limit; Loxone maps via target_charge_power_name when present."
     },
     {
       "address": 47103,
@@ -57,7 +48,7 @@
       "scale": 1,
       "unit": "W",
       "direction": "write",
-      "notes": "Future EHAL set_ess_discharge_power_limit."
+      "notes": "EHAL set_ess_discharge_power_limit."
     }
   ],
   "ehal_bindings": [
@@ -87,18 +78,11 @@
       "negate": false
     },
     {
-      "source": "Target_SoC",
-      "ehal_field": "loxone_extra:target_soc_name",
-      "scale": 1,
-      "negate": false,
-      "transform_note": "Loxone extra — not M1 EHAL telemetry/setpoint."
-    },
-    {
       "source": "Control_Cmd",
-      "ehal_field": "loxone_extra:control_cmd_name",
+      "ehal_field": "set_ess_mode",
       "scale": 1,
       "negate": false,
-      "transform_note": "Loxone extra — Huawei control command via markers."
+      "transform_note": "Huawei control command via markers."
     }
   ]
 }

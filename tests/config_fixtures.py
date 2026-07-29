@@ -20,13 +20,9 @@ def minimal_config_payload(
         },
         "loxone_blocks": {
             "soc_name": "soc",
-            "pv_counter_name": "pv",
-            "log_filename": "log.csv",
-            "pv_tuning_log_file": "pv.csv",
             "pv_power_name": "pv_act",
             "battery_power_name": "bat",
             "grid_power_name": "grid",
-            "target_soc_name": "t_soc",
             "target_charge_power_name": "t_charge",
             "target_discharge_power_name": "t_discharge",
             "control_cmd_name": "cmd",

@@ -329,7 +329,7 @@ Wenn die Was-wäre-wenn-Analyse überzeugt, folgt die Anbindung an die Smarthome
    - Verbraucher: Ist-Leistung lesen; Freigabe 0/1 oder E-Auto-Leistungs-Soll schreiben  
    - E-Auto: angesteckt, Fertig-Zeit, Rest-SOC, Kapazität, …  
    Konkrete Beispielnamen und Config-Schlüssel: [Loxone-Signale](../referenz/loxone-signale.md). Zentrale Merker unter `loxone_blocks` in `config.json`; Verbraucher-Merker im Hausprofil (`house_profiles.json`) bzw. Legacy in `flexible_consumers[]`.  
-3. Optional **FTP-Verbrauchslog** für historische Offline-Daten (`loxone_blocks.log_filename`, Miniserver-Ordner `log/`) — siehe [Loxone-Anbindung](../einrichtung/loxone-anbindung.md#ftp-verbrauchslog). Für Jahres-Leistungsprofile im Hauskonfigurator nutzen Sie eher CSV-Upload / Energiemonitor ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)).  
+3. Für Jahres-Leistungsprofile im Hauskonfigurator nutzen Sie CSV-Upload / Energiemonitor ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Historische Offline-Daten für den Szenario-Explorer liegen in `cons_data_hourly.csv` (kein Miniserver-FTP-Import mehr).  
 4. Namen in Earnie hinterlegen (Hauskonfigurator / Szenarienkonfigurator) — **exakt** wie im Smarthome-System.  
 
 Earnie liest Smarthome-Werte oft als Text mit Einheit (z. B. `3.5 kW`) ein; die Einheit wird ignoriert.

@@ -30,7 +30,7 @@ SETPOINT_FIELDS = (
     "set_evcs_mode",
 )
 EHAL_MAP_FIELDS = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + SETPOINT_FIELDS
-EXTRAS_FIELDS = ("target_soc_name",)
+EXTRAS_FIELDS: tuple[str, ...] = ()
 
 # Canonical §C → loxone_blocks role keys (+ legacy unprefixed dual-read aliases).
 EHAL_TO_BLOCKS: dict[str, str] = {
@@ -67,7 +67,6 @@ except ImportError:  # pragma: no cover
         "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl",
         "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
         "set_evcs_mode": "Setpoint Wallbox-Modus (pv|now)",
-        "target_soc_name": "Loxone-Extras: Ziel-SOC",
     }
 
 _HINTS: dict[str, tuple[str, ...]] = {
@@ -97,7 +96,6 @@ _HINTS: dict[str, tuple[str, ...]] = {
     "flex.power_name": ("leistung", "power", "verbrauch"),
     "flex.enable_name": ("freigabe", "enable", "sg ready"),
     "flex.power_setpoint_name": ("sollwert", "setpoint", "ziel leistung"),
-    "target_soc_name": ("ziel-soc", "target soc", "soll-soc"),
 }
 
 
@@ -118,9 +116,6 @@ def ehal_mapping_to_loxone_blocks(
         name = str(marker or "").strip()
         if role == "control_cmd_name" and name:
             blocks["control_cmd_name"] = name
-            continue
-        if role in EXTRAS_FIELDS and name:
-            blocks[role] = name
     return blocks
 
 

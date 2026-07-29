@@ -1,6 +1,0 @@
-{
-    "$schema": "./tariffs.schema.json",
-    "earnie_data_model": 3,
-    "import_tariffs": [],
-    "export_tariffs": []
-}
