@@ -41,7 +41,7 @@
           },
           "kind": {
             "type": "string",
-            "enum": ["telemetry", "setpoint", "capability", "stub"]
+            "enum": ["telemetry", "setpoint", "capability", "input", "stub"]
           },
           "notes": {
             "type": "string"

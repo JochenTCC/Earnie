@@ -1,7 +1,8 @@
-# EHAL — Earnie Hardware Access Layer (M1 freeze)
+# EHAL — Earnie Hardware Access Layer (schema_version 2)
 
-**Backlog:** `2.4.a` (Phase 1 / M1 spec)  
+**Backlog:** `2.4.a` (M1) → **`2.4.j`** (wire rename + promoted fields)  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 §2.2, §2.5 Phase 1, §2.6  
+**Canonical field names:** [`docs/ui/ehal-com.md`](../ui/ehal-com.md) §B / §C  
 **Schemas:** [`share/ehal/`](../../share/ehal/)  
 **Python:** [`ehal/`](../../ehal/)  
 **Lab mapping (OpenEMS):** [`openems-testing-platform-todo.md`](openems-testing-platform-todo.md)  
@@ -24,7 +25,7 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 | Hub isolation | No OpenEMS, Home Assistant, evcc, or Loxone types in the math core |
 | Adapter duty | Map hub channels/entities → EHAL; normalize signs and units inside the adapter |
 | Transport | Network only (REST / WebSocket / JSON). No linking or copying hub source into Earnie repos (Separate Works / AGPL shield for OpenEMS) |
-| Loxone today | Default `ehal.backend=loxone` uses [`integrations/loxone_adapter.py`](../../integrations/loxone_adapter.py) for M1 plant telemetry; Huawei extras + flex remain on `loxone_client` (not first-class EHAL fields) |
+| Loxone today | Default `ehal.backend=loxone` uses [`integrations/loxone_adapter.py`](../../integrations/loxone_adapter.py) for plant telemetry/setpoints; during **2.4.j** config may still dual-read legacy `loxone_blocks` / house-profile `*_name` (entity mapping UI is **2.4.k**) |
 
 ## Schema version and envelope
 
@@ -32,7 +33,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 
 | Field | Type | Required | Meaning |
 |-------|------|----------|---------|
-| `schema_version` | integer | yes | Wire version; **M1 = `1`** |
+| `schema_version` | integer | yes | Wire version; **current = `2`** (`sens_*` freeze in **2.4.j**; M1 was `1`) |
 | `ts` | string (ISO-8601) | yes | Sample / write time with timezone (`Z` or offset). Prefer UTC. |
 | `adapter_id` | string | yes | Stable adapter instance id (e.g. `openems-lab`, `ha-home`) |
 
@@ -42,51 +43,63 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 
 | Domain | Unit | Sign / range |
 |--------|------|----------------|
-| Active power telemetry (`grid_power_active`, `pv_production_active`, `evcs_active_power`, `ess_power`) | **W** | See below |
-| `ess_soc` | **%** | `0`…`100` |
+| Active power telemetry (`sens_grid_power_active`, `sens_pv_production_active`, `sens_evcs_active_power`, `sens_ess_power`, `sens_power_consumers`) | **W** | See below |
+| `sens_ess_soc` / EV SoC fields | **%** | `0`…`100` |
 | ESS charge/discharge **limits** | **W** | Non-negative **magnitudes** |
-| `set_evcs_max_current` | **A** | Non-negative |
+| `set_evcs_max_current` / `set_evcs_current` / `sens_evcs_nominal_current` | **A** | Non-negative |
 
-**Grid (`grid_power_active`):** `+` = grid **import** (Bezug), `−` = **export** (Einspeisung). Adapters normalize hub-native signs before emit.
+**Grid (`sens_grid_power_active`):** `+` = grid **import** (Bezug), `−` = **export** (Einspeisung). Adapters normalize hub-native signs before emit.
 
-**PV (`pv_production_active`):** production ≥ `0` (W).
+**PV (`sens_pv_production_active`):** production ≥ `0` (W). Interval energy = ∫ power × Δt (no cumulative counter on the wire).
 
-**EVCS (`evcs_active_power`):** charge power ≥ `0` (W) when charging; `0` when idle.
+**EVCS (`sens_evcs_active_power`):** charge power ≥ `0` (W) when charging; `0` when idle.
 
-**ESS (`ess_power`, optional):** OpenEMS-aligned — `+` = **discharge**, `−` = **charge**. Adapters that use the opposite convention (e.g. current Loxone Live: + charge) must invert at the boundary.
+**ESS (`sens_ess_power`, optional):** OpenEMS-aligned — `+` = **discharge**, `−` = **charge**. Adapters that use the opposite convention (e.g. Loxone Live: + charge) must invert at the boundary.
 
-## Telemetry-API (M1)
+**House load (`sens_power_consumers`, optional):** prefer mapped Merker; else derive from grid/PV/ESS balance.
+
+## Telemetry-API (schema_version 2)
 
 | Field | Required | Unit | Notes |
 |-------|----------|------|-------|
-| `grid_power_active` | yes | W | PCC active power; sign as above |
-| `pv_production_active` | yes | W | ≥ 0 |
-| `ess_soc` | yes | % | Home battery SoC |
-| `ess_power` | no | W | Optional; sign as above |
-| `evcs_active_power` | no | W | ≥ 0 when present |
+| `sens_grid_power_active` | yes | W | PCC active power; sign as above |
+| `sens_pv_production_active` | yes | W | ≥ 0 |
+| `sens_ess_soc` | yes | % | Home battery SoC |
+| `sens_ess_power` | no | W | Optional; sign as above |
+| `sens_evcs_active_power` | no | W | ≥ 0 when present |
+| `sens_power_consumers` | no | W | House load; Merker or derive |
+| `sens_evcs_connected` | no | bool | EV plugged in |
+| `sens_evcs_soc_act` | no | % | Vehicle SoC |
+| `sens_evcs_nominal_current` | no | A | Nominal / max current |
+| `sens_evcs_bat_capacity` | no | kWh | EV battery capacity |
+| `get_evcs_ready_by_time` | no | string | Ready-by deadline |
+| `get_evcs_limit_soc` | no | % | Charge limit SoC |
 
 Machine schema: [`share/ehal/telemetry.schema.json`](../../share/ehal/telemetry.schema.json).
 
-## Setpoint-API (M1)
+## Setpoint-API (schema_version 2)
 
-Setpoints are **math limits / schedules**, not realtime inner-loop control. Realtime enforcement stays in the subsystem (OpenEMS / HA / inverter).
+Setpoints are **math limits / schedules / modes**, not realtime inner-loop control. Realtime enforcement stays in the subsystem (OpenEMS / HA / inverter).
 
 | Field | Required in doc | Unit | Notes |
 |-------|-----------------|------|-------|
 | `set_ess_charge_power_limit` | no* | W | Max charge power (magnitude ≥ 0) |
 | `set_ess_discharge_power_limit` | no* | W | Max discharge power (magnitude ≥ 0) |
-| `set_evcs_max_current` | no* | A | Max EV charge current (magnitude ≥ 0) |
+| `set_ess_mode` | no* | string/number | ESS mode / control command (e.g. Huawei) |
+| `set_evcs_max_current` | no* | A | Max EV charge current |
+| `set_evcs_current` | no* | A | EV charge current setpoint |
+| `set_evcs_mode` | no* | enum | `pv` \| `now` |
 
 \*A setpoint document must include **at least one** of these fields (plus envelope). Partial updates are allowed; omitted fields mean “leave unchanged” at the adapter.
 
 Machine schema: [`share/ehal/setpoint.schema.json`](../../share/ehal/setpoint.schema.json).
 
-## Capability-Flags (M1)
+## Capability-Flags (schema_version 2)
 
 | Field | Required | Meaning |
 |-------|----------|---------|
 | `supports_ess_write` | yes | ESS limit setpoints can be written |
-| `supports_evcs_current` | yes | `set_evcs_max_current` can be written |
+| `supports_evcs_current` | yes | `set_evcs_max_current` / `set_evcs_current` can be written |
 
 Additional boolean flags may be added in later `schema_version` values without removing these two.
 
@@ -99,8 +112,8 @@ Machine schema: [`share/ehal/capabilities.schema.json`](../../share/ehal/capabil
 | Minimum telemetry cadence toward Core | **60 s** |
 | Faster internal polling | Allowed inside the adapter |
 | Stale samples | Core must tolerate unchanged values until the next sample; adapters should still refresh `ts` when re-publishing |
-| Missing **optional** telemetry | Omit field or set `null` per schema (`ess_power`, `evcs_active_power`) |
-| Missing **required** `ess_soc` (Live) | Abort the Live run (same hard requirement as today’s house SOC) |
+| Missing **optional** telemetry | Omit field or set `null` per schema (`sens_ess_power`, `sens_evcs_*`, …) |
+| Missing **required** `sens_ess_soc` (Live) | Abort the Live run (same hard requirement as today’s house SOC) |
 | Missing required power telemetry | Do not invent zeros; surface error / skip overlay as documented by the Live path |
 
 ## Write failures and degrade
@@ -131,7 +144,7 @@ Machine schema: [`share/ehal/write_error.schema.json`](../../share/ehal/write_er
 | Situation | Behavior |
 |-----------|----------|
 | Optional telemetry absent | Omit / null; Core continues |
-| Required `ess_soc` absent | Live abort |
+| Required `sens_ess_soc` absent | Live abort |
 | Setpoint write fails | Log + capability degrade + Write-Error-Telemetry; optimizer continues |
 | Capability false from start | Skip writes for that family; no repeated error spam beyond periodic hint |
 | Schema validation fail | Reject document; adapter must not pass invalid JSON to Core |
@@ -144,11 +157,11 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 
 | EHAL field | OpenEMS (prototype) |
 |------------|---------------------|
-| `grid_power_active` | `_sum/GridActivePower` (normalize: `+` = import) |
-| `pv_production_active` | `_sum/ProductionActivePower` |
-| `ess_soc` | `ess0/Soc` / `_sum/EssSoc` |
-| `ess_power` | ESS ActivePower (OpenEMS sign; already EHAL-aligned) |
-| `evcs_active_power` | EVCS / EVSE active power channels |
+| `sens_grid_power_active` | `_sum/GridActivePower` (normalize: `+` = import) |
+| `sens_pv_production_active` | `_sum/ProductionActivePower` |
+| `sens_ess_soc` | `ess0/Soc` / `_sum/EssSoc` |
+| `sens_ess_power` | ESS ActivePower (OpenEMS sign; already EHAL-aligned) |
+| `sens_evcs_active_power` | EVCS / EVSE active power channels |
 | `set_ess_charge_power_limit` | e.g. `SetActivePowerGreaterOrEquals` / Equals (adapter maps magnitude) |
 | `set_ess_discharge_power_limit` | e.g. `SetActivePowerLessOrEquals` |
 | `set_evcs_max_current` | EVCS Max Current |
@@ -173,13 +186,13 @@ M2 schema slice — **mapping aids / contribution seeds**, not a new Live I/O pa
 | Loxone recipes | [`share/loxone/recipes/`](../../share/loxone/recipes/) | JSON Merker / Baustein tips → `loxone_blocks` (no `.loxone` binary) |
 | Python loader | [`ehal/profiles.py`](../../ehal/profiles.py) | `list_*` / `load_*` + HITL `role_field_labels` / `group_fields_by_role` |
 
-**Rules:** Do not invent new M1 wire fields here. Stub roles use `kind: stub`. Huawei `target_soc` / `control_cmd` stay `loxone_extra:*` in hardware outlines. HITL on EHAL-Com groups mapping rows by role label; confirm/save behavior unchanged.
+**Rules:** Stub roles use `kind: stub` (`flex.*` remain stubs until **2.4.k** mapping). HITL on EHAL-Com groups mapping rows by role label. **2.4.j** promotes `set_ess_mode`, EV `sens_*` / `set_evcs_*` / `get_*`, and `sens_power_consumers` onto the wire; marker editors and entity-centric storage are **2.4.k**.
 
 ## Out of scope (this freeze)
 
 - MQTT / Matter as first-class hubs
 - HA WebSocket state subscription / direct evcc REST adapter (deferred; REST HA path is **2.4.c**)
-- Loxone extras as first-class EHAL fields: `target_soc`, `control_cmd`, flex enable, EV **kW** setpoint (remain on `loxone_client` after **2.4.e** M1 extraction)
+- Flex first-class wire rename (C.4 stubs stay `flex.*` through **2.4.j**; mapped in **2.4.k**)
 - Community Bounty engine / ARP scan / profile upload (Entwicklungsplan **M4**). First Modbus/SunSpec **outline** schemas shipped in **2.4.g** under `share/hardware_profiles/` — not a runtime Modbus client.
 
 ## Implementation notes (2.4.b OpenEMS)
@@ -206,18 +219,18 @@ M2 schema slice — **mapping aids / contribution seeds**, not a new Live I/O pa
 
 - Adapter: `integrations/loxone_adapter.py` (HTTP markers via `loxone_client`). Live façade: `integrations/ehal_live.py` (`get_adapter()` includes Loxone).
 - Default config: missing/`none`/`loxone` → `EHAL_BACKEND=loxone`, `adapter_id` default `loxone-home`. Marker names stay on `loxone_blocks.*` / `LOXONE_*` (no nesting rewrite).
-- Telemetry: kW markers → W; Loxone battery **+charge** → EHAL `ess_power` **+discharge** (`× −1000`); grid pass-through as EHAL `+` import.
-- Capabilities: `supports_ess_write` when charge/discharge markers exist; **`supports_evcs_current=false`** (EV stays on flex `power_setpoint_name`).
-- Live writes for Loxone: still `send_huawei_modbus_states` + `send_flexible_consumer_states` (`is_ehal_network_backend()` remains openems|ha only). Adapter `write_setpoints` maps ESS limits for contract/future use; does **not** replace `target_soc` / `control_cmd`.
-- Extras still outside M1 EHAL: `target_soc`, `control_cmd`, flex enable, EV kW, FTP/PV-counter, optimizer marker reads (EV/thermal/events).
+- Telemetry: kW markers → W; Loxone battery **+charge** → EHAL `sens_ess_power` **+discharge** (`× −1000`); grid pass-through as EHAL `+` import; field names §C (`sens_*`).
+- Capabilities: `supports_ess_write` when charge/discharge markers exist; `supports_evcs_current` flips true when EV current write path works (**2.4.j**).
+- Live writes: ESS limits / `set_ess_mode` / EV current+mode via adapter + transitional legacy markers; flex stubs still house-profile until **2.4.k**.
+- Removed from live semantics (**2.4.j**): ESS `target_soc`, EV `soc_at_plug_in`, PV cumulative counter, Sofortladen countdown Merker.
 
 ## Implementation notes (2.4.f Loxone one-click mapping)
 
 - Onboarding helper **inside** the Loxone-EHAL path — not a live I/O replacement. Spec: Entwicklungsplan §3.1.
-- Structure scan (`integrations/loxone_structure.py`): **research compare-all** — LoxAPP3.json, HTTP marker probe, and optional official **MCP 17.1** `tools/list` each run as independent variants (default: all). UI shows comparison; mapping names default to **union**. No production winner locked yet — decide after lab data. `sources=(…)` may restrict variants for tests only.
+- Structure scan (`integrations/loxone_structure.py`): **research compare-all** — LoxAPP3.json and optional official **MCP 17.1** as independent variants (default: both). HTTP marker probe removed (only re-validates already-mapped names; useless for one-click discovery). MCP path: resolve `connect.loxonecloud.com/…/mcp` (GET 307) → headless OAuth 2.1 (`LOXONE_USER`/`LOXONE_PASS`) → `tools/list` → `control_find` / `control_describe` (seed from configured `loxone_blocks` and/or LoxAPP3 names; avoid empty/wildcard queries that return EFM `"Rest"` meters; filter low-value hits). Unwrap MCP `content`/`structuredContent`. Lab: MCP can supplement names; full structure usually better from LoxAPP3. Mapping names default to **union**. `sources=(…)` may restrict variants for tests only.
 - HITL UI: `ui/ehal_loxone_mapping.py` on EHAL-Com (backend Loxone). Proposals as EHAL fields; confirm writes flat `loxone_blocks` via `save_main_config`. Field rows grouped by device role (**2.4.g**).
 - Optional LLM: local **Ollama** HTTP (`/api/chat`, JSON). Not bundled in Earnie image / LoxBerry ZIP. Without Ollama: heuristic propose + manual selects.
-- EFM interpretation C (meter tree → Hausprofil consumers/CSV): backlog **2.4.i**; manual blueprint remains `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`.
+- EFM interpretation C (meter tree → Hausprofil consumers/CSV): backlog **2.4.l**; manual blueprint remains `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`.
 
 ## Implementation notes (2.4.g device / hardware profiles)
 

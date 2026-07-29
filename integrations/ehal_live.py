@@ -9,6 +9,7 @@ from typing import Any, Protocol
 
 import config
 from ehal import EHAL_SCHEMA_VERSION, EhalWriteError, validate_write_error
+from ehal.models import canonicalize_ha_entity_keys
 from integrations import loxone_client
 from integrations.ha_adapter import HaAdapter, HaConfig, HaHttpError
 from integrations.loxone_adapter import LoxoneAdapter, LoxoneAdapterError, LoxoneConfig
@@ -94,6 +95,25 @@ def load_write_error() -> EhalWriteError | None:
         return None
 
 
+def derive_sens_power_consumers_w(telemetry: dict[str, Any]) -> float:
+    """House load W: mapped value if present, else max(0, PV − grid − ESS)."""
+    mapped = telemetry.get("sens_power_consumers")
+    if mapped is not None:
+        return max(0.0, float(mapped))
+    pv = float(telemetry["sens_pv_production_active"])
+    grid = float(telemetry["sens_grid_power_active"])
+    ess = float(telemetry.get("sens_ess_power") or 0.0)
+    return max(0.0, pv - grid - ess)
+
+
+def with_derived_sens_power_consumers(telemetry: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy with sens_power_consumers filled when missing/null."""
+    out = dict(telemetry)
+    if out.get("sens_power_consumers") is None:
+        out["sens_power_consumers"] = derive_sens_power_consumers_w(out)
+    return out
+
+
 def get_openems_adapter() -> OpenemsAdapter:
     global _openems_adapter
     base_url = str(config.get("EHAL_OPENEMS_BASE_URL") or "").strip()
@@ -140,8 +160,10 @@ def get_ha_adapter() -> HaAdapter:
         base_url=base_url,
         token=token,
         adapter_id=str(config.get("EHAL_ADAPTER_ID") or "ha-home"),
-        entities={str(k): str(v) for k, v in entities.items()},
-        sign={str(k): str(v) for k, v in sign.items()},
+        entities=canonicalize_ha_entity_keys(
+            {str(k): str(v) for k, v in entities.items()}
+        ),
+        sign=canonicalize_ha_entity_keys({str(k): str(v) for k, v in sign.items()}),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
     )
     if _ha_adapter is not None and _ha_adapter.cfg != cfg:
@@ -153,6 +175,7 @@ def get_ha_adapter() -> HaAdapter:
 
 def get_loxone_adapter() -> LoxoneAdapter:
     global _loxone_adapter
+    ev = _first_ev_loxone_bindings()
     cfg = LoxoneConfig(
         adapter_id=str(config.get("EHAL_ADAPTER_ID") or "loxone-home"),
         soc_name=str(config.get("LOXONE_SOC_NAME") or ""),
@@ -163,6 +186,12 @@ def get_loxone_adapter() -> LoxoneAdapter:
         discharge_power_name=str(
             config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME") or ""
         ),
+        control_cmd_name=str(config.get("LOXONE_CONTROL_CMD_NAME") or ""),
+        consumers_power_name=str(config.get("LOXONE_CONSUMERS_POWER_NAME") or ""),
+        evcs_current_name=str(ev.get("evcs_current_name") or ""),
+        evcs_max_current_name=str(ev.get("evcs_max_current_name") or ""),
+        pv_follow_name=str(ev.get("pv_follow_name") or ""),
+        charge_immediate_name=str(ev.get("charge_immediate_name") or ""),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
     )
     if _loxone_adapter is not None and _loxone_adapter.cfg != cfg:
@@ -200,7 +229,7 @@ def reset_adapter_cache() -> None:
 
 def read_ess_soc() -> float | None:
     try:
-        telemetry = get_adapter().read_telemetry()
+        telemetry = with_derived_sens_power_consumers(get_adapter().read_telemetry())
     except (
         OpenemsHttpError,
         HaHttpError,
@@ -210,13 +239,13 @@ def read_ess_soc() -> float | None:
     ) as exc:
         logger.error("EHAL SoC read failed: %s", exc)
         return None
-    return float(telemetry["ess_soc"])
+    return float(telemetry["sens_ess_soc"])
 
 
 def read_live_power_kw() -> dict[str, float] | None:
     """Return Live power dict (kW) in Loxone-compatible signs (+ battery = charge)."""
     try:
-        telemetry = get_adapter().read_telemetry()
+        telemetry = with_derived_sens_power_consumers(get_adapter().read_telemetry())
     except (
         OpenemsHttpError,
         HaHttpError,
@@ -227,13 +256,13 @@ def read_live_power_kw() -> dict[str, float] | None:
         logger.error("EHAL live power read failed: %s", exc)
         return None
 
-    pv = max(0.0, float(telemetry["pv_production_active"]) / 1000.0)
-    grid = float(telemetry["grid_power_active"]) / 1000.0
-    ess_w = telemetry.get("ess_power")
+    pv = max(0.0, float(telemetry["sens_pv_production_active"]) / 1000.0)
+    grid = float(telemetry["sens_grid_power_active"]) / 1000.0
+    ess_w = telemetry.get("sens_ess_power")
     if ess_w is None:
         battery = 0.0
     else:
-        # EHAL ess_power: +discharge; Live/Loxone convention: +charge
+        # EHAL sens_ess_power: +discharge; Live/Loxone convention: +charge
         battery = -float(ess_w) / 1000.0
     house = pv + battery + grid
     return {
@@ -247,8 +276,8 @@ def read_live_power_kw() -> dict[str, float] | None:
 def write_ess_limits_from_huawei(
     mode: int, target_power_kw: float
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
-    """Map Huawei-style mode/power to EHAL ESS limits (skip target_soc / control_cmd)."""
-    charge_kw, discharge_kw, _cmd = loxone_client.map_huawei_modbus_values(
+    """Map Huawei-style mode/power to EHAL ESS limits (+ optional set_ess_mode)."""
+    charge_kw, discharge_kw, control_cmd = loxone_client.map_huawei_modbus_values(
         mode, target_power_kw
     )
     adapter = get_network_adapter()
@@ -261,6 +290,7 @@ def write_ess_limits_from_huawei(
         "adapter_id": adapter.cfg.adapter_id,
         "set_ess_charge_power_limit": charge_w,
         "set_ess_discharge_power_limit": discharge_w,
+        "set_ess_mode": control_cmd,
     }
     error = adapter.write_setpoints(setpoint)
     if error is not None:
@@ -269,6 +299,7 @@ def write_ess_limits_from_huawei(
         {
             "set_ess_charge_power_limit": charge_w,
             "set_ess_discharge_power_limit": discharge_w,
+            "set_ess_mode": float(control_cmd),
         },
         written_at=ts,
         error=error,
@@ -283,7 +314,7 @@ def write_evcs_max_current_from_consumers(
     """Write set_evcs_max_current from first EV consumer planned power (kW→A)."""
     consumer = _first_ev_consumer()
     if consumer is None:
-        logger.info("EHAL: no EV consumer configured — skip EVCS setpoint")
+        logger.info("EHAL: no EV consumer configured — skip EVCS write")
         return None, []
 
     cid = consumer["id"]
@@ -359,3 +390,23 @@ def _first_ev_consumer() -> dict | None:
         if sched and sched.get("enabled"):
             return consumer
     return None
+
+
+def _first_ev_loxone_bindings() -> dict[str, str]:
+    """EV write markers from first EV consumer ``ehal_bindings`` (+ legacy dual-read)."""
+    from settings.ehal_marker_resolve import (
+        marker_charge_immediate,
+        marker_pv_follow,
+        marker_set_evcs_current,
+        marker_set_evcs_max_current,
+    )
+
+    consumer = _first_ev_consumer()
+    if consumer is None:
+        return {}
+    return {
+        "evcs_current_name": marker_set_evcs_current(consumer),
+        "evcs_max_current_name": marker_set_evcs_max_current(consumer),
+        "pv_follow_name": marker_pv_follow(consumer),
+        "charge_immediate_name": marker_charge_immediate(consumer),
+    }

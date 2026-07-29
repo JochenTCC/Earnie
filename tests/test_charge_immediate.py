@@ -207,7 +207,7 @@ class TestMainStateFallback:
             labels = ci.immediate_charging_labels_from_main_state(main_state)
         assert labels == ["Smart: 3.479 kW live (Sofort-Laden)"]
 
-    def test_labels_show_loxone_remaining_hours(self):
+    def test_labels_show_remaining_hours(self):
         contexts = {
             "eauto": {
                 "immediate_charge": True,
@@ -216,7 +216,7 @@ class TestMainStateFallback:
             }
         }
         assert ci.immediate_charging_labels(contexts) == [
-            "eauto: 3.5 kW fix (noch 2.5 h, Loxone)"
+            "eauto: 3.5 kW fix (noch 2.5 h)"
         ]
 
 
@@ -252,10 +252,7 @@ class TestEnrichContext:
         consumer = _eauto_consumer()
         with (
             patch.object(ci, "fetch_charge_immediate_switch", return_value=True),
-            patch(
-                "integrations.loxone_client.fetch_charge_immediate_remaining_seconds",
-                return_value=7200.0,
-            ),
+            patch.object(ci, "compute_immediate_remaining_seconds", return_value=7200.0),
         ):
             result = ci.enrich_context_with_immediate_charge(
                 consumer,
@@ -275,10 +272,7 @@ class TestEnrichContext:
         base = _plugged_context()
         with (
             patch.object(ci, "fetch_charge_immediate_switch", return_value=True),
-            patch(
-                "integrations.loxone_client.fetch_charge_immediate_remaining_seconds",
-                return_value=0.0,
-            ),
+            patch.object(ci, "compute_immediate_remaining_seconds", return_value=0.0),
         ):
             assert (
                 ci.enrich_context_with_immediate_charge(
@@ -297,3 +291,21 @@ class TestEnrichContext:
             )
             is base
         )
+
+    def test_compute_remaining_from_soc_and_power(self):
+        consumer = _eauto_consumer()
+        with (
+            patch.object(
+                ci.loxone_client,
+                "resolve_consumer_battery_capacity_kwh",
+                return_value=77.0,
+            ),
+            patch.object(ci, "fetch_loxone_actual_soc_percent", return_value=50.0),
+        ):
+            seconds = ci.compute_immediate_remaining_seconds(
+                consumer,
+                _plugged_context(),
+                live_kw=3.5,
+                max_kw=3.5,
+            )
+        assert seconds == pytest.approx(38.5 / 0.9 / 3.5 * 3600.0)

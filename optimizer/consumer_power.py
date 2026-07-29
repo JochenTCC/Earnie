@@ -1,19 +1,23 @@
-"""Hilfen für flexible Verbraucher: Binär (Ein/Aus) vs. kW-Sollwert."""
+"""Hilfen für flexible Verbraucher: Binär (Ein/Aus) vs. kW-/A-Sollwert."""
 from __future__ import annotations
+
+from settings.ehal_marker_resolve import (
+    marker_pv_follow,
+    marker_set_evcs_current,
+    marker_set_evcs_mode,
+)
 
 
 def uses_power_setpoint(consumer: dict) -> bool:
-    """True, wenn die Optimierung einen kW-Sollwert an Loxone sendet."""
-    outputs = consumer.get("loxone_outputs") or {}
-    return bool(str(outputs.get("power_setpoint_name", "")).strip())
+    """True, wenn die Optimierung einen Leistungs-/Strom-Sollwert an Loxone sendet."""
+    return bool(marker_set_evcs_current(consumer))
 
 
 def uses_pv_follow(consumer: dict) -> bool:
-    """True, wenn Loxone zwischen fester Leistung und PV-Überschuss umschalten soll."""
+    """True, wenn PV-Überschuss-Modus (set_evcs_mode / pv_follow) verfügbar ist."""
     if not uses_power_setpoint(consumer):
         return False
-    outputs = consumer.get("loxone_outputs") or {}
-    return bool(str(outputs.get("pv_follow_name", "")).strip())
+    return bool(marker_pv_follow(consumer) or marker_set_evcs_mode(consumer))
 
 
 def power_limits_kw(consumer: dict) -> tuple[float, float]:
@@ -29,7 +33,7 @@ def power_limits_kw(consumer: dict) -> tuple[float, float]:
     if min_kw is None:
         raise ValueError(
             f"Verbraucher '{consumer.get('id', '?')}': min_power_kw fehlt "
-            "(Pflicht bei loxone_outputs.power_setpoint_name)."
+            "(Pflicht bei set_evcs_current / power_setpoint_name)."
         )
     min_kw = float(min_kw)
     if min_kw < 0.0:
@@ -55,7 +59,7 @@ def estimate_pv_surplus_kw(matrix_row: dict, max_kw: float) -> float:
 
 
 def clamp_setpoint_kw(consumer: dict, power_kw: float) -> float:
-    """Soll-Leistung für Loxone im Modus fester Leistung: 0 oder [min, max]."""
+    """Soll-Leistung für festen Leistungsmodus: 0 oder [min, max]."""
     min_kw, max_kw = power_limits_kw(consumer)
     power_kw = max(0.0, float(power_kw or 0.0))
     if power_kw <= 1e-3:
@@ -72,6 +76,7 @@ def loxone_control_outputs(
     Loxone-Ausgaben aus MILP-Plan (aktuelle Stunde).
     pv_follow=1: Soll = P_max, Loxone regelt live am Überschuss.
     pv_follow=0: Soll = geplante feste Leistung.
+    Returns (setpoint_kw, pv_follow_out).
     """
     planned_kw = max(0.0, float(planned_kw or 0.0))
     if planned_kw <= 1e-3:
@@ -80,3 +85,12 @@ def loxone_control_outputs(
     if int(pv_follow) == 1:
         return round(max_kw, 3), 1
     return clamp_setpoint_kw(consumer, planned_kw), 0
+
+
+def set_evcs_mode_for_plan(*, pv_follow: int, immediate: bool) -> str | None:
+    """EHAL set_evcs_mode for live write; None when neither pv nor Sofortladen."""
+    if immediate:
+        return "now"
+    if int(pv_follow) == 1:
+        return "pv"
+    return None

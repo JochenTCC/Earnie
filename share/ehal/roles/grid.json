@@ -5,10 +5,16 @@
   "status": "m1",
   "ehal_fields": [
     {
-      "field": "grid_power_active",
+      "field": "sens_grid_power_active",
       "required": true,
       "kind": "telemetry",
       "notes": "W; + = import (Bezug), − = export (Einspeisung)."
+    },
+    {
+      "field": "sens_power_consumers",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Optional house load W; Merker when mapped, else derive from grid/PV/ESS."
     }
   ],
   "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."

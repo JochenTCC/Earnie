@@ -19,19 +19,34 @@ from ehal import (
     validate_telemetry,
     validate_write_error,
 )
+from ehal.models import canonicalize_ha_entity_keys
 from ehal.validate import EhalValidationError
 
 logger = logging.getLogger(__name__)
 
-TELEMETRY_REQUIRED = ("grid_power_active", "pv_production_active", "ess_soc")
-TELEMETRY_OPTIONAL = ("ess_power", "evcs_active_power")
+TELEMETRY_REQUIRED = (
+    "sens_grid_power_active",
+    "sens_pv_production_active",
+    "sens_ess_soc",
+)
+TELEMETRY_OPTIONAL = (
+    "sens_ess_power",
+    "sens_evcs_active_power",
+    "sens_power_consumers",
+)
 SETPOINT_FIELDS = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
+    "set_ess_mode",
     "set_evcs_max_current",
+    "set_evcs_current",
+    "set_evcs_mode",
 )
 MAPPABLE_DOMAINS = frozenset({"sensor", "number", "select", "input_number"})
 WRITE_DOMAINS = frozenset({"number", "select", "input_number"})
+_NONNEG_TELEMETRY = frozenset(
+    {"sens_pv_production_active", "sens_evcs_active_power", "sens_power_consumers"}
+)
 
 
 @dataclass(frozen=True)
@@ -81,12 +96,23 @@ class HaAdapter:
     """REST-only Home Assistant ↔ EHAL adapter (no HA libraries)."""
 
     def __init__(self, cfg: HaConfig) -> None:
-        self.cfg = cfg
-        self._supports_ess_write = bool(
-            cfg.entities.get("set_ess_charge_power_limit")
-            or cfg.entities.get("set_ess_discharge_power_limit")
+        entities = canonicalize_ha_entity_keys(dict(cfg.entities))
+        sign = canonicalize_ha_entity_keys(dict(cfg.sign))
+        self.cfg = HaConfig(
+            base_url=cfg.base_url,
+            token=cfg.token,
+            adapter_id=cfg.adapter_id,
+            entities=entities,
+            sign=sign,
+            timeout_sec=cfg.timeout_sec,
         )
-        self._supports_evcs_current = bool(cfg.entities.get("set_evcs_max_current"))
+        self._supports_ess_write = bool(
+            entities.get("set_ess_charge_power_limit")
+            or entities.get("set_ess_discharge_power_limit")
+        )
+        self._supports_evcs_current = bool(
+            entities.get("set_evcs_max_current") or entities.get("set_evcs_current")
+        )
         self._last_write_error: EhalWriteError | None = None
         self._base = cfg.base_url.rstrip("/")
         self._headers = {
@@ -174,12 +200,22 @@ class HaAdapter:
                 value = self._read_mapped_numeric(field_name)
             except (HaHttpError, ValueError):
                 continue
-            if field_name in ("pv_production_active", "evcs_active_power"):
+            if field_name in _NONNEG_TELEMETRY:
                 value = max(0.0, value)
             doc[field_name] = value
 
-        if "pv_production_active" in doc:
-            doc["pv_production_active"] = max(0.0, float(doc["pv_production_active"]))
+        if "sens_pv_production_active" in doc:
+            doc["sens_pv_production_active"] = max(
+                0.0, float(doc["sens_pv_production_active"])
+            )
+        if doc.get("sens_power_consumers") is None:
+            ess = float(doc.get("sens_ess_power") or 0.0)
+            doc["sens_power_consumers"] = max(
+                0.0,
+                float(doc["sens_pv_production_active"])
+                - float(doc["sens_grid_power_active"])
+                - ess,
+            )
         return validate_telemetry(doc)
 
     def write_setpoints(
@@ -190,7 +226,7 @@ class HaAdapter:
         evcs_phases: int = 1,
     ) -> EhalWriteError | None:
         """Write setpoints; on failure degrade capabilities and return write_error."""
-        del evcs_voltage_v, evcs_phases  # HA max_current entity is already Amps
+        del evcs_voltage_v, evcs_phases  # HA current entities are already Amps
         raw = dict(setpoint)
         try:
             doc = validate_setpoint(raw)
@@ -221,12 +257,25 @@ class HaAdapter:
                 hub_status = status or hub_status
                 flip_ess = True
 
-        if "set_evcs_max_current" in doc and self._supports_evcs_current:
+        if "set_ess_mode" in doc and self.cfg.entities.get("set_ess_mode"):
             ok, status, msg = self._try_setpoint_write(
-                "set_evcs_max_current", float(doc["set_evcs_max_current"])
+                "set_ess_mode", doc["set_ess_mode"]
             )
             if not ok:
-                failed.append("set_evcs_max_current")
+                failed.append("set_ess_mode")
+                messages.append(msg)
+                hub_status = status or hub_status
+
+        for field_name in ("set_evcs_max_current", "set_evcs_current", "set_evcs_mode"):
+            if field_name not in doc or not self._supports_evcs_current:
+                continue
+            if not self.cfg.entities.get(field_name):
+                continue
+            value = doc[field_name]
+            numeric = float(value) if field_name != "set_evcs_mode" else value
+            ok, status, msg = self._try_setpoint_write(field_name, numeric)
+            if not ok:
+                failed.append(field_name)
                 messages.append(msg)
                 hub_status = status or hub_status
                 flip_evcs = True
@@ -265,12 +314,12 @@ class HaAdapter:
         attrs = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
         unit = attrs.get("unit_of_measurement")
         raw = parse_ha_numeric_state(str(payload.get("state")), unit=unit)
-        if field_name == "ess_soc":
+        if field_name == "sens_ess_soc":
             return float(raw)
         return apply_sign(raw, self.cfg.sign.get(field_name))
 
     def _try_setpoint_write(
-        self, field_name: str, value: float
+        self, field_name: str, value: float | str
     ) -> tuple[bool, str | None, str]:
         entity_id = str(self.cfg.entities.get(field_name) or "").strip()
         if not entity_id:

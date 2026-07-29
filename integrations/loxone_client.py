@@ -12,7 +12,20 @@ from requests.auth import HTTPBasicAuth
 import config
 import logging
 from integrations.loxone_comm_trace import LoxoneWriteRecord
-from settings.ev_power import kw_from_nominal_reading
+from settings.ehal_marker_resolve import (
+    charging_loxone,
+    marker_charge_immediate,
+    marker_pv_follow,
+    marker_sens_evcs_bat_capacity,
+    marker_sens_evcs_nominal_current,
+    marker_set_evcs_current,
+)
+from settings.ev_power import (
+    ampere_to_kw,
+    ev_nominal_power_conversion,
+    kw_from_nominal_reading,
+    kw_to_ampere,
+)
 from settings.flexible_consumers import runtime_consumer_id
 
 logger = logging.getLogger(__name__)
@@ -166,11 +179,11 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
 
 
 def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
-    """Nennleistung (kW): live aus Loxone, sonst Fallback aus config.json."""
+    """Nennleistung (kW): live sens_evcs_nominal_current (A) oder Legacy-Merker."""
     fallback = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
-    sched = consumer.get("charging_schedule") or {}
-    lox = sched.get("loxone") or {}
-    io_name = lox.get("nominal_power_kw_name", "")
+    lox = charging_loxone(consumer)
+    ehal_name = str(lox.get("sens_evcs_nominal_current") or "").strip()
+    io_name = marker_sens_evcs_nominal_current(consumer)
     if not io_name:
         return fallback
 
@@ -195,7 +208,11 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
         )
         return fallback
 
-    live = kw_from_nominal_reading(value, unit, consumer)
+    if ehal_name or unit == "a":
+        voltage_v, phases = ev_nominal_power_conversion(consumer)
+        live = ampere_to_kw(value, voltage_v=voltage_v, phases=phases)
+    else:
+        live = kw_from_nominal_reading(value, unit, consumer)
 
     if live <= 0:
         logger.warning(
@@ -210,7 +227,7 @@ def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
 
 
 def resolve_consumer_battery_capacity_kwh(consumer: dict) -> float | None:
-    """Akkukapazität (kWh): Hausprofil-Bridge oder live aus Loxone."""
+    """Akkukapazität (kWh): Hausprofil-Bridge oder live sens_evcs_bat_capacity."""
     direct = consumer.get("battery_capacity_kwh")
     if direct is not None and float(direct) > 0:
         return float(direct)
@@ -219,12 +236,12 @@ def resolve_consumer_battery_capacity_kwh(consumer: dict) -> float | None:
     if sched_cap is not None and float(sched_cap) > 0:
         return float(sched_cap)
 
-    lox = sched.get("loxone") or {}
-    io_name = str(lox.get("battery_capacity_kwh_name", "")).strip()
+    io_name = marker_sens_evcs_bat_capacity(consumer)
     cid = consumer.get("id", "?")
     if not io_name:
         logger.error(
-            "Verbraucher '%s': charging_schedule.loxone.battery_capacity_kwh_name fehlt.",
+            "Verbraucher '%s': sens_evcs_bat_capacity / "
+            "battery_capacity_kwh_name fehlt.",
             cid,
         )
         return None
@@ -267,48 +284,6 @@ def resolve_consumer_battery_capacity_kwh(consumer: dict) -> float | None:
         )
         return None
     return float(value)
-
-
-def fetch_charge_immediate_remaining_seconds(consumer: dict) -> float | None:
-    """Verbleibende Sofort-Ladezeit in Sekunden (Loxone-Countdown)."""
-    sched = consumer.get("charging_schedule") or {}
-    lox = sched.get("loxone") or {}
-    io_name = str(lox.get("charge_immediate_remaining_name", "")).strip()
-    if not io_name:
-        logger.warning(
-            "Verbraucher '%s': charge_immediate_remaining_name fehlt in der Config.",
-            consumer.get("id"),
-        )
-        return None
-
-    raw = fetch_loxone_generic_value(io_name)
-    if raw is None:
-        logger.warning(
-            "Loxone: Keine Restladezeit für '%s' (%s).",
-            consumer.get("id"),
-            io_name,
-        )
-        return None
-
-    try:
-        seconds = float(raw)
-    except (TypeError, ValueError):
-        logger.error(
-            "Loxone: Parsing-Fehler bei Restladezeit '%s' (raw=%r).",
-            io_name,
-            raw,
-        )
-        return None
-
-    if not math.isfinite(seconds) or seconds < 0:
-        logger.warning(
-            "Loxone: Ungültige Restladezeit für '%s' (%s, raw=%r).",
-            consumer.get("id"),
-            io_name,
-            raw,
-        )
-        return None
-    return seconds
 
 
 def consumers_with_live_nominal_power(consumers: list | None = None) -> list:
@@ -751,11 +726,10 @@ def flex_consumer_power_setpoint_kw(
     charging_contexts: dict[str, dict],
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> float | None:
-    """kW-Sollwert für Loxone (None wenn kein power_setpoint_name)."""
+    """kW-Sollwert aus MILP (None wenn kein set_evcs_current / power_setpoint)."""
     from optimizer.consumer_power import loxone_control_outputs
 
-    setpoint_name = (consumer.get("loxone_outputs") or {}).get("power_setpoint_name", "")
-    if not setpoint_name:
+    if not marker_set_evcs_current(consumer):
         return None
 
     cid = consumer["id"]
@@ -765,17 +739,32 @@ def flex_consumer_power_setpoint_kw(
     return setpoint_kw
 
 
+def flex_consumer_setpoint_amps(
+    consumer: dict,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict],
+    consumer_pv_follow: dict[str, int] | None = None,
+) -> float | None:
+    """set_evcs_current (A) from planned kW; None wenn kein Current-Merker."""
+    setpoint_kw = flex_consumer_power_setpoint_kw(
+        consumer, consumer_powers, charging_contexts, consumer_pv_follow
+    )
+    if setpoint_kw is None:
+        return None
+    voltage_v, phases = ev_nominal_power_conversion(consumer)
+    return round(kw_to_ampere(setpoint_kw, voltage_v=voltage_v, phases=phases), 3)
+
+
 def flex_consumer_pv_follow_value(
     consumer: dict,
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict],
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> int | None:
-    """PV-Überschuss-Modus 0/1 für Loxone (None wenn kein pv_follow_name)."""
+    """PV-Überschuss-Modus 0/1 für Legacy-pv_follow Merker."""
     from optimizer.consumer_power import loxone_control_outputs
 
-    pv_follow_name = (consumer.get("loxone_outputs") or {}).get("pv_follow_name", "")
-    if not pv_follow_name:
+    if not marker_pv_follow(consumer):
         return None
 
     cid = consumer["id"]
@@ -793,69 +782,98 @@ def _skip_flexible_consumer_output(
     return bool(ctx.get("skip_loxone_output"))
 
 
-def _flexible_consumer_output_values(
+def _append_evcs_mode_writes(
+    values: dict[str, float],
     consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-    consumer_pv_follow: dict[str, int] | None = None,
-) -> dict[str, float]:
-    """Berechnet Loxone-Merker → Wert für einen flexiblen Verbraucher (ohne HTTP)."""
-    outputs = consumer.get("loxone_outputs") or {}
-    pv_follow_name = str(outputs.get("pv_follow_name", "")).strip()
+    *,
+    mode: str | None,
+    pv_out: int | None,
+) -> None:
+    """Dual-write legacy pv_follow / charge_immediate for set_evcs_mode during 2.4.j."""
+    pv_name = marker_pv_follow(consumer)
+    now_name = marker_charge_immediate(consumer)
+    if mode == "now":
+        if pv_name:
+            values[pv_name] = 0.0
+        if now_name:
+            values[now_name] = 1.0
+        return
+    if mode == "pv":
+        if pv_name:
+            values[pv_name] = 1.0 if pv_out is None else float(pv_out)
+        if now_name:
+            values[now_name] = 0.0
+        return
+    if pv_name and pv_out is not None:
+        values[pv_name] = float(pv_out)
+    if now_name:
+        values[now_name] = 0.0
 
-    if _skip_flexible_consumer_output(consumer, charging_contexts):
-        if pv_follow_name:
-            logger.info(
-                "Flex consumer %s -> Sofort laden: %s=0 (kein Lade-Sollwert von Earnie).",
-                consumer["name"],
-                pv_follow_name,
-            )
-            return {pv_follow_name: 0.0}
+
+def _immediate_skip_output_values(consumer: dict) -> dict[str, float]:
+    values: dict[str, float] = {}
+    _append_evcs_mode_writes(values, consumer, mode="now", pv_out=0)
+    if values:
+        logger.info(
+            "Flex consumer %s -> Sofort laden: set_evcs_mode=now "
+            "(kein Lade-Sollstrom von Earnie).",
+            consumer["name"],
+        )
+    else:
         logger.info(
             "Flex consumer %s -> keine Steuerung (Sofort laden aktiv, Loxone regelt).",
             consumer["name"],
         )
+    return values
+
+
+def _evcs_current_output_values(
+    consumer: dict,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict],
+    consumer_pv_follow: dict[str, int] | None,
+    current_name: str,
+) -> dict[str, float]:
+    from optimizer.consumer_power import set_evcs_mode_for_plan
+
+    amps = flex_consumer_setpoint_amps(
+        consumer, consumer_powers, charging_contexts, consumer_pv_follow
+    )
+    if amps is None:
         return {}
+    values = {str(current_name): float(amps)}
+    pv_out = flex_consumer_pv_follow_value(
+        consumer, consumer_powers, charging_contexts, consumer_pv_follow
+    )
+    mode = set_evcs_mode_for_plan(pv_follow=int(pv_out or 0), immediate=False)
+    _append_evcs_mode_writes(values, consumer, mode=mode, pv_out=pv_out)
+    setpoint_kw = flex_consumer_power_setpoint_kw(
+        consumer, consumer_powers, charging_contexts, consumer_pv_follow
+    )
+    planned_kw = max(0.0, float(consumer_powers.get(consumer["id"], 0.0) or 0.0))
+    logger.info(
+        "Flex consumer %s -> Soll=%.2f A (%.2f kW), mode=%s "
+        "(geplant %.2f kW, Loxone: %s)",
+        consumer["name"],
+        amps,
+        setpoint_kw or 0.0,
+        mode or "fixed",
+        planned_kw,
+        current_name,
+    )
+    return values
 
-    enable_name = outputs.get("enable_name", "")
-    setpoint_name = outputs.get("power_setpoint_name", "")
-    cid = consumer["id"]
-    values: dict[str, float] = {}
 
-    if setpoint_name:
-        setpoint_kw = flex_consumer_power_setpoint_kw(
-            consumer, consumer_powers, charging_contexts, consumer_pv_follow
-        )
-        if setpoint_kw is None:
-            return values
-        values[str(setpoint_name)] = float(setpoint_kw)
-        pv_out = flex_consumer_pv_follow_value(
-            consumer, consumer_powers, charging_contexts, consumer_pv_follow
-        )
-        if pv_follow_name and pv_out is not None:
-            values[str(pv_follow_name)] = float(pv_out)
-        planned_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
-        logger.info(
-            "Flex consumer %s -> Soll=%.2f kW, pv_follow=%s "
-            "(geplant %.2f kW, Loxone: %s%s)",
-            consumer["name"],
-            setpoint_kw,
-            pv_out if pv_follow_name else "n/a",
-            planned_kw,
-            setpoint_name,
-            f", {pv_follow_name}" if pv_follow_name else "",
-        )
-        return values
-
-    if not enable_name:
-        return values
-
+def _enable_output_values(
+    consumer: dict,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict],
+    enable_name: str,
+) -> dict[str, float]:
     enabled = flex_consumer_enable_value(consumer, consumer_powers, charging_contexts)
     if enabled is None:
-        return values
-
-    values[str(enable_name)] = float(enabled)
-    power_kw = max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0))
+        return {}
+    power_kw = max(0.0, float(consumer_powers.get(consumer["id"], 0.0) or 0.0))
     logger.info(
         "Flex consumer %s -> Freigabe=%s (optimiert %.2f kW, Loxone: %s)",
         consumer["name"],
@@ -863,7 +881,35 @@ def _flexible_consumer_output_values(
         power_kw,
         enable_name,
     )
-    return values
+    return {str(enable_name): float(enabled)}
+
+
+def _flexible_consumer_output_values(
+    consumer: dict,
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict],
+    consumer_pv_follow: dict[str, int] | None = None,
+) -> dict[str, float]:
+    """Berechnet Loxone-Merker → Wert für einen flexiblen Verbraucher (ohne HTTP)."""
+    if _skip_flexible_consumer_output(consumer, charging_contexts):
+        return _immediate_skip_output_values(consumer)
+
+    current_name = marker_set_evcs_current(consumer)
+    if current_name:
+        return _evcs_current_output_values(
+            consumer,
+            consumer_powers,
+            charging_contexts,
+            consumer_pv_follow,
+            current_name,
+        )
+
+    enable_name = str((consumer.get("loxone_outputs") or {}).get("enable_name", "")).strip()
+    if not enable_name:
+        return {}
+    return _enable_output_values(
+        consumer, consumer_powers, charging_contexts, enable_name
+    )
 
 
 def _write_flexible_consumer_output(
@@ -875,7 +921,7 @@ def _write_flexible_consumer_output(
     *,
     send: bool,
 ) -> list[LoxoneWriteRecord]:
-    """Schreibt Freigabe/kW-Sollwert/pv_follow an Loxone und/oder in den Snapshot."""
+    """Schreibt Freigabe/Strom-Sollwert/Modus an Loxone und/oder in den Snapshot."""
     values = _flexible_consumer_output_values(
         consumer, consumer_powers, charging_contexts, consumer_pv_follow
     )
@@ -900,9 +946,10 @@ def build_sent_loxone_snapshot(
     charge_kw, discharge_kw, control_cmd = map_huawei_modbus_values(mode, target_power_kw)
     contexts = charging_contexts or {}
     snapshot: dict[str, float] = {}
+    # target_soc_name removed (2.4.j): ESS via charge/discharge limits + set_ess_mode.
+    _ = target_soc
 
     for cfg_name, value in (
-        (config.get("LOXONE_TARGET_SOC_NAME"), float(target_soc)),
         (config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw),
         (config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
         (config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
@@ -923,10 +970,11 @@ def send_huawei_modbus_states(
 ) -> list[LoxoneWriteRecord]:
     """Übersetzt Optimierungsmodi und schreibt Huawei-Steuerwerte an Loxone."""
     charge_kw, discharge_kw, control_cmd = map_huawei_modbus_values(mode, target_power_kw)
+    # target_soc no longer written (2.4.j); kept in signature for call-site compat.
+    _ = target_soc
 
     logger.info(
-        "Sending Modbus Mapping -> SoC: %s, Ladung: %s kW, Entladung: %s kW, Cmd: %s",
-        target_soc,
+        "Sending Modbus Mapping -> Ladung: %s kW, Entladung: %s kW, set_ess_mode/Cmd: %s",
         charge_kw,
         discharge_kw,
         control_cmd,
@@ -934,7 +982,6 @@ def send_huawei_modbus_states(
 
     records: list[LoxoneWriteRecord] = []
     for cfg_name, value in (
-        (config.get("LOXONE_TARGET_SOC_NAME"), target_soc),
         (config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw),
         (config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
         (config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
@@ -949,7 +996,7 @@ def send_flexible_consumer_states(
     charging_contexts: dict[str, dict] | None = None,
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> list[LoxoneWriteRecord]:
-    """Sendet Freigabe (0/1), kW-Sollwert und optional pv_follow an Loxone."""
+    """Sendet Freigabe (0/1), set_evcs_current (A) und set_evcs_mode an Loxone."""
     contexts = charging_contexts or {}
     records: list[LoxoneWriteRecord] = []
     for consumer in config.get_flexible_consumers(optimizer_only=True):

@@ -10,11 +10,17 @@ import config
 from integrations import loxone_client
 from optimizer.consumer_power import power_limits_kw
 from optimizer.event_trigger import parse_binary_value
+from optimizer.ev_soc_tracking import fetch_loxone_actual_soc_percent
+from settings.ehal_marker_resolve import (
+    marker_charge_immediate,
+    resolve_get_evcs_limit_soc,
+)
 from settings.flexible_consumers import (
     flex_kw_lookup,
     flex_kw_pop_for_consumer,
     flex_kw_to_canonical,
     runtime_consumer_id,
+    target_kwh_from_rest_soc,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,15 +29,7 @@ _SECONDS_PER_HOUR = 3600.0
 
 
 def charge_immediate_io_name(consumer: dict) -> str:
-    sched = consumer.get("charging_schedule") or {}
-    lox = sched.get("loxone") or {}
-    return str(lox.get("charge_immediate_name", "")).strip()
-
-
-def charge_immediate_remaining_io_name(consumer: dict) -> str:
-    sched = consumer.get("charging_schedule") or {}
-    lox = sched.get("loxone") or {}
-    return str(lox.get("charge_immediate_remaining_name", "")).strip()
+    return marker_charge_immediate(consumer)
 
 
 def fetch_charge_immediate_switch(consumer: dict) -> bool | None:
@@ -43,6 +41,89 @@ def fetch_charge_immediate_switch(consumer: dict) -> bool | None:
 
 def charging_power_threshold_kw() -> float:
     return float(config.get_threshold_power())
+
+
+def _energy_to_limit_kwh(
+    consumer: dict,
+    base_context: dict,
+    *,
+    capacity: float,
+    actual_soc: float | None,
+) -> float | None:
+    label = consumer.get("name") or consumer.get("id")
+    if actual_soc is None:
+        target_kwh = base_context.get("target_kwh")
+        if target_kwh is None:
+            logger.warning(
+                "%s: Sofort-Laden — Ist-SOC fehlt und kein target_kwh.",
+                label,
+            )
+            return None
+        return max(0.0, float(target_kwh))
+    try:
+        limit_soc = resolve_get_evcs_limit_soc(consumer)
+    except ValueError as exc:
+        logger.warning("%s: %s", label, exc)
+        return None
+    energy = target_kwh_from_rest_soc(
+        consumer,
+        actual_soc,
+        capacity_kwh=capacity,
+        limit_soc_percent=limit_soc,
+    )
+    return None if energy is None else float(energy)
+
+
+def _charge_power_for_remaining(
+    *,
+    live_kw: float | None,
+    max_kw: float,
+    label: object,
+) -> float | None:
+    threshold = charging_power_threshold_kw()
+    if live_kw is not None and float(live_kw) >= threshold:
+        power_kw = float(live_kw)
+    else:
+        power_kw = float(max_kw)
+    if power_kw <= 1e-9:
+        logger.warning(
+            "%s: Sofort-Laden — Ladeleistung <= 0, Restzeit nicht berechenbar.",
+            label,
+        )
+        return None
+    return power_kw
+
+
+def compute_immediate_remaining_seconds(
+    consumer: dict,
+    base_context: dict,
+    *,
+    live_kw: float | None,
+    max_kw: float,
+) -> float | None:
+    """Restzeit Sofortladen: Energie-bis-Limit / Ladeleistung (kein Countdown-Merker)."""
+    label = consumer.get("name") or consumer.get("id")
+    capacity = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    if capacity is None:
+        logger.warning(
+            "%s: Sofort-Laden — Akkukapazität fehlt, Restzeit nicht berechenbar.",
+            label,
+        )
+        return None
+    energy_kwh = _energy_to_limit_kwh(
+        consumer,
+        base_context,
+        capacity=float(capacity),
+        actual_soc=fetch_loxone_actual_soc_percent(consumer),
+    )
+    if energy_kwh is None:
+        return None
+    power_kw = _charge_power_for_remaining(
+        live_kw=live_kw, max_kw=max_kw, label=label
+    )
+    if power_kw is None:
+        return None
+    return energy_kwh / power_kw * _SECONDS_PER_HOUR
 
 
 def is_immediate_charging_active(
@@ -108,6 +189,22 @@ def build_immediate_context(
     }
 
 
+def _log_immediate_horizon_skip(
+    consumer: dict, remaining_seconds: float | None
+) -> None:
+    if remaining_seconds is None:
+        logger.warning(
+            "%s: Sofort-Laden aktiv, aber Restladezeit nicht berechenbar "
+            "(Ist-SOC / Leistung) – keine Planung als fixer Verbraucher.",
+            consumer["name"],
+        )
+    else:
+        logger.info(
+            "%s: Sofort-Laden aktiv, Restladezeit abgelaufen – keine Planung.",
+            consumer["name"],
+        )
+
+
 def enrich_context_with_immediate_charge(
     consumer: dict,
     context: dict,
@@ -129,24 +226,15 @@ def enrich_context_with_immediate_charge(
     ):
         return context
 
-    remaining_seconds = loxone_client.fetch_charge_immediate_remaining_seconds(consumer)
+    _, max_kw = power_limits_kw(consumer)
+    remaining_seconds = compute_immediate_remaining_seconds(
+        consumer, context, live_kw=live_kw, max_kw=max_kw
+    )
     horizon_slots = immediate_horizon_slots(remaining_seconds, horizon)
     if horizon_slots <= 0:
-        if remaining_seconds is None:
-            logger.warning(
-                "%s: Sofort-Laden aktiv, aber keine gültige Restladezeit von Loxone "
-                "(%s) – keine Planung als fixer Verbraucher.",
-                consumer["name"],
-                charge_immediate_remaining_io_name(consumer) or "?",
-            )
-        else:
-            logger.info(
-                "%s: Sofort-Laden aktiv, Restladezeit abgelaufen – keine Planung.",
-                consumer["name"],
-            )
+        _log_immediate_horizon_skip(consumer, remaining_seconds)
         return context
 
-    _, max_kw = power_limits_kw(consumer)
     result = build_immediate_context(
         consumer,
         context,
@@ -360,7 +448,7 @@ def immediate_charging_labels(contexts: dict[str, dict]) -> list[str]:
         if remaining_h is not None:
             labels.append(
                 f"{cid}: {ctx.get('immediate_charge_kw')} kW fix "
-                f"(noch {remaining_h} h, Loxone)"
+                f"(noch {remaining_h} h)"
             )
         else:
             labels.append(

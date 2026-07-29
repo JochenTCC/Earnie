@@ -1,14 +1,50 @@
 {
   "role_id": "evcs",
   "label": "Wallbox (EVCS)",
-  "description": "EV charge point active power and optional max-current setpoint.",
+  "description": "EV charge point telemetry, current/mode setpoints, and schedule inputs.",
   "status": "m1",
   "ehal_fields": [
     {
-      "field": "evcs_active_power",
+      "field": "sens_evcs_active_power",
       "required": false,
       "kind": "telemetry",
       "notes": "Optional W; charge power ≥ 0 when present."
+    },
+    {
+      "field": "sens_evcs_connected",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "EV plugged in / connected."
+    },
+    {
+      "field": "sens_evcs_soc_act",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Vehicle SoC in %."
+    },
+    {
+      "field": "sens_evcs_nominal_current",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "Nominal / max current in A; power = f(A, V, phases)."
+    },
+    {
+      "field": "sens_evcs_bat_capacity",
+      "required": false,
+      "kind": "telemetry",
+      "notes": "EV battery capacity in kWh."
+    },
+    {
+      "field": "get_evcs_ready_by_time",
+      "required": false,
+      "kind": "input",
+      "notes": "Ready-by deadline from house / wallbox."
+    },
+    {
+      "field": "get_evcs_limit_soc",
+      "required": false,
+      "kind": "input",
+      "notes": "Charge limit SoC % (Merker mapping in 2.4.k)."
     },
     {
       "field": "set_evcs_max_current",
@@ -17,10 +53,22 @@
       "notes": "Max EV charge current in A."
     },
     {
+      "field": "set_evcs_current",
+      "required": false,
+      "kind": "setpoint",
+      "notes": "EV charge current setpoint in A (replaces kW power_setpoint)."
+    },
+    {
+      "field": "set_evcs_mode",
+      "required": false,
+      "kind": "setpoint",
+      "notes": "Enum pv | now (replaces pv_follow + charge_immediate markers)."
+    },
+    {
       "field": "supports_evcs_current",
       "required": true,
       "kind": "capability",
-      "notes": "Loxone M1 typically false (EV stays on flex kW setpoint)."
+      "notes": "True when set_evcs_max_current / set_evcs_current writes work."
     }
   ],
   "capability_expectations": {

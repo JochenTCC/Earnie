@@ -125,8 +125,19 @@ class Config:
                 f"Kritischer Fehler: '{self.config_path}' konnte nicht gelesen werden: {e}"
             ) from e
 
+    def _load_house_profiles_raw(self) -> dict:
+        if not os.path.isfile(self.house_profiles_path):
+            return {}
+        try:
+            return read_json_dict(self.house_profiles_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            return {}
+
     def _load_event_triggers(self) -> list[dict]:
-        return system_settings.load_event_triggers(self._raw_config)
+        return system_settings.load_event_triggers(
+            self._raw_config,
+            house_doc=self._load_house_profiles_raw(),
+        )
 
     def _load_env_vars(self) -> None:
         config_loaders.apply_attrs(
@@ -137,6 +148,7 @@ class Config:
         )
 
     def _load_static_params(self) -> None:
+        house_doc = self._load_house_profiles_raw()
         config_loaders.apply_attrs(
             self,
             config_loaders.load_system_and_ui_params(
@@ -148,7 +160,9 @@ class Config:
         )
         config_loaders.apply_attrs(
             self,
-            config_loaders.load_loxone_block_params(self._raw_config, self.config_path),
+            config_loaders.load_loxone_block_params(
+                self._raw_config, self.config_path, house_doc=house_doc
+            ),
         )
         config_loaders.apply_attrs(
             self,

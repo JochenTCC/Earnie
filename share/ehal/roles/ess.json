@@ -1,17 +1,17 @@
 {
   "role_id": "ess",
   "label": "Batterie (ESS)",
-  "description": "Home battery SoC, optional power, and charge/discharge limit setpoints.",
+  "description": "Home battery SoC, optional power, charge/discharge limits, and optional mode.",
   "status": "m1",
   "ehal_fields": [
     {
-      "field": "ess_soc",
+      "field": "sens_ess_soc",
       "required": true,
       "kind": "telemetry",
       "notes": "SoC in % (0…100)."
     },
     {
-      "field": "ess_power",
+      "field": "sens_ess_power",
       "required": false,
       "kind": "telemetry",
       "notes": "Optional W; + = discharge, − = charge (OpenEMS-aligned)."
@@ -27,6 +27,12 @@
       "required": false,
       "kind": "setpoint",
       "notes": "Max discharge power magnitude in W."
+    },
+    {
+      "field": "set_ess_mode",
+      "required": false,
+      "kind": "setpoint",
+      "notes": "ESS mode / control command (e.g. Huawei); replaces target_soc write."
     },
     {
       "field": "supports_ess_write",

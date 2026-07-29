@@ -23,17 +23,27 @@ _HW_EXAMPLES = _HW_DIR / "examples"
 _RECIPES_DIR = _REPO_ROOT / "share" / "loxone" / "recipes"
 _RECIPE_SCHEMA = _RECIPES_DIR / "recipe.schema.json"
 
-# M1 EHAL field surface (telemetry + setpoint + capabilities).
+# M1 EHAL field surface (telemetry + setpoint + capabilities; schema_version 2 / §C).
 M1_EHAL_FIELDS: frozenset[str] = frozenset(
     {
-        "grid_power_active",
-        "pv_production_active",
-        "ess_soc",
-        "ess_power",
-        "evcs_active_power",
+        "sens_grid_power_active",
+        "sens_pv_production_active",
+        "sens_ess_soc",
+        "sens_ess_power",
+        "sens_evcs_active_power",
+        "sens_power_consumers",
+        "sens_evcs_connected",
+        "sens_evcs_soc_act",
+        "sens_evcs_nominal_current",
+        "sens_evcs_bat_capacity",
+        "get_evcs_ready_by_time",
+        "get_evcs_limit_soc",
         "set_ess_charge_power_limit",
         "set_ess_discharge_power_limit",
+        "set_ess_mode",
         "set_evcs_max_current",
+        "set_evcs_current",
+        "set_evcs_mode",
         "supports_ess_write",
         "supports_evcs_current",
     }
@@ -41,28 +51,44 @@ M1_EHAL_FIELDS: frozenset[str] = frozenset(
 
 # HITL display labels (German) for M1 mapping fields — single source for UI.
 _FIELD_LABELS_DE: dict[str, str] = {
-    "grid_power_active": "Netzleistung (W, +Bezug)",
-    "pv_production_active": "PV-Produktion (W)",
-    "ess_soc": "Batterie-SoC (%)",
-    "ess_power": "Batterieleistung (W, +Entladung)",
-    "evcs_active_power": "Wallbox-Leistung (W)",
+    "sens_grid_power_active": "Netzleistung (W, +Bezug)",
+    "sens_pv_production_active": "PV-Produktion (W)",
+    "sens_ess_soc": "Batterie-SoC (%)",
+    "sens_ess_power": "Batterieleistung (W, +Entladung)",
+    "sens_evcs_active_power": "Wallbox-Leistung (W)",
+    "sens_power_consumers": "Hauslast (W)",
+    "sens_evcs_connected": "EV angeschlossen",
+    "sens_evcs_soc_act": "EV Ist-SOC (%)",
+    "sens_evcs_nominal_current": "EV Nennstrom (A)",
+    "sens_evcs_bat_capacity": "EV Batteriekapazität (kWh)",
+    "get_evcs_ready_by_time": "EV FertigUm",
+    "get_evcs_limit_soc": "EV Ladeziel-SOC (%)",
     "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
     "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
+    "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl",
     "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
+    "set_evcs_current": "Setpoint Wallbox-Strom (A)",
+    "set_evcs_mode": "Setpoint Wallbox-Modus (pv|now)",
+    "flex.power_name": "Flex Leistung / Zustand",
+    "flex.enable_name": "Flex Freigabe",
+    "flex.power_setpoint_name": "Flex Leistungs-Sollwert",
     "target_soc_name": "Loxone-Extras: Ziel-SOC",
-    "control_cmd_name": "Loxone-Extras: Steuerbefehl",
 }
 
 # Field → device role_id for HITL grouping (M1 plant roles only).
 _FIELD_ROLE: dict[str, str] = {
-    "grid_power_active": "grid",
-    "pv_production_active": "pv",
-    "ess_soc": "ess",
-    "ess_power": "ess",
+    "sens_grid_power_active": "grid",
+    "sens_power_consumers": "grid",
+    "sens_pv_production_active": "pv",
+    "sens_ess_soc": "ess",
+    "sens_ess_power": "ess",
     "set_ess_charge_power_limit": "ess",
     "set_ess_discharge_power_limit": "ess",
-    "evcs_active_power": "evcs",
+    "set_ess_mode": "ess",
+    "sens_evcs_active_power": "evcs",
     "set_evcs_max_current": "evcs",
+    "set_evcs_current": "evcs",
+    "set_evcs_mode": "evcs",
 }
 
 _ROLE_ORDER = ("grid", "pv", "ess", "evcs", "consumer", "heatpump")

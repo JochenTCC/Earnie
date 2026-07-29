@@ -1,11 +1,10 @@
-"""Tests for live-only Merker expander gating in Hausprofil consumer editors."""
+"""Tests for Hausprofil consumer passthrough (EHAL bindings live on EHAL-Com)."""
 from __future__ import annotations
 
 from ui.house_config_profile_form import (
     _live_markers_enabled,
     _merge_passthrough_consumer_fields,
     _preserved_appliance_power_source,
-    _run_in_markers_expander,
 )
 
 
@@ -22,25 +21,16 @@ def test_live_markers_enabled_follows_ui_modes(monkeypatch) -> None:
     assert _live_markers_enabled() is True
 
 
-def test_run_in_markers_expander_skips_body_when_hidden(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "ui.house_config_profile_form._live_markers_enabled",
-        lambda: False,
-    )
-    called = {"n": 0}
-
-    def body():
-        called["n"] += 1
-        return "edited"
-
-    assert _run_in_markers_expander(body) is None
-    assert called["n"] == 0
-
-
 def test_preserved_appliance_power_source() -> None:
     assert (
         _preserved_appliance_power_source(
             {"appliance_recommendation": {"power_source": "loxone"}}
+        )
+        == "loxone"
+    )
+    assert (
+        _preserved_appliance_power_source(
+            {"ehal_bindings": {"flex.power_name": "P_act"}}
         )
         == "loxone"
     )
@@ -62,6 +52,16 @@ def test_omit_marker_keys_preserves_via_passthrough() -> None:
         "loxone_outputs": {"enable_name": "Ernie_WP_Freigabe"},
         "thermal_control": {"loxone": {"heating_active_name": "heat"}},
         "swimspa_filter_bindings": {"power_name": "filt"},
+        "ehal_bindings": {"flex.power_name": "Ernie_WP_P_act"},
+        "event_triggers": [
+            {
+                "id": "wp_on",
+                "ehal_field": "flex.power_name",
+                "signal_type": "binary",
+                "on_change": "rising",
+                "label": "WP",
+            }
+        ],
     }
     edited = {
         "id": "wp",
@@ -74,6 +74,8 @@ def test_omit_marker_keys_preserves_via_passthrough() -> None:
     assert merged["loxone_outputs"]["enable_name"] == "Ernie_WP_Freigabe"
     assert merged["thermal_control"]["loxone"]["heating_active_name"] == "heat"
     assert merged["swimspa_filter_bindings"]["power_name"] == "filt"
+    assert merged["ehal_bindings"]["flex.power_name"] == "Ernie_WP_P_act"
+    assert merged["event_triggers"][0]["id"] == "wp_on"
 
 
 def test_omit_charging_loxone_preserves_via_passthrough() -> None:
@@ -85,6 +87,7 @@ def test_omit_charging_loxone_preserves_via_passthrough() -> None:
             "target_soc_percent": 100.0,
             "loxone": {"plugged_in_name": "Da"},
         },
+        "ehal_bindings": {"sens_evcs_connected": "Da"},
     }
     edited = {
         "id": "ev",
@@ -95,3 +98,4 @@ def test_omit_charging_loxone_preserves_via_passthrough() -> None:
     assert merged["charging_schedule"]["loxone"]["plugged_in_name"] == "Da"
     assert merged["loxone_inputs"]["power_name"] == "P"
     assert merged["charging_schedule"]["target_soc_percent"] == 90.0
+    assert merged["ehal_bindings"]["sens_evcs_connected"] == "Da"

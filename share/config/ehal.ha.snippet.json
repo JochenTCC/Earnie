@@ -6,18 +6,18 @@
       "base_url": "http://homeassistant:8123",
       "token": "<long-lived-access-token>",
       "entities": {
-        "grid_power_active": "sensor.evcc_grid_power",
-        "pv_production_active": "sensor.evcc_pv_power",
-        "ess_soc": "sensor.evcc_battery_soc",
-        "ess_power": "sensor.evcc_battery_power",
-        "evcs_active_power": "sensor.evcc_loadpoint_1_charge_power",
+        "sens_grid_power_active": "sensor.evcc_grid_power",
+        "sens_pv_production_active": "sensor.evcc_pv_power",
+        "sens_ess_soc": "sensor.evcc_battery_soc",
+        "sens_ess_power": "sensor.evcc_battery_power",
+        "sens_evcs_active_power": "sensor.evcc_loadpoint_1_charge_power",
         "set_ess_charge_power_limit": "number.evcc_battery_grid_charge_limit",
         "set_ess_discharge_power_limit": "number.evcc_battery_discharge_limit",
         "set_evcs_max_current": "number.evcc_loadpoint_1_max_current"
       },
       "sign": {
-        "grid_power_active": "ehal",
-        "ess_power": "ehal"
+        "sens_grid_power_active": "ehal",
+        "sens_ess_power": "ehal"
       }
     }
   }

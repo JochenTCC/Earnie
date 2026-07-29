@@ -4,23 +4,9 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any
 
-from integrations import loxone_client
-
 from .charging_context import charging_schedule_enabled
 
 SESSION_FULFILL_EPSILON_KWH = 0.05
-
-
-def _plug_in_rest_soc_percent(consumer: dict) -> float | None:
-    sched = consumer.get("charging_schedule") or {}
-    lox = sched.get("loxone") or {}
-    io_name = str(lox.get("soc_at_plug_in_name", "")).strip()
-    if not io_name:
-        return None
-    raw = loxone_client.fetch_loxone_generic_value(io_name)
-    if raw is None:
-        return None
-    return float(raw)
 
 
 def _parse_deadline(value: str | dt.datetime | None) -> dt.datetime | None:
@@ -121,19 +107,12 @@ def sync_charging_sessions(
         if cid in sessions:
             sessions[cid]["target_kwh"] = target
             sessions[cid]["deadline"] = dl_iso
-            if sessions[cid].get("plug_in_rest_soc_percent") is None:
-                plug_soc = _plug_in_rest_soc_percent(consumer)
-                if plug_soc is not None:
-                    sessions[cid]["plug_in_rest_soc_percent"] = round(plug_soc, 2)
         else:
-            plug_soc = _plug_in_rest_soc_percent(consumer)
             sessions[cid] = {
                 "target_kwh": target,
                 "delivered_kwh": 0.0,
                 "deadline": dl_iso,
             }
-            if plug_soc is not None:
-                sessions[cid]["plug_in_rest_soc_percent"] = round(plug_soc, 2)
     return fulfilled_from_purge
 
 

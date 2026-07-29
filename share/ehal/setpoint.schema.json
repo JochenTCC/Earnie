@@ -1,14 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/setpoint.schema.json",
-  "title": "EHAL Setpoint-API (M1)",
-  "description": "Limit/schedule setpoints only. ESS limits in W (non-negative magnitudes); EVCS max current in A. At least one setpoint field required.",
+  "title": "EHAL Setpoint-API (schema_version 2)",
+  "description": "Limit/mode setpoints. ESS limits in W (non-negative magnitudes); EVCS currents in A. At least one setpoint field required. Field names: docs/ui/ehal-com.md §C.",
   "type": "object",
   "required": ["schema_version", "ts", "adapter_id"],
   "properties": {
     "schema_version": {
       "type": "integer",
-      "const": 1
+      "const": 2
     },
     "ts": {
       "type": "string",
@@ -28,16 +28,33 @@
       "minimum": 0,
       "description": "Max ESS discharge power in W (magnitude)."
     },
+    "set_ess_mode": {
+      "type": ["string", "number"],
+      "description": "ESS mode / control command (e.g. Huawei control_cmd)."
+    },
     "set_evcs_max_current": {
       "type": "number",
       "minimum": 0,
       "description": "Max EV charge current in A."
+    },
+    "set_evcs_current": {
+      "type": "number",
+      "minimum": 0,
+      "description": "EV charge current setpoint in A."
+    },
+    "set_evcs_mode": {
+      "type": "string",
+      "enum": ["pv", "now"],
+      "description": "EV charge mode: pv (PV-follow) or now (immediate)."
     }
   },
   "anyOf": [
     {"required": ["set_ess_charge_power_limit"]},
     {"required": ["set_ess_discharge_power_limit"]},
-    {"required": ["set_evcs_max_current"]}
+    {"required": ["set_ess_mode"]},
+    {"required": ["set_evcs_max_current"]},
+    {"required": ["set_evcs_current"]},
+    {"required": ["set_evcs_mode"]}
   ],
   "additionalProperties": false
 }

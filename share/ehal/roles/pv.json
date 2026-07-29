@@ -1,14 +1,14 @@
 {
   "role_id": "pv",
   "label": "PV",
-  "description": "Photovoltaic production active power.",
+  "description": "Photovoltaic production active power (interval energy from ∫ power × Δt).",
   "status": "m1",
   "ehal_fields": [
     {
-      "field": "pv_production_active",
+      "field": "sens_pv_production_active",
       "required": true,
       "kind": "telemetry",
-      "notes": "W; production ≥ 0."
+      "notes": "W; production ≥ 0. Cumulative kWh counter is removed (2.4.j)."
     }
   ],
   "unit_sign_notes": "See docs/spec/ehal.md § Units and sign convention."

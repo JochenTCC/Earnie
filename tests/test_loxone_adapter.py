@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from ehal import EHAL_SCHEMA_VERSION
 from integrations.loxone_adapter import (
     LoxoneAdapter,
     LoxoneAdapterError,
@@ -40,6 +41,11 @@ def test_capabilities_ess_true_evcs_false():
     assert caps["supports_evcs_current"] is False
 
 
+def test_capabilities_evcs_true_with_current_marker():
+    caps = LoxoneAdapter(_cfg(evcs_current_name="EV_A")).capabilities()
+    assert caps["supports_evcs_current"] is True
+
+
 def test_capabilities_ess_false_without_markers():
     caps = LoxoneAdapter(
         _cfg(charge_power_name="", discharge_power_name="")
@@ -59,10 +65,12 @@ def test_read_telemetry_normalizes(fetch_mock):
 
     fetch_mock.side_effect = _fetch
     telemetry = LoxoneAdapter(_cfg()).read_telemetry()
-    assert telemetry["ess_soc"] == 55.0
-    assert telemetry["pv_production_active"] == 2000.0
-    assert telemetry["grid_power_active"] == 1000.0
-    assert telemetry["ess_power"] == pytest.approx(-500.0)
+    assert telemetry["sens_ess_soc"] == 55.0
+    assert telemetry["sens_pv_production_active"] == 2000.0
+    assert telemetry["sens_grid_power_active"] == 1000.0
+    assert telemetry["sens_ess_power"] == pytest.approx(-500.0)
+    # max(0, 2000 - 1000 - (-500)) = 1500
+    assert telemetry["sens_power_consumers"] == pytest.approx(1500.0)
 
 
 @patch("integrations.loxone_adapter.loxone_client.fetch_loxone_generic_value")
@@ -78,7 +86,7 @@ def test_write_setpoints_ess_kw(send_mock):
     adapter = LoxoneAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 1,
+            "schema_version": EHAL_SCHEMA_VERSION,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "loxone-home",
             "set_ess_charge_power_limit": 1500,
@@ -94,12 +102,41 @@ def test_write_setpoints_ess_kw(send_mock):
 
 
 @patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
+def test_write_setpoints_evcs_and_mode(send_mock):
+    send_mock.return_value = True
+    adapter = LoxoneAdapter(
+        _cfg(
+            control_cmd_name="Cmd",
+            evcs_current_name="EV_A",
+            pv_follow_name="PVF",
+            charge_immediate_name="NOW",
+        )
+    )
+    error = adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-07-28T12:00:00Z",
+            "adapter_id": "loxone-home",
+            "set_ess_mode": 2,
+            "set_evcs_current": 16,
+            "set_evcs_mode": "pv",
+        }
+    )
+    assert error is None
+    calls = {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
+    assert ("Cmd", 2.0) in calls
+    assert ("EV_A", 16.0) in calls
+    assert ("PVF", 1.0) in calls
+    assert ("NOW", 0.0) in calls
+
+
+@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
 def test_write_setpoints_degrades_on_failure(send_mock):
     send_mock.return_value = False
     adapter = LoxoneAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 1,
+            "schema_version": EHAL_SCHEMA_VERSION,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "loxone-home",
             "set_ess_charge_power_limit": 1000,

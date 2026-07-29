@@ -5,6 +5,10 @@ import logging
 from typing import Any
 
 from integrations import loxone_client
+from settings.ehal_marker_resolve import (
+    marker_sens_evcs_soc_act,
+    resolve_get_evcs_limit_soc,
+)
 from settings.flexible_consumers import charging_efficiency
 
 logger = logging.getLogger(__name__)
@@ -13,14 +17,9 @@ SOC_COMPLETE_TOLERANCE_PCT = 0.5
 SOC_COMPARE_WARN_DELTA_PCT = 5.0
 
 
-def _charging_loxone(consumer: dict) -> dict:
-    sched = consumer.get("charging_schedule") or {}
-    return sched.get("loxone") or {}
-
-
 def fetch_loxone_actual_soc_percent(consumer: dict) -> float | None:
-    """Liest optionalen Loxone-Ist-SOC (z. B. Ernie-SOC-Ist-EAuto), %."""
-    io_name = str(_charging_loxone(consumer).get("actual_soc_name", "")).strip()
+    """Liest sens_evcs_soc_act / Legacy actual_soc_name (%)."""
+    io_name = marker_sens_evcs_soc_act(consumer)
     if not io_name:
         return None
     raw = loxone_client.fetch_loxone_generic_value(io_name)
@@ -30,8 +29,8 @@ def fetch_loxone_actual_soc_percent(consumer: dict) -> float | None:
 
 
 def target_soc_percent(consumer: dict) -> float:
-    sched = consumer.get("charging_schedule") or {}
-    return float(sched.get("target_soc_percent", 100.0) or 100.0)
+    """Ladeziel-SOC: get_evcs_limit_soc Merker oder Profil target_soc_percent."""
+    return resolve_get_evcs_limit_soc(consumer)
 
 
 def loxone_reports_charge_complete(consumer: dict) -> bool:

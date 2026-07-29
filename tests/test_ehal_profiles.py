@@ -85,13 +85,14 @@ def test_plant_recipes_align_with_device_roles() -> None:
 def test_role_field_labels_cover_m1_mapping_fields() -> None:
     labels = role_field_labels()
     for field in (
-        "grid_power_active",
-        "pv_production_active",
-        "ess_soc",
-        "ess_power",
-        "evcs_active_power",
+        "sens_grid_power_active",
+        "sens_pv_production_active",
+        "sens_ess_soc",
+        "sens_ess_power",
+        "sens_evcs_active_power",
         "set_ess_charge_power_limit",
         "set_ess_discharge_power_limit",
+        "set_ess_mode",
         "set_evcs_max_current",
     ):
         assert field in labels
@@ -100,16 +101,16 @@ def test_role_field_labels_cover_m1_mapping_fields() -> None:
 
 def test_group_fields_by_role_order() -> None:
     fields = (
-        "ess_soc",
-        "grid_power_active",
+        "sens_ess_soc",
+        "sens_grid_power_active",
         "set_evcs_max_current",
         "target_soc_name",
-        "pv_production_active",
+        "sens_pv_production_active",
     )
     groups = group_fields_by_role(fields)
     assert [g[0] for g in groups] == ["grid", "pv", "ess", "evcs", "other"]
-    assert groups[0][1] == ["grid_power_active"]
-    assert field_role_id("ess_soc") == "ess"
+    assert groups[0][1] == ["sens_grid_power_active"]
+    assert field_role_id("sens_ess_soc") == "ess"
 
 
 def test_missing_role_raises() -> None:

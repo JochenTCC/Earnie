@@ -336,6 +336,42 @@ def test_legacy_export_monthly_float_soft_migrates():
     assert "arbeitspreis_kwh_cent" not in export
 
 
+def test_legacy_awattar_and_dynamic_epex_soft_migrate_to_spot_hourly():
+    from house_config.tariffs_store import normalize_tariffs_document
+
+    doc = normalize_tariffs_document(
+        {
+            "import_tariffs": [
+                {
+                    "id": "awattar_at",
+                    "label": "aWATTar — HOURLY",
+                    "type": "awattar",
+                    "land": "AT",
+                    "settlement_fee_cent_kwh": 1.5,
+                    "markup_percent": 3.0,
+                    "prices_include_vat": False,
+                    "vat_percent": 20.0,
+                }
+            ],
+            "export_tariffs": [
+                {
+                    "id": "dynamic_epex",
+                    "label": "aWATTar — SUNNY SPOT",
+                    "type": "dynamic_epex",
+                    "land": "AT",
+                    "feed_in_fee_factor": 0.19,
+                    "feed_in_fix_cent": 0.0,
+                }
+            ],
+        }
+    )
+    assert doc["import_tariffs"]["awattar_at"]["type"] == "spot_hourly"
+    assert doc["export_tariffs"]["dynamic_epex"]["type"] == "spot_hourly"
+    assert doc["export_tariffs"]["dynamic_epex"]["feed_in_fee_factor"] == pytest.approx(
+        0.19
+    )
+
+
 def test_awattar_tariff_spec_includes_surcharges():
     root = Path(__file__).resolve().parents[1]
     doc = load_tariffs_document(str(root / "share" / "config" / "tariffs.json"))
@@ -1424,9 +1460,10 @@ def test_assemble_filter_bindings_shape():
     assert bindings["filter_schedule"]["loxone"]["native_start_hour_name"] == "Start"
 
 
-def test_save_main_config_roundtrip_loxone_blocks_and_triggers(tmp_path, monkeypatch):
+def test_save_main_config_roundtrip_strips_triggers_keeps_log(tmp_path, monkeypatch):
     import json
 
+    from house_config.ehal_bindings import strip_migrated_config_keys
     from runtime_store import persist_paths
     from ui.house_config_io import load_main_config, save_main_config
 
@@ -1466,7 +1503,6 @@ def test_save_main_config_roundtrip_loxone_blocks_and_triggers(tmp_path, monkeyp
     monkeypatch.setattr("ui.house_config_io.config.reinit_config", _noop_reinit)
 
     data = load_main_config()
-    data["loxone_blocks"]["soc_name"] = "New_SOC"
     data["system"]["event_triggers"] = [
         {
             "id": "t1",
@@ -1476,7 +1512,8 @@ def test_save_main_config_roundtrip_loxone_blocks_and_triggers(tmp_path, monkeyp
             "label": "Test",
         }
     ]
-    save_main_config(data)
+    save_main_config(strip_migrated_config_keys(data))
     reloaded = json.loads(config_path.read_text(encoding="utf-8"))
-    assert reloaded["loxone_blocks"]["soc_name"] == "New_SOC"
-    assert reloaded["system"]["event_triggers"][0]["loxone_name"] == "Merker_A"
+    assert reloaded["system"]["event_triggers"] == []
+    assert "soc_name" not in reloaded["loxone_blocks"]
+    assert reloaded["loxone_blocks"]["log_filename"] == "Verbrauch.csv"

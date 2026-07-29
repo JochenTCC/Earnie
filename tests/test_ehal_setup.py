@@ -102,7 +102,7 @@ def test_build_ehal_write_records_marks_failed_fields():
     from integrations.ehal_live import build_ehal_write_records
 
     error = {
-        "schema_version": 1,
+        "schema_version": 2,
         "ts": "2026-07-28T12:00:00Z",
         "adapter_id": "ha-home",
         "failed_fields": ["set_ess_charge_power_limit"],

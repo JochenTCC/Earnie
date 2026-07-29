@@ -1,4 +1,4 @@
-"""Unit tests for EHAL M1 schemas and validate helpers."""
+"""Unit tests for EHAL schema_version 2 schemas and validate helpers."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from ehal import (
     validate_telemetry,
     validate_write_error,
 )
+from ehal.models import canonicalize_ha_entity_keys
 from ehal.validate import load_schema, schema_dir
 
 
@@ -23,6 +24,12 @@ def _envelope(**extra):
     }
     base.update(extra)
     return base
+
+
+def test_schema_version_is_2():
+    assert EHAL_SCHEMA_VERSION == 2
+    for kind in ("telemetry", "setpoint", "capabilities", "write_error"):
+        assert load_schema(kind)["properties"]["schema_version"]["const"] == 2
 
 
 def test_schema_files_exist():
@@ -41,31 +48,33 @@ def test_schema_files_exist():
 
 def test_valid_telemetry_with_optional_fields():
     doc = _envelope(
-        grid_power_active=1500.0,
-        pv_production_active=3200.0,
-        ess_soc=55.0,
-        ess_power=-800.0,
-        evcs_active_power=11000.0,
+        sens_grid_power_active=1500.0,
+        sens_pv_production_active=3200.0,
+        sens_ess_soc=55.0,
+        sens_ess_power=-800.0,
+        sens_evcs_active_power=11000.0,
+        sens_power_consumers=2500.0,
     )
     out = validate_telemetry(doc)
-    assert out["grid_power_active"] == 1500.0
-    assert out["ess_power"] == -800.0
+    assert out["sens_grid_power_active"] == 1500.0
+    assert out["sens_ess_power"] == -800.0
+    assert out["sens_power_consumers"] == 2500.0
 
 
 def test_telemetry_allows_grid_export_negative():
     doc = _envelope(
-        grid_power_active=-2200.0,
-        pv_production_active=4000.0,
-        ess_soc=80.0,
+        sens_grid_power_active=-2200.0,
+        sens_pv_production_active=4000.0,
+        sens_ess_soc=80.0,
     )
-    assert validate_telemetry(doc)["grid_power_active"] == -2200.0
+    assert validate_telemetry(doc)["sens_grid_power_active"] == -2200.0
 
 
 def test_telemetry_rejects_negative_pv():
     doc = _envelope(
-        grid_power_active=0.0,
-        pv_production_active=-1.0,
-        ess_soc=50.0,
+        sens_grid_power_active=0.0,
+        sens_pv_production_active=-1.0,
+        sens_ess_soc=50.0,
     )
     with pytest.raises(EhalValidationError):
         validate_telemetry(doc)
@@ -73,8 +82,8 @@ def test_telemetry_rejects_negative_pv():
 
 def test_telemetry_rejects_missing_ess_soc():
     doc = _envelope(
-        grid_power_active=0.0,
-        pv_production_active=0.0,
+        sens_grid_power_active=0.0,
+        sens_pv_production_active=0.0,
     )
     with pytest.raises(EhalValidationError):
         validate_telemetry(doc)
@@ -82,9 +91,9 @@ def test_telemetry_rejects_missing_ess_soc():
 
 def test_telemetry_rejects_soc_out_of_range():
     doc = _envelope(
-        grid_power_active=0.0,
-        pv_production_active=0.0,
-        ess_soc=101.0,
+        sens_grid_power_active=0.0,
+        sens_pv_production_active=0.0,
+        sens_ess_soc=101.0,
     )
     with pytest.raises(EhalValidationError):
         validate_telemetry(doc)
@@ -93,6 +102,16 @@ def test_telemetry_rejects_soc_out_of_range():
 def test_valid_setpoint_partial_ess_charge():
     doc = _envelope(set_ess_charge_power_limit=2000.0)
     assert validate_setpoint(doc)["set_ess_charge_power_limit"] == 2000.0
+
+
+def test_valid_setpoint_evcs_mode():
+    doc = _envelope(set_evcs_mode="pv")
+    assert validate_setpoint(doc)["set_evcs_mode"] == "pv"
+
+
+def test_valid_setpoint_ess_mode():
+    doc = _envelope(set_ess_mode="auto")
+    assert validate_setpoint(doc)["set_ess_mode"] == "auto"
 
 
 def test_setpoint_rejects_empty_limits():
@@ -143,3 +162,16 @@ def test_write_error_requires_failed_fields():
     )
     with pytest.raises(EhalValidationError):
         validate_write_error(doc)
+
+
+def test_canonicalize_ha_entity_keys():
+    mapped = canonicalize_ha_entity_keys(
+        {
+            "grid_power_active": "sensor.grid",
+            "sens_ess_soc": "sensor.soc",
+            "pv_production_active": "sensor.pv",
+        }
+    )
+    assert mapped["sens_grid_power_active"] == "sensor.grid"
+    assert mapped["sens_pv_production_active"] == "sensor.pv"
+    assert mapped["sens_ess_soc"] == "sensor.soc"

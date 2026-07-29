@@ -27,6 +27,8 @@ from optimizer.event_trigger import (
     wait_until_next_run,
 )
 import optimizer
+from settings.ehal_marker_resolve import marker_set_evcs_current
+from settings.ev_power import ampere_to_kw, ev_nominal_power_conversion
 from version import __version__
 
 logger = logging.getLogger("main")
@@ -101,7 +103,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         )
         pv_delta = 0.0
 
-    logger.info("PV-Zähler-Delta (letztes Intervall): %.3f kWh", pv_delta)
+    logger.info(
+        "PV-Energie-Delta (Integral letztes Intervall): %.3f kWh", pv_delta
+    )
 
     optimization_matrix = profile_manager.build_live_planning_matrix(
         market_data, planning_window
@@ -203,12 +207,15 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     )
     for consumer in live_consumers:
         lox = (consumer.get("charging_schedule") or {}).get("loxone") or {}
-        if lox.get("nominal_power_kw_name"):
+        if lox.get("sens_evcs_nominal_current") or lox.get("nominal_power_kw_name"):
+            marker = lox.get("sens_evcs_nominal_current") or lox.get(
+                "nominal_power_kw_name"
+            )
             logger.info(
                 "Verbraucher %s: Nennleistung live = %.2f kW (Loxone: %s)",
                 consumer["name"],
                 consumer["nominal_power_kw"],
-                lox["nominal_power_kw_name"],
+                marker,
             )
     mode, target_power, target_soc, consumer_powers, consumer_pv_follow, _, urgent_obs = optimizer.milp_optimizer(
         optimization_matrix,
@@ -312,11 +319,14 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     )
     sent_flex_kw: dict[str, float] = {}
     for consumer in live_consumers:
-        outputs = consumer.get("loxone_outputs") or {}
-        setpoint_name = outputs.get("power_setpoint_name", "")
+        setpoint_name = marker_set_evcs_current(consumer)
         if not setpoint_name:
             continue
-        sent_flex_kw[consumer["id"]] = float(loxone_sent.get(setpoint_name, 0.0) or 0.0)
+        amps = float(loxone_sent.get(setpoint_name, 0.0) or 0.0)
+        voltage_v, phases = ev_nominal_power_conversion(consumer)
+        sent_flex_kw[consumer["id"]] = round(
+            ampere_to_kw(amps, voltage_v=voltage_v, phases=phases), 3
+        )
 
     delivery_compliance = optimizer.register_consumer_delivery(
         consumer_powers,

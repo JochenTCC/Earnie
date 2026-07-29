@@ -13,11 +13,11 @@ _FIXTURE_TELEMETRY = {
     "schema_version": EHAL_SCHEMA_VERSION,
     "ts": "2026-07-28T12:00:00Z",
     "adapter_id": "contract",
-    "grid_power_active": 1000.0,
-    "pv_production_active": 2000.0,
-    "ess_soc": 50.0,
-    "ess_power": 500.0,
-    "evcs_active_power": 1200.0,
+    "sens_grid_power_active": 1000.0,
+    "sens_pv_production_active": 2000.0,
+    "sens_ess_soc": 50.0,
+    "sens_ess_power": 500.0,
+    "sens_evcs_active_power": 1200.0,
 }
 
 _FIXTURE_CAPABILITIES = {
@@ -41,10 +41,10 @@ def _config_side_effect(backend: str):
         "EHAL_HA_BASE_URL": "http://homeassistant:8123",
         "EHAL_HA_TOKEN": "token",
         "EHAL_HA_ENTITIES": {
-            "grid_power_active": "sensor.grid",
-            "pv_production_active": "sensor.pv",
-            "ess_soc": "sensor.soc",
-            "ess_power": "sensor.ess",
+            "sens_grid_power_active": "sensor.grid",
+            "sens_pv_production_active": "sensor.pv",
+            "sens_ess_soc": "sensor.soc",
+            "sens_ess_power": "sensor.ess",
             "set_ess_charge_power_limit": "number.charge",
             "set_ess_discharge_power_limit": "number.discharge",
             "set_evcs_max_current": "number.max_a",
@@ -157,6 +157,7 @@ def test_ess_setpoint_payload_identical_when_only_backend_switches():
         == ha_sp["set_ess_discharge_power_limit"]
     )
     assert openems_sp["set_ess_charge_power_limit"] == 1500.0
+    assert openems_sp["set_ess_mode"] == ha_sp["set_ess_mode"]
 
 
 def test_loxone_ess_write_uses_non_network_path():
@@ -216,3 +217,20 @@ def test_loxone_backend_is_not_network_backend(config_mock):
     assert ehal_live.is_ehal_network_backend() is False
     assert ehal_live.is_ha_backend() is False
     assert ehal_live.is_openems_backend() is False
+
+
+def test_derive_sens_power_consumers_w():
+    assert ehal_live.derive_sens_power_consumers_w(
+        {
+            "sens_pv_production_active": 2000.0,
+            "sens_grid_power_active": 1000.0,
+            "sens_ess_power": 500.0,
+        }
+    ) == pytest.approx(500.0)
+    assert ehal_live.derive_sens_power_consumers_w(
+        {
+            "sens_pv_production_active": 2000.0,
+            "sens_grid_power_active": 1000.0,
+            "sens_power_consumers": 123.0,
+        }
+    ) == pytest.approx(123.0)

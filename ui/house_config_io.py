@@ -50,8 +50,28 @@ def load_house_profiles() -> dict:
     return load_house_profiles_document(resolve_house_profiles_json_path())
 
 
+def house_doc_for_save(doc: dict) -> dict:
+    """Normalize in-memory house doc (profiles dict|list) for ``save_house_profiles_document``."""
+    profiles = doc.get("profiles")
+    if isinstance(profiles, dict):
+        profile_list = list(profiles.values())
+    elif isinstance(profiles, list):
+        profile_list = list(profiles)
+    else:
+        profile_list = []
+    out: dict = {"profiles": profile_list}
+    plant = doc.get("plant")
+    if isinstance(plant, dict) and plant:
+        out["plant"] = dict(plant)
+    if "earnie_data_model" in doc:
+        out["earnie_data_model"] = doc["earnie_data_model"]
+    return out
+
+
 def save_house_profiles(doc: dict) -> None:
-    save_house_profiles_document(resolve_house_profiles_json_path(), doc)
+    save_house_profiles_document(
+        resolve_house_profiles_json_path(), house_doc_for_save(doc)
+    )
 
 
 def tariffs_json_path() -> str:
@@ -104,6 +124,7 @@ def upsert_house_profile(profile: dict) -> None:
     from house_config.label_uniqueness import assert_unique_label, assert_unique_labels_in_list
 
     path = resolve_house_profiles_json_path()
+    raw: dict = {}
     if os.path.isfile(path):
         raw = read_json_document(path)
         profiles = list(raw.get("profiles", []))
@@ -115,7 +136,13 @@ def upsert_house_profile(profile: dict) -> None:
     assert_unique_labels_in_list(consumers)
     profiles = [p for p in profiles if p.get("id") != profile["id"]]
     profiles.append(profile)
-    save_house_profiles_document(path, {"profiles": profiles})
+    payload: dict = {"profiles": profiles}
+    plant = raw.get("plant")
+    if isinstance(plant, dict) and plant:
+        payload["plant"] = dict(plant)
+    if "earnie_data_model" in raw:
+        payload["earnie_data_model"] = raw["earnie_data_model"]
+    save_house_profiles_document(path, payload)
 
 
 def _stable_upload_csv_name(

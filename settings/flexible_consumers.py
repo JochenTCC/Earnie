@@ -107,8 +107,9 @@ def target_kwh_from_rest_soc(
     rest_soc_percent: float | None,
     *,
     capacity_kwh: float | None,
+    limit_soc_percent: float | None = None,
 ) -> float | None:
-    """Berechnet Ladeziel (kWh) aus Rest-SOC (%), Kapazität und Lade-Wirkungsgrad."""
+    """Ladeziel (kWh) aus Ist-/Rest-SOC (%), Limit-SOC, Kapazität und Wirkungsgrad."""
     if rest_soc_percent is None:
         return None
     if capacity_kwh is None:
@@ -117,7 +118,10 @@ def target_kwh_from_rest_soc(
     if capacity <= 0:
         return None
     sched = consumer.get("charging_schedule") or {}
-    target_soc = float(sched.get("target_soc_percent", 100.0) or 100.0)
+    if limit_soc_percent is None:
+        target_soc = float(sched.get("target_soc_percent", 100.0) or 100.0)
+    else:
+        target_soc = float(limit_soc_percent)
     battery_delta_kwh = (target_soc - float(rest_soc_percent)) / 100.0 * capacity
     eff = charging_efficiency(sched)
     return max(0.0, battery_delta_kwh / eff)

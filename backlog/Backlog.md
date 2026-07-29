@@ -12,7 +12,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Check possibilities to get quarterly-hour EPEX prices and change optimization to 15 min slots
 
 
+
 ## Feature Backlog
+
 
 
 ### Version 2.4 — EHAL foundation, DACH docking & Loxone on EHAL
@@ -21,19 +23,24 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Goal:** Freeze **EHAL**, prove Loxone-free southbounds (OpenEMS + HA/evcc), move production Loxone onto EHAL, add MCP one-click mapping, and prove config-only switch across all three. Earnie Core remains the sole 48h optimizer; hardware I/O only via EHAL (telemetry + setpoints + capability flags).  
 **Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume; **Loxone** = production path via EHAL (`2.4.e`–`2.4.h`).  
 **Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) done — thin Docker wrapper in `packaging/loxberry/` (not a native host install).  
-**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
+**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-- [ ] **2.4.j — EFM auto-sync (interpretation C)** *(follow-up from 2.4.f / §3.1)*
-  - Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths after structure compare-all (`2.4.f`) yields a chosen source
+Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://connect.loxonecloud.com/504F94A1137C)
+
+- [ ] **2.4.l — EFM auto-sync (interpretation C)** *(follow-up from 2.4.f / §3.1)*
+  - Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths
   - Manual blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
+  - Loxone MCP interfaces recognizes all "Zähler Bausteine" from loxone config - so chances are good to identify consumers. To be clarified if consumer's actual power can be mapped to Earnie consumers. CSV must be exported manually by user, but "mapping" to these files could be done by same assignment from Loxone's "Zähler Bausteine" and Earnie consumers. 
   - EFM has **no** multi-column Statistik export of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23)
+
 - [ ] **2.4.0 — Release**
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
   - “All three southbounds” release: OpenEMS ↔ HA+evcc ↔ Loxone via config switch
   - LoxBerry Scope A MVP (`2.4.d`) is implemented; ship plugin ZIP with this release when ready (hardware install acceptance optional)
-  - **Note:** EFM auto-sync (`2.4.j`) is not a hard gate for `2.4.0`
+  - **Note:** EFM auto-sync (`2.4.l`) is not a hard gate for `2.4.0`
+
 
 
 ### Version 2.5 — Investigate full migration to 15‑min slots (former B)
@@ -55,12 +62,13 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - If go: carve implementation phases into this MINOR (or successor); if no-go: archive rationale and close **2.3.2** accordingly
 
 
+
 ### Version 2.+1 — Introducing nested data models
 
 - [ ] **Banner der Wahrheit — Layer C enforcement** *(follow-up from 2.4.i spike)*
   - Cosign/Sigstore in release CI + startup verifier + production signing keys
   - Watermark vs refuse-to-start decision; offline public-key path
-  - Spec: [`docs/spec/hardware-registry-layer-c.md`](../docs/spec/hardware-registry-layer-c.md)
+  - Spec: `[docs/spec/hardware-registry-layer-c.md](../docs/spec/hardware-registry-layer-c.md)`
 - [ ] For manual consumers take also PV into account - not just tariffs (check)
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
   - Move Loxone markers to data model - remove flat definition in config.json where possible
@@ -71,21 +79,18 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Use Loxone power markers also for Sankey-Diagram for further differentation of defined consumers
 
 
+
 ### Version 2.+1 — Epics **Adaptation** & **Thermals** (architecture first)
 
-- [ ] **Adaptation P1** — Generic adaptation model (skeleton)
+- [ ] **Adaptation P3** — Adaptation algorithm (PV pilot)
   - Common structure for parameter adaptation of various forecast models:
     - Reference value (target for adaptation)
     - Variable parameters (with bounds)
     - Time horizon (e.g. 24 h for PV/freezer, 1 year for swim spa/house)
     - Start parameters from `config.json`; adaptation history **separate**; correct live parameters only when needed (rhythm oriented to horizon)
-  - Target models (connect later): PV yield, thermal models, solar collector
-  - **Precursor (done):** *Unified Open-Meteo solar* — shared archive bundle ([Backlog-Erledigt.md](Backlog-Erledigt.md))
-- [ ] **Adaptation P2** — PV adaptation (new approach) — first pilot on Adaptation P1
-  - Sidebar PV tuning removed (UI S-2 P1 + 2026-07-15 code path) → [Backlog-Erledigt.md](Backlog-Erledigt.md) § PV tuning removal; see `runtime/pv_accuracy_log.csv`
-  - Replace or integrate old `pv_tuner` path into Adaptation P1 (`pv_tuner.py` counter delta only)
-- [ ] **Adaptation P3** — Adaptation algorithm (PV pilot)
-  - Concrete update loop on Adaptation P2; thermal models remain **linear** (thermal adaptation only in Thermals P3)
+
+- Concrete update loop on Adaptation P2; thermal models remain **linear** (thermal adaptation only in Thermals P3)
+
 - [ ] **Thermals P2** — Coupled single-node models
   - House ↔ heat storage ↔ solar system
   - House parameters from energy certificate (`EXAMPLE:/local/reference/energy-certificate.pdf` — not in repo)
@@ -95,9 +100,11 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Adaptation P4** — UI visualization adaptation algos (after Adaptation P3 and Thermals P3)
 
 
+
 ### Version 2.+1
 
 - [ ] Generic EV model — for better reusability
+
 
 
 ### Version 2.+1
@@ -105,5 +112,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Better consumption optimization with temperature-control devices
   - [ ] Heat pump (Prio3) — only indirect control via setpoint adjustment via Loxone setpoint (after **Thermals P2**); distinct from **Thermals P1a** (direct enable/PWM flex from daily HDD budget)
 
+
+
 ### Version 3.0
+
 - [ ] Make complete Earnie available as cloud service (Online optimization and Internet communication with local smarthome / isolated devices) - similar to "Smart-Energy" (Steiermark)

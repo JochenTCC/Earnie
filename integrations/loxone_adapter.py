@@ -1,4 +1,4 @@
-"""Loxone Miniserver markers → EHAL documents (M1 plant surface)."""
+"""Loxone Miniserver markers → EHAL documents (schema_version 2 / §C)."""
 from __future__ import annotations
 
 import logging
@@ -25,7 +25,10 @@ logger = logging.getLogger(__name__)
 SETPOINT_FIELDS = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
+    "set_ess_mode",
     "set_evcs_max_current",
+    "set_evcs_current",
+    "set_evcs_mode",
 )
 
 
@@ -38,6 +41,12 @@ class LoxoneConfig:
     grid_power_name: str
     charge_power_name: str = ""
     discharge_power_name: str = ""
+    control_cmd_name: str = ""
+    consumers_power_name: str = ""
+    evcs_current_name: str = ""
+    evcs_max_current_name: str = ""
+    pv_follow_name: str = ""
+    charge_immediate_name: str = ""
     timeout_sec: float = 10.0
 
 
@@ -50,7 +59,7 @@ def _utc_ts() -> str:
 
 
 def loxone_battery_kw_to_ehal_w(battery_kw: float) -> float:
-    """Loxone Live: +charge → EHAL ess_power: +discharge."""
+    """Loxone Live: +charge → EHAL sens_ess_power: +discharge."""
     return -float(battery_kw) * 1000.0
 
 
@@ -60,12 +69,14 @@ def ehal_limit_w_to_loxone_kw(limit_w: float) -> float:
 
 
 class LoxoneAdapter:
-    """Marker HTTP via loxone_client ↔ EHAL (no new EHAL flex/extras fields)."""
+    """Marker HTTP via loxone_client ↔ EHAL (§C wire names)."""
 
     def __init__(self, cfg: LoxoneConfig) -> None:
         self.cfg = cfg
         self._supports_ess_write = bool(cfg.charge_power_name or cfg.discharge_power_name)
-        self._supports_evcs_current = False
+        self._supports_evcs_current = bool(
+            cfg.evcs_current_name or cfg.evcs_max_current_name
+        )
         self._last_write_error: EhalWriteError | None = None
 
     def last_write_error(self) -> EhalWriteError | None:
@@ -82,19 +93,25 @@ class LoxoneAdapter:
         return validate_capabilities(doc)
 
     def read_telemetry(self) -> EhalTelemetry:
-        soc = self._require_marker(self.cfg.soc_name, "ess_soc")
-        pv_kw = self._require_marker(self.cfg.pv_power_name, "pv_production_active")
-        grid_kw = self._require_marker(self.cfg.grid_power_name, "grid_power_active")
-        battery_kw = self._require_marker(self.cfg.battery_power_name, "ess_power")
+        soc = self._require_marker(self.cfg.soc_name, "sens_ess_soc")
+        pv_kw = self._require_marker(self.cfg.pv_power_name, "sens_pv_production_active")
+        grid_kw = self._require_marker(self.cfg.grid_power_name, "sens_grid_power_active")
+        battery_kw = self._require_marker(
+            self.cfg.battery_power_name, "sens_ess_power"
+        )
 
+        grid_w = float(grid_kw) * 1000.0
+        pv_w = max(0.0, float(pv_kw)) * 1000.0
+        ess_w = loxone_battery_kw_to_ehal_w(battery_kw)
         doc: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": _utc_ts(),
             "adapter_id": self.cfg.adapter_id,
-            "grid_power_active": float(grid_kw) * 1000.0,
-            "pv_production_active": max(0.0, float(pv_kw)) * 1000.0,
-            "ess_soc": float(soc),
-            "ess_power": loxone_battery_kw_to_ehal_w(battery_kw),
+            "sens_grid_power_active": grid_w,
+            "sens_pv_production_active": pv_w,
+            "sens_ess_soc": float(soc),
+            "sens_ess_power": ess_w,
+            "sens_power_consumers": self._read_or_derive_consumers(pv_w, grid_w, ess_w),
         }
         return validate_telemetry(doc)
 
@@ -103,7 +120,7 @@ class LoxoneAdapter:
         setpoint: EhalSetpoint | dict[str, Any],
         **_kwargs: Any,
     ) -> EhalWriteError | None:
-        """Write ESS limits to Loxone markers; EVCS Ampere remains pre-EHAL (flex path)."""
+        """Write ESS/EV setpoints to Loxone markers (transitional EV bindings)."""
         raw = dict(setpoint)
         try:
             doc = validate_setpoint(raw)
@@ -115,33 +132,24 @@ class LoxoneAdapter:
                 hub_status=None,
                 retryable=False,
                 flip_ess=False,
+                flip_evcs=False,
             )
 
         failed: list[str] = []
         messages: list[str] = []
         flip_ess = False
+        flip_evcs = False
 
-        if "set_ess_charge_power_limit" in doc and self._supports_ess_write:
-            ok, msg = self._try_ess_marker_write(
-                self.cfg.charge_power_name,
-                ehal_limit_w_to_loxone_kw(doc["set_ess_charge_power_limit"]),
+        flip_ess = self._write_ess_limits(doc, failed, messages) or flip_ess
+        if "set_ess_mode" in doc:
+            ok, msg = self._try_marker_write(
+                self.cfg.control_cmd_name, float(doc["set_ess_mode"])
             )
             if not ok:
-                failed.append("set_ess_charge_power_limit")
+                failed.append("set_ess_mode")
                 messages.append(msg)
-                flip_ess = True
 
-        if "set_ess_discharge_power_limit" in doc and self._supports_ess_write:
-            ok, msg = self._try_ess_marker_write(
-                self.cfg.discharge_power_name,
-                ehal_limit_w_to_loxone_kw(doc["set_ess_discharge_power_limit"]),
-            )
-            if not ok:
-                failed.append("set_ess_discharge_power_limit")
-                messages.append(msg)
-                flip_ess = True
-
-        # set_evcs_max_current: skipped (supports_evcs_current=false; EV on flex path)
+        flip_evcs = self._write_evcs_setpoints(doc, failed, messages) or flip_evcs
 
         if not failed:
             self._last_write_error = None
@@ -153,7 +161,87 @@ class LoxoneAdapter:
             hub_status=None,
             retryable=True,
             flip_ess=flip_ess,
+            flip_evcs=flip_evcs,
         )
+
+    def _write_ess_limits(
+        self, doc: dict[str, Any], failed: list[str], messages: list[str]
+    ) -> bool:
+        flip = False
+        if "set_ess_charge_power_limit" in doc and self._supports_ess_write:
+            ok, msg = self._try_marker_write(
+                self.cfg.charge_power_name,
+                ehal_limit_w_to_loxone_kw(doc["set_ess_charge_power_limit"]),
+            )
+            if not ok:
+                failed.append("set_ess_charge_power_limit")
+                messages.append(msg)
+                flip = True
+        if "set_ess_discharge_power_limit" in doc and self._supports_ess_write:
+            ok, msg = self._try_marker_write(
+                self.cfg.discharge_power_name,
+                ehal_limit_w_to_loxone_kw(doc["set_ess_discharge_power_limit"]),
+            )
+            if not ok:
+                failed.append("set_ess_discharge_power_limit")
+                messages.append(msg)
+                flip = True
+        return flip
+
+    def _write_evcs_setpoints(
+        self, doc: dict[str, Any], failed: list[str], messages: list[str]
+    ) -> bool:
+        flip = False
+        if not self._supports_evcs_current:
+            return flip
+        for field, marker in (
+            ("set_evcs_max_current", self.cfg.evcs_max_current_name or self.cfg.evcs_current_name),
+            ("set_evcs_current", self.cfg.evcs_current_name or self.cfg.evcs_max_current_name),
+        ):
+            if field not in doc:
+                continue
+            ok, msg = self._try_marker_write(marker, float(doc[field]))
+            if not ok:
+                failed.append(field)
+                messages.append(msg)
+                flip = True
+        if "set_evcs_mode" in doc:
+            ok, msg = self._try_evcs_mode_write(str(doc["set_evcs_mode"]))
+            if not ok:
+                failed.append("set_evcs_mode")
+                messages.append(msg)
+                flip = True
+        return flip
+
+    def _try_evcs_mode_write(self, mode: str) -> tuple[bool, str]:
+        """Map set_evcs_mode pv|now → pv_follow / charge_immediate until 2.4.k."""
+        mode_l = str(mode or "").strip().lower()
+        if mode_l not in ("pv", "now"):
+            return False, f"Unsupported set_evcs_mode: {mode!r}"
+        pv_val = 1.0 if mode_l == "pv" else 0.0
+        now_val = 1.0 if mode_l == "now" else 0.0
+        wrote = False
+        if self.cfg.pv_follow_name:
+            ok, msg = self._try_marker_write(self.cfg.pv_follow_name, pv_val)
+            if not ok:
+                return False, msg
+            wrote = True
+        if self.cfg.charge_immediate_name:
+            ok, msg = self._try_marker_write(self.cfg.charge_immediate_name, now_val)
+            if not ok:
+                return False, msg
+            wrote = True
+        if not wrote:
+            return False, "No pv_follow/charge_immediate markers for set_evcs_mode"
+        return True, ""
+
+    def _read_or_derive_consumers(self, pv_w: float, grid_w: float, ess_w: float) -> float:
+        marker = str(self.cfg.consumers_power_name or "").strip()
+        if marker:
+            value = loxone_client.fetch_loxone_generic_value(marker)
+            if value is not None:
+                return max(0.0, float(value) * 1000.0)
+        return max(0.0, pv_w - grid_w - ess_w)
 
     def _require_marker(self, name: str, field: str) -> float:
         marker = str(name or "").strip()
@@ -164,15 +252,15 @@ class LoxoneAdapter:
             raise LoxoneAdapterError(f"Loxone marker read failed for {field} ({marker})")
         return float(value)
 
-    def _try_ess_marker_write(self, marker_name: str, value_kw: float) -> tuple[bool, str]:
+    def _try_marker_write(self, marker_name: str, value: float) -> tuple[bool, str]:
         marker = str(marker_name or "").strip()
         if not marker:
-            return False, "Loxone ESS write marker name is empty"
+            return False, "Loxone write marker name is empty"
         try:
-            ok = loxone_client.send_loxone_value(marker, float(value_kw))
+            ok = loxone_client.send_loxone_value(marker, float(value))
         except (OSError, ValueError, TypeError) as exc:
             logger.warning(
-                "Loxone ESS write failed adapter_id=%s marker=%s: %s",
+                "Loxone write failed adapter_id=%s marker=%s: %s",
                 self.cfg.adapter_id,
                 marker,
                 exc,
@@ -181,7 +269,7 @@ class LoxoneAdapter:
         if not ok:
             msg = f"Loxone POST failed for marker {marker}"
             logger.warning(
-                "Loxone ESS write failed adapter_id=%s marker=%s",
+                "Loxone write failed adapter_id=%s marker=%s",
                 self.cfg.adapter_id,
                 marker,
             )
@@ -196,9 +284,12 @@ class LoxoneAdapter:
         hub_status: str | None,
         retryable: bool,
         flip_ess: bool,
+        flip_evcs: bool,
     ) -> EhalWriteError:
         if flip_ess:
             self._supports_ess_write = False
+        if flip_evcs:
+            self._supports_evcs_current = False
         payload: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": _utc_ts(),

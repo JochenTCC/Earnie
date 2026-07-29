@@ -6,6 +6,7 @@ from typing import Any
 import streamlit as st
 
 from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
+from ehal.models import canonicalize_ha_entity_keys
 from integrations.ehal_live import reset_adapter_cache
 from integrations.ha_adapter import (
     SETPOINT_FIELDS,
@@ -23,21 +24,27 @@ _SESSION_SCAN_ERROR = "ehal_ha_scan_error"
 
 _FIELD_LABELS: dict[str, str] = role_field_labels()
 
-_SIGN_FIELDS = ("grid_power_active", "ess_power")
+_SIGN_FIELDS = ("sens_grid_power_active", "sens_ess_power")
 
 
 def _ha_block(data: dict) -> dict[str, Any]:
     ehal = data.get("ehal") if isinstance(data.get("ehal"), dict) else {}
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
+    raw_entities = (
+        dict(ha.get("entities") or {}) if isinstance(ha.get("entities"), dict) else {}
+    )
+    raw_sign = dict(ha.get("sign") or {}) if isinstance(ha.get("sign"), dict) else {}
     return {
         "backend": str(ehal.get("backend") or ""),
         "adapter_id": str(ehal.get("adapter_id") or "ha-home"),
         "base_url": str(ha.get("base_url") or "").strip(),
         "token": str(ha.get("token") or "").strip(),
-        "entities": dict(ha.get("entities") or {})
-        if isinstance(ha.get("entities"), dict)
-        else {},
-        "sign": dict(ha.get("sign") or {}) if isinstance(ha.get("sign"), dict) else {},
+        "entities": canonicalize_ha_entity_keys(
+            {str(k): str(v) for k, v in raw_entities.items()}
+        ),
+        "sign": canonicalize_ha_entity_keys(
+            {str(k): str(v) for k, v in raw_sign.items()}
+        ),
     }
 
 

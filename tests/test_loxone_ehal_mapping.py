@@ -15,16 +15,31 @@ from integrations.loxone_ehal_mapping import (
 def test_ehal_mapping_to_loxone_blocks():
     blocks = ehal_mapping_to_loxone_blocks(
         {
-            "ess_soc": "Batterie_SoC",
-            "pv_production_active": "PV_Leistung_kW",
-            "evcs_active_power": "ignored-no-block-key",
+            "sens_ess_soc": "Batterie_SoC",
+            "sens_pv_production_active": "PV_Leistung_kW",
+            "sens_evcs_active_power": "ignored-no-block-key",
+            "set_ess_mode": "Steuerbefehl",
         },
         extras={"target_soc_name": "Ziel_SOC", "control_cmd_name": ""},
     )
     assert blocks == {
         "soc_name": "Batterie_SoC",
         "pv_power_name": "PV_Leistung_kW",
+        "control_cmd_name": "Steuerbefehl",
         "target_soc_name": "Ziel_SOC",
+    }
+
+
+def test_ehal_mapping_dual_read_legacy_keys():
+    blocks = ehal_mapping_to_loxone_blocks(
+        {
+            "ess_soc": "Batterie_SoC",
+            "grid_power_active": "Netz",
+        }
+    )
+    assert blocks == {
+        "soc_name": "Batterie_SoC",
+        "grid_power_name": "Netz",
     }
 
 
@@ -47,10 +62,10 @@ def test_heuristic_propose_energy_names():
         "Wohnzimmer Licht",
     ]
     proposals = heuristic_propose(names)
-    assert proposals["pv_production_active"]["marker_name"] == "PV_Leistung_kW"
-    assert proposals["grid_power_active"]["marker_name"] == "Netz_Leistung"
-    assert proposals["ess_soc"]["marker_name"] == "Batterie_SoC"
-    assert 0.35 <= proposals["ess_soc"]["confidence"] <= 0.75
+    assert proposals["sens_pv_production_active"]["marker_name"] == "PV_Leistung_kW"
+    assert proposals["sens_grid_power_active"]["marker_name"] == "Netz_Leistung"
+    assert proposals["sens_ess_soc"]["marker_name"] == "Batterie_SoC"
+    assert 0.35 <= proposals["sens_ess_soc"]["confidence"] <= 0.75
 
 
 def test_parse_ollama_proposals_filters_unknown():
@@ -58,12 +73,12 @@ def test_parse_ollama_proposals_filters_unknown():
         {
             "mappings": [
                 {
-                    "field": "pv_production_active",
+                    "field": "sens_pv_production_active",
                     "marker_name": "PV_Leistung_kW",
                     "confidence": 0.9,
                 },
                 {
-                    "field": "ess_soc",
+                    "field": "sens_ess_soc",
                     "marker_name": "not-in-list",
                     "confidence": 0.9,
                 },
@@ -73,10 +88,10 @@ def test_parse_ollama_proposals_filters_unknown():
     out = parse_ollama_proposals(
         content,
         allowed_names={"PV_Leistung_kW"},
-        fields=("pv_production_active", "ess_soc"),
+        fields=("sens_pv_production_active", "sens_ess_soc"),
     )
-    assert list(out) == ["pv_production_active"]
-    assert out["pv_production_active"]["source"] == "ollama"
+    assert list(out) == ["sens_pv_production_active"]
+    assert out["sens_pv_production_active"]["source"] == "ollama"
 
 
 @patch("integrations.loxone_ehal_mapping.requests.post")
@@ -89,7 +104,7 @@ def test_propose_with_ollama_ok(post_mock):
                     {
                         "mappings": [
                             {
-                                "field": "grid_power_active",
+                                "field": "sens_grid_power_active",
                                 "marker_name": "Netz_Leistung",
                                 "confidence": 0.8,
                             }
@@ -101,7 +116,7 @@ def test_propose_with_ollama_ok(post_mock):
         raise_for_status=lambda: None,
     )
     out = propose_with_ollama(["Netz_Leistung", "Other"])
-    assert out["grid_power_active"]["marker_name"] == "Netz_Leistung"
+    assert out["sens_grid_power_active"]["marker_name"] == "Netz_Leistung"
 
 
 @patch("integrations.loxone_ehal_mapping.requests.post")

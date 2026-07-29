@@ -70,11 +70,12 @@ def test_read_telemetry_normalizes(get_mock):
     get_mock.side_effect = _get
     adapter = OpenemsAdapter(_cfg())
     telemetry = adapter.read_telemetry()
-    assert telemetry["grid_power_active"] == 100.0
-    assert telemetry["pv_production_active"] == 500.0
-    assert telemetry["ess_soc"] == 55.0
-    assert telemetry["ess_power"] == 200.0
-    assert telemetry["evcs_active_power"] == 1200.0
+    assert telemetry["sens_grid_power_active"] == 100.0
+    assert telemetry["sens_pv_production_active"] == 500.0
+    assert telemetry["sens_ess_soc"] == 55.0
+    assert telemetry["sens_ess_power"] == 200.0
+    assert telemetry["sens_evcs_active_power"] == 1200.0
+    assert telemetry["sens_power_consumers"] == pytest.approx(200.0)
 
 
 @patch("integrations.openems_adapter.requests.post")
@@ -83,7 +84,7 @@ def test_write_setpoints_ess_and_evcs(post_mock):
     adapter = OpenemsAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "ts": "2026-07-27T12:00:00Z",
             "adapter_id": "openems-lab",
             "set_ess_charge_power_limit": 1000,
@@ -109,7 +110,7 @@ def test_write_lock_degrades_ess(post_mock):
     adapter = OpenemsAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "ts": "2026-07-27T12:00:00Z",
             "adapter_id": "openems-lab",
             "set_ess_charge_power_limit": 500,

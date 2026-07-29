@@ -37,10 +37,10 @@ def test_read_live_power_kw_ha_backend(config_mock, adapter_factory):
         "schema_version": EHAL_SCHEMA_VERSION,
         "ts": "2026-07-28T12:00:00Z",
         "adapter_id": "ha-home",
-        "grid_power_active": 1000.0,
-        "pv_production_active": 2000.0,
-        "ess_soc": 50.0,
-        "ess_power": 500.0,
+        "sens_grid_power_active": 1000.0,
+        "sens_pv_production_active": 2000.0,
+        "sens_ess_soc": 50.0,
+        "sens_ess_power": 500.0,
     }
     adapter_factory.return_value = adapter
     power = ehal_live.read_live_power_kw()
@@ -61,10 +61,10 @@ def test_read_live_power_kw_loxone_backend(config_mock, adapter_factory):
         "schema_version": EHAL_SCHEMA_VERSION,
         "ts": "2026-07-28T12:00:00Z",
         "adapter_id": "loxone-home",
-        "grid_power_active": 1000.0,
-        "pv_production_active": 2000.0,
-        "ess_soc": 50.0,
-        "ess_power": 500.0,
+        "sens_grid_power_active": 1000.0,
+        "sens_pv_production_active": 2000.0,
+        "sens_ess_soc": 50.0,
+        "sens_ess_power": 500.0,
     }
     adapter_factory.return_value = adapter
     power = ehal_live.read_live_power_kw()
@@ -87,10 +87,10 @@ def test_read_live_power_kw_sign(config_mock, adapter_factory):
         "schema_version": EHAL_SCHEMA_VERSION,
         "ts": "2026-07-27T12:00:00Z",
         "adapter_id": "openems-lab",
-        "grid_power_active": 1000.0,
-        "pv_production_active": 2000.0,
-        "ess_soc": 50.0,
-        "ess_power": 500.0,
+        "sens_grid_power_active": 1000.0,
+        "sens_pv_production_active": 2000.0,
+        "sens_ess_soc": 50.0,
+        "sens_ess_power": 500.0,
     }
     adapter_factory.return_value = adapter
     power = ehal_live.read_live_power_kw()
@@ -113,7 +113,7 @@ def test_write_ess_limits_persists_error(config_mock, adapter_factory, persist_m
     adapter = MagicMock()
     adapter.cfg.adapter_id = "openems-lab"
     adapter.write_setpoints.return_value = {
-        "schema_version": 1,
+        "schema_version": EHAL_SCHEMA_VERSION,
         "ts": "2026-07-27T12:00:00Z",
         "adapter_id": "openems-lab",
         "failed_fields": ["set_ess_charge_power_limit"],
@@ -130,3 +130,4 @@ def test_write_ess_limits_persists_error(config_mock, adapter_factory, persist_m
     args = adapter.write_setpoints.call_args[0][0]
     assert args["set_ess_charge_power_limit"] == 1500.0
     assert args["set_ess_discharge_power_limit"] == 0.0
+    assert "set_ess_mode" in args

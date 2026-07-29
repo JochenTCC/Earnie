@@ -8,25 +8,46 @@ from typing import Any
 
 import requests
 
+from ehal.models import TELEMETRY_FIELD_ALIASES
+
 logger = logging.getLogger(__name__)
 
-TELEMETRY_REQUIRED = ("grid_power_active", "pv_production_active", "ess_soc")
-TELEMETRY_OPTIONAL = ("ess_power", "evcs_active_power")
+TELEMETRY_REQUIRED = (
+    "sens_grid_power_active",
+    "sens_pv_production_active",
+    "sens_ess_soc",
+)
+TELEMETRY_OPTIONAL = (
+    "sens_ess_power",
+    "sens_evcs_active_power",
+    "sens_power_consumers",
+)
 SETPOINT_FIELDS = (
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
+    "set_ess_mode",
     "set_evcs_max_current",
+    "set_evcs_current",
+    "set_evcs_mode",
 )
 EHAL_MAP_FIELDS = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + SETPOINT_FIELDS
-EXTRAS_FIELDS = ("target_soc_name", "control_cmd_name")
+EXTRAS_FIELDS = ("target_soc_name",)
 
+# Canonical §C → loxone_blocks role keys (+ legacy unprefixed dual-read aliases).
 EHAL_TO_BLOCKS: dict[str, str] = {
+    "sens_ess_soc": "soc_name",
+    "sens_pv_production_active": "pv_power_name",
+    "sens_ess_power": "battery_power_name",
+    "sens_grid_power_active": "grid_power_name",
+    "sens_power_consumers": "consumers_power_name",
+    "set_ess_charge_power_limit": "target_charge_power_name",
+    "set_ess_discharge_power_limit": "target_discharge_power_name",
+    "set_ess_mode": "control_cmd_name",
+    # Legacy M1 unprefixed keys (dual-read during 2.4.j).
     "ess_soc": "soc_name",
     "pv_production_active": "pv_power_name",
     "ess_power": "battery_power_name",
     "grid_power_active": "grid_power_name",
-    "set_ess_charge_power_limit": "target_charge_power_name",
-    "set_ess_discharge_power_limit": "target_discharge_power_name",
 }
 
 # Prefer ehal.profiles (2.4.g); keep local fallback if import fails in odd envs.
@@ -36,29 +57,44 @@ try:
     FIELD_LABELS: dict[str, str] = _role_field_labels()
 except ImportError:  # pragma: no cover
     FIELD_LABELS = {
-        "grid_power_active": "Netzleistung (W, +Bezug)",
-        "pv_production_active": "PV-Produktion (W)",
-        "ess_soc": "Batterie-SoC (%)",
-        "ess_power": "Batterieleistung (W, +Entladung)",
-        "evcs_active_power": "Wallbox-Leistung (W)",
+        "sens_grid_power_active": "Netzleistung (W, +Bezug)",
+        "sens_pv_production_active": "PV-Produktion (W)",
+        "sens_ess_soc": "Batterie-SoC (%)",
+        "sens_ess_power": "Batterieleistung (W, +Entladung)",
+        "sens_evcs_active_power": "Wallbox-Leistung (W)",
+        "sens_power_consumers": "Hauslast (W)",
         "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
         "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
+        "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl",
         "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
+        "set_evcs_current": "Setpoint Wallbox-Strom (A)",
+        "set_evcs_mode": "Setpoint Wallbox-Modus (pv|now)",
         "target_soc_name": "Loxone-Extras: Ziel-SOC",
-        "control_cmd_name": "Loxone-Extras: Steuerbefehl",
     }
 
 _HINTS: dict[str, tuple[str, ...]] = {
-    "grid_power_active": ("netz", "grid", "bezug", "energieversorger"),
-    "pv_production_active": ("pv", "produktion", "solar", "erzeug"),
-    "ess_soc": ("soc", "ladezustand", "batterie soc", "akku soc"),
-    "ess_power": ("batterie", "speicher", "akku", "ess"),
-    "evcs_active_power": ("wallbox", "evcs", "e-auto", "eauto", "ladung leistung"),
+    "sens_grid_power_active": ("netz", "grid", "bezug", "energieversorger"),
+    "sens_pv_production_active": ("pv", "produktion", "solar", "erzeug"),
+    "sens_ess_soc": ("soc", "ladezustand", "batterie soc", "akku soc"),
+    "sens_ess_power": ("batterie", "speicher", "akku", "ess"),
+    "sens_evcs_active_power": ("wallbox", "evcs", "e-auto", "eauto", "ladung leistung"),
+    "sens_power_consumers": ("hauslast", "verbraucher", "house load", "verbrauch"),
     "set_ess_charge_power_limit": ("ladeleistung", "charge", "zwangslade"),
     "set_ess_discharge_power_limit": ("entlade", "discharge"),
+    "set_ess_mode": ("steuerbefehl", "control_cmd", "huawei", "modbus cmd", "ess mode"),
     "set_evcs_max_current": ("maxstrom", "max current", "ladestrom"),
+    "set_evcs_current": ("sollstrom", "set current", "ladestrom soll"),
+    "set_evcs_mode": ("pv_follow", "sofort", "charge_immediate", "ev mode"),
+    "get_evcs_limit_soc": ("limit soc", "ladeziel", "target soc ev", "limit_soc"),
+    "sens_evcs_connected": ("angeschlossen", "plugged", "connected", "ev da"),
+    "sens_evcs_soc_act": ("ev soc", "fahrzeug soc", "ist-soc", "vehicle soc"),
+    "sens_evcs_bat_capacity": ("kapazität", "capacity", "akkukapazität"),
+    "sens_evcs_nominal_current": ("nennstrom", "nominal", "maxstrom ev"),
+    "get_evcs_ready_by_time": ("fertig", "ready", "deadline"),
+    "flex.power_name": ("leistung", "power", "verbrauch"),
+    "flex.enable_name": ("freigabe", "enable", "sg ready"),
+    "flex.power_setpoint_name": ("sollwert", "setpoint", "ziel leistung"),
     "target_soc_name": ("ziel-soc", "target soc", "soll-soc"),
-    "control_cmd_name": ("steuerbefehl", "control_cmd", "huawei", "modbus cmd"),
 }
 
 
@@ -70,12 +106,16 @@ def ehal_mapping_to_loxone_blocks(
     """Translate EHAL field → marker map into loxone_blocks role keys."""
     blocks: dict[str, str] = {}
     for field, marker in ehal_map.items():
-        role = EHAL_TO_BLOCKS.get(field)
+        canonical = TELEMETRY_FIELD_ALIASES.get(field, field)
+        role = EHAL_TO_BLOCKS.get(canonical) or EHAL_TO_BLOCKS.get(field)
         name = str(marker or "").strip()
         if role and name:
             blocks[role] = name
     for role, marker in (extras or {}).items():
         name = str(marker or "").strip()
+        if role == "control_cmd_name" and name:
+            blocks["control_cmd_name"] = name
+            continue
         if role in EXTRAS_FIELDS and name:
             blocks[role] = name
     return blocks

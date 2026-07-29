@@ -34,6 +34,21 @@ def _copy_loxone_binding(raw: dict, spec: dict) -> None:
         spec["loxone_outputs"] = dict(loxone_outputs)
 
 
+def _copy_ehal_entity_fields(raw: dict, spec: dict) -> None:
+    bindings = raw.get("ehal_bindings")
+    if isinstance(bindings, dict) and bindings:
+        cleaned = {
+            str(key): str(value).strip()
+            for key, value in bindings.items()
+            if str(value).strip()
+        }
+        if cleaned:
+            spec["ehal_bindings"] = cleaned
+    triggers = raw.get("event_triggers")
+    if isinstance(triggers, list) and triggers:
+        spec["event_triggers"] = [dict(item) for item in triggers if isinstance(item, dict)]
+
+
 def _legacy_loxone_power_name(raw: dict) -> str:
     rec = raw.get("appliance_recommendation")
     if isinstance(rec, dict):
@@ -295,6 +310,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     legacy_id = str(raw.get("legacy_id", "")).strip()
     if legacy_id and legacy_id != consumer_id:
         spec["legacy_id"] = legacy_id
+    _copy_ehal_entity_fields(raw, spec)
     return spec
 
 
@@ -390,6 +406,25 @@ def _normalize_profile(raw: dict, index: int) -> dict:
     }
 
 
+def _normalize_plant(raw: dict | None) -> dict:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict = {}
+    bindings = raw.get("ehal_bindings")
+    if isinstance(bindings, dict) and bindings:
+        cleaned = {
+            str(key): str(value).strip()
+            for key, value in bindings.items()
+            if str(value).strip()
+        }
+        if cleaned:
+            out["ehal_bindings"] = cleaned
+    triggers = raw.get("event_triggers")
+    if isinstance(triggers, list) and triggers:
+        out["event_triggers"] = [dict(item) for item in triggers if isinstance(item, dict)]
+    return out
+
+
 def normalize_house_profiles_document(doc: dict) -> dict:
     if not isinstance(doc, dict):
         raise ValueError("house_profiles.json muss ein Objekt sein.")
@@ -402,7 +437,13 @@ def normalize_house_profiles_document(doc: dict) -> dict:
         if spec["id"] in profiles:
             raise ValueError(f"profiles: doppelte id '{spec['id']}'.")
         profiles[spec["id"]] = spec
-    return {"profiles": profiles}
+    out: dict = {"profiles": profiles}
+    plant = _normalize_plant(doc.get("plant"))
+    if plant:
+        out["plant"] = plant
+    if "earnie_data_model" in doc:
+        out["earnie_data_model"] = doc["earnie_data_model"]
+    return out
 
 
 def load_house_profiles_document(path: str) -> dict:
@@ -444,6 +485,8 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
     serializable = {
         "profiles": [_serialize_profile(p) for p in normalized["profiles"].values()]
     }
+    if normalized.get("plant"):
+        serializable["plant"] = dict(normalized["plant"])
     stamp_data_model(serializable)
     target = os.path.abspath(path)
     os.makedirs(os.path.dirname(target) or ".", exist_ok=True)
@@ -452,6 +495,13 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
         json.dump(serializable, handle, indent=4, ensure_ascii=False)
         handle.write("\n")
     os.replace(tmp, target)
+
+
+def _attach_ehal_entity_fields(out: dict, consumer: dict) -> None:
+    if consumer.get("ehal_bindings"):
+        out["ehal_bindings"] = dict(consumer["ehal_bindings"])
+    if consumer.get("event_triggers"):
+        out["event_triggers"] = [dict(item) for item in consumer["event_triggers"]]
 
 
 def _serialize_consumer(consumer: dict) -> dict:
@@ -518,6 +568,7 @@ def _serialize_consumer(consumer: dict) -> dict:
             out["thermal_control"] = dict(consumer["thermal_control"])
         if consumer.get("legacy_id"):
             out["legacy_id"] = consumer["legacy_id"]
+    _attach_ehal_entity_fields(out, consumer)
     return out
 
 

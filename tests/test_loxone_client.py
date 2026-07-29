@@ -455,6 +455,22 @@ class TestSharedMeterSubtraction:
             live = lc.resolve_consumer_nominal_power_kw(consumer)
         assert live == pytest.approx(11.04)
 
+    def test_resolve_nominal_current_ehal_key_as_amperes(self):
+        consumer = {
+            "id": "eauto",
+            "nominal_power_kw": 3.5,
+            "charging_schedule": {
+                "nominal_power_voltage_v": 230.0,
+                "nominal_power_phases": 3,
+                "loxone": {
+                    "sens_evcs_nominal_current": "Ladestrom Max",
+                },
+            },
+        }
+        with patch.object(lc, "fetch_loxone_raw_value", return_value="16"):
+            live = lc.resolve_consumer_nominal_power_kw(consumer)
+        assert live == pytest.approx(11.04)
+
     def test_resolve_nominal_power_from_ampere_loxone_level_fallback(self):
         consumer = {
             "id": "eauto",
@@ -485,6 +501,16 @@ class TestSharedMeterSubtraction:
         with patch.object(lc, "fetch_loxone_raw_value", return_value="77 kWh"):
             assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(77.0)
 
+    def test_resolve_battery_capacity_ehal_key(self):
+        consumer = {
+            "id": "eauto",
+            "charging_schedule": {
+                "loxone": {"sens_evcs_bat_capacity": "Batteriekapazität_E-Auto"},
+            },
+        }
+        with patch.object(lc, "fetch_loxone_raw_value", return_value="77 kWh"):
+            assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(77.0)
+
     def test_resolve_battery_capacity_fails_without_loxone_value(self):
         consumer = {
             "id": "eauto",
@@ -501,26 +527,6 @@ class TestSharedMeterSubtraction:
             "charging_schedule": {"loxone": {}},
         }
         assert lc.resolve_consumer_battery_capacity_kwh(consumer) is None
-
-    def test_fetch_charge_immediate_remaining_seconds(self):
-        consumer = {
-            "id": "eauto",
-            "charging_schedule": {
-                "loxone": {"charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen"},
-            },
-        }
-        with patch.object(lc, "fetch_loxone_generic_value", return_value=5400.0):
-            assert lc.fetch_charge_immediate_remaining_seconds(consumer) == pytest.approx(5400.0)
-
-    def test_fetch_charge_immediate_remaining_seconds_invalid(self):
-        consumer = {
-            "id": "eauto",
-            "charging_schedule": {
-                "loxone": {"charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen"},
-            },
-        }
-        with patch.object(lc, "fetch_loxone_generic_value", return_value=-1.0):
-            assert lc.fetch_charge_immediate_remaining_seconds(consumer) is None
 
 
 class TestBuildSentSnapshot:
@@ -554,13 +560,13 @@ class TestBuildSentSnapshot:
                 charging_contexts={},
             )
 
-        assert snapshot["Ernie_Ziel_SoC"] == 80.0
+        assert "Ernie_Ziel_SoC" not in snapshot
         assert snapshot["Ernie_Ziel_LadeLeistung"] == 2.0
         assert snapshot["Ernie_Ziel_Entladeleistung"] == 0.0
         assert snapshot["Ernie_Steuerbefehl"] == 1.0
         assert snapshot["Ernie_SwimSpa_Freigabe"] == 1.0
 
-    def test_snapshot_contains_power_setpoint(self):
+    def test_snapshot_contains_power_setpoint_as_amps(self):
         consumers = [
             {
                 "id": "eauto",
@@ -595,10 +601,11 @@ class TestBuildSentSnapshot:
                 consumer_pv_follow={"eauto": 0},
             )
 
-        assert snapshot["Ernie_EAuto_Ziel_kW"] == 2.5
+        # 2.5 kW @ 230 V / 1 ph → A
+        assert snapshot["Ernie_EAuto_Ziel_kW"] == pytest.approx(2.5 * 1000.0 / 230.0, abs=1e-3)
         assert snapshot["Ernie_EAuto_pv_follow"] == 0.0
 
-    def test_snapshot_pv_follow_sends_pmax(self):
+    def test_snapshot_pv_follow_sends_pmax_as_amps(self):
         consumers = [
             {
                 "id": "eauto",
@@ -633,7 +640,7 @@ class TestBuildSentSnapshot:
                 consumer_pv_follow={"eauto": 1},
             )
 
-        assert snapshot["Ernie_EAuto_Ziel_kW"] == 3.5
+        assert snapshot["Ernie_EAuto_Ziel_kW"] == pytest.approx(3.5 * 1000.0 / 230.0, abs=1e-3)
         assert snapshot["Ernie_EAuto_pv_follow"] == 1.0
 
     def test_snapshot_suppresses_power_when_anticipated_absent(self):
@@ -719,12 +726,12 @@ class TestBuildSentSnapshot:
             )
 
         mock_send.assert_not_called()
-        assert snapshot["Ernie_EAuto_Ziel_kW"] == 2.5
+        assert snapshot["Ernie_EAuto_Ziel_kW"] == pytest.approx(2.5 * 1000.0 / 230.0, abs=1e-3)
         assert snapshot["Ernie_EAuto_pv_follow"] == 0.0
 
 
 class TestSendHuaweiAndConsumers:
-    def test_send_huawei_modbus_states_returns_four_records(self):
+    def test_send_huawei_modbus_states_returns_three_records(self):
         names = {
             "LOXONE_TARGET_SOC_NAME": "SoC",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
@@ -739,12 +746,13 @@ class TestSendHuaweiAndConsumers:
         ) as mock_send:
             records = lc.send_huawei_modbus_states(mode=3, target_power_kw=1.5, target_soc=55.0)
 
-        assert len(records) == 4
-        assert mock_send.call_count == 4
-        mock_send.assert_any_call("SoC", 55.0)
+        assert len(records) == 3
+        assert mock_send.call_count == 3
         mock_send.assert_any_call("Discharge", 1.5)
+        called_names = [c.args[0] for c in mock_send.call_args_list]
+        assert "SoC" not in called_names
 
-    def test_send_huawei_modbus_states_calls_all_outputs(self):
+    def test_send_huawei_modbus_states_calls_ess_outputs_only(self):
         names = {
             "LOXONE_TARGET_SOC_NAME": "SoC",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
@@ -756,11 +764,12 @@ class TestSendHuaweiAndConsumers:
         ) as mock_send:
             lc.send_huawei_modbus_states(mode=3, target_power_kw=1.5, target_soc=55.0)
 
-        assert mock_send.call_count == 4
-        mock_send.assert_any_call("SoC", 55.0)
+        assert mock_send.call_count == 3
         mock_send.assert_any_call("Charge", 0.0)
         mock_send.assert_any_call("Discharge", 1.5)
-        mock_send.assert_any_call("Cmd", 2)
+        mock_send.assert_any_call("Cmd", 2.0)
+        called_names = [c.args[0] for c in mock_send.call_args_list]
+        assert "SoC" not in called_names
 
     def test_send_flexible_consumer_states_skips_without_output(self):
         consumers = [

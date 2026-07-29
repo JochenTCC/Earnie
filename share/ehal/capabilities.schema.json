@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/capabilities.schema.json",
-  "title": "EHAL Capability-Flags (M1)",
+  "title": "EHAL Capability-Flags (schema_version 2)",
   "description": "Adapter write capabilities. Graceful degrade when false (read-only hubs, OEM locks).",
   "type": "object",
   "required": [
@@ -14,7 +14,7 @@
   "properties": {
     "schema_version": {
       "type": "integer",
-      "const": 1
+      "const": 2
     },
     "ts": {
       "type": "string",
@@ -30,7 +30,7 @@
     },
     "supports_evcs_current": {
       "type": "boolean",
-      "description": "set_evcs_max_current can be written."
+      "description": "set_evcs_max_current / set_evcs_current can be written."
     }
   },
   "additionalProperties": false

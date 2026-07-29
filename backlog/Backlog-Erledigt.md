@@ -3,6 +3,12 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.j / 2.4.k EHAL wire + entity mapping (2026-07-29)
+
+- [x] **2.4.j — EHAL wire & core semantics** — `schema_version` 2; §C `sens_*` / `set_*` / `get_*` in schemas, roles, adapters (Loxone/HA/OpenEMS), `ehal_live`; PV ∫ power → `pv_kwh_interval`; drop ESS `target_soc` / EV plug-in Rest-SOC / Sofortladen countdown Merker; `set_ess_mode`, `set_evcs_current`, `set_evcs_mode`, `sens_evcs_nominal_current`, `sens_power_consumers` (Merker or derive); docs [`docs/spec/ehal.md`](../docs/spec/ehal.md).
+- [x] **2.4.k — Entity-centric EHAL mapping** — `house_profiles` `plant` / `consumers[].ehal_bindings` + entity `event_triggers` (out of `config.json`); migrator/aggregate [`house_config/ehal_bindings.py`](../house_config/ehal_bindings.py); EHAL-Com entity HITL save; remove scattered Merker editors; German [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md).
+
+
 ### 2.4.i Hardware registry + Layer C research spike (2026-07-28)
 
 - [x] **2.4.i** — Clarified one-time hardware-bound registry UX + Layer C prerequisites in [`docs/spec/hardware-registry-layer-c.md`](../docs/spec/hardware-registry-layer-c.md); spike: `runtime_store/hardware_identity.py`, `runtime_store/registry_entitlement.py` (dev HMAC), `share/registry/`, CLI `scripts/print_hardware_fingerprint.py` / `scripts/issue_dev_registry_token.py`, soft Info/About caption (no refuse-to-start, `release.yml` unchanged). Full Layer C enforcement deferred to `2.+1`.
@@ -20,7 +26,8 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 ### 2.4.f Loxone one-click mapping + structure research (2026-07-28)
 
-- [x] **2.4.f — Loxone one-click mapping + structure research (§3.1)** *(was 2.5.b)* — Structure **compare-all** `integrations/loxone_structure.py` (LoxAPP3.json + HTTP probe + MCP 17.1 `tools/list`; no first-wins cascade); EHAL↔`loxone_blocks` + optional Ollama `integrations/loxone_ehal_mapping.py`; HITL `ui/ehal_loxone_mapping.py` on EHAL-Com; docs [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) + [`docs/spec/ehal.md`](../docs/spec/ehal.md). Production structure source TBD after lab. EFM interpretation C split to open **2.4.i**.
+- [x] **2.4.f — Loxone one-click mapping + structure research (§3.1)** *(was 2.5.b)* — Structure **compare-all** `integrations/loxone_structure.py` (LoxAPP3.json + MCP 17.1 `tools/list`; no first-wins cascade); EHAL↔`loxone_blocks` + optional Ollama `integrations/loxone_ehal_mapping.py`; HITL `ui/ehal_loxone_mapping.py` on EHAL-Com; docs [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) + [`docs/spec/ehal.md`](../docs/spec/ehal.md). Production structure source TBD after lab. EFM interpretation C split to open **2.4.i**.
+- [x] **2.4.f follow-up — drop HTTP probe** (2026-07-29) — Removed `http_probe` from one-click structure sources (only re-validates already-mapped markers; no new names). Default compare-all: LoxAPP3 + optional MCP 17.1.
 
 
 ### 2.4.e Loxone-EHAL adapter extraction (2026-07-28)

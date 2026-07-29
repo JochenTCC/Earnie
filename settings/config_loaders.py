@@ -100,22 +100,63 @@ def load_system_and_ui_params(
     }
 
 
-def load_loxone_block_params(raw_config: dict, config_path: str) -> dict[str, Any]:
-    keys = (
-        ("LOXONE_SOC_NAME", ["loxone_blocks", "soc_name"]),
-        ("LOXONE_PV_COUNTER_NAME", ["loxone_blocks", "pv_counter_name"]),
-        ("LOXONE_LOG_FILENAME", ["loxone_blocks", "log_filename"]),
-        ("PV_TUNING_LOG_FILE", ["loxone_blocks", "pv_tuning_log_file"]),
-        ("LOXONE_PV_POWER_NAME", ["loxone_blocks", "pv_power_name"]),
-        ("LOXONE_BATTERY_POWER_NAME", ["loxone_blocks", "battery_power_name"]),
-        ("LOXONE_GRID_POWER_NAME", ["loxone_blocks", "grid_power_name"]),
-        ("LOXONE_TARGET_SOC_NAME", ["loxone_blocks", "target_soc_name"]),
-        ("LOXONE_TARGET_CHARGE_POWER_NAME", ["loxone_blocks", "target_charge_power_name"]),
-        ("LOXONE_TARGET_DISCHARGE_POWER_NAME", ["loxone_blocks", "target_discharge_power_name"]),
-        ("LOXONE_CONTROL_CMD_NAME", ["loxone_blocks", "control_cmd_name"]),
-    )
+_LOXONE_BLOCK_ATTRS: tuple[tuple[str, str, str | None], ...] = (
+    ("LOXONE_SOC_NAME", "soc_name", "sens_ess_soc"),
+    ("LOXONE_PV_COUNTER_NAME", "pv_counter_name", None),
+    ("LOXONE_LOG_FILENAME", "log_filename", None),
+    ("PV_TUNING_LOG_FILE", "pv_tuning_log_file", None),
+    ("LOXONE_PV_POWER_NAME", "pv_power_name", "sens_pv_production_active"),
+    ("LOXONE_BATTERY_POWER_NAME", "battery_power_name", "sens_ess_power"),
+    ("LOXONE_GRID_POWER_NAME", "grid_power_name", "sens_grid_power_active"),
+    ("LOXONE_CONSUMERS_POWER_NAME", "consumers_power_name", "sens_power_consumers"),
+    ("LOXONE_TARGET_SOC_NAME", "target_soc_name", None),
+    ("LOXONE_TARGET_CHARGE_POWER_NAME", "target_charge_power_name", "set_ess_charge_power_limit"),
+    ("LOXONE_TARGET_DISCHARGE_POWER_NAME", "target_discharge_power_name", "set_ess_discharge_power_limit"),
+    ("LOXONE_CONTROL_CMD_NAME", "control_cmd_name", "set_ess_mode"),
+)
+
+
+def _plant_bindings_present(house_doc: dict | None) -> bool:
+    house = house_doc if isinstance(house_doc, dict) else {}
+    plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
+    bindings = plant.get("ehal_bindings") if isinstance(plant.get("ehal_bindings"), dict) else {}
+    return any(str(v or "").strip() for v in bindings.values())
+
+
+def _resolve_loxone_block_value(
+    raw_config: dict,
+    block_key: str,
+    ehal_field: str | None,
+    house_doc: dict | None,
+    config_path: str,
+) -> Any:
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    if ehal_field:
+        bound = resolve_plant_binding(house_doc, ehal_field, raw_config)
+        if bound:
+            return bound
+        if _plant_bindings_present(house_doc):
+            return ""
+        if ehal_field == "sens_power_consumers":
+            blocks = raw_config.get("loxone_blocks")
+            if isinstance(blocks, dict):
+                return str(blocks.get(block_key) or "")
+            return ""
+    return get_strict(raw_config, ["loxone_blocks", block_key], config_path)
+
+
+def load_loxone_block_params(
+    raw_config: dict,
+    config_path: str,
+    house_doc: dict | None = None,
+) -> dict[str, Any]:
+    """Prefer ``plant.ehal_bindings`` (§C); skip ``loxone_blocks`` when plant is set."""
     return {
-        attr: get_strict(raw_config, path, config_path) for attr, path in keys
+        attr: _resolve_loxone_block_value(
+            raw_config, block_key, ehal_field, house_doc, config_path
+        )
+        for attr, block_key, ehal_field in _LOXONE_BLOCK_ATTRS
     }
 
 

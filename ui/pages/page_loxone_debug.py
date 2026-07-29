@@ -12,7 +12,6 @@ from ui.ehal_connection import (
 )
 from ui.help_hint import render_page_title_with_help
 from ui.loxone_debug import render_loxone_debug_block
-from ui.loxone_marker_forms import render_marker_config_editors
 from ui.setup_dotenv import render_loxone_credentials_form
 from ui.setup_readiness import (
     is_betrieb_unlocked,
@@ -24,7 +23,8 @@ _EHAL_COM_HELP = (
     "Anbindung und Live-Übersicht für Loxone, Home Assistant (EHAL) oder OpenEMS. "
     "Live-Lesen zeigt Merker (Loxone) bzw. EHAL-Telemetrie (HA/OpenEMS); "
     "Live-Schreiben die letzten Schreibvorgänge aus dem Produktiv-Lauf von main.py. "
-    "Anlagen-Merker und Event-Trigger bleiben für den Loxone-Pfad editierbar."
+    "Loxone-Bindings und Event-Trigger werden entity-zentriert unter "
+    "Loxone Struktur → EHAL Mapping gepflegt."
 )
 
 _COCKPIT_LOCKED_NOTICE = (
@@ -80,14 +80,3 @@ def render() -> None:
 
         with st.expander("Loxone Struktur → EHAL Mapping", expanded=True):
             render_ehal_loxone_mapping_section()
-
-    with st.expander(
-        "Loxone Anlagen-Merker / Event-Trigger",
-        expanded=(backend == BACKEND_LOXONE),
-    ):
-        if backend != BACKEND_LOXONE:
-            st.caption(
-                "Loxone-Marker — für Loxone-EHAL und Flex-/Extras; "
-                "One-Click-Mapping oben bei Backend Loxone."
-            )
-        render_marker_config_editors()

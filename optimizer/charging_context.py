@@ -6,7 +6,15 @@ from datetime import datetime, timedelta, time
 
 import config
 from integrations import loxone_client
-from optimizer.ev_soc_tracking import loxone_reports_charge_complete
+from optimizer.ev_soc_tracking import (
+    fetch_loxone_actual_soc_percent,
+    loxone_reports_charge_complete,
+)
+from settings.ehal_marker_resolve import (
+    marker_get_evcs_ready_by_time,
+    marker_sens_evcs_connected,
+    resolve_get_evcs_limit_soc,
+)
 from settings.flexible_consumers import flex_kw_lookup
 
 _LOXONE_WEEKDAY_NAMES = {
@@ -193,10 +201,8 @@ def charging_deadline_after(available_from: datetime, consumer: dict) -> datetim
 
 
 def _loxone_ready_raw(consumer: dict) -> str | None:
-    """Roher Loxone-String für Fertig-Uhrzeit, falls konfiguriert."""
-    sched = consumer.get("charging_schedule") or {}
-    lox = sched.get("loxone", {})
-    io_name = lox.get("ready_by_time_name", "")
+    """Roher Loxone-String für Fertig-Uhrzeit (get_evcs_ready_by_time)."""
+    io_name = marker_get_evcs_ready_by_time(consumer)
     if not io_name:
         return None
     return loxone_client.fetch_loxone_raw_value(io_name)
@@ -359,8 +365,12 @@ def _loxone_absent_forecast_context(consumer: dict, horizon_start: datetime) -> 
         )
     day_sched = config_day_schedule(consumer, available_from)
     capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    limit_soc = resolve_get_evcs_limit_soc(consumer)
     target_kwh = config.Config.target_kwh_from_rest_soc(
-        consumer, day_sched.get("daily_rest_soc"), capacity_kwh=capacity_kwh
+        consumer,
+        day_sched.get("daily_rest_soc"),
+        capacity_kwh=capacity_kwh,
+        limit_soc_percent=limit_soc,
     )
     if target_kwh is None or target_kwh <= 0:
         return _loxone_inactive_context(
@@ -380,11 +390,9 @@ def _loxone_absent_forecast_context(consumer: dict, horizon_start: datetime) -> 
 
 def fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> dict:
     sched = consumer.get("charging_schedule") or {}
-    lox = sched.get("loxone", {})
+    plug_name = marker_sens_evcs_connected(consumer)
     plugged_val = (
-        loxone_client.fetch_loxone_generic_value(lox.get("plugged_in_name", ""))
-        if lox.get("plugged_in_name")
-        else None
+        loxone_client.fetch_loxone_generic_value(plug_name) if plug_name else None
     )
     plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
     if not plugged_in:
@@ -395,14 +403,14 @@ def fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> di
         return _loxone_plugged_in_complete_context()
     ready_raw = _loxone_ready_raw(consumer)
     deadline = parse_loxone_ready_by_time(ready_raw, horizon_start)
-    soc_val = (
-        loxone_client.fetch_loxone_generic_value(lox.get("soc_at_plug_in_name", ""))
-        if lox.get("soc_at_plug_in_name")
-        else None
-    )
+    soc_val = fetch_loxone_actual_soc_percent(consumer)
     capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    limit_soc = resolve_get_evcs_limit_soc(consumer)
     target_kwh = config.Config.target_kwh_from_rest_soc(
-        consumer, soc_val, capacity_kwh=capacity_kwh
+        consumer,
+        soc_val,
+        capacity_kwh=capacity_kwh,
+        limit_soc_percent=limit_soc,
     )
     return {
         "active": True,
@@ -457,8 +465,7 @@ def _config_path_with_plugged_in(
     ready_raw: str | None,
 ) -> dict:
     """Attach Loxone plugged_in; suppress live output when absent (anticipated)."""
-    lox = sched.get("loxone") or {}
-    plug_name = lox.get("plugged_in_name")
+    plug_name = marker_sens_evcs_connected(consumer)
     if not plug_name:
         return result
     plugged_val = loxone_client.fetch_loxone_generic_value(plug_name)
@@ -508,8 +515,12 @@ def resolve_charging_context(
     day_sched = config_day_schedule(consumer, horizon_start)
     rest_soc = day_sched.get("daily_rest_soc")
     capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+    limit_soc = resolve_get_evcs_limit_soc(consumer)
     target_kwh = config.Config.target_kwh_from_rest_soc(
-        consumer, rest_soc, capacity_kwh=capacity_kwh
+        consumer,
+        rest_soc,
+        capacity_kwh=capacity_kwh,
+        limit_soc_percent=limit_soc,
     )
     config_deadline = deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour"))
     ready_raw = _loxone_ready_raw(consumer)

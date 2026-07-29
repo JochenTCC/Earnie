@@ -67,6 +67,8 @@ _PASSTHROUGH_CONSUMER_KEYS = (
     "swimspa_filter_bindings",
     "profile_csv",
     "use_profile_csv",
+    "ehal_bindings",
+    "event_triggers",
 )
 
 _EARNIE_ROLE_LABELS = {
@@ -154,22 +156,10 @@ def _loxone_inputs_from_consumer(consumer: dict) -> dict:
 
 
 def _live_markers_enabled() -> bool:
-    """True when EARNIE_UI_MODES includes live_environment (Daemon Control)."""
+    """True when Live UI mode is on (legacy; Merker editors moved to EHAL-Com)."""
     from ui.mode_selector import get_enabled_ui_mode_keys
 
     return "live_environment" in get_enabled_ui_mode_keys()
-
-
-def _run_in_markers_expander(render_body):
-    """Run Merker widgets in an expander when live mode is on; else skip (return None).
-
-    Callers must omit marker keys from the edited item when this returns None so
-    ``_merge_passthrough_consumer_fields`` keeps stored bindings.
-    """
-    if not _live_markers_enabled():
-        return None
-    with st.expander("Smarthome-Merker", expanded=False):
-        return render_body()
 
 
 def _preserved_appliance_power_source(consumer: dict) -> str:
@@ -180,198 +170,35 @@ def _preserved_appliance_power_source(consumer: dict) -> str:
         return source
     if _loxone_inputs_from_consumer(consumer).get("power_name"):
         return "loxone"
+    bindings = consumer.get("ehal_bindings")
+    if isinstance(bindings, dict) and str(bindings.get("flex.power_name") or "").strip():
+        return "loxone"
     return "manual"
 
 
-def _render_power_source_fields(
+def _render_manual_power_source(
     consumer: dict,
     index: int,
     *,
     session_scope: str,
-    key_prefix: str,
-) -> tuple[str, dict | None]:
-    """Leistungsquelle + optional loxone_inputs.power_name."""
-    from ui.smarthome_marker_fields import render_marker_text
-
-    inputs = _loxone_inputs_from_consumer(consumer)
-    rec = consumer.get("appliance_recommendation") or {}
-    has_marker = bool(str(inputs.get("power_name", "")).strip())
-    default_source = "loxone" if (
-        str(rec.get("power_source", "")).lower() == "loxone" or has_marker
-    ) else "manual"
+) -> str:
+    """Leistungsquelle without Merker text fields (bindings only via EHAL-Com)."""
+    default_source = _preserved_appliance_power_source(consumer)
     power_source = labeled_selectbox(
         "Leistungsquelle",
         options=["manual", "loxone"],
         index=0 if default_source != "loxone" else 1,
         format_func=lambda value: (
-            "Aus Profil (Nennleistung)" if value == "manual" else "Smarthome-Merker"
+            "Aus Profil (Nennleistung)" if value == "manual" else "Smarthome-Merker (EHAL-Com)"
         ),
-        key=_scoped_key(session_scope, f"{key_prefix}_src_{index}"),
+        key=_scoped_key(session_scope, f"hc_app_src_{index}"),
     )
-    if power_source != "loxone":
-        return power_source, None
-    st.caption(
-        "Merker-Adresse (Loxone Miniserver); für künftige Live-Adaption gespeichert. "
-        "Grundlast/Empfehlung nutzen weiterhin Nennleistung aus dem Profil."
-    )
-    marker = render_marker_text(
-        "Smarthome-Merker (Leistung)",
-        inputs.get("power_name", ""),
-        key=_scoped_key(session_scope, f"{key_prefix}_merker_{index}"),
-    )
-    return power_source, {"power_name": marker} if marker else None
-
-
-def _render_live_io_markers(
-    consumer: dict,
-    index: int,
-    *,
-    session_scope: str,
-    key_prefix: str,
-    include_enable: bool = True,
-    include_ev_outputs: bool = False,
-    include_subtract: bool = False,
-) -> tuple[dict, dict]:
-    """Edit loxone_inputs / loxone_outputs used by live consumers."""
-    from ui.smarthome_marker_fields import render_marker_text
-
-    st.markdown("**Smarthome-Merker (Live)**")
-    st.caption("Rollen = Config-Schlüssel; Werte = Miniserver-Merkernamen (Loxone).")
-    inputs = _loxone_inputs_from_consumer(consumer)
-    outputs = dict(consumer.get("loxone_outputs") or {})
-    power_name = render_marker_text(
-        "Merker: Leistung (Lesen)",
-        inputs.get("power_name", ""),
-        key=_scoped_key(session_scope, f"{key_prefix}_pwr_{index}"),
-    )
-    new_inputs: dict = {}
-    if power_name:
-        new_inputs["power_name"] = power_name
-    if "signal_type" in inputs:
-        new_inputs["signal_type"] = inputs["signal_type"]
-    if include_subtract:
-        subtract = inputs.get("subtract_consumer_ids")
-        existing = (
-            ", ".join(str(item) for item in subtract)
-            if isinstance(subtract, list)
-            else ""
+    if power_source == "loxone":
+        st.caption(
+            "Merker-Adresse unter **Daemon Control → EHAL-Com** "
+            "(Entity-Mapping, Feld `flex.power_name`) pflegen."
         )
-        subtract_text = render_marker_text(
-            "Abzug Verbraucher-IDs (Komma, optional)",
-            existing,
-            key=_scoped_key(session_scope, f"{key_prefix}_sub_{index}"),
-        )
-        if subtract_text:
-            new_inputs["subtract_consumer_ids"] = [
-                part.strip() for part in subtract_text.split(",") if part.strip()
-            ]
-    new_outputs: dict = {}
-    if include_enable:
-        enable_name = render_marker_text(
-            "Merker: Freigabe (Schreiben)",
-            outputs.get("enable_name", ""),
-            key=_scoped_key(session_scope, f"{key_prefix}_en_{index}"),
-        )
-        if enable_name:
-            new_outputs["enable_name"] = enable_name
-    if include_ev_outputs:
-        setpoint = render_marker_text(
-            "Merker: Lade-Sollwert kW (Schreiben)",
-            outputs.get("power_setpoint_name", ""),
-            key=_scoped_key(session_scope, f"{key_prefix}_set_{index}"),
-        )
-        pv_follow = render_marker_text(
-            "Merker: PV-Follow (Schreiben)",
-            outputs.get("pv_follow_name", ""),
-            key=_scoped_key(session_scope, f"{key_prefix}_pvf_{index}"),
-        )
-        if setpoint:
-            new_outputs["power_setpoint_name"] = setpoint
-        if pv_follow:
-            new_outputs["pv_follow_name"] = pv_follow
-    return new_inputs, new_outputs
-
-
-def _render_ev_charging_loxone(
-    sched: dict,
-    index: int,
-    *,
-    session_scope: str,
-) -> dict:
-    from ui.smarthome_marker_fields import (
-        EV_CHARGING_LOXONE_FIELDS,
-        collect_named_markers,
-    )
-
-    st.markdown("**E-Auto Status-Merker** (`charging_schedule.loxone`)")
-    source = sched.get("loxone") if isinstance(sched.get("loxone"), dict) else {}
-    return collect_named_markers(
-        source,
-        EV_CHARGING_LOXONE_FIELDS,
-        key_prefix=_scoped_key(session_scope, f"hc_ev_lox_{index}"),
-    )
-
-
-def _render_thermal_control_loxone(
-    consumer: dict,
-    index: int,
-    *,
-    session_scope: str,
-) -> dict:
-    from ui.smarthome_marker_fields import (
-        THERMAL_CONTROL_LOXONE_FIELDS,
-        collect_named_markers,
-    )
-
-    st.markdown("**Temperatur-Merker** (`thermal_control.loxone`)")
-    control = consumer.get("thermal_control") if isinstance(
-        consumer.get("thermal_control"), dict
-    ) else {}
-    source = control.get("loxone") if isinstance(control.get("loxone"), dict) else {}
-    loxone = collect_named_markers(
-        source,
-        THERMAL_CONTROL_LOXONE_FIELDS,
-        key_prefix=_scoped_key(session_scope, f"hc_tc_lox_{index}"),
-    )
-    return {"loxone": loxone} if loxone else {}
-
-
-def _render_swimspa_filter_bindings(
-    consumer: dict,
-    index: int,
-    *,
-    session_scope: str,
-) -> dict:
-    """Optional marker overrides for bridge-only SwimSpa filter."""
-    from house_config.planning_flex_bridge import SWIMSPA_FILTER_BRIDGE_DEFAULTS
-    from ui.smarthome_marker_fields import (
-        assemble_filter_bindings,
-        filter_binding_prefills,
-        render_marker_text,
-    )
-
-    st.markdown("**SwimSpa-Filter Merker** (optional, Bridge-Defaults)")
-    st.caption(
-        "Overrides für den Bridge-Filter; leer = eingebauter Default. "
-        "Kein eigener Hausprofil-Verbraucher."
-    )
-    stored = consumer.get("swimspa_filter_bindings")
-    stored = stored if isinstance(stored, dict) else {}
-    prefills = filter_binding_prefills(stored, SWIMSPA_FILTER_BRIDGE_DEFAULTS)
-    prefix = _scoped_key(session_scope, f"hc_filt_{index}")
-    labels = (
-        ("loxone_target_hours_name", "Merker: Filter-Sollstunden", "hours"),
-        ("power_name", "Merker: Filter Leistung/Aktiv", "pwr"),
-        ("alternate_binary_power_name", "Merker: Filter alternativ", "alt"),
-        ("enable_name", "Merker: Filter Freigabe", "en"),
-        ("native_start_hour_name", "Merker: natives Filter-Start", "start"),
-        ("native_duration_hours_name", "Merker: natives Filter-Dauer", "dur"),
-    )
-    values = {
-        role: render_marker_text(label, prefills.get(role, ""), key=f"{prefix}_{suffix}")
-        for role, label, suffix in labels
-    }
-    return assemble_filter_bindings(values)
+    return power_source
 
 
 def _render_manual_appliance_defaults(
@@ -453,18 +280,6 @@ def _render_generic_fields(
                 "(oder Rolle Bekannt wählen und CSV nutzen)."
             )
         item["annual_kwh"] = 0.0
-        if earnie_role == EARNIE_ROLE_KNOWN:
-            result = _run_in_markers_expander(
-                lambda: _render_power_source_fields(
-                    consumer,
-                    index,
-                    session_scope=session_scope,
-                    key_prefix="hc_known",
-                )
-            )
-            if result is not None:
-                _, loxone_inputs = result
-                item["loxone_inputs"] = loxone_inputs or {}
         return item
     duration_h = labeled_number_input(
         "Nenndauer pro Lauf (h)",
@@ -514,38 +329,14 @@ def _render_generic_fields(
             float(duration_h),
             session_scope=session_scope,
         )
-        result = _run_in_markers_expander(
-            lambda: _render_power_source_fields(
-                consumer,
-                index,
-                session_scope=session_scope,
-                key_prefix="hc_app",
-            )
-        )
-        if result is not None:
-            power_source, loxone_inputs = result
-            item["appliance_recommendation"] = {
-                "power_source": power_source,
-                **appliance_defaults,
-            }
-            item["loxone_inputs"] = loxone_inputs or {}
-        else:
-            item["appliance_recommendation"] = {
-                "power_source": _preserved_appliance_power_source(consumer),
-                **appliance_defaults,
-            }
+        item["appliance_recommendation"] = {
+            "power_source": _render_manual_power_source(
+                consumer, index, session_scope=session_scope
+            ),
+            **appliance_defaults,
+        }
     elif earnie_role == EARNIE_ROLE_KNOWN:
-        result = _run_in_markers_expander(
-            lambda: _render_power_source_fields(
-                consumer,
-                index,
-                session_scope=session_scope,
-                key_prefix="hc_known",
-            )
-        )
-        if result is not None:
-            _, loxone_inputs = result
-            item["loxone_inputs"] = loxone_inputs or {}
+        pass
     item["schedule"] = {
         "runs_per_week": runs,
         "duration_h": float(duration_h),
@@ -841,25 +632,11 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
             session_scope=session_scope,
         ),
     }
-    loxone_result = _run_in_markers_expander(
-        lambda: (
-            _render_live_io_markers(
-                consumer,
-                index,
-                session_scope=session_scope,
-                key_prefix="hc_ev_io",
-                include_enable=False,
-                include_ev_outputs=True,
-            ),
-            _render_ev_charging_loxone(sched, index, session_scope=session_scope),
+    if _live_markers_enabled():
+        st.caption(
+            "E-Auto-Merker unter **Daemon Control → EHAL-Com** "
+            "(Entity-Mapping) pflegen."
         )
-    )
-    if loxone_result is not None:
-        (loxone_inputs, loxone_outputs), charging_loxone = loxone_result
-        item["loxone_inputs"] = loxone_inputs
-        item["loxone_outputs"] = loxone_outputs
-        if charging_loxone:
-            item["charging_schedule"]["loxone"] = charging_loxone
     return item
 
 
@@ -1005,32 +782,11 @@ def _render_thermal_rc_fields(
             ),
         },
     }
-    marker_result = _run_in_markers_expander(
-        lambda: (
-            _render_live_io_markers(
-                consumer,
-                index,
-                session_scope=session_scope,
-                key_prefix="hc_rc_io",
-                include_enable=True,
-                include_subtract=True,
-            ),
-            _render_thermal_control_loxone(
-                consumer, index, session_scope=session_scope
-            ),
-            _render_swimspa_filter_bindings(
-                consumer, index, session_scope=session_scope
-            ),
+    if _live_markers_enabled():
+        st.caption(
+            "Thermal-/Filter-Merker unter **Daemon Control → EHAL-Com** "
+            "(Entity-Mapping) pflegen."
         )
-    )
-    if marker_result is not None:
-        (loxone_inputs, loxone_outputs), thermal_control, filter_bindings = marker_result
-        item["loxone_inputs"] = loxone_inputs
-        item["loxone_outputs"] = loxone_outputs
-        if thermal_control:
-            item["thermal_control"] = thermal_control
-        if filter_bindings:
-            item["swimspa_filter_bindings"] = filter_bindings
     return item
 
 
@@ -1245,19 +1001,11 @@ def _render_consumer_form_body(
                 default_azimuth=default_pv_azimuth,
             )
         )
-        loxone_result = _run_in_markers_expander(
-            lambda: _render_live_io_markers(
-                consumer,
-                index,
-                session_scope=session_scope,
-                key_prefix="hc_ta_io",
-                include_enable=True,
+        if _live_markers_enabled():
+            st.caption(
+                "WP-Merker unter **Daemon Control → EHAL-Com** "
+                "(Entity-Mapping, `flex.*`) pflegen."
             )
-        )
-        if loxone_result is not None:
-            loxone_inputs, loxone_outputs = loxone_result
-            item["loxone_inputs"] = loxone_inputs
-            item["loxone_outputs"] = loxone_outputs
         from data.modeled_climate import thermal_annual_kwh_from_archive
 
         thermal_preview = {**item, "latitude": latitude, "longitude": longitude}

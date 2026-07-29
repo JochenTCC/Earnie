@@ -184,7 +184,7 @@ def normalize_event_trigger(raw: dict, index: int) -> dict:
     }
 
 
-def load_event_triggers(raw_config: dict) -> list[dict]:
+def _load_event_triggers_from_config(raw_config: dict) -> list[dict]:
     raw = raw_config.get("system", {}).get("event_triggers")
     if raw is None:
         return []
@@ -202,3 +202,24 @@ def load_event_triggers(raw_config: dict) -> list[dict]:
         seen.add(spec["id"])
         triggers.append(spec)
     return triggers
+
+
+def load_event_triggers(
+    raw_config: dict,
+    house_doc: dict | None = None,
+    profile_id: str | None = None,
+) -> list[dict]:
+    """Prefer plant/consumer entity triggers; migrate config triggers when plant empty."""
+    from house_config.ehal_bindings import (
+        aggregate_event_triggers,
+        ensure_migrated,
+        house_has_entity_triggers,
+    )
+
+    house = house_doc if isinstance(house_doc, dict) else {}
+    if house_has_entity_triggers(house):
+        return aggregate_event_triggers(house, profile_id=profile_id)
+    migrated_house, _, _ = ensure_migrated(house, raw_config)
+    if house_has_entity_triggers(migrated_house):
+        return aggregate_event_triggers(migrated_house, profile_id=profile_id)
+    return _load_event_triggers_from_config(raw_config)

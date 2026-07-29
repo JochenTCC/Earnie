@@ -134,27 +134,31 @@ class OpenemsAdapter:
         if grid_raw is None or pv_raw is None or soc is None:
             raise OpenemsHttpError("OpenEMS telemetry missing required channel value(s)")
 
+        grid_w = openems_grid_to_ehal_w(grid_raw)
+        pv_w = max(0.0, float(pv_raw))
         doc: dict[str, Any] = {
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": _utc_ts(),
             "adapter_id": self.cfg.adapter_id,
-            "grid_power_active": openems_grid_to_ehal_w(grid_raw),
-            "pv_production_active": max(0.0, float(pv_raw)),
-            "ess_soc": float(soc),
+            "sens_grid_power_active": grid_w,
+            "sens_pv_production_active": pv_w,
+            "sens_ess_soc": float(soc),
         }
         ess_power = self._optional_channel(self.cfg.ess_component, "ActivePower")
         if ess_power is None:
             ess_power = self._optional_channel("_sum", "EssActivePower")
         if ess_power is not None:
-            doc["ess_power"] = float(ess_power)
+            doc["sens_ess_power"] = float(ess_power)
 
         if self.cfg.evcs_component:
             evcs_power = self._optional_channel(self.cfg.evcs_component, "ActivePower")
             if evcs_power is None:
                 evcs_power = self._optional_channel(self.cfg.evcs_component, "ChargePower")
             if evcs_power is not None:
-                doc["evcs_active_power"] = max(0.0, float(evcs_power))
+                doc["sens_evcs_active_power"] = max(0.0, float(evcs_power))
 
+        ess_w = float(doc.get("sens_ess_power") or 0.0)
+        doc["sens_power_consumers"] = max(0.0, pv_w - grid_w - ess_w)
         return validate_telemetry(doc)
 
     def write_setpoints(
@@ -174,7 +178,10 @@ class OpenemsAdapter:
                 for k in (
                     "set_ess_charge_power_limit",
                     "set_ess_discharge_power_limit",
+                    "set_ess_mode",
                     "set_evcs_max_current",
+                    "set_evcs_current",
+                    "set_evcs_mode",
                 )
                 if k in raw
             ]
