@@ -59,6 +59,41 @@ In der Sidebar unter **Info / About** (unten) und zusätzlich **am unteren Ende 
 
 Bei erkennbar inoffiziellen oder geänderten Builds (z. B. abweichende Git-Remote) kann zusätzlich ein Warnhinweis erscheinen. Das Banner ist bewusst sichtbar gehalten; es ist **nicht** technisch fälschungssicher.
 
+Unter **Info / About** kann zusätzlich ein kurzer Hinweis zum **Hardware-Fingerprint** und zum Registry-Status erscheinen (`unbound` / gebunden / Abweichung). Das ist optional und sperrt den Start **nicht**.
+
+### Hardware-Registry (`earnie_registry.json`)
+
+Die Datei `earnie_registry.json` ist eine **einmalig ausgestellte Bindung** Ihrer Earnie-Installation an Ihren Hardware-Fingerprint (Host und optional Smart-Home-IDs). Private Nutzung ohne diese Datei bleibt möglich; der Status bleibt dann `unbound`.
+
+**Wichtig:** Sie erzeugen die signierte Datei **nicht selbst**. Earnie berechnet nur den Fingerprint. Die Datei stellt der Rechteinhaber aus (derzeit per E-Mail; später ggf. Cloud-Portal).
+
+**So erhalten Sie die Datei:**
+
+1. Earnie starten (Docker oder lokal).
+2. In der Sidebar **Info / About** öffnen und den angezeigten **Hardware-Fingerprint** notieren (Kurzform genügt für die Anzeige; für die Ausstellung wird der vollständige 64-stellige Hex-Wert benötigt — siehe unten).
+3. Alternativ auf dem Host (Projektwurzel, mit Python-Umgebung):
+
+   ```text
+   python -m scripts.print_hardware_fingerprint
+   ```
+
+   Die Ausgabe enthält `fingerprint=` (vollständig) und `fingerprint_display=` (Kurzform).
+4. Per **Info / About → E-Mail schreiben** an `mail@techcreacon.com` den Fingerprint mitschicken (Betreff z. B. „Earnie Registry“). Optional die Kontakt-ZIP anhängen.
+5. Sie erhalten zurück die Datei `earnie_registry.json`.
+6. Datei ablegen unter:
+
+   | Installation | Ablageort |
+   |--------------|-----------|
+   | Docker / typisch | `earnie_env/runtime/earnie_registry.json` |
+   | eigener Runtime-Pfad | Ordner aus `EARNIE_RUNTIME_PATH` bzw. `…/runtime/` |
+   | abweichender Pfad | Umgebungsvariable `EARNIE_REGISTRY_PATH` auf die Datei setzen |
+
+7. Oberfläche neu laden und unter **Info / About** prüfen: Registry sollte als gebunden (`bound`) erscheinen. Steht dort „mismatch“, passt der Fingerprint nicht mehr zur Datei (z. B. anderer Host) — neuen Fingerprint senden und Datei erneut anfordern.
+
+**Was die Datei enthält (Kurz):** Fingerprint, Ausstellungszeit, optional Ablaufdatum, Aussteller und eine kryptografische Signatur. Ohne passende Signatur und ohne das serverseitige Geheimnis ist eine selbst gebaute Datei ungültig (`invalid_sig`).
+
+Die Datei wird **beim Rechteinhaber** erzeugt (Signatur mit einem nur dort bekannten Geheimnis), nicht in der Earnie-Oberfläche. Technische Aussteller-Anleitung: Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md`.
+
 ### Support
 
 - **Kontakt in der App:** Sidebar **Info / About** — Thema, Beschreibung, optional Anhänge; **Informationen in ZIP sammeln**, dann **E-Mail schreiben** und die ZIP-Datei manuell anhängen (wird nicht automatisch angehängt) an `mail@techcreacon.com`

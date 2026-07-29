@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.i Hardware registry + Layer C research spike (2026-07-28)
+
+- [x] **2.4.i** — Clarified one-time hardware-bound registry UX + Layer C prerequisites in [`docs/spec/hardware-registry-layer-c.md`](../docs/spec/hardware-registry-layer-c.md); spike: `runtime_store/hardware_identity.py`, `runtime_store/registry_entitlement.py` (dev HMAC), `share/registry/`, CLI `scripts/print_hardware_fingerprint.py` / `scripts/issue_dev_registry_token.py`, soft Info/About caption (no refuse-to-start, `release.yml` unchanged). Full Layer C enforcement deferred to `2.+1`.
+
+
 ### 2.4.h Multi-system field test (2026-07-28)
 
 - [x] **2.4.h — Multi-system field test (Phase 4)** *(was 2.5.d)* — Automated config-switch proof OpenEMS ↔ HA+evcc ↔ Loxone (`tests/test_ehal_contract_backends.py`: routing, power parity, ESS write asymmetry, capabilities); German adapter choice [`docs/einrichtung/adapter-wahl.md`](../docs/einrichtung/adapter-wahl.md); expanded connector recipe [`CONTRIBUTING.md`](../CONTRIBUTING.md) §3 + [`docs/spec/ehal.md`](../docs/spec/ehal.md). Live compose/HITL deferred (soft check for `2.4.0`).

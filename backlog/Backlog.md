@@ -24,20 +24,16 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-- [ ] **2.4.i — EFM auto-sync (interpretation C)** *(follow-up from 2.4.f / §3.1)*
+- [ ] **2.4.j — EFM auto-sync (interpretation C)** *(follow-up from 2.4.f / §3.1)*
   - Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths after structure compare-all (`2.4.f`) yields a chosen source
   - Manual blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
   - EFM has **no** multi-column Statistik export of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23)
-- [ ] **2.4.i**
-  - Clarify how user could get a one-time registry that is bound to their hardware
-  - What are the technical prerequisites to make that running?
-  - **Banner der Wahrheit — Layer C (deferred):** signed official builds / GHCR attestation + startup verifier; tie to hardware registry. Enforces attribution on *official* distribution only — not source forks. See plan outline (A + light B shipped in 2.2.0).
 - [ ] **2.4.0 — Release**
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
   - “All three southbounds” release: OpenEMS ↔ HA+evcc ↔ Loxone via config switch
   - LoxBerry Scope A MVP (`2.4.d`) is implemented; ship plugin ZIP with this release when ready (hardware install acceptance optional)
-  - **Note:** EFM auto-sync (`2.4.i`) is not a hard gate for `2.4.0`
+  - **Note:** EFM auto-sync (`2.4.j`) is not a hard gate for `2.4.0`
 
 
 ### Version 2.5 — Investigate full migration to 15‑min slots (former B)
@@ -61,6 +57,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.+1 — Introducing nested data models
 
+- [ ] **Banner der Wahrheit — Layer C enforcement** *(follow-up from 2.4.i spike)*
+  - Cosign/Sigstore in release CI + startup verifier + production signing keys
+  - Watermark vs refuse-to-start decision; offline public-key path
+  - Spec: [`docs/spec/hardware-registry-layer-c.md`](../docs/spec/hardware-registry-layer-c.md)
 - [ ] For manual consumers take also PV into account - not just tariffs (check)
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
   - Move Loxone markers to data model - remove flat definition in config.json where possible

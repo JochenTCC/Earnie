@@ -12,7 +12,7 @@ import streamlit as st
 
 from runtime_store.config_pack import build_config_pack_bytes
 from ui.doc_links import MANUAL_URL
-from ui.truth_banner import render_truth_banner
+from ui.truth_banner import render_registry_status_caption, render_truth_banner
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,7 @@ def render_info_sidebar() -> None:
     """Info / About expander: attribution banner, version, contact form."""
     with st.sidebar.expander("Info / About", expanded=False):
         render_truth_banner(where="inline")
+        render_registry_status_caption()
         st.link_button(
             "Benutzer-Handbuch",
             MANUAL_URL,

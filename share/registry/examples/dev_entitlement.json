@@ -1,0 +1,8 @@
+{
+  "fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "issued_at": "2026-07-28T12:00:00Z",
+  "expires_at": null,
+  "issuer": "earnie-dev",
+  "sig_alg": "hmac-sha256",
+  "sig": "ca8c95ecf12062767878e6a250d8447ba5c3f2935b852b7e53dd6e79015d941c"
+}

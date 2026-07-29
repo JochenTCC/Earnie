@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 import streamlit as st
 
 from runtime_store.env_vars import read_env
+from runtime_store.registry_entitlement import RegistryReport, registry_status
 from version import __version__
 
 OFFICIAL_REPO_URL = "https://github.com/JochenTCC/Earnie"
@@ -77,6 +78,41 @@ def _unofficial_message() -> str:
         f"Offizielles Projekt: [{OFFICIAL_REPO_URL}]({OFFICIAL_REPO_URL}). "
         f"Privat, {REQUIRED_PHRASE_NONCOMMERCIAL} — Version {__version__}."
     )
+
+
+def soft_registry_caption(report: RegistryReport | None = None) -> str | None:
+    """
+    Optional quiet caption for Info / About (never refuse-to-start).
+
+    Returns None when unbound (private use stays calm with no extra line).
+    """
+    try:
+        status_report = report if report is not None else registry_status()
+    except Exception:  # noqa: BLE001 — soft path
+        return None
+    fp = status_report.fingerprint_display or status_report.fingerprint[:16]
+    if status_report.status == "unbound":
+        if fp:
+            return f"Hardware-Fingerprint: `{fp}` · Registry: unbound (optional)"
+        return None
+    if status_report.status == "valid":
+        return f"Hardware-Fingerprint: `{fp}` · Registry: bound"
+    if status_report.status == "mismatch":
+        return (
+            f"Hardware-Fingerprint: `{fp}` · Registry: mismatch "
+            "(entitlement does not match this host)"
+        )
+    return (
+        f"Hardware-Fingerprint: `{fp}` · Registry: invalid "
+        f"({status_report.detail or 'signature'})"
+    )
+
+
+def render_registry_status_caption() -> None:
+    """Render soft registry line in the active Streamlit container."""
+    line = soft_registry_caption()
+    if line:
+        st.caption(line)
 
 
 def render_truth_banner(*, where: Literal["sidebar", "main", "inline"]) -> None:

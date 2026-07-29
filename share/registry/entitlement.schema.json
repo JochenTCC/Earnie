@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://earnie.local/registry/entitlement.schema.json",
+  "title": "Earnie hardware registry entitlement (2.4.i spike)",
+  "description": "One-time entitlement bound to a hardware fingerprint. Spike uses HMAC-SHA256 with EARNIE_REGISTRY_DEV_SECRET — not production Layer C.",
+  "type": "object",
+  "required": [
+    "fingerprint",
+    "issued_at",
+    "expires_at",
+    "issuer",
+    "sig_alg",
+    "sig"
+  ],
+  "properties": {
+    "fingerprint": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Full SHA-256 hex hardware fingerprint"
+    },
+    "issued_at": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ISO-8601 UTC issue time"
+    },
+    "expires_at": {
+      "description": "ISO-8601 UTC expiry, or null for one-time forever",
+      "oneOf": [
+        {"type": "null"},
+        {"type": "string", "minLength": 1}
+      ]
+    },
+    "issuer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sig_alg": {
+      "type": "string",
+      "enum": ["hmac-sha256"]
+    },
+    "sig": {
+      "type": "string",
+      "minLength": 64,
+      "pattern": "^[0-9a-fA-F]+$",
+      "description": "Hex HMAC over canonical signing payload"
+    }
+  },
+  "additionalProperties": false
+}
