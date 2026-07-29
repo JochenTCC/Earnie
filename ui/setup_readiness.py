@@ -310,9 +310,43 @@ def is_betrieb_unlocked() -> bool:
     return _loxone_markers_complete()
 
 
+_REQUIRED_PLANT_LIVE_FIELDS = (
+    "sens_grid_power_active",
+    "sens_pv_production_active",
+    "sens_ess_soc",
+    "set_ess_charge_power_limit",
+    "set_ess_discharge_power_limit",
+    "set_ess_mode",
+)
+
+
+def _required_plant_live_bindings_present() -> bool:
+    """True when required plant telemetry + ESS setpoints resolve to Merker names."""
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    raw = _read_json_document(resolve_config_json_path())
+    house = _read_json_document(resolve_house_profiles_json_path())
+    for field in _REQUIRED_PLANT_LIVE_FIELDS:
+        if not str(resolve_plant_binding(house, field, raw) or "").strip():
+            return False
+    return True
+
+
 def _loxone_markers_complete() -> bool:
-    """Prüfung aller benötigten Loxone-Merker — noch nicht implementiert."""
-    return False
+    """Hub credentials plus required plant live bindings (or HA/OpenEMS hub ready)."""
+    from runtime_store.ehal_setup import (
+        BACKEND_HA,
+        BACKEND_OPENEMS,
+        active_ehal_backend,
+        hub_credentials_configured,
+    )
+
+    if not hub_credentials_configured():
+        return False
+    backend = active_ehal_backend()
+    if backend in (BACKEND_HA, BACKEND_OPENEMS):
+        return True
+    return _required_plant_live_bindings_present()
 
 
 def is_scenario_editor_unlocked() -> bool:

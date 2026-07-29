@@ -27,7 +27,6 @@ SETPOINT_FIELDS = (
     "set_ess_discharge_power_limit",
     "set_ess_mode",
     "set_evcs_max_current",
-    "set_evcs_current",
     "set_evcs_mode",
 )
 EHAL_MAP_FIELDS = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + SETPOINT_FIELDS
@@ -67,7 +66,6 @@ except ImportError:  # pragma: no cover
         "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
         "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl",
         "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
-        "set_evcs_current": "Setpoint Wallbox-Strom (A)",
         "set_evcs_mode": "Setpoint Wallbox-Modus (pv|now)",
         "target_soc_name": "Loxone-Extras: Ziel-SOC",
     }
@@ -82,14 +80,19 @@ _HINTS: dict[str, tuple[str, ...]] = {
     "set_ess_charge_power_limit": ("ladeleistung", "charge", "zwangslade"),
     "set_ess_discharge_power_limit": ("entlade", "discharge"),
     "set_ess_mode": ("steuerbefehl", "control_cmd", "huawei", "modbus cmd", "ess mode"),
-    "set_evcs_max_current": ("maxstrom", "max current", "ladestrom"),
-    "set_evcs_current": ("sollstrom", "set current", "ladestrom soll"),
+    "set_evcs_max_current": (
+        "maxstrom",
+        "max current",
+        "ladestrom",
+        "sollstrom",
+        "set current",
+    ),
     "set_evcs_mode": ("pv_follow", "sofort", "charge_immediate", "ev mode"),
     "get_evcs_limit_soc": ("limit soc", "ladeziel", "target soc ev", "limit_soc"),
     "sens_evcs_connected": ("angeschlossen", "plugged", "connected", "ev da"),
     "sens_evcs_soc_act": ("ev soc", "fahrzeug soc", "ist-soc", "vehicle soc"),
     "sens_evcs_bat_capacity": ("kapazität", "capacity", "akkukapazität"),
-    "sens_evcs_nominal_current": ("nennstrom", "nominal", "maxstrom ev"),
+    "get_evcs_nominal_current": ("nennstrom", "nominal", "maxstrom ev"),
     "get_evcs_ready_by_time": ("fertig", "ready", "deadline"),
     "flex.power_name": ("leistung", "power", "verbrauch"),
     "flex.enable_name": ("freigabe", "enable", "sg ready"),

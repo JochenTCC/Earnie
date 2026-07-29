@@ -44,6 +44,26 @@ def resolve_output_marker(consumer: dict, ehal_field: str, *, legacy: str) -> st
     )
 
 
+def marker_sens_evcs_active_power(consumer: dict) -> str:
+    """EV wallbox power: bindings first, else ``loxone_inputs.power_name``."""
+    inputs = consumer.get("loxone_inputs") or {}
+    return _first_nonempty(
+        ehal_bindings(consumer).get("sens_evcs_active_power"),
+        inputs.get("sens_evcs_active_power"),
+        inputs.get("power_name"),
+    )
+
+
+def marker_flex_power(consumer: dict) -> str:
+    """Consumer Messwert power: bindings ``flex.power_name``, else inputs."""
+    inputs = consumer.get("loxone_inputs") or {}
+    return _first_nonempty(
+        ehal_bindings(consumer).get("flex.power_name"),
+        inputs.get("flex.power_name"),
+        inputs.get("power_name"),
+    )
+
+
 def marker_sens_evcs_connected(consumer: dict) -> str:
     return resolve_lox_marker(
         consumer, "sens_evcs_connected", legacy="plugged_in_name"
@@ -62,9 +82,15 @@ def marker_sens_evcs_bat_capacity(consumer: dict) -> str:
     )
 
 
-def marker_sens_evcs_nominal_current(consumer: dict) -> str:
-    return resolve_lox_marker(
-        consumer, "sens_evcs_nominal_current", legacy="nominal_power_kw_name"
+def marker_get_evcs_nominal_current(consumer: dict) -> str:
+    """Nominal current Merker; dual-read legacy ``sens_evcs_nominal_current`` / kW name."""
+    lox = charging_loxone(consumer)
+    return _first_nonempty(
+        ehal_bindings(consumer).get("get_evcs_nominal_current"),
+        ehal_bindings(consumer).get("sens_evcs_nominal_current"),
+        lox.get("get_evcs_nominal_current"),
+        lox.get("sens_evcs_nominal_current"),
+        lox.get("nominal_power_kw_name"),
     )
 
 
@@ -75,14 +101,14 @@ def marker_get_evcs_ready_by_time(consumer: dict) -> str:
 
 
 def marker_set_evcs_max_current(consumer: dict) -> str:
-    return resolve_output_marker(
-        consumer, "set_evcs_max_current", legacy="set_evcs_max_current"
-    )
-
-
-def marker_set_evcs_current(consumer: dict) -> str:
-    return resolve_output_marker(
-        consumer, "set_evcs_current", legacy="power_setpoint_name"
+    """EV current setpoint Merker; dual-read legacy ``set_evcs_current`` / ``power_setpoint_name``."""
+    outputs = loxone_outputs(consumer)
+    return _first_nonempty(
+        ehal_bindings(consumer).get("set_evcs_max_current"),
+        ehal_bindings(consumer).get("set_evcs_current"),
+        outputs.get("set_evcs_max_current"),
+        outputs.get("set_evcs_current"),
+        outputs.get("power_setpoint_name"),
     )
 
 
@@ -109,14 +135,18 @@ def marker_set_evcs_mode(consumer: dict) -> str:
     )
 
 
+def marker_get_evcs_limit_soc(consumer: dict) -> str:
+    return _first_nonempty(
+        ehal_bindings(consumer).get("get_evcs_limit_soc"),
+        charging_loxone(consumer).get("get_evcs_limit_soc"),
+    )
+
+
 def resolve_get_evcs_limit_soc(consumer: dict) -> float:
     """Limit SoC %: optional ``get_evcs_limit_soc`` Merker, else profile percent."""
     from integrations import loxone_client
 
-    io_name = _first_nonempty(
-        ehal_bindings(consumer).get("get_evcs_limit_soc"),
-        charging_loxone(consumer).get("get_evcs_limit_soc"),
-    )
+    io_name = marker_get_evcs_limit_soc(consumer)
     if io_name:
         raw = loxone_client.fetch_loxone_generic_value(io_name)
         if raw is None:

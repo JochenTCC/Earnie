@@ -63,7 +63,7 @@
       "maximum": 100,
       "description": "Optional EV vehicle SoC in %."
     },
-    "sens_evcs_nominal_current": {
+    "get_evcs_nominal_current": {
       "type": ["number", "null"],
       "minimum": 0,
       "description": "Optional EVCS nominal / max charge current in A."

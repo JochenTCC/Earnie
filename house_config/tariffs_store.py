@@ -31,6 +31,13 @@ VALID_CURRENCIES = frozenset({"EUR", "CHF"})
 _EXPORT_TARIFF_ID_ALIASES: dict[str, str] = {
     "awattar_sunny_float": "dynamic_epex",
 }
+# Pre-spot_hourly type names (catalog / greenfield leftovers).
+_LEGACY_IMPORT_TYPES: dict[str, str] = {
+    "awattar": "spot_hourly",
+}
+_LEGACY_EXPORT_TYPES: dict[str, str] = {
+    "dynamic_epex": "spot_hourly",
+}
 # Legacy tariff ids that must share one supplier_id for monthly-fee dedupe.
 _SUPPLIER_ID_BY_TARIFF_ID: dict[str, str] = {
     "awattar_at": "awattar_at",
@@ -299,6 +306,46 @@ def migrate_export_monthly_float_in_doc(doc: dict) -> list[str]:
     return migrated
 
 
+def _migrate_type_aliases(
+    items: list,
+    *,
+    aliases: dict[str, str],
+    kind: str,
+) -> list[str]:
+    migrated: list[str] = []
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        tariff_type = str(item.get("type", "")).strip().lower()
+        target = aliases.get(tariff_type)
+        if not target:
+            continue
+        tariff_id = str(item.get("id", "")).strip() or f"{kind}[{index}]"
+        item["type"] = target
+        migrated.append(tariff_id)
+    return migrated
+
+
+def migrate_legacy_spot_types_in_doc(doc: dict) -> list[str]:
+    """In-place soft migrate: awattar/dynamic_epex → spot_hourly."""
+    migrated: list[str] = []
+    imports = doc.get("import_tariffs")
+    if isinstance(imports, list):
+        migrated.extend(
+            _migrate_type_aliases(
+                imports, aliases=_LEGACY_IMPORT_TYPES, kind="import_tariffs"
+            )
+        )
+    exports = doc.get("export_tariffs")
+    if isinstance(exports, list):
+        migrated.extend(
+            _migrate_type_aliases(
+                exports, aliases=_LEGACY_EXPORT_TYPES, kind="export_tariffs"
+            )
+        )
+    return migrated
+
+
 def normalize_tariffs_document(doc: dict) -> dict:
     if not isinstance(doc, dict):
         raise ValueError("tariffs.json muss ein Objekt sein.")
@@ -308,6 +355,7 @@ def normalize_tariffs_document(doc: dict) -> dict:
         raise ValueError("import_tariffs muss ein Array sein.")
     if not isinstance(exports_raw, list):
         raise ValueError("export_tariffs muss ein Array sein.")
+    migrate_legacy_spot_types_in_doc(doc)
     migrate_export_monthly_float_in_doc(doc)
     imports: dict[str, dict] = {}
     for index, item in enumerate(imports_raw):

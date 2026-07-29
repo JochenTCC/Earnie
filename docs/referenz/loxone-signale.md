@@ -58,11 +58,10 @@ Live-Steuerung kommt aus dem aktiven Hausprofil (`house_profiles.json`). Nach Cu
 | `sens_evcs_connected` | Lesen | `EAuto_Angeschlossen` | `1` = angeschlossen |
 | `sens_evcs_soc_act` | Lesen | `Ernie-SOC-Ist-EAuto` | Aktueller SOC, % |
 | `sens_evcs_bat_capacity` | Lesen | `Batteriekapazität_E-Auto` | kWh |
-| `sens_evcs_nominal_current` | Lesen | `EAuto_MaxStrom` | A |
+| `get_evcs_nominal_current` | Lesen | `EAuto_MaxStrom` | A |
 | `get_evcs_ready_by_time` | Lesen | `EAuto_FertigUm` | Text / Uhrzeit |
 | `get_evcs_limit_soc` | Lesen | (optional) | Ladeziel-SOC % |
-| `set_evcs_current` | Schreiben | `Ernie_EAuto_Soll_A` | Sollstrom A |
-| `set_evcs_max_current` | Schreiben | (optional) | Maxstrom A |
+| `set_evcs_max_current` | Schreiben | `Ernie_EAuto_Soll_A` | Soll-/Maxstrom A |
 | `set_evcs_mode` | Schreiben | (optional) | `pv` \| `now` |
 
 Zusätzlich Pflichtfeld **`min_power_kw`** am Verbraucher. SwimSpa-Filter-Overrides können noch unter `swimspa_filter_bindings` liegen (Bridge-Defaults); Pflege der Haupt-Merker über EHAL-Com.
@@ -86,7 +85,7 @@ Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden)
 | Verbraucher (`id`) | Steuerung (Schreiben) | Leistung (Lesen) |
 |--------------------|----------------------|------------------|
 | `swimspa` | `flex.enable_name` → `Ernie_SwimSpa_Freigabe` | `flex.power_name` → `Ernie_Swim-Spa-P_act` |
-| `eauto` | `set_evcs_current` / `set_evcs_mode` | `sens_evcs_*` / `flex.power_name` |
+| `eauto` | `set_evcs_max_current` / `set_evcs_mode` | `sens_evcs_*` / `flex.power_name` |
 | `wp_heating` | `flex.enable_name` → `Ernie_WP_Freigabe` | `flex.power_name` → `Ernie_WP_P_act` |
 
 ## Lesen vs. Schreiben in `main.py`

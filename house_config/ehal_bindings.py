@@ -17,7 +17,7 @@ _EV_CHARGING_TO_EHAL: dict[str, str] = {
     "plugged_in_name": "sens_evcs_connected",
     "actual_soc_name": "sens_evcs_soc_act",
     "battery_capacity_kwh_name": "sens_evcs_bat_capacity",
-    "nominal_power_kw_name": "sens_evcs_nominal_current",
+    "nominal_power_kw_name": "get_evcs_nominal_current",
     "ready_by_time_name": "get_evcs_ready_by_time",
     "charge_immediate_name": "charge_immediate_name",
     "get_evcs_limit_soc": "get_evcs_limit_soc",
@@ -25,7 +25,8 @@ _EV_CHARGING_TO_EHAL: dict[str, str] = {
     "sens_evcs_connected": "sens_evcs_connected",
     "sens_evcs_soc_act": "sens_evcs_soc_act",
     "sens_evcs_bat_capacity": "sens_evcs_bat_capacity",
-    "sens_evcs_nominal_current": "sens_evcs_nominal_current",
+    "sens_evcs_nominal_current": "get_evcs_nominal_current",
+    "get_evcs_nominal_current": "get_evcs_nominal_current",
     "get_evcs_ready_by_time": "get_evcs_ready_by_time",
 }
 
@@ -70,9 +71,13 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
         return
     _put_binding(bindings, "flex.enable_name", outputs.get("enable_name"))
     _put_binding(bindings, "pv_follow_name", outputs.get("pv_follow_name"))
-    setpoint = outputs.get("power_setpoint_name") or outputs.get("set_evcs_current")
+    setpoint = (
+        outputs.get("power_setpoint_name")
+        or outputs.get("set_evcs_max_current")
+        or outputs.get("set_evcs_current")
+    )
     if consumer.get("type") == "ev":
-        _put_binding(bindings, "set_evcs_current", setpoint)
+        _put_binding(bindings, "set_evcs_max_current", setpoint)
     else:
         _put_binding(bindings, "flex.power_setpoint_name", setpoint)
     _put_binding(bindings, "set_evcs_mode", outputs.get("set_evcs_mode"))
@@ -84,7 +89,14 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     existing = consumer.get("ehal_bindings")
     if isinstance(existing, dict):
         for key, value in existing.items():
-            _put_binding(bindings, str(key), value)
+            key_s = str(key)
+            if key_s == "set_evcs_current":
+                field = "set_evcs_max_current"
+            elif key_s == "sens_evcs_nominal_current":
+                field = "get_evcs_nominal_current"
+            else:
+                field = key_s
+            _put_binding(bindings, field, value)
     sched = consumer.get("charging_schedule")
     if isinstance(sched, dict) and isinstance(sched.get("loxone"), dict):
         _migrate_charging_loxone(sched["loxone"], bindings)

@@ -126,6 +126,16 @@ def test_build_ehal_write_records_marks_failed_fields():
 def test_build_telemetry_rows():
     from ui.loxone_debug import build_telemetry_rows
 
-    rows = build_telemetry_rows({"ess_soc": 55.0, "grid_power_active": 100}, "t0")
+    rows = build_telemetry_rows(
+        {
+            "schema_version": 2,
+            "sens_ess_soc": 55.0,
+            "sens_grid_power_active": 100,
+        },
+        "t0",
+        mapping={"sens_ess_soc": "sensor.soc"},
+        expected_fields=["sens_ess_soc", "sens_grid_power_active"],
+    )
     assert len(rows) == 2
-    assert rows[0]["EHAL-Feld"] == "ess_soc"
+    assert rows[0]["EHAL-Feld"] == "sens_ess_soc"
+    assert rows[0]["Mapping"] == "sensor.soc"

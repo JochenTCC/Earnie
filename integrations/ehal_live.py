@@ -188,7 +188,6 @@ def get_loxone_adapter() -> LoxoneAdapter:
         ),
         control_cmd_name=str(config.get("LOXONE_CONTROL_CMD_NAME") or ""),
         consumers_power_name=str(config.get("LOXONE_CONSUMERS_POWER_NAME") or ""),
-        evcs_current_name=str(ev.get("evcs_current_name") or ""),
         evcs_max_current_name=str(ev.get("evcs_max_current_name") or ""),
         pv_follow_name=str(ev.get("pv_follow_name") or ""),
         charge_immediate_name=str(ev.get("charge_immediate_name") or ""),
@@ -397,7 +396,6 @@ def _first_ev_loxone_bindings() -> dict[str, str]:
     from settings.ehal_marker_resolve import (
         marker_charge_immediate,
         marker_pv_follow,
-        marker_set_evcs_current,
         marker_set_evcs_max_current,
     )
 
@@ -405,7 +403,6 @@ def _first_ev_loxone_bindings() -> dict[str, str]:
     if consumer is None:
         return {}
     return {
-        "evcs_current_name": marker_set_evcs_current(consumer),
         "evcs_max_current_name": marker_set_evcs_max_current(consumer),
         "pv_follow_name": marker_pv_follow(consumer),
         "charge_immediate_name": marker_charge_immediate(consumer),

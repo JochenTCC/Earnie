@@ -11,7 +11,7 @@ from house_config.ehal_bindings import (
     strip_migrated_config_keys,
 )
 from settings.config_loaders import load_loxone_block_params
-from settings.ehal_marker_resolve import marker_sens_evcs_connected, marker_set_evcs_current
+from settings.ehal_marker_resolve import marker_sens_evcs_connected, marker_set_evcs_max_current
 from settings.system_settings import load_event_triggers
 
 
@@ -57,10 +57,10 @@ def test_migrate_consumer_legacy_to_ehal_bindings_ev():
     assert bindings["sens_evcs_connected"] == "EV_Da"
     assert bindings["sens_evcs_soc_act"] == "EV_SOC"
     assert bindings["sens_evcs_bat_capacity"] == "EV_Cap"
-    assert bindings["sens_evcs_nominal_current"] == "EV_A"
+    assert bindings["get_evcs_nominal_current"] == "EV_A"
     assert bindings["get_evcs_ready_by_time"] == "EV_Ready"
     assert bindings["charge_immediate_name"] == "EV_Now"
-    assert bindings["set_evcs_current"] == "EV_SetA"
+    assert bindings["set_evcs_max_current"] == "EV_SetA"
     assert bindings["pv_follow_name"] == "EV_PV"
     assert bindings["flex.power_name"] == "EV_Power"
     assert bindings["flex.enable_name"] == "EV_Enable"
@@ -75,7 +75,7 @@ def test_migrate_consumer_flex_power_setpoint():
     }
     bindings = migrate_consumer_legacy_to_ehal_bindings(consumer)
     assert bindings["flex.power_setpoint_name"] == "Pump_Set"
-    assert "set_evcs_current" not in bindings
+    assert "set_evcs_max_current" not in bindings
 
 
 def test_migrate_config_triggers_to_plant_event_stub():
@@ -274,10 +274,10 @@ def test_ehal_marker_resolve_prefers_bindings():
     consumer = {
         "ehal_bindings": {
             "sens_evcs_connected": "Bind_Da",
-            "set_evcs_current": "Bind_A",
+            "set_evcs_max_current": "Bind_A",
         },
         "charging_schedule": {"loxone": {"plugged_in_name": "Legacy_Da"}},
         "loxone_outputs": {"power_setpoint_name": "Legacy_A"},
     }
     assert marker_sens_evcs_connected(consumer) == "Bind_Da"
-    assert marker_set_evcs_current(consumer) == "Bind_A"
+    assert marker_set_evcs_max_current(consumer) == "Bind_A"

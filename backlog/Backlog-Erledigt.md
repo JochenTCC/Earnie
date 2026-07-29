@@ -3,9 +3,14 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### EHAL-Com Live-Lesen / Live-Schreiben EHAL columns (2026-07-29)
+
+- [x] Update Chapter "Live-Lesen" in EHAL-Com with EHAL value names and actual mapping to smarthome backend — Live-Lesen only `sens_*`/`get_*` (no PV-Zähler / `set_*`); Live-Schreiben `set_*` with columns EHAL-Feld + Mapping; UI [`ui/loxone_debug.py`](../ui/loxone_debug.py), probes [`integrations/loxone_connectivity.py`](../integrations/loxone_connectivity.py), helpers [`integrations/ehal_debug_mapping.py`](../integrations/ehal_debug_mapping.py); German [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md)
+
+
 ### 2.4.j / 2.4.k EHAL wire + entity mapping (2026-07-29)
 
-- [x] **2.4.j — EHAL wire & core semantics** — `schema_version` 2; §C `sens_*` / `set_*` / `get_*` in schemas, roles, adapters (Loxone/HA/OpenEMS), `ehal_live`; PV ∫ power → `pv_kwh_interval`; drop ESS `target_soc` / EV plug-in Rest-SOC / Sofortladen countdown Merker; `set_ess_mode`, `set_evcs_current`, `set_evcs_mode`, `sens_evcs_nominal_current`, `sens_power_consumers` (Merker or derive); docs [`docs/spec/ehal.md`](../docs/spec/ehal.md).
+- [x] **2.4.j — EHAL wire & core semantics** — `schema_version` 2; §C `sens_*` / `set_*` / `get_*` in schemas, roles, adapters (Loxone/HA/OpenEMS), `ehal_live`; PV ∫ power → `pv_kwh_interval`; drop ESS `target_soc` / EV plug-in Rest-SOC / Sofortladen countdown Merker; `set_ess_mode`, `set_evcs_current`, `set_evcs_mode`, `get_evcs_nominal_current`, `sens_power_consumers` (Merker or derive); docs [`docs/spec/ehal.md`](../docs/spec/ehal.md).
 - [x] **2.4.k — Entity-centric EHAL mapping** — `house_profiles` `plant` / `consumers[].ehal_bindings` + entity `event_triggers` (out of `config.json`); migrator/aggregate [`house_config/ehal_bindings.py`](../house_config/ehal_bindings.py); EHAL-Com entity HITL save; remove scattered Merker editors; German [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md).
 
 

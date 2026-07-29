@@ -70,11 +70,11 @@ def _select_entity(
     options: list[str],
     required: bool,
 ) -> str:
-    label = _FIELD_LABELS.get(field, field)
+    meaning = _FIELD_LABELS.get(field, field)
     suffix = " *" if required else ""
     choice = current if current in options else _NONE
     selected = st.selectbox(
-        f"{label}{suffix}",
+        f"{meaning} (`{field}`){suffix}",
         options=options,
         index=options.index(choice) if choice in options else 0,
         key=f"ehal_ha_map_{field}",

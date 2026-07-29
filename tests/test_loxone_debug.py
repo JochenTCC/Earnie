@@ -2,14 +2,17 @@
 from __future__ import annotations
 
 import os
+from unittest.mock import patch
 
 os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 
 from integrations.loxone_comm_trace import LoxoneWriteRecord, serialize_write_records
 from integrations.loxone_connectivity import LoxoneCheck
 from ui.loxone_debug import (
+    build_ehal_write_rows,
     build_intended_write_rows,
     build_read_rows,
+    build_telemetry_rows,
     build_write_rows_from_trace,
     read_check_status_label,
     write_summary_text,
@@ -30,14 +33,46 @@ def test_serialize_write_records():
 
 def test_build_read_rows_includes_timestamp():
     checks = [
-        LoxoneCheck("SoC", "Ernie_SOC", True, "Wert=65.0"),
-        LoxoneCheck("PV", "Ernie_PV", False, "Timeout", severity="warning"),
+        LoxoneCheck("sens_ess_soc", "Ernie_SOC", True, "Wert=65.0"),
+        LoxoneCheck("sens_pv_production_active", "Ernie_PV", False, "Timeout", severity="warning"),
     ]
-    rows = build_read_rows(checks, "2026-07-14T12:00:00")
+    rows = build_read_rows(
+        checks,
+        "2026-07-14T12:00:00",
+        expected_fields=["sens_ess_soc", "sens_pv_production_active"],
+    )
     assert len(rows) == 2
+    assert rows[0]["EHAL-Feld"] == "sens_ess_soc"
+    assert rows[0]["Mapping"] == "Ernie_SOC"
+    assert rows[0]["Wert"] == "65.0"
     assert rows[0]["Status"] == "OK"
     assert rows[0]["Zuletzt gelesen"] == "2026-07-14T12:00:00"
     assert rows[1]["Status"] == "Warnung"
+    assert rows[1]["Wert"] == ""
+    assert rows[1]["Detail"] == "Timeout"
+
+
+def test_build_read_rows_includes_flex_power():
+    checks = [
+        LoxoneCheck("wp:flex.power_name", "Ernie_WP", True, "Wert=1.2"),
+    ]
+    rows = build_read_rows(checks, "t0", expected_fields=["wp:flex.power_name"])
+    assert len(rows) == 1
+    assert rows[0]["EHAL-Feld"] == "wp:flex.power_name"
+    assert rows[0]["Mapping"] == "Ernie_WP"
+
+
+def test_build_read_rows_unmapped_expected_empty_mapping():
+    rows = build_read_rows(
+        [],
+        "t0",
+        expected_fields=["sens_ess_soc", "car:sens_evcs_active_power"],
+    )
+    assert len(rows) == 2
+    assert rows[0]["Mapping"] == ""
+    assert rows[0]["Status"] == "Kein Mapping"
+    assert rows[1]["EHAL-Feld"] == "car:sens_evcs_active_power"
+    assert rows[1]["Mapping"] == ""
 
 
 def test_read_check_status_label():
@@ -46,20 +81,121 @@ def test_read_check_status_label():
     assert read_check_status_label(LoxoneCheck("x", "io", False, "bad")) == "Fehler"
 
 
-def test_build_write_rows_from_trace():
-    rows = build_write_rows_from_trace(
-        [{"io_name": "A", "value": 1.5, "success": True, "written_at": "2026-07-14T10:00:00"}]
-    )
+def test_build_write_rows_from_trace_maps_set_fields():
+    with patch(
+        "ui.loxone_debug.build_loxone_setpoint_io_index",
+        return_value={"Ernie_Charge": "set_ess_charge_power_limit"},
+    ), patch(
+        "ui.loxone_debug.loxone_write_field_to_io",
+        return_value={"set_ess_charge_power_limit": "Ernie_Charge"},
+    ):
+        rows = build_write_rows_from_trace(
+            [
+                {
+                    "io_name": "Ernie_Charge",
+                    "value": 1.5,
+                    "success": True,
+                    "written_at": "2026-07-14T10:00:00",
+                },
+                {
+                    "io_name": "Other_Marker",
+                    "value": 0.0,
+                    "success": True,
+                    "written_at": "2026-07-14T10:00:01",
+                },
+            ],
+            expected_fields=["set_ess_charge_power_limit"],
+        )
+    assert len(rows) == 1
+    assert rows[0]["EHAL-Feld"] == "set_ess_charge_power_limit"
+    assert rows[0]["Mapping"] == "Ernie_Charge"
     assert rows[0]["Erfolg"] == "Ja"
     assert rows[0]["Wert"] == "1.5"
 
 
+def test_build_write_rows_includes_unmapped_expected():
+    with patch("ui.loxone_debug.build_loxone_setpoint_io_index", return_value={}), patch(
+        "ui.loxone_debug.loxone_write_field_to_io", return_value={}
+    ):
+        rows = build_write_rows_from_trace(
+            [],
+            expected_fields=["set_ess_charge_power_limit", "set_ess_mode"],
+        )
+    assert len(rows) == 2
+    assert rows[0]["Mapping"] == ""
+    assert rows[0]["Wert"] == ""
+    assert rows[1]["EHAL-Feld"] == "set_ess_mode"
+
+
+def test_build_ehal_write_rows_includes_mapping():
+    rows = build_ehal_write_rows(
+        [
+            {
+                "field": "set_ess_charge_power_limit",
+                "value": 1000,
+                "success": True,
+                "written_at": "t0",
+                "message": "",
+            }
+        ],
+        mapping={"set_ess_charge_power_limit": "number.ess_charge"},
+        expected_fields=["set_ess_charge_power_limit"],
+    )
+    assert rows[0]["EHAL-Feld"] == "set_ess_charge_power_limit"
+    assert rows[0]["Mapping"] == "number.ess_charge"
+
+
 def test_build_intended_write_rows_for_silent_mode():
-    rows = build_intended_write_rows({"Ernie_Mode": 2.0}, "2026-07-14T09:00:00")
-    assert rows[0]["Status"] == "Nicht gesendet (Silent-Modus)"
-    assert rows[0]["Sollwert"] == "2.0"
+    with patch(
+        "ui.loxone_debug.build_loxone_setpoint_io_index",
+        return_value={"Ernie_Mode": "set_ess_mode"},
+    ), patch(
+        "ui.loxone_debug.loxone_write_field_to_io",
+        return_value={"set_ess_mode": "Ernie_Mode"},
+    ):
+        rows = build_intended_write_rows(
+            {"Ernie_Mode": 2.0},
+            "2026-07-14T09:00:00",
+            expected_fields=["set_ess_mode"],
+        )
+    assert rows[0]["EHAL-Feld"] == "set_ess_mode"
+    assert rows[0]["Mapping"] == "Ernie_Mode"
+    assert rows[0]["Meldung"] == "Nicht gesendet (Silent-Modus)"
+    assert rows[0]["Wert"] == "2.0"
 
 
 def test_write_summary_text():
     assert write_summary_text([]) == "Keine Schreibvorgänge erfasst."
     assert write_summary_text([{"success": True}, {"success": False}]) == "1/2 Schreibvorgänge erfolgreich"
+
+
+def test_build_telemetry_rows_filters_and_maps():
+    rows = build_telemetry_rows(
+        {
+            "schema_version": 2,
+            "ts": "t",
+            "adapter_id": "ha",
+            "sens_ess_soc": 55.0,
+            "sens_grid_power_active": 100,
+        },
+        "t0",
+        mapping={"sens_ess_soc": "sensor.soc", "sens_grid_power_active": "sensor.grid"},
+        expected_fields=["sens_ess_soc", "sens_grid_power_active"],
+    )
+    assert len(rows) == 2
+    assert rows[0]["EHAL-Feld"] == "sens_ess_soc"
+    assert rows[0]["Mapping"] == "sensor.soc"
+    assert "schema_version" not in {r["EHAL-Feld"] for r in rows}
+
+
+def test_build_telemetry_rows_pads_unmapped_expected():
+    rows = build_telemetry_rows(
+        {"sens_ess_soc": 10.0},
+        "t0",
+        mapping={"sens_ess_soc": "sensor.soc"},
+        expected_fields=["sens_ess_soc", "sens_grid_power_active"],
+    )
+    assert len(rows) == 2
+    by_field = {r["EHAL-Feld"]: r for r in rows}
+    assert by_field["sens_grid_power_active"]["Mapping"] == ""
+    assert by_field["sens_grid_power_active"]["Status"] == "Kein Mapping"

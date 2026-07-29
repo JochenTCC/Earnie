@@ -352,8 +352,8 @@ Damit nutzen Live-Optimierung und Szenario-Explorer dieselbe Auflösungslogik.
 Unter **Daemon Control → EHAL-Com** (Anbindung / Debug / Abnahme):
 
 - **Anbindung:** Backend wählen (Loxone / Home Assistant / OpenEMS) und Zugangsdaten speichern  
-- **Live-Lesen:** Merker (Loxone) bzw. EHAL-Telemetrie (HA/OpenEMS), periodisch aktualisiert  
-- **Live-Schreiben:** was `main.py` zuletzt gesendet hat (Erfolg ja/nein)  
+- **Live-Lesen:** `sens_*` / `get_*` mit EHAL-Feld und Backend-Mapping, periodisch aktualisiert  
+- **Live-Schreiben:** `set_*` aus dem letzten Produktiv-Lauf (EHAL-Feld + Mapping, Erfolg ja/nein)  
 - **Silent-Modus:** Earnie berechnet und zeigt Sollwerte, **schreibt aber nicht** an den Hub — sinnvoll für Tests  
 - **Live-Modus:** Schreiben aktiv — erst nach erfolgreicher Lesekontrolle umschalten  
 

@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from settings.ehal_marker_resolve import (
     marker_pv_follow,
-    marker_set_evcs_current,
+    marker_set_evcs_max_current,
     marker_set_evcs_mode,
 )
 
 
 def uses_power_setpoint(consumer: dict) -> bool:
     """True, wenn die Optimierung einen Leistungs-/Strom-Sollwert an Loxone sendet."""
-    return bool(marker_set_evcs_current(consumer))
+    return bool(marker_set_evcs_max_current(consumer))
 
 
 def uses_pv_follow(consumer: dict) -> bool:
@@ -33,7 +33,7 @@ def power_limits_kw(consumer: dict) -> tuple[float, float]:
     if min_kw is None:
         raise ValueError(
             f"Verbraucher '{consumer.get('id', '?')}': min_power_kw fehlt "
-            "(Pflicht bei set_evcs_current / power_setpoint_name)."
+            "(Pflicht bei set_evcs_max_current / power_setpoint_name)."
         )
     min_kw = float(min_kw)
     if min_kw < 0.0:

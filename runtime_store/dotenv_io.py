@@ -31,6 +31,15 @@ def _is_placeholder_credential(key: str, value: str) -> bool:
     return False
 
 
+def read_loxone_credentials() -> tuple[str, str, str]:
+    """Return ``(ip, user, password)`` from the process environment (normalized)."""
+    return (
+        _normalized_env_value("LOXONE_IP"),
+        _normalized_env_value("LOXONE_USER"),
+        _normalized_env_value("LOXONE_PASS"),
+    )
+
+
 def loxone_credentials_configured() -> bool:
     """True wenn alle Loxone-Zugangsdaten gesetzt und keine Vorlagen-Platzhalter."""
     for key in _LOXONE_KEYS:

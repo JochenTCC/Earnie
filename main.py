@@ -27,7 +27,7 @@ from optimizer.event_trigger import (
     wait_until_next_run,
 )
 import optimizer
-from settings.ehal_marker_resolve import marker_set_evcs_current
+from settings.ehal_marker_resolve import marker_set_evcs_max_current
 from settings.ev_power import ampere_to_kw, ev_nominal_power_conversion
 from version import __version__
 
@@ -207,9 +207,13 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     )
     for consumer in live_consumers:
         lox = (consumer.get("charging_schedule") or {}).get("loxone") or {}
-        if lox.get("sens_evcs_nominal_current") or lox.get("nominal_power_kw_name"):
-            marker = lox.get("sens_evcs_nominal_current") or lox.get(
-                "nominal_power_kw_name"
+        if lox.get("get_evcs_nominal_current") or lox.get(
+            "sens_evcs_nominal_current"
+        ) or lox.get("nominal_power_kw_name"):
+            marker = (
+                lox.get("get_evcs_nominal_current")
+                or lox.get("sens_evcs_nominal_current")
+                or lox.get("nominal_power_kw_name")
             )
             logger.info(
                 "Verbraucher %s: Nennleistung live = %.2f kW (Loxone: %s)",
@@ -319,7 +323,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     )
     sent_flex_kw: dict[str, float] = {}
     for consumer in live_consumers:
-        setpoint_name = marker_set_evcs_current(consumer)
+        setpoint_name = marker_set_evcs_max_current(consumer)
         if not setpoint_name:
             continue
         amps = float(loxone_sent.get(setpoint_name, 0.0) or 0.0)

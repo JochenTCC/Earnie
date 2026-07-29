@@ -23,9 +23,9 @@
       "notes": "Vehicle SoC in %."
     },
     {
-      "field": "sens_evcs_nominal_current",
+      "field": "get_evcs_nominal_current",
       "required": false,
-      "kind": "telemetry",
+      "kind": "input",
       "notes": "Nominal / max current in A; power = f(A, V, phases)."
     },
     {
@@ -50,13 +50,7 @@
       "field": "set_evcs_max_current",
       "required": false,
       "kind": "setpoint",
-      "notes": "Max EV charge current in A."
-    },
-    {
-      "field": "set_evcs_current",
-      "required": false,
-      "kind": "setpoint",
-      "notes": "EV charge current setpoint in A (replaces kW power_setpoint)."
+      "notes": "EV charge current setpoint / max current in A (replaces kW power_setpoint)."
     },
     {
       "field": "set_evcs_mode",
@@ -68,7 +62,7 @@
       "field": "supports_evcs_current",
       "required": true,
       "kind": "capability",
-      "notes": "True when set_evcs_max_current / set_evcs_current writes work."
+      "notes": "True when set_evcs_max_current writes work."
     }
   ],
   "capability_expectations": {

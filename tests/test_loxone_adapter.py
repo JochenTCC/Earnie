@@ -42,7 +42,7 @@ def test_capabilities_ess_true_evcs_false():
 
 
 def test_capabilities_evcs_true_with_current_marker():
-    caps = LoxoneAdapter(_cfg(evcs_current_name="EV_A")).capabilities()
+    caps = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A")).capabilities()
     assert caps["supports_evcs_current"] is True
 
 
@@ -107,7 +107,7 @@ def test_write_setpoints_evcs_and_mode(send_mock):
     adapter = LoxoneAdapter(
         _cfg(
             control_cmd_name="Cmd",
-            evcs_current_name="EV_A",
+            evcs_max_current_name="EV_A",
             pv_follow_name="PVF",
             charge_immediate_name="NOW",
         )
@@ -118,7 +118,7 @@ def test_write_setpoints_evcs_and_mode(send_mock):
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "loxone-home",
             "set_ess_mode": 2,
-            "set_evcs_current": 16,
+            "set_evcs_max_current": 16,
             "set_evcs_mode": "pv",
         }
     )

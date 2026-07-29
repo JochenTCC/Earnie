@@ -6,13 +6,15 @@ from typing import NotRequired, TypedDict
 
 EHAL_SCHEMA_VERSION = 2
 
-# Legacy M1 unprefixed → §C sens_* aliases (HA entity map / dual-read during 2.4.j).
+# Legacy M1 unprefixed / renamed → §C aliases (HA entity map / dual-read during 2.4.j).
 TELEMETRY_FIELD_ALIASES: dict[str, str] = {
     "grid_power_active": "sens_grid_power_active",
     "pv_production_active": "sens_pv_production_active",
     "ess_soc": "sens_ess_soc",
     "ess_power": "sens_ess_power",
     "evcs_active_power": "sens_evcs_active_power",
+    "set_evcs_current": "set_evcs_max_current",
+    "sens_evcs_nominal_current": "get_evcs_nominal_current",
 }
 
 
@@ -34,7 +36,7 @@ class EhalTelemetry(TypedDict):
     sens_power_consumers: NotRequired[float | None]
     sens_evcs_connected: NotRequired[bool | None]
     sens_evcs_soc_act: NotRequired[float | None]
-    sens_evcs_nominal_current: NotRequired[float | None]
+    get_evcs_nominal_current: NotRequired[float | None]
     sens_evcs_bat_capacity: NotRequired[float | None]
     get_evcs_ready_by_time: NotRequired[str | None]
     get_evcs_limit_soc: NotRequired[float | None]
@@ -48,7 +50,6 @@ class EhalSetpoint(TypedDict):
     set_ess_discharge_power_limit: NotRequired[float]
     set_ess_mode: NotRequired[str | float]
     set_evcs_max_current: NotRequired[float]
-    set_evcs_current: NotRequired[float]
     set_evcs_mode: NotRequired[str]
 
 

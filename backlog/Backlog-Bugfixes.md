@@ -26,7 +26,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
- 
+
+- [ ] Give Loxone Struktur --> EHAL Mapping expander an own chapter title on streamlit EHAL-com page
 - [ ] Displaying annual consumption of consumer in expander isn't updated after editing parameters
 - [ ] Loxberry Plugin - Button "Stop" is not working - manual stop works and Container-Status shows this
 

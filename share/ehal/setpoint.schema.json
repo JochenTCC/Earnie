@@ -35,12 +35,7 @@
     "set_evcs_max_current": {
       "type": "number",
       "minimum": 0,
-      "description": "Max EV charge current in A."
-    },
-    "set_evcs_current": {
-      "type": "number",
-      "minimum": 0,
-      "description": "EV charge current setpoint in A."
+      "description": "EV charge current setpoint / max current in A."
     },
     "set_evcs_mode": {
       "type": "string",
@@ -53,7 +48,6 @@
     {"required": ["set_ess_discharge_power_limit"]},
     {"required": ["set_ess_mode"]},
     {"required": ["set_evcs_max_current"]},
-    {"required": ["set_evcs_current"]},
     {"required": ["set_evcs_mode"]}
   ],
   "additionalProperties": false

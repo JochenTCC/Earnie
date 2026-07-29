@@ -463,7 +463,7 @@ class TestSharedMeterSubtraction:
                 "nominal_power_voltage_v": 230.0,
                 "nominal_power_phases": 3,
                 "loxone": {
-                    "sens_evcs_nominal_current": "Ladestrom Max",
+                    "get_evcs_nominal_current": "Ladestrom Max",
                 },
             },
         }

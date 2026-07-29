@@ -14,11 +14,12 @@ import logging
 from integrations.loxone_comm_trace import LoxoneWriteRecord
 from settings.ehal_marker_resolve import (
     charging_loxone,
+    ehal_bindings,
     marker_charge_immediate,
+    marker_get_evcs_nominal_current,
     marker_pv_follow,
     marker_sens_evcs_bat_capacity,
-    marker_sens_evcs_nominal_current,
-    marker_set_evcs_current,
+    marker_set_evcs_max_current,
 )
 from settings.ev_power import (
     ampere_to_kw,
@@ -179,11 +180,18 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
 
 
 def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
-    """Nennleistung (kW): live sens_evcs_nominal_current (A) oder Legacy-Merker."""
+    """Nennleistung (kW): live get_evcs_nominal_current (A) oder Legacy-Merker."""
     fallback = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
     lox = charging_loxone(consumer)
-    ehal_name = str(lox.get("sens_evcs_nominal_current") or "").strip()
-    io_name = marker_sens_evcs_nominal_current(consumer)
+    bindings = ehal_bindings(consumer)
+    ehal_name = str(
+        bindings.get("get_evcs_nominal_current")
+        or bindings.get("sens_evcs_nominal_current")
+        or lox.get("get_evcs_nominal_current")
+        or lox.get("sens_evcs_nominal_current")
+        or ""
+    ).strip()
+    io_name = marker_get_evcs_nominal_current(consumer)
     if not io_name:
         return fallback
 
@@ -726,10 +734,10 @@ def flex_consumer_power_setpoint_kw(
     charging_contexts: dict[str, dict],
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> float | None:
-    """kW-Sollwert aus MILP (None wenn kein set_evcs_current / power_setpoint)."""
+    """kW-Sollwert aus MILP (None wenn kein set_evcs_max_current / power_setpoint)."""
     from optimizer.consumer_power import loxone_control_outputs
 
-    if not marker_set_evcs_current(consumer):
+    if not marker_set_evcs_max_current(consumer):
         return None
 
     cid = consumer["id"]
@@ -745,7 +753,7 @@ def flex_consumer_setpoint_amps(
     charging_contexts: dict[str, dict],
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> float | None:
-    """set_evcs_current (A) from planned kW; None wenn kein Current-Merker."""
+    """set_evcs_max_current (A) from planned kW; None wenn kein Current-Merker."""
     setpoint_kw = flex_consumer_power_setpoint_kw(
         consumer, consumer_powers, charging_contexts, consumer_pv_follow
     )
@@ -894,7 +902,7 @@ def _flexible_consumer_output_values(
     if _skip_flexible_consumer_output(consumer, charging_contexts):
         return _immediate_skip_output_values(consumer)
 
-    current_name = marker_set_evcs_current(consumer)
+    current_name = marker_set_evcs_max_current(consumer)
     if current_name:
         return _evcs_current_output_values(
             consumer,
@@ -996,7 +1004,7 @@ def send_flexible_consumer_states(
     charging_contexts: dict[str, dict] | None = None,
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> list[LoxoneWriteRecord]:
-    """Sendet Freigabe (0/1), set_evcs_current (A) und set_evcs_mode an Loxone."""
+    """Sendet Freigabe (0/1), set_evcs_max_current (A) und set_evcs_mode an Loxone."""
     contexts = charging_contexts or {}
     records: list[LoxoneWriteRecord] = []
     for consumer in config.get_flexible_consumers(optimizer_only=True):

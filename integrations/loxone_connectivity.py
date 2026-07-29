@@ -12,7 +12,7 @@ from integrations import loxone_client
 
 @dataclass(frozen=True)
 class LoxoneCheck:
-    """Einzelprüfung: Label, IO-Name (optional), Erfolg, Detailtext."""
+    """Einzelprüfung: EHAL-Feld (label), Mapping/IO-Name, Erfolg, Detailtext."""
 
     label: str
     io_name: str
@@ -105,21 +105,6 @@ def _binary_valid(value: float) -> str | None:
     return f"Erwartet 0 oder 1, erhalten: {value}"
 
 
-def _non_negative_hours(value: float) -> str | None:
-    if not math.isfinite(value) or value < 0.0:
-        return f"Stundenwert ungültig: {value}"
-    return None
-
-
-def _filter_duration_hours_valid(value: float) -> str | None:
-    err = _non_negative_hours(value)
-    if err:
-        return err
-    if value <= 0.0:
-        return f"Dauer muss > 0 sein: {value}"
-    return None
-
-
 def _consumer_power_validate(consumer: dict) -> Callable[[float], str | None]:
     inputs = consumer.get("loxone_inputs") or {}
     signal = inputs.get("signal_type") or consumer.get("signal_type", "power")
@@ -128,149 +113,195 @@ def _consumer_power_validate(consumer: dict) -> Callable[[float], str | None]:
     return _power_valid
 
 
-def collect_read_checks() -> list[tuple[str, str, dict]]:
-    """(Label, IO-Name, Optionen) für alle konfigurierten Loxone-Eingänge."""
-    checks: list[tuple[str, str, dict]] = [
-        ("Batterie-SoC", config.get("LOXONE_SOC_NAME"), {"validate": _soc_valid}),
-        ("PV-Leistung", config.get("LOXONE_PV_POWER_NAME"), {"validate": _power_valid}),
-        ("Batterie-Leistung", config.get("LOXONE_BATTERY_POWER_NAME"), {"validate": _power_valid}),
-        ("Netz-Leistung", config.get("LOXONE_GRID_POWER_NAME"), {"validate": _power_valid}),
-        ("PV-Zähler", config.get("LOXONE_PV_COUNTER_NAME"), {}),
-    ]
-    for block_key, label in (
-        ("LOXONE_TARGET_SOC_NAME", "Soll-SoC (Merker)"),
-        ("LOXONE_TARGET_CHARGE_POWER_NAME", "Soll-Ladeleistung (Merker)"),
-        ("LOXONE_TARGET_DISCHARGE_POWER_NAME", "Soll-Entladeleistung (Merker)"),
-        ("LOXONE_CONTROL_CMD_NAME", "Steuerbefehl (Merker)"),
+def _is_ev_consumer(consumer: dict) -> bool:
+    """True for EV — ``type`` may be missing after planning→MILP bridge."""
+    if consumer.get("type") == "ev":
+        return True
+    sched = consumer.get("charging_schedule") or {}
+    if not isinstance(sched, dict):
+        return False
+    if sched.get("enabled"):
+        return True
+    lox = sched.get("loxone") if isinstance(sched.get("loxone"), dict) else {}
+    for key in (
+        "plugged_in_name",
+        "actual_soc_name",
+        "ready_by_time_name",
+        "battery_capacity_kwh_name",
+        "nominal_power_kw_name",
+        "sens_evcs_connected",
+        "sens_evcs_soc_act",
+        "get_evcs_ready_by_time",
     ):
-        io_name = config.get(block_key)
-        if io_name:
-            checks.append((label, io_name, {}))
+        if str(lox.get(key) or "").strip():
+            return True
+    bindings = consumer.get("ehal_bindings")
+    if isinstance(bindings, dict):
+        for key, value in bindings.items():
+            name = str(key or "")
+            if name.startswith(("sens_evcs_", "get_evcs_", "set_evcs_")) and str(
+                value or ""
+            ).strip():
+                return True
+    return False
+
+
+def _consumer_has_live_read_marker(consumer: dict) -> bool:
+    from settings.ehal_marker_resolve import (
+        marker_flex_power,
+        marker_get_evcs_ready_by_time,
+        marker_sens_evcs_active_power,
+        marker_sens_evcs_connected,
+    )
+
+    if marker_flex_power(consumer) or marker_sens_evcs_active_power(consumer):
+        return True
+    if marker_sens_evcs_connected(consumer) or marker_get_evcs_ready_by_time(consumer):
+        return True
+    return False
+
+
+def _consumers_for_live_reads() -> list[dict]:
+    """House-profile consumers first (keep ``ehal_bindings``), then flex-only rows.
+
+    Planning→MILP bridge drops ``type`` / ``ehal_bindings``; Live-Lesen must use
+    the house-profile record when both exist (e.g. greenfield EV mappings).
+    """
+    by_id: dict[str, dict] = {}
+    resolved = config.CONFIG.get_resolved_runtime_settings()
+    profile = resolved.get("_house_profile") if isinstance(resolved, dict) else None
+    if isinstance(profile, dict):
+        for consumer in profile.get("consumers") or []:
+            if not isinstance(consumer, dict):
+                continue
+            cid = str(consumer.get("id") or "").strip()
+            if cid and _consumer_has_live_read_marker(consumer):
+                by_id[cid] = consumer
 
     for consumer in config.get_flexible_consumers():
-        cid = consumer["id"]
-        inputs = consumer.get("loxone_inputs") or {}
-        outputs = consumer.get("loxone_outputs") or {}
-        power_name = inputs.get("power_name", "")
-        if power_name:
-            checks.append(
-                (
-                    f"Verbraucher {cid} Leistung",
-                    power_name,
-                    {"validate": _consumer_power_validate(consumer)},
-                )
-            )
-        enable_name = outputs.get("enable_name", "")
-        if enable_name:
-            checks.append((f"Verbraucher {cid} Freigabe", enable_name, {"validate": _binary_valid}))
-        setpoint_name = outputs.get("power_setpoint_name", "")
-        if setpoint_name:
-            checks.append(
-                (f"Verbraucher {cid} Soll-Leistung", setpoint_name, {"validate": _power_valid})
-            )
-        pv_follow_name = outputs.get("pv_follow_name", "")
-        if pv_follow_name:
-            checks.append(
-                (f"Verbraucher {cid} pv_follow", pv_follow_name, {"validate": _binary_valid})
-            )
+        cid = str(consumer.get("id") or "").strip()
+        if not cid or cid in by_id:
+            continue
+        if _consumer_has_live_read_marker(consumer):
+            by_id[cid] = consumer
+    return list(by_id.values())
 
-        sched = consumer.get("charging_schedule") or {}
-        lox = sched.get("loxone") or {}
-        for key, label in (
-            ("plugged_in_name", f"Verbraucher {cid} angeschlossen"),
-            ("soc_at_plug_in_name", f"Verbraucher {cid} Rest-SoC"),
-            ("actual_soc_name", f"Verbraucher {cid} Ist-SoC"),
-            ("nominal_power_kw_name", f"Verbraucher {cid} Nennleistung"),
-            ("battery_capacity_kwh_name", f"Verbraucher {cid} Akkukapazität"),
-            ("charge_immediate_name", f"Verbraucher {cid} Sofort laden"),
-            ("charge_immediate_remaining_name", f"Verbraucher {cid} Restladezeit Sofort"),
-        ):
-            io_name = lox.get(key, "")
-            if io_name:
-                opts: dict = {}
-                if key in ("plugged_in_name", "charge_immediate_name"):
-                    opts["validate"] = _binary_valid
-                checks.append((label, io_name, opts))
-        ready_name = lox.get("ready_by_time_name", "")
-        if ready_name:
-            checks.append(
-                (
-                    f"Verbraucher {cid} Fertig-um",
-                    ready_name,
-                    {"read_raw": True, "warn_if_missing": True},
-                )
-            )
 
-        if consumer.get("daily_target_source") == "loxone_remaining_hours":
-            hours_name = consumer.get("loxone_target_hours_name", "")
-            if hours_name:
-                checks.append(
-                    (
-                        f"Verbraucher {cid} Sollstunden",
-                        hours_name,
-                        {"validate": _non_negative_hours},
-                    )
-                )
+def _append_io_check(
+    checks: list[tuple[str, str, dict]],
+    label: str,
+    io_name: str,
+    opts: dict | None = None,
+) -> None:
+    name = str(io_name or "").strip()
+    if name:
+        checks.append((label, name, opts or {}))
 
-        filter_sched = consumer.get("filter_schedule") or {}
-        if filter_sched.get("enabled"):
-            flox = filter_sched.get("loxone") or {}
-            start_name = flox.get("native_start_hour_name", "")
-            if start_name:
-                checks.append(
-                    (
-                        f"Verbraucher {cid} Filter Start-Stunde",
-                        start_name,
-                        {"validate_filter_start_hour": True},
-                    )
-                )
-            duration_name = flox.get("native_duration_hours_name", "")
-            if duration_name:
-                checks.append(
-                    (
-                        f"Verbraucher {cid} Filter Dauer (h)",
-                        duration_name,
-                        {"validate": _filter_duration_hours_valid},
-                    )
-                )
 
-        thermal = consumer.get("thermal_control") or {}
-        if thermal.get("enabled"):
-            tlox = thermal.get("loxone") or {}
-            for key, label in (
-                ("actual_temp_name", f"Verbraucher {cid} Ist-Temp"),
-                ("setpoint_temp_name", f"Verbraucher {cid} Soll-Temp"),
-                ("ambient_temp_name", f"Verbraucher {cid} Außen-Temp"),
-                ("tolerance_c_name", f"Verbraucher {cid} Temp-Toleranz"),
-            ):
-                io_name = tlox.get(key, "")
-                if io_name:
-                    checks.append((label, io_name, {}))
-            heating_name = tlox.get("heating_active_name", "")
-            if heating_name:
-                checks.append(
-                    (
-                        f"Verbraucher {cid} Heiz-Indikator",
-                        heating_name,
-                        {"validate": _binary_valid},
-                    )
-                )
+def _append_ev_read_checks(
+    checks: list[tuple[str, str, dict]],
+    consumer: dict,
+) -> None:
+    from settings.ehal_marker_resolve import (
+        marker_get_evcs_limit_soc,
+        marker_get_evcs_ready_by_time,
+        marker_sens_evcs_active_power,
+        marker_sens_evcs_bat_capacity,
+        marker_sens_evcs_connected,
+        marker_get_evcs_nominal_current,
+        marker_sens_evcs_soc_act,
+    )
 
-    for trigger in config.get_event_triggers():
-        label = trigger.get("label") or trigger["id"]
-        io_name = trigger["loxone_name"]
-        if trigger["signal_type"] == "text":
-            checks.append(
-                (
-                    f"Event-Trigger {label}",
-                    io_name,
-                    {"read_raw": True, "warn_if_missing": True},
-                )
-            )
-        elif trigger["signal_type"] == "analog":
-            checks.append((f"Event-Trigger {label}", io_name, {"validate": _soc_valid}))
+    cid = consumer["id"]
+    _append_io_check(
+        checks,
+        f"{cid}:sens_evcs_active_power",
+        marker_sens_evcs_active_power(consumer),
+        {"validate": _consumer_power_validate(consumer)},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:sens_evcs_connected",
+        marker_sens_evcs_connected(consumer),
+        {"validate": _binary_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:sens_evcs_soc_act",
+        marker_sens_evcs_soc_act(consumer),
+        {"validate": _soc_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:sens_evcs_bat_capacity",
+        marker_sens_evcs_bat_capacity(consumer),
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:get_evcs_nominal_current",
+        marker_get_evcs_nominal_current(consumer),
+        {"validate": _power_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:get_evcs_ready_by_time",
+        marker_get_evcs_ready_by_time(consumer),
+        {"read_raw": True, "warn_if_missing": True},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:get_evcs_limit_soc",
+        marker_get_evcs_limit_soc(consumer),
+        {"validate": _soc_valid},
+    )
+
+
+def _append_flex_power_check(
+    checks: list[tuple[str, str, dict]],
+    consumer: dict,
+) -> None:
+    from settings.ehal_marker_resolve import marker_flex_power
+
+    cid = consumer["id"]
+    _append_io_check(
+        checks,
+        f"{cid}:flex.power_name",
+        marker_flex_power(consumer),
+        {"validate": _consumer_power_validate(consumer)},
+    )
+
+
+def collect_read_checks() -> list[tuple[str, str, dict]]:
+    """(EHAL-Feld, Mapping/IO-Name) — plant ``sens_*`` + consumer reads."""
+    checks: list[tuple[str, str, dict]] = [
+        ("sens_ess_soc", config.get("LOXONE_SOC_NAME"), {"validate": _soc_valid}),
+        (
+            "sens_pv_production_active",
+            config.get("LOXONE_PV_POWER_NAME"),
+            {"validate": _power_valid},
+        ),
+        (
+            "sens_ess_power",
+            config.get("LOXONE_BATTERY_POWER_NAME"),
+            {"validate": _power_valid},
+        ),
+        (
+            "sens_grid_power_active",
+            config.get("LOXONE_GRID_POWER_NAME"),
+            {"validate": _power_valid},
+        ),
+    ]
+    consumers_power = config.get("LOXONE_CONSUMERS_POWER_NAME")
+    if consumers_power:
+        checks.append(
+            ("sens_power_consumers", consumers_power, {"validate": _power_valid})
+        )
+
+    for consumer in _consumers_for_live_reads():
+        if _is_ev_consumer(consumer):
+            _append_ev_read_checks(checks, consumer)
         else:
-            checks.append((f"Event-Trigger {label}", io_name, {"validate": _binary_valid}))
+            _append_flex_power_check(checks, consumer)
 
     return checks
 

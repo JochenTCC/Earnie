@@ -180,7 +180,6 @@ class OpenemsAdapter:
                     "set_ess_discharge_power_limit",
                     "set_ess_mode",
                     "set_evcs_max_current",
-                    "set_evcs_current",
                     "set_evcs_mode",
                 )
                 if k in raw

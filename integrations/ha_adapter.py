@@ -39,7 +39,6 @@ SETPOINT_FIELDS = (
     "set_ess_discharge_power_limit",
     "set_ess_mode",
     "set_evcs_max_current",
-    "set_evcs_current",
     "set_evcs_mode",
 )
 MAPPABLE_DOMAINS = frozenset({"sensor", "number", "select", "input_number"})
@@ -110,9 +109,7 @@ class HaAdapter:
             entities.get("set_ess_charge_power_limit")
             or entities.get("set_ess_discharge_power_limit")
         )
-        self._supports_evcs_current = bool(
-            entities.get("set_evcs_max_current") or entities.get("set_evcs_current")
-        )
+        self._supports_evcs_current = bool(entities.get("set_evcs_max_current"))
         self._last_write_error: EhalWriteError | None = None
         self._base = cfg.base_url.rstrip("/")
         self._headers = {
@@ -266,7 +263,7 @@ class HaAdapter:
                 messages.append(msg)
                 hub_status = status or hub_status
 
-        for field_name in ("set_evcs_max_current", "set_evcs_current", "set_evcs_mode"):
+        for field_name in ("set_evcs_max_current", "set_evcs_mode"):
             if field_name not in doc or not self._supports_evcs_current:
                 continue
             if not self.cfg.entities.get(field_name):

@@ -6,6 +6,7 @@ from ui.ehal_loxone_mapping import (
     FLEX_FIELDS,
     PLANT_ENTITY_ID,
     PLANT_FIELDS,
+    _field_select_caption,
     apply_entity_bindings,
     build_entity_rows,
     fields_for_consumer,
@@ -17,6 +18,13 @@ def test_fields_for_consumer_ev_vs_flex():
     assert "get_evcs_limit_soc" in EV_FIELDS
     assert "sens_power_consumers" in PLANT_FIELDS
     assert fields_for_consumer({"type": "thermal_annual"}) == FLEX_FIELDS
+
+
+def test_field_select_caption_includes_ehal_name():
+    caption = _field_select_caption("sens_ess_soc", required=True)
+    assert "`sens_ess_soc`" in caption
+    assert caption.endswith(" *")
+    assert "sens_ess_soc" != caption  # meaning text present beside the name
 
 
 def test_build_entity_rows_includes_plant_and_consumers():
@@ -36,7 +44,8 @@ def test_build_entity_rows_includes_plant_and_consumers():
     ids = [r["id"] for r in rows]
     assert ids == [PLANT_ENTITY_ID, "ev1", "wp"]
     assert rows[0]["bindings"]["sens_ess_soc"] == "SOC"
-    assert "set_evcs_current" in rows[1]["fields"]
+    assert "set_evcs_max_current" in rows[1]["fields"]
+    assert "set_evcs_current" not in rows[1]["fields"]
     assert "flex.power_name" in rows[2]["fields"]
 
 

@@ -30,7 +30,7 @@
     },
     "supports_evcs_current": {
       "type": "boolean",
-      "description": "set_evcs_max_current / set_evcs_current can be written."
+      "description": "set_evcs_max_current can be written."
     }
   },
   "additionalProperties": false

@@ -72,12 +72,11 @@ EV_FIELDS: tuple[str, ...] = (
     "sens_evcs_active_power",
     "sens_evcs_connected",
     "sens_evcs_soc_act",
-    "sens_evcs_nominal_current",
+    "get_evcs_nominal_current",
     "sens_evcs_bat_capacity",
     "get_evcs_ready_by_time",
     "get_evcs_limit_soc",
     "set_evcs_max_current",
-    "set_evcs_current",
     "set_evcs_mode",
 )
 
@@ -90,7 +89,7 @@ FLEX_FIELDS: tuple[str, ...] = (
 _EXTRA_LABELS: dict[str, str] = {
     "sens_evcs_connected": "EV angeschlossen",
     "sens_evcs_soc_act": "EV Ist-SOC (%)",
-    "sens_evcs_nominal_current": "EV Nennstrom (A)",
+    "get_evcs_nominal_current": "EV Nennstrom (A)",
     "sens_evcs_bat_capacity": "EV Batteriekapazität (kWh)",
     "get_evcs_ready_by_time": "EV FertigUm",
     "get_evcs_limit_soc": "EV Ladeziel-SOC (%)",
@@ -103,6 +102,19 @@ _EXTRA_LABELS: dict[str, str] = {
 def _field_label(field: str) -> str:
     labels = {**role_field_labels(), **FIELD_LABELS, **_EXTRA_LABELS}
     return labels.get(field, field)
+
+
+def _field_select_caption(
+    field: str,
+    *,
+    required: bool = False,
+    confidence: float | None = None,
+) -> str:
+    """Bedeutung + EHAL value name for HITL select labels."""
+    meaning = _field_label(field)
+    suffix = " *" if required else ""
+    conf = f" (Konfidenz {confidence:.0%})" if confidence is not None else ""
+    return f"{meaning} (`{field}`){suffix}{conf}"
 
 
 def _nonempty(value: object) -> str:
@@ -257,12 +269,9 @@ def _select_marker(
     confidence: float | None,
     key: str,
 ) -> str:
-    label = _field_label(field)
-    suffix = " *" if required else ""
-    conf = f" (Konfidenz {confidence:.0%})" if confidence is not None else ""
     choice = current if current in options else _NONE
     selected = st.selectbox(
-        f"{label}{suffix}{conf}",
+        _field_select_caption(field, required=required, confidence=confidence),
         options=options,
         index=options.index(choice) if choice in options else 0,
         key=key,

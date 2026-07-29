@@ -9,7 +9,11 @@ from integrations.loxone_connectivity import (
     loxone_env_configured,
     verify_loxone_setup,
 )
-from runtime_store.dotenv_io import validate_loxone_credentials, write_loxone_dotenv
+from runtime_store.dotenv_io import (
+    read_loxone_credentials,
+    validate_loxone_credentials,
+    write_loxone_dotenv,
+)
 from runtime_store.dotenv_loader import load_app_dotenv
 from runtime_store.ehal_setup import (
     BACKEND_HA,
@@ -46,11 +50,17 @@ def _save_loxone_credentials(ip: str, user: str, password: str) -> str | None:
 
 def render_loxone_credentials_form(*, form_key: str = "loxone_setup_form") -> None:
     """Formular für Miniserver-IP, Benutzer und Passwort."""
-    st.caption(f"Zieldatei: `{resolve_dotenv_path()}`")
+    dotenv_path = resolve_dotenv_path()
+    env_ip, env_user, env_pass = read_loxone_credentials()
+    st.caption(f"Zieldatei: `{dotenv_path}`")
     with st.form(form_key):
-        ip = st.text_input("Miniserver-IP", placeholder="192.168.178.1")
-        user = st.text_input("Benutzername")
-        password = st.text_input("Passwort", type="password")
+        ip = st.text_input(
+            "Miniserver-IP",
+            value=env_ip,
+            placeholder="192.168.178.1",
+        )
+        user = st.text_input("Benutzername", value=env_user)
+        password = st.text_input("Passwort", value=env_pass, type="password")
         submitted = st.form_submit_button("Speichern", type="primary")
 
     if not submitted:

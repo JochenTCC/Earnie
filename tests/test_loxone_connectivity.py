@@ -4,8 +4,6 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-import pytest
-
 os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 
 from integrations import loxone_connectivity as lc
@@ -39,7 +37,7 @@ class TestReadCheckValidation:
     def test_read_check_missing_text_io_is_warning(self):
         with patch.object(lc.loxone_client, "fetch_loxone_raw_value", return_value=None):
             result = lc._read_check(
-                "Event-Trigger Test",
+                "ev1:get_evcs_ready_by_time",
                 "Ernie_EAuto_FertigUm",
                 read_raw=True,
                 warn_if_missing=True,
@@ -50,71 +48,151 @@ class TestReadCheckValidation:
 
 
 class TestCollectReadChecks:
-    def test_collects_flexible_consumer_ios(self):
+    def _plant_get(self, name, **kw):
+        return {
+            "LOXONE_SOC_NAME": "SOC",
+            "LOXONE_PV_POWER_NAME": "PV",
+            "LOXONE_BATTERY_POWER_NAME": "BAT",
+            "LOXONE_GRID_POWER_NAME": "GRID",
+            "LOXONE_PV_COUNTER_NAME": "CNT",
+            "LOXONE_CONSUMERS_POWER_NAME": "",
+            "LOXONE_TARGET_CHARGE_POWER_NAME": "CHG",
+            "LOXONE_CONTROL_CMD_NAME": "CMD",
+        }.get(name)
+
+    def test_plant_labels_are_ehal_sens_fields(self):
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=[]
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ):
+            checks = lc.collect_read_checks()
+
+        labels = [label for label, _, _ in checks]
+        assert labels == [
+            "sens_ess_soc",
+            "sens_pv_production_active",
+            "sens_ess_power",
+            "sens_grid_power_active",
+        ]
+        assert "PV-Zähler" not in labels
+        assert all(not lbl.startswith("set_") for lbl in labels)
+
+    def test_collects_ev_sens_get_ios(self):
+        consumers = [
+            {
+                "id": "ev1",
+                "type": "ev",
+                "loxone_inputs": {"power_name": "P_EV"},
+                "loxone_outputs": {"enable_name": "En_EV"},
+                "charging_schedule": {
+                    "enabled": True,
+                    "loxone": {
+                        "plugged_in_name": "Plug",
+                        "actual_soc_name": "EvSoc",
+                        "ready_by_time_name": "Ready",
+                    },
+                },
+            }
+        ]
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ):
+            checks = lc.collect_read_checks()
+
+        labels = [label for label, _, _ in checks]
+        assert "ev1:sens_evcs_active_power" in labels
+        assert "ev1:sens_evcs_connected" in labels
+        assert "ev1:sens_evcs_soc_act" in labels
+        assert "ev1:get_evcs_ready_by_time" in labels
+        assert "ev1:flex.power_name" not in labels
+
+    def test_collects_non_ev_flex_power(self):
         consumers = [
             {
                 "id": "swimspa",
                 "loxone_inputs": {"power_name": "P_Spa"},
                 "loxone_outputs": {"enable_name": "En_Spa"},
                 "charging_schedule": None,
-            }
+            },
+            {
+                "id": "wp_heating",
+                "type": "thermal_annual",
+                "loxone_inputs": {"power_name": "P_WP"},
+            },
         ]
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: {
-            "LOXONE_SOC_NAME": "SOC",
-            "LOXONE_PV_POWER_NAME": "PV",
-            "LOXONE_BATTERY_POWER_NAME": "BAT",
-            "LOXONE_GRID_POWER_NAME": "GRID",
-            "LOXONE_PV_COUNTER_NAME": "CNT",
-        }.get(name)), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ):
             checks = lc.collect_read_checks()
 
-        labels = [label for label, _, _ in checks]
-        assert "Verbraucher swimspa Leistung" in labels
-        assert "Verbraucher swimspa Freigabe" in labels
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["swimspa:flex.power_name"] == "P_Spa"
+        assert by_label["wp_heating:flex.power_name"] == "P_WP"
+        assert "swimspa:flex.enable_name" not in by_label
 
-    def test_collects_swimspa_filter_ios(self):
+    def test_ev_detected_without_type_via_charging_loxone(self):
         consumers = [
             {
-                "id": "swimspa_filter",
-                "signal_type": "binary",
-                "daily_target_source": "loxone_remaining_hours",
-                "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
-                "loxone_inputs": {
-                    "power_name": "homie_bwa_spa_filter2",
-                    "signal_type": "binary",
-                },
-                "loxone_outputs": {"enable_name": "Ernie_Swimspa_Filter_Freigabe"},
-                "filter_schedule": {
-                    "enabled": True,
-                    "loxone": {
-                        "native_start_hour_name": "homie_bwa_spa_filter1hour",
-                        "native_duration_hours_name": "homie_bwa_spa_filter1durationhours",
-                    },
+                "id": "ev",
+                "loxone_inputs": {"power_name": "P_EV"},
+                "charging_schedule": {
+                    "loxone": {"plugged_in_name": "Plug", "actual_soc_name": "Soc"},
                 },
             }
         ]
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: {
-            "LOXONE_SOC_NAME": "SOC",
-            "LOXONE_PV_POWER_NAME": "PV",
-            "LOXONE_BATTERY_POWER_NAME": "BAT",
-            "LOXONE_GRID_POWER_NAME": "GRID",
-            "LOXONE_PV_COUNTER_NAME": "CNT",
-        }.get(name)), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch.object(
+            lc.config.CONFIG,
+            "get_resolved_runtime_settings",
+            return_value={},
+        ):
             checks = lc.collect_read_checks()
 
         labels = [label for label, _, _ in checks]
-        assert "Verbraucher swimspa_filter Sollstunden" in labels
-        assert "Verbraucher swimspa_filter Filter Start-Stunde" in labels
-        assert "Verbraucher swimspa_filter Filter Dauer (h)" in labels
-        assert "Verbraucher swimspa_filter Freigabe" in labels
+        assert "ev:sens_evcs_active_power" in labels
+        assert "ev:sens_evcs_connected" in labels
 
-    def test_binary_consumer_uses_binary_validation(self):
-        consumer = {
-            "id": "swimspa_filter",
-            "signal_type": "binary",
-            "loxone_inputs": {"power_name": "F", "signal_type": "binary"},
+    def test_house_profile_ehal_bindings_preferred_over_stripped_flex(self):
+        """Greenfield: EV bindings on profile; flex bridge often drops ehal_bindings."""
+        flex = [
+            {
+                "id": "ev",
+                "loxone_inputs": {},
+                "charging_schedule": {"weekday": {}, "weekend": {}},
+            }
+        ]
+        profile = {
+            "consumers": [
+                {
+                    "id": "ev",
+                    "type": "ev",
+                    "ehal_bindings": {
+                        "sens_evcs_active_power": "Ernie_EAuto_P_act",
+                        "sens_evcs_connected": "Ernie_EAuto_Da",
+                        "get_evcs_ready_by_time": "Ernie_EAuto_FertigUm",
+                    },
+                }
+            ]
         }
-        assert lc._consumer_power_validate(consumer) is lc._binary_valid
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=flex
+        ), patch.object(
+            lc.config.CONFIG,
+            "get_resolved_runtime_settings",
+            return_value={"_house_profile": profile},
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["ev:sens_evcs_active_power"] == "Ernie_EAuto_P_act"
+        assert by_label["ev:sens_evcs_connected"] == "Ernie_EAuto_Da"
+        assert by_label["ev:get_evcs_ready_by_time"] == "Ernie_EAuto_FertigUm"
 
 
 class TestLoxoneIntegrationGate:
@@ -141,7 +219,8 @@ class TestLoxoneIntegrationGate:
 class TestVerifySetupAggregation:
     def test_verify_reports_failure_from_read_checks(self):
         with patch.object(lc, "ensure_live_config"), patch.object(
-            lc, "run_read_checks",
+            lc,
+            "run_read_checks",
             return_value=[lc.LoxoneCheck("Test", "IO", False, "fehlgeschlagen")],
         ):
             ok, results = lc.verify_loxone_setup()

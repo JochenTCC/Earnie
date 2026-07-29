@@ -27,7 +27,6 @@ SETPOINT_FIELDS = (
     "set_ess_discharge_power_limit",
     "set_ess_mode",
     "set_evcs_max_current",
-    "set_evcs_current",
     "set_evcs_mode",
 )
 
@@ -43,7 +42,6 @@ class LoxoneConfig:
     discharge_power_name: str = ""
     control_cmd_name: str = ""
     consumers_power_name: str = ""
-    evcs_current_name: str = ""
     evcs_max_current_name: str = ""
     pv_follow_name: str = ""
     charge_immediate_name: str = ""
@@ -74,9 +72,7 @@ class LoxoneAdapter:
     def __init__(self, cfg: LoxoneConfig) -> None:
         self.cfg = cfg
         self._supports_ess_write = bool(cfg.charge_power_name or cfg.discharge_power_name)
-        self._supports_evcs_current = bool(
-            cfg.evcs_current_name or cfg.evcs_max_current_name
-        )
+        self._supports_evcs_current = bool(cfg.evcs_max_current_name)
         self._last_write_error: EhalWriteError | None = None
 
     def last_write_error(self) -> EhalWriteError | None:
@@ -194,15 +190,13 @@ class LoxoneAdapter:
         flip = False
         if not self._supports_evcs_current:
             return flip
-        for field, marker in (
-            ("set_evcs_max_current", self.cfg.evcs_max_current_name or self.cfg.evcs_current_name),
-            ("set_evcs_current", self.cfg.evcs_current_name or self.cfg.evcs_max_current_name),
-        ):
-            if field not in doc:
-                continue
-            ok, msg = self._try_marker_write(marker, float(doc[field]))
+        if "set_evcs_max_current" in doc:
+            ok, msg = self._try_marker_write(
+                self.cfg.evcs_max_current_name,
+                float(doc["set_evcs_max_current"]),
+            )
             if not ok:
-                failed.append(field)
+                failed.append("set_evcs_max_current")
                 messages.append(msg)
                 flip = True
         if "set_evcs_mode" in doc:
