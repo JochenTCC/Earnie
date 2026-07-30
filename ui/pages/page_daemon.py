@@ -86,20 +86,20 @@ def render() -> None:
             "Start",
             type="primary",
             disabled=running,
-            use_container_width=True,
+            width="stretch",
             key="daemon_start",
         )
     with col_stop:
         do_stop = st.button(
             "Stop",
             disabled=daemon.state == "stopped",
-            use_container_width=True,
+            width="stretch",
             key="daemon_stop",
         )
     with col_restart:
         do_restart = st.button(
             "Neustart",
-            use_container_width=True,
+            width="stretch",
             key="daemon_restart",
         )
 

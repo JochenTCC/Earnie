@@ -432,7 +432,7 @@ def _render_live_reads_fragment() -> None:
     st.caption(f"{ok}/{len(checks)} Merker erfolgreich gelesen · Stand **{read_at}**")
     rows = build_read_rows(checks, read_at)
     if rows:
-        st.dataframe(rows, use_container_width=True, hide_index=True)
+        st.dataframe(rows, width="stretch", hide_index=True)
 
 
 @st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
@@ -457,7 +457,7 @@ def _render_ehal_telemetry_fragment() -> None:
             read_at,
             mapping=_telemetry_mapping_for_adapter(adapter),
         ),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     power = read_live_power_kw()
@@ -516,7 +516,7 @@ def render_last_writes_section(main_state: dict | None) -> None:
             st.caption("Noch kein Produktiv-Durchlauf — Sollwerte leer, Mapping aus Config.")
             st.dataframe(
                 build_ehal_write_rows([]),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             return
@@ -526,7 +526,7 @@ def render_last_writes_section(main_state: dict | None) -> None:
                 build_intended_write_rows(loxone_sent, completed_at)
                 if loxone_sent
                 else build_ehal_write_rows([]),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             return
@@ -540,14 +540,14 @@ def render_last_writes_section(main_state: dict | None) -> None:
                 st.success(summary)
         else:
             st.caption("Letzter Lauf ohne EHAL-Schreibdatensätze.")
-        st.dataframe(write_rows, use_container_width=True, hide_index=True)
+        st.dataframe(write_rows, width="stretch", hide_index=True)
         return
 
     if not has_produktiv_run(main_state):
         st.caption("Noch kein Produktiv-Durchlauf — Sollwerte leer, Mapping aus Config.")
         st.dataframe(
             build_write_rows_from_trace([]),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         return
@@ -558,7 +558,7 @@ def render_last_writes_section(main_state: dict | None) -> None:
         st.info("Silent-Modus beim letzten Lauf — keine Schreibvorgänge ausgeführt.")
         st.dataframe(
             build_intended_write_rows(loxone_sent, completed_at),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         if not loxone_sent and silent_now:
@@ -574,7 +574,7 @@ def render_last_writes_section(main_state: dict | None) -> None:
             build_intended_write_rows(loxone_sent, completed_at)
             if loxone_sent
             else build_write_rows_from_trace([]),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
         return
@@ -586,7 +586,7 @@ def render_last_writes_section(main_state: dict | None) -> None:
         st.error(summary)
     else:
         st.success(summary)
-    st.dataframe(write_rows, use_container_width=True, hide_index=True)
+    st.dataframe(write_rows, width="stretch", hide_index=True)
 
 def render_last_run_snapshot_expander(main_state: dict | None) -> None:
     if not has_produktiv_run(main_state):

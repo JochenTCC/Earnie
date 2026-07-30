@@ -135,7 +135,7 @@ def render_ehal_ha_mapping_section() -> None:
             }
             for row in rows[:40]
         ]
-        st.dataframe(preview, use_container_width=True, hide_index=True)
+        st.dataframe(preview, width="stretch", hide_index=True)
         if len(rows) > 40:
             st.caption(f"... und {len(rows) - 40} weitere (Auswahl unten vollständig).")
 

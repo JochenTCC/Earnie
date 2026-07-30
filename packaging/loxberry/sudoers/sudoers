@@ -1,0 +1,8 @@
+# Earnie: allow loxberry (Plugin Admin PHP) to run earnie_ctl without a password.
+# REPLACE tags are substituted by plugininstall.pl before this file is installed.
+
+loxberry ALL=(root) NOPASSWD: REPLACELBPBINDIR/earnie_ctl.sh start
+loxberry ALL=(root) NOPASSWD: REPLACELBPBINDIR/earnie_ctl.sh stop
+loxberry ALL=(root) NOPASSWD: REPLACELBPBINDIR/earnie_ctl.sh restart
+loxberry ALL=(root) NOPASSWD: REPLACELBPBINDIR/earnie_ctl.sh pull
+loxberry ALL=(root) NOPASSWD: REPLACELBPBINDIR/earnie_ctl.sh status

@@ -343,14 +343,14 @@ def _render_scan_and_compare(
     compare = st.session_state.get(_SESSION_COMPARE)
     if isinstance(compare, dict) and compare.get("rows"):
         st.markdown("**Quellenvergleich** (Research — noch keine Winner-Entscheidung)")
-        st.dataframe(compare["rows"], use_container_width=True, hide_index=True)
+        st.dataframe(compare["rows"], width="stretch", hide_index=True)
         for err in (compare.get("errors") or [])[:8]:
             st.caption(err)
     use_source = _render_source_picker(compare if isinstance(compare, dict) else {})
     rows: list[dict[str, Any]] = list(st.session_state.get(_SESSION_SCAN) or [])
     if rows:
         st.caption(f"{len(rows)} Namen für Mapping ({_SOURCE_LABELS.get(use_source, use_source)})")
-        st.dataframe(rows[:40], use_container_width=True, hide_index=True)
+        st.dataframe(rows[:40], width="stretch", hide_index=True)
         if len(rows) > 40:
             st.caption(f"... und {len(rows) - 40} weitere.")
     return rows, ollama_url, ollama_model, ai_clicked

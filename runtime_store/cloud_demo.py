@@ -220,13 +220,13 @@ def render_cloud_demo_feedback_banner() -> None:
         st.link_button(
             "Feedback per E-Mail vorbereiten",
             mailto,
-            use_container_width=True,
+            width="stretch",
         )
     with col_dismiss:
         if st.button(
             "Später",
             key="earnie_cloud_se_feedback_dismiss",
-            use_container_width=True,
+            width="stretch",
         ):
             st.session_state[SESSION_SE_FEEDBACK_DISMISSED_KEY] = True
             st.rerun()

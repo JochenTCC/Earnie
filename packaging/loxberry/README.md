@@ -2,7 +2,7 @@
 
 Thin Docker wrapper for LoxBerry **4.x** (aarch64). Source tree: this folder (`packaging/loxberry/`).
 
-Plugin SemVer (`plugin.cfg` `VERSION`) is **independent** of Earnie `version.py`. The compose file always uses `ghcr.io/jochentcc/earnie-energy:latest`. Refresh the image with Plugin Admin → **Image aktualisieren** or `sbin/earnie_ctl.sh pull`.
+Plugin SemVer (`plugin.cfg` `VERSION`) is **independent** of Earnie `version.py`. The compose file always uses `ghcr.io/jochentcc/earnie-energy:latest`. Refresh the image with Plugin Admin → **Image aktualisieren** or `bin/earnie_ctl.sh pull`.
 
 ## Manual ZIP for Plugin Admin
 
@@ -54,9 +54,9 @@ LoxBerry rewrites these in text files on install:
 | Tag | Typical use |
 |-----|-------------|
 | `REPLACELBPDATADIR` | Compose volumes, systemd `WorkingDirectory`, ctl compose path |
-| `REPLACELBPSBINDIR` | PHP `sudo …/earnie_ctl.sh` |
+| `REPLACELBPBINDIR` | `bin/earnie_ctl.sh`, `sudoers/sudoers` (LoxBerry does **not** install plugin `sbin/` or replace `REPLACELBPSBINDIR`) |
 
-Do not hardcode `/opt/loxberry/...` paths in shipped files.
+PHP uses runtime `$lbpbindir` from `loxberry_system.php` (not a REPLACE tag). Do not hardcode `/opt/loxberry/...` paths in shipped files.
 
 ## Persistence / uninstall
 

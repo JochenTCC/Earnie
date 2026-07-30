@@ -208,16 +208,16 @@ def render_price_forecast_block() -> None:
     )
     _metric_columns(evaluation.model_metrics, evaluation.mirror_metrics, evaluation.test)
 
-    st.plotly_chart(_price_timeseries_chart(evaluation.test), use_container_width=True)
+    st.plotly_chart(_price_timeseries_chart(evaluation.test), width="stretch")
     left, right = st.columns(2)
     with left:
-        st.plotly_chart(_scatter_chart(evaluation.test), use_container_width=True)
+        st.plotly_chart(_scatter_chart(evaluation.test), width="stretch")
     with right:
-        st.plotly_chart(_hourly_mae_chart(hourly_error_summary(evaluation.test)), use_container_width=True)
+        st.plotly_chart(_hourly_mae_chart(hourly_error_summary(evaluation.test)), width="stretch")
 
     with st.expander("Holdout-Tabelle"):
         show = evaluation.test[
             ["actual_cent_kwh", "model_cent_kwh", "mirror_cent_kwh", "model_error", "mirror_error"]
         ].copy()
         show.index = show.index.strftime("%Y-%m-%d %H:%M")
-        st.dataframe(show.round(3), use_container_width=True)
+        st.dataframe(show.round(3), width="stretch")

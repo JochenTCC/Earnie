@@ -37,6 +37,9 @@ Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://conn
 - [ ] **2.4.m - Loxone Library**
   - Build a first Loxone library (templates) with inputs and outputs for the common entities (Plant, EV, Heatpump, Generic consumers)
   - see .cursor/plans/loxone-device-template.md
+  - Show earnie.log file (at least the tail trunk) on page "Optimierer-Dienst". Show it in an expander with an extra chapter title
+  - Add possibility in loxberry plugin to change the IP Port for Streamlit
+  
 - [ ] **2.4.0 — Release**
   - Make a code coverage test
   - Review code against coding KPIs and refactor it if needed
