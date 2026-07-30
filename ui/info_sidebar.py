@@ -70,7 +70,7 @@ def render_info_sidebar() -> None:
         st.link_button(
             "Benutzer-Handbuch",
             MANUAL_URL,
-            use_container_width=True,
+            width="stretch",
         )
         st.markdown("#### Kontakt")
         st.caption(
@@ -103,4 +103,47 @@ def render_info_sidebar() -> None:
                 "Die ZIP-Datei muss der E-Mail manuell als Anhang hinzugefügt werden."
             )
         mailto = build_mailto_url(topic, description)
-        st.link_button("E-Mail schreiben", mailto, use_container_width=True)
+        st.link_button("E-Mail schreiben", mailto, width="stretch")
+
+
+def render_missing_next_month_tariff_sidebar() -> None:
+    """Warn when live monthly_table tariffs lack the next calendar month."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    import config
+    from data.tariff_pricing import (
+        missing_next_month_tariff_hints,
+        next_calendar_month,
+    )
+
+    try:
+        if config.is_runtime_params_deferred():
+            return
+        resolved = config.get_resolved_runtime_settings()
+    except Exception:  # noqa: BLE001 — sidebar must not break the app
+        return
+    if not isinstance(resolved, dict):
+        return
+
+    try:
+        tz_name = config.CONFIG.get_planning_timezone()
+        now = datetime.now(ZoneInfo(tz_name))
+    except Exception:  # noqa: BLE001
+        now = datetime.now().astimezone()
+    year, month = next_calendar_month(now.year, now.month)
+    hints = missing_next_month_tariff_hints(
+        import_tariff=resolved.get("_import_tariff_spec"),
+        export_tariff=resolved.get("_export_tariff_spec"),
+        year=year,
+        month=month,
+    )
+    if not hints:
+        return
+    lines = "\n".join(f"- {h}" for h in hints)
+    st.sidebar.warning(
+        f"**Monatstarif fehlt für {year}-{month:02d}** (nächster Monat):\n\n"
+        f"{lines}\n\n"
+        "Temporär Vorjahres-/Vormonatswert. "
+        "Bitte im **Szenarienkonfigurator** den Cent/kWh-Wert ergänzen."
+    )

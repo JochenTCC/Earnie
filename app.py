@@ -36,7 +36,7 @@ from ui.mode_selector import get_enabled_ui_mode_keys, render_ui_mode_env_notice
 from ui.navigation import build_navigation
 from ui.setup_progress import render_setup_progress_notice
 from ui.config_pack import render_config_pack_sidebar
-from ui.info_sidebar import render_info_sidebar
+from ui.info_sidebar import render_info_sidebar, render_missing_next_month_tariff_sidebar
 from ui.styles import (
     inject_checkbox_highlight_css,
     inject_compact_numeric_css,
@@ -83,6 +83,7 @@ def main() -> None:
     render_ui_mode_env_notices()
     render_config_pack_sidebar()
     render_setup_progress_notice()
+    render_missing_next_month_tariff_sidebar()
     _render_drift_warning()
     render_cloud_demo_intro()
 

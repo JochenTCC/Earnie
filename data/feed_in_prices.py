@@ -79,6 +79,8 @@ def _fixed_tariff_for_slot(
     slot_datetime: datetime | None,
     settings: FeedInSettings,
 ) -> float:
+    from data.tariff_pricing import lookup_monthly_cent
+
     tariffs = settings.monthly_fixed_tariffs
     if tariffs is None:
         return float(settings.k_push_cent)
@@ -88,13 +90,13 @@ def _fixed_tariff_for_slot(
             "slot_datetime pro Matrix-Zeile bzw. Stunde."
         )
     lookup = monthly_fixed_tariff_lookup(tariffs)
-    key = (slot_datetime.year, slot_datetime.month)
-    if key not in lookup:
-        raise ValueError(
-            f"Kein fixer Einspeisetarif für {key[0]}-{key[1]:02d} in "
-            "monthly_rates (Export-Tarif monthly_table / monthly_float)."
-        )
-    return lookup[key]
+    price, _source = lookup_monthly_cent(
+        lookup,
+        slot_datetime.year,
+        slot_datetime.month,
+        label="Einspeisetarif (monthly_rates)",
+    )
+    return price
 
 
 def epex_to_feed_in_cent(

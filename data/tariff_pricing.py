@@ -1,6 +1,7 @@
 """Bezugs- und Einspeisepreise aus Tarif-Specs (DACH-Prototyp, Backtesting)."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -16,6 +17,13 @@ MARKET_ZONE_BY_LAND = {
     "DE": "DE-LU",
     "CH": "CH",
 }
+
+FALLBACK_PRIOR_YEAR = "prior_year"
+FALLBACK_PRIOR_MONTH = "prior_month"
+
+logger = logging.getLogger(__name__)
+# Log each (label, year, month) fallback once per process (matrix has many slots).
+_logged_monthly_fallbacks: set[tuple[str, int, int]] = set()
 
 
 def market_zone_for_land(land: str) -> str:
@@ -64,6 +72,140 @@ def _monthly_table_lookup(tariff: dict[str, Any]) -> dict[tuple[int, int], float
     return lookup
 
 
+def previous_calendar_month(year: int, month: int) -> tuple[int, int]:
+    if month <= 1:
+        return year - 1, 12
+    return year, month - 1
+
+
+def next_calendar_month(year: int, month: int) -> tuple[int, int]:
+    if month >= 12:
+        return year + 1, 1
+    return year, month + 1
+
+
+def _available_months_suffix(lookup: dict[tuple[int, int], float]) -> str:
+    if not lookup:
+        return " (Lookup leer)"
+    first_y, first_m = min(lookup)
+    last_y, last_m = max(lookup)
+    return (
+        f" verfügbar: {first_y}-{first_m:02d} … {last_y}-{last_m:02d}"
+        f" ({len(lookup)} Monate)"
+    )
+
+
+def lookup_monthly_cent(
+    lookup: dict[tuple[int, int], float],
+    year: int,
+    month: int,
+    *,
+    label: str = "Tarif",
+) -> tuple[float, str | None]:
+    """Resolve Cent/kWh for (year, month) with temporary fallbacks.
+
+    Order: exact → same month prior year → previous calendar month.
+    Returns ``(cent, source)`` where ``source`` is None on exact match,
+    else ``prior_year`` / ``prior_month``. Raises ValueError if none exist.
+    """
+    key = (int(year), int(month))
+    if key in lookup:
+        return float(lookup[key]), None
+
+    prior_year_key = (key[0] - 1, key[1])
+    if prior_year_key in lookup:
+        cent = float(lookup[prior_year_key])
+        _warn_monthly_fallback_once(
+            label,
+            key[0],
+            key[1],
+            prior_year_key[0],
+            prior_year_key[1],
+            kind="Vorjahr",
+        )
+        return cent, FALLBACK_PRIOR_YEAR
+
+    prior_month_key = previous_calendar_month(key[0], key[1])
+    if prior_month_key in lookup:
+        cent = float(lookup[prior_month_key])
+        _warn_monthly_fallback_once(
+            label,
+            key[0],
+            key[1],
+            prior_month_key[0],
+            prior_month_key[1],
+            kind="Vormonat",
+        )
+        return cent, FALLBACK_PRIOR_MONTH
+
+    raise ValueError(
+        f"Kein Monatseintrag für {key[0]}-{key[1]:02d} im {label}."
+        f"{_available_months_suffix(lookup)}."
+    )
+
+
+def _warn_monthly_fallback_once(
+    label: str,
+    year: int,
+    month: int,
+    used_year: int,
+    used_month: int,
+    *,
+    kind: str,
+) -> None:
+    token = (str(label), int(year), int(month))
+    if token in _logged_monthly_fallbacks:
+        return
+    _logged_monthly_fallbacks.add(token)
+    logger.warning(
+        "Kein Monatseintrag für %04d-%02d im %s; temporär %04d-%02d "
+        "(%s) verwendet — bitte tariffs.json aktualisieren "
+        "(Szenarienkonfigurator).",
+        year,
+        month,
+        label,
+        used_year,
+        used_month,
+        kind,
+    )
+
+
+def monthly_rates_cover_month(tariff: dict[str, Any], year: int, month: int) -> bool:
+    """True if tariff monthly_rates contain an exact (year, month) row."""
+    if str(tariff.get("type", "")).strip().lower() != IMPORT_MONTHLY:
+        return True
+    rates = tariff.get("monthly_rates")
+    if not isinstance(rates, (list, tuple)) or not rates:
+        return False
+    try:
+        lookup = _monthly_table_lookup(tariff)
+    except ValueError:
+        return False
+    return (int(year), int(month)) in lookup
+
+
+def missing_next_month_tariff_hints(
+    *,
+    import_tariff: dict[str, Any] | None,
+    export_tariff: dict[str, Any] | None,
+    year: int,
+    month: int,
+) -> list[str]:
+    """German captions for monthly_table tariffs missing exact (year, month)."""
+    hints: list[str] = []
+    for side_label, tariff in (
+        ("Bezug", import_tariff),
+        ("Einspeise", export_tariff),
+    ):
+        if not isinstance(tariff, dict):
+            continue
+        if monthly_rates_cover_month(tariff, year, month):
+            continue
+        name = str(tariff.get("label") or tariff.get("id") or side_label)
+        hints.append(f"{side_label}: {name}")
+    return hints
+
+
 def _spot_import_cent(
     epex_cent: float,
     tariff: dict[str, Any],
@@ -101,21 +243,12 @@ def import_cent_kwh(
                 "Import-Tarif type 'monthly_table' erfordert slot_datetime."
             )
         lookup = _monthly_table_lookup(tariff)
-        key = (slot_datetime.year, slot_datetime.month)
-        if key not in lookup:
-            if lookup:
-                first_y, first_m = min(lookup)
-                last_y, last_m = max(lookup)
-                available = (
-                    f" verfügbar: {first_y}-{first_m:02d} … {last_y}-{last_m:02d}"
-                    f" ({len(lookup)} Monate)"
-                )
-            else:
-                available = " (Lookup leer)"
-            raise ValueError(
-                f"Kein Monatseintrag für {key[0]}-{key[1]:02d} im Import-Tarif.{available}."
-            )
-        price = lookup[key]
+        price, _source = lookup_monthly_cent(
+            lookup,
+            slot_datetime.year,
+            slot_datetime.month,
+            label="Import-Tarif",
+        )
         return round(
             _apply_vat(
                 price,
@@ -177,21 +310,12 @@ def export_cent_kwh(
             raise ValueError(
                 f"Export-Tarif type '{tariff_type}' erfordert slot_datetime und monthly_lookup."
             )
-        key = (slot_datetime.year, slot_datetime.month)
-        if key not in monthly_lookup:
-            if monthly_lookup:
-                first_y, first_m = min(monthly_lookup)
-                last_y, last_m = max(monthly_lookup)
-                available = (
-                    f" verfügbar: {first_y}-{first_m:02d} … {last_y}-{last_m:02d}"
-                    f" ({len(monthly_lookup)} Monate)"
-                )
-            else:
-                available = " (Lookup leer)"
-            raise ValueError(
-                f"Kein Monatseintrag für {key[0]}-{key[1]:02d} im Export-Tarif.{available}."
-            )
-        price = monthly_lookup[key]
+        price, _source = lookup_monthly_cent(
+            monthly_lookup,
+            slot_datetime.year,
+            slot_datetime.month,
+            label="Export-Tarif",
+        )
     elif tariff_type in EXPORT_SPOT_TYPES:
         if epex_cent is None:
             raise ValueError(f"Export-Tarif type '{tariff_type}' erfordert EPEX Cent/kWh.")

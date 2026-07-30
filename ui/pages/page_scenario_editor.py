@@ -8,6 +8,7 @@ from ui.doc_links import DocLink, markdown_doc_link
 from ui.help_hint import render_page_title_with_help
 from ui.form_layout import labeled_checkbox
 from ui.house_config_io import (
+    append_tariff_monthly_rate,
     delete_scenario,
     list_batteries,
     list_export_tariffs,
@@ -66,6 +67,71 @@ _SESSION_SELECT_PENDING_KEY = "scenario_select_pending"
 _SESSION_ACTIVE_SELECT_KEY = "scenario_editor_active_select"
 _SESSION_SWITCH_TARGET_KEY = "scenario_editor_switch_target"
 _SESSION_SWITCH_DISCARD_KEY = "scenario_editor_switch_discard"
+
+
+def _next_month_in_planning_tz() -> tuple[int, int]:
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from data.tariff_pricing import next_calendar_month
+
+    tz_name = config.CONFIG.get_planning_timezone()
+    now = datetime.now(ZoneInfo(tz_name))
+    return next_calendar_month(now.year, now.month)
+
+
+def _render_next_month_rate_entry(
+    *,
+    tariff: dict,
+    side: str,
+    year: int,
+    month: int,
+    session_scope: str,
+) -> None:
+    """Warn + form when next calendar month is missing on a monthly_table tariff."""
+    from data.tariff_pricing import monthly_rates_cover_month
+
+    if str(tariff.get("type", "")).strip().lower() != "monthly_table":
+        return
+    if monthly_rates_cover_month(tariff, year, month):
+        return
+
+    side_label = "Bezug" if side == "import" else "Einspeise"
+    tariff_label = str(tariff.get("label") or tariff.get("id") or side)
+    st.warning(
+        f"{side_label}tarif „{tariff_label}“ hat keinen Eintrag für "
+        f"{year}-{month:02d} (nächster Monat). Bis zur Aktualisierung "
+        "wird temporär der Vorjahres- bzw. Vormonatswert verwendet. "
+        "Bitte den aktuellen Cent/kWh-Wert eintragen:"
+    )
+    cent_key = scoped_widget_key(session_scope, f"next_month_cent_{side}")
+    cols = st.columns([1, 1, 2, 1])
+    cols[0].markdown(f"**Jahr**  \n{year}")
+    cols[1].markdown(f"**Monat**  \n{month}")
+    cent = cols[2].number_input(
+        "Cent/kWh",
+        min_value=0.01,
+        step=0.01,
+        format="%.3f",
+        key=cent_key,
+        help=f"Wird in tariffs.json für {tariff['id']} ergänzt.",
+    )
+    if cols[3].button(
+        "Speichern",
+        key=scoped_widget_key(session_scope, f"next_month_save_{side}"),
+    ):
+        try:
+            append_tariff_monthly_rate(
+                side=side,
+                tariff_id=str(tariff["id"]),
+                year=year,
+                month=month,
+                tariff_cent_kwh=float(cent),
+            )
+        except ValueError as exc:
+            st.error(str(exc))
+            return
+        st.rerun()
 
 
 def _scenario_explorer_ui_enabled() -> bool:
@@ -679,6 +745,23 @@ def _render_scenarios_tab() -> None:
             title="Einspeisetarif-Parameter",
             kind="export",
             container=export_param_col,
+        )
+    next_y, next_m = _next_month_in_planning_tz()
+    if import_tariff is not None:
+        _render_next_month_rate_entry(
+            tariff=import_tariff,
+            side="import",
+            year=next_y,
+            month=next_m,
+            session_scope=session_scope,
+        )
+    if export_tariff is not None:
+        _render_next_month_rate_entry(
+            tariff=export_tariff,
+            side="export",
+            year=next_y,
+            month=next_m,
+            session_scope=session_scope,
         )
     if selected_import or selected_export:
         st.info(

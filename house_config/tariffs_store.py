@@ -438,3 +438,89 @@ def resolve_export_tariff_into_settings(
                 validated = validate_fixed_monthly_feed_in_rates(rates)
             monthly_rates_holder["_monthly_fixed_tariffs"] = validated
     return out
+
+
+def append_monthly_rate(
+    path: str,
+    *,
+    side: str,
+    tariff_id: str,
+    year: int,
+    month: int,
+    tariff_cent_kwh: float,
+) -> None:
+    """Append or replace one monthly_rates row on a raw list-shaped tariffs.json.
+
+    ``side`` is ``import`` or ``export``. Does not write normalized id-maps.
+    """
+    from settings.json_io import write_json_dict
+
+    side_key = str(side).strip().lower()
+    if side_key == "import":
+        list_key = "import_tariffs"
+    elif side_key == "export":
+        list_key = "export_tariffs"
+    else:
+        raise ValueError("side muss 'import' oder 'export' sein.")
+
+    year_i = int(year)
+    month_i = int(month)
+    cent = float(tariff_cent_kwh)
+    if month_i < 1 or month_i > 12:
+        raise ValueError("month muss 1–12 sein.")
+    if cent <= 0.0:
+        raise ValueError("tariff_cent_kwh muss > 0 sein.")
+
+    doc = _read_json(path)
+    tariffs = doc.get(list_key)
+    if not isinstance(tariffs, list):
+        raise ValueError(
+            f"{list_key} muss ein Array in tariffs.json sein (nicht normalisierte Map)."
+        )
+
+    want_id = str(tariff_id).strip()
+    if side_key == "export":
+        want_id = resolve_export_tariff_id(want_id)
+
+    target: dict | None = None
+    for entry in tariffs:
+        if isinstance(entry, dict) and str(entry.get("id", "")).strip() == want_id:
+            target = entry
+            break
+    if target is None:
+        raise ValueError(f"Unbekannte {side_key}_tariff_id '{want_id}'.")
+
+    tariff_type = str(target.get("type", "")).strip().lower()
+    if tariff_type != "monthly_table":
+        raise ValueError(
+            f"Tarif '{want_id}' hat type '{tariff_type}' — "
+            "nur monthly_table erlaubt Monatseinträge."
+        )
+
+    rates = target.get("monthly_rates")
+    if rates is None:
+        rates = []
+        target["monthly_rates"] = rates
+    if not isinstance(rates, list):
+        raise ValueError(f"Tarif '{want_id}': monthly_rates muss ein Array sein.")
+
+    new_row = {
+        "year": year_i,
+        "month": month_i,
+        "tariff_cent_kwh": cent,
+    }
+    replaced = False
+    for index, row in enumerate(rates):
+        if (
+            isinstance(row, dict)
+            and int(row.get("year", -1)) == year_i
+            and int(row.get("month", -1)) == month_i
+        ):
+            rates[index] = new_row
+            replaced = True
+            break
+    if not replaced:
+        rates.append(new_row)
+
+    validate_fixed_monthly_feed_in_rates(rates)
+    write_json_dict(path, doc)

@@ -11,7 +11,7 @@ from house_config.profiles_store import (
     load_house_profiles_document,
     save_house_profiles_document,
 )
-from house_config.tariffs_store import load_tariffs_document
+from house_config.tariffs_store import append_monthly_rate, load_tariffs_document
 from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,
     resolve_components_json_path,
@@ -80,6 +80,26 @@ def tariffs_json_path() -> str:
 
 def load_tariffs() -> dict:
     return load_tariffs_document(tariffs_json_path())
+
+
+def append_tariff_monthly_rate(
+    *,
+    side: str,
+    tariff_id: str,
+    year: int,
+    month: int,
+    tariff_cent_kwh: float,
+) -> None:
+    """Persist one monthly_rates row and reload live config."""
+    append_monthly_rate(
+        tariffs_json_path(),
+        side=side,
+        tariff_id=tariff_id,
+        year=year,
+        month=month,
+        tariff_cent_kwh=tariff_cent_kwh,
+    )
+    config.reload_config()
 
 
 def load_backtesting_scenarios_raw() -> dict:

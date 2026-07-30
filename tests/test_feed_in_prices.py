@@ -159,3 +159,19 @@ def test_enrich_matrix_fixed_mode_uses_slot_month():
     )
     enrich_matrix_feed_in_prices(matrix, settings)
     assert matrix[0]["k_push_act"] == pytest.approx(3.60)
+
+
+def test_fixed_mode_monthly_tariff_falls_back_to_prior_year():
+    tariffs = validate_fixed_monthly_feed_in_rates([
+        {"year": 2025, "month": 8, "tariff_cent_kwh": 4.2},
+        {"year": 2026, "month": 7, "tariff_cent_kwh": 9.9},
+    ])
+    settings = FeedInSettings(
+        mode=FEED_IN_MODE_FIXED,
+        k_push_cent=99.0,
+        fee_factor=0.0,
+        fix_cent=0.0,
+        monthly_fixed_tariffs=tariffs,
+    )
+    august = datetime(2026, 8, 1, 0, 0)
+    assert resolve_k_push_act(None, settings, slot_datetime=august) == pytest.approx(4.2)

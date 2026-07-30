@@ -69,6 +69,8 @@ Interner Runtime-`feed_in_mode` für stündliche EPEX-Einspeise bleibt `dynamic_
 
 Berechnung: `[data/tariff_pricing.py](../../data/tariff_pricing.py)` (`import_cent_kwh`, `export_cent_kwh`). Die MILP-Matrix nutzt `k_act` (Bezug) und `k_push_act` (Einspeise) je Stunde.
 
+**Fehlender Folgemonat:** Fehlt in `monthly_rates` der Monat eines Planungsslots (typisch der **nächste Kalendermonat** am Monatsende), nutzt Earnie vorübergehend denselben Monat im Vorjahr, sonst den Vormonat, und schreibt eine Warnung ins Log. Im **Szenarienkonfigurator** erscheint dann ein Hinweis mit Eingabe (Cent/kWh), die den Monat in `earnie_env/config/tariffs.json` ergänzt. `main.py` liest die Datei bei jedem Optimierungslauf neu (`reload_config`); die Streamlit-App bei jedem Lauf (`reinit_config`).
+
 ### Marktzonen (Backtesting)
 
 
