@@ -1,0 +1,133 @@
+{
+  "rooms": {
+    "r-tech": {"name": "Technikraum"},
+    "r-kitchen": {"name": "Küche"}
+  },
+  "cats": {
+    "c-load": {"name": "Verbraucher"}
+  },
+  "controls": {
+    "uuid-efm": {
+      "name": "Energie-Monitor",
+      "type": "EFM",
+      "uuidAction": "uuid-efm",
+      "room": "r-tech",
+      "cat": "c-load",
+      "details": {
+        "nodes": [
+          {
+            "title": "Zähler Netz",
+            "ctrlUuid": "uuid-grid",
+            "nodeType": "Grid"
+          },
+          {
+            "title": "Zähler PV-Anlage",
+            "ctrlUuid": "uuid-pv",
+            "nodeType": "Production"
+          },
+          {
+            "title": "Zähler Batterie",
+            "ctrlUuid": "uuid-batt",
+            "nodeType": "Storage"
+          },
+          {
+            "title": "Zähler Wärmepumpe",
+            "ctrlUuid": "uuid-wp",
+            "nodeType": "Load"
+          },
+          {
+            "title": "Rest",
+            "ctrlUuid": "uuid-rest-node",
+            "nodeType": "Load"
+          },
+          {
+            "title": "Haushaltsgeräte",
+            "nodeType": "Group",
+            "nodes": [
+              {
+                "title": "Zähler Kochen",
+                "ctrlUuid": "uuid-cook",
+                "nodeType": "Load"
+              }
+            ]
+          }
+        ]
+      },
+      "subControls": {
+        "uuid-rest": {
+          "name": "Rest",
+          "type": "Meter",
+          "uuidAction": "uuid-rest",
+          "room": "r-tech",
+          "cat": "c-load",
+          "details": {"type": "bidirectional"},
+          "states": {"actual": "st-rest"}
+        }
+      },
+      "states": {}
+    },
+    "uuid-grid": {
+      "name": "Zähler Netz",
+      "type": "Meter",
+      "uuidAction": "uuid-grid",
+      "room": "r-tech",
+      "cat": "c-load",
+      "details": {"type": "bidirectional"},
+      "states": {"actual": "st-grid"}
+    },
+    "uuid-pv": {
+      "name": "Zähler PV-Anlage",
+      "type": "Meter",
+      "uuidAction": "uuid-pv",
+      "room": "r-tech",
+      "cat": "c-load",
+      "details": {"type": "unidirectional"},
+      "states": {"actual": "st-pv"}
+    },
+    "uuid-batt": {
+      "name": "Zähler Batterie",
+      "type": "Meter",
+      "uuidAction": "uuid-batt",
+      "room": "r-tech",
+      "cat": "c-load",
+      "details": {"type": "storage"},
+      "states": {"actual": "st-batt"}
+    },
+    "uuid-wp": {
+      "name": "Zähler Wärmepumpe",
+      "type": "Meter",
+      "uuidAction": "uuid-wp",
+      "room": "r-tech",
+      "cat": "c-load",
+      "details": {"type": "unidirectional"},
+      "states": {"actual": "st-wp"}
+    },
+    "uuid-cook": {
+      "name": "Zähler Kochen",
+      "type": "Meter",
+      "uuidAction": "uuid-cook",
+      "room": "r-kitchen",
+      "cat": "c-load",
+      "details": {"type": "unidirectional"},
+      "states": {"actual": "st-cook"}
+    },
+    "uuid-rest-node": {
+      "name": "Rest",
+      "type": "Meter",
+      "uuidAction": "uuid-rest-node",
+      "room": "r-tech",
+      "cat": "c-load",
+      "details": {"type": "bidirectional"},
+      "states": {"actual": "st-rest-node"}
+    },
+    "uuid-tv": {
+      "name": "Zähler TV",
+      "type": "Meter",
+      "uuidAction": "uuid-tv",
+      "room": "r-kitchen",
+      "cat": "c-load",
+      "details": {"type": "unidirectional"},
+      "states": {"actual": "st-tv"}
+    }
+  }
+}

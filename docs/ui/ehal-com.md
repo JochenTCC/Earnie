@@ -204,7 +204,7 @@ Nur bei Backend **Loxone**: Entity-zentrierter Assistent (Backlog **2.4.k**, Str
 3. **Human-in-the-Loop** — Entity wählen, EHAL-Felder zuweisen (Select-Label: **Bedeutung** plus EHAL-Value-Name, z. B. `Netzleistung (sens_grid_power_active)`); darunter **Event-Trigger** je Entity (`id`, `ehal_field`, `signal_type`, `on_change`, `label`). Die Merker-Adresse kommt aus dem Binding des gewählten Feldes.
 4. **Speichern** — schreibt `plant.ehal_bindings` / `consumers[].ehal_bindings` sowie `event_triggers` in `house_profiles.json`. Beim ersten Migrate/Save werden `system.event_triggers` geleert und Anlagen-Rollen aus `loxone_blocks` entfernt (leeres `loxone_blocks` entfällt).
 
-**Energieflussmonitor → Hausprofil (Interpretation C):** Auto-Sync = Backlog **2.4.l**. Manueller Blueprint: siehe Plan `energieflussmonitor_hausprofil_blueprint_a` im Repo.
+**Energieflussmonitor → Verbraucher:** Expander **Zähler importieren** lädt Zähler aus `LoxAPP3.json` (EFM-Baum + orphan Meter), schlägt generische Verbraucher vor und kann optional `flex.power_name` auf die Zähler-Bezeichnung setzen. CSV-Export bleibt manuell; `flex.enable_name` / `flex.power_setpoint_name` nicht vom Zähler. Spec: [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md). Manueller Blueprint: Plan `energieflussmonitor_hausprofil_blueprint_a`.
 
 Bindings werden **nicht** mehr im Hauskonfigurator unter „Smarthome-Merker“ editiert — nur noch hier auf EHAL-Com. Siehe [Loxone-Signale](../referenz/loxone-signale.md).
 

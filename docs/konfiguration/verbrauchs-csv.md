@@ -151,6 +151,14 @@ python -m scripts.export_historical_test_csvs --out-dir Historical-Data/export-t
 
 Optional: `--cons-data`, `--from`, `--to`. Die Dateien sind Loxone-kompatibel und lassen sich im Hauskonfigurator (getrennte CSVs bzw. Energiemonitor) wieder einlesen. Es sind mindestens 8760 Stunden nötig.
 
+## Von Loxone Energieflussmonitor zum Hausprofil
+
+Kurzweg für die Einrichtung (Details und Rollen-Tabelle: Spec [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md), manueller Blueprint im Repo-Plan `energieflussmonitor_hausprofil_blueprint_a`):
+
+1. In Loxone **Energieflussmonitor** + **Zähler** für Netz / PV / Speicher / Verbraucher anlegen (flach oder bewusst flachhalten).
+2. Auf **EHAL-Com** unter **Zähler importieren** die Zähler aus `LoxAPP3.json` laden und gewünschte **generische Verbraucher** übernehmen (optional Live-`flex.power_name` = Zähler-Bezeichnung). Freigabe- und Sollwert-Merker (`flex.enable_name` / `flex.power_setpoint_name`) weiterhin manuell im EHAL-Mapping.
+3. **Statistik-CSVs einzeln** je Serie exportieren und im Hauskonfigurator hochladen (Haus: Energiemonitor/Bilanz/getrennt; Verbraucher: Einzelserie → `profile_csv`, ggf. „Von Basis-Last abziehen“). Es gibt **keinen** Multi-Spalten-Import aller EFM-Leistungsflüsse in einem Schritt.
+
 ## Abgrenzung Live-Loxone und CSV-Ebenen
 
 

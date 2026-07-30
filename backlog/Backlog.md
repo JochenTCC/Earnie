@@ -23,23 +23,40 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Goal:** Freeze **EHAL**, prove Loxone-free southbounds (OpenEMS + HA/evcc), move production Loxone onto EHAL, add MCP one-click mapping, and prove config-only switch across all three. Earnie Core remains the sole 48h optimizer; hardware I/O only via EHAL (telemetry + setpoints + capability flags).  
 **Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume; **Loxone** = production path via EHAL (`2.4.e`–`2.4.h`).  
 **Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) done — thin Docker wrapper in `packaging/loxberry/` (not a native host install).  
-**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.m` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
+**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.l`/`2.4.m` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
 Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://connect.loxonecloud.com/504F94A1137C)
 
-- [ ] **2.4.l — EFM auto-sync (interpretation C)** *(follow-up from 2.4.f / §3.1)*
-  - Auto-sync Energieflussmonitor meter tree → Hausprofil consumers + CSV paths
-  - Manual blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
-  - Loxone MCP interfaces recognizes all "Zähler Bausteine" (with control_bind) from loxone config - so chances are good to identify consumers. To be clarified if consumer's actual power can be mapped to Earnie consumers. CSV must be exported manually by user, but "mapping" to these files could be done by same assignment from Loxone's "Zähler Bausteine" and Earnie consumers. 
-  - EFM has **no** multi-column Statistik export of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23)
-     
-- [ ] **2.4.m - Loxone Library**
+- [ ] **2.4.n — Greenfield Loxone Import - Workflow**
+  - Goal is to get a complete HK structure with regard to consumers with power marker and also a complete marker mapping from importing information from loxapp3.json. User has only to set parameters to the existing entities
+  - @efm-auto-sync-2.4.l.md mechanisms are used
   - Build a first Loxone library (templates) with inputs and outputs for the common entities (Plant, EV, Heatpump, Generic consumers)
-  - see .cursor/plans/loxone-device-template.md
+    - Create a how-to doc for importing Earnie Loxone library and insert it into a loxone config project
+    - Give hints for fallback solutions in case Earnie is not accessible (look for regular updating of Earnies outputs and switch to fallback solution in case Earnie seems to be dead)
+  - see .cursor/plans/loxone-device-template.md and `.cursor/plans/greenfield_loxone_import_303f8861.plan.md`
+  - **P1 done (draft):** frozen names in `share/loxone/greenfield_device_map.json` + recipes; Pattern B `VI_`/`VO_` drafts under `share/loxone/templates/` — Config validate/re-export pending
+  - Build a first template automatically with proposed naming
+    - Also include pre-labeled Zähler-Bausteine if possible
+  - Change initial workflow in Earnie:
+    - Start on page HK (as now)
+    - Ask user if automated Loxone import is wished for first HK structure and EHAL mapping (maybe later this can be extended to other smarthome backends)
+    - if Yes:
+      - Switch to EHAL-com page with preselected Loxone as smarthome backend
+      - Ask for Miniserver credentials (implemented already)
+      - Give user hint to import Earnie Loxone Template library into his project (best with Zähler Bausteine or as an alternative give link on how to prepare them when used already)
+      - Import button for importing all entities from loxapp3.json after user has integrated Earnie Loxone library into his loxone config project
+        - Scan loxapp3.json for all entities, build a HK structure accordingly and set all EHAL markers accordingly
+        - Show mapping on EHAL-com page
+        - Give hint to user that entities on HK page are preset but he has to set parameters correctly
+        - User has to switch to HK page on his own
+    if No:
+      - Proceed as usual
+
+
   - Show earnie.log file (at least the tail trunk) on page "Optimierer-Dienst". Show it in an expander with an extra chapter title
   - Add possibility in loxberry plugin to change the IP Port for Streamlit
-  
+
 - [ ] **2.4.0 — Release**
   - Make a code coverage test
   - Review code against coding KPIs and refactor it if needed
@@ -48,7 +65,6 @@ Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://conn
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
   - “All three southbounds” release: OpenEMS ↔ HA+evcc ↔ Loxone via config switch
   - LoxBerry Scope A MVP (`2.4.d`) is implemented; ship plugin ZIP with this release when ready (hardware install acceptance optional)
-  - **Note:** EFM auto-sync (`2.4.l`) is not a hard gate for `2.4.0`
 
 
 
@@ -112,15 +128,12 @@ Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://conn
 
 ### Version 2.+1
 
-- [ ] Generic EV model — for better reusability
-
-
-
-### Version 2.+1
-
 - [ ] Better consumption optimization with temperature-control devices
   - [ ] Heat pump (Prio3) — only indirect control via setpoint adjustment via Loxone setpoint (after **Thermals P2**); distinct from **Thermals P1a** (direct enable/PWM flex from daily HDD budget)
 
+
+### Version 2.+1
+- [ ] Make also an EHAL adaption for MQTT
 
 
 ### Version 3.0

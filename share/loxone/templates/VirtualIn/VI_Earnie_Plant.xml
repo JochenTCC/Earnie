@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DRAFT (2.4.n Pattern B) — validate in Loxone Config, then "Als Vorlage speichern".
+  Replace EARNIE_HOST with Earnie LAN IP/hostname. Status JSON path is a placeholder
+  until Earnie exposes a Loxone status endpoint; Check patterns assume JSON like:
+  {"heartbeat_ts":1710000000,"set_ess_charge_power_limit":0,"set_ess_discharge_power_limit":0,"set_ess_mode":0}
+  Cmd Titles = frozen Merker names (share/loxone/greenfield_device_map.json).
+-->
+<VirtualInHttp Title="Earnie Plant Status" Comment="Pattern B: poll Earnie heartbeat + ESS setpoints (draft)" Address="http://EARNIE_HOST:8501/ehal/loxone/status.json" PollingTime="30">
+	<VirtualInHttpCmd Title="Earnie_Heartbeat" Comment="Unix timestamp; watchdog if stale" Check="&quot;heartbeat_ts&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647"/>
+	<VirtualInHttpCmd Title="Earnie_Ladegrenze" Comment="set_ess_charge_power_limit (W or kW — align with Earnie)" Check="&quot;set_ess_charge_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647"/>
+	<VirtualInHttpCmd Title="Earnie_Entladegrenze" Comment="set_ess_discharge_power_limit" Check="&quot;set_ess_discharge_power_limit&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647"/>
+	<VirtualInHttpCmd Title="Earnie_Steuerbefehl" Comment="set_ess_mode" Check="&quot;set_ess_mode&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="100" DestValHigh="100" DefVal="0" MinVal="-2147483647" MaxVal="2147483647"/>
+</VirtualInHttp>

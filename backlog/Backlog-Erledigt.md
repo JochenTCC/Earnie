@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.l EFM auto-sync Interpretation C (2026-07-30)
+
+- [x] **2.4.l — EFM auto-sync (interpretation C)** — Lab: LoxAPP3 Meter/EFM `nodes` + live `/jdev/sps/io/{name}` as `flex.power_name`; MCP has no `control_bind`. Research note [`docs/spec/efm-auto-sync-2.4.l.md`](../docs/spec/efm-auto-sync-2.4.l.md); HITL [`integrations/loxone_efm_meters.py`](../integrations/loxone_efm_meters.py) + [`ui/ehal_efm_import.py`](../ui/ehal_efm_import.py) on EHAL-Com; CSV still manual; enable/setpoint not from Zähler; German [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) + [`docs/konfiguration/verbrauchs-csv.md`](../docs/konfiguration/verbrauchs-csv.md).
+
+
 ### Bugfix LoxBerry Plugin Stop button (2026-07-30)
 
 - [x] **LoxBerry Plugin — Button "Stop" not working** — ctl lived under non-installed `sbin/` with invalid `REPLACELBPSBINDIR`; moved to `bin/earnie_ctl.sh`, PHP uses `$lbpbindir` + plugin `sudoers`, start/stop/restart wait before redirect so status updates on first reload.

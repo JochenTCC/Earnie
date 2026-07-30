@@ -76,7 +76,12 @@ def render() -> None:
             render_ehal_ha_mapping_section()
 
     if backend == BACKEND_LOXONE:
+        from ui.ehal_efm_import import render_efm_consumer_import_section
         from ui.ehal_loxone_mapping import render_ehal_loxone_mapping_section
+
+        st.subheader("Energieflussmonitor → Verbraucher")
+        with st.expander("Zähler importieren (2.4.l)", expanded=False):
+            render_efm_consumer_import_section()
 
         st.subheader("Loxone Struktur → EHAL Mapping")
         with st.expander("Mapping-Tabelle", expanded=True):

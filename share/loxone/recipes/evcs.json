@@ -1,19 +1,55 @@
 {
   "role_id": "evcs",
-  "label": "Wallbox (EVCS)",
-  "baustein_notes": "EHAL_TO_BLOCKS has no plant keys for evcs_active_power / set_evcs_max_current today. Loxone M1 sets supports_evcs_current=false; EV control stays on house-profile flex (loxone_inputs.power_name / loxone_outputs.power_setpoint_name). Suggested Merker names below are documentation aids for a future mapping key — not written by current HITL save.",
+  "label": "Wallbox / E-Auto (EVCS)",
+  "baustein_notes": "Greenfield prefix Ernie_EAuto_*. Live EV control is on house-profile ev consumer ehal_bindings. Pattern B VI mirrors Soll_A / Modus from Earnie; telemetry usually from Loxone/Wallbox Merkers.",
   "recommended_markers": [
     {
-      "ehal_field": "evcs_active_power",
-      "loxone_blocks_key": "(none — use Hausprofil loxone_inputs.power_name)",
-      "suggested_name": "Ernie_Wallbox_Leistung",
-      "notes": "Telemetry optional on EHAL; Live EV power typically via Hausprofil EV consumer."
+      "ehal_field": "flex.power_name",
+      "loxone_blocks_key": "loxone_inputs.power_name",
+      "suggested_name": "Ernie_EAuto_P_act",
+      "notes": "Active charge power (kW). Prefer EFM Load meter Bezeichnung when that meter is the wallbox."
+    },
+    {
+      "ehal_field": "sens_evcs_connected",
+      "loxone_blocks_key": "plugged_in_name",
+      "suggested_name": "Ernie_EAuto_Angeschlossen",
+      "notes": "1 = plugged in."
+    },
+    {
+      "ehal_field": "sens_evcs_soc_act",
+      "loxone_blocks_key": "actual_soc_name",
+      "suggested_name": "Ernie_EAuto_SOC",
+      "notes": "Vehicle SOC %."
+    },
+    {
+      "ehal_field": "sens_evcs_bat_capacity",
+      "loxone_blocks_key": "battery_capacity_kwh_name",
+      "suggested_name": "Ernie_EAuto_Kapazitaet",
+      "notes": "Battery capacity kWh."
+    },
+    {
+      "ehal_field": "get_evcs_nominal_current",
+      "loxone_blocks_key": "nominal_power_kw_name",
+      "suggested_name": "Ernie_EAuto_MaxStrom",
+      "notes": "Max/nominal current A (legacy key name is misleading)."
+    },
+    {
+      "ehal_field": "get_evcs_ready_by_time",
+      "loxone_blocks_key": "ready_by_time_name",
+      "suggested_name": "Ernie_EAuto_FertigUm",
+      "notes": "Ready-by time."
     },
     {
       "ehal_field": "set_evcs_max_current",
-      "loxone_blocks_key": "(none — use Hausprofil loxone_outputs.power_setpoint_name in kW)",
-      "suggested_name": "Ernie_EAuto_Ziel_kW",
-      "notes": "M1 Ampere setpoint usually unmapped on Loxone; flex uses kW setpoint instead."
+      "loxone_blocks_key": "loxone_outputs.power_setpoint_name",
+      "suggested_name": "Ernie_EAuto_Soll_A",
+      "notes": "Charge current setpoint A."
+    },
+    {
+      "ehal_field": "set_evcs_mode",
+      "loxone_blocks_key": "set_evcs_mode",
+      "suggested_name": "Ernie_EAuto_Modus",
+      "notes": "Enum pv | now (encoding as agreed in Config)."
     }
   ],
   "reference": "docs/referenz/loxone-signale.md"

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DRAFT (2.4.n Pattern B) — validate in Loxone Config, then re-export.
+  Expected JSON: {"Ernie_Verbraucher_Freigabe":1,"Ernie_Verbraucher_Ziel_kW":0}
+-->
+<VirtualInHttp Title="Earnie Generic Consumer" Comment="Pattern B: flex Freigabe/setpoint from Earnie (draft)" Address="http://EARNIE_HOST:8501/ehal/loxone/status.json" PollingTime="30">
+	<VirtualInHttpCmd Title="Earnie_Verbraucher_Freigabe" Comment="flex.enable_name 0/1" Check="&quot;Earnie_Verbraucher_Freigabe&quot;:\v" Signed="true" Analog="false" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
+	<VirtualInHttpCmd Title="Earnie_Verbraucher_Ziel_kW" Comment="flex.power_setpoint_name kW" Check="&quot;Earnie_Verbraucher_Ziel_kW&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="10" DestValHigh="10" DefVal="0" MinVal="0" MaxVal="100"/>
+</VirtualInHttp>

@@ -1,0 +1,188 @@
+{
+  "version": 1,
+  "description": "2.4.n greenfield import contract: match loxapp3 control Bezeichnung to HK entity + ehal_bindings. Exact names preferred; prefix groups multi-signal devices. EFM meter roles still apply per docs/spec/efm-auto-sync-2.4.l.md.",
+  "markers": [
+    {
+      "name": "Ernie_Heartbeat",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": null,
+      "notes": "Pattern B Virtual In: Earnie liveness (unix ts or age). Watchdog only; not an EHAL wire field."
+    },
+    {
+      "name": "Ernie_Netzleistung",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "sens_grid_power_active",
+      "notes": "kW +Bezug. Prefer EFM Grid meter Bezeichnung when present."
+    },
+    {
+      "name": "Ernie_PV_Leistung",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "sens_pv_production_active",
+      "notes": "kW production. Prefer EFM Production meter when present."
+    },
+    {
+      "name": "Ernie_Batterie_SoC",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "sens_ess_soc"
+    },
+    {
+      "name": "Ernie_Batterie_Leistung",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "sens_ess_power",
+      "notes": "Prefer EFM Storage meter for power; SoC often separate Merker."
+    },
+    {
+      "name": "Ernie_Ladegrenze",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "set_ess_charge_power_limit"
+    },
+    {
+      "name": "Ernie_Entladegrenze",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "set_ess_discharge_power_limit"
+    },
+    {
+      "name": "Ernie_Steuerbefehl",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "set_ess_mode"
+    },
+    {
+      "name": "Ernie_WP_P_act",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "flex.power_name",
+      "group": "Ernie_WP_"
+    },
+    {
+      "name": "Ernie_WP_Freigabe",
+      "match": "exact",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "ehal_field": "flex.enable_name",
+      "group": "Ernie_WP_"
+    },
+    {
+      "name": "Ernie_EAuto_P_act",
+      "match": "exact",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "ehal_field": "flex.power_name",
+      "group": "Ernie_EAuto_"
+    },
+    {
+      "name": "Ernie_EAuto_Angeschlossen",
+      "match": "exact",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "ehal_field": "sens_evcs_connected",
+      "group": "Ernie_EAuto_"
+    },
+    {
+      "name": "Ernie_EAuto_SOC",
+      "match": "exact",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "ehal_field": "sens_evcs_soc_act",
+      "group": "Ernie_EAuto_"
+    },
+    {
+      "name": "Ernie_EAuto_Kapazitaet",
+      "match": "exact",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "ehal_field": "sens_evcs_bat_capacity",
+      "group": "Ernie_EAuto_"
+    },
+    {
+      "name": "Ernie_EAuto_MaxStrom",
+      "match": "exact",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "ehal_field": "get_evcs_nominal_current",
+      "group": "Ernie_EAuto_"
+    },
+    {
+      "name": "Ernie_EAuto_FertigUm",
+      "match": "exact",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "ehal_field": "get_evcs_ready_by_time",
+      "group": "Ernie_EAuto_"
+    },
+    {
+      "name": "Ernie_EAuto_Soll_A",
+      "match": "exact",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "ehal_field": "set_evcs_max_current",
+      "group": "Ernie_EAuto_"
+    },
+    {
+      "name": "Ernie_EAuto_Modus",
+      "match": "exact",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "ehal_field": "set_evcs_mode",
+      "group": "Ernie_EAuto_"
+    },
+    {
+      "name": "Ernie_Verbraucher_Leistung",
+      "match": "exact",
+      "entity_kind": "generic",
+      "hk_type": "generic",
+      "ehal_field": "flex.power_name",
+      "group": "Ernie_Verbraucher_"
+    },
+    {
+      "name": "Ernie_Verbraucher_Freigabe",
+      "match": "exact",
+      "entity_kind": "generic",
+      "hk_type": "generic",
+      "ehal_field": "flex.enable_name",
+      "group": "Ernie_Verbraucher_"
+    },
+    {
+      "name": "Ernie_Verbraucher_Ziel_kW",
+      "match": "exact",
+      "entity_kind": "generic",
+      "hk_type": "generic",
+      "ehal_field": "flex.power_setpoint_name",
+      "group": "Ernie_Verbraucher_"
+    }
+  ],
+  "prefix_groups": [
+    {
+      "prefix": "Ernie_WP_",
+      "entity_kind": "heatpump",
+      "hk_type": "thermal_annual",
+      "default_label": "Wärmepumpe"
+    },
+    {
+      "prefix": "Ernie_EAuto_",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "default_label": "E-Auto"
+    },
+    {
+      "prefix": "Ernie_Wallbox_",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "default_label": "Wallbox"
+    },
+    {
+      "prefix": "Ernie_Verbraucher_",
+      "entity_kind": "generic",
+      "hk_type": "generic",
+      "default_label": "Flex-Verbraucher"
+    }
+  ]
+}

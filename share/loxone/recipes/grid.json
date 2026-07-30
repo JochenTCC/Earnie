@@ -1,13 +1,13 @@
 {
   "role_id": "grid",
   "label": "Netz (PCC)",
-  "baustein_notes": "Virtual Status or Memory holding grid active power in kW (Earnie converts to W). Prefer a stable Merker name; Live addresses names, not UUIDs.",
+  "baustein_notes": "Prefer EFM Grid Zähler Bezeichnung as sens_grid_power_active. Recipe name Ernie_Netzleistung is the greenfield fallback Merker when no EFM Grid node exists.",
   "recommended_markers": [
     {
-      "ehal_field": "grid_power_active",
+      "ehal_field": "sens_grid_power_active",
       "loxone_blocks_key": "grid_power_name",
       "suggested_name": "Ernie_Netzleistung",
-      "notes": "kW; + = Bezug. Maps to EHAL grid_power_active (W)."
+      "notes": "kW; + = Bezug. Maps to EHAL sens_grid_power_active (W)."
     }
   ],
   "reference": "docs/referenz/loxone-signale.md"
