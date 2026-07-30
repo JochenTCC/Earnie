@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix LoxBerry Plugin Stop button (2026-07-30)
+
+- [x] **LoxBerry Plugin — Button "Stop" not working** — ctl lived under non-installed `sbin/` with invalid `REPLACELBPSBINDIR`; moved to `bin/earnie_ctl.sh`, PHP uses `$lbpbindir` + plugin `sudoers`, start/stop/restart wait before redirect so status updates on first reload.
+
+
 ### Bugfix Hausprofil Verbraucher expander kWh/a (2026-07-29)
 
 - [x] **Displaying annual consumption of consumer in expander isn't updated after editing parameters** — expander title now overlays live widget values, session syncs full edited consumer fields, and expander `key` includes rounded annual kWh so Streamlit refreshes the label while open/closed state is preserved separately (`ui/house_config_profile_form.py`).
