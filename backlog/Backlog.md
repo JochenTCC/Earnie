@@ -33,9 +33,13 @@ Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://conn
   - Manual blueprint: `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
   - Loxone MCP interfaces recognizes all "Zähler Bausteine" (with control_bind) from loxone config - so chances are good to identify consumers. To be clarified if consumer's actual power can be mapped to Earnie consumers. CSV must be exported manually by user, but "mapping" to these files could be done by same assignment from Loxone's "Zähler Bausteine" and Earnie consumers. 
   - EFM has **no** multi-column Statistik export of all Leistungsflüsse — do not plan HK CSV column↔Verbraucher mapping on that assumption (abandoned 2026-07-23)
-
+     
+- [ ] **2.4.m - Loxone Library**
+  - Build a first Loxone library (templates) with inputs and outputs for the common entities (Plant, EV, Heatpump, Generic consumers)
+  - see .cursor/plans/loxone-device-template.md
 - [ ] **2.4.0 — Release**
   - Make a code coverage test
+  - Review code against coding KPIs and refactor it if needed
   - Make a test coverage test to identify obsolete tests
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
