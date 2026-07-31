@@ -33,6 +33,45 @@ def loxone_env_configured() -> bool:
     return loxone_credentials_configured()
 
 
+def probe_loxone_http_access(
+    *,
+    host: str,
+    username: str,
+    password: str,
+    timeout_sec: float = 5.0,
+) -> tuple[bool, str]:
+    """Light LoxAPP3 GET (streamed) to verify Miniserver reachability + auth.
+
+    Returns ``(ok, detail)``. Does not download the full structure JSON.
+    """
+    import requests
+    from requests.auth import HTTPBasicAuth
+
+    ip = str(host or "").strip().removeprefix("http://").removeprefix("https://")
+    ip = ip.split("/")[0]
+    if not ip:
+        return False, "LOXONE_IP is empty"
+    url = f"http://{ip}/data/LoxAPP3.json"
+    try:
+        response = requests.get(
+            url,
+            auth=HTTPBasicAuth(username, password),
+            timeout=timeout_sec,
+            stream=True,
+        )
+    except (requests.RequestException, OSError, ValueError) as exc:
+        return False, f"Loxone unreachable: {exc}"
+    try:
+        code = int(response.status_code)
+    finally:
+        response.close()
+    if code == 200:
+        return True, f"LoxAPP3 HTTP {code}"
+    if code in (401, 403):
+        return False, f"Loxone auth failed (HTTP {code})"
+    return False, f"LoxAPP3 HTTP {code} from {url}"
+
+
 def ensure_live_config(config_path: str = config.CONFIG_JSON_PATH) -> None:
     """Lädt config.json mit Pflicht auf Loxone-Credentials (kein Offline-Modus)."""
     config.CONFIG = config.Config(
@@ -57,7 +96,12 @@ def _read_check(
     if read_raw:
         raw = loxone_client.fetch_loxone_raw_value(io_name)
         if raw is None:
-            detail = "Lesen fehlgeschlagen (kein Wert)"
+            # Empty LL.value with HTTP/Code 200 is common for unset FertigUm text.
+            detail = (
+                "Wert leer (IO erreichbar — in Loxone noch kein Text gesetzt)"
+                if warn_if_missing
+                else "Lesen fehlgeschlagen (kein Wert)"
+            )
             if warn_if_missing:
                 return LoxoneCheck(label, io_name, False, detail, severity="warning")
             return LoxoneCheck(label, io_name, False, detail)
@@ -262,10 +306,12 @@ def _append_flex_power_check(
 ) -> None:
     from settings.ehal_marker_resolve import marker_flex_power
 
+    from ehal.flex_fields import flex_sens_power_act
+
     cid = consumer["id"]
     _append_io_check(
         checks,
-        f"{cid}:flex.power_name",
+        f"{cid}:{flex_sens_power_act(cid)}",
         marker_flex_power(consumer),
         {"validate": _consumer_power_validate(consumer)},
     )
