@@ -1,118 +1,122 @@
 {
-    "system": {
-        "global_timeout": 10,
-        "loop_timeout": 900,
-        "event_trigger_enabled": false,
-        "event_poll_interval_sec": 60,
-        "event_triggers": []
+  "system": {
+    "global_timeout": 10,
+    "loop_timeout": 900,
+    "event_trigger_enabled": false,
+    "event_poll_interval_sec": 60,
+    "event_triggers": []
+  },
+  "loxone_blocks": {
+    "soc_name": "Battery_SOC",
+    "pv_power_name": "PV_Act",
+    "battery_power_name": "Battery_Act",
+    "grid_power_name": "Grid_Act",
+    "target_charge_power_name": "Target_Charge",
+    "target_discharge_power_name": "Target_Discharge",
+    "control_cmd_name": "Control_Cmd",
+    "pv_counter_name": "PV_Counter",
+    "log_filename": "Verbrauch.csv",
+    "pv_tuning_log_file": "runtime/pv_accuracy_log.csv",
+    "target_soc_name": "Target_SoC"
+  },
+  "live_scenario_id": "live",
+  "planning_horizon": {
+    "mode": "sunrise_window"
+  },
+  "scenario_explorer_conf": {
+    "path_cons_data": "tests/fixtures/backtesting/cons_data_hourly.csv",
+    "cons_data_retention_months": 24,
+    "cons_data_write_mode": "hourly",
+    "price_source": "api",
+    "price_provider": "awattar",
+    "price_range": "last_12_months"
+  },
+  "flexible_consumers": [
+    {
+      "id": "swimspa",
+      "name": "SwimSpa",
+      "nominal_power_kw": 2.8,
+      "daily_target_kwh": 8.0,
+      "daily_target_source": "historical",
+      "min_on_quarterhours": 1,
+      "path_historical_log": "tests/fixtures/backtesting/swimspa.csv",
+      "signal_type": "power",
+      "optimizer_enabled": true,
+      "loxone_outputs": {
+        "enable_name": "SwimSpa_Enable"
+      },
+      "loxone_inputs": {
+        "power_name": "SwimSpa_Power"
+      },
+      "chart_color_index": 0
     },
-    "loxone_blocks": {
-        "soc_name": "Battery_SOC",
-        "pv_power_name": "PV_Act",
-        "battery_power_name": "Battery_Act",
-        "grid_power_name": "Grid_Act",
-        "target_charge_power_name": "Target_Charge",
-        "target_discharge_power_name": "Target_Discharge",
-        "control_cmd_name": "Control_Cmd"
-    },
-    "live_scenario_id": "live",
-    "planning_horizon": {
-        "mode": "sunrise_window"
-    },
-    "scenario_explorer_conf": {
-        "path_cons_data": "tests/fixtures/backtesting/cons_data_hourly.csv",
-        "cons_data_retention_months": 24,
-        "cons_data_write_mode": "hourly",
-        "price_source": "api",
-        "price_provider": "awattar",
-        "price_range": "last_12_months"
-    },
-    "flexible_consumers": [
-        {
-            "id": "swimspa",
-            "name": "SwimSpa",
-            "nominal_power_kw": 2.8,
-            "daily_target_kwh": 8.0,
-            "daily_target_source": "historical",
-            "min_on_quarterhours": 1,
-            "path_historical_log": "tests/fixtures/backtesting/swimspa.csv",
-            "signal_type": "power",
-            "optimizer_enabled": true,
-            "loxone_outputs": {
-                "enable_name": "SwimSpa_Enable"
-            },
-            "loxone_inputs": {
-                "power_name": "SwimSpa_Power"
-            },
-            "chart_color_index": 0
+    {
+      "id": "eauto",
+      "name": "E-Auto",
+      "nominal_power_kw": 3.5,
+      "min_power_kw": 1.4,
+      "daily_target_source": "loxone",
+      "min_on_quarterhours": 1,
+      "path_historical_log": "tests/fixtures/backtesting/eauto.csv",
+      "signal_type": "power",
+      "optimizer_enabled": true,
+      "loxone_outputs": {
+        "power_setpoint_name": "EAuto_Target_kW",
+        "pv_follow_name": "EAuto_PV_Follow"
+      },
+      "loxone_inputs": {
+        "power_name": "EAuto_Power"
+      },
+      "charging_schedule": {
+        "enabled": true,
+        "forecast_when_absent": true,
+        "charging_efficiency": 0.9,
+        "target_soc_percent": 100.0,
+        "weekday": {
+          "car_available_from_hour": 15,
+          "ready_by_hour": 7,
+          "daily_rest_soc": 20.0
         },
-        {
-            "id": "eauto",
-            "name": "E-Auto",
-            "nominal_power_kw": 3.5,
-            "min_power_kw": 1.4,
-            "daily_target_source": "loxone",
-            "min_on_quarterhours": 1,
-            "path_historical_log": "tests/fixtures/backtesting/eauto.csv",
-            "signal_type": "power",
-            "optimizer_enabled": true,
-            "loxone_outputs": {
-                "power_setpoint_name": "EAuto_Target_kW",
-                "pv_follow_name": "EAuto_PV_Follow"
-            },
-            "loxone_inputs": {
-                "power_name": "EAuto_Power"
-            },
-            "charging_schedule": {
-                "enabled": true,
-                "forecast_when_absent": true,
-                "charging_efficiency": 0.9,
-                "target_soc_percent": 100.0,
-                "weekday": {
-                    "car_available_from_hour": 15,
-                    "ready_by_hour": 7,
-                    "daily_rest_soc": 20.0
-                },
-                "weekend": {
-                    "car_available_from_hour": 18,
-                    "ready_by_hour": 10,
-                    "daily_rest_soc": 40.0
-                },
-                "loxone": {
-                    "plugged_in_name": "EAuto_Plugged",
-                    "ready_by_time_name": "EAuto_ReadyBy",
-                    "soc_at_plug_in_name": "EAuto_RestSOC",
-                    "charge_immediate_name": "EAuto_ChargeNow",
-                    "charge_immediate_remaining_name": "EAuto_ChargeNowRemaining",
-                    "battery_capacity_kwh_name": "EAuto_Battery_kWh",
-                    "nominal_power_kw_name": "EAuto_Max_kW"
-                },
-                "milp": {
-                    "live_modus_a_min_remaining_kwh": 2.8,
-                    "tie_break_on_epsilon": 0.001,
-                    "tie_break_time_epsilon": 0.0001
-                }
-            },
-            "chart_color_index": 2
+        "weekend": {
+          "car_available_from_hour": 18,
+          "ready_by_hour": 10,
+          "daily_rest_soc": 40.0
         },
-        {
-            "id": "waermepumpe",
-            "name": "Wärmepumpe",
-            "nominal_power_kw": 1.6,
-            "daily_target_kwh": 4.0,
-            "daily_target_source": "historical",
-            "min_on_quarterhours": 2,
-            "path_historical_log": "tests/fixtures/backtesting/waermepumpe.csv",
-            "signal_type": "power",
-            "log_signal_type": "binary",
-            "optimizer_enabled": true,
-            "loxone_outputs": {
-                "enable_name": "WP_Enable"
-            },
-            "loxone_inputs": {
-                "power_name": "WP_Power"
-            },
-            "chart_color_index": 7
+        "loxone": {
+          "plugged_in_name": "EAuto_Plugged",
+          "ready_by_time_name": "EAuto_ReadyBy",
+          "soc_at_plug_in_name": "EAuto_RestSOC",
+          "charge_immediate_name": "EAuto_ChargeNow",
+          "charge_immediate_remaining_name": "EAuto_ChargeNowRemaining",
+          "battery_capacity_kwh_name": "EAuto_Battery_kWh",
+          "nominal_power_kw_name": "EAuto_Max_kW"
+        },
+        "milp": {
+          "live_modus_a_min_remaining_kwh": 2.8,
+          "tie_break_on_epsilon": 0.001,
+          "tie_break_time_epsilon": 0.0001
         }
-    ]
+      },
+      "chart_color_index": 2
+    },
+    {
+      "id": "waermepumpe",
+      "name": "Wärmepumpe",
+      "nominal_power_kw": 1.6,
+      "daily_target_kwh": 4.0,
+      "daily_target_source": "historical",
+      "min_on_quarterhours": 2,
+      "path_historical_log": "tests/fixtures/backtesting/waermepumpe.csv",
+      "signal_type": "power",
+      "log_signal_type": "binary",
+      "optimizer_enabled": true,
+      "loxone_outputs": {
+        "enable_name": "WP_Enable"
+      },
+      "loxone_inputs": {
+        "power_name": "WP_Power"
+      },
+      "chart_color_index": 7
+    }
+  ]
 }

@@ -304,6 +304,12 @@ def resolve_absent_availability(
             )
             if today_from is not None and horizon_start >= today_from:
                 continue
+            # FertigUm parsed from yesterday's window_start can push the overnight
+            # deadline into daytime (e.g. "Morgen, 11:00" → 11:00). Only treat the
+            # overnight cycle as still open before the *config* ready_by.
+            config_deadline = charging_deadline_after(window_start, consumer)
+            if config_deadline is not None and horizon_start >= config_deadline:
+                continue
             return horizon_start
     return next_scheduled_availability(horizon_start, consumer)
 
