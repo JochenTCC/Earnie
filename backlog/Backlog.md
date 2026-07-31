@@ -28,6 +28,12 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://connect.loxonecloud.com/504F94A1137C)
 
+- [ ] **2.4.o — EHAL ESS active power (Design C1)**
+  - Portable `set_ess_active_power` (signed W, +discharge/−charge); charge/discharge fields are true caps; `set_ess_mode` optional hint (OpenEMS ignores)
+  - Wire `schema_version` 3; adapters: OpenEMS Equals + limits; Loxone/HA write active power Merker/entity
+  - Greenfield Plant VI / recipes / docs aligned (`Ernie_Batterie_Sollleistung`)
+  - See plan `.cursor/plans/ehal_ess_design_c1_*.plan.md`
+
 - [ ] **2.4.n — Greenfield Loxone Import - Workflow**
   - Goal is to get a complete HK structure with regard to consumers with power marker and also a complete marker mapping from importing information from loxapp3.json. User has only to set parameters to the existing entities
   - @efm-auto-sync-2.4.l.md mechanisms are used

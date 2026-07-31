@@ -1,14 +1,14 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/setpoint.schema.json",
-  "title": "EHAL Setpoint-API (schema_version 2)",
-  "description": "Limit/mode setpoints. ESS limits in W (non-negative magnitudes); EVCS currents in A. At least one setpoint field required. Field names: docs/ui/ehal-com.md §C.",
+  "title": "EHAL Setpoint-API (schema_version 3)",
+  "description": "Design C1: ESS active_power (signed W) + true charge/discharge limits + optional mode hint. EVCS currents in A. At least one setpoint field required. Field names: docs/ui/ehal-com.md §C.",
   "type": "object",
   "required": ["schema_version", "ts", "adapter_id"],
   "properties": {
     "schema_version": {
       "type": "integer",
-      "const": 2
+      "const": 3
     },
     "ts": {
       "type": "string",
@@ -18,19 +18,23 @@
       "type": "string",
       "minLength": 1
     },
+    "set_ess_active_power": {
+      "type": "number",
+      "description": "Forced ESS active power in W (+discharge, −charge). Omit on Automatik."
+    },
     "set_ess_charge_power_limit": {
       "type": "number",
       "minimum": 0,
-      "description": "Max ESS charge power in W (magnitude)."
+      "description": "Max ESS charge power in W (magnitude; true cap)."
     },
     "set_ess_discharge_power_limit": {
       "type": "number",
       "minimum": 0,
-      "description": "Max ESS discharge power in W (magnitude)."
+      "description": "Max ESS discharge power in W (magnitude; true cap)."
     },
     "set_ess_mode": {
       "type": ["string", "number"],
-      "description": "ESS mode / control command (e.g. Huawei control_cmd)."
+      "description": "Optional ESS mode hint for Loxone/HA (e.g. Huawei control_cmd). OpenEMS ignores."
     },
     "set_evcs_max_current": {
       "type": "number",
@@ -44,6 +48,7 @@
     }
   },
   "anyOf": [
+    {"required": ["set_ess_active_power"]},
     {"required": ["set_ess_charge_power_limit"]},
     {"required": ["set_ess_discharge_power_limit"]},
     {"required": ["set_ess_mode"]},

@@ -36,9 +36,10 @@ Greenfield-Namen (2.4.n). Bestehende Prod-Namen (z. B. `B004-Battery_SOC`) ble
 | `sens_ess_power` | Lesen | `Ernie_Batterie_Leistung` (oder EFM Storage) | Batterie; EHAL: +Entladung |
 | `sens_grid_power_active` | Lesen | `Ernie_Netzleistung` (oder EFM Grid) | Netz: +Bezug, kW |
 | `sens_power_consumers` | Lesen | (optional) | Hauslast; sonst Ableitung |
-| `set_ess_charge_power_limit` | Schreiben | `Ernie_Ladegrenze` | Max. Ladeleistung |
-| `set_ess_discharge_power_limit` | Schreiben | `Ernie_Entladegrenze` | Max. Entladeleistung |
-| `set_ess_mode` | Schreiben | `Ernie_Steuerbefehl` | ESS-Modus / Huawei-Steuerbefehl |
+| `set_ess_active_power` | Schreiben | `Ernie_Batterie_Sollleistung` | Forced Leistung, kW; `+` Entladung, `−` Ladung |
+| `set_ess_charge_power_limit` | Schreiben | `Ernie_Ladegrenze` | Max. Ladeleistung (echte Grenze) |
+| `set_ess_discharge_power_limit` | Schreiben | `Ernie_Entladegrenze` | Max. Entladeleistung (echte Grenze) |
+| `set_ess_mode` | Schreiben | `Ernie_Steuerbefehl` | Modus-Hinweis (Huawei); OpenEMS ignoriert |
 | *(Watchdog)* | Lesen | `Ernie_Heartbeat` | Pattern B; kein EHAL-Feld |
 
 Legacy-Rollenamen (`soc_name`, `pv_power_name`, …) in `loxone_blocks` werden beim Migrate nach `plant.ehal_bindings` übernommen und danach aus der Config entfernt (leeres `loxone_blocks` entfällt; **2.4.m**).

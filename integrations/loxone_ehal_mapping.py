@@ -23,6 +23,7 @@ TELEMETRY_OPTIONAL = (
     "sens_power_consumers",
 )
 SETPOINT_FIELDS = (
+    "set_ess_active_power",
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
@@ -39,6 +40,7 @@ EHAL_TO_BLOCKS: dict[str, str] = {
     "sens_ess_power": "battery_power_name",
     "sens_grid_power_active": "grid_power_name",
     "sens_power_consumers": "consumers_power_name",
+    "set_ess_active_power": "target_active_power_name",
     "set_ess_charge_power_limit": "target_charge_power_name",
     "set_ess_discharge_power_limit": "target_discharge_power_name",
     "set_ess_mode": "control_cmd_name",
@@ -62,9 +64,10 @@ except ImportError:  # pragma: no cover
         "sens_ess_power": "Batterieleistung (W, +Entladung)",
         "sens_evcs_active_power": "Wallbox-Leistung (W)",
         "sens_power_consumers": "Hauslast (W)",
+        "set_ess_active_power": "Setpoint ESS-Sollleistung (W, +Entladung)",
         "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
         "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
-        "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl",
+        "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl (Hinweis)",
         "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
         "set_evcs_mode": "Setpoint Wallbox-Modus (pv|now)",
     }
@@ -76,8 +79,14 @@ _HINTS: dict[str, tuple[str, ...]] = {
     "sens_ess_power": ("batterie", "speicher", "akku", "ess"),
     "sens_evcs_active_power": ("wallbox", "evcs", "e-auto", "eauto", "ladung leistung"),
     "sens_power_consumers": ("hauslast", "verbraucher", "house load", "verbrauch"),
-    "set_ess_charge_power_limit": ("ladeleistung", "charge", "zwangslade"),
-    "set_ess_discharge_power_limit": ("entlade", "discharge"),
+    "set_ess_active_power": (
+        "sollleistung",
+        "active power",
+        "ziel leistung batterie",
+        "ess setpoint",
+    ),
+    "set_ess_charge_power_limit": ("ladegrenze", "charge limit", "max lade"),
+    "set_ess_discharge_power_limit": ("entladegrenze", "discharge limit", "max entlade"),
     "set_ess_mode": ("steuerbefehl", "control_cmd", "huawei", "modbus cmd", "ess mode"),
     "set_evcs_max_current": (
         "maxstrom",

@@ -1,7 +1,7 @@
 {
   "role_id": "ess",
   "label": "Batterie (ESS)",
-  "baustein_notes": "SoC as %. Battery power often kW with Loxone +charge (adapter inverts to EHAL +discharge). Prefer EFM Storage Zähler for power. ESS writes via charge/discharge limits + set_ess_mode. Pattern B VI can mirror setpoints from Earnie into these Merker names.",
+  "baustein_notes": "SoC as %. Battery power often kW with Loxone +charge (adapter inverts to EHAL +discharge). Prefer EFM Storage Zähler for power. Design C1: set_ess_active_power (force) + true charge/discharge limits + set_ess_mode hint. Pattern B VI mirrors setpoints from Earnie.",
   "recommended_markers": [
     {
       "ehal_field": "sens_ess_soc",
@@ -16,22 +16,28 @@
       "notes": "Optional; kW, typically +charge in Loxone. Prefer EFM Storage meter name when present."
     },
     {
+      "ehal_field": "set_ess_active_power",
+      "loxone_blocks_key": "target_active_power_name",
+      "suggested_name": "Ernie_Batterie_Sollleistung",
+      "notes": "Design C1 forced active power kW (+discharge)."
+    },
+    {
       "ehal_field": "set_ess_charge_power_limit",
       "loxone_blocks_key": "target_charge_power_name",
       "suggested_name": "Ernie_Ladegrenze",
-      "notes": "Write marker for charge limit (Earnie Core jdev and/or Pattern B VI mirror)."
+      "notes": "True charge cap (kW)."
     },
     {
       "ehal_field": "set_ess_discharge_power_limit",
       "loxone_blocks_key": "target_discharge_power_name",
       "suggested_name": "Ernie_Entladegrenze",
-      "notes": "Write marker for discharge limit."
+      "notes": "True discharge cap (kW)."
     },
     {
       "ehal_field": "set_ess_mode",
       "loxone_blocks_key": "control_cmd_name",
       "suggested_name": "Ernie_Steuerbefehl",
-      "notes": "Huawei control command / ESS mode."
+      "notes": "Mode hint for Huawei/Loxone; OpenEMS ignores."
     }
   ],
   "reference": "docs/referenz/loxone-signale.md"

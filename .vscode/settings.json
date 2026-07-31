@@ -3,5 +3,7 @@
     "terminal.integrated.env.windows": {
         "PYTHONUTF8": "1"
     },
-    "files.encoding": "utf8"
+    "files.encoding": "utf8",
+    "containers.imageBuildContextPath": "${workspaceFolder}",
+    "docker.imageBuildContextPath": "${workspaceFolder}"
 }

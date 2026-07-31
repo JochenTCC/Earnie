@@ -1,4 +1,4 @@
-"""Unit tests for EHAL schema_version 2 schemas and validate helpers."""
+"""Unit tests for EHAL schema_version 3 schemas and validate helpers."""
 
 from __future__ import annotations
 
@@ -26,10 +26,10 @@ def _envelope(**extra):
     return base
 
 
-def test_schema_version_is_2():
-    assert EHAL_SCHEMA_VERSION == 2
+def test_schema_version_is_3():
+    assert EHAL_SCHEMA_VERSION == 3
     for kind in ("telemetry", "setpoint", "capabilities", "write_error"):
-        assert load_schema(kind)["properties"]["schema_version"]["const"] == 2
+        assert load_schema(kind)["properties"]["schema_version"]["const"] == 3
 
 
 def test_schema_files_exist():
@@ -97,6 +97,11 @@ def test_telemetry_rejects_soc_out_of_range():
     )
     with pytest.raises(EhalValidationError):
         validate_telemetry(doc)
+
+
+def test_valid_setpoint_active_power():
+    doc = _envelope(set_ess_active_power=-1500.0)
+    assert validate_setpoint(doc)["set_ess_active_power"] == -1500.0
 
 
 def test_valid_setpoint_partial_ess_charge():

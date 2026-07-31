@@ -11,8 +11,10 @@
         "sens_ess_soc": "sensor.evcc_battery_soc",
         "sens_ess_power": "sensor.evcc_battery_power",
         "sens_evcs_active_power": "sensor.evcc_loadpoint_1_charge_power",
-        "set_ess_charge_power_limit": "number.evcc_battery_grid_charge_limit",
-        "set_ess_discharge_power_limit": "number.evcc_battery_discharge_limit",
+        "set_ess_active_power": "input_number.ess_active_power_w",
+        "set_ess_charge_power_limit": "input_number.ess_charge_limit_w",
+        "set_ess_discharge_power_limit": "input_number.ess_discharge_limit_w",
+        "set_ess_mode": "input_number.ess_mode_hint",
         "set_evcs_max_current": "number.evcc_loadpoint_1_max_current"
       },
       "sign": {

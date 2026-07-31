@@ -87,6 +87,7 @@ def test_role_field_labels_cover_m1_mapping_fields() -> None:
         "sens_ess_soc",
         "sens_ess_power",
         "sens_evcs_active_power",
+        "set_ess_active_power",
         "set_ess_charge_power_limit",
         "set_ess_discharge_power_limit",
         "set_ess_mode",

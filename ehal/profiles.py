@@ -23,7 +23,7 @@ _HW_EXAMPLES = _HW_DIR / "examples"
 _RECIPES_DIR = _REPO_ROOT / "share" / "loxone" / "recipes"
 _RECIPE_SCHEMA = _RECIPES_DIR / "recipe.schema.json"
 
-# M1 EHAL field surface (telemetry + setpoint + capabilities; schema_version 2 / §C).
+# M1 EHAL field surface (telemetry + setpoint + capabilities; schema_version 3 / §C).
 M1_EHAL_FIELDS: frozenset[str] = frozenset(
     {
         "sens_grid_power_active",
@@ -38,6 +38,7 @@ M1_EHAL_FIELDS: frozenset[str] = frozenset(
         "get_evcs_nominal_current",
         "get_evcs_ready_by_time",
         "get_evcs_limit_soc",
+        "set_ess_active_power",
         "set_ess_charge_power_limit",
         "set_ess_discharge_power_limit",
         "set_ess_mode",
@@ -62,9 +63,10 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "get_evcs_nominal_current": "EV Nennstrom (A)",
     "get_evcs_ready_by_time": "EV FertigUm",
     "get_evcs_limit_soc": "EV Ladeziel-SOC (%)",
+    "set_ess_active_power": "Setpoint ESS-Sollleistung (W, +Entladung)",
     "set_ess_charge_power_limit": "Setpoint Ladegrenze (W)",
     "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
-    "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl",
+    "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl (Hinweis)",
     "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
     "set_evcs_mode": "Setpoint Wallbox-Modus (pv|now)",
     "flex.power_name": "Flex Leistung / Zustand",
@@ -79,6 +81,7 @@ _FIELD_ROLE: dict[str, str] = {
     "sens_pv_production_active": "pv",
     "sens_ess_soc": "ess",
     "sens_ess_power": "ess",
+    "set_ess_active_power": "ess",
     "set_ess_charge_power_limit": "ess",
     "set_ess_discharge_power_limit": "ess",
     "set_ess_mode": "ess",

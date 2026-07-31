@@ -10,6 +10,7 @@ from integrations.loxone_adapter import (
     LoxoneAdapter,
     LoxoneAdapterError,
     LoxoneConfig,
+    ehal_active_power_w_to_loxone_kw,
     ehal_limit_w_to_loxone_kw,
     loxone_battery_kw_to_ehal_w,
 )
@@ -24,6 +25,8 @@ def _cfg(**kwargs) -> LoxoneConfig:
         grid_power_name="Grid",
         charge_power_name="Charge",
         discharge_power_name="Discharge",
+        active_power_name="Active",
+        control_cmd_name="Cmd",
     )
     base.update(kwargs)
     return LoxoneConfig(**base)
@@ -33,6 +36,7 @@ def test_battery_sign_and_limit_units():
     assert loxone_battery_kw_to_ehal_w(1.5) == pytest.approx(-1500.0)
     assert loxone_battery_kw_to_ehal_w(-0.5) == pytest.approx(500.0)
     assert ehal_limit_w_to_loxone_kw(2000) == pytest.approx(2.0)
+    assert ehal_active_power_w_to_loxone_kw(-1500) == pytest.approx(-1.5)
 
 
 def test_capabilities_ess_true_evcs_false():
@@ -48,7 +52,7 @@ def test_capabilities_evcs_true_with_current_marker():
 
 def test_capabilities_ess_false_without_markers():
     caps = LoxoneAdapter(
-        _cfg(charge_power_name="", discharge_power_name="")
+        _cfg(charge_power_name="", discharge_power_name="", active_power_name="")
     ).capabilities()
     assert caps["supports_ess_write"] is False
 
@@ -89,14 +93,15 @@ def test_write_setpoints_ess_kw(send_mock):
             "schema_version": EHAL_SCHEMA_VERSION,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "loxone-home",
+            "set_ess_active_power": -1500,
             "set_ess_charge_power_limit": 1500,
             "set_ess_discharge_power_limit": 2000,
-            "set_evcs_max_current": 10,
         }
     )
     assert error is None
-    assert send_mock.call_count == 2
+    assert send_mock.call_count == 3
     calls = {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
+    assert ("Active", -1.5) in calls
     assert ("Charge", 1.5) in calls
     assert ("Discharge", 2.0) in calls
 

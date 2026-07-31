@@ -267,7 +267,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     elif ehal_live.is_ehal_network_backend():
         backend = "HA" if ehal_live.is_ha_backend() else "OpenEMS"
         logger.info("Sende EHAL ESS-Limits an %s...", backend)
-        err_ess, ess_records = ehal_live.write_ess_limits_from_huawei(
+        err_ess, ess_records = ehal_live.write_ess_setpoints_from_control(
             mode, target_power
         )
         logger.info("Sende EHAL EVCS-Maxstrom an %s...", backend)

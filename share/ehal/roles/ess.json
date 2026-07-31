@@ -1,7 +1,7 @@
 {
   "role_id": "ess",
   "label": "Batterie (ESS)",
-  "description": "Home battery SoC, optional power, charge/discharge limits, and optional mode.",
+  "description": "Home battery SoC, optional power, active-power setpoint (Design C1), true charge/discharge limits, and optional mode hint.",
   "status": "m1",
   "ehal_fields": [
     {
@@ -17,28 +17,34 @@
       "notes": "Optional W; + = discharge, − = charge (OpenEMS-aligned)."
     },
     {
+      "field": "set_ess_active_power",
+      "required": false,
+      "kind": "setpoint",
+      "notes": "Forced active power in W (+discharge, −charge). Omit on Automatik. Design C1."
+    },
+    {
       "field": "set_ess_charge_power_limit",
       "required": false,
       "kind": "setpoint",
-      "notes": "Max charge power magnitude in W."
+      "notes": "Max charge power magnitude in W (true cap)."
     },
     {
       "field": "set_ess_discharge_power_limit",
       "required": false,
       "kind": "setpoint",
-      "notes": "Max discharge power magnitude in W."
+      "notes": "Max discharge power magnitude in W (true cap)."
     },
     {
       "field": "set_ess_mode",
       "required": false,
       "kind": "setpoint",
-      "notes": "ESS mode / control command (e.g. Huawei); replaces target_soc write."
+      "notes": "Optional mode hint for Loxone/HA (e.g. Huawei); OpenEMS ignores."
     },
     {
       "field": "supports_ess_write",
       "required": true,
       "kind": "capability",
-      "notes": "True when charge/discharge limit writes are available."
+      "notes": "True when ESS setpoint writes are available."
     }
   ],
   "capability_expectations": {

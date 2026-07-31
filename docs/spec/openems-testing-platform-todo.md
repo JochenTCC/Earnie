@@ -274,8 +274,10 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 | `ess_soc`                       | `ess0/Soc` / `_sum/EssSoc`                            |
 | `ess_power` (optional)          | `ess0/ActivePower` / `_sum/EssActivePower` (+ = discharge) |
 | `evcs_active_power`             | `evcs0/ActivePower` (W, ≥ 0)                              |
+| `set_ess_active_power`          | `ess0/SetActivePowerEquals` (value = signed W; omit on Automatik) |
 | `set_ess_charge_power_limit`    | `ess0/SetActivePowerGreaterOrEquals` (value = −|W|)       |
 | `set_ess_discharge_power_limit` | `ess0/SetActivePowerLessOrEquals` (value = +|W|)          |
+| `set_ess_mode`                  | *(ignored by OpenEMS adapter)*                            |
 | `set_evcs_max_current`          | A→W then `evcs0/SetChargePowerLimit` (W)                  |
 
 

@@ -141,8 +141,9 @@
             "sens_pv_production_active": "Ernie-Merker-PV_Act",
             "sens_ess_power": "Ernie-Merker-LeistungBat_Act",
             "sens_grid_power_active": "Ernie-Merker-LeistungNetz_Act",
-            "set_ess_charge_power_limit": "Ernie_Ziel_LadeLeistung",
-            "set_ess_discharge_power_limit": "Ernie_Ziel_Entladeleistung",
+            "set_ess_active_power": "Ernie_Batterie_Sollleistung",
+            "set_ess_charge_power_limit": "Ernie_Ladegrenze",
+            "set_ess_discharge_power_limit": "Ernie_Entladegrenze",
             "set_ess_mode": "Ernie_Steuerbefehl"
         },
         "event_triggers": []

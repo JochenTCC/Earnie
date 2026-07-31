@@ -176,6 +176,7 @@ class OpenemsAdapter:
             known = [
                 k
                 for k in (
+                    "set_ess_active_power",
                     "set_ess_charge_power_limit",
                     "set_ess_discharge_power_limit",
                     "set_ess_mode",
@@ -199,6 +200,18 @@ class OpenemsAdapter:
         flip_ess = False
         flip_evcs = False
 
+        # Design C1: active_power → Equals; limits → Greater/Less; set_ess_mode ignored.
+        if "set_ess_active_power" in doc and self._supports_ess_write:
+            ok, status, msg = self._try_ess_write(
+                "SetActivePowerEquals",
+                float(doc["set_ess_active_power"]),
+            )
+            if not ok:
+                failed.append("set_ess_active_power")
+                messages.append(msg)
+                hub_status = status
+                flip_ess = True
+
         if "set_ess_charge_power_limit" in doc and self._supports_ess_write:
             ok, status, msg = self._try_ess_write(
                 "SetActivePowerGreaterOrEquals",
@@ -207,7 +220,7 @@ class OpenemsAdapter:
             if not ok:
                 failed.append("set_ess_charge_power_limit")
                 messages.append(msg)
-                hub_status = status
+                hub_status = status or hub_status
                 flip_ess = True
 
         if "set_ess_discharge_power_limit" in doc and self._supports_ess_write:

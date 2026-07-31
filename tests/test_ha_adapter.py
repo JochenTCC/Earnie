@@ -94,7 +94,7 @@ def test_write_setpoints_number_service(post_mock):
     adapter = HaAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 2,
+            "schema_version": 3,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "ha-home",
             "set_ess_charge_power_limit": 1000,
@@ -121,7 +121,7 @@ def test_write_setpoints_degrades_on_403(post_mock):
     adapter = HaAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 2,
+            "schema_version": 3,
             "ts": "2026-07-28T12:00:00Z",
             "adapter_id": "ha-home",
             "set_ess_charge_power_limit": 1000,

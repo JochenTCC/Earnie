@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/write_error.schema.json",
-  "title": "EHAL Write-Error-Telemetry (schema_version 2)",
+  "title": "EHAL Write-Error-Telemetry (schema_version 3)",
   "description": "Emitted when setpoint writes fail. Pair with flipping supports_ess_write / supports_evcs_current.",
   "type": "object",
   "required": [
@@ -15,7 +15,7 @@
   "properties": {
     "schema_version": {
       "type": "integer",
-      "const": 2
+      "const": 3
     },
     "ts": {
       "type": "string",
@@ -31,6 +31,7 @@
       "items": {
         "type": "string",
         "enum": [
+          "set_ess_active_power",
           "set_ess_charge_power_limit",
           "set_ess_discharge_power_limit",
           "set_ess_mode",

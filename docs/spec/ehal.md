@@ -45,7 +45,8 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 |--------|------|----------------|
 | Active power telemetry (`sens_grid_power_active`, `sens_pv_production_active`, `sens_evcs_active_power`, `sens_ess_power`, `sens_power_consumers`) | **W** | See below |
 | `sens_ess_soc` / EV SoC fields | **%** | `0`…`100` |
-| ESS charge/discharge **limits** | **W** | Non-negative **magnitudes** |
+| ESS charge/discharge **limits** | **W** | Non-negative **magnitudes** (true caps) |
+| `set_ess_active_power` | **W** | Signed; `+` = discharge, `−` = charge (omit on Automatik) |
 | `set_evcs_max_current` / `get_evcs_nominal_current` | **A** | Non-negative |
 
 **Grid (`sens_grid_power_active`):** `+` = grid **import** (Bezug), `−` = **export** (Einspeisung). Adapters normalize hub-native signs before emit.
@@ -58,7 +59,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 
 **House load (`sens_power_consumers`, optional):** prefer mapped Merker; else derive from grid/PV/ESS balance.
 
-## Telemetry-API (schema_version 2)
+## Telemetry-API (schema_version 3)
 
 | Field | Required | Unit | Notes |
 |-------|----------|------|-------|
@@ -77,27 +78,30 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 
 Machine schema: [`share/ehal/telemetry.schema.json`](../../share/ehal/telemetry.schema.json).
 
-## Setpoint-API (schema_version 2)
+## Setpoint-API (schema_version 3)
 
-Setpoints are **math limits / schedules / modes**, not realtime inner-loop control. Realtime enforcement stays in the subsystem (OpenEMS / HA / inverter).
+Setpoints are **math limits / forced power / modes**, not a full inner-loop controller. Realtime enforcement stays in the subsystem (OpenEMS / HA / inverter).
+
+**Design C1:** force lives in `set_ess_active_power`; charge/discharge fields are **true caps**; `set_ess_mode` is an optional **hint** for Loxone/HA (OpenEMS ignores it).
 
 | Field | Required in doc | Unit | Notes |
 |-------|-----------------|------|-------|
+| `set_ess_active_power` | no* | W | Forced ESS power (`+` discharge, `−` charge); **omit** on Automatik |
 | `set_ess_charge_power_limit` | no* | W | Max charge power (magnitude ≥ 0) |
 | `set_ess_discharge_power_limit` | no* | W | Max discharge power (magnitude ≥ 0) |
-| `set_ess_mode` | no* | string/number | ESS mode / control command (e.g. Huawei) |
+| `set_ess_mode` | no* | string/number | Optional mode hint (e.g. Huawei Steuerbefehl); OpenEMS ignores |
 | `set_evcs_max_current` | no* | A | EV charge current setpoint / max current |
 | `set_evcs_mode` | no* | enum | `pv` \| `now` |
 
-\*A setpoint document must include **at least one** of these fields (plus envelope). Partial updates are allowed; omitted fields mean “leave unchanged” at the adapter.
+\*A setpoint document must include **at least one** of these fields (plus envelope). Partial updates are allowed; omitted fields mean “leave unchanged” at the adapter (except Automatik → omit `set_ess_active_power` so Equals is not forced).
 
 Machine schema: [`share/ehal/setpoint.schema.json`](../../share/ehal/setpoint.schema.json).
 
-## Capability-Flags (schema_version 2)
+## Capability-Flags (schema_version 3)
 
 | Field | Required | Meaning |
 |-------|----------|---------|
-| `supports_ess_write` | yes | ESS limit setpoints can be written |
+| `supports_ess_write` | yes | ESS setpoints (active power and/or limits) can be written |
 | `supports_evcs_current` | yes | `set_evcs_max_current` can be written |
 
 Additional boolean flags may be added in later `schema_version` values without removing these two.
@@ -161,8 +165,10 @@ M1 fields are chosen so they map to known OpenEMS Edge channels (semantic refere
 | `sens_ess_soc` | `ess0/Soc` / `_sum/EssSoc` |
 | `sens_ess_power` | ESS ActivePower (OpenEMS sign; already EHAL-aligned) |
 | `sens_evcs_active_power` | EVCS / EVSE active power channels |
-| `set_ess_charge_power_limit` | e.g. `SetActivePowerGreaterOrEquals` / Equals (adapter maps magnitude) |
+| `set_ess_active_power` | e.g. `SetActivePowerEquals` (signed W; omit on Automatik) |
+| `set_ess_charge_power_limit` | e.g. `SetActivePowerGreaterOrEquals` (adapter maps magnitude) |
 | `set_ess_discharge_power_limit` | e.g. `SetActivePowerLessOrEquals` |
+| `set_ess_mode` | *(ignored by OpenEMS)* |
 | `set_evcs_max_current` | EVCS Max Current |
 
 ### Deferred device classes

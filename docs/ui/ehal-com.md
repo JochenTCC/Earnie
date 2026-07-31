@@ -30,7 +30,7 @@ Kurze Übersicht der **kanonischen EHAL-Wire-Felder** (gleich `docs/ui/ehal-com.
 
 | Kategorie             | Feld                            | Required | Einheit / Sign-Konvention                                                        |
 | --------------------- | ------------------------------- | -------- | -------------------------------------------------------------------------------- |
-| Envelope              | `schema_version`                | ja       | integer; Wire-Version (M1 historisch `1`; `sens_*`-Freeze in **2.4.j**)          |
+| Envelope              | `schema_version`                | ja       | integer; Wire-Version (**3** = Design C1 `set_ess_active_power`)                 |
 | Envelope              | `ts`                            | ja       | ISO-8601 Timestamp **mit Zeitzone** (bevorzugt UTC)                              |
 | Envelope              | `adapter_id`                    | ja       | stabile Adapter-ID (z. B. `openems-lab`, `ha-home`)                              |
 | Telemetrie            | `sens_grid_power_active`        | ja       | **W**; `+` = Netz **Bezug**, `-` = **Einspeisung**                               |
@@ -39,12 +39,13 @@ Kurze Übersicht der **kanonischen EHAL-Wire-Felder** (gleich `docs/ui/ehal-com.
 | Telemetrie (optional) | `sens_ess_power`                | nein     | **W**; ESS Vorzeichen **OpenEMS-aligned**: `+` = **Entladung**, `-` = **Ladung** |
 | Telemetrie (optional) | `sens_evcs_active_power`        | nein     | **W**; >= 0 (bei Idle i. d. R. 0)                                                |
 | Telemetrie (optional) | `sens_power_consumers`          | nein     | **W**; Hauslast; Merker wenn gemappt, sonst aus Netz/PV/ESS ableiten             |
-| Setpoints (Limits)    | `set_ess_charge_power_limit`    | nein*    | **W**; nicht-negativer Betrag (Max. Ladeleistung)                                |
-| Setpoints (Limits)    | `set_ess_discharge_power_limit` | nein*    | **W**; nicht-negativer Betrag (Max. Entladeleistung)                             |
+| Setpoints (Force)     | `set_ess_active_power`          | nein*    | **W**; signed; `+` = Entladung, `-` = Ladung; bei Automatik weglassen            |
+| Setpoints (Limits)    | `set_ess_charge_power_limit`    | nein*    | **W**; nicht-negativer Betrag (echte Max. Ladeleistung)                          |
+| Setpoints (Limits)    | `set_ess_discharge_power_limit` | nein*    | **W**; nicht-negativer Betrag (echte Max. Entladeleistung)                       |
 | Setpoints (Limits)    | `set_evcs_max_current`          | nein*    | **A**; nicht-negativer Betrag (EV-Lade-Soll-/Maxstrom)                           |
-| Setpoints (erweitert) | `set_ess_mode`                  | nein*    | ESS-Modus / Steuerbefehl (z. B. Huawei)                                          |
+| Setpoints (Hinweis)   | `set_ess_mode`                  | nein*    | optionaler Modus-Hinweis (z. B. Huawei); OpenEMS ignoriert                       |
 | Setpoints (erweitert) | `set_evcs_mode`                 | nein*    | Enum: `pv`                                                                       |
-| Capability Flags      | `supports_ess_write`            | ja       | boolean; ESS-Limit-Setpoints dürfen geschrieben werden                           |
+| Capability Flags      | `supports_ess_write`            | ja       | boolean; ESS-Setpoints dürfen geschrieben werden                                 |
 | Capability Flags      | `supports_evcs_current`         | ja       | boolean; `set_evcs_max_current` darf geschrieben werden                          |
 
 
@@ -85,10 +86,11 @@ Quellen Victron: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 | ------------------------------ | ---------- | ------------------------------- | --------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | Batterie-SoC                   | Messwert   | `sens_ess_soc`                  | `ess0/Soc` oder `_sum/EssSoc`                 | `meters.battery.soc`           | Unit 100 Reg. **843** (`battery_soc`, %)                                                                                | `soc_name`                                                               |
 | Batterieleistung               | Messwert   | `sens_ess_power`                | `ess0/ActivePower` oder `_sum/EssActivePower` | `meters.battery.power`         | Unit 100 Reg. **842** (W; Victron: `+` = Laden, `−` = Entladen → für EHAL **Vorzeichen invertieren**)                   | `battery_power_name`                                                     |
+| ESS Sollleistung schreiben     | Steuerwert | `set_ess_active_power`          | `ess0/SetActivePowerEquals`                   |                                | (gerätabhängig; nicht evcc Preis-Limit)                                                                                 | `target_active_power_name` / `Ernie_Batterie_Sollleistung`               |
 | ESS Ladegrenze schreiben       | Steuerwert | `set_ess_charge_power_limit`    | `ess0/SetActivePowerGreaterOrEquals`          |                                | ESS Mode 2 Unit 100 Reg. **2705** (`system_max_charge_current`, A) bzw. Ein/Aus **2701** (kein 1:1-W-Limit wie OpenEMS) | `target_charge_power_name`                                               |
 | ESS Entladegrenze schreiben    | Steuerwert | `set_ess_discharge_power_limit` | `ess0/SetActivePowerLessOrEquals`             |                                | ESS Mode 2 Unit 100 Reg. **2704** (`ess_max_discharge_power`, W)                                                        | `target_discharge_power_name`                                            |
-| Steuerbefehl Batterie / Huawei | Steuerwert | `set_ess_mode`                  |                                               |                                | Siehe ESS Mode 2/3 ESS Schreibfähigkeit                                                                                 | `control_cmd_name`                                                       |
-| ESS-Schreibfähigkeit           | Capability | `supports_ess_write`            | abgeleitete Adapter-Capability                | abgeleitete Adapter-Capability | ESS Mode 2/3 (Reg. **2700+** / Mode-3 VE.Bus-Setpoints); siehe ESS Mode 2/3 Manual                                      | aus `target_charge_power_name` / `target_discharge_power_name` ableitbar |
+| Steuerbefehl Batterie / Huawei | Steuerwert | `set_ess_mode`                  | *(ignoriert)*                                 |                                | Siehe ESS Mode 2/3 ESS Schreibfähigkeit                                                                                 | `control_cmd_name`                                                       |
+| ESS-Schreibfähigkeit           | Capability | `supports_ess_write`            | abgeleitete Adapter-Capability                | abgeleitete Adapter-Capability | ESS Mode 2/3 (Reg. **2700+** / Mode-3 VE.Bus-Setpoints); siehe ESS Mode 2/3 Manual                                      | aus active/charge/discharge Merker ableitbar                             |
 
 
 

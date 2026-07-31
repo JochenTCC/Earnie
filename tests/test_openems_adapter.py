@@ -84,9 +84,10 @@ def test_write_setpoints_ess_and_evcs(post_mock):
     adapter = OpenemsAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 2,
+            "schema_version": 3,
             "ts": "2026-07-27T12:00:00Z",
             "adapter_id": "openems-lab",
+            "set_ess_active_power": -1500,
             "set_ess_charge_power_limit": 1000,
             "set_ess_discharge_power_limit": 2000,
             "set_evcs_max_current": 10,
@@ -95,8 +96,9 @@ def test_write_setpoints_ess_and_evcs(post_mock):
         evcs_phases=1,
     )
     assert error is None
-    assert post_mock.call_count == 3
+    assert post_mock.call_count == 4
     bodies = [call.kwargs["json"]["value"] for call in post_mock.call_args_list]
+    assert -1500 in bodies  # Equals
     assert -1000 in bodies
     assert 2000 in bodies
     assert 2300 in bodies  # 10 A * 230 V * 1
@@ -110,7 +112,7 @@ def test_write_lock_degrades_ess(post_mock):
     adapter = OpenemsAdapter(_cfg())
     error = adapter.write_setpoints(
         {
-            "schema_version": 2,
+            "schema_version": 3,
             "ts": "2026-07-27T12:00:00Z",
             "adapter_id": "openems-lab",
             "set_ess_charge_power_limit": 500,

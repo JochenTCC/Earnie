@@ -1,10 +1,10 @@
-"""TypedDict models mirroring share/ehal/*.schema.json (schema_version 2)."""
+"""TypedDict models mirroring share/ehal/*.schema.json (schema_version 3)."""
 
 from __future__ import annotations
 
 from typing import NotRequired, TypedDict
 
-EHAL_SCHEMA_VERSION = 2
+EHAL_SCHEMA_VERSION = 3
 
 # Legacy M1 unprefixed / renamed → §C aliases (HA entity map / dual-read during 2.4.j).
 TELEMETRY_FIELD_ALIASES: dict[str, str] = {
@@ -46,6 +46,7 @@ class EhalSetpoint(TypedDict):
     schema_version: int
     ts: str
     adapter_id: str
+    set_ess_active_power: NotRequired[float]
     set_ess_charge_power_limit: NotRequired[float]
     set_ess_discharge_power_limit: NotRequired[float]
     set_ess_mode: NotRequired[str | float]

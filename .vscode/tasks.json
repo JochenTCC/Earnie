@@ -60,6 +60,16 @@
         "panel": "shared",
         "showReuseMessage": false
       }
+    },
+    {
+      "type": "docker-build",
+      "label": "docker: build earnie",
+      "dockerBuild": {
+        "tag": "energyoptimizer:latest",
+        "dockerfile": "${workspaceFolder}/docker/Dockerfile",
+        "context": "${workspaceFolder}",
+        "pull": true
+      }
     }
   ]
 }

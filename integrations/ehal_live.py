@@ -186,6 +186,7 @@ def get_loxone_adapter() -> LoxoneAdapter:
         discharge_power_name=str(
             config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME") or ""
         ),
+        active_power_name=str(config.get("LOXONE_TARGET_ACTIVE_POWER_NAME") or ""),
         control_cmd_name=str(config.get("LOXONE_CONTROL_CMD_NAME") or ""),
         consumers_power_name=str(config.get("LOXONE_CONSUMERS_POWER_NAME") or ""),
         evcs_max_current_name=str(ev.get("evcs_max_current_name") or ""),
@@ -272,12 +273,14 @@ def read_live_power_kw() -> dict[str, float] | None:
     }
 
 
-def write_ess_limits_from_huawei(
-    mode: int, target_power_kw: float
+def write_ess_setpoints_from_control(
+    mode: int, target_power_kw: float, max_power_kw: float | None = None
 ) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
-    """Map Huawei-style mode/power to EHAL ESS limits (+ optional set_ess_mode)."""
-    charge_kw, discharge_kw, control_cmd = loxone_client.map_huawei_modbus_values(
-        mode, target_power_kw
+    """Map optimizer mode/power to EHAL Design C1 ESS setpoints."""
+    if max_power_kw is None:
+        max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
+    active_kw, charge_kw, discharge_kw, control_cmd = loxone_client.map_ess_setpoints(
+        mode, target_power_kw, float(max_power_kw)
     )
     adapter = get_network_adapter()
     ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -291,19 +294,31 @@ def write_ess_limits_from_huawei(
         "set_ess_discharge_power_limit": discharge_w,
         "set_ess_mode": control_cmd,
     }
+    record_fields: dict[str, float] = {
+        "set_ess_charge_power_limit": charge_w,
+        "set_ess_discharge_power_limit": discharge_w,
+        "set_ess_mode": float(control_cmd),
+    }
+    if active_kw is not None:
+        active_w = float(active_kw) * 1000.0
+        setpoint["set_ess_active_power"] = active_w
+        record_fields["set_ess_active_power"] = active_w
     error = adapter.write_setpoints(setpoint)
     if error is not None:
         persist_write_error(error)
     records = build_ehal_write_records(
-        {
-            "set_ess_charge_power_limit": charge_w,
-            "set_ess_discharge_power_limit": discharge_w,
-            "set_ess_mode": float(control_cmd),
-        },
+        record_fields,
         written_at=ts,
         error=error,
     )
     return error, records
+
+
+def write_ess_limits_from_huawei(
+    mode: int, target_power_kw: float
+) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
+    """Deprecated alias for :func:`write_ess_setpoints_from_control`."""
+    return write_ess_setpoints_from_control(mode, target_power_kw)
 
 
 def write_evcs_max_current_from_consumers(

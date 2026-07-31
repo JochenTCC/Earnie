@@ -104,12 +104,13 @@ def test_read_live_power_kw_sign(config_mock, adapter_factory):
 @patch("integrations.ehal_live.persist_write_error")
 @patch("integrations.ehal_live.get_openems_adapter")
 @patch("integrations.ehal_live.config")
-def test_write_ess_limits_persists_error(config_mock, adapter_factory, persist_mock):
+def test_write_ess_setpoints_persists_error(config_mock, adapter_factory, persist_mock):
     ehal_live.reset_adapter_cache()
     config_mock.get.side_effect = lambda key, default=None: {
         "EHAL_BACKEND": "openems",
         "EHAL_ADAPTER_ID": "openems-lab",
     }.get(key, default)
+    config_mock.get_battery_params.return_value = {"max_power_kw": 5.0}
     adapter = MagicMock()
     adapter.cfg.adapter_id = "openems-lab"
     adapter.write_setpoints.return_value = {
@@ -122,12 +123,13 @@ def test_write_ess_limits_persists_error(config_mock, adapter_factory, persist_m
         "hub_status": "403",
     }
     adapter_factory.return_value = adapter
-    error, records = ehal_live.write_ess_limits_from_huawei(1, 1.5)
+    error, records = ehal_live.write_ess_setpoints_from_control(1, 1.5)
     assert error is not None
     assert records
     assert records[0]["success"] is False
     persist_mock.assert_called_once()
     args = adapter.write_setpoints.call_args[0][0]
-    assert args["set_ess_charge_power_limit"] == 1500.0
+    assert args["set_ess_active_power"] == -1500.0
+    assert args["set_ess_charge_power_limit"] == 5000.0
     assert args["set_ess_discharge_power_limit"] == 0.0
     assert "set_ess_mode" in args

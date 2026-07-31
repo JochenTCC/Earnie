@@ -314,6 +314,7 @@ _REQUIRED_PLANT_LIVE_FIELDS = (
     "sens_grid_power_active",
     "sens_pv_production_active",
     "sens_ess_soc",
+    "set_ess_active_power",
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",

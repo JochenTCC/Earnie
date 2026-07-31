@@ -22,6 +22,7 @@ PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
 )
 
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
+    "set_ess_active_power",
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
@@ -166,6 +167,7 @@ def openems_setpoint_mapping(
     ess = str(ess_component or "ess0").strip() or "ess0"
     evcs = str(evcs_component or "evcs0").strip() or "evcs0"
     return {
+        "set_ess_active_power": f"{ess}/SetActivePowerEquals",
         "set_ess_charge_power_limit": f"{ess}/SetActivePowerGreaterOrEquals",
         "set_ess_discharge_power_limit": f"{ess}/SetActivePowerLessOrEquals",
         "set_evcs_max_current": f"{evcs}/SetChargePowerLimit",
@@ -187,6 +189,7 @@ def build_loxone_setpoint_io_index() -> dict[str, str]:
 
     index: dict[str, str] = {}
     plant_map = (
+        ("set_ess_active_power", "LOXONE_TARGET_ACTIVE_POWER_NAME"),
         ("set_ess_charge_power_limit", "LOXONE_TARGET_CHARGE_POWER_NAME"),
         ("set_ess_discharge_power_limit", "LOXONE_TARGET_DISCHARGE_POWER_NAME"),
         ("set_ess_mode", "LOXONE_CONTROL_CMD_NAME"),

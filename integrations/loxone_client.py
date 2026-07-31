@@ -634,19 +634,42 @@ def fetch_loxone_live_power() -> Optional[dict]:
     }
 
 
-def map_huawei_modbus_values(mode: int, target_power_kw: float) -> tuple[float, float, int]:
-    """
-    Interner Modus → (Lade-kW, Entlade-kW, Steuerbefehl).
+def map_ess_setpoints(
+    mode: int, target_power_kw: float, max_power_kw: float
+) -> tuple[float | None, float, float, int]:
+    """Design C1: (active_power_kw|None, charge_limit_kw, discharge_limit_kw, mode_hint).
 
-    Steuerbefehl (Huawei-Register 47100): 0=Automatik, 1=Zwangsladen/Entladesperre, 2=Zwangs-Entladen.
+    ``active_power_kw`` uses EHAL sign (+discharge, −charge). ``None`` means Automatik /
+    Entladesperre without a forced Equals setpoint. Limits are true caps (kW magnitudes).
+    ``mode_hint`` is for Loxone/HA (Huawei Steuerbefehl); OpenEMS ignores it.
     """
-    if mode == 1:
-        return target_power_kw, 0.0, 1
-    if mode == 2:
-        return 0.0, 0.0, 1
-    if mode == 3:
-        return 0.0, target_power_kw, 2
-    return 0.0, 0.0, 0
+    max_kw = max(0.0, abs(float(max_power_kw)))
+    target = max(0.0, abs(float(target_power_kw)))
+    if mode == 1:  # MODE_ZWANGS_LADEN
+        return -target, max_kw, 0.0, 1
+    if mode == 2:  # MODE_ENTLADESPERRE
+        return None, max_kw, 0.0, 1
+    if mode == 3:  # MODE_ZWANGS_ENTLADEN
+        return target, 0.0, max_kw, 2
+    return None, max_kw, max_kw, 0
+
+
+def map_huawei_modbus_values(mode: int, target_power_kw: float) -> tuple[float, float, int]:
+    """Deprecated: charge/discharge legs were force magnitudes pre-C1.
+
+    Prefer :func:`map_ess_setpoints`. Returns (charge_limit_kw, discharge_limit_kw, mode_hint)
+    using battery max from config when available.
+    """
+    try:
+        max_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
+    except Exception:  # pragma: no cover - defensive for early import
+        max_kw = abs(float(target_power_kw))
+    if max_kw <= 0.0:
+        max_kw = abs(float(target_power_kw))
+    _active, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
+        mode, target_power_kw, max_kw
+    )
+    return charge_kw, discharge_kw, control_cmd
 
 
 def flex_consumer_enable_value(
@@ -902,19 +925,23 @@ def build_sent_loxone_snapshot(
     consumer_pv_follow: dict[str, int] | None = None,
 ) -> dict[str, float]:
     """Alle an Loxone gesendeten Steuerwerte: Merkername → Zahl."""
-    charge_kw, discharge_kw, control_cmd = map_huawei_modbus_values(mode, target_power_kw)
+    max_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
+    active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
+        mode, target_power_kw, max_kw
+    )
     contexts = charging_contexts or {}
     snapshot: dict[str, float] = {}
-    # target_soc_name removed (2.4.j): ESS via charge/discharge limits + set_ess_mode.
+    # target_soc_name removed (2.4.j): ESS via active_power + limits + set_ess_mode.
     _ = target_soc
 
     for cfg_name, value in (
+        (config.get("LOXONE_TARGET_ACTIVE_POWER_NAME"), active_kw),
         (config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw),
         (config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
         (config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
     ):
-        if cfg_name:
-            snapshot[str(cfg_name)] = value
+        if cfg_name and value is not None:
+            snapshot[str(cfg_name)] = float(value)
 
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         _write_flexible_consumer_output(
@@ -927,13 +954,18 @@ def build_sent_loxone_snapshot(
 def send_huawei_modbus_states(
     mode: int, target_power_kw: float, target_soc: float
 ) -> list[LoxoneWriteRecord]:
-    """Übersetzt Optimierungsmodi und schreibt Huawei-Steuerwerte an Loxone."""
-    charge_kw, discharge_kw, control_cmd = map_huawei_modbus_values(mode, target_power_kw)
+    """Übersetzt Optimierungsmodi und schreibt ESS-Steuerwerte (Design C1) an Loxone."""
+    max_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
+    active_kw, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
+        mode, target_power_kw, max_kw
+    )
     # target_soc no longer written (2.4.j); kept in signature for call-site compat.
     _ = target_soc
 
     logger.info(
-        "Sending Modbus Mapping -> Ladung: %s kW, Entladung: %s kW, set_ess_mode/Cmd: %s",
+        "Sending ESS C1 Mapping -> Soll: %s kW, Ladegrenze: %s kW, "
+        "Entladegrenze: %s kW, set_ess_mode/Cmd: %s",
+        active_kw,
         charge_kw,
         discharge_kw,
         control_cmd,
@@ -941,11 +973,12 @@ def send_huawei_modbus_states(
 
     records: list[LoxoneWriteRecord] = []
     for cfg_name, value in (
+        (config.get("LOXONE_TARGET_ACTIVE_POWER_NAME"), active_kw),
         (config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw),
         (config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
         (config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
     ):
-        if cfg_name:
+        if cfg_name and value is not None:
             records.append(_send_loxone_value_traced(str(cfg_name), float(value)))
     return records
 

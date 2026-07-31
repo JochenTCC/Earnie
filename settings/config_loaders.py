@@ -106,6 +106,7 @@ _LOXONE_BLOCK_ATTRS: tuple[tuple[str, str, str | None], ...] = (
     ("LOXONE_BATTERY_POWER_NAME", "battery_power_name", "sens_ess_power"),
     ("LOXONE_GRID_POWER_NAME", "grid_power_name", "sens_grid_power_active"),
     ("LOXONE_CONSUMERS_POWER_NAME", "consumers_power_name", "sens_power_consumers"),
+    ("LOXONE_TARGET_ACTIVE_POWER_NAME", "target_active_power_name", "set_ess_active_power"),
     ("LOXONE_TARGET_CHARGE_POWER_NAME", "target_charge_power_name", "set_ess_charge_power_limit"),
     ("LOXONE_TARGET_DISCHARGE_POWER_NAME", "target_discharge_power_name", "set_ess_discharge_power_limit"),
     ("LOXONE_CONTROL_CMD_NAME", "control_cmd_name", "set_ess_mode"),

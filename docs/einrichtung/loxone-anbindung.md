@@ -45,14 +45,15 @@ Konfigurierte Namen stehen in `config.json` → siehe [Loxone-Signale](../refere
 
 | Signal               | Konfiguration                                             | Wirkung (Schnittstelle)                                                 |
 | -------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Zwangsladeleistung   | `plant.ehal_bindings.set_ess_charge_power_limit` (Legacy: `target_charge_power_name`) | kW                                                                      |
-| Ziel-Entladeleistung | `plant.ehal_bindings.set_ess_discharge_power_limit` (Legacy: `target_discharge_power_name`) | kW                                                                      |
-| Steuerbefehl / ESS-Modus | `plant.ehal_bindings.set_ess_mode` (Legacy: `control_cmd_name`) | `0` = Automatik, `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen |
+| ESS-Sollleistung     | `plant.ehal_bindings.set_ess_active_power` (Legacy: `target_active_power_name`) | kW; `+` = Entladung, `−` = Ladung; bei Automatik weglassen / 0          |
+| Ladegrenze           | `plant.ehal_bindings.set_ess_charge_power_limit` (Legacy: `target_charge_power_name`) | kW; echte Max. Ladeleistung                                             |
+| Entladegrenze        | `plant.ehal_bindings.set_ess_discharge_power_limit` (Legacy: `target_discharge_power_name`) | kW; echte Max. Entladeleistung                                          |
+| Steuerbefehl / ESS-Modus | `plant.ehal_bindings.set_ess_mode` (Legacy: `control_cmd_name`) | Hinweis: `0` = Automatik, `1` = Zwangsladen/Entladesperre, `2` = Zwangs-Entladen |
 | Verbraucher-Freigabe | `flexible_consumers[].loxone_outputs.enable_name` / `ehal_bindings.flex.enable_name` | `0` = gesperrt, `1` = Freigabe (SwimSpa, Wärmepumpe, Filter)            |
 | E-Auto Sollstrom     | `ehal_bindings.set_evcs_max_current` (Legacy: `power_setpoint_name`) | Ziel-Ladestrom / -leistung                                              |
 | E-Auto PV-Follow     | `ehal_bindings.pv_follow_name` / `set_evcs_mode`          | `0`/`1` bzw. Modus                                                      |
 
-`target_soc_name` (Ziel-SOC) und `pv_counter_name` (kumulierte PV-kWh) wurden in **2.4.j** entfernt (ESS über Grenzen + `set_ess_mode`; PV-Intervallenergie aus ∫ `sens_pv_production_active`).
+`target_soc_name` (Ziel-SOC) und `pv_counter_name` (kumulierte PV-kWh) wurden in **2.4.j** entfernt. Ab Design C1 (**2.4.o**): Force über `set_ess_active_power`, Grenzen als echte Caps, `set_ess_mode` nur Hinweis für Loxone/Huawei. PV-Intervallenergie aus ∫ `sens_pv_production_active`.
 Das frühere Miniserver-FTP-Verbrauchslog (`loxone_blocks.log_filename`) und das PV-Tuning-Log entfallen in **2.4.m** — historische Verbrauchsdaten kommen über CSV-Upload / Energiemonitor bzw. `cons_data`.
 
 

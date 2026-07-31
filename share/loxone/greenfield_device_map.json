@@ -37,22 +37,32 @@
       "notes": "Prefer EFM Storage meter for power; SoC often separate Merker."
     },
     {
+      "name": "Ernie_Batterie_Sollleistung",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "set_ess_active_power",
+      "notes": "Design C1: forced ESS active power kW (+discharge, -charge). Omit/0 when Automatik."
+    },
+    {
       "name": "Ernie_Ladegrenze",
       "match": "exact",
       "entity_kind": "plant",
-      "ehal_field": "set_ess_charge_power_limit"
+      "ehal_field": "set_ess_charge_power_limit",
+      "notes": "True max charge cap (kW magnitude)."
     },
     {
       "name": "Ernie_Entladegrenze",
       "match": "exact",
       "entity_kind": "plant",
-      "ehal_field": "set_ess_discharge_power_limit"
+      "ehal_field": "set_ess_discharge_power_limit",
+      "notes": "True max discharge cap (kW magnitude)."
     },
     {
       "name": "Ernie_Steuerbefehl",
       "match": "exact",
       "entity_kind": "plant",
-      "ehal_field": "set_ess_mode"
+      "ehal_field": "set_ess_mode",
+      "notes": "Optional mode hint for Huawei/Loxone Config; OpenEMS ignores."
     },
     {
       "name": "Ernie_WP_P_act",

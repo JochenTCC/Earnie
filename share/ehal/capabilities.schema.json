@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/capabilities.schema.json",
-  "title": "EHAL Capability-Flags (schema_version 2)",
+  "title": "EHAL Capability-Flags (schema_version 3)",
   "description": "Adapter write capabilities. Graceful degrade when false (read-only hubs, OEM locks).",
   "type": "object",
   "required": [
@@ -14,8 +14,9 @@
   "properties": {
     "schema_version": {
       "type": "integer",
-      "const": 2
+      "const": 3
     },
+
     "ts": {
       "type": "string",
       "minLength": 1

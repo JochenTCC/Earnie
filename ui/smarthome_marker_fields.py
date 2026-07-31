@@ -28,9 +28,10 @@ LOXONE_BLOCKS_FIELDS: tuple[tuple[str, str], ...] = (
     ("pv_power_name", "PV-Leistung (Lesen)"),
     ("battery_power_name", "Batterie-Leistung (Lesen)"),
     ("grid_power_name", "Netz-Leistung (Lesen)"),
-    ("target_charge_power_name", "Ziel-Ladeleistung (Schreiben)"),
-    ("target_discharge_power_name", "Ziel-Entladeleistung (Schreiben)"),
-    ("control_cmd_name", "Steuerbefehl (Schreiben)"),
+    ("target_active_power_name", "ESS-Sollleistung (Schreiben, +Entladung)"),
+    ("target_charge_power_name", "Ladegrenze (Schreiben)"),
+    ("target_discharge_power_name", "Entladegrenze (Schreiben)"),
+    ("control_cmd_name", "Steuerbefehl / Modus-Hinweis (Schreiben)"),
 )
 
 

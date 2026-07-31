@@ -131,11 +131,12 @@ def test_ess_setpoint_payload_identical_when_only_backend_switches():
     ) as config_mock, patch(
         "integrations.ehal_live.get_openems_adapter", return_value=adapter
     ), patch(
-        "integrations.ehal_live.loxone_client.map_huawei_modbus_values",
-        return_value=(1.5, 0.0, 0),
+        "integrations.ehal_live.loxone_client.map_ess_setpoints",
+        return_value=(-1.5, 5.0, 0.0, 1),
     ):
         config_mock.get.side_effect = _config_side_effect("openems")
-        ehal_live.write_ess_limits_from_huawei(1, 1.5)
+        config_mock.get_battery_params.return_value = {"max_power_kw": 5.0}
+        ehal_live.write_ess_setpoints_from_control(1, 1.5)
 
     ehal_live.reset_adapter_cache()
     with patch("integrations.ehal_live.persist_write_error"), patch(
@@ -143,20 +144,23 @@ def test_ess_setpoint_payload_identical_when_only_backend_switches():
     ) as config_mock, patch(
         "integrations.ehal_live.get_ha_adapter", return_value=adapter
     ), patch(
-        "integrations.ehal_live.loxone_client.map_huawei_modbus_values",
-        return_value=(1.5, 0.0, 0),
+        "integrations.ehal_live.loxone_client.map_ess_setpoints",
+        return_value=(-1.5, 5.0, 0.0, 1),
     ):
         config_mock.get.side_effect = _config_side_effect("ha")
-        ehal_live.write_ess_limits_from_huawei(1, 1.5)
+        config_mock.get_battery_params.return_value = {"max_power_kw": 5.0}
+        ehal_live.write_ess_setpoints_from_control(1, 1.5)
 
     assert len(captured) == 2
     openems_sp, ha_sp = captured
+    assert openems_sp["set_ess_active_power"] == ha_sp["set_ess_active_power"]
+    assert openems_sp["set_ess_active_power"] == -1500.0
     assert openems_sp["set_ess_charge_power_limit"] == ha_sp["set_ess_charge_power_limit"]
     assert (
         openems_sp["set_ess_discharge_power_limit"]
         == ha_sp["set_ess_discharge_power_limit"]
     )
-    assert openems_sp["set_ess_charge_power_limit"] == 1500.0
+    assert openems_sp["set_ess_charge_power_limit"] == 5000.0
     assert openems_sp["set_ess_mode"] == ha_sp["set_ess_mode"]
 
 
@@ -164,16 +168,17 @@ def test_loxone_ess_write_uses_non_network_path():
     """Loxone Live writes stay on loxone_client; façade ESS helper requires network backend."""
     ehal_live.reset_adapter_cache()
     with patch("integrations.ehal_live.config") as config_mock, patch(
-        "integrations.ehal_live.loxone_client.map_huawei_modbus_values",
-        return_value=(1.5, 0.0, 0),
+        "integrations.ehal_live.loxone_client.map_ess_setpoints",
+        return_value=(-1.5, 5.0, 0.0, 1),
     ) as map_mock, patch(
         "integrations.ehal_live.get_loxone_adapter"
     ) as get_loxone:
         config_mock.get.side_effect = _config_side_effect("loxone")
+        config_mock.get_battery_params.return_value = {"max_power_kw": 5.0}
         assert ehal_live.is_ehal_network_backend() is False
         with pytest.raises(ValueError, match="openems or ha"):
-            ehal_live.write_ess_limits_from_huawei(1, 1.5)
-        map_mock.assert_called_once_with(1, 1.5)
+            ehal_live.write_ess_setpoints_from_control(1, 1.5)
+        map_mock.assert_called_once_with(1, 1.5, 5.0)
         get_loxone.assert_not_called()
 
 

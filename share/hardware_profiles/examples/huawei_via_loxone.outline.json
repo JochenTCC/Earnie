@@ -3,7 +3,7 @@
   "model": "Luna / inverter via Loxone markers (outline)",
   "protocol": "proprietary",
   "status": "outline",
-  "notes": "Seeded from Earnie Loxone path: Live writes ESS via charge/discharge limits + set_ess_mode (control_cmd). Ziel-SOC write removed in 2.4.j. Register addresses are illustrative placeholders for a future Path D direct-Modbus profile.",
+  "notes": "Design C1: Live writes set_ess_active_power + true charge/discharge limits + set_ess_mode hint (control_cmd). Ziel-SOC removed in 2.4.j. Register addresses illustrative for future Path D.",
   "registers": [
     {
       "address": 47000,
@@ -30,7 +30,16 @@
       "scale": 1,
       "unit": "",
       "direction": "write",
-      "notes": "Mapped via set_ess_mode / control_cmd_name."
+      "notes": "Mapped via set_ess_mode / control_cmd_name (hint; OpenEMS ignores)."
+    },
+    {
+      "address": 47100,
+      "type": "int16",
+      "name": "Active_Power_Setpoint",
+      "scale": 1,
+      "unit": "W",
+      "direction": "write",
+      "notes": "EHAL set_ess_active_power (+discharge); Loxone maps via target_active_power_name."
     },
     {
       "address": 47102,
@@ -39,7 +48,7 @@
       "scale": 1,
       "unit": "W",
       "direction": "write",
-      "notes": "EHAL set_ess_charge_power_limit; Loxone maps via target_charge_power_name when present."
+      "notes": "EHAL set_ess_charge_power_limit (true cap)."
     },
     {
       "address": 47103,
@@ -48,7 +57,7 @@
       "scale": 1,
       "unit": "W",
       "direction": "write",
-      "notes": "EHAL set_ess_discharge_power_limit."
+      "notes": "EHAL set_ess_discharge_power_limit (true cap)."
     }
   ],
   "ehal_bindings": [
@@ -64,6 +73,13 @@
       "scale": 1000,
       "negate": true,
       "transform_note": "kW→W and invert +charge → EHAL +discharge (matches loxone_adapter)."
+    },
+    {
+      "source": "Active_Power_Setpoint",
+      "ehal_field": "set_ess_active_power",
+      "scale": 1,
+      "negate": false,
+      "transform_note": "Signed W; +discharge −charge."
     },
     {
       "source": "Charge_Power_Limit",

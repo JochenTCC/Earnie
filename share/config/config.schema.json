@@ -438,6 +438,10 @@
           "type": "string",
           "description": "Legacy Lesen Netzleistung — bevorzugt plant.ehal_bindings.sens_grid_power_active."
         },
+        "target_active_power_name": {
+          "type": "string",
+          "description": "Legacy Schreiben ESS-Sollleistung — bevorzugt plant.ehal_bindings.set_ess_active_power."
+        },
         "target_charge_power_name": {
           "type": "string",
           "description": "Legacy Schreiben Ladegrenze — bevorzugt plant.ehal_bindings.set_ess_charge_power_limit."
@@ -448,7 +452,7 @@
         },
         "control_cmd_name": {
           "type": "string",
-          "description": "Legacy Schreiben ESS-Modus — bevorzugt plant.ehal_bindings.set_ess_mode."
+          "description": "Legacy Schreiben ESS-Modus-Hinweis — bevorzugt plant.ehal_bindings.set_ess_mode."
         },
         "consumers_power_name": {
           "type": "string",

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/ehal/telemetry.schema.json",
-  "title": "EHAL Telemetry-API (schema_version 2)",
+  "title": "EHAL Telemetry-API (schema_version 3)",
   "description": "Normalized plant telemetry. Power in W; ess_soc in %; grid + = import, − = export; ess_power + = discharge, − = charge (OpenEMS-aligned). Field names: docs/ui/ehal-com.md §C.",
   "type": "object",
   "required": [
@@ -15,8 +15,9 @@
   "properties": {
     "schema_version": {
       "type": "integer",
-      "const": 2
+      "const": 3
     },
+
     "ts": {
       "type": "string",
       "minLength": 1

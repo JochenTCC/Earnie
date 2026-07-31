@@ -211,18 +211,31 @@ class TestFetchLoxoneLivePower:
             assert lc.fetch_loxone_live_power() is None
 
 
-class TestHuaweiModbusMapping:
+class TestEssSetpointsMapping:
     @pytest.mark.parametrize(
-        "mode,target,charge,discharge,cmd",
+        "mode,target,max_kw,active,charge,discharge,cmd",
         [
-            (0, 2.0, 0.0, 0.0, 0),
-            (1, 2.5, 2.5, 0.0, 1),
-            (2, 1.0, 0.0, 0.0, 1),
-            (3, 1.8, 0.0, 1.8, 2),
+            (0, 2.0, 5.0, None, 5.0, 5.0, 0),
+            (1, 2.5, 5.0, -2.5, 5.0, 0.0, 1),
+            (2, 1.0, 5.0, None, 5.0, 0.0, 1),
+            (3, 1.8, 5.0, 1.8, 0.0, 5.0, 2),
         ],
     )
-    def test_map_huawei_modbus_values(self, mode, target, charge, discharge, cmd):
-        assert lc.map_huawei_modbus_values(mode, target) == (charge, discharge, cmd)
+    def test_map_ess_setpoints(self, mode, target, max_kw, active, charge, discharge, cmd):
+        assert lc.map_ess_setpoints(mode, target, max_kw) == (
+            active,
+            charge,
+            discharge,
+            cmd,
+        )
+
+    def test_map_huawei_modbus_values_returns_limits(self, monkeypatch):
+        monkeypatch.setattr(
+            lc.config,
+            "get_battery_params",
+            lambda: {"max_power_kw": 5.0},
+        )
+        assert lc.map_huawei_modbus_values(1, 2.5) == (5.0, 0.0, 1)
 
 
 class TestFlexibleConsumerHelpers:
@@ -543,12 +556,15 @@ class TestBuildSentSnapshot:
             }
         ]
         config_map = {
+            "LOXONE_TARGET_ACTIVE_POWER_NAME": "Ernie_Batterie_Sollleistung",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
             "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
         }
 
         with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
+            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+        ), patch.object(
             lc.config, "get_flexible_consumers", return_value=consumers
         ):
             snapshot = lc.build_sent_loxone_snapshot(
@@ -560,7 +576,8 @@ class TestBuildSentSnapshot:
             )
 
         assert "Ernie_Ziel_SoC" not in snapshot
-        assert snapshot["Ernie_Ziel_LadeLeistung"] == 2.0
+        assert snapshot["Ernie_Batterie_Sollleistung"] == -2.0
+        assert snapshot["Ernie_Ziel_LadeLeistung"] == 5.0
         assert snapshot["Ernie_Ziel_Entladeleistung"] == 0.0
         assert snapshot["Ernie_Steuerbefehl"] == 1.0
         assert snapshot["Ernie_SwimSpa_Freigabe"] == 1.0
@@ -726,8 +743,9 @@ class TestBuildSentSnapshot:
 
 
 class TestSendHuaweiAndConsumers:
-    def test_send_huawei_modbus_states_returns_three_records(self):
+    def test_send_huawei_modbus_states_returns_c1_records(self):
         names = {
+            "LOXONE_TARGET_ACTIVE_POWER_NAME": "Active",
             "LOXONE_TARGET_CHARGE_POWER_NAME": "Charge",
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
             "LOXONE_CONTROL_CMD_NAME": "Cmd",
@@ -735,14 +753,19 @@ class TestSendHuaweiAndConsumers:
         fake_record = lc.LoxoneWriteRecord(
             io_name="x", value=1.0, success=True, written_at="2026-07-14T10:00:00"
         )
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: names[name]), patch.object(
+        with patch.object(lc.config, "get", side_effect=lambda name, **kw: names.get(name)), patch.object(
+            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+        ), patch.object(
             lc, "_send_loxone_value_traced", return_value=fake_record
         ) as mock_send:
             records = lc.send_huawei_modbus_states(mode=3, target_power_kw=1.5, target_soc=55.0)
 
-        assert len(records) == 3
-        assert mock_send.call_count == 3
-        mock_send.assert_any_call("Discharge", 1.5)
+        assert len(records) == 4
+        assert mock_send.call_count == 4
+        mock_send.assert_any_call("Active", 1.5)
+        mock_send.assert_any_call("Charge", 0.0)
+        mock_send.assert_any_call("Discharge", 5.0)
+        mock_send.assert_any_call("Cmd", 2.0)
         called_names = [c.args[0] for c in mock_send.call_args_list]
         assert "SoC" not in called_names
 
@@ -752,14 +775,16 @@ class TestSendHuaweiAndConsumers:
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Discharge",
             "LOXONE_CONTROL_CMD_NAME": "Cmd",
         }
-        with patch.object(lc.config, "get", side_effect=lambda name, **kw: names[name]), patch.object(
+        with patch.object(lc.config, "get", side_effect=lambda name, **kw: names.get(name)), patch.object(
+            lc.config, "get_battery_params", return_value={"max_power_kw": 5.0}
+        ), patch.object(
             lc, "_send_loxone_value_traced", return_value=lc.LoxoneWriteRecord("x", 0.0, True, "t")
         ) as mock_send:
             lc.send_huawei_modbus_states(mode=3, target_power_kw=1.5, target_soc=55.0)
 
         assert mock_send.call_count == 3
         mock_send.assert_any_call("Charge", 0.0)
-        mock_send.assert_any_call("Discharge", 1.5)
+        mock_send.assert_any_call("Discharge", 5.0)
         mock_send.assert_any_call("Cmd", 2.0)
         called_names = [c.args[0] for c in mock_send.call_args_list]
         assert "SoC" not in called_names

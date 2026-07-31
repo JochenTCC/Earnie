@@ -35,6 +35,7 @@ TELEMETRY_OPTIONAL = (
     "sens_power_consumers",
 )
 SETPOINT_FIELDS = (
+    "set_ess_active_power",
     "set_ess_charge_power_limit",
     "set_ess_discharge_power_limit",
     "set_ess_mode",
@@ -106,7 +107,8 @@ class HaAdapter:
             timeout_sec=cfg.timeout_sec,
         )
         self._supports_ess_write = bool(
-            entities.get("set_ess_charge_power_limit")
+            entities.get("set_ess_active_power")
+            or entities.get("set_ess_charge_power_limit")
             or entities.get("set_ess_discharge_power_limit")
         )
         self._supports_evcs_current = bool(entities.get("set_evcs_max_current"))
@@ -244,7 +246,11 @@ class HaAdapter:
         flip_ess = False
         flip_evcs = False
 
-        for field_name in ("set_ess_charge_power_limit", "set_ess_discharge_power_limit"):
+        for field_name in (
+            "set_ess_active_power",
+            "set_ess_charge_power_limit",
+            "set_ess_discharge_power_limit",
+        ):
             if field_name not in doc or not self._supports_ess_write:
                 continue
             ok, status, msg = self._try_setpoint_write(field_name, float(doc[field_name]))
