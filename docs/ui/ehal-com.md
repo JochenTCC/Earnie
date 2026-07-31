@@ -121,16 +121,16 @@ Quellen Victron: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 
 Noch **keine** first-class M1-EHAL-Felder. Live läuft über Hausprofil-Flex-Merker (`loxone_inputs` / `loxone_outputs`). Rollen-Vorlage: `share/ehal/roles/consumer.json`. **Wärmepumpe** → [C.5](#c5-wärmepumpe-stub); **Pool / SwimSpa** → [C.6](#c6-pool--swimspa-stub).
 
-`flex.` ist ein **Rollen-Namespace** (nicht der Consumer-Id). Die konkrete Entität steht im Hausprofil; Live zeigt `{id}:flex.…`. Binding-Keys im Code heißen heute noch `flex.power_name` / `flex.enable_name` / `flex.power_setpoint_name`.
+`flex.` ist ein **Rollen-Namespace**. Binding- und Live-Keys folgen Pattern B: `flex.{slug}.sens_power_act` / `set_enable` / `set_power_setpoint`. Live zeigt `{id}:flex.{slug}.…`. Bei Zähler-Ids `zaehler_<slug>` ist der Wire-Slug ohne Prefix (Beispiel: `zaehler_trockner:flex.trockner.sens_power_act`). Legacy-Stubs `flex.power_name` / `flex.enable_name` / `flex.power_setpoint_name` werden beim Laden migriert.
 
-**Pattern B VO-Push-Pfad (Ziel):** `/ehal/loxone/telemetry/flex.{id}.sens_power_act/\v` (Freigabe/Soll später `flex.{id}.set_enable` / `flex.{id}.set_power_setpoint`). `{id}` = Hausprofil-Consumer-Id. Merker-Title bleibt `Earnie_Verbraucher_…`; Binding-Key unverändert `flex.power_name`. Siehe [Loxone-Signale — Mehrere Flex-Verbraucher](../referenz/loxone-signale.md).
+**Pattern B VO-Push-Pfad:** `/ehal/loxone/telemetry/flex.{slug}.sens_power_act/\v` (Freigabe/Soll `flex.{slug}.set_enable` / `flex.{slug}.set_power_setpoint`). Merker-Title bleibt `Earnie_Verbraucher_…`. Siehe [Loxone-Signale — Mehrere Flex-Verbraucher](../referenz/loxone-signale.md).
 
 
-| Bereich / Bedeutung     | Art        | EHAL Value Name (Stub)    | OpenEMS | evcc (YAML-Attribut) | Victron GX / EVCS (Modbus) | Loxone / Loxone-Extra                                      |
-| ----------------------- | ---------- | ------------------------- | ------- | -------------------- | -------------------------- | ---------------------------------------------------------- |
-| Flex Leistung / Zustand | Messwert   | `flex.sens_power_act`     |         |                      |                            | `Earnie_Verbraucher_Leistung` oder EFM Load; Key `flex.power_name` |
-| Flex Freigabe           | Steuerwert | `flex.set_enable`         |         |                      |                            | `Earnie_Verbraucher_Freigabe`; Key `flex.enable_name`   |
-| Flex Leistungs-Sollwert | Steuerwert | `flex.set_power_setpoint` |         |                      |                            | `Earnie_Verbraucher_Ziel_kW`; Key `flex.power_setpoint_name` |
+| Bereich / Bedeutung     | Art        | EHAL Value Name (Stub)              | OpenEMS | evcc (YAML-Attribut) | Victron GX / EVCS (Modbus) | Loxone / Loxone-Extra                                      |
+| ----------------------- | ---------- | ----------------------------------- | ------- | -------------------- | -------------------------- | ---------------------------------------------------------- |
+| Flex Leistung / Zustand | Messwert   | `flex.{slug}.sens_power_act`        |         |                      |                            | `Earnie_Verbraucher_Leistung` oder EFM Load |
+| Flex Freigabe           | Steuerwert | `flex.{slug}.set_enable`            |         |                      |                            | `Earnie_Verbraucher_Freigabe` |
+| Flex Leistungs-Sollwert | Steuerwert | `flex.{slug}.set_power_setpoint`    |         |                      |                            | `Earnie_Verbraucher_Ziel_kW` |
 
 
 ### C.5 Wärmepumpe (Stub)
@@ -139,8 +139,8 @@ Rollen-Vorlage: `share/ehal/roles/heatpump.json`. Greenfield-Prefix `Earnie_Waer
 
 | Bereich / Bedeutung | Art | EHAL Value Name (Stub / Wire) | OpenEMS | evcc | Victron | Loxone / Loxone-Extra |
 | ------------------- | --- | ----------------------------- | ------- | ---- | ------- | --------------------- |
-| WP Leistung | Messwert | `flex.sens_power_act` (Key: `flex.power_name`) | | | | `Earnie_Waermepumpe_Leistung` oder EFM Load |
-| WP Freigabe / SG-Ready | Steuerwert | `flex.set_enable` (Key: `flex.enable_name`) | | | | `Earnie_Waermepumpe_Freigabe` |
+| WP Leistung | Messwert | `flex.{slug}.sens_power_act` | | | | `Earnie_Waermepumpe_Leistung` oder EFM Load |
+| WP Freigabe / SG-Ready | Steuerwert | `flex.{slug}.set_enable` | | | | `Earnie_Waermepumpe_Freigabe` |
 | Außentemperatur | Messwert | `sens_temperature_outside` | | | | `Earnie_Aussentemperatur` (hausweit; oft `thermal_control.loxone.ambient_temp_name`; auch C.6) |
 
 Hinweise: Pattern B — VI = Freigabe von Earnie (`flex.{hk_id}.…` im Check); VO = optional Push `flex.{hk_id}.sens_power_act`. Außentemperatur liegt auf Plant-VO (nicht doppelt auf WP-VO). Kein Ziel-kW-Merker in dieser Greenfield-Runde.
@@ -152,15 +152,15 @@ Deckt die **heute für SwimSpa genutzten** Signale (Heizung + Filter) ab. Zwei L
 
 | Bereich / Bedeutung | Art | EHAL Value Name (Stub) | OpenEMS | evcc | Victron | Loxone / Loxone-Extra |
 | ------------------- | --- | ---------------------- | ------- | ---- | ------- | --------------------- |
-| Pool Gesamtleistung | Messwert | `flex.sens_power_act` | | | | `Earnie_Pool_P_act` oder EFM Load (Fall B: Heizung+Filter+Jets) |
-| Pool Heiz-Freigabe | Steuerwert | `flex.set_enable` | | | | `Earnie_Pool_Freigabe` |
+| Pool Gesamtleistung | Messwert | `flex.{slug}.sens_power_act` | | | | `Earnie_Pool_P_act` oder EFM Load (Fall B: Heizung+Filter+Jets) |
+| Pool Heiz-Freigabe | Steuerwert | `flex.{slug}.set_enable` | | | | `Earnie_Pool_Freigabe` |
 | Pool Ist-Temperatur | Messwert | `sens_temperature_water` | | | | `Earnie_Pool_Temp_Ist` |
 | Pool Soll-Temperatur | Eingabewert | `get_temperature_water_setpoint` | | | | `Earnie_Pool_Temp_Soll` |
 | Außentemperatur | Messwert | `sens_temperature_outside` | | | | `Earnie_Aussentemperatur` (shared C.5) |
 | Temperatur-Toleranz | Eingabewert | `get_temperature_tolerance_c` | | | | `Earnie_Pool_Temp_Toleranz` |
 | Heizung aktiv | Messwert | `sens_heating_active` | | | | `Earnie_Pool_Heizung_aktiv` |
 | Filter Sollstunden | Eingabewert | `get_filter_remaining_hours` | | | | `Earnie_Pool_Filter_Sollstunden` |
-| Filter Freigabe | Steuerwert | `flex.set_enable` (Filter-Entity) | | | | `Earnie_Pool_Filter_Freigabe` |
+| Filter Freigabe | Steuerwert | `flex.{slug}.set_enable` (Filter-Entity) | | | | `Earnie_Pool_Filter_Freigabe` |
 | Filter läuft (Binär) | Messwert | `sens_filter_active` | | | | `Earnie_Pool_Filter_aktiv` |
 | Native Filter-Startstunde | Eingabewert | `get_filter_native_start_hour` | | | | `Earnie_Pool_Filter_NativeStart` |
 | Native Filter-Dauer | Eingabewert | `get_filter_native_duration_hours` | | | | `Earnie_Pool_Filter_NativeDauer` |
@@ -199,7 +199,7 @@ Nur `**sens_***` und `**get_***` (Messwerte / Eingaben). Die Tabelle listet **al
 | Zuletzt gelesen | Zeitstempel der Abfrage                                                                                   |
 
 
-**Loxone:** periodisches Lesen der konfigurierten Merker (Tabelle + **Smarthome-Merker testen**). Anlagen-Felder: `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, optional `sens_power_consumers`. **Verbraucher** (aus Flex-Liste und Hausprofil mit Merker): EV → `{id}:sens_evcs_`* / `{id}:get_evcs_`*; andere mit Leistung → `{id}:flex.power_name`. Kein PV-Zähler, keine `set_`* / Freigaben.
+**Loxone:** periodisches Lesen der konfigurierten Merker (Tabelle + **Smarthome-Merker testen**). Anlagen-Felder: `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, optional `sens_power_consumers`. **Verbraucher** (aus Flex-Liste und Hausprofil mit Merker): EV → `{id}:sens_evcs_`* / `{id}:get_evcs_`*; andere mit Leistung → `{id}:flex.{slug}.sens_power_act`. Kein PV-Zähler, keine `set_`* / Freigaben.
 
 **HA / OpenEMS:** EHAL-Telemetrie über REST (nur `sens_`* / `get_`* in der Tabelle; Verbindungstest zeigt ggf. das volle JSON inkl. Envelope). Mapping = Entity bzw. Kanal; abgeleitete Hauslast: `—(abgeleitet)`. Optional Caption Live-Leistung in kW.
 
@@ -240,13 +240,12 @@ Nur bei Backend **Loxone**: Entity-zentrierter Assistent (Backlog **2.4.k**, Str
 
 Library-Vorlagen und Earnie-tot-Fallback: [Earnie-Loxone-Library](../einrichtung/loxone-earnie-library.md).
 
-1. **Alle Quellen testen** — Research-Vergleich (noch keine feste Produktions-Quelle): **LoxAPP3.json**, **HTTP-Probe** bekannter Greenfield-/Template-Namen und in LoxAPP3 gefundener `Earnie_*` Titel (`greenfield_device_map.json` + bereits gemappte Merker; auch Prefix+Slug) über `/jdev/sps/io/{Name}` (`LL.Code` 200 oder 403 = vorhanden, 404 = fehlt; Visualisierung nicht nötig), und optional **Loxone MCP 17.1** (Base-URL). Bei `connect.loxonecloud.com/…/mcp`: unauthentifizierter GET (307→Relay), danach **headless OAuth 2.1** mit `LOXONE_USER`/`LOXONE_PASS`, dann Namensauflösung über MCP-Tools. Mapping-Dropdowns standardmäßig **Union**.
-2. **Greenfield importieren** — legt typisierte Plant-/Verbraucher-Entities und `ehal_bindings` aus Merker+EFM an (Prefix+Slug case-insensitive). Parameter danach im Hauskonfigurator. Vorher Library/Merker auf dem Miniserver: [Earnie-Loxone-Library](../einrichtung/loxone-earnie-library.md).
-3. **Optional KI-Vorschlag** — lokales [Ollama](https://ollama.com/) (`http://127.0.0.1:11434`, Modell z. B. `llama3.2`). Ollama ist **nicht** im Earnie-Container / LoxBerry-Plugin enthalten.
-4. **Human-in-the-Loop** — Entity wählen, EHAL-Felder zuweisen (Select-Label: **Bedeutung** plus EHAL-Value-Name, z. B. `Netzleistung (sens_grid_power_active)`); darunter **Event-Trigger** je Entity (`id`, `ehal_field`, `signal_type`, `on_change`, `label`). Die Merker-Adresse kommt aus dem Binding des gewählten Feldes.
-5. **Speichern** — schreibt `plant.ehal_bindings` / `consumers[].ehal_bindings` sowie `event_triggers` in `house_profiles.json`. Beim ersten Migrate/Save werden `system.event_triggers` geleert und Anlagen-Rollen aus `loxone_blocks` entfernt (leeres `loxone_blocks` entfällt).
+1. **HTTP-Probe** — bekannte Greenfield-/Template-Namen und bereits gemappte Merker (`greenfield_device_map.json` + Prefix+Slug) über `/jdev/sps/io/{Name}` prüfen (`LL.Code` 200 oder 403 = vorhanden, 404 = fehlt). Gefundene Namen füllen die Mapping-Dropdowns. (Loxone MCP und Ollama-KI bleiben im Code für spätere Re-Integration, sind auf der Oberfläche derzeit nicht angeboten.)
+2. **Loxone-Import** (im **Hauskonfigurator**, oberhalb von Verbraucher) — legt typisierte Plant-/Verbraucher-Entities und `ehal_bindings` aus Merker+EFM an (Prefix+Slug case-insensitive). Zähler-Bezeichnung ohne führendes „Zähler“/„Zaehler“ und ohne EFM-„Verbraucher N:“ als Label/Id; gleiche physische Geräte (z. B. Pool↔Swimspa, E-Auto↔Wallbox/smart) werden zusammengeführt, EFM-Leistung bevorzugt auf den typisierten Verbraucher. Danach hier die Signal-Zuordnung prüfen. Vorher Library/Merker auf dem Miniserver: [Earnie-Loxone-Library](../einrichtung/loxone-earnie-library.md).
+3. **Human-in-the-Loop** — Entity wählen, EHAL-Felder zuweisen (Select-Label: **Bedeutung** plus EHAL-Value-Name, z. B. `Netzleistung (sens_grid_power_active)`); darunter **Event-Trigger** je Entity (`id`, `ehal_field`, `signal_type`, `on_change`, `label`). Die Merker-Adresse kommt aus dem Binding des gewählten Feldes.
+4. **Speichern** — schreibt `plant.ehal_bindings` / `consumers[].ehal_bindings` sowie `event_triggers` in `house_profiles.json`. Beim ersten Migrate/Save werden `system.event_triggers` geleert und Anlagen-Rollen aus `loxone_blocks` entfernt (leeres `loxone_blocks` entfällt).
 
-**Energieflussmonitor → Verbraucher:** Expander **Zähler importieren** lädt Zähler aus `LoxAPP3.json` (EFM-Baum + orphan Meter), schlägt generische Verbraucher vor und kann optional `flex.power_name` auf die Zähler-Bezeichnung setzen. CSV-Export bleibt manuell; `flex.enable_name` / `flex.power_setpoint_name` nicht vom Zähler. Spec: [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md). Manueller Blueprint: Plan `energieflussmonitor_hausprofil_blueprint_a`.
+**Energieflussmonitor → Verbraucher:** Expander **Zähler importieren** lädt Zähler aus `LoxAPP3.json` (EFM-Baum + orphan Meter), schlägt generische Verbraucher vor (Label/Id ohne führendes „Zähler“) und kann optional `flex.{slug}.sens_power_act` auf die Zähler-Bezeichnung setzen. Treffer auf bestehende typisierte Verbraucher (Merker) werden gematcht statt dupliziert. CSV-Export bleibt manuell; `flex.{slug}.set_enable` / `set_power_setpoint` nicht vom Zähler. Spec: [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md). Manueller Blueprint: Plan `energieflussmonitor_hausprofil_blueprint_a`.
 
 Bindings werden **nicht** mehr im Hauskonfigurator unter „Smarthome-Merker“ editiert — nur noch hier auf EHAL-Com. Siehe [Loxone-Signale](../referenz/loxone-signale.md).
 

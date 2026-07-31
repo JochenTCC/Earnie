@@ -3,9 +3,25 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
-### 2.4.n Greenfield Loxone Import P1–P3 + how-to (2026-07-31)
+### 2.4.o Changes / EHAL-Com cleanup (2026-07-31)
 
-- [x] **2.4.n (partial) — Greenfield Loxone Import** — P1 naming freeze + Pattern B draft `VI_`/`VO_` under `share/loxone/templates/`; P2 `integrations/loxone_greenfield_import.py` (exact + Prefix+Slug casefold, EFM merge, HTTP probe); P3 HK onboarding → EHAL-Com **Greenfield importieren**; P4 German how-to [`docs/einrichtung/loxone-earnie-library.md`](../docs/einrichtung/loxone-earnie-library.md) + TOC/`ehal-com`/`loxone-anbindung` links. **Still open in Backlog.md:** Config-exported canonical XML packaging.
+- [x] **2.4.o — changes**
+  - [x] Move button "Nein - manuell fortfahren" at same row as "Loxone-Import"; move hint "Neues Hausprofil ..." accordingly
+  - [x] Include the consumer type in label of consumers expander (like "Verbraucher 1 (Haus Wärme): ...")
+  - [x] Change "Loxone-Import (Merker + EFM → Hausprofil / EHAL-Bindings)" label on HK page to chapter size
+  - [x] Merge Loxone-Import hints into one with Anleitung link
+  - [x] Button "Loxone-Import" disabled until Loxone credentials/access work; hint otherwise
+  - [x] EHAL-Com: remove MCP mapping source UI, Ollama UI, Quellenvergleich, Quellen selection — HTTP-Probe only for mapping names; MCP/Ollama code kept in `integrations/` for later re-integration; docs `ehal-com.md` / `ehal.md`
+
+
+### 2.4.o Tuning Greenfield Import (2026-07-31)
+
+- [x] **2.4.o — Tuning Greenfield Import** — Merker↔Zähler merge (strip Zähler/Zaehler; slug/aliases pool↔swimspa, e_auto↔wallbox); same-id merge ev/thermal_rc; **Loxone-Import** on Hauskonfigurator above Verbraucher (replaces EHAL-Com Greenfield button); EHAL-Com mapping hint; docs `ehal-com.md` / `loxone-earnie-library.md`.
+
+
+### 2.4.n Greenfield Loxone Import - Workflow (2026-07-31)
+
+- [x] **2.4.n — Greenfield Loxone Import - Workflow** — P1 naming freeze + Pattern B full draft set under `share/loxone/templates/` (`VI_`/`VO_` Plant, EV, Heatpump, Consumer, Pool, Status); P2 `integrations/loxone_greenfield_import.py` (exact + Prefix+Slug casefold, EFM merge, HTTP probe); P3 HK onboarding → EHAL-Com **Greenfield importieren**; P4 German how-to [`docs/einrichtung/loxone-earnie-library.md`](../docs/einrichtung/loxone-earnie-library.md) + TOC/EHAL-Com/HK links; ehal-com **C.5** Wärmepumpe / **C.6** Pool + Aussentemp; Plant VI ESS Design C1 (`Earnie_Batterie_Sollleistung` + sticky `set_ess_mode`). Plans: `.cursor/plans/greenfield_loxone_import_303f8861.plan.md`, `.cursor/plans/vo_sens_get_templates_9cbef698.plan.md`, `.cursor/plans/ehal_ess_design_c1_9ae0ebdd.plan.md`. Config **Als Vorlage speichern** canonical re-export closed with chapter (drafts ship as library).
 
 
 ### 2.4.o EHAL ESS active power Design C1 (2026-07-31)

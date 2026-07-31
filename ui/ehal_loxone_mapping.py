@@ -18,16 +18,9 @@ from integrations.loxone_ehal_mapping import (
     TELEMETRY_OPTIONAL,
     TELEMETRY_REQUIRED,
     heuristic_propose,
-    ollama_reachable,
-    propose_with_ollama,
 )
 from integrations.loxone_structure import (
-    ALL_SOURCES,
     SOURCE_HTTP_PROBE,
-    SOURCE_LOXAPP3,
-    SOURCE_MCP17,
-    SOURCE_UNION,
-    StructureCompareResult,
     scan_structure,
 )
 from ui.form_layout import WIDE_LABEL_RATIOS, labeled_selectbox, labeled_text_input
@@ -41,19 +34,10 @@ from ui.house_config_io import (
 
 _NONE = "— nicht gemappt —"
 _SESSION_SCAN = "ehal_lox_scan"
-_SESSION_COMPARE = "ehal_lox_compare"
 _SESSION_PROPOSALS = "ehal_lox_proposals"
-_SESSION_USE_SOURCE = "ehal_lox_use_source"
 _SESSION_ENTITY = "ehal_lox_entity_id"
 _SESSION_TRIGGERS = "ehal_lox_triggers_draft"
 _SESSION_MIGRATED = "ehal_lox_migrated_once"
-
-_SOURCE_LABELS = {
-    SOURCE_UNION: "Union (alle Quellen)",
-    SOURCE_LOXAPP3: "LoxAPP3.json",
-    SOURCE_HTTP_PROBE: "HTTP-Probe (Earnie_* / gemappt)",
-    SOURCE_MCP17: "Loxone MCP 17.1",
-}
 
 _SIGNAL_TYPES = ("binary", "text", "analog")
 _ON_CHANGE_OPTIONS = ("any", "rising", "falling")
@@ -83,9 +67,9 @@ EV_FIELDS: tuple[str, ...] = (
 )
 
 FLEX_FIELDS: tuple[str, ...] = (
-    "flex.power_name",
-    "flex.enable_name",
-    "flex.power_setpoint_name",
+    "flex.sens_power_act",
+    "flex.set_enable",
+    "flex.set_power_setpoint",
 )
 
 _EXTRA_LABELS: dict[str, str] = {
@@ -98,11 +82,19 @@ _EXTRA_LABELS: dict[str, str] = {
     "flex.power_name": "Flex Leistung / Zustand",
     "flex.enable_name": "Flex Freigabe",
     "flex.power_setpoint_name": "Flex Leistungs-Sollwert",
+    "flex.sens_power_act": "Flex Leistung / Zustand",
+    "flex.set_enable": "Flex Freigabe",
+    "flex.set_power_setpoint": "Flex Leistungs-Sollwert",
 }
 
 
 def _field_label(field: str) -> str:
+    from ehal.flex_fields import flex_field_label
+
     labels = {**role_field_labels(), **FIELD_LABELS, **_EXTRA_LABELS}
+    pattern_label = flex_field_label(field)
+    if pattern_label:
+        return pattern_label
     return labels.get(field, field)
 
 
@@ -127,6 +119,11 @@ def fields_for_consumer(consumer: dict) -> tuple[str, ...]:
     """EHAL mapping fields for a house-profile consumer type."""
     if str(consumer.get("type") or "") == "ev":
         return EV_FIELDS
+    from ehal.flex_fields import flex_fields_for_consumer
+
+    cid = str(consumer.get("id") or "").strip()
+    if cid:
+        return flex_fields_for_consumer(cid)
     return FLEX_FIELDS
 
 
@@ -297,12 +294,12 @@ def _migrate_on_open() -> tuple[dict, dict]:
 
 
 def render_ehal_loxone_mapping_section() -> None:
-    """Structure compare-all + entity HITL; persists plant/consumer ehal_bindings."""
+    """HTTP-probe structure scan + entity HITL; persists plant/consumer ehal_bindings."""
     st.caption(
         "Entity-zentriertes Mapping: Anlage + Verbraucher aus dem Live-Hausprofil. "
         "Felder `{entity}.{ehal_field}` → Merker; Speichern in `house_profiles.json` "
         "(`plant` / `consumers[].ehal_bindings` + `event_triggers`). "
-        "Struktur-Scan: LoxAPP3 / HTTP-Probe (Earnie_* Template-Namen) / optional MCP / Ollama."
+        "Struktur-Scan: HTTP-Probe bekannter Earnie_*/gemappter Merker."
     )
     house, config_doc = _migrate_on_open()
     profile_id = resolve_live_profile_id(house)
@@ -310,12 +307,8 @@ def render_ehal_loxone_mapping_section() -> None:
     if not profile_id:
         st.warning("Kein Hausprofil im Live-Szenario — bitte zuerst im Szenarienkonfigurator setzen.")
         return
-    rows, ollama_url, ollama_model, ai_clicked = _render_scan_and_compare(
-        house, profile_id
-    )
+    rows = _render_http_probe_scan(house, profile_id)
     entity = _render_entity_picker(entities)
-    if ai_clicked:
-        _run_ai_propose(rows, ollama_url, ollama_model, fields=tuple(entity["fields"]))
     proposals: dict[str, dict[str, Any]] = dict(st.session_state.get(_SESSION_PROPOSALS) or {})
     options = _name_options(rows, list(entity["bindings"].values()))
     ehal_map = _render_field_selects(entity, options, proposals)
@@ -331,54 +324,20 @@ def render_ehal_loxone_mapping_section() -> None:
         )
 
 
-def _render_scan_and_compare(
-    house: dict, profile_id: str
-) -> tuple[list[dict[str, Any]], str, str, bool]:
-    mcp_url, ollama_url, ollama_model = _render_scan_inputs()
-    col_scan, col_ai = st.columns(2)
-    with col_scan:
-        scan_clicked = st.button("Alle Quellen testen", key="ehal_lox_scan_btn")
-    with col_ai:
-        ai_clicked = st.button("KI-Vorschlag (Ollama)", key="ehal_lox_ai_btn")
-    if scan_clicked:
-        _run_structure_scan(configured_marker_names(house, profile_id), mcp_url)
-    compare = st.session_state.get(_SESSION_COMPARE)
-    if isinstance(compare, dict) and compare.get("rows"):
-        st.markdown("**Quellenvergleich** (Research — noch keine Winner-Entscheidung)")
-        st.dataframe(compare["rows"], width="stretch", hide_index=True)
-        for err in (compare.get("errors") or [])[:8]:
-            st.caption(err)
-    use_source = _render_source_picker(compare if isinstance(compare, dict) else {})
+def _render_http_probe_scan(house: dict, profile_id: str) -> list[dict[str, Any]]:
+    """Scan via HTTP-Probe only (MCP / Ollama / Quellenvergleich UI removed; code kept in integrations)."""
+    if st.button("HTTP-Probe", key="ehal_lox_scan_btn"):
+        _run_structure_scan(configured_marker_names(house, profile_id))
     rows: list[dict[str, Any]] = list(st.session_state.get(_SESSION_SCAN) or [])
     if rows:
-        st.caption(f"{len(rows)} Namen für Mapping ({_SOURCE_LABELS.get(use_source, use_source)})")
+        st.caption(f"{len(rows)} Namen für Mapping (HTTP-Probe)")
         st.dataframe(rows[:40], width="stretch", hide_index=True)
         if len(rows) > 40:
             st.caption(f"... und {len(rows) - 40} weitere.")
-    return rows, ollama_url, ollama_model, ai_clicked
-
-
-def _render_scan_inputs() -> tuple[str, str, str]:
-    mcp_url = st.text_input(
-        "Loxone MCP 17.1 Base-URL (optional)",
-        value=str(st.session_state.get("ehal_lox_mcp_url") or ""),
-        key="ehal_lox_mcp_url",
-        help=(
-            "Optional. connect.loxonecloud.com/…/mcp: GET 307→Relay, "
-            "OAuth mit LOXONE_USER/PASS, dann control_find/control_describe."
-        ),
-    ).strip()
-    ollama_url = st.text_input(
-        "Ollama URL",
-        value=str(st.session_state.get("ehal_lox_ollama_url") or "http://127.0.0.1:11434"),
-        key="ehal_lox_ollama_url",
-    ).strip() or "http://127.0.0.1:11434"
-    ollama_model = st.text_input(
-        "Ollama Modell",
-        value=str(st.session_state.get("ehal_lox_ollama_model") or "llama3.2"),
-        key="ehal_lox_ollama_model",
-    ).strip() or "llama3.2"
-    return mcp_url, ollama_url, ollama_model
+        errors = st.session_state.get("ehal_lox_scan_errors") or []
+        for err in errors[:8]:
+            st.caption(err)
+    return rows
 
 
 def _render_entity_picker(entities: list[dict[str, Any]]) -> dict[str, Any]:
@@ -552,74 +511,20 @@ def _render_one_trigger(
     }
 
 
-def _render_source_picker(compare: dict[str, Any]) -> str:
-    available = [SOURCE_UNION]
-    for source in ALL_SOURCES:
-        if any(row.get("source") == source for row in (compare.get("rows") or [])):
-            available.append(source)
-    labels = [_SOURCE_LABELS.get(s, s) for s in available]
-    current = str(st.session_state.get(_SESSION_USE_SOURCE) or SOURCE_UNION)
-    if current not in available:
-        current = SOURCE_UNION
-    picked_label = st.selectbox(
-        "Namen für Mapping aus",
-        options=labels,
-        index=labels.index(_SOURCE_LABELS.get(current, current)),
-        key="ehal_lox_source_pick",
-        help="Research: Union = alle gefundenen Namen; Einzelquelle zum Vergleich.",
-    )
-    source = next(
-        (s for s in available if _SOURCE_LABELS.get(s, s) == picked_label),
-        SOURCE_UNION,
-    )
-    if source != st.session_state.get(_SESSION_USE_SOURCE):
-        st.session_state[_SESSION_USE_SOURCE] = source
-        _apply_selected_source(source)
-    return source
-
-
-def _apply_selected_source(source: str) -> None:
-    raw = st.session_state.get(_SESSION_COMPARE)
-    if not isinstance(raw, dict) or "result" not in raw:
-        return
-    result: StructureCompareResult = raw["result"]
-    result.selected_source = source
-    items = result.mapping_items(use_source=source)
-    st.session_state[_SESSION_SCAN] = [
-        {
-            "name": item.name,
-            "uuid": item.uuid,
-            "type": item.type,
-            "room": item.room,
-            "category": item.category,
-            "source": item.source,
-        }
-        for item in items
-    ]
-    if items:
-        st.session_state[_SESSION_PROPOSALS] = heuristic_propose(
-            [item.name for item in items],
-            fields=PLANT_FIELDS + EV_FIELDS + FLEX_FIELDS,
-        )
-
-
-def _run_structure_scan(configured: list[str], mcp_url: str) -> None:
+def _run_structure_scan(configured: list[str]) -> None:
+    """HTTP-Probe only for mapping names. MCP/Ollama remain in integrations for later re-use."""
     st.session_state.pop(_SESSION_PROPOSALS, None)
     result = scan_structure(
         host=str(config.get("LOXONE_IP") or ""),
         username=str(config.get("LOXONE_USER") or ""),
         password=str(config.get("LOXONE_PASS") or ""),
         configured_names=configured,
-        mcp_base_url=mcp_url,
-        selected_source=SOURCE_UNION,
+        mcp_base_url="",
+        sources=(SOURCE_HTTP_PROBE,),
+        selected_source=SOURCE_HTTP_PROBE,
     )
-    st.session_state[_SESSION_USE_SOURCE] = SOURCE_UNION
-    st.session_state[_SESSION_COMPARE] = {
-        "rows": result.comparison_rows(),
-        "errors": result.all_errors(),
-        "result": result,
-    }
-    items = result.mapping_items(use_source=SOURCE_UNION)
+    st.session_state["ehal_lox_scan_errors"] = result.all_errors()
+    items = result.mapping_items(use_source=SOURCE_HTTP_PROBE)
     st.session_state[_SESSION_SCAN] = [
         {
             "name": item.name,
@@ -636,36 +541,6 @@ def _run_structure_scan(configured: list[str], mcp_url: str) -> None:
             [item.name for item in items],
             fields=PLANT_FIELDS + EV_FIELDS + FLEX_FIELDS,
         )
-
-
-def _run_ai_propose(
-    rows: list[dict[str, Any]],
-    ollama_url: str,
-    ollama_model: str,
-    *,
-    fields: tuple[str, ...],
-) -> None:
-    names = [str(row.get("name") or "") for row in rows if row.get("name")]
-    if not names:
-        st.error("Zuerst alle Quellen testen (Namensliste leer).")
-        return
-    if not ollama_reachable(ollama_url):
-        st.warning(
-            "Ollama nicht erreichbar — Heuristik-Vorschläge bleiben aktiv. "
-            "Ollama separat installieren (nicht im Earnie-Image)."
-        )
-        st.session_state[_SESSION_PROPOSALS] = heuristic_propose(names, fields=fields)
-        return
-    with st.spinner("Ollama mappt Merker → EHAL …"):
-        proposals = propose_with_ollama(
-            names, base_url=ollama_url, model=ollama_model, fields=fields
-        )
-    if not proposals:
-        st.warning("Ollama lieferte keine Vorschläge — Heuristik wird genutzt.")
-        proposals = heuristic_propose(names, fields=fields)
-    else:
-        st.success(f"{len(proposals)} KI-Vorschläge übernommen.")
-    st.session_state[_SESSION_PROPOSALS] = proposals
 
 
 def _validate_mapping_save(

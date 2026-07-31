@@ -23,20 +23,15 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Goal:** Freeze **EHAL**, prove Loxone-free southbounds (OpenEMS + HA/evcc), move production Loxone onto EHAL, add MCP one-click mapping, and prove config-only switch across all three. Earnie Core remains the sole 48h optimizer; hardware I/O only via EHAL (telemetry + setpoints + capability flags).  
 **Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume; **Loxone** = production path via EHAL (`2.4.e`–`2.4.h`).  
 **Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) done — thin Docker wrapper in `packaging/loxberry/` (not a native host install).  
-**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.l`/`2.4.m`/`2.4.o` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
+**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.l`/`2.4.m`/`2.4.n`/`2.4.o` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://connect.loxonecloud.com/504F94A1137C)
-
-- [ ] **2.4.n — Greenfield Loxone Import - Workflow**
-  - **Done (P1–P3 + how-to):** frozen Merker map/recipes; Pattern B `VI_`/`VO_` drafts; import engine + slug/casefold; HK prompt → EHAL-Com **Greenfield importieren**; German [`docs/einrichtung/loxone-earnie-library.md`](../docs/einrichtung/loxone-earnie-library.md) (TOC + EHAL-Com/HK links). Plan: `.cursor/plans/greenfield_loxone_import_303f8861.plan.md`
-  - **Open (packaging):** Config validate → **Als Vorlage speichern** → replace draft XML under `share/loxone/templates/` with Config-exported canonical files (user handoff)
-
-- [ ] **2.4.o - UI polishing**
+- [ ] **2.4.p - UI polishing**
   - Show earnie.log file (at least the tail trunk) on page "Optimierer-Dienst". Show it in an expander with an extra chapter title
   - Add possibility in loxberry plugin to change the IP Port for Streamlit
 
-- [ ] **2.4.p — Release**
+
+- [ ] **2.4.q — Release**
   - Make a code coverage test
   - Review code against coding KPIs and refactor it if needed
   - Make a test coverage test to identify obsolete tests
@@ -65,7 +60,8 @@ Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://conn
   - Decide: full B vs stay hourly + optional A (store QH prices for SE/billing only) vs hybrid C
   - If go: carve implementation phases into this MINOR (or successor); if no-go: archive rationale and close **2.3.2** accordingly
 
-
+### Version 2.+1 - Min immediate charging for EV
+- [ ] Add the possibility that EV is charged immediately to a min SOC independent from regular schedule - This can be enabled separately for working days and weekend
 
 ### Version 2.+1 — Introducing nested data models
 
@@ -81,7 +77,13 @@ Loxone external URL: [https://connect.loxonecloud.com/504F94A1137C](https://conn
   - Adaptive re runtime/energy per run; smart devices instead of manual input
   - Adaptation algo maintains `appliance_recommendation.default_power_kw` from Loxone power markers (`loxone_inputs.power_name`) on house-profile generics — reserved so far, no live use
   - Use Loxone power markers also for Sankey-Diagram for further differentation of defined consumers
+- [ ] Update Greenfield import workflow
 
+
+### Version 2.+1
+- [ ] When importing from existing Loxone config is working the other way round would also be possible:
+    - User has a complete HK with live scenario in place in Earnie
+    - Earnie generates pre-filled Loxone Template XML files (with correct ids, (multiple) evs, (multiple) consumers) for importing into Loxone config.
 
 
 ### Version 2.+1 — Epics **Adaptation** & **Thermals** (architecture first)
