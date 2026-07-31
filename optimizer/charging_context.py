@@ -6,7 +6,10 @@ from datetime import datetime, timedelta, time
 
 import config
 from integrations import loxone_client
-from optimizer.ev_soc_tracking import loxone_reports_charge_complete
+from optimizer.ev_soc_tracking import (
+    fetch_loxone_actual_soc_percent,
+    loxone_reports_charge_complete,
+)
 from settings.flexible_consumers import flex_kw_lookup
 
 _LOXONE_WEEKDAY_NAMES = {
@@ -298,6 +301,12 @@ def resolve_absent_availability(
             )
             if today_from is not None and horizon_start >= today_from:
                 continue
+            # FertigUm parsed from yesterday's window_start can push the overnight
+            # deadline into daytime (e.g. "Morgen, 11:00" → 11:00). Only treat the
+            # overnight cycle as still open before the *config* ready_by.
+            config_deadline = charging_deadline_after(window_start, consumer)
+            if config_deadline is not None and horizon_start >= config_deadline:
+                continue
             return horizon_start
     return next_scheduled_availability(horizon_start, consumer)
 
@@ -535,9 +544,39 @@ def resolve_charging_context(
     out = _config_path_with_plugged_in(
         result, consumer, sched, horizon_start, ready_raw
     )
-    if out.get("plugged_in") and loxone_reports_charge_complete(consumer):
+    return _config_path_apply_live_ist_soc(
+        out,
+        consumer,
+        capacity_kwh=capacity_kwh,
+        from_loxone=from_loxone,
+    )
+
+
+def _config_path_apply_live_ist_soc(
+    out: dict,
+    consumer: dict,
+    *,
+    capacity_kwh: float | None,
+    from_loxone: bool,
+) -> dict:
+    """Plugged-in config path: energy from Ist-SOC (not daily_rest_soc forecast)."""
+    if out.get("plugged_in") is not True:
+        return out
+    if loxone_reports_charge_complete(consumer):
         return _loxone_plugged_in_complete_context()
-    return out
+    soc_val = fetch_loxone_actual_soc_percent(consumer)
+    if soc_val is None:
+        return out
+    target_kwh = config.Config.target_kwh_from_rest_soc(
+        consumer, soc_val, capacity_kwh=capacity_kwh
+    )
+    updated = dict(out)
+    updated["target_kwh"] = round(target_kwh, 3) if target_kwh is not None else None
+    if from_loxone:
+        updated["source_label"] = "config.json (Ist-SOC → kWh, FertigUm Loxone)"
+    else:
+        updated["source_label"] = "config.json (Ist-SOC → kWh)"
+    return updated
 
 
 def _load_plug_cycle_fulfilled_flags() -> dict[str, bool]:
