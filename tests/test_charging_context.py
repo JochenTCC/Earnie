@@ -77,6 +77,14 @@ class TestAbsentAvailability:
       with patch.object(cc, "_loxone_ready_raw", return_value=None):
           assert cc.resolve_absent_availability(horizon, consumer) == horizon
 
+  def test_resolve_absent_after_overnight_ready_by_uses_next_scheduled(self):
+      consumer = _eauto_consumer()
+      horizon = datetime(2026, 6, 23, 9, 0)  # nach ready_by_hour 7
+      with patch.object(cc, "_loxone_ready_raw", return_value="Morgen, 11:00"):
+          assert cc.resolve_absent_availability(
+              horizon, consumer
+          ) == cc.next_scheduled_availability(horizon, consumer)
+
   def test_resolve_absent_with_timezone_aware_horizon(self):
       from zoneinfo import ZoneInfo
 
@@ -167,10 +175,30 @@ class TestLoxoneAbsentForecast:
       ), _patch_eauto_capacity():
           ctx = cc.fetch_loxone_charging_context(consumer, horizon)
 
+      # Overnight ready_by already passed; next arrival is after FertigUm → inactive.
+      assert ctx["active"] is False
+      assert ctx["target_kwh"] == 0.0
+
+  def test_absent_after_overnight_ready_by_waits_for_next_arrival(self):
+      """Dump 091219: FertigUm 'Morgen' must not keep overnight open all morning."""
+      consumer = _eauto_consumer()
+      consumer["charging_schedule"]["weekday"]["car_available_from_hour"] = 18
+      consumer["charging_schedule"]["weekend"]["car_available_from_hour"] = 18
+      consumer["charging_schedule"]["weekday"]["ready_by_hour"] = 7
+      consumer["charging_schedule"]["weekend"]["ready_by_hour"] = 7
+      horizon = datetime(2026, 7, 31, 9, 0)
+      with patch.object(
+          cc.loxone_client, "fetch_loxone_generic_value", return_value=0
+      ), patch.object(
+          cc.loxone_client, "fetch_loxone_raw_value", return_value="Morgen, 11:00"
+      ), _patch_eauto_capacity():
+          ctx = cc.fetch_loxone_charging_context(consumer, horizon)
+
       assert ctx["active"] is True
-      assert ctx["available_from"] == horizon
-      assert ctx["deadline"] == datetime(2026, 6, 23, 16, 3)
-      assert ctx["use_time_window"] is False
+      assert ctx["anticipated"] is True
+      assert ctx["plugged_in"] is False
+      assert ctx["available_from"] == datetime(2026, 7, 31, 18, 0)
+      assert ctx["deadline"] == datetime(2026, 8, 1, 11, 0)
 
   def test_forecast_same_day_past_slot_waits_for_next_arrival(self):
       consumer = _eauto_consumer()

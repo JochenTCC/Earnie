@@ -22,6 +22,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **EV absent daytime plan after overnight ready_by** — dumps `debug_dump_20260731_075323` / `091219`: FertigUm kept overnight open past config `ready_by` → daytime Smart plan while unplugged. Fix: `resolve_absent_availability` (config `ready_by` bound). Also shipped on `hotfix/2.3.2` (`v2.3.2`) with Ist-SOC config-path port. Tests: `TestAbsentAvailability`, `TestLoxoneAbsentForecast`. Live verify: unplugged daytime → no EV plan before next `car_available_from`.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
