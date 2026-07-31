@@ -1,7 +1,7 @@
 {
   "role_id": "ess",
   "label": "Batterie (ESS)",
-  "description": "Home battery SoC, optional power, active-power setpoint (Design C1), true charge/discharge limits, and optional mode hint.",
+  "description": "Home battery SoC, optional power, active-power setpoint (Design C1), true charge/discharge limits, and sticky-backend mode control.",
   "status": "m1",
   "ehal_fields": [
     {
@@ -38,7 +38,7 @@
       "field": "set_ess_mode",
       "required": false,
       "kind": "setpoint",
-      "notes": "Optional mode hint for Loxone/HA (e.g. Huawei); OpenEMS ignores."
+      "notes": "Sticky-backend control (Loxone/HA): always write; 0 = Automatik even if Sollleistung Merker is stale. OpenEMS ignores."
     },
     {
       "field": "supports_ess_write",

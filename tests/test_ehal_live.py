@@ -133,3 +133,58 @@ def test_write_ess_setpoints_persists_error(config_mock, adapter_factory, persis
     assert args["set_ess_charge_power_limit"] == 5000.0
     assert args["set_ess_discharge_power_limit"] == 0.0
     assert "set_ess_mode" in args
+
+
+def test_clamp_ess_test_target_kw():
+    assert ehal_live.clamp_ess_test_target_kw(3.0, max_power_kw=5.0) == 3.0
+    assert ehal_live.clamp_ess_test_target_kw(9.0, max_power_kw=5.0) == 5.0
+    assert ehal_live.clamp_ess_test_target_kw(-2.0, max_power_kw=5.0) == 2.0
+    assert ehal_live.clamp_ess_test_target_kw(1.5, max_power_kw=0.0) == 1.5
+
+
+@patch("integrations.ehal_live.write_ess_setpoints_from_control")
+@patch("integrations.ehal_live.config")
+def test_force_write_ess_test_setpoints_network(config_mock, write_mock):
+    ehal_live.reset_adapter_cache()
+    config_mock.is_loxone_silent_mode.return_value = False
+    config_mock.get.side_effect = lambda key, default=None: {
+        "EHAL_BACKEND": "openems",
+    }.get(key, default)
+    config_mock.get_battery_params.return_value = {"max_power_kw": 5.0}
+    write_mock.return_value = (None, [{"field": "set_ess_mode", "success": True}])
+    err, records, backend = ehal_live.force_write_ess_test_setpoints(1, 1.5)
+    assert err is None
+    assert backend == "OpenEMS"
+    assert records
+    write_mock.assert_called_once_with(1, 1.5, 5.0)
+
+
+@patch("integrations.ehal_live.loxone_client.send_huawei_modbus_states")
+@patch("integrations.ehal_live.config")
+def test_force_write_ess_test_setpoints_loxone(config_mock, send_mock):
+    from integrations.loxone_comm_trace import LoxoneWriteRecord
+
+    ehal_live.reset_adapter_cache()
+    config_mock.is_loxone_silent_mode.return_value = False
+    config_mock.get.side_effect = lambda key, default=None: {
+        "EHAL_BACKEND": "loxone",
+    }.get(key, default)
+    config_mock.get_battery_params.return_value = {"max_power_kw": 5.0}
+    send_mock.return_value = [
+        LoxoneWriteRecord("Earnie_Steuerbefehl", 0.0, True, "2026-07-31T06:00:00")
+    ]
+    err, records, backend = ehal_live.force_write_ess_test_setpoints(0, 1.0)
+    assert err is None
+    assert backend == "Loxone"
+    assert records[0]["io_name"] == "Earnie_Steuerbefehl"
+    send_mock.assert_called_once_with(0, 1.0, 0.0)
+
+
+@patch("integrations.ehal_live.config")
+def test_force_write_ess_test_setpoints_silent(config_mock):
+    config_mock.is_loxone_silent_mode.return_value = True
+    err, records, backend = ehal_live.force_write_ess_test_setpoints(1, 1.0)
+    assert err is not None
+    assert "Silent" in err
+    assert records == []
+    assert backend == "silent"

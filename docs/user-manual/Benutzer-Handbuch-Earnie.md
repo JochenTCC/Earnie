@@ -25,7 +25,7 @@ Besonders wirksam ist Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar),
 | **Was-wäre-wenn (ohne Smart-Home)** | Haus und Varianten konfigurieren, Jahresvergleich rechnen — z. B. ob sich Speicher, größere PV oder ein Spot-Tarif lohnen |
 | **Live-Betrieb (mit Loxone)** | Dauerhaft optimieren und Sollwerte an die Hausautomation schreiben; Monitor zeigt Plan und Ist |
 
-Nur der Hintergrunddienst (`main.py`) steuert die Anlage. Die Web-Oberfläche (Streamlit) ist das **Cockpit**: Anzeige, Konfiguration und Analyse — und unter **Daemon Control → Optimierer-Dienst** Start/Stop/Neustart des Daemons. Die Oberfläche selbst schreibt keine Steuerbefehle an Loxone.
+Nur der Hintergrunddienst (`main.py`) steuert die Anlage im Produktivbetrieb. Die Web-Oberfläche (Streamlit) ist das **Cockpit**: Anzeige, Konfiguration und Analyse — und unter **Daemon Control → Optimierer-Dienst** Start/Stop/Neustart des Daemons. Bei gestopptem Dienst können dort zusätzlich manuelle **ESS-Test-Sollwerte** an Loxone/HA/OpenEMS gesendet werden (Schnittstellentest).
 
 ### Voraussetzungen
 
@@ -367,7 +367,7 @@ Cutover-Checkliste: Lesen OK → Schreiben Erfolg → Monitor/Sankey plausibel. 
 
 Im Produktivbetrieb läuft der Optimierer dauerhaft (im Docker-Container automatisch mit der UI, oder lokal als `python main.py`) als Daemon und arbeitet im **15-Minuten-Takt** (zusätzlich bei konfigurierten Ereignissen).
 
-Unter **Daemon Control → Optimierer-Dienst** können Sie den Daemon starten, stoppen oder neu starten. Die Oberfläche zeigt den aktuellen Plan; Loxone-Schreibvorgänge kommen weiterhin nur von `main.py`.
+Unter **Daemon Control → Optimierer-Dienst** können Sie den Daemon starten, stoppen oder neu starten. Die Oberfläche zeigt den aktuellen Plan; Produktions-Schreibvorgänge kommen von `main.py`. Bei gestopptem Daemon können Sie unter **ESS-Schnittstelle testen** manuelle Modi/Sollwerte senden, um die Loxone-/EHAL-Anbindung zu prüfen.
 
 ### Monitor
 

@@ -1,19 +1,19 @@
 {
   "role_id": "heatpump",
   "label": "Wärmepumpe",
-  "baustein_notes": "Greenfield prefix Ernie_WP_*. HK type thermal_annual. Prefer EFM Load Bezeichnung for flex.power_name when that meter is the heatpump.",
+  "baustein_notes": "Greenfield prefix Earnie_Waermepumpe_*. HK type thermal_annual. Prefer EFM Load Bezeichnung for flex.power_name when that meter is the heatpump. Legacy Titles Earnie_WP_* still accepted by import.",
   "recommended_markers": [
     {
       "ehal_field": "flex.power_name",
       "loxone_blocks_key": "loxone_inputs.power_name",
-      "suggested_name": "Ernie_WP_P_act",
-      "notes": "Heatpump active power kW."
+      "suggested_name": "Earnie_Waermepumpe_Leistung",
+      "notes": "Heatpump active power kW. Pattern B VO path flex.{hk_id}.sens_power_act."
     },
     {
       "ehal_field": "flex.enable_name",
       "loxone_blocks_key": "loxone_outputs.enable_name",
-      "suggested_name": "Ernie_WP_Freigabe",
-      "notes": "SG-Ready / Freigabe 0/1."
+      "suggested_name": "Earnie_Waermepumpe_Freigabe",
+      "notes": "SG-Ready / Freigabe 0/1. VI Check key flex.{hk_id}.Earnie_Waermepumpe_Freigabe."
     }
   ],
   "reference": "docs/referenz/loxone-signale.md"

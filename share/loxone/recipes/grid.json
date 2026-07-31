@@ -1,12 +1,12 @@
 {
   "role_id": "grid",
   "label": "Netz (PCC)",
-  "baustein_notes": "Prefer EFM Grid Zähler Bezeichnung as sens_grid_power_active. Recipe name Ernie_Netzleistung is the greenfield fallback Merker when no EFM Grid node exists.",
+  "baustein_notes": "Prefer EFM Grid Zähler Bezeichnung as sens_grid_power_active. Recipe name Earnie_Netzleistung is the greenfield fallback Merker when no EFM Grid node exists.",
   "recommended_markers": [
     {
       "ehal_field": "sens_grid_power_active",
       "loxone_blocks_key": "grid_power_name",
-      "suggested_name": "Ernie_Netzleistung",
+      "suggested_name": "Earnie_Netzleistung",
       "notes": "kW; + = Bezug. Maps to EHAL sens_grid_power_active (W)."
     }
   ],

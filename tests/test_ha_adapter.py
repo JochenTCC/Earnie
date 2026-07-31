@@ -24,6 +24,7 @@ def _cfg(**kwargs) -> HaConfig:
             "sens_ess_soc": "sensor.battery_soc",
             "sens_ess_power": "sensor.battery_power",
             "sens_evcs_active_power": "sensor.evcs_power",
+            "set_ess_active_power": "input_number.ess_active_power_w",
             "set_ess_charge_power_limit": "number.charge_limit",
             "set_ess_discharge_power_limit": "number.discharge_limit",
             "set_evcs_max_current": "number.max_current",
@@ -111,6 +112,30 @@ def test_write_setpoints_number_service(post_mock):
     assert values["number.charge_limit"] == 1000
     assert values["number.discharge_limit"] == 2000
     assert values["number.max_current"] == 10
+
+
+@patch("integrations.ha_adapter.requests.post")
+def test_write_setpoints_active_power(post_mock):
+    response = MagicMock()
+    response.status_code = 200
+    post_mock.return_value = response
+    adapter = HaAdapter(_cfg())
+    error = adapter.write_setpoints(
+        {
+            "schema_version": 3,
+            "ts": "2026-07-28T12:00:00Z",
+            "adapter_id": "ha-home",
+            "set_ess_active_power": -1500,
+            "set_ess_charge_power_limit": 5000,
+            "set_ess_discharge_power_limit": 0,
+        }
+    )
+    assert error is None
+    bodies = [call.kwargs["json"] for call in post_mock.call_args_list]
+    values = {body["entity_id"]: body["value"] for body in bodies}
+    assert values["input_number.ess_active_power_w"] == -1500
+    assert values["number.charge_limit"] == 5000
+    assert values["number.discharge_limit"] == 0
 
 
 @patch("integrations.ha_adapter.requests.post")

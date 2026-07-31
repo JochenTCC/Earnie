@@ -14,7 +14,7 @@
       "field": "flex.enable_name",
       "required": false,
       "kind": "stub",
-      "notes": "loxone_outputs.enable_name — SG-Ready / Freigabe (e.g. Ernie_WP_Freigabe)."
+      "notes": "loxone_outputs.enable_name — SG-Ready / Freigabe (e.g. Earnie_Waermepumpe_Freigabe)."
     }
   ],
   "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signale.md and Thermals backlog."

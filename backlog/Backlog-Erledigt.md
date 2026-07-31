@@ -3,6 +3,16 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.n Greenfield Loxone Import P1–P3 + how-to (2026-07-31)
+
+- [x] **2.4.n (partial) — Greenfield Loxone Import** — P1 naming freeze + Pattern B draft `VI_`/`VO_` under `share/loxone/templates/`; P2 `integrations/loxone_greenfield_import.py` (exact + Prefix+Slug casefold, EFM merge, HTTP probe); P3 HK onboarding → EHAL-Com **Greenfield importieren**; P4 German how-to [`docs/einrichtung/loxone-earnie-library.md`](../docs/einrichtung/loxone-earnie-library.md) + TOC/`ehal-com`/`loxone-anbindung` links. **Still open in Backlog.md:** Config-exported canonical XML packaging.
+
+
+### 2.4.o EHAL ESS active power Design C1 (2026-07-31)
+
+- [x] **2.4.o — EHAL ESS active power (Design C1)** — Portable `set_ess_active_power` (signed W); charge/discharge = true caps; `schema_version` 3; OpenEMS Equals + limits; Loxone/HA Merker/entity; greenfield `Earnie_Batterie_Sollleistung`; sticky-Merker docs (`set_ess_mode=0` = Automatik); Optimierer-Dienst ESS force-test presets via `force_write_ess_test_setpoints`; Plant VI Titles aligned; plan `.cursor/plans/ehal_ess_design_c1_*.plan.md`.
+
+
 ### 2.4.l EFM auto-sync Interpretation C (2026-07-30)
 
 - [x] **2.4.l — EFM auto-sync (interpretation C)** — Lab: LoxAPP3 Meter/EFM `nodes` + live `/jdev/sps/io/{name}` as `flex.power_name`; MCP has no `control_bind`. Research note [`docs/spec/efm-auto-sync-2.4.l.md`](../docs/spec/efm-auto-sync-2.4.l.md); HITL [`integrations/loxone_efm_meters.py`](../integrations/loxone_efm_meters.py) + [`ui/ehal_efm_import.py`](../ui/ehal_efm_import.py) on EHAL-Com; CSV still manual; enable/setpoint not from Zähler; German [`docs/ui/ehal-com.md`](../docs/ui/ehal-com.md) + [`docs/konfiguration/verbrauchs-csv.md`](../docs/konfiguration/verbrauchs-csv.md).
@@ -487,7 +497,7 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
 
 ### Bugfix EV charge while unplugged config path (2026-07-20)
 
-- [x] **EV charge while unplugged (config path)** — house-profile EV (`daily_target_source=config`) sent `Ernie_EAuto_Ziel_kW` > 0 with `eauto_plugged_in: false`; config path now sets `anticipated`/`plugged_in` like Loxone path (`optimizer/charging_context.py::_config_path_with_plugged_in`). Dump: `chart_debug_review/debug_dump_20260720_094034`; verified live
+- [x] **EV charge while unplugged (config path)** — house-profile EV (`daily_target_source=config`) sent `Earnie_EAuto_Ziel_kW` > 0 with `eauto_plugged_in: false`; config path now sets `anticipated`/`plugged_in` like Loxone path (`optimizer/charging_context.py::_config_path_with_plugged_in`). Dump: `chart_debug_review/debug_dump_20260720_094034`; verified live
 
 
 ### Bugfix Hauskonfigurator second PV select jump (2026-07-20)
@@ -670,7 +680,7 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
 
 ### Bugfix EV FertigUm ignored on config path (2026-07-17)
 
-- [x] **EV FertigUm ignored on config path** — house-profile EV (`daily_target_source=config`) kept `ready_by_hour` deadline and ignored `Ernie_EAuto_FertigUm`; later FertigUm still forced early charge (`must_start` for old deadline). Fix: `resolve_charging_context` uses `resolve_charging_deadline` (FertigUm wins, `use_time_window=False`); tests `TestConfigPathFertigUm`. Dump: `chart_debug_review/chart_debug_20260716_065036`. Live verified: changing FertigUm later while EV needs charge updates `charging_contexts.ev.deadline`; no early force-charge for the old deadline.
+- [x] **EV FertigUm ignored on config path** — house-profile EV (`daily_target_source=config`) kept `ready_by_hour` deadline and ignored `Earnie_EAuto_FertigUm`; later FertigUm still forced early charge (`must_start` for old deadline). Fix: `resolve_charging_context` uses `resolve_charging_deadline` (FertigUm wins, `use_time_window=False`); tests `TestConfigPathFertigUm`. Dump: `chart_debug_review/chart_debug_20260716_065036`. Live verified: changing FertigUm later while EV needs charge updates `charging_contexts.ev.deadline`; no early force-charge for the old deadline.
 
 
 ### Bugfix Greenfield Loxone SoC 404 (2026-07-17)
@@ -693,7 +703,7 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
 
 ### Bugfix EV charge while not connected (2026-07-17)
 
-- [x] **EV charge planned while not connected** — Earnie scheduled/sent Smart charge setpoints although the car was unplugged (`eauto_plugged_in: false` but `Ernie_EAuto_Ziel_kW` > 0). Dump: `chart_debug_review/debug_dump_20260717_105429` (config-path charging context `active` without `plugged_in`/`anticipated`). Live verified fixed.
+- [x] **EV charge planned while not connected** — Earnie scheduled/sent Smart charge setpoints although the car was unplugged (`eauto_plugged_in: false` but `Earnie_EAuto_Ziel_kW` > 0). Dump: `chart_debug_review/debug_dump_20260717_105429` (config-path charging context `active` without `plugged_in`/`anticipated`). Live verified fixed.
 
 
 ### Community pre-release 2.1.0-alpha.2 (2026-07-17)
@@ -861,9 +871,9 @@ Year-1 product depth (trust / What-If / churn). **Good-enough €** for SE and d
 - [x] **Live verification** — PV, Batterie, and Szenarieneditor fields show saved values after page navigation (prod)
 
 
-### Bugfix Loxone marker Ernie_WP_Freigabe not sent (2026-07-15)
+### Bugfix Loxone marker Earnie_WP_Freigabe not sent (2026-07-15)
 
-- [x] **Loxone marker `Ernie_WP_Freigabe` not sent anymore** — heat-pump enable output restored via house-profile `wp_heating` / `loxone_outputs.enable_name` (migration/bridge keeps marker wired); live verification confirms marker is sent again
+- [x] **Loxone marker `Earnie_WP_Freigabe` not sent anymore** — heat-pump enable output restored via house-profile `wp_heating` / `loxone_outputs.enable_name` (migration/bridge keeps marker wired); live verification confirms marker is sent again
 
 
 ### Bugfix Chart 1 generic `known` consumers (2026-07-15)
@@ -1185,7 +1195,7 @@ Backlog path **1.93 P6a** / plan **1.99** prerequisite — prod NAS already on *
 
 Backlog **1.94** — shared total meter + binary indicators (no separate Loxone heating-kW marker). Spec/docs: [swimspa-filter.md](docs/spec/swimspa-filter.md), [loxone-signale.md](docs/referenz/loxone-signale.md).
 
-- [x] **Decision documented** — keep `Ernie_Swim-Spa-P_act` (heating + filter + jets/other); filter via `homie_bwa_spa_filter*`, heating via `homie_bwa_spa_heating`; jets unmodelled residual
+- [x] **Decision documented** — keep `Earnie_Swim-Spa-P_act` (heating + filter + jets/other); filter via `homie_bwa_spa_filter*`, heating via `homie_bwa_spa_heating`; jets unmodelled residual
 - [x] **Live wiring** — `thermal_control.loxone.heating_active_name`, `fetch_thermal_readings`, thermal observability (`readings_kw.heating`), `verify_loxone_setup`; `patch_swimspa_filter_config` idempotent for heating indicator
 - [x] **Historical calibration** — `data/thermal_power.py`; `tune_thermal_model` / backtest prefer `heating_active_csv` (+ optional `filter_active_csv`); threshold fallback when indicator CSVs absent
 - [x] **Config/schema/docs** — `config.example.json`, `config.schema.json`, `flexible-verbraucher.md`
@@ -1472,7 +1482,7 @@ Completes entity-catalog split from 1.26.0 / 1.93 P2: `batteries[]` and `pv_syst
 
 ### Earnie rename (2026-07-11)
 
-- [x] **Version 1.93 — branding** — UI/docs Ernie→Earnie; Loxone signal names (`Ernie_`*) unchanged in production config
+- [x] **Version 1.93 — branding** — UI/docs Ernie→Earnie; Loxone signal names (`Earnie_`*) unchanged in production config
 - [x] **Packaging** — `pyproject` package `earnie`; CLI `earnie-`* with legacy `ernie-`* aliases
 - [x] **Env vars** — canonical `EARNIE_`* with `ENERGY_OPTIMIZER_`* fallback (`runtime_store/env_vars.py`)
 - [x] **Docker** — `ghcr.io/jochentcc/earnie-energy` image and `earnie-`* container names; dual-tag transition (`ernie-energy` alias)
@@ -2022,7 +2032,7 @@ Spec: [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md). Goal: cost-opt
 - [x] **Code phases 1–4** — `loxone_remaining_hours`, `filter_context`/MILP blocking, schema/`config.example.json`/docs, live parser + `verify_swimspa_filter_live` / `patch_swimspa_filter_config`
 - [x] **Live acceptance (user)** — prod `config.json` patched; formats `filter1hour` and `Sollstunden` confirmed on miniserver
 - [x] **Deviation rules SwimSpa filter (S8–S10)** — `swimspa_filter_should_run_missing`, `swimspa_filter_runs_unexpectedly` (only outside native window), `swimspa_filter_over_nominal`; new predicates `power_ist_without_soll`, `slot_outside_native_filter_window`, `ist_power_above_nominal`; native window logged as `filter_contexts` in `optimization_history.jsonl`
-- [x] **Actual power heating/filtering checked separately + case B corrected** — separate Loxone markers/keys/charts confirmed; heating meter `Ernie_Swim-Spa-P_act` measures incl. filter → `subtract_consumer_ids` subtracts filter share from heating actual (no double counting in `flex_sum_kw`/`baseload_kw`); `patch_swimspa_filter_config` extended idempotently. Follow-up (historical logs / Loxone separation) as separate 1.+1 item
+- [x] **Actual power heating/filtering checked separately + case B corrected** — separate Loxone markers/keys/charts confirmed; heating meter `Earnie_Swim-Spa-P_act` measures incl. filter → `subtract_consumer_ids` subtracts filter share from heating actual (no double counting in `flex_sum_kw`/`baseload_kw`); `patch_swimspa_filter_config` extended idempotently. Follow-up (historical logs / Loxone separation) as separate 1.+1 item
 - [x] **Version 1.20.0** — minor bump
 
 
@@ -2121,7 +2131,7 @@ Spec: [docs/spec/swimspa-filter.md](docs/spec/swimspa-filter.md). Goal: cost-opt
 ### Bugfixes: test fixtures & heat pump (2026-07-06)
 
 - [x] **Test data executable on fresh checkout** — prod dump fixtures added (`.gitignore` exceptions, `scripts/complete_prod_dump_fixtures.py`), thermal CSV fixtures (`tests/fixtures/thermal/`), smoke tests on `tests/fixtures/historical/cons_data_hourly.csv`; **551 passed** (commit `71a4764`)
-- [x] **Heat pump restored in** `config.json` — entry `flexible_consumers[id=waermepumpe]` from production backup (`config_back.json`, commit `3b7fa1c`): `Ernie_WP_Freigabe`, `Ernie_WP_P_act`, historical daily target, `chart_color` `#ff9800`; also `config.example.json`
+- [x] **Heat pump restored in** `config.json` — entry `flexible_consumers[id=waermepumpe]` from production backup (`config_back.json`, commit `3b7fa1c`): `Earnie_WP_Freigabe`, `Earnie_WP_P_act`, historical daily target, `chart_color` `#ff9800`; also `config.example.json`
 - [x] **Target/actual notice: heat pump did not start** — rule `waermepumpe_enable_no_start` (category notice), docs/scenario S5, seed script and tests
 
 

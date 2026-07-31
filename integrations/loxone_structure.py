@@ -1,7 +1,7 @@
-"""Miniserver structure scan for Loxone → EHAL mapping (2.4.f).
+"""Miniserver structure scan for Loxone → EHAL mapping (2.4.f / 2.4.n).
 
-Research mode (default): run LoxAPP3 + optional MCP 17.1 and compare results.
-HTTP marker probe was dropped (only re-validates already-mapped names).
+Research mode (default): LoxAPP3 + HTTP marker probe (known Earnie_* / configured
+names via ``/jdev/sps/io``) + optional MCP 17.1, then compare results.
 A single preferred source may be selected later once lab data decides the winner.
 """
 from __future__ import annotations
@@ -24,11 +24,12 @@ from integrations.loxone_mcp_oauth import (
 logger = logging.getLogger(__name__)
 
 SOURCE_LOXAPP3 = "loxapp3"
+SOURCE_HTTP_PROBE = "http_probe"
 SOURCE_MCP17 = "mcp17"
 SOURCE_UNION = "union"
 SOURCE_NONE = "none"
 
-ALL_SOURCES = (SOURCE_LOXAPP3, SOURCE_MCP17)
+ALL_SOURCES = (SOURCE_LOXAPP3, SOURCE_HTTP_PROBE, SOURCE_MCP17)
 
 
 @dataclass(frozen=True)
@@ -1163,6 +1164,98 @@ def _union_items(variants: Iterable[StructureScanResult]) -> list[StructureItem]
     return merged
 
 
+def _http_probe_candidate_names(
+    configured_names: list[str] | None,
+    *,
+    extra_names: list[str] | None = None,
+) -> list[str]:
+    """Device-map Earnie_* names, configured bindings, plus optional LoxAPP3 Earnie_*."""
+    from integrations.loxone_greenfield_import import (
+        device_map_marker_names,
+        load_device_map,
+    )
+
+    names: list[str] = []
+    seen: set[str] = set()
+
+    def _add(raw: str) -> None:
+        name = str(raw or "").strip()
+        if not name:
+            return
+        key = name.casefold()
+        if key in seen:
+            return
+        seen.add(key)
+        names.append(name)
+
+    try:
+        for name in device_map_marker_names(load_device_map()):
+            _add(name)
+    except (OSError, ValueError, FileNotFoundError) as exc:
+        logger.info("HTTP probe: device map unavailable: %s", exc)
+    for raw in configured_names or []:
+        _add(str(raw))
+    for raw in extra_names or []:
+        _add(str(raw))
+    return names
+
+
+def probe_http_markers(
+    *,
+    host: str,
+    username: str,
+    password: str,
+    configured_names: list[str] | None = None,
+    extra_names: list[str] | None = None,
+    timeout_sec: float = 5.0,
+) -> StructureScanResult:
+    """Probe known Merker names via /jdev/sps/io (200/403 = present, 404 = missing)."""
+    from integrations.loxone_greenfield_import import probe_marker_names
+
+    names = _http_probe_candidate_names(configured_names, extra_names=extra_names)
+    if not names:
+        return StructureScanResult(
+            source=SOURCE_HTTP_PROBE,
+            structure_complete=False,
+            skipped=True,
+            errors=["HTTP probe: no device-map or configured names to probe"],
+        )
+    try:
+        result = probe_marker_names(
+            names,
+            host=host,
+            username=username,
+            password=password,
+            timeout_sec=timeout_sec,
+        )
+    except ValueError as exc:
+        return StructureScanResult(
+            source=SOURCE_HTTP_PROBE,
+            structure_complete=False,
+            errors=[str(exc)],
+        )
+    items = [
+        StructureItem(name=name, type="http_probe", source=SOURCE_HTTP_PROBE)
+        for name in sorted(result.present)
+    ]
+    errors: list[str] = []
+    if result.missing:
+        sample = ", ".join(sorted(result.missing)[:8])
+        more = len(result.missing) - min(8, len(result.missing))
+        suffix = f" (+{more})" if more else ""
+        errors.append(f"HTTP probe missing (404): {sample}{suffix}")
+    if result.errors:
+        errors.append(
+            "HTTP probe errors: " + ", ".join(sorted(result.errors)[:6])
+        )
+    return StructureScanResult(
+        source=SOURCE_HTTP_PROBE,
+        structure_complete=bool(items),
+        items=items,
+        errors=errors,
+    )
+
+
 def scan_structure(
     *,
     host: str,
@@ -1176,10 +1269,9 @@ def scan_structure(
 ) -> StructureCompareResult:
     """Probe structure sources and return a comparison (default: all variants).
 
-    Default variants: LoxAPP3.json and optional MCP 17.1 (HTTP marker probe
-    dropped — only re-validates already-mapped names, useless for one-click).
-    ``selected_source`` only affects which item set feeds mapping dropdowns
-    (``union`` = merge all names).
+    Default variants: LoxAPP3.json, HTTP probe of known greenfield / configured
+    Merker names, and optional MCP 17.1. ``selected_source`` only affects which
+    item set feeds mapping dropdowns (``union`` = merge all names).
     """
     wanted = tuple(sources) if sources is not None else ALL_SOURCES
     variants: list[StructureScanResult] = []
@@ -1191,6 +1283,27 @@ def scan_structure(
                 username=username,
                 password=password,
                 timeout_sec=timeout_sec,
+            )
+        )
+
+    if SOURCE_HTTP_PROBE in wanted:
+        loxapp3_for_probe = next(
+            (v for v in variants if v.source == SOURCE_LOXAPP3 and v.ok),
+            None,
+        )
+        earnie_from_loxapp3 = [
+            item.name
+            for item in (loxapp3_for_probe.items if loxapp3_for_probe else [])
+            if str(item.name or "").casefold().startswith("earnie_")
+        ]
+        variants.append(
+            probe_http_markers(
+                host=host,
+                username=username,
+                password=password,
+                configured_names=configured_names or [],
+                extra_names=earnie_from_loxapp3,
+                timeout_sec=min(timeout_sec, 5.0),
             )
         )
 

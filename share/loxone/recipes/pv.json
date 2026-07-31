@@ -1,12 +1,12 @@
 {
   "role_id": "pv",
   "label": "PV",
-  "baustein_notes": "Prefer EFM Production Zähler Bezeichnung. Recipe name Ernie_PV_Leistung is the greenfield fallback Merker.",
+  "baustein_notes": "Prefer EFM Production Zähler Bezeichnung. Recipe name Earnie_PV_Leistung is the greenfield fallback Merker.",
   "recommended_markers": [
     {
       "ehal_field": "sens_pv_production_active",
       "loxone_blocks_key": "pv_power_name",
-      "suggested_name": "Ernie_PV_Leistung",
+      "suggested_name": "Earnie_PV_Leistung",
       "notes": "kW production ≥ 0 → EHAL W."
     }
   ],

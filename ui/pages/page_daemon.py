@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+import config
 from runtime_store import run_state
 from runtime_store.main_daemon import (
     DaemonError,
@@ -16,7 +17,9 @@ from ui.help_hint import render_page_title_with_help
 
 _HELP = (
     "Startet, stoppt oder startet den Hintergrunddienst `main.py` neu. "
-    "Nur dieser Dienst schreibt Steuerwerte an Loxone. "
+    "Produktions-Steuerwerte schreibt nur der laufende Dienst. "
+    "Bei gestopptem Dienst können hier manuelle ESS-Test-Sollwerte "
+    "an Loxone/HA/OpenEMS gesendet werden. "
     "Vor dem Start wird geprüft, ob bereits eine Instanz läuft (`runtime/main.lock`)."
 )
 
@@ -25,6 +28,13 @@ _STATE_LABELS = {
     "stopped": "gestoppt",
     "unknown": "unbekannt",
 }
+
+_ESS_TEST_PRESETS = (
+    ("Automatik", 0),
+    ("Zwangsladen", 1),
+    ("Entladesperre", 2),
+    ("Zwangsentladen", 3),
+)
 
 
 def _format_last_run() -> str:
@@ -55,6 +65,57 @@ def _render_status(daemon: DaemonStatus) -> None:
     )
 
 
+def _battery_max_kw() -> float:
+    return float(config.get_battery_params().get("max_power_kw") or 0.0)
+
+
+def _render_ess_test_section(daemon: DaemonStatus) -> None:
+    from integrations.ehal_live import force_write_ess_test_setpoints
+
+    st.subheader("ESS-Schnittstelle testen")
+    st.caption(
+        "Sendet Design-C1-Sollwerte (Modus + Grenzen / Sollleistung) über denselben "
+        "Pfad wie `main.py`. Nur bei gestopptem Optimierer-Dienst."
+    )
+    max_kw = _battery_max_kw()
+    input_max = max_kw if max_kw > 0 else 50.0
+    default = min(1.0, input_max) if input_max > 0 else 1.0
+    target_kw = st.number_input(
+        "Zielleistung (kW)",
+        min_value=0.0,
+        max_value=float(input_max),
+        value=float(default),
+        step=0.1,
+        key="daemon_ess_test_target_kw",
+        help="Magnitude; Vorzeichen kommt aus dem Modus (Laden − / Entladen +).",
+    )
+    daemon_ok = daemon.state == "stopped"
+    if not daemon_ok:
+        st.info("Zum Testen den Optimierer-Dienst zuerst stoppen.")
+    cols = st.columns(len(_ESS_TEST_PRESETS))
+    clicked_mode: int | None = None
+    for col, (label, mode) in zip(cols, _ESS_TEST_PRESETS):
+        with col:
+            if st.button(
+                label,
+                disabled=not daemon_ok,
+                width="stretch",
+                key=f"daemon_ess_test_mode_{mode}",
+            ):
+                clicked_mode = mode
+    if clicked_mode is None:
+        return
+    err, records, backend = force_write_ess_test_setpoints(
+        clicked_mode, float(target_kw), max_power_kw=max_kw if max_kw > 0 else None
+    )
+    if err:
+        st.error(f"{backend}: {err}")
+    else:
+        st.success(f"{backend}: ESS-Test-Sollwerte gesendet (Modus {clicked_mode}).")
+    if records:
+        st.dataframe(records, width="stretch", hide_index=True)
+
+
 def render() -> None:
     render_page_title_with_help(
         "🛠️ Optimierer-Dienst",
@@ -64,7 +125,7 @@ def render() -> None:
     )
     st.caption(
         "Lebenszyklus von `main.py` (Start / Stop / Neustart). "
-        "Keine Loxone-Schreibvorgänge von dieser Seite."
+        "Manuelle ESS-Test-Schreibvorgänge nur bei gestopptem Dienst."
     )
 
     from integrations.ehal_live import load_write_error
@@ -121,3 +182,6 @@ def render() -> None:
             st.rerun()
     except DaemonError as exc:
         st.error(str(exc))
+
+    st.divider()
+    _render_ess_test_section(daemon)

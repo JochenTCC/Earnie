@@ -9,12 +9,14 @@ import pytest
 import requests
 
 from integrations.loxone_structure import (
+    SOURCE_HTTP_PROBE,
     SOURCE_LOXAPP3,
     SOURCE_MCP17,
     SOURCE_UNION,
     LoxoneStructureError,
     _extract_controls,
     normalize_loxapp3,
+    probe_http_markers,
     probe_mcp17,
     scan_structure,
 )
@@ -43,7 +45,8 @@ def test_normalize_loxapp3_rejects_bad_root():
 @patch("integrations.loxone_structure.obtain_access_token")
 @patch("integrations.loxone_structure.requests.post")
 @patch("integrations.loxone_structure.requests.get")
-def test_scan_structure_runs_all_variants(get_mock, post_mock, token_mock):
+@patch("integrations.loxone_greenfield_import.requests.get")
+def test_scan_structure_runs_all_variants(probe_get, get_mock, post_mock, token_mock):
     doc = json.loads(_FIXTURE.read_text(encoding="utf-8"))
     get_response = MagicMock()
     get_response.status_code = 200
@@ -59,6 +62,22 @@ def test_scan_structure_runs_all_variants(get_mock, post_mock, token_mock):
     }
     post_mock.return_value = post_response
 
+    def _probe_side_effect(url, auth=None, timeout=5.0):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.content = b"{}"
+        name = url.rsplit("/", 1)[-1]
+        if name in {"PV_Leistung_kW", "Earnie_Waermepumpe_Freigabe"}:
+            resp.json.return_value = {"LL": {"Code": "200", "value": "1"}}
+        elif "Earnie_" in name:
+            resp.json.return_value = {"LL": {"Code": "403", "value": ""}}
+        else:
+            resp.status_code = 404
+            resp.json.return_value = {"LL": {"Code": "404", "value": ""}}
+        return resp
+
+    probe_get.side_effect = _probe_side_effect
+
     result = scan_structure(
         host="192.168.1.10",
         username="user",
@@ -67,21 +86,36 @@ def test_scan_structure_runs_all_variants(get_mock, post_mock, token_mock):
         mcp_base_url="http://127.0.0.1:9000",
     )
     sources = [v.source for v in result.variants]
-    assert sources == [SOURCE_LOXAPP3, SOURCE_MCP17]
+    assert sources == [SOURCE_LOXAPP3, SOURCE_HTTP_PROBE, SOURCE_MCP17]
     assert result.variant(SOURCE_LOXAPP3).ok
+    assert result.variant(SOURCE_HTTP_PROBE).ok
+    assert "Earnie_Waermepumpe_Freigabe" in {i.name for i in result.variant(SOURCE_HTTP_PROBE).items}
     assert result.variant(SOURCE_MCP17).mcp_tools == ["weather_forecast"]
     post_kwargs = post_mock.call_args.kwargs
     assert post_kwargs["headers"]["Authorization"] == "Bearer token-123"
     union_names = {item.name for item in result.mapping_items(use_source=SOURCE_UNION)}
     assert "PV_Leistung_kW" in union_names
     assert "Netz_Leistung" in union_names
+    assert "Earnie_Waermepumpe_Freigabe" in union_names
     rows = result.comparison_rows()
-    assert len(rows) == 2
+    assert len(rows) == 3
 
 
+@patch("integrations.loxone_greenfield_import.requests.get")
 @patch("integrations.loxone_structure.requests.get")
-def test_scan_structure_records_loxapp3_failure_still_runs_mcp(get_mock):
+def test_scan_structure_records_loxapp3_failure_still_runs_probe_and_mcp(
+    get_mock, probe_get
+):
     get_mock.side_effect = requests.ConnectionError("down")
+
+    def _probe_side_effect(url, auth=None, timeout=5.0):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.content = b"{}"
+        resp.json.return_value = {"LL": {"Code": "403", "value": ""}}
+        return resp
+
+    probe_get.side_effect = _probe_side_effect
     result = scan_structure(
         host="192.168.1.10",
         username="user",
@@ -90,8 +124,37 @@ def test_scan_structure_records_loxapp3_failure_still_runs_mcp(get_mock):
         mcp_base_url="",
     )
     assert not result.variant(SOURCE_LOXAPP3).ok
+    assert result.variant(SOURCE_HTTP_PROBE).ok
     assert result.variant(SOURCE_MCP17).skipped
-    assert result.mapping_items() == []
+    assert "PV_Leistung_kW" in {i.name for i in result.mapping_items()}
+
+
+@patch("integrations.loxone_greenfield_import.requests.get")
+def test_probe_http_markers_403_counts_as_present(probe_get):
+    def _probe_side_effect(url, auth=None, timeout=5.0):
+        resp = MagicMock()
+        resp.content = b"{}"
+        if "missing" in url:
+            resp.status_code = 404
+            resp.json.return_value = {"LL": {"Code": "404", "value": ""}}
+        else:
+            resp.status_code = 200
+            resp.json.return_value = {"LL": {"Code": "403", "value": ""}}
+        return resp
+
+    probe_get.side_effect = _probe_side_effect
+    result = probe_http_markers(
+        host="192.168.1.10",
+        username="u",
+        password="p",
+        configured_names=["Earnie_Waermepumpe_Freigabe", "missing_marker"],
+    )
+    assert result.source == SOURCE_HTTP_PROBE
+    assert result.ok
+    names = {i.name for i in result.items}
+    assert "Earnie_Waermepumpe_Freigabe" in names
+    assert "missing_marker" not in names
+    assert any("missing" in err for err in result.errors)
 
 
 @patch("integrations.loxone_structure.obtain_access_token")

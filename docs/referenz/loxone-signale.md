@@ -1,10 +1,69 @@
 # Loxone-Signale — Referenz
 
-Für **Greenfield / Earnie-Library (2.4.n)** gelten die **gefrorenen** Merkernamen in [`share/loxone/greenfield_device_map.json`](../../share/loxone/greenfield_device_map.json) und [`share/loxone/recipes/`](../../share/loxone/recipes/) (z. B. `Ernie_WP_P_act`, `Ernie_Batterie_SoC`). Bestehende Anlagen dürfen abweichende Bezeichnungen behalten — in `ehal_bindings` muss die Adresse exakt dem Miniserver-Namen entsprechen.
+Für **Greenfield / Earnie-Library (2.4.n)** gelten die **gefrorenen** Merkernamen in [`share/loxone/greenfield_device_map.json`](../../share/loxone/greenfield_device_map.json) und [`share/loxone/recipes/`](../../share/loxone/recipes/) (z. B. `Earnie_Waermepumpe_Leistung`, `Earnie_Batterie_SoC`). Bestehende Anlagen dürfen abweichende Bezeichnungen behalten — in `ehal_bindings` muss die Adresse exakt dem Miniserver-Namen entsprechen.
 
-**Begriffsklärung (Smarthome-Merker):** Die **Adresse** (Zeichenkette, z. B. `Ernie_WP_P_act`) ist ein *Smarthome-Merker*. Die **Rolle** ist der EHAL-Feldname (`sens_ess_soc`, `flex.power_name`, …) in `ehal_bindings`. Live-Backend bleibt vorerst Loxone-HTTP; Legacy-Schlüssel `loxone_*` / `*.loxone` können nach Migration noch dual-gelesen werden. Nicht verwechseln mit Chart-Markern oder `earnie_role` (Bekannt/Gesteuert/Manuell).
+**Begriffsklärung (Smarthome-Merker):** Die **Adresse** (Zeichenkette, z. B. `Earnie_Waermepumpe_Freigabe`) ist ein *Smarthome-Merker*. Die **Rolle** ist der EHAL-Feldname (`sens_ess_soc`, `flex.power_name`, …) in `ehal_bindings`. Live-Backend bleibt vorerst Loxone-HTTP; Legacy-Schlüssel `loxone_*` / `*.loxone` können nach Migration noch dual-gelesen werden. Nicht verwechseln mit Chart-Markern oder `earnie_role` (Bekannt/Gesteuert/Manuell).
 
-**Pattern B (Library):** Virtual HTTP In pollt Earnie (Heartbeat + Sollwerte) → benannte Merker; Earnie Core schreibt parallel weiter per `/jdev/sps/io/{name}`. Entwürfe: [`share/loxone/templates/`](../../share/loxone/templates/).
+**Pattern B (Library):** **VI** = Earnie→Loxone (`set_*` / Freigaben / Sollwerte, Heartbeat). **VO** = optional Loxone→Earnie Push von `sens_*` / `get_*` / Flex-Leistung (Platzhalter-URLs). Core liest weiterhin `/jdev/sps/io/{name}`. Entwürfe: [`share/loxone/templates/`](../../share/loxone/templates/).
+
+### Drei Schichten (Title / Check / VO-Pfad)
+
+| Schicht | Wo | Beispiel Flex | Beispiel EV |
+|--------|-----|---------------|-------------|
+| **Miniserver-Title** | Cmd Title (jdev / Import) | `Earnie_Verbraucher_Waschmaschine_Freigabe` | `Earnie_EAuto_Garage_Soll_A` |
+| **VI Check / Status-JSON** | Virtual In Check-Muster | `flex.{hk_id}.Earnie_Verbraucher_Freigabe` | `ev.{ev_id}.Earnie_EAuto_Soll_A` |
+| **VO Befehl bei Ein** | Virtual Out URL | `/ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/\v` | `/ehal/loxone/telemetry/ev.{ev_id}.sens_evcs_soc_act/\v` |
+
+`{hk_id}` / `{ev_id}` = Hausprofil-Entity-`id` (snake_case). Templates lassen die Platzhalter stehen — in Config ersetzen.
+
+### HTTP-Marker-Probe (Greenfield, ohne Visualisierung)
+
+Die Template-Cmd-Titel sind **bekannt** (`greenfield_device_map.json`). Earnie kann sie per `GET /jdev/sps/io/{Name}` prüfen, **ohne** dass die Bausteine in der App-Visualisierung / `LoxAPP3.json` stehen:
+
+| `LL.Code` | Bedeutung für den Import |
+|-----------|---------------------------|
+| `200` | Name vorhanden und lesbar |
+| `403` | Name auf dem Miniserver bekannt, für den User nicht lesbar (häufig bei Virtual HTTP In) — zählt als **vorhanden** |
+| `404` | Name unbekannt / nicht hochgeladen |
+
+Greenfield-Import: LoxAPP3-Namen **union** Probe-Treffer. EFM-Zähler weiterhin aus `LoxAPP3.json`.
+
+### Mehrere Flex-Verbraucher (Namenskonvention)
+
+Ein Template `VI_Earnie_Consumer` / `VO_Earnie_Consumer` deckt **einen** Verbraucher ab. Miniserver-Bezeichnungen müssen eindeutig sein. Der Hausprofil-`id` (klein, snake_case, z. B. `waschmaschine`) ist der kanonische **Entity-Slug** (`{hk_id}`).
+
+| Signal | Merker-Title (1. / weitere) | VI Check / VO-Pfad |
+|--------|-----------------------------|--------------------|
+| Leistung | `Earnie_Verbraucher_Leistung` → `Earnie_Verbraucher_<Slug>_Leistung` | VO: `flex.{hk_id}.sens_power_act` |
+| Freigabe | `Earnie_Verbraucher_Freigabe` → `…_<Slug>_Freigabe` | Check: `flex.{hk_id}.Earnie_Verbraucher_Freigabe` |
+| Ziel kW | `Earnie_Verbraucher_Ziel_kW` → `…_<Slug>_Ziel_kW` | Check: `flex.{hk_id}.Earnie_Verbraucher_Ziel_kW` |
+
+**Beispiel Waschmaschine** (`id` = `waschmaschine`):
+
+- Title: `Earnie_Verbraucher_Waschmaschine_Leistung`
+- VO Befehl bei Ein: `/ehal/loxone/telemetry/flex.waschmaschine.sens_power_act/\v`
+- VI Check (Freigabe): `"flex.waschmaschine.Earnie_Verbraucher_Freigabe":\v` (Title bleibt `Earnie_Verbraucher_Waschmaschine_Freigabe`)
+- EHAL-Com Binding: `flex.power_name` → Title (Entity steckt in `{hk_id}`)
+
+**`<Slug>` im Merker:** kurzer stabiler Token (z. B. `Waschmaschine`). **`{hk_id}`:** gleicher Consumer wie im Hausprofil.
+
+### Mehrere E-Autos (Namenskonvention)
+
+Analog: Prefix `Earnie_EAuto_`, Entity-`id` = `{ev_id}` (z. B. `eauto`, `garage`).
+
+| Signal | Merker-Title (1. / weitere) | VI Check / VO-Pfad |
+|--------|-----------------------------|--------------------|
+| Soll A | `Earnie_EAuto_Soll_A` → `Earnie_EAuto_<Slug>_Soll_A` | Check: `ev.{ev_id}.Earnie_EAuto_Soll_A` |
+| Modus | `Earnie_EAuto_Modus` → `…_<Slug>_Modus` | Check: `ev.{ev_id}.Earnie_EAuto_Modus` |
+| Leistung | `Earnie_EAuto_Leistung` → `…_<Slug>_Leistung` | VO: `ev.{ev_id}.sens_evcs_active_power` |
+| weitere sens/get | `Earnie_EAuto_*` → `…_<Slug>_*` | VO: `ev.{ev_id}.<ehal_field>` |
+
+Wärmepumpe: Titles `Earnie_Waermepumpe_Leistung` / `Earnie_Waermepumpe_Freigabe` (Legacy `Earnie_WP_*`); VO/Check mit `flex.{hk_id}` (Default-`id` oft `waermepumpe` / `wp_heating`). Pool: `flex.pool.sens_power_act` bzw. `{hk_id}`.
+
+**Import:** Greenfield matcht **case-insensitive** exakte Template-Namen und **Prefix+Slug**
+(z. B. `Earnie_Verbraucher_Waschmaschine_Leistung` → Consumer `waschmaschine`; `Earnie_EAuto_Garage_Soll_A` → EV `garage`). Bindings behalten die Miniserver-Schreibweise.
+
+In Config: Template einfügen → Cmd-Titles + VO-Pfad `{id}` setzen → auf Miniserver speichern. Details: [`share/loxone/templates/README.md`](../../share/loxone/templates/README.md).
 
 Prüfung aller konfigurierten Signale:
 
@@ -17,11 +76,12 @@ Prüfung aller konfigurierten Signale:
 
 | Entity / Bereich | Speicherort | Typische EHAL-Felder / Rollen |
 |------------------|-------------|-------------------------------|
-| Anlage (Batterie, PV, Netz, Steuerbefehl, Hauslast) | `house_profiles.json` → `plant.ehal_bindings` | `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_power_consumers`, `set_ess_*` |
+| Anlage (Batterie, PV, Netz, Steuerbefehl, Hauslast, Außentemperatur) | `house_profiles.json` → `plant.ehal_bindings` | `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_power_consumers`, `set_ess_*` |
 | Event-Trigger (Anlage) | `house_profiles.json` → `plant.event_triggers[]` | `ehal_field` (+ `signal_type`, `on_change`, `label`); Adresse aus Binding |
 | Event-Trigger (Verbraucher) | `consumers[].event_triggers[]` | gleiches Schema, Scope = Consumer-Entity |
 | Wärmepumpe / Flex / Thermal | `consumers[].ehal_bindings` | `flex.power_name`, `flex.enable_name`, `flex.power_setpoint_name` |
 | E-Auto (`ev`) | `consumers[].ehal_bindings` | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*` |
+| Pool / SwimSpa | `consumers[].ehal_bindings` + Filter-Entity | siehe Greenfield `Earnie_Pool_*` / C.6 |
 
 Bearbeitung in der UI: **nur** unter **Daemon Control → EHAL-Com → Loxone Struktur → EHAL Mapping** (Entity wählen). Der Hauskonfigurator editiert keine Merker-Adressen mehr.
 
@@ -31,18 +91,21 @@ Greenfield-Namen (2.4.n). Bestehende Prod-Namen (z. B. `B004-Battery_SOC`) ble
 
 | EHAL-Feld | Richtung | Greenfield-Name | Wert / Einheit |
 |-----------|----------|-----------------|----------------|
-| `sens_ess_soc` | Lesen | `Ernie_Batterie_SoC` | Batterie-SOC, % |
-| `sens_pv_production_active` | Lesen | `Ernie_PV_Leistung` (oder EFM Production) | PV-Leistung, kW |
-| `sens_ess_power` | Lesen | `Ernie_Batterie_Leistung` (oder EFM Storage) | Batterie; EHAL: +Entladung |
-| `sens_grid_power_active` | Lesen | `Ernie_Netzleistung` (oder EFM Grid) | Netz: +Bezug, kW |
+| `sens_ess_soc` | Lesen | `Earnie_Batterie_SoC` | Batterie-SOC, % |
+| `sens_pv_production_active` | Lesen | `Earnie_PV_Leistung` (oder EFM Production) | PV-Leistung, kW |
+| `sens_ess_power` | Lesen | `Earnie_Batterie_Leistung` (oder EFM Storage) | Batterie; EHAL: +Entladung |
+| `sens_grid_power_active` | Lesen | `Earnie_Netzleistung` (oder EFM Grid) | Netz: +Bezug, kW |
 | `sens_power_consumers` | Lesen | (optional) | Hauslast; sonst Ableitung |
-| `set_ess_active_power` | Schreiben | `Ernie_Batterie_Sollleistung` | Forced Leistung, kW; `+` Entladung, `−` Ladung |
-| `set_ess_charge_power_limit` | Schreiben | `Ernie_Ladegrenze` | Max. Ladeleistung (echte Grenze) |
-| `set_ess_discharge_power_limit` | Schreiben | `Ernie_Entladegrenze` | Max. Entladeleistung (echte Grenze) |
-| `set_ess_mode` | Schreiben | `Ernie_Steuerbefehl` | Modus-Hinweis (Huawei); OpenEMS ignoriert |
-| *(Watchdog)* | Lesen | `Ernie_Heartbeat` | Pattern B; kein EHAL-Feld |
+| `sens_temperature_outside` | Lesen | `Earnie_Aussentemperatur` | Außentemperatur °C (hausweit; WP/Pool) |
+| `set_ess_active_power` | Schreiben | `Earnie_Batterie_Sollleistung` | Forced Leistung, kW; `+` Entladung, `−` Ladung |
+| `set_ess_charge_power_limit` | Schreiben | `Earnie_LadeLeistungs-Limit` | Max. Ladeleistung (echte Grenze) |
+| `set_ess_discharge_power_limit` | Schreiben | `Earnie_EntladeLeistungs-Limit` | Max. Entladeleistung (echte Grenze) |
+| `set_ess_mode` | Schreiben | `Earnie_Steuerbefehl` | Sticky: immer schreiben; `0` = Automatik (Sollleistung ignorieren); OpenEMS ignoriert |
+| *(Watchdog)* | Lesen | `Earnie_Heartbeat` | Pattern B; kein EHAL-Feld |
 
 Legacy-Rollenamen (`soc_name`, `pv_power_name`, …) in `loxone_blocks` werden beim Migrate nach `plant.ehal_bindings` übernommen und danach aus der Config entfernt (leeres `loxone_blocks` entfällt; **2.4.m**).
+
+**Sticky Merker:** Loxone behält den zuletzt geschriebenen Wert. Automatik ist **`set_ess_mode = 0`** — Config darf Sollleistung bei Modus 0 nicht anwenden, auch wenn `Earnie_Batterie_Sollleistung` noch einen alten Wert hält.
 
 ## Flexible Verbraucher — `ehal_bindings` am Consumer
 
@@ -52,27 +115,27 @@ Live-Steuerung kommt aus dem aktiven Hausprofil (`house_profiles.json`). Nach Cu
 
 | EHAL-Feld | Richtung | Greenfield / Beispiel | Wert |
 |-----------|----------|------------------------|------|
-| `flex.power_name` | Lesen | WP: `Ernie_WP_P_act`; Generic: `Ernie_Verbraucher_Leistung`; oder EFM Load | kW oder 0/1 |
-| `flex.enable_name` | Schreiben | WP: `Ernie_WP_Freigabe`; Generic: `Ernie_Verbraucher_Freigabe` | `0`/`1` |
-| `flex.power_setpoint_name` | Schreiben | `Ernie_Verbraucher_Ziel_kW` (optional) | kW-Sollwert |
+| `flex.power_name` | Lesen | WP: `Earnie_Waermepumpe_Leistung` (Legacy `Earnie_WP_P_act`); Generic: `Earnie_Verbraucher_Leistung`; oder EFM Load | kW oder 0/1 |
+| `flex.enable_name` | Schreiben | WP: `Earnie_Waermepumpe_Freigabe` (Legacy `Earnie_WP_Freigabe`); Generic: `Earnie_Verbraucher_Freigabe` | `0`/`1` |
+| `flex.power_setpoint_name` | Schreiben | `Earnie_Verbraucher_Ziel_kW` (optional) | kW-Sollwert |
 
-SwimSpa u. Ä. behalten projektspezifische Namen (z. B. `Ernie_SwimSpa_Freigabe`), sofern in `ehal_bindings` gesetzt.
+SwimSpa u. Ä. behalten projektspezifische Namen (z. B. `Earnie_SwimSpa_Freigabe`), sofern in `ehal_bindings` gesetzt.
 
-### E-Auto (Prefix `Ernie_EAuto_`)
+### E-Auto (Prefix `Earnie_EAuto_`)
 
 | EHAL-Feld | Richtung | Greenfield-Name | Wert |
 |-----------|----------|-----------------|------|
-| `flex.power_name` | Lesen | `Ernie_EAuto_P_act` (oder EFM Load) | kW |
-| `sens_evcs_connected` | Lesen | `Ernie_EAuto_Angeschlossen` | `1` = angeschlossen |
-| `sens_evcs_soc_act` | Lesen | `Ernie_EAuto_SOC` | Aktueller SOC, % |
-| `sens_evcs_bat_capacity` | Lesen | `Ernie_EAuto_Kapazitaet` | kWh |
-| `get_evcs_nominal_current` | Lesen | `Ernie_EAuto_MaxStrom` | A |
-| `get_evcs_ready_by_time` | Lesen | `Ernie_EAuto_FertigUm` | Text / Uhrzeit |
-| `get_evcs_limit_soc` | Lesen | (optional) | Ladeziel-SOC % |
-| `set_evcs_max_current` | Schreiben | `Ernie_EAuto_Soll_A` | Soll-/Maxstrom A |
-| `set_evcs_mode` | Schreiben | `Ernie_EAuto_Modus` | `pv` \| `now` |
+| `sens_evcs_active_power` | Lesen | `Earnie_EAuto_Leistung` (Legacy `Earnie_EAuto_P_act`; oder EFM Load; dual `flex.power_name`) | kW |
+| `sens_evcs_connected` | Lesen | `Earnie_EAuto_Angeschlossen` | `1` = angeschlossen |
+| `sens_evcs_soc_act` | Lesen | `Earnie_EAuto_SOC` | Aktueller SOC, % |
+| `sens_evcs_bat_capacity` | Lesen | `Earnie_EAuto_Kapazitaet` | kWh |
+| `get_evcs_nominal_current` | Lesen | `Earnie_EAuto_MaxStrom` | A |
+| `get_evcs_ready_by_time` | Lesen | `Earnie_EAuto_FertigUm` | Text / Uhrzeit |
+| `get_evcs_limit_soc` | Lesen | `Earnie_EAuto_LimitSOC` | Ladeziel-SOC % |
+| `set_evcs_max_current` | Schreiben | `Earnie_EAuto_Soll_A` | Soll-/Maxstrom A |
+| `set_evcs_mode` | Schreiben | `Earnie_EAuto_Modus` | `pv` \| `now` |
 
-Zusätzlich Pflichtfeld **`min_power_kw`** am Verbraucher. SwimSpa-Filter-Overrides können noch unter `swimspa_filter_bindings` liegen (Bridge-Defaults); Pflege der Haupt-Merker über EHAL-Com.
+Zusätzlich Pflichtfeld **`min_power_kw`** am Verbraucher. SwimSpa-Filter-Overrides können noch unter `swimspa_filter_bindings` liegen (Bridge-Defaults); Pflege der Haupt-Merker über EHAL-Com. Greenfield-Pool: Prefix `Earnie_Pool_*` / `Earnie_Pool_Filter_*` (siehe [ehal-com.md](../ui/ehal-com.md) §C.6); bestehende SwimSpa-Namen bleiben gültig.
 
 ## Event-Trigger (an Entities)
 
@@ -92,9 +155,9 @@ Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden)
 
 | Verbraucher (`id`) | Steuerung (Schreiben) | Leistung (Lesen) |
 |--------------------|----------------------|------------------|
-| `swimspa` | `flex.enable_name` → `Ernie_SwimSpa_Freigabe` | `flex.power_name` → `Ernie_Swim-Spa-P_act` |
+| `swimspa` | `flex.enable_name` → `Earnie_SwimSpa_Freigabe` | `flex.power_name` → `Earnie_Swim-Spa-P_act` |
 | `eauto` | `set_evcs_max_current` / `set_evcs_mode` | `sens_evcs_*` / `flex.power_name` |
-| `wp_heating` | `flex.enable_name` → `Ernie_WP_Freigabe` | `flex.power_name` → `Ernie_WP_P_act` |
+| `wp_heating` | `flex.enable_name` → `Earnie_Waermepumpe_Freigabe` | `flex.power_name` → `Earnie_Waermepumpe_Leistung` |
 
 ## Lesen vs. Schreiben in `main.py`
 

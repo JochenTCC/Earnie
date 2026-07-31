@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DRAFT (2.4.n Pattern B) — Loxone → Earnie plant telemetry push.
+  Replace EARNIE_HOST. Paths are placeholders until Earnie exposes ingest.
+  Cmd Titles = frozen Merker names (share/loxone/greenfield_device_map.json).
+  Netz/PV/Batterie_Leistung may also come from EFM Zähler — keep VO cmds; prefer EFM Bezeichnung in Earnie bindings when present.
+  Earnie_Aussentemperatur is house-wide (shared with WP/Pool thermal).
+-->
+<VirtualOut Title="Earnie Plant Telemetry" Comment="Pattern B: push plant sens_* to Earnie (draft)" Address="http://EARNIE_HOST:8501" CmdInit="" CloseAfterSend="true" CmdSep="">
+	<VirtualOutCmd Title="Earnie_Netzleistung" Comment="sens_grid_power_active kW; or EFM Grid" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_grid_power_active/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_PV_Leistung" Comment="sens_pv_production_active kW; or EFM Production" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_pv_production_active/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Batterie_SoC" Comment="sens_ess_soc %" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_ess_soc/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Batterie_Leistung" Comment="sens_ess_power kW; or EFM Storage" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_ess_power/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Aussentemperatur" Comment="sens_temperature_outside C; house-wide" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_temperature_outside/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+</VirtualOut>

@@ -6,37 +6,37 @@
     {
       "ehal_field": "sens_ess_soc",
       "loxone_blocks_key": "soc_name",
-      "suggested_name": "Ernie_Batterie_SoC",
+      "suggested_name": "Earnie_Batterie_SoC",
       "notes": "SoC in %."
     },
     {
       "ehal_field": "sens_ess_power",
       "loxone_blocks_key": "battery_power_name",
-      "suggested_name": "Ernie_Batterie_Leistung",
+      "suggested_name": "Earnie_Batterie_Leistung",
       "notes": "Optional; kW, typically +charge in Loxone. Prefer EFM Storage meter name when present."
     },
     {
       "ehal_field": "set_ess_active_power",
       "loxone_blocks_key": "target_active_power_name",
-      "suggested_name": "Ernie_Batterie_Sollleistung",
+      "suggested_name": "Earnie_Batterie_Sollleistung",
       "notes": "Design C1 forced active power kW (+discharge)."
     },
     {
       "ehal_field": "set_ess_charge_power_limit",
       "loxone_blocks_key": "target_charge_power_name",
-      "suggested_name": "Ernie_Ladegrenze",
+      "suggested_name": "Earnie_LadeLeistungs-Limit",
       "notes": "True charge cap (kW)."
     },
     {
       "ehal_field": "set_ess_discharge_power_limit",
       "loxone_blocks_key": "target_discharge_power_name",
-      "suggested_name": "Ernie_Entladegrenze",
+      "suggested_name": "Earnie_EntladeLeistungs-Limit",
       "notes": "True discharge cap (kW)."
     },
     {
       "ehal_field": "set_ess_mode",
       "loxone_blocks_key": "control_cmd_name",
-      "suggested_name": "Ernie_Steuerbefehl",
+      "suggested_name": "Earnie_Steuerbefehl",
       "notes": "Mode hint for Huawei/Loxone; OpenEMS ignores."
     }
   ],

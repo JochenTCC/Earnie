@@ -1,0 +1,1378 @@
+{
+  "rooms": {
+    "17b525a0-028d-b174-ffff912d5ec91829": {
+      "uuid": "17b525a0-028d-b174-ffff912d5ec91829",
+      "name": "Elektroauto",
+      "image": "IconsFilled/car.svg",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "type": 5,
+      "color": "#8DFF70"
+    },
+    "00000007-038f-002c-0f00000000000000": {
+      "uuid": "00000007-038f-002c-0f00000000000000",
+      "name": "Hauswirtschaftsraum",
+      "image": "IconsFilled/dumbbell.svg",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "type": 2,
+      "color": "#8DFF70"
+    },
+    "00000007-038f-0038-0f00000000000000": {
+      "uuid": "00000007-038f-0038-0f00000000000000",
+      "name": "Technikraum",
+      "image": "IconsFilled/cog-double.svg",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "type": 4,
+      "color": "#8DFF70"
+    },
+    "00000007-038f-002f-0f00000000000000": {
+      "uuid": "00000007-038f-002f-0f00000000000000",
+      "name": "Küche - Esszimmer",
+      "image": "IconsFilled/knife-fork.svg",
+      "defaultRating": 9,
+      "isFavorite": true,
+      "type": 2,
+      "color": "#8DFF70"
+    },
+    "1865c1ba-011a-d11a-ffff912d5ec91829": {
+      "uuid": "1865c1ba-011a-d11a-ffff912d5ec91829",
+      "name": "Dach",
+      "image": "IconsFilled/attic.svg",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "type": 5,
+      "color": "#8DFF70"
+    },
+    "17b52677-0363-20eb-ffff912d5ec91829": {
+      "uuid": "17b52677-0363-20eb-ffff912d5ec91829",
+      "name": "Swim-Spa",
+      "image": "IconsFilled/bathtub.svg",
+      "defaultRating": 5,
+      "isFavorite": true,
+      "type": 5,
+      "color": "#8DFF70"
+    },
+    "00000007-038f-0039-0f00000000000000": {
+      "uuid": "00000007-038f-0039-0f00000000000000",
+      "name": "Zentral",
+      "image": "IconsFilled/central.svg",
+      "defaultRating": 3,
+      "isFavorite": true,
+      "type": 4,
+      "color": "#8DFF70"
+    },
+    "00000007-038f-001b-0f00000000000000": {
+      "uuid": "00000007-038f-001b-0f00000000000000",
+      "name": "Wohnzimmer",
+      "image": "IconsFilled/sofa-1.svg",
+      "defaultRating": 3,
+      "isFavorite": true,
+      "type": 2,
+      "color": "#8DFF70"
+    }
+  },
+  "cats": {
+    "17a19e27-02cb-1065-ffff912d5ec91829": {
+      "uuid": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "name": "Wellness",
+      "image": "IconsFilled/rock.svg",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "type": "undefined",
+      "color": "#8DFF70"
+    },
+    "00000007-038f-0015-0d00000000000000": {
+      "uuid": "00000007-038f-0015-0d00000000000000",
+      "name": "Verbraucher",
+      "image": "IconsFilled/electricity-outlet-4.svg",
+      "defaultRating": 8,
+      "isFavorite": true,
+      "type": "undefined",
+      "color": "#8DFF70"
+    }
+  },
+  "controls": {
+    "20f36e71-01fe-475a-ffff912d5ec91829": {
+      "name": "Zähler Kochen",
+      "type": "Meter",
+      "uuidAction": "20f36e71-01fe-475a-ffff912d5ec91829",
+      "room": "00000007-038f-002f-0f00000000000000",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/add-circle-1.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "unidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a0f36e71-01fe-474d-02ffc2eb60a2ae07",
+        "actual": "20f36e71-01fe-474f-04ffc2eb60a2ae07",
+        "total": "20f36e71-01fe-4750-05ffc2eb60a2ae07",
+        "totalDay": "20f36e71-01fe-4751-06ffc2eb60a2ae07",
+        "totalWeek": "20f36e71-01fe-4753-08ffc2eb60a2ae07",
+        "totalMonth": "20f36e71-01fe-4755-0affc2eb60a2ae07",
+        "totalYear": "20f36e71-01fe-4757-0cffc2eb60a2ae07"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 9,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "21062c1c-033a-4701-ffff912d5ec91829": {
+      "name": "Zähler Swimspa",
+      "type": "Meter",
+      "uuidAction": "21062c1c-033a-4701-ffff912d5ec91829",
+      "room": "17b52677-0363-20eb-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/pool.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "unidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a1062c1c-033a-46f4-02ff54b25c805be6",
+        "actual": "21062c1c-033a-46f6-04ff54b25c805be6",
+        "total": "21062c1c-033a-46f7-05ff54b25c805be6",
+        "totalDay": "21062c1c-033a-46f8-06ff54b25c805be6",
+        "totalWeek": "21062c1c-033a-46fa-08ff54b25c805be6",
+        "totalMonth": "21062c1c-033a-46fc-0aff54b25c805be6",
+        "totalYear": "21062c1c-033a-46fe-0cff54b25c805be6"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 10,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "210633c7-033f-abe3-ffff912d5ec91829": {
+      "name": "Zähler PV-Anlage",
+      "type": "Meter",
+      "uuidAction": "210633c7-033f-abe3-ffff912d5ec91829",
+      "room": "1865c1ba-011a-d11a-ffff912d5ec91829",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/solar-panel.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "unidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a10633c7-033f-abd6-02ffae2f5ea96da7",
+        "actual": "210633c7-033f-abd8-04ffae2f5ea96da7",
+        "total": "210633c7-033f-abd9-05ffae2f5ea96da7",
+        "totalDay": "210633c7-033f-abda-06ffae2f5ea96da7",
+        "totalWeek": "210633c7-033f-abdc-08ffae2f5ea96da7",
+        "totalMonth": "210633c7-033f-abde-0affae2f5ea96da7",
+        "totalYear": "210633c7-033f-abe0-0cffae2f5ea96da7"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 10,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "21063715-03df-8423-fffffed3bac1ad55": {
+      "name": "Zähler Trockner",
+      "type": "Meter",
+      "uuidAction": "21063715-03df-8423-fffffed3bac1ad55",
+      "room": "00000007-038f-002c-0f00000000000000",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/add-circle-1.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "unidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a1063715-03df-8426-fffffed3bac1ad55",
+        "actual": "21063715-03df-8428-fffffed3bac1ad55",
+        "total": "21063715-03df-8429-fffffed3bac1ad55",
+        "totalDay": "21063715-03df-842a-fffffed3bac1ad55",
+        "totalWeek": "21063715-03df-842c-fffffed3bac1ad55",
+        "totalMonth": "21063715-03df-842e-fffffed3bac1ad55",
+        "totalYear": "21063715-03df-8430-fffffed3bac1ad55"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 9,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "21063a6e-03d2-6acc-ffffddd4cf6967bb": {
+      "name": "Zähler TV",
+      "type": "Meter",
+      "uuidAction": "21063a6e-03d2-6acc-ffffddd4cf6967bb",
+      "room": "00000007-038f-001b-0f00000000000000",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/tv-screen-2.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "unidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a1063a6e-03d2-6acf-ffffddd4cf6967bb",
+        "actual": "21063a6e-03d2-6ad1-ffffddd4cf6967bb",
+        "total": "21063a6e-03d2-6ad2-ffffddd4cf6967bb",
+        "totalDay": "21063a6e-03d2-6ad3-ffffddd4cf6967bb",
+        "totalWeek": "21063a6e-03d2-6ad5-ffffddd4cf6967bb",
+        "totalMonth": "21063a6e-03d2-6ad7-ffffddd4cf6967bb",
+        "totalYear": "21063a6e-03d2-6ad9-ffffddd4cf6967bb"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 10,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "21062972-01fe-ced8-ffff912d5ec91829": {
+      "name": "Zähler Wärmepumpe",
+      "type": "Meter",
+      "uuidAction": "21062972-01fe-ced8-ffff912d5ec91829",
+      "room": "00000007-038f-0038-0f00000000000000",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/radiator.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "unidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a1062972-01fe-cecb-02ff3816db61807c",
+        "actual": "21062972-01fe-cecd-04ff3816db61807c",
+        "total": "21062972-01fe-cece-05ff3816db61807c",
+        "totalDay": "21062972-01fe-cecf-06ff3816db61807c",
+        "totalWeek": "21062972-01fe-ced1-08ff3816db61807c",
+        "totalMonth": "21062972-01fe-ced3-0aff3816db61807c",
+        "totalYear": "21062972-01fe-ced5-0cff3816db61807c"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 10,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "2106378b-0380-fd24-ffff02bafaaf2533": {
+      "name": "Zähler Waschmaschine",
+      "type": "Meter",
+      "uuidAction": "2106378b-0380-fd24-ffff02bafaaf2533",
+      "room": "00000007-038f-002c-0f00000000000000",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/add-circle-1.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "unidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a106378b-0380-fd27-ffff02bafaaf2533",
+        "actual": "2106378b-0380-fd29-ffff02bafaaf2533",
+        "total": "2106378b-0380-fd2a-ffff02bafaaf2533",
+        "totalDay": "2106378b-0380-fd2b-ffff02bafaaf2533",
+        "totalWeek": "2106378b-0380-fd2d-ffff02bafaaf2533",
+        "totalMonth": "2106378b-0380-fd2f-ffff02bafaaf2533",
+        "totalYear": "2106378b-0380-fd31-ffff02bafaaf2533"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 9,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "21062b9c-01fc-484c-fffff6e3ac5252ab": {
+      "name": "Zähler Geschirrspüler",
+      "type": "Meter",
+      "uuidAction": "21062b9c-01fc-484c-fffff6e3ac5252ab",
+      "room": "00000007-038f-002f-0f00000000000000",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/add-circle-1.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "unidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a1062b9c-01fc-484f-fffff6e3ac5252ab",
+        "actual": "21062b9c-01fc-4851-fffff6e3ac5252ab",
+        "total": "21062b9c-01fc-4852-fffff6e3ac5252ab",
+        "totalDay": "21062b9c-01fc-4853-fffff6e3ac5252ab",
+        "totalWeek": "21062b9c-01fc-4855-fffff6e3ac5252ab",
+        "totalMonth": "21062b9c-01fc-4857-fffff6e3ac5252ab",
+        "totalYear": "21062b9c-01fc-4859-fffff6e3ac5252ab"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 9,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "210634c5-0341-8ece-ffff4950542b6ff4": {
+      "name": "Zähler Netz",
+      "type": "Meter",
+      "uuidAction": "210634c5-0341-8ece-ffff4950542b6ff4",
+      "room": "00000007-038f-0038-0f00000000000000",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/power-grid.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "bidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a10634c5-0341-8ed3-ffff4950542b6ff4",
+        "actual": "210634c5-0341-8ed6-ffff4950542b6ff4",
+        "total": "210634c5-0341-8ed7-ffff4950542b6ff4",
+        "totalNeg": "210634c5-0341-8ee0-ffff4950542b6ff4",
+        "totalDay": "210634c5-0341-8ed8-ffff4950542b6ff4",
+        "totalWeek": "210634c5-0341-8eda-ffff4950542b6ff4",
+        "totalMonth": "210634c5-0341-8edc-ffff4950542b6ff4",
+        "totalYear": "210634c5-0341-8ede-ffff4950542b6ff4",
+        "totalNegDay": "210634c5-0341-8ee1-ffff4950542b6ff4",
+        "totalNegWeek": "210634c5-0341-8ee3-ffff4950542b6ff4",
+        "totalNegMonth": "210634c5-0341-8ee5-ffff4950542b6ff4",
+        "totalNegYear": "210634c5-0341-8ee7-ffff4950542b6ff4"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 10,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              },
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "totalNeg"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "210635af-00b4-7c4d-ffff912d5ec91829": {
+      "name": "Zähler Batterie",
+      "type": "Meter",
+      "uuidAction": "210635af-00b4-7c4d-ffff912d5ec91829",
+      "room": "00000007-038f-0038-0f00000000000000",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/battery-charge-1.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "storage",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung",
+        "storageFormat": "%.0f%%",
+        "storageMax": 100.0
+      },
+      "states": {
+        "jLocked": "a10635af-00b4-7c35-04ffd549770017ec",
+        "actual": "210635af-00b4-7c38-07ffd549770017ec",
+        "total": "210635af-00b4-7c39-08ffd549770017ec",
+        "totalNeg": "210635af-00b4-7c42-11ffd549770017ec",
+        "storage": "210635af-00b4-7c34-03ffd549770017ec",
+        "totalDay": "210635af-00b4-7c3a-09ffd549770017ec",
+        "totalWeek": "210635af-00b4-7c3c-0bffd549770017ec",
+        "totalMonth": "210635af-00b4-7c3e-0dffd549770017ec",
+        "totalYear": "210635af-00b4-7c40-0fffd549770017ec",
+        "totalNegDay": "210635af-00b4-7c43-12ffd549770017ec",
+        "totalNegWeek": "210635af-00b4-7c45-14ffd549770017ec",
+        "totalNegMonth": "210635af-00b4-7c47-16ffd549770017ec",
+        "totalNegYear": "210635af-00b4-7c49-18ffd549770017ec"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 10,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              },
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "totalNeg"
+              }
+            ]
+          },
+          {
+            "id": "3",
+            "mode": 11,
+            "dataPoints": [
+              {
+                "title": "Speicherstand",
+                "format": "0%",
+                "output": "storageLevel"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "21062cfe-026e-6caa-ffff912d5ec91829": {
+      "name": "Energie-Monitor",
+      "type": "EFM",
+      "uuidAction": "21062cfe-026e-6caa-ffff912d5ec91829",
+      "room": "00000007-038f-0039-0f00000000000000",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": true,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/central.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": true,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "storageFormat": "%.0f%%",
+        "nodes": [
+          {
+            "uuid": "2106363d-002c-f419-ffffda45cdd02383",
+            "title": "Zähler Netz",
+            "icon": "IconsFilled/power-grid.svg",
+            "ctrlUuid": "210634c5-0341-8ece-ffff4950542b6ff4",
+            "nodeType": "Grid",
+            "actualEfmState": "21063a46-0328-526e-ffff912d5ec91829"
+          },
+          {
+            "uuid": "21063456-037a-edeb-ffff32c9afaf87a9",
+            "title": "Zähler PV-Anlage",
+            "icon": "IconsFilled/solar-panel.svg",
+            "ctrlUuid": "210633c7-033f-abe3-ffff912d5ec91829",
+            "nodeType": "Production",
+            "actualEfmState": "21063a46-0328-526f-ffff912d5ec91829"
+          },
+          {
+            "uuid": "2106363d-002c-f418-ffffda45cdd02383",
+            "title": "Zähler Batterie",
+            "icon": "IconsFilled/battery-charge-1.svg",
+            "ctrlUuid": "210635af-00b4-7c4d-ffff912d5ec91829",
+            "nodeType": "Storage",
+            "actualEfmState": "21063a46-0328-5270-ffff912d5ec91829"
+          },
+          {
+            "uuid": "21062d1e-010c-269a-ffff89fea25e2124",
+            "title": "Zähler Wärmepumpe",
+            "icon": "IconsFilled/radiator.svg",
+            "ctrlUuid": "21062972-01fe-ced8-ffff912d5ec91829",
+            "nodeType": "Load",
+            "actualEfmState": "21063a46-0328-5271-ffff912d5ec91829"
+          },
+          {
+            "uuid": "21062d1e-010c-2697-ffff89fea25e2124",
+            "title": "Zähler Wallbox",
+            "icon": "IconsFilled/electric-car.svg",
+            "ctrlUuid": "21062a20-033c-f839-ffff912d5ec91829",
+            "nodeType": "Load",
+            "actualEfmState": "21063a46-0328-5272-ffff912d5ec91829"
+          },
+          {
+            "uuid": "21062d1e-010c-269b-ffff89fea25e2124",
+            "title": "Zähler Swimspa",
+            "icon": "IconsFilled/pool.svg",
+            "ctrlUuid": "21062c1c-033a-4701-ffff912d5ec91829",
+            "nodeType": "Load",
+            "actualEfmState": "21063a46-0328-5273-ffff912d5ec91829"
+          },
+          {
+            "uuid": "210637f4-033a-a48e-fffff400d6140950",
+            "title": "Haushaltsgeräte",
+            "icon": "IconsFilled/stove.svg",
+            "nodeType": "Group",
+            "actualEfmState": "21063a46-0328-5274-ffff912d5ec91829",
+            "nodes": [
+              {
+                "uuid": "21062d1e-010c-2698-ffff89fea25e2124",
+                "title": "Zähler Kochen",
+                "icon": "IconsFilled/add-circle-1.svg",
+                "ctrlUuid": "20f36e71-01fe-475a-ffff912d5ec91829",
+                "nodeType": "Load",
+                "actualEfmState": "21063463-00da-ee7a-ffff912d5ec91829"
+              },
+              {
+                "uuid": "21062d1e-010c-2699-ffff89fea25e2124",
+                "title": "Zähler Geschirrspüler",
+                "icon": "IconsFilled/add-circle-1.svg",
+                "ctrlUuid": "21062b9c-01fc-484c-fffff6e3ac5252ab",
+                "nodeType": "Load",
+                "actualEfmState": "21063463-00da-ee7b-ffff912d5ec91829"
+              },
+              {
+                "uuid": "210637ea-0314-4654-ffffff6fc6bc1ba5",
+                "title": "Zähler Trockner",
+                "icon": "IconsFilled/add-circle-1.svg",
+                "ctrlUuid": "21063715-03df-8423-fffffed3bac1ad55",
+                "nodeType": "Load"
+              },
+              {
+                "uuid": "210637ea-0314-4655-ffffff6fc6bc1ba5",
+                "title": "Zähler Waschmaschine",
+                "icon": "IconsFilled/add-circle-1.svg",
+                "ctrlUuid": "2106378b-0380-fd24-ffff02bafaaf2533",
+                "nodeType": "Load"
+              },
+              {
+                "uuid": "21063a9b-0188-b4cb-ffffefa19da216e2",
+                "title": "Zähler TV",
+                "icon": "IconsFilled/tv-screen-2.svg",
+                "ctrlUuid": "21063a6e-03d2-6acc-ffffddd4cf6967bb",
+                "nodeType": "Load"
+              }
+            ]
+          },
+          {
+            "uuid": "21104130-01d2-10c5-ffffe454529b63d3",
+            "title": "Rest",
+            "icon": "",
+            "ctrlUuid": "21062cfe-026e-6c96-ffff64017f38e8f6",
+            "nodeType": "Load",
+            "actualEfmState": "21063a46-0328-5275-ffff912d5ec91829"
+          }
+        ]
+      },
+      "states": {
+        "jLocked": "a1062cfe-026e-6c97-00ff64017f38e8f6",
+        "Ppwr": "21062cfe-026e-6c9c-05ff64017f38e8f6",
+        "Gpwr": "21062cfe-026e-6c9b-04ff64017f38e8f6",
+        "Spwr": "21062cfe-026e-6c9e-07ff64017f38e8f6",
+        "Pre": "21062cfe-026e-6c98-01ff64017f38e8f6",
+        "Pri": "21062cfe-026e-6c99-02ff64017f38e8f6",
+        "CO2": "21062cfe-026e-6c9a-03ff64017f38e8f6",
+        "selfConsumption": "21062cfe-026e-6ca6-0fff64017f38e8f6",
+        "actual0": "21063a46-0328-526e-ffff912d5ec91829",
+        "actual1": "21063a46-0328-526f-ffff912d5ec91829",
+        "actual2": "21063a46-0328-5270-ffff912d5ec91829",
+        "actual3": "21063a46-0328-5271-ffff912d5ec91829",
+        "actual4": "21063a46-0328-5272-ffff912d5ec91829",
+        "actual5": "21063a46-0328-5273-ffff912d5ec91829",
+        "actual6": "21063a46-0328-5274-ffff912d5ec91829",
+        "actual7": "21063a46-0328-5275-ffff912d5ec91829"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "3",
+            "mode": 12,
+            "dataPoints": []
+          },
+          {
+            "id": "1",
+            "mode": 12,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "totalSelfConsumption"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Ertrag gesamt",
+                "format": "0,00€",
+                "output": "OYt"
+              }
+            ]
+          }
+        ]
+      },
+      "subControls": {
+        "21062cfe-026e-6c96-ffff64017f38e8f6": {
+          "name": "Rest",
+          "type": "Meter",
+          "uuidAction": "21062cfe-026e-6c96-ffff64017f38e8f6",
+          "room": "00000007-038f-0039-0f00000000000000",
+          "cat": "00000007-038f-0015-0d00000000000000",
+          "defaultRating": 0,
+          "isFavorite": false,
+          "isSecured": false,
+          "defaultIcon": null,
+          "restrictions": 0,
+          "details": {
+            "jLockable": false,
+            "type": "bidirectional",
+            "displayType": 0,
+            "actualFormat": "%.3fkW",
+            "totalFormat": "%.1fkWh",
+            "powerName": "Leistung"
+          },
+          "states": {
+            "jLocked": "a1062d2e-036f-26ce-03ff89fea25e2124",
+            "actual": "21062d2e-036f-26d1-06ff89fea25e2124",
+            "total": "21062d2e-036f-26d2-07ff89fea25e2124",
+            "totalNeg": "21062d2e-036f-26db-10ff89fea25e2124",
+            "totalDay": "21062d2e-036f-26d3-08ff89fea25e2124",
+            "totalWeek": "21062d2e-036f-26d5-0aff89fea25e2124",
+            "totalMonth": "21062d2e-036f-26d7-0cff89fea25e2124",
+            "totalYear": "21062d2e-036f-26d9-0eff89fea25e2124",
+            "totalNegDay": "21062d2e-036f-26dc-11ff89fea25e2124",
+            "totalNegWeek": "21062d2e-036f-26de-13ff89fea25e2124",
+            "totalNegMonth": "21062d2e-036f-26e0-15ff89fea25e2124",
+            "totalNegYear": "21062d2e-036f-26e2-17ff89fea25e2124"
+          },
+          "statisticV2": {
+            "groups": [
+              {
+                "id": "1",
+                "mode": 12,
+                "dataPoints": [
+                  {
+                    "title": "Leistung",
+                    "format": "0,000kW",
+                    "output": "actual"
+                  }
+                ]
+              },
+              {
+                "id": "2",
+                "mode": 12,
+                "accumulated": true,
+                "dataPoints": [
+                  {
+                    "title": "Zählerstand",
+                    "format": "0,0kWh",
+                    "output": "total"
+                  },
+                  {
+                    "title": "Zählerstand",
+                    "format": "0,0kWh",
+                    "output": "totalNeg"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "21062a20-033c-f839-ffff912d5ec91829": {
+      "name": "Zähler Wallbox",
+      "type": "Meter",
+      "uuidAction": "21062a20-033c-f839-ffff912d5ec91829",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "00000007-038f-0015-0d00000000000000",
+      "defaultRating": 0,
+      "isFavorite": false,
+      "isSecured": false,
+      "defaultIcon": "IconsFilled/electric-car.svg",
+      "restrictions": 0,
+      "details": {
+        "jLockable": false,
+        "type": "unidirectional",
+        "displayType": 0,
+        "actualFormat": "%.3fkW",
+        "totalFormat": "%.1fkWh",
+        "powerName": "Leistung"
+      },
+      "states": {
+        "jLocked": "a1062a20-033c-f82c-02ff0e2b48c541a0",
+        "actual": "21062a20-033c-f82e-04ff0e2b48c541a0",
+        "total": "21062a20-033c-f82f-05ff0e2b48c541a0",
+        "totalDay": "21062a20-033c-f830-06ff0e2b48c541a0",
+        "totalWeek": "21062a20-033c-f832-08ff0e2b48c541a0",
+        "totalMonth": "21062a20-033c-f834-0aff0e2b48c541a0",
+        "totalYear": "21062a20-033c-f836-0cff0e2b48c541a0"
+      },
+      "statisticV2": {
+        "groups": [
+          {
+            "id": "1",
+            "mode": 10,
+            "dataPoints": [
+              {
+                "title": "Leistung",
+                "format": "0,000kW",
+                "output": "actual"
+              }
+            ]
+          },
+          {
+            "id": "2",
+            "mode": 11,
+            "accumulated": true,
+            "dataPoints": [
+              {
+                "title": "Zählerstand",
+                "format": "0,0kWh",
+                "output": "total"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "gf-earn-000": {
+      "name": "Earnie_Heartbeat",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-000",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-000"
+      }
+    },
+    "gf-earn-001": {
+      "name": "Earnie_Netzleistung",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-001",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-001"
+      }
+    },
+    "gf-earn-002": {
+      "name": "Earnie_PV_Leistung",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-002",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-002"
+      }
+    },
+    "gf-earn-003": {
+      "name": "Earnie_Batterie_SoC",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-003",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-003"
+      }
+    },
+    "gf-earn-004": {
+      "name": "Earnie_Batterie_Leistung",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-004",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-004"
+      }
+    },
+    "gf-earn-005": {
+      "name": "Earnie_Aussentemperatur",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-005",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-005"
+      }
+    },
+    "gf-earn-006": {
+      "name": "Earnie_Batterie_Sollleistung",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-006",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-006"
+      }
+    },
+    "gf-earn-007": {
+      "name": "Earnie_LadeLeistungs-Limit",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-007",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-007"
+      }
+    },
+    "gf-earn-008": {
+      "name": "Earnie_EntladeLeistungs-Limit",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-008",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-008"
+      }
+    },
+    "gf-earn-009": {
+      "name": "Earnie_Steuerbefehl",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-009",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-009"
+      }
+    },
+    "gf-earn-010": {
+      "name": "Earnie_Waermepumpe_Leistung",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-010",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-010"
+      }
+    },
+    "gf-earn-011": {
+      "name": "Earnie_Waermepumpe_Freigabe",
+      "type": "InfoOnlyDigital",
+      "uuidAction": "gf-earn-011",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-011"
+      }
+    },
+    "gf-earn-012": {
+      "name": "Earnie_EAuto_Leistung",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-012",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-012"
+      }
+    },
+    "gf-earn-013": {
+      "name": "Earnie_EAuto_Angeschlossen",
+      "type": "InfoOnlyDigital",
+      "uuidAction": "gf-earn-013",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-013"
+      }
+    },
+    "gf-earn-014": {
+      "name": "Earnie_EAuto_SOC",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-014",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-014"
+      }
+    },
+    "gf-earn-015": {
+      "name": "Earnie_EAuto_Kapazitaet",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-015",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-015"
+      }
+    },
+    "gf-earn-016": {
+      "name": "Earnie_EAuto_MaxStrom",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-016",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-016"
+      }
+    },
+    "gf-earn-017": {
+      "name": "Earnie_EAuto_LimitSOC",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-017",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-017"
+      }
+    },
+    "gf-earn-018": {
+      "name": "Earnie_EAuto_FertigUm",
+      "type": "InfoOnlyText",
+      "uuidAction": "gf-earn-018",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-018"
+      }
+    },
+    "gf-earn-019": {
+      "name": "Earnie_EAuto_Soll_A",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-019",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-019"
+      }
+    },
+    "gf-earn-020": {
+      "name": "Earnie_EAuto_Modus",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-020",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-020"
+      }
+    },
+    "gf-earn-021": {
+      "name": "Earnie_Verbraucher_Leistung",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-021",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-021"
+      }
+    },
+    "gf-earn-022": {
+      "name": "Earnie_Verbraucher_Freigabe",
+      "type": "InfoOnlyDigital",
+      "uuidAction": "gf-earn-022",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-022"
+      }
+    },
+    "gf-earn-023": {
+      "name": "Earnie_Verbraucher_Ziel_kW",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-023",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-023"
+      }
+    },
+    "gf-earn-024": {
+      "name": "Earnie_Pool_P_act",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-024",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-024"
+      }
+    },
+    "gf-earn-025": {
+      "name": "Earnie_Pool_Freigabe",
+      "type": "InfoOnlyDigital",
+      "uuidAction": "gf-earn-025",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-025"
+      }
+    },
+    "gf-earn-026": {
+      "name": "Earnie_Pool_Temp_Ist",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-026",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-026"
+      }
+    },
+    "gf-earn-027": {
+      "name": "Earnie_Pool_Temp_Soll",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-027",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-027"
+      }
+    },
+    "gf-earn-028": {
+      "name": "Earnie_Pool_Temp_Toleranz",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-028",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-028"
+      }
+    },
+    "gf-earn-029": {
+      "name": "Earnie_Pool_Heizung_aktiv",
+      "type": "InfoOnlyDigital",
+      "uuidAction": "gf-earn-029",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-029"
+      }
+    },
+    "gf-earn-030": {
+      "name": "Earnie_Pool_Filter_Sollstunden",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-030",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-030"
+      }
+    },
+    "gf-earn-031": {
+      "name": "Earnie_Pool_Filter_Freigabe",
+      "type": "InfoOnlyDigital",
+      "uuidAction": "gf-earn-031",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-031"
+      }
+    },
+    "gf-earn-032": {
+      "name": "Earnie_Pool_Filter_aktiv",
+      "type": "InfoOnlyDigital",
+      "uuidAction": "gf-earn-032",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-032"
+      }
+    },
+    "gf-earn-033": {
+      "name": "Earnie_Pool_Filter_NativeStart",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-033",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-033"
+      }
+    },
+    "gf-earn-034": {
+      "name": "Earnie_Pool_Filter_NativeDauer",
+      "type": "InfoOnlyAnalog",
+      "uuidAction": "gf-earn-034",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "value": "st-gf-earn-034"
+      }
+    }
+  },
+  "_fixture_meta": {
+    "source": "live Miniserver LoxAPP3 + Earnie_* from greenfield_device_map",
+    "note": "Live MS at fetch time had legacy Ernie_* only; Earnie_* injected for 2.4.n contract tests. EFM/meters from live."
+  }
+}

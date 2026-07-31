@@ -23,6 +23,7 @@ from integrations.loxone_ehal_mapping import (
 )
 from integrations.loxone_structure import (
     ALL_SOURCES,
+    SOURCE_HTTP_PROBE,
     SOURCE_LOXAPP3,
     SOURCE_MCP17,
     SOURCE_UNION,
@@ -50,6 +51,7 @@ _SESSION_MIGRATED = "ehal_lox_migrated_once"
 _SOURCE_LABELS = {
     SOURCE_UNION: "Union (alle Quellen)",
     SOURCE_LOXAPP3: "LoxAPP3.json",
+    SOURCE_HTTP_PROBE: "HTTP-Probe (Earnie_* / gemappt)",
     SOURCE_MCP17: "Loxone MCP 17.1",
 }
 
@@ -300,7 +302,7 @@ def render_ehal_loxone_mapping_section() -> None:
         "Entity-zentriertes Mapping: Anlage + Verbraucher aus dem Live-Hausprofil. "
         "Felder `{entity}.{ehal_field}` → Merker; Speichern in `house_profiles.json` "
         "(`plant` / `consumers[].ehal_bindings` + `event_triggers`). "
-        "Struktur-Scan und optionale KI-Vorschläge wie zuvor (LoxAPP3 / MCP / Ollama)."
+        "Struktur-Scan: LoxAPP3 / HTTP-Probe (Earnie_* Template-Namen) / optional MCP / Ollama."
     )
     house, config_doc = _migrate_on_open()
     profile_id = resolve_live_profile_id(house)

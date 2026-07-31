@@ -8,7 +8,7 @@
   "properties": {
     "role_id": {
       "type": "string",
-      "enum": ["grid", "pv", "ess", "evcs", "consumer", "heatpump"]
+      "enum": ["grid", "pv", "ess", "evcs", "consumer", "heatpump", "pool"]
     },
     "label": {
       "type": "string",
@@ -23,7 +23,7 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["loxone_blocks_key", "suggested_name"],
+        "required": ["suggested_name"],
         "properties": {
           "ehal_field": {
             "type": "string",
@@ -35,7 +35,8 @@
           },
           "loxone_blocks_key": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Legacy / thermal / filter config path hint (optional for stub pool markers)."
           },
           "suggested_name": {
             "type": "string",

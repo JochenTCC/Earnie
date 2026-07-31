@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   DRAFT (2.4.n Pattern B) — validate in Loxone Config, then re-export.
-  Expected JSON: {"Ernie_EAuto_Soll_A":16,"Ernie_EAuto_Modus":0}
-  Telemetry (P_act, SOC, plugged) stays on local Merkers / Wallbox / EFM.
+  VI Check keys / status JSON: ev.{ev_id}.Earnie_EAuto_* (replace {ev_id}).
+  Miniserver Titles stay Earnie_EAuto_* (multi: Prefix+Slug, see docs).
+  Telemetry (Leistung, SOC, plugged) on VO_Earnie_EV / Wallbox / EFM.
 -->
 <VirtualInHttp Title="Earnie EV" Comment="Pattern B: EV setpoints from Earnie (draft)" Address="http://EARNIE_HOST:8501/ehal/loxone/status.json" PollingTime="30">
-	<VirtualInHttpCmd Title="Earnie_EAuto_Soll_A" Comment="set_evcs_max_current A" Check="&quot;Earnie_EAuto_Soll_A&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="32" DestValHigh="32" DefVal="0" MinVal="0" MaxVal="63"/>
-	<VirtualInHttpCmd Title="Earnie_EAuto_Modus" Comment="set_evcs_mode numeric encoding TBD" Check="&quot;Earnie_EAuto_Modus&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="10" DestValHigh="10" DefVal="0" MinVal="0" MaxVal="10"/>
+	<VirtualInHttpCmd Title="Earnie_EAuto_Soll_A" Comment="ev.{ev_id}.set_evcs_max_current A" Check="&quot;ev.{ev_id}.Earnie_EAuto_Soll_A&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="32" DestValHigh="32" DefVal="0" MinVal="0" MaxVal="63"/>
+	<VirtualInHttpCmd Title="Earnie_EAuto_Modus" Comment="ev.{ev_id}.set_evcs_mode numeric encoding TBD" Check="&quot;ev.{ev_id}.Earnie_EAuto_Modus&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="10" DestValHigh="10" DefVal="0" MinVal="0" MaxVal="10"/>
 </VirtualInHttp>

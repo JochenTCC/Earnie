@@ -9,7 +9,9 @@
 | **Produktiv-Daemon** | `python main.py`                  | Liest Loxone, optimiert, schreibt Steuerwerte — läuft dauerhaft (auch als Kind der Streamlit-App) |
 
 
-Nur `main.py` steuert die Anlage (Loxone-Schreibvorgänge). Die App **zeigt** den berechneten 24–48-Stunden-Horizont (`live_optimization_debug.json`) und kann den Daemon unter **Daemon Control → Optimierer-Dienst** starten, stoppen und neu starten. Vor dem Start prüft Earnie `runtime/main.lock` (bereits laufende Instanz).
+Nur `main.py` steuert die Anlage im Produktivbetrieb (Loxone-/EHAL-Schreibvorgänge). Die App **zeigt** den berechneten 24–48-Stunden-Horizont (`live_optimization_debug.json`) und kann den Daemon unter **Daemon Control → Optimierer-Dienst** starten, stoppen und neu starten. Vor dem Start prüft Earnie `runtime/main.lock` (bereits laufende Instanz).
+
+**Ausnahme (Schnittstellentest):** Bei **gestopptem** Optimierer-Dienst können unter **Optimierer-Dienst → ESS-Schnittstelle testen** manuelle Design-C1-Sollwerte (Modus + Grenzen / Sollleistung) gesendet werden — gleicher Schreibpfad wie `main.py`.
 
 **Docker (empfohlen):** Ein Container (`earnie`). Die UI startet `main.py` automatisch, wenn `EARNIE_AUTO_START_MAIN=1` gesetzt ist (Standard in den Compose-Dateien).
 

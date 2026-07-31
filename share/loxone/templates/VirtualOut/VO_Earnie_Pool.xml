@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DRAFT (2.4.n Pattern B) — Loxone → Earnie pool / SwimSpa telemetry.
+  Freigaben on VI_Earnie_Pool. Aussentemperatur is on VO_Earnie_Plant (shared).
+  Earnie_Pool_P_act may be EFM Load (Fall B total draw) — keep VO cmd.
+  Power VO path: flex.pool.sens_power_act (replace pool with HK id if different).
+-->
+<VirtualOut Title="Earnie Pool Telemetry" Comment="Pattern B: push pool thermal + filter telemetry (draft)" Address="http://EARNIE_HOST:8501" CmdInit="" CloseAfterSend="true" CmdSep="">
+	<VirtualOutCmd Title="Earnie_Pool_P_act" Comment="flex.pool.sens_power_act total kW; binding key flex.power_name; or EFM Load" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/flex.pool.sens_power_act/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Pool_Temp_Ist" Comment="sens_temperature_water C" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_temperature_water/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Pool_Temp_Soll" Comment="get_temperature_water_setpoint C" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_temperature_water_setpoint/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Pool_Temp_Toleranz" Comment="get_temperature_tolerance_c K" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_temperature_tolerance_c/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Pool_Heizung_aktiv" Comment="sens_heating_active 0/1" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_heating_active/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="false" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Pool_Filter_Sollstunden" Comment="get_filter_remaining_hours h" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_filter_remaining_hours/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Pool_Filter_aktiv" Comment="sens_filter_active 0/1" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_filter_active/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="false" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Pool_Filter_NativeStart" Comment="get_filter_native_start_hour" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_filter_native_start_hour/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Pool_Filter_NativeDauer" Comment="get_filter_native_duration_hours h" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_filter_native_duration_hours/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+</VirtualOut>

@@ -26,10 +26,10 @@
                     "target_temp_c": 21.5,
                     "heating_limit_c": 15.0,
                     "loxone_inputs": {
-                        "power_name": "Ernie_WP_P_act"
+                        "power_name": "Earnie_Waermepumpe_Leistung"
                     },
                     "loxone_outputs": {
-                        "enable_name": "Ernie_WP_Freigabe"
+                        "enable_name": "Earnie_Waermepumpe_Freigabe"
                     }
                 },
                 {
@@ -61,11 +61,11 @@
                         }
                     },
                     "loxone_inputs": {
-                        "power_name": "Ernie_EAuto_P_act"
+                        "power_name": "Earnie_EAuto_Leistung"
                     },
                     "loxone_outputs": {
-                        "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
-                        "pv_follow_name": "Ernie_EAuto_pv_follow"
+                        "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
+                        "pv_follow_name": "Earnie_EAuto_pv_follow"
                     },
                     "legacy_id": "eauto"
                 },
@@ -141,10 +141,10 @@
             "sens_pv_production_active": "Ernie-Merker-PV_Act",
             "sens_ess_power": "Ernie-Merker-LeistungBat_Act",
             "sens_grid_power_active": "Ernie-Merker-LeistungNetz_Act",
-            "set_ess_active_power": "Ernie_Batterie_Sollleistung",
-            "set_ess_charge_power_limit": "Ernie_Ladegrenze",
-            "set_ess_discharge_power_limit": "Ernie_Entladegrenze",
-            "set_ess_mode": "Ernie_Steuerbefehl"
+            "set_ess_active_power": "Earnie_Batterie_Sollleistung",
+            "set_ess_charge_power_limit": "Earnie_LadeLeistungs-Limit",
+            "set_ess_discharge_power_limit": "Earnie_EntladeLeistungs-Limit",
+            "set_ess_mode": "Earnie_Steuerbefehl"
         },
         "event_triggers": []
     }

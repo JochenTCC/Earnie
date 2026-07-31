@@ -91,12 +91,12 @@ class TestFetchLoxoneRawValue:
                 "LOXONE_PASS": "pass",
             }.get(name, kw.get("default", 5))
         ):
-            result = lc.fetch_loxone_raw_value("Ernie_SOC")
+            result = lc.fetch_loxone_raw_value("Earnie_SOC")
 
         assert result == "3.5 kW"
         mock_get.assert_called_once()
         assert mock_get.call_args.kwargs["auth"].username == "user"
-        assert "jdev/sps/io/Ernie_SOC" in mock_get.call_args.args[0]
+        assert "jdev/sps/io/Earnie_SOC" in mock_get.call_args.args[0]
 
     def test_empty_io_name_returns_none(self):
         assert lc.fetch_loxone_raw_value("") is None
@@ -142,9 +142,9 @@ class TestSendLoxoneValueTraced:
                 "LOXONE_PASS": "secret",
             }.get(name, kw.get("default", 5))
         ):
-            record = lc._send_loxone_value_traced("Ernie_Mode", 2.0)
+            record = lc._send_loxone_value_traced("Earnie_Mode", 2.0)
 
-        assert record.io_name == "Ernie_Mode"
+        assert record.io_name == "Earnie_Mode"
         assert record.value == pytest.approx(2.0)
         assert record.success is True
         assert record.written_at
@@ -153,10 +153,10 @@ class TestSendLoxoneValueTraced:
         with patch.object(
             lc.requests, "get", side_effect=requests.exceptions.Timeout()
         ), patch.object(lc.config, "get", return_value=5):
-            record = lc._send_loxone_value_traced("Ernie_Mode", 1.0)
+            record = lc._send_loxone_value_traced("Earnie_Mode", 1.0)
 
         assert record.success is False
-        assert record.io_name == "Ernie_Mode"
+        assert record.io_name == "Earnie_Mode"
 
 
 class TestSendLoxoneValue:
@@ -169,16 +169,16 @@ class TestSendLoxoneValue:
                 "LOXONE_PASS": "secret",
             }.get(name, kw.get("default", 5))
         ):
-            assert lc.send_loxone_value("Ernie_Mode", 2) is True
+            assert lc.send_loxone_value("Earnie_Mode", 2) is True
 
         url = mock_get.call_args.args[0]
-        assert url == "http://10.0.0.5/dev/sps/io/Ernie_Mode/2"
+        assert url == "http://10.0.0.5/dev/sps/io/Earnie_Mode/2"
 
     def test_timeout_returns_false(self):
         with patch.object(
             lc.requests, "get", side_effect=requests.exceptions.Timeout()
         ), patch.object(lc.config, "get", return_value=5):
-            assert lc.send_loxone_value("Ernie_Mode", 1) is False
+            assert lc.send_loxone_value("Earnie_Mode", 1) is False
 
 
 class TestFetchLoxoneLivePower:
@@ -244,8 +244,8 @@ class TestFlexibleConsumerHelpers:
             "id": "swimspa",
             "name": "SwimSpa",
             "nominal_power_kw": 2.8,
-            "loxone_outputs": {"enable_name": "Ernie_SwimSpa_Freigabe"},
-            "loxone_inputs": {"power_name": "Ernie_Swim-Spa-P_act", "signal_type": signal_type},
+            "loxone_outputs": {"enable_name": "Earnie_SwimSpa_Freigabe"},
+            "loxone_inputs": {"power_name": "Earnie_Swim-Spa-P_act", "signal_type": signal_type},
         }
 
     def test_flex_consumer_enable_on_when_power_positive(self):
@@ -266,13 +266,13 @@ class TestFlexibleConsumerHelpers:
             "nominal_power_kw": 3.5,
             "min_power_kw": 1.4,
             "loxone_outputs": {
-                "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
-                "pv_follow_name": "Ernie_EAuto_pv_follow",
+                "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
+                "pv_follow_name": "Earnie_EAuto_pv_follow",
             },
         }
         ctx = {"eauto": {"skip_loxone_output": True}}
         assert lc._flexible_consumer_output_values(consumer, {"eauto": 3.5}, ctx) == {
-            "Ernie_EAuto_pv_follow": 0.0,
+            "Earnie_EAuto_pv_follow": 0.0,
         }
 
     def test_flex_consumer_setpoint_clamped(self):
@@ -282,8 +282,8 @@ class TestFlexibleConsumerHelpers:
             "nominal_power_kw": 3.5,
             "min_power_kw": 1.4,
             "loxone_outputs": {
-                "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
-                "pv_follow_name": "Ernie_EAuto_pv_follow",
+                "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
+                "pv_follow_name": "Earnie_EAuto_pv_follow",
             },
         }
         assert lc.flex_consumer_power_setpoint_kw(consumer, {"eauto": 2.1}, {}, {"eauto": 0}) == 2.1
@@ -311,7 +311,7 @@ class TestSharedMeterSubtraction:
                 "nominal_power_kw": 2.8,
                 "signal_type": "power",
                 "loxone_inputs": {
-                    "power_name": "Ernie_Swim-Spa-P_act",
+                    "power_name": "Earnie_Swim-Spa-P_act",
                     "subtract_consumer_ids": ["swimspa_filter"],
                 },
             },
@@ -336,7 +336,7 @@ class TestSharedMeterSubtraction:
 
     def test_filter_running_is_subtracted_from_heating_total(self):
         reads = self._reads(
-            {"Ernie_Swim-Spa-P_act": 2.98, "homie_bwa_spa_filter2": 1.0}
+            {"Earnie_Swim-Spa-P_act": 2.98, "homie_bwa_spa_filter2": 1.0}
         )
         with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
             result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
@@ -348,7 +348,7 @@ class TestSharedMeterSubtraction:
         """Autonomer Filter: filter1=1, filter2=0, Gesamtzähler nur Filterlast."""
         reads = self._reads(
             {
-                "Ernie_Swim-Spa-P_act": 0.18,
+                "Earnie_Swim-Spa-P_act": 0.18,
                 "homie_bwa_spa_filter2": 0.0,
                 "homie_bwa_spa_filter1": 1.0,
             }
@@ -362,7 +362,7 @@ class TestSharedMeterSubtraction:
         """Prod-Dump 2026-07-07 10:15: Merker 0, Gesamtzähler nur Filterlast."""
         reads = self._reads(
             {
-                "Ernie_Swim-Spa-P_act": 0.18,
+                "Earnie_Swim-Spa-P_act": 0.18,
                 "homie_bwa_spa_filter2": 0.0,
                 "homie_bwa_spa_filter1": 0.0,
             }
@@ -389,7 +389,7 @@ class TestSharedMeterSubtraction:
         """Prod-Dump 2026-07-09 12:05: Gesamtzähler ~0,15 kW, Toleranz ±0,05."""
         reads = self._reads(
             {
-                "Ernie_Swim-Spa-P_act": 0.15,
+                "Earnie_Swim-Spa-P_act": 0.15,
                 "homie_bwa_spa_filter2": 0.0,
                 "homie_bwa_spa_filter1": 0.0,
             }
@@ -412,7 +412,7 @@ class TestSharedMeterSubtraction:
 
     def test_chart_kw_omits_milp_fallback_when_meter_missing(self):
         reads = self._reads(
-            {"Ernie_Swim-Spa-P_act": None, "homie_bwa_spa_filter2": 0.0}
+            {"Earnie_Swim-Spa-P_act": None, "homie_bwa_spa_filter2": 0.0}
         )
         with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
             live = lc.resolve_flexible_consumers_live_power(
@@ -425,7 +425,7 @@ class TestSharedMeterSubtraction:
 
     def test_filter_off_leaves_heating_unchanged(self):
         reads = self._reads(
-            {"Ernie_Swim-Spa-P_act": 2.8, "homie_bwa_spa_filter2": 0.0}
+            {"Earnie_Swim-Spa-P_act": 2.8, "homie_bwa_spa_filter2": 0.0}
         )
         with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
             result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
@@ -435,7 +435,7 @@ class TestSharedMeterSubtraction:
     def test_no_subtraction_when_heating_uses_fallback(self):
         """Zähler antwortet nicht → Fallback (Heizungs-Soll, bereits filterfrei), kein Abzug."""
         reads = self._reads(
-            {"Ernie_Swim-Spa-P_act": None, "homie_bwa_spa_filter2": 1.0}
+            {"Earnie_Swim-Spa-P_act": None, "homie_bwa_spa_filter2": 1.0}
         )
         with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
             result = lc.fetch_flexible_consumers_live_kw(
@@ -446,7 +446,7 @@ class TestSharedMeterSubtraction:
 
     def test_deduction_clamped_to_zero(self):
         reads = self._reads(
-            {"Ernie_Swim-Spa-P_act": 0.1, "homie_bwa_spa_filter2": 1.0}
+            {"Earnie_Swim-Spa-P_act": 0.1, "homie_bwa_spa_filter2": 1.0}
         )
         with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
             result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
@@ -552,14 +552,14 @@ class TestBuildSentSnapshot:
                 "optimizer_enabled": True,
                 "daily_target_kwh": 8.0,
                 "daily_target_source": "historical",
-                "loxone_outputs": {"enable_name": "Ernie_SwimSpa_Freigabe"},
+                "loxone_outputs": {"enable_name": "Earnie_SwimSpa_Freigabe"},
             }
         ]
         config_map = {
-            "LOXONE_TARGET_ACTIVE_POWER_NAME": "Ernie_Batterie_Sollleistung",
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
+            "LOXONE_TARGET_ACTIVE_POWER_NAME": "Earnie_Batterie_Sollleistung",
+            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
+            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
+            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
         }
 
         with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
@@ -575,12 +575,12 @@ class TestBuildSentSnapshot:
                 charging_contexts={},
             )
 
-        assert "Ernie_Ziel_SoC" not in snapshot
-        assert snapshot["Ernie_Batterie_Sollleistung"] == -2.0
-        assert snapshot["Ernie_Ziel_LadeLeistung"] == 5.0
-        assert snapshot["Ernie_Ziel_Entladeleistung"] == 0.0
-        assert snapshot["Ernie_Steuerbefehl"] == 1.0
-        assert snapshot["Ernie_SwimSpa_Freigabe"] == 1.0
+        assert "Earnie_Ziel_SoC" not in snapshot
+        assert snapshot["Earnie_Batterie_Sollleistung"] == -2.0
+        assert snapshot["Earnie_Ziel_LadeLeistung"] == 5.0
+        assert snapshot["Earnie_Ziel_Entladeleistung"] == 0.0
+        assert snapshot["Earnie_Steuerbefehl"] == 1.0
+        assert snapshot["Earnie_SwimSpa_Freigabe"] == 1.0
 
     def test_snapshot_contains_power_setpoint_as_amps(self):
         consumers = [
@@ -593,15 +593,15 @@ class TestBuildSentSnapshot:
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
                 "loxone_outputs": {
-                    "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
-                    "pv_follow_name": "Ernie_EAuto_pv_follow",
+                    "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
+                    "pv_follow_name": "Earnie_EAuto_pv_follow",
                 },
             }
         ]
         config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
+            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
+            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
+            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
         }
 
         with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
@@ -617,8 +617,8 @@ class TestBuildSentSnapshot:
             )
 
         # 2.5 kW @ 230 V / 1 ph → A
-        assert snapshot["Ernie_EAuto_Ziel_kW"] == pytest.approx(2.5 * 1000.0 / 230.0, abs=1e-3)
-        assert snapshot["Ernie_EAuto_pv_follow"] == 0.0
+        assert snapshot["Earnie_EAuto_Ziel_kW"] == pytest.approx(2.5 * 1000.0 / 230.0, abs=1e-3)
+        assert snapshot["Earnie_EAuto_pv_follow"] == 0.0
 
     def test_snapshot_pv_follow_sends_pmax_as_amps(self):
         consumers = [
@@ -631,15 +631,15 @@ class TestBuildSentSnapshot:
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
                 "loxone_outputs": {
-                    "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
-                    "pv_follow_name": "Ernie_EAuto_pv_follow",
+                    "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
+                    "pv_follow_name": "Earnie_EAuto_pv_follow",
                 },
             }
         ]
         config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
+            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
+            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
+            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
         }
 
         with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
@@ -654,8 +654,8 @@ class TestBuildSentSnapshot:
                 consumer_pv_follow={"eauto": 1},
             )
 
-        assert snapshot["Ernie_EAuto_Ziel_kW"] == pytest.approx(3.5 * 1000.0 / 230.0, abs=1e-3)
-        assert snapshot["Ernie_EAuto_pv_follow"] == 1.0
+        assert snapshot["Earnie_EAuto_Ziel_kW"] == pytest.approx(3.5 * 1000.0 / 230.0, abs=1e-3)
+        assert snapshot["Earnie_EAuto_pv_follow"] == 1.0
 
     def test_snapshot_suppresses_power_when_anticipated_absent(self):
         consumers = [
@@ -668,15 +668,15 @@ class TestBuildSentSnapshot:
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
                 "loxone_outputs": {
-                    "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
-                    "pv_follow_name": "Ernie_EAuto_pv_follow",
+                    "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
+                    "pv_follow_name": "Earnie_EAuto_pv_follow",
                 },
             }
         ]
         config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
+            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
+            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
+            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
         }
         absent_ctx = {
             "eauto": {
@@ -699,8 +699,8 @@ class TestBuildSentSnapshot:
                 consumer_pv_follow={"eauto": 1},
             )
 
-        assert snapshot["Ernie_EAuto_Ziel_kW"] == 0.0
-        assert snapshot["Ernie_EAuto_pv_follow"] == 0.0
+        assert snapshot["Earnie_EAuto_Ziel_kW"] == 0.0
+        assert snapshot["Earnie_EAuto_pv_follow"] == 0.0
 
 
     def test_build_snapshot_does_not_send_to_loxone(self):
@@ -714,15 +714,15 @@ class TestBuildSentSnapshot:
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
                 "loxone_outputs": {
-                    "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
-                    "pv_follow_name": "Ernie_EAuto_pv_follow",
+                    "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
+                    "pv_follow_name": "Earnie_EAuto_pv_follow",
                 },
             }
         ]
         config_map = {
-            "LOXONE_TARGET_CHARGE_POWER_NAME": "Ernie_Ziel_LadeLeistung",
-            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Ernie_Ziel_Entladeleistung",
-            "LOXONE_CONTROL_CMD_NAME": "Ernie_Steuerbefehl",
+            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
+            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
+            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
         }
 
         with patch.object(lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)), patch.object(
@@ -738,8 +738,8 @@ class TestBuildSentSnapshot:
             )
 
         mock_send.assert_not_called()
-        assert snapshot["Ernie_EAuto_Ziel_kW"] == pytest.approx(2.5 * 1000.0 / 230.0, abs=1e-3)
-        assert snapshot["Ernie_EAuto_pv_follow"] == 0.0
+        assert snapshot["Earnie_EAuto_Ziel_kW"] == pytest.approx(2.5 * 1000.0 / 230.0, abs=1e-3)
+        assert snapshot["Earnie_EAuto_pv_follow"] == 0.0
 
 
 class TestSendHuaweiAndConsumers:

@@ -1,6 +1,6 @@
-# EHAL — Earnie Hardware Access Layer (schema_version 2)
+# EHAL — Earnie Hardware Access Layer (schema_version 3)
 
-**Backlog:** `2.4.a` (M1) → **`2.4.j`** (wire rename + promoted fields)  
+**Backlog:** `2.4.a` (M1) → **`2.4.j`** (wire rename) → **`2.4.o`** (Design C1 `set_ess_active_power`)  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 §2.2, §2.5 Phase 1, §2.6  
 **Canonical field names:** [`docs/ui/ehal-com.md`](../ui/ehal-com.md) §B / §C  
 **Schemas:** [`share/ehal/`](../../share/ehal/)  
@@ -33,7 +33,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 
 | Field | Type | Required | Meaning |
 |-------|------|----------|---------|
-| `schema_version` | integer | yes | Wire version; **current = `2`** (`sens_*` freeze in **2.4.j**; M1 was `1`) |
+| `schema_version` | integer | yes | Wire version; **current = `3`** (Design C1 in **2.4.o**; `sens_*` freeze was **2.4.j** / v2; M1 was `1`) |
 | `ts` | string (ISO-8601) | yes | Sample / write time with timezone (`Z` or offset). Prefer UTC. |
 | `adapter_id` | string | yes | Stable adapter instance id (e.g. `openems-lab`, `ha-home`) |
 
@@ -82,18 +82,20 @@ Machine schema: [`share/ehal/telemetry.schema.json`](../../share/ehal/telemetry.
 
 Setpoints are **math limits / forced power / modes**, not a full inner-loop controller. Realtime enforcement stays in the subsystem (OpenEMS / HA / inverter).
 
-**Design C1:** force lives in `set_ess_active_power`; charge/discharge fields are **true caps**; `set_ess_mode` is an optional **hint** for Loxone/HA (OpenEMS ignores it).
+**Design C1:** force lives in `set_ess_active_power`; charge/discharge fields are **true caps**. OpenEMS uses active power + limits and **ignores** `set_ess_mode`.
+
+**Sticky backends (Loxone / HA entity holds):** Merker/entities keep the **last written value**. Omitting `set_ess_active_power` on the wire does **not** clear a stale Sollleistung. Earnie therefore **always writes `set_ess_mode` on every ESS cycle**. **Automatik / inverter free = `set_ess_mode = 0`** — Config must treat mode 0 as “ignore Sollleistung / release force,” even if `Earnie_Batterie_Sollleistung` still holds an old number. Do **not** infer Automatik from absent/`null` active power alone on sticky paths.
 
 | Field | Required in doc | Unit | Notes |
 |-------|-----------------|------|-------|
-| `set_ess_active_power` | no* | W | Forced ESS power (`+` discharge, `−` charge); **omit** on Automatik |
+| `set_ess_active_power` | no* | W | Forced ESS power (`+` discharge, `−` charge); **omit** on Automatik (OpenEMS: no Equals) |
 | `set_ess_charge_power_limit` | no* | W | Max charge power (magnitude ≥ 0) |
 | `set_ess_discharge_power_limit` | no* | W | Max discharge power (magnitude ≥ 0) |
-| `set_ess_mode` | no* | string/number | Optional mode hint (e.g. Huawei Steuerbefehl); OpenEMS ignores |
+| `set_ess_mode` | no* | string/number | Sticky-backend control (Huawei Steuerbefehl); **0 = Automatik**; OpenEMS ignores |
 | `set_evcs_max_current` | no* | A | EV charge current setpoint / max current |
 | `set_evcs_mode` | no* | enum | `pv` \| `now` |
 
-\*A setpoint document must include **at least one** of these fields (plus envelope). Partial updates are allowed; omitted fields mean “leave unchanged” at the adapter (except Automatik → omit `set_ess_active_power` so Equals is not forced).
+\*A setpoint document must include **at least one** of these fields (plus envelope). Partial updates are allowed; omitted fields mean “leave unchanged” at the adapter (except Automatik → omit `set_ess_active_power` so Equals is not forced; sticky backends still rely on **mode = 0**).
 
 Machine schema: [`share/ehal/setpoint.schema.json`](../../share/ehal/setpoint.schema.json).
 
@@ -232,7 +234,8 @@ M2 schema slice — **mapping aids / contribution seeds**, not a new Live I/O pa
 ## Implementation notes (2.4.f Loxone one-click mapping)
 
 - Onboarding helper **inside** the Loxone-EHAL path — not a live I/O replacement. Spec: Entwicklungsplan §3.1.
-- Structure scan (`integrations/loxone_structure.py`): **research compare-all** — LoxAPP3.json and optional official **MCP 17.1** as independent variants (default: both). HTTP marker probe removed (only re-validates already-mapped names; useless for one-click discovery). MCP path: resolve `connect.loxonecloud.com/…/mcp` (GET 307) → headless OAuth 2.1 (`LOXONE_USER`/`LOXONE_PASS`) → `tools/list` → `control_find` / `control_describe` (seed from configured `loxone_blocks` and/or LoxAPP3 names; avoid empty/wildcard queries that return EFM `"Rest"` meters; filter low-value hits). Unwrap MCP `content`/`structuredContent`. Lab: MCP can supplement names; full structure usually better from LoxAPP3. Mapping names default to **union**. `sources=(…)` may restrict variants for tests only.
+- Structure scan (`integrations/loxone_structure.py`): **research compare-all** — LoxAPP3.json and optional official **MCP 17.1** as independent variants (default: both). MCP path: resolve `connect.loxonecloud.com/…/mcp` (GET 307) → headless OAuth 2.1 (`LOXONE_USER`/`LOXONE_PASS`) → `tools/list` → `control_find` / `control_describe` (seed from configured `loxone_blocks` and/or LoxAPP3 names; avoid empty/wildcard queries that return EFM `"Rest"` meters; filter low-value hits). Unwrap MCP `content`/`structuredContent`. Lab: MCP can supplement names; full structure usually better from LoxAPP3. Mapping names default to **union**. `sources=(…)` may restrict variants for tests only.
+- **Greenfield HTTP marker probe (2.4.n):** `integrations/loxone_greenfield_import.probe_marker_names` hits known `greenfield_device_map.json` names via `/jdev/sps/io/{name}`. `LL.Code` `200` or `403` = present (403 common for Virtual HTTP In without App visualization); `404` = missing. Union with LoxAPP3 names for typed Merker match — visualization not required for Earnie_* discovery. EFM meters still need LoxAPP3.
 - HITL UI: `ui/ehal_loxone_mapping.py` on EHAL-Com (backend Loxone). Proposals as EHAL fields; confirm writes flat `loxone_blocks` via `save_main_config`. Field rows grouped by device role (**2.4.g**).
 - Optional LLM: local **Ollama** HTTP (`/api/chat`, JSON). Not bundled in Earnie image / LoxBerry ZIP. Without Ollama: heuristic propose + manual selects.
 - EFM interpretation C (meter tree → Hausprofil consumers + optional `flex.power_name`): **2.4.l** — research note [`docs/spec/efm-auto-sync-2.4.l.md`](efm-auto-sync-2.4.l.md); HITL `integrations/loxone_efm_meters.py` + `ui/ehal_efm_import.py` on EHAL-Com. Manual blueprint remains `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`.

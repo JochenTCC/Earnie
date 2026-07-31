@@ -159,6 +159,10 @@ PAGE_DOCS: dict[str, PageDocs] = {
                 "docs/ui/ehal-com.md",
             ),
             DocLink(
+                "Earnie-Loxone-Library",
+                "docs/einrichtung/loxone-earnie-library.md",
+            ),
+            DocLink(
                 "Home Assistant + evcc (A2/B)",
                 "docs/einrichtung/ha-evcc.md",
             ),

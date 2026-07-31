@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DRAFT (2.4.n Pattern B) — Loxone → Earnie heatpump telemetry push.
+  Freigabe is on VI_Earnie_Heatpump. Power may be EFM Load — keep VO cmd.
+  VO path: flex.{hk_id}.sens_power_act — default hk_id waermepumpe (rename if HK id differs).
+  Binding key stays flex.power_name. Legacy Title Earnie_WP_P_act still valid.
+-->
+<VirtualOut Title="Earnie Wärmepumpe Telemetry" Comment="Pattern B: push WP power to Earnie (draft)" Address="http://EARNIE_HOST:8501" CmdInit="" CloseAfterSend="true" CmdSep="">
+	<VirtualOutCmd Title="Earnie_Waermepumpe_Leistung" Comment="flex.{hk_id}.sens_power_act; binding key flex.power_name; or EFM Load" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+</VirtualOut>

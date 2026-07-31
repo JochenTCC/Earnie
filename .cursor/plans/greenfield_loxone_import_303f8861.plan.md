@@ -6,7 +6,7 @@ todos:
     content: Freeze Merker naming in recipes + greenfield_device_map; sync loxone-signale.md
     status: completed
   - id: draft-vi-vo-xml
-    content: "Draft VO_/VI_ XML skeletons (pattern B HTTP to Earnie) under share/loxone/templates/ for Config round-trip"
+    content: Draft VO_/VI_ XML skeletons (pattern B HTTP to Earnie) under share/loxone/templates/ for Config round-trip
     status: completed
   - id: import-engine
     content: Add loxone_greenfield_import.py (Merker typed + EFM merge) with pytest fixtures

@@ -28,28 +28,28 @@ Oben wählen Sie das **Smarthome-Backend**:
 Kurze Übersicht der **kanonischen EHAL-Wire-Felder** (gleich `docs/ui/ehal-com.md` §C; Ziel nach Backlog **2.4.j**). Adapter liefern/erzeugen diese Namen zwischen Hub und Earnie Core.
 
 
-| Kategorie             | Feld                            | Required | Einheit / Sign-Konvention                                                        |
-| --------------------- | ------------------------------- | -------- | -------------------------------------------------------------------------------- |
-| Envelope              | `schema_version`                | ja       | integer; Wire-Version (**3** = Design C1 `set_ess_active_power`)                 |
-| Envelope              | `ts`                            | ja       | ISO-8601 Timestamp **mit Zeitzone** (bevorzugt UTC)                              |
-| Envelope              | `adapter_id`                    | ja       | stabile Adapter-ID (z. B. `openems-lab`, `ha-home`)                              |
-| Telemetrie            | `sens_grid_power_active`        | ja       | **W**; `+` = Netz **Bezug**, `-` = **Einspeisung**                               |
-| Telemetrie            | `sens_pv_production_active`     | ja       | **W**; >= 0                                                                      |
-| Telemetrie            | `sens_ess_soc`                  | ja       | **%**; 0…100                                                                     |
-| Telemetrie (optional) | `sens_ess_power`                | nein     | **W**; ESS Vorzeichen **OpenEMS-aligned**: `+` = **Entladung**, `-` = **Ladung** |
-| Telemetrie (optional) | `sens_evcs_active_power`        | nein     | **W**; >= 0 (bei Idle i. d. R. 0)                                                |
-| Telemetrie (optional) | `sens_power_consumers`          | nein     | **W**; Hauslast; Merker wenn gemappt, sonst aus Netz/PV/ESS ableiten             |
-| Setpoints (Force)     | `set_ess_active_power`          | nein*    | **W**; signed; `+` = Entladung, `-` = Ladung; bei Automatik weglassen            |
-| Setpoints (Limits)    | `set_ess_charge_power_limit`    | nein*    | **W**; nicht-negativer Betrag (echte Max. Ladeleistung)                          |
-| Setpoints (Limits)    | `set_ess_discharge_power_limit` | nein*    | **W**; nicht-negativer Betrag (echte Max. Entladeleistung)                       |
-| Setpoints (Limits)    | `set_evcs_max_current`          | nein*    | **A**; nicht-negativer Betrag (EV-Lade-Soll-/Maxstrom)                           |
-| Setpoints (Hinweis)   | `set_ess_mode`                  | nein*    | optionaler Modus-Hinweis (z. B. Huawei); OpenEMS ignoriert                       |
-| Setpoints (erweitert) | `set_evcs_mode`                 | nein*    | Enum: `pv`                                                                       |
-| Capability Flags      | `supports_ess_write`            | ja       | boolean; ESS-Setpoints dürfen geschrieben werden                                 |
-| Capability Flags      | `supports_evcs_current`         | ja       | boolean; `set_evcs_max_current` darf geschrieben werden                          |
+| Kategorie             | Feld                            | Required | Einheit / Sign-Konvention                                                                              |
+| --------------------- | ------------------------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| Envelope              | `schema_version`                | ja       | integer; Wire-Version (**3** = Design C1 `set_ess_active_power`)                                       |
+| Envelope              | `ts`                            | ja       | ISO-8601 Timestamp **mit Zeitzone** (bevorzugt UTC)                                                    |
+| Envelope              | `adapter_id`                    | ja       | stabile Adapter-ID (z. B. `openems-lab`, `ha-home`)                                                    |
+| Telemetrie            | `sens_grid_power_active`        | ja       | **W**; `+` = Netz **Bezug**, `-` = **Einspeisung**                                                     |
+| Telemetrie            | `sens_pv_production_active`     | ja       | **W**; >= 0                                                                                            |
+| Telemetrie            | `sens_ess_soc`                  | ja       | **%**; 0…100                                                                                           |
+| Telemetrie (optional) | `sens_ess_power`                | nein     | **W**; ESS Vorzeichen **OpenEMS-aligned**: `+` = **Entladung**, `-` = **Ladung**                       |
+| Telemetrie (optional) | `sens_evcs_active_power`        | nein     | **W**; >= 0 (bei Idle i. d. R. 0)                                                                      |
+| Telemetrie (optional) | `sens_power_consumers`          | nein     | **W**; Hauslast; Merker wenn gemappt, sonst aus Netz/PV/ESS ableiten                                   |
+| Setpoints (Force)     | `set_ess_active_power`          | nein*    | **W**; signed; `+` = Entladung, `-` = Ladung; bei Automatik weglassen                                  |
+| Setpoints (Limits)    | `set_ess_charge_power_limit`    | nein*    | **W**; nicht-negativer Betrag (echte Max. Ladeleistung)                                                |
+| Setpoints (Limits)    | `set_ess_discharge_power_limit` | nein*    | **W**; nicht-negativer Betrag (echte Max. Entladeleistung)                                             |
+| Setpoints (Limits)    | `set_evcs_max_current`          | nein*    | **A**; nicht-negativer Betrag (EV-Lade-Soll-/Maxstrom)                                                 |
+| Setpoints (Modus)     | `set_ess_mode`                  | nein*    | Sticky-Backend: immer mitschreiben; **0 = Automatik** (auch bei alter Sollleistung); OpenEMS ignoriert |
+| Setpoints (erweitert) | `set_evcs_mode`                 | nein*    | Enum: `pv`                                                                                             |
+| Capability Flags      | `supports_ess_write`            | ja       | boolean; ESS-Setpoints dürfen geschrieben werden                                                       |
+| Capability Flags      | `supports_evcs_current`         | ja       | boolean; `set_evcs_max_current` darf geschrieben werden                                                |
 
 
- Ein Setpoint-Dokument muss **mindestens eins** der Setpoint-Felder enthalten. Omitted Felder bedeuten in der Regel: **„unverändert lassen“** (Partial Updates sind erlaubt). Vollständige Geräterollen inkl. `get_`* / weiterer `sens_evcs_`*: siehe §C.
+Ein Setpoint-Dokument muss **mindestens eins** der Setpoint-Felder enthalten. Weggelassene Felder bedeuten in der Regel: **„unverändert lassen“** (Partial Updates sind erlaubt). **Ausnahme sticky Backends (Loxone/HA):** Merker behalten den letzten Wert — Automatik ist `set_ess_mode = 0`, nicht „Sollleistung weggelassen“. Vollständige Geräterollen inkl. `get_`* / weiterer `sens_evcs_`*: siehe §C.
 
 ## C) Kombinierte Feldliste: EHAL, OpenEMS, evcc, Victron, Loxone
 
@@ -82,15 +82,15 @@ Quellen Victron: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 ### C.2 ESS (Batterie)
 
 
-| Bereich / Bedeutung            | Art        | EHAL Value Name                 | OpenEMS                                       | evcc (YAML-Attribut)           | Victron GX / EVCS (Modbus)                                                                                              | Loxone / Loxone-Extra                                                    |
-| ------------------------------ | ---------- | ------------------------------- | --------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Batterie-SoC                   | Messwert   | `sens_ess_soc`                  | `ess0/Soc` oder `_sum/EssSoc`                 | `meters.battery.soc`           | Unit 100 Reg. **843** (`battery_soc`, %)                                                                                | `soc_name`                                                               |
-| Batterieleistung               | Messwert   | `sens_ess_power`                | `ess0/ActivePower` oder `_sum/EssActivePower` | `meters.battery.power`         | Unit 100 Reg. **842** (W; Victron: `+` = Laden, `−` = Entladen → für EHAL **Vorzeichen invertieren**)                   | `battery_power_name`                                                     |
-| ESS Sollleistung schreiben     | Steuerwert | `set_ess_active_power`          | `ess0/SetActivePowerEquals`                   |                                | (gerätabhängig; nicht evcc Preis-Limit)                                                                                 | `target_active_power_name` / `Ernie_Batterie_Sollleistung`               |
-| ESS Ladegrenze schreiben       | Steuerwert | `set_ess_charge_power_limit`    | `ess0/SetActivePowerGreaterOrEquals`          |                                | ESS Mode 2 Unit 100 Reg. **2705** (`system_max_charge_current`, A) bzw. Ein/Aus **2701** (kein 1:1-W-Limit wie OpenEMS) | `target_charge_power_name`                                               |
-| ESS Entladegrenze schreiben    | Steuerwert | `set_ess_discharge_power_limit` | `ess0/SetActivePowerLessOrEquals`             |                                | ESS Mode 2 Unit 100 Reg. **2704** (`ess_max_discharge_power`, W)                                                        | `target_discharge_power_name`                                            |
-| Steuerbefehl Batterie / Huawei | Steuerwert | `set_ess_mode`                  | *(ignoriert)*                                 |                                | Siehe ESS Mode 2/3 ESS Schreibfähigkeit                                                                                 | `control_cmd_name`                                                       |
-| ESS-Schreibfähigkeit           | Capability | `supports_ess_write`            | abgeleitete Adapter-Capability                | abgeleitete Adapter-Capability | ESS Mode 2/3 (Reg. **2700+** / Mode-3 VE.Bus-Setpoints); siehe ESS Mode 2/3 Manual                                      | aus active/charge/discharge Merker ableitbar                             |
+| Bereich / Bedeutung            | Art        | EHAL Value Name                 | OpenEMS                                       | evcc (YAML-Attribut)           | Victron GX / EVCS (Modbus)                                                                                              | Loxone / Loxone-Extra                                       |
+| ------------------------------ | ---------- | ------------------------------- | --------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Batterie-SoC                   | Messwert   | `sens_ess_soc`                  | `ess0/Soc` oder `_sum/EssSoc`                 | `meters.battery.soc`           | Unit 100 Reg. **843** (`battery_soc`, %)                                                                                | `soc_name`                                                  |
+| Batterieleistung               | Messwert   | `sens_ess_power`                | `ess0/ActivePower` oder `_sum/EssActivePower` | `meters.battery.power`         | Unit 100 Reg. **842** (W; Victron: `+` = Laden, `−` = Entladen → für EHAL **Vorzeichen invertieren**)                   | `battery_power_name`                                        |
+| ESS Sollleistung schreiben     | Steuerwert | `set_ess_active_power`          | `ess0/SetActivePowerEquals`                   |                                | (gerätabhängig; nicht evcc Preis-Limit)                                                                                 | `target_active_power_name` / `Earnie_Batterie_Sollleistung` |
+| ESS Ladegrenze schreiben       | Steuerwert | `set_ess_charge_power_limit`    | `ess0/SetActivePowerGreaterOrEquals`          |                                | ESS Mode 2 Unit 100 Reg. **2705** (`system_max_charge_current`, A) bzw. Ein/Aus **2701** (kein 1:1-W-Limit wie OpenEMS) | `target_charge_power_name`                                  |
+| ESS Entladegrenze schreiben    | Steuerwert | `set_ess_discharge_power_limit` | `ess0/SetActivePowerLessOrEquals`             |                                | ESS Mode 2 Unit 100 Reg. **2704** (`ess_max_discharge_power`, W)                                                        | `target_discharge_power_name`                               |
+| Steuerbefehl Batterie / Huawei | Steuerwert | `set_ess_mode`                  | *(ignoriert)*                                 |                                | Siehe ESS Mode 2/3 ESS Schreibfähigkeit                                                                                 | `control_cmd_name`                                          |
+| ESS-Schreibfähigkeit           | Capability | `supports_ess_write`            | abgeleitete Adapter-Capability                | abgeleitete Adapter-Capability | ESS Mode 2/3 (Reg. **2700+** / Mode-3 VE.Bus-Setpoints); siehe ESS Mode 2/3 Manual                                      | aus active/charge/discharge Merker ableitbar                |
 
 
 
@@ -100,7 +100,7 @@ Quellen Victron: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 
 | Bereich / Bedeutung            | Art         | EHAL Value Name            | OpenEMS                                      | evcc (YAML-Attribut)             | Victron GX / EVCS (Modbus)                                          | Loxone / Loxone-Extra                                      |
 | ------------------------------ | ----------- | -------------------------- | -------------------------------------------- | -------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Wallbox-Ladeleistung           | Messwert    | `sens_evcs_active_power`   | `evcs0/ActivePower` oder `evcs0/ChargePower` | `chargers.wallbox.power`         | EVCS Reg. **5014** (`Power`, W); optional Phasen **5011–5013**      | `loxone_inputs.power_name` (EV-Hausprofil)                 |
+| Wallbox-Ladeleistung           | Messwert    | `sens_evcs_active_power`   | `evcs0/ActivePower` oder `evcs0/ChargePower` | `chargers.wallbox.power`         | EVCS Reg. **5014** (`Power`, W); optional Phasen **5011–5013**      | `Earnie_EAuto_Leistung` / EFM Load / `ehal_bindings`          |
 | EV angeschlossen               | Messwert    | `sens_evcs_connected`      |                                              | binary_sensor.evcc_lab_connected | EVCS Reg. **5015** Status `> 0` bzw. Binary `EV Connected`          | `charging_schedule.loxone.plugged_in_name`                 |
 | EV Rest-SOC bei Anschluss      | Messwert    | TO BE REMOVED              |                                              |                                  |                                                                     | `charging_schedule.loxone.soc_at_plug_in_name`             |
 | EV Ist-SOC                     | Messwert    | `sens_evcs_soc_act`        |                                              | sensor.evcc_lab_vehicle_soc      | (AC-EVCS liefert i. d. R. keinen Fahrzeug-SoC)                      | `charging_schedule.loxone.actual_soc_name`                 |
@@ -112,23 +112,60 @@ Quellen Victron: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 | EV Lademodus                   | Steuerwert  | `set_evcs_mode` (`pv`      | `now                                         | off                              | minpv`)                                                             |                                                            |
 | EV Deadline / FertigUm         | Eingabewert | `get_evcs_ready_by_time`   |                                              |                                  |                                                                     | `ehal_bindings.get_evcs_ready_by_time`                     |
 | EVCS-Schreibfähigkeit          | Capability  | `supports_evcs_current`    | abgeleitete Adapter-Capability               | abgeleitete Adapter-Capability   | ja (u. a. **5016**, **5010** Enable, **5009** Mode)                 | wenn Maxstrom-/Strom-Merker gemappt                        |
-| SOC Ladeziel                   | Eingabewert | `get_evcs_limit_soc`       |                                              | number.evcc_lab_limit_soc        |                                                                     | `ehal_bindings.get_evcs_limit_soc` (EHAL-Com)              |
+| SOC Ladeziel                   | Eingabewert | `get_evcs_limit_soc`       |                                              | number.evcc_lab_limit_soc        |                                                                     | `Earnie_EAuto_LimitSOC` / `ehal_bindings.get_evcs_limit_soc` |
 
 
 
 
 ### C.4 Andere Verbraucher (Stub)
 
-Noch **keine** first-class M1-EHAL-Felder. Live läuft über Hausprofil-Flex-Merker (`loxone_inputs` / `loxone_outputs`). Rollen-Vorlagen: `share/ehal/roles/consumer.json`, `share/ehal/roles/heatpump.json`.
+Noch **keine** first-class M1-EHAL-Felder. Live läuft über Hausprofil-Flex-Merker (`loxone_inputs` / `loxone_outputs`). Rollen-Vorlage: `share/ehal/roles/consumer.json`. **Wärmepumpe** → [C.5](#c5-wärmepumpe-stub); **Pool / SwimSpa** → [C.6](#c6-pool--swimspa-stub).
+
+`flex.` ist ein **Rollen-Namespace** (nicht der Consumer-Id). Die konkrete Entität steht im Hausprofil; Live zeigt `{id}:flex.…`. Binding-Keys im Code heißen heute noch `flex.power_name` / `flex.enable_name` / `flex.power_setpoint_name`.
+
+**Pattern B VO-Push-Pfad (Ziel):** `/ehal/loxone/telemetry/flex.{id}.sens_power_act/\v` (Freigabe/Soll später `flex.{id}.set_enable` / `flex.{id}.set_power_setpoint`). `{id}` = Hausprofil-Consumer-Id. Merker-Title bleibt `Earnie_Verbraucher_…`; Binding-Key unverändert `flex.power_name`. Siehe [Loxone-Signale — Mehrere Flex-Verbraucher](../referenz/loxone-signale.md).
 
 
-| Bereich / Bedeutung     | Art        | EHAL Value Name (Stub)     | OpenEMS | evcc (YAML-Attribut) | Victron GX / EVCS (Modbus) | Loxone / Loxone-Extra                                      |
-| ----------------------- | ---------- | -------------------------- | ------- | -------------------- | -------------------------- | ---------------------------------------------------------- |
-| Flex Leistung / Zustand | Messwert   | `flex.power_name`          |         |                      |                            | `loxone_inputs.power_name` (Flex- / Thermal-Verbraucher)   |
-| Flex Freigabe           | Steuerwert | `flex.enable_name`         |         |                      |                            | `loxone_outputs.enable_name` (z. B. SG-Ready / Freigabe)   |
-| Flex Leistungs-Sollwert | Steuerwert | `flex.power_setpoint_name` |         |                      |                            | `loxone_outputs.power_setpoint_name` (kW; nicht M1-EVCS-A) |
+| Bereich / Bedeutung     | Art        | EHAL Value Name (Stub)    | OpenEMS | evcc (YAML-Attribut) | Victron GX / EVCS (Modbus) | Loxone / Loxone-Extra                                      |
+| ----------------------- | ---------- | ------------------------- | ------- | -------------------- | -------------------------- | ---------------------------------------------------------- |
+| Flex Leistung / Zustand | Messwert   | `flex.sens_power_act`     |         |                      |                            | `Earnie_Verbraucher_Leistung` oder EFM Load; Key `flex.power_name` |
+| Flex Freigabe           | Steuerwert | `flex.set_enable`         |         |                      |                            | `Earnie_Verbraucher_Freigabe`; Key `flex.enable_name`   |
+| Flex Leistungs-Sollwert | Steuerwert | `flex.set_power_setpoint` |         |                      |                            | `Earnie_Verbraucher_Ziel_kW`; Key `flex.power_setpoint_name` |
 
 
+### C.5 Wärmepumpe (Stub)
+
+Rollen-Vorlage: `share/ehal/roles/heatpump.json`. Greenfield-Prefix `Earnie_Waermepumpe_*` (Legacy `Earnie_WP_*`). Live typisch als `thermal_annual`-Consumer (z. B. `wp_heating`).
+
+| Bereich / Bedeutung | Art | EHAL Value Name (Stub / Wire) | OpenEMS | evcc | Victron | Loxone / Loxone-Extra |
+| ------------------- | --- | ----------------------------- | ------- | ---- | ------- | --------------------- |
+| WP Leistung | Messwert | `flex.sens_power_act` (Key: `flex.power_name`) | | | | `Earnie_Waermepumpe_Leistung` oder EFM Load |
+| WP Freigabe / SG-Ready | Steuerwert | `flex.set_enable` (Key: `flex.enable_name`) | | | | `Earnie_Waermepumpe_Freigabe` |
+| Außentemperatur | Messwert | `sens_temperature_outside` | | | | `Earnie_Aussentemperatur` (hausweit; oft `thermal_control.loxone.ambient_temp_name`; auch C.6) |
+
+Hinweise: Pattern B — VI = Freigabe von Earnie (`flex.{hk_id}.…` im Check); VO = optional Push `flex.{hk_id}.sens_power_act`. Außentemperatur liegt auf Plant-VO (nicht doppelt auf WP-VO). Kein Ziel-kW-Merker in dieser Greenfield-Runde.
+
+### C.6 Pool / SwimSpa (Stub)
+
+Deckt die **heute für SwimSpa genutzten** Signale (Heizung + Filter) ab. Zwei Live-Entities: Wärme (`daily_target_source: thermal`) und Filter (`loxone_remaining_hours`). Greenfield-Prefix **`Earnie_Pool_*`** / **`Earnie_Pool_Filter_*`** (Legacy z. B. `Earnie_SwimSpa_*` / Homie bleibt in Prod gültig). Spec Filter: [swimspa-filter.md](../spec/swimspa-filter.md). Recipe: `share/loxone/recipes/pool.json`.
+
+
+| Bereich / Bedeutung | Art | EHAL Value Name (Stub) | OpenEMS | evcc | Victron | Loxone / Loxone-Extra |
+| ------------------- | --- | ---------------------- | ------- | ---- | ------- | --------------------- |
+| Pool Gesamtleistung | Messwert | `flex.sens_power_act` | | | | `Earnie_Pool_P_act` oder EFM Load (Fall B: Heizung+Filter+Jets) |
+| Pool Heiz-Freigabe | Steuerwert | `flex.set_enable` | | | | `Earnie_Pool_Freigabe` |
+| Pool Ist-Temperatur | Messwert | `sens_temperature_water` | | | | `Earnie_Pool_Temp_Ist` |
+| Pool Soll-Temperatur | Eingabewert | `get_temperature_water_setpoint` | | | | `Earnie_Pool_Temp_Soll` |
+| Außentemperatur | Messwert | `sens_temperature_outside` | | | | `Earnie_Aussentemperatur` (shared C.5) |
+| Temperatur-Toleranz | Eingabewert | `get_temperature_tolerance_c` | | | | `Earnie_Pool_Temp_Toleranz` |
+| Heizung aktiv | Messwert | `sens_heating_active` | | | | `Earnie_Pool_Heizung_aktiv` |
+| Filter Sollstunden | Eingabewert | `get_filter_remaining_hours` | | | | `Earnie_Pool_Filter_Sollstunden` |
+| Filter Freigabe | Steuerwert | `flex.set_enable` (Filter-Entity) | | | | `Earnie_Pool_Filter_Freigabe` |
+| Filter läuft (Binär) | Messwert | `sens_filter_active` | | | | `Earnie_Pool_Filter_aktiv` |
+| Native Filter-Startstunde | Eingabewert | `get_filter_native_start_hour` | | | | `Earnie_Pool_Filter_NativeStart` |
+| Native Filter-Dauer | Eingabewert | `get_filter_native_duration_hours` | | | | `Earnie_Pool_Filter_NativeDauer` |
+
+Hinweise: Chart zieht Filterleistung ggf. über `subtract_consumer_ids` ab (kein EHAL-Feld). Pattern B: `VI_Earnie_Pool` (Freigaben), `VO_Earnie_Pool` (Telemetrie).
 
 
 ## Live-Cockpit noch gesperrt (Greenfield)
@@ -162,7 +199,7 @@ Nur `**sens_***` und `**get_***` (Messwerte / Eingaben). Die Tabelle listet **al
 | Zuletzt gelesen | Zeitstempel der Abfrage                                                                                   |
 
 
-**Loxone:** periodisches Lesen der konfigurierten Merker (Tabelle + **Smarthome-Merker testen**). Anlagen-Felder: `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, optional `sens_power_consumers`. **Verbraucher** (aus Flex-Liste und Hausprofil mit Merker): EV → `{id}:sens_evcs_`* / `{id}:get_evcs_`*; andere mit Leistung → `{id}:flex.power_name`. Kein PV-Zähler, keine `set_*` / Freigaben.
+**Loxone:** periodisches Lesen der konfigurierten Merker (Tabelle + **Smarthome-Merker testen**). Anlagen-Felder: `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, optional `sens_power_consumers`. **Verbraucher** (aus Flex-Liste und Hausprofil mit Merker): EV → `{id}:sens_evcs_`* / `{id}:get_evcs_`*; andere mit Leistung → `{id}:flex.power_name`. Kein PV-Zähler, keine `set_`* / Freigaben.
 
 **HA / OpenEMS:** EHAL-Telemetrie über REST (nur `sens_`* / `get_`* in der Tabelle; Verbindungstest zeigt ggf. das volle JSON inkl. Envelope). Mapping = Entity bzw. Kanal; abgeleitete Hauslast: `—(abgeleitet)`. Optional Caption Live-Leistung in kW.
 
@@ -201,10 +238,13 @@ Nur bei Backend **Home Assistant**: Entities scannen, Telemetrie-/Setpoint-Felde
 
 Nur bei Backend **Loxone**: Entity-zentrierter Assistent (Backlog **2.4.k**, Struktur-Scan aus **2.4.f**). Entities = **Anlage (Plant)** + Verbraucher aus dem **Live-Hausprofil** (gleiches Shape wie Earnie-Entities). Mapping-Zeilen: `{entity}.{ehal_field}` → Merkername; Felder nach Geräterollen / §C (inkl. EV `set_evcs_max_current` / `get_evcs_limit_soc`, optional `sens_power_consumers`, C.4 `flex.`*).
 
-1. **Alle Quellen testen** — Research-Vergleich (noch keine feste Produktions-Quelle): **LoxAPP3.json** und optional **Loxone MCP 17.1** (Base-URL). Die frühere HTTP-Probe bereits konfigurierter Merker entfällt. Bei `connect.loxonecloud.com/…/mcp`: unauthentifizierter GET (307→Relay), danach **headless OAuth 2.1** mit `LOXONE_USER`/`LOXONE_PASS`, dann Namensauflösung über MCP-Tools. Mapping-Dropdowns standardmäßig **Union**.
-2. **Optional KI-Vorschlag** — lokales [Ollama](https://ollama.com/) (`http://127.0.0.1:11434`, Modell z. B. `llama3.2`). Ollama ist **nicht** im Earnie-Container / LoxBerry-Plugin enthalten.
-3. **Human-in-the-Loop** — Entity wählen, EHAL-Felder zuweisen (Select-Label: **Bedeutung** plus EHAL-Value-Name, z. B. `Netzleistung (sens_grid_power_active)`); darunter **Event-Trigger** je Entity (`id`, `ehal_field`, `signal_type`, `on_change`, `label`). Die Merker-Adresse kommt aus dem Binding des gewählten Feldes.
-4. **Speichern** — schreibt `plant.ehal_bindings` / `consumers[].ehal_bindings` sowie `event_triggers` in `house_profiles.json`. Beim ersten Migrate/Save werden `system.event_triggers` geleert und Anlagen-Rollen aus `loxone_blocks` entfernt (leeres `loxone_blocks` entfällt).
+Library-Vorlagen und Earnie-tot-Fallback: [Earnie-Loxone-Library](../einrichtung/loxone-earnie-library.md).
+
+1. **Alle Quellen testen** — Research-Vergleich (noch keine feste Produktions-Quelle): **LoxAPP3.json**, **HTTP-Probe** bekannter Greenfield-/Template-Namen und in LoxAPP3 gefundener `Earnie_*` Titel (`greenfield_device_map.json` + bereits gemappte Merker; auch Prefix+Slug) über `/jdev/sps/io/{Name}` (`LL.Code` 200 oder 403 = vorhanden, 404 = fehlt; Visualisierung nicht nötig), und optional **Loxone MCP 17.1** (Base-URL). Bei `connect.loxonecloud.com/…/mcp`: unauthentifizierter GET (307→Relay), danach **headless OAuth 2.1** mit `LOXONE_USER`/`LOXONE_PASS`, dann Namensauflösung über MCP-Tools. Mapping-Dropdowns standardmäßig **Union**.
+2. **Greenfield importieren** — legt typisierte Plant-/Verbraucher-Entities und `ehal_bindings` aus Merker+EFM an (Prefix+Slug case-insensitive). Parameter danach im Hauskonfigurator. Vorher Library/Merker auf dem Miniserver: [Earnie-Loxone-Library](../einrichtung/loxone-earnie-library.md).
+3. **Optional KI-Vorschlag** — lokales [Ollama](https://ollama.com/) (`http://127.0.0.1:11434`, Modell z. B. `llama3.2`). Ollama ist **nicht** im Earnie-Container / LoxBerry-Plugin enthalten.
+4. **Human-in-the-Loop** — Entity wählen, EHAL-Felder zuweisen (Select-Label: **Bedeutung** plus EHAL-Value-Name, z. B. `Netzleistung (sens_grid_power_active)`); darunter **Event-Trigger** je Entity (`id`, `ehal_field`, `signal_type`, `on_change`, `label`). Die Merker-Adresse kommt aus dem Binding des gewählten Feldes.
+5. **Speichern** — schreibt `plant.ehal_bindings` / `consumers[].ehal_bindings` sowie `event_triggers` in `house_profiles.json`. Beim ersten Migrate/Save werden `system.event_triggers` geleert und Anlagen-Rollen aus `loxone_blocks` entfernt (leeres `loxone_blocks` entfällt).
 
 **Energieflussmonitor → Verbraucher:** Expander **Zähler importieren** lädt Zähler aus `LoxAPP3.json` (EFM-Baum + orphan Meter), schlägt generische Verbraucher vor und kann optional `flex.power_name` auf die Zähler-Bezeichnung setzen. CSV-Export bleibt manuell; `flex.enable_name` / `flex.power_setpoint_name` nicht vom Zähler. Spec: [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md). Manueller Blueprint: Plan `energieflussmonitor_hausprofil_blueprint_a`.
 

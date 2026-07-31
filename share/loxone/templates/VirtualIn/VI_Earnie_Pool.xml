@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DRAFT (2.4.n Pattern B) — Earnie → Loxone pool Freigaben.
+  Heating Freigabe + Filter Freigabe. Telemetry on VO_Earnie_Pool.
+-->
+<VirtualInHttp Title="Earnie Pool" Comment="Pattern B: pool heat + filter Freigabe from Earnie (draft)" Address="http://EARNIE_HOST:8501/ehal/loxone/status.json" PollingTime="30">
+	<VirtualInHttpCmd Title="Earnie_Pool_Freigabe" Comment="flex.set_enable heat entity 0/1" Check="&quot;Earnie_Pool_Freigabe&quot;:\v" Signed="true" Analog="false" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
+	<VirtualInHttpCmd Title="Earnie_Pool_Filter_Freigabe" Comment="flex.set_enable filter entity 0/1" Check="&quot;Earnie_Pool_Filter_Freigabe&quot;:\v" Signed="true" Analog="false" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
+</VirtualInHttp>

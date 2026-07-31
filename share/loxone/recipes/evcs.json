@@ -1,54 +1,60 @@
 {
   "role_id": "evcs",
   "label": "Wallbox / E-Auto (EVCS)",
-  "baustein_notes": "Greenfield prefix Ernie_EAuto_*. Live EV control is on house-profile ev consumer ehal_bindings. Pattern B VI mirrors Soll_A / Modus from Earnie; telemetry usually from Loxone/Wallbox Merkers.",
+  "baustein_notes": "Greenfield prefix Earnie_EAuto_*. Multi-EV: Prefix+Slug Titles; VI Check / VO paths use ev.{ev_id}.…. Live EV on house-profile ev consumer ehal_bindings. Pattern B VI mirrors Soll_A / Modus; VO pushes sens_*/get_*.",
   "recommended_markers": [
     {
-      "ehal_field": "flex.power_name",
+      "ehal_field": "sens_evcs_active_power",
       "loxone_blocks_key": "loxone_inputs.power_name",
-      "suggested_name": "Ernie_EAuto_P_act",
-      "notes": "Active charge power (kW). Prefer EFM Load meter Bezeichnung when that meter is the wallbox."
+      "suggested_name": "Earnie_EAuto_Leistung",
+      "notes": "Active charge power (kW). Dual flex.power_name for import. Prefer EFM Load. Path ev.{ev_id}.sens_evcs_active_power. Legacy Earnie_EAuto_P_act."
     },
     {
       "ehal_field": "sens_evcs_connected",
       "loxone_blocks_key": "plugged_in_name",
-      "suggested_name": "Ernie_EAuto_Angeschlossen",
+      "suggested_name": "Earnie_EAuto_Angeschlossen",
       "notes": "1 = plugged in."
     },
     {
       "ehal_field": "sens_evcs_soc_act",
       "loxone_blocks_key": "actual_soc_name",
-      "suggested_name": "Ernie_EAuto_SOC",
+      "suggested_name": "Earnie_EAuto_SOC",
       "notes": "Vehicle SOC %."
     },
     {
       "ehal_field": "sens_evcs_bat_capacity",
       "loxone_blocks_key": "battery_capacity_kwh_name",
-      "suggested_name": "Ernie_EAuto_Kapazitaet",
+      "suggested_name": "Earnie_EAuto_Kapazitaet",
       "notes": "Battery capacity kWh."
     },
     {
       "ehal_field": "get_evcs_nominal_current",
       "loxone_blocks_key": "nominal_power_kw_name",
-      "suggested_name": "Ernie_EAuto_MaxStrom",
+      "suggested_name": "Earnie_EAuto_MaxStrom",
       "notes": "Max/nominal current A (legacy key name is misleading)."
+    },
+    {
+      "ehal_field": "get_evcs_limit_soc",
+      "loxone_blocks_key": "get_evcs_limit_soc",
+      "suggested_name": "Earnie_EAuto_LimitSOC",
+      "notes": "Charge limit SOC %."
     },
     {
       "ehal_field": "get_evcs_ready_by_time",
       "loxone_blocks_key": "ready_by_time_name",
-      "suggested_name": "Ernie_EAuto_FertigUm",
+      "suggested_name": "Earnie_EAuto_FertigUm",
       "notes": "Ready-by time."
     },
     {
       "ehal_field": "set_evcs_max_current",
       "loxone_blocks_key": "loxone_outputs.power_setpoint_name",
-      "suggested_name": "Ernie_EAuto_Soll_A",
+      "suggested_name": "Earnie_EAuto_Soll_A",
       "notes": "Charge current setpoint A."
     },
     {
       "ehal_field": "set_evcs_mode",
       "loxone_blocks_key": "set_evcs_mode",
-      "suggested_name": "Ernie_EAuto_Modus",
+      "suggested_name": "Earnie_EAuto_Modus",
       "notes": "Enum pv | now (encoding as agreed in Config)."
     }
   ],
