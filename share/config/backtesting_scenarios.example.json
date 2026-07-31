@@ -15,7 +15,7 @@
                     "roof_south"
                 ],
                 "import_tariff_id": "awattar_at",
-                "export_tariff_id": "fixed_37ct",
+                "export_tariff_id": "at_verbund_v_strom_sonneneinspeisung_fix",
                 "house_profile_id": "example_efh"
             }
         },
@@ -79,7 +79,7 @@
                     "roof_south"
                 ],
                 "import_tariff_id": "awattar_at",
-                "export_tariff_id": "monthly_sunny",
+                "export_tariff_id": "monthly_sunny_web_recherche",
                 "house_profile_id": "example_efh"
             }
         }
