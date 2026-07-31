@@ -48,6 +48,10 @@ def _loxone_jdev_url(io_name: str) -> str:
     return f"http://{config.get('LOXONE_IP')}/jdev/sps/io/{io_name}"
 
 
+def _loxone_jdev_all_url(io_name: str) -> str:
+    return f"http://{config.get('LOXONE_IP')}/jdev/sps/io/{io_name}/all"
+
+
 def _parse_loxone_value(raw_value: str) -> tuple[float, str | None]:
     """Parst Loxone-Werte wie '3.5 kW', '16 A' oder '16A' → (Zahl, Einheit|None)."""
     text = str(raw_value).strip().replace(",", ".")
@@ -164,6 +168,57 @@ def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
     except (KeyError, TypeError) as e:
         logger.error("Loxone: Antwort-Fehler bei '%s': %s", io_name, e)
     return None
+
+
+def fetch_loxone_alarm_clock_tna(io_name: str) -> Optional[str]:
+    """Liest AlarmClock-Ausgang Tna via ``/jdev/sps/io/{name}/all``.
+
+    Wie bei Zählern: Binding = Baustein-Bezeichnung (z. B. ``Wecker_Smart``).
+    Einfaches ``/io/{name}`` liefert hier nur ``0`` — Tna steht in ``output*``.
+    """
+    io_name = str(io_name or "").strip()
+    if not io_name:
+        return None
+
+    timeout_val = config.get_global_timeout(default=5)
+    try:
+        response = requests.get(
+            _loxone_jdev_all_url(io_name),
+            auth=_loxone_auth(),
+            timeout=timeout_val,
+        )
+        response.raise_for_status()
+        ll = response.json().get("LL") or {}
+        if not isinstance(ll, dict):
+            return None
+        if str(ll.get("Code") or "") not in ("", "200"):
+            return None
+        for item in ll.values():
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("name") or "") != "Tna":
+                continue
+            raw = item.get("value")
+            if raw is None or str(raw).strip() == "":
+                return None
+            return str(raw).strip()
+    except requests.exceptions.Timeout:
+        logger.error(
+            "Loxone: Timeout (%ss) bei AlarmClock/all '%s'", timeout_val, io_name
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error("Loxone: Netzwerkfehler bei AlarmClock/all '%s': %s", io_name, e)
+    except (KeyError, TypeError, ValueError) as e:
+        logger.error("Loxone: Antwort-Fehler bei AlarmClock/all '%s': %s", io_name, e)
+    return None
+
+
+def fetch_loxone_ready_by_time(io_name: str) -> Optional[str]:
+    """FertigUm: AlarmClock Tna (Baustein-Name), sonst Legacy InfoOnlyText-Rohwert."""
+    tna = fetch_loxone_alarm_clock_tna(io_name)
+    if tna is not None:
+        return tna
+    return fetch_loxone_raw_value(io_name)
 
 
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:

@@ -85,6 +85,8 @@ Die Templates enthalten **keine** Zähler-Hardware. In Config:
 
 Leistungs-Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **dürfen** vom EFM kommen; VO-Cmds bleiben optionaler Namenskatalog. Earnie bevorzugt die EFM-Bezeichnung im Binding, wenn vorhanden. HITL-Nacharbeit: EHAL-Com → **Energieflussmonitor → Verbraucher**.
 
+**E-Auto FertigUm:** Loxone-Import bindet **AlarmClock**-Bausteine (Ausgang **Tna**) an `get_evcs_ready_by_time` auf dem EV-Entity, das bereits Zähler-/Leistungs-Bindings hat — gleiche Konvention wie Zähler-Bezeichnung, kein Virtual-Out-Text. Earnie liest Tna über `/jdev/sps/io/{name}/all`.
+
 ## 5. Earnie-tot-Fallback (in Loxone Config)
 
 Ziel: Wenn Earnie nicht erreichbar ist oder Virtual In nicht mehr aktualisiert, **Earnie-Sollwerte ignorieren** und lokale Regeln fahren.
@@ -101,16 +103,13 @@ Empfohlener Ablauf (Logikbausteine in Config, kein Earnie-Code):
 
 Earnie Core bleibt unverändert auf Miniserver-IOs; der Fallback ist **nur** Config-Logik um die Merker herum.
 
-## 6. Greenfield-Import in Earnie
+## 6. Loxone-Import in Earnie
 
-Voraussetzung: Library (oder gleichnamige Merker) auf dem Miniserver; Zugangsdaten in `.env` / EHAL-Com.
+Voraussetzung: Earnie-Templates in der Loxone Config und pro Verbraucher ein Zählerbaustein (EFM); Zugangsdaten unter **EHAL-Com → Anbindung**. Der Import-Button ist erst aktiv, wenn der Miniserver erreichbar ist.
 
-1. **Hauskonfigurator** (Erstsetup): optional Assistent „Loxone-Import?“ → springt zu EHAL-Com mit Backend Loxone.
-2. Auf **EHAL-Com**: Anbindung prüfen, dann **Greenfield importieren**.
-3. Earnie lädt `LoxAPP3.json`, prüft `Earnie_*` per HTTP-Probe (auch Prefix+Slug, case-insensitive), legt typisierte Entities an und merged EFM-Zähler.
-4. Mapping-Tabelle prüfen; Parameter (kWh, Fahrpläne, Wohnfläche, …) im **Hauskonfigurator** nachziehen.
-
-Siehe [EHAL-Com — Loxone Struktur → EHAL Mapping](../ui/ehal-com.md#loxone-struktur--ehal-mapping).
+1. **Hauskonfigurator → Hausprofil**: Kapitel **Loxone-Import** oberhalb von **Verbraucher** — bei Erstsetup steht **Nein — manuell fortfahren** in derselben Zeile wie der Import-Button.
+2. Earnie lädt `LoxAPP3.json`, prüft `Earnie_*` per HTTP-Probe (auch Prefix+Slug, case-insensitive), legt typisierte Entities an und merged EFM-Zähler.
+3. Signal-Zuordnung auf **EHAL-Com** prüfen ([Loxone Struktur → EHAL Mapping](../ui/ehal-com.md#loxone-struktur--ehal-mapping)); Parameter (kWh, Fahrpläne, Wohnfläche, …) im **Hauskonfigurator** nachziehen.
 
 ## Checkliste
 
@@ -120,4 +119,4 @@ Siehe [EHAL-Com — Loxone Struktur → EHAL Mapping](../ui/ehal-com.md#loxone-s
 - [ ] Zähler am EFM mit eindeutigen Bezeichnungen
 - [ ] Programm auf Miniserver
 - [ ] Optional: Heartbeat-Watchdog + Fallback programmiert
-- [ ] EHAL-Com: Greenfield importieren → Parameter im Hauskonfigurator
+- [ ] Hauskonfigurator: Loxone-Import → Mapping auf EHAL-Com prüfen → Parameter im Hausprofil

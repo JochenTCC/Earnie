@@ -94,11 +94,16 @@ def _read_check(
         return LoxoneCheck(label, io_name, False, "IO-Name fehlt in config.json")
 
     if read_raw:
-        raw = loxone_client.fetch_loxone_raw_value(io_name)
+        # FertigUm: AlarmClock Tna via /all (Zähler-artige Baustein-Bezeichnung).
+        raw = (
+            loxone_client.fetch_loxone_ready_by_time(io_name)
+            if warn_if_missing
+            else loxone_client.fetch_loxone_raw_value(io_name)
+        )
         if raw is None:
-            # Empty LL.value with HTTP/Code 200 is common for unset FertigUm text.
+            # Empty Tna / LL.value is common when no next alarm / unset text.
             detail = (
-                "Wert leer (IO erreichbar — in Loxone noch kein Text gesetzt)"
+                "Wert leer (AlarmClock Tna / Text — in Loxone noch kein Termin)"
                 if warn_if_missing
                 else "Lesen fehlgeschlagen (kein Wert)"
             )

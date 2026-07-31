@@ -205,7 +205,7 @@ def _loxone_ready_raw(consumer: dict) -> str | None:
     io_name = marker_get_evcs_ready_by_time(consumer)
     if not io_name:
         return None
-    return loxone_client.fetch_loxone_raw_value(io_name)
+    return loxone_client.fetch_loxone_ready_by_time(io_name)
 
 
 def _loxone_ready_deadline(

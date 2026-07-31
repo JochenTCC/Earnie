@@ -122,6 +122,54 @@ class TestFetchLoxoneRawValue:
             assert lc.fetch_loxone_raw_value("Net_IO") is None
 
 
+class TestFetchLoxoneAlarmClockTna:
+    def test_extracts_tna_from_all(self):
+        response = _mock_http_response(
+            json_data={
+                "LL": {
+                    "Code": "200",
+                    "control": "dev/sps/io/Wecker_Smart/all",
+                    "value": "0",
+                    "output7": {"name": "Tna", "nr": 8, "value": "Morgen, 11:00"},
+                }
+            }
+        )
+        with patch.object(lc.requests, "get", return_value=response) as mock_get, patch.object(
+            lc.config, "get", side_effect=lambda name, **kw: {
+                "LOXONE_IP": "192.168.1.1",
+                "LOXONE_USER": "user",
+                "LOXONE_PASS": "pass",
+            }.get(name, kw.get("default", 5)),
+        ):
+            assert lc.fetch_loxone_alarm_clock_tna("Wecker_Smart") == "Morgen, 11:00"
+        assert "/jdev/sps/io/Wecker_Smart/all" in mock_get.call_args.args[0]
+
+    def test_missing_tna_returns_none(self):
+        response = _mock_http_response(
+            json_data={"LL": {"Code": "200", "value": "0", "output0": {"name": "A", "value": 0}}}
+        )
+        with patch.object(lc.requests, "get", return_value=response), patch.object(
+            lc.config, "get", return_value="x"
+        ):
+            assert lc.fetch_loxone_alarm_clock_tna("Wecker_Smart") is None
+
+
+class TestFetchLoxoneReadyByTime:
+    def test_prefers_alarm_clock_tna(self):
+        with patch.object(
+            lc, "fetch_loxone_alarm_clock_tna", return_value="Morgen, 11:00"
+        ) as tna, patch.object(lc, "fetch_loxone_raw_value") as raw:
+            assert lc.fetch_loxone_ready_by_time("Wecker_Smart") == "Morgen, 11:00"
+        tna.assert_called_once_with("Wecker_Smart")
+        raw.assert_not_called()
+
+    def test_falls_back_to_raw_merker(self):
+        with patch.object(lc, "fetch_loxone_alarm_clock_tna", return_value=None), patch.object(
+            lc, "fetch_loxone_raw_value", return_value="Heute, 08:00"
+        ):
+            assert lc.fetch_loxone_ready_by_time("Legacy_FertigUm") == "Heute, 08:00"
+
+
 class TestFetchLoxoneGenericValue:
     def test_parses_numeric_with_unit(self):
         with patch.object(lc, "fetch_loxone_raw_value", return_value="65.5 %"):

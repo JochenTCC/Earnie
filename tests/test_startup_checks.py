@@ -103,7 +103,7 @@ class TestRunLoxoneVerifyOnStartup:
                             "Event-Trigger E-Auto Fertig-Uhrzeit",
                             "Ernie_EAuto_FertigUm",
                             False,
-                            "Wert leer (IO erreichbar — in Loxone noch kein Text gesetzt)",
+                            "Wert leer (AlarmClock Tna / Text — in Loxone noch kein Termin)",
                             severity="warning",
                         )
                     ],

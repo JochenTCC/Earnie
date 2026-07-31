@@ -23,6 +23,43 @@ class TestLoxoneEnvHelpers:
         assert lc.loxone_env_configured() is True
 
 
+class TestProbeLoxoneHttpAccess:
+    def test_empty_host_fails(self):
+        ok, detail = lc.probe_loxone_http_access(
+            host="", username="u", password="p"
+        )
+        assert ok is False
+        assert "empty" in detail.lower()
+
+    def test_http_200_ok(self):
+        class _Resp:
+            status_code = 200
+
+            def close(self):
+                return None
+
+        with patch("requests.get", return_value=_Resp()):
+            ok, detail = lc.probe_loxone_http_access(
+                host="10.0.0.1", username="u", password="p"
+            )
+        assert ok is True
+        assert "200" in detail
+
+    def test_http_401_fails(self):
+        class _Resp:
+            status_code = 401
+
+            def close(self):
+                return None
+
+        with patch("requests.get", return_value=_Resp()):
+            ok, detail = lc.probe_loxone_http_access(
+                host="10.0.0.1", username="u", password="p"
+            )
+        assert ok is False
+        assert "401" in detail
+
+
 class TestReadCheckValidation:
     def test_soc_validation_rejects_out_of_range(self):
         assert lc._soc_valid(105.0) is not None
@@ -35,16 +72,17 @@ class TestReadCheckValidation:
         assert lc._binary_valid(0.5) is not None
 
     def test_read_check_missing_text_io_is_warning(self):
-        with patch.object(lc.loxone_client, "fetch_loxone_raw_value", return_value=None):
+        with patch.object(lc.loxone_client, "fetch_loxone_ready_by_time", return_value=None):
             result = lc._read_check(
                 "ev1:get_evcs_ready_by_time",
-                "Ernie_EAuto_FertigUm",
+                "Wecker_Smart",
                 read_raw=True,
                 warn_if_missing=True,
             )
         assert result.passed is False
         assert result.severity == "warning"
         assert lc._check_counts_as_ok(result) is True
+        assert "AlarmClock" in result.detail
 
 
 class TestCollectReadChecks:
@@ -107,6 +145,7 @@ class TestCollectReadChecks:
         assert "ev1:sens_evcs_soc_act" in labels
         assert "ev1:get_evcs_ready_by_time" in labels
         assert "ev1:flex.power_name" not in labels
+        assert "ev1:flex.ev1.sens_power_act" not in labels
 
     def test_collects_non_ev_flex_power(self):
         consumers = [
@@ -130,8 +169,9 @@ class TestCollectReadChecks:
             checks = lc.collect_read_checks()
 
         by_label = {label: io for label, io, _ in checks}
-        assert by_label["swimspa:flex.power_name"] == "P_Spa"
-        assert by_label["wp_heating:flex.power_name"] == "P_WP"
+        assert by_label["swimspa:flex.swimspa.sens_power_act"] == "P_Spa"
+        assert by_label["wp_heating:flex.wp_heating.sens_power_act"] == "P_WP"
+        assert "swimspa:flex.swimspa.set_enable" not in by_label
         assert "swimspa:flex.enable_name" not in by_label
 
     def test_ev_detected_without_type_via_charging_loxone(self):

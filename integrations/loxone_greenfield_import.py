@@ -36,6 +36,11 @@ _HK_TYPE_BY_KIND = {
     "pool_filter": "generic",
 }
 
+# Legacy prefix → canonical group (same physical heatpump / bindings merge).
+_GROUP_ALIASES = {
+    "Earnie_WP_": "Earnie_Waermepumpe_",
+}
+
 _DEFAULT_EV_SCHEDULE = {
     "target_soc_percent": 100.0,
     "charging_efficiency": 0.95,
@@ -99,6 +104,7 @@ class ImportReport:
     efm_created: list[str] = field(default_factory=list)
     efm_skipped_typed: list[str] = field(default_factory=list)
     efm_plant_filled: list[str] = field(default_factory=list)
+    alarm_clock_bound: list[str] = field(default_factory=list)
     probed_present: list[str] = field(default_factory=list)
     probed_missing: list[str] = field(default_factory=list)
     profile_id: str = ""
@@ -112,6 +118,7 @@ class ImportReport:
             "efm_created": list(self.efm_created),
             "efm_skipped_typed": list(self.efm_skipped_typed),
             "efm_plant_filled": list(self.efm_plant_filled),
+            "alarm_clock_bound": list(self.alarm_clock_bound),
             "probed_present": list(self.probed_present),
             "probed_missing": list(self.probed_missing),
             "profile_id": self.profile_id,
@@ -342,7 +349,27 @@ def _bind_field(bucket: dict[str, Any], field: str, io_name: str) -> None:
     if field not in bindings:
         bindings[field] = io_name
     if field == "sens_evcs_active_power":
-        bindings.setdefault("flex.power_name", io_name)
+        bindings.setdefault("flex.sens_power_act", io_name)
+
+
+def _collapse_alias_groups(groups: dict[str, dict[str, Any]]) -> None:
+    """Merge legacy heatpump groups into the canonical Earnie_Waermepumpe_ bucket."""
+    for alias_key, canonical_key in _GROUP_ALIASES.items():
+        if alias_key not in groups:
+            continue
+        alias_bucket = groups.pop(alias_key)
+        alias_bindings = dict(alias_bucket.get("bindings") or {})
+        if canonical_key in groups:
+            target = groups[canonical_key]
+            for field, io_name in alias_bindings.items():
+                target["bindings"].setdefault(field, io_name)
+            continue
+        groups[canonical_key] = {
+            "entity_kind": alias_bucket.get("entity_kind") or "heatpump",
+            "hk_type": alias_bucket.get("hk_type") or "thermal_annual",
+            "label": alias_bucket.get("label") or "Wärmepumpe",
+            "bindings": alias_bindings,
+        }
 
 
 def _match_exact_markers(
@@ -490,6 +517,7 @@ def match_controls(
         report=report,
         claimed=claimed,
     )
+    _collapse_alias_groups(groups)
     matches: list[EntityMatch] = []
     if plant_bindings:
         matches.append(
@@ -502,13 +530,18 @@ def match_controls(
             )
         )
     for group_key, bucket in groups.items():
+        from ehal.flex_fields import expand_flex_bindings
+
+        label = str(bucket["label"])
+        # Expand role stubs using the same slug apply_typed_matches will use.
+        proposed_id = slug_id(label)
         matches.append(
             EntityMatch(
                 entity_kind=str(bucket["entity_kind"]),
                 hk_type=str(bucket["hk_type"]),
                 group_key=group_key,
-                label=str(bucket["label"]),
-                bindings=dict(bucket["bindings"]),
+                label=label,
+                bindings=expand_flex_bindings(dict(bucket["bindings"]), proposed_id),
             )
         )
     return matches, report
@@ -577,6 +610,55 @@ def _stub_consumer(*, consumer_id: str, label: str, hk_type: str, bindings: dict
     return consumer
 
 
+def _merge_typed_bindings(
+    existing: dict,
+    *,
+    consumer_id: str,
+    incoming: dict[str, str],
+) -> None:
+    """Union Merker bindings onto an existing consumer (keep first-writer keys)."""
+    from ehal.flex_fields import expand_flex_bindings
+
+    bindings = dict(existing.get("ehal_bindings") or {})
+    expanded = expand_flex_bindings(incoming, consumer_id)
+    for field, io_name in expanded.items():
+        bindings.setdefault(field, io_name)
+    existing["ehal_bindings"] = expand_flex_bindings(bindings, consumer_id)
+
+
+def _find_merge_target(
+    by_id: dict[str, dict],
+    *,
+    preferred_id: str,
+    hk_type: str,
+    label: str,
+) -> str | None:
+    """Same id, or singleton thermal_annual / alias-compatible typed consumer."""
+    from integrations.loxone_efm_meters import identity_tokens, tokens_match
+
+    if preferred_id in by_id and str(by_id[preferred_id].get("type") or "") == hk_type:
+        return preferred_id
+    if hk_type == "thermal_annual":
+        return next(
+            (
+                cid
+                for cid, consumer in by_id.items()
+                if str(consumer.get("type") or "") == "thermal_annual"
+            ),
+            None,
+        )
+    label_tokens = identity_tokens(label) | identity_tokens(preferred_id)
+    for cid, consumer in by_id.items():
+        if str(consumer.get("type") or "") != hk_type:
+            continue
+        cons_tokens = identity_tokens(str(consumer.get("label") or "")) | identity_tokens(
+            cid
+        )
+        if tokens_match(label_tokens, cons_tokens):
+            return cid
+    return None
+
+
 def apply_typed_matches(
     house_doc: dict,
     matches: list[EntityMatch],
@@ -585,6 +667,8 @@ def apply_typed_matches(
     report: ImportReport | None = None,
 ) -> dict:
     """Write plant bindings and create typed consumers from Merker matches."""
+    from ehal.flex_fields import expand_flex_bindings
+
     house = dict(house_doc)
     profiles = _profiles_as_dict(house)
     if profile_id not in profiles:
@@ -606,16 +690,25 @@ def apply_typed_matches(
             plant_bindings.update(match.bindings)
             rep.plant_fields = sorted(match.bindings)
             continue
+        hk_type = match.hk_type or "generic"
+        preferred_id = slug_id(match.label)
+        merge_id = _find_merge_target(
+            by_id, preferred_id=preferred_id, hk_type=hk_type, label=match.label
+        )
+        if merge_id is not None:
+            _merge_typed_bindings(
+                by_id[merge_id], consumer_id=merge_id, incoming=match.bindings
+            )
+            continue
         cid = slug_id(match.label, existing=taken)
         taken.add(cid)
-        hk_type = match.hk_type or "generic"
         if hk_type in {"thermal_annual", "thermal_rc"}:
             needs_geo = True
         consumer = _stub_consumer(
             consumer_id=cid,
             label=match.label,
             hk_type=hk_type,
-            bindings=match.bindings,
+            bindings=expand_flex_bindings(match.bindings, cid),
         )
         by_id[cid] = consumer
         rep.created_consumers.append(cid)
@@ -636,15 +729,19 @@ def apply_typed_matches(
 
 
 def _bound_power_addresses(consumers: list[dict]) -> set[str]:
+    from ehal.flex_fields import is_flex_sens_power_act_field
+
     bound: set[str] = set()
     for consumer in consumers:
         bindings = consumer.get("ehal_bindings")
         if not isinstance(bindings, dict):
             continue
-        for key in ("flex.power_name", "sens_evcs_active_power"):
-            value = str(bindings.get(key) or "").strip()
-            if value:
-                bound.add(value.casefold())
+        for key, raw in bindings.items():
+            key_s = str(key)
+            if key_s == "sens_evcs_active_power" or is_flex_sens_power_act_field(key_s):
+                value = str(raw or "").strip()
+                if value:
+                    bound.add(value.casefold())
     return bound
 
 
@@ -706,6 +803,94 @@ def merge_efm(
     return house
 
 
+def extract_alarm_clocks(doc: dict[str, Any]) -> list[str]:
+    """LoxAPP3 AlarmClock Bezeichnungen (Tna via /all — Zähler-style binding)."""
+    names: list[str] = []
+    controls = doc.get("controls")
+    if not isinstance(controls, dict):
+        return names
+    for meta in controls.values():
+        if not isinstance(meta, dict):
+            continue
+        if str(meta.get("type") or "") != "AlarmClock":
+            continue
+        name = str(meta.get("name") or "").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def _ev_has_power_binding(consumer: dict) -> bool:
+    from ehal.flex_fields import is_flex_sens_power_act_field
+
+    bindings = consumer.get("ehal_bindings")
+    if not isinstance(bindings, dict):
+        return False
+    if str(bindings.get("sens_evcs_active_power") or "").strip():
+        return True
+    return any(
+        is_flex_sens_power_act_field(str(key)) and str(val or "").strip()
+        for key, val in bindings.items()
+    )
+
+
+def _pick_alarm_clock_for_ev(clocks: list[str], consumer: dict) -> str | None:
+    from integrations.loxone_efm_meters import identity_tokens, tokens_match
+
+    if not clocks:
+        return None
+    if len(clocks) == 1:
+        return clocks[0]
+    label = str(consumer.get("label") or consumer.get("id") or "")
+    ev_tokens = identity_tokens(label) | identity_tokens(str(consumer.get("id") or ""))
+    for name in clocks:
+        if tokens_match(ev_tokens, identity_tokens(name)):
+            return name
+    return clocks[0]
+
+
+def merge_alarm_clock_ready_by(
+    house_doc: dict,
+    doc: dict[str, Any],
+    *,
+    profile_id: str,
+    report: ImportReport | None = None,
+) -> dict:
+    """Bind AlarmClock Tna → get_evcs_ready_by_time on EV entities (with Zähler power)."""
+    house = dict(house_doc)
+    profiles = _profiles_as_dict(house)
+    profile = dict(profiles.get(profile_id) or {})
+    consumers = [dict(c) for c in (profile.get("consumers") or []) if isinstance(c, dict)]
+    house["profiles"] = {**profiles, profile_id: profile}
+    profile["consumers"] = consumers
+    rep = report or ImportReport()
+
+    clocks = extract_alarm_clocks(doc)
+    if not clocks:
+        return house
+
+    for consumer in consumers:
+        if str(consumer.get("type") or "") != "ev":
+            continue
+        if not _ev_has_power_binding(consumer):
+            continue
+        bindings = (
+            dict(consumer["ehal_bindings"])
+            if isinstance(consumer.get("ehal_bindings"), dict)
+            else {}
+        )
+        if str(bindings.get("get_evcs_ready_by_time") or "").strip():
+            continue
+        clock = _pick_alarm_clock_for_ev(clocks, consumer)
+        if not clock:
+            continue
+        bindings["get_evcs_ready_by_time"] = clock
+        consumer["ehal_bindings"] = bindings
+        cid = str(consumer.get("id") or "").strip() or "?"
+        rep.alarm_clock_bound.append(f"{cid}:{clock}")
+    return house
+
+
 def run_greenfield_import(
     doc: dict[str, Any],
     house_doc: dict | None = None,
@@ -748,6 +933,9 @@ def run_greenfield_import(
         report.probed_missing = sorted(probe_result.missing)
     house = apply_typed_matches(house, matches, profile_id=resolved_id, report=report)
     house = merge_efm(house, doc, profile_id=resolved_id, report=report)
+    house = merge_alarm_clock_ready_by(
+        house, doc, profile_id=resolved_id, report=report
+    )
     out: dict[str, Any] = {"house_doc": house, "report": report.as_dict(), "matches": matches}
     if probe_result is not None:
         out["probe"] = probe_result.as_dict()

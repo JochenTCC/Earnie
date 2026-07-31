@@ -50,13 +50,60 @@ def test_match_wp_and_ev_groups():
     by_group = {m.group_key: m for m in matches}
     wp = by_group["Earnie_Waermepumpe_"]
     assert wp.hk_type == "thermal_annual"
-    assert wp.bindings["flex.power_name"] == "Earnie_Waermepumpe_Leistung"
-    assert wp.bindings["flex.enable_name"] == "Earnie_Waermepumpe_Freigabe"
+    assert wp.bindings["flex.waermepumpe.sens_power_act"] == "Earnie_Waermepumpe_Leistung"
+    assert wp.bindings["flex.waermepumpe.set_enable"] == "Earnie_Waermepumpe_Freigabe"
     ev = by_group["Earnie_EAuto_"]
     assert ev.hk_type == "ev"
     assert ev.bindings["sens_evcs_active_power"] == "Earnie_EAuto_Leistung"
-    assert ev.bindings["flex.power_name"] == "Earnie_EAuto_Leistung"
+    assert ev.bindings["flex.e_auto.sens_power_act"] == "Earnie_EAuto_Leistung"
     assert ev.bindings["set_evcs_max_current"] == "Earnie_EAuto_Soll_A"
+
+
+def test_alarm_clock_tna_merges_onto_ev_with_power():
+    """AlarmClock Bezeichnung → get_evcs_ready_by_time on EV that has Zähler/power."""
+    from integrations.loxone_greenfield_import import (
+        extract_alarm_clocks,
+        merge_alarm_clock_ready_by,
+    )
+
+    assert extract_alarm_clocks(_doc()) == ["Ladewecker"]
+    result = run_greenfield_import(_doc(), _empty_house())
+    house = result["house_doc"]
+    pid = result["report"]["profile_id"]
+    consumers = house["profiles"][pid]["consumers"]
+    evs = [c for c in consumers if c.get("type") == "ev"]
+    assert len(evs) >= 1
+    assert evs[0]["ehal_bindings"]["get_evcs_ready_by_time"] == "Ladewecker"
+    assert f"{evs[0]['id']}:Ladewecker" in result["report"]["alarm_clock_bound"]
+    # Idempotent: existing binding kept
+    house2 = merge_alarm_clock_ready_by(house, _doc(), profile_id=pid)
+    ev2 = next(c for c in house2["profiles"][pid]["consumers"] if c.get("type") == "ev")
+    assert ev2["ehal_bindings"]["get_evcs_ready_by_time"] == "Ladewecker"
+
+
+def test_match_merges_legacy_wp_alias_into_waermepumpe():
+    """Mixed Earnie_Waermepumpe_* + Earnie_WP_* must yield one thermal_annual."""
+    empty_doc = {"controls": {}}
+    extra = {
+        "Earnie_Waermepumpe_Leistung",
+        "Earnie_WP_Freigabe",
+    }
+    matches, _report = match_controls(empty_doc, load_device_map(), extra_names=extra)
+    wp_matches = [m for m in matches if m.hk_type == "thermal_annual"]
+    assert len(wp_matches) == 1
+    assert wp_matches[0].group_key == "Earnie_Waermepumpe_"
+    assert wp_matches[0].bindings["flex.waermepumpe.sens_power_act"] == "Earnie_Waermepumpe_Leistung"
+    assert wp_matches[0].bindings["flex.waermepumpe.set_enable"] == "Earnie_WP_Freigabe"
+    house, pid = ensure_live_profile(_empty_house())
+    house = apply_typed_matches(house, matches, profile_id=pid)
+    consumers = house["profiles"][pid]["consumers"]
+    thermals = [c for c in consumers if c["type"] == "thermal_annual"]
+    assert len(thermals) == 1
+    assert thermals[0]["ehal_bindings"]["flex.waermepumpe.sens_power_act"] == "Earnie_Waermepumpe_Leistung"
+    assert thermals[0]["ehal_bindings"]["flex.waermepumpe.set_enable"] == "Earnie_WP_Freigabe"
+    normalize_house_profiles_document(
+        {"profiles": [dict(house["profiles"][pid], id=pid)]}
+    )
 
 
 def test_ensure_live_profile_bootstraps_empty():
@@ -79,7 +126,7 @@ def test_match_controls_unions_http_probe_extra_names():
     plant = next(m for m in matches if m.entity_kind == "plant")
     assert plant.bindings["sens_ess_soc"] == "Earnie_Batterie_SoC"
     wp = next(m for m in matches if m.group_key == "Earnie_Waermepumpe_")
-    assert wp.bindings["flex.enable_name"] == "Earnie_Waermepumpe_Freigabe"
+    assert wp.bindings["flex.waermepumpe.set_enable"] == "Earnie_Waermepumpe_Freigabe"
 
 
 def test_match_pool_is_thermal_rc():
@@ -104,14 +151,14 @@ def test_slug_match_waschmaschine_creates_generic_consumer():
     wm = cons[0]
     assert wm.label == "Waschmaschine"
     assert wm.hk_type == "generic"
-    assert wm.bindings["flex.power_name"] == "Earnie_Verbraucher_Waschmaschine_Leistung"
-    assert wm.bindings["flex.enable_name"] == "Earnie_Verbraucher_Waschmaschine_Freigabe"
-    assert wm.bindings["flex.power_setpoint_name"] == "Earnie_Verbraucher_Waschmaschine_Ziel_kW"
+    assert wm.bindings["flex.waschmaschine.sens_power_act"] == "Earnie_Verbraucher_Waschmaschine_Leistung"
+    assert wm.bindings["flex.waschmaschine.set_enable"] == "Earnie_Verbraucher_Waschmaschine_Freigabe"
+    assert wm.bindings["flex.waschmaschine.set_power_setpoint"] == "Earnie_Verbraucher_Waschmaschine_Ziel_kW"
     house, pid = ensure_live_profile(_empty_house())
     house = apply_typed_matches(house, matches, profile_id=pid)
     by_id = {c["id"]: c for c in house["profiles"][pid]["consumers"]}
     assert "waschmaschine" in by_id
-    assert by_id["waschmaschine"]["ehal_bindings"]["flex.power_name"].endswith(
+    assert by_id["waschmaschine"]["ehal_bindings"]["flex.waschmaschine.sens_power_act"].endswith(
         "Waschmaschine_Leistung"
     )
 
@@ -163,7 +210,7 @@ def test_slug_match_pool_filter_longest_prefix():
         by_kind.setdefault(m.entity_kind, []).append(m)
     assert len(by_kind.get("pool_filter", [])) == 1
     assert len(by_kind.get("pool", [])) == 1
-    assert by_kind["pool_filter"][0].bindings["flex.enable_name"] == (
+    assert by_kind["pool_filter"][0].bindings["flex.pool_filter.set_enable"] == (
         "Earnie_Pool_Filter_Freigabe"
     )
 
@@ -225,7 +272,7 @@ def test_run_import_creates_typed_and_efm_consumers():
     assert "waermepumpe" in by_id
     assert by_id["waermepumpe"]["type"] == "thermal_annual"
     assert (
-        by_id["waermepumpe"]["ehal_bindings"]["flex.enable_name"]
+        by_id["waermepumpe"]["ehal_bindings"]["flex.waermepumpe.set_enable"]
         == "Earnie_Waermepumpe_Freigabe"
     )
     assert "e_auto" in by_id
@@ -235,11 +282,61 @@ def test_run_import_creates_typed_and_efm_consumers():
         c["type"] == "thermal_rc" for c in consumers
     )
     # EFM loads that do not collide with Earnie_* power names are created
-    assert any(c.get("ehal_bindings", {}).get("flex.power_name") == "Zähler Kochen" for c in consumers)
+    from ehal.flex_fields import is_flex_sens_power_act_field
+
+    assert any(
+        is_flex_sens_power_act_field(k) and v == "Zähler Kochen"
+        for c in consumers
+        for k, v in (c.get("ehal_bindings") or {}).items()
+    )
     assert report["efm_created"]
+    # Zähler labels stripped on create
+    assert by_id["kochen"]["label"] == "Kochen"
+    assert "zaehler_kochen" not in by_id
+
+
+def test_efm_merges_swimspa_and_wallbox_onto_typed():
+    """Zähler Swimspa / Wallbox merge into typed pool / EV (no duplicate generics)."""
+    from ehal.flex_fields import flex_sens_power_act
+
+    result = run_greenfield_import(_doc(), _empty_house())
+    consumers = result["house_doc"]["profiles"]["live"]["consumers"]
+    by_id = {c["id"]: c for c in consumers}
+    pool = next(c for c in consumers if c["type"] == "thermal_rc")
+    assert pool["ehal_bindings"][flex_sens_power_act(pool["id"])] == "Zähler Swimspa"
+    assert by_id["e_auto"]["ehal_bindings"]["sens_evcs_active_power"] == "Zähler Wallbox"
+    assert (
+        by_id["waermepumpe"]["ehal_bindings"][flex_sens_power_act("waermepumpe")]
+        == "Zähler Wärmepumpe"
+    )
+    generic_ids = {c["id"] for c in consumers if c["type"] == "generic"}
+    assert not {"zaehler_swimspa", "swimspa", "zaehler_wallbox", "wallbox", "zaehler_waermepumpe"} & generic_ids
+
+
+def test_apply_typed_merges_same_id_ev():
+    """Second Merker group with same slug merges into existing EV."""
+    empty_doc = {"controls": {}}
+    first = {
+        "Earnie_EAuto_Garage_Soll_A",
+        "Earnie_EAuto_Garage_Leistung",
+    }
+    matches, _ = match_controls(empty_doc, load_device_map(), extra_names=first)
+    house, pid = ensure_live_profile(_empty_house())
+    house = apply_typed_matches(house, matches, profile_id=pid)
+    second = {"Earnie_EAuto_Garage_Modus", "Earnie_EAuto_Garage_Angeschlossen"}
+    matches2, _ = match_controls(empty_doc, load_device_map(), extra_names=second)
+    house = apply_typed_matches(house, matches2, profile_id=pid)
+    evs = [c for c in house["profiles"][pid]["consumers"] if c["type"] == "ev"]
+    assert len(evs) == 1
+    assert evs[0]["id"] == "garage"
+    assert "set_evcs_mode" in evs[0]["ehal_bindings"]
+    assert "sens_evcs_connected" in evs[0]["ehal_bindings"]
+    assert "set_evcs_max_current" in evs[0]["ehal_bindings"]
 
 
 def test_efm_duplicate_power_skips_create():
+    from ehal.flex_fields import flex_sens_power_act, is_flex_sens_power_act_field
+
     dmap = load_device_map()
     matches, report = match_controls(_doc(), dmap)
     house, pid = ensure_live_profile(_empty_house())
@@ -247,11 +344,13 @@ def test_efm_duplicate_power_skips_create():
     # Force typed power name to equal an EFM load Bezeichnung
     consumers = house["profiles"][pid]["consumers"]
     wp = next(c for c in consumers if c["type"] == "thermal_annual")
-    wp["ehal_bindings"]["flex.power_name"] = "Zähler Wärmepumpe"
+    wp["ehal_bindings"][flex_sens_power_act(wp["id"])] = "Zähler Wärmepumpe"
     house = merge_efm(house, _doc(), profile_id=pid, report=report)
     powers = [
-        str(c.get("ehal_bindings", {}).get("flex.power_name") or "")
+        str(v)
         for c in house["profiles"][pid]["consumers"]
+        for k, v in (c.get("ehal_bindings") or {}).items()
+        if is_flex_sens_power_act_field(str(k))
     ]
     assert powers.count("Zähler Wärmepumpe") == 1
     assert "Zähler Wärmepumpe" in report.efm_skipped_typed

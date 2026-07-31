@@ -8,7 +8,7 @@ EV_CHARGING_LOXONE_FIELDS: tuple[tuple[str, str], ...] = (
     ("plugged_in_name", "Merker: Angeschlossen"),
     ("soc_at_plug_in_name", "Merker: Rest-SOC bei Anschluss"),
     ("actual_soc_name", "Merker: Ist-SOC"),
-    ("ready_by_time_name", "Merker: Fertig-Uhrzeit"),
+    ("ready_by_time_name", "Baustein: Fertig-Uhrzeit (AlarmClock / Tna)"),
     ("nominal_power_kw_name", "Merker: max. Ladeleistung"),
     ("battery_capacity_kwh_name", "Merker: Akkukapazität"),
     ("charge_immediate_name", "Merker: Sofort-Laden"),

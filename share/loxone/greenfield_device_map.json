@@ -76,7 +76,7 @@
       "match": "exact",
       "entity_kind": "heatpump",
       "hk_type": "thermal_annual",
-      "ehal_field": "flex.power_name",
+      "ehal_field": "flex.sens_power_act",
       "group": "Earnie_Waermepumpe_",
       "notes": "VO Title; prefer EFM Load when present. Pattern B VO path flex.{hk_id}.sens_power_act."
     },
@@ -85,7 +85,7 @@
       "match": "exact",
       "entity_kind": "heatpump",
       "hk_type": "thermal_annual",
-      "ehal_field": "flex.enable_name",
+      "ehal_field": "flex.set_enable",
       "group": "Earnie_Waermepumpe_",
       "notes": "VI Title; status JSON key flex.{hk_id}.Earnie_Waermepumpe_Freigabe."
     },
@@ -94,7 +94,7 @@
       "match": "exact",
       "entity_kind": "heatpump",
       "hk_type": "thermal_annual",
-      "ehal_field": "flex.power_name",
+      "ehal_field": "flex.sens_power_act",
       "group": "Earnie_WP_",
       "notes": "Legacy alias of Earnie_Waermepumpe_Leistung."
     },
@@ -103,7 +103,7 @@
       "match": "exact",
       "entity_kind": "heatpump",
       "hk_type": "thermal_annual",
-      "ehal_field": "flex.enable_name",
+      "ehal_field": "flex.set_enable",
       "group": "Earnie_WP_",
       "notes": "Legacy alias of Earnie_Waermepumpe_Freigabe."
     },
@@ -167,14 +167,6 @@
       "notes": "Charge limit SOC %."
     },
     {
-      "name": "Earnie_EAuto_FertigUm",
-      "match": "exact",
-      "entity_kind": "ev",
-      "hk_type": "ev",
-      "ehal_field": "get_evcs_ready_by_time",
-      "group": "Earnie_EAuto_"
-    },
-    {
       "name": "Earnie_EAuto_Soll_A",
       "match": "exact",
       "entity_kind": "ev",
@@ -195,7 +187,7 @@
       "match": "exact",
       "entity_kind": "generic",
       "hk_type": "generic",
-      "ehal_field": "flex.power_name",
+      "ehal_field": "flex.sens_power_act",
       "group": "Earnie_Verbraucher_",
       "notes": "Prefer EFM Load when present."
     },
@@ -204,7 +196,7 @@
       "match": "exact",
       "entity_kind": "generic",
       "hk_type": "generic",
-      "ehal_field": "flex.enable_name",
+      "ehal_field": "flex.set_enable",
       "group": "Earnie_Verbraucher_"
     },
     {
@@ -212,7 +204,7 @@
       "match": "exact",
       "entity_kind": "generic",
       "hk_type": "generic",
-      "ehal_field": "flex.power_setpoint_name",
+      "ehal_field": "flex.set_power_setpoint",
       "group": "Earnie_Verbraucher_"
     },
     {
@@ -220,7 +212,7 @@
       "match": "exact",
       "entity_kind": "pool",
       "hk_type": "thermal",
-      "ehal_field": "flex.power_name",
+      "ehal_field": "flex.sens_power_act",
       "group": "Earnie_Pool_",
       "notes": "Fall B total draw; prefer EFM Load. Legacy Earnie_Swim-Spa-P_act."
     },
@@ -229,7 +221,7 @@
       "match": "exact",
       "entity_kind": "pool",
       "hk_type": "thermal",
-      "ehal_field": "flex.enable_name",
+      "ehal_field": "flex.set_enable",
       "group": "Earnie_Pool_",
       "notes": "Heat Freigabe. Legacy Earnie_SwimSpa_Freigabe."
     },
@@ -278,7 +270,7 @@
       "match": "exact",
       "entity_kind": "pool_filter",
       "hk_type": "generic",
-      "ehal_field": "flex.enable_name",
+      "ehal_field": "flex.set_enable",
       "group": "Earnie_Pool_Filter_"
     },
     {

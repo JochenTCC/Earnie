@@ -1184,14 +1184,14 @@
       }
     },
     "gf-earn-018": {
-      "name": "Earnie_EAuto_FertigUm",
-      "type": "InfoOnlyText",
+      "name": "Ladewecker",
+      "type": "AlarmClock",
       "uuidAction": "gf-earn-018",
       "room": "17b525a0-028d-b174-ffff912d5ec91829",
       "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
       "details": {},
       "states": {
-        "value": "st-gf-earn-018"
+        "nextEntryTime": "st-gf-earn-018"
       }
     },
     "gf-earn-019": {

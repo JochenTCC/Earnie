@@ -101,10 +101,21 @@ _HINTS: dict[str, tuple[str, ...]] = {
     "sens_evcs_soc_act": ("ev soc", "fahrzeug soc", "ist-soc", "vehicle soc"),
     "sens_evcs_bat_capacity": ("kapazität", "capacity", "akkukapazität"),
     "get_evcs_nominal_current": ("nennstrom", "nominal", "maxstrom ev"),
-    "get_evcs_ready_by_time": ("fertig", "ready", "deadline"),
+    "get_evcs_ready_by_time": (
+        "tna",
+        "wecker",
+        "ladewecker",
+        "alarm",
+        "fertig",
+        "ready",
+        "deadline",
+    ),
     "flex.power_name": ("leistung", "power", "verbrauch"),
     "flex.enable_name": ("freigabe", "enable", "sg ready"),
     "flex.power_setpoint_name": ("sollwert", "setpoint", "ziel leistung"),
+    "flex.sens_power_act": ("leistung", "power", "verbrauch"),
+    "flex.set_enable": ("freigabe", "enable", "sg ready"),
+    "flex.set_power_setpoint": ("sollwert", "setpoint", "ziel leistung"),
 }
 
 

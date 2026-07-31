@@ -38,7 +38,7 @@
       "field": "get_evcs_ready_by_time",
       "required": false,
       "kind": "input",
-      "notes": "Ready-by deadline from house / wallbox."
+      "notes": "Ready-by deadline: bind AlarmClock Bezeichnung (e.g. Wecker_Smart); read Tna via /all."
     },
     {
       "field": "get_evcs_limit_soc",
