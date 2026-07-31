@@ -156,7 +156,7 @@ Optional: `--cons-data`, `--from`, `--to`. Die Dateien sind Loxone-kompatibel un
 Kurzweg für die Einrichtung (Details und Rollen-Tabelle: Spec [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md), manueller Blueprint im Repo-Plan `energieflussmonitor_hausprofil_blueprint_a`):
 
 1. In Loxone **Energieflussmonitor** + **Zähler** für Netz / PV / Speicher / Verbraucher anlegen (flach oder bewusst flachhalten).
-2. Auf **EHAL-Com** unter **Zähler importieren** die Zähler aus `LoxAPP3.json` laden und gewünschte **generische Verbraucher** übernehmen (optional Live-`flex.power_name` = Zähler-Bezeichnung). Freigabe- und Sollwert-Merker (`flex.enable_name` / `flex.power_setpoint_name`) weiterhin manuell im EHAL-Mapping.
+2. Auf **EHAL-Com** unter **Zähler importieren** die Zähler aus `LoxAPP3.json` laden und gewünschte **generische Verbraucher** übernehmen (optional Live-`flex.{slug}.sens_power_act` = Zähler-Bezeichnung). Freigabe- und Sollwert-Merker (`flex.{slug}.set_enable` / `flex.{slug}.set_power_setpoint`) weiterhin manuell im EHAL-Mapping.
 3. **Statistik-CSVs einzeln** je Serie exportieren und im Hauskonfigurator hochladen (Haus: Energiemonitor/Bilanz/getrennt; Verbraucher: Einzelserie → `profile_csv`, ggf. „Von Basis-Last abziehen“). Es gibt **keinen** Multi-Spalten-Import aller EFM-Leistungsflüsse in einem Schritt.
 
 ## Abgrenzung Live-Loxone und CSV-Ebenen

@@ -3,6 +3,31 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.p UI polishing + pre-release 2.4.0-alpha.1 (2026-07-31)
+
+- [x] **2.4.p — UI polishing**
+  - [x] Show `earnie.log` tail on Optimierer-Dienst (expander)
+  - [x] LoxBerry plugin: change Streamlit IP port
+  - [x] Merge NAS/current config parameters into greenfield import (markers from greenfield kept)
+  - [x] At start: send all virtual inputs / `earnie_set` values once (not only on change)
+  - [x] Pre-release **2.4.0-alpha.1**
+
+
+### Bugfix Live-Schreiben summary vs table (2026-07-31)
+
+- [x] **Live Schreiben said 8 signals written, but only 6 shown** — banner counted raw `loxone_writes` (incl. Freigabe/`charge_immediate`); table is `set_*` only. Summary now from table rows; caption for omitted Freigabe/Legacy. Tests: `tests/test_loxone_debug.py`. Live verified.
+
+
+### Bugfix EV re-plan after charge complete (2026-07-31)
+
+- [x] **EV still connected after charge → re-planned full charge** — config-path house-profile EVs now honor Ist-SOC complete; `plug_cycle_fulfilled` latch survives deadline purge while plugged (cleared on unplug). Real SOC (or equivalent complete signal) remains necessary when Earnie has no fulfillment memory and Rest-/Ist-SOC stay stuck at plug-in values. Tests: `tests/test_charging_session.py`, `tests/test_charging_context.py::TestPluggedInChargeComplete`. Live verified.
+
+
+### Bugfix Missing next-month monthly_table rate (2026-07-31)
+
+- [x] **Missing next-month `monthly_table` rate** — pricing falls back to same month prior year, else prior calendar month (log warning); Szenarienkonfigurator warns + appends Cent/kWh into `earnie_env/config/tariffs.json`; `reload_config` / `reinit_config` reread disk. Tests: `tests/test_tariff_pricing.py`, `tests/test_feed_in_prices.py`, `tests/test_append_monthly_rate.py`. Live verified.
+
+
 ### 2.4.o Changes / EHAL-Com cleanup (2026-07-31)
 
 - [x] **2.4.o — changes**

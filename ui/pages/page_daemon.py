@@ -1,6 +1,8 @@
 """Daemon Control: Start/Stop/Restart des main.py-Optimierer-Dienstes."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 
 import config
@@ -13,6 +15,7 @@ from runtime_store.main_daemon import (
     status,
     stop,
 )
+from runtime_store.persist_paths import log_file
 from ui.help_hint import render_page_title_with_help
 
 _HELP = (
@@ -20,7 +23,8 @@ _HELP = (
     "Produktions-Steuerwerte schreibt nur der laufende Dienst. "
     "Bei gestopptem Dienst können hier manuelle ESS-Test-Sollwerte "
     "an Loxone/HA/OpenEMS gesendet werden. "
-    "Vor dem Start wird geprüft, ob bereits eine Instanz läuft (`runtime/main.lock`)."
+    "Vor dem Start wird geprüft, ob bereits eine Instanz läuft (`runtime/main.lock`). "
+    "Das Dienst-Log (`earnie.log`) zeigt die letzten Zeilen zum Diagnose-Blick."
 )
 
 _STATE_LABELS = {
@@ -35,6 +39,44 @@ _ESS_TEST_PRESETS = (
     ("Entladesperre", 2),
     ("Zwangsentladen", 3),
 )
+
+_LOG_TAIL_LINES = 200
+_LOG_TAIL_READ_BYTES = 256 * 1024
+
+
+def read_earnie_log_tail(
+    path: str | Path | None = None,
+    *,
+    max_lines: int = _LOG_TAIL_LINES,
+    max_bytes: int = _LOG_TAIL_READ_BYTES,
+) -> tuple[str | None, str | None]:
+    """Return ``(tail_text, error)``. Missing/unreadable → ``(None, message)``."""
+    if max_lines < 1:
+        raise ValueError("max_lines must be >= 1")
+    if max_bytes < 1:
+        raise ValueError("max_bytes must be >= 1")
+    target = Path(path) if path is not None else Path(log_file())
+    if not target.is_file():
+        return None, f"Logdatei nicht gefunden: `{target}`"
+    try:
+        size = target.stat().st_size
+        with target.open("rb") as handle:
+            if size > max_bytes:
+                handle.seek(size - max_bytes)
+                chunk = handle.read(max_bytes)
+                # Drop partial first line after mid-file seek.
+                nl = chunk.find(b"\n")
+                if nl >= 0:
+                    chunk = chunk[nl + 1 :]
+            else:
+                chunk = handle.read()
+        text = chunk.decode("utf-8", errors="replace")
+    except OSError as exc:
+        return None, f"Logdatei nicht lesbar: {exc}"
+    lines = text.splitlines()
+    if len(lines) > max_lines:
+        lines = lines[-max_lines:]
+    return "\n".join(lines), None
 
 
 def _format_last_run() -> str:
@@ -116,6 +158,26 @@ def _render_ess_test_section(daemon: DaemonStatus) -> None:
         st.dataframe(records, width="stretch", hide_index=True)
 
 
+def _render_log_section() -> None:
+    st.subheader("Dienst-Log")
+    path = log_file()
+    with st.expander(
+        f"earnie.log — letzte {_LOG_TAIL_LINES} Zeilen",
+        expanded=False,
+    ):
+        st.caption(f"Pfad: `{path}`")
+        if st.button("Aktualisieren", key="daemon_log_refresh"):
+            st.rerun()
+        text, err = read_earnie_log_tail(path)
+        if err:
+            st.info(err)
+            return
+        if not text:
+            st.caption("Logdatei ist leer.")
+            return
+        st.code(text, language="log")
+
+
 def render() -> None:
     render_page_title_with_help(
         "🛠️ Optimierer-Dienst",
@@ -185,3 +247,5 @@ def render() -> None:
 
     st.divider()
     _render_ess_test_section(daemon)
+    st.divider()
+    _render_log_section()

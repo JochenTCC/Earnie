@@ -77,11 +77,12 @@ def render() -> None:
 
     if backend == BACKEND_LOXONE:
         from ui.ehal_efm_import import render_efm_consumer_import_section
-        from ui.ehal_greenfield_import import render_greenfield_import_section
         from ui.ehal_loxone_mapping import render_ehal_loxone_mapping_section
 
-        st.subheader("Greenfield Loxone → Hausprofil")
-        render_greenfield_import_section()
+        st.caption(
+            "Loxone → Hausprofil (**Loxone-Import**) liegt im "
+            "**Hauskonfigurator** (Hausprofil, oberhalb von Verbraucher)."
+        )
 
         st.subheader("Energieflussmonitor → Verbraucher")
         with st.expander("Zähler importieren (2.4.l)", expanded=False):

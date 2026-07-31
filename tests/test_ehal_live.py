@@ -1,6 +1,7 @@
 """Unit tests for thin EHAL Live façade."""
 from __future__ import annotations
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -188,3 +189,60 @@ def test_force_write_ess_test_setpoints_silent(config_mock):
     assert "Silent" in err
     assert records == []
     assert backend == "silent"
+
+
+def _clear_safe_setpoints_skip_env() -> None:
+    os.environ.pop("EARNIE_SKIP_SAFE_SETPOINTS_ON_START", None)
+    os.environ.pop("ENERGY_OPTIMIZER_SKIP_SAFE_SETPOINTS_ON_START", None)
+
+
+@patch("integrations.ehal_live.write_evcs_max_current_from_consumers")
+@patch("integrations.ehal_live.write_ess_setpoints_from_control")
+@patch("integrations.ehal_live.config")
+def test_push_safe_setpoints_on_startup_network(config_mock, ess_mock, evcs_mock):
+    ehal_live.reset_adapter_cache()
+    config_mock.is_loxone_silent_mode.return_value = False
+    config_mock.get.side_effect = lambda key, default=None: {
+        "EHAL_BACKEND": "openems",
+    }.get(key, default)
+    ess_mock.return_value = (None, [])
+    evcs_mock.return_value = (None, [])
+    _clear_safe_setpoints_skip_env()
+    ehal_live.push_safe_setpoints_on_startup()
+    ess_mock.assert_called_once_with(0, 0.0)
+    evcs_mock.assert_called_once_with({})
+
+
+@patch("integrations.ehal_live.loxone_client.send_flexible_consumer_states")
+@patch("integrations.ehal_live.loxone_client.send_huawei_modbus_states")
+@patch("integrations.ehal_live.config")
+def test_push_safe_setpoints_on_startup_loxone(config_mock, huawei_mock, flex_mock):
+    ehal_live.reset_adapter_cache()
+    config_mock.is_loxone_silent_mode.return_value = False
+    config_mock.get.side_effect = lambda key, default=None: {
+        "EHAL_BACKEND": "loxone",
+    }.get(key, default)
+    huawei_mock.return_value = []
+    flex_mock.return_value = []
+    _clear_safe_setpoints_skip_env()
+    ehal_live.push_safe_setpoints_on_startup()
+    huawei_mock.assert_called_once_with(0, 0.0, 0.0)
+    flex_mock.assert_called_once_with({}, None, None)
+
+
+@patch("integrations.ehal_live.write_ess_setpoints_from_control")
+@patch("integrations.ehal_live.config")
+def test_push_safe_setpoints_on_startup_silent(config_mock, ess_mock):
+    config_mock.is_loxone_silent_mode.return_value = True
+    _clear_safe_setpoints_skip_env()
+    ehal_live.push_safe_setpoints_on_startup()
+    ess_mock.assert_not_called()
+
+
+@patch("integrations.ehal_live.write_ess_setpoints_from_control")
+@patch("integrations.ehal_live.config")
+def test_push_safe_setpoints_on_startup_skip_env(config_mock, ess_mock):
+    config_mock.is_loxone_silent_mode.return_value = False
+    with patch.dict("os.environ", {"EARNIE_SKIP_SAFE_SETPOINTS_ON_START": "1"}):
+        ehal_live.push_safe_setpoints_on_startup()
+    ess_mock.assert_not_called()

@@ -367,7 +367,7 @@ Cutover-Checkliste: Lesen OK → Schreiben Erfolg → Monitor/Sankey plausibel. 
 
 Im Produktivbetrieb läuft der Optimierer dauerhaft (im Docker-Container automatisch mit der UI, oder lokal als `python main.py`) als Daemon und arbeitet im **15-Minuten-Takt** (zusätzlich bei konfigurierten Ereignissen).
 
-Unter **Daemon Control → Optimierer-Dienst** können Sie den Daemon starten, stoppen oder neu starten. Die Oberfläche zeigt den aktuellen Plan; Produktions-Schreibvorgänge kommen von `main.py`. Bei gestopptem Daemon können Sie unter **ESS-Schnittstelle testen** manuelle Modi/Sollwerte senden, um die Loxone-/EHAL-Anbindung zu prüfen.
+Unter **Daemon Control → Optimierer-Dienst** können Sie den Daemon starten, stoppen oder neu starten. Die Oberfläche zeigt den aktuellen Plan; Produktions-Schreibvorgänge kommen von `main.py`. Bei gestopptem Daemon können Sie unter **ESS-Schnittstelle testen** manuelle Modi/Sollwerte senden, um die Loxone-/EHAL-Anbindung zu prüfen. Unter **Dienst-Log** sehen Sie die letzten Zeilen von `earnie.log` (Expander; bei Bedarf aktualisieren).
 
 ### Monitor
 

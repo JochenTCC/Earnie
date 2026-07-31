@@ -1,22 +1,22 @@
 {
   "role_id": "consumer",
   "label": "Flex-Verbraucher (Stub)",
-  "baustein_notes": "Greenfield prefix Earnie_Verbraucher_*. Multi: Prefix+Slug Titles; VI Check / VO paths use flex.{hk_id}.…. Prefer EFM Load Bezeichnung for flex.power_name when the meter is that consumer.",
+  "baustein_notes": "Greenfield prefix Earnie_Verbraucher_*. Multi: Prefix+Slug Titles; VI Check / VO paths use flex.{hk_id}.…. Prefer EFM Load Bezeichnung for flex.{hk_id}.sens_power_act when the meter is that consumer.",
   "recommended_markers": [
     {
-      "ehal_field": "flex.power_name",
+      "ehal_field": "flex.sens_power_act",
       "loxone_blocks_key": "loxone_inputs.power_name",
       "suggested_name": "Earnie_Verbraucher_Leistung",
       "notes": "Read power or binary on house-profile consumer."
     },
     {
-      "ehal_field": "flex.enable_name",
+      "ehal_field": "flex.set_enable",
       "loxone_blocks_key": "loxone_outputs.enable_name",
       "suggested_name": "Earnie_Verbraucher_Freigabe",
       "notes": "Enable / Freigabe write."
     },
     {
-      "ehal_field": "flex.power_setpoint_name",
+      "ehal_field": "flex.set_power_setpoint",
       "loxone_blocks_key": "loxone_outputs.power_setpoint_name",
       "suggested_name": "Earnie_Verbraucher_Ziel_kW",
       "notes": "Optional kW setpoint on flex consumer."

@@ -61,8 +61,8 @@ def test_migrate_consumer_legacy_to_ehal_bindings_ev():
     assert bindings["charge_immediate_name"] == "EV_Now"
     assert bindings["set_evcs_max_current"] == "EV_SetA"
     assert bindings["pv_follow_name"] == "EV_PV"
-    assert bindings["flex.power_name"] == "EV_Power"
-    assert bindings["flex.enable_name"] == "EV_Enable"
+    assert bindings["flex.ev1.sens_power_act"] == "EV_Power"
+    assert bindings["flex.ev1.set_enable"] == "EV_Enable"
 
 
 def test_migrate_consumer_flex_power_setpoint():
@@ -73,7 +73,7 @@ def test_migrate_consumer_flex_power_setpoint():
         "loxone_outputs": {"power_setpoint_name": "Pump_Set", "enable_name": "Pump_En"},
     }
     bindings = migrate_consumer_legacy_to_ehal_bindings(consumer)
-    assert bindings["flex.power_setpoint_name"] == "Pump_Set"
+    assert bindings["flex.pump.set_power_setpoint"] == "Pump_Set"
     assert "set_evcs_max_current" not in bindings
 
 

@@ -5,22 +5,22 @@
   "status": "stub",
   "ehal_fields": [
     {
-      "field": "flex.power_name",
+      "field": "flex.{hk_id}.sens_power_act",
       "required": false,
       "kind": "stub",
-      "notes": "House-profile loxone_inputs.power_name — read power or binary state."
+      "notes": "Pattern B power. Legacy binding key flex.power_name migrates on load. Zähler id zaehler_<slug> uses slug without prefix."
     },
     {
-      "field": "flex.enable_name",
+      "field": "flex.{hk_id}.set_enable",
       "required": false,
       "kind": "stub",
-      "notes": "House-profile loxone_outputs.enable_name — enable/freigabe write."
+      "notes": "Pattern B Freigabe. Legacy flex.enable_name migrates on load."
     },
     {
-      "field": "flex.power_setpoint_name",
+      "field": "flex.{hk_id}.set_power_setpoint",
       "required": false,
       "kind": "stub",
-      "notes": "EV-style loxone_outputs.power_setpoint_name (kW) — not M1 set_evcs_max_current."
+      "notes": "Pattern B Sollwert. Legacy flex.power_setpoint_name migrates on load."
     }
   ],
   "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signale.md § Flexible Verbraucher."

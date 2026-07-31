@@ -60,16 +60,36 @@ def _migrate_charging_loxone(lox: dict, bindings: dict[str, str]) -> None:
 
 
 def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
+    from ehal.flex_fields import (
+        KIND_SENS_POWER_ACT,
+        KIND_SET_ENABLE,
+        KIND_SET_POWER_SETPOINT,
+        flex_field,
+    )
+
+    cid = _nonempty(consumer.get("id"))
     inputs = consumer.get("loxone_inputs")
     if isinstance(inputs, dict):
-        _put_binding(bindings, "flex.power_name", inputs.get("power_name"))
+        if cid:
+            _put_binding(
+                bindings,
+                flex_field(cid, KIND_SENS_POWER_ACT),
+                inputs.get("power_name"),
+            )
+        else:
+            _put_binding(bindings, "flex.power_name", inputs.get("power_name"))
         alt = _nonempty(inputs.get("alternate_binary_power_name"))
         if alt:
             _put_binding(bindings, "flex.alternate_binary_power_name", alt)
     outputs = consumer.get("loxone_outputs")
     if not isinstance(outputs, dict):
         return
-    _put_binding(bindings, "flex.enable_name", outputs.get("enable_name"))
+    if cid:
+        _put_binding(
+            bindings, flex_field(cid, KIND_SET_ENABLE), outputs.get("enable_name")
+        )
+    else:
+        _put_binding(bindings, "flex.enable_name", outputs.get("enable_name"))
     _put_binding(bindings, "pv_follow_name", outputs.get("pv_follow_name"))
     setpoint = (
         outputs.get("power_setpoint_name")
@@ -78,6 +98,10 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
     )
     if consumer.get("type") == "ev":
         _put_binding(bindings, "set_evcs_max_current", setpoint)
+    elif cid:
+        _put_binding(
+            bindings, flex_field(cid, KIND_SET_POWER_SETPOINT), setpoint
+        )
     else:
         _put_binding(bindings, "flex.power_setpoint_name", setpoint)
     _put_binding(bindings, "set_evcs_mode", outputs.get("set_evcs_mode"))
@@ -85,6 +109,8 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
 
 def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     """Flatten nested Loxone ``*_name`` nests into ``ehal_bindings`` (§C + transitional)."""
+    from ehal.flex_fields import expand_flex_bindings
+
     bindings: dict[str, str] = {}
     existing = consumer.get("ehal_bindings")
     if isinstance(existing, dict):
@@ -101,6 +127,9 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     if isinstance(sched, dict) and isinstance(sched.get("loxone"), dict):
         _migrate_charging_loxone(sched["loxone"], bindings)
     _migrate_consumer_io(consumer, bindings)
+    cid = _nonempty(consumer.get("id"))
+    if cid:
+        return expand_flex_bindings(bindings, cid)
     return bindings
 
 
@@ -292,6 +321,8 @@ def ensure_migrated(
 
 
 def _migrate_all_consumers(house: dict) -> bool:
+    from ehal.flex_fields import expand_flex_bindings
+
     changed = False
     for profile in _profiles_iterable(house):
         consumers = profile.get("consumers")
@@ -300,8 +331,18 @@ def _migrate_all_consumers(house: dict) -> bool:
         for consumer in consumers:
             if not isinstance(consumer, dict):
                 continue
+            cid = _nonempty(consumer.get("id"))
             existing = consumer.get("ehal_bindings")
             if isinstance(existing, dict) and any(_nonempty(v) for v in existing.values()):
+                if cid:
+                    expanded = expand_flex_bindings(existing, cid)
+                    if expanded != {
+                        str(k): _nonempty(v)
+                        for k, v in existing.items()
+                        if _nonempty(v)
+                    }:
+                        consumer["ehal_bindings"] = expanded
+                        changed = True
                 continue
             migrated = migrate_consumer_legacy_to_ehal_bindings(consumer)
             if migrated:

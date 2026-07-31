@@ -171,8 +171,14 @@ def _preserved_appliance_power_source(consumer: dict) -> str:
     if _loxone_inputs_from_consumer(consumer).get("power_name"):
         return "loxone"
     bindings = consumer.get("ehal_bindings")
-    if isinstance(bindings, dict) and str(bindings.get("flex.power_name") or "").strip():
-        return "loxone"
+    if isinstance(bindings, dict):
+        from ehal.flex_fields import is_flex_sens_power_act_field
+
+        if any(
+            is_flex_sens_power_act_field(str(k)) and str(v or "").strip()
+            for k, v in bindings.items()
+        ):
+            return "loxone"
     return "manual"
 
 
@@ -196,7 +202,7 @@ def _render_manual_power_source(
     if power_source == "loxone":
         st.caption(
             "Merker-Adresse unter **Daemon Control → EHAL-Com** "
-            "(Entity-Mapping, Feld `flex.power_name`) pflegen."
+            "(Entity-Mapping, Feld `flex.{id}.sens_power_act`) pflegen."
         )
     return power_source
 
@@ -897,11 +903,13 @@ def _live_consumer_for_annual(
     return preview
 
 
-def _consumer_expander_title(consumer: dict, index: int, *, session_scope: str) -> tuple[str, float]:
+def _consumer_expander_title(
+    consumer: dict, index: int, *, session_scope: str
+) -> tuple[str, float, str]:
     """Prefer live Bezeichnung/params so expander header updates for every type.
 
-    Returns ``(title, annual_kwh)`` — annual is also used to remount the expander
-    when kWh/a changes (stable keys alone can leave a stale label in the UI).
+    Returns ``(title, annual_kwh, type_key)`` — annual and type remount the expander
+    when they change (stable keys alone can leave a stale label in the UI).
     """
     from house_config.baseload import consumer_annual_kwh
 
@@ -911,11 +919,17 @@ def _consumer_expander_title(consumer: dict, index: int, *, session_scope: str) 
         live = consumer.get("label")
     title = str(live or "").strip() or f"Verbraucher {index + 1}"
     preview = _live_consumer_for_annual(consumer, index, session_scope=session_scope)
+    c_type = str(preview.get("type", "generic") or "generic")
+    type_label = CONSUMER_TYPE_LABELS.get(c_type, c_type)
     try:
         annual = float(consumer_annual_kwh(preview))
     except (TypeError, ValueError, OSError):
         annual = float(preview.get("annual_kwh", 0.0) or 0.0)
-    return f"Verbraucher {index + 1}: {title} — {annual:.0f} kWh/a", annual
+    return (
+        f"Verbraucher {index + 1} ({type_label}): {title} — {annual:.0f} kWh/a",
+        annual,
+        c_type,
+    )
 
 
 def _render_consumer_form(
@@ -928,16 +942,17 @@ def _render_consumer_form(
     default_pv_tilt: float = 18.0,
     default_pv_azimuth: float = 0.0,
 ) -> dict:
-    expander_title, annual = _consumer_expander_title(
+    expander_title, annual, c_type = _consumer_expander_title(
         consumer, index, session_scope=session_scope
     )
     # Expand first consumer only when it has no saved id yet (new/empty form).
     has_saved_data = bool(str(consumer.get("id") or "").strip())
     default_expanded = index == 0 and not has_saved_data
-    # Stable open-state across label/annual remounts; annual in key forces label refresh.
+    # Stable open-state across label/annual/type remounts; suffix forces label refresh.
     open_key = _scoped_key(session_scope, f"hc_consumer_exp_open_{index}")
     exp_key = _scoped_key(
-        session_scope, f"hc_consumer_expander_{index}_{int(round(annual))}"
+        session_scope,
+        f"hc_consumer_expander_{index}_{int(round(annual))}_{c_type}",
     )
     if exp_key not in st.session_state and open_key in st.session_state:
         st.session_state[exp_key] = bool(st.session_state[open_key])
@@ -1643,6 +1658,10 @@ def render_house_profile_tab() -> None:
     )
 
     location = _render_location_fields(session_scope=session_scope)
+
+    from ui.ehal_greenfield_import import render_greenfield_import_section
+
+    render_greenfield_import_section()
 
     st.subheader("Verbraucher")
     st.caption(

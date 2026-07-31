@@ -28,6 +28,9 @@ if [ ! -f "$PDATA/docker/earnie.service" ]; then
   exit 2
 fi
 
+bash "$PDATA/docker/sync_streamlit_env.sh" "$PCONFIG/plugin.env" "$PDATA/docker"
+chown loxberry:loxberry "$PDATA/docker/.env" 2>/dev/null || true
+
 cp -f "$PDATA/docker/earnie.service" /etc/systemd/system/earnie.service
 systemctl daemon-reload
 systemctl enable earnie

@@ -5,16 +5,16 @@
   "status": "stub",
   "ehal_fields": [
     {
-      "field": "flex.power_name",
+      "field": "flex.{hk_id}.sens_power_act",
       "required": false,
       "kind": "stub",
-      "notes": "loxone_inputs.power_name on thermal_annual consumer (e.g. wp_heating)."
+      "notes": "Pattern B power on thermal_annual (e.g. waermepumpe). Legacy flex.power_name migrates on load."
     },
     {
-      "field": "flex.enable_name",
+      "field": "flex.{hk_id}.set_enable",
       "required": false,
       "kind": "stub",
-      "notes": "loxone_outputs.enable_name — SG-Ready / Freigabe (e.g. Earnie_Waermepumpe_Freigabe)."
+      "notes": "Pattern B Freigabe / SG-Ready. Legacy flex.enable_name migrates on load."
     }
   ],
   "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signale.md and Thermals backlog."

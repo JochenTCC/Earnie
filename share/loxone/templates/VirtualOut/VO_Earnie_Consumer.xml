@@ -3,9 +3,9 @@
   DRAFT (2.4.n Pattern B) — Loxone → Earnie generic flex consumer power push.
   Freigabe/Ziel_kW are on VI_Earnie_Consumer. Multi-consumer: Prefix+Slug Titles (docs).
   VO path: /ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/\v — replace {hk_id}
-  with the Hausprofil consumer id (e.g. waschmaschine). Binding key stays flex.power_name.
+  with the Hausprofil consumer id (e.g. waschmaschine). Binding key flex.{hk_id}.sens_power_act.
   Leistung may be EFM Load — keep VO cmd.
 -->
 <VirtualOut Title="Earnie Generic Consumer Telemetry" Comment="Pattern B: push flex power to Earnie (draft)" Address="http://EARNIE_HOST:8501" CmdInit="" CloseAfterSend="true" CmdSep="">
-	<VirtualOutCmd Title="Earnie_Verbraucher_Leistung" Comment="flex.{hk_id}.sens_power_act; binding key flex.power_name; or EFM Load" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Verbraucher_Leistung" Comment="flex.{hk_id}.sens_power_act; or EFM Load" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/flex.{hk_id}.sens_power_act/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
 </VirtualOut>

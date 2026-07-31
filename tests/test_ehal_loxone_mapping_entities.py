@@ -18,6 +18,11 @@ def test_fields_for_consumer_ev_vs_flex():
     assert "get_evcs_limit_soc" in EV_FIELDS
     assert "sens_power_consumers" in PLANT_FIELDS
     assert fields_for_consumer({"type": "thermal_annual"}) == FLEX_FIELDS
+    assert fields_for_consumer({"id": "wp", "type": "thermal_annual"}) == (
+        "flex.wp.sens_power_act",
+        "flex.wp.set_enable",
+        "flex.wp.set_power_setpoint",
+    )
 
 
 def test_field_select_caption_includes_ehal_name():
@@ -46,7 +51,7 @@ def test_build_entity_rows_includes_plant_and_consumers():
     assert rows[0]["bindings"]["sens_ess_soc"] == "SOC"
     assert "set_evcs_max_current" in rows[1]["fields"]
     assert "set_evcs_current" not in rows[1]["fields"]
-    assert "flex.power_name" in rows[2]["fields"]
+    assert "flex.wp.sens_power_act" in rows[2]["fields"]
 
 
 def test_apply_entity_bindings_writes_plant_and_consumer():

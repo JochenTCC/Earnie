@@ -1,6 +1,7 @@
 """Loxone Energieflussmonitor / Zähler → Hausprofil consumer proposals (2.4.l)."""
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -27,6 +28,24 @@ _NODE_TO_ROLE = {
     "load": ROLE_CONSUMER,
     "group": ROLE_GROUP,
 }
+
+# Leading meter Bezeichnung noise → strip for HK label / id defaults.
+_ZAEHLER_PREFIX = re.compile(r"^(?:zaehler|zähler)[\s_\-]*", re.IGNORECASE)
+# EFM Load titles often look like "Verbraucher 2: E-Auto" / "Verbraucher 8:smart".
+_VERBRAUCHER_N_PREFIX = re.compile(r"^verbraucher\s*\d+\s*:\s*", re.IGNORECASE)
+_SPLIT_NAME = re.compile(r"[/,|+]+")
+
+# Same physical device under different Loxone names (Merker vs Zähler).
+_MERGE_ALIASES: tuple[frozenset[str], ...] = (
+    frozenset({"pool", "swimspa", "swim_spa", "pool_swimspa", "pool_swim_spa"}),
+    frozenset({"e_auto", "eauto", "wallbox", "ev", "elektroauto", "smart"}),
+    frozenset({"waermepumpe", "wp"}),
+)
+
+# Recipe / generic EV labels — lose to a concrete EFM Bezeichnung (e.g. "smart").
+_GENERIC_EV_LABEL_SLUGS = frozenset(
+    {"e_auto", "eauto", "wallbox", "ev", "elektroauto", "e-auto"}
+)
 
 
 @dataclass(frozen=True)
@@ -62,8 +81,55 @@ class ConsumerImportProposal:
         return {k: str(v) for k, v in asdict(self).items()}
 
 
+def meter_display_name(name: str) -> str:
+    """Strip leading Zähler/Zaehler and EFM 'Verbraucher N:' for HK label/id."""
+    text = str(name or "").strip()
+    cleaned = _ZAEHLER_PREFIX.sub("", text).strip()
+    cleaned = _VERBRAUCHER_N_PREFIX.sub("", cleaned).strip()
+    return cleaned or text
+
+
+def preferred_merge_label(existing_label: str, incoming_name: str) -> str:
+    """Keep concrete device names over recipe defaults (E-Auto/Wallbox)."""
+    existing = str(existing_label or "").strip()
+    incoming = meter_display_name(incoming_name)
+    if not existing:
+        return incoming
+    if not incoming:
+        return existing
+    ex_generic = slug_id(existing) in _GENERIC_EV_LABEL_SLUGS
+    inc_generic = slug_id(incoming) in _GENERIC_EV_LABEL_SLUGS
+    if ex_generic and not inc_generic:
+        return incoming
+    return existing
+
+
 def csv_stem_from_name(name: str) -> str:
-    return slug_id(str(name or "").strip() or "zaehler")
+    return slug_id(meter_display_name(name) or "zaehler")
+
+
+def identity_tokens(name: str) -> set[str]:
+    """Casefold + slug tokens for duplicate matching (Merker ↔ Zähler)."""
+    raw = str(name or "").strip()
+    if not raw:
+        return set()
+    display = meter_display_name(raw)
+    tokens = {raw.casefold(), display.casefold(), slug_id(display), slug_id(raw)}
+    for part in _SPLIT_NAME.split(display):
+        part = part.strip()
+        if part:
+            tokens.add(part.casefold())
+            tokens.add(slug_id(part))
+    return {t for t in tokens if t}
+
+
+def tokens_match(left: set[str], right: set[str]) -> bool:
+    if left & right:
+        return True
+    for aliases in _MERGE_ALIASES:
+        if (left & aliases) and (right & aliases):
+            return True
+    return False
 
 
 def _room_cat_maps(doc: dict[str, Any]) -> tuple[dict[str, str], dict[str, str]]:
@@ -299,20 +365,17 @@ def extract_efm_meters(doc: dict[str, Any]) -> list[EfmMeterCandidate]:
 
 
 def _match_existing(name: str, consumers: list[dict]) -> dict | None:
-    key = name.casefold()
+    name_tokens = identity_tokens(name)
+    if not name_tokens:
+        return None
     for consumer in consumers:
         if not isinstance(consumer, dict):
             continue
         label = str(consumer.get("label") or "").strip()
         cid = str(consumer.get("id") or "").strip()
-        if label.casefold() == key or cid.casefold() == key:
+        cons_tokens = identity_tokens(label) | identity_tokens(cid)
+        if tokens_match(name_tokens, cons_tokens):
             return consumer
-        # "Zähler X" ↔ "X"
-        for prefix in ("zähler ", "zaehler "):
-            if key.startswith(prefix) and label.casefold() == key[len(prefix) :]:
-                return consumer
-            if label.casefold().startswith(prefix) and key == label.casefold()[len(prefix) :]:
-                return consumer
     return None
 
 
@@ -327,6 +390,10 @@ def propose_consumer_imports(
         if isinstance(c, dict) and str(c.get("id") or "").strip()
     }
     proposals: list[ConsumerImportProposal] = []
+    # Grow with creates so later EFM meters in the same batch can merge.
+    known: list[dict] = [
+        dict(c) for c in existing_consumers if isinstance(c, dict)
+    ]
     for cand in candidates:
         if cand.role == ROLE_RESIDUAL:
             action = "skip_residual"
@@ -336,16 +403,20 @@ def propose_consumer_imports(
             action = "skip_group"
         else:
             action = "create"
-        matched = _match_existing(cand.name, existing_consumers) if action == "create" else None
+        matched = _match_existing(cand.name, known) if action == "create" else None
         if matched is not None:
             action = "match"
             cid = str(matched.get("id") or "").strip()
-            label = str(matched.get("label") or cid).strip()
+            prior = str(matched.get("label") or cid).strip()
+            label = preferred_merge_label(prior, cand.name)
+            if label != prior:
+                matched["label"] = label
         else:
-            label = cand.name
+            label = meter_display_name(cand.name)
             cid = slug_id(label, existing=taken) if action == "create" else ""
             if cid:
                 taken.add(cid)
+                known.append({"id": cid, "label": label, "type": "generic"})
         proposals.append(
             ConsumerImportProposal(
                 action=action,
@@ -360,6 +431,21 @@ def propose_consumer_imports(
             )
         )
     return proposals
+
+
+def _bind_meter_power(consumer: dict, *, consumer_id: str, power: str) -> None:
+    """Attach Zähler power; prefer EFM address for sens_* power fields."""
+    from ehal.flex_fields import expand_flex_bindings, flex_sens_power_act
+
+    bindings = (
+        dict(consumer["ehal_bindings"])
+        if isinstance(consumer.get("ehal_bindings"), dict)
+        else {}
+    )
+    bindings[flex_sens_power_act(consumer_id)] = power
+    if str(consumer.get("type") or "") == "ev":
+        bindings["sens_evcs_active_power"] = power
+    consumer["ehal_bindings"] = expand_flex_bindings(bindings, consumer_id)
 
 
 def apply_consumer_imports(
@@ -383,13 +469,20 @@ def apply_consumer_imports(
         if action not in {"create", "match"}:
             continue
         cid = str(row.get("consumer_id") or "").strip()
-        label = str(row.get("label") or row.get("name") or cid).strip()
+        label = meter_display_name(
+            str(row.get("label") or row.get("name") or cid).strip()
+        )
         if not cid or not label:
             continue
         bind_power = bool(row.get("bind_power", True))
         power = str(row.get("power_address") or "").strip()
         if action == "match" and cid in by_id:
             consumer = dict(by_id[cid])
+            # Prefer concrete EFM Bezeichnung over recipe defaults (E-Auto/Wallbox).
+            consumer["label"] = preferred_merge_label(
+                str(consumer.get("label") or ""),
+                str(row.get("name") or row.get("label") or label),
+            )
         else:
             consumer = {
                 "id": cid,
@@ -399,16 +492,9 @@ def apply_consumer_imports(
                 "use_profile_csv": False,
                 "nominal_power_kw": 1.0,
             }
-        consumer["label"] = label
         if bind_power and power:
-            bindings = (
-                dict(consumer["ehal_bindings"])
-                if isinstance(consumer.get("ehal_bindings"), dict)
-                else {}
-            )
-            bindings["flex.power_name"] = power
-            consumer["ehal_bindings"] = bindings
-            # Do not invent enable_name / power_setpoint_name from Zähler.
+            _bind_meter_power(consumer, consumer_id=cid, power=power)
+            # Do not invent enable / setpoint from Zähler.
         by_id[cid] = consumer
     profile["consumers"] = list(by_id.values())
     house["profiles"] = {**profiles, profile_id: profile}

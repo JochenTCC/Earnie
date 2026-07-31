@@ -43,21 +43,21 @@ EV_LIVE_WRITE_FIELDS: tuple[str, ...] = (
     "set_evcs_mode",
 )
 
-FLEX_LIVE_READ_FIELDS: tuple[str, ...] = ("flex.power_name",)
-
 NETWORK_LIVE_READ_FIELDS: tuple[str, ...] = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL
 NETWORK_LIVE_WRITE_FIELDS: tuple[str, ...] = SETPOINT_FIELDS
 
 
 def is_live_read_field(field: str) -> bool:
-    """True for Live-Lesen rows (``sens_*`` / ``get_*`` / consumer ``flex.power_name``)."""
+    """True for Live-Lesen rows (``sens_*`` / ``get_*`` / flex ``*.sens_power_act``)."""
+    from ehal.flex_fields import is_flex_live_read_field
+
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
     return (
         name.startswith("sens_")
         or name.startswith("get_")
-        or name == "flex.power_name"
+        or is_flex_live_read_field(name)
     )
 
 
@@ -113,7 +113,9 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
         if _consumer_is_ev(consumer):
             fields.extend(f"{cid}:{name}" for name in EV_LIVE_READ_FIELDS)
         else:
-            fields.extend(f"{cid}:{name}" for name in FLEX_LIVE_READ_FIELDS)
+            from ehal.flex_fields import flex_sens_power_act
+
+            fields.append(f"{cid}:{flex_sens_power_act(cid)}")
     return fields
 
 

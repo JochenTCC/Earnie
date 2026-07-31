@@ -38,6 +38,21 @@ def _thermal_consumer_id(profile: dict) -> str:
     raise AssertionError("greenfield profile missing thermal_annual consumer")
 
 
+def _profile_consumer_ids(profile: dict) -> list[str]:
+    return [
+        str(consumer["id"])
+        for consumer in profile.get("consumers") or []
+        if str(consumer.get("id") or "").strip()
+    ]
+
+
+def _patch_expected_cons_ids(monkeypatch, consumer_ids: list[str]) -> None:
+    monkeypatch.setattr(
+        "data.cons_data_house_profile.expected_cons_data_consumer_ids",
+        lambda: list(consumer_ids),
+    )
+
+
 def _mock_open_meteo_climate(monkeypatch) -> None:
     install_open_meteo_climate_mock(monkeypatch)
 
@@ -67,11 +82,8 @@ def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
     _mock_open_meteo_climate(monkeypatch)
     profile = _greenfield_profile()
     thermal_id = _thermal_consumer_id(profile)
-    consumer_ids = [thermal_id, "ev", "rest"]
-    monkeypatch.setattr(
-        "data.cons_data_house_profile.expected_cons_data_consumer_ids",
-        lambda: consumer_ids,
-    )
+    consumer_ids = _profile_consumer_ids(profile)
+    _patch_expected_cons_ids(monkeypatch, consumer_ids)
     climate = ModeledClimateContext.for_house_profile(profile, kwp=5.0)
     df = build_synthetic_dataframe_from_house_profile(
         profile,
@@ -86,17 +98,21 @@ def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
     cache = HistoricalDataCache()
     cache._consumption_df = _cons_data_to_profile_dataframe(df)
     cache._pv_series = df["pv_kw"]
+    flex_ids = [cid for cid in consumer_ids if cid != thermal_id][:2] or consumer_ids[:1]
     _, hist_totals, total_load, hourly_flex = cache.get_window_consumption(
         slots,
-        flex_consumer_ids=["ev", "rest"],
+        flex_consumer_ids=flex_ids,
     )
     _, all_consumer_totals, _, _ = cache.get_window_consumption(slots)
+    cons_data_ids = cache.cons_data_consumer_ids_present()
     overlay = house_profile_baseload_overlay(
         profile,
         slots,
         historical_totals=all_consumer_totals,
+        cons_data_consumer_ids=cons_data_ids,
         climate=climate,
     )
+    assert thermal_id in cons_data_ids
     assert sum(overlay) == pytest.approx(0.0, abs=1e-6)
     _, baseload_sum = resolve_hourly_baseload_kw(total_load, hourly_flex)
     baseload_with_overlay = baseload_sum + sum(overlay)
@@ -110,11 +126,8 @@ def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch
     profile = _greenfield_profile()
     thermal_id = _thermal_consumer_id(profile)
     thermal_col = f"{thermal_id}_kw"
-    consumer_ids = [thermal_id, "ev", "rest"]
-    monkeypatch.setattr(
-        "data.cons_data_house_profile.expected_cons_data_consumer_ids",
-        lambda: consumer_ids,
-    )
+    consumer_ids = _profile_consumer_ids(profile)
+    _patch_expected_cons_ids(monkeypatch, consumer_ids)
     climate = ModeledClimateContext.for_house_profile(profile, kwp=5.0)
     df = build_synthetic_dataframe_from_house_profile(
         profile,
@@ -125,7 +138,6 @@ def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch
         climate=climate,
     )
     df[thermal_col] = 0.0
-    # Profile may only synthesize thermal col; ensure expected flex columns exist.
     for cid in consumer_ids:
         col = f"{cid}_kw"
         if col not in df.columns:
@@ -144,9 +156,10 @@ def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch
     cache = HistoricalDataCache()
     cache._consumption_df = _cons_data_to_profile_dataframe(df)
     cache._pv_series = df["pv_kw"]
+    flex_ids = [cid for cid in consumer_ids if cid != thermal_id][:2] or consumer_ids[:1]
     _, hist_totals, total_load, hourly_flex = cache.get_window_consumption(
         slots,
-        flex_consumer_ids=["ev", "rest"],
+        flex_consumer_ids=flex_ids,
     )
     _, all_consumer_totals, _, _ = cache.get_window_consumption(slots)
     cons_data_ids = cache.cons_data_consumer_ids_present()

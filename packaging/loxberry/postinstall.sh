@@ -19,4 +19,9 @@ if [ ! -f "$PCONFIG/plugin.env" ]; then
   } > "$PCONFIG/plugin.env"
 fi
 
+SYNC="$PDATA/docker/sync_streamlit_env.sh"
+if [ -x "$SYNC" ] || [ -f "$SYNC" ]; then
+  bash "$SYNC" "$PCONFIG/plugin.env" "$PDATA/docker"
+fi
+
 exit 0

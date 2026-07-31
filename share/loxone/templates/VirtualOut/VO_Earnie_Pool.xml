@@ -6,7 +6,7 @@
   Power VO path: flex.pool.sens_power_act (replace pool with HK id if different).
 -->
 <VirtualOut Title="Earnie Pool Telemetry" Comment="Pattern B: push pool thermal + filter telemetry (draft)" Address="http://EARNIE_HOST:8501" CmdInit="" CloseAfterSend="true" CmdSep="">
-	<VirtualOutCmd Title="Earnie_Pool_P_act" Comment="flex.pool.sens_power_act total kW; binding key flex.power_name; or EFM Load" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/flex.pool.sens_power_act/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
+	<VirtualOutCmd Title="Earnie_Pool_P_act" Comment="flex.pool.sens_power_act total kW; or EFM Load" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/flex.pool.sens_power_act/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
 	<VirtualOutCmd Title="Earnie_Pool_Temp_Ist" Comment="sens_temperature_water C" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/sens_temperature_water/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
 	<VirtualOutCmd Title="Earnie_Pool_Temp_Soll" Comment="get_temperature_water_setpoint C" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_temperature_water_setpoint/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>
 	<VirtualOutCmd Title="Earnie_Pool_Temp_Toleranz" Comment="get_temperature_tolerance_c K" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/get_temperature_tolerance_c/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="true" Repeat="0" RepeatRate="0"/>

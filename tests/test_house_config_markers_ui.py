@@ -30,6 +30,12 @@ def test_preserved_appliance_power_source() -> None:
     )
     assert (
         _preserved_appliance_power_source(
+            {"id": "x", "ehal_bindings": {"flex.x.sens_power_act": "P_act"}}
+        )
+        == "loxone"
+    )
+    assert (
+        _preserved_appliance_power_source(
             {"ehal_bindings": {"flex.power_name": "P_act"}}
         )
         == "loxone"

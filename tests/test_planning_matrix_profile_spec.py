@@ -260,6 +260,37 @@ def test_planning_ev_to_milp_copies_loxone_bindings_from_profile():
     assert milp["charging_schedule"]["milp"]["live_modus_a_min_remaining_kwh"] == pytest.approx(2.8)
 
 
+def test_planning_ev_to_milp_copies_ehal_bindings_from_profile():
+    from house_config.planning_flex_bridge import planning_ev_to_milp
+
+    ev = {
+        "id": "e_auto",
+        "label": "smart",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "min_on_quarterhours": 1,
+        "battery_capacity_kwh": 17.0,
+        "charging_schedule": {
+            "target_soc_percent": 100.0,
+            "charging_efficiency": 0.96,
+            "weekday": {"car_available_from_hour": 18, "ready_by_hour": 7},
+            "weekend": {"car_available_from_hour": 20, "ready_by_hour": 12},
+            "milp": {
+                "live_modus_a_min_remaining_kwh": 2.8,
+                "tie_break_on_epsilon": 0.001,
+                "tie_break_time_epsilon": 0.0001,
+            },
+        },
+        "ehal_bindings": {
+            "set_evcs_max_current": "Earnie_EAuto_Soll_A",
+            "set_evcs_mode": "Earnie_EAuto_Modus",
+        },
+    }
+    milp = planning_ev_to_milp(ev)
+    assert milp["ehal_bindings"]["set_evcs_max_current"] == "Earnie_EAuto_Soll_A"
+    assert milp["ehal_bindings"]["set_evcs_mode"] == "Earnie_EAuto_Modus"
+
+
 def test_planning_ev_to_milp_requires_milp_when_power_setpoint_configured():
     from house_config.planning_flex_bridge import planning_ev_to_milp
 

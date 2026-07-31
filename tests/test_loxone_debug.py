@@ -9,13 +9,14 @@ os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
 from integrations.loxone_comm_trace import LoxoneWriteRecord, serialize_write_records
 from integrations.loxone_connectivity import LoxoneCheck
 from ui.loxone_debug import (
+    _omitted_write_caption,
     build_ehal_write_rows,
     build_intended_write_rows,
     build_read_rows,
     build_telemetry_rows,
     build_write_rows_from_trace,
     read_check_status_label,
-    write_summary_text,
+    write_summary_from_rows,
 )
 
 
@@ -54,11 +55,11 @@ def test_build_read_rows_includes_timestamp():
 
 def test_build_read_rows_includes_flex_power():
     checks = [
-        LoxoneCheck("wp:flex.power_name", "Ernie_WP", True, "Wert=1.2"),
+        LoxoneCheck("wp:flex.wp.sens_power_act", "Ernie_WP", True, "Wert=1.2"),
     ]
-    rows = build_read_rows(checks, "t0", expected_fields=["wp:flex.power_name"])
+    rows = build_read_rows(checks, "t0", expected_fields=["wp:flex.wp.sens_power_act"])
     assert len(rows) == 1
-    assert rows[0]["EHAL-Feld"] == "wp:flex.power_name"
+    assert rows[0]["EHAL-Feld"] == "wp:flex.wp.sens_power_act"
     assert rows[0]["Mapping"] == "Ernie_WP"
 
 
@@ -164,9 +165,27 @@ def test_build_intended_write_rows_for_silent_mode():
     assert rows[0]["Wert"] == "2.0"
 
 
-def test_write_summary_text():
-    assert write_summary_text([]) == "Keine Schreibvorgänge erfasst."
-    assert write_summary_text([{"success": True}, {"success": False}]) == "1/2 Schreibvorgänge erfolgreich"
+def test_write_summary_from_rows_matches_table_not_raw_trace():
+    rows = [
+        {"Erfolg": "Ja"},
+        {"Erfolg": "Ja"},
+        {"Erfolg": ""},
+        {"Erfolg": "Nein"},
+    ]
+    assert write_summary_from_rows(rows) == "2/3 Schreibvorgänge erfolgreich"
+    assert write_summary_from_rows([{"Erfolg": ""}]) == "Keine Schreibvorgänge erfasst."
+    assert _omitted_write_caption(8, [
+        {"Erfolg": "Ja"},
+        {"Erfolg": "Ja"},
+        {"Erfolg": "Ja"},
+        {"Erfolg": "Ja"},
+        {"Erfolg": "Ja"},
+        {"Erfolg": "Ja"},
+    ]) == (
+        "2 weitere Schreibvorgänge (Freigabe/Legacy-Merker) "
+        "sind nicht als set_* in der Tabelle."
+    )
+    assert _omitted_write_caption(6, [{"Erfolg": "Ja"}] * 6) is None
 
 
 def test_build_telemetry_rows_filters_and_maps():

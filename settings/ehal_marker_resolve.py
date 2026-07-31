@@ -55,12 +55,48 @@ def marker_sens_evcs_active_power(consumer: dict) -> str:
 
 
 def marker_flex_power(consumer: dict) -> str:
-    """Consumer Messwert power: bindings ``flex.power_name``, else inputs."""
+    """Consumer Messwert power: Pattern B / legacy ``flex.power_name``, else inputs."""
+    from ehal.flex_fields import KIND_SENS_POWER_ACT, binding_address
+
     inputs = consumer.get("loxone_inputs") or {}
+    cid = str(consumer.get("id") or "").strip()
     return _first_nonempty(
+        binding_address(ehal_bindings(consumer), cid, KIND_SENS_POWER_ACT)
+        if cid
+        else "",
         ehal_bindings(consumer).get("flex.power_name"),
         inputs.get("flex.power_name"),
         inputs.get("power_name"),
+    )
+
+
+def marker_flex_enable(consumer: dict) -> str:
+    """Consumer Freigabe: Pattern B / legacy ``flex.enable_name``, else outputs."""
+    from ehal.flex_fields import KIND_SET_ENABLE, binding_address
+
+    outputs = loxone_outputs(consumer)
+    cid = str(consumer.get("id") or "").strip()
+    return _first_nonempty(
+        binding_address(ehal_bindings(consumer), cid, KIND_SET_ENABLE) if cid else "",
+        ehal_bindings(consumer).get("flex.enable_name"),
+        outputs.get("flex.enable_name"),
+        outputs.get("enable_name"),
+    )
+
+
+def marker_flex_power_setpoint(consumer: dict) -> str:
+    """Consumer Sollwert: Pattern B / legacy ``flex.power_setpoint_name``, else outputs."""
+    from ehal.flex_fields import KIND_SET_POWER_SETPOINT, binding_address
+
+    outputs = loxone_outputs(consumer)
+    cid = str(consumer.get("id") or "").strip()
+    return _first_nonempty(
+        binding_address(ehal_bindings(consumer), cid, KIND_SET_POWER_SETPOINT)
+        if cid
+        else "",
+        ehal_bindings(consumer).get("flex.power_setpoint_name"),
+        outputs.get("flex.power_setpoint_name"),
+        outputs.get("power_setpoint_name"),
     )
 
 

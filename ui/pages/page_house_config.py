@@ -3,18 +3,10 @@ from __future__ import annotations
 
 import streamlit as st
 
-from runtime_store.ehal_setup import BACKEND_LOXONE
-from ui.ehal_connection import persist_ehal_backend
-from ui.ehal_greenfield_import import (
-    dismiss_onboarding,
-    onboarding_dismissed,
-    set_wizard_flag,
-)
 from ui.help_hint import render_page_title_with_help
 from ui.house_config_profile_form import render_house_profile_tab
 from ui.planning_battery_form import render_battery_planning_tab
 from ui.planning_pv_form import render_pv_planning_tab
-from ui.setup_readiness import needs_planning_onboarding
 
 _HOUSE_CONFIG_TAB_KEY = "house_config_active_tab"
 _HOUSE_CONFIG_TABS = ("Hausprofil", "PV-Anlagen", "Batterien")
@@ -28,31 +20,6 @@ def _help_text() -> str:
     )
 
 
-def _render_greenfield_onboarding_prompt() -> None:
-    if not needs_planning_onboarding():
-        return
-    if onboarding_dismissed():
-        return
-    st.info(
-        "Neues Hausprofil: Soll Earnie die erste Struktur und EHAL-Merker "
-        "automatisch aus der Loxone-Anlage (Greenfield-Import) übernehmen?"
-    )
-    col_yes, col_no = st.columns(2)
-    with col_yes:
-        if st.button(
-            "Ja — Loxone-Import (EHAL-Com)",
-            key="hk_greenfield_yes",
-            type="primary",
-        ):
-            persist_ehal_backend(BACKEND_LOXONE)
-            set_wizard_flag()
-            st.switch_page("ehal-com")
-    with col_no:
-        if st.button("Nein — manuell fortfahren", key="hk_greenfield_no"):
-            dismiss_onboarding()
-            st.rerun()
-
-
 def render() -> None:
     render_page_title_with_help(
         "🏠 Hauskonfigurator",
@@ -60,7 +27,6 @@ def render() -> None:
         key="house_config_help",
         page_docs_key="house-config",
     )
-    _render_greenfield_onboarding_prompt()
 
     # Reseed before widget when missing OR None/invalid (deselection leaves key present as None).
     if st.session_state.get(_HOUSE_CONFIG_TAB_KEY) not in _HOUSE_CONFIG_TABS:

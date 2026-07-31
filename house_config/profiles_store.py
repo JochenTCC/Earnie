@@ -35,6 +35,8 @@ def _copy_loxone_binding(raw: dict, spec: dict) -> None:
 
 
 def _copy_ehal_entity_fields(raw: dict, spec: dict) -> None:
+    from ehal.flex_fields import expand_flex_bindings
+
     bindings = raw.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
         cleaned = {
@@ -43,7 +45,10 @@ def _copy_ehal_entity_fields(raw: dict, spec: dict) -> None:
             if str(value).strip()
         }
         if cleaned:
-            spec["ehal_bindings"] = cleaned
+            cid = str(spec.get("id") or raw.get("id") or "").strip()
+            spec["ehal_bindings"] = (
+                expand_flex_bindings(cleaned, cid) if cid else cleaned
+            )
     triggers = raw.get("event_triggers")
     if isinstance(triggers, list) and triggers:
         spec["event_triggers"] = [dict(item) for item in triggers if isinstance(item, dict)]

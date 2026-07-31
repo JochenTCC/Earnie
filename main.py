@@ -497,6 +497,7 @@ if __name__ == "__main__":
     run_tariff_plausibility_on_startup()
     run_live_scenario_entity_check_on_startup()
     run_loxone_verify_on_startup()
+    ehal_live.push_safe_setpoints_on_startup()
 
     if config.is_event_trigger_enabled() and not config.get_event_triggers():
         logger.warning(

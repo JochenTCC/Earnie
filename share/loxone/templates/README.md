@@ -89,7 +89,7 @@ Three layers:
 | HK `id` | snake_case entity | `waschmaschine` |
 | Merker Title | `Earnie_Verbraucher_<Slug>_…` | `Earnie_Verbraucher_Waschmaschine_Leistung` |
 | VO path | `flex.{hk_id}.sens_power_act` | `…/flex.waschmaschine.sens_power_act/\v` |
-| EHAL binding key | stays `flex.power_name` on that consumer | → Merker Title |
+| EHAL binding key | `flex.{hk_id}.sens_power_act` on that consumer | → Merker Title |
 
 Template defaults leave `{hk_id}` / `{ev_id}` placeholders — replace in Config. WP: Titles `Earnie_Waermepumpe_*` (legacy `Earnie_WP_*`); Pool: `flex.pool.sens_power_act` or `{hk_id}`.
 

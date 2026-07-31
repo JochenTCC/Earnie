@@ -22,6 +22,13 @@ LOGGED_DAY = "logged_day"
 CONSUMPTION_SOURCES = frozenset({PROFILE_SPEC, LOGGED_DAY})
 
 
+def _attach_ehal_bindings(result: dict, consumer: dict) -> None:
+    """Copy house-profile ``ehal_bindings`` onto MILP flex shape (Live write markers)."""
+    bindings = consumer.get("ehal_bindings")
+    if isinstance(bindings, dict) and bindings:
+        result["ehal_bindings"] = dict(bindings)
+
+
 def resolve_consumption_source(scenario_params: dict | None) -> str:
     """profile_spec = Hausprofil-Spec für Optimierung; logged_day = cons_data-Replay."""
     if not scenario_params:
@@ -125,7 +132,7 @@ def planning_consumer_to_milp(consumer: dict) -> dict:
     duration_h = float(schedule["duration_h"])
     min_on_quarterhours = max(4, int(round(duration_h * 4)))
     nominal = float(consumer["nominal_power_kw"])
-    return {
+    result = {
         "id": str(consumer["id"]),
         "name": str(consumer.get("label", consumer["id"])),
         "nominal_power_kw": nominal,
@@ -141,7 +148,17 @@ def planning_consumer_to_milp(consumer: dict) -> dict:
             "start_shift_h": float(schedule.get("start_shift_h", 0.0) or 0.0),
             "duration_h": duration_h,
         },
+        "loxone_outputs": {},
+        "loxone_inputs": {},
     }
+    loxone_inputs = consumer.get("loxone_inputs")
+    if isinstance(loxone_inputs, dict) and loxone_inputs:
+        result["loxone_inputs"] = dict(loxone_inputs)
+    loxone_outputs = consumer.get("loxone_outputs")
+    if isinstance(loxone_outputs, dict) and loxone_outputs:
+        result["loxone_outputs"] = dict(loxone_outputs)
+    _attach_ehal_bindings(result, consumer)
+    return result
 
 
 def _house_ev_consumers(house_profile: dict) -> list[dict]:
@@ -211,6 +228,7 @@ def planning_ev_to_milp(consumer: dict) -> dict:
     legacy_id = normalize_legacy_id(consumer, str(consumer["id"]))
     if legacy_id:
         result["legacy_id"] = legacy_id
+    _attach_ehal_bindings(result, consumer)
     return result
 
 
@@ -282,6 +300,7 @@ def planning_thermal_rc_to_milp(consumer: dict) -> dict:
         entry["thermal_control"]["loxone"] = dict(profile_loxone)
     if legacy_id:
         entry["legacy_id"] = legacy_id
+    _attach_ehal_bindings(entry, consumer)
     return entry
 
 
@@ -468,6 +487,7 @@ def planning_thermal_to_milp(consumer: dict) -> dict:
     legacy_id = normalize_legacy_id(consumer, str(consumer["id"]))
     if legacy_id:
         entry["legacy_id"] = legacy_id
+    _attach_ehal_bindings(entry, consumer)
     return entry
 
 

@@ -467,6 +467,9 @@ def normalize_consumer(raw: dict) -> dict:
     generic_window = raw.get("generic_flex_window")
     if isinstance(generic_window, dict) and generic_window:
         result["generic_flex_window"] = dict(generic_window)
+    bindings = raw.get("ehal_bindings")
+    if isinstance(bindings, dict) and bindings:
+        result["ehal_bindings"] = dict(bindings)
     return result
 
 

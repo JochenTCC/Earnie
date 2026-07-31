@@ -39,7 +39,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 - [Adapter wählen](einrichtung/adapter-wahl.md) — Loxone / HA+evcc / OpenEMS über `ehal.backend` (Config-Umschaltung)
 - [Loxone-Anbindung](einrichtung/loxone-anbindung.md) — HTTP-Schnittstelle, Prüfskript
-- [Earnie-Loxone-Library](einrichtung/loxone-earnie-library.md) — VI/VO-Vorlagen (Pattern B), EFM, Earnie-tot-Fallback, Greenfield-Import
+- [Earnie-Loxone-Library](einrichtung/loxone-earnie-library.md) — VI/VO-Vorlagen (Pattern B), EFM, Earnie-tot-Fallback, Loxone-Import (Hauskonfigurator)
 - [Betrieb](einrichtung/betrieb.md) — `main.py` vs. App, Laufzeitdateien, Optimierungs-Takt
 - [Container](einrichtung/container.md) — Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, Migration, Config-Drift
 - [LoxBerry-Plugin](einrichtung/loxberry-plugin.md) — Scope-A-Plugin (Docker-Wrapper, Port 8501) vs. manuelle Compose

@@ -19,6 +19,7 @@ from settings.ehal_marker_resolve import (
     marker_pv_follow,
     marker_sens_evcs_bat_capacity,
     marker_set_evcs_max_current,
+    marker_set_evcs_mode,
 )
 from settings.ev_power import (
     ampere_to_kw,
@@ -826,25 +827,32 @@ def _append_evcs_mode_writes(
     mode: str | None,
     pv_out: int | None,
 ) -> None:
-    """Dual-write legacy pv_follow / charge_immediate for set_evcs_mode during 2.4.j."""
+    """Dual-write legacy pv_follow / charge_immediate + set_evcs_mode Merker."""
     pv_name = marker_pv_follow(consumer)
     now_name = marker_charge_immediate(consumer)
+    mode_name = marker_set_evcs_mode(consumer)
     if mode == "now":
         if pv_name:
             values[pv_name] = 0.0
         if now_name:
             values[now_name] = 1.0
+        if mode_name:
+            values[mode_name] = 2.0
         return
     if mode == "pv":
         if pv_name:
             values[pv_name] = 1.0 if pv_out is None else float(pv_out)
         if now_name:
             values[now_name] = 0.0
+        if mode_name:
+            values[mode_name] = 1.0
         return
     if pv_name and pv_out is not None:
         values[pv_name] = float(pv_out)
     if now_name:
         values[now_name] = 0.0
+    if mode_name:
+        values[mode_name] = 0.0
 
 
 def _immediate_skip_output_values(consumer: dict) -> dict[str, float]:
@@ -932,6 +940,7 @@ def _flexible_consumer_output_values(
         return _immediate_skip_output_values(consumer)
 
     current_name = marker_set_evcs_max_current(consumer)
+    enable_name = str((consumer.get("loxone_outputs") or {}).get("enable_name", "")).strip()
     if current_name:
         return _evcs_current_output_values(
             consumer,
@@ -941,7 +950,6 @@ def _flexible_consumer_output_values(
             current_name,
         )
 
-    enable_name = str((consumer.get("loxone_outputs") or {}).get("enable_name", "")).strip()
     if not enable_name:
         return {}
     return _enable_output_values(
@@ -995,7 +1003,13 @@ def build_sent_loxone_snapshot(
         (config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
         (config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
     ):
-        if cfg_name and value is not None:
+        if not cfg_name:
+            continue
+        if value is None:
+            if cfg_name != config.get("LOXONE_TARGET_ACTIVE_POWER_NAME"):
+                continue
+            snapshot[str(cfg_name)] = 0.0
+        else:
             snapshot[str(cfg_name)] = float(value)
 
     for consumer in config.get_flexible_consumers(optimizer_only=True):
@@ -1027,14 +1041,23 @@ def send_huawei_modbus_states(
     )
 
     records: list[LoxoneWriteRecord] = []
+    active_name = config.get("LOXONE_TARGET_ACTIVE_POWER_NAME")
     for cfg_name, value in (
-        (config.get("LOXONE_TARGET_ACTIVE_POWER_NAME"), active_kw),
+        (active_name, active_kw),
         (config.get("LOXONE_TARGET_CHARGE_POWER_NAME"), charge_kw),
         (config.get("LOXONE_TARGET_DISCHARGE_POWER_NAME"), discharge_kw),
         (config.get("LOXONE_CONTROL_CMD_NAME"), float(control_cmd)),
     ):
-        if cfg_name and value is not None:
-            records.append(_send_loxone_value_traced(str(cfg_name), float(value)))
+        if not cfg_name:
+            continue
+        if value is None:
+            # Sticky Merker: still refresh Sollleistung with 0 under Automatik/Entladesperre.
+            if cfg_name != active_name:
+                continue
+            send_value = 0.0
+        else:
+            send_value = float(value)
+        records.append(_send_loxone_value_traced(str(cfg_name), send_value))
     return records
 
 

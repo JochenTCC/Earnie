@@ -49,7 +49,7 @@ def _render_proposal_rows(proposals: list[dict[str, Any]]) -> list[dict[str, Any
     selected: list[dict[str, Any]] = []
     st.caption(
         "CSV-Export bleibt manuell (Einzelserie). "
-        "`flex.enable_name` / `flex.power_setpoint_name` kommen nicht vom Zähler."
+        "`flex.{slug}.set_enable` / `flex.{slug}.set_power_setpoint` kommen nicht vom Zähler."
     )
     for idx, row in enumerate(proposals):
         action = str(row.get("action") or "")
@@ -73,7 +73,7 @@ def _render_proposal_rows(proposals: list[dict[str, Any]]) -> list[dict[str, Any
                     key=f"efm_imp_{idx}",
                 )
                 bind_power = st.checkbox(
-                    "flex.power_name",
+                    "flex.*.sens_power_act",
                     value=True,
                     key=f"efm_pwr_{idx}",
                     disabled=not include,
@@ -106,7 +106,7 @@ def render_efm_consumer_import_section() -> None:
     """EHAL-Com expander: discover Zähler and import generic consumers."""
     st.caption(
         "LoxAPP3 Energieflussmonitor / Zähler → generische Verbraucher im Live-Hausprofil "
-        "(optional `flex.power_name` = Zähler-Bezeichnung)."
+        "(optional `flex.{slug}.sens_power_act` = Zähler-Bezeichnung)."
     )
     house = load_house_profiles()
     profile_id = resolve_live_profile_id(house)

@@ -72,6 +72,9 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "flex.power_name": "Flex Leistung / Zustand",
     "flex.enable_name": "Flex Freigabe",
     "flex.power_setpoint_name": "Flex Leistungs-Sollwert",
+    "flex.sens_power_act": "Flex Leistung / Zustand",
+    "flex.set_enable": "Flex Freigabe",
+    "flex.set_power_setpoint": "Flex Leistungs-Sollwert",
 }
 
 # Field → device role_id for HITL grouping (M1 plant roles only).

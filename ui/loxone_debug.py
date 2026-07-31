@@ -330,11 +330,25 @@ def build_intended_write_rows(
     return rows
 
 
-def write_summary_text(writes: list[dict[str, Any]]) -> str:
-    if not writes:
+def write_summary_from_rows(rows: list[dict[str, str]]) -> str:
+    """Summary for Live-Schreiben: count only rows shown with a write attempt."""
+    attempted = [row for row in rows if row.get("Erfolg") in ("Ja", "Nein")]
+    if not attempted:
         return "Keine Schreibvorgänge erfasst."
-    ok = sum(1 for entry in writes if entry.get("success"))
-    return f"{ok}/{len(writes)} Schreibvorgänge erfolgreich"
+    ok = sum(1 for row in attempted if row.get("Erfolg") == "Ja")
+    return f"{ok}/{len(attempted)} Schreibvorgänge erfolgreich"
+
+
+def _omitted_write_caption(raw_count: int, rows: list[dict[str, str]]) -> str | None:
+    """Caption when raw traces include non-set_* Merker not shown in the table."""
+    shown = sum(1 for row in rows if row.get("Erfolg") in ("Ja", "Nein"))
+    omitted = raw_count - shown
+    if omitted <= 0:
+        return None
+    return (
+        f"{omitted} weitere Schreibvorgänge (Freigabe/Legacy-Merker) "
+        "sind nicht als set_* in der Tabelle."
+    )
 
 
 def _telemetry_mapping_for_adapter(adapter: Any) -> dict[str, str]:
@@ -494,7 +508,7 @@ def render_live_reads_section() -> None:
 
     render_loxone_verify_results(button_key="loxone_debug_verify_button")
     st.caption(
-        "Nur `sens_*` / `get_*` / `{id}:flex.power_name` · Tabelle aktualisiert sich "
+        "Nur `sens_*` / `get_*` / `{id}:flex.{slug}.sens_power_act` · Tabelle aktualisiert sich "
         "automatisch (ca. alle 10 Sekunden)."
     )
     if st.button("Jetzt aktualisieren", key="loxone_debug_refresh_reads"):
@@ -531,13 +545,18 @@ def render_last_writes_section(main_state: dict | None) -> None:
             )
             return
         write_rows = build_ehal_write_rows(ehal_writes or [])
-        summary = write_summary_text(ehal_writes or [])
-        failed = [entry for entry in (ehal_writes or []) if not entry.get("success")]
+        summary = write_summary_from_rows(write_rows)
+        failed = [
+            row for row in write_rows if row.get("Erfolg") == "Nein"
+        ]
         if ehal_writes:
             if failed:
                 st.error(summary)
             else:
                 st.success(summary)
+            omitted = _omitted_write_caption(len(ehal_writes), write_rows)
+            if omitted:
+                st.caption(omitted)
         else:
             st.caption("Letzter Lauf ohne EHAL-Schreibdatensätze.")
         st.dataframe(write_rows, width="stretch", hide_index=True)
@@ -580,12 +599,15 @@ def render_last_writes_section(main_state: dict | None) -> None:
         return
 
     write_rows = build_write_rows_from_trace(loxone_writes)
-    failed = [entry for entry in loxone_writes if not entry.get("success")]
-    summary = write_summary_text(loxone_writes)
+    failed = [row for row in write_rows if row.get("Erfolg") == "Nein"]
+    summary = write_summary_from_rows(write_rows)
+    omitted = _omitted_write_caption(len(loxone_writes), write_rows)
     if failed:
         st.error(summary)
     else:
         st.success(summary)
+    if omitted:
+        st.caption(omitted)
     st.dataframe(write_rows, width="stretch", hide_index=True)
 
 def render_last_run_snapshot_expander(main_state: dict | None) -> None:

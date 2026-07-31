@@ -33,6 +33,23 @@
     <p><?php echo htmlspecialchars($L['MAIN.UI_DESC']); ?></p>
     <p><a class="lb-btn" href="<?php echo htmlspecialchars($uiurl); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars($L['MAIN.BTN_OPEN_UI']); ?></a>
       <code><?php echo htmlspecialchars($uiurl); ?></code></p>
+
+    <?php if ($port_saved) { ?>
+      <p class="lb-ok"><?php echo htmlspecialchars($L['MAIN.PORT_SAVED']); ?></p>
+    <?php } ?>
+    <?php if ($port_error !== "") { ?>
+      <p class="lb-error"><?php echo htmlspecialchars($port_error); ?></p>
+    <?php } ?>
+
+    <form method="post" action="index.php" style="margin-top:1rem; display:flex; flex-wrap:wrap; align-items:flex-end; gap:0.5rem;">
+      <label for="streamlit_port"><?php echo htmlspecialchars($L['MAIN.LABEL_PORT']); ?></label>
+      <input type="number" id="streamlit_port" name="streamlit_port"
+             min="1024" max="65535" step="1" required
+             value="<?php echo (int) $streamlit_port; ?>"
+             style="width:7rem;">
+      <button type="submit" name="action" value="save_port" class="lb-btn"><?php echo htmlspecialchars($L['MAIN.BTN_SAVE_PORT']); ?></button>
+    </form>
+    <p style="margin-top:0.5rem; font-size:0.9em;"><?php echo htmlspecialchars($L['MAIN.PORT_HINT']); ?></p>
   </section>
 
   <section class="lb-section" style="margin-top:1.5rem;">

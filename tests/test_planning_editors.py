@@ -639,6 +639,57 @@ def test_consumer_type_options_thermal_only_on_first():
     assert _consumer_type_options(1) == ["generic", "thermal_rc", "ev"]
 
 
+def test_consumer_expander_title_includes_type_label():
+    class _Session(dict):
+        pass
+
+    session = _Session()
+    consumer = {
+        "label": "WP",
+        "type": "thermal_annual",
+        "nominal_power_kw": 5.0,
+        "living_area_m2": 120.0,
+        "building_class": 3,
+        "persons": 2,
+        "heat_pump_type": "luft",
+    }
+    import ui.house_config_profile_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        title, _annual, c_type = form._consumer_expander_title(
+            consumer, 0, session_scope="home"
+        )
+    finally:
+        form.st.session_state = original
+
+    assert c_type == "thermal_annual"
+    assert title.startswith("Verbraucher 1 (Haus Wärme): WP — ")
+    assert title.endswith(" kWh/a")
+
+
+def test_consumer_expander_title_uses_live_type_from_session():
+    class _Session(dict):
+        pass
+
+    session = _Session({"home__hc_type_1": "ev", "home__hc_label_1": "Garage"})
+    consumer = {"label": "Alt", "type": "generic", "nominal_power_kw": 11.0}
+    import ui.house_config_profile_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        title, _annual, c_type = form._consumer_expander_title(
+            consumer, 1, session_scope="home"
+        )
+    finally:
+        form.st.session_state = original
+
+    assert c_type == "ev"
+    assert title.startswith("Verbraucher 2 (E-Auto): Garage — ")
+
+
 def test_profile_rejects_thermal_on_second_consumer(tmp_path):
     path = tmp_path / "house_profiles.json"
     path.write_text(

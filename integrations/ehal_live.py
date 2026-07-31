@@ -334,6 +334,73 @@ def clamp_ess_test_target_kw(
     return target
 
 
+def push_safe_setpoints_on_startup() -> None:
+    """Force-write safe ESS/flex setpoints once at daemon start (before first optimize).
+
+    Does not update ``optimizer_run_state`` / ``loxone_sent``. Soft-fail: log only.
+    Skip via ``EARNIE_SKIP_SAFE_SETPOINTS_ON_START=1`` or silent mode.
+    """
+    from runtime_store.env_vars import is_truthy
+
+    if is_truthy("SKIP_SAFE_SETPOINTS_ON_START"):
+        logger.info(
+            "Safe setpoint startup push skipped (EARNIE_SKIP_SAFE_SETPOINTS_ON_START)."
+        )
+        return
+    if config.is_loxone_silent_mode():
+        logger.info("Silent-Modus: Safe setpoint startup push übersprungen.")
+        return
+    if is_ehal_network_backend():
+        _push_safe_setpoints_network()
+    else:
+        _push_safe_setpoints_loxone()
+
+
+def _push_safe_setpoints_network() -> None:
+    backend = "HA" if is_ha_backend() else "OpenEMS"
+    logger.info(
+        "Startup: sende sichere EHAL-Sollwerte (ESS Automatik, EVCS 0 A) an %s...",
+        backend,
+    )
+    err_ess, _ess_records = write_ess_setpoints_from_control(0, 0.0)
+    err_evcs, _evcs_records = write_evcs_max_current_from_consumers({})
+    if err_ess is None and err_evcs is None:
+        clear_write_error()
+        logger.info("Startup: sichere EHAL-Sollwerte an %s gesendet.", backend)
+        return
+    parts: list[str] = []
+    if err_ess is not None:
+        parts.append(str(err_ess.get("message") or "ESS"))
+    if err_evcs is not None:
+        parts.append(str(err_evcs.get("message") or "EVCS"))
+    logger.error(
+        "Startup: sichere EHAL-Sollwerte an %s teilweise fehlgeschlagen: %s",
+        backend,
+        "; ".join(parts),
+    )
+
+
+def _push_safe_setpoints_loxone() -> None:
+    logger.info(
+        "Startup: sende sichere Loxone-Sollwerte "
+        "(ESS Automatik, Freigabe/Sollwerte aus)..."
+    )
+    huawei = loxone_client.send_huawei_modbus_states(0, 0.0, 0.0)
+    flex = loxone_client.send_flexible_consumer_states({}, None, None)
+    failed = [
+        row
+        for row in (huawei + flex)
+        if not getattr(row, "success", True)
+    ]
+    if not failed:
+        logger.info("Startup: sichere Loxone-Sollwerte gesendet.")
+        return
+    logger.error(
+        "Startup: sichere Loxone-Sollwerte teilweise fehlgeschlagen (%s Feld(er)).",
+        len(failed),
+    )
+
+
 def force_write_ess_test_setpoints(
     mode: int,
     target_power_kw: float,

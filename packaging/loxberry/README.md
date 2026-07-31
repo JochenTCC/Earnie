@@ -16,15 +16,15 @@ From the repo root:
 
 ```bash
 cd packaging/loxberry
-zip -r ../../../earnie-loxberry-plugin-0.1.0.zip . \
-  -x "*.git*" -x "*~" -x "*.DS_Store"
+zip -r ../../../earnie-loxberry-plugin-0.2.0.zip . \
+    -x "*.git*" -x "*~" -x "*.DS_Store"
 ```
 
 ### Windows — 7-Zip (repo root)
 
 ```powershell
-Remove-Item .\earnie-loxberry-plugin-0.1.0.zip -ErrorAction SilentlyContinue
-& "C:\Program Files\7-Zip\7z.exe" a -tzip .\earnie-loxberry-plugin-0.1.0.zip .\packaging\loxberry\* `
+Remove-Item .\earnie-loxberry-plugin-0.2.0.zip -ErrorAction SilentlyContinue
+& "C:\Program Files\7-Zip\7z.exe" a -tzip .\earnie-loxberry-plugin-0.2.0.zip .\packaging\loxberry\* `
   "-x!*.git*" "-x!*~" "-x!*.DS_Store"
 ```
 
@@ -32,7 +32,7 @@ Remove-Item .\earnie-loxberry-plugin-0.1.0.zip -ErrorAction SilentlyContinue
 
 ```bash
 cd packaging/loxberry
-zip -r ../../../earnie-loxberry-plugin-0.1.0.zip . -x "*.git*" -x "*~" -x "*.DS_Store"
+zip -r ../../../earnie-loxberry-plugin-0.2.0.zip . -x "*.git*" -x "*~" -x "*.DS_Store"
 ```
 
 Install the ZIP under LoxBerry → Plugin Management → Install from ZIP.
@@ -42,7 +42,7 @@ Install the ZIP under LoxBerry → Plugin Management → Install from ZIP.
 1. Bump `VERSION` in `plugin.cfg`, `release.cfg`, and `prerelease.cfg` to the same value.
 2. Update `ARCHIVEURL` in `release.cfg` / `prerelease.cfg` to the new GitHub Release asset URL.
 3. Rebuild the ZIP with the new version in the filename.
-4. Publish a GitHub Release (e.g. tag `loxberry-plugin-v0.1.0`) and attach the ZIP asset named in `ARCHIVEURL`.
+4. Publish a GitHub Release (e.g. tag `loxberry-plugin-v0.2.0`) and attach the ZIP asset named in `ARCHIVEURL`.
 5. After the asset is live, AutoUpdate can pick up the new `VERSION` from `release.cfg` on `main`.
 
 Until the first Release asset exists, use **manual ZIP** install only; `ARCHIVEURL` is a placeholder target.
