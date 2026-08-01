@@ -27,6 +27,7 @@ Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonf
 - Zusätzlich **sofort**, wenn Loxone Virtual Out **`Earnie_Request_Optimize`** den Daemon-HTTP trifft (`POST /ehal/loxone/request_optimize`)
 - Port: `system.ehal_loxone_http_port` in `config.json` (Standard **8541**); Vorlage `VO_Earnie_Status.xml` → `http://EARNIE_HOST:8541`
 - Alive-Check am selben Port: `GET /ehal/loxone/alive`
+- Pattern B Virtual In Status am selben Port: `GET /ehal/loxone/status.json`
 - `system.loop_timeout` in `config.json`: maximale Wartezeit zwischen Durchläufen in Sekunden (Standard 900 = 15 Min.)
 - Die App lädt den Cockpit-Snapshot nach dem Viertelstunden-Wechsel, sobald `main.py` den aktuellen Slot abgeschlossen hat (typisch wenige Sekunden)
 

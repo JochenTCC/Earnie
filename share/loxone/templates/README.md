@@ -43,7 +43,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 
 1. Restart **Loxone Config**.
 2. Insert via periphery **Device Templates** / Virtual In / Virtual Out (Earnie entries should appear).
-3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **`VO_Earnie_Status.xml`** uses port **8541** (`system.ehal_loxone_http_port`; `Earnie_Request_Optimize` / `/alive`). Other VI/VO drafts still use **8501** placeholders for `/ehal/loxone/status.json` and `/ehal/loxone/telemetry/…` until those endpoints ship.
+3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **Virtual In** status (`/ehal/loxone/status.json`) and **`VO_Earnie_Status.xml`** (`Earnie_Request_Optimize` / `/alive`) use port **8541** (`system.ehal_loxone_http_port`). VO telemetry drafts may still use **8501** placeholders for `/ehal/loxone/telemetry/…` until those endpoints ship.
 
 ## Files (repo layout)
 

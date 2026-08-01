@@ -5,6 +5,6 @@
   Power Earnie_Waermepumpe_Leistung: VO_Earnie_Heatpump or EFM Load (not this VI).
   Legacy Titles Earnie_WP_* remain valid on existing plants.
 -->
-<VirtualInHttp Title="Earnie Wärmepumpe" Comment="Pattern B: WP Freigabe from Earnie (draft)" Address="http://EARNIE_HOST:8501/ehal/loxone/status.json" PollingTime="30">
+<VirtualInHttp Title="Earnie Wärmepumpe" Comment="Pattern B: WP Freigabe from Earnie (draft)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="30">
 	<VirtualInHttpCmd Title="Earnie_Waermepumpe_Freigabe" Comment="flex.{hk_id}.enable / flex.{hk_id}.set_enable 0/1" Check="&quot;flex.{hk_id}.Earnie_Waermepumpe_Freigabe&quot;:\v" Signed="true" Analog="false" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
 </VirtualInHttp>

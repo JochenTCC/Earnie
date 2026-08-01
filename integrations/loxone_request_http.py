@@ -1,6 +1,7 @@
-"""Minimal Loxone → Earnie HTTP wake (Earnie_Request_Optimize)."""
+"""Minimal Loxone → Earnie HTTP (Request Optimize, alive, Pattern B status.json)."""
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -11,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 REQUEST_OPTIMIZE_PATH = "/ehal/loxone/request_optimize"
 ALIVE_PATH = "/ehal/loxone/alive"
+STATUS_PATH = "/ehal/loxone/status.json"
+
+
+def _normalize_path(raw_path: str) -> str:
+    path = urlparse(raw_path).path.rstrip("/") or "/"
+    return path
 
 _optimize_event = threading.Event()
 _server: ThreadingHTTPServer | None = None
@@ -43,15 +50,25 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
         logger.debug("loxone_request_http: " + format, *args)
 
     def do_GET(self) -> None:  # noqa: N802
-        path = urlparse(self.path).path.rstrip("/") or "/"
+        path = _normalize_path(self.path)
         if path == ALIVE_PATH.rstrip("/") or path == ALIVE_PATH:
             self.send_response(204)
             self.end_headers()
             return
+        if path == STATUS_PATH.rstrip("/") or path == STATUS_PATH:
+            from integrations.loxone_status_json import build_loxone_status_payload
+
+            body = json.dumps(build_loxone_status_payload()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         self.send_error(404)
 
     def do_POST(self) -> None:  # noqa: N802
-        path = urlparse(self.path).path.rstrip("/") or "/"
+        path = _normalize_path(self.path)
         if path == REQUEST_OPTIMIZE_PATH.rstrip("/") or path == REQUEST_OPTIMIZE_PATH:
             length = int(self.headers.get("Content-Length") or 0)
             if length > 0:
@@ -84,11 +101,12 @@ def start_loxone_request_http(
         _server = server
         _thread = thread
         logger.info(
-            "Loxone request HTTP listening on %s:%s (%s, %s)",
+            "Loxone request HTTP listening on %s:%s (%s, %s, %s)",
             host,
             port,
             REQUEST_OPTIMIZE_PATH,
             ALIVE_PATH,
+            STATUS_PATH,
         )
         return server
 

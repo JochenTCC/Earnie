@@ -79,6 +79,34 @@ def test_http_get_alive() -> None:
         assert resp.status == 204
 
 
+def test_http_get_status_json(monkeypatch) -> None:
+    import json
+
+    from integrations import loxone_status_json as status_mod
+
+    monkeypatch.setattr(
+        status_mod,
+        "build_loxone_status_payload",
+        lambda: {
+            "heartbeat_ts": 42,
+            "set_ess_active_power": -1.5,
+            "set_ess_charge_power_limit": 0.0,
+            "set_ess_discharge_power_limit": 0.0,
+            "set_ess_mode": 0.0,
+        },
+    )
+    server = http_mod.start_loxone_request_http(0)
+    port = server.server_address[1]
+    with urllib.request.urlopen(
+        f"http://127.0.0.1:{port}/ehal/loxone/status.json", timeout=2
+    ) as resp:
+        assert resp.status == 200
+        assert "application/json" in resp.headers.get("Content-Type", "")
+        data = json.loads(resp.read().decode("utf-8"))
+    assert data["heartbeat_ts"] == 42
+    assert data["set_ess_active_power"] == -1.5
+
+
 def test_http_unknown_path_404() -> None:
     server = http_mod.start_loxone_request_http(0)
     port = server.server_address[1]

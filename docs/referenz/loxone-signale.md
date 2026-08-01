@@ -4,7 +4,7 @@ Für **Greenfield / Earnie-Library (2.4.n)** gelten die **gefrorenen** Merkernam
 
 **Begriffsklärung (Smarthome-Merker):** Die **Adresse** (Zeichenkette, z. B. `Earnie_Waermepumpe_Freigabe`) ist ein *Smarthome-Merker*. Die **Rolle** ist der EHAL-Feldname (`sens_ess_soc`, `flex.{slug}.sens_power_act`, …) in `ehal_bindings`. Live-Backend bleibt vorerst Loxone-HTTP; Legacy-Schlüssel `loxone_*` / `*.loxone` sowie Stub-Keys `flex.power_name` können nach Migration noch dual-gelesen werden. Nicht verwechseln mit Chart-Markern oder `earnie_role` (Bekannt/Gesteuert/Manuell).
 
-**Pattern B (Library):** **VI** = Earnie→Loxone (`set_*` / Freigaben / Sollwerte, Heartbeat). **VO** = optional Loxone→Earnie Push von `sens_*` / `get_*` / Flex-Leistung (Platzhalter-URLs). Core liest weiterhin `/jdev/sps/io/{name}`. Entwürfe: [`share/loxone/templates/`](../../share/loxone/templates/).
+**Pattern B (Library):** **VI** = Earnie→Loxone (`set_*` / Freigaben / Sollwerte, Heartbeat) über `GET http://<Earnie>:8541/ehal/loxone/status.json` (Daemon-HTTP; `heartbeat_ts` = Unix-Jetztzeit, Sollwerte aus dem letzten `loxone_sent`). **VO** = optional Loxone→Earnie Push von `sens_*` / `get_*` / Flex-Leistung (Platzhalter-URLs). Core schreibt/liest weiterhin `/jdev/sps/io/{name}`. Entwürfe: [`share/loxone/templates/`](../../share/loxone/templates/).
 
 ### Drei Schichten (Title / Check / VO-Pfad)
 

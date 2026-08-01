@@ -12,7 +12,7 @@ Verwandt: [Loxone-Anbindung](loxone-anbindung.md) · [Loxone-Signale](../referen
 | Loxone → Earnie | **Virtual Out** (`VO_Earnie_*.xml`) | optionaler Push (Telemetrie); Core liest weiterhin `/jdev/sps/io/{Name}` |
 | Zähler | EFM / Meter | Netz/PV/Batterie-/Flex-**Leistung** bevorzugt über EFM-Bezeichnung |
 
-Earnie Core schreibt und liest dieselben Merker-Namen am Miniserver. Die Library ergänzt die **Loxone-seitige** HTTP-Spiegelung und ermöglicht einen **Earnie-tot**-Fallback in Config (siehe unten). Status-/Telemetry-URLs in den XMLs (`/ehal/loxone/status.json`, `/ehal/loxone/telemetry/…`) sind **Platzhalter**, bis Earnie die Endpunkte ausliefert — Cmd-**Titles** sind trotzdem der Import-Vertrag.
+Earnie Core schreibt und liest dieselben Merker-Namen am Miniserver. Die Library ergänzt die **Loxone-seitige** HTTP-Spiegelung und ermöglicht einen **Earnie-tot**-Fallback in Config (siehe unten). **Virtual HTTP In** pollt `GET /ehal/loxone/status.json` am Daemon-Port (**8541**). VO-Telemetry-URLs (`/ehal/loxone/telemetry/…`) bleiben **Platzhalter**, bis Earnie sie ausliefert — Cmd-**Titles** sind trotzdem der Import-Vertrag.
 
 **XML-Stand:** Die Dateien im Repo sind handgeschriebene **Drafts**. Nach Validierung in Config bitte **Als Vorlage speichern** und die exportierte XML an Earnie zurückgeben, damit die kanonischen Templates ersetzt werden können.
 
@@ -56,11 +56,11 @@ Danach **Loxone Config neu starten**. Die Vorlagen erscheinen unter Peripherie /
 
 ## 2. Earnie-Adresse setzen
 
-In jedem eingefügten Virtual-In/Out den Platzhalter `EARNIE_HOST` durch die LAN-IP bzw. den Hostnamen von Earnie ersetzen. UI/Streamlit typisch Port **8501**; **Status-VO** (`VO_Earnie_Status.xml` mit `Earnie_Request_Optimize` / Alive) nutzt Port **8541** (`system.ehal_loxone_http_port`). Siehe [Streamlit-Ports](../referenz/streamlit-ports.md).
+In jedem eingefügten Virtual-In/Out den Platzhalter `EARNIE_HOST` durch die LAN-IP bzw. den Hostnamen von Earnie ersetzen. UI/Streamlit typisch Port **8501**; **Daemon-HTTP** (Virtual In Status, `Earnie_Request_Optimize` / Alive) nutzt Port **8541** (`system.ehal_loxone_http_port`). Siehe [Streamlit-Ports](../referenz/streamlit-ports.md).
 
-Beispiel Virtual In Address (Platzhalter-Status-JSON):
+Beispiel Virtual In Address (Pattern B Status-JSON):
 
-`http://192.168.178.10:8501/ehal/loxone/status.json`
+`http://192.168.178.10:8541/ehal/loxone/status.json`
 
 Virtual Out Address **Status / Request Optimize**:
 
@@ -68,7 +68,7 @@ Virtual Out Address **Status / Request Optimize**:
 
 Andere Telemetrie-VO-Drafts können noch `:8501` als Platzhalter tragen, bis die Endpunkte existieren.
 
-Polling / Cmd-Check-Muster erst anpassen, wenn Earnie echte JSON-Keys liefert; bis dahin reichen stabile **Titles** für Core und Greenfield-Import.
+Polling / Cmd-Check-Muster an die JSON-Keys anpassen (Plant: `set_ess_*` / `heartbeat_ts`; Flex/EV: `flex.{hk_id}.…` / `ev.{ev_id}.…`). Stabile **Titles** bleiben der Vertrag für Core und Greenfield-Import.
 
 ## 3. Geräte einfügen und Merker belassen
 

@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Pattern B Virtual In status.json (2026-08-01)
+
+- [x] **Daemon `GET /ehal/loxone/status.json` (port 8541)** — Pattern B VI payload from last-run `loxone_sent` (plant `set_ess_*` in kW, EV/flex namespaced Check keys, pool Freigaben) plus live `heartbeat_ts`; VI templates/docs retargeted from Streamlit `:8501` to daemon `:8541`. Tests: `tests/test_loxone_status_json.py`, `tests/test_loxone_request_http.py`.
+
+
 ### Bugfix Chart 2 flat Verbrauch optimiert (2026-08-01)
 
 - [x] **Chart 2 „Verbrauch optimiert“ constant** — snapshot reload rebuilt costs + matched consumption but omitted `hourly_optimized_consumption_kwh`; alignment filled zeros → flat cumulative at Ist offset. Fix: `_attach_hourly_series_from_rows` also recomputes optimized consumption from `simulation_rows`. Test: `tests/test_live_display_loader.py`. Verified live.
