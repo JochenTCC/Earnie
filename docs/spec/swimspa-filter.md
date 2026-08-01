@@ -26,7 +26,7 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 
 | Richtung | Merker | Bedeutung |
 |----------|--------|-----------|
-| Lesen | `Ernie_Swimspa_Filter_Sollstunden` | Verbleibende Filter-Schulden in **Stunden** (Float) |
+| Lesen | `get_filter_remaining_hours` → Merker (z. B. `Earnie_Pool_Filter_Sollstunden`; Legacy `Ernie_Swimspa_Filter_Sollstunden`) | Verbleibende Filter-Schulden in **Stunden** (Float) |
 | Lesen | `homie_bwa_spa_filter1hour` | Start-Stunde natives Fenster (ganze Stunde, Format Live prüfen) |
 | Lesen | `homie_bwa_spa_filter1durationhours` | Dauer natives Fenster in **Stunden** (Float) |
 | Lesen | `homie_bwa_spa_filter2` | Filter läuft (binär 0/1) → Ist-Leistung 0 / 0,18 kW |

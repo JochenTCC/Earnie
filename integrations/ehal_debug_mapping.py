@@ -43,6 +43,13 @@ EV_LIVE_WRITE_FIELDS: tuple[str, ...] = (
     "set_evcs_mode",
 )
 
+FILTER_LIVE_READ_FIELDS: tuple[str, ...] = (
+    "get_filter_remaining_hours",
+    "sens_filter_active",
+    "get_filter_native_start_hour",
+    "get_filter_native_duration_hours",
+)
+
 NETWORK_LIVE_READ_FIELDS: tuple[str, ...] = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL
 NETWORK_LIVE_WRITE_FIELDS: tuple[str, ...] = SETPOINT_FIELDS
 
@@ -76,6 +83,12 @@ def _consumer_is_ev(consumer: dict) -> bool:
     if isinstance(sched, dict) and sched.get("enabled"):
         return True
     return False
+
+
+def _consumer_is_filter(consumer: dict) -> bool:
+    if str(consumer.get("id") or "").strip() == "swimspa_filter":
+        return True
+    return consumer.get("daily_target_source") == "loxone_remaining_hours"
 
 
 def _all_live_consumers() -> list[dict]:
@@ -112,6 +125,11 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
             continue
         if _consumer_is_ev(consumer):
             fields.extend(f"{cid}:{name}" for name in EV_LIVE_READ_FIELDS)
+        elif _consumer_is_filter(consumer):
+            from ehal.flex_fields import flex_sens_power_act
+
+            fields.append(f"{cid}:{flex_sens_power_act(cid)}")
+            fields.extend(f"{cid}:{name}" for name in FILTER_LIVE_READ_FIELDS)
         else:
             from ehal.flex_fields import flex_sens_power_act
 

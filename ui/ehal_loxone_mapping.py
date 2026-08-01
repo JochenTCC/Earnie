@@ -8,7 +8,11 @@ import streamlit as st
 import config
 from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
 from house_config.ehal_bindings import (
+    FILTER_EHAL_FIELDS,
+    FILTER_ENTITY_ID,
+    ehal_map_to_filter_bindings,
     ensure_migrated,
+    filter_bindings_to_ehal_map,
     strip_migrated_config_keys,
 )
 from integrations.ehal_live import reset_adapter_cache
@@ -67,6 +71,8 @@ FLEX_FIELDS: tuple[str, ...] = (
     "flex.set_power_setpoint",
 )
 
+FILTER_FIELDS: tuple[str, ...] = FILTER_EHAL_FIELDS
+
 _EXTRA_LABELS: dict[str, str] = {
     "sens_evcs_connected": "EV angeschlossen",
     "sens_evcs_soc_act": "EV Ist-SOC (%)",
@@ -80,6 +86,10 @@ _EXTRA_LABELS: dict[str, str] = {
     "flex.sens_power_act": "Flex Leistung / Zustand",
     "flex.set_enable": "Flex Freigabe",
     "flex.set_power_setpoint": "Flex Leistungs-Sollwert",
+    "get_filter_remaining_hours": "Filter Sollstunden (h)",
+    "sens_filter_active": "Filter läuft (Binär)",
+    "get_filter_native_start_hour": "Native Filter-Startstunde",
+    "get_filter_native_duration_hours": "Native Filter-Dauer (h)",
 }
 
 
@@ -120,6 +130,19 @@ def fields_for_consumer(consumer: dict) -> tuple[str, ...]:
     if cid:
         return flex_fields_for_consumer(cid)
     return FLEX_FIELDS
+
+
+def _milp_thermal_rc_host(consumers: list[dict]) -> dict | None:
+    """First thermal_rc that creates the SwimSpa-filter bridge entity."""
+    from house_config.consumption_csv import consumer_uses_profile_csv
+
+    for consumer in consumers:
+        if str(consumer.get("type") or "") != "thermal_rc":
+            continue
+        if consumer_uses_profile_csv(consumer):
+            continue
+        return consumer
+    return None
 
 
 def binding_map(raw: object) -> dict[str, str]:
@@ -180,7 +203,8 @@ def build_entity_rows(house_doc: dict, profile_id: str) -> list[dict[str, Any]]:
             "bindings": binding_map(plant.get("ehal_bindings")),
         }
     ]
-    for consumer in consumers_for_profile(house_doc, profile_id):
+    consumers = consumers_for_profile(house_doc, profile_id)
+    for consumer in consumers:
         cid = _nonempty(consumer.get("id"))
         if not cid:
             continue
@@ -194,6 +218,21 @@ def build_entity_rows(house_doc: dict, profile_id: str) -> list[dict[str, Any]]:
                 "consumer": consumer,
             }
         )
+    host = _milp_thermal_rc_host(consumers)
+    if host is not None:
+        stored = host.get("swimspa_filter_bindings")
+        rows.append(
+            {
+                "id": FILTER_ENTITY_ID,
+                "kind": "filter",
+                "label": "Pool / SwimSpa Filter",
+                "fields": FILTER_FIELDS,
+                "bindings": filter_bindings_to_ehal_map(
+                    stored if isinstance(stored, dict) else {}
+                ),
+                "host_id": _nonempty(host.get("id")),
+            }
+        )
     return rows
 
 
@@ -204,7 +243,7 @@ def apply_entity_bindings(
     entity_id: str,
     bindings: dict[str, str],
 ) -> dict:
-    """Write bindings onto plant or matching consumer; return new doc."""
+    """Write bindings onto plant, consumer, or filter bridge nest; return new doc."""
     house = dict(house_doc)
     cleaned = {k: v for k, v in bindings.items() if _nonempty(v)}
     if entity_id == PLANT_ENTITY_ID:
@@ -214,17 +253,32 @@ def apply_entity_bindings(
         house["plant"] = plant
         return house
     profiles = house.get("profiles")
-    if isinstance(profiles, dict):
-        profile = dict(profiles.get(profile_id) or {})
-        consumers = [dict(c) for c in (profile.get("consumers") or []) if isinstance(c, dict)]
+    if not isinstance(profiles, dict):
+        return house
+    profile = dict(profiles.get(profile_id) or {})
+    consumers = [dict(c) for c in (profile.get("consumers") or []) if isinstance(c, dict)]
+    if entity_id == FILTER_ENTITY_ID:
+        host = _milp_thermal_rc_host(consumers)
+        host_id = _nonempty(host.get("id")) if host else ""
+        nest = ehal_map_to_filter_bindings(cleaned)
         for consumer in consumers:
-            if _nonempty(consumer.get("id")) == entity_id:
-                consumer["ehal_bindings"] = cleaned
-                consumer.pop("event_triggers", None)
-                break
+            if _nonempty(consumer.get("id")) != host_id:
+                continue
+            if nest:
+                consumer["swimspa_filter_bindings"] = nest
+            else:
+                consumer.pop("swimspa_filter_bindings", None)
+            break
         profile["consumers"] = consumers
         house["profiles"] = {**profiles, profile_id: profile}
         return house
+    for consumer in consumers:
+        if _nonempty(consumer.get("id")) == entity_id:
+            consumer["ehal_bindings"] = cleaned
+            consumer.pop("event_triggers", None)
+            break
+    profile["consumers"] = consumers
+    house["profiles"] = {**profiles, profile_id: profile}
     return house
 
 
@@ -282,8 +336,10 @@ def render_ehal_loxone_mapping_section() -> None:
     """HTTP-probe structure scan + entity HITL; persists plant/consumer ehal_bindings."""
     st.caption(
         "Entity-zentriertes Mapping: Anlage + Verbraucher aus dem Live-Hausprofil. "
+        "Bei MILP-`thermal_rc` zusätzlich Entity **Pool / SwimSpa Filter** "
+        f"(`{FILTER_ENTITY_ID}`) für `get_filter_remaining_hours` u. a. "
         "Felder `{entity}.{ehal_field}` → Merker; Speichern in `house_profiles.json` "
-        "(`plant` / `consumers[].ehal_bindings`). "
+        "(`plant` / `consumers[].ehal_bindings` / `swimspa_filter_bindings`). "
         "Außerplanmäßige Optimierung: Loxone VO `Earnie_Request_Optimize` "
         "(Daemon-HTTP, Port `system.ehal_loxone_http_port`, Standard 8541). "
         "Struktur-Scan: HTTP-Probe bekannter Earnie_*/gemappter Merker."
@@ -403,7 +459,7 @@ def _run_structure_scan(configured: list[str]) -> None:
     if items:
         st.session_state[_SESSION_PROPOSALS] = heuristic_propose(
             [item.name for item in items],
-            fields=PLANT_FIELDS + EV_FIELDS + FLEX_FIELDS,
+            fields=PLANT_FIELDS + EV_FIELDS + FLEX_FIELDS + FILTER_FIELDS,
         )
 
 

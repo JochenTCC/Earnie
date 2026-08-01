@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from ui.ehal_loxone_mapping import (
     EV_FIELDS,
+    FILTER_ENTITY_ID,
+    FILTER_FIELDS,
     FLEX_FIELDS,
     PLANT_ENTITY_ID,
     PLANT_FIELDS,
@@ -23,6 +25,7 @@ def test_fields_for_consumer_ev_vs_flex():
         "flex.wp.set_enable",
         "flex.wp.set_power_setpoint",
     )
+    assert "get_filter_remaining_hours" in FILTER_FIELDS
 
 
 def test_field_select_caption_includes_ehal_name():
@@ -52,6 +55,34 @@ def test_build_entity_rows_includes_plant_and_consumers():
     assert "set_evcs_max_current" in rows[1]["fields"]
     assert "set_evcs_current" not in rows[1]["fields"]
     assert "flex.wp.sens_power_act" in rows[2]["fields"]
+
+
+def test_build_entity_rows_includes_filter_for_thermal_rc():
+    house = {
+        "plant": {},
+        "profiles": {
+            "live": {
+                "id": "live",
+                "consumers": [
+                    {
+                        "id": "pool",
+                        "label": "Pool",
+                        "type": "thermal_rc",
+                        "use_profile_csv": False,
+                        "swimspa_filter_bindings": {
+                            "loxone_target_hours_name": "Earnie_Pool_Filter_Sollstunden",
+                        },
+                    }
+                ],
+            }
+        },
+    }
+    rows = build_entity_rows(house, "live")
+    ids = [r["id"] for r in rows]
+    assert ids == [PLANT_ENTITY_ID, "pool", FILTER_ENTITY_ID]
+    filt = rows[-1]
+    assert "get_filter_remaining_hours" in filt["fields"]
+    assert filt["bindings"]["get_filter_remaining_hours"] == "Earnie_Pool_Filter_Sollstunden"
 
 
 def test_apply_entity_bindings_writes_plant_and_consumer():
@@ -85,3 +116,33 @@ def test_apply_entity_bindings_writes_plant_and_consumer():
     consumer = house["profiles"]["live"]["consumers"][0]
     assert consumer["ehal_bindings"]["set_evcs_max_current"] == "EV_MaxA"
     assert consumer["ehal_bindings"]["get_evcs_limit_soc"] == "EV_Limit"
+
+
+def test_apply_entity_bindings_writes_filter_nest():
+    house = {
+        "plant": {},
+        "profiles": {
+            "live": {
+                "id": "live",
+                "consumers": [
+                    {
+                        "id": "pool",
+                        "label": "Pool",
+                        "type": "thermal_rc",
+                        "use_profile_csv": False,
+                    }
+                ],
+            }
+        },
+    }
+    house = apply_entity_bindings(
+        house,
+        profile_id="live",
+        entity_id=FILTER_ENTITY_ID,
+        bindings={"get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden"},
+    )
+    nest = house["profiles"]["live"]["consumers"][0]["swimspa_filter_bindings"]
+    assert nest["loxone_target_hours_name"] == "Earnie_Pool_Filter_Sollstunden"
+    assert nest["ehal_bindings"]["get_filter_remaining_hours"] == (
+        "Earnie_Pool_Filter_Sollstunden"
+    )

@@ -26,13 +26,15 @@ def uses_loxone_debt_counter(consumer: dict) -> bool:
 
 
 def _loxone_remaining_hours_target_kwh(consumer: dict, hours: float | None) -> float:
+    from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
+
     cid = consumer["id"]
-    loxone_name = consumer.get("loxone_target_hours_name", "")
+    loxone_name = marker_get_filter_remaining_hours(consumer)
     if hours is None:
         logger.warning(
             "Verbraucher '%s': Merker '%s' nicht lesbar — Verbraucher inaktiv.",
             cid,
-            loxone_name,
+            loxone_name or "get_filter_remaining_hours",
         )
         return 0.0
     if hours <= LOXONE_DEBT_HOURS_EPS:
@@ -132,11 +134,15 @@ def _resolve_single_consumer_daily_target_kwh(
         return fallback
 
     if source == "loxone_remaining_hours":
-        loxone_name = consumer.get("loxone_target_hours_name", "")
+        from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
+
+        loxone_name = marker_get_filter_remaining_hours(consumer)
         today = datetime.now().date()
         if loxone_name and target_date == today:
             hours = loxone_client.fetch_loxone_generic_value(loxone_name)
             return _loxone_remaining_hours_target_kwh(consumer, hours)
+        if not loxone_name and target_date == today:
+            return _loxone_remaining_hours_target_kwh(consumer, None)
         totals = _historical_totals_for_date(target_date, cache)
         if cid in totals:
             return float(totals[cid])

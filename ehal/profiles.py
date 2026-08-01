@@ -75,6 +75,10 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "flex.sens_power_act": "Flex Leistung / Zustand",
     "flex.set_enable": "Flex Freigabe",
     "flex.set_power_setpoint": "Flex Leistungs-Sollwert",
+    "get_filter_remaining_hours": "Filter Sollstunden (h)",
+    "sens_filter_active": "Filter läuft (Binär)",
+    "get_filter_native_start_hour": "Native Filter-Startstunde",
+    "get_filter_native_duration_hours": "Native Filter-Dauer (h)",
 }
 
 # Field → device role_id for HITL grouping (M1 plant roles only).

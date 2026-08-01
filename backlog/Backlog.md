@@ -28,11 +28,13 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 
 - [ ] **2.4.r — Release**
-  - Polish Loxone Template XML-files (use write displaying decimals and units)
-  - Make a code coverage test#
-  - Review code against coding KPIs and refactor it if needed
-  - Make a test coverage test to identify obsolete tests
-  - Update and review official docs for needed updates our outdated infos
+  - [ ] Review old *_BRIDGE_DEFAULTS:
+    - Remove legacy defaults
+  - [ ] Code Quality
+    - Make a code coverage test#
+    - Review code against coding KPIs and refactor it if needed
+    - Make a test coverage test to identify obsolete tests
+  - [ ] Update and review official docs for needed updates our outdated infos
     - Update screenshots where it is useful
     - Consolidate number of documents (merge docs with content that relies on each other)
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check; hardware-registry first approach (`2.4.q`) done

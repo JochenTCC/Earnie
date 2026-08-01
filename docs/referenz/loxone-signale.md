@@ -134,7 +134,7 @@ SwimSpa u. Ä. behalten projektspezifische Namen (z. B. `Earnie_SwimSpa_Frei
 | `set_evcs_max_current` | Schreiben | `Earnie_EAuto_Soll_A` | Soll-/Maxstrom A |
 | `set_evcs_mode` | Schreiben | `Earnie_EAuto_Modus` | `off`=0 \| `pv`=1 \| `now`=2 |
 
-Zusätzlich Pflichtfeld **`min_power_kw`** am Verbraucher. SwimSpa-Filter-Overrides können noch unter `swimspa_filter_bindings` liegen (Bridge-Defaults); Pflege der Haupt-Merker über EHAL-Com. Greenfield-Pool: Prefix `Earnie_Pool_*` / `Earnie_Pool_Filter_*` (siehe [ehal-com.md](../ui/ehal-com.md) §C.6); bestehende SwimSpa-Namen bleiben gültig.
+Zusätzlich Pflichtfeld **`min_power_kw`** am Verbraucher. SwimSpa-Filter: EHAL-Com-Entity **Pool / SwimSpa Filter** (`get_filter_remaining_hours` u. a.) → `swimspa_filter_bindings`; Legacy-Keys bleiben dual-lesbar. Greenfield-Pool: Prefix `Earnie_Pool_*` / `Earnie_Pool_Filter_*` (siehe [ehal-com.md](../ui/ehal-com.md) §C.6); bestehende SwimSpa-Namen bleiben gültig.
 
 ## Request Optimize (außerplanmäßige Läufe)
 

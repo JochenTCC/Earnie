@@ -125,29 +125,25 @@ def filter_binding_prefills(stored: dict, defaults: dict) -> dict[str, str]:
 
 def assemble_filter_bindings(values: dict[str, str]) -> dict:
     """Build swimspa_filter_bindings nest from edited marker addresses."""
-    bindings: dict = {}
+    from house_config.ehal_bindings import ehal_map_to_filter_bindings
+
+    ehal_map: dict[str, str] = {}
     target_hours = str(values.get("loxone_target_hours_name") or "").strip()
     if target_hours:
-        bindings["loxone_target_hours_name"] = target_hours
-    inputs: dict = {"signal_type": "binary"}
+        ehal_map["get_filter_remaining_hours"] = target_hours
     power_name = str(values.get("power_name") or "").strip()
-    alt_power = str(values.get("alternate_binary_power_name") or "").strip()
     if power_name:
-        inputs["power_name"] = power_name
+        ehal_map["flex.swimspa_filter.sens_power_act"] = power_name
+    alt_power = str(values.get("alternate_binary_power_name") or "").strip()
     if alt_power:
-        inputs["alternate_binary_power_name"] = alt_power
-    if len(inputs) > 1:
-        bindings["loxone_inputs"] = inputs
+        ehal_map["sens_filter_active"] = alt_power
     enable_name = str(values.get("enable_name") or "").strip()
     if enable_name:
-        bindings["loxone_outputs"] = {"enable_name": enable_name}
-    sched_lox: dict = {}
+        ehal_map["flex.swimspa_filter.set_enable"] = enable_name
     native_start = str(values.get("native_start_hour_name") or "").strip()
-    native_dur = str(values.get("native_duration_hours_name") or "").strip()
     if native_start:
-        sched_lox["native_start_hour_name"] = native_start
+        ehal_map["get_filter_native_start_hour"] = native_start
+    native_dur = str(values.get("native_duration_hours_name") or "").strip()
     if native_dur:
-        sched_lox["native_duration_hours_name"] = native_dur
-    if sched_lox:
-        bindings["filter_schedule"] = {"loxone": sched_lox}
-    return bindings
+        ehal_map["get_filter_native_duration_hours"] = native_dur
+    return ehal_map_to_filter_bindings(ehal_map)

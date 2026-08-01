@@ -140,6 +140,123 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     return bindings
 
 
+FILTER_ENTITY_ID = "swimspa_filter"
+
+FILTER_EHAL_FIELDS: tuple[str, ...] = (
+    "get_filter_remaining_hours",
+    "flex.swimspa_filter.sens_power_act",
+    "flex.swimspa_filter.set_enable",
+    "sens_filter_active",
+    "get_filter_native_start_hour",
+    "get_filter_native_duration_hours",
+)
+
+
+def filter_bindings_to_ehal_map(stored: dict | None) -> dict[str, str]:
+    """Normalize ``swimspa_filter_bindings`` nest → EHAL field map for HITL / Live."""
+    from ehal.flex_fields import (
+        KIND_SENS_POWER_ACT,
+        KIND_SET_ENABLE,
+        expand_flex_bindings,
+        flex_field,
+    )
+
+    raw = stored if isinstance(stored, dict) else {}
+    out: dict[str, str] = {}
+    existing = raw.get("ehal_bindings")
+    if isinstance(existing, dict):
+        for key, value in existing.items():
+            _put_binding(out, str(key), value)
+    _put_binding(out, "get_filter_remaining_hours", raw.get("loxone_target_hours_name"))
+    inputs = raw.get("loxone_inputs") if isinstance(raw.get("loxone_inputs"), dict) else {}
+    outputs = raw.get("loxone_outputs") if isinstance(raw.get("loxone_outputs"), dict) else {}
+    flox = {}
+    sched = raw.get("filter_schedule")
+    if isinstance(sched, dict) and isinstance(sched.get("loxone"), dict):
+        flox = sched["loxone"]
+    _put_binding(
+        out,
+        flex_field(FILTER_ENTITY_ID, KIND_SENS_POWER_ACT),
+        inputs.get("power_name"),
+    )
+    _put_binding(
+        out,
+        flex_field(FILTER_ENTITY_ID, KIND_SET_ENABLE),
+        outputs.get("enable_name"),
+    )
+    _put_binding(out, "sens_filter_active", inputs.get("alternate_binary_power_name"))
+    _put_binding(out, "get_filter_native_start_hour", flox.get("native_start_hour_name"))
+    _put_binding(
+        out, "get_filter_native_duration_hours", flox.get("native_duration_hours_name")
+    )
+    return expand_flex_bindings(out, FILTER_ENTITY_ID)
+
+
+def ehal_map_to_filter_bindings(ehal_map: dict[str, str] | None) -> dict:
+    """HITL save → ``swimspa_filter_bindings`` (EHAL + legacy dual-read keys)."""
+    from ehal.flex_fields import (
+        KIND_SENS_POWER_ACT,
+        KIND_SET_ENABLE,
+        binding_address,
+        expand_flex_bindings,
+    )
+
+    cleaned = expand_flex_bindings(
+        {str(k): _nonempty(v) for k, v in (ehal_map or {}).items() if _nonempty(v)},
+        FILTER_ENTITY_ID,
+    )
+    out: dict = {"ehal_bindings": cleaned} if cleaned else {}
+    hours = _nonempty(cleaned.get("get_filter_remaining_hours"))
+    if hours:
+        out["loxone_target_hours_name"] = hours
+    power = binding_address(cleaned, FILTER_ENTITY_ID, KIND_SENS_POWER_ACT)
+    alt = _nonempty(cleaned.get("sens_filter_active"))
+    inputs: dict = {"signal_type": "binary"}
+    if power:
+        inputs["power_name"] = power
+    if alt:
+        inputs["alternate_binary_power_name"] = alt
+    if len(inputs) > 1:
+        out["loxone_inputs"] = inputs
+    enable = binding_address(cleaned, FILTER_ENTITY_ID, KIND_SET_ENABLE)
+    if enable:
+        out["loxone_outputs"] = {"enable_name": enable}
+    sched_lox: dict = {}
+    start = _nonempty(cleaned.get("get_filter_native_start_hour"))
+    duration = _nonempty(cleaned.get("get_filter_native_duration_hours"))
+    if start:
+        sched_lox["native_start_hour_name"] = start
+    if duration:
+        sched_lox["native_duration_hours_name"] = duration
+    if sched_lox:
+        out["filter_schedule"] = {"loxone": sched_lox}
+    return out
+
+
+def migrate_swimspa_filter_bindings(consumer: dict) -> bool:
+    """Ensure ``swimspa_filter_bindings.ehal_bindings`` mirrors legacy marker keys."""
+    stored = consumer.get("swimspa_filter_bindings")
+    if not isinstance(stored, dict) or not stored:
+        return False
+    migrated = filter_bindings_to_ehal_map(stored)
+    existing = stored.get("ehal_bindings")
+    existing_map = (
+        {str(k): _nonempty(v) for k, v in existing.items() if _nonempty(v)}
+        if isinstance(existing, dict)
+        else {}
+    )
+    if migrated == existing_map:
+        return False
+    consumer["swimspa_filter_bindings"] = {
+        **stored,
+        "ehal_bindings": migrated,
+    }
+    hours = _nonempty(migrated.get("get_filter_remaining_hours"))
+    if hours and not _nonempty(stored.get("loxone_target_hours_name")):
+        consumer["swimspa_filter_bindings"]["loxone_target_hours_name"] = hours
+    return True
+
+
 def _profiles_iterable(house_doc: dict) -> list[dict]:
     profiles = house_doc.get("profiles")
     if isinstance(profiles, dict):
@@ -249,10 +366,14 @@ def _migrate_all_consumers(house: dict) -> bool:
                     }:
                         consumer["ehal_bindings"] = expanded
                         changed = True
+                if migrate_swimspa_filter_bindings(consumer):
+                    changed = True
                 continue
             migrated = migrate_consumer_legacy_to_ehal_bindings(consumer)
             if migrated:
                 consumer["ehal_bindings"] = migrated
+                changed = True
+            if migrate_swimspa_filter_bindings(consumer):
                 changed = True
     return changed
 

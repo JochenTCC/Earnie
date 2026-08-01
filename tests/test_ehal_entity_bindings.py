@@ -232,3 +232,19 @@ def test_ehal_marker_resolve_prefers_bindings():
     }
     assert marker_sens_evcs_connected(consumer) == "Bind_Da"
     assert marker_set_evcs_max_current(consumer) == "Bind_A"
+
+
+def test_marker_get_filter_remaining_hours_prefers_ehal():
+    from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
+
+    consumer = {
+        "ehal_bindings": {"get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden"},
+        "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
+    }
+    assert marker_get_filter_remaining_hours(consumer) == "Earnie_Pool_Filter_Sollstunden"
+    assert (
+        marker_get_filter_remaining_hours(
+            {"loxone_target_hours_name": "Legacy_Hours"}
+        )
+        == "Legacy_Hours"
+    )

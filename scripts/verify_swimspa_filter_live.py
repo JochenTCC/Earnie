@@ -4,8 +4,8 @@ r"""Live-Abnahme SwimSpa-Filter: Loxone-Formate und natives Fenster prüfen.
 Aufruf (Miniserver erreichbar, .env gesetzt):
     .venv\Scripts\python.exe -m scripts.verify_swimspa_filter_live
 
-Prüft swimspa_filter aus config.json:
-  - Ernie_Swimspa_Filter_Sollstunden (Float, Schulden in h)
+Prüft swimspa_filter aus config.json / Hausprofil:
+  - get_filter_remaining_hours (Float, Schulden in h; Legacy: loxone_target_hours_name)
   - homie_bwa_spa_filter1hour (Integer 0–23 oder HH:MM)
   - homie_bwa_spa_filter1durationhours (Float h)
   - homie_bwa_spa_filter2 (binär, Filter läuft)
@@ -36,9 +36,11 @@ def _status(ok: bool) -> str:
 
 
 def _check_sollstunden(consumer: dict) -> tuple[bool, str]:
-    name = consumer.get("loxone_target_hours_name", "")
+    from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
+
+    name = marker_get_filter_remaining_hours(consumer)
     if not name:
-        return False, "loxone_target_hours_name fehlt in config.json"
+        return False, "get_filter_remaining_hours / loxone_target_hours_name fehlt"
     raw = loxone_client.fetch_loxone_raw_value(name)
     value = loxone_client.fetch_loxone_generic_value(name)
     if value is None:

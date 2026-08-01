@@ -169,6 +169,8 @@ Deckt die **heute für SwimSpa genutzten** Signale (Heizung + Filter) ab. Zwei L
 
 Hinweise: Chart zieht Filterleistung ggf. über `subtract_consumer_ids` ab (kein EHAL-Feld). Pattern B: `VI_Earnie_Pool` (Freigaben), `VO_Earnie_Pool` (Telemetrie).
 
+**EHAL-Com Mapping:** Bei einem MILP-`thermal_rc`-Verbraucher erscheint zusätzlich die Entity **Pool / SwimSpa Filter** (`swimspa_filter`). Dort wird `get_filter_remaining_hours` (und weitere Filter-Felder) auf den Miniserver-Merker gemappt und unter `swimspa_filter_bindings` gespeichert. Ohne Mapping bleibt der Filter inaktiv (kein Hard-Default mehr auf `Ernie_Swimspa_Filter_Sollstunden`).
+
 ## Live-Cockpit noch gesperrt (Greenfield)
 
 Nach abgeschlossener Planungs-Konfiguration erscheint **Szenario-Explorer**, aber **Live-Cockpit** bleibt ausgeblendet, solange die Anbindung für den Live-Betrieb nicht vollständig ist. Nutzen Sie **Anbindung**, **Live-Lesen** und die Verbindungstests auf dieser Seite.

@@ -93,7 +93,8 @@ Getrennter Verbraucher `swimspa_filter` (Heizung bleibt `swimspa` mit `daily_tar
 | Feld                              | Bedeutung                                                                                       |
 | --------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `daily_target_source`             | `loxone_remaining_hours` — Ziel_kWh = `Sollstunden` × `nominal_power_kw`                        |
-| `loxone_target_hours_name`        | Loxone-Merker für verbleibende Filter-Schulden in **Stunden** (Float)                           |
+| `get_filter_remaining_hours`      | EHAL-Rolle (EHAL-Com Entity **Pool / SwimSpa Filter**); Merker-Adresse in `ehal_bindings` / `swimspa_filter_bindings` |
+| `loxone_target_hours_name`        | Legacy-Dual-Read für denselben Merker (verbleibende Filter-Schulden in **Stunden**)             |
 | `filter_schedule.enabled`         | `true` = natives Duty-Cycle-Fenster sperrt MILP-Slots                                           |
 | `filter_schedule.loxone`          | `native_start_hour_name`, `native_duration_hours_name` — natives Fenster `[Start, Start+Dauer)` |
 | `filter_schedule.config_fallback` | Festes Fenster für Backtesting/Offline (kein `path_historical_log`)                             |

@@ -1441,6 +1441,55 @@ def test_swimspa_filter_bindings_override_defaults():
     assert filt["loxone_target_hours_name"] == "Profile_Filter_Hours"
 
 
+def test_planning_filter_uses_ehal_get_filter_remaining_hours():
+    from house_config.planning_flex_bridge import (
+        collect_planning_flex_consumers,
+        planning_filter_to_milp,
+    )
+
+    custom = planning_filter_to_milp(
+        {
+            "ehal_bindings": {
+                "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
+            }
+        }
+    )
+    assert custom["loxone_target_hours_name"] == "Earnie_Pool_Filter_Sollstunden"
+    assert custom["ehal_bindings"]["get_filter_remaining_hours"] == (
+        "Earnie_Pool_Filter_Sollstunden"
+    )
+
+    bare = planning_filter_to_milp(None)
+    assert bare["loxone_target_hours_name"] == ""
+
+    profile = {
+        "consumers": [
+            {
+                "id": "swimspa",
+                "label": "SwimSpa",
+                "type": "thermal_rc",
+                "nominal_power_kw": 2.8,
+                "use_profile_csv": False,
+                "thermal_rc": {
+                    "water_volume_liters": 6000.0,
+                    "setpoint_c": 36.0,
+                    "tolerance_c": 1.0,
+                    "heat_loss_kw_per_k": 0.1,
+                    "heating_efficiency": 0.95,
+                },
+                "swimspa_filter_bindings": {
+                    "ehal_bindings": {
+                        "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
+                    }
+                },
+            }
+        ]
+    }
+    flex = collect_planning_flex_consumers(profile)
+    filt = next(item for item in flex if item["id"] == "swimspa_filter")
+    assert filt["loxone_target_hours_name"] == "Earnie_Pool_Filter_Sollstunden"
+
+
 def test_assemble_filter_bindings_shape():
     from ui.smarthome_marker_fields import assemble_filter_bindings
 
@@ -1455,6 +1504,7 @@ def test_assemble_filter_bindings_shape():
         }
     )
     assert bindings["loxone_target_hours_name"] == "Hours"
+    assert bindings["ehal_bindings"]["get_filter_remaining_hours"] == "Hours"
     assert bindings["loxone_inputs"]["power_name"] == "P2"
     assert bindings["loxone_outputs"]["enable_name"] == "En"
     assert bindings["filter_schedule"]["loxone"]["native_start_hour_name"] == "Start"

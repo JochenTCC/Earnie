@@ -199,6 +199,7 @@ def _consumer_has_live_read_marker(consumer: dict) -> bool:
     from settings.ehal_marker_resolve import (
         marker_flex_power,
         marker_get_evcs_ready_by_time,
+        marker_get_filter_remaining_hours,
         marker_sens_evcs_active_power,
         marker_sens_evcs_connected,
     )
@@ -206,6 +207,8 @@ def _consumer_has_live_read_marker(consumer: dict) -> bool:
     if marker_flex_power(consumer) or marker_sens_evcs_active_power(consumer):
         return True
     if marker_sens_evcs_connected(consumer) or marker_get_evcs_ready_by_time(consumer):
+        return True
+    if marker_get_filter_remaining_hours(consumer):
         return True
     return False
 
@@ -322,6 +325,50 @@ def _append_flex_power_check(
     )
 
 
+def _append_filter_read_checks(
+    checks: list[tuple[str, str, dict]],
+    consumer: dict,
+) -> None:
+    from settings.ehal_marker_resolve import (
+        marker_get_filter_native_duration_hours,
+        marker_get_filter_native_start_hour,
+        marker_get_filter_remaining_hours,
+        marker_sens_filter_active,
+    )
+
+    cid = consumer["id"]
+    _append_flex_power_check(checks, consumer)
+    _append_io_check(
+        checks,
+        f"{cid}:get_filter_remaining_hours",
+        marker_get_filter_remaining_hours(consumer),
+        {"validate": _power_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:sens_filter_active",
+        marker_sens_filter_active(consumer),
+        {"validate": _binary_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:get_filter_native_start_hour",
+        marker_get_filter_native_start_hour(consumer),
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:get_filter_native_duration_hours",
+        marker_get_filter_native_duration_hours(consumer),
+        {"validate": _power_valid},
+    )
+
+
+def _is_filter_consumer(consumer: dict) -> bool:
+    if str(consumer.get("id") or "").strip() == "swimspa_filter":
+        return True
+    return consumer.get("daily_target_source") == "loxone_remaining_hours"
+
+
 def collect_read_checks() -> list[tuple[str, str, dict]]:
     """(EHAL-Feld, Mapping/IO-Name) — plant ``sens_*`` + consumer reads."""
     checks: list[tuple[str, str, dict]] = [
@@ -351,6 +398,8 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
     for consumer in _consumers_for_live_reads():
         if _is_ev_consumer(consumer):
             _append_ev_read_checks(checks, consumer)
+        elif _is_filter_consumer(consumer):
+            _append_filter_read_checks(checks, consumer)
         else:
             _append_flex_power_check(checks, consumer)
 

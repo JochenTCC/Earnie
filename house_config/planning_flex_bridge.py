@@ -311,7 +311,8 @@ SWIMSPA_FILTER_BRIDGE_DEFAULTS: dict = {
     "nominal_power_kw": 0.18,
     "daily_target_kwh": 0.36,
     "daily_target_source": "loxone_remaining_hours",
-    "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
+    # Sollstunden: map via EHAL-Com ``get_filter_remaining_hours`` (no hard-coded Merker).
+    "loxone_target_hours_name": "",
     "signal_type": "binary",
     "min_on_quarterhours": 2,
     "optimizer_enabled": True,
@@ -338,9 +339,17 @@ SWIMSPA_FILTER_BRIDGE_DEFAULTS: dict = {
 
 def planning_filter_to_milp(bindings: dict | None = None) -> dict:
     """Bridge-only SwimSpa-Filter (kein Hausprofil-Row)."""
+    from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
+
     entry = dict(SWIMSPA_FILTER_BRIDGE_DEFAULTS)
     if bindings:
         entry = _deep_merge_dict(entry, bindings)
+    hours = marker_get_filter_remaining_hours(entry)
+    entry["loxone_target_hours_name"] = hours
+    ehal = dict(entry.get("ehal_bindings") or {})
+    if hours and not str(ehal.get("get_filter_remaining_hours") or "").strip():
+        ehal["get_filter_remaining_hours"] = hours
+        entry["ehal_bindings"] = ehal
     return entry
 
 
@@ -352,6 +361,15 @@ def _swimspa_filter_bindings_from_profile(house_profile: dict) -> dict | None:
         bindings = consumer.get("swimspa_filter_bindings")
         if isinstance(bindings, dict) and bindings:
             return bindings
+        # Lift get_filter_remaining_hours if mapped on the heat entity by mistake.
+        ehal = consumer.get("ehal_bindings")
+        if isinstance(ehal, dict):
+            hours = str(ehal.get("get_filter_remaining_hours") or "").strip()
+            if hours:
+                return {
+                    "ehal_bindings": {"get_filter_remaining_hours": hours},
+                    "loxone_target_hours_name": hours,
+                }
     return None
 
 

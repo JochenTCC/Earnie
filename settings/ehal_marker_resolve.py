@@ -178,6 +178,42 @@ def marker_get_evcs_limit_soc(consumer: dict) -> str:
     )
 
 
+def marker_get_filter_remaining_hours(consumer: dict) -> str:
+    """Filter Sollstunden Merker; prefer EHAL role, else legacy ``loxone_target_hours_name``."""
+    return _first_nonempty(
+        ehal_bindings(consumer).get("get_filter_remaining_hours"),
+        consumer.get("loxone_target_hours_name"),
+    )
+
+
+def marker_sens_filter_active(consumer: dict) -> str:
+    """Binary filter-running Merker; dual-read alternate Homie input."""
+    inputs = consumer.get("loxone_inputs") or {}
+    return _first_nonempty(
+        ehal_bindings(consumer).get("sens_filter_active"),
+        inputs.get("sens_filter_active"),
+        inputs.get("alternate_binary_power_name"),
+    )
+
+
+def marker_get_filter_native_start_hour(consumer: dict) -> str:
+    flox = (consumer.get("filter_schedule") or {}).get("loxone") or {}
+    return _first_nonempty(
+        ehal_bindings(consumer).get("get_filter_native_start_hour"),
+        flox.get("get_filter_native_start_hour"),
+        flox.get("native_start_hour_name"),
+    )
+
+
+def marker_get_filter_native_duration_hours(consumer: dict) -> str:
+    flox = (consumer.get("filter_schedule") or {}).get("loxone") or {}
+    return _first_nonempty(
+        ehal_bindings(consumer).get("get_filter_native_duration_hours"),
+        flox.get("get_filter_native_duration_hours"),
+        flox.get("native_duration_hours_name"),
+    )
+
+
 def resolve_get_evcs_limit_soc(consumer: dict) -> float:
     """Limit SoC %: optional ``get_evcs_limit_soc`` Merker, else profile percent."""
     from integrations import loxone_client

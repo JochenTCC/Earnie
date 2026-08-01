@@ -36,6 +36,27 @@ def test_resolve_loxone_remaining_hours_from_sollstunden(mock_fetch):
 
 
 @patch("integrations.loxone_client.fetch_loxone_generic_value")
+def test_resolve_loxone_remaining_hours_from_ehal_binding(mock_fetch):
+    mock_fetch.return_value = 2.0
+    today = date.today()
+    consumer = {
+        "id": "swimspa_filter",
+        "nominal_power_kw": 0.18,
+        "daily_target_source": "loxone_remaining_hours",
+        "ehal_bindings": {"get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden"},
+        "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
+    }
+    result = consumer_targets._resolve_single_consumer_daily_target_kwh(
+        consumer,
+        today,
+        None,
+        {},
+    )
+    assert result == pytest.approx(2.0 * 0.18)
+    mock_fetch.assert_called_once_with("Earnie_Pool_Filter_Sollstunden")
+
+
+@patch("integrations.loxone_client.fetch_loxone_generic_value")
 def test_resolve_loxone_remaining_hours_zero_is_inactive(mock_fetch):
     mock_fetch.return_value = 0.0
     today = date.today()

@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### EHAL-Com get_filter_remaining_hours mapping (2026-08-01)
+
+- [x] **Pool / SwimSpa Filter mapping in EHAL-Com** — synthetic entity `swimspa_filter` for `get_filter_remaining_hours` (plus filter power/Freigabe/aktiv/native window); persist under `swimspa_filter_bindings`; dual-read via `marker_get_filter_remaining_hours`; remove hard-coded `Ernie_Swimspa_Filter_Sollstunden` bridge default. Live-Lesen + docs (§C.6 / flexible-verbraucher / loxone-signale). Tests: mapping, resolve, consumer targets, planning bridge.
+
+
 ### Pattern B Virtual In status.json (2026-08-01)
 
 - [x] **Daemon `GET /ehal/loxone/status.json` (port 8541)** — Pattern B VI payload from last-run `loxone_sent` (plant `set_ess_*` in kW, EV/flex namespaced Check keys, pool Freigaben) plus live `heartbeat_ts`; VI templates/docs retargeted from Streamlit `:8501` to daemon `:8541`. Tests: `tests/test_loxone_status_json.py`, `tests/test_loxone_request_http.py`.
