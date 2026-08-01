@@ -895,6 +895,7 @@ class TestBuildSentSnapshot:
             "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
             "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
         }
+        # PV surplus → mode=1
         with patch.object(
             lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
         ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
@@ -909,6 +910,23 @@ class TestBuildSentSnapshot:
         assert snapshot["Earnie_EAuto_Modus"] == 1.0
         assert snapshot["Earnie_EAuto_pv_follow"] == 1.0
 
+        # Fixed set_evcs_max_current (not PV) → mode=2
+        with patch.object(
+            lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
+        ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+            snapshot = lc.build_sent_loxone_snapshot(
+                mode=0,
+                target_power_kw=0.0,
+                target_soc=80.0,
+                consumer_powers={"eauto": 2.0},
+                charging_contexts={"eauto": {"active": True, "plugged_in": True}},
+                consumer_pv_follow={"eauto": 0},
+            )
+        assert snapshot["Earnie_EAuto_Soll_A"] > 0.0
+        assert snapshot["Earnie_EAuto_Modus"] == 2.0
+        assert snapshot["Earnie_EAuto_pv_follow"] == 0.0
+
+        # Sofort laden skip → mode=2 (no amp setpoint from Earnie)
         with patch.object(
             lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
         ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):

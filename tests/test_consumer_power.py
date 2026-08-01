@@ -78,3 +78,6 @@ class TestConsumerPowerHelpers:
         assert set_evcs_mode_for_plan(pv_follow=1, immediate=False) == "pv"
         assert set_evcs_mode_for_plan(pv_follow=0, immediate=False) == "off"
         assert set_evcs_mode_for_plan(pv_follow=1, immediate=True) == "now"
+        assert set_evcs_mode_for_plan(pv_follow=0, immediate=False, charging=True) == "now"
+        assert set_evcs_mode_for_plan(pv_follow=1, immediate=False, charging=True) == "pv"
+        assert set_evcs_mode_for_plan(pv_follow=0, immediate=False, charging=False) == "off"

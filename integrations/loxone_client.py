@@ -955,7 +955,7 @@ def _evcs_current_output_values(
     consumer_pv_follow: dict[str, int] | None,
     current_name: str,
 ) -> dict[str, float]:
-    from optimizer.consumer_power import set_evcs_mode_for_plan
+    from optimizer.consumer_power import loxone_control_outputs, set_evcs_mode_for_plan
 
     amps = flex_consumer_setpoint_amps(
         consumer, consumer_powers, charging_contexts, consumer_pv_follow
@@ -963,15 +963,21 @@ def _evcs_current_output_values(
     if amps is None:
         return {}
     values = {str(current_name): float(amps)}
-    pv_out = flex_consumer_pv_follow_value(
-        consumer, consumer_powers, charging_contexts, consumer_pv_follow
+    cid = consumer["id"]
+    planned_kw = _effective_consumer_power_kw(
+        consumer, consumer_powers, charging_contexts, cid
     )
-    mode = set_evcs_mode_for_plan(pv_follow=int(pv_out or 0), immediate=False)
+    plan_pv = int((consumer_pv_follow or {}).get(cid, 0) or 0)
+    _, pv_out = loxone_control_outputs(consumer, planned_kw, plan_pv)
+    mode = set_evcs_mode_for_plan(
+        pv_follow=int(pv_out),
+        immediate=False,
+        charging=float(amps) > 1e-6,
+    )
     _append_evcs_mode_writes(values, consumer, mode=mode, pv_out=pv_out)
     setpoint_kw = flex_consumer_power_setpoint_kw(
         consumer, consumer_powers, charging_contexts, consumer_pv_follow
     )
-    planned_kw = max(0.0, float(consumer_powers.get(consumer["id"], 0.0) or 0.0))
     logger.info(
         "Flex consumer %s -> Soll=%.2f A (%.2f kW), mode=%s "
         "(geplant %.2f kW, Loxone: %s)",
@@ -979,7 +985,7 @@ def _evcs_current_output_values(
         amps,
         setpoint_kw or 0.0,
         mode,
-        planned_kw,
+        max(0.0, float(consumer_powers.get(cid, 0.0) or 0.0)),
         current_name,
     )
     return values

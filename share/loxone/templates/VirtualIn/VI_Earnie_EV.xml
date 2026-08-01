@@ -7,5 +7,5 @@
 -->
 <VirtualInHttp Title="Earnie EV" Comment="Pattern B: EV setpoints from Earnie (draft)" Address="http://EARNIE_HOST:8501/ehal/loxone/status.json" PollingTime="30">
 	<VirtualInHttpCmd Title="Earnie_EAuto_Soll_A" Comment="ev.{ev_id}.set_evcs_max_current A" Check="&quot;ev.{ev_id}.Earnie_EAuto_Soll_A&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="32" DestValHigh="32" DefVal="0" MinVal="0" MaxVal="63"/>
-	<VirtualInHttpCmd Title="Earnie_EAuto_Modus" Comment="ev.{ev_id}.set_evcs_mode numeric encoding TBD" Check="&quot;ev.{ev_id}.Earnie_EAuto_Modus&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="10" DestValHigh="10" DefVal="0" MinVal="0" MaxVal="10"/>
+	<VirtualInHttpCmd Title="Earnie_EAuto_Modus" Comment="ev.{ev_id}.set_evcs_mode off=0 pv=1 now=2" Check="&quot;ev.{ev_id}.Earnie_EAuto_Modus&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="10" DestValHigh="10" DefVal="0" MinVal="0" MaxVal="10"/>
 </VirtualInHttp>

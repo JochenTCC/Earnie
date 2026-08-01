@@ -87,10 +87,22 @@ def loxone_control_outputs(
     return clamp_setpoint_kw(consumer, planned_kw), 0
 
 
-def set_evcs_mode_for_plan(*, pv_follow: int, immediate: bool) -> str:
-    """EHAL set_evcs_mode for live write: now | pv | off (idle/absent/complete)."""
+def set_evcs_mode_for_plan(
+    *,
+    pv_follow: int,
+    immediate: bool,
+    charging: bool = False,
+) -> str:
+    """EHAL set_evcs_mode for live write: now | pv | off.
+
+    - now (2): Sofort laden, or Earnie charging via set_evcs_max_current
+    - pv (1): PV-surplus follow
+    - off (0): no charging
+    """
     if immediate:
         return "now"
     if int(pv_follow) == 1:
         return "pv"
+    if charging:
+        return "now"
     return "off"
