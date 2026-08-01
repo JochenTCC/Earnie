@@ -22,6 +22,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **EVCS `set_evcs_mode` with max current** — fixed current charging wrote mode `0`; now `2` (`now`) with `set_evcs_max_current`, PV surplus `1`, idle `0` (`698fc6a`, `v2.4.0-alpha.2`).
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
