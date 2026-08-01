@@ -317,7 +317,7 @@ SWIMSPA_FILTER_BRIDGE_DEFAULTS: dict = {
     "min_on_quarterhours": 2,
     "optimizer_enabled": True,
     "path_historical_log": "",
-    "loxone_outputs": {"enable_name": "Ernie_Swimspa_Filter_Freigabe"},
+    "loxone_outputs": {"enable_name": "Earnie_Swimspa_Filter_Freigabe"},
     "loxone_inputs": {
         "power_name": "homie_bwa_spa_filter2",
         "alternate_binary_power_name": "homie_bwa_spa_filter1",
@@ -373,8 +373,50 @@ def _swimspa_filter_bindings_from_profile(house_profile: dict) -> dict | None:
     return None
 
 
+def _pool_filter_enable_overlay(house_profile: dict) -> dict | None:
+    """When greenfield ``pool_filter`` exists, use its Freigabe for the MILP bridge."""
+    from settings.ehal_marker_resolve import marker_flex_enable
+
+    for consumer in house_profile.get("consumers") or []:
+        if not isinstance(consumer, dict):
+            continue
+        if str(consumer.get("id") or "").strip() != "pool_filter":
+            continue
+        enable = str(marker_flex_enable(consumer) or "").strip()
+        if not enable:
+            return None
+        return {"loxone_outputs": {"enable_name": enable}}
+    return None
+
+
+def _filter_bindings_for_milp(house_profile: dict) -> dict | None:
+    """Merge thermal_rc nest + greenfield pool_filter enable into bridge bindings."""
+    base = _swimspa_filter_bindings_from_profile(house_profile)
+    overlay = _pool_filter_enable_overlay(house_profile)
+    if base and overlay:
+        return _deep_merge_dict(base, overlay)
+    return overlay or base
+
+
 def planning_thermal_rc_consumers(house_profile: dict) -> list[dict]:
     return [planning_thermal_rc_to_milp(consumer) for consumer in _house_thermal_rc_consumers(house_profile)]
+
+
+def _ensure_shared_meter_filter_subtract(heat: dict, filter_id: str) -> None:
+    """Fall B: shared SwimSpa meter includes filter — subtract filter from heating Ist."""
+    fid = str(filter_id or "").strip()
+    if not fid:
+        return
+    inputs = dict(heat.get("loxone_inputs") or {})
+    existing = [
+        str(item).strip()
+        for item in (inputs.get("subtract_consumer_ids") or [])
+        if str(item).strip()
+    ]
+    if fid not in existing:
+        existing.append(fid)
+    inputs["subtract_consumer_ids"] = existing
+    heat["loxone_inputs"] = inputs
 
 
 def collect_planning_flex_consumers(house_profile: dict) -> list[dict]:
@@ -393,10 +435,14 @@ def collect_planning_flex_consumers(house_profile: dict) -> list[dict]:
     # Filter only with MILP thermal_rc. CSV thermal_rc meters (e.g. SwimSpa)
     # already include filter power in the overlay series.
     filters = (
-        [planning_filter_to_milp(_swimspa_filter_bindings_from_profile(house_profile))]
+        [planning_filter_to_milp(_filter_bindings_for_milp(house_profile))]
         if thermal_rc_flex
         else []
     )
+    if filters:
+        filter_id = str(filters[0].get("id") or SWIMSPA_FILTER_BRIDGE_DEFAULTS["id"])
+        for heat in thermal_rc_flex:
+            _ensure_shared_meter_filter_subtract(heat, filter_id)
     return (
         flex_generic
         + planning_ev_consumers(house_profile)

@@ -1031,6 +1031,10 @@ def test_planning_thermal_rc_to_milp_bridge():
     ids = {entry["id"] for entry in flex}
     assert "swimspa" in ids
     assert "swimspa_filter" in ids
+    heat = next(entry for entry in flex if entry["id"] == "swimspa")
+    assert (heat.get("loxone_inputs") or {}).get("subtract_consumer_ids") == [
+        "swimspa_filter"
+    ]
 
 
 def test_consumer_annual_kwh_thermal_rc_with_geo():
@@ -1439,6 +1443,41 @@ def test_swimspa_filter_bindings_override_defaults():
     flex = collect_planning_flex_consumers(profile)
     filt = next(item for item in flex if item["id"] == "swimspa_filter")
     assert filt["loxone_target_hours_name"] == "Profile_Filter_Hours"
+
+
+def test_pool_filter_enable_overlays_milp_bridge_freigabe():
+    """Greenfield pool_filter Freigabe must drive the bridged swimspa_filter write."""
+    from house_config.planning_flex_bridge import collect_planning_flex_consumers
+
+    profile = {
+        "consumers": [
+            {
+                "id": "pool_swimspa",
+                "label": "Pool",
+                "type": "thermal_rc",
+                "nominal_power_kw": 2.8,
+                "use_profile_csv": False,
+                "thermal_rc": {
+                    "water_volume_liters": 6000.0,
+                    "setpoint_c": 36.0,
+                    "tolerance_c": 1.0,
+                    "heat_loss_kw_per_k": 0.1,
+                    "heating_efficiency": 0.95,
+                },
+            },
+            {
+                "id": "pool_filter",
+                "label": "Pool Filter",
+                "type": "flexible",
+                "ehal_bindings": {
+                    "flex.pool_filter.set_enable": "Earnie_Pool_Filter_Freigabe",
+                },
+            },
+        ]
+    }
+    flex = collect_planning_flex_consumers(profile)
+    filt = next(item for item in flex if item["id"] == "swimspa_filter")
+    assert filt["loxone_outputs"]["enable_name"] == "Earnie_Pool_Filter_Freigabe"
 
 
 def test_planning_filter_uses_ehal_get_filter_remaining_hours():

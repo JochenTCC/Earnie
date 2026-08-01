@@ -9,7 +9,7 @@ Prüft swimspa_filter aus config.json / Hausprofil:
   - homie_bwa_spa_filter1hour (Integer 0–23 oder HH:MM)
   - homie_bwa_spa_filter1durationhours (Float h)
   - homie_bwa_spa_filter2 (binär, Filter läuft)
-  - Ernie_Swimspa_Filter_Freigabe (Schreib-Merker lesbar)
+  - Earnie_Swimspa_Filter_Freigabe (Schreib-Merker lesbar)
 """
 from __future__ import annotations
 

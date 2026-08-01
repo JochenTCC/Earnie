@@ -489,6 +489,26 @@ def _slot_in_native_filter_window(
     return slot_in_native_window(slot_dt, float(start), float(duration))
 
 
+def _shared_meter_heating_ids(consumers: list, filter_id: str) -> list[str]:
+    """Heating/runtime ids whose shared meter lists ``filter_id`` under subtract."""
+    found: list[str] = []
+    for consumer in consumers:
+        subtract_ids = (consumer.get("loxone_inputs") or {}).get(
+            "subtract_consumer_ids"
+        ) or []
+        if filter_id not in subtract_ids:
+            continue
+        cid = runtime_consumer_id(consumer)
+        if cid and cid not in found:
+            found.append(cid)
+    if found:
+        return found
+    # Legacy Fall B default when subtract_consumer_ids was never wired.
+    if any(item.get("id") == SWIMSPA_HEATING_ID for item in consumers):
+        return [SWIMSPA_HEATING_ID]
+    return []
+
+
 def _apply_native_filter_inference(
     result: dict[str, float],
     measured_ids: set[str],
@@ -504,8 +524,6 @@ def _apply_native_filter_inference(
         filter_contexts, SWIMSPA_FILTER_ID, slot_datetime
     ):
         return
-    if SWIMSPA_HEATING_ID not in measured_ids:
-        return
     if float(result.get(SWIMSPA_FILTER_ID, 0.0) or 0.0) > 1e-9:
         return
 
@@ -519,19 +537,24 @@ def _apply_native_filter_inference(
     if nominal <= 1e-9:
         return
 
-    total = float(result.get(SWIMSPA_HEATING_ID, 0.0) or 0.0)
-    if total <= 1e-9 or abs(total - nominal) > FILTER_INFERENCE_TOLERANCE_KW:
-        return
+    for heating_id in _shared_meter_heating_ids(consumers, SWIMSPA_FILTER_ID):
+        if heating_id not in measured_ids:
+            continue
+        total = float(result.get(heating_id, 0.0) or 0.0)
+        if total <= 1e-9 or abs(total - nominal) > FILTER_INFERENCE_TOLERANCE_KW:
+            continue
 
-    result[SWIMSPA_FILTER_ID] = round(nominal, 3)
-    result[SWIMSPA_HEATING_ID] = round(max(0.0, total - nominal), 3)
-    measured_ids.add(SWIMSPA_FILTER_ID)
-    logger.info(
-        "Loxone: natives Filterfenster — Filter %.3f kW aus Gesamtzähler %.3f kW "
-        "inferiert (Binär-Merker 0).",
-        nominal,
-        total,
-    )
+        result[SWIMSPA_FILTER_ID] = round(nominal, 3)
+        result[heating_id] = round(max(0.0, total - nominal), 3)
+        measured_ids.add(SWIMSPA_FILTER_ID)
+        logger.info(
+            "Loxone: natives Filterfenster — Filter %.3f kW aus Gesamtzähler %.3f kW "
+            "inferiert (Binär-Merker 0, heating=%s).",
+            nominal,
+            total,
+            heating_id,
+        )
+        return
 
 
 def _subtract_shared_meter_loads(

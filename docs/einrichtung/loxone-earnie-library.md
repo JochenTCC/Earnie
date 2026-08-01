@@ -70,6 +70,8 @@ Andere Telemetrie-VO-Drafts können noch `:8501` als Platzhalter tragen, bis die
 
 Polling / Cmd-Check-Muster an die JSON-Keys anpassen (Plant: `set_ess_*` / `heartbeat_ts`; Flex/EV: `flex.{hk_id}.…` / `ev.{ev_id}.…`). Stabile **Titles** bleiben der Vertrag für Core und Greenfield-Import.
 
+**Freigabe-Cmds (0/1) müssen analog sein:** In den VI-Templates ist `Analog="true"` gesetzt. In Config **nicht** „Als digitalen Eingang“ / Digital-Modus wählen — sonst pulst der Eingang bei **jedem** Poll (~PollingTime) kurz auf `1`, auch wenn `status.json` dauerhaft `0` liefert. Sticky 0/1 kommt nur im Analog-Modus aus dem `\v`-Wert.
+
 ## 3. Geräte einfügen und Merker belassen
 
 1. Pro Rolle die passende Vorlage einmal (oder mehrfach bei mehreren Flex-Verbrauchern) einfügen.

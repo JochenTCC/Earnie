@@ -6,6 +6,7 @@
   Leistung: VO_Earnie_Consumer or EFM Load (not this VI).
 -->
 <VirtualInHttp Title="Earnie Generic Consumer" Comment="Pattern B: flex Freigabe/setpoint from Earnie (draft)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="30">
-	<VirtualInHttpCmd Title="Earnie_Verbraucher_Freigabe" Comment="flex.{hk_id}.enable / flex.set_enable 0/1" Check="&quot;flex.{hk_id}.Earnie_Verbraucher_Freigabe&quot;:\v" Signed="true" Analog="false" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
+	<!-- Analog=true: sticky 0/1 from JSON. Analog=false (digital) pulses true on every poll. -->
+	<VirtualInHttpCmd Title="Earnie_Verbraucher_Freigabe" Comment="flex.{hk_id}.enable / flex.set_enable 0/1 sticky" Check="&quot;flex.{hk_id}.Earnie_Verbraucher_Freigabe&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
 	<VirtualInHttpCmd Title="Earnie_Verbraucher_Ziel_kW" Comment="flex.{hk_id}.power_setpoint / flex.{hk_id}.set_power_setpoint kW" Check="&quot;flex.{hk_id}.Earnie_Verbraucher_Ziel_kW&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="10" DestValHigh="10" DefVal="0" MinVal="0" MaxVal="100"/>
 </VirtualInHttp>

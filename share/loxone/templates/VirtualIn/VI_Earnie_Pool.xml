@@ -2,8 +2,11 @@
 <!--
   DRAFT (2.4.n Pattern B) — Earnie → Loxone pool Freigaben.
   Heating Freigabe + Filter Freigabe. Telemetry on VO_Earnie_Pool.
+  Check keys = status.json keys (bare Titles). Earnie maps legacy
+  Ernie_Swimspa_* enable Merkers onto these Check keys.
 -->
 <VirtualInHttp Title="Earnie Pool" Comment="Pattern B: pool heat + filter Freigabe from Earnie (draft)" Address="http://EARNIE_HOST:8541/ehal/loxone/status.json" PollingTime="30">
-	<VirtualInHttpCmd Title="Earnie_Pool_Freigabe" Comment="flex.set_enable heat entity 0/1" Check="&quot;Earnie_Pool_Freigabe&quot;:\v" Signed="true" Analog="false" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
-	<VirtualInHttpCmd Title="Earnie_Pool_Filter_Freigabe" Comment="flex.set_enable filter entity 0/1" Check="&quot;Earnie_Pool_Filter_Freigabe&quot;:\v" Signed="true" Analog="false" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
+	<!-- Analog=true: sticky 0/1 from JSON. Analog=false (digital) pulses true on every poll. -->
+	<VirtualInHttpCmd Title="Earnie_Pool_Freigabe" Comment="status.json Earnie_Pool_Freigabe 0/1 sticky" Check="&quot;Earnie_Pool_Freigabe&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
+	<VirtualInHttpCmd Title="Earnie_Pool_Filter_Freigabe" Comment="status.json Earnie_Pool_Filter_Freigabe 0/1 sticky" Check="&quot;Earnie_Pool_Filter_Freigabe&quot;:\v" Signed="true" Analog="true" SourceValLow="0" DestValLow="0" SourceValHigh="1" DestValHigh="1" DefVal="0" MinVal="0" MaxVal="1"/>
 </VirtualInHttp>

@@ -86,3 +86,57 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
     assert payload["flex.waermepumpe.Earnie_Waermepumpe_Freigabe"] == 1.0
     assert payload["Earnie_Pool_Freigabe"] == 0.0
     assert payload["Earnie_Pool_Filter_Freigabe"] == 1.0
+
+
+def test_status_payload_maps_legacy_swimspa_enable_to_pool_keys() -> None:
+    consumers = [
+        {
+            "id": "swimspa",
+            "type": "thermal_rc",
+            "loxone_outputs": {"enable_name": "Earnie_SwimSpa_Freigabe"},
+        },
+        {
+            "id": "swimspa_filter",
+            "daily_target_source": "loxone_remaining_hours",
+            "loxone_outputs": {"enable_name": "Earnie_Swimspa_Filter_Freigabe"},
+        },
+    ]
+    payload = build_loxone_status_payload(
+        loxone_sent={
+            "Earnie_SwimSpa_Freigabe": 1.0,
+            "Earnie_Swimspa_Filter_Freigabe": 0.0,
+        },
+        consumers=consumers,
+        plant_io_index={},
+        now_ts=50.0,
+    )
+    assert payload["Earnie_Pool_Freigabe"] == 1.0
+    assert payload["Earnie_Pool_Filter_Freigabe"] == 0.0
+    assert "flex.swimspa_filter.Earnie_Verbraucher_Freigabe" not in payload
+    assert "flex.swimspa.Earnie_Verbraucher_Freigabe" not in payload
+
+
+def test_status_payload_greenfield_pool_filter_reads_legacy_sent() -> None:
+    consumers = [
+        {
+            "id": "pool_swimspa",
+            "type": "thermal_rc",
+            "ehal_bindings": {"flex.pool_swimspa.set_enable": "Earnie_Pool_Freigabe"},
+        },
+        {
+            "id": "pool_filter",
+            "type": "generic",
+            "ehal_bindings": {"flex.pool_filter.set_enable": "Earnie_Pool_Filter_Freigabe"},
+        },
+    ]
+    payload = build_loxone_status_payload(
+        loxone_sent={
+            "Earnie_Pool_Freigabe": 1.0,
+            "Earnie_Swimspa_Filter_Freigabe": 0.0,
+        },
+        consumers=consumers,
+        plant_io_index={},
+        now_ts=50.0,
+    )
+    assert payload["Earnie_Pool_Freigabe"] == 1.0
+    assert payload["Earnie_Pool_Filter_Freigabe"] == 0.0

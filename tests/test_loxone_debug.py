@@ -182,8 +182,8 @@ def test_write_summary_from_rows_matches_table_not_raw_trace():
         {"Erfolg": "Ja"},
         {"Erfolg": "Ja"},
     ]) == (
-        "2 weitere Schreibvorgänge (Freigabe/Legacy-Merker) "
-        "sind nicht als set_* in der Tabelle."
+        "2 weitere Schreibvorgänge (nicht gemappte Legacy-Merker) "
+        "sind nicht in der Tabelle."
     )
     assert _omitted_write_caption(6, [{"Erfolg": "Ja"}] * 6) is None
 

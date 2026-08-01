@@ -15,7 +15,9 @@ from settings.ehal_marker_resolve import (
     marker_set_evcs_mode,
 )
 
-POOL_ENABLE_KEYS = ("Earnie_Pool_Freigabe", "Earnie_Pool_Filter_Freigabe")
+POOL_HEAT_ENABLE_KEY = "Earnie_Pool_Freigabe"
+POOL_FILTER_ENABLE_KEY = "Earnie_Pool_Filter_Freigabe"
+POOL_ENABLE_KEYS = (POOL_HEAT_ENABLE_KEY, POOL_FILTER_ENABLE_KEY)
 
 
 def _as_float_map(raw: Any) -> dict[str, float]:
@@ -40,26 +42,45 @@ def _consumer_is_ev(consumer: Mapping[str, Any]) -> bool:
     return isinstance(sched, dict) and bool(sched.get("enabled"))
 
 
-def _live_consumers() -> list[dict]:
-    import config
+def _consumer_is_pool_filter(consumer: Mapping[str, Any]) -> bool:
+    cid = str(consumer.get("id") or "").strip().lower()
+    if cid in ("swimspa_filter", "pool_filter"):
+        return True
+    return str(consumer.get("daily_target_source") or "") == "loxone_remaining_hours"
 
-    by_id: dict[str, dict] = {}
-    resolved = config.CONFIG.get_resolved_runtime_settings()
-    profile = resolved.get("_house_profile") if isinstance(resolved, dict) else None
-    if isinstance(profile, dict):
-        for consumer in profile.get("consumers") or []:
-            if not isinstance(consumer, dict):
-                continue
-            cid = str(consumer.get("id") or "").strip()
-            if cid:
-                by_id[cid] = consumer
-    for consumer in config.get_flexible_consumers():
-        if not isinstance(consumer, dict):
-            continue
-        cid = str(consumer.get("id") or "").strip()
-        if cid and cid not in by_id:
-            by_id[cid] = consumer
-    return list(by_id.values())
+
+def _marker_looks_like_pool_filter(marker: str) -> bool:
+    lower = marker.lower()
+    return (
+        "filter" in lower
+        and "freigabe" in lower
+        and ("swimspa" in lower or "pool" in lower)
+    )
+
+
+def _marker_looks_like_pool_heat(marker: str) -> bool:
+    lower = marker.lower()
+    if "filter" in lower:
+        return False
+    if lower in ("earnie_pool_freigabe", "ernie_pool_freigabe"):
+        return True
+    return "freigabe" in lower and ("swimspa" in lower or lower.endswith("pool_freigabe"))
+
+
+def _consumer_is_pool_heat(consumer: Mapping[str, Any]) -> bool:
+    if _consumer_is_pool_filter(consumer):
+        return False
+    cid = str(consumer.get("id") or "").strip().lower()
+    if cid in ("swimspa", "pool", "pool_swimspa"):
+        return True
+    return False
+
+
+def _live_consumers() -> list[dict]:
+    """Profile + flex consumers; drop bridged swimspa_filter if greenfield pool_filter exists."""
+    from integrations.ehal_debug_mapping import _all_live_consumers
+
+    return _all_live_consumers()
 
 
 def _plant_status_keys(
@@ -74,19 +95,60 @@ def _plant_status_keys(
     return payload
 
 
-def _flex_enable_status_key(consumer_id: str, enable_marker: str) -> str | None:
+def _flex_enable_status_key(
+    consumer_id: str,
+    enable_marker: str,
+    consumer: Mapping[str, Any] | None = None,
+) -> str | None:
+    """VI Check key for Freigabe (Pool Titles stay bare ``Earnie_Pool_*``)."""
     marker = str(enable_marker or "").strip()
     if not marker:
         return None
     if marker in POOL_ENABLE_KEYS:
         return marker
-    cid = str(consumer_id or "").strip()
+    as_dict = dict(consumer) if isinstance(consumer, Mapping) else {}
+    cid = str(consumer_id or as_dict.get("id") or "").strip()
+    if _consumer_is_pool_filter(as_dict) or _marker_looks_like_pool_filter(marker):
+        return POOL_FILTER_ENABLE_KEY
+    if _consumer_is_pool_heat(as_dict) or _marker_looks_like_pool_heat(marker):
+        return POOL_HEAT_ENABLE_KEY
+    # pool_swimspa / pool heat ids (greenfield)
+    if cid in ("pool_swimspa", "pool"):
+        return POOL_HEAT_ENABLE_KEY
     if not cid:
         return None
     lower = marker.lower()
     if "waermepumpe" in lower or marker.startswith("Earnie_WP_"):
         return f"flex.{cid}.Earnie_Waermepumpe_Freigabe"
     return f"flex.{cid}.Earnie_Verbraucher_Freigabe"
+
+
+def _sent_enable_value(
+    loxone_sent: Mapping[str, float],
+    primary_marker: str,
+    status_key: str,
+) -> float | None:
+    """Value for status Freigabe; pool keys also accept legacy SwimSpa merker names."""
+    name = str(primary_marker or "").strip()
+    if name and name in loxone_sent:
+        return float(loxone_sent[name])
+    aliases: tuple[str, ...] = ()
+    if status_key == POOL_FILTER_ENABLE_KEY:
+        aliases = (
+            "Earnie_Swimspa_Filter_Freigabe",
+            "Ernie_Swimspa_Filter_Freigabe",  # legacy typo dual-read
+            "Earnie_Pool_Filter_Freigabe",
+        )
+    elif status_key == POOL_HEAT_ENABLE_KEY:
+        aliases = (
+            "Earnie_SwimSpa_Freigabe",
+            "Ernie_SwimSpa_Freigabe",
+            "Earnie_Pool_Freigabe",
+        )
+    for alt in aliases:
+        if alt in loxone_sent:
+            return float(loxone_sent[alt])
+    return None
 
 
 def _emit_if_present(
@@ -130,9 +192,11 @@ def _consumer_status_keys(
             continue
 
         enable = marker_flex_enable(as_dict)
-        enable_key = _flex_enable_status_key(cid, enable)
+        enable_key = _flex_enable_status_key(cid, enable, as_dict)
         if enable_key:
-            _emit_if_present(payload, loxone_sent, enable, enable_key)
+            value = _sent_enable_value(loxone_sent, enable, enable_key)
+            if value is not None:
+                payload[enable_key] = value
 
         setpoint = marker_flex_power_setpoint(as_dict)
         _emit_if_present(

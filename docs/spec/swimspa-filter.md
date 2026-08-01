@@ -32,7 +32,7 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 | Lesen | `homie_bwa_spa_filter2` | Filter läuft (binär 0/1) → Ist-Leistung 0 / 0,18 kW |
 | Lesen | `homie_bwa_spa_filter1` | Autonome/native Filtersteuerung (binär 0/1) — Fallback wenn `filter2` = 0 |
 | Lesen | `homie_bwa_spa_heating` | Heizung aktiv (binär 0/1) — thermische Zuordnung auf Gesamtzähler (Fall B) |
-| Schreiben | `Ernie_Swimspa_Filter_Freigabe` | Earnie-Freigabe für **zusätzlichen** Filterlauf (`0`/`1`) |
+| Schreiben | `Earnie_Swimspa_Filter_Freigabe` | Earnie-Freigabe für **zusätzlichen** Filterlauf (`0`/`1`) |
 
 `homie_bwa_spa_filter2` erfasst jeden Filterlauf (nativ + Earnie) — für Logging, Soll-Ist und Delivery-Tracking.
 
@@ -63,7 +63,7 @@ Operative Pfade (`cons_data`, Delivery) nutzen weiterhin `kw` mit Fallback, wenn
   "daily_target_source": "loxone_remaining_hours",
   "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
   "loxone_outputs": {
-    "enable_name": "Ernie_Swimspa_Filter_Freigabe"
+    "enable_name": "Earnie_Swimspa_Filter_Freigabe"
   },
   "loxone_inputs": {
     "power_name": "homie_bwa_spa_filter2",
@@ -119,7 +119,7 @@ Native Duty-Cycle:
 
 Earnie (pro 15-Min-Slot):
   Wenn Sollstunden > 0 UND außerhalb nativem Fenster UND MILP-Freigabe
-    → Ernie_Swimspa_Filter_Freigabe = 1
+    → Earnie_Swimspa_Filter_Freigabe = 1
   sonst → 0
 ```
 

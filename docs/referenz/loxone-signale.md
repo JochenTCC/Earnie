@@ -6,6 +6,8 @@ Für **Greenfield / Earnie-Library (2.4.n)** gelten die **gefrorenen** Merkernam
 
 **Pattern B (Library):** **VI** = Earnie→Loxone (`set_*` / Freigaben / Sollwerte, Heartbeat) über `GET http://<Earnie>:8541/ehal/loxone/status.json` (Daemon-HTTP; `heartbeat_ts` = Unix-Jetztzeit, Sollwerte aus dem letzten `loxone_sent`). **VO** = optional Loxone→Earnie Push von `sens_*` / `get_*` / Flex-Leistung (Platzhalter-URLs). Core schreibt/liest weiterhin `/jdev/sps/io/{name}`. Entwürfe: [`share/loxone/templates/`](../../share/loxone/templates/).
 
+**Freigabe-VI:** Cmds mit sticky 0/1 als **Analog** (`Analog="true"`), nicht als digitalen Eingang — sonst kurzer `1`-Puls je Polling-Zyklus (siehe [loxone-earnie-library.md](../einrichtung/loxone-earnie-library.md)).
+
 ### Drei Schichten (Title / Check / VO-Pfad)
 
 | Schicht | Wo | Beispiel Flex | Beispiel EV |

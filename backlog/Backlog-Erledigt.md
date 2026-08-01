@@ -3,6 +3,13 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Pattern B pool Freigabe + Live-Schreiben flex (2026-08-01)
+
+- [x] **status.json pool VI Check keys** — bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe`; legacy SwimSpa enable Merkers dual-read onto those keys; VI templates `Analog=true` (sticky).
+- [x] **Greenfield `pool_filter` Freigabe → MILP bridge** — overlay enable onto filter bridge; auto `subtract_consumer_ids` for shared SwimSpa meter; native filter inference uses shared-meter heating ids.
+- [x] **EHAL-Com Live-Schreiben** — flex Freigabe / `set_enable` (+ optional power setpoint) in write table; drop bridged `swimspa_filter` row when greenfield `pool_filter` exists; docs §C.6 / Live-Schreiben.
+
+
 ### EHAL-Com get_filter_remaining_hours mapping (2026-08-01)
 
 - [x] **Pool / SwimSpa Filter mapping in EHAL-Com** — synthetic entity `swimspa_filter` for `get_filter_remaining_hours` (plus filter power/Freigabe/aktiv/native window); persist under `swimspa_filter_bindings`; dual-read via `marker_get_filter_remaining_hours`; remove hard-coded `Ernie_Swimspa_Filter_Sollstunden` bridge default. Live-Lesen + docs (§C.6 / flexible-verbraucher / loxone-signale). Tests: mapping, resolve, consumer targets, planning bridge.

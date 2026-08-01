@@ -219,7 +219,9 @@ def build_entity_rows(house_doc: dict, profile_id: str) -> list[dict[str, Any]]:
             }
         )
     host = _milp_thermal_rc_host(consumers)
-    if host is not None:
+    if host is not None and not any(
+        str(c.get("id") or "").strip() == "pool_filter" for c in consumers
+    ):
         stored = host.get("swimspa_filter_bindings")
         rows.append(
             {

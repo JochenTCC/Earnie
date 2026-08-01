@@ -167,7 +167,7 @@ Deckt die **heute für SwimSpa genutzten** Signale (Heizung + Filter) ab. Zwei L
 | Native Filter-Dauer       | Eingabewert | `get_filter_native_duration_hours`       |         |      |         | `Earnie_Pool_Filter_NativeDauer`                                |
 
 
-Hinweise: Chart zieht Filterleistung ggf. über `subtract_consumer_ids` ab (kein EHAL-Feld). Pattern B: `VI_Earnie_Pool` (Freigaben), `VO_Earnie_Pool` (Telemetrie).
+Hinweise: Chart zieht Filterleistung ggf. über `subtract_consumer_ids` ab (kein EHAL-Feld). Pattern B: `VI_Earnie_Pool` (Freigaben), `VO_Earnie_Pool` (Telemetrie). **VI Check** = bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` (wie Title); `status.json` mappt auch Legacy-Merker (`Ernie_Swimspa_*_Freigabe`) auf diese Keys.
 
 **EHAL-Com Mapping:** Bei einem MILP-`thermal_rc`-Verbraucher erscheint zusätzlich die Entity **Pool / SwimSpa Filter** (`swimspa_filter`). Dort wird `get_filter_remaining_hours` (und weitere Filter-Felder) auf den Miniserver-Merker gemappt und unter `swimspa_filter_bindings` gespeichert. Ohne Mapping bleibt der Filter inaktiv (kein Hard-Default mehr auf `Ernie_Swimspa_Filter_Sollstunden`).
 
@@ -210,12 +210,12 @@ Einheiten und Vorzeichen: siehe §B. Vollständige Rollen-Matrix: §C.
 
 ### Live-Schreiben
 
-Nur `**set_***`. Die Tabelle listet **alle** erwarteten Setpoint-Felder; Werte/Erfolg kommen aus dem letzten `main.py`-Lauf (`runtime/optimizer_run_state.json`), ungemappte Zeilen haben leeres **Mapping**. Gleiche Identitäts-Spalten:
+`**set_***` (Anlage / EV) sowie Flex-**Freigabe** / Sollwert (`{id}:flex.{slug}.set_enable`, optional `set_power_setpoint`). Die Tabelle listet **alle** erwarteten Schreibfelder; Werte/Erfolg kommen aus dem letzten `main.py`-Lauf (`runtime/optimizer_run_state.json`), ungemappte Zeilen haben leeres **Mapping**. Gleiche Identitäts-Spalten:
 
 
 | Spalte      | Bedeutung                                                               |
 | ----------- | ----------------------------------------------------------------------- |
-| EHAL-Feld   | `set_*` (ggf. `{id}:set_…` bei EV)                                      |
+| EHAL-Feld   | `set_*` bzw. `{id}:flex.{slug}.set_enable` (Freigabe)                   |
 | Mapping     | Merker / HA-Entity / OpenEMS-Schreibkanal; leer wenn noch nicht gemappt |
 | Wert        | Geschriebener Sollwert                                                  |
 | Erfolg      | Ja / Nein                                                               |
@@ -223,7 +223,7 @@ Nur `**set_***`. Die Tabelle listet **alle** erwarteten Setpoint-Felder; Werte/E
 | Meldung     | Fehlertext bzw. Silent-Hinweis                                          |
 
 
-- **Loxone:** Trace `loxone_writes` (IO-Name wird auf `set_`* zurückgeführt); Silent: geplante Sollwerte aus `loxone_sent` mit Status „Nicht gesendet“.
+- **Loxone:** Trace `loxone_writes` (IO-Name wird auf EHAL-Feld zurückgeführt); Silent: geplante Sollwerte aus `loxone_sent` mit Status „Nicht gesendet“.
 - **HA / OpenEMS:** `ehal_writes` (Feld, Wert, Erfolg, Zeit, Meldung); Fehlerbanner aus `runtime/ehal_write_error.json`.
 
 

@@ -8,6 +8,8 @@ Virtual HTTP **In/Out** XML for Loxone Config. Shape matches [LoxBerry LoxoneTem
 
 **Pattern B:** **VI** = Earnie → Loxone (`set_*` / Freigaben / Sollwerte + Heartbeat). **VO** = optional Loxone → Earnie telemetry push (`sens_*` / `get_*` / Flex-Leistung; placeholder URLs). Core still reads Miniserver `/jdev/sps/io/{name}`.
 
+**Freigabe 0/1:** VI cmds use `Analog="true"` (sticky value from `\v`). `Analog="false"` (digital) pulses true on every successful poll — do not use for Freigabe.
+
 ## Install in Loxone Config
 
 Copy **only the** `.xml` **files** (not this `README.md`, not the repo folder tree as a whole). Destination folders depend on your Config install; use whichever path exists on your PC (create `VirtualIn` / `VirtualOut` if missing).

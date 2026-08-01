@@ -218,7 +218,7 @@ def build_write_rows_from_trace(
         rows.append(
             _write_row(
                 field=field,
-                mapping=io_name,
+                mapping=configured or io_name,
                 value=str(entry.get("value", "")),
                 success="Ja" if entry.get("success") else "Nein",
                 written_at=str(entry.get("written_at") or ""),
@@ -320,7 +320,7 @@ def build_intended_write_rows(
         rows.append(
             _write_row(
                 field=field,
-                mapping=io_name or configured,
+                mapping=configured or io_name,
                 value=str(value),
                 success="Nein",
                 written_at=completed_at,
@@ -340,14 +340,14 @@ def write_summary_from_rows(rows: list[dict[str, str]]) -> str:
 
 
 def _omitted_write_caption(raw_count: int, rows: list[dict[str, str]]) -> str | None:
-    """Caption when raw traces include non-set_* Merker not shown in the table."""
+    """Caption when raw traces include Merker not shown in the Live-Schreiben table."""
     shown = sum(1 for row in rows if row.get("Erfolg") in ("Ja", "Nein"))
     omitted = raw_count - shown
     if omitted <= 0:
         return None
     return (
-        f"{omitted} weitere Schreibvorgänge (Freigabe/Legacy-Merker) "
-        "sind nicht als set_* in der Tabelle."
+        f"{omitted} weitere Schreibvorgänge (nicht gemappte Legacy-Merker) "
+        "sind nicht in der Tabelle."
     )
 
 

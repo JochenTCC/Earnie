@@ -69,11 +69,16 @@ def is_live_read_field(field: str) -> bool:
 
 
 def is_live_write_field(field: str) -> bool:
-    """True for Live-Schreiben rows (``set_*`` only)."""
+    """True for Live-Schreiben rows (``set_*`` / flex ``set_enable`` / setpoint)."""
+    from ehal.flex_fields import KIND_SET_ENABLE, KIND_SET_POWER_SETPOINT, flex_field_kind
+
     name = str(field or "").strip()
     if ":" in name:
         name = name.split(":", 1)[1]
-    return name.startswith("set_")
+    if name.startswith("set_"):
+        return True
+    kind = flex_field_kind(name)
+    return kind in (KIND_SET_ENABLE, KIND_SET_POWER_SETPOINT)
 
 
 def _consumer_is_ev(consumer: dict) -> bool:
@@ -86,13 +91,34 @@ def _consumer_is_ev(consumer: dict) -> bool:
 
 
 def _consumer_is_filter(consumer: dict) -> bool:
-    if str(consumer.get("id") or "").strip() == "swimspa_filter":
+    cid = str(consumer.get("id") or "").strip().lower()
+    if cid in ("swimspa_filter", "pool_filter"):
         return True
     return consumer.get("daily_target_source") == "loxone_remaining_hours"
 
 
+def _has_greenfield_pool_filter(by_id: dict[str, dict]) -> bool:
+    """True when house profile already has greenfield ``pool_filter`` (not bridge-only)."""
+    if "pool_filter" in by_id:
+        return True
+    for cid, consumer in by_id.items():
+        if str(cid).strip().lower() == "swimspa_filter":
+            continue
+        if not isinstance(consumer, dict):
+            continue
+        from settings.ehal_marker_resolve import marker_flex_enable
+
+        if str(marker_flex_enable(consumer) or "").strip() == "Earnie_Pool_Filter_Freigabe":
+            return True
+    return False
+
+
 def _all_live_consumers() -> list[dict]:
-    """House-profile + flex consumers (including unmapped)."""
+    """House-profile + flex consumers (including unmapped).
+
+    When greenfield ``pool_filter`` exists, omit bridged ``swimspa_filter`` so Live
+    tables do not show two Filter-Freigabe rows.
+    """
     import config
 
     by_id: dict[str, dict] = {}
@@ -111,6 +137,8 @@ def _all_live_consumers() -> list[dict]:
         cid = str(consumer.get("id") or "").strip()
         if cid and cid not in by_id:
             by_id[cid] = consumer
+    if _has_greenfield_pool_filter(by_id):
+        by_id.pop("swimspa_filter", None)
     return list(by_id.values())
 
 
@@ -138,15 +166,27 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
 
 
 def expected_live_write_fields(*, network_backend: bool = False) -> list[str]:
-    """Canonical Live-Schreiben ``set_*`` ids (plant + EV consumers), including unmapped."""
+    """Canonical Live-Schreiben ids (plant + EV + flex Freigabe/Sollwert)."""
     if network_backend:
         return list(NETWORK_LIVE_WRITE_FIELDS)
+    from ehal.flex_fields import flex_set_enable, flex_set_power_setpoint
+    from settings.ehal_marker_resolve import (
+        marker_flex_enable,
+        marker_flex_power_setpoint,
+    )
+
     fields = list(PLANT_LIVE_WRITE_FIELDS)
     for consumer in _all_live_consumers():
         cid = str(consumer.get("id") or "").strip()
-        if not cid or not _consumer_is_ev(consumer):
+        if not cid:
             continue
-        fields.extend(f"{cid}:{name}" for name in EV_LIVE_WRITE_FIELDS)
+        if _consumer_is_ev(consumer):
+            fields.extend(f"{cid}:{name}" for name in EV_LIVE_WRITE_FIELDS)
+            continue
+        if marker_flex_enable(consumer):
+            fields.append(f"{cid}:{flex_set_enable(cid)}")
+        if marker_flex_power_setpoint(consumer):
+            fields.append(f"{cid}:{flex_set_power_setpoint(cid)}")
     return fields
 
 
@@ -199,10 +239,13 @@ def mapping_or_dash(mapping: dict[str, str], field: str) -> str:
     return value if value else _MAPPING_EMPTY
 
 
-def build_loxone_setpoint_io_index() -> dict[str, str]:
-    """Merker IO-Name → EHAL ``set_*`` field (plant + EV consumers)."""
+def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dict[str, str]:
+    """Merker IO-Name → EHAL write field (plant + EV + flex Freigabe/Sollwert)."""
     import config
+    from ehal.flex_fields import flex_set_enable, flex_set_power_setpoint
     from settings.ehal_marker_resolve import (
+        marker_flex_enable,
+        marker_flex_power_setpoint,
         marker_set_evcs_max_current,
         marker_set_evcs_mode,
     )
@@ -220,26 +263,51 @@ def build_loxone_setpoint_io_index() -> dict[str, str]:
             index[io_name] = field
 
     for consumer in _all_live_consumers():
-        if not _consumer_is_ev(consumer):
+        cid = str(consumer.get("id") or "").strip()
+        if not cid:
             continue
-        cid = str(consumer.get("id") or "")
-        for field, marker in (
-            ("set_evcs_max_current", marker_set_evcs_max_current(consumer)),
-            ("set_evcs_mode", marker_set_evcs_mode(consumer)),
-        ):
-            io_name = str(marker or "").strip()
-            if io_name:
-                index[io_name] = f"{cid}:{field}" if cid else field
+        if _consumer_is_ev(consumer):
+            for field, marker in (
+                ("set_evcs_max_current", marker_set_evcs_max_current(consumer)),
+                ("set_evcs_mode", marker_set_evcs_mode(consumer)),
+            ):
+                io_name = str(marker or "").strip()
+                if io_name:
+                    index[io_name] = f"{cid}:{field}"
+            continue
+        enable = str(marker_flex_enable(consumer) or "").strip()
+        if enable:
+            index[enable] = f"{cid}:{flex_set_enable(cid)}"
+        setpoint = str(marker_flex_power_setpoint(consumer) or "").strip()
+        if setpoint:
+            index[setpoint] = f"{cid}:{flex_set_power_setpoint(cid)}"
+
+    if not include_write_aliases:
+        return index
+
+    # Resolve legacy bridge writes onto the greenfield pool_filter Live row.
+    if any(str(c.get("id") or "") == "pool_filter" for c in _all_live_consumers()):
+        pool_field = f"pool_filter:{flex_set_enable('pool_filter')}"
+        for consumer in config.get_flexible_consumers():
+            if str(consumer.get("id") or "") != "swimspa_filter":
+                continue
+            legacy = str(marker_flex_enable(consumer) or "").strip()
+            if legacy and legacy not in index:
+                index[legacy] = pool_field
+            break
     return index
 
 
 def loxone_write_field_to_io() -> dict[str, str]:
-    """EHAL ``set_*`` field → Merker IO-Name."""
-    return {field: io for io, field in build_loxone_setpoint_io_index().items()}
+    """EHAL write field → configured Merker (primary bindings only, no aliases)."""
+    return {
+        field: io
+        for io, field in build_loxone_setpoint_io_index(include_write_aliases=False).items()
+    }
 
 
 def resolve_loxone_write_field(io_name: str, index: dict[str, str] | None = None) -> str:
-    """Reverse-map Merker → EHAL ``set_*`` (or empty if unknown / not set_*)."""
+    """Reverse-map Merker → EHAL write field (or empty if unknown / not a write)."""
     name = str(io_name or "").strip()
     if not name:
         return _MAPPING_EMPTY
@@ -248,7 +316,7 @@ def resolve_loxone_write_field(io_name: str, index: dict[str, str] | None = None
     if field and is_live_write_field(field):
         return field
     # Direct EHAL key stored as io (rare)
-    if name.startswith("set_"):
+    if is_live_write_field(name):
         return name
     return _MAPPING_EMPTY
 
