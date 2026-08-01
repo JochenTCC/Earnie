@@ -970,7 +970,8 @@ def add_matched_flex_ghost_traces(
 
     Stackt nur die Matched-Baseline-Flex-Leistung (kW) ab ``history_slot_count``
     nach unten — unabhängig vom optimierten Stack. Segmente mit
-    Energie-Äquivalent unter ``_GHOST_MIN_KWH`` (kW × Slotdauer) werden weggelassen.
+    Energie-Äquivalent unter ``_GHOST_MIN_KWH`` (Roh-kW × Slotdauer) werden
+    weggelassen. Balkenhöhe ist auf ``nominal_power_kw`` begrenzt, wenn gesetzt.
     """
     if matched_baseline_df is None or matched_baseline_df.empty:
         return
@@ -999,11 +1000,15 @@ def add_matched_flex_ghost_traces(
         slot_hours = axis.slot_duration(index).total_seconds() / 3600.0
         cumulative = 0.0
         for consumer, column in pairs:
-            kw = _safe_float(row.get(column))
-            if kw <= 1e-9:
+            raw_kw = _safe_float(row.get(column))
+            if raw_kw <= 1e-9:
                 continue
-            if kw * slot_hours < _GHOST_MIN_KWH:
+            if raw_kw * slot_hours < _GHOST_MIN_KWH:
                 continue
+            nominal = _safe_float(consumer.get("nominal_power_kw"))
+            # Matched-baseline energy can concentrate into few slots above nominal
+            # (shape-preserving scale). Ghost outlines are capped for chart realism.
+            kw = min(raw_kw, nominal) if nominal > 0 else raw_kw
             cid = str(consumer.get("id", "")) or column
             label = str(consumer.get("name", consumer.get("id", column)))
             color = flex_bar_chart_color(consumer)

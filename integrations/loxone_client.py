@@ -15,8 +15,10 @@ from settings.ehal_marker_resolve import (
     charging_loxone,
     ehal_bindings,
     marker_charge_immediate,
+    marker_flex_power,
     marker_get_evcs_nominal_current,
     marker_pv_follow,
+    marker_sens_evcs_active_power,
     marker_sens_evcs_bat_capacity,
     marker_set_evcs_max_current,
     marker_set_evcs_mode,
@@ -361,13 +363,36 @@ def consumers_with_live_nominal_power(consumers: list | None = None) -> list:
     return updated
 
 
-def _binary_meter_kw(inputs: dict, nominal: float) -> float | None:
+def _consumer_power_io_name(consumer: dict) -> str:
+    """Live power Merker: EHAL bindings first, legacy ``loxone_inputs.power_name`` fallback."""
+    sched = consumer.get("charging_schedule") or {}
+    bindings = ehal_bindings(consumer)
+    is_ev = consumer.get("type") == "ev" or (
+        isinstance(sched, dict) and bool(sched.get("enabled"))
+    )
+    if not is_ev and isinstance(bindings, dict):
+        is_ev = any(
+            str(key or "").startswith(("sens_evcs_", "get_evcs_", "set_evcs_"))
+            and str(value or "").strip()
+            for key, value in bindings.items()
+        )
+    if is_ev:
+        return marker_sens_evcs_active_power(consumer) or marker_flex_power(consumer)
+    return marker_flex_power(consumer) or marker_sens_evcs_active_power(consumer)
+
+
+def _binary_meter_kw(
+    inputs: dict,
+    nominal: float,
+    *,
+    primary_io_name: str = "",
+) -> float | None:
     """Binärer Verbraucher: 0/1-Merker × Nennleistung.
 
     Optional ``alternate_binary_power_name`` (z. B. natives Filter-Relais neben
     Gesamt-Filterstatus) — läuft, wenn mindestens ein Merker ≥ 0,5 ist.
     """
-    io_name = str(inputs.get("power_name", "")).strip()
+    io_name = str(primary_io_name or inputs.get("power_name", "")).strip()
     if not io_name:
         return None
     alt_name = str(inputs.get("alternate_binary_power_name", "")).strip()
@@ -389,13 +414,13 @@ def _read_consumer_meter_kw(consumer: dict) -> float | None:
     binary: Merker 0/1 × Nennleistung; power: direkter kW-Wert (≥ 0).
     """
     inputs = consumer.get("loxone_inputs") or {}
-    io_name = inputs.get("power_name", "")
+    io_name = _consumer_power_io_name(consumer)
     if not io_name:
         return None
     signal_type = str(inputs.get("signal_type") or consumer.get("signal_type", "power")).lower()
     nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
     if signal_type == "binary":
-        return _binary_meter_kw(inputs, nominal)
+        return _binary_meter_kw(inputs, nominal, primary_io_name=io_name)
     raw = fetch_loxone_generic_value(io_name)
     if raw is None:
         return None
@@ -414,7 +439,7 @@ def resolve_consumer_live_power_kw(
     measured = _read_consumer_meter_kw(consumer)
     if measured is not None:
         return measured
-    io_name = (consumer.get("loxone_inputs") or {}).get("power_name", "")
+    io_name = _consumer_power_io_name(consumer)
     if io_name:
         logger.warning(
             "Loxone: Keine Live-Leistung für '%s' (%s), Fallback %s kW",
@@ -545,6 +570,49 @@ def _subtract_shared_meter_loads(
     return corrected
 
 
+def _house_profile_power_consumers() -> list[dict]:
+    """House-profile consumers with a resolvable live power Merker (known/manual)."""
+    resolved = config.CONFIG.get_resolved_runtime_settings()
+    profile = resolved.get("_house_profile") if isinstance(resolved, dict) else None
+    if not isinstance(profile, dict):
+        return []
+    out: list[dict] = []
+    for consumer in profile.get("consumers") or []:
+        if not isinstance(consumer, dict):
+            continue
+        cid = str(consumer.get("id") or "").strip()
+        if not cid:
+            continue
+        if not (marker_flex_power(consumer) or marker_sens_evcs_active_power(consumer)):
+            continue
+        out.append(consumer)
+    return out
+
+
+def _default_live_power_consumers() -> list[dict]:
+    """MILP flex plus house-profile loads that have a live power Merker."""
+    flex = list(config.get_flexible_consumers())
+    by_id: dict[str, dict] = {}
+    for consumer in flex:
+        cid = str(consumer.get("id") or "").strip()
+        if cid:
+            by_id[cid] = consumer
+    for house_consumer in _house_profile_power_consumers():
+        cid = str(house_consumer.get("id") or "").strip()
+        if not cid:
+            continue
+        existing = by_id.get(cid)
+        if existing is None:
+            by_id[cid] = house_consumer
+            continue
+        if existing.get("ehal_bindings") or not house_consumer.get("ehal_bindings"):
+            continue
+        merged = dict(existing)
+        merged["ehal_bindings"] = dict(house_consumer["ehal_bindings"])
+        by_id[cid] = merged
+    return list(by_id.values())
+
+
 def resolve_flexible_consumers_live_power(
     fallbacks: dict[str, float] | None = None,
     consumers: list | None = None,
@@ -559,7 +627,9 @@ def resolve_flexible_consumers_live_power(
     (und inferierte) Werte — ohne MILP-Soll — für Chart/Log-Ist.
     """
     fallbacks = fallbacks or {}
-    source = consumers if consumers is not None else config.get_flexible_consumers()
+    source = (
+        consumers if consumers is not None else _default_live_power_consumers()
+    )
     result: dict[str, float] = {}
     measured_ids: set[str] = set()
 
@@ -569,7 +639,7 @@ def resolve_flexible_consumers_live_power(
         fallback = float(
             fallbacks.get(runtime_id, fallbacks.get(canonical_id, 0.0)) or 0.0
         )
-        io_name = (consumer.get("loxone_inputs") or {}).get("power_name", "")
+        io_name = _consumer_power_io_name(consumer)
         measured = _read_consumer_meter_kw(consumer)
         if measured is not None:
             measured_ids.add(runtime_id)
@@ -827,7 +897,10 @@ def _append_evcs_mode_writes(
     mode: str | None,
     pv_out: int | None,
 ) -> None:
-    """Dual-write legacy pv_follow / charge_immediate + set_evcs_mode Merker."""
+    """Dual-write legacy pv_follow / charge_immediate + set_evcs_mode Merker.
+
+    Numeric encoding for set_evcs_mode Merker: off=0, pv=1, now=2.
+    """
     pv_name = marker_pv_follow(consumer)
     now_name = marker_charge_immediate(consumer)
     mode_name = marker_set_evcs_mode(consumer)
@@ -847,8 +920,11 @@ def _append_evcs_mode_writes(
         if mode_name:
             values[mode_name] = 1.0
         return
+    # off (or unknown): idle / absent / fully charged / standby
     if pv_name and pv_out is not None:
         values[pv_name] = float(pv_out)
+    elif pv_name:
+        values[pv_name] = 0.0
     if now_name:
         values[now_name] = 0.0
     if mode_name:
@@ -902,7 +978,7 @@ def _evcs_current_output_values(
         consumer["name"],
         amps,
         setpoint_kw or 0.0,
-        mode or "fixed",
+        mode,
         planned_kw,
         current_name,
     )

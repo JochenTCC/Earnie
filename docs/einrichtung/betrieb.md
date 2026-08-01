@@ -13,8 +13,6 @@ Nur `main.py` steuert die Anlage im Produktivbetrieb (Loxone-/EHAL-Schreibvorgä
 
 Beim Daemon-Start schreibt Earnie **einmal** sichere Sollwerte (ESS Automatik / Freigabe und EVCS aus), bevor der erste Optimierungslauf läuft — auf allen EHAL-Backends (Loxone, HA, OpenEMS). Im Silent-Modus entfällt dieser Schreibvorgang. Zum Überspringen: `EARNIE_SKIP_SAFE_SETPOINTS_ON_START=1`.
 
-**Ausnahme (Schnittstellentest):** Bei **gestopptem** Optimierer-Dienst können unter **Optimierer-Dienst → ESS-Schnittstelle testen** manuelle Design-C1-Sollwerte (Modus + Grenzen / Sollleistung) gesendet werden — gleicher Schreibpfad wie `main.py`.
-
 Unter **Optimierer-Dienst → Dienst-Log** zeigt die App den Schluss (Tail) von `runtime/earnie.log` in einem Expander (Aktualisieren lädt neu).
 
 **Docker (empfohlen):** Ein Container (`earnie`). Die UI startet `main.py` automatisch, wenn `EARNIE_AUTO_START_MAIN=1` gesetzt ist (Standard in den Compose-Dateien).
@@ -26,10 +24,9 @@ Konfiguration wird über die Planungs- und Echtzeit-Seiten geschrieben (Hauskonf
 ## Optimierungs-Takt
 
 - Auslösung an **Viertelstunden-Grenzen** (`:00`, `:15`, `:30`, `:45`)
-- Zusätzlich **sofort**, wenn ein konfigurierter **Event-Trigger** (`system.event_triggers`) seinen Wert ändert
-- `system.event_trigger_enabled` (Standard `true`): Event-Trigger ein/aus
-- `system.event_poll_interval_sec` (Standard `60`): Abfrageintervall für `event_triggers` zwischen den regulären Läufen
-- `system.event_triggers`: Liste der Loxone-Signale (binary/text) – siehe `config.schema.json`
+- Zusätzlich **sofort**, wenn Loxone Virtual Out **`Earnie_Request_Optimize`** den Daemon-HTTP trifft (`POST /ehal/loxone/request_optimize`)
+- Port: `system.ehal_loxone_http_port` in `config.json` (Standard **8541**); Vorlage `VO_Earnie_Status.xml` → `http://EARNIE_HOST:8541`
+- Alive-Check am selben Port: `GET /ehal/loxone/alive`
 - `system.loop_timeout` in `config.json`: maximale Wartezeit zwischen Durchläufen in Sekunden (Standard 900 = 15 Min.)
 - Die App lädt den Cockpit-Snapshot nach dem Viertelstunden-Wechsel, sobald `main.py` den aktuellen Slot abgeschlossen hat (typisch wenige Sekunden)
 

@@ -87,10 +87,10 @@ def loxone_control_outputs(
     return clamp_setpoint_kw(consumer, planned_kw), 0
 
 
-def set_evcs_mode_for_plan(*, pv_follow: int, immediate: bool) -> str | None:
-    """EHAL set_evcs_mode for live write; None when neither pv nor Sofortladen."""
+def set_evcs_mode_for_plan(*, pv_follow: int, immediate: bool) -> str:
+    """EHAL set_evcs_mode for live write: now | pv | off (idle/absent/complete)."""
     if immediate:
         return "now"
     if int(pv_follow) == 1:
         return "pv"
-    return None
+    return "off"

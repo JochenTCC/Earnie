@@ -19,6 +19,7 @@ dependencies = [
     "astral>=3.2",
     "jsonschema>=4.0.0",
     "timezonefinder>=8.2.0",
+    "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]

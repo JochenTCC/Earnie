@@ -69,18 +69,9 @@ def test_apply_entity_bindings_writes_plant_and_consumer():
         profile_id="live",
         entity_id=PLANT_ENTITY_ID,
         bindings={"sens_ess_soc": "Battery_SOC", "sens_power_consumers": "House_P"},
-        triggers=[
-            {
-                "id": "grid_spike",
-                "ehal_field": "sens_ess_soc",
-                "signal_type": "analog",
-                "on_change": "any",
-                "label": "SOC",
-            }
-        ],
     )
     assert house["plant"]["ehal_bindings"]["sens_ess_soc"] == "Battery_SOC"
-    assert house["plant"]["event_triggers"][0]["id"] == "grid_spike"
+    assert "event_triggers" not in house["plant"]
 
     house = apply_entity_bindings(
         house,
@@ -90,7 +81,6 @@ def test_apply_entity_bindings_writes_plant_and_consumer():
             "set_evcs_max_current": "EV_MaxA",
             "get_evcs_limit_soc": "EV_Limit",
         },
-        triggers=[],
     )
     consumer = house["profiles"]["live"]["consumers"][0]
     assert consumer["ehal_bindings"]["set_evcs_max_current"] == "EV_MaxA"

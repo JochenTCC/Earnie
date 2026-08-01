@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import main as main_module
 from integrations.loxone_comm_trace import LoxoneWriteRecord
-from optimizer.event_trigger import TRIGGER_QUARTER_HOUR, build_run_trigger
+from optimizer.run_trigger import TRIGGER_QUARTER_HOUR
 from tests.main_run_harness import patch_main_run
 
 
@@ -49,7 +49,7 @@ def test_main_persists_live_optimization_debug_snapshot(monkeypatch):
     )
     monkeypatch.setattr(main_module.run_state, "save_run_state", lambda _payload: None)
 
-    main_module.main(run_trigger=build_run_trigger(TRIGGER_QUARTER_HOUR))
+    main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
 
     assert saved_debug
     payload = saved_debug[0]
@@ -73,7 +73,7 @@ def test_main_run_state_includes_loxone_writes_when_not_silent(monkeypatch):
     monkeypatch.setattr(main_module.loxone_client, "send_huawei_modbus_states", lambda *a, **k: huawei)
     monkeypatch.setattr(main_module.loxone_client, "send_flexible_consumer_states", lambda *a, **k: flex)
 
-    main_module.main(run_trigger=build_run_trigger(TRIGGER_QUARTER_HOUR))
+    main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
 
     assert saved
     payload = saved[0]
@@ -97,7 +97,7 @@ def test_main_run_state_omits_loxone_writes_when_silent(monkeypatch):
     monkeypatch.setattr(main_module.loxone_client, "send_huawei_modbus_states", send_huawei)
     monkeypatch.setattr(main_module.loxone_client, "send_flexible_consumer_states", send_flex)
 
-    main_module.main(run_trigger=build_run_trigger(TRIGGER_QUARTER_HOUR))
+    main_module.main(run_trigger=TRIGGER_QUARTER_HOUR)
 
     send_huawei.assert_not_called()
     send_flex.assert_not_called()

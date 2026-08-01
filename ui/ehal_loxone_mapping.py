@@ -23,7 +23,6 @@ from integrations.loxone_structure import (
     SOURCE_HTTP_PROBE,
     scan_structure,
 )
-from ui.form_layout import WIDE_LABEL_RATIOS, labeled_selectbox, labeled_text_input
 from ui.house_config_io import (
     get_live_scenario_refs,
     load_house_profiles,
@@ -36,11 +35,7 @@ _NONE = "— nicht gemappt —"
 _SESSION_SCAN = "ehal_lox_scan"
 _SESSION_PROPOSALS = "ehal_lox_proposals"
 _SESSION_ENTITY = "ehal_lox_entity_id"
-_SESSION_TRIGGERS = "ehal_lox_triggers_draft"
 _SESSION_MIGRATED = "ehal_lox_migrated_once"
-
-_SIGNAL_TYPES = ("binary", "text", "analog")
-_ON_CHANGE_OPTIONS = ("any", "rising", "falling")
 
 PLANT_ENTITY_ID = "plant"
 
@@ -133,12 +128,6 @@ def binding_map(raw: object) -> dict[str, str]:
     return {str(k): _nonempty(v) for k, v in raw.items() if _nonempty(v)}
 
 
-def trigger_list(raw: object) -> list[dict]:
-    if not isinstance(raw, list):
-        return []
-    return [dict(item) for item in raw if isinstance(item, dict)]
-
-
 def resolve_live_profile_id(house_doc: dict) -> str:
     """Prefer Live-Szenario house_profile_id; else first profile id."""
     refs = get_live_scenario_refs()
@@ -189,7 +178,6 @@ def build_entity_rows(house_doc: dict, profile_id: str) -> list[dict[str, Any]]:
             "label": "Anlage (Plant)",
             "fields": PLANT_FIELDS,
             "bindings": binding_map(plant.get("ehal_bindings")),
-            "triggers": trigger_list(plant.get("event_triggers")),
         }
     ]
     for consumer in consumers_for_profile(house_doc, profile_id):
@@ -203,7 +191,6 @@ def build_entity_rows(house_doc: dict, profile_id: str) -> list[dict[str, Any]]:
                 "label": _nonempty(consumer.get("label")) or cid,
                 "fields": fields_for_consumer(consumer),
                 "bindings": binding_map(consumer.get("ehal_bindings")),
-                "triggers": trigger_list(consumer.get("event_triggers")),
                 "consumer": consumer,
             }
         )
@@ -216,16 +203,14 @@ def apply_entity_bindings(
     profile_id: str,
     entity_id: str,
     bindings: dict[str, str],
-    triggers: list[dict],
 ) -> dict:
-    """Write bindings/triggers onto plant or matching consumer; return new doc."""
+    """Write bindings onto plant or matching consumer; return new doc."""
     house = dict(house_doc)
     cleaned = {k: v for k, v in bindings.items() if _nonempty(v)}
-    cleaned_triggers = [dict(t) for t in triggers if _nonempty(t.get("id"))]
     if entity_id == PLANT_ENTITY_ID:
         plant = dict(house.get("plant") or {}) if isinstance(house.get("plant"), dict) else {}
         plant["ehal_bindings"] = cleaned
-        plant["event_triggers"] = cleaned_triggers
+        plant.pop("event_triggers", None)
         house["plant"] = plant
         return house
     profiles = house.get("profiles")
@@ -235,7 +220,7 @@ def apply_entity_bindings(
         for consumer in consumers:
             if _nonempty(consumer.get("id")) == entity_id:
                 consumer["ehal_bindings"] = cleaned
-                consumer["event_triggers"] = cleaned_triggers
+                consumer.pop("event_triggers", None)
                 break
         profile["consumers"] = consumers
         house["profiles"] = {**profiles, profile_id: profile}
@@ -298,7 +283,9 @@ def render_ehal_loxone_mapping_section() -> None:
     st.caption(
         "Entity-zentriertes Mapping: Anlage + Verbraucher aus dem Live-Hausprofil. "
         "Felder `{entity}.{ehal_field}` → Merker; Speichern in `house_profiles.json` "
-        "(`plant` / `consumers[].ehal_bindings` + `event_triggers`). "
+        "(`plant` / `consumers[].ehal_bindings`). "
+        "Außerplanmäßige Optimierung: Loxone VO `Earnie_Request_Optimize` "
+        "(Daemon-HTTP, Port `system.ehal_loxone_http_port`, Standard 8541). "
         "Struktur-Scan: HTTP-Probe bekannter Earnie_*/gemappter Merker."
     )
     house, config_doc = _migrate_on_open()
@@ -312,7 +299,6 @@ def render_ehal_loxone_mapping_section() -> None:
     proposals: dict[str, dict[str, Any]] = dict(st.session_state.get(_SESSION_PROPOSALS) or {})
     options = _name_options(rows, list(entity["bindings"].values()))
     ehal_map = _render_field_selects(entity, options, proposals)
-    triggers = _render_trigger_editor(entity, ehal_map)
     if st.button("Mapping speichern", key="ehal_lox_save_btn", type="primary"):
         _save_entity_mapping(
             house,
@@ -320,7 +306,6 @@ def render_ehal_loxone_mapping_section() -> None:
             profile_id=profile_id,
             entity_id=str(entity["id"]),
             ehal_map=ehal_map,
-            triggers=triggers,
         )
 
 
@@ -355,7 +340,6 @@ def _render_entity_picker(entities: list[dict[str, Any]]) -> dict[str, Any]:
     entity_id = ids[labels.index(picked)]
     if entity_id != st.session_state.get(_SESSION_ENTITY):
         st.session_state[_SESSION_ENTITY] = entity_id
-        st.session_state.pop(_SESSION_TRIGGERS, None)
     return next(row for row in entities if row["id"] == entity_id)
 
 
@@ -391,126 +375,6 @@ def _render_field_selects(
     return ehal_map
 
 
-def _trigger_field_options(entity: dict[str, Any], bindings: dict[str, str]) -> list[str]:
-    field_options = sorted(set(list(entity["fields"]) + list(bindings.keys())))
-    return field_options or list(entity["fields"])
-
-
-def _render_trigger_editor(
-    entity: dict[str, Any],
-    bindings: dict[str, str],
-) -> list[dict]:
-    st.markdown(f"**Event-Trigger** — `{entity['id']}`")
-    st.caption(
-        "Trigger beziehen sich auf EHAL-Felder dieser Entity; "
-        "Merker-Adresse kommt aus dem Binding."
-    )
-    draft_key = f"{_SESSION_TRIGGERS}_{entity['id']}"
-    if draft_key not in st.session_state:
-        st.session_state[draft_key] = trigger_list(entity.get("triggers"))
-    draft: list[dict] = list(st.session_state[draft_key])
-    field_options = _trigger_field_options(entity, bindings)
-    if st.button("Trigger hinzufügen", key=f"ehal_lox_trig_add_{entity['id']}"):
-        draft.append(
-            {
-                "id": f"trigger_{len(draft) + 1}",
-                "ehal_field": field_options[0] if field_options else "",
-                "signal_type": "binary",
-                "on_change": "any",
-                "label": "",
-            }
-        )
-        st.session_state[draft_key] = draft
-        st.rerun()
-    return _edit_trigger_draft(draft, draft_key, entity["id"], field_options)
-
-
-def _edit_trigger_draft(
-    draft: list[dict],
-    draft_key: str,
-    entity_id: str,
-    field_options: list[str],
-) -> list[dict]:
-    updated: list[dict] = []
-    remove_index: int | None = None
-    for index, trigger in enumerate(draft):
-        exp_col, rm_col = st.columns([4, 1], vertical_alignment="top")
-        with rm_col:
-            if st.button("Entfernen", key=f"ehal_lox_trig_rm_{entity_id}_{index}"):
-                remove_index = index
-        with exp_col:
-            with st.expander(
-                f"Trigger {index + 1}: {trigger.get('id') or '—'}",
-                expanded=False,
-            ):
-                updated.append(
-                    _render_one_trigger(trigger, index, entity_id, field_options)
-                )
-    if remove_index is not None:
-        del updated[remove_index]
-        st.session_state[draft_key] = updated
-        st.rerun()
-    st.session_state[draft_key] = updated
-    return updated
-
-
-def _option_index(options: tuple[str, ...] | list[str], value: object, default: str) -> int:
-    text = str(value or default)
-    if text in options:
-        return list(options).index(text)
-    return 0
-
-
-def _render_one_trigger(
-    trigger: dict,
-    index: int,
-    entity_id: str,
-    field_options: list[str],
-) -> dict:
-    prefix = f"ehal_lox_trig_{entity_id}_{index}"
-    current_field = _nonempty(trigger.get("ehal_field"))
-    options = list(field_options)
-    if current_field and current_field not in options:
-        options = [current_field] + options
-    return {
-        "id": str(
-            labeled_text_input(
-                "ID", value=str(trigger.get("id", "")), key=f"{prefix}_id",
-                ratios=WIDE_LABEL_RATIOS,
-            )
-            or ""
-        ).strip(),
-        "ehal_field": str(
-            labeled_selectbox(
-                "ehal_field",
-                options=options or [""],
-                index=_option_index(options or [""], current_field, ""),
-                key=f"{prefix}_field",
-            )
-            or ""
-        ).strip(),
-        "signal_type": labeled_selectbox(
-            "signal_type",
-            options=list(_SIGNAL_TYPES),
-            index=_option_index(_SIGNAL_TYPES, trigger.get("signal_type"), "binary"),
-            key=f"{prefix}_type",
-        ),
-        "on_change": labeled_selectbox(
-            "on_change",
-            options=list(_ON_CHANGE_OPTIONS),
-            index=_option_index(_ON_CHANGE_OPTIONS, trigger.get("on_change"), "any"),
-            key=f"{prefix}_chg",
-        ),
-        "label": str(
-            labeled_text_input(
-                "Label", value=str(trigger.get("label", "")), key=f"{prefix}_label",
-                ratios=WIDE_LABEL_RATIOS,
-            )
-            or ""
-        ).strip(),
-    }
-
-
 def _run_structure_scan(configured: list[str]) -> None:
     """HTTP-Probe only for mapping names. MCP/Ollama remain in integrations for later re-use."""
     st.session_state.pop(_SESSION_PROPOSALS, None)
@@ -543,22 +407,11 @@ def _run_structure_scan(configured: list[str]) -> None:
         )
 
 
-def _validate_mapping_save(
-    entity_id: str, ehal_map: dict[str, str], triggers: list[dict]
-) -> str | None:
+def _validate_mapping_save(entity_id: str, ehal_map: dict[str, str]) -> str | None:
     if entity_id == PLANT_ENTITY_ID:
         missing = [name for name in TELEMETRY_REQUIRED if name not in ehal_map]
         if missing:
             return "Pflichtfelder fehlen: " + ", ".join(missing)
-    for item in triggers:
-        if item.get("id") and not item.get("ehal_field"):
-            return f"Trigger '{item['id']}' braucht ehal_field."
-        field = item.get("ehal_field")
-        if item.get("id") and field and field not in ehal_map:
-            return (
-                f"Trigger '{item['id']}': Feld '{field}' "
-                "muss gemappt sein (Binding)."
-            )
     return None
 
 
@@ -580,9 +433,8 @@ def _save_entity_mapping(
     profile_id: str,
     entity_id: str,
     ehal_map: dict[str, str],
-    triggers: list[dict],
 ) -> None:
-    error = _validate_mapping_save(entity_id, ehal_map, triggers)
+    error = _validate_mapping_save(entity_id, ehal_map)
     if error:
         st.error(error)
         return
@@ -592,7 +444,6 @@ def _save_entity_mapping(
         profile_id=profile_id,
         entity_id=entity_id,
         bindings=ehal_map,
-        triggers=triggers,
     )
     save_house_profiles(updated)
     save_main_config(_ensure_ehal_loxone_meta(migrated_config))
@@ -600,6 +451,6 @@ def _save_entity_mapping(
     st.session_state[_SESSION_MIGRATED] = True
     st.success(
         f"Mapping für `{entity_id}` in `house_profiles.json` gespeichert "
-        "(Bindings + Trigger); `system.event_triggers` / Anlagen-Merker in config bereinigt."
+        "(Bindings); Legacy-Merker-Trigger und Anlagen-Rollen in config bereinigt."
     )
     st.rerun()

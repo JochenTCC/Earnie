@@ -59,15 +59,6 @@ def test_omit_marker_keys_preserves_via_passthrough() -> None:
         "thermal_control": {"loxone": {"heating_active_name": "heat"}},
         "swimspa_filter_bindings": {"power_name": "filt"},
         "ehal_bindings": {"flex.power_name": "Ernie_WP_P_act"},
-        "event_triggers": [
-            {
-                "id": "wp_on",
-                "ehal_field": "flex.power_name",
-                "signal_type": "binary",
-                "on_change": "rising",
-                "label": "WP",
-            }
-        ],
     }
     edited = {
         "id": "wp",
@@ -81,7 +72,6 @@ def test_omit_marker_keys_preserves_via_passthrough() -> None:
     assert merged["thermal_control"]["loxone"]["heating_active_name"] == "heat"
     assert merged["swimspa_filter_bindings"]["power_name"] == "filt"
     assert merged["ehal_bindings"]["flex.power_name"] == "Ernie_WP_P_act"
-    assert merged["event_triggers"][0]["id"] == "wp_on"
 
 
 def test_omit_charging_loxone_preserves_via_passthrough() -> None:

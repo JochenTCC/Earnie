@@ -2,9 +2,7 @@
   "system": {
     "global_timeout": 10,
     "loop_timeout": 900,
-    "event_trigger_enabled": false,
-    "event_poll_interval_sec": 60,
-    "event_triggers": []
+    "ehal_loxone_http_port": 8541
   },
   "loxone_blocks": {
     "soc_name": "Battery_SOC",

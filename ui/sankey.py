@@ -149,6 +149,44 @@ def _real_sink_sum_kw(
     return total
 
 
+def _sankey_breakdown_consumers() -> list[dict]:
+    """Flex MILP consumers plus known/manual house loads with live power Merker."""
+    from house_config.known_chart_display import chart_known_generics
+    from integrations.loxone_client import _house_profile_power_consumers
+    from simulation.engine import resolved_flexible_consumers
+
+    consumers = list(
+        resolved_flexible_consumers(
+            config.get_resolved_runtime_settings(),
+            optimizer_only=False,
+        )
+    )
+    flex_ids = {str(c.get("id") or "") for c in consumers}
+    meter_ids = {
+        str(c.get("id") or "")
+        for c in _house_profile_power_consumers()
+        if str(c.get("id") or "")
+    }
+    used = {
+        int(c["chart_color_index"])
+        for c in consumers
+        if c.get("chart_color_index") is not None
+    }
+    for known in chart_known_generics(used_color_indices=used):
+        cid = str(known.get("id") or "")
+        if not cid or cid in flex_ids or cid not in meter_ids:
+            continue
+        consumers.append(known)
+        flex_ids.add(cid)
+        raw = known.get("chart_color_index")
+        if raw is not None:
+            try:
+                used.add(int(raw))
+            except (TypeError, ValueError):
+                pass
+    return consumers
+
+
 def _prepare_sankey_data(
     data: dict,
     current_soc: float,
@@ -164,12 +202,7 @@ def _prepare_sankey_data(
     links = _SankeyLinks()
 
     if breakdown:
-        from simulation.engine import resolved_flexible_consumers
-
-        consumers = resolved_flexible_consumers(
-            config.get_resolved_runtime_settings(),
-            optimizer_only=False,
-        )
+        consumers = _sankey_breakdown_consumers()
         flex_kw = breakdown.get("flex_kw") or {}
         lbl_baseload = f"🏠 Grundlast ({breakdown['baseload_kw']:.2f} kW)"
         flex_labels = [
@@ -262,9 +295,7 @@ def _sankey_height(breakdown: dict | None, main_state: dict | None) -> int:
         return 280
     overlay = produktiv.has_produktiv_run(main_state)
     per_consumer = 40 if overlay else 25
-    from ui.chart_consumer_stack import _chart_flex_consumers
-
-    return 300 + len(_chart_flex_consumers(optimizer_only=False)) * per_consumer
+    return 300 + len(_sankey_breakdown_consumers()) * per_consumer
 
 
 def _create_live_flow_sankey(
@@ -341,16 +372,10 @@ def render_live_power_flow(current_soc: float) -> None:
         st.warning("⚠️ Live-Leistungswerte konnten nicht von Loxone geladen werden.")
         return
 
-    if main_state and main_state.get("consumption_snapshot"):
-        age = run_state.age_seconds(main_state)
-        if age is not None and age <= produktiv.PRODUKTIV_RUN_FRESH_SEC:
-            snapshot = main_state["consumption_snapshot"]
-        else:
-            flex_kw = live_consumption.fetch_live_flex_kw_for_ui(main_state)
-            snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
-    else:
-        flex_kw = live_consumption.fetch_live_flex_kw_for_ui(main_state)
-        snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
+    # Always resolve live flex (incl. known Merker) so Sankey is not stuck on a
+    # fresh optimizer snapshot that still omits house-profile known loads.
+    flex_kw = live_consumption.fetch_live_flex_kw_for_ui(main_state)
+    snapshot = live_consumption.build_consumption_snapshot(data, flex_kw)
 
     fig = _create_live_flow_sankey(
         data,

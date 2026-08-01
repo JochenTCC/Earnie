@@ -25,7 +25,7 @@ Besonders wirksam ist Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar),
 | **Was-wäre-wenn (ohne Smart-Home)** | Haus und Varianten konfigurieren, Jahresvergleich rechnen — z. B. ob sich Speicher, größere PV oder ein Spot-Tarif lohnen |
 | **Live-Betrieb (mit Loxone)** | Dauerhaft optimieren und Sollwerte an die Hausautomation schreiben; Monitor zeigt Plan und Ist |
 
-Nur der Hintergrunddienst (`main.py`) steuert die Anlage im Produktivbetrieb. Die Web-Oberfläche (Streamlit) ist das **Cockpit**: Anzeige, Konfiguration und Analyse — und unter **Daemon Control → Optimierer-Dienst** Start/Stop/Neustart des Daemons. Bei gestopptem Dienst können dort zusätzlich manuelle **ESS-Test-Sollwerte** an Loxone/HA/OpenEMS gesendet werden (Schnittstellentest).
+Nur der Hintergrunddienst (`main.py`) steuert die Anlage im Produktivbetrieb. Die Web-Oberfläche (Streamlit) ist das **Cockpit**: Anzeige, Konfiguration und Analyse — und unter **Daemon Control → Optimierer-Dienst** Start/Stop/Neustart des Daemons.
 
 ### Voraussetzungen
 
@@ -59,18 +59,18 @@ In der Sidebar unter **Info / About** (unten) und zusätzlich **am unteren Ende 
 
 Bei erkennbar inoffiziellen oder geänderten Builds (z. B. abweichende Git-Remote) kann zusätzlich ein Warnhinweis erscheinen. Das Banner ist bewusst sichtbar gehalten; es ist **nicht** technisch fälschungssicher.
 
-Unter **Info / About** kann zusätzlich ein kurzer Hinweis zum **Hardware-Fingerprint** und zum Registry-Status erscheinen (`unbound` / gebunden / Abweichung). Das ist optional und sperrt den Start **nicht**.
+Unter **Info / About** erscheinen zusätzlich der **Hardware-Fingerprint** (vollständig, kopierbar) und der Registry-Status (`unbound` / `valid` bzw. gebunden / `mismatch` / `invalid_sig`). Das ist optional und sperrt den Start **nicht**.
 
 ### Hardware-Registry (`earnie_registry.json`)
 
 Die Datei `earnie_registry.json` ist eine **einmalig ausgestellte Bindung** Ihrer Earnie-Installation an Ihren Hardware-Fingerprint (Host und optional Smart-Home-IDs). Private Nutzung ohne diese Datei bleibt möglich; der Status bleibt dann `unbound`.
 
-**Wichtig:** Sie erzeugen die signierte Datei **nicht selbst**. Earnie berechnet nur den Fingerprint. Die Datei stellt der Rechteinhaber aus (derzeit per E-Mail; später ggf. Cloud-Portal).
+**Wichtig:** Sie erzeugen die signierte Datei **nicht selbst**. Earnie berechnet nur den Fingerprint. Die Datei stellt der Rechteinhaber aus (derzeit per E-Mail; später ggf. Cloud-Portal). Offizielle Images prüfen die Signatur mit einem **öffentlichen** Schlüssel; der private Schlüssel bleibt beim Aussteller.
 
 **So erhalten Sie die Datei:**
 
 1. Earnie starten (Docker oder lokal).
-2. In der Sidebar **Info / About** öffnen und den angezeigten **Hardware-Fingerprint** notieren (Kurzform genügt für die Anzeige; für die Ausstellung wird der vollständige 64-stellige Hex-Wert benötigt — siehe unten).
+2. In der Sidebar **Info / About** öffnen und den **vollständigen 64-stelligen Hardware-Fingerprint** kopieren (Anzeige als Code-Block).
 3. Alternativ auf dem Host (Projektwurzel, mit Python-Umgebung):
 
    ```text
@@ -78,7 +78,7 @@ Die Datei `earnie_registry.json` ist eine **einmalig ausgestellte Bindung** Ihre
    ```
 
    Die Ausgabe enthält `fingerprint=` (vollständig) und `fingerprint_display=` (Kurzform).
-4. Per **Info / About → E-Mail schreiben** an `mail@techcreacon.com` den Fingerprint mitschicken (Betreff z. B. „Earnie Registry“). Optional die Kontakt-ZIP anhängen.
+4. Per **Info / About → Registry per E-Mail anfordern** an `mail@techcreacon.com` senden (Betreff „Earnie Registry“, Fingerprint und Datenschutzhinweis sind bereits im Mailtext). Bei Bedarf die Speicherung der Absenderadresse für Supportzwecke von **Nein** auf **Ja** ändern (DSGVO; Standard: keine Speicherung). Optional zusätzlich die Kontakt-ZIP über **E-Mail schreiben** anhängen.
 5. Sie erhalten zurück die Datei `earnie_registry.json`.
 6. Datei ablegen unter:
 
@@ -88,11 +88,11 @@ Die Datei `earnie_registry.json` ist eine **einmalig ausgestellte Bindung** Ihre
    | eigener Runtime-Pfad | Ordner aus `EARNIE_RUNTIME_PATH` bzw. `…/runtime/` |
    | abweichender Pfad | Umgebungsvariable `EARNIE_REGISTRY_PATH` auf die Datei setzen |
 
-7. Oberfläche neu laden und unter **Info / About** prüfen: Registry sollte als gebunden (`bound`) erscheinen. Steht dort „mismatch“, passt der Fingerprint nicht mehr zur Datei (z. B. anderer Host) — neuen Fingerprint senden und Datei erneut anfordern.
+7. Oberfläche neu laden und unter **Info / About** prüfen: Registry sollte als gebunden (`bound` / `valid`) erscheinen. Bei **mismatch** passt der Fingerprint nicht mehr zur Datei (z. B. anderer Host) — neuen Fingerprint senden und Datei erneut anfordern. Bei **invalid_sig** ist die Datei beschädigt oder nicht gültig signiert — neu anfordern. In beiden Fällen startet Earnie trotzdem (soft check).
 
-**Was die Datei enthält (Kurz):** Fingerprint, Ausstellungszeit, optional Ablaufdatum, Aussteller und eine kryptografische Signatur. Ohne passende Signatur und ohne das serverseitige Geheimnis ist eine selbst gebaute Datei ungültig (`invalid_sig`).
+**Was die Datei enthält (Kurz):** Fingerprint, Ausstellungszeit, optional Ablaufdatum, Aussteller und eine Ed25519-Signatur. Eine selbst gebaute Datei ohne passende Signatur ist ungültig (`invalid_sig`).
 
-Die Datei wird **beim Rechteinhaber** erzeugt (Signatur mit einem nur dort bekannten Geheimnis), nicht in der Earnie-Oberfläche. Technische Aussteller-Anleitung: Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md`.
+Die Datei wird **beim Rechteinhaber** erzeugt (Signatur mit dem privaten Schlüssel), nicht in der Earnie-Oberfläche. Technische Aussteller-Anleitung: Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md`.
 
 ### Support
 
@@ -365,9 +365,9 @@ Cutover-Checkliste: Lesen OK → Schreiben Erfolg → Monitor/Sankey plausibel. 
 
 ## Live-Betrieb
 
-Im Produktivbetrieb läuft der Optimierer dauerhaft (im Docker-Container automatisch mit der UI, oder lokal als `python main.py`) als Daemon und arbeitet im **15-Minuten-Takt** (zusätzlich bei konfigurierten Ereignissen).
+Im Produktivbetrieb läuft der Optimierer dauerhaft (im Docker-Container automatisch mit der UI, oder lokal als `python main.py`) als Daemon und arbeitet im **15-Minuten-Takt** (zusätzlich bei `Earnie_Request_Optimize` von Loxone).
 
-Unter **Daemon Control → Optimierer-Dienst** können Sie den Daemon starten, stoppen oder neu starten. Die Oberfläche zeigt den aktuellen Plan; Produktions-Schreibvorgänge kommen von `main.py`. Bei gestopptem Daemon können Sie unter **ESS-Schnittstelle testen** manuelle Modi/Sollwerte senden, um die Loxone-/EHAL-Anbindung zu prüfen. Unter **Dienst-Log** sehen Sie die letzten Zeilen von `earnie.log` (Expander; bei Bedarf aktualisieren).
+Unter **Daemon Control → Optimierer-Dienst** können Sie den Daemon starten, stoppen oder neu starten. Die Oberfläche zeigt den aktuellen Plan; Produktions-Schreibvorgänge kommen von `main.py`. Unter **Dienst-Log** sehen Sie die letzten Zeilen von `earnie.log` (Expander; bei Bedarf aktualisieren).
 
 ### Monitor
 
@@ -437,7 +437,7 @@ Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur wenn der UI-Modus `li
 
 - **Wochenansicht** aus dem Produktiv-Log: Verbrauch je Verbraucher (Optimizer-Flex und manuelle Geräte mit `earnie_role: manual`) im Vergleich zu Importpreis und PV, Herkunft der Energie (PV / Batterie / Netz) sowie grobe Kosten nur für den **Netzanteil** (PV und Batterie am Verbrauchsort zählen als 0 €). Manuelle Geräte erscheinen bei aktivem Startplan bzw. wenn ihre Leistung im Log gemessen ist.
 - **Summen** für Kalenderwoche, laufenden Monat und Jahr — bezogen auf vorhandene Log-Daten (kein Abgleich mit der Stromrechnung).
-- **Batterie-Energieflüsse** der gewählten Woche (Laden/Entladen, Anteil PV vs. Netz beim Laden).
+- **Batterie-Energieflüsse** der gewählten Woche: gestapelte Balken **Laden** (PV / Netz) und **Entladen** (Verbrauch / Einspeisung); Caption mit Laden-/Entladen-Summe und Δ (kleine Abweichungen durch SoC/Standby sind normal).
 - Darunter weiterhin die **Swimspa**-Auswertung (Ist-/Soll-Temperatur und Filter autonom vs. Earnie-initiiert im S-2-Fenster).
 
 ---

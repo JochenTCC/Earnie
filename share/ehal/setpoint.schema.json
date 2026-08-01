@@ -43,8 +43,8 @@
     },
     "set_evcs_mode": {
       "type": "string",
-      "enum": ["pv", "now"],
-      "description": "EV charge mode: pv (PV-follow) or now (immediate)."
+      "enum": ["off", "pv", "now"],
+      "description": "EV charge mode: off (idle/absent/complete), pv (PV-follow), or now (immediate)."
     }
   },
   "anyOf": [

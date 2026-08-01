@@ -1,8 +1,7 @@
-"""Entity-centric EHAL bindings + event-trigger migration (2.4.k)."""
+"""Entity-centric EHAL bindings migration (2.4.k; Merker event-triggers removed)."""
 from __future__ import annotations
 
 import copy
-from typing import Any
 
 from integrations.loxone_ehal_mapping import EHAL_TO_BLOCKS
 
@@ -29,6 +28,14 @@ _EV_CHARGING_TO_EHAL: dict[str, str] = {
     "get_evcs_nominal_current": "get_evcs_nominal_current",
     "get_evcs_ready_by_time": "get_evcs_ready_by_time",
 }
+
+_LEGACY_SYSTEM_TRIGGER_KEYS: frozenset[str] = frozenset(
+    {
+        "event_triggers",
+        "event_trigger_enabled",
+        "event_poll_interval_sec",
+    }
+)
 
 
 def _nonempty(value: object) -> str:
@@ -133,53 +140,6 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     return bindings
 
 
-def _binding_field_for_address(bindings: dict[str, str], address: str) -> str:
-    target = _nonempty(address)
-    if not target:
-        return ""
-    for field, value in bindings.items():
-        if _nonempty(value) == target:
-            return str(field)
-    return ""
-
-
-def migrate_config_triggers_to_plant(
-    triggers: list | None,
-    plant_bindings: dict | None,
-) -> tuple[list[dict], dict[str, str]]:
-    """Move ``system.event_triggers`` onto plant; stub ``event.<id>`` when needed."""
-    bindings = {
-        str(k): _nonempty(v)
-        for k, v in (plant_bindings or {}).items()
-        if _nonempty(v)
-    }
-    out: list[dict] = []
-    if not isinstance(triggers, list):
-        return out, bindings
-    for index, raw in enumerate(triggers):
-        if not isinstance(raw, dict):
-            continue
-        trigger_id = _nonempty(raw.get("id")) or f"trigger_{index}"
-        address = _nonempty(raw.get("loxone_name"))
-        ehal_field = _nonempty(raw.get("ehal_field"))
-        if not ehal_field:
-            ehal_field = _binding_field_for_address(bindings, address)
-        if not ehal_field:
-            ehal_field = f"event.{trigger_id}"
-        if address:
-            _put_binding(bindings, ehal_field, address)
-        out.append(
-            {
-                "id": trigger_id,
-                "ehal_field": ehal_field,
-                "signal_type": _nonempty(raw.get("signal_type")).lower() or "binary",
-                "on_change": _nonempty(raw.get("on_change")).lower() or "any",
-                "label": _nonempty(raw.get("label")) or trigger_id,
-            }
-        )
-    return out, bindings
-
-
 def _profiles_iterable(house_doc: dict) -> list[dict]:
     profiles = house_doc.get("profiles")
     if isinstance(profiles, dict):
@@ -187,74 +147,6 @@ def _profiles_iterable(house_doc: dict) -> list[dict]:
     if isinstance(profiles, list):
         return [p for p in profiles if isinstance(p, dict)]
     return []
-
-
-def _consumers_for_profile(house_doc: dict, profile_id: str | None) -> list[dict]:
-    consumers: list[dict] = []
-    for profile in _profiles_iterable(house_doc):
-        if profile_id and str(profile.get("id") or "") != profile_id:
-            continue
-        raw = profile.get("consumers") or []
-        if isinstance(raw, list):
-            consumers.extend(c for c in raw if isinstance(c, dict))
-    return consumers
-
-
-def _resolve_trigger_spec(raw: dict, bindings: dict[str, str], index: int) -> dict:
-    from settings.system_settings import normalize_event_trigger
-
-    ehal_field = _nonempty(raw.get("ehal_field"))
-    address = _nonempty(bindings.get(ehal_field)) or _nonempty(raw.get("loxone_name"))
-    return normalize_event_trigger(
-        {
-            "id": raw.get("id"),
-            "loxone_name": address,
-            "signal_type": raw.get("signal_type"),
-            "on_change": raw.get("on_change"),
-            "label": raw.get("label"),
-        },
-        index,
-    )
-
-
-def aggregate_event_triggers(
-    house_profiles_doc: dict | None,
-    profile_id: str | None = None,
-) -> list[dict]:
-    """Flatten plant + consumer triggers; resolve ``loxone_name`` from bindings."""
-    house = house_profiles_doc if isinstance(house_profiles_doc, dict) else {}
-    plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
-    plant_bindings = plant.get("ehal_bindings") if isinstance(plant.get("ehal_bindings"), dict) else {}
-    specs: list[dict] = []
-    seen: set[str] = set()
-    for index, raw in enumerate(plant.get("event_triggers") or []):
-        if not isinstance(raw, dict):
-            continue
-        spec = _resolve_trigger_spec(raw, plant_bindings, index)
-        if spec["id"] in seen:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: event_triggers enthält "
-                f"doppelte id '{spec['id']}'."
-            )
-        seen.add(spec["id"])
-        specs.append(spec)
-    offset = len(specs)
-    for c_index, consumer in enumerate(_consumers_for_profile(house, profile_id)):
-        bindings = consumer.get("ehal_bindings")
-        if not isinstance(bindings, dict):
-            bindings = {}
-        for t_index, raw in enumerate(consumer.get("event_triggers") or []):
-            if not isinstance(raw, dict):
-                continue
-            spec = _resolve_trigger_spec(raw, bindings, offset + c_index + t_index)
-            if spec["id"] in seen:
-                raise ValueError(
-                    f"Kritischer Konfigurationsfehler: event_triggers enthält "
-                    f"doppelte id '{spec['id']}'."
-                )
-            seen.add(spec["id"])
-            specs.append(spec)
-    return specs
 
 
 def resolve_plant_binding(house_doc: dict | None, ehal_field: str, config_doc: dict | None = None) -> str:
@@ -279,16 +171,34 @@ def _plant_bindings_empty(plant: dict) -> bool:
     return not (isinstance(bindings, dict) and any(_nonempty(v) for v in bindings.values()))
 
 
-def _plant_triggers_empty(plant: dict) -> bool:
-    triggers = plant.get("event_triggers")
-    return not (isinstance(triggers, list) and triggers)
+def _strip_entity_event_triggers(house: dict) -> bool:
+    """Drop legacy ``event_triggers`` from plant and consumers; return True if changed."""
+    changed = False
+    plant = house.get("plant") if isinstance(house.get("plant"), dict) else None
+    if isinstance(plant, dict) and "event_triggers" in plant:
+        plant = dict(plant)
+        plant.pop("event_triggers", None)
+        house["plant"] = plant
+        changed = True
+    for profile in _profiles_iterable(house):
+        consumers = profile.get("consumers")
+        if not isinstance(consumers, list):
+            continue
+        for index, consumer in enumerate(consumers):
+            if not isinstance(consumer, dict) or "event_triggers" not in consumer:
+                continue
+            cleaned = dict(consumer)
+            cleaned.pop("event_triggers", None)
+            consumers[index] = cleaned
+            changed = True
+    return changed
 
 
 def ensure_migrated(
     house_doc: dict | None,
     config_doc: dict | None,
 ) -> tuple[dict, dict, bool]:
-    """One-shot in-memory migration of blocks/triggers/consumer nests → entity bindings."""
+    """One-shot in-memory migration of blocks/consumer nests → entity bindings."""
     house = copy.deepcopy(house_doc) if isinstance(house_doc, dict) else {}
     config = copy.deepcopy(config_doc) if isinstance(config_doc, dict) else {}
     changed = False
@@ -304,17 +214,13 @@ def ensure_migrated(
         if migrated:
             bindings.update(migrated)
             changed = True
-    system = config.get("system") if isinstance(config.get("system"), dict) else {}
-    config_triggers = system.get("event_triggers")
-    if isinstance(config_triggers, list) and config_triggers and _plant_triggers_empty(plant):
-        new_triggers, bindings = migrate_config_triggers_to_plant(config_triggers, bindings)
-        plant["event_triggers"] = new_triggers
-        changed = True
     if bindings != (plant.get("ehal_bindings") or {}):
         plant["ehal_bindings"] = bindings
         changed = True
     if plant:
         house["plant"] = plant
+    if _strip_entity_event_triggers(house):
+        changed = True
     if _migrate_all_consumers(house):
         changed = True
     return house, config, changed
@@ -358,11 +264,12 @@ _OBSOLETE_BLOCK_KEYS: frozenset[str] = frozenset(
 
 
 def strip_migrated_config_keys(config_doc: dict | None) -> dict:
-    """Clear ``system.event_triggers``; drop migrated/obsolete ``loxone_blocks`` keys."""
+    """Drop legacy Merker event-trigger keys; drop migrated/obsolete ``loxone_blocks`` keys."""
     config = copy.deepcopy(config_doc) if isinstance(config_doc, dict) else {}
     system = dict(config.get("system") or {}) if isinstance(config.get("system"), dict) else {}
-    if "event_triggers" in system:
-        system["event_triggers"] = []
+    if isinstance(config.get("system"), dict) or any(k in system for k in _LEGACY_SYSTEM_TRIGGER_KEYS):
+        for key in _LEGACY_SYSTEM_TRIGGER_KEYS:
+            system.pop(key, None)
         config["system"] = system
     blocks = config.get("loxone_blocks")
     if isinstance(blocks, dict):
@@ -377,15 +284,3 @@ def strip_migrated_config_keys(config_doc: dict | None) -> dict:
         else:
             config.pop("loxone_blocks", None)
     return config
-
-
-def house_has_entity_triggers(house_doc: dict | None) -> bool:
-    house = house_doc if isinstance(house_doc, dict) else {}
-    plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
-    if isinstance(plant.get("event_triggers"), list) and plant["event_triggers"]:
-        return True
-    for consumer in _consumers_for_profile(house, None):
-        triggers = consumer.get("event_triggers")
-        if isinstance(triggers, list) and triggers:
-            return True
-    return False

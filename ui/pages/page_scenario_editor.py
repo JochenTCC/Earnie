@@ -69,14 +69,18 @@ _SESSION_SWITCH_TARGET_KEY = "scenario_editor_switch_target"
 _SESSION_SWITCH_DISCARD_KEY = "scenario_editor_switch_discard"
 
 
-def _next_month_in_planning_tz() -> tuple[int, int]:
+def _planning_now():
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
+    tz_name = config.CONFIG.get_planning_timezone()
+    return datetime.now(ZoneInfo(tz_name))
+
+
+def _next_month_in_planning_tz() -> tuple[int, int]:
     from data.tariff_pricing import next_calendar_month
 
-    tz_name = config.CONFIG.get_planning_timezone()
-    now = datetime.now(ZoneInfo(tz_name))
+    now = _planning_now()
     return next_calendar_month(now.year, now.month)
 
 
@@ -746,23 +750,26 @@ def _render_scenarios_tab() -> None:
             kind="export",
             container=export_param_col,
         )
-    next_y, next_m = _next_month_in_planning_tz()
-    if import_tariff is not None:
-        _render_next_month_rate_entry(
-            tariff=import_tariff,
-            side="import",
-            year=next_y,
-            month=next_m,
-            session_scope=session_scope,
-        )
-    if export_tariff is not None:
-        _render_next_month_rate_entry(
-            tariff=export_tariff,
-            side="export",
-            year=next_y,
-            month=next_m,
-            session_scope=session_scope,
-        )
+    from data.tariff_pricing import is_within_days_of_next_month
+
+    if is_within_days_of_next_month(_planning_now(), days=2):
+        next_y, next_m = _next_month_in_planning_tz()
+        if import_tariff is not None:
+            _render_next_month_rate_entry(
+                tariff=import_tariff,
+                side="import",
+                year=next_y,
+                month=next_m,
+                session_scope=session_scope,
+            )
+        if export_tariff is not None:
+            _render_next_month_rate_entry(
+                tariff=export_tariff,
+                side="export",
+                year=next_y,
+                month=next_m,
+                session_scope=session_scope,
+            )
     if selected_import or selected_export:
         st.info(
             "Bitte prüfen Sie die angezeigten Tarifdaten. Es gibt keine Garantie "

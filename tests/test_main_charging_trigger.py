@@ -1,14 +1,14 @@
-"""Tests for event vs regular main.py side effects (Nebenläufer-Schutz)."""
+"""Tests for out-of-band vs regular main.py side effects."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
 import main as main_module
-from optimizer.event_trigger import TRIGGER_QUARTER_HOUR, build_run_trigger
+from optimizer.run_trigger import TRIGGER_QUARTER_HOUR, TRIGGER_REQUEST_OPTIMIZE
 from tests.main_run_harness import patch_main_run
 
 
-def test_event_run_uses_peek_and_books_live_delivery(monkeypatch):
+def test_request_optimize_run_uses_peek_and_books_live_delivery(monkeypatch):
     patch_main_run(monkeypatch, silent=True)
     peek = MagicMock(return_value=1.5)
     update = MagicMock(return_value=1.5)
@@ -25,22 +25,16 @@ def test_event_run_uses_peek_and_books_live_delivery(monkeypatch):
         "save_run_state",
         lambda payload: saved.append(payload),
     )
-    monkeypatch.setattr(
-        main_module,
-        "fetch_trigger_snapshot",
-        lambda _specs: {"eauto_plugged_in": True},
-    )
 
-    run_trigger = build_run_trigger("eauto_plugged_in")
-    main_module.main(run_trigger=run_trigger)
+    main_module.main(run_trigger=TRIGGER_REQUEST_OPTIMIZE)
 
     peek.assert_called_once()
     update.assert_not_called()
     register.assert_called_once()
     assert register.call_args.kwargs["book_planned"] is False
     cons_data.assert_not_called()
-    assert saved[0]["run_trigger"] == run_trigger
-    assert saved[0]["event_trigger_snapshot"] == {"eauto_plugged_in": True}
+    assert saved[0]["run_trigger"] == TRIGGER_REQUEST_OPTIMIZE
+    assert saved[0]["event_trigger_snapshot"] == {}
 
 
 def test_regular_run_uses_update_and_side_effects(monkeypatch):

@@ -347,6 +347,51 @@ class TestFlexibleConsumerHelpers:
         with patch.object(lc, "fetch_loxone_generic_value", return_value=0.0):
             assert lc.resolve_consumer_live_power_kw(consumer) == 0.0
 
+    def test_resolve_live_power_reads_ehal_bindings_without_legacy_power_name(self):
+        """EHAL-only consumers must resolve power Merker (Monitor/Sankey Ist)."""
+        consumer = {
+            "id": "waschmaschine",
+            "name": "Waschmaschine",
+            "nominal_power_kw": 2.0,
+            "signal_type": "power",
+            "ehal_bindings": {"flex.power_name": "Zaehler Waschmaschine"},
+            "loxone_inputs": {},
+        }
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=0.85) as fetch:
+            assert lc.resolve_consumer_live_power_kw(consumer) == 0.85
+            fetch.assert_called_with("Zaehler Waschmaschine")
+        live = None
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=0.85):
+            live = lc.resolve_flexible_consumers_live_power(consumers=[consumer])
+        assert live.measured_ids == frozenset({"waschmaschine"})
+        assert live.chart_kw["waschmaschine"] == 0.85
+        assert live.kw["waschmaschine"] == 0.85
+
+    def test_default_live_power_includes_house_profile_known_meter(self, monkeypatch):
+        """Known house-profile loads with Merker must enter live flex/Sankey."""
+        known = {
+            "id": "tv",
+            "label": "TV",
+            "type": "generic",
+            "earnie_role": "known",
+            "ehal_bindings": {"flex.tv.sens_power_act": "Zaehler TV"},
+        }
+        monkeypatch.setattr(
+            lc.config,
+            "get_flexible_consumers",
+            lambda optimizer_only=False: [],
+        )
+        monkeypatch.setattr(
+            lc,
+            "_house_profile_power_consumers",
+            lambda: [known],
+        )
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=0.14):
+            live = lc.resolve_flexible_consumers_live_power()
+        assert "tv" in live.measured_ids
+        assert live.kw["tv"] == 0.14
+        assert live.chart_kw["tv"] == 0.14
+
 
 class TestSharedMeterSubtraction:
     """Fall B: SwimSpa-Heizungszähler misst Heizung + Filter am selben Zähler."""
@@ -749,6 +794,131 @@ class TestBuildSentSnapshot:
 
         assert snapshot["Earnie_EAuto_Ziel_kW"] == 0.0
         assert snapshot["Earnie_EAuto_pv_follow"] == 0.0
+
+    def test_snapshot_set_evcs_mode_off_when_absent_or_standby(self):
+        consumers = [
+            {
+                "id": "eauto",
+                "name": "E-Auto",
+                "nominal_power_kw": 3.5,
+                "min_power_kw": 1.4,
+                "optimizer_enabled": True,
+                "daily_target_kwh": 10.0,
+                "daily_target_source": "config",
+                "loxone_outputs": {
+                    "power_setpoint_name": "Earnie_EAuto_Soll_A",
+                    "set_evcs_mode": "Earnie_EAuto_Modus",
+                    "pv_follow_name": "Earnie_EAuto_pv_follow",
+                },
+            }
+        ]
+        config_map = {
+            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
+            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
+            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+        }
+        cases = (
+            {
+                "powers": {"eauto": 2.0},
+                "pv_follow": {"eauto": 1},
+                "ctx": {
+                    "eauto": {
+                        "active": True,
+                        "plugged_in": False,
+                        "anticipated": True,
+                        "target_kwh": 10.0,
+                    }
+                },
+                "expect_amps": 0.0,
+                "expect_mode": 0.0,
+                "expect_pv": 0.0,
+            },
+            {
+                "powers": {"eauto": 2.0},
+                "pv_follow": {"eauto": 0},
+                "ctx": {
+                    "eauto": {
+                        "active": False,
+                        "plugged_in": True,
+                        "target_kwh": 0.0,
+                    }
+                },
+                "expect_amps": 0.0,
+                "expect_mode": 0.0,
+                "expect_pv": 0.0,
+            },
+            {
+                "powers": {"eauto": 0.0},
+                "pv_follow": {"eauto": 0},
+                "ctx": {"eauto": {"active": True, "plugged_in": True}},
+                "expect_amps": 0.0,
+                "expect_mode": 0.0,
+                "expect_pv": 0.0,
+            },
+        )
+        for case in cases:
+            with patch.object(
+                lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
+            ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+                snapshot = lc.build_sent_loxone_snapshot(
+                    mode=0,
+                    target_power_kw=0.0,
+                    target_soc=80.0,
+                    consumer_powers=case["powers"],
+                    charging_contexts=case["ctx"],
+                    consumer_pv_follow=case["pv_follow"],
+                )
+            assert snapshot["Earnie_EAuto_Soll_A"] == case["expect_amps"]
+            assert snapshot["Earnie_EAuto_Modus"] == case["expect_mode"]
+            assert snapshot["Earnie_EAuto_pv_follow"] == case["expect_pv"]
+
+    def test_snapshot_set_evcs_mode_pv_and_now_encoding(self):
+        consumers = [
+            {
+                "id": "eauto",
+                "name": "E-Auto",
+                "nominal_power_kw": 3.5,
+                "min_power_kw": 1.4,
+                "optimizer_enabled": True,
+                "daily_target_kwh": 10.0,
+                "daily_target_source": "config",
+                "loxone_outputs": {
+                    "power_setpoint_name": "Earnie_EAuto_Soll_A",
+                    "set_evcs_mode": "Earnie_EAuto_Modus",
+                    "pv_follow_name": "Earnie_EAuto_pv_follow",
+                },
+                "ehal_bindings": {"set_evcs_mode": "Earnie_EAuto_Modus"},
+            }
+        ]
+        config_map = {
+            "LOXONE_TARGET_CHARGE_POWER_NAME": "Earnie_Ziel_LadeLeistung",
+            "LOXONE_TARGET_DISCHARGE_POWER_NAME": "Earnie_Ziel_Entladeleistung",
+            "LOXONE_CONTROL_CMD_NAME": "Earnie_Steuerbefehl",
+        }
+        with patch.object(
+            lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
+        ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+            snapshot = lc.build_sent_loxone_snapshot(
+                mode=0,
+                target_power_kw=0.0,
+                target_soc=80.0,
+                consumer_powers={"eauto": 2.0},
+                charging_contexts={"eauto": {"active": True, "plugged_in": True}},
+                consumer_pv_follow={"eauto": 1},
+            )
+        assert snapshot["Earnie_EAuto_Modus"] == 1.0
+        assert snapshot["Earnie_EAuto_pv_follow"] == 1.0
+
+        with patch.object(
+            lc.config, "get", side_effect=lambda name, **kw: config_map.get(name)
+        ), patch.object(lc.config, "get_flexible_consumers", return_value=consumers):
+            values = lc._flexible_consumer_output_values(
+                consumers[0],
+                {"eauto": 3.5},
+                {"eauto": {"skip_loxone_output": True}},
+            )
+        assert values["Earnie_EAuto_Modus"] == 2.0
+        assert values["Earnie_EAuto_pv_follow"] == 0.0
 
 
     def test_build_snapshot_does_not_send_to_loxone(self):

@@ -55,15 +55,12 @@ class Config:
     )
     _normalize_scenario = staticmethod(scenario_settings.normalize_scenario)
     _load_loxone_silent_mode = staticmethod(system_settings.load_loxone_silent_mode)
-    _load_event_trigger_enabled = staticmethod(system_settings.load_event_trigger_enabled)
     _load_ui_fragment_refresh_sec = staticmethod(system_settings.load_ui_fragment_refresh_sec)
     _load_ui_bool = staticmethod(system_settings.load_ui_bool)
     _load_ui_streamlit_port = staticmethod(system_settings.load_ui_streamlit_port)
     _load_ui_chart_debug_capture_dir = staticmethod(
         system_settings.load_ui_chart_debug_capture_dir
     )
-    _load_event_poll_interval_sec = staticmethod(system_settings.load_event_poll_interval_sec)
-    _normalize_event_trigger = staticmethod(system_settings.normalize_event_trigger)
     _validate_threshold_power = staticmethod(config_loaders.validate_threshold_power)
     _normalize_runtime_settings_key = staticmethod(
         live_scenario.normalize_runtime_settings_key
@@ -133,12 +130,6 @@ class Config:
         except (OSError, ValueError, json.JSONDecodeError):
             return {}
 
-    def _load_event_triggers(self) -> list[dict]:
-        return system_settings.load_event_triggers(
-            self._raw_config,
-            house_doc=self._load_house_profiles_raw(),
-        )
-
     def _load_env_vars(self) -> None:
         config_loaders.apply_attrs(
             self,
@@ -154,7 +145,6 @@ class Config:
             config_loaders.load_system_and_ui_params(
                 self._raw_config,
                 local_settings_path=self.local_settings_path,
-                event_triggers=self._load_event_triggers(),
                 config_path=self.config_path,
             ),
         )
@@ -333,11 +323,8 @@ class Config:
     def is_ehal_network_backend(self) -> bool:
         return self.is_ehal_openems_backend() or self.is_ehal_ha_backend()
 
-    def is_event_trigger_enabled(self) -> bool:
-        return bool(self.get('EVENT_TRIGGER_ENABLED', default=True))
-
-    def get_event_poll_interval_sec(self) -> int:
-        return int(self.get('EVENT_POLL_INTERVAL_SEC', default=60))
+    def get_ehal_loxone_http_port(self) -> int:
+        return int(self.get("EHAL_LOXONE_HTTP_PORT", default=8541))
 
     def get_ui_fragment_charts_sec(self) -> int:
         return int(self.get("UI_FRAGMENT_REFRESH_CHARTS_SEC", default=60))
@@ -363,9 +350,6 @@ class Config:
 
     def get_ui_price_forecast_page_enabled(self) -> bool:
         return bool(self.get("UI_PRICE_FORECAST_PAGE_ENABLED", default=False))
-
-    def get_event_triggers(self) -> list[dict]:
-        return list(self.EVENT_TRIGGERS)
 
     def get_scenario_explorer_conf(self) -> dict:
         """Gibt den Block scenario_explorer_conf aus der JSON-Struktur zurück."""
@@ -614,12 +598,8 @@ def is_ehal_network_backend() -> bool:
     return CONFIG.is_ehal_network_backend()
 
 
-def is_event_trigger_enabled() -> bool:
-    return CONFIG.is_event_trigger_enabled()
-
-
-def get_event_poll_interval_sec() -> int:
-    return CONFIG.get_event_poll_interval_sec()
+def get_ehal_loxone_http_port() -> int:
+    return CONFIG.get_ehal_loxone_http_port()
 
 
 def get_ui_fragment_charts_sec() -> int:
@@ -648,10 +628,6 @@ def get_ui_streamlit_port() -> int:
 
 def get_ui_price_forecast_page_enabled() -> bool:
     return CONFIG.get_ui_price_forecast_page_enabled()
-
-
-def get_event_triggers() -> list[dict]:
-    return CONFIG.get_event_triggers()
 
 
 def get_scenario_explorer_conf() -> dict:

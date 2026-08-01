@@ -14,6 +14,7 @@ from ui.chart_colors import (
     COLOR_PV,
     MUTED_BATTERY_CHARGE_GRID,
     MUTED_BATTERY_CHARGE_PV,
+    MUTED_BATTERY_EXPORT,
     MUTED_BATTERY_LOAD,
     flex_bar_chart_color,
 )
@@ -212,31 +213,54 @@ def week_cost_chart(
 
 
 def battery_flow_chart(totals: PeriodTotals, *, title: str) -> go.Figure:
-    """House battery energy sums for the selected period."""
+    """Stacked charge (PV/grid) and discharge (load/export) for the period."""
+    categories = ["Laden", "Entladen"]
     fig = go.Figure()
     fig.add_bar(
-        x=["Laden gesamt", "davon PV", "davon Netz", "Entladen"],
-        y=[
-            totals.battery_charge_kwh,
-            totals.charge_from_pv_kwh,
-            totals.charge_from_grid_kwh,
-            totals.battery_discharge_kwh,
-        ],
-        marker_color=[
-            MUTED_BATTERY_LOAD,
-            MUTED_BATTERY_CHARGE_PV,
-            MUTED_BATTERY_CHARGE_GRID,
-            MUTED_BATTERY_LOAD,
-        ],
+        name="PV",
+        x=categories,
+        y=[totals.charge_from_pv_kwh, 0.0],
+        marker_color=MUTED_BATTERY_CHARGE_PV,
+    )
+    fig.add_bar(
+        name="Netz (Laden)",
+        x=categories,
+        y=[totals.charge_from_grid_kwh, 0.0],
+        marker_color=MUTED_BATTERY_CHARGE_GRID,
+    )
+    fig.add_bar(
+        name="Verbrauch",
+        x=categories,
+        y=[0.0, totals.discharge_to_load_kwh],
+        marker_color=MUTED_BATTERY_LOAD,
+    )
+    fig.add_bar(
+        name="Netz (Einspeisung)",
+        x=categories,
+        y=[0.0, totals.export_from_battery_kwh],
+        marker_color=MUTED_BATTERY_EXPORT,
     )
     fig.update_layout(
         title=title,
+        barmode="stack",
         height=280,
         margin=dict(l=40, r=20, t=50, b=40),
         yaxis_title="kWh",
-        showlegend=False,
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
     )
     return fig
+
+
+def battery_flow_balance_caption(totals: PeriodTotals) -> str:
+    """German note comparing stacked charge vs discharge totals."""
+    charge = float(totals.battery_charge_kwh)
+    discharge = float(totals.battery_discharge_kwh)
+    delta = charge - discharge
+    return (
+        f"Laden {charge:.2f} kWh · Entladen {discharge:.2f} kWh · Δ {delta:+.2f} kWh. "
+        "Kleine Abweichungen sind normal (SoC-Änderung, Standby der Batterie)."
+    )
 
 
 def _format_coverage(series: CostAnalysisSeries) -> str:
@@ -357,3 +381,4 @@ def render_week_analysis(
         ),
         width="stretch",
     )
+    st.caption(battery_flow_balance_caption(week_totals))

@@ -23,8 +23,9 @@ _EHAL_COM_HELP = (
     "Anbindung und Live-Übersicht für Loxone, Home Assistant (EHAL) oder OpenEMS. "
     "Live-Lesen zeigt `sens_*`/`get_*` mit EHAL-Feld und Backend-Mapping; "
     "Live-Schreiben die `set_*`-Schreibvorgänge aus dem Produktiv-Lauf von main.py. "
-    "Loxone-Bindings und Event-Trigger werden entity-zentriert unter "
-    "Loxone Struktur → EHAL Mapping gepflegt."
+    "Loxone-Bindings werden entity-zentriert unter "
+    "Loxone Struktur → EHAL Mapping gepflegt. "
+    "Außerplanmäßige Optimierung: Earnie_Request_Optimize (Port 8541)."
 )
 
 _COCKPIT_LOCKED_NOTICE = (

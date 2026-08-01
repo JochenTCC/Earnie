@@ -68,7 +68,6 @@ _PASSTHROUGH_CONSUMER_KEYS = (
     "profile_csv",
     "use_profile_csv",
     "ehal_bindings",
-    "event_triggers",
 )
 
 _EARNIE_ROLE_LABELS = {

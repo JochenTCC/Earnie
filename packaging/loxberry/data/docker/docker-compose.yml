@@ -33,6 +33,8 @@ services:
     restart: unless-stopped
     ports:
       - "${STREAMLIT_PORT:-8501}:8501"
+      # Daemon Earnie_Request_Optimize /alive (VO_Earnie_Status → host:8541).
+      - "8541:8541"
     volumes: *persist-volumes
     environment:
       <<: *common-env

@@ -48,6 +48,7 @@ services:
     restart: unless-stopped
     ports:
       - "8511:8501"
+      - "8551:8541"
     volumes: *persist-volumes
     environment:
       <<: *common-env

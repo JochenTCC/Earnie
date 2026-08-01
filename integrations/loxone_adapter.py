@@ -228,9 +228,9 @@ class LoxoneAdapter:
         return flip
 
     def _try_evcs_mode_write(self, mode: str) -> tuple[bool, str]:
-        """Map set_evcs_mode pv|now → pv_follow / charge_immediate until 2.4.k."""
+        """Map set_evcs_mode off|pv|now → pv_follow / charge_immediate until mode Merker lands."""
         mode_l = str(mode or "").strip().lower()
-        if mode_l not in ("pv", "now"):
+        if mode_l not in ("off", "pv", "now"):
             return False, f"Unsupported set_evcs_mode: {mode!r}"
         pv_val = 1.0 if mode_l == "pv" else 0.0
         now_val = 1.0 if mode_l == "now" else 0.0

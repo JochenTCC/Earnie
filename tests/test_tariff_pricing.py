@@ -307,3 +307,19 @@ def test_missing_next_month_tariff_hints():
         month=8,
     )
     assert hints == ["Einspeise: OeMAG"]
+
+
+def test_is_within_days_of_next_month():
+    from datetime import date
+
+    from data.tariff_pricing import is_within_days_of_next_month
+
+    assert is_within_days_of_next_month(date(2026, 1, 29), days=2) is False
+    assert is_within_days_of_next_month(date(2026, 1, 30), days=2) is True
+    assert is_within_days_of_next_month(date(2026, 1, 31), days=2) is True
+    assert is_within_days_of_next_month(date(2026, 2, 26), days=2) is False
+    assert is_within_days_of_next_month(date(2026, 2, 27), days=2) is True
+    assert is_within_days_of_next_month(date(2026, 2, 28), days=2) is True
+    assert is_within_days_of_next_month(date(2024, 2, 27), days=2) is False
+    assert is_within_days_of_next_month(date(2024, 2, 28), days=2) is True
+    assert is_within_days_of_next_month(date(2024, 2, 29), days=2) is True

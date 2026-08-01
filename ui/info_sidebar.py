@@ -12,11 +12,14 @@ import streamlit as st
 
 from runtime_store.config_pack import build_config_pack_bytes
 from ui.doc_links import MANUAL_URL
-from ui.truth_banner import render_registry_status_caption, render_truth_banner
+from ui.truth_banner import (
+    SUPPORT_EMAIL,
+    render_registry_status_caption,
+    render_truth_banner,
+)
 
 logger = logging.getLogger(__name__)
 
-SUPPORT_EMAIL = "mail@techcreacon.com"
 _CONTACT_ZIP_PREFIX = "earnie_kontakt"
 
 
@@ -107,12 +110,13 @@ def render_info_sidebar() -> None:
 
 
 def render_missing_next_month_tariff_sidebar() -> None:
-    """Warn when live monthly_table tariffs lack the next calendar month."""
+    """Warn near month-end when live monthly_table tariffs lack next month."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
 
     import config
     from data.tariff_pricing import (
+        is_within_days_of_next_month,
         missing_next_month_tariff_hints,
         next_calendar_month,
     )
@@ -131,6 +135,8 @@ def render_missing_next_month_tariff_sidebar() -> None:
         now = datetime.now(ZoneInfo(tz_name))
     except Exception:  # noqa: BLE001
         now = datetime.now().astimezone()
+    if not is_within_days_of_next_month(now, days=2):
+        return
     year, month = next_calendar_month(now.year, now.month)
     hints = missing_next_month_tariff_hints(
         import_tariff=resolved.get("_import_tariff_spec"),

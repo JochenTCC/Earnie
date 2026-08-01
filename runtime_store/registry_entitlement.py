@@ -1,7 +1,7 @@
-"""Dev entitlement load/verify for hardware registry (2.4.i spike).
+"""Hardware registry entitlement load/verify (2.4.q first approach).
 
-Never refuses app start. HMAC with ``EARNIE_REGISTRY_DEV_SECRET`` is for local
-PoC only — not production Layer C.
+Official path: Ed25519 with bundled public key. HMAC + ``EARNIE_REGISTRY_DEV_SECRET``
+remains a local/test fallback only. Never refuses app start.
 """
 from __future__ import annotations
 
@@ -13,6 +13,13 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
+
 from runtime_store.env_vars import read_env
 from runtime_store.hardware_identity import (
     collect_and_fingerprint,
@@ -23,8 +30,12 @@ from runtime_store.persist_paths import runtime_path
 RegistryStatus = Literal["unbound", "valid", "mismatch", "invalid_sig"]
 
 DEFAULT_REGISTRY_FILENAME = "earnie_registry.json"
-SIG_ALG = "hmac-sha256"
+SIG_ALG_ED25519 = "ed25519"
+SIG_ALG_HMAC = "hmac-sha256"
+SIG_ALG = SIG_ALG_HMAC  # legacy alias for tests / HMAC helpers
 DEV_ISSUER = "earnie-dev"
+OFFICIAL_ISSUER = "earnie"
+BUNDLED_PUBKEY_REL = os.path.join("share", "registry", "earnie_registry_pubkey.pem")
 
 
 @dataclass(frozen=True)
@@ -45,6 +56,14 @@ def default_registry_path() -> str:
     return runtime_path(DEFAULT_REGISTRY_FILENAME)
 
 
+def bundled_registry_pubkey_path() -> str:
+    """Default Ed25519 public key shipped with the image/repo."""
+    override = read_env("REGISTRY_PUBLIC_KEY_PATH")
+    if override:
+        return override
+    return BUNDLED_PUBKEY_REL
+
+
 def _expires_canonical(expires_at: Any) -> str:
     if expires_at is None:
         return "null"
@@ -57,9 +76,9 @@ def signing_payload(
     issued_at: str,
     expires_at: Any,
     issuer: str,
-    sig_alg: str = SIG_ALG,
+    sig_alg: str,
 ) -> str:
-    """Canonical UTF-8 payload signed by HMAC (no trailing newline)."""
+    """Canonical UTF-8 payload signed by HMAC or Ed25519 (no trailing newline)."""
     return (
         f"fingerprint={fingerprint.strip()}\n"
         f"issued_at={issued_at.strip()}\n"
@@ -69,6 +88,45 @@ def signing_payload(
     )
 
 
+def load_ed25519_private_key(path: str) -> Ed25519PrivateKey:
+    """Load PKCS8 PEM private key from ``path``."""
+    with open(path, "rb") as handle:
+        raw = handle.read()
+    key = serialization.load_pem_private_key(raw, password=None)
+    if not isinstance(key, Ed25519PrivateKey):
+        raise ValueError("private key is not Ed25519")
+    return key
+
+
+def load_ed25519_public_key(path: str) -> Ed25519PublicKey:
+    """Load SubjectPublicKeyInfo PEM public key from ``path``."""
+    with open(path, "rb") as handle:
+        raw = handle.read()
+    key = serialization.load_pem_public_key(raw)
+    if not isinstance(key, Ed25519PublicKey):
+        raise ValueError("public key is not Ed25519")
+    return key
+
+
+def sign_entitlement_ed25519(
+    *,
+    fingerprint: str,
+    issued_at: str,
+    expires_at: Any,
+    issuer: str,
+    private_key: Ed25519PrivateKey,
+) -> str:
+    """Return hex Ed25519 signature of the signing payload."""
+    payload = signing_payload(
+        fingerprint=fingerprint,
+        issued_at=issued_at,
+        expires_at=expires_at,
+        issuer=issuer,
+        sig_alg=SIG_ALG_ED25519,
+    )
+    return private_key.sign(payload.encode("utf-8")).hex()
+
+
 def sign_entitlement(
     *,
     fingerprint: str,
@@ -76,9 +134,9 @@ def sign_entitlement(
     expires_at: Any,
     issuer: str,
     secret: str,
-    sig_alg: str = SIG_ALG,
+    sig_alg: str = SIG_ALG_HMAC,
 ) -> str:
-    """Return hex HMAC-SHA256 of the signing payload."""
+    """Return hex HMAC-SHA256 of the signing payload (dev/test fallback)."""
     payload = signing_payload(
         fingerprint=fingerprint,
         issued_at=issued_at,
@@ -102,7 +160,7 @@ def build_entitlement(
     expires_at: str | None = None,
     issued_at: str | None = None,
 ) -> dict[str, Any]:
-    """Build a signed entitlement dict (dev HMAC)."""
+    """Build a signed entitlement dict (HMAC fallback for tests)."""
     issued = issued_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     sig = sign_entitlement(
         fingerprint=fingerprint,
@@ -110,13 +168,41 @@ def build_entitlement(
         expires_at=expires_at,
         issuer=issuer,
         secret=secret,
+        sig_alg=SIG_ALG_HMAC,
     )
     return {
         "fingerprint": fingerprint.strip(),
         "issued_at": issued,
         "expires_at": expires_at,
         "issuer": issuer,
-        "sig_alg": SIG_ALG,
+        "sig_alg": SIG_ALG_HMAC,
+        "sig": sig,
+    }
+
+
+def build_entitlement_ed25519(
+    *,
+    fingerprint: str,
+    private_key: Ed25519PrivateKey,
+    issuer: str = OFFICIAL_ISSUER,
+    expires_at: str | None = None,
+    issued_at: str | None = None,
+) -> dict[str, Any]:
+    """Build a signed entitlement dict (Ed25519 first approach)."""
+    issued = issued_at or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    sig = sign_entitlement_ed25519(
+        fingerprint=fingerprint,
+        issued_at=issued,
+        expires_at=expires_at,
+        issuer=issuer,
+        private_key=private_key,
+    )
+    return {
+        "fingerprint": fingerprint.strip(),
+        "issued_at": issued,
+        "expires_at": expires_at,
+        "issuer": issuer,
+        "sig_alg": SIG_ALG_ED25519,
         "sig": sig,
     }
 
@@ -148,10 +234,10 @@ def _shape_ok(data: dict[str, Any]) -> bool:
 
 
 def verify_entitlement_sig(data: dict[str, Any], secret: str) -> bool:
-    """True when HMAC matches; False on any failure."""
+    """True when HMAC matches; False on any failure (HMAC fallback only)."""
     if not secret or not _shape_ok(data):
         return False
-    if str(data.get("sig_alg") or "").strip() != SIG_ALG:
+    if str(data.get("sig_alg") or "").strip() != SIG_ALG_HMAC:
         return False
     expected = sign_entitlement(
         fingerprint=str(data["fingerprint"]),
@@ -159,10 +245,37 @@ def verify_entitlement_sig(data: dict[str, Any], secret: str) -> bool:
         expires_at=data.get("expires_at"),
         issuer=str(data["issuer"]),
         secret=secret,
-        sig_alg=SIG_ALG,
+        sig_alg=SIG_ALG_HMAC,
     )
     actual = str(data.get("sig") or "").strip().lower()
     return hmac.compare_digest(expected.lower(), actual)
+
+
+def verify_entitlement_ed25519(
+    data: dict[str, Any],
+    public_key: Ed25519PublicKey,
+) -> bool:
+    """True when Ed25519 signature matches; False on any failure."""
+    if not _shape_ok(data):
+        return False
+    if str(data.get("sig_alg") or "").strip() != SIG_ALG_ED25519:
+        return False
+    payload = signing_payload(
+        fingerprint=str(data["fingerprint"]),
+        issued_at=str(data["issued_at"]),
+        expires_at=data.get("expires_at"),
+        issuer=str(data["issuer"]),
+        sig_alg=SIG_ALG_ED25519,
+    )
+    try:
+        sig_bytes = bytes.fromhex(str(data.get("sig") or "").strip())
+    except ValueError:
+        return False
+    try:
+        public_key.verify(sig_bytes, payload.encode("utf-8"))
+    except (InvalidSignature, ValueError):
+        return False
+    return True
 
 
 def _is_expired(expires_at: Any) -> bool:
@@ -172,7 +285,6 @@ def _is_expired(expires_at: Any) -> bool:
     if not text or text.lower() == "null":
         return False
     try:
-        # Support trailing Z
         normalized = text.replace("Z", "+00:00")
         when = datetime.fromisoformat(normalized)
         if when.tzinfo is None:
@@ -198,27 +310,52 @@ def _report(
     )
 
 
+def _verify_sig_for_status(
+    data: dict[str, Any],
+    *,
+    secret: str | None,
+    public_key_path: str | None,
+) -> tuple[bool, str]:
+    """Return (ok, detail_on_failure)."""
+    alg = str(data.get("sig_alg") or "").strip()
+    if alg == SIG_ALG_ED25519:
+        key_path = public_key_path or bundled_registry_pubkey_path()
+        if not key_path or not os.path.isfile(key_path):
+            return False, "Ed25519 public key not found"
+        try:
+            pub = load_ed25519_public_key(key_path)
+        except (OSError, ValueError) as exc:
+            return False, f"Ed25519 public key load error: {exc}"
+        if not verify_entitlement_ed25519(data, pub):
+            return False, "Ed25519 signature mismatch"
+        return True, ""
+    if alg == SIG_ALG_HMAC:
+        sec = secret if secret is not None else read_env("REGISTRY_DEV_SECRET")
+        if not sec:
+            return False, "EARNIE_REGISTRY_DEV_SECRET not set"
+        if not verify_entitlement_sig(data, sec):
+            return False, "HMAC mismatch"
+        return True, ""
+    return False, f"unsupported sig_alg: {alg}"
+
+
 def _evaluate_loaded_entitlement(
     data: dict[str, Any],
     *,
     fingerprint: str,
     path: str,
     secret: str | None,
+    public_key_path: str | None,
 ) -> RegistryReport:
     if not _shape_ok(data):
         return _report(
             "invalid_sig", fingerprint, path=path, detail="entitlement shape invalid"
         )
-    sec = secret if secret is not None else read_env("REGISTRY_DEV_SECRET")
-    if not sec:
-        return _report(
-            "invalid_sig",
-            fingerprint,
-            path=path,
-            detail="EARNIE_REGISTRY_DEV_SECRET not set",
-        )
-    if not verify_entitlement_sig(data, sec):
-        return _report("invalid_sig", fingerprint, path=path, detail="HMAC mismatch")
+    ok, detail = _verify_sig_for_status(
+        data, secret=secret, public_key_path=public_key_path
+    )
+    if not ok:
+        return _report("invalid_sig", fingerprint, path=path, detail=detail)
     bound = str(data.get("fingerprint") or "").strip().lower()
     if bound != fingerprint.lower():
         return _report(
@@ -239,6 +376,7 @@ def registry_status(
     path: str | None = None,
     fingerprint: str | None = None,
     secret: str | None = None,
+    public_key_path: str | None = None,
 ) -> RegistryReport:
     """
     Soft status: unbound | valid | mismatch | invalid_sig.
@@ -260,7 +398,11 @@ def registry_status(
                 detail="no entitlement file",
             )
         return _evaluate_loaded_entitlement(
-            data, fingerprint=fingerprint, path=resolved, secret=secret
+            data,
+            fingerprint=fingerprint,
+            path=resolved,
+            secret=secret,
+            public_key_path=public_key_path,
         )
     except Exception as exc:  # noqa: BLE001 — soft path never blocks
         try:

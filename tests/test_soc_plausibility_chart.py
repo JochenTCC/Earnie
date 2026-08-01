@@ -100,7 +100,13 @@ def test_chart_has_bl_ziel_not_opt_last_when_plausibility_enabled():
 
 
 def test_ghost_bars_from_matched_flex(monkeypatch):
-    ev = {"id": "eauto", "name": "E-Auto", "type": "ev", "chart_color_index": 0}
+    ev = {
+        "id": "eauto",
+        "name": "E-Auto",
+        "type": "ev",
+        "chart_color_index": 0,
+        "nominal_power_kw": 3.5,
+    }
     monkeypatch.setattr(
         "ui.chart_flow_balance._chart_flex_consumers",
         lambda **_: [ev],
@@ -125,8 +131,43 @@ def test_ghost_bars_from_matched_flex(monkeypatch):
     assert "kWh" not in ghost[0].hovertemplate
 
 
+def test_ghost_bars_capped_to_nominal_power(monkeypatch):
+    """Matched baseline may exceed nominal; ghost outline height is capped."""
+    ev = {
+        "id": "eauto",
+        "name": "E-Auto",
+        "type": "ev",
+        "chart_color_index": 0,
+        "nominal_power_kw": 3.5,
+    }
+    monkeypatch.setattr(
+        "ui.chart_flow_balance._chart_flex_consumers",
+        lambda **_: [ev],
+    )
+    matched = _slot_df(flex_kw=10.87)
+    axis = ChartSlotAxis.from_dataframe(matched)
+    fig = go.Figure()
+    add_matched_flex_ghost_traces(
+        fig,
+        matched,
+        axis,
+        flex_consumers=[(ev, "E-Auto (kW)")],
+        history_slot_count=1,
+    )
+    ghost = [trace for trace in fig.data if trace.name == "Original-Schedule"]
+    assert ghost
+    assert abs(ghost[0].y[0]) == pytest.approx(3.5)
+    assert ghost[0].customdata[0][1] == pytest.approx(3.5)
+
+
 def test_ghost_bars_skipped_below_one_kwh_equivalent(monkeypatch):
-    ev = {"id": "eauto", "name": "E-Auto", "type": "ev", "chart_color_index": 0}
+    ev = {
+        "id": "eauto",
+        "name": "E-Auto",
+        "type": "ev",
+        "chart_color_index": 0,
+        "nominal_power_kw": 3.5,
+    }
     monkeypatch.setattr(
         "ui.chart_flow_balance._chart_flex_consumers",
         lambda **_: [ev],

@@ -9,7 +9,7 @@ from typing import Any
 import config
 from integrations import loxone_client
 from optimizer.consumer_power import power_limits_kw
-from optimizer.event_trigger import parse_binary_value
+from integrations.loxone_value_parse import parse_binary_value
 from optimizer.ev_soc_tracking import fetch_loxone_actual_soc_percent
 from settings.ehal_marker_resolve import (
     marker_charge_immediate,

@@ -145,8 +145,7 @@
             "set_ess_charge_power_limit": "Earnie_LadeLeistungs-Limit",
             "set_ess_discharge_power_limit": "Earnie_EntladeLeistungs-Limit",
             "set_ess_mode": "Earnie_Steuerbefehl"
-        },
-        "event_triggers": []
+        }
     }
 }
 

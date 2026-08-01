@@ -65,7 +65,6 @@ def load_system_and_ui_params(
     raw_config: dict,
     *,
     local_settings_path: str,
-    event_triggers: list[dict],
     config_path: str,
 ) -> dict[str, Any]:
     local_settings = load_local_settings_document(local_settings_path)
@@ -75,9 +74,7 @@ def load_system_and_ui_params(
         "LOXONE_SILENT_MODE": system_settings.load_loxone_silent_mode(
             raw_config, local_settings, local_settings_path
         ),
-        "EVENT_TRIGGER_ENABLED": system_settings.load_event_trigger_enabled(raw_config),
-        "EVENT_POLL_INTERVAL_SEC": system_settings.load_event_poll_interval_sec(raw_config),
-        "EVENT_TRIGGERS": event_triggers,
+        "EHAL_LOXONE_HTTP_PORT": system_settings.load_ehal_loxone_http_port(raw_config),
         "UI_FRAGMENT_REFRESH_CHARTS_SEC": system_settings.load_ui_fragment_refresh_sec(
             raw_config, "fragment_refresh_charts_sec", 60
         ),

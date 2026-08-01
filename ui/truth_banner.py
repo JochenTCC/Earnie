@@ -16,6 +16,7 @@ OFFICIAL_REPO_URL = "https://github.com/JochenTCC/Earnie"
 REQUIRED_PHRASE_NONCOMMERCIAL = "nicht-kommerziell"
 REQUIRED_PHRASE_PRODUCT = "Earnie"
 BANNER_LABEL = "Banner der Wahrheit"
+SUPPORT_EMAIL = "mail@techcreacon.com"
 
 
 def _normalize_repo_identity(raw: str) -> str:
@@ -65,6 +66,10 @@ def is_unofficial_origin(origin: str | None) -> bool:
     return actual != official
 
 
+_BOUND_COLOR = "#008000"
+_UNBOUND_COLOR = "#c62828"
+
+
 def _attribution_line() -> str:
     return (
         f"**{REQUIRED_PHRASE_PRODUCT}** · privat, {REQUIRED_PHRASE_NONCOMMERCIAL} · "
@@ -80,53 +85,180 @@ def _unofficial_message() -> str:
     )
 
 
+def registry_is_bound(report: RegistryReport) -> bool:
+    """True only for a valid (bound) entitlement."""
+    return report.status == "valid"
+
+
+def attribution_registry_suffix(report: RegistryReport) -> str:
+    """Short registry fragment for the attribution caption."""
+    if report.status == "valid":
+        return "· Registry: bound"
+    if report.status == "unbound":
+        return "· Registry: unbound"
+    if report.status == "mismatch":
+        return "· Registry: mismatch"
+    return "· Registry: invalid_sig"
+
+
+def _safe_registry_report() -> RegistryReport | None:
+    try:
+        return registry_status()
+    except Exception:  # noqa: BLE001 — soft path
+        return None
+
+
+def colored_attribution_html(report: RegistryReport) -> str:
+    """HTML for the colored attribution line including registry suffix."""
+    color = _BOUND_COLOR if registry_is_bound(report) else _UNBOUND_COLOR
+    suffix = attribution_registry_suffix(report)
+    body = (
+        f"<strong>{REQUIRED_PHRASE_PRODUCT}</strong> · privat, "
+        f"{REQUIRED_PHRASE_NONCOMMERCIAL} · "
+        f'<a href="{OFFICIAL_REPO_URL}">{OFFICIAL_REPO_URL}</a> · '
+        f"Version {__version__} {suffix}"
+    )
+    return f'<p style="color:{color};font-size:0.875rem;margin:0;">{body}</p>'
+
+
 def soft_registry_caption(report: RegistryReport | None = None) -> str | None:
     """
-    Optional quiet caption for Info / About (never refuse-to-start).
+    Soft status caption for Info / About (never refuse-to-start).
 
-    Returns None when unbound (private use stays calm with no extra line).
+    Short fingerprint for the caption; full FP is shown separately via
+    ``render_registry_status_caption``.
     """
     try:
         status_report = report if report is not None else registry_status()
     except Exception:  # noqa: BLE001 — soft path
         return None
-    fp = status_report.fingerprint_display or status_report.fingerprint[:16]
+    short = status_report.fingerprint_display or (status_report.fingerprint or "")[:16]
     if status_report.status == "unbound":
-        if fp:
-            return f"Hardware-Fingerprint: `{fp}` · Registry: unbound (optional)"
-        return None
+        if short:
+            return f"Registry: unbound (optional) · kurz `{short}`"
+        return "Registry: unbound (optional)"
     if status_report.status == "valid":
-        return f"Hardware-Fingerprint: `{fp}` · Registry: bound"
+        return f"Registry: bound (valid) · kurz `{short}`"
     if status_report.status == "mismatch":
         return (
-            f"Hardware-Fingerprint: `{fp}` · Registry: mismatch "
-            "(entitlement does not match this host)"
+            f"Registry: mismatch · kurz `{short}` "
+            "(earnie_registry.json passt nicht zu diesem Host)"
         )
     return (
-        f"Hardware-Fingerprint: `{fp}` · Registry: invalid "
+        f"Registry: invalid_sig · kurz `{short}` "
         f"({status_report.detail or 'signature'})"
     )
 
 
+def registry_problem_note(report: RegistryReport) -> str | None:
+    """Mild warning text for mismatch / invalid_sig; None otherwise."""
+    if report.status == "mismatch":
+        return (
+            "Hardware-Registry: Fingerprint weicht von `earnie_registry.json` ab. "
+            "Neuen Fingerprint senden und Datei erneut anfordern. "
+            "Earnie startet trotzdem (soft check)."
+        )
+    if report.status == "invalid_sig":
+        return (
+            "Hardware-Registry: Signatur ungültig oder Datei beschädigt "
+            f"({report.detail or 'invalid_sig'}). "
+            "Datei neu anfordern. Earnie startet trotzdem (soft check)."
+        )
+    return None
+
+
+REGISTRY_MAIL_GDPR_DISCLAIMER = (
+    "Datenschutzhinweis (DSGVO):\n"
+    "Ihre E-Mail-Adresse wird nur dann gespeichert, wenn Sie dem unten "
+    "zustimmen — ausschließlich zum Zweck des Supports rund um die "
+    "Registry-Ausstellung. Ohne Zustimmung wird die Adresse nach der "
+    "Bearbeitung nicht gespeichert.\n"
+    "Ich bin mit der Speicherung meiner E-Mail-Adresse für Supportzwecke "
+    "einverstanden:\n"
+    "[ ] Ja\n"
+    "[x] Nein\n"
+)
+
+
+def build_registry_mailto_url(fingerprint: str) -> str:
+    """Mailto to request an entitlement for the given full fingerprint."""
+    from urllib.parse import quote
+
+    fp = (fingerprint or "").strip().lower()
+    subject = "Earnie Registry"
+    body = (
+        "Bitte stellen Sie eine earnie_registry.json für diese Installation aus.\n\n"
+        f"Hardware-Fingerprint (vollständig, 64 Hex):\n{fp}\n\n"
+        "Ablage nach Erhalt: earnie_env/runtime/earnie_registry.json "
+        "(bzw. EARNIE_REGISTRY_PATH).\n\n"
+        f"{REGISTRY_MAIL_GDPR_DISCLAIMER}"
+    )
+    return (
+        f"mailto:{SUPPORT_EMAIL}"
+        f"?subject={quote(subject, safe='')}"
+        f"&body={quote(body, safe='')}"
+    )
+
+
 def render_registry_status_caption() -> None:
-    """Render soft registry line in the active Streamlit container."""
-    line = soft_registry_caption()
-    if line:
+    """Render fingerprint, status, registry mailto, mild problem note."""
+    try:
+        report = registry_status()
+    except Exception:  # noqa: BLE001 — soft path
+        return
+    fp = (report.fingerprint or "").strip()
+    st.markdown("**Hardware-Fingerprint** (vollständig, kopierbar)")
+    if fp:
+        st.code(fp, language=None)
+    else:
+        st.caption("Fingerprint nicht verfügbar.")
+    line = soft_registry_caption(report)
+    if report.status == "valid":
+        st.success(line or "Registry: bound (valid)")
+    elif line:
         st.caption(line)
+    note = registry_problem_note(report)
+    if note:
+        st.warning(note)
+    if bool(fp) and report.status != "valid":
+        st.link_button(
+            "Registry per E-Mail anfordern",
+            build_registry_mailto_url(fp),
+            width="stretch",
+        )
+
+
+def _registry_status_line_html(report: RegistryReport) -> str:
+    """Colored HTML line with only the registry suffix (for unofficial builds)."""
+    color = _BOUND_COLOR if registry_is_bound(report) else _UNBOUND_COLOR
+    suffix = attribution_registry_suffix(report).lstrip("· ").strip()
+    return (
+        f'<p style="color:{color};font-size:0.875rem;margin:0;">{suffix}</p>'
+    )
+
+
+def _render_attribution_to(target) -> None:
+    """Render colored attribution (+ registry) into ``target`` or active container."""
+    unofficial = is_unofficial_origin(resolve_build_origin())
+    report = _safe_registry_report()
+    if unofficial:
+        target.warning(_unofficial_message())
+        if report is not None:
+            target.markdown(
+                _registry_status_line_html(report),
+                unsafe_allow_html=True,
+            )
+        return
+    if report is None:
+        target.caption(_attribution_line())
+        return
+    target.markdown(colored_attribution_html(report), unsafe_allow_html=True)
 
 
 def render_truth_banner(*, where: Literal["sidebar", "main", "inline"]) -> None:
     """Render attribution in sidebar root, main area, or current container."""
-    unofficial = is_unofficial_origin(resolve_build_origin())
     if where == "sidebar":
-        target = st.sidebar
-        if unofficial:
-            target.warning(_unofficial_message())
-        else:
-            target.caption(_attribution_line())
+        _render_attribution_to(st.sidebar)
         return
     # "main" and "inline" use the active Streamlit container (page or expander).
-    if unofficial:
-        st.warning(_unofficial_message())
-    else:
-        st.caption(_attribution_line())
+    _render_attribution_to(st)

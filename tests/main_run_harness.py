@@ -5,7 +5,7 @@ renames a stubbed entry point, update this module — not each test file.
 
 Patched (non-exhaustive of all main imports, but enough for a silent/full run):
   config.reload_config / is_loxone_silent_mode / is_sunrise_planning_horizon /
-  get_event_triggers / get_battery_params
+  get_battery_params
   profile_manager (month check, planning window, matrix)
   loxone_client (flex kw, resolve live power, snapshot, consumers)
   ehal_live.read_ess_soc / read_live_power_kw
@@ -15,8 +15,7 @@ Patched (non-exhaustive of all main imports, but enough for a silent/full run):
   milp_optimizer / battery_plan_kw_from_control / register_consumer_delivery /
   calculate_optimization_savings
   pv_tuner.get_pv_delta_and_update
-  cons_data_store / optimization_history / fetch_trigger_snapshot /
-  collect_thermal_observability
+  cons_data_store / optimization_history / collect_thermal_observability
 """
 from __future__ import annotations
 
@@ -57,7 +56,6 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
     monkeypatch.setattr(main_module.config, "reload_config", lambda: None)
     monkeypatch.setattr(main_module.config, "is_loxone_silent_mode", lambda: silent)
     monkeypatch.setattr(main_module.config, "is_sunrise_planning_horizon", lambda: True)
-    monkeypatch.setattr(main_module.config, "get_event_triggers", lambda: [])
     monkeypatch.setattr(
         main_module.profile_manager,
         "check_and_update_profile_if_new_month",
@@ -132,5 +130,4 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
     monkeypatch.setattr(main_module.optimization_history, "append_production_run", lambda _p: None)
     monkeypatch.setattr(main_module.pv_tuner, "get_pv_delta_and_update", lambda: 0.0)
     monkeypatch.setattr(main_module, "collect_thermal_observability", lambda *a, **k: [])
-    monkeypatch.setattr(main_module, "fetch_trigger_snapshot", lambda _specs: {})
     monkeypatch.setattr(main_module.optimizer, "calculate_optimization_savings", lambda *a, **k: None)

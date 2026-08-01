@@ -77,8 +77,7 @@ Prüfung aller konfigurierten Signale:
 | Entity / Bereich | Speicherort | Typische EHAL-Felder / Rollen |
 |------------------|-------------|-------------------------------|
 | Anlage (Batterie, PV, Netz, Steuerbefehl, Hauslast, Außentemperatur) | `house_profiles.json` → `plant.ehal_bindings` | `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_power_consumers`, `set_ess_*` |
-| Event-Trigger (Anlage) | `house_profiles.json` → `plant.event_triggers[]` | `ehal_field` (+ `signal_type`, `on_change`, `label`); Adresse aus Binding |
-| Event-Trigger (Verbraucher) | `consumers[].event_triggers[]` | gleiches Schema, Scope = Consumer-Entity |
+| Request Optimize (außerplanmäßig) | Loxone VO → Daemon-HTTP | `Earnie_Request_Optimize` auf Port `system.ehal_loxone_http_port` (Standard **8541**) |
 | Wärmepumpe / Flex / Thermal | `consumers[].ehal_bindings` | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`, `flex.{slug}.set_power_setpoint` |
 | E-Auto (`ev`) | `consumers[].ehal_bindings` | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*` |
 | Pool / SwimSpa | `consumers[].ehal_bindings` + Filter-Entity | siehe Greenfield `Earnie_Pool_*` / C.6 |
@@ -133,23 +132,22 @@ SwimSpa u. Ä. behalten projektspezifische Namen (z. B. `Earnie_SwimSpa_Frei
 | `get_evcs_ready_by_time` | Lesen | AlarmClock-**Bezeichnung** (z. B. `Ladewecker` / `Wecker_Smart`; Import merged auf EV mit Zähler) | Ausgang **Tna** via `/jdev/sps/io/{name}/all` (Text z. B. `Morgen, 11:00`). Kein Virtual-Out-String. |
 | `get_evcs_limit_soc` | Lesen | `Earnie_EAuto_LimitSOC` | Ladeziel-SOC % |
 | `set_evcs_max_current` | Schreiben | `Earnie_EAuto_Soll_A` | Soll-/Maxstrom A |
-| `set_evcs_mode` | Schreiben | `Earnie_EAuto_Modus` | `pv` \| `now` |
+| `set_evcs_mode` | Schreiben | `Earnie_EAuto_Modus` | `off`=0 \| `pv`=1 \| `now`=2 |
 
 Zusätzlich Pflichtfeld **`min_power_kw`** am Verbraucher. SwimSpa-Filter-Overrides können noch unter `swimspa_filter_bindings` liegen (Bridge-Defaults); Pflege der Haupt-Merker über EHAL-Com. Greenfield-Pool: Prefix `Earnie_Pool_*` / `Earnie_Pool_Filter_*` (siehe [ehal-com.md](../ui/ehal-com.md) §C.6); bestehende SwimSpa-Namen bleiben gültig.
 
-## Event-Trigger (an Entities)
+## Request Optimize (außerplanmäßige Läufe)
 
-Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden). Konfiguration in `house_profiles.json` an **Plant** oder **Verbraucher** — **nicht** mehr unter `config.json` → `system.event_triggers`.
+Außerplanmäßige Optimierungsläufe in `main.py` (zwischen den Viertelstunden) über Loxone → Earnie HTTP — **nicht** mehr über Merker-Event-Trigger in Config oder Hausprofil.
 
-| Feld | Bedeutung |
-|------|-----------|
-| `id` | Kennung für Logs und `run_trigger` (z. B. `eauto_plugged_in`) |
-| `ehal_field` | EHAL-Feld derselben Entity; Adresse aus `ehal_bindings` |
-| `signal_type` | `binary` (0/1) oder `text` oder `analog` |
-| `on_change` | `binary`: `any` / `rising` / `falling`; `text`/`analog`: `any` |
-| `label` | Anzeigename (optional) |
+| Element | Bedeutung |
+|---------|-----------|
+| Virtual Out | Vorlage `share/loxone/templates/VirtualOut/VO_Earnie_Status.xml` |
+| Address | `http://EARNIE_HOST:8541` (Port = `system.ehal_loxone_http_port`, Standard **8541**) |
+| Cmd `Earnie_Request_Optimize` | `POST /ehal/loxone/request_optimize` — weckt den Daemon vor der nächsten Viertelstunde |
+| Cmd `Earnie_Push_Alive` / Alive | `GET /ehal/loxone/alive` — Erreichbarkeitscheck |
 
-`verify_loxone_setup` prüft alle aggregierten Trigger.
+Compose-Produktiv-Stacks veröffentlichen den Container-Port **8541** (siehe [Streamlit-Ports](streamlit-ports.md)).
 
 ## Beispiel-Mapping
 

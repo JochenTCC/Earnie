@@ -114,6 +114,11 @@ def test_valid_setpoint_evcs_mode():
     assert validate_setpoint(doc)["set_evcs_mode"] == "pv"
 
 
+def test_valid_setpoint_evcs_mode_off():
+    doc = _envelope(set_evcs_mode="off")
+    assert validate_setpoint(doc)["set_evcs_mode"] == "off"
+
+
 def test_valid_setpoint_ess_mode():
     doc = _envelope(set_ess_mode="auto")
     assert validate_setpoint(doc)["set_ess_mode"] == "auto"

@@ -11,8 +11,7 @@ def _write_minimal_config(tmp_path, system_extra: dict | None = None) -> tuple[s
     system = {
         "global_timeout": 10,
         "loop_timeout": 900,
-        "event_trigger_enabled": True,
-        "event_triggers": [],
+        "ehal_loxone_http_port": 8541,
     }
     if system_extra:
         system.update(system_extra)

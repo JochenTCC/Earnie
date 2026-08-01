@@ -11,6 +11,7 @@ from optimizer.consumer_power import (
     clamp_setpoint_kw,
     loxone_control_outputs,
     power_limits_kw,
+    set_evcs_mode_for_plan,
     uses_power_setpoint,
     uses_pv_follow,
 )
@@ -71,3 +72,9 @@ class TestConsumerPowerHelpers:
         }
         with pytest.raises(ValueError, match="min_power_kw"):
             power_limits_kw(consumer)
+
+    def test_set_evcs_mode_for_plan(self):
+        assert set_evcs_mode_for_plan(pv_follow=0, immediate=True) == "now"
+        assert set_evcs_mode_for_plan(pv_follow=1, immediate=False) == "pv"
+        assert set_evcs_mode_for_plan(pv_follow=0, immediate=False) == "off"
+        assert set_evcs_mode_for_plan(pv_follow=1, immediate=True) == "now"

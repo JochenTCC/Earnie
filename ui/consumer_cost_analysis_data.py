@@ -66,6 +66,8 @@ class CostAnalysisSlot:
     battery_discharge_kwh: float
     charge_from_pv_kwh: float
     charge_from_grid_kwh: float
+    discharge_to_load_kwh: float
+    export_from_battery_kwh: float
     house_grid_cost_euro: float
 
 
@@ -83,6 +85,8 @@ class PeriodTotals:
     battery_discharge_kwh: float
     charge_from_pv_kwh: float
     charge_from_grid_kwh: float
+    discharge_to_load_kwh: float
+    export_from_battery_kwh: float
     slot_count: int
 
 
@@ -180,6 +184,8 @@ def build_slot_from_powers(
         battery_discharge_kwh=round(flows.discharge_kw * dt_hours, 6),
         charge_from_pv_kwh=round(flows.charge_from_pv * dt_hours, 6),
         charge_from_grid_kwh=round(flows.charge_from_grid * dt_hours, 6),
+        discharge_to_load_kwh=round(flows.discharge_to_load * dt_hours, 6),
+        export_from_battery_kwh=round(flows.export_from_battery * dt_hours, 6),
         house_grid_cost_euro=round(house_grid_cost, 6),
     )
 
@@ -422,11 +428,14 @@ def aggregate_slots(slots: Sequence[CostAnalysisSlot]) -> PeriodTotals:
     by_id: dict[str, list[float]] = {}
     energy = pv = batt = grid = cost = 0.0
     charge = discharge = charge_pv = charge_grid = 0.0
+    discharge_load = export_batt = 0.0
     for slot in slots:
         charge += slot.battery_charge_kwh
         discharge += slot.battery_discharge_kwh
         charge_pv += slot.charge_from_pv_kwh
         charge_grid += slot.charge_from_grid_kwh
+        discharge_load += slot.discharge_to_load_kwh
+        export_batt += slot.export_from_battery_kwh
         for share in slot.shares:
             bucket = by_id.setdefault(share.consumer_id, [0.0, 0.0, 0.0, 0.0])
             bucket[0] += share.pv_kwh
@@ -461,5 +470,7 @@ def aggregate_slots(slots: Sequence[CostAnalysisSlot]) -> PeriodTotals:
         battery_discharge_kwh=round(discharge, 4),
         charge_from_pv_kwh=round(charge_pv, 4),
         charge_from_grid_kwh=round(charge_grid, 4),
+        discharge_to_load_kwh=round(discharge_load, 4),
+        export_from_battery_kwh=round(export_batt, 4),
         slot_count=len(slots),
     )

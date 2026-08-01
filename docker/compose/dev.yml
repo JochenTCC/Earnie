@@ -27,8 +27,10 @@ services:
     container_name: earnie
     restart: unless-stopped
     # Host 8521 → Container 8501 (ui.streamlit_port im Container bleibt 8501).
+    # Host 8541 → Daemon Earnie_Request_Optimize /alive.
     ports:
       - "8521:8501"
+      - "8541:8541"
     volumes: *persist-volumes
     environment:
       <<: *common-env

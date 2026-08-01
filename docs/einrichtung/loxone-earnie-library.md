@@ -43,7 +43,7 @@ Quelle: `share/loxone/templates/VirtualOut/`
 
 | Datei | Inhalt (Kurz) |
 | ----- | ------------- |
-| `VO_Earnie_Status.xml` | optional alive / request_optimize |
+| `VO_Earnie_Status.xml` | optional alive / `Earnie_Request_Optimize` (Port **8541**) |
 | `VO_Earnie_Plant.xml` | Plant `sens_*`, Außentemperatur |
 | `VO_Earnie_EV.xml` | EV-Telemetrie |
 | `VO_Earnie_Heatpump.xml` | `Earnie_Waermepumpe_Leistung` |
@@ -56,15 +56,17 @@ Danach **Loxone Config neu starten**. Die Vorlagen erscheinen unter Peripherie /
 
 ## 2. Earnie-Adresse setzen
 
-In jedem eingefügten Virtual-In/Out den Platzhalter `EARNIE_HOST` durch die LAN-IP bzw. den Hostnamen von Earnie ersetzen (Port typisch **8501** im Compose-Stack, siehe [Streamlit-Ports](../referenz/streamlit-ports.md)).
+In jedem eingefügten Virtual-In/Out den Platzhalter `EARNIE_HOST` durch die LAN-IP bzw. den Hostnamen von Earnie ersetzen. UI/Streamlit typisch Port **8501**; **Status-VO** (`VO_Earnie_Status.xml` mit `Earnie_Request_Optimize` / Alive) nutzt Port **8541** (`system.ehal_loxone_http_port`). Siehe [Streamlit-Ports](../referenz/streamlit-ports.md).
 
-Beispiel Virtual In Address:
+Beispiel Virtual In Address (Platzhalter-Status-JSON):
 
 `http://192.168.178.10:8501/ehal/loxone/status.json`
 
-Virtual Out Address (Basis):
+Virtual Out Address **Status / Request Optimize**:
 
-`http://192.168.178.10:8501`
+`http://192.168.178.10:8541`
+
+Andere Telemetrie-VO-Drafts können noch `:8501` als Platzhalter tragen, bis die Endpunkte existieren.
 
 Polling / Cmd-Check-Muster erst anpassen, wenn Earnie echte JSON-Keys liefert; bis dahin reichen stabile **Titles** für Core und Greenfield-Import.
 

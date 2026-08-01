@@ -27,51 +27,12 @@
         "type": "string"
       }
     },
-    "event_trigger": {
-      "type": "object",
-      "required": [
-        "id",
-        "ehal_field",
-        "signal_type",
-        "on_change"
-      ],
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "ehal_field": {
-          "type": "string",
-          "description": "EHAL field on the same entity; address from ehal_bindings[ehal_field]."
-        },
-        "signal_type": {
-          "type": "string",
-          "enum": [
-            "binary",
-            "text",
-            "analog"
-          ]
-        },
-        "on_change": {
-          "type": "string",
-          "description": "binary: any|rising|falling; text/analog: any."
-        },
-        "label": {
-          "type": "string"
-        }
-      }
-    },
     "plant": {
       "type": "object",
-      "description": "House-wide plant entity: grid/PV/ESS bindings and house-level event triggers.",
+      "description": "House-wide plant entity: grid/PV/ESS bindings.",
       "properties": {
         "ehal_bindings": {
           "$ref": "#/definitions/ehal_bindings"
-        },
-        "event_triggers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/event_trigger"
-          }
         }
       }
     },
@@ -452,12 +413,6 @@
         },
         "ehal_bindings": {
           "$ref": "#/definitions/ehal_bindings"
-        },
-        "event_triggers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/event_trigger"
-          }
         },
         "loxone_inputs": {
           "$ref": "#/definitions/loxone_inputs"

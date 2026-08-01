@@ -56,7 +56,7 @@ def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypat
 
     share_dir = tmp_path / "share" / "config"
     share_dir.mkdir(parents=True)
-    example_payload = {"system": {"event_triggers": []}, "market_prices": {}}
+    example_payload = {"system": {"loop_timeout": 900}, "market_prices": {}}
     schema_payload = {"title": "schema"}
     deviation_example_payload = {"version": 1, "rules": []}
     deviation_schema_payload = {"title": "deviation-schema"}
@@ -93,7 +93,7 @@ def test_bootstrap_copies_config_templates_from_image_bundle(tmp_path, monkeypat
     assert deviation_example_path.is_file()
     assert deviation_schema_path.is_file()
     assert deviation_rules_path.is_file()
-    assert json.loads(example_path.read_text(encoding="utf-8"))["system"]["event_triggers"] == []
+    assert json.loads(example_path.read_text(encoding="utf-8"))["system"]["loop_timeout"] == 900
     assert json.loads(schema_path.read_text(encoding="utf-8"))["title"] == "schema"
     assert json.loads(deviation_example_path.read_text(encoding="utf-8"))["version"] == 1
     assert json.loads(deviation_rules_path.read_text(encoding="utf-8"))["version"] == 1

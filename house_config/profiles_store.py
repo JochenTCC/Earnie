@@ -49,11 +49,6 @@ def _copy_ehal_entity_fields(raw: dict, spec: dict) -> None:
             spec["ehal_bindings"] = (
                 expand_flex_bindings(cleaned, cid) if cid else cleaned
             )
-    triggers = raw.get("event_triggers")
-    if isinstance(triggers, list) and triggers:
-        spec["event_triggers"] = [dict(item) for item in triggers if isinstance(item, dict)]
-
-
 def _legacy_loxone_power_name(raw: dict) -> str:
     rec = raw.get("appliance_recommendation")
     if isinstance(rec, dict):
@@ -424,9 +419,6 @@ def _normalize_plant(raw: dict | None) -> dict:
         }
         if cleaned:
             out["ehal_bindings"] = cleaned
-    triggers = raw.get("event_triggers")
-    if isinstance(triggers, list) and triggers:
-        out["event_triggers"] = [dict(item) for item in triggers if isinstance(item, dict)]
     return out
 
 
@@ -505,8 +497,6 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
 def _attach_ehal_entity_fields(out: dict, consumer: dict) -> None:
     if consumer.get("ehal_bindings"):
         out["ehal_bindings"] = dict(consumer["ehal_bindings"])
-    if consumer.get("event_triggers"):
-        out["event_triggers"] = [dict(item) for item in consumer["event_triggers"]]
 
 
 def _serialize_consumer(consumer: dict) -> dict:

@@ -321,19 +321,6 @@ def write_ess_limits_from_huawei(
     return write_ess_setpoints_from_control(mode, target_power_kw)
 
 
-def clamp_ess_test_target_kw(
-    target_power_kw: float, max_power_kw: float | None = None
-) -> float:
-    """Non-negative target kW, capped by battery max when max > 0."""
-    if max_power_kw is None:
-        max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
-    max_kw = max(0.0, float(max_power_kw))
-    target = abs(float(target_power_kw))
-    if max_kw > 0.0:
-        return min(target, max_kw)
-    return target
-
-
 def push_safe_setpoints_on_startup() -> None:
     """Force-write safe ESS/flex setpoints once at daemon start (before first optimize).
 
@@ -399,51 +386,6 @@ def _push_safe_setpoints_loxone() -> None:
         "Startup: sichere Loxone-Sollwerte teilweise fehlgeschlagen (%s Feld(er)).",
         len(failed),
     )
-
-
-def force_write_ess_test_setpoints(
-    mode: int,
-    target_power_kw: float,
-    *,
-    max_power_kw: float | None = None,
-) -> tuple[str | None, list[dict[str, Any]], str]:
-    """Manual ESS C1 test write — same southbound path as ``main.py``.
-
-    Returns ``(error_message_or_None, write_records, backend_label)``.
-    Caller must ensure the optimizer daemon is stopped before invoking.
-    """
-    if config.is_loxone_silent_mode():
-        return "Silent-Modus aktiv — keine Steuerwerte.", [], "silent"
-    if max_power_kw is None:
-        max_power_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
-    target = clamp_ess_test_target_kw(target_power_kw, max_power_kw)
-    if is_ehal_network_backend():
-        return _force_write_ess_network(mode, target, float(max_power_kw))
-    return _force_write_ess_loxone(mode, target)
-
-
-def _force_write_ess_network(
-    mode: int, target_kw: float, max_power_kw: float
-) -> tuple[str | None, list[dict[str, Any]], str]:
-    backend = "HA" if is_ha_backend() else "OpenEMS"
-    error, records = write_ess_setpoints_from_control(mode, target_kw, max_power_kw)
-    if error is None:
-        clear_write_error()
-        return None, records, backend
-    return str(error.get("message") or "EHAL Schreibfehler"), records, backend
-
-
-def _force_write_ess_loxone(
-    mode: int, target_kw: float
-) -> tuple[str | None, list[dict[str, Any]], str]:
-    from integrations.loxone_comm_trace import serialize_write_records
-
-    raw = loxone_client.send_huawei_modbus_states(mode, target_kw, 0.0)
-    records = serialize_write_records(raw)
-    failed = [row for row in records if not row.get("success")]
-    if failed:
-        return f"Loxone-Schreibfehler ({len(failed)} Feld(er))", records, "Loxone"
-    return None, records, "Loxone"
 
 
 def write_evcs_max_current_from_consumers(

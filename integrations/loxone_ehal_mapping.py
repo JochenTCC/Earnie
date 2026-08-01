@@ -69,7 +69,7 @@ except ImportError:  # pragma: no cover
         "set_ess_discharge_power_limit": "Setpoint Entladegrenze (W)",
         "set_ess_mode": "Setpoint ESS-Modus / Steuerbefehl (Hinweis)",
         "set_evcs_max_current": "Setpoint Wallbox-Maxstrom (A)",
-        "set_evcs_mode": "Setpoint Wallbox-Modus (pv|now)",
+        "set_evcs_mode": "Setpoint Wallbox-Modus (off|pv|now)",
     }
 
 _HINTS: dict[str, tuple[str, ...]] = {

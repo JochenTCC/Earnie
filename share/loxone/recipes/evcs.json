@@ -55,7 +55,7 @@
       "ehal_field": "set_evcs_mode",
       "loxone_blocks_key": "set_evcs_mode",
       "suggested_name": "Earnie_EAuto_Modus",
-      "notes": "Enum pv | now (encoding as agreed in Config)."
+      "notes": "Enum off | pv | now (Loxone Merker: 0 / 1 / 2)."
     }
   ],
   "reference": "docs/referenz/loxone-signale.md"

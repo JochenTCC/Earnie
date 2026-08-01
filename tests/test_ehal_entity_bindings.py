@@ -1,10 +1,8 @@
-"""Tests for 2.4.k plant/consumer ehal_bindings migration and trigger aggregation."""
+"""Tests for 2.4.k plant/consumer ehal_bindings migration."""
 from __future__ import annotations
 
 from house_config.ehal_bindings import (
-    aggregate_event_triggers,
     ensure_migrated,
-    migrate_config_triggers_to_plant,
     migrate_consumer_legacy_to_ehal_bindings,
     migrate_loxone_blocks_to_plant,
     resolve_plant_binding,
@@ -12,7 +10,6 @@ from house_config.ehal_bindings import (
 )
 from settings.config_loaders import load_loxone_block_params
 from settings.ehal_marker_resolve import marker_sens_evcs_connected, marker_set_evcs_max_current
-from settings.system_settings import load_event_triggers
 
 
 def test_migrate_loxone_blocks_to_plant():
@@ -77,45 +74,18 @@ def test_migrate_consumer_flex_power_setpoint():
     assert "set_evcs_max_current" not in bindings
 
 
-def test_migrate_config_triggers_to_plant_event_stub():
-    triggers, bindings = migrate_config_triggers_to_plant(
-        [
-            {
-                "id": "plug",
-                "loxone_name": "Merker_A",
-                "signal_type": "binary",
-                "on_change": "rising",
-                "label": "EV",
-            }
-        ],
-        {"sens_grid_power_active": "Grid_P"},
-    )
-    assert triggers[0]["ehal_field"] == "event.plug"
-    assert bindings["event.plug"] == "Merker_A"
-    assert bindings["sens_grid_power_active"] == "Grid_P"
+def test_resolve_plant_binding_dual_read_blocks():
+    house = {"plant": {"ehal_bindings": {}}}
+    config = {"loxone_blocks": {"soc_name": "Battery_SOC"}}
+    assert resolve_plant_binding(house, "sens_ess_soc", config) == "Battery_SOC"
+    house2 = {"plant": {"ehal_bindings": {"sens_ess_soc": "Plant_SOC"}}}
+    assert resolve_plant_binding(house2, "sens_ess_soc", config) == "Plant_SOC"
 
 
-def test_migrate_config_triggers_reuses_existing_binding():
-    triggers, bindings = migrate_config_triggers_to_plant(
-        [
-            {
-                "id": "plug",
-                "loxone_name": "EV_Da",
-                "signal_type": "binary",
-                "on_change": "rising",
-                "label": "EV",
-            }
-        ],
-        {"sens_evcs_connected": "EV_Da"},
-    )
-    assert triggers[0]["ehal_field"] == "sens_evcs_connected"
-    assert "event.plug" not in bindings
-
-
-def test_aggregate_resolves_loxone_name():
+def test_ensure_migrated_strips_triggers_keeps_bindings():
     house = {
         "plant": {
-            "ehal_bindings": {"event.plug": "Merker_A"},
+            "ehal_bindings": {},
             "event_triggers": [
                 {
                     "id": "plug",
@@ -132,7 +102,6 @@ def test_aggregate_resolves_loxone_name():
                 "consumers": [
                     {
                         "id": "ev1",
-                        "ehal_bindings": {"sens_evcs_connected": "EV_Da"},
                         "event_triggers": [
                             {
                                 "id": "ev_plug",
@@ -147,23 +116,6 @@ def test_aggregate_resolves_loxone_name():
             }
         ],
     }
-    specs = aggregate_event_triggers(house)
-    assert len(specs) == 2
-    by_id = {s["id"]: s for s in specs}
-    assert by_id["plug"]["loxone_name"] == "Merker_A"
-    assert by_id["ev_plug"]["loxone_name"] == "EV_Da"
-
-
-def test_resolve_plant_binding_dual_read_blocks():
-    house = {"plant": {"ehal_bindings": {}}}
-    config = {"loxone_blocks": {"soc_name": "Battery_SOC"}}
-    assert resolve_plant_binding(house, "sens_ess_soc", config) == "Battery_SOC"
-    house2 = {"plant": {"ehal_bindings": {"sens_ess_soc": "Plant_SOC"}}}
-    assert resolve_plant_binding(house2, "sens_ess_soc", config) == "Plant_SOC"
-
-
-def test_ensure_migrated_and_strip_triggers():
-    house = {"profiles": [{"id": "live", "consumers": []}]}
     config = {
         "loxone_blocks": {
             "soc_name": "Battery_SOC",
@@ -179,35 +131,20 @@ def test_ensure_migrated_and_strip_triggers():
                     "on_change": "rising",
                     "label": "EV",
                 }
-            ]
+            ],
+            "event_trigger_enabled": True,
+            "event_poll_interval_sec": 60,
         },
     }
     new_house, new_config, changed = ensure_migrated(house, config)
     assert changed is True
     assert new_house["plant"]["ehal_bindings"]["sens_ess_soc"] == "Battery_SOC"
-    assert new_house["plant"]["event_triggers"][0]["id"] == "plug"
+    assert "event_triggers" not in new_house["plant"]
+    assert "event_triggers" not in new_house["profiles"][0]["consumers"][0]
     stripped = strip_migrated_config_keys(new_config)
-    assert stripped["system"]["event_triggers"] == []
+    assert "event_triggers" not in stripped.get("system", {})
+    assert "event_trigger_enabled" not in stripped.get("system", {})
     assert "loxone_blocks" not in stripped
-
-
-def test_load_event_triggers_migrates_from_config():
-    config = {
-        "system": {
-            "event_triggers": [
-                {
-                    "id": "plug",
-                    "loxone_name": "Merker_A",
-                    "signal_type": "binary",
-                    "on_change": "rising",
-                    "label": "EV",
-                }
-            ]
-        }
-    }
-    triggers = load_event_triggers(config, house_doc={})
-    assert len(triggers) == 1
-    assert triggers[0]["loxone_name"] == "Merker_A"
 
 
 def test_load_loxone_block_params_prefers_plant_bindings(tmp_path):

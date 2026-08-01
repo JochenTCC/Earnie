@@ -1,9 +1,9 @@
-# Hardware registry & Banner Layer C (2.4.i spike)
+# Hardware registry & Banner Layer C
 
-**Status:** Design + non-enforcing spike (2026-07-28).  
-**Related:** Banner A + light B (`ui/truth_banner.py`, shipped 2.2.0); plan outline `.cursor/plans/banner_der_wahrheit_0dfdf6a6.plan.md`; Entwicklungsplan §6 (hardware lock).
+**Status:** Soft first approach shipped under **2.4.q** (Ed25519 entitlement verify; 2026-08-01). Spike **2.4.i** archived.  
+**Related:** Banner A + light B (`ui/truth_banner.py`); Entwicklungsplan §6 (hardware lock).
 
-This document answers backlog **2.4.i**: how a user obtains a one-time registry bound to hardware, and what technical prerequisites Layer C needs. Enforcement (signed GHCR builds, refuse-to-start / watermark) is **deferred**.
+This document describes how a user obtains a one-time registry bound to hardware, and what remains deferred for full Layer C. Enforcement (signed GHCR builds, refuse-to-start / watermark) stays under backlog **`2.+1`**.
 
 ---
 
@@ -15,13 +15,13 @@ This document answers backlog **2.4.i**: how a user obtains a one-time registry 
    python -m scripts.print_hardware_fingerprint
    ```
 
-2. They see a **hardware fingerprint** (SHA-256 hex, display may truncate to 16 chars) derived from southbound system ID(s) + host machine id.
+2. They see the **full 64-char hardware fingerprint** (copyable in Info / About; short form may appear in captions) derived from southbound system ID(s) + host machine id.
 
-3. User sends that fingerprint once (existing contact mailto today; Cloud portal later) and receives an entitlement file `earnie_registry.json` bound to that fingerprint.
+3. User sends that fingerprint once (**Registry per E-Mail anfordern** mailto, or general contact) and receives an entitlement file `earnie_registry.json` bound to that fingerprint.
 
 4. User places the file in the env runtime directory (default name `earnie_registry.json`), or sets `EARNIE_REGISTRY_PATH`.
 
-5. Soft checker reports `unbound` | `valid` | `mismatch` | `invalid_sig`. **Unbound remains valid private use** — no start block in this spike.
+5. Soft checker reports `unbound` | `valid` | `mismatch` | `invalid_sig`. **Unbound remains valid private use** — no start block.
 
 6. **Future Layer C only:** official sealed images may require a valid entitlement *or* show an indelible watermark. Source forks stay unsupported; we do not claim forks keep the banner.
 
@@ -34,8 +34,8 @@ This document answers backlog **2.4.i**: how a user obtains a one-time registry 
 
 Canonical parts (omit empty values):
 
-| Key | Source (spike) |
-|-----|----------------|
+| Key | Source |
+|-----|--------|
 | `host` | Linux `/etc/machine-id`; Windows `MachineGuid` (fail soft) |
 | `loxone` | `EARNIE_LOXONE_SERIAL` (env); live Miniserver scrape later |
 | `ha` | `EARNIE_HA_INSTANCE_ID` (env placeholder) |
@@ -55,7 +55,7 @@ Implementation: `runtime_store/hardware_identity.py`.
 
 ---
 
-## 3. Entitlement JSON (dev PoC)
+## 3. Entitlement JSON (2.4.q first approach)
 
 Schema: `share/registry/entitlement.schema.json`.
 
@@ -64,17 +64,19 @@ Schema: `share/registry/entitlement.schema.json`.
 | `fingerprint` | Full SHA-256 hex of bound hardware |
 | `issued_at` | ISO-8601 UTC |
 | `expires_at` | ISO-8601 UTC or `null` (one-time forever) |
-| `issuer` | e.g. `earnie-dev` |
-| `sig_alg` | spike: `hmac-sha256` |
-| `sig` | Hex HMAC over canonical payload (see below) |
+| `issuer` | e.g. `earnie` |
+| `sig_alg` | official: `ed25519`; local/test fallback: `hmac-sha256` |
+| `sig` | Hex signature over canonical payload |
 
 **Signing payload (UTF-8, no trailing newline):**
 
 ```text
-fingerprint={fp}\nissued_at={…}\nexpires_at={null|iso}\nissuer={…}\nsig_alg=hmac-sha256
+fingerprint={fp}\nissued_at={…}\nexpires_at={null|iso}\nissuer={…}\nsig_alg=ed25519
 ```
 
-**Dev only:** verify with `EARNIE_REGISTRY_DEV_SECRET`. Not for production. Prod Layer C will use asymmetric keys + offline public key in the image.
+**Official path:** issue with Ed25519 private key (`EARNIE_REGISTRY_PRIVATE_KEY_PATH`, operator-only — never in git/image). Verify with bundled public key `share/registry/earnie_registry_pubkey.pem` (override: `EARNIE_REGISTRY_PUBLIC_KEY_PATH`).
+
+**Local/test fallback:** HMAC with `EARNIE_REGISTRY_DEV_SECRET` and issuer `--hmac`. Not for customer hand-outs.
 
 Issuer script: `python -m scripts.issue_dev_registry_token --fingerprint … --out path`.
 
@@ -84,13 +86,13 @@ Loader / soft status: `runtime_store/registry_entitlement.py` → `registry_stat
 
 ## 4. Technical prerequisites (Layer C later)
 
-| Layer | Prerequisite | After 2.4.i |
+| Layer | Prerequisite | After 2.4.q |
 |-------|--------------|-------------|
-| Identity | Stable southbound IDs + host fallback | Spike helper |
-| Entitlement | Signed JSON + issuer key | Dev HMAC schema + scripts |
+| Identity | Stable southbound IDs + host fallback | Soft helper |
+| Entitlement | Signed JSON + issuer key | **Ed25519** + bundled pubkey; HMAC test fallback |
 | Distribution | GHCR attestation (cosign/Sigstore); `permissions: id-token: write` + `packages: write` on `.github/workflows/release.yml` | Documented only — **release.yml unchanged** |
 | Verifier | Check image attestation + entitlement; refuse **or** indelible watermark | Soft UI status only |
-| Offline / air-gap | Bundled public key; no phone-home required for verify | Called out; not implemented |
+| Offline / air-gap | Bundled public key; no phone-home for entitlement verify | **Public key bundled**; Cosign still deferred |
 | Policy | LICENSE §2 commercial exceptions stay manual | Non-goal |
 
 ### GHCR attestation outline (not wired)
@@ -104,9 +106,9 @@ After multi-arch push in release workflow:
 
 ---
 
-## 5. Soft UI (spike)
+## 5. Soft UI (2.4.q)
 
-Info / About shows fingerprint + registry status caption. Status `mismatch` / `invalid_sig` → quiet caption note. Never `st.error` refuse; never change unofficial-origin (Layer B) logic; never block `app.py` / `main.py` startup.
+Info / About shows full copyable fingerprint, registry status caption (`unbound` / `valid`→bound / `mismatch` / `invalid_sig`), dedicated registry mailto, and a mild warning on `mismatch` / `invalid_sig`. The attribution caption (Banner der Wahrheit) appends a short registry suffix and is colored green when `valid`, red otherwise. Never refuse-to-start; never change unofficial-origin (Layer B) logic; never block `app.py` / `main.py` startup.
 
 ---
 
@@ -126,4 +128,4 @@ Layer A/B remain **tamper-resistant, not tamper-proof**. Layer C enforces attrib
 
 ## 7. Deferred follow-up
 
-**Layer C enforcement:** cosign in CI + startup verifier + production signing keys + watermark vs refuse decision. Tracked under backlog `2.+1` after archiving 2.4.i.
+**Layer C enforcement:** cosign in CI + startup verifier + watermark vs refuse decision. Tracked under backlog `2.+1`.

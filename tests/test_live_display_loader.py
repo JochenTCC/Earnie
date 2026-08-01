@@ -107,6 +107,8 @@ def test_savings_info_from_snapshot_recomputes_hourly_series():
     info = savings_info_from_snapshot(snapshot)
     assert info["hourly_optimized_cost_euro"] == [0.3]
     assert info["hourly_matched_baseline_cost_euro"] == [0.36]
+    assert info["hourly_optimized_consumption_kwh"] == [1.0]
+    assert info["hourly_matched_baseline_consumption_kwh"] == [1.2]
 
 
 def test_chart2_sa1_sa2_snapshot_bundle_has_nonzero_hourly_costs():

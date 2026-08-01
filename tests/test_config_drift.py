@@ -57,7 +57,7 @@ def test_find_config_drift_no_legacy_blocks_for_2_0_migrated_config():
     """2.0 configs omit root eauto_milp, appliances[], system.loxone_silent_mode."""
     example = {
         "market_prices": {"missing_price_strategy": "forecast"},
-        "system": {"global_timeout": 10, "event_triggers": []},
+        "system": {"global_timeout": 10, "ehal_loxone_http_port": 8541},
         "flexible_consumers": [],
         "live_scenario_id": "live",
     }
@@ -65,8 +65,7 @@ def test_find_config_drift_no_legacy_blocks_for_2_0_migrated_config():
         "market_prices": {"missing_price_strategy": "forecast"},
         "system": {
             "global_timeout": 10,
-            "event_trigger_enabled": True,
-            "event_triggers": [],
+            "ehal_loxone_http_port": 8541,
         },
         "flexible_consumers": [],
         "live_scenario_id": "live",
@@ -83,12 +82,12 @@ def test_find_config_drift_ignores_legacy_blocks_when_example_stale_2_0_actual()
         "batteries": [{"id": "default_5kwh"}],
         "pv_systems": [{"id": "roof_south"}],
         "appliances": [{"id": "waschmaschine"}],
-        "system": {"global_timeout": 10, "loxone_silent_mode": True, "event_triggers": []},
+        "system": {"global_timeout": 10, "loxone_silent_mode": True},
         "flexible_consumers": [],
         "live_scenario_id": "live",
     }
     actual = {
-        "system": {"global_timeout": 10, "event_triggers": []},
+        "system": {"global_timeout": 10},
         "flexible_consumers": [],
         "live_scenario_id": "live",
     }

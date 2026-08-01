@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/registry/entitlement.schema.json",
-  "title": "Earnie hardware registry entitlement (2.4.i spike)",
-  "description": "One-time entitlement bound to a hardware fingerprint. Spike uses HMAC-SHA256 with EARNIE_REGISTRY_DEV_SECRET — not production Layer C.",
+  "title": "Earnie hardware registry entitlement (2.4.q first approach)",
+  "description": "One-time entitlement bound to a hardware fingerprint. Official path: Ed25519 with bundled public key. HMAC-SHA256 remains a local/test fallback only.",
   "type": "object",
   "required": [
     "fingerprint",
@@ -38,13 +38,13 @@
     },
     "sig_alg": {
       "type": "string",
-      "enum": ["hmac-sha256"]
+      "enum": ["ed25519", "hmac-sha256"]
     },
     "sig": {
       "type": "string",
       "minLength": 64,
       "pattern": "^[0-9a-fA-F]+$",
-      "description": "Hex HMAC over canonical signing payload"
+      "description": "Hex signature over canonical signing payload (Ed25519 or HMAC)"
     }
   },
   "additionalProperties": false

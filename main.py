@@ -19,11 +19,10 @@ from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
 from optimizer.thermal_targets import collect_thermal_observability
-from optimizer.event_trigger import (
+from optimizer.run_trigger import (
     TRIGGER_QUARTER_HOUR,
-    fetch_trigger_snapshot,
-    is_event_trigger,
-    snapshot_from_run_state,
+    TRIGGER_REQUEST_OPTIMIZE,
+    is_out_of_band_trigger,
     wait_until_next_run,
 )
 import optimizer
@@ -34,23 +33,14 @@ from version import __version__
 logger = logging.getLogger("main")
 
 
-def _baseline_trigger_snapshot() -> dict:
-    state = run_state.load_run_state()
-    snapshot = snapshot_from_run_state(state)
-    if snapshot:
-        return snapshot
-    return fetch_trigger_snapshot(config.get_event_triggers())
-
-
 def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     config.reload_config()
     config.require_runtime_params_loaded()
-    event_run = is_event_trigger(run_trigger)
-    trigger_specs = config.get_event_triggers()
+    out_of_band = is_out_of_band_trigger(run_trigger)
 
-    if event_run:
+    if out_of_band:
         logger.info(
-            "--- Earnie Event-Lauf (v%s, Trigger: %s) ---",
+            "--- Earnie außerplanmäßiger Lauf (v%s, Trigger: %s) ---",
             __version__,
             run_trigger,
         )
@@ -93,7 +83,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         logger.error("Optimierung abgebrochen: Keine Awattar-Preise empfangen.")
         return
 
-    if event_run:
+    if out_of_band:
         pv_delta = pv_tuner.get_pv_delta_peek()
     else:
         pv_delta = pv_tuner.get_pv_delta_and_update()
@@ -193,7 +183,6 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         targets,
         consumers=live_consumers,
     )
-    event_trigger_snapshot = fetch_trigger_snapshot(trigger_specs)
     delivery_plausibility: dict = {}
     filter_contexts = optimizer.resolve_filter_contexts(optimization_matrix, live_consumers)
     consumer_remaining = optimizer.get_consumer_remaining_kwh(
@@ -202,7 +191,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         charging_contexts=charging_contexts,
         filter_contexts=filter_contexts,
         live_flex_kw=flex_kw_for_matrix,
-        trigger_snapshot=event_trigger_snapshot,
+        trigger_snapshot=None,
         delivery_plausibility=delivery_plausibility,
     )
     for consumer in live_consumers:
@@ -338,7 +327,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         consumers=live_consumers,
         live_flex_kw=flex_kw,
         sent_flex_kw=sent_flex_kw,
-        book_planned=not event_run,
+        book_planned=not out_of_band,
     )
 
     savings_snapshot = None
@@ -363,7 +352,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     except Exception as exc:
         logger.warning("Einsparungs-Prognose konnte nicht berechnet werden: %s", exc)
 
-    if not event_run:
+    if not out_of_band:
         try:
             written = cons_data_store.record_and_maybe_flush(
                 total_kw=total_kw,
@@ -388,7 +377,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "run_trigger": run_trigger,
             "loxone_silent_mode": config.is_loxone_silent_mode(),
             "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
-            "event_trigger_snapshot": event_trigger_snapshot,
+            "event_trigger_snapshot": {},
             "loxone_sent": loxone_sent,
             "loxone_writes": loxone_writes,
             "ehal_writes": ehal_writes,
@@ -499,11 +488,9 @@ if __name__ == "__main__":
     run_loxone_verify_on_startup()
     ehal_live.push_safe_setpoints_on_startup()
 
-    if config.is_event_trigger_enabled() and not config.get_event_triggers():
-        logger.warning(
-            "event_trigger_enabled ist true, aber system.event_triggers ist leer – "
-            "kein Event-Polling zwischen den regulären Läufen."
-        )
+    from integrations.loxone_request_http import start_loxone_request_http
+
+    start_loxone_request_http(config.get_ehal_loxone_http_port())
 
     from runtime_store.dotenv_io import (
         loxone_credentials_configured,
@@ -516,8 +503,6 @@ if __name__ == "__main__":
 
     _SETUP_WAIT_SEC = 60
     next_trigger = TRIGGER_QUARTER_HOUR
-    known_snapshot: dict = {}
-    trigger_specs = config.get_event_triggers()
 
     while True:
         if needs_loxone_setup():
@@ -570,20 +555,9 @@ if __name__ == "__main__":
             config.reinit_config()
             continue
 
-        if not known_snapshot:
-            known_snapshot = _baseline_trigger_snapshot()
-            trigger_specs = config.get_event_triggers()
-
         try:
             main(run_trigger=next_trigger)
             next_trigger = TRIGGER_QUARTER_HOUR
-            trigger_specs = config.get_event_triggers()
-
-            state = run_state.load_run_state()
-            if state and state.get("success") and isinstance(state.get("event_trigger_snapshot"), dict):
-                known_snapshot = snapshot_from_run_state(state)
-            else:
-                known_snapshot = fetch_trigger_snapshot(trigger_specs)
 
             wait_sec = optimization_schedule.seconds_until_next_quarter_hour()
             next_run = optimization_schedule.next_quarter_hour_datetime()
@@ -592,15 +566,9 @@ if __name__ == "__main__":
                 next_run.strftime("%H:%M:%S"),
                 wait_sec,
             )
-            event_trigger, known_snapshot = wait_until_next_run(
-                previous_snapshot=known_snapshot,
-                trigger_specs=trigger_specs,
-                total_wait_sec=wait_sec,
-                poll_interval_sec=config.get_event_poll_interval_sec(),
-                event_trigger_enabled=config.is_event_trigger_enabled(),
-            )
-            if event_trigger:
-                next_trigger = event_trigger
+            early = wait_until_next_run(total_wait_sec=wait_sec)
+            if early == TRIGGER_REQUEST_OPTIMIZE:
+                next_trigger = TRIGGER_REQUEST_OPTIMIZE
 
         except Exception as e:
             logger.exception(

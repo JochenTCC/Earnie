@@ -93,7 +93,7 @@ Setpoints are **math limits / forced power / modes**, not a full inner-loop cont
 | `set_ess_discharge_power_limit` | no* | W | Max discharge power (magnitude ≥ 0) |
 | `set_ess_mode` | no* | string/number | Sticky-backend control (Huawei Steuerbefehl); **0 = Automatik**; OpenEMS ignores |
 | `set_evcs_max_current` | no* | A | EV charge current setpoint / max current |
-| `set_evcs_mode` | no* | enum | `pv` \| `now` |
+| `set_evcs_mode` | no* | enum | `off` \| `pv` \| `now` |
 
 \*A setpoint document must include **at least one** of these fields (plus envelope). Partial updates are allowed; omitted fields mean “leave unchanged” at the adapter (except Automatik → omit `set_ess_active_power` so Equals is not forced; sticky backends still rely on **mode = 0**).
 

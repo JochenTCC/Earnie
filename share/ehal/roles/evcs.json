@@ -56,7 +56,7 @@
       "field": "set_evcs_mode",
       "required": false,
       "kind": "setpoint",
-      "notes": "Enum pv | now (replaces pv_follow + charge_immediate markers)."
+      "notes": "Enum off | pv | now (replaces pv_follow + charge_immediate markers; Loxone numeric 0/1/2)."
     },
     {
       "field": "supports_evcs_current",

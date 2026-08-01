@@ -43,7 +43,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 
 1. Restart **Loxone Config**.
 2. Insert via periphery **Device Templates** / Virtual In / Virtual Out (Earnie entries should appear).
-3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. Status URL `/ehal/loxone/status.json` and VO `/ehal/loxone/telemetry/…` are **placeholders** until Earnie ships those endpoints.
+3. Set Address: replace `EARNIE_HOST` with the Earnie LAN IP. **`VO_Earnie_Status.xml`** uses port **8541** (`system.ehal_loxone_http_port`; `Earnie_Request_Optimize` / `/alive`). Other VI/VO drafts still use **8501** placeholders for `/ehal/loxone/status.json` and `/ehal/loxone/telemetry/…` until those endpoints ship.
 
 ## Files (repo layout)
 
@@ -54,7 +54,7 @@ Copy these files from repo `share/loxone/templates/VirtualOut/` into Config’s 
 | `VirtualIn/VI_Earnie_EV.xml` | `Earnie_EAuto_Soll_A`, `Earnie_EAuto_Modus` |
 | `VirtualIn/VI_Earnie_Consumer.xml` | Generic Freigabe + Ziel_kW |
 | `VirtualIn/VI_Earnie_Pool.xml` | `Earnie_Pool_Freigabe`, `Earnie_Pool_Filter_Freigabe` |
-| `VirtualOut/VO_Earnie_Status.xml` | Optional alive / request_optimize |
+| `VirtualOut/VO_Earnie_Status.xml` | Optional alive / `Earnie_Request_Optimize` (port **8541**) |
 | `VirtualOut/VO_Earnie_Plant.xml` | Plant `sens_*` + `Earnie_Aussentemperatur` |
 | `VirtualOut/VO_Earnie_EV.xml` | EV `sens_*` / `get_*` (`Earnie_EAuto_Leistung`, …) |
 | `VirtualOut/VO_Earnie_Heatpump.xml` | `Earnie_Waermepumpe_Leistung` |

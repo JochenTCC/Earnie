@@ -4,7 +4,7 @@
   Replace EARNIE_HOST. Paths are placeholders; adjust method/body after Earnie API exists.
   Analog=true for heartbeat age / last status code style values.
 -->
-<VirtualOut Title="Earnie Status Push" Comment="Pattern B: optional push to Earnie (draft)" Address="http://EARNIE_HOST:8501" CmdInit="" CloseAfterSend="true" CmdSep="">
+<VirtualOut Title="Earnie Status Push" Comment="Pattern B: optional push to Earnie (draft)" Address="http://EARNIE_HOST:8541" CmdInit="" CloseAfterSend="true" CmdSep="">
 	<VirtualOutCmd Title="Earnie_Push_Alive" Comment="Notify Earnie that Miniserver is alive" CmdOnMethod="GET" CmdOn="/ehal/loxone/alive" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="false" Repeat="0" RepeatRate="0"/>
 	<VirtualOutCmd Title="Earnie_Request_Optimize" Comment="Optional: request out-of-band optimize" CmdOnMethod="POST" CmdOn="/ehal/loxone/request_optimize" CmdOnHTTP="Content-Type: application/json" CmdOnPost="{}" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="false" Repeat="0" RepeatRate="0"/>
 </VirtualOut>

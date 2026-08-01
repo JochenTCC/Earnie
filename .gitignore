@@ -48,6 +48,9 @@ system_history_log.csv
 runtime_settings.json
 .env
 config/.env
+# Operator-only registry private key (never commit)
+secrets/
+share/registry/*_private.pem
 # Vertraulich — Businessplan (lokal)
 CONF_Businessplan/
 

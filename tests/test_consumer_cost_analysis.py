@@ -97,6 +97,63 @@ def test_build_slot_battery_discharge_zero_cost() -> None:
     assert share.battery_kwh == pytest.approx(0.5)
     assert share.cost_euro == pytest.approx(0.0)
     assert slot.battery_discharge_kwh == pytest.approx(0.5)
+    assert slot.discharge_to_load_kwh == pytest.approx(0.5)
+    assert slot.export_from_battery_kwh == pytest.approx(0.0)
+
+
+def test_build_slot_discharge_export_split() -> None:
+    slot = build_slot_from_powers(
+        slot_start=datetime(2026, 7, 20, 14, 0),
+        price_cent=10.0,
+        pv_kw=0.0,
+        load_by_id={BASELOAD_ID: 1.0},
+        battery_charge_kw=0.0,
+        battery_discharge_kw=3.0,
+        grid_import_kw=0.0,
+        grid_export_kw=2.0,
+    )
+    assert slot.discharge_to_load_kwh == pytest.approx(0.25)
+    assert slot.export_from_battery_kwh == pytest.approx(0.5)
+    assert slot.battery_discharge_kwh == pytest.approx(0.75)
+
+
+def test_battery_flow_chart_stacked_totals() -> None:
+    from ui.consumer_cost_analysis_charts import (
+        battery_flow_balance_caption,
+        battery_flow_chart,
+    )
+
+    slot = build_slot_from_powers(
+        slot_start=datetime(2026, 7, 20, 12, 0),
+        price_cent=20.0,
+        pv_kw=5.0,
+        load_by_id={BASELOAD_ID: 1.0},
+        battery_charge_kw=2.0,
+        battery_discharge_kw=0.0,
+        grid_import_kw=0.0,
+        grid_export_kw=2.0,
+    )
+    disc = build_slot_from_powers(
+        slot_start=datetime(2026, 7, 20, 20, 0),
+        price_cent=40.0,
+        pv_kw=0.0,
+        load_by_id={BASELOAD_ID: 1.0},
+        battery_charge_kw=0.0,
+        battery_discharge_kw=2.0,
+        grid_import_kw=0.0,
+        grid_export_kw=1.0,
+    )
+    totals = aggregate_slots((slot, disc))
+    assert totals.charge_from_pv_kwh == pytest.approx(0.5)
+    assert totals.discharge_to_load_kwh + totals.export_from_battery_kwh == pytest.approx(
+        totals.battery_discharge_kwh
+    )
+    fig = battery_flow_chart(totals, title="t")
+    assert fig.layout.barmode == "stack"
+    names = {t.name for t in fig.data}
+    assert names == {"PV", "Netz (Laden)", "Verbrauch", "Netz (Einspeisung)"}
+    caption = battery_flow_balance_caption(totals)
+    assert "Laden" in caption and "Entladen" in caption and "Δ" in caption
 
 
 def test_aggregate_and_week_filter() -> None:

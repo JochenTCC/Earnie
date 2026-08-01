@@ -1,4 +1,4 @@
-"""System-, UI- und Event-Trigger-Einstellungen aus config.json / local_settings."""
+"""System- und UI-Einstellungen aus config.json / local_settings."""
 from __future__ import annotations
 
 import os
@@ -37,16 +37,24 @@ def load_local_settings_document(local_settings_path: str) -> dict:
     return read_json_dict(path)
 
 
-def load_event_trigger_enabled(raw_config: dict) -> bool:
-    raw = raw_config.get("system", {}).get("event_trigger_enabled")
+def load_ehal_loxone_http_port(raw_config: dict) -> int:
+    """Daemon port for Earnie_Request_Optimize / alive (default 8541)."""
+    raw = raw_config.get("system", {}).get("ehal_loxone_http_port")
     if raw is None:
-        return True
-    if not isinstance(raw, bool):
+        return 8541
+    try:
+        value = int(raw)
+    except (TypeError, ValueError) as exc:
         raise ValueError(
-            "Kritischer Konfigurationsfehler: system.event_trigger_enabled "
-            "muss true oder false sein."
+            "Kritischer Konfigurationsfehler: system.ehal_loxone_http_port "
+            "muss eine ganze Zahl sein."
+        ) from exc
+    if not 1024 <= value <= 65535:
+        raise ValueError(
+            "Kritischer Konfigurationsfehler: system.ehal_loxone_http_port "
+            "muss zwischen 1024 und 65535 liegen."
         )
-    return raw
+    return value
 
 
 def load_ui_fragment_refresh_sec(raw_config: dict, key: str, default: int) -> int:
@@ -124,102 +132,3 @@ def load_ui_chart_debug_capture_dir(raw_config: dict) -> str:
     return path
 
 
-def load_event_poll_interval_sec(raw_config: dict) -> int:
-    system = raw_config.get("system", {})
-    raw = system.get("event_poll_interval_sec")
-    if raw is None:
-        raw = system.get("charging_poll_interval_sec")
-    if raw is None:
-        return 60
-    try:
-        value = int(raw)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(
-            "Kritischer Konfigurationsfehler: system.event_poll_interval_sec "
-            "muss eine ganze Zahl sein."
-        ) from exc
-    if value < 1:
-        raise ValueError(
-            "Kritischer Konfigurationsfehler: system.event_poll_interval_sec "
-            "muss mindestens 1 sein."
-        )
-    return value
-
-
-def normalize_event_trigger(raw: dict, index: int) -> dict:
-    if not isinstance(raw, dict):
-        raise ValueError(f"system.event_triggers[{index}] muss ein Objekt sein.")
-    trigger_id = str(raw.get("id", "")).strip()
-    if not trigger_id:
-        raise ValueError(f"system.event_triggers[{index}]: id fehlt.")
-    loxone_name = str(raw.get("loxone_name", "")).strip()
-    if not loxone_name:
-        raise ValueError(
-            f"system.event_triggers[{index}] ('{trigger_id}'): loxone_name fehlt."
-        )
-    signal_type = str(raw.get("signal_type", "")).strip().lower()
-    if signal_type not in ("binary", "text", "analog"):
-        raise ValueError(
-            f"system.event_triggers[{index}] ('{trigger_id}'): "
-            "signal_type muss 'binary', 'text' oder 'analog' sein."
-        )
-    on_change = str(raw.get("on_change", "")).strip().lower()
-    if signal_type == "binary":
-        allowed = {"any", "rising", "falling"}
-    else:
-        allowed = {"any"}
-    if on_change not in allowed:
-        allowed_text = ", ".join(sorted(allowed))
-        raise ValueError(
-            f"system.event_triggers[{index}] ('{trigger_id}'): "
-            f"on_change muss einer von [{allowed_text}] sein."
-        )
-    label = str(raw.get("label", trigger_id)).strip() or trigger_id
-    return {
-        "id": trigger_id,
-        "loxone_name": loxone_name,
-        "signal_type": signal_type,
-        "on_change": on_change,
-        "label": label,
-    }
-
-
-def _load_event_triggers_from_config(raw_config: dict) -> list[dict]:
-    raw = raw_config.get("system", {}).get("event_triggers")
-    if raw is None:
-        return []
-    if not isinstance(raw, list):
-        raise ValueError("Kritischer Konfigurationsfehler: system.event_triggers muss ein Array sein.")
-    seen: set[str] = set()
-    triggers: list[dict] = []
-    for index, item in enumerate(raw):
-        spec = normalize_event_trigger(item, index)
-        if spec["id"] in seen:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: system.event_triggers enthält "
-                f"doppelte id '{spec['id']}'."
-            )
-        seen.add(spec["id"])
-        triggers.append(spec)
-    return triggers
-
-
-def load_event_triggers(
-    raw_config: dict,
-    house_doc: dict | None = None,
-    profile_id: str | None = None,
-) -> list[dict]:
-    """Prefer plant/consumer entity triggers; migrate config triggers when plant empty."""
-    from house_config.ehal_bindings import (
-        aggregate_event_triggers,
-        ensure_migrated,
-        house_has_entity_triggers,
-    )
-
-    house = house_doc if isinstance(house_doc, dict) else {}
-    if house_has_entity_triggers(house):
-        return aggregate_event_triggers(house, profile_id=profile_id)
-    migrated_house, _, _ = ensure_migrated(house, raw_config)
-    if house_has_entity_triggers(migrated_house):
-        return aggregate_event_triggers(migrated_house, profile_id=profile_id)
-    return _load_event_triggers_from_config(raw_config)

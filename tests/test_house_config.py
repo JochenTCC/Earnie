@@ -1471,7 +1471,7 @@ def test_save_main_config_roundtrip_strips_triggers_and_blocks(tmp_path, monkeyp
     config_path.write_text(
         json.dumps(
             {
-                "system": {"event_triggers": []},
+                "system": {"global_timeout": 10},
                 "loxone_blocks": {
                     "soc_name": "Old_SOC",
                     "log_filename": "Verbrauch.csv",
@@ -1510,7 +1510,9 @@ def test_save_main_config_roundtrip_strips_triggers_and_blocks(tmp_path, monkeyp
             "label": "Test",
         }
     ]
+    data["system"]["event_trigger_enabled"] = True
     save_main_config(strip_migrated_config_keys(data))
     reloaded = json.loads(config_path.read_text(encoding="utf-8"))
-    assert reloaded["system"]["event_triggers"] == []
+    assert "event_triggers" not in reloaded.get("system", {})
+    assert "event_trigger_enabled" not in reloaded.get("system", {})
     assert "loxone_blocks" not in reloaded

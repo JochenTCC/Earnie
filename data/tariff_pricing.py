@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from calendar import monthrange
+from datetime import date, datetime
 from typing import Any
 
 IMPORT_SPOT_TYPES = frozenset({"spot_hourly", "ex_post_spot", "monthly_market"})
@@ -82,6 +83,23 @@ def next_calendar_month(year: int, month: int) -> tuple[int, int]:
     if month >= 12:
         return year + 1, 1
     return year, month + 1
+
+
+def is_within_days_of_next_month(
+    when: date | datetime,
+    *,
+    days: int = 2,
+) -> bool:
+    """True in the last ``days`` calendar days of ``when``'s month.
+
+    Used to surface missing next-month ``monthly_table`` rates only when the
+    ~48h planning horizon can reach into the next month (default: last 2 days).
+    """
+    if days < 1:
+        raise ValueError("days must be >= 1.")
+    day = when.day
+    last_day = monthrange(when.year, when.month)[1]
+    return day > last_day - days
 
 
 def _available_months_suffix(lookup: dict[tuple[int, int], float]) -> str:

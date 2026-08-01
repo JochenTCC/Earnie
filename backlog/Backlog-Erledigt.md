@@ -3,6 +3,46 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Chart 2 flat Verbrauch optimiert (2026-08-01)
+
+- [x] **Chart 2 „Verbrauch optimiert“ constant** — snapshot reload rebuilt costs + matched consumption but omitted `hourly_optimized_consumption_kwh`; alignment filled zeros → flat cumulative at Ist offset. Fix: `_attach_hourly_series_from_rows` also recomputes optimized consumption from `simulation_rows`. Test: `tests/test_live_display_loader.py`. Verified live.
+
+
+### Bugfix Chart 1 oversized EV ghost bar (2026-08-01)
+
+- [x] **Oversized EV ghost outline on Chart 1** — matched-baseline flex scaled remaining EV target into one profile hour (~10.87 kW vs `nominal_power_kw` 3.5). Ghost outlines in `add_matched_flex_ghost_traces` capped to `nominal_power_kw`; matched-baseline energy/simulation unchanged. Dump: `chart_debug_review/debug_dump_20260801_080011`; verified.
+
+
+### Bugfix Missing monthly tariff warning timing (2026-08-01)
+
+- [x] **Show warning for missing monthly tariff only at end of month** — UI (sidebar + Szenarienkonfigurator) for missing next-month `monthly_table` rates only in the last 2 calendar days (`is_within_days_of_next_month`); pricing fallback/log unchanged. Tests: `tests/test_tariff_pricing.py`. Docs: `docs/konfiguration/preise.md`. Verified.
+
+
+### 2.4.q Hardware registry first approach (2026-08-01)
+
+- [x] **2.4.q — Hardware registry first approach** *(before release; builds on `2.4.i` spike)*
+  - [x] End-to-end soft registration for 2.4 community / official images: fingerprint visible + copyable under Info / About; mailto request with fingerprint; drop-in `earnie_registry.json`; status caption (`unbound` / `valid` / `mismatch` / `invalid_sig`)
+    - [x] Harden issuer path for real hand-outs: verify Earnie-Projekt `Entwicklungsplan/Hardware-Registry-Ausstellung.md` against `scripts/issue_dev_registry_token.py` + `share/registry/`; document where the HMAC secret lives (operator-only, never in image/git)
+    - [x] Optional mild UX: stronger Info / About note on `mismatch` / `invalid_sig` — still **no** refuse-to-start, still **no** Cosign/Sigstore (full Layer C stays under `2.+1`)
+    - [x] Spec / handbook touch-up if the first approach changes the user flow: [`docs/spec/hardware-registry-layer-c.md`](../docs/spec/hardware-registry-layer-c.md), handbook § Hardware-Registry
+    - [x] Acceptance: one real fingerprint → issued file → bound status on a lab install; `unbound` remains allowed private use
+  - [x] Add information about registry status in hints in streamlit app "Earnie · privat, nicht-kommerziell · https://github.com/JochenTCC/Earnie ..."
+    - [x] Make it red, when not bound
+    - [x] Make it green, when bound
+
+
+### 2.4.q Chart / ESS test / Request Optimize (2026-08-01)
+
+- [x] **Batterie-Energieflüsse** stacked Laden (PV/Netz) + Entladen (Verbrauch/Einspeisung) with balance caption
+- [x] Remove **ESS-Schnittstelle testen** from Optimierer-Dienst (UI + `force_write_ess_test_setpoints` helpers)
+- [x] Remove Merker event-trigger polling; wake via `Earnie_Request_Optimize` → daemon HTTP `:8541` (`POST /ehal/loxone/request_optimize`)
+
+
+### Bugfix Monitor consumers not identified (2026-08-01)
+
+- [x] **Consumers are not identified properly in charts on Monitor page but all power signals are available** — live meter read used only legacy `loxone_inputs.power_name`, so EHAL-only bindings were never measured (power still visible on debug). Fix: `_read_consumer_meter_kw` dual-reads EHAL markers (`marker_flex_power` / EVCS active power); known house-profile meters included in live flex/Sankey. Tests: `tests/test_loxone_client.py` (`test_resolve_live_power_reads_ehal_bindings_without_legacy_power_name`, known-meter coverage). Live verified.
+
+
 ### 2.4.p UI polishing + pre-release 2.4.0-alpha.1 (2026-07-31)
 
 - [x] **2.4.p — UI polishing**
@@ -11,6 +51,11 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
   - [x] Merge NAS/current config parameters into greenfield import (markers from greenfield kept)
   - [x] At start: send all virtual inputs / `earnie_set` values once (not only on change)
   - [x] Pre-release **2.4.0-alpha.1**
+
+
+### Bugfix EV absent daytime plan after overnight ready_by (2026-07-31)
+
+- [x] **EV absent daytime plan after overnight ready_by** — dumps `debug_dump_20260731_075323` / `091219`: FertigUm kept overnight open past config `ready_by` → daytime Smart plan while unplugged. Fix: `resolve_absent_availability` (config `ready_by` bound). Also shipped on `hotfix/2.3.2` (`v2.3.2`) with Ist-SOC config-path port. Tests: `TestAbsentAvailability`, `TestLoxoneAbsentForecast`. Live verified: unplugged daytime → no EV plan before next `car_available_from`.
 
 
 ### Bugfix Live-Schreiben summary vs table (2026-07-31)

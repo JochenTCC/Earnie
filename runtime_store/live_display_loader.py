@@ -86,6 +86,10 @@ def _attach_hourly_series_from_rows(
         savings_info["hourly_optimized_cost_euro"] = hourly_cost_euro_from_rows(
             optimized_rows
         )
+    if "hourly_optimized_consumption_kwh" not in savings_info:
+        savings_info["hourly_optimized_consumption_kwh"] = (
+            hourly_consumption_kwh_from_rows(optimized_rows)
+        )
     if matched_rows and _simulation_rows_support_hourly_series(matched_rows):
         if "hourly_matched_baseline_cost_euro" not in savings_info:
             savings_info["hourly_matched_baseline_cost_euro"] = hourly_cost_euro_from_rows(

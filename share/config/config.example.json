@@ -16,10 +16,7 @@
     },
     "system": {
         "global_timeout": 10,
-        "loop_timeout": 900,
-        "event_trigger_enabled": true,
-        "event_poll_interval_sec": 60,
-        "event_triggers": []
+        "loop_timeout": 900
     },
     "live_scenario_id": "live",
     "planning_horizon": {
