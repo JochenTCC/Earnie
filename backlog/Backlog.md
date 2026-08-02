@@ -68,6 +68,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Check possibility for automatically learn consumer schedules (for known consumers) and nominal power (for all consumers) from sens_power_act to substitute or improve manual settings
 - [ ] Clarify how to handle wallbox <> EVs
   - for multiple wallboxes / EVs there is not a "natural" 1 to 1 binding - hence it must be clarified how to handle that (have a look at evcc)
+- [ ] Optimize Pool temperature to a certain value on time. Set desired temperature and using time. Combine it with RC model
 
 ### Version 2.+1 — Introducing nested data models
 
