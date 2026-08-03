@@ -1,0 +1,31 @@
+---
+description: Anonymize personal/customer names in backlog bugfix and archive files before commit
+globs: backlog/Backlog-Bugfixes.md, backlog/Backlog-Erledigt.md
+alwaysApply: true
+---
+
+# Backlog — Anonymize User Names Before Commit
+
+Before staging or committing `backlog/Backlog-Bugfixes.md` or `backlog/Backlog-Erledigt.md`, scrub **personal/customer names** from those two files.
+
+## Scope
+
+| Scrub | Keep |
+|-------|------|
+| Person/customer names in paths or prose (`users\Alex\…`, `Kunden/Sam/…`, “bei Alex …”) | GitHub orgs/repos (`JochenTCC`), product names, technical IDs, `UserA`-style aliases already in use |
+| Folder segments under `users/`, `Kunden/`, `debug-dumps/users/` | `Backlog.md` (feature backlog — out of scope unless the user asks) |
+
+## Stable aliases (required)
+
+1. Read local map `.cursor/user-aliases.local.md` if it exists (gitignored; never commit it).
+2. For each **new** real name not in the map: **ask the user once** for a stable alias (`UserA`, `UserB`, … — user chooses).
+3. Replace **all** occurrences of that name in the two backlog files with the chosen alias.
+4. Append `RealName → Alias` to `.cursor/user-aliases.local.md` (create the file if missing).
+5. Reuse the map on later commits — do **not** invent a second alias for the same person.
+
+## Do / Don’t
+
+- **Do** anonymize as part of session conclusion / any commit that includes those files.
+- **Do not** write real-name ↔ alias pairs into committed files (rules, backlog, docs).
+- **Do not** commit `.cursor/user-aliases.local.md`.
+- If unsure whether a token is a personal name: **ask** before replacing.

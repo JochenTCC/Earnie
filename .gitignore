@@ -68,3 +68,6 @@ chart_debug_review/debug_dump_*/
 
 # Local VS Code / Cursor launch configs (machine-specific)
 .vscode/launch.json
+
+# Local real-name → backlog alias map (never commit)
+.cursor/user-aliases.local.md

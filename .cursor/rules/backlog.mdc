@@ -45,7 +45,11 @@ Bugfixes go through three strict phases in `backlog/Backlog-Bugfixes.md`:
 
 3. **Done:** Only after successful live/production acceptance, remove from *Pending* and permanently move to `backlog/Backlog-Erledigt.md`.
 
-## 4. Versioning & Release
+## 4. Anonymize User Names (before commit)
+
+Before committing `backlog/Backlog-Bugfixes.md` or `backlog/Backlog-Erledigt.md`, scrub personal/customer names using stable aliases (`UserA`, …). See `.cursor/rules/backlog-anonymize-users.mdc` and local map `.cursor/user-aliases.local.md` (gitignored).
+
+## 5. Versioning & Release
 
 * **Rule:** Changes to `version.py` must **never be made without explicit user approval**.
 

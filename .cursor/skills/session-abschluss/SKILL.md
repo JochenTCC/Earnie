@@ -69,6 +69,8 @@ Keep the schema from `backlog/Backlog.md` / `backlog/Backlog-Bugfixes.md` / `bac
 
 Include changed backlog file(s) in the commit.
 
+**Anonymize before commit:** If `backlog/Backlog-Bugfixes.md` or `backlog/Backlog-Erledigt.md` will be staged, scrub personal/customer names per `.cursor/rules/backlog-anonymize-users.mdc` (stable aliases; ask once per new name; update gitignored `.cursor/user-aliases.local.md`). Do not proceed to stage those files until names are replaced or the user confirms none remain.
+
 ### 4. Commit
 
 - Stage all **approved** changes (`git add` selectively or `-A` minus excluded paths)

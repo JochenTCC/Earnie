@@ -15,7 +15,9 @@ from ui.loxone_debug import (
     build_read_rows,
     build_telemetry_rows,
     build_write_rows_from_trace,
+    mapping_column_label,
     read_check_status_label,
+    rows_with_mapping_column_label,
     write_summary_from_rows,
 )
 
@@ -218,3 +220,41 @@ def test_build_telemetry_rows_pads_unmapped_expected():
     by_field = {r["EHAL-Feld"]: r for r in rows}
     assert by_field["sens_grid_power_active"]["Mapping"] == ""
     assert by_field["sens_grid_power_active"]["Status"] == "Kein Mapping"
+
+
+def test_mapping_column_label_by_backend():
+    with patch("ui.loxone_debug.config.is_ehal_ha_backend", return_value=True), patch(
+        "ui.loxone_debug.config.is_ehal_openems_backend", return_value=False
+    ):
+        assert mapping_column_label() == "Mapping auf Home Assistant"
+    with patch("ui.loxone_debug.config.is_ehal_ha_backend", return_value=False), patch(
+        "ui.loxone_debug.config.is_ehal_openems_backend", return_value=True
+    ):
+        assert mapping_column_label() == "Mapping auf OpenEMS"
+    with patch("ui.loxone_debug.config.is_ehal_ha_backend", return_value=False), patch(
+        "ui.loxone_debug.config.is_ehal_openems_backend", return_value=False
+    ):
+        assert mapping_column_label() == "Mapping auf Loxone"
+
+
+def test_rows_with_mapping_column_label_renames_key():
+    with patch("ui.loxone_debug.config.is_ehal_ha_backend", return_value=False), patch(
+        "ui.loxone_debug.config.is_ehal_openems_backend", return_value=False
+    ):
+        out = rows_with_mapping_column_label(
+            [
+                {
+                    "EHAL-Feld": "sens_ess_soc",
+                    "Mapping": "Ernie_SOC",
+                    "Wert": "1",
+                    "Status": "OK",
+                }
+            ]
+        )
+    assert list(out[0].keys()) == [
+        "EHAL-Feld",
+        "Mapping auf Loxone",
+        "Wert",
+        "Status",
+    ]
+    assert out[0]["Mapping auf Loxone"] == "Ernie_SOC"

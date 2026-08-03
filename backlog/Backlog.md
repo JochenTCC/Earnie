@@ -26,12 +26,11 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.l`/`2.4.m`/`2.4.n`/`2.4.o`/`2.4.p` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-
 - [ ] **2.4.r — Release**
   - [ ] Review old *_BRIDGE_DEFAULTS:
     - Remove legacy defaults
   - [ ] Code Quality
-    - Make a code coverage test#
+    - Make a code coverage test
     - Review code against coding KPIs and refactor it if needed
     - Make a test coverage test to identify obsolete tests
   - [ ] Update and review official docs for needed updates our outdated infos

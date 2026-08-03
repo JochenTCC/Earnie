@@ -47,6 +47,38 @@ def read_check_status_label(item: LoxoneCheck) -> str:
     return "Fehler"
 
 
+def mapping_column_label() -> str:
+    """Live-table column title for the backend address (Merker / entity / channel)."""
+    if config.is_ehal_ha_backend():
+        return "Mapping auf Home Assistant"
+    if config.is_ehal_openems_backend():
+        return "Mapping auf OpenEMS"
+    return "Mapping auf Loxone"
+
+
+def rows_with_mapping_column_label(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Rename internal ``Mapping`` key to the backend-specific display title.
+
+    Keeps column order: EHAL-Feld, mapping label, then remaining columns.
+    """
+    label = mapping_column_label()
+    if label == "Mapping":
+        return rows
+    renamed: list[dict[str, str]] = []
+    for row in rows:
+        out: dict[str, str] = {}
+        if "EHAL-Feld" in row:
+            out["EHAL-Feld"] = row["EHAL-Feld"]
+        if "Mapping" in row:
+            out[label] = row["Mapping"]
+        for key, value in row.items():
+            if key in ("EHAL-Feld", "Mapping"):
+                continue
+            out[key] = value
+        renamed.append(out)
+    return renamed
+
+
 def build_read_rows(
     checks: list[LoxoneCheck],
     read_at: str,
@@ -446,7 +478,11 @@ def _render_live_reads_fragment() -> None:
     st.caption(f"{ok}/{len(checks)} Merker erfolgreich gelesen · Stand **{read_at}**")
     rows = build_read_rows(checks, read_at)
     if rows:
-        st.dataframe(rows, width="stretch", hide_index=True)
+        st.dataframe(
+            rows_with_mapping_column_label(rows),
+            width="stretch",
+            hide_index=True,
+        )
 
 
 @st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
@@ -466,10 +502,12 @@ def _render_ehal_telemetry_fragment() -> None:
 
     st.caption(f"EHAL-Telemetrie · Stand **{read_at}**")
     st.dataframe(
-        build_telemetry_rows(
-            dict(telemetry),
-            read_at,
-            mapping=_telemetry_mapping_for_adapter(adapter),
+        rows_with_mapping_column_label(
+            build_telemetry_rows(
+                dict(telemetry),
+                read_at,
+                mapping=_telemetry_mapping_for_adapter(adapter),
+            )
         ),
         width="stretch",
         hide_index=True,
@@ -529,7 +567,7 @@ def render_last_writes_section(main_state: dict | None) -> None:
         if not has_produktiv_run(main_state):
             st.caption("Noch kein Produktiv-Durchlauf — Sollwerte leer, Mapping aus Config.")
             st.dataframe(
-                build_ehal_write_rows([]),
+                rows_with_mapping_column_label(build_ehal_write_rows([])),
                 width="stretch",
                 hide_index=True,
             )
@@ -537,9 +575,11 @@ def render_last_writes_section(main_state: dict | None) -> None:
         if silent_run or ehal_writes is None:
             st.info("Silent-Modus beim letzten Lauf — keine EHAL-Schreibvorgänge.")
             st.dataframe(
-                build_intended_write_rows(loxone_sent, completed_at)
-                if loxone_sent
-                else build_ehal_write_rows([]),
+                rows_with_mapping_column_label(
+                    build_intended_write_rows(loxone_sent, completed_at)
+                    if loxone_sent
+                    else build_ehal_write_rows([])
+                ),
                 width="stretch",
                 hide_index=True,
             )
@@ -559,13 +599,17 @@ def render_last_writes_section(main_state: dict | None) -> None:
                 st.caption(omitted)
         else:
             st.caption("Letzter Lauf ohne EHAL-Schreibdatensätze.")
-        st.dataframe(write_rows, width="stretch", hide_index=True)
+        st.dataframe(
+            rows_with_mapping_column_label(write_rows),
+            width="stretch",
+            hide_index=True,
+        )
         return
 
     if not has_produktiv_run(main_state):
         st.caption("Noch kein Produktiv-Durchlauf — Sollwerte leer, Mapping aus Config.")
         st.dataframe(
-            build_write_rows_from_trace([]),
+            rows_with_mapping_column_label(build_write_rows_from_trace([])),
             width="stretch",
             hide_index=True,
         )
@@ -576,7 +620,9 @@ def render_last_writes_section(main_state: dict | None) -> None:
     if silent_run or loxone_writes is None:
         st.info("Silent-Modus beim letzten Lauf — keine Schreibvorgänge ausgeführt.")
         st.dataframe(
-            build_intended_write_rows(loxone_sent, completed_at),
+            rows_with_mapping_column_label(
+                build_intended_write_rows(loxone_sent, completed_at)
+            ),
             width="stretch",
             hide_index=True,
         )
@@ -590,9 +636,11 @@ def render_last_writes_section(main_state: dict | None) -> None:
             "(Lauf vor dem Debug-Update?)."
         )
         st.dataframe(
-            build_intended_write_rows(loxone_sent, completed_at)
-            if loxone_sent
-            else build_write_rows_from_trace([]),
+            rows_with_mapping_column_label(
+                build_intended_write_rows(loxone_sent, completed_at)
+                if loxone_sent
+                else build_write_rows_from_trace([])
+            ),
             width="stretch",
             hide_index=True,
         )
@@ -608,7 +656,12 @@ def render_last_writes_section(main_state: dict | None) -> None:
         st.success(summary)
     if omitted:
         st.caption(omitted)
-    st.dataframe(write_rows, width="stretch", hide_index=True)
+    st.dataframe(
+        rows_with_mapping_column_label(write_rows),
+        width="stretch",
+        hide_index=True,
+    )
+
 
 def render_last_run_snapshot_expander(main_state: dict | None) -> None:
     if not has_produktiv_run(main_state):

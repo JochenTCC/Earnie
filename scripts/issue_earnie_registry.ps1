@@ -31,7 +31,7 @@
   .\scripts\issue_earnie_registry.ps1 `
     -Fingerprint 7afc0243254d84018cefdfbbd9d46598b950fbd4f493788a2b72515c27c1ac91 `
     -Out .\out\earnie_registry.json `
-    -PrivateKey C:\vault\earnie_registry_private.pem
+    -PrivateKey .\secrets\earnie_registry_private.pem
 #>
 param(
     [Parameter(Mandatory = $true)]

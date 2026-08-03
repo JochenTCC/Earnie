@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### EHAL-Com manual Merker mapping (2026-08-03)
+
+- [x] **2.4 polishing — manual Merker in EHAL mapping** — Per-field creatable selectboxes on EHAL-Com (`accept_new_options`); confirm dialog saves new Merker into options and maps the EHAL field to `house_profiles.json`; optional HTTP probe; Live table column titles `Mapping auf Loxone` / Home Assistant / OpenEMS. Docs `ehal-com.md`; tests `test_ehal_loxone_mapping_entities.py`, `test_loxone_debug.py`.
+
+
 ### Bugfix Backtesting crash empty cons_data (2026-08-03)
 
 - [x] **Backtesting page crash when `cons_data_hourly.csv` missing/empty** — Zeitraum-Hilfe called `resolve_simulation_window` and raised `ValueError` before the generate-data warning; help text now handles empty cons_data. Handbook: no-PV/no-battery baseline is automatic **Historisch** (no extra scenario). Tests: `tests/test_backtesting_time_ranges.py`. Verified.

@@ -23,6 +23,7 @@ from integrations.loxone_ehal_mapping import (
     TELEMETRY_REQUIRED,
     heuristic_propose,
 )
+from integrations.loxone_greenfield_import import probe_marker_names
 from integrations.loxone_structure import (
     SOURCE_HTTP_PROBE,
     scan_structure,
@@ -40,6 +41,9 @@ _SESSION_SCAN = "ehal_lox_scan"
 _SESSION_PROPOSALS = "ehal_lox_proposals"
 _SESSION_ENTITY = "ehal_lox_entity_id"
 _SESSION_MIGRATED = "ehal_lox_migrated_once"
+_SESSION_MANUAL_NAMES = "ehal_lox_manual_names"
+_SESSION_MANUAL_FEEDBACK = "ehal_lox_manual_feedback"
+_SESSION_PENDING_NEW = "ehal_lox_pending_new_marker"
 
 PLANT_ENTITY_ID = "plant"
 
@@ -107,13 +111,11 @@ def _field_select_caption(
     field: str,
     *,
     required: bool = False,
-    confidence: float | None = None,
 ) -> str:
     """Bedeutung + EHAL value name for HITL select labels."""
     meaning = _field_label(field)
     suffix = " *" if required else ""
-    conf = f" (Konfidenz {confidence:.0%})" if confidence is not None else ""
-    return f"{meaning} (`{field}`){suffix}{conf}"
+    return f"{meaning} (`{field}`){suffix}"
 
 
 def _nonempty(value: object) -> str:
@@ -291,11 +293,49 @@ def configured_marker_names(house_doc: dict, profile_id: str) -> list[str]:
     return names
 
 
-def _name_options(rows: list[dict[str, Any]], current_values: list[str]) -> list[str]:
+def session_manual_marker_names() -> list[str]:
+    """Session-only Merker names typed in on EHAL-Com (not yet necessarily saved)."""
+    raw = st.session_state.get(_SESSION_MANUAL_NAMES) or []
+    return [str(n).strip() for n in raw if str(n or "").strip()]
+
+
+def add_manual_marker_name(
+    existing: list[str],
+    raw: str,
+    *,
+    also_known: list[str] | None = None,
+) -> tuple[list[str], str | None]:
+    """Append a stripped Merker name; return (list, hint) — hint set on empty/duplicate."""
+    name = str(raw or "").strip()
+    if not name:
+        return list(existing), "Leerer Merkername — nichts hinzugefügt."
+    key = name.casefold()
+    known = list(existing) + list(also_known or [])
+    if any(str(n).strip().casefold() == key for n in known if str(n or "").strip()):
+        return list(existing), f"`{name}` ist bereits in der Liste."
+    return [*existing, name], None
+
+
+def is_known_marker_name(name: str, options: list[str]) -> bool:
+    """True if name matches a non-sentinel option (case-insensitive)."""
+    key = str(name or "").strip().casefold()
+    if not key or key == _NONE.casefold():
+        return False
+    return any(
+        str(o).strip().casefold() == key for o in options if str(o or "").strip() and o != _NONE
+    )
+
+
+def _name_options(
+    rows: list[dict[str, Any]],
+    current_values: list[str],
+    manual_names: list[str] | None = None,
+) -> list[str]:
     names = [str(row.get("name") or "") for row in rows if str(row.get("name") or "").strip()]
-    for value in current_values:
-        if value and value not in names:
-            names.append(value)
+    for value in list(current_values) + list(manual_names or []):
+        text = str(value or "").strip()
+        if text and text not in names:
+            names.append(text)
     names.sort(key=str.lower)
     return [_NONE] + names
 
@@ -303,20 +343,64 @@ def _name_options(rows: list[dict[str, Any]], current_values: list[str]) -> list
 def _select_marker(
     field: str,
     *,
+    entity_id: str,
+    profile_id: str,
     current: str,
     options: list[str],
     required: bool,
-    confidence: float | None,
     key: str,
 ) -> str:
     choice = current if current in options else _NONE
+    if key not in st.session_state and current and current not in options and current != _NONE:
+        # Restore a typed/custom value that is not yet in the shared options list.
+        st.session_state[key] = current
     selected = st.selectbox(
-        _field_select_caption(field, required=required, confidence=confidence),
+        _field_select_caption(field, required=required),
         options=options,
         index=options.index(choice) if choice in options else 0,
         key=key,
+        accept_new_options=True,
+        help="Bekannten Merker wählen oder neuen Namen eintippen (Bestätigung folgt).",
     )
-    return "" if selected == _NONE else str(selected)
+    if selected is None or selected == _NONE or not str(selected).strip():
+        _clear_pending_for_widget(key)
+        return ""
+    text = str(selected).strip()
+    known_pool = options + session_manual_marker_names()
+    if is_known_marker_name(text, known_pool):
+        _clear_pending_for_widget(key)
+        return text
+    _queue_pending_new_marker(
+        entity_id=entity_id,
+        profile_id=profile_id,
+        field=field,
+        name=text,
+        widget_key=key,
+    )
+    return ""
+
+
+def _clear_pending_for_widget(widget_key: str) -> None:
+    pending = st.session_state.get(_SESSION_PENDING_NEW)
+    if isinstance(pending, dict) and pending.get("widget_key") == widget_key:
+        st.session_state.pop(_SESSION_PENDING_NEW, None)
+
+
+def _queue_pending_new_marker(
+    *,
+    entity_id: str,
+    profile_id: str,
+    field: str,
+    name: str,
+    widget_key: str,
+) -> None:
+    st.session_state[_SESSION_PENDING_NEW] = {
+        "entity_id": entity_id,
+        "profile_id": profile_id,
+        "field": field,
+        "name": name,
+        "widget_key": widget_key,
+    }
 
 
 def _migrate_on_open() -> tuple[dict, dict]:
@@ -344,7 +428,8 @@ def render_ehal_loxone_mapping_section() -> None:
         "(`plant` / `consumers[].ehal_bindings` / `swimspa_filter_bindings`). "
         "Außerplanmäßige Optimierung: Loxone VO `Earnie_Request_Optimize` "
         "(Daemon-HTTP, Port `system.ehal_loxone_http_port`, Standard 8541). "
-        "Struktur-Scan: HTTP-Probe bekannter Earnie_*/gemappter Merker."
+        "Struktur-Scan: HTTP-Probe bekannter Earnie_*/gemappter Merker; "
+        "in jedem Feld-Dropdown einen neuen Merker eintippen (mit Bestätigung)."
     )
     house, config_doc = _migrate_on_open()
     profile_id = resolve_live_profile_id(house)
@@ -352,11 +437,26 @@ def render_ehal_loxone_mapping_section() -> None:
     if not profile_id:
         st.warning("Kein Hausprofil im Live-Szenario — bitte zuerst im Szenarienkonfigurator setzen.")
         return
+    feedback = st.session_state.pop(_SESSION_MANUAL_FEEDBACK, None)
+    if feedback:
+        st.info(feedback)
     rows = _render_http_probe_scan(house, profile_id)
     entity = _render_entity_picker(entities)
     proposals: dict[str, dict[str, Any]] = dict(st.session_state.get(_SESSION_PROPOSALS) or {})
-    options = _name_options(rows, list(entity["bindings"].values()))
-    ehal_map = _render_field_selects(entity, options, proposals)
+    options = _name_options(
+        rows,
+        list(entity["bindings"].values()),
+        session_manual_marker_names(),
+    )
+    ehal_map = _render_field_selects(
+        entity,
+        options,
+        proposals,
+        profile_id=profile_id,
+    )
+    pending = st.session_state.get(_SESSION_PENDING_NEW)
+    if isinstance(pending, dict) and str(pending.get("name") or "").strip():
+        _confirm_new_marker_dialog(house, config_doc)
     if st.button("Mapping speichern", key="ehal_lox_save_btn", type="primary"):
         _save_entity_mapping(
             house,
@@ -370,7 +470,8 @@ def render_ehal_loxone_mapping_section() -> None:
 def _render_http_probe_scan(house: dict, profile_id: str) -> list[dict[str, Any]]:
     """Scan via HTTP-Probe only (MCP / Ollama / Quellenvergleich UI removed; code kept in integrations)."""
     if st.button("HTTP-Probe", key="ehal_lox_scan_btn"):
-        _run_structure_scan(configured_marker_names(house, profile_id))
+        configured = configured_marker_names(house, profile_id) + session_manual_marker_names()
+        _run_structure_scan(configured)
     rows: list[dict[str, Any]] = list(st.session_state.get(_SESSION_SCAN) or [])
     if rows:
         st.caption(f"{len(rows)} Namen für Mapping (HTTP-Probe)")
@@ -383,17 +484,107 @@ def _render_http_probe_scan(house: dict, profile_id: str) -> list[dict[str, Any]
     return rows
 
 
+def _manual_add_probe_caption(name: str) -> str:
+    """Non-blocking HTTP presence check after manual add; always keeps the name in the list."""
+    host = str(config.get("LOXONE_IP") or "")
+    username = str(config.get("LOXONE_USER") or "")
+    password = str(config.get("LOXONE_PASS") or "")
+    if not host.strip() or not username.strip():
+        return (
+            f"`{name}` gespeichert und zugeordnet "
+            "(keine Loxone-Zugangsdaten — HTTP-Probe übersprungen)."
+        )
+    try:
+        result = probe_marker_names(
+            [name],
+            host=host,
+            username=username,
+            password=password,
+            timeout_sec=5.0,
+        )
+    except ValueError as exc:
+        return f"`{name}` gespeichert und zugeordnet (Probe fehlgeschlagen: {exc})."
+    if name in result.present:
+        return f"`{name}` gespeichert und zugeordnet — HTTP-Probe: auf dem Miniserver vorhanden."
+    if name in result.missing:
+        return (
+            f"`{name}` gespeichert und zugeordnet — HTTP-Probe: 404 (fehlt noch); "
+            "Mapping trotzdem aktiv."
+        )
+    return f"`{name}` gespeichert und zugeordnet (Probe ohne eindeutigen Status)."
+
+
+@st.dialog("Neuer Merker?")
+def _confirm_new_marker_dialog(house: dict, config_doc: dict) -> None:
+    pending = st.session_state.get(_SESSION_PENDING_NEW) or {}
+    name = str(pending.get("name") or "").strip()
+    field = str(pending.get("field") or "").strip()
+    entity_id = str(pending.get("entity_id") or "").strip()
+    st.markdown(
+        f"Unbekannter Merker `{name}` für EHAL-Feld `{field}` "
+        f"(Entity `{entity_id}`)."
+    )
+    st.caption("Als neuen Merker speichern und diesem Feld zuordnen?")
+    col_yes, col_no = st.columns(2)
+    with col_yes:
+        if st.button("Ja, speichern und zuordnen", type="primary", key="ehal_lox_new_yes"):
+            _accept_pending_new_marker(house, config_doc)
+            st.rerun()
+    with col_no:
+        if st.button("Nein", key="ehal_lox_new_no"):
+            widget_key = str(pending.get("widget_key") or "")
+            if widget_key:
+                st.session_state[widget_key] = _NONE
+            st.session_state.pop(_SESSION_PENDING_NEW, None)
+            st.rerun()
+
+
+def _accept_pending_new_marker(house: dict, config_doc: dict) -> None:
+    pending = st.session_state.get(_SESSION_PENDING_NEW) or {}
+    name = str(pending.get("name") or "").strip()
+    field = str(pending.get("field") or "").strip()
+    entity_id = str(pending.get("entity_id") or "").strip()
+    profile_id = str(pending.get("profile_id") or "").strip()
+    widget_key = str(pending.get("widget_key") or "")
+    if not (name and field and entity_id and profile_id):
+        st.session_state.pop(_SESSION_PENDING_NEW, None)
+        return
+    existing = list(st.session_state.get(_SESSION_MANUAL_NAMES) or [])
+    updated, _hint = add_manual_marker_name(existing, name)
+    st.session_state[_SESSION_MANUAL_NAMES] = updated
+    rows = build_entity_rows(house, profile_id)
+    entity = next((row for row in rows if row["id"] == entity_id), None)
+    bindings = dict(entity["bindings"]) if entity else {}
+    bindings[field] = name
+    migrated_house, migrated_config, _ = ensure_migrated(house, config_doc)
+    saved = apply_entity_bindings(
+        migrated_house,
+        profile_id=profile_id,
+        entity_id=entity_id,
+        bindings=bindings,
+    )
+    save_house_profiles(saved)
+    save_main_config(_ensure_ehal_loxone_meta(migrated_config))
+    reset_adapter_cache()
+    if widget_key:
+        st.session_state[widget_key] = name
+    st.session_state.pop(_SESSION_PENDING_NEW, None)
+    st.session_state[_SESSION_MANUAL_FEEDBACK] = _manual_add_probe_caption(name)
+
+
 def _render_entity_picker(entities: list[dict[str, Any]]) -> dict[str, Any]:
     labels = [f"{row['label']} (`{row['id']}`)" for row in entities]
     ids = [str(row["id"]) for row in entities]
     current = str(st.session_state.get(_SESSION_ENTITY) or PLANT_ENTITY_ID)
     if current not in ids:
         current = ids[0] if ids else PLANT_ENTITY_ID
+    st.markdown("#### Entity")
     picked = st.selectbox(
         "Entity",
         options=labels,
         index=ids.index(current) if current in ids else 0,
         key="ehal_lox_entity_pick",
+        label_visibility="collapsed",
     )
     entity_id = ids[labels.index(picked)]
     if entity_id != st.session_state.get(_SESSION_ENTITY):
@@ -405,6 +596,8 @@ def _render_field_selects(
     entity: dict[str, Any],
     options: list[str],
     proposals: dict[str, dict[str, Any]],
+    *,
+    profile_id: str,
 ) -> dict[str, str]:
     ehal_map: dict[str, str] = {}
     bindings = entity["bindings"]
@@ -413,20 +606,21 @@ def _render_field_selects(
     grouped = group_fields_by_role(fields)
     if not grouped:
         grouped = [("other", list(fields))]
+    entity_id = str(entity["id"])
     for role_id, role_fields in grouped:
         caption = role_group_label(role_id) if role_id != "other" else "Felder"
-        st.markdown(f"**{caption}** — `{entity['id']}`")
+        st.markdown(f"**{caption}** — `{entity_id}`")
         for field in role_fields:
             prop = proposals.get(field) or {}
             default = str(prop.get("marker_name") or bindings.get(field) or "")
-            conf = prop.get("confidence")
             mapped = _select_marker(
                 field,
+                entity_id=entity_id,
+                profile_id=profile_id,
                 current=default if default in options else bindings.get(field, ""),
                 options=options,
                 required=field in required,
-                confidence=float(conf) if conf is not None else None,
-                key=f"ehal_lox_map_{entity['id']}_{field}",
+                key=f"ehal_lox_map_{entity_id}_{field}",
             )
             if mapped:
                 ehal_map[field] = mapped

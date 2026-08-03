@@ -499,14 +499,18 @@ if __name__ == "__main__":
     )
     from runtime_store.dotenv_loader import load_app_dotenv
     from runtime_store.env_vars import is_planning_offline_gated
+    from runtime_store.setup_gate_log import log_setup_gate_wait
     from ui.setup_readiness import is_planning_ready, needs_planning_onboarding
 
     _SETUP_WAIT_SEC = 60
+    _setup_gate_state: dict = {}
     next_trigger = TRIGGER_QUARTER_HOUR
 
     while True:
         if needs_loxone_setup():
-            logger.warning(
+            log_setup_gate_wait(
+                _setup_gate_state,
+                "loxone_setup",
                 "Loxone-Zugangsdaten fehlen oder sind noch Platzhalter. "
                 "Bitte in der Streamlit-UI (Port %s) die Ersteinrichtung abschließen. "
                 "Erneuter Versuch in %s Sekunden.",
@@ -519,19 +523,24 @@ if __name__ == "__main__":
             continue
 
         if loxone_setup_deferred() and not loxone_credentials_configured():
-            logger.info(
+            log_setup_gate_wait(
+                _setup_gate_state,
+                "loxone_deferred",
                 "Loxone-Zugangsdaten noch nicht hinterlegt (optional bis Live-/Silent-Betrieb). "
                 "Planung/Backtesting in der UI (Port %s) möglich. "
                 "Erneuter Versuch in %s Sekunden.",
                 config.get_ui_streamlit_port(),
                 _SETUP_WAIT_SEC,
+                level=logging.INFO,
             )
             time.sleep(_SETUP_WAIT_SEC)
             config.reinit_config()
             continue
 
         if is_planning_offline_gated():
-            logger.warning(
+            log_setup_gate_wait(
+                _setup_gate_state,
+                "planning_offline",
                 "Live-Szenario unvollständig (Planung offline). "
                 "Bitte in der Streamlit-UI (Port %s) das Live-Szenario im "
                 "Szenarienkonfigurator vervollständigen (Entitäts-Referenzen speichern). "
@@ -544,7 +553,9 @@ if __name__ == "__main__":
             continue
 
         if needs_planning_onboarding() and not is_planning_ready():
-            logger.warning(
+            log_setup_gate_wait(
+                _setup_gate_state,
+                "planning_onboarding",
                 "Planungs-Konfiguration unvollständig. "
                 "Bitte in der Streamlit-UI (Port %s) Hauskonfigurator und Runtime-Szenario abschließen. "
                 "Erneuter Versuch in %s Sekunden.",
@@ -555,6 +566,7 @@ if __name__ == "__main__":
             config.reinit_config()
             continue
 
+        _setup_gate_state.clear()
         try:
             main(run_trigger=next_trigger)
             next_trigger = TRIGGER_QUARTER_HOUR

@@ -8,10 +8,14 @@ from ui.ehal_loxone_mapping import (
     FLEX_FIELDS,
     PLANT_ENTITY_ID,
     PLANT_FIELDS,
+    _NONE,
     _field_select_caption,
+    _name_options,
+    add_manual_marker_name,
     apply_entity_bindings,
     build_entity_rows,
     fields_for_consumer,
+    is_known_marker_name,
 )
 
 
@@ -146,3 +150,46 @@ def test_apply_entity_bindings_writes_filter_nest():
     assert nest["ehal_bindings"]["get_filter_remaining_hours"] == (
         "Earnie_Pool_Filter_Sollstunden"
     )
+
+
+def test_name_options_merges_manual_names():
+    options = _name_options(
+        [{"name": "From_Probe"}],
+        ["Saved_Binding"],
+        ["Manual_Merker", "From_Probe"],
+    )
+    assert options[0] == _NONE
+    assert "From_Probe" in options
+    assert "Saved_Binding" in options
+    assert "Manual_Merker" in options
+    assert options.count("From_Probe") == 1
+
+
+def test_add_manual_marker_name_empty_and_duplicate():
+    names, hint = add_manual_marker_name([], "  ")
+    assert names == []
+    assert hint is not None
+
+    names, hint = add_manual_marker_name(["Earnie_SOC"], "earnie_soc")
+    assert names == ["Earnie_SOC"]
+    assert hint is not None
+
+    names, hint = add_manual_marker_name(
+        [],
+        "New_Merker",
+        also_known=["New_Merker"],
+    )
+    assert names == []
+    assert hint is not None
+
+    names, hint = add_manual_marker_name(["A"], "B")
+    assert names == ["A", "B"]
+    assert hint is None
+
+
+def test_is_known_marker_name_casefold():
+    options = [_NONE, "Earnie_SOC", "House_P"]
+    assert is_known_marker_name("earnie_soc", options)
+    assert not is_known_marker_name("Brand_New", options)
+    assert not is_known_marker_name(_NONE, options)
+    assert not is_known_marker_name("", options)

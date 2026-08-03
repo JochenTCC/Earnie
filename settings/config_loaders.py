@@ -258,16 +258,17 @@ def should_defer_runtime_params(
     house_profiles_path: str,
     backtesting_scenarios_path: str,
 ) -> bool:
-    from runtime_store.env_vars import is_explicit_offline
     from runtime_store.offline_demo_seed import live_scenario_refs_incomplete
     from ui.setup_readiness import (
         is_planning_ready_for,
         needs_planning_onboarding_from_raw,
     )
 
-    # Cloud / offline: empty live refs must not abort config load (seed may not
-    # have catalogs yet; UI can still open for house/scenario setup).
-    if is_explicit_offline() and live_scenario_refs_incomplete(
+    # Empty live entity refs must not abort config load (cloud demo skips seed;
+    # greenfield/offline UI still needs to open for house/scenario setup).
+    # Do not rely on is_planning_ready_for alone: house profiles with Loxone
+    # wiring can look "ready" while battery/tariff IDs are still empty.
+    if live_scenario_refs_incomplete(
         scenarios_path=backtesting_scenarios_path,
     ):
         return True

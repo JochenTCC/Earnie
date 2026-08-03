@@ -189,17 +189,17 @@ Nach abgeschlossener Planungs-Konfiguration erscheint **Szenario-Explorer**, abe
 
 ### Live-Lesen
 
-Nur `**sens_***` und `**get_***` (Messwerte / Eingaben). Die Tabelle listet **alle** erwarteten EHAL-Felder (Anlage + Verbraucher); ohne Binding bleibt **Mapping** leer und Status **Kein Mapping**. Spalten überall:
+Nur `**sens_***` und `**get_***` (Messwerte / Eingaben). Die Tabelle listet **alle** erwarteten EHAL-Felder (Anlage + Verbraucher); ohne Binding bleibt die Mapping-Spalte leer und Status **Kein Mapping**. Spalten überall:
 
 
-| Spalte          | Bedeutung                                                                                                 |
-| --------------- | --------------------------------------------------------------------------------------------------------- |
-| EHAL-Feld       | Kanonischer EHAL-Name (bei Verbrauchern `{id}:{feld}`)                                                    |
-| Mapping         | Adresse im gewählten Backend (Loxone-Merker, HA-`entity_id`, OpenEMS-Kanal); leer wenn noch nicht gemappt |
-| Wert            | Live-Wert                                                                                                 |
-| Status          | OK / Warnung / Fehler / Kein Mapping                                                                      |
-| Detail          | Fehlertext (bei OK leer)                                                                                  |
-| Zuletzt gelesen | Zeitstempel der Abfrage                                                                                   |
+| Spalte | Bedeutung |
+| --- | --- |
+| EHAL-Feld | Kanonischer EHAL-Name (bei Verbrauchern `{id}:{feld}`) |
+| Mapping auf Loxone / Home Assistant / OpenEMS | Adresse im gewählten Backend (Loxone-Merker, HA-`entity_id`, OpenEMS-Kanal); Spaltentitel je nach Backend; leer wenn noch nicht gemappt |
+| Wert | Live-Wert |
+| Status | OK / Warnung / Fehler / Kein Mapping |
+| Detail | Fehlertext (bei OK leer) |
+| Zuletzt gelesen | Zeitstempel der Abfrage |
 
 
 **Loxone:** periodisches Lesen der konfigurierten Merker (Tabelle + **Smarthome-Merker testen**). Anlagen-Felder: `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, optional `sens_power_consumers`. **Verbraucher** (aus Flex-Liste und Hausprofil mit Merker): EV → `{id}:sens_evcs_`* / `{id}:get_evcs_`*; andere mit Leistung →* `{id}:flex.{slug}.sens_power_act`*. Kein PV-Zähler, keine* `set_` / Freigaben. `get_evcs_ready_by_time`**:** Binding = AlarmClock-Bezeichnung (wie Zähler); Lesen von **Tna** über `/jdev/sps/io/{name}/all`.
@@ -210,17 +210,17 @@ Einheiten und Vorzeichen: siehe §B. Vollständige Rollen-Matrix: §C.
 
 ### Live-Schreiben
 
-`**set_***` (Anlage / EV) sowie Flex-**Freigabe** / Sollwert (`{id}:flex.{slug}.set_enable`, optional `set_power_setpoint`). Die Tabelle listet **alle** erwarteten Schreibfelder; Werte/Erfolg kommen aus dem letzten `main.py`-Lauf (`runtime/optimizer_run_state.json`), ungemappte Zeilen haben leeres **Mapping**. Gleiche Identitäts-Spalten:
+`**set_***` (Anlage / EV) sowie Flex-**Freigabe** / Sollwert (`{id}:flex.{slug}.set_enable`, optional `set_power_setpoint`). Die Tabelle listet **alle** erwarteten Schreibfelder; Werte/Erfolg kommen aus dem letzten `main.py`-Lauf (`runtime/optimizer_run_state.json`), ungemappte Zeilen haben eine leere Mapping-Spalte. Gleiche Identitäts-Spalten:
 
 
-| Spalte      | Bedeutung                                                               |
-| ----------- | ----------------------------------------------------------------------- |
-| EHAL-Feld   | `set_*` bzw. `{id}:flex.{slug}.set_enable` (Freigabe)                   |
-| Mapping     | Merker / HA-Entity / OpenEMS-Schreibkanal; leer wenn noch nicht gemappt |
-| Wert        | Geschriebener Sollwert                                                  |
-| Erfolg      | Ja / Nein                                                               |
-| Gesendet um | Zeitstempel                                                             |
-| Meldung     | Fehlertext bzw. Silent-Hinweis                                          |
+| Spalte | Bedeutung |
+| --- | --- |
+| EHAL-Feld | `set_*` bzw. `{id}:flex.{slug}.set_enable` (Freigabe) |
+| Mapping auf Loxone / Home Assistant / OpenEMS | Merker / HA-Entity / OpenEMS-Schreibkanal; Spaltentitel je nach Backend; leer wenn noch nicht gemappt |
+| Wert | Geschriebener Sollwert |
+| Erfolg | Ja / Nein |
+| Gesendet um | Zeitstempel |
+| Meldung | Fehlertext bzw. Silent-Hinweis |
 
 
 - **Loxone:** Trace `loxone_writes` (IO-Name wird auf EHAL-Feld zurückgeführt); Silent: geplante Sollwerte aus `loxone_sent` mit Status „Nicht gesendet“.
@@ -243,10 +243,11 @@ Nur bei Backend **Loxone**: Entity-zentrierter Assistent (Backlog **2.4.k**, Str
 
 Library-Vorlagen und Earnie-tot-Fallback: [Earnie-Loxone-Library](../einrichtung/loxone-earnie-library.md).
 
-1. **HTTP-Probe** — bekannte Greenfield-/Template-Namen und bereits gemappte Merker (`greenfield_device_map.json` + Prefix+Slug) über `/jdev/sps/io/{Name}` prüfen (`LL.Code` 200 oder 403 = vorhanden, 404 = fehlt). Gefundene Namen füllen die Mapping-Dropdowns. (Loxone MCP und Ollama-KI bleiben im Code für spätere Re-Integration, sind auf der Oberfläche derzeit nicht angeboten.)
+1. **HTTP-Probe** — bekannte Greenfield-/Template-Namen und bereits gemappte Merker (`greenfield_device_map.json` + Prefix+Slug) über `/jdev/sps/io/{Name}` prüfen (`LL.Code` 200 oder 403 = vorhanden, 404 = fehlt). Gefundene Namen füllen die Mapping-Dropdowns. Manuell hinzugefügte Merker werden bei der nächsten Probe mitgeprüft. (Loxone MCP und Ollama-KI bleiben im Code für spätere Re-Integration, sind auf der Oberfläche derzeit nicht angeboten.)
 2. **Loxone-Import** (im **Hauskonfigurator**, oberhalb von Verbraucher) — legt typisierte Plant-/Verbraucher-Entities und `ehal_bindings` aus Merker+EFM an (Prefix+Slug case-insensitive). Zähler-Bezeichnung ohne führendes „Zähler“/„Zaehler“ und ohne EFM-„Verbraucher N:“ als Label/Id; gleiche physische Geräte (z. B. Pool↔Swimspa, E-Auto↔Wallbox/smart) werden zusammengeführt, EFM-Leistung bevorzugt auf den typisierten Verbraucher. Danach hier die Signal-Zuordnung prüfen. Vorher Library/Merker auf dem Miniserver: [Earnie-Loxone-Library](../einrichtung/loxone-earnie-library.md).
-3. **Human-in-the-Loop** — Entity wählen, EHAL-Felder zuweisen (Select-Label: **Bedeutung** plus EHAL-Value-Name, z. B. `Netzleistung (sens_grid_power_active)`). Die Merker-Adresse kommt aus dem Binding des gewählten Feldes.
-4. **Speichern** — schreibt `plant.ehal_bindings` / `consumers[].ehal_bindings` in `house_profiles.json`. Beim ersten Migrate/Save werden Legacy-Merker-Trigger-Keys und Anlagen-Rollen aus `loxone_blocks` entfernt (leeres `loxone_blocks` entfällt).
+3. **Neuer Merker im Feld-Dropdown** — In jedem EHAL-Feld-Select kann ein noch unbekannter Merkername eingetippt werden (`accept_new_options`). Es erscheint eine Bestätigung (**Neuer Merker?**): bei **Ja** wird der Name in die Merker-Liste aufgenommen, dem Feld in `house_profiles.json` zugeordnet und optional per HTTP-Probe geprüft (vorhanden / 404); bei **Nein** bleibt das Feld ungemappt. Leere Eingaben zählen nicht.
+4. **Human-in-the-Loop** — Entity wählen, EHAL-Felder zuweisen (Select-Label: **Bedeutung** plus EHAL-Value-Name, z. B. `Netzleistung (sens_grid_power_active)`). Die Merker-Adresse kommt aus dem Binding des gewählten Feldes.
+5. **Speichern** — **Mapping speichern** schreibt alle sichtbaren Feld-Zuordnungen der gewählten Entity nach `plant.ehal_bindings` / `consumers[].ehal_bindings` in `house_profiles.json`. Einzelne neue Merker werden bereits bei der Bestätigung (Schritt 3) für dieses Feld persistiert. Beim ersten Migrate/Save werden Legacy-Merker-Trigger-Keys und Anlagen-Rollen aus `loxone_blocks` entfernt (leeres `loxone_blocks` entfällt).
 
 **Energieflussmonitor → Verbraucher:** Expander **Zähler importieren** lädt Zähler aus `LoxAPP3.json` (EFM-Baum + orphan Meter), schlägt generische Verbraucher vor (Label/Id ohne führendes „Zähler“) und kann optional `flex.{slug}.sens_power_act` auf die Zähler-Bezeichnung setzen. Treffer auf bestehende typisierte Verbraucher (Merker) werden gematcht statt dupliziert. CSV-Export bleibt manuell; `flex.{slug}.set_enable` / `set_power_setpoint` nicht vom Zähler. Spec: [efm-auto-sync-2.4.l](../spec/efm-auto-sync-2.4.l.md). Manueller Blueprint: Plan `energieflussmonitor_hausprofil_blueprint_a`.
 
