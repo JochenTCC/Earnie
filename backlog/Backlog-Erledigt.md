@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Backtesting crash empty cons_data (2026-08-03)
+
+- [x] **Backtesting page crash when `cons_data_hourly.csv` missing/empty** — Zeitraum-Hilfe called `resolve_simulation_window` and raised `ValueError` before the generate-data warning; help text now handles empty cons_data. Handbook: no-PV/no-battery baseline is automatic **Historisch** (no extra scenario). Tests: `tests/test_backtesting_time_ranges.py`. Verified.
+
+
 ### Pattern B pool Freigabe + Live-Schreiben flex (2026-08-01)
 
 - [x] **status.json pool VI Check keys** — bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe`; legacy SwimSpa enable Merkers dual-read onto those keys; VI templates `Analog=true` (sticky).

@@ -44,21 +44,35 @@ def cons_data_section_caption() -> str:
     )
 
 
+def _simulation_window_help_line(price_range: str) -> str:
+    """Help line for the SE window; safe when cons_data is missing/empty."""
+    prefix = (
+        f"**Backtesting-Simulation:** `price_range` = `{price_range}` "
+        f"({describe_price_range(price_range)})"
+    )
+    try:
+        sim_start, sim_end = default_simulation_window()
+    except ValueError:
+        return (
+            f"{prefix} — Zeitraum noch nicht bestimmbar "
+            "(keine gültigen Verbrauchsdaten)."
+        )
+    return (
+        f"{prefix} — aktuell "
+        f"**{sim_start.isoformat()}** bis **{sim_end.isoformat()}**."
+    )
+
+
 def build_time_range_help_lines(*, log_period: dict | None = None) -> list[str]:
     retention = configured_retention_months()
     price_range = configured_price_range()
-    sim_start, sim_end = default_simulation_window()
     lines = [
         (
             f"**`cons_data_hourly.csv`:** Aufbewahrung **{retention}** Monate "
             f"(`cons_data_retention_months`; ältere Stunden werden beim Speichern "
             f"entfernt). Die Visualisierung im Abschnitt oben zeigt die **gesamte Datei**."
         ),
-        (
-            f"**Backtesting-Simulation:** `price_range` = `{price_range}` "
-            f"({describe_price_range(price_range)}) — aktuell "
-            f"**{sim_start.isoformat()}** bis **{sim_end.isoformat()}**."
-        ),
+        _simulation_window_help_line(price_range),
     ]
     if log_period and log_period.get("start") and log_period.get("end"):
         lines.append(

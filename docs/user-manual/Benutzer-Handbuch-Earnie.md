@@ -234,13 +234,15 @@ Unter **Konfiguration → Szenarienkonfigurator** bauen Sie **Varianten** Ihres 
 Ein Szenario verknüpft typischerweise:
 
 - Hausprofil  
-- Batterie und/oder PV-Anlage(n). Ein Szenario ohne diese Komponenten ist auch möglich.  
+- Batterie und/oder PV-Anlage(n)  
 - Bezugs- und Einspeisetarif  
+
+**Kein eigenes Szenario „ohne PV und ohne Batterie“ nötig:** Diese Referenz berechnet Earnie im Szenario-Explorer automatisch als Zeile **Historisch** (Live-Tarife, Last ohne PV/Speicher und ohne Flex-Optimierung). Legen Sie dafür kein zusätzliches Szenario im Szenarienkonfigurator an.
 
 Beispiele für Vergleiche:
 
 - Ist-Zustand vs. größerer Speicher  
-- mit PV vs. ohne PV oder mehrere PVs
+- mit PV vs. mehrere PVs  
 - Fixpreis vs. Spot-Tarif  
 - ohne Batterie, aber mit PV  
 
@@ -254,7 +256,7 @@ Unter **Konfiguration → Szenario-Explorer** (erscheint nach ausreichender Plan
 
 Hier analysieren Sie **Langzeitvergleiche** typischerweise über die letzten 12 Monate (für Tests auch kürzer, z. B. nur März) zwischen Referenzen und Ihren Szenarien:
 
-- **Historisch** — „nacktes Haus“ ohne PV und ohne Speicher (Live-Tarife, Last ohne Flex-Optimierung)  
+- **Historisch** — „nacktes Haus“ ohne PV und ohne Speicher (Live-Tarife, Last ohne Flex-Optimierung); **automatisch** berechnet, kein eigenes Szenario konfigurieren  
 - **Referenzen ohne Optimierung** — je nach Szenario-Einstellung und Heuristik: Live-Referenz und ggf. eigene Spalten bei abweichendem Tarif/PV (steuerbar im Szenarienkonfigurator)  
 - **optimierte Szenarien** — mit Earnie-Planung (Batterie/Flex, sofern im Szenario vorhanden)
 
@@ -279,7 +281,7 @@ Optional: Checkbox **Verbrauchsdaten auf letzten Kalendermonat spiegeln (aktuell
 2. Rechnung starten (kann je nach Umfang länger dauern).  
 3. Warten, bis die Auswertung fertig ist; Ergebnisse landen in der Laufzeitablage für den Explorer.
 
-Die Zeile **Historisch** rechnet die Last am Live-Tarif **ohne** PV und **ohne** Batterie. Zusätzliche Referenzen ohne Optimierung entstehen nach Heuristik bzw. der Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag dieses Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante — nicht zur Historisch-Zeile.
+Die Zeile **Historisch** rechnet Earnie **automatisch**: Last am Live-Tarif **ohne** PV und **ohne** Batterie. Dafür brauchen Sie kein eigenes Szenario im Szenarienkonfigurator. Zusätzliche Referenzen ohne Optimierung entstehen nach Heuristik bzw. der Einstellung **Eigene Referenz ohne Optimierung** (bei PV-Szenarien mit dem PV-Ertrag dieses Szenarios). Batterie und Lastverschiebung gehören zur **optimierten** Variante — nicht zur Historisch-Zeile.
 
 #### Ergebnisse des Szenario-Explorers
 

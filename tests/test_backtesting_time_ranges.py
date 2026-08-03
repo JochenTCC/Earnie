@@ -67,6 +67,31 @@ def test_build_time_range_help_lines_without_log(monkeypatch):
     assert "8760" in lines[3]
 
 
+def test_build_time_range_help_lines_empty_cons_data(monkeypatch):
+    monkeypatch.setattr(
+        "ui.backtesting_time_ranges.configured_retention_months",
+        lambda: 24,
+    )
+    monkeypatch.setattr(
+        "ui.backtesting_time_ranges.configured_price_range",
+        lambda: "last_12_months",
+    )
+
+    def _missing_window():
+        raise ValueError(
+            "Kein Zeitraum für die Simulation: cons_data_hourly.csv fehlt oder ist leer."
+        )
+
+    monkeypatch.setattr(
+        "ui.backtesting_time_ranges.default_simulation_window",
+        _missing_window,
+    )
+    lines = build_time_range_help_lines()
+    assert len(lines) == 4
+    assert "noch nicht bestimmbar" in lines[1]
+    assert "keine gültigen Verbrauchsdaten" in lines[1]
+
+
 def test_build_time_range_help_lines_with_log_period(monkeypatch):
     monkeypatch.setattr(
         "ui.backtesting_time_ranges.configured_retention_months",
