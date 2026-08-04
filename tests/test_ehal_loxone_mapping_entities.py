@@ -32,6 +32,53 @@ def test_fields_for_consumer_ev_vs_flex():
     assert "get_filter_remaining_hours" in FILTER_FIELDS
 
 
+def test_fields_for_consumer_pool_filter_includes_filter_roles():
+    fields = fields_for_consumer({"id": "pool_filter", "type": "flexible"})
+    assert "flex.pool_filter.sens_power_act" in fields
+    assert "get_filter_remaining_hours" in fields
+    assert "sens_filter_active" in fields
+    assert "get_filter_native_start_hour" in fields
+    assert "get_filter_native_duration_hours" in fields
+    assert "flex.pool_filter.set_enable" in fields
+    assert "flex.pool_filter.set_power_setpoint" not in fields
+
+
+def test_build_entity_rows_pool_filter_hides_synthetic_filter():
+    house = {
+        "plant": {},
+        "profiles": {
+            "live": {
+                "id": "live",
+                "consumers": [
+                    {
+                        "id": "pool",
+                        "label": "Pool",
+                        "type": "thermal_rc",
+                        "use_profile_csv": False,
+                    },
+                    {
+                        "id": "pool_filter",
+                        "label": "Pool Filter",
+                        "type": "flexible",
+                        "ehal_bindings": {
+                            "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
+                        },
+                    },
+                ],
+            }
+        },
+    }
+    rows = build_entity_rows(house, "live")
+    ids = [r["id"] for r in rows]
+    assert FILTER_ENTITY_ID not in ids
+    filt = next(r for r in rows if r["id"] == "pool_filter")
+    assert "get_filter_remaining_hours" in filt["fields"]
+    assert "flex.pool_filter.sens_power_act" in filt["fields"]
+    assert filt["bindings"]["get_filter_remaining_hours"] == (
+        "Earnie_Pool_Filter_Sollstunden"
+    )
+
+
 def test_field_select_caption_includes_ehal_name():
     caption = _field_select_caption("sens_ess_soc", required=True)
     assert "`sens_ess_soc`" in caption

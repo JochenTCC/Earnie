@@ -14,6 +14,7 @@ from house_config.ehal_bindings import (
     ehal_map_to_filter_bindings,
     ensure_migrated,
     filter_bindings_to_ehal_map,
+    filter_ehal_fields_for_consumer,
     strip_migrated_config_keys,
 )
 from integrations.ehal_live import reset_adapter_cache
@@ -135,6 +136,8 @@ def fields_for_consumer(consumer: dict) -> tuple[str, ...]:
     from ehal.flex_fields import flex_fields_for_consumer
 
     cid = str(consumer.get("id") or "").strip()
+    if cid == "pool_filter":
+        return filter_ehal_fields_for_consumer("pool_filter")
     if cid:
         base = flex_fields_for_consumer(cid)
     else:

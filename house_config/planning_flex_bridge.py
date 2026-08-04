@@ -359,31 +359,49 @@ def _swimspa_filter_bindings_from_profile(house_profile: dict) -> dict | None:
     return None
 
 
-def _pool_filter_enable_overlay(house_profile: dict) -> dict | None:
-    """When greenfield ``pool_filter`` exists, use its Freigabe for the MILP bridge."""
-    from ehal.flex_fields import KIND_SET_ENABLE, flex_field
-    from settings.ehal_marker_resolve import marker_flex_enable
+_POOL_FILTER_PASSTHROUGH: tuple[str, ...] = (
+    "get_filter_remaining_hours",
+    "sens_filter_active",
+    "get_filter_native_start_hour",
+    "get_filter_native_duration_hours",
+)
+
+
+def _pool_filter_bindings_overlay(house_profile: dict) -> dict | None:
+    """Map greenfield ``pool_filter`` EHAL bindings onto the MILP ``swimspa_filter`` bridge."""
+    from ehal.flex_fields import KIND_SENS_POWER_ACT, KIND_SET_ENABLE, flex_field
 
     for consumer in house_profile.get("consumers") or []:
         if not isinstance(consumer, dict):
             continue
         if str(consumer.get("id") or "").strip() != "pool_filter":
             continue
-        enable = str(marker_flex_enable(consumer) or "").strip()
-        if not enable:
+        raw = consumer.get("ehal_bindings")
+        if not isinstance(raw, dict):
             return None
-        return {
-            "ehal_bindings": {
-                flex_field("swimspa_filter", KIND_SET_ENABLE): enable,
-            }
-        }
+        out: dict[str, str] = {}
+        for key in _POOL_FILTER_PASSTHROUGH:
+            value = str(raw.get(key) or "").strip()
+            if value:
+                out[key] = value
+        power = str(
+            raw.get(flex_field("pool_filter", KIND_SENS_POWER_ACT)) or ""
+        ).strip()
+        if power:
+            out[flex_field("swimspa_filter", KIND_SENS_POWER_ACT)] = power
+        enable = str(raw.get(flex_field("pool_filter", KIND_SET_ENABLE)) or "").strip()
+        if enable:
+            out[flex_field("swimspa_filter", KIND_SET_ENABLE)] = enable
+        if not out:
+            return None
+        return {"ehal_bindings": out}
     return None
 
 
 def _filter_bindings_for_milp(house_profile: dict) -> dict | None:
-    """Merge thermal_rc nest + greenfield pool_filter enable into bridge bindings."""
+    """Merge thermal_rc nest + greenfield pool_filter bindings into bridge bindings."""
     base = _swimspa_filter_bindings_from_profile(house_profile)
-    overlay = _pool_filter_enable_overlay(house_profile)
+    overlay = _pool_filter_bindings_overlay(house_profile)
     if base and overlay:
         return _deep_merge_dict(base, overlay)
     return overlay or base

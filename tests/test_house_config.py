@@ -1483,6 +1483,52 @@ def test_pool_filter_enable_overlays_milp_bridge_freigabe():
     )
 
 
+def test_pool_filter_overlays_all_filter_bindings_onto_milp_bridge():
+    """Greenfield pool_filter filter roles must reach the bridged swimspa_filter."""
+    from house_config.planning_flex_bridge import collect_planning_flex_consumers
+
+    profile = {
+        "consumers": [
+            {
+                "id": "pool_swimspa",
+                "label": "Pool",
+                "type": "thermal_rc",
+                "nominal_power_kw": 2.8,
+                "use_profile_csv": False,
+                "thermal_rc": {
+                    "water_volume_liters": 6000.0,
+                    "setpoint_c": 36.0,
+                    "tolerance_c": 1.0,
+                    "heat_loss_kw_per_k": 0.1,
+                    "heating_efficiency": 0.95,
+                },
+            },
+            {
+                "id": "pool_filter",
+                "label": "Pool Filter",
+                "type": "flexible",
+                "ehal_bindings": {
+                    "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
+                    "flex.pool_filter.sens_power_act": "Earnie_Pool_Filter_P_act",
+                    "flex.pool_filter.set_enable": "Earnie_Pool_Filter_Freigabe",
+                    "sens_filter_active": "Earnie_Pool_Filter_aktiv",
+                    "get_filter_native_start_hour": "Earnie_Pool_Filter_NativeStart",
+                    "get_filter_native_duration_hours": "Earnie_Pool_Filter_NativeDauer",
+                },
+            },
+        ]
+    }
+    flex = collect_planning_flex_consumers(profile)
+    filt = next(item for item in flex if item["id"] == "swimspa_filter")
+    ehal = filt["ehal_bindings"]
+    assert ehal["get_filter_remaining_hours"] == "Earnie_Pool_Filter_Sollstunden"
+    assert ehal["flex.swimspa_filter.sens_power_act"] == "Earnie_Pool_Filter_P_act"
+    assert ehal["flex.swimspa_filter.set_enable"] == "Earnie_Pool_Filter_Freigabe"
+    assert ehal["sens_filter_active"] == "Earnie_Pool_Filter_aktiv"
+    assert ehal["get_filter_native_start_hour"] == "Earnie_Pool_Filter_NativeStart"
+    assert ehal["get_filter_native_duration_hours"] == "Earnie_Pool_Filter_NativeDauer"
+
+
 def test_planning_filter_uses_ehal_get_filter_remaining_hours():
     from house_config.planning_flex_bridge import (
         collect_planning_flex_consumers,

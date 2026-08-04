@@ -169,7 +169,7 @@ Deckt die **heute für SwimSpa genutzten** Signale (Heizung + Filter) ab. Zwei L
 
 Hinweise: Chart zieht Filterleistung ggf. über `subtract_consumer_ids` ab (kein EHAL-Feld). Pattern B: `VI_Earnie_Pool` (Freigaben), `VO_Earnie_Pool` (Telemetrie). **VI Check** = bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` (wie Title); `status.json` mappt auch Legacy-Merker (`Ernie_Swimspa_*_Freigabe`) auf diese Keys.
 
-**EHAL-Com Mapping:** Bei einem MILP-`thermal_rc`-Verbraucher erscheint zusätzlich die Entity **Pool / SwimSpa Filter** (`swimspa_filter`). Dort wird `get_filter_remaining_hours` (und weitere Filter-Felder) auf den Miniserver-Merker gemappt und unter `swimspa_filter_bindings` gespeichert. Ohne Mapping bleibt der Filter inaktiv (kein Hard-Default mehr auf `Ernie_Swimspa_Filter_Sollstunden`).
+**EHAL-Com Mapping:** Existiert ein Greenfield-Verbraucher `pool_filter`, werden Filter-Felder (`get_filter_remaining_hours`, `flex.pool_filter.sens_power_act`, `sens_filter_active`, native Start/Dauer, Freigabe) direkt auf dieser Entity unter `ehal_bindings` gemappt; die synthetische Entity **Pool / SwimSpa Filter** (`swimspa_filter`) erscheint dann nicht. Ohne `pool_filter` erscheint bei einem MILP-`thermal_rc`-Verbraucher weiterhin **Pool / SwimSpa Filter** — Mapping landet unter `swimspa_filter_bindings`. Ohne Mapping bleibt der Filter inaktiv (kein Hard-Default mehr auf `Ernie_Swimspa_Filter_Sollstunden`).
 
 ## Live-Cockpit noch gesperrt (Greenfield)
 

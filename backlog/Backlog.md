@@ -26,18 +26,11 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.l`/`2.4.m`/`2.4.n`/`2.4.o`/`2.4.p` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-- [ ] Add possibility to map the following EHAL fields (**before 2.4.0 release** — also tracked under **2.4.r**):
-  - pool_filter:flex.pool_filter.sens_power_act
-  - pool_filter:get_filter_remaining_hours
-  - pool_filter:sens_filter_active
-  - pool_filter:get_filter_native_start_hour
-  - pool_filter:get_filter_native_duration_hours
-
 - [ ] **2.4.r — Release**
   - [ ] Review old *_BRIDGE_DEFAULTS:
     - Remove legacy defaults
   - [x] Residual Loxone Merker nests → `ehal_bindings` only (thermal C.6, enable write, filter native, strip + `scripts/migrate_ehal_bindings`; Homie bridge defaults retired)
-  - [ ] **Before 2.4.0:** EHAL-Com must allow mapping pool_filter fields (`flex.pool_filter.sens_power_act`, `get_filter_remaining_hours`, `sens_filter_active`, `get_filter_native_start_hour`, `get_filter_native_duration_hours`) — remove this gap / open item above when done
+  - [x] **Before 2.4.0:** EHAL-Com maps pool_filter fields (`flex.pool_filter.sens_power_act`, `get_filter_remaining_hours`, `sens_filter_active`, `get_filter_native_start_hour`, `get_filter_native_duration_hours`) + MILP bridge overlay
   - [ ] Code Quality
     - Make a code coverage test
     - Review code against coding KPIs and refactor it if needed
@@ -88,6 +81,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
   - Move Loxone markers to data model - remove flat definition in config.json where possible
   - **Note:** Thin marker↔role prep and UI editability are in **2.3.f**; EHAL core / DACH adapters / Loxone-EHAL extraction in **2.4** (`2.4.e`). This chapter owns nesting / structure, not the EHAL interface rewrite.
+  - **Pool nesting:** Merge today’s separate consumers **Pool-Filter** into **Pool-Heizung** (drop the bridge/synthetic `swimspa_filter` / `pool_filter` sibling). Introduce a combined **pool** model: outer entity = one house-profile consumer; inner parts = RC thermal (Heizung) + generic flex (Filter hours / Freigabe / native window). EHAL bindings and MILP stay role-scoped to the inners; UI/planning show one Pool.
 - [ ] **Recommendation mode smart/adaptive devices** (follow-up to recommendation mode manual devices)
   - Adaptive re runtime/energy per run; smart devices instead of manual input
   - Adaptation algo maintains `appliance_recommendation.default_power_kw` from Loxone power markers (`loxone_inputs.power_name`) on house-profile generics — reserved so far, no live use

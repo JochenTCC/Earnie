@@ -192,14 +192,23 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
 
 FILTER_ENTITY_ID = "swimspa_filter"
 
-FILTER_EHAL_FIELDS: tuple[str, ...] = (
-    "get_filter_remaining_hours",
-    "flex.swimspa_filter.sens_power_act",
-    "flex.swimspa_filter.set_enable",
-    "sens_filter_active",
-    "get_filter_native_start_hour",
-    "get_filter_native_duration_hours",
-)
+
+def filter_ehal_fields_for_consumer(cid: str) -> tuple[str, ...]:
+    """HITL / Live filter field catalog with slug-aware flex power + enable."""
+    from ehal.flex_fields import KIND_SENS_POWER_ACT, KIND_SET_ENABLE, flex_field
+
+    slug = str(cid or "").strip() or FILTER_ENTITY_ID
+    return (
+        "get_filter_remaining_hours",
+        flex_field(slug, KIND_SENS_POWER_ACT),
+        flex_field(slug, KIND_SET_ENABLE),
+        "sens_filter_active",
+        "get_filter_native_start_hour",
+        "get_filter_native_duration_hours",
+    )
+
+
+FILTER_EHAL_FIELDS: tuple[str, ...] = filter_ehal_fields_for_consumer(FILTER_ENTITY_ID)
 
 
 def filter_bindings_to_ehal_map(stored: dict | None) -> dict[str, str]:
