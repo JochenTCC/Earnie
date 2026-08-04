@@ -1,5 +1,9 @@
 # Earnie
 
+<p align="center">
+  <img src="docs/assets/Earnie-Logo-Simple-Light.png" alt="Earnie" width="160">
+</p>
+
 **Earnie** optimiert den Energiefluss in einem Smart-Home: Speicher, PV und Verbraucher mit wählbaren Schaltzeiten werden im 15-Minuten-Takt so optimiert, dass Stromkosten sinken und der Eigenverbrauch steigt. Seine Stärke spielt **Earnie** vor allem im Zusammenhang mit sogenannten [SPOT-Tarifen (im DACH-Raum)](https://www.epexspot.com/) aus. Eine umfangreiche Oberfläche zeigt genau, was **Earnie** gemacht und geplant hat.
 Und wenn Sie vorab wissen wollen, wie hoch das Einsparpotenzial ist, kann **Earnie** das für Sie vorab für ein ganzes Jahr hochrechnen - Und das auch ganz ohne Smart-Home.
 Earnie funktioniert unabhängig von Energie- und / oder Systemlieferanten für maximale Unabhängigkeit.

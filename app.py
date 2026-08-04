@@ -37,6 +37,7 @@ from ui.navigation import build_navigation
 from ui.setup_progress import render_setup_progress_notice
 from ui.config_pack import render_config_pack_sidebar
 from ui.info_sidebar import render_info_sidebar, render_missing_next_month_tariff_sidebar
+from ui.branding import render_app_logo
 from ui.styles import (
     inject_checkbox_highlight_css,
     inject_compact_numeric_css,
@@ -54,6 +55,7 @@ st.set_page_config(
     page_icon="🔋",
     layout="wide",
 )
+render_app_logo()
 
 
 def _render_drift_warning() -> None:

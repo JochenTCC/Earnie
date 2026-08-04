@@ -27,14 +27,21 @@ Earnie/
 
 ## Lokale Entwicklung
 
+Use a real Windows CPython (e.g. from [python.org](https://www.python.org/downloads/) via the `py` launcher). Do **not** use `python` from Inkscape or the Microsoft Store stub — those can create a Unix-style `.venv` (`bin\`) without `Scripts\Activate.ps1`.
+
 ```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements-dev.txt
-python -m pytest
-python main.py
+py -3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt
+# optional: python -m pytest
 python -m scripts.run_streamlit
 ```
+
+`requirements-dev.txt` installs the project from `pyproject.toml` (incl. `python-dotenv`, Streamlit, …) plus pytest. Use `python -m pip` so install always targets the active venv. If you see `No module named 'dotenv'`, the venv is missing deps or you are not using `.\.venv\Scripts\python.exe`.
+
+One process is enough for local UI work: Streamlit (`app.py`). Start/stop `main.py` from **Echtzeit-Umgebung → Optimierer-Dienst**, or set `$env:EARNIE_AUTO_START_MAIN = "1"` before `run_streamlit` (as in Docker Compose). Only run `python main.py` in a second terminal when you need exclusive daemon debugging (local auto-start is off by default).
+
+If `Activate.ps1` is missing: remove `.venv` and recreate with `py -3 -m venv .venv`. Confirm `.\.venv\Scripts\Activate.ps1` exists before activating.
 
 Kanonische Metadaten und Abhängigkeiten: `pyproject.toml` (`version.py` = Versionsquelle).
 

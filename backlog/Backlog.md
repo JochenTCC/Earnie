@@ -27,6 +27,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Moved out:** Donate (sidebar) — not part of docking.
 
 - [ ] **2.4.r — Release**
+  - [x] Add the two logos to streamlit for dark and light designs in the sidebar as intended by streamlit
+    - docs\assets\Earnie-Logo-Simple_Dark.png for dark design
+    - docs\assets\Earnie-Logo-Simple-Light.png for light design
+    - Place logo (for light design) in Readme.md and prepare adding it into repository
   - [ ] Review old *_BRIDGE_DEFAULTS:
     - Remove legacy defaults
   - [x] Residual Loxone Merker nests → `ehal_bindings` only (thermal C.6, enable write, filter native, strip + `scripts/migrate_ehal_bindings`; Homie bridge defaults retired)
