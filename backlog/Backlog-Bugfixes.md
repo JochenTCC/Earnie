@@ -27,6 +27,37 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] Crash in streamlit community cloud when switching to SE with minimum Scenario Configuration:
+  - File "/mount/src/earnie/app.py", line 98, in <module>
+    main()
+    ~~~~^^
+File "/mount/src/earnie/app.py", line 91, in main
+    navigation.run()
+    ~~~~~~~~~~~~~~^^
+File "/home/adminuser/venv/lib/python3.14/site-packages/streamlit/navigation/page.py", line 494, in run
+    self._page()
+    ~~~~~~~~~~^^
+File "/mount/src/earnie/ui/pages/page_backtesting.py", line 32, in render
+    render_backtesting_block()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+File "/mount/src/earnie/ui/backtesting.py", line 739, in render_backtesting_block
+    cons_ready = render_cons_data_section()
+File "/mount/src/earnie/ui/backtesting_cons_data.py", line 52, in render_cons_data_section
+    render_time_range_help(key="backtesting_time_ranges_cons_data")
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/mount/src/earnie/ui/backtesting_time_ranges.py", line 92, in render_time_range_help
+    "\n".join(f"- {line}" for line in build_time_range_help_lines(log_period=log_period))
+                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+File "/mount/src/earnie/ui/backtesting_time_ranges.py", line 50, in build_time_range_help_lines
+    sim_start, sim_end = default_simulation_window()
+                         ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+File "/mount/src/earnie/ui/backtesting_time_ranges.py", line 30, in default_simulation_window
+    start, end = resolve_simulation_window(configured_price_range())
+                 ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/mount/src/earnie/data/data_loader.py", line 63, in resolve_simulation_window
+    raise ValueError(
+        "Kein Zeitraum für die Simulation: cons_data_hourly.csv fehlt oder ist leer."
+    )
 - [ ] Zähler Energiebezug can be ignored for consumers (not an Earnie issue)
 
 ## Organizational Changes - no bugs (but still no development issue)
