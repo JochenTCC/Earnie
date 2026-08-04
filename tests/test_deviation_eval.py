@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer import battery as bat
 from optimizer import deviation_facts as facts_mod

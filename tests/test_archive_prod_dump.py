@@ -54,10 +54,10 @@ def test_archive_prod_dump_includes_resolved_inputs(tmp_path, monkeypatch):
     _write_json(model_path, {"version": 2, "coefficients": {}})
     cons_data_path.write_text("timestamp;total_kw;baseload_kw;pv_kw;source\n", encoding="utf-8")
 
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_path))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_DEVIATION_RULES_PATH", str(rules_path))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH", str(local_settings_path))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("EARNIE_DEVIATION_RULES_PATH", str(rules_path))
+    monkeypatch.setenv("EARNIE_LOCAL_SETTINGS_PATH", str(local_settings_path))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(archive_script, "FIXTURES_ROOT", tmp_path / "fixtures")
 
@@ -78,7 +78,7 @@ def test_archive_prod_dump_includes_resolved_inputs(tmp_path, monkeypatch):
     assert manifest["resolved_paths"]["local_settings_json"] == str(local_settings_path)
     assert manifest["resolved_paths"]["forecast_model_path"] == str(model_path)
     assert manifest["resolved_paths"]["cons_data_path"] == str(cons_data_path)
-    assert manifest["env_overrides"]["ENERGY_OPTIMIZER_CONFIG_PATH"] == str(config_path)
+    assert manifest["env_overrides"]["EARNIE_CONFIG_PATH"] == str(config_path)
     assert "inputs/config.json" in manifest["files"]
     assert "inputs/deviation_rules.json" in manifest["files"]
     assert "inputs/local_settings.json" in manifest["files"]

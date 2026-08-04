@@ -1,4 +1,4 @@
-﻿# tests/test_setup_readiness.py
+# tests/test_setup_readiness.py
 """Tests für Greenfield-Onboarding und UI-Freischaltung."""
 from __future__ import annotations
 
@@ -15,18 +15,18 @@ def _bind_config_paths(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Path:
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         str(config_dir / "house_profiles.json"),
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        "EARNIE_COMPONENTS_PATH",
         str(config_dir / "components.json"),
     )
     return config_dir
@@ -282,8 +282,8 @@ def test_loxone_sidebar_deferred_after_planning_unlock(tmp_path, monkeypatch):
         "LOXONE_IP=192.168.178.1\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_DOTENV_PATH", str(dotenv_path))
-    monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", str(dotenv_path))
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     for key in ("LOXONE_IP", "LOXONE_USER", "LOXONE_PASS"):
         monkeypatch.delenv(key, raising=False)
     load_app_dotenv(override=True)

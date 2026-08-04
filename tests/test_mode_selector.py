@@ -7,7 +7,6 @@ from ui.mode_selector import UI_MODE_KEYS, get_enabled_ui_modes
 
 
 def test_default_modes_exclude_historical_and_price_forecast(monkeypatch):
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_MODES", raising=False)
     monkeypatch.delenv("EARNIE_UI_MODES", raising=False)
     monkeypatch.setattr(
         "ui.mode_selector.config.get_ui_price_forecast_page_enabled",
@@ -24,7 +23,6 @@ def test_default_modes_exclude_historical_and_price_forecast(monkeypatch):
 
 
 def test_price_forecast_mode_when_config_enabled(monkeypatch):
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_MODES", raising=False)
     monkeypatch.delenv("EARNIE_UI_MODES", raising=False)
     monkeypatch.setattr(
         "ui.mode_selector.config.get_ui_price_forecast_page_enabled",
@@ -40,7 +38,7 @@ def test_price_forecast_mode_when_config_enabled(monkeypatch):
 
 def test_prod_modes_from_env(monkeypatch):
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_UI_MODES",
+        "EARNIE_UI_MODES",
         "sunset2sunset,scenario_explorer,live_environment",
     )
     assert get_enabled_ui_modes() == [
@@ -52,7 +50,7 @@ def test_prod_modes_from_env(monkeypatch):
 
 def test_historical_in_env_is_ignored(monkeypatch):
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_UI_MODES",
+        "EARNIE_UI_MODES",
         "sunset2sunset,historical,scenario_explorer,live_environment",
     )
     modes = get_enabled_ui_modes()
@@ -70,7 +68,7 @@ def test_ui_mode_keys_has_no_historical():
 
 
 def test_ui_price_forecast_page_default_false(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
     config_path, scenarios_path = write_minimal_config_tree(tmp_path)
     cfg = config.Config(
         config_path=config_path,
@@ -81,7 +79,7 @@ def test_ui_price_forecast_page_default_false(tmp_path, monkeypatch):
 
 
 def test_ui_price_forecast_page_from_config_json(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
         config_payload=minimal_config_payload(

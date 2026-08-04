@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from ui.ehal_greenfield_import import (
     _CREDENTIALS_HINT,

@@ -134,18 +134,18 @@ def test_charge_immediate_name_loaded_from_json(tmp_path, monkeypatch):
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(path))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(path))
+    monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         str(config_dir / "house_profiles.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        "EARNIE_COMPONENTS_PATH",
         str(config_dir / "components.json"),
     )
     config.reinit_config()

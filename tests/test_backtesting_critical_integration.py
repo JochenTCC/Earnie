@@ -24,7 +24,7 @@ from tests.fixtures.backtesting_fixtures import (
     load_fixture_cache,
 )
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 pytestmark = pytest.mark.slow
 

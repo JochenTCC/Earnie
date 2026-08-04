@@ -1248,18 +1248,18 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         str(config_dir / "house_profiles.json"),
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        "EARNIE_COMPONENTS_PATH",
         str(config_dir / "components.json"),
     )
 
@@ -1401,22 +1401,21 @@ def test_merge_passthrough_keeps_edited_markers():
 
 def test_swimspa_filter_bindings_override_defaults():
     from house_config.planning_flex_bridge import (
-        SWIMSPA_FILTER_BRIDGE_DEFAULTS,
         collect_planning_flex_consumers,
         planning_filter_to_milp,
     )
 
     custom = planning_filter_to_milp(
         {
-            "loxone_target_hours_name": "Custom_Filter_Hours",
-            "loxone_outputs": {"enable_name": "Custom_Filter_Enable"},
+            "ehal_bindings": {
+                "get_filter_remaining_hours": "Custom_Filter_Hours",
+                "flex.swimspa_filter.set_enable": "Custom_Filter_Enable",
+            },
         }
     )
-    assert custom["loxone_target_hours_name"] == "Custom_Filter_Hours"
-    assert custom["loxone_outputs"]["enable_name"] == "Custom_Filter_Enable"
-    assert (
-        custom["loxone_inputs"]["power_name"]
-        == SWIMSPA_FILTER_BRIDGE_DEFAULTS["loxone_inputs"]["power_name"]
+    assert custom["ehal_bindings"]["get_filter_remaining_hours"] == "Custom_Filter_Hours"
+    assert custom["ehal_bindings"]["flex.swimspa_filter.set_enable"] == (
+        "Custom_Filter_Enable"
     )
 
     profile = {
@@ -1435,14 +1434,16 @@ def test_swimspa_filter_bindings_override_defaults():
                     "heating_efficiency": 0.95,
                 },
                 "swimspa_filter_bindings": {
-                    "loxone_target_hours_name": "Profile_Filter_Hours",
+                    "ehal_bindings": {
+                        "get_filter_remaining_hours": "Profile_Filter_Hours",
+                    },
                 },
             }
         ]
     }
     flex = collect_planning_flex_consumers(profile)
     filt = next(item for item in flex if item["id"] == "swimspa_filter")
-    assert filt["loxone_target_hours_name"] == "Profile_Filter_Hours"
+    assert filt["ehal_bindings"]["get_filter_remaining_hours"] == "Profile_Filter_Hours"
 
 
 def test_pool_filter_enable_overlays_milp_bridge_freigabe():
@@ -1477,7 +1478,9 @@ def test_pool_filter_enable_overlays_milp_bridge_freigabe():
     }
     flex = collect_planning_flex_consumers(profile)
     filt = next(item for item in flex if item["id"] == "swimspa_filter")
-    assert filt["loxone_outputs"]["enable_name"] == "Earnie_Pool_Filter_Freigabe"
+    assert filt["ehal_bindings"]["flex.swimspa_filter.set_enable"] == (
+        "Earnie_Pool_Filter_Freigabe"
+    )
 
 
 def test_planning_filter_uses_ehal_get_filter_remaining_hours():
@@ -1493,13 +1496,12 @@ def test_planning_filter_uses_ehal_get_filter_remaining_hours():
             }
         }
     )
-    assert custom["loxone_target_hours_name"] == "Earnie_Pool_Filter_Sollstunden"
     assert custom["ehal_bindings"]["get_filter_remaining_hours"] == (
         "Earnie_Pool_Filter_Sollstunden"
     )
 
     bare = planning_filter_to_milp(None)
-    assert bare["loxone_target_hours_name"] == ""
+    assert bare["ehal_bindings"] == {}
 
     profile = {
         "consumers": [
@@ -1526,7 +1528,9 @@ def test_planning_filter_uses_ehal_get_filter_remaining_hours():
     }
     flex = collect_planning_flex_consumers(profile)
     filt = next(item for item in flex if item["id"] == "swimspa_filter")
-    assert filt["loxone_target_hours_name"] == "Earnie_Pool_Filter_Sollstunden"
+    assert filt["ehal_bindings"]["get_filter_remaining_hours"] == (
+        "Earnie_Pool_Filter_Sollstunden"
+    )
 
 
 def test_assemble_filter_bindings_shape():
@@ -1542,11 +1546,16 @@ def test_assemble_filter_bindings_shape():
             "native_duration_hours_name": "Dur",
         }
     )
-    assert bindings["loxone_target_hours_name"] == "Hours"
-    assert bindings["ehal_bindings"]["get_filter_remaining_hours"] == "Hours"
-    assert bindings["loxone_inputs"]["power_name"] == "P2"
-    assert bindings["loxone_outputs"]["enable_name"] == "En"
-    assert bindings["filter_schedule"]["loxone"]["native_start_hour_name"] == "Start"
+    assert bindings == {
+        "ehal_bindings": {
+            "get_filter_remaining_hours": "Hours",
+            "flex.swimspa_filter.sens_power_act": "P2",
+            "sens_filter_active": "P1",
+            "flex.swimspa_filter.set_enable": "En",
+            "get_filter_native_start_hour": "Start",
+            "get_filter_native_duration_hours": "Dur",
+        }
+    }
 
 
 def test_save_main_config_roundtrip_strips_triggers_and_blocks(tmp_path, monkeypatch):

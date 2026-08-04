@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import plotly.graph_objects as go
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer.deviation_eval import DeviationEvent
 from ui.charts import ChartSlotAxis, build_deviation_marker_traces

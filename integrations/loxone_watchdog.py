@@ -8,6 +8,12 @@ from typing import Any
 import config
 from integrations import loxone_client
 from runtime_store import run_state
+from settings.ehal_marker_resolve import (
+    marker_flex_enable,
+    marker_flex_power_setpoint,
+    marker_pv_follow,
+    marker_set_evcs_max_current,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,17 +80,17 @@ def verify_and_restore_loxone_states(
     """Liest Steuer-Merker, vergleicht mit Soll und setzt bei Abweichung zurück."""
     mismatches: list[LoxoneMismatch] = []
     flex_enable_names = {
-        str((c.get("loxone_outputs") or {}).get("enable_name", ""))
+        str(marker_flex_enable(c) or "")
         for c in config.get_flexible_consumers(optimizer_only=True)
     }
     flex_enable_names.discard("")
     flex_setpoint_names = {
-        str((c.get("loxone_outputs") or {}).get("power_setpoint_name", ""))
+        str(marker_set_evcs_max_current(c) or marker_flex_power_setpoint(c) or "")
         for c in config.get_flexible_consumers(optimizer_only=True)
     }
     flex_setpoint_names.discard("")
     flex_pv_follow_names = {
-        str((c.get("loxone_outputs") or {}).get("pv_follow_name", ""))
+        str(marker_pv_follow(c) or "")
         for c in config.get_flexible_consumers(optimizer_only=True)
     }
     flex_pv_follow_names.discard("")

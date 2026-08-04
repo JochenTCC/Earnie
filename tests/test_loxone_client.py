@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from integrations import loxone_client as lc
 from integrations.loxone_client import (
@@ -122,18 +122,25 @@ class TestFetchLoxoneRawValue:
             assert lc.fetch_loxone_raw_value("Net_IO") is None
 
 
+def _alarm_clock_all_payload(*, tna="Morgen, 11:00", special10=555135300.0):
+    ll = {
+        "Code": "200",
+        "control": "dev/sps/io/Ladewecker/all",
+        "value": "0",
+        "output7": {"name": "Tna", "nr": 8, "value": tna},
+    }
+    if special10 is not None:
+        ll["SpecialState10"] = {
+            "uuid": "20e3f09d-02a2-e285-ffff912d5ec91829",
+            "nr": 11,
+            "value": special10,
+        }
+    return {"LL": ll}
+
+
 class TestFetchLoxoneAlarmClockTna:
     def test_extracts_tna_from_all(self):
-        response = _mock_http_response(
-            json_data={
-                "LL": {
-                    "Code": "200",
-                    "control": "dev/sps/io/Wecker_Smart/all",
-                    "value": "0",
-                    "output7": {"name": "Tna", "nr": 8, "value": "Morgen, 11:00"},
-                }
-            }
-        )
+        response = _mock_http_response(json_data=_alarm_clock_all_payload())
         with patch.object(lc.requests, "get", return_value=response) as mock_get, patch.object(
             lc.config, "get", side_effect=lambda name, **kw: {
                 "LOXONE_IP": "192.168.1.1",
@@ -141,8 +148,8 @@ class TestFetchLoxoneAlarmClockTna:
                 "LOXONE_PASS": "pass",
             }.get(name, kw.get("default", 5)),
         ):
-            assert lc.fetch_loxone_alarm_clock_tna("Wecker_Smart") == "Morgen, 11:00"
-        assert "/jdev/sps/io/Wecker_Smart/all" in mock_get.call_args.args[0]
+            assert lc.fetch_loxone_alarm_clock_tna("Ladewecker") == "Morgen, 11:00"
+        assert "/jdev/sps/io/Ladewecker/all" in mock_get.call_args.args[0]
 
     def test_missing_tna_returns_none(self):
         response = _mock_http_response(
@@ -151,23 +158,70 @@ class TestFetchLoxoneAlarmClockTna:
         with patch.object(lc.requests, "get", return_value=response), patch.object(
             lc.config, "get", return_value="x"
         ):
-            assert lc.fetch_loxone_alarm_clock_tna("Wecker_Smart") is None
+            assert lc.fetch_loxone_alarm_clock_tna("Ladewecker") is None
 
 
 class TestFetchLoxoneReadyByTime:
-    def test_prefers_alarm_clock_tna(self):
-        with patch.object(
-            lc, "fetch_loxone_alarm_clock_tna", return_value="Morgen, 11:00"
-        ) as tna, patch.object(lc, "fetch_loxone_raw_value") as raw:
-            assert lc.fetch_loxone_ready_by_time("Wecker_Smart") == "Morgen, 11:00"
-        tna.assert_called_once_with("Wecker_Smart")
+    def test_prefers_special_state10_unix(self):
+        response = _mock_http_response(json_data=_alarm_clock_all_payload())
+        with patch.object(lc.requests, "get", return_value=response), patch.object(
+            lc.config, "get", side_effect=lambda name, **kw: {
+                "LOXONE_IP": "192.168.1.1",
+                "LOXONE_USER": "user",
+                "LOXONE_PASS": "pass",
+            }.get(name, kw.get("default", 5)),
+        ), patch.object(lc, "fetch_loxone_raw_value") as raw:
+            got = lc.fetch_loxone_ready_by_time("Ladewecker")
+        assert got == pytest.approx(555135300.0 + lc.LOXONE_EPOCH_TO_UNIX)
         raw.assert_not_called()
 
+    def test_falls_back_to_tna_when_special10_missing(self):
+        response = _mock_http_response(
+            json_data=_alarm_clock_all_payload(special10=None)
+        )
+        with patch.object(lc.requests, "get", return_value=response), patch.object(
+            lc.config, "get", return_value="x"
+        ), patch.object(lc, "fetch_loxone_raw_value") as raw:
+            assert lc.fetch_loxone_ready_by_time("Ladewecker") == "Morgen, 11:00"
+        raw.assert_not_called()
+
+    def test_falls_back_to_tna_when_special10_zero(self):
+        response = _mock_http_response(
+            json_data=_alarm_clock_all_payload(special10=0.0)
+        )
+        with patch.object(lc.requests, "get", return_value=response), patch.object(
+            lc.config, "get", return_value="x"
+        ):
+            assert lc.fetch_loxone_ready_by_time("Ladewecker") == "Morgen, 11:00"
+
     def test_falls_back_to_raw_merker(self):
-        with patch.object(lc, "fetch_loxone_alarm_clock_tna", return_value=None), patch.object(
+        with patch.object(lc, "_fetch_loxone_io_all", return_value=None), patch.object(
             lc, "fetch_loxone_raw_value", return_value="Heute, 08:00"
         ):
             assert lc.fetch_loxone_ready_by_time("Legacy_FertigUm") == "Heute, 08:00"
+
+    def test_falls_back_to_raw_converts_loxone_counter(self):
+        with patch.object(lc, "_fetch_loxone_io_all", return_value=None), patch.object(
+            lc, "fetch_loxone_raw_value", return_value="555135300"
+        ):
+            got = lc.fetch_loxone_ready_by_time("Legacy_Counter")
+        assert got == pytest.approx(555135300.0 + lc.LOXONE_EPOCH_TO_UNIX)
+
+
+class TestFormatReadyByDisplay:
+    def test_converts_loxone_counter_to_human_unix(self):
+        text = lc.format_ready_by_display(555135300.0)
+        unix = int(555135300.0 + lc.LOXONE_EPOCH_TO_UNIX)
+        assert f"unix {unix}" in text
+        assert text.startswith("20")
+
+    def test_keeps_already_unix(self):
+        unix = 555135300.0 + lc.LOXONE_EPOCH_TO_UNIX
+        text = lc.format_ready_by_display(unix)
+        assert f"unix {int(unix)}" in text
+
+    def test_keeps_tna_text(self):
+        assert lc.format_ready_by_display("Morgen, 11:00") == "Morgen, 11:00"
 
 
 class TestFetchLoxoneGenericValue:
@@ -292,8 +346,11 @@ class TestFlexibleConsumerHelpers:
             "id": "swimspa",
             "name": "SwimSpa",
             "nominal_power_kw": 2.8,
-            "loxone_outputs": {"enable_name": "Earnie_SwimSpa_Freigabe"},
-            "loxone_inputs": {"power_name": "Earnie_Swim-Spa-P_act", "signal_type": signal_type},
+            "ehal_bindings": {
+                "flex.swimspa.set_enable": "Earnie_SwimSpa_Freigabe",
+                "flex.swimspa.sens_power_act": "Earnie_Swim-Spa-P_act",
+            },
+            "loxone_inputs": {"signal_type": signal_type},
         }
 
     def test_flex_consumer_enable_on_when_power_positive(self):
@@ -403,8 +460,10 @@ class TestSharedMeterSubtraction:
                 "name": "SwimSpa",
                 "nominal_power_kw": 2.8,
                 "signal_type": "power",
+                "ehal_bindings": {
+                    "flex.swimspa.sens_power_act": "Earnie_Swim-Spa-P_act",
+                },
                 "loxone_inputs": {
-                    "power_name": "Earnie_Swim-Spa-P_act",
                     "subtract_consumer_ids": ["swimspa_filter"],
                 },
             },
@@ -413,9 +472,11 @@ class TestSharedMeterSubtraction:
                 "name": "SwimSpa Filter",
                 "nominal_power_kw": 0.18,
                 "signal_type": "binary",
+                "ehal_bindings": {
+                    "flex.swimspa_filter.sens_power_act": "homie_bwa_spa_filter2",
+                    "sens_filter_active": "homie_bwa_spa_filter1",
+                },
                 "loxone_inputs": {
-                    "power_name": "homie_bwa_spa_filter2",
-                    "alternate_binary_power_name": "homie_bwa_spa_filter1",
                     "signal_type": "binary",
                 },
             },
@@ -645,7 +706,9 @@ class TestBuildSentSnapshot:
                 "optimizer_enabled": True,
                 "daily_target_kwh": 8.0,
                 "daily_target_source": "historical",
-                "loxone_outputs": {"enable_name": "Earnie_SwimSpa_Freigabe"},
+                "ehal_bindings": {
+                    "flex.swimspa.set_enable": "Earnie_SwimSpa_Freigabe",
+                },
             }
         ]
         config_map = {

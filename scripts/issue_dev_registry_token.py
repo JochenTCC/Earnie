@@ -76,8 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         secret = read_env("REGISTRY_DEV_SECRET")
         if not secret:
             print(
-                "EARNIE_REGISTRY_DEV_SECRET (or ENERGY_OPTIMIZER_REGISTRY_DEV_SECRET) "
-                "is required with --hmac.",
+                "EARNIE_REGISTRY_DEV_SECRET is required with --hmac.",
                 file=sys.stderr,
             )
             return 2

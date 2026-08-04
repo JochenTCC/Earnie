@@ -234,6 +234,66 @@ def test_ehal_marker_resolve_prefers_bindings():
     assert marker_set_evcs_max_current(consumer) == "Bind_A"
 
 
+def test_migrate_consumer_legacy_thermal_to_ehal_bindings():
+    consumer = {
+        "id": "swimspa",
+        "type": "thermal_rc",
+        "loxone_inputs": {"power_name": "Spa_P"},
+        "loxone_outputs": {"enable_name": "Spa_En"},
+        "thermal_control": {
+            "loxone": {
+                "actual_temp_name": "Spa_Ist",
+                "setpoint_temp_name": "Spa_Soll",
+                "ambient_temp_name": "Outside",
+                "tolerance_c_name": "Spa_Tol",
+                "heating_active_name": "Spa_Heat",
+            }
+        },
+    }
+    bindings = migrate_consumer_legacy_to_ehal_bindings(consumer)
+    assert bindings["sens_temperature_water"] == "Spa_Ist"
+    assert bindings["get_temperature_water_setpoint"] == "Spa_Soll"
+    assert bindings["sens_temperature_outside"] == "Outside"
+    assert bindings["get_temperature_tolerance_c"] == "Spa_Tol"
+    assert bindings["sens_heating_active"] == "Spa_Heat"
+    assert bindings["flex.swimspa.sens_power_act"] == "Spa_P"
+    assert bindings["flex.swimspa.set_enable"] == "Spa_En"
+
+
+def test_ensure_migrated_strips_thermal_loxone_and_promotes_ambient():
+    house = {
+        "plant": {"ehal_bindings": {}},
+        "profiles": [
+            {
+                "id": "p1",
+                "consumers": [
+                    {
+                        "id": "swimspa",
+                        "type": "thermal_rc",
+                        "thermal_control": {
+                            "enabled": True,
+                            "setpoint_c": 35.0,
+                            "loxone": {
+                                "actual_temp_name": "Ist",
+                                "ambient_temp_name": "Außen",
+                            },
+                        },
+                        "loxone_outputs": {"enable_name": "En"},
+                    }
+                ],
+            }
+        ],
+    }
+    out, _cfg, changed = ensure_migrated(house, {})
+    assert changed
+    cons = out["profiles"][0]["consumers"][0]
+    assert "loxone" not in (cons.get("thermal_control") or {})
+    assert cons["thermal_control"]["setpoint_c"] == 35.0
+    assert "loxone_outputs" not in cons
+    assert cons["ehal_bindings"]["sens_temperature_water"] == "Ist"
+    assert out["plant"]["ehal_bindings"]["sens_temperature_outside"] == "Außen"
+
+
 def test_marker_get_filter_remaining_hours_prefers_ehal():
     from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
 
@@ -242,9 +302,4 @@ def test_marker_get_filter_remaining_hours_prefers_ehal():
         "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
     }
     assert marker_get_filter_remaining_hours(consumer) == "Earnie_Pool_Filter_Sollstunden"
-    assert (
-        marker_get_filter_remaining_hours(
-            {"loxone_target_hours_name": "Legacy_Hours"}
-        )
-        == "Legacy_Hours"
-    )
+    assert marker_get_filter_remaining_hours({"loxone_target_hours_name": "Legacy_Hours"}) == ""

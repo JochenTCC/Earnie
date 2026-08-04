@@ -15,6 +15,7 @@ from settings.ehal_marker_resolve import (
     charging_loxone,
     ehal_bindings,
     marker_charge_immediate,
+    marker_flex_enable,
     marker_flex_power,
     marker_get_evcs_nominal_current,
     marker_pv_follow,
@@ -173,12 +174,46 @@ def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
     return None
 
 
-def fetch_loxone_alarm_clock_tna(io_name: str) -> Optional[str]:
-    """Liest AlarmClock-Ausgang Tna via ``/jdev/sps/io/{name}/all``.
+# AlarmClock nextEntryTime (SpecialState10): seconds since 2009-01-01.
+# Unix = loxone_seconds + LOXONE_EPOCH_TO_UNIX (see loxforum / Structure File).
+LOXONE_EPOCH_TO_UNIX = 1230768000
 
-    Wie bei Zählern: Binding = Baustein-Bezeichnung (z. B. ``Wecker_Smart``).
-    Einfaches ``/io/{name}`` liefert hier nur ``0`` — Tna steht in ``output*``.
-    """
+
+def normalize_loxone_time_to_unix(seconds: float) -> Optional[float]:
+    """Loxone Counter (s since 2009-01-01) or Unix seconds → Unix seconds."""
+    try:
+        value = float(seconds)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value) or value <= 0:
+        return None
+    if value > 1_000_000_000:
+        return value
+    return value + LOXONE_EPOCH_TO_UNIX
+
+
+def format_ready_by_display(value: str | float) -> str:
+    """Human-readable FertigUm for Live-Lesen (local datetime + unix, or Tna text)."""
+    if isinstance(value, str):
+        text = value.strip().strip("'\"")
+        if not text:
+            return text
+        try:
+            as_num = float(text.replace(",", "."))
+        except ValueError:
+            return text
+    else:
+        as_num = float(value)
+        text = str(value)
+    unix = normalize_loxone_time_to_unix(as_num)
+    if unix is None:
+        return text
+    stamp = datetime.fromtimestamp(unix).strftime("%Y-%m-%d %H:%M:%S")
+    return f"{stamp} (unix {int(unix)})"
+
+
+def _fetch_loxone_io_all(io_name: str) -> Optional[dict]:
+    """GET ``/jdev/sps/io/{name}/all`` → LL dict, or None on error / non-200."""
     io_name = str(io_name or "").strip()
     if not io_name:
         return None
@@ -196,15 +231,7 @@ def fetch_loxone_alarm_clock_tna(io_name: str) -> Optional[str]:
             return None
         if str(ll.get("Code") or "") not in ("", "200"):
             return None
-        for item in ll.values():
-            if not isinstance(item, dict):
-                continue
-            if str(item.get("name") or "") != "Tna":
-                continue
-            raw = item.get("value")
-            if raw is None or str(raw).strip() == "":
-                return None
-            return str(raw).strip()
+        return ll
     except requests.exceptions.Timeout:
         logger.error(
             "Loxone: Timeout (%ss) bei AlarmClock/all '%s'", timeout_val, io_name
@@ -216,12 +243,76 @@ def fetch_loxone_alarm_clock_tna(io_name: str) -> Optional[str]:
     return None
 
 
-def fetch_loxone_ready_by_time(io_name: str) -> Optional[str]:
-    """FertigUm: AlarmClock Tna (Baustein-Name), sonst Legacy InfoOnlyText-Rohwert."""
-    tna = fetch_loxone_alarm_clock_tna(io_name)
-    if tna is not None:
-        return tna
-    return fetch_loxone_raw_value(io_name)
+def _alarm_clock_next_entry_unix(ll: dict) -> Optional[float]:
+    """SpecialState10 / nextEntryTime → Unix seconds, or None if unset."""
+    item = ll.get("SpecialState10")
+    if not isinstance(item, dict):
+        return None
+    raw = item.get("value")
+    if raw is None or str(raw).strip() == "":
+        return None
+    try:
+        lox_seconds = float(str(raw).strip().replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+    return normalize_loxone_time_to_unix(lox_seconds)
+
+
+def _alarm_clock_tna_from_ll(ll: dict) -> Optional[str]:
+    """Backup: AlarmClock output Tna text (e.g. ``Morgen, 06:15``)."""
+    for item in ll.values():
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("name") or "") != "Tna":
+            continue
+        raw = item.get("value")
+        if raw is None or str(raw).strip() == "":
+            return None
+        return str(raw).strip()
+    return None
+
+
+def fetch_loxone_alarm_clock_tna(io_name: str) -> Optional[str]:
+    """Backup path: AlarmClock Tna text via ``/all``.
+
+    Prefer ``fetch_loxone_ready_by_time`` (SpecialState10). Kept if Loxone
+    renames SpecialState indices; Tna remains the human-readable output.
+    """
+    ll = _fetch_loxone_io_all(io_name)
+    if not ll:
+        return None
+    return _alarm_clock_tna_from_ll(ll)
+
+
+def _legacy_ready_by_value(raw: str | float | None) -> str | float | None:
+    """Convert legacy Merker numeric Counter → Unix; leave text unchanged."""
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return None
+        try:
+            as_num = float(text.replace(",", "."))
+        except ValueError:
+            return text
+        unix = normalize_loxone_time_to_unix(as_num)
+        return unix if unix is not None else text
+    unix = normalize_loxone_time_to_unix(float(raw))
+    return unix if unix is not None else raw
+
+
+def fetch_loxone_ready_by_time(io_name: str) -> str | float | None:
+    """FertigUm: AlarmClock SpecialState10 (unix), else Tna text, else legacy Merker."""
+    ll = _fetch_loxone_io_all(io_name)
+    if ll:
+        unix = _alarm_clock_next_entry_unix(ll)
+        if unix is not None:
+            return unix
+        tna = _alarm_clock_tna_from_ll(ll)
+        if tna is not None:
+            return tna
+    return _legacy_ready_by_value(fetch_loxone_raw_value(io_name))
 
 
 def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
@@ -386,16 +477,19 @@ def _binary_meter_kw(
     nominal: float,
     *,
     primary_io_name: str = "",
+    alternate_io_name: str = "",
 ) -> float | None:
     """Binärer Verbraucher: 0/1-Merker × Nennleistung.
 
-    Optional ``alternate_binary_power_name`` (z. B. natives Filter-Relais neben
+    Optional alternate binary Merker (z. B. natives Filter-Relais neben
     Gesamt-Filterstatus) — läuft, wenn mindestens ein Merker ≥ 0,5 ist.
     """
     io_name = str(primary_io_name or inputs.get("power_name", "")).strip()
     if not io_name:
         return None
-    alt_name = str(inputs.get("alternate_binary_power_name", "")).strip()
+    alt_name = str(
+        alternate_io_name or inputs.get("alternate_binary_power_name", "")
+    ).strip()
     readings: list[float | None] = [fetch_loxone_generic_value(io_name)]
     if alt_name:
         readings.append(fetch_loxone_generic_value(alt_name))
@@ -413,6 +507,8 @@ def _read_consumer_meter_kw(consumer: dict) -> float | None:
     „gemessen" von „Fallback verwendet" unterscheiden.
     binary: Merker 0/1 × Nennleistung; power: direkter kW-Wert (≥ 0).
     """
+    from settings.ehal_marker_resolve import marker_sens_filter_active
+
     inputs = consumer.get("loxone_inputs") or {}
     io_name = _consumer_power_io_name(consumer)
     if not io_name:
@@ -420,7 +516,12 @@ def _read_consumer_meter_kw(consumer: dict) -> float | None:
     signal_type = str(inputs.get("signal_type") or consumer.get("signal_type", "power")).lower()
     nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
     if signal_type == "binary":
-        return _binary_meter_kw(inputs, nominal, primary_io_name=io_name)
+        return _binary_meter_kw(
+            inputs,
+            nominal,
+            primary_io_name=io_name,
+            alternate_io_name=marker_sens_filter_active(consumer),
+        )
     raw = fetch_loxone_generic_value(io_name)
     if raw is None:
         return None
@@ -826,9 +927,8 @@ def flex_consumer_enable_value(
     consumer_powers: dict[str, float],
     charging_contexts: dict[str, dict],
 ) -> int | None:
-    """Freigabe 0/1 für einen flexiblen Verbraucher (None wenn kein enable_name)."""
-    enable_name = (consumer.get("loxone_outputs") or {}).get("enable_name", "")
-    if not enable_name:
+    """Freigabe 0/1 für einen flexiblen Verbraucher (None wenn kein enable Merker)."""
+    if not marker_flex_enable(consumer):
         return None
 
     cid = consumer["id"]
@@ -1045,7 +1145,7 @@ def _flexible_consumer_output_values(
         return _immediate_skip_output_values(consumer)
 
     current_name = marker_set_evcs_max_current(consumer)
-    enable_name = str((consumer.get("loxone_outputs") or {}).get("enable_name", "")).strip()
+    enable_name = marker_flex_enable(consumer)
     if current_name:
         return _evcs_current_output_values(
             consumer,
@@ -1190,39 +1290,52 @@ def _read_optional_temp_c(io_name: str) -> float | None:
     return fetch_loxone_generic_value(io_name)
 
 
-def fetch_thermal_readings(consumer: dict) -> dict:
-    """
-    Liest Ist-/Soll-/Außen-Temperatur, Toleranz und optional Heiz-Indikator für thermal_control.
-    Config-Fallbacks werden nur genutzt, wenn der jeweilige Merker leer ist.
-    """
+def fetch_thermal_readings(
+    consumer: dict,
+    *,
+    house_doc: dict | None = None,
+    config_doc: dict | None = None,
+) -> dict:
+    """Read thermal temps / heating flag via ehal_bindings (legacy nest dual-read)."""
+    from settings.ehal_marker_resolve import (
+        marker_get_temperature_tolerance_c,
+        marker_get_temperature_water_setpoint,
+        marker_sens_heating_active,
+        marker_sens_temperature_outside,
+        marker_sens_temperature_water,
+    )
+
     thermal = consumer.get("thermal_control") or {}
-    lox = thermal.get("loxone") or {}
     missing: list[str] = []
 
-    actual = _read_optional_temp_c(lox.get("actual_temp_name", ""))
+    actual_io = marker_sens_temperature_water(consumer)
+    actual = _read_optional_temp_c(actual_io)
     if actual is None:
-        missing.append("actual_temp_name")
+        missing.append("sens_temperature_water")
 
-    setpoint = _read_optional_temp_c(lox.get("setpoint_temp_name", ""))
-    if setpoint is None:
-        if thermal.get("setpoint_c") is None:
-            missing.append("setpoint_temp_name")
+    setpoint_io = marker_get_temperature_water_setpoint(consumer)
+    setpoint = _read_optional_temp_c(setpoint_io)
+    if setpoint is None and thermal.get("setpoint_c") is None:
+        missing.append("get_temperature_water_setpoint")
 
-    ambient = _read_optional_temp_c(lox.get("ambient_temp_name", ""))
+    ambient_io = marker_sens_temperature_outside(
+        consumer, house_doc=house_doc, config_doc=config_doc
+    )
+    ambient = _read_optional_temp_c(ambient_io)
     if ambient is None:
-        missing.append("ambient_temp_name")
+        missing.append("sens_temperature_outside")
 
-    tolerance = _read_optional_temp_c(lox.get("tolerance_c_name", ""))
-    if tolerance is None:
-        if thermal.get("tolerance_c") is None:
-            missing.append("tolerance_c_name")
+    tolerance_io = marker_get_temperature_tolerance_c(consumer)
+    tolerance = _read_optional_temp_c(tolerance_io)
+    if tolerance is None and thermal.get("tolerance_c") is None:
+        missing.append("get_temperature_tolerance_c")
 
     heating_active = None
-    heating_io = str(lox.get("heating_active_name", "") or "").strip()
+    heating_io = marker_sens_heating_active(consumer)
     if heating_io:
         raw = fetch_loxone_generic_value(heating_io)
         if raw is None:
-            missing.append("heating_active_name")
+            missing.append("sens_heating_active")
         else:
             heating_active = raw >= 0.5
 

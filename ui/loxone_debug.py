@@ -114,11 +114,16 @@ def build_read_rows(
             )
             continue
         mapping = str(item.io_name or "").strip()
+        wert = parse_check_wert(item.detail, passed=item.passed)
+        if wert and field.endswith("get_evcs_ready_by_time"):
+            from integrations.loxone_client import format_ready_by_display
+
+            wert = format_ready_by_display(wert)
         rows.append(
             {
                 "EHAL-Feld": field,
                 "Mapping": mapping,
-                "Wert": parse_check_wert(item.detail, passed=item.passed),
+                "Wert": wert,
                 "Status": (
                     "Kein Mapping" if not mapping else read_check_status_label(item)
                 ),

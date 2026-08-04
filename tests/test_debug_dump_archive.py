@@ -31,21 +31,21 @@ from tests.config_fixtures import minimal_config_payload, write_minimal_config_t
 
 _TZ = ZoneInfo("Europe/Vienna")
 _CONFIG_ENV_KEYS = (
-    "ENERGY_OPTIMIZER_CONFIG_PATH",
-    "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
-    "ENERGY_OPTIMIZER_OFFLINE",
-    "ENERGY_OPTIMIZER_RUNTIME_PATH",
-    "ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED",
-    "ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH",
+    "EARNIE_CONFIG_PATH",
+    "EARNIE_BACKTESTING_SCENARIOS_PATH",
+    "EARNIE_OFFLINE",
+    "EARNIE_RUNTIME_PATH",
+    "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED",
+    "EARNIE_LOCAL_SETTINGS_PATH",
 )
 
 
 @contextmanager
 def _dump_config(tmp_path, monkeypatch):
     prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    monkeypatch.delenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
         config_payload=minimal_config_payload(
@@ -57,8 +57,8 @@ def _dump_config(tmp_path, monkeypatch):
             }
         ),
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", config_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", scenarios_path)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", config_path)
+    monkeypatch.setenv("EARNIE_BACKTESTING_SCENARIOS_PATH", scenarios_path)
     config.reinit_config()
     try:
         yield
@@ -127,13 +127,8 @@ def test_write_debug_dump_zip_uses_volume_runtime_when_earnie_env_empty(
     monkeypatch.chdir(tmp_path)
     for key in (
         "EARNIE_RUNTIME_PATH",
-        "ENERGY_OPTIMIZER_RUNTIME_PATH",
         "EARNIE_ENV_PATH",
-        "ENERGY_OPTIMIZER_ENV_PATH",
-        "EARNIE_RUNTIME_DIR",
-        "ENERGY_OPTIMIZER_RUNTIME_DIR",
         "EARNIE_HOUSE_PROFILES_PATH",
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
     ):
         monkeypatch.delenv(key, raising=False)
     (tmp_path / "earnie_env" / "runtime").mkdir(parents=True)
@@ -162,9 +157,9 @@ def test_write_debug_dump_zip_uses_volume_runtime_when_earnie_env_empty(
         '{"profiles": []}',
         encoding="utf-8",
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", config_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", scenarios_path)
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", config_path)
+    monkeypatch.setenv("EARNIE_BACKTESTING_SCENARIOS_PATH", scenarios_path)
     config.reinit_config()
     zip_path = write_debug_dump_zip(
         title="docker path",

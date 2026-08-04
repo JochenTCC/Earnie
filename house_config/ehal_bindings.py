@@ -29,6 +29,43 @@ _EV_CHARGING_TO_EHAL: dict[str, str] = {
     "get_evcs_ready_by_time": "get_evcs_ready_by_time",
 }
 
+_THERMAL_LOXONE_TO_EHAL: dict[str, str] = {
+    "actual_temp_name": "sens_temperature_water",
+    "setpoint_temp_name": "get_temperature_water_setpoint",
+    "tolerance_c_name": "get_temperature_tolerance_c",
+    "heating_active_name": "sens_heating_active",
+    "ambient_temp_name": "sens_temperature_outside",
+}
+
+THERMAL_RC_EHAL_FIELDS: tuple[str, ...] = (
+    "sens_temperature_water",
+    "get_temperature_water_setpoint",
+    "get_temperature_tolerance_c",
+    "sens_heating_active",
+)
+
+_INPUT_MARKER_KEYS: frozenset[str] = frozenset(
+    {
+        "power_name",
+        "alternate_binary_power_name",
+        "sens_evcs_active_power",
+        "flex.power_name",
+        "sens_filter_active",
+    }
+)
+_OUTPUT_MARKER_KEYS: frozenset[str] = frozenset(
+    {
+        "enable_name",
+        "power_setpoint_name",
+        "pv_follow_name",
+        "set_evcs_max_current",
+        "set_evcs_current",
+        "set_evcs_mode",
+        "flex.enable_name",
+        "flex.power_setpoint_name",
+    }
+)
+
 _LEGACY_SYSTEM_TRIGGER_KEYS: frozenset[str] = frozenset(
     {
         "event_triggers",
@@ -114,6 +151,18 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
     _put_binding(bindings, "set_evcs_mode", outputs.get("set_evcs_mode"))
 
 
+def _migrate_thermal_loxone(consumer: dict, bindings: dict[str, str]) -> None:
+    thermal = consumer.get("thermal_control")
+    if not isinstance(thermal, dict):
+        return
+    lox = thermal.get("loxone")
+    if not isinstance(lox, dict):
+        return
+    for legacy_key, ehal_field in _THERMAL_LOXONE_TO_EHAL.items():
+        if legacy_key in lox:
+            _put_binding(bindings, ehal_field, lox.get(legacy_key))
+
+
 def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     """Flatten nested Loxone ``*_name`` nests into ``ehal_bindings`` (§C + transitional)."""
     from ehal.flex_fields import expand_flex_bindings
@@ -134,6 +183,7 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     if isinstance(sched, dict) and isinstance(sched.get("loxone"), dict):
         _migrate_charging_loxone(sched["loxone"], bindings)
     _migrate_consumer_io(consumer, bindings)
+    _migrate_thermal_loxone(consumer, bindings)
     cid = _nonempty(consumer.get("id"))
     if cid:
         return expand_flex_bindings(bindings, cid)
@@ -193,68 +243,126 @@ def filter_bindings_to_ehal_map(stored: dict | None) -> dict[str, str]:
 
 
 def ehal_map_to_filter_bindings(ehal_map: dict[str, str] | None) -> dict:
-    """HITL save → ``swimspa_filter_bindings`` (EHAL + legacy dual-read keys)."""
-    from ehal.flex_fields import (
-        KIND_SENS_POWER_ACT,
-        KIND_SET_ENABLE,
-        binding_address,
-        expand_flex_bindings,
-    )
+    """HITL save → ``swimspa_filter_bindings`` (EHAL-only persist)."""
+    from ehal.flex_fields import expand_flex_bindings
 
     cleaned = expand_flex_bindings(
         {str(k): _nonempty(v) for k, v in (ehal_map or {}).items() if _nonempty(v)},
         FILTER_ENTITY_ID,
     )
-    out: dict = {"ehal_bindings": cleaned} if cleaned else {}
-    hours = _nonempty(cleaned.get("get_filter_remaining_hours"))
-    if hours:
-        out["loxone_target_hours_name"] = hours
-    power = binding_address(cleaned, FILTER_ENTITY_ID, KIND_SENS_POWER_ACT)
-    alt = _nonempty(cleaned.get("sens_filter_active"))
-    inputs: dict = {"signal_type": "binary"}
-    if power:
-        inputs["power_name"] = power
-    if alt:
-        inputs["alternate_binary_power_name"] = alt
-    if len(inputs) > 1:
-        out["loxone_inputs"] = inputs
-    enable = binding_address(cleaned, FILTER_ENTITY_ID, KIND_SET_ENABLE)
-    if enable:
-        out["loxone_outputs"] = {"enable_name": enable}
-    sched_lox: dict = {}
-    start = _nonempty(cleaned.get("get_filter_native_start_hour"))
-    duration = _nonempty(cleaned.get("get_filter_native_duration_hours"))
-    if start:
-        sched_lox["native_start_hour_name"] = start
-    if duration:
-        sched_lox["native_duration_hours_name"] = duration
-    if sched_lox:
-        out["filter_schedule"] = {"loxone": sched_lox}
-    return out
+    return {"ehal_bindings": cleaned} if cleaned else {}
 
 
 def migrate_swimspa_filter_bindings(consumer: dict) -> bool:
-    """Ensure ``swimspa_filter_bindings.ehal_bindings`` mirrors legacy marker keys."""
+    """Ensure ``swimspa_filter_bindings`` is EHAL-only with migrated addresses."""
     stored = consumer.get("swimspa_filter_bindings")
     if not isinstance(stored, dict) or not stored:
         return False
     migrated = filter_bindings_to_ehal_map(stored)
-    existing = stored.get("ehal_bindings")
-    existing_map = (
-        {str(k): _nonempty(v) for k, v in existing.items() if _nonempty(v)}
-        if isinstance(existing, dict)
-        else {}
-    )
-    if migrated == existing_map:
+    cleaned = {"ehal_bindings": migrated} if migrated else {}
+    if cleaned == stored:
         return False
-    consumer["swimspa_filter_bindings"] = {
-        **stored,
-        "ehal_bindings": migrated,
-    }
-    hours = _nonempty(migrated.get("get_filter_remaining_hours"))
-    if hours and not _nonempty(stored.get("loxone_target_hours_name")):
-        consumer["swimspa_filter_bindings"]["loxone_target_hours_name"] = hours
+    consumer["swimspa_filter_bindings"] = cleaned
     return True
+
+
+def _strip_consumer_marker_nests(consumer: dict) -> bool:
+    """Remove legacy Merker address nests after ehal_bindings is populated."""
+    changed = False
+    thermal = consumer.get("thermal_control")
+    if isinstance(thermal, dict) and "loxone" in thermal:
+        thermal = dict(thermal)
+        thermal.pop("loxone", None)
+        if thermal:
+            consumer["thermal_control"] = thermal
+        else:
+            consumer.pop("thermal_control", None)
+        changed = True
+    inputs = consumer.get("loxone_inputs")
+    if isinstance(inputs, dict):
+        kept = {
+            key: value
+            for key, value in inputs.items()
+            if str(key) not in _INPUT_MARKER_KEYS
+        }
+        if kept != inputs:
+            if kept:
+                consumer["loxone_inputs"] = kept
+            else:
+                consumer.pop("loxone_inputs", None)
+            changed = True
+    if isinstance(consumer.get("loxone_outputs"), dict):
+        consumer.pop("loxone_outputs", None)
+        changed = True
+    sched = consumer.get("charging_schedule")
+    if isinstance(sched, dict) and "loxone" in sched:
+        sched = dict(sched)
+        sched.pop("loxone", None)
+        consumer["charging_schedule"] = sched
+        changed = True
+    fsched = consumer.get("filter_schedule")
+    if isinstance(fsched, dict) and "loxone" in fsched:
+        fsched = dict(fsched)
+        fsched.pop("loxone", None)
+        consumer["filter_schedule"] = fsched
+        changed = True
+    if "loxone_target_hours_name" in consumer:
+        consumer.pop("loxone_target_hours_name", None)
+        changed = True
+    stored = consumer.get("swimspa_filter_bindings")
+    if isinstance(stored, dict) and stored:
+        ehal = stored.get("ehal_bindings")
+        if isinstance(ehal, dict) and ehal and set(stored.keys()) != {"ehal_bindings"}:
+            consumer["swimspa_filter_bindings"] = {"ehal_bindings": dict(ehal)}
+            changed = True
+        elif any(k != "ehal_bindings" for k in stored):
+            mapped = filter_bindings_to_ehal_map(stored)
+            consumer["swimspa_filter_bindings"] = (
+                {"ehal_bindings": mapped} if mapped else {}
+            )
+            changed = True
+    return changed
+
+
+def strip_legacy_marker_nests(house_doc: dict | None) -> dict:
+    """Drop legacy Merker nests from all consumers after migration."""
+    house = copy.deepcopy(house_doc) if isinstance(house_doc, dict) else {}
+    for profile in _profiles_iterable(house):
+        consumers = profile.get("consumers")
+        if not isinstance(consumers, list):
+            continue
+        for consumer in consumers:
+            if isinstance(consumer, dict):
+                _strip_consumer_marker_nests(consumer)
+    return house
+
+
+def _promote_ambient_to_plant(house: dict, plant_bindings: dict[str, str]) -> bool:
+    if _nonempty(plant_bindings.get("sens_temperature_outside")):
+        return False
+    for profile in _profiles_iterable(house):
+        consumers = profile.get("consumers")
+        if not isinstance(consumers, list):
+            continue
+        for consumer in consumers:
+            if not isinstance(consumer, dict):
+                continue
+            bindings = consumer.get("ehal_bindings")
+            if isinstance(bindings, dict):
+                ambient = _nonempty(bindings.get("sens_temperature_outside"))
+                if ambient:
+                    plant_bindings["sens_temperature_outside"] = ambient
+                    return True
+            thermal = consumer.get("thermal_control")
+            if not isinstance(thermal, dict):
+                continue
+            lox = thermal.get("loxone")
+            if isinstance(lox, dict):
+                ambient = _nonempty(lox.get("ambient_temp_name"))
+                if ambient:
+                    plant_bindings["sens_temperature_outside"] = ambient
+                    return True
+    return False
 
 
 def _profiles_iterable(house_doc: dict) -> list[dict]:
@@ -314,6 +422,8 @@ def _strip_entity_event_triggers(house: dict) -> bool:
 def ensure_migrated(
     house_doc: dict | None,
     config_doc: dict | None,
+    *,
+    strip_legacy: bool = True,
 ) -> tuple[dict, dict, bool]:
     """One-shot in-memory migration of blocks/consumer nests → entity bindings."""
     house = copy.deepcopy(house_doc) if isinstance(house_doc, dict) else {}
@@ -331,6 +441,10 @@ def ensure_migrated(
         if migrated:
             bindings.update(migrated)
             changed = True
+    if _migrate_all_consumers(house):
+        changed = True
+    if _promote_ambient_to_plant(house, bindings):
+        changed = True
     if bindings != (plant.get("ehal_bindings") or {}):
         plant["ehal_bindings"] = bindings
         changed = True
@@ -338,14 +452,38 @@ def ensure_migrated(
         house["plant"] = plant
     if _strip_entity_event_triggers(house):
         changed = True
-    if _migrate_all_consumers(house):
-        changed = True
+    if strip_legacy:
+        for profile in _profiles_iterable(house):
+            for consumer in profile.get("consumers") or []:
+                if isinstance(consumer, dict) and _strip_consumer_marker_nests(consumer):
+                    changed = True
     return house, config, changed
 
 
-def _migrate_all_consumers(house: dict) -> bool:
-    from ehal.flex_fields import expand_flex_bindings
+def _consumer_has_legacy_markers(consumer: dict) -> bool:
+    thermal = consumer.get("thermal_control")
+    if isinstance(thermal, dict) and isinstance(thermal.get("loxone"), dict):
+        return True
+    inputs = consumer.get("loxone_inputs")
+    if isinstance(inputs, dict) and any(k in _INPUT_MARKER_KEYS for k in inputs):
+        return True
+    if isinstance(consumer.get("loxone_outputs"), dict):
+        return True
+    sched = consumer.get("charging_schedule")
+    if isinstance(sched, dict) and isinstance(sched.get("loxone"), dict):
+        return True
+    fsched = consumer.get("filter_schedule")
+    if isinstance(fsched, dict) and isinstance(fsched.get("loxone"), dict):
+        return True
+    if consumer.get("loxone_target_hours_name"):
+        return True
+    stored = consumer.get("swimspa_filter_bindings")
+    if isinstance(stored, dict) and any(k != "ehal_bindings" for k in stored):
+        return True
+    return False
 
+
+def _migrate_all_consumers(house: dict) -> bool:
     changed = False
     for profile in _profiles_iterable(house):
         consumers = profile.get("consumers")
@@ -354,23 +492,14 @@ def _migrate_all_consumers(house: dict) -> bool:
         for consumer in consumers:
             if not isinstance(consumer, dict):
                 continue
-            cid = _nonempty(consumer.get("id"))
-            existing = consumer.get("ehal_bindings")
-            if isinstance(existing, dict) and any(_nonempty(v) for v in existing.values()):
-                if cid:
-                    expanded = expand_flex_bindings(existing, cid)
-                    if expanded != {
-                        str(k): _nonempty(v)
-                        for k, v in existing.items()
-                        if _nonempty(v)
-                    }:
-                        consumer["ehal_bindings"] = expanded
-                        changed = True
-                if migrate_swimspa_filter_bindings(consumer):
-                    changed = True
-                continue
             migrated = migrate_consumer_legacy_to_ehal_bindings(consumer)
-            if migrated:
+            existing = consumer.get("ehal_bindings")
+            existing_map = (
+                {str(k): _nonempty(v) for k, v in existing.items() if _nonempty(v)}
+                if isinstance(existing, dict)
+                else {}
+            )
+            if migrated != existing_map:
                 consumer["ehal_bindings"] = migrated
                 changed = True
             if migrate_swimspa_filter_bindings(consumer):

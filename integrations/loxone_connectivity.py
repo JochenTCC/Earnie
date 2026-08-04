@@ -94,23 +94,29 @@ def _read_check(
         return LoxoneCheck(label, io_name, False, "IO-Name fehlt in config.json")
 
     if read_raw:
-        # FertigUm: AlarmClock Tna via /all (Zähler-artige Baustein-Bezeichnung).
+        # FertigUm: AlarmClock SpecialState10 (unix) via /all; Tna text as backup.
         raw = (
             loxone_client.fetch_loxone_ready_by_time(io_name)
             if warn_if_missing
             else loxone_client.fetch_loxone_raw_value(io_name)
         )
         if raw is None:
-            # Empty Tna / LL.value is common when no next alarm / unset text.
+            # Empty SpecialState10 / Tna is common when no next alarm is set.
             detail = (
-                "Wert leer (AlarmClock Tna / Text — in Loxone noch kein Termin)"
+                "Wert leer (AlarmClock nextEntryTime / Tna — in Loxone noch kein Termin)"
                 if warn_if_missing
                 else "Lesen fehlgeschlagen (kein Wert)"
             )
             if warn_if_missing:
                 return LoxoneCheck(label, io_name, False, detail, severity="warning")
             return LoxoneCheck(label, io_name, False, detail)
-        return LoxoneCheck(label, io_name, True, f"raw={raw!r}")
+        display = (
+            loxone_client.format_ready_by_display(raw)
+            if warn_if_missing
+            else repr(raw)
+        )
+        prefix = "Wert=" if warn_if_missing else "raw="
+        return LoxoneCheck(label, io_name, True, f"{prefix}{display}")
 
     if validate_filter_start_hour:
         hour, fmt, raw = loxone_client.fetch_filter_native_start_hour(io_name)

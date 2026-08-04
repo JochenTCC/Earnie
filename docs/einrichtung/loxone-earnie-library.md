@@ -89,7 +89,7 @@ Die Templates enthalten **keine** Zähler-Hardware. In Config:
 
 Leistungs-Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **dürfen** vom EFM kommen; VO-Cmds bleiben optionaler Namenskatalog. Earnie bevorzugt die EFM-Bezeichnung im Binding, wenn vorhanden. HITL-Nacharbeit: EHAL-Com → **Energieflussmonitor → Verbraucher**.
 
-**E-Auto FertigUm:** Loxone-Import bindet **AlarmClock**-Bausteine (Ausgang **Tna**) an `get_evcs_ready_by_time` auf dem EV-Entity, das bereits Zähler-/Leistungs-Bindings hat — gleiche Konvention wie Zähler-Bezeichnung, kein Virtual-Out-Text. Earnie liest Tna über `/jdev/sps/io/{name}/all`.
+**E-Auto FertigUm:** Loxone-Import bindet **AlarmClock**-Bausteine an `get_evcs_ready_by_time` auf dem EV-Entity, das bereits Zähler-/Leistungs-Bindings hat — gleiche Konvention wie Zähler-Bezeichnung, kein Virtual-Out-Text. Earnie liest **SpecialState10** (`nextEntryTime`) über `/jdev/sps/io/{name}/all` (Unix = Wert + 1230768000); Ausgang **Tna** bleibt Text-Backup.
 
 ## 5. Earnie-tot-Fallback (in Loxone Config)
 

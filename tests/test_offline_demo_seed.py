@@ -1,4 +1,4 @@
-﻿# tests/test_offline_demo_seed.py
+# tests/test_offline_demo_seed.py
 """Offline demo seed: fill empty live-scenario refs when EARNIE_OFFLINE=1."""
 from __future__ import annotations
 
@@ -24,23 +24,23 @@ def _prepare_cloud_like(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
     runtime_dir.mkdir(parents=True)
     monkeypatch.setenv("EARNIE_ENV_PATH", str(tmp_path / "earnie_env"))
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH", str(config_dir / "house_profiles.json")
+        "EARNIE_HOUSE_PROFILES_PATH", str(config_dir / "house_profiles.json")
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json")
+        "EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json")
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH", str(config_dir / "components.json")
+        "EARNIE_COMPONENTS_PATH", str(config_dir / "components.json")
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(runtime_dir))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(runtime_dir))
     monkeypatch.setenv("EARNIE_OFFLINE", "1")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
 
     _write_json(
         config_dir / "config.json",
@@ -177,7 +177,7 @@ def test_seed_does_not_overwrite_existing_refs(tmp_path, monkeypatch):
 def test_seed_noop_without_offline(tmp_path, monkeypatch):
     _prepare_cloud_like(tmp_path, monkeypatch)
     monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
 
     assert offline_demo_seed.seed_offline_live_scenario() is False
 

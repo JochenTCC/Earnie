@@ -74,7 +74,9 @@ def test_build_entity_rows_includes_filter_for_thermal_rc():
                         "type": "thermal_rc",
                         "use_profile_csv": False,
                         "swimspa_filter_bindings": {
-                            "loxone_target_hours_name": "Earnie_Pool_Filter_Sollstunden",
+                            "ehal_bindings": {
+                                "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
+                            },
                         },
                     }
                 ],
@@ -87,6 +89,8 @@ def test_build_entity_rows_includes_filter_for_thermal_rc():
     filt = rows[-1]
     assert "get_filter_remaining_hours" in filt["fields"]
     assert filt["bindings"]["get_filter_remaining_hours"] == "Earnie_Pool_Filter_Sollstunden"
+    pool = rows[1]
+    assert "sens_temperature_water" in pool["fields"]
 
 
 def test_apply_entity_bindings_writes_plant_and_consumer():
@@ -146,10 +150,11 @@ def test_apply_entity_bindings_writes_filter_nest():
         bindings={"get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden"},
     )
     nest = house["profiles"]["live"]["consumers"][0]["swimspa_filter_bindings"]
-    assert nest["loxone_target_hours_name"] == "Earnie_Pool_Filter_Sollstunden"
-    assert nest["ehal_bindings"]["get_filter_remaining_hours"] == (
-        "Earnie_Pool_Filter_Sollstunden"
-    )
+    assert nest == {
+        "ehal_bindings": {
+            "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
+        }
+    }
 
 
 def test_name_options_merges_manual_names():

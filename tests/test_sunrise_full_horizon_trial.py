@@ -9,7 +9,7 @@ import pytest
 
 from optimizer.simulation import _flex_indices_for_book_hours, simulate_horizon
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 _BATTERY = {
     "battery_capacity_kwh": 10.0,

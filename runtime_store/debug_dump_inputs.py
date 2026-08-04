@@ -27,7 +27,6 @@ _ENV_SUFFIXES = (
     "HOUSE_PROFILES_PATH",
     "LOCAL_SETTINGS_PATH",
     "RUNTIME_PATH",
-    "RUNTIME_DIR",  # legacy alias
     "TARIFFS_PATH",
     "BACKTESTING_SCENARIOS_PATH",
 )
@@ -37,11 +36,10 @@ def collect_dump_context() -> dict[str, object]:
     """Liefert aufgeloeste Pfade und relevante Env-Overrides fuer Repro-Dumps."""
     env_overrides = {}
     for suffix in _ENV_SUFFIXES:
-        for prefix in ("EARNIE_", "ENERGY_OPTIMIZER_"):
-            key = f"{prefix}{suffix}"
-            value = os.environ.get(key, "").strip()
-            if value:
-                env_overrides[key] = value
+        key = f"EARNIE_{suffix}"
+        value = os.environ.get(key, "").strip()
+        if value:
+            env_overrides[key] = value
     extra_paths = _resolve_optional_input_paths()
     return {
         "env_overrides": env_overrides,

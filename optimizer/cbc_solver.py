@@ -306,10 +306,8 @@ def solve_with_strict_fallback(
 
 def clear_cbc_solver_env() -> None:
     for suffix in _CBC_ENV_SUFFIXES:
-        for prefix in ("EARNIE_", "ENERGY_OPTIMIZER_"):
-            os.environ.pop(f"{prefix}{suffix}", None)
-    for prefix in ("EARNIE_", "ENERGY_OPTIMIZER_"):
-        os.environ.pop(f"{prefix}MILP_SOLVER", None)
+        os.environ.pop(f"EARNIE_{suffix}", None)
+    os.environ.pop("EARNIE_MILP_SOLVER", None)
 
 
 def apply_cbc_solver_env(

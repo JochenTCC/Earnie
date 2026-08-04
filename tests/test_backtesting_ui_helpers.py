@@ -85,7 +85,7 @@ def test_backtesting_script_path_points_to_run_backtesting():
 
 
 def test_default_backtesting_output_dir_uses_runtime_dir(monkeypatch, tmp_path):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "gf-runtime"))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "gf-runtime"))
     assert default_backtesting_output_dir() == str(tmp_path / "gf-runtime")
 
 
@@ -522,9 +522,7 @@ def test_subprocess_env_passes_cloud_session_root(monkeypatch, tmp_path):
         cloud_demo.set_session_env_root_for_tests(None)
 
     assert env["EARNIE_ENV_PATH"] == str(session)
-    assert env["ENERGY_OPTIMIZER_ENV_PATH"] == str(session)
     assert "EARNIE_CONFIG_PATH" not in env
-    assert "ENERGY_OPTIMIZER_CONFIG_PATH" not in env
 
 
 def test_run_backtesting_module_import_does_not_force_offline(monkeypatch):
@@ -533,9 +531,7 @@ def test_run_backtesting_module_import_does_not_force_offline(monkeypatch):
 
     import scripts.run_backtesting as rb
 
-    monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
     monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     importlib.reload(rb)
-    assert os.environ.get("ENERGY_OPTIMIZER_OFFLINE") is None
     assert os.environ.get("EARNIE_OFFLINE") is None
     assert BACKTESTING_YEAR == 2026

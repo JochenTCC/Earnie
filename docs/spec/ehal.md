@@ -73,7 +73,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 | `sens_evcs_soc_act` | no | % | Vehicle SoC |
 | `get_evcs_nominal_current` | no | A | Nominal / max current |
 | `sens_evcs_bat_capacity` | no | kWh | EV battery capacity |
-| `get_evcs_ready_by_time` | no | string | Ready-by deadline (Loxone: AlarmClock Tna via `/all`, binding = baustein name) |
+| `get_evcs_ready_by_time` | no | string | Ready-by deadline (Loxone: AlarmClock SpecialState10 via `/all`, Tna text backup; binding = baustein name) |
 | `get_evcs_limit_soc` | no | % | Charge limit SoC |
 
 Machine schema: [`share/ehal/telemetry.schema.json`](../../share/ehal/telemetry.schema.json).

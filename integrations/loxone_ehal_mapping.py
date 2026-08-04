@@ -21,6 +21,7 @@ TELEMETRY_OPTIONAL = (
     "sens_ess_power",
     "sens_evcs_active_power",
     "sens_power_consumers",
+    "sens_temperature_outside",
 )
 SETPOINT_FIELDS = (
     "set_ess_active_power",

@@ -1,15 +1,14 @@
-"""Environment variables: EARNIE_* canonical, ENERGY_OPTIMIZER_* legacy fallback."""
+"""Environment variables: EARNIE_* only (no ENERGY_OPTIMIZER_* fallback)."""
 from __future__ import annotations
 
 import os
 
 
 def read_env(suffix: str) -> str:
-    """Read ``EARNIE_{suffix}`` with ``ENERGY_OPTIMIZER_{suffix}`` fallback."""
-    for prefix in ("EARNIE_", "ENERGY_OPTIMIZER_"):
-        raw = os.environ.get(f"{prefix}{suffix}")
-        if raw is not None and str(raw).strip():
-            return str(raw).strip()
+    """Read ``EARNIE_{suffix}`` from the process environment."""
+    raw = os.environ.get(f"EARNIE_{suffix}")
+    if raw is not None and str(raw).strip():
+        return str(raw).strip()
     return ""
 
 
@@ -19,8 +18,8 @@ def read_env_or(suffix: str, default: str) -> str:
 
 
 def read_runtime_path() -> str:
-    """``EARNIE_RUNTIME_PATH`` with legacy ``EARNIE_RUNTIME_DIR`` fallback."""
-    return read_env("RUNTIME_PATH") or read_env("RUNTIME_DIR")
+    """``EARNIE_RUNTIME_PATH``."""
+    return read_env("RUNTIME_PATH")
 
 
 def read_runtime_path_or(default: str) -> str:
@@ -33,7 +32,7 @@ def is_truthy(suffix: str) -> bool:
 
 
 def is_explicit_offline() -> bool:
-    """True when EARNIE_OFFLINE / ENERGY_OPTIMIZER_OFFLINE is set to ``1``."""
+    """True when EARNIE_OFFLINE is set to ``1``."""
     return is_truthy("OFFLINE")
 
 

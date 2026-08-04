@@ -1,4 +1,17 @@
-"""Backtesting: Matrixbau und Sunrise-Buchungsschritte (ready_by → SA₂)."""
+"""Backtesting: Matrixbau und Sunrise-Buchungsschritte (ready_by → SA₂).
+
+Defaults when not set explicitly
+--------------------------------
+- Book / ``fixed_24h`` step length: ``BACKTESTING_STEP_HOURS`` (= **24**) from
+  ``simulation.horizon_mode`` (used by ``window_start_before_anchor``,
+  ``step_slot_datetimes``, truncate helpers).
+- Timezone for sun times: ``config.get_planning_timezone()`` (live scenario /
+  ``timezone_name`` in config) — not read from ``scenario_params``.
+- ``latitude`` / ``longitude``: **no defaults**; required in scenario settings
+  (``backtesting_scenarios.json``), else ``geo_params_from_scenario`` raises.
+- SE product horizon mode default (``sunrise_window``) lives in
+  ``simulation.horizon_mode.DEFAULT_HORIZON_MODE``, not in this module.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -47,7 +60,13 @@ def naive_backtesting_slot(moment: datetime) -> datetime:
 
 
 def geo_params_from_scenario(scenario_params: dict) -> tuple[float, float, str]:
-    """Latitude, Longitude und Zeitzone für Sonnenzeiten im Backtesting."""
+    """
+    Latitude, Longitude und Zeitzone für Sonnenzeiten im Backtesting.
+
+    ``latitude`` / ``longitude`` must be set in scenario settings (no default).
+    Timezone defaults to ``config.get_planning_timezone()`` when not supplied
+    here (this helper never reads timezone from ``scenario_params``).
+    """
     lat = scenario_params.get("latitude")
     lon = scenario_params.get("longitude")
     if lat is None or lon is None:

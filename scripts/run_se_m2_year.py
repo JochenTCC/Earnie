@@ -60,20 +60,20 @@ def main(argv: list[str] | None = None) -> int:
     # Stale se_calc_test cell overlays must not win over the env's house_profiles.
     for key in (
         "EARNIE_HOUSE_PROFILES_PATH",
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         "EARNIE_BACKTESTING_SCENARIOS_PATH",
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
     ):
         os.environ.pop(key, None)
 
     env_root = Path(
         os.environ.get("EARNIE_ENV_PATH")
-        or os.environ.get("ENERGY_OPTIMIZER_ENV_PATH")
+        or os.environ.get("EARNIE_ENV_PATH")
         or (ROOT / "earnie_env_se_m2")
     )
     os.environ["EARNIE_ENV_PATH"] = str(env_root)
-    os.environ["ENERGY_OPTIMIZER_ENV_PATH"] = str(env_root)
-    os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+    os.environ["EARNIE_ENV_PATH"] = str(env_root)
+    os.environ.setdefault("EARNIE_OFFLINE", "1")
 
     out = Path(args.output_dir) if args.output_dir else env_root / "runtime"
     out.mkdir(parents=True, exist_ok=True)

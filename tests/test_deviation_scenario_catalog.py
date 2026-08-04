@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer import battery as bat
 from optimizer.deviation_eval import evaluate_entry_deviations

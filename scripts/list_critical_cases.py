@@ -5,7 +5,7 @@ import argparse
 import json
 import os
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from simulation.backtesting_log import (
     BACKTESTING_LOG_JSON,

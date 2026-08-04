@@ -54,15 +54,17 @@ def test_status_payload_ev_and_flex_namespaced_keys() -> None:
         {
             "id": "waschmaschine",
             "type": "generic",
-            "loxone_outputs": {
-                "enable_name": "Earnie_Verbraucher_Waschmaschine_Freigabe",
-                "power_setpoint_name": "Earnie_Verbraucher_Waschmaschine_Ziel_kW",
+            "ehal_bindings": {
+                "flex.waschmaschine.set_enable": "Earnie_Verbraucher_Waschmaschine_Freigabe",
+                "flex.waschmaschine.set_power_setpoint": "Earnie_Verbraucher_Waschmaschine_Ziel_kW",
             },
         },
         {
             "id": "waermepumpe",
             "type": "thermal_annual",
-            "loxone_outputs": {"enable_name": "Earnie_Waermepumpe_Freigabe"},
+            "ehal_bindings": {
+                "flex.waermepumpe.set_enable": "Earnie_Waermepumpe_Freigabe",
+            },
         },
     ]
     payload = build_loxone_status_payload(
@@ -93,12 +95,16 @@ def test_status_payload_maps_legacy_swimspa_enable_to_pool_keys() -> None:
         {
             "id": "swimspa",
             "type": "thermal_rc",
-            "loxone_outputs": {"enable_name": "Earnie_SwimSpa_Freigabe"},
+            "ehal_bindings": {
+                "flex.swimspa.set_enable": "Earnie_SwimSpa_Freigabe",
+            },
         },
         {
             "id": "swimspa_filter",
             "daily_target_source": "loxone_remaining_hours",
-            "loxone_outputs": {"enable_name": "Earnie_Swimspa_Filter_Freigabe"},
+            "ehal_bindings": {
+                "flex.swimspa_filter.set_enable": "Earnie_Swimspa_Filter_Freigabe",
+            },
         },
     ]
     payload = build_loxone_status_payload(

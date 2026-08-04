@@ -79,6 +79,11 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "sens_filter_active": "Filter läuft (Binär)",
     "get_filter_native_start_hour": "Native Filter-Startstunde",
     "get_filter_native_duration_hours": "Native Filter-Dauer (h)",
+    "sens_temperature_outside": "Außentemperatur (°C)",
+    "sens_temperature_water": "Pool Ist-Temperatur (°C)",
+    "get_temperature_water_setpoint": "Pool Soll-Temperatur (°C)",
+    "get_temperature_tolerance_c": "Temperatur-Toleranz (°C)",
+    "sens_heating_active": "Heizung aktiv",
 }
 
 # Field → device role_id for HITL grouping (M1 plant roles only).

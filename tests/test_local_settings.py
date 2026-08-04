@@ -22,7 +22,7 @@ def _write_minimal_config(tmp_path, system_extra: dict | None = None) -> tuple[s
 
 
 def test_loxone_silent_mode_defaults_true_without_local_settings(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
     config_path, scenarios_path = _write_minimal_config(tmp_path)
     local_path = tmp_path / "missing_local_settings.json"
     cfg = config.Config(
@@ -35,7 +35,7 @@ def test_loxone_silent_mode_defaults_true_without_local_settings(tmp_path, monke
 
 
 def test_loxone_silent_mode_from_local_settings(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
     config_path, scenarios_path = _write_minimal_config(tmp_path)
     local_path = tmp_path / "local_settings.json"
     local_path.write_text(json.dumps({"loxone_silent_mode": True}), encoding="utf-8")
@@ -49,7 +49,7 @@ def test_loxone_silent_mode_from_local_settings(tmp_path, monkeypatch):
 
 
 def test_loxone_silent_mode_from_central_config(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
     config_path, scenarios_path = _write_minimal_config(tmp_path, {"loxone_silent_mode": True})
     local_path = tmp_path / "local_settings.json"
     cfg = config.Config(
@@ -62,7 +62,7 @@ def test_loxone_silent_mode_from_central_config(tmp_path, monkeypatch):
 
 
 def test_loxone_silent_mode_local_settings_overrides_central_config(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
     config_path, scenarios_path = _write_minimal_config(tmp_path, {"loxone_silent_mode": False})
     local_path = tmp_path / "local_settings.json"
     local_path.write_text(json.dumps({"loxone_silent_mode": True}), encoding="utf-8")
@@ -76,8 +76,8 @@ def test_loxone_silent_mode_local_settings_overrides_central_config(tmp_path, mo
 
 
 def test_chart_debug_capture_local_settings_overrides_config(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    monkeypatch.delenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
         config_payload=minimal_config_payload(
@@ -102,8 +102,8 @@ def test_bootstrap_creates_local_settings(tmp_path, monkeypatch):
     from runtime_store import bootstrap
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", "config/config.json")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", "config/config.json")
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
 
     config_dir = tmp_path / "config"
     config_dir.mkdir()

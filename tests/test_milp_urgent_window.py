@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer.milp import milp_optimizer
 

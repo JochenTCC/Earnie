@@ -47,7 +47,7 @@ PROTECTED_TEST_FILES = frozenset(
 )
 
 # Migration / pre-1.26 leftovers only — not still-valid 2.0 bridges (legacy_id,
-# subtract_consumer_ids) or routine test env overrides (ENERGY_OPTIMIZER_CONFIG_PATH).
+# subtract_consumer_ids) or routine test env overrides (EARNIE_CONFIG_PATH).
 # Manual review only; never auto-delete flagged tests.
 LEGACY_TEST_SYMBOLS = (
     "migrate_runtime_entities",

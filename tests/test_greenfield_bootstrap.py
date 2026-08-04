@@ -1,4 +1,4 @@
-﻿# tests/test_greenfield_bootstrap.py
+# tests/test_greenfield_bootstrap.py
 """Smoke-Tests für Greenfield-Ersteinrichtung (Bootstrap + Setup-Übergang)."""
 from __future__ import annotations
 
@@ -41,15 +41,15 @@ def _prepare_greenfield_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.chdir(tmp_path)
     config_dir = tmp_path / "config"
     config_dir.mkdir()
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH", str(config_dir / "house_profiles.json"))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.setenv("EARNIE_HOUSE_PROFILES_PATH", str(config_dir / "house_profiles.json"))
+    monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
-    monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
 
     share_dir = tmp_path / "share" / "config"
     share_dir.mkdir(parents=True)

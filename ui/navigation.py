@@ -1,6 +1,6 @@
 """Seiten-Registry für die native Menüstruktur (st.navigation / st.Page).
 
-Das Env-/Config-Gating (EARNIE_UI_MODES / ENERGY_OPTIMIZER_UI_MODES)
+Das Env-/Config-Gating (EARNIE_UI_MODES)
 steuert, welche Seiten registriert werden: Live-Cockpit (Monitor, Manuelle Geräte)
 braucht ``sunset2sunset``; Daemon Control braucht ``live_environment``;
 Szenario-Explorer und Preis-Prognose (Dev) folgen ihren Keys.

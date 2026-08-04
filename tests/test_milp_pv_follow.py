@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer.consumer_power import loxone_control_outputs
 from optimizer.milp import milp_optimizer

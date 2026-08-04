@@ -56,7 +56,7 @@ app.py (Router: st.navigation / st.Page)
     └── page_consumer_analysis.py # Mockup*
 ```
 
-- `ui/mode_selector.py` entfällt als Radio (Modus = Seite). Das Env-Gating (`ENERGY_OPTIMIZER_UI_MODES`, `ui.price_forecast_page_enabled`) bleibt erhalten und steuert nur noch, **welche Seiten registriert** werden.
+- `ui/mode_selector.py` entfällt als Radio (Modus = Seite). Das Env-Gating (`EARNIE_UI_MODES`, `ui.price_forecast_page_enabled`) bleibt erhalten und steuert nur noch, **welche Seiten registriert** werden.
 - Live-Panels (Auto-Refresh, `main_py`-Sync) bleiben an das Cockpit-Fenster SA₀→SA₁ gebunden (unverändert, siehe `ui-sunset2sunset.md`).
 
 ## 5. Seiten im Detail
@@ -92,7 +92,7 @@ Funktionslose Platzhalter mit `st.info("geplant")` und deaktivierten Widgets im 
 
 ### 5.6 Preis-Prognose (Dev, bestehend)
 
-Umzug in eine eigene Seite; bleibt per `ui.price_forecast_page_enabled` / `ENERGY_OPTIMIZER_UI_MODES` gegated.
+Umzug in eine eigene Seite; bleibt per `ui.price_forecast_page_enabled` / `EARNIE_UI_MODES` gegated.
 
 ## 6. Empfehlungsmodus — Algorithmus
 

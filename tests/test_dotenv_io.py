@@ -31,7 +31,7 @@ def test_loxone_credentials_configured_true_when_complete(monkeypatch):
 
 def test_needs_loxone_setup_respects_offline(monkeypatch):
     monkeypatch.delenv("LOXONE_IP", raising=False)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
     assert dotenv_io.needs_loxone_setup() is False
 
 
@@ -39,18 +39,18 @@ def test_needs_loxone_setup_deferred_during_planning_onboarding(tmp_path, monkey
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_COMPONENTS_PATH", str(config_dir / "components.json"))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv("EARNIE_COMPONENTS_PATH", str(config_dir / "components.json"))
+    monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         str(config_dir / "house_profiles.json"),
     )
-    monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     monkeypatch.delenv("LOXONE_IP", raising=False)
     monkeypatch.delenv("LOXONE_USER", raising=False)
@@ -82,8 +82,8 @@ def test_require_loxone_credentials_for_prod_without_onboarding(tmp_path, monkey
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
-    monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     monkeypatch.delenv("LOXONE_IP", raising=False)
     monkeypatch.delenv("LOXONE_USER", raising=False)
     monkeypatch.delenv("LOXONE_PASS", raising=False)
@@ -100,8 +100,8 @@ def test_loxone_setup_not_deferred_when_betrieb_unlocked(tmp_path, monkeypatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir()
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
-    monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     (config_dir / "config.json").write_text(
         '{"flexible_consumers": [{"id": "swimspa"}]}',
         encoding="utf-8",
@@ -119,7 +119,7 @@ def test_validate_loxone_ip_rejects_invalid():
 
 def test_write_loxone_dotenv_creates_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_DOTENV_PATH", "config/.env")
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", "config/.env")
 
     path = dotenv_io.write_loxone_dotenv("10.0.0.5", "loxuser", 'pa"ss')
     assert path.replace("\\", "/") == "config/.env"
@@ -131,6 +131,6 @@ def test_write_loxone_dotenv_creates_file(tmp_path, monkeypatch):
 
 def test_write_loxone_dotenv_rejects_empty_user(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_DOTENV_PATH", "config/.env")
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", "config/.env")
     with pytest.raises(ValueError, match="Benutzername"):
         dotenv_io.write_loxone_dotenv("10.0.0.5", "  ", "secret")

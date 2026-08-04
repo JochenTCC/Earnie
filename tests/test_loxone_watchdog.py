@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from integrations import loxone_watchdog as wd
 

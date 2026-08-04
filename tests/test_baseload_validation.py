@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from simulation.baseload_validation import (
     baseload_kwh_from_chart_rows,

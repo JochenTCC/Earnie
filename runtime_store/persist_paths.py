@@ -38,11 +38,10 @@ def _preferred_dotenv() -> str:
 
 
 def _env_path_explicit() -> bool:
-    """True when EARNIE_ENV_PATH / ENERGY_OPTIMIZER_ENV_PATH is set in the process env."""
-    for key in ("EARNIE_ENV_PATH", "ENERGY_OPTIMIZER_ENV_PATH"):
-        raw = os.environ.get(key)
-        if raw is not None and str(raw).strip():
-            return True
+    """True when EARNIE_ENV_PATH is set in the process env."""
+    raw = os.environ.get("EARNIE_ENV_PATH")
+    if raw is not None and str(raw).strip():
+        return True
     return False
 
 
@@ -155,7 +154,7 @@ def resolve_runtime_prefixed_path(configured_path: str) -> str:
     """
     Relative Pfade mit ``runtime/``-Präfix gegen ``runtime_dir()`` auflösen.
 
-    So greift ``EARNIE_RUNTIME_PATH`` (bzw. Legacy ``ENERGY_OPTIMIZER_RUNTIME_PATH`` / ``*_RUNTIME_DIR``) auch für ``path_cons_data`` in
+    So greift ``EARNIE_RUNTIME_PATH`` auch für ``path_cons_data`` in
     config.json (z. B. Dev mit NAS-Config, Docker unverändert).
     """
     if os.path.isabs(configured_path):

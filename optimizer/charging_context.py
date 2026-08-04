@@ -125,8 +125,15 @@ def parse_loxone_relative_ready_by(text: str, from_dt: datetime) -> datetime | N
     return None
 
 
+def _deadline_from_unix(unix_ts: float, from_dt: datetime) -> datetime:
+    parsed = datetime.fromtimestamp(unix_ts, tz=from_dt.tzinfo).replace(
+        second=0, microsecond=0
+    )
+    return _align_like(from_dt, parsed)
+
+
 def parse_loxone_ready_by_time(value: str | float | None, from_dt: datetime) -> datetime | None:
-    """Wandelt einen Loxone-Zeitwert (relativ/absolut oder Legacy-Zahl) in eine Deadline um."""
+    """Wandelt Loxone FertigUm (Unix, Tna-Text-Backup, Legacy-Zahl) in eine Deadline um."""
     if value is None:
         return None
 
@@ -135,6 +142,15 @@ def parse_loxone_ready_by_time(value: str | float | None, from_dt: datetime) -> 
         if not text:
             return None
 
+        # Prefer numeric Unix (SpecialState10 path may arrive as str).
+        try:
+            as_num = float(text.replace(",", "."))
+        except ValueError:
+            as_num = None
+        if as_num is not None and as_num > 1_000_000_000:
+            return _deadline_from_unix(as_num, from_dt)
+
+        # Backup: AlarmClock Tna relative/absolute text (Heute/Morgen/Wochentag).
         relative = parse_loxone_relative_ready_by(text, from_dt)
         if relative is not None:
             return relative
@@ -159,17 +175,14 @@ def parse_loxone_ready_by_time(value: str | float | None, from_dt: datetime) -> 
         return None
 
     v = float(value)
+    if v > 1_000_000_000:
+        return _deadline_from_unix(v, from_dt)
     if 0 <= v < 24:
         hour = int(v)
         minute = int(round((v - hour) * 60)) % 60
     elif 0 <= v < 2400 and abs(v - int(v)) < 1e-6:
         hour = int(v) // 100
         minute = int(v) % 100
-    elif v > 1_000_000_000:
-        parsed = datetime.fromtimestamp(v, tz=from_dt.tzinfo).replace(
-            second=0, microsecond=0
-        )
-        return _align_like(from_dt, parsed)
     else:
         return None
     hour %= 24
@@ -200,8 +213,8 @@ def charging_deadline_after(available_from: datetime, consumer: dict) -> datetim
     return deadline_from_ready_hour(available_from, day_sched.get("ready_by_hour"))
 
 
-def _loxone_ready_raw(consumer: dict) -> str | None:
-    """Roher Loxone-String für Fertig-Uhrzeit (get_evcs_ready_by_time)."""
+def _loxone_ready_raw(consumer: dict) -> str | float | None:
+    """Fertig-Uhrzeit roh: Unix (SpecialState10) oder Tna-/Merker-Text."""
     io_name = marker_get_evcs_ready_by_time(consumer)
     if not io_name:
         return None
@@ -212,7 +225,7 @@ def _loxone_ready_deadline(
     consumer: dict,
     parse_reference: datetime,
     *,
-    ready_raw: str | None = None,
+    ready_raw: str | float | None = None,
 ) -> datetime | None:
     """Fertig-Uhrzeit aus Loxone, falls konfiguriert und parsebar."""
     if ready_raw is None:
@@ -225,7 +238,7 @@ def resolve_charging_deadline(
     parse_reference: datetime,
     available_from: datetime,
     *,
-    ready_raw: str | None = None,
+    ready_raw: str | float | None = None,
 ) -> tuple[datetime | None, bool]:
     """
     Deadline für einen Ladezyklus: Loxone FertigUm vor Config ready_by_hour.
@@ -277,7 +290,7 @@ def resolve_absent_availability(
     horizon_start: datetime,
     consumer: dict,
     *,
-    ready_raw: str | None = None,
+    ready_raw: str | float | None = None,
 ) -> datetime | None:
     """
     Ladebeginn bei Abwesenheit: offenes Übernacht-Fenster oder nächster Termin.
@@ -468,7 +481,7 @@ def _config_path_with_plugged_in(
     consumer: dict,
     sched: dict,
     horizon_start: datetime,
-    ready_raw: str | None,
+    ready_raw: str | float | None,
 ) -> dict:
     """Attach Loxone plugged_in; suppress live output when absent (anticipated)."""
     plug_name = marker_sens_evcs_connected(consumer)

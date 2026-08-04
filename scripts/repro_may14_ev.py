@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 os.environ["EARNIE_ENV_PATH"] = str(ROOT / "greenfield")
 os.environ["EARNIE_CONFIG_PATH"] = str(ROOT / "greenfield/config")
 os.environ["EARNIE_RUNTIME_PATH"] = str(ROOT / "greenfield/runtime")

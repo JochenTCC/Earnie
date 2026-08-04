@@ -94,7 +94,7 @@ def test_root_appliances_block_rejected(tmp_path, monkeypatch):
     base["appliances"] = []
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(json.dumps(base, indent=2), encoding="utf-8")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(cfg_path))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg_path))
     with pytest.raises(ValueError, match="appliances"):
         reinit_config()
 
@@ -108,7 +108,7 @@ def test_root_eauto_milp_block_rejected(tmp_path, monkeypatch):
     }
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(json.dumps(base, indent=2), encoding="utf-8")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(cfg_path))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg_path))
     with pytest.raises(ValueError, match="eauto_milp"):
         reinit_config()
 
@@ -181,7 +181,7 @@ def test_root_legacy_config_blocks_rejected(
     base[block_key] = block_value
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text(json.dumps(base, indent=2), encoding="utf-8")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(cfg_path))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg_path))
     with pytest.raises(ValueError, match=block_key):
         reinit_config()
 
@@ -293,20 +293,20 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(cfg_path))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg_path))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         str(config_dir / "house_profiles.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json")
+        "EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json")
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        "EARNIE_COMPONENTS_PATH",
         str(config_dir / "components.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
     reinit_config()
@@ -415,20 +415,20 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(cfg_path))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg_path))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         str(config_dir / "house_profiles.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json")
+        "EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json")
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        "EARNIE_COMPONENTS_PATH",
         str(config_dir / "components.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
     reinit_config()

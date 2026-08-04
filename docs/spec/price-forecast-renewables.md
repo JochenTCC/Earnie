@@ -165,7 +165,7 @@ Holdout (25 %): **Spiegelung MAE ≈ 3,0 Cent/kWh**, Modell MAE ≈ 3,7 — auf 
 
 ### 7.1 UI-Modus „Preis-Prognose (Dev)“
 
-Sidebar-Betriebsmodus (nur wenn `ENERGY_OPTIMIZER_UI_MODES` leer oder `price_forecast` enthalten):
+Sidebar-Betriebsmodus (nur wenn `EARNIE_UI_MODES` leer oder `price_forecast` enthalten):
 
 - Zeitreihe: Ist vs. OLS vs. Spiegelung (Holdout)
 - Scatter Ist vs. Prognose

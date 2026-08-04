@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer import battery as bat
 from runtime_store import history_timeline, optimization_history

@@ -123,8 +123,10 @@ def test_chart_debug_dump_replay_filter_attribution():
             "id": "swimspa",
             "nominal_power_kw": 2.8,
             "signal_type": "power",
+            "ehal_bindings": {
+                "flex.swimspa.sens_power_act": "Ernie_Swim-Spa-P_act",
+            },
             "loxone_inputs": {
-                "power_name": "Ernie_Swim-Spa-P_act",
                 "subtract_consumer_ids": ["swimspa_filter"],
             },
         },
@@ -132,9 +134,11 @@ def test_chart_debug_dump_replay_filter_attribution():
             "id": "swimspa_filter",
             "nominal_power_kw": 0.18,
             "signal_type": "binary",
+            "ehal_bindings": {
+                "flex.swimspa_filter.sens_power_act": "homie_bwa_spa_filter2",
+                "sens_filter_active": "homie_bwa_spa_filter1",
+            },
             "loxone_inputs": {
-                "power_name": "homie_bwa_spa_filter2",
-                "alternate_binary_power_name": "homie_bwa_spa_filter1",
                 "signal_type": "binary",
             },
         },

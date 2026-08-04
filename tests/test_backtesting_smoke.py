@@ -25,7 +25,7 @@ from tests.backtesting_case_selection import (
 from tests.conftest import requires_historical_data
 from tests.fixtures.historical_fixtures import CONS_DATA_FILE
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 SMOKE_DAY = date(2026, 6, 14)
 

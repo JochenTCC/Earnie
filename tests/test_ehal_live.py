@@ -138,7 +138,7 @@ def test_write_ess_setpoints_persists_error(config_mock, adapter_factory, persis
 
 def _clear_safe_setpoints_skip_env() -> None:
     os.environ.pop("EARNIE_SKIP_SAFE_SETPOINTS_ON_START", None)
-    os.environ.pop("ENERGY_OPTIMIZER_SKIP_SAFE_SETPOINTS_ON_START", None)
+    os.environ.pop("EARNIE_SKIP_SAFE_SETPOINTS_ON_START", None)
 
 
 @patch("integrations.ehal_live.write_evcs_max_current_from_consumers")

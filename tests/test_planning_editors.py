@@ -1,4 +1,4 @@
-﻿"""Tests für Planungs-Editoren und ID-Generierung (1.24.e)."""
+"""Tests für Planungs-Editoren und ID-Generierung (1.24.e)."""
 from __future__ import annotations
 
 import json
@@ -39,18 +39,18 @@ def _bind_paths(tmp_path, monkeypatch: pytest.MonkeyPatch):
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         str(config_dir / "house_profiles.json"),
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        "EARNIE_COMPONENTS_PATH",
         str(config_dir / "components.json"),
     )
     return config_dir

@@ -1,5 +1,5 @@
 # tests/test_persist_paths_sidecars.py
-"""Tests für Sidecar-Pfad-Auflösung neben ENERGY_OPTIMIZER_CONFIG_PATH."""
+"""Tests für Sidecar-Pfad-Auflösung neben EARNIE_CONFIG_PATH."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -22,11 +22,11 @@ def test_sidecars_resolve_next_to_config_path(tmp_path, monkeypatch):
     (config_dir / "house_profiles.json").write_text("{}", encoding="utf-8")
     (config_dir / "backtesting_scenarios.json").write_text("{}", encoding="utf-8")
 
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
-    monkeypatch.delenv("ENERGY_OPTIMIZER_COMPONENTS_PATH", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_TARIFFS_PATH", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", raising=False)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.delenv("EARNIE_COMPONENTS_PATH", raising=False)
+    monkeypatch.delenv("EARNIE_TARIFFS_PATH", raising=False)
+    monkeypatch.delenv("EARNIE_HOUSE_PROFILES_PATH", raising=False)
+    monkeypatch.delenv("EARNIE_BACKTESTING_SCENARIOS_PATH", raising=False)
 
     assert resolve_components_json_path() == str(config_dir / "components.json")
     assert resolve_tariffs_json_path() == str(config_dir / "tariffs.json")
@@ -37,7 +37,7 @@ def test_sidecars_resolve_next_to_config_path(tmp_path, monkeypatch):
 
 
 def test_backtesting_log_dir_uses_runtime_dir(monkeypatch, tmp_path):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
     assert resolve_backtesting_log_dir() == str(tmp_path / "runtime")
 
 
@@ -51,8 +51,8 @@ def test_explicit_sidecar_env_overrides_co_located(tmp_path, monkeypatch):
     custom_tariffs = other_dir / "tariffs.json"
     custom_tariffs.write_text('{"custom": true}', encoding="utf-8")
 
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
-    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(custom_tariffs))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(custom_tariffs))
 
     assert resolve_tariffs_json_path() == str(custom_tariffs)
 
@@ -69,8 +69,8 @@ def test_sidecar_falls_back_to_default_config_when_missing_beside_config(
     default_tariffs.write_text("{}", encoding="utf-8")
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
-    monkeypatch.delenv("ENERGY_OPTIMIZER_TARIFFS_PATH", raising=False)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.delenv("EARNIE_TARIFFS_PATH", raising=False)
 
     resolved = resolve_tariffs_json_path()
     assert Path(resolved).resolve() == default_tariffs.resolve()

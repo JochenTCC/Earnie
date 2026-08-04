@@ -101,12 +101,12 @@ def _run_one(
     env = os.environ.copy()
     env["EARNIE_ENV_PATH"] = str(env_path)
     env["EARNIE_BACKTESTING_SCENARIOS_PATH"] = str(override_path)
-    env["ENERGY_OPTIMIZER_OFFLINE"] = "1"
+    env["EARNIE_OFFLINE"] = "1"
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("PYTHONUTF8", "1")
     # Prefer scenarios JSON over ambient env for this subprocess.
     env.pop("EARNIE_MILP_SOLVER", None)
-    env.pop("ENERGY_OPTIMIZER_MILP_SOLVER", None)
+    env.pop("EARNIE_MILP_SOLVER", None)
 
     cmd = [
         sys.executable,

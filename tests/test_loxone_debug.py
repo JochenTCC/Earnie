@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from integrations.loxone_comm_trace import LoxoneWriteRecord, serialize_write_records
 from integrations.loxone_connectivity import LoxoneCheck
@@ -53,6 +53,46 @@ def test_build_read_rows_includes_timestamp():
     assert rows[1]["Status"] == "Warnung"
     assert rows[1]["Wert"] == ""
     assert rows[1]["Detail"] == "Timeout"
+
+
+def test_build_read_rows_formats_ready_by_loxone_counter():
+    from integrations.loxone_client import LOXONE_EPOCH_TO_UNIX, format_ready_by_display
+
+    lox_counter = 555135300.0
+    checks = [
+        LoxoneCheck(
+            "ev:get_evcs_ready_by_time",
+            "Ladewecker",
+            True,
+            f"raw={lox_counter!r}",
+        ),
+    ]
+    rows = build_read_rows(
+        checks,
+        "t0",
+        expected_fields=["ev:get_evcs_ready_by_time"],
+    )
+    unix = int(lox_counter + LOXONE_EPOCH_TO_UNIX)
+    assert rows[0]["Wert"] == format_ready_by_display(lox_counter)
+    assert f"unix {unix}" in rows[0]["Wert"]
+    assert rows[0]["Wert"].count("-") >= 2
+
+
+def test_build_read_rows_ready_by_keeps_tna_text():
+    checks = [
+        LoxoneCheck(
+            "ev:get_evcs_ready_by_time",
+            "Ladewecker",
+            True,
+            "Wert=Morgen, 11:00",
+        ),
+    ]
+    rows = build_read_rows(
+        checks,
+        "t0",
+        expected_fields=["ev:get_evcs_ready_by_time"],
+    )
+    assert rows[0]["Wert"] == "Morgen, 11:00"
 
 
 def test_build_read_rows_includes_flex_power():

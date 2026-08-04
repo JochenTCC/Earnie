@@ -30,14 +30,11 @@ from ui.auto_persist import payload_fingerprint
 
 _RUNTIME_ENV_KEYS = (
     "EARNIE_RUNTIME_PATH",
-    "ENERGY_OPTIMIZER_RUNTIME_PATH",
-    "EARNIE_RUNTIME_DIR",
-    "ENERGY_OPTIMIZER_RUNTIME_DIR",
 )
 
 
 def _clear_runtime_overrides(monkeypatch) -> None:
-    """Drop PATH and legacy DIR overrides so runtime_dir() uses env_root()."""
+    """Drop PATH overrides so runtime_dir() uses env_root()."""
     for key in _RUNTIME_ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
 
@@ -45,9 +42,7 @@ def _clear_runtime_overrides(monkeypatch) -> None:
 def test_defaults_resolve_under_earnie_env(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("EARNIE_ENV_PATH", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_ENV_PATH", raising=False)
     monkeypatch.delenv("EARNIE_CONFIG_PATH", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_CONFIG_PATH", raising=False)
     _clear_runtime_overrides(monkeypatch)
     cfg = tmp_path / "earnie_env" / "config"
     rt = tmp_path / "earnie_env" / "runtime"
@@ -68,7 +63,6 @@ def test_env_path_derives_config_and_runtime(monkeypatch, tmp_path: Path) -> Non
     (stack / "config" / "config.json").write_text("{}", encoding="utf-8")
     monkeypatch.setenv("EARNIE_ENV_PATH", str(stack))
     monkeypatch.delenv("EARNIE_CONFIG_PATH", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_CONFIG_PATH", raising=False)
     _clear_runtime_overrides(monkeypatch)
     assert Path(env_root()).resolve() == stack.resolve()
     assert Path(config_dir()).resolve() == (stack / "config").resolve()
@@ -116,9 +110,7 @@ def test_ensure_compatible_rejects_unknown_version() -> None:
 def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("EARNIE_ENV_PATH", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_ENV_PATH", raising=False)
     monkeypatch.delenv("EARNIE_CONFIG_PATH", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_CONFIG_PATH", raising=False)
     _clear_runtime_overrides(monkeypatch)
     cfg = tmp_path / "earnie_env" / "config"
     cfg.mkdir(parents=True)
@@ -138,7 +130,6 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
     (uploads / "sample.csv").write_text("timestamp;power_kw\n", encoding="utf-8")
 
     monkeypatch.delenv("EARNIE_CONFIG_PATH", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_CONFIG_PATH", raising=False)
 
     payload = build_config_pack_bytes()
     with zipfile.ZipFile(__import__("io").BytesIO(payload)) as zf:

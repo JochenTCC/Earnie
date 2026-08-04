@@ -6,7 +6,7 @@ import os
 import pulp
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer.milp import _build_milp_model, milp_horizon_schedule
 

@@ -1,4 +1,4 @@
-﻿# tests/test_cloud_demo.py
+# tests/test_cloud_demo.py
 """Community Cloud per-session Greenfield (EARNIE_CLOUD_DEMO)."""
 from __future__ import annotations
 
@@ -100,7 +100,6 @@ def _minimal_share(tmp_path: Path) -> Path:
 
 def test_is_cloud_demo_env(monkeypatch):
     monkeypatch.delenv("EARNIE_CLOUD_DEMO", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_CLOUD_DEMO", raising=False)
     assert cloud_demo.is_cloud_demo() is False
     monkeypatch.setenv("EARNIE_CLOUD_DEMO", "1")
     assert cloud_demo.is_cloud_demo() is True
@@ -109,7 +108,6 @@ def test_is_cloud_demo_env(monkeypatch):
 def test_get_session_env_root_bare_mode_skips_streamlit(monkeypatch):
     """Without CLOUD_DEMO, never probe Streamlit (CLI / backtesting)."""
     monkeypatch.delenv("EARNIE_CLOUD_DEMO", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_CLOUD_DEMO", raising=False)
     assert cloud_demo.get_session_env_root() is None
 
 
@@ -164,7 +162,6 @@ def test_ensure_cloud_session_env_creates_and_reuses(tmp_path, monkeypatch):
 
 def test_ensure_cloud_session_env_noop_without_flag(monkeypatch):
     monkeypatch.delenv("EARNIE_CLOUD_DEMO", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_CLOUD_DEMO", raising=False)
     assert cloud_demo.ensure_cloud_session_env() is None
 
 
@@ -179,12 +176,11 @@ def test_bootstrap_under_cloud_session_skips_offline_seed(tmp_path, monkeypatch)
     monkeypatch.setenv("EARNIE_OFFLINE", "1")
     for key in (
         "EARNIE_CONFIG_PATH",
-        "ENERGY_OPTIMIZER_CONFIG_PATH",
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
-        "ENERGY_OPTIMIZER_TARIFFS_PATH",
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
-        "ENERGY_OPTIMIZER_RUNTIME_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
+        "EARNIE_TARIFFS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_COMPONENTS_PATH",
+        "EARNIE_RUNTIME_PATH",
         "EARNIE_ENV_PATH",
     ):
         monkeypatch.delenv(key, raising=False)
@@ -248,18 +244,18 @@ def test_cloud_restricted_nav_hauskonfigurator_only(tmp_path, monkeypatch):
     config_dir.mkdir(parents=True)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("EARNIE_CLOUD_DEMO", "1")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_dir / "config.json"))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir / "config.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         str(config_dir / "house_profiles.json"),
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_TARIFFS_PATH", str(config_dir / "tariffs.json"))
+    monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(config_dir / "tariffs.json"))
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(config_dir / "backtesting_scenarios.json"),
     )
     monkeypatch.setenv(
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        "EARNIE_COMPONENTS_PATH",
         str(config_dir / "components.json"),
     )
     _write_json(config_dir / "config.json", {"flexible_consumers": []})
@@ -335,7 +331,6 @@ def test_feedback_mailto_includes_attach_hint_when_agreed():
 
 def test_mark_se_sim_started_noop_without_cloud_demo(monkeypatch):
     monkeypatch.delenv("EARNIE_CLOUD_DEMO", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_CLOUD_DEMO", raising=False)
     fake_state: dict = {}
     fake_st = SimpleNamespace(session_state=fake_state)
     import sys

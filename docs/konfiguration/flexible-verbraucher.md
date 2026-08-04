@@ -57,7 +57,7 @@ Bei `daily_target_source: thermal` steuert das RC-Modell das Tagesenergieziel au
 | `thermal_control.setpoint_c` / `tolerance_c` | Soll-Temperatur und Band                                                                                       |
 | `thermal_control.water_volume_liters`        | Wasservolumen                                                                                                  |
 | `thermal_control.heat_loss_kw_per_k`         | Wärmeverlust pro Kelvin                                                                                        |
-| `thermal_control.loxone`                     | Merker für Ist-/Soll-/Außentemperatur und optional `heating_active_name` (binär, Fall B)                       |
+| `consumers[].ehal_bindings` (Pool C.6)       | Merker: `sens_temperature_water`, `get_temperature_water_setpoint`, `get_temperature_tolerance_c`, `sens_heating_active`; Außentemperatur hausweit unter `plant.ehal_bindings.sens_temperature_outside` |
 | `thermal_control.history_logs`               | CSV-Pfade für Kalibrierung; optional `heating_active_csv` / `filter_active_csv` statt reiner Leistungsschwelle |
 
 

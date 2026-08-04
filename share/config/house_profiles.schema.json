@@ -156,33 +156,33 @@
     },
     "thermal_control_loxone": {
       "type": "object",
-      "description": "thermal_control.loxone — Temperatur-/Heiz-Indikator-Merker (Lesen).",
+      "description": "DEPRECATED — migrate to consumers[].ehal_bindings (C.6). Stripped by ensure_migrated / scripts.migrate_ehal_bindings.",
       "properties": {
         "actual_temp_name": {
           "type": "string",
-          "description": "Rolle Lesen: Ist-Temperatur °C."
+          "description": "Legacy → sens_temperature_water"
         },
         "setpoint_temp_name": {
           "type": "string",
-          "description": "Rolle Lesen: Soll-Temperatur °C."
+          "description": "Legacy → get_temperature_water_setpoint"
         },
         "ambient_temp_name": {
           "type": "string",
-          "description": "Rolle Lesen: Umgebungs-/Außentemperatur °C."
+          "description": "Legacy → plant sens_temperature_outside"
         },
         "tolerance_c_name": {
           "type": "string",
-          "description": "Rolle Lesen: Toleranz ± °C."
+          "description": "Legacy → get_temperature_tolerance_c"
         },
         "heating_active_name": {
           "type": "string",
-          "description": "Rolle Lesen: Heizung aktiv (0/1)."
+          "description": "Legacy → sens_heating_active"
         }
       }
     },
     "thermal_control": {
       "type": "object",
-      "description": "Thermische Live-Steuerung am thermal_rc-Verbraucher (Merker unter .loxone).",
+      "description": "Thermische Modellparameter am thermal_rc-Verbraucher (Merker unter ehal_bindings C.6).",
       "properties": {
         "loxone": {
           "$ref": "#/definitions/thermal_control_loxone"

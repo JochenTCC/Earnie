@@ -10,6 +10,7 @@ from ehal.profiles import group_fields_by_role, role_field_labels, role_group_la
 from house_config.ehal_bindings import (
     FILTER_EHAL_FIELDS,
     FILTER_ENTITY_ID,
+    THERMAL_RC_EHAL_FIELDS,
     ehal_map_to_filter_bindings,
     ensure_migrated,
     filter_bindings_to_ehal_map,
@@ -94,6 +95,11 @@ _EXTRA_LABELS: dict[str, str] = {
     "sens_filter_active": "Filter läuft (Binär)",
     "get_filter_native_start_hour": "Native Filter-Startstunde",
     "get_filter_native_duration_hours": "Native Filter-Dauer (h)",
+    "sens_temperature_water": "Pool Ist-Temperatur (°C)",
+    "get_temperature_water_setpoint": "Pool Soll-Temperatur (°C)",
+    "get_temperature_tolerance_c": "Temperatur-Toleranz (°C)",
+    "sens_heating_active": "Heizung aktiv",
+    "sens_temperature_outside": "Außentemperatur (°C)",
 }
 
 
@@ -130,8 +136,12 @@ def fields_for_consumer(consumer: dict) -> tuple[str, ...]:
 
     cid = str(consumer.get("id") or "").strip()
     if cid:
-        return flex_fields_for_consumer(cid)
-    return FLEX_FIELDS
+        base = flex_fields_for_consumer(cid)
+    else:
+        base = FLEX_FIELDS
+    if str(consumer.get("type") or "") == "thermal_rc":
+        return base + THERMAL_RC_EHAL_FIELDS
+    return base
 
 
 def _milp_thermal_rc_host(consumers: list[dict]) -> dict | None:

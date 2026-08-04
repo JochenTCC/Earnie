@@ -56,11 +56,11 @@ def _bootstrap_config(
     runtime_dir: Path | None,
     log_path: Path,
 ) -> ModuleType:
-    os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+    os.environ.setdefault("EARNIE_OFFLINE", "1")
     if config_dir is not None:
         _apply_stack_env(config_dir, runtime_dir)
     elif not os.environ.get("EARNIE_CONFIG_PATH") and not os.environ.get(
-        "ENERGY_OPTIMIZER_CONFIG_PATH"
+        "EARNIE_CONFIG_PATH"
     ):
         inferred_config, inferred_runtime = _infer_stack_from_log(log_path)
         if inferred_config is not None:

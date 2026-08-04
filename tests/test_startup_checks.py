@@ -11,13 +11,13 @@ from scripts import startup_checks as sc
 
 class TestRunLoxoneVerifyOnStartup:
     def test_skipped_when_env_disabled(self, monkeypatch):
-        monkeypatch.setenv("ENERGY_OPTIMIZER_SKIP_LOXONE_VERIFY", "1")
+        monkeypatch.setenv("EARNIE_SKIP_LOXONE_VERIFY", "1")
         with patch.object(sc, "verify_loxone_setup") as mock_verify:
             sc.run_loxone_verify_on_startup()
         mock_verify.assert_not_called()
 
     def test_skipped_without_loxone_env(self, monkeypatch):
-        monkeypatch.delenv("ENERGY_OPTIMIZER_SKIP_LOXONE_VERIFY", raising=False)
+        monkeypatch.delenv("EARNIE_SKIP_LOXONE_VERIFY", raising=False)
         with (
             patch.object(sc, "loxone_env_configured", return_value=False),
             patch.object(sc, "verify_loxone_setup") as mock_verify,
@@ -26,7 +26,7 @@ class TestRunLoxoneVerifyOnStartup:
         mock_verify.assert_not_called()
 
     def test_logs_success(self, monkeypatch):
-        monkeypatch.delenv("ENERGY_OPTIMIZER_SKIP_LOXONE_VERIFY", raising=False)
+        monkeypatch.delenv("EARNIE_SKIP_LOXONE_VERIFY", raising=False)
         with (
             patch.object(sc, "loxone_env_configured", return_value=True),
             patch.object(
@@ -41,7 +41,7 @@ class TestRunLoxoneVerifyOnStartup:
             sc.run_loxone_verify_on_startup()
 
     def test_strict_mode_exits_on_failure(self, monkeypatch):
-        monkeypatch.setenv("ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY", "1")
+        monkeypatch.setenv("EARNIE_STRICT_LOXONE_VERIFY", "1")
         with (
             patch.object(sc, "loxone_env_configured", return_value=True),
             patch.object(
@@ -58,7 +58,7 @@ class TestRunLoxoneVerifyOnStartup:
         assert exc.value.code == 1
 
     def test_non_strict_continues_on_failure(self, monkeypatch):
-        monkeypatch.delenv("ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY", raising=False)
+        monkeypatch.delenv("EARNIE_STRICT_LOXONE_VERIFY", raising=False)
         with (
             patch.object(sc, "loxone_env_configured", return_value=True),
             patch.object(
@@ -73,13 +73,13 @@ class TestRunLoxoneVerifyOnStartup:
             sc.run_loxone_verify_on_startup()
 
     def test_tariff_validate_skipped_when_env_set(self, monkeypatch):
-        monkeypatch.setenv("ENERGY_OPTIMIZER_SKIP_TARIFF_VALIDATE", "1")
+        monkeypatch.setenv("EARNIE_SKIP_TARIFF_VALIDATE", "1")
         with patch.object(sc, "collect_tariff_plausibility_errors") as mock_collect:
             sc.run_tariff_plausibility_on_startup()
         mock_collect.assert_not_called()
 
     def test_tariff_validate_strict_exits_on_error(self, monkeypatch):
-        monkeypatch.setenv("ENERGY_OPTIMIZER_STRICT_TARIFF_VALIDATE", "1")
+        monkeypatch.setenv("EARNIE_STRICT_TARIFF_VALIDATE", "1")
         with patch.object(
             sc,
             "collect_tariff_plausibility_errors",
@@ -90,7 +90,7 @@ class TestRunLoxoneVerifyOnStartup:
         assert exc.value.code == 1
 
     def test_warning_severity_does_not_count_as_failed(self, monkeypatch):
-        monkeypatch.delenv("ENERGY_OPTIMIZER_STRICT_LOXONE_VERIFY", raising=False)
+        monkeypatch.delenv("EARNIE_STRICT_LOXONE_VERIFY", raising=False)
         with (
             patch.object(sc, "loxone_env_configured", return_value=True),
             patch.object(

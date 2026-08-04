@@ -25,11 +25,9 @@
                     "persons": 2,
                     "target_temp_c": 21.5,
                     "heating_limit_c": 15.0,
-                    "loxone_inputs": {
-                        "power_name": "Earnie_Waermepumpe_Leistung"
-                    },
-                    "loxone_outputs": {
-                        "enable_name": "Earnie_Waermepumpe_Freigabe"
+                    "ehal_bindings": {
+                        "flex.wp_heating.sens_power_act": "Earnie_Waermepumpe_Leistung",
+                        "flex.wp_heating.set_enable": "Earnie_Waermepumpe_Freigabe"
                     }
                 },
                 {
@@ -60,11 +58,10 @@
                             "tie_break_time_epsilon": 0.0001
                         }
                     },
-                    "loxone_inputs": {
-                        "power_name": "Earnie_EAuto_Leistung"
-                    },
-                    "loxone_outputs": {
-                        "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
+                    "ehal_bindings": {
+                        "sens_evcs_active_power": "Earnie_EAuto_Leistung",
+                        "flex.ev.sens_power_act": "Earnie_EAuto_Leistung",
+                        "set_evcs_max_current": "Earnie_EAuto_Ziel_kW",
                         "pv_follow_name": "Earnie_EAuto_pv_follow"
                     },
                     "legacy_id": "eauto"
@@ -87,8 +84,8 @@
                         "default_power_kw": 2.0,
                         "default_runtime_h": 2.0
                     },
-                    "loxone_inputs": {
-                        "power_name": "Leistung Waschmaschine"
+                    "ehal_bindings": {
+                        "flex.waschmaschine.sens_power_act": "Leistung Waschmaschine"
                     }
                 },
                 {
@@ -109,8 +106,8 @@
                         "default_power_kw": 2.5,
                         "default_runtime_h": 1.5
                     },
-                    "loxone_inputs": {
-                        "power_name": "Leistung Trockner"
+                    "ehal_bindings": {
+                        "flex.trockner.sens_power_act": "Leistung Trockner"
                     }
                 },
                 {
@@ -141,6 +138,7 @@
             "sens_pv_production_active": "Ernie-Merker-PV_Act",
             "sens_ess_power": "Ernie-Merker-LeistungBat_Act",
             "sens_grid_power_active": "Ernie-Merker-LeistungNetz_Act",
+            "sens_temperature_outside": "Earnie_Aussentemperatur",
             "set_ess_active_power": "Earnie_Batterie_Sollleistung",
             "set_ess_charge_power_limit": "Earnie_LadeLeistungs-Limit",
             "set_ess_discharge_power_limit": "Earnie_EntladeLeistungs-Limit",
@@ -148,4 +146,3 @@
         }
     }
 }
-

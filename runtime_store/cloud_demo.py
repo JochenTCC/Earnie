@@ -21,7 +21,7 @@ _test_session_env_root: str | None = None
 
 
 def is_cloud_demo() -> bool:
-    """True when EARNIE_CLOUD_DEMO / ENERGY_OPTIMIZER_CLOUD_DEMO is ``1``."""
+    """True when EARNIE_CLOUD_DEMO is ``1``."""
     return is_truthy("CLOUD_DEMO")
 
 

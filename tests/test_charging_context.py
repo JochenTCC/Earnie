@@ -537,3 +537,28 @@ class TestConfigPathFertigUm:
         assert ctx["active"] is False
         assert ctx.get("plugged_in") is False
         assert ctx.get("target_kwh", 0) == 0
+
+
+class TestParseLoxoneReadyByTime:
+    def test_unix_float_from_special_state10(self):
+        from integrations.loxone_client import LOXONE_EPOCH_TO_UNIX
+
+        # Live Ladewecker sample: SpecialState10=555135300 → 2026-08-05 06:15 local
+        unix = 555135300.0 + LOXONE_EPOCH_TO_UNIX
+        from_dt = datetime(2026, 8, 4, 17, 0)
+        assert cc.parse_loxone_ready_by_time(unix, from_dt) == datetime(2026, 8, 5, 6, 15)
+
+    def test_unix_string_also_accepted(self):
+        from integrations.loxone_client import LOXONE_EPOCH_TO_UNIX
+
+        unix = 555135300.0 + LOXONE_EPOCH_TO_UNIX
+        from_dt = datetime(2026, 8, 4, 17, 0)
+        assert cc.parse_loxone_ready_by_time(str(unix), from_dt) == datetime(
+            2026, 8, 5, 6, 15
+        )
+
+    def test_tna_text_backup_still_parses(self):
+        from_dt = datetime(2026, 8, 4, 17, 0)
+        assert cc.parse_loxone_ready_by_time("Morgen, 06:15", from_dt) == datetime(
+            2026, 8, 5, 6, 15
+        )

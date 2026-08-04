@@ -144,13 +144,7 @@ def test_history_file_follows_env_path_without_runtime_path(tmp_path, monkeypatc
         encoding="utf-8",
     )
     monkeypatch.setenv("EARNIE_ENV_PATH", str(stack))
-    for key in (
-        "EARNIE_RUNTIME_PATH",
-        "ENERGY_OPTIMIZER_RUNTIME_PATH",
-        "EARNIE_RUNTIME_DIR",
-        "ENERGY_OPTIMIZER_RUNTIME_DIR",
-    ):
-        monkeypatch.delenv(key, raising=False)
+    monkeypatch.delenv("EARNIE_RUNTIME_PATH", raising=False)
 
     runtime = persist_runtime_dir()
     assert Path(runtime).resolve() == (stack / "runtime").resolve()

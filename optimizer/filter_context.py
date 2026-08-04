@@ -87,14 +87,20 @@ def resolve_native_window(
         )
         return None, None, "config_fallback (fehlend)", None
 
-    lox = sched.get("loxone") or {}
-    start_name = lox.get("native_start_hour_name", "")
-    duration_name = lox.get("native_duration_hours_name", "")
+    from settings.ehal_marker_resolve import (
+        marker_get_filter_native_duration_hours,
+        marker_get_filter_native_start_hour,
+    )
+
+    start_name = marker_get_filter_native_start_hour(consumer)
+    duration_name = marker_get_filter_native_duration_hours(consumer)
     start = duration = None
     start_format = "missing"
     log_extra = None
     if start_name:
-        start, start_format, raw_start = loxone_client.fetch_filter_native_start_hour(start_name)
+        start, start_format, raw_start = loxone_client.fetch_filter_native_start_hour(
+            start_name
+        )
         if start is not None:
             log_extra = {"format": start_format, "raw": raw_start}
     if duration_name:

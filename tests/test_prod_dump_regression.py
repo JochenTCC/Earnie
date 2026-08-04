@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer import charging_context as cc
 from optimizer import charging_session as cs

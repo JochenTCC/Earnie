@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from integrations import loxone_connectivity as lc
 
@@ -120,15 +120,12 @@ class TestCollectReadChecks:
             {
                 "id": "ev1",
                 "type": "ev",
-                "loxone_inputs": {"power_name": "P_EV"},
-                "loxone_outputs": {"enable_name": "En_EV"},
-                "charging_schedule": {
-                    "enabled": True,
-                    "loxone": {
-                        "plugged_in_name": "Plug",
-                        "actual_soc_name": "EvSoc",
-                        "ready_by_time_name": "Ready",
-                    },
+                "ehal_bindings": {
+                    "sens_evcs_active_power": "P_EV",
+                    "sens_evcs_connected": "Plug",
+                    "sens_evcs_soc_act": "EvSoc",
+                    "get_evcs_ready_by_time": "Ready",
+                    "flex.ev1.set_enable": "En_EV",
                 },
             }
         ]
@@ -151,14 +148,18 @@ class TestCollectReadChecks:
         consumers = [
             {
                 "id": "swimspa",
-                "loxone_inputs": {"power_name": "P_Spa"},
-                "loxone_outputs": {"enable_name": "En_Spa"},
+                "ehal_bindings": {
+                    "flex.swimspa.sens_power_act": "P_Spa",
+                    "flex.swimspa.set_enable": "En_Spa",
+                },
                 "charging_schedule": None,
             },
             {
                 "id": "wp_heating",
                 "type": "thermal_annual",
-                "loxone_inputs": {"power_name": "P_WP"},
+                "ehal_bindings": {
+                    "flex.wp_heating.sens_power_act": "P_WP",
+                },
             },
         ]
         with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
@@ -178,7 +179,11 @@ class TestCollectReadChecks:
         consumers = [
             {
                 "id": "ev",
-                "loxone_inputs": {"power_name": "P_EV"},
+                "ehal_bindings": {
+                    "sens_evcs_active_power": "P_EV",
+                    "sens_evcs_connected": "Plug",
+                    "sens_evcs_soc_act": "Soc",
+                },
                 "charging_schedule": {
                     "loxone": {"plugged_in_name": "Plug", "actual_soc_name": "Soc"},
                 },
@@ -239,7 +244,7 @@ class TestLoxoneIntegrationGate:
         from tests import conftest as ct
 
         monkeypatch.setattr(ct, "_load_dotenv_for_tests", lambda: None)
-        monkeypatch.delenv("ENERGY_OPTIMIZER_SKIP_LOXONE_INTEGRATION", raising=False)
+        monkeypatch.delenv("EARNIE_SKIP_LOXONE_INTEGRATION", raising=False)
         monkeypatch.delenv("LOXONE_IP", raising=False)
         monkeypatch.delenv("LOXONE_USER", raising=False)
         monkeypatch.delenv("LOXONE_PASS", raising=False)
@@ -248,7 +253,7 @@ class TestLoxoneIntegrationGate:
     def test_integration_honours_skip_flag(self, monkeypatch):
         from tests import conftest as ct
 
-        monkeypatch.setenv("ENERGY_OPTIMIZER_SKIP_LOXONE_INTEGRATION", "1")
+        monkeypatch.setenv("EARNIE_SKIP_LOXONE_INTEGRATION", "1")
         monkeypatch.setenv("LOXONE_IP", "10.0.0.1")
         monkeypatch.setenv("LOXONE_USER", "u")
         monkeypatch.setenv("LOXONE_PASS", "p")

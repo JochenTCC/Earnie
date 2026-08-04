@@ -2,7 +2,7 @@
 
 Für **Greenfield / Earnie-Library (2.4.n)** gelten die **gefrorenen** Merkernamen in [`share/loxone/greenfield_device_map.json`](../../share/loxone/greenfield_device_map.json) und [`share/loxone/recipes/`](../../share/loxone/recipes/) (z. B. `Earnie_Waermepumpe_Leistung`, `Earnie_Batterie_SoC`). Bestehende Anlagen dürfen abweichende Bezeichnungen behalten — in `ehal_bindings` muss die Adresse exakt dem Miniserver-Namen entsprechen.
 
-**Begriffsklärung (Smarthome-Merker):** Die **Adresse** (Zeichenkette, z. B. `Earnie_Waermepumpe_Freigabe`) ist ein *Smarthome-Merker*. Die **Rolle** ist der EHAL-Feldname (`sens_ess_soc`, `flex.{slug}.sens_power_act`, …) in `ehal_bindings`. Live-Backend bleibt vorerst Loxone-HTTP; Legacy-Schlüssel `loxone_*` / `*.loxone` sowie Stub-Keys `flex.power_name` können nach Migration noch dual-gelesen werden. Nicht verwechseln mit Chart-Markern oder `earnie_role` (Bekannt/Gesteuert/Manuell).
+**Begriffsklärung (Smarthome-Merker):** Die **Adresse** (Zeichenkette, z. B. `Earnie_Waermepumpe_Freigabe`) ist ein *Smarthome-Merker*. Die **Rolle** ist der EHAL-Feldname (`sens_ess_soc`, `flex.{slug}.sens_power_act`, …) in `ehal_bindings`. Live-Backend bleibt vorerst Loxone-HTTP. Nicht verwechseln mit Chart-Markern oder `earnie_role` (Bekannt/Gesteuert/Manuell).
 
 **Pattern B (Library):** **VI** = Earnie→Loxone (`set_*` / Freigaben / Sollwerte, Heartbeat) über `GET http://<Earnie>:8541/ehal/loxone/status.json` (Daemon-HTTP; `heartbeat_ts` = Unix-Jetztzeit, Sollwerte aus dem letzten `loxone_sent`). **VO** = optional Loxone→Earnie Push von `sens_*` / `get_*` / Flex-Leistung (Platzhalter-URLs). Core schreibt/liest weiterhin `/jdev/sps/io/{name}`. Entwürfe: [`share/loxone/templates/`](../../share/loxone/templates/).
 
@@ -110,7 +110,7 @@ Legacy-Rollenamen (`soc_name`, `pv_power_name`, …) in `loxone_blocks` werden b
 
 ## Flexible Verbraucher — `ehal_bindings` am Consumer
 
-Live-Steuerung kommt aus dem aktiven Hausprofil (`house_profiles.json`). Nach Cutover liegen Merker unter `ehal_bindings` mit EHAL-Feldnamen; Legacy-Nester (`loxone_inputs` / `charging_schedule.loxone`) bleiben nur noch dual-read bis Migration.
+Live-Steuerung kommt aus dem aktiven Hausprofil (`house_profiles.json`). Merker liegen unter `ehal_bindings` mit EHAL-Feldnamen. Bestehende Profile ohne Bindings: `python -m scripts.migrate_ehal_bindings --path <house_profiles.json> [--config <config.json>]`.
 
 ### Flex / Thermal (Stub `flex.*`)
 
@@ -131,7 +131,7 @@ SwimSpa u. Ä. behalten projektspezifische Namen (z. B. `Earnie_SwimSpa_Frei
 | `sens_evcs_soc_act` | Lesen | `Earnie_EAuto_SOC` | Aktueller SOC, % |
 | `sens_evcs_bat_capacity` | Lesen | `Earnie_EAuto_Kapazitaet` | kWh |
 | `get_evcs_nominal_current` | Lesen | `Earnie_EAuto_MaxStrom` | A |
-| `get_evcs_ready_by_time` | Lesen | AlarmClock-**Bezeichnung** (z. B. `Ladewecker` / `Wecker_Smart`; Import merged auf EV mit Zähler) | Ausgang **Tna** via `/jdev/sps/io/{name}/all` (Text z. B. `Morgen, 11:00`). Kein Virtual-Out-String. |
+| `get_evcs_ready_by_time` | Lesen | AlarmClock-**Bezeichnung** (z. B. `Ladewecker` / `Wecker_Smart`; Import merged auf EV mit Zähler) | **SpecialState10** (`nextEntryTime`, Loxone-Sekunden seit 01.01.2009 → Unix `+ 1230768000`) via `/jdev/sps/io/{name}/all`. Backup: Ausgang **Tna** (Text z. B. `Morgen, 11:00`). Kein Virtual-Out-String. |
 | `get_evcs_limit_soc` | Lesen | `Earnie_EAuto_LimitSOC` | Ladeziel-SOC % |
 | `set_evcs_max_current` | Schreiben | `Earnie_EAuto_Soll_A` | Soll-/Maxstrom A |
 | `set_evcs_mode` | Schreiben | `Earnie_EAuto_Modus` | `off`=0 \| `pv`=1 \| `now`=2 |

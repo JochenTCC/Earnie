@@ -4,7 +4,7 @@
   Replace EARNIE_HOST and {ev_id} (HK EV id, e.g. eauto). Paths are placeholders until Earnie exposes ingest.
   Cmd Titles = frozen Merker names. Multi-EV: Prefix+Slug Titles (Earnie_EAuto_<Slug>_…).
   Earnie_EAuto_Leistung may be EFM Load — keep VO cmd. Legacy Title Earnie_EAuto_P_act still valid.
-  FertigUm / get_evcs_ready_by_time: not a VO — bind AlarmClock Bezeichnung (Wecker_Smart); Earnie reads Tna via /all.
+  FertigUm / get_evcs_ready_by_time: not a VO — bind AlarmClock Bezeichnung (Ladewecker); Earnie reads SpecialState10 via /all (Tna backup).
 -->
 <VirtualOut Title="Earnie EV Telemetry" Comment="Pattern B: push EV sens_*/get_* to Earnie (draft)" Address="http://EARNIE_HOST:8501" CmdInit="" CloseAfterSend="true" CmdSep="">
 	<VirtualOutCmd Title="Earnie_EAuto_Angeschlossen" Comment="ev.{ev_id}.sens_evcs_connected 0/1" CmdOnMethod="GET" CmdOn="/ehal/loxone/telemetry/ev.{ev_id}.sens_evcs_connected/\v" CmdOnHTTP="" CmdOnPost="" CmdOffMethod="GET" CmdOff="" CmdOffHTTP="" CmdOffPost="" Analog="false" Repeat="0" RepeatRate="0"/>

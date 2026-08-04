@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer import filter_context as fc
 from optimizer.milp import milp_horizon_schedule, milp_optimizer
@@ -199,15 +199,15 @@ def _swimspa_filter_loxone() -> dict:
     consumer = _swimspa_filter()
     consumer["filter_schedule"] = {
         "enabled": True,
-        "loxone": {
-            "native_start_hour_name": "FilterStart",
-            "native_duration_hours_name": "FilterDuration",
-        },
         "config_fallback": {
             "native_start_hour": 10,
             "native_duration_hours": 4.0,
         },
     }
+    ehal = dict(consumer.get("ehal_bindings") or {})
+    ehal["get_filter_native_start_hour"] = "FilterStart"
+    ehal["get_filter_native_duration_hours"] = "FilterDuration"
+    consumer["ehal_bindings"] = ehal
     return consumer
 
 

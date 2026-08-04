@@ -17,7 +17,9 @@ def _swimspa_filter() -> dict:
         "nominal_power_kw": 0.18,
         "daily_target_kwh": 0.36,
         "daily_target_source": "loxone_remaining_hours",
-        "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
+        "ehal_bindings": {
+            "get_filter_remaining_hours": "Ernie_Swimspa_Filter_Sollstunden",
+        },
     }
 
 

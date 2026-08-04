@@ -13,7 +13,7 @@ LOG = ROOT / "greenfield/runtime/backtesting_log.json"
 CONFIG_DIR = ROOT / "greenfield/config"
 RUNTIME_DIR = ROOT / "greenfield/runtime"
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 os.environ["EARNIE_CONFIG_PATH"] = str(CONFIG_DIR / "config.json")
 os.environ["EARNIE_RUNTIME_PATH"] = str(RUNTIME_DIR)
 for suffix, name in (

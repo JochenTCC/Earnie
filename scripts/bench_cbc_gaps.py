@@ -10,7 +10,7 @@ from datetime import datetime
 
 import pandas as pd
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from runtime_store.config_load import load_config_or_exit
 

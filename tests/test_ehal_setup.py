@@ -72,8 +72,8 @@ def test_require_loxone_credentials_false_for_ha(tmp_path, monkeypatch):
     from runtime_store import dotenv_io
 
     config_path = tmp_path / "config.json"
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(config_path))
-    monkeypatch.delenv("ENERGY_OPTIMIZER_OFFLINE", raising=False)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_path))
+    monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     monkeypatch.delenv("EARNIE_OFFLINE", raising=False)
     config_path.write_text(
         json.dumps(

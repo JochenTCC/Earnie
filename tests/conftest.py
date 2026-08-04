@@ -24,30 +24,30 @@ _configure_console_utf8()
 ROOT = Path(__file__).resolve().parents[1]
 DOTENV_PATHS = (ROOT / "earnie_env" / "config" / ".env", ROOT / ".env")
 DEFAULT_TEST_CONFIG_PATH = ROOT / "tests" / "fixtures" / "backtesting" / "config.json"
-_USE_LIVE_CONFIG_ENV = "ENERGY_OPTIMIZER_TEST_USE_LIVE_CONFIG"
+_USE_LIVE_CONFIG_ENV = "EARNIE_TEST_USE_LIVE_CONFIG"
 
 
 def _apply_default_test_config_env() -> None:
     """Fixture-Config erzwingen — unabhängig von lokaler .env/NAS-Pfad."""
     if os.getenv(_USE_LIVE_CONFIG_ENV) == "1":
         return
-    os.environ["ENERGY_OPTIMIZER_CONFIG_PATH"] = str(DEFAULT_TEST_CONFIG_PATH)
-    os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+    os.environ["EARNIE_CONFIG_PATH"] = str(DEFAULT_TEST_CONFIG_PATH)
+    os.environ.setdefault("EARNIE_OFFLINE", "1")
     bt_dir = DEFAULT_TEST_CONFIG_PATH.parent
     os.environ.setdefault(
-        "ENERGY_OPTIMIZER_TARIFFS_PATH",
+        "EARNIE_TARIFFS_PATH",
         str(bt_dir / "tariffs.json"),
     )
     os.environ.setdefault(
-        "ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH",
+        "EARNIE_HOUSE_PROFILES_PATH",
         str(bt_dir / "house_profiles.json"),
     )
     os.environ.setdefault(
-        "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
+        "EARNIE_BACKTESTING_SCENARIOS_PATH",
         str(bt_dir / "backtesting_scenarios.json"),
     )
     os.environ.setdefault(
-        "ENERGY_OPTIMIZER_COMPONENTS_PATH",
+        "EARNIE_COMPONENTS_PATH",
         str(bt_dir / "components.json"),
     )
 
@@ -119,7 +119,7 @@ def _restore_default_test_config_after_test():
 
 
 def _loxone_integration_enabled() -> bool:
-    if os.getenv("ENERGY_OPTIMIZER_SKIP_LOXONE_INTEGRATION") == "1":
+    if os.getenv("EARNIE_SKIP_LOXONE_INTEGRATION") == "1":
         return False
     if os.getenv(_USE_LIVE_CONFIG_ENV) != "1":
         return False
@@ -139,9 +139,9 @@ def _loxone_integration_enabled() -> bool:
 requires_loxone = pytest.mark.skipif(
     not _loxone_integration_enabled(),
     reason=(
-        "Loxone-Integration: ENERGY_OPTIMIZER_TEST_USE_LIVE_CONFIG=1, .env mit "
+        "Loxone-Integration: EARNIE_TEST_USE_LIVE_CONFIG=1, .env mit "
         "LOXONE_IP/USER/PASS und config.json erforderlich "
-        "(ENERGY_OPTIMIZER_SKIP_LOXONE_INTEGRATION=1 zum Überspringen)"
+        "(EARNIE_SKIP_LOXONE_INTEGRATION=1 zum Überspringen)"
     ),
 )
 
@@ -157,5 +157,5 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "requires_live_config: bewusst NAS/Prod-config.json (ENERGY_OPTIMIZER_TEST_USE_LIVE_CONFIG=1)",
+        "requires_live_config: bewusst NAS/Prod-config.json (EARNIE_TEST_USE_LIVE_CONFIG=1)",
     )

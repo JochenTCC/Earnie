@@ -1,7 +1,7 @@
 """Integrationstests gegen einen echten Loxone-Miniserver (nur lesend).
 
 Laufen automatisch bei `pytest`, wenn `.env` mit LOXONE_IP/USER/PASS und
-`config/config.json` vorhanden sind. Überspringen: ENERGY_OPTIMIZER_SKIP_LOXONE_INTEGRATION=1
+`config/config.json` vorhanden sind. Überspringen: EARNIE_SKIP_LOXONE_INTEGRATION=1
 
 Nur diese Datei:
     pytest tests/test_loxone_integration.py -v

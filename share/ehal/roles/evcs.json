@@ -38,7 +38,7 @@
       "field": "get_evcs_ready_by_time",
       "required": false,
       "kind": "input",
-      "notes": "Ready-by deadline: bind AlarmClock Bezeichnung (e.g. Wecker_Smart); read Tna via /all."
+      "notes": "Ready-by deadline: bind AlarmClock Bezeichnung (e.g. Ladewecker); prefer SpecialState10 (nextEntryTime) via /all; Tna text is backup."
     },
     {
       "field": "get_evcs_limit_soc",

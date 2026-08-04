@@ -15,7 +15,7 @@ def _unload_config_modules() -> None:
 
 def test_load_config_or_exit_missing_path(tmp_path, monkeypatch, capsys):
     missing = tmp_path / "missing" / "config.json"
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", str(missing))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", str(missing))
     _unload_config_modules()
 
     from runtime_store import config_load

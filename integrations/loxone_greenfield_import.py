@@ -804,7 +804,7 @@ def merge_efm(
 
 
 def extract_alarm_clocks(doc: dict[str, Any]) -> list[str]:
-    """LoxAPP3 AlarmClock Bezeichnungen (Tna via /all — Zähler-style binding)."""
+    """LoxAPP3 AlarmClock Bezeichnungen (SpecialState10 via /all — Zähler-style binding)."""
     names: list[str] = []
     controls = doc.get("controls")
     if not isinstance(controls, dict):

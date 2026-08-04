@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A/B: SE trivial MILP fast path on vs off (2.3.c.1).
 
-Compares ENERGY_OPTIMIZER_MILP_TRIVIAL_FAST_PATH=0 vs 1 on fixture days.
+Compares EARNIE_MILP_TRIVIAL_FAST_PATH=0 vs 1 on fixture days.
 Includes a no-battery / zero-flex scenario (where the skip applies) plus the
 normal fixture scenario (battery present — € must stay unchanged).
 
@@ -23,7 +23,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 
 def _configure_console_utf8() -> None:
@@ -39,15 +39,15 @@ def _activate_fixtures() -> None:
     from tests.fixtures.backtesting_fixtures import fixture_path
     from tests.fixtures.open_meteo_mock import _fake_fetch_hourly_archive_chunk
 
-    os.environ["ENERGY_OPTIMIZER_CONFIG_PATH"] = str(fixture_path("config.json"))
-    os.environ["ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH"] = str(
+    os.environ["EARNIE_CONFIG_PATH"] = str(fixture_path("config.json"))
+    os.environ["EARNIE_BACKTESTING_SCENARIOS_PATH"] = str(
         fixture_path("backtesting_scenarios.json")
     )
-    os.environ["ENERGY_OPTIMIZER_TARIFFS_PATH"] = str(fixture_path("tariffs.json"))
-    os.environ["ENERGY_OPTIMIZER_HOUSE_PROFILES_PATH"] = str(
+    os.environ["EARNIE_TARIFFS_PATH"] = str(fixture_path("tariffs.json"))
+    os.environ["EARNIE_HOUSE_PROFILES_PATH"] = str(
         fixture_path("house_profiles.json")
     )
-    os.environ["ENERGY_OPTIMIZER_OFFLINE"] = "1"
+    os.environ["EARNIE_OFFLINE"] = "1"
     config_module.reinit_config()
     archive._fetch_hourly_archive_chunk = _fake_fetch_hourly_archive_chunk  # type: ignore[method-assign]
 

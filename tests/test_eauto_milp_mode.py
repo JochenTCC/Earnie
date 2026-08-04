@@ -6,7 +6,7 @@ import os
 import pulp
 import pytest
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer.eauto_milp import (
     eauto_in_modus_b,

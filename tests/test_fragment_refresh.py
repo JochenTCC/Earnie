@@ -18,10 +18,10 @@ def _write_config(tmp_path, ui_block: dict | None) -> str:
 
 
 def test_ui_fragment_defaults_without_ui_block(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_MAIN_SYNC_POLL_SEC", raising=False)
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    monkeypatch.delenv("EARNIE_UI_FRAGMENT_CHARTS_SEC", raising=False)
+    monkeypatch.delenv("EARNIE_UI_FRAGMENT_STATUS_SEC", raising=False)
+    monkeypatch.delenv("EARNIE_UI_MAIN_SYNC_POLL_SEC", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(tmp_path)
     cfg = config.Config(
         config_path=config_path,
@@ -34,9 +34,9 @@ def test_ui_fragment_defaults_without_ui_block(tmp_path, monkeypatch):
 
 
 def test_ui_fragment_from_config_json(tmp_path, monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC", raising=False)
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC", raising=False)
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    monkeypatch.delenv("EARNIE_UI_FRAGMENT_CHARTS_SEC", raising=False)
+    monkeypatch.delenv("EARNIE_UI_FRAGMENT_STATUS_SEC", raising=False)
     from tests.config_fixtures import minimal_config_payload
 
     config_path, scenarios_path = write_minimal_config_tree(
@@ -55,18 +55,18 @@ def test_ui_fragment_from_config_json(tmp_path, monkeypatch):
 
 
 def test_env_overrides_config(monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC", "90")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_UI_FRAGMENT_STATUS_SEC", "15")
+    monkeypatch.setenv("EARNIE_UI_FRAGMENT_CHARTS_SEC", "90")
+    monkeypatch.setenv("EARNIE_UI_FRAGMENT_STATUS_SEC", "15")
     assert fragment_refresh.charts_fragment_interval_sec() == 90
     assert fragment_refresh.status_fragment_interval_sec() == 15
 
 
 def test_main_sync_poll_env_override(monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_UI_MAIN_SYNC_POLL_SEC", "20")
+    monkeypatch.setenv("EARNIE_UI_MAIN_SYNC_POLL_SEC", "20")
     assert fragment_refresh.main_sync_poll_interval_sec() == 20
 
 
 def test_invalid_env_raises(monkeypatch):
-    monkeypatch.setenv("ENERGY_OPTIMIZER_UI_FRAGMENT_CHARTS_SEC", "0")
+    monkeypatch.setenv("EARNIE_UI_FRAGMENT_CHARTS_SEC", "0")
     with pytest.raises(ValueError, match="mindestens 1"):
         fragment_refresh.charts_fragment_interval_sec()

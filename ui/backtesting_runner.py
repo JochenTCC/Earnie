@@ -129,10 +129,8 @@ def _apply_cloud_session_env(env: dict[str, str]) -> str | None:
     if not session:
         return None
     for suffix in _CLOUD_SESSION_PATH_OVERRIDE_SUFFIXES:
-        for prefix in ("EARNIE_", "ENERGY_OPTIMIZER_"):
-            env.pop(f"{prefix}{suffix}", None)
+        env.pop(f"EARNIE_{suffix}", None)
     env["EARNIE_ENV_PATH"] = session
-    env["ENERGY_OPTIMIZER_ENV_PATH"] = session
     return session
 
 
@@ -140,7 +138,7 @@ def _subprocess_env() -> dict[str, str]:
     """Kindprozess-Env: PYTHONPATH + offline + ohne Debugpy-Hooks (VS-Code-Launcher)."""
     root = str(project_root())
     env = os.environ.copy()
-    env["ENERGY_OPTIMIZER_OFFLINE"] = "1"
+    env["EARNIE_OFFLINE"] = "1"
     for key in list(env):
         if any(key.startswith(prefix) for prefix in _DEBUGPY_ENV_PREFIXES):
             del env[key]

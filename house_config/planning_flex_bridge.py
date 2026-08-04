@@ -311,24 +311,13 @@ SWIMSPA_FILTER_BRIDGE_DEFAULTS: dict = {
     "nominal_power_kw": 0.18,
     "daily_target_kwh": 0.36,
     "daily_target_source": "loxone_remaining_hours",
-    # Sollstunden: map via EHAL-Com ``get_filter_remaining_hours`` (no hard-coded Merker).
-    "loxone_target_hours_name": "",
     "signal_type": "binary",
     "min_on_quarterhours": 2,
     "optimizer_enabled": True,
     "path_historical_log": "",
-    "loxone_outputs": {"enable_name": "Earnie_Swimspa_Filter_Freigabe"},
-    "loxone_inputs": {
-        "power_name": "homie_bwa_spa_filter2",
-        "alternate_binary_power_name": "homie_bwa_spa_filter1",
-        "signal_type": "binary",
-    },
+    "ehal_bindings": {},
     "filter_schedule": {
         "enabled": True,
-        "loxone": {
-            "native_start_hour_name": "homie_bwa_spa_filter1hour",
-            "native_duration_hours_name": "homie_bwa_spa_filter1durationhours",
-        },
         "config_fallback": {
             "native_start_hour": 10,
             "native_duration_hours": 4.0,
@@ -342,14 +331,14 @@ def planning_filter_to_milp(bindings: dict | None = None) -> dict:
     from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
 
     entry = dict(SWIMSPA_FILTER_BRIDGE_DEFAULTS)
+    entry["ehal_bindings"] = dict(SWIMSPA_FILTER_BRIDGE_DEFAULTS.get("ehal_bindings") or {})
     if bindings:
         entry = _deep_merge_dict(entry, bindings)
     hours = marker_get_filter_remaining_hours(entry)
-    entry["loxone_target_hours_name"] = hours
     ehal = dict(entry.get("ehal_bindings") or {})
     if hours and not str(ehal.get("get_filter_remaining_hours") or "").strip():
         ehal["get_filter_remaining_hours"] = hours
-        entry["ehal_bindings"] = ehal
+    entry["ehal_bindings"] = ehal
     return entry
 
 
@@ -366,15 +355,13 @@ def _swimspa_filter_bindings_from_profile(house_profile: dict) -> dict | None:
         if isinstance(ehal, dict):
             hours = str(ehal.get("get_filter_remaining_hours") or "").strip()
             if hours:
-                return {
-                    "ehal_bindings": {"get_filter_remaining_hours": hours},
-                    "loxone_target_hours_name": hours,
-                }
+                return {"ehal_bindings": {"get_filter_remaining_hours": hours}}
     return None
 
 
 def _pool_filter_enable_overlay(house_profile: dict) -> dict | None:
     """When greenfield ``pool_filter`` exists, use its Freigabe for the MILP bridge."""
+    from ehal.flex_fields import KIND_SET_ENABLE, flex_field
     from settings.ehal_marker_resolve import marker_flex_enable
 
     for consumer in house_profile.get("consumers") or []:
@@ -385,7 +372,11 @@ def _pool_filter_enable_overlay(house_profile: dict) -> dict | None:
         enable = str(marker_flex_enable(consumer) or "").strip()
         if not enable:
             return None
-        return {"loxone_outputs": {"enable_name": enable}}
+        return {
+            "ehal_bindings": {
+                flex_field("swimspa_filter", KIND_SET_ENABLE): enable,
+            }
+        }
     return None
 
 

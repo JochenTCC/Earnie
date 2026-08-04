@@ -35,7 +35,7 @@ Countdown und letzter Lauf werden unten in der App angezeigt (siehe [Charts & Pa
 
 ## Laufzeitdateien (`runtime/`)
 
-Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_PATH` bzw. abgeleitet aus `EARNIE_ENV_PATH`; Legacy: `EARNIE_RUNTIME_DIR` / `ENERGY_OPTIMIZER_RUNTIME_PATH`).
+Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_PATH` bzw. abgeleitet aus `EARNIE_ENV_PATH`).
 
 
 | Datei                           | Inhalt                                                                                       |
@@ -77,15 +77,15 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 
 | Variable                                | Wirkung                                                                                                                                                                                                                              |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `EARNIE_ENV_PATH`                       | Wurzelverzeichnis für Persistenz (Standard: `earnie_env`). Daraus leiten sich `…/config` und `…/runtime` ab, sofern nicht separat gesetzt. Legacy-Alias: `ENERGY_OPTIMIZER_ENV_PATH`.                                                                      |
-| `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; Legacy: `config/`). Enthält `config.json`, Sidecars, `.env`, `uploads/`. Legacy-Alias: `ENERGY_OPTIMIZER_CONFIG_PATH`. (Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert.) |
-| `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; Legacy-Ordner: `runtime`). Legacy-Alias: `ENERGY_OPTIMIZER_RUNTIME_PATH` bzw. alt `EARNIE_RUNTIME_DIR`.                                                                                      |
-| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Live-Cockpit), `scenario_explorer`, `live_environment` (Daemon Control / Analyse Verbrauch & Kosten), `price_forecast` (Prod: `sunset2sunset,scenario_explorer,live_environment`; Cloud nur Explorer: `scenario_explorer`; siehe [Betriebsmodi](../ui/betriebsmodi.md)). Legacy-Alias: `ENERGY_OPTIMIZER_UI_MODES`. |
+| `EARNIE_ENV_PATH`                       | Wurzelverzeichnis für Persistenz (Standard: `earnie_env`). Daraus leiten sich `…/config` und `…/runtime` ab, sofern nicht separat gesetzt. |
+| `EARNIE_CONFIG_PATH`                    | Pfad zum **Config-Verzeichnis** (Standard: `earnie_env/config`; ältere Ordner: `config/`). Enthält `config.json`, Sidecars, `.env`, `uploads/`. (Ältere Setups mit Pfad zur `config.json`-Datei werden weiterhin akzeptiert.) |
+| `EARNIE_RUNTIME_PATH`                   | Verzeichnis für Laufzeitdaten (Standard: `earnie_env/runtime`; ältere Ordner: `runtime`). |
+| `EARNIE_UI_MODES`                       | Kommagetrennt: `sunset2sunset` (Live-Cockpit), `scenario_explorer`, `live_environment` (Daemon Control / Analyse Verbrauch & Kosten), `price_forecast`. Ohne Variable: `sunset2sunset,scenario_explorer,live_environment` (`price_forecast` nur bei `ui.price_forecast_page_enabled=true`). Prod-Compose setzt oft `sunset2sunset,live_environment`; Cloud: `scenario_explorer` — siehe [Betriebsmodi](../ui/betriebsmodi.md). |
 | `EARNIE_UI_STREAMLIT_PORT`              | TCP-Port für Streamlit (überschreibt `ui.streamlit_port`; siehe [Streamlit-Ports](../referenz/streamlit-ports.md))                                                                                                                   |
-| `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). Legacy-Alias: `ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED`.                                  |
+| `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls nicht schon laufend (Docker-Compose setzt das). Ohne Variable / lokal aus.                                                                              |
-| `EARNIE_OFFLINE`                        | `1` = kein Loxone-/Live-Zwang; Bootstrap füllt leere Live-Szenario-Entitäts-IDs aus den Katalogen (sinnvoll für Streamlit Community Cloud). Legacy-Alias: `ENERGY_OPTIMIZER_OFFLINE`.                                                  |
-| `EARNIE_CLOUD_DEMO`                     | `1` = Streamlit Community Cloud: pro Browser-Sitzung leerer Greenfield-Workspace (Temp-Verzeichnis), Start im Hauskonfigurator, Willkommenshinweis; nach Szenario-Explorer-Start Feedback-Banner mit Mailto; kein Offline-Demo-Seed. Typisch zusammen mit `EARNIE_OFFLINE=1`. Legacy-Alias: `ENERGY_OPTIMIZER_CLOUD_DEMO`. |
+| `EARNIE_OFFLINE`                        | `1` = kein Loxone-/Live-Zwang; Bootstrap füllt leere Live-Szenario-Entitäts-IDs aus den Katalogen (sinnvoll für Streamlit Community Cloud). |
+| `EARNIE_CLOUD_DEMO`                     | `1` = Streamlit Community Cloud: pro Browser-Sitzung leerer Greenfield-Workspace (Temp-Verzeichnis), Start im Hauskonfigurator, Willkommenshinweis; nach Szenario-Explorer-Start Feedback-Banner mit Mailto; kein Offline-Demo-Seed. Typisch zusammen mit `EARNIE_OFFLINE=1`. |
 
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).

@@ -20,7 +20,7 @@ from simulation.engine import window_slot_datetimes
 from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 from tests.fixtures.se_consumption import PROFILE_IDS, load_se_consumption_profile
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 # Sunset-style anchor (overnight EV / thermal windows).
 _ANCHOR = datetime(2025, 3, 1, 7, 0)

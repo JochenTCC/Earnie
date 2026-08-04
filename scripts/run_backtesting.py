@@ -3,7 +3,7 @@ import os
 
 if __name__ == "__main__":
     # Nur im Backtesting-Prozess — nicht beim Import aus der Streamlit-UI setzen.
-    os.environ["ENERGY_OPTIMIZER_OFFLINE"] = "1"
+    os.environ["EARNIE_OFFLINE"] = "1"
 
 import argparse
 import json

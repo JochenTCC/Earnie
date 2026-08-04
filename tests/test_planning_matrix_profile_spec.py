@@ -1,4 +1,4 @@
-﻿"""Step 1: profile_spec matrix — Hausprofil-Spec statt cons_data für Optimierung."""
+"""Step 1: profile_spec matrix — Hausprofil-Spec statt cons_data für Optimierung."""
 from __future__ import annotations
 
 import os
@@ -24,7 +24,7 @@ from simulation.engine import (
 from tests.fixtures.backtesting_fixtures import build_synthetic_prices_df
 from tests.fixtures.historical_fixtures import CONS_DATA_FILE
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 
 HOUSE_PROFILE = {

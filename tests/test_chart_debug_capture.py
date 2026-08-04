@@ -24,12 +24,12 @@ from tests.config_fixtures import minimal_config_payload, write_minimal_config_t
 
 _TZ = ZoneInfo("Europe/Vienna")
 _CONFIG_ENV_KEYS = (
-    "ENERGY_OPTIMIZER_CONFIG_PATH",
-    "ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH",
-    "ENERGY_OPTIMIZER_OFFLINE",
-    "ENERGY_OPTIMIZER_RUNTIME_PATH",
-    "ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED",
-    "ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH",
+    "EARNIE_CONFIG_PATH",
+    "EARNIE_BACKTESTING_SCENARIOS_PATH",
+    "EARNIE_OFFLINE",
+    "EARNIE_RUNTIME_PATH",
+    "EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED",
+    "EARNIE_LOCAL_SETTINGS_PATH",
 )
 
 
@@ -37,9 +37,9 @@ _CONFIG_ENV_KEYS = (
 def _chart_debug_config(tmp_path, monkeypatch, *, enabled: bool):
     """Mini-Config für Tests; stellt danach Projekt-Config wieder her."""
     prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    monkeypatch.setenv("ENERGY_OPTIMIZER_RUNTIME_PATH", str(tmp_path / "runtime"))
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
+    monkeypatch.delenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(
         tmp_path,
         config_payload=minimal_config_payload(
@@ -51,8 +51,8 @@ def _chart_debug_config(tmp_path, monkeypatch, *, enabled: bool):
             }
         ),
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", config_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", scenarios_path)
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", config_path)
+    monkeypatch.setenv("EARNIE_BACKTESTING_SCENARIOS_PATH", scenarios_path)
     config.reinit_config()
     try:
         yield config_path
@@ -105,23 +105,23 @@ def test_chart_debug_capture_config_enabled(tmp_path, monkeypatch):
 
 def test_chart_debug_capture_env_overrides_config(tmp_path, monkeypatch):
     with _chart_debug_config(tmp_path, monkeypatch, enabled=False):
-        monkeypatch.setenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", "1")
+        monkeypatch.setenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", "1")
         assert config.get_ui_chart_debug_capture_enabled() is True
 
 
 def test_chart_debug_capture_local_settings_override(tmp_path, monkeypatch):
     prev = {key: os.environ.get(key) for key in _CONFIG_ENV_KEYS}
-    monkeypatch.setenv("ENERGY_OPTIMIZER_OFFLINE", "1")
-    monkeypatch.delenv("ENERGY_OPTIMIZER_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    monkeypatch.delenv("EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED", raising=False)
     config_path, scenarios_path = write_minimal_config_tree(tmp_path)
     local_path = tmp_path / "local_settings.json"
     local_path.write_text(
         json.dumps({"chart_debug_capture_enabled": True}),
         encoding="utf-8",
     )
-    monkeypatch.setenv("ENERGY_OPTIMIZER_CONFIG_PATH", config_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_BACKTESTING_SCENARIOS_PATH", scenarios_path)
-    monkeypatch.setenv("ENERGY_OPTIMIZER_LOCAL_SETTINGS_PATH", str(local_path))
+    monkeypatch.setenv("EARNIE_CONFIG_PATH", config_path)
+    monkeypatch.setenv("EARNIE_BACKTESTING_SCENARIOS_PATH", scenarios_path)
+    monkeypatch.setenv("EARNIE_LOCAL_SETTINGS_PATH", str(local_path))
     config.reinit_config()
     try:
         assert config.get_ui_chart_debug_capture_enabled() is True
@@ -174,12 +174,12 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
             '{"written_at":"2026-07-05T23:00:00"}\n',
             encoding="utf-8",
         )
-        config_path = Path(os.environ["ENERGY_OPTIMIZER_CONFIG_PATH"])
+        config_path = Path(os.environ["EARNIE_CONFIG_PATH"])
         cfg = json.loads(config_path.read_text(encoding="utf-8"))
         cfg["market_prices"] = {"forecast_model_path": "runtime/price_model_coefficients.json"}
         config_path.write_text(json.dumps(cfg), encoding="utf-8")
         config.reinit_config()
-        monkeypatch.setenv("ENERGY_OPTIMIZER_DEVIATION_RULES_PATH", str(rules_path))
+        monkeypatch.setenv("EARNIE_DEVIATION_RULES_PATH", str(rules_path))
         now = datetime(2026, 7, 5, 23, 0, tzinfo=_TZ)
         bundle = _sample_bundle(now)
         zip_path = write_capture_zip(
@@ -223,7 +223,7 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
         )
         assert "inputs/config.json" in manifest["included_input_files"]
         assert "inputs/price_model_coefficients.json" in manifest["included_input_files"]
-        assert "ENERGY_OPTIMIZER_CONFIG_PATH" in manifest["env_overrides"]
+        assert "EARNIE_CONFIG_PATH" in manifest["env_overrides"]
 
 
 def test_build_capture_payload_json_safe(tmp_path, monkeypatch):

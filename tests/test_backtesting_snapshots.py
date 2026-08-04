@@ -19,7 +19,7 @@ from simulation.backtesting_snapshots import (
 )
 from simulation.horizon_mode import FIXED_24H, SUNRISE_WINDOW
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 
 def _sample_rows(count: int = 24, start: datetime | None = None) -> tuple[list[dict], list[dict]]:

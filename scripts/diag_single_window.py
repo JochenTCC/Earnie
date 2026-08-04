@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GREENFIELD_CONFIG = ROOT / "greenfield" / "config"
 GREENFIELD_RUNTIME = ROOT / "greenfield" / "runtime"
 
-os.environ.setdefault("ENERGY_OPTIMIZER_OFFLINE", "1")
+os.environ.setdefault("EARNIE_OFFLINE", "1")
 sys.path.insert(0, str(ROOT))
 
 

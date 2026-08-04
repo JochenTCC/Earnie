@@ -202,7 +202,7 @@ Erste Hinweis-Regel: `waermepumpe_enable_no_start` (Freigabe ohne Anlauf).
 | `config/deviation_rules.example.json` | Vorlage; bei Strukturänderungen parallel pflegen |
 | `config/deviation_rules.schema.json` | JSON-Schema für Editor-Validierung |
 
-Optional: `ENERGY_OPTIMIZER_DEVIATION_RULES_PATH` auf eine andere JSON-Datei setzen (siehe `runtime_store/persist_paths.py`).
+Optional: `EARNIE_DEVIATION_RULES_PATH` auf eine andere JSON-Datei setzen (siehe `runtime_store/persist_paths.py`).
 
 **Neue Regel**
 

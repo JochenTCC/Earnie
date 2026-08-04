@@ -81,7 +81,7 @@ def _build_thermal_plan(consumer: dict, *, horizon: int = 24):
     ambient_live = readings.get("ambient_c")
     if ambient_live is None:
         raise ValueError(
-            "Außentemperatur (Live) fehlt – ambient_temp_name in Loxone prüfen."
+            "Außentemperatur (Live) fehlt – sens_temperature_outside / ambient Merker prüfen."
         )
 
     ambient_forecast, ambient_source = get_outdoor_forecast_with_fallback(
