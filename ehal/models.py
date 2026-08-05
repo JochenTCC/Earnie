@@ -6,16 +6,16 @@ from typing import NotRequired, TypedDict
 
 EHAL_SCHEMA_VERSION = 3
 
-# Legacy M1 unprefixed / renamed → §C aliases (HA entity map / dual-read during 2.4.j).
-TELEMETRY_FIELD_ALIASES: dict[str, str] = {
-    "grid_power_active": "sens_grid_power_active",
-    "pv_production_active": "sens_pv_production_active",
-    "ess_soc": "sens_ess_soc",
-    "ess_power": "sens_ess_power",
-    "evcs_active_power": "sens_evcs_active_power",
-    "set_evcs_current": "set_evcs_max_current",
-    "sens_evcs_nominal_current": "get_evcs_nominal_current",
-}
+# Legacy M1 unprefixed telemetry names — rejected, no longer remapped to §C.
+REMOVED_TELEMETRY_FIELD_NAMES: frozenset[str] = frozenset(
+    {
+        "grid_power_active",
+        "pv_production_active",
+        "ess_soc",
+        "ess_power",
+        "evcs_active_power",
+    }
+)
 
 
 class EhalEnvelope(TypedDict):
@@ -73,14 +73,18 @@ class EhalWriteError(TypedDict):
 
 
 def canonicalize_ha_entity_keys(entities: dict[str, str]) -> dict[str, str]:
-    """Map legacy unprefixed HA entity keys to §C names; prefer explicit §C keys."""
+    """Validate HA entity keys: §C names only; legacy unprefixed names raise."""
+    removed = sorted(
+        str(key) for key in entities if str(key) in REMOVED_TELEMETRY_FIELD_NAMES
+    )
+    if removed:
+        raise ValueError(
+            "Kritischer Konfigurationsfehler: entfernte EHAL-Feldnamen "
+            f"{', '.join(removed)} — kanonische §C-Namen (sens_*/set_*/get_*) verwenden."
+        )
     out: dict[str, str] = {}
     for key, value in entities.items():
-        canonical = TELEMETRY_FIELD_ALIASES.get(key, key)
         name = str(value or "").strip()
-        if not name:
-            continue
-        if canonical in out and key in TELEMETRY_FIELD_ALIASES:
-            continue
-        out[canonical] = name
+        if name:
+            out[str(key)] = name
     return out

@@ -1,4 +1,4 @@
-"""Unified debug-dump ZIP (single type), schema v3; reads legacy chart/prod (v1/v2)."""
+"""Unified debug-dump ZIP (dump_type=debug), schema v3 only."""
 from __future__ import annotations
 
 import json
@@ -17,11 +17,7 @@ from runtime_store.persist_paths import runtime_dir, runtime_path
 
 DUMP_SCHEMA_VERSION = 3
 DUMP_TYPE_DEBUG = "debug"
-# Legacy schema v2 profile ids (still accepted by normalize/validate/replay).
-DUMP_TYPE_CHART = "chart"
-DUMP_TYPE_PROD = "prod"
-LEGACY_DUMP_TYPES = (DUMP_TYPE_CHART, DUMP_TYPE_PROD)
-DUMP_TYPES = (DUMP_TYPE_DEBUG, *LEGACY_DUMP_TYPES)
+DUMP_TYPES = (DUMP_TYPE_DEBUG,)
 
 _OPTIONAL_RUNTIME = (
     "optimizer_run_state.json",
@@ -33,20 +29,9 @@ _OPTIONAL_RUNTIME = (
 # Arcnames relative to ZIP root (validate/replay profiles).
 PROFILE_REQUIRED: dict[str, tuple[str, ...]] = {
     DUMP_TYPE_DEBUG: ("runtime/optimization_history.jsonl",),
-    DUMP_TYPE_PROD: ("runtime/optimization_history.jsonl",),
-    DUMP_TYPE_CHART: ("runtime/optimization_history_window.jsonl",),
 }
 PROFILE_OPTIONAL: dict[str, tuple[str, ...]] = {
     DUMP_TYPE_DEBUG: tuple(f"runtime/{name}" for name in _OPTIONAL_RUNTIME),
-    DUMP_TYPE_PROD: tuple(f"runtime/{name}" for name in _OPTIONAL_RUNTIME),
-    DUMP_TYPE_CHART: tuple(
-        f"runtime/{name}"
-        for name in (
-            "optimizer_run_state.json",
-            "live_optimization_debug.json",
-            "flexible_consumers_state.json",
-        )
-    ),
 }
 
 
@@ -237,9 +222,9 @@ def read_zip_bytes(zip_path: str) -> bytes:
 
 def normalize_manifest(raw: dict[str, Any]) -> dict[str, Any]:
     """
-    Normalize schema v1 chart, v2 chart/prod, and v3 debug manifests.
+    Accept schema v3 + dump_type ``debug`` only.
 
-    Legacy dumps keep their original ``dump_type`` for diagnostics/replay.
+    Older chart/prod manifests (schema v1/v2) raise ValueError.
     """
     if not isinstance(raw, dict):
         raise ValueError("manifest.json is not a JSON object")
@@ -247,57 +232,10 @@ def normalize_manifest(raw: dict[str, Any]) -> dict[str, Any]:
     dump_type = raw.get("dump_type")
     if dump_type == DUMP_TYPE_DEBUG and version >= DUMP_SCHEMA_VERSION:
         return raw
-    if dump_type in LEGACY_DUMP_TYPES and version >= 2:
-        return raw
-    # Schema v1 chart dump: flat payload, no dump_type.
-    if version == 1 or (
-        version == 0 and ("display_rows" in raw or "chart_context" in raw)
-    ):
-        chart_keys = (
-            "live_soc_percent",
-            "live_power",
-            "session_meta",
-            "chart_header_label",
-            "history_slot_count",
-            "chart_qualities",
-            "table_gap_notice",
-            "matched_cost_euro",
-            "optimized_cost_euro",
-            "chart_context",
-            "sun_markers",
-            "slot_deviation_events",
-            "display_rows",
-            "table_rows",
-            "baseline_rows",
-            "matched_baseline_rows",
-            "savings_view",
-            "savings_summary",
-            "chart1_plotly",
-            "run_state",
-            "battery_params",
-        )
-        chart = {key: raw[key] for key in chart_keys if key in raw}
-        return {
-            "schema_version": version or 1,
-            "dump_type": DUMP_TYPE_CHART,
-            "captured_at": raw.get("captured_at"),
-            "app_version": raw.get("app_version"),
-            "env_overrides": raw.get("env_overrides") or {},
-            "resolved_paths": raw.get("resolved_paths") or {},
-            "included_input_files": raw.get("included_input_files") or [],
-            "files": raw.get("files")
-            or {
-                "required_present": ["runtime/optimization_history_window.jsonl"],
-                "optional_present": [],
-            },
-            "chart": chart,
-            "_normalized_from_v1": True,
-        }
-    if dump_type in DUMP_TYPES:
-        return raw
     raise ValueError(
         f"Unsupported dump manifest (schema_version={version!r}, "
-        f"dump_type={dump_type!r})"
+        f"dump_type={dump_type!r}); only schema_version>={DUMP_SCHEMA_VERSION} "
+        f"with dump_type={DUMP_TYPE_DEBUG!r} is accepted"
     )
 
 

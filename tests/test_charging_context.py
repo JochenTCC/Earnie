@@ -31,12 +31,14 @@ def _eauto_consumer(*, forecast_when_absent: bool = True) -> dict:
                 "daily_rest_soc": 40.0,
             },
             "loxone": {
-                "plugged_in_name": "Ernie_EAuto_Da",
-                "ready_by_time_name": "Ernie_EAuto_FertigUm",
                 "soc_at_plug_in_name": "Rest-SOC",
-                "actual_soc_name": "Ernie-SOC-Ist-EAuto",
-                "battery_capacity_kwh_name": "Batteriekapazität_E-Auto",
             },
+        },
+        "ehal_bindings": {
+            "sens_evcs_connected": "Ernie_EAuto_Da",
+            "get_evcs_ready_by_time": "Ernie_EAuto_FertigUm",
+            "sens_evcs_soc_act": "Ernie-SOC-Ist-EAuto",
+            "sens_evcs_bat_capacity": "Batteriekapazität_E-Auto",
         },
     }
 

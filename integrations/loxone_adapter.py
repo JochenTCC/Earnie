@@ -31,6 +31,9 @@ SETPOINT_FIELDS = (
     "set_evcs_mode",
 )
 
+# Numeric encoding of the Loxone Modus Merker (Pattern B).
+EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
+
 
 @dataclass(frozen=True)
 class LoxoneConfig:
@@ -45,8 +48,7 @@ class LoxoneConfig:
     control_cmd_name: str = ""
     consumers_power_name: str = ""
     evcs_max_current_name: str = ""
-    pv_follow_name: str = ""
-    charge_immediate_name: str = ""
+    evcs_mode_name: str = ""
     timeout_sec: float = 10.0
 
 
@@ -228,26 +230,13 @@ class LoxoneAdapter:
         return flip
 
     def _try_evcs_mode_write(self, mode: str) -> tuple[bool, str]:
-        """Map set_evcs_mode off|pv|now → pv_follow / charge_immediate until mode Merker lands."""
+        """Write the ``set_evcs_mode`` Modus Merker (off=0, pv=1, now=2)."""
         mode_l = str(mode or "").strip().lower()
-        if mode_l not in ("off", "pv", "now"):
+        if mode_l not in EVCS_MODE_VALUES:
             return False, f"Unsupported set_evcs_mode: {mode!r}"
-        pv_val = 1.0 if mode_l == "pv" else 0.0
-        now_val = 1.0 if mode_l == "now" else 0.0
-        wrote = False
-        if self.cfg.pv_follow_name:
-            ok, msg = self._try_marker_write(self.cfg.pv_follow_name, pv_val)
-            if not ok:
-                return False, msg
-            wrote = True
-        if self.cfg.charge_immediate_name:
-            ok, msg = self._try_marker_write(self.cfg.charge_immediate_name, now_val)
-            if not ok:
-                return False, msg
-            wrote = True
-        if not wrote:
-            return False, "No pv_follow/charge_immediate markers for set_evcs_mode"
-        return True, ""
+        if not self.cfg.evcs_mode_name:
+            return False, "No set_evcs_mode marker configured"
+        return self._try_marker_write(self.cfg.evcs_mode_name, EVCS_MODE_VALUES[mode_l])
 
     def _read_or_derive_consumers(self, pv_w: float, grid_w: float, ess_w: float) -> float:
         marker = str(self.cfg.consumers_power_name or "").strip()

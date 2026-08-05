@@ -1,0 +1,22 @@
+name: Improvement
+description: Verbesserungsvorschlag oder neue Idee
+title: "[Improvement]: "
+labels: ["improvement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GitHub Issues sind **öffentlich**. Ideen werden diskutiert; die Einplanung
+        erfolgt im Markdown-Backlog durch Maintainer (Issue-Link `#NN`).
+  - type: textarea
+    id: description
+    attributes:
+      label: Vorschlag
+      description: Was soll besser werden? Welchen Nutzen hat es?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Kontext (optional)
+      description: Betroffene Seiten, Backends oder Nutzungsszenarien

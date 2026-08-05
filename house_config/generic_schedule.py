@@ -8,11 +8,6 @@ WEEKS_PER_YEAR = 52
 DEFAULT_START_HOUR = 12
 MAX_START_SHIFT_H = 12.0
 _EPS = 1e-9
-LEGACY_FLEX_TO_SHIFT = {
-    "fixed": 0.0,
-    "day": 12.0,
-    "any": 12.0,
-}
 
 
 def is_fixed_start(start_shift_h: float) -> bool:
@@ -32,14 +27,13 @@ def eligible_start_hours(start_hour: int, start_shift_h: float) -> frozenset[int
     return frozenset((center + offset) % 24 for offset in range(-shift, shift + 1))
 
 
-def migrate_start_flexibility(schedule: dict) -> dict:
-    """Überführt legacy start_flexibility in start_shift_h."""
-    out = dict(schedule)
-    if "start_shift_h" in out and out.get("start_shift_h") is not None:
-        return out
-    legacy = str(out.pop("start_flexibility", "day")).strip().lower()
-    out["start_shift_h"] = LEGACY_FLEX_TO_SHIFT.get(legacy, 12.0)
-    return out
+def reject_legacy_start_flexibility(schedule: dict) -> None:
+    """Reject legacy start_flexibility (use start_shift_h)."""
+    if "start_flexibility" in schedule:
+        raise ValueError(
+            "schedule.start_flexibility ist nicht mehr unterstützt — "
+            "bitte start_shift_h verwenden."
+        )
 
 
 def derive_duration_h(consumer: dict) -> float | None:
@@ -83,11 +77,11 @@ def normalize_generic_schedule(raw: dict | None) -> dict | None:
     runs = int(raw.get("runs_per_week", 0) or 0)
     if runs <= 0:
         return None
-    migrated = migrate_start_flexibility(raw)
-    duration = float(migrated.get("duration_h", 0.0) or 0.0)
-    start_hour_raw = migrated.get("start_hour")
+    reject_legacy_start_flexibility(raw)
+    duration = float(raw.get("duration_h", 0.0) or 0.0)
+    start_hour_raw = raw.get("start_hour")
     start_hour = DEFAULT_START_HOUR if start_hour_raw is None else int(start_hour_raw) % 24
-    start_shift_h = max(0.0, min(MAX_START_SHIFT_H, float(migrated.get("start_shift_h", 0.0) or 0.0)))
+    start_shift_h = max(0.0, min(MAX_START_SHIFT_H, float(raw.get("start_shift_h", 0.0) or 0.0)))
     schedule = {
         "runs_per_week": max(0, runs),
         "duration_h": max(0.0, duration),

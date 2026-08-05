@@ -1,6 +1,8 @@
 """Tests für ui.scenario_form_helpers."""
 from __future__ import annotations
 
+import pytest
+
 from ui.scenario_form_helpers import (
     NONE_LABEL,
     NEW_SCENARIO_OPTION,
@@ -383,15 +385,14 @@ def test_build_scenario_settings_use_imported_pv():
     assert "use_imported_pv" not in omitted
 
 
-def test_normalize_scenario_form_snapshot_legacy_pv_system_id():
-    snapshot = normalize_scenario_form_snapshot(
-        {
-            "label": "Live",
-            "settings": {"pv_system_id": "roof", "battery_id": "bat1"},
-        },
-    )
-    assert snapshot["settings"]["pv_system_ids"] == ["roof"]
-    assert "pv_system_id" not in snapshot["settings"]
+def test_normalize_scenario_form_snapshot_legacy_pv_system_id_rejected():
+    with pytest.raises(ValueError, match="pv_system_ids"):
+        normalize_scenario_form_snapshot(
+            {
+                "label": "Live",
+                "settings": {"pv_system_id": "roof", "battery_id": "bat1"},
+            },
+        )
 
 
 def test_normalize_scenario_form_snapshot_strips_geo_override():

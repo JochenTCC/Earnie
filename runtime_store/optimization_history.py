@@ -1,15 +1,13 @@
 """
 optimization_history.py – Persistierte Produktiv-Optimierungen (main.py) für die App.
 
-Neue Läufe: runtime/optimization_history.jsonl (append-only).
-Legacy: system_history_log.csv (nur Lesen).
+Läufe: runtime/optimization_history.jsonl (append-only, JSONL only).
 """
 from __future__ import annotations
 
 import json
 import logging
 import os
-import csv
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -19,7 +17,7 @@ import pandas as pd
 import config
 from data.planning_window import align_to_planning_timezone
 from .file_metadata import OPTIMIZATION_HISTORY_SCHEMA, stamp_payload, strip_metadata
-from .persist_paths import legacy_history_csv_file, runtime_dir as persist_runtime_dir
+from .persist_paths import runtime_dir as persist_runtime_dir
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +28,9 @@ HISTORY_FILENAME = "optimization_history.jsonl"
 # alone resolves to {ENV_PATH}/runtime (not cwd-relative "runtime/").
 RUNTIME_DIR = persist_runtime_dir()
 HISTORY_FILE = os.path.join(RUNTIME_DIR, HISTORY_FILENAME)
-LEGACY_CSV_FILE = legacy_history_csv_file()
 
 _JSONL_HISTORY_CACHE: tuple[tuple[int, int], list[dict[str, Any]]] | None = None
 _JSONL_HISTORY_CACHE_PATH: str | None = None
-
-_LEGACY_CSV_COLUMNS = (
-    "Timestamp",
-    "SoC_%",
-    "Awattar_Price",
-    "PV_Forecast_kW",
-    "Consumption_Forecast_kW",
-    "Ernie_Mode",
-    "Target_Power_kW",
-    "Target_SoC_%",
-)
 
 MODE_LABELS = {
     0: "Automatik",
@@ -85,11 +71,6 @@ def history_file_path() -> str:
     return HISTORY_FILE
 
 
-def legacy_csv_path() -> str:
-    """Active legacy CSV path; honors test monkeypatch of LEGACY_CSV_FILE."""
-    return LEGACY_CSV_FILE
-
-
 def append_production_run(payload: dict[str, Any]) -> None:
     """Hängt einen main.py-Durchlauf an die JSONL-Historie an."""
     path = history_file_path()
@@ -122,15 +103,6 @@ def _entry_completed_at(clean: dict[str, Any]) -> datetime | None:
     if completed is not None:
         return completed
     return _parse_timestamp(clean.get("written_at"))
-
-
-def _float_or_zero(value: Any) -> float:
-    if value is None:
-        return 0.0
-    text = str(value).strip()
-    if not text:
-        return 0.0
-    return float(text)
 
 
 def _flex_summary(consumer_powers: dict | None) -> str:
@@ -226,100 +198,14 @@ def _load_jsonl_history() -> list[dict[str, Any]]:
     return rows
 
 
-def _normalize_legacy_csv_fields(fields: list[str]) -> list[str] | None:
-    """
-    Alte system_history_log.csv: 7 Spalten ohne Target_SoC_%.
-    Neuere Zeilen (main.py): 8 Spalten.
-    """
-    if len(fields) < 7:
-        return None
-    if len(fields) == 7:
-        return fields + [""]
-    if len(fields) > 8:
-        logger.warning(
-            "optimization_history: Legacy-Zeile mit %s Feldern gekürzt (erwartet 7–8).",
-            len(fields),
-        )
-    return fields[:8]
-
-
-def _read_legacy_csv(path: str) -> pd.DataFrame:
-    """Liest Legacy-CSV robust, auch bei gemischten 7- und 8-Spalten-Zeilen."""
-    parsed_rows: list[list[str]] = []
-    with open(path, encoding="utf-8", newline="") as handle:
-        reader = csv.reader(handle)
-        header = next(reader, None)
-        if header is None:
-            return pd.DataFrame(columns=_LEGACY_CSV_COLUMNS)
-
-        for line_no, fields in enumerate(reader, start=2):
-            if not fields or all(not cell.strip() for cell in fields):
-                continue
-            normalized = _normalize_legacy_csv_fields(fields)
-            if normalized is None:
-                logger.warning(
-                    "optimization_history: Zeile %s in %s übersprungen (%s Felder).",
-                    line_no,
-                    path,
-                    len(fields),
-                )
-                continue
-            parsed_rows.append(normalized)
-
-    if not parsed_rows:
-        return pd.DataFrame(columns=_LEGACY_CSV_COLUMNS)
-    return pd.DataFrame(parsed_rows, columns=_LEGACY_CSV_COLUMNS)
-
-
-def _load_legacy_csv_history() -> list[dict[str, Any]]:
-    path = legacy_csv_path()
-    if not os.path.isfile(path):
-        return []
-    try:
-        df = _read_legacy_csv(path)
-    except (OSError, UnicodeDecodeError) as exc:
-        logger.warning("optimization_history: %s konnte nicht gelesen werden: %s", path, exc)
-        return []
-
-    rows: list[dict[str, Any]] = []
-    for _, record in df.iterrows():
-        completed = _parse_timestamp(record.get("Timestamp"))
-        if completed is None:
-            continue
-        mode = int(record.get("Ernie_Mode", 0))
-        rows.append({
-            "completed_at": completed,
-            "run_trigger_label": "Viertelstunde",
-            "soc_percent": float(record.get("SoC_%", 0.0) or 0.0),
-            "mode_label": MODE_LABELS.get(mode, str(mode)),
-            "target_power_kw": float(record.get("Target_Power_kW", 0.0) or 0.0),
-            "target_soc_percent": _float_or_zero(record.get("Target_SoC_%")),
-            "market_price_cent": float(record.get("Awattar_Price", 0.0) or 0.0),
-            "forecast_pv_kw": float(record.get("PV_Forecast_kW", 0.0) or 0.0),
-            "forecast_consumption_kw": float(record.get("Consumption_Forecast_kW", 0.0) or 0.0),
-            "battery_plan_kw": None,
-            "flex_summary": "",
-            "source": "system_history_log.csv",
-            "_raw": None,
-        })
-    return rows
-
-
-def _merge_history_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """JSONL bevorzugen; CSV nur für Zeitpunkte ohne JSONL-Eintrag."""
-    by_time: dict[datetime, dict[str, Any]] = {}
-    for row in rows:
-        if row["source"] == "system_history_log.csv":
-            by_time.setdefault(row["completed_at"], row)
-    for row in rows:
-        if row["source"] != "system_history_log.csv":
-            by_time[row["completed_at"]] = row
-    return sorted(by_time.values(), key=lambda item: item["completed_at"])
+def _sorted_history_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sort JSONL rows by completed_at ascending."""
+    return sorted(rows, key=lambda item: item["completed_at"])
 
 
 def load_optimization_history(days_back: int | None = 7) -> pd.DataFrame:
     """Lädt die Produktiv-Historie als DataFrame (neueste zuerst)."""
-    rows = _merge_history_rows(_load_jsonl_history() + _load_legacy_csv_history())
+    rows = _sorted_history_rows(_load_jsonl_history())
     if days_back is not None:
         cutoff = datetime.now() - timedelta(days=int(days_back))
         rows = [row for row in rows if row["completed_at"] >= cutoff]
@@ -338,55 +224,11 @@ def load_history_entry_at(completed_at: datetime) -> dict[str, Any] | None:
     return None
 
 
-def _legacy_record_to_replay_entry(
-    record: pd.Series,
-    completed: datetime,
-) -> dict[str, Any]:
-    mode = int(record.get("Ernie_Mode", 0))
-    return {
-        "completed_at": completed.isoformat(timespec="seconds"),
-        "source": "system_history_log.csv",
-        "success": True,
-        "soc_percent": float(record.get("SoC_%", 0.0) or 0.0),
-        "mode": mode,
-        "target_power_kw": float(record.get("Target_Power_kW", 0.0) or 0.0),
-        "target_soc_percent": _float_or_zero(record.get("Target_SoC_%")),
-        "market_price_cent": float(record.get("Awattar_Price", 0.0) or 0.0),
-        "forecast_pv_kw": float(record.get("PV_Forecast_kW", 0.0) or 0.0),
-        "forecast_consumption_kw": float(record.get("Consumption_Forecast_kW", 0.0) or 0.0),
-        "battery_plan_kw": None,
-        "consumer_powers_kw": {},
-        "consumer_pv_follow": {},
-    }
-
-
 def _replay_entry_from_row(row: dict[str, Any]) -> dict[str, Any] | None:
     raw = row.get("_raw")
     if isinstance(raw, dict):
         return strip_metadata(raw)
-    if row.get("source") == "system_history_log.csv":
-        completed = row.get("completed_at")
-        if isinstance(completed, datetime):
-            return _legacy_record_to_replay_entry(
-                pd.Series({
-                    "Ernie_Mode": _mode_from_label(row.get("mode_label", "")),
-                    "SoC_%": row.get("soc_percent"),
-                    "Target_Power_kW": row.get("target_power_kw"),
-                    "Target_SoC_%": row.get("target_soc_percent"),
-                    "Awattar_Price": row.get("market_price_cent"),
-                    "PV_Forecast_kW": row.get("forecast_pv_kw"),
-                    "Consumption_Forecast_kW": row.get("forecast_consumption_kw"),
-                }),
-                completed,
-            )
     return None
-
-
-def _mode_from_label(mode_label: str) -> int:
-    for mode_id, label in MODE_LABELS.items():
-        if label == mode_label:
-            return mode_id
-    return 0
 
 
 def _align_replay_timestamp(moment: datetime) -> datetime:
@@ -405,12 +247,8 @@ def load_replay_entries_between(
     window_start: datetime,
     window_end: datetime,
 ) -> list[dict[str, Any]]:
-    """
-    Produktiv-Einträge mit completed_at in [window_start, window_end).
-
-    JSONL bevorzugt; Legacy-CSV nur für Zeitpunkte ohne JSONL-Eintrag.
-    """
-    merged = _merge_history_rows(_load_jsonl_history() + _load_legacy_csv_history())
+    """Produktiv-Einträge mit completed_at in [window_start, window_end) (JSONL only)."""
+    merged = _sorted_history_rows(_load_jsonl_history())
     entries: list[dict[str, Any]] = []
     for row in merged:
         completed = row.get("completed_at")
@@ -425,8 +263,8 @@ def load_replay_entries_between(
 
 
 def earliest_replay_completed_at() -> datetime | None:
-    """Frühester bekanntes completed_at aus JSONL und Legacy-CSV."""
-    merged = _merge_history_rows(_load_jsonl_history() + _load_legacy_csv_history())
+    """Frühester bekanntes completed_at aus JSONL."""
+    merged = _sorted_history_rows(_load_jsonl_history())
     if not merged:
         return None
     return merged[0]["completed_at"]
@@ -442,8 +280,6 @@ class ProductionLogSourceInfo:
     history_exists: bool
     history_size_bytes: int | None
     history_modified_at: datetime | None
-    legacy_csv_file: str
-    legacy_csv_exists: bool
 
 
 def describe_production_log_source() -> ProductionLogSourceInfo:
@@ -456,7 +292,6 @@ def describe_production_log_source() -> ProductionLogSourceInfo:
     """
     runtime_dir = os.path.abspath(resolved_runtime_dir())
     history_file = os.path.abspath(history_file_path())
-    legacy_csv = os.path.abspath(legacy_csv_path())
     history_exists = os.path.isfile(history_file)
     history_size: int | None = None
     history_mtime: datetime | None = None
@@ -471,6 +306,4 @@ def describe_production_log_source() -> ProductionLogSourceInfo:
         history_exists=history_exists,
         history_size_bytes=history_size,
         history_modified_at=history_mtime,
-        legacy_csv_file=legacy_csv,
-        legacy_csv_exists=os.path.isfile(legacy_csv),
     )

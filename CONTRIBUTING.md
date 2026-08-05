@@ -26,10 +26,10 @@ Vollständige Bedingungen: **[LICENSE.md](LICENSE.md)**.
 
 - Earnie auf PC, NAS, LoxBerry oder Proxmox ausprobieren (auch Community-Pre-Releases).
   - Andere Plattformen gerne nachfragen
-- Fehler, unplausible Optimierungen oder UI-Probleme melden — ideal mit Config-Dump und kurzer Beschreibung.
+- Fehler, unplausible Optimierungen oder UI-Probleme melden — ideal mit kurzer Beschreibung (öffentliches GitHub-Issue; keine Secrets).
 - Erweiterungs-Wünsche
-- **In der App:** Sidebar **Info / About** → Kontakt (Thema, Beschreibung, optional Anhänge; ZIP sammeln und der E-Mail manuell anhängen) an `mail@techcreacon.com`.
-- **GitHub:** Issues unter [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie).
+- **In der App:** Sidebar **Info / About** → Kontakt (Art, Thema, Beschreibung) → **GitHub-Issue öffnen**. Optional lokal **ZIP sammeln** (wird nicht hochgeladen). Registry / Vertrauliches: `support@earnie-hems.com`.
+- **GitHub:** Issues unter [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie/issues) (Vorlagen: Bug / Change request / Improvement / Question).
 
 ### 2. Code und Dokumentation
 
@@ -89,7 +89,7 @@ Laut `LICENSE.md` § 3: Bei Hardware ohne offizielles Profil bist du zur Koopera
 
 Neue Profile bitte als JSON gegen die jeweiligen Schemas validieren (siehe Tests `tests/test_ehal_profiles.py`). Spec: [docs/spec/ehal.md](docs/spec/ehal.md) Abschnitt *Device roles and hardware profiles*.
 
-**Geplant (noch nicht produktiv):** ein Community-**Hardware-Bounty**-Verfahren (Entwicklungsplan **M4**) — Einreichung neuer, verifizierter Geräteprofile gegen eine Entschädigung (Höhe/Form noch offen bzw. projektspezifisch definiert; siehe `LICENSE.md` § 3 / `[PARAM_DATA_COMPENSATION]`). Bis die Bounty-Engine steht: Profile und Hinweise gern über Info / About oder GitHub Issues.
+**Geplant (noch nicht produktiv):** ein Community-**Hardware-Bounty**-Verfahren (Entwicklungsplan **M4**) — Einreichung neuer, verifizierter Geräteprofile gegen eine Entschädigung (Höhe/Form noch offen bzw. projektspezifisch definiert; siehe `LICENSE.md` § 3 / `[PARAM_DATA_COMPENSATION]`). Bis die Bounty-Engine steht: Profile und Hinweise gern über Info / About (GitHub-Issue) oder direkt als Issue.
 
 ---
 
@@ -101,12 +101,15 @@ Neue Profile bitte als JSON gegen die jeweiligen Schemas validieren (siehe Tests
 
 ---
 
-## Kontakt
+## Kontakt und Ticket-Kanäle
 
 | Kanal | Zweck |
 | --- | --- |
-| App **Info / About** | Feedback, Config-Dump, Anhänge → `mail@techcreacon.com` |
-| [GitHub Issues](https://github.com/JochenTCC/Earnie/issues) | Bugs, Feature-Ideen, Diskussion |
-| Roadmap | [backlog/Backlog.md](backlog/Backlog.md) |
+| [GitHub Issues](https://github.com/JochenTCC/Earnie/issues) | Öffentlicher Intake: Bugs, Änderungswünsche, Verbesserungen, Fragen (Vorlagen + Labels). App **Info / About** öffnet ein vorbefülltes Issue. |
+| App **Info / About** — ZIP lokal | Config-/Kontakt-ZIP nur herunterladen; nicht automatisch hochladen. Sichere Ausschnitte dürfen in Issues; vollständige Dumps nur privat. |
+| `support@earnie-hems.com` | Privater Ausnahmekanal: Registry-Fingerprint, Secrets, sensible Dumps (ZIP manuell anhängen). |
+| Roadmap | [backlog/Backlog.md](backlog/Backlog.md) — Scheduling-Quelle; Maintainer übernimmt Issues bei Einplanung mit `#NN`. |
 
-Demo ohne lokale Installation (Szenario-Explorer): [earnie.streamlit.app](https://earnie.streamlit.app) (falls verfügbar).
+**Triage (kurz):** neue Issues mit `needs-triage` → antworten/schließen oder labeln → bei Einplanung Markdown-Backlog-Eintrag mit Issue-Link. Bugfixes weiter über [backlog/Backlog-Bugfixes.md](backlog/Backlog-Bugfixes.md).
+
+Demo ohne lokale Installation (Szenario-Explorer): [earnie.streamlit.app](https://earnie.streamlit.app) (falls verfügbar) — Feedback ebenfalls als GitHub-Issue (`cloud-demo`).

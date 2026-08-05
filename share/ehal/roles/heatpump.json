@@ -8,13 +8,13 @@
       "field": "flex.{hk_id}.sens_power_act",
       "required": false,
       "kind": "stub",
-      "notes": "Pattern B power on thermal_annual (e.g. waermepumpe). Legacy flex.power_name migrates on load."
+      "notes": "Pattern B power on thermal_annual (e.g. wp_heating)."
     },
     {
       "field": "flex.{hk_id}.set_enable",
       "required": false,
       "kind": "stub",
-      "notes": "Pattern B Freigabe / SG-Ready. Legacy flex.enable_name migrates on load."
+      "notes": "Pattern B Freigabe / SG-Ready."
     }
   ],
   "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signale.md and Thermals backlog."

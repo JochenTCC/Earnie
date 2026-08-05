@@ -12,11 +12,15 @@ import streamlit as st
 
 from runtime_store.config_pack import build_config_pack_bytes
 from ui.doc_links import MANUAL_URL
+from ui.github_issue_url import ISSUE_KIND_LABELS, build_github_issue_url
 from ui.truth_banner import (
+    OFFICIAL_REPO_URL,
+    SITE_URL,
     SUPPORT_EMAIL,
     render_registry_status_caption,
     render_truth_banner,
 )
+from version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +28,7 @@ _CONTACT_ZIP_PREFIX = "earnie_kontakt"
 
 
 def build_mailto_url(topic: str, description: str) -> str:
-    """Build a mailto URL with subject/body; reminder to attach the ZIP."""
+    """Build a private-support mailto (Layer C); reminder to attach the ZIP."""
     subject = (topic or "").strip() or "Earnie Support"
     body_parts = [
         (description or "").strip(),
@@ -75,16 +79,27 @@ def render_info_sidebar() -> None:
             MANUAL_URL,
             width="stretch",
         )
+        st.link_button("Website", SITE_URL, width="stretch")
+        st.link_button(
+            "GitHub / Issues",
+            f"{OFFICIAL_REPO_URL.rstrip('/')}/issues",
+            width="stretch",
+        )
         st.markdown("#### Kontakt")
         st.caption(
-            f"Anfragen an {SUPPORT_EMAIL}. Zuerst ZIP sammeln, dann E-Mail "
-            "schreiben und die ZIP-Datei manuell als Anhang hinzufügen "
-            "(wird nicht automatisch angehängt)."
+            "Standardweg: **öffentliches** GitHub-Issue. Keine Passwörter, "
+            "Hostnamen, Kundennamen oder vollständigen Config-/Debug-Dumps "
+            "einfügen. ZIP bleibt lokal — nur sichere Ausschnitte pasten."
+        )
+        kind = st.selectbox(
+            "Art",
+            options=list(ISSUE_KIND_LABELS),
+            key="info_contact_kind",
         )
         topic = st.text_input("Thema", key="info_contact_topic")
         description = st.text_area("Beschreibung", key="info_contact_description")
         attachments = st.file_uploader(
-            "Anhänge",
+            "Anhänge (nur für lokale ZIP)",
             accept_multiple_files=True,
             key="info_contact_attachments",
         )
@@ -103,10 +118,29 @@ def render_info_sidebar() -> None:
                 key="info_contact_zip_download",
             )
             st.caption(
-                "Die ZIP-Datei muss der E-Mail manuell als Anhang hinzugefügt werden."
+                "ZIP wird **nicht** hochgeladen. Für öffentliche Issues nur "
+                "sichere Ausschnitte pasten; für Vertrauliches die ZIP der "
+                f"Mail an {SUPPORT_EMAIL} anhängen."
             )
-        mailto = build_mailto_url(topic, description)
-        st.link_button("E-Mail schreiben", mailto, width="stretch")
+        issue_url = build_github_issue_url(
+            kind,
+            topic,
+            description,
+            version=__version__,
+        )
+        st.link_button("GitHub-Issue öffnen", issue_url, width="stretch")
+        with st.expander("Privater Support (Registry / vertraulich)"):
+            st.caption(
+                "Nur wenn öffentliche Issues ungeeignet sind: Registry-"
+                "Fingerprint, Zugangsdaten, vollständige Dumps. "
+                f"Adresse: {SUPPORT_EMAIL}."
+            )
+            private_mailto = build_mailto_url(topic, description)
+            st.link_button(
+                "Private E-Mail vorbereiten",
+                private_mailto,
+                width="stretch",
+            )
 
 
 def render_missing_next_month_tariff_sidebar() -> None:

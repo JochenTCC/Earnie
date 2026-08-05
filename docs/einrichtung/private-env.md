@@ -33,7 +33,7 @@ Fehlendes `tariffs.json` im Link-Ziel wird aus `share/config/tariffs.json` kopie
 
 Ohne privates Repo und ohne Junction: leeres `earnie_env/config/` + Vorlagen in `share/config/` → Bootstrap legt minimale Haus-Dateien an und seeded den Tarifkatalog aus `share/config/tariffs.json`. Sinnvoll mit `EARNIE_OFFLINE=1` und ggf. `EARNIE_UI_MODES=scenario_explorer`.
 
-Für die öffentliche Demo auf Streamlit Community Cloud zusätzlich **`EARNIE_CLOUD_DEMO=1`**: jede Browser-Sitzung erhält einen eigenen temporären Greenfield-Workspace (leere Minimal-Config), startet im **Hauskonfigurator** und zeigt eine kurze Willkommenshinweis. Nach dem Start einer Szenario-Explorer-Berechnung erscheint ein Feedback-Hinweis mit vorbereiteter E-Mail an `jochen@techcreacon.com` (optional Konfigurations-ZIP nach Zustimmung, manuell anhängen). Offline-Demo-Seed der Live-Szenario-IDs entfällt in diesem Modus. Empfohlene Secrets: `EARNIE_CLOUD_DEMO=1`, `EARNIE_OFFLINE=1`, `EARNIE_UI_MODES=scenario_explorer`.
+Für die öffentliche Demo auf Streamlit Community Cloud zusätzlich **`EARNIE_CLOUD_DEMO=1`**: jede Browser-Sitzung erhält einen eigenen temporären Greenfield-Workspace (leere Minimal-Config), startet im **Hauskonfigurator** und zeigt eine kurze Willkommenshinweis. Nach dem Start einer Szenario-Explorer-Berechnung erscheint ein Feedback-Hinweis mit vorbereitetem **GitHub-Issue** (Label `cloud-demo`; optional Konfigurations-ZIP nur lokal herunterladen — nicht in öffentliche Issues; bei Bedarf privat an `support@earnie-hems.com`). Offline-Demo-Seed der Live-Szenario-IDs entfällt in diesem Modus. Empfohlene Secrets: `EARNIE_CLOUD_DEMO=1`, `EARNIE_OFFLINE=1`, `EARNIE_UI_MODES=scenario_explorer`.
 
 ## Tarifkatalog veröffentlichen
 

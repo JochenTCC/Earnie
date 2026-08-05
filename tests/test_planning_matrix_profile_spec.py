@@ -236,7 +236,6 @@ def test_planning_ev_to_milp_copies_loxone_bindings_from_profile():
         "min_power_kw": 1.4,
         "min_on_quarterhours": 1,
         "battery_capacity_kwh": 17.0,
-        "legacy_id": "eauto",
         "charging_schedule": {
             "target_soc_percent": 100.0,
             "charging_efficiency": 0.95,
@@ -256,7 +255,7 @@ def test_planning_ev_to_milp_copies_loxone_bindings_from_profile():
     assert milp["loxone_inputs"]["power_name"] == "Ernie_EAuto_P_act"
     assert milp["loxone_outputs"]["power_setpoint_name"] == "Ernie_EAuto_Ziel_kW"
     assert milp["charging_schedule"]["loxone"]["plugged_in_name"] == "Ernie_EAuto_Da"
-    assert milp["legacy_id"] == "eauto"
+    assert "legacy_id" not in milp
     assert milp["charging_schedule"]["milp"]["live_modus_a_min_remaining_kwh"] == pytest.approx(2.8)
 
 

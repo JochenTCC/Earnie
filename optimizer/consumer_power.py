@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from settings.ehal_marker_resolve import (
-    marker_pv_follow,
     marker_set_evcs_max_current,
     marker_set_evcs_mode,
 )
@@ -14,10 +13,10 @@ def uses_power_setpoint(consumer: dict) -> bool:
 
 
 def uses_pv_follow(consumer: dict) -> bool:
-    """True, wenn PV-Überschuss-Modus (set_evcs_mode / pv_follow) verfügbar ist."""
+    """True, wenn PV-Überschuss-Modus (``set_evcs_mode``) verfügbar ist."""
     if not uses_power_setpoint(consumer):
         return False
-    return bool(marker_pv_follow(consumer) or marker_set_evcs_mode(consumer))
+    return bool(marker_set_evcs_mode(consumer))
 
 
 def power_limits_kw(consumer: dict) -> tuple[float, float]:

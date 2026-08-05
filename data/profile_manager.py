@@ -64,24 +64,22 @@ def _flex_profile_export_spec(df: pd.DataFrame) -> tuple[list[str], dict[str, st
     """
     Spalten aus dem cons_data-Profil-DF für flexible_consumer_profiles.csv.
 
-    Nutzt cons_data-Labels (nicht config.name) und schreibt runtime CSV-Spalten
-    (legacy_id wenn gesetzt). Verbraucher ohne cons_data-Spalte werden übersprungen.
+    Nutzt cons_data-Labels (nicht config.name) und schreibt kanonische CSV-Spalten.
+    Verbraucher ohne cons_data-Spalte werden übersprungen.
     """
     from data.cons_data_house_profile import (
         consumer_labels_for_ids,
         expected_cons_data_consumer_ids,
     )
-    from settings.flexible_consumers import profile_column_id, runtime_consumer_id
+    from settings.flexible_consumers import profile_column_id
 
     cons_ids = set(expected_cons_data_consumer_ids())
     label_cols: list[str] = []
     rename_to_csv: dict[str, str] = {}
     for consumer in config.get_flexible_consumers():
-        runtime_id = runtime_consumer_id(consumer)
-        canonical_id = str(consumer["id"])
-        if runtime_id not in cons_ids and canonical_id not in cons_ids:
+        lookup_id = str(consumer["id"])
+        if lookup_id not in cons_ids:
             continue
-        lookup_id = runtime_id if runtime_id in cons_ids else canonical_id
         label = consumer_labels_for_ids([lookup_id]).get(lookup_id)
         if not label or label not in df.columns:
             continue
@@ -364,14 +362,11 @@ def _load_flexible_consumer_hourly_profiles(target_hours: List) -> dict[str, Lis
     try:
         df_profiles = pd.read_csv(profile_path, sep=';')
         csv_columns = set(df_profiles.columns)
-        column_by_consumer: dict[str, str] = {}
-        for consumer in consumers:
-            cid = str(consumer["id"])
-            runtime_col = profile_column_id(consumer)
-            if runtime_col in csv_columns:
-                column_by_consumer[cid] = runtime_col
-            elif cid in csv_columns:
-                column_by_consumer[cid] = cid
+        column_by_consumer = {
+            str(consumer["id"]): profile_column_id(consumer)
+            for consumer in consumers
+            if profile_column_id(consumer) in csv_columns
+        }
         lookup = {
             cid: df_profiles.set_index(['Month', 'Weekday', 'Hour'])[col].to_dict()
             for cid, col in column_by_consumer.items()

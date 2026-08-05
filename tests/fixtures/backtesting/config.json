@@ -42,6 +42,10 @@
       "loxone_inputs": {
         "power_name": "SwimSpa_Power"
       },
+      "ehal_bindings": {
+        "flex.swimspa.set_enable": "SwimSpa_Enable",
+        "flex.swimspa.sens_power_act": "SwimSpa_Power"
+      },
       "chart_color_index": 0
     },
     {
@@ -55,11 +59,21 @@
       "signal_type": "power",
       "optimizer_enabled": true,
       "loxone_outputs": {
-        "power_setpoint_name": "EAuto_Target_kW",
-        "pv_follow_name": "EAuto_PV_Follow"
+        "power_setpoint_name": "EAuto_Target_kW"
       },
       "loxone_inputs": {
         "power_name": "EAuto_Power"
+      },
+      "ehal_bindings": {
+        "set_evcs_max_current": "EAuto_Target_kW",
+        "set_evcs_mode": "EAuto_Mode",
+        "flex.eauto.sens_power_act": "EAuto_Power",
+        "sens_evcs_connected": "EAuto_Plugged",
+        "get_evcs_ready_by_time": "EAuto_ReadyBy",
+        "sens_evcs_soc_act": "EAuto_RestSOC",
+        "charge_immediate_name": "EAuto_ChargeNow",
+        "sens_evcs_bat_capacity": "EAuto_Battery_kWh",
+        "get_evcs_nominal_current": "EAuto_Max_kW"
       },
       "charging_schedule": {
         "enabled": true,
@@ -109,6 +123,10 @@
       },
       "loxone_inputs": {
         "power_name": "WP_Power"
+      },
+      "ehal_bindings": {
+        "flex.waermepumpe.set_enable": "WP_Enable",
+        "flex.waermepumpe.sens_power_act": "WP_Power"
       },
       "chart_color_index": 7
     }

@@ -51,9 +51,7 @@ def _entry(completed: datetime, **extra) -> dict:
 @pytest.fixture
 def history_files(tmp_path, monkeypatch):
     jsonl = tmp_path / "optimization_history.jsonl"
-    legacy = tmp_path / "legacy.csv"
     monkeypatch.setattr(optimization_history, "HISTORY_FILE", str(jsonl))
-    monkeypatch.setattr(optimization_history, "LEGACY_CSV_FILE", str(legacy))
     return jsonl
 
 

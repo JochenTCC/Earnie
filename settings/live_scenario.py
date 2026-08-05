@@ -7,7 +7,6 @@ from settings.json_io import read_json_dict, write_json_dict
 
 RUNTIME_REF_KEYS = frozenset({
     "battery_id",
-    "pv_system_id",
     "pv_system_ids",
     "import_tariff_id",
     "export_tariff_id",

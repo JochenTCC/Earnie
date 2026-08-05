@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 import tempfile
 from datetime import datetime
-from urllib.parse import quote
 
 from runtime_store.env_vars import is_truthy
 
@@ -12,9 +11,6 @@ SESSION_ENV_KEY = "_earnie_cloud_env_root"
 SESSION_INTRO_DISMISSED_KEY = "_earnie_cloud_intro_dismissed"
 SESSION_SE_SIM_STARTED_KEY = "_earnie_cloud_se_sim_started"
 SESSION_SE_FEEDBACK_DISMISSED_KEY = "_earnie_cloud_se_feedback_dismissed"
-
-FEEDBACK_EMAIL = "jochen@techcreacon.com"
-_FEEDBACK_SUBJECT = "Earnie Cloud-Demo — Feedback Szenario-Explorer"
 
 # Test hook when Streamlit session_state is unavailable.
 _test_session_env_root: str | None = None
@@ -119,37 +115,17 @@ def mark_cloud_demo_se_simulation_started() -> None:
     st.session_state[SESSION_SE_SIM_STARTED_KEY] = True
 
 
-def build_cloud_demo_feedback_mailto(
-    message: str = "",
-    *,
-    attach_config: bool = False,
-) -> str:
-    """Build mailto URL for cloud-demo SE feedback (pure; no Streamlit)."""
-    body_parts = [
-        "Hallo Jochen,",
-        "",
-        "Feedback zum Earnie Online Szenario-Explorer:",
-        "",
-        (message or "").strip() or "(hier eintragen)",
-        "",
-    ]
-    if attach_config:
-        body_parts.extend(
-            [
-                "Ich stimme zu, dass die Konfigurations-ZIP für Tests und "
-                "Bugfixes genutzt werden darf.",
-                "",
-                "Bitte die heruntergeladene Konfigurations-ZIP dieser E-Mail "
-                "manuell anhängen (wird nicht automatisch angehängt).",
-                "",
-            ]
-        )
-    body_parts.append("— gesendet aus der Streamlit-Cloud")
-    body = "\n".join(body_parts)
-    return (
-        f"mailto:{FEEDBACK_EMAIL}"
-        f"?subject={quote(_FEEDBACK_SUBJECT, safe='')}"
-        f"&body={quote(body, safe='')}"
+def build_cloud_demo_feedback_issue_url(message: str = "") -> str:
+    """Build GitHub Issue URL for cloud-demo SE feedback (pure; no Streamlit)."""
+    from ui.github_issue_url import build_github_issue_url
+    from version import __version__
+
+    return build_github_issue_url(
+        "Verbesserung",
+        "Cloud-Demo Szenario-Explorer",
+        (message or "").strip() or "(Feedback hier ergänzen)",
+        extra_labels=("cloud-demo",),
+        version=__version__,
     )
 
 
@@ -166,6 +142,8 @@ def render_cloud_demo_feedback_banner() -> None:
 
     import streamlit as st
 
+    from ui.truth_banner import SUPPORT_EMAIL
+
     if not st.session_state.get(SESSION_SE_SIM_STARTED_KEY):
         return
     if st.session_state.get(SESSION_SE_FEEDBACK_DISMISSED_KEY):
@@ -175,7 +153,8 @@ def render_cloud_demo_feedback_banner() -> None:
         "**Wie war die Simulation?**\n\n"
         "Sie haben gerade den **Szenario-Explorer** gestartet. "
         "Was hat gut funktioniert, was war unklar oder fehlte? "
-        "Kurzes Feedback hilft uns, Earnie zu verbessern."
+        "Kurzes Feedback hilft uns, Earnie zu verbessern "
+        "(öffentliches GitHub-Issue — keine Secrets pasten)."
     )
     message = st.text_area(
         "Ihr Feedback (optional)",
@@ -184,8 +163,8 @@ def render_cloud_demo_feedback_banner() -> None:
         placeholder="z. B. Einrichtung, Ergebnisse, Verständnis der Charts …",
     )
     attach_config = st.checkbox(
-        "Ich stimme zu, dass meine Konfiguration als ZIP der E-Mail "
-        "angehängt und für Tests sowie Bugfixes verwendet werden darf.",
+        "Konfigurations-ZIP lokal herunterladen "
+        "(nicht automatisch hochladen; nur für privaten Support nutzen).",
         key="earnie_cloud_se_feedback_attach_config",
     )
     if attach_config:
@@ -208,18 +187,16 @@ def render_cloud_demo_feedback_banner() -> None:
                 key="earnie_cloud_se_feedback_zip_download",
             )
             st.caption(
-                "Die ZIP-Datei muss der E-Mail manuell als Anhang hinzugefügt werden."
+                "ZIP bleibt lokal. Nicht in öffentliche Issues anhängen. "
+                f"Bei Bedarf an {SUPPORT_EMAIL} senden."
             )
 
-    mailto = build_cloud_demo_feedback_mailto(
-        message,
-        attach_config=attach_config,
-    )
-    col_mail, col_dismiss = st.columns(2)
-    with col_mail:
+    issue_url = build_cloud_demo_feedback_issue_url(message)
+    col_issue, col_dismiss = st.columns(2)
+    with col_issue:
         st.link_button(
-            "Feedback per E-Mail vorbereiten",
-            mailto,
+            "Feedback als GitHub-Issue",
+            issue_url,
             width="stretch",
         )
     with col_dismiss:

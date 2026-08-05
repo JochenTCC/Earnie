@@ -11,9 +11,8 @@ x-persist-volumes: &persist-volumes
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  EARNIE_CONFIG_PATH: config
-  # Volume is ./earnie_env/runtime:/app/runtime — must match writers (not baked earnie_env/runtime).
-  EARNIE_RUNTIME_PATH: runtime
+  # Volumes mount host …/{config,runtime} → /app/{config,runtime}; ENV_PATH=. derives both (not baked earnie_env/).
+  EARNIE_ENV_PATH: .
   EARNIE_VERIFY_LOXONE_ON_START: "1"
   EARNIE_AUTO_START_MAIN: "1"
 
@@ -25,7 +24,7 @@ services:
   earnie:
     build: *build
     container_name: earnie
-    restart: unless-stopped
+    restart: on-failure:3
     # Host 8521 → Container 8501 (ui.streamlit_port im Container bleibt 8501).
     # Host 8541 → Daemon Earnie_Request_Optimize /alive.
     ports:

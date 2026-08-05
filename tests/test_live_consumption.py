@@ -76,12 +76,11 @@ def test_apply_live_snapshot_maps_runtime_flex_to_canonical_ids():
     snapshot = {
         "baseload_kw": 0.3,
         "house_kw": 1.7,
-        "flex_kw": {"eauto": 1.4},
+        "flex_kw": {"ev": 1.4},
         "pv_kw": 2.0,
     }
     consumer = {
         "id": "ev",
-        "legacy_id": "eauto",
         "name": "Smart",
     }
     with patch.object(lc.config, "get_flexible_consumers", return_value=[consumer]):

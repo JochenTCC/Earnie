@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   DRAFT (2.4.n Pattern B) — Loxone → Earnie EV telemetry push.
-  Replace EARNIE_HOST and {ev_id} (HK EV id, e.g. eauto). Paths are placeholders until Earnie exposes ingest.
+  Replace EARNIE_HOST and {ev_id} (HK EV id, e.g. ev). Paths are placeholders until Earnie exposes ingest.
   Cmd Titles = frozen Merker names. Multi-EV: Prefix+Slug Titles (Earnie_EAuto_<Slug>_…).
   Earnie_EAuto_Leistung may be EFM Load — keep VO cmd. Legacy Title Earnie_EAuto_P_act still valid.
   FertigUm / get_evcs_ready_by_time: not a VO — bind AlarmClock Bezeichnung (Ladewecker); Earnie reads SpecialState10 via /all (Tna backup).

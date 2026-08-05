@@ -22,11 +22,13 @@ def _eauto_consumer() -> dict:
             "target_soc_percent": 100.0,
             "charging_efficiency": 0.9,
             "loxone": {
-                "plugged_in_name": "Ernie_EAuto_Da",
-                "charge_immediate_name": "E-Auto_SOFORT_LADEN",
                 "charge_immediate_remaining_name": "Ernie_Restzeit_Sofortladen",
-                "battery_capacity_kwh_name": "Batteriekapazität_E-Auto",
             },
+        },
+        "ehal_bindings": {
+            "sens_evcs_connected": "Ernie_EAuto_Da",
+            "charge_immediate_name": "E-Auto_SOFORT_LADEN",
+            "sens_evcs_bat_capacity": "Batteriekapazität_E-Auto",
         },
     }
 
@@ -175,22 +177,19 @@ class TestMainStateFallback:
         labels = ci.merge_immediate_charging_labels({}, main_state)
         assert labels == ["E-Auto: 3.479 kW live (Sofort-Laden)"]
 
-    def test_merge_labels_with_ev_legacy_id(self):
+    def test_merge_labels_with_canonical_ev_id(self):
         consumer = {
             "id": "ev",
-            "legacy_id": "eauto",
             "name": "Smart",
-            "charging_schedule": {
-                "enabled": True,
-                "loxone": {"charge_immediate_name": "E-Auto_SOFORT_LADEN"},
-            },
+            "charging_schedule": {"enabled": True},
+            "ehal_bindings": {"charge_immediate_name": "E-Auto_SOFORT_LADEN"},
         }
         main_state = {
             "event_trigger_snapshot": {
-                "eauto_charge_immediate": True,
-                "eauto_plugged_in": True,
+                "ev_charge_immediate": True,
+                "ev_plugged_in": True,
             },
-            "flex_live_kw": {"eauto": 3.479},
+            "flex_live_kw": {"ev": 3.479},
             "charging_contexts": {
                 "ev": {
                     "active": True,
@@ -283,7 +282,7 @@ class TestEnrichContext:
 
     def test_enrich_unchanged_without_io_name(self):
         consumer = _eauto_consumer()
-        consumer["charging_schedule"]["loxone"].pop("charge_immediate_name")
+        consumer["ehal_bindings"].pop("charge_immediate_name")
         base = _plugged_context()
         assert (
             ci.enrich_context_with_immediate_charge(

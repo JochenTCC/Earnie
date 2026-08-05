@@ -9,42 +9,35 @@ CONSUMER_PALETTE_SIZE = 8
 
 
 def runtime_consumer_id(consumer: dict) -> str:
-    """Live/cons_data/state key — legacy_id when bridged, else canonical id."""
-    legacy = str(consumer.get("legacy_id") or "").strip()
-    if legacy:
-        return legacy
+    """Live/cons_data/state key — always the canonical consumer id."""
     return str(consumer["id"])
 
 
 def profile_column_id(consumer: dict) -> str:
-    """Column name in flexible_consumer_profiles.csv (legacy when bridged)."""
-    return runtime_consumer_id(consumer)
+    """Column name in flexible_consumer_profiles.csv (canonical id)."""
+    return str(consumer["id"])
 
 
 def charging_context_lookup(contexts: dict | None, consumer: dict) -> dict:
-    """Lookup persisted charging_contexts by runtime or canonical consumer id."""
+    """Lookup persisted charging_contexts by canonical consumer id."""
     if not contexts:
         return {}
-    runtime_id = runtime_consumer_id(consumer)
-    canonical_id = str(consumer["id"])
-    ctx = contexts.get(runtime_id) or contexts.get(canonical_id) or {}
+    ctx = contexts.get(str(consumer["id"])) or {}
     return ctx if isinstance(ctx, dict) else {}
 
 
 def flex_kw_lookup(flex: dict | None, consumer: dict) -> float:
-    """Lookup live/matrix flex kW by runtime id with fallback to canonical id."""
+    """Lookup live/matrix flex kW by canonical consumer id."""
     if not flex:
         return 0.0
-    runtime_id = runtime_consumer_id(consumer)
-    canonical_id = str(consumer["id"])
-    return float(flex.get(runtime_id, flex.get(canonical_id, 0.0)) or 0.0)
+    return float(flex.get(str(consumer["id"]), 0.0) or 0.0)
 
 
 def flex_kw_to_canonical(
     flex: dict | None,
     consumers: list[dict],
 ) -> dict[str, float]:
-    """Map a runtime- or mixed-key flex dict to canonical consumer ids."""
+    """Restrict a flex dict to the given consumers (canonical ids, rounded)."""
     return {
         str(consumer["id"]): round(flex_kw_lookup(flex, consumer), 6)
         for consumer in consumers
@@ -52,25 +45,18 @@ def flex_kw_to_canonical(
 
 
 def flex_kw_pop_for_consumer(flex: dict, consumer: dict) -> float:
-    """Remove and return flex kW for consumer (runtime and canonical keys)."""
-    runtime_id = runtime_consumer_id(consumer)
-    canonical_id = str(consumer["id"])
-    value = float(flex.pop(runtime_id, 0.0) or 0.0)
-    if canonical_id != runtime_id:
-        value = max(value, float(flex.pop(canonical_id, 0.0) or 0.0))
-    return value
+    """Remove and return flex kW for consumer (canonical id)."""
+    return float(flex.pop(str(consumer["id"]), 0.0) or 0.0)
 
 
-def normalize_legacy_id(raw: dict, consumer_id: str) -> str | None:
-    legacy = str(raw.get("legacy_id", "")).strip()
-    if not legacy:
-        return None
-    if legacy == consumer_id:
-        raise ValueError(
-            f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-            "legacy_id muss sich von id unterscheiden."
-        )
-    return legacy
+def reject_legacy_id(raw: dict, consumer_id: str) -> None:
+    """Fail fast when a config/profile row still carries the removed ``legacy_id``."""
+    if "legacy_id" not in raw:
+        return
+    raise ValueError(
+        f"Kritischer Konfigurationsfehler: Verbraucher '{consumer_id}': "
+        "legacy_id entfernt, kanonische id verwenden."
+    )
 
 
 def normalize_day_schedule(block: dict | None) -> dict:
@@ -157,14 +143,11 @@ def normalize_loxone_outputs(raw: dict | None) -> dict:
         out["enable_name"] = enable_name
     if setpoint_name:
         out["power_setpoint_name"] = setpoint_name
-    pv_follow_name = str(raw.get("pv_follow_name", "")).strip()
-    if pv_follow_name:
-        if not setpoint_name:
-            raise ValueError(
-                "Kritischer Konfigurationsfehler: pv_follow_name erfordert "
-                "power_setpoint_name."
-            )
-        out["pv_follow_name"] = pv_follow_name
+    if str(raw.get("pv_follow_name", "")).strip():
+        raise ValueError(
+            "Kritischer Konfigurationsfehler: loxone_outputs.pv_follow_name entfernt — "
+            "EV-Modus wird ausschließlich über set_evcs_mode geschrieben."
+        )
     return out
 
 
@@ -374,7 +357,21 @@ def normalize_chart_color_index(raw: dict, consumer_id: str) -> int:
     return index
 
 
+def reject_pv_follow_binding(bindings: dict, consumer_id: str) -> None:
+    """``pv_follow_name`` is no longer a write role — ``set_evcs_mode`` replaces it."""
+    if str(bindings.get("pv_follow_name", "")).strip():
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: Verbraucher '{consumer_id}': "
+            "ehal_bindings.pv_follow_name entfernt — set_evcs_mode verwenden."
+        )
+
+
 def normalize_consumer(raw: dict) -> dict:
+    if "path_log" in raw:
+        raise ValueError(
+            "path_log entfernt, path_historical_log verwenden."
+        )
+    reject_legacy_id(raw, str(raw.get("id", "?")))
     source = str(raw.get("daily_target_source", "config")).lower().strip()
     if "daily_target_source" not in raw:
         charging_raw = raw.get("charging_schedule")
@@ -440,9 +437,7 @@ def normalize_consumer(raw: dict) -> dict:
         "loxone_target_kwh_name": str(raw.get("loxone_target_kwh_name", "")).strip(),
         "loxone_target_hours_name": str(raw.get("loxone_target_hours_name", "")).strip(),
         "min_on_quarterhours": max(1, int(raw.get("min_on_quarterhours", raw.get("min_on_hours", 1) * 4))),
-        "path_historical_log": str(
-            raw.get("path_historical_log") or raw.get("path_log", "")
-        ).strip(),
+        "path_historical_log": str(raw.get("path_historical_log", "")).strip(),
         "signal_type": str(raw.get("signal_type", "power")),
         "log_signal_type": str(
             raw.get("log_signal_type") or raw.get("signal_type", "power")
@@ -454,9 +449,6 @@ def normalize_consumer(raw: dict) -> dict:
         "thermal_control": thermal_control,
         "filter_schedule": normalize_filter_schedule(raw.get("filter_schedule"), consumer_id),
     }
-    legacy_id = normalize_legacy_id(raw, consumer_id)
-    if legacy_id:
-        result["legacy_id"] = legacy_id
     window = raw.get("thermal_flex_window")
     if isinstance(window, dict) and window:
         result["thermal_flex_window"] = dict(window)
@@ -469,6 +461,7 @@ def normalize_consumer(raw: dict) -> dict:
         result["generic_flex_window"] = dict(generic_window)
     bindings = raw.get("ehal_bindings")
     if isinstance(bindings, dict) and bindings:
+        reject_pv_follow_binding(bindings, consumer_id)
         result["ehal_bindings"] = dict(bindings)
     return result
 

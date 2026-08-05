@@ -27,11 +27,11 @@ EXPORT_TYPES = frozenset(
 )
 VALID_LANDS = frozenset({"AT", "DE", "CH"})
 VALID_CURRENCIES = frozenset({"EUR", "CHF"})
-# Umbenannte IDs aus Tarifkatalog 1.24.f (Abwärtskompatibilität für runtime_settings).
+# Umbenannte IDs aus Tarifkatalog 1.24.f (reject set for soft-alias).
 _EXPORT_TARIFF_ID_ALIASES: dict[str, str] = {
     "awattar_sunny_float": "dynamic_epex",
 }
-# Pre-spot_hourly type names (catalog / greenfield leftovers).
+# Pre-spot_hourly type names (reject → spot_hourly).
 _LEGACY_IMPORT_TYPES: dict[str, str] = {
     "awattar": "spot_hourly",
 }
@@ -53,9 +53,14 @@ _SPOT_EXPORT_FEE_KEYS = (
 
 
 def resolve_export_tariff_id(tariff_id: str) -> str:
-    """Mappt veraltete export_tariff_id auf den aktuellen Katalog-Eintrag."""
+    """Reject renamed export tariff ids; return unchanged when current."""
     key = str(tariff_id).strip()
-    return _EXPORT_TARIFF_ID_ALIASES.get(key, key)
+    replacement = _EXPORT_TARIFF_ID_ALIASES.get(key)
+    if replacement is not None:
+        raise ValueError(
+            f"Veraltete export_tariff_id '{key}' — bitte '{replacement}' verwenden."
+        )
+    return key
 
 
 def _read_json(path: str) -> dict:
@@ -233,117 +238,55 @@ def _normalize_export_tariff(raw: dict, index: int) -> dict:
     return _export_tariff_spec(raw, index)
 
 
-def _seed_monthly_rates_from_float(
-    raw: dict,
-    index: int,
+def _reject_legacy_tariff_types(
+    items: list,
     *,
-    oemag_rates: tuple,
-    reference_cent: float,
-) -> list:
-    """Build owned monthly_rates for a legacy monthly_float export row."""
-    from data.monthly_float_rates import build_monthly_float_lookup
-
-    tariff_id = str(raw.get("id", "")).strip() or f"index_{index}"
-    if "arbeitspreis_kwh_cent" not in raw:
+    aliases: dict[str, str],
+    kind: str,
+) -> None:
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        tariff_type = str(item.get("type", "")).strip().lower()
+        replacement = aliases.get(tariff_type)
+        if not replacement:
+            continue
+        tariff_id = str(item.get("id", "")).strip() or f"{kind}[{index}]"
         raise ValueError(
-            f"export_tariffs[{index}] ('{tariff_id}'): legacy monthly_float "
-            "braucht monthly_rates oder arbeitspreis_kwh_cent."
+            f"{kind} '{tariff_id}': type '{tariff_type}' ist nicht mehr unterstützt "
+            f"— bitte '{replacement}' verwenden."
         )
-    lookup = build_monthly_float_lookup(oemag_rates, reference_cent, raw)
-    return [
-        {"year": year, "month": month, "tariff_cent_kwh": cent}
-        for year, month, cent in lookup
-    ]
 
 
-def migrate_export_monthly_float_in_doc(doc: dict) -> list[str]:
-    """
-    In-place soft migrate: export type monthly_float → monthly_table.
-
-    Existing monthly_rates are kept; otherwise rates are seeded from the
-    shared OeMAG curve × arbeitspreis_kwh_cent (− settlement_fee).
-    Returns migrated tariff ids.
-    """
-    from data.monthly_float_rates import (
-        load_monthly_float_reference_cent,
-        load_oemag_monthly_reference_rates,
-    )
-
+def reject_export_monthly_float_in_doc(doc: dict) -> None:
+    """Reject legacy export type monthly_float (use monthly_table)."""
     exports = doc.get("export_tariffs")
     if not isinstance(exports, list):
-        return []
-    needs_seed = any(
-        isinstance(item, dict)
-        and str(item.get("type", "")).strip().lower() == "monthly_float"
-        and not (
-            isinstance(item.get("monthly_rates"), list) and item.get("monthly_rates")
-        )
-        for item in exports
-    )
-    oemag_rates = None
-    reference_cent = None
-    if needs_seed:
-        oemag_rates = load_oemag_monthly_reference_rates(doc)
-        reference_cent = load_monthly_float_reference_cent(doc)
-    migrated: list[str] = []
+        return
     for index, item in enumerate(exports):
         if not isinstance(item, dict):
             continue
         if str(item.get("type", "")).strip().lower() != "monthly_float":
             continue
         tariff_id = str(item.get("id", "")).strip() or f"index_{index}"
-        rates = item.get("monthly_rates")
-        if not (isinstance(rates, list) and rates):
-            item["monthly_rates"] = _seed_monthly_rates_from_float(
-                item,
-                index,
-                oemag_rates=oemag_rates,
-                reference_cent=reference_cent,
-            )
-        item["type"] = "monthly_table"
-        item.pop("arbeitspreis_kwh_cent", None)
-        migrated.append(tariff_id)
-    return migrated
+        raise ValueError(
+            f"export_tariffs '{tariff_id}': type 'monthly_float' ist nicht mehr "
+            "unterstützt — bitte 'monthly_table' verwenden."
+        )
 
 
-def _migrate_type_aliases(
-    items: list,
-    *,
-    aliases: dict[str, str],
-    kind: str,
-) -> list[str]:
-    migrated: list[str] = []
-    for index, item in enumerate(items):
-        if not isinstance(item, dict):
-            continue
-        tariff_type = str(item.get("type", "")).strip().lower()
-        target = aliases.get(tariff_type)
-        if not target:
-            continue
-        tariff_id = str(item.get("id", "")).strip() or f"{kind}[{index}]"
-        item["type"] = target
-        migrated.append(tariff_id)
-    return migrated
-
-
-def migrate_legacy_spot_types_in_doc(doc: dict) -> list[str]:
-    """In-place soft migrate: awattar/dynamic_epex → spot_hourly."""
-    migrated: list[str] = []
+def reject_legacy_spot_types_in_doc(doc: dict) -> None:
+    """Reject legacy types awattar / dynamic_epex (use spot_hourly)."""
     imports = doc.get("import_tariffs")
     if isinstance(imports, list):
-        migrated.extend(
-            _migrate_type_aliases(
-                imports, aliases=_LEGACY_IMPORT_TYPES, kind="import_tariffs"
-            )
+        _reject_legacy_tariff_types(
+            imports, aliases=_LEGACY_IMPORT_TYPES, kind="import_tariffs"
         )
     exports = doc.get("export_tariffs")
     if isinstance(exports, list):
-        migrated.extend(
-            _migrate_type_aliases(
-                exports, aliases=_LEGACY_EXPORT_TYPES, kind="export_tariffs"
-            )
+        _reject_legacy_tariff_types(
+            exports, aliases=_LEGACY_EXPORT_TYPES, kind="export_tariffs"
         )
-    return migrated
 
 
 def normalize_tariffs_document(doc: dict) -> dict:
@@ -355,8 +298,8 @@ def normalize_tariffs_document(doc: dict) -> dict:
         raise ValueError("import_tariffs muss ein Array sein.")
     if not isinstance(exports_raw, list):
         raise ValueError("export_tariffs muss ein Array sein.")
-    migrate_legacy_spot_types_in_doc(doc)
-    migrate_export_monthly_float_in_doc(doc)
+    reject_legacy_spot_types_in_doc(doc)
+    reject_export_monthly_float_in_doc(doc)
     imports: dict[str, dict] = {}
     for index, item in enumerate(imports_raw):
         spec = _normalize_import_tariff(item, index)

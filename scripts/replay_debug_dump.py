@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Partial replay / validation for unified debug-dump ZIPs (schema v3 + legacy)."""
+"""Partial replay / validation for unified debug-dump ZIPs (schema v3)."""
 from __future__ import annotations
 
 import argparse
@@ -11,9 +11,7 @@ from typing import Any
 import pandas as pd
 
 from runtime_store.debug_dump_archive import (
-    DUMP_TYPE_CHART,
     DUMP_TYPE_DEBUG,
-    DUMP_TYPE_PROD,
     DUMP_TYPES,
     extract_dump_to_dir,
     validate_dump_layout,
@@ -70,16 +68,13 @@ def _replay_chart(root: Path, manifest: dict[str, Any], *, html_out: Path | None
         slot_qualities=slot_qualities,
         battery_params=chart.get("battery_params"),
     )
-    window_path = root / "runtime" / "optimization_history_window.jsonl"
     history_path = root / "runtime" / "optimization_history.jsonl"
     history_entries = _load_jsonl(history_path) if history_path.is_file() else []
-    window_entries = _load_jsonl(window_path) if window_path.is_file() else []
     plotly = chart.get("chart1_plotly")
     print(
         "OK chart replay: "
         f"display_rows={len(display_rows)} "
         f"history_entries={len(history_entries)} "
-        f"history_window_entries={len(window_entries)} "
         f"chart1_plotly={'yes' if plotly else 'no'} "
         f"traces={len(fig.data)}"
     )
@@ -94,9 +89,6 @@ def _meta_from_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     meta = manifest.get("meta")
     if isinstance(meta, dict):
         return meta
-    prod = manifest.get("prod")
-    if isinstance(prod, dict):
-        return prod
     return {}
 
 
@@ -162,10 +154,6 @@ def replay_debug_dump(
     )
     if resolved == DUMP_TYPE_DEBUG:
         return _replay_debug(root, manifest, html_out=html_out)
-    if resolved == DUMP_TYPE_CHART:
-        return _replay_chart(root, manifest, html_out=html_out)
-    if resolved == DUMP_TYPE_PROD:
-        return _replay_history(root, manifest)
     print(f"FAIL: unsupported dump_type {resolved!r}")
     return 1
 
@@ -183,7 +171,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--dump-type",
         choices=DUMP_TYPES,
         default=None,
-        help="Override dump_type from manifest (debug|chart|prod)",
+        help="Override dump_type from manifest (debug)",
     )
     parser.add_argument(
         "--html-out",

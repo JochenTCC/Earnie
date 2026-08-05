@@ -28,7 +28,6 @@ from runtime_store.persist_paths import (
     consumption_profiles_file,
     default_cons_data_file,
     flexible_consumer_profiles_file,
-    legacy_history_csv_file,
     log_file,
     resolve_backtesting_scenarios_json_path,
     resolve_backtesting_scenarios_minimal_template_path,
@@ -257,30 +256,6 @@ def _bootstrap_backtesting_scenarios_json() -> bool:
     )
 
 
-_OEMAG_SHARED_TARIFF_KEYS = (
-    "oemag_monthly_feed_in_rates",
-    "monthly_float_reference_cent_kwh",
-    "econtrol_referenzmarktwert_pv_monthly",
-)
-_OEMAG_DATA_MODEL_V2 = 2
-
-
-def _oemag_rates_template_doc() -> dict:
-    """Source for missing OeMAG keys: tariffs minimal template, else example."""
-    from settings.json_io import read_json_dict
-
-    for path in (
-        resolve_tariffs_minimal_template_path(),
-        resolve_tariffs_template_path(),
-    ):
-        if not os.path.isfile(path):
-            continue
-        doc = read_json_dict(path)
-        if all(key in doc for key in _OEMAG_SHARED_TARIFF_KEYS):
-            return doc
-    return {}
-
-
 def _read_data_model_version(doc: dict) -> int:
     raw = doc.get("earnie_data_model")
     if raw is None:
@@ -289,150 +264,6 @@ def _read_data_model_version(doc: dict) -> int:
         return int(raw)
     except (TypeError, ValueError):
         return 1
-
-
-def _migrate_oemag_data_model_v2() -> list[str]:
-    """
-    Convert earnie_data_model 1 → 2 for tariffs + backtesting_scenarios.
-
-    - Copy OeMAG reference keys from scenarios to tariffs when missing there.
-    - Strip legacy OeMAG keys from scenarios.
-    - Template-fill tariffs if keys are still absent.
-    - Stamp both documents to earnie_data_model=2 when changed or still < 2.
-    """
-    tariffs_path = resolve_tariffs_json_path()
-    if not os.path.isfile(tariffs_path):
-        return []
-    from settings.json_io import read_json_dict, write_json_dict
-
-    scenarios_path = resolve_backtesting_scenarios_json_path()
-    tariffs = read_json_dict(tariffs_path)
-    scenarios: dict | None = None
-    if os.path.isfile(scenarios_path):
-        scenarios = read_json_dict(scenarios_path)
-
-    tariffs_changed = False
-    scenarios_changed = False
-    copied: list[str] = []
-    stripped: list[str] = []
-    filled: list[str] = []
-
-    if scenarios is not None:
-        for key in _OEMAG_SHARED_TARIFF_KEYS:
-            if scenarios.get(key) is None:
-                continue
-            if tariffs.get(key) is None:
-                tariffs[key] = scenarios[key]
-                tariffs_changed = True
-                copied.append(key)
-            if key in scenarios:
-                del scenarios[key]
-                scenarios_changed = True
-                stripped.append(key)
-
-    missing = [key for key in _OEMAG_SHARED_TARIFF_KEYS if tariffs.get(key) is None]
-    if missing:
-        template = _oemag_rates_template_doc()
-        for key in missing:
-            if key in template:
-                tariffs[key] = template[key]
-                tariffs_changed = True
-                filled.append(key)
-
-    if _read_data_model_version(tariffs) < _OEMAG_DATA_MODEL_V2 or tariffs_changed:
-        tariffs["earnie_data_model"] = _OEMAG_DATA_MODEL_V2
-        tariffs_changed = True
-    if scenarios is not None and (
-        _read_data_model_version(scenarios) < _OEMAG_DATA_MODEL_V2 or scenarios_changed
-    ):
-        scenarios["earnie_data_model"] = _OEMAG_DATA_MODEL_V2
-        scenarios_changed = True
-
-    modified: list[str] = []
-    if tariffs_changed:
-        write_json_dict(tariffs_path, tariffs)
-        modified.append(tariffs_path)
-    if scenarios is not None and scenarios_changed:
-        write_json_dict(scenarios_path, scenarios)
-        modified.append(scenarios_path)
-
-    if copied or stripped or filled:
-        logger.info(
-            "bootstrap: OeMAG data-model v2 migration "
-            "(copied=%s, stripped=%s, filled=%s) → %s",
-            ",".join(copied) or "-",
-            ",".join(stripped) or "-",
-            ",".join(filled) or "-",
-            ", ".join(modified),
-        )
-    elif modified:
-        logger.info(
-            "bootstrap: stamped earnie_data_model=2 on %s",
-            ", ".join(modified),
-        )
-    return modified
-
-
-def _migrate_export_monthly_float() -> list[str]:
-    """Persist legacy export monthly_float → monthly_table on live tariffs.json."""
-    tariffs_path = resolve_tariffs_json_path()
-    if not os.path.isfile(tariffs_path):
-        return []
-    from house_config.tariffs_store import migrate_export_monthly_float_in_doc
-    from settings.json_io import read_json_dict, write_json_dict
-
-    tariffs = read_json_dict(tariffs_path)
-    if not isinstance(tariffs, dict):
-        return []
-    migrated = migrate_export_monthly_float_in_doc(tariffs)
-    if not migrated:
-        return []
-    write_json_dict(tariffs_path, tariffs)
-    logger.info(
-        "bootstrap: migrated export monthly_float → monthly_table (%s) → %s",
-        ",".join(migrated),
-        tariffs_path,
-    )
-    return [tariffs_path]
-
-
-def _migrate_config_data_model_v3() -> list[str]:
-    """
-    Rename file_paths_battery_simulation → scenario_explorer_conf and strip
-    path_consumption / path_production on disk config (+ example/minimal).
-    """
-    from runtime_store.data_model import (
-        CURRENT_DATA_MODEL,
-        is_config_document,
-        migrate_config_document_to_v3,
-    )
-    from settings.json_io import read_json_dict, write_json_dict
-
-    candidates = [
-        resolve_config_json_path(),
-        config_path("config.example.json"),
-        config_path("config.minimal.json"),
-    ]
-    modified: list[str] = []
-    for path in candidates:
-        if not os.path.isfile(path):
-            continue
-        doc = read_json_dict(path)
-        if not isinstance(doc, dict) or not is_config_document(doc):
-            continue
-        changed = migrate_config_document_to_v3(doc)
-        if _read_data_model_version(doc) < CURRENT_DATA_MODEL:
-            doc["earnie_data_model"] = CURRENT_DATA_MODEL
-            changed = True
-        if changed:
-            write_json_dict(path, doc)
-            modified.append(path)
-    if modified:
-        logger.info(
-            "bootstrap: config data-model v3 migration (rename/strip) → %s",
-            ", ".join(modified),
-        )
-    return modified
 
 
 def _pack_json_stamp_candidates() -> list[str]:
@@ -466,8 +297,7 @@ def _stamp_pack_jsons_to_current_data_model() -> list[str]:
     """
     Persist CURRENT_DATA_MODEL on pack/sidecar JSONs still tagged older (or missing).
 
-    Complements the OeMAG structural migration: other files need only a version stamp
-    so schemas with const=CURRENT stay valid.
+    Ensures schemas with const=CURRENT stay valid for local/example files.
     """
     from runtime_store.data_model import CURRENT_DATA_MODEL
     from settings.json_io import read_json_dict, write_json_dict
@@ -678,15 +508,6 @@ def _bootstrap_dotenv() -> bool:
     canonical = resolve_dotenv_path()
     if not _is_missing_file(canonical):
         return False
-    if os.path.isfile(_LEGACY_DOTENV) and canonical != _LEGACY_DOTENV:
-        _ensure_parent_dir(canonical)
-        shutil.copyfile(_LEGACY_DOTENV, canonical)
-        logger.info(
-            "bootstrap: %s aus Legacy %s migriert – bitte Loxone-Zugangsdaten prüfen.",
-            canonical,
-            _LEGACY_DOTENV,
-        )
-        return True
     template_path = resolve_dotenv_template_path()
     return _copy_template_if_missing(
         canonical,
@@ -720,12 +541,6 @@ def run() -> None:
         created.append(config_path("tariffs.schema.json"))
     if _bootstrap_tariffs_json():
         created.append(resolve_tariffs_json_path())
-    for path in _migrate_oemag_data_model_v2():
-        created.append(path)
-    for path in _migrate_export_monthly_float():
-        created.append(path)
-    for path in _migrate_config_data_model_v3():
-        created.append(path)
     if _bootstrap_house_profiles_example():
         created.append(config_path("house_profiles.example.json"))
     if _bootstrap_house_profiles_schema():
@@ -760,7 +575,6 @@ def run() -> None:
         consumption_profiles_file,
         total_consumption_profiles_file,
         flexible_consumer_profiles_file,
-        legacy_history_csv_file,
     ):
         if _bootstrap_empty_csv(path_fn()):
             created.append(path_fn())

@@ -29,17 +29,14 @@ def test_ehal_mapping_to_loxone_blocks():
     }
 
 
-def test_ehal_mapping_dual_read_legacy_keys():
+def test_ehal_mapping_ignores_removed_unprefixed_keys():
     blocks = ehal_mapping_to_loxone_blocks(
         {
             "ess_soc": "Batterie_SoC",
             "grid_power_active": "Netz",
         }
     )
-    assert blocks == {
-        "soc_name": "Batterie_SoC",
-        "grid_power_name": "Netz",
-    }
+    assert blocks == {}
 
 
 def test_merge_preserves_unrelated_keys():

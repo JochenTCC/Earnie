@@ -60,7 +60,7 @@ def load_consumer_series(consumer: dict) -> pd.Series:
     is_binary = log_signal == "binary"
     nominal = float(consumer.get("nominal_power_kw", 1.6))
     return load_and_resample_csv(
-        consumer.get("path_historical_log") or consumer.get("path_log", ""),
+        consumer.get("path_historical_log", ""),
         is_wp=is_binary,
         wp_power=nominal,
     )

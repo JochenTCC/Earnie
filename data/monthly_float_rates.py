@@ -5,7 +5,6 @@ from data.feed_in_prices import validate_fixed_monthly_feed_in_rates
 
 MIN_OEMAG_MONTHS = 12
 # Backwards-compatible alias (tests / callers may still import the old name).
-REQUIRED_OEMAG_MONTHS = MIN_OEMAG_MONTHS
 MIN_REFMARKT_MONTHS = 12
 
 

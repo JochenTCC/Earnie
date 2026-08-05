@@ -1,4 +1,4 @@
-"""Resolve Merker addresses from ``ehal_bindings`` (legacy nests stripped after migrate)."""
+"""Resolve Merker addresses from ``ehal_bindings`` (§C / Pattern B keys only)."""
 from __future__ import annotations
 
 
@@ -15,34 +15,12 @@ def ehal_bindings(consumer: dict) -> dict:
     return bindings if isinstance(bindings, dict) else {}
 
 
-def charging_loxone(consumer: dict) -> dict:
-    """Deprecated nest accessor; prefer ``ehal_bindings`` (kept for transitional tests)."""
-    sched = consumer.get("charging_schedule") or {}
-    return sched.get("loxone") or {}
+def resolve_lox_marker(consumer: dict, ehal_field: str) -> str:
+    return _first_nonempty(ehal_bindings(consumer).get(ehal_field))
 
 
-def loxone_outputs(consumer: dict) -> dict:
-    """Deprecated nest accessor; prefer ``ehal_bindings``."""
-    return consumer.get("loxone_outputs") or {}
-
-
-def resolve_lox_marker(consumer: dict, ehal_field: str, *, legacy: str = "") -> str:
-    """Prefer ``ehal_bindings``; optional legacy charging nest only if still present."""
-    lox = charging_loxone(consumer)
-    return _first_nonempty(
-        ehal_bindings(consumer).get(ehal_field),
-        lox.get(ehal_field) if legacy else "",
-        lox.get(legacy) if legacy else "",
-    )
-
-
-def resolve_output_marker(consumer: dict, ehal_field: str, *, legacy: str = "") -> str:
-    outputs = loxone_outputs(consumer)
-    return _first_nonempty(
-        ehal_bindings(consumer).get(ehal_field),
-        outputs.get(ehal_field) if legacy else "",
-        outputs.get(legacy) if legacy else "",
-    )
+def resolve_output_marker(consumer: dict, ehal_field: str) -> str:
+    return _first_nonempty(ehal_bindings(consumer).get(ehal_field))
 
 
 def marker_flex_power(consumer: dict) -> str:
@@ -50,12 +28,9 @@ def marker_flex_power(consumer: dict) -> str:
     from ehal.flex_fields import KIND_SENS_POWER_ACT, binding_address
 
     cid = str(consumer.get("id") or "").strip()
-    return _first_nonempty(
-        binding_address(ehal_bindings(consumer), cid, KIND_SENS_POWER_ACT)
-        if cid
-        else "",
-        ehal_bindings(consumer).get("flex.power_name"),
-    )
+    if not cid:
+        return ""
+    return binding_address(ehal_bindings(consumer), cid, KIND_SENS_POWER_ACT)
 
 
 def marker_sens_evcs_active_power(consumer: dict) -> str:
@@ -75,10 +50,9 @@ def marker_flex_enable(consumer: dict) -> str:
     from ehal.flex_fields import KIND_SET_ENABLE, binding_address
 
     cid = str(consumer.get("id") or "").strip()
-    return _first_nonempty(
-        binding_address(ehal_bindings(consumer), cid, KIND_SET_ENABLE) if cid else "",
-        ehal_bindings(consumer).get("flex.enable_name"),
-    )
+    if not cid:
+        return ""
+    return binding_address(ehal_bindings(consumer), cid, KIND_SET_ENABLE)
 
 
 def marker_flex_power_setpoint(consumer: dict) -> str:
@@ -86,87 +60,52 @@ def marker_flex_power_setpoint(consumer: dict) -> str:
     from ehal.flex_fields import KIND_SET_POWER_SETPOINT, binding_address
 
     cid = str(consumer.get("id") or "").strip()
-    return _first_nonempty(
-        binding_address(ehal_bindings(consumer), cid, KIND_SET_POWER_SETPOINT)
-        if cid
-        else "",
-        ehal_bindings(consumer).get("flex.power_setpoint_name"),
-    )
+    if not cid:
+        return ""
+    return binding_address(ehal_bindings(consumer), cid, KIND_SET_POWER_SETPOINT)
 
 
 def marker_sens_evcs_connected(consumer: dict) -> str:
-    return resolve_lox_marker(
-        consumer, "sens_evcs_connected", legacy="plugged_in_name"
-    )
+    return resolve_lox_marker(consumer, "sens_evcs_connected")
 
 
 def marker_sens_evcs_soc_act(consumer: dict) -> str:
-    return resolve_lox_marker(
-        consumer, "sens_evcs_soc_act", legacy="actual_soc_name"
-    )
+    return resolve_lox_marker(consumer, "sens_evcs_soc_act")
 
 
 def marker_sens_evcs_bat_capacity(consumer: dict) -> str:
-    return resolve_lox_marker(
-        consumer, "sens_evcs_bat_capacity", legacy="battery_capacity_kwh_name"
-    )
+    return resolve_lox_marker(consumer, "sens_evcs_bat_capacity")
 
 
 def marker_get_evcs_nominal_current(consumer: dict) -> str:
-    lox = charging_loxone(consumer)
     return _first_nonempty(
         ehal_bindings(consumer).get("get_evcs_nominal_current"),
         ehal_bindings(consumer).get("sens_evcs_nominal_current"),
-        lox.get("get_evcs_nominal_current"),
-        lox.get("sens_evcs_nominal_current"),
-        lox.get("nominal_power_kw_name"),
     )
 
 
 def marker_get_evcs_ready_by_time(consumer: dict) -> str:
-    return resolve_lox_marker(
-        consumer, "get_evcs_ready_by_time", legacy="ready_by_time_name"
-    )
+    return resolve_lox_marker(consumer, "get_evcs_ready_by_time")
 
 
 def marker_set_evcs_max_current(consumer: dict) -> str:
-    outputs = loxone_outputs(consumer)
     return _first_nonempty(
         ehal_bindings(consumer).get("set_evcs_max_current"),
         ehal_bindings(consumer).get("set_evcs_current"),
-        outputs.get("set_evcs_max_current"),
-        outputs.get("set_evcs_current"),
-        outputs.get("power_setpoint_name"),
-    )
-
-
-def marker_pv_follow(consumer: dict) -> str:
-    return _first_nonempty(
-        ehal_bindings(consumer).get("pv_follow_name"),
-        loxone_outputs(consumer).get("pv_follow_name"),
     )
 
 
 def marker_charge_immediate(consumer: dict) -> str:
-    return _first_nonempty(
-        ehal_bindings(consumer).get("charge_immediate_name"),
-        charging_loxone(consumer).get("charge_immediate_name"),
-    )
+    """Read-only Nutzerwunsch ``Sofort laden`` sensor (never a write role)."""
+    return resolve_lox_marker(consumer, "charge_immediate_name")
 
 
 def marker_set_evcs_mode(consumer: dict) -> str:
-    return _first_nonempty(
-        ehal_bindings(consumer).get("set_evcs_mode"),
-        loxone_outputs(consumer).get("set_evcs_mode"),
-        charging_loxone(consumer).get("set_evcs_mode"),
-    )
+    return resolve_output_marker(consumer, "set_evcs_mode")
 
 
 def marker_get_evcs_limit_soc(consumer: dict) -> str:
-    return _first_nonempty(
-        ehal_bindings(consumer).get("get_evcs_limit_soc"),
-        charging_loxone(consumer).get("get_evcs_limit_soc"),
-    )
+    return resolve_lox_marker(consumer, "get_evcs_limit_soc")
 
 
 def marker_get_filter_native_start_hour(consumer: dict) -> str:

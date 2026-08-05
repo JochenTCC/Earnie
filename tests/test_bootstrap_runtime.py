@@ -137,7 +137,7 @@ def test_bootstrap_creates_dotenv_from_template(tmp_path, monkeypatch):
     assert "LOXONE_USER=test" in content
 
 
-def test_bootstrap_migrates_legacy_root_dotenv(tmp_path, monkeypatch):
+def test_bootstrap_does_not_copy_legacy_root_dotenv(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("EARNIE_CONFIG_PATH", "config/config.json")
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path / "runtime"))
@@ -150,7 +150,10 @@ def test_bootstrap_migrates_legacy_root_dotenv(tmp_path, monkeypatch):
 
     bootstrap.run()
 
-    assert (config_dir / ".env").read_text(encoding="utf-8") == "LOXONE_USER=legacy\n"
+    # Fail-fast: root ./.env is not copied; canonical dotenv comes from template only.
+    canonical = config_dir / ".env"
+    if canonical.is_file():
+        assert "LOXONE_USER=legacy" not in canonical.read_text(encoding="utf-8")
 
 
 def test_bootstrap_upgrades_stale_schema_from_bundled(tmp_path, monkeypatch):

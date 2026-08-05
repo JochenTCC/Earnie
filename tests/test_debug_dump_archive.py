@@ -15,9 +15,7 @@ import config
 from runtime_store.chart_debug_capture import write_capture_zip
 from runtime_store.debug_dump_archive import (
     DUMP_SCHEMA_VERSION,
-    DUMP_TYPE_CHART,
     DUMP_TYPE_DEBUG,
-    DUMP_TYPE_PROD,
     normalize_manifest,
     validate_dump_layout,
     write_debug_dump_zip,
@@ -234,7 +232,7 @@ def test_write_debug_dump_zip_with_chart(tmp_path, monkeypatch):
         assert manifest["chart"]["display_rows"]
 
 
-def test_normalize_manifest_v1_chart():
+def test_normalize_manifest_rejects_v1_chart():
     raw = {
         "schema_version": 1,
         "captured_at": "2026-07-05T23:00:00",
@@ -242,34 +240,45 @@ def test_normalize_manifest_v1_chart():
         "display_rows": [{"Simulierter SoC (%)": 20.5}],
         "chart_context": {"now": "x"},
     }
-    normalized = normalize_manifest(raw)
-    assert normalized["dump_type"] == DUMP_TYPE_CHART
-    assert normalized["chart"]["live_soc_percent"] == 20.5
-    assert normalized["chart"]["display_rows"]
+    try:
+        normalize_manifest(raw)
+        raised = False
+    except ValueError as exc:
+        raised = True
+        assert "Unsupported dump manifest" in str(exc)
+    assert raised
 
 
-def test_validate_legacy_chart_layout(tmp_path):
-    root = tmp_path / "legacy_chart"
-    (root / "runtime").mkdir(parents=True)
-    (root / "runtime" / "optimization_history_window.jsonl").write_text(
-        "\n", encoding="utf-8"
-    )
-    (root / "manifest.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 2,
-                "dump_type": DUMP_TYPE_CHART,
-                "chart": {"display_rows": [{"Simulierter SoC (%)": 1.0}]},
-            }
-        ),
-        encoding="utf-8",
-    )
-    manifest = validate_dump_layout(root, dump_type=DUMP_TYPE_CHART)
-    assert manifest["dump_type"] == DUMP_TYPE_CHART
+def test_normalize_manifest_rejects_v2_chart():
+    raw = {
+        "schema_version": 2,
+        "dump_type": "chart",
+        "chart": {"display_rows": [{"Simulierter SoC (%)": 1.0}]},
+    }
+    try:
+        normalize_manifest(raw)
+        raised = False
+    except ValueError:
+        raised = True
+    assert raised
 
 
-def test_validate_legacy_prod_layout(tmp_path):
-    root = tmp_path / "legacy_prod"
+def test_normalize_manifest_rejects_v2_prod():
+    raw = {
+        "schema_version": 2,
+        "dump_type": "prod",
+        "prod": {"title": "t", "symptom": "s", "case_id": ""},
+    }
+    try:
+        normalize_manifest(raw)
+        raised = False
+    except ValueError:
+        raised = True
+    assert raised
+
+
+def test_validate_debug_layout(tmp_path):
+    root = tmp_path / "debug"
     (root / "runtime").mkdir(parents=True)
     (root / "runtime" / "optimization_history.jsonl").write_text(
         '{"written_at":"2026-07-16T08:00:00"}\n',
@@ -278,15 +287,15 @@ def test_validate_legacy_prod_layout(tmp_path):
     (root / "manifest.json").write_text(
         json.dumps(
             {
-                "schema_version": 2,
-                "dump_type": DUMP_TYPE_PROD,
-                "prod": {"title": "t", "symptom": "s", "case_id": ""},
+                "schema_version": DUMP_SCHEMA_VERSION,
+                "dump_type": DUMP_TYPE_DEBUG,
+                "meta": {"title": "t", "symptom": "s", "case_id": ""},
             }
         ),
         encoding="utf-8",
     )
-    manifest = validate_dump_layout(root, dump_type=DUMP_TYPE_PROD)
-    assert manifest["dump_type"] == DUMP_TYPE_PROD
+    manifest = validate_dump_layout(root, dump_type=DUMP_TYPE_DEBUG)
+    assert manifest["dump_type"] == DUMP_TYPE_DEBUG
 
 
 def test_replay_debug_dump_with_chart(tmp_path, monkeypatch):
@@ -319,7 +328,7 @@ def test_replay_debug_dump_history_only(tmp_path, monkeypatch):
     assert rc == 0
 
 
-def test_replay_legacy_prod_dump(tmp_path):
+def test_replay_rejects_legacy_prod_dump(tmp_path):
     root = tmp_path / "legacy_prod_zip"
     (root / "runtime").mkdir(parents=True)
     (root / "runtime" / "optimization_history.jsonl").write_text(
@@ -330,14 +339,19 @@ def test_replay_legacy_prod_dump(tmp_path):
         json.dumps(
             {
                 "schema_version": 2,
-                "dump_type": DUMP_TYPE_PROD,
+                "dump_type": "prod",
                 "prod": {"title": "legacy", "symptom": "old", "case_id": ""},
             }
         ),
         encoding="utf-8",
     )
-    rc = replay_debug_dump(root)
-    assert rc == 0
+    try:
+        replay_debug_dump(root)
+        raised = False
+    except ValueError as exc:
+        raised = True
+        assert "Unsupported dump manifest" in str(exc)
+    assert raised
 
 
 def test_archive_prod_dump_from_unified_zip(tmp_path, monkeypatch):

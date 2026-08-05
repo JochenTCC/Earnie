@@ -135,22 +135,7 @@ def binding_address(
     consumer_id: str,
     kind: str,
 ) -> str:
-    """Prefer Pattern B key, then legacy / role stubs."""
+    """Address for this consumer's Pattern B key ``flex.{slug}.{kind}`` only."""
     if not isinstance(bindings, dict):
         return ""
-    primary = flex_field(consumer_id, kind)
-    value = str(bindings.get(primary) or "").strip()
-    if value:
-        return value
-    for role, role_kind in _ROLE_TO_KIND.items():
-        if role_kind != kind:
-            continue
-        value = str(bindings.get(role) or "").strip()
-        if value:
-            return value
-    for key, raw in bindings.items():
-        if flex_field_kind(str(key)) == kind:
-            value = str(raw or "").strip()
-            if value:
-                return value
-    return ""
+    return str(bindings.get(flex_field(consumer_id, kind)) or "").strip()

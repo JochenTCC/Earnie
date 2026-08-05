@@ -1,71 +1,71 @@
 {
   "role_id": "pool",
   "label": "Pool / SwimSpa (Stub)",
-  "baustein_notes": "Greenfield Earnie_Pool_* / Earnie_Pool_Filter_*. Maps from SwimSpa heat+filter entities. Prefer EFM Load for Earnie_Pool_P_act. Aussentemperatur is plant Earnie_Aussentemperatur.",
+  "baustein_notes": "Greenfield Earnie_Pool_* / Earnie_Pool_Filter_*. Prefer EFM Load for Earnie_Pool_P_act. Aussentemperatur is plant Earnie_Aussentemperatur.",
   "recommended_markers": [
     {
       "ehal_field": "flex.sens_power_act",
-      "loxone_blocks_key": "loxone_inputs.power_name",
+      "loxone_blocks_key": "ehal_bindings.flex.{id}.sens_power_act",
       "suggested_name": "Earnie_Pool_P_act",
-      "notes": "Total draw Fall B; legacy Earnie_Swim-Spa-P_act."
+      "notes": "Total draw Fall B."
     },
     {
       "ehal_field": "flex.set_enable",
-      "loxone_blocks_key": "loxone_outputs.enable_name",
+      "loxone_blocks_key": "ehal_bindings.flex.{id}.set_enable",
       "suggested_name": "Earnie_Pool_Freigabe",
-      "notes": "Heat Freigabe; legacy Earnie_SwimSpa_Freigabe."
+      "notes": "Heat Freigabe."
     },
     {
       "ehal_field": "sens_temperature_water",
-      "loxone_blocks_key": "thermal_control.loxone.actual_temp_name",
+      "loxone_blocks_key": "ehal_bindings.sens_temperature_water",
       "suggested_name": "Earnie_Pool_Temp_Ist",
       "notes": "Pool water Ist-Temperatur."
     },
     {
       "ehal_field": "get_temperature_water_setpoint",
-      "loxone_blocks_key": "thermal_control.loxone.setpoint_temp_name",
+      "loxone_blocks_key": "ehal_bindings.get_temperature_water_setpoint",
       "suggested_name": "Earnie_Pool_Temp_Soll",
       "notes": "Pool Soll-Temperatur."
     },
     {
       "ehal_field": "get_temperature_tolerance_c",
-      "loxone_blocks_key": "thermal_control.loxone.tolerance_c_name",
+      "loxone_blocks_key": "ehal_bindings.get_temperature_tolerance_c",
       "suggested_name": "Earnie_Pool_Temp_Toleranz",
       "notes": "Thermal band tolerance."
     },
     {
       "ehal_field": "sens_heating_active",
-      "loxone_blocks_key": "thermal_control.loxone.heating_active_name",
+      "loxone_blocks_key": "ehal_bindings.sens_heating_active",
       "suggested_name": "Earnie_Pool_Heizung_aktiv",
       "notes": "Binary heater on."
     },
     {
       "ehal_field": "get_filter_remaining_hours",
-      "loxone_blocks_key": "loxone_target_hours_name",
+      "loxone_blocks_key": "ehal_bindings.get_filter_remaining_hours",
       "suggested_name": "Earnie_Pool_Filter_Sollstunden",
       "notes": "Filter remaining hours on filter entity."
     },
     {
       "ehal_field": "flex.set_enable",
-      "loxone_blocks_key": "loxone_outputs.enable_name",
+      "loxone_blocks_key": "ehal_bindings.flex.{id}.set_enable",
       "suggested_name": "Earnie_Pool_Filter_Freigabe",
       "notes": "Filter Freigabe on filter entity."
     },
     {
       "ehal_field": "sens_filter_active",
-      "loxone_blocks_key": "loxone_inputs.alternate_binary_power_name",
+      "loxone_blocks_key": "ehal_bindings.sens_filter_active",
       "suggested_name": "Earnie_Pool_Filter_aktiv",
       "notes": "Binary filter running."
     },
     {
       "ehal_field": "get_filter_native_start_hour",
-      "loxone_blocks_key": "filter_schedule.loxone.native_start_hour_name",
+      "loxone_blocks_key": "ehal_bindings.get_filter_native_start_hour",
       "suggested_name": "Earnie_Pool_Filter_NativeStart",
       "notes": "Native filter window start hour."
     },
     {
       "ehal_field": "get_filter_native_duration_hours",
-      "loxone_blocks_key": "filter_schedule.loxone.native_duration_hours_name",
+      "loxone_blocks_key": "ehal_bindings.get_filter_native_duration_hours",
       "suggested_name": "Earnie_Pool_Filter_NativeDauer",
       "notes": "Native filter window duration hours."
     }

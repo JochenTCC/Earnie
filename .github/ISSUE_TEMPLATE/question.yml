@@ -1,0 +1,22 @@
+name: Question / support
+description: Frage zur Nutzung oder kurze Support-Anfrage (öffentlich)
+title: "[Question]: "
+labels: ["question", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GitHub Issues sind **öffentlich**. Für Registry-Fingerprints, Zugangsdaten
+        oder Config-/Debug-ZIPs bitte `support@earnie-hems.com` nutzen — nicht hier pasten.
+  - type: textarea
+    id: question
+    attributes:
+      label: Frage
+      description: Wobei brauchen Sie Hilfe?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: Bereits versucht (optional)
+      description: Docs, Handbuch-Abschnitte, Schritte

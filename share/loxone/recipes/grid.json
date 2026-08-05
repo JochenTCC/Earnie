@@ -5,7 +5,7 @@
   "recommended_markers": [
     {
       "ehal_field": "sens_grid_power_active",
-      "loxone_blocks_key": "grid_power_name",
+      "loxone_blocks_key": "plant.ehal_bindings.sens_grid_power_active",
       "suggested_name": "Earnie_Netzleistung",
       "notes": "kW; + = Bezug. Maps to EHAL sens_grid_power_active (W)."
     }

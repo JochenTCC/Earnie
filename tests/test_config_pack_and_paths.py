@@ -94,12 +94,16 @@ def test_config_prefixed_uploads_co_located(monkeypatch, tmp_path: Path) -> None
     assert Path(resolve_uploads_dir()).resolve() == uploads.resolve()
 
 
-def test_ensure_compatible_upgrades_v1_to_current() -> None:
-    doc_v1 = {DATA_MODEL_KEY: 1}
-    assert ensure_compatible(doc_v1, label="x.json") == CURRENT_DATA_MODEL
-    assert doc_v1[DATA_MODEL_KEY] == CURRENT_DATA_MODEL
-    doc_v2 = {DATA_MODEL_KEY: CURRENT_DATA_MODEL}
-    assert ensure_compatible(doc_v2, label="x.json") == CURRENT_DATA_MODEL
+def test_ensure_compatible_rejects_v1() -> None:
+    with pytest.raises(DataModelError, match="nicht kompatibel"):
+        ensure_compatible({DATA_MODEL_KEY: 1}, label="x.json")
+    doc_v3 = {DATA_MODEL_KEY: CURRENT_DATA_MODEL}
+    assert ensure_compatible(doc_v3, label="x.json") == CURRENT_DATA_MODEL
+
+
+def test_ensure_compatible_rejects_missing_tag() -> None:
+    with pytest.raises(DataModelError, match="fehlt"):
+        ensure_compatible({"live_scenario_id": "live"}, label="config.json")
 
 
 def test_ensure_compatible_rejects_unknown_version() -> None:
@@ -116,12 +120,27 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
     cfg.mkdir(parents=True)
     (tmp_path / "earnie_env" / "runtime").mkdir(parents=True)
     docs = {
-        "config.json": {DATA_MODEL_KEY: 1, "live_scenario_id": "live"},
-        "backtesting_scenarios.json": {DATA_MODEL_KEY: 1, "scenarios": []},
-        "components.json": {DATA_MODEL_KEY: 1, "batteries": [], "pv_systems": []},
-        "deviation_rules.json": {DATA_MODEL_KEY: 1, "version": 1, "rules": []},
-        "house_profiles.json": {DATA_MODEL_KEY: 1, "profiles": []},
-        "tariffs.json": {DATA_MODEL_KEY: 1, "import_tariffs": [], "export_tariffs": []},
+        "config.json": {DATA_MODEL_KEY: CURRENT_DATA_MODEL, "live_scenario_id": "live"},
+        "backtesting_scenarios.json": {
+            DATA_MODEL_KEY: CURRENT_DATA_MODEL,
+            "scenarios": [],
+        },
+        "components.json": {
+            DATA_MODEL_KEY: CURRENT_DATA_MODEL,
+            "batteries": [],
+            "pv_systems": [],
+        },
+        "deviation_rules.json": {
+            DATA_MODEL_KEY: CURRENT_DATA_MODEL,
+            "version": 1,
+            "rules": [],
+        },
+        "house_profiles.json": {DATA_MODEL_KEY: CURRENT_DATA_MODEL, "profiles": []},
+        "tariffs.json": {
+            DATA_MODEL_KEY: CURRENT_DATA_MODEL,
+            "import_tariffs": [],
+            "export_tariffs": [],
+        },
     }
     for name, doc in docs.items():
         (cfg / name).write_text(json.dumps(doc), encoding="utf-8")
@@ -157,7 +176,7 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
     assert (other / "uploads" / "sample.csv").is_file()
 
 
-def test_config_pack_accepts_v1_manifest(monkeypatch, tmp_path: Path) -> None:
+def test_config_pack_rejects_v1_manifest(monkeypatch, tmp_path: Path) -> None:
     import io
 
     monkeypatch.chdir(tmp_path)
@@ -175,11 +194,8 @@ def test_config_pack_accepts_v1_manifest(monkeypatch, tmp_path: Path) -> None:
             "config.json",
             json.dumps({DATA_MODEL_KEY: 1, "live_scenario_id": "live"}),
         )
-    written = import_config_pack_bytes(buf.getvalue())
-    assert "config.json" in written
-    loaded = json.loads((cfg / "config.json").read_text(encoding="utf-8"))
-    assert loaded[DATA_MODEL_KEY] == CURRENT_DATA_MODEL
-    assert loaded["live_scenario_id"] == "live"
+    with pytest.raises(DataModelError, match="nicht kompatibel"):
+        import_config_pack_bytes(buf.getvalue())
 
 
 def test_config_pack_rejects_bad_model(monkeypatch, tmp_path: Path) -> None:

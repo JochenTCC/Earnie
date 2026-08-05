@@ -198,7 +198,7 @@ def test_planning_ready_unlocks_scenario_explorer(tmp_path, monkeypatch):
                     "label": "Live",
                     "settings": {
                         "battery_id": "bat",
-                        "pv_system_id": "",
+                        "pv_system_ids": [],
                         "house_profile_id": "efh",
                         "import_tariff_id": "imp",
                         "export_tariff_id": "exp",
@@ -266,7 +266,7 @@ def test_loxone_sidebar_deferred_after_planning_unlock(tmp_path, monkeypatch):
                     "label": "Live",
                     "settings": {
                         "battery_id": "bat",
-                        "pv_system_id": "",
+                        "pv_system_ids": [],
                         "house_profile_id": "efh",
                         "import_tariff_id": "imp",
                         "export_tariff_id": "exp",

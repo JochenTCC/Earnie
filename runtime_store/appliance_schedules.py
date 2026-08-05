@@ -80,20 +80,8 @@ def load_schedules() -> dict[str, dict[str, Any]]:
     return _remap_schedule_keys(raw)
 
 
-def _canonical_appliance_id(appliance_id: str) -> str:
-    for appliance in config.get_appliances():
-        canonical = str(appliance["id"])
-        legacy = str(appliance.get("legacy_id", "")).strip()
-        if appliance_id == canonical or (legacy and appliance_id == legacy):
-            return canonical
-    return str(appliance_id)
-
-
 def _remap_schedule_keys(schedules: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    remapped: dict[str, dict[str, Any]] = {}
-    for key, entry in schedules.items():
-        remapped[_canonical_appliance_id(key)] = entry
-    return remapped
+    return {str(key): entry for key, entry in schedules.items()}
 
 
 def save_schedule(
@@ -116,17 +104,17 @@ def save_schedule(
         "expires_at": expires.isoformat(timespec="seconds"),
     }
     schedules = load_schedules()
-    schedules[str(_canonical_appliance_id(appliance_id))] = entry
+    schedules[str(appliance_id)] = entry
     _save_json(_schedules_path(), schedules)
     return entry
 
 
 def remove_schedule(appliance_id: str) -> None:
     schedules = load_schedules()
-    canonical = _canonical_appliance_id(appliance_id)
-    if canonical not in schedules:
+    key = str(appliance_id)
+    if key not in schedules:
         return
-    schedules.pop(canonical, None)
+    schedules.pop(key, None)
     _save_json(_schedules_path(), schedules)
 
 
@@ -151,4 +139,4 @@ def purge_expired(now: datetime | None = None) -> dict[str, dict[str, Any]]:
 
 def active_schedule_for(appliance_id: str) -> dict[str, Any] | None:
     schedules = purge_expired()
-    return schedules.get(_canonical_appliance_id(appliance_id))
+    return schedules.get(str(appliance_id))

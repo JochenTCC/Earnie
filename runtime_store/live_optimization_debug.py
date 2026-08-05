@@ -24,7 +24,6 @@ from runtime_store.persist_paths import runtime_path
 
 DEBUG_LIVE_FILENAME = "live_optimization_debug.json"
 DEBUG_HISTORICAL_FILENAME = "historical_optimization_debug.json"
-LEGACY_DEBUG_PATH = "live_optimization_debug.json"
 
 _MAIN_RUN_KEYS = (
     "completed_at",
@@ -51,10 +50,7 @@ def _debug_file(kind: str) -> str:
 
 
 def _candidate_paths(kind: str) -> list[str]:
-    primary = _debug_file(kind)
-    if kind == "live":
-        return [primary, LEGACY_DEBUG_PATH]
-    return [primary]
+    return [_debug_file(kind)]
 
 
 def _ensure_parent_dir(path: str) -> None:

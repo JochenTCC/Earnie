@@ -41,9 +41,8 @@ x-persist-volumes: &persist-volumes
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  EARNIE_CONFIG_PATH: config
-  # Volume is ./earnie_env/runtime:/app/runtime — must match writers (not baked earnie_env/runtime).
-  EARNIE_RUNTIME_PATH: runtime
+  # Volumes mount host …/{config,runtime} → /app/{config,runtime}; ENV_PATH=. derives both (not baked earnie_env/).
+  EARNIE_ENV_PATH: .
   EARNIE_STRICT_TARIFF_VALIDATE: "1"
   # Loxone-Smoke-Test beim main.py-Start (nach pull/up); siehe scripts/startup_checks.py
   EARNIE_VERIFY_LOXONE_ON_START: "1"
@@ -58,7 +57,7 @@ services:
       --
       --server.enableCORS false
       --server.enableXsrfProtection false
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "8501:8501"
       - "8541:8541"

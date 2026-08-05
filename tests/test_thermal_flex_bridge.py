@@ -21,7 +21,6 @@ from optimizer.thermal_flex_context import (
 def _wp_consumer() -> dict:
     return {
         "id": "wp_heating",
-        "legacy_id": "waermepumpe",
         "label": "Wärmepumpe",
         "type": "thermal_annual",
         "nominal_power_kw": 1.6,
@@ -57,7 +56,7 @@ def test_planning_thermal_to_milp_bridge():
     milp = planning_thermal_to_milp(_wp_consumer())
     assert milp["id"] == "wp_heating"
     assert milp["name"] == "Haus Wärme"
-    assert milp["legacy_id"] == "waermepumpe"
+    assert "legacy_id" not in milp
     assert milp["daily_target_source"] == "thermal_annual"
     assert milp["signal_type"] == "binary"
     assert milp["min_on_quarterhours"] == 4

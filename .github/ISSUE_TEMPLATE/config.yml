@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Earnie Website
+    url: https://earnie-hems.com
+    about: Produktübersicht und weitere Informationen.
+  - name: Benutzer-Handbuch
+    url: https://github.com/JochenTCC/Earnie/blob/main/docs/user-manual/Benutzer-Handbuch-Earnie.md
+    about: Einrichtung, Betrieb und Support-Hinweise in der Anwender-Doku.
+  - name: Privater Support (Registry / vertraulich)
+    url: mailto:support@earnie-hems.com
+    about: Hardware-Registry, Geheimnisse und Dumps — nicht in öffentliche Issues pasten.

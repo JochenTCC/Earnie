@@ -1,10 +1,10 @@
 """Earnie config data-model versioning for save/load packs."""
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 CURRENT_DATA_MODEL = 3
-COMPATIBLE_DATA_MODELS: frozenset[int] = frozenset({1, 2, 3})
+COMPATIBLE_DATA_MODELS: frozenset[int] = frozenset({3})
 
 DATA_MODEL_KEY = "earnie_data_model"
 
@@ -42,63 +42,43 @@ def is_config_document(doc: dict[str, Any]) -> bool:
     return "live_scenario_id" in doc
 
 
-def migrate_config_document_to_v3(doc: dict[str, Any]) -> bool:
-    """
-    In-place v2→v3 structural fixes for config.json.
-
-    - Rename ``file_paths_battery_simulation`` → ``scenario_explorer_conf``
-    - Drop ``path_consumption`` / ``path_production`` inside that block
-
-    Returns True if the document was mutated.
-    """
-    changed = False
+def reject_legacy_config_structure(doc: dict[str, Any], *, label: str) -> None:
+    """Reject pre-v3 config keys (no soft rename/strip)."""
     if _LEGACY_SIM_BLOCK in doc:
-        legacy = doc.pop(_LEGACY_SIM_BLOCK)
-        if _SIM_BLOCK not in doc and isinstance(legacy, dict):
-            doc[_SIM_BLOCK] = legacy
-        changed = True
+        raise DataModelError(
+            f"{label}: '{_LEGACY_SIM_BLOCK}' ist nicht mehr unterstützt — "
+            f"bitte '{_SIM_BLOCK}' verwenden (earnie_data_model={CURRENT_DATA_MODEL})."
+        )
     block = doc.get(_SIM_BLOCK)
     if isinstance(block, dict):
         for key in _REMOVED_PATH_KEYS:
             if key in block:
-                del block[key]
-                changed = True
-    return changed
-
-
-# Future: map from unsupported source version → callable that mutates in place.
-_CONVERTERS: dict[int, Callable[[dict[str, Any]], None]] = {}
+                raise DataModelError(
+                    f"{label}: '{_SIM_BLOCK}.{key}' ist entfernt — "
+                    f"bitte aus der Konfiguration löschen "
+                    f"(earnie_data_model={CURRENT_DATA_MODEL})."
+                )
 
 
 def ensure_compatible(doc: dict[str, Any], *, label: str) -> int:
     """
-    Validate / convert a document to a compatible data-model version.
+    Validate a document against the current data-model version.
 
-    Missing tag is treated as version 1 (legacy files before tagging).
-    Older compatible versions are upgraded in-memory to CURRENT_DATA_MODEL.
-    Config documents also get structural v3 migrations (rename + path-pair strip).
+    Missing tag or versions other than 3 raise ``DataModelError``.
+    Config documents are also checked for removed structural keys.
     """
     version = read_data_model(doc)
     if version is None:
-        version = 1
-        doc[DATA_MODEL_KEY] = version
-    if version in COMPATIBLE_DATA_MODELS:
-        if version < CURRENT_DATA_MODEL:
-            if is_config_document(doc):
-                migrate_config_document_to_v3(doc)
-            stamp_data_model(doc)
-            return CURRENT_DATA_MODEL
-        if is_config_document(doc):
-            # Already tagged 3 but may still carry path keys from partial packs.
-            migrate_config_document_to_v3(doc)
-        return version
-    converter = _CONVERTERS.get(version)
-    if converter is not None:
-        converter(doc)
-        stamp_data_model(doc)
-        return CURRENT_DATA_MODEL
-    raise DataModelError(
-        f"{label}: earnie_data_model={version} ist nicht kompatibel "
-        f"(aktuell {CURRENT_DATA_MODEL}, unterstützte Versionen: "
-        f"{sorted(COMPATIBLE_DATA_MODELS)})."
-    )
+        raise DataModelError(
+            f"{label}: earnie_data_model fehlt "
+            f"(erforderlich: {CURRENT_DATA_MODEL})."
+        )
+    if version not in COMPATIBLE_DATA_MODELS:
+        raise DataModelError(
+            f"{label}: earnie_data_model={version} ist nicht kompatibel "
+            f"(aktuell {CURRENT_DATA_MODEL}, unterstützte Versionen: "
+            f"{sorted(COMPATIBLE_DATA_MODELS)})."
+        )
+    if is_config_document(doc):
+        reject_legacy_config_structure(doc, label=label)
+    return version

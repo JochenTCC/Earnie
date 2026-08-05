@@ -486,12 +486,6 @@ def format_display_data_basis_caption(
             f"**Produktiv-Log:** `{log_source.history_file}` — "
             "**Datei nicht gefunden** (graue Slots ohne Log-Einträge)"
         )
-    legacy_note = ""
-    if log_source.legacy_csv_exists:
-        legacy_note = (
-            f" Zusätzlich Legacy-CSV: `{log_source.legacy_csv_file}` "
-            "(nur Lückenfüller für Zeitpunkte ohne JSONL-Eintrag)."
-        )
     flex_note = (
         "Flexible Verbraucher im grauen Bereich: **Soll** aus "
         "`consumer_powers_kw` je Log-Eintrag (Fallback: `consumption_snapshot.flex_kw`)."
@@ -510,7 +504,7 @@ def format_display_data_basis_caption(
             "Produktiv-Log wird für Chart/Tabelle nicht eingemischt."
         )
     return (
-        f"**Datenbasis Produktiv-Log** — {runtime_note}. {file_note}{legacy_note} "
+        f"**Datenbasis Produktiv-Log** — {runtime_note}. {file_note} "
         f"{flex_note} {merge_note}"
     )
 

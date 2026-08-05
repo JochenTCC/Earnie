@@ -11,7 +11,9 @@ def load_backtesting_scenarios_document(backtesting_scenarios_path: str) -> dict
     path = backtesting_scenarios_path
     if not os.path.isfile(path):
         return {}
-    return read_json_dict(path)
+    doc = read_json_dict(path)
+    reject_legacy_backtesting_keys(doc, path=path)
+    return doc
 
 
 def load_backtesting_scenarios_entries(
@@ -26,6 +28,7 @@ def load_backtesting_scenarios_entries(
             raise ValueError(
                 f"Kritischer Fehler: '{path}' enthält ungültiges JSON: {e}"
             ) from e
+        reject_legacy_backtesting_keys(data, path=path)
         raw = data.get("scenarios")
         if raw is None:
             raise KeyError(
@@ -38,23 +41,27 @@ def load_backtesting_scenarios_entries(
             )
         return raw
 
+    legacy_keys = [
+        key
+        for key in raw_config
+        if key.startswith("scenario_settings")
+    ]
+    if legacy_keys:
+        raise ValueError(
+            "Root-Keys "
+            + ", ".join(repr(k) for k in sorted(legacy_keys))
+            + " in config.json sind entfernt. scenarios[] in "
+            "backtesting_scenarios.json verwenden."
+        )
+
     raw = raw_config.get("scenarios")
     if isinstance(raw, list) and raw:
         return raw
 
-    legacy = {
-        key: value
-        for key, value in raw_config.items()
-        if key.startswith("scenario_settings") and isinstance(value, dict)
-    }
-    return [
-        {
-            "id": key,
-            "label": key.replace("_", " "),
-            "settings": dict(value),
-        }
-        for key, value in sorted(legacy.items())
-    ]
+    raise FileNotFoundError(
+        f"Kritischer Konfigurationsfehler: '{path}' fehlt und config.json "
+        "enthält kein scenarios-Array. backtesting_scenarios.json anlegen."
+    )
 
 
 def normalize_scenario(raw: dict, index: int) -> dict:
@@ -185,14 +192,10 @@ def get_backtesting_disable_horizon_soc_anchor(backtesting_scenarios_path: str) 
     return bool(doc.get("disable_horizon_soc_anchor", False))
 
 
-def get_backtesting_sunrise_full_horizon_trial(backtesting_scenarios_path: str) -> bool:
-    """
-    Deprecated shim (pre-sunrise-book SE).
-
-    Sunrise_window now always MILPs SA₀→SA₂ and books [SA₁, SA₂). The flag is
-    ignored by the engine; kept so older configs still load.
-    """
-    doc = load_backtesting_scenarios_document(backtesting_scenarios_path)
-    if "sunrise_full_horizon_trial" not in doc:
-        return True
-    return bool(doc.get("sunrise_full_horizon_trial"))
+def reject_legacy_backtesting_keys(doc: dict, *, path: str) -> None:
+    """Fail-fast on removed top-level backtesting_scenarios.json keys."""
+    if "sunrise_full_horizon_trial" in doc:
+        raise ValueError(
+            f"Key 'sunrise_full_horizon_trial' in '{path}' ist entfernt "
+            "(sunrise book ist Standard; keine Config mehr nötig)."
+        )

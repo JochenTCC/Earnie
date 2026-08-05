@@ -104,7 +104,7 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
                         "label": "Live",
                         "settings": {
                             "battery_id": "",
-                            "pv_system_id": "",
+                            "pv_system_ids": [],
                             "house_profile_id": "",
                             "import_tariff_id": "",
                             "export_tariff_id": "",
@@ -540,7 +540,7 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
                         "label": "Live",
                         "settings": {
                             "battery_id": "bat",
-                            "pv_system_id": "pv",
+                            "pv_system_ids": ["pv"],
                             "house_profile_id": "efh",
                             "import_tariff_id": "imp",
                             "export_tariff_id": "exp",
@@ -874,7 +874,7 @@ def test_sync_scenario_session_reseeds_when_widget_keys_missing():
         "settings": {
             "house_profile_id": "example_efh",
             "battery_id": "5_0_kwh_speicher",
-            "pv_system_id": "dach_sued",
+            "pv_system_ids": ["dach_sued"],
             "import_tariff_id": "awattar_at",
             "export_tariff_id": "monthly_sunny",
         },

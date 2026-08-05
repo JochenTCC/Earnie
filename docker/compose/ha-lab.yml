@@ -30,8 +30,8 @@ x-persist-volumes: &persist-volumes
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  EARNIE_CONFIG_PATH: config
-  EARNIE_RUNTIME_PATH: runtime
+  # Volumes mount host …/{config,runtime} → /app/{config,runtime}; ENV_PATH=. derives both (not baked earnie_env/).
+  EARNIE_ENV_PATH: .
   EARNIE_VERIFY_LOXONE_ON_START: "0"
   EARNIE_AUTO_START_MAIN: "1"
 
@@ -44,7 +44,7 @@ services:
   earnie:
     build: *build
     container_name: earnie-ha-lab
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "8506:8501"
     volumes: *persist-volumes
@@ -90,7 +90,7 @@ services:
     image: ghcr.io/home-assistant/home-assistant:2025.7.0
     container_name: earnie_homeassistant
     hostname: homeassistant
-    restart: unless-stopped
+    restart: on-failure:3
     volumes:
       - ./ha_lab/homeassistant:/config
     environment:
@@ -105,7 +105,7 @@ services:
     image: evcc/evcc:0.207.0
     container_name: earnie_evcc
     hostname: evcc
-    restart: unless-stopped
+    restart: on-failure:3
     command: ["evcc", "-c", "/etc/evcc.yaml"]
     volumes:
       - ./ha_lab/evcc/evcc.yaml:/etc/evcc.yaml:ro

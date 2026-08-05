@@ -68,7 +68,6 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `earnie.log`                         | **aktiv**                      | Rotierendes Python-Log von `main.py` (5×5 MB, 5 Archive)      |
 | `optimizer_run_state.json`           | **aktiv**                      | Letzter erfolgreicher `main.py`-Durchlauf                     |
 | `live_optimization_debug.json`       | **aktiv**                      | 24h-Anzeige-Snapshot für die Streamlit-App                    |
-| `system_history_log.csv`             | **Legacy, nur Lesen**          | Archivieren, sobald `optimization_history.jsonl` ausreicht    |
 | `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis von Szenario-Explorer — nicht für Produktiv-NAS   |
 
 
@@ -85,7 +84,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | `EARNIE_UI_CHART_DEBUG_CAPTURE_ENABLED` | `1` = Button „Debug-Dump speichern“ im Cockpit (überschreibt `ui.chart_debug_capture_enabled`; ZIP unter `runtime/chart_debug/`). |
 | `EARNIE_AUTO_START_MAIN`                | `1` = beim Start von `scripts.run_streamlit` automatisch `main.py` starten, falls nicht schon laufend (Docker-Compose setzt das). Ohne Variable / lokal aus.                                                                              |
 | `EARNIE_OFFLINE`                        | `1` = kein Loxone-/Live-Zwang; Bootstrap füllt leere Live-Szenario-Entitäts-IDs aus den Katalogen (sinnvoll für Streamlit Community Cloud). |
-| `EARNIE_CLOUD_DEMO`                     | `1` = Streamlit Community Cloud: pro Browser-Sitzung leerer Greenfield-Workspace (Temp-Verzeichnis), Start im Hauskonfigurator, Willkommenshinweis; nach Szenario-Explorer-Start Feedback-Banner mit Mailto; kein Offline-Demo-Seed. Typisch zusammen mit `EARNIE_OFFLINE=1`. |
+| `EARNIE_CLOUD_DEMO`                     | `1` = Streamlit Community Cloud: pro Browser-Sitzung leerer Greenfield-Workspace (Temp-Verzeichnis), Start im Hauskonfigurator, Willkommenshinweis; nach Szenario-Explorer-Start Feedback-Banner mit GitHub-Issue (`cloud-demo`); optional lokale Config-ZIP; kein Offline-Demo-Seed. Typisch zusammen mit `EARNIE_OFFLINE=1`. |
 
 
 Streamlit-Port-Übersicht (Stacks, Plattformen): [streamlit-ports.md](../referenz/streamlit-ports.md).
@@ -109,7 +108,7 @@ Gemeinsam in jedem ZIP:
 - `inputs/*` — aktive `config.json`, Sidecars, optional Preis-Modell und `cons_data_hourly.csv`
 - `README.txt` — Kurzbeschreibung der Struktur
 
-Dateiname: `debug_dump_YYYYMMDD_HHMMSS.zip` unter `runtime/chart_debug/` (oder `ui.chart_debug_capture_dir`). Alte ZIPs `debug_dump_chart_*` / `debug_dump_prod_*` (schema v1/v2) bleiben lesbar für Replay und Fixture-Promotion.
+Dateiname: `debug_dump_YYYYMMDD_HHMMSS.zip` unter `runtime/chart_debug/` (oder `ui.chart_debug_capture_dir`).
 
 ### Replay (teilautomatisch)
 
@@ -118,7 +117,7 @@ python -m scripts.replay_debug_dump path/to/debug_dump_….zip
 python -m scripts.replay_debug_dump path/to/debug_dump_….zip --html-out /tmp/chart1.html
 ```
 
-Prüft Pflichtdateien und führt einen Smoke-Pfad aus (Historie parsen; bei vorhandenem `chart.display_rows` zusätzlich Chart-1-Neuaufbau). Alte Chart-/Prod-Debug-ZIPs und `schema_version: 1` werden weiterhin erkannt.
+Prüft Pflichtdateien und führt einen Smoke-Pfad aus (Historie parsen; bei vorhandenem `chart.display_rows` zusätzlich Chart-1-Neuaufbau). Es werden nur Dumps mit `schema_version: 3` und `dump_type: debug` akzeptiert.
 
 ### Prod-Dump als Regression-Fixture
 

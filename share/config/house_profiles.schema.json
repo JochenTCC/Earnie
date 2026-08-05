@@ -100,7 +100,7 @@
     },
     "loxone_outputs": {
       "type": "object",
-      "description": "Smarthome-Merker-Rollen zum Schreiben (Freigabe und/oder kW-Sollwert). Rollen: enable_name, power_setpoint_name, pv_follow_name.",
+      "description": "Smarthome-Merker-Rollen zum Schreiben (Freigabe und/oder kW-Sollwert). Rollen: enable_name, power_setpoint_name. E-Auto-Modus: set_evcs_mode in ehal_bindings.",
       "properties": {
         "enable_name": {
           "type": "string",
@@ -109,10 +109,6 @@
         "power_setpoint_name": {
           "type": "string",
           "description": "Rolle Schreiben: Soll-Leistung in kW (E-Auto)."
-        },
-        "pv_follow_name": {
-          "type": "string",
-          "description": "Rolle Schreiben: 0/1 PV-Überschuss folgen (E-Auto)."
         }
       }
     },
@@ -367,9 +363,6 @@
           "type": "string"
         },
         "label": {
-          "type": "string"
-        },
-        "legacy_id": {
           "type": "string"
         },
         "type": {

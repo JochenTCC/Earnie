@@ -51,9 +51,7 @@ def _entry(completed: datetime, **extra) -> dict:
 @pytest.fixture
 def history_files(tmp_path, monkeypatch):
     jsonl = tmp_path / "optimization_history.jsonl"
-    legacy = tmp_path / "legacy.csv"
     monkeypatch.setattr(optimization_history, "HISTORY_FILE", str(jsonl))
-    monkeypatch.setattr(optimization_history, "LEGACY_CSV_FILE", str(legacy))
     return jsonl
 
 
@@ -126,10 +124,10 @@ class TestChartDisplayContextDeviations:
             [
                 _entry(
                     slot,
-                    consumer_powers_kw={"eauto": 3.5},
-                    consumption_snapshot={"flex_kw": {"eauto": 0.0}, "battery_kw": 0.0},
-                    charging_contexts={"eauto": {"plugged_in": True}},
-                    consumer_remaining_kwh={"eauto": 8.0},
+                    consumer_powers_kw={"ev": 3.5},
+                    consumption_snapshot={"flex_kw": {"ev": 0.0}, "battery_kw": 0.0},
+                    charging_contexts={"ev": {"plugged_in": True}},
+                    consumer_remaining_kwh={"ev": 8.0},
                 )
             ],
         )

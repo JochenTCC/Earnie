@@ -5,7 +5,7 @@
   "recommended_markers": [
     {
       "ehal_field": "sens_pv_production_active",
-      "loxone_blocks_key": "pv_power_name",
+      "loxone_blocks_key": "plant.ehal_bindings.sens_pv_production_active",
       "suggested_name": "Earnie_PV_Leistung",
       "notes": "kW production ≥ 0 → EHAL W."
     }

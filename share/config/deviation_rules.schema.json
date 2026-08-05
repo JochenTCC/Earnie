@@ -154,7 +154,7 @@
         "scope": {
           "type": "string",
           "minLength": 1,
-          "description": "Betroffenes Signal: consumer_id (eauto, swimspa, …) oder battery."
+          "description": "Betroffenes Signal: consumer_id (ev, swimspa, …) oder battery."
         },
         "when": {
           "type": "array",

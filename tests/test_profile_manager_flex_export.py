@@ -1,4 +1,4 @@
-"""Tests für flexible_consumer_profiles.csv-Export aus cons_data."""
+"""Tests für flexible_consumer_profiles.csv-Export aus cons_data (kanonische Spalten)."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -9,7 +9,7 @@ import pandas as pd
 from data import profile_manager as pm
 
 
-def test_flex_profile_export_uses_cons_data_labels_and_legacy_csv_columns():
+def test_flex_profile_export_uses_cons_data_labels_and_canonical_csv_columns():
     profile_df = pd.DataFrame(
         {
             "Total": [1.0],
@@ -21,7 +21,7 @@ def test_flex_profile_export_uses_cons_data_labels_and_legacy_csv_columns():
         }
     )
     consumers = [
-        {"id": "ev", "legacy_id": "eauto", "name": "Smart"},
+        {"id": "ev", "name": "Smart"},
         {"id": "pool_filter", "name": "SwimSpa Filter", "optimizer_enabled": True},
     ]
 
@@ -37,10 +37,10 @@ def test_flex_profile_export_uses_cons_data_labels_and_legacy_csv_columns():
                 label_cols, rename = pm._flex_profile_export_spec(profile_df)
 
     assert label_cols == ["Smart"]
-    assert rename == {"Smart": "eauto"}
+    assert rename == {"Smart": "ev"}
 
 
-def test_generate_consumption_profile_writes_legacy_flex_columns(tmp_path, monkeypatch):
+def test_generate_consumption_profile_writes_canonical_flex_columns(tmp_path, monkeypatch):
     flex_path = tmp_path / "flexible_consumer_profiles.csv"
     cons_path = tmp_path / "consumption_profiles.csv"
     total_path = tmp_path / "total_consumption_profiles.csv"
@@ -56,7 +56,7 @@ def test_generate_consumption_profile_writes_legacy_flex_columns(tmp_path, monke
         index=index,
     )
     consumers = [
-        {"id": "ev", "legacy_id": "eauto", "name": "Smart"},
+        {"id": "ev", "name": "Smart"},
         {"id": "pool_filter", "name": "SwimSpa Filter", "optimizer_enabled": True},
     ]
 
@@ -76,8 +76,9 @@ def test_generate_consumption_profile_writes_legacy_flex_columns(tmp_path, monke
 
     assert pm.generate_consumption_profile() is True
     flex_df = pd.read_csv(flex_path, sep=";")
-    assert "eauto" in flex_df.columns
-    assert flex_df["eauto"].iloc[0] == 0.5
+    assert "ev" in flex_df.columns
+    assert "eauto" not in flex_df.columns
+    assert flex_df["ev"].iloc[0] == 0.5
 
     profiles = pm._load_flexible_consumer_hourly_profiles(
         [datetime(2026, 7, 14, 18, 0)]

@@ -12,13 +12,10 @@ import config
 import logging
 from integrations.loxone_comm_trace import LoxoneWriteRecord
 from settings.ehal_marker_resolve import (
-    charging_loxone,
     ehal_bindings,
-    marker_charge_immediate,
     marker_flex_enable,
     marker_flex_power,
     marker_get_evcs_nominal_current,
-    marker_pv_follow,
     marker_sens_evcs_active_power,
     marker_sens_evcs_bat_capacity,
     marker_set_evcs_max_current,
@@ -328,15 +325,12 @@ def fetch_loxone_generic_value(io_name: str) -> Optional[float]:
 
 
 def resolve_consumer_nominal_power_kw(consumer: dict) -> float:
-    """Nennleistung (kW): live get_evcs_nominal_current (A) oder Legacy-Merker."""
+    """Nennleistung (kW) aus live ``get_evcs_nominal_current`` (A)."""
     fallback = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
-    lox = charging_loxone(consumer)
     bindings = ehal_bindings(consumer)
     ehal_name = str(
         bindings.get("get_evcs_nominal_current")
         or bindings.get("sens_evcs_nominal_current")
-        or lox.get("get_evcs_nominal_current")
-        or lox.get("sens_evcs_nominal_current")
         or ""
     ).strip()
     io_name = marker_get_evcs_nominal_current(consumer)
@@ -553,7 +547,6 @@ def resolve_consumer_live_power_kw(
 
 FILTER_INFERENCE_TOLERANCE_KW = 0.05
 POOL_FILTER_ID = "pool_filter"
-SWIMSPA_FILTER_ID = POOL_FILTER_ID  # backward alias for imports
 SWIMSPA_HEATING_ID = "swimspa"
 
 
@@ -623,14 +616,14 @@ def _apply_native_filter_inference(
     if slot_datetime is None:
         return
     if not _slot_in_native_filter_window(
-        filter_contexts, SWIMSPA_FILTER_ID, slot_datetime
+        filter_contexts, POOL_FILTER_ID, slot_datetime
     ):
         return
-    if float(result.get(SWIMSPA_FILTER_ID, 0.0) or 0.0) > 1e-9:
+    if float(result.get(POOL_FILTER_ID, 0.0) or 0.0) > 1e-9:
         return
 
     filter_consumer = next(
-        (item for item in consumers if item.get("id") == SWIMSPA_FILTER_ID),
+        (item for item in consumers if item.get("id") == POOL_FILTER_ID),
         None,
     )
     if filter_consumer is None:
@@ -639,16 +632,16 @@ def _apply_native_filter_inference(
     if nominal <= 1e-9:
         return
 
-    for heating_id in _shared_meter_heating_ids(consumers, SWIMSPA_FILTER_ID):
+    for heating_id in _shared_meter_heating_ids(consumers, POOL_FILTER_ID):
         if heating_id not in measured_ids:
             continue
         total = float(result.get(heating_id, 0.0) or 0.0)
         if total <= 1e-9 or abs(total - nominal) > FILTER_INFERENCE_TOLERANCE_KW:
             continue
 
-        result[SWIMSPA_FILTER_ID] = round(nominal, 3)
+        result[POOL_FILTER_ID] = round(nominal, 3)
         result[heating_id] = round(max(0.0, total - nominal), 3)
-        measured_ids.add(SWIMSPA_FILTER_ID)
+        measured_ids.add(POOL_FILTER_ID)
         logger.info(
             "Loxone: natives Filterfenster — Filter %.3f kW aus Gesamtzähler %.3f kW "
             "inferiert (Binär-Merker 0, heating=%s).",
@@ -905,24 +898,6 @@ def map_ess_setpoints(
     return None, max_kw, max_kw, 0
 
 
-def map_huawei_modbus_values(mode: int, target_power_kw: float) -> tuple[float, float, int]:
-    """Deprecated: charge/discharge legs were force magnitudes pre-C1.
-
-    Prefer :func:`map_ess_setpoints`. Returns (charge_limit_kw, discharge_limit_kw, mode_hint)
-    using battery max from config when available.
-    """
-    try:
-        max_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
-    except Exception:  # pragma: no cover - defensive for early import
-        max_kw = abs(float(target_power_kw))
-    if max_kw <= 0.0:
-        max_kw = abs(float(target_power_kw))
-    _active, charge_kw, discharge_kw, control_cmd = map_ess_setpoints(
-        mode, target_power_kw, max_kw
-    )
-    return charge_kw, discharge_kw, control_cmd
-
-
 def flex_consumer_enable_value(
     consumer: dict,
     consumer_powers: dict[str, float],
@@ -987,25 +962,6 @@ def flex_consumer_setpoint_amps(
     return round(kw_to_ampere(setpoint_kw, voltage_v=voltage_v, phases=phases), 3)
 
 
-def flex_consumer_pv_follow_value(
-    consumer: dict,
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict],
-    consumer_pv_follow: dict[str, int] | None = None,
-) -> int | None:
-    """PV-Überschuss-Modus 0/1 für Legacy-pv_follow Merker."""
-    from optimizer.consumer_power import loxone_control_outputs
-
-    if not marker_pv_follow(consumer):
-        return None
-
-    cid = consumer["id"]
-    planned_kw = _effective_consumer_power_kw(consumer, consumer_powers, charging_contexts, cid)
-    pv_follow = int((consumer_pv_follow or {}).get(cid, 0) or 0)
-    _, pv_out = loxone_control_outputs(consumer, planned_kw, pv_follow)
-    return pv_out
-
-
 def _skip_flexible_consumer_output(
     consumer: dict,
     charging_contexts: dict[str, dict],
@@ -1014,50 +970,25 @@ def _skip_flexible_consumer_output(
     return bool(ctx.get("skip_loxone_output"))
 
 
+_EVCS_MODE_VALUES: dict[str, float] = {"off": 0.0, "pv": 1.0, "now": 2.0}
+
+
 def _append_evcs_mode_writes(
     values: dict[str, float],
     consumer: dict,
     *,
     mode: str | None,
-    pv_out: int | None,
 ) -> None:
-    """Dual-write legacy pv_follow / charge_immediate + set_evcs_mode Merker.
-
-    Numeric encoding for set_evcs_mode Merker: off=0, pv=1, now=2.
-    """
-    pv_name = marker_pv_follow(consumer)
-    now_name = marker_charge_immediate(consumer)
+    """Write the canonical ``set_evcs_mode`` Merker (off=0, pv=1, now=2)."""
     mode_name = marker_set_evcs_mode(consumer)
-    if mode == "now":
-        if pv_name:
-            values[pv_name] = 0.0
-        if now_name:
-            values[now_name] = 1.0
-        if mode_name:
-            values[mode_name] = 2.0
+    if not mode_name:
         return
-    if mode == "pv":
-        if pv_name:
-            values[pv_name] = 1.0 if pv_out is None else float(pv_out)
-        if now_name:
-            values[now_name] = 0.0
-        if mode_name:
-            values[mode_name] = 1.0
-        return
-    # off (or unknown): idle / absent / fully charged / standby
-    if pv_name and pv_out is not None:
-        values[pv_name] = float(pv_out)
-    elif pv_name:
-        values[pv_name] = 0.0
-    if now_name:
-        values[now_name] = 0.0
-    if mode_name:
-        values[mode_name] = 0.0
+    values[mode_name] = _EVCS_MODE_VALUES.get(str(mode or "").strip().lower(), 0.0)
 
 
 def _immediate_skip_output_values(consumer: dict) -> dict[str, float]:
     values: dict[str, float] = {}
-    _append_evcs_mode_writes(values, consumer, mode="now", pv_out=0)
+    _append_evcs_mode_writes(values, consumer, mode="now")
     if values:
         logger.info(
             "Flex consumer %s -> Sofort laden: set_evcs_mode=now "
@@ -1098,7 +1029,7 @@ def _evcs_current_output_values(
         immediate=False,
         charging=float(amps) > 1e-6,
     )
-    _append_evcs_mode_writes(values, consumer, mode=mode, pv_out=pv_out)
+    _append_evcs_mode_writes(values, consumer, mode=mode)
     setpoint_kw = flex_consumer_power_setpoint_kw(
         consumer, consumer_powers, charging_contexts, consumer_pv_follow
     )

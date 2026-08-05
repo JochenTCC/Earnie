@@ -24,7 +24,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./earnie_env/config/.env`                       | Loxone-Zugangsdaten                                                                                                     |
 
 
-Umgebungsvariable in Compose: `EARNIE_CONFIG_PATH=config` (Config-Verzeichnis im Container, gemountet als `/app/config`)
+Umgebungsvariable in Compose: `EARNIE_ENV_PATH=.` (leitet `/app/config` und `/app/runtime` ab; Host-Mounts `./…/config` → `/app/config`, `./…/runtime` → `/app/runtime`)
 
 ## Erstinstallation (NAS)
 

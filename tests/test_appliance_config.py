@@ -282,7 +282,7 @@ def test_update_appliance_defaults_roundtrip(tmp_path, monkeypatch):
                         "label": "Live",
                         "settings": {
                             "battery_id": "home",
-                            "pv_system_id": "roof",
+                            "pv_system_ids": ["roof"],
                             "import_tariff_id": "fixed_imp",
                             "export_tariff_id": "fixed_exp",
                             "house_profile_id": "example_efh",
@@ -404,7 +404,7 @@ def test_update_appliance_unknown_id_raises(tmp_path, monkeypatch):
                         "label": "Live",
                         "settings": {
                             "battery_id": "home",
-                            "pv_system_id": "roof",
+                            "pv_system_ids": ["roof"],
                             "import_tariff_id": "fixed_imp",
                             "export_tariff_id": "fixed_exp",
                             "house_profile_id": "example_efh",

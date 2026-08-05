@@ -42,9 +42,7 @@ def _entry(completed: datetime, **extra) -> dict:
 @pytest.fixture
 def history_files(tmp_path, monkeypatch):
     jsonl = tmp_path / "optimization_history.jsonl"
-    legacy = tmp_path / "legacy.csv"
     monkeypatch.setattr(optimization_history, "HISTORY_FILE", str(jsonl))
-    monkeypatch.setattr(optimization_history, "LEGACY_CSV_FILE", str(legacy))
     return jsonl
 
 
@@ -151,14 +149,13 @@ def test_entry_to_chart_row_omits_unmeasured_flex(monkeypatch):
     assert row[consumer_column_name(swimspa)] is None
 
 
-def test_entry_to_chart_row_bridges_legacy_measured_flex_id(monkeypatch):
-    """Live flex/measured_ids use legacy_id (eauto); chart column uses canonical ev."""
+def test_entry_to_chart_row_uses_canonical_measured_flex_id(monkeypatch):
+    """Live flex/measured_ids and chart column all use the canonical id (ev)."""
     from optimizer.targets import consumer_column_name
     from ui.chart_flow_balance import KIND_EXPORT_PV, KIND_FLEX, build_flow_balance_segments
 
     ev = {
         "id": "ev",
-        "legacy_id": "eauto",
         "name": "Smart",
         "type": "ev",
         "nominal_power_kw": 3.5,
@@ -174,14 +171,14 @@ def test_entry_to_chart_row_bridges_legacy_measured_flex_id(monkeypatch):
         forecast_consumption_kw=0.646,
         battery_plan_kw=-2.5,
         consumer_powers_kw={"ev": 3.52},
-        flex_live_kw={"eauto": 3.574, "swimspa": 0.0},
-        flex_measured_ids=["eauto", "swimspa", "pool_filter", "waermepumpe"],
+        flex_live_kw={"ev": 3.574, "swimspa": 0.0},
+        flex_measured_ids=["ev", "swimspa", "pool_filter", "wp_heating"],
         consumption_snapshot={
             "pv_kw": 0.0,
             "baseload_kw": 0.646,
             "grid_kw": 4.22,
             "battery_kw": 0.0,
-            "flex_kw": {"eauto": 3.574, "swimspa": 0.0},
+            "flex_kw": {"ev": 3.574, "swimspa": 0.0},
         },
     )
     row = history_timeline.entry_to_chart_row(entry, datetime(2026, 7, 16, 2, 15, 0))

@@ -9,11 +9,11 @@ import pytest
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer.eauto_milp import (
-    eauto_in_modus_b,
-    eauto_modus_a_active,
     eauto_modus_b_uses_milp,
     eauto_preset_charge_kw,
     eauto_preset_power_now,
+    ev_in_modus_b,
+    ev_modus_a_active,
     is_logged_day_matrix,
     milp_binary_charge_kw,
     milp_uses_power_setpoint,
@@ -54,7 +54,7 @@ def _eauto_consumer() -> dict:
         "nominal_power_kw": 3.5,
         "min_power_kw": 1.4,
         "min_on_quarterhours": 1,
-        "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
+        "ehal_bindings": {"set_evcs_max_current": "Earnie_EAuto_Soll_A"},
         "charging_schedule": {
             "enabled": True,
             "milp": {
@@ -69,12 +69,11 @@ def _eauto_consumer() -> dict:
 def _ev_consumer_canonical() -> dict:
     return {
         "id": "ev",
-        "legacy_id": "eauto",
         "name": "E-Auto",
         "nominal_power_kw": 3.5,
         "min_power_kw": 1.4,
         "min_on_quarterhours": 1,
-        "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
+        "ehal_bindings": {"set_evcs_max_current": "Earnie_EAuto_Soll_A"},
         "charging_schedule": {
             "enabled": True,
             "milp": {
@@ -123,15 +122,15 @@ class TestEautoMilpModeSelection:
         consumer = _eauto_consumer()
         params = _eauto_milp_params()
         matrix = _matrix()
-        assert not eauto_modus_a_active(consumer, matrix, 2.0, params)
-        assert eauto_in_modus_b(consumer, matrix, 2.0, params)
+        assert not ev_modus_a_active(consumer, matrix, 2.0, params)
+        assert ev_in_modus_b(consumer, matrix, 2.0, params)
 
     def test_live_modus_a_above_threshold(self):
         consumer = _eauto_consumer()
         params = _eauto_milp_params()
         matrix = _matrix()
-        assert eauto_modus_a_active(consumer, matrix, 3.0, params)
-        assert not eauto_in_modus_b(consumer, matrix, 3.0, params)
+        assert ev_modus_a_active(consumer, matrix, 3.0, params)
+        assert not ev_in_modus_b(consumer, matrix, 3.0, params)
 
     def test_binary_charge_kw_is_p_nom_in_modus_b(self):
         consumer = _eauto_consumer()

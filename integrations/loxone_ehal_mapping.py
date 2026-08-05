@@ -8,8 +8,6 @@ from typing import Any
 
 import requests
 
-from ehal.models import TELEMETRY_FIELD_ALIASES
-
 logger = logging.getLogger(__name__)
 
 TELEMETRY_REQUIRED = (
@@ -34,7 +32,7 @@ SETPOINT_FIELDS = (
 EHAL_MAP_FIELDS = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + SETPOINT_FIELDS
 EXTRAS_FIELDS: tuple[str, ...] = ()
 
-# Canonical §C → loxone_blocks role keys (+ legacy unprefixed dual-read aliases).
+# Canonical §C → loxone_blocks role keys.
 EHAL_TO_BLOCKS: dict[str, str] = {
     "sens_ess_soc": "soc_name",
     "sens_pv_production_active": "pv_power_name",
@@ -45,11 +43,6 @@ EHAL_TO_BLOCKS: dict[str, str] = {
     "set_ess_charge_power_limit": "target_charge_power_name",
     "set_ess_discharge_power_limit": "target_discharge_power_name",
     "set_ess_mode": "control_cmd_name",
-    # Legacy M1 unprefixed keys (dual-read during 2.4.j).
-    "ess_soc": "soc_name",
-    "pv_production_active": "pv_power_name",
-    "ess_power": "battery_power_name",
-    "grid_power_active": "grid_power_name",
 }
 
 # Prefer ehal.profiles (2.4.g); keep local fallback if import fails in odd envs.
@@ -128,8 +121,7 @@ def ehal_mapping_to_loxone_blocks(
     """Translate EHAL field → marker map into loxone_blocks role keys."""
     blocks: dict[str, str] = {}
     for field, marker in ehal_map.items():
-        canonical = TELEMETRY_FIELD_ALIASES.get(field, field)
-        role = EHAL_TO_BLOCKS.get(canonical) or EHAL_TO_BLOCKS.get(field)
+        role = EHAL_TO_BLOCKS.get(field)
         name = str(marker or "").strip()
         if role and name:
             blocks[role] = name

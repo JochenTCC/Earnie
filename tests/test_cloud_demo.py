@@ -274,7 +274,7 @@ def test_cloud_restricted_nav_hauskonfigurator_only(tmp_path, monkeypatch):
                     "label": "Live",
                     "settings": {
                         "battery_id": "",
-                        "pv_system_id": "",
+                        "pv_system_ids": [],
                         "import_tariff_id": "",
                         "export_tariff_id": "",
                         "house_profile_id": "",
@@ -310,23 +310,20 @@ def test_render_intro_dismissed(monkeypatch):
     assert calls == []
 
 
-def test_feedback_mailto_targets_jochen():
-    url = cloud_demo.build_cloud_demo_feedback_mailto("Charts unklar")
-    assert url.startswith(f"mailto:{cloud_demo.FEEDBACK_EMAIL}?")
-    assert "jochen%40techcreacon.com" in url or "jochen@techcreacon.com" in url
-    assert "Charts" in url or "Charts%20unklar" in url or "Charts+unklar" in url
-    assert "manuell" not in unquote(url).lower()
-
-
-def test_feedback_mailto_includes_attach_hint_when_agreed():
-    url = cloud_demo.build_cloud_demo_feedback_mailto(
-        "ok",
-        attach_config=True,
-    )
+def test_feedback_issue_url_targets_github():
+    url = cloud_demo.build_cloud_demo_feedback_issue_url("Charts unklar")
+    assert url.startswith("https://github.com/JochenTCC/Earnie/issues/new?")
     plain = unquote(url)
-    assert "manuell" in plain.lower()
-    assert "ZIP" in plain
-    assert "Tests" in plain or "Bugfix" in plain
+    assert "Charts unklar" in plain or "Charts%20unklar" in url
+    assert "cloud-demo" in plain
+    assert "Improvement" in plain or "Verbesserung" in plain
+
+
+def test_feedback_issue_url_has_placeholder_when_empty():
+    url = cloud_demo.build_cloud_demo_feedback_issue_url("")
+    plain = unquote(url)
+    assert "Feedback hier ergänzen" in plain
+    assert "cloud-demo" in plain
 
 
 def test_mark_se_sim_started_noop_without_cloud_demo(monkeypatch):
@@ -391,7 +388,7 @@ def test_feedback_banner_shows_after_sim_started(monkeypatch):
         caption=lambda *a, **k: None,
         error=lambda *a, **k: calls.append("error"),
         columns=lambda *a, **k: (_Col(), _Col()),
-        link_button=lambda *a, **k: calls.append("mailto"),
+        link_button=lambda *a, **k: calls.append("issue"),
         button=lambda *a, **k: False,
         rerun=lambda: None,
     )
@@ -400,7 +397,7 @@ def test_feedback_banner_shows_after_sim_started(monkeypatch):
     monkeypatch.setitem(sys.modules, "streamlit", fake_st)
     cloud_demo.render_cloud_demo_feedback_banner()
     assert "info" in calls
-    assert "mailto" in calls
+    assert "issue" in calls
     assert "download" not in calls
 
 
@@ -425,7 +422,7 @@ def test_feedback_banner_offers_zip_when_attach_checked(monkeypatch):
         caption=lambda *a, **k: calls.append("caption"),
         error=lambda *a, **k: calls.append("error"),
         columns=lambda *a, **k: (_Col(), _Col()),
-        link_button=lambda *a, **k: calls.append("mailto"),
+        link_button=lambda *a, **k: calls.append("issue"),
         button=lambda *a, **k: False,
         rerun=lambda: None,
     )

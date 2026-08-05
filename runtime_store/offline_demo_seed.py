@@ -142,7 +142,7 @@ def _fill_empty_refs(settings: dict, defaults: dict[str, Any]) -> list[str]:
         filled.append(key)
     pv_ids = settings.get("pv_system_ids")
     has_pv = isinstance(pv_ids, list) and any(str(x).strip() for x in pv_ids)
-    if not has_pv and not str(settings.get("pv_system_id", "") or "").strip():
+    if not has_pv:
         default_pv = defaults.get("pv_system_ids") or []
         if default_pv:
             settings["pv_system_ids"] = list(default_pv)

@@ -65,7 +65,7 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
         config_dir,
         {
             "battery_id": "",
-            "pv_system_id": "",
+            "pv_system_ids": [],
             "import_tariff_id": "",
             "export_tariff_id": "",
             "house_profile_id": "",
@@ -116,7 +116,7 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
         config_dir,
         {
             "battery_id": "",
-            "pv_system_id": "",
+            "pv_system_ids": [],
             "import_tariff_id": "",
             "export_tariff_id": "",
             "house_profile_id": "efh",
@@ -179,7 +179,7 @@ def test_scenario_explorer_visible_when_planning_ready(tmp_path, monkeypatch):
         config_dir,
         {
             "battery_id": "bat",
-            "pv_system_id": "pv",
+            "pv_system_ids": ["pv"],
             "house_profile_id": "efh",
             "import_tariff_id": "imp",
             "export_tariff_id": "exp",

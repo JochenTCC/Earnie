@@ -16,7 +16,8 @@ OFFICIAL_REPO_URL = "https://github.com/JochenTCC/Earnie"
 REQUIRED_PHRASE_NONCOMMERCIAL = "nicht-kommerziell"
 REQUIRED_PHRASE_PRODUCT = "Earnie"
 BANNER_LABEL = "Banner der Wahrheit"
-SUPPORT_EMAIL = "mail@techcreacon.com"
+SUPPORT_EMAIL = "support@earnie-hems.com"
+SITE_URL = "https://earnie-hems.com"
 
 
 def _normalize_repo_identity(raw: str) -> str:

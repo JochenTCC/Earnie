@@ -116,10 +116,8 @@ def _loxone_setpoint_kw(
 ) -> float | None:
     if consumer is None or not uses_power_setpoint(consumer):
         return None
-    sent = entry.get("loxone_sent") or {}
-    setpoint_name = str((consumer.get("loxone_outputs") or {}).get("power_setpoint_name", "")).strip()
-    if setpoint_name and setpoint_name in sent:
-        return _float_or_zero(sent[setpoint_name])
+    # ``set_evcs_max_current`` is logged in ampere — derive the kW setpoint from the plan
+    # instead of reading the sent Merker value.
     pv_follow = int((entry.get("consumer_pv_follow") or {}).get(consumer_id, 0) or 0)
     planned = _effective_planned_kw(entry, consumer_id)
     setpoint, _ = loxone_control_outputs(consumer, planned, pv_follow)

@@ -78,7 +78,7 @@ Die Datei `earnie_registry.json` ist eine **einmalig ausgestellte Bindung** Ihre
    ```
 
    Die Ausgabe enthält `fingerprint=` (vollständig) und `fingerprint_display=` (Kurzform).
-4. Per **Info / About → Registry per E-Mail anfordern** an `mail@techcreacon.com` senden (Betreff „Earnie Registry“, Fingerprint und Datenschutzhinweis sind bereits im Mailtext). Bei Bedarf die Speicherung der Absenderadresse für Supportzwecke von **Nein** auf **Ja** ändern (DSGVO; Standard: keine Speicherung). Optional zusätzlich die Kontakt-ZIP über **E-Mail schreiben** anhängen.
+4. Per **Info / About → Registry per E-Mail anfordern** an `support@earnie-hems.com` senden (Betreff „Earnie Registry“, Fingerprint und Datenschutzhinweis sind bereits im Mailtext). Bei Bedarf die Speicherung der Absenderadresse für Supportzwecke von **Nein** auf **Ja** ändern (DSGVO; Standard: keine Speicherung). Optional zusätzlich die Kontakt-ZIP über **Privater Support** anhängen (nicht in öffentliche GitHub-Issues).
 5. Sie erhalten zurück die Datei `earnie_registry.json`.
 6. Datei ablegen unter:
 
@@ -96,8 +96,9 @@ Die Datei wird **beim Rechteinhaber** erzeugt (Signatur mit dem privaten Schlüs
 
 ### Support
 
-- **Kontakt in der App:** Sidebar **Info / About** — Thema, Beschreibung, optional Anhänge; **Informationen in ZIP sammeln**, dann **E-Mail schreiben** und die ZIP-Datei manuell anhängen (wird nicht automatisch angehängt) an `mail@techcreacon.com`
-- **Projekt & Issues:** [GitHub — JochenTCC/Earnie](https://github.com/JochenTCC/Earnie)  
+- **Kontakt in der App:** Sidebar **Info / About** — Art, Thema, Beschreibung → **GitHub-Issue öffnen** (öffentlich; keine Secrets). Optional **Informationen in ZIP sammeln** (bleibt lokal). Registry / Vertrauliches: Expander **Privater Support** an `support@earnie-hems.com`
+- **Projekt & Issues:** [GitHub — JochenTCC/Earnie](https://github.com/JochenTCC/Earnie/issues)  
+- **Website:** [earnie-hems.com](https://earnie-hems.com)  
 - **Community:** z. B. Diskussionen im Loxone-Umfeld (loxforum u. Ä.)  
 - **Technische Doku:** [docs/README.md](../README.md)  
 
@@ -313,7 +314,7 @@ Die Spalte zeigt **nicht überall dieselbe Datenquelle**. Deshalb kann die Zeile
 3. **PV und Batterie** ändern die Spalte „Jahres Verbrauch“ nicht: gezählt wird der **Hausverbrauch** (Last), nicht Netzbezug nach Abzug von PV/Speicher.  
 4. **Kleine Differenzen** zwischen Referenz und Optimierung derselben Szenario-Familie sind normal (Lastverschiebung, Toleranz der Plausibilitätsprüfung).
 
-Zum Abgleich Ist vs. Modell: Hauskonfigurator / Leistungsprofil-CSV und die Tabellen **Gesamtkosten und -Verbrauch** sowie **Verbrauchsvergleich** im Explorer. Weicht der Jahresverbrauch einer Zeile um **mehr als 5%** von der **Live-Referenz** ab, erscheint in der Spalte **Hinweis** eine Warnung — dann Config-Dump über **Info / About → Kontakt** an TechCreaCon senden. Technische Details: [Betriebsmodi — Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch), [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md).
+Zum Abgleich Ist vs. Modell: Hauskonfigurator / Leistungsprofil-CSV und die Tabellen **Gesamtkosten und -Verbrauch** sowie **Verbrauchsvergleich** im Explorer. Weicht der Jahresverbrauch einer Zeile um **mehr als 5%** von der **Live-Referenz** ab, erscheint in der Spalte **Hinweis** eine Warnung — dann über **Info / About → Kontakt** ein öffentliches Issue ohne Secrets melden bzw. die Config-ZIP privat an `support@earnie-hems.com` senden. Technische Details: [Betriebsmodi — Szenario-Explorer](../ui/betriebsmodi.md#gesamtkosten-und--verbrauch), [Historische Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md).
 
 
 ---

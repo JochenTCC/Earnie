@@ -23,9 +23,9 @@ def _eauto_consumer() -> dict:
         "name": "E-Auto",
         "nominal_power_kw": 3.5,
         "min_power_kw": 1.4,
-        "loxone_outputs": {
-            "power_setpoint_name": "Ernie_EAuto_Ziel_kW",
-            "pv_follow_name": "Ernie_EAuto_pv_follow",
+        "ehal_bindings": {
+            "set_evcs_max_current": "Earnie_EAuto_Soll_A",
+            "set_evcs_mode": "Earnie_EAuto_Modus",
         },
     }
 
@@ -33,11 +33,13 @@ def _eauto_consumer() -> dict:
 class TestConsumerPowerHelpers:
     def test_uses_power_setpoint(self):
         assert uses_power_setpoint(_eauto_consumer()) is True
-        assert uses_power_setpoint({"id": "x", "loxone_outputs": {"enable_name": "A"}}) is False
+        assert uses_power_setpoint({"id": "x", "ehal_bindings": {"flex.x.set_enable": "A"}}) is False
 
     def test_uses_pv_follow(self):
         assert uses_pv_follow(_eauto_consumer()) is True
-        assert uses_pv_follow({"id": "x", "loxone_outputs": {"power_setpoint_name": "A"}}) is False
+        assert (
+            uses_pv_follow({"id": "x", "ehal_bindings": {"set_evcs_max_current": "A"}}) is False
+        )
 
     def test_loxone_control_outputs(self):
         consumer = _eauto_consumer()
@@ -49,7 +51,11 @@ class TestConsumerPowerHelpers:
         assert power_limits_kw(_eauto_consumer()) == (1.4, 3.5)
 
     def test_power_limits_kw_binary(self):
-        consumer = {"id": "spa", "nominal_power_kw": 2.8, "loxone_outputs": {"enable_name": "X"}}
+        consumer = {
+            "id": "spa",
+            "nominal_power_kw": 2.8,
+            "ehal_bindings": {"flex.spa.set_enable": "X"},
+        }
         assert power_limits_kw(consumer) == (0.0, 2.8)
 
     def test_clamp_setpoint_zero(self):
@@ -68,7 +74,7 @@ class TestConsumerPowerHelpers:
         consumer = {
             "id": "eauto",
             "nominal_power_kw": 3.5,
-            "loxone_outputs": {"power_setpoint_name": "X"},
+            "ehal_bindings": {"set_evcs_max_current": "X"},
         }
         with pytest.raises(ValueError, match="min_power_kw"):
             power_limits_kw(consumer)

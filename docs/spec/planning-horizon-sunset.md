@@ -98,7 +98,7 @@ Geo/Zeit  = latitude/longitude aus aufgelöstem Live-Szenario (Hausprofil)
 
 Aufeinanderfolgende Schritte buchen **aneinanderstoßende** Sunrise-Intervalle — auch wenn ready_by von 07→10 oder 10→07 springt (kein Wanduhr-Gap/Overlap wie früher bei [ready_by−24h, ready_by)).
 
-`sunrise_full_horizon_trial` ist ein **Deprecated-Shim** (Config wird noch geladen, Engine ignoriert den Schalter); das Produktverhalten ist immer MILP SA₀→SA₂ + Book [SA₁, SA₂).
+Key `sunrise_full_horizon_trial` ist entfernt (fail-fast beim Laden); das Produktverhalten ist immer MILP SA₀→SA₂ + Book [SA₁, SA₂).
 
 **SE vs Live (Re-Opt-Policy):** Scenario Explorer / Backtesting hat innerhalb des Fensters
 **perfekte Voraussicht** (Preise/PV/Last fest). SE-Sunrise setzt `commit_hours` auf die volle MILP-Länge (ein Solve pro Schritt). Live-Steuerung bleibt periodisches Re-Opt

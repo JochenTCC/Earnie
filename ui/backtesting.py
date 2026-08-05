@@ -132,8 +132,7 @@ def _format_config_error(message: str) -> str:
         return (
             f"{message}\n\n"
             "Prüfe im **Szenarienkonfigurator → Runtime**, ob Bezugs- und Einspeisetarif "
-            "noch im Tarifkatalog existieren (Tarif-IDs wurden mit 1.24.f teils umbenannt, "
-            "z. B. `awattar_sunny_float` → `dynamic_epex`)."
+            "noch im Tarifkatalog existieren."
         )
     return message
 

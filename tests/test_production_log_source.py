@@ -40,8 +40,6 @@ def test_format_display_data_basis_path():
         history_exists=True,
         history_size_bytes=1200,
         history_modified_at=datetime(2026, 7, 4, 19, 0, 0),
-        legacy_csv_file=r"C:\legacy.csv",
-        legacy_csv_exists=False,
     )
     assert format_display_data_basis_path(info) == r"\\nas\runtime\optimization_history.jsonl"
 
@@ -54,8 +52,6 @@ def test_format_display_data_basis_caption_merge_active():
         history_exists=True,
         history_size_bytes=1200,
         history_modified_at=datetime(2026, 7, 4, 19, 0, 0),
-        legacy_csv_file=r"C:\legacy.csv",
-        legacy_csv_exists=False,
     )
     text = format_display_data_basis_caption(
         info,
@@ -76,8 +72,6 @@ def test_format_display_data_basis_caption_no_merge():
         history_exists=False,
         history_size_bytes=None,
         history_modified_at=None,
-        legacy_csv_file="/tmp/legacy.csv",
-        legacy_csv_exists=False,
     )
     text = format_display_data_basis_caption(info, merge_active=False)
     assert "Kein Merge-Pfad" in text

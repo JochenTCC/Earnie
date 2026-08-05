@@ -47,4 +47,4 @@ Move-Item runtime earnie_env\runtime
 
 Oder die bisherigen Pfade per Env belassen, z. B. `EARNIE_CONFIG_PATH=config` und `EARNIE_RUNTIME_PATH=runtime` (bzw. `EARNIE_ENV_PATH=.` mit Unterordnern `config/` und `runtime/`).
 
-Docker-Compose (Dev/Prod) mountet Host-`./earnie_env/config` bzw. `./earnie_env/runtime` weiterhin als `/app/config` und `/app/runtime` im Container.
+Docker-Compose (Dev/Prod) mountet Host-`./earnie_env/config` bzw. `./earnie_env/runtime` weiterhin als `/app/config` und `/app/runtime` im Container und setzt `EARNIE_ENV_PATH=.`.

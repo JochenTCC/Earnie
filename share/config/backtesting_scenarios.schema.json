@@ -37,10 +37,6 @@
       "type": "boolean",
       "description": "Trial: keine harte End-SoC-/Sonnenaufgangs-SOC_min-Gleichheit (nur min/max). Standard false."
     },
-    "sunrise_full_horizon_trial": {
-      "type": "boolean",
-      "description": "Deprecated shim (ignored by engine). sunrise_window always MILPs SA_0-->SA_2 and books [SA_1, SA_2)."
-    },
     "scenarios": {
       "type": "array",
       "description": "Alle Szenarien inkl. Live-Baseline (Standard-ID: live, gewählt via live_scenario_id).",
@@ -94,10 +90,6 @@
               "items": {
                 "type": "string"
               }
-            },
-            "pv_system_id": {
-              "type": "string",
-              "description": "Veraltet — Einzelreferenz; wird beim Laden zu pv_system_ids normalisiert."
             },
             "import_tariff_id": {
               "type": "string",

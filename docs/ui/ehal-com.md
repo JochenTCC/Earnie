@@ -119,7 +119,7 @@ Quellen Victron: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 
 Noch **keine** first-class M1-EHAL-Felder. Live läuft über Hausprofil-Flex-Merker (`loxone_inputs` / `loxone_outputs`). Rollen-Vorlage: `share/ehal/roles/consumer.json`. **Wärmepumpe** → [C.5](#c5-wärmepumpe-stub); **Pool / SwimSpa** → [C.6](#c6-pool--swimspa-stub).
 
-`flex.` ist ein **Rollen-Namespace**. Binding- und Live-Keys folgen Pattern B: `flex.{slug}.sens_power_act` / `set_enable` / `set_power_setpoint`. Live zeigt `{id}:flex.{slug}.…`. Bei Zähler-Ids `zaehler_<slug>` ist der Wire-Slug ohne Prefix (Beispiel: `zaehler_trockner:flex.trockner.sens_power_act`). Legacy-Stubs `flex.power_name` / `flex.enable_name` / `flex.power_setpoint_name` werden beim Laden migriert.
+`flex.` ist ein **Rollen-Namespace**. Binding- und Live-Keys folgen Pattern B: `flex.{slug}.sens_power_act` / `set_enable` / `set_power_setpoint`. Live zeigt `{id}:flex.{slug}.…`. Bei Zähler-Ids `zaehler_<slug>` ist der Wire-Slug ohne Prefix (Beispiel: `zaehler_trockner:flex.trockner.sens_power_act`). Stubs wie `flex.power_name` werden nicht mehr gelesen (fail-fast).
 
 **Pattern B VO-Push-Pfad:** `/ehal/loxone/telemetry/flex.{slug}.sens_power_act/\v` (Freigabe/Soll `flex.{slug}.set_enable` / `flex.{slug}.set_power_setpoint`). Merker-Title bleibt `Earnie_Verbraucher_…`. Siehe [Loxone-Signale — Mehrere Flex-Verbraucher](../referenz/loxone-signale.md).
 
@@ -135,7 +135,7 @@ Noch **keine** first-class M1-EHAL-Felder. Live läuft über Hausprofil-Flex-Mer
 
 ### C.5 Wärmepumpe (Stub)
 
-Rollen-Vorlage: `share/ehal/roles/heatpump.json`. Greenfield-Prefix `Earnie_Waermepumpe_*` (Legacy `Earnie_WP_*`). Live typisch als `thermal_annual`-Consumer (z. B. `wp_heating`).
+Rollen-Vorlage: `share/ehal/roles/heatpump.json`. Greenfield-Prefix `Earnie_Waermepumpe_*`. Live typisch als `thermal_annual`-Consumer (z. B. `wp_heating`).
 
 
 | Bereich / Bedeutung    | Art        | EHAL Value Name (Stub / Wire) | OpenEMS | evcc | Victron | Loxone / Loxone-Extra                                                                          |
@@ -148,7 +148,7 @@ Hinweise: Pattern B — VI = Freigabe von Earnie (`flex.{hk_id}.…` im Check); 
 
 ### C.6 Pool / SwimSpa (Stub)
 
-Deckt die **heute für SwimSpa genutzten** Signale (Heizung + Filter) ab. Zwei Live-Entities: Wärme (`daily_target_source: thermal`) und Filter (`loxone_remaining_hours`). Greenfield-Prefix `Earnie_Pool_`* / `Earnie_Pool_Filter_`* (Legacy z. B. `Earnie_SwimSpa_*` / Homie bleibt in Prod gültig). Spec Filter: [swimspa-filter.md](../spec/swimspa-filter.md). Recipe: `share/loxone/recipes/pool.json`.
+Deckt Heizung + Filter ab. Zwei Live-Entities: Wärme (`daily_target_source: thermal`) und Filter (`loxone_remaining_hours`). Greenfield-Prefix `Earnie_Pool_*` / `Earnie_Pool_Filter_*`. Spec Filter: [swimspa-filter.md](../spec/swimspa-filter.md). Recipe: `share/loxone/recipes/pool.json`.
 
 
 | Bereich / Bedeutung       | Art         | EHAL Value Name (Stub)                   | OpenEMS | evcc | Victron | Loxone / Loxone-Extra                                           |
@@ -166,9 +166,9 @@ Deckt die **heute für SwimSpa genutzten** Signale (Heizung + Filter) ab. Zwei L
 | Native Filter-Dauer       | Eingabewert | `get_filter_native_duration_hours`       |         |      |         | `Earnie_Pool_Filter_NativeDauer`                                |
 
 
-Hinweise: Außentemperatur nur Plant (`sens_temperature_outside`, siehe C.1). Chart zieht Filterleistung ggf. über `subtract_consumer_ids` ab (kein EHAL-Feld). Pattern B: `VI_Earnie_Pool` (Freigaben), `VO_Earnie_Pool` (Telemetrie). **VI Check** = bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` (wie Title); `status.json` mappt auch Legacy-Merker (`Ernie_Swimspa_*_Freigabe`) auf diese Keys.
+Hinweise: Außentemperatur nur Plant (`sens_temperature_outside`, siehe C.1). Chart zieht Filterleistung ggf. über `subtract_consumer_ids` ab (kein EHAL-Feld). Pattern B: `VI_Earnie_Pool` (Freigaben), `VO_Earnie_Pool` (Telemetrie). **VI Check** = bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` (wie Title); `status.json` liest dieselben Keys aus dem geschriebenen Freigabe-Titel.
 
-**EHAL-Com Mapping:** Filter-Felder (`get_filter_remaining_hours`, `flex.pool_filter.sens_power_act`, `sens_filter_active`, native Start/Dauer, Freigabe) werden auf dem Hausprofil-Verbraucher **`pool_filter`** unter `ehal_bindings` gemappt. Ohne `pool_filter` gibt es keine Filter-MILP und keine synthetische Filter-Entity. Ohne Mapping bleibt der Filter inaktiv (kein Hard-Default auf `Ernie_Swimspa_Filter_Sollstunden`).
+**EHAL-Com Mapping:** Filter-Felder (`get_filter_remaining_hours`, `flex.pool_filter.sens_power_act`, `sens_filter_active`, native Start/Dauer, Freigabe) werden auf dem Hausprofil-Verbraucher **`pool_filter`** unter `ehal_bindings` gemappt. Ohne `pool_filter` gibt es keine Filter-MILP und keine synthetische Filter-Entity. Ohne Mapping bleibt der Filter inaktiv.
 
 ## Live-Cockpit noch gesperrt (Greenfield)
 

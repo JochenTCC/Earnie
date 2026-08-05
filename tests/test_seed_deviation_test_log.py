@@ -5,6 +5,9 @@ import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import pytest
+
+from optimizer import deviation_facts as facts_mod
 from optimizer.deviation_eval import evaluate_entry_deviations
 from optimizer.deviation_rules import load_deviation_rules
 from scripts.seed_deviation_test_log import build_deviation_test_entries, seed_deviation_test_log
@@ -12,13 +15,35 @@ from scripts.seed_deviation_test_log import build_deviation_test_entries, seed_d
 TZ = ZoneInfo("Europe/Vienna")
 RULES_PATH = "share/config/deviation_rules.example.json"
 
+SEED_CONSUMERS = [
+    {
+        "id": "ev",
+        "name": "E-Auto",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "ehal_bindings": {
+            "set_evcs_max_current": "Earnie_EAuto_Soll_A",
+            "set_evcs_mode": "Earnie_EAuto_Modus",
+        },
+    },
+    {"id": "swimspa", "name": "SwimSpa", "nominal_power_kw": 2.8},
+    {"id": "wp_heating", "name": "Wärmepumpe", "nominal_power_kw": 1.6},
+]
+
+
+@pytest.fixture(autouse=True)
+def _seed_consumers(monkeypatch):
+    monkeypatch.setattr(
+        facts_mod.config, "get_flexible_consumers", lambda **kw: SEED_CONSUMERS
+    )
+
 
 def test_build_deviation_test_entries_scenario_count():
     entries = build_deviation_test_entries(baseline_count=3)
     assert len(entries) == 10
-    assert entries[-1]["scenario"] == "S5_waermepumpe_hint"
+    assert entries[-1]["scenario"] == "S5_wp_heating_hint"
     assert entries[-2]["scenario"] == "S4_within_tolerance"
-    assert entries[-3]["scenario"] == "S7_eauto_pv_follow"
+    assert entries[-3]["scenario"] == "S7_ev_pv_follow"
     assert entries[-4]["scenario"] == "S6_battery_forced_discharge"
     assert all(entry.get("scenario") == "baseline" for entry in entries[:3])
 
@@ -41,12 +66,12 @@ def test_seed_deviation_test_log_writes_expected_events(tmp_path):
     scenarios = rows[-7:]
     expected = [
         ("warning", "swimspa_thermal_band_ok"),
-        ("error", "eauto_should_charge"),
+        ("error", "ev_should_charge"),
         ("error", "battery_forced_charge_missing"),
         ("error", "battery_forced_discharge_missing"),
-        ("error", "eauto_pv_follow_missing"),
+        ("error", "ev_pv_follow_missing"),
         None,
-        ("hint", "waermepumpe_enable_no_start"),
+        ("hint", "wp_heating_enable_no_start"),
     ]
     for row, exp in zip(scenarios, expected):
         events = evaluate_entry_deviations(row, rules_doc=rules_doc)

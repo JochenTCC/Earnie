@@ -38,11 +38,11 @@
             "message": "SwimSpa nicht geheizt — Ist-Temperatur im Sollband"
         },
         {
-            "id": "eauto_pv_follow_missing",
+            "id": "ev_pv_follow_missing",
             "enabled": true,
             "category": "error",
             "priority": 60,
-            "scope": "eauto",
+            "scope": "ev",
             "when": [
                 "pv_follow_scheduled",
                 "pv_follow_power_below_tolerance"
@@ -50,11 +50,11 @@
             "message": "PV-Überschuss-Modus: Soll {soll_kw:.2f} kW, Ist {ist_kw:.2f} kW"
         },
         {
-            "id": "eauto_should_charge",
+            "id": "ev_should_charge",
             "enabled": true,
             "category": "error",
             "priority": 50,
-            "scope": "eauto",
+            "scope": "ev",
             "when": [
                 "power_mismatch_positive",
                 "plugged_in",
@@ -90,11 +90,11 @@
             "message": "Zwangs-Laden nicht ausgeführt"
         },
         {
-            "id": "waermepumpe_enable_no_start",
+            "id": "wp_heating_enable_no_start",
             "enabled": true,
             "category": "hint",
             "priority": 40,
-            "scope": "waermepumpe",
+            "scope": "wp_heating",
             "when": [
                 "power_mismatch_positive"
             ],

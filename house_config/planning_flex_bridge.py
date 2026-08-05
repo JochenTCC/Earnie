@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from settings.ev_power import merge_ev_power_conversion_fields
-from settings.flexible_consumers import CONSUMER_PALETTE_SIZE, normalize_legacy_id
+from settings.flexible_consumers import CONSUMER_PALETTE_SIZE, reject_legacy_id
 from house_config.consumption_csv import consumer_uses_profile_csv
 from house_config.earnie_role import is_earnie_flex, is_earnie_known, is_earnie_manual
 from house_config.generic_schedule import (
@@ -239,9 +239,7 @@ def planning_ev_to_milp(consumer: dict) -> dict:
             "(live_modus_a_min_remaining_kwh, tie_break_on_epsilon, tie_break_time_epsilon) — "
             "Pflicht bei loxone_outputs.power_setpoint_name."
         )
-    legacy_id = normalize_legacy_id(consumer, str(consumer["id"]))
-    if legacy_id:
-        result["legacy_id"] = legacy_id
+    reject_legacy_id(consumer, str(consumer["id"]))
     _attach_ehal_bindings(result, consumer)
     return result
 
@@ -270,7 +268,7 @@ def planning_thermal_rc_to_milp(consumer: dict) -> dict:
     """Hausprofil thermal_rc → MILP-flex mit thermal_control (Loxone via legacy overlay)."""
     rc = _thermal_rc_params(consumer)
     min_on = max(4, int(consumer.get("min_on_quarterhours", 8) or 8))
-    legacy_id = str(consumer.get("legacy_id") or "").strip() or None
+    reject_legacy_id(consumer, str(consumer["id"]))
     entry = {
         "id": str(consumer["id"]),
         "name": str(consumer.get("label", consumer["id"])),
@@ -312,8 +310,6 @@ def planning_thermal_rc_to_milp(consumer: dict) -> dict:
     profile_loxone = (consumer.get("thermal_control") or {}).get("loxone")
     if isinstance(profile_loxone, dict) and profile_loxone:
         entry["thermal_control"]["loxone"] = dict(profile_loxone)
-    if legacy_id:
-        entry["legacy_id"] = legacy_id
     _attach_ehal_bindings(entry, consumer)
     return entry
 
@@ -539,9 +535,7 @@ def planning_thermal_to_milp(consumer: dict) -> dict:
     loxone_outputs = consumer.get("loxone_outputs")
     if isinstance(loxone_outputs, dict) and loxone_outputs:
         entry["loxone_outputs"] = dict(loxone_outputs)
-    legacy_id = normalize_legacy_id(consumer, str(consumer["id"]))
-    if legacy_id:
-        entry["legacy_id"] = legacy_id
+    reject_legacy_id(consumer, str(consumer["id"]))
     _attach_ehal_bindings(entry, consumer)
     return entry
 
@@ -982,9 +976,7 @@ def _used_chart_color_indices(consumers: list[dict]) -> set[int]:
 _DEFAULT_CHART_COLOR_INDEX_BY_ID: dict[str, int] = {
     "swimspa": 0,
     "pool_filter": 1,
-    "eauto": 2,
     "ev": 2,
-    "waermepumpe": 7,
     "wp_heating": 7,
 }
 
@@ -992,105 +984,30 @@ _DEFAULT_CHART_COLOR_INDEX_BY_ID: dict[str, int] = {
 _CHART_COLOR_ALLOCATION_ORDER: tuple[int, ...] = (0, 1, 2, 7, 6, 3, 5, 4)
 
 
-def _allocate_chart_color_index(
-    used: set[int],
-    consumer_id: str,
-    *,
-    legacy_id: str | None = None,
-) -> int:
-    for key in (consumer_id, legacy_id):
-        if not key:
-            continue
-        preferred = _DEFAULT_CHART_COLOR_INDEX_BY_ID.get(str(key))
-        if preferred is not None and preferred not in used:
-            return preferred
+def _allocate_chart_color_index(used: set[int], consumer_id: str) -> int:
+    preferred = _DEFAULT_CHART_COLOR_INDEX_BY_ID.get(str(consumer_id))
+    if preferred is not None and preferred not in used:
+        return preferred
     for index in _CHART_COLOR_ALLOCATION_ORDER:
         if index not in used:
             return index
     return sum(ord(char) for char in consumer_id) % CONSUMER_PALETTE_SIZE
 
 
-def _deep_merge_dict(base: dict, overlay: dict) -> dict:
-    """Merge overlay onto base; nested dicts merged recursively."""
-    merged = dict(base)
-    for key, value in overlay.items():
-        if (
-            key in merged
-            and isinstance(merged[key], dict)
-            and isinstance(value, dict)
-        ):
-            merged[key] = _deep_merge_dict(merged[key], value)
-        else:
-            merged[key] = value
-    return merged
-
-
-_LIVE_OVERLAY_KEYS = (
-    "loxone_inputs",
-    "loxone_outputs",
-    "thermal_control",
-    "filter_schedule",
-    "chart_color_index",
-    "path_historical_log",
-    "loxone_target_kwh_name",
-    "loxone_target_hours_name",
-)
-
-
-def _overlay_legacy_consumer(planning: dict, base: dict) -> dict:
-    """Live fields from legacy base entry onto canonical planning row."""
-    entry = dict(planning)
-    for key in _LIVE_OVERLAY_KEYS:
-        base_val = base.get(key)
-        if base_val is None:
-            continue
-        if key in entry and isinstance(entry.get(key), dict) and isinstance(base_val, dict):
-            entry[key] = _deep_merge_dict(base_val, entry[key])
-        else:
-            entry[key] = base_val
-    base_cs = base.get("charging_schedule") or {}
-    if base_cs:
-        entry_cs = dict(entry.get("charging_schedule") or {})
-        base_lox = base_cs.get("loxone") or {}
-        if base_lox:
-            entry_cs["loxone"] = _deep_merge_dict(
-                base_lox,
-                entry_cs.get("loxone") or {},
-            )
-        for cs_key in ("enabled", "forecast_when_absent", "target_soc_percent", "charging_efficiency"):
-            if cs_key in base_cs and cs_key not in entry_cs:
-                entry_cs[cs_key] = base_cs[cs_key]
-        for day_key in ("weekday", "weekend"):
-            if base_cs.get(day_key) and not entry_cs.get(day_key):
-                entry_cs[day_key] = dict(base_cs[day_key])
-        entry["charging_schedule"] = _deep_merge_dict(base_cs, entry_cs)
-    if entry.get("chart_color_index") is None and base.get("chart_color_index") is not None:
-        entry["chart_color_index"] = base["chart_color_index"]
-    return entry
-
-
 def merge_flexible_consumers(
     base_consumers: list[dict],
     planning_consumers: list[dict],
 ) -> list[dict]:
-    """Config-Verbraucher + Planungs-Verbraucher; legacy_id overlay when ids differ."""
+    """Config-Verbraucher + Planungs-Verbraucher, zusammengeführt über die kanonische id."""
     merged_map: dict[str, dict] = {c["id"]: dict(c) for c in base_consumers}
     used_indices = _used_chart_color_indices(list(merged_map.values()))
     for consumer in planning_consumers:
         entry = dict(consumer)
         canonical_id = str(entry["id"])
-        legacy_id = str(entry.get("legacy_id") or "").strip()
-        if legacy_id and legacy_id in merged_map and legacy_id != canonical_id:
-            entry = _overlay_legacy_consumer(entry, merged_map[legacy_id])
-            del merged_map[legacy_id]
         if canonical_id in merged_map:
             continue
         if entry.get("chart_color_index") is None:
-            index = _allocate_chart_color_index(
-                used_indices,
-                canonical_id,
-                legacy_id=legacy_id or None,
-            )
+            index = _allocate_chart_color_index(used_indices, canonical_id)
             entry["chart_color_index"] = index
             used_indices.add(index)
         merged_map[canonical_id] = entry

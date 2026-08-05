@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from data.monthly_float_rates import (
-    REQUIRED_OEMAG_MONTHS,
+    MIN_OEMAG_MONTHS,
     build_monthly_float_lookup,
     load_econtrol_referenzmarktwert_pv_monthly,
     load_monthly_float_reference_cent,
@@ -45,7 +45,7 @@ def _tariffs_doc() -> dict:
 def test_load_oemag_requires_twelve_months():
     doc = _tariffs_doc()
     rates = load_oemag_monthly_reference_rates(doc)
-    assert len(rates) >= REQUIRED_OEMAG_MONTHS
+    assert len(rates) >= MIN_OEMAG_MONTHS
 
 
 def test_load_oemag_rejects_wrong_count():

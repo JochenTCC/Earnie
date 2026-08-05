@@ -53,27 +53,27 @@
   "ehal_bindings": [
     {
       "source": "W",
-      "ehal_field": "pv_production_active",
+      "ehal_field": "sens_pv_production_active",
       "scale": 1,
       "negate": false,
       "transform_note": "Ensure ≥ 0 production."
     },
     {
       "source": "SoC",
-      "ehal_field": "ess_soc",
+      "ehal_field": "sens_ess_soc",
       "scale": 1,
       "negate": false
     },
     {
       "source": "WBat",
-      "ehal_field": "ess_power",
+      "ehal_field": "sens_ess_power",
       "scale": 1,
       "negate": false,
       "transform_note": "Normalize hub sign to EHAL +discharge / −charge."
     },
     {
       "source": "AC_Meter_W",
-      "ehal_field": "grid_power_active",
+      "ehal_field": "sens_grid_power_active",
       "scale": 1,
       "negate": false,
       "transform_note": "Normalize to EHAL +import / −export."

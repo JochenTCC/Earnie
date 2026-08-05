@@ -90,17 +90,17 @@ class TestScenarioCatalog:
         assert events[0].category == "warning"
         assert events[0].rule_id == "swimspa_thermal_band_ok"
 
-    def test_s2_eauto_error(self, rules_doc):
+    def test_s2_ev_error(self, rules_doc):
         entry = _entry(
-            consumer_powers_kw={"eauto": 3.5},
-            consumption_snapshot={"flex_kw": {"eauto": 0.0}, "battery_kw": 0.0},
-            charging_contexts={"eauto": {"plugged_in": True, "active": True}},
-            consumer_remaining_kwh={"eauto": 8.0},
+            consumer_powers_kw={"ev": 3.5},
+            consumption_snapshot={"flex_kw": {"ev": 0.0}, "battery_kw": 0.0},
+            charging_contexts={"ev": {"plugged_in": True, "active": True}},
+            consumer_remaining_kwh={"ev": 8.0},
         )
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
         assert len(events) == 1
         assert events[0].category == "error"
-        assert events[0].rule_id == "eauto_should_charge"
+        assert events[0].rule_id == "ev_should_charge"
         assert "3.50" in events[0].message
 
     def test_s3_forced_charge_error(self, rules_doc):
@@ -129,21 +129,30 @@ class TestScenarioCatalog:
         assert events[0].scope == "battery"
         assert events[0].rule_id == "battery_forced_discharge_missing"
 
-    def test_s2b_eauto_pv_follow_error(self, rules_doc):
-        entry = _entry(
-            consumer_powers_kw={"eauto": 2.0},
-            consumer_pv_follow={"eauto": 1},
-            loxone_sent={
-                "Ernie_EAuto_Ziel_kW": 3.5,
-                "Ernie_EAuto_pv_follow": 1.0,
+    def test_s2b_ev_pv_follow_error(self, rules_doc, monkeypatch):
+        ev_consumer = {
+            "id": "ev",
+            "name": "E-Auto",
+            "nominal_power_kw": 3.5,
+            "min_power_kw": 1.4,
+            "ehal_bindings": {
+                "set_evcs_max_current": "Earnie_EAuto_Soll_A",
+                "set_evcs_mode": "Earnie_EAuto_Modus",
             },
-            consumption_snapshot={"flex_kw": {"eauto": 0.0}, "battery_kw": 0.0},
-            charging_contexts={"eauto": {"plugged_in": True, "active": True}},
-            consumer_remaining_kwh={"eauto": 8.0},
+        }
+        monkeypatch.setattr(
+            facts_mod.config, "get_flexible_consumers", lambda **kw: [ev_consumer]
+        )
+        entry = _entry(
+            consumer_powers_kw={"ev": 2.0},
+            consumer_pv_follow={"ev": 1},
+            consumption_snapshot={"flex_kw": {"ev": 0.0}, "battery_kw": 0.0},
+            charging_contexts={"ev": {"plugged_in": True, "active": True}},
+            consumer_remaining_kwh={"ev": 8.0},
         )
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
         assert len(events) == 1
-        assert events[0].rule_id == "eauto_pv_follow_missing"
+        assert events[0].rule_id == "ev_pv_follow_missing"
         assert "3.50" in events[0].message
 
     def test_s4_no_deviation_within_tolerance(self, rules_doc):
@@ -154,33 +163,33 @@ class TestScenarioCatalog:
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
         assert events == []
 
-    def test_s5_waermepumpe_hint(self, rules_doc):
+    def test_s5_wp_heating_hint(self, rules_doc):
         entry = _entry(
-            consumer_powers_kw={"waermepumpe": 1.5},
-            consumption_snapshot={"flex_kw": {"waermepumpe": 0.0}, "battery_kw": 0.0},
+            consumer_powers_kw={"wp_heating": 1.5},
+            consumption_snapshot={"flex_kw": {"wp_heating": 0.0}, "battery_kw": 0.0},
         )
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
         assert len(events) == 1
         assert events[0].category == "hint"
-        assert events[0].rule_id == "waermepumpe_enable_no_start"
+        assert events[0].rule_id == "wp_heating_enable_no_start"
         assert "1.50" in events[0].message
 
     def test_missing_slot_quality_skips_evaluation(self, rules_doc):
         entry = _entry(
-            consumer_powers_kw={"eauto": 3.5},
-            consumption_snapshot={"flex_kw": {"eauto": 0.0}, "battery_kw": 0.0},
-            charging_contexts={"eauto": {"plugged_in": True}},
-            consumer_remaining_kwh={"eauto": 8.0},
+            consumer_powers_kw={"ev": 3.5},
+            consumption_snapshot={"flex_kw": {"ev": 0.0}, "battery_kw": 0.0},
+            charging_contexts={"ev": {"plugged_in": True}},
+            consumer_remaining_kwh={"ev": 8.0},
         )
         facts = build_slot_deviation_facts(entry, slot_quality=SLOT_MISSING)
         assert evaluate_slot_deviations(facts, rules_doc) == []
 
     def test_present_slot_required_by_default(self, rules_doc):
         entry = _entry(
-            consumer_powers_kw={"eauto": 3.5},
-            consumption_snapshot={"flex_kw": {"eauto": 0.0}, "battery_kw": 0.0},
-            charging_contexts={"eauto": {"plugged_in": True}},
-            consumer_remaining_kwh={"eauto": 8.0},
+            consumer_powers_kw={"ev": 3.5},
+            consumption_snapshot={"flex_kw": {"ev": 0.0}, "battery_kw": 0.0},
+            charging_contexts={"ev": {"plugged_in": True}},
+            consumer_remaining_kwh={"ev": 8.0},
         )
         facts = build_slot_deviation_facts(entry, slot_quality=SLOT_PRESENT)
         events = evaluate_slot_deviations(facts, rules_doc)

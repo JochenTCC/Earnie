@@ -107,12 +107,9 @@ __all__ = [
     "build_savings_snapshot",
     "calculate_optimization_savings",
     "get_consumer_remaining_kwh",
-    "get_spa_remaining_kwh",
     "milp_optimizer",
     "overlay_main_run_on_rows",
     "register_consumer_delivery",
-    "register_consumer_hours",
-    "register_spa_hour",
     "resolve_applied_daily_targets",
     "resolve_baseload_kwh",
     "apply_immediate_charge_to_matrix",
@@ -374,33 +371,3 @@ def register_consumer_delivery(
     _save_consumer_state(state)
     return compliance
 
-
-def register_consumer_hours(
-    consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict] | None = None,
-    consumers: list | None = None,
-    *,
-    live_flex_kw: dict[str, float] | None = None,
-    sent_flex_kw: dict[str, float] | None = None,
-    book_planned: bool = True,
-) -> dict[str, dict]:
-    """Legacy-Alias für register_consumer_delivery."""
-    return register_consumer_delivery(
-        consumer_powers,
-        charging_contexts=charging_contexts,
-        consumers=consumers,
-        live_flex_kw=live_flex_kw,
-        sent_flex_kw=sent_flex_kw,
-        book_planned=book_planned,
-    )
-
-
-def get_spa_remaining_kwh() -> float:
-    """Legacy: verbleibendes SwimSpa-Tagesziel."""
-    return get_consumer_remaining_kwh().get("swimspa", 0.0)
-
-
-def register_spa_hour(spa_power_kw: float) -> None:
-    """Legacy: SwimSpa-Stunde buchen."""
-    if spa_power_kw > 0:
-        register_consumer_hours({"swimspa": spa_power_kw})

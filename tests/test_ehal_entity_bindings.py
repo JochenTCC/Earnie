@@ -57,7 +57,7 @@ def test_migrate_consumer_legacy_to_ehal_bindings_ev():
     assert bindings["get_evcs_ready_by_time"] == "EV_Ready"
     assert bindings["charge_immediate_name"] == "EV_Now"
     assert bindings["set_evcs_max_current"] == "EV_SetA"
-    assert bindings["pv_follow_name"] == "EV_PV"
+    assert "pv_follow_name" not in bindings
     assert bindings["flex.ev1.sens_power_act"] == "EV_Power"
     assert bindings["flex.ev1.set_enable"] == "EV_Enable"
 
@@ -74,10 +74,10 @@ def test_migrate_consumer_flex_power_setpoint():
     assert "set_evcs_max_current" not in bindings
 
 
-def test_resolve_plant_binding_dual_read_blocks():
+def test_resolve_plant_binding_has_no_loxone_blocks_fallback():
     house = {"plant": {"ehal_bindings": {}}}
     config = {"loxone_blocks": {"soc_name": "Battery_SOC"}}
-    assert resolve_plant_binding(house, "sens_ess_soc", config) == "Battery_SOC"
+    assert resolve_plant_binding(house, "sens_ess_soc", config) == ""
     house2 = {"plant": {"ehal_bindings": {"sens_ess_soc": "Plant_SOC"}}}
     assert resolve_plant_binding(house2, "sens_ess_soc", config) == "Plant_SOC"
 

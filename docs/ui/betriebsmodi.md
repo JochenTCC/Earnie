@@ -19,7 +19,7 @@ Beispiel Community Cloud (nur Szenario-Explorer): `EARNIE_UI_MODES=scenario_expl
 
 Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarienkonfigurator** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`). **Analyse Verbrauch & Kosten** erscheint nur mit `live_environment` und nur im Abschnitt Live-Cockpit; ohne Live-Verbindung zur Smarthome-Steuerung zeigt die Seite einen Hinweis statt der Analyse.
 
-In der Sidebar (unten): Abschnitt **Info / About** (Banner der Wahrheit, Version, Kontaktformular an `mail@techcreacon.com` — ZIP sammeln und der E-Mail manuell anhängen), oben Setup-Hinweise und **„Konfiguration speichern / laden“** (ZIP-Export/Import der Config-Sidecars und `uploads/` — siehe [Speichern / Laden](../konfiguration/speichern-laden.md)).
+In der Sidebar (unten): Abschnitt **Info / About** (Banner der Wahrheit, Version, Kontakt → **GitHub-Issue** mit Art/Thema/Beschreibung; optional lokale Kontakt-ZIP; privater Ausnahmekanal `support@earnie-hems.com` für Registry/Vertrauliches), oben Setup-Hinweise und **„Konfiguration speichern / laden“** (ZIP-Export/Import der Config-Sidecars und `uploads/` — siehe [Speichern / Laden](../konfiguration/speichern-laden.md)).
 
 ### Navigationsabschnitte (nach vollständiger Einrichtung)
 
@@ -136,7 +136,7 @@ Tabelle **Gesamtkosten und -Verbrauch**: Spalten `Szenario`, `Jahres Verbrauch [
 
 Mit Hausprofil ist `consumption_source` typisch `profile_spec`: Fenster-Referenz = Spec-Last (Jahresverbrauch/Zeitpläne), nicht der Zähler. Historisch bleibt bewusst am Ist-Zähler — Abweichungen zu den übrigen Zeilen sind erwartbar, wenn Ist ≠ Modell. Kurzfassung in der UI-Caption unter der Tabelle; Anwendertext: [Benutzer-Handbuch](../user-manual/Benutzer-Handbuch-Earnie.md#gesamtkosten-jahres-verbrauch-kwh).
 
-Weicht der Jahresverbrauch einer Zeile relativ um **mehr als 5%** (`CONSUMPTION_TOLERANCE_REL`) von der **Live-Referenz** ab, erscheint in der Spalte **Hinweis** eine Warnung mit Verweis auf **Info / About → Kontakt** (Config-Dump an TechCreaCon). Die Live-Referenz-Zeile selbst bleibt ohne Warnung.
+Weicht der Jahresverbrauch einer Zeile relativ um **mehr als 5%** (`CONSUMPTION_TOLERANCE_REL`) von der **Live-Referenz** ab, erscheint in der Spalte **Hinweis** eine Warnung mit Verweis auf **Info / About → Kontakt** (öffentliches Issue ohne Secrets; vollständige Config-ZIP nur privat an `support@earnie-hems.com`). Die Live-Referenz-Zeile selbst bleibt ohne Warnung.
 
 ### Verbrauchsvergleich (Debug)
 

@@ -223,7 +223,7 @@
       "hk_type": "thermal",
       "ehal_field": "flex.set_enable",
       "group": "Earnie_Pool_",
-      "notes": "Heat Freigabe. Legacy Earnie_SwimSpa_Freigabe."
+      "notes": "Heat Freigabe."
     },
     {
       "name": "Earnie_Pool_Temp_Ist",

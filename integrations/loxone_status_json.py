@@ -65,7 +65,7 @@ def _marker_looks_like_pool_heat(marker: str) -> bool:
     lower = marker.lower()
     if "filter" in lower:
         return False
-    if lower in ("earnie_pool_freigabe", "ernie_pool_freigabe"):
+    if lower == "earnie_pool_freigabe":
         return True
     return "freigabe" in lower and ("swimspa" in lower or lower.endswith("pool_freigabe"))
 
@@ -131,26 +131,12 @@ def _sent_enable_value(
     primary_marker: str,
     status_key: str,
 ) -> float | None:
-    """Value for status Freigabe; pool keys also accept legacy SwimSpa merker names."""
+    """Value for status Freigabe — only the configured Freigabe marker or the Pool title."""
     name = str(primary_marker or "").strip()
     if name and name in loxone_sent:
         return float(loxone_sent[name])
-    aliases: tuple[str, ...] = ()
-    if status_key == POOL_FILTER_ENABLE_KEY:
-        aliases = (
-            "Earnie_Swimspa_Filter_Freigabe",
-            "Ernie_Swimspa_Filter_Freigabe",  # legacy typo dual-read
-            "Earnie_Pool_Filter_Freigabe",
-        )
-    elif status_key == POOL_HEAT_ENABLE_KEY:
-        aliases = (
-            "Earnie_SwimSpa_Freigabe",
-            "Ernie_SwimSpa_Freigabe",
-            "Earnie_Pool_Freigabe",
-        )
-    for alt in aliases:
-        if alt in loxone_sent:
-            return float(loxone_sent[alt])
+    if status_key in POOL_ENABLE_KEYS and status_key in loxone_sent:
+        return float(loxone_sent[status_key])
     return None
 
 

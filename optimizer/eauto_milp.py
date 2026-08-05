@@ -122,11 +122,6 @@ def ev_in_modus_b(
     return not ev_modus_a_active(consumer, matrix, remaining_kwh, params)
 
 
-# Backward-compatible aliases
-eauto_modus_a_active = ev_modus_a_active
-eauto_in_modus_b = ev_in_modus_b
-
-
 def milp_uses_power_setpoint(
     consumer: dict,
     matrix: list | None,

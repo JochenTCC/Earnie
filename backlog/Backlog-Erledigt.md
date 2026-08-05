@@ -3,6 +3,26 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Streamlit UI HTTP 500 GZipResponder (2026-08-05)
+
+- [x] **Streamlit UI HTTP 500 on NAS/Docker (`GZipResponder` / `thread_minimum_size`)** — pin `starlette>=0.46.0,<1.4` in `pyproject.toml`; retag/overwrite pre-release `v2.4.0-alpha.5` (image rebuild). Verified.
+
+
+### Bugfix SE crash when cons_data missing/empty (2026-08-05)
+
+- [x] **SE crash when `cons_data_hourly.csv` missing/empty** — Backtesting time-range help no longer raises via `resolve_simulation_window`; guard empty cons_data (`1987684`, `v2.4.0-alpha.5`). Handbook: no-PV/no-battery baseline is automatic **Historisch** (no extra scenario). Tests: `tests/test_backtesting_time_ranges.py`. Verified.
+
+
+### Bugfix SwimSpa filter power also on heating Ist (2026-08-05)
+
+- [x] **SwimSpa filter power also on heating Ist** — shared meter: auto `subtract_consumer_ids` + native-filter inference over shared-meter heating ids (`v2.4.0-alpha.4`). Verified.
+
+
+### Bugfix EVCS set_evcs_mode with max current (2026-08-05)
+
+- [x] **EVCS `set_evcs_mode` with max current** — fixed current charging wrote mode `0`; now `2` (`now`) with `set_evcs_max_current`, PV surplus `1`, idle `0` (`698fc6a`, `v2.4.0-alpha.2`). Verified.
+
+
 ### EHAL-Com Silent/Loud status vs daemon (2026-08-05)
 
 - [x] EHAL-Com status bar combines Silent-/Loud-Modus with Optimierer-Dienst running state (`ui/loxone_debug.py`); no longer implies writes when `main.py` is stopped. Docs `ehal-com.md`; tests `test_loxone_debug.py`.
@@ -37,11 +57,6 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 ### EHAL-Com manual Merker mapping (2026-08-03)
 
 - [x] **2.4 polishing — manual Merker in EHAL mapping** — Per-field creatable selectboxes on EHAL-Com (`accept_new_options`); confirm dialog saves new Merker into options and maps the EHAL field to `house_profiles.json`; optional HTTP probe; Live table column titles `Mapping auf Loxone` / Home Assistant / OpenEMS. Docs `ehal-com.md`; tests `test_ehal_loxone_mapping_entities.py`, `test_loxone_debug.py`.
-
-
-### Bugfix Backtesting crash empty cons_data (2026-08-03)
-
-- [x] **Backtesting page crash when `cons_data_hourly.csv` missing/empty** — Zeitraum-Hilfe called `resolve_simulation_window` and raised `ValueError` before the generate-data warning; help text now handles empty cons_data. Handbook: no-PV/no-battery baseline is automatic **Historisch** (no extra scenario). Tests: `tests/test_backtesting_time_ranges.py`. Verified.
 
 
 ### Pattern B pool Freigabe + Live-Schreiben flex (2026-08-01)

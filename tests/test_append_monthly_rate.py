@@ -120,7 +120,7 @@ def _write_live_pack(config_dir: Path, tariffs: dict) -> None:
                         "label": "Live",
                         "settings": {
                             "battery_id": "home_5kwh",
-                            "pv_system_id": "roof",
+                            "pv_system_ids": ["roof"],
                             "import_tariff_id": "fixed_imp",
                             "export_tariff_id": "monthly_exp",
                             "house_profile_id": "efh",

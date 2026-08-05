@@ -19,7 +19,6 @@ from settings.flexible_consumers import (
     flex_kw_lookup,
     flex_kw_pop_for_consumer,
     flex_kw_to_canonical,
-    runtime_consumer_id,
     target_kwh_from_rest_soc,
 )
 
@@ -470,11 +469,9 @@ def _trigger_snapshot_flag(
     consumer: dict,
     suffix: str,
 ) -> bool | None:
-    runtime_id = runtime_consumer_id(consumer)
-    canonical_id = str(consumer["id"])
-    for key in (f"{runtime_id}_{suffix}", f"{canonical_id}_{suffix}"):
-        if key in snap:
-            return bool(snap[key])
+    key = f"{str(consumer['id'])}_{suffix}"
+    if key in snap:
+        return bool(snap[key])
     return None
 
 

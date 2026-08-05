@@ -5,55 +5,55 @@
   "recommended_markers": [
     {
       "ehal_field": "sens_evcs_active_power",
-      "loxone_blocks_key": "loxone_inputs.power_name",
+      "loxone_blocks_key": "ehal_bindings.sens_evcs_active_power",
       "suggested_name": "Earnie_EAuto_Leistung",
-      "notes": "Active charge power (kW). Dual flex.power_name for import. Prefer EFM Load. Path ev.{ev_id}.sens_evcs_active_power. Legacy Earnie_EAuto_P_act."
+      "notes": "Active charge power (kW). Prefer EFM Load. Path ev.{ev_id}.sens_evcs_active_power."
     },
     {
       "ehal_field": "sens_evcs_connected",
-      "loxone_blocks_key": "plugged_in_name",
+      "loxone_blocks_key": "ehal_bindings.sens_evcs_connected",
       "suggested_name": "Earnie_EAuto_Angeschlossen",
       "notes": "1 = plugged in."
     },
     {
       "ehal_field": "sens_evcs_soc_act",
-      "loxone_blocks_key": "actual_soc_name",
+      "loxone_blocks_key": "ehal_bindings.sens_evcs_soc_act",
       "suggested_name": "Earnie_EAuto_SOC",
       "notes": "Vehicle SOC %."
     },
     {
       "ehal_field": "sens_evcs_bat_capacity",
-      "loxone_blocks_key": "battery_capacity_kwh_name",
+      "loxone_blocks_key": "ehal_bindings.sens_evcs_bat_capacity",
       "suggested_name": "Earnie_EAuto_Kapazitaet",
       "notes": "Battery capacity kWh."
     },
     {
       "ehal_field": "get_evcs_nominal_current",
-      "loxone_blocks_key": "nominal_power_kw_name",
+      "loxone_blocks_key": "ehal_bindings.get_evcs_nominal_current",
       "suggested_name": "Earnie_EAuto_MaxStrom",
-      "notes": "Max/nominal current A (legacy key name is misleading)."
+      "notes": "Max/nominal current A."
     },
     {
       "ehal_field": "get_evcs_limit_soc",
-      "loxone_blocks_key": "get_evcs_limit_soc",
+      "loxone_blocks_key": "ehal_bindings.get_evcs_limit_soc",
       "suggested_name": "Earnie_EAuto_LimitSOC",
       "notes": "Charge limit SOC %."
     },
     {
       "ehal_field": "get_evcs_ready_by_time",
-      "loxone_blocks_key": "ready_by_time_name",
+      "loxone_blocks_key": "ehal_bindings.get_evcs_ready_by_time",
       "suggested_name": "Ladewecker",
       "notes": "LoxAPP3 AlarmClock Bezeichnung; import merges onto EV with Zähler/power. Earnie reads SpecialState10 via /jdev/sps/io/{name}/all (Tna backup)."
     },
     {
       "ehal_field": "set_evcs_max_current",
-      "loxone_blocks_key": "loxone_outputs.power_setpoint_name",
+      "loxone_blocks_key": "ehal_bindings.set_evcs_max_current",
       "suggested_name": "Earnie_EAuto_Soll_A",
       "notes": "Charge current setpoint A."
     },
     {
       "ehal_field": "set_evcs_mode",
-      "loxone_blocks_key": "set_evcs_mode",
+      "loxone_blocks_key": "ehal_bindings.set_evcs_mode",
       "suggested_name": "Earnie_EAuto_Modus",
       "notes": "Enum off | pv | now (Loxone Merker: 0 / 1 / 2)."
     }

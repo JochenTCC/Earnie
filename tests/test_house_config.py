@@ -84,7 +84,9 @@ def test_resolve_pv_into_settings():
     from house_config.entity_resolution import pv_systems_by_id
 
     pv_map = pv_systems_by_id(config.CONFIG.get_components_catalog())
-    resolved = resolve_pv_into_settings({"pv_system_id": "test_pv"}, pv_map)
+    with pytest.raises(ValueError, match="pv_system_ids"):
+        resolve_pv_into_settings({"pv_system_id": "test_pv"}, pv_map)
+    resolved = resolve_pv_into_settings({"pv_system_ids": ["test_pv"]}, pv_map)
     assert resolved["pv_kwp"] == 6.0
     assert len(resolved["_planning_pv_systems"]) == 1
     assert resolved["_planning_pv_systems"][0]["id"] == "test_pv"
@@ -307,69 +309,69 @@ def test_import_monthly_table_tariff_normalization():
     assert len(doc["import_tariffs"]["monthly_import"]["monthly_rates"]) == 1
 
 
-def test_legacy_export_monthly_float_soft_migrates():
+def test_legacy_export_monthly_float_rejected():
     from house_config.tariffs_store import normalize_tariffs_document
 
     oemag = [
         {"year": 2025, "month": i, "tariff_cent_kwh": 7.15} for i in range(1, 13)
     ]
-    doc = normalize_tariffs_document(
-        {
-            "monthly_float_reference_cent_kwh": 7.15,
-            "oemag_monthly_feed_in_rates": oemag,
-            "import_tariffs": [],
-            "export_tariffs": [
-                {
-                    "id": "legacy_float",
-                    "label": "Legacy Float",
-                    "type": "monthly_float",
-                    "land": "AT",
-                    "settlement_fee_cent_kwh": 0.5,
-                    "arbeitspreis_kwh_cent": 7.15,
-                }
-            ],
-        }
-    )
-    export = doc["export_tariffs"]["legacy_float"]
-    assert export["type"] == "monthly_table"
-    assert len(export["monthly_rates"]) == 12
-    assert "arbeitspreis_kwh_cent" not in export
+    with pytest.raises(ValueError, match="monthly_table"):
+        normalize_tariffs_document(
+            {
+                "monthly_float_reference_cent_kwh": 7.15,
+                "oemag_monthly_feed_in_rates": oemag,
+                "import_tariffs": [],
+                "export_tariffs": [
+                    {
+                        "id": "legacy_float",
+                        "label": "Legacy Float",
+                        "type": "monthly_float",
+                        "land": "AT",
+                        "settlement_fee_cent_kwh": 0.5,
+                        "arbeitspreis_kwh_cent": 7.15,
+                    }
+                ],
+            }
+        )
 
 
-def test_legacy_awattar_and_dynamic_epex_soft_migrate_to_spot_hourly():
+def test_legacy_awattar_and_dynamic_epex_types_rejected():
     from house_config.tariffs_store import normalize_tariffs_document
 
-    doc = normalize_tariffs_document(
-        {
-            "import_tariffs": [
-                {
-                    "id": "awattar_at",
-                    "label": "aWATTar — HOURLY",
-                    "type": "awattar",
-                    "land": "AT",
-                    "settlement_fee_cent_kwh": 1.5,
-                    "markup_percent": 3.0,
-                    "prices_include_vat": False,
-                    "vat_percent": 20.0,
-                }
-            ],
-            "export_tariffs": [
-                {
-                    "id": "dynamic_epex",
-                    "label": "aWATTar — SUNNY SPOT",
-                    "type": "dynamic_epex",
-                    "land": "AT",
-                    "feed_in_fee_factor": 0.19,
-                    "feed_in_fix_cent": 0.0,
-                }
-            ],
-        }
-    )
-    assert doc["import_tariffs"]["awattar_at"]["type"] == "spot_hourly"
-    assert doc["export_tariffs"]["dynamic_epex"]["type"] == "spot_hourly"
-    assert doc["export_tariffs"]["dynamic_epex"]["feed_in_fee_factor"] == pytest.approx(
-        0.19
-    )
+    with pytest.raises(ValueError, match="spot_hourly"):
+        normalize_tariffs_document(
+            {
+                "import_tariffs": [
+                    {
+                        "id": "awattar_at",
+                        "label": "aWATTar — HOURLY",
+                        "type": "awattar",
+                        "land": "AT",
+                        "settlement_fee_cent_kwh": 1.5,
+                        "markup_percent": 3.0,
+                        "prices_include_vat": False,
+                        "vat_percent": 20.0,
+                    }
+                ],
+                "export_tariffs": [],
+            }
+        )
+    with pytest.raises(ValueError, match="spot_hourly"):
+        normalize_tariffs_document(
+            {
+                "import_tariffs": [],
+                "export_tariffs": [
+                    {
+                        "id": "dynamic_epex",
+                        "label": "aWATTar — SUNNY SPOT",
+                        "type": "dynamic_epex",
+                        "land": "AT",
+                        "feed_in_fee_factor": 0.19,
+                        "feed_in_fix_cent": 0.0,
+                    }
+                ],
+            }
+        )
 
 
 def test_awattar_tariff_spec_includes_surcharges():
@@ -390,7 +392,7 @@ def test_awattar_tariff_spec_includes_surcharges():
     assert dynamic["supplier_id"] == "awattar_at"
 
 
-def test_export_tariff_id_alias_awattar_sunny_float():
+def test_export_tariff_id_alias_awattar_sunny_float_rejected():
     from house_config.tariffs_store import resolve_export_tariff_into_settings
 
     tariffs = {
@@ -404,14 +406,11 @@ def test_export_tariff_id_alias_awattar_sunny_float():
             }
         }
     }
-    resolved = resolve_export_tariff_into_settings(
-        {"export_tariff_id": "awattar_sunny_float"},
-        tariffs,
-    )
-    assert resolved["feed_in_mode"] == "dynamic_epex"
-    assert resolved["k_push_cent"] == pytest.approx(0.0)
-    assert resolved["_export_tariff_spec"]["id"] == "dynamic_epex"
-    assert resolved["_export_tariff_spec"]["type"] == "spot_hourly"
+    with pytest.raises(ValueError, match="dynamic_epex"):
+        resolve_export_tariff_into_settings(
+            {"export_tariff_id": "awattar_sunny_float"},
+            tariffs,
+        )
 
 
 def test_tariff_spec_resolution_de_spot_ch_fix():
@@ -541,7 +540,6 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path):
     }
     wp_original = {
         "id": "wp_heating",
-        "legacy_id": "waermepumpe",
         "label": "Wärmepumpe",
         "type": "thermal_annual",
         "nominal_power_kw": 1.6,
@@ -606,7 +604,7 @@ def test_house_profile_save_preserves_loxone_bindings(tmp_path):
     wp = next(item for item in consumers if item["id"] == "wp_heating")
     ev = next(item for item in consumers if item["id"] == "ev")
     spa = next(item for item in consumers if item["id"] == "swimspa")
-    assert wp["legacy_id"] == "waermepumpe"
+    assert "legacy_id" not in wp
     assert wp["loxone_outputs"]["enable_name"] == "Ernie_WP_Freigabe"
     assert wp["loxone_inputs"]["power_name"] == "Ernie_WP_P_act"
     assert ev["loxone_outputs"]["power_setpoint_name"] == "Ernie_EAuto_Ziel_kW"
@@ -735,14 +733,16 @@ def test_eligible_start_hours_shift_cases():
     assert len(eligible_start_hours(18, 12.0)) == 24
 
 
-def test_migrate_start_flexibility_legacy():
-    from house_config.generic_schedule import migrate_start_flexibility
+def test_reject_legacy_start_flexibility():
+    from house_config.generic_schedule import reject_legacy_start_flexibility
 
-    assert migrate_start_flexibility({"start_flexibility": "fixed"})["start_shift_h"] == 0.0
-    assert migrate_start_flexibility({"start_flexibility": "day"})["start_shift_h"] == 12.0
+    with pytest.raises(ValueError, match="start_shift_h"):
+        reject_legacy_start_flexibility({"start_flexibility": "fixed"})
+    with pytest.raises(ValueError, match="start_shift_h"):
+        reject_legacy_start_flexibility({"start_flexibility": "day"})
 
 
-def test_normalize_generic_schedule_migration(tmp_path):
+def test_normalize_generic_schedule_rejects_legacy_flexibility(tmp_path):
     import json
 
     path = tmp_path / "house_profiles.json"
@@ -771,11 +771,8 @@ def test_normalize_generic_schedule_migration(tmp_path):
         ),
         encoding="utf-8",
     )
-    doc = load_house_profiles_document(str(path))
-    washer = doc["profiles"]["home"]["consumers"][0]
-    assert washer["schedule"]["start_shift_h"] == 12.0
-    assert washer["schedule"]["duration_h"] == pytest.approx(2.0)
-    assert washer["annual_kwh"] == pytest.approx(208.0)
+    with pytest.raises(ValueError, match="start_shift_h"):
+        load_house_profiles_document(str(path))
 
 
 def test_generic_hourly_profile_fixed_start():
@@ -905,7 +902,6 @@ def test_merge_empty_base_uses_historical_chart_color_indices():
         "consumers": [
             {
                 "id": "wp_heating",
-                "legacy_id": "waermepumpe",
                 "label": "WP",
                 "type": "thermal_annual",
                 "nominal_power_kw": 1.6,
@@ -918,7 +914,6 @@ def test_merge_empty_base_uses_historical_chart_color_indices():
             },
             {
                 "id": "ev",
-                "legacy_id": "eauto",
                 "label": "EV",
                 "type": "ev",
                 "nominal_power_kw": 3.5,
@@ -995,7 +990,8 @@ def test_merge_flexible_consumers_pool_filter_chart_color():
     assert by_id["pool_filter"] == 1
 
 
-def test_merge_flexible_consumers_legacy_id_overlay():
+def test_merge_flexible_consumers_matches_canonical_id_only():
+    """Config row and planning row merge by ``id``; legacy ids stay separate entries."""
     from house_config.planning_flex_bridge import merge_flexible_consumers
 
     base = [
@@ -1004,36 +1000,44 @@ def test_merge_flexible_consumers_legacy_id_overlay():
             "name": "E-Auto Legacy",
             "chart_color_index": 2,
             "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
-            "loxone_inputs": {"power_name": "Ernie_EAuto_P_act"},
-            "charging_schedule": {
-                "enabled": True,
-                "loxone": {"plugged_in_name": "Ernie_EAuto_Da"},
-            },
         }
     ]
     planning = [
         {
             "id": "ev",
-            "legacy_id": "eauto",
             "name": "Smart",
             "nominal_power_kw": 3.5,
             "charging_schedule": {"enabled": True, "weekday": {"daily_rest_soc": 30.0}},
         }
     ]
     merged = merge_flexible_consumers(base, planning)
+    assert {item["id"] for item in merged} == {"eauto", "ev"}
+    ev = next(item for item in merged if item["id"] == "ev")
+    assert "legacy_id" not in ev
+    assert "loxone_outputs" not in ev
+
+
+def test_merge_flexible_consumers_config_row_wins_for_same_id():
+    from house_config.planning_flex_bridge import merge_flexible_consumers
+
+    base = [
+        {
+            "id": "ev",
+            "name": "E-Auto Config",
+            "chart_color_index": 2,
+            "loxone_outputs": {"power_setpoint_name": "Earnie_EAuto_Soll_A"},
+        }
+    ]
+    planning = [{"id": "ev", "name": "Smart", "nominal_power_kw": 3.5}]
+    merged = merge_flexible_consumers(base, planning)
     assert len(merged) == 1
-    ev = merged[0]
-    assert ev["id"] == "ev"
-    assert ev["legacy_id"] == "eauto"
-    assert ev["chart_color_index"] == 2
-    assert ev["loxone_outputs"]["power_setpoint_name"] == "Ernie_EAuto_Ziel_kW"
-    assert ev["charging_schedule"]["loxone"]["plugged_in_name"] == "Ernie_EAuto_Da"
+    assert merged[0]["name"] == "E-Auto Config"
 
 
 def test_runtime_consumer_id_for_cons_data():
     from settings.flexible_consumers import runtime_consumer_id
 
-    assert runtime_consumer_id({"id": "ev", "legacy_id": "eauto"}) == "eauto"
+    assert runtime_consumer_id({"id": "ev"}) == "ev"
     assert runtime_consumer_id({"id": "swimspa"}) == "swimspa"
 
 
@@ -1045,7 +1049,6 @@ def test_planning_thermal_rc_to_milp_bridge():
 
     consumer = {
         "id": "swimspa",
-        "legacy_id": "swimspa",
         "label": "SwimSpa",
         "type": "thermal_rc",
         "nominal_power_kw": 2.8,
@@ -1060,7 +1063,7 @@ def test_planning_thermal_rc_to_milp_bridge():
     milp = planning_thermal_rc_to_milp(consumer)
     assert milp["daily_target_source"] == "thermal"
     assert milp["thermal_control"]["enabled"] is True
-    assert milp["legacy_id"] == "swimspa"
+    assert "legacy_id" not in milp
     profile = {"consumers": [consumer]}
     flex = collect_planning_flex_consumers(profile)
     ids = {entry["id"] for entry in flex}
@@ -1412,7 +1415,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "label": "Live",
                 "settings": {
                     "battery_id": "home_5kwh",
-                    "pv_system_id": "roof",
+                    "pv_system_ids": ["roof"],
                     "import_tariff_id": "fixed_imp",
                     "export_tariff_id": "fixed_exp",
                     "house_profile_id": "efh"
@@ -1461,7 +1464,6 @@ def test_merge_passthrough_keeps_edited_markers():
         "loxone_inputs": {"power_name": "New_P"},
         "loxone_outputs": {
             "power_setpoint_name": "New_Set",
-            "pv_follow_name": "New_Pv",
         },
         "charging_schedule": {
             "target_soc_percent": 90.0,
@@ -1470,7 +1472,7 @@ def test_merge_passthrough_keeps_edited_markers():
     }
     merged = _merge_passthrough_consumer_fields(original, edited)
     assert merged["loxone_inputs"]["power_name"] == "New_P"
-    assert merged["loxone_outputs"]["pv_follow_name"] == "New_Pv"
+    assert merged["loxone_outputs"]["power_setpoint_name"] == "New_Set"
     assert merged["charging_schedule"]["loxone"]["plugged_in_name"] == "New_Da"
     assert merged["charging_schedule"]["milp"]["tie_break_on_epsilon"] == pytest.approx(
         0.001

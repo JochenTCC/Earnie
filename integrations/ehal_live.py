@@ -190,8 +190,7 @@ def get_loxone_adapter() -> LoxoneAdapter:
         control_cmd_name=str(config.get("LOXONE_CONTROL_CMD_NAME") or ""),
         consumers_power_name=str(config.get("LOXONE_CONSUMERS_POWER_NAME") or ""),
         evcs_max_current_name=str(ev.get("evcs_max_current_name") or ""),
-        pv_follow_name=str(ev.get("pv_follow_name") or ""),
-        charge_immediate_name=str(ev.get("charge_immediate_name") or ""),
+        evcs_mode_name=str(ev.get("evcs_mode_name") or ""),
         timeout_sec=float(config.get("GLOBAL_TIMEOUT") or 10),
     )
     if _loxone_adapter is not None and _loxone_adapter.cfg != cfg:
@@ -312,13 +311,6 @@ def write_ess_setpoints_from_control(
         error=error,
     )
     return error, records
-
-
-def write_ess_limits_from_huawei(
-    mode: int, target_power_kw: float
-) -> tuple[EhalWriteError | None, list[dict[str, Any]]]:
-    """Deprecated alias for :func:`write_ess_setpoints_from_control`."""
-    return write_ess_setpoints_from_control(mode, target_power_kw)
 
 
 def push_safe_setpoints_on_startup() -> None:
@@ -474,11 +466,10 @@ def _first_ev_consumer() -> dict | None:
 
 
 def _first_ev_loxone_bindings() -> dict[str, str]:
-    """EV write markers from first EV consumer ``ehal_bindings`` (+ legacy dual-read)."""
+    """EV write markers from first EV consumer ``ehal_bindings`` (Pattern B only)."""
     from settings.ehal_marker_resolve import (
-        marker_charge_immediate,
-        marker_pv_follow,
         marker_set_evcs_max_current,
+        marker_set_evcs_mode,
     )
 
     consumer = _first_ev_consumer()
@@ -486,6 +477,5 @@ def _first_ev_loxone_bindings() -> dict[str, str]:
         return {}
     return {
         "evcs_max_current_name": marker_set_evcs_max_current(consumer),
-        "pv_follow_name": marker_pv_follow(consumer),
-        "charge_immediate_name": marker_charge_immediate(consumer),
+        "evcs_mode_name": marker_set_evcs_mode(consumer),
     }

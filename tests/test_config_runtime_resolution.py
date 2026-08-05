@@ -13,7 +13,7 @@ from house_config.scenario_resolution import DEFAULT_LIVE_SCENARIO_ID
 def _write_live_scenarios(config_dir, *, settings: dict | None = None) -> None:
     live_settings = settings or {
         "battery_id": "home_5kwh",
-        "pv_system_id": "roof",
+        "pv_system_ids": ["roof"],
         "import_tariff_id": "fixed_imp",
         "export_tariff_id": "monthly_exp",
         "house_profile_id": "efh",
@@ -55,7 +55,7 @@ def _write_minimal_greenfield_config(config_dir) -> None:
     )
     _write_live_scenarios(config_dir, settings={
         "battery_id": "",
-        "pv_system_id": "",
+        "pv_system_ids": [],
         "import_tariff_id": "",
         "export_tariff_id": "",
         "house_profile_id": "",
@@ -339,7 +339,7 @@ def test_config_loads_zero_pv_without_pv_system(tmp_path, monkeypatch):
     scenarios_doc = json.loads(
         (config_dir / "backtesting_scenarios.json").read_text(encoding="utf-8")
     )
-    scenarios_doc["scenarios"][0]["settings"]["pv_system_id"] = ""
+    scenarios_doc["scenarios"][0]["settings"]["pv_system_ids"] = []
     (config_dir / "backtesting_scenarios.json").write_text(
         json.dumps(scenarios_doc),
         encoding="utf-8",
@@ -374,7 +374,7 @@ def test_backtesting_scenario_without_battery_resolves_zero_flat(tmp_path, monke
                 "label": "Live",
                 "settings": {
                     "battery_id": "home_5kwh",
-                    "pv_system_id": "roof",
+                    "pv_system_ids": ["roof"],
                     "import_tariff_id": "fixed_imp",
                     "export_tariff_id": "monthly_exp",
                     "house_profile_id": "efh",
@@ -503,7 +503,7 @@ def test_set_live_scenario_id_persists_and_reloads(tmp_path, monkeypatch):
             "label": "Alternative",
             "settings": {
                 "battery_id": "home_5kwh",
-                "pv_system_id": "roof",
+                "pv_system_ids": ["roof"],
                 "import_tariff_id": "fixed_imp",
                 "export_tariff_id": "monthly_exp",
                 "house_profile_id": "efh",

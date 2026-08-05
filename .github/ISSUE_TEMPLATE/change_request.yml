@@ -1,0 +1,25 @@
+name: Change request
+description: Änderungswunsch an bestehendem Verhalten oder an der UI
+title: "[Change]: "
+labels: ["change-request", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GitHub Issues sind **öffentlich**. Keine Secrets oder personenbezogene Daten.
+        Roadmap-Priorisierung bleibt im Markdown-Backlog (Maintainer triagiert).
+  - type: textarea
+    id: description
+    attributes:
+      label: Gewünschte Änderung
+      description: Was soll sich ändern und warum?
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Ist-Verhalten (kurz)
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativen / Workarounds (optional)

@@ -1,0 +1,30 @@
+name: Bug
+description: Fehler, Regression oder unplausibles Verhalten melden
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GitHub Issues sind **öffentlich**. Keine Passwörter, Hostnamen, Kundennamen,
+        vollständige Config-Pakete oder Debug-Dumps hier einfügen. Sensibles Material
+        an `support@earnie-hems.com` (ZIP lokal behalten und der Mail anhängen).
+  - type: textarea
+    id: description
+    attributes:
+      label: Beschreibung
+      description: Was ist passiert? Was war erwartet?
+      placeholder: Schritte, Symptom, erwartetes Verhalten …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Earnie-Version
+      description: z. B. aus Info / About oder dem Image-Tag
+      placeholder: 2.4.0-alpha.x
+  - type: textarea
+    id: context
+    attributes:
+      label: Umgebung (optional, ohne Secrets)
+      description: OS / Deploy (Docker, NAS, Cloud-Demo), Backend (Loxone / HA / OpenEMS) — ohne Hostnamen oder Zugangsdaten

@@ -143,7 +143,3 @@ def render_ehal_setup_page() -> None:
     st.markdown(f"**Zugang: {backend_label(backend)}**")
     render_hub_credentials(key_prefix="ehal_setup", backend=backend)
 
-
-def render_loxone_setup_page() -> None:
-    """Backward-compatible alias for the backend-aware first-run page."""
-    render_ehal_setup_page()

@@ -171,7 +171,6 @@ def appliance_from_profile_consumer(consumer: dict) -> dict:
         raise ValueError(
             f"Hausprofil-Verbraucher '{consumer_id}': appliance_recommendation fehlt."
         )
-    legacy_id = str(consumer.get("legacy_id", "")).strip()
     spec = {
         "id": consumer_id,
         "name": str(consumer.get("label", consumer_id)),
@@ -181,8 +180,6 @@ def appliance_from_profile_consumer(consumer: dict) -> dict:
     }
     if loxone_power_name:
         spec["loxone_inputs"] = {"power_name": loxone_power_name}
-    if legacy_id and legacy_id != consumer_id:
-        spec["legacy_id"] = legacy_id
     spec["recommendation_horizon_h"] = manual_recommendation_horizon_h(consumer)
     return spec
 

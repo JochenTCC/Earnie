@@ -123,10 +123,7 @@ def run_live_scenario_entity_check_on_startup() -> None:
     if not str(settings.get("battery_id", "") or "").strip():
         missing.append("battery_id")
     pv_ids = settings.get("pv_system_ids")
-    legacy_pv = str(settings.get("pv_system_id", "") or "").strip()
-    has_pv = (isinstance(pv_ids, list) and any(str(x or "").strip() for x in pv_ids)) or bool(
-        legacy_pv
-    )
+    has_pv = isinstance(pv_ids, list) and any(str(x or "").strip() for x in pv_ids)
     if not has_pv:
         missing.append("pv_system_ids")
     for key in ("import_tariff_id", "export_tariff_id", "house_profile_id"):

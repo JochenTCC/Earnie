@@ -17,7 +17,7 @@ from house_config.generic_schedule import (
     MAX_START_SHIFT_H,
     format_start_window_caption,
     generic_annual_kwh,
-    migrate_start_flexibility,
+    reject_legacy_start_flexibility,
 )
 from house_config.id_slug import slug_id
 from house_config.thermal_labels import (
@@ -55,7 +55,6 @@ _SESSION_FILE_STAMP_KEY = "house_profile_file_stamp"
 _PASSTHROUGH_CONSUMER_KEYS = (
     "loxone_inputs",
     "loxone_outputs",
-    "legacy_id",
     "optimizer_flex",
     "thermal_flex_window",
     "max_on_quarterhours",
@@ -135,12 +134,12 @@ def _default_additional_consumer() -> dict:
 
 
 def _schedule_defaults(sched: dict) -> dict:
-    migrated = migrate_start_flexibility(dict(sched))
-    raw_shift = migrated.get("start_shift_h")
+    reject_legacy_start_flexibility(sched)
+    raw_shift = sched.get("start_shift_h")
     coerced_shift = 12.0 if raw_shift is None else float(raw_shift)
     return {
-        "duration_h": float(migrated.get("duration_h", 2.0) or 2.0),
-        "start_hour": int(migrated.get("start_hour", DEFAULT_START_HOUR)) % 24,
+        "duration_h": float(sched.get("duration_h", 2.0) or 2.0),
+        "start_hour": int(sched.get("start_hour", DEFAULT_START_HOUR)) % 24,
         "start_shift_h": coerced_shift,
     }
 

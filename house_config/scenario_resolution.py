@@ -77,7 +77,7 @@ def resolve_scenario_settings(
     monthly_rates_holder: dict | None = None,
 ) -> dict:
     """
-    Löst battery_id, pv_system_ids (oder Legacy pv_system_id), import/export_tariff_id
+    Löst battery_id, pv_system_ids, import/export_tariff_id
     und house_profile_id auf. Liefert flaches Dict kompatibel mit simulation/engine.py.
     """
     out = dict(settings)

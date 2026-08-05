@@ -113,8 +113,7 @@ def test_write_setpoints_evcs_and_mode(send_mock):
         _cfg(
             control_cmd_name="Cmd",
             evcs_max_current_name="EV_A",
-            pv_follow_name="PVF",
-            charge_immediate_name="NOW",
+            evcs_mode_name="EV_Modus",
         )
     )
     error = adapter.write_setpoints(
@@ -131,20 +130,14 @@ def test_write_setpoints_evcs_and_mode(send_mock):
     calls = {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
     assert ("Cmd", 2.0) in calls
     assert ("EV_A", 16.0) in calls
-    assert ("PVF", 1.0) in calls
-    assert ("NOW", 0.0) in calls
+    assert ("EV_Modus", 1.0) in calls
+    assert not [name for name, _ in calls if name in ("PVF", "NOW")]
 
 
 @patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
 def test_write_setpoints_evcs_mode_off(send_mock):
     send_mock.return_value = True
-    adapter = LoxoneAdapter(
-        _cfg(
-            evcs_max_current_name="EV_A",
-            pv_follow_name="PVF",
-            charge_immediate_name="NOW",
-        )
-    )
+    adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A", evcs_mode_name="EV_Modus"))
     error = adapter.write_setpoints(
         {
             "schema_version": EHAL_SCHEMA_VERSION,
@@ -155,8 +148,39 @@ def test_write_setpoints_evcs_mode_off(send_mock):
     )
     assert error is None
     calls = {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
-    assert ("PVF", 0.0) in calls
-    assert ("NOW", 0.0) in calls
+    assert ("EV_Modus", 0.0) in calls
+
+
+@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
+def test_write_setpoints_evcs_mode_now_encodes_two(send_mock):
+    send_mock.return_value = True
+    adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A", evcs_mode_name="EV_Modus"))
+    error = adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-07-28T12:00:00Z",
+            "adapter_id": "loxone-home",
+            "set_evcs_mode": "now",
+        }
+    )
+    assert error is None
+    assert ("EV_Modus", 2.0) in {(c.args[0], c.args[1]) for c in send_mock.call_args_list}
+
+
+@patch("integrations.loxone_adapter.loxone_client.send_loxone_value")
+def test_write_setpoints_evcs_mode_fails_without_mode_marker(send_mock):
+    send_mock.return_value = True
+    adapter = LoxoneAdapter(_cfg(evcs_max_current_name="EV_A"))
+    error = adapter.write_setpoints(
+        {
+            "schema_version": EHAL_SCHEMA_VERSION,
+            "ts": "2026-07-28T12:00:00Z",
+            "adapter_id": "loxone-home",
+            "set_evcs_mode": "pv",
+        }
+    )
+    assert error is not None
+    assert "set_evcs_mode" in error["failed_fields"]
 
 
 @patch("integrations.loxone_adapter.loxone_client.send_loxone_value")

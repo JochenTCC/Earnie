@@ -22,7 +22,7 @@ def test_main_and_app_entry_points_are_callable() -> None:
         "get_consumer_remaining_kwh",
         "milp_optimizer",
         "battery_plan_kw_from_control",
-        "register_consumer_hours",
+        "register_consumer_delivery",
         "overlay_main_run_on_rows",
         "build_savings_snapshot",
         "calculate_optimization_savings",

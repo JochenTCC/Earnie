@@ -57,7 +57,6 @@ _OUTPUT_MARKER_KEYS: frozenset[str] = frozenset(
     {
         "enable_name",
         "power_setpoint_name",
-        "pv_follow_name",
         "set_evcs_max_current",
         "set_evcs_current",
         "set_evcs_mode",
@@ -134,7 +133,6 @@ def _migrate_consumer_io(consumer: dict, bindings: dict[str, str]) -> None:
         )
     else:
         _put_binding(bindings, "flex.enable_name", outputs.get("enable_name"))
-    _put_binding(bindings, "pv_follow_name", outputs.get("pv_follow_name"))
     setpoint = (
         outputs.get("power_setpoint_name")
         or outputs.get("set_evcs_max_current")
@@ -406,21 +404,17 @@ def _profiles_iterable(house_doc: dict) -> list[dict]:
     return []
 
 
-def resolve_plant_binding(house_doc: dict | None, ehal_field: str, config_doc: dict | None = None) -> str:
-    """Prefer ``plant.ehal_bindings``; dual-read ``loxone_blocks`` only while plant empty."""
+def resolve_plant_binding(
+    house_doc: dict | None,
+    ehal_field: str,
+    config_doc: dict | None = None,
+) -> str:
+    """Plant Merker from ``plant.ehal_bindings`` only (no ``loxone_blocks`` fallback)."""
     field = _nonempty(ehal_field)
     house = house_doc if isinstance(house_doc, dict) else {}
     plant = house.get("plant") if isinstance(house.get("plant"), dict) else {}
     bindings = plant.get("ehal_bindings") if isinstance(plant.get("ehal_bindings"), dict) else {}
-    value = _nonempty(bindings.get(field))
-    if value:
-        return value
-    if any(_nonempty(v) for v in bindings.values()):
-        return ""
-    config = config_doc if isinstance(config_doc, dict) else {}
-    blocks = config.get("loxone_blocks") if isinstance(config.get("loxone_blocks"), dict) else {}
-    block_key = EHAL_TO_BLOCKS.get(field, "")
-    return _nonempty(blocks.get(block_key)) if block_key else ""
+    return _nonempty(bindings.get(field))
 
 
 def _plant_bindings_empty(plant: dict) -> bool:

@@ -675,7 +675,7 @@
         },
         "path_historical_log": {
           "type": "string",
-          "description": "CSV-Pfad zum historischen Loxone-Verbrauchslog (Offline/cons_data, Backtesting). Legacy-Alias beim Laden: path_log."
+          "description": "CSV-Pfad zum historischen Loxone-Verbrauchslog (Offline/cons_data, Backtesting)."
         },
         "signal_type": {
           "type": "string",

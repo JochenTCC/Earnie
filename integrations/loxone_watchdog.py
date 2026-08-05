@@ -11,8 +11,8 @@ from runtime_store import run_state
 from settings.ehal_marker_resolve import (
     marker_flex_enable,
     marker_flex_power_setpoint,
-    marker_pv_follow,
     marker_set_evcs_max_current,
+    marker_set_evcs_mode,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,13 +57,13 @@ def _tolerance_for_io(
     io_name: str,
     flex_enable_names: set[str],
     flex_setpoint_names: set[str],
-    flex_pv_follow_names: set[str],
+    flex_mode_names: set[str],
 ) -> float:
     if io_name == config.get("LOXONE_CONTROL_CMD_NAME"):
         return 0.0
     if io_name in flex_enable_names:
         return 0.0
-    if io_name in flex_pv_follow_names:
+    if io_name in flex_mode_names:
         return 0.0
     if io_name in flex_setpoint_names:
         return POWER_TOLERANCE_KW
@@ -89,11 +89,11 @@ def verify_and_restore_loxone_states(
         for c in config.get_flexible_consumers(optimizer_only=True)
     }
     flex_setpoint_names.discard("")
-    flex_pv_follow_names = {
-        str(marker_pv_follow(c) or "")
+    flex_mode_names = {
+        str(marker_set_evcs_mode(c) or "")
         for c in config.get_flexible_consumers(optimizer_only=True)
     }
-    flex_pv_follow_names.discard("")
+    flex_mode_names.discard("")
 
     for io_name, expected_value in expected.items():
         if not io_name:
@@ -108,7 +108,7 @@ def verify_and_restore_loxone_states(
 
         actual_value = float(actual_raw)
         tolerance = _tolerance_for_io(
-            io_name, flex_enable_names, flex_setpoint_names, flex_pv_follow_names
+            io_name, flex_enable_names, flex_setpoint_names, flex_mode_names
         )
         if _values_match(expected_value, actual_value, tolerance):
             continue

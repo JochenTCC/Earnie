@@ -77,7 +77,7 @@ def _eauto_consumer() -> dict:
         "nominal_power_kw": 3.68,
         "min_power_kw": 1.4,
         "min_on_quarterhours": 1,
-        "loxone_outputs": {"power_setpoint_name": "Ernie_EAuto_Ziel_kW"},
+        "ehal_bindings": {"set_evcs_max_current": "Earnie_EAuto_Soll_A"},
         "charging_schedule": {
             "enabled": True,
             "milp": {

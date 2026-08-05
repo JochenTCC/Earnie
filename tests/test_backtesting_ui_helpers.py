@@ -474,9 +474,9 @@ def test_progress_eta_tracker_accumulates_fast_steps():
     )
 
 
-def test_migrate_oemag_template_fill_when_keys_missing(tmp_path, monkeypatch):
+def test_bootstrap_no_longer_soft_fills_oemag_from_template(tmp_path, monkeypatch):
+    """OeMAG soft-migrate was removed; bootstrap must not rewrite tariffs.json."""
     from runtime_store import bootstrap
-    from runtime_store.data_model import CURRENT_DATA_MODEL
     from settings.json_io import read_json_dict
 
     config_dir = tmp_path / "config"
@@ -496,13 +496,14 @@ def test_migrate_oemag_template_fill_when_keys_missing(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(config_dir))
     monkeypatch.setenv("EARNIE_TARIFFS_PATH", str(tariffs))
 
-    modified = bootstrap._migrate_oemag_data_model_v2()
-    assert str(tariffs) in modified
+    assert not hasattr(bootstrap, "_migrate_oemag_data_model_v2")
+    before = tariffs.read_text(encoding="utf-8")
+    bootstrap.run()
     doc = read_json_dict(str(tariffs))
-    assert len(doc["oemag_monthly_feed_in_rates"]) >= 12
-    assert doc["monthly_float_reference_cent_kwh"] == 7.15
-    assert doc["earnie_data_model"] == CURRENT_DATA_MODEL
-    assert bootstrap._migrate_oemag_data_model_v2() == []
+    # Stamp may bump earnie_data_model; must not invent OeMAG keys.
+    assert "oemag_monthly_feed_in_rates" not in doc
+    assert "monthly_float_reference_cent_kwh" not in doc
+    assert tariffs.read_text(encoding="utf-8") != before or doc.get("earnie_data_model") == 3
 
 
 def test_subprocess_env_passes_cloud_session_root(monkeypatch, tmp_path):

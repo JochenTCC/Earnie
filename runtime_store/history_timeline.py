@@ -22,11 +22,7 @@ from optimizer.targets import (
     consumer_immediate_charge_column_name,
     consumer_pv_follow_column_name,
 )
-from settings.flexible_consumers import (
-    charging_context_lookup,
-    flex_kw_lookup,
-    runtime_consumer_id,
-)
+from settings.flexible_consumers import charging_context_lookup, flex_kw_lookup
 
 from . import optimization_history
 
@@ -272,18 +268,14 @@ def _netzbezug_kw_from_entry(entry: dict[str, Any], row: dict[str, Any]) -> floa
 def _flex_dict_has_consumer(flex: dict[str, Any] | None, consumer: dict[str, Any]) -> bool:
     if not flex:
         return False
-    runtime_id = runtime_consumer_id(consumer)
-    canonical_id = str(consumer["id"])
-    return runtime_id in flex or canonical_id in flex
+    return str(consumer["id"]) in flex
 
 
 def _consumer_is_measured(measured_ids: Any, consumer: dict[str, Any]) -> bool:
-    """True if measured_ids lists runtime and/or canonical consumer id."""
+    """True if measured_ids lists the canonical consumer id."""
     if measured_ids is None:
         return True
-    runtime_id = runtime_consumer_id(consumer)
-    canonical_id = str(consumer["id"])
-    return runtime_id in measured_ids or canonical_id in measured_ids
+    return str(consumer["id"]) in measured_ids
 
 
 def _consumer_kw_from_entry(
@@ -367,8 +359,9 @@ def entry_to_chart_row(
         )
         if uses_pv_follow(consumer):
             pv_follow_map = entry.get("consumer_pv_follow") or {}
-            pv_follow = pv_follow_map.get(cid, pv_follow_map.get(runtime_consumer_id(consumer), 0))
-            row[consumer_pv_follow_column_name(consumer)] = int(pv_follow or 0)
+            row[consumer_pv_follow_column_name(consumer)] = int(
+                pv_follow_map.get(cid, 0) or 0
+            )
     if snapshot.get("pv_kw") is not None:
         row[PV_IST_COLUMN] = round(float(snapshot["pv_kw"]), 3)
     row["Netzbezug (kW)"] = _netzbezug_kw_from_entry(entry, row)

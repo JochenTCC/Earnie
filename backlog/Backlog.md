@@ -34,13 +34,28 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [x] Test greenfield approach with Loxone-Import without old BRIDGE_DEFAULTS
   - [x] Residual Loxone Merker nests → `ehal_bindings` only (thermal C.6, enable write, filter native, strip + `scripts/migrate_ehal_bindings`; Homie bridge defaults retired)
   - [x] **Before 2.4.0:** EHAL-Com maps pool_filter fields (`flex.pool_filter.sens_power_act`, `get_filter_remaining_hours`, `sens_filter_active`, `get_filter_native_start_hour`, `get_filter_native_duration_hours`) onto `pool_filter` MILP consumer
+  - [x] **GitHub ticket intake & Streamlit Kontakt → Issues** (before ship)
+    - **Model:** GitHub Issues = public intake; markdown backlog = schedule source of truth; `support@earnie-hems.com` = sole private exception (registry / secrets / dumps). No Discussions in this ship. Maintainer promotes Issues into backlog with `#NN` when scheduled.
+    - **Repo:** four issue forms (Bug / Change request / Improvement / Question) + labels; contact links to site/docs; registry/secrets → `support@`
+    - **UI:** Kontakt Art + Thema/Beschreibung → primary **GitHub-Issue öffnen** (prefilled title/body); ZIP local only (no auto-upload); public-Issue warning; private expander; site + repo links; cloud-demo → Issues (`cloud-demo`)
+    - **Docs:** `CONTRIBUTING.md`, Benutzer-Handbuch, `docs/ui/betriebsmodi.md` (+ private-env cloud note); techcreacon / `mail@` → `support@earnie-hems.com` only on private paths
+    - **Done when:** templates live; primary CTA is Issue not mailto; registry still mail to `support@`; no auto-upload; tests cover URL builders; docs match
   - [ ] Code Quality
-    - Make a code coverage test
-    - Review code against coding KPIs and refactor it if needed
-    - Make a test coverage test to identify obsolete tests
+    - [x] **Legacy / soft-compat first pass** (fail-fast; no old installs)
+      - Drop dead sunrise A/B script + `sunrise_full_horizon_trial` reject; rename-only aliases
+      - Drop `system_history_log.csv` merge, cwd `LEGACY_DEBUG_PATH`, debug-dump v1/v2 (JSONL + dump v3 only)
+      - Soft load migrators → reject (tariff types/IDs, `start_flexibility`, `path_log`, singular `pv_system_id`, data-model v1/v2); bootstrap no longer soft-migrates
+    - [x] **Remove dual-key bridges** (fail-fast)
+      - Drop `legacy_id` (writers use canonical `id`; reject field on load)
+      - Drop EHAL nest / unprefixed HA dual-read (bindings §C / Pattern B only)
+      - EVCS write = `set_evcs_mode` only; Pool Freigabe status without SwimSpa/`Ernie_*` aliases
+    - [ ] Make a code coverage test
+    - [ ] Review code against coding KPIs and refactor it if needed
+    - [ ] Make a test coverage test to identify obsolete tests
+    - Keep: CBC/PV/API operational fallbacks, `legacy_config_gates` fail-fast, live↔SE dual paths
   - [ ] Update and review official docs for needed updates our outdated infos
     - Update screenshots where it is useful
-    - Consolidate number of documents (merge docs with content that relies on each other)
+    - Consolidate number of documents (merge docs with content that relies on each other or is similar)
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check; hardware-registry first approach (`2.4.q`) done
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
   - “All three southbounds” release: OpenEMS ↔ HA+evcc ↔ Loxone via config switch
@@ -77,6 +92,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - for multiple wallboxes / EVs there is not a "natural" 1 to 1 binding - hence it must be clarified how to handle that (have a look at evcc)
 - [ ] Optimize Pool temperature to a certain value on time. Set desired temperature and using time. Combine it with RC model
   - Add a chart that shows comparison between actual and modeled temperature (including ambient temperature and heating activity)
+- [ ] For manual consumers do not take only import tariffs into account but also PV energy creation and export tariffs. Calculate a combined fictitious price (find rule for calculation)
  
 
 ### Version 2.+1 — Introducing nested data models

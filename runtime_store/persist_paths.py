@@ -222,10 +222,6 @@ def flexible_consumer_profiles_file() -> str:
     return runtime_path("flexible_consumer_profiles.csv")
 
 
-def legacy_history_csv_file() -> str:
-    return runtime_path("system_history_log.csv")
-
-
 def default_cons_data_file() -> str:
     return runtime_path("cons_data_hourly.csv")
 

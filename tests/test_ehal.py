@@ -174,14 +174,27 @@ def test_write_error_requires_failed_fields():
         validate_write_error(doc)
 
 
-def test_canonicalize_ha_entity_keys():
+def test_canonicalize_ha_entity_keys_passes_through_canonical_names():
     mapped = canonicalize_ha_entity_keys(
         {
-            "grid_power_active": "sensor.grid",
+            "sens_grid_power_active": "sensor.grid",
             "sens_ess_soc": "sensor.soc",
-            "pv_production_active": "sensor.pv",
+            "sens_pv_production_active": "sensor.pv",
+            "sens_ess_power": "",
         }
     )
-    assert mapped["sens_grid_power_active"] == "sensor.grid"
-    assert mapped["sens_pv_production_active"] == "sensor.pv"
-    assert mapped["sens_ess_soc"] == "sensor.soc"
+    assert mapped == {
+        "sens_grid_power_active": "sensor.grid",
+        "sens_ess_soc": "sensor.soc",
+        "sens_pv_production_active": "sensor.pv",
+    }
+
+
+def test_canonicalize_ha_entity_keys_rejects_removed_unprefixed_names():
+    with pytest.raises(ValueError, match="grid_power_active"):
+        canonicalize_ha_entity_keys(
+            {
+                "grid_power_active": "sensor.grid",
+                "sens_ess_soc": "sensor.soc",
+            }
+        )

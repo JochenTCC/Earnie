@@ -34,7 +34,12 @@ def strip_assets_for_reference(params: dict) -> dict:
 
 
 def normalize_pv_system_ids(settings: dict) -> list[str]:
-    """Normalize legacy ``pv_system_id`` and ``pv_system_ids`` to a unique id list."""
+    """Return unique ``pv_system_ids``; reject singular legacy ``pv_system_id``."""
+    if "pv_system_id" in settings:
+        raise ValueError(
+            "settings.pv_system_id ist nicht mehr unterstützt — "
+            "bitte pv_system_ids[] verwenden."
+        )
     ids: list[str] = []
     raw_list = settings.get("pv_system_ids")
     if isinstance(raw_list, list):
@@ -42,9 +47,6 @@ def normalize_pv_system_ids(settings: dict) -> list[str]:
             pv_id = str(item or "").strip()
             if pv_id and pv_id not in ids:
                 ids.append(pv_id)
-    legacy = str(settings.get("pv_system_id", "") or "").strip()
-    if legacy and legacy not in ids:
-        ids.append(legacy)
     return ids
 
 
@@ -189,7 +191,7 @@ def resolve_battery_into_settings(
 
 
 def resolve_pv_into_settings(settings: dict, pv_systems: dict[str, dict]) -> dict:
-    """Resolve ``pv_system_ids`` (or legacy ``pv_system_id``) into planning + flat fields.
+    """Resolve ``pv_system_ids`` into planning + flat fields.
 
     Injects ``_planning_pv_systems`` (one entry per selected system). Sets ``pv_kwp``
     to the sum of selected systems. When exactly one system is selected, also sets
@@ -197,7 +199,6 @@ def resolve_pv_into_settings(settings: dict, pv_systems: dict[str, dict]) -> dic
     """
     out = dict(settings)
     pv_ids = normalize_pv_system_ids(out)
-    out.pop("pv_system_id", None)
     out.pop("pv_system_ids", None)
 
     if not pv_ids:

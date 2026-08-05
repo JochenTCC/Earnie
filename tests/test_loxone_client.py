@@ -331,14 +331,6 @@ class TestEssSetpointsMapping:
             cmd,
         )
 
-    def test_map_huawei_modbus_values_returns_limits(self, monkeypatch):
-        monkeypatch.setattr(
-            lc.config,
-            "get_battery_params",
-            lambda: {"max_power_kw": 5.0},
-        )
-        assert lc.map_huawei_modbus_values(1, 2.5) == (5.0, 0.0, 1)
-
 
 class TestFlexibleConsumerHelpers:
     def _consumer(self, *, signal_type: str = "power") -> dict:
@@ -364,38 +356,34 @@ class TestFlexibleConsumerHelpers:
         enabled = lc.flex_consumer_enable_value(consumer, {"swimspa": 2.0}, ctx)
         assert enabled == 0
 
-    def test_flex_consumer_setpoint_skipped_on_immediate_charge(self):
-        consumer = {
+    def _ev_consumer(self) -> dict:
+        return {
             "id": "eauto",
             "name": "E-Auto",
             "nominal_power_kw": 3.5,
             "min_power_kw": 1.4,
-            "loxone_outputs": {
-                "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
-                "pv_follow_name": "Earnie_EAuto_pv_follow",
+            "ehal_bindings": {
+                "set_evcs_max_current": "Earnie_EAuto_Soll_A",
+                "set_evcs_mode": "Earnie_EAuto_Modus",
             },
         }
+
+    def test_flex_consumer_setpoint_skipped_on_immediate_charge(self):
+        """Sofort laden schreibt nur den Modus Merker (now=2), keinen pv_follow."""
+        consumer = self._ev_consumer()
         ctx = {"eauto": {"skip_loxone_output": True}}
         assert lc._flexible_consumer_output_values(consumer, {"eauto": 3.5}, ctx) == {
-            "Earnie_EAuto_pv_follow": 0.0,
+            "Earnie_EAuto_Modus": 2.0,
         }
 
     def test_flex_consumer_setpoint_clamped(self):
-        consumer = {
-            "id": "eauto",
-            "name": "E-Auto",
-            "nominal_power_kw": 3.5,
-            "min_power_kw": 1.4,
-            "loxone_outputs": {
-                "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
-                "pv_follow_name": "Earnie_EAuto_pv_follow",
-            },
-        }
+        consumer = self._ev_consumer()
         assert lc.flex_consumer_power_setpoint_kw(consumer, {"eauto": 2.1}, {}, {"eauto": 0}) == 2.1
         assert lc.flex_consumer_power_setpoint_kw(consumer, {"eauto": 2.1}, {}, {"eauto": 1}) == 3.5
-        assert lc.flex_consumer_pv_follow_value(consumer, {"eauto": 2.1}, {}, {"eauto": 1}) == 1
         assert lc.flex_consumer_power_setpoint_kw(consumer, {"eauto": 0.0}, {}, {"eauto": 1}) == 0.0
-        assert lc.flex_consumer_pv_follow_value(consumer, {"eauto": 0.0}, {}, {"eauto": 1}) == 0
+
+    def test_no_pv_follow_write_helper(self):
+        assert not hasattr(lc, "flex_consumer_pv_follow_value")
 
     def test_resolve_live_power_binary_signal(self):
         consumer = self._consumer(signal_type="binary")
@@ -404,14 +392,16 @@ class TestFlexibleConsumerHelpers:
         with patch.object(lc, "fetch_loxone_generic_value", return_value=0.0):
             assert lc.resolve_consumer_live_power_kw(consumer) == 0.0
 
-    def test_resolve_live_power_reads_ehal_bindings_without_legacy_power_name(self):
-        """EHAL-only consumers must resolve power Merker (Monitor/Sankey Ist)."""
+    def test_resolve_live_power_reads_pattern_b_binding(self):
+        """EHAL-only consumers resolve the power Merker from ``flex.{id}.sens_power_act``."""
         consumer = {
             "id": "waschmaschine",
             "name": "Waschmaschine",
             "nominal_power_kw": 2.0,
             "signal_type": "power",
-            "ehal_bindings": {"flex.power_name": "Zaehler Waschmaschine"},
+            "ehal_bindings": {
+                "flex.waschmaschine.sens_power_act": "Zaehler Waschmaschine"
+            },
             "loxone_inputs": {},
         }
         with patch.object(lc, "fetch_loxone_generic_value", return_value=0.85) as fetch:
@@ -606,59 +596,59 @@ class TestSharedMeterSubtraction:
             result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
         assert result["swimspa"] == 0.0
 
-    def test_resolve_nominal_power_from_ampere(self):
+    def test_resolve_nominal_current_binding_as_amperes(self):
         consumer = {
             "id": "eauto",
             "nominal_power_kw": 3.5,
+            "ehal_bindings": {"get_evcs_nominal_current": "Ladestrom Max"},
             "charging_schedule": {
                 "nominal_power_voltage_v": 230.0,
                 "nominal_power_phases": 3,
-                "loxone": {
-                    "nominal_power_kw_name": "Ladestrom Max",
-                },
-            },
-        }
-        with patch.object(lc, "fetch_loxone_raw_value", return_value="16 A"):
-            live = lc.resolve_consumer_nominal_power_kw(consumer)
-        assert live == pytest.approx(11.04)
-
-    def test_resolve_nominal_current_ehal_key_as_amperes(self):
-        consumer = {
-            "id": "eauto",
-            "nominal_power_kw": 3.5,
-            "charging_schedule": {
-                "nominal_power_voltage_v": 230.0,
-                "nominal_power_phases": 3,
-                "loxone": {
-                    "get_evcs_nominal_current": "Ladestrom Max",
-                },
             },
         }
         with patch.object(lc, "fetch_loxone_raw_value", return_value="16"):
             live = lc.resolve_consumer_nominal_power_kw(consumer)
         assert live == pytest.approx(11.04)
 
-    def test_resolve_nominal_power_from_ampere_loxone_level_fallback(self):
+    def test_resolve_nominal_current_binding_with_unit_suffix(self):
         consumer = {
             "id": "eauto",
             "nominal_power_kw": 3.5,
+            "ehal_bindings": {"get_evcs_nominal_current": "Ladestrom Max"},
             "charging_schedule": {
-                "loxone": {
-                    "nominal_power_kw_name": "Ladestrom Max",
-                    "nominal_power_voltage_v": 230.0,
-                    "nominal_power_phases": 3,
-                }
+                "nominal_power_voltage_v": 230.0,
+                "nominal_power_phases": 3,
             },
         }
         with patch.object(lc, "fetch_loxone_raw_value", return_value="16 A"):
             live = lc.resolve_consumer_nominal_power_kw(consumer)
         assert live == pytest.approx(11.04)
 
+    def test_resolve_nominal_power_ignores_legacy_charging_nest(self):
+        """Nest-only ``nominal_power_kw_name`` is no longer resolved (Pattern B only)."""
+        consumer = {
+            "id": "eauto",
+            "nominal_power_kw": 3.5,
+            "charging_schedule": {
+                "loxone": {"nominal_power_kw_name": "Ladestrom Max"},
+            },
+        }
+        with patch.object(lc, "fetch_loxone_raw_value", return_value="16 A"):
+            assert lc.resolve_consumer_nominal_power_kw(consumer) == 3.5
+
     def test_resolve_nominal_power_fallback_on_missing_io(self):
-        consumer = {"id": "x", "nominal_power_kw": 1.6, "charging_schedule": {"loxone": {}}}
+        consumer = {"id": "x", "nominal_power_kw": 1.6, "ehal_bindings": {}}
         assert lc.resolve_consumer_nominal_power_kw(consumer) == 1.6
 
-    def test_resolve_battery_capacity_from_loxone(self):
+    def test_resolve_battery_capacity_from_binding(self):
+        consumer = {
+            "id": "eauto",
+            "ehal_bindings": {"sens_evcs_bat_capacity": "Batteriekapazität_E-Auto"},
+        }
+        with patch.object(lc, "fetch_loxone_raw_value", return_value="77 kWh"):
+            assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(77.0)
+
+    def test_resolve_battery_capacity_ignores_legacy_charging_nest(self):
         consumer = {
             "id": "eauto",
             "charging_schedule": {
@@ -666,33 +656,18 @@ class TestSharedMeterSubtraction:
             },
         }
         with patch.object(lc, "fetch_loxone_raw_value", return_value="77 kWh"):
-            assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(77.0)
-
-    def test_resolve_battery_capacity_ehal_key(self):
-        consumer = {
-            "id": "eauto",
-            "charging_schedule": {
-                "loxone": {"sens_evcs_bat_capacity": "Batteriekapazität_E-Auto"},
-            },
-        }
-        with patch.object(lc, "fetch_loxone_raw_value", return_value="77 kWh"):
-            assert lc.resolve_consumer_battery_capacity_kwh(consumer) == pytest.approx(77.0)
+            assert lc.resolve_consumer_battery_capacity_kwh(consumer) is None
 
     def test_resolve_battery_capacity_fails_without_loxone_value(self):
         consumer = {
             "id": "eauto",
-            "charging_schedule": {
-                "loxone": {"battery_capacity_kwh_name": "Batteriekapazität_E-Auto"},
-            },
+            "ehal_bindings": {"sens_evcs_bat_capacity": "Batteriekapazität_E-Auto"},
         }
         with patch.object(lc, "fetch_loxone_raw_value", return_value=None):
             assert lc.resolve_consumer_battery_capacity_kwh(consumer) is None
 
     def test_resolve_battery_capacity_fails_without_io_name(self):
-        consumer = {
-            "id": "eauto",
-            "charging_schedule": {"loxone": {}},
-        }
+        consumer = {"id": "eauto", "ehal_bindings": {}}
         assert lc.resolve_consumer_battery_capacity_kwh(consumer) is None
 
 
@@ -748,9 +723,9 @@ class TestBuildSentSnapshot:
                 "optimizer_enabled": True,
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
-                "loxone_outputs": {
-                    "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
-                    "pv_follow_name": "Earnie_EAuto_pv_follow",
+                "ehal_bindings": {
+                    "set_evcs_max_current": "Earnie_EAuto_Ziel_kW",
+                    "set_evcs_mode": "Earnie_EAuto_Modus",
                 },
             }
         ]
@@ -774,7 +749,7 @@ class TestBuildSentSnapshot:
 
         # 2.5 kW @ 230 V / 1 ph → A
         assert snapshot["Earnie_EAuto_Ziel_kW"] == pytest.approx(2.5 * 1000.0 / 230.0, abs=1e-3)
-        assert snapshot["Earnie_EAuto_pv_follow"] == 0.0
+        assert "Earnie_EAuto_pv_follow" not in snapshot
 
     def test_snapshot_pv_follow_sends_pmax_as_amps(self):
         consumers = [
@@ -786,9 +761,9 @@ class TestBuildSentSnapshot:
                 "optimizer_enabled": True,
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
-                "loxone_outputs": {
-                    "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
-                    "pv_follow_name": "Earnie_EAuto_pv_follow",
+                "ehal_bindings": {
+                    "set_evcs_max_current": "Earnie_EAuto_Ziel_kW",
+                    "set_evcs_mode": "Earnie_EAuto_Modus",
                 },
             }
         ]
@@ -811,7 +786,7 @@ class TestBuildSentSnapshot:
             )
 
         assert snapshot["Earnie_EAuto_Ziel_kW"] == pytest.approx(3.5 * 1000.0 / 230.0, abs=1e-3)
-        assert snapshot["Earnie_EAuto_pv_follow"] == 1.0
+        assert snapshot["Earnie_EAuto_Modus"] == 1.0
 
     def test_snapshot_suppresses_power_when_anticipated_absent(self):
         consumers = [
@@ -823,9 +798,9 @@ class TestBuildSentSnapshot:
                 "optimizer_enabled": True,
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
-                "loxone_outputs": {
-                    "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
-                    "pv_follow_name": "Earnie_EAuto_pv_follow",
+                "ehal_bindings": {
+                    "set_evcs_max_current": "Earnie_EAuto_Ziel_kW",
+                    "set_evcs_mode": "Earnie_EAuto_Modus",
                 },
             }
         ]
@@ -856,7 +831,7 @@ class TestBuildSentSnapshot:
             )
 
         assert snapshot["Earnie_EAuto_Ziel_kW"] == 0.0
-        assert snapshot["Earnie_EAuto_pv_follow"] == 0.0
+        assert snapshot["Earnie_EAuto_Modus"] == 0.0
 
     def test_snapshot_set_evcs_mode_off_when_absent_or_standby(self):
         consumers = [
@@ -868,10 +843,9 @@ class TestBuildSentSnapshot:
                 "optimizer_enabled": True,
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
-                "loxone_outputs": {
-                    "power_setpoint_name": "Earnie_EAuto_Soll_A",
+                "ehal_bindings": {
+                    "set_evcs_max_current": "Earnie_EAuto_Soll_A",
                     "set_evcs_mode": "Earnie_EAuto_Modus",
-                    "pv_follow_name": "Earnie_EAuto_pv_follow",
                 },
             }
         ]
@@ -894,7 +868,6 @@ class TestBuildSentSnapshot:
                 },
                 "expect_amps": 0.0,
                 "expect_mode": 0.0,
-                "expect_pv": 0.0,
             },
             {
                 "powers": {"eauto": 2.0},
@@ -908,7 +881,6 @@ class TestBuildSentSnapshot:
                 },
                 "expect_amps": 0.0,
                 "expect_mode": 0.0,
-                "expect_pv": 0.0,
             },
             {
                 "powers": {"eauto": 0.0},
@@ -916,7 +888,6 @@ class TestBuildSentSnapshot:
                 "ctx": {"eauto": {"active": True, "plugged_in": True}},
                 "expect_amps": 0.0,
                 "expect_mode": 0.0,
-                "expect_pv": 0.0,
             },
         )
         for case in cases:
@@ -933,7 +904,7 @@ class TestBuildSentSnapshot:
                 )
             assert snapshot["Earnie_EAuto_Soll_A"] == case["expect_amps"]
             assert snapshot["Earnie_EAuto_Modus"] == case["expect_mode"]
-            assert snapshot["Earnie_EAuto_pv_follow"] == case["expect_pv"]
+            assert "Earnie_EAuto_pv_follow" not in snapshot
 
     def test_snapshot_set_evcs_mode_pv_and_now_encoding(self):
         consumers = [
@@ -945,12 +916,10 @@ class TestBuildSentSnapshot:
                 "optimizer_enabled": True,
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
-                "loxone_outputs": {
-                    "power_setpoint_name": "Earnie_EAuto_Soll_A",
+                "ehal_bindings": {
+                    "set_evcs_max_current": "Earnie_EAuto_Soll_A",
                     "set_evcs_mode": "Earnie_EAuto_Modus",
-                    "pv_follow_name": "Earnie_EAuto_pv_follow",
                 },
-                "ehal_bindings": {"set_evcs_mode": "Earnie_EAuto_Modus"},
             }
         ]
         config_map = {
@@ -971,7 +940,7 @@ class TestBuildSentSnapshot:
                 consumer_pv_follow={"eauto": 1},
             )
         assert snapshot["Earnie_EAuto_Modus"] == 1.0
-        assert snapshot["Earnie_EAuto_pv_follow"] == 1.0
+        assert "Earnie_EAuto_pv_follow" not in snapshot
 
         # Fixed set_evcs_max_current (not PV) → mode=2
         with patch.object(
@@ -987,7 +956,7 @@ class TestBuildSentSnapshot:
             )
         assert snapshot["Earnie_EAuto_Soll_A"] > 0.0
         assert snapshot["Earnie_EAuto_Modus"] == 2.0
-        assert snapshot["Earnie_EAuto_pv_follow"] == 0.0
+        assert "Earnie_EAuto_pv_follow" not in snapshot
 
         # Sofort laden skip → mode=2 (no amp setpoint from Earnie)
         with patch.object(
@@ -999,7 +968,7 @@ class TestBuildSentSnapshot:
                 {"eauto": {"skip_loxone_output": True}},
             )
         assert values["Earnie_EAuto_Modus"] == 2.0
-        assert values["Earnie_EAuto_pv_follow"] == 0.0
+        assert "Earnie_EAuto_pv_follow" not in values
 
 
     def test_build_snapshot_does_not_send_to_loxone(self):
@@ -1012,9 +981,9 @@ class TestBuildSentSnapshot:
                 "optimizer_enabled": True,
                 "daily_target_kwh": 10.0,
                 "daily_target_source": "config",
-                "loxone_outputs": {
-                    "power_setpoint_name": "Earnie_EAuto_Ziel_kW",
-                    "pv_follow_name": "Earnie_EAuto_pv_follow",
+                "ehal_bindings": {
+                    "set_evcs_max_current": "Earnie_EAuto_Ziel_kW",
+                    "set_evcs_mode": "Earnie_EAuto_Modus",
                 },
             }
         ]
@@ -1038,7 +1007,8 @@ class TestBuildSentSnapshot:
 
         mock_send.assert_not_called()
         assert snapshot["Earnie_EAuto_Ziel_kW"] == pytest.approx(2.5 * 1000.0 / 230.0, abs=1e-3)
-        assert snapshot["Earnie_EAuto_pv_follow"] == 0.0
+        # Earnie charges via set_evcs_max_current without PV-follow → Modus "now"
+        assert snapshot["Earnie_EAuto_Modus"] == 2.0
 
 
 class TestSendHuaweiAndConsumers:

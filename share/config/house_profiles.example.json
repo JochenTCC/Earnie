@@ -14,7 +14,6 @@
             "consumers": [
                 {
                     "id": "wp_heating",
-                    "legacy_id": "waermepumpe",
                     "label": "Wärmepumpe Heizen+WW",
                     "type": "thermal_annual",
                     "nominal_power_kw": 3.5,
@@ -62,9 +61,8 @@
                         "sens_evcs_active_power": "Earnie_EAuto_Leistung",
                         "flex.ev.sens_power_act": "Earnie_EAuto_Leistung",
                         "set_evcs_max_current": "Earnie_EAuto_Ziel_kW",
-                        "pv_follow_name": "Earnie_EAuto_pv_follow"
-                    },
-                    "legacy_id": "eauto"
+                        "set_evcs_mode": "Earnie_EAuto_Modus"
+                    }
                 },
                 {
                     "id": "waschmaschine",

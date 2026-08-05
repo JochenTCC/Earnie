@@ -122,7 +122,8 @@ def test_status_payload_maps_legacy_swimspa_enable_to_pool_keys() -> None:
     assert "flex.swimspa.Earnie_Verbraucher_Freigabe" not in payload
 
 
-def test_status_payload_greenfield_pool_filter_reads_legacy_sent() -> None:
+def test_status_payload_greenfield_pool_uses_configured_enable_only() -> None:
+    """Only the configured Freigabe name is read — no SwimSpa alias remap."""
     consumers = [
         {
             "id": "pool_swimspa",
@@ -145,4 +146,4 @@ def test_status_payload_greenfield_pool_filter_reads_legacy_sent() -> None:
         now_ts=50.0,
     )
     assert payload["Earnie_Pool_Freigabe"] == 1.0
-    assert payload["Earnie_Pool_Filter_Freigabe"] == 0.0
+    assert "Earnie_Pool_Filter_Freigabe" not in payload

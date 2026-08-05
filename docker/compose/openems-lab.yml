@@ -28,8 +28,8 @@ x-persist-volumes: &persist-volumes
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  EARNIE_CONFIG_PATH: config
-  EARNIE_RUNTIME_PATH: runtime
+  # Volumes mount host …/{config,runtime} → /app/{config,runtime}; ENV_PATH=. derives both (not baked earnie_env/).
+  EARNIE_ENV_PATH: .
   EARNIE_VERIFY_LOXONE_ON_START: "0"
   EARNIE_AUTO_START_MAIN: "1"
 
@@ -42,7 +42,7 @@ services:
   earnie:
     build: *build
     container_name: earnie-openems-lab
-    restart: unless-stopped
+    restart: on-failure:3
     ports:
       - "8503:8501"
     volumes: *persist-volumes
@@ -56,7 +56,7 @@ services:
     image: openems/edge:2026.7.0
     container_name: openems_edge
     hostname: openems_edge
-    restart: unless-stopped
+    restart: on-failure:3
     volumes:
       - openems-edge-conf:/var/opt/openems/config:rw
       - openems-edge-data:/var/opt/openems/data:rw
@@ -69,7 +69,7 @@ services:
     image: openems/ui-edge:2026.7.0
     container_name: openems_ui
     hostname: openems_ui
-    restart: unless-stopped
+    restart: on-failure:3
     volumes:
       - openems-ui-conf:/etc/nginx:rw
       - openems-ui-log:/var/log/nginx:rw

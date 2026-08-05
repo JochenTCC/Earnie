@@ -8,10 +8,35 @@ import pytest
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from optimizer import battery as bat
+from optimizer import deviation_facts as facts_mod
 from optimizer.deviation_eval import evaluate_entry_deviations
 from optimizer.deviation_rules import load_deviation_rules
 
 RULES_PATH = "share/config/deviation_rules.example.json"
+
+CATALOG_CONSUMERS = [
+    {
+        "id": "ev",
+        "name": "E-Auto",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "ehal_bindings": {
+            "set_evcs_max_current": "Earnie_EAuto_Soll_A",
+            "set_evcs_mode": "Earnie_EAuto_Modus",
+        },
+    },
+    {"id": "swimspa", "name": "SwimSpa", "nominal_power_kw": 2.8},
+    {"id": "wp_heating", "name": "Wärmepumpe", "nominal_power_kw": 1.6},
+    {"id": "pool_filter", "name": "Pool Filter", "nominal_power_kw": 0.18},
+]
+
+
+@pytest.fixture(autouse=True)
+def _catalog_consumers(monkeypatch):
+    """Scenario catalog must not depend on the local runtime config."""
+    monkeypatch.setattr(
+        facts_mod.config, "get_flexible_consumers", lambda **kw: CATALOG_CONSUMERS
+    )
 
 
 def _entry(**extra) -> dict:
@@ -57,14 +82,14 @@ SCENARIOS = [
     pytest.param(
         "S2",
         _entry(
-            consumer_powers_kw={"eauto": 3.5},
-            consumption_snapshot={"flex_kw": {"eauto": 0.0}, "battery_kw": 0.0},
-            charging_contexts={"eauto": {"plugged_in": True, "active": True}},
-            consumer_remaining_kwh={"eauto": 8.0},
+            consumer_powers_kw={"ev": 3.5},
+            consumption_snapshot={"flex_kw": {"ev": 0.0}, "battery_kw": 0.0},
+            charging_contexts={"ev": {"plugged_in": True, "active": True}},
+            consumer_remaining_kwh={"ev": 8.0},
         ),
         "error",
-        "eauto_should_charge",
-        id="S2_eauto_charge",
+        "ev_should_charge",
+        id="S2_ev_charge",
     ),
     pytest.param(
         "S3",
@@ -91,12 +116,12 @@ SCENARIOS = [
     pytest.param(
         "S5",
         _entry(
-            consumer_powers_kw={"waermepumpe": 1.5},
-            consumption_snapshot={"flex_kw": {"waermepumpe": 0.0}, "battery_kw": 0.0},
+            consumer_powers_kw={"wp_heating": 1.5},
+            consumption_snapshot={"flex_kw": {"wp_heating": 0.0}, "battery_kw": 0.0},
         ),
         "hint",
-        "waermepumpe_enable_no_start",
-        id="S5_waermepumpe_hint",
+        "wp_heating_enable_no_start",
+        id="S5_wp_heating_hint",
     ),
     pytest.param(
         "S6",
@@ -113,18 +138,14 @@ SCENARIOS = [
     pytest.param(
         "S7",
         _entry(
-            consumer_powers_kw={"eauto": 2.0},
-            consumer_pv_follow={"eauto": 1},
-            loxone_sent={
-                "Ernie_EAuto_Ziel_kW": 3.5,
-                "Ernie_EAuto_pv_follow": 1.0,
-            },
-            consumption_snapshot={"flex_kw": {"eauto": 0.0}, "battery_kw": 0.0},
-            charging_contexts={"eauto": {"plugged_in": True, "active": True}},
-            consumer_remaining_kwh={"eauto": 8.0},
+            consumer_powers_kw={"ev": 2.0},
+            consumer_pv_follow={"ev": 1},
+            consumption_snapshot={"flex_kw": {"ev": 0.0}, "battery_kw": 0.0},
+            charging_contexts={"ev": {"plugged_in": True, "active": True}},
+            consumer_remaining_kwh={"ev": 8.0},
         ),
         "error",
-        "eauto_pv_follow_missing",
+        "ev_pv_follow_missing",
         id="S7_pv_follow",
     ),
     pytest.param(

@@ -31,23 +31,23 @@ RULES_PATH = ROOT / "config" / "deviation_rules.json"
 
 SCENARIO_LABELS = (
     "S1_swimspa_warning",
-    "S2_eauto_error",
+    "S2_ev_error",
     "S3_battery_forced_charge",
     "S6_battery_forced_discharge",
-    "S7_eauto_pv_follow",
+    "S7_ev_pv_follow",
     "S4_within_tolerance",
-    "S5_waermepumpe_hint",
+    "S5_wp_heating_hint",
 )
 
 
 def _flex_snapshot(
     *,
     swimspa: float = 0.0,
-    eauto: float = 0.0,
-    waermepumpe: float = 0.0,
+    ev: float = 0.0,
+    wp_heating: float = 0.0,
     battery_kw: float = 0.0,
 ) -> dict:
-    flex = {"swimspa": swimspa, "eauto": eauto, "waermepumpe": waermepumpe}
+    flex = {"swimspa": swimspa, "ev": ev, "wp_heating": wp_heating}
     flex_sum = round(sum(flex.values()), 3)
     baseload = 0.65
     pv = 1.2
@@ -79,11 +79,11 @@ def _baseline_entry(index: int) -> dict:
         "target_power_kw": 0.0,
         "target_soc_percent": 85.0,
         "battery_plan_kw": -0.4,
-        "consumer_powers_kw": {"swimspa": 0.0, "eauto": 0.0, "waermepumpe": 0.0},
-        "flex_live_kw": {"swimspa": 0.0, "eauto": 0.0, "waermepumpe": 0.0},
+        "consumer_powers_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
+        "flex_live_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
         "consumption_snapshot": _flex_snapshot(battery_kw=0.35),
         "charging_contexts": {},
-        "consumer_remaining_kwh": {"eauto": 0.0},
+        "consumer_remaining_kwh": {"ev": 0.0},
         "thermal_observability": [],
         "scenario": "baseline",
     }
@@ -103,7 +103,7 @@ def _scenario_s1_swimspa_warning() -> dict:
         "target_soc_percent": 85.0,
         "battery_plan_kw": -0.2,
         "consumer_powers_kw": {"swimspa": 2.8},
-        "flex_live_kw": {"swimspa": 0.0, "eauto": 0.0, "waermepumpe": 0.0},
+        "flex_live_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
         "consumption_snapshot": _flex_snapshot(swimspa=0.0, battery_kw=0.2),
         "thermal_observability": [
             {
@@ -121,7 +121,7 @@ def _scenario_s1_swimspa_warning() -> dict:
     }
 
 
-def _scenario_s2_eauto_error() -> dict:
+def _scenario_s2_ev_error() -> dict:
     return {
         "source": "seed_deviation_test_log.py",
         "success": True,
@@ -134,11 +134,11 @@ def _scenario_s2_eauto_error() -> dict:
         "target_power_kw": 0.0,
         "target_soc_percent": 85.0,
         "battery_plan_kw": 0.0,
-        "consumer_powers_kw": {"eauto": 3.5},
-        "flex_live_kw": {"swimspa": 0.0, "eauto": 0.0, "waermepumpe": 0.0},
-        "consumption_snapshot": _flex_snapshot(eauto=0.0),
-        "charging_contexts": {"eauto": {"plugged_in": True, "active": True}},
-        "consumer_remaining_kwh": {"eauto": 8.0},
+        "consumer_powers_kw": {"ev": 3.5},
+        "flex_live_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
+        "consumption_snapshot": _flex_snapshot(ev=0.0),
+        "charging_contexts": {"ev": {"plugged_in": True, "active": True}},
+        "consumer_remaining_kwh": {"ev": 8.0},
         "thermal_observability": [],
         "scenario": SCENARIO_LABELS[1],
     }
@@ -158,7 +158,7 @@ def _scenario_s3_battery_forced_charge() -> dict:
         "target_soc_percent": 90.0,
         "battery_plan_kw": 2.5,
         "consumer_powers_kw": {},
-        "flex_live_kw": {"swimspa": 0.0, "eauto": 0.0, "waermepumpe": 0.0},
+        "flex_live_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
         "consumption_snapshot": _flex_snapshot(battery_kw=0.0),
         "thermal_observability": [],
         "scenario": SCENARIO_LABELS[2],
@@ -179,14 +179,14 @@ def _scenario_s6_battery_forced_discharge() -> dict:
         "target_soc_percent": 50.0,
         "battery_plan_kw": -2.0,
         "consumer_powers_kw": {},
-        "flex_live_kw": {"swimspa": 0.0, "eauto": 0.0, "waermepumpe": 0.0},
+        "flex_live_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
         "consumption_snapshot": _flex_snapshot(battery_kw=0.0),
         "thermal_observability": [],
         "scenario": SCENARIO_LABELS[3],
     }
 
 
-def _scenario_s7_eauto_pv_follow() -> dict:
+def _scenario_s7_ev_pv_follow() -> dict:
     return {
         "source": "seed_deviation_test_log.py",
         "success": True,
@@ -199,16 +199,16 @@ def _scenario_s7_eauto_pv_follow() -> dict:
         "target_power_kw": 0.0,
         "target_soc_percent": 85.0,
         "battery_plan_kw": -0.5,
-        "consumer_powers_kw": {"eauto": 2.0},
-        "consumer_pv_follow": {"eauto": 1},
+        "consumer_powers_kw": {"ev": 2.0},
+        "consumer_pv_follow": {"ev": 1},
         "loxone_sent": {
-            "Ernie_EAuto_Ziel_kW": 3.5,
-            "Ernie_EAuto_pv_follow": 1.0,
+            "Earnie_EAuto_Soll_A": 15.2,
+            "Earnie_EAuto_Modus": 1.0,
         },
-        "flex_live_kw": {"swimspa": 0.0, "eauto": 0.0, "waermepumpe": 0.0},
-        "consumption_snapshot": _flex_snapshot(eauto=0.0, battery_kw=0.3),
-        "charging_contexts": {"eauto": {"plugged_in": True, "active": True}},
-        "consumer_remaining_kwh": {"eauto": 6.0},
+        "flex_live_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
+        "consumption_snapshot": _flex_snapshot(ev=0.0, battery_kw=0.3),
+        "charging_contexts": {"ev": {"plugged_in": True, "active": True}},
+        "consumer_remaining_kwh": {"ev": 6.0},
         "thermal_observability": [],
         "scenario": SCENARIO_LABELS[4],
     }
@@ -228,14 +228,14 @@ def _scenario_s4_within_tolerance() -> dict:
         "target_soc_percent": 85.0,
         "battery_plan_kw": -0.3,
         "consumer_powers_kw": {"swimspa": 2.0},
-        "flex_live_kw": {"swimspa": 2.02, "eauto": 0.0, "waermepumpe": 0.0},
+        "flex_live_kw": {"swimspa": 2.02, "ev": 0.0, "wp_heating": 0.0},
         "consumption_snapshot": _flex_snapshot(swimspa=2.02, battery_kw=0.25),
         "thermal_observability": [],
         "scenario": SCENARIO_LABELS[5],
     }
 
 
-def _scenario_s5_waermepumpe_hint() -> dict:
+def _scenario_s5_wp_heating_hint() -> dict:
     return {
         "source": "seed_deviation_test_log.py",
         "success": True,
@@ -248,9 +248,9 @@ def _scenario_s5_waermepumpe_hint() -> dict:
         "target_power_kw": 0.0,
         "target_soc_percent": 85.0,
         "battery_plan_kw": -0.1,
-        "consumer_powers_kw": {"waermepumpe": 1.5},
-        "flex_live_kw": {"swimspa": 0.0, "eauto": 0.0, "waermepumpe": 0.0},
-        "consumption_snapshot": _flex_snapshot(waermepumpe=0.0),
+        "consumer_powers_kw": {"wp_heating": 1.5},
+        "flex_live_kw": {"swimspa": 0.0, "ev": 0.0, "wp_heating": 0.0},
+        "consumption_snapshot": _flex_snapshot(wp_heating=0.0),
         "thermal_observability": [],
         "scenario": SCENARIO_LABELS[6],
     }
@@ -263,12 +263,12 @@ def build_deviation_test_entries(*, baseline_count: int) -> list[dict]:
     entries.extend(
         [
             _scenario_s1_swimspa_warning(),
-            _scenario_s2_eauto_error(),
+            _scenario_s2_ev_error(),
             _scenario_s3_battery_forced_charge(),
             _scenario_s6_battery_forced_discharge(),
-            _scenario_s7_eauto_pv_follow(),
+            _scenario_s7_ev_pv_follow(),
             _scenario_s4_within_tolerance(),
-            _scenario_s5_waermepumpe_hint(),
+            _scenario_s5_wp_heating_hint(),
         ]
     )
     return entries
@@ -278,12 +278,12 @@ def _validate_scenarios(entries: list[dict], rules_doc: dict) -> None:
     scenarios = entries[-7:]
     expectations = [
         (1, "warning", "swimspa_thermal_band_ok"),
-        (1, "error", "eauto_should_charge"),
+        (1, "error", "ev_should_charge"),
         (1, "error", "battery_forced_charge_missing"),
         (1, "error", "battery_forced_discharge_missing"),
-        (1, "error", "eauto_pv_follow_missing"),
+        (1, "error", "ev_pv_follow_missing"),
         (0, None, None),
-        (1, "hint", "waermepumpe_enable_no_start"),
+        (1, "hint", "wp_heating_enable_no_start"),
     ]
     for entry, (expected_count, category, rule_id) in zip(scenarios, expectations):
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)

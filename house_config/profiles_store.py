@@ -21,6 +21,7 @@ from house_config.generic_schedule import (
     generic_annual_kwh,
     normalize_generic_schedule,
 )
+from settings.flexible_consumers import reject_legacy_id
 
 CONSUMER_TYPES = frozenset({"generic", "thermal_annual", "ev", "thermal_rc"})
 
@@ -228,6 +229,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     consumer_id = str(raw.get("id", "")).strip()
     if not consumer_id:
         raise ValueError(f"profiles '{profile_id}' consumers[{index}]: id fehlt.")
+    reject_legacy_id(raw, f"{profile_id}/{consumer_id}")
     consumer_type = str(raw.get("type", "generic")).strip().lower()
     if consumer_type not in CONSUMER_TYPES:
         raise ValueError(
@@ -307,9 +309,6 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
             loxone = thermal_control.get("loxone")
             if isinstance(loxone, dict) and loxone:
                 spec["thermal_control"] = {"loxone": dict(loxone)}
-    legacy_id = str(raw.get("legacy_id", "")).strip()
-    if legacy_id and legacy_id != consumer_id:
-        spec["legacy_id"] = legacy_id
     _copy_ehal_entity_fields(raw, spec)
     return spec
 
@@ -520,8 +519,6 @@ def _serialize_consumer(consumer: dict) -> dict:
             out["appliance_recommendation"] = dict(rec)
         if consumer.get("loxone_inputs"):
             out["loxone_inputs"] = dict(consumer["loxone_inputs"])
-        if consumer.get("legacy_id"):
-            out["legacy_id"] = consumer["legacy_id"]
     elif consumer["type"] == "ev":
         out["min_power_kw"] = consumer.get("min_power_kw", 0.0)
         out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 0)
@@ -531,8 +528,6 @@ def _serialize_consumer(consumer: dict) -> dict:
             out["loxone_inputs"] = dict(consumer["loxone_inputs"])
         if consumer.get("loxone_outputs"):
             out["loxone_outputs"] = dict(consumer["loxone_outputs"])
-        if consumer.get("legacy_id"):
-            out["legacy_id"] = consumer["legacy_id"]
     if consumer["type"] == "thermal_annual" and consumer.get("thermal"):
         thermal = dict(consumer["thermal"])
         thermal.pop("latitude", None)
@@ -543,8 +538,6 @@ def _serialize_consumer(consumer: dict) -> dict:
             out["loxone_inputs"] = dict(consumer["loxone_inputs"])
         if consumer.get("loxone_outputs"):
             out["loxone_outputs"] = dict(consumer["loxone_outputs"])
-        if consumer.get("legacy_id"):
-            out["legacy_id"] = consumer["legacy_id"]
     elif consumer["type"] == "thermal_rc":
         rc = consumer.get("thermal_rc")
         if isinstance(rc, dict):
@@ -561,8 +554,6 @@ def _serialize_consumer(consumer: dict) -> dict:
             out["loxone_outputs"] = dict(consumer["loxone_outputs"])
         if consumer.get("thermal_control"):
             out["thermal_control"] = dict(consumer["thermal_control"])
-        if consumer.get("legacy_id"):
-            out["legacy_id"] = consumer["legacy_id"]
     _attach_ehal_entity_fields(out, consumer)
     return out
 
