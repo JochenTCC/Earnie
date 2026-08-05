@@ -33,6 +33,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - Silent-mode is off / Daemon is running: "Loud-Modus - Optimierer läuft und sendet Daten"
     - Silent-mode is off / Daemon is not running "Loud-Modus - Optimierer läuft nicht - daher werden keine Daten gesendet"
 
+
 - [ ] **2.4.r — Release**
   - [x] Add the two logos to streamlit for dark and light designs in the sidebar as intended by streamlit
     - docs\assets\Earnie-Logo-Simple_Dark.png for dark design
@@ -73,6 +74,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **2.5.c — Go / no-go + backlog split**
   - Decide: full B vs stay hourly + optional A (store QH prices for SE/billing only) vs hybrid C
   - If go: carve implementation phases into this MINOR (or successor); if no-go: archive rationale and close **2.3.2** accordingly
+- [ ] Reduce messages like:
+  - 2026-08-05 13:42:43 [INFO] (optimizer.milp_consumers:620) - urgent-Regel [e_auto]: nur_urgent_fenster — Ziel 3.650 kWh, optional geplant 0.000 kWh, urgent geplant 3.652 kWh (must_start=2026-08-08T11:54:18+02:00, deadline=2026-08-08T13:00:00+02:00)
+  - Add possibilite on Optimierer-Dienst page to filter for [INFO] / [WARNING] / ...
 
 ### Version 2.+1 - Min immediate charging for EV and learning consumption behaviour
 - [ ] Add the possibility that EV is charged immediately to a min SOC independent from regular schedule - This can be enabled separately for working days and weekend
