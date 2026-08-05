@@ -24,7 +24,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 - [ ] **EVCS `set_evcs_mode` with max current** — fixed current charging wrote mode `0`; now `2` (`now`) with `set_evcs_max_current`, PV surplus `1`, idle `0` (`698fc6a`, `v2.4.0-alpha.2`).
 - [ ] **SwimSpa filter power also on heating Ist** — shared meter: auto `subtract_consumer_ids` + native-filter inference over shared-meter heating ids (`v2.4.0-alpha.4`).
-- [ ] **SE crash when `cons_data_hourly.csv` missing/empty** — Backtesting time-range help no longer raises via `resolve_simulation_window`; guard empty cons_data (`6acee92`, `v2.4.0-alpha.5`).
+- [ ] **SE crash when `cons_data_hourly.csv` missing/empty** — Backtesting time-range help no longer raises via `resolve_simulation_window`; guard empty cons_data (`1987684`, `v2.4.0-alpha.5`).
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
