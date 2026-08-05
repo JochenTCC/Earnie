@@ -74,7 +74,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["optimizer", "data", "house_config", "simulation", "settings", "runtime_store"]
+source = ["optimizer", "data", "house_config", "simulation", "settings", "runtime_store", "ehal"]
 omit = ["tests/*", "scripts/*", "ui/*"]
 
 [tool.coverage.report]

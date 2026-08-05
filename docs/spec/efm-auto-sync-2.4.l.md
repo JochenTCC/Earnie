@@ -1,5 +1,6 @@
-# EFM auto-sync research (2.4.l / Interpretation C)
+# EFM auto-sync research (Interpretation C)
 
+**Status:** historical research note (backlog **2.4.l**); HITL EFM import on EHAL-Com is shipped — see [`../ui/ehal-com.md`](../ui/ehal-com.md).  
 **Date:** 2026-07-30  
 **Lab:** Live Miniserver with Energieflussmonitor + Zähler (LoxAPP3 + MCP 17.1).  
 **Manual blueprint:** `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`

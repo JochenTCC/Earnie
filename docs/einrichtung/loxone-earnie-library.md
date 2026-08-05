@@ -54,6 +54,14 @@ Ziel: entsprechender Ordner **`VirtualOut`**.
 
 Danach **Loxone Config neu starten**. Die Vorlagen erscheinen unter Peripherie / Device Templates (Virtual In / Virtual Out).
 
+![Virtual Inputs Loxone](../assets/Virtual-Inputs-Loxone.png)
+
+*Beispiel: Virtual HTTP In (Earnie → Loxone) in Loxone Config.*
+
+![Virtual Outputs Loxone](../assets/Virtual-Outputs-Loxone.png)
+
+*Beispiel: Virtual Out (Loxone → Earnie) in Loxone Config.*
+
 ## 2. Earnie-Adresse setzen
 
 In jedem eingefügten Virtual-In/Out den Platzhalter `EARNIE_HOST` durch die LAN-IP bzw. den Hostnamen von Earnie ersetzen. UI/Streamlit typisch Port **8501**; **Daemon-HTTP** (Virtual In Status, `Earnie_Request_Optimize` / Alive) nutzt Port **8541** (`system.ehal_loxone_http_port`). Siehe [Streamlit-Ports](../referenz/streamlit-ports.md).

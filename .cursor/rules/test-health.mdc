@@ -37,18 +37,18 @@ Triage flags: never failed, not **protected**, plus heuristics (mock-heavy, low 
 .venv\Scripts\python.exe -m scripts.test_health_report report
 ```
 
-Coverage scope: `optimizer`, `data`, `house_config`, `simulation`, `settings`, `runtime_store` (see `pyproject.toml`).
+Coverage scope: `optimizer`, `data`, `house_config`, `simulation`, `settings`, `runtime_store`, `ehal` (see `pyproject.toml`).
 
 ## Dead code / orphaned fixtures (supplement)
 
 Requires `pip install -e ".[dev]"` (`vulture`, `pytest-deadfixtures`). Manual review only — never auto-delete.
 
 ```powershell
-.venv\Scripts\python.exe -m vulture optimizer data house_config simulation settings runtime_store scripts --min-confidence 80
+.venv\Scripts\python.exe -m vulture optimizer data house_config simulation settings runtime_store ehal scripts --min-confidence 80
 .venv\Scripts\python.exe -m pytest --dead-fixtures
 ```
 
-`LEGACY_TEST_SYMBOLS` in `scripts/test_health_report.py` targets migration / pre-1.26 leftovers (not still-valid `legacy_id` / `subtract_consumer_ids` bridges).
+`LEGACY_TEST_SYMBOLS` in `scripts/test_health_report.py` targets migration / pre-1.26 leftovers and 2.4-removed dual-key / soft-compat patterns (`legacy_id`, `pv_follow_name`, `BRIDGE_DEFAULTS`, `sunrise_full_horizon_trial`). Fail-fast reject tests that mention those symbols are expected — triage manually. Do not treat `subtract_consumer_ids` as legacy.
 
 ## Mutation testing (optional, weekly)
 

@@ -1,8 +1,8 @@
 # Spezifikation: UI-Menüstruktur (Sidebar-Ersatz) + Empfehlungsmodus manuelle Geräte
 
+**Status:** historical (epic record for former backlog `### Version 1.21`) — native pages and Empfehlungsmodus are shipped; use live UI / [`ui/betriebsmodi.md`](../ui/betriebsmodi.md) for operators.  
 **Version:** 0.1.0  
-**Status:** Geplant (Design abgestimmt 2026-07-07) — Umsetzung offen  
-**Bezug:** Backlog `### Version 1.21` (Menüstruktur Z. 15–20 + Empfehlungsmodus Z. 21)  
+**Bezug (archived):** Backlog `### Version 1.21` (Menüstruktur Z. 15–20 + Empfehlungsmodus Z. 21)  
 **Ersetzt:** Sidebar als Steuer-/Parameter-Container (`ui/mode_selector.py` Radio, `ui/config_forms.py`, Sidebar-Controls in `ui/backtesting.py` und `ui/price_forecast.py`)
 
 ## 1. Ziel

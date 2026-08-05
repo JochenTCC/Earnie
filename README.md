@@ -4,7 +4,7 @@
   <img src="docs/assets/Earnie-Logo-Simple-Light.png" alt="Earnie" width="160">
 </p>
 
-**Earnie** optimiert den Energiefluss in einem Smart-Home: Speicher, PV und Verbraucher mit wählbaren Schaltzeiten werden im 15-Minuten-Takt so optimiert, dass Stromkosten sinken und der Eigenverbrauch steigt. Seine Stärke spielt **Earnie** vor allem im Zusammenhang mit sogenannten [SPOT-Tarifen (im DACH-Raum)](https://www.epexspot.com/) aus. Eine umfangreiche Oberfläche zeigt genau, was **Earnie** gemacht und geplant hat.
+**Earnie** optimiert den Energiefluss in einem Smart-Home: Speicher, PV und Verbraucher mit wählbaren Schaltzeiten werden so optimiert, dass Stromkosten sinken und der Eigenverbrauch steigt. Der Daemon arbeitet typisch im **15-Minuten-Takt**; der MILP-Plan nutzt derzeit **Stunden-Slots**. Seine Stärke spielt **Earnie** vor allem im Zusammenhang mit sogenannten [SPOT-Tarifen (im DACH-Raum)](https://www.epexspot.com/) aus. Eine umfangreiche Oberfläche zeigt genau, was **Earnie** gemacht und geplant hat.
 Und wenn Sie vorab wissen wollen, wie hoch das Einsparpotenzial ist, kann **Earnie** das für Sie vorab für ein ganzes Jahr hochrechnen - Und das auch ganz ohne Smart-Home.
 Earnie funktioniert unabhängig von Energie- und / oder Systemlieferanten für maximale Unabhängigkeit.
 
@@ -12,18 +12,18 @@ GitHub-Repository: [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie).
 
 ## Was ist Earnie?
 
-**Earnie** richtet sich an Hausbesitzer, die Kosten beim Stromverbrauch minimieren möchten, insbesondere bei [SPOT-Tarifen](https://www.epexspot.com/). Er optimiert in einem variablen Zeitfenster (von max. 48h) die Verbräuche und Erträge so, dass die Kosten minimal sind. Das funktioniert am besten bei Häusern mit einer PV-Anlage, Batteriespeicher und Verbrauchern, die per Smart-Home gesteuert werden können (also smarter Wechselrichter, smarte Wallbox für das E-Auto, smarte Wärmepumpe und andere Geräte). Bisher kommuniziert **Earnie** mit diesen Systemen über eine [Loxone](https://www.loxone.com/dede/)-Haus-Automation — das wird aber auch um andere Systeme erweitert werden. Für andere Geräte, die noch nicht smart sind, kann **Earnie** Empfehlungen für den besten Start-Zeitpunkt geben.
+**Earnie** richtet sich an Hausbesitzer, die Kosten beim Stromverbrauch minimieren möchten, insbesondere bei [SPOT-Tarifen](https://www.epexspot.com/). Er optimiert in einem variablen Zeitfenster (von max. 48h) die Verbräuche und Erträge so, dass die Kosten minimal sind. Das funktioniert am besten bei Häusern mit einer PV-Anlage, Batteriespeicher und Verbrauchern, die per Smart-Home gesteuert werden können (also smarter Wechselrichter, smarte Wallbox für das E-Auto, smarte Wärmepumpe und andere Geräte). Die Live-Anbindung läuft über **EHAL**: Default [Loxone](https://www.loxone.com/dede/), DACH-Pfad A2 [Home Assistant](https://www.home-assistant.io/) + [evcc](https://evcc.io/), OpenEMS als Lab-/Industrie-Prototyp — Umschaltung per Config ([Adapter wählen](docs/einrichtung/adapter-wahl.md)). Für Geräte ohne smarte Freigabe kann **Earnie** Startempfehlungen geben.
 Der große Hebel für Einsparungen ist das geschickte Timing all dieser Verbraucher und der intelligente Einsatz des Batteriespeichers als Puffer.
 
 ![Was-Wäre-Wenn-Analyse](docs/assets/Monatliche-Stromkosten.png)
 *Was-Wäre-Wenn-Analyse: Vorab schon sehen, was eine andere Konfiguration sparen könnte*
 
-Statt fester Regeln (wie bei anderen Lösungen) berechnet **Earnie** einen **24-48 Stunden-Plan** unter Berücksichtigung von Strompreisen, PV-Prognose, Wettervorhersagen für den Standort des Hauses, Speicherzustand und Gerätebedarf. Ein dauerhaft laufender Daemon setzt den Plan in [Loxone](https://www.loxone.com/dede/) um; eine übersichtliche Web-Oberfläche zeigt Soll/Ist und hilft bei Konfiguration und Analyse.
+Statt fester Regeln (wie bei anderen Lösungen) berechnet **Earnie** einen **24-48 Stunden-Plan** unter Berücksichtigung von Strompreisen, PV-Prognose, Wettervorhersagen für den Standort des Hauses, Speicherzustand und Gerätebedarf. Ein dauerhaft laufender Daemon setzt den Plan über EHAL um; eine übersichtliche Web-Oberfläche zeigt Soll/Ist und hilft bei Konfiguration und Analyse.
 
 
 | Komponente                                 | Rolle                                                                                           |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| `main.py`                                  | Liest [Loxone](https://www.loxone.com/dede/), optimiert, schreibt Steuerwerte — läuft dauerhaft |
+| `main.py`                                  | Liest Telemetrie über EHAL, optimiert, schreibt Steuerwerte — läuft dauerhaft |
 | **[Streamlit](https://streamlit.io/)-App** | Cockpit, Planung, Simulation — optional parallel; steuert die Anlage nicht                      |
 
 
@@ -45,7 +45,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 ### Optimierung und Steuerung
 
-- Ganzheitliche Optimierung im 15-Minuten-Takt. für Speicher und Verbraucher, deren Aktivierung von Earnie oder dem Benutzer gewählt werden kann.
+- Ganzheitliche Optimierung: Daemon typisch im 15-Minuten-Takt; MILP-Plan derzeit in Stunden-Slots für Speicher und Verbraucher, deren Aktivierung von Earnie oder dem Benutzer gewählt werden kann.
 - Dynamische Strompreise (z. B. [aWATTar](https://www.awattar.at/)) und Preis-Prognose (über die veröffentlichten Preise hinaus)
 - PV-Erzeugungsprognose über [Open-Meteo](https://open-meteo.com/)-Wetterdaten und Grundlast-Modell mit Berücksichtigung der Temperaturen
 
@@ -80,12 +80,12 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 ## Typischer Ablauf
 
-1. **Voraussetzungen klären** — [Loxone](https://www.loxone.com/dede/)-Miniserver, PV + Speicher, verschiebbare Verbraucher, optional dynamischer Tarif
+1. **Voraussetzungen klären** — Smarthome-Backend (Loxone / HA+evcc / OpenEMS-Lab), PV + Speicher, verschiebbare Verbraucher, optional dynamischer Tarif
 2. **Deployment wählen** — Container ([Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox LXC](docs/einrichtung/proxmox-lxc.md)) oder lokaler Betrieb → [Container](docs/einrichtung/container.md) · [Betrieb](docs/einrichtung/betrieb.md)
-3. **Konfiguration anlegen** — `config/config.json` aus Vorlage, Loxone-Zugang, Merker-Namen → [Erste Schritte](docs/README.md#erste-schritte)
+3. **Konfiguration anlegen** — Bootstrap `earnie_env/config/`, Backend und Mapping → [Erste Schritte](docs/README.md#erste-schritte) · [Adapter wählen](docs/einrichtung/adapter-wahl.md)
 4. **Was-wäre-wenn-Analyse** — Mit Erstkonfiguration klären, ob sich ein Gesamtsystem und Earnie im produktiven Einsatz lohnen
-5. **Verbindung zu Smarthome** — `python -m scripts.verify_loxone_setup`
-6. **Produktiv starten** — `python main.py` dauerhaft (**nur eine Instanz**)
+5. **Verbindung zu Smarthome** — **EHAL-Com** (Live-Lesen); bei Loxone optional `python -m scripts.verify_loxone_setup`
+6. **Produktiv starten** — `python main.py` dauerhaft (**nur eine Instanz**) bzw. Docker Auto-Start
 7. **Monitor öffnen** — [Streamlit](https://streamlit.io/); Port je Stack: [Streamlit-Ports](docs/referenz/streamlit-ports.md) (Prod **8501**, lokal venv typisch **8531**)
 8. **Feintuning** — Hausprofil, Szenarien, flexible Verbraucher über Planungs- und Betriebsseiten
 
@@ -100,7 +100,7 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 | Bereich                | Kapitel                                                                                                                                                                                                          |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Handbuch**           | [Benutzer-Handbuch Earnie](docs/user-manual/Benutzer-Handbuch-Earnie.md)                                                                                                                                         |
-| **Einrichtung**        | [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Proxmox LXC](docs/einrichtung/proxmox-lxc.md)                  |
+| **Einrichtung**        | [Adapter wählen](docs/einrichtung/adapter-wahl.md) · [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Proxmox LXC](docs/einrichtung/proxmox-lxc.md) |
 | **Konfiguration**      | [Überblick](docs/konfiguration/ueberblick.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md) |
 | **Benutzeroberfläche** | [Betriebsmodi](docs/ui/betriebsmodi.md) · [Charts](docs/ui/charts.md) · [EHAL-Com](docs/ui/ehal-com.md)                                                                                            |
 | **Referenz**           | [Loxone-Signale](docs/referenz/loxone-signale.md)                                                                                                                                                                |

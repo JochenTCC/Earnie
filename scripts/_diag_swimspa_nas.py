@@ -21,7 +21,6 @@ from runtime_store import optimization_history
 from runtime_store.history_timeline import (
     SLOT_PRESENT,
     _index_entries_by_slot,
-    build_chart_history,
 )
 from ui.chart_context import build_live_chart_context, build_chart_display_context
 from ui.charts import (

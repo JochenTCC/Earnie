@@ -6,14 +6,14 @@ Diese Dokumentation richtet sich an Betreiber von Earnie: Einrichtung, Konfigura
 
 Für Entwickler (Projektstruktur, Tests, Container) siehe [DEVELOPER.md](../DEVELOPER.md).
 
-Zum Ausprobieren des Szenarien-eExplorers ohne Intallation:
+Zum Ausprobieren des Szenario-Explorers ohne Installation:
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://earnie.streamlit.app)
 
 ## Erste Schritte
 
 1. **Konfiguration:** `share/config/config.example.json` → Bootstrap legt `earnie_env/config/config.json` an (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime`. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
 2. **Smarthome-Backend wählen:** [Adapter wählen](einrichtung/adapter-wahl.md) (Default Loxone; alternativ HA+evcc oder OpenEMS-Lab). Bei Loxone: `.env.example` → `earnie_env/config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `.env` im Config-Volume an).
-3. **Feld-Mapping:** Bei Loxone Merker in `loxone_blocks` / Hausprofil ([Loxone-Signale](referenz/loxone-signale.md)); bei HA Entity→EHAL auf [EHAL-Com](ui/ehal-com.md). Legacy-`flexible_consumers` in `config.json` nur noch bei Bedarf.
+3. **Feld-Mapping:** Bei Loxone Merker in `plant.ehal_bindings` / Hausprofil über **EHAL-Com** ([Loxone-Signale](referenz/loxone-signale.md)); bei HA Entity→EHAL auf [EHAL-Com](ui/ehal-com.md). Legacy-`flexible_consumers` in `config.json` nur noch bei Bedarf (meist leer).
 4. **Verbindung prüfen:** EHAL-Com (Live-Lesen) bzw. bei Loxone:
   ```powershell
    python -m scripts.verify_loxone_setup
@@ -31,7 +31,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 ### Benutzer-Handbuch
 
-- [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md) — Überblick, Einrichtung Was-wäre-wenn, Loxone, Live-Betrieb (Entwurf)
+- [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md) — Überblick, Einrichtung Was-wäre-wenn, Smarthome, Live-Betrieb
 
 
 
@@ -81,6 +81,23 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 ### Entwickler-Specs (Englisch/technisch)
 
-- [Spec Soll-Ist](spec/soll-ist-abweichung.md) — Regelwerk, Szenarien, Pflegehinweis
-- [Backtesting: fixed_24h vs sunrise_window](spec/backtesting-horizon-fixed24h-vs-sunrise.md) — Jahresvergleich Nutzen (€) und Rechenlast (CBC / strict_slow)
+- [EHAL](spec/ehal.md) — Hardware Access Layer contract (schema_version 3, adapters)
+- [Spec Soll-Ist](spec/soll-ist-abweichung.md) — Regelwerk Chart 1, Szenarien, Pflegehinweis
+- [UI Sunset-2-Sunset](spec/ui-sunset2sunset.md) — Monitor-Cockpit (historisch abgeschlossen)
+- [UI-Menüstruktur](spec/ui-menu-structure.md) — historische Epic-Notiz (native Pages shipped)
+- [Sunset-Planungshorizont](spec/planning-horizon-sunset.md) — Live-Horizont SA₁→SA₂, SOC-Anker
+- [Backtesting: fixed_24h vs sunrise_window](spec/backtesting-horizon-fixed24h-vs-sunrise.md) — Jahresvergleich Nutzen (€) und Rechenlast
+- [Backtesting deviation calendar](spec/backtesting-deviation-calendar.md) — Abweichungskalender SE
+- [Backtesting plausibility S2](spec/backtesting-plausibility-s2-kein-pv-jan-2-7.md) — Plausibilitätsnotiz
+- [Scenario-Explorer consumption](spec/scenario-explorer-consumption.md) — SE-Last-/CSV-Semantik
+- [SE calculation test plan](spec/se-calculation-test-plan.md) — SE-Rechentests
+- [OpenEMS lab setup](spec/openems-lab-setup.md) — Compose + Earnie ↔ OpenEMS
+- [OpenEMS testing platform](spec/openems-testing-platform-todo.md) — Plant-/REST-Kanal-Checkliste
+- [HA + evcc lab setup](spec/ha-lab-setup.md) — Compose + Earnie ↔ Home Assistant
+- [SwimSpa filter](spec/swimspa-filter.md) — Filter-Schulden / MILP
+- [Price forecast renewables](spec/price-forecast-renewables.md) — Preisprognose-Modell
+- [EFM auto-sync](spec/efm-auto-sync-2.4.l.md) — historische Research-Notiz Interpretation C
+- [Hardware registry Layer C](spec/hardware-registry-layer-c.md) — Registry / Banner (soft 2.4.q; full C later)
+- [Branching & Hotfix Playbook](spec/branching-hotfix-playbook.md) — Tags, hotfixes, `main`
+- [Epic deploy user](spec/epic-deploy-user.md) — historische PyInstaller-Draft (superseded by GHCR release)
 

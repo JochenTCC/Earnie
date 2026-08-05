@@ -6,7 +6,7 @@ Typical workflow:
   .venv\\Scripts\\python.exe -m scripts.test_health_report report
 
   # Dead-code / orphaned-fixture supplements (pip install -e \".[dev]\"):
-  .venv\\Scripts\\python.exe -m vulture optimizer data house_config simulation settings runtime_store scripts --min-confidence 80
+  .venv\\Scripts\\python.exe -m vulture optimizer data house_config simulation settings runtime_store ehal scripts --min-confidence 80
   .venv\\Scripts\\python.exe -m pytest --dead-fixtures
 
   # Pre-commit only ingests the last JUnit file (see .githooks/pre-commit).
@@ -46,9 +46,9 @@ PROTECTED_TEST_FILES = frozenset(
     }
 )
 
-# Migration / pre-1.26 leftovers only — not still-valid 2.0 bridges (legacy_id,
-# subtract_consumer_ids) or routine test env overrides (EARNIE_CONFIG_PATH).
-# Manual review only; never auto-delete flagged tests.
+# Migration / pre-1.26 leftovers and 2.4-removed dual-key / soft-compat patterns.
+# Fail-fast reject tests that mention these symbols are expected — manual triage.
+# Do not flag routine env overrides (EARNIE_CONFIG_PATH) or subtract_consumer_ids.
 LEGACY_TEST_SYMBOLS = (
     "migrate_runtime_entities",
     "finalize_migration_for_2_0",
@@ -56,6 +56,10 @@ LEGACY_TEST_SYMBOLS = (
     "migrate_flex_consumers",
     "patch_swimspa_filter_config",
     "_raw_config.get(\"swimspa\")",
+    "legacy_id",
+    "pv_follow_name",
+    "BRIDGE_DEFAULTS",
+    "sunrise_full_horizon_trial",
 )
 
 COV_SOURCE_PACKAGES = (
@@ -65,6 +69,7 @@ COV_SOURCE_PACKAGES = (
     "simulation",
     "settings",
     "runtime_store",
+    "ehal",
 )
 
 

@@ -1,10 +1,14 @@
+# Epic: Automatisierte Multi-Plattform-Builds für GitHub Releases via GitHub Actions
+
+**Status:** historical draft — superseded for container/release flow by [`branching-hotfix-playbook.md`](branching-hotfix-playbook.md) and `.github/workflows/release.yml` (GHCR + GitHub Release). Native `.exe`/`.dmg` packaging below was never the shipping path.
+
+---
+
 Hier ist der Entwurf für ein **Epic**, das du direkt so in Cursor (z. B. als `.md`-Datei im Repository oder im Project Management) verwenden kannst, um die CI/CD-Pipeline umzusetzen.
 
 ---
 
-# Epic: Automatisierte Multi-Plattform-Builds für GitHub Releases via GitHub Actions
-
-## Status: 📋 Open
+## Status (original): Open
 
 ## Beschreibung
 

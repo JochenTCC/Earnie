@@ -31,7 +31,7 @@ Snippets unter `share/config/`:
 - HA: [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json)
 - OpenEMS: [`ehal.openems.snippet.json`](../../share/config/ehal.openems.snippet.json)
 
-Loxone-Zugangsdaten liegen in `config/.env` (`LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS`); Merker-Namen in `plant.ehal_bindings` / Hausprofil (Legacy optional `loxone_blocks`). Siehe [Loxone-Signale](../referenz/loxone-signale.md).
+Loxone-Zugangsdaten liegen in `config/.env` (`LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS`); Merker-Namen in `plant.ehal_bindings` / Hausprofil. Siehe [Loxone-Signale](../referenz/loxone-signale.md).
 
 Nach dem Wechsel: Verbindung auf **EHAL-Com** (Live-Lesen / Verbindungstest) prüfen, bevor Silent-Modus ausgeschaltet wird.
 

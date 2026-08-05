@@ -12,12 +12,13 @@ End-user documentation is **German**. Do not translate it to English unless the 
 | Path | Purpose |
 |------|---------|
 | `docs/README.md` | Anwender-Einstieg, Inhaltsverzeichnis |
+| `docs/user-manual/` | Benutzer-Handbuch (narrative operator journey) |
 | `docs/einrichtung/` | Einrichtung, Betrieb, Container, Dev-Stacks |
 | `docs/konfiguration/` | `config.json`, Sidecars, Szenarien |
 | `docs/ui/` | Streamlit-Oberfläche, Charts, Betrieb |
 | `docs/referenz/` | Loxone-Signale, Ports, Tabellen |
 
-**Not user docs:** `docs/spec/` (Entwickler-Specs, English OK), `Backlog*.md`, root `README.md` (Entwickler).
+**Not user docs:** `docs/spec/` (Entwickler-Specs, English OK), `Backlog*.md`. Root `README.md` is the public landing (German prose OK; keep in sync with user docs when facts change).
 
 ## When editing or adding user docs
 

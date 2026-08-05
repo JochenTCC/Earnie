@@ -1,6 +1,7 @@
-# HA + evcc lab setup — Earnie ↔ Home Assistant (2.4.c)
+# HA + evcc lab setup — Earnie ↔ Home Assistant
 
-**Purpose:** Bring up and configure the **combined** Compose stack (`earnie` + `homeassistant` + `evcc`) so you can prove Earnie talks to Home Assistant over **REST only** (EHAL M1 / backlog **2.4.c** / DACH path A2).
+**Status:** current  
+**Purpose:** Bring up and configure the **combined** Compose stack (`earnie` + `homeassistant` + `evcc`) so you can prove Earnie talks to Home Assistant over **REST only** (EHAL / DACH path A2; backlog history **2.4.c**).
 
 **Audience:** Operator of the lab on a Dev-PC or Pi. Containers may already be running; this guide finishes **HA onboarding**, **token**, **evcc**, **Earnie `ehal.ha`**, and a **communication check**.
 
@@ -379,7 +380,7 @@ Silent gate: `loxone_silent_mode` also blocks HA setpoint writes (same as OpenEM
 8. **Telemetrie testen** → expect validated JSON (SoC, powers).  
 9. **Mapping speichern** → writes `ehal` into `config.json` and reloads runtime config.
 
-LLM-assisted proposals are **out of scope** until **2.4.f**.
+LLM-assisted proposals are **not** in the shipping UI (optional Ollama code may exist in `integrations/` for later re-integration).
 
 ### 5.1 After marq24 ha-evcc is connected (lab follow-up)
 
@@ -498,8 +499,7 @@ Bind mounts (`ha_lab/…`) are kept. To factory-reset HA only, remove files unde
 
 ## Out of scope here
 
-- HA WebSocket state subscription (REST poll only in 2.4.c)
+- HA WebSocket state subscription (REST poll only)
 - Direct evcc REST/MQTT adapter from Earnie (lab-only option deferred)
-- LLM-assisted mapping (**2.4.f**)
-- Loxone-EHAL extraction (**2.4.e**)
+- LLM-assisted mapping in the shipping UI (optional Ollama helpers may exist off-UI)
 - Production Path B hardening beyond “point Earnie at existing HA URL + mapping UI”

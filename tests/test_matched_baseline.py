@@ -43,7 +43,7 @@ def test_build_matched_flex_scales_to_target():
     assert all(hour["swimspa"] == 0.0 for hour in per_hour[12:])
 
 
-def test_build_matched_flex_reads_legacy_matrix_keys():
+def test_build_matched_flex_reads_canonical_matrix_keys():
     matrix = [
         {
             "hour": h,
@@ -52,7 +52,7 @@ def test_build_matched_flex_reads_legacy_matrix_keys():
             "k_act": 20.0,
             "expected_flex_kw": {
                 "swimspa": 1.0 if h < 12 else 0.0,
-                "eauto": 0.5,
+                "ev": 0.5 if h < 12 else 0.0,
             },
         }
         for h in range(24)
@@ -60,7 +60,7 @@ def test_build_matched_flex_reads_legacy_matrix_keys():
     targets = {"swimspa": 6.0, "ev": 12.0}
     consumers = [
         {"id": "swimspa", "name": "SwimSpa"},
-        {"id": "ev", "legacy_id": "eauto", "name": "Smart"},
+        {"id": "ev", "name": "Smart"},
     ]
     with patch(
         "optimizer.simulation.config.get_flexible_consumers",
@@ -70,6 +70,9 @@ def test_build_matched_flex_reads_legacy_matrix_keys():
 
     ev_sum = sum(hour["ev"] for hour in per_hour)
     assert abs(ev_sum - 12.0) < 0.01
+    # Profile shape preserved (not uniform fallback): first half non-zero.
+    assert all(hour["ev"] > 0.0 for hour in per_hour[:12])
+    assert all(hour["ev"] == 0.0 for hour in per_hour[12:])
 
 
 def test_baseline_horizon_lower_soc_with_matrix_flex():

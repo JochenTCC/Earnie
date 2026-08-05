@@ -36,7 +36,7 @@ Persistenz Earnie: `ha_lab/config/` und `ha_lab/runtime/`. HA-Konfiguration: `ha
 1. In Home Assistant ein **Long-Lived Access Token** anlegen.
 2. Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) in `config.json` übernehmen bzw. in der UI setzen (IDs nur **Beispiele**).
 3. Streamlit-Seite **EHAL-Com** → Expander **HA Entity → EHAL Mapping**: Entities scannen, EHAL-Felder zuweisen, speichern.
-4. Optional **Telemetrie testen**. LLM-gestützte Vorschläge folgen in Version **2.4.f**.
+4. Optional **Telemetrie testen**. LLM-gestützte Vorschläge sind **nicht** Teil der ausgelieferten UI.
 
 ### Wenn marq24 / evcc bereits in HA verbunden ist
 

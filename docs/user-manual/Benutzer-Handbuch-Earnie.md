@@ -1,7 +1,7 @@
 # EARNIE — Benutzer-Handbuch
 
-> **Entwurf.** Dieses Handbuch beschreibt Earnie aus Anwendersicht nach der Installation.
-> Technische Details (Container, Config-Schema, Entwickler) stehen in der [Anwender-Dokumentation](../README.md) und im [README](../../README.md).
+Dieses Handbuch beschreibt Earnie aus Anwendersicht nach der Installation.
+Technische Details (Container, Config-Schema, Entwickler) stehen in der [Anwender-Dokumentation](../README.md) und im [README](../../README.md).
 
 ---
 
@@ -11,7 +11,7 @@
 
 **Earnie** ist ein Energie-Optimierer für Privathaushalte. Er plant und steuert, wann Strom bezogen, gespeichert, verbraucht oder eingespeist wird — mit dem Ziel, **Stromkosten zu senken** und den **Eigenverbrauch** zu erhöhen.
 
-Besonders wirksam ist Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar), weil Preise stündlich schwanken. Statt fester Regeln berechnet Earnie regelmäßig einen **Plan für die nächsten etwa 24–48 Stunden** (15-Minuten-Schritte) und berücksichtigt dabei:
+Besonders wirksam ist Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar), weil Preise stündlich schwanken. Statt fester Regeln berechnet Earnie regelmäßig einen **Plan für die nächsten etwa 24–48 Stunden** (MILP derzeit in **Stunden-Slots**; der Daemon läuft typisch im **15-Minuten-Takt**) und berücksichtigt dabei:
 
 - aktuelle und prognostizierte Strompreise  
 - PV-Ertragsprognose (Wetter am Standort)  
@@ -23,7 +23,7 @@ Besonders wirksam ist Earnie bei **dynamischen Spot-Tarifen** (z. B. aWATTar),
 | Nutzung | Was Sie damit machen |
 |--------|----------------------|
 | **Was-wäre-wenn (ohne Smart-Home)** | Haus und Varianten konfigurieren, Jahresvergleich rechnen — z. B. ob sich Speicher, größere PV oder ein Spot-Tarif lohnen |
-| **Live-Betrieb (mit Loxone)** | Dauerhaft optimieren und Sollwerte an die Hausautomation schreiben; Monitor zeigt Plan und Ist |
+| **Live-Betrieb (mit Smarthome)** | Dauerhaft optimieren und Sollwerte an Loxone, Home Assistant (+ evcc) oder OpenEMS (Lab) schreiben; Monitor zeigt Plan und Ist |
 
 Nur der Hintergrunddienst (`main.py`) steuert die Anlage im Produktivbetrieb. Die Web-Oberfläche (Streamlit) ist das **Cockpit**: Anzeige, Konfiguration und Analyse — und unter **Daemon Control → Optimierer-Dienst** Start/Stop/Neustart des Daemons.
 
@@ -38,12 +38,12 @@ Nur der Hintergrunddienst (`main.py`) steuert die Anlage im Produktivbetrieb. Di
 
 **Für den produktiven Live-Betrieb zusätzlich:**
 
-- [Loxone](https://www.loxone.com/)-Miniserver mit erreichbarer HTTP-Schnittstelle  
-- Sinnvolle Merker / virtuelle Eingänge für SOC, Leistungen, Freigaben und Sollwerte (siehe Kapitel *Verbindung zu Smarthome*)  
+- Erreichbares Smarthome-Backend: [Loxone](https://www.loxone.com/) (Default), [Home Assistant](https://www.home-assistant.io/) + evcc (DACH-Pfad A2) oder OpenEMS (Lab-/Industrie-Prototyp) — siehe [Adapter wählen](../einrichtung/adapter-wahl.md)  
+- Sinnvolle Merker / Entities für SOC, Leistungen, Freigaben und Sollwerte (Kapitel *Verbindung zu Smarthome*)  
 - Typischerweise: PV und/oder Batteriespeicher sowie steuerbare Verbraucher  
 - Empfohlen: dynamischer Bezugs- und/oder Einspeisetarif  
 
-Earnie ist **unabhängig von Energieversorger und Systemlieferant** gedacht; die heutige Live-Anbindung ist Loxone. Andere Systeme können später ergänzt werden.
+Earnie ist **unabhängig von Energieversorger und Systemlieferant** gedacht; die Live-Anbindung läuft über **EHAL** (Earnie Hardware Access Layer).
 
 ### Lizenzbedingungen
 
@@ -121,7 +121,7 @@ Kurzfassung der typischen Wege:
 1. Projekt bzw. Compose-Datei bereitstellen, Verzeichnisse `earnie_env/config/` und `earnie_env/runtime/` anlegen.  
 2. Container starten — fehlende Dateien werden beim ersten Start angelegt (Bootstrap).  
 3. Oberfläche im Browser öffnen (Produktiv oft Port **8501**, siehe [Streamlit-Ports](../referenz/streamlit-ports.md)).  
-4. Loxone-Zugang hinterlegen (falls Live geplant) und mit dem Hauskonfigurator fortfahren.
+4. Bei geplantem Live-Betrieb: Smarthome-Backend wählen und Zugang hinterlegen ([Adapter](../einrichtung/adapter-wahl.md)), dann mit dem Hauskonfigurator fortfahren.
 
 Details: [Container](../einrichtung/container.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md).
 
@@ -141,6 +141,10 @@ Empfohlene Reihenfolge:
 4. Szenario-Explorer: Verbrauch generieren, Rechnung starten, Ergebnisse lesen  
 
 ### Hauskonfigurator
+
+![Hauskonfigurator](../assets/Hauskonfigurator.png)
+
+*Hauskonfigurator: Hausprofil, Verbraucher, PV und Speicher als Kataloge.*
 
 Unter **Konfiguration → Hauskonfigurator** pflegen Sie die baulichen und technischen Bausteine Ihres Haushalts. Gespeichert werden Kataloge (Hausprofile, Komponenten), die später von Szenarien **referenziert** werden — nicht alles doppelt in einer einzigen Datei.
 
@@ -166,7 +170,7 @@ Thermischer Verbraucher für Heizung / Wärmepumpe (je nach Modell im Profil):
 
 - Solltemperaturen und thermische Parameter (Wärmeverlust, Volumen bzw. Gebäudekennwerte). Dafür ist ein Energieausweis des Gebäudes hilfreich.  
 - Earnie schätzt den **Wärmebedarf aus Wetterdaten** und plant den Strombedarf zeitlich mit ein  
-- Im Live-Betrieb später Anbindung über Loxone-Merker (Leistung, Freigabe, ggf. Temperaturen)
+- Im Live-Betrieb später Anbindung über EHAL-Bindings (Leistung, Freigabe, ggf. Temperaturen)
 
 Je genauer die thermischen Angaben, desto realistischer der Jahresvergleich — aber grobe Werte reichen für eine erste Orientierung.
 
@@ -253,6 +257,10 @@ Tarife wählen Sie aus dem Tarifkatalog (Bezug/Einspeise). Nach der Auswahl zeig
 
 ### Szenario-Explorer (Was-Wäre-Wenn-Analyse)
 
+![Monatliche Stromkosten](../assets/Monatliche-Stromkosten.png)
+
+*Szenario-Explorer: Monatliche Stromkosten im Vergleich (Was-wäre-wenn).*
+
 Unter **Konfiguration → Szenario-Explorer** (erscheint nach ausreichender Planungs-Konfiguration).
 
 Hier analysieren Sie **Langzeitvergleiche** typischerweise über die letzten 12 Monate (für Tests auch kürzer, z. B. nur März) zwischen Referenzen und Ihren Szenarien:
@@ -261,7 +269,7 @@ Hier analysieren Sie **Langzeitvergleiche** typischerweise über die letzten 12 
 - **Referenzen ohne Optimierung** — je nach Szenario-Einstellung und Heuristik: Live-Referenz und ggf. eigene Spalten bei abweichendem Tarif/PV (steuerbar im Szenarienkonfigurator)  
 - **optimierte Szenarien** — mit Earnie-Planung (Batterie/Flex, sofern im Szenario vorhanden)
 
-Das ist **kein** tägliches Live-Cockpit und ändert keine Steuerwerte an Loxone.
+Das ist **kein** tägliches Live-Cockpit und ändert keine Steuerwerte am Hub.
 
 > Hinweis: Ergebnisse sind Modellrechnungen. Es gibt **keine Garantie**, dass Live-Einsparungen exakt den Simulationen entsprechen (Wetter, Verhalten, Tarifdetails, Hardwaregrenzen).
 
@@ -321,127 +329,60 @@ Zum Abgleich Ist vs. Modell: Hauskonfigurator / Leistungsprofil-CSV und die Tabe
 
 ## Verbindung zu Smarthome
 
-Wenn die Was-wäre-wenn-Analyse überzeugt, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die konkrete Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt in der Smarthome-Steuerung.
+Wenn die Was-wäre-wenn-Analyse überzeugt, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die konkrete Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Hub.
+
+Backend wählen und Umschalten: [Adapter wählen](../einrichtung/adapter-wahl.md). Bei Loxone zusätzlich VI/VO-Vorlagen: [Earnie-Loxone-Library](../einrichtung/loxone-earnie-library.md).
 
 ### Vorbereitung der Smarthome-Konfiguration
 
-1. **Benutzer** am Smarthome-System mit Rechten zum Lesen und Schreiben der benötigten IOs anlegen.  
-2. **Merker / virtuelle Eingänge** anlegen bzw. benennen oder vorhandene Signale übernehmen — u. a.:  
-   - Batterie: SOC, Leistungen, PV-Leistung  
-   - Steuerung: Ziel-SOC, Lade-/Entlade-Soll, Steuerbefehl (Automatik / Zwang)  
-   - Verbraucher: Ist-Leistung lesen; Freigabe 0/1 oder E-Auto-Leistungs-Soll schreiben  
-   - E-Auto: angesteckt, Fertig-Zeit, Rest-SOC, Kapazität, …  
-   Konkrete Beispielnamen und Config-Schlüssel: [Loxone-Signale](../referenz/loxone-signale.md). Zentrale Merker unter `loxone_blocks` in `config.json`; Verbraucher-Merker im Hausprofil (`house_profiles.json`) bzw. Legacy in `flexible_consumers[]`.  
-3. Für Jahres-Leistungsprofile im Hauskonfigurator nutzen Sie CSV-Upload / Energiemonitor ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Historische Offline-Daten für den Szenario-Explorer liegen in `cons_data_hourly.csv` (kein Miniserver-FTP-Import mehr).  
-4. Namen in Earnie hinterlegen (Hauskonfigurator / Szenarienkonfigurator) — **exakt** wie im Smarthome-System.  
+1. **Benutzer / Token** am Hub mit Rechten zum Lesen und Schreiben der benötigten IOs / Entities.  
+2. **Signale** anlegen bzw. zuordnen — u. a. Batterie-SOC und Leistungen, PV, Netz, Freigaben, E-Auto-Status. Beispielnamen (Loxone): [Loxone-Signale](../referenz/loxone-signale.md).  
+3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** Merker bzw. HA-Entities den EHAL-Feldern zuweisen (`plant.ehal_bindings` / `consumers[].ehal_bindings`). Bei Loxone oft zuerst **Loxone-Import** im Hauskonfigurator, dann Mapping prüfen.  
+4. Für Jahres-Leistungsprofile: CSV-Upload / Energiemonitor ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)). Offline-Daten für den Szenario-Explorer: `cons_data_hourly.csv`.
 
-Earnie liest Smarthome-Werte oft als Text mit Einheit (z. B. `3.5 kW`) ein; die Einheit wird ignoriert.
+Earnie liest Werte oft als Text mit Einheit (z. B. `3.5 kW`); die Einheit wird ignoriert.
 
-Signalübersicht: [Loxone-Signale](../referenz/loxone-signale.md) · Anbindung: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md).
+Weiter: [Loxone-Anbindung](../einrichtung/loxone-anbindung.md) · [Home Assistant + evcc](../einrichtung/ha-evcc.md) · [EHAL-Com](../ui/ehal-com.md).
 
 ### Live-Szenario (Szenarienkonfigurator)
 
-Unter **Konfiguration → Szenarienkonfigurator**:
-
-- welches Szenario **live** gilt (`live_scenario_id` in `config.json`, Standard: `live`)  
-- welche Entitäten (Hausprofil, Batterie, PV, Tarife) daran hängen  
-
-Die **Bezeichnung** des Live-Szenarios ist fest (nicht umbenennbar / nicht löschbar). Entitäts-Referenzen und Kataloge ändern Sie im Szenarienkonfigurator bzw. Hauskonfigurator.
-
-Damit nutzen Live-Optimierung und Szenario-Explorer dieselbe Auflösungslogik.
+Unter **Konfiguration → Szenarienkonfigurator** wählen Sie das Live-Szenario und die Entitäten (Hausprofil, Batterie, PV, Tarife). Die Bezeichnung des Live-Szenarios ist fest. Details: [PV & Batterie](../konfiguration/batterie-pv.md), [Überblick](../konfiguration/ueberblick.md).
 
 ### EHAL-Com
 
-Unter **Daemon Control → EHAL-Com** (Anbindung / Debug / Abnahme):
+Unter **Daemon Control → EHAL-Com**: Backend und Zugangsdaten, Live-Lesen/Schreiben, Silent- vs. Live-Modus, Mapping-Assistenten. Cutover: Lesen OK → Schreiben OK → Monitor plausibel. Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md).
 
-- **Anbindung:** Backend wählen (Loxone / Home Assistant / OpenEMS) und Zugangsdaten speichern  
-- **Live-Lesen:** `sens_*` / `get_*` mit EHAL-Feld und Backend-Mapping, periodisch aktualisiert  
-- **Live-Schreiben:** `set_*` aus dem letzten Produktiv-Lauf (EHAL-Feld + Mapping, Erfolg ja/nein)  
-- **Silent-Modus:** Earnie berechnet und zeigt Sollwerte, **schreibt aber nicht** an den Hub — sinnvoll für Tests  
-- **Live-Modus:** Schreiben aktiv — erst nach erfolgreicher Lesekontrolle umschalten  
-
-Prüfungen Loxone auch per Skript: `python -m scripts.verify_loxone_setup`.
-
-Cutover-Checkliste: Lesen OK → Schreiben Erfolg → Monitor/Sankey plausibel. Details: [EHAL-Com](../ui/ehal-com.md).
+Bei Loxone optional: `python -m scripts.verify_loxone_setup`.
 
 ---
 
 ## Live-Betrieb
 
-Im Produktivbetrieb läuft der Optimierer dauerhaft (im Docker-Container automatisch mit der UI, oder lokal als `python main.py`) als Daemon und arbeitet im **15-Minuten-Takt** (zusätzlich bei `Earnie_Request_Optimize` von Loxone).
+Im Produktivbetrieb läuft der Optimierer dauerhaft (Docker: mit der UI; lokal: `python main.py`) im **15-Minuten-Takt** (bei Loxone zusätzlich bei `Earnie_Request_Optimize`). Der MILP-Plan selbst nutzt derzeit **Stunden-Slots**.
 
-Unter **Daemon Control → Optimierer-Dienst** können Sie den Daemon starten, stoppen oder neu starten. Die Oberfläche zeigt den aktuellen Plan; Produktions-Schreibvorgänge kommen von `main.py`. Unter **Dienst-Log** sehen Sie die letzten Zeilen von `earnie.log` (Expander; bei Bedarf aktualisieren).
+Unter **Daemon Control → Optimierer-Dienst**: Start/Stop/Neustart und Dienst-Log (`earnie.log`).
 
 ### Monitor
 
-Unter **Live-Cockpit → Monitor** (Sunset-2-Sunset):
+![Earnie Monitor](../assets/Live-Monitoring-Chart1-2.png)
 
-Einheitliches Cockpit über **Vergangenheit, Jetzt und Vorausschau** — navigierbar in Sonnenaufgangs-Fenstern (ca. 24 h Segmente). Die Anzeige erfolgt von Sonnenaufgang (SA_x) zu Sonnenaufgang (SA_x+1), da dies auch der Zeithorizont für die Optimierung von Earnie ist. Dieses Intervall ist überaus sinnvoll, da üblicherweise ein vorhandener Speicher dort am wenigsten Energie eingespeichert hat. (Sollte dies nicht der Fall sein, ist die Batterie möglicherweise zu groß gewählt ...)
+*Monitor (Chart 1): Vergangenheit, laufender Plan und Preisprognose in einem Sunset-2-Sunset-Fenster.*
 
-Typische Inhalte:
+Unter **Live-Cockpit → Monitor** (Sunset-2-Sunset): einheitliches Cockpit über Vergangenheit, Jetzt und Vorausschau (Sonnenaufgangs-Segmente). Chart 1 / SoC-Linien / Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md).
 
-- **Chart 1:** Leistungen und Energieflüsse (PV, Netz, Batterie, Flex-Verbraucher als gestapelte Balken), SoC und Preis — graue Zone = Historie, neutral = laufender Plan, grün = Preisprognose; Details und Fluss-Algorithmus: [Charts & Panels](../ui/charts.md#chart-1-leistung-soc--preis)  
-- **Chart 2:** Vergleich der verbrauchten Energie und der Kosten zwischen Basis (ohne Optimierung) und mit Eingriff von Earnie  
-- **Sankey:** aktueller Energiefluss aus Live-Daten  
-- **Tabelle & Energievergleich:** Rohdaten und Baseline vs. Optimierung  
-- **Countdown:** nächster Optimierungslauf  
-
-Grauer Bereich = Historie aus dem Produktiv-Log; Vorausschau = letzter Plan von `main.py`. Fehlende Log-Slots bleiben sichtbar leer.
-Weißer Bereich = Konkrete Optimierung für die nahe Zukunft, wo die Preise vom Anbieter schon bekanntgegeben worden sind.
-Grüner Bereich = Die Preise sind noch nicht bekannt, aber das interne Preismodell in Earnie macht eine Vorhersage, wie die Preise wahrscheinlich sein werden.
-
-Kennzahlen zur Ersparnis beziehen sich auf den **vollen Planungshorizont** (Jetzt bis übernächster Sonnenaufgang), nicht nur auf das gerade sichtbare Chart-Segment.
+Kennzahlen zur Ersparnis beziehen sich auf den **vollen Planungshorizont** (Jetzt bis übernächster Sonnenaufgang).
 
 #### Chart 1: SoC-Linien (Plausibilität)
 
-Im Live-Monitor können ab **Jetzt** zwei SoC-Verläufe liegen. Sie beantworten verschiedene Fragen — **SoC BL Ziel** ist keine zweite Optimierung, sondern eine Gegenprobe.
-
-| Linie | Flex-Last (E-Auto, …) | Hausbatterie | Was sie zeigt |
-|-------|------------------------|--------------|---------------|
-| **SoC** (durchgezogen) | wie von Earnie geplant | smarte MILP-Strategie (Netzladen, Entladen, Halten, …) | der eigentliche Plan |
-| **SoC BL Ziel** (gestrichelt) | gleiche Energie wie Opt, aber **Profilform** (ohne Preis-Lastverschiebung) | nur **PV-Überschuss** (einfache Regel) | Referenz ohne Lastverschiebung und ohne smarte Batterie |
-
-Kurz gesagt:
-
-```text
-SoC BL Ziel: Profil-Flex  +  Batterie nur PV-Überschuss
-SoC:         Opt-Flex    +  smarte Batterie
-```
-
-**Abstände lesen**
-
-- **BL Ziel → SoC:** Lastverschiebung (wann Flex läuft) und/oder Batteriestrategie (Netzladen, gezieltes Entladen, Entladesperre, …).
-
-Umrandete Flex-Balken (**Original-Schedule**, nur Kanten) zeigen, wo Flex laut BL-Ziel gelaufen wäre; gefüllte Flex-Balken bleiben der Optimierungsplan.
-
-**Beispiel Abend/Nacht (typisch)**
-
-Gleiche E-Auto-Energie insgesamt, aber unterschiedliche Zeiten:
-
-- **BL Ziel** lädt abends im „üblichen“ Fenster → bei wenig PV entlädt die einfache Batterieregel stark → SoC BL Ziel kann früh auf die Untergrenze fallen.  
-- **SoC** kann schon **vor** dem verschobenen E-Auto deutlich unter BL Ziel liegen, wenn die smarte Batterie am Nachmittag/Abend anders entladen oder gehalten hat — das ist Batteriestrategie, nicht nur die Abend-Lastverschiebung. Startet das E-Auto nachts, bezieht die Optimierung es oft stärker aus dem **Netz**, während BL Ziel stärker aus dem Speicher nachzieht.
-
-Technische Kurzfassung und Linienfarben: [Charts & Panels — Chart 1](../ui/charts.md#chart-1-leistung-soc--preis).
-
-Charts im Detail: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md).
+Ab **Jetzt** können zwei SoC-Verläufe liegen — **SoC** (MILP-Plan) und **SoC BL Ziel** (Gegenprobe ohne smarte Batterie / ohne Preis-Lastverschiebung). Kurzfassung und Farben: [Charts & Panels — Chart 1](../ui/charts.md#chart-1-leistung-soc--preis).
 
 ### Manuelle Geräte
 
-Unter **Live-Cockpit → Manuelle Geräte** für Verbraucher mit Rolle **manuell**:
-
-- Laufzeiten planen bzw. Earnie-**Startempfehlungen** nutzen  
-- angenommene Leistung und Dauer aus dem Hausprofil  
-
-Geplante Läufe (mit einem Check versehen) erscheinen im Monitor (Chart 1) und fließen in die Optimierung der übrigen Lasten ein. Ideal für Geräte ohne smarte Freigabe, bei denen Sie den Start selbst setzen.
+Unter **Live-Cockpit → Manuelle Geräte**: Laufzeiten und Startempfehlungen für Verbraucher mit Rolle **manuell**. Geplante Läufe erscheinen in Chart 1.
 
 ### Analyse Verbrauch & Kosten
 
-Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur wenn der UI-Modus `live_environment` aktiv ist und eine Live-Verbindung zur Smarthome-Steuerung besteht; sonst Hinweis auf der Seite):
-
-- **Wochenansicht** aus dem Produktiv-Log: Verbrauch je Verbraucher (Optimizer-Flex und manuelle Geräte mit `earnie_role: manual`) im Vergleich zu Importpreis und PV, Herkunft der Energie (PV / Batterie / Netz) sowie grobe Kosten nur für den **Netzanteil** (PV und Batterie am Verbrauchsort zählen als 0 €). Manuelle Geräte erscheinen bei aktivem Startplan bzw. wenn ihre Leistung im Log gemessen ist.
-- **Summen** für Kalenderwoche, laufenden Monat und Jahr — bezogen auf vorhandene Log-Daten (kein Abgleich mit der Stromrechnung).
-- **Batterie-Energieflüsse** der gewählten Woche: gestapelte Balken **Laden** (PV / Netz) und **Entladen** (Verbrauch / Einspeisung); Caption mit Laden-/Entladen-Summe und Δ (kleine Abweichungen durch SoC/Standby sind normal).
-- Darunter weiterhin die **Swimspa**-Auswertung (Ist-/Soll-Temperatur und Filter autonom vs. Earnie-initiiert im S-2-Fenster).
+Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur mit `live_environment` und Live-Verbindung): Wochen-/Monats-/Jahresauswertung aus dem Produktiv-Log, Batterieflüsse, Swimspa-Auswertung. Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
 
 ---
 
@@ -451,8 +392,8 @@ Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur wenn der UI-Modus `li
 2. Hauskonfigurator: Profil, Wärme, Auto, Pool, Geräte, PV, Batterie  
 3. Szenarienkonfigurator: Live-Szenario + Vergleichsvarianten  
 4. Szenario-Explorer: Verbrauch prüfen, Rechnung, Ergebnisse bewerten  
-5. Loxone vorbereiten und Zugang speichern  
-6. Live-Szenario im Szenarienkonfigurator + EHAL-Com (Silent → Live)  
+5. Backend wählen ([Adapter](../einrichtung/adapter-wahl.md)), Zugang speichern, Mapping auf **EHAL-Com**  
+6. Live-Szenario + EHAL-Com (Silent → Live)  
 7. Daemon dauerhaft laufen lassen, Monitor beobachten, Feintuning  
 
-Bei Unklarheiten in der Konfiguration: Hover-Hilfe in `config.json` (Schema) und die Kapitel unter [docs/README.md](../README.md).
+Bei Unklarheiten: Hover-Hilfe in `config.json` (Schema) und [docs/README.md](../README.md).

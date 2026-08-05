@@ -238,96 +238,111 @@ def normalize_charging_schedule(raw: dict | None) -> dict | None:
     )
 
 
-def normalize_thermal_control(raw: dict | None, consumer_id: str) -> dict | None:
-    if not isinstance(raw, dict) or not bool(raw.get("enabled", False)):
-        return None
+def _thermal_cfg_error(consumer_id: str, message: str) -> ValueError:
+    return ValueError(
+        f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' {message}"
+    )
+
+
+def _parse_thermal_scalars(raw: dict, consumer_id: str) -> dict:
     mode = str(raw.get("mode", "observe")).strip().lower()
     if mode not in ("observe", "active"):
-        raise ValueError(
-            f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-            "thermal_control.mode muss 'observe' oder 'active' sein."
+        raise _thermal_cfg_error(
+            consumer_id, "thermal_control.mode muss 'observe' oder 'active' sein."
         )
-    volume = raw.get("water_volume_liters")
-    if volume is None:
-        raise ValueError(
-            f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-            "thermal_control.water_volume_liters fehlt."
-        )
-    volume = float(volume)
+    if raw.get("water_volume_liters") is None:
+        raise _thermal_cfg_error(consumer_id, "thermal_control.water_volume_liters fehlt.")
+    volume = float(raw["water_volume_liters"])
     if volume <= 0:
-        raise ValueError(
-            f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-            "thermal_control.water_volume_liters muss > 0 sein."
+        raise _thermal_cfg_error(
+            consumer_id, "thermal_control.water_volume_liters muss > 0 sein."
         )
-    efficiency = raw.get("heating_efficiency")
-    if efficiency is None:
-        raise ValueError(
-            f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-            "thermal_control.heating_efficiency fehlt."
-        )
-    efficiency = float(efficiency)
+    if raw.get("heating_efficiency") is None:
+        raise _thermal_cfg_error(consumer_id, "thermal_control.heating_efficiency fehlt.")
+    efficiency = float(raw["heating_efficiency"])
     if not 0.0 < efficiency <= 1.0:
-        raise ValueError(
-            f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-            "thermal_control.heating_efficiency muss zwischen 0 (exkl.) und 1 liegen."
+        raise _thermal_cfg_error(
+            consumer_id,
+            "thermal_control.heating_efficiency muss zwischen 0 (exkl.) und 1 liegen.",
         )
     heat_loss = raw.get("heat_loss_kw_per_k")
     if heat_loss is not None:
         heat_loss = float(heat_loss)
         if heat_loss < 0:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-                "thermal_control.heat_loss_kw_per_k muss >= 0 sein."
+            raise _thermal_cfg_error(
+                consumer_id, "thermal_control.heat_loss_kw_per_k muss >= 0 sein."
             )
     threshold = float(raw.get("heating_power_threshold_kw", 2.0) or 2.0)
     if threshold < 0:
-        raise ValueError(
-            f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-            "thermal_control.heating_power_threshold_kw muss >= 0 sein."
+        raise _thermal_cfg_error(
+            consumer_id, "thermal_control.heating_power_threshold_kw muss >= 0 sein."
         )
     step = float(raw.get("actual_temp_step_c", 0.5) or 0.5)
     if step <= 0:
-        raise ValueError(
-            f"Kritischer Konfigurationsfehler: flexible_consumers '{consumer_id}' "
-            "thermal_control.actual_temp_step_c muss > 0 sein."
+        raise _thermal_cfg_error(
+            consumer_id, "thermal_control.actual_temp_step_c muss > 0 sein."
         )
-    loxone = {}
-    if isinstance(raw.get("loxone"), dict):
-        for key in (
-            "actual_temp_name",
-            "setpoint_temp_name",
-            "ambient_temp_name",
-            "tolerance_c_name",
-            "heating_active_name",
-        ):
-            if raw["loxone"].get(key):
-                loxone[key] = str(raw["loxone"][key]).strip()
-    history_logs = {}
-    if isinstance(raw.get("history_logs"), dict):
-        for key in (
-            "actual_temp_csv",
-            "ambient_temp_csv",
-            "power_csv",
-            "heating_active_csv",
-            "filter_active_csv",
-        ):
-            path = str(raw["history_logs"].get(key, "")).strip()
-            if path:
-                history_logs[key] = path
+    return {
+        "mode": mode,
+        "volume": volume,
+        "efficiency": efficiency,
+        "heat_loss": heat_loss,
+        "threshold": threshold,
+        "step": step,
+    }
+
+
+def _parse_thermal_loxone(raw: dict) -> dict:
+    loxone: dict = {}
+    if not isinstance(raw.get("loxone"), dict):
+        return loxone
+    for key in (
+        "actual_temp_name",
+        "setpoint_temp_name",
+        "ambient_temp_name",
+        "tolerance_c_name",
+        "heating_active_name",
+    ):
+        if raw["loxone"].get(key):
+            loxone[key] = str(raw["loxone"][key]).strip()
+    return loxone
+
+
+def _parse_thermal_history_logs(raw: dict) -> dict:
+    history_logs: dict = {}
+    if not isinstance(raw.get("history_logs"), dict):
+        return history_logs
+    for key in (
+        "actual_temp_csv",
+        "ambient_temp_csv",
+        "power_csv",
+        "heating_active_csv",
+        "filter_active_csv",
+    ):
+        path = str(raw["history_logs"].get(key, "")).strip()
+        if path:
+            history_logs[key] = path
+    return history_logs
+
+
+def normalize_thermal_control(raw: dict | None, consumer_id: str) -> dict | None:
+    if not isinstance(raw, dict) or not bool(raw.get("enabled", False)):
+        return None
+    scalars = _parse_thermal_scalars(raw, consumer_id)
     setpoint = raw.get("setpoint_c")
     tolerance = raw.get("tolerance_c")
     return {
         "enabled": True,
-        "mode": mode,
+        "mode": scalars["mode"],
         "setpoint_c": None if setpoint is None else float(setpoint),
         "tolerance_c": None if tolerance is None else float(tolerance),
-        "water_volume_liters": volume,
-        "heat_loss_kw_per_k": heat_loss,
-        "heating_efficiency": efficiency,
-        "heating_power_threshold_kw": threshold,
-        "actual_temp_step_c": step,
-        "history_logs": history_logs,
-        "loxone": loxone,
+        "water_volume_liters": scalars["volume"],
+        "heat_loss_kw_per_k": scalars["heat_loss"],
+        "heating_efficiency": scalars["efficiency"],
+        "heating_power_threshold_kw": scalars["threshold"],
+        "actual_temp_step_c": scalars["step"],
+        "history_logs": _parse_thermal_history_logs(raw),
+        "loxone": _parse_thermal_loxone(raw),
     }
 
 
@@ -366,58 +381,94 @@ def reject_pv_follow_binding(bindings: dict, consumer_id: str) -> None:
         )
 
 
-def normalize_consumer(raw: dict) -> dict:
-    if "path_log" in raw:
-        raise ValueError(
-            "path_log entfernt, path_historical_log verwenden."
-        )
-    reject_legacy_id(raw, str(raw.get("id", "?")))
-    source = str(raw.get("daily_target_source", "config")).lower().strip()
-    if "daily_target_source" not in raw:
-        charging_raw = raw.get("charging_schedule")
-        if isinstance(charging_raw, dict) and charging_raw.get("source"):
-            legacy = str(charging_raw["source"]).lower().strip()
-            if legacy in ("config", "historical", "loxone", "loxone_remaining_hours", "thermal"):
-                source = legacy
-    if source not in (
+_DAILY_TARGET_SOURCES = frozenset(
+    {
         "config",
         "historical",
         "loxone",
         "loxone_remaining_hours",
         "thermal",
         "thermal_annual",
-    ):
+    }
+)
+
+
+def _resolve_daily_target_source(raw: dict) -> str:
+    source = str(raw.get("daily_target_source", "config")).lower().strip()
+    if "daily_target_source" not in raw:
+        charging_raw = raw.get("charging_schedule")
+        if isinstance(charging_raw, dict) and charging_raw.get("source"):
+            legacy = str(charging_raw["source"]).lower().strip()
+            if legacy in (
+                "config",
+                "historical",
+                "loxone",
+                "loxone_remaining_hours",
+                "thermal",
+            ):
+                source = legacy
+    if source not in _DAILY_TARGET_SOURCES:
         raise ValueError(
             f"Kritischer Konfigurationsfehler: flexible_consumers Eintrag '{raw.get('id', '?')}' "
             "daily_target_source muss config, historical, loxone, loxone_remaining_hours, "
             "thermal oder thermal_annual sein."
         )
+    return source
+
+
+def _require_thermal_daily_source(consumer_id: str, thermal_control: dict | None) -> None:
+    if not thermal_control or not thermal_control.get("enabled"):
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: '{consumer_id}' "
+            "daily_target_source=thermal erfordert thermal_control.enabled=true."
+        )
+    if thermal_control.get("mode") != "active":
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: '{consumer_id}' "
+            "daily_target_source=thermal erfordert thermal_control.mode=active."
+        )
+    if thermal_control.get("heat_loss_kw_per_k") is None:
+        raise ValueError(
+            f"Kritischer Konfigurationsfehler: '{consumer_id}' "
+            "daily_target_source=thermal erfordert heat_loss_kw_per_k "
+            "(python -m scripts.tune_thermal_model)."
+        )
+
+
+def _apply_optional_consumer_fields(result: dict, raw: dict, consumer_id: str) -> None:
+    window = raw.get("thermal_flex_window")
+    if isinstance(window, dict) and window:
+        result["thermal_flex_window"] = dict(window)
+    if "max_on_quarterhours" in raw:
+        result["max_on_quarterhours"] = max(4, int(raw.get("max_on_quarterhours", 16) or 16))
+    if "max_pulses_per_day" in raw:
+        result["max_pulses_per_day"] = max(1, int(raw.get("max_pulses_per_day", 4) or 4))
+    generic_window = raw.get("generic_flex_window")
+    if isinstance(generic_window, dict) and generic_window:
+        result["generic_flex_window"] = dict(generic_window)
+    bindings = raw.get("ehal_bindings")
+    if isinstance(bindings, dict) and bindings:
+        reject_pv_follow_binding(bindings, consumer_id)
+        result["ehal_bindings"] = dict(bindings)
+
+
+def normalize_consumer(raw: dict) -> dict:
+    if "path_log" in raw:
+        raise ValueError(
+            "path_log entfernt, path_historical_log verwenden."
+        )
+    reject_legacy_id(raw, str(raw.get("id", "?")))
+    source = _resolve_daily_target_source(raw)
     consumer_id = str(raw["id"])
     thermal_control = normalize_thermal_control(raw.get("thermal_control"), consumer_id)
     if source == "thermal":
-        if not thermal_control or not thermal_control.get("enabled"):
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: '{consumer_id}' "
-                "daily_target_source=thermal erfordert thermal_control.enabled=true."
-            )
-        if thermal_control.get("mode") != "active":
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: '{consumer_id}' "
-                "daily_target_source=thermal erfordert thermal_control.mode=active."
-            )
-        if thermal_control.get("heat_loss_kw_per_k") is None:
-            raise ValueError(
-                f"Kritischer Konfigurationsfehler: '{consumer_id}' "
-                "daily_target_source=thermal erfordert heat_loss_kw_per_k "
-                "(python -m scripts.tune_thermal_model)."
-            )
+        _require_thermal_daily_source(consumer_id, thermal_control)
     loxone_outputs = normalize_loxone_outputs(raw.get("loxone_outputs"))
     charging_schedule = normalize_charging_schedule(raw.get("charging_schedule"))
     if not loxone_outputs and charging_schedule:
         sched_lox = charging_schedule.get("loxone") or {}
         if sched_lox.get("charge_enable_name"):
             loxone_outputs = {"enable_name": sched_lox["charge_enable_name"]}
-    consumer_id = str(raw["id"])
     min_power_kw = None
     if "min_power_kw" in raw:
         min_power_kw = float(raw["min_power_kw"])
@@ -449,20 +500,7 @@ def normalize_consumer(raw: dict) -> dict:
         "thermal_control": thermal_control,
         "filter_schedule": normalize_filter_schedule(raw.get("filter_schedule"), consumer_id),
     }
-    window = raw.get("thermal_flex_window")
-    if isinstance(window, dict) and window:
-        result["thermal_flex_window"] = dict(window)
-    if "max_on_quarterhours" in raw:
-        result["max_on_quarterhours"] = max(4, int(raw.get("max_on_quarterhours", 16) or 16))
-    if "max_pulses_per_day" in raw:
-        result["max_pulses_per_day"] = max(1, int(raw.get("max_pulses_per_day", 4) or 4))
-    generic_window = raw.get("generic_flex_window")
-    if isinstance(generic_window, dict) and generic_window:
-        result["generic_flex_window"] = dict(generic_window)
-    bindings = raw.get("ehal_bindings")
-    if isinstance(bindings, dict) and bindings:
-        reject_pv_follow_binding(bindings, consumer_id)
-        result["ehal_bindings"] = dict(bindings)
+    _apply_optional_consumer_fields(result, raw, consumer_id)
     return result
 
 

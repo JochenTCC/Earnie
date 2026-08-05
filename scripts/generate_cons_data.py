@@ -25,7 +25,6 @@ from data.cons_data_house_profile import (
 )
 from data.modeled_climate import ModeledClimateContext
 from house_config.ev_profile import ev_hourly_kw_from_schedule
-from integrations import loxone_log_import
 
 SOURCE_LOXONE = cons_data_store.SOURCE_LOXONE
 SOURCE_SYNTHETIC = cons_data_store.SOURCE_SYNTHETIC

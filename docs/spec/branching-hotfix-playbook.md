@@ -1,5 +1,7 @@
 # Branching & Hotfix Playbook
 
+**Status:** current  
+
 How to develop features on `main` while still shipping bugfixes for a **tagged** official or community pre-release.
 
 Related: [DEVELOPER.md](../../DEVELOPER.md) (tag → GHCR), [CONTRIBUTING.md](../../CONTRIBUTING.md) (PRs), `.cursor/rules/versioning.mdc` (`version.py` approval), `.cursor/rules/branching-hotfix-playbook.mdc` (agent warns before violations).

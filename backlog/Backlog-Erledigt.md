@@ -3,6 +3,14 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### 2.4.r Code Quality — coverage / obsolete tests / KPI refactor (2026-08-05)
+
+- [x] **Coverage baseline** — added `ehal` to `[tool.coverage.run]` + `COV_SOURCE_PACKAGES`; refreshed `LEGACY_TEST_SYMBOLS` for 2.4 removals; `test_health_report run --coverage` → overall **79.7%** (`data` 73.3, `ehal` 87.3, `house_config` 80.3, `optimizer` 83.3, `runtime_store` 79.3, `settings` 77.4, `simulation` 86.5); no package &lt; 40%; workflow docs in `.cursor/rules/test-health.mdc`
+- [x] **Obsolete-test / dead-code audit** — `pytest --dead-fixtures` clean; vulture unused imports removed (`bootstrap` schema-template imports, `KIND_EXPORT_BATTERY`, `loxone_log_import`, `build_chart_history` in diag); rewrote obsolete `legacy_id` matrix soft-bridge test → canonical keys; mock-heavy / fail-fast `pv_follow_name`/`legacy_id` flags kept (manual triage)
+- [x] **KPI refactor (bounded)** — split hard-limit funcs in `settings/flexible_consumers.py` (`normalize_thermal_control`, `normalize_consumer`) and `house_config/profiles_store.py` (`_normalize_consumer`, `_normalize_profile`); deferred mega-file splits (`optimizer/simulation.py`, `simulation/engine.py`, `integrations/loxone_*.py`, `planning_flex_bridge.py`)
+- [x] Pytest: 2026 passed / 3 skipped after changes
+
+
 ### Bugfix EV min_power_kw > nominal_power_kw (2026-08-05)
 
 - [x] **EV `min_power_kw` > `nominal_power_kw` crashes SE Live** — normalize rejects min>nominal and negative min; EV `min_on_quarterhours` default/coercion 4; UI seeds EV defaults on type switch; Loxone-Import EV stub `3.5`/`1.4`/`min_on` 4. Verified.

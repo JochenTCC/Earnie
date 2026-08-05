@@ -1,6 +1,7 @@
 # OpenEMS lab setup — Earnie ↔ OpenEMS communication
 
-**Purpose:** Bring up and configure the **combined** Compose stack (`earnie` + `openems-edge` + `openems-ui`) so you can prove Earnie talks to OpenEMS over REST only (EHAL M1 / backlog **2.4.b**).
+**Status:** current  
+**Purpose:** Bring up and configure the **combined** Compose stack (`earnie` + `openems-edge` + `openems-ui`) so you can prove Earnie talks to OpenEMS over REST only (EHAL OpenEMS prototype; backlog history **2.4.b**).
 
 **Audience:** Operator of the lab on a Dev-PC or Pi. Containers may already be running; this guide finishes **configuration** and a **communication check**.
 

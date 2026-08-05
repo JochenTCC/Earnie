@@ -1,8 +1,8 @@
 # Flexible Verbraucher
 
-Ab **2.0** liegen steuerbare Verbraucher (SwimSpa, E-Auto, Wärmepumpe, Filter, Generics) primär im **Hausprofil** (`earnie_env/config/house_profiles.json`). Der Block `flexible_consumers[]` in `config.json` ist **Legacy** (meist leer) und wird nur noch bei Bedarf über `legacy_id` mit dem Profil überlagert.
+Ab **2.0** liegen steuerbare Verbraucher (SwimSpa, E-Auto, Wärmepumpe, Filter, Generics) primär im **Hausprofil** (`earnie_env/config/house_profiles.json`). Der Block `flexible_consumers[]` in `config.json` ist **Legacy** (meist leer) und wird beim Laden abgelehnt bzw. ignoriert — Live-Parameter und Bindings leben im Profil (`consumers[].ehal_bindings`).
 
-Die Optimierung entscheidet **wann** sie laufen, nicht ob die Anlage technisch kann — die Freigabe an Loxone ist ein 0/1-Signal (E-Auto: Leistungs-Sollwert + PV-Follow). Die Feldnamen unten gelten für die aufgelöste Flex-Struktur (Profil-Bridge bzw. Legacy-Eintrag).
+Die Optimierung entscheidet **wann** sie laufen, nicht ob die Anlage technisch kann — die Freigabe an das Smarthome ist ein 0/1-Signal (E-Auto: Leistungs-Sollwert + PV-Follow). Die Feldnamen unten gelten für die aufgelöste Flex-Struktur im Hausprofil.
 
 ## Pflichtfelder (je Verbraucher)
 
@@ -33,18 +33,18 @@ Die Optimierung entscheidet **wann** sie laufen, nicht ob die Anlage technisch k
 
 
 
-## Loxone-Anbindung pro Verbraucher
+## Smarthome-Anbindung pro Verbraucher (EHAL)
 
 
-| Verbraucher                 | Lesen                      | Schreiben                                                                                 |
-| --------------------------- | -------------------------- | ----------------------------------------------------------------------------------------- |
-| SwimSpa, Wärmepumpe, Filter | `loxone_inputs.power_name` | `loxone_outputs.enable_name` (0/1)                                                        |
-| E-Auto                      | `loxone_inputs.power_name` | `loxone_outputs.power_setpoint_name` (kW), `pv_follow_name` (0/1); `min_power_kw` Pflicht |
+| Verbraucher                 | Lesen (EHAL)                         | Schreiben (EHAL)                                                                              |
+| --------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------- |
+| SwimSpa, Wärmepumpe, Filter | `ehal_bindings` / Leistung (`sens_*` bzw. Flex-Power) | `ehal_bindings.flex.enable_name` (0/1)                                                        |
+| E-Auto                      | EVCS-Telemetrie (`sens_evcs_*`, …)   | `set_evcs_max_current`, `set_evcs_mode` / PV-Follow                                           |
 
 
-Optional: `loxone_inputs.subtract_consumer_ids` — Leistung anderer Verbraucher vom Ist abziehen (SwimSpa − Filter, siehe [Loxone-Signale](../referenz/loxone-signale.md)).
+Optional: Leistung anderer Verbraucher vom Ist abziehen (SwimSpa − Filter, siehe [Loxone-Signale](../referenz/loxone-signale.md)).
 
-Signalübersicht: [Loxone-Signale](../referenz/loxone-signale.md).
+Signalübersicht und Feldnamen: [Loxone-Signale](../referenz/loxone-signale.md), Mapping-UI: [EHAL-Com](../ui/ehal-com.md).
 
 ## Pool: `thermal_control`
 

@@ -50,6 +50,8 @@ def _copy_ehal_entity_fields(raw: dict, spec: dict) -> None:
             spec["ehal_bindings"] = (
                 expand_flex_bindings(cleaned, cid) if cid else cleaned
             )
+
+
 def _legacy_loxone_power_name(raw: dict) -> str:
     rec = raw.get("appliance_recommendation")
     if isinstance(rec, dict):
@@ -223,6 +225,79 @@ def _normalize_earnie_role(
     )
 
 
+def _normalize_ev_consumer(raw: dict, spec: dict, *, profile_id: str, index: int) -> None:
+    battery_capacity = float(raw.get("battery_capacity_kwh", 0.0) or 0.0)
+    if battery_capacity <= 0:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers[{index}]: "
+            "battery_capacity_kwh muss > 0 sein."
+        )
+    spec["min_power_kw"] = float(raw.get("min_power_kw", 0.0) or 0.0)
+    if spec["min_power_kw"] < 0.0:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers[{index}] '{spec['id']}': "
+            "min_power_kw muss >= 0 sein."
+        )
+    if spec["min_power_kw"] > spec["nominal_power_kw"] + 1e-9:
+        raise ValueError(
+            f"profiles '{profile_id}' consumers[{index}] '{spec['id']}': "
+            f"min_power_kw ({spec['min_power_kw']}) darf nicht größer als "
+            f"nominal_power_kw ({spec['nominal_power_kw']}) sein."
+        )
+    spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 4) or 4))
+    spec["battery_capacity_kwh"] = battery_capacity
+    spec["charging_schedule"] = normalize_ev_charging_schedule(raw.get("charging_schedule"))
+    _copy_loxone_binding(raw, spec)
+
+
+def _normalize_thermal_annual_consumer(raw: dict, spec: dict) -> None:
+    hwb_raw = raw.get("hwb_kwh_m2")
+    hwb_value = float(hwb_raw) if hwb_raw not in (None, "") else 0.0
+    spec["thermal"] = {
+        "living_area_m2": float(raw.get("living_area_m2", 0.0) or 0.0),
+        "building_class": int(raw.get("building_class", 3)),
+        "heat_pump_type": str(raw.get("heat_pump_type", "luft")).strip().lower(),
+        "persons": int(raw.get("persons", 2)),
+        "target_temp_c": float(raw.get("target_temp_c", 21.5)),
+        "heating_limit_c": float(raw.get("heating_limit_c", 15.0)),
+        "solar_thermal_area_m2": float(raw.get("solar_thermal_area_m2", 0.0) or 0.0),
+        "solar_thermal_tilt_deg": float(raw.get("solar_thermal_tilt_deg", 18.0)),
+        "solar_thermal_azimuth_deg": float(raw.get("solar_thermal_azimuth_deg", 0.0)),
+    }
+    if hwb_value > 0:
+        spec["thermal"]["hwb_kwh_m2"] = hwb_value
+    if "optimizer_flex" in raw:
+        spec["optimizer_flex"] = bool(raw["optimizer_flex"])
+    window = raw.get("thermal_flex_window")
+    if isinstance(window, dict) and window:
+        spec["thermal_flex_window"] = dict(window)
+    spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 4) or 4))
+    if "max_on_quarterhours" in raw:
+        spec["max_on_quarterhours"] = max(4, int(raw.get("max_on_quarterhours", 16) or 16))
+    if "max_pulses_per_day" in raw:
+        spec["max_pulses_per_day"] = max(1, int(raw.get("max_pulses_per_day", 4) or 4))
+    _copy_loxone_binding(raw, spec)
+
+
+def _normalize_thermal_rc_consumer(
+    raw: dict, spec: dict, *, profile_id: str, index: int
+) -> None:
+    spec["thermal_rc"] = _normalize_thermal_rc(raw, index, profile_id)
+    min_on = raw.get("min_on_quarterhours")
+    if min_on is not None:
+        spec["min_on_quarterhours"] = max(0, int(min_on) or 0)
+    if raw.get("heating_power_threshold_kw") is not None:
+        spec["heating_power_threshold_kw"] = float(raw["heating_power_threshold_kw"])
+    if raw.get("actual_temp_step_c") is not None:
+        spec["actual_temp_step_c"] = float(raw["actual_temp_step_c"])
+    _copy_loxone_binding(raw, spec)
+    thermal_control = raw.get("thermal_control")
+    if isinstance(thermal_control, dict):
+        loxone = thermal_control.get("loxone")
+        if isinstance(loxone, dict) and loxone:
+            spec["thermal_control"] = {"loxone": dict(loxone)}
+
+
 def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     if not isinstance(raw, dict):
         raise ValueError(f"profiles '{profile_id}' consumers[{index}] muss ein Objekt sein.")
@@ -256,109 +331,23 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
             index=index,
         )
     elif consumer_type == "ev":
-        battery_capacity = float(raw.get("battery_capacity_kwh", 0.0) or 0.0)
-        if battery_capacity <= 0:
-            raise ValueError(
-                f"profiles '{profile_id}' consumers[{index}]: "
-                "battery_capacity_kwh muss > 0 sein."
-            )
-        spec["min_power_kw"] = float(raw.get("min_power_kw", 0.0) or 0.0)
-        if spec["min_power_kw"] < 0.0:
-            raise ValueError(
-                f"profiles '{profile_id}' consumers[{index}] '{consumer_id}': "
-                "min_power_kw muss >= 0 sein."
-            )
-        if spec["min_power_kw"] > spec["nominal_power_kw"] + 1e-9:
-            raise ValueError(
-                f"profiles '{profile_id}' consumers[{index}] '{consumer_id}': "
-                f"min_power_kw ({spec['min_power_kw']}) darf nicht größer als "
-                f"nominal_power_kw ({spec['nominal_power_kw']}) sein."
-            )
-        spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 4) or 4))
-        spec["battery_capacity_kwh"] = battery_capacity
-        spec["charging_schedule"] = normalize_ev_charging_schedule(raw.get("charging_schedule"))
-        _copy_loxone_binding(raw, spec)
+        _normalize_ev_consumer(raw, spec, profile_id=profile_id, index=index)
     if consumer_type == "thermal_annual":
-        hwb_raw = raw.get("hwb_kwh_m2")
-        hwb_value = float(hwb_raw) if hwb_raw not in (None, "") else 0.0
-        spec["thermal"] = {
-            "living_area_m2": float(raw.get("living_area_m2", 0.0) or 0.0),
-            "building_class": int(raw.get("building_class", 3)),
-            "heat_pump_type": str(raw.get("heat_pump_type", "luft")).strip().lower(),
-            "persons": int(raw.get("persons", 2)),
-            "target_temp_c": float(raw.get("target_temp_c", 21.5)),
-            "heating_limit_c": float(raw.get("heating_limit_c", 15.0)),
-            "solar_thermal_area_m2": float(raw.get("solar_thermal_area_m2", 0.0) or 0.0),
-            "solar_thermal_tilt_deg": float(raw.get("solar_thermal_tilt_deg", 18.0)),
-            "solar_thermal_azimuth_deg": float(raw.get("solar_thermal_azimuth_deg", 0.0)),
-        }
-        if hwb_value > 0:
-            spec["thermal"]["hwb_kwh_m2"] = hwb_value
-        if "optimizer_flex" in raw:
-            spec["optimizer_flex"] = bool(raw["optimizer_flex"])
-        window = raw.get("thermal_flex_window")
-        if isinstance(window, dict) and window:
-            spec["thermal_flex_window"] = dict(window)
-        spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 4) or 4))
-        if "max_on_quarterhours" in raw:
-            spec["max_on_quarterhours"] = max(4, int(raw.get("max_on_quarterhours", 16) or 16))
-        if "max_pulses_per_day" in raw:
-            spec["max_pulses_per_day"] = max(1, int(raw.get("max_pulses_per_day", 4) or 4))
-        _copy_loxone_binding(raw, spec)
+        _normalize_thermal_annual_consumer(raw, spec)
     elif consumer_type == "thermal_rc":
-        spec["thermal_rc"] = _normalize_thermal_rc(raw, index, profile_id)
-        min_on = raw.get("min_on_quarterhours")
-        if min_on is not None:
-            spec["min_on_quarterhours"] = max(0, int(min_on) or 0)
-        if raw.get("heating_power_threshold_kw") is not None:
-            spec["heating_power_threshold_kw"] = float(raw["heating_power_threshold_kw"])
-        if raw.get("actual_temp_step_c") is not None:
-            spec["actual_temp_step_c"] = float(raw["actual_temp_step_c"])
-        _copy_loxone_binding(raw, spec)
-        thermal_control = raw.get("thermal_control")
-        if isinstance(thermal_control, dict):
-            loxone = thermal_control.get("loxone")
-            if isinstance(loxone, dict) and loxone:
-                spec["thermal_control"] = {"loxone": dict(loxone)}
+        _normalize_thermal_rc_consumer(raw, spec, profile_id=profile_id, index=index)
     _copy_ehal_entity_fields(raw, spec)
     return spec
 
 
-def _normalize_profile(raw: dict, index: int) -> dict:
-    if not isinstance(raw, dict):
-        raise ValueError(f"profiles[{index}] muss ein Objekt sein.")
-    profile_id = str(raw.get("id", "")).strip()
-    if not profile_id:
-        raise ValueError(f"profiles[{index}]: id fehlt.")
-    label = str(raw.get("label", profile_id)).strip() or profile_id
-    annual_kwh = float(raw.get("annual_kwh", 0.0) or 0.0)
-    total_profile_csv = str(raw.get("total_profile_csv", "") or "").strip()
-    pv_profile_csv = str(raw.get("pv_profile_csv", "") or "").strip()
-    battery_profile_csv = str(raw.get("battery_profile_csv", "") or "").strip()
-    grid_profile_csv = str(raw.get("grid_profile_csv", "") or "").strip()
-    historical_csv_source = str(raw.get("historical_csv_source", "") or "").strip().lower()
-    if historical_csv_source not in ("separate", "energiemonitor", "balance"):
-        historical_csv_source = "separate"
-    consumers_raw = raw.get("consumers", [])
-    if not isinstance(consumers_raw, list):
-        raise ValueError(f"profiles '{profile_id}': consumers muss ein Array sein.")
-    has_thermal = any(
-        str(item.get("type", "")).strip().lower() == "thermal_annual"
-        for item in consumers_raw
-        if isinstance(item, dict)
-    )
-    if has_thermal and (raw.get("latitude") is None or raw.get("longitude") is None):
-        raise ValueError(
-            f"profiles '{profile_id}': latitude und longitude sind bei "
-            "thermal_annual-Verbraucher erforderlich."
-        )
-    land_raw = str(raw.get("land", "") or "").strip().upper()
-    land = land_raw if land_raw in {"AT", "DE", "CH"} else "AT"
-    latitude = float(raw.get("latitude", 48.0) or 48.0)
-    longitude = float(raw.get("longitude", 10.0) or 10.0)
-    timezone_name = lookup_timezone_name(latitude, longitude)
-    default_pv_tilt = float(raw.get("default_pv_tilt", 25.0) or 25.0)
-    default_pv_azimuth = float(raw.get("default_pv_azimuth", 0.0) or 0.0)
+def _normalize_profile_consumers(
+    consumers_raw: list,
+    *,
+    profile_id: str,
+    latitude: float,
+    longitude: float,
+    timezone_name: str,
+) -> list[dict]:
     consumers: list[dict] = []
     seen: set[str] = set()
     thermal_consumer_indices: list[int] = []
@@ -390,22 +379,82 @@ def _normalize_profile(raw: dict, index: int) -> dict:
             f"profiles '{profile_id}': Typ 'thermal_annual' (Haus Wärme) "
             "nur für Verbraucher 1 erlaubt."
         )
-    baseload = compute_baseload_kwh(annual_kwh, consumers)
+    return consumers
+
+
+def _profile_geo_and_csv_fields(raw: dict) -> dict:
+    annual_kwh = float(raw.get("annual_kwh", 0.0) or 0.0)
+    total_profile_csv = str(raw.get("total_profile_csv", "") or "").strip()
+    pv_profile_csv = str(raw.get("pv_profile_csv", "") or "").strip()
+    battery_profile_csv = str(raw.get("battery_profile_csv", "") or "").strip()
+    grid_profile_csv = str(raw.get("grid_profile_csv", "") or "").strip()
+    historical_csv_source = str(raw.get("historical_csv_source", "") or "").strip().lower()
+    if historical_csv_source not in ("separate", "energiemonitor", "balance"):
+        historical_csv_source = "separate"
+    land_raw = str(raw.get("land", "") or "").strip().upper()
+    land = land_raw if land_raw in {"AT", "DE", "CH"} else "AT"
+    latitude = float(raw.get("latitude", 48.0) or 48.0)
+    longitude = float(raw.get("longitude", 10.0) or 10.0)
     return {
-        "id": profile_id,
-        "label": label,
         "annual_kwh": annual_kwh,
-        "land": land,
-        "latitude": latitude,
-        "longitude": longitude,
-        "timezone_name": timezone_name,
-        "default_pv_tilt": default_pv_tilt,
-        "default_pv_azimuth": default_pv_azimuth,
         "total_profile_csv": total_profile_csv,
         "pv_profile_csv": pv_profile_csv,
         "battery_profile_csv": battery_profile_csv,
         "grid_profile_csv": grid_profile_csv,
         "historical_csv_source": historical_csv_source or "separate",
+        "land": land,
+        "latitude": latitude,
+        "longitude": longitude,
+        "timezone_name": lookup_timezone_name(latitude, longitude),
+        "default_pv_tilt": float(raw.get("default_pv_tilt", 25.0) or 25.0),
+        "default_pv_azimuth": float(raw.get("default_pv_azimuth", 0.0) or 0.0),
+    }
+
+
+def _normalize_profile(raw: dict, index: int) -> dict:
+    if not isinstance(raw, dict):
+        raise ValueError(f"profiles[{index}] muss ein Objekt sein.")
+    profile_id = str(raw.get("id", "")).strip()
+    if not profile_id:
+        raise ValueError(f"profiles[{index}]: id fehlt.")
+    label = str(raw.get("label", profile_id)).strip() or profile_id
+    consumers_raw = raw.get("consumers", [])
+    if not isinstance(consumers_raw, list):
+        raise ValueError(f"profiles '{profile_id}': consumers muss ein Array sein.")
+    has_thermal = any(
+        str(item.get("type", "")).strip().lower() == "thermal_annual"
+        for item in consumers_raw
+        if isinstance(item, dict)
+    )
+    if has_thermal and (raw.get("latitude") is None or raw.get("longitude") is None):
+        raise ValueError(
+            f"profiles '{profile_id}': latitude und longitude sind bei "
+            "thermal_annual-Verbraucher erforderlich."
+        )
+    fields = _profile_geo_and_csv_fields(raw)
+    consumers = _normalize_profile_consumers(
+        consumers_raw,
+        profile_id=profile_id,
+        latitude=fields["latitude"],
+        longitude=fields["longitude"],
+        timezone_name=fields["timezone_name"],
+    )
+    baseload = compute_baseload_kwh(fields["annual_kwh"], consumers)
+    return {
+        "id": profile_id,
+        "label": label,
+        "annual_kwh": fields["annual_kwh"],
+        "land": fields["land"],
+        "latitude": fields["latitude"],
+        "longitude": fields["longitude"],
+        "timezone_name": fields["timezone_name"],
+        "default_pv_tilt": fields["default_pv_tilt"],
+        "default_pv_azimuth": fields["default_pv_azimuth"],
+        "total_profile_csv": fields["total_profile_csv"],
+        "pv_profile_csv": fields["pv_profile_csv"],
+        "battery_profile_csv": fields["battery_profile_csv"],
+        "grid_profile_csv": fields["grid_profile_csv"],
+        "historical_csv_source": fields["historical_csv_source"],
         "baseload_distribution": normalize_baseload_distribution(
             raw.get("baseload_distribution")
         ),

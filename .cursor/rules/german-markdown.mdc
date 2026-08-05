@@ -7,7 +7,7 @@ alwaysApply: true
 
 Some project `.md` files may still be in German (e.g. `docs/spec/`, older notes). **Backlog files are in English** (`backlog/Backlog.md`, `backlog/Backlog-Bugfixes.md`, `backlog/Backlog-Erledigt.md`).
 
-**User docs** (`docs/README.md`, `docs/einrichtung/`, `docs/konfiguration/`, `docs/ui/`, `docs/referenz/`) are **intentionally German** — see `german-user-docs.mdc`. Do not offer to translate them to English; read as-is.
+**User docs** (`docs/README.md`, `docs/user-manual/`, `docs/einrichtung/`, `docs/konfiguration/`, `docs/ui/`, `docs/referenz/`) are **intentionally German** — see `german-user-docs.mdc`. Do not offer to translate them to English; read as-is.
 
 ## When This Applies
 

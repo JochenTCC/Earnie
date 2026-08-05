@@ -1,6 +1,7 @@
 # TODO — OpenEMS testing platform (Earnie 2.4 / M1)
 
-**Purpose:** Local lab stack for **2.4.b** (OpenEMS EHAL prototype).  
+**Status:** current lab checklist (plant / REST channels; first verified on Raspberry Pi). Bring-up steps: [`openems-lab-setup.md`](openems-lab-setup.md).  
+**Purpose:** Local lab stack for the OpenEMS EHAL prototype (backlog history: **2.4.b**).  
 **Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` §2.2, §2.5 Phase 2, §2.6; backlog `2.4.b`.  
 **EHAL wire contract (frozen):** [`docs/spec/ehal.md`](ehal.md) — schemas in `share/ehal/`, Python package `ehal`. Adapters must emit/consume only that contract.  
 **Goal:** Run `openems-edge` so Earnie can talk **network API only** (REST/WS) — Separate Works / AGPL shield. No OpenEMS source or libraries in Earnie repos.  
@@ -9,7 +10,7 @@
 **Combined Compose + Earnie ↔ OpenEMS setup (step-by-step):** [`openems-lab-setup.md`](openems-lab-setup.md) — use this when `earnie-openems-lab` + Edge + UI are already up but not configured for communication.  
 German pointer: [`docs/einrichtung/openems-lab.md`](../einrichtung/openems-lab.md).
 
-This TODO remains the **OpenEMS plant / REST channel** checklist (first verified on Raspberry Pi).
+This document remains the **OpenEMS plant / REST channel** checklist.
 
 
 | Service                   | URL                                                                                                        |
@@ -314,8 +315,8 @@ curl.exe -u x:admin http://192.168.178.34:8084/rest/channel/_sum/GridActivePower
 
 ## Out of scope for this platform TODO
 
-- Home Assistant + evcc (**2.4.c** / A2 DACH default) — implemented: `docker/compose/ha-lab.yml`, [`ha-lab-setup.md`](ha-lab-setup.md)
-- Loxone-EHAL extraction (**2.4.e**)
+- Home Assistant + evcc (A2 DACH) — see `docker/compose/ha-lab.yml`, [`ha-lab-setup.md`](ha-lab-setup.md)
+- Loxone (default backend) — see [`ehal.md`](ehal.md) and German [Loxone-Anbindung](../einrichtung/loxone-anbindung.md)
 - Real FEMS/OEM hardware (optional later; expect write locks)
 - MQTT/Matter as first-class hubs
 

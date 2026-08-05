@@ -40,7 +40,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
     - **UI:** Kontakt Art + Thema/Beschreibung → primary **GitHub-Issue öffnen** (prefilled title/body); ZIP local only (no auto-upload); public-Issue warning; private expander; site + repo links; cloud-demo → Issues (`cloud-demo`)
     - **Docs:** `CONTRIBUTING.md`, Benutzer-Handbuch, `docs/ui/betriebsmodi.md` (+ private-env cloud note); techcreacon / `mail@` → `support@earnie-hems.com` only on private paths
     - **Done when:** templates live; primary CTA is Issue not mailto; registry still mail to `support@`; no auto-upload; tests cover URL builders; docs match
-  - [ ] Code Quality
+  - [x] Code Quality
     - [x] **Legacy / soft-compat first pass** (fail-fast; no old installs)
       - Drop dead sunrise A/B script + `sunrise_full_horizon_trial` reject; rename-only aliases
       - Drop `system_history_log.csv` merge, cwd `LEGACY_DEBUG_PATH`, debug-dump v1/v2 (JSONL + dump v3 only)
@@ -49,11 +49,11 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
       - Drop `legacy_id` (writers use canonical `id`; reject field on load)
       - Drop EHAL nest / unprefixed HA dual-read (bindings §C / Pattern B only)
       - EVCS write = `set_evcs_mode` only; Pool Freigabe status without SwimSpa/`Ernie_*` aliases
-    - [ ] Make a code coverage test
-    - [ ] Review code against coding KPIs and refactor it if needed
-    - [ ] Make a test coverage test to identify obsolete tests
+    - [x] Make a code coverage test
+    - [x] Review code against coding KPIs and refactor it if needed
+    - [x] Make a test coverage test to identify obsolete tests
     - Keep: CBC/PV/API operational fallbacks, `legacy_config_gates` fail-fast, live↔SE dual paths
-  - [ ] Update and review official docs for needed updates our outdated infos
+  - [x] Update and review official docs for needed updates our outdated infos
     - Update screenshots where it is useful
     - Consolidate number of documents (merge docs with content that relies on each other or is similar)
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check; hardware-registry first approach (`2.4.q`) done
