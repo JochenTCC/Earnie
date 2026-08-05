@@ -263,7 +263,18 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
                 "battery_capacity_kwh muss > 0 sein."
             )
         spec["min_power_kw"] = float(raw.get("min_power_kw", 0.0) or 0.0)
-        spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 0) or 0))
+        if spec["min_power_kw"] < 0.0:
+            raise ValueError(
+                f"profiles '{profile_id}' consumers[{index}] '{consumer_id}': "
+                "min_power_kw muss >= 0 sein."
+            )
+        if spec["min_power_kw"] > spec["nominal_power_kw"] + 1e-9:
+            raise ValueError(
+                f"profiles '{profile_id}' consumers[{index}] '{consumer_id}': "
+                f"min_power_kw ({spec['min_power_kw']}) darf nicht größer als "
+                f"nominal_power_kw ({spec['nominal_power_kw']}) sein."
+            )
+        spec["min_on_quarterhours"] = max(0, int(raw.get("min_on_quarterhours", 4) or 4))
         spec["battery_capacity_kwh"] = battery_capacity
         spec["charging_schedule"] = normalize_ev_charging_schedule(raw.get("charging_schedule"))
         _copy_loxone_binding(raw, spec)
@@ -521,7 +532,7 @@ def _serialize_consumer(consumer: dict) -> dict:
             out["loxone_inputs"] = dict(consumer["loxone_inputs"])
     elif consumer["type"] == "ev":
         out["min_power_kw"] = consumer.get("min_power_kw", 0.0)
-        out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 0)
+        out["min_on_quarterhours"] = consumer.get("min_on_quarterhours", 4)
         out["battery_capacity_kwh"] = consumer["battery_capacity_kwh"]
         out["charging_schedule"] = consumer["charging_schedule"]
         if consumer.get("loxone_inputs"):

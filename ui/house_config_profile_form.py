@@ -385,6 +385,51 @@ def _default_ev_consumer() -> dict:
     }
 
 
+def _seed_ev_defaults_on_type_switch(
+    consumer: dict, index: int, *, session_scope: str
+) -> dict:
+    """On Typ → EV, seed widget keys with EV defaults (keep label/id)."""
+    type_key = _scoped_key(session_scope, f"hc_type_{index}")
+    selected = st.session_state.get(type_key, consumer.get("type", "generic"))
+    if str(selected) != "ev" or str(consumer.get("type", "generic")) == "ev":
+        return consumer
+
+    defaults = _default_ev_consumer()
+    seeded = dict(defaults)
+    if consumer.get("label"):
+        seeded["label"] = consumer["label"]
+    if consumer.get("id"):
+        seeded["id"] = consumer["id"]
+    _apply_ev_default_widget_keys(seeded, index, session_scope=session_scope)
+    return seeded
+
+
+def _apply_ev_default_widget_keys(
+    seeded: dict, index: int, *, session_scope: str
+) -> None:
+    sched = seeded.get("charging_schedule") or {}
+    weekday = sched.get("weekday") or {}
+    weekend = sched.get("weekend") or {}
+    values = {
+        f"hc_nom_{index}": float(seeded["nominal_power_kw"]),
+        f"hc_ev_min_{index}": float(seeded["min_power_kw"]),
+        f"hc_ev_min_qh_{index}": int(seeded["min_on_quarterhours"]),
+        f"hc_ev_cap_{index}": float(seeded["battery_capacity_kwh"]),
+        f"hc_ev_target_soc_{index}": float(sched.get("target_soc_percent", 100.0)),
+        f"hc_ev_eff_{index}": float(sched.get("charging_efficiency", 0.95)),
+        f"hc_ev_forecast_{index}": bool(sched.get("forecast_when_absent", True)),
+        f"hc_ev_Werktag_from_{index}": int(weekday.get("car_available_from_hour", 18)),
+        f"hc_ev_Werktag_ready_{index}": int(weekday.get("ready_by_hour", 7)),
+        f"hc_ev_Werktag_soc_{index}": float(weekday.get("daily_rest_soc", 40.0)),
+        f"hc_ev_Wochenende_from_{index}": int(weekend.get("car_available_from_hour", 20)),
+        f"hc_ev_Wochenende_ready_{index}": int(weekend.get("ready_by_hour", 9)),
+        f"hc_ev_Wochenende_soc_{index}": float(weekend.get("daily_rest_soc", 30.0)),
+    }
+    for suffix, value in values.items():
+        st.session_state[_scoped_key(session_scope, suffix)] = value
+
+
+
 def _flatten_consumer_for_edit(consumer: dict) -> dict:
     item = dict(consumer)
     thermal = item.pop("thermal", None)
@@ -1008,6 +1053,9 @@ def _render_consumer_form_body(
     default_pv_tilt: float = 18.0,
     default_pv_azimuth: float = 0.0,
 ) -> dict:
+    consumer = _seed_ev_defaults_on_type_switch(
+        consumer, index, session_scope=session_scope
+    )
     type_options = _consumer_type_options(index)
     current_type = str(consumer.get("type", "generic"))
     if index > 0 and current_type == "thermal_annual":

@@ -278,6 +278,9 @@ def test_run_import_creates_typed_and_efm_consumers():
     assert "e_auto" in by_id
     assert by_id["e_auto"]["type"] == "ev"
     assert by_id["e_auto"]["battery_capacity_kwh"] == 50.0
+    assert by_id["e_auto"]["nominal_power_kw"] == 3.5
+    assert by_id["e_auto"]["min_power_kw"] == 1.4
+    assert by_id["e_auto"]["min_on_quarterhours"] == 4
     assert "pool_swimspa" in by_id or "pool_swim_spa" in by_id or any(
         c["type"] == "thermal_rc" for c in consumers
     )

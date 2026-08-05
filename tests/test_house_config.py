@@ -175,6 +175,58 @@ def test_house_profile_without_consumers():
     assert profile["baseload_kwh"] == pytest.approx(3000.0, rel=1e-3)
 
 
+def _ev_profile_doc(**ev_overrides):
+    consumer = {
+        "id": "e_auto",
+        "label": "EV",
+        "type": "ev",
+        "nominal_power_kw": 3.5,
+        "min_power_kw": 1.4,
+        "battery_capacity_kwh": 50.0,
+        "charging_schedule": {
+            "weekday": {
+                "car_available_from_hour": 18,
+                "ready_by_hour": 7,
+                "daily_rest_soc": 40.0,
+            }
+        },
+    }
+    consumer.update(ev_overrides)
+    return {
+        "profiles": [
+            {
+                "id": "ev_profile",
+                "label": "EV Profile",
+                "annual_kwh": 3000.0,
+                "latitude": 48.2,
+                "longitude": 11.0,
+                "consumers": [consumer],
+            }
+        ]
+    }
+
+
+def test_ev_min_power_must_not_exceed_nominal():
+    from house_config.profiles_store import normalize_house_profiles_document
+
+    with pytest.raises(ValueError, match="min_power_kw .* darf nicht größer"):
+        normalize_house_profiles_document(
+            _ev_profile_doc(nominal_power_kw=1.0, min_power_kw=1.4)
+        )
+
+
+def test_ev_min_on_quarterhours_defaults_to_four():
+    from house_config.profiles_store import normalize_house_profiles_document
+
+    raw = _ev_profile_doc()
+    assert "min_on_quarterhours" not in raw["profiles"][0]["consumers"][0]
+    doc = normalize_house_profiles_document(raw)
+    assert doc["profiles"]["ev_profile"]["consumers"][0]["min_on_quarterhours"] == 4
+
+    doc_zero = normalize_house_profiles_document(_ev_profile_doc(min_on_quarterhours=0))
+    assert doc_zero["profiles"]["ev_profile"]["consumers"][0]["min_on_quarterhours"] == 4
+
+
 def test_scenario_entity_resolution():
     scenarios = config.get_backtesting_scenarios()
     assert "entity_test" in scenarios

@@ -597,8 +597,10 @@ def _stub_consumer(*, consumer_id: str, label: str, hk_type: str, bindings: dict
         consumer["earnie_role"] = "known"
         consumer["use_profile_csv"] = False
     elif hk_type == "ev":
+        consumer["nominal_power_kw"] = 3.5
         consumer["battery_capacity_kwh"] = 50.0
         consumer["min_power_kw"] = 1.4
+        consumer["min_on_quarterhours"] = 4
         consumer["charging_schedule"] = dict(_DEFAULT_EV_SCHEDULE)
     elif hk_type == "thermal_annual":
         consumer["living_area_m2"] = 0.0

@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix EV min_power_kw > nominal_power_kw (2026-08-05)
+
+- [x] **EV `min_power_kw` > `nominal_power_kw` crashes SE Live** — normalize rejects min>nominal and negative min; EV `min_on_quarterhours` default/coercion 4; UI seeds EV defaults on type switch; Loxone-Import EV stub `3.5`/`1.4`/`min_on` 4. Verified.
+
+
 ### Bugfix Streamlit UI HTTP 500 GZipResponder (2026-08-05)
 
 - [x] **Streamlit UI HTTP 500 on NAS/Docker (`GZipResponder` / `thread_minimum_size`)** — pin `starlette>=0.46.0,<1.4` in `pyproject.toml`; retag/overwrite pre-release `v2.4.0-alpha.5` (image rebuild). Verified.

@@ -27,9 +27,11 @@ from ui.house_config_profile_form import (
     _consumer_type_options,
     _default_additional_consumer,
     _default_consumer,
+    _default_ev_consumer,
     _flatten_consumer_for_edit,
     _profile_session_scope,
     _schedule_defaults,
+    _seed_ev_defaults_on_type_switch,
     _seed_profile_widget_state,
     _sync_profile_session,
 )
@@ -688,6 +690,64 @@ def test_consumer_expander_title_uses_live_type_from_session():
 
     assert c_type == "ev"
     assert title.startswith("Verbraucher 2 (E-Auto): Garage — ")
+
+
+def test_seed_ev_defaults_on_type_switch_overwrites_generic_power():
+    class _Session(dict):
+        pass
+
+    session = _Session({"home__hc_type_1": "ev", "home__hc_nom_1": 1.0})
+    consumer = {
+        "id": "e_auto",
+        "label": "Garage",
+        "type": "generic",
+        "nominal_power_kw": 1.0,
+    }
+    import ui.house_config_profile_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        seeded = _seed_ev_defaults_on_type_switch(
+            consumer, 1, session_scope="home"
+        )
+    finally:
+        form.st.session_state = original
+
+    defaults = _default_ev_consumer()
+    assert seeded["label"] == "Garage"
+    assert seeded["id"] == "e_auto"
+    assert seeded["type"] == "ev"
+    assert seeded["nominal_power_kw"] == defaults["nominal_power_kw"]
+    assert seeded["min_power_kw"] == defaults["min_power_kw"]
+    assert session["home__hc_nom_1"] == defaults["nominal_power_kw"]
+    assert session["home__hc_ev_min_1"] == defaults["min_power_kw"]
+    assert session["home__hc_ev_min_qh_1"] == defaults["min_on_quarterhours"]
+
+
+def test_seed_ev_defaults_skips_existing_ev_consumer():
+    class _Session(dict):
+        pass
+
+    session = _Session({"home__hc_type_0": "ev", "home__hc_nom_0": 11.0})
+    consumer = {
+        "label": "smart",
+        "type": "ev",
+        "nominal_power_kw": 11.0,
+        "min_power_kw": 1.4,
+    }
+    import ui.house_config_profile_form as form
+
+    original = form.st.session_state
+    form.st.session_state = session
+    try:
+        out = _seed_ev_defaults_on_type_switch(consumer, 0, session_scope="home")
+    finally:
+        form.st.session_state = original
+
+    assert out is consumer
+    assert session["home__hc_nom_0"] == 11.0
+    assert "home__hc_ev_min_0" not in session
 
 
 def test_profile_rejects_thermal_on_second_consumer(tmp_path):
