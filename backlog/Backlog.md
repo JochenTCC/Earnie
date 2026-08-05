@@ -26,14 +26,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.l`/`2.4.m`/`2.4.n`/`2.4.o`/`2.4.p` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
-- [x] "Live-Modus — main.py sendet Steuerwerte an Loxone" message on EHAL-Com page is misleading, when daemon is actually not running. 
-  - Check first if deamon is running and adjust messages to:
-    - Silent-mode is on / Daemon is running: "Silent-Modus - Optimierer läuft ohne Daten zu senden"
-    - Silent-mode is on / Daemon is not running "Silent-Modus - Optimierer läuft nicht"
-    - Silent-mode is off / Daemon is running: "Loud-Modus - Optimierer läuft und sendet Daten"
-    - Silent-mode is off / Daemon is not running "Loud-Modus - Optimierer läuft nicht - daher werden keine Daten gesendet"
-
-
 - [ ] **2.4.r — Release**
   - [x] Add the two logos to streamlit for dark and light designs in the sidebar as intended by streamlit
     - docs\assets\Earnie-Logo-Simple_Dark.png for dark design

@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### EHAL-Com Silent/Loud status vs daemon (2026-08-05)
+
+- [x] EHAL-Com status bar combines Silent-/Loud-Modus with Optimierer-Dienst running state (`ui/loxone_debug.py`); no longer implies writes when `main.py` is stopped. Docs `ehal-com.md`; tests `test_loxone_debug.py`.
+
+
 ### Plant-owned sens_temperature_outside (2026-08-05)
 
 - [x] Außentemperatur only on `plant.ehal_bindings.sens_temperature_outside` — no runtime consumer/legacy dual-read; migrate promotes then strips leftover consumer keys; Live-Lesen includes plant ambient; docs C.1 / C.5 / C.6.
