@@ -57,7 +57,7 @@ def test_omit_marker_keys_preserves_via_passthrough() -> None:
         "loxone_inputs": {"power_name": "Ernie_WP_P_act"},
         "loxone_outputs": {"enable_name": "Ernie_WP_Freigabe"},
         "thermal_control": {"loxone": {"heating_active_name": "heat"}},
-        "swimspa_filter_bindings": {"power_name": "filt"},
+        "filter_schedule": {"enabled": True, "config_fallback": {"native_start_hour": 10}},
         "ehal_bindings": {"flex.power_name": "Ernie_WP_P_act"},
     }
     edited = {
@@ -70,7 +70,7 @@ def test_omit_marker_keys_preserves_via_passthrough() -> None:
     assert merged["loxone_inputs"]["power_name"] == "Ernie_WP_P_act"
     assert merged["loxone_outputs"]["enable_name"] == "Ernie_WP_Freigabe"
     assert merged["thermal_control"]["loxone"]["heating_active_name"] == "heat"
-    assert merged["swimspa_filter_bindings"]["power_name"] == "filt"
+    assert merged["filter_schedule"]["enabled"] is True
     assert merged["ehal_bindings"]["flex.power_name"] == "Ernie_WP_P_act"
 
 

@@ -64,7 +64,9 @@ _PASSTHROUGH_CONSUMER_KEYS = (
     "heating_power_threshold_kw",
     "actual_temp_step_c",
     "thermal_control",
-    "swimspa_filter_bindings",
+    "filter_schedule",
+    "daily_target_source",
+    "daily_target_kwh",
     "profile_csv",
     "use_profile_csv",
     "ehal_bindings",
@@ -415,6 +417,14 @@ def _house_profiles_file_stamp() -> str:
 
 def _clear_scoped_widget_keys(session_scope: str) -> None:
     prefix = f"{session_scope}__"
+    for key in list(st.session_state.keys()):
+        if isinstance(key, str) and key.startswith(prefix):
+            del st.session_state[key]
+
+
+def _clear_consumer_widget_keys(session_scope: str) -> None:
+    """Drop index-scoped consumer widgets so remove does not leave stale labels."""
+    prefix = f"{session_scope}__hc_"
     for key in list(st.session_state.keys()):
         if isinstance(key, str) and key.startswith(prefix):
             del st.session_state[key]
@@ -964,6 +974,7 @@ def _render_consumer_form(
             consumers = list(st.session_state[_SESSION_CONSUMERS_KEY])
             del consumers[index]
             st.session_state[_SESSION_CONSUMERS_KEY] = consumers
+            _clear_consumer_widget_keys(session_scope)
             st.rerun()
     with exp_col:
         exp = st.expander(

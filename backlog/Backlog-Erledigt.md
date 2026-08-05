@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix HK consumer remove stale labels (2026-08-05)
+
+- [x] **Consumer „Energiebezug“ not removable on Hauskonfigurator** — After Loxone Import, `Entfernen` deleted the session entry but index-scoped `hc_*` widgets kept old Bezeichnung values; sync + auto-persist renamed shifted consumers. Fix: `_clear_consumer_widget_keys` before rerun. Verified.
+
+
 ### EHAL-Com pool_filter field mapping (2026-08-04)
 
 - [x] **2.4.r — map pool_filter EHAL fields in EHAL-Com** — HITL exposes `flex.pool_filter.sens_power_act`, `get_filter_remaining_hours`, `sens_filter_active`, native start/duration (+ Freigabe) on greenfield `pool_filter`; MILP overlay remaps flex keys onto bridged `swimspa_filter`; docs `ehal-com.md` §C.6. Tests: `test_ehal_loxone_mapping_entities.py`, `test_house_config.py`.
