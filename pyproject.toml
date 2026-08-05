@@ -11,6 +11,8 @@ dynamic = ["version"]
 dependencies = [
     "requests==2.31.0",
     "streamlit>=1.30.0",
+    # Streamlit MediaAwareGZipResponder omits thread_minimum_size (required kw-only in Starlette 1.4+ → HTTP 500).
+    "starlette>=0.46.0,<1.4",
     "plotly>=5.18.0",
     "pandas>=2.0.0",
     "pulp>=2.8.0",
