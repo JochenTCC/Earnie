@@ -25,10 +25,31 @@ from integrations.ehal_debug_mapping import (
 )
 from integrations.loxone_connectivity import LoxoneCheck, loxone_env_configured, run_read_checks
 from runtime_store import run_state
+from runtime_store.main_daemon import status as daemon_status
 from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY
 from ui.runtime_config import reload_runtime_config
 from ui.setup_dotenv import render_loxone_verify_results
 from ui.sankey_produktiv import has_produktiv_run
+
+
+def status_strip_banner(silent: bool, daemon_running: bool) -> tuple[str, str]:
+    """Return (streamlit_level, message) for Silent/Loud × daemon state."""
+    if silent and daemon_running:
+        return (
+            "warning",
+            "Silent-Modus - Optimierer läuft ohne Daten zu senden",
+        )
+    if silent:
+        return ("warning", "Silent-Modus - Optimierer läuft nicht")
+    if daemon_running:
+        return (
+            "success",
+            "Loud-Modus - Optimierer läuft und sendet Daten",
+        )
+    return (
+        "warning",
+        "Loud-Modus - Optimierer läuft nicht - daher werden keine Daten gesendet",
+    )
 
 
 def _format_age_text(age_sec: float | None) -> str:
@@ -405,23 +426,16 @@ def _telemetry_mapping_for_adapter(adapter: Any) -> dict[str, str]:
 
 def render_status_strip(main_state: dict | None) -> None:
     silent = config.is_loxone_silent_mode()
-    ehal_net = config.is_ehal_network_backend()
-    if ehal_net:
-        hub = "HA" if config.is_ehal_ha_backend() else "OpenEMS"
-        if silent:
-            st.warning(
-                f"**Silent-Modus aktiv** — EHAL/{hub}-Setpoints werden nicht gesendet."
-            )
-        else:
-            st.success(
-                f"**{hub}-EHAL** — `main.py` sendet M1-Setpoints an {hub} REST."
-            )
-    elif silent:
-        st.warning("**Silent-Modus aktiv** — Steuerwerte werden nicht an Loxone gesendet.")
+    daemon_running = daemon_status().state == "running"
+    level, message = status_strip_banner(silent, daemon_running)
+    if level == "success":
+        st.success(message)
     else:
-        st.success("**Live-Modus** — `main.py` sendet Steuerwerte an Loxone.")
+        st.warning(message)
 
     render_ehal_write_error_banner()
+
+    ehal_net = config.is_ehal_network_backend()
 
     if ehal_net:
         if not has_produktiv_run(main_state):

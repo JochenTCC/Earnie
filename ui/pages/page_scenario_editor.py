@@ -4,6 +4,7 @@ from __future__ import annotations
 import streamlit as st
 
 import config
+from runtime_store.persist_paths import resolve_backtesting_scenarios_json_path
 from ui.doc_links import DocLink, markdown_doc_link
 from ui.help_hint import render_page_title_with_help
 from ui.form_layout import labeled_checkbox
@@ -65,8 +66,15 @@ _SESSION_SYNC_KEY = "scenario_editor_sync_id"
 _SESSION_FILE_STAMP_KEY = "scenario_editor_file_stamp"
 _SESSION_SELECT_PENDING_KEY = "scenario_select_pending"
 _SESSION_ACTIVE_SELECT_KEY = "scenario_editor_active_select"
+_SESSION_TEMPLATE_SOURCE_KEY = "scenario_editor_template_source"
 _SESSION_SWITCH_TARGET_KEY = "scenario_editor_switch_target"
 _SESSION_SWITCH_DISCARD_KEY = "scenario_editor_switch_discard"
+
+
+def _remember_template_source(scenario_id: str) -> None:
+    sid = str(scenario_id or "").strip()
+    if sid and sid != NEW_SCENARIO_OPTION:
+        st.session_state[_SESSION_TEMPLATE_SOURCE_KEY] = sid
 
 
 def _planning_now():
@@ -150,6 +158,7 @@ def _apply_pending_scenario_select() -> None:
         st.session_state["scenario_select"] = pending
         st.session_state[_SESSION_ACTIVE_SELECT_KEY] = pending
         st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
+        _remember_template_source(pending)
 
 
 def _seed_scenario_widget_state(
@@ -374,6 +383,7 @@ def _resolve_scenario_selection(
             live_id=live_id,
             container=reorder_col,
         )
+        _remember_template_source(active)
         return active
 
     active_is_new = active == NEW_SCENARIO_OPTION
@@ -414,10 +424,12 @@ def _resolve_scenario_selection(
             st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
             st.session_state[_SESSION_SELECT_PENDING_KEY] = active
             st.rerun()
+        _remember_template_source(active)
         return active
 
     st.session_state[_SESSION_ACTIVE_SELECT_KEY] = requested
     st.session_state.pop(_SESSION_SWITCH_TARGET_KEY, None)
+    _remember_template_source(requested)
     _render_scenario_reorder_controls(
         selected=requested,
         scenario_ids=scenario_ids,
@@ -537,7 +549,15 @@ def _render_scenarios_tab() -> None:
     is_new = selected == NEW_SCENARIO_OPTION
     existing = next((s for s in scenarios if s.get("id") == selected), None) if not is_new else None
     scenario_template = (
-        new_scenario_template(live_id, scenarios) if is_new else dict(existing or {})
+        new_scenario_template(
+            scenarios,
+            source_id=str(
+                st.session_state.get(_SESSION_TEMPLATE_SOURCE_KEY) or live_id or ""
+            ).strip(),
+            live_id=live_id,
+        )
+        if is_new
+        else dict(existing or {})
     )
     session_scope = scenario_session_scope(selected, is_new=is_new)
     stable_scenario_id = "" if is_new else str(existing.get("id", "")).strip() if existing else str(selected)
@@ -872,6 +892,7 @@ def render() -> None:
         key="scenario_editor_help",
         page_docs_key="scenario-editor",
     )
+    st.caption(f"Datei: `{resolve_backtesting_scenarios_json_path()}`")
 
     catalog_meta = load_tariffs_catalog_meta()
     if catalog_meta.get("catalog_as_of"):

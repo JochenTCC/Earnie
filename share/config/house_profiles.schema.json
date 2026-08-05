@@ -189,33 +189,21 @@
         }
       }
     },
-    "swimspa_filter_bindings": {
+    "filter_schedule": {
       "type": "object",
-      "description": "Optionale Marker-Overrides für den Bridge-Filter (Deep-Merge auf SWIMSPA_FILTER_BRIDGE_DEFAULTS).",
+      "description": "Natives Filterfenster (MILP-Sperre) für pool_filter.",
       "properties": {
-        "loxone_target_hours_name": {
-          "type": "string",
-          "description": "Rolle Lesen: verbleibende Filter-Sollstunden."
+        "enabled": {
+          "type": "boolean"
         },
-        "loxone_inputs": {
-          "$ref": "#/definitions/loxone_inputs"
-        },
-        "loxone_outputs": {
-          "$ref": "#/definitions/loxone_outputs"
-        },
-        "filter_schedule": {
+        "config_fallback": {
           "type": "object",
           "properties": {
-            "loxone": {
-              "type": "object",
-              "properties": {
-                "native_start_hour_name": {
-                  "type": "string"
-                },
-                "native_duration_hours_name": {
-                  "type": "string"
-                }
-              }
+            "native_start_hour": {
+              "type": "number"
+            },
+            "native_duration_hours": {
+              "type": "number"
             }
           }
         }
@@ -423,8 +411,15 @@
         "thermal_control": {
           "$ref": "#/definitions/thermal_control"
         },
-        "swimspa_filter_bindings": {
-          "$ref": "#/definitions/swimspa_filter_bindings"
+        "filter_schedule": {
+          "$ref": "#/definitions/filter_schedule"
+        },
+        "daily_target_source": {
+          "type": "string",
+          "description": "Für pool_filter: loxone_remaining_hours (Sollstunden aus Loxone)."
+        },
+        "daily_target_kwh": {
+          "type": "number"
         },
         "appliance_recommendation": {
           "$ref": "#/definitions/appliance_recommendation"

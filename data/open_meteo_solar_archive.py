@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+import time
 
 import pandas as pd
 import requests
@@ -19,6 +20,9 @@ HOURLY_VAR = "global_tilted_irradiance"
 HOURLY_TEMP_VAR = "temperature_2m"
 REFERENCE_WM2 = 1000.0
 DEFAULT_THERMAL_EFFICIENCY = 0.40
+_ARCHIVE_RETRY_ATTEMPTS = 5
+_ARCHIVE_RETRY_BASE_SECONDS = 2.0
+_ARCHIVE_RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
 
 
 @dataclass(frozen=True)
@@ -114,12 +118,38 @@ def _fetch_hourly_archive_chunk(
     }
     if extra_params:
         params.update(extra_params)
-    response = requests.get(
-        OPEN_METEO_ARCHIVE,
-        params=params,
-        timeout=config.get_global_timeout(),
-    )
-    response.raise_for_status()
+    response: requests.Response | None = None
+    last_error: Exception | None = None
+    for attempt in range(_ARCHIVE_RETRY_ATTEMPTS):
+        try:
+            response = requests.get(
+                OPEN_METEO_ARCHIVE,
+                params=params,
+                timeout=config.get_global_timeout(),
+            )
+            status = getattr(response, "status_code", None)
+            if status in _ARCHIVE_RETRYABLE_STATUS:
+                last_error = requests.HTTPError(
+                    f"{status} for url: {getattr(response, 'url', OPEN_METEO_ARCHIVE)}",
+                    response=response,
+                )
+                time.sleep(_ARCHIVE_RETRY_BASE_SECONDS * (2 ** attempt))
+                continue
+            if hasattr(response, "raise_for_status"):
+                response.raise_for_status()
+            break
+        except requests.RequestException as exc:
+            last_error = exc
+            if isinstance(exc, requests.HTTPError):
+                status = exc.response.status_code if exc.response is not None else None
+                if status not in _ARCHIVE_RETRYABLE_STATUS:
+                    raise
+            time.sleep(_ARCHIVE_RETRY_BASE_SECONDS * (2 ** attempt))
+    else:
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Open-Meteo archive: Abruf ohne Antwort fehlgeschlagen.")
+    assert response is not None
     payload = response.json()
     hourly = payload.get("hourly") or {}
     times = hourly.get("time") or []

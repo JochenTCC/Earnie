@@ -9,11 +9,8 @@ import config
 from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
 from house_config.ehal_bindings import (
     FILTER_EHAL_FIELDS,
-    FILTER_ENTITY_ID,
     THERMAL_RC_EHAL_FIELDS,
-    ehal_map_to_filter_bindings,
     ensure_migrated,
-    filter_bindings_to_ehal_map,
     filter_ehal_fields_for_consumer,
     strip_migrated_config_keys,
 )
@@ -147,19 +144,6 @@ def fields_for_consumer(consumer: dict) -> tuple[str, ...]:
     return base
 
 
-def _milp_thermal_rc_host(consumers: list[dict]) -> dict | None:
-    """First thermal_rc that creates the SwimSpa-filter bridge entity."""
-    from house_config.consumption_csv import consumer_uses_profile_csv
-
-    for consumer in consumers:
-        if str(consumer.get("type") or "") != "thermal_rc":
-            continue
-        if consumer_uses_profile_csv(consumer):
-            continue
-        return consumer
-    return None
-
-
 def binding_map(raw: object) -> dict[str, str]:
     if not isinstance(raw, dict):
         return {}
@@ -233,23 +217,6 @@ def build_entity_rows(house_doc: dict, profile_id: str) -> list[dict[str, Any]]:
                 "consumer": consumer,
             }
         )
-    host = _milp_thermal_rc_host(consumers)
-    if host is not None and not any(
-        str(c.get("id") or "").strip() == "pool_filter" for c in consumers
-    ):
-        stored = host.get("swimspa_filter_bindings")
-        rows.append(
-            {
-                "id": FILTER_ENTITY_ID,
-                "kind": "filter",
-                "label": "Pool / SwimSpa Filter",
-                "fields": FILTER_FIELDS,
-                "bindings": filter_bindings_to_ehal_map(
-                    stored if isinstance(stored, dict) else {}
-                ),
-                "host_id": _nonempty(host.get("id")),
-            }
-        )
     return rows
 
 
@@ -260,7 +227,7 @@ def apply_entity_bindings(
     entity_id: str,
     bindings: dict[str, str],
 ) -> dict:
-    """Write bindings onto plant, consumer, or filter bridge nest; return new doc."""
+    """Write bindings onto plant or consumer; return new doc."""
     house = dict(house_doc)
     cleaned = {k: v for k, v in bindings.items() if _nonempty(v)}
     if entity_id == PLANT_ENTITY_ID:
@@ -274,21 +241,6 @@ def apply_entity_bindings(
         return house
     profile = dict(profiles.get(profile_id) or {})
     consumers = [dict(c) for c in (profile.get("consumers") or []) if isinstance(c, dict)]
-    if entity_id == FILTER_ENTITY_ID:
-        host = _milp_thermal_rc_host(consumers)
-        host_id = _nonempty(host.get("id")) if host else ""
-        nest = ehal_map_to_filter_bindings(cleaned)
-        for consumer in consumers:
-            if _nonempty(consumer.get("id")) != host_id:
-                continue
-            if nest:
-                consumer["swimspa_filter_bindings"] = nest
-            else:
-                consumer.pop("swimspa_filter_bindings", None)
-            break
-        profile["consumers"] = consumers
-        house["profiles"] = {**profiles, profile_id: profile}
-        return house
     for consumer in consumers:
         if _nonempty(consumer.get("id")) == entity_id:
             consumer["ehal_bindings"] = cleaned
@@ -435,10 +387,10 @@ def render_ehal_loxone_mapping_section() -> None:
     """HTTP-probe structure scan + entity HITL; persists plant/consumer ehal_bindings."""
     st.caption(
         "Entity-zentriertes Mapping: Anlage + Verbraucher aus dem Live-Hausprofil. "
-        "Bei MILP-`thermal_rc` zusätzlich Entity **Pool / SwimSpa Filter** "
-        f"(`{FILTER_ENTITY_ID}`) für `get_filter_remaining_hours` u. a. "
+        "Pool/SwimSpa-Filter: Verbraucher `pool_filter` mit `ehal_bindings` "
+        "(`get_filter_remaining_hours`, Freigabe, natives Fenster u. a.). "
         "Felder `{entity}.{ehal_field}` → Merker; Speichern in `house_profiles.json` "
-        "(`plant` / `consumers[].ehal_bindings` / `swimspa_filter_bindings`). "
+        "(`plant` / `consumers[].ehal_bindings`). "
         "Außerplanmäßige Optimierung: Loxone VO `Earnie_Request_Optimize` "
         "(Daemon-HTTP, Port `system.ehal_loxone_http_port`, Standard 8541). "
         "Struktur-Scan: HTTP-Probe bekannter Earnie_*/gemappter Merker; "

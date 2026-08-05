@@ -464,16 +464,16 @@ class TestSharedMeterSubtraction:
                     "flex.swimspa.sens_power_act": "Earnie_Swim-Spa-P_act",
                 },
                 "loxone_inputs": {
-                    "subtract_consumer_ids": ["swimspa_filter"],
+                    "subtract_consumer_ids": ["pool_filter"],
                 },
             },
             {
-                "id": "swimspa_filter",
+                "id": "pool_filter",
                 "name": "SwimSpa Filter",
                 "nominal_power_kw": 0.18,
                 "signal_type": "binary",
                 "ehal_bindings": {
-                    "flex.swimspa_filter.sens_power_act": "homie_bwa_spa_filter2",
+                    "flex.pool_filter.sens_power_act": "homie_bwa_spa_filter2",
                     "sens_filter_active": "homie_bwa_spa_filter1",
                 },
                 "loxone_inputs": {
@@ -494,9 +494,9 @@ class TestSharedMeterSubtraction:
         )
         with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
             result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
-        assert result["swimspa_filter"] == 0.18
+        assert result["pool_filter"] == 0.18
         assert result["swimspa"] == 2.8
-        assert round(result["swimspa"] + result["swimspa_filter"], 3) == 2.98
+        assert round(result["swimspa"] + result["pool_filter"], 3) == 2.98
 
     def test_native_filter1_when_filter2_off(self):
         """Autonomer Filter: filter1=1, filter2=0, Gesamtzähler nur Filterlast."""
@@ -509,7 +509,7 @@ class TestSharedMeterSubtraction:
         )
         with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
             result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
-        assert result["swimspa_filter"] == 0.18
+        assert result["pool_filter"] == 0.18
         assert result["swimspa"] == 0.0
 
     def test_native_filter_inferred_when_binary_silent_in_native_window(self):
@@ -522,7 +522,7 @@ class TestSharedMeterSubtraction:
             }
         )
         filter_contexts = {
-            "swimspa_filter": {
+            "pool_filter": {
                 "native_start_hour": 10,
                 "native_duration_hours": 4.0,
             }
@@ -534,9 +534,9 @@ class TestSharedMeterSubtraction:
                 filter_contexts=filter_contexts,
                 slot_datetime=slot,
             )
-        assert live.kw["swimspa_filter"] == 0.18
+        assert live.kw["pool_filter"] == 0.18
         assert live.kw["swimspa"] == 0.0
-        assert live.chart_kw["swimspa_filter"] == 0.18
+        assert live.chart_kw["pool_filter"] == 0.18
         assert live.chart_kw["swimspa"] == 0.0
 
     def test_native_filter_inferred_at_sub_nominal_meter_reading(self):
@@ -549,7 +549,7 @@ class TestSharedMeterSubtraction:
             }
         )
         filter_contexts = {
-            "swimspa_filter": {
+            "pool_filter": {
                 "native_start_hour": 10,
                 "native_duration_hours": 4.0,
             }
@@ -561,7 +561,7 @@ class TestSharedMeterSubtraction:
                 filter_contexts=filter_contexts,
                 slot_datetime=slot,
             )
-        assert live.kw["swimspa_filter"] == 0.18
+        assert live.kw["pool_filter"] == 0.18
         assert live.kw["swimspa"] == 0.0
 
     def test_chart_kw_omits_milp_fallback_when_meter_missing(self):
@@ -583,7 +583,7 @@ class TestSharedMeterSubtraction:
         )
         with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
             result = lc.fetch_flexible_consumers_live_kw(consumers=self._consumers())
-        assert result["swimspa_filter"] == 0.0
+        assert result["pool_filter"] == 0.0
         assert result["swimspa"] == 2.8
 
     def test_no_subtraction_when_heating_uses_fallback(self):
@@ -596,7 +596,7 @@ class TestSharedMeterSubtraction:
                 fallbacks={"swimspa": 2.8}, consumers=self._consumers()
             )
         assert result["swimspa"] == 2.8
-        assert result["swimspa_filter"] == 0.18
+        assert result["pool_filter"] == 0.18
 
     def test_deduction_clamped_to_zero(self):
         reads = self._reads(

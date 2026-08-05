@@ -175,7 +175,7 @@ def test_entry_to_chart_row_bridges_legacy_measured_flex_id(monkeypatch):
         battery_plan_kw=-2.5,
         consumer_powers_kw={"ev": 3.52},
         flex_live_kw={"eauto": 3.574, "swimspa": 0.0},
-        flex_measured_ids=["eauto", "swimspa", "swimspa_filter", "waermepumpe"],
+        flex_measured_ids=["eauto", "swimspa", "pool_filter", "waermepumpe"],
         consumption_snapshot={
             "pv_kw": 0.0,
             "baseload_kw": 0.646,

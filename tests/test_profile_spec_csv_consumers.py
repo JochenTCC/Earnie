@@ -86,7 +86,7 @@ def test_csv_thermal_rc_in_overlay_not_milp_flex(tmp_path: Path) -> None:
     flex_ids = {c["id"] for c in flex}
     assert "swimspa" not in flex_ids
     # CSV SwimSpa meter already includes filter; do not add bridge filter flex.
-    assert "swimspa_filter" not in flex_ids
+    assert "pool_filter" not in flex_ids
 
     slots = [start + timedelta(hours=i) for i in range(24)]
     overlay = house_profile_baseload_overlay(
@@ -195,4 +195,4 @@ def test_non_csv_thermal_rc_in_profile_spec_targets(monkeypatch) -> None:
     assert rc_targets["swimspa"] == pytest.approx(36.0)
     targets = resolve_profile_spec_flex_targets(flex, profile, slots, window_end=slots[-1])
     assert targets["swimspa"] == pytest.approx(36.0)
-    assert targets.get("swimspa_filter", 0.0) == pytest.approx(0.36)
+    assert "pool_filter" not in targets

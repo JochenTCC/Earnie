@@ -154,6 +154,14 @@ def _power_valid(value: float) -> str | None:
     return None
 
 
+def _temperature_valid(value: float) -> str | None:
+    if not math.isfinite(value):
+        return f"Temperatur nicht numerisch: {value}"
+    if value < -60.0 or value > 80.0:
+        return f"Temperatur unrealistisch: {value} °C"
+    return None
+
+
 def _binary_valid(value: float) -> str | None:
     if value in (0.0, 1.0):
         return None
@@ -370,13 +378,19 @@ def _append_filter_read_checks(
 
 
 def _is_filter_consumer(consumer: dict) -> bool:
-    if str(consumer.get("id") or "").strip() == "swimspa_filter":
+    cid = str(consumer.get("id") or "").strip()
+    if cid == "pool_filter":
         return True
-    return consumer.get("daily_target_source") == "loxone_remaining_hours"
+    if consumer.get("daily_target_source") == "loxone_remaining_hours":
+        return True
+    fsched = consumer.get("filter_schedule")
+    return isinstance(fsched, dict) and bool(fsched.get("enabled"))
 
 
 def collect_read_checks() -> list[tuple[str, str, dict]]:
     """(EHAL-Feld, Mapping/IO-Name) — plant ``sens_*`` + consumer reads."""
+    from settings.ehal_marker_resolve import marker_sens_temperature_outside
+
     checks: list[tuple[str, str, dict]] = [
         ("sens_ess_soc", config.get("LOXONE_SOC_NAME"), {"validate": _soc_valid}),
         (
@@ -400,6 +414,16 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
         checks.append(
             ("sens_power_consumers", consumers_power, {"validate": _power_valid})
         )
+
+    ambient_io = marker_sens_temperature_outside(
+        house_doc=loxone_client._default_house_profiles_doc()
+    )
+    _append_io_check(
+        checks,
+        "sens_temperature_outside",
+        ambient_io,
+        {"validate": _temperature_valid},
+    )
 
     for consumer in _consumers_for_live_reads():
         if _is_ev_consumer(consumer):

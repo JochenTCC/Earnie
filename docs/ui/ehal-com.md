@@ -75,6 +75,7 @@ Quellen Victron: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 | Netzleistung            | Messwert | `sens_grid_power_active`    | `_sum/GridActivePower`       | `meters.grid.power`  | Unit 100 Reg. **820–822** (`grid_power_l`*, W; `+` = Bezug, `−` = Einspeisung); alternativ Grid-Meter **2600–2602** | `grid_power_name`                                      |
 | PV-Produktion           | Messwert | `sens_pv_production_active` | `_sum/ProductionActivePower` | `meters.pv.power`    | Unit 100 Reg. **850** (DC-PV, W) bzw. AC-PV **808–813**; für Gesamt oft Summe DC+AC                                 | `pv_power_name` / `plant.ehal_bindings`                |
 | Leistung an Verbraucher | Messwert | `sens_power_consumers`      |                              |                      |                                                                                                                     | `ehal_bindings.sens_power_consumers` (sonst Ableitung) |
+| Außentemperatur         | Messwert | `sens_temperature_outside`  |                              |                      |                                                                                                                     | `Earnie_Aussentemperatur` / `plant.ehal_bindings`      |
 
 
 
@@ -141,10 +142,9 @@ Rollen-Vorlage: `share/ehal/roles/heatpump.json`. Greenfield-Prefix `Earnie_Waer
 | ---------------------- | ---------- | ----------------------------- | ------- | ---- | ------- | ---------------------------------------------------------------------------------------------- |
 | WP Leistung            | Messwert   | `flex.{slug}.sens_power_act`  |         |      |         | `Earnie_Waermepumpe_Leistung` oder EFM Load                                                    |
 | WP Freigabe / SG-Ready | Steuerwert | `flex.{slug}.set_enable`      |         |      |         | `Earnie_Waermepumpe_Freigabe`                                                                  |
-| Außentemperatur        | Messwert   | `sens_temperature_outside`    |         |      |         | `Earnie_Aussentemperatur` (`plant.ehal_bindings`; auch C.6) |
 
 
-Hinweise: Pattern B — VI = Freigabe von Earnie (`flex.{hk_id}.…` im Check); VO = optional Push `flex.{hk_id}.sens_power_act`. Außentemperatur liegt auf Plant-VO (nicht doppelt auf WP-VO). Kein Ziel-kW-Merker in dieser Greenfield-Runde.
+Hinweise: Pattern B — VI = Freigabe von Earnie (`flex.{hk_id}.…` im Check); VO = optional Push `flex.{hk_id}.sens_power_act`. Außentemperatur nur auf Plant (`sens_temperature_outside`, siehe C.1) — nicht auf WP-VO. Kein Ziel-kW-Merker in dieser Greenfield-Runde.
 
 ### C.6 Pool / SwimSpa (Stub)
 
@@ -157,7 +157,6 @@ Deckt die **heute für SwimSpa genutzten** Signale (Heizung + Filter) ab. Zwei L
 | Pool Heiz-Freigabe        | Steuerwert  | `flex.{slug}.set_enable`                 |         |      |         | `Earnie_Pool_Freigabe`                                          |
 | Pool Ist-Temperatur       | Messwert    | `sens_temperature_water`                 |         |      |         | `Earnie_Pool_Temp_Ist`                                          |
 | Pool Soll-Temperatur      | Eingabewert | `get_temperature_water_setpoint`         |         |      |         | `Earnie_Pool_Temp_Soll`                                         |
-| Außentemperatur           | Messwert    | `sens_temperature_outside`               |         |      |         | `Earnie_Aussentemperatur` (shared C.5)                          |
 | Temperatur-Toleranz       | Eingabewert | `get_temperature_tolerance_c`            |         |      |         | `Earnie_Pool_Temp_Toleranz`                                     |
 | Heizung aktiv             | Messwert    | `sens_heating_active`                    |         |      |         | `Earnie_Pool_Heizung_aktiv`                                     |
 | Filter Sollstunden        | Eingabewert | `get_filter_remaining_hours`             |         |      |         | `Earnie_Pool_Filter_Sollstunden`                                |
@@ -167,9 +166,9 @@ Deckt die **heute für SwimSpa genutzten** Signale (Heizung + Filter) ab. Zwei L
 | Native Filter-Dauer       | Eingabewert | `get_filter_native_duration_hours`       |         |      |         | `Earnie_Pool_Filter_NativeDauer`                                |
 
 
-Hinweise: Chart zieht Filterleistung ggf. über `subtract_consumer_ids` ab (kein EHAL-Feld). Pattern B: `VI_Earnie_Pool` (Freigaben), `VO_Earnie_Pool` (Telemetrie). **VI Check** = bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` (wie Title); `status.json` mappt auch Legacy-Merker (`Ernie_Swimspa_*_Freigabe`) auf diese Keys.
+Hinweise: Außentemperatur nur Plant (`sens_temperature_outside`, siehe C.1). Chart zieht Filterleistung ggf. über `subtract_consumer_ids` ab (kein EHAL-Feld). Pattern B: `VI_Earnie_Pool` (Freigaben), `VO_Earnie_Pool` (Telemetrie). **VI Check** = bare `Earnie_Pool_Freigabe` / `Earnie_Pool_Filter_Freigabe` (wie Title); `status.json` mappt auch Legacy-Merker (`Ernie_Swimspa_*_Freigabe`) auf diese Keys.
 
-**EHAL-Com Mapping:** Existiert ein Greenfield-Verbraucher `pool_filter`, werden Filter-Felder (`get_filter_remaining_hours`, `flex.pool_filter.sens_power_act`, `sens_filter_active`, native Start/Dauer, Freigabe) direkt auf dieser Entity unter `ehal_bindings` gemappt; die synthetische Entity **Pool / SwimSpa Filter** (`swimspa_filter`) erscheint dann nicht. Ohne `pool_filter` erscheint bei einem MILP-`thermal_rc`-Verbraucher weiterhin **Pool / SwimSpa Filter** — Mapping landet unter `swimspa_filter_bindings`. Ohne Mapping bleibt der Filter inaktiv (kein Hard-Default mehr auf `Ernie_Swimspa_Filter_Sollstunden`).
+**EHAL-Com Mapping:** Filter-Felder (`get_filter_remaining_hours`, `flex.pool_filter.sens_power_act`, `sens_filter_active`, native Start/Dauer, Freigabe) werden auf dem Hausprofil-Verbraucher **`pool_filter`** unter `ehal_bindings` gemappt. Ohne `pool_filter` gibt es keine Filter-MILP und keine synthetische Filter-Entity. Ohne Mapping bleibt der Filter inaktiv (kein Hard-Default auf `Ernie_Swimspa_Filter_Sollstunden`).
 
 ## Live-Cockpit noch gesperrt (Greenfield)
 
@@ -181,9 +180,13 @@ Nach abgeschlossener Planungs-Konfiguration erscheint **Szenario-Explorer**, abe
 
 ### Statusleiste
 
-- **Silent-Modus:** Steuerwerte werden nicht an den Hub geschrieben; nur Sollwerte.
-- **Live-Modus / HA-EHAL / OpenEMS-EHAL:** `main.py` sendet an den gewählten Hub.
-- **Letzter main.py-Lauf:** Zeitstempel und Alter.
+Die Statusleiste kombiniert **Silent-/Loud-Modus** mit dem Zustand des **Optimierer-Dienstes** (`main.py`):
+
+- **Silent-Modus / Dienst läuft:** Optimierer läuft, schreibt aber keine Steuerwerte an den Hub.
+- **Silent-Modus / Dienst gestoppt:** Optimierer läuft nicht.
+- **Loud-Modus / Dienst läuft:** Optimierer läuft und sendet Daten an den Hub.
+- **Loud-Modus / Dienst gestoppt:** Optimierer läuft nicht — daher werden keine Daten gesendet.
+- **Letzter main.py-Lauf:** Zeitstempel und Alter (unabhängig von der Statusleiste).
 
 
 
@@ -202,7 +205,7 @@ Nur `**sens_***` und `**get_***` (Messwerte / Eingaben). Die Tabelle listet **al
 | Zuletzt gelesen | Zeitstempel der Abfrage |
 
 
-**Loxone:** periodisches Lesen der konfigurierten Merker (Tabelle + **Smarthome-Merker testen**). Anlagen-Felder: `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, optional `sens_power_consumers`. **Verbraucher** (aus Flex-Liste und Hausprofil mit Merker): EV → `{id}:sens_evcs_`* / `{id}:get_evcs_`*; andere mit Leistung →* `{id}:flex.{slug}.sens_power_act`*. Kein PV-Zähler, keine* `set_` / Freigaben. `get_evcs_ready_by_time`**:** Binding = AlarmClock-Bezeichnung (wie Zähler); Lesen von **SpecialState10** (`nextEntryTime`) über `/jdev/sps/io/{name}/all`, Backup **Tna**-Text. Numerische Counter (Loxone-Epoche seit 2009-01-01) werden in Unix umgerechnet und in der Spalte **Wert** lokal lesbar angezeigt (`YYYY-MM-DD HH:MM:SS (unix …)`).
+**Loxone:** periodisches Lesen der konfigurierten Merker (Tabelle + **Smarthome-Merker testen**). Anlagen-Felder: `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, optional `sens_power_consumers`, `sens_temperature_outside` (`plant.ehal_bindings`). **Verbraucher** (aus Flex-Liste und Hausprofil mit Merker): EV → `{id}:sens_evcs_`* / `{id}:get_evcs_`*; andere mit Leistung →* `{id}:flex.{slug}.sens_power_act`*. Kein PV-Zähler, keine* `set_` / Freigaben. `get_evcs_ready_by_time`**:** Binding = AlarmClock-Bezeichnung (wie Zähler); Lesen von **SpecialState10** (`nextEntryTime`) über `/jdev/sps/io/{name}/all`, Backup **Tna**-Text. Numerische Counter (Loxone-Epoche seit 2009-01-01) werden in Unix umgerechnet und in der Spalte **Wert** lokal lesbar angezeigt (`YYYY-MM-DD HH:MM:SS (unix …)`).
 
 **HA / OpenEMS:** EHAL-Telemetrie über REST (nur `sens_`* / `get_`* in der Tabelle; Verbindungstest zeigt ggf. das volle JSON inkl. Envelope). Mapping = Entity bzw. Kanal; abgeleitete Hauslast: `—(abgeleitet)`. Optional Caption Live-Leistung in kW.
 
@@ -253,18 +256,18 @@ Library-Vorlagen und Earnie-tot-Fallback: [Earnie-Loxone-Library](../einrichtung
 
 Bindings werden **nicht** mehr im Hauskonfigurator unter „Smarthome-Merker“ editiert — nur noch hier auf EHAL-Com. Siehe [Loxone-Signale](../referenz/loxone-signale.md).
 
-## Silent-Modus vs. Live-Modus
+## Silent-Modus vs. Loud-Modus
 
 
-|                           | Silent-Modus                        | Live-Modus                  |
+|                           | Silent-Modus                        | Loud-Modus                  |
 | ------------------------- | ----------------------------------- | --------------------------- |
 | Lesen                     | Immer aktiv (auch auf dieser Seite) | Immer aktiv                 |
-| Schreiben durch `main.py` | Nein                                | Ja                          |
+| Schreiben durch `main.py` | Nein                                | Ja (nur wenn Dienst läuft)  |
 | Schreib-Tabelle           | Nur Sollwerte                       | Wert + Erfolg + Zeitstempel |
 | Typischer Einsatz         | Tests, paralleler Legacy-Betrieb    | Produktiv nach Cutover      |
 
 
-Silent-Modus: `runtime/local_settings.json` → `"loxone_silent_mode"` (Priorität vor `system.loxone_silent_mode`). Standard ohne Datei: **Silent an**.
+Silent-Modus: `runtime/local_settings.json` → `"loxone_silent_mode"` (Priorität vor `system.loxone_silent_mode`). Standard ohne Datei: **Silent an**. Die Statusleiste zeigt zusätzlich, ob der Optimierer-Dienst gerade läuft; ohne laufenden Dienst werden im Loud-Modus keine Daten gesendet.
 
 ## Cutover-Checkliste
 

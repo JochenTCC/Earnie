@@ -105,7 +105,7 @@
             "enabled": true,
             "category": "error",
             "priority": 55,
-            "scope": "swimspa_filter",
+            "scope": "pool_filter",
             "when": [
                 "power_mismatch_positive"
             ],
@@ -116,7 +116,7 @@
             "enabled": true,
             "category": "error",
             "priority": 52,
-            "scope": "swimspa_filter",
+            "scope": "pool_filter",
             "when": [
                 "power_ist_without_soll",
                 "slot_outside_native_filter_window"
@@ -128,7 +128,7 @@
             "enabled": true,
             "category": "warning",
             "priority": 45,
-            "scope": "swimspa_filter",
+            "scope": "pool_filter",
             "when": [
                 "ist_power_above_nominal"
             ],

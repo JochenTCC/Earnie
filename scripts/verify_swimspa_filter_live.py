@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-r"""Live-Abnahme SwimSpa-Filter: Loxone-Formate und natives Fenster prüfen.
+r"""Live-Abnahme Pool/SwimSpa-Filter: Loxone-Formate und natives Fenster prüfen.
 
 Aufruf (Miniserver erreichbar, .env gesetzt):
     .venv\Scripts\python.exe -m scripts.verify_swimspa_filter_live
 
-Prüft swimspa_filter aus config.json / Hausprofil:
-  - get_filter_remaining_hours (Float, Schulden in h; Legacy: loxone_target_hours_name)
-  - homie_bwa_spa_filter1hour (Integer 0–23 oder HH:MM)
-  - homie_bwa_spa_filter1durationhours (Float h)
-  - homie_bwa_spa_filter2 (binär, Filter läuft)
-  - Earnie_Swimspa_Filter_Freigabe (Schreib-Merker lesbar)
+Prüft pool_filter aus config.json / Hausprofil:
+  - get_filter_remaining_hours (Float, Schulden in h)
+  - get_filter_native_start_hour / get_filter_native_duration_hours
+  - sens_filter_active (binär, Filter läuft)
+  - flex.pool_filter.set_enable (Schreib-Merker lesbar)
 """
 from __future__ import annotations
 
@@ -24,9 +23,9 @@ from integrations.loxone_connectivity import loxone_env_configured, ensure_live_
 from optimizer.filter_context import slot_in_native_window
 
 
-def _find_swimspa_filter() -> dict | None:
+def _find_pool_filter() -> dict | None:
     for consumer in config.get_flexible_consumers():
-        if consumer.get("id") == "swimspa_filter":
+        if consumer.get("id") == "pool_filter":
             return consumer
     return None
 
@@ -40,7 +39,7 @@ def _check_sollstunden(consumer: dict) -> tuple[bool, str]:
 
     name = marker_get_filter_remaining_hours(consumer)
     if not name:
-        return False, "get_filter_remaining_hours / loxone_target_hours_name fehlt"
+        return False, "get_filter_remaining_hours fehlt"
     raw = loxone_client.fetch_loxone_raw_value(name)
     value = loxone_client.fetch_loxone_generic_value(name)
     if value is None:
@@ -50,20 +49,24 @@ def _check_sollstunden(consumer: dict) -> tuple[bool, str]:
     return True, f"{value:.4f} h (raw={raw!r})"
 
 
-def _check_start_hour(flox: dict) -> tuple[bool, str]:
-    name = flox.get("native_start_hour_name", "")
+def _check_start_hour(consumer: dict) -> tuple[bool, str]:
+    from settings.ehal_marker_resolve import marker_get_filter_native_start_hour
+
+    name = marker_get_filter_native_start_hour(consumer)
     if not name:
-        return False, "native_start_hour_name fehlt"
+        return False, "get_filter_native_start_hour fehlt"
     hour, fmt, raw = loxone_client.fetch_filter_native_start_hour(name)
     if hour is None:
         return False, f"nicht parsebar (raw={raw!r}, format={fmt})"
     return True, f"Start={hour:.0f} h, Format={fmt}, raw={raw!r}"
 
 
-def _check_duration(flox: dict) -> tuple[bool, str]:
-    name = flox.get("native_duration_hours_name", "")
+def _check_duration(consumer: dict) -> tuple[bool, str]:
+    from settings.ehal_marker_resolve import marker_get_filter_native_duration_hours
+
+    name = marker_get_filter_native_duration_hours(consumer)
     if not name:
-        return False, "native_duration_hours_name fehlt"
+        return False, "get_filter_native_duration_hours fehlt"
     raw = loxone_client.fetch_loxone_raw_value(name)
     value = loxone_client.fetch_loxone_generic_value(name)
     if value is None:
@@ -113,47 +116,50 @@ def main() -> int:
         print(f"FEHLER: Konfiguration ungültig: {exc}", file=sys.stderr)
         return 2
 
-    consumer = _find_swimspa_filter()
+    from settings.ehal_marker_resolve import (
+        marker_flex_enable,
+        marker_get_filter_native_duration_hours,
+        marker_get_filter_native_start_hour,
+        marker_sens_filter_active,
+    )
+
+    consumer = _find_pool_filter()
     if consumer is None:
         print(
-            "FEHLER: swimspa_filter fehlt in flexible_consumers "
+            "FEHLER: pool_filter fehlt in flexible_consumers "
             "(Hausprofil / Planungspfad prüfen).",
             file=sys.stderr,
         )
         return 2
-
-    flox = (consumer.get("filter_schedule") or {}).get("loxone") or {}
-    inputs = consumer.get("loxone_inputs") or {}
-    outputs = consumer.get("loxone_outputs") or {}
 
     checks: list[tuple[str, bool, str]] = []
 
     ok, detail = _check_sollstunden(consumer)
     checks.append(("Sollstunden (Schulden)", ok, detail))
 
-    ok, detail = _check_start_hour(flox)
+    ok, detail = _check_start_hour(consumer)
     checks.append(("Natives Fenster Start", ok, detail))
     start_hour = None
     if ok:
         start_hour, _, _ = loxone_client.fetch_filter_native_start_hour(
-            flox.get("native_start_hour_name", "")
+            marker_get_filter_native_start_hour(consumer)
         )
 
-    ok, detail = _check_duration(flox)
+    ok, detail = _check_duration(consumer)
     checks.append(("Natives Fenster Dauer", ok, detail))
     duration = None
     if ok:
         duration = loxone_client.fetch_loxone_generic_value(
-            flox.get("native_duration_hours_name", "")
+            marker_get_filter_native_duration_hours(consumer)
         )
 
-    ok, detail = _check_binary("Filter läuft", inputs.get("power_name", ""))
+    ok, detail = _check_binary("Filter läuft", marker_sens_filter_active(consumer))
     checks.append(("Filter läuft (Ist)", ok, detail))
 
-    ok, detail = _check_binary("Earnie-Freigabe", outputs.get("enable_name", ""))
+    ok, detail = _check_binary("Earnie-Freigabe", marker_flex_enable(consumer))
     checks.append(("Earnie Filter-Freigabe", ok, detail))
 
-    print("SwimSpa-Filter Live-Abnahme\n")
+    print("Pool-Filter Live-Abnahme\n")
     for label, passed, detail in checks:
         print(f"[{_status(passed)}] {label}: {detail}")
 
@@ -161,7 +167,7 @@ def main() -> int:
 
     all_ok = all(passed for _, passed, _ in checks)
     if all_ok:
-        print("\nAlle SwimSpa-Filter-Prüfungen erfolgreich.")
+        print("\nAlle Pool-Filter-Prüfungen erfolgreich.")
         return 0
 
     failed = sum(1 for _, passed, _ in checks if not passed)

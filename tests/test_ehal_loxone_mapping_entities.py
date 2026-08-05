@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from ui.ehal_loxone_mapping import (
     EV_FIELDS,
-    FILTER_ENTITY_ID,
     FILTER_FIELDS,
     FLEX_FIELDS,
     PLANT_ENTITY_ID,
@@ -43,7 +42,7 @@ def test_fields_for_consumer_pool_filter_includes_filter_roles():
     assert "flex.pool_filter.set_power_setpoint" not in fields
 
 
-def test_build_entity_rows_pool_filter_hides_synthetic_filter():
+def test_build_entity_rows_pool_filter_only():
     house = {
         "plant": {},
         "profiles": {
@@ -70,7 +69,7 @@ def test_build_entity_rows_pool_filter_hides_synthetic_filter():
     }
     rows = build_entity_rows(house, "live")
     ids = [r["id"] for r in rows]
-    assert FILTER_ENTITY_ID not in ids
+    assert ids == [PLANT_ENTITY_ID, "pool", "pool_filter"]
     filt = next(r for r in rows if r["id"] == "pool_filter")
     assert "get_filter_remaining_hours" in filt["fields"]
     assert "flex.pool_filter.sens_power_act" in filt["fields"]
@@ -108,7 +107,7 @@ def test_build_entity_rows_includes_plant_and_consumers():
     assert "flex.wp.sens_power_act" in rows[2]["fields"]
 
 
-def test_build_entity_rows_includes_filter_for_thermal_rc():
+def test_build_entity_rows_thermal_rc_alone_has_no_synthetic_filter():
     house = {
         "plant": {},
         "profiles": {
@@ -120,11 +119,6 @@ def test_build_entity_rows_includes_filter_for_thermal_rc():
                         "label": "Pool",
                         "type": "thermal_rc",
                         "use_profile_csv": False,
-                        "swimspa_filter_bindings": {
-                            "ehal_bindings": {
-                                "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
-                            },
-                        },
                     }
                 ],
             }
@@ -132,10 +126,8 @@ def test_build_entity_rows_includes_filter_for_thermal_rc():
     }
     rows = build_entity_rows(house, "live")
     ids = [r["id"] for r in rows]
-    assert ids == [PLANT_ENTITY_ID, "pool", FILTER_ENTITY_ID]
-    filt = rows[-1]
-    assert "get_filter_remaining_hours" in filt["fields"]
-    assert filt["bindings"]["get_filter_remaining_hours"] == "Earnie_Pool_Filter_Sollstunden"
+    assert ids == [PLANT_ENTITY_ID, "pool"]
+    assert "pool_filter" not in ids
     pool = rows[1]
     assert "sens_temperature_water" in pool["fields"]
 
@@ -173,7 +165,7 @@ def test_apply_entity_bindings_writes_plant_and_consumer():
     assert consumer["ehal_bindings"]["get_evcs_limit_soc"] == "EV_Limit"
 
 
-def test_apply_entity_bindings_writes_filter_nest():
+def test_apply_entity_bindings_writes_pool_filter_ehal():
     house = {
         "plant": {},
         "profiles": {
@@ -185,7 +177,12 @@ def test_apply_entity_bindings_writes_filter_nest():
                         "label": "Pool",
                         "type": "thermal_rc",
                         "use_profile_csv": False,
-                    }
+                    },
+                    {
+                        "id": "pool_filter",
+                        "label": "Pool Filter",
+                        "type": "generic",
+                    },
                 ],
             }
         },
@@ -193,15 +190,14 @@ def test_apply_entity_bindings_writes_filter_nest():
     house = apply_entity_bindings(
         house,
         profile_id="live",
-        entity_id=FILTER_ENTITY_ID,
+        entity_id="pool_filter",
         bindings={"get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden"},
     )
-    nest = house["profiles"]["live"]["consumers"][0]["swimspa_filter_bindings"]
-    assert nest == {
-        "ehal_bindings": {
-            "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
-        }
+    filt = house["profiles"]["live"]["consumers"][1]
+    assert filt["ehal_bindings"] == {
+        "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
     }
+    assert "swimspa_filter_bindings" not in house["profiles"]["live"]["consumers"][0]
 
 
 def test_name_options_merges_manual_names():

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
+from runtime_store.persist_paths import resolve_house_profiles_json_path
 from ui.help_hint import render_page_title_with_help
 from ui.house_config_profile_form import render_house_profile_tab
 from ui.planning_battery_form import render_battery_planning_tab
@@ -27,6 +28,7 @@ def render() -> None:
         key="house_config_help",
         page_docs_key="house-config",
     )
+    st.caption(f"Datei: `{resolve_house_profiles_json_path()}`")
 
     # Reseed before widget when missing OR None/invalid (deselection leaves key present as None).
     if st.session_state.get(_HOUSE_CONFIG_TAB_KEY) not in _HOUSE_CONFIG_TABS:

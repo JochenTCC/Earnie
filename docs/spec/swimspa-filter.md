@@ -6,7 +6,7 @@
 
 ## 1. Ziel
 
-Der SwimSpa-Filter soll als **eigener flexibler Verbraucher** (`swimspa_filter`) in die MILP-Optimierung eingebunden werden. Earnie plant **ergänzende** Filterlaufzeit, wenn Schulden in Stunden (`Sollstunden`) offen sind und Strom/PV günstig ist.
+Der SwimSpa-Filter soll als **eigener flexibler Verbraucher** (`pool_filter`) in die MILP-Optimierung eingebunden werden. Earnie plant **ergänzende** Filterlaufzeit, wenn Schulden in Stunden (`Sollstunden`) offen sind und Strom/PV günstig ist.
 
 Der native Duty-Cycle des SwimSpa läuft **unabhängig** und reduziert `Sollstunden` ohne Earnie. Earnie schaltet nur **zusätzlich** ein (nicht als Gate für den nativen Zyklus).
 
@@ -36,7 +36,7 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 
 `homie_bwa_spa_filter2` erfasst jeden Filterlauf (nativ + Earnie) — für Logging, Soll-Ist und Delivery-Tracking.
 
-**Gemeinsame Leistungsmessung (Fall B, Live-Abnahme bestätigt):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistungsaufnahme (Heizung, Filter, Jets/weitere Pumpen). Chart **SwimSpa** = Rest nach Abzug bekannter Binär-Lasten (Filter via `subtract_consumer_ids`). Thermisches Modell und Historien-Kalibrierung nutzen **`homie_bwa_spa_heating`** (live + optional `heating_active_csv`), nicht Leistungsschwelle allein. Korrektur in `resolve_flexible_consumers_live_power` nur bei echtem Zählerwert. Invariante Energiebilanz: `swimspa_ist + swimspa_filter_ist = Gesamtmessung`.
+**Gemeinsame Leistungsmessung (Fall B, Live-Abnahme bestätigt):** `Ernie_Swim-Spa-P_act` misst die **Gesamt**-Leistungsaufnahme (Heizung, Filter, Jets/weitere Pumpen). Chart **SwimSpa** = Rest nach Abzug bekannter Binär-Lasten (Filter via `subtract_consumer_ids` mit Id `pool_filter`). Thermisches Modell und Historien-Kalibrierung nutzen **`homie_bwa_spa_heating`** (live + optional `heating_active_csv`), nicht Leistungsschwelle allein. Korrektur in `resolve_flexible_consumers_live_power` nur bei echtem Zählerwert. Invariante Energiebilanz: `swimspa_ist + pool_filter_ist = Gesamtmessung`.
 
 ### Chart-Ist (seit v1.22.3)
 
@@ -49,33 +49,27 @@ Langfristig soll `Ernie_Swimspa_Filter_Sollstunden` gegen null gehen; der Zähle
 
 Operative Pfade (`cons_data`, Delivery) nutzen weiterhin `kw` mit Fallback, wenn der Zähler ausfällt.
 
-## 4. Verbraucher-Config (`swimspa_filter`)
+## 4. Verbraucher-Config (`pool_filter`)
 
 ```json
 {
-  "id": "swimspa_filter",
-  "name": "SwimSpa Filter",
-  "chart_color_index": 1,
+  "id": "pool_filter",
+  "label": "Pool-Filter",
+  "type": "generic",
   "nominal_power_kw": 0.18,
   "signal_type": "binary",
   "min_on_quarterhours": 2,
-  "optimizer_enabled": true,
   "daily_target_source": "loxone_remaining_hours",
-  "loxone_target_hours_name": "Ernie_Swimspa_Filter_Sollstunden",
-  "loxone_outputs": {
-    "enable_name": "Earnie_Swimspa_Filter_Freigabe"
-  },
-  "loxone_inputs": {
-    "power_name": "homie_bwa_spa_filter2",
-    "alternate_binary_power_name": "homie_bwa_spa_filter1",
-    "signal_type": "binary"
+  "ehal_bindings": {
+    "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
+    "flex.pool_filter.sens_power_act": "Earnie_Pool_Filter_P_act",
+    "flex.pool_filter.set_enable": "Earnie_Pool_Filter_Freigabe",
+    "sens_filter_active": "Earnie_Pool_Filter_aktiv",
+    "get_filter_native_start_hour": "Earnie_Pool_Filter_NativeStart",
+    "get_filter_native_duration_hours": "Earnie_Pool_Filter_NativeDauer"
   },
   "filter_schedule": {
     "enabled": true,
-    "loxone": {
-      "native_start_hour_name": "homie_bwa_spa_filter1hour",
-      "native_duration_hours_name": "homie_bwa_spa_filter1durationhours"
-    },
     "config_fallback": {
       "native_start_hour": 10,
       "native_duration_hours": 4.0
@@ -84,7 +78,7 @@ Operative Pfade (`cons_data`, Delivery) nutzen weiterhin `kw` mit Fallback, wenn
 }
 ```
 
-Getrennt vom Heiz-Verbraucher `swimspa` (2,8 kW, `daily_target_source: thermal`).
+Getrennt vom Heiz-Verbraucher (`pool_swimspa` / `swimspa`, `daily_target_source: thermal`). Ohne expliziten `pool_filter` im Hausprofil gibt es keine Filter-MILP (kein synthetischer Bridge-Verbraucher mehr).
 
 ## 5. Zielberechnung (`loxone_remaining_hours`)
 
@@ -132,7 +126,7 @@ Earnie (pro 15-Min-Slot):
 ## 9. UI & Soll-Ist
 
 - Chart 1 / Sankey: eigener Eintrag „SwimSpa Filter“ (`chart_color_index: 1`).
-- **Soll-Ist-Regeln** (Backlog Z.17, umgesetzt) — scope `swimspa_filter`, siehe [soll-ist-abweichung.md](soll-ist-abweichung.md) §5.1/§5.2:
+- **Soll-Ist-Regeln** (Backlog Z.17, umgesetzt) — scope `pool_filter`, siehe [soll-ist-abweichung.md](soll-ist-abweichung.md) §5.1/§5.2:
 
 | Regel-ID | Kategorie | Bedeutung |
 |----------|-----------|-----------|
@@ -166,4 +160,4 @@ Live-Abnahme:
 .venv\Scripts\python.exe -m scripts.verify_swimspa_filter_live
 ```
 
-`swimspa_filter` gehört ins Hausprofil / den Planungspfad (`flexible_consumers` bzw. bridged profile), nicht mehr als One-Shot-Patch-Skript.
+`pool_filter` gehört ins Hausprofil (Planning → `flexible_consumers` via `planning_pool_filter_to_milp`). Migration: `python -m scripts.migrate_pool_filter_milp --path …/house_profiles.json`.

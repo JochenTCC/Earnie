@@ -130,8 +130,8 @@ SCENARIOS = [
     pytest.param(
         "S8",
         _entry(
-            consumer_powers_kw={"swimspa_filter": 0.18},
-            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.0}, "battery_kw": 0.0},
+            consumer_powers_kw={"pool_filter": 0.18},
+            consumption_snapshot={"flex_kw": {"pool_filter": 0.0}, "battery_kw": 0.0},
         ),
         "error",
         "swimspa_filter_should_run_missing",

@@ -148,16 +148,84 @@ def test_new_scenario_template_clones_live_settings():
             "settings": {"battery_id": "bat1", "house_profile_id": "home"},
         }
     ]
-    template = new_scenario_template("live", scenarios)
-    assert template["label"] == "Mein Szenario"
+    template = new_scenario_template(scenarios, source_id="live", live_id="live")
+    assert template["label"] == "Live copy"
     assert template["settings"]["battery_id"] == "bat1"
     assert template["settings"]["house_profile_id"] == "home"
+    assert template["enabled"] is True
 
 
-def test_new_scenario_template_without_live_uses_empty_settings():
-    template = new_scenario_template("live", [])
+def test_new_scenario_template_clones_last_selected_not_live():
+    scenarios = [
+        {
+            "id": "live",
+            "label": "Live",
+            "enabled": True,
+            "settings": {"battery_id": "bat_live"},
+            "own_reference": False,
+        },
+        {
+            "id": "ohne_pv",
+            "label": "Ohne PV",
+            "enabled": False,
+            "settings": {
+                "battery_id": "bat1",
+                "pv_system_ids": ["pv1", "pv2"],
+            },
+            "own_reference": True,
+        },
+    ]
+    template = new_scenario_template(
+        scenarios, source_id="ohne_pv", live_id="live"
+    )
+    assert template["label"] == "Ohne PV copy"
+    assert template["enabled"] is False
+    assert template["own_reference"] is True
+    assert template["settings"]["battery_id"] == "bat1"
+    assert template["settings"]["pv_system_ids"] == ["pv1", "pv2"]
+
+
+def test_new_scenario_template_label_collision_gets_suffix():
+    scenarios = [
+        {"id": "live", "label": "Live", "settings": {}},
+        {"id": "live_copy", "label": "Live copy", "settings": {}},
+    ]
+    template = new_scenario_template(scenarios, source_id="live", live_id="live")
+    assert template["label"] == "Live copy 2"
+
+
+def test_new_scenario_template_unknown_source_falls_back_to_live():
+    scenarios = [
+        {
+            "id": "live",
+            "label": "Live",
+            "settings": {"battery_id": "bat_live"},
+        }
+    ]
+    template = new_scenario_template(
+        scenarios, source_id="missing", live_id="live"
+    )
+    assert template["label"] == "Live copy"
+    assert template["settings"]["battery_id"] == "bat_live"
+
+
+def test_new_scenario_template_without_source_uses_empty_settings():
+    template = new_scenario_template([], source_id="live", live_id="live")
     assert template["label"] == "Mein Szenario"
     assert template["settings"] == {}
+
+
+def test_new_scenario_template_deepcopies_nested_settings():
+    scenarios = [
+        {
+            "id": "live",
+            "label": "Live",
+            "settings": {"pv_system_ids": ["pv1"]},
+        }
+    ]
+    template = new_scenario_template(scenarios, source_id="live", live_id="live")
+    template["settings"]["pv_system_ids"].append("pv2")
+    assert scenarios[0]["settings"]["pv_system_ids"] == ["pv1"]
 
 
 def test_resolve_scenario_id_keeps_existing_id():

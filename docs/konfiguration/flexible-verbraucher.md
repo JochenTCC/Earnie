@@ -87,20 +87,18 @@ Block `charging_schedule.milp` am EV-Verbraucher in `house_profiles.json`: Feint
 
 ## Pool-Filter: `filter_schedule` und `loxone_remaining_hours`
 
-Getrennter Verbraucher `swimspa_filter` (Heizung bleibt `swimspa` mit `daily_target_source: thermal`).
+Getrennter Verbraucher `pool_filter` (Heizung bleibt z. B. `pool_swimspa` / `swimspa` mit `daily_target_source: thermal`).
 
 
 | Feld                              | Bedeutung                                                                                       |
 | --------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `daily_target_source`             | `loxone_remaining_hours` — Ziel_kWh = `Sollstunden` × `nominal_power_kw`                        |
-| `get_filter_remaining_hours`      | EHAL-Rolle (EHAL-Com Entity **Pool / SwimSpa Filter**); Merker-Adresse in `ehal_bindings` / `swimspa_filter_bindings` |
-| `loxone_target_hours_name`        | Legacy-Dual-Read für denselben Merker (verbleibende Filter-Schulden in **Stunden**)             |
+| `get_filter_remaining_hours`      | EHAL-Rolle am Verbraucher `pool_filter`; Merker-Adresse in `ehal_bindings`                      |
 | `filter_schedule.enabled`         | `true` = natives Duty-Cycle-Fenster sperrt MILP-Slots                                           |
-| `filter_schedule.loxone`          | `native_start_hour_name`, `native_duration_hours_name` — natives Fenster `[Start, Start+Dauer)` |
-| `filter_schedule.config_fallback` | Festes Fenster für Backtesting/Offline (kein `path_historical_log`)                             |
+| `filter_schedule.config_fallback` | Festes Fenster für Backtesting/Offline (kein natives Loxone-Fenster)                            |
 
 
-Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`loxone_outputs.enable_name`). Spec: [SwimSpa Filter](../spec/swimspa-filter.md).
+Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`flex.pool_filter.set_enable`). Spec: [SwimSpa Filter](../spec/swimspa-filter.md).
 
 ## Manuelle Geräte (Hausprofil, `type: generic`)
 

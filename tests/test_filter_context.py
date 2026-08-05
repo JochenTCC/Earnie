@@ -14,7 +14,7 @@ from optimizer.milp import milp_horizon_schedule, milp_optimizer
 
 def _swimspa_filter() -> dict:
     return {
-        "id": "swimspa_filter",
+        "id": "pool_filter",
         "name": "SwimSpa Filter",
         "nominal_power_kw": 0.18,
         "min_on_quarterhours": 4,
@@ -128,11 +128,11 @@ class TestMilpFilterWindow:
             k_push=3.5,
             verbose=False,
             consumers=[consumer],
-            consumer_remaining_kwh={"swimspa_filter": ernie_rem},
-            filter_contexts={"swimspa_filter": filter_ctx},
+            consumer_remaining_kwh={"pool_filter": ernie_rem},
+            filter_contexts={"pool_filter": filter_ctx},
         )
         powers = [
-            slot["consumer_powers"].get("swimspa_filter", 0.0) for slot in schedule
+            slot["consumer_powers"].get("pool_filter", 0.0) for slot in schedule
         ]
         assert any(abs(p - 0.18) < 1e-6 for p in powers)
         assert sum(powers) == pytest.approx(0.36, abs=0.02)
@@ -159,10 +159,10 @@ class TestMilpFilterWindow:
             k_push=3.5,
             verbose=False,
             consumers=[consumer],
-            consumer_remaining_kwh={"swimspa_filter": ernie_rem},
-            filter_contexts={"swimspa_filter": filter_ctx},
+            consumer_remaining_kwh={"pool_filter": ernie_rem},
+            filter_contexts={"pool_filter": filter_ctx},
         )
-        assert powers.get("swimspa_filter", 0.0) == pytest.approx(0.0)
+        assert powers.get("pool_filter", 0.0) == pytest.approx(0.0)
 
     def test_no_power_in_blocked_native_slots(self):
         matrix = _matrix_24h()
@@ -180,16 +180,16 @@ class TestMilpFilterWindow:
                 k_push=3.5,
                 verbose=False,
                 consumers=[consumer],
-                consumer_remaining_kwh={"swimspa_filter": ernie_rem},
+                consumer_remaining_kwh={"pool_filter": ernie_rem},
                 filter_contexts={
-                    "swimspa_filter": fc.resolve_filter_context(
+                    "pool_filter": fc.resolve_filter_context(
                         consumer,
                         slice_matrix,
                         logged_simulation=True,
                     )
                 },
             )
-            powers_by_hour[hour] = powers.get("swimspa_filter", 0.0)
+            powers_by_hour[hour] = powers.get("pool_filter", 0.0)
 
         for blocked_hour in filter_ctx["blocked_indices"]:
             assert powers_by_hour[blocked_hour] == pytest.approx(0.0)
@@ -253,7 +253,7 @@ class TestFilterContextCaching:
             verbose=False,
             matrix_prepared=True,
             charging_contexts={},
-            consumer_daily_targets_kwh={"swimspa_filter": 0.0},
+            consumer_daily_targets_kwh={"pool_filter": 0.0},
             flexible_consumers=[consumer],
         )
         assert fetch_calls == ["FilterStart"]
@@ -286,7 +286,7 @@ class TestFilterContextCaching:
             verbose=False,
             matrix_prepared=True,
             charging_contexts={},
-            consumer_daily_targets_kwh={"swimspa_filter": 0.0},
+            consumer_daily_targets_kwh={"pool_filter": 0.0},
             flexible_consumers=[consumer],
             filter_contexts=filters,
         )

@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     history_logs = thermal.get("history_logs") or {}
     filter_nominal = 0.18
     filter_consumer = next(
-        (c for c in config.get_flexible_consumers() if c.get("id") == "swimspa_filter"),
+        (c for c in config.get_flexible_consumers() if c.get("id") == "pool_filter"),
         None,
     )
     if filter_consumer is not None:

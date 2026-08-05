@@ -955,9 +955,44 @@ def test_merge_empty_base_uses_historical_chart_color_indices():
     merged = merge_flexible_consumers([], planning)
     by_id = {item["id"]: item["chart_color_index"] for item in merged}
     assert by_id["swimspa"] == 0
-    assert by_id["swimspa_filter"] == 1
     assert by_id["ev"] == 2
     assert by_id["wp_heating"] == 7
+
+
+def test_merge_flexible_consumers_pool_filter_chart_color():
+    from house_config.planning_flex_bridge import (
+        collect_planning_flex_consumers,
+        merge_flexible_consumers,
+    )
+
+    profile = {
+        "consumers": [
+            {
+                "id": "swimspa",
+                "label": "SwimSpa",
+                "type": "thermal_rc",
+                "nominal_power_kw": 2.8,
+                "thermal_rc": {
+                    "water_volume_liters": 6000.0,
+                    "setpoint_c": 36.0,
+                    "tolerance_c": 1.0,
+                    "heat_loss_kw_per_k": 0.1,
+                    "heating_efficiency": 0.95,
+                },
+            },
+            {
+                "id": "pool_filter",
+                "label": "Pool Filter",
+                "type": "generic",
+                "nominal_power_kw": 0.18,
+            },
+        ]
+    }
+    planning = collect_planning_flex_consumers(profile)
+    merged = merge_flexible_consumers([], planning)
+    by_id = {item["id"]: item["chart_color_index"] for item in merged}
+    assert by_id["swimspa"] == 0
+    assert by_id["pool_filter"] == 1
 
 
 def test_merge_flexible_consumers_legacy_id_overlay():
@@ -1030,11 +1065,54 @@ def test_planning_thermal_rc_to_milp_bridge():
     flex = collect_planning_flex_consumers(profile)
     ids = {entry["id"] for entry in flex}
     assert "swimspa" in ids
-    assert "swimspa_filter" in ids
+    assert "pool_filter" not in ids
+    heat = next(entry for entry in flex if entry["id"] == "swimspa")
+    assert (heat.get("loxone_inputs") or {}).get("subtract_consumer_ids") in (None, [])
+
+
+def test_planning_thermal_rc_with_pool_filter():
+    from house_config.planning_flex_bridge import collect_planning_flex_consumers
+
+    profile = {
+        "consumers": [
+            {
+                "id": "swimspa",
+                "label": "SwimSpa",
+                "type": "thermal_rc",
+                "nominal_power_kw": 2.8,
+                "use_profile_csv": False,
+                "thermal_rc": {
+                    "water_volume_liters": 6000,
+                    "setpoint_c": 36.5,
+                    "tolerance_c": 1.0,
+                    "heat_loss_kw_per_k": 0.1,
+                    "heating_efficiency": 0.95,
+                },
+            },
+            {
+                "id": "pool_filter",
+                "label": "Pool Filter",
+                "type": "generic",
+                "nominal_power_kw": 0.18,
+                "ehal_bindings": {
+                    "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
+                    "flex.pool_filter.set_enable": "Earnie_Pool_Filter_Freigabe",
+                },
+            },
+        ]
+    }
+    flex = collect_planning_flex_consumers(profile)
+    ids = {entry["id"] for entry in flex}
+    assert "pool_filter" in ids
     heat = next(entry for entry in flex if entry["id"] == "swimspa")
     assert (heat.get("loxone_inputs") or {}).get("subtract_consumer_ids") == [
-        "swimspa_filter"
+        "pool_filter"
     ]
+    filt = next(entry for entry in flex if entry["id"] == "pool_filter")
+    assert filt["daily_target_source"] == "loxone_remaining_hours"
+    assert filt["ehal_bindings"]["flex.pool_filter.set_enable"] == (
+        "Earnie_Pool_Filter_Freigabe"
+    )
 
 
 def test_consumer_annual_kwh_thermal_rc_with_geo():
@@ -1399,22 +1477,26 @@ def test_merge_passthrough_keeps_edited_markers():
     )
 
 
-def test_swimspa_filter_bindings_override_defaults():
+def test_planning_pool_filter_to_milp_bindings():
     from house_config.planning_flex_bridge import (
         collect_planning_flex_consumers,
-        planning_filter_to_milp,
+        planning_pool_filter_to_milp,
     )
 
-    custom = planning_filter_to_milp(
+    custom = planning_pool_filter_to_milp(
         {
+            "id": "pool_filter",
+            "label": "Pool Filter",
+            "nominal_power_kw": 0.18,
             "ehal_bindings": {
                 "get_filter_remaining_hours": "Custom_Filter_Hours",
-                "flex.swimspa_filter.set_enable": "Custom_Filter_Enable",
+                "flex.pool_filter.set_enable": "Custom_Filter_Enable",
             },
         }
     )
+    assert custom["id"] == "pool_filter"
     assert custom["ehal_bindings"]["get_filter_remaining_hours"] == "Custom_Filter_Hours"
-    assert custom["ehal_bindings"]["flex.swimspa_filter.set_enable"] == (
+    assert custom["ehal_bindings"]["flex.pool_filter.set_enable"] == (
         "Custom_Filter_Enable"
     )
 
@@ -1433,21 +1515,25 @@ def test_swimspa_filter_bindings_override_defaults():
                     "heat_loss_kw_per_k": 0.1,
                     "heating_efficiency": 0.95,
                 },
-                "swimspa_filter_bindings": {
-                    "ehal_bindings": {
-                        "get_filter_remaining_hours": "Profile_Filter_Hours",
-                    },
+            },
+            {
+                "id": "pool_filter",
+                "label": "Pool Filter",
+                "type": "generic",
+                "nominal_power_kw": 0.18,
+                "ehal_bindings": {
+                    "get_filter_remaining_hours": "Profile_Filter_Hours",
                 },
-            }
+            },
         ]
     }
     flex = collect_planning_flex_consumers(profile)
-    filt = next(item for item in flex if item["id"] == "swimspa_filter")
+    filt = next(item for item in flex if item["id"] == "pool_filter")
     assert filt["ehal_bindings"]["get_filter_remaining_hours"] == "Profile_Filter_Hours"
 
 
-def test_pool_filter_enable_overlays_milp_bridge_freigabe():
-    """Greenfield pool_filter Freigabe must drive the bridged swimspa_filter write."""
+def test_pool_filter_milp_preserves_all_ehal_bindings():
+    """pool_filter ehal_bindings reach MILP without remapping to swimspa_filter keys."""
     from house_config.planning_flex_bridge import collect_planning_flex_consumers
 
     profile = {
@@ -1469,44 +1555,8 @@ def test_pool_filter_enable_overlays_milp_bridge_freigabe():
             {
                 "id": "pool_filter",
                 "label": "Pool Filter",
-                "type": "flexible",
-                "ehal_bindings": {
-                    "flex.pool_filter.set_enable": "Earnie_Pool_Filter_Freigabe",
-                },
-            },
-        ]
-    }
-    flex = collect_planning_flex_consumers(profile)
-    filt = next(item for item in flex if item["id"] == "swimspa_filter")
-    assert filt["ehal_bindings"]["flex.swimspa_filter.set_enable"] == (
-        "Earnie_Pool_Filter_Freigabe"
-    )
-
-
-def test_pool_filter_overlays_all_filter_bindings_onto_milp_bridge():
-    """Greenfield pool_filter filter roles must reach the bridged swimspa_filter."""
-    from house_config.planning_flex_bridge import collect_planning_flex_consumers
-
-    profile = {
-        "consumers": [
-            {
-                "id": "pool_swimspa",
-                "label": "Pool",
-                "type": "thermal_rc",
-                "nominal_power_kw": 2.8,
-                "use_profile_csv": False,
-                "thermal_rc": {
-                    "water_volume_liters": 6000.0,
-                    "setpoint_c": 36.0,
-                    "tolerance_c": 1.0,
-                    "heat_loss_kw_per_k": 0.1,
-                    "heating_efficiency": 0.95,
-                },
-            },
-            {
-                "id": "pool_filter",
-                "label": "Pool Filter",
-                "type": "flexible",
+                "type": "generic",
+                "nominal_power_kw": 0.18,
                 "ehal_bindings": {
                     "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
                     "flex.pool_filter.sens_power_act": "Earnie_Pool_Filter_P_act",
@@ -1519,64 +1569,14 @@ def test_pool_filter_overlays_all_filter_bindings_onto_milp_bridge():
         ]
     }
     flex = collect_planning_flex_consumers(profile)
-    filt = next(item for item in flex if item["id"] == "swimspa_filter")
+    filt = next(item for item in flex if item["id"] == "pool_filter")
     ehal = filt["ehal_bindings"]
     assert ehal["get_filter_remaining_hours"] == "Earnie_Pool_Filter_Sollstunden"
-    assert ehal["flex.swimspa_filter.sens_power_act"] == "Earnie_Pool_Filter_P_act"
-    assert ehal["flex.swimspa_filter.set_enable"] == "Earnie_Pool_Filter_Freigabe"
+    assert ehal["flex.pool_filter.sens_power_act"] == "Earnie_Pool_Filter_P_act"
+    assert ehal["flex.pool_filter.set_enable"] == "Earnie_Pool_Filter_Freigabe"
     assert ehal["sens_filter_active"] == "Earnie_Pool_Filter_aktiv"
     assert ehal["get_filter_native_start_hour"] == "Earnie_Pool_Filter_NativeStart"
     assert ehal["get_filter_native_duration_hours"] == "Earnie_Pool_Filter_NativeDauer"
-
-
-def test_planning_filter_uses_ehal_get_filter_remaining_hours():
-    from house_config.planning_flex_bridge import (
-        collect_planning_flex_consumers,
-        planning_filter_to_milp,
-    )
-
-    custom = planning_filter_to_milp(
-        {
-            "ehal_bindings": {
-                "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
-            }
-        }
-    )
-    assert custom["ehal_bindings"]["get_filter_remaining_hours"] == (
-        "Earnie_Pool_Filter_Sollstunden"
-    )
-
-    bare = planning_filter_to_milp(None)
-    assert bare["ehal_bindings"] == {}
-
-    profile = {
-        "consumers": [
-            {
-                "id": "swimspa",
-                "label": "SwimSpa",
-                "type": "thermal_rc",
-                "nominal_power_kw": 2.8,
-                "use_profile_csv": False,
-                "thermal_rc": {
-                    "water_volume_liters": 6000.0,
-                    "setpoint_c": 36.0,
-                    "tolerance_c": 1.0,
-                    "heat_loss_kw_per_k": 0.1,
-                    "heating_efficiency": 0.95,
-                },
-                "swimspa_filter_bindings": {
-                    "ehal_bindings": {
-                        "get_filter_remaining_hours": "Earnie_Pool_Filter_Sollstunden",
-                    }
-                },
-            }
-        ]
-    }
-    flex = collect_planning_flex_consumers(profile)
-    filt = next(item for item in flex if item["id"] == "swimspa_filter")
-    assert filt["ehal_bindings"]["get_filter_remaining_hours"] == (
-        "Earnie_Pool_Filter_Sollstunden"
-    )
 
 
 def test_assemble_filter_bindings_shape():
@@ -1595,9 +1595,9 @@ def test_assemble_filter_bindings_shape():
     assert bindings == {
         "ehal_bindings": {
             "get_filter_remaining_hours": "Hours",
-            "flex.swimspa_filter.sens_power_act": "P2",
+            "flex.pool_filter.sens_power_act": "P2",
             "sens_filter_active": "P1",
-            "flex.swimspa_filter.set_enable": "En",
+            "flex.pool_filter.set_enable": "En",
             "get_filter_native_start_hour": "Start",
             "get_filter_native_duration_hours": "Dur",
         }

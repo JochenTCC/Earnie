@@ -100,10 +100,10 @@ def test_status_payload_maps_legacy_swimspa_enable_to_pool_keys() -> None:
             },
         },
         {
-            "id": "swimspa_filter",
+            "id": "pool_filter",
             "daily_target_source": "loxone_remaining_hours",
             "ehal_bindings": {
-                "flex.swimspa_filter.set_enable": "Earnie_Swimspa_Filter_Freigabe",
+                "flex.pool_filter.set_enable": "Earnie_Swimspa_Filter_Freigabe",
             },
         },
     ]
@@ -118,7 +118,7 @@ def test_status_payload_maps_legacy_swimspa_enable_to_pool_keys() -> None:
     )
     assert payload["Earnie_Pool_Freigabe"] == 1.0
     assert payload["Earnie_Pool_Filter_Freigabe"] == 0.0
-    assert "flex.swimspa_filter.Earnie_Verbraucher_Freigabe" not in payload
+    assert "flex.pool_filter.Earnie_Verbraucher_Freigabe" not in payload
     assert "flex.swimspa.Earnie_Verbraucher_Freigabe" not in payload
 
 

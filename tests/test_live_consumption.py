@@ -9,7 +9,7 @@ from data import live_consumption as lc
 from integrations.loxone_client import LiveFlexPowerResult
 
 _FILTER_CONTEXTS = {
-    "swimspa_filter": {
+    "pool_filter": {
         "native_start_hour": 10,
         "native_duration_hours": 4.0,
         "source_label": "loxone",
@@ -21,9 +21,9 @@ _SLOT = datetime(2026, 7, 9, 12, 5, tzinfo=ZoneInfo("Europe/Vienna"))
 def test_fetch_live_flex_kw_for_ui_passes_filter_contexts_from_main_state():
     main_state = {"filter_contexts": _FILTER_CONTEXTS}
     flex_result = LiveFlexPowerResult(
-        kw={"swimspa": 0.0, "swimspa_filter": 0.18},
-        chart_kw={"swimspa_filter": 0.18},
-        measured_ids=frozenset({"swimspa", "swimspa_filter"}),
+        kw={"swimspa": 0.0, "pool_filter": 0.18},
+        chart_kw={"pool_filter": 0.18},
+        measured_ids=frozenset({"swimspa", "pool_filter"}),
     )
     with patch.object(
         lc.loxone_client,
@@ -37,7 +37,7 @@ def test_fetch_live_flex_kw_for_ui_passes_filter_contexts_from_main_state():
         filter_contexts=_FILTER_CONTEXTS,
         slot_datetime=_SLOT,
     )
-    assert result["swimspa_filter"] == 0.18
+    assert result["pool_filter"] == 0.18
     assert result["swimspa"] == 0.0
 
 
@@ -53,13 +53,13 @@ def test_fetch_live_consumption_snapshot_uses_ui_flex_resolution():
         with patch.object(
             lc,
             "fetch_live_flex_kw_for_ui",
-            return_value={"swimspa": 0.0, "swimspa_filter": 0.18},
+            return_value={"swimspa": 0.0, "pool_filter": 0.18},
         ) as fetch_flex:
             snapshot = lc.fetch_live_consumption_snapshot(main_state)
 
     fetch_flex.assert_called_once_with(main_state)
     assert snapshot is not None
-    assert snapshot["flex_kw"]["swimspa_filter"] == 0.18
+    assert snapshot["flex_kw"]["pool_filter"] == 0.18
     assert snapshot["flex_kw"]["swimspa"] == 0.0
     assert snapshot["baseload_kw"] == 0.32
 
@@ -93,7 +93,7 @@ def test_apply_live_snapshot_maps_runtime_flex_to_canonical_ids():
 
 def test_filter_contexts_for_ui_uses_config_fallback_without_main_state():
     consumer = {
-        "id": "swimspa_filter",
+        "id": "pool_filter",
         "filter_schedule": {
             "enabled": True,
             "config_fallback": {
@@ -106,7 +106,7 @@ def test_filter_contexts_for_ui_uses_config_fallback_without_main_state():
         contexts = lc.filter_contexts_for_ui(None)
 
     assert contexts == {
-        "swimspa_filter": {
+        "pool_filter": {
             "native_start_hour": 10.0,
             "native_duration_hours": 4.0,
             "source_label": "config_fallback",
@@ -127,15 +127,15 @@ def test_chart_debug_dump_replay_filter_attribution():
                 "flex.swimspa.sens_power_act": "Ernie_Swim-Spa-P_act",
             },
             "loxone_inputs": {
-                "subtract_consumer_ids": ["swimspa_filter"],
+                "subtract_consumer_ids": ["pool_filter"],
             },
         },
         {
-            "id": "swimspa_filter",
+            "id": "pool_filter",
             "nominal_power_kw": 0.18,
             "signal_type": "binary",
             "ehal_bindings": {
-                "flex.swimspa_filter.sens_power_act": "homie_bwa_spa_filter2",
+                "flex.pool_filter.sens_power_act": "homie_bwa_spa_filter2",
                 "sens_filter_active": "homie_bwa_spa_filter1",
             },
             "loxone_inputs": {
@@ -159,5 +159,5 @@ def test_chart_debug_dump_replay_filter_attribution():
             slot_datetime=_SLOT,
         )
 
-    assert live.kw["swimspa_filter"] == 0.18
+    assert live.kw["pool_filter"] == 0.18
     assert live.kw["swimspa"] == 0.0

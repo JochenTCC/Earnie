@@ -17,7 +17,7 @@ from runtime_store.history_timeline import (
 from ui.chart_context import build_live_chart_context, live_now
 
 SWIMSPA_ID = "swimspa"
-FILTER_ID = "swimspa_filter"
+FILTER_ID = "pool_filter"
 
 
 @dataclass(frozen=True)

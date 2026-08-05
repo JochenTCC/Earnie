@@ -26,15 +26,21 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.l`/`2.4.m`/`2.4.n`/`2.4.o`/`2.4.p` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
 **Moved out:** Donate (sidebar) — not part of docking.
 
+- [x] "Live-Modus — main.py sendet Steuerwerte an Loxone" message on EHAL-Com page is misleading, when daemon is actually not running. 
+  - Check first if deamon is running and adjust messages to:
+    - Silent-mode is on / Daemon is running: "Silent-Modus - Optimierer läuft ohne Daten zu senden"
+    - Silent-mode is on / Daemon is not running "Silent-Modus - Optimierer läuft nicht"
+    - Silent-mode is off / Daemon is running: "Loud-Modus - Optimierer läuft und sendet Daten"
+    - Silent-mode is off / Daemon is not running "Loud-Modus - Optimierer läuft nicht - daher werden keine Daten gesendet"
+
 - [ ] **2.4.r — Release**
   - [x] Add the two logos to streamlit for dark and light designs in the sidebar as intended by streamlit
     - docs\assets\Earnie-Logo-Simple_Dark.png for dark design
     - docs\assets\Earnie-Logo-Simple-Light.png for light design
     - Place logo (for light design) in Readme.md and prepare adding it into repository
-  - [ ] Review old *_BRIDGE_DEFAULTS:
-    - Remove legacy defaults
+  - [x] Test greenfield approach with Loxone-Import without old BRIDGE_DEFAULTS
   - [x] Residual Loxone Merker nests → `ehal_bindings` only (thermal C.6, enable write, filter native, strip + `scripts/migrate_ehal_bindings`; Homie bridge defaults retired)
-  - [x] **Before 2.4.0:** EHAL-Com maps pool_filter fields (`flex.pool_filter.sens_power_act`, `get_filter_remaining_hours`, `sens_filter_active`, `get_filter_native_start_hour`, `get_filter_native_duration_hours`) + MILP bridge overlay
+  - [x] **Before 2.4.0:** EHAL-Com maps pool_filter fields (`flex.pool_filter.sens_power_act`, `get_filter_remaining_hours`, `sens_filter_active`, `get_filter_native_start_hour`, `get_filter_native_duration_hours`) onto `pool_filter` MILP consumer
   - [ ] Code Quality
     - Make a code coverage test
     - Review code against coding KPIs and refactor it if needed
@@ -74,6 +80,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Clarify how to handle wallbox <> EVs
   - for multiple wallboxes / EVs there is not a "natural" 1 to 1 binding - hence it must be clarified how to handle that (have a look at evcc)
 - [ ] Optimize Pool temperature to a certain value on time. Set desired temperature and using time. Combine it with RC model
+  - Add a chart that shows comparison between actual and modeled temperature (including ambient temperature and heating activity)
+ 
 
 ### Version 2.+1 — Introducing nested data models
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
+import pytest
+
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
 from integrations.loxone_comm_trace import LoxoneWriteRecord, serialize_write_records
@@ -18,6 +20,7 @@ from ui.loxone_debug import (
     mapping_column_label,
     read_check_status_label,
     rows_with_mapping_column_label,
+    status_strip_banner,
     write_summary_from_rows,
 )
 
@@ -298,3 +301,42 @@ def test_rows_with_mapping_column_label_renames_key():
         "Status",
     ]
     assert out[0]["Mapping auf Loxone"] == "Ernie_SOC"
+
+
+@pytest.mark.parametrize(
+    ("silent", "daemon_running", "level", "fragment"),
+    [
+        (True, True, "warning", "läuft ohne Daten zu senden"),
+        (True, False, "warning", "Optimierer läuft nicht"),
+        (False, True, "success", "läuft und sendet Daten"),
+        (False, False, "warning", "daher werden keine Daten gesendet"),
+    ],
+)
+def test_status_strip_banner(silent, daemon_running, level, fragment):
+    got_level, message = status_strip_banner(silent, daemon_running)
+    assert got_level == level
+    assert fragment in message
+    assert ("Silent-Modus" if silent else "Loud-Modus") in message
+
+
+def test_status_strip_banner_unknown_daemon_treated_as_not_running():
+    """Callers map unknown/stopped to daemon_running=False."""
+    level, message = status_strip_banner(False, False)
+    assert level == "warning"
+    assert "läuft nicht" in message
+
+
+def test_expected_live_read_fields_include_plant_ambient():
+    from integrations.ehal_debug_mapping import (
+        PLANT_LIVE_READ_FIELDS,
+        expected_live_read_fields,
+    )
+
+    assert "sens_temperature_outside" in PLANT_LIVE_READ_FIELDS
+    with patch(
+        "integrations.ehal_debug_mapping._all_live_consumers",
+        return_value=[],
+    ):
+        fields = expected_live_read_fields(network_backend=False)
+    assert "sens_temperature_outside" in fields
+    assert fields.index("sens_temperature_outside") > fields.index("sens_ess_soc")

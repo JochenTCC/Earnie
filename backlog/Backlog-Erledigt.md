@@ -3,9 +3,25 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Plant-owned sens_temperature_outside (2026-08-05)
+
+- [x] Außentemperatur only on `plant.ehal_bindings.sens_temperature_outside` — no runtime consumer/legacy dual-read; migrate promotes then strips leftover consumer keys; Live-Lesen includes plant ambient; docs C.1 / C.5 / C.6.
+
+
+### HK/SE path caption + scenario copy-on-new (2026-08-05)
+
+- [x] Show used config path in HK and SE as information — `st.caption` with `resolve_house_profiles_json_path()` / `resolve_backtesting_scenarios_json_path()` after page title.
+- [x] When adding a new scenario, copy the last selected scenario as template and take the label + "copy" — `new_scenario_template` deep-clones last real selection (fallback Live); unique `{label} copy`.
+
+
 ### Bugfix HK consumer remove stale labels (2026-08-05)
 
 - [x] **Consumer „Energiebezug“ not removable on Hauskonfigurator** — After Loxone Import, `Entfernen` deleted the session entry but index-scoped `hc_*` widgets kept old Bezeichnung values; sync + auto-persist renamed shifted consumers. Fix: `_clear_consumer_widget_keys` before rerun. Verified.
+
+
+### Drop synthetic SwimSpa filter bridge (2026-08-04)
+
+- [x] **2.4.r — Review old `*_BRIDGE_DEFAULTS` / Remove legacy defaults** — Deleted `SWIMSPA_FILTER_BRIDGE_DEFAULTS` and thermal_rc auto-inject; MILP filter is house-profile `pool_filter` only (`planning_pool_filter_to_milp`); removed synthetic EHAL entity / `swimspa_filter_bindings`; migration `scripts/migrate_pool_filter_milp.py`; deviation scopes → `pool_filter`; docs updated.
 
 
 ### EHAL-Com pool_filter field mapping (2026-08-04)

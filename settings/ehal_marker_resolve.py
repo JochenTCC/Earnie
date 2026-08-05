@@ -202,19 +202,14 @@ def marker_sens_heating_active(consumer: dict) -> str:
 
 
 def marker_sens_temperature_outside(
-    consumer: dict | None = None,
     *,
     house_doc: dict | None = None,
     config_doc: dict | None = None,
 ) -> str:
-    """Außentemperatur: consumer binding, else plant ``sens_temperature_outside``."""
+    """Außentemperatur: plant ``sens_temperature_outside`` only (no consumer/legacy dual-read)."""
     from house_config.ehal_bindings import resolve_plant_binding
 
-    cons = consumer if isinstance(consumer, dict) else {}
-    return _first_nonempty(
-        ehal_bindings(cons).get("sens_temperature_outside"),
-        resolve_plant_binding(house_doc, "sens_temperature_outside", config_doc),
-    )
+    return resolve_plant_binding(house_doc, "sens_temperature_outside", config_doc)
 
 
 def resolve_get_evcs_limit_soc(consumer: dict) -> float:

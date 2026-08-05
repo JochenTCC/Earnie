@@ -34,7 +34,7 @@ _THERMAL_LOXONE_TO_EHAL: dict[str, str] = {
     "setpoint_temp_name": "get_temperature_water_setpoint",
     "tolerance_c_name": "get_temperature_tolerance_c",
     "heating_active_name": "sens_heating_active",
-    "ambient_temp_name": "sens_temperature_outside",
+    # ambient_temp_name → plant only (see _promote_ambient_to_plant)
 }
 
 THERMAL_RC_EHAL_FIELDS: tuple[str, ...] = (
@@ -190,7 +190,7 @@ def migrate_consumer_legacy_to_ehal_bindings(consumer: dict) -> dict[str, str]:
     return bindings
 
 
-FILTER_ENTITY_ID = "swimspa_filter"
+FILTER_ENTITY_ID = "pool_filter"
 
 
 def filter_ehal_fields_for_consumer(cid: str) -> tuple[str, ...]:
@@ -212,7 +212,7 @@ FILTER_EHAL_FIELDS: tuple[str, ...] = filter_ehal_fields_for_consumer(FILTER_ENT
 
 
 def filter_bindings_to_ehal_map(stored: dict | None) -> dict[str, str]:
-    """Normalize ``swimspa_filter_bindings`` nest → EHAL field map for HITL / Live."""
+    """Normalize legacy ``swimspa_filter_bindings`` nest → EHAL field map (pool_filter keys)."""
     from ehal.flex_fields import (
         KIND_SENS_POWER_ACT,
         KIND_SET_ENABLE,
@@ -233,16 +233,17 @@ def filter_bindings_to_ehal_map(stored: dict | None) -> dict[str, str]:
     sched = raw.get("filter_schedule")
     if isinstance(sched, dict) and isinstance(sched.get("loxone"), dict):
         flox = sched["loxone"]
-    _put_binding(
-        out,
-        flex_field(FILTER_ENTITY_ID, KIND_SENS_POWER_ACT),
-        inputs.get("power_name"),
+    # Prefer already-migrated pool_filter flex keys; fall back to swimspa bridge keys.
+    power = inputs.get("power_name") or out.get(
+        flex_field("swimspa_filter", KIND_SENS_POWER_ACT)
     )
-    _put_binding(
-        out,
-        flex_field(FILTER_ENTITY_ID, KIND_SET_ENABLE),
-        outputs.get("enable_name"),
+    enable = outputs.get("enable_name") or out.get(
+        flex_field("swimspa_filter", KIND_SET_ENABLE)
     )
+    out.pop(flex_field("swimspa_filter", KIND_SENS_POWER_ACT), None)
+    out.pop(flex_field("swimspa_filter", KIND_SET_ENABLE), None)
+    _put_binding(out, flex_field(FILTER_ENTITY_ID, KIND_SENS_POWER_ACT), power)
+    _put_binding(out, flex_field(FILTER_ENTITY_ID, KIND_SET_ENABLE), enable)
     _put_binding(out, "sens_filter_active", inputs.get("alternate_binary_power_name"))
     _put_binding(out, "get_filter_native_start_hour", flox.get("native_start_hour_name"))
     _put_binding(
@@ -252,18 +253,18 @@ def filter_bindings_to_ehal_map(stored: dict | None) -> dict[str, str]:
 
 
 def ehal_map_to_filter_bindings(ehal_map: dict[str, str] | None) -> dict:
-    """HITL save → ``swimspa_filter_bindings`` (EHAL-only persist)."""
+    """Normalize HITL map → ``ehal_bindings`` dict for ``pool_filter``."""
     from ehal.flex_fields import expand_flex_bindings
 
     cleaned = expand_flex_bindings(
         {str(k): _nonempty(v) for k, v in (ehal_map or {}).items() if _nonempty(v)},
         FILTER_ENTITY_ID,
     )
-    return {"ehal_bindings": cleaned} if cleaned else {}
+    return cleaned
 
 
 def migrate_swimspa_filter_bindings(consumer: dict) -> bool:
-    """Ensure ``swimspa_filter_bindings`` is EHAL-only with migrated addresses."""
+    """Legacy no-op: nests are lifted onto ``pool_filter`` by ``promote_pool_filter_milp``."""
     stored = consumer.get("swimspa_filter_bindings")
     if not isinstance(stored, dict) or not stored:
         return False
@@ -374,6 +375,28 @@ def _promote_ambient_to_plant(house: dict, plant_bindings: dict[str, str]) -> bo
     return False
 
 
+def _strip_consumer_ambient_bindings(house: dict) -> bool:
+    """Remove leftover ``sens_temperature_outside`` from consumer ehal_bindings."""
+    changed = False
+    for profile in _profiles_iterable(house):
+        consumers = profile.get("consumers")
+        if not isinstance(consumers, list):
+            continue
+        for consumer in consumers:
+            if not isinstance(consumer, dict):
+                continue
+            bindings = consumer.get("ehal_bindings")
+            if not isinstance(bindings, dict):
+                continue
+            if "sens_temperature_outside" not in bindings:
+                continue
+            cleaned = dict(bindings)
+            cleaned.pop("sens_temperature_outside", None)
+            consumer["ehal_bindings"] = cleaned
+            changed = True
+    return changed
+
+
 def _profiles_iterable(house_doc: dict) -> list[dict]:
     profiles = house_doc.get("profiles")
     if isinstance(profiles, dict):
@@ -459,6 +482,8 @@ def ensure_migrated(
         changed = True
     if plant:
         house["plant"] = plant
+    if _strip_consumer_ambient_bindings(house):
+        changed = True
     if _strip_entity_event_triggers(house):
         changed = True
     if strip_legacy:

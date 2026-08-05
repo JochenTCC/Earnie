@@ -552,7 +552,8 @@ def resolve_consumer_live_power_kw(
 
 
 FILTER_INFERENCE_TOLERANCE_KW = 0.05
-SWIMSPA_FILTER_ID = "swimspa_filter"
+POOL_FILTER_ID = "pool_filter"
+SWIMSPA_FILTER_ID = POOL_FILTER_ID  # backward alias for imports
 SWIMSPA_HEATING_ID = "swimspa"
 
 
@@ -1290,13 +1291,28 @@ def _read_optional_temp_c(io_name: str) -> float | None:
     return fetch_loxone_generic_value(io_name)
 
 
+def _default_house_profiles_doc() -> dict | None:
+    """Load house_profiles.json for plant ehal_bindings (e.g. sens_temperature_outside)."""
+    try:
+        from house_config.profiles_store import load_house_profiles_document
+        from runtime_store.persist_paths import resolve_house_profiles_json_path
+
+        path = resolve_house_profiles_json_path()
+        if not path or not os.path.isfile(path):
+            return None
+        return load_house_profiles_document(path)
+    except Exception as exc:
+        logger.warning("house_profiles für Plant-Bindings nicht geladen: %s", exc)
+        return None
+
+
 def fetch_thermal_readings(
     consumer: dict,
     *,
     house_doc: dict | None = None,
     config_doc: dict | None = None,
 ) -> dict:
-    """Read thermal temps / heating flag via ehal_bindings (legacy nest dual-read)."""
+    """Read thermal temps / heating flag via ehal_bindings; ambient from plant only."""
     from settings.ehal_marker_resolve import (
         marker_get_temperature_tolerance_c,
         marker_get_temperature_water_setpoint,
@@ -1307,6 +1323,8 @@ def fetch_thermal_readings(
 
     thermal = consumer.get("thermal_control") or {}
     missing: list[str] = []
+    if house_doc is None:
+        house_doc = _default_house_profiles_doc()
 
     actual_io = marker_sens_temperature_water(consumer)
     actual = _read_optional_temp_c(actual_io)
@@ -1319,7 +1337,7 @@ def fetch_thermal_readings(
         missing.append("get_temperature_water_setpoint")
 
     ambient_io = marker_sens_temperature_outside(
-        consumer, house_doc=house_doc, config_doc=config_doc
+        house_doc=house_doc, config_doc=config_doc
     )
     ambient = _read_optional_temp_c(ambient_io)
     if ambient is None:

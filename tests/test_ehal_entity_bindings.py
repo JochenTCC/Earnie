@@ -253,7 +253,7 @@ def test_migrate_consumer_legacy_thermal_to_ehal_bindings():
     bindings = migrate_consumer_legacy_to_ehal_bindings(consumer)
     assert bindings["sens_temperature_water"] == "Spa_Ist"
     assert bindings["get_temperature_water_setpoint"] == "Spa_Soll"
-    assert bindings["sens_temperature_outside"] == "Outside"
+    assert "sens_temperature_outside" not in bindings
     assert bindings["get_temperature_tolerance_c"] == "Spa_Tol"
     assert bindings["sens_heating_active"] == "Spa_Heat"
     assert bindings["flex.swimspa.sens_power_act"] == "Spa_P"
@@ -291,7 +291,36 @@ def test_ensure_migrated_strips_thermal_loxone_and_promotes_ambient():
     assert cons["thermal_control"]["setpoint_c"] == 35.0
     assert "loxone_outputs" not in cons
     assert cons["ehal_bindings"]["sens_temperature_water"] == "Ist"
+    assert "sens_temperature_outside" not in (cons.get("ehal_bindings") or {})
     assert out["plant"]["ehal_bindings"]["sens_temperature_outside"] == "Außen"
+
+
+def test_ensure_migrated_strips_consumer_ambient_when_plant_already_set():
+    house = {
+        "plant": {
+            "ehal_bindings": {"sens_temperature_outside": "PlantOutside"},
+        },
+        "profiles": [
+            {
+                "id": "p1",
+                "consumers": [
+                    {
+                        "id": "swimspa",
+                        "type": "thermal_rc",
+                        "ehal_bindings": {
+                            "sens_temperature_water": "Ist",
+                            "sens_temperature_outside": "LeftoverOutside",
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+    out, _cfg, changed = ensure_migrated(house, {})
+    assert changed
+    cons = out["profiles"][0]["consumers"][0]
+    assert "sens_temperature_outside" not in (cons.get("ehal_bindings") or {})
+    assert out["plant"]["ehal_bindings"]["sens_temperature_outside"] == "PlantOutside"
 
 
 def test_marker_get_filter_remaining_hours_prefers_ehal():

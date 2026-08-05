@@ -57,6 +57,9 @@ def test_fetch_hourly_pv_kw_series_parses_archive_payload(monkeypatch):
         assert url == archive.OPEN_METEO_ARCHIVE
         assert params["hourly"] == "global_tilted_irradiance"
         class Resp:
+            status_code = 200
+            url = archive.OPEN_METEO_ARCHIVE
+
             def raise_for_status(self):
                 return None
 
@@ -133,6 +136,7 @@ def test_build_open_meteo_climate_bundle_raises_on_api_error(monkeypatch):
         raise requests.ConnectionError("offline")
 
     monkeypatch.setattr(archive.requests, "get", _fake_get)
+    monkeypatch.setattr(archive.time, "sleep", lambda *_args, **_kwargs: None)
     with pytest.raises(requests.ConnectionError, match="offline"):
         archive.build_open_meteo_climate_bundle(
             date(2024, 7, 13),
@@ -143,6 +147,35 @@ def test_build_open_meteo_climate_bundle_raises_on_api_error(monkeypatch):
             surfaces=[archive.TiltedSurface(20.0, 0.0)],
             use_cache=False,
         )
+
+
+def test_fetch_hourly_archive_chunk_retries_502(monkeypatch):
+    calls = {"n": 0}
+
+    def _fake_get(url, params, timeout):
+        calls["n"] += 1
+        response = requests.Response()
+        response.status_code = 502 if calls["n"] < 3 else 200
+        response.url = url
+        response._content = (
+            b'{"hourly":{"time":["2024-07-13T00:00"],"temperature_2m":[21.0]}}'
+            if response.status_code == 200
+            else b"bad gateway"
+        )
+        return response
+
+    monkeypatch.setattr(archive.requests, "get", _fake_get)
+    monkeypatch.setattr(archive.time, "sleep", lambda *_args, **_kwargs: None)
+    payload = archive._fetch_hourly_archive_chunk(
+        lat=48.0,
+        lon=10.0,
+        timezone="Europe/Berlin",
+        start=date(2024, 7, 13),
+        end=date(2024, 7, 14),
+        hourly_vars=archive.HOURLY_TEMP_VAR,
+    )
+    assert calls["n"] == 3
+    assert list(payload[archive.HOURLY_TEMP_VAR]) == [21.0]
 
 
 def test_open_meteo_cache_roundtrip(monkeypatch, tmp_path):

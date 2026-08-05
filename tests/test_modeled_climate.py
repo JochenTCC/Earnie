@@ -123,3 +123,34 @@ def test_thermal_annual_kwh_from_archive(monkeypatch):
     assert year == 2024
     assert without > 0.0
     assert with_solar < without
+
+
+def test_strip_assets_reference_has_no_zero_kwp_pv_surface():
+    from house_config.entity_resolution import strip_assets_for_reference
+
+    profile = _profile()
+    profile["consumers"][0]["solar_thermal_area_m2"] = 6.0
+    profile["consumers"][0]["solar_thermal_tilt_deg"] = 18.0
+    profile["consumers"][0]["solar_thermal_azimuth_deg"] = 26.0
+    live = {
+        "pv_kwp": 10.0,
+        "pv_tilt": 18.0,
+        "pv_azimuth": -154.0,
+        "_house_profile": profile,
+        "_planning_pv_systems": [
+            {
+                "id": "roof",
+                "label": "roof",
+                "pv_kwp": 10.0,
+                "pv_tilt": 18.0,
+                "pv_azimuth": -154.0,
+            }
+        ],
+    }
+    ref = strip_assets_for_reference(live)
+    climate = ModeledClimateContext.from_scenario(ref)
+    assert climate.pv_systems == []
+    from data.modeled_climate import _surfaces_for_profile
+
+    surfaces = _surfaces_for_profile(profile, climate._pv_surfaces())
+    assert [(s.tilt_deg, s.azimuth_deg) for s in surfaces] == [(18.0, 26.0)]

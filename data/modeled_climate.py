@@ -135,7 +135,7 @@ def _planning_systems_from_scenario(scenario_params: dict) -> list[ModeledPvSyst
             else None
         ),
     )
-    if kwp <= 0.0 and "pv_tilt" not in scenario_params and "pv_azimuth" not in scenario_params:
+    if kwp <= 0.0:
         return []
     return [
         ModeledPvSystem(
@@ -216,9 +216,7 @@ class ModeledClimateContext:
         return pv_surface_from_profile(self.house_profile)
 
     def _pv_surfaces(self) -> list[TiltedSurface]:
-        if self.pv_systems:
-            return [system.surface for system in self.pv_systems]
-        return [self.pv_surface]
+        return [system.surface for system in self.pv_systems]
 
     @classmethod
     def for_house_profile(cls, profile: dict, *, kwp: float) -> ModeledClimateContext:

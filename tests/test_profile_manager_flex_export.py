@@ -22,7 +22,7 @@ def test_flex_profile_export_uses_cons_data_labels_and_legacy_csv_columns():
     )
     consumers = [
         {"id": "ev", "legacy_id": "eauto", "name": "Smart"},
-        {"id": "swimspa_filter", "name": "SwimSpa Filter", "optimizer_enabled": True},
+        {"id": "pool_filter", "name": "SwimSpa Filter", "optimizer_enabled": True},
     ]
 
     with patch(
@@ -57,7 +57,7 @@ def test_generate_consumption_profile_writes_legacy_flex_columns(tmp_path, monke
     )
     consumers = [
         {"id": "ev", "legacy_id": "eauto", "name": "Smart"},
-        {"id": "swimspa_filter", "name": "SwimSpa Filter", "optimizer_enabled": True},
+        {"id": "pool_filter", "name": "SwimSpa Filter", "optimizer_enabled": True},
     ]
 
     monkeypatch.setattr(

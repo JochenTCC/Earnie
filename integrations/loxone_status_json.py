@@ -44,9 +44,12 @@ def _consumer_is_ev(consumer: Mapping[str, Any]) -> bool:
 
 def _consumer_is_pool_filter(consumer: Mapping[str, Any]) -> bool:
     cid = str(consumer.get("id") or "").strip().lower()
-    if cid in ("swimspa_filter", "pool_filter"):
+    if cid == "pool_filter":
         return True
-    return str(consumer.get("daily_target_source") or "") == "loxone_remaining_hours"
+    if str(consumer.get("daily_target_source") or "") == "loxone_remaining_hours":
+        return True
+    fsched = consumer.get("filter_schedule")
+    return isinstance(fsched, dict) and bool(fsched.get("enabled"))
 
 
 def _marker_looks_like_pool_filter(marker: str) -> bool:
@@ -77,7 +80,7 @@ def _consumer_is_pool_heat(consumer: Mapping[str, Any]) -> bool:
 
 
 def _live_consumers() -> list[dict]:
-    """Profile + flex consumers; drop bridged swimspa_filter if greenfield pool_filter exists."""
+    """Profile + flex consumers for status payload."""
     from integrations.ehal_debug_mapping import _all_live_consumers
 
     return _all_live_consumers()

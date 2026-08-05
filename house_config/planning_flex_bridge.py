@@ -94,11 +94,24 @@ def monthly_residual_baseload_kw(
         for slot_dt in slot_datetimes
     ]
 
+POOL_FILTER_ID = "pool_filter"
+
+
+def is_milp_pool_filter(consumer: dict) -> bool:
+    """True for the house-profile Pool/SwimSpa filter row (MILP Sollstunden path)."""
+    return str(consumer.get("id") or "").strip() == POOL_FILTER_ID
+
+
 def _house_generic_consumers(house_profile: dict) -> list[dict]:
-    """Generic consumers with a schedule, or known+CSV (schedule optional)."""
+    """Generic consumers with a schedule, or known+CSV (schedule optional).
+
+    ``pool_filter`` is excluded — it is MILP-only via ``planning_pool_filter_to_milp``.
+    """
     out: list[dict] = []
     for consumer in house_profile.get("consumers", []):
         if consumer.get("type") != "generic":
+            continue
+        if is_milp_pool_filter(consumer):
             continue
         if consumer.get("schedule"):
             out.append(consumer)
@@ -114,6 +127,7 @@ def split_planning_generic_consumers(
 
     ``known`` feeds the fixed baseload overlay. ``flex`` and ``manual`` are
     MILP-flex (manual timing optimized in SE; Live uses user day-plans only).
+    ``pool_filter`` is excluded here — it uses ``planning_pool_filter_to_milp``.
     """
     fixed: list[dict] = []
     flex: list[dict] = []
@@ -304,36 +318,67 @@ def planning_thermal_rc_to_milp(consumer: dict) -> dict:
     return entry
 
 
-SWIMSPA_FILTER_BRIDGE_DEFAULTS: dict = {
-    "id": "swimspa_filter",
-    "legacy_id": "swimspa_filter",
-    "name": "SwimSpa Filter",
-    "nominal_power_kw": 0.18,
-    "daily_target_kwh": 0.36,
-    "daily_target_source": "loxone_remaining_hours",
-    "signal_type": "binary",
-    "min_on_quarterhours": 2,
-    "optimizer_enabled": True,
-    "path_historical_log": "",
-    "ehal_bindings": {},
-    "filter_schedule": {
+def _pool_filter_schedule(consumer: dict) -> dict:
+    """Build ``filter_schedule`` from profile row or weekly schedule fallback."""
+    stored = consumer.get("filter_schedule")
+    if isinstance(stored, dict) and stored:
+        schedule = dict(stored)
+        fallback = dict(schedule.get("config_fallback") or {})
+        sched = consumer.get("schedule") if isinstance(consumer.get("schedule"), dict) else {}
+        if "native_start_hour" not in fallback and sched.get("start_hour") is not None:
+            fallback["native_start_hour"] = int(sched["start_hour"]) % 24
+        if "native_duration_hours" not in fallback and sched.get("duration_h") is not None:
+            fallback["native_duration_hours"] = float(sched["duration_h"])
+        if fallback:
+            schedule["config_fallback"] = fallback
+        schedule.setdefault("enabled", True)
+        return schedule
+    sched = consumer.get("schedule") if isinstance(consumer.get("schedule"), dict) else {}
+    start = int(sched.get("start_hour", 10) or 10) % 24
+    duration = float(sched.get("duration_h", 4.0) or 4.0)
+    return {
         "enabled": True,
         "config_fallback": {
-            "native_start_hour": 10,
-            "native_duration_hours": 4.0,
+            "native_start_hour": start,
+            "native_duration_hours": duration,
         },
-    },
-}
+    }
 
 
-def planning_filter_to_milp(bindings: dict | None = None) -> dict:
-    """Bridge-only SwimSpa-Filter (kein Hausprofil-Row)."""
+def _pool_filter_daily_target_kwh(consumer: dict, nominal: float) -> float:
+    raw = consumer.get("daily_target_kwh")
+    if raw is not None:
+        try:
+            return round(float(raw), 3)
+        except (TypeError, ValueError):
+            pass
+    sched = consumer.get("schedule") if isinstance(consumer.get("schedule"), dict) else {}
+    duration = float(sched.get("duration_h", 0.0) or 0.0)
+    if duration > 0 and nominal > 0:
+        return round(nominal * duration, 3)
+    return round(nominal * 2.0, 3) if nominal > 0 else 0.0
+
+
+def planning_pool_filter_to_milp(consumer: dict) -> dict:
+    """House-profile ``pool_filter`` → MILP flex (Sollstunden / native window)."""
     from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
 
-    entry = dict(SWIMSPA_FILTER_BRIDGE_DEFAULTS)
-    entry["ehal_bindings"] = dict(SWIMSPA_FILTER_BRIDGE_DEFAULTS.get("ehal_bindings") or {})
-    if bindings:
-        entry = _deep_merge_dict(entry, bindings)
+    nominal = float(consumer.get("nominal_power_kw", 0.18) or 0.18)
+    min_on = max(1, int(consumer.get("min_on_quarterhours", 2) or 2))
+    entry = {
+        "id": POOL_FILTER_ID,
+        "name": str(consumer.get("label") or consumer.get("name") or "Pool Filter"),
+        "nominal_power_kw": nominal,
+        "daily_target_kwh": _pool_filter_daily_target_kwh(consumer, nominal),
+        "daily_target_source": "loxone_remaining_hours",
+        "signal_type": str(consumer.get("signal_type") or "binary"),
+        "min_on_quarterhours": min_on,
+        "optimizer_enabled": bool(consumer.get("optimizer_enabled", True)),
+        "path_historical_log": str(consumer.get("path_historical_log") or ""),
+        "ehal_bindings": {},
+        "filter_schedule": _pool_filter_schedule(consumer),
+    }
+    _attach_ehal_bindings(entry, consumer)
     hours = marker_get_filter_remaining_hours(entry)
     ehal = dict(entry.get("ehal_bindings") or {})
     if hours and not str(ehal.get("get_filter_remaining_hours") or "").strip():
@@ -342,69 +387,11 @@ def planning_filter_to_milp(bindings: dict | None = None) -> dict:
     return entry
 
 
-def _swimspa_filter_bindings_from_profile(house_profile: dict) -> dict | None:
-    """Optional marker overrides from first MILP thermal_rc consumer."""
-    for consumer in _house_thermal_rc_consumers(house_profile):
-        if consumer_uses_profile_csv(consumer):
-            continue
-        bindings = consumer.get("swimspa_filter_bindings")
-        if isinstance(bindings, dict) and bindings:
-            return bindings
-        # Lift get_filter_remaining_hours if mapped on the heat entity by mistake.
-        ehal = consumer.get("ehal_bindings")
-        if isinstance(ehal, dict):
-            hours = str(ehal.get("get_filter_remaining_hours") or "").strip()
-            if hours:
-                return {"ehal_bindings": {"get_filter_remaining_hours": hours}}
-    return None
-
-
-_POOL_FILTER_PASSTHROUGH: tuple[str, ...] = (
-    "get_filter_remaining_hours",
-    "sens_filter_active",
-    "get_filter_native_start_hour",
-    "get_filter_native_duration_hours",
-)
-
-
-def _pool_filter_bindings_overlay(house_profile: dict) -> dict | None:
-    """Map greenfield ``pool_filter`` EHAL bindings onto the MILP ``swimspa_filter`` bridge."""
-    from ehal.flex_fields import KIND_SENS_POWER_ACT, KIND_SET_ENABLE, flex_field
-
+def _house_pool_filter_consumer(house_profile: dict) -> dict | None:
     for consumer in house_profile.get("consumers") or []:
-        if not isinstance(consumer, dict):
-            continue
-        if str(consumer.get("id") or "").strip() != "pool_filter":
-            continue
-        raw = consumer.get("ehal_bindings")
-        if not isinstance(raw, dict):
-            return None
-        out: dict[str, str] = {}
-        for key in _POOL_FILTER_PASSTHROUGH:
-            value = str(raw.get(key) or "").strip()
-            if value:
-                out[key] = value
-        power = str(
-            raw.get(flex_field("pool_filter", KIND_SENS_POWER_ACT)) or ""
-        ).strip()
-        if power:
-            out[flex_field("swimspa_filter", KIND_SENS_POWER_ACT)] = power
-        enable = str(raw.get(flex_field("pool_filter", KIND_SET_ENABLE)) or "").strip()
-        if enable:
-            out[flex_field("swimspa_filter", KIND_SET_ENABLE)] = enable
-        if not out:
-            return None
-        return {"ehal_bindings": out}
+        if isinstance(consumer, dict) and is_milp_pool_filter(consumer):
+            return consumer
     return None
-
-
-def _filter_bindings_for_milp(house_profile: dict) -> dict | None:
-    """Merge thermal_rc nest + greenfield pool_filter bindings into bridge bindings."""
-    base = _swimspa_filter_bindings_from_profile(house_profile)
-    overlay = _pool_filter_bindings_overlay(house_profile)
-    if base and overlay:
-        return _deep_merge_dict(base, overlay)
-    return overlay or base
 
 
 def planning_thermal_rc_consumers(house_profile: dict) -> list[dict]:
@@ -429,10 +416,11 @@ def _ensure_shared_meter_filter_subtract(heat: dict, filter_id: str) -> None:
 
 
 def collect_planning_flex_consumers(house_profile: dict) -> list[dict]:
-    """Generic MILP-flex + EV + thermal_annual + thermal_rc (+ Filter bei thermal_rc).
+    """Generic MILP-flex + EV + thermal_annual + thermal_rc + optional pool_filter.
 
     thermal_rc with use_profile_csv is not MILP-flex: CSV load goes into the
     baseload overlay instead (historical replay, no double-counting).
+    Filter is included only when an explicit ``pool_filter`` consumer exists.
     """
     _fixed, flex_generic = split_planning_generic_consumers(house_profile)
     thermal_rc_rows = _house_thermal_rc_consumers(house_profile)
@@ -441,17 +429,11 @@ def collect_planning_flex_consumers(house_profile: dict) -> list[dict]:
         for consumer in thermal_rc_rows
         if not consumer_uses_profile_csv(consumer)
     ]
-    # Filter only with MILP thermal_rc. CSV thermal_rc meters (e.g. SwimSpa)
-    # already include filter power in the overlay series.
-    filters = (
-        [planning_filter_to_milp(_filter_bindings_for_milp(house_profile))]
-        if thermal_rc_flex
-        else []
-    )
-    if filters:
-        filter_id = str(filters[0].get("id") or SWIMSPA_FILTER_BRIDGE_DEFAULTS["id"])
+    pool = _house_pool_filter_consumer(house_profile)
+    filters = [planning_pool_filter_to_milp(pool)] if pool is not None else []
+    if filters and thermal_rc_flex:
         for heat in thermal_rc_flex:
-            _ensure_shared_meter_filter_subtract(heat, filter_id)
+            _ensure_shared_meter_filter_subtract(heat, POOL_FILTER_ID)
     return (
         flex_generic
         + planning_ev_consumers(house_profile)
@@ -999,7 +981,7 @@ def _used_chart_color_indices(consumers: list[dict]) -> set[int]:
 # Used when config.json has no flexible_consumers row to overlay from.
 _DEFAULT_CHART_COLOR_INDEX_BY_ID: dict[str, int] = {
     "swimspa": 0,
-    "swimspa_filter": 1,
+    "pool_filter": 1,
     "eauto": 2,
     "ev": 2,
     "waermepumpe": 7,

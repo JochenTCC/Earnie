@@ -193,17 +193,17 @@ class TestSwimspaFilterRules:
     @pytest.fixture
     def with_filter_consumer(self, monkeypatch):
         """swimspa_filter mit Nennleistung 0,18 kW für den Facts-Lookup bereitstellen."""
-        consumer = {"id": "swimspa_filter", "name": "SwimSpa Filter", "nominal_power_kw": 0.18}
+        consumer = {"id": "pool_filter", "name": "SwimSpa Filter", "nominal_power_kw": 0.18}
 
         def _fake_consumer_config(consumer_id: str):
-            return consumer if consumer_id == "swimspa_filter" else None
+            return consumer if consumer_id == "pool_filter" else None
 
         monkeypatch.setattr(facts_mod, "_consumer_config", _fake_consumer_config)
 
     def test_s8_should_run_but_missing(self, rules_doc):
         entry = _entry(
-            consumer_powers_kw={"swimspa_filter": 0.18},
-            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.0}, "battery_kw": 0.0},
+            consumer_powers_kw={"pool_filter": 0.18},
+            consumption_snapshot={"flex_kw": {"pool_filter": 0.0}, "battery_kw": 0.0},
         )
         events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
         assert len(events) == 1
@@ -212,10 +212,10 @@ class TestSwimspaFilterRules:
 
     def test_s9_runs_unexpectedly_outside_native_window(self, rules_doc):
         entry = _entry(
-            consumer_powers_kw={"swimspa_filter": 0.0},
-            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.18}, "battery_kw": 0.0},
+            consumer_powers_kw={"pool_filter": 0.0},
+            consumption_snapshot={"flex_kw": {"pool_filter": 0.18}, "battery_kw": 0.0},
             filter_contexts={
-                "swimspa_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
+                "pool_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
             },
         )
         events = evaluate_entry_deviations(
@@ -227,10 +227,10 @@ class TestSwimspaFilterRules:
 
     def test_s9b_native_run_inside_window_no_event(self, rules_doc):
         entry = _entry(
-            consumer_powers_kw={"swimspa_filter": 0.0},
-            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.18}, "battery_kw": 0.0},
+            consumer_powers_kw={"pool_filter": 0.0},
+            consumption_snapshot={"flex_kw": {"pool_filter": 0.18}, "battery_kw": 0.0},
             filter_contexts={
-                "swimspa_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
+                "pool_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
             },
         )
         events = evaluate_entry_deviations(
@@ -240,8 +240,8 @@ class TestSwimspaFilterRules:
 
     def test_s9c_no_window_info_is_conservative(self, rules_doc):
         entry = _entry(
-            consumer_powers_kw={"swimspa_filter": 0.0},
-            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.18}, "battery_kw": 0.0},
+            consumer_powers_kw={"pool_filter": 0.0},
+            consumption_snapshot={"flex_kw": {"pool_filter": 0.18}, "battery_kw": 0.0},
         )
         events = evaluate_entry_deviations(
             entry, rules_doc=rules_doc, slot_start=datetime(2026, 7, 7, 15, 0)
@@ -250,10 +250,10 @@ class TestSwimspaFilterRules:
 
     def test_s10_over_nominal_warning(self, rules_doc, with_filter_consumer):
         entry = _entry(
-            consumer_powers_kw={"swimspa_filter": 0.18},
-            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.40}, "battery_kw": 0.0},
+            consumer_powers_kw={"pool_filter": 0.18},
+            consumption_snapshot={"flex_kw": {"pool_filter": 0.40}, "battery_kw": 0.0},
             filter_contexts={
-                "swimspa_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
+                "pool_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
             },
         )
         events = evaluate_entry_deviations(
@@ -267,10 +267,10 @@ class TestSwimspaFilterRules:
     def test_over_nominal_without_config_does_not_fire(self, rules_doc):
         """Ohne bekannte Nennleistung (Consumer nicht in Config) keine Warnung."""
         entry = _entry(
-            consumer_powers_kw={"swimspa_filter": 0.18},
-            consumption_snapshot={"flex_kw": {"swimspa_filter": 0.40}, "battery_kw": 0.0},
+            consumer_powers_kw={"pool_filter": 0.18},
+            consumption_snapshot={"flex_kw": {"pool_filter": 0.40}, "battery_kw": 0.0},
             filter_contexts={
-                "swimspa_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
+                "pool_filter": {"native_start_hour": 10, "native_duration_hours": 4.0}
             },
         )
         events = evaluate_entry_deviations(

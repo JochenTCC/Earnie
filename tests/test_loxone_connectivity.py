@@ -102,6 +102,8 @@ class TestCollectReadChecks:
             lc.config, "get_flexible_consumers", return_value=[]
         ), patch.object(
             lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ), patch.object(
+            lc.loxone_client, "_default_house_profiles_doc", return_value=None
         ):
             checks = lc.collect_read_checks()
 
@@ -114,6 +116,38 @@ class TestCollectReadChecks:
         ]
         assert "PV-Zähler" not in labels
         assert all(not lbl.startswith("set_") for lbl in labels)
+
+    def test_collects_plant_ambient_from_house_profiles(self):
+        house = {
+            "plant": {
+                "ehal_bindings": {"sens_temperature_outside": "Earnie_Aussentemperatur"},
+            }
+        }
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=[]
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ), patch.object(
+            lc.loxone_client, "_default_house_profiles_doc", return_value=house
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["sens_temperature_outside"] == "Earnie_Aussentemperatur"
+
+    def test_ignores_consumer_ambient_for_live_reads(self):
+        house = {"plant": {"ehal_bindings": {}}}
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=[]
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ), patch.object(
+            lc.loxone_client, "_default_house_profiles_doc", return_value=house
+        ):
+            checks = lc.collect_read_checks()
+
+        labels = [label for label, _, _ in checks]
+        assert "sens_temperature_outside" not in labels
 
     def test_collects_ev_sens_get_ios(self):
         consumers = [

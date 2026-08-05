@@ -19,6 +19,7 @@ PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_ess_soc",
     "sens_ess_power",
     "sens_power_consumers",
+    "sens_temperature_outside",
 )
 
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (
@@ -92,33 +93,16 @@ def _consumer_is_ev(consumer: dict) -> bool:
 
 def _consumer_is_filter(consumer: dict) -> bool:
     cid = str(consumer.get("id") or "").strip().lower()
-    if cid in ("swimspa_filter", "pool_filter"):
+    if cid == "pool_filter":
         return True
-    return consumer.get("daily_target_source") == "loxone_remaining_hours"
-
-
-def _has_greenfield_pool_filter(by_id: dict[str, dict]) -> bool:
-    """True when house profile already has greenfield ``pool_filter`` (not bridge-only)."""
-    if "pool_filter" in by_id:
+    if consumer.get("daily_target_source") == "loxone_remaining_hours":
         return True
-    for cid, consumer in by_id.items():
-        if str(cid).strip().lower() == "swimspa_filter":
-            continue
-        if not isinstance(consumer, dict):
-            continue
-        from settings.ehal_marker_resolve import marker_flex_enable
-
-        if str(marker_flex_enable(consumer) or "").strip() == "Earnie_Pool_Filter_Freigabe":
-            return True
-    return False
+    fsched = consumer.get("filter_schedule")
+    return isinstance(fsched, dict) and bool(fsched.get("enabled"))
 
 
 def _all_live_consumers() -> list[dict]:
-    """House-profile + flex consumers (including unmapped).
-
-    When greenfield ``pool_filter`` exists, omit bridged ``swimspa_filter`` so Live
-    tables do not show two Filter-Freigabe rows.
-    """
+    """House-profile + flex consumers (including unmapped)."""
     import config
 
     by_id: dict[str, dict] = {}
@@ -137,8 +121,6 @@ def _all_live_consumers() -> list[dict]:
         cid = str(consumer.get("id") or "").strip()
         if cid and cid not in by_id:
             by_id[cid] = consumer
-    if _has_greenfield_pool_filter(by_id):
-        by_id.pop("swimspa_filter", None)
     return list(by_id.values())
 
 
@@ -285,16 +267,6 @@ def build_loxone_setpoint_io_index(*, include_write_aliases: bool = True) -> dic
     if not include_write_aliases:
         return index
 
-    # Resolve legacy bridge writes onto the greenfield pool_filter Live row.
-    if any(str(c.get("id") or "") == "pool_filter" for c in _all_live_consumers()):
-        pool_field = f"pool_filter:{flex_set_enable('pool_filter')}"
-        for consumer in config.get_flexible_consumers():
-            if str(consumer.get("id") or "") != "swimspa_filter":
-                continue
-            legacy = str(marker_flex_enable(consumer) or "").strip()
-            if legacy and legacy not in index:
-                index[legacy] = pool_field
-            break
     return index
 
 

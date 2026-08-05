@@ -273,19 +273,37 @@ def render_entity_multiselect(
     )
 
 
-def new_scenario_template(live_id: str, scenarios: list[dict]) -> dict:
-    """Defaults for a new scenario — clone live settings when available."""
+def new_scenario_template(
+    scenarios: list[dict],
+    *,
+    source_id: str = "",
+    live_id: str = "",
+) -> dict:
+    """Defaults for a new scenario — clone last selected (else Live) settings."""
+    import copy
+
     from house_config.label_uniqueness import allocate_unique_label
 
-    label = allocate_unique_label("Mein Szenario", scenarios)
-    live = next((item for item in scenarios if item.get("id") == live_id), None)
-    if live:
-        return {
-            "label": label,
-            "enabled": True,
-            "settings": dict(live.get("settings", {})),
-        }
-    return {"label": label, "enabled": True, "settings": {}}
+    by_id = {
+        str(item.get("id", "")).strip(): item
+        for item in scenarios
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    }
+    source = by_id.get(str(source_id or "").strip()) or by_id.get(str(live_id or "").strip())
+    if source is None:
+        label = allocate_unique_label("Mein Szenario", scenarios)
+        return {"label": label, "enabled": True, "settings": {}}
+
+    source_label = str(source.get("label") or source.get("id") or "Szenario").strip()
+    label = allocate_unique_label(f"{source_label} copy", scenarios)
+    out: dict = {
+        "label": label,
+        "enabled": source.get("enabled", True) is not False,
+        "settings": copy.deepcopy(dict(source.get("settings") or {})),
+    }
+    if "own_reference" in source:
+        out["own_reference"] = bool(source.get("own_reference"))
+    return out
 
 
 def resolve_scenario_id(

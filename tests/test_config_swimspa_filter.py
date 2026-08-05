@@ -6,7 +6,7 @@ import config
 
 def test_normalize_swimspa_filter_consumer():
     raw = {
-        "id": "swimspa_filter",
+        "id": "pool_filter",
         "name": "SwimSpa Filter",
         "chart_color_index": 1,
         "nominal_power_kw": 0.18,
