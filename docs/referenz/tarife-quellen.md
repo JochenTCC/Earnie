@@ -15,7 +15,10 @@ Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration/Typen) �
 | **Netzentgelt-Grundpreis** (`grid_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Messstellengebühr** (`metering_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Sonstige Fixkosten** (`other_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
+| **Netznutzungsentgelte** (Arbeits-/Leistungspreis, netzgebietsspezifisch) | **nein** | **nein** |
 | PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/Konzessionsabgabe | nein | nein |
+
+**Hinweis:** **Netznutzungsentgelte** fließen derzeit **nicht** in die Kostenrechnung ein (weder Live/MILP noch Szenario-Explorer). Optionale Katalogfelder wie `grid_monthly_fee_eur` oder `netzentgelt_cent_kwh` sind unvollständige Näherungs-Stubs — keine Abbildung echter, netzgebietsspezifischer Netznutzungsentgelte.
 
 Earnie liefert **gute-genug-€** für Vergleiche und Demos — **keine** Abrechnung gegen echte Stromrechnungen. Katalogwerte können unvollständig oder veraltet sein; bitte die Parameter im Szenarienkonfigurator prüfen.
 
@@ -98,9 +101,10 @@ Regel: Wert aus dem **Bezugstarif**; fehlt er dort, aus dem Einspeisetarif — *
 - Pro **Kalendermonat** im SE-Zeitraum: **eine volle** Gebühr — keine anteilige Kürzung.
 - Jahres-/Gesamtwert: Summe aller Fixkosten über alle Monate + volumetrische Energiekosten (Bezug minus Einspeiseerlös).
 - **Nicht** in Live-MILP, **nicht** in den stündlichen `sim_cost`-Kurven.
-- Optional volumetrisch: `netzentgelt_cent_kwh` fließt in den Bezugs-Arbeitspreis (wenn gesetzt).
+- Optional volumetrisch: `netzentgelt_cent_kwh` fließt in den Bezugs-Arbeitspreis (wenn gesetzt) — **kein** Ersatz für echte Netznutzungsentgelte.
+- **Netznutzungsentgelte** (Arbeits-/Leistungspreis, netzgebietsspezifisch) werden derzeit **nicht** modelliert.
 
-In der UI: Szenario-Explorer → Gesamtkosten und Monatliche Stromkosten (Hinweis „Näherung Monatsgebühren“, wenn Gebühren vorhanden). Fake-Jahresrechnung: siehe §1.
+In der UI: Szenario-Explorer → Gesamtkosten und Monatliche Stromkosten (Hinweis „Näherung Monatsgebühren“, wenn Gebühren vorhanden; Hinweis zu Netznutzungsentgelten). Fake-Jahresrechnung: siehe §1.
 
 ## 5. Katalogparameter prüfen
 
@@ -111,7 +115,7 @@ Prüfen Sie insbesondere:
 - Stimmen Aufschlag und USt-Flag mit dem Tarifblatt des Anbieters überein?
 - Ist ein Lieferant-Grundpreis hinterlegt, den Sie erwarten — oder fehlt er (dann 0 in der SE-Rechnung)?
 - Bei gleichem Anbieter (z. B. aWATTar Bezug + SUNNY): erscheint die Lieferant-Gebühr nur **einmal**?
-- Netz-/Messstellenwerte sind oft netzgebietsspezifisch — ohne Katalogeintrag bleiben sie 0.
+- Netz-/Messstellenwerte sind oft netzgebietsspezifisch — ohne Katalogeintrag bleiben sie 0; **Netznutzungsentgelte** insgesamt fließen derzeit **nicht** in die Rechnung ein.
 - Es gibt **keine Garantie** für Vollständigkeit oder Aktualität des Katalogs.
 
 Nachrechnen der Formeln: diese Seite. Technisches Mapping: [preise.md](../konfiguration/preise.md).

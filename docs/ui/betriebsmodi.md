@@ -126,6 +126,8 @@ Geplant (Dev-only): Nachrechnung eines beliebigen Kalendertags — ersetzt den f
 
 Tabelle **Gesamtkosten und -Verbrauch**: Spalten `Szenario`, `Jahres Verbrauch [kWh]`, `Jahres Kosten [€]`, `Δ vs Referenz [€]`, `Hinweis` (Delta immer gegen die Live-Referenz-Zeile).
 
+**Netznutzungsentgelte** werden derzeit **nicht** in den SE-Kosten berücksichtigt (gute-genug-€ ohne netzgebietsspezifischen Netz-Arbeits-/Leistungspreis). Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md).
+
 **Datenquellen für `Jahres Verbrauch [kWh]`** (UI: `build_annual_cost_rows` / `_jahres_kwh_for_row`):
 
 | Zeile | kWh-Quelle |

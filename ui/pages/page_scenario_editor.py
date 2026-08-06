@@ -796,6 +796,7 @@ def _render_scenarios_tab() -> None:
             "für Vollständigkeit oder Aktualität des Katalogs. Monatliche Fixkosten "
             "(Grundgebühr o. Ä.) fließen als **Näherung** in die Gesamtkosten und "
             "Monatswerte des Szenario-Explorers ein — nicht in die Live-MILP-Kosten. "
+            "**Netznutzungsentgelte** werden derzeit **nicht** berücksichtigt. "
             f"Nachrechnen: "
             f"{markdown_doc_link(DocLink('Tarife und Preise nachrechnen', 'docs/referenz/tarife-quellen.md'))}."
         )

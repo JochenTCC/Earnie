@@ -310,6 +310,8 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
     assert "Fake-Jahresrechnung — Live" in text
     assert "aWATTar HOURLY" in text
     assert "SUNNY SPOT" in text
+    assert "Netznutzungsentgelte" in text
+    assert "werden derzeit **nicht** berücksichtigt" in text
     # 12*1.0 import - 12*0.5 export + 5.5 fees = 11.50
     assert "11.50 €" in text
     body = render_scenario_invoice_markdown(

@@ -211,6 +211,8 @@ def _hinweise_lines() -> list[str]:
         "## Hinweise",
         "",
         "- Näherung für Plausibilität im Szenario-Explorer — **keine** echte Stromrechnung.",
+        "- **Netznutzungsentgelte** werden derzeit **nicht** berücksichtigt "
+        "(weder volumetrischer Arbeitspreis noch netzgebietsspezifischer Leistungspreis).",
         "- Verbrauch (Info) = Jahres Verbrauch aus der SE-Tabelle Gesamtkosten "
         "(nicht Summe der Stunden-CSV; bei Sunrise können die Werte abweichen).",
         "- Verbrauch geht **nicht** in die Rechnungssumme ein.",
@@ -220,9 +222,10 @@ def _hinweise_lines() -> list[str]:
         "(nur Stunden mit Bezug bzw. Einspeisung wirken über die Summen).",
         "- Fixkosten: Lieferant-Grundpreis je `supplier_id` einmal; "
         "Netzentgelt-/Messstellen-/Sonstige Fixkosten einmal je Hausanschluss "
-        "(aus Bezugstarif, sonst Einspeisetarif).",
-        "- Nicht modelliert: PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/"
-        "Konzessionsabgabe/Elektrizitätsabgabe (oft im Arbeitspreis).",
+        "(aus Bezugstarif, sonst Einspeisetarif) — Katalog-Stubs, keine echten "
+        "Netznutzungsentgelte.",
+        "- Nicht modelliert: Netznutzungsentgelte, PLZ-/netzgebietsspezifische Stacks, "
+        "separate Stromsteuer/Konzessionsabgabe/Elektrizitätsabgabe (oft im Arbeitspreis).",
         "",
     ]
 

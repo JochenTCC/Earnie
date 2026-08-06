@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Docs Netznutzungsentgelte disclaimer (2026-08-06)
+
+- [x] Document that **Netznutzungsentgelte** are currently **not** included in Live/SE costs: German docs (`tarife-quellen`, `preise`, handbook, `betriebsmodi`), SE UI captions, Szenarienkonfigurator info, Fake-Jahresrechnung Hinweise; invoice test updated. Feature work to model them remains open in `Backlog.md`.
+
+
 ### Bugfix history chart Strompreis EPEX vs retail k_act (2026-08-06)
 
 - [x] `debug_dump_20260806_181907`: History logged `price_buy` (EPEX) as `market_price_cent` while live/plan used retail `k_act` → fake ~0.6 ct import/export gap then jump at boundary. Fix: log `k_act` (+ `epex_price_cent`); `_import_price_cent_from_entry` converts legacy EPEX rows for chart/cost analysis.

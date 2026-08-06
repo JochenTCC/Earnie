@@ -621,7 +621,8 @@ def render_annual_cost_table(meta: dict) -> None:
         "Hausprofil-Modell bzw. der gelieferten Optimierungsenergie — "
         "Abweichungen zu Historisch sind erwartbar, wenn Ist ≠ Modell."
         + fee_note
-        + "Abweichung >5% vs. Live-Referenz → Warnung in Spalte Hinweis "
+        + "**Netznutzungsentgelte** werden derzeit **nicht** berücksichtigt. "
+        "Abweichung >5% vs. Live-Referenz → Warnung in Spalte Hinweis "
         "(Config-Dump über Info / About → Kontakt). "
         f"Details: {_annual_cost_details_markdown()}."
     )
@@ -693,7 +694,13 @@ def render_backtesting_monthly_chart(meta: dict) -> None:
     if any(float(v or 0) > 0 for v in fee_map.values()):
         st.caption(
             "Monatswerte inkl. Näherung Fixkosten (eine volle Gebühr pro "
-            "Kalendermonat). Nachrechnen: Tarife und Preise nachrechnen."
+            "Kalendermonat). **Netznutzungsentgelte** werden derzeit **nicht** "
+            "berücksichtigt. Nachrechnen: Tarife und Preise nachrechnen."
+        )
+    else:
+        st.caption(
+            "**Netznutzungsentgelte** werden derzeit **nicht** berücksichtigt. "
+            "Nachrechnen: Tarife und Preise nachrechnen."
         )
 
 
