@@ -2,6 +2,7 @@
 !tests/fixtures/backtesting/cons_data_hourly.csv
 !tests/fixtures/historical/cons_data_hourly.csv
 !tests/fixtures/thermal/*.csv
+!docs/referenz/Netznutzungsentgelte-Austria-2026.csv
 config.py
 config.json
 !tests/fixtures/backtesting/config.json
