@@ -362,23 +362,26 @@ def derive_and_write_balance_total(
     invert_battery: bool = False,
     invert_grid: bool = False,
 ) -> dict[str, object]:
-    """Load three canonical/raw series, derive total, write ``total_dest``."""
+    """Load PV + Netz (+ optional Batterie), derive total, write ``total_dest``."""
     pv_rows = load_and_normalize_profile_csv(pv_path, min_hours=min_hours)
-    batt_series = detect_and_load_raw_series(battery_path)
     grid_series = detect_and_load_raw_series(grid_path)
-    batt_rows = normalize_hourly_power_kw(
-        batt_series,
-        min_hours=min_hours,
-        source=battery_path,
-        preserve_sign=True,
-    )
     grid_rows = normalize_hourly_power_kw(
         grid_series,
         min_hours=min_hours,
         source=grid_path,
         preserve_sign=True,
     )
-    write_canonical_hourly_csv(battery_path, batt_rows)
+    batt_rows: list[tuple[str, float]] = []
+    batt = str(battery_path or "").strip()
+    if batt:
+        batt_series = detect_and_load_raw_series(batt)
+        batt_rows = normalize_hourly_power_kw(
+            batt_series,
+            min_hours=min_hours,
+            source=batt,
+            preserve_sign=True,
+        )
+        write_canonical_hourly_csv(batt, batt_rows)
     write_canonical_hourly_csv(grid_path, grid_rows)
     write_canonical_hourly_csv(pv_path, pv_rows)
     total_rows, clipped = derive_total_from_balance(
@@ -464,7 +467,7 @@ def _rows_to_lookup(rows: list[tuple[str, float]]) -> dict[str, float]:
 
 def derive_total_from_balance(
     pv_rows: list[tuple[str, float]],
-    battery_rows: list[tuple[str, float]],
+    battery_rows: list[tuple[str, float]] | None,
     grid_rows: list[tuple[str, float]],
     *,
     invert_pv: bool = False,
@@ -473,16 +476,21 @@ def derive_total_from_balance(
 ) -> tuple[list[tuple[str, float]], int]:
     """Derive house load: P_Ges = P_PV + P_Batt + P_Grid (+ = into system).
 
-    Returns (rows, clipped_negative_hours). Intersection of timestamps only.
+    Battery may be empty/None (treated as 0 kW). Returns (rows, clipped_negative_hours).
+    Intersection: PV ∩ Grid, and ∩ Battery when battery rows are present.
     """
     pv = _rows_to_lookup(pv_rows)
-    batt = _rows_to_lookup(battery_rows)
     grid = _rows_to_lookup(grid_rows)
-    common = sorted(set(pv) & set(batt) & set(grid))
+    batt = _rows_to_lookup(battery_rows or [])
+    if batt:
+        common = sorted(set(pv) & set(batt) & set(grid))
+        missing_msg = "PV-, Batterie- und Netz-Serie"
+    else:
+        common = sorted(set(pv) & set(grid))
+        missing_msg = "PV- und Netz-Serie"
     if not common:
         raise ValueError(
-            "Bilanz-Import: keine gemeinsamen Zeitstempel zwischen "
-            "PV-, Batterie- und Netz-Serie."
+            f"Bilanz-Import: keine gemeinsamen Zeitstempel zwischen {missing_msg}."
         )
     sign_pv = -1.0 if invert_pv else 1.0
     sign_batt = -1.0 if invert_battery else 1.0
@@ -492,7 +500,7 @@ def derive_total_from_balance(
     for ts in common:
         total = (
             sign_pv * float(pv[ts])
-            + sign_batt * float(batt[ts])
+            + sign_batt * float(batt.get(ts, 0.0))
             + sign_grid * float(grid[ts])
         )
         if total < 0.0:

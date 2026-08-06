@@ -4,7 +4,7 @@ Earnie kommuniziert mit dem Loxone Miniserver über **HTTP** (Lesen und Schreibe
 
 Andere Hubs (HA+evcc, OpenEMS): [Adapter wählen](adapter-wahl.md).
 
-**Greenfield / Library:** Virtual-In/Out-Vorlagen einspielen, Zähler am EFM, Earnie-tot-Fallback und Import: [Earnie-Loxone-Library](loxone-earnie-library.md).
+**Default / Library:** Virtual-In/Out-Vorlagen einspielen, Zähler am EFM, Earnie-tot-Fallback und Import: [Loxone-Signale und Earnie-Library](../referenz/loxone-signale.md).
 
 ## Zugangsdaten (`config/.env`)
 

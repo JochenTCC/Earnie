@@ -56,6 +56,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - [x] Update and review official docs for needed updates our outdated infos
     - Update screenshots where it is useful
     - Consolidate number of documents (merge docs with content that relies on each other or is similar)
+  - [x] Review documents manually - see list in backlog\Doc-Review-Checklist.md
   - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check; hardware-registry first approach (`2.4.q`) done
   - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
   - “All three southbounds” release: OpenEMS ↔ HA+evcc ↔ Loxone via config switch
@@ -63,7 +64,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 
 
-### Version 2.5 — Investigate full migration to 15‑min slots (former B)
+### Version 2.5 — Investigate full migration to 15‑min slots
 
 **Context:** Day-Ahead clearing is 15‑min MTU since ~2025-10-01. Earnie already fetches Energy-Charts (free, CC BY 4.0; native 15‑min after go-live) but `normalize_price_slot` floors to the hour — MILP still assumes `dt ≡ 1 h`. Official EPEX SFTP/MATS stays out of scope (paid; external use = license quote). aWATTar remains hourly fallback only. Prior deferral: **2.3.c.2** takeaway *variable sample time — hard*. Related open check: **2.3.2**.
 
@@ -83,7 +84,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - If go: carve implementation phases into this MINOR (or successor); if no-go: archive rationale and close **2.3.2** accordingly
 - [ ] Reduce messages like:
   - 2026-08-05 13:42:43 [INFO] (optimizer.milp_consumers:620) - urgent-Regel [e_auto]: nur_urgent_fenster — Ziel 3.650 kWh, optional geplant 0.000 kWh, urgent geplant 3.652 kWh (must_start=2026-08-08T11:54:18+02:00, deadline=2026-08-08T13:00:00+02:00)
-  - Add possibilite on Optimierer-Dienst page to filter for [INFO] / [WARNING] / ...
+  - Add possibility on Optimierer-Dienst page to filter for [INFO] / [WARNING] / ...
 
 ### Version 2.+1 - Min immediate charging for EV and learning consumption behaviour
 - [ ] Add the possibility that EV is charged immediately to a min SOC independent from regular schedule - This can be enabled separately for working days and weekend
@@ -93,6 +94,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Optimize Pool temperature to a certain value on time. Set desired temperature and using time. Combine it with RC model
   - Add a chart that shows comparison between actual and modeled temperature (including ambient temperature and heating activity)
 - [ ] For manual consumers do not take only import tariffs into account but also PV energy creation and export tariffs. Calculate a combined fictitious price (find rule for calculation)
+- [ ] Place a thicker slightly transparent line behind the SOC line in chart 1 of Monitor page depending on ess-mode
+  - Nothing, when in Automode
+  - Cyan when in Zwangsladen but charging power is near zero (Remove yellow / black bar)
+  - Blue when in Zwangsladen with higher charging power
  
 
 ### Version 2.+1 — Introducing nested data models

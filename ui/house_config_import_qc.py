@@ -75,8 +75,8 @@ def balance_gesamt_for_chart(
     invert_battery: bool = False,
     invert_grid: bool = False,
 ) -> tuple[list[tuple[str, float]] | None, int]:
-    """Derive Gesamtverbrauch when all three Bilanz series are available."""
-    if not pv_rows or not battery_rows or not grid_rows:
+    """Derive Gesamtverbrauch when PV + Netz are available (Batterie optional)."""
+    if not pv_rows or not grid_rows:
         return None, 0
     try:
         total, clipped = derive_total_from_balance(
@@ -224,7 +224,8 @@ def render_import_power_qc(
         else:
             st.caption(
                 "Lastprofil [kW] (Gesamt) aus Bilanz berechnet: "
-                "`P_Ges = P_PV + P_Batt + P_Grid`."
+                "`P_Ges = P_PV + P_Batt + P_Grid` "
+                "(fehlende Batterie = 0 kW)."
             )
     if (
         verbrauch_rows is None

@@ -226,6 +226,18 @@ def test_derive_total_from_balance_signs_and_clip() -> None:
     assert clipped == 1
 
 
+def test_derive_total_from_balance_without_battery() -> None:
+    rows_pv = [("2025-01-01 00:00:00", 2.0), ("2025-01-01 01:00:00", 1.0)]
+    rows_grid = [("2025-01-01 00:00:00", 0.5), ("2025-01-01 01:00:00", -0.25)]
+    total, clipped = derive_total_from_balance(rows_pv, None, rows_grid)
+    assert len(total) == 2
+    assert total[0][1] == pytest.approx(2.5)
+    assert total[1][1] == pytest.approx(0.75)
+    assert clipped == 0
+    total_empty, _ = derive_total_from_balance(rows_pv, [], rows_grid)
+    assert total_empty == total
+
+
 def test_energiemonitor_balance_without_verbrauch(tmp_path: Path) -> None:
     from house_config.consumption_csv import (
         import_energiemonitor_balance_to_canonical,

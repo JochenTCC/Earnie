@@ -3,6 +3,27 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Document Review Loxone-Signale + Library merge (2026-08-06)
+
+- [x] in loxone-signale.md: add motivation; replace user-facing "Greenfield" with "Default"; merge `loxone-earnie-library.md` into `docs/referenz/loxone-signale.md` (deleted library path); retarget TOC/UI/tests/templates README
+
+
+### Document Review abbreviations glossary (2026-08-06)
+
+- [x] Create a document with explanation of abbreviations — `docs/referenz/abkuerzungen.md`; linked from `docs/README.md`, handbook, and root `README.md`
+- [x] Extended glossary from Doc-Review-Checklist Priority-1 docs (missing terms: B2C, BL, DACH, DSGVO, evcc, FTP, GHCR, Greenfield, GX, HITL, kWp, LoxAPP3, LoxBerry, LXC, MCP, Modbus, NAS, OpenEMS, RefMarkt, REST, SaaS, SG-Ready, SSD, VE, WR, …)
+
+
+### Bugfix HK mobile Streamlit chunk load (duplicate) (2026-08-06)
+
+- [x] **HK mobile `TypeError: Failed to fetch dynamically imported module` (`/static/js/ButtonGroup.<hash>`)** — same Streamlit stale/flaky JS-chunk class as Monitor (2026-07-17): phone keeps old hashed `/static/js` imports after upgrade, or a one-off fetch fails via DDNS/mobile; HK surfaces it when widgets lazy-load `ButtonGroup`. Already covered by global `ui/chunk_load_recovery.py` (injected from `app.py`). Error vanished after reload / side change — no new Earnie code fix. Not an HK logic bug.
+
+
+### Bugfix HK Bilanz charts time horizon without battery CSV (2026-08-06)
+
+- [x] **Mismatch in time-horizons of CSV files and weekly plot in HK charts** — Bilanz (`historical_csv_source=balance`) required PV+Batterie+Netz; with PV+Netz only (no battery), Gesamt-Lastverhalten fell back to synthetic modeled year 2023 (monthly Jan–Dec 2023, weekly KW 52/2022) while import QC showed the real CSV span. Fix: battery optional (0 kW); derive/persist/chart on PV∩Netz. Dump: `debug-dumps/users/UserA/earnie_env`. Tests: `test_derive_total_from_balance_without_battery`. Verified.
+
+
 ### 2.4.r Code Quality — coverage / obsolete tests / KPI refactor (2026-08-05)
 
 - [x] **Coverage baseline** — added `ehal` to `[tool.coverage.run]` + `COV_SOURCE_PACKAGES`; refreshed `LEGACY_TEST_SYMBOLS` for 2.4 removals; `test_health_report run --coverage` → overall **79.7%** (`data` 73.3, `ehal` 87.3, `house_config` 80.3, `optimizer` 83.3, `runtime_store` 79.3, `settings` 77.4, `simulation` 86.5); no package &lt; 40%; workflow docs in `.cursor/rules/test-health.mdc`

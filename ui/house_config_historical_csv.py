@@ -137,7 +137,7 @@ def render_historical_csv_section(
             "automatisch in mittlere Leistung [kW] umgerechnet. "
             "Kurze Serien sind für visuelle Kontrolle erlaubt; "
             "Szenario-Explorer braucht ≥12 Monate, sonst synthetische Werte. "
-            "Alternativ: Bilanz aus PV + Batterie + Netz "
+            "Alternativ: Bilanz aus PV + Netz (Batterie optional) "
             "(`P_Ges = P_PV + P_Batt + P_Grid`, positiv = in das Haussystem). "
             "SOC wird nicht importiert."
         )
@@ -202,7 +202,7 @@ def render_historical_csv_section(
         st.session_state.get(f"house_profile_balance_invert_grid_{preview_id}", False)
     )
     balance_series = None
-    if pv_path and battery_path and grid_path:
+    if pv_path and grid_path:
         from ui.house_config_import_qc import load_balance_gesamt_series
 
         balance_series, _clipped = load_balance_gesamt_series(
@@ -447,7 +447,8 @@ def _render_balance_mode(preview_id: str, keys: dict[str, str]) -> None:
         "**Bilanz:** `P_Ges = P_PV + P_Batt + P_Grid`. "
         "Positiv bei Batterie/Netz = Leistung **in** das Haussystem "
         "(Entladen / Netzbezug). Negativ = Laden / Einspeisung. "
-        "Sobald alle drei Serien vorliegen, wird das Lastprofil automatisch "
+        "PV und Netz sind Pflicht; Batterie optional (fehlt → 0 kW). "
+        "Sobald PV und Netz vorliegen, wird das Lastprofil automatisch "
         "abgeleitet und als Gesamt-CSV gespeichert."
     )
     invert_pv_key = f"house_profile_balance_invert_pv_{preview_id}"
@@ -519,8 +520,8 @@ def _maybe_persist_balance_total(
     invert_battery: bool,
     invert_grid: bool,
 ) -> None:
-    """Write derived Gesamtverbrauch when all Bilanz inputs are present."""
-    if not (pv_path and battery_path and grid_path):
+    """Write derived Gesamtverbrauch when PV + Netz are present (Batterie optional)."""
+    if not (pv_path and grid_path):
         return
     fingerprint = (
         f"{pv_path}|{battery_path}|{grid_path}|"

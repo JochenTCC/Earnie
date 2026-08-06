@@ -25,7 +25,10 @@ _SIGNALE_URL = docs_blob_url(
     "docs/referenz/loxone-signale.md",
     fragment="mehrere-flex-verbraucher-namenskonvention",
 )
-_LIBRARY_URL = docs_blob_url("docs/einrichtung/loxone-earnie-library.md")
+_LIBRARY_URL = docs_blob_url(
+    "docs/referenz/loxone-signale.md",
+    fragment="library-einrichten",
+)
 
 _CREDENTIALS_HINT = (
     "Loxone-Zugangsdaten fehlen oder der Miniserver ist nicht erreichbar. "

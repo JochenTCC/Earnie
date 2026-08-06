@@ -34,7 +34,7 @@ Unter **Historische Jahres-Leistungsprofile [kW] (CSV)** wählen Sie:
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | **Getrennte CSVs**        | Lastprofil (für Ist-vs-Modell) und optional PV-Erzeugungsprofil als eigene Dateien                                            |
 | **Loxone Energiemonitor** | Eine Statistik-Datei; `Leistung Verbrauch [kW]` (Pflicht, direkt als Lastprofil), optional `Leistung Produktion [kW]` (PV), `Leistung Batterie` und `Leistung Energieversorger [kW]` (Netz). Keine Bilanz-Ableitung; SOC wird ignoriert. |
-| **Bilanz**                | PV + Batterie + Netz → abgeleitetes Lastprofil: \(P_\mathrm{Ges} = P_\mathrm{PV} + P_\mathrm{Batt} + P_\mathrm{Grid}\)       |
+| **Bilanz**                | PV + Netz (Batterie optional = 0) → abgeleitetes Lastprofil: \(P_\mathrm{Ges} = P_\mathrm{PV} + P_\mathrm{Batt} + P_\mathrm{Grid}\)       |
 
 
 **Bevorzugter Import:** Leistungsdaten [kW] (`timestamp;power_kw`). Kumulierte **Energiezähler [kWh]** werden ebenfalls akzeptiert und automatisch in mittlere Leistung [kW] umgerechnet (siehe unten).

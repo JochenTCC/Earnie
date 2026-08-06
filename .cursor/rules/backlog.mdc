@@ -1,5 +1,5 @@
 ---
-description: 
+description: Backlog lifecycle — features, bugfixes (incl. Verifications Pending), Document Review Findings, and Erledigt archive format
 globs: backlog/Backlog.md, backlog/Backlog-Bugfixes.md, backlog/Backlog-Erledigt.md
 alwaysApply: false
 ---
@@ -10,9 +10,9 @@ alwaysApply: false
 
 * **`backlog/Backlog.md`:** Open features (sorted by version, packaging, references). Repeated `### Version …` headings are intentional – move blocks, do not merge them.
 
-* **`backlog/Backlog-Bugfixes.md`:** Open bugs, deviations, and regressions (`xfail`). Contains the dedicated chapter `## Bugfix Verifications Pending`.
+* **`backlog/Backlog-Bugfixes.md`:** Open bugs, deviations, and regressions (`xfail`). Contains the dedicated chapters `## Bugfix Verifications Pending` and `## Document Review Findings`.
 
-* **`backlog/Backlog-Erledigt.md`:** Central archive for all completed features and bugfixes.
+* **`backlog/Backlog-Erledigt.md`:** Central archive for all completed features, bugfixes, and document-review findings.
 
 ## 2. Archiving & Maintenance Rules
 
@@ -25,7 +25,7 @@ alwaysApply: false
 
 * **Archive Format (`backlog/Backlog-Erledigt.md`):**
 
-* Structure: `### <Topic Bugfix or> (YYYY-MM-DD)` (Date according to Europe/Vienna).
+* Structure: `### <Topic Bugfix or Document Review …> (YYYY-MM-DD)` (Date according to Europe/Vienna).
 
 * Checkboxes: Entries must be formatted as `- [x] …`.
 
@@ -44,6 +44,17 @@ Bugfixes go through three strict phases in `backlog/Backlog-Bugfixes.md`:
 2. **Verifications Pending:** The fix is ​​implemented and committed $\rightarrow$ Move the entry from the topic to the chapter `## Bugfix Verifications Pending` (**do not archive yet!**). If verification fails, return to the topic or create a new follow-up item.
 
 3. **Done:** Only after successful live/production acceptance, remove from *Pending* and permanently move to `backlog/Backlog-Erledigt.md`.
+
+## 3b. Document Review Findings (2-Step)
+
+Chapter: `## Document Review Findings` in `backlog/Backlog-Bugfixes.md` (keep the heading even if empty).
+
+Doc/review corrections only (user docs, renames, merges, TOC, abbreviations) — **not** prod code bugs.
+
+1. **Open:** Finding listed under that chapter $\rightarrow$ Cursor agent corrects the docs (see skill `doc-review-findings`).
+2. **Done:** After the correction is applied, **remove** the item from `Backlog-Bugfixes.md` and archive in `backlog/Backlog-Erledigt.md` as `### Document Review … (YYYY-MM-DD)` with `- [x]`.
+
+**Do not** route these through `## Bugfix Verifications Pending`.
 
 ## 4. Anonymize User Names (before commit)
 
