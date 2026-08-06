@@ -47,27 +47,57 @@ def load_loxone_value_hourly(filepath: str, *, encoding: str = "latin-1") -> pd.
     return resample_to_hourly_zoh(series)
 
 
-def load_loxone_raw_value_series(filepath: str, *, encoding: str = "latin-1") -> pd.Series:
-    """Loxone-CSV → Rohserie (Sample-Zeitstempel, ohne stündliches ZOH)."""
+def load_loxone_raw_value_series(
+    filepath: str,
+    *,
+    encoding: str = "latin-1",
+    value_column: int | None = None,
+) -> pd.Series:
+    """Loxone-CSV → Rohserie (Sample-Zeitstempel, ohne stündliches ZOH).
+
+    ``value_column`` selects a specific column index; default resolves
+    ``leistung`` or the last column.
+    """
     path = Path(filepath)
     if not path.is_file():
         raise FileNotFoundError(f"Loxone-CSV nicht gefunden: {filepath}")
 
     df = _read_loxone_frame(path, encoding=encoding)
     ts_width = _resolve_timestamp_width(df, filepath)
-    value_column = _resolve_value_column(df, ts_width=ts_width, filepath=filepath)
+    if value_column is None:
+        resolved = _resolve_value_column(df, ts_width=ts_width, filepath=filepath)
+    else:
+        resolved = value_column
+        if resolved < ts_width or resolved >= df.shape[1]:
+            raise ValueError(
+                f"Loxone-CSV '{filepath}': value_column={resolved} ungültig "
+                f"(ts_width={ts_width}, Spalten={df.shape[1]})."
+            )
     if ts_width == 2:
         timestamps = _parse_split_timestamps(df)
     else:
         timestamps = _parse_combined_timestamps(df)
-    values = _to_numeric_power(df.iloc[:, value_column])
+    values = _to_numeric_power(df.iloc[:, resolved])
     series = pd.Series(
         values.values,
         index=timestamps,
-        name=str(df.columns[value_column]),
+        name=str(df.columns[resolved]),
     )
     series = series[~series.index.isna()].sort_index()
     return series[~series.index.duplicated(keep="last")]
+
+
+def loxone_value_column_headers(
+    filepath: str, *, encoding: str = "latin-1"
+) -> tuple[int, list[str]]:
+    """Return ``(ts_width, headers of value columns after the timestamp).``"""
+    path = Path(filepath)
+    if not path.is_file():
+        raise FileNotFoundError(f"Loxone-CSV nicht gefunden: {filepath}")
+    df = _read_loxone_frame(path, encoding=encoding)
+    ts_width = _resolve_timestamp_width(df, filepath)
+    headers = [str(c) for c in df.columns[ts_width:]]
+    return ts_width, headers
 
 
 def _detect_loxone_csv_sep(path: Path, *, encoding: str) -> tuple[str, str]:

@@ -400,6 +400,7 @@ def _save_signed_component_csv(
     """Normalize bipolar battery/grid series without majority-sign flip."""
     from house_config.consumption_csv import (
         MIN_HOURS_IMPORT,
+        detect_and_load_grid_raw_series,
         detect_and_load_raw_series,
         normalize_hourly_power_kw,
         write_canonical_hourly_csv,
@@ -412,7 +413,10 @@ def _save_signed_component_csv(
     target = uploads_dir / f"{profile_id}_{role}_{stem}_resampled.csv"
     target.write_bytes(content)
     portable = f"config/uploads/{target.name}"
-    series = detect_and_load_raw_series(portable)
+    if role == "grid":
+        series = detect_and_load_grid_raw_series(portable)
+    else:
+        series = detect_and_load_raw_series(portable)
     rows = normalize_hourly_power_kw(
         series,
         min_hours=MIN_HOURS_IMPORT,

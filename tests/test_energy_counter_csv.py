@@ -10,6 +10,7 @@ import pytest
 
 from house_config.consumption_csv import (
     MIN_HOURS_FULL_YEAR,
+    detect_and_load_grid_raw_series,
     load_and_normalize_profile_csv,
 )
 from house_config.energy_counter_csv import (
@@ -26,6 +27,25 @@ def _write_loxone_counter(path: Path, series: pd.Series, *, header: str) -> None
         value_txt = f"{float(value):.6f}".replace(".", ",")
         lines.append(
             f"{stamp.strftime('%d.%m.%Y')};{stamp.strftime('%H:%M:%S')};{value_txt}"
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="latin-1")
+
+
+def _write_loxone_dual(
+    path: Path,
+    *,
+    header: str,
+    times: list[datetime],
+    col_a: list[float],
+    col_b: list[float],
+) -> None:
+    lines = [header]
+    for ts, a, b in zip(times, col_a, col_b, strict=True):
+        stamp = pd.Timestamp(ts)
+        a_txt = f"{float(a):.6f}".replace(".", ",")
+        b_txt = f"{float(b):.6f}".replace(".", ",")
+        lines.append(
+            f"{stamp.strftime('%d.%m.%Y')};{stamp.strftime('%H:%M:%S')};{a_txt};{b_txt}"
         )
     path.write_text("\n".join(lines) + "\n", encoding="latin-1")
 
@@ -181,3 +201,59 @@ def test_normalize_full_year_counter_conserves_energy(tmp_path: Path) -> None:
     expected_delta = energies[-1] - energies[0]
     # ZOH hourly mean over closed year of constant power ≈ ΔE.
     assert total_kwh == pytest.approx(expected_delta, rel=1e-6, abs=0.01)
+
+
+def test_grid_kw_path_keeps_bipolar_sign(tmp_path: Path) -> None:
+    start = datetime(2025, 1, 1)
+    power = pd.Series(
+        [2.0, -1.5, 0.0, 3.0],
+        index=pd.DatetimeIndex([start + timedelta(hours=i) for i in range(4)]),
+    )
+    path = tmp_path / "netz_kw.csv"
+    _write_loxone_counter(path, power, header="Datum;Zeit;Netz [kW]")
+    series = detect_and_load_grid_raw_series(str(path))
+    assert list(series.values) == pytest.approx([2.0, -1.5, 0.0, 3.0], abs=1e-9)
+
+
+def test_grid_single_kwh_rejected(tmp_path: Path) -> None:
+    start = datetime(2025, 1, 1)
+    energy = pd.Series(
+        [100.0 + i for i in range(5)],
+        index=pd.DatetimeIndex([start + timedelta(hours=i) for i in range(5)]),
+    )
+    path = tmp_path / "netz_single_kwh.csv"
+    _write_loxone_counter(path, energy, header="Datum;Zeit;Bezug [kWh]")
+    with pytest.raises(ValueError, match="zwei Spalten"):
+        detect_and_load_grid_raw_series(str(path))
+
+
+def test_grid_dual_kwh_combines_import_minus_export(tmp_path: Path) -> None:
+    start = datetime(2025, 1, 1, 0, 0, 0)
+    # Three stamps → two intervals. Bezug: +2 kWh/h, Einspeisung: +0.5 kWh/h → net +1.5
+    times = [start + timedelta(hours=i) for i in range(3)]
+    bezug = [1000.0, 1002.0, 1004.0]
+    einspeisung = [200.0, 200.5, 201.0]
+    path = tmp_path / "netz_dual_kwh.csv"
+    _write_loxone_dual(
+        path,
+        header="Datum;Zeit;Bezug [kWh];Einspeisung [kWh]",
+        times=times,
+        col_a=bezug,
+        col_b=einspeisung,
+    )
+    series = detect_and_load_grid_raw_series(str(path))
+    assert len(series) == 2
+    assert float(series.iloc[0]) == pytest.approx(1.5, abs=1e-9)
+    assert float(series.iloc[1]) == pytest.approx(1.5, abs=1e-9)
+
+
+def test_non_grid_single_kwh_still_works(tmp_path: Path) -> None:
+    start = datetime(2025, 1, 1)
+    energy = pd.Series(
+        [100.0 + 2.0 * i for i in range(5)],
+        index=pd.DatetimeIndex([start + timedelta(hours=i) for i in range(5)]),
+    )
+    path = tmp_path / "last_kwh.csv"
+    _write_loxone_counter(path, energy, header="Datum;Zeit;Zählerstand [kWh]")
+    loaded = load_energy_counter_as_power_kw(str(path))
+    assert list(loaded.values) == pytest.approx([2.0, 2.0, 2.0, 2.0], abs=1e-9)

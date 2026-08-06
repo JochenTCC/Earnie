@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix Bilanz Netz-Leistung dual-kWh CSV (2026-08-06)
+
+- [x] **Bilanz Netz-Leistung dual-kWh CSV** — first value column `[kW]` stays bipolar power; `[kWh]` requires second `[kWh]` (Bezug − Einspeisung via ΔE/Δt); lone Netz energy counter rejected. Docs: `docs/konfiguration/verbrauchs-csv.md`. Tests: `tests/test_energy_counter_csv.py`. Verified.
+
+
 ### Document Review Loxone-Signale + Library merge (2026-08-06)
 
 - [x] in loxone-signale.md: add motivation; replace user-facing "Greenfield" with "Default"; merge `loxone-earnie-library.md` into `docs/referenz/loxone-signale.md` (deleted library path); retarget TOC/UI/tests/templates README

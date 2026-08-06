@@ -91,6 +91,26 @@ Datum;Zeit;Counter [kWh]
 
 Gilt für **Lastprofil [kW] (Gesamt)**, **PV-Erzeugungsprofil [kW]** und Verbraucher-CSVs im Modus Getrennte CSVs.
 
+### Bilanz Netz-Leistung: Leistung oder zwei Energiezähler
+
+Für den Upload **Netz-Leistung** (Modus Bilanz) gilt zusätzlich:
+
+| Variante | Kopfzeile (Wertspalten) | Verhalten |
+| -------- | ----------------------- | --------- |
+| Leistung | Erste Wertspalte mit `[kW]` (eine bipolare Serie) | Wie bisher: positiv = Netzbezug, negativ = Einspeisung |
+| Zwei Zähler | Erste Wertspalte Bezug `[kWh]`, zweite Einspeisung `[kWh]` | Beide als kumulierte Zähler → \(\Delta E/\Delta t\); Netzleistung \(P = P_\mathrm{Bezug} - P_\mathrm{Einspeisung}\) |
+| Ungültig | Nur eine Wertspalte mit `[kWh]` | Import wird abgelehnt (Netz braucht Bezug und Einspeisung) |
+
+```text
+Datum;Zeit;Bezug [kWh];Einspeisung [kWh]
+01.01.2025;00:00:00;1000,000;200,000
+01.01.2025;01:00:00;1002,000;200,500
+```
+
+→ \(P_\mathrm{Bezug}=2\,\mathrm{kW}\), \(P_\mathrm{Einspeisung}=0{,}5\,\mathrm{kW}\) → Netz \(+1{,}5\,\mathrm{kW}\).
+
+Diese Zwei-Spalten-Regel gilt **nur** für Bilanz **Netz-Leistung**. Batterie, PV und Last behalten den Ein-Zähler-Import oben.
+
 ## Gesamt-CSV (`total_profile_csv`)
 
 Optional: Abgleich Ist vs. Modell und Grundlage für die Rest-Grundlast, wenn Verbraucher-CSVs abgezogen werden.

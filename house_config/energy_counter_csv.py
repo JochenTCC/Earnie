@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from data.loxone_csv_timeseries import load_loxone_raw_value_series
+from data.loxone_csv_timeseries import (
+    load_loxone_raw_value_series,
+    loxone_value_column_headers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +99,67 @@ def load_energy_counter_as_power_kw(path: str, *, encoding: str = "latin-1") -> 
     if energy.empty:
         raise ValueError(f"Energiezähler-CSV '{path}' enthält keine Datenzeilen.")
     return counter_kwh_to_power_kw(energy, source=path)
+
+
+def column_header_unit_kind(header: str) -> str | None:
+    """Return 'energy', 'power', or None from a single column header cell."""
+    lower = str(header).strip().lower()
+    # [kWh] before [kW] — "[kwh]" contains the letters of "[kw]".
+    if "[kwh]" in lower:
+        return "energy"
+    if re.search(r"\[kw\]", lower):
+        return "power"
+    return None
+
+
+def first_value_column_unit_kind(path: str | Path, *, encoding: str = "latin-1") -> str | None:
+    """Unit kind of the first value column after the timestamp, or None."""
+    _ts_width, headers = loxone_value_column_headers(str(path), encoding=encoding)
+    if not headers:
+        return None
+    return column_header_unit_kind(headers[0])
+
+
+def load_grid_dual_energy_as_power_kw(
+    path: str, *, encoding: str = "latin-1"
+) -> pd.Series:
+    """Netz: two cumulative kWh columns → bipolar power (Bezug − Einspeisung).
+
+    First value column = import (positive), second = export (subtracted).
+    Both must be labeled ``[kWh]``.
+    """
+    file_path = Path(path)
+    ts_width, headers = loxone_value_column_headers(str(file_path), encoding=encoding)
+    if len(headers) < 1 or column_header_unit_kind(headers[0]) != "energy":
+        raise ValueError(
+            f"Netz-CSV '{path}': erste Wertspalte muss [kWh] sein "
+            "(Bezug-Energiezähler)."
+        )
+    if len(headers) < 2 or column_header_unit_kind(headers[1]) != "energy":
+        raise ValueError(
+            f"Netz-CSV '{path}' mit Energiezähler [kWh] ist ungültig: "
+            "es werden zwei Spalten benötigt (Bezug [kWh], dann Einspeisung [kWh])."
+        )
+    e_import = load_loxone_raw_value_series(
+        str(file_path), encoding=encoding, value_column=ts_width
+    )
+    e_export = load_loxone_raw_value_series(
+        str(file_path), encoding=encoding, value_column=ts_width + 1
+    )
+    if e_import.empty or e_export.empty:
+        raise ValueError(f"Netz-CSV '{path}' enthält keine Datenzeilen.")
+    p_import = counter_kwh_to_power_kw(e_import, source=f"{path}#bezug")
+    p_export = counter_kwh_to_power_kw(e_export, source=f"{path}#einspeisung")
+    aligned = pd.concat(
+        [p_import.rename("bezug"), p_export.rename("einspeisung")],
+        axis=1,
+        join="inner",
+    )
+    if aligned.empty:
+        raise ValueError(
+            f"Netz-CSV '{path}': keine überlappenden Intervalle nach ΔE/Δt."
+        )
+    return aligned["bezug"] - aligned["einspeisung"]
 
 
 def _header_series_kind(path: Path) -> str | None:

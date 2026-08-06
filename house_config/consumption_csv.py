@@ -425,6 +425,33 @@ def detect_and_load_raw_series(path: str) -> pd.Series:
     return _load_canonical_raw_series(path)
 
 
+def detect_and_load_grid_raw_series(path: str) -> pd.Series:
+    """Load Bilanz Netz series: bipolar kW, or dual cumulative kWh → signed power.
+
+    First value column ``[kWh]`` requires a second ``[kWh]`` column
+    (Bezug, then Einspeisung). Lone Netz energy counters are rejected.
+    ``[kW]`` or unlabeled headers fall through to :func:`detect_and_load_raw_series`.
+    """
+    from house_config.energy_counter_csv import (
+        first_value_column_unit_kind,
+        load_grid_dual_energy_as_power_kw,
+    )
+    from runtime_store.persist_paths import resolve_config_prefixed_path
+
+    resolved = resolve_config_prefixed_path(path)
+    file_path = Path(resolved)
+    if not file_path.is_file():
+        raise FileNotFoundError(f"Profil-CSV nicht gefunden: {path}")
+    try:
+        first_unit = first_value_column_unit_kind(file_path)
+    except ValueError:
+        # Non-Loxone layout (e.g. canonical) — use generic path.
+        return detect_and_load_raw_series(path)
+    if first_unit == "energy":
+        return load_grid_dual_energy_as_power_kw(str(file_path))
+    return detect_and_load_raw_series(path)
+
+
 def normalize_hourly_power_kw(
     series: pd.Series,
     *,
