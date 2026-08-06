@@ -11,6 +11,7 @@ from runtime_store import optimization_history
 from runtime_store.history_timeline import (
     _chart_battery_kw_from_snapshot,
     _consumer_kw_from_entry,
+    _import_price_cent_from_entry,
     _parse_completed_at,
     _power_kw_from_entry,
 )
@@ -302,7 +303,9 @@ def slot_from_replay_entry(
     load_kw = sum(load_by_id.values())
     charge_kw, discharge_kw = _battery_charge_discharge_kw(entry)
     grid_import, grid_export = _grid_import_export_kw(entry, load_kw, pv_kw)
-    price = float(entry.get("market_price_cent", 0.0) or 0.0)
+    price = _import_price_cent_from_entry(
+        entry, slot_start=slot_start
+    )
     return build_slot_from_powers(
         slot_start=slot_start,
         price_cent=price,

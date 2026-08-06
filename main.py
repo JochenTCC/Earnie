@@ -371,6 +371,13 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         )
 
     try:
+        if "k_act" not in current_market_item:
+            raise KeyError(
+                "optimization_matrix[0] fehlt 'k_act' (Bezugspreis Cent/kWh) "
+                "für market_price_cent im Produktiv-Log."
+            )
+        market_price_cent = round(float(current_market_item["k_act"]), 4)
+        epex_price_cent = round(float(current_market_item["price_buy"]), 4)
         run_payload = {
             "source": "main.py",
             "success": True,
@@ -383,7 +390,8 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "ehal_writes": ehal_writes,
             "soc_percent": round(float(current_soc), 2),
             "pv_delta_kwh": round(float(pv_delta), 4),
-            "market_price_cent": round(float(current_market_item["price_buy"]), 4),
+            "market_price_cent": market_price_cent,
+            "epex_price_cent": epex_price_cent,
             "k_push_act": round(
                 k_push_act_for_matrix_row(
                     current_market_item,

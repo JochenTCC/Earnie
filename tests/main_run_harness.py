@@ -86,6 +86,7 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
                 "expected_p_pv": 2.0,
                 "expected_p_act": 1.0,
                 "price_buy": 10.0,
+                "k_act": 13.44,
                 "hour": 10,
             }
         ],

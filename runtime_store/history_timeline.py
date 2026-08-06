@@ -318,6 +318,38 @@ def _feed_in_price_cent_from_entry(entry: dict[str, Any] | None) -> float:
     return round(config.get_push_price_cent(), 4)
 
 
+def _import_price_cent_from_entry(
+    entry: dict[str, Any],
+    *,
+    slot_start: datetime | None = None,
+) -> float:
+    """
+    Bezugspreis (Cent/kWh) für Chart/Tabelle aus dem Produktiv-Log.
+
+    Neu: market_price_cent ist Retail (k_act); optional epex_price_cent.
+    Legacy: market_price_cent war EPEX (price_buy) — dann auf Retail umrechnen.
+    """
+    raw = float(entry.get("market_price_cent", 0.0) or 0.0)
+    if entry.get("epex_price_cent") is not None:
+        return round(raw, 4)
+
+    k_push = entry.get("k_push_act")
+    if k_push is None:
+        return round(raw, 4)
+
+    from data.feed_in_prices import resolve_k_push_act
+    from data.market_prices import epex_to_brutto_cent
+
+    expected_push = resolve_k_push_act(
+        raw,
+        config.get_feed_in_settings(),
+        slot_datetime=slot_start,
+    )
+    if abs(float(expected_push) - float(k_push)) <= 0.05:
+        return round(float(epex_to_brutto_cent(raw)), 4)
+    return round(raw, 4)
+
+
 def _append_milp_table_columns(row: dict[str, Any], entry: dict[str, Any] | None) -> None:
     """
     Spalten, die nur in MILP-Chart-Zeilen vorkommen — für die Tabelle mit Defaults befüllen.
@@ -343,7 +375,9 @@ def entry_to_chart_row(
     row: dict[str, Any] = {
         "slot_datetime": slot_start,
         "Uhrzeit": _format_slot_time(slot_start, include_date=include_date),
-        "Strompreis (Cent/kWh)": round(float(entry.get("market_price_cent", 0.0) or 0.0), 4),
+        "Strompreis (Cent/kWh)": _import_price_cent_from_entry(
+            entry, slot_start=slot_start
+        ),
         "Preis extrapoliert": False,
         "PV-Prognose (kW)": round(_pv_forecast_kw_from_entry(entry), 3),
         "Verbrauch-Prognose (kW)": round(baseload, 3),

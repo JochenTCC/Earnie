@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix history chart Strompreis EPEX vs retail k_act (2026-08-06)
+
+- [x] `debug_dump_20260806_181907`: History logged `price_buy` (EPEX) as `market_price_cent` while live/plan used retail `k_act` → fake ~0.6 ct import/export gap then jump at boundary. Fix: log `k_act` (+ `epex_price_cent`); `_import_price_cent_from_entry` converts legacy EPEX rows for chart/cost analysis.
+
+
 ### Bugfix Bilanz Netz-Leistung dual-kWh CSV (2026-08-06)
 
 - [x] **Bilanz Netz-Leistung dual-kWh CSV** — first value column `[kW]` stays bipolar power; `[kWh]` requires second `[kWh]` (Bezug − Einspeisung via ΔE/Δt); lone Netz energy counter rejected. Docs: `docs/konfiguration/verbrauchs-csv.md`. Tests: `tests/test_energy_counter_csv.py`. Verified.

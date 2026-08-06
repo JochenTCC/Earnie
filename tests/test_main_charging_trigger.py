@@ -64,6 +64,8 @@ def test_regular_run_uses_update_and_side_effects(monkeypatch):
     cons_data.assert_called_once()
     assert saved[0]["run_trigger"] == TRIGGER_QUARTER_HOUR
     assert saved[0]["k_push_act"] == main_module.config.get_push_price_cent()
+    assert saved[0]["market_price_cent"] == 13.44
+    assert saved[0]["epex_price_cent"] == 10.0
 
 
 def test_run_payload_forecast_pv_kw_uses_pre_overlay_matrix(monkeypatch):
@@ -72,7 +74,7 @@ def test_run_payload_forecast_pv_kw_uses_pre_overlay_matrix(monkeypatch):
         main_module.profile_manager,
         "build_live_planning_matrix",
         lambda _market, _window: [
-            {"expected_p_pv": 2.5, "expected_p_act": 1.0, "price_buy": 10.0, "hour": 10}
+            {"expected_p_pv": 2.5, "expected_p_act": 1.0, "price_buy": 10.0, "k_act": 13.44, "hour": 10}
         ],
     )
     monkeypatch.setattr(
