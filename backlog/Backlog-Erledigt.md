@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Pre-release 2.4.0-alpha.6 (2026-08-07)
+
+- [x] Bump `version.py` to `2.4.0-alpha.6`; sync `docker/compose/*-alpha.yml` + `docs/einrichtung/container.md` example pins; GitHub Pre-release tag `v2.4.0-alpha.6`
+
+
 ### Docs Netznutzungsentgelte disclaimer (2026-08-06)
 
 - [x] Document that **Netznutzungsentgelte** are currently **not** included in Live/SE costs: German docs (`tarife-quellen`, `preise`, handbook, `betriebsmodi`), SE UI captions, Szenarienkonfigurator info, Fake-Jahresrechnung Hinweise; invoice test updated. Feature work to model them remains open in `Backlog.md`.
