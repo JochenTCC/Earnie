@@ -1,4 +1,4 @@
-﻿# Project Roadmap & Backlog
+# Project Roadmap & Backlog
 
 Completed items → [Backlog-Erledigt.md](Backlog-Erledigt.md)
 
@@ -14,53 +14,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 
 ## Feature Backlog
-
-
-
-### Version 2.4 — EHAL foundation, DACH docking & Loxone on EHAL
-
-**Strategic source:** `Earnie-Projekt/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md` v2.4 (Phases 1–4 / M1–M2)  
-**Goal:** Freeze **EHAL**, prove Loxone-free southbounds (OpenEMS + HA/evcc), move production Loxone onto EHAL, add MCP one-click mapping, and prove config-only switch across all three. Earnie Core remains the sole 48h optimizer; hardware I/O only via EHAL (telemetry + setpoints + capability flags).  
-**Southbound in this MINOR:** **C** OpenEMS = EHAL semantic prototype; **A+B** Home Assistant + evcc (A2) = DACH device volume; **Loxone** = production path via EHAL (`2.4.e`–`2.4.h`).  
-**Packaging in this MINOR:** LoxBerry plugin **Scope A** MVP (`2.4.d`) done — thin Docker wrapper in `packaging/loxberry/` (not a native host install).  
-**Naming:** **EHAL** is established (`docs/spec/ehal.md`, `2.4.a`/`2.4.b`/`2.4.e`/`2.4.f`/`2.4.g`/`2.4.h`/`2.4.j`/`2.4.k`/`2.4.l`/`2.4.m`/`2.4.n`/`2.4.o`/`2.4.p` done). Do not use “SAM” for this layer (Businessplan “SAM” = market size only). Thin marker prep (`2.3.f`) is done.  
-**Moved out:** Donate (sidebar) — not part of docking.
-
-- [ ] **2.4.r — Release**
-  - [x] Add the two logos to streamlit for dark and light designs in the sidebar as intended by streamlit
-    - docs\assets\Earnie-Logo-Simple_Dark.png for dark design
-    - docs\assets\Earnie-Logo-Simple-Light.png for light design
-    - Place logo (for light design) in Readme.md and prepare adding it into repository
-  - [x] Test greenfield approach with Loxone-Import without old BRIDGE_DEFAULTS
-  - [x] Residual Loxone Merker nests → `ehal_bindings` only (thermal C.6, enable write, filter native, strip + `scripts/migrate_ehal_bindings`; Homie bridge defaults retired)
-  - [x] **Before 2.4.0:** EHAL-Com maps pool_filter fields (`flex.pool_filter.sens_power_act`, `get_filter_remaining_hours`, `sens_filter_active`, `get_filter_native_start_hour`, `get_filter_native_duration_hours`) onto `pool_filter` MILP consumer
-  - [x] **GitHub ticket intake & Streamlit Kontakt → Issues** (before ship)
-    - **Model:** GitHub Issues = public intake; markdown backlog = schedule source of truth; `support@earnie-hems.com` = sole private exception (registry / secrets / dumps). No Discussions in this ship. Maintainer promotes Issues into backlog with `#NN` when scheduled.
-    - **Repo:** four issue forms (Bug / Change request / Improvement / Question) + labels; contact links to site/docs; registry/secrets → `support@`
-    - **UI:** Kontakt Art + Thema/Beschreibung → primary **GitHub-Issue öffnen** (prefilled title/body); ZIP local only (no auto-upload); public-Issue warning; private expander; site + repo links; cloud-demo → Issues (`cloud-demo`)
-    - **Docs:** `CONTRIBUTING.md`, Benutzer-Handbuch, `docs/ui/betriebsmodi.md` (+ private-env cloud note); techcreacon / `mail@` → `support@earnie-hems.com` only on private paths
-    - **Done when:** templates live; primary CTA is Issue not mailto; registry still mail to `support@`; no auto-upload; tests cover URL builders; docs match
-  - [x] Code Quality
-    - [x] **Legacy / soft-compat first pass** (fail-fast; no old installs)
-      - Drop dead sunrise A/B script + `sunrise_full_horizon_trial` reject; rename-only aliases
-      - Drop `system_history_log.csv` merge, cwd `LEGACY_DEBUG_PATH`, debug-dump v1/v2 (JSONL + dump v3 only)
-      - Soft load migrators → reject (tariff types/IDs, `start_flexibility`, `path_log`, singular `pv_system_id`, data-model v1/v2); bootstrap no longer soft-migrates
-    - [x] **Remove dual-key bridges** (fail-fast)
-      - Drop `legacy_id` (writers use canonical `id`; reject field on load)
-      - Drop EHAL nest / unprefixed HA dual-read (bindings §C / Pattern B only)
-      - EVCS write = `set_evcs_mode` only; Pool Freigabe status without SwimSpa/`Ernie_*` aliases
-    - [x] Make a code coverage test
-    - [x] Review code against coding KPIs and refactor it if needed
-    - [x] Make a test coverage test to identify obsolete tests
-    - Keep: CBC/PV/API operational fallbacks, `legacy_config_gates` fail-fast, live↔SE dual paths
-  - [x] Update and review official docs for needed updates our outdated infos
-    - Update screenshots where it is useful
-    - Consolidate number of documents (merge docs with content that relies on each other or is similar)
-  - [x] Review documents manually - see list in backlog\Doc-Review-Checklist.md
-  - Ship when: EHAL schema frozen, OpenEMS Compose path green, HA-EHAL path proven in lab (contract-tests + helpers smoke + marq24/HITL entity mapping); Loxone on EHAL without regression; Loxone one-click mapping usable (HITL; structure source compare-all until lab picks winner); Phase-4 automated config-switch proof (`2.4.h`) done — optional live lab matrix soft check; hardware-registry first approach (`2.4.q`) done
-  - Official DACH messaging: Path A2; OpenEMS documented as prototype/industrial, not B2C default
-  - “All three southbounds” release: OpenEMS ↔ HA+evcc ↔ Loxone via config switch
-  - LoxBerry Scope A MVP (`2.4.d`) is implemented; ship plugin ZIP with this release when ready (hardware install acceptance optional)
 
 
 
@@ -85,6 +38,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Reduce messages like:
   - 2026-08-05 13:42:43 [INFO] (optimizer.milp_consumers:620) - urgent-Regel [e_auto]: nur_urgent_fenster — Ziel 3.650 kWh, optional geplant 0.000 kWh, urgent geplant 3.652 kWh (must_start=2026-08-08T11:54:18+02:00, deadline=2026-08-08T13:00:00+02:00)
   - Add possibility on Optimierer-Dienst page to filter for [INFO] / [WARNING] / ...
+- [ ] Add possibility to take Netznutzungsentgelte into account (as far as they are relevant to relative price changes)
+- [ ] Add possibility to simulate restrictions for energy export dependent on current grid situation in SE (and maybe in Live optimization)
 
 ### Version 2.+1 - Min immediate charging for EV and learning consumption behaviour
 - [ ] Add the possibility that EV is charged immediately to a min SOC independent from regular schedule - This can be enabled separately for working days and weekend

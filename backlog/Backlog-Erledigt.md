@@ -3,6 +3,18 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 2.4.0 — Official release (2026-08-07)
+
+EHAL foundation, DACH docking & Loxone on EHAL. Letter steps (`2.4.a`–`2.4.q`, …) archived under their own sections below / earlier in this file.
+
+- [x] **2.4.r — Release** → official `2.4.0` (from `2.4.0-alpha.6`)
+  - Sidebar logos (light/dark); greenfield Loxone import without `BRIDGE_DEFAULTS`; residual Merker → `ehal_bindings` only
+  - EHAL-Com pool_filter field mapping; GitHub ticket intake & Streamlit Kontakt → Issues
+  - Code quality (legacy/soft-compat + dual-key bridges fail-fast; coverage / obsolete tests / KPI refactor)
+  - Official docs update + manual Doc-Review-Checklist
+  - Ship gate accepted: EHAL frozen; OpenEMS / HA+evcc / Loxone via config; LoxBerry Scope A MVP; Path A2 messaging
+
+
 ### Pre-release 2.4.0-alpha.6 (2026-08-07)
 
 - [x] Bump `version.py` to `2.4.0-alpha.6`; sync `docker/compose/*-alpha.yml` + `docs/einrichtung/container.md` example pins; GitHub Pre-release tag `v2.4.0-alpha.6`
