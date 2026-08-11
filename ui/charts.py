@@ -33,7 +33,7 @@ from ui.chart_cumulative import (
 from ui.chart_slot_axis import ChartSlotAxis, _chart_xaxis_config
 from ui.chart_soc import (
     add_baseline_soc_traces,
-    add_entladesperre_soc_band_traces,
+    add_ess_mode_soc_underlay_traces,
     add_export_price_on_soc_axis_trace,
     add_optimized_soc_trace,
     add_price_on_soc_axis_trace,
@@ -143,8 +143,10 @@ def build_power_soc_chart_figure(
         show_soc_plausibility=show_soc_plausibility,
         history_slot_count=history_slot_count,
     )
-    add_entladesperre_soc_band_traces(
+    add_ess_mode_soc_underlay_traces(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
+        history_slot_count=history_slot_count,
+        battery_params=battery_params,
     )
     add_optimized_soc_trace(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
@@ -584,15 +586,10 @@ from ui.chart_cumulative import (
     add_projected_savings_trace,
 )
 from ui.chart_soc import (
-    _ENTLADESPERRE_BAND_HEIGHT_PCT,
-    _ENTLADESPERRE_BAND_WIDTH_FRACTION,
-    _ENTLADESPERRE_BAND_Y_MIN,
     _apply_soc_current_hour_ramps,
     _apply_soc_intra_hour_ramp,
     _current_hour_soc_ramp,
     _current_hour_soc_ramp_before_now,
-    _entladesperre_band_marker,
-    _entladesperre_soc_band_bottom,
     _first_milp_slot_in_current_hour,
     _history_battery_kw_for_extrapolation,
     _soc_at_chart_now,
@@ -601,10 +598,11 @@ from ui.chart_soc import (
     _soc_tail_y_from_row,
     _soc_y_at_moment,
     add_baseline_soc_traces,
-    add_entladesperre_soc_band_traces,
+    add_ess_mode_soc_underlay_traces,
     add_export_price_on_soc_axis_trace,
     add_optimized_soc_trace,
     add_price_on_soc_axis_trace,
+    classify_ess_soc_underlay,
 )
 
 __all__ = [

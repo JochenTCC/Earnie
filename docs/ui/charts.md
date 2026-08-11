@@ -69,6 +69,7 @@ Entladen → Last ← verbleibende Entladung
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
 | SoC (optimiert) | Grüne Linie (`_HSL_SOC` in `ui/chart_colors.py`) | Simulierter Batterie-SOC |
+| ESS-Mode-Underlay | Dickere, halbtransparente Linie hinter dem SoC | Cyan = Entladesperre / Hold bzw. Zwangsleistung unter 5 % von `max_power_kw`; Blau = Zwangsladen ≥ 5 %; Magenta = Zwangsentladen ≥ 5 %; Automatik ohne Underlay |
 | SoC BL Ziel | Dieselbe Farbe, gestrichelt ab **Jetzt** (nicht davor) | Referenz-SOC (Baseline); Anker = Log-SOC am Jetzt-Marker |
 | Preis (rot) | Strompreis skaliert | Hover: Cent/kWh |
 | Einspeisepreis (orange, gestrichelt) | Einspeisevergütung skaliert | Hover: Cent/kWh |

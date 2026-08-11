@@ -33,18 +33,15 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Add a new section into fake invoices for the Netzentgelt 
     - Jahr: split Energiebezug (Lieferant) vs Netznutzung Arbeitspreis (same Gesamt; AP already in k_act)
     - Dedicated ## Netznutzung section (AP, Bezug kWh, €, Grundpreis stub)
-- [ ] Reduce messages like:
+- [x] Reduce messages like:
   - 2026-08-05 13:42:43 [INFO] (optimizer.milp_consumers:620) - urgent-Regel [e_auto]: nur_urgent_fenster — Ziel 3.650 kWh, optional geplant 0.000 kWh, urgent geplant 3.652 kWh (must_start=2026-08-08T11:54:18+02:00, deadline=2026-08-08T13:00:00+02:00)
   - Add possibility on Optimierer-Dienst page to filter for [INFO] / [WARNING] / ...
-- [ ] Place a thicker slightly transparent line behind the SOC line in chart 1 of Monitor page depending on ess-mode
+- [x] Place a thicker slightly transparent line behind the SOC line in chart 1 of Monitor page depending on ess-mode
   - Nothing, when in Automode
   - Cyan when in Zwangsladen but charging power is near zero (Remove yellow / black bar)
   - Blue when in Zwangsladen with higher charging power
 - [ ] For manual consumers do not take only import tariffs into account but also PV energy creation and export tariffs. Calculate a combined fictitious price (find rule for calculation)
-- [ ] Add the possibility that EV is charged immediately to a min SOC independent from regular schedule - This can be enabled separately for working days and weekend
-- [ ] When importing from existing Loxone config is working the other way round would also be possible:
-    - User has a complete HK with live scenario in place in Earnie
-    - Earnie generates pre-filled Loxone Template XML files (with correct ids, (multiple) evs, (multiple) consumers) for importing into Loxone config.
+- [ ] Add the possibility that EV is charged immediately to a min SOC independent from regular schedule
 - [ ] **2.5.a — Data & tariff fidelity**
   - Confirm Energy-Charts 15‑min coverage (AT/DE-LU/CH) vs pre-2025-10 hourly history; mixed-resolution handling
   - Map which catalog tariffs settle on ¼‑h EPEX vs hourly average; document billing vs plan mismatch if MILP stays hourly
@@ -61,6 +58,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.+1 — Introducing nested data models
 
+- [ ] When importing from existing Loxone config is working the other way round would also be possible:
+    - User has a complete HK with live scenario in place in Earnie
+    - Earnie generates pre-filled Loxone Template XML files (with correct ids, (multiple) evs, (multiple) consumers) for importing into Loxone config.
 - [ ] Check possibility for automatically learn consumer schedules (for known consumers) and nominal power (for all consumers) from sens_power_act to substitute or improve manual settings
 - [ ] Clarify how to handle wallbox <> EVs
   - for multiple wallboxes / EVs there is not a "natural" 1 to 1 binding - hence it must be clarified how to handle that (have a look at evcc)

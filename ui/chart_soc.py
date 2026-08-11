@@ -1,7 +1,8 @@
-"""SoC-Traces, Entladesperre-Band und Preis auf SoC-Achse."""
+"""SoC-Traces, ESS-Mode-Underlay und Preis auf SoC-Achse."""
 from __future__ import annotations
 
 import math
+import re
 from datetime import datetime, timedelta
 
 import config
@@ -12,18 +13,16 @@ from data.planning_window import normalize_hour_slot
 from optimizer import battery as bat
 from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN
 from ui.chart_colors import (
-    CHART_ENTLADESPERRE_BAND_FILL,
-    CHART_ENTLADESPERRE_BAND_STRIPE,
+    COLOR_ESS_UNDERLAY_CHARGE,
+    COLOR_ESS_UNDERLAY_DISCHARGE,
+    COLOR_ESS_UNDERLAY_HOLD,
     COLOR_SOC,
 )
-from ui.chart_consumer_stack import _CONSUMER_PV_FOLLOW_PATTERN, _is_entladesperre_command
 from ui.chart_slot_axis import (
     ChartSlotAxis,
-    _battery_bar_times,
     _chart_time_series,
     _line_plot_float,
     _optional_float,
-    _safe_float,
 )
 from ui.chart_trace_segments import (
     _EXPORT_PRICE_COLUMN,
@@ -34,13 +33,29 @@ from ui.chart_trace_segments import (
     _trace_segments,
 )
 
-_ENTLADESPERRE_BAND_HEIGHT_PCT = 4.0
+ESS_UNDERLAY_HOLD = "hold"
+ESS_UNDERLAY_CHARGE = "charge"
+ESS_UNDERLAY_DISCHARGE = "discharge"
 
+_ESS_UNDERLAY_NEAR_ZERO_FRACTION = 0.05
+_ESS_UNDERLAY_LINE_WIDTH = 7.5
+_ESS_UNDERLAY_OPACITY = 0.4
 
-_ENTLADESPERRE_BAND_Y_MIN = -5.0
+_ESS_UNDERLAY_TRACE_NAMES = {
+    ESS_UNDERLAY_HOLD: "Entladesperre / Hold",
+    ESS_UNDERLAY_CHARGE: "Zwangsladen",
+    ESS_UNDERLAY_DISCHARGE: "Zwangsentladen",
+}
+_ESS_UNDERLAY_COLORS = {
+    ESS_UNDERLAY_HOLD: COLOR_ESS_UNDERLAY_HOLD,
+    ESS_UNDERLAY_CHARGE: COLOR_ESS_UNDERLAY_CHARGE,
+    ESS_UNDERLAY_DISCHARGE: COLOR_ESS_UNDERLAY_DISCHARGE,
+}
 
-
-_ENTLADESPERRE_BAND_WIDTH_FRACTION = 0.85
+_ZWANGS_POWER_RE = re.compile(
+    r"^Zwangs(?:laden|entladen)\s*\(([-\d.]+)\s*kW\)",
+    re.IGNORECASE,
+)
 
 
 def _resolve_battery_params(battery_params: dict | None) -> dict:
@@ -396,82 +411,196 @@ def _soc_hover_labels_for_times(
     return labels
 
 
-def _entladesperre_band_marker() -> dict:
-    return dict(
-        color=CHART_ENTLADESPERRE_BAND_FILL,
-        opacity=0.95,
-        pattern=dict(
-            shape=_CONSUMER_PV_FOLLOW_PATTERN,
-            fgcolor=CHART_ENTLADESPERRE_BAND_STRIPE,
-            bgcolor=CHART_ENTLADESPERRE_BAND_FILL,
-            solidity=0.45,
-            fillmode="overlay",
+def _parse_zwangs_power_kw(command: str) -> float | None:
+    match = _ZWANGS_POWER_RE.match(str(command).strip())
+    if match is None:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
+
+
+def _ess_underlay_near_zero(power_kw: float, max_power_kw: float) -> bool:
+    if max_power_kw <= 0:
+        return abs(power_kw) <= 0.0
+    return abs(power_kw) < _ESS_UNDERLAY_NEAR_ZERO_FRACTION * max_power_kw
+
+
+def classify_ess_soc_underlay(
+    command,
+    max_power_kw: float,
+) -> str | None:
+    """Map Steuerbefehl → underlay kind (hold/charge/discharge) or None."""
+    text = str(command)
+    if "Entladesperre" in text:
+        return ESS_UNDERLAY_HOLD
+    if text.startswith("Zwangsladen"):
+        power = _parse_zwangs_power_kw(text)
+        if power is None:
+            power = 0.0
+        if _ess_underlay_near_zero(power, max_power_kw):
+            return ESS_UNDERLAY_HOLD
+        return ESS_UNDERLAY_CHARGE
+    if text.startswith("Zwangsentladen"):
+        power = _parse_zwangs_power_kw(text)
+        if power is None:
+            power = 0.0
+        if _ess_underlay_near_zero(power, max_power_kw):
+            return ESS_UNDERLAY_HOLD
+        return ESS_UNDERLAY_DISCHARGE
+    return None
+
+
+def _contiguous_underlay_runs(
+    kinds: list[str | None],
+    start: int,
+    end: int,
+) -> list[tuple[int, int, str]]:
+    runs: list[tuple[int, int, str]] = []
+    index = start
+    while index < end:
+        kind = kinds[index]
+        if kind is None:
+            index += 1
+            continue
+        run_end = index + 1
+        while run_end < end and kinds[run_end] == kind:
+            run_end += 1
+        runs.append((index, run_end, kind))
+        index = run_end
+    return runs
+
+
+def _add_ess_underlay_scatter(
+    fig: go.Figure,
+    *,
+    soc_x: pd.Series,
+    soc_y: pd.Series,
+    kind: str,
+    hover_labels: list[str],
+    yaxis: str,
+    show_legend: bool,
+) -> None:
+    fig.add_trace(go.Scatter(
+        x=soc_x,
+        y=soc_y,
+        name=_ESS_UNDERLAY_TRACE_NAMES[kind],
+        showlegend=show_legend,
+        mode="lines",
+        line=dict(color=_ESS_UNDERLAY_COLORS[kind], width=_ESS_UNDERLAY_LINE_WIDTH),
+        opacity=_ESS_UNDERLAY_OPACITY,
+        yaxis=yaxis,
+        connectgaps=False,
+        customdata=hover_labels,
+        hovertemplate=(
+            "Uhrzeit: %{customdata}<br>%{fullData.name}<extra></extra>"
         ),
+    ))
+
+
+def _underlay_part_ranges(
+    length: int,
+    history_slot_count: int | None,
+) -> list[tuple[int, int]]:
+    if history_slot_count is not None and 0 < history_slot_count < length:
+        return [(0, history_slot_count), (history_slot_count, length)]
+    return [(0, length)]
+
+
+def _add_ess_underlay_run(
+    fig: go.Figure,
+    *,
+    axis: ChartSlotAxis,
+    soc: pd.Series,
+    uhrzeit: pd.Series,
+    df: pd.DataFrame,
+    run_start: int,
+    run_end: int,
+    kind: str,
+    length: int,
+    yaxis: str,
+    legend_shown: set[str],
+    battery_params: dict | None,
+) -> None:
+    seg_tail = None
+    if run_end == length:
+        seg_tail = _soc_tail_y_from_row(df.iloc[-1], battery_params=battery_params)
+    soc_x, soc_y = _segment_connected_line_xy(
+        axis, soc, run_start, run_end, tail_y=seg_tail, step_line=False,
     )
+    if soc_x.empty:
+        return
+    hover_labels = _soc_hover_labels_for_times(soc_x, uhrzeit, axis.starts)
+    show_legend = kind not in legend_shown
+    _add_ess_underlay_scatter(
+        fig,
+        soc_x=soc_x,
+        soc_y=soc_y,
+        kind=kind,
+        hover_labels=hover_labels,
+        yaxis=yaxis,
+        show_legend=show_legend,
+    )
+    legend_shown.add(kind)
 
 
-def _entladesperre_soc_band_bottom(soc: float) -> float:
-    return max(_ENTLADESPERRE_BAND_Y_MIN, soc - _ENTLADESPERRE_BAND_HEIGHT_PCT)
-
-
-def add_entladesperre_soc_band_traces(
+def add_ess_mode_soc_underlay_traces(
     fig: go.Figure,
     df: pd.DataFrame,
     axis: ChartSlotAxis,
+    yaxis: str = "y2",
     extrap_start: int | None = None,
     extrap_end: int | None = None,
+    history_slot_count: int | None = None,
+    battery_params: dict | None = None,
 ) -> None:
-    """Gelb-schwarz gestreiftes Band knapp unter dem SoC bei Entladesperre."""
+    """Thicker translucent SoC underlay by ESS mode (hold/charge/discharge)."""
     if "Steuerbefehl" not in df.columns or "Simulierter SoC (%)" not in df.columns:
         return
+    params = _resolve_battery_params(battery_params)
+    max_power_kw = float(params.get("max_power_kw") or 0.0)
     commands = df["Steuerbefehl"]
-    soc_series = df["Simulierter SoC (%)"]
+    soc = df["Simulierter SoC (%)"]
     uhrzeit = df["Uhrzeit"]
-    segments = _trace_segments(len(df), extrap_start, extrap_end)
-    legend_shown = False
-    for start, end, _is_extrapolated in segments:
-        indices = [
-            index
-            for index in range(start, end)
-            if _is_entladesperre_command(commands.iloc[index])
-        ]
-        if not indices:
-            continue
-        xs: list = []
-        ys: list[float] = []
-        bases: list[float] = []
-        widths: list[float] = []
-        custom: list = []
-        for index in indices:
-            soc = _safe_float(soc_series.iloc[index], 0.0)
-            band_bottom = _entladesperre_soc_band_bottom(soc)
-            band_height = max(0.0, soc - band_bottom)
-            if band_height <= 0:
-                continue
-            xs.append(_battery_bar_times(axis, index).iloc[0])
-            ys.append(band_height)
-            bases.append(band_bottom)
-            widths.append(
-                axis.bar_width_ms(_ENTLADESPERRE_BAND_WIDTH_FRACTION, index)
-            )
-            custom.append(uhrzeit.iloc[index])
-        if not xs:
-            continue
-        fig.add_trace(go.Bar(
-            x=xs,
-            y=ys,
-            base=bases,
-            name="Entladesperre",
-            showlegend=not legend_shown,
-            marker=_entladesperre_band_marker(),
-            width=widths,
-            yaxis="y2",
-            customdata=custom,
-            hovertemplate=(
-                "Uhrzeit: %{customdata}<br>Entladesperre aktiv<extra></extra>"
-            ),
-        ))
-        legend_shown = True
+    length = len(df)
+    kinds = [
+        classify_ess_soc_underlay(commands.iloc[i], max_power_kw)
+        for i in range(length)
+    ]
+    legend_shown: set[str] = set()
+    for part_start, part_end in _underlay_part_ranges(length, history_slot_count):
+        part_extrap_start: int | None = None
+        part_extrap_end: int | None = None
+        if extrap_start is not None and extrap_end is not None:
+            abs_extrap_start = max(extrap_start, part_start)
+            abs_extrap_end = min(extrap_end, part_end)
+            if abs_extrap_start < abs_extrap_end:
+                part_extrap_start = abs_extrap_start - part_start
+                part_extrap_end = abs_extrap_end - part_start
+        segments = _trace_segments(
+            part_end - part_start, part_extrap_start, part_extrap_end
+        )
+        for start, end, _is_extrapolated in segments:
+            abs_start = part_start + start
+            abs_end = part_start + end
+            for run_start, run_end, kind in _contiguous_underlay_runs(
+                kinds, abs_start, abs_end
+            ):
+                _add_ess_underlay_run(
+                    fig,
+                    axis=axis,
+                    soc=soc,
+                    uhrzeit=uhrzeit,
+                    df=df,
+                    run_start=run_start,
+                    run_end=run_end,
+                    kind=kind,
+                    length=length,
+                    yaxis=yaxis,
+                    legend_shown=legend_shown,
+                    battery_params=battery_params,
+                )
 
 
 def add_optimized_soc_trace(
