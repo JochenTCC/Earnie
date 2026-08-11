@@ -3,15 +3,17 @@
 Reine Kosten-/Startzeit-Logik ohne Streamlit-Abhängigkeit (Schritt 3a).
 Bewusst getroffene Modell-Entscheidungen:
 
-- Startgüte = reine Netzbezugskosten (€) je möglicher Startstunde; PV wird
-  nicht berücksichtigt (Entscheidung 2026-07).
-- Sterne (1–5) nach kombinierter Regel: zuerst absolute k_act-Marge (ct/kWh),
-  danach prozentuale Mehrkosten gegenüber der günstigsten Startstunde.
+- Startgüte = Opportunitätskosten (€) je möglicher Startstunde: PV-Überschuss
+  bewertet mit Einspeisetarif ``k_push_act``, Rest mit Bezugspreis ``k_act``
+  (MILP-aligned; ersetzt die reine Netzbezug-Regel von 2026-07).
+- Sterne (1–5) nach kombinierter Regel: zuerst absolute Marge der fiktiven
+  ct/kWh-Serie, danach prozentuale Mehrkosten gegenüber der günstigsten
+  Startstunde.
 - Ein Lauf darf über das Horizontende hinausreichen, solange genügend
   Planungs-Slots vorliegen; sonst entfallen die betroffenen Startstunden.
 
 Die Planungs-Slots sind stündlich (siehe ``data.profile_manager``); ein Slot
-entspricht daher einer Stunde. ``k_act`` ist der Brutto-Netzpreis in Cent/kWh.
+entspricht daher einer Stunde.
 """
 from __future__ import annotations
 
@@ -102,15 +104,34 @@ def _slot_run_weights(runtime_h: float) -> list[float]:
     return weights
 
 
-def _slot_price_cent(slot: dict) -> float:
-    """Brutto-Netzpreis (Cent/kWh) eines Planungs-Slots; Fehler statt Default."""
-    value = slot.get("k_act")
-    if value is None:
+def _require_slot_float(slot: dict, key: str) -> float:
+    """Liest ein Pflicht-Float-Feld aus dem Planungs-Slot; Fehler statt Default."""
+    if key not in slot or slot[key] is None:
         raise ValueError(
-            "recommend_start_times: Planungs-Slot ohne 'k_act' "
-            "(Brutto-Netzpreis in Cent/kWh)."
+            f"recommend_start_times: Planungs-Slot ohne '{key}'."
         )
-    return float(value)
+    return float(slot[key])
+
+
+def _slot_opportunity_cost_cent(slot: dict, power_kw: float) -> float:
+    """Opportunitätskosten (Cent) für 1 h Betrieb mit ``power_kw`` in diesem Slot.
+
+    PV-Überschuss (``expected_p_pv − expected_p_act``) wird mit ``k_push_act``
+    bewertet, der Rest mit ``k_act``.
+    """
+    k_act = _require_slot_float(slot, "k_act")
+    k_push = _require_slot_float(slot, "k_push_act")
+    p_pv = _require_slot_float(slot, "expected_p_pv")
+    p_act = _require_slot_float(slot, "expected_p_act")
+    surplus_kw = max(0.0, p_pv - p_act)
+    pv_share = min(power_kw, surplus_kw)
+    grid_share = power_kw - pv_share
+    return pv_share * k_push + grid_share * k_act
+
+
+def _slot_effective_price_cent(slot: dict, power_kw: float) -> float:
+    """Fiktiver Durchschnittspreis (Cent/kWh) für ``power_kw`` in diesem Slot."""
+    return _slot_opportunity_cost_cent(slot, power_kw) / power_kw
 
 
 def run_cost_eur(
@@ -119,13 +140,18 @@ def run_cost_eur(
     """Laufkosten (€) für einen Start bei start_index über die gegebenen Slot-Gewichte."""
     cost_cent = 0.0
     for offset, weight in enumerate(weights):
-        cost_cent += power_kw * weight * _slot_price_cent(slots[start_index + offset])
+        cost_cent += weight * _slot_opportunity_cost_cent(
+            slots[start_index + offset], power_kw
+        )
     return cost_cent / 100.0
 
 
-def _max_k_act_for_run(slots: list, start_index: int, weights: list[float]) -> float:
+def _max_effective_price_for_run(
+    slots: list, start_index: int, weights: list[float], power_kw: float
+) -> float:
     values = [
-        _slot_price_cent(slots[start_index + offset]) for offset in range(len(weights))
+        _slot_effective_price_cent(slots[start_index + offset], power_kw)
+        for offset in range(len(weights))
     ]
     return max(values)
 
@@ -147,8 +173,9 @@ def _assign_stars(
     costs: list[float],
     settings: StarThresholdSettings,
     horizon_h: int,
+    power_kw: float,
 ) -> list[int]:
-    """Kombinierte Sterne-Regel: k_act-Marge, danach prozentuale Mehrkosten."""
+    """Kombinierte Sterne-Regel: fiktive ct/kWh-Marge, danach %-Mehrkosten."""
     _validate_star_settings(settings)
     if not costs:
         return []
@@ -157,11 +184,13 @@ def _assign_stars(
         return [STAR_NEUTRAL] * len(costs)
 
     horizon_slots = min(horizon_h, len(slots))
-    min_k_act = min(_slot_price_cent(slots[i]) for i in range(horizon_slots))
+    min_price = min(
+        _slot_effective_price_cent(slots[i], power_kw) for i in range(horizon_slots)
+    )
     stars: list[int] = []
     for start, cost in zip(valid_starts, costs):
-        max_k_act = _max_k_act_for_run(slots, start, weights)
-        if max_k_act <= min_k_act + settings.abs_margin_cent:
+        max_price = _max_effective_price_for_run(slots, start, weights, power_kw)
+        if max_price <= min_price + settings.abs_margin_cent:
             stars.append(STAR_MAX)
             continue
         if min_cost < _EPS:
@@ -180,11 +209,11 @@ def recommend_start_times(
     horizon_h: int = DEFAULT_HORIZON_H,
     star_settings: StarThresholdSettings | None = None,
 ) -> ApplianceRecommendation:
-    """Rankt die möglichen Startstunden im Horizont nach Netzbezugskosten.
+    """Rankt die möglichen Startstunden im Horizont nach Opportunitätskosten.
 
     ``slots`` ist eine chronologische Liste stündlicher Planungs-Slots
-    (dicts mit ``slot_datetime`` und ``k_act`` in Cent/kWh), z. B. aus
-    ``data.profile_manager.build_live_planning_matrix``.
+    (dicts mit ``slot_datetime``, ``k_act``, ``k_push_act``, ``expected_p_pv``,
+    ``expected_p_act``), z. B. aus ``data.profile_manager``.
     """
     _validate_inputs(slots, power_kw, runtime_h, horizon_h)
     thresholds = star_settings or DEFAULT_STAR_THRESHOLDS
@@ -199,7 +228,9 @@ def recommend_start_times(
         )
 
     costs = [run_cost_eur(slots, s, power_kw, weights) for s in valid_starts]
-    stars = _assign_stars(slots, valid_starts, weights, costs, thresholds, horizon_h)
+    stars = _assign_stars(
+        slots, valid_starts, weights, costs, thresholds, horizon_h, power_kw
+    )
     immediate_cost = costs[0]
     options = [
         StartOption(

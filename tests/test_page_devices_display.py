@@ -65,11 +65,22 @@ def test_appliance_loxone_power_name_legacy_fallback() -> None:
     assert _appliance_loxone_power_name(appliance) == "Legacy Merker"
 
 
-def test_recommendation_dataframe_delta_to_best() -> None:
-    slots = [
-        {"slot_datetime": BASE + timedelta(hours=i), "k_act": price}
-        for i, price in enumerate([30.0, 10.0, 20.0, 40.0, 25.0, 35.0])
+def _make_slots(prices_cent: list[float]) -> list[dict]:
+    """Planungs-Slots ohne PV-Überschuss (Import-only Opportunitätskosten)."""
+    return [
+        {
+            "slot_datetime": BASE + timedelta(hours=i),
+            "k_act": price,
+            "k_push_act": 0.0,
+            "expected_p_pv": 0.0,
+            "expected_p_act": 0.0,
+        }
+        for i, price in enumerate(prices_cent)
     ]
+
+
+def test_recommendation_dataframe_delta_to_best() -> None:
+    slots = _make_slots([30.0, 10.0, 20.0, 40.0, 25.0, 35.0])
     rec = recommend_start_times(slots, power_kw=1.0, runtime_h=1.0)
     df = _recommendation_dataframe(rec)
     cheapest_row = df.loc[df["Start"] == f"{rec.cheapest.start_datetime:%H:%M}"]
@@ -80,10 +91,7 @@ def test_recommendation_dataframe_delta_to_best() -> None:
 
 
 def test_style_recommendation_dataframe_formats_signed_delta() -> None:
-    slots = [
-        {"slot_datetime": BASE + timedelta(hours=i), "k_act": price}
-        for i, price in enumerate([30.0, 10.0, 20.0, 40.0, 25.0, 35.0])
-    ]
+    slots = _make_slots([30.0, 10.0, 20.0, 40.0, 25.0, 35.0])
     rec = recommend_start_times(slots, power_kw=1.0, runtime_h=1.0)
     html = _style_recommendation_dataframe(rec).to_html()
     assert "+0.20" in html

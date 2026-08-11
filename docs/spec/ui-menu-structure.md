@@ -71,7 +71,7 @@ Pro Gerät (Waschmaschine, Trockner, Geschirrspüler):
 
 1. **Leistung & Laufzeit:** aus Hausprofil (`appliance_recommendation`); optionaler Loxone-Merker in `loxone_inputs.power_name` (noch keine Live-Abfrage).
 2. **Empfehlungshorizont:** je Gerät aus Hausprofil (`schedule.start_shift_h` bei `earnie_role: manual`).
-3. Über den **Empfehlungshorizont** wird für jeden möglichen Startslot die Stromkosten des Laufs berechnet → **günstigste Startzeit** + **Startgüte** (Kosten in €, plus Ersparnis vs. „sofort starten").
+3. Über den **Empfehlungshorizont** wird für jeden möglichen Startslot die Opportunitätskosten des Laufs berechnet (PV-Überschuss × Einspeisetarif + Rest × Bezugspreis) → **günstigste Startzeit** + **Startgüte** (Kosten in €, plus Ersparnis vs. „sofort starten").
 4. Rein **beratend** — kein Loxone-Schaltsignal.
 
 ### 5.3 Konfiguration (Z. 17, Roh-JSON-Editor)
@@ -96,13 +96,16 @@ Umzug in eine eigene Seite; bleibt per `ui.price_forecast_page_enabled` / `EARNI
 
 ## 6. Empfehlungsmodus — Algorithmus
 
-Für ein Gerät mit Leistung `P` (kW) und Laufzeit `d` (in 15-min-Slots):
+Für ein Gerät mit Leistung `P` (kW) und Laufzeit `d` (in Stunden; Planungsmatrix stündlich):
 
 1. Nächste *h* (Empfehlungshorizont je Gerät) aus der **persistierten Planungsmatrix** im letzten `live_optimization_debug.json` (geschrieben von `main.py`; kein Live-Matrix-Build in der UI).
-2. Für jeden möglichen Startslot `s` die Laufkosten über die `d` Slots ab `s` summieren:
-   `Kosten(s) = Σ P × slot_dauer_h × Netzpreis`, wobei PV-gedeckter Anteil den Netzbezug (und damit die Kosten) reduziert.
+2. Für jeden möglichen Startslot `s` die Laufkosten über die Laufzeit ab `s` summieren. Pro Slot gilt die **Opportunitätskosten**-Regel:
+   - `surplus = max(0, expected_p_pv − expected_p_act)`
+   - `pv_share = min(P, surplus)`, `grid_share = P − pv_share`
+   - Slotkosten (Cent) = `pv_share × k_push_act + grid_share × k_act` (Zeiten als Slot-Gewicht in h)
+   - `Kosten(s)` = Summe der Slotkosten / 100 (€)
 3. **Günstigste Startzeit** = Slot mit minimalen Kosten.
-4. **Startgüte** = diese Kosten (€), ergänzt um die Ersparnis gegenüber „sofort starten".
+4. **Startgüte** = diese Kosten (€), ergänzt um die Ersparnis gegenüber „sofort starten". Sterne nutzen dieselbe fiktive ct/kWh-Serie (`Slotkosten / P`) für die absolute Marge.
 
 Kernlogik als reine, testbare Funktion in `optimizer/appliance_recommendation.py` (ohne Streamlit-Abhängigkeit).
 

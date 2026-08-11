@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Manual consumers opportunity-cost fictitious price (2026-08-11)
+
+- [x] Manual appliance Startempfehlung: combined fictitious price (PV surplus × `k_push_act` + remainder × `k_act`); stars on same series; UI/docs; merged duplicate “PV into account” item from Version 2.+1
+
+
 ### Bugfix SE battery standby ignored (2026-08-11)
 
 - [x] Battery Standby Power not calculated correctly in SE — low vs high standby same result (`earnie_env`). Cause: `_scenario_to_battery_params` dropped `standby_power_kw`. Fix: pass standby through; regression in `tests/test_battery_standby.py`. Live path already OK. Verified (SE 1-month test).

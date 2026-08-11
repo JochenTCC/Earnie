@@ -40,7 +40,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Nothing, when in Automode
   - Cyan when in Zwangsladen but charging power is near zero (Remove yellow / black bar)
   - Blue when in Zwangsladen with higher charging power
-- [ ] For manual consumers do not take only import tariffs into account but also PV energy creation and export tariffs. Calculate a combined fictitious price (find rule for calculation)
 - [ ] Add the possibility that EV is charged immediately to a min SOC independent from regular schedule
 - [ ] **2.5.a — Data & tariff fidelity**
   - Confirm Energy-Charts 15‑min coverage (AT/DE-LU/CH) vs pre-2025-10 hourly history; mixed-resolution handling
@@ -71,7 +70,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Cosign/Sigstore in release CI + startup verifier + production signing keys
   - Watermark vs refuse-to-start decision; offline public-key path
   - Spec: `[docs/spec/hardware-registry-layer-c.md](../docs/spec/hardware-registry-layer-c.md)`
-- [ ] For manual consumers take also PV into account - not just tariffs (check)
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
   - Move Loxone markers to data model - remove flat definition in config.json where possible
   - **Note:** Thin marker↔role prep and UI editability are in **2.3.f**; EHAL core / DACH adapters / Loxone-EHAL extraction in **2.4** (`2.4.e`). This chapter owns nesting / structure, not the EHAL interface rewrite.

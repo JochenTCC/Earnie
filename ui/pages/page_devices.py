@@ -1,8 +1,8 @@
 """Manuelle Geräte: Empfehlungsmodus (günstigste Startzeit im Empfehlungshorizont).
 
 Rein beratend: Nennleistung und Laufzeit kommen aus dem Hausprofil (Hauskonfigurator).
-Pro Gerät wird die günstigste Startstunde nach Netzbezugskosten im konfigurierten
-Empfehlungshorizont ermittelt.
+Pro Gerät wird die günstigste Startstunde nach Opportunitätskosten (PV-Überschuss
+zu Einspeisetarif, Rest zu Bezugspreis) im konfigurierten Empfehlungshorizont ermittelt.
 """
 from __future__ import annotations
 
@@ -34,7 +34,8 @@ from ui.runtime_config import invalidate_live_optimization_cache
 _DEVICES_HELP = (
     "Empfehlungsmodus für manuelle Geräte (Waschmaschine, Trockner, "
     "Geschirrspüler): günstigste Startstunde im konfigurierten "
-    "Empfehlungshorizont (Hausprofil) nach reinen Netzbezugskosten. "
+    "Empfehlungshorizont (Hausprofil) nach Opportunitätskosten — "
+    "PV-Überschuss zum Einspeisetarif, Rest zum Bezugspreis. "
     "Optional kann eine Startstunde in die nächste Optimierung einfließen "
     "(Nennleistung × Laufzeit)."
 )
@@ -147,8 +148,9 @@ def _render_star_threshold_settings() -> None:
     settings = config.get_appliance_recommendation_settings()
     with st.expander("Sterne-Schwellen", expanded=False):
         st.caption(
-            "5 Sterne wenn kein Slot des Laufs mehr als die absolute k_act-Marge "
-            "über dem günstigsten Horizont-Preis liegt; sonst prozentuale Mehrkosten."
+            "5 Sterne wenn kein Slot des Laufs mehr als die absolute Marge "
+            "(fiktiver ct/kWh-Preis) über dem günstigsten Horizont-Preis liegt; "
+            "sonst prozentuale Mehrkosten."
         )
         with st.form(key="appliance_star_thresholds_form"):
             margin = st.number_input(

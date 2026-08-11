@@ -104,6 +104,8 @@ Earnie schaltet nur **ergänzend** außerhalb des nativen Fensters ein (`flex.po
 
 Waschmaschine, Trockner usw. als `generic`**-Verbraucher** in `house_profiles.json` (optional `appliance_recommendation` für Loxone-Leistung und Empfehlungsmodus). Planung über die Seite **Manuelle Geräte**; Persistenz in `runtime/appliance_schedules.json`. Geplante Laufzeiten erscheinen in Chart 1 (Flow-Balance).
 
+**Startempfehlung (Opportunitätskosten):** Ranking und Sterne nutzen nicht den reinen Bezugspreis. Pro Planungsstunde gilt: PV-Überschuss (`expected_p_pv − expected_p_act`) wird mit dem Einspeisetarif (`k_push_act`) bewertet, der Rest mit dem Bezugspreis (`k_act`). Batteriepfade sind in dieser Näherung nicht enthalten.
+
 
 | Feld                                                             | Bedeutung                                                      |
 | ---------------------------------------------------------------- | -------------------------------------------------------------- |
