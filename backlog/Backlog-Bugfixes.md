@@ -23,10 +23,12 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] EV short unplug before FertigUm skipped today's cycle (`debug_dump_20260808_102915`) — `open_charging_deadlines` latch keeps `available_from=now` until deadline/fulfill; tests in `test_charging_session.py` / `test_charging_context.py`. Live acceptance pending.
+- [ ] Pool filter Ist not assigned when only `sens_filter_active` is bound (`debug_dump_20260808_232225`) — binary meter accepts alternate-only; regression in `test_loxone_client.py`. Live acceptance pending.
+- [ ] Monitor Chart 1 phantom Kochen + missing battery export (`debug_dump_20260810_212549`) — skip known schedule peel on history Ist slots (`house_config/known_chart_display.py`); test `test_history_ist_slots_skip_known_schedule_peel`. Live acceptance pending.
+
 
 ## New Bugs (Do not remove this chapter — even if empty)
-
-- [ ] Zähler Energiebezug can be ignored for consumers (not an Earnie issue)
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

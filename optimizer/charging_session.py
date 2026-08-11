@@ -20,6 +20,15 @@ def _parse_deadline(value: str | dt.datetime | None) -> dt.datetime | None:
     return dt.datetime.fromisoformat(text)
 
 
+def deadline_reached(now: dt.datetime, deadline: dt.datetime) -> bool:
+    """Compare now/deadline even if only one side is timezone-aware."""
+    if now.tzinfo is None and deadline.tzinfo is not None:
+        return now >= deadline.replace(tzinfo=None)
+    if now.tzinfo is not None and deadline.tzinfo is None:
+        return now.replace(tzinfo=None) >= deadline
+    return now >= deadline
+
+
 def is_charging_session_context(consumer: dict, ctx: dict | None) -> bool:
     """True wenn Ladeziel an eine Deadline gebunden ist (nicht Tageszähler)."""
     if not charging_schedule_enabled(consumer):
@@ -50,7 +59,7 @@ def purge_expired_sessions(
     fulfilled_purged: set[str] = set()
     for cid in list(sessions):
         deadline = _parse_deadline(sessions[cid].get("deadline"))
-        if deadline is not None and now >= deadline:
+        if deadline is not None and deadline_reached(now, deadline):
             if session_target_fulfilled(sessions[cid]):
                 fulfilled_purged.add(cid)
             del sessions[cid]
@@ -78,6 +87,66 @@ def sync_plug_cycle_fulfilled(
         if ctx.get("plugged_in") is False:
             out.pop(cid, None)
     return out
+
+
+def _context_marks_cycle_complete(ctx: dict) -> bool:
+    """True wenn angesteckt und Ladung für diesen Zyklus als erledigt gilt."""
+    if ctx.get("plugged_in") is not True:
+        return False
+    if ctx.get("active", True):
+        return False
+    src = str(ctx.get("source_label") or "").lower()
+    return "abgeschlossen" in src or "erfüllt" in src or "erfuellt" in src
+
+
+def sync_open_charging_deadlines(
+    open_deadlines: dict[str, str],
+    charging_contexts: dict[str, dict],
+    *,
+    plug_cycle_fulfilled: dict[str, bool] | None = None,
+    now: dt.datetime,
+) -> dict[str, str]:
+    """
+    Latch: aktive Plug-Deadline bleibt über kurzes Unplug erhalten.
+
+    Gesetzt solange angesteckt + aktiver Ladekontext mit Deadline.
+    Gelöscht bei Deadline-Ablauf, Ziel erreicht oder Ladung abgeschlossen.
+    Unplug allein löscht den Latch nicht (Kurzunterbrechung vor FertigUm).
+    """
+    fulfilled = plug_cycle_fulfilled or {}
+    out: dict[str, str] = {}
+    for cid, raw_dl in (open_deadlines or {}).items():
+        if fulfilled.get(cid):
+            continue
+        deadline = _parse_deadline(raw_dl)
+        if deadline is None or deadline_reached(now, deadline):
+            continue
+        out[str(cid)] = deadline.isoformat(timespec="seconds")
+
+    for cid, ctx in charging_contexts.items():
+        key = str(cid)
+        if fulfilled.get(key):
+            out.pop(key, None)
+            continue
+        if _context_marks_cycle_complete(ctx):
+            out.pop(key, None)
+            continue
+        if ctx.get("plugged_in") is not True or not ctx.get("active", True):
+            continue
+        deadline = ctx.get("deadline")
+        if not isinstance(deadline, dt.datetime) or deadline_reached(now, deadline):
+            continue
+        out[key] = deadline.isoformat(timespec="seconds")
+    return out
+
+
+def parse_open_charging_deadline(
+    open_deadlines: dict[str, str] | None,
+    consumer_id: str,
+) -> dt.datetime | None:
+    if not open_deadlines:
+        return None
+    return _parse_deadline(open_deadlines.get(str(consumer_id)))
 
 
 def sync_charging_sessions(
@@ -158,6 +227,15 @@ def normalize_consumer_state(
         fulfilled_raw = {}
     fulfilled = {str(cid): True for cid, flag in fulfilled_raw.items() if flag}
 
+    open_raw = dict(raw.get("open_charging_deadlines") or {})
+    if not isinstance(open_raw, dict):
+        open_raw = {}
+    open_deadlines = {
+        str(cid): str(dl)
+        for cid, dl in open_raw.items()
+        if dl is not None and str(dl).strip()
+    }
+
     if charging_contexts:
         purged_fulfilled = sync_charging_sessions(
             sessions,
@@ -172,10 +250,22 @@ def normalize_consumer_state(
             sessions,
             fulfilled_from_purge=purged_fulfilled,
         )
+        open_deadlines = sync_open_charging_deadlines(
+            open_deadlines,
+            charging_contexts,
+            plug_cycle_fulfilled=fulfilled,
+            now=current,
+        )
     else:
         purged_fulfilled = purge_expired_sessions(sessions, current)
         for cid in purged_fulfilled:
             fulfilled[cid] = True
+        open_deadlines = sync_open_charging_deadlines(
+            open_deadlines,
+            {},
+            plug_cycle_fulfilled=fulfilled,
+            now=current,
+        )
 
     delivered = dict(raw.get("delivered") or {})
     if not isinstance(delivered, dict):
@@ -196,4 +286,5 @@ def normalize_consumer_state(
         "charging_sessions": sessions,
         "generic_flex_run": generic_flex_run,
         "plug_cycle_fulfilled": fulfilled,
+        "open_charging_deadlines": open_deadlines,
     }

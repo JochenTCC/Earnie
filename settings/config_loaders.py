@@ -368,6 +368,7 @@ def load_full_runtime_params(
         "BATTERY_MAX_SOC": float(
             lookup_runtime_value(resolved, "battery_max_soc", config_path)
         ),
+        "BATTERY_STANDBY_POWER_KW": float(resolved.get("standby_power_kw", 0.0) or 0.0),
         "THRESHOLD_POWER": validate_threshold_power(
             lookup_runtime_value(resolved, "threshold_power", config_path)
         ),

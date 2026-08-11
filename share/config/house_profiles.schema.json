@@ -547,6 +547,11 @@
           ],
           "description": "Land für Tariffilter (Szenarienkonfigurator). Soft-Default AT wenn fehlend."
         },
+        "netznutzung_arbeitspreis_cent_kwh": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Netznutzung Arbeitspreis (Cent/kWh netto, ohne USt). Unabhängig vom Lieferantentarif; wird zum Bezugspreis addiert."
+        },
         "latitude": {
           "type": "number",
           "description": "Breitengrad (Standort Heizung/PV)."

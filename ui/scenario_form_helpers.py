@@ -329,7 +329,6 @@ def build_scenario_settings(
     import_tariff_id: str,
     export_tariff_id: str,
     house_profile_id: str,
-    netzentgelt_cent_kwh_override: float | None = None,
     use_imported_pv: bool = False,
 ) -> dict:
     settings: dict = {}
@@ -348,8 +347,6 @@ def build_scenario_settings(
         settings["export_tariff_id"] = export_tariff_id
     if house_profile_id:
         settings["house_profile_id"] = house_profile_id
-    if netzentgelt_cent_kwh_override is not None and netzentgelt_cent_kwh_override > 0.0:
-        settings["netzentgelt_cent_kwh_override"] = float(netzentgelt_cent_kwh_override)
     if use_imported_pv:
         settings["use_imported_pv"] = True
     return settings
@@ -365,7 +362,6 @@ def normalize_scenario_form_snapshot(scenario: dict) -> dict:
         import_tariff_id=str(raw_settings.get("import_tariff_id", "") or "").strip(),
         export_tariff_id=str(raw_settings.get("export_tariff_id", "") or "").strip(),
         house_profile_id=str(raw_settings.get("house_profile_id", "") or "").strip(),
-        netzentgelt_cent_kwh_override=raw_settings.get("netzentgelt_cent_kwh_override"),
         use_imported_pv=bool(raw_settings.get("use_imported_pv")),
     )
     out = {
@@ -412,9 +408,6 @@ def read_scenario_form_snapshot(
         import_tariff_id=lookup_entity_id(imp_map, import_pick),
         export_tariff_id=lookup_entity_id(exp_map, export_pick),
         house_profile_id=lookup_entity_id(prof_map, profile_pick),
-        netzentgelt_cent_kwh_override=float(
-            session_state.get(scoped_widget_key(session_scope, "scenario_netzentgelt"), 0.0) or 0.0
-        ),
         use_imported_pv=bool(
             session_state.get(scoped_widget_key(session_scope, "scenario_use_imported_pv"), False)
         ),

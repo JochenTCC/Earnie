@@ -71,6 +71,9 @@ def _serialize_battery(spec: dict) -> dict:
         "battery_max_soc": spec["battery_max_soc"],
         "threshold_power": spec["threshold_power"],
     }
+    standby = float(spec.get("standby_power_kw", 0.0) or 0.0)
+    if standby > 0.0:
+        out["standby_power_kw"] = standby
     wear = spec.get("battery_wear")
     if wear is not None:
         out["battery_wear"] = wear

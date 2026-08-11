@@ -26,7 +26,7 @@ def type_caption(tariff: dict, labels: dict[str, str]) -> str:
 
 def _fmt_number(value: float | int, *, suffix: str = "") -> str:
     num = float(value)
-    text = f"{num:g}" if num == int(num) else f"{num:.2f}"
+    text = f"{num:g}" if num == int(num) else f"{num:.3f}"
     return f"{text}{suffix}" if suffix else text
 
 
@@ -72,7 +72,7 @@ def _append_monthly_rates_summary(
     rows.append(
         (
             "Monatsraten Min–Max (Cent/kWh)",
-            f"{min(cents):.2f} – {max(cents):.2f}",
+            f"{min(cents):.3f} – {max(cents):.3f}",
         )
     )
 
@@ -127,9 +127,6 @@ def _append_fee_vat_fields(rows: list[tuple[str, str]], tariff: dict) -> None:
     _append_if_present(rows, tariff, "markup_percent", "Aufschlag", suffix=" %")
     _append_bool_if_present(rows, tariff, "prices_include_vat", "Preise inkl. USt")
     _append_if_present(rows, tariff, "vat_percent", "USt", suffix=" %")
-    _append_if_present(
-        rows, tariff, "netzentgelt_cent_kwh", "Netzentgelt", suffix=" Cent/kWh"
-    )
 
 
 def _append_type_specific_rows(

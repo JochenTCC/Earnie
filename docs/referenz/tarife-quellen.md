@@ -15,14 +15,15 @@ Verwandt: [Preise & aWATTar](../konfiguration/preise.md) (Konfiguration/Typen) �
 | **Netzentgelt-Grundpreis** (`grid_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Messstellengebühr** (`metering_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
 | **Sonstige Fixkosten** (`other_monthly_fee_eur`) | **nein** | **ja** (wenn im Katalog) |
-| **Netznutzungsentgelte** (Arbeits-/Leistungspreis, netzgebietsspezifisch) | **nein** | **nein** |
+| **Netznutzung Arbeitspreis** (`netznutzung_arbeitspreis_cent_kwh` am Hausprofil) | **ja** (vor USt zum Bezugspreis) | **ja** |
+| **Netznutzung Leistungspreis** / netzgebietsspezifische Tabellen | **nein** | **nein** |
 | PLZ-/netzgebietsspezifische Stacks, separate Stromsteuer/Konzessionsabgabe | nein | nein |
 
-**Hinweis:** **Netznutzungsentgelte** fließen derzeit **nicht** in die Kostenrechnung ein (weder Live/MILP noch Szenario-Explorer). Optionale Katalogfelder wie `grid_monthly_fee_eur` oder `netzentgelt_cent_kwh` sind unvollständige Näherungs-Stubs — keine Abbildung echter, netzgebietsspezifischer Netznutzungsentgelte.
+**Hinweis:** Der volumetrische **Netznutzung Arbeitspreis** wird am Hausprofil (Standort) gepflegt und ist unabhängig vom Lieferantentarif. Leistungspreis und echte Netzgebiet-Lookup fehlen weiterhin. Optionaler Katalog-Stub `grid_monthly_fee_eur` bleibt nur SE-Monatsfixgebühr.
 
 Earnie liefert **gute-genug-€** für Vergleiche und Demos — **keine** Abrechnung gegen echte Stromrechnungen. Katalogwerte können unvollständig oder veraltet sein; bitte die Parameter im Szenarienkonfigurator prüfen.
 
-Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Markdown unter `{Log-Ordner}/invoices/{szenario_label}_jahresrechnung.md` (Dateiname aus der Szenario-Bezeichnung; Bezug/Einspeisung getrennt mit Ø Tarif- und Ø Ist-Preis, Fixkosten ausgewiesen, Tarifnamen im Kopf, Katalogparameter am Ende).
+Nach jedem SE-Lauf schreibt Earnie zusätzlich **Fake-Jahresrechnungen** als Markdown unter `{Log-Ordner}/invoices/{szenario_label}_jahresrechnung.md` (Dateiname aus der Szenario-Bezeichnung; Bezug/Einspeisung getrennt mit Ø Tarif- und Ø Ist-Preis, Fixkosten ausgewiesen, Tarifnamen im Kopf, Katalogparameter am Ende). Ist am Hausprofil ein **Netznutzung Arbeitspreis** gesetzt, erscheint ein Abschnitt **Netznutzung** und die Jahrestabelle trennt **Energiebezug (Lieferant)** und **Netznutzung Arbeitspreis** (Summe unverändert — kein Doppelzählen).
 
 - **Ø Tarif Cent/kWh:** arithmetisches Mittel der stündlichen Tarifpreise über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`).
 - **Ø Ist Cent/kWh:** `Energiekosten € / Netzenergie kWh × 100`.
@@ -34,7 +35,8 @@ Für Spot-/aWATTar-Tarife gilt (Cent/kWh), wie im Katalog und in der Vorschau:
 1. **Börsenpreis** der Stunde (Day-Ahead / EPEX-Zone zum Land des Tarifs).
 2. Optional **prozentualer Aufschlag** (`markup_percent`), z. B. 3 → Faktor 1,03.
 3. **Fixer Aufschlag** (`settlement_fee_cent_kwh`) in Cent/kWh.
-4. **Umsatzsteuer**, falls `prices_include_vat` = nein: Ergebnis × (1 + `vat_percent`/100).
+4. Optional **Netznutzung Arbeitspreis** aus dem Hausprofil (`netznutzung_arbeitspreis_cent_kwh`, netto).
+5. **Umsatzsteuer**, falls `prices_include_vat` = nein: Ergebnis × (1 + `vat_percent`/100).
 
 Formel:
 
@@ -101,8 +103,8 @@ Regel: Wert aus dem **Bezugstarif**; fehlt er dort, aus dem Einspeisetarif — *
 - Pro **Kalendermonat** im SE-Zeitraum: **eine volle** Gebühr — keine anteilige Kürzung.
 - Jahres-/Gesamtwert: Summe aller Fixkosten über alle Monate + volumetrische Energiekosten (Bezug minus Einspeiseerlös).
 - **Nicht** in Live-MILP, **nicht** in den stündlichen `sim_cost`-Kurven.
-- Optional volumetrisch: `netzentgelt_cent_kwh` fließt in den Bezugs-Arbeitspreis (wenn gesetzt) — **kein** Ersatz für echte Netznutzungsentgelte.
-- **Netznutzungsentgelte** (Arbeits-/Leistungspreis, netzgebietsspezifisch) werden derzeit **nicht** modelliert.
+- Volumetrische **Netznutzung Arbeitspreis** kommt aus dem Hausprofil (`netznutzung_arbeitspreis_cent_kwh`), nicht aus dem Tarifkatalog.
+- **Leistungspreis** und netzgebietsspezifische Lookup-Tabellen werden derzeit **nicht** modelliert.
 
 In der UI: Szenario-Explorer → Gesamtkosten und Monatliche Stromkosten (Hinweis „Näherung Monatsgebühren“, wenn Gebühren vorhanden; Hinweis zu Netznutzungsentgelten). Fake-Jahresrechnung: siehe §1.
 
@@ -115,7 +117,7 @@ Prüfen Sie insbesondere:
 - Stimmen Aufschlag und USt-Flag mit dem Tarifblatt des Anbieters überein?
 - Ist ein Lieferant-Grundpreis hinterlegt, den Sie erwarten — oder fehlt er (dann 0 in der SE-Rechnung)?
 - Bei gleichem Anbieter (z. B. aWATTar Bezug + SUNNY): erscheint die Lieferant-Gebühr nur **einmal**?
-- Netz-/Messstellenwerte sind oft netzgebietsspezifisch — ohne Katalogeintrag bleiben sie 0; **Netznutzungsentgelte** insgesamt fließen derzeit **nicht** in die Rechnung ein.
+- Netz-/Messstellenwerte sind oft netzgebietsspezifisch — ohne Katalogeintrag bleiben sie 0; volumetrische **Netznutzung Arbeitspreis** kommt aus dem Hausprofil.
 - Es gibt **keine Garantie** für Vollständigkeit oder Aktualität des Katalogs.
 
 Nachrechnen der Formeln: diese Seite. Technisches Mapping: [preise.md](../konfiguration/preise.md).

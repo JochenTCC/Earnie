@@ -7,6 +7,7 @@ from typing import Any
 import pulp
 
 from data.feed_in_prices import k_push_act_for_matrix_row
+from .battery import effective_p_act
 from .consumer_power import power_limits_kw
 from .eauto_milp import milp_binary_charge_kw
 from .milp_consumers import (
@@ -92,7 +93,10 @@ def _build_milp_model(
     ]
     delta_charge = [pulp.LpVariable(f"delta_charge_{t}", cat=pulp.LpBinary) for t in range(horizon)]
     max_flex_power = sum(power_limits_kw(c)[1] for c in planned_consumers)
-    max_load = max((row["expected_p_act"] for row in matrix[:horizon]), default=0.0)
+    max_load = max(
+        (effective_p_act(row, battery_params) for row in matrix[:horizon]),
+        default=0.0,
+    )
     max_pv = max((row["expected_p_pv"] for row in matrix[:horizon]), default=0.0)
     big_m_grid = max(max_load + max_flex_power + max_power, max_pv + max_power, 50.0)
     delta_import = [pulp.LpVariable(f"delta_import_{t}", cat=pulp.LpBinary) for t in range(horizon)]
@@ -127,7 +131,7 @@ def _build_milp_model(
     fixed_flex_by_t = _normalize_fixed_flex_by_t(fixed_flex_kw_t0_or_by_t)
     for t in range(horizon):
         p_pv = matrix[t]["expected_p_pv"]
-        p_con = matrix[t]["expected_p_act"]
+        p_con = effective_p_act(matrix[t], battery_params)
         fixed_flex = float(fixed_flex_by_t.get(t, 0.0))
         p_flex = fixed_flex + pulp.lpSum(
             _flex_power_at_t(

@@ -275,6 +275,11 @@
           "maximum": 1,
           "description": "Relativer Anteil von battery_max_power_kw (Standard 0.02)."
         },
+        "standby_power_kw": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Dauerhafte AC-Eigenleistung der Batterie (kW), 24/7 als Verbrauch."
+        },
         "battery_wear": {
           "$ref": "#/definitions/battery_wear",
           "description": "Verschleißmodell dieser Batterie (Pflicht wenn enabled; kein globaler Fallback ab 1.26.0 P1)."

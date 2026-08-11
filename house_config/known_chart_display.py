@@ -44,6 +44,21 @@ def _slot_datetime(row: dict[str, Any]) -> datetime | None:
         return None
 
 
+def _row_has_logged_ist(row: dict[str, Any]) -> bool:
+    """True for Produktiv-Log history slots (Ist columns present, incl. 0.0)."""
+    for key in ("Ist Batterie-Leistung (kW)", "PV-Ist (kW)"):
+        raw = row.get(key)
+        if raw is None:
+            continue
+        try:
+            number = float(raw)
+        except (TypeError, ValueError):
+            continue
+        if number == number:  # not NaN
+            return True
+    return False
+
+
 def known_column_name(consumer: dict) -> str:
     label = str(consumer.get("label") or consumer.get("name") or consumer["id"])
     return f"{label} (kW)"
@@ -99,6 +114,8 @@ def apply_known_generic_to_chart_rows(
     Split known power out of Verbrauch-Prognose into named kW columns.
 
     Uses CSV when ``use_profile_csv`` is active, otherwise the weekly schedule.
+    Skips Produktiv-Log history slots (``Ist Batterie-Leistung`` / ``PV-Ist`` set)
+    so assumed schedules cannot invent phantom bars or hide battery export.
     Manuals are not peeled here — use ``apply_appliance_schedules_to_chart_rows``.
     """
     if not chart_rows:
@@ -113,6 +130,8 @@ def apply_known_generic_to_chart_rows(
     for chart_row in chart_rows:
         slot = _slot_datetime(chart_row)
         if slot is None:
+            continue
+        if _row_has_logged_ist(chart_row):
             continue
         moved_kw = 0.0
         for consumer in fixed:

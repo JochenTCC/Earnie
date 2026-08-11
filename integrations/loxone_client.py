@@ -477,15 +477,18 @@ def _binary_meter_kw(
 
     Optional alternate binary Merker (z. B. natives Filter-Relais neben
     Gesamt-Filterstatus) — läuft, wenn mindestens ein Merker ≥ 0,5 ist.
+    Alternate-only is valid when no primary power Merker is configured.
     """
     io_name = str(primary_io_name or inputs.get("power_name", "")).strip()
-    if not io_name:
-        return None
     alt_name = str(
         alternate_io_name or inputs.get("alternate_binary_power_name", "")
     ).strip()
-    readings: list[float | None] = [fetch_loxone_generic_value(io_name)]
-    if alt_name:
+    if not io_name and not alt_name:
+        return None
+    readings: list[float | None] = []
+    if io_name:
+        readings.append(fetch_loxone_generic_value(io_name))
+    if alt_name and alt_name != io_name:
         readings.append(fetch_loxone_generic_value(alt_name))
     if all(value is None for value in readings):
         return None
@@ -505,8 +508,7 @@ def _read_consumer_meter_kw(consumer: dict) -> float | None:
 
     inputs = consumer.get("loxone_inputs") or {}
     io_name = _consumer_power_io_name(consumer)
-    if not io_name:
-        return None
+    alt_filter = marker_sens_filter_active(consumer)
     signal_type = str(inputs.get("signal_type") or consumer.get("signal_type", "power")).lower()
     nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
     if signal_type == "binary":
@@ -514,8 +516,10 @@ def _read_consumer_meter_kw(consumer: dict) -> float | None:
             inputs,
             nominal,
             primary_io_name=io_name,
-            alternate_io_name=marker_sens_filter_active(consumer),
+            alternate_io_name=alt_filter,
         )
+    if not io_name:
+        return None
     raw = fetch_loxone_generic_value(io_name)
     if raw is None:
         return None

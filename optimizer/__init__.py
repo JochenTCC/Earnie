@@ -29,6 +29,7 @@ from .charging_session import (
     normalize_consumer_state,
     session_delivered_kwh,
     session_target_fulfilled,
+    sync_open_charging_deadlines,
     sync_plug_cycle_fulfilled,
 )
 from .delivery_tracking import (
@@ -367,6 +368,12 @@ def register_consumer_delivery(
         fulfilled,
         charging_contexts or {},
         sessions,
+    )
+    state["open_charging_deadlines"] = sync_open_charging_deadlines(
+        dict(state.get("open_charging_deadlines") or {}),
+        charging_contexts or {},
+        plug_cycle_fulfilled=state["plug_cycle_fulfilled"],
+        now=datetime.now(),
     )
     _save_consumer_state(state)
     return compliance

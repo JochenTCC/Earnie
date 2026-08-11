@@ -1,7 +1,12 @@
 """Unit tests for compact form layout helpers (no Streamlit runtime)."""
 from __future__ import annotations
 
-from ui.form_layout import DEFAULT_RATIOS, WIDE_LABEL_RATIOS, _with_collapsed_label
+from ui.form_layout import (
+    DEFAULT_RATIOS,
+    WIDE_LABEL_RATIOS,
+    _float_number_input_needs_format,
+    _with_collapsed_label,
+)
 
 
 def test_default_and_wide_ratios() -> None:
@@ -18,3 +23,12 @@ def test_with_collapsed_label_forces_visibility() -> None:
     assert out["key"] == "x"
     assert out["min_value"] == 1
     assert original["label_visibility"] == "visible"
+
+
+def test_float_number_input_needs_format() -> None:
+    assert _float_number_input_needs_format({"min_value": 0.0, "step": 0.001})
+    assert _float_number_input_needs_format({"value": 1.5})
+    assert not _float_number_input_needs_format({"min_value": 0, "step": 1})
+    assert not _float_number_input_needs_format(
+        {"min_value": 0.0, "format": "%.4f"}
+    )

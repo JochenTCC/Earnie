@@ -492,6 +492,7 @@ def _seed_profile_widget_state(
         longitude = float(existing.get("longitude", 11.0))
         default_pv_tilt = int(existing.get("default_pv_tilt", 25))
         default_pv_azimuth = int(existing.get("default_pv_azimuth", 0))
+        nne_ap = float(existing.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0)
     else:
         label = allocate_unique_label("Mein Haushalt", siblings or [])
         annual_kwh = 4500.0
@@ -500,6 +501,7 @@ def _seed_profile_widget_state(
         longitude = 11.0
         default_pv_tilt = 25
         default_pv_azimuth = 0
+        nne_ap = 0.0
     st.session_state[_scoped_key(session_scope, "house_profile_label")] = label
     st.session_state[_scoped_key(session_scope, "house_annual_kwh")] = annual_kwh
     st.session_state[_scoped_key(session_scope, "house_profile_land")] = land
@@ -507,6 +509,7 @@ def _seed_profile_widget_state(
     st.session_state[_scoped_key(session_scope, "house_profile_longitude")] = longitude
     st.session_state[_scoped_key(session_scope, "house_profile_default_pv_tilt")] = default_pv_tilt
     st.session_state[_scoped_key(session_scope, "house_profile_default_pv_azimuth")] = default_pv_azimuth
+    st.session_state[_scoped_key(session_scope, "house_profile_nne_ap")] = nne_ap
 
 
 def _profile_widget_state_missing(session_scope: str) -> bool:
@@ -776,6 +779,18 @@ def _render_location_fields(*, session_scope: str) -> dict:
             help="0 = Süd, -90 = Ost, 90 = West. Überschreibbar im Tab PV-Anlagen.",
             key=_scoped_key(session_scope, "house_profile_default_pv_azimuth"),
         )
+    nne_ap = labeled_number_input(
+        "Netznutzung Arbeitspreis (Cent/kWh)",
+        min_value=0.0,
+        step=0.001,
+        help=(
+            "Volumetrischer Netznutzungs-Arbeitspreis netto (ohne USt), unabhängig vom "
+            "Lieferantentarif. Wird zum Bezugspreis addiert (Live und SE). "
+            "AT-Orientierung: docs/referenz/Netznutzungsentgelte-Austria-2026.csv"
+        ),
+        ratios=WIDE_LABEL_RATIOS,
+        key=_scoped_key(session_scope, "house_profile_nne_ap"),
+    )
     return {
         "land": str(land),
         "latitude": float(latitude),
@@ -783,6 +798,7 @@ def _render_location_fields(*, session_scope: str) -> dict:
         "timezone_name": timezone_name,
         "default_pv_tilt": float(default_pv_tilt),
         "default_pv_azimuth": float(default_pv_azimuth),
+        "netznutzung_arbeitspreis_cent_kwh": float(nne_ap or 0.0),
     }
 
 
@@ -1555,10 +1571,14 @@ def _perform_house_profile_save(
                 "id": profile_id,
                 "label": label.strip() or profile_id,
                 "annual_kwh": float(annual_kwh),
+                "land": location.get("land", "AT"),
                 "latitude": location["latitude"],
                 "longitude": location["longitude"],
                 "default_pv_tilt": location["default_pv_tilt"],
                 "default_pv_azimuth": location["default_pv_azimuth"],
+                "netznutzung_arbeitspreis_cent_kwh": float(
+                    location.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0
+                ),
                 "consumers": resolved,
                 "total_profile_csv": hist["total_profile_csv"],
                 "pv_profile_csv": hist["pv_profile_csv"],
@@ -1625,6 +1645,9 @@ def _render_house_profile_save(
         "longitude": location["longitude"],
         "default_pv_tilt": location["default_pv_tilt"],
         "default_pv_azimuth": location["default_pv_azimuth"],
+        "netznutzung_arbeitspreis_cent_kwh": float(
+            location.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0
+        ),
         "consumers": resolved,
         "total_profile_csv": hist["total_profile_csv"],
         "pv_profile_csv": hist["pv_profile_csv"],

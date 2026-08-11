@@ -478,14 +478,66 @@ def test_tariff_spec_resolution_de_spot_ch_fix():
     assert resolved["_export_tariff_spec"]["land"] == "CH"
 
 
-def test_tariff_netzentgelt_override_resolution():
-    resolved = config.CONFIG.resolve_scenario_settings_dict(
-        {
-            "import_tariff_id": "de_spot_test",
-            "netzentgelt_cent_kwh_override": 8.0,
-        }
+def test_profile_netznutzung_arbeitspreis_resolution(tmp_path):
+    import json
+
+    from house_config.scenario_resolution import resolve_scenario_settings
+
+    profiles_path = tmp_path / "house_profiles.json"
+    profiles_path.write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {
+                        "id": "home",
+                        "label": "Home",
+                        "annual_kwh": 4000,
+                        "latitude": 48.2,
+                        "longitude": 16.3,
+                        "netznutzung_arbeitspreis_cent_kwh": 5.353,
+                        "consumers": [],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
     )
-    assert resolved["netzentgelt_cent_kwh"] == 8.0
+    components_path = tmp_path / "components.json"
+    components_path.write_text(
+        json.dumps({"batteries": [], "pv_systems": []}), encoding="utf-8"
+    )
+    tariffs_path = tmp_path / "tariffs.json"
+    tariffs_path.write_text(
+        json.dumps(
+            {
+                "import_tariffs": [
+                    {
+                        "id": "fix",
+                        "label": "Fix",
+                        "type": "fixed_cent",
+                        "supplier_id": "x",
+                        "land": "AT",
+                        "fix_cent_kwh": 20.0,
+                        "prices_include_vat": True,
+                    }
+                ],
+                "export_tariffs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    resolved = resolve_scenario_settings(
+        {"house_profile_id": "home", "import_tariff_id": "fix"},
+        raw_config={},
+        components_path=str(components_path),
+        tariffs_path=str(tariffs_path),
+        house_profiles_path=str(profiles_path),
+    )
+    assert resolved["netzentgelt_cent_kwh"] == pytest.approx(5.353)
+    from data.backtesting_prices import pricing_kwargs_from_resolved
+
+    kwargs = pricing_kwargs_from_resolved(resolved)
+    assert kwargs["netzentgelt_override"] == pytest.approx(5.353)
 
 
 def test_monthly_table_export_tariff_resolution():

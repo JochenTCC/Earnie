@@ -23,6 +23,16 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Scope of this chapter:** Investigate and decide whether/how to run the **full** optimizer on 15‑min slots (option B), not only “prices only” averaging (A) or hybrid grids (C).
 
+### Version 2.5
+
+- [ ] Add standby power for battery
+  - This power is needed all the time as consumed energy for keeping the battery up. For optimization treat it as 24/7 consumer. Parameter is part of battery
+- [ ] Add possibility to take Netznutzungsentgelte into account (as far as they are relevant to relative price changes)
+  - As a first MVP the user has to provide the "Arbeitspreis" in ct/kWh
+  - Add "Arbeitspreis" to normal import tariff and use sum for optimization
+  - Add a new section into fake invoices for the Netzentgelt 
+    - Jahr: split Energiebezug (Lieferant) vs Netznutzung Arbeitspreis (same Gesamt; AP already in k_act)
+    - Dedicated ## Netznutzung section (AP, Bezug kWh, €, Grundpreis stub)
 - [ ] **2.5.a — Data & tariff fidelity**
   - Confirm Energy-Charts 15‑min coverage (AT/DE-LU/CH) vs pre-2025-10 hourly history; mixed-resolution handling
   - Map which catalog tariffs settle on ¼‑h EPEX vs hourly average; document billing vs plan mismatch if MILP stays hourly
@@ -38,7 +48,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] Reduce messages like:
   - 2026-08-05 13:42:43 [INFO] (optimizer.milp_consumers:620) - urgent-Regel [e_auto]: nur_urgent_fenster — Ziel 3.650 kWh, optional geplant 0.000 kWh, urgent geplant 3.652 kWh (must_start=2026-08-08T11:54:18+02:00, deadline=2026-08-08T13:00:00+02:00)
   - Add possibility on Optimierer-Dienst page to filter for [INFO] / [WARNING] / ...
-- [ ] Add possibility to take Netznutzungsentgelte into account (as far as they are relevant to relative price changes)
 - [ ] Add possibility to simulate restrictions for energy export dependent on current grid situation in SE (and maybe in Live optimization)
 
 ### Version 2.+1 - Min immediate charging for EV and learning consumption behaviour

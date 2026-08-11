@@ -141,6 +141,81 @@ class TestChargingSessionState:
         )
         assert "eauto" not in state["plug_cycle_fulfilled"]
 
+    def test_open_charging_deadline_set_while_plugged(self):
+        consumer = _eauto_consumer()
+        deadline = datetime(2026, 8, 8, 13, 0)
+        contexts = {
+            "eauto": {
+                "active": True,
+                "plugged_in": True,
+                "deadline": deadline,
+                "target_kwh": 10.0,
+            }
+        }
+        state = cs.normalize_consumer_state(
+            {"date": "2026-08-08", "delivered": {}, "charging_sessions": {}},
+            "2026-08-08",
+            contexts,
+            {"eauto": consumer},
+            now=datetime(2026, 8, 8, 9, 0),
+        )
+        assert state["open_charging_deadlines"]["eauto"] == "2026-08-08T13:00:00"
+
+    def test_open_charging_deadline_survives_unplug(self):
+        consumer = _eauto_consumer()
+        contexts = {
+            "eauto": {
+                "active": True,
+                "plugged_in": False,
+                "anticipated": True,
+                "deadline": datetime(2026, 8, 8, 13, 0),
+                "target_kwh": 8.0,
+            }
+        }
+        raw = {
+            "date": "2026-08-08",
+            "delivered": {},
+            "charging_sessions": {},
+            "open_charging_deadlines": {"eauto": "2026-08-08T13:00:00"},
+        }
+        state = cs.normalize_consumer_state(
+            raw,
+            "2026-08-08",
+            contexts,
+            {"eauto": consumer},
+            now=datetime(2026, 8, 8, 10, 0),
+        )
+        assert state["open_charging_deadlines"]["eauto"] == "2026-08-08T13:00:00"
+
+    def test_open_charging_deadline_cleared_when_fulfilled(self):
+        consumer = _eauto_consumer()
+        contexts = {
+            "eauto": {
+                "active": False,
+                "plugged_in": True,
+                "deadline": None,
+                "target_kwh": 0.0,
+                "source_label": (
+                    "session (angeschlossen, Ladeziel im Plug-Zyklus erfüllt — FertigUm ignoriert)"
+                ),
+            }
+        }
+        raw = {
+            "date": "2026-08-08",
+            "delivered": {},
+            "charging_sessions": {},
+            "open_charging_deadlines": {"eauto": "2026-08-08T13:00:00"},
+            "plug_cycle_fulfilled": {"eauto": True},
+        }
+        state = cs.normalize_consumer_state(
+            raw,
+            "2026-08-08",
+            contexts,
+            {"eauto": consumer},
+            now=datetime(2026, 8, 8, 10, 0),
+        )
+        assert "eauto" not in state["open_charging_deadlines"]
+
 
 class TestDeadlineHelpers:
     def test_schedule_indices_cross_midnight(self):

@@ -24,7 +24,7 @@ In Cursor/VS Code erscheinen für viele Felder **Hover-Beschreibungen** aus [`sh
 | `live_scenario_id`                  | ID des **Live-Szenarios** in `backtesting_scenarios.json` (Standard: `live`)                                                 |
 | `earnie_env/config/components.json`            | Technische Parameter für Speicher und PV (`batteries[]`, `pv_systems[]`; referenziert über IDs)                              |
 | `earnie_env/config/tariffs.json`               | Laufzeit-Tarifkatalog (Bezug/Einspeise); Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json) |
-| `earnie_env/config/house_profiles.json`        | Standort (Geo/Zeitzone), Planungs-Verbraucher (EV, Wärmepumpe, Waschmaschine …); referenziert über `house_profile_id`        |
+| `earnie_env/config/house_profiles.json`        | Standort (Geo/Zeitzone), Netznutzung Arbeitspreis, Planungs-Verbraucher (EV, Wärmepumpe, Waschmaschine …); referenziert über `house_profile_id`        |
 | `earnie_env/config/backtesting_scenarios.json` | **Alle** Szenarien (Live + Varianten); einheitliches `settings`-Format                                                       |
 | `scenario_explorer_conf`     | Szenario-Explorer / Backtesting: `cons_data_hourly.csv`, Preisquelle; Zeitraum aus cons_data-Monaten |
 | `flexible_consumers`                | Legacy-Overlay (meist leer); Live-Verbraucher in `house_profiles.json` |

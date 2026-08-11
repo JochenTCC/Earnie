@@ -207,7 +207,7 @@ def _chart_row_from_controls(
 ) -> tuple[float, dict, int, float]:
     """Baut Chart-Zeile aus Modus/Flex-Leistungen (gemeinsam für MPC und commit-K)."""
     pv = row["expected_p_pv"]
-    con = row["expected_p_act"]
+    con = bat.effective_p_act(row, battery_params)
     total_flex_power = sum(consumer_powers.values())
     max_power = battery_params["max_power_kw"]
     batt_action = bat.battery_plan_kw_from_control(
@@ -899,13 +899,14 @@ def _simulate_single_hour_baseline(
     simulation_mode = row.get("consumption_mode") in ("logged_day", "profile_spec")
     if flex_kw_override is None and simulation_mode and not has_flex_profile:
         con = float(row.get("expected_p_total", row["expected_p_act"]) or 0.0)
+        con = con + bat.standby_power_kw(battery_params)
         total_flex_power = 0.0
         flex_kw = {}
     elif baseload_kw_override is not None:
-        con = float(baseload_kw_override)
+        con = float(baseload_kw_override) + bat.standby_power_kw(battery_params)
         total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
     else:
-        con = float(row["expected_p_act"] or 0.0)
+        con = bat.effective_p_act(row, battery_params)
         total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
     net_pv_surplus = pv - con - total_flex_power
     batt_action = bat.clamp_power(net_pv_surplus, battery_params["max_power_kw"])

@@ -299,6 +299,7 @@ def battery_params_snapshot(get_attr: Callable[..., Any]) -> dict:
         "max_soc": get_attr("BATTERY_MAX_SOC", cast=float),
         "max_power_kw": get_attr("BATTERY_MAX_POWER_KW", cast=float),
         "efficiency": get_attr("BATTERY_EFFICIENCY", cast=float),
+        "standby_power_kw": get_attr("BATTERY_STANDBY_POWER_KW", default=0.0, cast=float),
     }
 
 

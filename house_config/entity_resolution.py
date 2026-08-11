@@ -8,6 +8,7 @@ ZERO_BATTERY_FLAT = {
     "battery_min_soc": 0.0,
     "battery_max_soc": 100.0,
     "threshold_power": 0.02,
+    "standby_power_kw": 0.0,
 }
 
 ZERO_PV_FLAT = {
@@ -73,6 +74,11 @@ def normalize_battery(raw: dict, index: int) -> dict:
         raise ValueError(
             f"batteries[{index}] ('{battery_id}'): threshold_power muss in (0, 1] liegen."
         )
+    standby = float(raw.get("standby_power_kw", 0.0) or 0.0)
+    if standby < 0.0:
+        raise ValueError(
+            f"batteries[{index}] ('{battery_id}'): standby_power_kw muss >= 0 sein."
+        )
     return {
         "id": battery_id,
         "label": label,
@@ -82,6 +88,7 @@ def normalize_battery(raw: dict, index: int) -> dict:
         "battery_min_soc": float(raw["battery_min_soc"]),
         "battery_max_soc": float(raw["battery_max_soc"]),
         "threshold_power": threshold,
+        "standby_power_kw": standby,
         "battery_wear": _normalize_battery_wear(raw.get("battery_wear"), battery_id, index),
     }
 
@@ -183,6 +190,7 @@ def resolve_battery_into_settings(
             "battery_min_soc": bat["battery_min_soc"],
             "battery_max_soc": bat["battery_max_soc"],
             "threshold_power": bat["threshold_power"],
+            "standby_power_kw": bat.get("standby_power_kw", 0.0),
         }
     )
     if bat.get("battery_wear") is not None:

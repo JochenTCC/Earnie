@@ -135,7 +135,6 @@ def _normalize_dach_fields(raw: dict, spec: dict) -> None:
         "settlement_fee_cent_kwh",
         "markup_percent",
         "vat_percent",
-        "netzentgelt_cent_kwh",
         "monthly_fee_eur",
         "grid_monthly_fee_eur",
         "metering_monthly_fee_eur",
@@ -339,8 +338,6 @@ def resolve_import_tariff_into_settings(settings: dict, tariffs: dict) -> dict:
         out["import_fixed_cent_kwh"] = tariff["fix_cent_kwh"]
     if "land" in tariff:
         out["market_zone"] = market_zone_for_land(tariff["land"])
-    if out.get("netzentgelt_cent_kwh_override") is not None:
-        out["netzentgelt_cent_kwh"] = float(out.pop("netzentgelt_cent_kwh_override"))
     return out
 
 

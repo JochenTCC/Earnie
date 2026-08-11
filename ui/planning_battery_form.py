@@ -68,6 +68,7 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         min_soc = float(existing.get("battery_min_soc", 10.0))
         max_soc = float(existing.get("battery_max_soc", 100.0))
         threshold_percent = float(existing.get("threshold_power", 0.05)) * 100.0
+        standby_power = float(existing.get("standby_power_kw", 0.0) or 0.0)
     else:
         label = allocate_unique_label("5 kWh Speicher", list_batteries())
         capacity = 5.0
@@ -76,6 +77,7 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         min_soc = 10.0
         max_soc = 100.0
         threshold_percent = 5.0
+        standby_power = 0.0
 
     st.session_state[_scoped_key(session_scope, "planning_battery_label")] = label
     st.session_state[_scoped_key(session_scope, "planning_battery_capacity")] = capacity
@@ -84,6 +86,7 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
     st.session_state[_scoped_key(session_scope, "planning_battery_min_soc")] = min_soc
     st.session_state[_scoped_key(session_scope, "planning_battery_max_soc")] = max_soc
     st.session_state[_scoped_key(session_scope, "planning_battery_threshold")] = threshold_percent
+    st.session_state[_scoped_key(session_scope, "planning_battery_standby")] = standby_power
 
 
 def _battery_widget_state_missing(session_scope: str) -> bool:
@@ -206,6 +209,13 @@ def render_battery_planning_tab() -> None:
         help="Anteil der max. Lade-/Entladeleistung.",
         key=_scoped_key(session_scope, "planning_battery_threshold"),
     )
+    standby_power = labeled_number_input(
+        "Standby-Leistung (kW)",
+        min_value=0.0,
+        step=0.01,
+        help="Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch).",
+        key=_scoped_key(session_scope, "planning_battery_standby"),
+    )
 
     ready = bool(str(label or "").strip()) and float(capacity or 0) > 0
     taken = {bid for bid in battery_ids if bid != stable_id}
@@ -219,6 +229,7 @@ def render_battery_planning_tab() -> None:
         "battery_min_soc": min_soc,
         "battery_max_soc": max_soc,
         "threshold_power": threshold_percent / 100.0,
+        "standby_power_kw": float(standby_power or 0.0),
     }
 
     def _save_battery() -> None:
@@ -232,6 +243,7 @@ def render_battery_planning_tab() -> None:
                     "battery_min_soc": min_soc,
                     "battery_max_soc": max_soc,
                     "threshold_power": threshold_percent / 100.0,
+                    "standby_power_kw": float(standby_power or 0.0),
                 },
                 stable_id=stable_id,
             )

@@ -8,7 +8,7 @@ Quellen und rechtliche Anker: [Tarife und Preise nachrechnen](../referenz/tarife
 
 **Fixkosten (SE only):** `monthly_fee_eur` (Lieferant-Grundpreis; Deduplizierung über `supplier_id`), optional `grid_monthly_fee_eur` / `metering_monthly_fee_eur` / `other_monthly_fee_eur` (einmal je Hausanschluss aus Bezug, sonst Einspeise). Bei **EPEX-/Spot-Tarifen** immer **netto** speichern und `prices_include_vat` = false (gleiche Basis wie Settlement/Markup); Festpreise: Netto/brutto wie `prices_include_vat`. Nur in **Szenario-Explorer**-Gesamt-/Monatskosten und in Fake-Jahresrechnungen unter `{Log}/invoices/`, nicht in Live-MILP und nicht in stündlichen `sim_cost`. Details: [tarife-quellen.md](../referenz/tarife-quellen.md) §4.
 
-**Netznutzungsentgelte:** Derzeit **nicht** berücksichtigt (weder Live noch SE). Optionale Katalog-Stubs (`grid_monthly_fee_eur`, `netzentgelt_cent_kwh`) ersetzen keine netzgebietsspezifischen Netznutzungsentgelte.
+**Netznutzungsentgelte (Arbeitspreis):** Am Hausprofil unter Standort als `netznutzung_arbeitspreis_cent_kwh` (Cent/kWh **netto**, ohne USt). Unabhängig vom Lieferantentarif; wird **vor** der USt zum Bezugspreis addiert und gilt für Live-MILP und SE (alle Import-Typen). In Fake-Jahresrechnungen erscheint er als eigene Position (aus dem Energiebezug herausgerechnet). Leistungspreis und netzgebietsspezifische Tabellen sind nicht modelliert; Orientierung AT: [Netznutzungsentgelte-Austria-2026.csv](../referenz/Netznutzungsentgelte-Austria-2026.csv). Monatlicher Netz-Grundpreis `grid_monthly_fee_eur` bleibt nur SE-Fixkosten-Stub.
 
 **Land am Hausprofil:** Im Hauskonfigurator (Standort) wird `land` (`AT`/`DE`/`CH`) gespeichert. Der Szenarienkonfigurator-Filter **Land** ist Pflicht (kein „Alle“) und wird aus dem gewählten Hausprofil vorbelegt.
 
@@ -19,7 +19,8 @@ Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `earnie_e
 Marktpreise (Live) kommen je nach Provider von Energy-Charts bzw. der aWATTar-API; die aWATTar-URL aus `land` (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
 
 ```
-(Marktpreis × (1 + markup_percent/100) + settlement_fee_cent_kwh)
+(Marktpreis × (1 + markup_percent/100) + settlement_fee_cent_kwh
+  + netznutzung_arbeitspreis_cent_kwh aus Hausprofil)
   × (1 + vat_percent/100)   falls prices_include_vat = false
 ```
 
@@ -30,6 +31,8 @@ Marktpreise (Live) kommen je nach Provider von Energy-Charts bzw. der aWATTar-AP
 | `markup_percent`                   | Prozentualer Aufschlag (z. B. 3 ≈ Netzverlust) |
 | `vat_percent` / `prices_include_vat` | USt (z. B. 20 % bei `prices_include_vat=false`) |
 
+
+Hausprofil-Feld `netznutzung_arbeitspreis_cent_kwh` (siehe oben) gilt zusätzlich für **alle** Import-Typen.
 
 
 
@@ -48,11 +51,11 @@ Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/
 
 | Typ              | Bedeutung                                                                                             |
 | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| `fixed_cent`     | Fixer Arbeitspreis (`fix_cent_kwh`)                                                                   |
-| `spot_hourly`    | EPEX × (1 + `markup_percent`%) + `settlement_fee_cent_kwh` (+ optional `netzentgelt_cent_kwh` für DE) |
+| `fixed_cent`     | Fixer Arbeitspreis (`fix_cent_kwh`) + optional Hausprofil-Netznutzung AP |
+| `spot_hourly`    | EPEX × (1 + `markup_percent`%) + `settlement_fee_cent_kwh` + optional Hausprofil-Netznutzung AP |
 | `ex_post_spot`   | Wie Spot; Kennzeichnung ex-post-Abrechnung                                                            |
 | `monthly_market` | Wie Spot; Kennzeichnung Monatsmarkt                                                                   |
-| `monthly_table`  | Monatstabelle Bezug (`monthly_rates`)                                                                 |
+| `monthly_table`  | Monatstabelle Bezug (`monthly_rates`) + optional Hausprofil-Netznutzung AP                            |
 
 
 

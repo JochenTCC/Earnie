@@ -488,6 +488,45 @@ class TestSharedMeterSubtraction:
         assert result["swimspa"] == 2.8
         assert round(result["swimspa"] + result["pool_filter"], 3) == 2.98
 
+    def test_filter_active_alone_assigns_chart_without_sens_power_act(self):
+        """Dump 20260808_232225: only sens_filter_active bound — still chart-Ist."""
+        consumers = [
+            {
+                "id": "pool_swimspa",
+                "name": "Pool / SwimSpa",
+                "nominal_power_kw": 2.8,
+                "signal_type": "power",
+                "ehal_bindings": {
+                    "flex.pool_swimspa.sens_power_act": "Zaehler Swimspa",
+                },
+                "loxone_inputs": {
+                    "subtract_consumer_ids": ["pool_filter"],
+                },
+            },
+            {
+                "id": "pool_filter",
+                "name": "Pool-Filter",
+                "nominal_power_kw": 0.18,
+                "signal_type": "binary",
+                "ehal_bindings": {
+                    "sens_filter_active": "Earnie_Pool_Filter_aktiv",
+                    "flex.pool_filter.set_enable": "Earnie_Pool_Filter_Freigabe",
+                },
+            },
+        ]
+        reads = self._reads(
+            {"Zaehler Swimspa": 0.18, "Earnie_Pool_Filter_aktiv": 1.0}
+        )
+        with patch.object(lc, "fetch_loxone_generic_value", side_effect=reads):
+            live = lc.resolve_flexible_consumers_live_power(
+                fallbacks={"pool_filter": 0.18},
+                consumers=consumers,
+            )
+        assert live.kw["pool_filter"] == 0.18
+        assert live.chart_kw["pool_filter"] == 0.18
+        assert "pool_filter" in live.measured_ids
+        assert live.kw["pool_swimspa"] == 0.0
+
     def test_native_filter1_when_filter2_off(self):
         """Autonomer Filter: filter1=1, filter2=0, Gesamtzähler nur Filterlast."""
         reads = self._reads(

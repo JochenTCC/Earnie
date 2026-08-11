@@ -211,9 +211,6 @@ def _seed_scenario_widget_state(
         settings.get("export_tariff_id"),
         allow_none=True,
     )
-    st.session_state[scoped_widget_key(session_scope, "scenario_netzentgelt")] = float(
-        settings.get("netzentgelt_cent_kwh_override", 0.0) or 0.0
-    )
     st.session_state[scoped_widget_key(session_scope, "scenario_use_imported_pv")] = bool(
         settings.get("use_imported_pv")
     )
@@ -741,7 +738,6 @@ def _render_scenarios_tab() -> None:
     selected_export = lookup_entity_id(exp_map, exp_pick)
     import_tariff = None
     export_tariff = None
-    netzentgelt_override = None
     _, import_param_col, export_param_col = st.columns(3)
     if selected_import:
         import_tariff = next(t for t in import_tariffs if t["id"] == selected_import)
@@ -751,17 +747,6 @@ def _render_scenarios_tab() -> None:
             kind="import",
             container=import_param_col,
         )
-        if import_tariff.get("land") == "DE" and import_tariff.get("type") in {
-            "spot_hourly",
-            "ex_post_spot",
-            "monthly_market",
-        }:
-            netzentgelt_override = import_param_col.number_input(
-                "Netzentgelt-Override (Cent/kWh, DE-Spot)",
-                min_value=0.0,
-                step=0.1,
-                key=scoped_widget_key(session_scope, "scenario_netzentgelt"),
-            )
     if selected_export:
         export_tariff = next(t for t in export_tariffs if t["id"] == selected_export)
         render_tariff_parameter_preview(
@@ -796,7 +781,8 @@ def _render_scenarios_tab() -> None:
             "für Vollständigkeit oder Aktualität des Katalogs. Monatliche Fixkosten "
             "(Grundgebühr o. Ä.) fließen als **Näherung** in die Gesamtkosten und "
             "Monatswerte des Szenario-Explorers ein — nicht in die Live-MILP-Kosten. "
-            "**Netznutzungsentgelte** werden derzeit **nicht** berücksichtigt. "
+            "Volumetrische **Netznutzung Arbeitspreis** kommt aus dem Hausprofil "
+            "(nicht aus dem Lieferantentarif). "
             f"Nachrechnen: "
             f"{markdown_doc_link(DocLink('Tarife und Preise nachrechnen', 'docs/referenz/tarife-quellen.md'))}."
         )
@@ -824,7 +810,6 @@ def _render_scenarios_tab() -> None:
         import_tariff_id=lookup_entity_id(imp_map, imp_pick),
         export_tariff_id=lookup_entity_id(exp_map, exp_pick),
         house_profile_id=lookup_entity_id(prof_map, prof_pick),
-        netzentgelt_cent_kwh_override=netzentgelt_override,
         use_imported_pv=bool(
             st.session_state.get(
                 scoped_widget_key(session_scope, "scenario_use_imported_pv"),

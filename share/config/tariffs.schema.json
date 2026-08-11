@@ -75,10 +75,6 @@
           "type": "number",
           "minimum": 0
         },
-        "netzentgelt_cent_kwh": {
-          "type": "number",
-          "minimum": 0
-        },
         "monthly_fee_eur": {
           "type": "number",
           "minimum": 0,

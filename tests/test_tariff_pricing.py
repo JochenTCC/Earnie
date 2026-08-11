@@ -26,7 +26,7 @@ def test_spot_import_with_markup_and_settlement():
     assert result == pytest.approx(13.096, rel=1e-4)
 
 
-def test_spot_import_de_netzentgelt_override():
+def test_spot_import_netznutzung_arbeitspreis():
     tariff = {
         "type": "spot_hourly",
         "land": "DE",
@@ -36,6 +36,45 @@ def test_spot_import_de_netzentgelt_override():
         "vat_percent": 19.0,
     }
     assert import_cent_kwh(10.0, tariff, netzentgelt_override=5.0) == pytest.approx(16.0)
+
+
+def test_fixed_import_adds_netznutzung_before_vat():
+    tariff = {
+        "type": "fixed_cent",
+        "fix_cent_kwh": 10.0,
+        "prices_include_vat": False,
+        "vat_percent": 20.0,
+    }
+    # (10 + 5) * 1.2
+    assert import_cent_kwh(99.0, tariff, netzentgelt_override=5.0) == pytest.approx(18.0)
+
+
+def test_monthly_import_adds_netznutzung():
+    from datetime import datetime
+
+    tariff = {
+        "type": "monthly_table",
+        "prices_include_vat": True,
+        "vat_percent": 0.0,
+        "monthly_rates": [{"year": 2026, "month": 8, "tariff_cent_kwh": 12.0}],
+    }
+    slot = datetime(2026, 8, 10, 12, 0)
+    assert import_cent_kwh(
+        0.0, tariff, netzentgelt_override=3.0, slot_datetime=slot
+    ) == pytest.approx(15.0)
+
+
+def test_tariff_dict_netzentgelt_ignored():
+    tariff = {
+        "type": "spot_hourly",
+        "land": "AT",
+        "settlement_fee_cent_kwh": 0.0,
+        "markup_percent": 0.0,
+        "prices_include_vat": True,
+        "vat_percent": 0.0,
+        "netzentgelt_cent_kwh": 99.0,
+    }
+    assert import_cent_kwh(10.0, tariff) == pytest.approx(10.0)
 
 
 def test_fixed_import_includes_vat():

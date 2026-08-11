@@ -19,6 +19,16 @@ def power_threshold_kw(max_power_kw: float) -> float:
     return max_power_kw * config.get_threshold_power()
 
 
+def standby_power_kw(battery_params: dict) -> float:
+    """Dauerhafte AC-Standby-Leistung der Hausbatterie (kW)."""
+    return max(0.0, float(battery_params.get("standby_power_kw") or 0.0))
+
+
+def effective_p_act(matrix_row: dict, battery_params: dict) -> float:
+    """Grundlast inkl. Batterie-Standby (AC-Verbrauch)."""
+    return float(matrix_row["expected_p_act"]) + standby_power_kw(battery_params)
+
+
 def steuerbefehl_for_mode(mode: int, target_power_kw: float = 0.0) -> str:
     """Steuerbefehl-Text für Chart und Simulations-Tabelle."""
     if mode == MODE_ZWANGS_LADEN:
@@ -162,7 +172,9 @@ def derive_control_from_milp_plan(
     opt_discharge = milp_plan["p_discharge"]
     opt_grid_buy = milp_plan["p_grid_buy"]
     net_pv_surplus = (
-        matrix_row["expected_p_pv"] - matrix_row["expected_p_act"] - total_flex_power
+        matrix_row["expected_p_pv"]
+        - effective_p_act(matrix_row, battery_params)
+        - total_flex_power
     )
 
     mode = MODE_AUTOMATIK

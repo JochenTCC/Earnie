@@ -291,13 +291,23 @@ def resolve_absent_availability(
     consumer: dict,
     *,
     ready_raw: str | float | None = None,
+    open_cycle_deadline: datetime | None = None,
 ) -> datetime | None:
     """
     Ladebeginn bei Abwesenheit: offenes Übernacht-Fenster oder nächster Termin.
 
     Verspätete Rückkehr am selben Tag (Slot vorbei, Auto noch abgehängt) gilt nicht
     als „jetzt verfügbar“ — es wird der nächste car_available_from_hour verwendet.
+
+    open_cycle_deadline: Latch aus flexible_consumers_state — kurzes Unplug vor
+    FertigUm hält den laufenden Ladezyklus offen (available_from = jetzt).
     """
+    from .charging_session import deadline_reached
+
+    if open_cycle_deadline is not None and not deadline_reached(
+        horizon_start, open_cycle_deadline
+    ):
+        return horizon_start
     for day_offset in (0, -1):
         day = horizon_start.date() + timedelta(days=day_offset)
         window_start = _window_start_for_day(consumer, day, reference=horizon_start)
@@ -364,7 +374,12 @@ def _plugged_in_fulfilled_context() -> dict:
     }
 
 
-def _loxone_absent_forecast_context(consumer: dict, horizon_start: datetime) -> dict:
+def _loxone_absent_forecast_context(
+    consumer: dict,
+    horizon_start: datetime,
+    *,
+    open_cycle_deadline: datetime | None = None,
+) -> dict:
     ready_raw = _loxone_ready_raw(consumer)
     loxone_deadline = parse_loxone_ready_by_time(ready_raw, horizon_start)
     if loxone_deadline is None:
@@ -372,7 +387,10 @@ def _loxone_absent_forecast_context(consumer: dict, horizon_start: datetime) -> 
             "loxone (abwesend, keine aktive Fertigstellungszeit in Loxone)"
         )
     available_from = resolve_absent_availability(
-        horizon_start, consumer, ready_raw=ready_raw
+        horizon_start,
+        consumer,
+        ready_raw=ready_raw,
+        open_cycle_deadline=open_cycle_deadline,
     )
     if available_from is None:
         return _loxone_inactive_context(
@@ -407,7 +425,12 @@ def _loxone_absent_forecast_context(consumer: dict, horizon_start: datetime) -> 
     }
 
 
-def fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> dict:
+def fetch_loxone_charging_context(
+    consumer: dict,
+    horizon_start: datetime,
+    *,
+    open_cycle_deadline: datetime | None = None,
+) -> dict:
     sched = consumer.get("charging_schedule") or {}
     plug_name = marker_sens_evcs_connected(consumer)
     plugged_val = (
@@ -416,7 +439,11 @@ def fetch_loxone_charging_context(consumer: dict, horizon_start: datetime) -> di
     plugged_in = plugged_val is not None and int(round(float(plugged_val))) == 1
     if not plugged_in:
         if sched.get("forecast_when_absent"):
-            return _loxone_absent_forecast_context(consumer, horizon_start)
+            return _loxone_absent_forecast_context(
+                consumer,
+                horizon_start,
+                open_cycle_deadline=open_cycle_deadline,
+            )
         return _loxone_inactive_context("loxone (nicht angeschlossen)")
     if loxone_reports_charge_complete(consumer):
         return _loxone_plugged_in_complete_context()
@@ -482,6 +509,8 @@ def _config_path_with_plugged_in(
     sched: dict,
     horizon_start: datetime,
     ready_raw: str | float | None,
+    *,
+    open_cycle_deadline: datetime | None = None,
 ) -> dict:
     """Attach Loxone plugged_in; suppress live output when absent (anticipated)."""
     plug_name = marker_sens_evcs_connected(consumer)
@@ -499,7 +528,10 @@ def _config_path_with_plugged_in(
     out["plugged_in"] = False
     out["anticipated"] = True
     available_from = resolve_absent_availability(
-        horizon_start, consumer, ready_raw=ready_raw
+        horizon_start,
+        consumer,
+        ready_raw=ready_raw,
+        open_cycle_deadline=open_cycle_deadline,
     )
     if available_from is not None:
         out["available_from"] = available_from
@@ -546,6 +578,8 @@ def resolve_charging_context(
     matrix: list,
     consumer_daily_targets_kwh: dict | None,
     logged_simulation: bool,
+    *,
+    open_cycle_deadline: datetime | None = None,
 ) -> dict:
     sched = consumer.get("charging_schedule")
     if not sched or not sched.get("enabled"):
@@ -561,7 +595,11 @@ def resolve_charging_context(
             realtime=not logged_simulation,
         )
     if target_source == "loxone":
-        return fetch_loxone_charging_context(consumer, horizon_start)
+        return fetch_loxone_charging_context(
+            consumer,
+            horizon_start,
+            open_cycle_deadline=open_cycle_deadline,
+        )
     day_sched = config_day_schedule(consumer, horizon_start)
     rest_soc = day_sched.get("daily_rest_soc")
     capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
@@ -594,7 +632,12 @@ def resolve_charging_context(
         "source_label": source_label,
     }
     out = _config_path_with_plugged_in(
-        result, consumer, sched, horizon_start, ready_raw
+        result,
+        consumer,
+        sched,
+        horizon_start,
+        ready_raw,
+        open_cycle_deadline=open_cycle_deadline,
     )
     out = _config_path_apply_live_ist_soc(
         out,
@@ -606,20 +649,47 @@ def resolve_charging_context(
     return out
 
 
-def _load_plug_cycle_fulfilled_flags() -> dict[str, bool]:
-    """Leichtgewichtiger Read des Plug-Zyklus-Latch aus flexible_consumers_state."""
+def _load_consumer_state_json() -> dict:
     try:
         from runtime_store.persist_paths import consumer_state_file
 
         path = consumer_state_file()
         with open(path, encoding="utf-8") as fh:
             raw = json.load(fh)
-        fulfilled = raw.get("plug_cycle_fulfilled") or {}
-        if not isinstance(fulfilled, dict):
-            return {}
-        return {str(cid): True for cid, flag in fulfilled.items() if flag}
+        return raw if isinstance(raw, dict) else {}
     except Exception:
         return {}
+
+
+def _load_plug_cycle_fulfilled_flags() -> dict[str, bool]:
+    """Leichtgewichtiger Read des Plug-Zyklus-Latch aus flexible_consumers_state."""
+    raw = _load_consumer_state_json()
+    fulfilled = raw.get("plug_cycle_fulfilled") or {}
+    if not isinstance(fulfilled, dict):
+        return {}
+    return {str(cid): True for cid, flag in fulfilled.items() if flag}
+
+
+def _load_open_charging_deadlines() -> dict[str, str]:
+    """Read open plug-cycle deadlines (survive brief unplug until FertigUm)."""
+    from .charging_session import sync_open_charging_deadlines
+
+    raw = _load_consumer_state_json()
+    open_raw = raw.get("open_charging_deadlines") or {}
+    if not isinstance(open_raw, dict):
+        open_raw = {}
+    fulfilled_raw = raw.get("plug_cycle_fulfilled") or {}
+    fulfilled = {
+        str(cid): True
+        for cid, flag in fulfilled_raw.items()
+        if isinstance(fulfilled_raw, dict) and flag
+    }
+    return sync_open_charging_deadlines(
+        {str(cid): str(dl) for cid, dl in open_raw.items() if dl},
+        {},
+        plug_cycle_fulfilled=fulfilled,
+        now=datetime.now(),
+    )
 
 
 def apply_plug_cycle_fulfilled_contexts(
@@ -648,9 +718,11 @@ def resolve_charging_contexts(
     live_flex_kw: dict[str, float] | None = None,
     consumers: list | None = None,
     plug_cycle_fulfilled: dict[str, bool] | None = None,
+    open_charging_deadlines: dict[str, str] | None = None,
 ) -> dict[str, dict]:
     """Ladekontext je Verbraucher mit charging_schedule für den Optimierungshorizont."""
     from . import charge_immediate as ci
+    from .charging_session import parse_open_charging_deadline
 
     logged_simulation = bool(
         optimization_matrix
@@ -661,6 +733,11 @@ def resolve_charging_contexts(
         optimizer_only=True
     )
     horizon = len(optimization_matrix) if optimization_matrix else 24
+    open_deadlines = (
+        open_charging_deadlines
+        if open_charging_deadlines is not None
+        else _load_open_charging_deadlines()
+    )
     contexts: dict[str, dict] = {}
     for consumer in active:
         if not charging_schedule_enabled(consumer):
@@ -671,6 +748,7 @@ def resolve_charging_contexts(
             optimization_matrix,
             consumer_daily_targets_kwh,
             logged_simulation,
+            open_cycle_deadline=parse_open_charging_deadline(open_deadlines, cid),
         )
         live_kw = flex_kw_lookup(live_flex_kw, consumer)
         contexts[cid] = ci.enrich_context_with_immediate_charge(

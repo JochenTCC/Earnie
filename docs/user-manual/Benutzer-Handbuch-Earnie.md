@@ -275,7 +275,7 @@ Das **Live-Szenario** (meist ID `live`) ist die Basis für den späteren Produkt
 
 Pro Szenario können Sie **Aktiv für Szenario-Explorer** setzen; deaktivierte Varianten werden in der Explorer-Rechnung übersprungen (vorhandene Ergebnisse werden dadurch ungültig). Mit **Eigene Referenz ohne Optimierung** legen Sie fest, ob für die Variante eine eigene Nicht-Opt-Referenz berechnet wird (Vorbelegung nach Tarif/PV-Heuristik; Batterie-only-Varianten teilen standardmäßig die Live-Referenz); der Earnie-Optimierungs-Algorithmus ist dann **NICHT** aktiv.
 
-Tarife wählen Sie aus dem Tarifkatalog (Bezug/Einspeise). Nach der Auswahl zeigt der Editor die **Katalogparameter** des gewählten Tarifs (read-only). Bitte prüfen Sie diese Werte — es gibt **keine Garantie** für Vollständigkeit oder Aktualität. **Monatliche Fixkosten** (Lieferant-Grundpreis, optional Netz-/Messstellen-/Sonstige) fließen als **Näherung** in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung. **Netznutzungsentgelte** werden derzeit **nicht** berücksichtigt. Nach jedem SE-Lauf liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/` (Bezug/Einspeisung mit Ø Tarif- und Ø Ist-Preis, Katalogparameter am Ende). Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md). Technik: [Preise & aWATTar](../konfiguration/preise.md).
+Tarife wählen Sie aus dem Tarifkatalog (Bezug/Einspeise). Nach der Auswahl zeigt der Editor die **Katalogparameter** des gewählten Tarifs (read-only). Bitte prüfen Sie diese Werte — es gibt **keine Garantie** für Vollständigkeit oder Aktualität. **Monatliche Fixkosten** (Lieferant-Grundpreis, optional Netz-/Messstellen-/Sonstige) fließen als **Näherung** in die Gesamt- und Monatskosten des Szenario-Explorers ein, nicht in die Live-Optimierung. Den volumetrischen **Netznutzung Arbeitspreis** pflegen Sie am Hausprofil (Standort); er fließt in Live und SE ein und erscheint in Fake-Jahresrechnungen getrennt vom Lieferantenanteil. Nach jedem SE-Lauf liegen **Fake-Jahresrechnungen** (Markdown) im Log-Ordner unter `invoices/` (Bezug/Einspeisung mit Ø Tarif- und Ø Ist-Preis, Katalogparameter am Ende). Nachrechnen: [Tarife und Preise nachrechnen](../referenz/tarife-quellen.md). Technik: [Preise & aWATTar](../konfiguration/preise.md).
 
 ### Szenario-Explorer (Was-Wäre-Wenn-Analyse)
 
@@ -327,7 +327,7 @@ Auswertung u. a.:
 - **Monatsverläufe** und Plausibilitätsansichten  
 - Charts zu Leistung, Verbrauch und PV je nach gewählter Ansicht
 
-Nutzen Sie die Ergebnisse als **Entscheidungsgrundlage** (Investition, Tarif), nicht als exakte Prognose der nächsten Stromrechnung. Es wird keine Gewähr dafür übernommen, dass die Ergebnisse genau so eintreffen werden. **Netznutzungsentgelte** fließen derzeit **nicht** in die SE-Kostenrechnung ein.
+Nutzen Sie die Ergebnisse als **Entscheidungsgrundlage** (Investition, Tarif), nicht als exakte Prognose der nächsten Stromrechnung. Es wird keine Gewähr dafür übernommen, dass die Ergebnisse genau so eintreffen werden. Der volumetrische **Netznutzung Arbeitspreis** (Hausprofil) fließt in die SE-Kosten ein; Leistungspreis und netzgebietsspezifische Tabellen fehlen.
 
 ##### Gesamtkosten und -Verbrauch: Jahres Verbrauch [kWh]
 

@@ -150,3 +150,22 @@ def test_manual_schedule_not_peeled_into_named_bars():
     assert chart_rows[0]["Fernsehen (kW)"] == 0.2
     assert chart_rows[0]["Verbrauch-Prognose (kW)"] == 0.196
     assert chart_known_generics(profile)[0]["id"] == "fernsehen"
+
+
+def test_history_ist_slots_skip_known_schedule_peel():
+    """Logged Ist slots must not invent Kochen/TV from the weekly schedule."""
+    slot = datetime(2026, 8, 10, 19, 15, tzinfo=_TZ)
+    chart_rows = [
+        {
+            "slot_datetime": slot,
+            "Verbrauch-Prognose (kW)": 0.46,
+            "PV-Prognose (kW)": 0.445,
+            "PV-Ist (kW)": 0.71,
+            "Ist Batterie-Leistung (kW)": -1.03,
+            "Netzbezug (kW)": -1.29,
+        }
+    ]
+    apply_known_generic_to_chart_rows(chart_rows, house_profile=_PROFILE)
+    assert "Kochen (kW)" not in chart_rows[0]
+    assert "Fernsehen (kW)" not in chart_rows[0]
+    assert chart_rows[0]["Verbrauch-Prognose (kW)"] == 0.46

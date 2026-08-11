@@ -3,6 +3,16 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Bugfix SE battery standby ignored (2026-08-11)
+
+- [x] Battery Standby Power not calculated correctly in SE — low vs high standby same result (`earnie_env`). Cause: `_scenario_to_battery_params` dropped `standby_power_kw`. Fix: pass standby through; regression in `tests/test_battery_standby.py`. Live path already OK. Verified (SE 1-month test).
+
+
+### Bugfix HK analog numbers 3 decimals (2026-08-11)
+
+- [x] Analog number in HK shown with only 2 digits → three — `labeled_number_input` defaults float widgets to `%.3f` (ints / explicit `format` unchanged); NNE AP `step=0.001`; tariff preview Cent values use 3 decimals. UI acceptance verified.
+
+
 ### Version 2.4.0 — Official release (2026-08-07)
 
 EHAL foundation, DACH docking & Loxone on EHAL. Letter steps (`2.4.a`–`2.4.q`, …) archived under their own sections below / earlier in this file.

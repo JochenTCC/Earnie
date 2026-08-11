@@ -224,6 +224,17 @@ def missing_next_month_tariff_hints(
     return hints
 
 
+def _add_netzentgelt(
+    work_price: float,
+    *,
+    netzentgelt_override: float | None,
+) -> float:
+    """Add volumetric Netznutzung Arbeitspreis (Cent/kWh) from house-profile settings."""
+    if netzentgelt_override is None:
+        return float(work_price)
+    return float(work_price) + float(netzentgelt_override)
+
+
 def _spot_import_cent(
     epex_cent: float,
     tariff: dict[str, Any],
@@ -233,12 +244,7 @@ def _spot_import_cent(
     settlement = float(tariff.get("settlement_fee_cent_kwh", 0.0) or 0.0)
     markup = float(tariff.get("markup_percent", 0.0) or 0.0)
     work_price = (float(epex_cent) * (1.0 + markup / 100.0)) + settlement
-    if netzentgelt_override is not None:
-        work_price += float(netzentgelt_override)
-    else:
-        netzentgelt = tariff.get("netzentgelt_cent_kwh")
-        if netzentgelt is not None:
-            work_price += float(netzentgelt)
+    work_price = _add_netzentgelt(work_price, netzentgelt_override=netzentgelt_override)
     return _apply_vat(
         work_price,
         prices_include_vat=bool(tariff.get("prices_include_vat", True)),
@@ -267,9 +273,10 @@ def import_cent_kwh(
             slot_datetime.month,
             label="Import-Tarif",
         )
+        work = _add_netzentgelt(price, netzentgelt_override=netzentgelt_override)
         return round(
             _apply_vat(
-                price,
+                work,
                 prices_include_vat=bool(tariff.get("prices_include_vat", True)),
                 vat_percent=float(tariff.get("vat_percent", 0.0) or 0.0),
             ),
@@ -288,9 +295,10 @@ def import_cent_kwh(
         if "fix_cent_kwh" not in tariff:
             raise ValueError("Import-Tarif type 'fixed_cent' erfordert fix_cent_kwh.")
         fixed = float(tariff["fix_cent_kwh"])
+        work = _add_netzentgelt(fixed, netzentgelt_override=netzentgelt_override)
         return round(
             _apply_vat(
-                fixed,
+                work,
                 prices_include_vat=bool(tariff.get("prices_include_vat", True)),
                 vat_percent=float(tariff.get("vat_percent", 0.0) or 0.0),
             ),

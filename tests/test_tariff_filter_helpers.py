@@ -124,7 +124,7 @@ def test_parameter_rows_fixed_cent() -> None:
     assert rows["Typ"] == "Fixpreis Bezug"
     assert rows["Land"] == "AT"
     assert rows["Währung"] == "EUR"
-    assert rows["Arbeitspreis"] == "28.50 Cent/kWh"
+    assert rows["Arbeitspreis"] == "28.500 Cent/kWh"
     assert rows["Hinweis"] == "Test"
     assert "Abwicklungsgebühr" not in rows
 
@@ -144,7 +144,7 @@ def test_parameter_rows_spot_hourly_import() -> None:
         )
     )
     assert rows["Typ"] == "Spot stündlich"
-    assert rows["Abwicklungsgebühr"] == "1.50 Cent/kWh"
+    assert rows["Abwicklungsgebühr"] == "1.500 Cent/kWh"
     assert rows["Aufschlag"] == "3 %"
     assert rows["Preise inkl. USt"] == "ja"
     assert rows["USt"] == "20 %"
@@ -166,7 +166,7 @@ def test_parameter_rows_spot_export_with_fee_factor() -> None:
         )
     )
     assert rows["Typ"] == "Spot stündlich"
-    assert rows["Einspeise-Gebührenfaktor"] == "0.19"
+    assert rows["Einspeise-Gebührenfaktor"] == "0.190"
     assert rows["Einspeise-Fix"] == "0 Cent/kWh"
 
 
@@ -178,7 +178,7 @@ def test_parameter_rows_export_fixed() -> None:
         )
     )
     assert rows["Typ"] == "Fixpreis Einspeise"
-    assert rows["Einspeisevergütung"] == "8.20 Cent/kWh"
+    assert rows["Einspeisevergütung"] == "8.200 Cent/kWh"
 
 
 def test_parameter_rows_monthly_table_summary() -> None:
@@ -197,7 +197,7 @@ def test_parameter_rows_monthly_table_summary() -> None:
     )
     assert rows["Typ"] == "Monatspreis"
     assert rows["Monatsraten"] == "2"
-    assert rows["Monatsraten Min–Max (Cent/kWh)"] == "5.00 – 7.50"
+    assert rows["Monatsraten Min–Max (Cent/kWh)"] == "5.000 – 7.500"
 
 
 def test_parameter_rows_omits_missing_optional() -> None:

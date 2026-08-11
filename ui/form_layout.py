@@ -36,6 +36,16 @@ def labeled_text_input(
     return col.text_input(label, **_with_collapsed_label(kwargs))
 
 
+def _float_number_input_needs_format(kwargs: dict[str, Any]) -> bool:
+    """True when Streamlit would treat the widget as float and no format is set."""
+    if "format" in kwargs:
+        return False
+    for key in ("value", "step", "min_value", "max_value"):
+        if isinstance(kwargs.get(key), float):
+            return True
+    return False
+
+
 def labeled_number_input(
     label: str,
     *,
@@ -43,7 +53,11 @@ def labeled_number_input(
     **kwargs: Any,
 ) -> Any:
     col = form_row(label, ratios=ratios)
-    return col.number_input(label, **_with_collapsed_label(kwargs))
+    opts = _with_collapsed_label(kwargs)
+    # HK/SE float fields: show 3 decimals (NNE Cent/kWh etc.); keep ints / explicit format.
+    if _float_number_input_needs_format(opts):
+        opts["format"] = "%.3f"
+    return col.number_input(label, **opts)
 
 
 def labeled_selectbox(

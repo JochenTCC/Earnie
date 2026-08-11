@@ -388,6 +388,9 @@ def _scenario_to_battery_params(scenario_params: dict) -> dict:
         "max_soc": float(scenario_params["battery_max_soc"]),
         "max_power_kw": float(scenario_params["battery_max_power_kw"]),
         "efficiency": float(scenario_params["battery_efficiency"]),
+        "standby_power_kw": max(
+            0.0, float(scenario_params.get("standby_power_kw") or 0.0)
+        ),
     }
 
 

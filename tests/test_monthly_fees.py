@@ -310,8 +310,8 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
     assert "Fake-Jahresrechnung — Live" in text
     assert "aWATTar HOURLY" in text
     assert "SUNNY SPOT" in text
-    assert "Netznutzungsentgelte" in text
-    assert "werden derzeit **nicht** berücksichtigt" in text
+    assert "Netznutzung Arbeitspreis" in text or "netznutzung_arbeitspreis" in text
+    assert "Leistungspreis" in text
     # 12*1.0 import - 12*0.5 export + 5.5 fees = 11.50
     assert "11.50 €" in text
     body = render_scenario_invoice_markdown(
@@ -333,6 +333,8 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
         },
     )
     assert "Energiebezug" in body
+    assert "| Energiebezug |" in body  # no split when AP=0
+    assert "## Netznutzung" not in body
     assert "Einspeiseerlös" in body
     assert "Verbrauch (Info)" in body
     assert "## Bezug" in body
@@ -370,3 +372,63 @@ def test_write_se_invoices_markdown(tmp_path) -> None:
     assert "## Katalogparameter Einspeisung" in body
     assert "Abwicklungsgebühr" in body
     assert "Einspeise-Gebührenfaktor" in body
+
+
+def test_invoice_netznutzung_ap_split_from_energiebezug() -> None:
+    """AP breakout: Lieferant + Netznutzung = original Energiebezug; Gesamt unchanged."""
+    idx = pd.date_range("2025-01-01", periods=10, freq="h")
+    df = pd.DataFrame(
+        {
+            "import_cost_eur": [1.2] * 10,  # 12 € total
+            "export_earn_eur": [0.0] * 10,
+            "import_kwh": [10.0] * 10,  # 100 kWh
+            "export_kwh": [0.0] * 10,
+            "consumption_kw": [5.0] * 10,
+            "k_act": [12.0] * 10,
+            "k_push_act": [0.0] * 10,
+        },
+        index=idx,
+    )
+    fees = ScenarioFeeBreakdown(supplier_monthly_eur=0.0, grid_monthly_eur=2.0)
+    # 5 ct/kWh net, prices_include_vat true → 5 € on 100 kWh
+    body = render_scenario_invoice_markdown(
+        scenario_id="live",
+        label="Live",
+        df=df,
+        fees=fees,
+        import_spec={
+            "id": "fix",
+            "label": "Fix",
+            "type": "fixed_cent",
+            "prices_include_vat": True,
+            "vat_percent": 20.0,
+        },
+        export_spec=None,
+        netznutzung_arbeitspreis_cent_kwh=5.0,
+    )
+    assert "## Netznutzung" in body
+    assert "| Energiebezug (Lieferant) | 7.00 € (100.0 kWh) |" in body
+    assert "| Netznutzung Arbeitspreis | 5.00 € |" in body
+    # 12 import - 0 export + 2 grid = 14
+    assert "| **Gesamt** | **14.00 €** |" in body
+    assert "| Arbeitspreis (Jahr) | 5.00 € |" in body
+
+    # With VAT on net AP: 5 * 1.2 = 6 ct → 6 €
+    body_vat = render_scenario_invoice_markdown(
+        scenario_id="live",
+        label="Live",
+        df=df,
+        fees=fees,
+        import_spec={
+            "id": "spot",
+            "label": "Spot",
+            "type": "spot_hourly",
+            "prices_include_vat": False,
+            "vat_percent": 20.0,
+        },
+        export_spec=None,
+        netznutzung_arbeitspreis_cent_kwh=5.0,
+    )
+    assert "| Netznutzung Arbeitspreis | 6.00 € |" in body_vat
+    assert "| Energiebezug (Lieferant) | 6.00 € (100.0 kWh) |" in body_vat
+    assert "| **Gesamt** | **14.00 €** |" in body_vat

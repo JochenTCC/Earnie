@@ -31,6 +31,45 @@ def _fmt_cent(value: float | None) -> str:
     return f"{float(value):.2f}"
 
 
+def _netznutzung_ap_net_cent(params: dict | None) -> float:
+    """Hausprofil-Arbeitspreis (Cent/kWh netto) aus aufgelösten SE-Params."""
+    if not isinstance(params, dict):
+        return 0.0
+    raw = params.get("netzentgelt_cent_kwh")
+    if raw is None:
+        profile = params.get("_house_profile")
+        if isinstance(profile, dict):
+            raw = profile.get("netznutzung_arbeitspreis_cent_kwh")
+    return max(0.0, float(raw or 0.0))
+
+
+def _netznutzung_ap_gross_cent(
+    ap_net_cent: float,
+    import_spec: dict | None,
+) -> float:
+    """Arbeitspreis Cent/kWh wie in k_act (USt laut Bezugstarif)."""
+    if ap_net_cent <= 0.0:
+        return 0.0
+    spec = import_spec if isinstance(import_spec, dict) else {}
+    if bool(spec.get("prices_include_vat", True)):
+        return float(ap_net_cent)
+    vat = float(spec.get("vat_percent", 0.0) or 0.0)
+    return float(ap_net_cent) * (1.0 + vat / 100.0)
+
+
+def _netznutzung_ap_eur(
+    *,
+    import_kwh: float,
+    ap_net_cent: float,
+    import_spec: dict | None,
+) -> float:
+    """Volumetrische Netznutzung € aus Netzbezug × brutto-AP."""
+    if import_kwh <= 0.0 or ap_net_cent <= 0.0:
+        return 0.0
+    gross_cent = _netznutzung_ap_gross_cent(ap_net_cent, import_spec)
+    return float(import_kwh) * gross_cent / 100.0
+
+
 def _tariff_line(spec: dict | None, *, kind: str) -> str:
     if not isinstance(spec, dict) or not spec:
         return f"{kind}: —"
@@ -188,43 +227,99 @@ def _year_summary_lines(
     fees: ScenarioFeeBreakdown,
     month_count: int,
     total_year: float,
+    netznutzung_ap_eur: float = 0.0,
 ) -> list[str]:
-    return [
+    nne = max(0.0, min(float(netznutzung_ap_eur), float(import_year)))
+    lieferant_eur = float(import_year) - nne
+    lines = [
         "## Jahr",
         "",
         "| Position | Betrag |",
         "| --- | ---: |",
-        f"| Energiebezug | {_fmt_eur(import_year)} ({_fmt_kwh(import_kwh_year)}) |",
-        f"| Einspeiseerlös | −{_fmt_eur(export_year)} ({_fmt_kwh(export_kwh_year)}) |",
-        f"| Verbrauch (Info) | {_fmt_kwh(consumption_kwh_year)} |",
-        f"| Lieferant-Grundpreis | {_fmt_eur(fees.supplier_monthly_eur * month_count)} |",
-        f"| Netzentgelt-Grundpreis | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
-        f"| Messstellengebühr | {_fmt_eur(fees.metering_monthly_eur * month_count)} |",
-        f"| Sonstige Fixkosten | {_fmt_eur(fees.other_monthly_eur * month_count)} |",
-        f"| **Gesamt** | **{_fmt_eur(total_year)}** |",
+    ]
+    if nne > 0.0:
+        lines.append(
+            f"| Energiebezug (Lieferant) | {_fmt_eur(lieferant_eur)} "
+            f"({_fmt_kwh(import_kwh_year)}) |"
+        )
+        lines.append(f"| Netznutzung Arbeitspreis | {_fmt_eur(nne)} |")
+    else:
+        lines.append(
+            f"| Energiebezug | {_fmt_eur(import_year)} ({_fmt_kwh(import_kwh_year)}) |"
+        )
+    lines.extend(
+        [
+            f"| Einspeiseerlös | −{_fmt_eur(export_year)} ({_fmt_kwh(export_kwh_year)}) |",
+            f"| Verbrauch (Info) | {_fmt_kwh(consumption_kwh_year)} |",
+            f"| Lieferant-Grundpreis | {_fmt_eur(fees.supplier_monthly_eur * month_count)} |",
+            f"| Netzentgelt-Grundpreis | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
+            f"| Messstellengebühr | {_fmt_eur(fees.metering_monthly_eur * month_count)} |",
+            f"| Sonstige Fixkosten | {_fmt_eur(fees.other_monthly_eur * month_count)} |",
+            f"| **Gesamt** | **{_fmt_eur(total_year)}** |",
+            "",
+        ]
+    )
+    return lines
+
+
+def _netznutzung_section_lines(
+    *,
+    ap_net_cent: float,
+    ap_gross_cent: float,
+    import_kwh_year: float,
+    netznutzung_ap_eur: float,
+    fees: ScenarioFeeBreakdown,
+    month_count: int,
+) -> list[str]:
+    """Separate Netznutzung block (Arbeitspreis breakout + Grundpreis-Stub)."""
+    lines = [
+        "## Netznutzung",
+        "",
+        "| Position | Wert |",
+        "| --- | ---: |",
+        f"| Arbeitspreis netto | {_fmt_cent(ap_net_cent)} Cent/kWh |",
+        f"| Arbeitspreis in k_act | {_fmt_cent(ap_gross_cent)} Cent/kWh |",
+        f"| Netzbezug | {_fmt_kwh(import_kwh_year)} |",
+        f"| Arbeitspreis (Jahr) | {_fmt_eur(netznutzung_ap_eur)} |",
+        f"| Grundpreis (Katalog-Stub) | {_fmt_eur(fees.grid_monthly_eur * month_count)} |",
+        "",
+        "Arbeitspreis kommt aus dem Hausprofil (`netznutzung_arbeitspreis_cent_kwh`), "
+        "unabhängig vom Lieferantentarif. In der Jahressumme ist er aus dem "
+        "Energiebezug herausgerechnet (kein Doppelzählen). Leistungspreis und "
+        "netzgebietsspezifische Tabellen fehlen.",
         "",
     ]
+    return lines
 
 
-def _hinweise_lines() -> list[str]:
+def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
+    nne_hint = (
+        "- Volumetrische **Netznutzung Arbeitspreis** (Hausprofil) ist in `k_act` "
+        "enthalten und in der Jahrestabelle als eigene Position ausgewiesen "
+        "(aus Energiebezug herausgerechnet)."
+        if has_netznutzung_ap
+        else "- Volumetrische **Netznutzung Arbeitspreis**: am Hausprofil setzen "
+        "(`netznutzung_arbeitspreis_cent_kwh`); sonst 0."
+    )
     return [
         "## Hinweise",
         "",
         "- Näherung für Plausibilität im Szenario-Explorer — **keine** echte Stromrechnung.",
-        "- **Netznutzungsentgelte** werden derzeit **nicht** berücksichtigt "
-        "(weder volumetrischer Arbeitspreis noch netzgebietsspezifischer Leistungspreis).",
+        nne_hint,
+        "- **Leistungspreis** und netzgebietsspezifische Lookup-Tabellen werden "
+        "**nicht** modelliert.",
         "- Verbrauch (Info) = Jahres Verbrauch aus der SE-Tabelle Gesamtkosten "
         "(nicht Summe der Stunden-CSV; bei Sunrise können die Werte abweichen).",
         "- Verbrauch geht **nicht** in die Rechnungssumme ein.",
         "- Ø Tarif Cent/kWh: arithmetisches Mittel der stündlichen Tarifpreise "
-        "über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`).",
+        "über alle Stunden des Monats (`Summe(k_act)/N` bzw. `k_push_act`); "
+        "enthält ggf. den Netznutzung-Arbeitspreis.",
         "- Ø Ist Cent/kWh: `Energiekosten € / Netzenergie kWh × 100` "
         "(nur Stunden mit Bezug bzw. Einspeisung wirken über die Summen).",
         "- Fixkosten: Lieferant-Grundpreis je `supplier_id` einmal; "
         "Netzentgelt-/Messstellen-/Sonstige Fixkosten einmal je Hausanschluss "
-        "(aus Bezugstarif, sonst Einspeisetarif) — Katalog-Stubs, keine echten "
-        "Netznutzungsentgelte.",
-        "- Nicht modelliert: Netznutzungsentgelte, PLZ-/netzgebietsspezifische Stacks, "
+        "(aus Bezugstarif, sonst Einspeisetarif) — Katalog-Stubs.",
+        "- Nicht modelliert: Leistungspreis, PLZ-/netzgebietsspezifische Stacks, "
         "separate Stromsteuer/Konzessionsabgabe/Elektrizitätsabgabe (oft im Arbeitspreis).",
         "",
     ]
@@ -239,11 +334,15 @@ def render_scenario_invoice_markdown(
     import_spec: dict | None,
     export_spec: dict | None,
     verbrauch_info_kwh: float | None = None,
+    netznutzung_arbeitspreis_cent_kwh: float = 0.0,
 ) -> str:
     """Build one German fake-Jahresrechnung markdown body.
 
     ``verbrauch_info_kwh`` should match SE Gesamtkosten Jahres Verbrauch when set;
     otherwise falls back to summing hourly ``consumption_kw`` (legacy).
+
+    ``netznutzung_arbeitspreis_cent_kwh`` is the house-profile net AP (Cent/kWh).
+    When > 0, Jahr splits Lieferant vs Netznutzung (same Gesamt; AP already in k_act).
     """
     (
         import_cost,
@@ -266,6 +365,15 @@ def render_scenario_invoice_markdown(
     else:
         consumption_kwh_year = hourly_consumption_year
     total_year = import_year - export_year + fees.total_monthly_eur * month_count
+    ap_net = max(0.0, float(netznutzung_arbeitspreis_cent_kwh or 0.0))
+    ap_gross = _netznutzung_ap_gross_cent(ap_net, import_spec)
+    nne_eur = _netznutzung_ap_eur(
+        import_kwh=import_kwh_year,
+        ap_net_cent=ap_net,
+        import_spec=import_spec,
+    )
+    if nne_eur > import_year:
+        nne_eur = import_year
 
     lines = [
         f"# Fake-Jahresrechnung — {label}",
@@ -287,8 +395,20 @@ def render_scenario_invoice_markdown(
             fees=fees,
             month_count=month_count,
             total_year=total_year,
+            netznutzung_ap_eur=nne_eur,
         )
     )
+    if ap_net > 0.0:
+        lines.extend(
+            _netznutzung_section_lines(
+                ap_net_cent=ap_net,
+                ap_gross_cent=ap_gross,
+                import_kwh_year=import_kwh_year,
+                netznutzung_ap_eur=nne_eur,
+                fees=fees,
+                month_count=month_count,
+            )
+        )
     lines.extend(
         _energy_table_lines(
             title="Bezug",
@@ -311,7 +431,7 @@ def render_scenario_invoice_markdown(
             price_cent=k_push_act,
         )
     )
-    lines.extend(_hinweise_lines())
+    lines.extend(_hinweise_lines(has_netznutzung_ap=ap_net > 0.0))
     lines.extend(
         _catalog_table_lines(
             title="Katalogparameter Bezug",
@@ -397,6 +517,7 @@ def write_se_invoices(
             import_spec=import_spec if isinstance(import_spec, dict) else None,
             export_spec=export_spec if isinstance(export_spec, dict) else None,
             verbrauch_info_kwh=verbrauch_info,
+            netznutzung_arbeitspreis_cent_kwh=_netznutzung_ap_net_cent(params),
         )
         path = os.path.join(
             invoice_dir, f"{_safe_filename(label)}_jahresrechnung.md"

@@ -137,6 +137,11 @@ def _apply_profile_geo(out: dict, profile: dict) -> None:
             float(out["latitude"]),
             float(out["longitude"]),
         )
+    nne = float(profile.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0)
+    if nne > 0.0:
+        out["netzentgelt_cent_kwh"] = nne
+    else:
+        out.pop("netzentgelt_cent_kwh", None)
 
 
 def _prepare_live_scenario_settings(

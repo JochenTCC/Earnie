@@ -530,6 +530,7 @@ def upsert_battery(raw_spec: dict, *, stable_id: str = "") -> None:
         "battery_min_soc": float(raw_spec["battery_min_soc"]),
         "battery_max_soc": float(raw_spec["battery_max_soc"]),
         "threshold_power": float(raw_spec.get("threshold_power", 0.05)),
+        "standby_power_kw": float(raw_spec.get("standby_power_kw", 0.0) or 0.0),
     }
     existing_wear = None
     if stable_id:

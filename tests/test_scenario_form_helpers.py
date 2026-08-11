@@ -274,7 +274,6 @@ def test_scenario_form_is_dirty_when_label_changed():
         scoped_widget_key("live", "scenario_pv"): [],
         scoped_widget_key("live", "scenario_import"): "— keine —",
         scoped_widget_key("live", "scenario_export"): "— keine —",
-        scoped_widget_key("live", "scenario_netzentgelt"): 0.0,
     }
     store_scenario_form_baseline(
         session,
@@ -300,7 +299,6 @@ def test_scenario_form_is_clean_when_matching_baseline():
         scoped_widget_key("live", "scenario_pv"): [],
         scoped_widget_key("live", "scenario_import"): "— keine —",
         scoped_widget_key("live", "scenario_export"): "— keine —",
-        scoped_widget_key("live", "scenario_netzentgelt"): 0.0,
     }
     store_scenario_form_baseline(
         session,
@@ -327,7 +325,6 @@ def test_read_scenario_form_snapshot_resolves_entity_ids():
         scoped_widget_key("live", "scenario_pv"): [],
         scoped_widget_key("live", "scenario_import"): "— keine —",
         scoped_widget_key("live", "scenario_export"): "— keine —",
-        scoped_widget_key("live", "scenario_netzentgelt"): 0.0,
     }
     snapshot = read_scenario_form_snapshot(
         session,
@@ -341,15 +338,19 @@ def test_read_scenario_form_snapshot_resolves_entity_ids():
     assert snapshot["settings"]["battery_id"] == "bat1"
 
 
-def test_build_scenario_settings_omits_zero_netzentgelt():
+def test_build_scenario_settings_basic_refs():
     settings = build_scenario_settings(
         battery_id="",
         pv_system_ids=[],
         import_tariff_id="imp",
         export_tariff_id="exp",
         house_profile_id="home",
-        netzentgelt_cent_kwh_override=0.0,
     )
+    assert settings == {
+        "import_tariff_id": "imp",
+        "export_tariff_id": "exp",
+        "house_profile_id": "home",
+    }
     assert "netzentgelt_cent_kwh_override" not in settings
     assert "pv_system_ids" not in settings
 
