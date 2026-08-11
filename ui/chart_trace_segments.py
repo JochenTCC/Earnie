@@ -6,7 +6,6 @@ from datetime import datetime
 import pandas as pd
 import plotly.graph_objects as go
 
-from data.planning_window import normalize_hour_slot
 from ui.chart_colors import CHART_PV_FILL_COLOR, CHART_PV_LINE_COLOR
 from ui.chart_slot_axis import (
     ChartSlotAxis,
@@ -19,7 +18,7 @@ from ui.chart_slot_axis import (
     _empty_chart_time_series,
     _line_plot_float,
     _optional_float,
-    _slot_indices_for_hour,
+    _slot_index_at_or_after,
     _zone_slot_left,
     _zone_slot_right,
 )
@@ -121,30 +120,29 @@ _IMPORT_PRICE_COLUMN = "Strompreis (Cent/kWh)"
 _EXPORT_PRICE_COLUMN = "Einspeisevergütung (Cent/kWh)"
 
 
+def _axis_index_for_slot(axis: ChartSlotAxis, slot: datetime) -> int | None:
+    """Index des Achsen-Slots mit gleichem Beginn, sonst at-or-after."""
+    target = pd.Timestamp(slot)
+    for index, start in enumerate(axis.starts):
+        if pd.Timestamp(start) == target:
+            return index
+    return _slot_index_at_or_after(axis, slot)
+
+
 def _hour_prices_from_df(
     df: pd.DataFrame,
     column: str = _IMPORT_PRICE_COLUMN,
 ) -> list[tuple[datetime, float]]:
-    """Ein Preis pro volle Stunde (chronologisch), bevorzugt Wert am Stunden-Slot."""
-    if column not in df.columns:
+    """Ein Preis pro Chart-Slot (QH oder Stunde), chronologisch wie im DataFrame."""
+    if column not in df.columns or "slot_datetime" not in df.columns:
         return []
-    by_hour: dict[datetime, float] = {}
+    ordered: list[tuple[datetime, float]] = []
     for _, row in df.iterrows():
         slot = pd.Timestamp(row["slot_datetime"]).to_pydatetime()
-        hour = normalize_hour_slot(slot)
         price = _optional_float(row.get(column))
         if price is None:
             continue
-        if slot == hour or hour not in by_hour:
-            by_hour[hour] = price
-    ordered: list[tuple[datetime, float]] = []
-    seen: set[datetime] = set()
-    for _, row in df.iterrows():
-        hour = normalize_hour_slot(pd.Timestamp(row["slot_datetime"]).to_pydatetime())
-        if hour in seen or hour not in by_hour:
-            continue
-        seen.add(hour)
-        ordered.append((hour, by_hour[hour]))
+        ordered.append((slot, price))
     return ordered
 
 
@@ -154,21 +152,21 @@ def _hourly_price_hv_xy(
     column: str = _IMPORT_PRICE_COLUMN,
 ) -> tuple[pd.Series, pd.Series]:
     """
-    Preis-Treppe mit Stufen nur an Stundengrenzen (Spec: stündlicher Marktpreis).
+    Preis-Treppe mit Stufen an Slotgrenzen (QH oder Stunde).
 
-    Bei gemischter 15-min/1-h-Achse spannt jede Stufe die volle Stundenbreite auf der Achse.
+    Jede Stufe spannt genau die Breite des zugehörigen Achsen-Slots.
     """
-    hour_prices = _hour_prices_from_df(df, column=column)
-    if not hour_prices:
+    slot_prices = _hour_prices_from_df(df, column=column)
+    if not slot_prices:
         return _empty_chart_time_series(), _EMPTY_FLOAT_SERIES
     points_x: list[datetime] = []
     points_y: list[float] = []
-    for hour, price in hour_prices:
-        indices = _slot_indices_for_hour(axis, hour)
-        if not indices:
+    for slot, price in slot_prices:
+        index = _axis_index_for_slot(axis, slot)
+        if index is None:
             continue
-        x_left = _zone_slot_left(axis, indices[0])
-        x_right = _zone_slot_right(axis, indices[-1])
+        x_left = _zone_slot_left(axis, index)
+        x_right = _zone_slot_right(axis, index)
         if not points_x:
             points_x.extend([x_left, x_right])
             points_y.extend([price, price])
@@ -193,21 +191,21 @@ def _hourly_price_hover_labels(
     line_x: pd.Series,
     column: str = _IMPORT_PRICE_COLUMN,
 ) -> list[str]:
-    """Hover-Uhrzeit je Punkt entlang der stündlichen Preis-Treppe."""
-    hour_prices = _hour_prices_from_df(df, column=column)
-    if not hour_prices or line_x.empty:
+    """Hover-Uhrzeit je Punkt entlang der Slot-Preis-Treppe."""
+    slot_prices = _hour_prices_from_df(df, column=column)
+    if not slot_prices or line_x.empty:
         return []
     labels: list[str] = []
-    hour_idx = 0
+    slot_idx = 0
     for x in line_x:
         x_ts = pd.Timestamp(x)
-        while hour_idx + 1 < len(hour_prices):
-            _hour, _ = hour_prices[hour_idx + 1]
-            if x_ts >= pd.Timestamp(_hour):
-                hour_idx += 1
+        while slot_idx + 1 < len(slot_prices):
+            _slot, _ = slot_prices[slot_idx + 1]
+            if x_ts >= pd.Timestamp(_slot):
+                slot_idx += 1
             else:
                 break
-        labels.append(hour_prices[hour_idx][0].strftime("%d.%m. %H:%M"))
+        labels.append(slot_prices[slot_idx][0].strftime("%d.%m. %H:%M"))
     return labels
 
 

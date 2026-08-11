@@ -887,6 +887,18 @@ def hourly_savings_euro_from_rows(
     return [round(matched[i] - optimized[i], 4) for i in range(hour_count)]
 
 
+def _matched_baseline_profile_kw(row: dict, consumer: dict) -> float:
+    """Flex kW used as matched-baseline *shape*.
+
+    ``live_snapshot`` is the current meter reading, not a historical day profile.
+    Scaling a full horizon target onto that single QH sample yields
+    ``target / dt_h`` kW (factor 4 at ``DEFAULT_DT_H=0.25``) and inflated BL Ziel €.
+    """
+    if row.get("consumption_mode") == "live_snapshot":
+        return 0.0
+    return flex_kw_lookup(row.get("expected_flex_kw") or {}, consumer)
+
+
 def build_matched_flex_kw_per_hour(
     optimization_matrix: list,
     consumer_targets_kwh: dict[str, float],
@@ -895,7 +907,7 @@ def build_matched_flex_kw_per_hour(
     """
     Skaliert das historische Flex-Profil auf die aktuellen Horizont-Ziele (kWh).
     Zeitliche Form bleibt erhalten (auch unter Nennleistung); außerhalb des
-    Ladezeitfensters null – wie im MILP.
+    Ladezeitfensters null – wie im MILP. Live-Snapshot-Slots zählen nicht als Profil.
     """
     consumers_cfg = config.get_flexible_consumers(optimizer_only=True)
     rows = optimization_matrix
@@ -921,12 +933,10 @@ def build_matched_flex_kw_per_hour(
         for t, row in enumerate(rows):
             if t not in eligible:
                 continue
-            flex = row.get("expected_flex_kw") or {}
-            profile_sums[cid] += flex_kw_lookup(flex, consumer)
+            profile_sums[cid] += _matched_baseline_profile_kw(row, consumer)
 
     per_hour: list[dict[str, float]] = []
     for t, row in enumerate(rows):
-        flex = row.get("expected_flex_kw") or {}
         hour_flex: dict[str, float] = {}
         for consumer in consumers_cfg:
             cid = consumer["id"]
@@ -937,7 +947,7 @@ def build_matched_flex_kw_per_hour(
                 continue
             eligible_count = len(eligible)
             profile_sum = profile_sums[cid]
-            profile_val = flex_kw_lookup(flex, consumer)
+            profile_val = _matched_baseline_profile_kw(row, consumer)
             if profile_sum > 1e-6:
                 # target is kWh; profile_sum is Σ kW → scale so Σ(kW)*dt_h = target
                 hour_flex[cid] = profile_val * (

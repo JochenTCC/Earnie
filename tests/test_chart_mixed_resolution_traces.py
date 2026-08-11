@@ -26,7 +26,7 @@ def _mixed_slots() -> list[datetime]:
     return quarters + hours
 
 
-def test_hour_prices_from_df_one_price_per_hour():
+def test_hour_prices_from_df_keeps_qh_slot_prices():
     slots = _mixed_slots()
     rows = []
     for index, slot in enumerate(slots):
@@ -39,13 +39,14 @@ def test_hour_prices_from_df_one_price_per_hour():
             "Strompreis (Cent/kWh)": price,
         })
     df = pd.DataFrame(rows)
-    hour_prices = _hour_prices_from_df(df)
-    assert len(hour_prices) == 4
-    assert hour_prices[0] == (_dt(6, 0), 16.0)
-    assert hour_prices[1] == (_dt(7, 0), 17.0)
+    slot_prices = _hour_prices_from_df(df)
+    assert len(slot_prices) == 7
+    assert slot_prices[0] == (_dt(6, 0), 16.0)
+    assert slot_prices[1] == (_dt(6, 15), 16.5)
+    assert slot_prices[4] == (_dt(7, 0), 17.0)
 
 
-def test_hourly_price_hv_steps_only_at_hour_boundaries():
+def test_hourly_price_hv_steps_at_qh_boundaries_when_prices_vary():
     slots = _mixed_slots()
     df = pd.DataFrame({
         "slot_datetime": slots,
@@ -56,18 +57,16 @@ def test_hourly_price_hv_steps_only_at_hour_boundaries():
     axis = ChartSlotAxis.from_dataframe(df)
     line_x, line_y = _hourly_price_hv_xy(axis, df)
     assert line_x.iloc[0] == _dt(6, 0)
-    assert line_x.iloc[1] == _dt(7, 0)
     assert line_y.iloc[0] == 16.0
-    assert line_y.iloc[1] == 16.0
     price_changes = [
-            index
-            for index in range(1, len(line_y))
-            if line_y.iloc[index] != line_y.iloc[index - 1]
-        ]
+        index
+        for index in range(1, len(line_y))
+        if line_y.iloc[index] != line_y.iloc[index - 1]
+    ]
     change_times = [line_x.iloc[index] for index in price_changes]
+    assert _dt(6, 15) in change_times
+    assert _dt(6, 30) in change_times
     assert _dt(7, 0) in change_times
-    assert _dt(6, 15) not in change_times
-    assert _dt(6, 30) not in change_times
 
 
 def test_bar_widths_follow_slot_duration():

@@ -47,6 +47,55 @@ def test_build_matched_flex_scales_to_target():
     assert all(hour["swimspa"] == 0.0 for hour in per_hour[12:])
 
 
+def test_matched_flex_ignores_live_snapshot_profile_shape(monkeypatch):
+    """Live meter flex must not absorb a full thermal target into one QH slot."""
+    from datetime import date
+
+    from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw
+
+    target_kwh = 30.8
+    matrix = [
+        {
+            "hour": 19,
+            "date": date(2026, 8, 11),
+            "consumption_mode": "live_snapshot",
+            "expected_p_pv": 0.0,
+            "expected_p_act": 0.5,
+            "k_act": 32.0,
+            "expected_flex_kw": {"pool_swimspa": 2.82},
+        }
+    ]
+    for offset in range(1, 16):
+        minute = (19 * 60 + offset * 15) % (24 * 60)
+        matrix.append(
+            {
+                "hour": minute // 60,
+                "date": date(2026, 8, 11),
+                "consumption_mode": "forecast",
+                "expected_p_pv": 0.0,
+                "expected_p_act": 0.5,
+                "k_act": 20.0,
+                "expected_flex_kw": {"pool_swimspa": 0.0},
+            }
+        )
+    consumers = [{"id": "pool_swimspa", "name": "Pool / SwimSpa", "nominal_power_kw": 2.8}]
+
+    monkeypatch.setattr(
+        "optimizer.simulation.config.get_flexible_consumers",
+        lambda optimizer_only=False: consumers,
+    )
+    monkeypatch.setattr(
+        "optimizer.simulation.consumer_charging_eligible_indices",
+        lambda rows, consumer, schedule_indices, context=None: list(schedule_indices),
+    )
+
+    per_hour = build_matched_flex_kw_per_hour(matrix, {"pool_swimspa": target_kwh})
+    powers = [float(slot["pool_swimspa"]) for slot in per_hour]
+    assert max(powers) == pytest.approx(target_kwh / (len(matrix) * DEFAULT_DT_H))
+    assert max(powers) < target_kwh / DEFAULT_DT_H
+    assert energy_kwh_from_kw(powers) == pytest.approx(target_kwh)
+
+
 def test_build_matched_flex_reads_canonical_matrix_keys():
     matrix = [
         {

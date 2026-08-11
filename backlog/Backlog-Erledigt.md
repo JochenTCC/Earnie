@@ -38,6 +38,22 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 - [x] Manual appliance Startempfehlung: combined fictitious price (PV surplus × `k_push_act` + remainder × `k_act`); stars on same series; UI/docs; merged duplicate “PV into account” item from Version 2.+1
 
 
+### Bugfix Chart 1 QH tariff plotted hourly (2026-08-11)
+
+- [x] Chart 1 Preis/Einspeisepreis only stepped hourly with QH tariff (`debug_dump_20260811_203552`, VKW Dynamisch). Cause: `_hour_prices_from_df` / `_hourly_price_hv_xy` collapsed to one price per clock hour. Fix: per-slot HV steps; tests in `test_chart_mixed_resolution_traces.py`. Live acceptance verified.
+
+### Bugfix Chart 1 phantom Kochen + missing battery export (2026-08-11)
+
+- [x] Monitor Chart 1 phantom Kochen + missing battery export (`debug_dump_20260810_212549`) — skip known schedule peel on history Ist slots (`house_config/known_chart_display.py`); test `test_history_ist_slots_skip_known_schedule_peel`. Live acceptance verified.
+
+### Bugfix BL Ziel €/kW ~4× too high with QH (2026-08-11)
+
+- [x] BL Ziel €/kW ~4× too high with QH (`debug_dump_20260811_195848`) — matched baseline scaled full SwimSpa target onto single `live_snapshot` QH (`target/dt_h`); exclude live snapshot from profile shape. Live acceptance verified.
+
+### Bugfix Chart 1 empty MILP gap after Ist (QH ≥:15) (2026-08-11)
+
+- [x] Chart 1 empty MILP gap after Ist when `now.minute≥15` (`debug_dump_20260811_203552` 20:30–20:45) — `_milp_tail_rows` now prefers exact QH sim row (`_milp_row_for_quarter_slot`); test `test_build_chart_display_qh_milp_uses_exact_slots_not_missing_hour_zero`. Live acceptance verified.
+
 ### Bugfix SE battery standby ignored (2026-08-11)
 
 - [x] Battery Standby Power not calculated correctly in SE — low vs high standby same result (`earnie_env`). Cause: `_scenario_to_battery_params` dropped `standby_power_kw`. Fix: pass standby through; regression in `tests/test_battery_standby.py`. Live path already OK. Verified (SE 1-month test).

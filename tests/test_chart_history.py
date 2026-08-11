@@ -322,6 +322,53 @@ def test_build_chart_display_quarter_soll_from_milp_hour_zero(history_files):
     assert soll_row["Simulierter SoC (%)"] == 60.0
 
 
+def test_build_chart_display_qh_milp_uses_exact_slots_not_missing_hour_zero(
+    history_files,
+):
+    """QH MILP starting mid-hour must fill remainder QHs (dump 20260811_203552)."""
+    now = _dt(2026, 8, 11, 20, 34)
+    chart_context = build_live_chart_context(0, 0, now=now)
+    _write_jsonl(
+        history_files,
+        [
+            _entry(_dt(2026, 8, 11, 20, 0), soc_percent=82.0),
+            _entry(_dt(2026, 8, 11, 20, 15), soc_percent=79.0),
+        ],
+    )
+    sim_rows = []
+    for slot, soc, price, bat in (
+        (_dt(2026, 8, 11, 20, 30), 75.0, 28.176, -0.42),
+        (_dt(2026, 8, 11, 20, 45), 72.7, 28.7268, -2.5),
+        (_dt(2026, 8, 11, 21, 0), 59.1, 27.9468, -0.72),
+    ):
+        sim_rows.append(
+            {
+                "slot_datetime": slot,
+                "Uhrzeit": slot.strftime("%d.%m. %H:%M"),
+                "Strompreis (Cent/kWh)": price,
+                "Preis extrapoliert": False,
+                "PV-Prognose (kW)": 0.0,
+                "Verbrauch-Prognose (kW)": 0.5,
+                "Geplante Batterie-Aktion (kW)": bat,
+                "Netzbezug (kW)": 0.0,
+                "Simulierter SoC (%)": soc,
+                "Steuerbefehl": "Automatik",
+            }
+        )
+    display = build_chart_display_context(chart_context, sim_rows)
+    by_slot = {
+        slot: row
+        for slot, row, quality in zip(
+            display.slot_datetimes, display.rows, display.slot_qualities
+        )
+        if quality == SLOT_MILP
+    }
+    assert by_slot[_dt(2026, 8, 11, 20, 30)]["Simulierter SoC (%)"] == 75.0
+    assert by_slot[_dt(2026, 8, 11, 20, 45)]["Simulierter SoC (%)"] == 72.7
+    assert by_slot[_dt(2026, 8, 11, 20, 30)]["Geplante Batterie-Aktion (kW)"] == -0.42
+    assert by_slot[_dt(2026, 8, 11, 21, 0)]["Simulierter SoC (%)"] == 59.1
+
+
 def test_entry_to_chart_row_uses_logged_k_push_act(history_files):
     window_start = _dt(2026, 6, 15, 10, 0)
     _write_jsonl(history_files, [_entry(window_start, k_push_act=8.12)])

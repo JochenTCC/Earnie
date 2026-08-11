@@ -273,6 +273,19 @@ def _milp_row_for_hour(sim_rows: list[dict], hour_start: datetime) -> dict:
     return _empty_chart_row(hour_start)
 
 
+def _milp_row_for_quarter_slot(
+    sim_rows: list[dict],
+    slot: datetime,
+    hour_start: datetime,
+) -> dict:
+    """Prefer exact QH MILP row; fall back to hour-start for legacy hourly matrices."""
+    for row in sim_rows:
+        row_slot = _row_slot(row)
+        if row_slot == slot:
+            return row
+    return _milp_row_for_hour(sim_rows, hour_start)
+
+
 def _quarter_row_from_milp(milp_row: dict, slot: datetime) -> dict:
     """Copy MILP payload onto ``slot`` — always replace ISO-string slot_datetime."""
     row = dict(milp_row)
@@ -299,10 +312,10 @@ def _milp_tail_rows(
     tail_rows: list[dict] = []
     tail_slots: list[datetime] = []
     if history_end_exclusive < next_hour:
-        milp_row = _milp_row_for_hour(sim_rows, hour_start)
         for slot in quarter_hour_slots_between(history_end_exclusive, next_hour):
             if slot > chart.end:
                 break
+            milp_row = _milp_row_for_quarter_slot(sim_rows, slot, hour_start)
             tail_rows.append(_quarter_row_from_milp(milp_row, slot))
             tail_slots.append(slot)
 

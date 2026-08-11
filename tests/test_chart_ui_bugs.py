@@ -336,7 +336,7 @@ def test_price_trace_bridges_extrapolation_start():
 
 
 def test_export_price_trace_dashed_orange_hv_alignment():
-    """Einspeisepreis: gestrichelt orange, HV an Stundenrändern, y2."""
+    """Einspeisepreis: gestrichelt orange, HV an Slot-Rändern, y2."""
     slots = _mixed_resolution_slots()[:8]
     rows = []
     for index, slot in enumerate(slots):

@@ -855,24 +855,24 @@ def add_price_on_soc_axis_trace(
     line: dict | None = None,
     hover_label: str = "Preis",
 ) -> None:
-    """Preis auf der SoC-Achse — stündliche Stufen, an Slot-Rändern ausgerichtet."""
+    """Preis auf der SoC-Achse — Stufen je Chart-Slot (QH/Stunde), an Slot-Rändern."""
     del extrap_start, extrap_end
     line_style = line if line is not None else dict(color="red", width=2.5, shape="hv")
     line_x, line_y = _hourly_price_hv_xy(axis, df, column=column)
     if line_x.empty:
         return
-    hour_prices = _hour_prices_from_df(df, column=column)
+    slot_prices = _hour_prices_from_df(df, column=column)
     customdata: list[float] = []
-    hour_idx = 0
+    slot_idx = 0
     for x in line_x:
         x_ts = pd.Timestamp(x)
-        while hour_idx + 1 < len(hour_prices):
-            next_hour = hour_prices[hour_idx + 1][0]
-            if x_ts >= pd.Timestamp(next_hour):
-                hour_idx += 1
+        while slot_idx + 1 < len(slot_prices):
+            next_slot = slot_prices[slot_idx + 1][0]
+            if x_ts >= pd.Timestamp(next_slot):
+                slot_idx += 1
             else:
                 break
-        customdata.append(hour_prices[hour_idx][1])
+        customdata.append(slot_prices[slot_idx][1])
     fig.add_trace(go.Scatter(
         x=line_x,
         y=line_y,
