@@ -37,6 +37,7 @@ EV_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_evcs_bat_capacity",
     "get_evcs_ready_by_time",
     "get_evcs_limit_soc",
+    "get_evcs_soc_min_immediate",
 )
 
 EV_LIVE_WRITE_FIELDS: tuple[str, ...] = (

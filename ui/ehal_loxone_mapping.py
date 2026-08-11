@@ -64,6 +64,7 @@ EV_FIELDS: tuple[str, ...] = (
     "sens_evcs_bat_capacity",
     "get_evcs_ready_by_time",
     "get_evcs_limit_soc",
+    "get_evcs_soc_min_immediate",
     "set_evcs_max_current",
     "set_evcs_mode",
 )
@@ -83,6 +84,7 @@ _EXTRA_LABELS: dict[str, str] = {
     "sens_evcs_bat_capacity": "EV Batteriekapazität (kWh)",
     "get_evcs_ready_by_time": "EV FertigUm",
     "get_evcs_limit_soc": "EV Ladeziel-SOC (%)",
+    "get_evcs_soc_min_immediate": "EV SOC-Min Sofort (%)",
     "flex.power_name": "Flex Leistung / Zustand",
     "flex.enable_name": "Flex Freigabe",
     "flex.power_setpoint_name": "Flex Leistungs-Sollwert",

@@ -219,9 +219,11 @@ def _preset_must_charge_now(
     charging_context: dict | None,
 ) -> bool:
     """Preset-Fallback: Deadline-Druck statt nur günstigste Stunde (t=0)."""
+    ctx = charging_context or {}
+    if float(ctx.get("urgent_min_kwh") or 0.0) > 1e-9:
+        return True
     if remaining_kwh <= 1e-9:
         return False
-    ctx = charging_context or {}
     deadline = _parse_charging_deadline(ctx.get("deadline"))
     if deadline is None:
         return False

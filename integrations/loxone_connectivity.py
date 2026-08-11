@@ -271,6 +271,7 @@ def _append_ev_read_checks(
     from settings.ehal_marker_resolve import (
         marker_get_evcs_limit_soc,
         marker_get_evcs_ready_by_time,
+        marker_get_evcs_soc_min_immediate,
         marker_sens_evcs_active_power,
         marker_sens_evcs_bat_capacity,
         marker_sens_evcs_connected,
@@ -318,6 +319,12 @@ def _append_ev_read_checks(
         checks,
         f"{cid}:get_evcs_limit_soc",
         marker_get_evcs_limit_soc(consumer),
+        {"validate": _soc_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:get_evcs_soc_min_immediate",
+        marker_get_evcs_soc_min_immediate(consumer),
         {"validate": _soc_valid},
     )
 

@@ -83,6 +83,14 @@ Ladeziel in kWh (vereinfacht, Kapazität nur aus Loxone):
 
 `nominal_power_kw_name` überschreibt zur Laufzeit die konfigurierte `nominal_power_kw`, wenn der Merker lesbar ist.
 
+### SOC-Ziele im Live-Betrieb (EHAL)
+
+| Signal | EHAL / Default-Merker | Bedeutung |
+| ------ | --------------------- | --------- |
+| Ladeziel (Limit) | `get_evcs_limit_soc` / `Earnie_EAuto_LimitSOC` | Oberes SOC-Ziel bis FertigUm; Restenergie wird preisoptimiert geplant |
+| SOC-Min Sofort | `get_evcs_soc_min_immediate` / `Earnie_EAuto_SOCMinSofort` | Sofort-Boden: Earnie erzwingt ASAP-Lieferung bis zu diesem SOC (MILP), danach normale Planung bis Limit. ≤0 oder ungebunden = inaktiv; Wert über Limit wird auf Limit begrenzt |
+| Sofortladen | `set_evcs_mode=now` / Legacy Sofort-Merker | Volllast bis Limit, **außerhalb** der MILP-Planung (Loxone steuert) — nicht dasselbe wie SOC-Min Sofort |
+
 Block `charging_schedule.milp` am EV-Verbraucher in `house_profiles.json`: Feintuning der MILP-Heuristik (`live_modus_a_min_remaining_kwh`, Tie-Break-Parameter) — siehe Schema.
 
 ## Pool-Filter: `filter_schedule` und `loxone_remaining_hours`

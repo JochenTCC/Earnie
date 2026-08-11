@@ -40,12 +40,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Nothing, when in Automode
   - Cyan when in Zwangsladen but charging power is near zero (Remove yellow / black bar)
   - Blue when in Zwangsladen with higher charging power
-- [ ] Add the possibility that EV is charged immediately to a min SOC independent from regular schedule
 - [ ] **2.5.a — Data & tariff fidelity**
   - Confirm Energy-Charts 15‑min coverage (AT/DE-LU/CH) vs pre-2025-10 hourly history; mixed-resolution handling
   - Map which catalog tariffs settle on ¼‑h EPEX vs hourly average; document billing vs plan mismatch if MILP stays hourly
-  - Keep official EPEX unconnected unless a paid/internal use case appears
-  - Check possibilities to automatic tariffs.json update to existing installations
 - [ ] **2.5.b — MILP / horizon impact study**
   - Explicit `dt_h` (0.25): battery SoC, wear, import/export cost, EV/thermal/generic (`min_on_quarterhours` as real slots)
   - Size estimate: ~4× variables on sunset→sunset; HiGHS/CBC solve time Live vs SE (`sunrise_window` / commit-K)
@@ -110,6 +107,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.+1
 - [ ] Make also an EHAL adaption for MQTT
+- [ ] **Data & tariff fidelity - Part 2**
+  - Keep official EPEX unconnected unless a paid/internal use case appears
+  - Check possibilities to automatic tariffs.json update to existing installations
 
 
 ### Version 3.0

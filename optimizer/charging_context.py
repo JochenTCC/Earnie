@@ -14,8 +14,9 @@ from settings.ehal_marker_resolve import (
     marker_get_evcs_ready_by_time,
     marker_sens_evcs_connected,
     resolve_get_evcs_limit_soc,
+    resolve_get_evcs_soc_min_immediate,
 )
-from settings.flexible_consumers import flex_kw_lookup
+from settings.flexible_consumers import flex_kw_lookup, target_kwh_from_rest_soc
 
 _LOXONE_WEEKDAY_NAMES = {
     "montag": 0,
@@ -458,6 +459,13 @@ def fetch_loxone_charging_context(
         capacity_kwh=capacity_kwh,
         limit_soc_percent=limit_soc,
     )
+    soc_min_immediate = resolve_get_evcs_soc_min_immediate(consumer)
+    urgent_min_kwh = urgent_min_kwh_from_soc(
+        consumer,
+        actual_soc=soc_val,
+        soc_min_immediate=soc_min_immediate,
+        capacity_kwh=capacity_kwh,
+    )
     return {
         "active": True,
         "plugged_in": True,
@@ -465,6 +473,8 @@ def fetch_loxone_charging_context(
         "target_kwh": round(target_kwh, 3) if target_kwh is not None else None,
         "use_time_window": False,
         "source_label": "loxone (angeschlossen, SOC → kWh)",
+        "soc_min_immediate": soc_min_immediate,
+        "urgent_min_kwh": round(urgent_min_kwh, 3),
     }
 
 
@@ -770,6 +780,59 @@ def hours_needed_to_deliver(remaining_kwh: float, max_kw: float) -> float:
     if max_kw <= 1e-9 or remaining_kwh <= 1e-9:
         return 0.0
     return (remaining_kwh / max_kw) * 1.05
+
+
+def urgent_min_kwh_from_soc(
+    consumer: dict,
+    *,
+    actual_soc: float | None,
+    soc_min_immediate: float | None,
+    capacity_kwh: float | None,
+) -> float:
+    """Grid kWh needed ASAP to reach SOC-Min-Immediate; 0 if inactive or already above."""
+    if soc_min_immediate is None or actual_soc is None or capacity_kwh is None:
+        return 0.0
+    if float(actual_soc) >= float(soc_min_immediate) - 1e-9:
+        return 0.0
+    energy = target_kwh_from_rest_soc(
+        consumer,
+        float(actual_soc),
+        capacity_kwh=float(capacity_kwh),
+        limit_soc_percent=float(soc_min_immediate),
+    )
+    return max(0.0, float(energy or 0.0))
+
+
+def asap_indices_for_urgent_min(
+    matrix: list,
+    *,
+    horizon: int,
+    urgent_min_kwh: float,
+    max_kw: float,
+    deadline: datetime | None = None,
+) -> list[int]:
+    """
+    Horizon slots from now until energy can be delivered at max_kw (ASAP window).
+
+    Ignores weekday charging windows; still skips slots at/after FertigUm deadline.
+    """
+    if urgent_min_kwh <= 1e-9 or max_kw <= 1e-9 or horizon <= 0 or not matrix:
+        return []
+    now = matrix_slot_datetime(matrix, 0)
+    asap_end = now + timedelta(hours=hours_needed_to_deliver(urgent_min_kwh, max_kw))
+    indices: list[int] = []
+    for t in range(min(int(horizon), len(matrix))):
+        slot_dt = matrix_slot_datetime(matrix, t)
+        if deadline is not None and slot_dt >= deadline:
+            continue
+        if slot_dt < asap_end:
+            indices.append(t)
+    if indices:
+        return indices
+    slot0 = matrix_slot_datetime(matrix, 0)
+    if deadline is None or slot0 < deadline:
+        return [0]
+    return []
 
 
 def latest_start_datetime(

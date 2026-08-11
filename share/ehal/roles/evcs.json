@@ -47,6 +47,12 @@
       "notes": "Charge limit SoC % (Merker mapping in 2.4.k)."
     },
     {
+      "field": "get_evcs_soc_min_immediate",
+      "required": false,
+      "kind": "input",
+      "notes": "ASAP min SoC floor %; ≤0 or absent = inactive; clamped to get_evcs_limit_soc."
+    },
+    {
       "field": "set_evcs_max_current",
       "required": false,
       "kind": "setpoint",

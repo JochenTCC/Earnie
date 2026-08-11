@@ -108,6 +108,10 @@ def marker_get_evcs_limit_soc(consumer: dict) -> str:
     return resolve_lox_marker(consumer, "get_evcs_limit_soc")
 
 
+def marker_get_evcs_soc_min_immediate(consumer: dict) -> str:
+    return resolve_lox_marker(consumer, "get_evcs_soc_min_immediate")
+
+
 def marker_get_filter_native_start_hour(consumer: dict) -> str:
     return _first_nonempty(
         ehal_bindings(consumer).get("get_filter_native_start_hour"),
@@ -166,3 +170,23 @@ def resolve_get_evcs_limit_soc(consumer: dict) -> float:
         return float(raw)
     sched = consumer.get("charging_schedule") or {}
     return float(sched.get("target_soc_percent", 100.0) or 100.0)
+
+
+def resolve_get_evcs_soc_min_immediate(consumer: dict) -> float | None:
+    """ASAP min SoC %; None = inactive. Clamped to Limit-SOC when active."""
+    from integrations import loxone_client
+
+    io_name = marker_get_evcs_soc_min_immediate(consumer)
+    if not io_name:
+        return None
+    raw = loxone_client.fetch_loxone_generic_value(io_name)
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if value <= 0.0:
+        return None
+    limit_soc = resolve_get_evcs_limit_soc(consumer)
+    return min(value, float(limit_soc))

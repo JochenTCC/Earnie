@@ -167,6 +167,15 @@
       "notes": "Charge limit SOC %."
     },
     {
+      "name": "Earnie_EAuto_SOCMinSofort",
+      "match": "exact",
+      "entity_kind": "ev",
+      "hk_type": "ev",
+      "ehal_field": "get_evcs_soc_min_immediate",
+      "group": "Earnie_EAuto_",
+      "notes": "ASAP min SOC floor %; ≤0 inactive."
+    },
+    {
       "name": "Earnie_EAuto_Soll_A",
       "match": "exact",
       "entity_kind": "ev",

@@ -83,6 +83,12 @@
       "minimum": 0,
       "maximum": 100,
       "description": "Optional EV charge limit SoC in %."
+    },
+    "get_evcs_soc_min_immediate": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Optional EV ASAP min SoC floor in %; ≤0 or null = inactive."
     }
   },
   "additionalProperties": false

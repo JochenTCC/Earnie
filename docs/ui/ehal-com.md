@@ -109,6 +109,7 @@ Quellen Victron: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 | EV Deadline / FertigUm     | Eingabewert | `get_evcs_ready_by_time`                                     |                                              |                                  |                                                                   | AlarmClock-Bezeichnung; SpecialState10 via `/all` (Tna-Text Backup) |
 | EVCS-Schreibfähigkeit      | Capability  | `supports_evcs_current`                                      | abgeleitete Adapter-Capability               | abgeleitete Adapter-Capability   | ja (u. a. **5016**, **5010** Enable, **5009** Mode)               | wenn Maxstrom-/Strom-Merker gemappt                                 |
 | SOC Ladeziel               | Eingabewert | `get_evcs_limit_soc`                                         |                                              | number.evcc_lab_limit_soc        |                                                                   | `Earnie_EAuto_LimitSOC` / `ehal_bindings.get_evcs_limit_soc`        |
+| SOC-Min Sofort             | Eingabewert | `get_evcs_soc_min_immediate`                                 |                                              |                                  |                                                                   | `Earnie_EAuto_SOCMinSofort` / `ehal_bindings.get_evcs_soc_min_immediate` (≤0 = inaktiv) |
 
 
 

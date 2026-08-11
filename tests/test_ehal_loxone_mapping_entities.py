@@ -21,6 +21,7 @@ from ui.ehal_loxone_mapping import (
 def test_fields_for_consumer_ev_vs_flex():
     assert "set_evcs_max_current" in fields_for_consumer({"type": "ev"})
     assert "get_evcs_limit_soc" in EV_FIELDS
+    assert "get_evcs_soc_min_immediate" in EV_FIELDS
     assert "sens_power_consumers" in PLANT_FIELDS
     assert fields_for_consumer({"type": "thermal_annual"}) == FLEX_FIELDS
     assert fields_for_consumer({"id": "wp", "type": "thermal_annual"}) == (

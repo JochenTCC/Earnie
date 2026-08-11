@@ -40,6 +40,7 @@ class EhalTelemetry(TypedDict):
     sens_evcs_bat_capacity: NotRequired[float | None]
     get_evcs_ready_by_time: NotRequired[str | None]
     get_evcs_limit_soc: NotRequired[float | None]
+    get_evcs_soc_min_immediate: NotRequired[float | None]
 
 
 class EhalSetpoint(TypedDict):

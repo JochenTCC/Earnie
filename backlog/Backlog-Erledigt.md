@@ -3,6 +3,11 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### EV SOC-Min-Immediate ASAP floor (2026-08-11)
+
+- [x] EV charged immediately to a min SOC independent from regular schedule — EHAL `get_evcs_soc_min_immediate` / VO `Earnie_EAuto_SOCMinSofort`; MILP ASAP delivery to floor then price-optimize remainder to Limit-SOC (not Sofortladen)
+
+
 ### Manual consumers opportunity-cost fictitious price (2026-08-11)
 
 - [x] Manual appliance Startempfehlung: combined fictitious price (PV surplus × `k_push_act` + remainder × `k_act`); stars on same series; UI/docs; merged duplicate “PV into account” item from Version 2.+1

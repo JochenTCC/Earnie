@@ -91,6 +91,12 @@ _HINTS: dict[str, tuple[str, ...]] = {
     ),
     "set_evcs_mode": ("pv_follow", "sofort", "charge_immediate", "ev mode"),
     "get_evcs_limit_soc": ("limit soc", "ladeziel", "target soc ev", "limit_soc"),
+    "get_evcs_soc_min_immediate": (
+        "soc min sofort",
+        "socminsfort",
+        "min soc immediate",
+        "soc_min_immediate",
+    ),
     "sens_evcs_connected": ("angeschlossen", "plugged", "connected", "ev da"),
     "sens_evcs_soc_act": ("ev soc", "fahrzeug soc", "ist-soc", "vehicle soc"),
     "sens_evcs_bat_capacity": ("kapazität", "capacity", "akkukapazität"),

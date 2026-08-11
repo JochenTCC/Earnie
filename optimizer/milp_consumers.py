@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import pulp
 
 from .charging_context import (
+    asap_indices_for_urgent_min,
     latest_start_datetime,
     schedule_indices_for_consumer,
     split_eligible_by_urgent_deadline,
@@ -407,6 +408,34 @@ def _parse_charging_deadline(value: datetime | str | None) -> datetime | None:
     return datetime.fromisoformat(text)
 
 
+def _add_urgent_min_asap_constraint(
+    model: MilpHorizonModel,
+    matrix: list[dict[str, Any]],
+    consumer: dict,
+    ctx: dict | None,
+    *,
+    max_kw: float,
+) -> None:
+    """Hard ASAP delivery for SOC-Min-Immediate floor (independent of weekday window)."""
+    urgent_min = float((ctx or {}).get("urgent_min_kwh") or 0.0)
+    if urgent_min <= 1e-9 or max_kw <= 1e-9:
+        return
+    deadline = _parse_charging_deadline((ctx or {}).get("deadline"))
+    asap = asap_indices_for_urgent_min(
+        matrix,
+        horizon=model.horizon,
+        urgent_min_kwh=urgent_min,
+        max_kw=max_kw,
+        deadline=deadline,
+    )
+    if not asap:
+        return
+    effective_urgent = min(urgent_min, _max_deliverable_kwh(consumer, asap))
+    if effective_urgent <= 1e-9:
+        return
+    model.prob += _delivery_energy_expr(model, consumer, asap) >= effective_urgent
+
+
 def _add_consumer_delivery_constraints(
     model: MilpHorizonModel,
     matrix: list[dict[str, Any]],
@@ -465,6 +494,13 @@ def _add_consumer_delivery_constraints(
         max_deliverable = _max_deliverable_kwh(consumer, eligible)
         effective_target = min(target, max_deliverable)
         model.prob += _delivery_energy_expr(model, consumer, eligible) >= effective_target
+        _add_urgent_min_asap_constraint(
+            model,
+            matrix,
+            consumer,
+            ctx,
+            max_kw=max_kw,
+        )
 
 
 def _consumer_pv_follow_at(model: MilpHorizonModel, consumer: dict, hour_index: int) -> int:
