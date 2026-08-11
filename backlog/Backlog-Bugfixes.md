@@ -29,6 +29,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] earnie.log becomes very big. A new log file should be created on a regular basis depending on size of file (weekly or monthly)
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
 
