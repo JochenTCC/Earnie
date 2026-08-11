@@ -16,39 +16,11 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 
 
-### Version 2.5 — Full migration to 15‑min MILP slots
+### Version 2.5.0 — Official release (pending)
 
-**Context:** Day-Ahead clearing is 15‑min MTU since ~2025-10-01. Investigation **2.5.a–c** decided **option B** (full optimizer on `dt_h = 0.25`). Implementation **2.5.d–h** completed. Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
+**Context:** Community pre-release `2.5.0-alpha.1` ships full 15‑min MILP (`dt_h = 0.25`) plus remaining 2.5 feature items (archived). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
 
-### Version 2.5
-
-- [x] Add standby power for battery
-  - This power is needed all the time as consumed energy for keeping the battery up. For optimization treat it as 24/7 consumer. Parameter is part of battery
-- [x] Add possibility to take Netznutzungsentgelte into account (as far as they are relevant to relative price changes)
-  - As a first MVP the user has to provide the "Arbeitspreis" in ct/kWh
-  - Add "Arbeitspreis" to normal import tariff and use sum for optimization
-  - Add a new section into fake invoices for the Netzentgelt 
-    - Jahr: split Energiebezug (Lieferant) vs Netznutzung Arbeitspreis (same Gesamt; AP already in k_act)
-    - Dedicated ## Netznutzung section (AP, Bezug kWh, €, Grundpreis stub)
-- [x] Reduce messages like:
-  - 2026-08-05 13:42:43 [INFO] (optimizer.milp_consumers:620) - urgent-Regel [e_auto]: nur_urgent_fenster — Ziel 3.650 kWh, optional geplant 0.000 kWh, urgent geplant 3.652 kWh (must_start=2026-08-08T11:54:18+02:00, deadline=2026-08-08T13:00:00+02:00)
-  - Add possibility on Optimierer-Dienst page to filter for [INFO] / [WARNING] / ...
-- [x] Place a thicker slightly transparent line behind the SOC line in chart 1 of Monitor page depending on ess-mode
-  - Nothing, when in Automode
-  - Cyan when in Zwangsladen but charging power is near zero (Remove yellow / black bar)
-  - Blue when in Zwangsladen with higher charging power
-- [x] **2.5.a — Data & tariff fidelity**
-  - Confirm Energy-Charts 15‑min coverage (AT/DE-LU/CH) vs pre-2025-10 hourly history; mixed-resolution handling
-  - Map which catalog tariffs settle on ¼‑h EPEX vs hourly average; document billing vs plan mismatch if MILP stays hourly
-  - Findings: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md) §§3–3.4
-- [x] **2.5.b — MILP / horizon impact study**
-  - Explicit `dt_h` (0.25): battery SoC, wear, import/export cost, EV/thermal/generic (`min_on_quarterhours` as real slots)
-  - Size estimate: ~4× variables on sunset→sunset; HiGHS/CBC solve time Live vs SE (`sunrise_window` / commit-K)
-  - List breakages: `cons_data_hourly`, PV/price forecasts, charts (today mixed 15‑min log + 1‑h MILP), Loxone write cadence
-  - Findings: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md) §§4–4.4 (HiGHS Live-sized QH ~0.6 s heavy stub)
-- [x] **2.5.c — Go / no-go + backlog split**
-  - Decision **B**: full optimizer on 15‑min slots (`dt_h = 0.25`); not A / C
-  - Closed research item “quarterly-hour EPEX…” / **2.3.2**; implementation carved as **2.5.d–h**
+- [ ] Official `2.5.0` after community soak (tag without `-alpha`; GHCR `:latest`)
 
 
 ### Version 2.+1 — Introducing nested data models

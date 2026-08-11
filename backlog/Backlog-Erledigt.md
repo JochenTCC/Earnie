@@ -3,6 +3,14 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 2.5 — feature items (2026-08-11)
+
+- [x] Battery standby power as 24/7 consumer (`standby_power_kw` on battery; Live + SE)
+- [x] Netznutzungsentgelte MVP — import tariff Arbeitspreis (ct/kWh) into `k_act`; fake-invoice Netzentgelt split (Jahr + ## Netznutzung)
+- [x] Quieter MILP INFO chatter; Optimierer-Dienst log-level filter ([INFO] / [WARNING] / …)
+- [x] Monitor Chart-1 SoC ESS-mode underlay (Automode none; Zwangsladen cyan≈0 / blue charging)
+
+
 ### Version 2.5.d–h — Full QH MILP implementation (2026-08-11)
 
 - [x] **2.5.d** Explicit `dt_h` plumbing (SoC, objective, wear, delivery energy, EV slot math, sim)
