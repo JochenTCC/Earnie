@@ -106,7 +106,9 @@ class TestBacktestingDisplayBundle:
         assert anchor_ts.strftime("%d.%m.%Y %H:%M") in bundle.chart_header_label
         assert bundle.chart_context.chart_window.end == anchor_ts.to_pydatetime()
         assert bundle.chart_context.now == planning_start.to_pydatetime()
-        assert len(bundle.display_df) == 24
+        from optimizer.slot_duration import slots_for_wall_hours
+
+        assert len(bundle.display_df) == slots_for_wall_hours(24)
         axis = ChartSlotAxis.from_dataframe(bundle.display_df)
         x0, x1 = _chart_xaxis_config(
             axis,
@@ -119,7 +121,7 @@ class TestBacktestingDisplayBundle:
         snapshots = self._collect_snapshots(SUNRISE_WINDOW)
         snapshot = snapshots[0]
         book_n = len(snapshot["chart_rows_24h"])
-        assert 23 <= book_n <= 25
+        assert 92 <= book_n <= 100
         assert snapshot.get("chart_rows_full") is not None
         assert len(snapshot["chart_rows_full"]) > book_n
         # Sunrise books [SA₁, SA₂); 24h view expects Anker−24h — only sunrise view applies.

@@ -147,8 +147,8 @@ def test_backtesting_run_simulation_single_window(
         cache=historical_cache,
         scenario_id=config.get_live_scenario_id(),
     )
-    # Sunrise book ~24h; optional SA₀→SA₁ foresight flex may extend the series.
-    assert 23 <= len(df) <= 48
+    # Sunrise book ~24h QH; optional SA₀→SA₁ foresight flex may extend the series.
+    assert 92 <= len(df) <= 192
     assert plausibility.failed == []
     assert df["sim_cost"].notna().all()
     assert isinstance(cbc_events, list)
@@ -161,6 +161,8 @@ def test_backtesting_reference_costs_single_window(
     smoke_prices_df: pd.DataFrame,
     runtime_scenario_params: dict,
 ):
+    from optimizer.slot_duration import slots_for_wall_hours
+
     day = smoke_anchor.normalize()
     scenario = _smoke_scenario_without_house_overlay(runtime_scenario_params)
     ref_settings = config.get_backtesting_feed_in_settings(runtime_override=scenario)
@@ -172,7 +174,7 @@ def test_backtesting_reference_costs_single_window(
         cache=historical_cache,
         scenario_params=scenario,
     )
-    assert len(df) == 24
+    assert len(df) == slots_for_wall_hours(24)
     assert df["sim_cost"].notna().all()
 
 

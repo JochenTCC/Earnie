@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from optimizer.simulation import (
     build_matched_flex_kw_per_hour,
     delivered_flex_kwh_from_rows,
@@ -31,13 +33,15 @@ def _sample_matrix() -> list[dict]:
 
 
 def test_build_matched_flex_scales_to_target():
+    from optimizer.slot_duration import energy_kwh_from_kw
+
     matrix = _sample_matrix()
     targets = {"swimspa": 6.0, "eauto": 12.0, "waermepumpe": 0.0}
     per_hour = build_matched_flex_kw_per_hour(matrix, targets)
 
     assert len(per_hour) == 24
-    swimspa_sum = sum(hour["swimspa"] for hour in per_hour)
-    eauto_sum = sum(hour["eauto"] for hour in per_hour)
+    swimspa_sum = energy_kwh_from_kw(hour["swimspa"] for hour in per_hour)
+    eauto_sum = energy_kwh_from_kw(hour["eauto"] for hour in per_hour)
     assert abs(swimspa_sum - 6.0) < 0.01
     assert abs(eauto_sum - 12.0) < 0.01
     assert all(hour["swimspa"] == 0.0 for hour in per_hour[12:])
@@ -68,7 +72,9 @@ def test_build_matched_flex_reads_canonical_matrix_keys():
     ):
         per_hour = build_matched_flex_kw_per_hour(matrix, targets)
 
-    ev_sum = sum(hour["ev"] for hour in per_hour)
+    from optimizer.slot_duration import energy_kwh_from_kw
+
+    ev_sum = energy_kwh_from_kw(hour["ev"] for hour in per_hour)
     assert abs(ev_sum - 12.0) < 0.01
     # Profile shape preserved (not uniform fallback): first half non-zero.
     assert all(hour["ev"] > 0.0 for hour in per_hour[:12])
@@ -115,7 +121,8 @@ def test_matched_baseline_covers_matrix_beyond_24_hours():
 
 def test_matched_baseline_matches_optimized_consumption_total():
     matrix = _sample_matrix()
-    targets = {"swimspa": 6.0, "eauto": 12.0, "waermepumpe": 0.0}
+    # Targets below historical profile energy so matched < unconstrained profile.
+    targets = {"swimspa": 2.0, "eauto": 2.0, "waermepumpe": 0.0}
     profile_rows = simulate_baseline_horizon(matrix, initial_soc=50.0)
     matched_rows = simulate_matched_baseline_horizon(matrix, 50.0, targets)
 
@@ -124,8 +131,8 @@ def test_matched_baseline_matches_optimized_consumption_total():
     matched_flex = delivered_flex_kwh_from_rows(matched_rows)
 
     assert matched_kwh < profile_kwh
-    assert abs(matched_flex["swimspa"] - 6.0) < 0.05
-    assert abs(matched_flex["eauto"] - 12.0) < 0.05
+    assert abs(matched_flex["swimspa"] - 2.0) < 0.05
+    assert abs(matched_flex["eauto"] - 2.0) < 0.05
     assert all(row["Steuerbefehl"] == "Baseline (Ziel)" for row in matched_rows)
 
 
@@ -286,7 +293,9 @@ def test_matched_baseline_uses_profile_targets_for_config_appliances(monkeypatch
         _flex_consumers,
     )
     matched = resolve_matched_baseline_horizon_targets(matrix, None, None)
-    assert matched.get("waschmaschine") == 2.0
+    from optimizer.slot_duration import DEFAULT_DT_H
+
+    assert matched.get("waschmaschine") == pytest.approx(2.0 * DEFAULT_DT_H)
 
 
 def test_matched_eauto_profile_shape_scaled_to_current_target():
@@ -319,8 +328,10 @@ def test_matched_eauto_profile_shape_scaled_to_current_target():
     )
     per_hour = build_matched_flex_kw_per_hour(matrix, {"eauto": target_kwh}, {"eauto": ctx})
 
+    from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw
+
     profile_sum = 3.5 * 3
-    expected_evening = 3.5 * (target_kwh / profile_sum)
+    expected_evening = 3.5 * (target_kwh / (profile_sum * DEFAULT_DT_H))
     assert per_hour[2]["eauto"] == 0.0
     assert abs(per_hour[20]["eauto"] - expected_evening) < 0.01
-    assert abs(sum(h["eauto"] for h in per_hour) - target_kwh) < 0.01
+    assert abs(energy_kwh_from_kw(h["eauto"] for h in per_hour) - target_kwh) < 0.01

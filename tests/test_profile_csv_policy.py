@@ -181,7 +181,10 @@ def test_flex_targets_use_csv_window(tmp_path: Path) -> None:
             }
         ]
     }
-    slots = [start + timedelta(hours=i) for i in range(24)]
+    from optimizer.slot_duration import slots_for_wall_hours, slot_step
+
+    step = slot_step()
+    slots = [start + step * i for i in range(slots_for_wall_hours(24))]
     flex = collect_planning_flex_consumers(profile)
     targets = planning_flex_daily_targets(flex, profile, slots, window_end=slots[-1])
     assert targets["wm"] == pytest.approx(48.0)

@@ -16,6 +16,7 @@ from house_config.planning_flex_bridge import (
     house_profile_baseload_overlay,
     thermal_hourly_overlay,
 )
+from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw
 from simulation.baseload_validation import resolve_hourly_baseload_kw
 from simulation.engine import HistoricalDataCache, window_slot_datetimes
 
@@ -74,7 +75,10 @@ def test_synthetic_haus_kw_matches_thermal_overlay_for_jan_14(monkeypatch):
     anchor = datetime(2025, 1, 15, 0, 0)
     slots = window_slot_datetimes(anchor)
     thermal = thermal_hourly_overlay(profile, slots, climate=climate)
-    assert float(df[thermal_col].sum()) == pytest.approx(sum(thermal), rel=1e-6)
+    # Hourly cons_data sum(kW) ≈ kWh; QH overlay energy = sum(kW)*dt_h.
+    assert float(df[thermal_col].sum()) == pytest.approx(
+        energy_kwh_from_kw(thermal), rel=1e-6
+    )
     assert float(df[thermal_col].sum()) > 0.0
 
 
@@ -115,9 +119,11 @@ def test_baseload_overlay_skipped_when_haus_in_cons_data(monkeypatch):
     assert thermal_id in cons_data_ids
     assert sum(overlay) == pytest.approx(0.0, abs=1e-6)
     _, baseload_sum = resolve_hourly_baseload_kw(total_load, hourly_flex)
-    baseload_with_overlay = baseload_sum + sum(overlay)
+    baseload_with_overlay = baseload_sum + energy_kwh_from_kw(overlay)
     optimized_total = baseload_with_overlay + sum(hist_totals.values())
-    assert round(sum(total_load), 3) == pytest.approx(optimized_total, rel=1e-6)
+    assert round(sum(total_load) * DEFAULT_DT_H, 3) == pytest.approx(
+        optimized_total, rel=1e-6
+    )
 
 
 def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch):
@@ -174,5 +180,9 @@ def test_baseload_overlay_skipped_when_haus_column_zero_in_cons_data(monkeypatch
     assert float(all_consumer_totals.get(thermal_id, -1.0)) == 0.0
     assert sum(overlay) == pytest.approx(0.0, abs=1e-6)
     _, baseload_sum = resolve_hourly_baseload_kw(total_load, hourly_flex)
-    optimized_total = baseload_sum + sum(overlay) + sum(hist_totals.values())
-    assert round(sum(total_load), 3) == pytest.approx(optimized_total, rel=1e-6)
+    optimized_total = (
+        baseload_sum + energy_kwh_from_kw(overlay) + sum(hist_totals.values())
+    )
+    assert round(sum(total_load) * DEFAULT_DT_H, 3) == pytest.approx(
+        optimized_total, rel=1e-6
+    )

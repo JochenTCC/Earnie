@@ -143,12 +143,17 @@ def _check_and_fetch_api_data(url: str, kwp: float) -> Optional[dict]:
 
 
 def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[list, bool]:
-    """Mappt API-Daten auf die Zielstunden. Returns (pv_vector, success)."""
+    """Map API hourly watts onto target slots (QH inherits parent clock hour)."""
+    from optimizer.slot_duration import floor_to_hour_slot
+
     pv_vector = [0.0] * len(target_hours)
     success_count = 0
 
     for idx, target_dt in enumerate(target_hours):
         key_str = target_dt.strftime("%Y-%m-%d %H:%M:%S")
+        if key_str not in hourly_watts:
+            parent = floor_to_hour_slot(target_dt)
+            key_str = parent.strftime("%Y-%m-%d %H:%M:%S")
         if key_str in hourly_watts:
             watts = hourly_watts[key_str]
             pv_vector[idx] = round(watts / 1000.0, 3)
@@ -157,7 +162,7 @@ def _map_hourly_data_to_vector(hourly_watts: dict, target_hours: list) -> tuple[
     if success_count > 0:
         print(
             f"[OK] PV-Ertragsprognose erfolgreich bereitgestellt "
-            f"({success_count}/{len(target_hours)} Stunden gemappt. Max: {max(pv_vector)} kW)."
+            f"({success_count}/{len(target_hours)} Slots gemappt. Max: {max(pv_vector)} kW)."
         )
         return pv_vector, True
 

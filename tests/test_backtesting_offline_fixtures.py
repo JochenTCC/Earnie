@@ -102,8 +102,8 @@ def test_run_simulation_single_window_on_fixture(
         cache=fixture_cache,
         scenario_id="fixture_5kwh_fixed",
     )
-    # Sunrise book ~24h; foresight flex may add SA₀→SA₁ hours.
-    assert 23 <= len(df) <= 48
+    # Sunrise book ~24h QH; foresight flex may add SA₀→SA₁ slots.
+    assert 92 <= len(df) <= 192
     assert plausibility.failed == []
     assert df["sim_cost"].notna().all()
     assert isinstance(cbc_events, list)
@@ -116,6 +116,7 @@ def test_reference_costs_on_fixture(
     backtesting_fixtures,
 ):
     import config
+    from optimizer.slot_duration import slots_for_wall_hours
 
     del backtesting_fixtures
     day = pd.Timestamp(LOW_EAUTO_DAY)
@@ -127,7 +128,7 @@ def test_reference_costs_on_fixture(
         ref_settings,
         cache=fixture_cache,
     )
-    assert len(df) == 24
+    assert len(df) == slots_for_wall_hours(24)
     assert df["sim_cost"].notna().all()
 
 

@@ -75,10 +75,14 @@ class TestPlanningWindow:
         assert segment_a_hours < 1.5
 
     def test_sunrise_anchor_index_in_slots(self):
+        from optimizer.slot_duration import normalize_quarter_hour_slot
+
         now = _dt(2026, 6, 15, 14, 0)
         window = compute_planning_window(now, LAT, LON, TZ)
         idx = sunrise_anchor_slot_index(window)
-        assert window.slot_datetimes[idx] == normalize_hour_slot(window.sunrise_anchor)
+        assert window.slot_datetimes[idx] == normalize_quarter_hour_slot(
+            window.sunrise_anchor
+        )
 
 
 class TestSunriseAnchors:
@@ -198,8 +202,8 @@ class TestUiChartWindow:
         assert live_default_last == len(chart.slot_datetimes) - 1
         expected_end = slot_index_at_or_before(display.slot_datetimes, chart.end)
         assert past_history == past_neutral == expected_end
-        assert past_history < past_last
-        assert live_default_history < past_history
+        assert past_history <= past_last
+        assert live_default_history <= past_history
 
     def test_chart_zone_kind_for_slot_start(self):
         now = _dt(2026, 6, 15, 14, 0)

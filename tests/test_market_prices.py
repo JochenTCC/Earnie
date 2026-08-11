@@ -152,3 +152,22 @@ def test_resolve_market_slots_matches_aware_target_with_naive_market_data():
     assert len(resolved) == 1
     assert resolved[0]["price_source"] == PRICE_SOURCE_DAY_AHEAD
     assert resolved[0]["price_buy"] == 12.34
+
+
+def test_hourly_market_expands_onto_quarter_hour_targets():
+    """CH / aWATTar hourly samples fill :15/:30/:45 via parent-hour expand."""
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("Europe/Vienna")
+    hour = datetime(2026, 7, 4, 9, 0, tzinfo=tz)
+    targets = [
+        hour,
+        hour + timedelta(minutes=15),
+        hour + timedelta(minutes=30),
+        hour + timedelta(minutes=45),
+    ]
+    market_data = [_market_entry(datetime(2026, 7, 4, 9, 0, 0), 11.0)]
+    resolved = resolve_market_slots(market_data, targets)
+    assert len(resolved) == 4
+    assert all(slot["price_buy"] == 11.0 for slot in resolved)
+    assert all(slot["price_source"] == PRICE_SOURCE_DAY_AHEAD for slot in resolved)

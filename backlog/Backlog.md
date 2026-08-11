@@ -9,7 +9,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
-- [ ] Check possibilities to get quarterly-hour EPEX prices and change optimization to 15 min slots
 
 
 
@@ -17,11 +16,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 
 
-### Version 2.5 — Investigate full migration to 15‑min slots
+### Version 2.5 — Full migration to 15‑min MILP slots
 
-**Context:** Day-Ahead clearing is 15‑min MTU since ~2025-10-01. Earnie already fetches Energy-Charts (free, CC BY 4.0; native 15‑min after go-live) but `normalize_price_slot` floors to the hour — MILP still assumes `dt ≡ 1 h`. Official EPEX SFTP/MATS stays out of scope (paid; external use = license quote). aWATTar remains hourly fallback only. Prior deferral: **2.3.c.2** takeaway *variable sample time — hard*. Related open check: **2.3.2**.
-
-**Scope of this chapter:** Investigate and decide whether/how to run the **full** optimizer on 15‑min slots (option B), not only “prices only” averaging (A) or hybrid grids (C).
+**Context:** Day-Ahead clearing is 15‑min MTU since ~2025-10-01. Investigation **2.5.a–c** decided **option B** (full optimizer on `dt_h = 0.25`). Implementation **2.5.d–h** completed. Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
 
 ### Version 2.5
 
@@ -40,16 +37,18 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Nothing, when in Automode
   - Cyan when in Zwangsladen but charging power is near zero (Remove yellow / black bar)
   - Blue when in Zwangsladen with higher charging power
-- [ ] **2.5.a — Data & tariff fidelity**
+- [x] **2.5.a — Data & tariff fidelity**
   - Confirm Energy-Charts 15‑min coverage (AT/DE-LU/CH) vs pre-2025-10 hourly history; mixed-resolution handling
   - Map which catalog tariffs settle on ¼‑h EPEX vs hourly average; document billing vs plan mismatch if MILP stays hourly
-- [ ] **2.5.b — MILP / horizon impact study**
+  - Findings: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md) §§3–3.4
+- [x] **2.5.b — MILP / horizon impact study**
   - Explicit `dt_h` (0.25): battery SoC, wear, import/export cost, EV/thermal/generic (`min_on_quarterhours` as real slots)
   - Size estimate: ~4× variables on sunset→sunset; HiGHS/CBC solve time Live vs SE (`sunrise_window` / commit-K)
   - List breakages: `cons_data_hourly`, PV/price forecasts, charts (today mixed 15‑min log + 1‑h MILP), Loxone write cadence
-- [ ] **2.5.c — Go / no-go + backlog split**
-  - Decide: full B vs stay hourly + optional A (store QH prices for SE/billing only) vs hybrid C
-  - If go: carve implementation phases into this MINOR (or successor); if no-go: archive rationale and close **2.3.2** accordingly
+  - Findings: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md) §§4–4.4 (HiGHS Live-sized QH ~0.6 s heavy stub)
+- [x] **2.5.c — Go / no-go + backlog split**
+  - Decision **B**: full optimizer on 15‑min slots (`dt_h = 0.25`); not A / C
+  - Closed research item “quarterly-hour EPEX…” / **2.3.2**; implementation carved as **2.5.d–h**
 
 
 ### Version 2.+1 — Introducing nested data models

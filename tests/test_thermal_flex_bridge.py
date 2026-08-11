@@ -102,7 +102,11 @@ def test_planning_thermal_daily_targets_matches_single_calendar_day(monkeypatch)
     install_open_meteo_climate_mock(monkeypatch)
     profile = _house_profile()
     milp = planning_thermal_to_milp(_wp_consumer())
-    slots = [datetime(2024, 1, 15, h, 0) for h in range(24)]
+    from optimizer.slot_duration import slot_step, slots_for_wall_hours
+
+    day_start = datetime(2024, 1, 15, 0, 0)
+    step = slot_step()
+    slots = [day_start + step * i for i in range(slots_for_wall_hours(24))]
     from data.modeled_climate import ModeledClimateContext
 
     climate = ModeledClimateContext.for_house_profile(profile, kwp=0.0)
@@ -133,7 +137,11 @@ def test_planning_thermal_daily_targets_cross_midnight_is_slot_energy(monkeypatc
     profile = _house_profile()
     milp = planning_thermal_to_milp(_wp_consumer())
     window_end = datetime(2025, 3, 1, 12, 0)
-    slots = [window_end - timedelta(hours=24 - i) for i in range(24)]
+    from optimizer.slot_duration import slot_step, slots_for_wall_hours
+
+    step = slot_step()
+    n = slots_for_wall_hours(24)
+    slots = [window_end - step * (n - i) for i in range(n)]
     climate = ModeledClimateContext.for_house_profile(profile, kwp=0.0)
     targets = planning_thermal_daily_targets(
         [milp],
@@ -158,12 +166,12 @@ def test_prorate_thermal_day_target_scales_partial_days():
         _prorate_thermal_day_target_kwh,
     )
 
-    assert _prorate_thermal_day_target_kwh(14.14, 24) == pytest.approx(14.14)
-    assert _prorate_thermal_day_target_kwh(14.14, 17) == pytest.approx(
-        round(14.14 * 17 / 24, 3)
+    assert _prorate_thermal_day_target_kwh(14.14, 96) == pytest.approx(14.14)
+    assert _prorate_thermal_day_target_kwh(14.14, 24) == pytest.approx(
+        round(14.14 * (24 * 0.25 / 24.0), 3)
     )
-    assert _prorate_thermal_day_target_kwh(14.751, 7) == pytest.approx(
-        round(14.751 * 7 / 24, 3)
+    assert _prorate_thermal_day_target_kwh(14.751, 28) == pytest.approx(
+        round(14.751 * (28 * 0.25 / 24.0), 3)
     )
     # 7 slots, max consecutive 4: cannot turn all 7 ON
     assert _max_on_slots_with_limits(7, max_hours=4, max_pulses=4) < 7

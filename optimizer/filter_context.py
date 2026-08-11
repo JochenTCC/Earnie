@@ -187,11 +187,13 @@ def resolve_filter_contexts(
 
 def expected_native_delivery_kwh(consumer: dict, filter_context: dict | None) -> float:
     """Erwartete native Filterenergie (kWh) für gesperrte Slots im Horizont."""
+    from .slot_duration import DEFAULT_DT_H
+
     if not filter_context or not filter_schedule_enabled(consumer):
         return 0.0
     blocked = filter_context.get("blocked_indices") or []
     power = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
-    return len(blocked) * power
+    return len(blocked) * power * float(DEFAULT_DT_H)
 
 
 def ernie_filter_remaining_kwh(

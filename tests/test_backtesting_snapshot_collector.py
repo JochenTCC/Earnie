@@ -68,4 +68,6 @@ class TestSnapshotCollector:
         assert len(snapshots) == 2
         assert snapshots[0]["scenario_id"] == "live"
         assert snapshots[0]["horizon_mode"] == FIXED_24H
-        assert len(snapshots[0]["chart_rows_24h"]) == 24
+        from optimizer.slot_duration import slots_for_wall_hours
+
+        assert len(snapshots[0]["chart_rows_24h"]) == slots_for_wall_hours(24)

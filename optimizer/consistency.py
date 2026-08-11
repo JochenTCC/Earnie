@@ -14,6 +14,7 @@ from .battery import (
     apply_soc_change as _apply_soc_change,
     battery_plan_kw_from_control,
 )
+from .slot_duration import DEFAULT_DT_H
 from .simulation import (
     calculate_step_cost_euro_from_row as _calculate_step_cost_euro_from_row,
     delivered_flex_kwh_from_rows as _delivered_flex_kwh_from_rows,
@@ -74,21 +75,28 @@ def _consumer_delivery_tolerance_kwh(consumer: dict, target_kwh: float) -> float
 
 
 def check_window_structure(matrix: list[dict], anchor: datetime) -> list[ConsistencyIssue]:
+    from .slot_duration import slots_for_wall_hours, slot_step
+
     issues: list[ConsistencyIssue] = []
-    if len(matrix) != 24:
+    expected_slots = slots_for_wall_hours(24.0, DEFAULT_DT_H)
+    if len(matrix) != expected_slots:
         issues.append(
             ConsistencyIssue(
                 "window_length",
                 None,
-                f"Matrix hat {len(matrix)} statt 24 Stunden",
+                f"Matrix hat {len(matrix)} statt {expected_slots} Slots (24h)",
             )
         )
         return issues
 
     slots = window_slot_datetimes(anchor)
-    if len(slots) != 24:
+    if len(slots) != expected_slots:
         issues.append(
-            ConsistencyIssue("window_slots", None, f"Erwartete 24 Slot-Zeiten, erhalten {len(slots)}")
+            ConsistencyIssue(
+                "window_slots",
+                None,
+                f"Erwartete {expected_slots} Slot-Zeiten, erhalten {len(slots)}",
+            )
         )
         return issues
 
@@ -123,12 +131,12 @@ def check_window_structure(matrix: list[dict], anchor: datetime) -> list[Consist
         )
 
     last_slot = slots[-1]
-    if last_slot + timedelta(hours=1) != anchor:
+    if last_slot + slot_step(DEFAULT_DT_H) != anchor:
         issues.append(
             ConsistencyIssue(
                 "ready_by_hour",
-                23,
-                f"Letzte Stunde {last_slot} + 1h != Anker {anchor}",
+                expected_slots - 1,
+                f"Letzter Slot {last_slot} + {DEFAULT_DT_H}h != Anker {anchor}",
             )
         )
     return issues
@@ -185,6 +193,7 @@ def check_soc_chain(
             battery_params["efficiency"],
             battery_params["min_soc"],
             battery_params["max_soc"],
+            dt_h=DEFAULT_DT_H,
         )
     return issues
 
@@ -212,6 +221,7 @@ def check_mode_battery_alignment(
             battery_params["efficiency"],
             battery_params["min_soc"],
             battery_params["max_soc"],
+            dt_h=DEFAULT_DT_H,
         )
         if abs(actual - expected_after_limits) > _GRID_TOLERANCE_KW:
             issues.append(
@@ -277,9 +287,9 @@ def check_cost_recompute(rows: list[dict], sell_price_cent: float | None) -> lis
         price = float(row["Strompreis (Cent/kWh)"])
         sell_cent = resolve_sell_price_cent(row, sell_price_cent)
         if grid >= 0:
-            expected = grid * price / 100.0
+            expected = grid * DEFAULT_DT_H * price / 100.0
         else:
-            expected = grid * sell_cent / 100.0
+            expected = grid * DEFAULT_DT_H * sell_cent / 100.0
         actual = _calculate_step_cost_euro_from_row(row, sell_price_cent)
         if abs(actual - expected) > 1e-6:
             issues.append(
@@ -304,11 +314,17 @@ def validate_24h_optimization_run(
     label: str = "",
 ) -> ConsistencyReport:
     """Führt alle internen Konsistenzprüfungen für einen 24h-Lauf aus."""
+    from .slot_duration import slots_for_wall_hours
+
+    expected_slots = slots_for_wall_hours(24.0, DEFAULT_DT_H)
     report = ConsistencyReport(anchor=anchor, label=label)
     for issue in check_window_structure(matrix, anchor):
         report.add(issue.check, issue.message, issue.hour_index)
-    if len(rows) != 24:
-        report.add("result_length", f"Ergebnis hat {len(rows)} statt 24 Zeilen")
+    if len(rows) != expected_slots:
+        report.add(
+            "result_length",
+            f"Ergebnis hat {len(rows)} statt {expected_slots} Zeilen",
+        )
         return report
     for checker in (
         check_energy_balance,

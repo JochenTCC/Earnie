@@ -38,13 +38,14 @@ def _eauto_consumer() -> dict:
 
 
 def _plugged_in_matrix() -> tuple[list[dict], datetime]:
+    from optimizer.slot_duration import slot_step
+
     start = datetime(2026, 6, 28, 9, 0)
     deadline = datetime(2026, 6, 29, 7, 45)
     matrix: list[dict] = []
-    for i in range(24):
-        dt = start + timedelta(hours=i)
-        if dt >= deadline:
-            break
+    step = slot_step()
+    dt = start
+    while dt < deadline:
         if dt.date() == start.date() and 10 <= dt.hour <= 14:
             price = 2.0
             pv = 2.5
@@ -64,6 +65,7 @@ def _plugged_in_matrix() -> tuple[list[dict], datetime]:
                 "k_act": price,
             }
         )
+        dt += step
     return matrix, deadline
 
 
@@ -125,18 +127,23 @@ class TestMilpUrgentWindow:
         assert obs["eauto"]["planned_urgent_kwh"] == 0.0
 
     def test_must_catch_up_in_urgent_if_not_charged_earlier(self):
+        from optimizer.slot_duration import slot_step
+
         deadline = datetime(2026, 6, 29, 7, 45)
-        urgent_only = [
-            {
-                "slot_datetime": datetime(2026, 6, 29, hour, 0),
-                "hour": hour,
-                "date": datetime(2026, 6, 29).date(),
-                "expected_p_pv": 0.1,
-                "expected_p_act": 0.5,
-                "k_act": 16.0,
-            }
-            for hour in (6, 7)
-        ]
+        urgent_only = []
+        dt = datetime(2026, 6, 29, 6, 0)
+        while dt < deadline:
+            urgent_only.append(
+                {
+                    "slot_datetime": dt,
+                    "hour": dt.hour,
+                    "date": dt.date(),
+                    "expected_p_pv": 0.1,
+                    "expected_p_act": 0.5,
+                    "k_act": 16.0,
+                }
+            )
+            dt += slot_step()
         _, _, _, _, _, _, obs = milp_optimizer(
             urgent_only,
             current_hour=0,

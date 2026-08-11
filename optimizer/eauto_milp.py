@@ -1,7 +1,6 @@
 """E-Auto-MILP-Moduswahl: Modus A (power_setpoint) vs. Modus B (binär/Preset)."""
 from __future__ import annotations
 
-import math
 from datetime import datetime
 from typing import Any
 
@@ -217,8 +216,13 @@ def _preset_must_charge_now(
     remaining_kwh: float,
     schedule_indices: list[int],
     charging_context: dict | None,
+    *,
+    dt_h: float = 1.0,
 ) -> bool:
     """Preset-Fallback: Deadline-Druck statt nur günstigste Stunde (t=0)."""
+    from .slot_duration import slots_for_wall_hours, validate_dt_h
+
+    dt_h = validate_dt_h(dt_h)
     ctx = charging_context or {}
     if float(ctx.get("urgent_min_kwh") or 0.0) > 1e-9:
         return True
@@ -244,7 +248,9 @@ def _preset_must_charge_now(
     future = [t for t in eligible if t >= 0]
     if not future:
         return False
-    slots_needed = math.ceil(hours_needed_to_deliver(remaining_kwh, max_kw))
+    slots_needed = slots_for_wall_hours(
+        hours_needed_to_deliver(remaining_kwh, max_kw), dt_h
+    )
     return len(future) <= slots_needed
 
 

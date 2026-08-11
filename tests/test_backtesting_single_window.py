@@ -86,8 +86,10 @@ def test_simulate_window_snapshot_on_fixture(
     )
     assert snapshot["scenario_id"] == "fixture_5kwh_fixed"
     assert snapshot["kind"] == "on_demand"
-    assert len(snapshot["chart_rows_24h"]) == 24
-    assert len(snapshot["matrix_24h"]) == 24
+    from optimizer.slot_duration import slots_for_wall_hours
+
+    assert len(snapshot["chart_rows_24h"]) == slots_for_wall_hours(24)
+    assert len(snapshot["matrix_24h"]) == slots_for_wall_hours(24)
 
 
 def test_cache_key_normalizes_anchor():

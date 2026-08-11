@@ -340,8 +340,8 @@ Compose-Produktiv-Stacks veröffentlichen den Container-Port **8541** (siehe [St
 | Phase       | Aktion                                           |
 | ----------- | ------------------------------------------------ |
 | Einlesen    | SOC, Leistungen, PV, Flex-Inputs, E-Auto-Status  |
-| Optimierung | MILP über 24 h (15-Min-Slots intern)             |
-| Schreiben   | ESS-Limits / Modus, Freigaben / EV-Strom je Slot |
+| Optimierung | MILP über den Planhorizont (15-Min-Slots; `dt_h = 0.25`) |
+| Schreiben   | ESS-Limits / Modus, Freigaben / EV-Strom je 15-Min-Schreibzyklus |
 
 
 Die App **liest** dieselben Live-Werte für Anzeige; **schreibt** Steuerwerte nur im Live-Modus. Merker-Zuordnung: [EHAL-Com](../ui/ehal-com.md).

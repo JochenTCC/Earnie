@@ -236,5 +236,5 @@ def test_reference_costs_never_call_milp_solver(monkeypatch):
                     ref_settings,
                     cache=cache,
                 )
-        assert len(df) == 24
+        assert len(df) == 96
         assert df["sim_cost"].notna().all()

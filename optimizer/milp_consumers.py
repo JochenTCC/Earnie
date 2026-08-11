@@ -30,6 +30,7 @@ from .generic_flex_context import (
     generic_flex_window,
 )
 from .thermal_flex_context import is_thermal_flex_consumer
+from .slot_duration import DEFAULT_DT_H
 
 if TYPE_CHECKING:
     from .milp_horizon import MilpHorizonModel
@@ -46,22 +47,22 @@ def add_min_on_time_constraints(
     on_before_horizon: bool = False,
     force_on_at_start: bool = False,
 ) -> None:
-    """Erzwingt Mindest-Einschaltdauer; MILP arbeitet stündlich (4 Viertelstunden = 1 Slot)."""
-    min_hours = max(1, (int(min_on_quarterhours) + 3) // 4)
+    """Enforce minimum consecutive ON slots (``min_on_quarterhours`` = real MILP slots)."""
+    min_slots = max(1, int(min_on_quarterhours))
     if force_on_at_start and on_vars:
         prob += on_vars[0] == 1
-    if min_hours <= 1:
+    if min_slots <= 1:
         return
     horizon = len(on_vars)
     prev_at_start = 1 if on_before_horizon else 0
-    for t in range(horizon - min_hours + 1):
+    for t in range(horizon - min_slots + 1):
         if t == 0:
             if on_before_horizon:
                 continue
             prev: pulp.LpAffineExpression | int = prev_at_start
         else:
             prev = on_vars[t - 1]
-        prob += pulp.lpSum(on_vars[t:t + min_hours]) >= min_hours * (on_vars[t] - prev)
+        prob += pulp.lpSum(on_vars[t:t + min_slots]) >= min_slots * (on_vars[t] - prev)
 
 
 def add_generic_block_start_guard(
@@ -83,14 +84,20 @@ def add_generic_block_start_guard(
         prob += on_vars[0] == 0
 
 
-def _max_deliverable_kwh(consumer: dict, eligible_indices: list[int]) -> float:
+def _max_deliverable_kwh(
+    consumer: dict,
+    eligible_indices: list[int],
+    *,
+    dt_h: float,
+) -> float:
     _, max_kw = power_limits_kw(consumer)
-    return len(eligible_indices) * max_kw
+    return len(eligible_indices) * max_kw * float(dt_h)
 
 
 def _min_on_hours(consumer: dict) -> int:
+    """Minimum consecutive ON slots (config key remains min_on_quarterhours)."""
     min_on_qh = int(consumer.get("min_on_quarterhours", 4) or 4)
-    return max(1, (min_on_qh + 3) // 4)
+    return max(1, min_on_qh)
 
 
 def _eligible_slot_labels(matrix: list, eligible_indices: list[int]) -> list[str]:
@@ -161,7 +168,9 @@ def delivery_constraint_diagnostics(
             )
             eligible = [index for index in eligible if index in generic_eligible]
         _, max_kw = power_limits_kw(consumer)
-        max_deliverable = _max_deliverable_kwh(consumer, eligible)
+        max_deliverable = _max_deliverable_kwh(
+            consumer, eligible, dt_h=DEFAULT_DT_H
+        )
         effective_target = min(target, max_deliverable)
         entry.update(
             {
@@ -229,12 +238,16 @@ def _delivery_energy_expr(
     eligible_indices: list[int],
 ):
     cid = consumer["id"]
+    dt_h = float(model.dt_h)
     if cid in model.consumer_p:
-        return pulp.lpSum(model.consumer_p[cid][t] for t in eligible_indices)
+        return pulp.lpSum(model.consumer_p[cid][t] for t in eligible_indices) * dt_h
     charge_kw = model.consumer_milp_charge_kw[cid]
-    return pulp.lpSum(
-        charge_kw * model.consumer_on[cid][t]
-        for t in eligible_indices
+    return (
+        pulp.lpSum(
+            charge_kw * model.consumer_on[cid][t]
+            for t in eligible_indices
+        )
+        * dt_h
     )
 
 
@@ -246,8 +259,13 @@ def filter_feasible_consumers(
     verbose: bool,
     charging_contexts: dict[str, dict] | None,
     filter_contexts: dict[str, dict] | None = None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> list:
     """Entfernt Verbraucher, deren Ziel im verbleibenden Horizont nicht erreichbar ist."""
+    from .slot_duration import validate_dt_h
+
+    dt_h = validate_dt_h(dt_h)
     feasible = []
     contexts = charging_contexts or {}
     filters = filter_contexts or {}
@@ -267,7 +285,9 @@ def filter_feasible_consumers(
             matrix, consumer, consumer_indices, ctx, filters.get(cid)
         )
         capacity_indices = eligible if eligible else consumer_indices
-        max_deliverable = _max_deliverable_kwh(consumer, capacity_indices)
+        max_deliverable = _max_deliverable_kwh(
+            consumer, capacity_indices, dt_h=dt_h
+        )
         if target > max_deliverable + 1e-6:
             if verbose:
                 sched_hint = ""
@@ -430,7 +450,9 @@ def _add_urgent_min_asap_constraint(
     )
     if not asap:
         return
-    effective_urgent = min(urgent_min, _max_deliverable_kwh(consumer, asap))
+    effective_urgent = min(
+        urgent_min, _max_deliverable_kwh(consumer, asap, dt_h=model.dt_h)
+    )
     if effective_urgent <= 1e-9:
         return
     model.prob += _delivery_energy_expr(model, consumer, asap) >= effective_urgent
@@ -491,7 +513,9 @@ def _add_consumer_delivery_constraints(
                 )
             continue
         _, max_kw = power_limits_kw(consumer)
-        max_deliverable = _max_deliverable_kwh(consumer, eligible)
+        max_deliverable = _max_deliverable_kwh(
+            consumer, eligible, dt_h=model.dt_h
+        )
         effective_target = min(target, max_deliverable)
         model.prob += _delivery_energy_expr(model, consumer, eligible) >= effective_target
         _add_urgent_min_asap_constraint(
@@ -577,15 +601,16 @@ def _planned_consumer_kwh_in_slots(
     cid = consumer["id"]
     total = 0.0
     charge_kw = model.consumer_milp_charge_kw[cid]
+    dt_h = float(model.dt_h)
     for t in slot_indices:
         if cid in model.consumer_p:
             value = model.consumer_p[cid][t].varValue
             if value is not None:
-                total += float(value)
+                total += float(value) * dt_h
             continue
         on_val = model.consumer_on[cid][t].varValue
         if on_val is not None and on_val > 0.5:
-            total += charge_kw
+            total += charge_kw * dt_h
     return total
 
 
@@ -622,7 +647,9 @@ def _collect_urgent_rule_observability(
         if not eligible:
             continue
         _, max_kw = power_limits_kw(consumer)
-        max_deliverable = _max_deliverable_kwh(consumer, eligible)
+        max_deliverable = _max_deliverable_kwh(
+            consumer, eligible, dt_h=model.dt_h
+        )
         effective_target = min(target, max_deliverable)
         pre_urgent, urgent = split_eligible_by_urgent_deadline(
             matrix[: model.horizon],

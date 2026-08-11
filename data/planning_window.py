@@ -229,19 +229,22 @@ def previous_sunrise_before(
 
 
 def hourly_slots_inclusive(start: datetime, end: datetime) -> tuple[datetime, ...]:
-    """Stündliche Slots von floor(start) bis floor(end) einschließlich."""
+    """Planning slots from floor(start) to floor(end) inclusive (QH step since 2.5.e)."""
+    from optimizer.slot_duration import normalize_quarter_hour_slot, slot_step
+
     if start.tzinfo is None or end.tzinfo is None:
         raise ValueError("start und end müssen timezone-aware sein.")
     if end < start:
         raise ValueError(f"end ({end}) liegt vor start ({start}).")
-    slot = normalize_hour_slot(start)
-    end_slot = normalize_hour_slot(end)
+    slot = normalize_quarter_hour_slot(start)
+    end_slot = normalize_quarter_hour_slot(end)
+    step = slot_step()
     slots: list[datetime] = []
     while slot <= end_slot:
         slots.append(slot)
-        slot += timedelta(hours=1)
+        slot += step
     if not slots:
-        raise ValueError(f"Keine Stunden-Slots zwischen {start} und {end}.")
+        raise ValueError(f"Keine Planungs-Slots zwischen {start} und {end}.")
     return tuple(slots)
 
 
@@ -263,7 +266,7 @@ def compute_planning_window(
     sunrise_anchor = next_sunrise_after(now, latitude, longitude, timezone_name)
     anchors = compute_sunrise_anchors(now, latitude, longitude, timezone_name)
     horizon_end = anchors.sa2
-    start = normalize_hour_slot(now)
+    start = quarter_hour_slot_start(now)
     slots = hourly_slots_inclusive(start, horizon_end)
     return PlanningWindow(
         start=start,
@@ -416,10 +419,12 @@ def compute_ui_chart_window_with_offset(
 
 
 def slot_index_at_or_before(slots: tuple[datetime, ...], moment: datetime) -> int:
-    """Index des letzten Slots mit slot <= moment (normalisiert auf volle Stunde)."""
+    """Index des letzten Slots mit slot <= moment (QH-floor seit 2.5.e)."""
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
     if not slots:
         raise ValueError("slots darf nicht leer sein.")
-    target = normalize_hour_slot(moment)
+    target = normalize_quarter_hour_slot(moment)
     if target in slots:
         return slots.index(target)
     for index in range(len(slots) - 1, -1, -1):
@@ -429,7 +434,7 @@ def slot_index_at_or_before(slots: tuple[datetime, ...], moment: datetime) -> in
 
 
 def _row_slot_datetime(row: dict) -> datetime | None:
-    return parse_row_slot_datetime(row)
+    return parse_chart_row_slot_datetime(row)
 
 
 def first_extrapolated_slot(
@@ -656,7 +661,9 @@ def ui_chart_zones(
 
 def sunrise_anchor_slot_index(window: PlanningWindow) -> int:
     """Index des SOC-Anker-Sonnenaufgangs in slot_datetimes."""
-    anchor_slot = normalize_hour_slot(window.sunrise_anchor)
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
+    anchor_slot = normalize_quarter_hour_slot(window.sunrise_anchor)
     try:
         return window.slot_datetimes.index(anchor_slot)
     except ValueError as exc:

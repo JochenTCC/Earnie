@@ -144,10 +144,11 @@ def _indices_for_date(matrix: list, day: date) -> list[int]:
 
 
 def _max_on_hours(consumer: dict) -> int:
+    """Max consecutive ON slots (config ``max_on_quarterhours`` = real MILP slots)."""
     raw = consumer.get("max_on_quarterhours")
     if raw is not None:
-        return max(1, int(raw) // 4)
-    return THERMAL_MAX_ON_HOURS
+        return max(1, int(raw))
+    return THERMAL_MAX_ON_HOURS * 4  # legacy default was hours; keep ~same wall-clock
 
 
 def _max_pulses_per_day(consumer: dict) -> int:
@@ -157,17 +158,22 @@ def _max_pulses_per_day(consumer: dict) -> int:
     return THERMAL_MAX_PULSES_PER_DAY
 
 
-def _prorate_thermal_day_target_kwh(full_day_kwh: float, day_slots: int) -> float:
-    """Scale full-calendar HDD kWh to the fraction of the day present in the horizon.
+def _prorate_thermal_day_target_kwh(
+    full_day_kwh: float,
+    day_slots: int,
+    *,
+    dt_h: float | None = None,
+) -> float:
+    """Scale full-calendar HDD kWh to the fraction of the day present in the horizon."""
+    from .slot_duration import DEFAULT_DT_H, slots_for_wall_hours, validate_dt_h
 
-    Midnight-spanning SE windows otherwise apply two full HDD days (infeasible with
-    max consecutive ON) while profile_spec Jahres Verbrauch uses one window total.
-    """
     if day_slots <= 0 or full_day_kwh <= 0.0:
         return 0.0
-    if day_slots >= 24:
+    dt = validate_dt_h(DEFAULT_DT_H if dt_h is None else dt_h)
+    slots_per_day = slots_for_wall_hours(24.0, dt)
+    if day_slots >= slots_per_day:
         return float(full_day_kwh)
-    return round(float(full_day_kwh) * (day_slots / 24.0), 3)
+    return round(float(full_day_kwh) * (day_slots * dt / 24.0), 3)
 
 
 def _max_on_slots_with_limits(
@@ -279,13 +285,15 @@ def add_thermal_flex_constraints(
             if not day_indices or target_kwh <= 0.0:
                 continue
             _, max_kw = power_limits_kw(consumer)
-            max_deliverable = _max_deliverable_kwh(consumer, day_indices)
+            max_deliverable = _max_deliverable_kwh(
+                consumer, day_indices, dt_h=model.dt_h
+            )
             day_slots = len(day_indices)
             prorated = _prorate_thermal_day_target_kwh(float(target_kwh), day_slots)
             op_slots = _max_on_slots_with_limits(
                 day_slots, max_hours=max_hours, max_pulses=max_pulses
             )
-            op_max_kwh = op_slots * float(max_kw)
+            op_max_kwh = op_slots * float(max_kw) * float(model.dt_h)
             effective = min(prorated, max_deliverable, op_max_kwh)
             if effective <= 1e-9:
                 continue

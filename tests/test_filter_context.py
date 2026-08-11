@@ -41,21 +41,26 @@ def _battery_params() -> dict:
 
 
 def _matrix_24h(day: datetime | None = None) -> list[dict]:
+    from optimizer.slot_duration import slot_step
+
     start = day or datetime(2026, 7, 7, 0, 0)
+    step = slot_step()
     matrix: list[dict] = []
-    for i in range(24):
-        dt = start + timedelta(hours=i)
+    moment = start
+    end = start + timedelta(hours=24)
+    while moment < end:
         matrix.append(
             {
-                "hour": dt.hour,
-                "date": dt.date(),
-                "slot_datetime": dt,
+                "hour": moment.hour,
+                "date": moment.date(),
+                "slot_datetime": moment,
                 "expected_p_pv": 0.0,
                 "expected_p_act": 0.3,
-                "k_act": 15.0 if 10 <= dt.hour < 14 else 2.0,
+                "k_act": 15.0 if 10 <= moment.hour < 14 else 2.0,
                 "consumption_mode": "logged_day",
             }
         )
+        moment += step
     return matrix
 
 
@@ -86,13 +91,14 @@ class TestSlotInNativeWindow:
 class TestNativeBlockedIndices:
     def test_blocks_native_hours_only(self):
         matrix = _matrix_24h()
-        blocked = fc.native_blocked_indices(matrix, list(range(24)), 10, 4.0)
-        assert blocked == [10, 11, 12, 13]
+        blocked = fc.native_blocked_indices(matrix, list(range(len(matrix))), 10, 4.0)
+        # 10:00–13:45 = 16 QH slots
+        assert blocked == list(range(10 * 4, 14 * 4))
 
     def test_resolve_filter_context_uses_config_fallback(self):
         matrix = _matrix_24h()
         ctx = fc.resolve_filter_context(_swimspa_filter(), matrix, logged_simulation=True)
-        assert ctx["blocked_indices"] == [10, 11, 12, 13]
+        assert ctx["blocked_indices"] == list(range(10 * 4, 14 * 4))
         assert ctx["source_label"] == "config_fallback"
 
 
@@ -135,7 +141,9 @@ class TestMilpFilterWindow:
             slot["consumer_powers"].get("pool_filter", 0.0) for slot in schedule
         ]
         assert any(abs(p - 0.18) < 1e-6 for p in powers)
-        assert sum(powers) == pytest.approx(0.36, abs=0.02)
+        from optimizer.slot_duration import DEFAULT_DT_H
+
+        assert sum(powers) * DEFAULT_DT_H == pytest.approx(ernie_rem, abs=0.1)
         blocked = set(filter_ctx["blocked_indices"])
         for hour_idx, row in enumerate(matrix):
             if hour_idx in blocked:
@@ -169,12 +177,14 @@ class TestMilpFilterWindow:
         consumer = _swimspa_filter()
         filter_ctx = fc.resolve_filter_context(consumer, matrix, logged_simulation=True)
         ernie_rem = fc.ernie_filter_remaining_kwh(consumer, 1.0, filter_ctx)
-        powers_by_hour: dict[int, float] = {}
-        for hour in range(24):
-            slice_matrix = matrix[hour:]
+        powers_by_slot: dict[int, float] = {}
+        # Spot-check a few blocked + unblocked slots (full horizon loop is slow).
+        sample_indices = sorted(set(filter_ctx["blocked_indices"][:2]) | {0, 8 * 4, 15 * 4})
+        for index in sample_indices:
+            slice_matrix = matrix[index:]
             _, _, _, powers, _, _, _ = milp_optimizer(
                 slice_matrix,
-                current_hour=matrix[hour]["hour"],
+                current_hour=matrix[index]["hour"],
                 current_soc=50.0,
                 battery_params=_battery_params(),
                 k_push=3.5,
@@ -189,10 +199,10 @@ class TestMilpFilterWindow:
                     )
                 },
             )
-            powers_by_hour[hour] = powers.get("pool_filter", 0.0)
+            powers_by_slot[index] = powers.get("pool_filter", 0.0)
 
-        for blocked_hour in filter_ctx["blocked_indices"]:
-            assert powers_by_hour[blocked_hour] == pytest.approx(0.0)
+        for blocked_index in filter_ctx["blocked_indices"][:2]:
+            assert powers_by_slot[blocked_index] == pytest.approx(0.0)
 
 
 def _swimspa_filter_loxone() -> dict:

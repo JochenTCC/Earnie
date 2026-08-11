@@ -364,6 +364,7 @@ def test_collect_planning_flex_includes_generic_and_ev():
 
 
 def test_validate_window_consumption_uses_spec_totals_for_profile_spec():
+    from optimizer.slot_duration import DEFAULT_DT_H
     from simulation.engine import validate_window_consumption
 
     meta = {
@@ -378,7 +379,10 @@ def test_validate_window_consumption_uses_spec_totals_for_profile_spec():
         "_flexible_consumers": [{"id": "washer", "name": "Washer"}],
     }
     rows = [
-        {"Verbrauch-Prognose (kW)": 12.0, "Washer (kW)": 8.0},
+        {
+            "Verbrauch-Prognose (kW)": 12.0 / DEFAULT_DT_H,
+            "Washer (kW)": 8.0 / DEFAULT_DT_H,
+        },
     ]
     result = validate_window_consumption(rows, meta)
     assert result.ok
@@ -455,7 +459,9 @@ def test_build_per_scenario_reference_costs_adds_tariff_specific_ref(
     assert ref_id in extra
     assert ref_id in labels
     assert labels[ref_id] == scenario_reference_label("Fixed")
-    assert len(extra[ref_id]) == 24
+    from optimizer.slot_duration import slots_for_wall_hours
+
+    assert len(extra[ref_id]) == slots_for_wall_hours(24)
 
 
 def test_build_per_scenario_reference_costs_pv_variant(

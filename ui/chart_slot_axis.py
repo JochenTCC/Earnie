@@ -7,7 +7,27 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from data.planning_window import UiChartWindow, normalize_hour_slot
+from data.planning_window import (
+    UiChartWindow,
+    align_to_planning_timezone,
+    normalize_hour_slot,
+)
+
+
+def _coerce_slot_datetime_value(raw) -> datetime:
+    """Normalize chart slot values to planning-tz ``datetime`` (no mixed tz)."""
+    if isinstance(raw, datetime):
+        value = raw
+    elif hasattr(raw, "to_pydatetime"):
+        value = raw.to_pydatetime()
+    elif isinstance(raw, str):
+        value = datetime.fromisoformat(raw)
+    else:
+        raise ValueError(f"Ungültiges slot_datetime: {type(raw).__name__}")
+    import config
+
+    return align_to_planning_timezone(value, config.get_planning_timezone())
+
 
 def _safe_float(value, default: float = 0.0) -> float:
     if value is None:
@@ -78,7 +98,9 @@ class ChartSlotAxis:
         slot_datetimes: tuple[datetime, ...] | None = None,
     ) -> ChartSlotAxis:
         if "slot_datetime" in df.columns:
-            starts = pd.to_datetime(df["slot_datetime"])
+            starts = pd.Series(
+                [_coerce_slot_datetime_value(raw) for raw in df["slot_datetime"].tolist()]
+            )
         elif slot_datetimes is not None:
             if len(slot_datetimes) != len(df):
                 raise ValueError(
@@ -214,9 +236,11 @@ def _slot_time_in_chart(
     slots: tuple[datetime, ...] | list[datetime],
     moment: datetime,
 ) -> datetime | None:
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
     if not slots:
         return None
-    target = normalize_hour_slot(moment)
+    target = normalize_quarter_hour_slot(moment)
     if target in slots:
         return target
     for slot in slots:
@@ -266,8 +290,11 @@ def _zone_right_edge(axis: ChartSlotAxis, moment: datetime) -> datetime:
 
 
 def _zone_left_edge(axis: ChartSlotAxis, moment: datetime) -> datetime:
-    """Linker Rand des ersten Slots mit Beginn >= ``moment``."""
-    index = _slot_index_at_or_after(axis, moment)
+    """Linker Rand des ersten Slots mit Beginn >= QH-floor(``moment``)."""
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
+    target = normalize_quarter_hour_slot(moment)
+    index = _slot_index_at_or_after(axis, target)
     if index is None:
         last = len(axis.starts) - 1
         if last < 0:

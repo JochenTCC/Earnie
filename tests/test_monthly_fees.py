@@ -227,6 +227,8 @@ def test_tariff_preview_shows_monthly_fee_and_supplier() -> None:
 
 
 def test_step_cost_parts_import_and_export() -> None:
+    from optimizer.slot_duration import DEFAULT_DT_H
+
     import_row = {
         "Verbrauch-Prognose (kW)": 1.0,
         "Strompreis (Cent/kWh)": 20.0,
@@ -236,10 +238,10 @@ def test_step_cost_parts_import_and_export() -> None:
     import_eur, export_eur, net_eur, import_kwh, export_kwh = (
         calculate_step_cost_parts_from_row(import_row)
     )
-    assert import_eur == pytest.approx(0.4)
+    assert import_eur == pytest.approx(2.0 * DEFAULT_DT_H * 20.0 / 100.0)
     assert export_eur == 0.0
-    assert net_eur == pytest.approx(0.4)
-    assert import_kwh == pytest.approx(2.0)
+    assert net_eur == pytest.approx(2.0 * DEFAULT_DT_H * 20.0 / 100.0)
+    assert import_kwh == pytest.approx(2.0 * DEFAULT_DT_H)
     assert export_kwh == 0.0
 
     export_row = {
@@ -252,10 +254,10 @@ def test_step_cost_parts_import_and_export() -> None:
         calculate_step_cost_parts_from_row(export_row)
     )
     assert import_eur == 0.0
-    assert export_eur == pytest.approx(0.3)
-    assert net_eur == pytest.approx(-0.3)
+    assert export_eur == pytest.approx(3.0 * DEFAULT_DT_H * 10.0 / 100.0)
+    assert net_eur == pytest.approx(-(3.0 * DEFAULT_DT_H * 10.0 / 100.0))
     assert import_kwh == 0.0
-    assert export_kwh == pytest.approx(3.0)
+    assert export_kwh == pytest.approx(3.0 * DEFAULT_DT_H)
 
 
 def test_write_se_invoices_markdown(tmp_path) -> None:

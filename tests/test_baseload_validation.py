@@ -8,6 +8,7 @@ import pytest
 
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
+from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw, slots_for_wall_hours
 from simulation.baseload_validation import (
     baseload_kwh_from_chart_rows,
     derive_historical_baseload_kwh,
@@ -28,8 +29,9 @@ class TestResolveHourlyBaseload:
         total = [1.555] + [0.5] * 23
         flex = [3.815] + [0.0] * 23
         hourly, baseload_sum = resolve_hourly_baseload_kw(total, flex)
-        assert baseload_sum == pytest.approx(sum(total) - sum(flex))
-        assert sum(hourly) == pytest.approx(baseload_sum)
+        target_kw = sum(total) - sum(flex)
+        assert baseload_sum == pytest.approx(target_kw * DEFAULT_DT_H)
+        assert sum(hourly) == pytest.approx(target_kw)
         assert all(value >= 0.0 for value in hourly)
 
     def test_requires_equal_length(self):
@@ -44,9 +46,11 @@ class TestBaseloadFromChartRows:
             {"Verbrauch-Prognose (kW)": 0.063, "Kochen (kW)": 2.0, "Smart (kW)": 1.0},
         ]
         flex = [{"id": "ev", "name": "Smart"}]
-        assert baseload_kwh_from_chart_rows(rows) == pytest.approx(0.126)
+        assert baseload_kwh_from_chart_rows(rows) == pytest.approx(
+            energy_kwh_from_kw([0.063, 0.063])
+        )
         assert baseload_kwh_from_chart_rows(rows, flexible_consumers=flex) == pytest.approx(
-            2.326
+            energy_kwh_from_kw([0.063 + 0.2, 0.063 + 2.0])
         )
 
 
@@ -58,6 +62,7 @@ class TestValidateWindowConsumption:
             "baseload_kwh": 9.05,
             "historical_totals": {"swimspa": 11.66, "eauto": 0.0},
         }
+        n = slots_for_wall_hours(24)
         rows = [
             {
                 "Verbrauch-Prognose (kW)": 9.05 / 24,
@@ -65,12 +70,14 @@ class TestValidateWindowConsumption:
                 "E-Auto (kW)": 0.0,
                 "Wärmepumpe (kW)": 0.0,
             }
-        ] * 24
-        # Skaliere auf exakte Summen
-        rows[0]["Verbrauch-Prognose (kW)"] = 9.05 - sum(
+        ] * n
+        # Skaliere auf exakte Energiesummen (sum(kW) * dt_h)
+        rows[0]["Verbrauch-Prognose (kW)"] = 9.05 / DEFAULT_DT_H - sum(
             r["Verbrauch-Prognose (kW)"] for r in rows[1:]
         )
-        rows[0]["SwimSpa (kW)"] = 11.66 - sum(r["SwimSpa (kW)"] for r in rows[1:])
+        rows[0]["SwimSpa (kW)"] = 11.66 / DEFAULT_DT_H - sum(
+            r["SwimSpa (kW)"] for r in rows[1:]
+        )
 
         result = validate_window_consumption(rows, meta)
         assert result.ok
@@ -84,6 +91,7 @@ class TestValidateWindowConsumption:
             "baseload_kwh": 8.85,
             "historical_totals": {"swimspa": 11.86, "eauto": 6.16},
         }
+        n = slots_for_wall_hours(24)
         rows = [
             {
                 "Verbrauch-Prognose (kW)": 8.85 / 24,
@@ -91,7 +99,7 @@ class TestValidateWindowConsumption:
                 "E-Auto (kW)": 3.5 / 24,
                 "Wärmepumpe (kW)": 0.0,
             }
-        ] * 24
+        ] * n
         result = validate_window_consumption(rows, meta)
         assert not result.ok
         assert result.flex_diff_kwh is not None
@@ -105,7 +113,7 @@ class TestPlanningFlexPlausibility:
         planning = [{"id": "swimspa", "name": "Swimspa"}]
         rows = [{"Swimspa (kW)": 2.8, "Verbrauch-Prognose (kW)": 1.0}] * 2
         delivered = delivered_flex_kwh_from_rows(rows, flexible_consumers=planning)
-        assert delivered["swimspa"] == pytest.approx(5.6)
+        assert delivered["swimspa"] == pytest.approx(2.8 * 2 * DEFAULT_DT_H)
 
     def test_validate_uses_stashed_full_horizon_flex(self):
         planning = [{"id": "ev", "name": "Smart"}]
@@ -118,7 +126,13 @@ class TestPlanningFlexPlausibility:
             "plausibility_optimized_flex_kwh": 8.0,
         }
         # Book rows only show WP-less / no EV (as after SA₁ cut).
-        rows = [{"Verbrauch-Prognose (kW)": 22.0, "Smart (kW)": 0.0}]
+        # Single-row energy = kW * dt_h → scale power so baseload energy is 22 kWh.
+        rows = [
+            {
+                "Verbrauch-Prognose (kW)": 22.0 / DEFAULT_DT_H,
+                "Smart (kW)": 0.0,
+            }
+        ]
         result = validate_window_consumption(rows, meta)
         assert result.ok
         assert result.optimized_flex_kwh == pytest.approx(8.0)
@@ -136,12 +150,13 @@ class TestPlanningFlexPlausibility:
             "consumer_daily_targets_kwh": {"ev": 8.0},
             "_flexible_consumers": [{"id": "ev", "name": "Smart"}],
         }
+        # Scale kW so energy (kW * dt_h) matches the historical kWh targets.
         rows = [
             {
-                "Verbrauch-Prognose (kW)": 2.512,
-                "Fernsehen (kW)": 0.2,
-                "Kochen (kW)": 2.0,
-                "Smart (kW)": 8.0,
+                "Verbrauch-Prognose (kW)": 2.512 / DEFAULT_DT_H,
+                "Fernsehen (kW)": 0.2 / DEFAULT_DT_H,
+                "Kochen (kW)": 2.0 / DEFAULT_DT_H,
+                "Smart (kW)": 8.0 / DEFAULT_DT_H,
             }
         ]
         result = validate_window_consumption(rows, meta)

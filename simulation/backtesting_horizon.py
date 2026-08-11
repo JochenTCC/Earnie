@@ -23,7 +23,6 @@ from data.planning_window import (
     compute_planning_window,
     hourly_slots_inclusive,
     next_sunrise_after,
-    normalize_hour_slot,
     previous_sunrise_before,
     sunrise_anchor_slot_index,
 )
@@ -52,8 +51,10 @@ class SunriseBookStep:
 
 
 def naive_backtesting_slot(moment: datetime) -> datetime:
-    """Backtesting cons_data_hourly.csv nutzt naive lokale Zeitstempel."""
-    slot = normalize_hour_slot(moment)
+    """Backtesting fuel uses naive local timestamps; keep QH minutes."""
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
+    slot = normalize_quarter_hour_slot(moment)
     if slot.tzinfo is not None:
         return slot.replace(tzinfo=None)
     return slot
@@ -86,17 +87,20 @@ def _aware_ready_by(ready_by: datetime, timezone_name: str) -> datetime:
 
 
 def hourly_slots_half_open(start: datetime, end: datetime) -> tuple[datetime, ...]:
-    """Hourly slots with start inclusive and end exclusive (floor hours)."""
+    """Planning slots with start inclusive and end exclusive (QH floor since 2.5.e)."""
+    from optimizer.slot_duration import normalize_quarter_hour_slot, slot_step
+
     if start.tzinfo is None or end.tzinfo is None:
         raise ValueError("start und end müssen timezone-aware sein.")
-    slot = normalize_hour_slot(start)
-    end_slot = normalize_hour_slot(end)
+    slot = normalize_quarter_hour_slot(start)
+    end_slot = normalize_quarter_hour_slot(end)
     if end_slot <= slot:
         raise ValueError(f"Leeres Halb-offen-Intervall: [{slot}, {end_slot}).")
+    step = slot_step()
     slots: list[datetime] = []
     while slot < end_slot:
         slots.append(slot)
-        slot += timedelta(hours=1)
+        slot += step
     return tuple(slots)
 
 
@@ -124,22 +128,18 @@ def resolve_ready_by_sunrise_step(
             f"ready_by {ready.isoformat()} liegt nicht strikt zwischen "
             f"SA₁ {sa1.isoformat()} und SA₂ {sa2.isoformat()}."
         )
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
     milp_slots = hourly_slots_inclusive(sa0, sa2)
     book_slots = hourly_slots_half_open(sa1, sa2)
-    sa1_floor = normalize_hour_slot(sa1)
-    sa1_index = next(
-        (
-            index
-            for index, slot in enumerate(milp_slots)
-            if normalize_hour_slot(slot) == sa1_floor
-        ),
-        None,
-    )
-    if sa1_index is None:
+    sa1_slot = normalize_quarter_hour_slot(sa1)
+    try:
+        sa1_index = milp_slots.index(sa1_slot)
+    except ValueError as exc:
         raise ValueError(
-            f"SA₁ {sa1_floor.isoformat()} fehlt in MILP-Slots "
+            f"SA₁ {sa1_slot.isoformat()} fehlt in MILP-Slots "
             f"{milp_slots[0].isoformat()}…{milp_slots[-1].isoformat()}."
-        )
+        ) from exc
     return SunriseBookStep(
         ready_by=ready,
         sa0=sa0,
@@ -180,29 +180,39 @@ def compute_sunrise_planning_at_anchor(
     lat, lon, tz_name = geo_params_from_scenario(scenario_params)
     now = window_start_before_anchor(anchor, tz_name)
     window = compute_planning_window(now, lat, lon, tz_name)
-    if len(window.slot_datetimes) < BACKTESTING_STEP_HOURS:
+    from optimizer.slot_duration import DEFAULT_DT_H, slots_for_wall_hours
+
+    min_slots = slots_for_wall_hours(float(BACKTESTING_STEP_HOURS), DEFAULT_DT_H)
+    if len(window.slot_datetimes) < min_slots:
         raise ValueError(
-            f"Sunrise-Planungsfenster ab {now} hat nur {len(window.slot_datetimes)} h, "
-            f"benötigt mindestens {BACKTESTING_STEP_HOURS}."
+            f"Sunrise-Planungsfenster ab {now} hat nur {len(window.slot_datetimes)} Slots, "
+            f"benötigt mindestens {min_slots} ({BACKTESTING_STEP_HOURS} h)."
         )
     return window, sunrise_anchor_slot_index(window)
 
 
 def step_slot_datetimes(anchor: datetime, timezone_name: str) -> list[datetime]:
-    """24 Stunden [Anker−24h, Anker) — identisch zu fixed_24h für fairen Vergleich."""
+    """24 wall-clock hours [Anker−24h, Anker) as QH slots — fair vs fixed_24h."""
+    from optimizer.slot_duration import DEFAULT_DT_H, slots_for_wall_hours
+
     start = window_start_before_anchor(anchor, timezone_name)
+    n = slots_for_wall_hours(float(BACKTESTING_STEP_HOURS), DEFAULT_DT_H)
+    step = timedelta(hours=DEFAULT_DT_H)
     slots = [
-        naive_backtesting_slot(start + timedelta(hours=index))
-        for index in range(BACKTESTING_STEP_HOURS)
+        naive_backtesting_slot(start + step * index)
+        for index in range(n)
     ]
     return slots
 
 
 def effective_sunrise_soc_min_index(sunrise_soc_min_index: int | None) -> int | None:
     """SOC_min am Sonnenaufgang nur, wenn der Anker innerhalb des 24h-Output-Schritts liegt."""
+    from optimizer.slot_duration import DEFAULT_DT_H, slots_for_wall_hours
+
     if sunrise_soc_min_index is None:
         return None
-    if sunrise_soc_min_index >= BACKTESTING_STEP_HOURS:
+    step_slots = slots_for_wall_hours(float(BACKTESTING_STEP_HOURS), DEFAULT_DT_H)
+    if sunrise_soc_min_index >= step_slots:
         return None
     return sunrise_soc_min_index
 
@@ -214,13 +224,12 @@ def truncate_matrix_for_step_simulation(
     """
     Kürzt die Sunset-Matrix auf den 24h-Output-Schritt (legacy truncate path).
     """
-    if len(matrix) <= BACKTESTING_STEP_HOURS:
+    from optimizer.slot_duration import DEFAULT_DT_H, slots_for_wall_hours
+
+    step_slots = slots_for_wall_hours(float(BACKTESTING_STEP_HOURS), DEFAULT_DT_H)
+    if len(matrix) <= step_slots:
         return matrix
-    return matrix[:BACKTESTING_STEP_HOURS]
-
-
-def _slot_lookup_key(moment: datetime) -> datetime:
-    return naive_backtesting_slot(normalize_hour_slot(moment))
+    return matrix[:step_slots]
 
 
 def overlay_step_consumption_on_matrix(
@@ -228,21 +237,27 @@ def overlay_step_consumption_on_matrix(
     step_matrix: list[dict],
 ) -> None:
     """
-    Übernimmt stündliche Grundlast/Total aus dem Buchungs-Schritt in die MILP-Matrix.
+    Übernimmt Grundlast/Total aus dem Buchungs-Schritt in die MILP-Matrix.
+
+    Iterates book/step rows and updates matching QH MILP rows. SA₀ foresight
+    rows without book fuel are left unchanged.
     """
-    by_out = {_slot_lookup_key(row["slot_datetime"]): row for row in output_matrix}
+    by_output = {
+        naive_backtesting_slot(row["slot_datetime"]): row for row in output_matrix
+    }
     missing: list[str] = []
     for source in step_matrix:
-        key = _slot_lookup_key(source["slot_datetime"])
-        row = by_out.get(key)
-        if row is None:
+        key = naive_backtesting_slot(source["slot_datetime"])
+        target = by_output.get(key)
+        if target is None:
             missing.append(key.isoformat())
             continue
-        row["expected_p_act"] = source["expected_p_act"]
-        row["expected_p_total"] = source["expected_p_total"]
+        target["expected_p_act"] = source["expected_p_act"]
+        target["expected_p_total"] = source["expected_p_total"]
     if missing:
+        unique = sorted(set(missing))
         raise ValueError(
-            "Sunrise-Output-Matrix: fehlende Buchungs-Slots in MILP-Matrix: "
-            + ", ".join(missing[:5])
-            + (" ..." if len(missing) > 5 else "")
+            "Sunrise-Overlay: Buchungs-Slots fehlen in der MILP-Matrix: "
+            + ", ".join(unique[:5])
+            + ("…" if len(unique) > 5 else "")
         )

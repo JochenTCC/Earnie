@@ -70,13 +70,17 @@ def _total_battery_throughput(model) -> float:
 def test_wear_reduces_battery_throughput_at_equal_prices():
     matrix = _shift_matrix()
     params = _battery_params()
-    model_no_wear = _build_milp_model(matrix, 2, params, 50.0, [], 0.0, {}, None)
+    model_no_wear = _build_milp_model(
+        matrix, 2, params, 50.0, [], 0.0, {}, None, dt_h=1.0
+    )
     _add_milp_objective(
         model_no_wear, matrix, 3.5, None, wear_cent_per_kwh=0.0
     )
     throughput_no_wear = _total_battery_throughput(model_no_wear)
 
-    model_wear = _build_milp_model(matrix, 2, params, 50.0, [], 0.0, {}, None)
+    model_wear = _build_milp_model(
+        matrix, 2, params, 50.0, [], 0.0, {}, None, dt_h=1.0
+    )
     _add_milp_objective(
         model_wear, matrix, 3.5, None, wear_cent_per_kwh=10.0
     )
@@ -106,7 +110,9 @@ def test_wear_allows_profitable_arbitrage():
         },
     ]
     params = _battery_params()
-    model = _build_milp_model(matrix, 2, params, 50.0, [], 0.0, {}, None)
+    model = _build_milp_model(
+        matrix, 2, params, 50.0, [], 0.0, {}, None, dt_h=1.0
+    )
     _add_milp_objective(model, matrix, 3.5, None, wear_cent_per_kwh=2.5)
     model.prob.solve(pulp.PULP_CBC_CMD(msg=False))
     assert pulp.LpStatus[model.prob.status] == "Optimal"

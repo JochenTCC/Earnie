@@ -5,6 +5,8 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from optimizer import schedule as optimization_schedule
 from runtime_store import live_optimization_debug
 from runtime_store.live_display_loader import (
@@ -105,10 +107,20 @@ def test_savings_info_from_snapshot_recomputes_hourly_series():
         "energy_comparison": [],
     }
     info = savings_info_from_snapshot(snapshot)
-    assert info["hourly_optimized_cost_euro"] == [0.3]
-    assert info["hourly_matched_baseline_cost_euro"] == [0.36]
-    assert info["hourly_optimized_consumption_kwh"] == [1.0]
-    assert info["hourly_matched_baseline_consumption_kwh"] == [1.2]
+    from optimizer.slot_duration import DEFAULT_DT_H
+
+    assert info["hourly_optimized_cost_euro"][0] == pytest.approx(
+        1.0 * DEFAULT_DT_H * 30.0 / 100.0
+    )
+    assert info["hourly_matched_baseline_cost_euro"][0] == pytest.approx(
+        1.2 * DEFAULT_DT_H * 30.0 / 100.0
+    )
+    assert info["hourly_optimized_consumption_kwh"][0] == pytest.approx(
+        1.0 * DEFAULT_DT_H
+    )
+    assert info["hourly_matched_baseline_consumption_kwh"][0] == pytest.approx(
+        1.2 * DEFAULT_DT_H
+    )
 
 
 def test_chart2_sa1_sa2_snapshot_bundle_has_nonzero_hourly_costs():

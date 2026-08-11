@@ -170,9 +170,11 @@ def _solve_urgent_dump_milp(urgent_manifest: dict, case_id: str) -> dict:
         "tie_break_on_epsilon": 0.001,
         "tie_break_time_epsilon": 0.0001,
     }
+    # Prod-dump rows are hourly snapshots; replay with dt_h=1.0.
     model = _build_milp_model(
         matrix, len(matrix), _battery_params(), 10.0, [consumer], 0.0, {"eauto": 8.0},
         {"eauto": ev_params},
+        dt_h=1.0,
     )
     _add_milp_objective(model, matrix, 3.7, {"eauto": ev_params}, wear_cent_per_kwh=0.0)
     _add_consumer_delivery_constraints(

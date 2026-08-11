@@ -18,15 +18,17 @@ MISSING_PRICE_STRATEGY_FORECAST = "forecast"
 
 
 def normalize_price_slot(dt: datetime) -> datetime:
-    """Stunden-Slot in Planungszeitzone (config: runtime_settings.timezone_name)."""
+    """Quarter-hour slot in planning timezone (config: runtime_settings.timezone_name)."""
     from zoneinfo import ZoneInfo
+
+    from optimizer.slot_duration import normalize_quarter_hour_slot
 
     tz = ZoneInfo(config.get_planning_timezone())
     if dt.tzinfo is None:
         aligned = dt.replace(tzinfo=tz)
     else:
         aligned = dt.astimezone(tz)
-    return aligned.replace(minute=0, second=0, microsecond=0)
+    return normalize_quarter_hour_slot(aligned)
 
 
 def epex_to_brutto_cent(epex_price_cent: float) -> float:
@@ -50,7 +52,7 @@ def epex_to_brutto_cent(epex_price_cent: float) -> float:
 
 
 def index_market_data_by_slot(market_data: list[dict[str, Any]]) -> dict[datetime, dict[str, Any]]:
-    """Indiziert Roh-Marktdaten nach Stunden-Slot (Mittelwert bei Duplikaten)."""
+    """Index raw market data by quarter-hour slot (mean on true duplicates)."""
     buckets: dict[datetime, list[float]] = {}
     for item in market_data:
         ts = item.get("timestamp")
@@ -74,19 +76,39 @@ def index_market_data_by_slot(market_data: list[dict[str, Any]]) -> dict[datetim
     return indexed
 
 
+def _price_from_indexed_slot(
+    slot: datetime,
+    by_slot: dict[datetime, dict[str, Any]],
+) -> float | None:
+    """Exact QH match, else expand from parent clock-hour sample."""
+    from optimizer.slot_duration import floor_to_hour_slot
+
+    if slot in by_slot:
+        return float(by_slot[slot]["price_buy"])
+    parent = floor_to_hour_slot(slot)
+    if parent in by_slot:
+        return float(by_slot[parent]["price_buy"])
+    return None
+
+
 def find_mirror_slot(
     slot: datetime,
     by_slot: dict[datetime, dict[str, Any]],
     *,
     max_lookback_days: int,
 ) -> datetime | None:
-    """Sucht Spiegelquelle: gleiche Uhrzeit an vorherigen Tagen."""
+    """Sucht Spiegelquelle: gleiche Uhrzeit an vorherigen Tagen (QH oder Stunden-Expand)."""
+    from optimizer.slot_duration import floor_to_hour_slot
+
     if max_lookback_days < 1:
         raise ValueError("max_lookback_days muss mindestens 1 sein.")
     for days_back in range(1, max_lookback_days + 1):
         candidate = slot - timedelta(days=days_back)
         if candidate in by_slot:
             return candidate
+        parent = floor_to_hour_slot(candidate)
+        if parent in by_slot:
+            return parent
     return None
 
 
@@ -135,6 +157,7 @@ def _lookup_forecast_epex(
     forecast_feature_frame: pd.DataFrame,
 ) -> float | None:
     from data.price_forecast_model import predict_prices
+    from optimizer.slot_duration import floor_to_hour_slot
 
     key = normalize_price_slot(slot)
     idx = forecast_feature_frame.index
@@ -143,7 +166,10 @@ def _lookup_forecast_epex(
     else:
         lookup_key = key
     if lookup_key not in forecast_feature_frame.index:
-        return None
+        parent = floor_to_hour_slot(lookup_key)
+        if parent not in forecast_feature_frame.index:
+            return None
+        lookup_key = parent
     frame = forecast_feature_frame.loc[[lookup_key]]
     return float(predict_prices(forecast_model, frame)[0])
 
@@ -222,8 +248,8 @@ def resolve_market_slots(
 
     for target_dt in target_hours:
         slot = normalize_price_slot(target_dt)
-        if slot in by_slot:
-            epex = float(by_slot[slot]["price_buy"])
+        epex = _price_from_indexed_slot(slot, by_slot)
+        if epex is not None:
             resolved.append(
                 {
                     "slot_datetime": slot,
@@ -275,11 +301,13 @@ def awattar_fetch_window(planning_end: datetime | None = None) -> tuple[datetime
     planning_end: optionales Fensterende (z. B. SA₂); sonst jetzt + 24 h.
     Zeitzone von planning_end wird übernommen (typisch Europe/Vienna).
     """
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
     tz = planning_end.tzinfo if planning_end is not None and planning_end.tzinfo else None
     if tz is not None:
-        now = datetime.now(tz).replace(minute=0, second=0, microsecond=0)
+        now = normalize_quarter_hour_slot(datetime.now(tz))
     else:
-        now = datetime.now().replace(minute=0, second=0, microsecond=0)
+        now = normalize_quarter_hour_slot(datetime.now())
     start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(
         days=MAX_MIRROR_LOOKBACK_DAYS
     )
@@ -289,7 +317,7 @@ def awattar_fetch_window(planning_end: datetime | None = None) -> tuple[datetime
             end = end.replace(tzinfo=tz)
         if end < now:
             raise ValueError(
-                f"planning_end ({planning_end}) liegt vor dem aktuellen Stunden-Slot ({now})."
+                f"planning_end ({planning_end}) liegt vor dem aktuellen Slot ({now})."
             )
         return start, end
     end = now + timedelta(hours=24)
@@ -300,8 +328,36 @@ def epex_prices_for_slots(
     prices_df: pd.DataFrame,
     slot_datetimes: list[datetime],
 ) -> list[float]:
-    """EPEX Cent/kWh je Stunden-Slot aus einem Preis-DataFrame."""
-    hourly = prices_df["price_cent_kwh"].resample("h").mean()
-    idx = pd.DatetimeIndex(slot_datetimes)
-    series = hourly.reindex(idx).ffill().bfill().fillna(0.0)
-    return [float(p) for p in series.tolist()]
+    """EPEX Cent/kWh je Planungs-Slot; native QH kept, hourly series expanded."""
+    from optimizer.slot_duration import floor_to_hour_slot
+
+    series = prices_df["price_cent_kwh"]
+    if not isinstance(series.index, pd.DatetimeIndex):
+        raise ValueError("prices_df index must be DatetimeIndex for epex_prices_for_slots.")
+    # Drop tz for naive slot_datetimes used in SE; keep aligned lookup keys.
+    idx = series.index
+    if getattr(idx, "tz", None) is not None:
+        series = series.copy()
+        series.index = idx.tz_localize(None)
+
+    out: list[float] = []
+    for slot in slot_datetimes:
+        key = pd.Timestamp(slot).to_pydatetime().replace(tzinfo=None)
+        if key in series.index:
+            out.append(float(series.loc[key]))
+            continue
+        parent = floor_to_hour_slot(key)
+        if parent in series.index:
+            out.append(float(series.loc[parent]))
+            continue
+        # Nearest prior sample (covers sparse archives), then ffill-like fallback.
+        prior = series.loc[:key]
+        if len(prior) > 0:
+            out.append(float(prior.iloc[-1]))
+            continue
+        later = series.loc[key:]
+        if len(later) > 0:
+            out.append(float(later.iloc[0]))
+            continue
+        out.append(0.0)
+    return out

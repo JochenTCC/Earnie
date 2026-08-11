@@ -72,6 +72,37 @@ def _map_to_horizon(
     return vector
 
 
+def outdoor_temps_for_slots(
+    slot_datetimes: list[datetime],
+    *,
+    latitude: float | None = None,
+    longitude: float | None = None,
+) -> list[float]:
+    """Outdoor °C for each planning slot (hourly Open-Meteo held onto QH)."""
+    if not slot_datetimes:
+        return []
+    start = min(slot_datetimes).replace(minute=0, second=0, microsecond=0)
+    end = max(slot_datetimes)
+    wall_hours = max(1, int((end - start).total_seconds() // 3600) + 1)
+    hourly_vals = get_hourly_outdoor_forecast_c(
+        horizon=wall_hours,
+        latitude=latitude,
+        longitude=longitude,
+        start=start,
+    )
+    by_hour = {
+        (start + timedelta(hours=i)).replace(minute=0, second=0, microsecond=0): hourly_vals[i]
+        for i in range(len(hourly_vals))
+    }
+    out: list[float] = []
+    for slot in slot_datetimes:
+        key = slot.replace(minute=0, second=0, microsecond=0)
+        if key not in by_hour:
+            raise ValueError(f"Open-Meteo: keine Temperatur für {key.isoformat()}")
+        out.append(by_hour[key])
+    return out
+
+
 def get_hourly_outdoor_forecast_c(
     *,
     horizon: int = 24,

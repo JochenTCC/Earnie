@@ -17,6 +17,7 @@ from house_config.planning_flex_bridge import (
     profile_flat_baseload_kw,
     resolve_profile_spec_flex_targets,
 )
+from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw, slot_step
 
 
 def _hourly_csv(path: Path, start: datetime, hours: int, power: float) -> None:
@@ -25,6 +26,17 @@ def _hourly_csv(path: Path, start: datetime, hours: int, power: float) -> None:
         for i in range(hours)
     ]
     write_canonical_hourly_csv(str(path), rows)
+
+
+def _qh_slots(start: datetime, wall_hours: int = 24) -> list[datetime]:
+    step = slot_step()
+    end = start + timedelta(hours=wall_hours)
+    slots: list[datetime] = []
+    moment = start
+    while moment < end:
+        slots.append(moment)
+        moment += step
+    return slots
 
 
 def test_modeled_kw_prefers_csv_over_climate(tmp_path: Path, monkeypatch) -> None:
@@ -88,7 +100,7 @@ def test_csv_thermal_rc_in_overlay_not_milp_flex(tmp_path: Path) -> None:
     # CSV SwimSpa meter already includes filter; do not add bridge filter flex.
     assert "pool_filter" not in flex_ids
 
-    slots = [start + timedelta(hours=i) for i in range(24)]
+    slots = _qh_slots(start)
     overlay = house_profile_baseload_overlay(
         profile,
         slots,
@@ -97,8 +109,10 @@ def test_csv_thermal_rc_in_overlay_not_milp_flex(tmp_path: Path) -> None:
         milp_flex_thermal_ids=milp_flex_thermal_annual_ids(flex),
     )
     flat = profile_flat_baseload_kw(profile)
-    assert sum(overlay) == pytest.approx(2.5 * 24, rel=1e-6)
-    assert sum(flat + o for o in overlay) == pytest.approx(flat * 24 + 2.5 * 24)
+    assert energy_kwh_from_kw(overlay) == pytest.approx(2.5 * 24, rel=1e-6)
+    assert energy_kwh_from_kw(flat + o for o in overlay) == pytest.approx(
+        flat * 24 + 2.5 * 24, rel=1e-6
+    )
 
 
 def test_ev_and_thermal_targets_use_csv_window(tmp_path: Path) -> None:
@@ -147,7 +161,7 @@ def test_ev_and_thermal_targets_use_csv_window(tmp_path: Path) -> None:
             },
         ],
     }
-    slots = [start + timedelta(hours=i) for i in range(24)]
+    slots = _qh_slots(start)
     flex = collect_planning_flex_consumers(profile)
     targets = resolve_profile_spec_flex_targets(flex, profile, slots, window_end=slots[-1])
     assert targets["ev"] == pytest.approx(24.0)
@@ -184,7 +198,7 @@ def test_non_csv_thermal_rc_in_profile_spec_targets(monkeypatch) -> None:
             }
         ],
     }
-    slots = [start + timedelta(hours=i) for i in range(24)]
+    slots = _qh_slots(start)
     monkeypatch.setattr(
         "data.consumption_profiles.modeled_consumer_kw_at_datetime",
         lambda *_a, **_k: 1.5,

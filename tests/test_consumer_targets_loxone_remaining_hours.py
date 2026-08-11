@@ -148,17 +148,24 @@ def test_get_consumer_remaining_kwh_credits_native_filter(
         "delivered": {},
         "charging_sessions": {},
     }
+    from datetime import timedelta
+
+    from optimizer.slot_duration import DEFAULT_DT_H, slot_step
+
+    start = datetime(2026, 7, 8, 8, 0)
+    n_slots = int(round(12.0 / DEFAULT_DT_H))
+    step = slot_step()
     matrix = [
         {
-            "hour": hour,
+            "hour": (start + step * index).hour,
             "date": date(2026, 7, 8),
-            "slot_datetime": datetime(2026, 7, 8, hour, 0),
+            "slot_datetime": start + step * index,
             "expected_p_pv": 0.0,
             "expected_p_act": 0.3,
             "k_act": 14.0,
             "consumption_mode": "forecast",
         }
-        for hour in range(8, 20)
+        for index in range(n_slots)
     ]
     remaining = optimizer.get_consumer_remaining_kwh(
         consumers=[consumer],

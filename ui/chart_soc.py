@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 
 from data.planning_window import normalize_hour_slot
 from optimizer import battery as bat
+from optimizer.slot_duration import DEFAULT_DT_H
 from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN
 from ui.chart_colors import (
     COLOR_ESS_UNDERLAY_CHARGE,
@@ -86,6 +87,7 @@ def _soc_tail_y_from_row(
         params["efficiency"],
         params["min_soc"],
         params["max_soc"],
+        dt_h=DEFAULT_DT_H,
     )
     return round(new_soc, 1)
 
@@ -159,11 +161,12 @@ def _soc_from_history_extrapolation(
         return last_soc
     new_soc, _ = bat.apply_soc_change(
         last_soc,
-        action * elapsed_h,
+        action,
         capacity,
         params["efficiency"],
         params["min_soc"],
         params["max_soc"],
+        dt_h=elapsed_h,
     )
     return round(new_soc, 1)
 

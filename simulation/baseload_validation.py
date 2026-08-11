@@ -16,11 +16,15 @@ def resolve_hourly_baseload_kw(
     hourly_flex_kw: list[float],
 ) -> tuple[list[float], float]:
     """
-    Stündliche Grundlast (kW), sodass Summe Grundlast + Summe Flex == Summe Total.
+    Slotweise Grundlast (kW), sodass Summe Grundlast + Summe Flex == Summe Total.
 
-    Pro Stunde: max(0, Total − Flex). Liegt Flex in einer Stunde über Total,
-    wird die Differenz über die übrigen Stunden verteilt (Skalierung).
+    Pro Slot: max(0, Total − Flex). Liegt Flex in einem Slot über Total,
+    wird die Differenz über die übrigen Slots verteilt (Skalierung).
+
+    Returns ``(baseload_kw_list, baseload_kwh)`` with energy scaled by ``DEFAULT_DT_H``.
     """
+    from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw
+
     if len(total_load) != len(hourly_flex_kw):
         raise ValueError(
             "total_load und hourly_flex_kw müssen gleich lang sein "
@@ -29,7 +33,7 @@ def resolve_hourly_baseload_kw(
     if not total_load:
         return [], 0.0
 
-    target_baseload = sum(float(t) for t in total_load) - sum(
+    target_baseload_kw_sum = sum(float(t) for t in total_load) - sum(
         float(f) for f in hourly_flex_kw
     )
     raw = [
@@ -37,18 +41,19 @@ def resolve_hourly_baseload_kw(
         for total, flex in zip(total_load, hourly_flex_kw)
     ]
     raw_sum = sum(raw)
-    if abs(target_baseload) < 1e-9:
+    if abs(target_baseload_kw_sum) < 1e-9:
         return [0.0] * len(total_load), 0.0
     if raw_sum < 1e-9:
-        per_hour = target_baseload / len(total_load)
-        return [round(per_hour, 3) for _ in total_load], round(target_baseload, 3)
+        per_slot = target_baseload_kw_sum / len(total_load)
+        scaled = [round(per_slot, 3) for _ in total_load]
+        return scaled, energy_kwh_from_kw(scaled)
 
-    scale = target_baseload / raw_sum
+    scale = target_baseload_kw_sum / raw_sum
     scaled = [round(value * scale, 3) for value in raw]
-    residual = round(target_baseload - sum(scaled), 3)
+    residual = round(target_baseload_kw_sum - sum(scaled), 3)
     if abs(residual) > 1e-9:
         scaled[-1] = round(scaled[-1] + residual, 3)
-    return scaled, round(target_baseload, 3)
+    return scaled, energy_kwh_from_kw(scaled)
 
 
 _CHART_RESERVED_KW_COLUMNS = frozenset(
@@ -81,22 +86,24 @@ def baseload_kwh_from_chart_rows(
     Mit ``flexible_consumers`` werden known-Generic-Spalten nach Chart-1-Peel
     mitgezählt (alles außer reservierten und Flex-Spalten).
     """
+    from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw
+
     if not rows:
         return 0.0
     if flexible_consumers is None:
-        return round(
-            sum(float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0) for row in rows),
-            3,
+        return energy_kwh_from_kw(
+            float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0) for row in rows
         )
 
     flex_cols = _flex_chart_column_names(flexible_consumers)
-    total = 0.0
+    powers: list[float] = []
     for row in rows:
-        total += float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+        slot_kw = float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
         for key, value in row.items():
             if not key.endswith(" (kW)"):
                 continue
             if key in _CHART_RESERVED_KW_COLUMNS or key in flex_cols:
                 continue
-            total += float(value or 0.0)
-    return round(total, 3)
+            slot_kw += float(value or 0.0)
+        powers.append(slot_kw)
+    return energy_kwh_from_kw(powers)

@@ -22,15 +22,20 @@ def test_failure_window_label_contains_delta():
 
 
 def test_slice_cons_data_for_window_returns_24_rows():
+    from optimizer.slot_duration import slots_for_wall_hours
+    from simulation.engine import window_slot_datetimes
+
     window_end = datetime(2025, 6, 15, 7, 0, 0)
-    start = window_end - pd.Timedelta(hours=24)
-    index = pd.date_range(start, periods=24, freq="h")
+    slots = window_slot_datetimes(window_end)
     cons_df = pd.DataFrame(
-        {"total_kw": [1.0] * 24, "baseload_kw": [0.5] * 24},
-        index=index,
+        {
+            "total_kw": [1.0] * len(slots),
+            "baseload_kw": [0.5] * len(slots),
+        },
+        index=pd.DatetimeIndex(slots),
     )
     sliced = slice_cons_data_for_window(cons_df, window_end.isoformat())
-    assert len(sliced) == 24
+    assert len(sliced) == slots_for_wall_hours(24)
     assert sliced["total_kw"].notna().all()
 
 

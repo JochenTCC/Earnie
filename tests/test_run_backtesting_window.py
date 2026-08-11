@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from optimizer import battery as bat
+from optimizer.slot_duration import DEFAULT_DT_H, slots_for_wall_hours
 from scripts.run_backtesting import (
     _parse_month,
     resolve_backtesting_window,
@@ -45,6 +46,7 @@ def _horizon_end_soc_from_hourly(
           battery_params["efficiency"],
           battery_params["min_soc"],
           battery_params["max_soc"],
+          dt_h=DEFAULT_DT_H,
       )
   return round(soc, 1)
 
@@ -152,14 +154,15 @@ class TestSocChainTwoWindows:
             initial_soc=50.0,
             horizon_mode=FIXED_24H,
         )
-        assert len(df) == 48
+        assert len(df) == 192
         assert plausibility.failed == []
         assert df["sim_soc"].notna().all()
 
-        boundary_idx = 23
+        step_slots = slots_for_wall_hours(24)
+        boundary_idx = step_slots - 1
         battery_params = _scenario_to_battery_params(scenario)
         end_window_1 = _horizon_end_soc_from_hourly(
-            df.iloc[:24],
+            df.iloc[:step_slots],
             50.0,
             battery_params,
         )

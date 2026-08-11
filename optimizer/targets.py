@@ -36,27 +36,46 @@ def _consumer_is_ev(consumer: dict) -> bool:
     return bool(sched and sched.get("enabled"))
 
 
-def min_delivery_kwh(consumer: dict) -> float:
+def min_delivery_kwh(consumer: dict, *, dt_h: float | None = None) -> float:
     """Mindest-Energie (kWh) für eine einzelne Einschaltperiode (min_on_quarterhours)."""
-    min_hours = max(1, (int(consumer["min_on_quarterhours"]) + 3) // 4)
-    return consumer["nominal_power_kw"] * min_hours
+    from .slot_duration import DEFAULT_DT_H, validate_dt_h
+
+    dt = validate_dt_h(DEFAULT_DT_H if dt_h is None else dt_h)
+    min_slots = max(1, int(consumer["min_on_quarterhours"]))
+    return consumer["nominal_power_kw"] * min_slots * dt
 
 
-def feasible_target_kwh(consumer: dict, target: float, day_hours: int) -> float:
-    """Rundet das Ziel auf die kleinste mit min_on erreichbare Energiemenge (volle Stunden à Nennleistung)."""
+def feasible_target_kwh(
+    consumer: dict,
+    target: float,
+    day_slots: int,
+    *,
+    dt_h: float | None = None,
+) -> float:
+    """Rundet das Ziel auf die kleinste mit min_on erreichbare Energiemenge."""
+    from .slot_duration import DEFAULT_DT_H, validate_dt_h
+
     if target <= 0:
         return 0.0
+    dt = validate_dt_h(DEFAULT_DT_H if dt_h is None else dt_h)
     power = consumer["nominal_power_kw"]
-    min_hours = max(1, (int(consumer["min_on_quarterhours"]) + 3) // 4)
-    for hours in range(min_hours, day_hours + 1):
-        if hours * power >= target - 1e-6:
-            return hours * power
-    return day_hours * power
+    min_slots = max(1, int(consumer["min_on_quarterhours"]))
+    for slots in range(min_slots, day_slots + 1):
+        energy = slots * power * dt
+        if energy >= target - 1e-6:
+            return energy
+    return day_slots * power * dt
 
 
-def max_delivery_cap_kwh(consumer: dict, target: float, day_hours: int) -> float:
+def max_delivery_cap_kwh(
+    consumer: dict,
+    target: float,
+    day_hours: int,
+    *,
+    dt_h: float | None = None,
+) -> float:
     """Obergrenze für Flex-Energie: Ziel plus höchstens eine Mindestperiode (min_on-Granularität)."""
-    return feasible_target_kwh(consumer, target, day_hours)
+    return feasible_target_kwh(consumer, target, day_hours, dt_h=dt_h)
 
 
 def resolve_daily_target_kwh(
@@ -360,6 +379,11 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
         flex = row.get("expected_flex_kw") or {}
         for consumer in consumers:
             flex_sums[consumer["id"]] += flex_kw_lookup(flex, consumer)
+    from .slot_duration import DEFAULT_DT_H
+
+    flex_sums = {
+        cid: round(value * float(DEFAULT_DT_H), 3) for cid, value in flex_sums.items()
+    }
     has_profile_flex = any(v > 0 for v in flex_sums.values())
     source = (
         "Verbrauchsprofil (flexible_consumer_profiles.csv)"
@@ -381,9 +405,10 @@ def resolve_baseload_kwh(optimization_matrix: list) -> float:
     """Summiert die Grundlast (kWh) über den Simulationshorizont."""
     if not optimization_matrix:
         return 0.0
-    return round(
-        sum(float(row.get("expected_p_act", 0.0) or 0.0) for row in optimization_matrix),
-        3,
+    from .slot_duration import energy_kwh_from_kw
+
+    return energy_kwh_from_kw(
+        float(row.get("expected_p_act", 0.0) or 0.0) for row in optimization_matrix
     )
 
 

@@ -14,6 +14,7 @@ from data.planning_window import (
     history_log_end_exclusive,
     normalize_hour_slot,
     normalize_planning_hour_slot,
+    parse_chart_row_slot_datetime,
     parse_row_slot_datetime,
     ui_chart_zones,
 )
@@ -189,7 +190,8 @@ def build_live_chart_context(
 
 
 def _row_slot(row: dict) -> datetime | None:
-    return parse_row_slot_datetime(row)
+    """Prefer QH-preserving parse; fall back to hour-normalized for legacy rows."""
+    return parse_chart_row_slot_datetime(row) or parse_row_slot_datetime(row)
 
 
 def matrix_indices_for_chart(
@@ -227,18 +229,22 @@ def align_rows_to_chart_slots(
     chart: UiChartWindow,
 ) -> list[dict]:
     by_slot: dict[datetime, dict] = {}
+    by_hour: dict[datetime, dict] = {}
     for row in sim_rows:
         slot = _row_slot(row)
-        if slot is not None:
-            by_slot[slot] = row
+        if slot is None:
+            continue
+        by_slot[slot] = row
+        by_hour[normalize_hour_slot(slot)] = row
     aligned: list[dict] = []
     for slot in chart.slot_datetimes:
+        if slot in by_slot:
+            aligned.append(_quarter_row_from_milp(by_slot[slot], slot))
+            continue
         hour = normalize_hour_slot(slot)
-        if hour in by_slot:
-            row = dict(by_slot[hour])
-            row["slot_datetime"] = slot
-            row["Uhrzeit"] = slot.strftime("%d.%m. %H:%M")
-            aligned.append(row)
+        if hour in by_hour:
+            # Stamp chart slot (ZoneInfo); never keep matrix ISO strings.
+            aligned.append(_quarter_row_from_milp(by_hour[hour], slot))
         else:
             aligned.append(_empty_chart_row(slot))
     return aligned
@@ -268,6 +274,7 @@ def _milp_row_for_hour(sim_rows: list[dict], hour_start: datetime) -> dict:
 
 
 def _quarter_row_from_milp(milp_row: dict, slot: datetime) -> dict:
+    """Copy MILP payload onto ``slot`` — always replace ISO-string slot_datetime."""
     row = dict(milp_row)
     row["slot_datetime"] = slot
     row["Uhrzeit"] = slot.strftime("%d.%m. %H:%M")
@@ -425,10 +432,7 @@ def align_rows_to_display_slots(
     for slot in slot_datetimes:
         hour = normalize_hour_slot(slot)
         if hour in by_hour:
-            row = dict(by_hour[hour])
-            row["slot_datetime"] = slot
-            row["Uhrzeit"] = slot.strftime("%d.%m. %H:%M")
-            aligned.append(row)
+            aligned.append(_quarter_row_from_milp(by_hour[hour], slot))
         else:
             aligned.append(_empty_chart_row(slot))
     return aligned

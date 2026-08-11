@@ -4,8 +4,8 @@ from __future__ import annotations
 import streamlit as st
 import pandas as pd
 
-from integrations import awattar_client
 from data import consumer_targets, live_consumption, profile_manager
+from data.live_market_prices import fetch_live_day_ahead_prices
 from runtime_store import run_state
 from runtime_store.live_display_loader import (
     load_live_display_snapshot,
@@ -188,11 +188,11 @@ def _run_opt_in_live_simulation(
         return
 
     planning_window = profile_manager.compute_live_planning_window()
-    market_data = awattar_client.fetch_awattar_prices(planning_end=planning_window.end)
+    market_data = fetch_live_day_ahead_prices(planning_end=planning_window.end)
     if not market_data:
         st.error(
-            "🚨 Fehler: Börsenstrompreise von aWATTar konnten nicht geladen werden. "
-            "Abbruch der Simulation."
+            "🚨 Fehler: Börsenstrompreise (Energy-Charts / aWATTar-Fallback) "
+            "konnten nicht geladen werden. Abbruch der Simulation."
         )
         st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
         return

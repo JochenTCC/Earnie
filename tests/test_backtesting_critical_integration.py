@@ -76,8 +76,11 @@ def test_critical_high_eauto_window_completes(
         cache=fixture_cache,
         scenario_id="fixture_5kwh_fixed",
     )
-    # Sunrise book ~24h; SA₀→SA₁ foresight flex may add hours for EV delivery.
-    assert 23 <= len(df) <= 48
+    # Sunrise book ~24h QH; SA₀→SA₁ foresight flex may add slots for EV delivery.
+    from optimizer.slot_duration import slots_for_wall_hours
+
+    step = slots_for_wall_hours(24)
+    assert step - 4 <= len(df) <= step * 2
     assert df["sim_cost"].notna().all()
     assert df["sim_soc"].between(0.0, 100.0).all()
     assert isinstance(cbc_events, list)
@@ -98,9 +101,13 @@ def test_critical_baseload_flex_exceeds_total_stays_non_negative(
         "Fixture-Tag soll mindestens eine Stunde mit Flex > Total enthalten"
     )
 
+    from optimizer.slot_duration import DEFAULT_DT_H
+
     hourly_baseload, baseload_sum = resolve_hourly_baseload_kw(total_load, hourly_flex)
     assert all(value >= 0.0 for value in hourly_baseload)
-    assert baseload_sum == pytest.approx(sum(total_load) - sum(hourly_flex), abs=0.05)
+    assert baseload_sum == pytest.approx(
+        (sum(total_load) - sum(hourly_flex)) * DEFAULT_DT_H, abs=0.05
+    )
 
     matrix, meta = build_historical_window_matrix(
         anchor,

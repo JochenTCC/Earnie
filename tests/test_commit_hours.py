@@ -72,6 +72,7 @@ def test_extract_horizon_schedule_t0_matches_t0_helpers():
         50.0,
         schedule[0]["planned_soc_percent"],
         _BATTERY,
+        dt_h=0.25,
     )
     assert derived[0] == mode
     assert derived[1] == pytest.approx(target_power)

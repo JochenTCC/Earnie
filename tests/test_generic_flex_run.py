@@ -1,7 +1,7 @@
 """Tests für generic-Flex min_on-Fortsetzung über rollierende MILP-Schritte."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pulp
 
@@ -12,18 +12,35 @@ from optimizer.generic_flex_run import (
 from optimizer.milp import milp_optimizer
 from optimizer.milp_consumers import add_generic_block_start_guard, add_min_on_time_constraints
 from optimizer.simulation import simulate_horizon
+from optimizer.slot_duration import DEFAULT_DT_H, slot_step
 
 
-def _matrix_row(hour: int, day: datetime, *, pv: float = 0.0, load: float = 1.0) -> dict:
-    slot = day.replace(hour=hour, minute=0, second=0, microsecond=0)
+def _matrix_row(slot: datetime, *, pv: float = 0.0, load: float = 1.0) -> dict:
     return {
-        "hour": hour,
-        "date": day.date(),
+        "hour": slot.hour,
+        "date": slot.date(),
         "slot_datetime": slot,
         "expected_p_pv": pv,
         "expected_p_act": load,
         "k_act": 25.0,
     }
+
+
+def _matrix_qh(day: datetime, start_hour: int, end_hour: int) -> list[dict]:
+    """Build QH matrix rows for wall-clock hours ``[start_hour, end_hour)``."""
+    start = day.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+        hours=start_hour
+    )
+    end = day.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+        hours=end_hour
+    )
+    step = slot_step()
+    rows: list[dict] = []
+    moment = start
+    while moment < end:
+        rows.append(_matrix_row(moment))
+        moment += step
+    return rows
 
 
 def _generic_consumer(cid: str = "standard", *, min_on_h: int = 2) -> dict:
@@ -43,11 +60,19 @@ def _generic_consumer(cid: str = "standard", *, min_on_h: int = 2) -> dict:
 
 def test_continue_on_state_tracks_open_block():
     consumer = _generic_consumer()
+    min_slots = int(consumer["min_on_quarterhours"])
     run_state: dict[str, dict] = {}
     update_generic_flex_run_state(run_state, consumer, 3.0)
     assert continue_on_from_state({"generic_flex_run": run_state}, [consumer])["standard"]
+    for _ in range(min_slots - 2):
+        update_generic_flex_run_state(run_state, consumer, 3.0)
+        assert continue_on_from_state({"generic_flex_run": run_state}, [consumer])[
+            "standard"
+        ]
     update_generic_flex_run_state(run_state, consumer, 3.0)
-    assert not continue_on_from_state({"generic_flex_run": run_state}, [consumer])["standard"]
+    assert not continue_on_from_state({"generic_flex_run": run_state}, [consumer])[
+        "standard"
+    ]
 
 
 def test_min_on_force_continuation_at_horizon_start():
@@ -67,7 +92,8 @@ def test_min_on_force_continuation_at_horizon_start():
 
 def test_rolling_horizon_completes_two_hour_generic_block():
     day = datetime(2025, 1, 1)
-    matrix = [_matrix_row(h, day) for h in range(20, 24)]
+    # 4 wall-clock hours → 16 QH slots; 6 kWh @ 3 kW needs 8 slots.
+    matrix = _matrix_qh(day, 20, 24)
     consumer = _generic_consumer()
     battery = {
         "battery_capacity_kwh": 5.0,
@@ -85,12 +111,13 @@ def test_rolling_horizon_completes_two_hour_generic_block():
         flexible_consumers=[consumer],
     )
     delivered = sum(float(row.get("standard (kW)", 0.0) or 0.0) for row in rows)
-    assert delivered == 6.0
+    assert delivered * DEFAULT_DT_H == 6.0
 
 
 def test_milp_continues_generic_block_when_continue_on_set():
     day = datetime(2025, 1, 1)
-    matrix = [_matrix_row(21, day), _matrix_row(22, day), _matrix_row(23, day)]
+    # Remaining 3 kWh @ 3 kW / 0.25 h → 4 QH slots.
+    matrix = _matrix_qh(day, 21, 23)
     consumer = _generic_consumer()
     battery = {
         "battery_capacity_kwh": 5.0,

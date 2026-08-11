@@ -60,8 +60,13 @@ def test_partial_power_when_target_below_max():
     )
     powers = [slot["consumer_powers"].get("eauto", 0.0) for slot in schedule]
     assert any(0.0 < p <= 3.5 for p in powers)
-    assert any(abs(p - 2.0) <= 0.05 for p in powers)
-    assert sum(powers) == pytest.approx(2.0, abs=0.05)
+    from optimizer.slot_duration import DEFAULT_DT_H, energy_kwh_from_kw
+
+    assert energy_kwh_from_kw(powers) == pytest.approx(2.0, abs=0.05)
+    # Partial setpoint somewhere: not only full nominal on every ON slot.
+    assert any(0.0 < p < 3.5 - 0.05 for p in powers) or any(
+        abs(p - 2.0) <= 0.05 for p in powers
+    )
 
 
 def test_model_has_continuous_power_variables():

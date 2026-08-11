@@ -445,14 +445,14 @@ def _consumer_window_kwh(
     *,
     climate: ModeledClimateContext | None = None,
 ) -> float:
-    """Sum modeled/CSV kW over planning slots (1 h steps → kWh)."""
+    """Sum modeled/CSV power over planning slots as energy (kWh)."""
     from data.consumption_profiles import modeled_consumer_kw_at_datetime
+    from optimizer.slot_duration import energy_kwh_from_kw
 
-    total = sum(
-        float(modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate) or 0.0)
+    return energy_kwh_from_kw(
+        modeled_consumer_kw_at_datetime(consumer, slot_dt, climate=climate) or 0.0
         for slot_dt in slot_datetimes
     )
-    return round(total, 3)
 
 
 def planning_ev_daily_targets(

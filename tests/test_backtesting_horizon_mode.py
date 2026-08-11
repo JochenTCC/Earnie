@@ -7,6 +7,7 @@ import time
 import pandas as pd
 import pytest
 
+from optimizer.slot_duration import slots_for_wall_hours
 from simulation.backtesting_horizon import (
     compute_sunrise_planning_at_anchor,
     effective_sunrise_soc_min_index,
@@ -58,14 +59,16 @@ class TestEffectiveSunriseSocMinIndex:
         assert effective_sunrise_soc_min_index(23) == 23
 
     def test_at_or_beyond_step_returns_none(self):
-        assert effective_sunrise_soc_min_index(BACKTESTING_STEP_HOURS) is None
-        assert effective_sunrise_soc_min_index(BACKTESTING_STEP_HOURS + 1) is None
+        step_slots = slots_for_wall_hours(BACKTESTING_STEP_HOURS)
+        assert effective_sunrise_soc_min_index(step_slots) is None
+        assert effective_sunrise_soc_min_index(step_slots + 1) is None
 
     def test_none_idempotent(self):
+        step_slots = slots_for_wall_hours(BACKTESTING_STEP_HOURS)
         assert effective_sunrise_soc_min_index(None) is None
         assert (
             effective_sunrise_soc_min_index(
-                effective_sunrise_soc_min_index(BACKTESTING_STEP_HOURS)
+                effective_sunrise_soc_min_index(step_slots)
             )
             is None
         )
@@ -98,8 +101,8 @@ class TestSunriseBacktestingRun:
             initial_soc=50.0,
             horizon_mode=SUNRISE_WINDOW,
         )
-        # Two abutting sunrise books (~24h each; DST/astronomy may vary ±1h).
-        assert 44 <= len(df) <= 52
+        # Two abutting sunrise books (~24h each; DST/astronomy may vary ±1h → ±4 QH).
+        assert 176 <= len(df) <= 208
         assert plausibility.failed == []
         assert df["sim_soc"].notna().all()
 
@@ -119,8 +122,8 @@ class TestSunriseBacktestingRun:
         df_sunrise, _, _ = run_simulation(
             start, end, scenario, prices, cache=cache, horizon_mode=SUNRISE_WINDOW
         )
-        assert len(df_fixed) == 48
-        assert abs(len(df_sunrise) - len(df_fixed)) <= 4
+        assert len(df_fixed) == 192
+        assert abs(len(df_sunrise) - len(df_fixed)) <= 16
 
 
 class TestSunriseHorizonSizing:
@@ -138,16 +141,18 @@ class TestSunriseHorizonSizing:
             anchor = window_anchor_for_date(day.date())
             window, _ = compute_sunrise_planning_at_anchor(anchor, scenario)
             lengths.append(len(window.slot_datetimes))
-        assert min(lengths) > BACKTESTING_STEP_HOURS
-        assert max(lengths) <= BACKTESTING_STEP_HOURS + 24
+        step_slots = slots_for_wall_hours(BACKTESTING_STEP_HOURS)
+        assert min(lengths) > step_slots
+        assert max(lengths) <= slots_for_wall_hours(BACKTESTING_STEP_HOURS + 24)
 
     def test_sunrise_index_within_or_at_output_boundary(self):
         scenario = fixture_scenario_params()
+        step_slots = slots_for_wall_hours(BACKTESTING_STEP_HOURS)
         outside = 0
         for day in JUNE_SAMPLE_DAYS:
             anchor = window_anchor_for_date(day.date())
             _, sunrise_index = compute_sunrise_planning_at_anchor(anchor, scenario)
-            if sunrise_index >= BACKTESTING_STEP_HOURS:
+            if sunrise_index >= step_slots:
                 outside += 1
         assert outside == 0, "Sommer-Fixture: Sonnenaufgang erwartet innerhalb 24h"
 
@@ -165,7 +170,7 @@ class TestSunriseHorizonSizing:
         assert meta["planning_horizon_hours"] == len(matrix_full)
         assert len(matrix_full) > len(matrix)
         assert len(matrix) == meta["book_hours"]
-        assert 23 <= len(matrix) <= 25
+        assert 92 <= len(matrix) <= 100
         assert sa1_index == meta["sa1_index"]
         assert meta["ready_by"] == anchor
 

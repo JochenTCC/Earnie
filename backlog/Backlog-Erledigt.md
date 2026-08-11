@@ -3,6 +3,23 @@
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
 
+### Version 2.5.d–h — Full QH MILP implementation (2026-08-11)
+
+- [x] **2.5.d** Explicit `dt_h` plumbing (SoC, objective, wear, delivery energy, EV slot math, sim)
+- [x] **2.5.e** QH planning window + prices; Live Energy-Charts with aWATTar expand fallback; `DEFAULT_DT_H = 0.25`
+- [x] **2.5.f** Flex: `min_on`/`max_on_quarterhours` as real slots; thermal/generic day caps slot-aware
+- [x] **2.5.g** Downstream: cons_data hour-hold, PV/outdoor/feature hold, chart 1:1 QH, `commit_hours`→slots, `loxone-signale.md`
+- [x] **2.5.h** Soak (Live-sized HiGHS) + German user-doc note (`docs/konfiguration/preise.md`); spec status implemented
+
+
+### Version 2.5.a–c — Quarter-hour migration study → decide B (2026-08-11)
+
+- [x] **2.5.a** Data & tariff fidelity (Energy-Charts AT/DE-LU QH post‑2025‑10; CH hourly; catalog settlement map)
+- [x] **2.5.b** MILP `dt_h` impact + light HiGHS N vs ~4N probe
+- [x] **2.5.c** Owner decision **B** (full 15‑min MILP); closed research “quarterly-hour EPEX…” / **2.3.2**; implementation **2.5.d–h** archived below
+- [x] Decision brief [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md)
+
+
 ### EV SOC-Min-Immediate ASAP floor (2026-08-11)
 
 - [x] EV charged immediately to a min SOC independent from regular schedule — EHAL `get_evcs_soc_min_immediate` / VO `Earnie_EAuto_SOCMinSofort`; MILP ASAP delivery to floor then price-optimize remainder to Limit-SOC (not Sofortladen)

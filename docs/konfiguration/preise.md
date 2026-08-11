@@ -16,7 +16,7 @@ Quellen und rechtliche Anker: [Tarife und Preise nachrechnen](../referenz/tarife
 
 Live-Optimierung löst die `import_tariff_id` des Live-Szenarios gegen `earnie_env/config/tariffs.json` auf (Seed aus öffentlichem [`share/config/tariffs.json`](../../share/config/tariffs.json)). Aufschläge stehen **am Tarif-Eintrag** (`settlement_fee_cent_kwh`, `markup_percent`, `vat_percent` / `prices_include_vat`).
 
-Marktpreise (Live) kommen je nach Provider von Energy-Charts bzw. der aWATTar-API; die aWATTar-URL aus `land` (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
+Marktpreise (Live) kommen primär von **Energy-Charts** (Gebotszone aus Hausprofil-`land`: AT / DE-LU / CH); bei Ausfall Fallback **aWATTar** (stündlich, auf 15-Min-Slots expandiert). Die aWATTar-URL aus `land` (AT → `api.awattar.at`, DE → `api.awattar.de`). Berechnung des **Bezugspreises in Cent/kWh**:
 
 ```
 (Marktpreis × (1 + markup_percent/100) + settlement_fee_cent_kwh
@@ -72,7 +72,9 @@ Der veröffentlichte Katalog liegt in [`share/config/tariffs.json`](../../share/
 
 Interner Runtime-`feed_in_mode` für stündliche EPEX-Einspeise bleibt `dynamic_epex` (nicht mit dem entfernten Katalog-`type` verwechseln). Beispiel mit Prozentabschlag: Katalog-id `dynamic_epex` (aWATTar SUNNY SPOT) als `spot_hourly` mit `feed_in_fee_factor: 0.19`.
 
-Berechnung: `[data/tariff_pricing.py](../../data/tariff_pricing.py)` (`import_cent_kwh`, `export_cent_kwh`). Die MILP-Matrix nutzt `k_act` (Bezug) und `k_push_act` (Einspeise) je Stunde.
+Berechnung: `[data/tariff_pricing.py](../../data/tariff_pricing.py)` (`import_cent_kwh`, `export_cent_kwh`). Die MILP-Matrix nutzt `k_act` (Bezug) und `k_push_act` (Einspeise) je **15-Min-Slot** (`dt_h = 0.25`).
+
+**Abrechnung vs. Plan:** Lieferanten mit Viertelstunden-EPEX (z. B. VKW, Tibber) und solche mit Stundenprodukt (z. B. aWATTar HOURLY) werden im Optimizer auf derselben QH-Matrix geplant. Stündliche Marktdaten (CH auf Energy-Charts, aWATTar-Fallback, Historie vor ~2025-10) werden auf vier gleiche QH-Preise expandiert — die Rechnung kann dann weiterhin stündlich mitteln, während der Plan QH-fähig ist.
 
 **Fehlender Folgemonat:** Fehlt in `monthly_rates` der Monat eines Planungsslots (typisch der **nächste Kalendermonat**), nutzt Earnie vorübergehend denselben Monat im Vorjahr, sonst den Vormonat, und schreibt eine Warnung ins Log. UI-Hinweis (Sidebar und Eingabeformular im **Szenarienkonfigurator**) erscheint erst in den **letzten zwei Kalendertagen** des Monats — wenn der ~48h-Planungshorizont in den Folgemonat reichen kann. Die Eingabe (Cent/kWh) ergänzt den Monat in `earnie_env/config/tariffs.json`. `main.py` liest die Datei bei jedem Optimierungslauf neu (`reload_config`); die Streamlit-App bei jedem Lauf (`reinit_config`).
 

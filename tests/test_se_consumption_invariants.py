@@ -16,6 +16,7 @@ from house_config.planning_flex_bridge import (
     profile_reference_hourly_load,
     resolve_profile_spec_flex_targets,
 )
+from optimizer.slot_duration import energy_kwh_from_kw
 from simulation.engine import window_slot_datetimes
 from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 from tests.fixtures.se_consumption import PROFILE_IDS, load_se_consumption_profile
@@ -45,7 +46,7 @@ def _profile_spec_window_kwh(
         milp_flex_thermal_ids=thermal_milp,
         climate=climate,
     )
-    baseload = sum(flat + extra for extra in overlay)
+    baseload = energy_kwh_from_kw(flat + extra for extra in overlay)
     targets = resolve_profile_spec_flex_targets(
         flex,
         profile,
@@ -57,7 +58,9 @@ def _profile_spec_window_kwh(
 
 
 def _hourly_window_kwh(profile: dict, slots: list[datetime], *, climate) -> float:
-    return round(sum(profile_reference_hourly_load(profile, slots, climate=climate)), 3)
+    return energy_kwh_from_kw(
+        profile_reference_hourly_load(profile, slots, climate=climate)
+    )
 
 
 def _attach_csv_thermal(profile: dict, tmp_path: Path, slots: list[datetime]) -> dict:

@@ -75,23 +75,34 @@ def apply_soc_change(
     efficiency: float,
     min_soc_limit: float,
     max_soc_limit: float,
+    *,
+    dt_h: float,
 ) -> tuple[float, float]:
     if battery_capacity_kwh <= 0.0:
         return old_soc, 0.0
     if batt_action >= 0:
-        energy_change = batt_action * efficiency
+        energy_change = batt_action * efficiency * dt_h
     else:
-        energy_change = batt_action / efficiency
+        energy_change = batt_action / efficiency * dt_h
     soc_change = (energy_change / battery_capacity_kwh) * 100
     new_soc = old_soc + soc_change
     if new_soc > max_soc_limit:
         new_soc = max_soc_limit
         actual_energy = ((max_soc_limit - old_soc) / 100) * battery_capacity_kwh
-        batt_action = actual_energy / efficiency if actual_energy >= 0 else actual_energy * efficiency
+        # Reverse: energy = p * η * dt_h  →  p = energy / (η * dt_h)
+        batt_action = (
+            actual_energy / (efficiency * dt_h)
+            if actual_energy >= 0
+            else actual_energy * efficiency / dt_h
+        )
     elif new_soc < min_soc_limit:
         new_soc = min_soc_limit
         actual_energy = ((min_soc_limit - old_soc) / 100) * battery_capacity_kwh
-        batt_action = actual_energy * efficiency if actual_energy < 0 else actual_energy / efficiency
+        batt_action = (
+            actual_energy * efficiency / dt_h
+            if actual_energy < 0
+            else actual_energy / (efficiency * dt_h)
+        )
     return new_soc, batt_action
 
 
@@ -103,8 +114,10 @@ def charge_kw_for_hourly_soc(
     max_power_kw: float,
     min_soc: float,
     max_soc: float,
+    *,
+    dt_h: float,
 ) -> float:
-    """Ladeleistung (kW) für geplanten SoC nach 1 h (konsistent zu apply_soc_change)."""
+    """Ladeleistung (kW) für geplanten SoC nach einem Slot der Länge ``dt_h``."""
     if battery_capacity_kwh <= 0.0:
         return 0.0
     planned = max(min_soc, min(max_soc, planned_soc))
@@ -112,7 +125,7 @@ def charge_kw_for_hourly_soc(
     if delta_soc <= SOC_DELTA_THRESHOLD:
         return 0.0
     energy_kwh = (delta_soc / 100.0) * battery_capacity_kwh
-    return round(clamp_power(energy_kwh / efficiency, max_power_kw), 3)
+    return round(clamp_power(energy_kwh / (efficiency * dt_h), max_power_kw), 3)
 
 
 def discharge_kw_for_hourly_soc(
@@ -123,8 +136,10 @@ def discharge_kw_for_hourly_soc(
     max_power_kw: float,
     min_soc: float,
     max_soc: float,
+    *,
+    dt_h: float,
 ) -> float:
-    """Entladeleistung (kW, positiv) für geplanten SoC nach 1 h (konsistent zu apply_soc_change)."""
+    """Entladeleistung (kW, positiv) für geplanten SoC nach einem Slot der Länge ``dt_h``."""
     if battery_capacity_kwh <= 0.0:
         return 0.0
     planned = max(min_soc, min(max_soc, planned_soc))
@@ -132,7 +147,7 @@ def discharge_kw_for_hourly_soc(
     if delta_soc <= SOC_DELTA_THRESHOLD:
         return 0.0
     energy_kwh = (delta_soc / 100.0) * battery_capacity_kwh
-    return round(clamp_power(energy_kwh * efficiency, max_power_kw), 3)
+    return round(clamp_power(energy_kwh * efficiency / dt_h, max_power_kw), 3)
 
 
 def planned_soc_percent_from_energy(
@@ -157,8 +172,13 @@ def derive_control_from_milp_plan(
     current_soc: float,
     planned_soc: float,
     battery_params: dict,
+    *,
+    dt_h: float,
 ) -> tuple[int, float, float]:
     """Leitet Loxone-Modus/Leistung aus MILP-Planwerten einer Stunde ab."""
+    from .slot_duration import validate_dt_h
+
+    dt_h = validate_dt_h(dt_h)
     min_soc = battery_params["min_soc"]
     max_soc = battery_params["max_soc"]
     max_power = battery_params["max_power_kw"]
@@ -193,6 +213,7 @@ def derive_control_from_milp_plan(
             max_power,
             min_soc,
             max_soc,
+            dt_h=dt_h,
         )
     elif opt_discharge > threshold:
         candidate_soc = round(min(current_soc, planned_soc), 1)
@@ -204,6 +225,7 @@ def derive_control_from_milp_plan(
             max_power,
             min_soc,
             max_soc,
+            dt_h=dt_h,
         )
         automatik_power = automatik_discharge_kw(net_pv_surplus, max_power)
         if candidate_power > automatik_power + threshold:
@@ -250,4 +272,5 @@ def _derive_control_from_milp(
         current_soc,
         planned_soc,
         battery_params,
+        dt_h=float(model.dt_h),
     )

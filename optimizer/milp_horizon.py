@@ -14,6 +14,7 @@ from .milp_consumers import (
     _add_consumer_power_variables,
     _flex_power_at_t,
 )
+from .slot_duration import DEFAULT_DT_H, validate_dt_h
 
 EMPTY_MILP_PLAN = {
     "p_grid_buy": 0.0,
@@ -38,6 +39,7 @@ class MilpHorizonModel:
     consumer_pv_follow: dict[str, list]
     planned_consumers: list
     consumer_milp_charge_kw: dict[str, float]
+    dt_h: float
 
 
 def _normalize_fixed_flex_by_t(
@@ -66,7 +68,10 @@ def _build_milp_model(
     remaining_by_consumer: dict[str, float],
     ev_milp_params_by_id: dict[str, dict[str, float]],
     consumer_continue_on: dict[str, bool] | None = None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> MilpHorizonModel:
+    dt_h = validate_dt_h(dt_h)
     min_soc = battery_params["min_soc"]
     max_soc = battery_params["max_soc"]
     max_power = battery_params["max_power_kw"]
@@ -154,12 +159,14 @@ def _build_milp_model(
         if t == 0:
             prob += (
                 e_batt[t]
-                == e_init + p_charge[t] * efficiency - p_discharge[t] / efficiency
+                == e_init
+                + (p_charge[t] * efficiency - p_discharge[t] / efficiency) * dt_h
             )
         else:
             prob += (
                 e_batt[t]
-                == e_batt[t - 1] + p_charge[t] * efficiency - p_discharge[t] / efficiency
+                == e_batt[t - 1]
+                + (p_charge[t] * efficiency - p_discharge[t] / efficiency) * dt_h
             )
 
     return MilpHorizonModel(
@@ -176,6 +183,7 @@ def _build_milp_model(
         consumer_pv_follow=consumer_pv_follow,
         planned_consumers=planned_consumers,
         consumer_milp_charge_kw=consumer_milp_charge_kw,
+        dt_h=dt_h,
     )
 
 
@@ -256,15 +264,19 @@ def _add_milp_objective(
     *,
     wear_cent_per_kwh: float,
 ) -> None:
+    dt_h = validate_dt_h(model.dt_h)
     energy_cost = pulp.lpSum([
-        model.p_grid_buy[t] * matrix[t]["k_act"]
-        - model.p_grid_sell[t]
-        * k_push_act_for_matrix_row(matrix[t], fallback_k_push)
+        (
+            model.p_grid_buy[t] * matrix[t]["k_act"]
+            - model.p_grid_sell[t]
+            * k_push_act_for_matrix_row(matrix[t], fallback_k_push)
+        )
+        * dt_h
         for t in range(model.horizon)
     ])
     wear_cost = 0.0
     if wear_cent_per_kwh > 0.0:
-        wear_cost = wear_cent_per_kwh * pulp.lpSum(
+        wear_cost = wear_cent_per_kwh * dt_h * pulp.lpSum(
             model.p_charge[t] + model.p_discharge[t]
             for t in range(model.horizon)
         )

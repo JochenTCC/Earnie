@@ -10,6 +10,7 @@ Patched (non-exhaustive of all main imports, but enough for a silent/full run):
   loxone_client (flex kw, resolve live power, snapshot, consumers)
   ehal_live.read_ess_soc / read_live_power_kw
   awattar_client.fetch_awattar_prices
+  data.live_market_prices.fetch_live_day_ahead_prices
   consumer_targets.resolve_consumer_daily_targets
   optimizer.prepare_optimization_matrix / get_consumer_remaining_kwh /
   milp_optimizer / battery_plan_kw_from_control / register_consumer_delivery /
@@ -28,15 +29,18 @@ from data.planning_window import PlanningWindow
 
 
 def sample_planning_window() -> PlanningWindow:
+    from data.planning_window import hourly_slots_inclusive
+
     tz = ZoneInfo("Europe/Vienna")
     start = datetime(2026, 6, 15, 10, 0, tzinfo=tz)
     sunset_1 = datetime(2026, 6, 15, 21, 0, tzinfo=tz)
     sunset_2 = datetime(2026, 6, 16, 21, 0, tzinfo=tz)
     sunrise = datetime(2026, 6, 16, 5, 30, tzinfo=tz)
-    slots = tuple(start + timedelta(hours=i) for i in range(35))
+    end = datetime(2026, 6, 17, 5, 30, tzinfo=tz)
+    slots = hourly_slots_inclusive(start, end)
     return PlanningWindow(
         start=start,
-        end=sunset_2,
+        end=end,
         sunset_1=sunset_1,
         sunset_2=sunset_2,
         sunrise_anchor=sunrise,
@@ -72,8 +76,15 @@ def patch_main_run(monkeypatch, *, silent: bool = True) -> None:
         lambda: 50.0,
     )
     monkeypatch.setattr(
-        main_module.awattar_client,
-        "fetch_awattar_prices",
+        "data.live_market_prices.fetch_live_day_ahead_prices",
+        lambda planning_end=None: [
+            {"timestamp": datetime(2026, 6, 15, 10, 0), "price_buy": 10.0}
+        ],
+    )
+    # main imports the symbol; patch the bound name on main_module too
+    monkeypatch.setattr(
+        main_module,
+        "fetch_live_day_ahead_prices",
         lambda planning_end=None: [
             {"timestamp": datetime(2026, 6, 15, 10, 0), "price_buy": 10.0}
         ],

@@ -8,10 +8,11 @@ from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
 
 config = load_config_or_exit()
 import logger_config
-from integrations import awattar_client, loxone_client
+from integrations import loxone_client
 from integrations import ehal_live
 from integrations.loxone_comm_trace import serialize_write_records
 from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, live_consumption, pv_forecast
+from data.live_market_prices import fetch_live_day_ahead_prices
 from data.feed_in_prices import k_push_act_for_matrix_row
 from runtime_store import run_state, optimization_history
 from runtime_store import live_optimization_debug
@@ -78,9 +79,9 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         planning_window.sunrise_anchor.strftime("%Y-%m-%d %H:%M"),
     )
 
-    market_data = awattar_client.fetch_awattar_prices(planning_end=planning_window.end)
+    market_data = fetch_live_day_ahead_prices(planning_end=planning_window.end)
     if not market_data:
-        logger.error("Optimierung abgebrochen: Keine Awattar-Preise empfangen.")
+        logger.error("Optimierung abgebrochen: Keine Day-Ahead-Preise empfangen.")
         return
 
     if out_of_band:

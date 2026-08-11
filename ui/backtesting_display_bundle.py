@@ -119,12 +119,14 @@ def _parse_slot_datetime(value) -> datetime:
 
 
 def _rows_with_parsed_slots(rows: list[dict], tz_name: str) -> list[dict]:
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
     parsed: list[dict] = []
     for row in rows:
         item = dict(row)
         slot = item.get("slot_datetime")
         if slot is not None:
-            item["slot_datetime"] = normalize_hour_slot(
+            item["slot_datetime"] = normalize_quarter_hour_slot(
                 align_to_planning_timezone(_parse_slot_datetime(slot), tz_name)
             )
         parsed.append(item)
@@ -192,13 +194,15 @@ def _slot_datetimes_from_sim_rows(
     sim_rows: list[dict],
     tz_name: str,
 ) -> tuple[datetime, ...]:
+    from optimizer.slot_duration import normalize_quarter_hour_slot
+
     slots: list[datetime] = []
     for row in sim_rows:
         slot = row.get("slot_datetime")
         if slot is None:
             continue
         slots.append(
-            normalize_hour_slot(
+            normalize_quarter_hour_slot(
                 align_to_planning_timezone(_parse_slot_datetime(slot), tz_name)
             )
         )
@@ -217,13 +221,14 @@ def _parse_window_anchor(window_anchor: str, tz_name: str) -> datetime:
 
 
 def _backtesting_24h_slots_from_anchor(window_anchor: str, tz_name: str) -> tuple[datetime, ...]:
-    """24 Stunden [Anker−24h, Anker) — identisch zu simulation.engine.window_slot_datetimes."""
+    """24 wall-clock hours [Anker−24h, Anker) as QH slots (same grid as window_slot_datetimes)."""
+    from optimizer.slot_duration import normalize_quarter_hour_slot, slot_step, slots_for_wall_hours
+
     anchor_dt = _parse_window_anchor(window_anchor, tz_name)
-    start = window_start_before_anchor(anchor_dt, tz_name)
-    return tuple(
-        normalize_hour_slot(start + timedelta(hours=index))
-        for index in range(BACKTESTING_STEP_HOURS)
-    )
+    start = normalize_quarter_hour_slot(window_start_before_anchor(anchor_dt, tz_name))
+    step = slot_step()
+    n = slots_for_wall_hours(float(BACKTESTING_STEP_HOURS))
+    return tuple(start + step * index for index in range(n))
 
 
 def format_backtesting_window_range(window_anchor: str, tz_name: str) -> str:

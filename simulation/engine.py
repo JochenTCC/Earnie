@@ -11,6 +11,7 @@ from data import feed_in_prices
 from data.backtesting_prices import BacktestingPriceResources, matrix_prices_from_context
 from data.planning_window import normalize_hour_slot
 from data.market_prices import epex_prices_for_slots
+from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer import (
     simulate_horizon,
     horizon_end_soc_from_chart_rows,
@@ -98,6 +99,28 @@ class PlausibilityReport:
         self.results.append(result)
 
 
+def _hour_hold_reindex(series_or_frame, slot_datetimes: list[datetime]):
+    """Reindex hourly fuel onto QH slots by holding the parent clock-hour value."""
+    from optimizer.slot_duration import floor_to_hour_slot
+
+    idx = pd.DatetimeIndex(slot_datetimes)
+    parent_idx = pd.DatetimeIndex(
+        [floor_to_hour_slot(pd.Timestamp(ts).to_pydatetime()) for ts in slot_datetimes]
+    )
+    # Map each QH target to its parent hour row/value.
+    hourly = series_or_frame.copy()
+    if not isinstance(hourly.index, pd.DatetimeIndex):
+        hourly.index = pd.DatetimeIndex(hourly.index)
+    hourly.index = hourly.index.map(
+        lambda ts: floor_to_hour_slot(pd.Timestamp(ts).to_pydatetime())
+    )
+    # Collapse duplicate hour keys (keep last).
+    hourly = hourly[~hourly.index.duplicated(keep="last")]
+    held = hourly.reindex(parent_idx)
+    held.index = idx
+    return held.fillna(0.0)
+
+
 class HistoricalDataCache:
     """Lädt Loxone-Verbrauchs-, Flex- und PV-Daten einmalig für tagweise Simulation."""
 
@@ -172,8 +195,7 @@ class HistoricalDataCache:
         )
 
         self.load()
-        idx = pd.DatetimeIndex(slot_datetimes)
-        df_window = self._consumption_df.reindex(idx, fill_value=0.0)
+        df_window = _hour_hold_reindex(self._consumption_df, slot_datetimes)
 
         consumer_ids = flex_consumer_ids or expected_cons_data_consumer_ids()
         labels = consumer_labels_for_ids(consumer_ids)
@@ -183,7 +205,9 @@ class HistoricalDataCache:
             label = labels.get(consumer_id, consumer_id)
             if label in df_window.columns:
                 series = df_window[label].astype(float)
-                historical_totals[consumer_id] = round(float(series.sum()), 3)
+                historical_totals[consumer_id] = round(
+                    float(series.sum()) * float(DEFAULT_DT_H), 3
+                )
                 hourly_flex = [
                     round(prev + float(value), 3)
                     for prev, value in zip(hourly_flex, series.tolist())
@@ -208,10 +232,11 @@ class HistoricalDataCache:
 
             return pv_kw_for_slots(slot_datetimes, scenario_params)
         self.load()
-        idx = pd.DatetimeIndex(slot_datetimes)
         if self._pv_series is None or self._pv_series.empty:
             return [0.0] * len(slot_datetimes)
-        return self._pv_series.reindex(idx, fill_value=0.0).round(3).tolist()
+        return (
+            _hour_hold_reindex(self._pv_series, slot_datetimes).round(3).tolist()
+        )
 
     def cons_data_consumer_ids_present(self) -> set[str]:
         """Hausprofil-Verbraucher-IDs mit Spalte in cons_data (auch wenn 0 kWh im Fenster)."""
@@ -375,9 +400,13 @@ def window_anchor_for_date(target_date: date) -> datetime:
 
 
 def window_slot_datetimes(anchor: datetime) -> list[datetime]:
-    """24 Stunden unmittelbar vor dem Ankerzeitpunkt (Anker exklusiv)."""
+    """24 wall-clock hours before anchor as QH slots (anchor exclusive)."""
+    from optimizer.slot_duration import DEFAULT_DT_H, slots_for_wall_hours
+
     start = anchor - timedelta(hours=24)
-    return [start + timedelta(hours=i) for i in range(24)]
+    n = slots_for_wall_hours(24.0, DEFAULT_DT_H)
+    step = timedelta(hours=DEFAULT_DT_H)
+    return [start + step * i for i in range(n)]
 
 
 def _scenario_to_battery_params(scenario_params: dict) -> dict:
@@ -518,7 +547,7 @@ def build_historical_matrix_for_slots(
         else:
             flat_kw = profile_flat_baseload_kw(profile)
             baseload_kw = [round(flat_kw + extra, 3) for extra in overlay]
-        historical_baseload_kwh = round(sum(baseload_kw), 3)
+        historical_baseload_kwh = round(sum(baseload_kw) * float(DEFAULT_DT_H), 3)
         matrix_total_kw = list(baseload_kw)
         consumer_daily_targets_kwh = resolve_profile_spec_flex_targets(
             flexible_consumers or [],
@@ -549,13 +578,13 @@ def build_historical_matrix_for_slots(
             baseload_kw = [
                 round(base + extra, 3) for base, extra in zip(baseload_kw, overlay)
             ]
-            historical_baseload_kwh = round(sum(baseload_kw), 3)
+            historical_baseload_kwh = round(sum(baseload_kw) * float(DEFAULT_DT_H), 3)
         matrix_total_kw = total_load
         consumer_daily_targets_kwh = dict(historical_totals)
         spec_flex_kwh = round(sum(consumer_daily_targets_kwh.values()), 3)
-        spec_total_kwh = round(sum(total_load), 3)
+        spec_total_kwh = round(sum(total_load) * float(DEFAULT_DT_H), 3)
 
-    stored_baseload_kwh = round(sum(baseload_stored), 3)
+    stored_baseload_kwh = round(sum(baseload_stored) * float(DEFAULT_DT_H), 3)
     pv_profile = cache.get_pv_for_slots(
         slot_datetimes,
         scenario_params=scenario_params,
@@ -609,7 +638,7 @@ def build_historical_matrix_for_slots(
     else:
         reference_totals = dict(historical_totals)
         meta_historical_totals = dict(historical_totals)
-        meta_historical_total_kwh = round(sum(total_load), 3)
+        meta_historical_total_kwh = round(sum(total_load) * float(DEFAULT_DT_H), 3)
 
     meta = {
         "window_end": window_end,

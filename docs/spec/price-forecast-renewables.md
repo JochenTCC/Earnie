@@ -1,10 +1,10 @@
 # Spezifikation: Preisprognose für extrapolierte Slots (EU-Wetter & Erzeugung)
 
-**Version:** 0.2  
-**Status:** Phase 0–2 abgeschlossen (2026-07-06); Jahres-Evaluation läuft  
+**Version:** 0.3  
+**Status:** Phase 0–2 abgeschlossen (2026-07-06); **2.5.e+:** Live Day-Ahead is QH; forecast **features stay hourly** and are **held onto parent-hour QH slots** (no QH retrain in Version 2.5)  
 **Epic-Kurzname:** **Preis-Prognose**  
 **Ersetzt:** Backlog-Research „Preis-Spiegelung Mittelung“  
-**Bezug:** [UI Sunset-2-Sunset](ui-sunset2sunset.md) §5 (grüne Zone), `data/market_prices.py` (`resolve_market_slots`)
+**Bezug:** [UI Sunset-2-Sunset](ui-sunset2sunset.md) §5 (grüne Zone), `data/market_prices.py` (`resolve_market_slots`), [quarter-hour-slots.md](quarter-hour-slots.md)
 
 ## 1. Ziel
 

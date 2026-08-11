@@ -1,11 +1,14 @@
 """Tests für Planungshorizont-Ziele (SA_0-->SA_2, nicht nur 24 h)."""
 from __future__ import annotations
 
+import pytest
+
+from data.consumer_targets import resolve_horizon_flex_targets_kwh
+from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.targets import (
     build_baseline_targets_detail,
     resolve_baseload_kwh,
 )
-from data.consumer_targets import resolve_horizon_flex_targets_kwh
 
 
 def _extended_matrix(hours: int = 36) -> list[dict]:
@@ -21,17 +24,17 @@ def _extended_matrix(hours: int = 36) -> list[dict]:
 
 def test_resolve_baseload_kwh_sums_full_matrix():
     matrix = _extended_matrix(36)
-    assert resolve_baseload_kwh(matrix) == 36.0
+    assert resolve_baseload_kwh(matrix) == pytest.approx(36.0 * DEFAULT_DT_H)
 
 
 def test_baseline_flex_profile_sums_full_matrix():
     matrix = _extended_matrix(30)
     details = build_baseline_targets_detail(matrix)
     swimspa = next(row for row in details if row["id"] == "swimspa")
-    assert swimspa["target_kwh"] == 15.0
+    assert swimspa["target_kwh"] == pytest.approx(15.0 * DEFAULT_DT_H)
 
 
 def test_horizon_flex_targets_sums_full_matrix():
     matrix = _extended_matrix(40)
     totals = resolve_horizon_flex_targets_kwh(matrix)
-    assert totals["swimspa"] == 20.0
+    assert totals["swimspa"] == pytest.approx(20.0 * DEFAULT_DT_H)

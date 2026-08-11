@@ -14,6 +14,7 @@ from .eauto_milp import (
     split_eauto_preset,
 )
 from .filter_context import resolve_filter_contexts
+from .slot_duration import DEFAULT_DT_H, validate_dt_h
 from .thermal_flex_context import (
     add_thermal_flex_constraints,
     is_thermal_flex_consumer,
@@ -184,12 +185,15 @@ def _solve_milp_to_model(
     thermal_flex_contexts: dict[str, dict] | None,
     soc_hold_index: int | None = None,
     soc_hold_percent: float | None = None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> tuple[MilpHorizonModel, dict[str, float], dict[str, float], list[int], dict, dict] | None:
     """Baut und löst das MILP; None wenn nicht optimal / leere Matrix."""
     if not matrix:
         logger.error("MILP: Optimierungsmatrix ist leer.")
         return None
 
+    dt_h = validate_dt_h(dt_h)
     active = _active_consumers(consumers)
     remaining = _remaining_kwh_by_consumer(active, consumer_remaining_kwh, spa_remaining_kwh)
     horizon = len(matrix)
@@ -209,6 +213,7 @@ def _solve_milp_to_model(
         verbose,
         contexts,
         filters,
+        dt_h=dt_h,
     )
     ev_milp_by_id = build_ev_milp_params_by_id(planned_consumers)
     preset_by_slot, milp_consumers = split_eauto_preset(
@@ -231,6 +236,7 @@ def _solve_milp_to_model(
         remaining,
         ev_milp_by_id,
         consumer_continue_on=consumer_continue_on,
+        dt_h=dt_h,
     )
     wear_cent_per_kwh = 0.0
     if battery_params["battery_capacity_kwh"] > 0.0:

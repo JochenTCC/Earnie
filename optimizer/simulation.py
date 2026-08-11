@@ -24,6 +24,7 @@ from .generic_flex_run import continue_on_from_state, update_generic_flex_run_st
 from .consumer_power import uses_pv_follow
 from .filter_context import adjust_targets_for_native_filter, resolve_filter_contexts
 from .milp import milp_horizon_schedule, milp_optimizer
+from .slot_duration import DEFAULT_DT_H, slots_for_wall_hours, validate_dt_h
 from .targets import (
     build_applied_targets_detail,
     build_baseline_targets_detail,
@@ -222,6 +223,7 @@ def _chart_row_from_controls(
         battery_params["efficiency"],
         battery_params["min_soc"],
         battery_params["max_soc"],
+        dt_h=DEFAULT_DT_H,
     )
     p_grid = con + total_flex_power - pv + round(batt_action, 2)
     chart_row = {
@@ -267,6 +269,7 @@ def _chart_row_from_schedule_slot(
         sim_soc,
         float(planned_soc),
         battery_params,
+        dt_h=DEFAULT_DT_H,
     )
     return _chart_row_from_controls(
         row,
@@ -280,12 +283,27 @@ def _chart_row_from_schedule_slot(
     )
 
 
+def _commit_slots_for_buffer(
+    commit_hours: int,
+    *,
+    matrix_len: int,
+    remaining_len: int,
+) -> int:
+    """Wall-clock commit_hours → QH slot count; open-loop when >= matrix_len."""
+    if commit_hours >= matrix_len:
+        return remaining_len
+    return min(
+        remaining_len,
+        max(1, slots_for_wall_hours(float(commit_hours), DEFAULT_DT_H)),
+    )
+
+
 def _terminal_soc_for_commit(
     commit_hours: int,
     remaining_slice_len: int,
     horizon_terminal_soc: float | None,
 ) -> float | None:
-    """K=1: Terminal nur in der letzten 1h-Solve; K>1: Terminal solange Fensterende enthalten."""
+    """K=1: Terminal nur in der letzten Slot-Solve; K>1: Terminal solange Fensterende enthalten."""
     if horizon_terminal_soc is None:
         return None
     if commit_hours <= 1:
@@ -328,8 +346,11 @@ def _cap_flex_delivery(
     consumers_cfg: list,
     horizon_limits: dict[str, float],
     delivered_horizon: dict[str, float],
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> bool:
     """Begrenzt Flex-Leistung auf verbleibendes Horizontziel; True wenn gekappt."""
+    dt_h = validate_dt_h(dt_h)
     flex_capped = False
     for consumer in consumers_cfg:
         col = consumer_column_name(consumer)
@@ -340,12 +361,14 @@ def _cap_flex_delivery(
         max_kwh = horizon_limits.get(cid, 0.0)
         already = delivered_horizon.get(cid, 0.0)
         room = max(0.0, max_kwh - already)
-        if power > room + 1e-6:
-            power = room
+        energy = power * dt_h
+        if energy > room + 1e-6:
+            power = room / dt_h
             chart_row[col] = round(power, 2)
             flex_capped = True
-        if power > 0:
-            delivered_horizon[cid] = already + power
+            energy = power * dt_h
+        if energy > 0:
+            delivered_horizon[cid] = already + energy
     return flex_capped
 
 
@@ -377,6 +400,7 @@ def horizon_end_soc_percent(
             battery_params["efficiency"],
             battery_params["min_soc"],
             battery_params["max_soc"],
+            dt_h=DEFAULT_DT_H,
         )
     return round(soc, 1)
 
@@ -409,6 +433,7 @@ def _apply_forced_grid_recharge_at_horizon_end(
         battery_params["max_power_kw"],
         min_soc,
         max_soc,
+        dt_h=DEFAULT_DT_H,
     )
     if charge_kw <= 0.0:
         return end_soc
@@ -423,9 +448,13 @@ def _apply_forced_grid_recharge_at_horizon_end(
         battery_params["efficiency"],
         min_soc,
         max_soc,
+        dt_h=DEFAULT_DT_H,
     )
     last["Geplante Batterie-Aktion (kW)"] = round(batt_new, 2)
-    last["Steuerbefehl"] = bat.steuerbefehl_for_mode(bat.MODE_ZWANGS_LADEN, charge_kw)
+    # Steuerbefehl must match the applied charge power (after SoC clip / prior action).
+    last["Steuerbefehl"] = bat.steuerbefehl_for_mode(
+        bat.MODE_ZWANGS_LADEN, max(0.0, float(batt_new))
+    )
     sync_chart_row_netzbezug(last)
     return round(new_end_soc, 1)
 
@@ -452,6 +481,7 @@ def finalize_chart_row_energy(
         battery_params["efficiency"],
         battery_params["min_soc"],
         battery_params["max_soc"],
+        dt_h=DEFAULT_DT_H,
     )
     chart_row["Geplante Batterie-Aktion (kW)"] = round(batt_action, 2)
     chart_row["Netzbezug (kW)"] = round(
@@ -494,8 +524,8 @@ def simulate_horizon(
     """
     Simuliert einen Optimierungshorizont über die gesamte Matrix.
 
-    commit_hours=1: stündliches Re-Solve (Live-Savings / MPC).
-    commit_hours=N: alle N Stunden neu lösen und den Plan open-loop anwenden (SE).
+    commit_hours=1: re-solve every matrix slot (Live MPC).
+    commit_hours=N (N>1): wall-clock hours → commit N/dt_h QH slots open-loop (SE).
     disable_horizon_soc_anchor: keine Terminal-/Sonnenaufgangs-SOC_min-Gleichheit.
     flex_book_hours / flex_book_start: Flex nur in Absolutstunden
     [flex_book_start, flex_book_start + flex_book_hours).
@@ -504,7 +534,7 @@ def simulate_horizon(
     if commit_hours < 1:
         raise ValueError(
             f"commit_hours must be >= 1 (got {commit_hours}). "
-            "Use 1 for hourly re-opt or len(matrix) for open-loop."
+            "Use 1 for per-slot re-opt or len(matrix) for open-loop."
         )
     if disable_horizon_soc_anchor:
         sunrise_soc_min_index = None
@@ -641,7 +671,12 @@ def simulate_horizon(
                             soc_hold_percent if rel_hold is not None else None
                         ),
                     )
-                    commit_buffer = schedule[:commit_hours]
+                    commit_slots = _commit_slots_for_buffer(
+                        commit_hours,
+                        matrix_len=len(optimization_matrix),
+                        remaining_len=len(schedule),
+                    )
+                    commit_buffer = schedule[:commit_slots]
                     buffer_pos = 0
                 slot = commit_buffer[buffer_pos]
                 buffer_pos += 1
@@ -709,15 +744,20 @@ def simulate_24h_horizon(
     )
 
 
-def total_consumption_kwh_from_rows(rows: list) -> float:
-    """
-    Summiert den Stundenverbrauch (Grundlast + flexible Verbraucher) über alle Zeilen.
-    Jede Zeile = 1 Stunde; kW-Werte werden als kWh addiert.
-    """
+def total_consumption_kwh_from_rows(
+    rows: list,
+    *,
+    dt_h: float = DEFAULT_DT_H,
+) -> float:
+    """Sum consumption energy (baseload + flex) over simulation slots."""
+    dt_h = validate_dt_h(dt_h)
     return round(
         sum(
-            float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
-            + flexible_consumer_power_kw(row)
+            (
+                float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+                + flexible_consumer_power_kw(row)
+            )
+            * dt_h
             for row in rows
         ),
         3,
@@ -728,8 +768,10 @@ def delivered_flex_kwh_from_rows(
     rows: list,
     *,
     flexible_consumers: list | None = None,
+    dt_h: float = DEFAULT_DT_H,
 ) -> dict[str, float]:
-    """Summiert die gelieferte Flex-Energie je Verbraucher über alle Simulationsstunden."""
+    """Summiert die gelieferte Flex-Energie je Verbraucher über alle Simulationsslots."""
+    dt_h = validate_dt_h(dt_h)
     totals: dict[str, float] = {}
     consumers_cfg = flexible_consumers or config.get_flexible_consumers(
         optimizer_only=True
@@ -737,7 +779,7 @@ def delivered_flex_kwh_from_rows(
     for consumer in consumers_cfg:
         col = consumer_column_name(consumer)
         totals[consumer["id"]] = round(
-            sum(float(row.get(col, 0.0) or 0.0) for row in rows),
+            sum(float(row.get(col, 0.0) or 0.0) * dt_h for row in rows),
             3,
         )
     return totals
@@ -756,20 +798,23 @@ def _grid_kw_from_row(row: dict) -> float:
 def calculate_step_cost_parts_from_row(
     row: dict,
     sell_price_cent: float | None = None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> tuple[float, float, float, float, float]:
-    """Import/export split for one sim hour.
+    """Import/export split for one sim slot.
 
     Returns ``(import_cost_eur, export_earn_eur, net_eur, import_kwh, export_kwh)``.
     ``export_earn_eur`` and ``export_kwh`` are non-negative; ``net_eur = import − export``.
     """
+    dt_h = validate_dt_h(dt_h)
     price_cent = row["Strompreis (Cent/kWh)"]
     sell_cent = resolve_sell_price_cent(row, sell_price_cent)
     p_grid = _grid_kw_from_row(row)
     if p_grid >= 0:
-        import_kwh = float(p_grid)
+        import_kwh = float(p_grid) * dt_h
         import_eur = import_kwh * float(price_cent) / 100.0
         return import_eur, 0.0, import_eur, import_kwh, 0.0
-    export_kwh = float(-p_grid)
+    export_kwh = float(-p_grid) * dt_h
     export_eur = export_kwh * float(sell_cent) / 100.0
     return 0.0, export_eur, -export_eur, 0.0, export_kwh
 
@@ -777,22 +822,42 @@ def calculate_step_cost_parts_from_row(
 def calculate_step_cost_euro_from_row(
     row: dict,
     sell_price_cent: float | None = None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> float:
-    """Berechnet die Stromkosten einer einzelnen Simulationsstunde in Euro."""
-    return calculate_step_cost_parts_from_row(row, sell_price_cent)[2]
+    """Berechnet die Stromkosten eines einzelnen Simulationsslots in Euro."""
+    return calculate_step_cost_parts_from_row(
+        row, sell_price_cent, dt_h=dt_h
+    )[2]
 
 
-def calculate_cost_euro_from_rows(rows: list, sell_price_cent: float | None = None) -> float:
-    """Berechnet die Kosten in Euro für eine Stundenreihe aus einem Simulations-Output."""
-    return sum(calculate_step_cost_euro_from_row(row, sell_price_cent) for row in rows)
+def calculate_cost_euro_from_rows(
+    rows: list,
+    sell_price_cent: float | None = None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
+) -> float:
+    """Berechnet die Kosten in Euro für eine Slot-Reihe aus einem Simulations-Output."""
+    return sum(
+        calculate_step_cost_euro_from_row(row, sell_price_cent, dt_h=dt_h)
+        for row in rows
+    )
 
 
-def hourly_consumption_kwh_from_rows(rows: list) -> list[float]:
-    """Stündlicher Gesamtverbrauch (Grundlast + Flex) in kWh je Simulationszeile."""
+def hourly_consumption_kwh_from_rows(
+    rows: list,
+    *,
+    dt_h: float = DEFAULT_DT_H,
+) -> list[float]:
+    """Gesamtverbrauch (Grundlast + Flex) in kWh je Simulationszeile."""
+    dt_h = validate_dt_h(dt_h)
     return [
         round(
-            float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
-            + flexible_consumer_power_kw(row),
+            (
+                float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+                + flexible_consumer_power_kw(row)
+            )
+            * dt_h,
             4,
         )
         for row in rows
@@ -874,9 +939,12 @@ def build_matched_flex_kw_per_hour(
             profile_sum = profile_sums[cid]
             profile_val = flex_kw_lookup(flex, consumer)
             if profile_sum > 1e-6:
-                hour_flex[cid] = profile_val * (target / profile_sum)
+                # target is kWh; profile_sum is Σ kW → scale so Σ(kW)*dt_h = target
+                hour_flex[cid] = profile_val * (
+                    target / (profile_sum * float(DEFAULT_DT_H))
+                )
             elif target > 0 and eligible_count > 0:
-                hour_flex[cid] = target / eligible_count
+                hour_flex[cid] = target / (eligible_count * float(DEFAULT_DT_H))
             else:
                 hour_flex[cid] = 0.0
         per_hour.append(hour_flex)
@@ -918,6 +986,7 @@ def _simulate_single_hour_baseline(
         battery_params["efficiency"],
         battery_params["min_soc"],
         battery_params["max_soc"],
+        dt_h=DEFAULT_DT_H,
     )
     p_grid = con + total_flex_power - pv + round(batt_action, 2)
     chart_row = {
