@@ -135,7 +135,7 @@ def resolve_filter_context(
         consumer, logged_simulation
     )
     if log_extra is not None and start is not None:
-        logger.info(
+        logger.debug(
             "Verbraucher '%s': natives Filterfenster Start=%.0f h (Format=%s, raw=%r).",
             consumer.get("id"),
             start,
@@ -207,7 +207,7 @@ def ernie_filter_remaining_kwh(
         return debt_kwh
     ernie_kwh = max(0.0, debt_kwh - native_kwh)
     if ernie_kwh < debt_kwh - 1e-6:
-        logger.info(
+        logger.debug(
             "Verbraucher '%s': natives Fenster liefert ~%.2f kWh im Horizont — "
             "Earnie-Zusatzziel %.2f → %.2f kWh.",
             consumer.get("id"),

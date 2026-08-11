@@ -617,7 +617,7 @@ def _log_urgent_rule_observability(observability: dict[str, dict]) -> None:
         role = summary.get("role")
         if role == "nicht_aktiv":
             continue
-        logger.info(
+        logger.debug(
             "urgent-Regel [%s]: %s — Ziel %.3f kWh, optional geplant %.3f kWh, "
             "urgent geplant %.3f kWh (must_start=%s, deadline=%s)",
             cid,

@@ -1,6 +1,7 @@
 """Daemon Control: Start/Stop/Restart des main.py-Optimierer-Dienstes."""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import streamlit as st
@@ -21,7 +22,8 @@ _HELP = (
     "Startet, stoppt oder startet den Hintergrunddienst `main.py` neu. "
     "Produktions-Steuerwerte schreibt nur der laufende Dienst. "
     "Vor dem Start wird geprüft, ob bereits eine Instanz läuft (`runtime/main.lock`). "
-    "Das Dienst-Log (`earnie.log`) zeigt die letzten Zeilen zum Diagnose-Blick."
+    "Das Dienst-Log (`earnie.log`) zeigt die letzten Zeilen zum Diagnose-Blick; "
+    "Log-Level sind filterbar (Standard: INFO und höher)."
 )
 
 _STATE_LABELS = {
@@ -32,6 +34,27 @@ _STATE_LABELS = {
 
 _LOG_TAIL_LINES = 200
 _LOG_TAIL_READ_BYTES = 256 * 1024
+_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+_LOG_LEVELS_DEFAULT = ["INFO", "WARNING", "ERROR", "CRITICAL"]
+_LOG_LEVEL_RE = re.compile(r"\[(DEBUG|INFO|WARNING|ERROR|CRITICAL)\]")
+
+
+def parse_log_level(line: str) -> str | None:
+    """Return bracket log level from a line, or None if absent."""
+    match = _LOG_LEVEL_RE.search(line)
+    return match.group(1) if match else None
+
+
+def filter_log_lines(text: str, levels: set[str]) -> str:
+    """Keep lines whose ``[LEVEL]`` is in ``levels``; lines without a level stay."""
+    if not text:
+        return text
+    kept: list[str] = []
+    for line in text.splitlines():
+        level = parse_log_level(line)
+        if level is None or level in levels:
+            kept.append(line)
+    return "\n".join(kept)
 
 
 def read_earnie_log_tail(
@@ -105,6 +128,13 @@ def _render_log_section() -> None:
         expanded=False,
     ):
         st.caption(f"Pfad: `{path}`")
+        selected = st.multiselect(
+            "Log-Level",
+            options=list(_LOG_LEVELS),
+            default=_LOG_LEVELS_DEFAULT,
+            key="daemon_log_levels",
+            help="Zeilen ohne [LEVEL] bleiben immer sichtbar.",
+        )
         if st.button("Aktualisieren", key="daemon_log_refresh"):
             st.rerun()
         text, err = read_earnie_log_tail(path)
@@ -114,7 +144,13 @@ def _render_log_section() -> None:
         if not text:
             st.caption("Logdatei ist leer.")
             return
-        st.code(text, language="log")
+        levels = set(selected)
+        filtered = filter_log_lines(text, levels)
+        total = len(text.splitlines())
+        shown = len(filtered.splitlines()) if filtered else 0
+        if shown < total:
+            st.caption(f"Anzeige: {shown} von {total} Zeilen (Level-Filter).")
+        st.code(filtered, language="log")
 
 
 def render() -> None:

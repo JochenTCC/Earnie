@@ -133,7 +133,7 @@ def _log_milp_decision(
         planned_kwh = _planned_consumer_kwh(model, consumer)
         pv_flag = consumer_pv_follow.get(cid, 0)
         mode_txt = f" pv_follow={pv_flag}" if uses_pv_follow(consumer) else ""
-        logger.info(
+        logger.debug(
             "MILP %s: jetzt=%s (%.2f kW)%s | Restziel=%.2f kWh | "
             "geplant=%.2f kWh | min_on=%s x 15min",
             consumer["name"],
