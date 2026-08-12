@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Live main.py hang after control MILP (2026-08-12)
+
+- [x] Live `main.py` hang after control MILP — `calculate_optimization_savings` now open-loop `commit_hours=len(matrix)` (was per-slot MPC on ~188 QH); test `test_calculate_optimization_savings_uses_open_loop_commit`. Live acceptance verified.
+
+
+### Bugfix Chart-1 SoC ESS underlay thicker (2026-08-12)
+
+- [x] Monitor Chart-1 SoC ESS-mode underlay thicker — `_ESS_UNDERLAY_LINE_WIDTH` 7.5→16.0, `_ESS_UNDERLAY_OPACITY` 0.4→0.2 in `ui/chart_soc.py`. Live acceptance verified.
+
+
 ### Bugfix EV Modus B QH preset power (2026-08-12)
 
 - [x] Unsteady night EV / not max at cheapest (`debug_dump_20260812_054310`) — Modus B still treated `remaining_kwh` as hourly kW after QH (`dt_h=0.25`): preset `clamp(remaining)` and `rem > P_nom` for MILP-B. Fix: `ev_preset_charge_kw` / `ev_modus_b_uses_milp` use `remaining/dt_h` and `P_nom·dt_h`; tests in `test_eauto_milp_mode.py`. Verified.
