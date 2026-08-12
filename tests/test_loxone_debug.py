@@ -340,3 +340,31 @@ def test_expected_live_read_fields_include_plant_ambient():
         fields = expected_live_read_fields(network_backend=False)
     assert "sens_temperature_outside" in fields
     assert fields.index("sens_temperature_outside") > fields.index("sens_ess_soc")
+
+
+def test_expected_live_read_fields_include_thermal_temps():
+    from integrations.ehal_debug_mapping import expected_live_read_fields
+
+    consumers = [
+        {
+            "id": "swimspa",
+            "type": "thermal_rc",
+            "ehal_bindings": {
+                "sens_temperature_water": "Spa_Ist",
+            },
+        }
+    ]
+    with patch(
+        "integrations.ehal_debug_mapping._all_live_consumers",
+        return_value=consumers,
+    ):
+        fields = expected_live_read_fields(network_backend=False)
+
+    assert "swimspa:flex.swimspa.sens_power_act" in fields
+    assert "swimspa:sens_temperature_water" in fields
+    assert "swimspa:get_temperature_water_setpoint" in fields
+    assert "swimspa:get_temperature_tolerance_c" in fields
+    assert "swimspa:sens_heating_active" in fields
+    assert fields.index("swimspa:sens_temperature_water") > fields.index(
+        "swimspa:flex.swimspa.sens_power_act"
+    )

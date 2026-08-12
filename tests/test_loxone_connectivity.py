@@ -272,6 +272,57 @@ class TestCollectReadChecks:
         assert by_label["ev:sens_evcs_connected"] == "Ernie_EAuto_Da"
         assert by_label["ev:get_evcs_ready_by_time"] == "Ernie_EAuto_FertigUm"
 
+    def test_collects_thermal_rc_temperatures(self):
+        consumers = [
+            {
+                "id": "swimspa",
+                "type": "thermal_rc",
+                "ehal_bindings": {
+                    "flex.swimspa.sens_power_act": "P_Spa",
+                    "sens_temperature_water": "Spa_Ist",
+                    "get_temperature_water_setpoint": "Spa_Soll",
+                    "get_temperature_tolerance_c": "Spa_Tol",
+                    "sens_heating_active": "Spa_Heat",
+                },
+            }
+        ]
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["swimspa:flex.swimspa.sens_power_act"] == "P_Spa"
+        assert by_label["swimspa:sens_temperature_water"] == "Spa_Ist"
+        assert by_label["swimspa:get_temperature_water_setpoint"] == "Spa_Soll"
+        assert by_label["swimspa:get_temperature_tolerance_c"] == "Spa_Tol"
+        assert by_label["swimspa:sens_heating_active"] == "Spa_Heat"
+
+    def test_thermal_temps_without_power_marker_still_collected(self):
+        consumers = [
+            {
+                "id": "pool",
+                "type": "thermal_rc",
+                "ehal_bindings": {
+                    "sens_temperature_water": "Pool_Ist",
+                    "get_temperature_water_setpoint": "Pool_Soll",
+                },
+            }
+        ]
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=consumers
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["pool:sens_temperature_water"] == "Pool_Ist"
+        assert by_label["pool:get_temperature_water_setpoint"] == "Pool_Soll"
+        assert "pool:flex.pool.sens_power_act" not in by_label
+
 
 class TestLoxoneIntegrationGate:
     def test_integration_skips_without_credentials(self, monkeypatch):
