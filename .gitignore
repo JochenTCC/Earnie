@@ -64,11 +64,12 @@ docs/Loxone EMS Projekt.pdf
 .coverage
 debug-*.log
 
-# Lokale Debug-Dump-Extrakte unter chart_debug_review/ (promoted chart_debug_* bleibt versionierbar)
-chart_debug_review/debug_dump_*/
+# Local Debug-Dumps (not versioned)
+debug-dumps/
 
 # Local VS Code / Cursor launch configs (machine-specific)
 .vscode/launch.json
 
 # Local real-name → backlog alias map (never commit)
 .cursor/user-aliases.local.md
+loxone-online-access.txt

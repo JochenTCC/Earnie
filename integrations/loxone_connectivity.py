@@ -214,8 +214,12 @@ def _consumer_has_live_read_marker(consumer: dict) -> bool:
         marker_flex_power,
         marker_get_evcs_ready_by_time,
         marker_get_filter_remaining_hours,
+        marker_get_temperature_tolerance_c,
+        marker_get_temperature_water_setpoint,
         marker_sens_evcs_active_power,
         marker_sens_evcs_connected,
+        marker_sens_heating_active,
+        marker_sens_temperature_water,
     )
 
     if marker_flex_power(consumer) or marker_sens_evcs_active_power(consumer):
@@ -223,6 +227,13 @@ def _consumer_has_live_read_marker(consumer: dict) -> bool:
     if marker_sens_evcs_connected(consumer) or marker_get_evcs_ready_by_time(consumer):
         return True
     if marker_get_filter_remaining_hours(consumer):
+        return True
+    if (
+        marker_sens_temperature_water(consumer)
+        or marker_get_temperature_water_setpoint(consumer)
+        or marker_get_temperature_tolerance_c(consumer)
+        or marker_sens_heating_active(consumer)
+    ):
         return True
     return False
 
@@ -394,6 +405,63 @@ def _is_filter_consumer(consumer: dict) -> bool:
     return isinstance(fsched, dict) and bool(fsched.get("enabled"))
 
 
+def _is_thermal_consumer(consumer: dict) -> bool:
+    """True for Pool/SwimSpa thermal_rc (or water-temp EHAL bindings)."""
+    if str(consumer.get("type") or "") == "thermal_rc":
+        return True
+    from settings.ehal_marker_resolve import (
+        marker_get_temperature_tolerance_c,
+        marker_get_temperature_water_setpoint,
+        marker_sens_heating_active,
+        marker_sens_temperature_water,
+    )
+
+    return bool(
+        marker_sens_temperature_water(consumer)
+        or marker_get_temperature_water_setpoint(consumer)
+        or marker_get_temperature_tolerance_c(consumer)
+        or marker_sens_heating_active(consumer)
+    )
+
+
+def _append_thermal_read_checks(
+    checks: list[tuple[str, str, dict]],
+    consumer: dict,
+) -> None:
+    from settings.ehal_marker_resolve import (
+        marker_get_temperature_tolerance_c,
+        marker_get_temperature_water_setpoint,
+        marker_sens_heating_active,
+        marker_sens_temperature_water,
+    )
+
+    cid = consumer["id"]
+    _append_io_check(
+        checks,
+        f"{cid}:sens_temperature_water",
+        marker_sens_temperature_water(consumer),
+        {"validate": _temperature_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:get_temperature_water_setpoint",
+        marker_get_temperature_water_setpoint(consumer),
+        {"validate": _temperature_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:get_temperature_tolerance_c",
+        marker_get_temperature_tolerance_c(consumer),
+        {"validate": _temperature_valid},
+    )
+    _append_io_check(
+        checks,
+        f"{cid}:sens_heating_active",
+        marker_sens_heating_active(consumer),
+        {"validate": _binary_valid},
+    )
+
+
 def collect_read_checks() -> list[tuple[str, str, dict]]:
     """(EHAL-Feld, Mapping/IO-Name) — plant ``sens_*`` + consumer reads."""
     from settings.ehal_marker_resolve import marker_sens_temperature_outside
@@ -439,6 +507,8 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
             _append_filter_read_checks(checks, consumer)
         else:
             _append_flex_power_check(checks, consumer)
+            if _is_thermal_consumer(consumer):
+                _append_thermal_read_checks(checks, consumer)
 
     return checks
 

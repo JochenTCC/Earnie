@@ -52,6 +52,13 @@ FILTER_LIVE_READ_FIELDS: tuple[str, ...] = (
     "get_filter_native_duration_hours",
 )
 
+THERMAL_LIVE_READ_FIELDS: tuple[str, ...] = (
+    "sens_temperature_water",
+    "get_temperature_water_setpoint",
+    "get_temperature_tolerance_c",
+    "sens_heating_active",
+)
+
 NETWORK_LIVE_READ_FIELDS: tuple[str, ...] = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL
 NETWORK_LIVE_WRITE_FIELDS: tuple[str, ...] = SETPOINT_FIELDS
 
@@ -102,6 +109,18 @@ def _consumer_is_filter(consumer: dict) -> bool:
     return isinstance(fsched, dict) and bool(fsched.get("enabled"))
 
 
+def _consumer_is_thermal(consumer: dict) -> bool:
+    """True for Pool/SwimSpa thermal_rc (or bindings with water-temp markers)."""
+    if str(consumer.get("type") or "") == "thermal_rc":
+        return True
+    bindings = consumer.get("ehal_bindings")
+    if not isinstance(bindings, dict):
+        return False
+    return any(
+        str(bindings.get(field) or "").strip() for field in THERMAL_LIVE_READ_FIELDS
+    )
+
+
 def _all_live_consumers() -> list[dict]:
     """House-profile + flex consumers (including unmapped)."""
     import config
@@ -145,6 +164,8 @@ def expected_live_read_fields(*, network_backend: bool = False) -> list[str]:
             from ehal.flex_fields import flex_sens_power_act
 
             fields.append(f"{cid}:{flex_sens_power_act(cid)}")
+            if _consumer_is_thermal(consumer):
+                fields.extend(f"{cid}:{name}" for name in THERMAL_LIVE_READ_FIELDS)
     return fields
 
 

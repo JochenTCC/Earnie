@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../../TechCreaCon/Earnie-Projekt"
+		}
+	],
+	"settings": {
+		"terminal.integrated.env.windows": {
+			"PYTHONUTF8": "1"
+		},
+		"containers.imageBuildContextPath": "${workspaceFolder}",
+		"docker.imageBuildContextPath": "${workspaceFolder}"
+	}
+}

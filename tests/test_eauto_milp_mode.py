@@ -187,29 +187,35 @@ class TestEautoMilpModeSelection:
 
 
 class TestEautoBacktestingPreset:
-    def test_modus_b_milp_when_remaining_gt_p_nom(self):
+    def test_modus_b_milp_when_remaining_gt_one_slot(self):
         consumer = _eauto_consumer()
         matrix = _matrix(6, logged_day=True)
         params = _eauto_milp_params()
+        # One QH at P_nom delivers 3.5 * 0.25 = 0.875 kWh
         assert eauto_modus_b_uses_milp(consumer, matrix, 7.0, params)
-        assert not eauto_modus_b_uses_milp(consumer, matrix, 3.5, params)
+        assert eauto_modus_b_uses_milp(consumer, matrix, 1.0, params)
+        assert not eauto_modus_b_uses_milp(consumer, matrix, 0.5, params)
 
-    def test_preset_charge_kw_clamps_to_p_min(self):
+    def test_preset_charge_kw_scales_remaining_by_dt_h(self):
         consumer = _eauto_consumer()
+        # rem 0.3 kWh / 0.25 h = 1.2 kW → floor at min 1.4
         assert eauto_preset_charge_kw(consumer, 0.3) == 1.4
-        assert eauto_preset_charge_kw(consumer, 2.0) == 2.0
-        assert eauto_preset_charge_kw(consumer, 3.5) == 3.5
+        # rem 0.5 kWh / 0.25 h = 2.0 kW
+        assert eauto_preset_charge_kw(consumer, 0.5) == 2.0
+        # rem 2.0 kWh / 0.25 h = 8.0 kW → cap at P_nom 3.5
+        assert eauto_preset_charge_kw(consumer, 2.0) == 3.5
 
-    def test_preset_charges_at_cheapest_hour_only(self):
+    def test_preset_charges_at_cheapest_slot_only(self):
         consumer = _eauto_consumer()
         matrix = _matrix(6, logged_day=True)
         params = _eauto_milp_params()
         schedule = list(range(6))
+        # rem 0.5 fits in one QH at 2.0 kW (below P_nom*dt)
         assert eauto_preset_power_now(
-            matrix, consumer, 1.0, schedule, None, params
-        ) == 1.4
+            matrix, consumer, 0.5, schedule, None, params
+        ) == 2.0
         assert eauto_preset_power_now(
-            matrix, consumer, 1.0, schedule[3:], None, params
+            matrix, consumer, 0.5, schedule[3:], None, params
         ) == 0.0
 
     def test_preset_charges_when_deadline_slots_exhausted(self):
@@ -240,9 +246,10 @@ class TestEautoBacktestingPreset:
             },
         }
         power = eauto_preset_power_now(
-            matrix, consumer, 5.842, [0], ctx, params
+            matrix, consumer, 2.5, [0], ctx, params
         )
-        assert power == pytest.approx(5.842, abs=0.01)
+        # 2.5 kWh / 0.25 h = 10 kW (fits one QH at P_nom=11)
+        assert power == pytest.approx(10.0, abs=0.01)
 
     def test_logged_day_small_target_uses_preset_not_milp(self):
         _, _, _, powers, _, _, _ = milp_optimizer(
@@ -253,14 +260,17 @@ class TestEautoBacktestingPreset:
             k_push=3.5,
             verbose=False,
             consumers=[_eauto_consumer()],
-            consumer_remaining_kwh={"eauto": 1.0},
+            consumer_remaining_kwh={"eauto": 0.5},
             charging_contexts={},
         )
-        assert powers["eauto"] == 1.4
+        # 0.5 kWh / 0.25 h = 2.0 kW at cheapest t0
+        assert powers["eauto"] == 2.0
 
     def test_logged_day_open_loop_places_preset_at_cheapest_not_t0(self):
-        """SE sunrise open-loop: small EV target must land on cheapest eligible hour."""
+        """SE sunrise open-loop: small EV target must land on cheapest eligible slot."""
         from datetime import datetime, timedelta
+
+        from optimizer.slot_duration import DEFAULT_DT_H
 
         start = datetime(2025, 2, 3, 7, 0)
         matrix = []
@@ -280,10 +290,11 @@ class TestEautoBacktestingPreset:
                 }
             )
         consumer = _eauto_consumer()
+        target = 0.5  # fits one QH at P_nom*dt_h = 0.875
         ctx = {
             "active": True,
             "deadline": datetime(2025, 2, 4, 7),
-            "target_kwh": 1.44,
+            "target_kwh": target,
             "use_time_window": True,
             "config_day_schedule": {
                 "car_available_from_hour": 18,
@@ -297,14 +308,15 @@ class TestEautoBacktestingPreset:
             k_push=3.5,
             verbose=False,
             consumers=[consumer],
-            consumer_remaining_kwh={"eauto": 1.44},
+            consumer_remaining_kwh={"eauto": target},
             charging_contexts={"eauto": ctx},
         )
         powers = [float(slot["consumer_powers"].get("eauto", 0.0)) for slot in schedule]
-        assert sum(powers) == pytest.approx(1.44, abs=0.01)
+        energy = sum(p * DEFAULT_DT_H for p in powers)
+        assert energy == pytest.approx(target, abs=0.01)
         assert powers[0] == 0.0
         # hour 2 is first cheapest eligible night slot (index 19 from 07:00 start)
-        assert powers[19] == pytest.approx(1.44, abs=0.01)
+        assert powers[19] == pytest.approx(target / DEFAULT_DT_H, abs=0.01)
 
     def test_live_small_target_uses_preset(self):
         _, _, _, powers, _, _, _ = milp_optimizer(
@@ -315,7 +327,7 @@ class TestEautoBacktestingPreset:
             k_push=3.5,
             verbose=False,
             consumers=[_eauto_consumer()],
-            consumer_remaining_kwh={"eauto": 2.0},
+            consumer_remaining_kwh={"eauto": 0.5},
             charging_contexts={},
         )
         assert powers["eauto"] == 2.0

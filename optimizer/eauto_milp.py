@@ -12,6 +12,7 @@ from optimizer.charging_context import (
     schedule_indices_for_consumer,
 )
 from optimizer.consumer_power import power_limits_kw, uses_power_setpoint
+from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 
 EAUTO_MILP_PARAM_KEYS = (
     "live_modus_a_min_remaining_kwh",
@@ -161,21 +162,31 @@ def ev_modus_b_uses_milp(
     matrix: list | None,
     remaining_kwh: float,
     params: dict[str, float] | None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> bool:
-    """True, wenn EV in Modus B über MILP (remaining > P_nom) geplant wird."""
+    """True, wenn EV in Modus B über MILP (remaining > one slot at P_nom) geplant wird."""
     if not ev_in_modus_b(consumer, matrix, remaining_kwh, params):
         return False
     _, max_kw = power_limits_kw(consumer)
-    return remaining_kwh > max_kw + 1e-9
+    slot_kwh = max_kw * validate_dt_h(dt_h)
+    return remaining_kwh > slot_kwh + 1e-9
 
 
 eauto_modus_b_uses_milp = ev_modus_b_uses_milp
 
 
-def ev_preset_charge_kw(consumer: dict, remaining_kwh: float) -> float:
-    """kW für eine Preset-Stunde: clamp(remaining, P_min, P_nom)."""
+def ev_preset_charge_kw(
+    consumer: dict,
+    remaining_kwh: float,
+    *,
+    dt_h: float = DEFAULT_DT_H,
+) -> float:
+    """kW for one preset slot: clamp(remaining/dt_h, P_min, P_nom)."""
     min_kw, max_kw = power_limits_kw(consumer)
-    return max(min_kw, min(remaining_kwh, max_kw))
+    dt = validate_dt_h(dt_h)
+    need_kw = float(remaining_kwh) / dt
+    return max(min_kw, min(need_kw, max_kw))
 
 
 eauto_preset_charge_kw = ev_preset_charge_kw
@@ -217,10 +228,10 @@ def _preset_must_charge_now(
     schedule_indices: list[int],
     charging_context: dict | None,
     *,
-    dt_h: float = 1.0,
+    dt_h: float = DEFAULT_DT_H,
 ) -> bool:
     """Preset-Fallback: Deadline-Druck statt nur günstigste Stunde (t=0)."""
-    from .slot_duration import slots_for_wall_hours, validate_dt_h
+    from .slot_duration import slots_for_wall_hours
 
     dt_h = validate_dt_h(dt_h)
     ctx = charging_context or {}
@@ -261,27 +272,35 @@ def ev_preset_power_now(
     schedule_indices: list[int],
     charging_context: dict | None,
     params: dict[str, float] | None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> float | None:
     """
-    Preset-Leistung in der aktuellen Stunde (t=0).
+    Preset-Leistung im aktuellen Slot (t=0).
 
-    None: E-Auto bleibt im MILP (Modus A oder Modus B mit remaining > P_nom).
-    0.0: Preset-Modus, aber noch nicht die günstigste Stunde.
-    >0: Preset-Laden jetzt mit clamp(remaining, P_min, P_nom).
+    None: E-Auto bleibt im MILP (Modus A oder Modus B mit remaining > one slot).
+    0.0: Preset-Modus, aber noch nicht der günstigste Slot.
+    >0: Preset-Laden jetzt mit clamp(remaining/dt_h, P_min, P_nom).
     """
+    dt_h = validate_dt_h(dt_h)
     if not ev_in_modus_b(consumer, matrix, remaining_kwh, params):
         return None
-    if ev_modus_b_uses_milp(consumer, matrix, remaining_kwh, params):
+    if ev_modus_b_uses_milp(consumer, matrix, remaining_kwh, params, dt_h=dt_h):
         return None
     slot = _ev_cheapest_eligible_index(
         matrix, consumer, schedule_indices, charging_context
     )
     if slot == 0:
-        return ev_preset_charge_kw(consumer, remaining_kwh)
+        return ev_preset_charge_kw(consumer, remaining_kwh, dt_h=dt_h)
     if _preset_must_charge_now(
-        matrix, consumer, remaining_kwh, schedule_indices, charging_context
+        matrix,
+        consumer,
+        remaining_kwh,
+        schedule_indices,
+        charging_context,
+        dt_h=dt_h,
     ):
-        return ev_preset_charge_kw(consumer, remaining_kwh)
+        return ev_preset_charge_kw(consumer, remaining_kwh, dt_h=dt_h)
     return 0.0
 
 
@@ -295,23 +314,26 @@ def ev_preset_horizon_placement(
     schedule_indices: list[int],
     charging_context: dict | None,
     params: dict[str, float] | None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> tuple[int, float] | None:
     """
-    Open-loop SE/logged_day: place Modus-B preset at cheapest eligible hour.
+    Open-loop SE/logged_day: place Modus-B preset at cheapest eligible slot.
 
     None → keep consumer in MILP. (slot, kw) → fixed flex outside MILP at slot.
     Unlike Live ``ev_preset_power_now``, never returns a wait-at-t0 (0.0) drop.
     """
+    dt_h = validate_dt_h(dt_h)
     if not ev_in_modus_b(consumer, matrix, remaining_kwh, params):
         return None
-    if ev_modus_b_uses_milp(consumer, matrix, remaining_kwh, params):
+    if ev_modus_b_uses_milp(consumer, matrix, remaining_kwh, params, dt_h=dt_h):
         return None
     slot = _ev_cheapest_eligible_index(
         matrix, consumer, schedule_indices, charging_context
     )
     if slot is None:
         return None
-    power = ev_preset_charge_kw(consumer, remaining_kwh)
+    power = ev_preset_charge_kw(consumer, remaining_kwh, dt_h=dt_h)
     if power <= 1e-9:
         return None
     return slot, power
@@ -336,6 +358,8 @@ def split_eauto_preset(
     remaining: dict[str, float],
     schedule_indices: list[int],
     charging_contexts: dict[str, dict],
+    *,
+    dt_h: float = DEFAULT_DT_H,
 ) -> tuple[dict[int, dict[str, float]], list]:
     """
     Trenne Preset-EV (außerhalb MILP) von MILP-Verbrauchern.
@@ -343,12 +367,13 @@ def split_eauto_preset(
     Returns
     -------
     preset_by_slot:
-        hour-index → {consumer_id: kW}. Live/rolling only fills slot 0 when
+        slot-index → {consumer_id: kW}. Live/rolling only fills slot 0 when
         charging now; logged_day/profile_spec open-loop places at the cheapest
-        eligible hour so SE sunrise commit_hours=H still delivers small EV targets.
+        eligible slot so SE sunrise commit still delivers small EV targets.
     milp_consumers:
         consumers that stay inside the MILP.
     """
+    dt_h = validate_dt_h(dt_h)
     preset_by_slot: dict[int, dict[str, float]] = {}
     milp_consumers: list = []
     logged = is_logged_day_matrix(matrix)
@@ -359,11 +384,11 @@ def split_eauto_preset(
         ctx = charging_contexts.get(cid)
         if logged and is_ev_milp_consumer(consumer):
             placement = ev_preset_horizon_placement(
-                matrix, consumer, rem, schedule_indices, ctx, params
+                matrix, consumer, rem, schedule_indices, ctx, params, dt_h=dt_h
             )
             if placement is None:
                 if ev_in_modus_b(consumer, matrix, rem, params) and not ev_modus_b_uses_milp(
-                    consumer, matrix, rem, params
+                    consumer, matrix, rem, params, dt_h=dt_h
                 ):
                     continue
                 milp_consumers.append(consumer)
@@ -378,6 +403,7 @@ def split_eauto_preset(
             schedule_indices,
             ctx,
             params,
+            dt_h=dt_h,
         )
         if preset is None:
             milp_consumers.append(consumer)

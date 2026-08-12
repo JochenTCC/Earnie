@@ -45,7 +45,7 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `pv_counter_state.json`         | PV-Zählerstand für Stunden-Delta                                                             |
 | `cons_data_pending.json`        | Pending-Puffer für cons_data-Samples                                                         |
 | `consumption_profiles.csv`      | Berechnete Grundlast-Profile                                                                 |
-| `earnie.log`                    | Rotierendes Python-Log von main.py                                                           |
+| `earnie.log`                    | Rotierendes Python-Log von main.py (5 MB oder wöchentlich; Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`) |
 | `main.lock` / `main.pid`        | Single-Instance-Sperre des Produktiv-Daemons (`main.lock` gehalten; PID zusätzlich in `main.pid` für Status/Stop unter Windows) |
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll)           |
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf)                               |
@@ -65,7 +65,7 @@ Betriebsstatus der wichtigsten Log-, Historien- und Debug-Dateien (Review 2026-0
 | Datei                                | Status                         | Hinweis                                                       |
 | ------------------------------------ | ------------------------------ | ------------------------------------------------------------- |
 | `optimization_history.jsonl`         | **kanonisch**                  | Produktiv-Historie (eine JSON-Zeile pro Optimierungslauf)     |
-| `earnie.log`                         | **aktiv**                      | Rotierendes Python-Log von `main.py` (5×5 MB, 5 Archive)      |
+| `earnie.log`                         | **aktiv**                      | Rotierendes Python-Log von `main.py` (5 MB **oder** wöchentlich Mo 00:00/`W0`, max. 8 Archive) |
 | `optimizer_run_state.json`           | **aktiv**                      | Letzter erfolgreicher `main.py`-Durchlauf                     |
 | `live_optimization_debug.json`       | **aktiv**                      | 24h-Anzeige-Snapshot für die Streamlit-App                    |
 | `backtesting_log.json`               | **nur Dev/Backtesting**        | Ergebnis von Szenario-Explorer — nicht für Produktiv-NAS   |

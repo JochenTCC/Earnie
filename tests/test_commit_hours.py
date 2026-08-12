@@ -153,3 +153,28 @@ def test_extract_horizon_schedule_length_matches_model_horizon():
     assert len(slots) == 5
     assert slots[0]["milp_plan"] == _extract_milp_plan(model)
     assert _consumer_powers_now(model)[0] == slots[0]["consumer_powers"]
+
+
+def test_calculate_optimization_savings_uses_open_loop_commit():
+    """Live savings must not re-solve MILP per QH slot (commit_hours=1)."""
+    from optimizer.simulation import calculate_optimization_savings
+
+    matrix = _small_matrix(4)
+    with (
+        patch(
+            "optimizer.charge_immediate.prepare_optimization_matrix",
+            return_value=(matrix, {}, {}),
+        ),
+        patch(
+            "optimizer.simulation.resolve_filter_contexts",
+            return_value={},
+        ),
+        patch(
+            "optimizer.simulation.simulate_horizon",
+            side_effect=RuntimeError("stop-after-commit-check"),
+        ) as mock_horizon,
+    ):
+        with pytest.raises(RuntimeError, match="stop-after-commit-check"):
+            calculate_optimization_savings(matrix, 50.0)
+
+    assert mock_horizon.call_args.kwargs["commit_hours"] == len(matrix)
