@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Pool/SwimSpa temperatures EHAL-Com Live-Lesen (2026-08-12)
+
+- [x] Pool/SwimSpa temperatures missing in EHAL-Com Live-Lesen — thermal_rc rows now include `sens_temperature_water` / Soll / Toleranz / `sens_heating_active` (`ehal_debug_mapping` + `loxone_connectivity`); tests in `test_loxone_connectivity.py` / `test_loxone_debug.py`. Live acceptance verified.
+
+
 ### Bugfix Live main.py hang after control MILP (2026-08-12)
 
 - [x] Live `main.py` hang after control MILP — `calculate_optimization_savings` now open-loop `commit_hours=len(matrix)` (was per-slot MPC on ~188 QH); test `test_calculate_optimization_savings_uses_open_loop_commit`. Live acceptance verified.
