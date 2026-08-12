@@ -222,6 +222,7 @@ def _solve_milp_to_model(
         remaining,
         schedule_indices,
         contexts,
+        dt_h=dt_h,
     )
     fixed_flex_by_t = {
         slot: sum(powers.values()) for slot, powers in preset_by_slot.items()

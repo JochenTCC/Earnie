@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix EV Modus B QH preset power (2026-08-12)
+
+- [x] Unsteady night EV / not max at cheapest (`debug_dump_20260812_054310`) — Modus B still treated `remaining_kwh` as hourly kW after QH (`dt_h=0.25`): preset `clamp(remaining)` and `rem > P_nom` for MILP-B. Fix: `ev_preset_charge_kw` / `ev_modus_b_uses_milp` use `remaining/dt_h` and `P_nom·dt_h`; tests in `test_eauto_milp_mode.py`. Verified.
+
 
 ### Version 2.5 — feature items (2026-08-11)
 

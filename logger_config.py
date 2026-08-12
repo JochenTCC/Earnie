@@ -1,9 +1,20 @@
 # logger_config.py
 import logging
-from logging.handlers import RotatingFileHandler
 import os
+import re
+import shutil
 import sys
+import time
+from logging.handlers import TimedRotatingFileHandler
 from typing import TextIO
+
+_DEFAULT_MAX_BYTES = 5 * 1024 * 1024
+_DEFAULT_BACKUP_COUNT = 8
+_SIZE_TIME_SUFFIX = "%Y-%m-%d_%H-%M-%S"
+_SIZE_TIME_EXT_MATCH = re.compile(
+    r"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(\.\d+)?(\.\w+)?$",
+    re.ASCII,
+)
 
 
 def configure_utf8_stdio() -> None:
@@ -52,11 +63,117 @@ def attach_utf8_log_file(path: str) -> TextIO:
     return handle
 
 
+class SizeAndTimeRotatingFileHandler(TimedRotatingFileHandler):
+    """Rotate on weekly boundary or maxBytes; rename with copy+truncate fallback."""
+
+    def __init__(
+        self,
+        filename: str,
+        *,
+        when: str = "W0",
+        interval: int = 1,
+        backupCount: int = _DEFAULT_BACKUP_COUNT,
+        maxBytes: int = _DEFAULT_MAX_BYTES,
+        encoding: str | None = "utf-8",
+        delay: bool = False,
+        utc: bool = False,
+        atTime=None,
+    ) -> None:
+        super().__init__(
+            filename,
+            when=when,
+            interval=interval,
+            backupCount=backupCount,
+            encoding=encoding,
+            delay=delay,
+            utc=utc,
+            atTime=atTime,
+        )
+        self.maxBytes = maxBytes
+        # Unique stamp so mid-week size rolls do not collide with a prior archive.
+        self.suffix = _SIZE_TIME_SUFFIX
+        self.extMatch = _SIZE_TIME_EXT_MATCH
+
+    def shouldRollover(self, record: logging.LogRecord) -> bool:
+        if super().shouldRollover(record):
+            return True
+        return self._size_exceeded()
+
+    def _size_exceeded(self) -> bool:
+        if self.maxBytes <= 0:
+            return False
+        if self.stream is None:
+            self.stream = self._open()
+        try:
+            self.stream.seek(0, os.SEEK_END)
+            return self.stream.tell() >= self.maxBytes
+        except OSError:
+            return False
+
+    def rotate(self, source: str, dest: str) -> None:
+        if not os.path.exists(source):
+            return
+        try:
+            os.rename(source, dest)
+            return
+        except OSError as rename_exc:
+            self._rotate_via_copy(source, dest, rename_exc)
+
+    def _rotate_via_copy(
+        self, source: str, dest: str, rename_exc: OSError
+    ) -> None:
+        try:
+            shutil.copy2(source, dest)
+            with open(
+                source,
+                "w",
+                encoding=self.encoding or "utf-8",
+                newline="\n",
+            ):
+                pass
+        except OSError as copy_exc:
+            logging.getLogger(__name__).warning(
+                "Log rollover failed for %s -> %s (rename: %s; copy: %s)",
+                source,
+                dest,
+                rename_exc,
+                copy_exc,
+            )
+            raise copy_exc from rename_exc
+
+    def doRollover(self) -> None:
+        current_time = int(time.time())
+        time_tuple = time.gmtime(current_time) if self.utc else time.localtime(current_time)
+        dfn = self._unique_archive_name(time_tuple)
+        if self.stream:
+            self.stream.close()
+            self.stream = None
+        try:
+            self.rotate(self.baseFilename, dfn)
+            if self.backupCount > 0:
+                for path in self.getFilesToDelete():
+                    os.remove(path)
+        finally:
+            if not self.delay and self.stream is None:
+                self.stream = self._open()
+            self.rolloverAt = self.computeRollover(current_time)
+
+    def _unique_archive_name(self, time_tuple: time.struct_time) -> str:
+        stamp = time.strftime(self.suffix, time_tuple)
+        dfn = self.rotation_filename(f"{self.baseFilename}.{stamp}")
+        if not os.path.exists(dfn):
+            return dfn
+        n = 1
+        while os.path.exists(f"{dfn}.{n}"):
+            n += 1
+        return f"{dfn}.{n}"
+
+
 def setup_logging(log_file="earnie.log", level=logging.INFO):
     """
     Konfiguriert das globale Logging-System für das gesamte Projekt.
     Erzeugt eine saubere Ausgabe auf der Konsole und schreibt rotierende
-    Details in eine Log-Datei.
+    Details in eine Log-Datei (5 MB oder wöchentlich, bis zu 8 Archive).
     """
     configure_utf8_stdio()
 
@@ -85,12 +202,14 @@ def setup_logging(log_file="earnie.log", level=logging.INFO):
         datefmt='%H:%M:%S'
     )
 
-    # --- 1. FILE HANDLER (Rotierend, maximal 5 Dateien à 5 MB, UTF-8 codiert) ---
-    file_handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=5 * 1024 * 1024, 
-        backupCount=5, 
-        encoding='utf-8'
+    # --- 1. FILE HANDLER (5 MB oder wöchentlich Mo 00:00, max. 8 Archive) ---
+    file_handler = SizeAndTimeRotatingFileHandler(
+        log_file,
+        when="W0",
+        interval=1,
+        maxBytes=_DEFAULT_MAX_BYTES,
+        backupCount=_DEFAULT_BACKUP_COUNT,
+        encoding="utf-8",
     )
     file_handler.setLevel(level)
     file_handler.setFormatter(file_formatter)
@@ -104,4 +223,8 @@ def setup_logging(log_file="earnie.log", level=logging.INFO):
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
 
-    logging.info("📝 Logging-System initialisiert. Log-Datei: '%s' (max 5x5MB)", log_file)
+    logging.info(
+        "Logging-System initialisiert. Log-Datei: '%s' (5 MB oder woechentlich, max %d Archive)",
+        log_file,
+        _DEFAULT_BACKUP_COUNT,
+    )

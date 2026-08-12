@@ -1150,7 +1150,12 @@ def calculate_optimization_savings(
     sunrise_soc_min_index: int | None = None,
     filter_contexts: dict[str, dict] | None = None,
 ) -> dict:
-    """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation."""
+    """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation.
+
+    Optimized path uses open-loop ``commit_hours=len(matrix)`` (one MILP), not
+    per-slot MPC — Live control already solved once; savings/charts must stay fast
+    on QH horizons (~188 slots).
+    """
     from .charge_immediate import prepare_optimization_matrix
     from .charging_context import serialize_charging_contexts
 
@@ -1159,6 +1164,7 @@ def calculate_optimization_savings(
         consumer_daily_targets_kwh,
     )
     filters = filter_contexts or resolve_filter_contexts(matrix)
+    # Open-loop: one CBC solve for the display horizon (not commit_hours=1 MPC).
     optimized_rows = simulate_horizon(
         matrix,
         initial_soc,
@@ -1168,6 +1174,7 @@ def calculate_optimization_savings(
         filter_contexts=filters,
         matrix_prepared=True,
         sunrise_soc_min_index=sunrise_soc_min_index,
+        commit_hours=len(matrix),
     )
     baseline_rows = simulate_baseline_horizon(
         matrix, initial_soc, charging_contexts=charging_contexts
