@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Chart-1 SoC vs underlay / BL anchor (2026-08-12)
+
+- [x] Chart-1 SoC implausible vs ESS underlay (`debug_dump_20260812_191122`, 19:00–20:00) — current-hour ramp no longer wipes later MILP quarters; Jetzt-Anker uses MILP polyline when later QH exist (BL met Opt ~93%, not Ist-extrapolation ~82.5%); underlay `bridge_left=False`. Tests in `test_charts_soc_tail.py`. Live acceptance verified.
+
+
 ### Bugfix Pool/SwimSpa temperatures EHAL-Com Live-Lesen (2026-08-12)
 
 - [x] Pool/SwimSpa temperatures missing in EHAL-Com Live-Lesen — thermal_rc rows now include `sens_temperature_water` / Soll / Toleranz / `sens_heating_active` (`ehal_debug_mapping` + `loxone_connectivity`); tests in `test_loxone_connectivity.py` / `test_loxone_debug.py`. Live acceptance verified.

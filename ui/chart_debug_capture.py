@@ -36,6 +36,9 @@ def _session_meta() -> dict[str, Any]:
 
 def _chart1_plotly_json(bundle) -> str | None:
     try:
+        chart_now = None
+        if bundle.chart_context is not None:
+            chart_now = bundle.chart_context.zone_reference
         fig = build_power_soc_chart_figure(
             bundle.display_df,
             bundle.baseline_df,
@@ -50,6 +53,8 @@ def _chart1_plotly_json(bundle) -> str | None:
             chart_header_label=bundle.chart_header_label,
             slot_deviation_events=bundle.slot_deviation_events,
             optimization_matrix=bundle.optimization_matrix,
+            chart_now=chart_now,
+            battery_params=getattr(bundle, "battery_params", None),
         )
         return fig.to_json()
     except Exception as exc:

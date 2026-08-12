@@ -495,3 +495,144 @@ def test_cost_summary_annotations_include_totals_and_savings_sign():
     assert annotations[1]["yshift"] == -20
     assert annotations[2]["yshift"] == -40
     assert annotations[0]["font"]["size"] == 14
+
+
+def test_current_hour_ramp_preserves_later_milp_quarters_with_underlay():
+    """Dump 20260812_191122: SoC must not wipe 19:15–19:45 discharge vs underlay."""
+    import plotly.graph_objects as go
+
+    from optimizer import battery as bat
+    from ui.chart_soc import (
+        _ESS_UNDERLAY_TRACE_NAMES,
+        ESS_UNDERLAY_DISCHARGE,
+        add_ess_mode_soc_underlay_traces,
+    )
+
+    now = datetime(2026, 8, 12, 19, 9, tzinfo=_TZ)
+    slots = [
+        datetime(2026, 8, 12, 18, 45, tzinfo=_TZ),
+        datetime(2026, 8, 12, 19, 0, tzinfo=_TZ),
+        datetime(2026, 8, 12, 19, 15, tzinfo=_TZ),
+        datetime(2026, 8, 12, 19, 30, tzinfo=_TZ),
+        datetime(2026, 8, 12, 19, 45, tzinfo=_TZ),
+        datetime(2026, 8, 12, 20, 0, tzinfo=_TZ),
+        datetime(2026, 8, 12, 20, 15, tzinfo=_TZ),
+    ]
+    discharge = bat.steuerbefehl_for_mode(bat.MODE_ZWANGS_ENTLADEN, 2.5)
+    df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [91.0, 92.0, 93.4, 84.0, 70.4, 56.8, 43.2],
+        "Geplante Batterie-Aktion (kW)": [0.39, 0.31, -1.73, -2.5, -2.5, -2.5, -2.5],
+        "Ist Batterie-Leistung (kW)": [-0.98, None, None, None, None, None, None],
+        "Steuerbefehl": [
+            "Automatikbetrieb",
+            "Automatikbetrieb",
+            discharge,
+            discharge,
+            discharge,
+            discharge,
+            discharge,
+        ],
+        "Preis extrapoliert": [False] * len(slots),
+    })
+    battery = {
+        "battery_capacity_kwh": 5.0,
+        "min_soc": 10.0,
+        "max_soc": 100.0,
+        "max_power_kw": 2.5,
+        "efficiency": 0.92,
+    }
+    axis = ChartSlotAxis.from_dataframe(df)
+    fig = go.Figure()
+    add_ess_mode_soc_underlay_traces(
+        fig, df, axis, history_slot_count=1, battery_params=battery,
+    )
+    add_optimized_soc_trace(
+        fig, df, axis, history_slot_count=1, chart_now=now, battery_params=battery,
+    )
+    soc_trace = [trace for trace in fig.data if trace.name == "SoC"][-1]
+    under_name = _ESS_UNDERLAY_TRACE_NAMES[ESS_UNDERLAY_DISCHARGE]
+    under_trace = next(trace for trace in fig.data if trace.name == under_name)
+    soc_ys = {
+        pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ): float(y)
+        for x, y in zip(soc_trace.x, soc_trace.y)
+    }
+    under_ys = {
+        pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ): float(y)
+        for x, y in zip(under_trace.x, under_trace.y)
+    }
+    t_1930 = datetime(2026, 8, 12, 19, 30, tzinfo=_TZ)
+    t_1945 = datetime(2026, 8, 12, 19, 45, tzinfo=_TZ)
+    t_1900 = datetime(2026, 8, 12, 19, 0, tzinfo=_TZ)
+    t_2000 = datetime(2026, 8, 12, 20, 0, tzinfo=_TZ)
+    assert t_1930 in soc_ys
+    assert t_1945 in soc_ys
+    assert soc_ys[t_1930] == pytest.approx(84.0)
+    assert soc_ys[t_1945] == pytest.approx(70.4)
+    assert soc_ys[t_1900] == pytest.approx(92.0)
+    assert under_ys[t_1930] == pytest.approx(soc_ys[t_1930])
+    assert under_ys[t_1945] == pytest.approx(soc_ys[t_1945])
+    if t_2000 in soc_ys:
+        assert soc_ys[t_2000] == pytest.approx(56.8)
+        assert soc_ys[t_2000] != pytest.approx(93.4)
+
+
+def test_bl_ziel_anchor_matches_optimized_soc_when_later_milp_quarters():
+    """BL must not anchor on stale Ist-extrapolation (dump: 82.5 vs ~93)."""
+    import plotly.graph_objects as go
+
+    now = datetime(2026, 8, 12, 19, 9, tzinfo=_TZ)
+    slots = [
+        datetime(2026, 8, 12, 18, 45, tzinfo=_TZ),
+        datetime(2026, 8, 12, 19, 0, tzinfo=_TZ),
+        datetime(2026, 8, 12, 19, 15, tzinfo=_TZ),
+        datetime(2026, 8, 12, 19, 30, tzinfo=_TZ),
+        datetime(2026, 8, 12, 20, 0, tzinfo=_TZ),
+    ]
+    optimized_df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [91.0, 92.0, 93.4, 84.0, 56.8],
+        "Geplante Batterie-Aktion (kW)": [0.39, 0.31, -1.73, -2.5, -2.5],
+        "Ist Batterie-Leistung (kW)": [-0.98, None, None, None, None],
+        "Preis extrapoliert": [False] * len(slots),
+    })
+    baseline_df = pd.DataFrame({
+        "slot_datetime": slots,
+        "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
+        "Simulierter SoC (%)": [91.0, 92.0, 92.0, 92.0, 46.1],
+        "Geplante Batterie-Aktion (kW)": [0.0] * len(slots),
+        "Preis extrapoliert": [False] * len(slots),
+    })
+    axis = ChartSlotAxis.from_dataframe(optimized_df)
+    history_slot_count = 1
+    soc_at_now = _soc_at_chart_now(
+        axis, optimized_df, now, history_slot_count,
+    )
+    assert soc_at_now == pytest.approx(92.84, abs=0.05)
+    fig = go.Figure()
+    add_optimized_soc_trace(
+        fig, optimized_df, axis,
+        history_slot_count=history_slot_count, chart_now=now,
+    )
+    add_baseline_soc_traces(
+        fig,
+        baseline_df,
+        history_slot_count=history_slot_count,
+        chart_now=now,
+        soc_at_now=soc_at_now,
+    )
+    soc_trace = [trace for trace in fig.data if trace.name == "SoC"][-1]
+    bl_trace = next(trace for trace in fig.data if trace.name == "SoC BL Ziel")
+    soc_at = {
+        pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ): float(y)
+        for x, y in zip(soc_trace.x, soc_trace.y)
+    }
+    bl_at = {
+        pd.Timestamp(x).to_pydatetime().replace(tzinfo=_TZ): float(y)
+        for x, y in zip(bl_trace.x, bl_trace.y)
+    }
+    assert now in soc_at and now in bl_at
+    assert bl_at[now] == pytest.approx(soc_at[now])
+    assert bl_at[now] > 90.0
