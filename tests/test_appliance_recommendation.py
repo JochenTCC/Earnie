@@ -65,7 +65,7 @@ def test_cost_over_multiple_full_hours():
     slots = make_slots([10.0, 20.0, 30.0, 40.0, 50.0, 60.0])
     weights = [1.0, 1.0]
     # 1 kW * (10 + 20) ct = 30 ct = 0,30 €
-    assert run_cost_eur(slots, 0, 1.0, weights) == pytest.approx(0.30)
+    assert run_cost_eur(slots, 0, 1.0, weights, 1.0) == pytest.approx(0.30)
 
 
 def test_fractional_runtime_weights_last_hour():
@@ -216,7 +216,7 @@ def test_no_surplus_equals_import_only():
     )
     weights = [1.0]
     # surplus 0 → 2 kW * 30 ct = 60 ct = 0,60 €
-    assert run_cost_eur(slots, 0, 2.0, weights) == pytest.approx(0.60)
+    assert run_cost_eur(slots, 0, 2.0, weights, 1.0) == pytest.approx(0.60)
 
 
 def test_full_surplus_uses_export_tariff():
@@ -228,7 +228,7 @@ def test_full_surplus_uses_export_tariff():
     )
     weights = [1.0]
     # surplus 4 kW ≥ power 2 → 2 * 8 ct = 16 ct = 0,16 €
-    assert run_cost_eur(slots, 0, 2.0, weights) == pytest.approx(0.16)
+    assert run_cost_eur(slots, 0, 2.0, weights, 1.0) == pytest.approx(0.16)
 
 
 def test_partial_surplus_splits_import_and_export():
@@ -240,7 +240,7 @@ def test_partial_surplus_splits_import_and_export():
     )
     weights = [1.0]
     # surplus 2, power 3 → 2*10 + 1*40 = 60 ct = 0,60 €
-    assert run_cost_eur(slots, 0, 3.0, weights) == pytest.approx(0.60)
+    assert run_cost_eur(slots, 0, 3.0, weights, 1.0) == pytest.approx(0.60)
 
 
 def test_ranking_prefers_pv_surplus_over_low_import():
@@ -281,3 +281,43 @@ def test_stars_abs_margin_on_fictitious_series():
     assert result.options[0].stars == STAR_MAX
     assert result.options[1].stars == STAR_MAX
     assert result.options[2].stars == STAR_MAX
+
+
+def _make_qh_slots(count: int, price_cent: float = 10.0) -> list[dict]:
+    return [
+        {
+            "slot_datetime": BASE + timedelta(minutes=15 * i),
+            "k_act": price_cent,
+            "k_push_act": 0.0,
+            "expected_p_pv": 0.0,
+            "expected_p_act": 0.0,
+        }
+        for i in range(count)
+    ]
+
+
+def test_quarter_hour_starts_are_half_hour_and_keep_horizon():
+    result = recommend_start_times(
+        _make_qh_slots(40), power_kw=1.0, runtime_h=1.0, horizon_h=4
+    )
+    times = [option.start_datetime for option in result.options]
+    assert times[0] == BASE
+    assert {moment.minute for moment in times} <= {0, 30}
+    assert times[-1] == BASE + timedelta(hours=3, minutes=30)
+    assert len(times) == 8
+
+
+def test_quarter_hour_keeps_current_slot_if_not_half_hour():
+    slots = _make_qh_slots(40)[1:]
+    result = recommend_start_times(slots, power_kw=1.0, runtime_h=1.0, horizon_h=2)
+    times = [option.start_datetime for option in result.options]
+    assert times[0] == BASE + timedelta(minutes=15)
+    assert times[1] == BASE + timedelta(minutes=30)
+    assert times[-1] < BASE + timedelta(minutes=15) + timedelta(hours=2)
+
+
+def test_quarter_hour_runtime_cost_scales_with_slot_duration():
+    result = recommend_start_times(
+        _make_qh_slots(12), power_kw=1.0, runtime_h=1.0, horizon_h=1
+    )
+    assert result.immediate.cost_eur == pytest.approx(0.10)

@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Manuelle Geräte 30-min start slots (2026-08-13)
+
+- [x] Time slots on Manuelle Geräte always showed `x.00` with duplicate checks per hour — snapshot loader floored QH `slot_datetime` to the hour and `recommend_start_times` treated `horizon_h` as a slot count. Fix: keep sub-hour timestamps; current slot plus `:00`/`:30` starts across the consumer wall-clock horizon; schedule overlay uses real slot duration. Tests in `test_appliance_recommendation.py` / `test_appliance_schedule.py` / `test_live_display_loader.py`. Live acceptance verified.
+
+
 ### Bugfix Chart-1 SoC vs underlay / BL anchor (2026-08-12)
 
 - [x] Chart-1 SoC implausible vs ESS underlay (`debug_dump_20260812_191122`, 19:00–20:00) — current-hour ramp no longer wipes later MILP quarters; Jetzt-Anker uses MILP polyline when later QH exist (BL met Opt ~93%, not Ist-extrapolation ~82.5%); underlay `bridge_left=False`. Tests in `test_charts_soc_tail.py`. Live acceptance verified.

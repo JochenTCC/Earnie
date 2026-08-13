@@ -62,6 +62,19 @@ def test_planning_matrix_from_snapshot():
     assert isinstance(matrix[0]["slot_datetime"], datetime)
 
 
+def test_planning_matrix_preserves_quarter_hour_minutes():
+    snapshot = {
+        "planning_matrix": [
+            {"slot_datetime": "2026-08-13T09:45:00+02:00", "k_act": 10.0},
+            {"slot_datetime": "2026-08-13T10:00:00+02:00", "k_act": 11.0},
+            {"slot_datetime": "2026-08-13T10:15:00+02:00", "k_act": 12.0},
+        ]
+    }
+    matrix = planning_matrix_from_snapshot(snapshot)
+    minutes = [row["slot_datetime"].minute for row in matrix]
+    assert minutes == [45, 0, 15]
+
+
 def test_planning_matrix_falls_back_to_simulation_rows():
     snapshot = {
         "simulation_rows": [

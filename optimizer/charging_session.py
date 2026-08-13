@@ -174,7 +174,9 @@ def sync_charging_sessions(
         target = round(float(ctx["target_kwh"]), 3)
         dl_iso = deadline.isoformat(timespec="seconds")
         if cid in sessions:
-            sessions[cid]["target_kwh"] = target
+            prev = float(sessions[cid].get("target_kwh") or 0.0)
+            if target > prev:
+                sessions[cid]["target_kwh"] = target
             sessions[cid]["deadline"] = dl_iso
         else:
             sessions[cid] = {
@@ -183,6 +185,23 @@ def sync_charging_sessions(
                 "deadline": dl_iso,
             }
     return fulfilled_from_purge
+
+
+def charging_session_remaining_kwh(
+    ctx: dict | None,
+    *,
+    daily_target: float,
+    delivered_kwh: float,
+) -> float:
+    """Energy still needed for MILP.
+
+    Plugged-in ctx.target_kwh is already Ist-SOC remaining. Subtracting booked
+    delivery again double-counts the same energy (dump 20260813_075350).
+    """
+    target = max(0.0, float(daily_target))
+    if (ctx or {}).get("plugged_in") is True:
+        return target
+    return max(0.0, target - float(delivered_kwh))
 
 
 def session_delivered_kwh(sessions: dict[str, dict], consumer_id: str) -> float:

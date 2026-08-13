@@ -1,7 +1,7 @@
 """Tests für optimizer.appliance_schedule."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from optimizer.appliance_schedule import apply_appliance_schedules_to_matrix
@@ -37,6 +37,21 @@ def test_apply_appliance_schedule_adds_baseload():
     assert updated[0]["expected_p_act"] == 3.0
     assert updated[1]["expected_p_act"] == 3.0
     assert updated[2]["expected_p_act"] == 1.0
+
+
+def test_apply_appliance_schedule_half_hour_start_on_qh_matrix():
+    start = datetime(2026, 7, 8, 18, 30, tzinfo=TZ)
+    matrix = [_row(start + timedelta(minutes=15 * i)) for i in range(8)]
+    schedules = {
+        "waschmaschine": {
+            "start_at": start.isoformat(timespec="seconds"),
+            "power_kw": 2.0,
+            "runtime_h": 1.0,
+            "expires_at": (start + timedelta(hours=1)).isoformat(timespec="seconds"),
+        }
+    }
+    updated = apply_appliance_schedules_to_matrix(matrix, schedules)
+    assert [row["expected_p_act"] for row in updated[:5]] == [3.0, 3.0, 3.0, 3.0, 1.0]
 
 
 def test_apply_appliance_schedule_empty_is_noop():

@@ -10,22 +10,24 @@ Bewusst getroffene Modell-Entscheidungen:
   ct/kWh-Serie, danach prozentuale Mehrkosten gegenüber der günstigsten
   Startstunde.
 - Ein Lauf darf über das Horizontende hinausreichen, solange genügend
-  Planungs-Slots vorliegen; sonst entfallen die betroffenen Startstunden.
-
-Die Planungs-Slots sind stündlich (siehe ``data.profile_manager``); ein Slot
-entspricht daher einer Stunde.
+  Planungs-Slots vorliegen; sonst entfallen die betroffenen Startzeiten.
+- Angezeigte Starts: aktueller Slot plus volle 30-Minuten-Zeiten (:00/:30)
+  im Empfehlungshorizont (Wandstunden, nicht Slot-Anzahl).
 """
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
+
+from optimizer.slot_duration import DEFAULT_DT_H
 
 STAR_MIN = 1
 STAR_MAX = 5
 STAR_NEUTRAL = 3
 DEFAULT_HORIZON_H = 6
 _EPS = 1e-9
+_HALF_HOUR_MINUTES = frozenset({0, 30})
 
 DEFAULT_ABS_MARGIN_CENT = 0.05
 DEFAULT_PCT_STARS_4 = 10.0
@@ -94,13 +96,47 @@ def _validate_star_settings(settings: StarThresholdSettings) -> None:
         raise ValueError("pct_stars_1 muss größer als pct_stars_4 sein.")
 
 
-def _slot_run_weights(runtime_h: float) -> list[float]:
-    """Anteil (in Stunden) je Stundenslot, den ein Lauf von runtime_h belegt."""
-    full_hours = int(math.floor(runtime_h + _EPS))
-    remainder = runtime_h - full_hours
-    weights = [1.0] * full_hours
-    if remainder > _EPS:
-        weights.append(remainder)
+def _infer_slot_dt_h(slots: list) -> float:
+    """Wall-clock hours between consecutive slots (QH live, 1 h in older tests)."""
+    prev = None
+    for slot in slots[:8]:
+        moment = slot.get("slot_datetime")
+        if not hasattr(moment, "timestamp"):
+            continue
+        if prev is not None:
+            delta_h = (moment - prev).total_seconds() / 3600.0
+            if delta_h > _EPS:
+                return delta_h
+        prev = moment
+    return DEFAULT_DT_H
+
+
+def _horizon_end(slots: list, horizon_h: int) -> datetime:
+    return slots[0]["slot_datetime"] + timedelta(hours=horizon_h)
+
+
+def _half_hour_start_indices(slots: list, horizon_end: datetime) -> list[int]:
+    """Current slot plus :00/:30 starts strictly inside the wall-clock horizon."""
+    indices: list[int] = []
+    for index, slot in enumerate(slots):
+        moment = slot["slot_datetime"]
+        if moment >= horizon_end:
+            break
+        if index == 0 or moment.minute in _HALF_HOUR_MINUTES:
+            indices.append(index)
+    return indices
+
+
+def _slot_run_weights(runtime_h: float, dt_h: float) -> list[float]:
+    """Power fraction per matrix slot for a run of ``runtime_h`` hours."""
+    step = float(dt_h)
+    if step <= _EPS:
+        raise ValueError(f"_slot_run_weights: dt_h muss > 0 sein (erhalten: {dt_h}).")
+    full_slots = int(math.floor((runtime_h + _EPS) / step))
+    remainder_h = runtime_h - full_slots * step
+    weights = [1.0] * full_slots
+    if remainder_h > _EPS:
+        weights.append(remainder_h / step)
     return weights
 
 
@@ -135,12 +171,12 @@ def _slot_effective_price_cent(slot: dict, power_kw: float) -> float:
 
 
 def run_cost_eur(
-    slots: list, start_index: int, power_kw: float, weights: list[float]
+    slots: list, start_index: int, power_kw: float, weights: list[float], dt_h: float
 ) -> float:
     """Laufkosten (€) für einen Start bei start_index über die gegebenen Slot-Gewichte."""
     cost_cent = 0.0
     for offset, weight in enumerate(weights):
-        cost_cent += weight * _slot_opportunity_cost_cent(
+        cost_cent += weight * dt_h * _slot_opportunity_cost_cent(
             slots[start_index + offset], power_kw
         )
     return cost_cent / 100.0
@@ -183,7 +219,11 @@ def _assign_stars(
     if max(costs) - min_cost < _EPS:
         return [STAR_NEUTRAL] * len(costs)
 
-    horizon_slots = min(horizon_h, len(slots))
+    horizon_end = _horizon_end(slots, horizon_h)
+    horizon_slots = min(
+        len(slots),
+        max(1, sum(1 for slot in slots if slot["slot_datetime"] < horizon_end)),
+    )
     min_price = min(
         _slot_effective_price_cent(slots[i], power_kw) for i in range(horizon_slots)
     )
@@ -209,25 +249,28 @@ def recommend_start_times(
     horizon_h: int = DEFAULT_HORIZON_H,
     star_settings: StarThresholdSettings | None = None,
 ) -> ApplianceRecommendation:
-    """Rankt die möglichen Startstunden im Horizont nach Opportunitätskosten.
+    """Rankt die möglichen Startzeiten im Horizont nach Opportunitätskosten.
 
-    ``slots`` ist eine chronologische Liste stündlicher Planungs-Slots
-    (dicts mit ``slot_datetime``, ``k_act``, ``k_push_act``, ``expected_p_pv``,
-    ``expected_p_act``), z. B. aus ``data.profile_manager``.
+    ``slots`` ist die chronologische Planungsmatrix (Live: Viertelstunden) mit
+    ``slot_datetime``, ``k_act``, ``k_push_act``, ``expected_p_pv``,
+    ``expected_p_act``. Angezeigte Starts: aktueller Slot plus :00/:30.
+    ``horizon_h`` sind Wandstunden, keine Slot-Anzahl.
     """
     _validate_inputs(slots, power_kw, runtime_h, horizon_h)
     thresholds = star_settings or DEFAULT_STAR_THRESHOLDS
-    weights = _slot_run_weights(runtime_h)
+    dt_h = _infer_slot_dt_h(slots)
+    weights = _slot_run_weights(runtime_h, dt_h)
     run_slots = len(weights)
-    max_start = min(horizon_h, len(slots))
-    valid_starts = [s for s in range(max_start) if s + run_slots <= len(slots)]
+    grid_starts = _half_hour_start_indices(slots, _horizon_end(slots, horizon_h))
+    valid_starts = [s for s in grid_starts if s + run_slots <= len(slots)]
+    max_start = len(grid_starts)
     if not valid_starts:
         raise ValueError(
             f"recommend_start_times: nur {len(slots)} Planungs-Slots für eine "
             f"Laufzeit von {runtime_h} h ({run_slots} Slots) — keine Empfehlung möglich."
         )
 
-    costs = [run_cost_eur(slots, s, power_kw, weights) for s in valid_starts]
+    costs = [run_cost_eur(slots, s, power_kw, weights, dt_h) for s in valid_starts]
     stars = _assign_stars(
         slots, valid_starts, weights, costs, thresholds, horizon_h, power_kw
     )

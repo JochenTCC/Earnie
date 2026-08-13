@@ -217,6 +217,51 @@ class TestChargingSessionState:
         assert "eauto" not in state["open_charging_deadlines"]
 
 
+class TestDump20260813PrematureFulfill:
+    """debug_dump_20260813_075350: Ist-SOC remaining 6.75 kWh, booked ~6.3 kWh."""
+
+    def test_shrinking_ist_soc_does_not_overwrite_session_target(self):
+        consumer = _eauto_consumer()
+        deadline = datetime(2026, 8, 13, 7, 45)
+        sessions = {
+            "eauto": {
+                "target_kwh": 11.667,
+                "delivered_kwh": 6.3,
+                "deadline": "2026-08-13T07:45:00",
+            }
+        }
+        contexts = {
+            "eauto": {
+                "active": True,
+                "plugged_in": True,
+                "deadline": deadline,
+                "target_kwh": 6.75,
+            }
+        }
+        cs.sync_charging_sessions(
+            sessions, contexts, {"eauto": consumer}, datetime(2026, 8, 13, 3, 15)
+        )
+        assert sessions["eauto"]["target_kwh"] == pytest.approx(11.667)
+        cs.add_session_delivery(sessions, "eauto", 0.895)
+        assert cs.session_target_fulfilled(sessions["eauto"]) is False
+
+    def test_plugged_in_remaining_is_ist_soc_not_booked_minus(self):
+        rem = cs.charging_session_remaining_kwh(
+            {"plugged_in": True, "target_kwh": 6.75},
+            daily_target=6.75,
+            delivered_kwh=6.3,
+        )
+        assert rem == pytest.approx(6.75)
+
+    def test_absent_remaining_still_subtracts_delivered(self):
+        rem = cs.charging_session_remaining_kwh(
+            {"plugged_in": False, "anticipated": True, "target_kwh": 11.5},
+            daily_target=11.5,
+            delivered_kwh=2.0,
+        )
+        assert rem == pytest.approx(9.5)
+
+
 class TestDeadlineHelpers:
     def test_schedule_indices_cross_midnight(self):
         consumer = _eauto_consumer()

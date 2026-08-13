@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from data.planning_window import PlanningWindow, parse_row_slot_datetime
+from data.planning_window import PlanningWindow, parse_chart_row_slot_datetime
 from optimizer import schedule as optimization_schedule
 from runtime_store import live_optimization_debug
 
@@ -50,7 +50,7 @@ def _normalize_matrix_rows(rows: list) -> list[dict]:
         if not isinstance(row, dict):
             continue
         item = dict(row)
-        slot_dt = parse_row_slot_datetime(row)
+        slot_dt = parse_chart_row_slot_datetime(row)
         if slot_dt is not None:
             item["slot_datetime"] = slot_dt
         normalized.append(item)

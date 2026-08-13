@@ -25,6 +25,7 @@ from .charging_context import (
 )
 from .charging_session import (
     add_session_delivery,
+    charging_session_remaining_kwh,
     is_charging_session_context,
     normalize_consumer_state,
     session_delivered_kwh,
@@ -274,6 +275,10 @@ def get_consumer_remaining_kwh(
             )
             if note is not None:
                 plausibility[cid] = note
+            remaining[cid] = charging_session_remaining_kwh(
+                ctx, daily_target=daily_target, delivered_kwh=already
+            )
+            continue
         else:
             already = float(delivered.get(cid, 0.0))
         remaining[cid] = max(0.0, daily_target - already)

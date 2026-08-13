@@ -3,14 +3,15 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
-from data.planning_window import align_to_planning_timezone, normalize_hour_slot
+from data.planning_window import align_to_planning_timezone
 import config
-from optimizer.appliance_recommendation import _slot_run_weights
+from optimizer.slot_duration import DEFAULT_DT_H
 
 CHART_KIND_MANUAL_APPLIANCE = "manual_appliance"
+_EPS_H = 1e-9
 
 
 def _planning_tz() -> str:
@@ -27,16 +28,49 @@ def _slot_datetime(row: dict[str, Any]) -> datetime | None:
     return align_to_planning_timezone(datetime.fromisoformat(str(raw)), tz)
 
 
-def _weight_for_slot(
+def _infer_rows_dt_h(rows: list[dict[str, Any]]) -> float:
+    prev = None
+    for row in rows:
+        moment = _slot_datetime(row)
+        if moment is None:
+            continue
+        if prev is not None:
+            delta_h = (moment - prev).total_seconds() / 3600.0
+            if delta_h > _EPS_H:
+                return delta_h
+        prev = moment
+    return DEFAULT_DT_H
+
+
+def _neighbor_dt_h(moments: list[datetime | None], index: int) -> float:
+    current = moments[index]
+    if current is None:
+        return DEFAULT_DT_H
+    if index + 1 < len(moments) and moments[index + 1] is not None:
+        delta_h = (moments[index + 1] - current).total_seconds() / 3600.0
+        if delta_h > _EPS_H:
+            return delta_h
+    if index > 0 and moments[index - 1] is not None:
+        delta_h = (current - moments[index - 1]).total_seconds() / 3600.0
+        if delta_h > _EPS_H:
+            return delta_h
+    return DEFAULT_DT_H
+
+
+def _power_fraction(
     slot_start: datetime,
     schedule_start: datetime,
-    weights: list[float],
+    runtime_h: float,
+    slot_dt_h: float,
 ) -> float:
-    delta_h = (normalize_hour_slot(slot_start) - normalize_hour_slot(schedule_start)).total_seconds() / 3600.0
-    index = int(round(delta_h))
-    if index < 0 or index >= len(weights):
+    slot_end = slot_start + timedelta(hours=slot_dt_h)
+    run_end = schedule_start + timedelta(hours=runtime_h)
+    overlap_start = max(slot_start, schedule_start)
+    overlap_end = min(slot_end, run_end)
+    if overlap_end <= overlap_start:
         return 0.0
-    return float(weights[index])
+    overlap_h = (overlap_end - overlap_start).total_seconds() / 3600.0
+    return min(1.0, overlap_h / slot_dt_h)
 
 
 def apply_appliance_schedules_to_matrix(
@@ -48,6 +82,7 @@ def apply_appliance_schedules_to_matrix(
         return matrix
 
     updated = copy.deepcopy(matrix)
+    slot_dt_h = _infer_rows_dt_h(updated)
     for entry in schedules.values():
         start_raw = entry.get("start_at")
         if not start_raw:
@@ -59,15 +94,14 @@ def apply_appliance_schedules_to_matrix(
         runtime_h = float(entry.get("runtime_h", 0.0) or 0.0)
         if power_kw <= 0 or runtime_h <= 0:
             continue
-        weights = _slot_run_weights(runtime_h)
         for row in updated:
             slot_start = _slot_datetime(row)
             if slot_start is None:
                 continue
-            weight = _weight_for_slot(slot_start, start_at, weights)
-            if weight <= 0:
+            fraction = _power_fraction(slot_start, start_at, runtime_h, slot_dt_h)
+            if fraction <= 0:
                 continue
-            add_kw = round(power_kw * weight, 3)
+            add_kw = round(power_kw * fraction, 3)
             row["expected_p_act"] = round(float(row.get("expected_p_act", 0.0)) + add_kw, 3)
             flex = dict(row.get("expected_flex_kw") or {})
             total_flex = sum(float(v or 0.0) for v in flex.values())
@@ -97,11 +131,13 @@ def appliance_kw_for_slot(
     schedules: dict[str, dict[str, Any]],
     *,
     appliances_by_id: dict[str, dict[str, Any]] | None = None,
+    slot_dt_h: float | None = None,
 ) -> dict[str, float]:
     """Geplante Leistung (kW) je Gerät für einen Slotbeginn."""
     lookup = appliances_by_id if appliances_by_id is not None else _appliances_by_id()
     if not schedules or not lookup:
         return {}
+    dt_h = DEFAULT_DT_H if slot_dt_h is None else float(slot_dt_h)
     result: dict[str, float] = {}
     for appliance_id, entry in schedules.items():
         appliance = lookup.get(str(appliance_id))
@@ -117,14 +153,10 @@ def appliance_kw_for_slot(
         runtime_h = float(entry.get("runtime_h", 0.0) or 0.0)
         if power_kw <= 0 or runtime_h <= 0:
             continue
-        weight = _weight_for_slot(
-            slot_start,
-            start_at,
-            _slot_run_weights(runtime_h),
-        )
-        if weight <= 0:
+        fraction = _power_fraction(slot_start, start_at, runtime_h, dt_h)
+        if fraction <= 0:
             continue
-        kw = round(power_kw * weight, 2)
+        kw = round(power_kw * fraction, 2)
         if kw > 0:
             result[str(appliance_id)] = kw
     return result
@@ -165,14 +197,16 @@ def apply_appliance_schedules_to_chart_rows(
     if not schedules or not appliances_by_id:
         return
 
-    for chart_row in chart_rows:
-        slot_start = _slot_datetime(chart_row)
+    slot_times = [_slot_datetime(chart_row) for chart_row in chart_rows]
+    for index, chart_row in enumerate(chart_rows):
+        slot_start = slot_times[index]
         if slot_start is None:
             continue
         by_id = appliance_kw_for_slot(
             slot_start,
             schedules,
             appliances_by_id=appliances_by_id,
+            slot_dt_h=_neighbor_dt_h(slot_times, index),
         )
         moved_kw = 0.0
         for appliance_id, kw in by_id.items():
