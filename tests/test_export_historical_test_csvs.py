@@ -38,14 +38,14 @@ def _write_cons_data(path: Path, hours: int) -> None:
 
 
 def test_export_requires_full_year(tmp_path: Path) -> None:
-    cons = tmp_path / "cons_data_hourly.csv"
+    cons = tmp_path / "cons_data.csv"
     _write_cons_data(cons, hours=100)
     with pytest.raises(ValueError, match="8760"):
         export_historical_test_csvs(cons, tmp_path / "out")
 
 
 def test_export_round_trip_energiemonitor_and_pv(tmp_path: Path) -> None:
-    cons = tmp_path / "cons_data_hourly.csv"
+    cons = tmp_path / "cons_data.csv"
     _write_cons_data(cons, hours=MIN_HOURS_FULL_YEAR)
     out_dir = tmp_path / "export"
     paths = export_historical_test_csvs(cons, out_dir)
@@ -77,7 +77,7 @@ def test_export_round_trip_energiemonitor_and_pv(tmp_path: Path) -> None:
 
 
 def test_export_date_filter(tmp_path: Path) -> None:
-    cons = tmp_path / "cons_data_hourly.csv"
+    cons = tmp_path / "cons_data.csv"
     _write_cons_data(cons, hours=MIN_HOURS_FULL_YEAR + 48)
     out_dir = tmp_path / "filtered"
     export_historical_test_csvs(

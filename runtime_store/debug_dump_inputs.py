@@ -70,7 +70,7 @@ def iter_input_files() -> list[tuple[str, str]]:
         ("inputs/deviation_rules.json", resolved["deviation_rules_json"]),
         ("inputs/local_settings.json", resolved["local_settings_json"]),
         ("inputs/price_model_coefficients.json", resolved.get("forecast_model_path")),
-        ("inputs/cons_data_hourly.csv", resolved.get("cons_data_path")),
+        ("inputs/cons_data.csv", resolved.get("cons_data_path")),
     )
     files: list[tuple[str, str]] = []
     for archive_name, source_path in candidates:

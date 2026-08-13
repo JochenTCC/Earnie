@@ -96,7 +96,7 @@ def build_rows(
                 row[f"d_eur_k{k}_vs_k{baseline_k}"] = None
             plaus = payload.get("plausibility", {})
             row[f"plaus_k{k}"] = _plaus_ok(plaus, sid)
-            hourly = run_dirs[k] / "backtesting_hourly.csv"
+            hourly = run_dirs[k] / "backtesting.csv"
             batt = _battery_totals(hourly, sid)
             row[f"batt_charge_kwh_k{k}"] = round(batt["charge_kwh"], 2)
             row[f"batt_discharge_kwh_k{k}"] = round(batt["discharge_kwh"], 2)

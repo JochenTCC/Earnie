@@ -11,7 +11,7 @@
 #   1. Ordner anlegen: mkdir -p earnie_env/config earnie_env/runtime
 #   2. Container starten – fehlende Dateien legt der Entrypoint an (config/.env, config.json)
 #   3. config/.env und earnie_env/config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
-#   4. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
+#   4. Optional: bestehende cons_data nach runtime/cons_data.csv kopieren
 #
 # Migration vom alten Dateinamen loxberry.yml / Container „earnie“:
 #   docker stop earnie; docker rm earnie

@@ -20,6 +20,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Context:** Community pre-release `2.5.0-alpha.1` ships full 15‑min MILP (`dt_h = 0.25`) plus remaining 2.5 feature items (archived). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
 
+- [ ] Check possibilities to show decimal numbers according to regional settings (e.g. use "," as decimal sign for Germany)
 - [ ] Official `2.5.0` after community soak (tag without `-alpha`; GHCR `:latest`)
 
 

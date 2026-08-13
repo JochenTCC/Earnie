@@ -7,7 +7,7 @@ from runtime_store.config_drift import find_config_drift, should_show_config_dri
 def test_find_config_drift_reports_missing_top_level_and_nested_keys():
     example = {
         "market_prices": {"missing_price_strategy": "forecast"},
-        "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+        "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data.csv"},
         "flexible_consumers": [
             {
                 "id": "eauto",

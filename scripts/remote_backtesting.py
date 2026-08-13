@@ -5,9 +5,9 @@ remote_backtesting.py – Backtesting auf einem leistungsstärkeren PC im LAN.
 Gemeinsame Datenbasis (empfohlen): SMB-Freigabe auf NAS/Server, z. B.
   \\\\NAS\\EnergyOptimizer\\backtesting-sync\\
     config\\           ← config.json, backtesting_scenarios.json
-    runtime\\          ← cons_data_hourly.csv
+    runtime\\          ← cons_data.csv
     Historical-Data\\   ← Loxone-CSVs (wie in config.json referenziert)
-    results\\          ← backtesting_log.json, backtesting_hourly.csv
+    results\\          ← backtesting_log.json, backtesting.csv
 
 Einrichtung:
   1. Freigabe anlegen und von beiden PCs aus erreichbar machen

@@ -365,7 +365,7 @@ Backend wählen und Umschalten: [Adapter wählen](../einrichtung/adapter-wahl.md
 1. **Benutzer / Token** am Smarthome-Backend mit Rechten zum Lesen und Schreiben der benötigten IOs / Entities einrichten.
 2. **Signale** anlegen bzw. zuordnen — u. a. Batterie-SOC und Leistungen, PV, Netz, Freigaben, E-Auto-Status. Beispielnamen (Loxone): [Loxone-Signale](../referenz/loxone-signale.md).
 3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** Merker bzw. HA-Entities den EHAL-Feldern zuweisen (`plant.ehal_bindings` / `consumers[].ehal_bindings`). Bei Loxone oft zuerst **Loxone-Import** im Hauskonfigurator, dann Mapping prüfen.
-4. Wenn Jahres-Leistungsprofile berücksichtigt werden sollen (ist optional): CSV-Upload nuten ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)) Offline-Daten für den Szenario-Explorerliegen später unter`cons_data_hourly.csv`.
+4. Wenn Jahres-Leistungsprofile berücksichtigt werden sollen (ist optional): CSV-Upload nuten ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)) Offline-Daten für den Szenario-Explorerliegen später unter`cons_data.csv`.
 
 Earnie liest Werte im Live-Betrief oft als Text mit Einheit (z. B. `3.5 kW`); die Einheit wird ignoriert.
 

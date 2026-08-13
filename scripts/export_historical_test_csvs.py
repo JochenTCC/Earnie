@@ -136,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         "--cons-data",
         type=Path,
         default=None,
-        help="Pfad zu cons_data_hourly.csv (Default: path_cons_data aus config)",
+        help="Pfad zu cons_data.csv (Default: path_cons_data aus config)",
     )
     parser.add_argument(
         "--out-dir",

@@ -92,7 +92,7 @@ SOC in    = SoC an SA₁ = End-SoC an SA₂ des vorherigen Sunrise-Schritts
             (hartes SoC-Hold am Slot vor SA₁; kein terminal end=start am ready_by;
              kein SOC_min an SA₂ in SE v1)
 Flex      = nur im Book-Slice (flex_book_start / flex_book_hours)
-Daten     = historische Ist-Verbräuche/PV aus cons_data_hourly.csv
+Daten     = historische Ist-Verbräuche/PV aus cons_data.csv
 Geo/Zeit  = latitude/longitude aus aufgelöstem Live-Szenario (Hausprofil)
 ```
 

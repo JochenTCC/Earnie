@@ -152,7 +152,7 @@ def _resolve_single_consumer_daily_target_kwh(
 
 
 def resolve_historical_consumer_daily_targets(target_date: date) -> dict[str, float]:
-    """Geloggte Tagesenergie je Verbraucher aus cons_data_hourly."""
+    """Geloggte Tagesenergie je Verbraucher aus cons_data."""
     if isinstance(target_date, str):
         target_date = pd.to_datetime(target_date).date()
     elif isinstance(target_date, datetime):

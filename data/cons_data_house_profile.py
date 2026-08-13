@@ -1,4 +1,4 @@
-"""Hausprofil-Auflösung und Synthese für cons_data_hourly.csv."""
+"""Hausprofil-Auflösung und Synthese für cons_data.csv."""
 from __future__ import annotations
 
 import hashlib

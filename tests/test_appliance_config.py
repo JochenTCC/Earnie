@@ -116,7 +116,7 @@ def test_root_eauto_milp_block_rejected(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "block_key,block_value",
     [
-        ("file_paths_battery_simulation", {"path_cons_data": "runtime/cons_data_hourly.csv"}),
+        ("file_paths_battery_simulation", {"path_cons_data": "runtime/cons_data.csv"}),
         ("awattar", {}),
         ("battery_wear", {"enabled": False}),
         ("batteries", []),
@@ -144,7 +144,7 @@ def test_reject_path_consumption_production_in_scenario_explorer_conf():
         reject_legacy_config_blocks(
             {
                 "scenario_explorer_conf": {
-                    "path_cons_data": "runtime/cons_data_hourly.csv",
+                    "path_cons_data": "runtime/cons_data.csv",
                     "path_consumption": "c.csv",
                     "path_production": "p.csv",
                 }

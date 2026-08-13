@@ -49,7 +49,7 @@ def _smoke_scenario_without_house_overlay(runtime_scenario_params: dict) -> dict
 def historical_cache() -> HistoricalDataCache:
     if not CONS_DATA_FILE.is_file():
         pytest.fail(
-            "tests/fixtures/historical/cons_data_hourly.csv fehlt "
+            "tests/fixtures/historical/cons_data.csv fehlt "
             "(python -m scripts.extract_historical_fixtures)"
         )
     cache = HistoricalDataCache(str(CONS_DATA_FILE))

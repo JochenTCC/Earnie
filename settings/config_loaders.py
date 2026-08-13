@@ -204,7 +204,7 @@ def load_sim_path_params(raw_config: dict) -> dict[str, Any]:
     sim_paths = raw_config.get("scenario_explorer_conf", {})
     return {
         "PATH_PRICE": sim_paths.get("path_price", ""),
-        "PATH_CONS_DATA": sim_paths.get("path_cons_data", "runtime/cons_data_hourly.csv"),
+        "PATH_CONS_DATA": sim_paths.get("path_cons_data", "runtime/cons_data.csv"),
         "CONS_DATA_RETENTION_MONTHS": sim_paths.get("cons_data_retention_months", 24),
         "CONS_DATA_WRITE_MODE": sim_paths.get("cons_data_write_mode", "hourly"),
         "PRICE_SOURCE": sim_paths.get("price_source", "csv"),

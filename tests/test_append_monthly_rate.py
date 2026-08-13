@@ -59,7 +59,7 @@ def _write_live_pack(config_dir: Path, tariffs: dict) -> None:
                 },
                 "planning_horizon": {"mode": "sunrise_window"},
                 "scenario_explorer_conf": {
-                    "path_cons_data": "runtime/cons_data_hourly.csv"
+                    "path_cons_data": "runtime/cons_data.csv"
                 },
             }
         ),

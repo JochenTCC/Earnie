@@ -807,7 +807,7 @@ def fetch_flexible_consumers_live_kw(
     slot_datetime: datetime | None = None,
 ) -> dict[str, float]:
     """
-    Live-Leistungen aller flexiblen Verbraucher für cons_data_hourly.
+    Live-Leistungen aller flexiblen Verbraucher für cons_data.
     Fallback (z. B. Optimizer-Sollwerte) wenn Merker fehlt oder Loxone nicht antwortet.
     """
     return resolve_flexible_consumers_live_power(

@@ -29,7 +29,7 @@ def initial_soc_for_anchor(
     scenario_id: str,
     hourly_df: pd.DataFrame,
 ) -> float:
-    """SOC am Fensterstart aus backtesting_hourly.csv; Fallback 50 %."""
+    """SOC am Fensterstart aus backtesting.csv; Fallback 50 %."""
     slots = window_slot_datetimes(anchor)
     first_slot = slots[0]
     if hourly_df is None or hourly_df.empty:

@@ -34,7 +34,7 @@ def test_bootstrap_creates_missing_files_without_overwriting(tmp_path, monkeypat
     bootstrap.run()
 
     config_path = tmp_path / "config" / "config.json"
-    cons_data_path = tmp_path / "runtime" / "cons_data_hourly.csv"
+    cons_data_path = tmp_path / "runtime" / "cons_data.csv"
     assert config_path.is_file()
     assert cons_data_path.is_file()
     config_payload = json.loads(config_path.read_text(encoding="utf-8"))

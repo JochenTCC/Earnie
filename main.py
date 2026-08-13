@@ -361,7 +361,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
                 flex_kw=flex_kw,
             )
             if written:
-                logger.info("cons_data: %s Stunde(n) in cons_data_hourly.csv geschrieben.", written)
+                logger.info("cons_data: %s Stunde(n) in cons_data.csv geschrieben.", written)
         except Exception as e:
             logger.warning("cons_data: Messwerte konnten nicht gespeichert werden: %s", e)
 

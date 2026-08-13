@@ -6,13 +6,13 @@
     "sync_paths": [
         "config/config.json",
         "config/backtesting_scenarios.json",
-        "runtime/cons_data_hourly.csv",
+        "runtime/cons_data.csv",
         "Historical-Data"
     ],
     "result_dir": "results",
     "result_files": [
         "backtesting_log.json",
-        "backtesting_hourly.csv"
+        "backtesting.csv"
     ],
     "ssh": {
         "host": "192.168.1.100",

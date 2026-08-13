@@ -61,7 +61,7 @@ def resolve_simulation_window(
     data_min, data_max = get_cons_data_date_bounds()
     if data_min is None or data_max is None:
         raise ValueError(
-            "Kein Zeitraum für die Simulation: cons_data_hourly.csv fehlt oder ist leer."
+            "Kein Zeitraum für die Simulation: cons_data.csv fehlt oder ist leer."
         )
 
     end = last_complete_month_end(pd.Timestamp(data_max))

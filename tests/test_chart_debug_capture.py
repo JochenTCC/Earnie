@@ -138,7 +138,7 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
     with _chart_debug_config(tmp_path, monkeypatch, enabled=True):
         rules_path = tmp_path / "deviation_rules.json"
         model_path = tmp_path / "runtime" / "price_model_coefficients.json"
-        cons_data_path = tmp_path / "runtime" / "cons_data_hourly.csv"
+        cons_data_path = tmp_path / "runtime" / "cons_data.csv"
         rules_path.write_text(
             json.dumps(
                 {
@@ -210,7 +210,7 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
         assert "inputs/config.json" in names
         assert "inputs/deviation_rules.json" in names
         assert "inputs/price_model_coefficients.json" in names
-        assert "inputs/cons_data_hourly.csv" in names
+        assert "inputs/cons_data.csv" in names
         assert manifest["resolved_paths"]["config_json"].endswith("config.json")
         assert manifest["resolved_paths"]["deviation_rules_json"].endswith(
             "deviation_rules.json"
@@ -219,7 +219,7 @@ def test_write_capture_zip_contains_manifest(tmp_path, monkeypatch):
             "price_model_coefficients.json"
         )
         assert manifest["resolved_paths"]["cons_data_path"].endswith(
-            "cons_data_hourly.csv"
+            "cons_data.csv"
         )
         assert "inputs/config.json" in manifest["included_input_files"]
         assert "inputs/price_model_coefficients.json" in manifest["included_input_files"]

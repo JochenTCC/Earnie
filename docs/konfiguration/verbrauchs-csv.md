@@ -150,7 +150,7 @@ Pro Verbraucher:
 
 **SE-Basislast:** Pfad **B** (stündlicher Meter-Rest), wenn Gesamt-CSV vorhanden und alle Gesteuert/Manual ein aktives CSV haben; sonst Pfad **A**. Unter A: bei `baseload_distribution=monthly` monatsweise Ist − Modellverbraucher, sonst flache `baseload_kwh/8760`.
 
-Synthetische `cons_data_hourly.csv` nutzt die konfigurierte Grundlast (`baseload_kwh / 8760`), außer SE läuft mit Pfad B (oder Pfad A Monats-Rest aus dem Hausprofil).
+Synthetische `cons_data.csv` nutzt die konfigurierte Grundlast (`baseload_kwh / 8760`), außer SE läuft mit Pfad B (oder Pfad A Monats-Rest aus dem Hausprofil).
 
 ### Digitale Ein/Aus-Signale (0/1)
 
@@ -163,7 +163,7 @@ Die Haus-Gesamt-CSV (`total_profile_csv`) wird nicht so skaliert — dort gibt e
 
 ## Test-Export aus Live-`cons_data`
 
-Für lokale Import-Tests kann aus der Live-System-Datei `cons_data_hourly.csv` eine **PV-Erzeugungsprofil**-CSV und eine **Energiemonitor**-CSV (nur relevante Spalten) erzeugt werden:
+Für lokale Import-Tests kann aus der Live-System-Datei `cons_data.csv` eine **PV-Erzeugungsprofil**-CSV und eine **Energiemonitor**-CSV (nur relevante Spalten) erzeugt werden:
 
 ```text
 python -m scripts.export_historical_test_csvs --out-dir Historical-Data/export-test
@@ -184,9 +184,9 @@ Kurzweg für die Einrichtung (Details und Rollen-Tabelle: Spec [efm-auto-sync-2.
 
 | Ebene            | Ort                                                                    | Zweck                            |
 | ---------------- | ---------------------------------------------------------------------- | -------------------------------- |
-| Runtime          | `scenario_explorer_conf.path_cons_data` → `cons_data_hourly.csv`       | Live + Szenario-Explorer         |
+| Runtime          | `scenario_explorer_conf.path_cons_data` → `cons_data.csv`       | Live + Szenario-Explorer         |
 | Hausmodell       | `house_profiles`: `total_profile_csv`, `pv_profile_csv`, `profile_csv` | Planung, Ist-vs-Modell, Synthese |
 | Offline-Flex-Log | `path_historical_log` am Verbraucher (Legacy-Overlay / Profil)         | Einzelserie → cons_data          |
 
 
-Das Feld `path_historical_log` (flexible Verbraucher / Hausprofil) gehört zum Offline-Weg Loxone-Log → `cons_data_hourly.csv` und ist unabhängig von den Hausprofil-Jahres-CSVs. Die früheren Keys `path_consumption` / `path_production` in `config.json` sind entfernt (data-model v3).
+Das Feld `path_historical_log` (flexible Verbraucher / Hausprofil) gehört zum Offline-Weg Loxone-Log → `cons_data.csv` und ist unabhängig von den Hausprofil-Jahres-CSVs. Die früheren Keys `path_consumption` / `path_production` in `config.json` sind entfernt (data-model v3).

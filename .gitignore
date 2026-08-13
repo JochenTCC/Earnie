@@ -1,6 +1,6 @@
 *.csv
-!tests/fixtures/backtesting/cons_data_hourly.csv
-!tests/fixtures/historical/cons_data_hourly.csv
+!tests/fixtures/backtesting/cons_data.csv
+!tests/fixtures/historical/cons_data.csv
 !tests/fixtures/thermal/*.csv
 !docs/referenz/Netznutzungsentgelte-Austria-2026.csv
 config.py
@@ -25,6 +25,7 @@ flexible_consumers_state.json
 !tests/fixtures/prod_dumps/**/flexible_consumers_state.json
 pv_counter_state.json
 !tests/fixtures/prod_dumps/**/pv_counter_state.json
+cons_data.meta.json
 cons_data_hourly.meta.json
 cons_data_pending.json
 optimizer_run_state.json

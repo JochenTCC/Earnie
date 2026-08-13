@@ -19,7 +19,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./earnie_env/config/house_profiles.json`        | Hausprofile (Sidecar)                                                                                                   |
 | `./earnie_env/config/deviation_rules.json`       | Soll/Ist-Regeln für Chart-Marker (Bootstrap legt an)                                                                    |
 | `./earnie_env/config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
-| `./earnie_env/runtime/`                          | `cons_data_hourly.csv`, Zustands-JSONs, Profile, Logs                                                                   |
+| `./earnie_env/runtime/`                          | `cons_data.csv`, Zustands-JSONs, Profile, Logs                                                                   |
 | `./earnie_env/runtime/local_settings.json`       | Lokale Einstellungen (z. B. Silent-Mode)                                                                                |
 | `./earnie_env/config/.env`                       | Loxone-Zugangsdaten                                                                                                     |
 
@@ -32,7 +32,7 @@ Umgebungsvariable in Compose: `EARNIE_ENV_PATH=.` (leitet `/app/config` und `/ap
 2. `mkdir -p earnie_env/config earnie_env/runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`.env`, `config.json`, `tariffs.json`, weitere Sidecars, Vorlagen aus `share/config/` falls nötig, leere Runtime-Dateien)
 4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
-5. Optional: historische `cons_data` aus Dev nach `earnie_env/runtime/cons_data_hourly.csv` kopieren
+5. Optional: historische `cons_data` aus Dev nach `earnie_env/runtime/cons_data.csv` kopieren
 
 
 
@@ -224,7 +224,7 @@ Für Abnahme von Hauskonfigurator und Backtesting auf **leeren** Volumes (Port *
 2. `mkdir -p earnie_env/config earnie_env/runtime`
 3. Container starten — der **Entrypoint** legt fehlende Dateien an (`earnie_env/config/.env`, `config.json`, … im gemounteten Volume)
 4. `earnie_env/config/.env`, `earnie_env/config/config.json` und `earnie_env/config/tariffs.json` anpassen (Loxone-Zugang, Entitäten, Tarif-IDs der Szenarien)
-5. Optional: historische `cons_data` nach `earnie_env/runtime/cons_data_hourly.csv` kopieren
+5. Optional: historische `cons_data` nach `earnie_env/runtime/cons_data.csv` kopieren
 
 
 

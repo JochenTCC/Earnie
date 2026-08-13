@@ -135,7 +135,7 @@ Environment: `EARNIE_MILP_SOLVER=highs`, trivial fast-path off. Synthetic matrix
 
 | Surface | Paths / notes |
 |---------|----------------|
-| `cons_data_hourly` | Hourly CSV + hour flush (`data/cons_data_store.py`, `main.py`) |
+| `cons_data` | Hourly CSV + hour flush (`data/cons_data_store.py`, `main.py`) |
 | PV forecast | `data/pv_forecast.py` — hourly watts map |
 | Outdoor / archive PV | `data/outdoor_forecast.py`, `data/open_meteo_solar_archive.py` |
 | Price features | `docs/spec/price-forecast-renewables.md` — EC 15‑min → hourly mean for features |

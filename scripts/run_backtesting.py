@@ -232,7 +232,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--output-dir",
         metavar="PFAD",
         default=".",
-        help="Zielordner für backtesting_log.json und backtesting_hourly.csv (Standard: .).",
+        help="Zielordner für backtesting_log.json und backtesting.csv (Standard: .).",
     )
     parser.add_argument(
         "--progress-file",

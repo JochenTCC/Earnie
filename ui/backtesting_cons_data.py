@@ -1,4 +1,4 @@
-"""Backtesting-UI: cons_data_hourly.csv anzeigen, prüfen und generieren."""
+"""Backtesting-UI: cons_data.csv anzeigen, prüfen und generieren."""
 from __future__ import annotations
 
 import streamlit as st
@@ -46,7 +46,7 @@ def _format_match_status(reason: str | None) -> tuple[str, str]:
 def render_cons_data_section() -> bool:
     """Zeigt Verbrauchsdaten-Abschnitt; gibt True zurück wenn Backtesting starten kann."""
     path = cons_data_store.get_output_path()
-    st.subheader("Verbrauchsdaten (`cons_data_hourly.csv`)")
+    st.subheader("Verbrauchsdaten (`cons_data.csv`)")
     st.caption(f"Pfad: `{path}`")
     st.caption(cons_data_section_caption())
     render_time_range_help(key="backtesting_time_ranges_cons_data")
@@ -89,7 +89,7 @@ def render_cons_data_section() -> bool:
         df = cons_data_store.load_cons_data(path)
         if not cons_data_has_flex_energy(df):
             st.warning(
-                "Flexible Verbraucher haben in `cons_data_hourly.csv` keine "
+                "Flexible Verbraucher haben in `cons_data.csv` keine "
                 "messbaren Werte (nur Basislast). Bitte Daten neu generieren."
             )
         try:

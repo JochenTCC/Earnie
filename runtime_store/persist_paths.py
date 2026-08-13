@@ -146,7 +146,7 @@ def runtime_path(filename: str) -> str:
 
 
 def resolve_backtesting_log_dir() -> str:
-    """Zielordner für backtesting_log.json und backtesting_hourly.csv (UI und Laufzeit)."""
+    """Zielordner für backtesting_log.json und backtesting.csv (UI und Laufzeit)."""
     return runtime_dir()
 
 
@@ -222,8 +222,31 @@ def flexible_consumer_profiles_file() -> str:
     return runtime_path("flexible_consumer_profiles.csv")
 
 
+CONS_DATA_CSV = "cons_data.csv"
+CONS_DATA_CSV_LEGACY = "cons_data_hourly.csv"
+
+
 def default_cons_data_file() -> str:
-    return runtime_path("cons_data_hourly.csv")
+    """Canonical cons_data path; fall back to legacy ``*_hourly`` name if present."""
+    preferred = runtime_path(CONS_DATA_CSV)
+    if os.path.exists(preferred):
+        return preferred
+    legacy = runtime_path(CONS_DATA_CSV_LEGACY)
+    if os.path.exists(legacy):
+        return legacy
+    return preferred
+
+
+def resolve_cons_data_path(configured_path: str) -> str:
+    """Prefer existing file; if ``cons_data.csv`` is missing, try ``cons_data_hourly.csv``."""
+    if os.path.exists(configured_path):
+        return configured_path
+    norm = configured_path.replace("\\", "/")
+    if norm.endswith("/" + CONS_DATA_CSV) or norm.endswith(CONS_DATA_CSV):
+        legacy = configured_path[: -len(CONS_DATA_CSV)] + CONS_DATA_CSV_LEGACY
+        if os.path.exists(legacy):
+            return legacy
+    return configured_path
 
 
 def bundled_config_dir() -> str:

@@ -40,7 +40,7 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 
 | Datei                           | Inhalt                                                                                       |
 | ------------------------------- | -------------------------------------------------------------------------------------------- |
-| `cons_data_hourly.csv`          | Stündliche Verbrauchs- und PV-Basis (von `main.py` gepflegt)                                 |
+| `cons_data.csv`          | Stündliche Verbrauchs- und PV-Basis (von `main.py` gepflegt)                                 |
 | `flexible_consumers_state.json` | Tagesenergie je Flex-Verbraucher                                                             |
 | `pv_counter_state.json`         | PV-Zählerstand für Stunden-Delta                                                             |
 | `cons_data_pending.json`        | Pending-Puffer für cons_data-Samples                                                         |
@@ -105,7 +105,7 @@ Ein Dump enthält immer die volle Optimierungshistorie und die aktiven Inputs. D
 Gemeinsam in jedem ZIP:
 
 - `manifest.json` — `schema_version: 3`, `dump_type: debug`, App-Version, Env-Overrides, aufgelöste Pfade; optional `chart`, immer `meta` (Titel/Symptom/case_id)
-- `inputs/*` — aktive `config.json`, Sidecars, optional Preis-Modell und `cons_data_hourly.csv`
+- `inputs/*` — aktive `config.json`, Sidecars, optional Preis-Modell und `cons_data.csv`
 - `README.txt` — Kurzbeschreibung der Struktur
 
 Dateiname: `debug_dump_YYYYMMDD_HHMMSS.zip` unter `runtime/chart_debug/` (oder `ui.chart_debug_capture_dir`).

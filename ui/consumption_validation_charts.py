@@ -47,7 +47,7 @@ def load_csv_monthly_kwh(csv_path: str) -> dict[str, float]:
 
 
 def cons_dataframe_to_series(df: pd.DataFrame) -> list[tuple[str, float]]:
-    """Mappt cons_data_hourly DataFrame (total_kw) auf (timestamp, kW)-Serie."""
+    """Mappt cons_data DataFrame (total_kw) auf (timestamp, kW)-Serie."""
     if df.empty:
         return []
     series: list[tuple[str, float]] = []

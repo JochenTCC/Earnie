@@ -79,7 +79,7 @@ def test_build_time_range_help_lines_empty_cons_data(monkeypatch):
 
     def _missing_window():
         raise ValueError(
-            "Kein Zeitraum für die Simulation: cons_data_hourly.csv fehlt oder ist leer."
+            "Kein Zeitraum für die Simulation: cons_data.csv fehlt oder ist leer."
         )
 
     monkeypatch.setattr(

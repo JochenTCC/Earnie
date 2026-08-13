@@ -134,7 +134,7 @@ def optimized_kw_by_consumer_from_hourly(
     timestamps: list[str],
     consumer_ids: list[str],
 ) -> dict[str, list[float]]:
-    """Optimierte kW-Serien je Verbraucher aus backtesting_hourly.csv."""
+    """Optimierte kW-Serien je Verbraucher aus backtesting.csv."""
     flex_cols = _flex_kw_columns(hourly_df)
     flex_by_id = {
         col[: -len("_kw")]: col

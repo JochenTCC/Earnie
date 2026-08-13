@@ -29,7 +29,7 @@ def minimal_config_payload(
         },
         "planning_horizon": {"mode": "sunrise_window"},
         "scenario_explorer_conf": {
-            "path_cons_data": "runtime/cons_data_hourly.csv",
+            "path_cons_data": "runtime/cons_data.csv",
         },
         "flexible_consumers": [],
     }

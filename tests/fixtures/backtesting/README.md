@@ -1,12 +1,12 @@
 # Backtesting Offline-Fixtures
 
-Versionierte Mini-Daten für Backtesting-Tests **ohne** lokale `cons_data_hourly.csv`.
+Versionierte Mini-Daten für Backtesting-Tests **ohne** lokale `cons_data.csv`.
 
 ## Inhalt
 
 | Datei | Zweck |
 |-------|--------|
-| `cons_data_hourly.csv` | Auszug aus Produktiv-Logs (158 Stunden) |
+| `cons_data.csv` | Auszug aus Produktiv-Logs (158 Stunden) |
 | `config.json` | Minimale Config mit Pfad auf diese CSV |
 | `backtesting_scenarios.json` | Ein schnelles 5-kWh-Szenario |
 
@@ -24,4 +24,4 @@ Versionierte Mini-Daten für Backtesting-Tests **ohne** lokale `cons_data_hourly
 python scripts/extract_backtesting_fixtures.py
 ```
 
-(Nur bei bewusster Aktualisierung der Fixture-Daten aus `runtime/cons_data_hourly.csv`.)
+(Nur bei bewusster Aktualisierung der Fixture-Daten aus `runtime/cons_data.csv`.)

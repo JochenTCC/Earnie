@@ -15,7 +15,7 @@
 #   2. Diese Datei als compose.yaml ablegen (oder -f docker/compose/proxmox_productive.yml)
 #   3. Container starten – fehlende Dateien legt der Entrypoint an
 #   4. config/.env und earnie_env/config/config.json anpassen (Loxone-Zugang, Namen, Verbraucher)
-#   5. Optional: bestehende cons_data nach runtime/cons_data_hourly.csv kopieren
+#   5. Optional: bestehende cons_data nach runtime/cons_data.csv kopieren
 #
 # Migration vom alten Dateinamen proxmox.yml / Container „earnie“:
 #   docker stop earnie; docker rm earnie

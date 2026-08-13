@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Kopiert runtime/cons_data_hourly.csv nach tests/fixtures/historical/."""
+"""Kopiert runtime/cons_data.csv nach tests/fixtures/historical/."""
 from __future__ import annotations
 
 import argparse
@@ -7,8 +7,8 @@ import shutil
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = REPO_ROOT / "runtime" / "cons_data_hourly.csv"
-DEFAULT_TARGET = REPO_ROOT / "tests" / "fixtures" / "historical" / "cons_data_hourly.csv"
+DEFAULT_SOURCE = REPO_ROOT / "runtime" / "cons_data.csv"
+DEFAULT_TARGET = REPO_ROOT / "tests" / "fixtures" / "historical" / "cons_data.csv"
 
 
 def extract(source: Path, target: Path) -> int:

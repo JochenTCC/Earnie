@@ -1,4 +1,4 @@
-"""Offline-Fixtures: Backtesting ohne lokale cons_data_hourly.csv."""
+"""Offline-Fixtures: Backtesting ohne lokale cons_data.csv."""
 from __future__ import annotations
 
 import os
@@ -58,7 +58,7 @@ def fixture_prices_df() -> pd.DataFrame:
 def test_fixture_files_exist():
     assert (FIXTURES_ROOT / "config.json").is_file()
     assert (FIXTURES_ROOT / "backtesting_scenarios.json").is_file()
-    assert (FIXTURES_ROOT / "cons_data_hourly.csv").is_file()
+    assert (FIXTURES_ROOT / "cons_data.csv").is_file()
 
 
 def test_fixture_config_loads_without_production_cons_data(
@@ -70,7 +70,7 @@ def test_fixture_config_loads_without_production_cons_data(
     del backtesting_fixtures
     monkeypatch.chdir(FIXTURES_ROOT.parents[2])
     sim_cfg = config.get_scenario_explorer_conf()
-    assert sim_cfg["path_cons_data"] == "tests/fixtures/backtesting/cons_data_hourly.csv"
+    assert sim_cfg["path_cons_data"] == "tests/fixtures/backtesting/cons_data.csv"
     cache = load_fixture_cache()
     assert cache._consumption_df is not None
     assert not cache._consumption_df.empty
@@ -130,6 +130,58 @@ def test_reference_costs_on_fixture(
     )
     assert len(df) == slots_for_wall_hours(24)
     assert df["sim_cost"].notna().all()
+
+
+def test_reference_progress_reports_wall_hours_not_slots(
+    fixture_cache,
+    fixture_scenario,
+    fixture_prices_df,
+    backtesting_fixtures,
+):
+    import config
+
+    del backtesting_fixtures
+    seen: list[tuple[int, int]] = []
+    day = pd.Timestamp(LOW_EAUTO_DAY)
+    ref_settings = config.get_backtesting_feed_in_settings(
+        runtime_override=fixture_scenario
+    )
+    compute_historical_reference_costs(
+        day,
+        day,
+        fixture_prices_df,
+        ref_settings,
+        cache=fixture_cache,
+        scenario_params=fixture_scenario,
+        on_progress=lambda current, total: seen.append((current, total)),
+    )
+    assert seen
+    assert seen[-1] == (24, 24)
+    assert all(total == 24 for _current, total in seen)
+    assert max(current for current, _total in seen) == 24
+
+
+def test_simulation_progress_reports_wall_hours_not_slots(
+    fixture_cache,
+    fixture_scenario,
+    fixture_prices_df,
+):
+    seen: list[tuple[int, int]] = []
+    day = pd.Timestamp(LOW_EAUTO_DAY)
+    run_simulation(
+        day,
+        day,
+        fixture_scenario,
+        fixture_prices_df,
+        cache=fixture_cache,
+        scenario_id="fixture_5kwh_fixed",
+        on_progress=lambda current, total: seen.append((current, total)),
+    )
+    assert seen
+    last_current, last_total = seen[-1]
+    assert last_total == 24
+    assert last_current == last_total
+    assert last_total < 50
 
 
 def test_backtesting_log_roundtrip_on_fixture(tmp_path, fixture_cache):

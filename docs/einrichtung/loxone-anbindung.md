@@ -36,7 +36,7 @@ Merker-Namen liegen in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Haus
 | -------------------- | -------------------------------------------------- | ------------------------------------------------- |
 | Anlage (Plant)       | `plant.ehal_bindings`                              | SOC, Netz/PV/ESS-Leistungen, Außentemperatur      |
 | Steuer-Rückmeldung   | dieselben Soll-/Ist-Merker                         | Prüfen, ob Schreiben ankommt                      |
-| Flexible Verbraucher | `consumers[].ehal_bindings`                        | Live-Leistung / Freigaben für `cons_data_hourly`  |
+| Flexible Verbraucher | `consumers[].ehal_bindings`                        | Live-Leistung / Freigaben für `cons_data`  |
 | E-Auto-Status        | EVCS-Felder in `ehal_bindings` / Ladeplan          | Anschluss, Rest-SOC, Fertig-um, max. Ladeleistung |
 
 

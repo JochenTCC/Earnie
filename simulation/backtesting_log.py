@@ -33,7 +33,8 @@ from .period_clip import clip_results_map_to_period
 logger = logging.getLogger(__name__)
 
 BACKTESTING_LOG_JSON = "backtesting_log.json"
-BACKTESTING_HOURLY_CSV = "backtesting_hourly.csv"
+BACKTESTING_CSV = "backtesting.csv"
+BACKTESTING_CSV_LEGACY = "backtesting_hourly.csv"
 BACKTESTING_CBC_EVENTS_JSONL = "backtesting_cbc_events.jsonl"
 LOG_VERSION = BACKTESTING_LOG_SCHEMA
 _DEFAULT_LOG_DIR = resolve_backtesting_log_dir()
@@ -391,7 +392,7 @@ def save_backtesting_log(
     target_dir = _DEFAULT_LOG_DIR if log_dir is None else log_dir
     os.makedirs(target_dir, exist_ok=True)
     json_path = os.path.join(target_dir, BACKTESTING_LOG_JSON)
-    csv_path = os.path.join(target_dir, BACKTESTING_HOURLY_CSV)
+    csv_path = os.path.join(target_dir, BACKTESTING_CSV)
 
     period_start = period.get("start")
     period_end = period.get("end")
@@ -437,7 +438,7 @@ def save_backtesting_log(
                 sid: _serialize_plausibility(rep)
                 for sid, rep in plausibility_by_scenario.items()
             },
-            "hourly_file": BACKTESTING_HOURLY_CSV,
+            "series_file": BACKTESTING_CSV,
             "scenario_ids": list(results.keys()),
             "reference_id": HISTORICAL_REFERENCE_ID,
             "config_fingerprint": config_fingerprint or _compute_config_fingerprint(period),
@@ -508,8 +509,14 @@ def load_backtesting_log(log_dir: str | None = None) -> tuple[dict, pd.DataFrame
             BACKTESTING_LOG_SCHEMA,
         )
 
-    hourly_name = meta.get("hourly_file", BACKTESTING_HOURLY_CSV)
-    csv_path = os.path.join(target_dir, hourly_name)
+    series_name = meta.get("series_file") or meta.get("hourly_file") or BACKTESTING_CSV
+    csv_path = os.path.join(target_dir, series_name)
+    if not os.path.exists(csv_path):
+        for candidate in (BACKTESTING_CSV, BACKTESTING_CSV_LEGACY):
+            alt = os.path.join(target_dir, candidate)
+            if os.path.exists(alt):
+                csv_path = alt
+                break
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"Stundendatei fehlt: {csv_path}")
 

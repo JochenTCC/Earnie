@@ -10,7 +10,7 @@ import pandas as pd
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "backtesting"
 
-# Kalendertage mit bekanntem Verhalten in cons_data_hourly.csv (siehe README).
+# Kalendertage mit bekanntem Verhalten in cons_data.csv (siehe README).
 LOW_EAUTO_DAY = date(2026, 6, 25)
 HIGH_EAUTO_DAY = date(2026, 6, 23)
 BASELOAD_EDGE_DAY = date(2024, 7, 4)

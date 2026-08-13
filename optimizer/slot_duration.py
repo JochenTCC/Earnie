@@ -25,6 +25,12 @@ def slots_for_wall_hours(wall_hours: float, dt_h: float | None = None) -> int:
     return max(0, math.ceil(float(wall_hours) / dt))
 
 
+def wall_hours_from_slots(n_slots: int, dt_h: float | None = None) -> int:
+    """Convert a slot count to whole wall-clock hours (floor)."""
+    dt = validate_dt_h(DEFAULT_DT_H if dt_h is None else dt_h)
+    return int(n_slots * dt)
+
+
 def normalize_quarter_hour_slot(moment: datetime) -> datetime:
     """Floor ``moment`` to the start of its 15-minute slot (keeps tzinfo)."""
     minute = (moment.minute // 15) * 15

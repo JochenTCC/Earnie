@@ -25,12 +25,12 @@ def _sample_df() -> pd.DataFrame:
 
 
 def test_is_cons_data_populated_false_when_missing(tmp_path):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     assert cons_data_store.is_cons_data_populated(str(path)) is False
 
 
 def test_is_cons_data_populated_false_when_header_only(tmp_path):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     path.write_text("timestamp;total_kw;baseload_kw;pv_kw;source\n", encoding="utf-8")
     assert cons_data_store.is_cons_data_populated(str(path)) is False
 
@@ -51,14 +51,14 @@ def _patch_config_flex_ids(monkeypatch, ids: list[str]) -> None:
 
 
 def test_is_cons_data_populated_true_with_rows(tmp_path, monkeypatch):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     _patch_config_flex_ids(monkeypatch, [])
     cons_data_store.save_cons_data(_sample_df(), str(path), apply_retention=False)
     assert cons_data_store.is_cons_data_populated(str(path)) is True
 
 
 def test_load_cons_data_meta_roundtrip(tmp_path, monkeypatch):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     _patch_config_flex_ids(monkeypatch, ["swimspa"])
     cons_data_store.save_cons_data(_sample_df(), str(path), apply_retention=False)
     meta = cons_data_store.load_cons_data_meta(str(path))
@@ -67,14 +67,14 @@ def test_load_cons_data_meta_roundtrip(tmp_path, monkeypatch):
 
 
 def test_cons_data_consumer_match_reason_matching(tmp_path, monkeypatch):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     _patch_config_flex_ids(monkeypatch, ["eauto", "swimspa"])
     cons_data_store.save_cons_data(_sample_df(), str(path), apply_retention=False)
     assert cons_data_store.cons_data_consumer_match_reason(str(path)) is None
 
 
 def test_cons_data_consumer_match_reason_mismatch(tmp_path, monkeypatch):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     _patch_config_flex_ids(monkeypatch, ["eauto"])
     cons_data_store.save_cons_data(_sample_df(), str(path), apply_retention=False)
     _patch_config_flex_ids(monkeypatch, ["eauto", "swimspa"])
@@ -82,7 +82,7 @@ def test_cons_data_consumer_match_reason_mismatch(tmp_path, monkeypatch):
 
 
 def test_cons_data_consumer_match_reason_missing_meta(tmp_path, monkeypatch):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     _patch_config_flex_ids(monkeypatch, [])
     cons_data_store.save_cons_data(_sample_df(), str(path), apply_retention=False)
     os.remove(str(path).replace(".csv", ".meta.json"))
@@ -141,13 +141,13 @@ def test_expected_ids_match_house_profile_synthesis(tmp_path, monkeypatch):
         source="synthetic",
         pv_kw_at_datetime=lambda _slot: 0.0,
     )
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     cons_data_store.save_cons_data(df, str(path), apply_retention=False)
     assert cons_data_store.cons_data_consumer_match_reason(str(path)) is None
 
 
 def test_cons_data_consumer_match_reason_profile_mismatch(tmp_path, monkeypatch):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     profile = {
         "id": "efh",
         "annual_kwh": 11000.0,
@@ -168,7 +168,7 @@ def test_cons_data_consumer_match_reason_profile_mismatch(tmp_path, monkeypatch)
 
 
 def test_cons_data_consumer_match_reason_baseload_mismatch(tmp_path, monkeypatch):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     profile = {
         "id": "efh",
         "annual_kwh": 11000.0,
@@ -190,7 +190,7 @@ def test_cons_data_consumer_match_reason_baseload_mismatch(tmp_path, monkeypatch
 
 
 def test_cons_data_consumer_match_reason_pv_kwp_mismatch(tmp_path, monkeypatch):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     profile = {
         "id": "efh",
         "annual_kwh": 11000.0,
@@ -215,7 +215,7 @@ def test_cons_data_consumer_match_reason_pv_kwp_mismatch(tmp_path, monkeypatch):
 
 
 def test_invalidate_cons_data_meta(tmp_path, monkeypatch):
-    path = tmp_path / "cons_data_hourly.csv"
+    path = tmp_path / "cons_data.csv"
     _patch_config_flex_ids(monkeypatch, [])
     cons_data_store.save_cons_data(_sample_df(), str(path), apply_retention=False)
     assert cons_data_store.load_cons_data_meta(str(path)) is not None

@@ -138,9 +138,9 @@ def _format_config_error(message: str) -> str:
 
 
 def _format_backtesting_run_error(output: str) -> str | None:
-    if "cons_data_hourly.csv" in output:
+    if "cons_data.csv" in output:
         return (
-            "Szenario-Explorer benötigt Verbrauchsdaten in `cons_data_hourly.csv` "
+            "Szenario-Explorer benötigt Verbrauchsdaten in `cons_data.csv` "
             f"unter `{resolve_backtesting_log_dir()}` (bzw. dem in der Config "
             "konfigurierten `path_cons_data`). "
             "Für Greenfield: Daten per `scripts/generate_cons_data.py` erzeugen "
@@ -429,7 +429,7 @@ def render_backtesting_run_controls(
     if not cons_data_ready:
         st.caption(
             "Szenario-Explorer ist deaktiviert, bis gültige Verbrauchsdaten in "
-            "`cons_data_hourly.csv` vorhanden sind (siehe Abschnitt oben)."
+            "`cons_data.csv` vorhanden sind (siehe Abschnitt oben)."
         )
     elif test_month is None:
         st.caption(

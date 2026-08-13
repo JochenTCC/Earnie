@@ -708,7 +708,7 @@
         },
         "loxone_inputs": {
           "type": "object",
-          "description": "Live-Messwerte aus Loxone für cons_data_hourly (main.py).",
+          "description": "Live-Messwerte aus Loxone für cons_data (main.py).",
           "properties": {
             "power_name": {
               "type": "string",

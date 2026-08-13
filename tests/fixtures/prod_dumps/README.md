@@ -52,7 +52,7 @@ tests/fixtures/prod_dumps/<fall-id>/
   inputs/                    # aus Capture-ZIP oder Live-Pfaden
 ```
 
-Große Dateien (`cons_data_hourly.csv`, `earnie.log`) werden nicht versioniert;
+Große Dateien (`cons_data.csv`, `earnie.log`) werden nicht versioniert;
 sie bleiben im lokalen Capture-ZIP bzw. `runtime-prod/` zur manuellen Analyse.
 
 ## Capture-ZIP (schema v3, dump_type=debug)

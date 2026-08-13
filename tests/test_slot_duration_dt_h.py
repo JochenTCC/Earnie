@@ -8,6 +8,7 @@ from optimizer.slot_duration import (
     SLOTS_PER_HOUR,
     slots_for_wall_hours,
     validate_dt_h,
+    wall_hours_from_slots,
 )
 
 
@@ -63,3 +64,10 @@ def test_slots_for_wall_hours():
     assert slots_for_wall_hours(1.0, 0.25) == 4
     assert slots_for_wall_hours(1.05, 0.25) == 5
     assert slots_for_wall_hours(24.0) == 96
+
+
+def test_wall_hours_from_slots():
+    assert wall_hours_from_slots(4) == 1
+    assert wall_hours_from_slots(96) == 24
+    assert wall_hours_from_slots(35040) == 8760
+    assert wall_hours_from_slots(35041) == 8760

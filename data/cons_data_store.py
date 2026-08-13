@@ -1,5 +1,5 @@
 """
-cons_data_store.py – Lesen/Schreiben der generischen Stunden-Log-Datei (cons_data_hourly.csv).
+cons_data_store.py – Lesen/Schreiben der generischen Stunden-Log-Datei (cons_data.csv).
 
 Wird von profile_manager, main.py und scripts/generate_cons_data.py genutzt.
 """
@@ -15,8 +15,11 @@ import pandas as pd
 
 import config
 from runtime_store.persist_paths import (
+    CONS_DATA_CSV,
+    CONS_DATA_CSV_LEGACY,
     cons_data_pending_file,
     default_cons_data_file,
+    resolve_cons_data_path,
     resolve_runtime_prefixed_path,
 )
 from runtime_store.file_metadata import (
@@ -42,7 +45,7 @@ def get_output_path() -> str:
     configured = sim.get("path_cons_data")
     if not configured:
         return default_cons_data_file()
-    return resolve_runtime_prefixed_path(configured)
+    return resolve_cons_data_path(resolve_runtime_prefixed_path(configured))
 
 
 def get_retention_months() -> int:
@@ -154,7 +157,7 @@ def save_cons_data(df: pd.DataFrame, path: str | None = None, *, apply_retention
     export["timestamp"] = export["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
     export.to_csv(path, sep=CSV_SEP, index=False, decimal=".")
 
-    meta_path = path.replace(".csv", METADATA_SUFFIX) if path.endswith(".csv") else path + METADATA_SUFFIX
+    meta_path = path[: -len(".csv")] + METADATA_SUFFIX if path.endswith(".csv") else path + METADATA_SUFFIX
     from data.cons_data_house_profile import (
         current_cons_data_synthesis_fingerprint,
         expected_cons_data_consumer_ids,
@@ -244,8 +247,17 @@ def get_date_bounds() -> tuple[datetime | None, datetime | None]:
 
 def _meta_file_path(path: str) -> str:
     if path.endswith(".csv"):
-        return path.replace(".csv", METADATA_SUFFIX)
-    return path + METADATA_SUFFIX
+        preferred = path[: -len(".csv")] + METADATA_SUFFIX
+    else:
+        preferred = path + METADATA_SUFFIX
+    if os.path.isfile(preferred):
+        return preferred
+    norm = path.replace("\\", "/")
+    if norm.endswith(CONS_DATA_CSV):
+        legacy = path[: -len(CONS_DATA_CSV)] + CONS_DATA_CSV_LEGACY[: -len(".csv")] + METADATA_SUFFIX
+        if os.path.isfile(legacy):
+            return legacy
+    return preferred
 
 
 def is_cons_data_populated(path: str | None = None) -> bool:
@@ -257,7 +269,7 @@ def is_cons_data_populated(path: str | None = None) -> bool:
 
 
 def load_cons_data_meta(path: str | None = None) -> dict | None:
-    """Liest cons_data_hourly.meta.json; None wenn nicht vorhanden oder ungültig."""
+    """Liest cons_data.meta.json (legacy: cons_data_hourly.meta.json); None wenn fehlend/ungültig."""
     path = path or get_output_path()
     meta_path = _meta_file_path(path)
     if not os.path.isfile(meta_path):
@@ -397,7 +409,7 @@ def _aggregate_samples_to_hours(samples: Iterable[dict]) -> list[dict]:
 
 def flush_pending_samples(now: datetime | None = None) -> int:
     """
-    Schreibt abgeschlossene Stunden aus dem Pending-Puffer nach cons_data_hourly.csv.
+    Schreibt abgeschlossene Stunden aus dem Pending-Puffer nach cons_data.csv.
     hourly: alle vollständigen Stunden vor der aktuellen
     daily: einmal pro Tag alle Stunden des Vortags (und älter)
     Returns: Anzahl geschriebener Stunden.

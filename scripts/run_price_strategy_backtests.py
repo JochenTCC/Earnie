@@ -115,9 +115,9 @@ def main(argv: list[str] | None = None) -> int:
         "-o",
         str(comparison_path),
         "--mirror-hourly",
-        str(mirror_dir / "backtesting_hourly.csv"),
+        str(mirror_dir / "backtesting.csv"),
         "--forecast-hourly",
-        str(forecast_dir / "backtesting_hourly.csv"),
+        str(forecast_dir / "backtesting.csv"),
     ]
     subprocess.run(compare_cmd, check=True)
     print(f"\nFertig. Vergleich: {comparison_path}")

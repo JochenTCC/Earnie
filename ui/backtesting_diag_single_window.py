@@ -90,7 +90,7 @@ def render_diag_single_window_panel(
     with st.expander("Fenster-Diagnose (diag_single_window)"):
         st.caption(
             f"Einzelnes 24h-Fenster wie in der CLI — Start-SOC {initial_soc:.1f} % "
-            "aus backtesting_hourly.csv."
+            "aus backtesting.csv."
         )
         st.code(command, language="powershell")
         if st.button(

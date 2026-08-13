@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "historical"
-CONS_DATA_FILE = FIXTURES_ROOT / "cons_data_hourly.csv"
+CONS_DATA_FILE = FIXTURES_ROOT / "cons_data.csv"
 
 
 def cons_data_file() -> Path:

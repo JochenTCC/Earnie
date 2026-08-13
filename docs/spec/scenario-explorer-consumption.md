@@ -6,8 +6,8 @@ Developer reference for SE / greenfield backtesting load paths.
 
 | Path | Source | Used for |
 | ---- | ------ | -------- |
-| **Baseline** | House profile default schedules and/or `cons_data_hourly.csv` | Reference €, SE “Referenz-Verbrauch”, UI dashed lines |
-| **Optimized** | MILP output from `simulate_horizon` | Plausibility, SE solid lines, `backtesting_hourly.csv` consumption columns |
+| **Baseline** | House profile default schedules and/or `cons_data.csv` | Reference €, SE “Referenz-Verbrauch”, UI dashed lines |
+| **Optimized** | MILP output from `simulate_horizon` | Plausibility, SE solid lines, `backtesting.csv` consumption columns |
 
 ### Gesamtkosten column `Jahres Verbrauch [kWh]`
 

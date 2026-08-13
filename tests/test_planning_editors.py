@@ -88,7 +88,7 @@ def test_upsert_pv_and_battery_persist(tmp_path, monkeypatch):
                     "control_cmd_name": "Control_Cmd",
                 },
                 "planning_horizon": {"mode": "sunrise_window"},
-                "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+                "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data.csv"},
             }
         ),
         encoding="utf-8",

@@ -96,7 +96,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                 },
                 "planning_horizon": {"mode": "sunrise_window"},
                 "scenario_explorer_conf": {
-                    "path_cons_data": "runtime/cons_data_hourly.csv"
+                    "path_cons_data": "runtime/cons_data.csv"
                 },
                 "flexible_consumers": [],
             }

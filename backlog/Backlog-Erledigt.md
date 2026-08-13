@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Runtime filenames: drop `_hourly` (2026-08-13)
+
+- [x] Canonical runtime names are `cons_data.csv` / `cons_data.meta.json` and `backtesting.csv` (log field `series_file`). Legacy `*_hourly*` still loads if the new file is missing. Fixtures, docs, compose comments, schema, and `.gitignore` exceptions updated.
+
+
+### Bugfix SE calc non-optimized costs after QH (2026-08-13)
+
+- [x] SE calc costs much too high for non-optimized scenarios after QH-change — `_hour_cost_parts_without_optimization` treated each QH slot as 1 h (kW as kWh, ~4×). Fix: energy is `kW * dt_h`. Tests `test_reference_slot_cost_scales_with_dt_h` / `test_step_cost_parts_import_and_export`. Live acceptance verified. SE progress now reports wall-clock hours (`wall_hours_from_slots`).
+
+
 ### Bugfix Manuelle Geräte 30-min start slots (2026-08-13)
 
 - [x] Time slots on Manuelle Geräte always showed `x.00` with duplicate checks per hour — snapshot loader floored QH `slot_datetime` to the hour and `recommend_start_times` treated `horizon_h` as a slot count. Fix: keep sub-hour timestamps; current slot plus `:00`/`:30` starts across the consumer wall-clock horizon; schedule overlay uses real slot duration. Tests in `test_appliance_recommendation.py` / `test_appliance_schedule.py` / `test_live_display_loader.py`. Live acceptance verified.

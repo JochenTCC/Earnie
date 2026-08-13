@@ -1,6 +1,6 @@
 # Historische cons_data für Integrationstests
 
-Isolierte Kopie von `runtime/cons_data_hourly.csv` (≥12 Monate), damit Tests
+Isolierte Kopie von `runtime/cons_data.csv` (≥12 Monate), damit Tests
 unabhängig von der laufenden Runtime-Datei sind.
 
 ## Regenerieren

@@ -40,7 +40,7 @@ REQUIRED_CONFIG_FILES = (
 )
 REQUIRED_RUNTIME_FILES = (
     "local_settings.json",
-    "cons_data_hourly.csv",
+    "cons_data.csv",
 )
 
 LOG_OK_MARKERS = (

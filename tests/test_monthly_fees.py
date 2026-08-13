@@ -226,6 +226,28 @@ def test_tariff_preview_shows_monthly_fee_and_supplier() -> None:
     assert rows["Anbieter (supplier_id)"] == "vkw"
 
 
+def test_reference_slot_cost_scales_with_dt_h() -> None:
+    from optimizer.slot_duration import DEFAULT_DT_H
+    from simulation.engine import _hour_cost_parts_without_optimization
+
+    import_eur, export_eur, net_eur, import_kwh, export_kwh = (
+        _hour_cost_parts_without_optimization(2.0, 0.0, 20.0, 5.0)
+    )
+    assert import_kwh == pytest.approx(2.0 * DEFAULT_DT_H)
+    assert export_kwh == 0.0
+    assert import_eur == pytest.approx(2.0 * DEFAULT_DT_H * 20.0 / 100.0)
+    assert export_eur == 0.0
+    assert net_eur == pytest.approx(import_eur)
+
+    import_eur, export_eur, net_eur, import_kwh, export_kwh = (
+        _hour_cost_parts_without_optimization(0.0, 3.0, 20.0, 10.0)
+    )
+    assert import_kwh == 0.0
+    assert export_kwh == pytest.approx(3.0 * DEFAULT_DT_H)
+    assert export_eur == pytest.approx(3.0 * DEFAULT_DT_H * 10.0 / 100.0)
+    assert net_eur == pytest.approx(-export_eur)
+
+
 def test_step_cost_parts_import_and_export() -> None:
     from optimizer.slot_duration import DEFAULT_DT_H
 

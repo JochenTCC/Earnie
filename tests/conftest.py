@@ -56,15 +56,15 @@ _apply_default_test_config_env()
 
 
 def _has_runtime_cons_data() -> bool:
-    return (ROOT / "cons_data_hourly.csv").is_file() or (
-        ROOT / "runtime" / "cons_data_hourly.csv"
+    return (ROOT / "cons_data.csv").is_file() or (
+        ROOT / "runtime" / "cons_data.csv"
     ).is_file()
 
 
 requires_historical_data = pytest.mark.skipif(
     not fixture_available(),
     reason=(
-        "tests/fixtures/historical/cons_data_hourly.csv fehlt "
+        "tests/fixtures/historical/cons_data.csv fehlt "
         "(python -m scripts.extract_historical_fixtures)"
     ),
 )
@@ -72,7 +72,7 @@ requires_historical_data = pytest.mark.skipif(
 
 requires_runtime_cons_data = pytest.mark.skipif(
     not _has_runtime_cons_data(),
-    reason="runtime/cons_data_hourly.csv wird für Backtesting-Smoke-Tests benötigt",
+    reason="runtime/cons_data.csv wird für Backtesting-Smoke-Tests benötigt",
 )
 
 
@@ -81,7 +81,7 @@ def historical_cons_data():
     """Pfad zur isolierten cons_data-Test-Fixture (unabhängig von runtime/)."""
     if not fixture_available():
         pytest.skip(
-            "tests/fixtures/historical/cons_data_hourly.csv fehlt "
+            "tests/fixtures/historical/cons_data.csv fehlt "
             "(python -m scripts.extract_historical_fixtures)"
         )
     return str(CONS_DATA_FILE)

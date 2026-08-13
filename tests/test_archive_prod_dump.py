@@ -31,12 +31,12 @@ def test_archive_prod_dump_includes_resolved_inputs(tmp_path, monkeypatch):
     rules_path = tmp_path / "cfg" / "deviation_rules.json"
     local_settings_path = tmp_path / "runtime" / "local_settings.json"
     model_path = tmp_path / "runtime" / "price_model_coefficients.json"
-    cons_data_path = tmp_path / "runtime" / "cons_data_hourly.csv"
+    cons_data_path = tmp_path / "runtime" / "cons_data.csv"
     _write_json(
         config_path,
         {
             "market_prices": {"forecast_model_path": "runtime/price_model_coefficients.json"},
-            "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data_hourly.csv"},
+            "scenario_explorer_conf": {"path_cons_data": "runtime/cons_data.csv"},
             "runtime_settings": {"battery_capacity_kwh": 5.0},
         },
     )
@@ -83,9 +83,9 @@ def test_archive_prod_dump_includes_resolved_inputs(tmp_path, monkeypatch):
     assert "inputs/deviation_rules.json" in manifest["files"]
     assert "inputs/local_settings.json" in manifest["files"]
     assert "inputs/price_model_coefficients.json" in manifest["files"]
-    assert "inputs/cons_data_hourly.csv" in manifest["files"]
+    assert "inputs/cons_data.csv" in manifest["files"]
     assert (target / "inputs" / "config.json").is_file()
     assert (target / "inputs" / "deviation_rules.json").is_file()
     assert (target / "inputs" / "local_settings.json").is_file()
     assert (target / "inputs" / "price_model_coefficients.json").is_file()
-    assert (target / "inputs" / "cons_data_hourly.csv").is_file()
+    assert (target / "inputs" / "cons_data.csv").is_file()

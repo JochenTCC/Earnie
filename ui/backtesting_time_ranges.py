@@ -68,7 +68,7 @@ def build_time_range_help_lines(*, log_period: dict | None = None) -> list[str]:
     price_range = configured_price_range()
     lines = [
         (
-            f"**`cons_data_hourly.csv`:** Aufbewahrung **{retention}** Monate "
+            f"**`cons_data.csv`:** Aufbewahrung **{retention}** Monate "
             f"(`cons_data_retention_months`; ältere Stunden werden beim Speichern "
             f"entfernt). Die Visualisierung im Abschnitt oben zeigt die **gesamte Datei**."
         ),

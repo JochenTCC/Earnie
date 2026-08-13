@@ -21,7 +21,7 @@ def _minimal_charge_immediate_config() -> dict:
         "live_scenario_id": "live",
         "planning_horizon": {"mode": "sunrise_window"},
         "scenario_explorer_conf": {
-            "path_cons_data": "runtime/cons_data_hourly.csv",
+            "path_cons_data": "runtime/cons_data.csv",
         },
         "flexible_consumers": [
             {

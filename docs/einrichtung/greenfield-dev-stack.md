@@ -42,7 +42,7 @@ Nach `up` (vor manueller Ersteinrichtung) sollten u. a. vorhanden sein:
 | `greenfield/config/config.example.json` | Vollständiges Referenzbeispiel (Earnie) — nur zum Nachschlagen |
 | `greenfield/config/.env` | Aus `.env.example` (Platzhalter → Setup-Seite) |
 | `greenfield/runtime/local_settings.json` | z. B. `{"loxone_silent_mode": false}` |
-| `greenfield/runtime/cons_data_hourly.csv` | Nur CSV-Header, keine Messzeilen |
+| `greenfield/runtime/cons_data.csv` | Nur CSV-Header, keine Messzeilen |
 | `greenfield/config/house_profiles.json` | `profiles: []` |
 | `greenfield/config/tariffs.json` | Katalog aus `tariffs.example.json` (mehrere Import-/Export-Tarife zur Auswahl) |
 | `greenfield/config/backtesting_scenarios.json` | Mindestens Live-Szenario `live` (aus `backtesting_scenarios.minimal.json`) |

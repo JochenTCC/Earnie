@@ -11,7 +11,7 @@ from data import feed_in_prices
 from data.backtesting_prices import BacktestingPriceResources, matrix_prices_from_context
 from data.planning_window import normalize_hour_slot
 from data.market_prices import epex_prices_for_slots
-from optimizer.slot_duration import DEFAULT_DT_H
+from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h, wall_hours_from_slots
 from optimizer import (
     simulate_horizon,
     horizon_end_soc_from_chart_rows,
@@ -176,7 +176,7 @@ class HistoricalDataCache:
         cons_df = cons_data_store.load_cons_data()
         if cons_df.empty:
             raise ValueError(
-                "Backtesting benötigt cons_data_hourly.csv (z. B. via scripts/generate_cons_data.py)."
+                "Backtesting benötigt cons_data.csv (z. B. via scripts/generate_cons_data.py)."
             )
         cons_df = self._maybe_season_mirror(cons_df)
         self._consumption_df = profile_manager._cons_data_to_profile_dataframe(cons_df)
@@ -941,13 +941,15 @@ def _hour_cost_parts_without_optimization(
     """Import/export split without optimization (no battery, no flex).
 
     Returns ``(import_cost_eur, export_earn_eur, net_eur, import_kwh, export_kwh)``.
+    Energy is ``kW * dt_h`` (QH slots after 2.5).
     """
+    dt_h = validate_dt_h(DEFAULT_DT_H)
     p_grid = float(load_kw) - float(pv_kw)
     if p_grid >= 0:
-        import_kwh = float(p_grid)
+        import_kwh = float(p_grid) * dt_h
         import_eur = import_kwh * float(price_cent) / 100.0
         return import_eur, 0.0, import_eur, import_kwh, 0.0
-    export_kwh = float(-p_grid)
+    export_kwh = float(-p_grid) * dt_h
     export_eur = export_kwh * float(k_push_cent) / 100.0
     return 0.0, export_eur, -export_eur, 0.0, export_kwh
 
@@ -959,7 +961,7 @@ def _hour_cost_without_optimization(
     k_push_cent: float,
 ) -> float:
     """
-    Stromkosten einer Stunde ohne Optimierung:
+    Stromkosten eines Slots ohne Optimierung:
     historischer Verbrauch minus PV, keine Batterie, kein Flex-Scheduling.
     """
     return _hour_cost_parts_without_optimization(
@@ -1049,7 +1051,7 @@ def compute_historical_reference_costs(
             runtime_override=scenario_params
         )
 
-    total_hours = len(anchors) * 24
+    total_hours = len(anchors) * BACKTESTING_STEP_HOURS
     hours_done = 0
     for anchor in anchors:
         slot_datetimes = window_slot_datetimes(anchor)
@@ -1089,7 +1091,7 @@ def compute_historical_reference_costs(
             k_push_values.append(float(k_push))
             hours_done += 1
             if on_progress is not None:
-                on_progress(hours_done, total_hours)
+                on_progress(wall_hours_from_slots(hours_done), total_hours)
 
     df_res = pd.DataFrame(
         {
@@ -1499,9 +1501,13 @@ def run_simulation(
     )
     solver_token = set_milp_solver_override(config.get_backtesting_milp_solver())
     if horizon_mode == SUNRISE_WINDOW:
-        total_hours = sum(
-            resolve_sunrise_book_step_for_scenario(anchor, scenario_params).book_hours
-            for anchor in anchors
+        total_hours = wall_hours_from_slots(
+            sum(
+                resolve_sunrise_book_step_for_scenario(
+                    anchor, scenario_params
+                ).book_hours
+                for anchor in anchors
+            )
         )
     else:
         total_hours = len(anchors) * BACKTESTING_STEP_HOURS
@@ -1595,7 +1601,7 @@ def run_simulation(
 
             hours_done += len(chart_rows)
             if on_progress is not None:
-                on_progress(hours_done, total_hours)
+                on_progress(wall_hours_from_slots(hours_done), total_hours)
     finally:
         reset_cbc_gap_rel_override(gap_token)
         reset_cbc_strict_time_limit_override(limit_token)

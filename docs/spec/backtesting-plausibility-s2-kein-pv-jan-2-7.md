@@ -37,7 +37,7 @@ Month context (`s2-kein-pv`): **28/31** windows OK, **3** failures (Jan 2, Jan 7
 
 ## Per-consumer breakdown (identical on both days)
 
-From `scripts/analyze_plausibility_failures.py` and `greenfield/runtime/backtesting_hourly.csv`:
+From `scripts/analyze_plausibility_failures.py` and `greenfield/runtime/backtesting.csv`:
 
 | Consumer | Spec target | Delivered (`s2-kein-pv`) | Δ | Hours on |
 | -------- | ----------- | ------------------------ | - | -------- |
@@ -359,7 +359,7 @@ Jan 21 also passes with independent 50% SOC windows (SOC carry-over class unchan
 | Path | Role |
 | ---- | ---- |
 | `greenfield/runtime/backtesting_log.json` | Plausibility results |
-| `greenfield/runtime/backtesting_hourly.csv` | Per-scenario hourly flex |
+| `greenfield/runtime/backtesting.csv` | Per-scenario hourly flex |
 | `greenfield/runtime/backtesting_window_snapshots.jsonl` | Critical window dumps |
 | `greenfield/config/backtesting_scenarios.json` | Scenario matrix |
 | `greenfield/config/house_profiles.json` | `mein_haushalt` consumers |

@@ -29,7 +29,7 @@
         "pct_stars_1": 30.0
     },
     "scenario_explorer_conf": {
-        "path_cons_data": "runtime/cons_data_hourly.csv",
+        "path_cons_data": "runtime/cons_data.csv",
         "cons_data_retention_months": 24,
         "cons_data_write_mode": "hourly",
         "price_source": "api",

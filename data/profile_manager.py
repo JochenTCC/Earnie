@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def _cons_data_to_profile_dataframe(cons_df: pd.DataFrame) -> pd.DataFrame:
-    """Wandelt cons_data_hourly in das interne Profil-Format (Total, BaseLoad, Verbraucher-Namen)."""
+    """Wandelt cons_data in das interne Profil-Format (Total, BaseLoad, Verbraucher-Namen)."""
     from data.cons_data_house_profile import (
         consumer_labels_for_ids,
         expected_cons_data_consumer_ids,
@@ -40,7 +40,7 @@ def _cons_data_to_profile_dataframe(cons_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_cons_data_profile_dataframe() -> pd.DataFrame | None:
-    """Lädt cons_data_hourly.csv als Profil-DataFrame; None wenn leer/fehlend."""
+    """Lädt cons_data.csv als Profil-DataFrame; None wenn leer/fehlend."""
     cons_df = cons_data_store.load_cons_data()
     if cons_df.empty:
         return None
@@ -48,7 +48,7 @@ def load_cons_data_profile_dataframe() -> pd.DataFrame | None:
 
 
 def load_cons_data_pv_series() -> pd.Series:
-    """PV-Zeitreihe (kW) aus cons_data_hourly."""
+    """PV-Zeitreihe (kW) aus cons_data."""
     cons_df = cons_data_store.load_cons_data()
     if cons_df.empty:
         return pd.Series(dtype=float)
@@ -56,7 +56,7 @@ def load_cons_data_pv_series() -> pd.Series:
 
 
 def _load_profile_source_dataframe() -> pd.DataFrame | None:
-    """Datenquelle für Profile und Historie: ausschließlich cons_data_hourly.csv."""
+    """Datenquelle für Profile und Historie: ausschließlich cons_data.csv."""
     return load_cons_data_profile_dataframe()
 
 
@@ -89,7 +89,7 @@ def _flex_profile_export_spec(df: pd.DataFrame) -> tuple[list[str], dict[str, st
 
 
 def generate_consumption_profile() -> bool:
-    """Berechnet Verbrauchsprofile aus cons_data_hourly.csv."""
+    """Berechnet Verbrauchsprofile aus cons_data.csv."""
     try:
         print("[cache] Verarbeite Verbrauchsdaten und isoliere die Haus-Grundlast...")
         df = _load_profile_source_dataframe()
@@ -537,7 +537,7 @@ def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]
     df = _load_profile_source_dataframe()
     if df is None or df.empty:
         print(
-            f"[WARN] Keine historischen Daten in cons_data_hourly für das Datum {target_date}."
+            f"[WARN] Keine historischen Daten in cons_data für das Datum {target_date}."
         )
         empty_totals = {c["id"]: 0.0 for c in config.get_flexible_consumers()}
         return [0.5] * 24, empty_totals, [0.5] * 24
@@ -563,7 +563,7 @@ def get_historical_day_data(target_date) -> Tuple[List[float], dict, List[float]
 
 
 def get_cons_data_date_bounds() -> Tuple[Optional[date], Optional[date]]:
-    """Frühestes und spätestes Datum in cons_data_hourly.csv."""
+    """Frühestes und spätestes Datum in cons_data.csv."""
     ts_min, ts_max = cons_data_store.get_date_bounds()
     if ts_min is None or ts_max is None:
         return None, None
@@ -571,7 +571,7 @@ def get_cons_data_date_bounds() -> Tuple[Optional[date], Optional[date]]:
 
 
 def get_historical_date_picker_bounds(months_back: int = 12) -> Tuple[date, date]:
-    """Wählbarer Datumsbereich: Schnittmenge aus cons_data_hourly und den letzten N Monaten."""
+    """Wählbarer Datumsbereich: Schnittmenge aus cons_data und den letzten N Monaten."""
     today = datetime.now().date()
     rolling_min = today - timedelta(days=months_back * 30)
 
@@ -602,7 +602,7 @@ def _reindex_hourly_series(series: pd.Series, target_date: date) -> List[float]:
 
 
 def _get_historical_pv_for_day(target_date: date) -> List[float]:
-    """Liest den PV-Ertrag eines Tages aus cons_data_hourly.csv."""
+    """Liest den PV-Ertrag eines Tages aus cons_data.csv."""
     return _reindex_hourly_series(load_cons_data_pv_series(), target_date)
 
 
@@ -653,7 +653,7 @@ def _get_historical_brutto_prices_for_day(target_date: date) -> List[float]:
 
 def build_historical_optimization_matrix(target_date) -> Tuple[List[dict], dict]:
     """
-    Baut eine 24-Stunden-Optimierungsmatrix aus cons_data_hourly und historischen Preisen.
+    Baut eine 24-Stunden-Optimierungsmatrix aus cons_data und historischen Preisen.
     """
     if isinstance(target_date, str):
         target_date = pd.to_datetime(target_date).date()

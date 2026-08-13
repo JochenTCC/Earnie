@@ -1,4 +1,4 @@
-"""Pfadauflösung für cons_data_hourly.csv."""
+"""Pfadauflösung für cons_data.csv."""
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -12,13 +12,13 @@ def test_resolve_runtime_prefixed_path_uses_runtime_dir(monkeypatch, tmp_path):
     nas_runtime.mkdir()
     monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(nas_runtime))
 
-    resolved = resolve_runtime_prefixed_path("runtime/cons_data_hourly.csv")
+    resolved = resolve_runtime_prefixed_path("runtime/cons_data.csv")
 
-    assert resolved == str(nas_runtime / "cons_data_hourly.csv")
+    assert resolved == str(nas_runtime / "cons_data.csv")
 
 
 def test_resolve_runtime_prefixed_path_keeps_fixture_paths():
-    fixture = "tests/fixtures/backtesting/cons_data_hourly.csv"
+    fixture = "tests/fixtures/backtesting/cons_data.csv"
     assert resolve_runtime_prefixed_path(fixture) == fixture
 
 
@@ -30,6 +30,6 @@ def test_get_output_path_uses_runtime_dir_for_standard_config(monkeypatch, tmp_p
     with patch.object(
         cons_data_store.config,
         "get_scenario_explorer_conf",
-        return_value={"path_cons_data": "runtime/cons_data_hourly.csv"},
+        return_value={"path_cons_data": "runtime/cons_data.csv"},
     ):
-        assert cons_data_store.get_output_path() == str(nas_runtime / "cons_data_hourly.csv")
+        assert cons_data_store.get_output_path() == str(nas_runtime / "cons_data.csv")

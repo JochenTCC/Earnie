@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-generate_cons_data.py – Erzeugt cons_data_hourly.csv aus Loxone-Logs oder config.json.
+generate_cons_data.py – Erzeugt cons_data.csv aus Loxone-Logs oder config.json.
 
 Einmaliger Migrations-Job; laufende Pflege erfolgt über main.py (cons_data_store).
 
