@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Chart 1 ESS hold underlay after 16:00 (2026-08-13)
+
+- [x] Chart 1 shows no ESS hold SoC underlay after 16:00 while table shows Entladesperre / Zwangsladen ~0 kW and live sends `set_ess_mode==1` — underlay runs now cover the full last slot (1-slot MILP hold visible); `chart_now` ramps align underlay with SoC. Tests in `test_ess_mode_soc_underlay.py`. Live acceptance verified.
+
+
+### Sankey EV SoC on charging node label (2026-08-13)
+
+- [x] Current EV SoC on the Sankey charging-path description while the EV is charging — shown in the flex node label (not hover). Tests in `test_sankey_produktiv.py`; docs `docs/ui/charts.md`.
+
+
 ### Runtime filenames: drop `_hourly` (2026-08-13)
 
 - [x] Canonical runtime names are `cons_data.csv` / `cons_data.meta.json` and `backtesting.csv` (log field `series_file`). Legacy `*_hourly*` still loads if the new file is missing. Fixtures, docs, compose comments, schema, and `.gitignore` exceptions updated.

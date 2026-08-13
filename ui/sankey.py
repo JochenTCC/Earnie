@@ -67,14 +67,35 @@ def _battery_label(current_soc: float, battery_kw: float, main_state: dict | Non
 
 
 def _flex_label(consumer: dict, live_kw: float, main_state: dict | None) -> str:
+    ev_soc = _ev_soc_while_charging(consumer, live_kw)
     if produktiv.has_produktiv_run(main_state):
         return produktiv.flex_node_label(
             consumer["name"],
             live_kw,
             consumer["id"],
             main_state,
+            ev_soc_percent=ev_soc,
         )
-    return f"⚡ {consumer['name']} ({live_kw:.2f} kW)"
+    return (
+        f"⚡ {consumer['name']} ({live_kw:.2f} kW"
+        f"{produktiv.ev_soc_label_suffix(ev_soc)})"
+    )
+
+
+def _consumer_is_ev(consumer: dict) -> bool:
+    if consumer.get("type") == "ev":
+        return True
+    sched = consumer.get("charging_schedule")
+    return bool(sched and sched.get("enabled"))
+
+
+def _ev_soc_while_charging(consumer: dict, live_kw: float) -> float | None:
+    """Live EV SoC for the Sankey node label while that EV is charging."""
+    if not _consumer_is_ev(consumer) or float(live_kw or 0.0) <= _MIN_FLOW_KW:
+        return None
+    from optimizer.ev_soc_tracking import fetch_loxone_actual_soc_percent
+
+    return fetch_loxone_actual_soc_percent(consumer)
 
 
 class _SankeyLinks:

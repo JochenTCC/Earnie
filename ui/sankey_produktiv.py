@@ -98,9 +98,24 @@ def battery_node_label(current_soc: float, battery_kw: float, state: dict) -> st
     )
 
 
-def flex_node_label(name: str, live_kw: float, consumer_id: str, state: dict) -> str:
+def ev_soc_label_suffix(ev_soc_percent: float | None) -> str:
+    if ev_soc_percent is None:
+        return ""
+    return f" · {float(ev_soc_percent):.1f} % SoC"
+
+
+def flex_node_label(
+    name: str,
+    live_kw: float,
+    consumer_id: str,
+    state: dict,
+    ev_soc_percent: float | None = None,
+) -> str:
     soll_kw = _soll_flex_kw(state, consumer_id)
-    return f"⚡ {name} (live {live_kw:.2f} kW · Soll {soll_kw:.2f} kW)"
+    return (
+        f"⚡ {name} (live {live_kw:.2f} kW · Soll {soll_kw:.2f} kW"
+        f"{ev_soc_label_suffix(ev_soc_percent)})"
+    )
 
 
 def flex_node_color(
@@ -141,7 +156,12 @@ def flex_sankey_link(
     return None, False
 
 
-def flex_link_hover(live_kw: float, consumer_id: str, state: dict, is_placeholder: bool) -> str:
+def flex_link_hover(
+    live_kw: float,
+    consumer_id: str,
+    state: dict,
+    is_placeholder: bool,
+) -> str:
     if is_placeholder:
         soll = _soll_flex_kw(state, consumer_id)
         return f"Geplant (inaktiv)<br>Soll: {soll:.2f} kW<br>Ist: 0,00 kW"

@@ -146,6 +146,7 @@ def build_power_soc_chart_figure(
     add_ess_mode_soc_underlay_traces(
         fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
         history_slot_count=history_slot_count,
+        chart_now=chart_now,
         battery_params=battery_params,
     )
     add_optimized_soc_trace(

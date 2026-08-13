@@ -663,6 +663,61 @@ def _underlay_part_ranges(
     return [(0, length)]
 
 
+def _extend_underlay_xy_to_run_end(
+    axis: ChartSlotAxis,
+    soc: pd.Series,
+    soc_x: pd.Series,
+    soc_y: pd.Series,
+    run_end: int,
+    length: int,
+) -> tuple[pd.Series, pd.Series]:
+    """Ensure underlay covers the full last slot (1-slot runs stay visible)."""
+    if soc_x.empty or run_end >= length:
+        return soc_x, soc_y
+    end_x = axis.at(run_end, 0.0).iloc[0]
+    if pd.Timestamp(soc_x.iloc[-1]) >= pd.Timestamp(end_x):
+        return soc_x, soc_y
+    end_y = _line_plot_float(soc.iloc[run_end])
+    return (
+        pd.concat([soc_x, pd.Series([end_x])], ignore_index=True),
+        pd.concat([soc_y, pd.Series([end_y])], ignore_index=True),
+    )
+
+
+def _clip_line_xy_to_span(
+    soc_x: pd.Series,
+    soc_y: pd.Series,
+    span_start: pd.Timestamp,
+    span_end: pd.Timestamp,
+) -> tuple[pd.Series, pd.Series]:
+    """Drop points forced outside the underlay run (e.g. hour-ramp endpoints)."""
+    kept_x: list = []
+    kept_y: list[float] = []
+    for x_val, y_val in zip(soc_x, soc_y):
+        stamp = pd.Timestamp(x_val)
+        if stamp < span_start or stamp > span_end:
+            continue
+        kept_x.append(x_val)
+        kept_y.append(float(y_val))
+    if not kept_x:
+        return soc_x, soc_y
+    return _chart_time_series(kept_x), pd.Series(kept_y, dtype=float)
+
+
+def _underlay_ramp_if_overlaps(
+    soc_x: pd.Series,
+    ramp: tuple[datetime, float, datetime, float] | None,
+) -> tuple[datetime, float, datetime, float] | None:
+    if ramp is None or soc_x.empty:
+        return None
+    t_start, _y0, t_end, _y1 = ramp
+    x_min = pd.Timestamp(soc_x.iloc[0])
+    x_max = pd.Timestamp(soc_x.iloc[-1])
+    if pd.Timestamp(t_end) < x_min or pd.Timestamp(t_start) > x_max:
+        return None
+    return ramp
+
+
 def _add_ess_underlay_run(
     fig: go.Figure,
     *,
@@ -677,6 +732,8 @@ def _add_ess_underlay_run(
     yaxis: str,
     legend_shown: set[str],
     battery_params: dict | None,
+    ramp_before: tuple[datetime, float, datetime, float] | None = None,
+    ramp_after: tuple[datetime, float, datetime, float] | None = None,
 ) -> None:
     seg_tail = None
     if run_end == length:
@@ -690,6 +747,20 @@ def _add_ess_underlay_run(
         step_line=False,
         bridge_left=False,
     )
+    soc_x, soc_y = _extend_underlay_xy_to_run_end(
+        axis, soc, soc_x, soc_y, run_end, length,
+    )
+    if soc_x.empty:
+        return
+    span_start = pd.Timestamp(soc_x.iloc[0])
+    span_end = pd.Timestamp(soc_x.iloc[-1])
+    soc_x, soc_y = _apply_soc_current_hour_ramps(
+        soc_x,
+        soc_y,
+        _underlay_ramp_if_overlaps(soc_x, ramp_before),
+        _underlay_ramp_if_overlaps(soc_x, ramp_after),
+    )
+    soc_x, soc_y = _clip_line_xy_to_span(soc_x, soc_y, span_start, span_end)
     if soc_x.empty:
         return
     hover_labels = _soc_hover_labels_for_times(soc_x, uhrzeit, axis.starts)
@@ -706,6 +777,53 @@ def _add_ess_underlay_run(
     legend_shown.add(kind)
 
 
+def _milp_part_soc_ramps(
+    axis: ChartSlotAxis,
+    soc: pd.Series,
+    df: pd.DataFrame,
+    chart_now: datetime | None,
+    abs_start: int,
+    abs_end: int,
+    history_slot_count: int | None,
+    is_milp_part: bool,
+    battery_params: dict | None,
+) -> tuple[
+    tuple[datetime, float, datetime, float] | None,
+    tuple[datetime, float, datetime, float] | None,
+]:
+    if chart_now is None or not is_milp_part:
+        return None, None
+    y_at_now: float | None = None
+    if history_slot_count is not None and history_slot_count > 0:
+        y_at_now = _soc_at_chart_now(
+            axis, df, chart_now, history_slot_count,
+            battery_params=battery_params,
+        )
+    ramp_before = _current_hour_soc_ramp_before_now(
+        axis,
+        soc,
+        df,
+        chart_now,
+        abs_start,
+        abs_end,
+        history_slot_count,
+        y_at_now=y_at_now,
+        battery_params=battery_params,
+    )
+    ramp_after = _current_hour_soc_ramp(
+        axis,
+        soc,
+        df,
+        chart_now,
+        abs_start,
+        abs_end,
+        history_slot_count,
+        y_at_now=y_at_now,
+        battery_params=battery_params,
+    )
+    return ramp_before, ramp_after
+
+
 def add_ess_mode_soc_underlay_traces(
     fig: go.Figure,
     df: pd.DataFrame,
@@ -714,6 +832,7 @@ def add_ess_mode_soc_underlay_traces(
     extrap_start: int | None = None,
     extrap_end: int | None = None,
     history_slot_count: int | None = None,
+    chart_now: datetime | None = None,
     battery_params: dict | None = None,
 ) -> None:
     """Thicker translucent SoC underlay by ESS mode (hold/charge/discharge)."""
@@ -742,9 +861,23 @@ def add_ess_mode_soc_underlay_traces(
         segments = _trace_segments(
             part_end - part_start, part_extrap_start, part_extrap_end
         )
+        is_milp_part = (
+            history_slot_count is None or part_start >= history_slot_count
+        )
         for start, end, _is_extrapolated in segments:
             abs_start = part_start + start
             abs_end = part_start + end
+            ramp_before, ramp_after = _milp_part_soc_ramps(
+                axis,
+                soc,
+                df,
+                chart_now,
+                abs_start,
+                abs_end,
+                history_slot_count,
+                is_milp_part,
+                battery_params,
+            )
             for run_start, run_end, kind in _contiguous_underlay_runs(
                 kinds, abs_start, abs_end
             ):
@@ -761,6 +894,8 @@ def add_ess_mode_soc_underlay_traces(
                     yaxis=yaxis,
                     legend_shown=legend_shown,
                     battery_params=battery_params,
+                    ramp_before=ramp_before,
+                    ramp_after=ramp_after,
                 )
 
 

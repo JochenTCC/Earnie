@@ -144,7 +144,7 @@ Tabelle je flexiblem Verbraucher über Horizont SA_0-->SA_2:
 
 ## Energiefluss (Live-Sankey)
 
-Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden. Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`).
+Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden. Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`). Beim Laden eines E-Autos zeigt der Flex-Knoten den aktuellen SoC in der Knotenbeschriftung.
 
 ## Footer
 
