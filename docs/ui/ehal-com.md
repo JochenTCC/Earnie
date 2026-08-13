@@ -37,7 +37,7 @@ Kurze Übersicht der **kanonischen EHAL-Wire-Felder** (gleich `docs/ui/ehal-com.
 | Telemetrie (optional) | `sens_ess_power`                | nein     | **W**; ESS Vorzeichen **OpenEMS-aligned**: `+` = **Entladung**, `-` = **Ladung**                       |
 | Telemetrie (optional) | `sens_evcs_active_power`        | nein     | **W**; >= 0 (bei Idle i. d. R. 0)                                                                      |
 | Telemetrie (optional) | `sens_power_consumers`          | nein     | **W**; Hauslast; Merker wenn gemappt, sonst aus Netz/PV/ESS ableiten                                   |
-| Setpoints (Force)     | `set_ess_active_power`          | nein*    | **W**; signed; `+` = Entladung, `-` = Ladung; bei Automatik weglassen                                  |
+| Setpoints (Force)     | `set_ess_active_power`          | nein*    | **W**; signed; OpenEMS-aligned: `+` = **Entladung**, `−` = **Ladung**; bei Automatik weglassen (siehe [Vorzeichen `set_ess_active_power`](#vorzeichen-set_ess_active_power)) |
 | Setpoints (Limits)    | `set_ess_charge_power_limit`    | nein*    | **W**; nicht-negativer Betrag (echte Max. Ladeleistung)                                                |
 | Setpoints (Limits)    | `set_ess_discharge_power_limit` | nein*    | **W**; nicht-negativer Betrag (echte Max. Entladeleistung)                                             |
 | Setpoints (Limits)    | `set_evcs_max_current`          | nein*    | **A**; nicht-negativer Betrag (EV-Lade-Soll-/Maxstrom)                                                 |
@@ -48,6 +48,33 @@ Kurze Übersicht der **kanonischen EHAL-Wire-Felder** (gleich `docs/ui/ehal-com.
 
 
 Ein Setpoint-Dokument muss **mindestens eins** der Setpoint-Felder enthalten. Weggelassene Felder bedeuten in der Regel: **„unverändert lassen“** (Partial Updates sind erlaubt). **Ausnahme sticky Backends (Loxone/HA):** Merker behalten den letzten Wert — Automatik ist `set_ess_mode = 0`, nicht „Sollleistung weggelassen“. Vollständige Geräterollen inkl. `get_`* / weiterer `sens_evcs_`*: siehe §C.
+
+<a id="vorzeichen-set_ess_active_power"></a>
+
+### Vorzeichen `set_ess_active_power`
+
+Das Feld ist der **Zwangs-Sollwert** der ESS-Wirkleistung (Design C1). Einheit auf dem EHAL-Wire: **Watt**. Vorzeichen wie bei `sens_ess_power` (**OpenEMS-aligned**):
+
+| Wire-Wert (Beispiel) | Bedeutung |
+| -------------------- | --------- |
+| `set_ess_active_power = +2000` | **Entladen** mit 2 kW (Batterie → Haus / Netz) |
+| `set_ess_active_power = −1500` | **Laden** mit 1,5 kW (Haus / PV / Netz → Batterie) |
+| Feld **weglassen** | Kein Force (Automatik); OpenEMS schreibt dann kein `SetActivePowerEquals` |
+
+**Nicht** mit den Limit-Feldern verwechseln: `set_ess_charge_power_limit` und `set_ess_discharge_power_limit` sind **nicht-negative Beträge** (echte Maxima), kein Vorzeichen für Lade- vs. Entladerichtung.
+
+Adapter müssen hub-eigene Konventionen **an der Grenze** auf EHAL bringen. Wichtigste Unterschiede:
+
+| Backend | Wire / Schreiben | Hinweis |
+| ------- | ---------------- | ------- |
+| OpenEMS | `ess0/SetActivePowerEquals` | Gleiches Vorzeichen wie EHAL (`+` Entladung); Wert in **W** |
+| Home Assistant | gemappte Entity | Wert in **W**, EHAL-Vorzeichen; nicht mit evcc-Preis-Limits mischen |
+| Loxone | `Earnie_Batterie_Sollleistung` | Adapter schreibt **kW**, **gleiches Vorzeichen** wie EHAL (`+` Entladung). Config/Wechselrichter müssen dasselbe Vorzeichen verwenden. |
+| Victron GX | gerätabhängig | Messkanal Reg. **842** ist oft `+` = Laden — für EHAL **invertieren**. Ein ESS-Sollwert muss nach der jeweiligen ESS-Mode-2/3-Doku gemappt werden. |
+
+**Loxone Live vs. Sollwert:** Beim **Lesen** von `sens_ess_power` invertiert der Adapter Loxone-Live (`+` = Laden) nach EHAL (`+` = Entladung). Beim **Schreiben** von `set_ess_active_power` wird nur **W → kW** umgerechnet, das Vorzeichen bleibt EHAL (`+` = Entladung). Config darf den Sollwert daher nicht noch einmal invertieren.
+
+Sticky Backends: ein alter Sollwert im Merker bleibt stehen. Freigabe/Automatik ist `set_ess_mode = 0`, nicht „Sollleistung = 0“ oder weggelassenes Feld allein.
 
 ## C) Kombinierte Feldliste: EHAL, OpenEMS, evcc, Victron, Loxone
 
@@ -85,7 +112,7 @@ Quellen Victron: [GX Modbus-TCP Manual](https://www.victronenergy.com/live/ccgx:
 | ------------------------------ | ---------- | ------------------------------------------------ | --------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | Batterie-SoC                   | Messwert   | `sens_ess_soc`                                   | `ess0/Soc` oder `_sum/EssSoc`                 | `meters.battery.soc`           | Unit 100 Reg. **843** (`battery_soc`, %)                                                                                | `soc_name`                                                  |
 | Batterieleistung               | Messwert   | `sens_ess_power`                                 | `ess0/ActivePower` oder `_sum/EssActivePower` | `meters.battery.power`         | Unit 100 Reg. **842** (W; Victron: `+` = Laden, `−` = Entladen → für EHAL **Vorzeichen invertieren**)                   | `battery_power_name`                                        |
-| ESS Sollleistung schreiben     | Steuerwert | `set_ess_active_power`                           | `ess0/SetActivePowerEquals`                   |                                | (gerätabhängig; nicht evcc Preis-Limit)                                                                                 | `target_active_power_name` / `Earnie_Batterie_Sollleistung` |
+| ESS Sollleistung schreiben     | Steuerwert | `set_ess_active_power` (**W**; `+` Entladung, `−` Ladung) | `ess0/SetActivePowerEquals` (gleiches Vorzeichen, W) |                                | (gerätabhängig; Victron-Messung oft `+` Laden → invertieren; nicht evcc Preis-Limit)                                    | `target_active_power_name` / `Earnie_Batterie_Sollleistung` (kW, **gleiches** EHAL-Vorzeichen) |
 | ESS Ladegrenze schreiben       | Steuerwert | `set_ess_charge_power_limit`                     | `ess0/SetActivePowerGreaterOrEquals`          |                                | ESS Mode 2 Unit 100 Reg. **2705** (`system_max_charge_current`, A) bzw. Ein/Aus **2701** (kein 1:1-W-Limit wie OpenEMS) | `target_charge_power_name`                                  |
 | ESS Entladegrenze schreiben    | Steuerwert | `set_ess_discharge_power_limit`                  | `ess0/SetActivePowerLessOrEquals`             |                                | ESS Mode 2 Unit 100 Reg. **2704** (`ess_max_discharge_power`, W)                                                        | `target_discharge_power_name`                               |
 | Steuerbefehl Batterie / Huawei | Steuerwert | `set_ess_mode (0 = automatik / 1 = Zwangsladen / 2 = Zwangs-Entladen)` | *(ignoriert)*                                 |                                | Siehe ESS Mode 2/3 ESS Schreibfähigkeit                                                                                 | `control_cmd_name`                                          |
