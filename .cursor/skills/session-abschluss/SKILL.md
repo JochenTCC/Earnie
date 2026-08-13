@@ -78,6 +78,7 @@ Include changed backlog file(s) in the commit.
 - Commit message in repo style: short, German, period at end, focus on **why/what** (see `git log`)
 - Multiple thematically separate blocks → one commit with bullet lines in the body is ok; prefer **one session commit** over many mini-commits
 - **Commit only when the user triggered Phase 1** (explicit end-session request = approval)
+- Pre-commit (`.githooks/pre-commit`) **skips pytest** when every staged path is docs/Markdown, **PNG**, Cursor, GitHub, or `.githooks/` (including Git C-quoted non-ASCII names such as `"docs/assets/…png"`). Mixed code+docs still runs the full suite. Do **not** pass `--no-verify` to skip tests on code commits.
 
 ### 5. Push
 

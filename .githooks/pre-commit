@@ -7,9 +7,10 @@ cd "$ROOT"
 
 STAGED="$(git diff --cached --name-only | tr -d '\r')"
 if [ -n "$STAGED" ]; then
-  # Skip full suite for docs / Cursor / GitHub workflow+notes / hook tooling only.
-  if ! echo "$STAGED" | grep -qvE '\.md$|^docs/|^\.cursor/|^\.github/|^\.githooks/'; then
-    echo "pre-commit: Nur Doku/Workflow/Hooks geändert — pytest übersprungen."
+  # Skip full suite for docs / images / Cursor / GitHub workflow+notes / hook tooling.
+  # Git C-quotes non-ASCII names ("docs/assets/foo\303\274.png"), so ^docs/ alone misses them.
+  if ! echo "$STAGED" | grep -qvE '\.(md|png)"?$|^"?docs/|^"?\.cursor/|^"?\.github/|^"?\.githooks/'; then
+    echo "pre-commit: Nur Doku/PNG/Workflow/Hooks geändert — pytest übersprungen."
     exit 0
   fi
 fi
