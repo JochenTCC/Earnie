@@ -51,6 +51,45 @@ def session_target_fulfilled(session: dict[str, Any] | None) -> bool:
     return delivered >= target - SESSION_FULFILL_EPSILON_KWH
 
 
+def ist_soc_still_needs_energy(ctx: dict | None) -> bool:
+    """True wenn angesteckt und Ist-SOC-Rest (ctx.target_kwh) noch über Epsilon liegt."""
+    if not ctx or ctx.get("plugged_in") is not True:
+        return False
+    try:
+        return float(ctx.get("target_kwh") or 0.0) > SESSION_FULFILL_EPSILON_KWH
+    except (TypeError, ValueError):
+        return False
+
+
+def healed_session_target_kwh(
+    prev_target: float,
+    delivered_kwh: float,
+    ctx_target: float,
+    *,
+    plugged_in: bool,
+) -> float:
+    """Keep original target; raise to booked + Ist remaining while plugged in."""
+    if plugged_in:
+        return max(prev_target, round(float(delivered_kwh) + float(ctx_target), 3))
+    if ctx_target > prev_target:
+        return ctx_target
+    return prev_target
+
+
+def drop_stale_plug_cycle_latch(
+    fulfilled: dict[str, bool],
+    charging_contexts: dict[str, dict],
+    sessions: dict[str, dict] | None,
+) -> dict[str, bool]:
+    """Clear latch while an open session still has Ist-SOC remaining."""
+    out = {cid: True for cid, flag in fulfilled.items() if flag}
+    open_sessions = sessions if isinstance(sessions, dict) else {}
+    for cid, ctx in charging_contexts.items():
+        if cid in open_sessions and ist_soc_still_needs_energy(ctx):
+            out.pop(cid, None)
+    return out
+
+
 def purge_expired_sessions(
     sessions: dict[str, dict],
     now: dt.datetime,
@@ -81,12 +120,17 @@ def sync_plug_cycle_fulfilled(
     for cid in fulfilled_from_purge or ():
         out[cid] = True
     for cid, session in sessions.items():
-        if session_target_fulfilled(session):
+        ctx = charging_contexts.get(cid) or {}
+        if not session_target_fulfilled(session):
+            continue
+        if ist_soc_still_needs_energy(ctx):
+            out.pop(cid, None)
+        else:
             out[cid] = True
     for cid, ctx in charging_contexts.items():
         if ctx.get("plugged_in") is False:
             out.pop(cid, None)
-    return out
+    return drop_stale_plug_cycle_latch(out, charging_contexts, sessions)
 
 
 def _context_marks_cycle_complete(ctx: dict) -> bool:
@@ -175,8 +219,13 @@ def sync_charging_sessions(
         dl_iso = deadline.isoformat(timespec="seconds")
         if cid in sessions:
             prev = float(sessions[cid].get("target_kwh") or 0.0)
-            if target > prev:
-                sessions[cid]["target_kwh"] = target
+            delivered = float(sessions[cid].get("delivered_kwh") or 0.0)
+            sessions[cid]["target_kwh"] = healed_session_target_kwh(
+                prev,
+                delivered,
+                target,
+                plugged_in=ctx.get("plugged_in") is True,
+            )
             sessions[cid]["deadline"] = dl_iso
         else:
             sessions[cid] = {

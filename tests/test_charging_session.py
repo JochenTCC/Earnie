@@ -241,7 +241,7 @@ class TestDump20260813PrematureFulfill:
         cs.sync_charging_sessions(
             sessions, contexts, {"eauto": consumer}, datetime(2026, 8, 13, 3, 15)
         )
-        assert sessions["eauto"]["target_kwh"] == pytest.approx(11.667)
+        assert sessions["eauto"]["target_kwh"] == pytest.approx(13.05)
         cs.add_session_delivery(sessions, "eauto", 0.895)
         assert cs.session_target_fulfilled(sessions["eauto"]) is False
 
@@ -260,6 +260,77 @@ class TestDump20260813PrematureFulfill:
             delivered_kwh=2.0,
         )
         assert rem == pytest.approx(9.5)
+
+
+class TestDump20260813AfternoonEarlyStop:
+    """debug_dump_20260813_144852: SOC ~80%, session target stuck 7.167, latch at 14:30."""
+
+    def test_heals_shrunk_session_target_from_delivered_plus_ist(self):
+        """Afternoon dump: delivered 7.039 + Ist 4.083 must raise target above 7.167."""
+        consumer = _eauto_consumer()
+        deadline = datetime(2026, 8, 14, 7, 45)
+        sessions = {
+            "eauto": {
+                "target_kwh": 7.167,
+                "delivered_kwh": 7.039,
+                "deadline": "2026-08-14T07:45:00+02:00",
+            }
+        }
+        contexts = {
+            "eauto": {
+                "active": True,
+                "plugged_in": True,
+                "deadline": deadline,
+                "target_kwh": 4.083,
+            }
+        }
+        cs.sync_charging_sessions(
+            sessions, contexts, {"eauto": consumer}, datetime(2026, 8, 13, 14, 15)
+        )
+        assert sessions["eauto"]["target_kwh"] == pytest.approx(11.122)
+        assert cs.session_target_fulfilled(sessions["eauto"]) is False
+
+    def test_booked_full_does_not_latch_while_ist_soc_still_needs_energy(self):
+        consumer = _eauto_consumer()
+        sessions = {
+            "eauto": {
+                "target_kwh": 7.167,
+                "delivered_kwh": 7.946,
+                "deadline": "2026-08-14T07:45:00+02:00",
+            }
+        }
+        contexts = {
+            "eauto": {
+                "active": True,
+                "plugged_in": True,
+                "deadline": datetime(2026, 8, 14, 7, 45),
+                "target_kwh": 3.333,
+            }
+        }
+        out = cs.sync_plug_cycle_fulfilled(
+            {},
+            contexts,
+            sessions,
+        )
+        assert out.get("eauto") is not True
+
+    def test_open_session_clears_stale_latch_while_ist_needs_energy(self):
+        sessions = {
+            "eauto": {
+                "target_kwh": 7.167,
+                "delivered_kwh": 7.946,
+                "deadline": "2026-08-14T07:45:00+02:00",
+            }
+        }
+        contexts = {
+            "eauto": {
+                "active": True,
+                "plugged_in": True,
+                "target_kwh": 3.333,
+            }
+        }
+        out = cs.drop_stale_plug_cycle_latch({"eauto": True}, contexts, sessions)
+        assert "eauto" not in out
 
 
 class TestDeadlineHelpers:

@@ -27,6 +27,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 - [ ] Pool filter Ist not assigned when only `sens_filter_active` is bound (`debug_dump_20260808_232225`) — binary meter accepts alternate-only; regression in `test_loxone_client.py`. Live acceptance pending.
 - [ ] earnie.log unbounded growth — `SizeAndTimeRotatingFileHandler` (5 MB or weekly `W0`, backupCount 8, rename→copy/truncate fallback); tests in `test_logger_config_rotation.py`. Live acceptance pending.
 - [ ] EV stopped at ~58% SOC with no error (`debug_dump_20260813_075350`) — plugged-in remaining subtracted booked kWh from Ist-SOC remaining (double count → MILP leftover 0.5 kWh); session `target_kwh` overwritten each QH with shrinking Ist-SOC need until `plug_cycle_fulfilled`. Fix: keep original session target; remaining = Ist-SOC need while plugged in. Tests in `test_charging_session.py`. Live acceptance pending.
+- [ ] EV stopped at ~80% SOC afternoon (`debug_dump_20260813_144852`) — shrunk session target 7.167 latched `plug_cycle_fulfilled` while Ist-SOC still ~4 kWh short. Fix: heal target to `max(prev, delivered+Ist)` while plugged in; do not latch/clear stale latch while open session still has Ist remaining. Tests in `test_charging_session.py`. Live acceptance pending.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)

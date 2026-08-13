@@ -30,6 +30,7 @@ from .charging_session import (
     normalize_consumer_state,
     session_delivered_kwh,
     session_target_fulfilled,
+    ist_soc_still_needs_energy,
     sync_open_charging_deadlines,
     sync_plug_cycle_fulfilled,
 )
@@ -365,7 +366,7 @@ def register_consumer_delivery(
     for consumer in active:
         cid = consumer["id"]
         ctx = (charging_contexts or {}).get(cid)
-        if session_target_fulfilled(sessions.get(cid)):
+        if session_target_fulfilled(sessions.get(cid)) and not ist_soc_still_needs_energy(ctx):
             fulfilled[cid] = True
         if (ctx or {}).get("plugged_in") is False:
             fulfilled.pop(cid, None)

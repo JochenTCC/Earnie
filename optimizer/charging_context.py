@@ -732,7 +732,7 @@ def resolve_charging_contexts(
 ) -> dict[str, dict]:
     """Ladekontext je Verbraucher mit charging_schedule für den Optimierungshorizont."""
     from . import charge_immediate as ci
-    from .charging_session import parse_open_charging_deadline
+    from .charging_session import drop_stale_plug_cycle_latch, parse_open_charging_deadline
 
     logged_simulation = bool(
         optimization_matrix
@@ -772,6 +772,11 @@ def resolve_charging_contexts(
         if plug_cycle_fulfilled is not None
         else _load_plug_cycle_fulfilled_flags()
     )
+    raw_state = _load_consumer_state_json()
+    sessions = raw_state.get("charging_sessions") or {}
+    if not isinstance(sessions, dict):
+        sessions = {}
+    fulfilled = drop_stale_plug_cycle_latch(fulfilled, contexts, sessions)
     return apply_plug_cycle_fulfilled_contexts(contexts, fulfilled)
 
 
