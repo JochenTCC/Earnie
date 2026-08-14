@@ -161,6 +161,67 @@ def test_enrich_matrix_fixed_mode_uses_slot_month():
     assert matrix[0]["k_push_act"] == pytest.approx(3.60)
 
 
+def test_enrich_matrix_feed_in_prices_averages_hourly_settlement():
+    """Export tariffs with settlement_mtu='60min' (e.g. SUNNY Spot) bill the hour's EPEX mean."""
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    vienna = ZoneInfo("Europe/Vienna")
+    hour = datetime(2026, 7, 4, 9, 0, tzinfo=vienna)
+    matrix = [
+        {
+            "hour": hour.hour,
+            "price_buy": price,
+            "slot_datetime": hour + timedelta(minutes=15 * i),
+        }
+        for i, price in enumerate([10.0, 20.0, 30.0, 40.0])
+    ]
+    settings = FeedInSettings(
+        mode=FEED_IN_MODE_DYNAMIC_EPEX,
+        k_push_cent=3.7,
+        fee_factor=0.19,
+        fix_cent=0.0,
+        export_tariff_spec={
+            "type": "spot_hourly",
+            "settlement_mtu": "60min",
+            "feed_in_fee_factor": 0.19,
+        },
+    )
+    enrich_matrix_feed_in_prices(matrix, settings)
+    # mean(10,20,30,40) = 25.0 -> 25.0 - 0.19*25.0 = 20.25 for all 4 quarters
+    assert [row["k_push_act"] for row in matrix] == [pytest.approx(20.25)] * 4
+    # price_buy stays the raw, un-averaged QH value (display/logging field)
+    assert [row["price_buy"] for row in matrix] == [10.0, 20.0, 30.0, 40.0]
+
+
+def test_enrich_matrix_feed_in_prices_quarter_hour_settlement_unaffected():
+    """No settlement_mtu (or '15min', e.g. VKW PV-Einspeisetarif Dynamisch) — per-QH prices, no averaging."""
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    vienna = ZoneInfo("Europe/Vienna")
+    hour = datetime(2026, 7, 4, 9, 0, tzinfo=vienna)
+    matrix = [
+        {
+            "hour": hour.hour,
+            "price_buy": price,
+            "slot_datetime": hour + timedelta(minutes=15 * i),
+        }
+        for i, price in enumerate([10.0, 20.0, 30.0, 40.0])
+    ]
+    settings = FeedInSettings(
+        mode=FEED_IN_MODE_DYNAMIC_EPEX,
+        k_push_cent=3.7,
+        fee_factor=0.19,
+        fix_cent=0.0,
+        export_tariff_spec={"type": "spot_hourly"},
+    )
+    enrich_matrix_feed_in_prices(matrix, settings)
+    assert [row["k_push_act"] for row in matrix] == [
+        pytest.approx(v) for v in [10.0, 20.0, 30.0, 40.0]
+    ]
+
+
 def test_fixed_mode_monthly_tariff_falls_back_to_prior_year():
     tariffs = validate_fixed_monthly_feed_in_rates([
         {"year": 2025, "month": 8, "tariff_cent_kwh": 4.2},

@@ -241,35 +241,3 @@ def load_market_prices_for_scenario(
         market_zone=str(zone),
     )
 
-
-def generate_simulation_base(
-    profile: pd.DataFrame,
-    prices: pd.DataFrame,
-    start: pd.Timestamp,
-    end: pd.Timestamp,
-) -> pd.DataFrame:
-    """
-    Projiziert das gemittelte historische Profil auf das Simulationsfenster
-    und führt es mit den Marktpreisen zusammen.
-    """
-    target_end = end.normalize() + pd.Timedelta(hours=23, minutes=50)
-    target_range = pd.date_range(start=start.normalize(), end=target_end, freq='10min')
-    df = pd.DataFrame(index=target_range)
-    df.index.name = 'ts'
-
-    df['month'] = df.index.month
-    df['day'] = df.index.day
-    df['hour'] = df.index.hour
-    df['minute'] = df.index.minute
-
-    df_sim = df.reset_index().merge(profile, on=['month', 'day', 'hour', 'minute'], how='left')
-    df_sim.set_index('ts', inplace=True)
-
-    df_sim['load'] = df_sim['load'].interpolate(method='time').fillna(0)
-    df_sim['pv'] = df_sim['pv'].interpolate(method='time').fillna(0)
-
-    df_prices_resampled = prices.resample('10min').ffill()
-    df_final = df_sim.join(df_prices_resampled, how='left')
-    df_final.drop(columns=['month', 'day', 'hour', 'minute'], inplace=True)
-
-    return df_final.dropna(subset=['price_cent_kwh'])

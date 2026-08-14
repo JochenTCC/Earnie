@@ -246,10 +246,13 @@ def import_brutto_cent_for_slots(
     netzentgelt_override: float | None = None,
 ) -> list[float]:
     """EPEX Cent/kWh → Bezugspreis je Slot (Tarif-Spec oder Legacy-Brutto)."""
-    from data.tariff_pricing import import_cent_kwh
+    from data.market_prices import hourly_settlement_epex_values
+    from data.tariff_pricing import SETTLEMENT_MTU_HOURLY, import_cent_kwh, tariff_settlement_mtu
 
     if import_tariff_spec is None:
         return [epex_to_brutto_cent(float(p)) for p in epex_values]
+    if tariff_settlement_mtu(import_tariff_spec) == SETTLEMENT_MTU_HOURLY:
+        epex_values = hourly_settlement_epex_values(epex_values, slot_datetimes)
     tariff_type = str(import_tariff_spec.get("type", "")).strip().lower()
     if tariff_type == "monthly_table":
         return [

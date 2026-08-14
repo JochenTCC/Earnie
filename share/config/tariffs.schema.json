@@ -75,6 +75,14 @@
           "type": "number",
           "minimum": 0
         },
+        "settlement_mtu": {
+          "type": "string",
+          "enum": [
+            "15min",
+            "60min"
+          ],
+          "description": "Abrechnungs-Markteinheit des Tarifs: '15min' (nativer EPEX-QH-Preis, Default) oder '60min' (echt stuendlich abgerechnetes Produkt, z. B. aWATTar HOURLY/SUNNY Spot). Bei '60min' wird der Stundenpreis als arithmetisches Mittel der vier QH-Preise gebildet (EPEX SDAC 'average rule')."
+        },
         "monthly_fee_eur": {
           "type": "number",
           "minimum": 0,

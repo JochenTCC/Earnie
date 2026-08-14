@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Hourly-settlement EPEX tariffs — average QH slots for genuinely hourly-billed products (2026-08-14)
+
+- [x] Tariffs genuinely settled **hourly** (aWATTar HOURLY `awattar_at`/`de_awattar_de_hourly_de`, SUNNY Spot `dynamic_epex`) now use the EPEX SDAC "average rule" (hourly price = arithmetic mean of the 4 QH clearing prices, structurally enforced by Euphemia market coupling since the 2025-10-01 15-min MTU transition) instead of each QH's individual spot price — matches real supplier billing. New `settlement_mtu` field (`"15min"` default / `"60min"`) in `share/config/tariffs.json` + `tariffs.schema.json`, normalized through `house_config/tariffs_store.py::_normalize_dach_fields`; averaging in `data/market_prices.py::hourly_settlement_epex_values`, wired into `data/backtesting_prices.py::import_brutto_cent_for_slots` and `data/feed_in_prices.py::enrich_matrix_feed_in_prices` (the two actual `k_act`/`k_push_act` choke points — covers Live and SE identically). "Likely hourly" tariffs (AAE, AVIA, smartSUN SPOT) intentionally left unflagged, not yet Tarifblatt-verified. Tests in `test_tariff_pricing.py` / `test_market_prices.py` / `test_backtesting_prices.py` / `test_feed_in_prices.py` / `test_house_config.py`. Spec updated: `docs/spec/quarter-hour-slots.md` §3.2–3.4. Sources: SDAC 15-min MTU transition writeups (Dexter Energy, N-SIDE, EPEX SPOT), aWATTar tariff pages.
+
+### Bugfix EV early stop / shrunk session target (2026-08-14)
+
+- [x] EV stopped at ~58% SOC with no error (`debug_dump_20260813_075350`) — plugged-in remaining subtracted booked kWh from Ist-SOC remaining (double count → MILP leftover 0.5 kWh); session `target_kwh` overwritten each QH with shrinking Ist-SOC need until `plug_cycle_fulfilled`. Fix: keep original session target; remaining = Ist-SOC need while plugged in. Tests in `test_charging_session.py`. Live acceptance verified.
+- [x] EV stopped at ~80% SOC afternoon (`debug_dump_20260813_144852`) — shrunk session target 7.167 latched `plug_cycle_fulfilled` while Ist-SOC still ~4 kWh short. Fix: heal target to `max(prev, delivered+Ist)` while plugged in; do not latch/clear stale latch while open session still has Ist remaining. Tests in `test_charging_session.py`. Live acceptance verified.
+
+
 ### Bugfix Chart 1 ESS hold underlay after 16:00 (2026-08-13)
 
 - [x] Chart 1 shows no ESS hold SoC underlay after 16:00 while table shows Entladesperre / Zwangsladen ~0 kW and live sends `set_ess_mode==1` — underlay runs now cover the full last slot (1-slot MILP hold visible); `chart_now` ramps align underlay with SoC. Tests in `test_ess_mode_soc_underlay.py`. Live acceptance verified.

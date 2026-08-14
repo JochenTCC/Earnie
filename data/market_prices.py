@@ -51,6 +51,30 @@ def epex_to_brutto_cent(epex_price_cent: float) -> float:
     )
 
 
+def hourly_settlement_epex_values(
+    epex_values: list[float | None],
+    slot_datetimes: list[datetime],
+) -> list[float | None]:
+    """EPEX SDAC "average rule": Stundenpreis = striktes arithmetisches Mittel der 4 QH-Preise.
+
+    Fuer echt stuendlich abgerechnete Tarife (settlement_mtu='60min'); ersetzt jeden
+    QH-Wert durch den Mittelwert seiner Stunde. None-Werte bleiben unveraendert.
+    """
+    from optimizer.slot_duration import floor_to_hour_slot
+
+    parents = [floor_to_hour_slot(normalize_price_slot(s)) for s in slot_datetimes]
+    buckets: dict[datetime, list[float]] = {}
+    for value, parent in zip(epex_values, parents):
+        if value is None:
+            continue
+        buckets.setdefault(parent, []).append(float(value))
+    means = {parent: sum(vals) / len(vals) for parent, vals in buckets.items()}
+    return [
+        means[parent] if value is not None and parent in means else value
+        for value, parent in zip(epex_values, parents)
+    ]
+
+
 def index_market_data_by_slot(market_data: list[dict[str, Any]]) -> dict[datetime, dict[str, Any]]:
     """Index raw market data by quarter-hour slot (mean on true duplicates)."""
     buckets: dict[datetime, list[float]] = {}

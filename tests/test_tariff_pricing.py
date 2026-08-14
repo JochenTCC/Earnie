@@ -3,13 +3,32 @@ from __future__ import annotations
 
 import pytest
 
-from data.tariff_pricing import export_cent_kwh, import_cent_kwh, market_zone_for_land
+from data.tariff_pricing import (
+    SETTLEMENT_MTU_HOURLY,
+    SETTLEMENT_MTU_QUARTER_HOUR,
+    export_cent_kwh,
+    import_cent_kwh,
+    market_zone_for_land,
+    tariff_settlement_mtu,
+)
 
 
 def test_market_zone_for_land():
     assert market_zone_for_land("AT") == "AT"
     assert market_zone_for_land("DE") == "DE-LU"
     assert market_zone_for_land("CH") == "CH"
+
+
+def test_tariff_settlement_mtu_defaults_to_quarter_hour():
+    assert tariff_settlement_mtu(None) == SETTLEMENT_MTU_QUARTER_HOUR
+    assert tariff_settlement_mtu({}) == SETTLEMENT_MTU_QUARTER_HOUR
+    assert tariff_settlement_mtu({"type": "spot_hourly"}) == SETTLEMENT_MTU_QUARTER_HOUR
+    assert tariff_settlement_mtu({"settlement_mtu": "unknown"}) == SETTLEMENT_MTU_QUARTER_HOUR
+
+
+def test_tariff_settlement_mtu_reads_hourly_flag():
+    assert tariff_settlement_mtu({"settlement_mtu": "60min"}) == SETTLEMENT_MTU_HOURLY
+    assert tariff_settlement_mtu({"settlement_mtu": "60MIN"}) == SETTLEMENT_MTU_HOURLY
 
 
 def test_spot_import_with_markup_and_settlement():

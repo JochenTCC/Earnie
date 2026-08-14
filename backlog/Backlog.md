@@ -20,7 +20,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Context:** Community pre-release `2.5.0-alpha.1` ships full 15‑min MILP (`dt_h = 0.25`) plus remaining 2.5 feature items (archived). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
 
-- [ ] Check possibilities to show decimal numbers according to regional settings (e.g. use "," as decimal sign for Germany)
 - [ ] Official `2.5.0` after community soak (tag without `-alpha`; GHCR `:latest`)
 
 
@@ -33,6 +32,11 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 
 ### Version 2.+1 — Improvements for EVs / Export
 
+- [ ] Calculate efficiency for battery from difference in overall charging and discharging energy 
+  - eff = ((E_discharge) / E_charge)^0.5 
+  - Add standby energy consumption on top of "Entladen" bar
+  - give it as recommendation for possible changes in HK - keep nominal values in description#
+  - remove "Kleine Abweichungen sind normal (SoC-Änderung, Standby der Batterie)."
 - [ ] Clarify how to handle wallbox <> EVs
 - [ ] When importing from existing Loxone config is working the other way round would also be possible:
     - User has a complete HK with live scenario in place in Earnie
@@ -83,6 +87,7 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 - [ ] **Data & tariff fidelity - Part 2**
   - Keep official EPEX unconnected unless a paid/internal use case appears
   - Check possibilities to automatic tariffs.json update to existing installations
+- [ ] Check possibilities to show decimal numbers according to regional settings (e.g. use "," as decimal sign for Germany)
 
 
 ### Version 3.0

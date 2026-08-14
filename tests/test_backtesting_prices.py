@@ -10,6 +10,7 @@ import pytest
 from data.backtesting_prices import (
     BacktestingPriceContext,
     build_market_data_as_of,
+    import_brutto_cent_for_slots,
     last_day_ahead_calendar_date,
     matrix_prices_from_context,
     slot_in_market_data_as_of,
@@ -82,3 +83,38 @@ def test_matrix_prices_mirror_marks_extrapolated_slots():
     )
     _, _, sources = matrix_prices_from_context(prices, slots, ctx)
     assert sources == [PRICE_SOURCE_MIRRORED] * 3
+
+
+def test_import_brutto_cent_hourly_settlement_averages_quarters():
+    """Tariffs with settlement_mtu='60min' bill the hour's EPEX mean, not each QH price."""
+    hour = datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA)
+    slots = [hour + timedelta(minutes=15 * i) for i in range(4)]
+    epex_values = [10.0, 20.0, 30.0, 40.0]  # mean = 25.0
+    tariff = {
+        "type": "spot_hourly",
+        "land": "AT",
+        "settlement_fee_cent_kwh": 0.0,
+        "markup_percent": 0.0,
+        "prices_include_vat": False,
+        "vat_percent": 0.0,
+        "settlement_mtu": "60min",
+    }
+    brutto = import_brutto_cent_for_slots(epex_values, slots, import_tariff_spec=tariff)
+    assert brutto == [pytest.approx(25.0)] * 4
+
+
+def test_import_brutto_cent_quarter_hour_settlement_keeps_per_slot_prices():
+    """No settlement_mtu (or '15min') keeps today's per-QH behaviour — regression guard."""
+    hour = datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA)
+    slots = [hour + timedelta(minutes=15 * i) for i in range(4)]
+    epex_values = [10.0, 20.0, 30.0, 40.0]
+    tariff = {
+        "type": "spot_hourly",
+        "land": "AT",
+        "settlement_fee_cent_kwh": 0.0,
+        "markup_percent": 0.0,
+        "prices_include_vat": False,
+        "vat_percent": 0.0,
+    }
+    brutto = import_brutto_cent_for_slots(epex_values, slots, import_tariff_spec=tariff)
+    assert brutto == [pytest.approx(v) for v in epex_values]

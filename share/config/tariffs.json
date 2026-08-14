@@ -279,6 +279,7 @@
             "prices_include_vat": false,
             "vat_percent": 20.0,
             "monthly_fee_eur": 4.79,
+            "settlement_mtu": "60min",
             "supplier_id": "awattar_at"
         },
         {
@@ -377,6 +378,7 @@
             "prices_include_vat": false,
             "vat_percent": 19.0,
             "monthly_fee_eur": 4.58,
+            "settlement_mtu": "60min",
             "notes": "Monatsgebuehr ca. 4,58 EUR (Naeherung, ggf. PLZ-abhaengig). settlement_fee_cent_kwh 2,25 vs. aktuelles DE-Tarifblatt (EPEX+3%) noch zu klaeren.",
             "supplier_id": "awattar_de"
         },
@@ -688,6 +690,7 @@
             "feed_in_fee_factor": 0.19,
             "feed_in_fix_cent": 0.0,
             "monthly_fee_eur": 4.79,
+            "settlement_mtu": "60min",
             "notes": "aWATTar SUNNY Spot 60 min. EPEX Spot AT 60min − 19% × |EPEX| (netto=brutto, keine USt laut UStBBKV). Grundgebühr 4,79 EUR/Monat netto (einmal pro Stromlieferadresse). Quelle: awattar.at/tariffs/sunnyspot, Tarifblatt Stand 2026-07.",
             "supplier_id": "awattar_at"
         },

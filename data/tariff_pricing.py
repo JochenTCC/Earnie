@@ -13,6 +13,9 @@ IMPORT_MONTHLY = "monthly_table"
 EXPORT_FIXED = "fixed"
 EXPORT_MONTHLY = "monthly_table"
 
+SETTLEMENT_MTU_HOURLY = "60min"
+SETTLEMENT_MTU_QUARTER_HOUR = "15min"
+
 MARKET_ZONE_BY_LAND = {
     "AT": "AT",
     "DE": "DE-LU",
@@ -34,6 +37,16 @@ def market_zone_for_land(land: str) -> str:
             f"Unbekanntes Tarif-Land '{land}'. Erlaubt: {', '.join(sorted(MARKET_ZONE_BY_LAND))}."
         )
     return MARKET_ZONE_BY_LAND[code]
+
+
+def tariff_settlement_mtu(tariff: dict[str, Any] | None) -> str:
+    """Abrechnungs-Markteinheit ('15min' Default, '60min' fuer echt stuendlich abgerechnete Produkte)."""
+    if not tariff:
+        return SETTLEMENT_MTU_QUARTER_HOUR
+    value = str(tariff.get("settlement_mtu") or "").strip().lower()
+    if value == SETTLEMENT_MTU_HOURLY:
+        return SETTLEMENT_MTU_HOURLY
+    return SETTLEMENT_MTU_QUARTER_HOUR
 
 
 def _apply_vat(

@@ -442,6 +442,79 @@ def test_awattar_tariff_spec_includes_surcharges():
     assert dynamic["monthly_fee_eur"] == pytest.approx(4.79)
     assert awattar["supplier_id"] == "awattar_at"
     assert dynamic["supplier_id"] == "awattar_at"
+    assert awattar["settlement_mtu"] == "60min"
+    assert dynamic["settlement_mtu"] == "60min"
+
+
+def test_settlement_mtu_survives_normalization_round_trip():
+    from house_config.tariffs_store import normalize_tariffs_document
+
+    doc = normalize_tariffs_document(
+        {
+            "import_tariffs": [
+                {
+                    "id": "hourly_import",
+                    "label": "Hourly Import",
+                    "type": "spot_hourly",
+                    "land": "AT",
+                    "settlement_fee_cent_kwh": 1.0,
+                    "markup_percent": 0.0,
+                    "prices_include_vat": False,
+                    "vat_percent": 20.0,
+                    "settlement_mtu": "60min",
+                }
+            ],
+            "export_tariffs": [],
+        }
+    )
+    assert doc["import_tariffs"]["hourly_import"]["settlement_mtu"] == "60min"
+
+
+def test_settlement_mtu_defaults_when_absent():
+    from house_config.tariffs_store import normalize_tariffs_document
+
+    doc = normalize_tariffs_document(
+        {
+            "import_tariffs": [
+                {
+                    "id": "qh_import",
+                    "label": "QH Import",
+                    "type": "spot_hourly",
+                    "land": "AT",
+                    "settlement_fee_cent_kwh": 1.0,
+                    "markup_percent": 0.0,
+                    "prices_include_vat": False,
+                    "vat_percent": 20.0,
+                }
+            ],
+            "export_tariffs": [],
+        }
+    )
+    assert "settlement_mtu" not in doc["import_tariffs"]["qh_import"]
+
+
+def test_settlement_mtu_rejects_unknown_value():
+    from house_config.tariffs_store import normalize_tariffs_document
+
+    with pytest.raises(ValueError, match="settlement_mtu"):
+        normalize_tariffs_document(
+            {
+                "import_tariffs": [
+                    {
+                        "id": "bad_mtu",
+                        "label": "Bad MTU",
+                        "type": "spot_hourly",
+                        "land": "AT",
+                        "settlement_fee_cent_kwh": 1.0,
+                        "markup_percent": 0.0,
+                        "prices_include_vat": False,
+                        "vat_percent": 20.0,
+                        "settlement_mtu": "30min",
+                    }
+                ],
+                "export_tariffs": [],
+            }
+        )
 
 
 def test_export_tariff_id_alias_awattar_sunny_float_rejected():

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from data.market_prices import (
     PRICE_SOURCE_DAY_AHEAD,
     PRICE_SOURCE_MIRRORED,
+    hourly_settlement_epex_values,
     index_market_data_by_slot,
     normalize_price_slot,
     resolve_24h_market_slots,
@@ -171,3 +172,37 @@ def test_hourly_market_expands_onto_quarter_hour_targets():
     assert len(resolved) == 4
     assert all(slot["price_buy"] == 11.0 for slot in resolved)
     assert all(slot["price_source"] == PRICE_SOURCE_DAY_AHEAD for slot in resolved)
+
+
+def test_hourly_settlement_epex_values_averages_per_clock_hour():
+    """EPEX SDAC 'average rule': all 4 QH quarters get the hour's arithmetic mean."""
+    hour = datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA)
+    slots = [hour + timedelta(minutes=15 * i) for i in range(4)]
+    values = [10.0, 20.0, 30.0, 40.0]
+
+    averaged = hourly_settlement_epex_values(values, slots)
+
+    assert averaged == [25.0, 25.0, 25.0, 25.0]
+
+
+def test_hourly_settlement_epex_values_keeps_hours_independent():
+    slots = [
+        datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA),
+        datetime(2026, 7, 4, 9, 30, tzinfo=VIENNA),
+        datetime(2026, 7, 4, 10, 0, tzinfo=VIENNA),
+        datetime(2026, 7, 4, 10, 30, tzinfo=VIENNA),
+    ]
+    values = [10.0, 30.0, 100.0, 200.0]
+
+    averaged = hourly_settlement_epex_values(values, slots)
+
+    assert averaged == [20.0, 20.0, 150.0, 150.0]
+
+
+def test_hourly_settlement_epex_values_passes_through_none():
+    hour = datetime(2026, 7, 4, 9, 0, tzinfo=VIENNA)
+    slots = [hour, hour + timedelta(minutes=15)]
+
+    averaged = hourly_settlement_epex_values([10.0, None], slots)
+
+    assert averaged == [10.0, None]

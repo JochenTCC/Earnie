@@ -145,6 +145,13 @@ def _normalize_dach_fields(raw: dict, spec: dict) -> None:
             spec[key] = value
     if "prices_include_vat" in raw:
         spec["prices_include_vat"] = bool(raw["prices_include_vat"])
+    if "settlement_mtu" in raw and raw["settlement_mtu"] is not None:
+        settlement_mtu = str(raw["settlement_mtu"]).strip().lower()
+        if settlement_mtu not in ("15min", "60min"):
+            raise ValueError(
+                f"settlement_mtu muss '15min' oder '60min' sein, nicht {raw['settlement_mtu']!r}."
+            )
+        spec["settlement_mtu"] = settlement_mtu
     notes = raw.get("notes")
     if notes is not None and str(notes).strip():
         spec["notes"] = str(notes).strip()

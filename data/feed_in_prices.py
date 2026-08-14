@@ -184,9 +184,18 @@ def feed_in_settings_from_dict(
 
 def enrich_matrix_feed_in_prices(matrix: list[dict[str, Any]], settings: FeedInSettings) -> None:
     """Setzt k_push_act je Matrix-Zeile (in-place)."""
-    for row in matrix:
+    from data.tariff_pricing import SETTLEMENT_MTU_HOURLY, tariff_settlement_mtu
+
+    epex_for_export = [row.get("price_buy") for row in matrix]
+    if tariff_settlement_mtu(settings.export_tariff_spec) == SETTLEMENT_MTU_HOURLY:
+        slots = [row.get("slot_datetime") for row in matrix]
+        if all(slot is not None for slot in slots):
+            from data.market_prices import hourly_settlement_epex_values
+
+            epex_for_export = hourly_settlement_epex_values(epex_for_export, slots)
+    for row, epex in zip(matrix, epex_for_export):
         row["k_push_act"] = resolve_k_push_act(
-            row.get("price_buy"),
+            epex,
             settings,
             slot_datetime=row.get("slot_datetime"),
         )

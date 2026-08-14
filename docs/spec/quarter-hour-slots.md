@@ -48,22 +48,24 @@ SDAC Day-Ahead switched to 15‑min MTU for delivery from **2025-10-01** (EPEX /
 | Path | Code | Notes |
 |------|------|-------|
 | SE / backtesting | `data/data_loader.py` `fetch_energy_charts_prices` | AT / DE-LU / CH; AT falls back to aWATTar on failure |
-| Live | `integrations/awattar_client.py` via `main.py`, `ui/live_mode.py` | **aWATTar only** (hourly API) |
+| Live | `data/live_market_prices.py` `fetch_live_day_ahead_prices` via `main.py`, `ui/live_mode.py` | **Energy-Charts first, aWATTar fallback on failure** (corrected 2026-08-14; both paths now share the same QH-resolution source) |
 
-User docs ([`docs/konfiguration/preise.md`](../konfiguration/preise.md)) describe Energy-Charts for planning; Live prose still implies provider choice — **code path is aWATTar-only**. Fidelity finding for follow-up; not a blocker for A/B/C.
+**Update (2026-08-14):** the line above previously read "Live: aWATTar only (hourly API)" — stale. `data/live_market_prices.py` prefers Energy-Charts (same QH source as SE) and only falls back to aWATTar's hourly API when the Energy-Charts request fails. Live and SE are therefore equally exposed to the settlement-mismatch risk in §3.3/§3.4, not just SE.
 
 ### 3.3 Catalog tariff settlement map
 
-Catalog type is only `spot_hourly` ([`share/config/tariffs.json`](../../share/config/tariffs.json)). There is **no** `settlement_mtu` field. Classification below is from product notes / public marketing (spot-check 2026-08), not from Earnie runtime fields.
+**Implemented (2026-08-14):** `share/config/tariffs.json` now has a `settlement_mtu` field (`"15min"` default / `"60min"`), validated by `share/config/tariffs.schema.json` and normalized through `house_config/tariffs_store.py::_normalize_dach_fields`. When a tariff is `"60min"`, `data/backtesting_prices.py::import_brutto_cent_for_slots` and `data/feed_in_prices.py::enrich_matrix_feed_in_prices` replace each QH EPEX value with the arithmetic mean of its clock hour (`data/market_prices.py::hourly_settlement_epex_values`) before applying the tariff's markup formula — matching the EPEX SDAC "average rule" (the exchange's own 60-min index price is by construction the mean of the four 15-min clearing prices; see backlog research in `backlog/Backlog.md`). Applies identically to Live and SE (§3.2). Only the tariffs in the first row below carry the flag so far; classification is from product notes / public marketing (spot-check 2026-08), not verified per Tarifblatt for every id.
 
-| Settlement | Catalog ids (representative) | Evidence |
-|------------|------------------------------|----------|
-| **Hourly / 60‑min product** | `awattar_at`, `de_awattar_de_hourly_de`, export `dynamic_epex` (SUNNY Spot) | aWATTar HOURLY: “24 Preise”, “EPEX Spot AT (60 min)”; SUNNY Spot **60 min** by name and Tarifblatt |
-| **¼‑h EPEX** | `at_vkw_strom_dynamisch`, `at_vkw_pv_dynamisch`, `de_tibber_tibber_dynamic` | VKW: “Viertelstundenpreise EPEX Spot Day-Ahead AT”; Tibber: quarter-hourly product page post‑2025‑10 |
-| **Likely hourly (name / notes)** | `at_aae_…_spot_stunde_ii`, `at_avia_…_stundenfloater`, export `at_smartenergy_smartsun_spot` (“Stuendlich…”) | Naming / notes; not re-verified on every Tarifblatt |
-| **Unclear / assume market MTU** | Most other AT/DE/CH `spot_hourly` without notes | Day-Ahead market is QH for AT/DE-LU since 2025-10; supplier may still invoice hourly averages — **verify before treating as QH billing** |
+| Settlement | Catalog ids (representative) | Evidence | Status |
+|------------|------------------------------|----------|--------|
+| **Hourly / 60‑min product** | `awattar_at`, `de_awattar_de_hourly_de`, export `dynamic_epex` (SUNNY Spot) | aWATTar HOURLY: “24 Preise”, “EPEX Spot AT (60 min)”; SUNNY Spot **60 min** by name and Tarifblatt | `settlement_mtu: "60min"` set |
+| **¼‑h EPEX** | `at_vkw_strom_dynamisch`, `at_vkw_pv_dynamisch`, `de_tibber_tibber_dynamic` | VKW: “Viertelstundenpreise EPEX Spot Day-Ahead AT”; Tibber: quarter-hourly product page post‑2025‑10 | Default (`"15min"`), no change needed |
+| **Likely hourly (name / notes)** | `at_aae_…_spot_stunde_ii`, `at_avia_…_stundenfloater`, export `at_smartenergy_smartsun_spot` (“Stuendlich…”) | Naming / notes; not re-verified on every Tarifblatt | **Follow-up** — not yet flagged, needs Tarifblatt verification |
+| **Unclear / assume market MTU** | Most other AT/DE/CH `spot_hourly` without notes | Day-Ahead market is QH for AT/DE-LU since 2025-10; supplier may still invoice hourly averages — **verify before treating as QH billing** | Default (`"15min"`), unchanged |
 
-CH catalog entries (`ch_ekz_…`, `ch_groupe_e_vario`): Energy-Charts CH series sampled as hourly → treat as **hourly** for Earnie SE until proven otherwise.
+CH catalog entries (`ch_ekz_…`, `ch_groupe_e_vario`): Energy-Charts CH series sampled as hourly → treat as **hourly** for Earnie SE until proven otherwise; `settlement_mtu` is irrelevant there since the source itself never carries QH resolution for CH.
+
+**Known remaining gap:** `runtime_store/history_timeline.py`'s legacy-log display fallback (`epex_to_brutto_cent()` / single-value `resolve_k_push_act()` calls) reconstructs a price for old production-log entries missing newer fields, one slot at a time with no visibility into sibling QH slots — it cannot apply the hourly-mean rule and stays on the raw QH value. Display/chart-reconstruction only, not cost/MILP-relevant.
 
 ### 3.4 Billing vs plan mismatch (if MILP stays hourly)
 
