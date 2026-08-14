@@ -58,5 +58,5 @@
       "notes": "Enum off | pv | now (Loxone Merker: 0 / 1 / 2)."
     }
   ],
-  "reference": "docs/referenz/loxone-signale.md"
+  "reference": "docs/referenz/loxone-signals.md"
 }

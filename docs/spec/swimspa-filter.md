@@ -142,7 +142,7 @@ Earnie (pro 15-Min-Slot):
 |-------|--------|
 | 1 | `loxone_remaining_hours` in `consumer_targets` + `get_consumer_remaining_kwh` (ohne `delivered`-Abzug) |
 | 2 | `filter_context.py`: natives Fenster → gesperrte Matrix-Indizes; Anbindung MILP |
-| 3 | Schema, `config.example.json`, `loxone-signale.md`, `verify_loxone_setup` |
+| 3 | Schema, `config.example.json`, `loxone-signals.md`, `verify_loxone_setup` |
 | 4 | Live-Abnahme (Format `filter1hour`, Float `Sollstunden`) |
 
 ## 11. Live-Formate (Abnahme)

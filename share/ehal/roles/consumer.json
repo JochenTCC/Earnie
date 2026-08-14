@@ -23,5 +23,5 @@
       "notes": "Pattern B Sollwert. Legacy flex.power_setpoint_name migrates on load."
     }
   ],
-  "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signale.md § Flexible Verbraucher."
+  "unit_sign_notes": "Stub only — not part of M1 wire. See docs/referenz/loxone-signals.md § Flexible Verbraucher."
 }

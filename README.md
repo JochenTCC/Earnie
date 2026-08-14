@@ -101,9 +101,9 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Handbuch**           | [Benutzer-Handbuch Earnie](docs/user-manual/Benutzer-Handbuch-Earnie.md)                                                                                                                                         |
 | **Einrichtung**        | [Adapter wählen](docs/einrichtung/adapter-wahl.md) · [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Proxmox LXC](docs/einrichtung/proxmox-lxc.md) |
-| **Konfiguration**      | [Überblick](docs/konfiguration/ueberblick.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md) |
+| **Konfiguration**      | [Überblick](docs/konfiguration/overview.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md) |
 | **Benutzeroberfläche** | [Betriebsmodi](docs/ui/betriebsmodi.md) · [Charts](docs/ui/charts.md) · [EHAL-Com](docs/ui/ehal-com.md)                                                                                            |
-| **Referenz**           | [Abkürzungen](docs/referenz/abkuerzungen.md) · [Loxone-Signale und Earnie-Library](docs/referenz/loxone-signale.md)                                                                                                                                                                |
+| **Referenz**           | [Abkürzungen](docs/referenz/abbreviations.md) · [Loxone-Signale und Earnie-Library](docs/referenz/loxone-signals.md)                                                                                                                                                                |
 
 
 

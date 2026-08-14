@@ -10,5 +10,5 @@
       "notes": "kW; + = Bezug. Maps to EHAL sens_grid_power_active (W)."
     }
   ],
-  "reference": "docs/referenz/loxone-signale.md"
+  "reference": "docs/referenz/loxone-signals.md"
 }

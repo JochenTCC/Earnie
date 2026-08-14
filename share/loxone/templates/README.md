@@ -2,7 +2,7 @@
 
 Virtual HTTP **In/Out** XML for Loxone Config. Shape matches [LoxBerry LoxoneTemplateBuilder](https://wiki.loxberry.de/entwickler/perl_develop_plugins_with_perl/perl_loxberry_sdk_dokumentation/perl_modul_loxberryloxonetemplatebuilder) (`VI_*.xml` / `VO_*.xml`).
 
-**German how-to (operators):** [`docs/referenz/loxone-signale.md`](../../../docs/referenz/loxone-signale.md) — Library setup, Default Merker names, EFM, Earnie-dead fallback, Loxone import.
+**How-to (operators):** [`docs/referenz/loxone-signals.md`](../../../docs/referenz/loxone-signals.md) — Library setup, Default Merker names, EFM, Earnie-dead fallback, Loxone import.
 
 **Status:** hand-authored draft. Import → fix Address/`Check` → **Als Vorlage speichern** → replace these files with Config-exported XML (canonical packaging still open until that handoff).
 
@@ -76,7 +76,7 @@ Frozen Merker names: [`../greenfield_device_map.json`](../greenfield_device_map.
 
 ## Multiple consumers / EVs (`VI_`/`VO_` Consumer + EV)
 
-**Canonical naming** (German user reference): [`docs/referenz/loxone-signale.md`](../../../docs/referenz/loxone-signale.md) — *Mehrere Flex-Verbraucher* / *Mehrere E-Autos*.
+**Canonical naming** (user reference): [`docs/referenz/loxone-signals.md`](../../../docs/referenz/loxone-signals.md) — *Multiple Flex Consumers* / *Multiple EVs*.
 
 Three layers:
 
@@ -103,4 +103,4 @@ Template defaults leave `{hk_id}` / `{ev_id}` placeholders — replace in Config
 ## Not in these XMLs
 
 - **Zähler / EFM hardware** — attach meters in Config; unique Bezeichnung; see EFM research note. Power VO Titles may still exist as optional aliases.
-- **Earnie-dead fallback** — watchdog on `Earnie_Heartbeat` age in Config: [loxone-signale.md](../../../docs/referenz/loxone-signale.md#earnie-tot-fallback-in-loxone-config).
+- **Earnie-dead fallback** — watchdog on `Earnie_Heartbeat` age in Config: [loxone-signals.md](../../../docs/referenz/loxone-signals.md#earnie-dead-fallback-in-loxone-config).

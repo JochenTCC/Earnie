@@ -4,7 +4,7 @@ Earnie kommuniziert mit dem Loxone Miniserver über **HTTP** (Lesen und Schreibe
 
 Andere Hubs (HA+evcc, OpenEMS): [Adapter wählen](adapter-wahl.md).
 
-**Default / Library:** Virtual-In/Out-Vorlagen einspielen, Zähler am EFM, Earnie-tot-Fallback und Import: [Loxone-Signale und Earnie-Library](../referenz/loxone-signale.md).
+**Default / Library:** Virtual-In/Out-Vorlagen einspielen, Zähler am EFM, Earnie-tot-Fallback und Import: [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
 
 ## Zugangsdaten (`config/.env`)
 
@@ -27,7 +27,7 @@ Die Zugangsdaten können auch bequem über die Web-Oberfläche eingegeben werden
 
 Antworten liefern den Wert unter `LL.value`. Loxone gibt Zahlen oft **mit Einheit** zurück (z. B. `3.5 kW`, `72 %`, `16 A`). Der Optimizer parst diese Strings und ignoriert die Einheit für die Berechnung.
 
-Merker-Namen liegen in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Hausprofil) — siehe [Loxone-Signale](../referenz/loxone-signale.md). Zuordnung in der UI: **EHAL-Com**.
+Merker-Namen liegen in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Hausprofil) — siehe [Loxone-Signale](../referenz/loxone-signals.md). Zuordnung in der UI: **EHAL-Com**.
 
 ## Was der Optimizer liest
 

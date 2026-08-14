@@ -2,7 +2,7 @@
 
 Dieses Handbuch beschreibt Earnie aus Anwendersicht.  
 Technische Details (Container, Config-Schema, Entwickler) stehen in der [Anwender-Dokumentation](../README.md) und im [README](../../README.md).  
-Häufige Kurzformen (EHAL, SE, SoC, …): [Abkürzungen](../referenz/abkuerzungen.md).
+Häufige Kurzformen (EHAL, SE, SoC, …): [Abkürzungen](../referenz/abbreviations.md).
 
 ---
 
@@ -358,12 +358,12 @@ Zum Abgleich Ist vs. Modell: Hauskonfigurator / Leistungsprofil-CSV und die Tabe
 
 Wenn die Was-wäre-wenn-Analyse überzeugt, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die konkrete Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend.
 
-Backend wählen und Umschalten: [Adapter wählen](../einrichtung/adapter-wahl.md). Bei Loxone zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Earnie-Library](../referenz/loxone-signale.md).
+Backend wählen und Umschalten: [Adapter wählen](../einrichtung/adapter-wahl.md). Bei Loxone zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
 
 ### Vorbereitung der Smarthome-Konfiguration
 
 1. **Benutzer / Token** am Smarthome-Backend mit Rechten zum Lesen und Schreiben der benötigten IOs / Entities einrichten.
-2. **Signale** anlegen bzw. zuordnen — u. a. Batterie-SOC und Leistungen, PV, Netz, Freigaben, E-Auto-Status. Beispielnamen (Loxone): [Loxone-Signale](../referenz/loxone-signale.md).
+2. **Signale** anlegen bzw. zuordnen — u. a. Batterie-SOC und Leistungen, PV, Netz, Freigaben, E-Auto-Status. Beispielnamen (Loxone): [Loxone-Signale](../referenz/loxone-signals.md).
 3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** Merker bzw. HA-Entities den EHAL-Feldern zuweisen (`plant.ehal_bindings` / `consumers[].ehal_bindings`). Bei Loxone oft zuerst **Loxone-Import** im Hauskonfigurator, dann Mapping prüfen.
 4. Wenn Jahres-Leistungsprofile berücksichtigt werden sollen (ist optional): CSV-Upload nuten ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)) Offline-Daten für den Szenario-Explorerliegen später unter`cons_data.csv`.
 
@@ -375,7 +375,7 @@ Weitere Informationen dazu: [Loxone-Anbindung](../einrichtung/loxone-anbindung.m
 
 Unter **Konfiguration → Szenarienkonfigurator** wählen Sie das Live-Szenario und die Entitäten (Hausprofil, Batterie, PV, Tarife). Die Bezeichnung des Live-Szenarios ist fest. 
 
-Details dazu: [PV & Batterie](../konfiguration/batterie-pv.md), [Überblick](../konfiguration/ueberblick.md).
+Details dazu: [PV & Batterie](../konfiguration/batterie-pv.md), [Überblick](../konfiguration/overview.md).
 
 ### EHAL-Com
 

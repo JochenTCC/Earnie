@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://earnie.local/loxone/recipes/recipe.schema.json",
   "title": "Loxone Merker / Baustein Recipe (2.4.g)",
-  "description": "JSON Merker recipes (2.4.n greenfield contract). suggested_name must match share/loxone/greenfield_device_map.json. VI/VO XML drafts live under share/loxone/templates/. See docs/referenz/loxone-signale.md.",
+  "description": "JSON Merker recipes (2.4.n greenfield contract). suggested_name must match share/loxone/greenfield_device_map.json. VI/VO XML drafts live under share/loxone/templates/. See docs/referenz/loxone-signals.md.",
   "type": "object",
   "required": ["role_id", "label", "recommended_markers"],
   "properties": {

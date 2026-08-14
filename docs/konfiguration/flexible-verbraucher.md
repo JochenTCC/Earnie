@@ -42,9 +42,9 @@ Die Optimierung entscheidet **wann** sie laufen, nicht ob die Anlage technisch k
 | E-Auto                      | EVCS-Telemetrie (`sens_evcs_*`, …)   | `set_evcs_max_current`, `set_evcs_mode` / PV-Follow                                           |
 
 
-Optional: Leistung anderer Verbraucher vom Ist abziehen (SwimSpa − Filter, siehe [Loxone-Signale](../referenz/loxone-signale.md)).
+Optional: Leistung anderer Verbraucher vom Ist abziehen (SwimSpa − Filter, siehe [Loxone-Signale](../referenz/loxone-signals.md)).
 
-Signalübersicht und Feldnamen: [Loxone-Signale](../referenz/loxone-signale.md), Mapping-UI: [EHAL-Com](../ui/ehal-com.md).
+Signalübersicht und Feldnamen: [Loxone-Signale](../referenz/loxone-signals.md), Mapping-UI: [EHAL-Com](../ui/ehal-com.md).
 
 ## Pool: `thermal_control`
 
@@ -61,7 +61,7 @@ Bei `daily_target_source: thermal` steuert das RC-Modell das Tagesenergieziel au
 | `thermal_control.history_logs`               | CSV-Pfade für Kalibrierung; optional `heating_active_csv` / `filter_active_csv` statt reiner Leistungsschwelle |
 
 
-Details: [Loxone-Signale](../referenz/loxone-signale.md), [SwimSpa Filter](../spec/swimspa-filter.md).
+Details: [Loxone-Signale](../referenz/loxone-signals.md), [SwimSpa Filter](../spec/swimspa-filter.md).
 
 ## E-Auto: `charging_schedule`
 

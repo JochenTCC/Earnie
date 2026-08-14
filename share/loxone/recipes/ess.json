@@ -40,5 +40,5 @@
       "notes": "Mode hint for Huawei/Loxone; OpenEMS ignores."
     }
   ],
-  "reference": "docs/referenz/loxone-signale.md"
+  "reference": "docs/referenz/loxone-signals.md"
 }

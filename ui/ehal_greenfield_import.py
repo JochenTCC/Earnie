@@ -22,12 +22,12 @@ _SESSION_FLASH_OK = "greenfield_loxone_flash_ok"
 _SESSION_ACCESS = "greenfield_loxone_access"
 
 _SIGNALE_URL = docs_blob_url(
-    "docs/referenz/loxone-signale.md",
-    fragment="mehrere-flex-verbraucher-namenskonvention",
+    "docs/referenz/loxone-signals.md",
+    fragment="multiple-flex-consumers-naming-convention",
 )
 _LIBRARY_URL = docs_blob_url(
-    "docs/referenz/loxone-signale.md",
-    fragment="library-einrichten",
+    "docs/referenz/loxone-signals.md",
+    fragment="library-setup",
 )
 
 _CREDENTIALS_HINT = (

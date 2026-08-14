@@ -14,8 +14,8 @@ from ui.ehal_greenfield_import import (
 
 def test_import_hint_links_library_doc():
     assert "Anleitung" in _IMPORT_HINT
-    assert "loxone-signale.md" in _IMPORT_HINT
-    assert "library-einrichten" in _IMPORT_HINT
+    assert "loxone-signals.md" in _IMPORT_HINT
+    assert "library-setup" in _IMPORT_HINT
 
 
 def test_access_disabled_without_credentials():

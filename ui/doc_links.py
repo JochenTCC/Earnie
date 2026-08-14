@@ -160,7 +160,7 @@ PAGE_DOCS: dict[str, PageDocs] = {
             ),
             DocLink(
                 "Loxone-Signale und Earnie-Library",
-                "docs/referenz/loxone-signale.md",
+                "docs/referenz/loxone-signals.md",
             ),
             DocLink(
                 "Home Assistant + evcc (A2/B)",

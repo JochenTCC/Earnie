@@ -13,7 +13,7 @@ Zum Ausprobieren des Szenario-Explorers ohne Installation:
 
 1. **Konfiguration:** `share/config/config.example.json` → Bootstrap legt `earnie_env/config/config.json` an (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime`. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
 2. **Smarthome-Backend wählen:** [Adapter wählen](einrichtung/adapter-wahl.md) (Default Loxone; alternativ HA+evcc oder OpenEMS-Lab). Bei Loxone: `.env.example` → `earnie_env/config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `.env` im Config-Volume an).
-3. **Feld-Mapping:** Bei Loxone Merker in `plant.ehal_bindings` / Hausprofil über **EHAL-Com** ([Loxone-Signale und Earnie-Library](referenz/loxone-signale.md)); bei HA Entity→EHAL auf [EHAL-Com](ui/ehal-com.md). Legacy-`flexible_consumers` in `config.json` nur noch bei Bedarf (meist leer).
+3. **Feld-Mapping:** Bei Loxone Merker in `plant.ehal_bindings` / Hausprofil über **EHAL-Com** ([Loxone-Signale und Earnie-Library](referenz/loxone-signals.md)); bei HA Entity→EHAL auf [EHAL-Com](ui/ehal-com.md). Legacy-`flexible_consumers` in `config.json` nur noch bei Bedarf (meist leer).
 4. **Verbindung prüfen:** EHAL-Com (Live-Lesen) bzw. bei Loxone:
   ```powershell
    python -m scripts.verify_loxone_setup
@@ -52,7 +52,7 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 ### Konfiguration (`earnie_env/config/config.json`)
 
-- [Überblick](konfiguration/ueberblick.md) — Aufbau der Datei, Szenarien, Dateipfade
+- [Überblick](konfiguration/overview.md) — Aufbau der Datei, Szenarien, Dateipfade
 - [Speichern / Laden](konfiguration/speichern-laden.md) — `earnie_env`, Auto-Save, ZIP-Export/Import
 - [PV & Batterie](konfiguration/batterie-pv.md) — Live-Szenario, Entitäts-Referenzen
 - [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
@@ -71,9 +71,9 @@ Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `
 
 ### Referenz
 
-- [Abkürzungen](referenz/abkuerzungen.md) — EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
+- [Abkürzungen](referenz/abbreviations.md) — EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
 - [Streamlit-Ports](referenz/streamlit-ports.md) — Port pro Stack/Plattform (8501 Prod, 8521/8531 lokal, 8502/8532 Greenfield, 8503 OpenEMS-Lab, …)
-- [Loxone-Signale und Earnie-Library](referenz/loxone-signale.md) — Motivation, VI/VO-Vorlagen (Pattern B), Default-Merker, EFM, Import, Signal-Tabellen
+- [Loxone-Signale und Earnie-Library](referenz/loxone-signals.md) — Motivation, VI/VO-Vorlagen (Pattern B), Default-Merker, EFM, Import, Signal-Tabellen
 - [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) — OeMAG-Marktpreis vs. E-Control RefMarkt PV
 - [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) — Bezugs-/Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung; Quellen und Katalog-Audit
 

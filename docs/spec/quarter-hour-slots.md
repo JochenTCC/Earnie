@@ -140,7 +140,7 @@ Environment: `EARNIE_MILP_SOLVER=highs`, trivial fast-path off. Synthetic matrix
 | Outdoor / archive PV | `data/outdoor_forecast.py`, `data/open_meteo_solar_archive.py` |
 | Price features | `docs/spec/price-forecast-renewables.md` — EC 15‑min → hourly mean for features |
 | Charts | Mixed 15‑min log + 1‑h MILP (`ui/chart_context.py`, `docs/spec/ui-sunset2sunset.md`) — would need redefinition if MILP becomes QH |
-| Loxone write cadence | Can remain 15 min regardless of MILP grain; **doc drift:** [`docs/referenz/loxone-signale.md`](../referenz/loxone-signale.md) claims “MILP … 15-Min-Slots intern” — **false today** |
+| Loxone write cadence | Can remain 15 min regardless of MILP grain; **doc drift:** [`docs/referenz/loxone-signals.md`](../referenz/loxone-signals.md) claims “MILP … 15-Min-Slots intern” — **false today** |
 | SE commit-K / scripts | `optimizer/simulation.py`, `scripts/run_commit_hours_backtests.py` |
 
 ---
