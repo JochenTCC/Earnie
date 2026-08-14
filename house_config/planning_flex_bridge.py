@@ -29,6 +29,42 @@ def _attach_ehal_bindings(result: dict, consumer: dict) -> None:
         result["ehal_bindings"] = dict(bindings)
 
 
+def _generic_live_signal_type(consumer: dict, result: dict) -> str:
+    """Live meter type for generic MILP flex (manual/flex).
+
+    MILP itself stays on/off. Live/Chart must use kW when a Zähler is bound;
+    otherwise 0/1 × Nennleistung.
+    """
+    explicit = str(
+        ((consumer.get("loxone_inputs") or {}).get("signal_type"))
+        or consumer.get("signal_type")
+        or ""
+    ).strip().lower()
+    if explicit in ("power", "binary"):
+        return explicit
+    from settings.ehal_marker_resolve import marker_flex_power
+
+    if marker_flex_power(result) or marker_flex_power(consumer):
+        return "power"
+    power_name = str(
+        ((consumer.get("loxone_inputs") or {}).get("power_name") or "")
+    ).strip()
+    if power_name:
+        return "power"
+    return "binary"
+
+
+def _apply_live_signal_type(consumer: dict, result: dict) -> None:
+    live_signal = _generic_live_signal_type(consumer, result)
+    result["signal_type"] = live_signal
+    result["log_signal_type"] = live_signal
+    if live_signal != "power":
+        return
+    inputs = dict(result.get("loxone_inputs") or {})
+    inputs["signal_type"] = "power"
+    result["loxone_inputs"] = inputs
+
+
 def resolve_consumption_source(scenario_params: dict | None) -> str:
     """profile_spec = Hausprofil-Spec für Optimierung; logged_day = cons_data-Replay."""
     if not scenario_params:
@@ -172,6 +208,7 @@ def planning_consumer_to_milp(consumer: dict) -> dict:
     if isinstance(loxone_outputs, dict) and loxone_outputs:
         result["loxone_outputs"] = dict(loxone_outputs)
     _attach_ehal_bindings(result, consumer)
+    _apply_live_signal_type(consumer, result)
     return result
 
 
@@ -537,6 +574,7 @@ def planning_thermal_to_milp(consumer: dict) -> dict:
         entry["loxone_outputs"] = dict(loxone_outputs)
     reject_legacy_id(consumer, str(consumer["id"]))
     _attach_ehal_bindings(entry, consumer)
+    _apply_live_signal_type(consumer, entry)
     return entry
 
 

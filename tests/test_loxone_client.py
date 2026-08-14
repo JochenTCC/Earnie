@@ -439,6 +439,33 @@ class TestFlexibleConsumerHelpers:
         assert live.kw["tv"] == 0.14
         assert live.chart_kw["tv"] == 0.14
 
+    def test_generic_with_zaehler_binding_keeps_analog_kw(self):
+        """Manual generic + Zähler must not collapse analog kW via binary 0.5 threshold."""
+        from house_config.planning_flex_bridge import planning_consumer_to_milp
+
+        house = {
+            "id": "geschirrspueler",
+            "label": "Geschirrspüler",
+            "type": "generic",
+            "earnie_role": "manual",
+            "nominal_power_kw": 0.35,
+            "schedule": {
+                "runs_per_week": 6,
+                "duration_h": 2.5,
+                "start_hour": 12,
+                "start_shift_h": 8.0,
+            },
+            "ehal_bindings": {
+                "flex.geschirrspueler.sens_power_act": "Zähler Geschirrspüler"
+            },
+        }
+        milp = planning_consumer_to_milp(house)
+        assert milp["signal_type"] == "power"
+        with patch.object(lc, "fetch_loxone_generic_value", return_value=0.06):
+            live = lc.resolve_flexible_consumers_live_power(consumers=[milp])
+        assert live.kw["geschirrspueler"] == 0.06
+        assert live.chart_kw["geschirrspueler"] == 0.06
+
 
 class TestSharedMeterSubtraction:
     """Fall B: SwimSpa-Heizungszähler misst Heizung + Filter am selben Zähler."""

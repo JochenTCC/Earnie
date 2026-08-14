@@ -58,7 +58,7 @@ def test_planning_thermal_to_milp_bridge():
     assert milp["name"] == "Haus Wärme"
     assert "legacy_id" not in milp
     assert milp["daily_target_source"] == "thermal_annual"
-    assert milp["signal_type"] == "binary"
+    assert milp["signal_type"] == "power"
     assert milp["min_on_quarterhours"] == 4
     assert milp["max_on_quarterhours"] == 16
     assert milp["loxone_outputs"]["enable_name"] == "Ernie_WP_Freigabe"
@@ -72,6 +72,7 @@ def test_planning_thermal_to_milp_without_loxone_stays_empty():
     milp = planning_thermal_to_milp(consumer)
     assert milp["loxone_outputs"] == {}
     assert milp["loxone_inputs"] == {}
+    assert milp["signal_type"] == "binary"
 
 
 def test_collect_planning_flex_includes_wp_heating():
