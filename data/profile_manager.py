@@ -626,6 +626,7 @@ def _get_historical_epex_and_brutto_prices_for_day(target_date: date) -> tuple[l
         sim_cfg,
         awattar_url=config.get('AWATTAR_URL'),
         timeout=config.get_global_timeout(),
+        market_zone=(config.get_resolved_runtime_settings() or {}).get("market_zone"),
     )
 
     full_day_range = pd.date_range(

@@ -84,7 +84,7 @@ Berechnung: `[data/tariff_pricing.py](../../data/tariff_pricing.py)` (`import_ce
 | Land (`land`) | Zone  | Datenquelle (API)                                      |
 | ------------- | ----- | ------------------------------------------------------ |
 | AT            | AT    | Energy-Charts (`bzn=AT`); Fallback aWATTar AT           |
-| DE            | DE-LU | Energy-Charts oder optional `api.awattar.de`           |
+| DE            | DE-LU | Energy-Charts (`bzn=DE-LU`); Fallback aWATTar DE        |
 | CH            | CH    | Energy-Charts                                          |
 
 
@@ -140,7 +140,7 @@ Spec: [Preis-Prognose (Dev)](../spec/price-forecast-renewables.md).
 
 ## Historische Preise
 
-Für **Backtesting** (und geplante Dev-Nachrechnung): `scenario_explorer_conf.price_source`, `price_provider`, `price_range` und ggf. `path_price` (Energy-Charts-CSV, Zone `energy_charts_bzn`). Der Simulations-Gesamtzeitraum kommt aus `cons_data` (12 Kalendermonate bis zum letzten vollständigen Monat), nicht aus ehemaligen Loxone-Pfadpaaren.
+Für **Backtesting** (Szenario-Explorer): `scenario_explorer_conf.price_source` (`api` oder CSV via `path_price`). Die API lädt **Energy-Charts** (natives EPEX-Viertelstundenraster, gleiche Quelle wie Live) und fällt nur bei Fehler auf aWATTar (stündlich) zurück. `price_provider` ist ein Legacy-Feld und steuert die Reihenfolge nicht mehr. Bidding-Zone kommt aus dem Live-Importtarif (`market_zone` / `land`), nicht aus dem Default `DE-LU`. `price_range` und der Simulations-Gesamtzeitraum kommen aus `cons_data` (12 Kalendermonate bis zum letzten vollständigen Monat).
 
 ### Monatliche Fixtarife (Backtesting)
 

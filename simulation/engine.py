@@ -1315,6 +1315,16 @@ def _consumption_within_tolerance(historical_kwh: float, optimized_kwh: float) -
     return (diff / historical_kwh) <= CONSUMPTION_TOLERANCE_REL
 
 
+def _standby_kwh_in_rows(chart_rows: list[dict], meta: dict) -> float:
+    """ESS standby energy included in Verbrauch-Prognose but not in cons_data."""
+    from optimizer.slot_duration import energy_kwh_from_kw
+
+    standby_kw = max(0.0, float(meta.get("standby_power_kw") or 0.0))
+    if standby_kw <= 0.0 or not chart_rows:
+        return 0.0
+    return energy_kwh_from_kw(standby_kw for _ in chart_rows)
+
+
 def _plausibility_reference_values(
     meta: dict,
     flexible_consumers: list | None,
@@ -1360,6 +1370,9 @@ def validate_window_consumption(
         chart_rows,
         flexible_consumers=flexible_consumers,
     )
+    standby_kwh = _standby_kwh_in_rows(chart_rows, meta)
+    if standby_kwh:
+        optimized_baseload = round(max(0.0, optimized_baseload - standby_kwh), 3)
     delivered_flex = _delivered_flex_kwh_from_rows(
         chart_rows,
         flexible_consumers=flexible_consumers,
@@ -1558,6 +1571,9 @@ def run_simulation(
                 set_cbc_milp_context(
                     consumer_targets_kwh=dict(meta["consumer_daily_targets_kwh"]),
                 )
+            meta["standby_power_kw"] = float(
+                battery_params.get("standby_power_kw") or 0.0
+            )
             plausibility_result = validate_window_consumption(chart_rows, meta)
             plausibility.add(plausibility_result)
 

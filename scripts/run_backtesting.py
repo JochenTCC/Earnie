@@ -734,17 +734,18 @@ def main(argv: list[str] | None = None):
         )
 
     if price_source == "api":
-        provider = sim_cfg.get("price_provider", "awattar")
         price_load_start, price_load_end = _price_load_window(start, end, price_strategy)
         if price_load_start < start:
             print(
-                f"Lade Börsenpreise per API ({provider}) für {price_load_start.date()} "
-                f"bis {price_load_end.date()} (Simulation {start.date()}–{end.date()}, "
+                f"Lade Börsenpreise per API (Energy-Charts, aWATTar-Fallback) für "
+                f"{price_load_start.date()} bis {price_load_end.date()} "
+                f"(Simulation {start.date()}–{end.date()}, "
                 f"+{ (start - price_load_start).days}d Lookback für {price_strategy})..."
             )
         else:
             print(
-                f"Lade Börsenpreise per API ({provider}) für {start.date()} bis {end.date()}..."
+                f"Lade Börsenpreise per API (Energy-Charts, aWATTar-Fallback) "
+                f"für {start.date()} bis {end.date()}..."
             )
     else:
         price_load_start, price_load_end = _price_load_window(start, end, price_strategy)
@@ -756,12 +757,23 @@ def main(argv: list[str] | None = None):
         else:
             print(f"Lade Börsenpreise aus CSV für {start.date()} bis {end.date()}...")
 
+    scenario_labels = config.get_scenario_labels()
+    labels = _all_labels(scenario_labels)
+    scenarios = config.get_backtesting_scenarios()
+    live_scenario_id = config.get_live_scenario_id()
+    live_params = scenarios.get(live_scenario_id) or (
+        next(iter(scenarios.values())) if scenarios else None
+    )
+    market_zone = None
+    if live_params is not None:
+        market_zone = live_params.get("market_zone")
     prices = load_market_prices(
         price_load_start,
         price_load_end,
         sim_cfg,
         awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
+        market_zone=market_zone,
     )
 
     first_window = window_slot_datetimes(anchors[0])[0]
@@ -786,13 +798,6 @@ def main(argv: list[str] | None = None):
         )
 
     ref_settings = config.get_backtesting_feed_in_settings()
-    scenario_labels = config.get_scenario_labels()
-    labels = _all_labels(scenario_labels)
-    scenarios = config.get_backtesting_scenarios()
-    live_scenario_id = config.get_live_scenario_id()
-    live_params = scenarios.get(live_scenario_id) or (
-        next(iter(scenarios.values())) if scenarios else None
-    )
     if live_params is not None:
         ref_settings = config.get_backtesting_feed_in_settings(
             runtime_override=live_params

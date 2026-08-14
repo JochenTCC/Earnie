@@ -33,7 +33,7 @@
         "cons_data_retention_months": 24,
         "cons_data_write_mode": "hourly",
         "price_source": "api",
-        "price_provider": "awattar",
+        "price_provider": "energy_charts",
         "price_range": "last_12_months",
         "season_mirror_to_last_month": false
     },

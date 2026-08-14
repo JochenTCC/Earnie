@@ -70,7 +70,12 @@ def _price_month_bounds(anchor: datetime, period: dict) -> tuple[int, int]:
     return month, min(12, month + 1)
 
 
-def _load_prices_for_anchor(anchor: datetime, period: dict) -> pd.DataFrame:
+def _load_prices_for_anchor(
+    anchor: datetime,
+    period: dict,
+    *,
+    market_zone: str | None = None,
+) -> pd.DataFrame:
     sim_cfg = config.get_scenario_explorer_conf()
     year = int(period.get("backtesting_year") or anchor.year)
     price_start, price_end = _price_month_bounds(anchor, period)
@@ -85,6 +90,7 @@ def _load_prices_for_anchor(anchor: datetime, period: dict) -> pd.DataFrame:
         sim_cfg,
         awattar_url=config.get("AWATTAR_URL"),
         timeout=config.get_global_timeout(default=30),
+        market_zone=market_zone,
     )
 
 
@@ -106,7 +112,11 @@ def simulate_window_snapshot(
     scenario_params = dict(scenarios[scenario_id])
     cache = cache or HistoricalDataCache()
     cache.load()
-    prices_df = _load_prices_for_anchor(anchor, period)
+    prices_df = _load_prices_for_anchor(
+        anchor,
+        period,
+        market_zone=scenario_params.get("market_zone"),
+    )
     battery_params = _scenario_to_battery_params(scenario_params)
     feed_in_settings = config.get_backtesting_feed_in_settings(runtime_override=scenario_params)
 

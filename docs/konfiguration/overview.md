@@ -53,7 +53,7 @@ Template for scenarios: [`backtesting_scenarios.example.json`](../../share/confi
 | `cons_data_retention_months`   | How long hourly values are retained                                              |
 | `cons_data_write_mode`         | Write mode (`hourly`)                                                             |
 | `price_source`                 | `api` = live prices; other values for historical prices from CSV                  |
-| `price_provider`               | e.g. `awattar`                                                                     |
+| `price_provider`               | Legacy; API uses Energy-Charts first (aWATTar hourly fallback)                      |
 | `price_range`                  | `last_12_months`: 12 calendar months up to the last **complete** month in `cons_data` (defined backwards; days chronological) |
 | `energy_charts_bzn`            | Bidding zone for the Energy-Charts CSV (e.g. `DE-LU`)                             |
 

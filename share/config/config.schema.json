@@ -360,7 +360,7 @@
         },
         "price_provider": {
           "type": "string",
-          "description": "Preisanbieter für Live-API (z. B. awattar)."
+          "description": "Legacy label. SE/Live API fetch always prefers Energy-Charts (native 15-min EPEX); aWATTar hourly is fallback only."
         },
         "price_range": {
           "type": "string",

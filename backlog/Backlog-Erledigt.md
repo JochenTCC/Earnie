@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix SE plausibility after QH / mean-h (2026-08-14)
+
+- [x] SE calculation after qh / mean-h-Fix (local-env Scenarios) marked every window as a consumption issue. Cause: Verbrauch-Prognose includes ESS standby (`standby_power_kw` 0.026 → 0.624 kWh/day) while cons_data baseload does not; 0.5 kWh / 5% check failed on all 31 days. Fix: peel standby from optimized baseload in `validate_window_consumption` (`simulation/engine.py`). Also: Energy-Charts first for native QH prices (aWATTar hourly only on Charts failure); SE loads prices with the live import tariff `market_zone`. Tests in `test_baseload_validation.py`. Live/local-env SE acceptance verified.
+
+
 ### Bugfix Zähler-wired consumers shown as nominal/binary (2026-08-14)
 
 - [x] Consumer Geschirrspüler (and other Zähler-wired manuals / Wärmepumpe) shown as Nennleistung or 0 although Loxone Zähler should be monitored — `planning_consumer_to_milp` / `planning_thermal_to_milp` forced `signal_type: binary`, so analog kW below 0.5 became 0 and at/above 0.5 became nominal. Fix: live/log `signal_type: power` when `flex.{id}.sens_power_act` or `power_name` is bound. Tests in `test_loxone_client.py` / `test_thermal_flex_bridge.py`. Live acceptance verified.

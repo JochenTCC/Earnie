@@ -251,7 +251,8 @@ def import_brutto_cent_for_slots(
 
     if import_tariff_spec is None:
         return [epex_to_brutto_cent(float(p)) for p in epex_values]
-    if tariff_settlement_mtu(import_tariff_spec) == SETTLEMENT_MTU_HOURLY:
+    _mtu = tariff_settlement_mtu(import_tariff_spec)
+    if _mtu == SETTLEMENT_MTU_HOURLY:
         epex_values = hourly_settlement_epex_values(epex_values, slot_datetimes)
     tariff_type = str(import_tariff_spec.get("type", "")).strip().lower()
     if tariff_type == "monthly_table":

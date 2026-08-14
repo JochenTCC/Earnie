@@ -105,6 +105,24 @@ class TestValidateWindowConsumption:
         assert result.flex_diff_kwh is not None
         assert result.flex_diff_kwh > 0.5
 
+    def test_standby_in_verbrauch_prognose_does_not_fail(self):
+        """ESS standby is in Verbrauch-Prognose but not in cons_data baseload."""
+        standby = 0.026
+        house_kwh = 6.276
+        n = slots_for_wall_hours(24)
+        house_kw = house_kwh / 24.0
+        meta = {
+            "window_end": datetime(2026, 3, 2, 7, 0),
+            "historical_total_kwh": house_kwh,
+            "baseload_kwh": house_kwh,
+            "historical_totals": {},
+            "standby_power_kw": standby,
+        }
+        rows = [{"Verbrauch-Prognose (kW)": house_kw + standby}] * n
+        result = validate_window_consumption(rows, meta)
+        assert result.ok
+        assert result.baseload_diff_kwh == pytest.approx(0.0, abs=0.05)
+
 
 class TestPlanningFlexPlausibility:
     def test_delivered_flex_uses_planning_consumers(self):

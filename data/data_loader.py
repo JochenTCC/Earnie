@@ -6,6 +6,10 @@ import requests
 logger = logging.getLogger(__name__)
 
 ENERGY_CHARTS_PRICE_URL = "https://api.energy-charts.info/price"
+_ENERGY_CHARTS_HEADERS = {
+    "User-Agent": "Earnie-SE/2.5 (energy-optimizer backtesting)",
+    "Accept": "application/json",
+}
 DEFAULT_ENERGY_CHARTS_BZN = "DE-LU"
 AWATTAR_DE_URL = "https://api.awattar.de/v1/marketdata"
 MARKET_ZONE_AT = "AT"
@@ -127,6 +131,15 @@ def fetch_energy_charts_prices(
     timeout: int = 30,
 ) -> pd.DataFrame:
     """Lädt Day-Ahead-Preise (DE-LU o.ä.) von der Energy-Charts-API."""
+    return _energy_charts_http(start, end, bzn, timeout)
+
+
+def _energy_charts_http(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    bzn: str,
+    timeout: int,
+) -> pd.DataFrame:
     response = requests.get(
         ENERGY_CHARTS_PRICE_URL,
         params={
@@ -134,6 +147,7 @@ def fetch_energy_charts_prices(
             'start': start.strftime('%Y-%m-%d'),
             'end': end.strftime('%Y-%m-%d'),
         },
+        headers=_ENERGY_CHARTS_HEADERS,
         timeout=timeout,
     )
     response.raise_for_status()
@@ -160,6 +174,26 @@ def _prepare_energy_charts_prices(price_csv_path: str) -> pd.DataFrame:
     return df_prices.groupby('ts_price')['price_cent_kwh'].mean().dropna().to_frame()
 
 
+def _fetch_api_prices_qh_first(
+    *,
+    zone: str,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    awattar_url: str,
+    timeout: int,
+) -> pd.DataFrame:
+    """Energy-Charts (native QH) first; aWATTar hourly only if Charts fails."""
+    try:
+        return fetch_energy_charts_prices(start, end, bzn=zone, timeout=timeout)
+    except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        logger.warning(
+            "Energy-Charts %s failed (%s); falling back to aWATTar (hourly)",
+            zone,
+            exc,
+        )
+        return fetch_awattar_prices(start, end, awattar_url, timeout=timeout)
+
+
 def load_market_prices(
     start: pd.Timestamp,
     end: pd.Timestamp,
@@ -175,32 +209,21 @@ def load_market_prices(
 
     if source == 'api':
         if zone == MARKET_ZONE_AT:
-            provider = sim_cfg.get('price_provider', 'energy_charts')
-            if provider == 'awattar':
-                df_prices = fetch_awattar_prices(start, end, awattar_url, timeout=timeout)
-            else:
-                try:
-                    df_prices = fetch_energy_charts_prices(
-                        start, end, bzn=MARKET_ZONE_AT, timeout=timeout
-                    )
-                except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
-                    logger.warning(
-                        "Energy-Charts AT failed (%s); falling back to aWATTar",
-                        exc,
-                    )
-                    df_prices = fetch_awattar_prices(
-                        start, end, awattar_url, timeout=timeout
-                    )
+            df_prices = _fetch_api_prices_qh_first(
+                zone=MARKET_ZONE_AT,
+                start=start,
+                end=end,
+                awattar_url=awattar_url,
+                timeout=timeout,
+            )
         elif zone == MARKET_ZONE_DE:
-            provider = sim_cfg.get('price_provider', 'energy_charts')
-            if provider == 'awattar':
-                df_prices = fetch_awattar_prices(
-                    start, end, AWATTAR_DE_URL, timeout=timeout
-                )
-            else:
-                df_prices = fetch_energy_charts_prices(
-                    start, end, bzn=MARKET_ZONE_DE, timeout=timeout
-                )
+            df_prices = _fetch_api_prices_qh_first(
+                zone=MARKET_ZONE_DE,
+                start=start,
+                end=end,
+                awattar_url=AWATTAR_DE_URL,
+                timeout=timeout,
+            )
         elif zone == MARKET_ZONE_CH:
             df_prices = fetch_energy_charts_prices(
                 start, end, bzn=MARKET_ZONE_CH, timeout=timeout
