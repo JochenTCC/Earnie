@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Pre-release 2.5.0-alpha.6 (2026-08-15)
+
+- [x] Community pre-release `2.5.0-alpha.6`: hourly EPEX settlement (aWATTar HOURLY/SUNNY), full-catalog `settlement_mtu`, analog Zähler consumers, SE plausibility vs ESS standby; alpha compose + container docs pin `ghcr.io/jochentcc/earnie-energy:2.5.0-alpha.6`.
+
 ### Bugfix SE plausibility after QH / mean-h (2026-08-14)
 
 - [x] SE calculation after qh / mean-h-Fix (local-env Scenarios) marked every window as a consumption issue. Cause: Verbrauch-Prognose includes ESS standby (`standby_power_kw` 0.026 → 0.624 kWh/day) while cons_data baseload does not; 0.5 kWh / 5% check failed on all 31 days. Fix: peel standby from optimized baseload in `validate_window_consumption` (`simulation/engine.py`). Also: Energy-Charts first for native QH prices (aWATTar hourly only on Charts failure); SE loads prices with the live import tariff `market_zone`. Tests in `test_baseload_validation.py`. Live/local-env SE acceptance verified.
