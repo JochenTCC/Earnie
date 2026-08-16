@@ -65,6 +65,7 @@ from ui.chart_flow_segments import (
     _flex_kw_pairs,
     _flex_pattern_shape,
     _safe_float,
+    _safe_int_flag,
     build_flow_balance_slots_from_df,
 )
 
