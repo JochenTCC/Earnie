@@ -126,49 +126,49 @@ def _deadline_from_unix(unix_ts: float, from_dt: datetime) -> datetime:
     return _align_like(from_dt, parsed)
 
 
-def parse_loxone_ready_by_time(value: str | float | None, from_dt: datetime) -> datetime | None:
-    """Wandelt Loxone FertigUm (Unix, Tna-Text-Backup, Legacy-Zahl) in eine Deadline um."""
-    if value is None:
-        return None
+def _strip_short_weekday_prefix(text: str) -> str:
+    """Legacy 'Mo, 12:34' → '12:34' when the prefix isn't a full weekday/heute/morgen token."""
+    if ", " not in text:
+        return text
+    prefix, remainder = text.split(", ", 1)
+    low = prefix.strip().lower()
+    if low in _LOXONE_WEEKDAY_NAMES or low in ("heute", "morgen"):
+        return text
+    if len(prefix) <= 3 and remainder.strip():
+        return remainder.strip()
+    return text
 
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return None
 
-        # Prefer numeric Unix (SpecialState10 path may arrive as str).
+def _parse_loxone_ready_by_text(text: str, from_dt: datetime) -> datetime | None:
+    # Prefer numeric Unix (SpecialState10 path may arrive as str).
+    try:
+        as_num = float(text.replace(",", "."))
+    except ValueError:
+        as_num = None
+    if as_num is not None and as_num > 1_000_000_000:
+        return _deadline_from_unix(as_num, from_dt)
+
+    # Backup: AlarmClock Tna relative/absolute text (Heute/Morgen/Wochentag).
+    relative = parse_loxone_relative_ready_by(text, from_dt)
+    if relative is not None:
+        return relative
+
+    parse_text = _strip_short_weekday_prefix(text)
+    for fmt in (
+        "%d.%m.%Y %H:%M:%S",
+        "%d.%m.%Y %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+    ):
         try:
-            as_num = float(text.replace(",", "."))
+            parsed = datetime.strptime(parse_text, fmt).replace(second=0, microsecond=0)
+            return _align_like(from_dt, parsed)
         except ValueError:
-            as_num = None
-        if as_num is not None and as_num > 1_000_000_000:
-            return _deadline_from_unix(as_num, from_dt)
+            continue
+    return None
 
-        # Backup: AlarmClock Tna relative/absolute text (Heute/Morgen/Wochentag).
-        relative = parse_loxone_relative_ready_by(text, from_dt)
-        if relative is not None:
-            return relative
 
-        parse_text = text
-        if ", " in text:
-            prefix, remainder = text.split(", ", 1)
-            if prefix.strip().lower() not in _LOXONE_WEEKDAY_NAMES and prefix.strip().lower() not in ("heute", "morgen"):
-                if len(prefix) <= 3 and remainder.strip():
-                    parse_text = remainder.strip()
-        for fmt in (
-            "%d.%m.%Y %H:%M:%S",
-            "%d.%m.%Y %H:%M",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%d %H:%M",
-        ):
-            try:
-                parsed = datetime.strptime(parse_text, fmt).replace(second=0, microsecond=0)
-                return _align_like(from_dt, parsed)
-            except ValueError:
-                continue
-        return None
-
-    v = float(value)
+def _parse_loxone_ready_by_number(v: float, from_dt: datetime) -> datetime | None:
     if v > 1_000_000_000:
         return _deadline_from_unix(v, from_dt)
     if 0 <= v < 24:
@@ -187,6 +187,18 @@ def parse_loxone_ready_by_time(value: str | float | None, from_dt: datetime) -> 
     if candidate > from_dt + timedelta(hours=24):
         return None
     return candidate
+
+
+def parse_loxone_ready_by_time(value: str | float | None, from_dt: datetime) -> datetime | None:
+    """Wandelt Loxone FertigUm (Unix, Tna-Text-Backup, Legacy-Zahl) in eine Deadline um."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        return _parse_loxone_ready_by_text(text, from_dt)
+    return _parse_loxone_ready_by_number(float(value), from_dt)
 
 
 def deadline_from_ready_hour(horizon_start: datetime, ready_hour: int | None) -> datetime | None:
@@ -292,6 +304,33 @@ def hour_in_charging_window(hour: int, available_from_h: int, ready_by_h: int) -
     return hour >= available_from_h or hour < ready_by_h
 
 
+def _is_slot_charging_eligible(
+    t: int,
+    matrix: list,
+    consumer: dict,
+    ctx: dict,
+    *,
+    deadline: datetime | None,
+    available_from: datetime | None,
+    use_time_window: bool,
+) -> bool:
+    slot_dt = matrix_slot_datetime(matrix, t)
+    if available_from is not None and slot_dt < available_from:
+        return False
+    if deadline is not None and slot_dt >= deadline:
+        return False
+    if not use_time_window:
+        return True
+    day_sched = ctx.get("config_day_schedule") or config_day_schedule(consumer, slot_dt)
+    from_h = day_sched.get("car_available_from_hour")
+    until_h = day_sched.get("ready_by_hour")
+    if from_h is None and until_h is None:
+        return True
+    from_h = int(from_h) if from_h is not None else 0
+    until_h = int(until_h) if until_h is not None else 24
+    return hour_in_charging_window(slot_dt.hour, from_h, until_h)
+
+
 def consumer_charging_eligible_indices(
     matrix: list,
     consumer: dict,
@@ -312,28 +351,20 @@ def consumer_charging_eligible_indices(
         day_sched = ctx.get("config_day_schedule") or config_day_schedule(consumer, horizon_start)
         deadline = deadline_from_ready_hour(horizon_start, day_sched.get("ready_by_hour"))
     use_time_window = bool(ctx.get("use_time_window"))
-    eligible = []
     available_from = ctx.get("available_from")
-    for t in schedule_indices:
-        slot_dt = matrix_slot_datetime(matrix, t)
-        if available_from is not None and slot_dt < available_from:
-            continue
-        if deadline is not None and slot_dt >= deadline:
-            continue
-        if not use_time_window:
-            eligible.append(t)
-            continue
-        day_sched = ctx.get("config_day_schedule") or config_day_schedule(consumer, slot_dt)
-        from_h = day_sched.get("car_available_from_hour")
-        until_h = day_sched.get("ready_by_hour")
-        if from_h is None and until_h is None:
-            eligible.append(t)
-            continue
-        from_h = int(from_h) if from_h is not None else 0
-        until_h = int(until_h) if until_h is not None else 24
-        if hour_in_charging_window(slot_dt.hour, from_h, until_h):
-            eligible.append(t)
-    return eligible
+    return [
+        t
+        for t in schedule_indices
+        if _is_slot_charging_eligible(
+            t,
+            matrix,
+            consumer,
+            ctx,
+            deadline=deadline,
+            available_from=available_from,
+            use_time_window=use_time_window,
+        )
+    ]
 
 
 def apply_charging_window_constraints(

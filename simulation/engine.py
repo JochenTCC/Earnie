@@ -71,6 +71,7 @@ from simulation.matrix_builder import (
     collect_imported_pv_scenario_meta,
     scenario_uses_imported_pv,
     _imported_pv_kw_for_slots,
+    _pricing_kwargs_from_scenario,
 )
 from simulation.reference_costs import (
     HISTORICAL_REFERENCE_ID,

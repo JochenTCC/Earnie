@@ -75,6 +75,26 @@ def _present_index(names: set[str]) -> dict[str, str]:
     return index
 
 
+def _add_signal_tail(marker: Any, tails: dict[str, dict[str, str]]) -> None:
+    if not isinstance(marker, dict):
+        return
+    name = str(marker.get("name") or "").strip()
+    field = marker.get("ehal_field")
+    if not name or field is None:
+        return
+    ehal = str(field).strip()
+    if not ehal:
+        return
+    group = str(marker.get("group") or "").strip()
+    if not group or group not in tails:
+        return
+    if not name.casefold().startswith(group.casefold()):
+        return
+    tail = name[len(group) :]
+    if tail:
+        tails[group][tail.casefold()] = ehal
+
+
 def _signal_tails_by_prefix(
     device_map: dict[str, Any],
 ) -> dict[str, dict[str, str]]:
@@ -82,23 +102,7 @@ def _signal_tails_by_prefix(
     prefixes = _prefix_meta(device_map)
     tails: dict[str, dict[str, str]] = {p: {} for p in prefixes}
     for marker in device_map.get("markers") or []:
-        if not isinstance(marker, dict):
-            continue
-        name = str(marker.get("name") or "").strip()
-        field = marker.get("ehal_field")
-        if not name or field is None:
-            continue
-        ehal = str(field).strip()
-        if not ehal:
-            continue
-        group = str(marker.get("group") or "").strip()
-        if not group or group not in tails:
-            continue
-        if not name.casefold().startswith(group.casefold()):
-            continue
-        tail = name[len(group) :]
-        if tail:
-            tails[group][tail.casefold()] = ehal
+        _add_signal_tail(marker, tails)
     return tails
 
 
@@ -181,6 +185,53 @@ def _collapse_alias_groups(groups: dict[str, dict[str, Any]]) -> None:
         }
 
 
+def _match_one_exact_marker(
+    marker: Any,
+    *,
+    present_by_fold: dict[str, str],
+    prefixes: dict[str, dict[str, str]],
+    plant_bindings: dict[str, str],
+    groups: dict[str, dict[str, Any]],
+    report: ImportReport,
+    claimed: set[str],
+) -> None:
+    if not isinstance(marker, dict):
+        return
+    map_name = str(marker.get("name") or "").strip()
+    if not map_name:
+        return
+    io_name = present_by_fold.get(map_name.casefold())
+    if not io_name:
+        return
+    ehal_field = marker.get("ehal_field")
+    field = "" if ehal_field is None else str(ehal_field).strip()
+    if not field:
+        report.skipped_markers.append(io_name)
+        claimed.add(io_name.casefold())
+        return
+    report.matched_markers.append(io_name)
+    claimed.add(io_name.casefold())
+    kind = str(marker.get("entity_kind") or "").strip()
+    if kind == "plant":
+        plant_bindings.setdefault(field, io_name)
+        return
+    group_key = str(marker.get("group") or "").strip() or kind
+    meta = prefixes.get(group_key) or {}
+    hk_type = _resolve_hk_type(
+        kind,
+        str(marker.get("hk_type") or meta.get("hk_type") or ""),
+        prefixes,
+    )
+    bucket = _ensure_group_bucket(
+        groups,
+        group_key=group_key,
+        entity_kind=kind or meta.get("entity_kind") or "generic",
+        hk_type=hk_type,
+        label=str(meta.get("default_label") or group_key.rstrip("_")),
+    )
+    _bind_field(bucket, field, io_name)
+
+
 def _match_exact_markers(
     device_map: dict[str, Any],
     *,
@@ -192,45 +243,38 @@ def _match_exact_markers(
     claimed: set[str],
 ) -> None:
     for marker in device_map.get("markers") or []:
-        if not isinstance(marker, dict):
-            continue
-        map_name = str(marker.get("name") or "").strip()
-        if not map_name:
-            continue
-        io_name = present_by_fold.get(map_name.casefold())
-        if not io_name:
-            continue
-        ehal_field = marker.get("ehal_field")
-        if ehal_field is None:
-            report.skipped_markers.append(io_name)
-            claimed.add(io_name.casefold())
-            continue
-        field = str(ehal_field).strip()
-        if not field:
-            report.skipped_markers.append(io_name)
-            claimed.add(io_name.casefold())
-            continue
-        report.matched_markers.append(io_name)
-        claimed.add(io_name.casefold())
-        kind = str(marker.get("entity_kind") or "").strip()
-        if kind == "plant":
-            plant_bindings.setdefault(field, io_name)
-            continue
-        group_key = str(marker.get("group") or "").strip() or kind
-        meta = prefixes.get(group_key) or {}
-        hk_type = _resolve_hk_type(
-            kind,
-            str(marker.get("hk_type") or meta.get("hk_type") or ""),
-            prefixes,
+        _match_one_exact_marker(
+            marker,
+            present_by_fold=present_by_fold,
+            prefixes=prefixes,
+            plant_bindings=plant_bindings,
+            groups=groups,
+            report=report,
+            claimed=claimed,
         )
-        bucket = _ensure_group_bucket(
-            groups,
-            group_key=group_key,
-            entity_kind=kind or meta.get("entity_kind") or "generic",
-            hk_type=hk_type,
-            label=str(meta.get("default_label") or group_key.rstrip("_")),
-        )
-        _bind_field(bucket, field, io_name)
+
+
+def _match_tail_for_prefix(
+    name: str,
+    prefix: str,
+    tails: dict[str, str],
+) -> tuple[str, str, str, str] | None:
+    remainder = name[len(prefix) :]
+    rem_fold = remainder.casefold()
+    for tail_fold in sorted(tails.keys(), key=len, reverse=True):
+        field = tails[tail_fold]
+        if rem_fold == tail_fold:
+            return prefix, "", field, prefix
+        if not rem_fold.endswith("_" + tail_fold):
+            continue
+        if len(rem_fold) <= len(tail_fold) + 1:
+            continue
+        slug = remainder[: -(len(tail_fold) + 1)]
+        if not slug or "_" in slug:
+            continue
+        group_key = f"{prefix}{slug.casefold()}"
+        return prefix, slug, field, group_key
+    return None
 
 
 def _parse_prefix_remainder(
@@ -241,22 +285,12 @@ def _parse_prefix_remainder(
     """Return (prefix, slug_token, ehal_field, group_key) or None."""
     low = name.casefold()
     for prefix in _sorted_prefixes(prefixes):
-        pfold = prefix.casefold()
-        if not low.startswith(pfold):
+        if not low.startswith(prefix.casefold()):
             continue
-        remainder = name[len(prefix) :]
-        rem_fold = remainder.casefold()
         tails = tails_by_prefix.get(prefix) or {}
-        for tail_fold in sorted(tails.keys(), key=len, reverse=True):
-            field = tails[tail_fold]
-            if rem_fold == tail_fold:
-                return prefix, "", field, prefix
-            if rem_fold.endswith("_" + tail_fold) and len(rem_fold) > len(tail_fold) + 1:
-                slug = remainder[: -(len(tail_fold) + 1)]
-                if not slug or "_" in slug:
-                    continue
-                group_key = f"{prefix}{slug.casefold()}"
-                return prefix, slug, field, group_key
+        matched = _match_tail_for_prefix(name, prefix, tails)
+        if matched is not None:
+            return matched
     return None
 
 

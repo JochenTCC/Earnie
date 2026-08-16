@@ -17,12 +17,6 @@ from simulation.backtesting_horizon import (
 from simulation.historical_cache import HistoricalDataCache
 
 
-def _pricing_kwargs_from_scenario(scenario_params):
-    from simulation.engine import _pricing_kwargs_from_scenario as _impl
-
-    return _impl(scenario_params)
-
-
 def scenario_uses_imported_pv(scenario_params: dict | None) -> bool:
     """True when scenario requests house-profile PV CSV and a path is configured.
 
@@ -86,6 +80,137 @@ def _pricing_kwargs_from_scenario(scenario_params: dict | None) -> dict:
     return pricing_kwargs_from_resolved(scenario_params)
 
 
+def _profile_spec_baseload_and_targets(
+    profile: dict,
+    slot_datetimes: list[datetime],
+    scenario_params: dict | None,
+    flexible_consumers: list | None,
+    historical_totals: dict,
+    window_end: datetime,
+) -> tuple[list[float], float, list[float], dict, float, float, int]:
+    """PROFILE_SPEC consumption source: baseload/targets tuple used by ``build_historical_matrix_for_slots``.
+
+    Returns ``(baseload_kw, historical_baseload_kwh, matrix_total_kw,
+    consumer_daily_targets_kwh, spec_flex_kwh, spec_total_kwh, residual_clipped_hours)``.
+    """
+    from house_config.planning_flex_bridge import (
+        house_profile_baseload_overlay,
+        meter_residual_baseload_kw,
+        milp_flex_thermal_annual_ids,
+        monthly_residual_baseload_kw,
+        profile_flat_baseload_kw,
+        resolve_profile_spec_flex_targets,
+    )
+    from house_config.profile_csv_policy import (
+        se_uses_meter_residual_baseload,
+        se_uses_monthly_baseload,
+    )
+    from data.modeled_climate import ModeledClimateContext
+
+    if not profile:
+        raise ValueError(
+            "consumption_source=profile_spec erfordert _house_profile im Szenario."
+        )
+    climate = ModeledClimateContext.from_scenario(scenario_params)
+    thermal_milp_ids = milp_flex_thermal_annual_ids(flexible_consumers)
+    overlay = house_profile_baseload_overlay(
+        profile,
+        slot_datetimes,
+        historical_totals=None,
+        cons_data_consumer_ids=set(),
+        milp_flex_thermal_ids=thermal_milp_ids,
+        climate=climate,
+    )
+    residual_clipped_hours = 0
+    if se_uses_meter_residual_baseload(profile):
+        residual, residual_clipped_hours = meter_residual_baseload_kw(
+            profile,
+            slot_datetimes,
+            climate=climate,
+        )
+        baseload_kw = [round(base + extra, 3) for base, extra in zip(residual, overlay)]
+    elif se_uses_monthly_baseload(profile):
+        residual = monthly_residual_baseload_kw(
+            profile,
+            slot_datetimes,
+            climate=climate,
+        )
+        baseload_kw = [round(base + extra, 3) for base, extra in zip(residual, overlay)]
+    else:
+        flat_kw = profile_flat_baseload_kw(profile)
+        baseload_kw = [round(flat_kw + extra, 3) for extra in overlay]
+    historical_baseload_kwh = round(sum(baseload_kw) * float(DEFAULT_DT_H), 3)
+    matrix_total_kw = list(baseload_kw)
+    consumer_daily_targets_kwh = resolve_profile_spec_flex_targets(
+        flexible_consumers or [],
+        profile,
+        slot_datetimes,
+        historical_totals=historical_totals,
+        window_end=window_end,
+        climate=climate,
+    )
+    spec_flex_kwh = round(sum(consumer_daily_targets_kwh.values()), 3)
+    spec_total_kwh = round(historical_baseload_kwh + spec_flex_kwh, 3)
+    return (
+        baseload_kw,
+        historical_baseload_kwh,
+        matrix_total_kw,
+        consumer_daily_targets_kwh,
+        spec_flex_kwh,
+        spec_total_kwh,
+        residual_clipped_hours,
+    )
+
+
+def _historical_baseload_and_targets(
+    profile: dict | None,
+    slot_datetimes: list[datetime],
+    scenario_params: dict | None,
+    cache: HistoricalDataCache,
+    total_load: list[float],
+    hourly_flex,
+    historical_totals: dict,
+    all_consumer_totals: dict,
+) -> tuple[list[float], float, list[float], dict, float, float]:
+    """Non-PROFILE_SPEC consumption source: baseload/targets tuple (no residual_clipped_hours).
+
+    Returns ``(baseload_kw, historical_baseload_kwh, matrix_total_kw,
+    consumer_daily_targets_kwh, spec_flex_kwh, spec_total_kwh)``.
+    """
+    from house_config.planning_flex_bridge import house_profile_baseload_overlay
+    from data.modeled_climate import ModeledClimateContext
+
+    baseload_kw, historical_baseload_kwh = resolve_hourly_baseload_kw(
+        total_load, hourly_flex
+    )
+    if profile:
+        climate = ModeledClimateContext.from_scenario(scenario_params)
+        cons_data_consumer_ids = cache.cons_data_consumer_ids_present()
+        overlay = house_profile_baseload_overlay(
+            profile,
+            slot_datetimes,
+            historical_totals=all_consumer_totals,
+            cons_data_consumer_ids=cons_data_consumer_ids,
+            climate=climate,
+        )
+        baseload_kw = [
+            round(base + extra, 3) for base, extra in zip(baseload_kw, overlay)
+        ]
+        historical_baseload_kwh = round(sum(baseload_kw) * float(DEFAULT_DT_H), 3)
+    matrix_total_kw = total_load
+    consumer_daily_targets_kwh = dict(historical_totals)
+    spec_flex_kwh = round(sum(consumer_daily_targets_kwh.values()), 3)
+    spec_total_kwh = round(sum(total_load) * float(DEFAULT_DT_H), 3)
+    return (
+        baseload_kw,
+        historical_baseload_kwh,
+        matrix_total_kw,
+        consumer_daily_targets_kwh,
+        spec_flex_kwh,
+        spec_total_kwh,
+    )
+
+
 def build_historical_matrix_for_slots(
     slot_datetimes: list[datetime],
     cache: HistoricalDataCache,
@@ -99,20 +224,8 @@ def build_historical_matrix_for_slots(
     scenario_params: dict | None = None,
 ) -> tuple[list[dict], dict]:
     """Baut eine Optimierungsmatrix für beliebige stündliche Slots aus historischen Logs."""
-    from house_config.planning_flex_bridge import (
-        PROFILE_SPEC,
-        house_profile_baseload_overlay,
-        meter_residual_baseload_kw,
-        milp_flex_thermal_annual_ids,
-        monthly_residual_baseload_kw,
-        profile_flat_baseload_kw,
-        resolve_consumption_source,
-        resolve_profile_spec_flex_targets,
-    )
-    from house_config.profile_csv_policy import (
-        se_uses_meter_residual_baseload,
-        se_uses_monthly_baseload,
-    )
+    from house_config.planning_flex_bridge import PROFILE_SPEC, resolve_consumption_source
+
     consumption_source = resolve_consumption_source(scenario_params)
     profile = (scenario_params or {}).get("_house_profile")
     flexible_consumers = None
@@ -134,77 +247,42 @@ def build_historical_matrix_for_slots(
     )
     reference_total_kwh = round(sum(reference_total_load), 3)
 
-    residual_clipped_hours = 0
     if consumption_source == PROFILE_SPEC:
-        if not profile:
-            raise ValueError(
-                "consumption_source=profile_spec erfordert _house_profile im Szenario."
-            )
-        from data.modeled_climate import ModeledClimateContext
-
-        climate = ModeledClimateContext.from_scenario(scenario_params)
-        thermal_milp_ids = milp_flex_thermal_annual_ids(flexible_consumers)
-        overlay = house_profile_baseload_overlay(
+        (
+            baseload_kw,
+            historical_baseload_kwh,
+            matrix_total_kw,
+            consumer_daily_targets_kwh,
+            spec_flex_kwh,
+            spec_total_kwh,
+            residual_clipped_hours,
+        ) = _profile_spec_baseload_and_targets(
             profile,
             slot_datetimes,
-            historical_totals=None,
-            cons_data_consumer_ids=set(),
-            milp_flex_thermal_ids=thermal_milp_ids,
-            climate=climate,
+            scenario_params,
+            flexible_consumers,
+            historical_totals,
+            window_end,
         )
-        if se_uses_meter_residual_baseload(profile):
-            residual, residual_clipped_hours = meter_residual_baseload_kw(
-                profile,
-                slot_datetimes,
-                climate=climate,
-            )
-            baseload_kw = [round(base + extra, 3) for base, extra in zip(residual, overlay)]
-        elif se_uses_monthly_baseload(profile):
-            residual = monthly_residual_baseload_kw(
-                profile,
-                slot_datetimes,
-                climate=climate,
-            )
-            baseload_kw = [round(base + extra, 3) for base, extra in zip(residual, overlay)]
-        else:
-            flat_kw = profile_flat_baseload_kw(profile)
-            baseload_kw = [round(flat_kw + extra, 3) for extra in overlay]
-        historical_baseload_kwh = round(sum(baseload_kw) * float(DEFAULT_DT_H), 3)
-        matrix_total_kw = list(baseload_kw)
-        consumer_daily_targets_kwh = resolve_profile_spec_flex_targets(
-            flexible_consumers or [],
-            profile,
-            slot_datetimes,
-            historical_totals=historical_totals,
-            window_end=window_end,
-            climate=climate,
-        )
-        spec_flex_kwh = round(sum(consumer_daily_targets_kwh.values()), 3)
-        spec_total_kwh = round(historical_baseload_kwh + spec_flex_kwh, 3)
     else:
-        baseload_kw, historical_baseload_kwh = resolve_hourly_baseload_kw(
-            total_load, hourly_flex
+        residual_clipped_hours = 0
+        (
+            baseload_kw,
+            historical_baseload_kwh,
+            matrix_total_kw,
+            consumer_daily_targets_kwh,
+            spec_flex_kwh,
+            spec_total_kwh,
+        ) = _historical_baseload_and_targets(
+            profile,
+            slot_datetimes,
+            scenario_params,
+            cache,
+            total_load,
+            hourly_flex,
+            historical_totals,
+            all_consumer_totals,
         )
-        if profile:
-            from data.modeled_climate import ModeledClimateContext
-
-            climate = ModeledClimateContext.from_scenario(scenario_params)
-            cons_data_consumer_ids = cache.cons_data_consumer_ids_present()
-            overlay = house_profile_baseload_overlay(
-                profile,
-                slot_datetimes,
-                historical_totals=all_consumer_totals,
-                cons_data_consumer_ids=cons_data_consumer_ids,
-                climate=climate,
-            )
-            baseload_kw = [
-                round(base + extra, 3) for base, extra in zip(baseload_kw, overlay)
-            ]
-            historical_baseload_kwh = round(sum(baseload_kw) * float(DEFAULT_DT_H), 3)
-        matrix_total_kw = total_load
-        consumer_daily_targets_kwh = dict(historical_totals)
-        spec_flex_kwh = round(sum(consumer_daily_targets_kwh.values()), 3)
-        spec_total_kwh = round(sum(total_load) * float(DEFAULT_DT_H), 3)
 
     stored_baseload_kwh = round(sum(baseload_stored) * float(DEFAULT_DT_H), 3)
     pv_profile = cache.get_pv_for_slots(

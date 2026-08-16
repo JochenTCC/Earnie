@@ -208,6 +208,122 @@ def _ensure_live_ref_spec(
     return True
 
 
+def _assign_shared_or_historical_reference(
+    scenario_id: str,
+    *,
+    baseline_fp: tuple,
+    live_fp: tuple,
+    live_ref_id: str | None,
+    live_scenario_id: str,
+    live_params: dict | None,
+    labels: dict[str, str],
+    reference_by_scenario: dict[str, str],
+    extra_labels: dict[str, str],
+    extra_specs: list[tuple[str, dict, str]],
+    live_ref_registered: bool,
+) -> bool:
+    """Scenario doesn't want its own reference: reuse the live ref, else historical."""
+    if live_ref_id and live_fp != baseline_fp:
+        reference_by_scenario[scenario_id] = live_ref_id
+        return _ensure_live_ref_spec(
+            live_ref_id=live_ref_id,
+            live_scenario_id=live_scenario_id,
+            live_params=live_params,
+            labels=labels,
+            extra_labels=extra_labels,
+            extra_specs=extra_specs,
+            live_ref_registered=live_ref_registered,
+        )
+    reference_by_scenario[scenario_id] = HISTORICAL_REFERENCE_ID
+    return live_ref_registered
+
+
+def _plan_reference_for_scenario(
+    scenario_id: str,
+    params: dict,
+    *,
+    baseline_fp: tuple,
+    live_fp: tuple,
+    live_ref_id: str | None,
+    live_scenario_id: str,
+    live_params: dict | None,
+    labels: dict[str, str],
+    flags: dict[str, bool | None],
+    reference_by_scenario: dict[str, str],
+    extra_labels: dict[str, str],
+    extra_specs: list[tuple[str, dict, str]],
+    fp_to_ref_id: dict[tuple, str],
+    live_ref_registered: bool,
+) -> bool:
+    """Resolve one scenario's reference, mutating the shared out-dicts in place.
+
+    Returns the (possibly updated) ``live_ref_registered`` flag.
+    """
+    from house_config.planning_flex_bridge import reference_fingerprint
+
+    fp = reference_fingerprint(params)
+    if fp == baseline_fp:
+        reference_by_scenario[scenario_id] = HISTORICAL_REFERENCE_ID
+        return live_ref_registered
+
+    explicit = flags.get(scenario_id)
+    if explicit is None:
+        want_own = default_own_reference(
+            scenario_id,
+            params,
+            live_scenario_id=live_scenario_id,
+            live_params=live_params,
+        )
+        use_dedupe = True
+    else:
+        want_own = bool(explicit)
+        use_dedupe = False
+
+    if not want_own:
+        return _assign_shared_or_historical_reference(
+            scenario_id,
+            baseline_fp=baseline_fp,
+            live_fp=live_fp,
+            live_ref_id=live_ref_id,
+            live_scenario_id=live_scenario_id,
+            live_params=live_params,
+            labels=labels,
+            reference_by_scenario=reference_by_scenario,
+            extra_labels=extra_labels,
+            extra_specs=extra_specs,
+            live_ref_registered=live_ref_registered,
+        )
+
+    if use_dedupe and live_ref_id and fp == live_fp:
+        reference_by_scenario[scenario_id] = live_ref_id
+        return _ensure_live_ref_spec(
+            live_ref_id=live_ref_id,
+            live_scenario_id=live_scenario_id,
+            live_params=live_params,
+            labels=labels,
+            extra_labels=extra_labels,
+            extra_specs=extra_specs,
+            live_ref_registered=live_ref_registered,
+        )
+
+    if use_dedupe and fp in fp_to_ref_id:
+        reference_by_scenario[scenario_id] = fp_to_ref_id[fp]
+        return live_ref_registered
+
+    ref_id = scenario_reference_id(scenario_id)
+    if use_dedupe:
+        fp_to_ref_id[fp] = ref_id
+    elif fp not in fp_to_ref_id:
+        fp_to_ref_id[fp] = ref_id
+    display = labels.get(scenario_id, scenario_id)
+    extra_labels[ref_id] = scenario_reference_label(display)
+    extra_specs.append((ref_id, dict(params), extra_labels[ref_id]))
+    reference_by_scenario[scenario_id] = ref_id
+    if live_ref_id and scenario_id == live_scenario_id:
+        return True
+    return live_ref_registered
+
+
 def plan_per_scenario_reference_tasks(
     scenarios: dict[str, dict],
     *,
@@ -249,68 +365,22 @@ def plan_per_scenario_reference_tasks(
     fp_to_ref_id: dict[tuple, str] = {}
 
     for scenario_id, params in scenarios.items():
-        fp = reference_fingerprint(params)
-        if fp == baseline_fp:
-            reference_by_scenario[scenario_id] = HISTORICAL_REFERENCE_ID
-            continue
-
-        explicit = flags.get(scenario_id)
-        if explicit is None:
-            want_own = default_own_reference(
-                scenario_id,
-                params,
-                live_scenario_id=live_scenario_id,
-                live_params=live_params,
-            )
-            use_dedupe = True
-        else:
-            want_own = bool(explicit)
-            use_dedupe = False
-
-        if not want_own:
-            if live_ref_id and live_fp != baseline_fp:
-                reference_by_scenario[scenario_id] = live_ref_id
-                live_ref_registered = _ensure_live_ref_spec(
-                    live_ref_id=live_ref_id,
-                    live_scenario_id=live_scenario_id,
-                    live_params=live_params,
-                    labels=labels,
-                    extra_labels=extra_labels,
-                    extra_specs=extra_specs,
-                    live_ref_registered=live_ref_registered,
-                )
-            else:
-                reference_by_scenario[scenario_id] = HISTORICAL_REFERENCE_ID
-            continue
-
-        if use_dedupe and live_ref_id and fp == live_fp:
-            reference_by_scenario[scenario_id] = live_ref_id
-            live_ref_registered = _ensure_live_ref_spec(
-                live_ref_id=live_ref_id,
-                live_scenario_id=live_scenario_id,
-                live_params=live_params,
-                labels=labels,
-                extra_labels=extra_labels,
-                extra_specs=extra_specs,
-                live_ref_registered=live_ref_registered,
-            )
-            continue
-
-        if use_dedupe and fp in fp_to_ref_id:
-            reference_by_scenario[scenario_id] = fp_to_ref_id[fp]
-            continue
-
-        ref_id = scenario_reference_id(scenario_id)
-        if use_dedupe:
-            fp_to_ref_id[fp] = ref_id
-        elif fp not in fp_to_ref_id:
-            fp_to_ref_id[fp] = ref_id
-        display = labels.get(scenario_id, scenario_id)
-        extra_labels[ref_id] = scenario_reference_label(display)
-        extra_specs.append((ref_id, dict(params), extra_labels[ref_id]))
-        reference_by_scenario[scenario_id] = ref_id
-        if live_ref_id and scenario_id == live_scenario_id:
-            live_ref_registered = True
+        live_ref_registered = _plan_reference_for_scenario(
+            scenario_id,
+            params,
+            baseline_fp=baseline_fp,
+            live_fp=live_fp,
+            live_ref_id=live_ref_id,
+            live_scenario_id=live_scenario_id,
+            live_params=live_params,
+            labels=labels,
+            flags=flags,
+            reference_by_scenario=reference_by_scenario,
+            extra_labels=extra_labels,
+            extra_specs=extra_specs,
+            fp_to_ref_id=fp_to_ref_id,
+            live_ref_registered=live_ref_registered,
+        )
 
     return reference_by_scenario, extra_labels, extra_specs
 

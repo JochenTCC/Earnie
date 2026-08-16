@@ -15,6 +15,14 @@ if TYPE_CHECKING:
 POOL_FILTER_ID = "pool_filter"
 
 
+def _copied_dict_field(source: dict, key: str) -> dict | None:
+    """Return a shallow copy of ``source[key]`` when it is a non-empty dict."""
+    value = source.get(key)
+    if isinstance(value, dict) and value:
+        return dict(value)
+    return None
+
+
 def _attach_ehal_bindings(result: dict, consumer: dict) -> None:
     """Copy house-profile ``ehal_bindings`` onto MILP flex shape (Live write markers)."""
     bindings = consumer.get("ehal_bindings")
@@ -163,12 +171,12 @@ def planning_ev_to_milp(consumer: dict) -> dict:
         },
         sched,
     )
-    sched_loxone = sched.get("loxone")
-    if isinstance(sched_loxone, dict) and sched_loxone:
-        charging_schedule["loxone"] = dict(sched_loxone)
-    milp_raw = sched.get("milp")
-    if isinstance(milp_raw, dict) and milp_raw:
-        charging_schedule["milp"] = dict(milp_raw)
+    sched_loxone = _copied_dict_field(sched, "loxone")
+    if sched_loxone is not None:
+        charging_schedule["loxone"] = sched_loxone
+    milp_raw = _copied_dict_field(sched, "milp")
+    if milp_raw is not None:
+        charging_schedule["milp"] = milp_raw
     result = {
         "id": str(consumer["id"]),
         "name": str(consumer.get("label", consumer["id"])),
@@ -188,12 +196,12 @@ def planning_ev_to_milp(consumer: dict) -> dict:
         "loxone_target_kwh_name": "",
         "loxone_target_hours_name": "",
     }
-    loxone_inputs = consumer.get("loxone_inputs")
-    if isinstance(loxone_inputs, dict) and loxone_inputs:
-        result["loxone_inputs"] = dict(loxone_inputs)
-    loxone_outputs = consumer.get("loxone_outputs")
-    if isinstance(loxone_outputs, dict) and loxone_outputs:
-        result["loxone_outputs"] = dict(loxone_outputs)
+    loxone_inputs = _copied_dict_field(consumer, "loxone_inputs")
+    if loxone_inputs is not None:
+        result["loxone_inputs"] = loxone_inputs
+    loxone_outputs = _copied_dict_field(consumer, "loxone_outputs")
+    if loxone_outputs is not None:
+        result["loxone_outputs"] = loxone_outputs
     setpoint_name = str((result.get("loxone_outputs") or {}).get("power_setpoint_name", "")).strip()
     if setpoint_name and not charging_schedule.get("milp"):
         raise ValueError(
@@ -276,21 +284,21 @@ def planning_thermal_rc_to_milp(consumer: dict) -> dict:
     return entry
 
 
-def _pool_filter_schedule(consumer: dict) -> dict:
-    """Build ``filter_schedule`` from profile row or weekly schedule fallback."""
-    stored = consumer.get("filter_schedule")
-    if isinstance(stored, dict) and stored:
-        schedule = dict(stored)
-        fallback = dict(schedule.get("config_fallback") or {})
-        sched = consumer.get("schedule") if isinstance(consumer.get("schedule"), dict) else {}
-        if "native_start_hour" not in fallback and sched.get("start_hour") is not None:
-            fallback["native_start_hour"] = int(sched["start_hour"]) % 24
-        if "native_duration_hours" not in fallback and sched.get("duration_h") is not None:
-            fallback["native_duration_hours"] = float(sched["duration_h"])
-        if fallback:
-            schedule["config_fallback"] = fallback
-        schedule.setdefault("enabled", True)
-        return schedule
+def _pool_filter_schedule_from_stored(consumer: dict, stored: dict) -> dict:
+    schedule = dict(stored)
+    fallback = dict(schedule.get("config_fallback") or {})
+    sched = consumer.get("schedule") if isinstance(consumer.get("schedule"), dict) else {}
+    if "native_start_hour" not in fallback and sched.get("start_hour") is not None:
+        fallback["native_start_hour"] = int(sched["start_hour"]) % 24
+    if "native_duration_hours" not in fallback and sched.get("duration_h") is not None:
+        fallback["native_duration_hours"] = float(sched["duration_h"])
+    if fallback:
+        schedule["config_fallback"] = fallback
+    schedule.setdefault("enabled", True)
+    return schedule
+
+
+def _pool_filter_schedule_default(consumer: dict) -> dict:
     sched = consumer.get("schedule") if isinstance(consumer.get("schedule"), dict) else {}
     start = int(sched.get("start_hour", 10) or 10) % 24
     duration = float(sched.get("duration_h", 4.0) or 4.0)
@@ -301,6 +309,14 @@ def _pool_filter_schedule(consumer: dict) -> dict:
             "native_duration_hours": duration,
         },
     }
+
+
+def _pool_filter_schedule(consumer: dict) -> dict:
+    """Build ``filter_schedule`` from profile row or weekly schedule fallback."""
+    stored = consumer.get("filter_schedule")
+    if isinstance(stored, dict) and stored:
+        return _pool_filter_schedule_from_stored(consumer, stored)
+    return _pool_filter_schedule_default(consumer)
 
 
 def _pool_filter_daily_target_kwh(consumer: dict, nominal: float) -> float:

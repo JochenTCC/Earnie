@@ -38,6 +38,45 @@ def suppresses_live_charging_output(ctx: dict | None) -> bool:
     return bool(ctx.get("anticipated") and not ctx.get("plugged_in"))
 
 
+def _absent_availability_for_day_offset(
+    horizon_start: datetime,
+    consumer: dict,
+    day_offset: int,
+    ready_raw: str | float | None,
+) -> datetime | None:
+    """One (0, -1) day-offset candidate for ``resolve_absent_availability``.
+
+    Returns ``horizon_start`` when this offset's overnight window is still open,
+    else ``None`` (caller tries the next offset / falls back to next-scheduled).
+    """
+    day = horizon_start.date() + timedelta(days=day_offset)
+    window_start = _window_start_for_day(consumer, day, reference=horizon_start)
+    if window_start is None or window_start > horizon_start:
+        return None
+    deadline, _ = resolve_charging_deadline(
+        consumer,
+        window_start,
+        window_start,
+        ready_raw=ready_raw,
+    )
+    if deadline is None or horizon_start >= deadline:
+        return None
+    if window_start.date() >= horizon_start.date():
+        return None
+    today_from = _window_start_for_day(
+        consumer, horizon_start.date(), reference=horizon_start
+    )
+    if today_from is not None and horizon_start >= today_from:
+        return None
+    # FertigUm parsed from yesterday's window_start can push the overnight
+    # deadline into daytime (e.g. "Morgen, 11:00" → 11:00). Only treat the
+    # overnight cycle as still open before the *config* ready_by.
+    config_deadline = charging_deadline_after(window_start, consumer)
+    if config_deadline is not None and horizon_start >= config_deadline:
+        return None
+    return horizon_start
+
+
 def resolve_absent_availability(
     horizon_start: datetime,
     consumer: dict,
@@ -61,31 +100,11 @@ def resolve_absent_availability(
     ):
         return horizon_start
     for day_offset in (0, -1):
-        day = horizon_start.date() + timedelta(days=day_offset)
-        window_start = _window_start_for_day(consumer, day, reference=horizon_start)
-        if window_start is None or window_start > horizon_start:
-            continue
-        deadline, _ = resolve_charging_deadline(
-            consumer,
-            window_start,
-            window_start,
-            ready_raw=ready_raw,
+        found = _absent_availability_for_day_offset(
+            horizon_start, consumer, day_offset, ready_raw
         )
-        if deadline is None or horizon_start >= deadline:
-            continue
-        if window_start.date() < horizon_start.date():
-            today_from = _window_start_for_day(
-                consumer, horizon_start.date(), reference=horizon_start
-            )
-            if today_from is not None and horizon_start >= today_from:
-                continue
-            # FertigUm parsed from yesterday's window_start can push the overnight
-            # deadline into daytime (e.g. "Morgen, 11:00" → 11:00). Only treat the
-            # overnight cycle as still open before the *config* ready_by.
-            config_deadline = charging_deadline_after(window_start, consumer)
-            if config_deadline is not None and horizon_start >= config_deadline:
-                continue
-            return horizon_start
+        if found is not None:
+            return found
     return next_scheduled_availability(horizon_start, consumer)
 
 

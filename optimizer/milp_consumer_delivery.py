@@ -177,6 +177,31 @@ def _delivery_energy_expr(
     )
 
 
+def _log_infeasible_consumer_warning(
+    consumer: dict,
+    *,
+    target: float,
+    capacity_indices: list[int],
+    eligible: list[int],
+    filters: dict[str, dict],
+    cid: str,
+) -> None:
+    sched_hint = ""
+    if charging_schedule_enabled(consumer):
+        sched_hint = f" ({len(eligible)} h im Ladezeitfenster)"
+    elif filters.get(cid, {}).get("blocked_indices"):
+        sched_hint = f" ({len(eligible)} h außerhalb nativem Filterfenster)"
+    logger.warning(
+        "%s: Ziel (%.2f kWh) nicht vollständig erreichbar "
+        "mit %s h à %.2f kW%s – lade mit Best-Effort.",
+        consumer["name"],
+        target,
+        len(capacity_indices),
+        power_limits_kw(consumer)[1],
+        sched_hint,
+    )
+
+
 def filter_feasible_consumers(
     consumers: list,
     remaining_kwh: dict[str, float],
@@ -214,24 +239,15 @@ def filter_feasible_consumers(
         max_deliverable = _max_deliverable_kwh(
             consumer, capacity_indices, dt_h=dt_h
         )
-        if target > max_deliverable + 1e-6:
-            if verbose:
-                sched_hint = ""
-                if charging_schedule_enabled(consumer):
-                    sched_hint = f" ({len(eligible)} h im Ladezeitfenster)"
-                elif filters.get(cid, {}).get("blocked_indices"):
-                    sched_hint = (
-                        f" ({len(eligible)} h außerhalb nativem Filterfenster)"
-                    )
-                logger.warning(
-                    "%s: Ziel (%.2f kWh) nicht vollständig erreichbar "
-                    "mit %s h à %.2f kW%s – lade mit Best-Effort.",
-                    consumer["name"],
-                    target,
-                    len(capacity_indices),
-                    power_limits_kw(consumer)[1],
-                    sched_hint,
-                )
+        if target > max_deliverable + 1e-6 and verbose:
+            _log_infeasible_consumer_warning(
+                consumer,
+                target=target,
+                capacity_indices=capacity_indices,
+                eligible=eligible,
+                filters=filters,
+                cid=cid,
+            )
         feasible.append(consumer)
     return feasible
 

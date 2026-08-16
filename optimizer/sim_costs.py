@@ -3,7 +3,14 @@ from __future__ import annotations
 
 import config
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
-from optimizer.sim_chart_rows import flexible_consumer_power_kw, resolve_sell_price_cent
+from optimizer.sim_chart_rows import (
+    COL_BATTERIE_AKTION,
+    COL_NETZBEZUG,
+    COL_PV_PROGNOSE,
+    COL_VERBRAUCH_PROGNOSE,
+    flexible_consumer_power_kw,
+    resolve_sell_price_cent,
+)
 from optimizer.targets import consumer_column_name
 
 
@@ -17,7 +24,7 @@ def total_consumption_kwh_from_rows(
     return round(
         sum(
             (
-                float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+                float(row.get(COL_VERBRAUCH_PROGNOSE, 0.0) or 0.0)
                 + flexible_consumer_power_kw(row)
             )
             * dt_h
@@ -50,11 +57,11 @@ def delivered_flex_kwh_from_rows(
 
 def _grid_kw_from_row(row: dict) -> float:
     """Netzbezug (kW): positiv = Bezug, negativ = Einspeisung."""
-    if "Netzbezug (kW)" in row:
-        return float(row["Netzbezug (kW)"])
-    p_con = row["Verbrauch-Prognose (kW)"] + flexible_consumer_power_kw(row)
-    p_pv = row["PV-Prognose (kW)"]
-    batt_action = row["Geplante Batterie-Aktion (kW)"]
+    if COL_NETZBEZUG in row:
+        return float(row[COL_NETZBEZUG])
+    p_con = row[COL_VERBRAUCH_PROGNOSE] + flexible_consumer_power_kw(row)
+    p_pv = row[COL_PV_PROGNOSE]
+    batt_action = row[COL_BATTERIE_AKTION]
     return float(p_con - p_pv + batt_action)
 
 
@@ -117,7 +124,7 @@ def hourly_consumption_kwh_from_rows(
     return [
         round(
             (
-                float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
+                float(row.get(COL_VERBRAUCH_PROGNOSE, 0.0) or 0.0)
                 + flexible_consumer_power_kw(row)
             )
             * dt_h,

@@ -46,6 +46,96 @@ def _structure_mod():
 
 
 
+def _mcp_broad_query_candidates(seed_queries: list[str] | None) -> list[dict[str, Any]]:
+    query_candidates: list[dict[str, Any]] = []
+    for seed in seed_queries or []:
+        seed = str(seed or "").strip()
+        if seed:
+            query_candidates.extend(
+                [{"query": seed}, {"name": seed}, {"text": seed}]
+            )
+    # Avoid empty/wildcard queries — they tend to return EFM "Rest" meters.
+    if not query_candidates:
+        for token in ("Ernie", "Earnie", "Status", "Leistung", "SoC", "SOC"):
+            query_candidates.append({"query": token})
+    return query_candidates
+
+
+def _run_control_find_queries(
+    mcp_call: Any,
+    query_candidates: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    controls: list[dict[str, Any]] = []
+    for args in query_candidates:
+        resp = mcp_call("control_find", args)
+        if resp.status_code >= 400:
+            continue
+        body, _ = _parse_mcp_jsonrpc_body(resp)
+        if not body:
+            continue
+        found = _extract_controls(body.get("result"))
+        if found:
+            controls.extend(found)
+    return controls
+
+
+def _seed_items_by_uuid(
+    controls: list[dict[str, Any]],
+    max_controls: int,
+) -> dict[str, StructureItem]:
+    items_by_uuid: dict[str, StructureItem] = {}
+    for c in controls[:max_controls]:
+        uuid = _control_uuid(c)
+        if not uuid:
+            continue
+        name = _control_name(c) or uuid
+        items_by_uuid[uuid] = StructureItem(
+            name=name,
+            uuid=uuid,
+            type=str(c.get("type") or c.get("controlType") or ""),
+            room=str(c.get("room") or ""),
+            category=str(c.get("category") or ""),
+            source=SOURCE_MCP17,
+        )
+    return items_by_uuid
+
+
+def _describe_one_control(mcp_call: Any, uuid: str) -> Any:
+    for dargs in ({"uuid": uuid}, {"id": uuid}):
+        resp = mcp_call("control_describe", dargs)
+        if resp.status_code >= 400:
+            continue
+        body, _ = _parse_mcp_jsonrpc_body(resp)
+        if not body:
+            continue
+        return _unwrap_tool_call_result(body.get("result"))
+    return None
+
+
+def _describe_items_in_place(
+    mcp_call: Any,
+    items_by_uuid: dict[str, StructureItem],
+    max_describe: int,
+) -> None:
+    uuids = list(items_by_uuid.keys())
+    for uuid in uuids[:max_describe]:
+        describe_any = _describe_one_control(mcp_call, uuid)
+        if describe_any is None:
+            continue
+        meta = _control_metadata_from_describe(describe_any)
+        it = items_by_uuid.get(uuid)
+        if not it:
+            continue
+        items_by_uuid[uuid] = StructureItem(
+            name=_control_name(meta) or it.name,
+            uuid=uuid,
+            type=str(meta.get("type") or it.type or ""),
+            room=str(meta.get("room") or it.room or ""),
+            category=str(meta.get("category") or it.category or ""),
+            source=SOURCE_MCP17,
+        )
+
+
 def _resolve_mcp_broad_controls(
     endpoint: str,
     *,
@@ -58,7 +148,6 @@ def _resolve_mcp_broad_controls(
     session_id, protocol_version = _ensure_mcp_session(
         endpoint, bearer_token=bearer_token, timeout_sec=timeout_sec
     )
-    items_by_uuid: dict[str, StructureItem] = {}
 
     def mcp_call(tool_name: str, arguments: dict[str, Any]) -> requests.Response:
         nonlocal session_id, protocol_version
@@ -86,78 +175,212 @@ def _resolve_mcp_broad_controls(
             timeout_sec=timeout_sec,
         )
 
-    query_candidates: list[dict[str, Any]] = []
-    for seed in seed_queries or []:
-        seed = str(seed or "").strip()
-        if seed:
-            query_candidates.extend(
-                [{"query": seed}, {"name": seed}, {"text": seed}]
-            )
-    # Avoid empty/wildcard queries — they tend to return EFM "Rest" meters.
-    if not query_candidates:
-        for token in ("Ernie", "Earnie", "Status", "Leistung", "SoC", "SOC"):
-            query_candidates.append({"query": token})
-
-    controls: list[dict[str, Any]] = []
-    for args in query_candidates:
-        resp = mcp_call("control_find", args)
-        if resp.status_code >= 400:
-            continue
-        body, _ = _parse_mcp_jsonrpc_body(resp)
-        if not body:
-            continue
-        found = _extract_controls(body.get("result"))
-        if found:
-            controls.extend(found)
-
+    query_candidates = _mcp_broad_query_candidates(seed_queries)
+    controls = _run_control_find_queries(mcp_call, query_candidates)
     if not controls:
         return []
 
-    for c in controls[:max_controls]:
-        uuid = _control_uuid(c)
-        name = _control_name(c) or uuid
-        if not uuid:
-            continue
-        items_by_uuid[uuid] = StructureItem(
-            name=name,
-            uuid=uuid,
-            type=str(c.get("type") or c.get("controlType") or ""),
-            room=str(c.get("room") or ""),
-            category=str(c.get("category") or ""),
-            source=SOURCE_MCP17,
-        )
-
-    uuids = list(items_by_uuid.keys())
-    for uuid in uuids[:max_describe]:
-        describe_args_candidates = [{"uuid": uuid}, {"id": uuid}]
-        describe_any: Any = None
-        for dargs in describe_args_candidates:
-            resp = mcp_call("control_describe", dargs)
-            if resp.status_code >= 400:
-                continue
-            body, _ = _parse_mcp_jsonrpc_body(resp)
-            if not body:
-                continue
-            describe_any = _unwrap_tool_call_result(body.get("result"))
-            break
-        if describe_any is None:
-            continue
-        meta = _control_metadata_from_describe(describe_any)
-        it = items_by_uuid.get(uuid)
-        if not it:
-            continue
-        items_by_uuid[uuid] = StructureItem(
-            name=_control_name(meta) or it.name,
-            uuid=uuid,
-            type=str(meta.get("type") or it.type or ""),
-            room=str(meta.get("room") or it.room or ""),
-            category=str(meta.get("category") or it.category or ""),
-            source=SOURCE_MCP17,
-        )
+    items_by_uuid = _seed_items_by_uuid(controls, max_controls)
+    _describe_items_in_place(mcp_call, items_by_uuid, max_describe)
 
     out = list(items_by_uuid.values())
     out.sort(key=lambda row: row.name.lower())
     return _filter_mcp_mapping_items(out)
+
+
+def _resolve_mcp_endpoint_and_token(
+    mcp_base_url: str,
+    *,
+    username: str,
+    password: str,
+    timeout_sec: float,
+) -> tuple[str, str, StructureScanResult | None]:
+    """Resolve the MCP endpoint and OAuth bearer token, or an early error result."""
+    base = str(mcp_base_url or "").strip()
+    if not base:
+        return "", "", StructureScanResult(
+            source=SOURCE_MCP17,
+            structure_complete=False,
+            errors=["MCP base URL is empty"],
+            skipped=True,
+        )
+    endpoint = _normalize_mcp_endpoint(base)
+    endpoint, resolve_err = _resolve_mcp_entry(endpoint, timeout_sec=timeout_sec)
+    if resolve_err:
+        return "", "", StructureScanResult(
+            source=SOURCE_MCP17,
+            structure_complete=False,
+            errors=[resolve_err],
+        )
+    try:
+        bearer_token = _oauth_bearer_token(
+            endpoint,
+            username=username,
+            password=password,
+            timeout_sec=max(timeout_sec, 20.0),
+        )
+    except McpOAuthError as exc:
+        return "", "", StructureScanResult(
+            source=SOURCE_MCP17,
+            structure_complete=False,
+            errors=[f"MCP OAuth failed: {exc}"],
+        )
+    return endpoint, bearer_token, None
+
+
+def _fetch_initial_tools_list(
+    endpoint: str,
+    *,
+    bearer_token: str,
+    timeout_sec: float,
+) -> tuple[requests.Response | None, StructureScanResult | None]:
+    try:
+        response = _post_mcp_tools_list(
+            endpoint,
+            bearer_token=bearer_token,
+            timeout_sec=max(timeout_sec, 20.0),
+        )
+    except _structure_mod().requests.RequestException as exc:
+        return None, StructureScanResult(
+            source=SOURCE_MCP17,
+            structure_complete=False,
+            errors=[f"MCP unreachable: {exc}"],
+        )
+    return response, None
+
+
+def _retry_tools_list_via_422(
+    response: requests.Response,
+    endpoint: str,
+    *,
+    bearer_token: str,
+    timeout_sec: float,
+) -> tuple[requests.Response | None, StructureScanResult | None]:
+    try:
+        retried, init_err = _mcp_initialize_then_retry(
+            endpoint,
+            bearer_token=bearer_token,
+            timeout_sec=max(timeout_sec, 20.0),
+        )
+    except _structure_mod().requests.RequestException as exc:
+        return None, StructureScanResult(
+            source=SOURCE_MCP17,
+            structure_complete=False,
+            errors=[f"MCP initialize/retry failed: {exc}"],
+        )
+    if init_err:
+        return None, StructureScanResult(
+            source=SOURCE_MCP17,
+            structure_complete=False,
+            errors=[init_err],
+        )
+    if retried is not None and retried.status_code < 400:
+        return retried, None
+    if retried is not None:
+        return None, StructureScanResult(
+            source=SOURCE_MCP17,
+            structure_complete=False,
+            errors=[
+                _mcp_http_error_message(
+                    retried.status_code,
+                    endpoint,
+                    auth_mode="OAuth Bearer tools/list after initialize",
+                    response_text=_response_text_snippet(retried),
+                )
+            ],
+        )
+    return None, StructureScanResult(
+        source=SOURCE_MCP17,
+        structure_complete=False,
+        errors=[
+            _mcp_http_error_message(
+                response.status_code,
+                endpoint,
+                auth_mode="OAuth Bearer",
+                response_text=_response_text_snippet(response),
+            )
+        ],
+    )
+
+
+def _resolve_tools_list_response(
+    response: requests.Response,
+    endpoint: str,
+    *,
+    bearer_token: str,
+    timeout_sec: float,
+) -> tuple[requests.Response | None, StructureScanResult | None]:
+    """Handle non-2xx ``tools/list`` responses, including the 422 initialize+retry path."""
+    if response.status_code < 400:
+        return response, None
+    if int(response.status_code) == 422:
+        return _retry_tools_list_via_422(
+            response, endpoint, bearer_token=bearer_token, timeout_sec=timeout_sec
+        )
+    return None, StructureScanResult(
+        source=SOURCE_MCP17,
+        structure_complete=False,
+        errors=[
+            _mcp_http_error_message(
+                response.status_code,
+                endpoint,
+                auth_mode="OAuth Bearer",
+                response_text=_response_text_snippet(response),
+            )
+        ],
+    )
+
+
+def _configured_names_scan_result(
+    endpoint: str,
+    *,
+    bearer_token: str,
+    configured: list[str],
+    timeout_sec: float,
+    tools: list[str],
+) -> StructureScanResult | None:
+    mcp_items = _filter_mcp_mapping_items(
+        _resolve_mcp_configured_names(
+            endpoint,
+            bearer_token=bearer_token,
+            configured_names=configured,
+            timeout_sec=max(timeout_sec, 20.0),
+        )
+    )
+    if not mcp_items:
+        return None
+    return StructureScanResult(
+        source=SOURCE_MCP17,
+        structure_complete=True,
+        items=mcp_items,
+        errors=[],
+        mcp_tools=tools,
+    )
+
+
+def _broad_discovery_scan_result(
+    endpoint: str,
+    *,
+    bearer_token: str,
+    timeout_sec: float,
+    seeds: list[str],
+    tools: list[str],
+) -> StructureScanResult | None:
+    broad = _structure_mod()._resolve_mcp_broad_controls(
+        endpoint,
+        bearer_token=bearer_token,
+        timeout_sec=max(timeout_sec, 20.0),
+        seed_queries=seeds,
+    )
+    if not broad:
+        return None
+    return StructureScanResult(
+        source=SOURCE_MCP17,
+        structure_complete=True,
+        items=broad,
+        errors=[],
+        mcp_tools=tools,
+    )
 
 
 def probe_mcp17(
@@ -177,109 +400,24 @@ def probe_mcp17(
     marker names, then falls back to broad ``control_find`` queries. Tool-call
     payloads unwrap MCP ``content`` / ``structuredContent``.
     """
-    base = str(mcp_base_url or "").strip()
-    if not base:
-        return StructureScanResult(
-            source=SOURCE_MCP17,
-            structure_complete=False,
-            errors=["MCP base URL is empty"],
-            skipped=True,
-        )
-    endpoint = _normalize_mcp_endpoint(base)
-    endpoint, resolve_err = _resolve_mcp_entry(endpoint, timeout_sec=timeout_sec)
-    if resolve_err:
-        return StructureScanResult(
-            source=SOURCE_MCP17,
-            structure_complete=False,
-            errors=[resolve_err],
-        )
-    try:
-        bearer_token = _oauth_bearer_token(
-            endpoint,
-            username=username,
-            password=password,
-            timeout_sec=max(timeout_sec, 20.0),
-        )
-    except McpOAuthError as exc:
-        return StructureScanResult(
-            source=SOURCE_MCP17,
-            structure_complete=False,
-            errors=[f"MCP OAuth failed: {exc}"],
-        )
-    try:
-        response = _post_mcp_tools_list(
-            endpoint,
-            bearer_token=bearer_token,
-            timeout_sec=max(timeout_sec, 20.0),
-        )
-    except _structure_mod().requests.RequestException as exc:
-        return StructureScanResult(
-            source=SOURCE_MCP17,
-            structure_complete=False,
-            errors=[f"MCP unreachable: {exc}"],
-        )
-    if response.status_code >= 400:
-        if int(response.status_code) == 422:
-            try:
-                retried, init_err = _mcp_initialize_then_retry(
-                    endpoint,
-                    bearer_token=bearer_token,
-                    timeout_sec=max(timeout_sec, 20.0),
-                )
-            except _structure_mod().requests.RequestException as exc:
-                return StructureScanResult(
-                    source=SOURCE_MCP17,
-                    structure_complete=False,
-                    errors=[f"MCP initialize/retry failed: {exc}"],
-                )
-            if init_err:
-                return StructureScanResult(
-                    source=SOURCE_MCP17,
-                    structure_complete=False,
-                    errors=[init_err],
-                )
-            if retried is not None and retried.status_code < 400:
-                tools, parse_error = _parse_mcp_tools(retried)
-                response = retried
-            elif retried is not None:
-                return StructureScanResult(
-                    source=SOURCE_MCP17,
-                    structure_complete=False,
-                    errors=[
-                        _mcp_http_error_message(
-                            retried.status_code,
-                            endpoint,
-                            auth_mode="OAuth Bearer tools/list after initialize",
-                            response_text=_response_text_snippet(retried),
-                        )
-                    ],
-                )
-            else:
-                return StructureScanResult(
-                    source=SOURCE_MCP17,
-                    structure_complete=False,
-                    errors=[
-                        _mcp_http_error_message(
-                            response.status_code,
-                            endpoint,
-                            auth_mode="OAuth Bearer",
-                            response_text=_response_text_snippet(response),
-                        )
-                    ],
-                )
-        else:
-            return StructureScanResult(
-                source=SOURCE_MCP17,
-                structure_complete=False,
-                errors=[
-                    _mcp_http_error_message(
-                        response.status_code,
-                        endpoint,
-                        auth_mode="OAuth Bearer",
-                        response_text=_response_text_snippet(response),
-                    )
-                ],
-            )
+    endpoint, bearer_token, error_result = _resolve_mcp_endpoint_and_token(
+        mcp_base_url, username=username, password=password, timeout_sec=timeout_sec
+    )
+    if error_result is not None:
+        return error_result
+
+    response, error_result = _fetch_initial_tools_list(
+        endpoint, bearer_token=bearer_token, timeout_sec=timeout_sec
+    )
+    if error_result is not None:
+        return error_result
+
+    response, error_result = _resolve_tools_list_response(
+        response, endpoint, bearer_token=bearer_token, timeout_sec=timeout_sec
+    )
+    if error_result is not None:
+        return error_result
+
     tools, parse_error = _parse_mcp_tools(response)
     if parse_error:
         return _mcp_tools_scan_result(tools, parse_error)
@@ -287,39 +425,27 @@ def probe_mcp17(
     configured = configured_names or []
     seeds = list(dict.fromkeys([*(seed_names or []), *configured]))
     if configured:
-        mcp_items = _filter_mcp_mapping_items(
-            _resolve_mcp_configured_names(
-                endpoint,
-                bearer_token=bearer_token,
-                configured_names=configured,
-                timeout_sec=max(timeout_sec, 20.0),
-            )
+        configured_result = _configured_names_scan_result(
+            endpoint,
+            bearer_token=bearer_token,
+            configured=configured,
+            timeout_sec=timeout_sec,
+            tools=tools,
         )
-        if mcp_items:
-            return StructureScanResult(
-                source=SOURCE_MCP17,
-                structure_complete=True,
-                items=mcp_items,
-                errors=[],
-                mcp_tools=tools,
-            )
+        if configured_result is not None:
+            return configured_result
         # Fall through to broad discovery with seeds.
 
     # Broad discovery when configured resolve found 0 / no configured names yet.
-    broad = _structure_mod()._resolve_mcp_broad_controls(
+    broad_result = _broad_discovery_scan_result(
         endpoint,
         bearer_token=bearer_token,
-        timeout_sec=max(timeout_sec, 20.0),
-        seed_queries=seeds,
+        timeout_sec=timeout_sec,
+        seeds=seeds,
+        tools=tools,
     )
-    if broad:
-        return StructureScanResult(
-            source=SOURCE_MCP17,
-            structure_complete=True,
-            items=broad,
-            errors=[],
-            mcp_tools=tools,
-        )
+    if broad_result is not None:
+        return broad_result
     return _mcp_tools_scan_result(tools, parse_error)
 
 

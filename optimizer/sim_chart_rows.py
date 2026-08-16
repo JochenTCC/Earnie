@@ -9,6 +9,13 @@ from optimizer.consumer_power import uses_pv_follow
 from optimizer.slot_duration import DEFAULT_DT_H
 from optimizer.targets import consumer_column_name, consumer_pv_follow_column_name
 
+COL_EINSPEISEVERGUETUNG = "Einspeisevergütung (Cent/kWh)"
+COL_PV_PROGNOSE = "PV-Prognose (kW)"
+COL_PV_IST = "PV-Ist (kW)"
+COL_VERBRAUCH_PROGNOSE = "Verbrauch-Prognose (kW)"
+COL_BATTERIE_AKTION = "Geplante Batterie-Aktion (kW)"
+COL_NETZBEZUG = "Netzbezug (kW)"
+
 
 def _chart_price_fields(row: dict) -> dict:
     """Preis-Felder für Simulations-/Chart-Zeilen."""
@@ -17,28 +24,28 @@ def _chart_price_fields(row: dict) -> dict:
         "Preis extrapoliert": is_extrapolated_source(row.get("price_source")),
     }
     if "k_push_act" in row:
-        fields["Einspeisevergütung (Cent/kWh)"] = row["k_push_act"]
+        fields[COL_EINSPEISEVERGUETUNG] = row["k_push_act"]
     return fields
 
 
 def resolve_sell_price_cent(row: dict, default_sell_price_cent: float | None = None) -> float:
     """Stündliche Einspeisevergütung aus Chart-Zeile oder Fallback."""
-    if "Einspeisevergütung (Cent/kWh)" in row:
-        return float(row["Einspeisevergütung (Cent/kWh)"])
+    if COL_EINSPEISEVERGUETUNG in row:
+        return float(row[COL_EINSPEISEVERGUETUNG])
     if default_sell_price_cent is not None:
         return float(default_sell_price_cent)
     raise ValueError(
         "Kein Einspeisepreis in der Zeile und kein Fallback angegeben "
-        "(Einspeisevergütung (Cent/kWh) oder default_sell_price_cent)."
+        f"({COL_EINSPEISEVERGUETUNG} oder default_sell_price_cent)."
     )
 
 
 _RESERVED_KW_COLUMNS = {
-    "PV-Prognose (kW)",
-    "PV-Ist (kW)",
-    "Verbrauch-Prognose (kW)",
-    "Geplante Batterie-Aktion (kW)",
-    "Netzbezug (kW)",
+    COL_PV_PROGNOSE,
+    COL_PV_IST,
+    COL_VERBRAUCH_PROGNOSE,
+    COL_BATTERIE_AKTION,
+    COL_NETZBEZUG,
 }
 
 
@@ -120,10 +127,10 @@ def _chart_row_from_controls(
         "Uhrzeit": _format_chart_uhrzeit(row),
         **_chart_row_slot_field(row),
         **_chart_price_fields(row),
-        "PV-Prognose (kW)": pv,
-        "Verbrauch-Prognose (kW)": con,
-        "Geplante Batterie-Aktion (kW)": round(batt_action, 2),
-        "Netzbezug (kW)": round(p_grid, 2),
+        COL_PV_PROGNOSE: pv,
+        COL_VERBRAUCH_PROGNOSE: con,
+        COL_BATTERIE_AKTION: round(batt_action, 2),
+        COL_NETZBEZUG: round(p_grid, 2),
         "Simulierter SoC (%)": round(old_soc, 1),
         "Steuerbefehl": action_text,
     }
@@ -193,7 +200,7 @@ def horizon_end_soc_percent(
     for row in chart_rows:
         displayed = float(row["Simulierter SoC (%)"])
         soc = displayed
-        batt = float(row.get("Geplante Batterie-Aktion (kW)", 0.0) or 0.0)
+        batt = float(row.get(COL_BATTERIE_AKTION, 0.0) or 0.0)
         soc, _ = bat.apply_soc_change(
             soc,
             batt,
@@ -214,8 +221,8 @@ def finalize_chart_row_energy(
     battery_params: dict,
 ) -> float:
     """Leitet Batterieaktion, Netzbezug und End-SoC aus Zeileninhalt ab (Huawei-Logik)."""
-    pv = float(chart_row["PV-Prognose (kW)"])
-    con = float(chart_row["Verbrauch-Prognose (kW)"])
+    pv = float(chart_row[COL_PV_PROGNOSE])
+    con = float(chart_row[COL_VERBRAUCH_PROGNOSE])
     total_flex = flexible_consumer_power_kw(chart_row)
     max_power = battery_params["max_power_kw"]
     batt_action = bat.battery_plan_kw_from_control(
@@ -230,9 +237,9 @@ def finalize_chart_row_energy(
         battery_params["max_soc"],
         dt_h=DEFAULT_DT_H,
     )
-    chart_row["Geplante Batterie-Aktion (kW)"] = round(batt_action, 2)
-    chart_row["Netzbezug (kW)"] = round(
-        con + total_flex - pv + chart_row["Geplante Batterie-Aktion (kW)"],
+    chart_row[COL_BATTERIE_AKTION] = round(batt_action, 2)
+    chart_row[COL_NETZBEZUG] = round(
+        con + total_flex - pv + chart_row[COL_BATTERIE_AKTION],
         2,
     )
     return new_soc
@@ -240,8 +247,8 @@ def finalize_chart_row_energy(
 
 def sync_chart_row_netzbezug(chart_row: dict) -> None:
     """Netzbezug aus PV, Last, Flex und Batterie ableiten (Chart-Energiebilanz)."""
-    pv = float(chart_row.get("PV-Prognose (kW)", 0.0) or 0.0)
-    con = float(chart_row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
-    batt = float(chart_row.get("Geplante Batterie-Aktion (kW)", 0.0) or 0.0)
+    pv = float(chart_row.get(COL_PV_PROGNOSE, 0.0) or 0.0)
+    con = float(chart_row.get(COL_VERBRAUCH_PROGNOSE, 0.0) or 0.0)
+    batt = float(chart_row.get(COL_BATTERIE_AKTION, 0.0) or 0.0)
     flex_sum = flexible_consumer_power_kw(chart_row)
-    chart_row["Netzbezug (kW)"] = round(con + flex_sum - pv + batt, 2)
+    chart_row[COL_NETZBEZUG] = round(con + flex_sum - pv + batt, 2)

@@ -22,6 +22,9 @@ from integrations.loxone_structure import (
 
 logger = logging.getLogger(__name__)
 
+_CONTENT_TYPE_JSON = "application/json"
+_ACCEPT_JSON_OR_SSE = "application/json, text/event-stream"
+
 
 def _structure_mod():
     """Facade module — tests patch requests/OAuth on loxone_structure."""
@@ -94,8 +97,8 @@ def _post_mcp_tools_list(
         "params": {},
     }
     headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
+        "Content-Type": _CONTENT_TYPE_JSON,
+        "Accept": _ACCEPT_JSON_OR_SSE,
     }
     if bearer_token:
         headers["Authorization"] = f"Bearer {bearer_token}"
@@ -128,8 +131,8 @@ def _post_mcp_tool_call(
         "params": {"name": tool_name, "arguments": arguments},
     }
     headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
+        "Content-Type": _CONTENT_TYPE_JSON,
+        "Accept": _ACCEPT_JSON_OR_SSE,
     }
     if bearer_token:
         headers["Authorization"] = f"Bearer {bearer_token}"
@@ -199,8 +202,8 @@ def _post_mcp_initialize(
         },
     }
     headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
+        "Content-Type": _CONTENT_TYPE_JSON,
+        "Accept": _ACCEPT_JSON_OR_SSE,
     }
     if bearer_token:
         headers["Authorization"] = f"Bearer {bearer_token}"
@@ -325,6 +328,31 @@ def _mcp_tools_scan_result(
     )
 
 
+def _text_blocks_from_content(content: list[Any]) -> list[str]:
+    texts: list[str] = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if str(block.get("type") or "") != "text":
+            continue
+        text = str(block.get("text") or "").strip()
+        if text:
+            texts.append(text)
+    return texts
+
+
+def _joined_content_payload(content: list[Any]) -> Any | None:
+    texts = _text_blocks_from_content(content)
+    if not texts:
+        return None
+    joined = "\n".join(texts).strip()
+    try:
+        return json.loads(joined)
+    except ValueError:
+        # Non-JSON text — keep as string for debug / callers.
+        return joined
+
+
 def _unwrap_tool_call_result(result_any: Any) -> Any:
     """Normalize MCP tools/call result (content[] / structuredContent) to payload."""
     if not isinstance(result_any, dict):
@@ -334,22 +362,9 @@ def _unwrap_tool_call_result(result_any: Any) -> Any:
         return structured
     content = result_any.get("content")
     if isinstance(content, list):
-        texts: list[str] = []
-        for block in content:
-            if not isinstance(block, dict):
-                continue
-            if str(block.get("type") or "") != "text":
-                continue
-            text = str(block.get("text") or "").strip()
-            if text:
-                texts.append(text)
-        if texts:
-            joined = "\n".join(texts).strip()
-            try:
-                return json.loads(joined)
-            except ValueError:
-                # Non-JSON text — keep as string for debug / callers.
-                return joined
+        payload = _joined_content_payload(content)
+        if payload is not None:
+            return payload
     return result_any
 
 
@@ -465,6 +480,66 @@ def _control_metadata_from_describe(desc_any: Any) -> dict[str, Any]:
     return desc_any
 
 
+def _find_control_for_query(
+    mcp_call: Any,
+    query: str,
+) -> tuple[dict[str, Any] | None, str]:
+    find_args_candidates = [
+        {"query": query},
+        {"name": query},
+        {"text": query},
+    ]
+    for find_args in find_args_candidates:
+        resp = mcp_call("control_find", find_args)
+        if resp.status_code >= 400:
+            continue
+        body, _ = _parse_mcp_jsonrpc_body(resp)
+        if not body or not isinstance(body.get("result"), (dict, list)):
+            continue
+        controls = _extract_controls(body.get("result"))
+        found_control: dict[str, Any] | None = None
+        for c in controls:
+            cname = _control_name(c)
+            if cname and cname.lower() == query.lower():
+                found_control = c
+                break
+        if not found_control and controls:
+            found_control = controls[0]
+        if found_control:
+            return found_control, _control_uuid(found_control)
+    return None, ""
+
+
+def _describe_configured_control(mcp_call: Any, found_uuid: str) -> Any:
+    for describe_args in ({"uuid": found_uuid}, {"id": found_uuid}):
+        resp = mcp_call("control_describe", describe_args)
+        if resp.status_code >= 400:
+            continue
+        body, _ = _parse_mcp_jsonrpc_body(resp)
+        if not body:
+            continue
+        return body.get("result")
+    return None
+
+
+def _resolve_one_configured_name(mcp_call: Any, query: str) -> StructureItem | None:
+    found_control, found_uuid = _find_control_for_query(mcp_call, query)
+    if not found_control or not found_uuid:
+        return None
+    describe_any = _describe_configured_control(mcp_call, found_uuid)
+    if describe_any is None:
+        return None
+    meta = _control_metadata_from_describe(describe_any)
+    return StructureItem(
+        name=_control_name(meta) or query,
+        uuid=found_uuid,
+        type=str(meta.get("type") or ""),
+        room=str(meta.get("room") or ""),
+        category=str(meta.get("category") or ""),
+        source=SOURCE_MCP17,
+    )
+
+
 def _resolve_mcp_configured_names(
     endpoint: str,
     *,
@@ -509,66 +584,9 @@ def _resolve_mcp_configured_names(
         if not query or query.lower() in seen_names:
             continue
         seen_names.add(query.lower())
-
-        find_args_candidates = [
-            {"query": query},
-            {"name": query},
-            {"text": query},
-        ]
-        found_control: dict[str, Any] | None = None
-        found_uuid = ""
-
-        for find_args in find_args_candidates:
-            resp = mcp_call("control_find", find_args)
-            if resp.status_code >= 400:
-                continue
-            body, _ = _parse_mcp_jsonrpc_body(resp)
-            if not body or not isinstance(body.get("result"), (dict, list)):
-                continue
-            controls = _extract_controls(body.get("result"))
-            for c in controls:
-                cname = _control_name(c)
-                if cname and cname.lower() == query.lower():
-                    found_control = c
-                    break
-            if not found_control and controls:
-                found_control = controls[0]
-            if found_control:
-                found_uuid = _control_uuid(found_control)
-                break
-
-        if not found_control or not found_uuid:
-            continue
-
-        describe_args_candidates = [
-            {"uuid": found_uuid},
-            {"id": found_uuid},
-        ]
-        describe_any: Any = None
-        for describe_args in describe_args_candidates:
-            resp = mcp_call("control_describe", describe_args)
-            if resp.status_code >= 400:
-                continue
-            body, _ = _parse_mcp_jsonrpc_body(resp)
-            if not body:
-                continue
-            describe_any = body.get("result")
-            break
-        if describe_any is None:
-            continue
-
-        meta = _control_metadata_from_describe(describe_any)
-        item_name = _control_name(meta) or query
-        items.append(
-            StructureItem(
-                name=item_name,
-                uuid=found_uuid,
-                type=str(meta.get("type") or ""),
-                room=str(meta.get("room") or ""),
-                category=str(meta.get("category") or ""),
-                source=SOURCE_MCP17,
-            )
-        )
+        item = _resolve_one_configured_name(mcp_call, query)
+        if item is not None:
+            items.append(item)
 
     items.sort(key=lambda row: row.name.lower())
     return items
@@ -583,8 +601,8 @@ def _post_mcp_initialized_notification(
     timeout_sec: float,
 ) -> None:
     headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream",
+        "Content-Type": _CONTENT_TYPE_JSON,
+        "Accept": _ACCEPT_JSON_OR_SSE,
     }
     if bearer_token:
         headers["Authorization"] = f"Bearer {bearer_token}"
