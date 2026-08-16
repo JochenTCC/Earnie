@@ -1,7 +1,11 @@
 """Backtesting results tables and charts UI."""
 from __future__ import annotations
 
-from ui.backtesting import _HORIZON_MODE_LABELS
+from ui.backtesting import (
+    _HORIZON_MODE_LABELS,
+    scenario_labels_map,
+    try_get_backtesting_scenarios,
+)
 
 import time
 
