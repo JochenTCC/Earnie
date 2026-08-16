@@ -8,6 +8,7 @@ import config
 from data.outdoor_forecast import get_outdoor_forecast_with_fallback
 from data.thermal_power import resolve_live_heating_power_kw
 from integrations import loxone_client
+from optimizer.slot_duration import wall_hours_from_slots
 from optimizer.thermal_model import (
     ThermalBand,
     capacity_kwh_per_k_from_volume,
@@ -15,6 +16,17 @@ from optimizer.thermal_model import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def thermal_horizon_hours_from_slots(n_slots: int, *, dt_h: float | None = None) -> int:
+    """Hourly RC-model horizon from a QH (or other) planning-matrix length.
+
+    ``plan_minimum_heating`` steps one hour at a time. Passing slot count
+    (e.g. 162 QH) as ``horizon`` overstates cooling by ~1/dt_h.
+    """
+    if n_slots <= 0:
+        return 24
+    return max(1, wall_hours_from_slots(n_slots, dt_h))
 
 
 def _resolve_band(thermal: dict, readings: dict) -> ThermalBand:

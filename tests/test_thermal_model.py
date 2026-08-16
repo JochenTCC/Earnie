@@ -91,3 +91,23 @@ def test_freezer_reference_band_below_ambient():
         heating_efficiency=0.85,
     )
     assert warmed > -18.0
+
+
+def test_plan_at_band_max_uses_wall_hours_not_qh_slot_count():
+    """Dump 20260816_140828: Ist 35.5 at band max; 162 QH ≠ 162 hourly steps."""
+    band = ThermalBand(setpoint_c=34.0, tolerance_c=1.5)
+    capacity = capacity_kwh_per_k_from_volume(5900)
+    kwargs = dict(
+        start_temp_c=35.5,
+        band=band,
+        heat_power_kw=2.8,
+        capacity_kwh_per_k=capacity,
+        heat_loss_kw_per_k=0.02,
+        heating_efficiency=0.99,
+    )
+    wall_hours = plan_minimum_heating(ambient_forecast_c=[20.0] * 40, **kwargs)
+    slot_count_as_hours = plan_minimum_heating(ambient_forecast_c=[20.0] * 162, **kwargs)
+    assert wall_hours.required_kwh == 0.0
+    assert wall_hours.heating_hours == 0
+    assert slot_count_as_hours.required_kwh > 0.0
+

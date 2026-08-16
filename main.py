@@ -19,7 +19,10 @@ from runtime_store import live_optimization_debug
 from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
 from optimizer import schedule as optimization_schedule
-from optimizer.thermal_targets import collect_thermal_observability
+from optimizer.thermal_targets import (
+    collect_thermal_observability,
+    thermal_horizon_hours_from_slots,
+)
 from optimizer.run_trigger import (
     TRIGGER_QUARTER_HOUR,
     TRIGGER_REQUEST_OPTIMIZE,
@@ -151,7 +154,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         live_consumers,
         active_targets_kwh=targets,
         baseline_targets_kwh=baseline_targets,
-        horizon=len(optimization_matrix),
+        horizon=thermal_horizon_hours_from_slots(len(optimization_matrix)),
     )
     for item in thermal_observability:
         if item.get("error"):

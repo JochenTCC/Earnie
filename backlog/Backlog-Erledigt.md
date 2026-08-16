@@ -13,6 +13,10 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
     - [x] God-function splits (Wave-2 modules) — listed bodies now ≤ 40 (ramps 41/43, under hard 60): `_render_scenarios_tab` → `scenario_editor_sections` (`_prepare_scenario_tab`, `_render_scenario_identity_fields`, `_render_scenario_entity_picks`, `_render_scenario_tariff_block`, `_persist_or_delete_scenario`); `_render_consumer_form_body` → `_render_thermal_annual_fields`; `render_house_profile_tab` → `_render_profile_selector` / `_edit_and_sync_consumers` / `_render_baseload_preview`; `_render_generic_fields` → `_render_generic_role_schedule`; `build_flow_balance_segments` → `_primary_up_segments` / `_primary_down_segments` / `_assemble_balanced_slot`; SE run → `_prepare_backtesting_run_context` / `_render_backtesting_progress` / `_render_season_mirror_toggle` / `_render_horizon_select` / `_render_run_buttons`; SoC → `_add_optimized_soc_segment` / `_add_counterfactual_soc_segment` / `_ramp_before_ys` / `_ramp_end_point` / `_ramp_start_soc` / `_add_underlay_part`; `build_optimization_display_bundle` → `_merge_chart_into_bundle` / `_resolve_bundle_headers`. Facades unchanged.
   - [x] Official docs: landing/handbook/charts no longer claim hourly MILP; issue-template version pin; swimspa-filter / UI-spec QH granularity
 
+### Bugfix Pool heating at band max / QH RC horizon (2026-08-16)
+
+- [x] Planned pool heating although Ist at band max (`debug_dump_20260816_140828`) — QH matrix length (162) was passed as hourly RC horizon → 28 kWh / `Earnie_Pool_Freigabe=1` while actual 35.5 °C = band_max (Soll 34.0, tol 1.5). Fix: `thermal_horizon_hours_from_slots` (162 → 40 h → 0 kWh) in `main.py` / `optimizer/targets.py` / `data/consumer_targets.py`. Tests in `test_thermal_targets.py` / `test_thermal_model.py` / `test_consumer_targets_thermal.py`. Live acceptance verified.
+
 ### Bugfix Pool filter Ist with alternate-only binding (2026-08-16)
 
 - [x] Pool filter Ist not assigned when only `sens_filter_active` is bound (`debug_dump_20260808_232225`) — binary meter accepts alternate-only; regression in `test_loxone_client.py`. Live acceptance verified.

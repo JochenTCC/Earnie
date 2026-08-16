@@ -78,3 +78,18 @@ def test_resolve_consumer_daily_targets_multi_day_matrix(mock_dt, mock_resolve, 
     assert targets[today]["swimspa"] == 12.5
     assert targets[tomorrow]["swimspa"] == 2.4
     mock_resolve.assert_called_once()
+
+
+@patch("data.consumer_targets.datetime")
+@patch("optimizer.thermal_targets.resolve_thermal_daily_target_kwh")
+def test_resolve_thermal_qh_matrix_uses_wall_hour_horizon(mock_resolve, mock_dt):
+    _patch_consumer_today(mock_dt)
+    mock_resolve.return_value = 0.0
+    result = consumer_targets._resolve_single_consumer_daily_target_kwh(
+        _swimspa(),
+        _FIXED_TODAY,
+        [{"date": _FIXED_TODAY}] * 162,
+        {},
+    )
+    assert result == 0.0
+    mock_resolve.assert_called_once_with(_swimspa(), horizon=40)

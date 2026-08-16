@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from optimizer.thermal_targets import build_thermal_observability
+from optimizer.thermal_targets import (
+    build_thermal_observability,
+    thermal_horizon_hours_from_slots,
+)
 
 
 def _swimspa_consumer() -> dict:
@@ -50,3 +53,28 @@ def test_build_thermal_observability_compare(mock_readings, mock_forecast):
     assert snapshot["active_target_kwh"] == snapshot["thermal_target_kwh"]
     assert snapshot["baseline_target_kwh"] == 8.0
     assert snapshot["delta_kwh"] == round(snapshot["thermal_target_kwh"] - 8.0, 3)
+
+
+def test_thermal_horizon_hours_from_qh_slots():
+    assert thermal_horizon_hours_from_slots(162) == 40
+    assert thermal_horizon_hours_from_slots(96) == 24
+    assert thermal_horizon_hours_from_slots(0) == 24
+    assert thermal_horizon_hours_from_slots(1) == 1
+
+
+@patch("optimizer.thermal_targets.resolve_thermal_daily_target_kwh")
+def test_horizon_target_passes_wall_hours_not_slot_count(mock_resolve):
+    from optimizer.targets import resolve_horizon_target_kwh
+
+    mock_resolve.return_value = 0.0
+    consumer = {
+        "id": "pool_swimspa",
+        "daily_target_source": "thermal",
+        "daily_target_kwh": 0.0,
+    }
+    result = resolve_horizon_target_kwh(
+        consumer, None, optimization_matrix=[{}] * 162
+    )
+    assert result == 0.0
+    mock_resolve.assert_called_once_with(consumer, horizon=40)
+

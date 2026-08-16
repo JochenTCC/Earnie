@@ -172,9 +172,12 @@ def resolve_horizon_target_kwh(
 ) -> float:
     source = consumer.get("daily_target_source", "config")
     if source == "thermal" and not logged_targets_only:
-        from optimizer.thermal_targets import resolve_thermal_daily_target_kwh
+        from optimizer.thermal_targets import (
+            resolve_thermal_daily_target_kwh,
+            thermal_horizon_hours_from_slots,
+        )
 
-        horizon = max(1, len(optimization_matrix or []))
+        horizon = thermal_horizon_hours_from_slots(len(optimization_matrix or []))
         return float(resolve_thermal_daily_target_kwh(consumer, horizon=horizon))
     if source == "thermal_annual" and not logged_targets_only:
         return resolve_thermal_annual_horizon_kwh(consumer, optimization_matrix)
