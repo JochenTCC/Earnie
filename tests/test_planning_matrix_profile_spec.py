@@ -418,6 +418,7 @@ def test_reference_hourly_load_uses_profile_not_cons_data(
 
 def test_build_per_scenario_reference_costs_adds_tariff_specific_ref(
     historical_cache: HistoricalDataCache,
+    monkeypatch,
 ):
     from simulation.engine import (
         HISTORICAL_REFERENCE_ID,
@@ -425,6 +426,9 @@ def test_build_per_scenario_reference_costs_adds_tariff_specific_ref(
         scenario_reference_id,
         scenario_reference_label,
     )
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
 
     scenarios = {
         "live": {
