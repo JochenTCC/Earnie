@@ -1,103 +1,143 @@
-# Earnie — Anwender-Dokumentation
+# Earnie
 
-Diese Dokumentation richtet sich an Betreiber von Earnie: Einrichtung, Konfiguration, Streamlit-Oberfläche und die Smarthome-Anbindung (Loxone, Home Assistant/evcc oder OpenEMS).
+<p align="center">
+  <img src="docs/assets/Earnie-Logo-Simple-Light.png" alt="Earnie" width="160">
+</p>
 
-**Einstieg aus Anwendersicht (Handbuch):** [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md)
+**Earnie** optimiert den Energiefluss in einem Smart-Home: Speicher, PV und Verbraucher mit wählbaren Schaltzeiten werden so optimiert, dass Stromkosten sinken und der Eigenverbrauch steigt. Der Daemon arbeitet typisch im **15-Minuten-Takt**; der MILP-Plan nutzt derzeit **Stunden-Slots**. Seine Stärke spielt **Earnie** vor allem im Zusammenhang mit sogenannten [SPOT-Tarifen (im DACH-Raum)](https://www.epexspot.com/) aus. Eine umfangreiche Oberfläche zeigt genau, was **Earnie** gemacht und geplant hat.
+Und wenn Sie vorab wissen wollen, wie hoch das Einsparpotenzial ist, kann **Earnie** das für Sie vorab für ein ganzes Jahr hochrechnen - Und das auch ganz ohne Smart-Home.
+Earnie funktioniert unabhängig von Energie- und / oder Systemlieferanten für maximale Unabhängigkeit.
 
-Für Entwickler (Projektstruktur, Tests, Container) siehe [DEVELOPER.md](../DEVELOPER.md).
+GitHub-Repository: [JochenTCC/Earnie](https://github.com/JochenTCC/Earnie).
 
-Zum Ausprobieren des Szenario-Explorers ohne Installation:
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://earnie.streamlit.app)
+## Was ist Earnie?
 
-## Erste Schritte
+**Earnie** richtet sich an Hausbesitzer, die Kosten beim Stromverbrauch minimieren möchten, insbesondere bei [SPOT-Tarifen](https://www.epexspot.com/). Er optimiert in einem variablen Zeitfenster (von max. 48h) die Verbräuche und Erträge so, dass die Kosten minimal sind. Das funktioniert am besten bei Häusern mit einer PV-Anlage, Batteriespeicher und Verbrauchern, die per Smart-Home gesteuert werden können (also smarter Wechselrichter, smarte Wallbox für das E-Auto, smarte Wärmepumpe und andere Geräte). Die Live-Anbindung läuft über **EHAL**: Default [Loxone](https://www.loxone.com/dede/), DACH-Pfad A2 [Home Assistant](https://www.home-assistant.io/) + [evcc](https://evcc.io/), OpenEMS als Lab-/Industrie-Prototyp — Umschaltung per Config ([Adapter wählen](docs/einrichtung/adapter-wahl.md)). Für Geräte ohne smarte Freigabe kann **Earnie** Startempfehlungen geben.
+Der große Hebel für Einsparungen ist das geschickte Timing all dieser Verbraucher und der intelligente Einsatz des Batteriespeichers als Puffer.
 
-1. **Konfiguration:** `share/config/config.example.json` → Bootstrap legt `earnie_env/config/config.json` an (lokal, nicht committen). Alternativ `python -m scripts.bootstrap_runtime`. Hausdaten: [Private Haus-Config](einrichtung/private-env.md).
-2. **Smarthome-Backend wählen:** [Adapter wählen](einrichtung/adapter-wahl.md) (Default Loxone; alternativ HA+evcc oder OpenEMS-Lab). Bei Loxone: `.env.example` → `earnie_env/config/.env` mit `LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS` (Docker: Entrypoint legt `.env` im Config-Volume an).
-3. **Feld-Mapping:** Bei Loxone Merker in `plant.ehal_bindings` / Hausprofil über **EHAL-Com** ([Loxone-Signale und Earnie-Library](referenz/loxone-signals.md)); bei HA Entity→EHAL auf [EHAL-Com](ui/ehal-com.md). Legacy-`flexible_consumers` in `config.json` nur noch bei Bedarf (meist leer).
-4. **Verbindung prüfen:** EHAL-Com (Live-Lesen) bzw. bei Loxone:
-  ```powershell
-   python -m scripts.verify_loxone_setup
-  ```
-5. **Produktivbetrieb:** Docker-Container starten (UI + `main.py` Auto-Start) oder lokal `python main.py` / UI **Optimierer-Dienst**.
-6. **Monitor öffnen:** `python -m scripts.run_streamlit` (Port: `ui.streamlit_port` / `EARNIE_UI_STREAMLIT_PORT`; lokal venv typisch **8531**, siehe [Streamlit-Ports](referenz/streamlit-ports.md))
+![Was-Wäre-Wenn-Analyse](docs/assets/Monatliche-Stromkosten.png)
+*Was-Wäre-Wenn-Analyse: Vorab schon sehen, was eine andere Konfiguration sparen könnte*
 
-Parameter-Beschreibungen erscheinen in Cursor/VS Code als Hover-Hilfe, wenn in `config.json` `"$schema": "./config.schema.json"` gesetzt ist.
-
-**Container-Betrieb (Synology / LoxBerry / Proxmox LXC):** [Container](einrichtung/container.md) · [LoxBerry-Plugin](einrichtung/loxberry-plugin.md) · [Proxmox LXC](einrichtung/proxmox-lxc.md)
-
-## Inhaltsverzeichnis
+Statt fester Regeln (wie bei anderen Lösungen) berechnet **Earnie** einen **24-48 Stunden-Plan** unter Berücksichtigung von Strompreisen, PV-Prognose, Wettervorhersagen für den Standort des Hauses, Speicherzustand und Gerätebedarf. Ein dauerhaft laufender Daemon setzt den Plan über EHAL um; eine übersichtliche Web-Oberfläche zeigt Soll/Ist und hilft bei Konfiguration und Analyse.
 
 
+| Komponente                                 | Rolle                                                                                           |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `main.py`                                  | Liest Telemetrie über EHAL, optimiert, schreibt Steuerwerte — läuft dauerhaft |
+| **[Streamlit](https://streamlit.io/)-App** | Cockpit, Planung, Simulation — optional parallel; steuert die Anlage nicht                      |
 
-### Benutzer-Handbuch
 
-- [Benutzer-Handbuch Earnie](user-manual/Benutzer-Handbuch-Earnie.md) — Überblick, Einrichtung Was-wäre-wenn, Smarthome, Live-Betrieb
+Details: [Betrieb](docs/einrichtung/betrieb.md)
 
+## Was bringt Earnie?
 
-
-### Einrichtung
-
-- [Adapter wählen](einrichtung/adapter-wahl.md) — Loxone / HA+evcc / OpenEMS über `ehal.backend` (Config-Umschaltung)
-- [Loxone-Anbindung](einrichtung/loxone-anbindung.md) — HTTP-Schnittstelle, Prüfskript
-- [Betrieb](einrichtung/betrieb.md) — `main.py` vs. App, Laufzeitdateien, Optimierungs-Takt
-- [Container](einrichtung/container.md) — Docker/Synology/LoxBerry, Multi-Arch, Bootstrap, Migration, Config-Drift
-- [LoxBerry-Plugin](einrichtung/loxberry-plugin.md) — Scope-A-Plugin (Docker-Wrapper, Port 8501) vs. manuelle Compose
-- [Proxmox LXC](einrichtung/proxmox-lxc.md) — Unprivileged LXC mit Docker Compose (Port 8501)
-- [Greenfield Dev-Stack](einrichtung/greenfield-dev-stack.md) — lokale Ersteinrichtung (Port 8502) für Hauskonfigurator/Backtesting
-- [OpenEMS-Lab](einrichtung/openems-lab.md) — Earnie + OpenEMS Edge/UI (Port 8503); Kommunikationscheck in der Spec
-- [Home Assistant + evcc](einrichtung/ha-evcc.md) — DACH-Pfad A2 (Compose, Port 8506) vs Pfad B (bestehendes HA); Optimizer-Exklusivität / Modbus
-- [Private Haus-Config](einrichtung/private-env.md) — privates Repo + Junction; öffentliche Vorlagen/Tarife unter `share/config/`
+- **Günstiger laden und heizen** — Nutzung günstiger Stunden und PV-Überschuss statt Flatrate-Denken
+- **Speicher sinnvoll nutzen** — SOC-Ziele und Entladestrategie im Tagesverlauf, nicht nur „voll/leer“
+- **Flexible Geräte intelligent einplanen** — EV, Wärmepumpe, SwimSpa-Filter, manuelle Geräte mit Empfehlungen
+- **Transparenz** — Monitor (Sunset-2-Sunset): Vergangenheit, Live-Snapshot und Vorausschau in einem Cockpit
+- **What-if ohne Risiko** — Szenario-Exploration vergleicht Varianten, ohne den Produktivbetrieb zu ändern und unnötige oder falsche Investitionen zu tätigen oder sich für den falschen Stromtarif zu entscheiden
 
 
 
-### Konfiguration (`earnie_env/config/config.json`)
-
-- [Überblick](konfiguration/overview.md) — Aufbau der Datei, Szenarien, Dateipfade
-- [Speichern / Laden](konfiguration/speichern-laden.md) — `earnie_env`, Auto-Save, ZIP-Export/Import
-- [PV & Batterie](konfiguration/batterie-pv.md) — Live-Szenario, Entitäts-Referenzen
-- [Flexible Verbraucher](konfiguration/flexible-verbraucher.md) — SwimSpa, E-Auto, Wärmepumpe, Manuelle Geräte
-- [Historische Leistungsprofil-CSV](konfiguration/verbrauchs-csv.md) — Hausprofil Last-/PV-/Verbraucher-Leistungsprofile, Normalisierung, Loxone-Import
-- [Preise & aWATTar](konfiguration/preise.md) — Bezugspreis, Einspeisevergütung, Preis-Prognose
+## Funktionen
 
 
 
-### Benutzeroberfläche (Streamlit)
+### Optimierung und Steuerung
 
-- [Betriebsmodi & Navigation](ui/betriebsmodi.md) — Seitenstruktur, Monitor (Sunset-2-Sunset), Szenario-Explorer
-- [Charts & Panels](ui/charts.md) — Diagramme, Metriken, Sankey, Soll/Ist-Icons
-- [EHAL-Com](ui/ehal-com.md) — Anbindung & Debug: Loxone / HA / OpenEMS, Live-Lesen, Live-Schreiben
-
-
-
-### Referenz
-
-- [Abkürzungen](referenz/abbreviations.md) — EHAL, SE, HK, SoC, VI/VO und weitere Kurzformen
-- [Streamlit-Ports](referenz/streamlit-ports.md) — Port pro Stack/Plattform (8501 Prod, 8521/8531 lokal, 8502/8532 Greenfield, 8503 OpenEMS-Lab, …)
-- [Loxone-Signale und Earnie-Library](referenz/loxone-signals.md) — Motivation, VI/VO-Vorlagen (Pattern B), Default-Merker, EFM, Import, Signal-Tabellen
-- [OeMAG & Referenzmarktwert](referenz/oemag-referenzmarktwert.md) — OeMAG-Marktpreis vs. E-Control RefMarkt PV
-- [Tarife und Preise nachrechnen](referenz/tarife-quellen.md) — Bezugs-/Einspeisepreise, SE-Fixkosten und Fake-Jahresrechnung; Quellen und Katalog-Audit
+- Ganzheitliche Optimierung: Daemon typisch im 15-Minuten-Takt; MILP-Plan derzeit in Stunden-Slots für Speicher und Verbraucher, deren Aktivierung von Earnie oder dem Benutzer gewählt werden kann.
+- Dynamische Strompreise (z. B. [aWATTar](https://www.awattar.at/)) und Preis-Prognose (über die veröffentlichten Preise hinaus)
+- PV-Erzeugungsprognose über [Open-Meteo](https://open-meteo.com/)-Wetterdaten und Grundlast-Modell mit Berücksichtigung der Temperaturen
 
 
 
-### Entwickler-Specs (Englisch/technisch)
+### Verbraucher
 
-- [EHAL](spec/ehal.md) — Hardware Access Layer contract (schema_version 3, adapters)
-- [Spec Soll-Ist](spec/soll-ist-abweichung.md) — Regelwerk Chart 1, Szenarien, Pflegehinweis
-- [UI Sunset-2-Sunset](spec/ui-sunset2sunset.md) — Monitor-Cockpit (historisch abgeschlossen)
-- [UI-Menüstruktur](spec/ui-menu-structure.md) — historische Epic-Notiz (native Pages shipped)
-- [Sunset-Planungshorizont](spec/planning-horizon-sunset.md) — Live-Horizont SA₁→SA₂, SOC-Anker
-- [Backtesting: fixed_24h vs sunrise_window](spec/backtesting-horizon-fixed24h-vs-sunrise.md) — Jahresvergleich Nutzen (€) und Rechenlast
-- [Backtesting deviation calendar](spec/backtesting-deviation-calendar.md) — Abweichungskalender SE
-- [Backtesting plausibility S2](spec/backtesting-plausibility-s2-kein-pv-jan-2-7.md) — Plausibilitätsnotiz
-- [Scenario-Explorer consumption](spec/scenario-explorer-consumption.md) — SE-Last-/CSV-Semantik
-- [SE calculation test plan](spec/se-calculation-test-plan.md) — SE-Rechentests
-- [OpenEMS lab setup](spec/openems-lab-setup.md) — Compose + Earnie ↔ OpenEMS
-- [OpenEMS testing platform](spec/openems-testing-platform-todo.md) — Plant-/REST-Kanal-Checkliste
-- [HA + evcc lab setup](spec/ha-lab-setup.md) — Compose + Earnie ↔ Home Assistant
-- [SwimSpa filter](spec/swimspa-filter.md) — Filter-Schulden / MILP
-- [Price forecast renewables](spec/price-forecast-renewables.md) — Preisprognose-Modell
-- [EFM auto-sync](spec/efm-auto-sync-2.4.l.md) — historische Research-Notiz Interpretation C
-- [Hardware registry Layer C](spec/hardware-registry-layer-c.md) — Registry / Banner (soft 2.4.q; full C later)
-- [Branching & Hotfix Playbook](spec/branching-hotfix-playbook.md) — Tags, hotfixes, `main`
-- [Epic deploy user](spec/epic-deploy-user.md) — historische PyInstaller-Draft (superseded by GHCR release)
+- E-Auto über Wallbox (Smarthome sagt an, wann das E-Auto voll sein soll, Earnie kümmert sich um den Rest) 
+- Wärmepumpe (mit Wärmemodell des Hauses, das den Wärmebedarf anhand der Wetterdaten voraussagt und in die Optimierung mit einfließen lässt)
+- Pool (auch mit Wärmemodell, wie bei der Wärmepumpe) - Filter können auch bedarfsgerecht aktiviret werden
+- Generische Geräte (Waschmaschine, Trockner, Geschirrspüler, ...)
 
+
+
+### Oberfläche (Weboberfläche über [Streamlit](https://streamlit.io/))
+
+- **Monitor** (mit vollem Optimierungs-Horizont) — Energiefluss, SOC-Verlauf der Batterie, Verbraucherverhalten, Lade-Kontrolle der Batterie von Earnie
+- **Hauskonfigurator / Szenarienkonfigurator** — Umfangreiche Konfiguration des Hauses mit allen Verbrauchern zur Planung und Szenario-Exploration
+- **Manuelle Geräte** — Laufzeiten mithilfe von Earnie planen und Empfehlungen annehmen
+- **Szenario-Explorer** — Szenarien vergleichen (Was-Wäre-Wenn Analysen)
+- **Analyse Verbrauch & Kosten** — Verbrauch/Herkunft/Kosten aus dem Produktiv-Log; Swimspa autonom vs. Earnie
+
+
+
+### Betrieb
+
+- [Docker](https://www.docker.com/) auf [Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox](https://www.proxmox.com/) LXC oder PC (weitere Systeme folgen bei Bedarf)
+- Persistente Laufzeitdaten für Nachvollziehbarkeit und Debug-Dumps
+
+![Earnie Monitor](docs/assets/Live-Monitoring-Chart1-2.png)
+*Earnie Monitor: Kompletter Optimierungs-Horizont mit Energiefluss, SOC und Verbraucherverhalten.*
+
+## Typischer Ablauf
+
+1. **Voraussetzungen klären** — Smarthome-Backend (Loxone / HA+evcc / OpenEMS-Lab), PV + Speicher, verschiebbare Verbraucher, optional dynamischer Tarif
+2. **Deployment wählen** — Container ([Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox LXC](docs/einrichtung/proxmox-lxc.md)) oder lokaler Betrieb → [Container](docs/einrichtung/container.md) · [Betrieb](docs/einrichtung/betrieb.md)
+3. **Konfiguration anlegen** — Bootstrap `earnie_env/config/`, Backend und Mapping → [Erste Schritte](docs/README.md#erste-schritte) · [Adapter wählen](docs/einrichtung/adapter-wahl.md)
+4. **Was-wäre-wenn-Analyse** — Mit Erstkonfiguration klären, ob sich ein Gesamtsystem und Earnie im produktiven Einsatz lohnen
+5. **Verbindung zu Smarthome** — **EHAL-Com** (Live-Lesen); bei Loxone optional `python -m scripts.verify_loxone_setup`
+6. **Produktiv starten** — `python main.py` dauerhaft (**nur eine Instanz**) bzw. Docker Auto-Start
+7. **Monitor öffnen** — [Streamlit](https://streamlit.io/); Port je Stack: [Streamlit-Ports](docs/referenz/streamlit-ports.md) (Prod **8501**, lokal venv typisch **8531**)
+8. **Feintuning** — Hausprofil, Szenarien, flexible Verbraucher über Planungs- und Betriebsseiten
+
+Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Ersteinrichtung)
+
+## Anwender-Dokumentation
+
+- **Benutzer-Handbuch (Einstieg aus Anwendersicht):** [docs/user-manual/Benutzer-Handbuch-Earnie.md](docs/user-manual/Benutzer-Handbuch-Earnie.md)
+- **Technische Anwender-Doku** (Einrichtung, Konfiguration, UI, Loxone): **[docs/README.md](docs/README.md)**
+
+
+| Bereich                | Kapitel                                                                                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Handbuch**           | [Benutzer-Handbuch Earnie](docs/user-manual/Benutzer-Handbuch-Earnie.md)                                                                                                                                         |
+| **Einrichtung**        | [Adapter wählen](docs/einrichtung/adapter-wahl.md) · [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Proxmox LXC](docs/einrichtung/proxmox-lxc.md) |
+| **Konfiguration**      | [Überblick](docs/konfiguration/overview.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md) |
+| **Benutzeroberfläche** | [Betriebsmodi](docs/ui/betriebsmodi.md) · [Charts](docs/ui/charts.md) · [EHAL-Com](docs/ui/ehal-com.md)                                                                                            |
+| **Referenz**           | [Abkürzungen](docs/referenz/abbreviations.md) · [Loxone-Signale und Earnie-Library](docs/referenz/loxone-signals.md)                                                                                                                                                                |
+
+
+
+
+## Installation und Betrieb
+
+
+| Weg                              | Für wen                                                                                                               | Detail                                                                                                             |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Docker (empfohlen Prod)**      | [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/), [Proxmox](https://www.proxmox.com/) LXC | [docs/einrichtung/container.md](docs/einrichtung/container.md) · [proxmox-lxc.md](docs/einrichtung/proxmox-lxc.md) |
+| **Lokal (Dev / ohne Container)** | Entwickler, Tests                                                                                                     | [DEVELOPER.md](DEVELOPER.md)                                                                                       |
+
+
+
+
+## Roadmap (Kurz)
+
+- **2.0** — Stabilisiertes Datenmodell; klarer Projekteinstieg (dieses README)
+- **Adaptation** — PV- und thermische Parameter-Anpassung über die Zeit
+- **Thermals** — Gekoppelte Haus-/Speicher-/Solar-Modelle
+- **Smartere Geräte-Empfehlungen** — adaptive Leistung und Laufzeit für Haushaltsgeräte
+- **Streamlit-Steuerung von** `main.py` — Start/Stop/Neustart in der UI; ein Docker-Container (`earnie`) mit Auto-Start
+
+Earnie wird weitgehend mit Hilfe von [Cursor](https://cursor.com/) entwickelt.
+
+Vollständige Roadmap → **[backlog/Backlog.md](backlog/Backlog.md)**
+
+## Lizenz
+
+Die Software ist **Source-Available** und auf **private, nicht-kommerzielle Nutzung** beschränkt. Vollständige Bedingungen: **[LICENSE.md](LICENSE.md)**.
+
+## Für Entwickler
+
+Unterstützung ist sehr willkommen - vor allem bei der Einbindung weiterer Systeme und beim Ausprobieren :-).
+
+Wie mitwirken (Lizenz, Forks, Hardware-Profile, Kontakt): **[CONTRIBUTING.md](CONTRIBUTING.md)**  
+Projektstruktur, lokale Entwicklung, Container-Build und technische Hinweise: **[DEVELOPER.md](DEVELOPER.md)**
