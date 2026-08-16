@@ -74,3 +74,12 @@ debug-dumps/
 # Local real-name → backlog alias map (never commit)
 .cursor/user-aliases.local.md
 loxone-online-access.txt
+poc_doc_assistant/.gitignore
+poc_doc_assistant/.oikb.yaml
+poc_doc_assistant/ingest.py
+poc_doc_assistant/oikb_daemon.log
+poc_doc_assistant/periodic_sync.log
+poc_doc_assistant/query.py
+poc_doc_assistant/README.md
+poc_doc_assistant/requirements.txt
+poc_doc_assistant/run_periodic_sync.py
