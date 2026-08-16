@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 
 import config
-from settings.flexible_consumers import flex_kw_lookup
 from .cbc_events import (
     begin_cbc_event_collection,
     cbc_event_collection_active,
@@ -21,100 +19,49 @@ from .charging_context import (
 )
 from . import battery as bat
 from .generic_flex_run import continue_on_from_state, update_generic_flex_run_state
-from .consumer_power import uses_pv_follow
 from .filter_context import adjust_targets_for_native_filter, resolve_filter_contexts
 from .milp import milp_horizon_schedule, milp_optimizer
 from .slot_duration import DEFAULT_DT_H, slots_for_wall_hours, validate_dt_h
 from .targets import (
-    build_applied_targets_detail,
-    build_baseline_targets_detail,
-    build_energy_comparison_detail,
     consumer_column_name,
-    consumer_pv_follow_column_name,
-    resolve_baseload_kwh,
     resolve_horizon_consumer_targets_kwh,
-    resolve_matched_baseline_horizon_targets,
+)
+from .sim_chart_rows import (
+    _chart_row_from_controls,
+    _chart_row_from_schedule_slot,
+    _finalize_chart_rows_for_display,
+    finalize_chart_row_energy,
+    flexible_consumer_power_kw,
+    horizon_end_soc_from_chart_rows,
+    horizon_end_soc_percent,
+    resolve_sell_price_cent,
+    sync_chart_row_netzbezug,
+)
+from .sim_baseline import (
+    _flex_kw_from_chart_row,
+    _matched_baseline_profile_kw,
+    _simulate_single_hour_baseline,
+    build_matched_flex_kw_per_hour,
+    simulate_baseline_horizon,
+    simulate_baseline_with_optimized_flex,
+    simulate_matched_baseline_horizon,
+)
+from .sim_costs import (
+    _grid_kw_from_row,
+    _round_savings_list,
+    build_savings_snapshot,
+    calculate_cost_euro_from_rows,
+    calculate_optimization_savings,
+    calculate_step_cost_euro_from_row,
+    calculate_step_cost_parts_from_row,
+    delivered_flex_kwh_from_rows,
+    hourly_consumption_kwh_from_rows,
+    hourly_cost_euro_from_rows,
+    hourly_savings_euro_from_rows,
+    total_consumption_kwh_from_rows,
 )
 
-from data.price_forecast_live import is_extrapolated_source
-
 logger = logging.getLogger(__name__)
-
-
-def _chart_price_fields(row: dict) -> dict:
-    """Preis-Felder für Simulations-/Chart-Zeilen."""
-    fields = {
-        "Strompreis (Cent/kWh)": row["k_act"],
-        "Preis extrapoliert": is_extrapolated_source(row.get("price_source")),
-    }
-    if "k_push_act" in row:
-        fields["Einspeisevergütung (Cent/kWh)"] = row["k_push_act"]
-    return fields
-
-
-def resolve_sell_price_cent(row: dict, default_sell_price_cent: float | None = None) -> float:
-    """Stündliche Einspeisevergütung aus Chart-Zeile oder Fallback."""
-    if "Einspeisevergütung (Cent/kWh)" in row:
-        return float(row["Einspeisevergütung (Cent/kWh)"])
-    if default_sell_price_cent is not None:
-        return float(default_sell_price_cent)
-    raise ValueError(
-        "Kein Einspeisepreis in der Zeile und kein Fallback angegeben "
-        "(Einspeisevergütung (Cent/kWh) oder default_sell_price_cent)."
-    )
-
-
-_RESERVED_KW_COLUMNS = {
-    "PV-Prognose (kW)",
-    "PV-Ist (kW)",
-    "Verbrauch-Prognose (kW)",
-    "Geplante Batterie-Aktion (kW)",
-    "Netzbezug (kW)",
-}
-
-
-def flexible_consumer_power_kw(row: dict) -> float:
-    """Summiert alle flexiblen Verbraucher-Leistungen aus einer Chart-Zeile."""
-    return sum(
-        float(value or 0.0)
-        for key, value in row.items()
-        if key.endswith(" (kW)") and key not in _RESERVED_KW_COLUMNS
-    )
-
-
-def _finalize_chart_rows_for_display(
-    chart_rows: list[dict],
-    charging_contexts: dict[str, dict] | None = None,
-    *,
-    flex_live_kw: dict[str, float] | None = None,
-) -> None:
-    """Chart-Darstellung: Sofort-Laden, manuelle Geräte und known-Generics als Flex-Spuren."""
-    from .charge_immediate import apply_immediate_charge_to_chart_rows
-    from .appliance_schedule import apply_appliance_schedules_to_chart_rows
-    from house_config.known_chart_display import apply_known_generic_to_chart_rows
-
-    apply_immediate_charge_to_chart_rows(
-        chart_rows,
-        charging_contexts,
-        flex_live_kw=flex_live_kw,
-    )
-    apply_appliance_schedules_to_chart_rows(chart_rows)
-    apply_known_generic_to_chart_rows(chart_rows)
-
-
-def _format_chart_uhrzeit(row: dict) -> str:
-    slot_dt = row.get("slot_datetime")
-    if isinstance(slot_dt, datetime):
-        return slot_dt.strftime("%d.%m. %H:%M")
-    hour = row.get("hour", 0)
-    return f"{int(hour):02d}:00"
-
-
-def _chart_row_slot_field(row: dict) -> dict:
-    slot_dt = row.get("slot_datetime")
-    if isinstance(slot_dt, datetime):
-        return {"slot_datetime": slot_dt}
-    return {}
 
 
 def _relative_sunrise_index(
@@ -183,93 +130,6 @@ def _simulate_single_hour_optimizer(
         consumer_continue_on=consumer_continue_on,
         soc_hold_index=rel_hold,
         soc_hold_percent=soc_hold_percent if rel_hold is not None else None,
-    )
-    return _chart_row_from_controls(
-        row,
-        sim_soc,
-        battery_params,
-        consumers_cfg,
-        mode,
-        target_power,
-        consumer_powers,
-        consumer_pv_follow,
-    )
-
-
-def _chart_row_from_controls(
-    row: dict,
-    sim_soc: float,
-    battery_params: dict,
-    consumers_cfg: list,
-    mode: int,
-    target_power: float,
-    consumer_powers: dict[str, float],
-    consumer_pv_follow: dict[str, int],
-) -> tuple[float, dict, int, float]:
-    """Baut Chart-Zeile aus Modus/Flex-Leistungen (gemeinsam für MPC und commit-K)."""
-    pv = row["expected_p_pv"]
-    con = bat.effective_p_act(row, battery_params)
-    total_flex_power = sum(consumer_powers.values())
-    max_power = battery_params["max_power_kw"]
-    batt_action = bat.battery_plan_kw_from_control(
-        mode, target_power, pv, con, total_flex_power, max_power
-    )
-    action_text = bat.steuerbefehl_for_mode(mode, target_power)
-    old_soc = sim_soc
-    sim_soc, batt_action = bat.apply_soc_change(
-        old_soc,
-        batt_action,
-        battery_params["battery_capacity_kwh"],
-        battery_params["efficiency"],
-        battery_params["min_soc"],
-        battery_params["max_soc"],
-        dt_h=DEFAULT_DT_H,
-    )
-    p_grid = con + total_flex_power - pv + round(batt_action, 2)
-    chart_row = {
-        "Uhrzeit": _format_chart_uhrzeit(row),
-        **_chart_row_slot_field(row),
-        **_chart_price_fields(row),
-        "PV-Prognose (kW)": pv,
-        "Verbrauch-Prognose (kW)": con,
-        "Geplante Batterie-Aktion (kW)": round(batt_action, 2),
-        "Netzbezug (kW)": round(p_grid, 2),
-        "Simulierter SoC (%)": round(old_soc, 1),
-        "Steuerbefehl": action_text,
-    }
-    for consumer in consumers_cfg:
-        chart_row[consumer_column_name(consumer)] = round(
-            consumer_powers.get(consumer["id"], 0.0), 2
-        )
-        if uses_pv_follow(consumer):
-            chart_row[consumer_pv_follow_column_name(consumer)] = int(
-                consumer_pv_follow.get(consumer["id"], 0) or 0
-            )
-    return sim_soc, chart_row, mode, target_power
-
-
-def _chart_row_from_schedule_slot(
-    row: dict,
-    sim_soc: float,
-    battery_params: dict,
-    consumers_cfg: list,
-    slot: dict,
-) -> tuple[float, dict, int, float]:
-    """Wendet einen MILP-Stundenplan-Slot open-loop auf die aktuelle SoC an."""
-    consumer_powers = dict(slot.get("consumer_powers") or {})
-    consumer_pv_follow = dict(slot.get("consumer_pv_follow") or {})
-    total_flex = sum(consumer_powers.values())
-    planned_soc = slot.get("planned_soc_percent")
-    if planned_soc is None:
-        planned_soc = sim_soc
-    mode, target_power, _ = bat.derive_control_from_milp_plan(
-        slot["milp_plan"],
-        row,
-        total_flex,
-        sim_soc,
-        float(planned_soc),
-        battery_params,
-        dt_h=DEFAULT_DT_H,
     )
     return _chart_row_from_controls(
         row,
@@ -372,39 +232,6 @@ def _cap_flex_delivery(
     return flex_capped
 
 
-def horizon_end_soc_from_chart_rows(chart_rows: list[dict]) -> float | None:
-    """End-SOC nach Horizontlauf (gesetzt in simulate_horizon auf der letzten Zeile)."""
-    if not chart_rows:
-        return None
-    raw = chart_rows[-1].get("_horizon_end_soc")
-    if raw is None:
-        return None
-    return float(raw)
-
-
-def horizon_end_soc_percent(
-    chart_rows: list[dict],
-    initial_soc: float,
-    battery_params: dict,
-) -> float:
-    """SoC nach der letzten Horizontstunde (Kette über alle chart_rows)."""
-    soc = float(initial_soc)
-    for row in chart_rows:
-        displayed = float(row["Simulierter SoC (%)"])
-        soc = displayed
-        batt = float(row.get("Geplante Batterie-Aktion (kW)", 0.0) or 0.0)
-        soc, _ = bat.apply_soc_change(
-            soc,
-            batt,
-            battery_params["battery_capacity_kwh"],
-            battery_params["efficiency"],
-            battery_params["min_soc"],
-            battery_params["max_soc"],
-            dt_h=DEFAULT_DT_H,
-        )
-    return round(soc, 1)
-
-
 def _apply_forced_grid_recharge_at_horizon_end(
     chart_rows: list[dict],
     end_soc: float,
@@ -457,47 +284,6 @@ def _apply_forced_grid_recharge_at_horizon_end(
     )
     sync_chart_row_netzbezug(last)
     return round(new_end_soc, 1)
-
-
-def finalize_chart_row_energy(
-    chart_row: dict,
-    mode: int,
-    target_power: float,
-    old_soc: float,
-    battery_params: dict,
-) -> float:
-    """Leitet Batterieaktion, Netzbezug und End-SoC aus Zeileninhalt ab (Huawei-Logik)."""
-    pv = float(chart_row["PV-Prognose (kW)"])
-    con = float(chart_row["Verbrauch-Prognose (kW)"])
-    total_flex = flexible_consumer_power_kw(chart_row)
-    max_power = battery_params["max_power_kw"]
-    batt_action = bat.battery_plan_kw_from_control(
-        mode, target_power, pv, con, total_flex, max_power
-    )
-    new_soc, batt_action = bat.apply_soc_change(
-        old_soc,
-        batt_action,
-        battery_params["battery_capacity_kwh"],
-        battery_params["efficiency"],
-        battery_params["min_soc"],
-        battery_params["max_soc"],
-        dt_h=DEFAULT_DT_H,
-    )
-    chart_row["Geplante Batterie-Aktion (kW)"] = round(batt_action, 2)
-    chart_row["Netzbezug (kW)"] = round(
-        con + total_flex - pv + chart_row["Geplante Batterie-Aktion (kW)"],
-        2,
-    )
-    return new_soc
-
-
-def sync_chart_row_netzbezug(chart_row: dict) -> None:
-    """Netzbezug aus PV, Last, Flex und Batterie ableiten (Chart-Energiebilanz)."""
-    pv = float(chart_row.get("PV-Prognose (kW)", 0.0) or 0.0)
-    con = float(chart_row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
-    batt = float(chart_row.get("Geplante Batterie-Aktion (kW)", 0.0) or 0.0)
-    flex_sum = flexible_consumer_power_kw(chart_row)
-    chart_row["Netzbezug (kW)"] = round(con + flex_sum - pv + batt, 2)
 
 
 def simulate_horizon(
@@ -744,522 +530,43 @@ def simulate_24h_horizon(
     )
 
 
-def total_consumption_kwh_from_rows(
-    rows: list,
-    *,
-    dt_h: float = DEFAULT_DT_H,
-) -> float:
-    """Sum consumption energy (baseload + flex) over simulation slots."""
-    dt_h = validate_dt_h(dt_h)
-    return round(
-        sum(
-            (
-                float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
-                + flexible_consumer_power_kw(row)
-            )
-            * dt_h
-            for row in rows
-        ),
-        3,
-    )
-
-
-def delivered_flex_kwh_from_rows(
-    rows: list,
-    *,
-    flexible_consumers: list | None = None,
-    dt_h: float = DEFAULT_DT_H,
-) -> dict[str, float]:
-    """Summiert die gelieferte Flex-Energie je Verbraucher über alle Simulationsslots."""
-    dt_h = validate_dt_h(dt_h)
-    totals: dict[str, float] = {}
-    consumers_cfg = flexible_consumers or config.get_flexible_consumers(
-        optimizer_only=True
-    )
-    for consumer in consumers_cfg:
-        col = consumer_column_name(consumer)
-        totals[consumer["id"]] = round(
-            sum(float(row.get(col, 0.0) or 0.0) * dt_h for row in rows),
-            3,
-        )
-    return totals
-
-
-def _grid_kw_from_row(row: dict) -> float:
-    """Netzbezug (kW): positiv = Bezug, negativ = Einspeisung."""
-    if "Netzbezug (kW)" in row:
-        return float(row["Netzbezug (kW)"])
-    p_con = row["Verbrauch-Prognose (kW)"] + flexible_consumer_power_kw(row)
-    p_pv = row["PV-Prognose (kW)"]
-    batt_action = row["Geplante Batterie-Aktion (kW)"]
-    return float(p_con - p_pv + batt_action)
-
-
-def calculate_step_cost_parts_from_row(
-    row: dict,
-    sell_price_cent: float | None = None,
-    *,
-    dt_h: float = DEFAULT_DT_H,
-) -> tuple[float, float, float, float, float]:
-    """Import/export split for one sim slot.
-
-    Returns ``(import_cost_eur, export_earn_eur, net_eur, import_kwh, export_kwh)``.
-    ``export_earn_eur`` and ``export_kwh`` are non-negative; ``net_eur = import − export``.
-    """
-    dt_h = validate_dt_h(dt_h)
-    price_cent = row["Strompreis (Cent/kWh)"]
-    sell_cent = resolve_sell_price_cent(row, sell_price_cent)
-    p_grid = _grid_kw_from_row(row)
-    if p_grid >= 0:
-        import_kwh = float(p_grid) * dt_h
-        import_eur = import_kwh * float(price_cent) / 100.0
-        return import_eur, 0.0, import_eur, import_kwh, 0.0
-    export_kwh = float(-p_grid) * dt_h
-    export_eur = export_kwh * float(sell_cent) / 100.0
-    return 0.0, export_eur, -export_eur, 0.0, export_kwh
-
-
-def calculate_step_cost_euro_from_row(
-    row: dict,
-    sell_price_cent: float | None = None,
-    *,
-    dt_h: float = DEFAULT_DT_H,
-) -> float:
-    """Berechnet die Stromkosten eines einzelnen Simulationsslots in Euro."""
-    return calculate_step_cost_parts_from_row(
-        row, sell_price_cent, dt_h=dt_h
-    )[2]
-
-
-def calculate_cost_euro_from_rows(
-    rows: list,
-    sell_price_cent: float | None = None,
-    *,
-    dt_h: float = DEFAULT_DT_H,
-) -> float:
-    """Berechnet die Kosten in Euro für eine Slot-Reihe aus einem Simulations-Output."""
-    return sum(
-        calculate_step_cost_euro_from_row(row, sell_price_cent, dt_h=dt_h)
-        for row in rows
-    )
-
-
-def hourly_consumption_kwh_from_rows(
-    rows: list,
-    *,
-    dt_h: float = DEFAULT_DT_H,
-) -> list[float]:
-    """Gesamtverbrauch (Grundlast + Flex) in kWh je Simulationszeile."""
-    dt_h = validate_dt_h(dt_h)
-    return [
-        round(
-            (
-                float(row.get("Verbrauch-Prognose (kW)", 0.0) or 0.0)
-                + flexible_consumer_power_kw(row)
-            )
-            * dt_h,
-            4,
-        )
-        for row in rows
-    ]
-
-
-def hourly_cost_euro_from_rows(rows: list, sell_price_cent: float | None = None) -> list[float]:
-    """Stündliche Stromkosten in Euro je Simulationszeile."""
-    return [
-        round(calculate_step_cost_euro_from_row(row, sell_price_cent), 4)
-        for row in rows
-    ]
-
-
-def hourly_savings_euro_from_rows(
-    matched_baseline_rows: list,
-    optimized_rows: list,
-    sell_price_cent: float | None = None,
-) -> list[float]:
-    """
-    Stündliche Einsparung vs. Ziel-Baseline (positiv = günstiger optimiert).
-    Summe entspricht savings_matched_euro in calculate_optimization_savings.
-    """
-    matched = hourly_cost_euro_from_rows(matched_baseline_rows, sell_price_cent)
-    optimized = hourly_cost_euro_from_rows(optimized_rows, sell_price_cent)
-    hour_count = min(len(matched), len(optimized))
-    return [round(matched[i] - optimized[i], 4) for i in range(hour_count)]
-
-
-def _matched_baseline_profile_kw(row: dict, consumer: dict) -> float:
-    """Flex kW used as matched-baseline *shape*.
-
-    ``live_snapshot`` is the current meter reading, not a historical day profile.
-    Scaling a full horizon target onto that single QH sample yields
-    ``target / dt_h`` kW (factor 4 at ``DEFAULT_DT_H=0.25``) and inflated BL Ziel €.
-    """
-    if row.get("consumption_mode") == "live_snapshot":
-        return 0.0
-    return flex_kw_lookup(row.get("expected_flex_kw") or {}, consumer)
-
-
-def build_matched_flex_kw_per_hour(
-    optimization_matrix: list,
-    consumer_targets_kwh: dict[str, float],
-    charging_contexts: dict[str, dict] | None = None,
-) -> list[dict[str, float]]:
-    """
-    Skaliert das historische Flex-Profil auf die aktuellen Horizont-Ziele (kWh).
-    Zeitliche Form bleibt erhalten (auch unter Nennleistung); außerhalb des
-    Ladezeitfensters null – wie im MILP. Live-Snapshot-Slots zählen nicht als Profil.
-    """
-    consumers_cfg = config.get_flexible_consumers(optimizer_only=True)
-    rows = optimization_matrix
-    hour_count = len(rows)
-    contexts = charging_contexts or {}
-    schedule_indices = list(range(hour_count))
-
-    eligible_by_consumer: dict[str, set[int]] = {}
-    for consumer in consumers_cfg:
-        cid = consumer["id"]
-        eligible = consumer_charging_eligible_indices(
-            rows,
-            consumer,
-            schedule_indices,
-            contexts.get(cid),
-        )
-        eligible_by_consumer[cid] = set(eligible)
-
-    profile_sums: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
-    for consumer in consumers_cfg:
-        cid = consumer["id"]
-        eligible = eligible_by_consumer[cid]
-        for t, row in enumerate(rows):
-            if t not in eligible:
-                continue
-            profile_sums[cid] += _matched_baseline_profile_kw(row, consumer)
-
-    per_hour: list[dict[str, float]] = []
-    for t, row in enumerate(rows):
-        hour_flex: dict[str, float] = {}
-        for consumer in consumers_cfg:
-            cid = consumer["id"]
-            target = float(consumer_targets_kwh.get(cid, 0.0) or 0.0)
-            eligible = eligible_by_consumer[cid]
-            if t not in eligible:
-                hour_flex[cid] = 0.0
-                continue
-            eligible_count = len(eligible)
-            profile_sum = profile_sums[cid]
-            profile_val = _matched_baseline_profile_kw(row, consumer)
-            if profile_sum > 1e-6:
-                # target is kWh; profile_sum is Σ kW → scale so Σ(kW)*dt_h = target
-                hour_flex[cid] = profile_val * (
-                    target / (profile_sum * float(DEFAULT_DT_H))
-                )
-            elif target > 0 and eligible_count > 0:
-                hour_flex[cid] = target / (eligible_count * float(DEFAULT_DT_H))
-            else:
-                hour_flex[cid] = 0.0
-        per_hour.append(hour_flex)
-    return per_hour
-
-
-def _simulate_single_hour_baseline(
-    row: dict,
-    sim_soc: float,
-    battery_params: dict,
-    flex_kw_override: dict[str, float] | None = None,
-    steuerbefehl: str = "Baseline",
-    baseload_kw_override: float | None = None,
-) -> tuple[float, dict]:
-    """Simuliert eine einzelne Stunde im Baseline-Pfad."""
-    h = row["hour"]
-    pv = row["expected_p_pv"]
-    flex_kw = flex_kw_override if flex_kw_override is not None else (row.get("expected_flex_kw") or {})
-    has_flex_profile = any(float(v or 0.0) > 0.0 for v in flex_kw.values())
-    simulation_mode = row.get("consumption_mode") in ("logged_day", "profile_spec")
-    if flex_kw_override is None and simulation_mode and not has_flex_profile:
-        con = float(row.get("expected_p_total", row["expected_p_act"]) or 0.0)
-        con = con + bat.standby_power_kw(battery_params)
-        total_flex_power = 0.0
-        flex_kw = {}
-    elif baseload_kw_override is not None:
-        con = float(baseload_kw_override) + bat.standby_power_kw(battery_params)
-        total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
-    else:
-        con = bat.effective_p_act(row, battery_params)
-        total_flex_power = sum(float(v or 0.0) for v in flex_kw.values())
-    net_pv_surplus = pv - con - total_flex_power
-    batt_action = bat.clamp_power(net_pv_surplus, battery_params["max_power_kw"])
-    old_soc = sim_soc
-    sim_soc, batt_action = bat.apply_soc_change(
-        old_soc,
-        batt_action,
-        battery_params["battery_capacity_kwh"],
-        battery_params["efficiency"],
-        battery_params["min_soc"],
-        battery_params["max_soc"],
-        dt_h=DEFAULT_DT_H,
-    )
-    p_grid = con + total_flex_power - pv + round(batt_action, 2)
-    chart_row = {
-        "Uhrzeit": _format_chart_uhrzeit(row),
-        **_chart_row_slot_field(row),
-        **_chart_price_fields(row),
-        "PV-Prognose (kW)": pv,
-        "Verbrauch-Prognose (kW)": con,
-        "Geplante Batterie-Aktion (kW)": round(batt_action, 2),
-        "Netzbezug (kW)": round(p_grid, 2),
-        "Simulierter SoC (%)": round(old_soc, 1),
-        "Steuerbefehl": steuerbefehl,
-    }
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
-        if flex_kw:
-            chart_row[consumer_column_name(consumer)] = round(
-                float(flex_kw.get(consumer["id"], 0.0) or 0.0), 2
-            )
-    return sim_soc, chart_row
-
-
-def simulate_baseline_horizon(
-    optimization_matrix: list,
-    initial_soc: float,
-    charging_contexts: dict[str, dict] | None = None,
-    *,
-    battery_params: dict | None = None,
-) -> list:
-    """Simuliert den 24h-Verlauf ohne Optimierung: Batterie folgt nur dem aktuellen PV-Überschuss."""
-    chart_rows = []
-    sim_soc = initial_soc
-    battery_params = battery_params or config.get_battery_params()
-    for row in optimization_matrix:
-        sim_soc, chart_row = _simulate_single_hour_baseline(row, sim_soc, battery_params)
-        chart_rows.append(chart_row)
-    _finalize_chart_rows_for_display(chart_rows, charging_contexts)
-    return chart_rows
-
-
-def _flex_kw_from_chart_row(chart_row: dict) -> dict[str, float]:
-    """Flex-Leistungen je Verbraucher aus einer Simulationszeile."""
-    return {
-        consumer["id"]: float(chart_row.get(consumer_column_name(consumer), 0.0) or 0.0)
-        for consumer in config.get_flexible_consumers(optimizer_only=True)
-    }
-
-
-def simulate_baseline_with_optimized_flex(
-    optimization_matrix: list,
-    optimized_rows: list,
-    initial_soc: float,
-    *,
-    battery_params: dict | None = None,
-) -> list:
-    """
-    Baseline-Batterie (nur PV-Überschuss), aber dieselbe stündliche Flex-Last wie optimiert.
-    Für den stündlichen Kostenvergleich: gleiche Last, Unterschied nur Batterie/Netz.
-    """
-    battery_params = battery_params or config.get_battery_params()
-    sim_soc = initial_soc
-    chart_rows: list[dict] = []
-    for row, optimized_row in zip(optimization_matrix, optimized_rows):
-        sim_soc, chart_row = _simulate_single_hour_baseline(
-            row,
-            sim_soc,
-            battery_params,
-            flex_kw_override=_flex_kw_from_chart_row(optimized_row),
-            steuerbefehl="Baseline (Ziel)",
-            baseload_kw_override=float(
-                optimized_row.get("Verbrauch-Prognose (kW)", row["expected_p_act"]) or 0.0
-            ),
-        )
-        chart_rows.append(chart_row)
-    return chart_rows
-
-
-def simulate_matched_baseline_horizon(
-    optimization_matrix: list,
-    initial_soc: float,
-    consumer_targets_kwh: dict[str, float],
-    charging_contexts: dict[str, dict] | None = None,
-    *,
-    battery_params: dict | None = None,
-) -> list:
-    """
-    Baseline mit gleicher Flex-Energie wie die Optimierung,
-    aber ohne Preis-Lastverschiebung – Batterie nur PV-Überschuss.
-    """
-    matched_flex = build_matched_flex_kw_per_hour(
-        optimization_matrix,
-        consumer_targets_kwh,
-        charging_contexts,
-    )
-    chart_rows = []
-    sim_soc = initial_soc
-    battery_params = battery_params or config.get_battery_params()
-    for row, flex_kw in zip(optimization_matrix, matched_flex):
-        sim_soc, chart_row = _simulate_single_hour_baseline(
-            row,
-            sim_soc,
-            battery_params,
-            flex_kw_override=flex_kw,
-            steuerbefehl="Baseline (Ziel)",
-        )
-        chart_rows.append(chart_row)
-    _finalize_chart_rows_for_display(chart_rows, charging_contexts)
-    return chart_rows
-
-
-def _round_savings_list(values: list | None, *, digits: int = 4) -> list[float]:
-    return [round(float(value), digits) for value in (values or [])]
-
-
-def build_savings_snapshot(savings_info: dict) -> dict:
-    """Kompakte Einsparungs-Kennzahlen für optimization_history (ohne Simulationszeilen)."""
-    required = (
-        "baseline_cost_euro",
-        "matched_baseline_cost_euro",
-        "optimized_cost_euro",
-        "savings_euro",
-        "savings_matched_euro",
-    )
-    for key in required:
-        if key not in savings_info:
-            raise ValueError(f"savings_info fehlt Feld {key!r}")
-
-    return {
-        "baseline_cost_euro": round(float(savings_info["baseline_cost_euro"]), 4),
-        "matched_baseline_cost_euro": round(
-            float(savings_info["matched_baseline_cost_euro"]), 4
-        ),
-        "optimized_cost_euro": round(float(savings_info["optimized_cost_euro"]), 4),
-        "savings_euro": round(float(savings_info["savings_euro"]), 4),
-        "savings_matched_euro": round(float(savings_info["savings_matched_euro"]), 4),
-        "hourly_savings_euro": _round_savings_list(
-            savings_info.get("hourly_savings_euro")
-        ),
-        "hourly_matched_baseline_cost_euro": _round_savings_list(
-            savings_info.get("hourly_matched_baseline_cost_euro")
-        ),
-        "hourly_optimized_cost_euro": _round_savings_list(
-            savings_info.get("hourly_optimized_cost_euro")
-        ),
-    }
-
-
-def calculate_optimization_savings(
-    optimization_matrix: list,
-    initial_soc: float,
-    consumer_daily_targets_kwh: dict[str, float] | None = None,
-    sunrise_soc_min_index: int | None = None,
-    filter_contexts: dict[str, dict] | None = None,
-) -> dict:
-    """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation.
-
-    Optimized path uses open-loop ``commit_hours=len(matrix)`` (one MILP), not
-    per-slot MPC — Live control already solved once; savings/charts must stay fast
-    on QH horizons (~188 slots).
-    """
-    from .charge_immediate import prepare_optimization_matrix
-    from .charging_context import serialize_charging_contexts
-
-    matrix, charging_contexts, targets = prepare_optimization_matrix(
-        optimization_matrix,
-        consumer_daily_targets_kwh,
-    )
-    filters = filter_contexts or resolve_filter_contexts(matrix)
-    # Open-loop: one CBC solve for the display horizon (not commit_hours=1 MPC).
-    optimized_rows = simulate_horizon(
-        matrix,
-        initial_soc,
-        consumer_daily_targets_kwh=targets,
-        verbose=False,
-        charging_contexts=charging_contexts,
-        filter_contexts=filters,
-        matrix_prepared=True,
-        sunrise_soc_min_index=sunrise_soc_min_index,
-        commit_hours=len(matrix),
-    )
-    baseline_rows = simulate_baseline_horizon(
-        matrix, initial_soc, charging_contexts=charging_contexts
-    )
-    horizon_targets = resolve_horizon_consumer_targets_kwh(
-        matrix,
-        targets,
-    )
-    horizon_targets = apply_horizon_charging_limits(horizon_targets, charging_contexts)
-    matched_targets = resolve_matched_baseline_horizon_targets(
-        matrix,
-        targets,
-        charging_contexts,
-    )
-    matched_baseline_rows = simulate_matched_baseline_horizon(
-        matrix,
-        initial_soc,
-        matched_targets,
-        charging_contexts,
-    )
-    sell_price_cent = None
-    optimized_cost = calculate_cost_euro_from_rows(optimized_rows, sell_price_cent)
-    baseline_cost = calculate_cost_euro_from_rows(baseline_rows, sell_price_cent)
-    matched_baseline_cost = calculate_cost_euro_from_rows(
-        matched_baseline_rows, sell_price_cent
-    )
-    savings = baseline_cost - optimized_cost
-    savings_matched_euro = matched_baseline_cost - optimized_cost
-    baseline_kwh = total_consumption_kwh_from_rows(baseline_rows)
-    matched_baseline_kwh = total_consumption_kwh_from_rows(matched_baseline_rows)
-    optimized_kwh = total_consumption_kwh_from_rows(optimized_rows)
-    applied_targets = build_applied_targets_detail(
-        matrix,
-        targets,
-    )
-    baseline_targets = build_baseline_targets_detail(matrix)
-    matched_flex_kwh = (
-        delivered_flex_kwh_from_rows(matched_baseline_rows)
-        if matched_baseline_rows
-        else None
-    )
-    energy_comparison = build_energy_comparison_detail(
-        matrix,
-        targets,
-        matched_flex_kwh=matched_flex_kwh,
-    )
-    baseline_same_flex_rows = simulate_baseline_with_optimized_flex(
-        matrix,
-        optimized_rows,
-        initial_soc,
-    )
-    hourly_matched_cost = hourly_cost_euro_from_rows(
-        matched_baseline_rows, sell_price_cent
-    )
-    hourly_optimized_cost = hourly_cost_euro_from_rows(optimized_rows, sell_price_cent)
-    hourly_savings = hourly_savings_euro_from_rows(
-        matched_baseline_rows, optimized_rows, sell_price_cent
-    )
-    hourly_battery_only_cost = hourly_cost_euro_from_rows(
-        baseline_same_flex_rows, sell_price_cent
-    )
-    hourly_matched_consumption = hourly_consumption_kwh_from_rows(matched_baseline_rows)
-    hourly_optimized_consumption = hourly_consumption_kwh_from_rows(optimized_rows)
-    return {
-        "baseline_cost_euro": round(baseline_cost, 4),
-        "matched_baseline_cost_euro": round(matched_baseline_cost, 4),
-        "optimized_cost_euro": round(optimized_cost, 4),
-        "savings_euro": round(savings, 4),
-        "savings_matched_euro": round(savings_matched_euro, 4),
-        "baseline_consumption_kwh": round(baseline_kwh, 3),
-        "matched_baseline_consumption_kwh": round(matched_baseline_kwh, 3),
-        "optimized_consumption_kwh": round(optimized_kwh, 3),
-        "baseload_kwh": resolve_baseload_kwh(matrix),
-        "baseline_targets": baseline_targets,
-        "applied_targets": applied_targets,
-        "energy_comparison": energy_comparison,
-        "charging_contexts": serialize_charging_contexts(charging_contexts),
-        "optimized_rows": optimized_rows,
-        "baseline_rows": baseline_rows,
-        "matched_baseline_rows": matched_baseline_rows,
-        "baseline_same_flex_rows": baseline_same_flex_rows,
-        "hourly_matched_baseline_cost_euro": hourly_matched_cost,
-        "hourly_optimized_cost_euro": hourly_optimized_cost,
-        "hourly_battery_only_baseline_cost_euro": hourly_battery_only_cost,
-        "hourly_savings_euro": hourly_savings,
-        "hourly_matched_baseline_consumption_kwh": hourly_matched_consumption,
-        "hourly_optimized_consumption_kwh": hourly_optimized_consumption,
-    }
+# Re-Exports für API-Stabilität (from optimizer.simulation import ...)
+__all__ = [
+    "_apply_forced_grid_recharge_at_horizon_end",
+    "_cap_flex_delivery",
+    "_chart_row_from_controls",
+    "_chart_row_from_schedule_slot",
+    "_commit_slots_for_buffer",
+    "_finalize_chart_rows_for_display",
+    "_flex_indices_for_book_hours",
+    "_flex_kw_from_chart_row",
+    "_grid_kw_from_row",
+    "_matched_baseline_profile_kw",
+    "_relative_sunrise_index",
+    "_round_savings_list",
+    "_simulate_single_hour_baseline",
+    "_simulate_single_hour_optimizer",
+    "_terminal_soc_for_commit",
+    "build_matched_flex_kw_per_hour",
+    "build_savings_snapshot",
+    "calculate_cost_euro_from_rows",
+    "calculate_optimization_savings",
+    "calculate_step_cost_euro_from_row",
+    "calculate_step_cost_parts_from_row",
+    "delivered_flex_kwh_from_rows",
+    "finalize_chart_row_energy",
+    "flexible_consumer_power_kw",
+    "horizon_end_soc_from_chart_rows",
+    "horizon_end_soc_percent",
+    "hourly_consumption_kwh_from_rows",
+    "hourly_cost_euro_from_rows",
+    "hourly_savings_euro_from_rows",
+    "resolve_sell_price_cent",
+    "simulate_24h_horizon",
+    "simulate_baseline_horizon",
+    "simulate_baseline_with_optimized_flex",
+    "simulate_horizon",
+    "simulate_matched_baseline_horizon",
+    "sync_chart_row_netzbezug",
+    "total_consumption_kwh_from_rows",
+]

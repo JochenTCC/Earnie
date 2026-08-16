@@ -11,3 +11,12 @@
 - [x] `docs/einrichtung/loxone-anbindung.md` — medium rewrite; Loxone connection
 - [x] `docs/README.md` — TOC / entry updates
 - [x] `README.md` — landing page; logos
+
+## 2.5.0 — QH MILP wording (2026-08-16)
+- [x] `README.md` / `docs/README.md` — Daemon + MILP are 15‑min slots (no “hourly MILP”)
+- [x] `docs/user-manual/Benutzer-Handbuch-Earnie.md` — Live-Betrieb: Viertelstunden-Slots
+- [x] `docs/ui/charts.md` — Chart-1 bar width 15 min across horizon
+- [x] `.github/ISSUE_TEMPLATE/bug.yml` — version placeholder `2.5.0`
+- [x] `docs/spec/swimspa-filter.md` / `docs/spec/ui-menu-structure.md` — QH matrix granularity
+- [x] `docs/konfiguration/preise.md` — already documents QH plan vs hourly settlement (`settlement_mtu`)
+- [x] `docs/konfiguration/batterie-pv.md` — `standby_power_kw` already documented

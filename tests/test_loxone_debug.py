@@ -129,10 +129,10 @@ def test_read_check_status_label():
 
 def test_build_write_rows_from_trace_maps_set_fields():
     with patch(
-        "ui.loxone_debug.build_loxone_setpoint_io_index",
+        "ui.loxone_debug_rows.build_loxone_setpoint_io_index",
         return_value={"Ernie_Charge": "set_ess_charge_power_limit"},
     ), patch(
-        "ui.loxone_debug.loxone_write_field_to_io",
+        "ui.loxone_debug_rows.loxone_write_field_to_io",
         return_value={"set_ess_charge_power_limit": "Ernie_Charge"},
     ):
         rows = build_write_rows_from_trace(
@@ -160,8 +160,8 @@ def test_build_write_rows_from_trace_maps_set_fields():
 
 
 def test_build_write_rows_includes_unmapped_expected():
-    with patch("ui.loxone_debug.build_loxone_setpoint_io_index", return_value={}), patch(
-        "ui.loxone_debug.loxone_write_field_to_io", return_value={}
+    with patch("ui.loxone_debug_rows.build_loxone_setpoint_io_index", return_value={}), patch(
+        "ui.loxone_debug_rows.loxone_write_field_to_io", return_value={}
     ):
         rows = build_write_rows_from_trace(
             [],
@@ -193,10 +193,10 @@ def test_build_ehal_write_rows_includes_mapping():
 
 def test_build_intended_write_rows_for_silent_mode():
     with patch(
-        "ui.loxone_debug.build_loxone_setpoint_io_index",
+        "ui.loxone_debug_rows.build_loxone_setpoint_io_index",
         return_value={"Ernie_Mode": "set_ess_mode"},
     ), patch(
-        "ui.loxone_debug.loxone_write_field_to_io",
+        "ui.loxone_debug_rows.loxone_write_field_to_io",
         return_value={"set_ess_mode": "Ernie_Mode"},
     ):
         rows = build_intended_write_rows(

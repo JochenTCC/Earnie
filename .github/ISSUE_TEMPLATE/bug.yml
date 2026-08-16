@@ -22,7 +22,7 @@ body:
     attributes:
       label: Earnie-Version
       description: z. B. aus Info / About oder dem Image-Tag
-      placeholder: 2.4.0-alpha.x
+      placeholder: 2.5.0
   - type: textarea
     id: context
     attributes:

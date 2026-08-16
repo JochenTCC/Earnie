@@ -99,14 +99,31 @@ _load_dotenv_for_tests()
 
 import config as _config_module
 
-_config_module.reinit_config()
+
+def _reinit_config_offline() -> None:
+    """reinit_config() ohne Live-Open-Meteo-Fetch (Fixture-Profile enthalten
+    thermal_annual-Verbraucher, deren Baseload-Berechnung sonst
+    archive-api.open-meteo.com kontaktiert — in CI ohne Netzwerkzugriff
+    bricht das mit ReadTimeout ab, bevor überhaupt ein Test läuft)."""
+    from tests.fixtures.open_meteo_mock import _fake_fetch_hourly_archive_chunk
+    from data import open_meteo_solar_archive as _archive
+
+    original = _archive._fetch_hourly_archive_chunk
+    _archive._fetch_hourly_archive_chunk = _fake_fetch_hourly_archive_chunk
+    try:
+        _config_module.reinit_config()
+    finally:
+        _archive._fetch_hourly_archive_chunk = original
+
+
+_reinit_config_offline()
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _bootstrap_test_config():
     """Stellt sicher, dass CONFIG nach Session-Start auf der Fixture-Config basiert."""
     _apply_default_test_config_env()
-    _config_module.reinit_config()
+    _reinit_config_offline()
 
 
 
@@ -115,7 +132,7 @@ def _restore_default_test_config_after_test():
     """Nach jedem Test zurück auf Fixture-Config (tmp_path-Overrides aus Einzeltests)."""
     yield
     _apply_default_test_config_env()
-    _config_module.reinit_config()
+    _reinit_config_offline()
 
 
 def _loxone_integration_enabled() -> bool:

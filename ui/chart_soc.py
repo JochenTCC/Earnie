@@ -38,865 +38,175 @@ from ui.chart_trace_segments import (
     _trace_segments,
 )
 
-ESS_UNDERLAY_HOLD = "hold"
-ESS_UNDERLAY_CHARGE = "charge"
-ESS_UNDERLAY_DISCHARGE = "discharge"
-
-_ESS_UNDERLAY_NEAR_ZERO_FRACTION = 0.05
-_ESS_UNDERLAY_LINE_WIDTH = 16.0
-_ESS_UNDERLAY_OPACITY = 0.2
-
-_ESS_UNDERLAY_TRACE_NAMES = {
-    ESS_UNDERLAY_HOLD: "Entladesperre / Hold",
-    ESS_UNDERLAY_CHARGE: "Zwangsladen",
-    ESS_UNDERLAY_DISCHARGE: "Zwangsentladen",
-}
-_ESS_UNDERLAY_COLORS = {
-    ESS_UNDERLAY_HOLD: COLOR_ESS_UNDERLAY_HOLD,
-    ESS_UNDERLAY_CHARGE: COLOR_ESS_UNDERLAY_CHARGE,
-    ESS_UNDERLAY_DISCHARGE: COLOR_ESS_UNDERLAY_DISCHARGE,
-}
-
-_ZWANGS_POWER_RE = re.compile(
-    r"^Zwangs(?:laden|entladen)\s*\(([-\d.]+)\s*kW\)",
-    re.IGNORECASE,
-)
 
 
-def _resolve_battery_params(battery_params: dict | None) -> dict:
-    if battery_params is not None:
-        return battery_params
-    return config.get_battery_params()
 
 
-def _soc_tail_y_from_row(
-    row: pd.Series,
-    battery_params: dict | None = None,
-) -> float | None:
-    """SoC am Ende der Stunde aus geplanter Batterieaktion (Optimierer/Huawei-Logik)."""
-    if "Geplante Batterie-Aktion (kW)" not in row.index:
-        return None
-    soc = _optional_float(row.get("Simulierter SoC (%)"))
-    action = _optional_float(row.get("Geplante Batterie-Aktion (kW)"))
-    if soc is None or action is None:
-        return None
-    params = _resolve_battery_params(battery_params)
-    capacity = float(params.get("battery_capacity_kwh", 0.0))
-    if capacity <= 0:
-        return None
-    new_soc, _ = bat.apply_soc_change(
-        soc,
-        action,
-        capacity,
-        params["efficiency"],
-        params["min_soc"],
-        params["max_soc"],
-        dt_h=DEFAULT_DT_H,
-    )
-    return round(new_soc, 1)
 
 
-def _soc_y_at_moment(
-    axis: ChartSlotAxis,
-    soc: pd.Series,
-    moment: datetime,
-    max_index: int,
-) -> float:
-    """Lineare SoC-Interpolation zwischen Slot-Anfangswerten bis ``max_index``."""
-    moment_ts = pd.Timestamp(moment)
-    last_idx: int | None = None
-    limit = min(max_index, len(axis.starts))
-    for index in range(limit):
-        if axis.starts.iloc[index] <= moment_ts:
-            last_idx = index
-        else:
-            break
-    if last_idx is None:
-        return float("nan")
-    y0 = _line_plot_float(soc.iloc[last_idx])
-    if last_idx + 1 < limit:
-        next_ts = axis.starts.iloc[last_idx + 1]
-        if moment_ts < next_ts:
-            t0 = axis.starts.iloc[last_idx].to_pydatetime()
-            t1 = next_ts.to_pydatetime()
-            y1 = _line_plot_float(soc.iloc[last_idx + 1])
-            span = (t1 - t0).total_seconds()
-            if span > 0 and not math.isnan(y0) and not math.isnan(y1):
-                frac = (moment - t0).total_seconds() / span
-                return y0 + frac * (y1 - y0)
-    return y0
 
 
-def _history_battery_kw_for_extrapolation(row: pd.Series) -> float | None:
-    """Ist-Leistung aus Log bevorzugen, sonst geplanter Batteriewert."""
-    ist = _optional_float(row.get(CHART_IST_BATTERY_KW_COLUMN))
-    if ist is not None:
-        return ist
-    return _optional_float(row.get("Geplante Batterie-Aktion (kW)"))
 
 
-def _soc_from_history_extrapolation(
-    axis: ChartSlotAxis,
-    soc: pd.Series,
-    df: pd.DataFrame,
-    moment: datetime,
-    history_slot_count: int,
-    battery_params: dict | None = None,
-) -> float:
-    """SoC aus Log-Slots; nach letztem Log-Eintrag per Batterieleistung hochgerechnet."""
-    if history_slot_count <= 0:
-        return float("nan")
-    last_idx = history_slot_count - 1
-    last_start = axis.starts.iloc[last_idx].to_pydatetime()
-    if moment <= last_start:
-        return _soc_y_at_moment(axis, soc, moment, history_slot_count)
-    last_soc = _line_plot_float(soc.iloc[last_idx])
-    if math.isnan(last_soc):
-        return float("nan")
-    action = _history_battery_kw_for_extrapolation(df.iloc[last_idx])
-    if action is None:
-        return last_soc
-    elapsed_h = (moment - last_start).total_seconds() / 3600.0
-    if elapsed_h <= 0:
-        return last_soc
-    params = _resolve_battery_params(battery_params)
-    capacity = float(params.get("battery_capacity_kwh", 0.0))
-    if capacity <= 0:
-        return last_soc
-    new_soc, _ = bat.apply_soc_change(
-        last_soc,
-        action,
-        capacity,
-        params["efficiency"],
-        params["min_soc"],
-        params["max_soc"],
-        dt_h=elapsed_h,
-    )
-    return round(new_soc, 1)
 
 
-def _soc_y_for_chart_now(
-    axis: ChartSlotAxis,
-    soc: pd.Series,
-    df: pd.DataFrame,
-    chart_now: datetime,
-    history_slot_count: int,
-    battery_params: dict | None = None,
-) -> float:
-    """
-    SoC am Jetzt — gleiche Quelle wie die aktuelle Stunden-Rampe.
-
-    Sobald weitere MILP-Viertel in der laufenden Stunde folgen, entlang der
-    MILP-Polylinie (nicht Ist-Extrapolation aus dem letzten Log-Slot); sonst
-    Log-Extrapolation. So treffen SoC und SoC BL Ziel am Jetzt-Marker.
-    """
-    seg_end = len(soc)
-    quarter_start = normalize_quarter_hour_slot(chart_now)
-    quarter_end = quarter_start + slot_step()
-    hour_end = normalize_hour_slot(chart_now) + timedelta(hours=1)
-    later_milp = _has_milp_slots_between(
-        axis, quarter_end, hour_end, 0, seg_end, history_slot_count,
-    )
-    start_idx = _slot_index_at_or_after(axis, quarter_start, 0, seg_end)
-    if (
-        later_milp
-        and start_idx is not None
-        and start_idx >= history_slot_count
-    ):
-        return _soc_on_milp_polyline(
-            axis, soc, chart_now, start_idx, seg_end,
-        )
-    return _soc_from_history_extrapolation(
-        axis, soc, df, chart_now, history_slot_count,
-        battery_params=battery_params,
-    )
 
 
-def _soc_at_chart_now(
-    axis: ChartSlotAxis,
-    df: pd.DataFrame,
-    chart_now: datetime | None,
-    history_slot_count: int | None,
-    battery_params: dict | None = None,
-) -> float | None:
-    """SoC am Jetzt-Marker (Referenz für BL-Ziel-Anker und Opt-Rampe)."""
-    if (
-        chart_now is None
-        or chart_now.tzinfo is None
-        or history_slot_count is None
-        or history_slot_count <= 0
-    ):
-        return None
-    soc = df["Simulierter SoC (%)"]
-    value = _soc_y_for_chart_now(
-        axis, soc, df, chart_now, history_slot_count,
-        battery_params=battery_params,
-    )
-    if math.isnan(value):
-        return None
-    return value
 
 
-def _first_milp_slot_in_current_hour(
-    axis: ChartSlotAxis,
-    now: datetime,
-    seg_start: int,
-    seg_end: int,
-    history_slot_count: int | None,
-) -> int | None:
-    hour_start = normalize_hour_slot(now)
-    hour_end = hour_start + timedelta(hours=1)
-    for index in range(seg_start, seg_end):
-        slot = axis.starts.iloc[index].to_pydatetime()
-        if hour_start <= slot < hour_end:
-            if history_slot_count is not None and index < history_slot_count:
-                continue
-            return index
-    return None
 
 
-def _slot_index_at_or_after(
-    axis: ChartSlotAxis,
-    moment: datetime,
-    seg_start: int,
-    seg_end: int,
-) -> int | None:
-    moment_ts = pd.Timestamp(moment)
-    for index in range(seg_start, seg_end):
-        if axis.starts.iloc[index] >= moment_ts:
-            return index
-    return None
 
 
-def _has_milp_slots_between(
-    axis: ChartSlotAxis,
-    start_exclusive: datetime,
-    end_exclusive: datetime,
-    seg_start: int,
-    seg_end: int,
-    history_slot_count: int | None,
-) -> bool:
-    """True if a MILP slot start lies in (start_exclusive, end_exclusive)."""
-    lo = pd.Timestamp(start_exclusive)
-    hi = pd.Timestamp(end_exclusive)
-    for index in range(seg_start, seg_end):
-        if history_slot_count is not None and index < history_slot_count:
-            continue
-        stamp = axis.starts.iloc[index]
-        if lo < stamp < hi:
-            return True
-    return False
 
 
-def _soc_on_milp_polyline(
-    axis: ChartSlotAxis,
-    soc: pd.Series,
-    moment: datetime,
-    slot_idx: int,
-    seg_end: int,
-) -> float:
-    """SoC along planned slot polyline at ``moment`` (within/after ``slot_idx``)."""
-    t0 = axis.starts.iloc[slot_idx].to_pydatetime()
-    y0 = _line_plot_float(soc.iloc[slot_idx])
-    if moment <= t0 or math.isnan(y0):
-        return y0
-    if slot_idx + 1 >= seg_end or slot_idx + 1 >= len(soc):
-        return y0
-    t1 = axis.starts.iloc[slot_idx + 1].to_pydatetime()
-    y1 = _line_plot_float(soc.iloc[slot_idx + 1])
-    span = (t1 - t0).total_seconds()
-    if span <= 0 or math.isnan(y1):
-        return y0
-    frac = min(1.0, max(0.0, (moment - t0).total_seconds() / span))
-    return y0 + frac * (y1 - y0)
 
 
-def _current_hour_soc_ramp_before_now(
-    axis: ChartSlotAxis,
-    soc: pd.Series,
-    df: pd.DataFrame,
-    now: datetime,
-    seg_start: int,
-    seg_end: int,
-    history_slot_count: int | None,
-    y_at_now: float | None = None,
-    battery_params: dict | None = None,
-) -> tuple[datetime, float, datetime, float] | None:
-    """
-    Rampe laufende MILP-Viertelstunde → Jetzt (keine konstante MILP-Soll-Treppe).
-
-    Nur innerhalb der aktuellen Viertelstunde — spätere MILP-Slots der Stunde
-    bleiben erhalten (sonst divergiert SoC vom ESS-Underlay).
-    """
-    if now.tzinfo is None or history_slot_count is None or history_slot_count <= 0:
-        return None
-    hour_start = normalize_hour_slot(now)
-    hour_end = hour_start + timedelta(hours=1)
-    if now <= hour_start or now >= hour_end or seg_start >= seg_end:
-        return None
-
-    milp_idx = _first_milp_slot_in_current_hour(
-        axis, now, seg_start, seg_end, history_slot_count,
-    )
-    if milp_idx is None:
-        return None
-
-    quarter_start = normalize_quarter_hour_slot(now)
-    milp_start = axis.starts.iloc[milp_idx].to_pydatetime()
-    t_start = max(milp_start, quarter_start)
-    if now <= t_start:
-        return None
-
-    start_idx = _slot_index_at_or_after(axis, t_start, seg_start, seg_end)
-    if start_idx is None:
-        return None
-    quarter_end = quarter_start + slot_step()
-    later_milp = _has_milp_slots_between(
-        axis, quarter_end, hour_end, seg_start, seg_end, history_slot_count,
-    )
-    use_milp_polyline = (
-        later_milp
-        and (history_slot_count is None or start_idx >= history_slot_count)
-    )
-    if use_milp_polyline:
-        y_start = _line_plot_float(soc.iloc[start_idx])
-        if y_at_now is not None:
-            y_end = y_at_now
-        else:
-            y_end = _soc_on_milp_polyline(
-                axis, soc, now, start_idx, seg_end,
-            )
-    else:
-        y_start = _soc_from_history_extrapolation(
-            axis, soc, df, t_start, history_slot_count,
-            battery_params=battery_params,
-        )
-        if y_at_now is not None:
-            y_end = y_at_now
-        else:
-            y_end = _soc_from_history_extrapolation(
-                axis, soc, df, now, history_slot_count,
-                battery_params=battery_params,
-            )
-    if math.isnan(y_start) or math.isnan(y_end):
-        return None
-    return t_start, y_start, now, y_end
 
 
-def _current_hour_soc_ramp(
-    axis: ChartSlotAxis,
-    soc: pd.Series,
-    df: pd.DataFrame,
-    now: datetime,
-    seg_start: int,
-    seg_end: int,
-    history_slot_count: int | None,
-    y_at_now: float | None = None,
-    battery_params: dict | None = None,
-) -> tuple[datetime, float, datetime, float] | None:
-    """
-    Rampe Jetzt → Ende der aktuellen Viertelstunde (oder Stundenende).
-
-    Wenn weitere MILP-Viertel in derselben Stunde folgen, nur bis
-    Viertelstundenende rampen — sonst würde die geplante SoC-Kurve
-    (und der ESS-Underlay) zwischen Jetzt und Stundenende gelöscht.
-    """
-    if now.tzinfo is None:
-        return None
-    hour_start = normalize_hour_slot(now)
-    hour_end = hour_start + timedelta(hours=1)
-    if now >= hour_end or seg_start >= seg_end:
-        return None
-
-    milp_idx = _first_milp_slot_in_current_hour(
-        axis, now, seg_start, seg_end, history_slot_count,
-    )
-    if milp_idx is None:
-        return None
-
-    quarter_start = normalize_quarter_hour_slot(now)
-    quarter_end = quarter_start + slot_step()
-    later_milp = _has_milp_slots_between(
-        axis, quarter_end, hour_end, seg_start, seg_end, history_slot_count,
-    )
-    if later_milp:
-        t_end = min(quarter_end, hour_end)
-        end_idx = _slot_index_at_or_after(axis, t_end, seg_start, seg_end)
-        if end_idx is None:
-            return None
-        y_end = _line_plot_float(soc.iloc[end_idx])
-    else:
-        t_end = hour_end
-        y_end = _soc_tail_y_from_row(
-            df.iloc[milp_idx], battery_params=battery_params,
-        )
-        if y_end is None:
-            return None
-
-    t_start = max(now, hour_start)
-    if y_at_now is not None:
-        y_start = y_at_now
-    elif later_milp:
-        start_idx = _slot_index_at_or_after(
-            axis, quarter_start, seg_start, seg_end,
-        )
-        if start_idx is None:
-            y_start = float("nan")
-        elif history_slot_count is not None and start_idx < history_slot_count:
-            y_start = _soc_from_history_extrapolation(
-                axis, soc, df, t_start, history_slot_count,
-                battery_params=battery_params,
-            )
-        else:
-            y_start = _soc_on_milp_polyline(
-                axis, soc, t_start, start_idx, seg_end,
-            )
-    elif history_slot_count is not None and history_slot_count > 0:
-        y_start = _soc_from_history_extrapolation(
-            axis, soc, df, t_start, history_slot_count,
-            battery_params=battery_params,
-        )
-    else:
-        y_start = float("nan")
-    if math.isnan(y_start):
-        y_start = _soc_y_at_moment(axis, soc, t_start, seg_end)
-    if math.isnan(y_start) or math.isnan(y_end) or t_start >= t_end:
-        return None
-    return t_start, y_start, t_end, y_end
 
 
-def _apply_soc_intra_hour_ramp(
-    line_x: pd.Series,
-    line_y: pd.Series,
-    ramp: tuple[datetime, float, datetime, float],
-) -> tuple[pd.Series, pd.Series]:
-    """Ersetzt konstante Viertelstunden-Punkte durch Rampe bis Stundenende."""
-    t_start, y_start, t_end, y_end = ramp
-    ts_start = pd.Timestamp(t_start)
-    ts_end = pd.Timestamp(t_end)
-    kept: list[tuple[datetime, float]] = []
-    for x_val, y_val in zip(line_x, line_y):
-        t_stamp = pd.Timestamp(x_val)
-        if t_stamp == ts_start:
-            kept.append((t_start, float(y_start)))
-            continue
-        if ts_start < t_stamp < ts_end:
-            continue
-        if t_stamp == ts_end:
-            kept.append((t_end, float(y_end)))
-            continue
-        kept.append((t_stamp.to_pydatetime(), float(y_val)))
-
-    if not any(pd.Timestamp(t) == ts_start for t, _ in kept):
-        kept.append((t_start, float(y_start)))
-    if not any(pd.Timestamp(t) == ts_end for t, _ in kept):
-        kept.append((t_end, float(y_end)))
-
-    kept.sort(key=lambda pair: pd.Timestamp(pair[0]))
-    merged: list[tuple[datetime, float]] = []
-    for point in kept:
-        if merged and pd.Timestamp(merged[-1][0]) == pd.Timestamp(point[0]):
-            merged[-1] = point
-        else:
-            merged.append(point)
-    if not merged:
-        return line_x, line_y
-    times, values = zip(*merged)
-    return _chart_time_series(list(times)), pd.Series(values, dtype=float)
 
 
-def _apply_soc_current_hour_ramps(
-    line_x: pd.Series,
-    line_y: pd.Series,
-    ramp_before: tuple[datetime, float, datetime, float] | None,
-    ramp_after: tuple[datetime, float, datetime, float] | None,
-) -> tuple[pd.Series, pd.Series]:
-    if ramp_before is not None:
-        line_x, line_y = _apply_soc_intra_hour_ramp(line_x, line_y, ramp_before)
-    if ramp_after is not None:
-        line_x, line_y = _apply_soc_intra_hour_ramp(line_x, line_y, ramp_after)
-    return line_x, line_y
 
 
-def _anchor_baseline_soc_at_now(
-    line_x: pd.Series,
-    line_y: pd.Series,
-    chart_now: datetime | None,
-    soc_at_now: float | None,
-) -> tuple[pd.Series, pd.Series]:
-    """BL-Ziel beginnt am Jetzt-Marker — keine Spur davor."""
-    if chart_now is None or soc_at_now is None:
-        return line_x, line_y
-    ts_now = pd.Timestamp(chart_now)
-    kept: list[tuple[datetime, float]] = [(chart_now, float(soc_at_now))]
-    for x_val, y_val in zip(line_x, line_y):
-        if pd.Timestamp(x_val) <= ts_now:
-            continue
-        kept.append((pd.Timestamp(x_val).to_pydatetime(), float(y_val)))
-    kept.sort(key=lambda pair: pd.Timestamp(pair[0]))
-    merged: list[tuple[datetime, float]] = []
-    for point in kept:
-        if merged and pd.Timestamp(merged[-1][0]) == pd.Timestamp(point[0]):
-            merged[-1] = point
-        else:
-            merged.append(point)
-    if not merged:
-        return line_x, line_y
-    times, values = zip(*merged)
-    return _chart_time_series(list(times)), pd.Series(values, dtype=float)
 
 
-def _soc_hover_labels_for_times(
-    times: pd.Series,
-    uhrzeit: pd.Series,
-    slot_starts: pd.Series,
-) -> list[str]:
-    """Hover-Labels für SoC-Punkte (inkl. Jetzt-/Stundenend-Interpolation)."""
-    slot_labels = {
-        pd.Timestamp(start): str(label)
-        for start, label in zip(slot_starts, uhrzeit)
-    }
-    labels: list[str] = []
-    for moment in times:
-        ts = pd.Timestamp(moment)
-        label = slot_labels.get(ts)
-        if label is None:
-            label = ts.strftime("%d.%m. %H:%M")
-        labels.append(label)
-    return labels
 
 
-def _parse_zwangs_power_kw(command: str) -> float | None:
-    match = _ZWANGS_POWER_RE.match(str(command).strip())
-    if match is None:
-        return None
-    try:
-        return float(match.group(1))
-    except ValueError:
-        return None
 
 
-def _ess_underlay_near_zero(power_kw: float, max_power_kw: float) -> bool:
-    if max_power_kw <= 0:
-        return abs(power_kw) <= 0.0
-    return abs(power_kw) < _ESS_UNDERLAY_NEAR_ZERO_FRACTION * max_power_kw
 
 
-def classify_ess_soc_underlay(
-    command,
-    max_power_kw: float,
-) -> str | None:
-    """Map Steuerbefehl → underlay kind (hold/charge/discharge) or None."""
-    text = str(command)
-    if "Entladesperre" in text:
-        return ESS_UNDERLAY_HOLD
-    if text.startswith("Zwangsladen"):
-        power = _parse_zwangs_power_kw(text)
-        if power is None:
-            power = 0.0
-        if _ess_underlay_near_zero(power, max_power_kw):
-            return ESS_UNDERLAY_HOLD
-        return ESS_UNDERLAY_CHARGE
-    if text.startswith("Zwangsentladen"):
-        power = _parse_zwangs_power_kw(text)
-        if power is None:
-            power = 0.0
-        if _ess_underlay_near_zero(power, max_power_kw):
-            return ESS_UNDERLAY_HOLD
-        return ESS_UNDERLAY_DISCHARGE
-    return None
 
 
-def _contiguous_underlay_runs(
-    kinds: list[str | None],
-    start: int,
-    end: int,
-) -> list[tuple[int, int, str]]:
-    runs: list[tuple[int, int, str]] = []
-    index = start
-    while index < end:
-        kind = kinds[index]
-        if kind is None:
-            index += 1
-            continue
-        run_end = index + 1
-        while run_end < end and kinds[run_end] == kind:
-            run_end += 1
-        runs.append((index, run_end, kind))
-        index = run_end
-    return runs
 
 
-def _add_ess_underlay_scatter(
-    fig: go.Figure,
-    *,
-    soc_x: pd.Series,
-    soc_y: pd.Series,
-    kind: str,
-    hover_labels: list[str],
-    yaxis: str,
-    show_legend: bool,
-) -> None:
-    fig.add_trace(go.Scatter(
-        x=soc_x,
-        y=soc_y,
-        name=_ESS_UNDERLAY_TRACE_NAMES[kind],
-        showlegend=show_legend,
-        mode="lines",
-        line=dict(color=_ESS_UNDERLAY_COLORS[kind], width=_ESS_UNDERLAY_LINE_WIDTH),
-        opacity=_ESS_UNDERLAY_OPACITY,
-        yaxis=yaxis,
-        connectgaps=False,
-        customdata=hover_labels,
-        hovertemplate=(
-            "Uhrzeit: %{customdata}<br>%{fullData.name}<extra></extra>"
-        ),
-    ))
 
 
-def _underlay_part_ranges(
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def _soc_split_points(
     length: int,
     history_slot_count: int | None,
+    *,
+    skip_history: bool = False,
 ) -> list[tuple[int, int]]:
+    if skip_history:
+        if history_slot_count is not None and history_slot_count > 0:
+            return [(history_slot_count, length)]
+        return [(0, length)]
     if history_slot_count is not None and 0 < history_slot_count < length:
         return [(0, history_slot_count), (history_slot_count, length)]
     return [(0, length)]
 
 
-def _extend_underlay_xy_to_run_end(
-    axis: ChartSlotAxis,
-    soc: pd.Series,
-    soc_x: pd.Series,
-    soc_y: pd.Series,
-    run_end: int,
-    length: int,
-) -> tuple[pd.Series, pd.Series]:
-    """Ensure underlay covers the full last slot (1-slot runs stay visible)."""
-    if soc_x.empty or run_end >= length:
-        return soc_x, soc_y
-    end_x = axis.at(run_end, 0.0).iloc[0]
-    if pd.Timestamp(soc_x.iloc[-1]) >= pd.Timestamp(end_x):
-        return soc_x, soc_y
-    end_y = _line_plot_float(soc.iloc[run_end])
-    return (
-        pd.concat([soc_x, pd.Series([end_x])], ignore_index=True),
-        pd.concat([soc_y, pd.Series([end_y])], ignore_index=True),
-    )
+def _part_extrap_offsets(
+    part_start: int,
+    part_end: int,
+    extrap_start: int | None,
+    extrap_end: int | None,
+) -> tuple[int | None, int | None]:
+    if extrap_start is None or extrap_end is None:
+        return None, None
+    abs_extrap_start = max(extrap_start, part_start)
+    abs_extrap_end = min(extrap_end, part_end)
+    if abs_extrap_start < abs_extrap_end:
+        return abs_extrap_start - part_start, abs_extrap_end - part_start
+    return None, None
 
 
-def _clip_line_xy_to_span(
-    soc_x: pd.Series,
-    soc_y: pd.Series,
-    span_start: pd.Timestamp,
-    span_end: pd.Timestamp,
-) -> tuple[pd.Series, pd.Series]:
-    """Drop points forced outside the underlay run (e.g. hour-ramp endpoints)."""
-    kept_x: list = []
-    kept_y: list[float] = []
-    for x_val, y_val in zip(soc_x, soc_y):
-        stamp = pd.Timestamp(x_val)
-        if stamp < span_start or stamp > span_end:
-            continue
-        kept_x.append(x_val)
-        kept_y.append(float(y_val))
-    if not kept_x:
-        return soc_x, soc_y
-    return _chart_time_series(kept_x), pd.Series(kept_y, dtype=float)
-
-
-def _underlay_ramp_if_overlaps(
-    soc_x: pd.Series,
-    ramp: tuple[datetime, float, datetime, float] | None,
-) -> tuple[datetime, float, datetime, float] | None:
-    if ramp is None or soc_x.empty:
-        return None
-    t_start, _y0, t_end, _y1 = ramp
-    x_min = pd.Timestamp(soc_x.iloc[0])
-    x_max = pd.Timestamp(soc_x.iloc[-1])
-    if pd.Timestamp(t_end) < x_min or pd.Timestamp(t_start) > x_max:
-        return None
-    return ramp
-
-
-def _add_ess_underlay_run(
+def _add_soc_line_trace(
     fig: go.Figure,
+    soc_x: pd.Series,
+    soc_y: pd.Series,
     *,
-    axis: ChartSlotAxis,
-    soc: pd.Series,
-    uhrzeit: pd.Series,
-    df: pd.DataFrame,
-    run_start: int,
-    run_end: int,
-    kind: str,
-    length: int,
+    name: str,
+    show_legend: bool,
     yaxis: str,
-    legend_shown: set[str],
-    battery_params: dict | None,
-    ramp_before: tuple[datetime, float, datetime, float] | None = None,
-    ramp_after: tuple[datetime, float, datetime, float] | None = None,
+    hover_labels: list[str],
+    line: dict,
+    opacity: float = 1.0,
 ) -> None:
-    seg_tail = None
-    if run_end == length:
-        seg_tail = _soc_tail_y_from_row(df.iloc[-1], battery_params=battery_params)
-    soc_x, soc_y = _segment_connected_line_xy(
-        axis,
-        soc,
-        run_start,
-        run_end,
-        tail_y=seg_tail,
-        step_line=False,
-        bridge_left=False,
-    )
-    soc_x, soc_y = _extend_underlay_xy_to_run_end(
-        axis, soc, soc_x, soc_y, run_end, length,
-    )
-    if soc_x.empty:
-        return
-    span_start = pd.Timestamp(soc_x.iloc[0])
-    span_end = pd.Timestamp(soc_x.iloc[-1])
-    soc_x, soc_y = _apply_soc_current_hour_ramps(
-        soc_x,
-        soc_y,
-        _underlay_ramp_if_overlaps(soc_x, ramp_before),
-        _underlay_ramp_if_overlaps(soc_x, ramp_after),
-    )
-    soc_x, soc_y = _clip_line_xy_to_span(soc_x, soc_y, span_start, span_end)
-    if soc_x.empty:
-        return
-    hover_labels = _soc_hover_labels_for_times(soc_x, uhrzeit, axis.starts)
-    show_legend = kind not in legend_shown
-    _add_ess_underlay_scatter(
-        fig,
-        soc_x=soc_x,
-        soc_y=soc_y,
-        kind=kind,
-        hover_labels=hover_labels,
+    fig.add_trace(go.Scatter(
+        x=soc_x,
+        y=soc_y,
+        name=name,
+        showlegend=show_legend,
+        mode="lines",
+        line=line,
+        opacity=opacity,
         yaxis=yaxis,
-        show_legend=show_legend,
-    )
-    legend_shown.add(kind)
+        connectgaps=False,
+        customdata=hover_labels,
+        hovertemplate=(
+            "Uhrzeit: %{customdata}<br>%{fullData.name}: "
+            "%{y:.1f}<extra></extra>"
+        ),
+    ))
 
 
-def _milp_part_soc_ramps(
-    axis: ChartSlotAxis,
-    soc: pd.Series,
-    df: pd.DataFrame,
-    chart_now: datetime | None,
+def _add_optimized_soc_segment(
+    fig: go.Figure,
+    ctx: dict,
     abs_start: int,
     abs_end: int,
-    history_slot_count: int | None,
-    is_milp_part: bool,
-    battery_params: dict | None,
-) -> tuple[
-    tuple[datetime, float, datetime, float] | None,
-    tuple[datetime, float, datetime, float] | None,
-]:
-    if chart_now is None or not is_milp_part:
-        return None, None
-    y_at_now: float | None = None
-    if history_slot_count is not None and history_slot_count > 0:
-        y_at_now = _soc_at_chart_now(
-            axis, df, chart_now, history_slot_count,
-            battery_params=battery_params,
-        )
-    ramp_before = _current_hour_soc_ramp_before_now(
-        axis,
-        soc,
-        df,
-        chart_now,
-        abs_start,
-        abs_end,
-        history_slot_count,
-        y_at_now=y_at_now,
-        battery_params=battery_params,
-    )
-    ramp_after = _current_hour_soc_ramp(
-        axis,
-        soc,
-        df,
-        chart_now,
-        abs_start,
-        abs_end,
-        history_slot_count,
-        y_at_now=y_at_now,
-        battery_params=battery_params,
-    )
-    return ramp_before, ramp_after
-
-
-def add_ess_mode_soc_underlay_traces(
-    fig: go.Figure,
-    df: pd.DataFrame,
-    axis: ChartSlotAxis,
-    yaxis: str = "y2",
-    extrap_start: int | None = None,
-    extrap_end: int | None = None,
-    history_slot_count: int | None = None,
-    chart_now: datetime | None = None,
-    battery_params: dict | None = None,
+    index: int,
+    part_start: int,
 ) -> None:
-    """Thicker translucent SoC underlay by ESS mode (hold/charge/discharge)."""
-    if "Steuerbefehl" not in df.columns or "Simulierter SoC (%)" not in df.columns:
+    length = ctx["length"]
+    history_slot_count = ctx["history_slot_count"]
+    seg_tail = ctx["tail_y"] if abs_end == length else None
+    is_milp_part = history_slot_count is None or part_start >= history_slot_count
+    ramp_before, ramp_after = _milp_part_soc_ramps(
+        ctx["axis"],
+        ctx["soc"],
+        ctx["df"],
+        ctx["chart_now"],
+        abs_start,
+        abs_end,
+        history_slot_count,
+        is_milp_part,
+        ctx["battery_params"],
+    )
+    # Keep horizon end-of-hour SoC even when the current-hour ramp is active.
+    # Clearing tail_y here drew a flat last hour (start SoC repeated to 06:00).
+    soc_x, soc_y = _segment_connected_line_xy(
+        ctx["axis"], ctx["soc"], abs_start, abs_end, tail_y=seg_tail,
+        step_line=False,
+    )
+    if soc_x.empty:
         return
-    params = _resolve_battery_params(battery_params)
-    max_power_kw = float(params.get("max_power_kw") or 0.0)
-    commands = df["Steuerbefehl"]
-    soc = df["Simulierter SoC (%)"]
-    uhrzeit = df["Uhrzeit"]
-    length = len(df)
-    kinds = [
-        classify_ess_soc_underlay(commands.iloc[i], max_power_kw)
-        for i in range(length)
-    ]
-    legend_shown: set[str] = set()
-    for part_start, part_end in _underlay_part_ranges(length, history_slot_count):
-        part_extrap_start: int | None = None
-        part_extrap_end: int | None = None
-        if extrap_start is not None and extrap_end is not None:
-            abs_extrap_start = max(extrap_start, part_start)
-            abs_extrap_end = min(extrap_end, part_end)
-            if abs_extrap_start < abs_extrap_end:
-                part_extrap_start = abs_extrap_start - part_start
-                part_extrap_end = abs_extrap_end - part_start
-        segments = _trace_segments(
-            part_end - part_start, part_extrap_start, part_extrap_end
-        )
-        is_milp_part = (
-            history_slot_count is None or part_start >= history_slot_count
-        )
-        for start, end, _is_extrapolated in segments:
-            abs_start = part_start + start
-            abs_end = part_start + end
-            ramp_before, ramp_after = _milp_part_soc_ramps(
-                axis,
-                soc,
-                df,
-                chart_now,
-                abs_start,
-                abs_end,
-                history_slot_count,
-                is_milp_part,
-                battery_params,
-            )
-            for run_start, run_end, kind in _contiguous_underlay_runs(
-                kinds, abs_start, abs_end
-            ):
-                _add_ess_underlay_run(
-                    fig,
-                    axis=axis,
-                    soc=soc,
-                    uhrzeit=uhrzeit,
-                    df=df,
-                    run_start=run_start,
-                    run_end=run_end,
-                    kind=kind,
-                    length=length,
-                    yaxis=yaxis,
-                    legend_shown=legend_shown,
-                    battery_params=battery_params,
-                    ramp_before=ramp_before,
-                    ramp_after=ramp_after,
-                )
+    soc_x, soc_y = _apply_soc_current_hour_ramps(
+        soc_x, soc_y, ramp_before, ramp_after,
+    )
+    _add_soc_line_trace(
+        fig,
+        soc_x,
+        soc_y,
+        name="SoC",
+        show_legend=part_start == 0 and index == 0,
+        yaxis=ctx["yaxis"],
+        hover_labels=_soc_hover_labels_for_times(
+            soc_x, ctx["uhrzeit"], ctx["axis"].starts,
+        ),
+        line=dict(color=COLOR_SOC, width=2.5),
+    )
 
 
 def add_optimized_soc_trace(
@@ -910,30 +220,26 @@ def add_optimized_soc_trace(
     chart_now: datetime | None = None,
     battery_params: dict | None = None,
 ) -> None:
-    uhrzeit = df["Uhrzeit"]
-    length = len(df)
-    soc = df["Simulierter SoC (%)"]
-    tail_y = (
-        _soc_tail_y_from_row(df.iloc[-1], battery_params=battery_params)
-        if not df.empty
-        else None
-    )
-
-    split_points: list[tuple[int, int]] = []
-    if history_slot_count is not None and 0 < history_slot_count < length:
-        split_points = [(0, history_slot_count), (history_slot_count, length)]
-    else:
-        split_points = [(0, length)]
-
-    for part_start, part_end in split_points:
-        part_extrap_start: int | None = None
-        part_extrap_end: int | None = None
-        if extrap_start is not None and extrap_end is not None:
-            abs_extrap_start = max(extrap_start, part_start)
-            abs_extrap_end = min(extrap_end, part_end)
-            if abs_extrap_start < abs_extrap_end:
-                part_extrap_start = abs_extrap_start - part_start
-                part_extrap_end = abs_extrap_end - part_start
+    ctx = {
+        "df": df,
+        "axis": axis,
+        "yaxis": yaxis,
+        "uhrzeit": df["Uhrzeit"],
+        "length": len(df),
+        "soc": df["Simulierter SoC (%)"],
+        "tail_y": (
+            _soc_tail_y_from_row(df.iloc[-1], battery_params=battery_params)
+            if not df.empty
+            else None
+        ),
+        "history_slot_count": history_slot_count,
+        "chart_now": chart_now,
+        "battery_params": battery_params,
+    }
+    for part_start, part_end in _soc_split_points(ctx["length"], history_slot_count):
+        part_extrap_start, part_extrap_end = _part_extrap_offsets(
+            part_start, part_end, extrap_start, extrap_end
+        )
         segments = _trace_segments(
             part_end - part_start, part_extrap_start, part_extrap_end
         )
@@ -942,72 +248,9 @@ def add_optimized_soc_trace(
             abs_end = part_start + end
             if abs_start >= abs_end:
                 continue
-            seg_tail = tail_y if abs_end == length else None
-            is_milp_part = (
-                history_slot_count is None or part_start >= history_slot_count
+            _add_optimized_soc_segment(
+                fig, ctx, abs_start, abs_end, index, part_start
             )
-            ramp_before: tuple[datetime, float, datetime, float] | None = None
-            ramp_after: tuple[datetime, float, datetime, float] | None = None
-            y_at_now: float | None = None
-            if chart_now is not None and is_milp_part:
-                if history_slot_count is not None and history_slot_count > 0:
-                    y_at_now = _soc_at_chart_now(
-                        axis, df, chart_now, history_slot_count,
-                        battery_params=battery_params,
-                    )
-                ramp_before = _current_hour_soc_ramp_before_now(
-                    axis,
-                    soc,
-                    df,
-                    chart_now,
-                    abs_start,
-                    abs_end,
-                    history_slot_count,
-                    y_at_now=y_at_now,
-                    battery_params=battery_params,
-                )
-                ramp_after = _current_hour_soc_ramp(
-                    axis,
-                    soc,
-                    df,
-                    chart_now,
-                    abs_start,
-                    abs_end,
-                    history_slot_count,
-                    y_at_now=y_at_now,
-                    battery_params=battery_params,
-                )
-            # Keep horizon end-of-hour SoC even when the current-hour ramp is active.
-            # Clearing tail_y here drew a flat last hour (start SoC repeated to 06:00).
-            soc_x, soc_y = _segment_connected_line_xy(
-                axis, soc, abs_start, abs_end, tail_y=seg_tail,
-                step_line=False,
-            )
-            if soc_x.empty:
-                continue
-            soc_x, soc_y = _apply_soc_current_hour_ramps(
-                soc_x, soc_y, ramp_before, ramp_after,
-            )
-            hover_labels = _soc_hover_labels_for_times(
-                soc_x, uhrzeit, axis.starts,
-            )
-            show_legend = part_start == 0 and index == 0
-            fig.add_trace(go.Scatter(
-                x=soc_x,
-                y=soc_y,
-                name="SoC",
-                showlegend=show_legend,
-                mode="lines",
-                line=dict(color=COLOR_SOC, width=2.5),
-                opacity=1.0,
-                yaxis=yaxis,
-                connectgaps=False,
-                customdata=hover_labels,
-                hovertemplate=(
-                    "Uhrzeit: %{customdata}<br>%{fullData.name}: "
-                    "%{y:.1f}<extra></extra>"
-                ),
-            ))
 
 
 def add_baseline_soc_traces(
@@ -1036,6 +279,69 @@ def add_baseline_soc_traces(
     )
 
 
+def _add_counterfactual_soc_segment(
+    fig: go.Figure,
+    ctx: dict,
+    abs_start: int,
+    abs_end: int,
+    index: int,
+) -> None:
+    soc_df = ctx["soc_df"]
+    matched_axis = ctx["axis"]
+    soc = soc_df["Simulierter SoC (%)"]
+    seg_tail = None
+    if abs_end == ctx["length"]:
+        seg_tail = _soc_tail_y_from_row(
+            soc_df.iloc[-1],
+            battery_params=ctx["battery_params"],
+        )
+    ramp_after = None
+    if ctx["chart_now"] is not None:
+        ramp_after = _current_hour_soc_ramp(
+            matched_axis,
+            soc,
+            soc_df,
+            ctx["chart_now"],
+            abs_start,
+            abs_end,
+            ctx["history_slot_count"],
+            y_at_now=ctx["soc_at_now"],
+            battery_params=ctx["battery_params"],
+        )
+    # Same as optimized SoC: do not drop horizon tail when ramp_after is set.
+    matched_x, matched_y = _segment_connected_line_xy(
+        matched_axis,
+        soc,
+        abs_start,
+        abs_end,
+        tail_y=seg_tail,
+        step_line=False,
+        bridge_left=(index > 0),
+    )
+    if matched_x.empty:
+        return
+    matched_x, matched_y = _apply_soc_current_hour_ramps(
+        matched_x, matched_y, None, ramp_after,
+    )
+    if index == 0:
+        matched_x, matched_y = _anchor_baseline_soc_at_now(
+            matched_x, matched_y, ctx["chart_now"], ctx["soc_at_now"],
+        )
+    _add_soc_line_trace(
+        fig,
+        matched_x,
+        matched_y,
+        name=ctx["name"],
+        show_legend=index == 0,
+        yaxis=ctx["yaxis"],
+        hover_labels=_soc_hover_labels_for_times(
+            matched_x, soc_df["Uhrzeit"], matched_axis.starts,
+        ),
+        line=dict(color=COLOR_SOC, width=ctx["line_width"], dash=ctx["dash"]),
+        opacity=ctx["opacity"],
+    )
+
+
 def add_anchored_counterfactual_soc_traces(
     fig: go.Figure,
     soc_df: pd.DataFrame | None,
@@ -1054,25 +360,29 @@ def add_anchored_counterfactual_soc_traces(
 ) -> None:
     if soc_df is None or soc_df.empty:
         return
-    matched_axis = ChartSlotAxis.from_dataframe(soc_df)
     length = len(soc_df)
     if history_slot_count is not None and history_slot_count >= length:
         return
-    split_points: list[tuple[int, int]] = []
-    if history_slot_count is not None and history_slot_count > 0:
-        split_points = [(history_slot_count, length)]
-    else:
-        split_points = [(0, length)]
-
-    for part_start, part_end in split_points:
-        part_extrap_start: int | None = None
-        part_extrap_end: int | None = None
-        if extrap_start is not None and extrap_end is not None:
-            abs_extrap_start = max(extrap_start, part_start)
-            abs_extrap_end = min(extrap_end, part_end)
-            if abs_extrap_start < abs_extrap_end:
-                part_extrap_start = abs_extrap_start - part_start
-                part_extrap_end = abs_extrap_end - part_start
+    ctx = {
+        "soc_df": soc_df,
+        "axis": ChartSlotAxis.from_dataframe(soc_df),
+        "length": length,
+        "name": name,
+        "dash": dash,
+        "line_width": line_width,
+        "opacity": opacity,
+        "yaxis": yaxis,
+        "chart_now": chart_now,
+        "history_slot_count": history_slot_count,
+        "soc_at_now": soc_at_now,
+        "battery_params": battery_params,
+    }
+    for part_start, part_end in _soc_split_points(
+        length, history_slot_count, skip_history=True
+    ):
+        part_extrap_start, part_extrap_end = _part_extrap_offsets(
+            part_start, part_end, extrap_start, extrap_end
+        )
         matched_segments = _trace_segments(
             part_end - part_start, part_extrap_start, part_extrap_end,
         )
@@ -1081,66 +391,7 @@ def add_anchored_counterfactual_soc_traces(
             abs_end = part_start + end
             if abs_start >= abs_end:
                 continue
-            seg_tail = None
-            if abs_end == length:
-                seg_tail = _soc_tail_y_from_row(
-                    soc_df.iloc[-1],
-                    battery_params=battery_params,
-                )
-            ramp_after: tuple[datetime, float, datetime, float] | None = None
-            if chart_now is not None:
-                ramp_after = _current_hour_soc_ramp(
-                    matched_axis,
-                    soc_df["Simulierter SoC (%)"],
-                    soc_df,
-                    chart_now,
-                    abs_start,
-                    abs_end,
-                    history_slot_count,
-                    y_at_now=soc_at_now,
-                    battery_params=battery_params,
-                )
-            # Same as optimized SoC: do not drop horizon tail when ramp_after is set.
-            matched_x, matched_y = _segment_connected_line_xy(
-                matched_axis,
-                soc_df["Simulierter SoC (%)"],
-                abs_start,
-                abs_end,
-                tail_y=seg_tail,
-                step_line=False,
-                bridge_left=(index > 0),
-            )
-            if matched_x.empty:
-                continue
-            matched_x, matched_y = _apply_soc_current_hour_ramps(
-                matched_x, matched_y, None, ramp_after,
-            )
-            if index == 0:
-                matched_x, matched_y = _anchor_baseline_soc_at_now(
-                    matched_x, matched_y, chart_now, soc_at_now,
-                )
-            hover_labels = _soc_hover_labels_for_times(
-                matched_x,
-                soc_df["Uhrzeit"],
-                matched_axis.starts,
-            )
-            show_legend = index == 0
-            fig.add_trace(go.Scatter(
-                x=matched_x,
-                y=matched_y,
-                name=name,
-                showlegend=show_legend,
-                mode="lines",
-                line=dict(color=COLOR_SOC, width=line_width, dash=dash),
-                opacity=opacity,
-                yaxis=yaxis,
-                connectgaps=False,
-                customdata=hover_labels,
-                hovertemplate=(
-                    "Uhrzeit: %{customdata}<br>%{fullData.name}: "
-                    "%{y:.1f}<extra></extra>"
-                ),
-            ))
+            _add_counterfactual_soc_segment(fig, ctx, abs_start, abs_end, index)
 
 
 def add_price_on_soc_axis_trace(
@@ -1214,3 +465,60 @@ def add_export_price_on_soc_axis_trace(
         hover_label="Einspeisepreis",
     )
 
+from ui.chart_soc_ramps import (  # noqa: E402
+    _anchor_baseline_soc_at_now,
+    _apply_soc_current_hour_ramps,
+    _apply_soc_intra_hour_ramp,
+    _current_hour_soc_ramp,
+    _current_hour_soc_ramp_before_now,
+    _first_milp_slot_in_current_hour,
+    _has_milp_slots_between,
+    _history_battery_kw_for_extrapolation,
+    _resolve_battery_params,
+    _slot_index_at_or_after,
+    _soc_at_chart_now,
+    _soc_from_history_extrapolation,
+    _soc_hover_labels_for_times,
+    _soc_on_milp_polyline,
+    _soc_tail_y_from_row,
+    _soc_y_at_moment,
+    _soc_y_for_chart_now,
+)
+from ui.chart_soc_underlay import (  # noqa: E402
+    ESS_UNDERLAY_CHARGE,
+    ESS_UNDERLAY_DISCHARGE,
+    ESS_UNDERLAY_HOLD,
+    _ESS_UNDERLAY_COLORS,
+    _ESS_UNDERLAY_LINE_WIDTH,
+    _ESS_UNDERLAY_NEAR_ZERO_FRACTION,
+    _ESS_UNDERLAY_OPACITY,
+    _ESS_UNDERLAY_TRACE_NAMES,
+    _ZWANGS_POWER_RE,
+    _add_ess_underlay_run,
+    _add_ess_underlay_scatter,
+    _clip_line_xy_to_span,
+    _contiguous_underlay_runs,
+    _ess_underlay_near_zero,
+    _extend_underlay_xy_to_run_end,
+    _milp_part_soc_ramps,
+    _parse_zwangs_power_kw,
+    _underlay_part_ranges,
+    _underlay_ramp_if_overlaps,
+    add_ess_mode_soc_underlay_traces,
+    classify_ess_soc_underlay,
+)
+
+# Re-Exports für API-Stabilität (from ui.chart_soc import ...)
+__all__ = [
+    "ESS_UNDERLAY_CHARGE",
+    "ESS_UNDERLAY_DISCHARGE",
+    "ESS_UNDERLAY_HOLD",
+    "add_anchored_counterfactual_soc_traces",
+    "add_baseline_soc_traces",
+    "add_ess_mode_soc_underlay_traces",
+    "add_export_price_on_soc_axis_trace",
+    "add_optimized_soc_trace",
+    "add_price_on_soc_axis_trace",
+    "classify_ess_soc_underlay",
+    "_soc_tail_y_from_row",
+]

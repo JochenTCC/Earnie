@@ -102,7 +102,7 @@ Neuer Wert in `daily_target_source`-Enum: `loxone_remaining_hours` (unterscheide
 
 ### Granularität
 
-Die MILP-Matrix ist **stündlich**; `min_on_quarterhours` wird auf ganze Stunden gerundet. Effektive Mindestlaufzeit: **1 h** pro Einschaltung.
+Die MILP-Matrix ist **viertelstündlich** (`dt_h = 0.25`); `min_on_quarterhours` zählt echte QH-Slots. Effektive Mindestlaufzeit: `min_on_quarterhours × 0,25 h` pro Einschaltung.
 
 ## 7. Loxone-Logik (ergänzend)
 

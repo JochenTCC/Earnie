@@ -24,9 +24,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
 - [ ] EV short unplug before FertigUm skipped today's cycle (`debug_dump_20260808_102915`) — `open_charging_deadlines` latch keeps `available_from=now` until deadline/fulfill; tests in `test_charging_session.py` / `test_charging_context.py`. Live acceptance pending.
-- [ ] Pool filter Ist not assigned when only `sens_filter_active` is bound (`debug_dump_20260808_232225`) — binary meter accepts alternate-only; regression in `test_loxone_client.py`. Live acceptance pending.
-- [ ] earnie.log unbounded growth — `SizeAndTimeRotatingFileHandler` (5 MB or weekly `W0`, backupCount 8, rename→copy/truncate fallback); tests in `test_logger_config_rotation.py`. Live acceptance pending.
-
 
 ## New Bugs (Do not remove this chapter — even if empty)
 

@@ -4,7 +4,7 @@
   <img src="docs/assets/Earnie-Logo-Simple-Light.png" alt="Earnie" width="160">
 </p>
 
-**Earnie** optimiert den Energiefluss in einem Smart-Home: Speicher, PV und Verbraucher mit wählbaren Schaltzeiten werden so optimiert, dass Stromkosten sinken und der Eigenverbrauch steigt. Der Daemon arbeitet typisch im **15-Minuten-Takt**; der MILP-Plan nutzt derzeit **Stunden-Slots**. Seine Stärke spielt **Earnie** vor allem im Zusammenhang mit sogenannten [SPOT-Tarifen (im DACH-Raum)](https://www.epexspot.com/) aus. Eine umfangreiche Oberfläche zeigt genau, was **Earnie** gemacht und geplant hat.
+**Earnie** optimiert den Energiefluss in einem Smart-Home: Speicher, PV und Verbraucher mit wählbaren Schaltzeiten werden so optimiert, dass Stromkosten sinken und der Eigenverbrauch steigt. Daemon und MILP-Plan arbeiten im **15-Minuten-Takt** (Viertelstunden-Slots). Seine Stärke spielt **Earnie** vor allem im Zusammenhang mit sogenannten [SPOT-Tarifen (im DACH-Raum)](https://www.epexspot.com/) aus. Eine umfangreiche Oberfläche zeigt genau, was **Earnie** gemacht und geplant hat.
 Und wenn Sie vorab wissen wollen, wie hoch das Einsparpotenzial ist, kann **Earnie** das für Sie vorab für ein ganzes Jahr hochrechnen - Und das auch ganz ohne Smart-Home.
 Earnie funktioniert unabhängig von Energie- und / oder Systemlieferanten für maximale Unabhängigkeit.
 
@@ -45,7 +45,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 
 ### Optimierung und Steuerung
 
-- Ganzheitliche Optimierung: Daemon typisch im 15-Minuten-Takt; MILP-Plan derzeit in Stunden-Slots für Speicher und Verbraucher, deren Aktivierung von Earnie oder dem Benutzer gewählt werden kann.
+- Ganzheitliche Optimierung im 15-Minuten-Takt für Speicher und Verbraucher, deren Aktivierung von Earnie oder dem Benutzer gewählt werden kann.
 - Dynamische Strompreise (z. B. [aWATTar](https://www.awattar.at/)) und Preis-Prognose (über die veröffentlichten Preise hinaus)
 - PV-Erzeugungsprognose über [Open-Meteo](https://open-meteo.com/)-Wetterdaten und Grundlast-Modell mit Berücksichtigung der Temperaturen
 

@@ -2,6 +2,25 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.5.r Quality / release hardening (2026-08-16)
+
+- [x] **2.5.r — Quality / release hardening** (same shape as `2.4.r`)
+  - [x] Coverage baseline (`test_health_report run --coverage`) — 2132 passed / 3 skipped; overall **79.9%** (`data` 73.2, `ehal` 87.4, `house_config` 80.4, `optimizer` 83.9, `runtime_store` 79.4, `settings` 77.3, `simulation` 86.6); no package &lt; 40%
+  - [x] Dead-code / obsolete-test audit — `vulture` (confidence 80) clean; `pytest --dead-fixtures` clean; health-report flags are expected fail-fast `legacy_id` / `pv_follow_name` + mock-heavy cons_data/dotenv (same class as `2.4.r`)
+  - [x] KPI refactor (incl. mega-file splits; do not defer) — files over hard limit 600 LOC and functions > 60 LOC in core/UI; skill `quality-gate`
+    - [x] Wave 1 (deferred `2.4.r` mega-files): `planning_flex_bridge`, `optimizer/simulation`, `simulation/engine`, `loxone_structure`, `loxone_client`, `loxone_greenfield_import` — facades + siblings ≤ 600 LOC; original import paths stable
+    - [x] Wave 2 mega-files (14): facades + topic siblings ≤ 600 LOC; original import paths stable (`house_config_profile_form`, `chart_soc`, `chart_flow_balance`, `page_scenario_editor`, `house_config_historical_csv`, `backtesting`, `house_config_io`, `loxone_debug`, `backtesting_display_bundle`, `simulation_results`, `ehal_loxone_mapping`, `charging_context`, `milp_consumers`, `history_timeline`)
+    - [x] God-function splits (Wave-2 modules) — listed bodies now ≤ 40 (ramps 41/43, under hard 60): `_render_scenarios_tab` → `scenario_editor_sections` (`_prepare_scenario_tab`, `_render_scenario_identity_fields`, `_render_scenario_entity_picks`, `_render_scenario_tariff_block`, `_persist_or_delete_scenario`); `_render_consumer_form_body` → `_render_thermal_annual_fields`; `render_house_profile_tab` → `_render_profile_selector` / `_edit_and_sync_consumers` / `_render_baseload_preview`; `_render_generic_fields` → `_render_generic_role_schedule`; `build_flow_balance_segments` → `_primary_up_segments` / `_primary_down_segments` / `_assemble_balanced_slot`; SE run → `_prepare_backtesting_run_context` / `_render_backtesting_progress` / `_render_season_mirror_toggle` / `_render_horizon_select` / `_render_run_buttons`; SoC → `_add_optimized_soc_segment` / `_add_counterfactual_soc_segment` / `_ramp_before_ys` / `_ramp_end_point` / `_ramp_start_soc` / `_add_underlay_part`; `build_optimization_display_bundle` → `_merge_chart_into_bundle` / `_resolve_bundle_headers`. Facades unchanged.
+  - [x] Official docs: landing/handbook/charts no longer claim hourly MILP; issue-template version pin; swimspa-filter / UI-spec QH granularity
+
+### Bugfix Pool filter Ist with alternate-only binding (2026-08-16)
+
+- [x] Pool filter Ist not assigned when only `sens_filter_active` is bound (`debug_dump_20260808_232225`) — binary meter accepts alternate-only; regression in `test_loxone_client.py`. Live acceptance verified.
+
+### Bugfix earnie.log unbounded growth (2026-08-16)
+
+- [x] earnie.log unbounded growth — `SizeAndTimeRotatingFileHandler` (5 MB or weekly `W0`, backupCount 8, rename→copy/truncate fallback); tests in `test_logger_config_rotation.py`. Live acceptance verified.
+
 ### Pre-release 2.5.0-alpha.6 (2026-08-15)
 
 - [x] Community pre-release `2.5.0-alpha.6`: hourly EPEX settlement (aWATTar HOURLY/SUNNY), full-catalog `settlement_mtu`, analog Zähler consumers, SE plausibility vs ESS standby; alpha compose + container docs pin `ghcr.io/jochentcc/earnie-energy:2.5.0-alpha.6`.

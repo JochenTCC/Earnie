@@ -20,7 +20,7 @@ Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdo
 
 **Überschrift:** Segment-Label (z. B. „SA₀→SA₁ (Live) · Datumsbereich“) mit **?** (Hintergrundzonen grau/neutral/grün, Navigation).
 
-**Linke Y-Achse (kW):** Balkenhöhe = Leistung. Die Balkenbreite folgt der Slotdauer (15 min grau nahe „Jetzt“, später oft 1 h) — Fläche ∝ Energie. **Ausnahme Verbraucher:** Läufe mit `duration_h < 1` in der Zukunft (Stunden-Slots) tragen bereits die mittlere Leistung (`nominal × duration_h`, Duty-Cycle in `generic_schedule`); im grauen 15‑min-Bereich entfällt diese Korrektur, weil die Breite dem echten Zeitraum entspricht.
+**Linke Y-Achse (kW):** Balkenhöhe = Leistung. Die Balkenbreite folgt der Slotdauer (**15 min** über den Horizont) — Fläche ∝ Energie. **Ausnahme Verbraucher:** Bei Generic-Schedules, die intern stündlich modelliert und auf QH gehalten werden, können Läufe mit `duration_h < 1` als mittlere Leistung (`nominal × duration_h` in `generic_schedule`) erscheinen.
 
 | Spur | Darstellung | Bedeutung |
 |------|-------------|-----------|
@@ -56,7 +56,7 @@ Entladen → Last ← verbleibende Entladung
 
 **Flexible Verbraucher** (gestapelte Down-Segmente): Farbe aus fester **8er-Palette** in `ui/chart_colors.py` (`CONSUMER_PALETTE`, Hue **260→40**, S≈90, L≈50). In `config.json` je Verbraucher **`chart_color_index`** (0–7), nicht mehr freies Hex. Auflösung zentral über `consumer_chart_color()` — Chart 1 und Sankey nutzen dieselben Vollfarben.
 
-**Generic `earnie_role: known` and `manual`:** In der Optimierung Teil der Grundlast-Overlay; in Chart 1 werden die geplanten Stundenleistungen **sichtbar** aus `Verbrauch-Prognose` in eigene Down-Segmente herausgezogen (`house_config/known_chart_display.py`). `manual` bleibt für die Empfehlungs-UI; SE/Live rechnen die Default-Schedule mit (Nutzer startet wie empfohlen).
+**Generic `earnie_role: known` and `manual`:** In der Optimierung Teil der Grundlast-Overlay; in Chart 1 werden die geplanten Slot-Leistungen **sichtbar** aus `Verbrauch-Prognose` in eigene Down-Segmente herausgezogen (`house_config/known_chart_display.py`). `manual` bleibt für die Empfehlungs-UI; SE/Live rechnen die Default-Schedule mit (Nutzer startet wie empfohlen).
 
 **Zonenabhängige Sättigung (nur Chart-1-Flex-Balken):** Grauer Bereich (Vergangenheit) volle Palette-Sättigung; neutraler Bereich (laufender Plan) und grüner Bereich (Preis-Prognose) gemeinsam gedämpft (`CONSUMER_CHART_SATURATION_MUTED`, derzeit 0,6). Slot → Zone über `chart_zone_kind_for_slot_start()` / `UiChartZones`; Legende bleibt in Vollfarbe (`visible='legendonly'`). Sankey unverändert volle Sättigung.
 

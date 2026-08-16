@@ -96,7 +96,7 @@ Umzug in eine eigene Seite; bleibt per `ui.price_forecast_page_enabled` / `EARNI
 
 ## 6. Empfehlungsmodus — Algorithmus
 
-Für ein Gerät mit Leistung `P` (kW) und Laufzeit `d` (in Stunden; Planungsmatrix stündlich):
+Für ein Gerät mit Leistung `P` (kW) und Laufzeit `d` (in Stunden; Planungsmatrix viertelstündlich, `dt_h = 0.25`):
 
 1. Nächste *h* (Empfehlungshorizont je Gerät) aus der **persistierten Planungsmatrix** im letzten `live_optimization_debug.json` (geschrieben von `main.py`; kein Live-Matrix-Build in der UI).
 2. Für jeden möglichen Startslot `s` die Laufkosten über die Laufzeit ab `s` summieren. Pro Slot gilt die **Opportunitätskosten**-Regel:
