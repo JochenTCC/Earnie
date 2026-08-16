@@ -659,9 +659,12 @@ def test_ev_consumer_normalization(tmp_path):
     assert "loxone" not in ev.get("charging_schedule", {})
 
 
-def test_house_profile_save_preserves_loxone_bindings(tmp_path):
+def test_house_profile_save_preserves_loxone_bindings(tmp_path, monkeypatch):
     from house_config.profiles_store import save_house_profiles_document
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
     from ui.house_config_profile_form import _merge_passthrough_consumer_fields
+
+    install_open_meteo_climate_mock(monkeypatch)
 
     path = tmp_path / "house_profiles.json"
     ev_original = {

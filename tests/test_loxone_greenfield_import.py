@@ -81,8 +81,11 @@ def test_alarm_clock_tna_merges_onto_ev_with_power():
     assert ev2["ehal_bindings"]["get_evcs_ready_by_time"] == "Ladewecker"
 
 
-def test_match_merges_legacy_wp_alias_into_waermepumpe():
+def test_match_merges_legacy_wp_alias_into_waermepumpe(monkeypatch):
     """Mixed Earnie_Waermepumpe_* + Earnie_WP_* must yield one thermal_annual."""
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     empty_doc = {"controls": {}}
     extra = {
         "Earnie_Waermepumpe_Leistung",
@@ -397,7 +400,10 @@ def test_efm_fills_plant_when_earnie_grid_absent():
     assert "sens_grid_power_active" in result["report"]["efm_plant_filled"]
 
 
-def test_normalize_and_save_round_trip(tmp_path):
+def test_normalize_and_save_round_trip(tmp_path, monkeypatch):
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     result = run_greenfield_import(_doc(), _empty_house())
     house = result["house_doc"]
     path = tmp_path / "house_profiles.json"

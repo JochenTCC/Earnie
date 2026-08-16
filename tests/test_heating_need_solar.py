@@ -112,7 +112,10 @@ def test_consumer_annual_kwh_reflects_solar_thermal(monkeypatch):
     assert with_solar < without
 
 
-def test_profiles_store_geo_and_solar_roundtrip(tmp_path: Path):
+def test_profiles_store_geo_and_solar_roundtrip(tmp_path: Path, monkeypatch):
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     path = tmp_path / "house_profiles.json"
     doc = {
         "profiles": [

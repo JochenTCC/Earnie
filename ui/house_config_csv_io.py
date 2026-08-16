@@ -26,7 +26,11 @@ def _stable_upload_csv_name(
 
 def _resampled_upload_csv_name(filename: str, *, fallback: str) -> str:
     """Build ``{original_stem}_resampled.csv`` from the uploaded basename."""
-    basename = Path(str(filename or "").strip()).name
+    # Strip both separators explicitly: the browser-supplied name may carry a
+    # Windows-style path even when this server process runs on Linux (Path.name
+    # only recognizes '/' there), and vice versa.
+    normalized = str(filename or "").strip().replace("\\", "/")
+    basename = Path(normalized).name
     if not basename:
         return fallback
     stem = Path(basename).stem.strip()

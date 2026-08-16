@@ -66,7 +66,10 @@ def test_get_pv_for_slots_uses_imported_csv(tmp_path: Path) -> None:
     assert values[0] == pytest.approx(3.0)
 
 
-def test_get_pv_for_slots_falls_back_when_short_csv(tmp_path: Path) -> None:
+def test_get_pv_for_slots_falls_back_when_short_csv(tmp_path: Path, monkeypatch) -> None:
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     pv_path = tmp_path / "short.csv"
     _write_pv_csv(pv_path, hours=48, power_kw=9.0)
     cache = HistoricalDataCache()
@@ -89,7 +92,10 @@ def test_get_pv_for_slots_falls_back_when_short_csv(tmp_path: Path) -> None:
     assert values != [9.0]
 
 
-def test_get_pv_for_slots_falls_back_when_flag_without_csv() -> None:
+def test_get_pv_for_slots_falls_back_when_flag_without_csv(monkeypatch) -> None:
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     cache = HistoricalDataCache()
     slots = [datetime(2023, 6, 15, 12, 0)]
     values = cache.get_pv_for_slots(

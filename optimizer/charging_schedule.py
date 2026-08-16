@@ -114,9 +114,15 @@ def parse_loxone_relative_ready_by(text: str, from_dt: datetime) -> datetime | N
 
 
 def _deadline_from_unix(unix_ts: float, from_dt: datetime) -> datetime:
-    parsed = datetime.fromtimestamp(unix_ts, tz=from_dt.tzinfo).replace(
-        second=0, microsecond=0
-    )
+    tz = from_dt.tzinfo
+    if tz is None:
+        import config
+        from zoneinfo import ZoneInfo
+
+        tz = ZoneInfo(config.get_planning_timezone())
+    parsed = datetime.fromtimestamp(unix_ts, tz=tz).replace(second=0, microsecond=0)
+    if from_dt.tzinfo is None:
+        parsed = parsed.replace(tzinfo=None)
     return _align_like(from_dt, parsed)
 
 

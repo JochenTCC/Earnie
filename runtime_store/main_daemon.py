@@ -185,7 +185,9 @@ def stop(*, timeout_sec: float = _STOP_WAIT_SEC) -> DaemonStatus:
     else:
         logger.warning("main.py PID %s reagiert nicht – erzwinge Beendigung", pid)
         _force_kill(pid)
-        time.sleep(0.3)
+        force_deadline = time.monotonic() + 2.0
+        while time.monotonic() < force_deadline and is_pid_alive(pid):
+            time.sleep(0.1)
 
     return status()
 
