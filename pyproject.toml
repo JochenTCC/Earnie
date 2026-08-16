@@ -72,6 +72,7 @@ markers = [
     "requires_loxone: Integrationstest gegen echten Loxone-Miniserver",
     "slow: Längerer Backtesting- oder MILP-Integrationslauf",
     "test_health_protected: Nie automatisch als Review-Kandidat markieren",
+    "apptest: Streamlit-AppTest UI-Smoketest (rendert echte Seiten headless)",
 ]
 
 [tool.coverage.run]
