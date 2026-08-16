@@ -23,7 +23,7 @@ def _configure_console_utf8() -> None:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> None:
     _configure_console_utf8()
     from scripts.se_calc_test_common import (
         PRIORITIZED_CELLS,
@@ -55,14 +55,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.inventory:
         snap = inventory_snapshot(env)
         print(json.dumps(snap, ensure_ascii=False, indent=2))
-        return 0
-
-    cell_ids = parse_csv_ids(args.cells, PRIORITIZED_CELLS)
-    payload = materialize_cells(cell_ids, env)
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
-    print(f"\nWrote descriptors: {DESCRIPTORS_PATH}")
-    return 0
+    else:
+        cell_ids = parse_csv_ids(args.cells, PRIORITIZED_CELLS)
+        payload = materialize_cells(cell_ids, env)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        print(f"\nWrote descriptors: {DESCRIPTORS_PATH}")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

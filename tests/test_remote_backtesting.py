@@ -5,6 +5,7 @@ import pytest
 
 from scripts.remote_backtesting_support import (
     RemoteBacktestingError,
+    _safe_join,
     build_remote_run_command,
     validate_remote_config,
 )
@@ -43,6 +44,19 @@ def test_build_remote_run_command_powershell():
     assert "scripts.run_backtesting" in cmd
     assert "--start-month 6" in cmd
     assert "robocopy" in cmd
+
+
+def test_safe_join_rejects_parent_segments(tmp_path):
+    with pytest.raises(RemoteBacktestingError, match="verlässt"):
+        _safe_join(tmp_path, "../secret.txt")
+    with pytest.raises(RemoteBacktestingError, match="verlässt"):
+        _safe_join(tmp_path, "ok/../../secret.txt")
+
+
+def test_safe_join_keeps_relative_child(tmp_path):
+    target = _safe_join(tmp_path, "results/backtesting.csv")
+    expected = tmp_path / "results" / "backtesting.csv"
+    assert target == expected.resolve()
 
 
 def test_build_remote_run_command_bash():

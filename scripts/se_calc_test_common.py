@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from copy import deepcopy
 from pathlib import Path
@@ -22,6 +23,7 @@ PROFILE_ID = "example_efh"
 LIVE_SCENARIO_ID = "live"
 M2_CSV_CONSUMER_IDS = ("wp_heating", "ev", "swimspa")
 PRIORITIZED_CELLS = ("M0", "M1", "M2")
+ALL_CELL_IDS = ("M0", "M1", "M2", "M3", "M4")
 
 
 def project_root() -> Path:
@@ -41,8 +43,14 @@ def load_json(path: Path) -> Any:
 
 
 def write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    root_abs = os.path.abspath(str(ROOT))
+    target_abs = os.path.abspath(str(path))
+    prefix = root_abs if root_abs.endswith(os.sep) else root_abs + os.sep
+    if target_abs != root_abs and not target_abs.startswith(prefix):
+        raise ValueError(f"Refusing to write outside project root: {path}")
+    target = Path(target_abs)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
@@ -197,6 +205,10 @@ def live_only_scenarios_doc(env: Path | None = None) -> dict:
 
 def materialize_cell(cell_id: str, env: Path | None = None) -> dict:
     from house_config.profile_csv_policy import se_uses_meter_residual_baseload
+
+    if cell_id not in ALL_CELL_IDS:
+        raise ValueError(f"Unknown matrix cell '{cell_id}'")
+    cell_id = next(cid for cid in ALL_CELL_IDS if cid == cell_id)
 
     base_env = env_root(env)
     profiles_doc = load_house_profiles_doc(base_env)

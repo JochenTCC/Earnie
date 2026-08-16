@@ -20,8 +20,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Context:** Community line is `2.5.0-alpha.7` (full 15‑min MILP `dt_h = 0.25` plus remaining 2.5 feature items, archived; `2.5.r` quality gate done). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
 
-- [ ] Create first set of automated UI tests for all pages with streamlit AppTest
-  - Check what pages are not covered yet and create tests for missing pages
 - [ ] Official `2.5.0` after community soak (tag without `-alpha`; GHCR `:latest`)
 
 

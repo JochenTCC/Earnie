@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Streamlit AppTest page coverage + script path guards (2026-08-16)
+
+- [x] First automated UI smoke set with Streamlit AppTest for remaining pages (Config, Daemon, Loxone Debug, Price Forecast, Consumer Analysis, Backtesting) plus earlier Cockpit / Devices / House Config / Scenario Editor — import bugs found during the runs were fixed in the same wave.
+- [x] Remote backtesting and SE matrix writers reject path escape (`..` / absolute); SE `materialize_cell` only accepts `M0`–`M4`; CLI `main()` helpers flattened.
+
 ### 2.5.r Quality / release hardening (2026-08-16)
 
 - [x] **2.5.r — Quality / release hardening** (same shape as `2.4.r`)

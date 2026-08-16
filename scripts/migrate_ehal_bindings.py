@@ -33,7 +33,7 @@ def _write_json(path: Path, doc: dict) -> None:
         handle.write("\n")
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> None:
     _configure_console_utf8()
     parser = argparse.ArgumentParser(
         description="Migrate legacy Loxone Merker nests → ehal_bindings and strip leftovers."
@@ -86,20 +86,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.dry_run:
         print(f"dry-run: house_changed={changed and house_out != house_doc} "
               f"config_changed={config_changed} path={house_path}")
-        return 0
-
-    if house_out != house_doc:
-        _write_json(house_path, house_out)
-        print(f"Wrote {house_path}")
     else:
-        print(f"No house_profiles changes: {house_path}")
-
-    if config_path is not None and config_changed:
-        _write_json(config_path, config_out)
-        print(f"Wrote {config_path}")
-
-    return 0
+        if house_out != house_doc:
+            _write_json(house_path, house_out)
+            print(f"Wrote {house_path}")
+        else:
+            print(f"No house_profiles changes: {house_path}")
+        if config_path is not None and config_changed:
+            _write_json(config_path, config_out)
+            print(f"Wrote {config_path}")
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    main()

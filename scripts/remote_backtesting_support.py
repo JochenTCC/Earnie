@@ -69,9 +69,30 @@ def _copy_file(src: Path, dst: Path) -> None:
     shutil.copy2(src, dst)
 
 
+def _safe_join(root: Path, rel: str) -> Path:
+    """Join a config-supplied relative path onto root, rejecting any escape.
+
+    Guards the rmtree/copytree calls below against a typo'd sync_paths or
+    result_files entry (e.g. an accidental "../..") wiping or overwriting
+    something outside the intended sync/repo directory.
+    """
+    if os.path.isabs(rel) or Path(rel).is_absolute() or ".." in Path(rel).parts:
+        raise RemoteBacktestingError(
+            f"Konfigurierter Pfad '{rel}' verlässt das Zielverzeichnis {root}."
+        )
+    root_abs = os.path.abspath(str(root))
+    candidate = os.path.abspath(os.path.join(root_abs, rel))
+    prefix = root_abs if root_abs.endswith(os.sep) else root_abs + os.sep
+    if candidate != root_abs and not candidate.startswith(prefix):
+        raise RemoteBacktestingError(
+            f"Konfigurierter Pfad '{rel}' verlässt das Zielverzeichnis {root_abs}."
+        )
+    return Path(candidate)
+
+
 def _copy_path(repo_rel: str, src_root: Path, dst_root: Path) -> None:
-    src = src_root / repo_rel
-    dst = dst_root / repo_rel
+    src = _safe_join(src_root, repo_rel)
+    dst = _safe_join(dst_root, repo_rel)
     if not src.exists():
         raise RemoteBacktestingError(f"Sync-Quelle fehlt: {src}")
     if src.is_dir():
@@ -98,10 +119,10 @@ def pull_from_share(cfg: dict, repo_root: Path = REPO_ROOT) -> None:
     if not source.is_dir():
         raise RemoteBacktestingError(f"Ergebnisordner fehlt auf dem Share: {source}")
     for name in cfg["result_files"]:
-        src = source / name
+        src = _safe_join(source, name)
         if not src.is_file():
             raise RemoteBacktestingError(f"Ergebnisdatei fehlt auf dem Share: {src}")
-        _copy_file(src, repo_root / name)
+        _copy_file(src, _safe_join(repo_root, name))
     print(f"Pull abgeschlossen nach {repo_root}")
 
 

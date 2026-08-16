@@ -544,26 +544,11 @@ def _pick_alarm_clock_for_ev(clocks: list[str], consumer: dict) -> str | None:
     return clocks[0]
 
 
-def merge_alarm_clock_ready_by(
-    house_doc: dict,
-    doc: dict[str, Any],
-    *,
-    profile_id: str,
-    report: ImportReport | None = None,
-) -> dict:
-    """Bind AlarmClock Tna → get_evcs_ready_by_time on EV entities (with Zähler power)."""
-    house = dict(house_doc)
-    profiles = _profiles_as_dict(house)
-    profile = dict(profiles.get(profile_id) or {})
-    consumers = [dict(c) for c in (profile.get("consumers") or []) if isinstance(c, dict)]
-    house["profiles"] = {**profiles, profile_id: profile}
-    profile["consumers"] = consumers
-    rep = report or ImportReport()
-
-    clocks = extract_alarm_clocks(doc)
-    if not clocks:
-        return house
-
+def _bind_alarm_clocks(
+    consumers: list[dict],
+    clocks: list[str],
+    report: ImportReport,
+) -> None:
     for consumer in consumers:
         if str(consumer.get("type") or "") != "ev":
             continue
@@ -582,7 +567,28 @@ def merge_alarm_clock_ready_by(
         bindings["get_evcs_ready_by_time"] = clock
         consumer["ehal_bindings"] = bindings
         cid = str(consumer.get("id") or "").strip() or "?"
-        rep.alarm_clock_bound.append(f"{cid}:{clock}")
+        report.alarm_clock_bound.append(f"{cid}:{clock}")
+
+
+def merge_alarm_clock_ready_by(
+    house_doc: dict,
+    doc: dict[str, Any],
+    *,
+    profile_id: str,
+    report: ImportReport | None = None,
+) -> dict:
+    """Bind AlarmClock Tna → get_evcs_ready_by_time on EV entities (with Zähler power)."""
+    house = dict(house_doc)
+    profiles = _profiles_as_dict(house)
+    profile = dict(profiles.get(profile_id) or {})
+    consumers = [dict(c) for c in (profile.get("consumers") or []) if isinstance(c, dict)]
+    house["profiles"] = {**profiles, profile_id: profile}
+    profile["consumers"] = consumers
+    rep = report or ImportReport()
+
+    clocks = extract_alarm_clocks(doc)
+    if clocks:
+        _bind_alarm_clocks(consumers, clocks, rep)
     return house
 
 
