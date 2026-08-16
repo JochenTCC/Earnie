@@ -23,12 +23,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt -r requirements-dev.txt
+          pip install -e ".[dev]"
           pip install pytest-cov
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=. --cov-report=xml
+          python -m pytest --cov=. --cov-report=xml
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
