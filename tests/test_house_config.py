@@ -1502,6 +1502,9 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
         DEFAULT_LIVE_SCENARIO_ID,
         resolve_live_scenario_settings,
     )
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
 
     config_dir = tmp_path / "config"
     config_dir.mkdir()
