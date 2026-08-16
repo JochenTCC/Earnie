@@ -586,7 +586,10 @@ def test_planning_ready_with_selected_tariffs(tmp_path, monkeypatch):
     assert setup_readiness.is_planning_ready() is True
 
 
-def test_house_profile_hwb_normalization(tmp_path):
+def test_house_profile_hwb_normalization(tmp_path, monkeypatch):
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     path = tmp_path / "house_profiles.json"
     path.write_text(
         json.dumps(
@@ -1135,7 +1138,10 @@ def test_seed_battery_widget_state_uses_existing_capacity():
     assert session["speicher_8kwh__planning_battery_threshold"] == 8.0
 
 
-def test_upsert_thermal_profile_roundtrip(tmp_path):
+def test_upsert_thermal_profile_roundtrip(tmp_path, monkeypatch):
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
     path = tmp_path / "house_profiles.json"
     save_house_profiles_document(
         str(path),

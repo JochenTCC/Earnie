@@ -466,12 +466,16 @@ def test_build_per_scenario_reference_costs_adds_tariff_specific_ref(
 
 def test_build_per_scenario_reference_costs_pv_variant(
     historical_cache: HistoricalDataCache,
+    monkeypatch,
 ):
     from simulation.engine import (
         HISTORICAL_REFERENCE_ID,
         build_per_scenario_reference_costs,
         scenario_reference_id,
     )
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
 
     tariff_block = {
         "_import_tariff_spec": {"id": "fixed_25ct", "type": "fixed_cent", "fix_cent_kwh": 25.0},

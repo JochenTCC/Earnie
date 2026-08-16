@@ -118,6 +118,9 @@ def test_start_stop_with_stub_script(
 
         stopped = main_daemon.stop(timeout_sec=5.0)
         assert stopped.state == "stopped"
+        # stub is our direct child: reap it so a SIGKILL-but-still-zombie PID
+        # (os.kill(pid, 0) succeeds for zombies) doesn't read as "alive".
+        proc.wait(timeout=5.0)
         assert not is_pid_alive(st.pid)
     finally:
         if proc.poll() is None:
