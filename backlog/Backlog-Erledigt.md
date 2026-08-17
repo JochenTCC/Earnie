@@ -12,6 +12,10 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 M3 (persistence proof on real Supervisor hardware) is the one milestone left open — tracked in [Backlog.md](Backlog.md).
 
+### CI: skip SonarCloud on doc-only changes (2026-08-17)
+
+- [x] `paths-ignore` (`**/*.md`, `**/*.png`, `docs/**`) added to the SonarCloud workflow's `push`/`pull_request` triggers ([`.github/workflows/sonarcloud.yml`](../.github/workflows/sonarcloud.yml)) — pure documentation commits no longer trigger a full `pytest --cov` + scan run. Deliberately narrower than the local pre-commit hook's skip list (`.github/**`/`.githooks/**` still trigger a real run, so CI/hook changes stay validated).
+
 ### Streamlit AppTest page coverage + script path guards (2026-08-16)
 
 - [x] First automated UI smoke set with Streamlit AppTest for remaining pages (Config, Daemon, Loxone Debug, Price Forecast, Consumer Analysis, Backtesting) plus earlier Cockpit / Devices / House Config / Scenario Editor — import bugs found during the runs were fixed in the same wave.

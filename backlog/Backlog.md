@@ -25,6 +25,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [x] Adding AppTest feature and AppTest (rendering tests for Streamlit) + tests for all pages
 - [ ] Adding SonarQube analysis into commit workflow
   - Integration into workflow (done)
+  - Skip on doc-only pushes/PRs (`paths-ignore` for `.md`/`.png`/`docs/**`, done 2026-08-17)
   - Integration into release quality gate todo
 - [ ] Official `2.5.0` after community soak (tag without `-alpha`; GHCR `:latest`)
 
@@ -41,6 +42,10 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 
 - [ ] Improvements for HA-binding
   - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from the Add-on's M3 VM test above (that one tests Supervisor add-on persistence; this one tests EHAL discovery/mapping against different HA integration shapes)
+  - [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)
+  - [ ] Add-on CI linting (`hassfest` / HA Add-on lint action) as a GitHub workflow in the `ha-addon-earnie` repo itself (open point #2 in the same doc — that repo has no backlog of its own, easy to lose track of)
+  - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap): Options-UI → `config.json` generation, Ingress (embedded UI, no separate port), Supervisor-Proxy instead of a manual long-lived-access token for the EHAL-HA-adapter
+  - [ ] Add-on Version 1.0 (Entwicklungsplan roadmap): MQTT Discovery, native Home-Assistant entities for Earnie state, Energy-Dashboard integration — distinct from the "Make also an EHAL adaption for MQTT" item elsewhere in this file (that's an EHAL southbound backend; this is the add-on itself publishing Earnie state via HA's native MQTT Discovery)
 - [ ] Calculate efficiency for battery from difference in overall charging and discharging energy 
   - eff = ((E_discharge) / E_charge)^0.5 
   - Add standby energy consumption on top of "Entladen" bar
