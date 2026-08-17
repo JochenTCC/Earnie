@@ -27,6 +27,9 @@ from tests.historical_case_selection import (
 # Offline: keine Loxone-API beim Import von config
 os.environ.setdefault("EARNIE_OFFLINE", "1")
 
+# 25x reales MILP-Solving über historische Tage — dominiert die Suite-Laufzeit.
+pytestmark = pytest.mark.slow
+
 
 def _load_cases() -> tuple[list[HistoricalConsistencyCase], list[str]]:
     if not fixture_available():

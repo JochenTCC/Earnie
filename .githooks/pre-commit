@@ -30,7 +30,10 @@ fi
 
 echo "pre-commit: Starte Testsuite (pytest tests) ..."
 mkdir -p .pytest_cache/test-metrics
-"$PYTHON" -m pytest tests -q --junitxml=.pytest_cache/test-metrics/junit-last.xml
+# --maxfail: bei >=5 Fehlschlägen früh abbrechen. `slow`-Tests laufen dank
+# conftest.pytest_collection_modifyitems zuletzt, sodass ein Abbruch wegen
+# vieler früher Fehler die teuren MILP-Läufe gar nicht erst startet.
+"$PYTHON" -m pytest tests -q --maxfail=5 --junitxml=.pytest_cache/test-metrics/junit-last.xml
 "$PYTHON" -m scripts.test_health_report ingest --junit .pytest_cache/test-metrics/junit-last.xml
 
 echo "pre-commit: Tests bestanden."

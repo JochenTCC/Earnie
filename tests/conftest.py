@@ -176,3 +176,8 @@ def pytest_configure(config):
         "markers",
         "requires_live_config: bewusst NAS/Prod-config.json (EARNIE_TEST_USE_LIVE_CONFIG=1)",
     )
+
+
+def pytest_collection_modifyitems(items):
+    """`slow`-Tests ans Ende: bei --maxfail-Abbruch sparen wir uns ihre Laufzeit."""
+    items.sort(key=lambda item: item.get_closest_marker("slow") is not None)
