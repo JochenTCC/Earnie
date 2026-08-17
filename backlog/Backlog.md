@@ -20,8 +20,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Context:** Community line is `2.5.0-alpha.7` (full 15‑min MILP `dt_h = 0.25` plus remaining 2.5 feature items, archived; `2.5.r` quality gate done). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
 
-- [ ] Implementing Home-Assistant Add-on MVP (see Earnie_HomeAssistant_Addon_Dokumentation.md on Earnie-Projekt/Entwicklungsplan)
-  -  [x] Create new Repo with MVP
+- [x] Home-Assistant Add-on MVP 0.1 — M1/M2/M4/M5 of Earnie_HomeAssistant_Addon_Dokumentation.md (Earnie-Projekt/Entwicklungsplan); details → [Backlog-Erledigt.md](Backlog-Erledigt.md)
+  - [ ] M3 — persistence proof on a real Supervisor (restart / add-on update / Supervisor backup-restore); VM walkthrough: [docs/einrichtung/homeassistant-addon.md](../docs/einrichtung/homeassistant-addon.md#testumgebung-für-m3-persistenz-nachweis)
 - [x] Adding AppTest feature and AppTest (rendering tests for Streamlit) + tests for all pages
 - [ ] Adding SonarQube analysis into commit workflow
   - Integration into workflow (done)
@@ -40,8 +40,7 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 ### Version 2.+1 — Improvements for EVs / Export
 
 - [ ] Improvements for HA-binding
-  - [ ] Build HA-OS on Virtual Machine (see Earnie-Projekt\Entwicklungsplan\Earnie_HomeAssistant_Addon_Dokumentation.md)
-  - [ ] Build Smoke Test for Integration test (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md)
+  - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from the Add-on's M3 VM test above (that one tests Supervisor add-on persistence; this one tests EHAL discovery/mapping against different HA integration shapes)
 - [ ] Calculate efficiency for battery from difference in overall charging and discharging energy 
   - eff = ((E_discharge) / E_charge)^0.5 
   - Add standby energy consumption on top of "Entladen" bar

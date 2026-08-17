@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Home Assistant Supervisor Add-on MVP 0.1 — M1/M2/M4/M5 (2026-08-17)
+
+- [x] Add-on skeleton under `packaging/homeassistant-addon/earnie/` — image-wrapper `Dockerfile` (`FROM ghcr.io/jochentcc/earnie-energy:${EARNIE_VERSION}`, pinned `2.4.0`), `config.yaml` manifest (ports 8501/8541, `/data` volume, optional options/schema), `build.yaml` (arch mapping, build args), `run.sh` (`/data/options.json` → `EARNIE_*` env via `jq`, hands off to the existing `docker/entrypoint.sh`), `DOCS.md`, `CHANGELOG.md`, `translations/en.yaml`, `icon.png`/`logo.png`.
+- [x] Persistence wired to the standard `/data` add-on convention (`EARNIE_ENV_PATH=/data/earnie_env`) instead of `/config` (corrects the original HA-Green sketch). Local Docker smoke test (bind-mounted `/data`, simulated `options.json`) confirmed config/runtime survive a container restart and caught/fixed a real bug: `jq -r '.auto_start_main // empty'` treated JSON `false` like `null` (jq's `//` falsy-boolean trap), silently ignoring `auto_start_main: false`.
+- [x] User doc [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) (install, options, ports, data paths, limitations) plus a Hyper-V-VM walkthrough for the still-open M3 (Supervisor restart/update/backup-restore proof — needs a real Supervisor, not achievable via plain `docker run`). Cross-linked from `docker/README.md` and `docs/referenz/streamlit-ports.md`.
+- [x] Published add-on repository [`github.com/JochenTCC/ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) (public) — `repository.yaml`, mirrored `earnie/`, `README.md`, `LICENSE.md` (carried over verbatim per license terms), `.gitattributes`. New sync script `packaging/homeassistant-addon/sync-to-ha-addon-repo.sh` mirrors the dev-source folder into a checkout of that repo (manual-copy sync mechanism, per the Entwicklungsplan's decision for 0.1 — no GitHub Action needed).
+- [x] Maintainer-facing release-workflow doc [`packaging/homeassistant-addon/README.md`](../packaging/homeassistant-addon/README.md) (analogous to `packaging/loxberry/README.md`): version-bump checklist (`build.yaml` `EARNIE_VERSION` + `config.yaml` `version`), sync-script usage, local build/test steps — notes that add-on updates need no GitHub Release/tag in `ha-addon-earnie`, just a commit to `main` (Supervisor reads the tracked branch directly).
+
+M3 (persistence proof on real Supervisor hardware) is the one milestone left open — tracked in [Backlog.md](Backlog.md).
+
 ### Streamlit AppTest page coverage + script path guards (2026-08-16)
 
 - [x] First automated UI smoke set with Streamlit AppTest for remaining pages (Config, Daemon, Loxone Debug, Price Forecast, Consumer Analysis, Backtesting) plus earlier Cockpit / Devices / House Config / Scenario Editor — import bugs found during the runs were fixed in the same wave.
