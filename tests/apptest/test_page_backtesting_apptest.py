@@ -3,6 +3,8 @@
 Die Fixture-Config unter tests/fixtures/backtesting/ enthält keinen
 Szenario-Explorer-Log, daher deckt dieser Test den Leerzustand ab (Titel,
 Hinweistext, Run-Controls) — kein Backtesting-Lauf wird ausgelöst.
+Open-Meteo ist für den ganzen AppTest über tests/apptest/conftest.py gemockt
+(cons_data modeled-PV würde sonst archive-api.open-meteo.com anrufen).
 default_timeout=30 statt der AppTest-Vorgabe (3s, zwischenzeitlich 10s):
 unter voller Test-Suite-Last (parallele MILP-/Backtesting-Rechentests) UND
 mit `pytest --cov=.` (Coverage-Instrumentierung verlangsamt den Script-Run

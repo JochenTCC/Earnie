@@ -19,6 +19,7 @@ import pytest
 from runtime_store import optimization_history
 from simulation import backtesting_log
 from tests.conftest import _reinit_config_offline
+from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 
 _FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "backtesting"
 _THIS_DIR = Path(__file__).resolve().parent
@@ -50,6 +51,11 @@ def _isolated_backtesting_config(tmp_path, monkeypatch):
     vollen Suite praktisch immer der Fall), zeigt EARNIE_RUNTIME_PATH allein
     ins Leere. Deshalb zusätzlich direkt per monkeypatch.setattr überschreiben
     (gleiches Muster wie tests/test_optimization_history.py).
+
+    Open-Meteo bleibt für den ganzen AppTest gemockt, nicht nur während
+    reinit_config(): der Szenario-Explorer baut modeled PV für das
+    cons_data-Panel und würde sonst archive-api.open-meteo.com anrufen
+    (CI-Timeouts unter pytest --cov=.).
     """
     config_dir = tmp_path / "config"
     shutil.copytree(_FIXTURE_DIR, config_dir, ignore=shutil.ignore_patterns("README.md"))
@@ -75,6 +81,7 @@ def _isolated_backtesting_config(tmp_path, monkeypatch):
         str(runtime_dir / optimization_history.HISTORY_FILENAME),
     )
 
+    install_open_meteo_climate_mock(monkeypatch)
     _reinit_config_offline()
     yield
     _reinit_config_offline()
