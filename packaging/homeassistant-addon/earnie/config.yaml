@@ -1,0 +1,56 @@
+# Earnie Home-Assistant-Add-on — Manifest (Supervisor).
+# Entwicklungsquelle im Hauptrepo; Sync nach ha-addon-earnie bei Releases
+# (siehe docs/einrichtung/homeassistant-addon.md und der Entwicklungsplan-Doku).
+name: Earnie
+version: "0.1.0"
+slug: earnie
+description: Energiemanagement und Optimierung für Smart Homes
+url: https://github.com/JochenTCC/Earnie
+startup: services
+boot: auto
+init: false
+panel_icon: mdi:solar-power
+arch:
+  - aarch64
+  - amd64
+
+# Container-Ports bleiben fix; Streamlit-Host-Port ändert man über die
+# Add-on-Option "streamlit_port" (Compose-analoges Verhalten wäre ein Port-
+# Remap, das Supervisor-Add-ons nicht unterstützen — daher fixes Mapping).
+ports:
+  8501/tcp: 8501
+  8541/tcp: 8541
+ports_description:
+  8501/tcp: "Earnie Web-UI"
+  8541/tcp: "EHAL Loxone-HTTP (optional, nur bei Loxone-Backend)"
+
+webui: "http://[HOST]:[PORT:8501]"
+
+# Add-on-eigenes Volume; wird nach EARNIE_ENV_PATH=/data/earnie_env gemappt
+# (run.sh) und übersteht Add-on-Updates/-Neustarts/-Backups.
+map:
+  - type: data
+    read_only: false
+
+# Dateibasierte Konfiguration bleibt der primäre Weg in 0.1 (config.json
+# manuell unter /data/earnie_env/config pflegen). Die folgenden Optionen sind
+# ein optionales Zusatzangebot und decken nur die gängigsten Env-Variablen ab.
+options:
+  loxone_user: ""
+  loxone_pass: ""
+  loxone_ip: ""
+  streamlit_port: 8501
+  ehal_loxone_http_port: 8541
+  ui_modes: "sunset2sunset,scenario_explorer,live_environment"
+  auto_start_main: true
+  timezone: "Europe/Vienna"
+
+schema:
+  loxone_user: "str?"
+  loxone_pass: "password?"
+  loxone_ip: "str?"
+  streamlit_port: "port?"
+  ehal_loxone_http_port: "port?"
+  ui_modes: "str?"
+  auto_start_main: "bool?"
+  timezone: "str?"

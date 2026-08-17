@@ -37,6 +37,8 @@ Port-Übersicht (venv, NAS-UI): [`docs/referenz/streamlit-ports.md`](../docs/ref
 
 LoxBerry **Plugin** (Scope A, ZIP-Install): [`packaging/loxberry/`](../packaging/loxberry/) · Anwenderdok: [`docs/einrichtung/loxberry-plugin.md`](../docs/einrichtung/loxberry-plugin.md)
 
+Home-Assistant-**Add-on** (Supervisor, primär HA Green): [`packaging/homeassistant-addon/earnie/`](../packaging/homeassistant-addon/earnie/) · Anwenderdok: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md)
+
 ```powershell
 docker compose --project-directory . -f docker/compose/dev.yml up -d --build
 docker compose --project-directory . -f docker/compose/greenfield.yml up -d --build

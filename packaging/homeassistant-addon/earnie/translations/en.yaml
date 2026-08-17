@@ -1,0 +1,28 @@
+configuration:
+  loxone_user:
+    name: Loxone user
+    description: Username for the Loxone Miniserver connection (ehal.backend=loxone). Leave empty to configure via config.json/.env instead.
+  loxone_pass:
+    name: Loxone password
+    description: Password for the Loxone user above.
+  loxone_ip:
+    name: Loxone IP
+    description: IP address or hostname of the Loxone Miniserver.
+  streamlit_port:
+    name: Streamlit port
+    description: Internal port for the Earnie web UI.
+  ehal_loxone_http_port:
+    name: EHAL Loxone HTTP port
+    description: Reserved for the EHAL Loxone-HTTP daemon. Currently has no effect via this option (still fixed at 8541 / config.json system.ehal_loxone_http_port).
+  ui_modes:
+    name: UI modes
+    description: Comma-separated list of enabled UI modes (e.g. sunset2sunset,scenario_explorer,live_environment).
+  auto_start_main:
+    name: Auto-start optimizer
+    description: Start the Earnie optimization daemon (main.py) automatically with the add-on.
+  timezone:
+    name: Timezone
+    description: Timezone used for planning and display (e.g. Europe/Vienna).
+network:
+  8501/tcp: Web UI
+  8541/tcp: EHAL Loxone-HTTP
