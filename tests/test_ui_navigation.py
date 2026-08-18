@@ -12,7 +12,10 @@ def _titles(keys: list[str]) -> list[str]:
     return [spec.title for spec in build_page_specs(keys)]
 
 
-def test_default_pages_include_core_and_scenario_explorer():
+def test_default_pages_include_core_and_scenario_explorer(monkeypatch):
+    monkeypatch.setenv("LOXONE_IP", "192.168.178.20")
+    monkeypatch.setenv("LOXONE_USER", "earnie")
+    monkeypatch.setenv("LOXONE_PASS", "secret")
     titles = _titles(_FULL_MODES)
     assert "Monitor" in titles
     assert "Manuelle Geräte" in titles
@@ -28,7 +31,10 @@ def test_price_forecast_page_only_when_enabled():
     assert "Preis-Prognose (Dev)" in with_pf
 
 
-def test_only_sunset_hides_dev_and_scenario_explorer():
+def test_only_sunset_hides_dev_and_scenario_explorer(monkeypatch):
+    monkeypatch.setenv("LOXONE_IP", "192.168.178.20")
+    monkeypatch.setenv("LOXONE_USER", "earnie")
+    monkeypatch.setenv("LOXONE_PASS", "secret")
     titles = _titles(["sunset2sunset", "live_environment"])
     assert "Monitor" in titles
     assert "Optimierer-Dienst" in titles
@@ -74,7 +80,10 @@ def test_url_paths_are_unique():
     assert len(url_paths) == len(set(url_paths))
 
 
-def test_sections_are_assigned():
+def test_sections_are_assigned(monkeypatch):
+    monkeypatch.setenv("LOXONE_IP", "192.168.178.20")
+    monkeypatch.setenv("LOXONE_USER", "earnie")
+    monkeypatch.setenv("LOXONE_PASS", "secret")
     specs = build_page_specs([*_FULL_MODES, "price_forecast"])
     sections = {spec.title: spec.section for spec in specs}
     assert sections["Monitor"] == "Live-Cockpit"

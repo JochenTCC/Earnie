@@ -144,14 +144,16 @@ def _append_konfiguration_and_echtzeit(
     if scenario_explorer is not None:
         specs.append(scenario_explorer)
     if show_daemon:
-        # Onboarding (force_echtzeit): Optimierer-Dienst/EHAL-Com stay hidden until
-        # a Smarthome-Backend is chosen — Smarthome-Backend now owns that step
-        # (used to be EHAL-Com's inline backend selector). Outside onboarding the
-        # blocking first-run gate (setup_dotenv.render_ehal_setup_page) already
-        # enforces this before nav ever renders, so no extra check is needed there.
+        # Optimierer-Dienst/EHAL-Com stay hidden until a Smarthome-Backend is
+        # chosen — Smarthome-Backend now owns that step (used to be EHAL-Com's
+        # inline backend selector). Applied unconditionally, not just during
+        # onboarding: the blocking first-run gate (setup_dotenv.render_ehal_setup_page)
+        # intentionally stays deferred for a mature config that has never had a
+        # backend configured (see runtime_store/dotenv_io.py::loxone_setup_deferred),
+        # so it alone would leave these pages reachable without SB ever configured.
         from ui.setup_readiness import needs_sb_setup
 
-        include_daemon_pages = not (force_echtzeit and needs_sb_setup())
+        include_daemon_pages = not needs_sb_setup()
         specs.extend(_echtzeit_page_specs(include_daemon_pages=include_daemon_pages))
 
 

@@ -118,6 +118,72 @@ def test_restricted_navigation_shows_daemon_pages_once_sb_configured(tmp_path, m
     ]
 
 
+def test_general_nav_hides_daemon_pages_for_mature_config_without_backend(
+    tmp_path, monkeypatch
+):
+    """Mature config (never restricted) that has never had a backend configured
+    must not leak Optimierer-Dienst/EHAL-Com into live_environment nav either.
+
+    The pre-nav blocking gate (loxone_setup_deferred) intentionally stays
+    deferred for exactly this state (mature config, no backend ever
+    configured) — see runtime_store/dotenv_io.py::loxone_setup_deferred and
+    tests/test_dotenv_io.py::test_require_loxone_credentials_for_prod_without_onboarding.
+    Nav-level gating via is_sb_configured() is what actually closes this.
+    """
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.delenv("LOXONE_IP", raising=False)
+    monkeypatch.delenv("LOXONE_USER", raising=False)
+    monkeypatch.delenv("LOXONE_PASS", raising=False)
+    _write(
+        config_dir / "config.json",
+        {"flexible_consumers": [{"id": "swimspa", "name": "SwimSpa"}]},
+    )
+    _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
+    _write(config_dir / "house_profiles.json", {"profiles": []})
+    _write(
+        config_dir / "tariffs.json",
+        {"import_tariffs": [], "export_tariffs": []},
+    )
+
+    from ui.setup_readiness import is_setup_navigation_restricted, needs_planning_onboarding
+
+    assert needs_planning_onboarding() is False
+    assert is_setup_navigation_restricted() is False
+
+    specs = build_page_specs(["live_environment"])
+    titles = [spec.title for spec in specs]
+
+    assert "Smarthome-Backend" in titles
+    assert "Optimierer-Dienst" not in titles
+    assert "EHAL-Com" not in titles
+
+
+def test_general_nav_shows_daemon_pages_for_mature_config_once_sb_configured(
+    tmp_path, monkeypatch
+):
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.setenv("LOXONE_IP", "192.168.178.20")
+    monkeypatch.setenv("LOXONE_USER", "earnie")
+    monkeypatch.setenv("LOXONE_PASS", "secret")
+    _write(
+        config_dir / "config.json",
+        {"flexible_consumers": [{"id": "swimspa", "name": "SwimSpa"}]},
+    )
+    _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
+    _write(config_dir / "house_profiles.json", {"profiles": []})
+    _write(
+        config_dir / "tariffs.json",
+        {"import_tariffs": [], "export_tariffs": []},
+    )
+
+    specs = build_page_specs(["live_environment"])
+    titles = [spec.title for spec in specs]
+
+    assert "Smarthome-Backend" in titles
+    assert "Optimierer-Dienst" in titles
+    assert "EHAL-Com" in titles
+
+
 def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     monkeypatch.delenv("LOXONE_IP", raising=False)
