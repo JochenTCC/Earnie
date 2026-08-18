@@ -6,12 +6,16 @@ on:
     paths-ignore:
       - "**/*.md"
       - "**/*.png"
+      - "**/*.yml"
+      - "**/*.yaml"
       - "docs/**"
   pull_request:
     types: [opened, synchronize, reopened]
     paths-ignore:
       - "**/*.md"
       - "**/*.png"
+      - "**/*.yml"
+      - "**/*.yaml"
       - "docs/**"
   workflow_dispatch:
 
