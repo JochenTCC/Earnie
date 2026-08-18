@@ -20,6 +20,9 @@ x-common-env: &common-env
   EARNIE_STRICT_TARIFF_VALIDATE: "1"
   EARNIE_VERIFY_LOXONE_ON_START: "1"
   EARNIE_AUTO_START_MAIN: "1"
+  # Narrows the Smarthome-Backend page's targeted scan to Loxone (LoxBerry is a
+  # Loxone companion box) — see runtime_store/install_context.py.
+  EARNIE_INSTALL_CONTEXT: loxberry
 
 services:
   earnie-productive:

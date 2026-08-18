@@ -2,7 +2,7 @@
 
 Earnie spricht Anlagen über den **EHAL** (Earnie Hardware Access Layer) an. Derselbe Optimizer-Kern bleibt; gewechselt wird nur das **Smarthome-Backend** (`ehal.backend`) plus die jeweiligen Zugangsdaten und Feld-Mappings.
 
-Überblick und Debug: [EHAL-Com](../ui/ehal-com.md).
+Auswahl/Erkennung: [Smarthome-Backend](../ui/smarthome-backend.md); Überblick und Debug danach: [EHAL-Com](../ui/ehal-com.md).
 
 ## Welcher Pfad?
 
@@ -22,9 +22,9 @@ Offizielle DACH-Empfehlung für neue Setups ohne Loxone: **HA + evcc**. OpenEMS 
 
 ### Über die Oberfläche (empfohlen)
 
-1. Streamlit: **Daemon Control → EHAL-Com → Anbindung**
-2. Backend wählen (Loxone / Home Assistant / OpenEMS)
-3. Zugangsdaten speichern; bei HA zusätzlich Entity→EHAL-Mapping, bei Loxone Merker/`plant.ehal_bindings`
+1. Streamlit: **Daemon Control → Smarthome-Backend**
+2. Backend wählen — automatische Suche (mDNS/SSDP, optional OpenEMS-Portscan) oder manuell (Loxone / Home Assistant / OpenEMS)
+3. Zugangsdaten speichern; bei HA zusätzlich Entity→EHAL-Mapping, bei Loxone Merker/`plant.ehal_bindings` (weiterhin auf **EHAL-Com**)
 
 Die Auswahl schreibt `ehal.backend` in `config.json` und leert den Adapter-Cache.
 
@@ -55,6 +55,7 @@ Nach dem Wechsel: Verbindung auf **EHAL-Com** (Live-Lesen / Verbindungstest) pr�
 
 ## Weiterlesen
 
+- [Smarthome-Backend](../ui/smarthome-backend.md) — Erkennung/Auswahl
 - [EHAL-Com](../ui/ehal-com.md) — Anbindung, Live-Lesen/Schreiben
 - [Loxone-Anbindung](loxone-anbindung.md)
 - [Home Assistant + evcc](ha-evcc.md)

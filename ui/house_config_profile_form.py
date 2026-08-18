@@ -276,9 +276,6 @@ def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict]:
         key=_scoped_key(session_scope, "house_annual_kwh"),
     )
     location = _render_location_fields(session_scope=session_scope)
-    from ui.ehal_greenfield_import import render_greenfield_import_section
-
-    render_greenfield_import_section()
     return label, preview_id, float(annual_kwh), location
 
 

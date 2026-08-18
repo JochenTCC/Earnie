@@ -1,4 +1,4 @@
-"""Unit tests for Hauskonfigurator Loxone-Import access gating."""
+"""Unit tests for Smarthome-Backend Loxone-Import access gating."""
 from __future__ import annotations
 
 import os

@@ -25,6 +25,7 @@ NAV_DOC_PAGE_KEYS: frozenset[str] = frozenset(
         "scenario-explorer",
         "optimizer-daemon",
         "ehal-com",
+        "smarthome-backend",
     }
 )
 
@@ -146,6 +147,12 @@ PAGE_DOCS: dict[str, PageDocs] = {
                 "Kurz-Checkliste Go-Live (Benutzer-Handbuch)",
                 "kurz-checkliste-vom-initial-zustand-zum-go-live",
             ),
+        ),
+    ),
+    "smarthome-backend": PageDocs(
+        primary=DocLink(
+            "Smarthome-Backend (SB)",
+            "docs/ui/smarthome-backend.md",
         ),
     ),
     "ehal-com": PageDocs(

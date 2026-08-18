@@ -9,7 +9,7 @@ The **EHAL-Com** page under **Daemon Control** is the central place for smarthom
 
 ## Connection
 
-At the top, choose the **smarthome backend**:
+The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-backend.md) (discovery + selection); this page only shows/re-checks the credentials for whichever backend is already active:
 
 
 | Backend        | Storage                                       | Form                                                 |
@@ -273,7 +273,7 @@ Only with backend **Loxone**: entity-centric wizard (backlog **2.4.k**, structur
 Library templates and the Earnie-dead fallback: [Loxone Signals and the Earnie Library](../referenz/loxone-signals.md#library-setup).
 
 1. **HTTP probe** — checks known Greenfield/template names and already mapped Merker (`greenfield_device_map.json` + prefix+slug) via `/jdev/sps/io/{Name}` (`LL.Code` 200 or 403 = present, 404 = missing). Found names fill the mapping dropdowns. Manually added Merker are checked on the next probe as well. (Loxone MCP and the Ollama AI remain in the code for later re-integration; they are currently not offered in the UI.)
-2. **Loxone import** (in the **House Configurator**, above Consumers) — creates typed plant/consumer entities and `ehal_bindings` from Merker+EFM (prefix+slug, case-insensitive). Meter designation without a leading "Zähler"/"Zaehler" and without EFM's "Verbraucher N:" as label/id; the same physical devices (e.g. pool↔swimspa, EV↔wallbox/smart) are merged, with EFM power preferred on the typed consumer. Afterward, check the signal mapping here. Beforehand, set up the library/Merker on the Miniserver: [Loxone Signals and the Earnie Library](../referenz/loxone-signals.md#library-setup).
+2. **Loxone import** (on **Smarthome-Backend**, once connected) — creates typed plant/consumer entities and `ehal_bindings` from Merker+EFM (prefix+slug, case-insensitive). Meter designation without a leading "Zähler"/"Zaehler" and without EFM's "Verbraucher N:" as label/id; the same physical devices (e.g. pool↔swimspa, EV↔wallbox/smart) are merged, with EFM power preferred on the typed consumer. Afterward, check the signal mapping here. Beforehand, set up the library/Merker on the Miniserver: [Loxone Signals and the Earnie Library](../referenz/loxone-signals.md#library-setup).
 3. **New Merker in the field dropdown** — in every EHAL field select, a still-unknown Merker name can be typed in (`accept_new_options`). A confirmation appears (**New Merker?**): choosing **yes** adds the name to the Merker list, assigns it to the field in `house_profiles.json`, and optionally checks it via HTTP probe (present / 404); choosing **no** leaves the field unmapped. Empty input doesn't count.
 4. **Human-in-the-loop** — choose an entity, assign EHAL fields (select label: **meaning** plus the EHAL value name, e.g. `Netzleistung (sens_grid_power_active)`). The Merker address comes from the binding of the chosen field.
 5. **Save** — **Save mapping** writes all visible field assignments of the selected entity to `plant.ehal_bindings` / `consumers[].ehal_bindings` in `house_profiles.json`. Individual new Merker are already persisted for that field on confirmation (step 3). On the first migrate/save, legacy Merker trigger keys and plant roles are removed from `loxone_blocks` (an empty `loxone_blocks` is dropped).
@@ -297,7 +297,7 @@ Silent mode: `runtime/local_settings.json` → `"loxone_silent_mode"` (takes pri
 
 ## Cutover Checklist
 
-1. **Connection** saved and backend chosen
+1. **Backend** chosen on Smarthome-Backend, **Connection** credentials saved here
 2. **Live Read:** `sens_`* / `get_`* with status **OK**
 3. **Live Write:** all `set_`* entries **success = yes** (disable silent mode first)
 4. **Cockpit / Sankey:** setpoints match live values ([Charts & Panels](charts.md))

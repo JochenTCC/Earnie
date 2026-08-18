@@ -48,6 +48,10 @@ fi
 export EARNIE_UI_STREAMLIT_PORT="$(_opt '.streamlit_port' '8501')"
 export EARNIE_UI_MODES="$(_opt '.ui_modes' 'sunset2sunset,scenario_explorer,live_environment')"
 
+# Narrows the Smarthome-Backend page's targeted scan to Home Assistant itself
+# (see runtime_store/install_context.py).
+export EARNIE_INSTALL_CONTEXT=homeassistant_addon
+
 AUTO_START_MAIN="$(_opt '.auto_start_main' 'true')"
 if [ "$AUTO_START_MAIN" = "false" ]; then
     export EARNIE_AUTO_START_MAIN=0

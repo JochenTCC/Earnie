@@ -355,3 +355,15 @@ def is_scenario_editor_unlocked() -> bool:
     if not needs_planning_onboarding():
         return True
     return is_house_config_ready()
+
+
+def is_sb_configured() -> bool:
+    """Smarthome-Backend page: a hub is selected and has usable connection settings."""
+    from runtime_store.ehal_setup import hub_credentials_configured
+
+    return hub_credentials_configured()
+
+
+def needs_sb_setup() -> bool:
+    """True while the Smarthome-Backend page must still be shown/selected."""
+    return not is_sb_configured()

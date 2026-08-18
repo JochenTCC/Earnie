@@ -97,25 +97,38 @@ def _konfiguration_core_specs(*, house_config_default: bool) -> list[PageSpec]:
     return specs
 
 
-def _echtzeit_page_specs() -> list[PageSpec]:
-    from ui.pages import page_daemon, page_loxone_debug
+def _echtzeit_page_specs(*, include_daemon_pages: bool = True) -> list[PageSpec]:
+    from ui.pages import page_daemon, page_loxone_debug, page_smarthome_backend
 
-    return [
+    specs = [
         PageSpec(
-            page_daemon.render,
-            "Optimierer-Dienst",
-            "🛠️",
+            page_smarthome_backend.render,
+            "Smarthome-Backend",
+            "📡",
             SECTION_ECHTZEIT,
-            "optimizer-daemon",
-        ),
-        PageSpec(
-            page_loxone_debug.render,
-            "EHAL-Com",
-            "🔗",
-            SECTION_ECHTZEIT,
-            "ehal-com",
+            "smarthome-backend",
         ),
     ]
+    if include_daemon_pages:
+        specs.extend(
+            [
+                PageSpec(
+                    page_daemon.render,
+                    "Optimierer-Dienst",
+                    "🛠️",
+                    SECTION_ECHTZEIT,
+                    "optimizer-daemon",
+                ),
+                PageSpec(
+                    page_loxone_debug.render,
+                    "EHAL-Com",
+                    "🔗",
+                    SECTION_ECHTZEIT,
+                    "ehal-com",
+                ),
+            ]
+        )
+    return specs
 
 
 def _append_konfiguration_and_echtzeit(
@@ -131,7 +144,15 @@ def _append_konfiguration_and_echtzeit(
     if scenario_explorer is not None:
         specs.append(scenario_explorer)
     if show_daemon:
-        specs.extend(_echtzeit_page_specs())
+        # Onboarding (force_echtzeit): Optimierer-Dienst/EHAL-Com stay hidden until
+        # a Smarthome-Backend is chosen — Smarthome-Backend now owns that step
+        # (used to be EHAL-Com's inline backend selector). Outside onboarding the
+        # blocking first-run gate (setup_dotenv.render_ehal_setup_page) already
+        # enforces this before nav ever renders, so no extra check is needed there.
+        from ui.setup_readiness import needs_sb_setup
+
+        include_daemon_pages = not (force_echtzeit and needs_sb_setup())
+        specs.extend(_echtzeit_page_specs(include_daemon_pages=include_daemon_pages))
 
 
 def _restricted_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:

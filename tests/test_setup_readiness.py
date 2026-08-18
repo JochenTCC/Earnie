@@ -385,3 +385,54 @@ def test_scenario_editor_unlocked_after_house_config(tmp_path, monkeypatch):
 
     assert setup_readiness.is_scenario_editor_unlocked() is True
     assert setup_readiness.is_planning_ready() is False
+
+
+def test_sb_not_configured_without_any_credentials(tmp_path, monkeypatch):
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.delenv("LOXONE_IP", raising=False)
+    monkeypatch.delenv("LOXONE_USER", raising=False)
+    monkeypatch.delenv("LOXONE_PASS", raising=False)
+    _write(config_dir / "config.json", _minimal_config())
+
+    assert setup_readiness.is_sb_configured() is False
+    assert setup_readiness.needs_sb_setup() is True
+
+
+def test_sb_configured_with_loxone_env_credentials(tmp_path, monkeypatch):
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.setenv("LOXONE_IP", "192.168.178.20")
+    monkeypatch.setenv("LOXONE_USER", "earnie")
+    monkeypatch.setenv("LOXONE_PASS", "secret")
+    _write(config_dir / "config.json", _minimal_config())
+
+    assert setup_readiness.is_sb_configured() is True
+    assert setup_readiness.needs_sb_setup() is False
+
+
+def test_sb_configured_with_ha_backend_credentials(tmp_path, monkeypatch):
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(
+        config_dir / "config.json",
+        {
+            "flexible_consumers": [],
+            "ehal": {
+                "backend": "ha",
+                "ha": {"base_url": "http://homeassistant:8123", "token": "secret-token"},
+            },
+        },
+    )
+
+    assert setup_readiness.is_sb_configured() is True
+
+
+def test_sb_not_configured_with_ha_backend_missing_token(tmp_path, monkeypatch):
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    _write(
+        config_dir / "config.json",
+        {
+            "flexible_consumers": [],
+            "ehal": {"backend": "ha", "ha": {"base_url": "http://homeassistant:8123"}},
+        },
+    )
+
+    assert setup_readiness.is_sb_configured() is False

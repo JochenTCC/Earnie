@@ -1,4 +1,4 @@
-"""EHAL backend selector and OpenEMS connection form for EHAL-Com / first-run."""
+"""EHAL connection forms (Loxone/HA/OpenEMS) — backend persistence and credentials."""
 from __future__ import annotations
 
 from typing import Any
@@ -7,17 +7,8 @@ import streamlit as st
 
 import config
 from integrations.ehal_live import reset_adapter_cache
-from runtime_store.ehal_setup import (
-    BACKEND_HA,
-    BACKEND_LOXONE,
-    BACKEND_OPENEMS,
-    active_ehal_backend,
-    backend_label,
-    normalize_backend,
-)
+from runtime_store.ehal_setup import BACKEND_HA, BACKEND_LOXONE, BACKEND_OPENEMS, normalize_backend
 from ui.house_config_io import load_main_config, save_main_config
-
-_BACKEND_OPTIONS = (BACKEND_LOXONE, BACKEND_HA, BACKEND_OPENEMS)
 
 
 def _ehal_block(data: dict) -> dict[str, Any]:
@@ -37,24 +28,6 @@ def persist_ehal_backend(backend: str) -> None:
     data["ehal"] = ehal
     save_main_config(data)
     reset_adapter_cache()
-
-
-def render_backend_selector(*, key_prefix: str = "ehal") -> str:
-    """Selectbox for Loxone / HA / OpenEMS; persists on change."""
-    current = active_ehal_backend()
-    labels = [backend_label(b) for b in _BACKEND_OPTIONS]
-    index = _BACKEND_OPTIONS.index(current) if current in _BACKEND_OPTIONS else 0
-    choice_label = st.selectbox(
-        "Smarthome-Backend",
-        options=labels,
-        index=index,
-        key=f"{key_prefix}_backend_select",
-    )
-    selected = _BACKEND_OPTIONS[labels.index(choice_label)]
-    if selected != current:
-        persist_ehal_backend(selected)
-        st.rerun()
-    return selected
 
 
 def render_openems_connection_form(*, form_key: str = "ehal_openems_form") -> None:

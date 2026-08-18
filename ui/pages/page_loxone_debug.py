@@ -4,12 +4,14 @@ from __future__ import annotations
 import streamlit as st
 
 import config
-from runtime_store.ehal_setup import BACKEND_HA, BACKEND_LOXONE, BACKEND_OPENEMS
-from ui.ehal_connection import (
-    render_backend_selector,
-    render_ha_connection_form,
-    render_openems_connection_form,
+from runtime_store.ehal_setup import (
+    BACKEND_HA,
+    BACKEND_LOXONE,
+    BACKEND_OPENEMS,
+    active_ehal_backend,
+    backend_label,
 )
+from ui.ehal_connection import render_ha_connection_form, render_openems_connection_form
 from ui.help_hint import render_page_title_with_help
 from ui.loxone_debug import render_loxone_debug_block
 from ui.setup_dotenv import render_loxone_credentials_form
@@ -48,6 +50,10 @@ def _render_cockpit_locked_notice() -> None:
 
 def _render_connection_section(backend: str) -> None:
     st.subheader("Anbindung")
+    st.caption(
+        f"Backend: **{backend_label(backend)}** — Auswahl/Wechsel auf "
+        "**Smarthome-Backend**. Zugangsdaten können hier erneut geprüft werden."
+    )
     if backend == BACKEND_LOXONE:
         render_loxone_credentials_form(form_key="ehal_com_loxone_form")
     elif backend == BACKEND_HA:
@@ -66,7 +72,7 @@ def render() -> None:
     st.caption(f"Konfiguration: `{config.CONFIG.config_path}`")
     _render_cockpit_locked_notice()
 
-    backend = render_backend_selector(key_prefix="ehal_com")
+    backend = active_ehal_backend()
     _render_connection_section(backend)
 
     render_loxone_debug_block()
@@ -82,8 +88,8 @@ def render() -> None:
         from ui.ehal_loxone_mapping import render_ehal_loxone_mapping_section
 
         st.caption(
-            "Loxone → Hausprofil (**Loxone-Import**) liegt im "
-            "**Hauskonfigurator** (Hausprofil, oberhalb von Verbraucher)."
+            "Loxone → Hausprofil (**Loxone-Import**) liegt auf "
+            "**Smarthome-Backend** (nach erfolgreicher Verbindung)."
         )
 
         st.subheader("Energieflussmonitor → Verbraucher")

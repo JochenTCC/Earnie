@@ -54,6 +54,9 @@ def _write_live_scenario(config_dir: Path, settings: dict) -> None:
 
 def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.delenv("LOXONE_IP", raising=False)
+    monkeypatch.delenv("LOXONE_USER", raising=False)
+    monkeypatch.delenv("LOXONE_PASS", raising=False)
     _write(config_dir / "config.json", {"flexible_consumers": []})
     _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
     _write(config_dir / "house_profiles.json", {"profiles": []})
@@ -77,6 +80,39 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
 
     assert titles == [
         "Hauskonfigurator",
+        "Smarthome-Backend",
+    ]
+
+
+def test_restricted_navigation_shows_daemon_pages_once_sb_configured(tmp_path, monkeypatch):
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.setenv("LOXONE_IP", "192.168.178.20")
+    monkeypatch.setenv("LOXONE_USER", "earnie")
+    monkeypatch.setenv("LOXONE_PASS", "secret")
+    _write(config_dir / "config.json", {"flexible_consumers": []})
+    _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
+    _write(config_dir / "house_profiles.json", {"profiles": []})
+    _write(
+        config_dir / "tariffs.json",
+        {"import_tariffs": [], "export_tariffs": []},
+    )
+    _write_live_scenario(
+        config_dir,
+        {
+            "battery_id": "",
+            "pv_system_ids": [],
+            "import_tariff_id": "",
+            "export_tariff_id": "",
+            "house_profile_id": "",
+        },
+    )
+
+    specs = build_page_specs(["scenario_explorer"])
+    titles = [spec.title for spec in specs]
+
+    assert titles == [
+        "Hauskonfigurator",
+        "Smarthome-Backend",
         "Optimierer-Dienst",
         "EHAL-Com",
     ]
@@ -84,6 +120,9 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
 
 def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.delenv("LOXONE_IP", raising=False)
+    monkeypatch.delenv("LOXONE_USER", raising=False)
+    monkeypatch.delenv("LOXONE_PASS", raising=False)
     _write(
         config_dir / "config.json",
         {
@@ -129,8 +168,7 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
     assert titles == [
         "Hauskonfigurator",
         "Szenarienkonfigurator",
-        "Optimierer-Dienst",
-        "EHAL-Com",
+        "Smarthome-Backend",
     ]
     assert "Szenario-Explorer" not in titles
     assert "Live-Konfiguration" not in titles

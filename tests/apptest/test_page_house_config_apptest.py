@@ -26,6 +26,12 @@ def test_title_and_default_tab():
     assert tabs.value == "Hausprofil"
 
 
+def test_loxone_import_moved_to_smarthome_backend_page():
+    """Loxone-Import now lives on Smarthome-Backend, not Hausprofil (see M4)."""
+    at = AppTest.from_file(str(_SCRIPT)).run()
+    assert not any("Loxone-Import" in h.value for h in at.subheader)
+
+
 def test_switch_to_pv_tab_renders_without_exception():
     at = AppTest.from_file(str(_SCRIPT)).run()
     [tabs] = at.segmented_control

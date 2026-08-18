@@ -34,3 +34,12 @@ def test_title_and_missing_credentials_notice():
     assert any(
         "Zugangsdaten fehlen" in caption.value for caption in at.caption
     )
+
+
+def test_backend_selector_moved_to_smarthome_backend_page():
+    """Backend choice now lives on Smarthome-Backend (see M5) — no selectbox here."""
+    at = AppTest.from_file(str(_SCRIPT)).run()
+    assert not any(sb.label == "Smarthome-Backend" for sb in at.selectbox)
+    assert any(
+        "Smarthome-Backend" in caption.value for caption in at.caption
+    )

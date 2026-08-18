@@ -44,6 +44,8 @@ x-common-env: &common-env
   # Loxone-Smoke-Test beim main.py-Start (nach pull/up); siehe scripts/startup_checks.py
   EARNIE_VERIFY_LOXONE_ON_START: "1"
   EARNIE_AUTO_START_MAIN: "1"
+  # Narrows the Smarthome-Backend page's targeted scan to Loxone (LoxBerry host).
+  EARNIE_INSTALL_CONTEXT: loxberry
 
 services:
   earnie-productive:

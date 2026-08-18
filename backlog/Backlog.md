@@ -21,8 +21,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 **Context:** Community line is `2.5.0-alpha.7` (full 15‑min MILP `dt_h = 0.25` plus remaining 2.5 feature items, archived; `2.5.r` quality gate done). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
 
 - [x] Home-Assistant Add-on MVP 0.1 — M1/M2/M4/M5 of Earnie_HomeAssistant_Addon_Dokumentation.md (Earnie-Projekt/Entwicklungsplan); details → [Backlog-Erledigt.md](Backlog-Erledigt.md)
-  - [ ] M3 — persistence proof on a real Supervisor (restart / add-on update / Supervisor backup-restore); VM walkthrough: [docs/einrichtung/homeassistant-addon.md](/docs/einrichtung/homeassistant-addon.md#testumgebung-für-m3-persistenz-nachweis)
+  - [x] M3 — persistence proof on a real Supervisor (restart / add-on update / Supervisor backup-restore); VM walkthrough: [docs/einrichtung/homeassistant-addon.md](/docs/einrichtung/homeassistant-addon.md#testumgebung-für-m3-persistenz-nachweis)
 - [x] Adding AppTest feature and AppTest (rendering tests for Streamlit) + tests for all pages
+- [x] Create "Smarthome Backend" page (SB) (for Earnie_UI_Modes==live_environment) — mDNS/SSDP discovery, HK Loxone-Import moved to SB, EHAL-Com selector removed; details → [Backlog-Erledigt.md](Backlog-Erledigt.md), dev plan [docs/spec/smarthome-backend-page.md](../docs/spec/smarthome-backend-page.md)
+
 - [ ] Adding SonarQube analysis into commit workflow
   - Integration into workflow (done)
   - Skip on doc-only pushes/PRs (`paths-ignore` for `.md`/`.png`/`docs/**`, done 2026-08-17)

@@ -1,4 +1,4 @@
-"""Hauskonfigurator: Loxone → Hausprofil import (2.4.n / 2.4.o)."""
+"""Smarthome-Backend: Loxone → Hausprofil import (2.4.n / 2.4.o)."""
 from __future__ import annotations
 
 from typing import Any
@@ -32,7 +32,7 @@ _LIBRARY_URL = docs_blob_url(
 
 _CREDENTIALS_HINT = (
     "Loxone-Zugangsdaten fehlen oder der Miniserver ist nicht erreichbar. "
-    "Bitte zuerst unter **EHAL-Com → Anbindung** eintragen und prüfen."
+    "Bitte zuerst oben unter **Smarthome-Backend** eintragen und prüfen."
 )
 _IMPORT_HINT = (
     "Earnie kann die Verbraucher aus der Loxone Config importieren, wenn die "
