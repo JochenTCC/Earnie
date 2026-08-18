@@ -79,3 +79,4 @@ def test_shows_configured_summary_when_hub_credentials_present(monkeypatch):
     at = AppTest.from_file(str(_SCRIPT)).run()
     assert not at.exception
     assert any("Smarthome-Backend verbunden" in s.value for s in at.success)
+    assert any(sh.value == "Anbindung" for sh in at.subheader)

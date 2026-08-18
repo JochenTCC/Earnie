@@ -28,6 +28,7 @@ from runtime_store.persist_paths import resolve_house_profiles_json_path
 from ui.house_config_io import (
     apply_csv_path_pending,
     csv_upload_widget_key,
+    delete_house_profile,
     load_house_profiles,
     preview_baseload,
     queue_csv_path_update,
@@ -147,6 +148,40 @@ from ui.form_layout import (
 
 
 
+def _render_profile_select_row(
+    profile_options: list[str],
+    initial_index: int | None,
+):
+    col_label, col_select, col_delete = st.columns(
+        [2.0, 3.0, 1.2], vertical_alignment="center"
+    )
+    col_label.markdown("Profil")
+    kwargs = {
+        "label": "Profil",
+        "options": profile_options,
+        "key": "house_profile_select",
+        "label_visibility": "collapsed",
+    }
+    if initial_index is not None:
+        kwargs["index"] = initial_index
+    selected_display = col_select.selectbox(**kwargs)
+    return str(selected_display), col_delete
+
+
+def _handle_house_profile_delete(selected_id: str, profile_ids: list[str]) -> None:
+    try:
+        delete_house_profile(selected_id)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    fallback = _profile_select_fallback_after_delete(profile_ids, selected_id)
+    st.session_state[_SESSION_SELECT_PENDING_KEY] = fallback
+    st.session_state[_SESSION_SYNC_KEY] = None
+    st.session_state[_SESSION_FILE_STAMP_KEY] = None
+    st.session_state.pop(_SESSION_CONSUMERS_KEY, None)
+    st.rerun()
+
+
 def _render_profile_selector() -> dict:
     _apply_pending_profile_select()
     profiles_doc = load_house_profiles()
@@ -155,25 +190,18 @@ def _render_profile_selector() -> dict:
     profile_options, id_by_display = _profile_select_choices(profile_map, profile_ids)
     _align_profile_select_session(profile_map, profile_ids, id_by_display)
     initial_index = _initial_profile_index(profile_ids)
-    if initial_index is not None:
-        selected_display = labeled_selectbox(
-            "Profil",
-            options=profile_options,
-            index=initial_index,
-            key="house_profile_select",
-        )
-    else:
-        selected_display = labeled_selectbox(
-            "Profil",
-            options=profile_options,
-            key="house_profile_select",
-        )
+    selected_display, delete_col = _render_profile_select_row(
+        profile_options, initial_index
+    )
     selected_id = id_by_display.get(str(selected_display), str(selected_display))
     is_new = selected_id == _NEW_PROFILE_OPTION
+    if not is_new:
+        with delete_col:
+            if st.button("Entfernen", key="house_profile_delete"):
+                _handle_house_profile_delete(selected_id, profile_ids)
+        st.session_state[_SESSION_SELECTED_ID_KEY] = selected_id
     existing = profile_map.get(selected_id, {}) if not is_new else {}
     session_scope = _profile_session_scope(selected_id, is_new=is_new)
-    if not is_new:
-        st.session_state[_SESSION_SELECTED_ID_KEY] = selected_id
     _sync_profile_session(
         session_scope,
         existing,
@@ -332,6 +360,7 @@ from ui.house_config_profile_session import (  # noqa: E402
     _live_markers_enabled,
     _profile_display_label,
     _profile_select_choices,
+    _profile_select_fallback_after_delete,
     _profile_session_scope,
     _profile_widget_state_missing,
     _resolve_profile_id,

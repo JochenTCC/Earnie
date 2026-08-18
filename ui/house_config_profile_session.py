@@ -282,6 +282,29 @@ def _align_profile_select_session(
             profile_map, str(current)
         )
 
+
+def _profile_select_fallback_after_delete(
+    profile_ids: list[str], deleted_id: str
+) -> str:
+    remaining = [pid for pid in profile_ids if pid != deleted_id]
+    if remaining:
+        return remaining[0]
+    return _NEW_PROFILE_OPTION
+
+def _default_existing_profile_id(profile_ids: list[str]) -> str:
+    """Prefer Live-Szenario id, then greenfield ``live``, then first profile."""
+    if not profile_ids:
+        return ""
+    from ui.house_config_io import get_runtime_scenario_refs
+
+    profile_id = str(get_runtime_scenario_refs().get("house_profile_id", "") or "").strip()
+    if profile_id in profile_ids:
+        return profile_id
+    if "live" in profile_ids:
+        return "live"
+    return profile_ids[0]
+
+
 def _apply_pending_profile_select() -> None:
     pending = st.session_state.pop(_SESSION_SELECT_PENDING_KEY, None)
     if pending is not None:
@@ -290,9 +313,7 @@ def _apply_pending_profile_select() -> None:
 def _initial_profile_index(profile_ids: list[str]) -> int | None:
     if "house_profile_select" in st.session_state:
         return None
-    from ui.house_config_io import get_runtime_scenario_refs
-
-    profile_id = str(get_runtime_scenario_refs().get("house_profile_id", "") or "").strip()
-    if profile_id in profile_ids:
-        return profile_ids.index(profile_id) + 1
-    return None
+    selected = _default_existing_profile_id(profile_ids)
+    if not selected:
+        return None
+    return profile_ids.index(selected) + 1

@@ -126,6 +126,20 @@ def earnie_names_from_doc(doc: dict[str, Any], device_map: dict[str, Any]) -> li
     return out
 
 
+def device_map_marker_names(device_map: dict[str, Any]) -> list[str]:
+    """Stable list of exact Merker names from the greenfield device map."""
+    names: list[str] = []
+    seen: set[str] = set()
+    for marker in device_map.get("markers") or []:
+        if not isinstance(marker, dict):
+            continue
+        name = str(marker.get("name") or "").strip()
+        if name and name not in seen:
+            seen.add(name)
+            names.append(name)
+    return names
+
+
 def probe_candidate_names(doc: dict[str, Any], device_map: dict[str, Any]) -> list[str]:
     """Exact device-map markers plus Earnie_* names from LoxAPP3."""
     names: list[str] = []

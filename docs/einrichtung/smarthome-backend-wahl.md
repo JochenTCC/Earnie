@@ -56,7 +56,7 @@ Nach dem Wechsel: Verbindung auf **EHAL-Com** (Live-Lesen / Verbindungstest) pr�
 ## Weiterlesen
 
 - [Smarthome-Backend](../ui/smarthome-backend.md) — Erkennung/Auswahl
-- [EHAL-Com](../ui/ehal-com.md) — Anbindung, Live-Lesen/Schreiben
+- [EHAL-Com](../ui/ehal-com.md) — Live-Lesen/Schreiben, Mapping
 - [Loxone-Anbindung](loxone-anbindung.md)
 - [Home Assistant + evcc](ha-evcc.md)
 - [OpenEMS-Lab](openems-lab.md)

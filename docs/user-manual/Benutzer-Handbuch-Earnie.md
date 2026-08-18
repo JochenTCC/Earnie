@@ -171,7 +171,7 @@ Ein **Hausprofil** beschreibt Standort und „Wer lebt / was verbraucht hier“:
 - **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool, generische Geräte  
 - **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen)
 
-Legen Sie zuerst ein Profil an und ergänzen Sie danach die Geräte. Ohne Standort und sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig. Je mehr Freiheiten sie Earnie beim Verschieben der Aktivierung der verschiedenen Verbraucher geben, umso höher sind die Einsparungspotenziale.
+Legen Sie zuerst ein Profil an und ergänzen Sie danach die Geräte. Ein bestehendes Profil entfernen Sie mit **Entfernen** rechts neben der Profilauswahl — das Profil des Live-Szenarios und Profile, die noch von anderen Szenarien referenziert werden, können nicht gelöscht werden. Ohne Standort und sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig. Je mehr Freiheiten sie Earnie beim Verschieben der Aktivierung der verschiedenen Verbraucher geben, umso höher sind die Einsparungspotenziale.
 
 Optional: **Historische Jahres-Leistungsprofile [kW] (CSV)** — Lastprofil (direkt oder als **Bilanz** aus PV + Batterie + Netz), optional PV-Erzeugungsprofil und Verbraucher — für Ist-vs-Modell-Vergleich und realistischere Explorer-Rechnungen. Pro Verbraucher: Checkbox **„Von Basis-Last abziehen“** steuert, ob die CSV-Last die Synthese ersetzt und von der Basislast abgezogen wird.
 
@@ -364,7 +364,7 @@ Backend wählen und Umschalten: [Adapter wählen](../einrichtung/adapter-wahl.md
 
 1. **Benutzer / Token** am Smarthome-Backend mit Rechten zum Lesen und Schreiben der benötigten IOs / Entities einrichten.
 2. **Signale** anlegen bzw. zuordnen — u. a. Batterie-SOC und Leistungen, PV, Netz, Freigaben, E-Auto-Status. Beispielnamen (Loxone): [Loxone-Signale](../referenz/loxone-signals.md).
-3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** Merker bzw. HA-Entities den EHAL-Feldern zuweisen (`plant.ehal_bindings` / `consumers[].ehal_bindings`). Bei Loxone oft zuerst **Loxone-Import** im Hauskonfigurator, dann Mapping prüfen.
+3. **Mapping in Earnie:** unter **Daemon Control → EHAL-Com** Merker bzw. HA-Entities den EHAL-Feldern zuweisen (`plant.ehal_bindings` / `consumers[].ehal_bindings`). Bei Loxone oft zuerst **Loxone-Import** auf **Smarthome-Backend**, dann Mapping prüfen.
 4. Wenn Jahres-Leistungsprofile berücksichtigt werden sollen (ist optional): CSV-Upload nuten ([Leistungsprofil-CSV](../konfiguration/verbrauchs-csv.md)) Offline-Daten für den Szenario-Explorerliegen später unter`cons_data.csv`.
 
 Earnie liest Werte im Live-Betrief oft als Text mit Einheit (z. B. `3.5 kW`); die Einheit wird ignoriert.
@@ -379,7 +379,7 @@ Details dazu: [PV & Batterie](../konfiguration/batterie-pv.md), [Überblick](../
 
 ### EHAL-Com
 
-Unter **Daemon Control → EHAL-Com**: Backend und Zugangsdaten, Live-Lesen/Schreiben, Silent- vs. Live-Modus, Mapping-Assistenten. Cutover: Lesen OK → Schreiben OK → Monitor plausibel. 
+Unter **Daemon Control → EHAL-Com**: Live-Lesen/Schreiben, Silent- vs. Live-Modus, Mapping-Assistenten. Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend** (Anbindung). Cutover: Lesen OK → Schreiben OK → Monitor plausibel. 
 
 Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md).
 

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from copy import deepcopy
 from pathlib import Path
@@ -43,12 +42,10 @@ def load_json(path: Path) -> Any:
 
 
 def write_json(path: Path, payload: Any) -> None:
-    root_abs = os.path.abspath(str(ROOT))
-    target_abs = os.path.abspath(str(path))
-    prefix = root_abs if root_abs.endswith(os.sep) else root_abs + os.sep
-    if target_abs != root_abs and not target_abs.startswith(prefix):
+    root_resolved = ROOT.resolve()
+    target = Path(path).resolve()
+    if target != root_resolved and not target.is_relative_to(root_resolved):
         raise ValueError(f"Refusing to write outside project root: {path}")
-    target = Path(target_abs)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",

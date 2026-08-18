@@ -81,6 +81,7 @@ from integrations.greenfield_match import (  # noqa: E402
     _resolve_hk_type,
     _signal_tails_by_prefix,
     _sorted_prefixes,
+    device_map_marker_names,
     earnie_names_from_doc,
     probe_candidate_names,
 )
@@ -156,20 +157,6 @@ def _control_names(doc: dict[str, Any]) -> set[str]:
         name = str(ctrl.get("name") or "").strip()
         if name:
             names.add(name)
-    return names
-
-
-def device_map_marker_names(device_map: dict[str, Any]) -> list[str]:
-    """Stable list of exact Merker names from the greenfield device map."""
-    names: list[str] = []
-    seen: set[str] = set()
-    for marker in device_map.get("markers") or []:
-        if not isinstance(marker, dict):
-            continue
-        name = str(marker.get("name") or "").strip()
-        if name and name not in seen:
-            seen.add(name)
-            names.append(name)
     return names
 
 

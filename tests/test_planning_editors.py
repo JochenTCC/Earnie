@@ -12,6 +12,7 @@ from data.heating_need import specific_heating_kwh_m2
 from ui import setup_readiness
 from ui.house_config_io import (
     delete_battery,
+    delete_house_profile,
     delete_scenario,
     get_planning_tariff_selection,
     load_backtesting_scenarios_raw,
@@ -24,11 +25,13 @@ from ui.house_config_io import (
 )
 from tests.config_fixtures import default_live_settings, minimal_config_payload
 from ui.house_config_profile_form import (
+    _NEW_PROFILE_OPTION,
     _consumer_type_options,
     _default_additional_consumer,
     _default_consumer,
     _default_ev_consumer,
     _flatten_consumer_for_edit,
+    _profile_select_fallback_after_delete,
     _profile_session_scope,
     _schedule_defaults,
     _seed_ev_defaults_on_type_switch,
@@ -784,6 +787,31 @@ def test_profile_rejects_thermal_on_second_consumer(tmp_path):
     assert _profile_session_scope("example_efh", is_new=False) == "example_efh"
 
 
+def test_initial_profile_index_defaults_to_live_when_runtime_empty(monkeypatch):
+    import ui.house_config_profile_session as sess
+
+    monkeypatch.setattr(sess.st, "session_state", {})
+    monkeypatch.setattr(
+        "ui.house_config_io.get_runtime_scenario_refs",
+        lambda: {"house_profile_id": ""},
+    )
+    ids = ["alpha", "live"]
+    assert sess._initial_profile_index(ids) == ids.index("live") + 1
+    assert sess._initial_profile_index([]) is None
+
+
+def test_initial_profile_index_prefers_runtime_house_profile_id(monkeypatch):
+    import ui.house_config_profile_session as sess
+
+    monkeypatch.setattr(sess.st, "session_state", {})
+    monkeypatch.setattr(
+        "ui.house_config_io.get_runtime_scenario_refs",
+        lambda: {"house_profile_id": "alpha"},
+    )
+    ids = ["alpha", "live"]
+    assert sess._initial_profile_index(ids) == ids.index("alpha") + 1
+
+
 def test_flatten_consumer_for_edit_merges_thermal():
     flattened = _flatten_consumer_for_edit(
         {
@@ -1245,3 +1273,104 @@ def test_schedule_defaults_preserves_zero_start_shift_h():
         }
     )
     assert defaults["start_shift_h"] == 0.0
+
+
+def _write_house_profile_delete_tree(
+    config_dir,
+    *,
+    live_house_id: str,
+    extra_house_id: str = "extra",
+    extra_scenario_house_id: str | None = None,
+) -> None:
+    live_settings = default_live_settings()
+    live_settings["house_profile_id"] = live_house_id
+    extra_settings = default_live_settings()
+    extra_settings["house_profile_id"] = extra_scenario_house_id or extra_house_id
+    config_dir.joinpath("config.json").write_text(
+        json.dumps(minimal_config_payload()),
+        encoding="utf-8",
+    )
+    config_dir.joinpath("backtesting_scenarios.json").write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "id": "live",
+                        "label": "Live",
+                        "settings": live_settings,
+                    },
+                    {
+                        "id": "ohne_pv",
+                        "label": "Ohne PV",
+                        "settings": extra_settings,
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    config_dir.joinpath("house_profiles.json").write_text(
+        json.dumps(
+            {
+                "profiles": [
+                    {"id": live_house_id, "label": "Home", "annual_kwh": 4000.0},
+                    {"id": extra_house_id, "label": "Extra", "annual_kwh": 3000.0},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_delete_house_profile_removes_unreferenced(tmp_path, monkeypatch):
+    config_dir = _bind_paths(tmp_path, monkeypatch)
+    monkeypatch.setattr("ui.house_config_io.config.reinit_config", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "ui.house_config_io.config.get_live_scenario_id",
+        lambda: "live",
+    )
+    _write_house_profile_delete_tree(
+        config_dir,
+        live_house_id="home",
+        extra_scenario_house_id="home",
+    )
+
+    delete_house_profile("extra")
+
+    doc = load_house_profiles_document(str(config_dir / "house_profiles.json"))
+    assert set(doc["profiles"]) == {"home"}
+
+
+def test_delete_house_profile_rejects_live(tmp_path, monkeypatch):
+    config_dir = _bind_paths(tmp_path, monkeypatch)
+    monkeypatch.setattr("ui.house_config_io.config.reinit_config", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "ui.house_config_io.config.get_live_scenario_id",
+        lambda: "live",
+    )
+    _write_house_profile_delete_tree(config_dir, live_house_id="home")
+
+    with pytest.raises(ValueError, match="Live-Szenario"):
+        delete_house_profile("home")
+
+
+def test_delete_house_profile_rejects_scenario_ref(tmp_path, monkeypatch):
+    config_dir = _bind_paths(tmp_path, monkeypatch)
+    monkeypatch.setattr("ui.house_config_io.config.reinit_config", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "ui.house_config_io.config.get_live_scenario_id",
+        lambda: "live",
+    )
+    _write_house_profile_delete_tree(
+        config_dir,
+        live_house_id="home",
+        extra_scenario_house_id="extra",
+    )
+
+    with pytest.raises(ValueError, match="Szenarien"):
+        delete_house_profile("extra")
+
+
+def test_profile_select_fallback_after_delete():
+    assert _profile_select_fallback_after_delete(["home", "extra"], "extra") == "home"
+    assert _profile_select_fallback_after_delete(["home"], "home") == _NEW_PROFILE_OPTION

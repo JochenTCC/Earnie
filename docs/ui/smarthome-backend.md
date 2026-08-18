@@ -1,6 +1,6 @@
 # Smarthome-Backend (SB)
 
-The **Smarthome-Backend** page under **Daemon Control** picks and connects the live-environment hub — **Loxone**, **Home Assistant**, or **OpenEMS**. It is the single place backend selection happens; **EHAL-Com** no longer offers a backend switch, it only shows connection details, live read/write, and mapping for the backend chosen here.
+The **Smarthome-Backend** page under **Daemon Control** picks and connects the live-environment hub — **Loxone**, **Home Assistant**, or **OpenEMS**. It is the single place backend selection **and credentials** happen; **EHAL-Com** no longer offers a backend switch or Anbindung form, it only shows live read/write and mapping for the backend chosen here.
 
 ## Access
 
@@ -18,7 +18,9 @@ The **Smarthome-Backend** page under **Daemon Control** picks and connects the l
 
 See [SB-Identification-Draft](../../backlog/SB-Identification-Draft.md) and [development plan](../spec/smarthome-backend-page.md) for the underlying design.
 
-## Credentials
+## Anbindung / Credentials
+
+Once a backend is connected, this page shows **Anbindung** at the top (re-enter / re-check credentials), then **Backend ändern** (discovery / switch), then **Loxone-Import** when the backend is Loxone.
 
 Same storage as before, just reached from here now:
 
@@ -32,7 +34,7 @@ Saving credentials sets `ehal.backend` and unlocks **EHAL-Com** and **Optimierer
 
 ## Loxone Import
 
-The Loxone → house-profile import (formerly on the Hauskonfigurator) now runs from this page once Loxone is connected.
+The Loxone → house-profile import (formerly on the Hauskonfigurator) now runs from this page once Loxone is connected. After import, check created consumers on the Hauskonfigurator and signal mapping on EHAL-Com.
 
 ## See Also
 

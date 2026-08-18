@@ -2,6 +2,22 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### SB / HK follow-ups (2026-08-18)
+
+- [x] On SB page — Loxone-Import success text hints to check created consumers on **Hauskonfigurator** and signal mapping on **EHAL-Com** (`ui/ehal_greenfield_import.py` `_IMPORT_SAVED_FLASH`; regression in `tests/test_ehal_greenfield_import_ui.py`).
+- [x] Move **Anbindung** (credentials) from EHAL-Com to Smarthome-Backend: configured SB order is Anbindung → **Backend ändern** → Loxone-Import; EHAL-Com keeps live debug/mapping only (`ui/ehal_connection.py::render_anbindung_section`, `ui/pages/page_smarthome_backend.py`, `ui/pages/page_loxone_debug.py`).
+- [x] Hausprofil **Entfernen** beside the Profil select (`ui/house_config_profile_form.py`); `delete_house_profile` refuses the Live-Szenario profile and any profile still referenced by other scenarios (`ui/house_config_io.py`).
+- [x] LoxBerry plugin and Home-Assistant add-on store icons now use `docs/assets/Earnie-Logo-Simple-Light.png` (`packaging/loxberry/icons/`, `packaging/homeassistant-addon/earnie/icon.png`+`logo.png`, mirrored to `ha-addon-earnie`).
+
+### Bugfix SB Loxone-Import → extra Hausprofil on HK (2026-08-18)
+
+- [x] Do not automatically add another House profile when switching from SB page to HK page — HK now defaults to an existing profile (`live` / Live-Szenario) instead of `— neu —`; Loxone-Import sets pending HK select to the imported profile (`ui/house_config_profile_session.py`, `ui/ehal_greenfield_import.py`). Live acceptance verified.
+- [x] SB success text after Loxone-Import: hint to check created consumers on Hauskonfigurator (and EHAL-Com signal mapping).
+
+### Bugfix EV short unplug before FertigUm skipped today's cycle (2026-08-18)
+
+- [x] EV short unplug before FertigUm skipped today's cycle (`debug_dump_20260808_102915`) — `open_charging_deadlines` latch keeps `available_from=now` until deadline/fulfill; tests in `test_charging_session.py` / `test_charging_context.py`. Live acceptance verified.
+
 ### Smarthome-Backend (SB) page — M1/M2/M3/M4/M5/M6 (2026-08-18)
 
 Dev plan drafted and implemented same day, 2026-08-18: [docs/spec/smarthome-backend-page.md](../docs/spec/smarthome-backend-page.md) (see its §5 "Implementation notes" for deviations from the original plan found during implementation). Detection design draft: [backlog/SB-Identification-Draft.md](SB-Identification-Draft.md).

@@ -1,4 +1,4 @@
-"""EHAL-Com: Debug-Seite für Anbindung, Live-Lesen und Live-Schreiben."""
+"""EHAL-Com: Debug-Seite für Live-Lesen, Live-Schreiben und Mapping."""
 from __future__ import annotations
 
 import streamlit as st
@@ -7,14 +7,10 @@ import config
 from runtime_store.ehal_setup import (
     BACKEND_HA,
     BACKEND_LOXONE,
-    BACKEND_OPENEMS,
     active_ehal_backend,
-    backend_label,
 )
-from ui.ehal_connection import render_ha_connection_form, render_openems_connection_form
 from ui.help_hint import render_page_title_with_help
 from ui.loxone_debug import render_loxone_debug_block
-from ui.setup_dotenv import render_loxone_credentials_form
 from ui.setup_readiness import (
     is_betrieb_unlocked,
     is_planning_ready,
@@ -22,7 +18,8 @@ from ui.setup_readiness import (
 )
 
 _EHAL_COM_HELP = (
-    "Anbindung und Live-Übersicht für Loxone, Home Assistant (EHAL) oder OpenEMS. "
+    "Live-Übersicht für Loxone, Home Assistant (EHAL) oder OpenEMS. "
+    "Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend**. "
     "Live-Lesen zeigt `sens_*`/`get_*` mit EHAL-Feld und Backend-Mapping; "
     "Live-Schreiben die Schreibvorgänge (`set_*`, Flex-Freigabe/`set_enable`) "
     "aus dem Produktiv-Lauf von main.py. "
@@ -34,8 +31,8 @@ _EHAL_COM_HELP = (
 _COCKPIT_LOCKED_NOTICE = (
     "**Live-Cockpit noch gesperrt:** Monitor und Manuelle Geräte erscheinen erst, "
     "wenn die Smarthome-Anbindung für den Live-Betrieb vollständig und korrekt "
-    "konfiguriert ist. Prüfen Sie **Anbindung**, **Live-Lesen** und die "
-    "Verbindungstests auf dieser Seite."
+    "konfiguriert ist. Prüfen Sie **Smarthome-Backend** (Anbindung), **Live-Lesen** "
+    "und die Verbindungstests auf dieser Seite."
 )
 
 
@@ -46,20 +43,6 @@ def _render_cockpit_locked_notice() -> None:
     if not is_planning_ready() or is_betrieb_unlocked():
         return
     st.info(_COCKPIT_LOCKED_NOTICE)
-
-
-def _render_connection_section(backend: str) -> None:
-    st.subheader("Anbindung")
-    st.caption(
-        f"Backend: **{backend_label(backend)}** — Auswahl/Wechsel auf "
-        "**Smarthome-Backend**. Zugangsdaten können hier erneut geprüft werden."
-    )
-    if backend == BACKEND_LOXONE:
-        render_loxone_credentials_form(form_key="ehal_com_loxone_form")
-    elif backend == BACKEND_HA:
-        render_ha_connection_form(form_key="ehal_com_ha_form")
-    elif backend == BACKEND_OPENEMS:
-        render_openems_connection_form(form_key="ehal_com_openems_form")
 
 
 def render() -> None:
@@ -73,7 +56,10 @@ def render() -> None:
     _render_cockpit_locked_notice()
 
     backend = active_ehal_backend()
-    _render_connection_section(backend)
+    st.caption(
+        "Zugangsdaten und Backend-Wechsel auf **Smarthome-Backend**. "
+        "Diese Seite zeigt Live-Lesen/Schreiben und das Signal-Mapping."
+    )
 
     render_loxone_debug_block()
 

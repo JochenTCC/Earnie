@@ -9,14 +9,14 @@ The **EHAL-Com** page under **Daemon Control** is the central place for smarthom
 
 ## Connection
 
-The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-backend.md) (discovery + selection); this page only shows/re-checks the credentials for whichever backend is already active:
+The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-backend.md) (discovery + selection + **Anbindung** credentials). This page no longer re-checks credentials; use Smarthome-Backend for that. EHAL-Com shows live read/write and mapping for whichever backend is already active:
 
 
-| Backend        | Storage                                       | Form                                                 |
+| Backend        | Storage                                       | Mapping on this page                                 |
 | -------------- | --------------------------------------------- | ------------------------------------------------------ |
-| Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | Miniserver IP, user, password                          |
-| Home Assistant | `config.json` → `ehal.ha`                     | URL, long-lived token; entity→EHAL mapping below        |
-| OpenEMS        | `config.json` → `ehal.openems`                | base URL, user, password, ESS/EVCS components          |
+| Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | Loxone Structure → EHAL Mapping                        |
+| Home Assistant | `config.json` → `ehal.ha`                     | HA Entity → EHAL Mapping                               |
+| OpenEMS        | `config.json` → `ehal.openems`                | (credentials on Smarthome-Backend)                     |
 
 
 `ehal.backend` controls the live path in `main.py` (Loxone HTTP vs. EHAL REST). Which backend choice makes sense when: [Choose Adapter](../einrichtung/adapter-wahl.md).
@@ -297,7 +297,7 @@ Silent mode: `runtime/local_settings.json` → `"loxone_silent_mode"` (takes pri
 
 ## Cutover Checklist
 
-1. **Backend** chosen on Smarthome-Backend, **Connection** credentials saved here
+1. **Backend** and **credentials** on Smarthome-Backend (**Anbindung**)
 2. **Live Read:** `sens_`* / `get_`* with status **OK**
 3. **Live Write:** all `set_`* entries **success = yes** (disable silent mode first)
 4. **Cockpit / Sankey:** setpoints match live values ([Charts & Panels](charts.md))

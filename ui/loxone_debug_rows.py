@@ -393,7 +393,7 @@ def render_status_strip(main_state: dict | None) -> None:
     if not loxone_env_configured():
         st.warning(
             "Loxone-Zugangsdaten fehlen. Tragen Sie IP, Benutzer und Passwort unter "
-            "**Anbindung** auf dieser Seite ein."
+            "**Anbindung** auf **Smarthome-Backend** ein."
         )
         return
 

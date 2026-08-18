@@ -39,6 +39,11 @@ _IMPORT_HINT = (
     "Earnie-Templates verwendet wurden und für jeden Verbraucher ein "
     f"Zählerbaustein eingefügt wurde — siehe [Anleitung]({_LIBRARY_URL})."
 )
+_IMPORT_SAVED_FLASH = (
+    "Loxone-Import gespeichert. Entities/Bindings sind gesetzt — "
+    "Signal-Mapping auf **EHAL-Com** prüfen, angelegte Verbraucher "
+    "im **Hauskonfigurator** prüfen und Parameter dort ergänzen."
+)
 
 
 def wizard_active() -> bool:
@@ -159,10 +164,7 @@ def render_greenfield_import_section() -> None:
         )
     if not clicked:
         if st.session_state.pop(_SESSION_FLASH_OK, None):
-            st.success(
-                "Loxone-Import gespeichert. Entities/Bindings sind gesetzt — "
-                "Signal-Mapping auf **EHAL-Com** prüfen, Parameter hier ergänzen."
-            )
+            st.success(_IMPORT_SAVED_FLASH)
         report = st.session_state.get(_SESSION_LAST_REPORT)
         if isinstance(report, dict):
             _show_report(report)
@@ -199,6 +201,15 @@ def _run_import() -> None:
     report = result.get("report") or {}
     st.session_state[_SESSION_LAST_REPORT] = report
     st.session_state[_SESSION_FLASH_OK] = True
+    profile_id = str(report.get("profile_id") or "").strip()
+    if profile_id:
+        from ui.house_config_profile_session import (
+            _SESSION_SELECT_PENDING_KEY,
+            _SESSION_SYNC_KEY,
+        )
+
+        st.session_state[_SESSION_SELECT_PENDING_KEY] = profile_id
+        st.session_state[_SESSION_SYNC_KEY] = None
     clear_wizard_flag()
     dismiss_onboarding()
     st.rerun()

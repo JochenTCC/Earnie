@@ -7,13 +7,36 @@ import streamlit as st
 
 import config
 from integrations.ehal_live import reset_adapter_cache
-from runtime_store.ehal_setup import BACKEND_HA, BACKEND_LOXONE, BACKEND_OPENEMS, normalize_backend
+from runtime_store.ehal_setup import (
+    BACKEND_HA,
+    BACKEND_LOXONE,
+    BACKEND_OPENEMS,
+    backend_label,
+    normalize_backend,
+)
 from ui.house_config_io import load_main_config, save_main_config
 
 
 def _ehal_block(data: dict) -> dict[str, Any]:
     ehal = data.get("ehal") if isinstance(data.get("ehal"), dict) else {}
     return dict(ehal)
+
+
+def render_anbindung_section(backend: str, *, form_key_prefix: str) -> None:
+    """Credentials re-entry for the already-selected backend (SB Anbindung)."""
+    from ui.setup_dotenv import render_loxone_credentials_form
+
+    st.subheader("Anbindung")
+    st.caption(
+        f"Backend: **{backend_label(backend)}** — Auswahl/Wechsel unter "
+        "**Backend ändern**. Zugangsdaten können hier erneut geprüft werden."
+    )
+    if backend == BACKEND_LOXONE:
+        render_loxone_credentials_form(form_key=f"{form_key_prefix}_loxone_form")
+    elif backend == BACKEND_HA:
+        render_ha_connection_form(form_key=f"{form_key_prefix}_ha_form")
+    elif backend == BACKEND_OPENEMS:
+        render_openems_connection_form(form_key=f"{form_key_prefix}_openems_form")
 
 
 def persist_ehal_backend(backend: str) -> None:

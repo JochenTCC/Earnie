@@ -8,6 +8,7 @@ os.environ.setdefault("EARNIE_OFFLINE", "1")
 from ui.ehal_greenfield_import import (
     _CREDENTIALS_HINT,
     _IMPORT_HINT,
+    _IMPORT_SAVED_FLASH,
     resolve_loxone_import_access,
 )
 
@@ -16,6 +17,12 @@ def test_import_hint_links_library_doc():
     assert "Anleitung" in _IMPORT_HINT
     assert "loxone-signals.md" in _IMPORT_HINT
     assert "library-setup" in _IMPORT_HINT
+
+
+def test_import_saved_flash_points_to_hk_consumers_and_ehal_com():
+    assert "Hauskonfigurator" in _IMPORT_SAVED_FLASH
+    assert "Verbraucher" in _IMPORT_SAVED_FLASH
+    assert "EHAL-Com" in _IMPORT_SAVED_FLASH
 
 
 def test_access_disabled_without_credentials():

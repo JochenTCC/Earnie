@@ -43,3 +43,4 @@ def test_backend_selector_moved_to_smarthome_backend_page():
     assert any(
         "Smarthome-Backend" in caption.value for caption in at.caption
     )
+    assert not any(sh.value == "Anbindung" for sh in at.subheader)

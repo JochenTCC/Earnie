@@ -23,13 +23,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] EV short unplug before FertigUm skipped today's cycle (`debug_dump_20260808_102915`) — `open_charging_deadlines` latch keeps `available_from=now` until deadline/fulfill; tests in `test_charging_session.py` / `test_charging_context.py`. Live acceptance pending.
-
 
 ## New Bugs (Do not remove this chapter — even if empty)
-
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
 
 
-## Organizational Changes - no bugs (but still no development issue)

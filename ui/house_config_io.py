@@ -149,6 +149,53 @@ def upsert_house_profile(profile: dict) -> None:
     save_house_profiles_document(path, payload)
 
 
+def _scenario_ids_using_house_profile(profile_id: str) -> tuple[list[str], bool]:
+    target = str(profile_id or "").strip()
+    live_id = str(config.get_live_scenario_id() or "").strip()
+    used_by: list[str] = []
+    live_hit = False
+    for item in load_backtesting_scenarios_raw().get("scenarios") or []:
+        if not isinstance(item, dict):
+            continue
+        settings = item.get("settings") if isinstance(item.get("settings"), dict) else {}
+        if str(settings.get("house_profile_id", "") or "").strip() != target:
+            continue
+        sid = str(item.get("id", "") or "").strip() or "?"
+        used_by.append(sid)
+        if live_id and sid == live_id:
+            live_hit = True
+    return used_by, live_hit
+
+
+def delete_house_profile(profile_id: str) -> None:
+    """Remove a house profile that no scenario still references."""
+    target = str(profile_id or "").strip()
+    if not target:
+        raise ValueError("Profil-ID fehlt.")
+    used_by, live_hit = _scenario_ids_using_house_profile(target)
+    if live_hit:
+        raise ValueError("Das Hausprofil des Live-Szenarios kann nicht entfernt werden.")
+    if used_by:
+        raise ValueError(
+            "Hausprofil wird noch von Szenarien verwendet: " + ", ".join(used_by) + "."
+        )
+    path = resolve_house_profiles_json_path()
+    if not os.path.isfile(path):
+        raise ValueError(f"Unbekanntes Hausprofil '{target}'.")
+    raw = read_json_document(path)
+    profiles = list(raw.get("profiles", []))
+    remaining = [p for p in profiles if str(p.get("id", "")).strip() != target]
+    if len(remaining) == len(profiles):
+        raise ValueError(f"Unbekanntes Hausprofil '{target}'.")
+    payload: dict = {"profiles": remaining}
+    plant = raw.get("plant")
+    if isinstance(plant, dict) and plant:
+        payload["plant"] = dict(plant)
+    if "earnie_data_model" in raw:
+        payload["earnie_data_model"] = raw["earnie_data_model"]
+    save_house_profiles_document(path, payload)
+
+
 from ui.house_config_csv_io import (  # noqa: E402
     _resampled_upload_csv_name,
     _stable_upload_csv_name,
@@ -200,6 +247,7 @@ __all__ = [
     "compute_baseload_kwh",
     "csv_upload_widget_key",
     "delete_battery",
+    "delete_house_profile",
     "delete_pv_system",
     "delete_scenario",
     "get_live_scenario_refs",

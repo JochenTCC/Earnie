@@ -20,6 +20,7 @@ from runtime_store.ehal_setup import (
 from runtime_store.install_context import install_context_target_kinds
 from ui.ehal_connection import (
     persist_ehal_backend,
+    render_anbindung_section,
     render_ha_connection_form,
     render_openems_connection_form,
 )
@@ -82,6 +83,9 @@ def _render_configured_summary() -> None:
     backend = active_ehal_backend()
     st.success(f"Smarthome-Backend verbunden: **{backend_label(backend)}**")
     st.caption("EHAL-Com und Optimierer-Dienst sind freigeschaltet.")
+    render_anbindung_section(backend, form_key_prefix="sb_anbindung")
+    with st.expander("Backend ändern", expanded=False):
+        _render_discovery_flow()
     _render_backend_import_section(backend)
 
 
@@ -190,7 +194,5 @@ def render() -> None:
     )
     if is_sb_configured():
         _render_configured_summary()
-        with st.expander("Backend ändern", expanded=False):
-            _render_discovery_flow()
         return
     _render_discovery_flow()
