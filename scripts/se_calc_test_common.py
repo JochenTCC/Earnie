@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from copy import deepcopy
 from pathlib import Path
@@ -76,10 +77,9 @@ def _allowed_write_target(path: Path) -> Path:
 def write_json(path: Path, payload: Any) -> None:
     target = _allowed_write_target(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    serialized = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    with open(os.fspath(target), mode="w", encoding="utf-8") as handle:
+        handle.write(serialized)
 
 
 def load_house_profiles_doc(env: Path | None = None) -> dict:
