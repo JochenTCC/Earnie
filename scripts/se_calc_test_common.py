@@ -23,6 +23,7 @@ LIVE_SCENARIO_ID = "live"
 M2_CSV_CONSUMER_IDS = ("wp_heating", "ev", "swimspa")
 PRIORITIZED_CELLS = ("M0", "M1", "M2")
 ALL_CELL_IDS = ("M0", "M1", "M2", "M3", "M4")
+_CELL_JSON_NAMES = ("house_profiles.json", "backtesting_scenarios.json")
 
 
 def project_root() -> Path:
@@ -41,11 +42,39 @@ def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def write_json(path: Path, payload: Any) -> None:
-    root_resolved = ROOT.resolve()
+def _canonical_name(value: str, allowed: tuple[str, ...]) -> str:
+    for item in allowed:
+        if item == value:
+            return item
+    raise ValueError(f"Value {value!r} is not allowed")
+
+
+def _allowed_cell_json(target: Path) -> Path | None:
+    try:
+        rel = target.relative_to(CELLS_DIR.resolve())
+    except ValueError:
+        return None
+    if len(rel.parts) != 2:
+        return None
+    cell_id = _canonical_name(rel.parts[0], ALL_CELL_IDS)
+    filename = _canonical_name(rel.parts[1], _CELL_JSON_NAMES)
+    return (CELLS_DIR / cell_id / filename).resolve()
+
+
+def _allowed_write_target(path: Path) -> Path:
+    """Return a path reconstructed from constants, never the caller Path."""
     target = Path(path).resolve()
-    if target != root_resolved and not target.is_relative_to(root_resolved):
-        raise ValueError(f"Refusing to write outside project root: {path}")
+    for allowed in (DESCRIPTORS_PATH.resolve(), RESULTS_JSON.resolve()):
+        if target == allowed:
+            return allowed
+    cell_target = _allowed_cell_json(target)
+    if cell_target is not None:
+        return cell_target
+    raise ValueError(f"Refusing to write outside SE allowlist: {path}")
+
+
+def write_json(path: Path, payload: Any) -> None:
+    target = _allowed_write_target(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",

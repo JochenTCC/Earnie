@@ -4,15 +4,15 @@ description: >-
   Runs the Earnie MINOR release quality / hardening gate (same shape as 2.4.r /
   2.5.r): coverage baseline, dead-code and obsolete-test audit, identify
   redundant / unnecessarily complex / unneeded code without changing
-  functionality, KPI refactor including mega-file splits, then official-docs
-  review. Use when the user asks for a quality gate, quality/release hardening,
-  2.X.r, coverage/KPI audit before official release, or to repeat the 2.4.r
-  checklist.
+  functionality, KPI refactor including mega-file splits, official-docs
+  review, then a SonarCloud snapshot. Use when the user asks for a quality gate,
+  quality/release hardening, 2.X.r, coverage/KPI audit before official release,
+  or to repeat the 2.4.r / 2.5.r checklist.
 ---
 
 # Quality / release hardening gate
 
-Canonical shape: **coverage → dead-code / obsolete tests → simplify redundant/complex/unneeded code (no behavior change) → KPI refactor (incl. mega-file splits) → official docs**. Do **not** tag, bump `version.py`, or publish; that is [session-abschluss](../session-abschluss/SKILL.md).
+Canonical shape: **coverage → dead-code / obsolete tests → simplify redundant/complex/unneeded code (no behavior change) → KPI refactor (incl. mega-file splits) → official docs → SonarCloud snapshot**. Do **not** tag, bump `version.py`, or publish; that is [session-abschluss](../session-abschluss/SKILL.md).
 
 Never auto-delete tests, fixtures, or vulture hits — triage with the user.
 
@@ -31,7 +31,8 @@ Quality gate:
 - [ ] 3. Identify redundant, unnecessarily complex, or unneeded code without changing functionality
 - [ ] 4. KPI refactor — functions + files over hard limits; do not defer mega-file splits
 - [ ] 5. Official docs (landing/handbook/charts/specs vs this MINOR)
-- [ ] 6. Record results in the open `X.Y.r` backlog chapter (do not bump version.py)
+- [ ] 6. SonarCloud snapshot (new issues vs last .r; record gate status)
+- [ ] 7. Record results in the open `X.Y.r` backlog chapter (do not bump version.py)
 ```
 
 Windows: prefix every Python/pytest command with `$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1';` ([windows-unicode-console](../windows-unicode-console/SKILL.md)). PowerShell 5.x: no `&&`. Commands: [`.cursor/rules/test-health.mdc`](../../rules/test-health.mdc).
@@ -105,9 +106,26 @@ Walk [`backlog/Doc-Review-Checklist.md`](../../../backlog/Doc-Review-Checklist.m
 
 New findings that are not fixed in this pass go under `## Document Review Findings` in `backlog/Backlog-Bugfixes.md` (skill [doc-review-findings](../doc-review-findings/SKILL.md)). If headings/nav change, [streamlit-doc-links](../streamlit-doc-links/SKILL.md).
 
-## 6. Backlog — no version bump
+## 6. SonarCloud snapshot
 
-Tick the open `X.Y.r` items in `backlog/Backlog.md` with measured numbers (pytest count, coverage, vulture/dead-fixtures, simplification removals vs deferred, which files were split). Leave live-verification bugs in `Backlog-Bugfixes.md`. **Never** change `version.py` in this skill.
+CI already scans `main`/PRs ([`.github/workflows/sonarcloud.yml`](../../../.github/workflows/sonarcloud.yml)). **Do not** re-run Sonar or `pytest --cov` locally for this step. Open the SonarCloud project (`JochenTCC_Earnie`) on the `main` commit this `.r` is based on.
+
+Record in the `X.Y.r` chapter:
+
+| Record | Rule |
+|--------|------|
+| Sonar Quality Gate | Passed / Failed — **informational** (not a required GitHub check; not a merge blocker) |
+| New issues since last `.r` | Bugs, vulnerabilities, and security hotspots only — **new**, not the whole historical backlog |
+| Code smells | Triage like vulture: list candidates; fix only what the user accepts |
+| Coverage | Note dashboard % vs health-report; **do not** chase alignment as in-gate work |
+
+**Fail the `.r` chapter** only if there are **new bugs or vulnerabilities** on `main` that are not deferred with an explicit item in `backlog/Backlog-Bugfixes.md`. Smells and old debt stay triage.
+
+Do not enable SonarCloud’s Quality Gate as a required GitHub status check in this skill.
+
+## 7. Backlog — no version bump
+
+Tick the open `X.Y.r` items in `backlog/Backlog.md` with measured numbers (pytest count, coverage, vulture/dead-fixtures, simplification removals vs deferred, which files were split, Sonar gate status + new-issue counts). Leave live-verification bugs in `Backlog-Bugfixes.md`. **Never** change `version.py` in this skill.
 
 ## Do not
 
@@ -116,3 +134,5 @@ Tick the open `X.Y.r` items in `backlog/Backlog.md` with measured numbers (pytes
 - Change behavior while simplifying (defaults, numerics, APIs, persisted keys)
 - Tag / GHCR / `:latest` (session-abschluss)
 - Treat “never failed” tests as ineffective
+- Re-run Sonar locally or treat Sonar coverage as a second coverage baseline
+- Make the Sonar Quality Gate a required GitHub check from this skill

@@ -2,6 +2,15 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### SonarCloud in CI + quality-gate snapshot (2026-08-18)
+
+- [x] Adding SonarQube/SonarCloud analysis into the commit workflow — scan on `push`/`pull_request` to `main` ([`.github/workflows/sonarcloud.yml`](../.github/workflows/sonarcloud.yml), [`sonar-project.properties`](../sonar-project.properties)); doc-only skip archived 2026-08-17.
+- [x] Remaining “integration into release quality gate” is not a 2.5.0 checkbox: from the **next** `X.Y.r`, skill `quality-gate` step 6 is a SonarCloud snapshot (new bugs/vulnerabilities vs last `.r`; gate status informational). Do not re-run Sonar locally; do not make the Sonar Quality Gate a required GitHub check.
+
+### Home Assistant Supervisor Add-on MVP 0.1 — M3 persistence proof (2026-08-18)
+
+- [x] M3 on a real Supervisor: add-on restart, add-on update, and Supervisor backup-restore keep `config.json`, sidecars, and `runtime/` (Entwicklungsplan MVP 0.1). Walkthrough: [`docs/einrichtung/homeassistant-addon-testumgebung.md`](../docs/einrichtung/homeassistant-addon-testumgebung.md) (WSL2 Supervised and Pi 4 HA OS). M1/M2/M4/M5 already archived 2026-08-17.
+
 ### SB / HK follow-ups (2026-08-18)
 
 - [x] On SB page — Loxone-Import success text hints to check created consumers on **Hauskonfigurator** and signal mapping on **EHAL-Com** (`ui/ehal_greenfield_import.py` `_IMPORT_SAVED_FLASH`; regression in `tests/test_ehal_greenfield_import_ui.py`).
@@ -46,11 +55,11 @@ Closed the residual gap noted above: `ui/navigation.py::_echtzeit_page_specs(inc
 
 - [x] Add-on skeleton under `packaging/homeassistant-addon/earnie/` — image-wrapper `Dockerfile` (`FROM ghcr.io/jochentcc/earnie-energy:${EARNIE_VERSION}`, pinned `2.4.0`), `config.yaml` manifest (ports 8501/8541, `/data` volume, optional options/schema), `build.yaml` (arch mapping, build args), `run.sh` (`/data/options.json` → `EARNIE_*` env via `jq`, hands off to the existing `docker/entrypoint.sh`), `DOCS.md`, `CHANGELOG.md`, `translations/en.yaml`, `icon.png`/`logo.png`.
 - [x] Persistence wired to the standard `/data` add-on convention (`EARNIE_ENV_PATH=/data/earnie_env`) instead of `/config` (corrects the original HA-Green sketch). Local Docker smoke test (bind-mounted `/data`, simulated `options.json`) confirmed config/runtime survive a container restart and caught/fixed a real bug: `jq -r '.auto_start_main // empty'` treated JSON `false` like `null` (jq's `//` falsy-boolean trap), silently ignoring `auto_start_main: false`.
-- [x] User doc [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) (install, options, ports, data paths, limitations) plus a Hyper-V-VM walkthrough for the still-open M3 (Supervisor restart/update/backup-restore proof — needs a real Supervisor, not achievable via plain `docker run`). Cross-linked from `docker/README.md` and `docs/referenz/streamlit-ports.md`.
+- [x] User doc [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) (install, options, ports, data paths, limitations) plus a Supervisor test-environment walkthrough for M3 (now archived 2026-08-18). Cross-linked from `docker/README.md` and `docs/referenz/streamlit-ports.md`.
 - [x] Published add-on repository [`github.com/JochenTCC/ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) (public) — `repository.yaml`, mirrored `earnie/`, `README.md`, `LICENSE.md` (carried over verbatim per license terms), `.gitattributes`. New sync script `packaging/homeassistant-addon/sync-to-ha-addon-repo.sh` mirrors the dev-source folder into a checkout of that repo (manual-copy sync mechanism, per the Entwicklungsplan's decision for 0.1 — no GitHub Action needed).
 - [x] Maintainer-facing release-workflow doc [`packaging/homeassistant-addon/README.md`](../packaging/homeassistant-addon/README.md) (analogous to `packaging/loxberry/README.md`): version-bump checklist (`build.yaml` `EARNIE_VERSION` + `config.yaml` `version`), sync-script usage, local build/test steps — notes that add-on updates need no GitHub Release/tag in `ha-addon-earnie`, just a commit to `main` (Supervisor reads the tracked branch directly).
 
-M3 (persistence proof on real Supervisor hardware) is the one milestone left open — tracked in [Backlog.md](Backlog.md).
+M3 (persistence proof on real Supervisor) archived 2026-08-18 — see section above.
 
 ### CI: skip SonarCloud on doc-only changes (2026-08-17)
 

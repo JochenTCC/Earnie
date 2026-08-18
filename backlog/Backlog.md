@@ -18,16 +18,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.5.0 — Official release (pending)
 
-**Context:** Community line is `2.5.0-alpha.8` (SB page, Anbindung on SB, HK profile delete; full 15‑min MILP `dt_h = 0.25` plus remaining 2.5 feature items archived; `2.5.r` quality gate done). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
+**Context:** Community line is `2.5.0-alpha.8` (SB page, Anbindung on SB, HK profile delete; full 15‑min MILP `dt_h = 0.25` plus remaining 2.5 feature items archived; `2.5.r` quality gate done). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope. SonarCloud is on `main`/PRs; from the next `X.Y.r` the quality-gate skill includes a Sonar snapshot (not a 2.5.0 blocker).
 
-- [x] Home-Assistant Add-on MVP 0.1 — M1/M2/M4/M5 of Earnie_HomeAssistant_Addon_Dokumentation.md (Earnie-Projekt/Entwicklungsplan); details → [Backlog-Erledigt.md](Backlog-Erledigt.md)
-  - [x] M3 — persistence proof on a real Supervisor (restart / add-on update / Supervisor backup-restore); VM walkthrough: [docs/einrichtung/homeassistant-addon.md](/docs/einrichtung/homeassistant-addon.md#testumgebung-für-m3-persistenz-nachweis)
-- [x] Adding AppTest feature and AppTest (rendering tests for Streamlit) + tests for all pages
-- [x] Create "Smarthome Backend" page (SB) (for Earnie_UI_Modes==live_environment) — mDNS/SSDP discovery, HK Loxone-Import moved to SB, EHAL-Com selector removed; details → [Backlog-Erledigt.md](Backlog-Erledigt.md), dev plan [docs/spec/smarthome-backend-page.md](../docs/spec/smarthome-backend-page.md)
-- [ ] Adding SonarQube analysis into commit workflow
-  - Integration into workflow (done)
-  - Skip on doc-only pushes/PRs (`paths-ignore` for `.md`/`.png`/`docs/**`, done 2026-08-17)
-  - Integration into release quality gate todo
 - [ ] Official `2.5.0` after community soak (tag without `-alpha`; GHCR `:latest`)
 
 
@@ -42,7 +34,7 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 ### Version 2.+1 — Improvements for EVs / Export
 
 - [ ] Improvements for HA-binding
-  - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from the Add-on's M3 VM test above (that one tests Supervisor add-on persistence; this one tests EHAL discovery/mapping against different HA integration shapes)
+  - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)); this item tests EHAL discovery/mapping against different HA integration shapes
   - [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)
   - [ ] Add-on CI linting (`hassfest` / HA Add-on lint action) as a GitHub workflow in the `ha-addon-earnie` repo itself (open point #2 in the same doc — that repo has no backlog of its own, easy to lose track of)
   - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap): Options-UI → `config.json` generation, Ingress (embedded UI, no separate port), Supervisor-Proxy instead of a manual long-lived-access token for the EHAL-HA-adapter
