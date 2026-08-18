@@ -153,9 +153,9 @@ Earnie Core stays unchanged on the Miniserver IOs; the fallback is **only** Conf
 
 ### 6. Loxone Import into Earnie
 
-Prerequisite: Earnie templates are installed in Loxone Config and each consumer has a meter block (EFM); credentials under **EHAL-Com → Connection**. The import button only becomes active once the Miniserver is reachable.
+Prerequisite: Earnie templates are installed in Loxone Config and each consumer has a meter block (EFM); credentials are entered on **Smarthome-Backend → Anbindung**. The import button only becomes active once the Miniserver is reachable.
 
-1. **House Configurator → House Profile**: chapter **Loxone Import** above **Consumers** — on first setup, **No — continue manually** is shown on the same row as the import button.
+1. **Daemon Control → Smarthome-Backend**: once Loxone is connected, the **Loxone Import** section appears below the connection summary — on first setup, **No — continue manually** is shown on the same row as the import button.
 2. Earnie loads `LoxAPP3.json`, probes `Earnie_*` via HTTP (also prefix+slug, case-insensitive), creates typed entities, and binds in EFM meters.
 3. Check the signal mapping on **EHAL-Com** ([Loxone Structure → EHAL Mapping](../ui/ehal-com.md#loxone-structure--ehal-mapping)); follow up on parameters (kWh, schedules, living area, …) in the **House Configurator**.
 
@@ -167,7 +167,7 @@ Prerequisite: Earnie templates are installed in Loxone Config and each consumer 
 - [ ] Meters on the EFM with unique designations
 - [ ] Program saved on the Miniserver
 - [ ] Optional: heartbeat watchdog + fallback programmed
-- [ ] House Configurator: Loxone import → check mapping on EHAL-Com → parameters in the house profile
+- [ ] Smarthome-Backend: Loxone import → check mapping on EHAL-Com → parameters in the house profile
 
 ---
 

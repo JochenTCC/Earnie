@@ -2,7 +2,7 @@
 
 Produktiver Southbound für Gerätevolumen in DACH: Earnie spricht den **HA-EHAL-Adapter** (REST) an. **evcc** läuft als Sidecar unter Home Assistant und liefert typische Wallbox-/Zähler-/WR-Entities — Earnie schreibt auf **stabile HA-Entities**, nicht parallel direkt gegen die evcc-API.
 
-Vergleich Loxone / HA / OpenEMS und Umschaltung: [Adapter wählen](adapter-wahl.md). Entwickler-Setup (Compose, Token, Mapping): [HA-Lab Spec](../spec/ha-lab-setup.md).
+Vergleich Loxone / HA / OpenEMS und Umschaltung: [Smarthome-Backend wählen](smarthome-backend-wahl.md). Entwickler-Setup (Compose, Token, Mapping): [HA-Lab Spec](../spec/ha-lab-setup.md).
 
 ## Pfad A2 (Default) vs Pfad B
 
@@ -34,8 +34,8 @@ Persistenz Earnie: `ha_lab/config/` und `ha_lab/runtime/`. HA-Konfiguration: `ha
 ## Entity-Mapping (Human-in-the-Loop)
 
 1. In Home Assistant ein **Long-Lived Access Token** anlegen.
-2. Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) in `config.json` übernehmen bzw. in der UI setzen (IDs nur **Beispiele**).
-3. Streamlit-Seite **EHAL-Com** → Expander **HA Entity → EHAL Mapping**: Entities scannen, EHAL-Felder zuweisen, speichern.
+2. Backend **Home Assistant** wählen und URL/Token auf **Daemon Control → Smarthome-Backend** eintragen (setzt `ehal.backend=ha`) — alternativ das Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) direkt in `config.json` übernehmen (IDs nur **Beispiele**).
+3. Danach auf **Daemon Control → EHAL-Com** im Expander **HA Entity → EHAL Mapping**: Entities scannen, EHAL-Felder zuweisen, speichern.
 4. Optional **Telemetrie testen**. LLM-gestützte Vorschläge sind **nicht** Teil der ausgelieferten UI.
 
 ### Wenn marq24 / evcc bereits in HA verbunden ist
@@ -44,7 +44,7 @@ Voraussetzung: Integration **evcc☀️🚘- Solar Charging** zeigt Geräte unte
 
 1. In HA **Entwicklerwerkzeuge → Zustände** die exakten `entity_id`s notieren (Filter z. B. `evcc`). Mit dem Lab-Stub (`ha_lab/evcc/evcc.yaml`) sind Leistungen oft **0 W**, SoC **50 %** — das reicht für den Pfadnachweis.
 2. Mindestens zuordnen: Netzleistung → `grid_power_active`, PV → `pv_production_active`, Batterie-SoC → `ess_soc`. Optional: Batterie-/Ladeleistung, Maxstrom (`number`).
-3. Earnie http://localhost:8506 → **EHAL-Com** → **HA Entity → EHAL Mapping** → scannen → zuweisen → **Telemetrie testen** → **Mapping speichern**.
+3. Earnie http://localhost:8506 → **Smarthome-Backend** → Backend **Home Assistant** mit URL/Token verbinden (setzt `ehal.backend=ha`) → **EHAL-Com** → **HA Entity → EHAL Mapping** → scannen → zuweisen → **Telemetrie testen** → **Mapping speichern**.
 4. Vorzeichen: EHAL Netz **+** = Bezug, ESS **+** = Entladen; bei abweichender Integration **negate**.
 5. Erfolg: Telemetrie-Test OK, `config.json` mit `ehal.backend=ha`, Live ohne „Kein Zugriff auf EHAL SoC“.
 

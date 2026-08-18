@@ -1,8 +1,8 @@
 # Smarthome-Backend wählen
 
-Earnie spricht Anlagen über den **EHAL** (Earnie Hardware Access Layer) an. Derselbe Optimizer-Kern bleibt; gewechselt wird nur das **Smarthome-Backend** (`ehal.backend`) plus die jeweiligen Zugangsdaten und Feld-Mappings.
+Earnie spricht die Anlage über den **EHAL** (Earnie Hardware Access Layer) an. Der Optimizer-Kern bleibt dabei immer derselbe; gewechselt wird nur das **Smarthome-Backend** (`ehal.backend`) zusammen mit den jeweiligen Zugangsdaten und Feld-Mappings.
 
-Auswahl/Erkennung: [Smarthome-Backend](../ui/smarthome-backend.md); Überblick und Debug danach: [EHAL-Com](../ui/ehal-com.md).
+Auswahl und Erkennung des Backends sind auf der Seite [Smarthome-Backend](../ui/smarthome-backend.md) beschrieben; den Überblick und die Live-Diagnose danach liefert [EHAL-Com](../ui/ehal-com.md).
 
 ## Welcher Pfad?
 
@@ -14,7 +14,7 @@ Auswahl/Erkennung: [Smarthome-Backend](../ui/smarthome-backend.md); Überblick u
 | **OpenEMS**               | `openems`            | Lab- / Industrie-Prototyp (**nicht** B2C-Default)     | [OpenEMS-Lab](openems-lab.md)           |
 
 
-Offizielle DACH-Empfehlung für neue Setups ohne Loxone: **HA + evcc**. OpenEMS bleibt dokumentierter Validierungspfad.
+Für neue Setups ohne bestehende Loxone-Anlage lautet die offizielle DACH-Empfehlung **HA + evcc**. OpenEMS bleibt ein dokumentierter Validierungspfad.
 
 ## Umschalten
 
@@ -22,28 +22,28 @@ Offizielle DACH-Empfehlung für neue Setups ohne Loxone: **HA + evcc**. OpenEMS 
 
 ### Über die Oberfläche (empfohlen)
 
-1. Streamlit: **Daemon Control → Smarthome-Backend**
-2. Backend wählen — automatische Suche (mDNS/SSDP, optional OpenEMS-Portscan) oder manuell (Loxone / Home Assistant / OpenEMS)
-3. Zugangsdaten speichern; bei HA zusätzlich Entity→EHAL-Mapping, bei Loxone Merker/`plant.ehal_bindings` (weiterhin auf **EHAL-Com**)
+1. In Streamlit zur Seite **Daemon Control → Smarthome-Backend** wechseln.
+2. Das Backend wählen — entweder über die automatische Suche (mDNS/SSDP, optional mit OpenEMS-Portscan) oder manuell (Loxone, Home Assistant oder OpenEMS).
+3. Die Zugangsdaten speichern. Bei Home Assistant folgt danach das Entity→EHAL-Mapping, bei Loxone die Merker- bzw. `plant.ehal_bindings`-Zuordnung — beides weiterhin auf **EHAL-Com**.
 
-Die Auswahl schreibt `ehal.backend` in `config.json` und leert den Adapter-Cache.
+Die Auswahl schreibt `ehal.backend` in `config.json` und leert dabei den Adapter-Cache.
 
 ### Manuell in `config.json`
 
-Snippets unter `share/config/`:
+Für Home Assistant und OpenEMS liegen passende Snippets unter `share/config/`:
 
 - HA: `[ehal.ha.snippet.json](../../share/config/ehal.ha.snippet.json)`
 - OpenEMS: `[ehal.openems.snippet.json](../../share/config/ehal.openems.snippet.json)`
 
-Loxone-Zugangsdaten liegen in `config/.env` (`LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS`); Merker-Namen in `plant.ehal_bindings` / Hausprofil. Siehe [Loxone-Signale](../referenz/loxone-signals.md).
+Die Loxone-Zugangsdaten liegen dagegen in `config/.env` (`LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS`), die Merker-Namen stehen in `plant.ehal_bindings` bzw. im Hausprofil. Details dazu: [Loxone-Signale](../referenz/loxone-signals.md).
 
-Nach dem Wechsel: Verbindung auf **EHAL-Com** (Live-Lesen / Verbindungstest) prüfen, bevor Silent-Modus ausgeschaltet wird.
+Nach jedem Wechsel sollte die Verbindung auf **EHAL-Com** (Live-Lesen / Verbindungstest) geprüft werden, bevor der Silent-Modus ausgeschaltet wird.
 
 ## Was gleich bleibt — was neu gemappt werden muss
 
-**Gleich (Kern):** Optimierung (MILP), Charts, Silent-/Live-Modus, Hausprofil-Szenarien — kein Core-Umbau nötig.
+Der Kern bleibt beim Wechsel unverändert: Optimierung (MILP), Charts, Silent-/Live-Modus und die Hausprofil-Szenarien brauchen keinen Core-Umbau.
 
-**Neu zuordnen je Hub:**
+Neu zugeordnet werden muss dagegen je Hub Folgendes:
 
 
 | Backend | Mapping                                                              |

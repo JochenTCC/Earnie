@@ -2,7 +2,7 @@
 
 Earnie kommuniziert mit dem Loxone Miniserver über **HTTP** (Lesen und Schreiben von Werten). Die konkrete Schaltlogik in Loxone (Wechselrichter (Batteriespeicher), Wallbox, Pool, ...) liegt außerhalb von Earnie — der Optimizer liefert Sollwerte und Freigaben.
 
-Andere Hubs (HA+evcc, OpenEMS): [Adapter wählen](adapter-wahl.md).
+Andere Hubs (HA+evcc, OpenEMS): [Smarthome-Backend wählen](smarthome-backend-wahl.md).
 
 **Default / Library:** Virtual-In/Out-Vorlagen einspielen, Zähler am EFM, Earnie-tot-Fallback und Import: [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
 

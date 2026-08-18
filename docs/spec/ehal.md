@@ -253,7 +253,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 Acceptance (docs + automated proof):
 
 - Mocked three-way contract: `tests/test_ehal_contract_backends.py` — same Core-facing `read_live_power_kw` for `openems` / `ha` / `loxone`; `get_adapter()` routing by `EHAL_BACKEND` only; ESS setpoint parity for network backends; documented Loxone write asymmetry (`is_ehal_network_backend` = openems|ha only; Live ESS/flex still via `loxone_client`).
-- German operator docs: [docs/einrichtung/adapter-wahl.md](../einrichtung/adapter-wahl.md).
+- German operator docs: [docs/einrichtung/smarthome-backend-wahl.md](../einrichtung/smarthome-backend-wahl.md).
 - Connector recipe expanded in [CONTRIBUTING.md](../../CONTRIBUTING.md) §3 and the checklist below.
 
 Optional live lab matrix (Compose OpenEMS/HA + prod Loxone HITL) remains a soft check for release **2.4.0**.

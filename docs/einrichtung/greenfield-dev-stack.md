@@ -25,11 +25,10 @@ Im Browser: `http://localhost:8502`
 ## Ablauf Ersteinrichtung
 
 1. **Bootstrap** — Entrypoint legt fehlende Dateien an (`python -m scripts.bootstrap_runtime`, siehe [Container](container.md)). `config.json` und die Planungs-Dateien starten **minimal** (leere Kataloge, keine Earnie-Beispieldaten).
-2. **UI: Loxone-Zugang** — Formular aus [`ui/setup_dotenv.py`](../../ui/setup_dotenv.py); Platzhalter in `config/.env` reichen nicht.
-3. **Dummy-Zugangsdaten** — Für Greenfield ohne echte Miniserver-Anbindung z. B. IP `192.168.178.99`, beliebiger Benutzer/Passwort eintragen und **Speichern**.
-4. **Planungs-Konfiguration** — Navigationsabschnitte **Konfiguration** (Hauskonfigurator, nach Freischaltung Szenarienkonfigurator und Szenario-Explorer) und **Daemon Control** (Optimierer-Dienst, EHAL-Com). Im Hauskonfigurator: **Hausprofil**, **PV-Anlagen**, **Batterien**. Im Szenarienkonfigurator: Live-Szenario und Varianten (Entitäts-Referenzen). Sidebar zeigt fehlende Schritte. Während der Planung erscheint **kein** Config-Drift-Hinweis zu `flexible_consumers` aus `config.example.json`.
-5. **Szenario-Explorer** — Nach vollständiger Planungs-Konfiguration erscheint die Szenario-Explorer-Seite unter **Konfiguration**.
-6. **Daemon** — `main.py` startet mit der UI (`EARNIE_AUTO_START_MAIN=1`); Loxone-Startup-Prüfung ist deaktiviert (`EARNIE_VERIFY_LOXONE_ON_START=0`).
+2. **Planungs-Konfiguration** — Solange die Planung nicht abgeschlossen ist, zeigt die Navigation nur **Konfiguration** (Hauskonfigurator, nach Freischaltung Szenarienkonfigurator und Szenario-Explorer) und **Daemon Control** (Optimierer-Dienst, EHAL-Com); die Backend-Einrichtung wird bewusst zurückgestellt (`loxone_setup_deferred`). Im Hauskonfigurator: **Hausprofil**, **PV-Anlagen**, **Batterien**. Im Szenarienkonfigurator: Live-Szenario und Varianten (Entitäts-Referenzen). Die Sidebar zeigt die noch fehlenden Schritte. Während der Planung erscheint **kein** Config-Drift-Hinweis zu `flexible_consumers` aus `config.example.json`.
+3. **Smarthome-Backend (nur für den Live-Pfad)** — Sobald die Planung abgeschlossen und noch kein Backend konfiguriert ist, blockiert die App vor der übrigen Navigation mit der Seite **Smarthome-Backend** (`ui/pages/page_smarthome_backend.py`, siehe [Smarthome-Backend](../ui/smarthome-backend.md)). Für Greenfield ohne echte Miniserver-Anbindung genügt Backend **Loxone** mit Dummy-Zugangsdaten, z. B. IP `192.168.178.99`, beliebiger Benutzer/Passwort, und **Speichern**.
+4. **Szenario-Explorer** — Nach vollständiger Planungs-Konfiguration erscheint die Szenario-Explorer-Seite unter **Konfiguration**; für reine Was-wäre-wenn-Rechnungen ist dafür kein Smarthome-Backend nötig.
+5. **Daemon** — `main.py` startet mit der UI (`EARNIE_AUTO_START_MAIN=1`); die Loxone-Startup-Prüfung ist deaktiviert (`EARNIE_VERIFY_LOXONE_ON_START=0`).
 
 ## Checkliste — erwartete Dateien nach erstem Start
 

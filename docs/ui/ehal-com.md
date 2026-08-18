@@ -19,7 +19,7 @@ The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-back
 | OpenEMS        | `config.json` → `ehal.openems`                | (credentials on Smarthome-Backend)                     |
 
 
-`ehal.backend` controls the live path in `main.py` (Loxone HTTP vs. EHAL REST). Which backend choice makes sense when: [Choose Adapter](../einrichtung/adapter-wahl.md).
+`ehal.backend` controls the live path in `main.py` (Loxone HTTP vs. EHAL REST). Which backend choice makes sense when: [Choose Smarthome-Backend](../einrichtung/smarthome-backend-wahl.md).
 
 ## B) EHAL Wire (Fields, Units, Signals)
 

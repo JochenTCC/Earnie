@@ -41,7 +41,7 @@ Im Hintergrund läuft ein Optimierer-Dienst, der exklusiv die Anlage steuert. Di
 
 **Für den produktiven Live-Betrieb zusätzlich:**
 
-- Erreichbares Smarthome-Backend: [Loxone](https://www.loxone.com/) (Default), [Home Assistant](https://www.home-assistant.io/) + evcc (DACH-Pfad A2) oder OpenEMS (Lab-/Industrie-Prototyp) — siehe [Adapter wählen](../einrichtung/adapter-wahl.md)  
+- Erreichbares Smarthome-Backend: [Loxone](https://www.loxone.com/) (Default), [Home Assistant](https://www.home-assistant.io/) + evcc (DACH-Pfad A2) oder OpenEMS (Lab-/Industrie-Prototyp) — siehe [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)  
 - Sinnvolle Merker / Entities für SOC, Leistungen, Freigaben und Sollwerte (Kapitel *Verbindung zu Smarthome*)  
 - Typischerweise: PV und/oder Batteriespeicher sowie steuerbare Verbraucher  
 - Empfohlen: dynamischer Bezugs- und/oder Einspeisetarif
@@ -128,7 +128,7 @@ Kurzfassung der typischen Wege:
 1. Projekt bzw. Compose-Datei bereitstellen, Verzeichnisse `earnie_env/config/` und `earnie_env/runtime/` anlegen.
 2. Container starten — fehlende Dateien werden beim ersten Start angelegt (Bootstrap).
 3. Oberfläche im Browser öffnen (Produktiv oft Port **8501**, siehe [Streamlit-Ports](../referenz/streamlit-ports.md)).
-4. Bei geplantem Live-Betrieb: Smarthome-Backend wählen und Zugang hinterlegen ([Adapter](../einrichtung/adapter-wahl.md)), dann mit dem Hauskonfigurator fortfahren.
+4. Bei geplantem Live-Betrieb: Auf der Seite **Smarthome-Backend** das Backend wählen und den Zugang hinterlegen (siehe [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)), danach mit dem Hauskonfigurator fortfahren.
 
 Details: [Container](../einrichtung/container.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md).
 
@@ -358,7 +358,7 @@ Zum Abgleich Ist vs. Modell: Hauskonfigurator / Leistungsprofil-CSV und die Tabe
 
 Wenn die Was-wäre-wenn-Analyse überzeugt, folgt die Anbindung an die Smarthome-Steuerung. Earnie liefert **Sollwerte und Freigaben**; die konkrete Schaltlogik (Wechselrichter, Wallbox, Relais) bleibt im Smarthome-Backend.
 
-Backend wählen und Umschalten: [Adapter wählen](../einrichtung/adapter-wahl.md). Bei Loxone zusätzlich VI/VO-Vorlagen und Merker: [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md).
+Das Backend wird auf der Seite **Daemon Control → Smarthome-Backend** gewählt und bei Bedarf gewechselt; welches Backend zu Ihrer Anlage passt, erklärt [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md). Bei Loxone kommen zusätzlich VI/VO-Vorlagen und Merker aus [Loxone-Signale und Earnie-Library](../referenz/loxone-signals.md) hinzu.
 
 ### Vorbereitung der Smarthome-Konfiguration
 
@@ -427,7 +427,7 @@ Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur mit `live_environment
 2. Hauskonfigurator: Profil, Wärme, Auto, Pool, Geräte, PV, Batterie
 3. Szenarienkonfigurator: Live-Szenario + Vergleichsvarianten
 4. Szenario-Explorer: Verbrauch prüfen, Rechnung, Ergebnisse bewerten
-5. Backend wählen ([Adapter](../einrichtung/adapter-wahl.md)), Zugang speichern, Mapping auf **EHAL-Com**
+5. Backend auf **Smarthome-Backend** wählen und Zugang speichern ([Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)), danach Mapping auf **EHAL-Com** prüfen
 6. Live-Szenario + EHAL-Com (Silent → Live)
 7. Daemon dauerhaft laufen lassen, Monitor beobachten, Feintuning
 
