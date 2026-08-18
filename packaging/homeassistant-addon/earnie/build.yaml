@@ -5,11 +5,11 @@
 # gleich, da ghcr.io/jochentcc/earnie-energy bereits multi-arch (amd64/
 # aarch64) veröffentlicht wird.
 build_from:
-  aarch64: ghcr.io/jochentcc/earnie-energy:2.4.0
-  amd64: ghcr.io/jochentcc/earnie-energy:2.4.0
+  aarch64: ghcr.io/jochentcc/earnie-energy:2.5.0-alpha.7
+  amd64: ghcr.io/jochentcc/earnie-energy:2.5.0-alpha.7
 
 args:
-  EARNIE_VERSION: "2.4.0"
+  EARNIE_VERSION: "2.5.0-alpha.7"
 
 labels:
   org.opencontainers.image.title: Earnie

@@ -1,0 +1,20 @@
+   services:
+     haos:
+       container_name: haos
+       image: qemux/homeassistant
+       environment:
+         DISK_SIZE: "32G"
+         RAM_SIZE: "4G"
+         CPU_CORES: "4"
+         BOOT: "stable"        # Release-Kanal; alternativ eine feste HA-OS-Version, z. B. "12.3"
+       devices:
+         - /dev/net/tun
+       cap_add:
+         - NET_ADMIN
+       ports:
+         - "8123:8123"         # Home Assistant Web-UI
+         - "8501:8501"         # Earnie-UI (nach Add-on-Install, siehe unten)
+         - "8006:8006"         # noVNC — Boot-Konsole / GRUB, zum Mitverfolgen des Starts
+       volumes:
+         - ./haos-storage:/storage
+       restart: unless-stopped

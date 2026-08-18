@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../../../TechCreaCon/Earnie-Projekt"
+		},
+		{
+			"path": "../ha-addon-earnie"
 		}
 	],
 	"settings": {
