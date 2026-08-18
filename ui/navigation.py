@@ -97,7 +97,9 @@ def _konfiguration_core_specs(*, house_config_default: bool) -> list[PageSpec]:
     return specs
 
 
-def _echtzeit_page_specs(*, include_daemon_pages: bool = True) -> list[PageSpec]:
+def _echtzeit_page_specs(
+    *, include_daemon_pages: bool = True, smarthome_backend_default: bool = False
+) -> list[PageSpec]:
     from ui.pages import page_daemon, page_loxone_debug, page_smarthome_backend
 
     specs = [
@@ -107,6 +109,7 @@ def _echtzeit_page_specs(*, include_daemon_pages: bool = True) -> list[PageSpec]
             "📡",
             SECTION_ECHTZEIT,
             "smarthome-backend",
+            default=smarthome_backend_default,
         ),
     ]
     if include_daemon_pages:
@@ -138,6 +141,7 @@ def _append_konfiguration_and_echtzeit(
     house_config_default: bool,
     force_echtzeit: bool = False,
     scenario_explorer: PageSpec | None = None,
+    smarthome_backend_default: bool = False,
 ) -> None:
     specs.extend(_konfiguration_core_specs(house_config_default=house_config_default))
     show_daemon = force_echtzeit or "live_environment" in enabled_mode_keys
@@ -154,7 +158,12 @@ def _append_konfiguration_and_echtzeit(
         from ui.setup_readiness import needs_sb_setup
 
         include_daemon_pages = not needs_sb_setup()
-        specs.extend(_echtzeit_page_specs(include_daemon_pages=include_daemon_pages))
+        specs.extend(
+            _echtzeit_page_specs(
+                include_daemon_pages=include_daemon_pages,
+                smarthome_backend_default=smarthome_backend_default,
+            )
+        )
 
 
 def _restricted_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
@@ -163,14 +172,22 @@ def _restricted_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
     # config-only (no forced Daemon).
     from runtime_store.cloud_demo import is_cloud_demo
 
+    # live_environment: a real backend connection is the prerequisite for
+    # everything else (house-profile appliance wiring benefits from having
+    # entities available), so land on Smarthome-Backend first. Otherwise
+    # (e.g. scenario_explorer-only planning/demo setups, no real hardware
+    # expected) keep Hauskonfigurator as the landing page — matches the
+    # documented Cloud-Demo behaviour ("Start im Hauskonfigurator").
+    live_environment_active = "live_environment" in enabled_mode_keys
     specs: list[PageSpec] = []
     _append_konfiguration_and_echtzeit(
         specs,
         enabled_mode_keys,
-        house_config_default=True,
+        house_config_default=not live_environment_active,
         force_echtzeit=not is_cloud_demo(),
+        smarthome_backend_default=live_environment_active,
     )
-    return specs
+    return _ensure_one_default(specs)
 
 
 def _ensure_one_default(specs: list[PageSpec]) -> list[PageSpec]:

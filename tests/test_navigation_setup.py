@@ -82,6 +82,45 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
         "Hauskonfigurator",
         "Smarthome-Backend",
     ]
+    defaults = [spec for spec in specs if spec.default]
+    assert len(defaults) == 1
+    assert defaults[0].title == "Hauskonfigurator"
+
+
+def test_restricted_navigation_defaults_to_smarthome_backend_when_live_environment(
+    tmp_path, monkeypatch
+):
+    """live_environment during onboarding: a real backend connection is the
+    prerequisite for everything else, so land on Smarthome-Backend first
+    instead of Hauskonfigurator (matches EARNIE_UI_MODES-dependent flow
+    agreed for greenfield installs — see docs/spec/smarthome-backend-page.md §5)."""
+    config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.delenv("LOXONE_IP", raising=False)
+    monkeypatch.delenv("LOXONE_USER", raising=False)
+    monkeypatch.delenv("LOXONE_PASS", raising=False)
+    _write(config_dir / "config.json", {"flexible_consumers": []})
+    _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
+    _write(config_dir / "house_profiles.json", {"profiles": []})
+    _write(
+        config_dir / "tariffs.json",
+        {"import_tariffs": [], "export_tariffs": []},
+    )
+    _write_live_scenario(
+        config_dir,
+        {
+            "battery_id": "",
+            "pv_system_ids": [],
+            "import_tariff_id": "",
+            "export_tariff_id": "",
+            "house_profile_id": "",
+        },
+    )
+
+    specs = build_page_specs(["scenario_explorer", "live_environment"])
+    defaults = [spec for spec in specs if spec.default]
+
+    assert len(defaults) == 1
+    assert defaults[0].title == "Smarthome-Backend"
 
 
 def test_restricted_navigation_shows_daemon_pages_once_sb_configured(tmp_path, monkeypatch):
