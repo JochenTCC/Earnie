@@ -18,7 +18,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.5.0 — Official release (pending)
 
-**Context:** Community line is `2.5.0-alpha.8` (SB page, Anbindung on SB, HK profile delete; full 15‑min MILP `dt_h = 0.25` plus remaining 2.5 feature items archived; `2.5.r` quality gate done). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope. SonarCloud is on `main`/PRs; from the next `X.Y.r` the quality-gate skill includes a Sonar snapshot (not a 2.5.0 blocker).
+**Context:** Community line is `2.5.0-alpha.9` (HK Batterien: Verschleiß editierbar; SB page, Anbindung on SB, HK profile delete; full 15‑min MILP `dt_h = 0.25` plus remaining 2.5 feature items archived; `2.5.r` quality gate done). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope. SonarCloud is on `main`/PRs; from the next `X.Y.r` the quality-gate skill includes a Sonar snapshot (not a 2.5.0 blocker).
 
 - [ ] Official `2.5.0` after community soak (tag without `-alpha`; GHCR `:latest`)
 
@@ -33,6 +33,8 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 
 ### Version 2.+1 — Improvements for EVs / Export
 
+- [] UI improvement - adding new entities (PV-Anlage, Batterie)
+  - like also implemented for adding new scenarios (by copying the last selected entity) the same functionality should also be implemented for PV-Anlagen and Batterien on HK page
 - [ ] Improvements for HA-binding
   - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)); this item tests EHAL discovery/mapping against different HA integration shapes
   - [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)

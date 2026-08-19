@@ -16,6 +16,7 @@ from ui.house_config_io import (
 from ui.auto_persist import auto_persist, payload_fingerprint
 from ui.form_layout import (
     WIDE_LABEL_RATIOS,
+    labeled_checkbox,
     labeled_number_input,
     labeled_selectbox,
     labeled_text_input,
@@ -69,6 +70,11 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         max_soc = float(existing.get("battery_max_soc", 100.0))
         threshold_percent = float(existing.get("threshold_power", 0.05)) * 100.0
         standby_power = float(existing.get("standby_power_kw", 0.0) or 0.0)
+        wear = existing.get("battery_wear") or {}
+        wear_enabled = bool(wear.get("enabled", False))
+        wear_replacement_cost = float(wear.get("replacement_cost_euro", 1500.0))
+        wear_expected_cycles = float(wear.get("expected_cycles", 6000.0))
+        wear_cycle_fraction = float(wear.get("cycle_cost_fraction", 0.5))
     else:
         label = allocate_unique_label("5 kWh Speicher", list_batteries())
         capacity = 5.0
@@ -78,6 +84,10 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
         max_soc = 100.0
         threshold_percent = 5.0
         standby_power = 0.0
+        wear_enabled = False
+        wear_replacement_cost = 1500.0
+        wear_expected_cycles = 6000.0
+        wear_cycle_fraction = 0.5
 
     st.session_state[_scoped_key(session_scope, "planning_battery_label")] = label
     st.session_state[_scoped_key(session_scope, "planning_battery_capacity")] = capacity
@@ -87,6 +97,16 @@ def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
     st.session_state[_scoped_key(session_scope, "planning_battery_max_soc")] = max_soc
     st.session_state[_scoped_key(session_scope, "planning_battery_threshold")] = threshold_percent
     st.session_state[_scoped_key(session_scope, "planning_battery_standby")] = standby_power
+    st.session_state[_scoped_key(session_scope, "planning_battery_wear_enabled")] = wear_enabled
+    st.session_state[
+        _scoped_key(session_scope, "planning_battery_wear_replacement_cost")
+    ] = wear_replacement_cost
+    st.session_state[
+        _scoped_key(session_scope, "planning_battery_wear_expected_cycles")
+    ] = wear_expected_cycles
+    st.session_state[
+        _scoped_key(session_scope, "planning_battery_wear_cycle_fraction")
+    ] = wear_cycle_fraction
 
 
 def _battery_widget_state_missing(session_scope: str) -> bool:
@@ -216,6 +236,39 @@ def render_battery_planning_tab() -> None:
         help="Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch).",
         key=_scoped_key(session_scope, "planning_battery_standby"),
     )
+    wear_enabled = labeled_checkbox(
+        "Verschleiß berücksichtigen",
+        key=_scoped_key(session_scope, "planning_battery_wear_enabled"),
+    )
+    if wear_enabled:
+        wear_replacement_cost = labeled_number_input(
+            "Ersatzkosten (€)",
+            min_value=0.01,
+            step=50.0,
+            key=_scoped_key(session_scope, "planning_battery_wear_replacement_cost"),
+        )
+        wear_expected_cycles = labeled_number_input(
+            "Erwartete Vollzyklen",
+            min_value=1.0,
+            step=100.0,
+            key=_scoped_key(session_scope, "planning_battery_wear_expected_cycles"),
+        )
+        wear_cycle_fraction = labeled_number_input(
+            "Anteil zyklenbedingter Kosten",
+            min_value=0.01,
+            max_value=1.0,
+            step=0.05,
+            help="Rest wird als Kalenderalterung angenommen (nicht separat modelliert).",
+            key=_scoped_key(session_scope, "planning_battery_wear_cycle_fraction"),
+        )
+        battery_wear_payload = {
+            "enabled": True,
+            "replacement_cost_euro": wear_replacement_cost,
+            "expected_cycles": wear_expected_cycles,
+            "cycle_cost_fraction": wear_cycle_fraction,
+        }
+    else:
+        battery_wear_payload = {"enabled": False}
 
     ready = bool(str(label or "").strip()) and float(capacity or 0) > 0
     taken = {bid for bid in battery_ids if bid != stable_id}
@@ -230,6 +283,7 @@ def render_battery_planning_tab() -> None:
         "battery_max_soc": max_soc,
         "threshold_power": threshold_percent / 100.0,
         "standby_power_kw": float(standby_power or 0.0),
+        "battery_wear": battery_wear_payload,
     }
 
     def _save_battery() -> None:
@@ -244,6 +298,7 @@ def render_battery_planning_tab() -> None:
                     "battery_max_soc": max_soc,
                     "threshold_power": threshold_percent / 100.0,
                     "standby_power_kw": float(standby_power or 0.0),
+                    "battery_wear": battery_wear_payload,
                 },
                 stable_id=stable_id,
             )

@@ -63,6 +63,8 @@ Beispiel (5 kWh, 1500 €, 6000 Zyklen, 50 % zyklenbedingt): **2,5 ct/kWh**.
 | `expected_cycles`       | Angenommene Vollzyklen bis Ersatz                                               |
 | `cycle_cost_fraction`   | Anteil der Kosten durch Zyklen (Rest: Kalenderalterung)                         |
 
+Editierbar im Hauskonfigurator unter **Batterien** per Checkbox "Verschleiß berücksichtigen" (schaltet die drei Parameter frei); Direktbearbeitung von `components.json` bleibt weiterhin möglich.
+
 
 
 

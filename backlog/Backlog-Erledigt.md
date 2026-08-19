@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Batterien tab: Verschleiß editierbar (2026-08-19)
+
+- [x] Checkbox **„Verschleiß berücksichtigen“** auf dem Hauskonfigurator-Tab **Batterien** (`[ui/planning_battery_form.py](../ui/planning_battery_form.py)`) — aktiviert schaltet drei Felder frei (Ersatzkosten €, Erwartete Vollzyklen, Anteil zyklenbedingter Kosten, Defaults 1500/6000/0.5), persistiert in den bereits vorhandenen `battery_wear`-Block je Batterie (Backend/Validierung/Schema unverändert). Tests: `[tests/test_planning_editors.py](../tests/test_planning_editors.py)`. Doku: `[docs/konfiguration/batterie-pv.md](../docs/konfiguration/batterie-pv.md)`. Verified live (Streamlit, isolierte Testkonfiguration).
+
 ### SonarCloud in CI + quality-gate snapshot (2026-08-18)
 
 - [x] Adding SonarQube/SonarCloud analysis into the commit workflow — scan on `push`/`pull_request` to `main` ([`.github/workflows/sonarcloud.yml`](../.github/workflows/sonarcloud.yml), [`sonar-project.properties`](../sonar-project.properties)); doc-only skip archived 2026-08-17.
