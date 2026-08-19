@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.5.r pre-official quality gate re-check (2026-08-19)
+
+- [x] **2.5.r re-check** on `main` @ `492d02c` (after EHAL-Com Loud/Silent + `silent_mode` rename; no `version.py` bump)
+  - [x] Coverage baseline — 2279 passed / 6 skipped; overall **80.6%** (`data` 73.2, `ehal` 88.8, `house_config` 80.6, `optimizer` 85.8, `runtime_store` 80.0, `settings` 77.4, `simulation` 86.5); no package &lt; 40% (vs 2.5.r 79.9% / 2132 passed)
+  - [x] Dead-code / obsolete-test audit — `vulture` (confidence 80) clean; `pytest --dead-fixtures` clean; health-report flags unchanged (mock-heavy cons_data/dotenv + expected fail-fast `legacy_id` / `pv_follow_name`)
+  - [x] Simplification triage — no functional removals this pass; `load_loxone_silent_mode` / `is_loxone_silent_mode` kept as intentional legacy aliases; deferred deeper MILP/UI god-function splits (see KPI)
+  - [x] KPI — **0** core/UI files &gt; 600 LOC (mega-file splits from 2026-08-16 hold); **62** functions &gt; 60 LOC remain (structural: `simulate_horizon`, `run_simulation`, MILP build/solve, planning PV/battery tabs, chart builders) — defer post-`2.5.0` unless a letter chapter targets them
+  - [x] Official docs — `Doc-Review-Checklist.md` 2.5.0 QH items still complete; this session updated `docs/ui/ehal-com.md` + `docs/einrichtung/betrieb.md` for `silent_mode` (already on `492d02c`)
+  - [x] SonarCloud snapshot (`492d02c`, [Actions run 32254786683](https://github.com/JochenTCC/Earnie/actions/runs/32254786683)) — Quality Gate **Passed**; new code: **0** bugs, **0** vulnerabilities, **0** security hotspots; new coverage **83.8%**; dashboard overall coverage **75.3%** (informational vs health-report 80.6%)
+
 ### Bugfix EHAL-Com Loud/Silent status banner (2026-08-19)
 
 - [x] **Misleading status text on EHAL-Com** — banner combined Loud mode with “Optimierer läuft nicht” in one sentence (`Loud-Modus - Optimierer läuft nicht - daher werden keine Daten gesendet`) even when Loud was only configured and `main.py` was stopped. Fix: `ui/loxone_debug_rows.py::status_strip_banner` separates configured mode from optimizer service state; Loud+stopped now prompts to start `main.py` under Daemon Control. Renamed setting **`silent_mode`** (primary in `runtime/local_settings.json`; legacy `loxone_silent_mode` still read). Run state writes `silent_mode`. Docs: `docs/ui/ehal-com.md`, `docs/einrichtung/betrieb.md`. Tests: `tests/test_loxone_debug.py`, `tests/test_local_settings.py`. Live acceptance verified (NAS / EHAL-Com).

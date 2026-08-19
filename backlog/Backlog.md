@@ -18,7 +18,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.5.0 — Official release (pending)
 
-**Context:** Community line is `2.5.0-alpha.9` (HK Batterien: Verschleiß editierbar; SB page, Anbindung on SB, HK profile delete; full 15‑min MILP `dt_h = 0.25` plus remaining 2.5 feature items archived; `2.5.r` quality gate done). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope. SonarCloud is on `main`/PRs; from the next `X.Y.r` the quality-gate skill includes a Sonar snapshot (not a 2.5.0 blocker).
+**Context:** Community line is `2.5.0-alpha.9` (HK Batterien: Verschleiß editierbar; SB page, Anbindung on SB, HK profile delete; full 15‑min MILP `dt_h = 0.25` plus remaining 2.5 feature items archived; `2.5.r` done + **re-checked 2026-08-19** on `492d02c`: 2279 passed, 80.6% cov, Sonar QG passed, 0 new bugs/vulns). Brief: [`docs/spec/quarter-hour-slots.md`](../docs/spec/quarter-hour-slots.md). Official EPEX SFTP/MATS stays out of scope.
 
 - [ ] Official `2.5.0` after community soak (tag without `-alpha`; GHCR `:latest`)
 
