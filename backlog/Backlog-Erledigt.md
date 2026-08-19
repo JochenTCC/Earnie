@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Official release 2.5.0 (2026-08-19)
+
+- [x] Official `2.5.0` — GitHub Latest + GHCR `:2.5.0` and `:latest`; tag `v2.5.0` on `main` after community alpha line (`2.5.0-alpha.9`); release notes [`.github/release-notes/v2.5.0.md`](../.github/release-notes/v2.5.0.md); alpha compose stays pinned to `2.5.0-alpha.9`
+
 ### 2.5.r pre-official quality gate re-check (2026-08-19)
 
 - [x] **2.5.r re-check** on `main` @ `492d02c` (after EHAL-Com Loud/Silent + `silent_mode` rename; no `version.py` bump)
