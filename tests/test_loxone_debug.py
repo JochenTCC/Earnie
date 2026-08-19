@@ -306,10 +306,10 @@ def test_rows_with_mapping_column_label_renames_key():
 @pytest.mark.parametrize(
     ("silent", "daemon_running", "level", "fragment"),
     [
-        (True, True, "warning", "läuft ohne Daten zu senden"),
-        (True, False, "warning", "Optimierer läuft nicht"),
+        (True, True, "warning", "sendet aber keine Daten"),
+        (True, False, "warning", "Optimierer-Dienst läuft nicht"),
         (False, True, "success", "läuft und sendet Daten"),
-        (False, False, "warning", "daher werden keine Daten gesendet"),
+        (False, False, "warning", "Loud-Modus konfiguriert"),
     ],
 )
 def test_status_strip_banner(silent, daemon_running, level, fragment):

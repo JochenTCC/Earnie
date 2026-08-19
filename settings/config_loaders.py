@@ -71,7 +71,7 @@ def load_system_and_ui_params(
     return {
         "GLOBAL_TIMEOUT": get_strict(raw_config, ["system", "global_timeout"], config_path),
         "LOOP_TIMEOUT": get_strict(raw_config, ["system", "loop_timeout"], config_path),
-        "LOXONE_SILENT_MODE": system_settings.load_loxone_silent_mode(
+        "SILENT_MODE": system_settings.load_silent_mode(
             raw_config, local_settings, local_settings_path
         ),
         "EHAL_LOXONE_HTTP_PORT": system_settings.load_ehal_loxone_http_port(raw_config),

@@ -54,6 +54,7 @@ class Config:
         appliance_settings.normalize_appliance_recommendation
     )
     _normalize_scenario = staticmethod(scenario_settings.normalize_scenario)
+    _load_silent_mode = staticmethod(system_settings.load_silent_mode)
     _load_loxone_silent_mode = staticmethod(system_settings.load_loxone_silent_mode)
     _load_ui_fragment_refresh_sec = staticmethod(system_settings.load_ui_fragment_refresh_sec)
     _load_ui_bool = staticmethod(system_settings.load_ui_bool)
@@ -311,8 +312,11 @@ class Config:
     def get_global_timeout(self, default: int = 5) -> int:
         return self.get('GLOBAL_TIMEOUT', default=default, cast=int)
 
+    def is_silent_mode(self) -> bool:
+        return bool(self.get("SILENT_MODE", default=True))
+
     def is_loxone_silent_mode(self) -> bool:
-        return bool(self.get('LOXONE_SILENT_MODE', default=True))
+        return self.is_silent_mode()
 
     def is_ehal_openems_backend(self) -> bool:
         return str(self.get("EHAL_BACKEND") or "").strip().lower() == "openems"
@@ -580,6 +584,10 @@ def is_sunrise_planning_horizon() -> bool:
 
 def get_global_timeout(default: int = 5) -> int:
     return CONFIG.get_global_timeout(default=default)
+
+
+def is_silent_mode() -> bool:
+    return CONFIG.is_silent_mode()
 
 
 def is_loxone_silent_mode() -> bool:

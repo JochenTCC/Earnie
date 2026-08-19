@@ -24,7 +24,7 @@ _LEGACY_ROOT_KEYS_RELOCATED_2_0 = frozenset({
     "awattar",
     "battery_wear",
 })
-_LEGACY_SYSTEM_KEYS_RELOCATED_2_0 = frozenset({"loxone_silent_mode"})
+_LEGACY_SYSTEM_KEYS_RELOCATED_2_0 = frozenset({"silent_mode", "loxone_silent_mode"})
 
 
 @dataclass(frozen=True)

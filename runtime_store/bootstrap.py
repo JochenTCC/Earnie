@@ -447,7 +447,7 @@ def _bootstrap_local_settings_json() -> bool:
         return True
     return _create_file_if_missing(
         settings_path,
-        lambda: _write_json(settings_path, {"loxone_silent_mode": False}),
+        lambda: _write_json(settings_path, {"silent_mode": False}),
     )
 
 

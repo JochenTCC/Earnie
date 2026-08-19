@@ -223,8 +223,10 @@ def render_live_reads_section() -> None:
 def render_last_writes_section(main_state: dict | None) -> None:
     st.subheader("Live-Schreiben")
 
-    silent_now = config.is_loxone_silent_mode()
-    silent_run = bool((main_state or {}).get("loxone_silent_mode"))
+    silent_now = config.is_silent_mode()
+    silent_run = bool(
+        (main_state or {}).get("silent_mode", (main_state or {}).get("loxone_silent_mode"))
+    )
     completed_at = str((main_state or {}).get("completed_at") or "")
     loxone_sent = (main_state or {}).get("loxone_sent") or {}
     ehal_writes = (main_state or {}).get("ehal_writes")

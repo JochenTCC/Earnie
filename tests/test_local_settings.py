@@ -34,6 +34,48 @@ def test_loxone_silent_mode_defaults_true_without_local_settings(tmp_path, monke
     assert cfg.is_loxone_silent_mode() is True
 
 
+def test_silent_mode_from_local_settings(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    config_path, scenarios_path = _write_minimal_config(tmp_path)
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(json.dumps({"silent_mode": True}), encoding="utf-8")
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_silent_mode() is True
+
+
+def test_silent_mode_legacy_loxone_key_still_works(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    config_path, scenarios_path = _write_minimal_config(tmp_path)
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(json.dumps({"loxone_silent_mode": False}), encoding="utf-8")
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_silent_mode() is False
+
+
+def test_silent_mode_local_settings_overrides_legacy_system_key(tmp_path, monkeypatch):
+    monkeypatch.setenv("EARNIE_OFFLINE", "1")
+    config_path, scenarios_path = _write_minimal_config(tmp_path, {"loxone_silent_mode": False})
+    local_path = tmp_path / "local_settings.json"
+    local_path.write_text(json.dumps({"silent_mode": True}), encoding="utf-8")
+    cfg = config.Config(
+        config_path=config_path,
+        backtesting_scenarios_path=scenarios_path,
+        local_settings_path=str(local_path),
+        require_loxone_credentials=False,
+    )
+    assert cfg.is_silent_mode() is True
+
+
 def test_loxone_silent_mode_from_local_settings(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_OFFLINE", "1")
     config_path, scenarios_path = _write_minimal_config(tmp_path)
@@ -111,10 +153,10 @@ def test_bootstrap_creates_local_settings(tmp_path, monkeypatch):
     (config_dir / "config.json").write_text("{}", encoding="utf-8")
     example = tmp_path / "runtime" / "local_settings.example.json"
     example.parent.mkdir(parents=True)
-    example.write_text(json.dumps({"loxone_silent_mode": False}), encoding="utf-8")
+    example.write_text(json.dumps({"silent_mode": False}), encoding="utf-8")
 
     bootstrap.run()
 
     local_path = tmp_path / "runtime" / "local_settings.json"
     assert local_path.is_file()
-    assert json.loads(local_path.read_text(encoding="utf-8"))["loxone_silent_mode"] is False
+    assert json.loads(local_path.read_text(encoding="utf-8"))["silent_mode"] is False

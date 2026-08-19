@@ -50,7 +50,7 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll)           |
 | `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf)                               |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
-| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `loxone_silent_mode`, `chart_debug_capture_enabled`)     |
+| `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode`, `chart_debug_capture_enabled`)     |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |
 | `backtesting_log.json`          | Ergebnis von Szenario-Explorer / `run_backtesting`                                        |
 

@@ -128,7 +128,7 @@ def test_greenfield_bootstrap_creates_expected_files(tmp_path, monkeypatch):
     assert len(cons_lines) == 1
     assert cons_lines[0].startswith("timestamp;")
 
-    assert json.loads(local_settings.read_text(encoding="utf-8"))["loxone_silent_mode"] is False
+    assert json.loads(local_settings.read_text(encoding="utf-8"))["silent_mode"] is False
 
     dotenv_content = dotenv_path.read_text(encoding="utf-8")
     assert "name-des-benutzers-in-der-loxone" in dotenv_content
@@ -152,6 +152,7 @@ def test_config_minimal_live_scenario_id_only():
     assert minimal.get("live_scenario_id") == "live"
     assert "eauto_milp" not in minimal
     assert "appliances" not in minimal
+    assert "silent_mode" not in minimal.get("system", {})
     assert "loxone_silent_mode" not in minimal.get("system", {})
 
     scenarios_path = repo_root / "share" / "config" / "backtesting_scenarios.minimal.json"

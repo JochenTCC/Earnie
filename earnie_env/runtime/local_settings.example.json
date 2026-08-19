@@ -1,4 +1,4 @@
 {
-  "loxone_silent_mode": false,
+  "silent_mode": false,
   "chart_debug_capture_enabled": false
 }

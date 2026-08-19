@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix EHAL-Com Loud/Silent status banner (2026-08-19)
+
+- [x] **Misleading status text on EHAL-Com** — banner combined Loud mode with “Optimierer läuft nicht” in one sentence (`Loud-Modus - Optimierer läuft nicht - daher werden keine Daten gesendet`) even when Loud was only configured and `main.py` was stopped. Fix: `ui/loxone_debug_rows.py::status_strip_banner` separates configured mode from optimizer service state; Loud+stopped now prompts to start `main.py` under Daemon Control. Renamed setting **`silent_mode`** (primary in `runtime/local_settings.json`; legacy `loxone_silent_mode` still read). Run state writes `silent_mode`. Docs: `docs/ui/ehal-com.md`, `docs/einrichtung/betrieb.md`. Tests: `tests/test_loxone_debug.py`, `tests/test_local_settings.py`. Live acceptance verified (NAS / EHAL-Com).
+
 ### Bugfix SB Loxone password save corrupts .env on NAS (2026-08-19)
 
 - [x] Changing Loxone credentials on **Smarthome-Backend → Anbindung** could leave `config/.env` empty on NAS/SMB when `os.replace` failed or wrote invalid content (missing write permissions). Fix: `runtime_store/dotenv_io.py::write_loxone_dotenv` — pre-check config dir writable / target not a directory, backup existing `.env`, verify temp + final content, restore backup on failure, clean up `.env.tmp`; `ui/setup_dotenv.py` — explicit German error when save is not possible (no success toast). Tests: `tests/test_dotenv_io.py` (`test_write_loxone_dotenv_preserves_original_when_replace_fails`, `test_write_loxone_dotenv_restores_when_post_replace_content_invalid`). Live acceptance verified (Streamlit SB save + read-only simulation).

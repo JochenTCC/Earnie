@@ -46,10 +46,10 @@ def status_strip_banner(silent: bool, daemon_running: bool) -> tuple[str, str]:
     if silent and daemon_running:
         return (
             "warning",
-            "Silent-Modus - Optimierer läuft ohne Daten zu senden",
+            "Silent-Modus - Optimierer läuft, sendet aber keine Daten",
         )
     if silent:
-        return ("warning", "Silent-Modus - Optimierer läuft nicht")
+        return ("warning", "Silent-Modus - Optimierer-Dienst läuft nicht")
     if daemon_running:
         return (
             "success",
@@ -57,7 +57,8 @@ def status_strip_banner(silent: bool, daemon_running: bool) -> tuple[str, str]:
         )
     return (
         "warning",
-        "Loud-Modus - Optimierer läuft nicht - daher werden keine Daten gesendet",
+        "Loud-Modus konfiguriert - Optimierer-Dienst läuft nicht "
+        "(starten Sie main.py unter Daemon Control)",
     )
 
 def read_check_status_label(item: LoxoneCheck) -> str:
@@ -369,7 +370,7 @@ def write_summary_from_rows(rows: list[dict[str, str]]) -> str:
     return f"{ok}/{len(attempted)} Schreibvorgänge erfolgreich"
 
 def render_status_strip(main_state: dict | None) -> None:
-    silent = config.is_loxone_silent_mode()
+    silent = config.is_silent_mode()
     daemon_running = daemon_status().state == "running"
     level, message = status_strip_banner(silent, daemon_running)
     if level == "success":

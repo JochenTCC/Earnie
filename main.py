@@ -406,7 +406,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "source": "main.py",
             "success": True,
             "run_trigger": run_trigger,
-            "loxone_silent_mode": config.is_loxone_silent_mode(),
+            "silent_mode": config.is_silent_mode(),
             "optimization_interval_sec": optimization_schedule.optimization_interval_seconds(),
             "event_trigger_snapshot": {},
             "loxone_sent": loxone_sent,

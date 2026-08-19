@@ -5,29 +5,44 @@ import os
 
 from settings.json_io import read_json_dict
 
+_SILENT_MODE_KEYS = ("silent_mode", "loxone_silent_mode")
 
-def _validate_loxone_silent_mode_bool(raw: object, source: str) -> bool:
+
+def _validate_silent_mode_bool(raw: object, source: str) -> bool:
     if not isinstance(raw, bool):
         raise ValueError(
-            f"Kritischer Konfigurationsfehler: loxone_silent_mode in '{source}' "
+            f"Kritischer Konfigurationsfehler: silent_mode in '{source}' "
             "muss true oder false sein."
         )
     return raw
 
 
-def load_loxone_silent_mode(raw_config: dict, local_settings: dict, local_settings_path: str) -> bool:
-    if "loxone_silent_mode" in local_settings:
-        return _validate_loxone_silent_mode_bool(
-            local_settings.get("loxone_silent_mode"),
-            local_settings_path,
-        )
+def _read_silent_mode_from_mapping(mapping: dict, source: str) -> bool | None:
+    for key in _SILENT_MODE_KEYS:
+        if key in mapping:
+            return _validate_silent_mode_bool(mapping.get(key), f"{source} ({key})")
+    return None
+
+
+def load_silent_mode(raw_config: dict, local_settings: dict, local_settings_path: str) -> bool:
+    local_val = _read_silent_mode_from_mapping(local_settings, local_settings_path)
+    if local_val is not None:
+        return local_val
     system = raw_config.get("system")
     if not isinstance(system, dict):
-        return False
-    raw = system.get("loxone_silent_mode")
-    if raw is None:
         return True
-    return _validate_loxone_silent_mode_bool(raw, "config.json (system.loxone_silent_mode)")
+    for key in _SILENT_MODE_KEYS:
+        if key in system:
+            return _validate_silent_mode_bool(
+                system.get(key),
+                f"config.json (system.{key})",
+            )
+    return True
+
+
+def load_loxone_silent_mode(raw_config: dict, local_settings: dict, local_settings_path: str) -> bool:
+    """Deprecated alias for :func:`load_silent_mode`."""
+    return load_silent_mode(raw_config, local_settings, local_settings_path)
 
 
 def load_local_settings_document(local_settings_path: str) -> dict:
@@ -130,5 +145,3 @@ def load_ui_chart_debug_capture_dir(raw_config: dict) -> str:
             "Kritischer Konfigurationsfehler: ui.chart_debug_capture_dir darf nicht leer sein."
         )
     return path
-
-

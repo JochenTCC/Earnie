@@ -176,9 +176,13 @@
           "exclusiveMinimum": 0,
           "description": "Maximale Wartezeit zwischen Optimierungs-Durchläufen in Sekunden (900 = 15 Min.)."
         },
+        "silent_mode": {
+          "type": "boolean",
+          "description": "true = nur lesen, keine Schreibbefehle (Standard: true). Optional maschinenspezifisch in runtime/local_settings.json überschreibbar. Legacy-Key: loxone_silent_mode."
+        },
         "loxone_silent_mode": {
           "type": "boolean",
-          "description": "true = Loxone/Huawei/Verbraucher nur lesen, keine Schreibbefehle (Standard: true). Optional maschinenspezifisch in runtime/local_settings.json überschreibbar."
+          "description": "Veraltet — verwenden Sie silent_mode. true = nur lesen, keine Schreibbefehle."
         },
         "ehal_loxone_http_port": {
           "type": "integer",
