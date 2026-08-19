@@ -441,3 +441,48 @@ def test_build_chart_display_past_cycle_is_history_only(history_files):
     display = build_chart_display_context(chart_context, [])
     assert display.history_only is True
     assert all(q != SLOT_MILP for q in display.slot_qualities)
+
+
+def test_build_chart_history_sanitizes_implausible_soc_spike(history_files):
+    """Prod dump debug_dump_20260819_135605: 51.2 % spike at 00:15 with ~0 kW battery."""
+    window_start = _dt(2026, 8, 18, 0, 0)
+    snapshot = {
+        "house_kw": 0.91,
+        "baseload_kw": 0.33,
+        "flex_kw": {},
+        "flex_sum_kw": 0.58,
+        "pv_kw": 0.0,
+        "grid_kw": 1.11,
+        "battery_kw": -0.2,
+    }
+    _write_jsonl(
+        history_files,
+        [
+            _entry(
+                _dt(2026, 8, 18, 0, 0),
+                soc_percent=19.0,
+                battery_plan_kw=0.0,
+                consumption_snapshot=dict(snapshot, grid_kw=1.21),
+            ),
+            _entry(
+                _dt(2026, 8, 18, 0, 15),
+                soc_percent=51.2,
+                battery_plan_kw=0.0,
+                consumption_snapshot=snapshot,
+            ),
+            _entry(
+                _dt(2026, 8, 18, 0, 30),
+                soc_percent=20.0,
+                battery_plan_kw=0.0,
+                consumption_snapshot=snapshot,
+            ),
+        ],
+    )
+    result = history_timeline.build_chart_history(
+        window_start,
+        window_start.replace(hour=1),
+    )
+    assert result.rows[1]["Simulierter SoC (%)"] != 51.2
+    assert result.rows[1]["Simulierter SoC (%)"] == pytest.approx(19.6, abs=0.3)
+    assert result.rows[2]["Simulierter SoC (%)"] == pytest.approx(20.0, abs=0.2)
+

@@ -270,6 +270,20 @@ def earliest_replay_completed_at() -> datetime | None:
     return merged[0]["completed_at"]
 
 
+def latest_logged_soc_percent() -> float | None:
+    """Letzter geloggter ESS-SoC aus optimization_history.jsonl."""
+    merged = _sorted_history_rows(_load_jsonl_history())
+    if not merged:
+        return None
+    raw = merged[-1].get("_raw") or merged[-1]
+    if not isinstance(raw, dict):
+        return None
+    soc = raw.get("soc_percent")
+    if soc is None:
+        return None
+    return float(soc)
+
+
 @dataclass(frozen=True)
 class ProductionLogSourceInfo:
     """Metadaten zur aktuell eingebundenen Produktiv-Log-Datei."""

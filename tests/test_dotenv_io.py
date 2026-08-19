@@ -134,3 +134,46 @@ def test_write_loxone_dotenv_rejects_empty_user(tmp_path, monkeypatch):
     monkeypatch.setenv("EARNIE_DOTENV_PATH", "config/.env")
     with pytest.raises(ValueError, match="Benutzername"):
         dotenv_io.write_loxone_dotenv("10.0.0.5", "  ", "secret")
+
+
+def test_write_loxone_dotenv_preserves_original_when_replace_fails(
+    tmp_path, monkeypatch
+):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    env_path = config_dir / ".env"
+    original = 'LOXONE_USER="keep"\nLOXONE_PASS="secret"\nLOXONE_IP=10.0.0.1\n'
+    env_path.write_text(original, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", "config/.env")
+
+    def _fail_replace(src: str, dst: str) -> None:
+        raise PermissionError(f"denied: {src} -> {dst}")
+
+    monkeypatch.setattr(os, "replace", _fail_replace)
+    with pytest.raises(OSError, match="denied"):
+        dotenv_io.write_loxone_dotenv("10.0.0.5", "newuser", "newpass")
+    assert env_path.read_text(encoding="utf-8") == original
+    assert not (config_dir / ".env.tmp").exists()
+
+
+def test_write_loxone_dotenv_restores_when_post_replace_content_invalid(
+    tmp_path, monkeypatch
+):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    env_path = config_dir / ".env"
+    original = 'LOXONE_USER="keep"\nLOXONE_PASS="secret"\nLOXONE_IP=10.0.0.1\n'
+    env_path.write_text(original, encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", "config/.env")
+
+    def _empty_replace(src: str, dst: str) -> None:
+        with open(dst, "w", encoding="utf-8"):
+            pass
+        os.remove(src)
+
+    monkeypatch.setattr(os, "replace", _empty_replace)
+    with pytest.raises(OSError, match="wiederhergestellt"):
+        dotenv_io.write_loxone_dotenv("10.0.0.5", "newuser", "newpass")
+    assert env_path.read_text(encoding="utf-8") == original

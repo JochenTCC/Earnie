@@ -29,7 +29,10 @@ def _save_loxone_credentials(ip: str, user: str, password: str) -> str | None:
     except ValueError as exc:
         return str(exc)
     except OSError as exc:
-        return f"Datei konnte nicht geschrieben werden: {exc}"
+        return (
+            f"{exc} "
+            "Bitte Schreibrechte auf die .env-Datei bzw. das Config-Verzeichnis prüfen."
+        )
 
     load_app_dotenv(override=True)
     config.reinit_config(require_loxone_credentials=True)

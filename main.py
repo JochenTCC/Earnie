@@ -15,6 +15,7 @@ from data import profile_manager, consumer_targets, pv_tuner, cons_data_store, l
 from data.live_market_prices import fetch_live_day_ahead_prices
 from data.feed_in_prices import k_push_act_for_matrix_row
 from runtime_store import run_state, optimization_history
+from runtime_store.soc_plausibility import sanitize_soc_reading
 from runtime_store import live_optimization_debug
 from runtime_store.live_display_loader import serialize_planning_window
 from runtime_store.single_instance import SingleInstanceError, ensure_single_instance
@@ -140,6 +141,25 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             matrix_snapshot["pv_kw"],
             matrix_snapshot["baseload_kw"],
         )
+
+    reported_soc = float(current_soc)
+    prev_logged_soc = optimization_history.latest_logged_soc_percent()
+    if prev_logged_soc is not None:
+        battery_kw = float(live_power["battery"]) if live_power else 0.0
+        current_soc, soc_corrected = sanitize_soc_reading(
+            prev_logged_soc,
+            reported_soc,
+            battery_kw,
+        )
+        if soc_corrected:
+            logger.warning(
+                "SoC-Lesung korrigiert: Miniserver %.1f%% → %.1f%% "
+                "(Integration aus %.1f%%, Batterie %.2f kW).",
+                reported_soc,
+                current_soc,
+                prev_logged_soc,
+                battery_kw,
+            )
 
     current_hour = datetime.now().hour
     targets = consumer_targets.resolve_consumer_daily_targets(matrix=optimization_matrix)

@@ -126,6 +126,56 @@ def format_loxone_dotenv(ip: str, user: str, password: str) -> str:
     )
 
 
+def _read_text_file(path: str) -> str | None:
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read()
+    except OSError:
+        return None
+
+
+def _assert_dotenv_target_usable(path: str) -> None:
+    if os.path.isdir(path):
+        raise OSError(
+            f"'{path}' ist ein Verzeichnis (typisch fehlgeschlagener Docker-Bind-Mount). "
+            "Bitte auf dem Host löschen und neu anlegen."
+        )
+    parent = os.path.dirname(path) or "."
+    if not os.access(parent, os.W_OK):
+        raise PermissionError(
+            f"Keine Schreibrechte für das Config-Verzeichnis '{parent}'. "
+            "Die .env-Datei wurde nicht geändert."
+        )
+
+
+def _write_tmp_file(tmp_path: str, content: str) -> None:
+    with open(tmp_path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(content)
+        handle.flush()
+        try:
+            os.fsync(handle.fileno())
+        except OSError:
+            pass
+
+
+def _restore_dotenv_content(path: str, backup: str) -> None:
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(backup)
+        handle.flush()
+        try:
+            os.fsync(handle.fileno())
+        except OSError:
+            pass
+
+
+def _cleanup_tmp_file(tmp_path: str) -> None:
+    if os.path.isfile(tmp_path):
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
 def write_loxone_dotenv(ip: str, user: str, password: str) -> str:
     """
     Schreibt Loxone-Zugangsdaten atomar nach config/.env.
@@ -141,12 +191,37 @@ def write_loxone_dotenv(ip: str, user: str, password: str) -> str:
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
+    _assert_dotenv_target_usable(path)
 
     content = format_loxone_dotenv(ip, user, password)
+    backup = _read_text_file(path) if os.path.isfile(path) else None
     tmp_path = f"{path}.tmp"
-    with open(tmp_path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(content)
-    os.replace(tmp_path, path)
+    try:
+        _write_tmp_file(tmp_path, content)
+        if _read_text_file(tmp_path) != content:
+            raise OSError(
+                "Temporäre .env-Datei unvollständig. Die bestehende .env wurde nicht geändert."
+            )
+        os.replace(tmp_path, path)
+        if _read_text_file(path) != content:
+            if backup is not None:
+                _restore_dotenv_content(path, backup)
+                raise OSError(
+                    "Die .env-Datei konnte nicht zuverlässig geschrieben werden. "
+                    "Der vorherige Inhalt wurde wiederhergestellt."
+                )
+            raise OSError(
+                "Die .env-Datei konnte nicht zuverlässig geschrieben werden."
+            )
+    except OSError as exc:
+        if backup is not None and _read_text_file(path) != backup:
+            try:
+                _restore_dotenv_content(path, backup)
+            except OSError:
+                pass
+        raise OSError(str(exc)) from exc
+    finally:
+        _cleanup_tmp_file(tmp_path)
     if hasattr(os, "chmod"):
         try:
             os.chmod(path, 0o600)

@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix SB Loxone password save corrupts .env on NAS (2026-08-19)
+
+- [x] Changing Loxone credentials on **Smarthome-Backend → Anbindung** could leave `config/.env` empty on NAS/SMB when `os.replace` failed or wrote invalid content (missing write permissions). Fix: `runtime_store/dotenv_io.py::write_loxone_dotenv` — pre-check config dir writable / target not a directory, backup existing `.env`, verify temp + final content, restore backup on failure, clean up `.env.tmp`; `ui/setup_dotenv.py` — explicit German error when save is not possible (no success toast). Tests: `tests/test_dotenv_io.py` (`test_write_loxone_dotenv_preserves_original_when_replace_fails`, `test_write_loxone_dotenv_restores_when_post_replace_content_invalid`). Live acceptance verified (Streamlit SB save + read-only simulation).
+
+### Bugfix Chart-1 implausible SOC peak at midnight (2026-08-19)
+
+- [x] **Unplausible SOC peak around 0:00** — Chart-1 showed a ~51% SoC spike at 18.08. 00:15 with no matching battery charge/discharge bars (`debug_dump_20260819_135605`). Root cause: bad Miniserver ESS read logged to `optimization_history.jsonl` (`soc_percent` 51.2 with `battery_plan_kw` 0). Fix: `runtime_store/soc_plausibility.py` (physics envelope + battery-power integration); sanitize history chart rows in `runtime_store/history_chart_rows.py`; correct live SoC before MILP in `main.py` (`optimization_history.latest_logged_soc_percent`). Tests: `tests/test_soc_plausibility.py`, `tests/test_chart_history.py::test_build_chart_history_sanitizes_implausible_soc_spike`. Live acceptance verified (S-2 past cycle, midnight window).
+
 ### Batterien tab: Verschleiß editierbar (2026-08-19)
 
 - [x] Checkbox **„Verschleiß berücksichtigen“** auf dem Hauskonfigurator-Tab **Batterien** (`[ui/planning_battery_form.py](../ui/planning_battery_form.py)`) — aktiviert schaltet drei Felder frei (Ersatzkosten €, Erwartete Vollzyklen, Anteil zyklenbedingter Kosten, Defaults 1500/6000/0.5), persistiert in den bereits vorhandenen `battery_wear`-Block je Batterie (Backend/Validierung/Schema unverändert). Tests: `[tests/test_planning_editors.py](../tests/test_planning_editors.py)`. Doku: `[docs/konfiguration/batterie-pv.md](../docs/konfiguration/batterie-pv.md)`. Verified live (Streamlit, isolierte Testkonfiguration).
