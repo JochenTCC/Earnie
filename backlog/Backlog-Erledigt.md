@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### HA Add-on auto-publish on release (2026-08-19)
+
+- [x] **`scripts/bump_ha_addon.py`** — idempotent pin of `build.yaml`, `config.yaml`, `Dockerfile` ARG, `CHANGELOG.md`; add-on `version:` mirrors Earnie app release
+- [x] **Release CI** — `.github/workflows/release.yml` job `publish_ha_addon` (lint → commit Earnie `main` → mirror `ha-addon-earnie` `main`); manual retry via `.github/workflows/ha-addon-publish.yml`
+- [x] **Add-on CI lint** — `frenck/action-addon-linter` in publish job + `ha-addon-earnie/.github/workflows/hassfest.yml` on push/PR
+- [x] **Docs** — `packaging/homeassistant-addon/README.md`, `earnie/CHANGELOG.md`, `docs/einrichtung/homeassistant-addon.md`, `ha-addon-earnie/README.md`
+- [x] **Prerequisite (maintainer):** repo secret `HA_ADDON_REPO_TOKEN` on `JochenTCC/Earnie` (PAT `contents:write` on Earnie + ha-addon-earnie) — required before first tagged publish
+
 ### Official release 2.5.0 (2026-08-19)
 
 - [x] Official `2.5.0` — GitHub Latest + GHCR `:2.5.0` and `:latest`; tag `v2.5.0` on `main` after community alpha line (`2.5.0-alpha.9`); release notes [`.github/release-notes/v2.5.0.md`](../.github/release-notes/v2.5.0.md); alpha compose stays pinned to `2.5.0-alpha.9`

@@ -5,8 +5,8 @@
 # direkt im Repo-Root liegen (Supervisor-Repository-Konvention, kein
 # Unterordner-Deeplink möglich).
 #
-# Sync-Mechanik für 0.1 laut Entwicklungsplan: manueller Kopiervorgang bei
-# Release, keine GitHub-Action-Automatisierung (kein 0.1-Blocker).
+# Sync-Mechanik: manueller Kopiervorgang bei lokaler Entwicklung / Recovery.
+# Automatischer Publish: .github/workflows/release.yml → publish_ha_addon.
 #
 # Usage: packaging/homeassistant-addon/sync-to-ha-addon-repo.sh <path-to-ha-addon-earnie-checkout>
 set -e

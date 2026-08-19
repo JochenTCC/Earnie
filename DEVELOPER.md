@@ -81,6 +81,7 @@ git push origin vX.Y.Z-alpha.N
 - Optional notes: `.github/release-notes/vX.Y.Z.md` or `vX.Y.Z-alpha.N.md` (else a short default body).
 - Official: GitHub Latest Release; images `:<version>` and `:latest` (+ legacy aliases).
 - Pre-release (`-` in version): GitHub Pre-release (not Latest); images `:<version>` only (no `:latest`).
+- **HA Add-on:** same tag triggers job `publish_ha_addon` — bumps `packaging/homeassistant-addon/earnie/`, lints, commits Earnie `main`, mirrors [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie). Requires repo secret `HA_ADDON_REPO_TOKEN` (PAT `contents:write` on both repos). Manual retry: workflow **HA Add-on publish**. Details: `packaging/homeassistant-addon/README.md`.
 - Publish from `main`; leave the pre-release string on `main` until the next approved bump.
 - Parallel feature work + urgent fix for an already tagged build: [docs/spec/branching-hotfix-playbook.md](docs/spec/branching-hotfix-playbook.md) (`main` + tags; short-lived `hotfix/…` only when needed).
 - **GHCR auth for Actions:** store a classic PAT with `write:packages` (and `read:packages`) as repo secret `GHCR_TOKEN`. Without it, `GITHUB_TOKEN` only works if each package (`earnie-energy`, `ernie-energy`) grants this repository **Write** under Package settings → Manage Actions access. Also set packages **Public** if anonymous `docker pull` is required.
