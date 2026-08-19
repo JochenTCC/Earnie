@@ -7,7 +7,6 @@ slug: earnie
 description: Energiemanagement und Optimierung für Smart Homes
 url: https://github.com/JochenTCC/Earnie
 startup: services
-boot: auto
 init: false
 panel_icon: mdi:solar-power
 arch:
