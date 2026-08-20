@@ -64,6 +64,14 @@ def integrate_soc_step(
     return round(new_soc, 1)
 
 
+def _delta_sign(value: float) -> int:
+    if value > 0.0:
+        return 1
+    if value < 0.0:
+        return -1
+    return 0
+
+
 def sanitize_soc_reading(
     prev_soc: float | None,
     reported_soc: float,
@@ -71,11 +79,14 @@ def sanitize_soc_reading(
     battery_params: dict | None = None,
     *,
     dt_h: float = DEFAULT_DT_H,
+    consecutive_same_reported: int = 1,
 ) -> tuple[float, bool]:
     """
     Return (soc, corrected?) — replace implausible jumps with battery integration.
 
     Uses Ist/plan battery power between slots; full-power envelope as backstop.
+    When the ESS latches to a repeated new level or the reading contradicts the
+    integrated direction, trust the reported value (stale chain after bad spikes).
     """
     if prev_soc is None:
         return round(float(reported_soc), 1), False
@@ -87,4 +98,10 @@ def sanitize_soc_reading(
         return reported, False
     if abs(reported - expected) <= _SOC_INTEGRATION_TOLERANCE:
         return reported, False
+    if consecutive_same_reported >= 2:
+        return reported, True
+    rep_sign = _delta_sign(reported - prev)
+    exp_sign = _delta_sign(expected - prev)
+    if rep_sign != 0 and exp_sign != 0 and rep_sign != exp_sign:
+        return reported, True
     return expected, True

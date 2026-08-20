@@ -396,6 +396,8 @@ def _sanitize_history_soc_rows(
         return rows
     battery_params = config.get_battery_params()
     prev_soc: float | None = None
+    last_raw_reported: float | None = None
+    consecutive_same_reported = 0
     sanitized: list[dict[str, Any]] = []
     for index, row in enumerate(rows):
         row = dict(row)
@@ -403,11 +405,18 @@ def _sanitize_history_soc_rows(
         if reported is None or qualities[index] != SLOT_PRESENT:
             sanitized.append(row)
             continue
+        raw_reported = float(reported)
+        if last_raw_reported is not None and raw_reported == last_raw_reported:
+            consecutive_same_reported += 1
+        else:
+            consecutive_same_reported = 1
+        last_raw_reported = raw_reported
         soc_value, corrected = sanitize_soc_reading(
             prev_soc,
-            float(reported),
+            raw_reported,
             _battery_kw_for_soc_row(row),
             battery_params,
+            consecutive_same_reported=consecutive_same_reported,
         )
         if corrected:
             row["Simulierter SoC (%)"] = soc_value

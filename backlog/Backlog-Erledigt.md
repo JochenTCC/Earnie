@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix Chart-1 SoC jump between S-2 cycle charts (2026-08-20)
+
+- [x] **SoC jump >10% yesterday vs today chart** — S-2 cycle navigation showed e.g. 62.6% vs 29.0% at the same slot on 20.08. 06:15 (`debug_dump_20260820_093415`). Root cause: history SoC sanitizer kept a stale high chain after bad ESS reads (81%→55% latch, then rejected true low readings while integration drifted upward overnight). Fix: `runtime_store/soc_plausibility.py` — accept repeated ESS plateaus (≥2 identical raw readings) and readings contradicting battery-integration direction; `runtime_store/history_chart_rows.py` tracks consecutive raw values. Tests: `tests/test_soc_plausibility.py`. Live acceptance verified (Streamlit S-2 cycle navigation).
+
 ### HA Add-on auto-publish on release (2026-08-19)
 
 - [x] **`scripts/bump_ha_addon.py`** — idempotent pin of `build.yaml`, `config.yaml`, `Dockerfile` ARG, `CHANGELOG.md`; add-on `version:` mirrors Earnie app release
