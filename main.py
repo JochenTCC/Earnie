@@ -133,14 +133,20 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         matrix_snapshot = live_consumption.build_consumption_snapshot(
             live_power, flex_kw_for_matrix
         )
-        optimization_matrix = live_consumption.apply_live_snapshot_to_matrix(
-            optimization_matrix, matrix_snapshot, hour_index=0
-        )
-        logger.info(
-            "Live-Snapshot in Optimierungsmatrix: PV=%.2f kW, Grundlast=%.2f kW",
-            matrix_snapshot["pv_kw"],
-            matrix_snapshot["baseload_kw"],
-        )
+        if live_consumption.is_dead_telemetry_snapshot(matrix_snapshot):
+            logger.warning(
+                "Live-Telemetrie liefert Nullwerte (PV/Haus/Netz/Batterie) — "
+                "Optimierungsmatrix behält Prognose-Werte."
+            )
+        else:
+            optimization_matrix = live_consumption.apply_live_snapshot_to_matrix(
+                optimization_matrix, matrix_snapshot, hour_index=0
+            )
+            logger.info(
+                "Live-Snapshot in Optimierungsmatrix: PV=%.2f kW, Grundlast=%.2f kW",
+                matrix_snapshot["pv_kw"],
+                matrix_snapshot["baseload_kw"],
+            )
 
     reported_soc = float(current_soc)
     prev_logged_soc = optimization_history.latest_logged_soc_percent()
@@ -393,6 +399,12 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         consumption_snapshot = live_consumption.build_consumption_snapshot(
             live_power, flex_chart_kw
         )
+        if live_consumption.is_dead_telemetry_snapshot(consumption_snapshot):
+            logger.warning(
+                "Live-Telemetrie liefert Nullwerte (PV/Haus/Netz/Batterie) — "
+                "consumption_snapshot wird nicht ins Produktiv-Log geschrieben."
+            )
+            consumption_snapshot = None
 
     try:
         if "k_act" not in current_market_item:

@@ -23,8 +23,11 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] Chart 1 empty history bars after all-zero EHAL live read (`debug_dump_20260820_191521`) — `is_dead_telemetry_snapshot` skips poisoned consumption_snapshot in optimizer matrix, prod log, and chart rows; hold-forward load after dead slot.
+
 
 ## New Bugs (Do not remove this chapter — even if empty)
+
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

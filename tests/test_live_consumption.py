@@ -18,6 +18,26 @@ _FILTER_CONTEXTS = {
 _SLOT = datetime(2026, 7, 9, 12, 5, tzinfo=ZoneInfo("Europe/Vienna"))
 
 
+def test_is_dead_telemetry_snapshot_detects_all_zero_read():
+    snapshot = {
+        "house_kw": 0.0,
+        "pv_kw": 0.0,
+        "grid_kw": 0.0,
+        "battery_kw": 0.0,
+    }
+    assert lc.is_dead_telemetry_snapshot(snapshot) is True
+
+
+def test_is_dead_telemetry_snapshot_allows_normal_reading():
+    snapshot = {
+        "house_kw": 0.56,
+        "pv_kw": 0.0,
+        "grid_kw": -0.01,
+        "battery_kw": 0.57,
+    }
+    assert lc.is_dead_telemetry_snapshot(snapshot) is False
+
+
 def test_fetch_live_flex_kw_for_ui_passes_filter_contexts_from_main_state():
     main_state = {"filter_contexts": _FILTER_CONTEXTS}
     flex_result = LiveFlexPowerResult(

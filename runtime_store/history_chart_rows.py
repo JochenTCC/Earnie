@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import config
+from data.live_consumption import is_dead_telemetry_snapshot
 from data.planning_window import align_to_planning_timezone
 from optimizer import battery as bat
 from optimizer.consumer_power import uses_pv_follow
@@ -92,8 +93,16 @@ def _pv_forecast_kw_from_entry(entry: dict[str, Any]) -> float:
     return float(entry.get("forecast_pv_kw", 0.0) or 0.0)
 
 
-def _power_kw_from_entry(entry: dict[str, Any]) -> tuple[float, float, float]:
+def _chart_snapshot(entry: dict[str, Any]) -> dict[str, Any]:
+    """Consumption snapshot for chart rows; dead all-zero telemetry is ignored."""
     snapshot = entry.get("consumption_snapshot") or {}
+    if is_dead_telemetry_snapshot(snapshot):
+        return {}
+    return snapshot
+
+
+def _power_kw_from_entry(entry: dict[str, Any]) -> tuple[float, float, float]:
+    snapshot = _chart_snapshot(entry)
     pv = snapshot.get("pv_kw")
     if pv is None:
         pv = entry.get("forecast_pv_kw", 0.0)
@@ -135,7 +144,7 @@ def _pv_kw_for_balance(row: dict[str, Any]) -> float:
 
 def _netzbezug_kw_from_entry(entry: dict[str, Any], row: dict[str, Any]) -> float:
     """Netzbezug: gemessenes grid_kw aus consumption_snapshot, sonst Bilanz aus der Zeile."""
-    snapshot = entry.get("consumption_snapshot") or {}
+    snapshot = _chart_snapshot(entry)
     grid = snapshot.get("grid_kw")
     if grid is not None:
         return round(float(grid), 2)
@@ -170,7 +179,7 @@ def _consumer_kw_from_entry(
     if not _consumer_is_measured(measured_ids, consumer):
         return None
 
-    snapshot = entry.get("consumption_snapshot") or {}
+    snapshot = _chart_snapshot(entry)
     flex_kw = snapshot.get("flex_kw") or {}
     if _flex_dict_has_consumer(flex_kw, consumer):
         return float(flex_kw_lookup(flex_kw, consumer))
@@ -254,7 +263,7 @@ def entry_to_chart_row(
     mode = int(entry.get("mode", bat.MODE_AUTOMATIK))
     target_power = float(entry.get("target_power_kw", 0.0) or 0.0)
     _, baseload, battery_plan = _power_kw_from_entry(entry)
-    snapshot = entry.get("consumption_snapshot") or {}
+    snapshot = _chart_snapshot(entry)
     row: dict[str, Any] = {
         "slot_datetime": slot_start,
         "Uhrzeit": _format_slot_time(slot_start, include_date=include_date),
@@ -425,6 +434,38 @@ def _sanitize_history_soc_rows(
     return sanitized
 
 
+def _sanitize_dead_telemetry_rows(
+    rows: list[dict[str, Any]],
+    qualities: tuple[str, ...] | list[str],
+    by_slot: dict[datetime, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Hold-forward load/flex when log slot exists but live meters returned all zeros."""
+    last_good: dict[str, Any] | None = None
+    sanitized: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        row = dict(row)
+        if qualities[index] == SLOT_PRESENT:
+            slot_start = row.get("slot_datetime")
+            entry = (
+                by_slot.get(_coerce_slot_start(slot_start))
+                if slot_start is not None
+                else None
+            )
+            snapshot = (entry or {}).get("consumption_snapshot") or {}
+            if is_dead_telemetry_snapshot(snapshot):
+                if last_good is not None and float(row.get("Verbrauch-Prognose (kW)") or 0) <= 0:
+                    row["Verbrauch-Prognose (kW)"] = last_good["Verbrauch-Prognose (kW)"]
+                    for consumer in config.get_flexible_consumers(optimizer_only=True):
+                        col = consumer_column_name(consumer)
+                        if float(row.get(col) or 0) <= 0 and last_good.get(col):
+                            row[col] = last_good[col]
+                    row["Netzbezug (kW)"] = _netzbezug_kw_from_entry(entry or {}, row)
+            else:
+                last_good = row
+        sanitized.append(row)
+    return sanitized
+
+
 def _build_rows_for_slot_starts(
     slot_starts: tuple[datetime, ...] | list[datetime],
     *,
@@ -463,5 +504,6 @@ def _build_rows_for_slot_starts(
             missing += 1
             qualities.append(SLOT_MISSING)
         rows.append(row)
+    rows = _sanitize_dead_telemetry_rows(rows, qualities, by_slot)
     rows = _sanitize_history_soc_rows(rows, qualities)
     return rows, tuple(qualities), present, held, missing, by_slot

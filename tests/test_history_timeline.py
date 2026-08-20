@@ -198,6 +198,79 @@ def test_entry_to_chart_row_line_and_bar_pv_sources_differ():
     assert pv_bar.kw == pytest.approx(3.5)
 
 
+def test_entry_to_chart_row_ignores_dead_telemetry_snapshot():
+    """Regression: debug_dump_20260820_191521 — all-zero EHAL read must not empty Chart 1."""
+    entry = _entry(
+        datetime(2026, 8, 20, 16, 45, 0),
+        forecast_pv_kw=0.895,
+        forecast_consumption_kw=0.5,
+        consumption_snapshot={
+            "house_kw": 0.0,
+            "baseload_kw": 0.0,
+            "flex_kw": {"pool_swimspa": 0.0},
+            "flex_sum_kw": 0.0,
+            "pv_kw": 0.0,
+            "grid_kw": 0.0,
+            "battery_kw": 0.0,
+        },
+        flex_live_kw={"pool_swimspa": 1.2},
+        flex_measured_ids=["pool_swimspa"],
+    )
+    row = history_timeline.entry_to_chart_row(entry, datetime(2026, 8, 20, 16, 45, 0))
+    from ui.chart_flow_balance import KIND_PV, build_flow_balance_segments
+
+    assert history_timeline.PV_IST_COLUMN not in row
+    assert row["Verbrauch-Prognose (kW)"] == 0.5
+    assert row["PV-Prognose (kW)"] == 0.895
+    slot = build_flow_balance_segments(row, flex_consumers=[])
+    pv_bar = next(segment for segment in slot.up if segment.kind == KIND_PV)
+    assert pv_bar.kw == pytest.approx(0.895)
+
+
+def test_build_chart_history_hold_forwards_load_after_dead_telemetry(history_files, monkeypatch):
+    """Regression: debug_dump_20260820_191521 — poisoned forecast after all-zero EHAL read."""
+    from datetime import timezone
+
+    tz = timezone.utc
+    dead_snapshot = {
+        "house_kw": 0.0,
+        "baseload_kw": 0.0,
+        "flex_kw": {},
+        "flex_sum_kw": 0.0,
+        "pv_kw": 0.0,
+        "grid_kw": 0.0,
+        "battery_kw": 0.0,
+    }
+    _write_jsonl(
+        history_files,
+        [
+            _entry(
+                datetime(2026, 8, 20, 16, 30, tzinfo=tz),
+                forecast_consumption_kw=0.5,
+                consumption_snapshot={
+                    "house_kw": 0.5,
+                    "baseload_kw": 0.5,
+                    "flex_kw": {},
+                    "flex_sum_kw": 0.0,
+                    "pv_kw": 0.05,
+                    "grid_kw": 0.0,
+                    "battery_kw": -0.2,
+                },
+            ),
+            _entry(
+                datetime(2026, 8, 20, 16, 45, tzinfo=tz),
+                forecast_consumption_kw=0.0,
+                forecast_pv_kw=0.895,
+                consumption_snapshot=dead_snapshot,
+            ),
+        ],
+    )
+    window_start = datetime(2026, 8, 20, 16, 30, tzinfo=tz)
+    window_end = datetime(2026, 8, 20, 17, 0, tzinfo=tz)
+    result = history_timeline.build_chart_history(window_start, window_end)
+    assert result.rows[1]["Verbrauch-Prognose (kW)"] == 0.5
+
+
 def test_entry_to_chart_row_uses_measured_flex_live(monkeypatch):
     from optimizer.targets import consumer_column_name
 

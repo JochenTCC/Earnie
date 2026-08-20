@@ -19,6 +19,21 @@ from settings.flexible_consumers import flex_kw_to_canonical
 logger = logging.getLogger(__name__)
 
 _UI_TIMEZONE = ZoneInfo("Europe/Vienna")
+_DEAD_TELEMETRY_EPS = 1e-6
+
+
+def is_dead_telemetry_snapshot(snapshot: dict[str, Any] | None) -> bool:
+    """
+    True when live meters all read exactly zero (EHAL/Loxone outage pattern).
+
+    Observed in prod when Chart 1 shows empty history bars despite present log slots.
+    """
+    if not snapshot:
+        return False
+    for key in ("house_kw", "pv_kw", "grid_kw", "battery_kw"):
+        if abs(float(snapshot.get(key, 0.0) or 0.0)) > _DEAD_TELEMETRY_EPS:
+            return False
+    return True
 
 
 def build_consumption_snapshot(
