@@ -2,7 +2,7 @@
 # Entwicklungsquelle im Hauptrepo; Sync nach ha-addon-earnie bei Releases
 # (siehe docs/einrichtung/homeassistant-addon.md und der Entwicklungsplan-Doku).
 name: Earnie
-version: "2.5.0"
+version: "2.5.1"
 slug: earnie
 description: Energiemanagement und Optimierung für Smart Homes
 url: https://github.com/JochenTCC/Earnie

@@ -2,7 +2,7 @@
 # (Architektur-Entscheidung "Image-Wrapper" statt Git-Clone-Build, siehe
 # Entwicklungsplan-Doku). Die App selbst (Dockerfile/Entrypoint) bleibt die
 # einzige Quelle der Wahrheit in docker/Dockerfile im Hauptrepo.
-ARG EARNIE_VERSION=2.5.0
+ARG EARNIE_VERSION=2.5.1
 FROM ghcr.io/jochentcc/earnie-energy:${EARNIE_VERSION}
 
 # run.sh liest /data/options.json (Supervisor) selbst — kein HA-Base-Image
