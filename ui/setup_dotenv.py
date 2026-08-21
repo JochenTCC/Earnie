@@ -10,6 +10,8 @@ from integrations.loxone_connectivity import (
     verify_loxone_setup,
 )
 from runtime_store.dotenv_io import (
+    import_loxone_dotenv_from,
+    loxone_dotenv_conflict,
     read_loxone_credentials,
     validate_loxone_credentials,
     write_loxone_dotenv,
@@ -40,11 +42,42 @@ def _save_loxone_credentials(ip: str, user: str, password: str) -> str | None:
     return None
 
 
+def _render_loxone_dotenv_conflict_hint() -> None:
+    conflict = loxone_dotenv_conflict()
+    if not conflict:
+        return
+    canonical = conflict["canonical_path"]
+    for item in conflict["conflicts"]:
+        st.warning(
+            f"Die Datei `{item['path']}` enthält andere Loxone-Zugangsdaten als die "
+            f"aktive Datei `{canonical}`. Earnie verwendet **nur** `{canonical}`. "
+            "Wenn Sie die Zugangsdaten aus der anderen Datei meinen, übernehmen Sie sie "
+            "mit dem Button unten oder speichern Sie sie erneut im Formular."
+        )
+        if st.button(
+            f"Zugangsdaten aus `{item['path']}` übernehmen",
+            key=f"import_loxone_dotenv_{item['label']}",
+        ):
+            try:
+                import_loxone_dotenv_from(item["path"])
+            except (ValueError, OSError) as exc:
+                st.error(str(exc))
+                return
+            load_app_dotenv(override=True)
+            config.reinit_config(require_loxone_credentials=True)
+            from runtime_store.loxone_auth_error import clear_loxone_auth_error
+
+            clear_loxone_auth_error()
+            st.success(f"Zugangsdaten aus `{item['path']}` nach `{canonical}` übernommen.")
+            st.rerun()
+
+
 def render_loxone_credentials_form(*, form_key: str = "loxone_setup_form") -> None:
     """Formular für Miniserver-IP, Benutzer und Passwort."""
     dotenv_path = resolve_dotenv_path()
     env_ip, env_user, env_pass = read_loxone_credentials()
     st.caption(f"Zieldatei: `{dotenv_path}`")
+    _render_loxone_dotenv_conflict_hint()
     with st.form(form_key):
         ip = st.text_input(
             "Miniserver-IP",
@@ -85,6 +118,9 @@ def display_loxone_verify_results(ok: bool, results: list[LoxoneCheck]) -> None:
             st.error(line)
     if ok:
         st.success("Alle Loxone-Prüfungen erfolgreich.")
+        from runtime_store.loxone_auth_error import clear_loxone_auth_error
+
+        clear_loxone_auth_error()
     else:
         failed = sum(
             1 for item in results if not item.passed and item.severity != "warning"

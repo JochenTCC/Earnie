@@ -20,6 +20,8 @@ Vorlage: [.env.example](../../.env.example) → nach `config/.env` kopieren (Pro
 
 Die Zugangsdaten können auch bequem über die Web-Oberfläche eingegeben werden.
 
+Bei abgelehnten Zugangsdaten (HTTP **401** oder **403**) pausiert der Optimierer (`main.py`) die Miniserver-Zugriffe und zeigt in der Web-Oberfläche einen Fehlerhinweis. Korrigieren Sie IP, Benutzer und Passwort unter **Smarthome-Backend → Anbindung** und testen Sie die Merker erneut.
+
 ## HTTP-Schnittstelle
 
 - **Lesen:** `GET http://{LOXONE_IP}/jdev/sps/io/{Name}`

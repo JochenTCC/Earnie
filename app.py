@@ -1,7 +1,7 @@
 # app.py
 from runtime_store.dotenv_loader import load_app_dotenv
 
-load_app_dotenv()
+load_app_dotenv(override=True)
 
 import logger_config
 
@@ -69,6 +69,12 @@ def _render_drift_warning() -> None:
         st.warning(format_drift_message(drift_items))
 
 
+def _render_loxone_auth_warning() -> None:
+    from ui.loxone_auth_banner import render_loxone_auth_error_banner
+
+    render_loxone_auth_error_banner()
+
+
 def main() -> None:
     if needs_loxone_setup():
         render_ehal_setup_page()
@@ -87,6 +93,7 @@ def main() -> None:
     render_setup_progress_notice()
     render_missing_next_month_tariff_sidebar()
     _render_drift_warning()
+    _render_loxone_auth_warning()
     render_cloud_demo_intro()
 
     navigation = build_navigation(get_enabled_ui_mode_keys())

@@ -165,6 +165,9 @@ def fetch_loxone_raw_value(io_name: str) -> Optional[str]:
             "Loxone: Timeout (%ss) beim Abrufen von '%s'", timeout_val, io_name
         )
     except requests.exceptions.RequestException as e:
+        from integrations.loxone_connectivity import record_loxone_auth_http_error
+
+        record_loxone_auth_http_error(e, source="loxone_client.read")
         logger.error("Loxone: Netzwerkfehler bei '%s': %s", io_name, e)
     except (KeyError, TypeError) as e:
         logger.error("Loxone: Antwort-Fehler bei '%s': %s", io_name, e)
@@ -234,6 +237,9 @@ def _fetch_loxone_io_all(io_name: str) -> Optional[dict]:
             "Loxone: Timeout (%ss) bei AlarmClock/all '%s'", timeout_val, io_name
         )
     except requests.exceptions.RequestException as e:
+        from integrations.loxone_connectivity import record_loxone_auth_http_error
+
+        record_loxone_auth_http_error(e, source="loxone_client.read_all")
         logger.error("Loxone: Netzwerkfehler bei AlarmClock/all '%s': %s", io_name, e)
     except (KeyError, TypeError, ValueError) as e:
         logger.error("Loxone: Antwort-Fehler bei AlarmClock/all '%s': %s", io_name, e)

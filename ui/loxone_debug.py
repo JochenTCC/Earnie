@@ -134,6 +134,15 @@ def _render_live_reads_fragment() -> None:
         st.caption("Live-Lesen nicht möglich — Zugangsdaten fehlen.")
         return
 
+    from runtime_store.loxone_auth_error import load_loxone_auth_error
+
+    if load_loxone_auth_error():
+        st.error(
+            "Live-Lesen pausiert — Loxone-Zugang verweigert. "
+            "Bitte Zugangsdaten unter **Smarthome-Backend → Anbindung** prüfen."
+        )
+        return
+
     try:
         checks = run_read_checks()
     except Exception as exc:

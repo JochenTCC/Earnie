@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     from runtime_store.config_load import load_config_or_exit
     from runtime_store.dotenv_loader import load_app_dotenv
 
-    load_app_dotenv()
+    load_app_dotenv(override=True)
     bootstrap.run()
     load_config_or_exit()
 

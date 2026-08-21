@@ -6,7 +6,7 @@ from runtime_store.dotenv_io import loxone_credentials_configured
 from runtime_store.dotenv_loader import load_app_dotenv
 
 # Sensible Daten aus .env laden (Prod: config/.env, Dev: Fallback ./.env)
-load_app_dotenv()
+load_app_dotenv(override=True)
 
 from runtime_store.persist_paths import (
     resolve_backtesting_scenarios_json_path,

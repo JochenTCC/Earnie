@@ -34,7 +34,7 @@ def prepare_config_path() -> str:
     from runtime_store.dotenv_loader import load_app_dotenv
     from runtime_store.persist_paths import resolve_config_json_path
 
-    load_app_dotenv()
+    load_app_dotenv(override=True)
     config_path = resolve_config_json_path()
     if not os.path.isfile(config_path):
         print(_missing_config_message(config_path), file=sys.stderr)

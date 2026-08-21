@@ -177,3 +177,48 @@ def test_write_loxone_dotenv_restores_when_post_replace_content_invalid(
     with pytest.raises(OSError, match="wiederhergestellt"):
         dotenv_io.write_loxone_dotenv("10.0.0.5", "newuser", "newpass")
     assert env_path.read_text(encoding="utf-8") == original
+
+
+def test_loxone_dotenv_conflict_detects_root_mismatch(tmp_path, monkeypatch):
+    env_root = tmp_path / "earnie_env" / "config"
+    env_root.mkdir(parents=True)
+    canonical = env_root / ".env"
+    canonical.write_text(
+        'LOXONE_USER="user-a"\nLOXONE_PASS="pass-a"\nLOXONE_IP=10.0.0.1\n',
+        encoding="utf-8",
+    )
+    (tmp_path / ".env").write_text(
+        'LOXONE_USER="user-a"\nLOXONE_PASS="pass-b"\nLOXONE_IP=10.0.0.1\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EARNIE_ENV_PATH", "earnie_env")
+
+    conflict = dotenv_io.loxone_dotenv_conflict()
+
+    assert conflict is not None
+    assert conflict["canonical_path"].replace("\\", "/") == "earnie_env/config/.env"
+    assert conflict["conflicts"][0]["path"] == ".env"
+
+
+def test_import_loxone_dotenv_from_copies_credentials(tmp_path, monkeypatch):
+    env_root = tmp_path / "earnie_env" / "config"
+    env_root.mkdir(parents=True)
+    canonical = env_root / ".env"
+    canonical.write_text(
+        'LOXONE_USER="old"\nLOXONE_PASS="oldpass"\nLOXONE_IP=10.0.0.1\n',
+        encoding="utf-8",
+    )
+    source = tmp_path / ".env"
+    source.write_text(
+        'LOXONE_USER="new"\nLOXONE_PASS="newpass"\nLOXONE_IP=10.0.0.2\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EARNIE_ENV_PATH", "earnie_env")
+
+    written = dotenv_io.import_loxone_dotenv_from(".env")
+
+    assert written.replace("\\", "/") == "earnie_env/config/.env"
+    ip, user, password = dotenv_io.read_loxone_dotenv_file(str(canonical))
+    assert (ip, user, password) == ("10.0.0.2", "new", "newpass")

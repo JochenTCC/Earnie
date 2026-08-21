@@ -37,7 +37,12 @@ def test_serialize_write_records():
     ]
 
 
-def test_build_read_rows_includes_timestamp():
+def test_load_loxone_auth_error_none_when_missing():
+    from runtime_store.loxone_auth_error import load_loxone_auth_error
+
+    with patch("runtime_store.loxone_auth_error.auth_error_path", return_value="/no/such/file.json"):
+        assert load_loxone_auth_error() is None
+
     checks = [
         LoxoneCheck("sens_ess_soc", "Ernie_SOC", True, "Wert=65.0"),
         LoxoneCheck("sens_pv_production_active", "Ernie_PV", False, "Timeout", severity="warning"),

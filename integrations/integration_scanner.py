@@ -84,7 +84,14 @@ def _ha_service_info_to_backend(info) -> DiscoveredBackend | None:
 
 def discover_home_assistant(*, timeout_sec: float = 4.0) -> list[DiscoveredBackend]:
     """mDNS browse for ``_home-assistant._tcp.local.``."""
-    from zeroconf import ServiceBrowser, Zeroconf
+    try:
+        from zeroconf import ServiceBrowser, Zeroconf
+    except ImportError as exc:
+        logger.warning(
+            "Home Assistant mDNS discovery unavailable (missing optional dependency zeroconf): %s",
+            exc,
+        )
+        return []
 
     found: list[DiscoveredBackend] = []
 

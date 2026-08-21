@@ -63,6 +63,9 @@ def _send_loxone_value_traced(input_name: str, value: float) -> LoxoneWriteRecor
     except lc.requests.exceptions.Timeout:
         print(f"🚨 Loxone-Fehler: Timeout ({timeout_val}s) beim Senden an {io_name}.")
     except lc.requests.exceptions.RequestException as e:
+        from integrations.loxone_connectivity import raise_if_loxone_auth_http_error
+
+        raise_if_loxone_auth_http_error(e, source="loxone_writes")
         print(f"🚨 Loxone-Fehler: Fehler beim Senden an {io_name}: {e}")
     return LoxoneWriteRecord(io_name=io_name, value=float(value), success=False, written_at=written_at)
 

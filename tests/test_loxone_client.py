@@ -121,6 +121,29 @@ class TestFetchLoxoneRawValue:
         ), patch.object(lc.config, "get", return_value=5):
             assert lc.fetch_loxone_raw_value("Net_IO") is None
 
+    def test_http_403_records_auth_error_and_returns_none(self, tmp_path, monkeypatch):
+        from runtime_store.loxone_auth_error import load_loxone_auth_error
+
+        monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+        response = MagicMock()
+        response.status_code = 403
+        http_error = requests.HTTPError("403 Client Error")
+        http_error.response = response
+        response.raise_for_status.side_effect = http_error
+
+        with patch.object(lc.requests, "get", return_value=response), patch.object(
+            lc.config, "get", side_effect=lambda name, **kw: {
+                "LOXONE_IP": "192.168.1.1",
+                "LOXONE_USER": "user",
+                "LOXONE_PASS": "pass",
+            }.get(name, kw.get("default", 5))
+        ):
+            assert lc.fetch_loxone_raw_value("Earnie_SOC") is None
+
+        loaded = load_loxone_auth_error()
+        assert loaded is not None
+        assert loaded["http_status"] == 403
+
 
 def _alarm_clock_all_payload(*, tna="Morgen, 11:00", special10=555135300.0):
     ll = {

@@ -1,4 +1,5 @@
 {
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "terminal.integrated.env.windows": {
         "PYTHONUTF8": "1"

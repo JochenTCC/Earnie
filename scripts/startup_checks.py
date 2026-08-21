@@ -56,6 +56,31 @@ def run_loxone_verify_on_startup() -> None:
         )
         return
 
+    from integrations.loxone_connectivity import probe_current_loxone_credentials
+    from runtime_store.loxone_auth_error import persist_loxone_auth_error
+
+    ok, detail = probe_current_loxone_credentials()
+    if not ok:
+        if detail.startswith("Loxone auth failed"):
+            code = 401 if "HTTP 401" in detail else 403
+            persist_loxone_auth_error(
+                message=detail,
+                http_status=code,
+                source="startup_checks",
+            )
+            logger.error(
+                "Loxone-Startup-Prüfung: %s Marker-Prüfung übersprungen.",
+                detail,
+            )
+            if _env_flag("STRICT_LOXONE_VERIFY"):
+                raise SystemExit(1)
+            return
+        logger.warning(
+            "Loxone-Startup-Prüfung: Miniserver nicht erreichbar (%s). "
+            "Marker-Prüfung wird trotzdem versucht.",
+            detail,
+        )
+
     try:
         ok, results = verify_loxone_setup()
     except (FileNotFoundError, ValueError, KeyError) as exc:

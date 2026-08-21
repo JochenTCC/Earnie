@@ -610,9 +610,47 @@ if __name__ == "__main__":
             config.reinit_config()
             continue
 
+        from integrations.loxone_connectivity import (
+            LoxoneAuthError,
+            probe_current_loxone_credentials,
+        )
+        from runtime_store.loxone_auth_error import (
+            clear_loxone_auth_error,
+            needs_loxone_auth_recovery,
+            persist_loxone_auth_error,
+        )
+
+        if needs_loxone_auth_recovery():
+            ok, detail = probe_current_loxone_credentials()
+            if ok:
+                clear_loxone_auth_error()
+            else:
+                if detail.startswith("Loxone auth failed"):
+                    code = 401 if "HTTP 401" in detail else 403
+                    persist_loxone_auth_error(
+                        message=detail,
+                        http_status=code,
+                        source="main_gate",
+                    )
+                log_setup_gate_wait(
+                    _setup_gate_state,
+                    "loxone_auth",
+                    "Loxone-Zugang verweigert (%s). "
+                    "Bitte Zugangsdaten in der Streamlit-UI (Port %s) unter "
+                    "Smarthome-Backend prüfen. Erneuter Versuch in %s Sekunden.",
+                    detail,
+                    config.get_ui_streamlit_port(),
+                    _SETUP_WAIT_SEC,
+                )
+                time.sleep(_SETUP_WAIT_SEC)
+                load_app_dotenv(override=True)
+                config.reinit_config()
+                continue
+
         _setup_gate_state.clear()
         try:
             main(run_trigger=next_trigger)
+            clear_loxone_auth_error()
             next_trigger = TRIGGER_QUARTER_HOUR
 
             wait_sec = optimization_schedule.seconds_until_next_quarter_hour()
@@ -626,6 +664,16 @@ if __name__ == "__main__":
             if early == TRIGGER_REQUEST_OPTIMIZE:
                 next_trigger = TRIGGER_REQUEST_OPTIMIZE
 
+        except LoxoneAuthError as exc:
+            logger.error(
+                "Loxone-Zugang verweigert (HTTP %s). Optimierung pausiert — "
+                "erneuter Versuch in %s Sekunden.",
+                exc.http_status,
+                _SETUP_WAIT_SEC,
+            )
+            time.sleep(_SETUP_WAIT_SEC)
+            load_app_dotenv(override=True)
+            config.reinit_config()
         except Exception as e:
             logger.exception(
                 "🚨 Unerwarteter Fehler während des Durchlaufs: %s", e

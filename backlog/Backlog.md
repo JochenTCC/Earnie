@@ -18,6 +18,8 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - POC for EEG-ready Earnie
 
+- [ ] In case main.py gets no access to Loxone (403) it should stop trying to prevent timeot blocking of Miniserver. Instead an error message should come up on Streamlit app to give user opportunity to check and update credentials
+
 Main Goal of this version is to get a proof-of-concept for an evolved Earnie that is able to optimize EEGs (Energie-Erzeuger-Gemeinschaft)
 - See Entwicklungsplan\eeg-earnie-recherche-zusammenfassung.md for current research
 - [ ] Implement a POC for EEG simulation

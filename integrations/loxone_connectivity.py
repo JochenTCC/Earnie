@@ -33,6 +33,62 @@ def loxone_env_configured() -> bool:
     return loxone_credentials_configured()
 
 
+class LoxoneAuthError(RuntimeError):
+    """HTTP 401/403 against the Miniserver — credentials rejected."""
+
+    def __init__(self, message: str, *, http_status: int) -> None:
+        super().__init__(message)
+        self.http_status = int(http_status)
+
+
+def is_loxone_auth_http_status(code: int) -> bool:
+    return int(code) in (401, 403)
+
+
+def record_loxone_auth_http_error(
+    exc: BaseException,
+    *,
+    source: str,
+) -> bool:
+    """Persist auth failure for HTTP 401/403; return True if recorded."""
+    import requests
+
+    if not isinstance(exc, requests.exceptions.RequestException):
+        return False
+    response = getattr(exc, "response", None)
+    if response is None:
+        return False
+    code = int(response.status_code)
+    if not is_loxone_auth_http_status(code):
+        return False
+    message = f"Loxone auth failed (HTTP {code})"
+    from runtime_store.loxone_auth_error import persist_loxone_auth_error
+
+    persist_loxone_auth_error(message=message, http_status=code, source=source)
+    return True
+
+
+def raise_if_loxone_auth_http_error(
+    exc: BaseException,
+    *,
+    source: str,
+) -> None:
+    """Persist auth failure and raise ``LoxoneAuthError`` for HTTP 401/403."""
+    if record_loxone_auth_http_error(exc, source=source):
+        code = int(getattr(getattr(exc, "response", None), "status_code", 403))
+        message = f"Loxone auth failed (HTTP {code})"
+        raise LoxoneAuthError(message, http_status=code) from exc
+
+
+def probe_current_loxone_credentials() -> tuple[bool, str]:
+    """Probe LoxAPP3 with credentials from config."""
+    return probe_loxone_http_access(
+        host=config.get("LOXONE_IP"),
+        username=config.get("LOXONE_USER"),
+        password=config.get("LOXONE_PASS"),
+    )
+
+
 def probe_loxone_http_access(
     *,
     host: str,

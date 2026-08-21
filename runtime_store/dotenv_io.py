@@ -115,6 +115,64 @@ def validate_loxone_credentials(ip: str, user: str, password: str) -> str | None
     return None
 
 
+def read_loxone_dotenv_file(path: str) -> tuple[str, str, str]:
+    """Return ``(ip, user, password)`` from a specific .env file."""
+    from dotenv import dotenv_values
+
+    vals = dotenv_values(path)
+    return (
+        str(vals.get("LOXONE_IP") or "").strip(),
+        str(vals.get("LOXONE_USER") or "").strip().strip('"'),
+        str(vals.get("LOXONE_PASS") or ""),
+    )
+
+
+def _loxone_credentials_fingerprint(ip: str, user: str, password: str) -> str:
+    import hashlib
+
+    payload = f"{ip.strip()}|{user}|{password}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+
+
+def loxone_dotenv_conflict() -> dict | None:
+    """When another .env exists with different Loxone credentials than the active file."""
+    canonical = resolve_dotenv_path()
+    if not os.path.isfile(canonical):
+        return None
+    canon_ip, canon_user, canon_pass = read_loxone_dotenv_file(canonical)
+    if not all([canon_ip, canon_user, canon_pass]):
+        return None
+    canon_fp = _loxone_credentials_fingerprint(canon_ip, canon_user, canon_pass)
+    alternate_paths = (
+        ("root", ".env"),
+        ("legacy_config", os.path.join("config", ".env")),
+    )
+    conflicts: list[dict[str, str]] = []
+    for label, path in alternate_paths:
+        norm_canonical = os.path.normcase(os.path.abspath(canonical))
+        norm_path = os.path.normcase(os.path.abspath(path))
+        if norm_path == norm_canonical or not os.path.isfile(path):
+            continue
+        alt_ip, alt_user, alt_pass = read_loxone_dotenv_file(path)
+        if not all([alt_ip, alt_user, alt_pass]):
+            continue
+        alt_fp = _loxone_credentials_fingerprint(alt_ip, alt_user, alt_pass)
+        if alt_fp != canon_fp:
+            conflicts.append({"label": label, "path": path})
+    if not conflicts:
+        return None
+    return {"canonical_path": canonical, "conflicts": conflicts}
+
+
+def import_loxone_dotenv_from(source_path: str) -> str:
+    """Copy Loxone credentials from ``source_path`` into the active .env file."""
+    ip, user, password = read_loxone_dotenv_file(source_path)
+    error = validate_loxone_credentials(ip, user, password)
+    if error:
+        raise ValueError(error)
+    return write_loxone_dotenv(ip, user, password)
+
+
 def format_loxone_dotenv(ip: str, user: str, password: str) -> str:
     """Erzeugt den Inhalt von config/.env (ohne optionale Kommentarzeilen)."""
     escaped_user = user.strip().replace("\\", "\\\\").replace('"', '\\"')
