@@ -9,7 +9,20 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
-
+- [ ] Enable multiple isolated battery or battery+Inverter entities
+  - Isolated battery modes: charging / discharging / standby
+  - batt+inverter modes: optimizing / charging / discharging
+  - All batteries are parts of optimization
+- [ ] Enable multiple EV / Wallboxes
+  - Parametrize EVs as now (+ sensors)
+  - Parametrize Wallboxes 
+    - Max power
+    - sensor / control commands
+  - Assignment is done when EV is connected to a wallbox:
+    - both devices report connection
+    - confirm assignment by test charging
+    - Assignment is removed when disconnecting
+    - Cancel assignments and re-bind in case of shutdown
 
 
 ## Feature Backlog
