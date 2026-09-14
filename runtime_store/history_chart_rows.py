@@ -20,7 +20,11 @@ from optimizer.targets import (
 from settings.flexible_consumers import charging_context_lookup, flex_kw_lookup
 
 from . import optimization_history
-from .soc_plausibility import sanitize_soc_reading
+from .soc_plausibility import (
+    battery_kw_from_soc_delta,
+    ist_contradicts_soc_delta,
+    sanitize_soc_reading,
+)
 
 # Same values as history_timeline public constants (avoid circular import).
 CHART_IST_BATTERY_KW_COLUMN = "Ist Batterie-Leistung (kW)"
@@ -434,6 +438,53 @@ def _sanitize_history_soc_rows(
     return sanitized
 
 
+def _reconcile_history_battery_with_soc(
+    rows: list[dict[str, Any]],
+    qualities: list[str],
+) -> list[dict[str, Any]]:
+    """
+    Replace instantaneous Ist battery when it opposes the SoC step to the next slot.
+
+    Produktiv-Log samples are point-in-time; a full-slot discharge bar while SoC rises
+    (or vice versa) is not plausible for Chart 1. Prefer SoC-implied average power.
+    """
+    if len(rows) < 2:
+        return rows
+    battery_params = config.get_battery_params()
+    reconciled: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        row = dict(row)
+        if (
+            index + 1 < len(rows)
+            and qualities[index] == SLOT_PRESENT
+            and qualities[index + 1] == SLOT_PRESENT
+        ):
+            ist_raw = row.get(CHART_IST_BATTERY_KW_COLUMN)
+            soc = row.get("Simulierter SoC (%)")
+            next_soc = rows[index + 1].get("Simulierter SoC (%)")
+            if ist_raw is not None and soc is not None and next_soc is not None:
+                try:
+                    ist_kw = float(ist_raw)
+                    soc_f = float(soc)
+                    next_f = float(next_soc)
+                except (TypeError, ValueError):
+                    ist_kw = None
+                    soc_f = next_f = None
+                if (
+                    ist_kw is not None
+                    and soc_f is not None
+                    and next_f is not None
+                    and not math.isnan(ist_kw)
+                    and ist_contradicts_soc_delta(ist_kw, next_f - soc_f)
+                ):
+                    implied = battery_kw_from_soc_delta(
+                        soc_f, next_f, battery_params
+                    )
+                    row[CHART_IST_BATTERY_KW_COLUMN] = implied
+        reconciled.append(row)
+    return reconciled
+
+
 def _sanitize_dead_telemetry_rows(
     rows: list[dict[str, Any]],
     qualities: tuple[str, ...] | list[str],
@@ -506,4 +557,5 @@ def _build_rows_for_slot_starts(
         rows.append(row)
     rows = _sanitize_dead_telemetry_rows(rows, qualities, by_slot)
     rows = _sanitize_history_soc_rows(rows, qualities)
+    rows = _reconcile_history_battery_with_soc(rows, qualities)
     return rows, tuple(qualities), present, held, missing, by_slot

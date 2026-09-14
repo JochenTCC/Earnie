@@ -64,6 +64,53 @@ def integrate_soc_step(
     return round(new_soc, 1)
 
 
+def battery_kw_from_soc_delta(
+    soc_start: float,
+    soc_end: float,
+    battery_params: dict | None = None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
+) -> float:
+    """Chart-signed battery power (kW, +charge) implied by a SoC step over ``dt_h``."""
+    params = battery_params or config.get_battery_params()
+    capacity = float(params.get("battery_capacity_kwh", 0.0))
+    max_power = float(params.get("max_power_kw", 0.0))
+    efficiency = float(params["efficiency"])
+    min_soc = float(params["min_soc"])
+    max_soc = float(params["max_soc"])
+    if soc_end >= soc_start:
+        return bat.charge_kw_for_hourly_soc(
+            soc_start,
+            soc_end,
+            capacity,
+            efficiency,
+            max_power,
+            min_soc,
+            max_soc,
+            dt_h=dt_h,
+        )
+    magnitude = bat.discharge_kw_for_hourly_soc(
+        soc_start,
+        soc_end,
+        capacity,
+        efficiency,
+        max_power,
+        min_soc,
+        max_soc,
+        dt_h=dt_h,
+    )
+    return -magnitude
+
+
+def ist_contradicts_soc_delta(ist_kw: float, soc_delta: float) -> bool:
+    """True when instantaneous Ist sign opposes the SoC change over the slot."""
+    return (
+        _delta_sign(ist_kw) != 0
+        and _delta_sign(soc_delta) != 0
+        and _delta_sign(ist_kw) != _delta_sign(soc_delta)
+    )
+
+
 def _delta_sign(value: float) -> int:
     if value > 0.0:
         return 1

@@ -43,11 +43,6 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 
 - [ ] UI improvement - adding new entities by copying existing ones (PV-Anlage, Batterie)
   - like also implemented for adding new scenarios (by copying the last selected entity) the same functionality should also be implemented for PV-Anlagen and Batterien on HK page
-- [ ] Calculate efficiency for battery from difference in overall charging and discharging energy 
-  - eff = ((E_discharge) / E_charge)^0.5 
-  - Add standby energy consumption on top of "Entladen" bar
-  - give it as recommendation for possible changes in HK - keep nominal values in description#
-  - remove "Kleine Abweichungen sind normal (SoC-Änderung, Standby der Batterie)."
 - [ ] Clarify how to handle wallbox <> EVs
   - see also bullet point in research item
 - [ ] Improvements for HA-binding
@@ -58,8 +53,11 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 - [ ] When importing from existing Loxone config is working the other way round would also be possible:
     - User has a complete HK with live scenario in place in Earnie
     - Earnie generates pre-filled Loxone Template XML files (with correct ids, (multiple) evs, (multiple) consumers) for importing into Loxone config.
-- [ ] Optimize Pool temperature to a certain value on time. Set desired temperature and using time. Combine it with RC model
-  - Add a chart that shows comparison between actual and modeled temperature (including ambient temperature and heating activity)
+- [ ] Calculate efficiency for battery from difference in overall charging and discharging energy 
+  - eff = ((E_discharge) / E_charge)^0.5 
+  - Add standby energy consumption on top of "Entladen" bar
+  - give it as recommendation for possible changes in HK - keep nominal values in description
+  - remove "Kleine Abweichungen sind normal (SoC-Änderung, Standby der Batterie)."
 - [ ] Allow changing HTTP port for Home Assistant and OpenEMS (follow-up to Miniserver #9)
   - HA form already stores a full `ehal.ha.base_url` (default `http://homeassistant:8123`) — port is in the URL, not a separate field
   - OpenEMS form already stores `ehal.openems.base_url` (default `http://openems-edge:8084`)
@@ -68,6 +66,8 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)
 
+- [ ] Optimize Pool temperature to a certain value on time. Set desired temperature and using time. Combine it with RC model
+  - Add a chart that shows comparison between actual and modeled temperature (including ambient temperature and heating activity)
 - [ ] Enhance data model to nested structures. E.g. pool can consist of multiple "inner" consumers or house consists also of multiple "inner" consumers
   - Move Loxone markers to data model - remove flat definition in config.json where possible
   - **Note:** Thin marker↔role prep and UI editability are in **2.3.f**; EHAL core / DACH adapters / Loxone-EHAL extraction in **2.4** (`2.4.e`). This chapter owns nesting / structure, not the EHAL interface rewrite.
