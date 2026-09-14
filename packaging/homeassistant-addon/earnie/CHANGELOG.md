@@ -2,6 +2,11 @@
 
 Add-on `version:` mirrors the Earnie app release (`version.py` / GHCR tag). Each release tag auto-publishes via `.github/workflows/release.yml` → job `publish_ha_addon`.
 
+## 2.5.2
+
+- Official **PATCH** after **2.5.1**. Focus: Analyse period navigation and Chart 1 Ist↔SoC consistency.
+- Earnie release: [2.5.2](https://github.com/JochenTCC/Earnie/releases/tag/v2.5.2)
+
 ## 2.5.1
 
 - Official **PATCH** after **2.5.0**. Focus: live telemetry robustness, Chart 1 / SoC consistency, and Loxone auth recovery.
