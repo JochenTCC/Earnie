@@ -12,8 +12,11 @@ from ui.consumer_cost_analysis_data import (
     build_slot_from_powers,
     filter_slots_calendar_month,
     filter_slots_iso_week,
+    filter_slots_trailing_days,
+    filter_slots_window,
     iso_weeks_in_slots,
 )
+from ui.consumption_display.period import PeriodKind, resolve_rolling_window
 
 
 def test_attribute_pro_rata_equal_loads() -> None:
@@ -192,6 +195,53 @@ def test_aggregate_and_week_filter() -> None:
     week31 = aggregate_slots(filter_slots_iso_week((s1, s2), iso_year=2026, iso_week=31))
     assert week31.battery_charge_kwh == pytest.approx(0.25)
     assert week31.charge_from_grid_kwh == pytest.approx(0.25)
+
+
+def test_filter_slots_window_and_trailing_days() -> None:
+    s1 = build_slot_from_powers(
+        slot_start=datetime(2026, 9, 1, 10, 0),
+        price_cent=20.0,
+        pv_kw=0.0,
+        load_by_id={"a": 4.0},
+        battery_charge_kw=0.0,
+        battery_discharge_kw=0.0,
+        grid_import_kw=4.0,
+        grid_export_kw=0.0,
+    )
+    s2 = build_slot_from_powers(
+        slot_start=datetime(2026, 9, 10, 10, 0),
+        price_cent=20.0,
+        pv_kw=0.0,
+        load_by_id={"a": 4.0},
+        battery_charge_kw=0.0,
+        battery_discharge_kw=0.0,
+        grid_import_kw=4.0,
+        grid_export_kw=0.0,
+    )
+    s3 = build_slot_from_powers(
+        slot_start=datetime(2026, 9, 14, 10, 0),
+        price_cent=20.0,
+        pv_kw=0.0,
+        load_by_id={"a": 4.0},
+        battery_charge_kw=0.0,
+        battery_discharge_kw=0.0,
+        grid_import_kw=4.0,
+        grid_export_kw=0.0,
+    )
+    window = resolve_rolling_window(datetime(2026, 9, 14, 10, 0), days=7)
+    assert window.kind == PeriodKind.ROLLING_7
+    filtered = filter_slots_window((s1, s2, s3), window)
+    assert filtered == (s2, s3)
+
+    trailing = filter_slots_trailing_days(
+        (s1, s2, s3), end=datetime(2026, 9, 14, 12, 0), days=5
+    )
+    assert trailing == (s2, s3)
+
+    yearish = filter_slots_trailing_days(
+        (s1, s2, s3), end=datetime(2026, 9, 14, 12, 0), days=365
+    )
+    assert yearish == (s1, s2, s3)
 
 
 def test_manual_schedule_peels_from_baseload() -> None:

@@ -9,21 +9,25 @@ from ui.consumer_analysis_charts import (
     render_swimspa_temperature_chart,
 )
 from ui.consumer_analysis_data import build_swimspa_analysis_data
-from ui.consumer_cost_analysis_charts import render_week_analysis
-from ui.consumer_cost_analysis_data import (
-    build_cost_analysis_series,
-    iso_weeks_in_slots,
-)
-from ui.consumption_display.navigation import render_iso_week_navigation
+from ui.consumer_cost_analysis_charts import render_window_analysis
+from ui.consumer_cost_analysis_data import build_cost_analysis_series
+from ui.consumption_display.navigation import render_period_navigation
+from ui.consumption_display.period import PeriodKind
 from ui.help_hint import render_page_title_with_help
 from ui.history_navigation import get_s2_cycle_offset, get_s2_segment_index
 
 _HELP = (
     "Analyse aus dem Produktiv-Log: Verbrauch je Verbraucher vs. Preis/PV, "
     "Herkunft (PV / Batterie / Netz) und grobe Kosten nur für den Netzanteil. "
-    "Summen für KW / Monat / Jahr beziehen sich auf vorhandene Log-Daten — "
-    "keine Rechnungskorrektur. Swimspa-Temperatur und Filter unten."
+    "Charts für die letzten 7 oder 28 Tage (verschiebbar); Kennzahl zusätzlich "
+    "für die letzten 365 Tage der vorhandenen Log-Daten — keine Rechnungskorrektur. "
+    "Swimspa-Temperatur und Filter unten."
 )
+
+_PERIOD_OPTIONS = {
+    "7 Tage": PeriodKind.ROLLING_7,
+    "28 Tage": PeriodKind.ROLLING_28,
+}
 
 
 def _render_cost_section() -> None:
@@ -33,33 +37,25 @@ def _render_cost_section() -> None:
         st.info("Noch keine Produktiv-Log-Daten für die Verbrauchs- & Kostenanalyse.")
         return
 
-    weeks = iso_weeks_in_slots(series.slots)
-    if not weeks:
-        st.info("Keine Kalenderwochen im Produktiv-Log.")
-        return
-
     timestamps = [slot.slot_start.isoformat() for slot in series.slots]
-    # Prefer latest ISO week on first visit (nav helper defaults to oldest).
-    week_idx_key = "cost_analysis_week_idx"
-    week_reset_key = "cost_analysis_week_reset"
-    reset_token = "cost_analysis_v1"
-    if st.session_state.get(week_reset_key) != reset_token:
-        st.session_state[week_reset_key] = reset_token
-        st.session_state[week_idx_key] = max(0, len(weeks) - 1)
-    selected = render_iso_week_navigation(
+    length_label = st.radio(
+        "Zeitfenster",
+        options=list(_PERIOD_OPTIONS.keys()),
+        horizontal=True,
+        key="cost_analysis_period_length",
+    )
+    period_kind = _PERIOD_OPTIONS[length_label]
+    selected = render_period_navigation(
         timestamps,
         key_prefix="cost_analysis",
-        reset_token=reset_token,
+        period_kind=period_kind,
+        reset_token="cost_analysis_v2",
+        default_to_latest=True,
     )
     if selected is None:
+        st.info("Keine Zeitfenster im Produktiv-Log.")
         return
-    iso_year, iso_week = selected
-    render_week_analysis(
-        series,
-        iso_year=iso_year,
-        iso_week=iso_week,
-        now=now,
-    )
+    render_window_analysis(series, window=selected, now=now)
 
 
 def _render_swimspa_section() -> None:

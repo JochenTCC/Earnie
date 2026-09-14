@@ -2,14 +2,18 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import datetime
+from typing import TYPE_CHECKING
 
 from ui.consumption_display.types import (
     ConsumptionSeriesBundle,
     ScenarioConsumerOverlayBundle,
     ScenarioConsumerSeries,
 )
-from ui.consumption_validation_charts import format_iso_week_label, iso_weeks_in_series
+from ui.consumption_validation_charts import iso_weeks_in_series
+
+if TYPE_CHECKING:
+    from ui.consumption_display.period import TimeWindow
 
 
 def parse_timestamp(ts_raw: str) -> datetime:
@@ -141,18 +145,24 @@ def slice_scenario_consumer_overlay_bundle(
     )
 
 
+def slice_bundle_for_window(
+    bundle: ConsumptionSeriesBundle,
+    window: TimeWindow,
+) -> ConsumptionSeriesBundle:
+    from ui.consumption_display.period import indices_in_window
+
+    return _slice_bundle(bundle, indices_in_window(bundle.timestamps, window))
+
+
 def slice_bundle_for_iso_week(
     bundle: ConsumptionSeriesBundle,
     *,
     iso_year: int,
     iso_week: int,
 ) -> ConsumptionSeriesBundle:
-    indices = [
-        index
-        for index, ts_raw in enumerate(bundle.timestamps)
-        if parse_timestamp(ts_raw).isocalendar()[:2] == (iso_year, iso_week)
-    ]
-    return _slice_bundle(bundle, indices)
+    from ui.consumption_display.period import iso_week_time_window
+
+    return slice_bundle_for_window(bundle, iso_week_time_window(iso_year, iso_week))
 
 
 def _slice_bundle(bundle: ConsumptionSeriesBundle, indices: list[int]) -> ConsumptionSeriesBundle:

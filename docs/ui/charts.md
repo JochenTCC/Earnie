@@ -42,7 +42,7 @@ Einspeisung (Batterie) ← Rest der Einspeisung (≤ Entlade-Rest)
 Entladen → Last ← verbleibende Entladung
 ```
 
-**Analyse Verbrauch & Kosten (Live-Cockpit):** Dieselbe Slot-Zuordnung (`allocate_slot_flows`) wird pro-rata auf Grundlast und gemessene Flex-Verbraucher verteilt. Kosten am Verbrauchsort nur für den **Netzanteil** × Importpreis (PV/Batterie-Entladung = 0 €). Quelle: Produktiv-Log.
+**Analyse Verbrauch & Kosten (Live-Cockpit):** Dieselbe Slot-Zuordnung (`allocate_slot_flows`) wird pro-rata auf Grundlast und gemessene Flex-Verbraucher verteilt. Kosten am Verbrauchsort nur für den **Netzanteil** × Importpreis (PV/Batterie-Entladung = 0 €). Quelle: Produktiv-Log; Charts für rollierende **7-/28-Tage**-Fenster (Navigation), Kennzahlen zusätzlich für die letzten **365 Tage** vorhandener Log-Daten.
 
 **Sonderfälle:** `Netzbezug` und `Geplante Batterie-Aktion` sind vorzeichenkodiert (Bezug/Laden positiv, Einspeisung/Entladen negativ). Fehlt eine explizite Einspeisung in der Zeile, wird PV-Überschuss (`offset_kw > 0`) als gedämpfte PV-Einspeisung gezeichnet. **Grauer Bereich (Produktiv-Log):** PV, Last, Netz, Batterieflüsse und **Flex-Verbraucher** nutzen Ist-Werte aus `consumption_snapshot` / `flex_live_kw` — die Aufteilung Laden/Einspeisung leitet sich aus gemessener Batterieleistung (`Ist Batterie-Leistung (kW)`) ab, nicht aus `battery_plan_kw`. **MILP/neutral/grün:** geplanter Batteriewert; am oberen/unteren SoC-Limit wird geplanter Lade-/Entladeanteil nicht gezeichnet, Überschuss erscheint als PV-Einspeisung bzw. Netzbezug. Im neutralen MILP-Bereich wird `Netzbezug` nach Live-Overlay aus Last, Flex, PV und Batterie neu abgeleitet.
 

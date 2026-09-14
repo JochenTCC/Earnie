@@ -67,6 +67,7 @@ def render_consumption_display(
     token = reset_token if reset_token is not None else str(bundle.hour_count())
     _render_metrics(mode, bundle, annual_kwh=annual_kwh, actual_total_label=actual_total_label)
     _render_monthly_chart(mode, bundle, csv_series=csv_series)
+    # Rolling 7/28 kinds are Analyse-first; SE/HK keep ISO-week browsing here.
     week = render_iso_week_navigation(
         bundle.timestamps,
         key_prefix=key_prefix,

@@ -17,7 +17,7 @@ Ohne diese Variable stehen in der Entwicklung **Sunset-2-Sunset** (Seite **Monit
 
 Beispiel Community Cloud (nur Szenario-Explorer): `EARNIE_UI_MODES=scenario_explorer` — Live-Cockpit und Daemon Control entfallen.
 
-Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarienkonfigurator** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`). **Analyse Verbrauch & Kosten** erscheint nur mit `live_environment` und nur im Abschnitt Live-Cockpit; ohne Live-Verbindung zur Smarthome-Steuerung zeigt die Seite einen Hinweis statt der Analyse.
+Weitere Seiten (nicht über `EARNIE_UI_MODES` gesteuert): **Hauskonfigurator**, **Szenarienkonfigurator** — Freischaltung abhängig vom Setup-Fortschritt (`ui/setup_readiness.py`). **Analyse Verbrauch & Kosten** erscheint nur mit `live_environment` und nur im Abschnitt Live-Cockpit; ohne Live-Verbindung zur Smarthome-Steuerung zeigt die Seite einen Hinweis statt der Analyse. Die Analyse nutzt rollierende **7-/28-Tage**-Charts (nicht Kalenderwochen) sowie eine Kennzahl über die letzten **365 Tage** vorhandener Log-Daten.
 
 In der Sidebar (unten): Abschnitt **Info / About** (Banner der Wahrheit, Version, Kontakt → **GitHub-Issue** mit Art/Thema/Beschreibung; optional lokale Kontakt-ZIP; privater Ausnahmekanal `support@earnie-hems.com` für Registry/Vertrauliches), oben Setup-Hinweise und **„Konfiguration speichern / laden“** (ZIP-Export/Import der Config-Sidecars und `uploads/` — siehe [Speichern / Laden](../konfiguration/speichern-laden.md)).
 

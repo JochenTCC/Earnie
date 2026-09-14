@@ -25,11 +25,10 @@ from ui.consumer_cost_analysis_data import (
     PeriodTotals,
     aggregate_slots,
     cost_analysis_consumers,
-    filter_slots_calendar_month,
-    filter_slots_calendar_year,
-    filter_slots_iso_week,
+    filter_slots_trailing_days,
+    filter_slots_window,
 )
-from ui.consumption_validation_charts import format_iso_week_label
+from ui.consumption_display.period import TimeWindow, format_window_label
 
 
 def _label(labels: Mapping[str, str], consumer_id: str) -> str:
@@ -64,12 +63,11 @@ def _ordered_consumer_ids(slots: Sequence[CostAnalysisSlot]) -> list[str]:
     return order
 
 
-def week_usage_vs_price_pv_chart(
+def window_usage_vs_price_pv_chart(
     slots: Sequence[CostAnalysisSlot],
     *,
     labels: Mapping[str, str],
-    iso_year: int,
-    iso_week: int,
+    window: TimeWindow,
 ) -> go.Figure:
     """Stacked consumer kWh bars with PV (kW) and price overlays."""
     fig = go.Figure()
@@ -118,7 +116,7 @@ def week_usage_vs_price_pv_chart(
         yaxis="y2",
     )
     fig.update_layout(
-        title=f"Verbrauch vs. Preis & PV — {format_iso_week_label(iso_year, iso_week)}",
+        title=f"Verbrauch vs. Preis & PV — {format_window_label(window)}",
         barmode="stack",
         height=380,
         margin=dict(l=40, r=50, t=50, b=40),
@@ -135,14 +133,13 @@ def week_usage_vs_price_pv_chart(
     return fig
 
 
-def week_source_mix_chart(
+def window_source_mix_chart(
     slots: Sequence[CostAnalysisSlot],
     *,
     labels: Mapping[str, str],
-    iso_year: int,
-    iso_week: int,
+    window: TimeWindow,
 ) -> go.Figure:
-    """Stacked PV / battery / grid energy per consumer for the week."""
+    """Stacked PV / battery / grid energy per consumer for the window."""
     totals = aggregate_slots(slots)
     fig = go.Figure()
     consumer_ids = list(totals.by_consumer.keys())
@@ -169,7 +166,7 @@ def week_source_mix_chart(
         marker_color=COLOR_GRID_IMPORT,
     )
     fig.update_layout(
-        title=f"Herkunft je Verbraucher — {format_iso_week_label(iso_year, iso_week)}",
+        title=f"Herkunft je Verbraucher — {format_window_label(window)}",
         barmode="stack",
         height=340,
         margin=dict(l=40, r=20, t=50, b=40),
@@ -179,14 +176,13 @@ def week_source_mix_chart(
     return fig
 
 
-def week_cost_chart(
+def window_cost_chart(
     slots: Sequence[CostAnalysisSlot],
     *,
     labels: Mapping[str, str],
-    iso_year: int,
-    iso_week: int,
+    window: TimeWindow,
 ) -> go.Figure:
-    """Per-consumer grid-attributed € for the week (option I)."""
+    """Per-consumer grid-attributed € for the window (option I)."""
     totals = aggregate_slots(slots)
     fig = go.Figure()
     consumer_ids = list(totals.by_consumer.keys())
@@ -201,9 +197,7 @@ def week_cost_chart(
         marker_color=[_consumer_color(cid, by_id) for cid in consumer_ids],
     )
     fig.update_layout(
-        title=(
-            f"Kosten (nur Netzanteil) — {format_iso_week_label(iso_year, iso_week)}"
-        ),
+        title=f"Kosten (nur Netzanteil) — {format_window_label(window)}",
         height=320,
         margin=dict(l=40, r=20, t=50, b=40),
         yaxis_title="€",
@@ -278,40 +272,33 @@ def _format_coverage(series: CostAnalysisSeries) -> str:
 def render_period_kpis(
     series: CostAnalysisSeries,
     *,
-    week_slots: Sequence[CostAnalysisSlot],
-    iso_year: int,
-    iso_week: int,
+    window_slots: Sequence[CostAnalysisSlot],
+    window: TimeWindow,
     now: datetime,
 ) -> None:
-    """Week / month / year rough totals and per-consumer cost table."""
-    week = aggregate_slots(week_slots)
-    month_slots = filter_slots_calendar_month(
-        series.slots, year=now.year, month=now.month
-    )
-    year_slots = filter_slots_calendar_year(series.slots, year=now.year)
-    month = aggregate_slots(month_slots)
-    year = aggregate_slots(year_slots)
+    """Selected-window and trailing-365-day rough totals plus per-consumer table."""
+    selected = aggregate_slots(window_slots)
+    year_slots = filter_slots_trailing_days(series.slots, end=now, days=365)
+    trailing_year = aggregate_slots(year_slots)
 
     st.caption(_format_coverage(series))
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     c1.metric(
-        f"KW {iso_week}/{iso_year}",
-        f"{week.cost_euro:.2f} €",
-        help=f"{week.energy_kwh:.1f} kWh · {week.slot_count} Slots",
+        format_window_label(window),
+        f"{selected.cost_euro:.2f} €",
+        help=f"{selected.energy_kwh:.1f} kWh · {selected.slot_count} Slots",
     )
     c2.metric(
-        f"Monat {now.month:02d}/{now.year}",
-        f"{month.cost_euro:.2f} €",
-        help=f"{month.energy_kwh:.1f} kWh · {month.slot_count} Slots",
-    )
-    c3.metric(
-        f"Jahr {now.year}",
-        f"{year.cost_euro:.2f} €",
-        help=f"{year.energy_kwh:.1f} kWh · {year.slot_count} Slots",
+        "Letzte 365 Tage",
+        f"{trailing_year.cost_euro:.2f} €",
+        help=(
+            f"{trailing_year.energy_kwh:.1f} kWh · {trailing_year.slot_count} Slots "
+            "(nur vorhandene Log-Daten)"
+        ),
     )
 
     rows = []
-    for cid, share in sorted(week.by_consumer.items(), key=lambda item: item[0]):
+    for cid, share in sorted(selected.by_consumer.items(), key=lambda item: item[0]):
         rows.append(
             {
                 "Verbraucher": _label(series.consumer_labels, cid),
@@ -326,59 +313,49 @@ def render_period_kpis(
         st.dataframe(rows, hide_index=True, width="stretch")
 
 
-def render_week_analysis(
+def render_window_analysis(
     series: CostAnalysisSeries,
     *,
-    iso_year: int,
-    iso_week: int,
+    window: TimeWindow,
     now: datetime,
 ) -> None:
-    """Week charts, KPIs, and battery panel for the selected ISO week."""
-    week_slots = filter_slots_iso_week(
-        series.slots, iso_year=iso_year, iso_week=iso_week
-    )
-    if not week_slots:
-        st.info(
-            f"Keine Log-Slots für {format_iso_week_label(iso_year, iso_week)}."
-        )
+    """Window charts, KPIs, and battery panel for the selected rolling period."""
+    window_slots = filter_slots_window(series.slots, window)
+    if not window_slots:
+        st.info(f"Keine Log-Slots für {format_window_label(window)}.")
         return
 
     labels = series.consumer_labels
     st.plotly_chart(
-        week_usage_vs_price_pv_chart(
-            week_slots, labels=labels, iso_year=iso_year, iso_week=iso_week
+        window_usage_vs_price_pv_chart(
+            window_slots, labels=labels, window=window
         ),
         width="stretch",
     )
     left, right = st.columns(2)
     with left:
         st.plotly_chart(
-            week_source_mix_chart(
-                week_slots, labels=labels, iso_year=iso_year, iso_week=iso_week
-            ),
+            window_source_mix_chart(window_slots, labels=labels, window=window),
             width="stretch",
         )
     with right:
         st.plotly_chart(
-            week_cost_chart(
-                week_slots, labels=labels, iso_year=iso_year, iso_week=iso_week
-            ),
+            window_cost_chart(window_slots, labels=labels, window=window),
             width="stretch",
         )
 
     render_period_kpis(
         series,
-        week_slots=week_slots,
-        iso_year=iso_year,
-        iso_week=iso_week,
+        window_slots=window_slots,
+        window=window,
         now=now,
     )
-    week_totals = aggregate_slots(week_slots)
+    window_totals = aggregate_slots(window_slots)
     st.plotly_chart(
         battery_flow_chart(
-            week_totals,
-            title=f"Batterie-Energieflüsse — {format_iso_week_label(iso_year, iso_week)}",
+            window_totals,
+            title=f"Batterie-Energieflüsse — {format_window_label(window)}",
         ),
         width="stretch",
     )
-    st.caption(battery_flow_balance_caption(week_totals))
+    st.caption(battery_flow_balance_caption(window_totals))

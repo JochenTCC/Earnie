@@ -386,11 +386,33 @@ def filter_slots_iso_week(
     iso_year: int,
     iso_week: int,
 ) -> tuple[CostAnalysisSlot, ...]:
+    from ui.consumption_display.period import iso_week_time_window
+
+    return filter_slots_window(slots, iso_week_time_window(iso_year, iso_week))
+
+
+def filter_slots_window(
+    slots: Sequence[CostAnalysisSlot],
+    window: "TimeWindow",
+) -> tuple[CostAnalysisSlot, ...]:
+    from ui.consumption_display.period import timestamp_in_window
+
     return tuple(
-        slot
-        for slot in slots
-        if slot.slot_start.isocalendar()[:2] == (iso_year, iso_week)
+        slot for slot in slots if timestamp_in_window(slot.slot_start, window)
     )
+
+
+def filter_slots_trailing_days(
+    slots: Sequence[CostAnalysisSlot],
+    *,
+    end: datetime,
+    days: int,
+) -> tuple[CostAnalysisSlot, ...]:
+    from ui.consumption_display.period import resolve_rolling_window
+
+    if days <= 0:
+        raise ValueError(f"days must be > 0, got {days}.")
+    return filter_slots_window(slots, resolve_rolling_window(end, days=days))
 
 
 def filter_slots_calendar_month(

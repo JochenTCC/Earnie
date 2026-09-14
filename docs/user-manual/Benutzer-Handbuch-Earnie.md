@@ -415,7 +415,7 @@ Unter **Live-Cockpit → Manuelle Geräte**: Laufzeiten und Startempfehlungen f�
 
 ### Analyse Verbrauch & Kosten
 
-Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur mit `live_environment` und Live-Verbindung): Wochen-/Monats-/Jahresauswertung aus dem Produktiv-Log, Batterieflüsse, Swimspa-Auswertung. Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
+Unter **Live-Cockpit → Analyse Verbrauch & Kosten** (nur mit `live_environment` und Live-Verbindung): Auswertung der letzten **7** oder **28 Tage** aus dem Produktiv-Log (verschiebbar), Kennzahl für die letzten **365 Tage** vorhandener Log-Daten, Batterieflüsse, Swimspa-Auswertung. Details in der App und unter [Betriebsmodi](../ui/betriebsmodi.md).
 
 ---
 

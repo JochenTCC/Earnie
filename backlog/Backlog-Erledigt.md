@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Analyse rolling 7/28-day windows (2026-09-14)
+
+- [x] **Changes in analysis chart view / summaries** — Analyse Verbrauch & Kosten uses rolling **7** / **28** days (←/→ by window length) instead of calendar ISO weeks; shared `ui/consumption_display/period.py` + generic nav; KPIs = selected window + trailing 365 days of log; SE/HK keep ISO-week browsing via the same API. Docs: `docs/ui/betriebsmodi.md`, `docs/ui/charts.md`, `docs/user-manual/Benutzer-Handbuch-Earnie.md`. Tests: `tests/test_consumption_display.py`, `tests/test_consumer_cost_analysis.py`. (12-month chart mode / SE-HK rolling opt-in left for later.)
+
 ### Hausprofil timezone from Land (DACH) + Dev tooling (2026-09-14)
 
 - [x] **Timezone without timezonefinder** — `house_config/geo_timezone.py` maps AT/DE/CH → Europe/Vienna|Berlin|Zurich (`timezone_for_land`); removed `timezonefinder` from `pyproject.toml`; callers/schema/tests updated

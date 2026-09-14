@@ -41,8 +41,6 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 
 ### Version 2.+1 — Improvements for EVs / Export
 
-- [ ] Changes in analysis chart view / summaries
-  - offer either a view for last 7 days or last 28 days (maybe later last 12 months) - no more bound to calendar weeks
 - [ ] UI improvement - adding new entities by copying existing ones (PV-Anlage, Batterie)
   - like also implemented for adding new scenarios (by copying the last selected entity) the same functionality should also be implemented for PV-Anlagen and Batterien on HK page
 - [ ] Calculate efficiency for battery from difference in overall charging and discharging energy 

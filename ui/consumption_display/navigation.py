@@ -1,12 +1,18 @@
-"""Zeitnavigation für die Verbrauchs-UI (ISO-KW)."""
+"""Zeitnavigation für die Verbrauchs-UI (rolling windows und ISO-KW)."""
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 import streamlit as st
 
-from ui.consumption_display.aggregation import iso_weeks_in_timestamps
+from ui.consumption_display.period import (
+    PeriodKind,
+    TimeWindow,
+    format_window_label,
+    list_windows_for_kind,
+    window_containing_date,
+)
 from ui.consumption_validation_charts import format_iso_week_label
 
 
@@ -39,6 +45,21 @@ def parse_iso_week_number_only(text: str) -> int | None:
     if week < 1 or week > 53:
         return None
     return week
+
+
+def parse_date_jump(text: str) -> date | None:
+    """Parst TT.MM.JJJJ oder TT.MM.JJ zu einem Datum."""
+    cleaned = text.strip()
+    match = re.match(r"^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$", cleaned)
+    if not match:
+        return None
+    day, month, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+    if year < 100:
+        year += 2000
+    try:
+        return date(year, month, day)
+    except ValueError:
+        return None
 
 
 def resolve_iso_week_jump_target(
@@ -75,13 +96,18 @@ def week_index_for_iso(
 
 
 def _apply_iso_week_jump(
-    weeks: list[tuple[int, int]],
+    windows: list[TimeWindow],
     jump_text: str,
     *,
-    week_idx_key: str,
+    period_idx_key: str,
     error_key: str,
 ) -> None:
-    week_idx = int(st.session_state.get(week_idx_key, 0))
+    weeks = [
+        (w.iso_year, w.iso_week)
+        for w in windows
+        if w.iso_year is not None and w.iso_week is not None
+    ]
+    week_idx = int(st.session_state.get(period_idx_key, 0))
     week_only = parse_iso_week_number_only(jump_text)
     target = resolve_iso_week_jump_target(jump_text, weeks, current_idx=week_idx)
     if target is None:
@@ -101,8 +127,171 @@ def _apply_iso_week_jump(
         )
         return
     st.session_state.pop(error_key, None)
-    st.session_state[week_idx_key] = target_idx
+    st.session_state[period_idx_key] = target_idx
     st.rerun()
+
+
+def _apply_date_jump(
+    windows: list[TimeWindow],
+    jump_text: str,
+    *,
+    period_idx_key: str,
+    error_key: str,
+) -> None:
+    day = parse_date_jump(jump_text)
+    if day is None:
+        st.session_state[error_key] = "Format: Datum, z. B. 14.09.2026."
+        return
+    target = window_containing_date(windows, day)
+    if target is None:
+        st.session_state[error_key] = (
+            f"{day.strftime('%d.%m.%Y')} liegt außerhalb des Zeitraums."
+        )
+        return
+    st.session_state.pop(error_key, None)
+    st.session_state[period_idx_key] = windows.index(target)
+    st.rerun()
+
+
+def _render_period_chrome(
+    *,
+    key_prefix: str,
+    period_idx: int,
+    windows: list[TimeWindow],
+    label: str,
+    back_help: str,
+    forward_help: str,
+    jump_placeholder: str,
+    on_jump,
+) -> None:
+    period_idx_key = f"{key_prefix}_period_idx"
+    jump_error_key = f"{key_prefix}_period_jump_error"
+    with st.container(
+        horizontal=True,
+        horizontal_alignment="center",
+        gap="small",
+        vertical_alignment="center",
+    ):
+        if st.button(
+            "←",
+            disabled=period_idx <= 0,
+            key=f"{key_prefix}_period_back",
+            help=back_help,
+            type="secondary",
+            width="content",
+        ):
+            st.session_state[period_idx_key] = period_idx - 1
+            st.rerun()
+        st.markdown(f"**{label}**")
+        if st.button(
+            "→",
+            disabled=period_idx >= len(windows) - 1,
+            key=f"{key_prefix}_period_forward",
+            help=forward_help,
+            type="secondary",
+            width="content",
+        ):
+            st.session_state[period_idx_key] = period_idx + 1
+            st.rerun()
+
+    jump_col, button_col = st.columns([3, 1])
+    with jump_col:
+        jump_text = st.text_input(
+            "Zeitraum springen",
+            placeholder=jump_placeholder,
+            key=f"{key_prefix}_period_jump",
+            label_visibility="collapsed",
+        )
+    with button_col:
+        if st.button("Gehe zu", key=f"{key_prefix}_period_jump_btn", width="stretch"):
+            on_jump(jump_text)
+
+    jump_error = st.session_state.get(jump_error_key)
+    if jump_error:
+        st.caption(f"⚠ {jump_error}")
+
+
+def render_period_navigation(
+    timestamps: list[str],
+    *,
+    key_prefix: str,
+    period_kind: PeriodKind,
+    reset_token: str | None = None,
+    nav_bounds: tuple[datetime, datetime] | None = None,
+    default_to_latest: bool = False,
+) -> TimeWindow | None:
+    """Generic ← / label / → navigation for rolling or ISO-week windows."""
+    windows = list_windows_for_kind(
+        timestamps, period_kind, nav_bounds=nav_bounds
+    )
+    if not windows:
+        return None
+
+    period_idx_key = f"{key_prefix}_period_idx"
+    period_reset_key = f"{key_prefix}_period_reset"
+    jump_error_key = f"{key_prefix}_period_jump_error"
+    # Legacy ISO keys — keep reset in sync when SE/HK still use week_idx.
+    legacy_week_idx_key = f"{key_prefix}_week_idx"
+    legacy_week_reset_key = f"{key_prefix}_week_reset"
+
+    token = reset_token if reset_token is not None else str(len(timestamps))
+    token = f"{token}:{period_kind.value}"
+    if st.session_state.get(period_reset_key) != token:
+        st.session_state[period_reset_key] = token
+        initial = len(windows) - 1 if default_to_latest else 0
+        st.session_state[period_idx_key] = initial
+        st.session_state[legacy_week_reset_key] = token
+        st.session_state[legacy_week_idx_key] = initial
+        st.session_state.pop(jump_error_key, None)
+        st.session_state.pop(f"{key_prefix}_week_jump_error", None)
+
+    period_idx = int(st.session_state.get(period_idx_key, 0))
+    period_idx = max(0, min(period_idx, len(windows) - 1))
+    st.session_state[period_idx_key] = period_idx
+    st.session_state[legacy_week_idx_key] = period_idx
+    window = windows[period_idx]
+    label = format_window_label(window)
+
+    if period_kind == PeriodKind.ISO_WEEK:
+        def _jump(text: str) -> None:
+            _apply_iso_week_jump(
+                windows,
+                text,
+                period_idx_key=period_idx_key,
+                error_key=jump_error_key,
+            )
+
+        _render_period_chrome(
+            key_prefix=key_prefix,
+            period_idx=period_idx,
+            windows=windows,
+            label=label,
+            back_help="Vorherige Kalenderwoche",
+            forward_help="Nächste Kalenderwoche",
+            jump_placeholder="12 oder 12/2025",
+            on_jump=_jump,
+        )
+    else:
+        def _jump(text: str) -> None:
+            _apply_date_jump(
+                windows,
+                text,
+                period_idx_key=period_idx_key,
+                error_key=jump_error_key,
+            )
+
+        _render_period_chrome(
+            key_prefix=key_prefix,
+            period_idx=period_idx,
+            windows=windows,
+            label=label,
+            back_help="Vorheriges Zeitfenster",
+            forward_help="Nächstes Zeitfenster",
+            jump_placeholder="14.09.2026",
+            on_jump=_jump,
+        )
+
+    return window
 
 
 def render_iso_week_navigation(
@@ -112,73 +301,15 @@ def render_iso_week_navigation(
     reset_token: str | None = None,
     nav_bounds: tuple[datetime, datetime] | None = None,
 ) -> tuple[int, int] | None:
-    """ISO-KW-Navigation (← / Label / →) mit Direktsprung."""
-    weeks = iso_weeks_in_timestamps(timestamps, nav_bounds=nav_bounds)
-    if not weeks:
+    """ISO-KW-Navigation (← / Label / →) mit Direktsprung — SE/HK wrapper."""
+    window = render_period_navigation(
+        timestamps,
+        key_prefix=key_prefix,
+        period_kind=PeriodKind.ISO_WEEK,
+        reset_token=reset_token,
+        nav_bounds=nav_bounds,
+        default_to_latest=False,
+    )
+    if window is None or window.iso_year is None or window.iso_week is None:
         return None
-
-    week_idx_key = f"{key_prefix}_week_idx"
-    week_reset_key = f"{key_prefix}_week_reset"
-    jump_error_key = f"{key_prefix}_week_jump_error"
-    token = reset_token if reset_token is not None else str(len(timestamps))
-    if st.session_state.get(week_reset_key) != token:
-        st.session_state[week_reset_key] = token
-        st.session_state[week_idx_key] = 0
-        st.session_state.pop(jump_error_key, None)
-
-    week_idx = int(st.session_state.get(week_idx_key, 0))
-    week_idx = max(0, min(week_idx, len(weeks) - 1))
-    st.session_state[week_idx_key] = week_idx
-    iso_year, iso_week = weeks[week_idx]
-    week_label = format_iso_week_label(iso_year, iso_week)
-
-    with st.container(
-        horizontal=True,
-        horizontal_alignment="center",
-        gap="small",
-        vertical_alignment="center",
-    ):
-        if st.button(
-            "←",
-            disabled=week_idx <= 0,
-            key=f"{key_prefix}_week_back",
-            help="Vorherige Kalenderwoche",
-            type="secondary",
-            width="content",
-        ):
-            st.session_state[week_idx_key] = week_idx - 1
-            st.rerun()
-        st.markdown(f"**{week_label}**")
-        if st.button(
-            "→",
-            disabled=week_idx >= len(weeks) - 1,
-            key=f"{key_prefix}_week_forward",
-            help="Nächste Kalenderwoche",
-            type="secondary",
-            width="content",
-        ):
-            st.session_state[week_idx_key] = week_idx + 1
-            st.rerun()
-
-    jump_col, button_col = st.columns([3, 1])
-    with jump_col:
-        jump_text = st.text_input(
-            "Kalenderwoche springen",
-            placeholder="12 oder 12/2025",
-            key=f"{key_prefix}_week_jump",
-            label_visibility="collapsed",
-        )
-    with button_col:
-        if st.button("Gehe zu", key=f"{key_prefix}_week_jump_btn", width="stretch"):
-            _apply_iso_week_jump(
-                weeks,
-                jump_text,
-                week_idx_key=week_idx_key,
-                error_key=jump_error_key,
-            )
-
-    jump_error = st.session_state.get(jump_error_key)
-    if jump_error:
-        st.caption(f"⚠ {jump_error}")
-
-    return iso_year, iso_week
+    return window.iso_year, window.iso_week

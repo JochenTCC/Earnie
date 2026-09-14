@@ -286,6 +286,84 @@ def test_week_index_for_iso():
     assert week_index_for_iso(weeks, 2024, 99) is None
 
 
+def test_resolve_rolling_window_inclusive_bounds():
+    from ui.consumption_display.period import PeriodKind, resolve_rolling_window
+
+    end = datetime(2026, 9, 14, 15, 0, 0)
+    window = resolve_rolling_window(end, days=7)
+    assert window.kind == PeriodKind.ROLLING_7
+    assert window.end == end
+    assert window.start == end - timedelta(days=7)
+
+
+def test_list_rolling_windows_steps_by_days_newest_last():
+    from ui.consumption_display.period import (
+        PeriodKind,
+        format_window_label,
+        list_rolling_windows,
+    )
+
+    start = datetime(2026, 8, 1, 12, 0, 0)
+    timestamps = [
+        (start + timedelta(days=index)).isoformat() for index in range(21)
+    ]
+    windows = list_rolling_windows(timestamps, days=7)
+    assert len(windows) >= 2
+    assert windows[0].start < windows[-1].start
+    assert windows[-1].kind == PeriodKind.ROLLING_7
+    assert windows[-1].end == datetime.fromisoformat(timestamps[-1])
+    label = format_window_label(windows[-1])
+    assert "7 Tage" in label
+    assert "–" in label
+
+
+def test_slice_bundle_for_window_matches_iso_week_wrapper():
+    from ui.consumption_display.aggregation import slice_bundle_for_window
+    from ui.consumption_display.period import iso_week_time_window
+
+    start = datetime(2024, 3, 18, 0, 0, 0)
+    timestamps = [
+        (start + timedelta(hours=index)).strftime("%Y-%m-%d %H:%M:%S")
+        for index in range(168)
+    ]
+    bundle = bundle_from_modeled_profile(_sample_profile(), hours=168)
+    bundle = bundle.__class__(
+        timestamps=timestamps,
+        consumer_series=bundle.consumer_series,
+        baseload=bundle.baseload,
+        consumer_labels=bundle.consumer_labels,
+    )
+    via_iso = slice_bundle_for_iso_week(bundle, iso_year=2024, iso_week=12)
+    via_window = slice_bundle_for_window(
+        bundle, iso_week_time_window(2024, 12)
+    )
+    assert via_iso.timestamps == via_window.timestamps
+
+
+def test_parse_date_jump_formats():
+    from datetime import date
+
+    from ui.consumption_display.navigation import parse_date_jump
+
+    assert parse_date_jump("14.09.2026") == date(2026, 9, 14)
+    assert parse_date_jump("1.2.26") == date(2026, 2, 1)
+    assert parse_date_jump("invalid") is None
+    assert parse_date_jump("") is None
+
+
+def test_list_iso_week_windows_matches_iso_weeks_in_timestamps():
+    from ui.consumption_display.period import list_iso_week_windows
+
+    start = datetime(2024, 3, 18, 0, 0, 0)
+    timestamps = [
+        (start + timedelta(hours=index)).strftime("%Y-%m-%d %H:%M:%S")
+        for index in range(336)
+    ]
+    weeks = iso_weeks_in_timestamps(timestamps)
+    windows = list_iso_week_windows(timestamps)
+    assert [(w.iso_year, w.iso_week) for w in windows] == weeks
+
+
 def test_week_baseline_optimized_timeseries_chart_dashed_vs_solid():
     from datetime import datetime, timedelta
 
