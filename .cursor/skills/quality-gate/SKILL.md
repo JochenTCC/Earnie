@@ -35,7 +35,7 @@ Quality gate:
 - [ ] 7. Record results in the open `X.Y.r` backlog chapter (do not bump version.py)
 ```
 
-Windows: prefix every Python/pytest command with `$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1';` ([windows-unicode-console](../windows-unicode-console/SKILL.md)). PowerShell 5.x: no `&&`. Commands: [`.cursor/rules/test-health.mdc`](../../rules/test-health.mdc).
+Windows: prefix host Python with `$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1';` ([windows-unicode-console](../windows-unicode-console/SKILL.md)). Run the suite with `-m pytest` or `-m scripts.run_pytest` / `test_health_report run`. PowerShell 5.x: no `&&`. Commands: [`.cursor/rules/test-health.mdc`](../../rules/test-health.mdc).
 
 ## 1. Coverage baseline
 
@@ -52,7 +52,7 @@ Requires `pip install -e ".[dev]"`.
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'; .venv\Scripts\python.exe -m vulture optimizer data house_config simulation settings runtime_store ehal scripts --min-confidence 80
-$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'; .venv\Scripts\python.exe -m pytest --dead-fixtures
+$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'; .venv\Scripts\python.exe -m scripts.run_pytest --dead-fixtures
 ```
 
 Triage `health-report.md` flags. **Protected** files in `scripts/test_health_report.py` stay unflagged. Fail-fast tests that mention `LEGACY_TEST_SYMBOLS` (`legacy_id`, `pv_follow_name`, …) are expected — keep unless the user agrees to rewrite. Remove unused imports / dead helpers only after confirming no callers. Do not treat `subtract_consumer_ids` as legacy.
@@ -75,7 +75,7 @@ Rules:
 - Propose a short triage list (file, what, why safe). Apply only items the user accepts, or clearly mechanical ones (unused import, identical duplicate).
 - Prefer delete/inline over a new helper if the helper exists only to wrap one call.
 - Do not “simplify” by changing defaults, rounding, or fallbacks that alter numbers.
-- Re-run the smallest pytest set that covers the touched module after each accepted change.
+- Re-run the smallest pytest set that covers the touched module after each accepted change (`-m scripts.run_pytest`).
 
 Record what was removed vs deferred in the `X.Y.r` chapter.
 
@@ -96,7 +96,7 @@ How to split:
 1. Measure (count code LOC, not blank/comment-only lines). List every file over 600 and every function > 60 in core/UI.
 2. Split in bounded steps: **≤ 3 files per step**, public import facades unchanged where callers rely on them (same pattern as `config.py` → `settings/config_loaders.py`).
 3. Ask only about **order / API surface** if a split would change call sites across many packages — not whether to skip the split.
-4. Re-run pytest for the touched packages after each step.
+4. Re-run pytest (`-m scripts.run_pytest`) for the touched packages after each step.
 
 Keep cyclomatic complexity ≤ 10 and nesting ≤ 3; extract named helpers instead of growing existing bodies.
 

@@ -157,6 +157,21 @@ def test_build_sun_markers_sa1_sa2_in_forecast_segment():
     assert markers.now_x is None
 
 
+def test_build_sun_markers_full_span_shows_jetzt_when_now_in_window():
+    now = _dt(2026, 6, 15, 14, 0)
+    chart = compute_ui_chart_window(
+        now, LAT, LON, TZ, segment_index=0, cycle_offset=1, span="full"
+    )
+    markers = build_sun_markers(
+        chart, now, planning_window=None, show_now=True
+    )
+    assert chart.start < now < chart.end
+    assert markers.now_x is not None
+    assert markers.sa0_x is not None
+    assert markers.sa1_x is not None
+    assert markers.sa2_x is not None
+
+
 def test_add_sun_markers_shows_sa_labels_not_sunset():
     fig = go.Figure()
     now = _dt(2026, 6, 15, 14, 0)

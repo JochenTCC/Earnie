@@ -14,8 +14,8 @@ from ui.sankey import render_live_power_flow
 
 _PAGE_TITLE = "🔋 Monitor"
 _COCKPIT_HELP = (
-    "Produktiv-Cockpit **Sunset-2-Sunset**: Vergangenheit und Vorausschau "
-    "in zwei Sonnenaufgang-Segmenten (SA₀→SA₁, SA₁→SA₂)."
+    "Produktiv-Cockpit **Sunset-2-Sunset**: Vergangenheit und Vorausschau. "
+    "Desktop: ein Fenster SA₀→SA₂; Mobil: Segmente SA₀→SA₁ / SA₁→SA₂."
 )
 
 

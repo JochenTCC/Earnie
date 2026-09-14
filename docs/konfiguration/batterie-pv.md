@@ -26,7 +26,7 @@ Im **Szenario-Explorer** (Verbrauchsdaten / cons_data) gilt für die PV-Linien:
 | `battery_max_soc`       | %        | `components.json` → `batteries[]`    | Obere SOC-Grenze                                                                                                                      |
 | `threshold_power`       | Anteil   | `components.json` → `batteries[]`    | Relativ zu `battery_max_power_kw` (z. B. `0.2` = 20 %). Schwellwert für Modus-Erkennung und Entscheidung Zwangsentladen vs. Automatik |
 | `standby_power_kw`      | kW       | `components.json` → `batteries[]`    | Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch in der Optimierung)                                                          |
-| `timezone_name`         | —        | `house_profiles.json`                | IANA-Zeitzone für astronomische Sonnenzeiten (z. B. `Europe/Vienna`); siehe `planning_horizon`                                        |
+| `timezone_name`         | —        | `house_profiles.json`                | IANA-Zeitzone für astronomische Sonnenzeiten; wird aus `land` abgeleitet (`AT`→`Europe/Vienna`, `DE`→`Europe/Berlin`, `CH`→`Europe/Zurich`); siehe `planning_horizon` |
 | `netznutzung_arbeitspreis_cent_kwh` | Cent/kWh | `house_profiles.json` | Netznutzung Arbeitspreis netto (ohne USt); unabhängig vom Lieferantentarif                                                     |
 
 

@@ -1,20 +1,14 @@
-"""IANA-Zeitzone aus Breiten-/Längengrad (offline, timezonefinder)."""
+"""IANA-Zeitzone aus Hausprofil-Land (DACH, offline)."""
 from __future__ import annotations
 
-_finder = None
+_LAND_TIMEZONES = {
+    "AT": "Europe/Vienna",
+    "DE": "Europe/Berlin",
+    "CH": "Europe/Zurich",
+}
 
 
-def lookup_timezone_name(latitude: float, longitude: float) -> str:
-    """Liefert IANA-Zeitzone für geographische Koordinaten."""
-    global _finder
-    if _finder is None:
-        from timezonefinder import TimezoneFinder
-
-        _finder = TimezoneFinder()
-    tz = _finder.timezone_at(lat=float(latitude), lng=float(longitude))
-    if not tz:
-        raise ValueError(
-            f"Keine Zeitzone für Koordinaten {latitude:.4f}, {longitude:.4f} gefunden "
-            "(z. B. Meer oder ungültiger Punkt)."
-        )
-    return str(tz)
+def timezone_for_land(land: str) -> str:
+    """Liefert IANA-Zeitzone für AT/DE/CH; unbekannte Werte → Europe/Vienna."""
+    key = str(land or "").strip().upper()
+    return _LAND_TIMEZONES.get(key, _LAND_TIMEZONES["AT"])

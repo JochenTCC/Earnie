@@ -41,9 +41,12 @@ class SunriseAnchors:
     sa2: datetime
 
 
+ChartSpan = Literal["segment", "full"]
+
+
 @dataclass(frozen=True)
 class UiChartWindow:
-    """S-2-Chart-Segment: SA₀→SA₁ oder SA₁→SA₂."""
+    """S-2-Chart-Fenster: Segment SA₀→SA₁ / SA₁→SA₂ oder Desktop-Span SA₀→SA₂."""
 
     start: datetime
     end: datetime
@@ -52,6 +55,7 @@ class UiChartWindow:
     sa2: datetime
     segment_index: int
     slot_datetimes: tuple[datetime, ...]
+    span: ChartSpan = "segment"
 
     @property
     def previous_sunrise(self) -> datetime:
@@ -59,6 +63,8 @@ class UiChartWindow:
 
     @property
     def next_sunrise(self) -> datetime:
+        if self.span == "full":
+            return self.sa2
         return self.sa1 if self.segment_index == 0 else self.sa2
 
 
@@ -360,16 +366,29 @@ def _sunrise_anchors_at(
 def compute_ui_s2_chart_window(
     anchors: SunriseAnchors,
     segment_index: int,
+    *,
+    span: ChartSpan = "segment",
 ) -> UiChartWindow:
-    """Chart-Segment 0: SA₀→SA₁, Segment 1: SA₁→SA₂."""
-    if segment_index not in (0, 1):
-        raise ValueError(
-            f"segment_index muss 0 oder 1 sein, erhalten: {segment_index}."
-        )
-    if segment_index == 0:
-        start, end = anchors.sa0, anchors.sa1
+    """Chart-Segment 0: SA₀→SA₁, Segment 1: SA₁→SA₂; span=full: SA₀→SA₂."""
+    if span not in ("segment", "full"):
+        raise ValueError(f"span muss 'segment' oder 'full' sein, erhalten: {span!r}.")
+    if span == "full":
+        if segment_index not in (0, 1):
+            raise ValueError(
+                f"segment_index muss 0 oder 1 sein, erhalten: {segment_index}."
+            )
+        start, end = anchors.sa0, anchors.sa2
+        resolved_segment = 0
     else:
-        start, end = anchors.sa1, anchors.sa2
+        if segment_index not in (0, 1):
+            raise ValueError(
+                f"segment_index muss 0 oder 1 sein, erhalten: {segment_index}."
+            )
+        if segment_index == 0:
+            start, end = anchors.sa0, anchors.sa1
+        else:
+            start, end = anchors.sa1, anchors.sa2
+        resolved_segment = segment_index
     slots = hourly_slots_inclusive(start, end)
     return UiChartWindow(
         start=start,
@@ -377,8 +396,9 @@ def compute_ui_s2_chart_window(
         sa0=anchors.sa0,
         sa1=anchors.sa1,
         sa2=anchors.sa2,
-        segment_index=segment_index,
+        segment_index=resolved_segment,
         slot_datetimes=slots,
+        span=span,
     )
 
 
@@ -390,12 +410,13 @@ def compute_ui_chart_window(
     *,
     segment_index: int = 0,
     cycle_offset: int = 0,
+    span: ChartSpan = "segment",
 ) -> UiChartWindow:
     """S-2-Chart-Fenster um now (Standard: Segment SA₀→SA₁)."""
     anchors = compute_sunrise_anchors(
         now, latitude, longitude, timezone_name, cycle_offset=cycle_offset
     )
-    return compute_ui_s2_chart_window(anchors, segment_index)
+    return compute_ui_s2_chart_window(anchors, segment_index, span=span)
 
 
 def compute_ui_chart_window_with_offset(
@@ -406,6 +427,7 @@ def compute_ui_chart_window_with_offset(
     timezone_name: str,
     *,
     segment_index: int = 0,
+    span: ChartSpan = "segment",
 ) -> UiChartWindow:
     """Verschiebt SA-Anker um offset_cycles Zyklen zurück (Kompatibilität)."""
     return compute_ui_chart_window(
@@ -415,7 +437,30 @@ def compute_ui_chart_window_with_offset(
         timezone_name,
         segment_index=segment_index,
         cycle_offset=offset_cycles,
+        span=span,
     )
+
+
+def chart_now_in_window(chart: UiChartWindow, now: datetime) -> bool:
+    """True, wenn ``now`` im sichtbaren Chart-Fenster liegt (inkl. Ränder)."""
+    if now.tzinfo is None:
+        raise ValueError("now muss timezone-aware sein.")
+    return chart.start <= now <= chart.end
+
+
+def chart_uses_live_zones(chart: UiChartWindow, now: datetime) -> bool:
+    """
+    True, wenn grau/neutral/grün anhand von ``now`` gesetzt werden.
+
+    Volle Grauzone nur, wenn das Fenster vollständig vor der Log-Grenze liegt.
+    SA₁→SA₂ (segment) nutzt eigene Zonen ohne dieses Flag.
+    """
+    if now.tzinfo is None:
+        raise ValueError("now muss timezone-aware sein.")
+    if chart.span == "segment" and chart.segment_index == 1:
+        return False
+    return history_boundary_exclusive(now) < chart.end
+
 
 
 def slot_index_at_or_before(slots: tuple[datetime, ...], moment: datetime) -> int:
@@ -639,16 +684,18 @@ def ui_chart_zones(
     """
     Hintergrundzonen für den S-2-Chart.
 
-    SA₀→SA₁: grau (Vergangenheit) · neutral · grün (extrapolierte Preise)
-    SA₁→SA₂: neutral · grün (nur gespiegelte/extrapolierte Preise)
+    SA₀→SA₁ / SA₀→SA₂: grau (Vergangenheit) · neutral · grün (extrapolierte Preise)
+    SA₁→SA₂ (segment): neutral · grün (nur gespiegelte/extrapolierte Preise)
 
     ``slot_datetimes``: Display-Slots (15-min/1-h gemischt); Default ``chart.slot_datetimes``.
-    ``is_live_segment``: False bei vergangenen SA-Zyklen (cycle_offset > 0) — volle Grauzone.
+    ``is_live_segment``: False nur wenn das Fenster vollständig vor der Log-Grenze liegt
+    (volle Grauzone). Bei Desktop-Span SA₀→SA₂ und ``now`` im Fenster immer anhand von
+    ``now`` clippen — auch bei cycle_offset > 0.
     """
     if now.tzinfo is None:
         raise ValueError("now muss timezone-aware sein.")
     slots = slot_datetimes if slot_datetimes is not None else chart.slot_datetimes
-    if chart.segment_index == 1:
+    if chart.span == "segment" and chart.segment_index == 1:
         return _ui_chart_zones_sa1_sa2(chart, sim_rows, slot_datetimes=slots)
     return _ui_chart_zones_sa0_sa1(
         now,

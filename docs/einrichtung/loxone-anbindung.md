@@ -11,7 +11,7 @@ Andere Hubs (HA+evcc, OpenEMS): [Smarthome-Backend wählen](smarthome-backend-wa
 
 | Variable      | Bedeutung                              |
 | ------------- | -------------------------------------- |
-| `LOXONE_IP`   | IP-Adresse des Miniservers             |
+| `LOXONE_IP`   | IP-Adresse des Miniservers; optional mit HTTP-Port (`192.168.178.1:85`, Standard ohne Angabe: Port 80) |
 | `LOXONE_USER` | Benutzername (HTTP Basic Auth)         |
 | `LOXONE_PASS` | Passwort                               |
 

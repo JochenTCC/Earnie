@@ -19,7 +19,7 @@ Alle Optionen sind **optional**. Wer nichts einträgt, konfiguriert Earnie statt
 |---|---|---|
 | `loxone_user` | Benutzername für die Loxone Miniserver-Anbindung (`ehal.backend=loxone`) | leer |
 | `loxone_pass` | Passwort dazu (verschlüsselt im Optionen-UI dargestellt) | leer |
-| `loxone_ip` | IP/Hostname des Loxone Miniservers | leer |
+| `loxone_ip` | IP des Loxone Miniservers (IPv4; optional mit HTTP-Port, z. B. `192.168.178.1:85`) | leer |
 | `streamlit_port` | Interner Streamlit-Port | `8501` |
 | `ehal_loxone_http_port` | Reserviert für den EHAL-Loxone-HTTP-Daemon (aktuell noch ohne Env-Wirkung — Port bleibt `8541`, über `config.json` `system.ehal_loxone_http_port` änderbar) | `8541` |
 | `ui_modes` | Aktive UI-Modi, kommagetrennt (`sunset2sunset`, `scenario_explorer`, `live_environment`, …) | `sunset2sunset,scenario_explorer,live_environment` |

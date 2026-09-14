@@ -23,11 +23,12 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] Chart 1 empty history bars after all-zero EHAL live read (`debug_dump_20260820_191521`) — `is_dead_telemetry_snapshot` skips poisoned consumption_snapshot in optimizer matrix, prod log, and chart rows; hold-forward load after dead slot.
-
+- [ ] **Monitor S₀→S₂ desktop plot (hide on phones)** — implemented (`ui/s2_viewport.py`: phones keep 24h segments; tablets/desktop get full SA₀→SA₂ span; navigation switch still 24h-based). **Verify on a real mobile device after next pre-release** (phone UA must not show full S₀→S₂; desktop/tablet unchanged).
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] "debug-dumps\debug_dump_20260914_134015"
+  - Second incident in same dump: On 13:00 slot in chart 1 the bar chart says that battery was discharged but SOC is rising in the same slot. This is not plausible. Check for reasons and fix if necessary 
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

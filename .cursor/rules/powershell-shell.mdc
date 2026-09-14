@@ -12,7 +12,7 @@ This environment uses **Windows PowerShell 5.x** (not pwsh 7+). `&&` and `||` ar
 
 ```powershell
 # ❌ ParserError: The token "&&" is not a valid statement separator
-cd "c:\...\Energy-Optimizer" && .venv\Scripts\python.exe -m pytest ...
+cd "c:\...\Energy-Optimizer" && .venv\Scripts\python.exe -m scripts.run_pytest ...
 ```
 
 ## Instead
@@ -20,24 +20,25 @@ cd "c:\...\Energy-Optimizer" && .venv\Scripts\python.exe -m pytest ...
 **Preferred:** Set `working_directory` in the shell tool and execute the command without `cd`:
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests/ -q --tb=short
+.venv\Scripts\python.exe -m scripts.run_pytest tests/ -q --tb=short
 ```
 
 **Alternative:** Use a semicolon instead of `&&` (continues execution even if the first part fails):
 
 ```powershell
-Set-Location "c:\Users\joche\Documents\Smarthome\Python\Energy-Optimizer"; .venv\Scripts\python.exe -m pytest tests/ -q --tb=short
+Set-Location "c:\Users\joche\Documents\Smarthome\Python\Energy-Optimizer"; .venv\Scripts\python.exe -m scripts.run_pytest tests/ -q --tb=short
 
 **Conditional Chaining** (only if the first command succeeds) in PowerShell 5.x:
 
 ```powershell
-Set-Location "c:\...\Energy-Optimizer"; if ($?) { .venv\Scripts\python.exe -m pytest tests/ -q }
+Set-Location "c:\...\Energy-Optimizer"; if ($?) { .venv\Scripts\python.exe -m scripts.run_pytest tests/ -q }
 
 ```
 
 ## Further Notes
 
 - Python from the project: `.venv\Scripts\python.exe` (not `python` without the path if venv is meant)
+- pytest: `-m pytest` or `-m scripts.run_pytest` (thin wrapper for pre-commit)
 
 - No Bash heredocs (`<<'EOF'`) — in PowerShell, heredocs are created with `@"..."@` or `-m` with a single-line string
 

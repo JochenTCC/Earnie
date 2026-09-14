@@ -7,7 +7,7 @@ Typical workflow:
 
   # Dead-code / orphaned-fixture supplements (pip install -e \".[dev]\"):
   .venv\\Scripts\\python.exe -m vulture optimizer data house_config simulation settings runtime_store ehal scripts --min-confidence 80
-  .venv\\Scripts\\python.exe -m pytest --dead-fixtures
+  .venv\\Scripts\\python.exe -m scripts.run_pytest --dead-fixtures
 
   # Pre-commit only ingests the last JUnit file (see .githooks/pre-commit).
 
@@ -209,7 +209,7 @@ def ingest_junit(xml_path: Path) -> int:
 
 
 def _pytest_command(*, with_coverage: bool, quiet: bool) -> list[str]:
-    cmd = [sys.executable, "-m", "pytest", "tests"]
+    cmd = [sys.executable, "-m", "scripts.run_pytest", "tests"]
     if quiet:
         cmd.append("-q")
     cmd.append(f"--junitxml={JUNIT_LAST}")

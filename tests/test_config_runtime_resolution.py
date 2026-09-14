@@ -128,6 +128,7 @@ def _write_id_only_config(config_dir, *, battery_wear_enabled: bool = False) -> 
                         "id": "efh",
                         "label": "EFH",
                         "annual_kwh": 4000,
+                        "land": "DE",
                         "latitude": 48.2,
                         "longitude": 11.0,
                         "consumers": [

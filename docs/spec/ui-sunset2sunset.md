@@ -1,12 +1,12 @@
 # Spezifikation: UI-Modus „Sunset-2-Sunset“
 
-**Version:** 0.8.0  
-**Status:** Epic abgeschlossen (2026-07-05); Phasen 1–4 umgesetzt (P4a–P4c Docs & Tests; P4d entfallen)  
+**Version:** 0.8.1  
+**Status:** Epic abgeschlossen (2026-07-05); Phasen 1–4 umgesetzt (P4a–P4c Docs & Tests; P4d entfallen); Desktop-Span SA₀→SA₂ (2026-09-14)  
 **Ersetzt:** Streamlit-Modi „Echtzeit“ und „Historischer Tag“, Button „Produktiv-Archiv“, getrennte Live/History-Umschaltung, UI-seitige Standard-Live-MILP
 
 ## 1. Ziel
 
-Ein einheitlicher Produktiv-Cockpit-Modus ohne Grenze zwischen Live und Historie: Vergangenheit aus dem Produktiv-Log, Gegenwart und Vorausschau aus dem **Produktiv-Snapshot** (`live_optimization_debug.json`, geschrieben von `main.py`) — in zwei benachbarten Sonnenaufgang-Segmenten navigierbar.
+Ein einheitlicher Produktiv-Cockpit-Modus ohne Grenze zwischen Live und Historie: Vergangenheit aus dem Produktiv-Log, Gegenwart und Vorausschau aus dem **Produktiv-Snapshot** (`live_optimization_debug.json`, geschrieben von `main.py`) — Desktop als SA₀→SA₂-Fenster, Mobil in zwei benachbarten Sonnenaufgang-Segmenten navigierbar.
 
 **Keine Nachrechnung** im S-2-Modus (beliebiger Kalendertag → später Backtesting, Dev-only).
 
@@ -32,7 +32,9 @@ Immer **Sonnenaufgang** (nicht Sonnenuntergang; abweichend von MILP-Spec SU₁/S
 
 ## 4. Chart-Fenster & Navigation
 
-Zwei umschaltbare Segmente (~24 h):
+**Desktop / Tablet:** ein sichtbares Fenster **SA₀→SA₂** (~48 h). Kein Segment-Umschalter. ←/→ verschieben um **einen** Sonnenaufgang-Zyklus (~24 h). Bei Live (`cycle_offset=0`) ist → deaktiviert (Vorausschau ist bereits im Plot).
+
+**Mobil (Phone-UA):** zwei umschaltbare Segmente (~24 h) wie bisher:
 
 | Index | Fenster | Standard |
 |-------|---------|----------|
@@ -42,12 +44,16 @@ Zwei umschaltbare Segmente (~24 h):
 | Steuerung | Verhalten |
 |-----------|-----------|
 | ← Zurück | Weitere SA-Zyklen zurück, max. bis `optimization_history.jsonl` reicht |
-| Vor → | Wechsel SA₀→SA₁ ↔ SA₁→SA₂; in SA₁→SA₂ deaktiviert |
+| Vor → | Desktop: Zyklus Richtung Live (bei Live deaktiviert). Mobil: SA₀→SA₁ ↔ SA₁→SA₂ bzw. Zyklus Richtung Live; in SA₁→SA₂ deaktiviert |
 | Produktiv-Archiv | entfällt |
 
-**Chart-Marker (P3b):** Vertikale Linien **SA₀**, **SA₁**, **SA₂** (Sonnenaufgang), jeweils nur wenn der Anker im sichtbaren Segment liegt. **Jetzt** (gestrichelt) nur im Live-Segment SA₀→SA₁ (`cycle_offset=0`, `segment_index=0`). Keine SU-Marker mehr.
+Viewport-Erkennung: `ui/s2_viewport.py` (User-Agent; Override `?s2_span=segment|full` bzw. Session). Chart 1, Chart 2 und Simulations-Tabelle teilen dasselbe Fenster.
 
-Beschriftung z. B. „SA₀→SA₁ (Live)“ / „SA₁→SA₂ (Vorausschau)“ plus Datumsbereich.
+**Chart-Marker (P3b):** Vertikale Linien **SA₀**, **SA₁**, **SA₂** (Sonnenaufgang), jeweils nur wenn der Anker im sichtbaren Fenster liegt. **Jetzt** (gestrichelt), sobald `now` im sichtbaren Fenster liegt (auch bei Desktop-Span mit `cycle_offset>0`, wenn das Fenster `now` noch enthält). Keine SU-Marker mehr.
+
+Beschriftung z. B. „SA₀→SA₂ (Live)“ (Desktop) bzw. „SA₀→SA₁ (Live)“ / „SA₁→SA₂ (Vorausschau)“ (Mobil) plus Datumsbereich.
+
+**Zonen bei Desktop-Span:** Grau/neutral/grün werden anhand von `now` auf `[chart.start, chart.end]` geclippt, sobald die Log-Grenze vor dem Fensterrand liegt. Volle Grauzone nur, wenn das sichtbare Fenster vollständig vor der Log-Grenze liegt.
 
 ## 5. Hintergrundzonen
 
@@ -110,7 +116,7 @@ Hold-Forward (bisher „hellorange / gehalten“) gilt im S-2-Modus **nicht**. F
 |-------|-----------|
 | Sankey | immer (aktuelle Loxone-Daten) |
 | Countdown | immer |
-| Auto-Refresh | nur Fenster SA₀→SA₁ |
+| Auto-Refresh | Desktop: `cycle_offset=0` (SA₀→SA₂); Mobil: nur Fenster SA₀→SA₁ |
 
 ### 7.1 UI-Layout (Follow-up, umgesetzt 2026-07-05)
 
@@ -143,6 +149,7 @@ Kompaktere Chart-UI; Details in [docs/ui/charts.md](../ui/charts.md).
 
 | Datum | Version | Inhalt |
 |-------|---------|--------|
+| 2026-09-14 | 0.8.1 | Desktop SA₀→SA₂-Span; Mobil behält 24h-Segmente; Jetzt/Zonen wenn `now` im Fenster |
 | 2026-07-05 | 0.7.0 | Epic-Abschluss Phase 4: Betriebsmodi-Doku, Deployment-Querverweise, Navigationstests (P4a–P4c); P4d entfallen |
 | 2026-07-05 | 0.6.3 | Follow-up UI-Layout: Navigation zwischen Charts, ?-Hilfen, Footer-Datenbasis (§7.1) |
 | 2026-07-05 | 0.6.2 | P3b: Chart-Marker SA₀/SA₁/SA₂; Jetzt nur Live SA₀→SA₁; P3d Horizont Jetzt→SA₂ |

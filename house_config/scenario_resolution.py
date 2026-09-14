@@ -8,7 +8,7 @@ from house_config.entity_resolution import (
     resolve_battery_into_settings,
     resolve_pv_into_settings,
 )
-from house_config.geo_timezone import lookup_timezone_name
+from house_config.geo_timezone import timezone_for_land
 from house_config.planning_flex_bridge import collect_planning_flex_consumers
 from house_config.profiles_store import load_house_profiles_document
 from house_config.tariffs_store import (
@@ -121,10 +121,7 @@ def _ensure_geo_defaults(out: dict) -> None:
     if "longitude" not in out:
         out["longitude"] = 16.37
     if not str(out.get("timezone_name", "") or "").strip():
-        out["timezone_name"] = lookup_timezone_name(
-            float(out["latitude"]),
-            float(out["longitude"]),
-        )
+        out["timezone_name"] = timezone_for_land("AT")
 
 
 def _apply_profile_geo(out: dict, profile: dict) -> None:
@@ -133,10 +130,7 @@ def _apply_profile_geo(out: dict, profile: dict) -> None:
     out["longitude"] = float(profile["longitude"])
     out["timezone_name"] = str(profile.get("timezone_name", "") or "").strip()
     if not out["timezone_name"]:
-        out["timezone_name"] = lookup_timezone_name(
-            float(out["latitude"]),
-            float(out["longitude"]),
-        )
+        out["timezone_name"] = timezone_for_land(profile.get("land", "AT"))
     nne = float(profile.get("netznutzung_arbeitspreis_cent_kwh", 0.0) or 0.0)
     if nne > 0.0:
         out["netzentgelt_cent_kwh"] = nne

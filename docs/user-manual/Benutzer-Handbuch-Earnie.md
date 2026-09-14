@@ -167,7 +167,7 @@ In der Sidebar sehen Sie fehlende Schritte der Ersteinrichtung.
 
 Ein **Hausprofil** beschreibt Standort und „Wer lebt / was verbraucht hier“:
 
-- **Standort:** Breite, Länge, Zeitzone (wichtig für Sonnenzeiten und PV-Prognose)  
+- **Standort:** Breite, Länge, Land (daraus wird die Zeitzone abgeleitet — wichtig für Sonnenzeiten und PV-Prognose)  
 - **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool, generische Geräte  
 - **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen)
 
@@ -401,7 +401,7 @@ Earnie Monitor
 
 *Monitor (Chart 1): Vergangenheit, laufender Plan und Preisprognose in einem Sunset-2-Sunset-Fenster.*
 
-Unter **Live-Cockpit → Monitor** (Sunset-2-Sunset): einheitliches Cockpit über Vergangenheit, Jetzt und Vorausschau (Sonnenaufgangs-Segmente). Chart 1 / SoC-Linien / Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md).
+Unter **Live-Cockpit → Monitor** (Sunset-2-Sunset): einheitliches Cockpit über Vergangenheit, Jetzt und Vorausschau — Desktop als SA₀→SA₂-Fenster, Mobil in Sonnenaufgangs-Segmenten. Chart 1 / SoC-Linien / Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md).
 
 Kennzahlen zur Ersparnis beziehen sich auf den **vollen Planungshorizont** (Jetzt bis übernächster Sonnenaufgang).
 

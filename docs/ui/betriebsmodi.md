@@ -31,11 +31,11 @@ In der Sidebar (unten): Abschnitt **Info / About** (Banner der Wahrheit, Version
 
 Während der Greenfield-Ersteinrichtung sind zunächst nur **Konfiguration** und **Daemon Control** sichtbar (Daemon-Seiten werden für die Ersteinrichtung auch ohne `live_environment` in der Env erzwungen). Solange kein Smarthome-Backend gewählt ist, zeigt Daemon Control zunächst nur **Smarthome-Backend** — Optimierer-Dienst und EHAL-Com erscheinen erst danach.
 
-Spezifikation: [UI Sunset-2-Sunset](../spec/ui-sunset2sunset.md) (v0.6.2). Chart- und Panel-Details: [Charts & Panels](charts.md).
+Spezifikation: [UI Sunset-2-Sunset](../spec/ui-sunset2sunset.md) (v0.8.1). Chart- und Panel-Details: [Charts & Panels](charts.md).
 
 ## Sunset-2-Sunset (Seite Monitor)
 
-**Zweck:** Einheitliches Produktiv-Cockpit ohne Grenze zwischen Live und Historie. Vergangenheit aus dem Produktiv-Log (`optimization_history.jsonl`), Gegenwart und Vorausschau aus dem **Produktiv-Snapshot** (`live_optimization_debug.json`, geschrieben von `main.py`) — in zwei benachbarten Sonnenaufgang-Segmenten navigierbar.
+**Zweck:** Einheitliches Produktiv-Cockpit ohne Grenze zwischen Live und Historie. Vergangenheit aus dem Produktiv-Log (`optimization_history.jsonl`), Gegenwart und Vorausschau aus dem **Produktiv-Snapshot** (`live_optimization_debug.json`, geschrieben von `main.py`). **Desktop:** ein Fenster SA₀→SA₂; **Mobil:** zwei benachbarte Sonnenaufgang-Segmente.
 
 **Ersetzt:** die früheren Modi **Echtzeit** und **Historischer Tag** sowie den Button **Produktiv-Archiv**. Es gibt **keine Nachrechnung** beliebiger Kalendertage im S-2-Modus (geplant als Dev-Feature in Szenario-Explorer).
 
@@ -50,7 +50,9 @@ Immer **Sonnenaufgang** (nicht Sonnenuntergang):
 
 ### Chart-Fenster & Navigation
 
-Zwei umschaltbare Segmente (~24 h):
+**Desktop / Tablet:** sichtbares Fenster **SA₀→SA₂** (~48 h). ←/→ verschieben um einen Sonnenaufgang-Zyklus; bei Live ist → deaktiviert.
+
+**Mobil:** zwei umschaltbare Segmente (~24 h):
 
 | Index | Fenster | Standard |
 |-------|---------|----------|
@@ -60,10 +62,10 @@ Zwei umschaltbare Segmente (~24 h):
 | Steuerung | Verhalten |
 |-----------|-----------|
 | ← Zurück | Weitere SA-Zyklen zurück, bis `optimization_history.jsonl` reicht |
-| Vor → | Wechsel SA₀→SA₁ ↔ SA₁→SA₂; in SA₁→SA₂ deaktiviert |
+| Vor → | Desktop: Zyklus Richtung Live (Live: deaktiviert). Mobil: SA₀→SA₁ ↔ SA₁→SA₂ bzw. Zyklus Richtung Live |
 | Navigation | Kompakte Buttons **zwischen Chart 1 und Chart 2** |
 
-Beschriftung z. B. „SA₀→SA₁ (Live)“ / „SA₁→SA₂ (Vorausschau)“ plus Datumsbereich. Vertikale Marker **SA₀**, **SA₁**, **SA₂** im Chart; **Jetzt** nur im Live-Segment SA₀→SA₁.
+Beschriftung z. B. „SA₀→SA₂ (Live)“ (Desktop) bzw. „SA₀→SA₁ (Live)“ / „SA₁→SA₂ (Vorausschau)“ (Mobil) plus Datumsbereich. Vertikale Marker **SA₀**, **SA₁**, **SA₂** im Chart; **Jetzt**, sobald die aktuelle Zeit im sichtbaren Fenster liegt.
 
 ### Datenquellen
 
@@ -90,13 +92,13 @@ PV-, Batterie- und Einspeise-Parameter werden über Entitäts-IDs im **Live-Szen
 | Energievergleich | Expander: Baseline vs. Optimierung |
 | Sankey | immer (aktuelle Loxone-Daten) |
 | Countdown / Optimierungs-Takt | immer |
-| Auto-Refresh | nur Fenster SA₀→SA₁ |
+| Auto-Refresh | Desktop: Live-Zyklus (`cycle_offset=0`); Mobil: nur Fenster SA₀→SA₁ |
 
 Details: [Charts & Panels](charts.md).
 
 ### Kennzahlen-Horizont
 
-Ersparnis-, Kosten-Kennzahlen und Energievergleich beziehen sich auf **Jetzt → SA₂** (voller MILP-Planungshorizont). Die Chart-Segmente SA₀→SA₁ und SA₁→SA₂ sind **Darstellungsfenster** — kumulierte Kurven darin sind Ausschnitte, keine eigene Matching-Periode.
+Ersparnis-, Kosten-Kennzahlen und Energievergleich beziehen sich auf **Jetzt → SA₂** (voller MILP-Planungshorizont). Die Chart-Fenster (Desktop SA₀→SA₂ bzw. Mobil-Segmente) sind **Darstellungsfenster** — kumulierte Kurven darin sind Ausschnitte, keine eigene Matching-Periode.
 
 ## Szenario-Explorer
 

@@ -15,7 +15,12 @@ from optimizer import schedule as optimization_schedule
 import optimizer
 from ui.chart_context import build_live_chart_context, live_now
 from ui.fragment_refresh import CHARTS_FRAGMENT_RUN_EVERY, main_sync_poll_interval_sec
-from ui.history_navigation import get_s2_cycle_offset, get_s2_segment_index, render_s2_nav_buttons
+from ui.history_navigation import (
+    get_s2_cycle_offset,
+    get_s2_segment_index,
+    get_s2_span,
+    render_s2_nav_buttons,
+)
 from ui.help_hint import render_status_with_help
 from ui.main_py_sync import MAIN_PY_SYNC_HELP, main_py_sync_status_message
 from ui.runtime_config import reload_runtime_config, simulation_settings_fingerprint
@@ -55,11 +60,12 @@ def _snapshot_cache_key(
     snapshot: dict | None,
     cycle_offset: int,
     segment_index: int,
+    span: str,
 ) -> str:
     completed = snapshot_completed_at(snapshot) or ""
     return (
         f"{current_slot}|{completed}|{simulation_settings_fingerprint()}"
-        f"|s2:{cycle_offset}:{segment_index}"
+        f"|s2:{cycle_offset}:{segment_index}:{span}"
     )
 
 
@@ -69,6 +75,7 @@ def _store_bundle_from_snapshot(snapshot: dict) -> bool:
         cycle_offset=get_s2_cycle_offset(),
         segment_index=get_s2_segment_index(),
         now=live_now(),
+        span=get_s2_span(),
     )
     if bundle is None:
         st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
@@ -152,6 +159,7 @@ def _store_opt_in_display_bundle(
         now=live_now(),
         planning_window=planning_window,
         sim_rows=optimized_df.to_dict("records"),
+        span=get_s2_span(),
     )
     st.session_state[SESSION_LIVE_DISPLAY_BUNDLE] = build_optimization_display_bundle(
         savings_info,
@@ -282,6 +290,7 @@ def _live_optimization_prepare_fragment(current_soc: float) -> None:
         snapshot,
         get_s2_cycle_offset(),
         get_s2_segment_index(),
+        get_s2_span(),
     )
 
     if reason == "wait_main":

@@ -562,7 +562,7 @@
         },
         "timezone_name": {
           "type": "string",
-          "description": "Optional, abgeleitet aus latitude/longitude beim Laden — nicht manuell pflegen."
+          "description": "Optional, abgeleitet aus land (AT/DE/CH) beim Laden — nicht manuell pflegen."
         },
         "default_pv_tilt": {
           "type": "number",

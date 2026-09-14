@@ -94,12 +94,30 @@ def require_loxone_credentials_for_config() -> bool:
 
 
 def validate_loxone_ip(ip: str) -> str | None:
-    """Liefert Fehlermeldung oder None wenn die IPv4-Adresse gültig ist."""
+    """Liefert Fehlermeldung oder None wenn IPv4 bzw. IPv4:port gültig ist."""
     cleaned = ip.strip()
     if not cleaned:
         return "IP-Adresse ist erforderlich."
-    if not _IPV4_RE.match(cleaned):
-        return "Bitte eine gültige IPv4-Adresse eingeben (z. B. 192.168.178.1)."
+    host, sep, port_text = cleaned.partition(":")
+    if sep:
+        if not host or not port_text or ":" in port_text:
+            return (
+                "Bitte eine gültige IPv4-Adresse eingeben "
+                "(z. B. 192.168.178.1 oder 192.168.178.1:85)."
+            )
+        if not port_text.isdigit():
+            return (
+                "Bitte eine gültige IPv4-Adresse eingeben "
+                "(z. B. 192.168.178.1 oder 192.168.178.1:85)."
+            )
+        port = int(port_text)
+        if port < 1 or port > 65535:
+            return "Port muss zwischen 1 und 65535 liegen."
+    if not _IPV4_RE.match(host if sep else cleaned):
+        return (
+            "Bitte eine gültige IPv4-Adresse eingeben "
+            "(z. B. 192.168.178.1 oder 192.168.178.1:85)."
+        )
     return None
 
 

@@ -1,10 +1,11 @@
 ---
 name: windows-unicode-console
 description: >-
-  Prevents Windows UnicodeEncodeError (charmap codec) when running Python,
-  pytest, or scripts that print Unicode such as arrows (→), subscripts (₀),
-  or German umlauts. Use on Windows before any shell Python/pytest invocation,
-  when UnicodeEncodeError or charmap_encode appears, or when output contains →.
+  Prevents Windows UnicodeEncodeError (charmap codec) when running Python
+  or scripts that print Unicode such as arrows (→), subscripts (₀), or
+  German umlauts. Use on Windows before any native shell Python invocation
+  (including pytest), when UnicodeEncodeError or charmap_encode appears, or
+  when output contains →.
 ---
 
 # Windows Unicode Console (charmap fix)
@@ -21,7 +22,7 @@ UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' ...
 
 ## Agent rule: every Python shell command on Windows
 
-Before **any** `.venv\Scripts\python.exe` or `pytest` invocation in the Shell tool, set UTF-8 for that command:
+Before **any** `.venv\Scripts\python.exe` invocation in the Shell tool, set UTF-8 for that command.
 
 ```powershell
 $env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'; .venv\Scripts\python.exe -m pytest tests/ -q --tb=short

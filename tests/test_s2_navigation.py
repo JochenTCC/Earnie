@@ -70,6 +70,46 @@ def test_apply_s2_nav_heute_returns_live():
     assert apply_s2_nav_heute() == (0, 0)
 
 
+def test_full_span_forward_disabled_at_live():
+    assert s2_forward_disabled(0, 0, span="full") is True
+    assert apply_s2_nav_forward(0, 0, span="full") == (0, 0)
+
+
+def test_full_span_forward_from_past_decrements_offset():
+    assert apply_s2_nav_forward(2, 0, span="full") == (1, 0)
+    assert s2_forward_disabled(2, 0, span="full") is False
+
+
+def test_full_span_back_increments_cycle_keeps_segment_zero():
+    assert apply_s2_nav_back(0, 0, max_cycle=3, span="full") == (1, 0)
+    assert apply_s2_nav_back(3, 0, max_cycle=3, span="full") == (3, 0)
+    assert s2_back_disabled(3, 0, max_cycle=3, span="full") is True
+
+
+def test_full_span_heute_disabled_only_at_live_cycle():
+    assert s2_heute_disabled(0, 0, span="full") is True
+    assert s2_heute_disabled(1, 0, span="full") is False
+
+
+def test_full_span_navigation_label():
+    now = _dt(2026, 6, 15, 14, 0)
+    live_chart = compute_ui_chart_window(
+        now, LAT, LON, TZ, segment_index=0, cycle_offset=0, span="full"
+    )
+    past_chart = compute_ui_chart_window(
+        now, LAT, LON, TZ, segment_index=0, cycle_offset=1, span="full"
+    )
+    assert live_chart.span == "full"
+    assert live_chart.start == live_chart.sa0
+    assert live_chart.end == live_chart.sa2
+    assert segment_navigation_label(
+        live_chart, cycle_offset=0, segment_index=0
+    ).startswith("SA₀→SA₂ (Live) · ")
+    assert segment_navigation_label(
+        past_chart, cycle_offset=1, segment_index=0
+    ).startswith("SA₀→SA₂ · ")
+
+
 def test_s2_navigable_cycles_without_log(monkeypatch):
     monkeypatch.setattr(
         "ui.chart_context.optimization_history.earliest_replay_completed_at",

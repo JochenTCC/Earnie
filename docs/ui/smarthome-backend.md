@@ -30,6 +30,8 @@ Same storage as before, just reached from here now:
 | Home Assistant | `config.json` → `ehal.ha`                     |
 | OpenEMS        | `config.json` → `ehal.openems`                |
 
+For Loxone, `LOXONE_IP` may include an optional HTTP port (`192.168.178.1:85`; default without a port is 80).
+
 Saving credentials sets `ehal.backend` and unlocks **EHAL-Com** and **Optimierer-Dienst**.
 
 ## Loxone Import

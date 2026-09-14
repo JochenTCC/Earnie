@@ -33,11 +33,23 @@ Use a real Windows CPython (e.g. from [python.org](https://www.python.org/downlo
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
-# optional: python -m pytest
+# optional: python -m scripts.run_pytest
 python -m scripts.run_streamlit
 ```
 
 `requirements-dev.txt` installs the project from `pyproject.toml` (incl. `python-dotenv`, Streamlit, …) plus pytest. Use `python -m pip` so install always targets the active venv. If you see `No module named 'dotenv'`, the venv is missing deps or you are not using `.\.venv\Scripts\python.exe`.
+
+House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `house_config/geo_timezone.py` — no `timezonefinder`/`h3`. Run tests with `python -m pytest` or `python -m scripts.run_pytest` (thin wrapper used by pre-commit).
+
+### Dev Container (optional)
+
+For a Linux-aligned editor/runtime (Docker Desktop required):
+
+1. Command Palette → **Dev Containers: Reopen in Container**
+2. Wait for `post-create` (`pip install -e ".[dev]"`, bootstrap `earnie_env/`)
+3. F5 with **Streamlit app.py (:8531 lokal (earnie_env))**
+
+Config: `.devcontainer/` (Python 3.14-slim, env aligned with `.vscode/launch.json`). UI: `http://localhost:8531`.
 
 One process is enough for local UI work: Streamlit (`app.py`). Start/stop `main.py` from **Real-Time Environment → Optimizer Service**, or set `$env:EARNIE_AUTO_START_MAIN = "1"` before `run_streamlit` (as in Docker Compose). Only run `python main.py` in a second terminal when you need exclusive daemon debugging (local auto-start is off by default).
 

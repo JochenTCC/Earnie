@@ -8,7 +8,7 @@ import streamlit as st
 import pandas as pd
 
 import config
-from data.planning_window import ui_chart_zones
+from data.planning_window import ChartSpan, chart_now_in_window, chart_uses_live_zones, ui_chart_zones
 from optimizer.deviation_eval import DeviationEvent
 from optimizer.targets import consumer_column_name, consumer_immediate_charge_column_name
 from runtime_store import live_optimization_debug
@@ -115,19 +115,17 @@ def _apply_live_chart_merge(
         chart_context,
         optimized_df.to_dict("records"),
     )
-    is_live_segment = (
-        chart_context.cycle_offset == 0 and chart_context.segment_index == 0
-    )
+    uses_live = chart_uses_live_zones(chart_context.chart_window, chart_context.now)
     zone_now = (
         chart_context.now
-        if is_live_segment
+        if uses_live
         else chart_context.chart_window.end
     )
     chart_zones = ui_chart_zones(
         zone_now,
         chart_context.chart_window,
         sim_rows=optimized_df.to_dict("records"),
-        is_live_segment=is_live_segment,
+        is_live_segment=uses_live,
         slot_datetimes=display_ctx.slot_datetimes,
     )
     savings_view = build_display_savings_series(
@@ -158,7 +156,7 @@ def _apply_live_chart_merge(
         chart_context.now,
         chart_context.planning_window,
         slot_datetimes=display_ctx.slot_datetimes,
-        show_now=is_live_segment,
+        show_now=chart_now_in_window(chart_context.chart_window, chart_context.now),
     )
     return (
         savings_view,
@@ -350,6 +348,7 @@ def build_optimization_display_bundle_from_snapshot(
     segment_index: int,
     now=None,
     simulation_table_title: str | None = "📋 Simulations-Details (Nächste 24 Stunden)",
+    span: ChartSpan = "segment",
 ) -> OptimizationDisplayBundle | None:
     """Display-Bundle aus main.py-Persistenz ohne MILP-Neuberechnung."""
     from runtime_store.live_display_loader import (
@@ -376,6 +375,7 @@ def build_optimization_display_bundle_from_snapshot(
         now=moment,
         planning_window=planning_window,
         sim_rows=optimized_rows,
+        span=span,
     )
     return build_optimization_display_bundle(
         savings_info,

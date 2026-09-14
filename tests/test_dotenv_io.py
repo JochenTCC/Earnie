@@ -115,6 +115,18 @@ def test_loxone_setup_not_deferred_when_betrieb_unlocked(tmp_path, monkeypatch):
 def test_validate_loxone_ip_rejects_invalid():
     assert dotenv_io.validate_loxone_ip("") == "IP-Adresse ist erforderlich."
     assert dotenv_io.validate_loxone_ip("not-an-ip") is not None
+    assert dotenv_io.validate_loxone_ip(":85") is not None
+    assert dotenv_io.validate_loxone_ip("10.0.0.5:0") is not None
+    assert dotenv_io.validate_loxone_ip("10.0.0.5:99999") is not None
+    assert dotenv_io.validate_loxone_ip("10.0.0.5:abc") is not None
+    assert dotenv_io.validate_loxone_ip("10.0.0.5:85:1") is not None
+
+
+def test_validate_loxone_ip_accepts_optional_port():
+    assert dotenv_io.validate_loxone_ip("10.0.0.5") is None
+    assert dotenv_io.validate_loxone_ip("10.0.0.5:85") is None
+    assert dotenv_io.validate_loxone_ip("192.168.1.100:1") is None
+    assert dotenv_io.validate_loxone_ip("192.168.1.100:65535") is None
 
 
 def test_write_loxone_dotenv_creates_file(tmp_path, monkeypatch):

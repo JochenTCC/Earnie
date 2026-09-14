@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from data.planning_window import (
+    chart_now_in_window,
+    chart_uses_live_zones,
     chart_zone_kind_for_slot_start,
     compute_planning_window,
     compute_sunrise_anchors,
@@ -121,6 +123,65 @@ class TestUiChartWindow:
         assert chart.start == anchors.sa1
         assert chart.end == anchors.sa2
         assert chart.segment_index == 1
+
+    def test_full_span_sa0_to_sa2(self):
+        now = _dt(2026, 6, 15, 14, 0)
+        anchors = compute_sunrise_anchors(now, LAT, LON, TZ)
+        chart = compute_ui_chart_window(
+            now, LAT, LON, TZ, segment_index=0, span="full"
+        )
+        assert chart.span == "full"
+        assert chart.segment_index == 0
+        assert chart.start == anchors.sa0
+        assert chart.end == anchors.sa2
+        assert chart.next_sunrise == anchors.sa2
+        span_h = (chart.end - chart.start).total_seconds() / 3600.0
+        assert 40 <= span_h <= 52
+        assert chart.sa0 in chart.slot_datetimes or chart.slot_datetimes[0] <= chart.sa0
+        assert len(chart.slot_datetimes) > 24 * 4
+
+    def test_full_span_live_zones_gray_neutral_green(self):
+        now = _dt(2026, 6, 15, 14, 0)
+        chart = compute_ui_chart_window(
+            now, LAT, LON, TZ, segment_index=0, span="full"
+        )
+        assert chart_uses_live_zones(chart, now) is True
+        assert chart_now_in_window(chart, now) is True
+        rows = [
+            {
+                "slot_datetime": slot,
+                "Preis extrapoliert": slot >= _dt(2026, 6, 16, 10, 0),
+            }
+            for slot in chart.slot_datetimes
+        ]
+        zones = ui_chart_zones(now, chart, sim_rows=rows, is_live_segment=True)
+        assert zones.history.fill_color is not None
+        assert zones.history.end == normalize_hour_slot(now)
+        assert zones.forecast.fill_color is not None
+        assert zones.forecast.end == chart.end
+
+    def test_full_span_offset_one_still_uses_live_zones_when_now_intersects(self):
+        now = _dt(2026, 6, 15, 14, 0)
+        chart = compute_ui_chart_window(
+            now, LAT, LON, TZ, segment_index=0, cycle_offset=1, span="full"
+        )
+        assert chart.start < now < chart.end
+        assert chart_uses_live_zones(chart, now) is True
+        zones = ui_chart_zones(now, chart, sim_rows=[], is_live_segment=True)
+        assert zones.history.fill_color is not None
+        assert zones.history.end < chart.end
+        assert zones.history.end == normalize_hour_slot(now)
+
+    def test_full_span_far_past_is_full_gray(self):
+        now = _dt(2026, 6, 15, 14, 0)
+        chart = compute_ui_chart_window(
+            now, LAT, LON, TZ, segment_index=0, cycle_offset=5, span="full"
+        )
+        assert chart.end < now
+        assert chart_uses_live_zones(chart, now) is False
+        zones = ui_chart_zones(now, chart, sim_rows=[], is_live_segment=False)
+        assert zones.history.end == chart.end
+        assert zones.forecast.fill_color is None
 
     def test_ui_zones_segment_one_no_gray_green_on_extrapolated(self):
         now = _dt(2026, 6, 15, 14, 0)

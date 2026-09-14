@@ -110,7 +110,7 @@ docker compose --project-directory . -f docker/compose/greenfield.yml up -d --bu
 ### Ohne Docker (pytest)
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests/test_greenfield_bootstrap.py tests/test_setup_readiness.py tests/test_navigation_setup.py tests/test_planning_editors.py tests/test_config_drift.py -q
+.venv\Scripts\python.exe -m scripts.run_pytest tests/test_greenfield_bootstrap.py tests/test_setup_readiness.py tests/test_navigation_setup.py tests/test_planning_editors.py tests/test_config_drift.py -q
 ```
 
 Prüft Bootstrap auf leerem Verzeichnis und den Übergang Setup → konfigurierte `.env`.

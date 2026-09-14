@@ -18,7 +18,7 @@ Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdo
 
 ## Chart 1: Leistung, SoC & Preis
 
-**Überschrift:** Segment-Label (z. B. „SA₀→SA₁ (Live) · Datumsbereich“) mit **?** (Hintergrundzonen grau/neutral/grün, Navigation).
+**Überschrift:** Fenster-Label (z. B. „SA₀→SA₂ (Live)“ Desktop bzw. „SA₀→SA₁ (Live)“ Mobil · Datumsbereich) mit **?** (Hintergrundzonen grau/neutral/grün, Navigation).
 
 **Linke Y-Achse (kW):** Balkenhöhe = Leistung. Die Balkenbreite folgt der Slotdauer (**15 min** über den Horizont) — Fläche ∝ Energie. **Ausnahme Verbraucher:** Bei Generic-Schedules, die intern stündlich modelliert und auf QH gehalten werden, können Läufe mit `duration_h < 1` als mittlere Leistung (`nominal × duration_h` in `generic_schedule`) erscheinen.
 
@@ -78,7 +78,7 @@ Entladen → Last ← verbleibende Entladung
 
 **Hintergrundzonen** (Details im **?** der Chart-1-Überschrift): grau = Vergangenheit (Log), neutral = laufende Stunde, grün = extrapolierte Preise bis Fensterrand.
 
-Vertikale Marker **SA₀**, **SA₁**, **SA₂**; **Jetzt** nur im Live-Segment SA₀→SA₁.
+Vertikale Marker **SA₀**, **SA₁**, **SA₂**; **Jetzt**, sobald die aktuelle Zeit im sichtbaren Fenster liegt.
 
 **Soll/Ist-Icons** im grauen Log-Bereich (nur Slots mit echtem Produktiv-Eintrag, `slot_quality == present`):
 
@@ -115,9 +115,9 @@ Marker liegen oberhalb der Chart-Fläche; **Hover** zeigt Kategorie-Label und Re
 | Steuerung | Verhalten |
 |-----------|-----------|
 | ← Zurück | Weitere SA-Zyklen zurück im Produktiv-Log |
-| Vor → | SA₀→SA₁ ↔ SA₁→SA₂ bzw. einen Zyklus Richtung Live |
+| Vor → | Desktop: einen Zyklus Richtung Live (bei Live deaktiviert). Mobil: SA₀→SA₁ ↔ SA₁→SA₂ bzw. Zyklus Richtung Live |
 
-Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich).
+Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich). Desktop zeigt standardmäßig SA₀→SA₂; Mobil behält die 24h-Segmente.
 
 ## Chart 2: Kumulierte Kosten & Verbrauch
 

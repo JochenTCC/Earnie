@@ -15,7 +15,7 @@ from runtime_store.chart_debug_capture import (
 )
 from runtime_store.debug_dump_archive import write_debug_dump_zip
 from ui.charts import build_power_soc_chart_figure
-from ui.history_navigation import get_s2_cycle_offset, get_s2_segment_index
+from ui.history_navigation import get_s2_cycle_offset, get_s2_segment_index, get_s2_span
 from ui.simulation_results import SESSION_LIVE_DISPLAY_BUNDLE
 
 logger = logging.getLogger("app")
@@ -31,6 +31,7 @@ def _session_meta() -> dict[str, Any]:
         "live_optimization_cache_key": st.session_state.get("live_optimization_cache_key"),
         "s2_cycle_offset": get_s2_cycle_offset(),
         "s2_segment_index": get_s2_segment_index(),
+        "s2_span": get_s2_span(),
     }
 
 

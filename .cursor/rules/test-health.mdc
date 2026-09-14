@@ -10,7 +10,7 @@ Identify **potentially ineffective tests** (never fail but weak coverage / heavy
 
 ## Automatic (every code commit)
 
-Pre-commit (`.githooks/pre-commit`) runs `pytest tests -q`, writes JUnit to `.pytest_cache/test-metrics/junit-last.xml`, then:
+Pre-commit (`.githooks/pre-commit`) runs `python -m scripts.run_pytest tests -q` (native pytest). JUnit → `.pytest_cache/test-metrics/junit-last.xml`, then:
 
 ```powershell
 .venv\Scripts\python.exe -m scripts.test_health_report ingest
@@ -45,7 +45,7 @@ Requires `pip install -e ".[dev]"` (`vulture`, `pytest-deadfixtures`). Manual re
 
 ```powershell
 .venv\Scripts\python.exe -m vulture optimizer data house_config simulation settings runtime_store ehal scripts --min-confidence 80
-.venv\Scripts\python.exe -m pytest --dead-fixtures
+.venv\Scripts\python.exe -m scripts.run_pytest --dead-fixtures
 ```
 
 `LEGACY_TEST_SYMBOLS` in `scripts/test_health_report.py` targets migration / pre-1.26 leftovers and 2.4-removed dual-key / soft-compat patterns (`legacy_id`, `pv_follow_name`, `BRIDGE_DEFAULTS`, `sunrise_full_horizon_trial`). Fail-fast reject tests that mention those symbols are expected — triage manually. Do not treat `subtract_consumer_ids` as legacy.
@@ -62,6 +62,8 @@ mutmut html
 ```
 
 Scoped modules: `mutmut.ini` (`data/cons_data_house_profile.py`, `house_config/planning_flex_bridge.py`, `settings/flexible_consumers.py`, `settings/legacy_config_gates.py`).
+
+Windows pytest: `python -m pytest` or `python -m scripts.run_pytest` (native; thin pre-commit wrapper).
 
 ## Agent guidance
 

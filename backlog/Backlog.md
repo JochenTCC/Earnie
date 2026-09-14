@@ -41,25 +41,31 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
 
 ### Version 2.+1 — Improvements for EVs / Export
 
-- [] UI improvement - adding new entities (PV-Anlage, Batterie)
+- [ ] Changes in analysis chart view / summaries
+  - offer either a view for last 7 days or last 28 days (maybe later last 12 months) - no more bound to calendar weeks
+- [ ] UI improvement - adding new entities by copying existing ones (PV-Anlage, Batterie)
   - like also implemented for adding new scenarios (by copying the last selected entity) the same functionality should also be implemented for PV-Anlagen and Batterien on HK page
-- [ ] Improvements for HA-binding
-  - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)); this item tests EHAL discovery/mapping against different HA integration shapes
-  - [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)
-  - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap): Options-UI → `config.json` generation, Ingress (embedded UI, no separate port), Supervisor-Proxy instead of a manual long-lived-access token for the EHAL-HA-adapter
-  - [ ] Add-on Version 1.0 (Entwicklungsplan roadmap): MQTT Discovery, native Home-Assistant entities for Earnie state, Energy-Dashboard integration — distinct from the "Make also an EHAL adaption for MQTT" item elsewhere in this file (that's an EHAL southbound backend; this is the add-on itself publishing Earnie state via HA's native MQTT Discovery)
 - [ ] Calculate efficiency for battery from difference in overall charging and discharging energy 
   - eff = ((E_discharge) / E_charge)^0.5 
   - Add standby energy consumption on top of "Entladen" bar
   - give it as recommendation for possible changes in HK - keep nominal values in description#
   - remove "Kleine Abweichungen sind normal (SoC-Änderung, Standby der Batterie)."
 - [ ] Clarify how to handle wallbox <> EVs
+  - see also bullet point in research item
+- [ ] Improvements for HA-binding
+  - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)); this item tests EHAL discovery/mapping against different HA integration shapes
+  - [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)
+  - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap): Options-UI → `config.json` generation, Ingress (embedded UI, no separate port), Supervisor-Proxy instead of a manual long-lived-access token for the EHAL-HA-adapter
+  - [ ] Add-on Version 1.0 (Entwicklungsplan roadmap): MQTT Discovery, native Home-Assistant entities for Earnie state, Energy-Dashboard integration — distinct from the "Make also an EHAL adaption for MQTT" item elsewhere in this file (that's an EHAL southbound backend; this is the add-on itself publishing Earnie state via HA's native MQTT Discovery)
 - [ ] When importing from existing Loxone config is working the other way round would also be possible:
     - User has a complete HK with live scenario in place in Earnie
     - Earnie generates pre-filled Loxone Template XML files (with correct ids, (multiple) evs, (multiple) consumers) for importing into Loxone config.
 - [ ] Optimize Pool temperature to a certain value on time. Set desired temperature and using time. Combine it with RC model
   - Add a chart that shows comparison between actual and modeled temperature (including ambient temperature and heating activity)
-- [ ] Add possibility to simulate restrictions for energy export dependent on current grid situation in SE (and maybe in Live optimization)
+- [ ] Allow changing HTTP port for Home Assistant and OpenEMS (follow-up to Miniserver #9)
+  - HA form already stores a full `ehal.ha.base_url` (default `http://homeassistant:8123`) — port is in the URL, not a separate field
+  - OpenEMS form already stores `ehal.openems.base_url` (default `http://openems-edge:8084`)
+  - Follow-up: make non-default ports obvious in SB Anbindung (help/caption, or dedicated port field if users still cannot change it in practice)
 
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)
@@ -104,6 +110,7 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
   - Keep official EPEX unconnected unless a paid/internal use case appears
   - Check possibilities to automatic tariffs.json update to existing installations
 - [ ] Check possibilities to show decimal numbers according to regional settings (e.g. use "," as decimal sign for Germany)
+- [ ] Add possibility to simulate restrictions for energy export dependent on current grid situation in SE (and maybe in Live optimization)
 
 
 ### Version 3.0

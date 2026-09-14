@@ -15,7 +15,7 @@ from house_config.earnie_role import (
 )
 from house_config.consumption_csv import load_hourly_profile_csv
 from house_config.ev_profile import normalize_ev_charging_schedule
-from house_config.geo_timezone import lookup_timezone_name
+from house_config.geo_timezone import timezone_for_land
 from house_config.generic_schedule import (
     derive_duration_h,
     generic_annual_kwh,
@@ -409,7 +409,7 @@ def _profile_geo_and_csv_fields(raw: dict) -> dict:
         "land": land,
         "latitude": latitude,
         "longitude": longitude,
-        "timezone_name": lookup_timezone_name(latitude, longitude),
+        "timezone_name": timezone_for_land(land),
         "default_pv_tilt": float(raw.get("default_pv_tilt", 25.0) or 25.0),
         "default_pv_azimuth": float(raw.get("default_pv_azimuth", 0.0) or 0.0),
         "netznutzung_arbeitspreis_cent_kwh": nne,

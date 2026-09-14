@@ -2,6 +2,21 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Hausprofil timezone from Land (DACH) + Dev tooling (2026-09-14)
+
+- [x] **Timezone without timezonefinder** — `house_config/geo_timezone.py` maps AT/DE/CH → Europe/Vienna|Berlin|Zurich (`timezone_for_land`); removed `timezonefinder` from `pyproject.toml`; callers/schema/tests updated
+- [x] **Dev tooling** — `scripts/run_pytest.py`; `.devcontainer` Dockerfile + post-create; Cursor skills/rules for pytest/Unicode; pre-commit uses `run_pytest`
+
+### Bugfix Chart-1 empty history bars after dead EHAL read (2026-09-14)
+
+- [x] **Chart 1 empty history bars after all-zero EHAL live read** — (`debug_dump_20260820_191521`). Root cause: poisoned all-zero `consumption_snapshot` from EHAL/Loxone outage emptied Chart 1 history bars. Fix: `data/live_consumption.py::is_dead_telemetry_snapshot` detects all-zero meter reads; `main.py` skips applying/writing poisoned snapshots to optimizer matrix and prod log; `runtime_store/history_chart_rows.py` sanitizes dead telemetry and hold-forwards load after dead slot. Tests: `tests/test_live_consumption.py`, `tests/test_history_timeline.py`. Live acceptance verified.
+
+### Miniserver HTTP port / GitHub issue #9 (2026-09-14)
+
+- [x] https://github.com/JochenTCC/Earnie/issues/9 — optional HTTP port on Miniserver IP (`LOXONE_IP` as `IPv4` or `IPv4:port`)
+  - `runtime_store/dotenv_io.py` `validate_loxone_ip` accepts port 1–65535; Streamlit **Smarthome-Backend → Anbindung** help/caption; docs (`.env.example`, `loxone-anbindung`, SB page, HA add-on `loxone_ip`); tests in `tests/test_dotenv_io.py` / `tests/test_loxone_client.py`
+  - HA/OpenEMS port UX left as open `2.+1` follow-up in [Backlog.md](Backlog.md)
+
 ### Bugfix Chart-1 SoC jump between S-2 cycle charts (2026-08-20)
 
 - [x] **SoC jump >10% yesterday vs today chart** — S-2 cycle navigation showed e.g. 62.6% vs 29.0% at the same slot on 20.08. 06:15 (`debug_dump_20260820_093415`). Root cause: history SoC sanitizer kept a stale high chain after bad ESS reads (81%→55% latch, then rejected true low readings while integration drifted upward overnight). Fix: `runtime_store/soc_plausibility.py` — accept repeated ESS plateaus (≥2 identical raw readings) and readings contradicting battery-integration direction; `runtime_store/history_chart_rows.py` tracks consecutive raw values. Tests: `tests/test_soc_plausibility.py`. Live acceptance verified (Streamlit S-2 cycle navigation).

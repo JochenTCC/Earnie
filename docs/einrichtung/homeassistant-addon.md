@@ -35,7 +35,7 @@ Add-on-Optionen (`config.yaml` → `options`) sind ein optionales Zusatzangebot,
 |---|---|---|
 | `loxone_user` | `LOXONE_USER` | nein (nur bei `ehal.backend=loxone`) |
 | `loxone_pass` | `LOXONE_PASS` | nein |
-| `loxone_ip` | `LOXONE_IP` | nein |
+| `loxone_ip` | `LOXONE_IP` | nein (IPv4, optional mit Port z. B. `192.168.178.1:85`) |
 | `streamlit_port` (Default `8501`) | `EARNIE_UI_STREAMLIT_PORT` | nein |
 | `ehal_loxone_http_port` (Default `8541`) | aktuell kein Env-Override — wirkt nur über `config.json` `system.ehal_loxone_http_port` | nein |
 | `ui_modes` (Default `sunset2sunset,scenario_explorer,live_environment`) | `EARNIE_UI_MODES` | nein |

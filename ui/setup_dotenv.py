@@ -83,6 +83,14 @@ def render_loxone_credentials_form(*, form_key: str = "loxone_setup_form") -> No
             "Miniserver-IP",
             value=env_ip,
             placeholder="192.168.178.1",
+            help=(
+                "IPv4-Adresse des Miniservers. Optionaler HTTP-Port mit Doppelpunkt, "
+                "z. B. 192.168.178.1:85 (Standard ohne Angabe: Port 80)."
+            ),
+        )
+        st.caption(
+            "HTTP-Port weicht vom Standard ab? IP mit Port eingeben "
+            "(z. B. `192.168.178.1:85`)."
         )
         user = st.text_input("Benutzername", value=env_user)
         password = st.text_input("Passwort", value=env_pass, type="password")

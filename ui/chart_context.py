@@ -10,6 +10,8 @@ from data.planning_window import (
     PlanningWindow,
     UiChartWindow,
     UiChartZones,
+    ChartSpan,
+    chart_uses_live_zones,
     compute_ui_chart_window,
     history_log_end_exclusive,
     normalize_hour_slot,
@@ -57,6 +59,7 @@ class LiveChartContext:
     segment_index: int
     zone_reference: datetime
     planning_window: PlanningWindow | None = None
+    span: ChartSpan = "segment"
 
 
 def live_now() -> datetime:
@@ -148,6 +151,7 @@ def build_live_chart_context(
     now: datetime | None = None,
     planning_window: PlanningWindow | None = None,
     sim_rows: list[dict] | None = None,
+    span: ChartSpan = "segment",
 ) -> LiveChartContext:
     if cycle_offset < 0:
         raise ValueError(f"cycle_offset muss >= 0 sein, erhalten: {cycle_offset}.")
@@ -155,6 +159,9 @@ def build_live_chart_context(
         raise ValueError(
             f"segment_index muss 0 oder 1 sein, erhalten: {segment_index}."
         )
+    if span not in ("segment", "full"):
+        raise ValueError(f"span muss 'segment' oder 'full' sein, erhalten: {span!r}.")
+    resolved_segment = 0 if span == "full" else segment_index
     moment = now if now is not None else live_now()
     if moment.tzinfo is None:
         raise ValueError("now muss timezone-aware sein.")
@@ -166,26 +173,28 @@ def build_live_chart_context(
         lat,
         lon,
         tz_name,
-        segment_index=segment_index,
+        segment_index=resolved_segment,
         cycle_offset=cycle_offset,
+        span=span,
     )
-    is_live_segment = cycle_offset == 0 and segment_index == 0
-    reference = moment if is_live_segment else chart.end
-    zone_now = moment if is_live_segment else chart.end
+    uses_live = chart_uses_live_zones(chart, moment)
+    reference = moment if uses_live else chart.end
+    zone_now = moment if uses_live else chart.end
     zones = ui_chart_zones(
         zone_now,
         chart,
         sim_rows=sim_rows,
-        is_live_segment=is_live_segment,
+        is_live_segment=uses_live,
     )
     return LiveChartContext(
         now=moment,
         chart_window=chart,
         zones=zones,
         cycle_offset=cycle_offset,
-        segment_index=segment_index,
+        segment_index=resolved_segment,
         zone_reference=reference,
         planning_window=planning_window,
+        span=span,
     )
 
 
@@ -361,11 +370,9 @@ def build_chart_display_context(
     """
     chart = chart_context.chart_window
     rows_input = sim_rows or []
-    is_live_segment = (
-        chart_context.cycle_offset == 0 and chart_context.segment_index == 0
-    )
+    uses_live_tail = chart_uses_live_zones(chart, chart_context.now)
 
-    if chart.segment_index == 1:
+    if chart.span == "segment" and chart.segment_index == 1:
         hourly_rows = align_rows_to_chart_slots(rows_input, chart)
         qualities = tuple(SLOT_MILP for _ in hourly_rows)
         return ChartDisplayContext(
@@ -379,7 +386,7 @@ def build_chart_display_context(
             slot_deviation_events=empty_deviation_series(len(hourly_rows)),
         )
 
-    if not is_live_segment:
+    if not uses_live_tail:
         history_end = chart.end + timedelta(hours=1)
         history = build_chart_history(chart.start, history_end)
         return ChartDisplayContext(
@@ -588,7 +595,9 @@ def segment_navigation_label(
     cycle_offset: int,
     segment_index: int,
 ) -> str:
-    if segment_index == 0:
+    if chart.span == "full":
+        prefix = "SA₀→SA₂ (Live)" if cycle_offset == 0 else "SA₀→SA₂"
+    elif segment_index == 0:
         prefix = "SA₀→SA₁ (Live)" if cycle_offset == 0 else "SA₀→SA₁"
     else:
         prefix = "SA₁→SA₂ (Vorausschau)"

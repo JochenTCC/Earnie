@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 import streamlit as st
 
+from data.planning_window import ChartSpan
 from ui.chart_context import (
     build_live_chart_context,
     cycle_offset_for_sa0_date,
@@ -21,6 +22,7 @@ from ui.s2_navigation import (
     s2_forward_disabled,
     s2_heute_disabled,
 )
+from ui.s2_viewport import resolve_s2_span
 
 SESSION_S2_CYCLE_OFFSET = "s2_cycle_offset"
 SESSION_S2_SEGMENT_INDEX = "s2_segment_index"
@@ -36,13 +38,24 @@ def get_s2_cycle_offset() -> int:
 
 
 def get_s2_segment_index() -> int:
-    """0 = SA₀→SA₁, 1 = SA₁→SA₂."""
+    """0 = SA₀→SA₁, 1 = SA₁→SA₂ (nur span=segment; Desktop full erzwingt 0)."""
+    span = resolve_s2_span()
+    if span == "full":
+        return 0
     return int(st.session_state.get(SESSION_S2_SEGMENT_INDEX, 0))
 
 
+def get_s2_span() -> ChartSpan:
+    return resolve_s2_span()
+
+
 def is_live_s2_window() -> bool:
-    """Live-Fenster SA₀→SA₁ ohne Zyklus-Offset (Auto-Refresh, Sankey-Kontext)."""
-    return get_s2_cycle_offset() == 0 and get_s2_segment_index() == 0
+    """Live-Fenster für Auto-Refresh / Sankey-Kontext."""
+    if get_s2_cycle_offset() != 0:
+        return False
+    if get_s2_span() == "full":
+        return True
+    return get_s2_segment_index() == 0
 
 
 def _set_s2_cycle_offset(cycles: int) -> None:
@@ -67,26 +80,41 @@ def _apply_s2_nav_state(cycle_offset: int, segment_index: int) -> None:
     st.rerun()
 
 
-def _s2_segment_label(now: datetime | None) -> tuple[int, int, int, str]:
-    """Zyklus, Segment, max_cycle und Navigations-Label für S-2."""
+def _s2_segment_label(now: datetime | None) -> tuple[int, int, int, str, ChartSpan]:
+    """Zyklus, Segment, max_cycle, Label und Span für S-2."""
+    span = get_s2_span()
     cycle_offset = get_s2_cycle_offset()
     segment_index = get_s2_segment_index()
     max_cycle = max_sunrise_cycle_offset(now)
-    ctx = build_live_chart_context(cycle_offset, segment_index, now=now)
+    ctx = build_live_chart_context(
+        cycle_offset, segment_index, now=now, span=span
+    )
     label = segment_navigation_label(
         ctx.chart_window,
         cycle_offset=cycle_offset,
         segment_index=segment_index,
     )
-    return cycle_offset, segment_index, max_cycle, label
+    return cycle_offset, segment_index, max_cycle, label, span
 
 
 def s2_zone_help_text(*, include_soc_plausibility: bool = False) -> str:
+    span = get_s2_span()
+    if span == "full":
+        nav_hint = (
+            "Desktop: Chart-Fenster SA₀→SA₂ (~48 h). "
+            "Navigation: «←» / «→» einen Sonnenaufgang-Zyklus, «Heute» Live, "
+            "Kalender-Icon für Datum (nur mit Log-Daten)"
+        )
+    else:
+        nav_hint = (
+            "Mobil: Segmente SA₀→SA₁ / SA₁→SA₂ (~24 h). "
+            "Navigation: «←» / «→» Zyklus bzw. Segment, «Heute» Live-Fenster, "
+            "Kalender-Icon für Datum (nur mit Log-Daten)"
+        )
     base = (
         "Hintergrund: grau = Vergangenheit · neutral = aktuelle Stunde · "
         "grün = extrapolierte Preise · "
-        "Navigation: «←» / «→» Zyklus, «Heute» Live-Fenster, "
-        "Kalender-Icon für Datum (nur mit Log-Daten)\n\n"
+        f"{nav_hint}\n\n"
         "**Soll/Ist-Icons** (nur grauer Log-Bereich): "
         "▲ Hinweis (gelb) · ◆ Warnung (orange) · ⬡ Fehler (rot). "
         "Hover zeigt Kategorie und Erläuterung. "
@@ -149,7 +177,7 @@ def _render_s2_date_picker(
 
 def render_s2_nav_buttons(now: datetime | None = None) -> None:
     """Kompakte ← / Heute / Datum / →-Navigation zwischen Chart 1 und Chart 2."""
-    cycle_offset, segment_index, max_cycle, _ = _s2_segment_label(now)
+    cycle_offset, segment_index, max_cycle, _, span = _s2_segment_label(now)
     with st.container(
         horizontal=True,
         horizontal_alignment="center",
@@ -158,37 +186,47 @@ def render_s2_nav_buttons(now: datetime | None = None) -> None:
     ):
         if st.button(
             "←",
-            disabled=s2_back_disabled(cycle_offset, segment_index, max_cycle),
+            disabled=s2_back_disabled(
+                cycle_offset, segment_index, max_cycle, span=span
+            ),
             key="s2_nav_back",
             help="Einen Zyklus zurück",
             type="secondary",
             width="content",
         ):
             new_cycle, new_segment = apply_s2_nav_back(
-                cycle_offset, segment_index, max_cycle
+                cycle_offset, segment_index, max_cycle, span=span
             )
             _apply_s2_nav_state(new_cycle, new_segment)
         if st.button(
             "Heute",
-            disabled=s2_heute_disabled(cycle_offset, segment_index),
+            disabled=s2_heute_disabled(cycle_offset, segment_index, span=span),
             key="s2_nav_today",
-            help="Live-Fenster SA₀→SA₁",
+            help=(
+                "Live-Fenster SA₀→SA₂"
+                if span == "full"
+                else "Live-Fenster SA₀→SA₁"
+            ),
             type="secondary",
             width="content",
         ):
-            new_cycle, new_segment = apply_s2_nav_heute()
+            new_cycle, new_segment = apply_s2_nav_heute(span=span)
             _apply_s2_nav_state(new_cycle, new_segment)
         _render_s2_date_picker(cycle_offset, segment_index, now)
         if st.button(
             "→",
-            disabled=s2_forward_disabled(cycle_offset, segment_index),
+            disabled=s2_forward_disabled(cycle_offset, segment_index, span=span),
             key="s2_nav_forward",
-            help="Einen Zyklus vor / Vorausschau",
+            help=(
+                "Einen Zyklus vor"
+                if span == "full"
+                else "Einen Zyklus vor / Vorausschau"
+            ),
             type="secondary",
             width="content",
         ):
             new_cycle, new_segment = apply_s2_nav_forward(
-                cycle_offset, segment_index
+                cycle_offset, segment_index, span=span
             )
             _apply_s2_nav_state(new_cycle, new_segment)
 

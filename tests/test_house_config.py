@@ -1572,6 +1572,7 @@ def test_live_scenario_resolves_entity_refs(tmp_path, monkeypatch):
                 "id": "efh",
                 "label": "EFH",
                 "annual_kwh": 4000,
+                "land": "DE",
                 "latitude": 48.2,
                 "longitude": 11.0,
                 "consumers": [{"id": "heat", "type": "thermal_annual", "nominal_power_kw": 3.0}]

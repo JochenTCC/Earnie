@@ -120,14 +120,10 @@ def _render_location_fields(*, session_scope: str) -> dict:
             key=land_key,
             help="Land für Tariffilter im Szenarienkonfigurator (Bezug/Einspeise).",
         )
-    timezone_name = "Europe/Vienna"
-    try:
-        from house_config.geo_timezone import lookup_timezone_name
+    from house_config.geo_timezone import timezone_for_land
 
-        timezone_name = lookup_timezone_name(float(latitude), float(longitude))
-        st.caption(f"Zeitzone (abgeleitet): **{timezone_name}**")
-    except ValueError as exc:
-        st.warning(str(exc))
+    timezone_name = timezone_for_land(str(land))
+    st.caption(f"Zeitzone (aus Land): **{timezone_name}**")
     col_c, col_d = st.columns(2)
     with col_c:
         default_pv_tilt = labeled_number_input(

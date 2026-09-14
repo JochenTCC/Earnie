@@ -98,6 +98,18 @@ class TestFetchLoxoneRawValue:
         assert mock_get.call_args.kwargs["auth"].username == "user"
         assert "jdev/sps/io/Earnie_SOC" in mock_get.call_args.args[0]
 
+    def test_jdev_url_includes_optional_port(self):
+        with patch.object(
+            lc.config,
+            "get",
+            side_effect=lambda name, **kw: {
+                "LOXONE_IP": "192.168.1.1:85",
+            }.get(name, kw.get("default")),
+        ):
+            assert lc._loxone_jdev_url("Earnie_SOC") == (
+                "http://192.168.1.1:85/jdev/sps/io/Earnie_SOC"
+            )
+
     def test_empty_io_name_returns_none(self):
         assert lc.fetch_loxone_raw_value("") is None
         assert lc.fetch_loxone_raw_value(None) is None

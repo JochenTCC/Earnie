@@ -32,5 +32,5 @@ VS Code: Launch **Streamlit app.py (Deviation-Test)** (seedet automatisch, lokal
 ## Tests ausführen
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests/test_deviation_*.py tests/test_seed_deviation_test_log.py -q
+.venv\Scripts\python.exe -m scripts.run_pytest tests/test_deviation_*.py tests/test_seed_deviation_test_log.py -q
 ```
