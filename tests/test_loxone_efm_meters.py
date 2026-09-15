@@ -203,3 +203,6 @@ def test_apply_plant_power_suggestions():
     bindings = out["plant"]["ehal_bindings"]
     assert bindings["sens_grid_power_active"] == "Zähler Netz"
     assert bindings["sens_ess_soc"] == "SoC"
+    energy = out["plant"]["loxone_meter_energy"]
+    assert energy["sens_grid_power_active"]["name"] == "Zähler Netz"
+    assert energy["sens_grid_power_active"]["bidirectional"] is True

@@ -22,15 +22,18 @@ def wait_until_next_run(
     total_wait_sec: float,
     poll_interval_sec: float = 1.0,
     sleep_fn: Callable[[float], None] = time.sleep,
+    on_poll: Callable[[], None] | None = None,
 ) -> str | None:
     """Wait until next quarter-hour or Earnie_Request_Optimize wake.
 
     Returns ``TRIGGER_REQUEST_OPTIMIZE`` if woken early, else ``None``.
+    ``on_poll`` runs each wait chunk (e.g. power-interval sampler tick).
     """
     if wait_for_optimize_or_timeout(
         total_wait_sec,
         poll_interval_sec=poll_interval_sec,
         sleep_fn=sleep_fn,
+        on_poll=on_poll,
     ):
         logger.info(
             "Earnie_Request_Optimize — Optimierung wird vorzeitig angestoßen."

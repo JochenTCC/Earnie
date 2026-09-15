@@ -435,12 +435,16 @@ def evaluate_entry_deviations(
     rules_doc: dict[str, Any] | None = None,
     rules_path: str | None = None,
     slot_start: Any = None,
+    closed_by_interval: dict | None = None,
 ) -> list[DeviationEvent]:
     """Facts aus Log-Eintrag bauen und Regeln auswerten."""
     from optimizer.deviation_facts import build_slot_deviation_facts
 
     facts = build_slot_deviation_facts(
-        entry, slot_quality=slot_quality, slot_start=slot_start
+        entry,
+        slot_quality=slot_quality,
+        slot_start=slot_start,
+        closed_by_interval=closed_by_interval,
     )
     document = rules_doc if rules_doc is not None else load_deviation_rules(rules_path)
     return evaluate_slot_deviations(facts, document)

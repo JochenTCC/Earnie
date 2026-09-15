@@ -481,7 +481,9 @@ def merge_efm(
             house, profile_id=profile_id, selected=selected_consumers
         )
     if selected_plant:
-        house = apply_plant_power_suggestions(house, selected=selected_plant)
+        house = apply_plant_power_suggestions(
+            house, selected=selected_plant, loxapp3_doc=doc
+        )
     return house
 
 

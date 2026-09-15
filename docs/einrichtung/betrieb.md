@@ -43,12 +43,13 @@ Standardverzeichnis: `earnie_env/runtime/` (überschreibbar mit `EARNIE_RUNTIME_
 | `cons_data.csv`          | Stündliche Verbrauchs- und PV-Basis (von `main.py` gepflegt)                                 |
 | `flexible_consumers_state.json` | Tagesenergie je Flex-Verbraucher                                                             |
 | `pv_counter_state.json`         | PV-Zählerstand für Stunden-Delta                                                             |
+| `power_interval_sampler_state.json` | Zwischenpuffer der Leistungsproben (≤ 60 s) für Viertelstunden-Mittel im Produktiv-Log; optional Energie-Anker (`energy_anchors`) für Loxone-Zähler ΔkWh → mittlere Slot-Leistung |
 | `cons_data_pending.json`        | Pending-Puffer für cons_data-Samples                                                         |
 | `consumption_profiles.csv`      | Berechnete Grundlast-Profile                                                                 |
 | `earnie.log`                    | Rotierendes Python-Log von main.py (5 MB oder wöchentlich; Archive `earnie.log.YYYY-MM-DD_HH-MM-SS`) |
 | `main.lock` / `main.pid`        | Single-Instance-Sperre des Produktiv-Daemons (`main.lock` gehalten; PID zusätzlich in `main.pid` für Status/Stop unter Windows) |
 | `optimizer_run_state.json`      | Letzter erfolgreicher `main.py`-Durchlauf (SoC, Modus, Soll-Leistungen, Flex-Soll)           |
-| `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf)                               |
+| `optimization_history.jsonl`    | Historie aller Produktiv-Durchläufe (eine Zeile JSON pro Lauf; u. a. `consumption_snapshot`, optional `closed_interval`) |
 | `live_optimization_debug.json`  | Anzeige-Snapshot des Optimierungs-Horizonts (von `main.py` geschrieben, von der App gelesen) |
 | `local_settings.json`           | Lokale Betriebseinstellungen (z. B. `silent_mode`, `chart_debug_capture_enabled`)     |
 | `appliance_schedules.json`      | Geplante Laufzeiten manueller Geräte                                                         |

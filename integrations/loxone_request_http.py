@@ -129,6 +129,7 @@ def wait_for_optimize_or_timeout(
     poll_interval_sec: float = 1.0,
     sleep_fn: Callable[[float], None] | None = None,
     event: threading.Event | None = None,
+    on_poll: Callable[[], None] | None = None,
 ) -> bool:
     """Sleep until timeout or optimize Event; return True if Event fired."""
     import time
@@ -141,6 +142,11 @@ def wait_for_optimize_or_timeout(
 
     poll = max(0.2, float(poll_interval_sec))
     while remaining > 0:
+        if on_poll is not None:
+            try:
+                on_poll()
+            except Exception:  # noqa: BLE001 — wait loop must not die on poll hooks
+                logger.exception("wait_for_optimize_or_timeout: on_poll failed")
         if ev.is_set():
             if event is None:
                 clear_optimize_request()
@@ -150,6 +156,11 @@ def wait_for_optimize_or_timeout(
         chunk = min(poll, remaining)
         sleep(chunk)
         remaining -= chunk
+    if on_poll is not None:
+        try:
+            on_poll()
+        except Exception:  # noqa: BLE001
+            logger.exception("wait_for_optimize_or_timeout: on_poll failed")
     if ev.is_set():
         if event is None:
             clear_optimize_request()

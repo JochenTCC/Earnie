@@ -124,8 +124,13 @@ def _loxone_setpoint_kw(
     return setpoint
 
 
-def _ist_flex_kw(entry: dict[str, Any], consumer_id: str) -> float:
-    snapshot = entry.get("consumption_snapshot") or {}
+def _ist_flex_kw(
+    entry: dict[str, Any],
+    consumer_id: str,
+    *,
+    ist_snapshot: dict[str, Any] | None = None,
+) -> float:
+    snapshot = ist_snapshot if ist_snapshot is not None else (entry.get("consumption_snapshot") or {})
     flex_kw = snapshot.get("flex_kw") or {}
     if consumer_id in flex_kw:
         return _float_or_zero(flex_kw[consumer_id])
@@ -193,8 +198,12 @@ def _battery_plan_kw(entry: dict[str, Any]) -> float:
     return 0.0
 
 
-def _battery_facts(entry: dict[str, Any]) -> BatteryFacts:
-    snapshot = entry.get("consumption_snapshot") or {}
+def _battery_facts(
+    entry: dict[str, Any],
+    *,
+    ist_snapshot: dict[str, Any] | None = None,
+) -> BatteryFacts:
+    snapshot = ist_snapshot if ist_snapshot is not None else (entry.get("consumption_snapshot") or {})
     return BatteryFacts(
         soll_mode=int(entry.get("mode", bat.MODE_AUTOMATIK)),
         soll_power_kw=_float_or_zero(entry.get("target_power_kw")),
@@ -208,13 +217,24 @@ def build_slot_deviation_facts(
     *,
     slot_quality: str = SLOT_PRESENT,
     slot_start: datetime | None = None,
+    closed_by_interval: dict | None = None,
 ) -> SlotDeviationFacts:
     """Extrahiert Vergleichsfakten aus einem Produktiv-Log-Eintrag."""
+    from runtime_store.slot_ist_powers import resolve_ist_snapshot
+
+    ist_snap: dict[str, Any] | None = None
+    if slot_start is not None or closed_by_interval:
+        resolved, _source = resolve_ist_snapshot(
+            slot_start or datetime.now(),
+            entry,
+            closed_by_interval,
+        )
+        ist_snap = resolved or None
     consumers: dict[str, FlexPowerFacts] = {}
     for consumer_id in sorted(_consumer_ids_from_entry(entry)):
         consumer = _consumer_config(consumer_id)
         soll_kw = _soll_flex_kw(entry, consumer_id)
-        ist_kw = _ist_flex_kw(entry, consumer_id)
+        ist_kw = _ist_flex_kw(entry, consumer_id, ist_snapshot=ist_snap)
         consumers[consumer_id] = FlexPowerFacts(
             soll_kw=soll_kw,
             ist_kw=ist_kw,
@@ -240,7 +260,7 @@ def build_slot_deviation_facts(
     return SlotDeviationFacts(
         slot_quality=slot_quality,
         consumers=consumers,
-        battery=_battery_facts(entry),
+        battery=_battery_facts(entry, ist_snapshot=ist_snap),
         thermal=thermal,
         charging_contexts=contexts,
         consumer_remaining_kwh=remaining,

@@ -73,7 +73,11 @@
       "room": "r-tech",
       "cat": "c-load",
       "details": {"type": "bidirectional"},
-      "states": {"actual": "st-grid"}
+      "states": {
+        "actual": "st-grid",
+        "total": "st-grid-total",
+        "totalNeg": "st-grid-total-neg"
+      }
     },
     "uuid-pv": {
       "name": "Zähler PV-Anlage",
@@ -82,7 +86,7 @@
       "room": "r-tech",
       "cat": "c-load",
       "details": {"type": "unidirectional"},
-      "states": {"actual": "st-pv"}
+      "states": {"actual": "st-pv", "total": "st-pv-total"}
     },
     "uuid-batt": {
       "name": "Zähler Batterie",

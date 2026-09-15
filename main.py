@@ -1,10 +1,11 @@
 # main.py
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 from runtime_store.config_load import load_config_or_exit, reinit_config_or_exit
+from runtime_store import power_interval_sampler
 
 config = load_config_or_exit()
 import logger_config
@@ -42,6 +43,12 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
     config.reload_config()
     config.require_runtime_params_loaded()
     out_of_band = is_out_of_band_trigger(run_trigger)
+    closed_interval = None
+    if not out_of_band:
+        previous_slot = optimization_schedule.quarter_hour_slot_start() - timedelta(
+            minutes=optimization_schedule.QUARTER_HOUR_MINUTES
+        )
+        closed_interval = power_interval_sampler.finalize_closed_interval(previous_slot)
 
     if out_of_band:
         logger.info(
@@ -460,8 +467,14 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             "thermal_observability": thermal_observability,
             "savings_snapshot": savings_snapshot,
             "consumption_snapshot": consumption_snapshot,
+            "closed_interval": closed_interval,
             "current_hour": int(current_hour),
         }
+        if consumption_snapshot is not None:
+            power_interval_sampler.note_decision_sample(
+                consumption_snapshot,
+                soc_percent=float(current_soc),
+            )
         run_state.save_run_state(run_payload)
         if savings_info:
             try:
@@ -660,7 +673,10 @@ if __name__ == "__main__":
                 next_run.strftime("%H:%M:%S"),
                 wait_sec,
             )
-            early = wait_until_next_run(total_wait_sec=wait_sec)
+            early = wait_until_next_run(
+                total_wait_sec=wait_sec,
+                on_poll=power_interval_sampler.tick,
+            )
             if early == TRIGGER_REQUEST_OPTIMIZE:
                 next_trigger = TRIGGER_REQUEST_OPTIMIZE
 

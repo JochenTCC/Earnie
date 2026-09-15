@@ -2,6 +2,23 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Energy counters plant PV/grid Loxone + Chart 1 QH slot-mean (2026-09-15)
+
+- [x] **Chart 1 / Produktiv-Log: QH slot-mean sampling** — `runtime_store/power_interval_sampler.py` (30 s ticks in daemon wait), `closed_interval` on QH Produktiv-Log; Chart 1 / Verbrauch & Kosten / Soll–Ist prefer mean when `sample_count ≥ 3`; SoC↔Ist reconcile only as low-sample fallback. Docs: `docs/ui/charts.md`, `docs/einrichtung/betrieb.md`. Tests: `tests/test_power_interval_sampler.py`, `tests/test_slot_ist_mean_consumers.py`. Live acceptance: sampler state fills mid-slot samples; **v2.5.3**.
+- [x] **Energy counters (ΔkWh) for slot Ist — Loxone plant PV/grid** — `integrations/loxone_meter_energy.py`: HTTP `/all` parses `total`/`totalNeg` and Meter abbreviations `Mr`/`Mrc`/`Mrd`; `plant.loxone_meter_energy` preserved in `house_config/profiles_store.py`; EFM bind + sampler `energy_anchors` → ΔE→avg kW overlay on `closed_interval` (`ist_power_source` counter). Spec: `docs/spec/loxone-meter-energy-slot-ist.md`. Tests: `tests/test_loxone_meter_energy.py`. Live: open anchors with PV/grid totals. Flex consumer counters remain open under Backlog **2.+1**. **v2.5.3**.
+
+### Bugfix Chart 1 evening Grundlast hides Haus Wärme (2026-09-15)
+
+- [x] **Chart 1: evening Grundlast hides Haus Wärme** — Dump `debug_dump_20260915_154542`. Live `_apply_house_profile_baseload_overlay` overlaid `thermal_annual` into `Verbrauch-Prognose` when raw `flexible_consumers` was empty, even though resolved MILP flex includes Haus Wärme. Fix: skip `milp_flex_thermal_ids` (SE parity) in `data/profile_manager.py`. Test: `tests/test_profile_manager_baseload_overlay.py`. Live acceptance verified.
+
+### Bugfix Monitor S₀→S₂ desktop plot hide on phones (2026-09-15)
+
+- [x] **Monitor S₀→S₂ desktop plot (hide on phones)** — `ui/s2_viewport.py`: phones keep 24h segments; tablets/desktop get full SA₀→SA₂ span; navigation switch still 24h-based. Live acceptance verified (phone UA must not show full S₀→S₂; desktop/tablet unchanged).
+
+### Bugfix Chart 1 Ist battery vs SoC direction interim (2026-09-15)
+
+- [x] **Chart 1 Ist battery vs SoC direction (interim)** — `_reconcile_history_battery_with_soc` replaces `Ist Batterie-Leistung` when sign opposes the SoC step to the next present slot (`runtime_store/history_chart_rows.py`, `soc_plausibility.py`). Docs: `docs/ui/charts.md`. Tests: `tests/test_soc_battery_reconcile.py`. **v2.5.2**. Live acceptance verified (dump slot 14.09. 13:00 discharge bar while SoC 42%→50%). Durable QH energy path: slot-mean + plant Meter counters in **v2.5.3** (flex counters still open).
+
 ### Analyse rolling 7/28-day windows (2026-09-14)
 
 - [x] **Changes in analysis chart view / summaries** — Analyse Verbrauch & Kosten uses rolling **7** / **28** days (←/→ by window length) instead of calendar ISO weeks; shared `ui/consumption_display/period.py` + generic nav; KPIs = selected window + trailing 365 days of log; SE/HK keep ISO-week browsing via the same API. Docs: `docs/ui/betriebsmodi.md`, `docs/ui/charts.md`, `docs/user-manual/Benutzer-Handbuch-Earnie.md`. Tests: `tests/test_consumption_display.py`, `tests/test_consumer_cost_analysis.py`. (12-month chart mode / SE-HK rolling opt-in left for later.)

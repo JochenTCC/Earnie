@@ -505,13 +505,22 @@ def apply_plant_power_suggestions(
     house_doc: dict,
     *,
     selected: list[dict[str, Any]],
+    loxapp3_doc: dict[str, Any] | None = None,
 ) -> dict:
     """Optionally set plant sens_* from grid/pv/battery Zähler names."""
+    from integrations.loxone_meter_energy import (
+        bind_plant_meter_energy,
+        controls_by_name,
+        meter_has_energy_states,
+        meter_is_bidirectional,
+    )
+
     house = dict(house_doc)
     plant = dict(house.get("plant") or {}) if isinstance(house.get("plant"), dict) else {}
     bindings = dict(plant.get("ehal_bindings") or {})
     if not isinstance(plant.get("ehal_bindings"), dict):
         bindings = {}
+    by_name = controls_by_name(loxapp3_doc) if isinstance(loxapp3_doc, dict) else {}
     changed = False
     for row in selected:
         if not isinstance(row, dict):
@@ -525,6 +534,25 @@ def apply_plant_power_suggestions(
         if field and power:
             bindings[field] = power
             changed = True
+            meta = by_name.get(power.casefold())
+            if meter_has_energy_states(meta):
+                bind_plant_meter_energy(
+                    plant,
+                    ehal_field=field,
+                    meter_name=power,
+                    bidirectional=meter_is_bidirectional(meta),
+                )
+            elif field in (
+                "sens_pv_production_active",
+                "sens_grid_power_active",
+            ):
+                # EFM Zähler name: assume Meter energy states exist (LoxAPP3 optional).
+                bind_plant_meter_energy(
+                    plant,
+                    ehal_field=field,
+                    meter_name=power,
+                    bidirectional=field == "sens_grid_power_active",
+                )
     if changed:
         plant["ehal_bindings"] = bindings
         house["plant"] = plant

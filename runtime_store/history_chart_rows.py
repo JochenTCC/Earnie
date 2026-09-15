@@ -20,6 +20,11 @@ from optimizer.targets import (
 from settings.flexible_consumers import charging_context_lookup, flex_kw_lookup
 
 from . import optimization_history
+from .slot_ist_powers import (
+    IST_SOURCE_MEAN,
+    index_closed_intervals_by_start,
+    resolve_ist_snapshot,
+)
 from .soc_plausibility import (
     battery_kw_from_soc_delta,
     ist_contradicts_soc_delta,
@@ -105,8 +110,12 @@ def _chart_snapshot(entry: dict[str, Any]) -> dict[str, Any]:
     return snapshot
 
 
-def _power_kw_from_entry(entry: dict[str, Any]) -> tuple[float, float, float]:
-    snapshot = _chart_snapshot(entry)
+def _power_kw_from_entry(
+    entry: dict[str, Any],
+    *,
+    ist_snapshot: dict[str, Any] | None = None,
+) -> tuple[float, float, float]:
+    snapshot = ist_snapshot if ist_snapshot else _chart_snapshot(entry)
     pv = snapshot.get("pv_kw")
     if pv is None:
         pv = entry.get("forecast_pv_kw", 0.0)
@@ -146,9 +155,14 @@ def _pv_kw_for_balance(row: dict[str, Any]) -> float:
     return float(row.get("PV-Prognose (kW)", 0.0) or 0.0)
 
 
-def _netzbezug_kw_from_entry(entry: dict[str, Any], row: dict[str, Any]) -> float:
-    """Netzbezug: gemessenes grid_kw aus consumption_snapshot, sonst Bilanz aus der Zeile."""
-    snapshot = _chart_snapshot(entry)
+def _netzbezug_kw_from_entry(
+    entry: dict[str, Any],
+    row: dict[str, Any],
+    *,
+    ist_snapshot: dict[str, Any] | None = None,
+) -> float:
+    """Netzbezug: gemessenes grid_kw (Ist), sonst Bilanz aus der Zeile."""
+    snapshot = ist_snapshot if ist_snapshot else _chart_snapshot(entry)
     grid = snapshot.get("grid_kw")
     if grid is not None:
         return round(float(grid), 2)
@@ -177,13 +191,15 @@ def _consumer_is_measured(measured_ids: Any, consumer: dict[str, Any]) -> bool:
 def _consumer_kw_from_entry(
     entry: dict[str, Any],
     consumer: dict[str, Any],
+    *,
+    ist_snapshot: dict[str, Any] | None = None,
 ) -> float | None:
     """Flex-Leistung für Chart/Tabelle im Produktiv-Log — Ist, nicht MILP-Soll."""
     measured_ids = entry.get("flex_measured_ids")
     if not _consumer_is_measured(measured_ids, consumer):
         return None
 
-    snapshot = _chart_snapshot(entry)
+    snapshot = ist_snapshot if ist_snapshot else _chart_snapshot(entry)
     flex_kw = snapshot.get("flex_kw") or {}
     if _flex_dict_has_consumer(flex_kw, consumer):
         return float(flex_kw_lookup(flex_kw, consumer))
@@ -262,12 +278,13 @@ def entry_to_chart_row(
     slot_start: datetime,
     *,
     include_date: bool = False,
+    ist_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Baut eine Chart-Zeile aus einem Produktiv-Durchlauf."""
     mode = int(entry.get("mode", bat.MODE_AUTOMATIK))
     target_power = float(entry.get("target_power_kw", 0.0) or 0.0)
-    _, baseload, battery_plan = _power_kw_from_entry(entry)
-    snapshot = _chart_snapshot(entry)
+    snapshot = ist_snapshot if ist_snapshot else _chart_snapshot(entry)
+    _, baseload, battery_plan = _power_kw_from_entry(entry, ist_snapshot=snapshot)
     row: dict[str, Any] = {
         "slot_datetime": slot_start,
         "Uhrzeit": _format_slot_time(slot_start, include_date=include_date),
@@ -283,7 +300,9 @@ def entry_to_chart_row(
     }
     for consumer in config.get_flexible_consumers(optimizer_only=True):
         cid = consumer["id"]
-        flex_kw = _consumer_kw_from_entry(entry, consumer)
+        flex_kw = _consumer_kw_from_entry(
+            entry, consumer, ist_snapshot=snapshot
+        )
         row[consumer_column_name(consumer)] = (
             round(flex_kw, 2) if flex_kw is not None else None
         )
@@ -294,7 +313,9 @@ def entry_to_chart_row(
             )
     if snapshot.get("pv_kw") is not None:
         row[PV_IST_COLUMN] = round(float(snapshot["pv_kw"]), 3)
-    row["Netzbezug (kW)"] = _netzbezug_kw_from_entry(entry, row)
+    row["Netzbezug (kW)"] = _netzbezug_kw_from_entry(
+        entry, row, ist_snapshot=snapshot
+    )
     ist_battery = _chart_battery_kw_from_snapshot(snapshot)
     if ist_battery is not None:
         row[CHART_IST_BATTERY_KW_COLUMN] = ist_battery
@@ -441,12 +462,13 @@ def _sanitize_history_soc_rows(
 def _reconcile_history_battery_with_soc(
     rows: list[dict[str, Any]],
     qualities: list[str],
+    *,
+    mean_usable: list[bool] | tuple[bool, ...] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Replace instantaneous Ist battery when it opposes the SoC step to the next slot.
 
-    Produktiv-Log samples are point-in-time; a full-slot discharge bar while SoC rises
-    (or vice versa) is not plausible for Chart 1. Prefer SoC-implied average power.
+    Skip slots that already use a usable QH slot-mean (``mean_usable``).
     """
     if len(rows) < 2:
         return rows
@@ -454,6 +476,9 @@ def _reconcile_history_battery_with_soc(
     reconciled: list[dict[str, Any]] = []
     for index, row in enumerate(rows):
         row = dict(row)
+        if mean_usable is not None and index < len(mean_usable) and mean_usable[index]:
+            reconciled.append(row)
+            continue
         if (
             index + 1 < len(rows)
             and qualities[index] == SLOT_PRESENT
@@ -528,34 +553,50 @@ def _build_rows_for_slot_starts(
     starts = tuple(slot_starts)
     window_start = _coerce_slot_start(starts[0])
     window_end = _coerce_slot_start(starts[-1]) + timedelta(minutes=QUARTER_HOUR_MINUTES)
-    entries = optimization_history.load_replay_entries_between(window_start, window_end)
+    # One extra QH so closed_interval for the last visible slot is included.
+    load_end = window_end + timedelta(minutes=QUARTER_HOUR_MINUTES)
+    entries = optimization_history.load_replay_entries_between(window_start, load_end)
     by_slot = _index_entries_by_slot(entries)
+    closed_by = index_closed_intervals_by_start(entries)
     rows: list[dict[str, Any]] = []
     qualities: list[str] = []
+    mean_usable_flags: list[bool] = []
     present = held = missing = 0
     last_row: dict[str, Any] | None = None
     for slot_start in starts:
-        slot_key = _coerce_slot_start(slot_start)
-        entry = by_slot.get(slot_key)
+        slot = _coerce_slot_start(slot_start)
+        entry = by_slot.get(slot)
         if entry is not None:
-            row = entry_to_chart_row(entry, slot_key, include_date=include_date)
+            ist_snap, source = resolve_ist_snapshot(slot, entry, closed_by)
+            row = entry_to_chart_row(
+                entry,
+                slot,
+                include_date=include_date,
+                ist_snapshot=ist_snap,
+            )
             present += 1
             last_row = row
             qualities.append(SLOT_PRESENT)
+            mean_usable_flags.append(source == IST_SOURCE_MEAN)
         elif hold_forward and last_row is not None:
-            row = _hold_forward_row(last_row, slot_key, include_date=include_date)
+            row = _hold_forward_row(last_row, slot, include_date=include_date)
             held += 1
             qualities.append(SLOT_HELD)
+            mean_usable_flags.append(False)
         elif hold_forward:
-            row = _empty_chart_row(slot_key, include_date=include_date)
+            row = _empty_chart_row(slot, include_date=include_date)
             missing += 1
             qualities.append(SLOT_MISSING)
+            mean_usable_flags.append(False)
         else:
-            row = _missing_chart_row(slot_key, include_date=include_date)
+            row = _missing_chart_row(slot, include_date=include_date)
             missing += 1
             qualities.append(SLOT_MISSING)
+            mean_usable_flags.append(False)
         rows.append(row)
     rows = _sanitize_dead_telemetry_rows(rows, qualities, by_slot)
     rows = _sanitize_history_soc_rows(rows, qualities)
-    rows = _reconcile_history_battery_with_soc(rows, qualities)
+    rows = _reconcile_history_battery_with_soc(
+        rows, qualities, mean_usable=mean_usable_flags
+    )
     return rows, tuple(qualities), present, held, missing, by_slot

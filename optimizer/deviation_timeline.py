@@ -37,8 +37,10 @@ def build_slot_deviation_series(
 ) -> tuple[tuple[DeviationEvent, ...], ...]:
     """Pro Slot eine Event-Tuple; nur SLOT_PRESENT mit Log-Eintrag wird ausgewertet."""
     from runtime_store.history_timeline import SLOT_PRESENT
+    from runtime_store.slot_ist_powers import index_closed_intervals_by_start
 
     document = resolve_deviation_rules_document(rules_doc)
+    closed_by = index_closed_intervals_by_start(list(by_slot.values()))
     series: list[tuple[DeviationEvent, ...]] = []
     for slot_start, quality in zip(slot_starts, slot_qualities):
         if quality != SLOT_PRESENT:
@@ -53,6 +55,7 @@ def build_slot_deviation_series(
             slot_quality=quality,
             rules_doc=document,
             slot_start=slot_start,
+            closed_by_interval=closed_by,
         )
         series.append(tuple(slot_events))
     return tuple(series)

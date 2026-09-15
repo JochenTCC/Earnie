@@ -484,6 +484,27 @@ def _normalize_plant(raw: dict | None) -> dict:
         }
         if cleaned:
             out["ehal_bindings"] = cleaned
+    energy = raw.get("loxone_meter_energy")
+    if isinstance(energy, dict) and energy:
+        cleaned_energy: dict = {}
+        for key, value in energy.items():
+            field = str(key).strip()
+            if not field:
+                continue
+            if isinstance(value, dict):
+                name = str(value.get("name") or "").strip()
+                if not name:
+                    continue
+                cleaned_energy[field] = {
+                    "name": name,
+                    "bidirectional": bool(value.get("bidirectional")),
+                }
+            else:
+                name = str(value or "").strip()
+                if name:
+                    cleaned_energy[field] = name
+        if cleaned_energy:
+            out["loxone_meter_energy"] = cleaned_energy
     return out
 
 

@@ -55,7 +55,8 @@ def test_fixed_generic_overlay_with_flexible_consumers_present():
             "get_resolved_runtime_settings",
             return_value={"_house_profile": profile},
         ):
-            result = pm._apply_house_profile_baseload_overlay(target_hours, base)
+            with patch.object(pm.config, "get_flexible_consumers", return_value=[{"id": "ev"}]):
+                result = pm._apply_house_profile_baseload_overlay(target_hours, base)
 
     assert result[19] == 2.5
     assert result[18] == 0.5
@@ -73,6 +74,68 @@ def test_flexible_generic_not_added_to_grundlast_overlay():
             "get_resolved_runtime_settings",
             return_value={"_house_profile": profile},
         ):
-            result = pm._apply_house_profile_baseload_overlay(target_hours, base)
+            with patch.object(pm.config, "get_flexible_consumers", return_value=[{"id": "ev"}]):
+                result = pm._apply_house_profile_baseload_overlay(target_hours, base)
 
     assert result[20] == 0.5
+
+
+def test_milp_thermal_annual_not_added_to_live_grundlast_when_raw_flex_empty():
+    """Empty config flexible_consumers must not bake Haus Wärme into Grundlast."""
+    target_hours = [datetime(2026, 9, 15, h, 0) for h in range(16, 20)]
+    base = [0.5] * len(target_hours)
+    profile = {
+        "id": "example_efh",
+        "consumers": [
+            {
+                "id": "waermepumpe",
+                "label": "Wärmepumpe",
+                "type": "thermal_annual",
+                "nominal_power_kw": 1.6,
+                "living_area_m2": 157.0,
+                "building_class": 2,
+                "heat_pump_type": "erde",
+                "persons": 2,
+                "target_temp_c": 21.5,
+                "heating_limit_c": 15.0,
+                "hwb_kwh_m2": 40.0,
+                "timezone_name": "Europe/Vienna",
+            },
+            {
+                "id": "kochen",
+                "label": "Kochen",
+                "type": "generic",
+                "nominal_power_kw": 1.5,
+                "schedule": {
+                    "runs_per_week": 7,
+                    "duration_h": 1.0,
+                    "start_hour": 19,
+                    "start_shift_h": 0.0,
+                },
+                "earnie_role": "known",
+            },
+        ],
+    }
+    raw_config = {"flexible_consumers": []}
+    milp_flex = [
+        {
+            "id": "waermepumpe",
+            "name": "Haus Wärme",
+            "daily_target_source": "thermal_annual",
+        }
+    ]
+
+    with patch.object(pm.config.CONFIG, "_raw_config", raw_config):
+        with patch.object(
+            pm.config,
+            "get_resolved_runtime_settings",
+            return_value={"_house_profile": profile},
+        ):
+            with patch.object(pm.config, "get_flexible_consumers", return_value=milp_flex):
+                result = pm._apply_house_profile_baseload_overlay(target_hours, base)
+
+    # 16–18: WP skipped → flat base; 19: known Kochen still overlaid
+    assert result[0] == 0.5
+    assert result[1] == 0.5
+    assert result[2] == 0.5
+    assert result[3] == 2.0

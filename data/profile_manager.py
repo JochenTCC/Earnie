@@ -253,30 +253,33 @@ def _apply_house_profile_baseload_overlay(
 
     Manuelles Gerät is not overlaid here — only user day-plans via
     appliance_schedules. Live always uses path-A style overlay (not meter residual).
+
+    ``thermal_annual`` consumers that are MILP flex (Haus Wärme) are skipped in the
+    thermal overlay — same as SE ``milp_flex_thermal_ids`` — so their power is not
+    double-counted into Verbrauch-Prognose / Chart-1 Grundlast.
     """
     profile = config.get_resolved_runtime_settings().get("_house_profile")
     if not profile:
         return baseload
     from house_config.planning_flex_bridge import (
         fixed_generic_hourly_overlay,
+        milp_flex_thermal_annual_ids,
         thermal_hourly_overlay,
     )
 
-    if config.CONFIG._raw_config.get("flexible_consumers"):
-        overlay = fixed_generic_hourly_overlay(
-            profile,
-            target_hours,
-            meter_residual_mode=False,
-        )
-    else:
-        # Greenfield: include thermal fixed overlays; force non-residual for live.
-        generic = fixed_generic_hourly_overlay(
-            profile,
-            target_hours,
-            meter_residual_mode=False,
-        )
-        thermal = thermal_hourly_overlay(profile, target_hours)
-        overlay = [round(g + t, 6) for g, t in zip(generic, thermal)]
+    resolved_flex = config.get_flexible_consumers()
+    thermal_milp_ids = milp_flex_thermal_annual_ids(resolved_flex)
+    generic = fixed_generic_hourly_overlay(
+        profile,
+        target_hours,
+        meter_residual_mode=False,
+    )
+    thermal = thermal_hourly_overlay(
+        profile,
+        target_hours,
+        milp_flex_thermal_ids=thermal_milp_ids,
+    )
+    overlay = [round(g + t, 6) for g, t in zip(generic, thermal)]
     return [round(base + extra, 3) for base, extra in zip(baseload, overlay)]
 
 

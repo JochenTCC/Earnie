@@ -212,12 +212,21 @@ def _manual_kw_from_schedules(
     return max(float(kw), 0.0)
 
 
-def _measured_flex_kw(entry: dict[str, Any], consumer: Mapping[str, Any]) -> float | None:
+def _measured_flex_kw(
+    entry: dict[str, Any],
+    consumer: Mapping[str, Any],
+    *,
+    ist_snapshot: dict[str, Any] | None = None,
+) -> float | None:
     """Return measured kW only when the consumer id is present in the log maps."""
     from runtime_store.history_timeline import _flex_dict_has_consumer
     from settings.flexible_consumers import flex_kw_lookup
 
-    snapshot = entry.get("consumption_snapshot") or {}
+    snapshot = (
+        ist_snapshot
+        if ist_snapshot is not None
+        else (entry.get("consumption_snapshot") or {})
+    )
     flex_kw = snapshot.get("flex_kw") or {}
     if _flex_dict_has_consumer(flex_kw, dict(consumer)):
         return max(float(flex_kw_lookup(flex_kw, dict(consumer))), 0.0)
@@ -233,15 +242,16 @@ def _load_by_id_from_entry(
     *,
     slot_start: datetime,
     schedules: Mapping[str, Mapping[str, Any]] | None = None,
+    ist_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, float]:
     """Baseload + measured flex + manuals (measured or schedule peel from baseload)."""
-    _, baseload, _ = _power_kw_from_entry(entry)
+    _, baseload, _ = _power_kw_from_entry(entry, ist_snapshot=ist_snapshot)
     baseload_kw = max(float(baseload), 0.0)
     loads: dict[str, float] = {}
     for consumer in consumers:
         cid = str(consumer["id"])
         if _is_manual_chart_consumer(consumer):
-            measured = _measured_flex_kw(entry, consumer)
+            measured = _measured_flex_kw(entry, consumer, ist_snapshot=ist_snapshot)
             if measured is not None:
                 if measured > 1e-12:
                     loads[cid] = measured
@@ -252,7 +262,9 @@ def _load_by_id_from_entry(
             loads[cid] = scheduled
             baseload_kw = max(0.0, baseload_kw - scheduled)
             continue
-        flex_kw = _consumer_kw_from_entry(entry, dict(consumer))
+        flex_kw = _consumer_kw_from_entry(
+            entry, dict(consumer), ist_snapshot=ist_snapshot
+        )
         if flex_kw is None:
             continue
         loads[cid] = max(float(flex_kw), 0.0)
@@ -260,19 +272,36 @@ def _load_by_id_from_entry(
     return loads
 
 
-def _grid_import_export_kw(entry: dict[str, Any], load_kw: float, pv_kw: float) -> tuple[float, float]:
-    snapshot = entry.get("consumption_snapshot") or {}
+def _grid_import_export_kw(
+    entry: dict[str, Any],
+    load_kw: float,
+    pv_kw: float,
+    *,
+    ist_snapshot: dict[str, Any] | None = None,
+) -> tuple[float, float]:
+    snapshot = (
+        ist_snapshot
+        if ist_snapshot is not None
+        else (entry.get("consumption_snapshot") or {})
+    )
     grid_raw = snapshot.get("grid_kw")
     if grid_raw is not None:
         grid = float(grid_raw)
         return max(grid, 0.0), max(-grid, 0.0)
-    # Fallback balance without battery when snapshot lacks grid
     net = load_kw - pv_kw
     return max(net, 0.0), max(-net, 0.0)
 
 
-def _battery_charge_discharge_kw(entry: dict[str, Any]) -> tuple[float, float]:
-    snapshot = entry.get("consumption_snapshot") or {}
+def _battery_charge_discharge_kw(
+    entry: dict[str, Any],
+    *,
+    ist_snapshot: dict[str, Any] | None = None,
+) -> tuple[float, float]:
+    snapshot = (
+        ist_snapshot
+        if ist_snapshot is not None
+        else (entry.get("consumption_snapshot") or {})
+    )
     ist = _chart_battery_kw_from_snapshot(snapshot)
     if ist is not None:
         return max(ist, 0.0), max(-ist, 0.0)
@@ -287,11 +316,15 @@ def slot_from_replay_entry(
     *,
     consumers: Sequence[Mapping[str, Any]] | None = None,
     schedules: Mapping[str, Mapping[str, Any]] | None = None,
+    closed_by_interval: dict | None = None,
 ) -> CostAnalysisSlot:
     """Build one attributed slot from a productivity-log entry."""
+    from runtime_store.slot_ist_powers import resolve_ist_snapshot
+
     flex = list(consumers) if consumers is not None else cost_analysis_consumers()
-    pv_kw, _, _ = _power_kw_from_entry(entry)
-    snapshot = entry.get("consumption_snapshot") or {}
+    ist_snap, _source = resolve_ist_snapshot(slot_start, entry, closed_by_interval)
+    snapshot = ist_snap or (entry.get("consumption_snapshot") or {})
+    pv_kw, _, _ = _power_kw_from_entry(entry, ist_snapshot=snapshot)
     if snapshot.get("pv_kw") is not None:
         pv_kw = float(snapshot["pv_kw"])
     load_by_id = _load_by_id_from_entry(
@@ -299,10 +332,15 @@ def slot_from_replay_entry(
         flex,
         slot_start=slot_start,
         schedules=schedules,
+        ist_snapshot=snapshot,
     )
     load_kw = sum(load_by_id.values())
-    charge_kw, discharge_kw = _battery_charge_discharge_kw(entry)
-    grid_import, grid_export = _grid_import_export_kw(entry, load_kw, pv_kw)
+    charge_kw, discharge_kw = _battery_charge_discharge_kw(
+        entry, ist_snapshot=snapshot
+    )
+    grid_import, grid_export = _grid_import_export_kw(
+        entry, load_kw, pv_kw, ist_snapshot=snapshot
+    )
     price = _import_price_cent_from_entry(
         entry, slot_start=slot_start
     )
@@ -349,6 +387,10 @@ def build_cost_analysis_series(
     consumers: Sequence[Mapping[str, Any]] | None = None,
 ) -> CostAnalysisSeries | None:
     """Load all present history slots and attribute costs (live log only)."""
+    from datetime import timedelta
+
+    from runtime_store.slot_ist_powers import index_closed_intervals_by_start
+
     earliest = optimization_history.earliest_replay_completed_at()
     if earliest is None:
         return None
@@ -357,20 +399,28 @@ def build_cost_analysis_series(
     from runtime_store.appliance_schedules import load_schedules
 
     schedules = load_schedules()
-    entries = optimization_history.load_replay_entries_between(earliest, end)
+    # Extra QH so closed_interval for the last plan slot is available.
+    entries = optimization_history.load_replay_entries_between(
+        earliest, end + timedelta(minutes=QUARTER_HOUR_MINUTES)
+    )
     if not entries:
         return None
     by_slot = _entries_by_slot(entries)
     if not by_slot:
         return None
+    closed_by = index_closed_intervals_by_start(entries)
+    plan_slots = sorted(s for s in by_slot if s < end)
+    if not plan_slots:
+        return None
     slots = tuple(
         slot_from_replay_entry(
-            entry,
+            by_slot[slot_start],
             slot_start,
             consumers=flex,
             schedules=schedules,
+            closed_by_interval=closed_by,
         )
-        for slot_start, entry in sorted(by_slot.items())
+        for slot_start in plan_slots
     )
     return CostAnalysisSeries(
         slots=slots,

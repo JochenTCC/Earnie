@@ -202,6 +202,10 @@ def pv_counter_state_file() -> str:
     return runtime_path("pv_counter_state.json")
 
 
+def power_interval_sampler_state_file() -> str:
+    return runtime_path("power_interval_sampler_state.json")
+
+
 def cons_data_pending_file() -> str:
     return runtime_path("cons_data_pending.json")
 
