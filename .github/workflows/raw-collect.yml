@@ -1,0 +1,42 @@
+name: traffic-raw-collect
+
+on:
+  schedule:
+    - cron: '0 0,12 * * *'   # 2x taeglich, wegen rollierendem 14-Tage-Fenster
+  workflow_dispatch:
+
+jobs:
+  fetch-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stats-raw
+          fetch-depth: 0
+
+      - name: Fetch traffic stats for both repos
+        env:
+          GH_TOKEN: ${{ secrets.GH_REPO_STATS_TOKEN }}
+        run: |
+          mkdir -p traffic
+          DATE=$(date -u +%Y-%m-%dT%H%M)
+          REPOS=("JochenTCC/Earnie" "JochenTCC/ha-addon-earnie")
+          for REPO in "${REPOS[@]}"; do
+            NAME=$(basename "$REPO")
+            curl -s -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/traffic/clones?per=day" \
+              -o "traffic/${NAME}-clones-${DATE}.json"
+            curl -s -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPO/traffic/views?per=day" \
+              -o "traffic/${NAME}-views-${DATE}.json"
+          done
+
+      - name: Commit and push raw snapshots
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add traffic/
+          git diff --cached --quiet && echo "keine Aenderungen" || git commit -m "Traffic snapshot $(date -u +%Y-%m-%d)"
+          git push origin stats-raw

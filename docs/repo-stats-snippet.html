@@ -1,0 +1,67 @@
+<!-- Earnie Repo-Traffic-Statistik - Custom-HTML-Block (Spectra) -->
+<div id="earnie-repo-stats" class="earnie-repo-stats">Lade Repo-Statistik ...</div>
+<style>
+  .earnie-repo-stats { font-family: inherit; }
+  .earnie-repo-stats .ers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 0.5rem;
+  }
+  .earnie-repo-stats .ers-card {
+    border: 1px solid #e2e2e2;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .earnie-repo-stats .ers-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .earnie-repo-stats .ers-label {
+    font-size: 0.85rem;
+    opacity: 0.75;
+    margin-top: 0.25rem;
+  }
+  .earnie-repo-stats .ers-error { color: #b00020; font-size: 0.9rem; }
+</style>
+<script>
+(async () => {
+  const url = "https://raw.githubusercontent.com/JochenTCC/repo-stats-public/main/stats/summary.json";
+  const el = document.getElementById("earnie-repo-stats");
+  const repoLabels = {
+    "Earnie": "Earnie Core",
+    "ha-addon-earnie": "Earnie HA-Add-on",
+  };
+
+  const sumField = (daily, field) => daily.reduce((s, d) => s + (d[field] || 0), 0);
+
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+
+    const cards = Object.entries(data.repos || {}).map(([repo, info]) => {
+      const daily = info.daily || [];
+      const clones = sumField(daily, "clones_total");
+      const clonesUnique = sumField(daily, "clones_unique");
+      const views = sumField(daily, "views_total");
+      const viewsUnique = sumField(daily, "views_unique");
+      const label = repoLabels[repo] || repo;
+      return `
+        <div class="ers-card">
+          <div class="ers-value">${clones}</div>
+          <div class="ers-label">${label} &ndash; Clones (${clonesUnique} unique)</div>
+          <div class="ers-value" style="margin-top:.5rem">${views}</div>
+          <div class="ers-label">Views (${viewsUnique} unique)</div>
+        </div>`;
+    });
+
+    el.innerHTML = `<div class="ers-grid">${cards.join("")}</div>`;
+  } catch (e) {
+    console.error("Repo-Stats konnten nicht geladen werden", e);
+    el.innerHTML = '<p class="ers-error">Statistik derzeit nicht verfuegbar.</p>';
+  }
+})();
+</script>
