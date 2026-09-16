@@ -5,6 +5,9 @@ on:
     - cron: '0 0,12 * * *'   # 2x taeglich, wegen rollierendem 14-Tage-Fenster
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   fetch-stats:
     runs-on: ubuntu-latest
@@ -19,7 +22,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_REPO_STATS_TOKEN }}
         run: |
           mkdir -p traffic
-          DATE=$(date -u +%Y-%m-%dT%H%M)
+          DATE=$(date -u +%Y%m%dT%H%M)
           REPOS=("JochenTCC/Earnie" "JochenTCC/ha-addon-earnie")
           for REPO in "${REPOS[@]}"; do
             NAME=$(basename "$REPO")
