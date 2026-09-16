@@ -240,7 +240,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 - **Greenfield HTTP marker probe:** `integrations/loxone_greenfield_import.probe_marker_names` hits known `greenfield_device_map.json` names via `/jdev/sps/io/{name}`. `LL.Code` `200` or `403` = present; `404` = missing. Union with LoxAPP3 names for typed Merker match. EFM meters still need LoxAPP3.
 - HITL UI: `ui/ehal_loxone_mapping.py` on EHAL-Com (backend Loxone). Heuristic proposals + manual selects; confirm writes `plant` / `consumers[].ehal_bindings` via house profiles. Field rows grouped by device role.
 - Optional LLM (code retained, **not** exposed in UI): local **Ollama** HTTP (`/api/chat`, JSON). Not bundled in Earnie image / LoxBerry ZIP.
-- EFM interpretation C (meter tree → Hausprofil consumers + optional flex power): research note [`efm-auto-sync-2.4.l.md`](efm-auto-sync-2.4.l.md); HITL `integrations/loxone_efm_meters.py` + `ui/ehal_efm_import.py` on EHAL-Com.
+- EFM interpretation C (meter tree → Hausprofil consumers + optional flex power): research note [`efm-auto-sync-2.4.l.md`](efm-auto-sync-2.4.l.md); library `integrations/loxone_efm_meters.py` via greenfield `merge_efm` (Smarthome-Backend Loxone-Import).
 
 ## Implementation notes — device / hardware profiles
 

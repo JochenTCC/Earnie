@@ -28,7 +28,6 @@ from runtime_store import run_state
 from runtime_store.main_daemon import status as daemon_status
 from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY
 from ui.runtime_config import reload_runtime_config
-from ui.setup_dotenv import render_loxone_verify_results
 from ui.sankey_produktiv import has_produktiv_run
 
 
@@ -219,7 +218,6 @@ def render_live_reads_section() -> None:
         _render_ehal_telemetry_fragment()
         return
 
-    render_loxone_verify_results(button_key="loxone_debug_verify_button")
     st.caption(
         "Nur `sens_*` / `get_*` / `{id}:flex.{slug}.sens_power_act` · Tabelle aktualisiert sich "
         "automatisch (ca. alle 10 Sekunden)."

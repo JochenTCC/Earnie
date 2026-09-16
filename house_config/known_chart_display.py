@@ -19,9 +19,22 @@ def _known_fixed_for_chart(house_profile: dict) -> list[dict]:
 
     ``earnie_role: manual`` is MILP-flex in SE; on Live, named bars come only
     from ``appliance_schedules.json`` (user-planned runs).
+
+    When live absent is effective, opted-in known consumers are omitted (same
+    skip set as the live baseload overlay).
     """
     fixed, _flex = split_planning_generic_consumers(house_profile)
-    return [consumer for consumer in fixed if is_earnie_known(consumer)]
+    known = [consumer for consumer in fixed if is_earnie_known(consumer)]
+    from optimizer.absent_mode import resolve_live_absent_skip_ids
+
+    skip = resolve_live_absent_skip_ids(house_profile)
+    if not skip:
+        return known
+    return [
+        consumer
+        for consumer in known
+        if str(consumer.get("id") or "") not in skip
+    ]
 
 
 def _resolve_house_profile(house_profile: dict | None) -> dict:

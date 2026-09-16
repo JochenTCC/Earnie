@@ -180,6 +180,29 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
         live_consumers = config.get_flexible_consumers()
     else:
         live_consumers = loxone_client.consumers_with_live_nominal_power()
+    from optimizer.absent_mode import (
+        apply_absent_mode_to_live_flex,
+        resolve_absent_status,
+    )
+
+    house_profile = (config.get_resolved_runtime_settings() or {}).get(
+        "_house_profile"
+    ) or {}
+    absent_status = resolve_absent_status(house_profile)
+    if absent_status["effective"]:
+        logger.info(
+            "Abwesenheitsmodus wirksam (Quelle: %s).",
+            absent_status["source"] or "?",
+        )
+        live_consumers = apply_absent_mode_to_live_flex(
+            live_consumers,
+            house_profile,
+            active=True,
+        )
+    live_ids = {str(c.get("id") or "") for c in live_consumers}
+    targets = {
+        cid: value for cid, value in (targets or {}).items() if cid in live_ids
+    }
     baseline_targets = consumer_targets.resolve_historical_baseline_targets_kwh(
         matrix=optimization_matrix,
     )
@@ -376,6 +399,7 @@ def main(run_trigger: str = TRIGGER_QUARTER_HOUR):
             consumer_daily_targets_kwh=targets,
             sunrise_soc_min_index=sunrise_soc_min_index,
             filter_contexts=filter_contexts,
+            consumers=live_consumers,
         )
         savings_snapshot = optimizer.build_savings_snapshot(savings_info)
         logger.info(

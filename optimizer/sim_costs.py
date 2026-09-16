@@ -200,6 +200,7 @@ def calculate_optimization_savings(
     consumer_daily_targets_kwh: dict[str, float] | None = None,
     sunrise_soc_min_index: int | None = None,
     filter_contexts: dict[str, dict] | None = None,
+    consumers: list | None = None,
 ) -> dict:
     """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation.
 
@@ -231,8 +232,9 @@ def calculate_optimization_savings(
     matrix, charging_contexts, targets = prepare_optimization_matrix(
         optimization_matrix,
         consumer_daily_targets_kwh,
+        consumers=consumers,
     )
-    filters = filter_contexts or resolve_filter_contexts(matrix)
+    filters = filter_contexts or resolve_filter_contexts(matrix, consumers)
     # Open-loop: one CBC solve for the display horizon (not commit_hours=1 MPC).
     optimized_rows = simulate_horizon(
         matrix,
@@ -243,6 +245,7 @@ def calculate_optimization_savings(
         filter_contexts=filters,
         matrix_prepared=True,
         sunrise_soc_min_index=sunrise_soc_min_index,
+        flexible_consumers=consumers,
         commit_hours=len(matrix),
     )
     baseline_rows = simulate_baseline_horizon(
@@ -251,6 +254,7 @@ def calculate_optimization_savings(
     horizon_targets = resolve_horizon_consumer_targets_kwh(
         matrix,
         targets,
+        flexible_consumers=consumers,
     )
     horizon_targets = apply_horizon_charging_limits(horizon_targets, charging_contexts)
     matched_targets = resolve_matched_baseline_horizon_targets(
@@ -278,10 +282,13 @@ def calculate_optimization_savings(
     applied_targets = build_applied_targets_detail(
         matrix,
         targets,
+        consumers=consumers,
     )
-    baseline_targets = build_baseline_targets_detail(matrix)
+    baseline_targets = build_baseline_targets_detail(matrix, consumers=consumers)
     matched_flex_kwh = (
-        delivered_flex_kwh_from_rows(matched_baseline_rows)
+        delivered_flex_kwh_from_rows(
+            matched_baseline_rows, flexible_consumers=consumers
+        )
         if matched_baseline_rows
         else None
     )
@@ -289,6 +296,7 @@ def calculate_optimization_savings(
         matrix,
         targets,
         matched_flex_kwh=matched_flex_kwh,
+        consumers=consumers,
     )
     baseline_same_flex_rows = simulate_baseline_with_optimized_flex(
         matrix,

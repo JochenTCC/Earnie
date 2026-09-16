@@ -43,6 +43,7 @@ def test_match_skips_heartbeat_and_binds_plant():
     assert plant.bindings["sens_ess_soc"] == "Earnie_Batterie_SoC"
     assert plant.bindings["set_ess_mode"] == "Earnie_Steuerbefehl"
     assert plant.bindings["set_ess_charge_power_limit"] == "Earnie_LadeLeistungs-Limit"
+    assert plant.bindings["sens_absent_mode"] == "Earnie_Abwesend"
 
 
 def test_match_wp_and_ev_groups():

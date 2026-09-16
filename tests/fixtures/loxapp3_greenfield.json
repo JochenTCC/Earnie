@@ -1051,6 +1051,17 @@
         "value": "st-gf-earn-005"
       }
     },
+    "gf-earn-005b": {
+      "name": "Earnie_Abwesend",
+      "type": "InfoOnlyDigital",
+      "uuidAction": "gf-earn-005b",
+      "room": "17b525a0-028d-b174-ffff912d5ec91829",
+      "cat": "17a19e27-02cb-1065-ffff912d5ec91829",
+      "details": {},
+      "states": {
+        "active": "st-gf-earn-005b"
+      }
+    },
     "gf-earn-006": {
       "name": "Earnie_Batterie_Sollleistung",
       "type": "InfoOnlyAnalog",

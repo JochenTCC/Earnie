@@ -135,6 +135,24 @@ class TestCollectReadChecks:
         by_label = {label: io for label, io, _ in checks}
         assert by_label["sens_temperature_outside"] == "Earnie_Aussentemperatur"
 
+    def test_collects_plant_absent_mode_from_house_profiles(self):
+        house = {
+            "plant": {
+                "ehal_bindings": {"sens_absent_mode": "Earnie_Abwesend"},
+            }
+        }
+        with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(
+            lc.config, "get_flexible_consumers", return_value=[]
+        ), patch.object(
+            lc.config.CONFIG, "get_resolved_runtime_settings", return_value={}
+        ), patch.object(
+            lc.loxone_client, "_default_house_profiles_doc", return_value=house
+        ):
+            checks = lc.collect_read_checks()
+
+        by_label = {label: io for label, io, _ in checks}
+        assert by_label["sens_absent_mode"] == "Earnie_Abwesend"
+
     def test_ignores_consumer_ambient_for_live_reads(self):
         house = {"plant": {"ehal_bindings": {}}}
         with patch.object(lc.config, "get", side_effect=self._plant_get), patch.object(

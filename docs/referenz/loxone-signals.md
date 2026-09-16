@@ -127,7 +127,7 @@ The templates contain **no** meter hardware. Still, meter blocks in use are also
 
 Power Merker (`Earnie_Netzleistung`, `Earnie_PV_Leistung`, …) **may** come from the EFM; the Virtual Output Cmds remain an optional name catalog. Earnie prefers the EFM designation in the binding when available.
 
-Manual follow-up: EHAL-Com → **Energy Flow Monitor → Consumers**.
+Manual follow-up: after **Smarthome-Backend → Loxone-Import**, check signal mapping on EHAL-Com (**Loxone Structure → EHAL Mapping**).
 
 **EV ready-by time:** the Loxone import binds **AlarmClock** blocks to `get_evcs_ready_by_time` on the EV entity that already has meter/power bindings — same convention as the meter designation, no Virtual-Out text.
 
@@ -241,7 +241,7 @@ Checking all configured signals:
 
 | Entity / area                                                          | Storage location                              | Typical EHAL fields / roles                                                                                                                               |
 | ------------------------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Plant (battery, PV, grid, control command, house load, outside temp.)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_power_consumers`, `set_ess_*` |
+| Plant (battery, PV, grid, control command, house load, outside temp., absent)   | `house_profiles.json` → `plant.ehal_bindings` | `sens_ess_soc`, `sens_pv_production_active`, `sens_ess_power`, `sens_grid_power_active`, `sens_temperature_outside`, `sens_absent_mode`, `sens_power_consumers`, `set_ess_*` |
 | Request Optimize (ad hoc)                                               | Loxone VO → daemon HTTP                       | `Earnie_Request_Optimize` on port `system.ehal_loxone_http_port` (default **8541**)                                                                       |
 | Heat pump / Flex / Thermal                                              | `consumers[].ehal_bindings`                   | `flex.{slug}.sens_power_act`, `flex.{slug}.set_enable`, `flex.{slug}.set_power_setpoint`                                                                  |
 | EV (`ev`)                                                                | `consumers[].ehal_bindings`                   | `sens_evcs_*`, `get_evcs_*`, `set_evcs_*`                                                                                                                  |
@@ -263,6 +263,7 @@ Default names (2.4.n). Grid/PV/battery **power** preferably via the EFM meter de
 | `sens_grid_power_active`          | Read      | `Earnie_Netzleistung` (or EFM grid)              | Grid: + import, kW                                                                          |
 | `sens_power_consumers`            | Read      | (optional)                                        | House load; otherwise derived                                                               |
 | `sens_temperature_outside`        | Read      | `Earnie_Aussentemperatur`                        | Outside temperature °C (house-wide; heat pump/pool)                                        |
+| `sens_absent_mode`                | Read      | `Earnie_Abwesend`                                | House absent / holiday mode 0/1 (OR with HK `absent_mode`)                                 |
 | `set_ess_active_power`            | Write     | `Earnie_Batterie_Sollleistung`                   | Forced power, kW; `+` discharge, `−` charge                                                 |
 | `set_ess_charge_power_limit`      | Write     | `Earnie_LadeLeistungs-Limit`                     | Max. charge power (true limit)                                                              |
 | `set_ess_discharge_power_limit`   | Write     | `Earnie_EntladeLeistungs-Limit`                  | Max. discharge power (true limit)                                                           |

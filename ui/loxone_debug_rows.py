@@ -36,7 +36,6 @@ from runtime_store import run_state
 from runtime_store.main_daemon import status as daemon_status
 from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY
 from ui.runtime_config import reload_runtime_config
-from ui.setup_dotenv import render_loxone_verify_results
 from ui.sankey_produktiv import has_produktiv_run
 
 

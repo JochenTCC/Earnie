@@ -2,6 +2,46 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Remove EHAL-Com "Smarthome-Merker testen" (2026-09-16)
+
+- [x] **Remove button "Smarthome-Merker testen" on EHAL-Com** — Dropped `render_loxone_verify_results` from Live-Lesen (`ui/loxone_debug.py`); helper remains on Smarthome-Backend credentials. Docs: `docs/ui/ehal-com.md`. Backlog **2.5.3**.
+
+### Bugfix EHAL Live-Lesen absent + SOC-Min Sofort binding (2026-09-16)
+
+- [x] **EHAL binding / Live-Lesen for `sens_absent_mode` and `get_evcs_soc_min_immediate`** — Live-Lesen omitted plant `sens_absent_mode` despite mapping (`collect_read_checks`); heuristic hints missed `Earnie_EAuto_SOCMinSofort`. Probe 404 = Merker title missing on Miniserver (VO CmdOn URL ≠ Merker pull). Fix: plant absent in Live-Lesen; heuristic `socminsofort` hints. Tests: `test_loxone_connectivity`, `test_loxone_ehal_mapping`. Live acceptance verified.
+
+### Bugfix Known consumers in absent mode (2026-09-16)
+
+- [x] **Consumer "Kochen" still planned in absent mode** — Live absent only filtered MILP flex; `earnie_role: known` stayed in baseload overlay + Chart-1 peel. Fix: `resolve_live_absent_skip_ids` / `live_absent_skip_fixed_ids` skip opted-in non–Haus-Wärme IDs in `data/profile_manager.py` live overlay and `house_config/known_chart_display.py`. Tests: `tests/test_absent_mode.py`. Live acceptance verified (local_env).
+
+### Bugfix Absent-mode labels + Haus-Wärme delta (2026-09-16)
+
+- [x] **Absent-mode UI labels + Haus-Wärme temperature delta** — Consumer opt-in „Inaktiv wenn abwesend“; Haus Wärme „Solltemperatur“ + `absent_temp_reduction_c` („Temperaturabsenkung wenn abwesend“) with legacy `absent_temp_c` migrate; EV „Prognose, wenn nicht angeschlossen“. Docs: handbook, `flexible-verbraucher.md`. Tests: `tests/test_absent_mode.py`. Live acceptance verified.
+
+### Holiday / absent mode (live-only) (2026-09-16)
+
+- [x] **Add holiday / absent mode for consumers with no consumption** — HK master `absent_mode` OR plant EHAL `sens_absent_mode` (`Earnie_Abwesend`); per-consumer `absent_mode_enabled`; Haus-Wärme `absent_temp_c` + persons/WW=0; non–Haus-Wärme dropped from live MILP only. HK status + Monitor hint. VO + greenfield auto-bind. Docs: handbook, `flexible-verbraucher.md`, `ehal-com.md`, `loxone-signals.md`, `betriebsmodi.md`. Runtime: `optimizer/absent_mode.py`. Tests: `tests/test_absent_mode.py`. Backlog **2.+1**.
+
+### Remove EHAL-Com Energieflussmonitor → Verbraucher (2026-09-16)
+
+- [x] **Remove redundant EFM HITL chapter on EHAL-Com** — Dropped UI `ui/ehal_efm_import.py` and EHAL-Com expander; EFM meter → consumers/plant stays in Smarthome-Backend **Loxone-Import** via `merge_efm` / `integrations/loxone_efm_meters.py`. Docs retargeted: `docs/ui/ehal-com.md`, `docs/konfiguration/verbrauchs-csv.md`, `docs/referenz/loxone-signals.md`, `docs/spec/efm-auto-sync-2.4.l.md`, `docs/spec/ehal.md`, `docs/spec/loxone-meter-energy-slot-ist.md`. Backlog **2.+1**.
+
+### Loxone auth gate on HTTP 401/403 (2026-09-16)
+
+- [x] **main.py pauses Miniserver access on Loxone 401/403** — Auth failure persisted to `runtime/loxone_auth_error.json`; `main.py` skips optimization runs until credentials recover; Streamlit banner (`ui/loxone_auth_banner.py`) and **Smarthome-Backend → Anbindung** credential update path. Startup checks skip marker verify on auth failure. Delivered **v2.5.1**; backlog item under Version 2.6 was duplicate.
+
+### HK copy-on-add PV / Batterie (2026-09-16)
+
+- [x] **UI: add PV-Anlage / Batterie by copying last selected** — Hauskonfigurator `— neu —` clones last selected entity (label `{source} copy`), fallback Live refs then hard defaults; same pattern as scenarios. `ui/planning_pv_form.py` (`new_pv_system_template`), `ui/planning_battery_form.py` (`new_battery_template`). Tests: `tests/test_planning_editors.py`. Backlog **2.+1**.
+
+### Battery efficiency & standby recommendation (2026-09-16)
+
+- [x] **Calculate battery efficiency from charge/discharge** — Analyse Verbrauch & Kosten: `η = √(E_discharge/E_charge)`; Standby (HK `standby_power_kw` × Fenster) on Entladen bar; caption recommends measured η vs nominal and compares standby A vs residual B (hint if &gt;20%); removed „Kleine Abweichungen…“. Helpers: `ui/consumer_cost_battery_metrics.py`. Docs: `docs/ui/charts.md`. Tests: `tests/test_consumer_cost_analysis.py`. Backlog **2.+1**.
+
+### Energy counters flex Meter Loxone slot Ist (2026-09-16)
+
+- [x] **Energy counters (ΔkWh) for slot Ist — Loxone flex consumers** — `integrations/loxone_meter_energy.py`: `consumer.loxone_meter_energy`, `flex_energy_meter_*`, flex overlay on `closed_interval.flex_kw`; EFM consumer import bind; `profiles_store` normalize; sampler `energy_anchors.open.flex`. Merker-only and shared-meter (`subtract_consumer_ids`) stay sample mean; battery out of scope. Docs: `docs/spec/loxone-meter-energy-slot-ist.md`, `docs/ui/charts.md`, `docs/ui/ehal-com.md`. Tests: `tests/test_loxone_meter_energy.py`, `tests/test_power_interval_sampler.py`, `tests/test_loxone_efm_meters.py`. Backlog **2.+1**.
+
 ### Energy counters plant PV/grid Loxone + Chart 1 QH slot-mean (2026-09-15)
 
 - [x] **Chart 1 / Produktiv-Log: QH slot-mean sampling** — `runtime_store/power_interval_sampler.py` (30 s ticks in daemon wait), `closed_interval` on QH Produktiv-Log; Chart 1 / Verbrauch & Kosten / Soll–Ist prefer mean when `sample_count ≥ 3`; SoC↔Ist reconcile only as low-sample fallback. Docs: `docs/ui/charts.md`, `docs/einrichtung/betrieb.md`. Tests: `tests/test_power_interval_sampler.py`, `tests/test_slot_ist_mean_consumers.py`. Live acceptance: sampler state fills mid-slot samples; **v2.5.3**.

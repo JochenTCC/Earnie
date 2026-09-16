@@ -70,7 +70,7 @@ Frozen Merker names: [`../greenfield_device_map.json`](../greenfield_device_map.
 - `Earnie_Batterie_Sollleistung` → `set_ess_active_power` (VI)
 - `Earnie_LadeLeistungs-Limit` / `Earnie_EntladeLeistungs-Limit` → true caps (VI)
 - `Earnie_Steuerbefehl` → `set_ess_mode` (sticky: **0 = Automatik**; VI)
-- VO: `Earnie_Netzleistung`, `Earnie_PV_Leistung`, `Earnie_Batterie_SoC`, `Earnie_Batterie_Leistung`, `Earnie_Aussentemperatur` (`sens_temperature_outside`)
+- VO: `Earnie_Netzleistung`, `Earnie_PV_Leistung`, `Earnie_Batterie_SoC`, `Earnie_Batterie_Leistung`, `Earnie_Aussentemperatur` (`sens_temperature_outside`), `Earnie_Abwesend` (`sens_absent_mode`)
 
 **Zähler-Bausteine:** `Earnie_Netzleistung`, `Earnie_PV_Leistung`, `Earnie_Batterie_Leistung` (sowie WP/EV/Verbraucher/Pool-Leistung) **können auch vom jeweiligen EFM-Zähler kommen**. VO-Cmds bleiben im XML als Namenskatalog / optionaler Push — Earnie-Binding bevorzugt die EFM-Bezeichnung, wenn vorhanden.
 

@@ -7,10 +7,13 @@ from pathlib import Path
 import pytest
 
 from integrations.loxone_meter_energy import (
+    bind_consumer_meter_energy,
     bind_plant_meter_energy,
     channel_delta_kwh,
     controls_by_name,
     energy_from_io_all,
+    flex_energy_meter_config,
+    flex_energy_meter_names,
     meter_has_energy_states,
     meter_is_bidirectional,
     mono_delta_kwh,
@@ -101,6 +104,7 @@ def test_overlay_counter_on_closed_prefers_delta():
     assert out["ist_power_source"]["pv"] == "counter"
     assert out["ist_power_source"]["grid"] == "counter"
     assert out["ist_power_source"]["battery"] == "mean"
+    assert out["ist_power_source"]["flex"] == {}
 
 
 def test_plant_energy_meter_names_prefer_loxone_meter_energy():
@@ -128,3 +132,57 @@ def test_bind_plant_meter_energy():
         bidirectional=True,
     )
     assert plant["loxone_meter_energy"]["sens_grid_power_active"]["name"] == "Zähler Netz"
+
+
+def test_overlay_counter_on_closed_flex_meter():
+    closed = {
+        "flex_kw": {"ev": 3.0, "wp": 1.0},
+    }
+    out = overlay_counter_on_closed(
+        closed,
+        open_readings={
+            "flex": {
+                "ev": {"total": 20.0},
+                "wp": {"total": 5.0},
+            }
+        },
+        end_readings={
+            "flex": {
+                "ev": {"total": 20.75},
+                "wp": {"total": 4.0},
+            }
+        },
+        dt_h=0.25,
+    )
+    assert out["flex_kw"]["ev"] == pytest.approx(3.0)
+    assert out["flex_energy_kwh"]["ev"] == pytest.approx(0.75)
+    assert out["flex_kw"]["wp"] == pytest.approx(1.0)
+    assert out["ist_power_source"]["flex"]["ev"] == "counter"
+    assert out["ist_power_source"]["flex"]["wp"] == "mean"
+
+
+def test_flex_energy_meter_names_skip_shared_meter():
+    consumers = [
+        {
+            "id": "swimspa",
+            "loxone_meter_energy": {"name": "Zähler SwimSpa"},
+            "loxone_inputs": {"subtract_consumer_ids": ["pool_filter"]},
+        },
+        {
+            "id": "kochen",
+            "ehal_bindings": {"flex.kochen.sens_power_act": "Zähler Kochen"},
+        },
+    ]
+    names = flex_energy_meter_names(consumers)
+    assert "swimspa" not in names
+    assert names["kochen"] == "Zähler Kochen"
+    cfg = flex_energy_meter_config(consumers)
+    assert cfg["kochen"]["bidirectional"] is False
+
+
+def test_bind_consumer_meter_energy():
+    consumer: dict = {"id": "ev"}
+    bind_consumer_meter_energy(
+        consumer, meter_name="Zähler Wallbox", bidirectional=False
+    )
+    assert consumer["loxone_meter_energy"]["name"] == "Zähler Wallbox"

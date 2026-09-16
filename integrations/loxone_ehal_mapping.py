@@ -20,6 +20,7 @@ TELEMETRY_OPTIONAL = (
     "sens_evcs_active_power",
     "sens_power_consumers",
     "sens_temperature_outside",
+    "sens_absent_mode",
 )
 SETPOINT_FIELDS = (
     "set_ess_active_power",
@@ -90,10 +91,20 @@ _HINTS: dict[str, tuple[str, ...]] = {
         "set current",
     ),
     "set_evcs_mode": ("pv_follow", "sofort", "charge_immediate", "ev mode"),
+    "sens_absent_mode": (
+        "abwesend",
+        "absent",
+        "urlaub",
+        "holiday",
+        "vacation",
+        "abwesenheit",
+    ),
     "get_evcs_limit_soc": ("limit soc", "ladeziel", "target soc ev", "limit_soc"),
     "get_evcs_soc_min_immediate": (
+        "socminsofort",
+        "soc_min_sofort",
         "soc min sofort",
-        "socminsfort",
+        "minsofort",
         "min soc immediate",
         "soc_min_immediate",
     ),

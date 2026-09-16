@@ -20,6 +20,7 @@ PLANT_LIVE_READ_FIELDS: tuple[str, ...] = (
     "sens_ess_power",
     "sens_power_consumers",
     "sens_temperature_outside",
+    "sens_absent_mode",
 )
 
 PLANT_LIVE_WRITE_FIELDS: tuple[str, ...] = (

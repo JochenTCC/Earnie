@@ -99,11 +99,19 @@ def resolve_thermal_flex_contexts(
     if not house_profile or not matrix:
         return {}
     from house_config.planning_flex_bridge import _house_thermal_consumers
+    from optimizer.absent_mode import (
+        matrix_is_live_snapshot,
+        resolve_absent_status,
+        thermal_source_with_live_absent,
+    )
 
     thermal_by_id = {
         str(item["id"]): item
         for item in _house_thermal_consumers(house_profile)
     }
+    live_absent = False
+    if matrix_is_live_snapshot(matrix):
+        live_absent = bool(resolve_absent_status(house_profile)["effective"])
     dates = sorted(
         {
             row.get("date")
@@ -119,6 +127,9 @@ def resolve_thermal_flex_contexts(
         source = thermal_by_id.get(cid)
         if not source:
             continue
+        source = thermal_source_with_live_absent(
+            source, live_absent_active=live_absent
+        )
         daily_targets: dict[date, float] = {}
         for day in dates:
             if not isinstance(day, date):

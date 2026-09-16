@@ -18,6 +18,23 @@ Die Optimierung entscheidet **wann** sie laufen, nicht ob die Anlage technisch k
 
 
 
+## Abwesenheits- / Urlaubsmodus (Live)
+
+<a id="abwesenheitsmodus-live"></a>
+
+Hausprofil-Felder (nur **Live**-Optimierung; Szenario-Explorer unverändert):
+
+| Feld | Ort | Bedeutung |
+| ---- | --- | --------- |
+| `absent_mode` | Profil | Earnie-Schalter „Abwesend / Urlaub“ |
+| `absent_mode_enabled` | Verbraucher | „Inaktiv wenn abwesend“ — bei wirksamem Modus: non–Haus-Wärme aus Live-MILP; Haus Wärme mit Absenkung |
+| `absent_temp_reduction_c` | Haus Wärme (`thermal_annual`) | Absenkung in K; Live-Soll = `target_temp_c` − Absenkung; Warmwasser (`persons`) dann 0 |
+| `plant.ehal_bindings.sens_absent_mode` | Plant | Optional `Earnie_Abwesend` (0/1); **ODER** mit `absent_mode` |
+
+Wirksam = HK **oder** EHAL. Opt-in-Verbraucher außer Haus Wärme werden aus der Live-MILP-Liste genommen; Haus Wärme bleibt mit reduzierter Solltemperatur in der Optimierung.
+
+
+
 ## Tagesenergie-Ziel
 
 

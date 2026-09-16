@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Sequence
 
 import streamlit as st
 
 from house_config.id_slug import slug_id
+from house_config.label_uniqueness import allocate_unique_label
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import (
     delete_pv_system,
@@ -28,6 +30,43 @@ _SESSION_FILE_STAMP_KEY = "planning_pv_file_stamp"
 _SESSION_SELECT_PENDING_KEY = "planning_pv_select_pending"
 _SESSION_SELECTED_ID_KEY = "planning_pv_selected_id"
 _SESSION_SUPPRESS_AUTOPERSIST_KEY = "planning_pv_suppress_autopersist"
+_SESSION_TEMPLATE_SOURCE_KEY = "planning_pv_template_source"
+
+
+def new_pv_system_template(
+    systems: list[dict],
+    *,
+    source_id: str = "",
+    live_pv_ids: Sequence[str] = (),
+) -> dict:
+    """Defaults for a new PV system — clone last selected (else Live), else {}."""
+    by_id = {
+        str(item.get("id", "")).strip(): item
+        for item in systems
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    }
+    source = by_id.get(str(source_id or "").strip())
+    if source is None:
+        for live_id in live_pv_ids:
+            source = by_id.get(str(live_id or "").strip())
+            if source is not None:
+                break
+    if source is None:
+        return {}
+
+    source_label = str(source.get("label") or source.get("id") or "PV-Anlage").strip()
+    return {
+        "label": allocate_unique_label(f"{source_label} copy", systems),
+        "pv_kwp": float(source.get("pv_kwp", source.get("kwp", 10.0))),
+        "pv_tilt": float(source.get("pv_tilt", source.get("tilt", 18.0))),
+        "pv_azimuth": float(source.get("pv_azimuth", source.get("azimuth", 0.0))),
+    }
+
+
+def _remember_pv_template_source(entity_id: str) -> None:
+    sid = str(entity_id or "").strip()
+    if sid and sid != NEW_OPTION:
+        st.session_state[_SESSION_TEMPLATE_SOURCE_KEY] = sid
 
 
 def _scoped_key(session_scope: str, base: str) -> str:
@@ -93,8 +132,6 @@ def _seed_pv_widget_state(
     profiles: dict[str, dict],
     default_profile: dict,
 ) -> None:
-    from house_config.label_uniqueness import allocate_unique_label
-
     default_tilt, default_azimuth = _profile_pv_defaults(default_profile)
     if existing:
         label = str(existing.get("label", "Dach Süd"))
@@ -199,9 +236,17 @@ def render_pv_planning_tab() -> None:
         )
     selected = resolve_label_select(selected_display, id_by_display)
     is_new = selected == NEW_OPTION
-    existing = system_map.get(selected, {}) if not is_new else {}
-    if not is_new:
+    if is_new:
+        source_id = str(st.session_state.get(_SESSION_TEMPLATE_SOURCE_KEY) or "")
+        existing = new_pv_system_template(
+            list_pv_systems(),
+            source_id=source_id,
+            live_pv_ids=get_runtime_scenario_refs().get("pv_system_ids") or [],
+        )
+    else:
+        _remember_pv_template_source(selected)
         st.session_state[_SESSION_SELECTED_ID_KEY] = selected
+        existing = system_map.get(selected, {})
 
     profiles = load_house_profiles().get("profiles", {})
     default_profile = _default_profile_for_pv(profiles)
@@ -221,7 +266,7 @@ def render_pv_planning_tab() -> None:
     )
     stable_id = "" if is_new else str(existing.get("id", ""))
 
-    if is_new and profiles:
+    if is_new and profiles and not existing:
         profile_ids = sorted(profiles.keys())
         profile_options, profile_id_by_display = label_select_choices(
             profiles, profile_ids, new_option=None

@@ -285,7 +285,7 @@ def _render_baseload_preview(
     return preview
 
 
-def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict]:
+def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict, bool]:
     session_scope = ctx["session_scope"]
     label = labeled_text_input(
         "Bezeichnung",
@@ -303,13 +303,47 @@ def _render_profile_identity(ctx: dict) -> tuple[str, str, float, dict]:
         step=100.0,
         key=_scoped_key(session_scope, "house_annual_kwh"),
     )
+    absent_mode = labeled_checkbox(
+        "Abwesend / Urlaub",
+        key=_scoped_key(session_scope, "house_absent_mode"),
+        help=(
+            "Earnie-seitiger Abwesenheitsmodus (Live). "
+            "Wirkt zusammen mit dem Smarthome-Signal sens_absent_mode (ODER)."
+        ),
+    )
+    _render_absent_mode_status(profile_absent=bool(absent_mode))
     location = _render_location_fields(session_scope=session_scope)
-    return label, preview_id, float(annual_kwh), location
+    return label, preview_id, float(annual_kwh), location, bool(absent_mode)
+
+
+def _render_absent_mode_status(*, profile_absent: bool) -> None:
+    from optimizer.absent_mode import ehal_read_state, effective_absent_mode, read_ehal_absent_mode
+
+    ehal_labels = {
+        "unbound": "nicht gebunden",
+        "unreadable": "nicht lesbar",
+        "on": "an",
+        "off": "aus",
+    }
+    try:
+        ehal_live, bound = read_ehal_absent_mode()
+    except Exception:
+        ehal_live, bound = None, False
+    state = ehal_read_state(ehal_live, bound=bound)
+    effective = effective_absent_mode(profile_absent, ehal_live)
+    st.caption(
+        f"Smarthome (EHAL): **{ehal_labels[state]}** · "
+        f"Wirksam (Live): **{'aktiv' if effective else 'inaktiv'}**"
+    )
+    if bound:
+        st.caption(
+            "Smarthome kann Abwesenheit aktiv halten, auch wenn der Earnie-Schalter aus ist."
+        )
 
 
 def render_house_profile_tab() -> None:
     ctx = _render_profile_selector()
-    label, preview_id, annual_kwh, location = _render_profile_identity(ctx)
+    label, preview_id, annual_kwh, location, absent_mode = _render_profile_identity(ctx)
     resolved, resolved_for_preview = _edit_and_sync_consumers(
         ctx["session_scope"], location
     )
@@ -323,6 +357,7 @@ def render_house_profile_tab() -> None:
         "label": label,
         "profile_ids": ctx["profile_ids"],
         "annual_kwh": annual_kwh,
+        "absent_mode": absent_mode,
         "location": location,
         "resolved": resolved,
         "existing": ctx["existing"],

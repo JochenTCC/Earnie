@@ -149,6 +149,145 @@ def read_plant_energy_readings(
     return readings
 
 
+def _consumer_has_shared_meter(consumer: dict[str, Any]) -> bool:
+    subtract_ids = (consumer.get("loxone_inputs") or {}).get("subtract_consumer_ids") or []
+    return bool(subtract_ids)
+
+
+def _consumer_power_meter_name(consumer: dict[str, Any]) -> str:
+    from settings.ehal_marker_resolve import (
+        marker_flex_power,
+        marker_sens_evcs_active_power,
+    )
+
+    name = marker_flex_power(consumer) or marker_sens_evcs_active_power(consumer)
+    if name:
+        return name
+    inputs = consumer.get("loxone_inputs")
+    if isinstance(inputs, dict):
+        return str(inputs.get("power_name") or "").strip()
+    return ""
+
+
+def flex_energy_meter_config(
+    consumers: list[dict[str, Any]] | None,
+) -> dict[str, dict[str, Any]]:
+    """``{consumer_id: {name, bidirectional}}`` for slot-Ist ΔE candidates."""
+    out: dict[str, dict[str, Any]] = {}
+    for consumer in consumers or []:
+        if not isinstance(consumer, dict):
+            continue
+        cid = str(consumer.get("id") or "").strip()
+        if not cid or _consumer_has_shared_meter(consumer):
+            continue
+        energy_map = consumer.get("loxone_meter_energy")
+        if isinstance(energy_map, dict):
+            name = str(energy_map.get("name") or "").strip()
+            if name:
+                out[cid] = {
+                    "name": name,
+                    "bidirectional": bool(energy_map.get("bidirectional")),
+                }
+                continue
+        name = _consumer_power_meter_name(consumer)
+        if name:
+            out[cid] = {"name": name, "bidirectional": False}
+    return out
+
+
+def flex_energy_meter_names(
+    consumers: list[dict[str, Any]] | None,
+) -> dict[str, str]:
+    """Map flex consumer id → Meter name (skips shared-meter primaries)."""
+    cfg = flex_energy_meter_config(consumers)
+    return {cid: meta["name"] for cid, meta in cfg.items()}
+
+
+def read_flex_energy_readings(
+    meter_names: dict[str, str],
+    *,
+    fetch_meter: Callable[[str], dict[str, float] | None] | None = None,
+) -> dict[str, dict[str, float]]:
+    """``{consumer_id: {total[, total_neg]}}`` for configured flex Meter names."""
+    fetch = fetch_meter or fetch_meter_energy_kwh
+    readings: dict[str, dict[str, float]] = {}
+    for consumer_id, name in meter_names.items():
+        energy = fetch(name)
+        if energy:
+            readings[str(consumer_id)] = energy
+    return readings
+
+
+def load_live_profile_consumers() -> list[dict[str, Any]]:
+    """Consumers from ``house_profiles.json`` live profile."""
+    try:
+        import os
+
+        from house_config.profiles_store import load_house_profiles_document
+        from runtime_store.persist_paths import resolve_house_profiles_json_path
+        from ui.ehal_loxone_mapping import resolve_live_profile_id
+    except ImportError:
+        return []
+    path = resolve_house_profiles_json_path()
+    if not path or not os.path.isfile(path):
+        return []
+    try:
+        doc = load_house_profiles_document(path)
+    except (OSError, ValueError, TypeError):
+        return []
+    if not isinstance(doc, dict):
+        return []
+    profile_id = resolve_live_profile_id(doc)
+    profiles = doc.get("profiles")
+    if not profile_id or not isinstance(profiles, dict):
+        return []
+    profile = profiles.get(profile_id)
+    if not isinstance(profile, dict):
+        return []
+    return [
+        c for c in (profile.get("consumers") or []) if isinstance(c, dict)
+    ]
+
+
+def _flex_power_sources(flex_kw: dict[str, Any] | None) -> dict[str, str]:
+    return {str(key): "mean" for key in (flex_kw or {})}
+
+
+def _overlay_flex_counters(
+    out: dict[str, Any],
+    *,
+    open_r: dict[str, Any],
+    end_r: dict[str, Any],
+    dt_h: float,
+    flex_meter_config: dict[str, dict[str, Any]] | None,
+) -> None:
+    flex_open = open_r.get("flex")
+    flex_end = end_r.get("flex")
+    if not isinstance(flex_open, dict) or not isinstance(flex_end, dict):
+        return
+    flex_kw = dict(out.get("flex_kw") or {})
+    flex_energy: dict[str, float] = dict(out.get("flex_energy_kwh") or {})
+    flex_sources = _flex_power_sources(flex_kw)
+    cfg = flex_meter_config or {}
+    for consumer_id, open_read in flex_open.items():
+        fid = str(consumer_id)
+        end_read = flex_end.get(consumer_id)
+        if not isinstance(open_read, dict) or not isinstance(end_read, dict):
+            continue
+        bipolar = bool((cfg.get(fid) or {}).get("bidirectional"))
+        delta = channel_delta_kwh(open_read, end_read, bipolar=bipolar)
+        if delta is None:
+            continue
+        flex_kw[fid] = round(delta / dt_h, 3)
+        flex_energy[fid] = round(delta, 4)
+        flex_sources[fid] = "counter"
+    out["flex_kw"] = flex_kw
+    if flex_energy:
+        out["flex_energy_kwh"] = flex_energy
+    sources = out.setdefault("ist_power_source", {})
+    sources["flex"] = flex_sources
+
+
 def mono_delta_kwh(start: float | None, end: float | None) -> float | None:
     """Non-negative counter delta; None on missing or reset."""
     if start is None or end is None:
@@ -190,16 +329,17 @@ def overlay_counter_on_closed(
     open_readings: dict[str, dict[str, float]] | None,
     end_readings: dict[str, dict[str, float]] | None,
     dt_h: float,
+    flex_meter_config: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Prefer measured ΔkWh → avg kW for pv/grid; leave other channels on mean."""
+    """Prefer measured ΔkWh → avg kW for pv/grid and flex Meters; others stay mean."""
     out = dict(closed)
-    sources = {
+    sources: dict[str, Any] = {
         "pv": "mean",
         "grid": "mean",
         "battery": "mean",
         "house": "mean",
         "baseload": "mean",
-        "flex": "mean",
+        "flex": _flex_power_sources(out.get("flex_kw")),
     }
     open_r = open_readings or {}
     end_r = end_readings or {}
@@ -218,7 +358,30 @@ def overlay_counter_on_closed(
         out["grid_kw"] = round(grid_delta / dt_h, 3)
         sources["grid"] = "counter"
     out["ist_power_source"] = sources
+    _overlay_flex_counters(
+        out,
+        open_r=open_r,
+        end_r=end_r,
+        dt_h=dt_h,
+        flex_meter_config=flex_meter_config,
+    )
     return out
+
+
+def bind_consumer_meter_energy(
+    consumer: dict[str, Any],
+    *,
+    meter_name: str,
+    bidirectional: bool = False,
+) -> None:
+    """Record Loxone-local energy binding on a flex consumer (in-place)."""
+    name = str(meter_name or "").strip()
+    if not name:
+        return
+    consumer["loxone_meter_energy"] = {
+        "name": name,
+        "bidirectional": bool(bidirectional),
+    }
 
 
 def bind_plant_meter_energy(

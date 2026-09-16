@@ -269,9 +269,13 @@ def _apply_house_profile_baseload_overlay(
 
     resolved_flex = config.get_flexible_consumers()
     thermal_milp_ids = milp_flex_thermal_annual_ids(resolved_flex)
+    from optimizer.absent_mode import resolve_live_absent_skip_ids
+
+    absent_skip_ids = resolve_live_absent_skip_ids(profile)
     generic = fixed_generic_hourly_overlay(
         profile,
         target_hours,
+        skip_ids=absent_skip_ids,
         meter_residual_mode=False,
     )
     thermal = thermal_hourly_overlay(

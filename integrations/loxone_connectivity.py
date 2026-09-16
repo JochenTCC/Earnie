@@ -520,7 +520,10 @@ def _append_thermal_read_checks(
 
 def collect_read_checks() -> list[tuple[str, str, dict]]:
     """(EHAL-Feld, Mapping/IO-Name) — plant ``sens_*`` + consumer reads."""
-    from settings.ehal_marker_resolve import marker_sens_temperature_outside
+    from settings.ehal_marker_resolve import (
+        marker_sens_absent_mode,
+        marker_sens_temperature_outside,
+    )
 
     checks: list[tuple[str, str, dict]] = [
         ("sens_ess_soc", config.get("LOXONE_SOC_NAME"), {"validate": _soc_valid}),
@@ -546,14 +549,20 @@ def collect_read_checks() -> list[tuple[str, str, dict]]:
             ("sens_power_consumers", consumers_power, {"validate": _power_valid})
         )
 
-    ambient_io = marker_sens_temperature_outside(
-        house_doc=loxone_client._default_house_profiles_doc()
-    )
+    house_doc = loxone_client._default_house_profiles_doc()
+    ambient_io = marker_sens_temperature_outside(house_doc=house_doc)
     _append_io_check(
         checks,
         "sens_temperature_outside",
         ambient_io,
         {"validate": _temperature_valid},
+    )
+    absent_io = marker_sens_absent_mode(house_doc=house_doc)
+    _append_io_check(
+        checks,
+        "sens_absent_mode",
+        absent_io,
+        {"validate": _binary_valid},
     )
 
     for consumer in _consumers_for_live_reads():

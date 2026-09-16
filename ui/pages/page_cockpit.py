@@ -1,6 +1,8 @@
 """Cockpit-Seite: Sunset-2-Sunset-Produktivansicht (bestehender S-2-Block)."""
 from __future__ import annotations
 
+import streamlit as st
+
 import config
 from integrations import loxone_client
 from ui.auto_refresh import setup_auto_refresh
@@ -19,6 +21,20 @@ _COCKPIT_HELP = (
 )
 
 
+def _render_absent_mode_hint() -> None:
+    from optimizer.absent_mode import resolve_absent_status
+
+    try:
+        status = resolve_absent_status()
+    except Exception:
+        return
+    if not status.get("effective"):
+        return
+    source = status.get("source") or ""
+    suffix = f" (Quelle: {source})" if source else ""
+    st.info(f"Abwesenheitsmodus aktiv{suffix}.")
+
+
 def render() -> None:
     reload_runtime_config()
     if is_live_s2_window():
@@ -31,6 +47,7 @@ def render() -> None:
         key="cockpit_scope_help",
         page_docs_key="cockpit",
     )
+    _render_absent_mode_hint()
 
     current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
     render_optimization_savings_and_chart(current_soc)

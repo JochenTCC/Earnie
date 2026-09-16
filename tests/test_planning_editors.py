@@ -1201,6 +1201,218 @@ def test_seed_battery_widget_state_uses_existing_capacity():
     assert session["speicher_8kwh__planning_battery_threshold"] == 8.0
 
 
+def test_new_pv_system_template_clones_last_selected():
+    from ui.planning_pv_form import new_pv_system_template
+
+    systems = [
+        {
+            "id": "live_pv",
+            "label": "Dach Süd",
+            "pv_kwp": 8.0,
+            "pv_tilt": 20.0,
+            "pv_azimuth": -15.0,
+        },
+        {
+            "id": "ost",
+            "label": "Dach Ost",
+            "pv_kwp": 4.5,
+            "pv_tilt": 30.0,
+            "pv_azimuth": -90.0,
+        },
+    ]
+    template = new_pv_system_template(
+        systems, source_id="ost", live_pv_ids=["live_pv"]
+    )
+    assert template["label"] == "Dach Ost copy"
+    assert template["pv_kwp"] == 4.5
+    assert template["pv_tilt"] == 30.0
+    assert template["pv_azimuth"] == -90.0
+    assert "id" not in template
+
+
+def test_new_pv_system_template_label_collision_gets_suffix():
+    from ui.planning_pv_form import new_pv_system_template
+
+    systems = [
+        {"id": "a", "label": "Dach Süd", "pv_kwp": 10.0, "pv_tilt": 18, "pv_azimuth": 0},
+        {
+            "id": "b",
+            "label": "Dach Süd copy",
+            "pv_kwp": 5.0,
+            "pv_tilt": 18,
+            "pv_azimuth": 0,
+        },
+    ]
+    template = new_pv_system_template(systems, source_id="a", live_pv_ids=[])
+    assert template["label"] == "Dach Süd copy 2"
+
+
+def test_new_pv_system_template_unknown_source_falls_back_to_live():
+    from ui.planning_pv_form import new_pv_system_template
+
+    systems = [
+        {
+            "id": "live_pv",
+            "label": "Live PV",
+            "pv_kwp": 12.0,
+            "pv_tilt": 22.0,
+            "pv_azimuth": 5.0,
+        }
+    ]
+    template = new_pv_system_template(
+        systems, source_id="missing", live_pv_ids=["live_pv"]
+    )
+    assert template["label"] == "Live PV copy"
+    assert template["pv_kwp"] == 12.0
+
+
+def test_new_pv_system_template_without_source_returns_empty():
+    from ui.planning_pv_form import new_pv_system_template
+
+    assert new_pv_system_template([], source_id="x", live_pv_ids=["y"]) == {}
+    systems = [
+        {"id": "a", "label": "A", "pv_kwp": 1.0, "pv_tilt": 10, "pv_azimuth": 0}
+    ]
+    assert new_pv_system_template(systems, source_id="", live_pv_ids=[]) == {}
+
+
+def test_new_battery_template_clones_last_selected():
+    from ui.planning_battery_form import new_battery_template
+
+    batteries = [
+        {
+            "id": "live_bat",
+            "label": "5 kWh Speicher",
+            "battery_capacity_kwh": 5.0,
+            "battery_max_power_kw": 2.5,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05,
+            "standby_power_kw": 0.0,
+        },
+        {
+            "id": "big",
+            "label": "10 kWh Speicher",
+            "battery_capacity_kwh": 10.0,
+            "battery_max_power_kw": 5.0,
+            "battery_efficiency": 0.95,
+            "battery_min_soc": 15.0,
+            "battery_max_soc": 95.0,
+            "threshold_power": 0.08,
+            "standby_power_kw": 0.1,
+            "battery_wear": {
+                "enabled": True,
+                "replacement_cost_euro": 2000.0,
+                "expected_cycles": 5000.0,
+                "cycle_cost_fraction": 0.4,
+            },
+        },
+    ]
+    template = new_battery_template(
+        batteries, source_id="big", live_battery_id="live_bat"
+    )
+    assert template["label"] == "10 kWh Speicher copy"
+    assert template["battery_capacity_kwh"] == 10.0
+    assert template["battery_max_power_kw"] == 5.0
+    assert template["battery_efficiency"] == 0.95
+    assert template["threshold_power"] == 0.08
+    assert template["standby_power_kw"] == 0.1
+    assert template["battery_wear"]["enabled"] is True
+    assert "id" not in template
+
+
+def test_new_battery_template_label_collision_gets_suffix():
+    from ui.planning_battery_form import new_battery_template
+
+    batteries = [
+        {
+            "id": "a",
+            "label": "5 kWh Speicher",
+            "battery_capacity_kwh": 5.0,
+            "battery_max_power_kw": 2.5,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05,
+        },
+        {
+            "id": "b",
+            "label": "5 kWh Speicher copy",
+            "battery_capacity_kwh": 6.0,
+            "battery_max_power_kw": 2.5,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05,
+        },
+    ]
+    template = new_battery_template(batteries, source_id="a", live_battery_id="")
+    assert template["label"] == "5 kWh Speicher copy 2"
+
+
+def test_new_battery_template_unknown_source_falls_back_to_live():
+    from ui.planning_battery_form import new_battery_template
+
+    batteries = [
+        {
+            "id": "live_bat",
+            "label": "Live Speicher",
+            "battery_capacity_kwh": 7.0,
+            "battery_max_power_kw": 3.0,
+            "battery_efficiency": 0.96,
+            "battery_min_soc": 12.0,
+            "battery_max_soc": 98.0,
+            "threshold_power": 0.06,
+        }
+    ]
+    template = new_battery_template(
+        batteries, source_id="missing", live_battery_id="live_bat"
+    )
+    assert template["label"] == "Live Speicher copy"
+    assert template["battery_capacity_kwh"] == 7.0
+
+
+def test_new_battery_template_without_source_returns_empty():
+    from ui.planning_battery_form import new_battery_template
+
+    assert new_battery_template([], source_id="x", live_battery_id="y") == {}
+    batteries = [
+        {
+            "id": "a",
+            "label": "A",
+            "battery_capacity_kwh": 5.0,
+            "battery_max_power_kw": 2.5,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05,
+        }
+    ]
+    assert new_battery_template(batteries, source_id="", live_battery_id="") == {}
+
+
+def test_new_battery_template_deepcopies_wear():
+    from ui.planning_battery_form import new_battery_template
+
+    batteries = [
+        {
+            "id": "a",
+            "label": "Speicher",
+            "battery_capacity_kwh": 5.0,
+            "battery_max_power_kw": 2.5,
+            "battery_efficiency": 0.97,
+            "battery_min_soc": 10.0,
+            "battery_max_soc": 100.0,
+            "threshold_power": 0.05,
+            "battery_wear": {"enabled": True, "expected_cycles": 6000.0},
+        }
+    ]
+    template = new_battery_template(batteries, source_id="a", live_battery_id="")
+    template["battery_wear"]["expected_cycles"] = 1.0
+    assert batteries[0]["battery_wear"]["expected_cycles"] == 6000.0
+
+
 def test_upsert_thermal_profile_roundtrip(tmp_path, monkeypatch):
     from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
 

@@ -64,6 +64,18 @@ def test_heuristic_propose_energy_names():
     assert 0.35 <= proposals["sens_ess_soc"]["confidence"] <= 0.75
 
 
+def test_heuristic_propose_soc_min_immediate_and_absent():
+    proposals = heuristic_propose(
+        ["Earnie_Abwesend", "Earnie_EAuto_SOCMinSofort"],
+        fields=("sens_absent_mode", "get_evcs_soc_min_immediate"),
+    )
+    assert proposals["sens_absent_mode"]["marker_name"] == "Earnie_Abwesend"
+    assert (
+        proposals["get_evcs_soc_min_immediate"]["marker_name"]
+        == "Earnie_EAuto_SOCMinSofort"
+    )
+
+
 def test_parse_ollama_proposals_filters_unknown():
     content = json_blob(
         {

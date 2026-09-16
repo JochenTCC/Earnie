@@ -57,12 +57,15 @@ def _empty_state() -> dict[str, Any]:
 
 
 def _default_read_energy() -> dict[str, dict[str, float]] | None:
-    """Loxone Meter totals for pv/grid when backend is Loxone; else None."""
+    """Loxone Meter totals for pv/grid and flex when backend is Loxone; else None."""
     try:
         import config
         from integrations import ehal_live
         from integrations.loxone_meter_energy import (
+            flex_energy_meter_names,
+            load_live_profile_consumers,
             plant_energy_meter_names,
+            read_flex_energy_readings,
             read_plant_energy_readings,
         )
     except Exception as exc:  # noqa: BLE001
@@ -89,10 +92,18 @@ def _default_read_energy() -> dict[str, dict[str, float]] | None:
                 plant = raw_plant
     except Exception as exc:  # noqa: BLE001
         logger.debug("power_interval_sampler: plant load failed: %s", exc)
-    names = plant_energy_meter_names(plant=plant, config_get=config.get)
-    if not names:
-        return None
-    readings = read_plant_energy_readings(names)
+    readings: dict[str, Any] = {}
+    plant_names = plant_energy_meter_names(plant=plant, config_get=config.get)
+    if plant_names:
+        readings.update(read_plant_energy_readings(plant_names))
+    try:
+        consumers = load_live_profile_consumers()
+        flex_names = flex_energy_meter_names(consumers)
+        flex_readings = read_flex_energy_readings(flex_names)
+        if flex_readings:
+            readings["flex"] = flex_readings
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("power_interval_sampler: flex energy load failed: %s", exc)
     return readings or None
 
 
@@ -127,7 +138,11 @@ def _overlay_energy_counters(
     state: dict[str, Any],
     read_energy: Callable[[], dict[str, dict[str, float]] | None] | None,
 ) -> dict[str, Any]:
-    from integrations.loxone_meter_energy import overlay_counter_on_closed
+    from integrations.loxone_meter_energy import (
+        flex_energy_meter_config,
+        load_live_profile_consumers,
+        overlay_counter_on_closed,
+    )
 
     key = _iso(interval_start)
     anchors = dict(state.get("energy_anchors") or {})
@@ -138,6 +153,9 @@ def _overlay_energy_counters(
         raw_open = open_payload.get("open")
         if isinstance(raw_open, dict):
             open_readings = raw_open
+    flex_sources = {
+        str(key): "mean" for key in (closed.get("flex_kw") or {})
+    }
     if not open_readings:
         out = dict(closed)
         out["ist_power_source"] = {
@@ -146,7 +164,7 @@ def _overlay_energy_counters(
             "battery": "mean",
             "house": "mean",
             "baseload": "mean",
-            "flex": "mean",
+            "flex": flex_sources,
         }
         return out
     reader = read_energy if read_energy is not None else _default_read_energy
@@ -155,11 +173,13 @@ def _overlay_energy_counters(
         end_readings = reader()
     except Exception as exc:  # noqa: BLE001
         logger.debug("power_interval_sampler: energy close read failed: %s", exc)
+    flex_cfg = flex_energy_meter_config(load_live_profile_consumers())
     return overlay_counter_on_closed(
         closed,
         open_readings=open_readings,
         end_readings=end_readings,
         dt_h=DEFAULT_DT_H,
+        flex_meter_config=flex_cfg,
     )
 
 

@@ -136,6 +136,11 @@ def resolve_thermal_annual_horizon_kwh(
     if not profile:
         return 0.0
     from house_config.planning_flex_bridge import _house_thermal_consumers
+    from optimizer.absent_mode import (
+        matrix_is_live_snapshot,
+        resolve_absent_status,
+        thermal_source_with_live_absent,
+    )
     from optimizer.thermal_flex_context import thermal_daily_kwh_for_date
 
     thermal_by_id = {
@@ -144,6 +149,12 @@ def resolve_thermal_annual_horizon_kwh(
     source = thermal_by_id.get(str(consumer["id"]))
     if not source:
         return 0.0
+    live_absent = False
+    if matrix_is_live_snapshot(optimization_matrix):
+        live_absent = bool(resolve_absent_status(profile)["effective"])
+    source = thermal_source_with_live_absent(
+        source, live_absent_active=live_absent
+    )
     total = 0.0
     dates = sorted(
         {
@@ -308,6 +319,8 @@ def resolve_applied_daily_targets(
 def build_applied_targets_detail(
     optimization_matrix: list,
     consumer_daily_targets_kwh: dict | None = None,
+    *,
+    consumers: list | None = None,
 ) -> list[dict]:
     """Bereitet die genutzten Tagesziele mit Verbrauchername und Quelle für die UI auf."""
     consumption_mode = (
@@ -315,10 +328,15 @@ def build_applied_targets_detail(
     )
     logged_day = consumption_mode == "logged_day"
     targets = resolve_applied_daily_targets(optimization_matrix, consumer_daily_targets_kwh)
-    charging_contexts = resolve_charging_contexts(optimization_matrix, consumer_daily_targets_kwh)
+    active = consumers if consumers is not None else config.get_flexible_consumers(
+        optimizer_only=True
+    )
+    charging_contexts = resolve_charging_contexts(
+        optimization_matrix, consumer_daily_targets_kwh, consumers=active
+    )
     targets = apply_horizon_charging_limits(targets, charging_contexts)
     details = []
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in active:
         cid = consumer["id"]
         ctx = charging_contexts.get(cid)
         if ctx and ctx.get("source_label"):
@@ -347,7 +365,11 @@ def build_applied_targets_detail(
     return details
 
 
-def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
+def build_baseline_targets_detail(
+    optimization_matrix: list,
+    *,
+    consumers: list | None = None,
+) -> list[dict]:
     """
     Ermittelt die pro Verbraucher in der Baseline enthaltene Tagesenergie.
     Historisch: geloggte Summen im Gesamtverbrauchs-Stundenprofil.
@@ -358,7 +380,9 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
     consumption_mode = optimization_matrix[0].get("consumption_mode")
     logged_day = consumption_mode == "logged_day"
     profile_spec = consumption_mode == "profile_spec"
-    consumers = config.get_flexible_consumers(optimizer_only=True)
+    active = consumers if consumers is not None else config.get_flexible_consumers(
+        optimizer_only=True
+    )
     details = []
     if logged_day or profile_spec:
         row_date = optimization_matrix[0].get("date")
@@ -368,7 +392,7 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
             source = "Hausprofil (profile_spec, cons_data Referenz)"
         else:
             source = "geloggt (Gesamtverbrauchs-Stundenprofil)"
-        for consumer in consumers:
+        for consumer in active:
             cid = consumer["id"]
             details.append({
                 "id": cid,
@@ -377,10 +401,10 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
                 "source": source,
             })
         return details
-    flex_sums = {consumer["id"]: 0.0 for consumer in consumers}
+    flex_sums = {consumer["id"]: 0.0 for consumer in active}
     for row in optimization_matrix:
         flex = row.get("expected_flex_kw") or {}
-        for consumer in consumers:
+        for consumer in active:
             flex_sums[consumer["id"]] += flex_kw_lookup(flex, consumer)
     from .slot_duration import DEFAULT_DT_H
 
@@ -393,7 +417,7 @@ def build_baseline_targets_detail(optimization_matrix: list) -> list[dict]:
         if has_profile_flex
         else "Gesamtprofil (total_consumption_profiles.csv, nicht aufgeteilt)"
     )
-    for consumer in consumers:
+    for consumer in active:
         cid = consumer["id"]
         details.append({
             "id": cid,
@@ -419,6 +443,8 @@ def build_energy_comparison_detail(
     optimization_matrix: list,
     consumer_daily_targets_kwh: dict | None = None,
     matched_flex_kwh: dict[str, float] | None = None,
+    *,
+    consumers: list | None = None,
 ) -> list[dict]:
     """Kombiniert Profil-Baseline, Ziel-Baseline und Optimierung je Verbraucher inkl. Grundlast."""
     baseload_kwh = resolve_baseload_kwh(optimization_matrix)
@@ -431,12 +457,20 @@ def build_energy_comparison_detail(
         baseload_source = "geloggt (historischer Tag)"
     else:
         baseload_source = "Verbrauchsprofil (consumption_profiles.csv)"
+    active = consumers if consumers is not None else config.get_flexible_consumers(
+        optimizer_only=True
+    )
     baseline_by_id = {
-        item["id"]: item for item in build_baseline_targets_detail(optimization_matrix)
+        item["id"]: item
+        for item in build_baseline_targets_detail(
+            optimization_matrix, consumers=active
+        )
     }
     optimized_by_id = {
         item["id"]: item
-        for item in build_applied_targets_detail(optimization_matrix, consumer_daily_targets_kwh)
+        for item in build_applied_targets_detail(
+            optimization_matrix, consumer_daily_targets_kwh, consumers=active
+        )
     }
     matched_flex = matched_flex_kwh or {}
     rows = [{
@@ -446,7 +480,7 @@ def build_energy_comparison_detail(
         "optimization_kwh": baseload_kwh,
         "optimization_source": baseload_source,
     }]
-    for consumer in config.get_flexible_consumers(optimizer_only=True):
+    for consumer in active:
         cid = consumer["id"]
         base = baseline_by_id.get(cid, {})
         opt = optimized_by_id.get(cid, {})

@@ -44,6 +44,13 @@
       "notes": "Outside air C; house-wide (WP/Pool thermal). Pattern B VO on Plant."
     },
     {
+      "name": "Earnie_Abwesend",
+      "match": "exact",
+      "entity_kind": "plant",
+      "ehal_field": "sens_absent_mode",
+      "notes": "House absent mode 0/1; Pattern B VO on Plant."
+    },
+    {
       "name": "Earnie_Batterie_Sollleistung",
       "match": "exact",
       "entity_kind": "plant",

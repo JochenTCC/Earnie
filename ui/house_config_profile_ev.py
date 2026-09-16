@@ -213,9 +213,13 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
             key=_scoped_key(session_scope, f"hc_ev_eff_{index}"),
         ),
         "forecast_when_absent": labeled_checkbox(
-            "Prognose bei Abwesenheit",
+            "Prognose, wenn nicht angeschlossen",
             value=bool(sched.get("forecast_when_absent", True)),
             key=_scoped_key(session_scope, f"hc_ev_forecast_{index}"),
+            help=(
+                "Lade-Prognose ohne Wallbox-Anschluss (charging_schedule). "
+                "Unabhängig vom Haus-Abwesenheitsmodus."
+            ),
         ),
         "nominal_power_voltage_v": labeled_number_input(
             "Nennspannung (V) für A→kW",

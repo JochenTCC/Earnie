@@ -52,6 +52,19 @@ def _copy_ehal_entity_fields(raw: dict, spec: dict) -> None:
             )
 
 
+def _normalize_loxone_meter_energy(raw: dict, spec: dict) -> None:
+    energy = raw.get("loxone_meter_energy")
+    if not isinstance(energy, dict):
+        return
+    name = str(energy.get("name") or "").strip()
+    if not name:
+        return
+    spec["loxone_meter_energy"] = {
+        "name": name,
+        "bidirectional": bool(energy.get("bidirectional")),
+    }
+
+
 def _legacy_loxone_power_name(raw: dict) -> str:
     rec = raw.get("appliance_recommendation")
     if isinstance(rec, dict):
@@ -250,15 +263,26 @@ def _normalize_ev_consumer(raw: dict, spec: dict, *, profile_id: str, index: int
     _copy_loxone_binding(raw, spec)
 
 
+def _absent_temp_reduction_c(raw: dict, target_temp_c: float) -> float:
+    """Resolve Kelvin reduction; migrate legacy absolute ``absent_temp_c``."""
+    if raw.get("absent_temp_reduction_c") not in (None, ""):
+        return max(0.0, float(raw["absent_temp_reduction_c"]))
+    if raw.get("absent_temp_c") not in (None, ""):
+        return max(0.0, float(target_temp_c) - float(raw["absent_temp_c"]))
+    return 6.5
+
+
 def _normalize_thermal_annual_consumer(raw: dict, spec: dict) -> None:
     hwb_raw = raw.get("hwb_kwh_m2")
     hwb_value = float(hwb_raw) if hwb_raw not in (None, "") else 0.0
+    target_temp_c = float(raw.get("target_temp_c", 21.5))
     spec["thermal"] = {
         "living_area_m2": float(raw.get("living_area_m2", 0.0) or 0.0),
         "building_class": int(raw.get("building_class", 3)),
         "heat_pump_type": str(raw.get("heat_pump_type", "luft")).strip().lower(),
         "persons": int(raw.get("persons", 2)),
-        "target_temp_c": float(raw.get("target_temp_c", 21.5)),
+        "target_temp_c": target_temp_c,
+        "absent_temp_reduction_c": _absent_temp_reduction_c(raw, target_temp_c),
         "heating_limit_c": float(raw.get("heating_limit_c", 15.0)),
         "solar_thermal_area_m2": float(raw.get("solar_thermal_area_m2", 0.0) or 0.0),
         "solar_thermal_tilt_deg": float(raw.get("solar_thermal_tilt_deg", 18.0)),
@@ -319,6 +343,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
         "nominal_power_kw": float(raw.get("nominal_power_kw", 0.0) or 0.0),
         "profile_csv": str(raw.get("profile_csv", "")).strip(),
         "use_profile_csv": bool(raw.get("use_profile_csv", False)),
+        "absent_mode_enabled": bool(raw.get("absent_mode_enabled", False)),
     }
     if consumer_type == "generic":
         spec["schedule"] = _normalize_schedule(raw.get("schedule"), consumer=raw)
@@ -337,6 +362,7 @@ def _normalize_consumer(raw: dict, index: int, profile_id: str) -> dict:
     elif consumer_type == "thermal_rc":
         _normalize_thermal_rc_consumer(raw, spec, profile_id=profile_id, index=index)
     _copy_ehal_entity_fields(raw, spec)
+    _normalize_loxone_meter_energy(raw, spec)
     return spec
 
 
@@ -449,6 +475,7 @@ def _normalize_profile(raw: dict, index: int) -> dict:
         "id": profile_id,
         "label": label,
         "annual_kwh": fields["annual_kwh"],
+        "absent_mode": bool(raw.get("absent_mode", False)),
         "land": fields["land"],
         "latitude": fields["latitude"],
         "longitude": fields["longitude"],
@@ -538,6 +565,7 @@ def _serialize_profile(profile: dict) -> dict:
         "id": profile["id"],
         "label": profile["label"],
         "annual_kwh": profile["annual_kwh"],
+        "absent_mode": bool(profile.get("absent_mode", False)),
         "total_profile_csv": profile.get("total_profile_csv", ""),
         "pv_profile_csv": profile.get("pv_profile_csv", ""),
         "battery_profile_csv": profile.get("battery_profile_csv", ""),
@@ -586,6 +614,12 @@ def save_house_profiles_document(path: str, doc: dict) -> None:
 def _attach_ehal_entity_fields(out: dict, consumer: dict) -> None:
     if consumer.get("ehal_bindings"):
         out["ehal_bindings"] = dict(consumer["ehal_bindings"])
+    energy = consumer.get("loxone_meter_energy")
+    if isinstance(energy, dict) and str(energy.get("name") or "").strip():
+        out["loxone_meter_energy"] = {
+            "name": str(energy.get("name") or "").strip(),
+            "bidirectional": bool(energy.get("bidirectional")),
+        }
 
 
 def _serialize_consumer(consumer: dict) -> dict:
@@ -598,6 +632,7 @@ def _serialize_consumer(consumer: dict) -> dict:
     if consumer.get("profile_csv"):
         out["profile_csv"] = consumer["profile_csv"]
     out["use_profile_csv"] = bool(consumer.get("use_profile_csv", False))
+    out["absent_mode_enabled"] = bool(consumer.get("absent_mode_enabled", False))
     if consumer["type"] == "generic":
         out["annual_kwh"] = consumer.get("annual_kwh", 0.0)
         if consumer.get("schedule"):

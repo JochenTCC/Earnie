@@ -1,11 +1,13 @@
 """Batterie-Tab im Hauskonfigurator."""
 from __future__ import annotations
 
+import copy
 import os
 
 import streamlit as st
 
 from house_config.id_slug import slug_id
+from house_config.label_uniqueness import allocate_unique_label
 from runtime_store.persist_paths import resolve_config_json_path
 from ui.house_config_io import (
     delete_battery,
@@ -33,6 +35,45 @@ _SESSION_FILE_STAMP_KEY = "planning_battery_file_stamp"
 _SESSION_SELECT_PENDING_KEY = "planning_battery_select_pending"
 _SESSION_SELECTED_ID_KEY = "planning_battery_selected_id"
 _SESSION_SUPPRESS_AUTOPERSIST_KEY = "planning_battery_suppress_autopersist"
+_SESSION_TEMPLATE_SOURCE_KEY = "planning_battery_template_source"
+
+
+def new_battery_template(
+    batteries: list[dict],
+    *,
+    source_id: str = "",
+    live_battery_id: str = "",
+) -> dict:
+    """Defaults for a new battery — clone last selected (else Live), else {}."""
+    by_id = {
+        str(item.get("id", "")).strip(): item
+        for item in batteries
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    }
+    source = by_id.get(str(source_id or "").strip()) or by_id.get(
+        str(live_battery_id or "").strip()
+    )
+    if source is None:
+        return {}
+
+    source_label = str(source.get("label") or source.get("id") or "Batterie").strip()
+    return {
+        "label": allocate_unique_label(f"{source_label} copy", batteries),
+        "battery_capacity_kwh": float(source.get("battery_capacity_kwh", 5.0)),
+        "battery_max_power_kw": float(source.get("battery_max_power_kw", 2.5)),
+        "battery_efficiency": float(source.get("battery_efficiency", 0.97)),
+        "battery_min_soc": float(source.get("battery_min_soc", 10.0)),
+        "battery_max_soc": float(source.get("battery_max_soc", 100.0)),
+        "threshold_power": float(source.get("threshold_power", 0.05)),
+        "standby_power_kw": float(source.get("standby_power_kw", 0.0) or 0.0),
+        "battery_wear": copy.deepcopy(dict(source.get("battery_wear") or {})),
+    }
+
+
+def _remember_battery_template_source(entity_id: str) -> None:
+    sid = str(entity_id or "").strip()
+    if sid and sid != NEW_OPTION:
+        st.session_state[_SESSION_TEMPLATE_SOURCE_KEY] = sid
 
 
 def _scoped_key(session_scope: str, base: str) -> str:
@@ -59,8 +100,6 @@ def _clear_scoped_widget_keys(session_scope: str) -> None:
 
 
 def _seed_battery_widget_state(session_scope: str, existing: dict) -> None:
-    from house_config.label_uniqueness import allocate_unique_label
-
     if existing:
         label = str(existing.get("label", "5 kWh Speicher"))
         capacity = float(existing.get("battery_capacity_kwh", 5.0))
@@ -176,9 +215,19 @@ def render_battery_planning_tab() -> None:
         )
     selected = resolve_label_select(selected_display, id_by_display)
     is_new = selected == NEW_OPTION
-    existing = battery_map.get(selected, {}) if not is_new else {}
-    if not is_new:
+    if is_new:
+        source_id = str(st.session_state.get(_SESSION_TEMPLATE_SOURCE_KEY) or "")
+        existing = new_battery_template(
+            list_batteries(),
+            source_id=source_id,
+            live_battery_id=str(
+                get_runtime_scenario_refs().get("battery_id", "") or ""
+            ),
+        )
+    else:
+        _remember_battery_template_source(selected)
         st.session_state[_SESSION_SELECTED_ID_KEY] = selected
+        existing = battery_map.get(selected, {})
 
     session_scope = _battery_session_scope(selected, is_new=is_new)
     file_stamp = _config_file_stamp()

@@ -183,6 +183,7 @@ def test_apply_consumer_imports_sets_flex_power_only():
     assert cons[0]["label"] == "Kochen"
     assert cons[0]["earnie_role"] == "known"
     assert cons[0]["ehal_bindings"]["flex.kochen.sens_power_act"] == "Zähler Kochen"
+    assert cons[0]["loxone_meter_energy"]["name"] == "Zähler Kochen"
     assert "flex.enable_name" not in cons[0]["ehal_bindings"]
     assert "flex.power_setpoint_name" not in cons[0]["ehal_bindings"]
     assert "flex.kochen.set_enable" not in cons[0]["ehal_bindings"]

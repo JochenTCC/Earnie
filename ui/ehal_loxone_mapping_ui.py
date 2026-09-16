@@ -119,6 +119,7 @@ _EXTRA_LABELS: dict[str, str] = {
     "get_temperature_tolerance_c": "Temperatur-Toleranz (°C)",
     "sens_heating_active": "Heizung aktiv",
     "sens_temperature_outside": "Außentemperatur (°C)",
+    "sens_absent_mode": "Abwesend / Urlaub (0/1)",
 }
 
 

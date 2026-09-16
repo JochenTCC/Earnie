@@ -433,9 +433,20 @@ def propose_consumer_imports(
     return proposals
 
 
-def _bind_meter_power(consumer: dict, *, consumer_id: str, power: str) -> None:
+def _bind_meter_power(
+    consumer: dict,
+    *,
+    consumer_id: str,
+    power: str,
+    meter_meta: dict[str, Any] | None = None,
+) -> None:
     """Attach Zähler power; prefer EFM address for sens_* power fields."""
     from ehal.flex_fields import expand_flex_bindings, flex_sens_power_act
+    from integrations.loxone_meter_energy import (
+        bind_consumer_meter_energy,
+        meter_has_energy_states,
+        meter_is_bidirectional,
+    )
 
     bindings = (
         dict(consumer["ehal_bindings"])
@@ -446,6 +457,15 @@ def _bind_meter_power(consumer: dict, *, consumer_id: str, power: str) -> None:
     if str(consumer.get("type") or "") == "ev":
         bindings["sens_evcs_active_power"] = power
     consumer["ehal_bindings"] = expand_flex_bindings(bindings, consumer_id)
+    if meter_has_energy_states(meter_meta):
+        bind_consumer_meter_energy(
+            consumer,
+            meter_name=power,
+            bidirectional=meter_is_bidirectional(meter_meta),
+        )
+    elif power:
+        # EFM Zähler name: assume Meter energy states exist (LoxAPP3 optional).
+        bind_consumer_meter_energy(consumer, meter_name=power, bidirectional=False)
 
 
 def apply_consumer_imports(
@@ -453,9 +473,13 @@ def apply_consumer_imports(
     *,
     profile_id: str,
     selected: list[dict[str, Any]],
+    loxapp3_doc: dict[str, Any] | None = None,
 ) -> dict:
     """Create/update generic consumers from HITL selections; return new house doc."""
+    from integrations.loxone_meter_energy import controls_by_name
+
     house = dict(house_doc)
+    by_name = controls_by_name(loxapp3_doc) if isinstance(loxapp3_doc, dict) else {}
     profiles = house.get("profiles")
     if not isinstance(profiles, dict) or not profile_id:
         raise ValueError("house profiles must be a dict with a live profile_id")
@@ -493,7 +517,12 @@ def apply_consumer_imports(
                 "nominal_power_kw": 1.0,
             }
         if bind_power and power:
-            _bind_meter_power(consumer, consumer_id=cid, power=power)
+            _bind_meter_power(
+                consumer,
+                consumer_id=cid,
+                power=power,
+                meter_meta=by_name.get(power.casefold()),
+            )
             # Do not invent enable / setpoint from Zähler.
         by_id[cid] = consumer
     profile["consumers"] = list(by_id.values())

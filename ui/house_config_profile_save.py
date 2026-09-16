@@ -130,6 +130,7 @@ def _perform_house_profile_save(
     resolved: list[dict],
     existing: dict,
     preview_id: str,
+    absent_mode: bool = False,
     from_auto: bool = False,
 ) -> str | None:
     profile_id = _resolve_profile_id(
@@ -147,6 +148,7 @@ def _perform_house_profile_save(
                 "id": profile_id,
                 "label": label.strip() or profile_id,
                 "annual_kwh": float(annual_kwh),
+                "absent_mode": bool(absent_mode),
                 "land": location.get("land", "AT"),
                 "latitude": location["latitude"],
                 "longitude": location["longitude"],
@@ -197,6 +199,7 @@ def _render_house_profile_save(
     resolved: list[dict],
     existing: dict,
     preview_id: str,
+    absent_mode: bool = False,
 ) -> None:
     from ui.auto_persist import auto_persist
     from ui.house_config_historical_csv import historical_csv_save_fields
@@ -215,6 +218,7 @@ def _render_house_profile_save(
         "id": profile_id,
         "label": label.strip() or profile_id,
         "annual_kwh": float(annual_kwh),
+        "absent_mode": bool(absent_mode),
         "land": location.get("land", "AT"),
         "latitude": location["latitude"],
         "longitude": location["longitude"],
@@ -239,6 +243,7 @@ def _render_house_profile_save(
             label=label,
             profile_ids=profile_ids,
             annual_kwh=annual_kwh,
+            absent_mode=absent_mode,
             location=location,
             resolved=resolved,
             existing=existing,

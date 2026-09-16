@@ -8,6 +8,7 @@ from typing import Any
 import plotly.graph_objects as go
 import streamlit as st
 
+import config
 from ui.chart_colors import (
     COLOR_BASELOAD,
     COLOR_GRID_IMPORT,
@@ -16,6 +17,7 @@ from ui.chart_colors import (
     MUTED_BATTERY_CHARGE_PV,
     MUTED_BATTERY_EXPORT,
     MUTED_BATTERY_LOAD,
+    MUTED_BATTERY_STANDBY,
     flex_bar_chart_color,
 )
 from ui.consumer_cost_analysis_data import (
@@ -27,6 +29,10 @@ from ui.consumer_cost_analysis_data import (
     cost_analysis_consumers,
     filter_slots_trailing_days,
     filter_slots_window,
+)
+from ui.consumer_cost_battery_metrics import (
+    BatteryPeriodMetrics,
+    build_battery_period_metrics,
 )
 from ui.consumption_display.period import TimeWindow, format_window_label
 
@@ -206,8 +212,13 @@ def window_cost_chart(
     return fig
 
 
-def battery_flow_chart(totals: PeriodTotals, *, title: str) -> go.Figure:
-    """Stacked charge (PV/grid) and discharge (load/export) for the period."""
+def battery_flow_chart(
+    totals: PeriodTotals,
+    *,
+    title: str,
+    standby_a_kwh: float = 0.0,
+) -> go.Figure:
+    """Stacked charge (PV/grid) and discharge (load/export/standby) for the period."""
     categories = ["Laden", "Entladen"]
     fig = go.Figure()
     fig.add_bar(
@@ -234,6 +245,12 @@ def battery_flow_chart(totals: PeriodTotals, *, title: str) -> go.Figure:
         y=[0.0, totals.export_from_battery_kwh],
         marker_color=MUTED_BATTERY_EXPORT,
     )
+    fig.add_bar(
+        name="Standby",
+        x=categories,
+        y=[0.0, max(0.0, float(standby_a_kwh))],
+        marker_color=MUTED_BATTERY_STANDBY,
+    )
     fig.update_layout(
         title=title,
         barmode="stack",
@@ -246,15 +263,50 @@ def battery_flow_chart(totals: PeriodTotals, *, title: str) -> go.Figure:
     return fig
 
 
-def battery_flow_balance_caption(totals: PeriodTotals) -> str:
-    """German note comparing stacked charge vs discharge totals."""
+def battery_flow_balance_caption(
+    totals: PeriodTotals,
+    metrics: BatteryPeriodMetrics,
+) -> str:
+    """German note: balance, measured η vs nominal, standby A vs residual B."""
     charge = float(totals.battery_charge_kwh)
     discharge = float(totals.battery_discharge_kwh)
     delta = charge - discharge
-    return (
-        f"Laden {charge:.2f} kWh · Entladen {discharge:.2f} kWh · Δ {delta:+.2f} kWh. "
-        "Kleine Abweichungen sind normal (SoC-Änderung, Standby der Batterie)."
+    parts = [
+        f"Laden {charge:.2f} kWh · Entladen {discharge:.2f} kWh · Δ {delta:+.2f} kWh."
+    ]
+    if metrics.eta_measured is not None:
+        parts.append(
+            f"Gemessener Wirkungsgrad ≈ {metrics.eta_measured:.3f} "
+            f"(Empfehlung für HK); nominal {metrics.eta_nominal:.3f}."
+        )
+    else:
+        parts.append(
+            f"Wirkungsgrad nicht ableitbar (Laden/Entladen unvollständig); "
+            f"nominal {metrics.eta_nominal:.3f}."
+        )
+    parts.append(
+        f"Standby HK {metrics.standby_a_kwh:.2f} kWh "
+        f"({metrics.standby_nominal_kw:.3f} kW × Fenster) · "
+        f"Rest nach Roundtrip {metrics.standby_b_kwh:.2f} kWh."
     )
+    if metrics.recommended_standby_kw is not None:
+        parts.append(
+            f"Empfehlung Standby-Leistung ≈ {metrics.recommended_standby_kw:.3f} kW "
+            f"(nominal {metrics.standby_nominal_kw:.3f} kW)."
+        )
+    if metrics.standby_hint:
+        if metrics.recommended_standby_kw is not None:
+            parts.append(
+                "Hinweis: Standby HK und Rest weichen um mehr als 20 % ab — "
+                f"im Hauskonfigurator auf ≈ {metrics.recommended_standby_kw:.3f} kW prüfen."
+            )
+        else:
+            parts.append(
+                "Hinweis: Standby HK und Rest weichen um mehr als 20 % ab — "
+                "Standby-Leistung im Hauskonfigurator prüfen "
+                f"(nominal {metrics.standby_nominal_kw:.3f} kW)."
+            )
+    return " ".join(parts)
 
 
 def _format_coverage(series: CostAnalysisSeries) -> str:
@@ -351,11 +403,18 @@ def render_window_analysis(
         now=now,
     )
     window_totals = aggregate_slots(window_slots)
+    battery_params = config.get_battery_params()
+    metrics = build_battery_period_metrics(
+        window_totals,
+        eta_nominal=float(battery_params.get("efficiency") or 0.0),
+        standby_power_kw=float(battery_params.get("standby_power_kw") or 0.0),
+    )
     st.plotly_chart(
         battery_flow_chart(
             window_totals,
             title=f"Batterie-Energieflüsse — {format_window_label(window)}",
+            standby_a_kwh=metrics.standby_a_kwh,
         ),
         width="stretch",
     )
-    st.caption(battery_flow_balance_caption(window_totals))
+    st.caption(battery_flow_balance_caption(window_totals, metrics))

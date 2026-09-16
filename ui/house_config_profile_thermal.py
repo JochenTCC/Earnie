@@ -300,6 +300,23 @@ def _render_thermal_annual_wp_preview(
         value=int(thermal.get("persons", 2)),
         key=_scoped_key(session_scope, f"hc_persons_{index}"),
     )
+    item["target_temp_c"] = labeled_number_input(
+        "Solltemperatur (°C)",
+        value=float(thermal.get("target_temp_c", 21.5)),
+        step=0.5,
+        key=_scoped_key(session_scope, f"hc_target_temp_{index}"),
+    )
+    item["absent_temp_reduction_c"] = labeled_number_input(
+        "Temperaturabsenkung wenn abwesend",
+        min_value=0.0,
+        value=float(thermal.get("absent_temp_reduction_c", 6.5)),
+        step=0.5,
+        key=_scoped_key(session_scope, f"hc_absent_temp_red_{index}"),
+        help=(
+            "Bei wirksamem Abwesenheitsmodus und aktiver Verbraucher-Option: "
+            "Live-Soll = Solltemperatur − Absenkung; Warmwasser dann 0."
+        ),
+    )
     item.update(
         _render_thermal_solar_fields(
             thermal,

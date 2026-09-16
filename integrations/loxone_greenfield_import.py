@@ -478,7 +478,10 @@ def merge_efm(
 
     if selected_consumers:
         house = apply_consumer_imports(
-            house, profile_id=profile_id, selected=selected_consumers
+            house,
+            profile_id=profile_id,
+            selected=selected_consumers,
+            loxapp3_doc=doc,
         )
     if selected_plant:
         house = apply_plant_power_suggestions(

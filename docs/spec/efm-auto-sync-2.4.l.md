@@ -1,6 +1,6 @@
 # EFM auto-sync research (Interpretation C)
 
-**Status:** historical research note (backlog **2.4.l**); HITL EFM import on EHAL-Com is shipped — see [`../ui/ehal-com.md`](../ui/ehal-com.md).  
+**Status:** historical research note (backlog **2.4.l**). The separate EHAL-Com HITL expander was removed; EFM merge runs inside Smarthome-Backend **Loxone-Import** via `integrations/loxone_greenfield_import.merge_efm` → [`integrations/loxone_efm_meters.py`](../../integrations/loxone_efm_meters.py). Mapping follow-up: [`../ui/ehal-com.md`](../ui/ehal-com.md).  
 **Date:** 2026-07-30  
 **Lab:** Live Miniserver with Energieflussmonitor + Zähler (LoxAPP3 + MCP 17.1).  
 **Manual blueprint:** `.cursor/plans/energieflussmonitor_hausprofil_blueprint_a.plan.md`
@@ -16,7 +16,7 @@
 | MCP `control_bind` | **N/A** | `control_describe` returns Meter metadata (`states`, `details`) but **no** `control_bind` field. EFM↔Zähler link is LoxAPP3 `nodes[].ctrlUuid`. |
 | `flex.enable_name` / `flex.power_setpoint_name` | **N/A** | Cannot be derived from Zähler (by design). |
 
-**Product path:** thin HITL on EHAL-Com (`integrations/loxone_efm_meters.py`, `ui/ehal_efm_import.py`). No multi-column EFM Statistik import.
+**Product path:** library `integrations/loxone_efm_meters.py` called from greenfield `merge_efm` (Smarthome-Backend Loxone-Import). No separate EHAL-Com EFM UI. No multi-column EFM Statistik import.
 
 ## Role mapping (EFM `nodeType` + Meter `details.type`)
 

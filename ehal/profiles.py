@@ -82,6 +82,7 @@ _FIELD_LABELS_DE: dict[str, str] = {
     "get_filter_native_start_hour": "Native Filter-Startstunde",
     "get_filter_native_duration_hours": "Native Filter-Dauer (h)",
     "sens_temperature_outside": "Außentemperatur (°C)",
+    "sens_absent_mode": "Abwesend / Urlaub (0/1)",
     "sens_temperature_water": "Pool Ist-Temperatur (°C)",
     "get_temperature_water_setpoint": "Pool Soll-Temperatur (°C)",
     "get_temperature_tolerance_c": "Temperatur-Toleranz (°C)",

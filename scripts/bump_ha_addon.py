@@ -183,8 +183,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Add-on directory not found: {args.addon_dir}", file=sys.stderr)
         return 1
 
-    changed = apply_bump(args.version, addon_dir=args.addon_dir, dry_run=args.dry_run)
-    return 0 if changed or args.dry_run else 0
+    apply_bump(args.version, addon_dir=args.addon_dir, dry_run=args.dry_run)
+    return 0
 
 
 if __name__ == "__main__":

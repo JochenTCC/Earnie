@@ -24,30 +24,32 @@ jobs:
           fi
 
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: main
           token: ${{ secrets.HA_ADDON_REPO_TOKEN }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.14"
 
       - name: Bump HA add-on pins
-        run: python -m scripts.bump_ha_addon --version "${{ inputs.version }}"
+        env:
+          VERSION: ${{ inputs.version }}
+        run: python -m scripts.bump_ha_addon --version "$VERSION"
 
       - name: Lint HA add-on configuration
-        uses: frenck/action-addon-linter@v2
+        uses: frenck/action-addon-linter@b9cfd1bc62ba60d2c4fc96317b5f7ada5923f4a7 # v2.21.1
         with:
           path: ./packaging/homeassistant-addon/earnie
 
       - name: Commit and push Earnie main
         env:
           VERSION: ${{ inputs.version }}
-          COMMIT_MSG: "ha-addon: publish ${{ inputs.version }} (pins ghcr.io/jochentcc/earnie-energy:${{ inputs.version }})"
         run: |
           set -euo pipefail
+          COMMIT_MSG="ha-addon: publish ${VERSION} (pins ghcr.io/jochentcc/earnie-energy:${VERSION})"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add packaging/homeassistant-addon/earnie
@@ -61,10 +63,10 @@ jobs:
       - name: Publish ha-addon-earnie
         env:
           VERSION: ${{ inputs.version }}
-          COMMIT_MSG: "ha-addon: publish ${{ inputs.version }} (pins ghcr.io/jochentcc/earnie-energy:${{ inputs.version }})"
           HA_ADDON_REPO_TOKEN: ${{ secrets.HA_ADDON_REPO_TOKEN }}
         run: |
           set -euo pipefail
+          COMMIT_MSG="ha-addon: publish ${VERSION} (pins ghcr.io/jochentcc/earnie-energy:${VERSION})"
           git clone "https://x-access-token:${HA_ADDON_REPO_TOKEN}@github.com/JochenTCC/ha-addon-earnie.git" /tmp/ha-addon-earnie
           rm -rf /tmp/ha-addon-earnie/earnie
           cp -a packaging/homeassistant-addon/earnie /tmp/ha-addon-earnie/earnie

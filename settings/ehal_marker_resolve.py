@@ -155,6 +155,17 @@ def marker_sens_temperature_outside(
     return resolve_plant_binding(house_doc, "sens_temperature_outside", config_doc)
 
 
+def marker_sens_absent_mode(
+    *,
+    house_doc: dict | None = None,
+    config_doc: dict | None = None,
+) -> str:
+    """Abwesenheitsmodus: plant ``sens_absent_mode`` only."""
+    from house_config.ehal_bindings import resolve_plant_binding
+
+    return resolve_plant_binding(house_doc, "sens_absent_mode", config_doc)
+
+
 def resolve_get_evcs_limit_soc(consumer: dict) -> float:
     """Limit SoC %: optional ``get_evcs_limit_soc`` Merker, else profile percent."""
     from integrations import loxone_client

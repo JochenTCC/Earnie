@@ -386,6 +386,10 @@
           "type": "boolean",
           "description": "true = historisches Profil nutzen und von Basislast abziehen; false = synthetisches Modell/Schedule."
         },
+        "absent_mode_enabled": {
+          "type": "boolean",
+          "description": "true = bei wirksamem Abwesenheitsmodus (Live) diesen Verbraucher berücksichtigen (Ausschluss bzw. Haus-Wärme-Absenktemperatur)."
+        },
         "schedule": {
           "$ref": "#/definitions/schedule"
         },
@@ -481,6 +485,15 @@
         "target_temp_c": {
           "type": "number"
         },
+        "absent_temp_reduction_c": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Temperaturabsenkung (K) bei aktivem Abwesenheitsmodus (Live); effektiv = target_temp_c − Absenkung."
+        },
+        "absent_temp_c": {
+          "type": "number",
+          "description": "Legacy absolute Absenk-Solltemperatur (°C); beim Laden zu absent_temp_reduction_c migriert."
+        },
         "heating_limit_c": {
           "type": "number"
         },
@@ -537,6 +550,10 @@
         "annual_kwh": {
           "type": "number",
           "minimum": 0
+        },
+        "absent_mode": {
+          "type": "boolean",
+          "description": "Earnie-seitiger Abwesenheits-/Urlaubsmodus (Live; OR mit plant EHAL sens_absent_mode)."
         },
         "land": {
           "type": "string",

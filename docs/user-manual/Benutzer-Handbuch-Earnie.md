@@ -170,6 +170,7 @@ Ein **Hausprofil** beschreibt Standort und „Wer lebt / was verbraucht hier“:
 - **Standort:** Breite, Länge, Land (daraus wird die Zeitzone abgeleitet — wichtig für Sonnenzeiten und PV-Prognose)  
 - **Verbraucher im Profil:** z. B. Haus-Wärme, E-Auto, Pool, generische Geräte  
 - **Grundlast:** typischer Haushaltsverbrauch über den Tag (Vorschau im Konfigurator prüfen)
+- **Abwesend / Urlaub:** Profil-Schalter für den Live-Abwesenheitsmodus; je Verbraucher optional **„Inaktiv wenn abwesend“**. Wirksam wird der Modus, wenn der Earnie-Schalter **oder** das Smarthome-Signal `sens_absent_mode` (`Earnie_Abwesend`) an ist. Details: [Flexible Verbraucher — Abwesenheitsmodus](../konfiguration/flexible-verbraucher.md#abwesenheitsmodus-live).
 
 Legen Sie zuerst ein Profil an und ergänzen Sie danach die Geräte. Ein bestehendes Profil entfernen Sie mit **Entfernen** rechts neben der Profilauswahl — das Profil des Live-Szenarios und Profile, die noch von anderen Szenarien referenziert werden, können nicht gelöscht werden. Ohne Standort und sinnvolles Profil sind Jahresvergleiche wenig aussagekräftig. Je mehr Freiheiten sie Earnie beim Verschieben der Aktivierung der verschiedenen Verbraucher geben, umso höher sind die Einsparungspotenziale.
 
@@ -186,6 +187,7 @@ Unter **Gesamt-Lastverhalten** können Sie die Basislast als **Jahres-Rest gleic
 Thermischer Verbraucher für Heizung / Wärmepumpe (je nach Modell im Profil):
 
 - Solltemperaturen und thermische Parameter (Wärmeverlust, Volumen bzw. Gebäudekennwerte). Dafür ist ein Energieausweis des Gebäudes hilfreich.  
+- **Temperaturabsenkung wenn abwesend:** bei wirksamem Abwesenheitsmodus und aktiver Verbraucher-Option gilt Live-Soll = Solltemperatur − Absenkung; Warmwasserbedarf wird dann mit 0 Personen gerechnet.  
 - Earnie schätzt den **Wärmebedarf aus Wetterdaten** und den thermischen Parametern und plant den Strombedarf zeitlich mit ein.  
 - Im Live-Betrieb erfolgt später die Anbindung über EHAL-Bindings (Leistung, Freigabe, ggf. Temperaturen)
 
@@ -197,7 +199,8 @@ E-Auto / Wallbox als planbarer Verbraucher:
 
 - Akkukapazität, Ladeleistung, Wirkungsgrad  
 - **Zeitfenster:** wann das Auto da ist und bis wann es „geladen“ sein soll (getrennt für Werktage / Wochenende).  
-- Ziel-SOC beim Abfahren
+- Ziel-SOC beim Abfahren  
+- **Prognose, wenn nicht angeschlossen:** optionale Lade-Prognose ohne Wallbox-Anschluss (unabhängig vom Haus-Abwesenheitsmodus)
 
 Earnie entscheidet **wann** am günstigsten geladen wird (günstige Stunden, PV-Überschuss) unter der Vorgabe, dass es zum angegebenen Zeitpunkt den gewünschten End-SOC hat. Im Live-Betrieb liefert das Smarthome-Backend typischerweise „angesteckt“, Ist-SOC und Fertig-Zeit; Earnie schreibt Lade-Sollleistung und ggf. PV-Follow um genau den PV-Überschuss ins E-Auto zu laden.
 
@@ -379,7 +382,7 @@ Details dazu: [PV & Batterie](../konfiguration/batterie-pv.md), [Überblick](../
 
 ### EHAL-Com
 
-Unter **Daemon Control → EHAL-Com**: Live-Lesen/Schreiben, Silent- vs. Live-Modus, Mapping-Assistenten. Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend** (Anbindung). Cutover: Lesen OK → Schreiben OK → Monitor plausibel. 
+Unter **Daemon Control → EHAL-Com**: Live-Lesen/Schreiben, Silent- vs. Live-Modus, Mapping-Assistenten. Zugangsdaten und Backend-Wechsel liegen auf **Smarthome-Backend** (Anbindung). Cutover: Lesen OK → Schreiben OK → Monitor plausibel. Plant-Signal für Abwesenheit: `sens_absent_mode` → Default-Merker `Earnie_Abwesend` (siehe [EHAL-Com](../ui/ehal-com.md), [Loxone-Signale](../referenz/loxone-signals.md)).
 
 Vollständige Checkliste: [EHAL-Com](../ui/ehal-com.md).
 
@@ -403,6 +406,7 @@ Earnie Monitor
 
 Unter **Live-Cockpit → Monitor** (Sunset-2-Sunset): einheitliches Cockpit über Vergangenheit, Jetzt und Vorausschau — Desktop als SA₀→SA₂-Fenster, Mobil in Sonnenaufgangs-Segmenten. Chart 1 / SoC-Linien / Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md).
 
+Ist der **Abwesenheitsmodus** wirksam (Earnie-Schalter und/oder Smarthome `Earnie_Abwesend`), erscheint oben ein Hinweis „Abwesenheitsmodus aktiv“ inkl. Quelle. Opt-in-Verbraucher außer Haus-Wärme fallen dann aus der Live-Optimierung; Haus-Wärme läuft mit Absenktemperatur.
 Kennzahlen zur Ersparnis beziehen sich auf den **vollen Planungshorizont** (Jetzt bis übernächster Sonnenaufgang).
 
 #### Chart 1: SoC-Linien (Plausibilität)

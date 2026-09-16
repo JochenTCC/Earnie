@@ -184,3 +184,41 @@ def test_finalize_overlays_counter_delta_when_anchored(tmp_path: Path):
     # Δimport 0.25 − Δexport 0.05 = 0.20 kWh → 0.8 kW
     assert closed["grid_kw"] == pytest.approx(0.8)
     assert closed["battery_kw"] == pytest.approx(-0.5)
+
+
+def test_finalize_overlays_flex_counter_when_anchored(tmp_path: Path):
+    state = tmp_path / "sampler.json"
+    start = datetime(2026, 9, 14, 14, 0, 0)
+    readings = {
+        "open": {
+            "flex": {"ev": {"total": 10.0}},
+        },
+        "close": {
+            "flex": {"ev": {"total": 10.5}},
+        },
+    }
+    phase = {"n": 0}
+
+    def read_energy():
+        phase["n"] += 1
+        return readings["open"] if phase["n"] == 1 else readings["close"]
+
+    for offset in (30, 60, 90):
+        assert sampler.tick(
+            now=start + timedelta(seconds=offset),
+            force=True,
+            state_path=str(state),
+            read_plant=lambda: _plant(pv=1.0, grid=0.0),
+            read_soc=lambda: 50.0,
+            read_flex_chart=lambda: {"ev": 1.0, "merker_only": 0.5},
+            read_energy=read_energy,
+        )
+    closed = sampler.finalize_closed_interval(
+        start, state_path=str(state), read_energy=read_energy
+    )
+    assert closed is not None
+    assert closed["flex_kw"]["ev"] == pytest.approx(2.0)
+    assert closed["flex_energy_kwh"]["ev"] == pytest.approx(0.5)
+    assert closed["flex_kw"]["merker_only"] == pytest.approx(0.5)
+    assert closed["ist_power_source"]["flex"]["ev"] == "counter"
+    assert closed["ist_power_source"]["flex"]["merker_only"] == "mean"

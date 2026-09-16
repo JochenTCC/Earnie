@@ -125,6 +125,7 @@ def test_battery_flow_chart_stacked_totals() -> None:
         battery_flow_balance_caption,
         battery_flow_chart,
     )
+    from ui.consumer_cost_battery_metrics import build_battery_period_metrics
 
     slot = build_slot_from_powers(
         slot_start=datetime(2026, 7, 20, 12, 0),
@@ -151,12 +152,85 @@ def test_battery_flow_chart_stacked_totals() -> None:
     assert totals.discharge_to_load_kwh + totals.export_from_battery_kwh == pytest.approx(
         totals.battery_discharge_kwh
     )
-    fig = battery_flow_chart(totals, title="t")
+    metrics = build_battery_period_metrics(
+        totals, eta_nominal=0.95, standby_power_kw=0.1
+    )
+    fig = battery_flow_chart(totals, title="t", standby_a_kwh=metrics.standby_a_kwh)
     assert fig.layout.barmode == "stack"
     names = {t.name for t in fig.data}
-    assert names == {"PV", "Netz (Laden)", "Verbrauch", "Netz (Einspeisung)"}
-    caption = battery_flow_balance_caption(totals)
+    assert names == {
+        "PV",
+        "Netz (Laden)",
+        "Verbrauch",
+        "Netz (Einspeisung)",
+        "Standby",
+    }
+    caption = battery_flow_balance_caption(totals, metrics)
     assert "Laden" in caption and "Entladen" in caption and "Δ" in caption
+    assert "Gemessener Wirkungsgrad" in caption
+    assert "Empfehlung für HK" in caption
+    assert "Kleine Abweichungen sind normal" not in caption
+
+
+def test_battery_period_metrics_helpers() -> None:
+    from ui.consumer_cost_battery_metrics import (
+        build_battery_period_metrics,
+        configured_standby_kwh,
+        measured_battery_efficiency,
+        recommended_standby_power_kw,
+        residual_standby_kwh,
+        standby_diff_significant,
+    )
+
+    assert measured_battery_efficiency(4.0, 3.61) == pytest.approx(0.95)
+    assert measured_battery_efficiency(0.0, 1.0) is None
+    assert measured_battery_efficiency(1.0, 0.0) is None
+
+    assert configured_standby_kwh(0.1, 4) == pytest.approx(0.1)
+    assert residual_standby_kwh(10.0, 8.0, 0.95) == pytest.approx(10.0 * 0.95**2 - 8.0)
+    assert residual_standby_kwh(10.0, 9.5, 0.95) == pytest.approx(0.0)
+
+    assert recommended_standby_power_kw(1.0, 4) == pytest.approx(1.0)
+    assert recommended_standby_power_kw(0.5, 0) is None
+
+    assert standby_diff_significant(1.0, 1.05) is False
+    assert standby_diff_significant(1.0, 1.3) is True
+    assert standby_diff_significant(0.0, 0.0) is False
+    assert standby_diff_significant(0.0, 1.0) is True
+
+    slot = build_slot_from_powers(
+        slot_start=datetime(2026, 7, 20, 12, 0),
+        price_cent=20.0,
+        pv_kw=0.0,
+        load_by_id={BASELOAD_ID: 1.0},
+        battery_charge_kw=4.0,
+        battery_discharge_kw=0.0,
+        grid_import_kw=1.0,
+        grid_export_kw=0.0,
+    )
+    disc = build_slot_from_powers(
+        slot_start=datetime(2026, 7, 20, 20, 0),
+        price_cent=40.0,
+        pv_kw=0.0,
+        load_by_id={BASELOAD_ID: 1.0},
+        battery_charge_kw=0.0,
+        battery_discharge_kw=2.0,
+        grid_import_kw=0.0,
+        grid_export_kw=0.0,
+    )
+    totals = aggregate_slots((slot, disc))
+    metrics = build_battery_period_metrics(
+        totals, eta_nominal=1.0, standby_power_kw=0.0
+    )
+    assert metrics.recommended_standby_kw == pytest.approx(
+        metrics.standby_b_kwh / 0.5
+    )
+    assert metrics.standby_hint is True
+    from ui.consumer_cost_analysis_charts import battery_flow_balance_caption
+
+    caption = battery_flow_balance_caption(totals, metrics)
+    assert "Empfehlung Standby-Leistung" in caption
+    assert f"{metrics.recommended_standby_kw:.3f} kW" in caption
 
 
 def test_aggregate_and_week_filter() -> None:

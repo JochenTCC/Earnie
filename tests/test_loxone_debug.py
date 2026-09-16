@@ -338,12 +338,14 @@ def test_expected_live_read_fields_include_plant_ambient():
     )
 
     assert "sens_temperature_outside" in PLANT_LIVE_READ_FIELDS
+    assert "sens_absent_mode" in PLANT_LIVE_READ_FIELDS
     with patch(
         "integrations.ehal_debug_mapping._all_live_consumers",
         return_value=[],
     ):
         fields = expected_live_read_fields(network_backend=False)
     assert "sens_temperature_outside" in fields
+    assert "sens_absent_mode" in fields
     assert fields.index("sens_temperature_outside") > fields.index("sens_ess_soc")
 
 

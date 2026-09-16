@@ -13,66 +13,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Isolated battery modes: charging / discharging / standby
   - batt+inverter modes: optimizing / charging / discharging
   - All batteries are parts of optimization
-- [ ] Enable multiple EV / Wallboxes
-  - Parametrize EVs as now (+ sensors)
-  - Parametrize Wallboxes 
-    - Max power
-    - sensor / control commands
-  - Assignment is done when EV is connected to a wallbox:
-    - both devices report connection
-    - confirm assignment by test charging
-    - Assignment is removed when disconnecting
-    - Cancel assignments and re-bind in case of shutdown
 
 
 ## Feature Backlog
-
-
-
-### Version 2.6 - POC for EEG-ready Earnie
-
-- [ ] In case main.py gets no access to Loxone (403) it should stop trying to prevent timeot blocking of Miniserver. Instead an error message should come up on Streamlit app to give user opportunity to check and update credentials
-- [ ] Add holiday / absent mode for consumers with no consumption - just a switch
-
-Main Goal of this version is to get a proof-of-concept for an evolved Earnie that is able to optimize EEGs (Energie-Erzeuger-Gemeinschaft)
-- See Entwicklungsplan\eeg-earnie-recherche-zusammenfassung.md for current research
-- [ ] Implement a POC for EEG simulation
-
-
-### Version 2.+1 — Improvements for EVs / Export
-
-- [ ] **Energy counters (ΔkWh) for slot Ist — Loxone**
-  - Plant PV/grid Meter ΔE→avg kW on `closed_interval` shipped (**v2.5.3**) — see [Backlog-Erledigt.md](Backlog-Erledigt.md)
-  - **Next:** flex consumers with Loxone Meter power bindings — same ΔE→avg kW on `closed_interval.flex_kw` for Monitor Chart 1 / Verbrauch & Kosten analysis; Merker-only power stay on sample mean; battery stays mean (out of scope until dedicated design)
-  - HA path: later under Improvements for HA-binding
-- [ ] When importing from existing Loxone config is working the other way round would also be possible:
-    - User has a complete HK with live scenario in place in Earnie
-    - Earnie generates pre-filled Loxone Template XML files (with correct ids, (multiple) evs, (multiple) consumers) for importing into Loxone config.
-- [ ] UI improvement - adding new entities by copying existing ones (PV-Anlage, Batterie)
-  - like also implemented for adding new scenarios (by copying the last selected entity) the same functionality should also be implemented for PV-Anlagen and Batterien on HK page
-- [ ] Clarify how to handle wallbox <> EVs
-  - see also bullet point in research item
-- [ ] Allow changing HTTP port for Home Assistant and OpenEMS (follow-up to Miniserver #9)
-  - HA form already stores a full `ehal.ha.base_url` (default `http://homeassistant:8123`) — port is in the URL, not a separate field
-  - OpenEMS form already stores `ehal.openems.base_url` (default `http://openems-edge:8084`)
-  - Follow-up: make non-default ports obvious in SB Anbindung (help/caption, or dedicated port field if users still cannot change it in practice)
-- [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)
-- [ ] Improvements for HA-binding
-  - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)); this item tests EHAL discovery/mapping against different HA integration shapes
-  - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap): Options-UI → `config.json` generation, Ingress (embedded UI, no separate port), Supervisor-Proxy instead of a manual long-lived-access token for the EHAL-HA-adapter
-  - [ ] Add-on Version 1.0 (Entwicklungsplan roadmap): MQTT Discovery, native Home-Assistant entities for Earnie state, Energy-Dashboard integration — distinct from the "Make also an EHAL adaption for MQTT" item elsewhere in this file (that's an EHAL southbound backend; this is the add-on itself publishing Earnie state via HA's native MQTT Discovery)
-  - [ ] **Later: energy counters (ΔkWh) for slot Ist on HA backend**
-    - Prefer cumulative / total-increasing energy entities for grid± / PV when mapped
-    - Same chart contract as Loxone (avg power = ΔE / slot Δt); battery/flex may stay on sampled mean
-    - Needs HA entity discovery/mapping (energy sensors are usually separate entities, not a second channel of the power entity) — depends on improved HA-binding / EHAL-Com HA mapping UX
-    - Combines with existing `closed_interval` / sampler path — not a replacement for daemon metering
-- [ ] Calculate efficiency for battery from difference in overall charging and discharging energy 
-  - eff = ((E_discharge) / E_charge)^0.5 
-  - Add standby energy consumption on top of "Entladen" bar
-  - give it as recommendation for possible changes in HK - keep nominal values in description
-  - remove "Kleine Abweichungen sind normal (SoC-Änderung, Standby der Batterie)."
-
-
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)
 
@@ -104,11 +47,60 @@ Main Goal of this version is to get a proof-of-concept for an evolved Earnie tha
   - [ ] Heat pump (Prio3) — only indirect control via setpoint adjustment via Loxone setpoint (after **Thermals P2**); distinct from **Thermals P1a** (direct enable/PWM flex from daily HDD budget)
 
 
+### Version 2.+1 - Enhance Loxone Auto Binding functionality
+
+- [ ] When importing from existing Loxone config is working the other way round would also be possible:
+    - User has a complete HK with live scenario in place in Earnie
+    - Earnie generates pre-filled Loxone Template XML files (with correct ids, (multiple) evs, (multiple) consumers) for importing into Loxone config.
+
+
+### Version 2.+1 - POC for EEG-ready Earnie
+
+Main Goal of this version is to get a proof-of-concept for an evolved Earnie that is able to optimize EEGs (Energie-Erzeuger-Gemeinschaft)
+- See Entwicklungsplan\eeg-earnie-recherche-zusammenfassung.md for current research
+- [ ] Implement a POC for EEG simulation
+
+
+### Version 2.+1 - Enhancements for HA coupling
+
+#### Prerequisites for this epic
+- [ ] Install HA simulation instance on Synology for testing
+
+#### Features
+
+- [ ] Allow changing HTTP port for Home Assistant and OpenEMS (follow-up to Miniserver #9)
+  - HA form already stores a full `ehal.ha.base_url` (default `http://homeassistant:8123`) — port is in the URL, not a separate field
+  - OpenEMS form already stores `ehal.openems.base_url` (default `http://openems-edge:8084`)
+  - Follow-up: make non-default ports obvious in SB Anbindung (help/caption, or dedicated port field if users still cannot change it in practice)
+- [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)
+- [ ] Improvements for HA-binding
+  - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)); this item tests EHAL discovery/mapping against different HA integration shapes
+  - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap): Options-UI → `config.json` generation, Ingress (embedded UI, no separate port), Supervisor-Proxy instead of a manual long-lived-access token for the EHAL-HA-adapter
+  - [ ] Add-on Version 1.0 (Entwicklungsplan roadmap): MQTT Discovery, native Home-Assistant entities for Earnie state, Energy-Dashboard integration — distinct from the "Make also an EHAL adaption for MQTT" item elsewhere in this file (that's an EHAL southbound backend; this is the add-on itself publishing Earnie state via HA's native MQTT Discovery)
+  - [ ] **Later: energy counters (ΔkWh) for slot Ist on HA backend**
+    - Prefer cumulative / total-increasing energy entities for grid± / PV when mapped
+    - Same chart contract as Loxone (avg power = ΔE / slot Δt); battery/flex may stay on sampled mean
+    - Needs HA entity discovery/mapping (energy sensors are usually separate entities, not a second channel of the power entity) — depends on improved HA-binding / EHAL-Com HA mapping UX
+    - Combines with existing `closed_interval` / sampler path — not a replacement for daemon metering
+
+
+### Version 2.+1
+
+- [ ] Enable multiple EV / Wallboxes
+  - Parametrize EVs as now (+ sensors)
+  - Parametrize Wallboxes 
+    - Max power
+    - sensor / control commands
+  - Assignment is done when EV is connected to a wallbox:
+    - both devices report connection
+    - confirm assignment by test charging
+    - Assignment is removed when disconnecting
+    - Cancel assignments and re-bind in case of shutdown
+
 
 ### Version 2.+1
 
 - [ ] Check possibility for automatically learn consumer schedules (for known consumers) and nominal power (for all consumers) from sens_power_act to substitute or improve manual settings
-  - for multiple wallboxes / EVs there is not a "natural" 1 to 1 binding - hence it must be clarified how to handle that (have a look at evcc)
 - [ ] **Banner der Wahrheit — Layer C enforcement** *(after soft first approach `2.4.q`; follow-up from `2.4.i` spike)*
   - Cosign/Sigstore in release CI + startup verifier + production signing keys
   - Watermark vs refuse-to-start decision; offline public-key path

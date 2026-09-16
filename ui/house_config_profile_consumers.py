@@ -21,6 +21,7 @@ import streamlit as st
 
 from house_config.thermal_labels import CONSUMER_TYPE_LABELS
 from ui.form_layout import (
+    labeled_checkbox,
     labeled_number_input,
     labeled_selectbox,
     labeled_text_input,
@@ -241,6 +242,17 @@ def _render_consumer_form_body(
         "label": c_label,
         "type": c_type,
         "nominal_power_kw": nominal,
+        "absent_mode_enabled": labeled_checkbox(
+            "Inaktiv wenn abwesend",
+            value=bool(consumer.get("absent_mode_enabled", False)),
+            key=_scoped_key(session_scope, f"hc_absent_opt_in_{index}"),
+            help=(
+                "Bei wirksamem Abwesenheitsmodus (Live): "
+                "andere Verbraucher ohne Live-Optimierung; "
+                "Haus Wärme bleibt aktiv mit Solltemperatur − Absenkung "
+                "und Warmwasser 0."
+            ),
+        ),
     }
     item.update(
         _dispatch_consumer_type_fields(

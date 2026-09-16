@@ -21,10 +21,17 @@
 2. `GET /jdev/sps/io/{name}/all` → LL object.
 3. Walk LL values; for dict items with `name` ∈ {`total`, `totalNeg`} **or HTTP Meter abbreviations** `Mr` (uni total), `Mrc`/`Mrd` (bipolar consumption/delivery) parse `value` (strip kWh via existing Loxone numeric parser). Power-only Merker (e.g. `Earnie_*`) are not enough — set `plant.loxone_meter_energy` to the real Meter control names when EHAL power bindings point at Merker.
 4. At QH open + close: store readings; on `finalize_closed_interval` set `*_energy_kwh` from ΔE and `*_kw = ΔE / 0.25` when usable.
-5. Battery / flex / house / baseload stay on sample means. Tag `ist_power_source`.
+5. Plant channels without usable ΔE, battery, house, baseload, Merker-only flex, and shared-meter primaries (`subtract_consumer_ids`) stay on sample means. Tag `ist_power_source` (`flex` is a per-consumer-id map: `counter` | `mean`).
+
+## Flex consumers (2.+1)
+
+1. Resolve Meter name from `consumer.loxone_meter_energy` or power binding (`flex.{slug}.sens_power_act` / EVCS / `loxone_inputs.power_name`).
+2. Skip counter overlay when `loxone_inputs.subtract_consumer_ids` is set (composite meter; live power already peels subtracted loads).
+3. At QH open + close: anchor flex readings under `energy_anchors.open.flex`; on `finalize_closed_interval` set `flex_kw[id] = ΔE / 0.25` when usable.
+4. Greenfield / Loxone-Import (`merge_efm`) writes `loxone_meter_energy` when binding `flex.*.sens_power_act` to a Meter.
 
 ## Out of scope
 
 - HA / OpenEMS energy entities (later backlog under Improvements for HA-binding).
 - Extending EHAL telemetry schema with cumulative kWh.
-- Battery / flex on counters.
+- Battery on counters; shared-meter ΔE peel beyond sample mean.

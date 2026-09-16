@@ -24,26 +24,46 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev]"
-          pip install pytest-cov
+          pip install --only-binary=:all: -e ".[dev]"
+          pip install --only-binary=:all: pytest-cov
 
       - name: Run tests with coverage
         run: |
           python -m pytest --cov=. --cov-report=xml
 
+      - name: Verify SONAR_TOKEN against SonarCloud
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "${SONAR_TOKEN}" ]; then
+            echo "::error::SONAR_TOKEN secret is empty or unset in this repository"
+            exit 1
+          fi
+          echo "SONAR_TOKEN length: ${#SONAR_TOKEN}"
+          http_code=$(curl -sS -o /tmp/sonar_jre.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${SONAR_TOKEN}" \
+            "https://api.sonarcloud.io/analysis/jres?os=linux&arch=x86_64")
+          echo "JRE metadata HTTP status: ${http_code}"
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::SonarCloud rejected SONAR_TOKEN (HTTP ${http_code}). Regenerate the token in SonarCloud and update the GitHub Actions secret."
+            head -c 300 /tmp/sonar_jre.json || true
+            echo
+            exit 1
+          fi
+
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
