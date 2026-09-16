@@ -2,6 +2,11 @@
 
 Add-on `version:` mirrors the Earnie app release (`version.py` / GHCR tag). Each release tag auto-publishes via `.github/workflows/release.yml` → job `publish_ha_addon`.
 
+## 2.5.3-alpha.1
+
+- Pins Earnie `2.5.3-alpha.1` (`ghcr.io/jochentcc/earnie-energy:2.5.3-alpha.1`).
+- Earnie release: [2.5.3-alpha.1](https://github.com/JochenTCC/Earnie/releases/tag/v2.5.3-alpha.1)
+
 ## 2.5.2
 
 - Official **PATCH** after **2.5.1**. Focus: Analyse period navigation and Chart 1 Ist↔SoC consistency.
