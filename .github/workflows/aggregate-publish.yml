@@ -1,0 +1,35 @@
+name: traffic-aggregate-publish
+
+on:
+  push:
+    branches: [stats-raw]
+  workflow_dispatch:
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stats-raw
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run aggregation
+        run: python scripts/aggregate_stats.py traffic/ summary.json
+
+      - name: Push summary to public repo
+        env:
+          GH_TOKEN: ${{ secrets.GH_PUBLIC_PUSH_TOKEN }}
+        run: |
+          git clone --branch main "https://x-access-token:${GH_TOKEN}@github.com/JochenTCC/repo-stats-public.git" public-repo
+          mkdir -p public-repo/stats
+          cp summary.json public-repo/stats/summary.json
+          cd public-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add stats/summary.json
+          git diff --cached --quiet && echo "keine Aenderungen" || git commit -m "Update stats summary $(date -u +%Y-%m-%d)"
+          git push
