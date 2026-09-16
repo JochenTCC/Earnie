@@ -17,6 +17,46 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Feature Backlog
 
+### Version 2.6 - Enhancements for HA coupling
+
+#### Prerequisites for this epic
+- [x] Install HA simulation instance on Synology for testing
+
+#### Features
+
+**Priority order (2026-09-16):** phased by "must fix before we publicly promote the HA add-on" — see `Earnie-Projekt/Business-Backlog.md`, Awareness-Sprint item "Earnie ist jetzt auch als HA-Add-On zu haben!" (postponed pending Phase 1).
+
+##### Phase 1 — Installation blockers (gate the HA-add-on awareness post)
+
+- [ ] Remove Loxone-only Supervisor options (`loxone_user`/`loxone_pass`/`loxone_ip` in `ha-addon-earnie/earnie/config.yaml` `options`/`schema`) — shown unconditionally in the Supervisor "Configuration" tab regardless of chosen backend, confusing when the add-on already implies HA as backend; the in-app Smarthome-Backend page (`ui/pages/page_smarthome_backend.py`) already handles this conditionally and correctly, so these Supervisor-level options are redundant
+- [ ] Fix HA self-discovery inside the add-on: `discover_home_assistant()` ([integrations/integration_scanner.py](../integrations/integration_scanner.py)) only tries mDNS, and `full_active` adds nothing for HA (only an OpenEMS port scan) — no active fallback. Found via dogfooding: both normal and extended Smarthome-Backend scans find nothing when Earnie runs as the HA add-on, because the container isn't on `host_network` (missing in `config.yaml`) so mDNS multicast can't cross Supervisor's isolated Docker network. The code already knows it's running as the add-on (`EARNIE_INSTALL_CONTEXT=homeassistant_addon` from `run.sh`, read by `install_context_target_kinds()` in [runtime_store/install_context.py](../runtime_store/install_context.py)) but only uses that to narrow the scan, not to skip network discovery. Preferred fix: use the Supervisor's proxied Core API directly (`SUPERVISOR_TOKEN` + `hassio_api`/`homeassistant_api: true`) instead of network discovery — reliable, no multicast dependency. Weaker fallback: `host_network: true` (still useful for genuine LAN-discovery scenarios, has its own security/compatibility tradeoffs)
+- [ ] Add-on Version 0.2 (Entwicklungsplan roadmap): Options-UI → `config.json` generation, Ingress (embedded UI, no separate port), Supervisor-Proxy instead of a manual long-lived-access token for the EHAL-HA-adapter
+  - Confirmed via dogfooding on the new HAOS-in-VM Synology instance (2026-09-16): without Ingress, "OPEN WEB UI" opens `http://homeassistant.local:8501`, which fails when mDNS doesn't resolve the extra port from a fresh tab — user has to manually look up the VM IP. Looks like a broken add-on to a non-technical user; Ingress removes the port/IP lookup entirely
+
+##### Phase 2 — Rounds out onboarding (not blocking, high value)
+
+- [ ] Allow changing HTTP port for Home Assistant and OpenEMS (follow-up to Miniserver #9)
+  - HA form already stores a full `ehal.ha.base_url` (default `http://homeassistant:8123`) — port is in the URL, not a separate field
+  - OpenEMS form already stores `ehal.openems.base_url` (default `http://openems-edge:8084`)
+  - Follow-up: make non-default ports obvious in SB Anbindung (help/caption, or dedicated port field if users still cannot change it in practice)
+- [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)
+
+##### Phase 3 — Test infrastructure (regression safety net before more feature scope)
+
+- [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — fixture-based testing with simulated ("faked") device entity signatures instead of real hardware, to test EHAL discovery/mapping against different HA integration shapes. Separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)). Do this before Phase 4 so later feature work doesn't silently regress discovery/mapping for configs beyond the one real dogfooding instance
+
+##### Phase 4 — Larger scope (after the add-on feels reliable)
+
+- [ ] Add-on Version 1.0 (Entwicklungsplan roadmap): MQTT Discovery, native Home-Assistant entities for Earnie state, Energy-Dashboard integration — distinct from the "Make also an EHAL adaption for MQTT" item elsewhere in this file (that's an EHAL southbound backend; this is the add-on itself publishing Earnie state via HA's native MQTT Discovery)
+- [ ] **energy counters (ΔkWh) for slot Ist on HA backend**
+  - Prefer cumulative / total-increasing energy entities for grid± / PV when mapped
+  - Same chart contract as Loxone (avg power = ΔE / slot Δt); battery/flex may stay on sampled mean
+  - Needs HA entity discovery/mapping (energy sensors are usually separate entities, not a second channel of the power entity) — depends on improved HA-binding / EHAL-Com HA mapping UX
+  - Combines with existing `closed_interval` / sampler path — not a replacement for daemon metering
+- [ ] Check possibility to install either latest productive or pre-release version of Earnie
+
+
+
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)
 
 - [ ] Optimize Pool temperature to a certain value on time. Set desired temperature and using time. Combine it with RC model
@@ -59,29 +99,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 Main Goal of this version is to get a proof-of-concept for an evolved Earnie that is able to optimize EEGs (Energie-Erzeuger-Gemeinschaft)
 - See Entwicklungsplan\eeg-earnie-recherche-zusammenfassung.md for current research
 - [ ] Implement a POC for EEG simulation
-
-
-### Version 2.+1 - Enhancements for HA coupling
-
-#### Prerequisites for this epic
-- [ ] Install HA simulation instance on Synology for testing
-
-#### Features
-
-- [ ] Allow changing HTTP port for Home Assistant and OpenEMS (follow-up to Miniserver #9)
-  - HA form already stores a full `ehal.ha.base_url` (default `http://homeassistant:8123`) — port is in the URL, not a separate field
-  - OpenEMS form already stores `ehal.openems.base_url` (default `http://openems-edge:8084`)
-  - Follow-up: make non-default ports obvious in SB Anbindung (help/caption, or dedicated port field if users still cannot change it in practice)
-- [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)
-- [ ] Improvements for HA-binding
-  - [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)); this item tests EHAL discovery/mapping against different HA integration shapes
-  - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap): Options-UI → `config.json` generation, Ingress (embedded UI, no separate port), Supervisor-Proxy instead of a manual long-lived-access token for the EHAL-HA-adapter
-  - [ ] Add-on Version 1.0 (Entwicklungsplan roadmap): MQTT Discovery, native Home-Assistant entities for Earnie state, Energy-Dashboard integration — distinct from the "Make also an EHAL adaption for MQTT" item elsewhere in this file (that's an EHAL southbound backend; this is the add-on itself publishing Earnie state via HA's native MQTT Discovery)
-  - [ ] **Later: energy counters (ΔkWh) for slot Ist on HA backend**
-    - Prefer cumulative / total-increasing energy entities for grid± / PV when mapped
-    - Same chart contract as Loxone (avg power = ΔE / slot Δt); battery/flex may stay on sampled mean
-    - Needs HA entity discovery/mapping (energy sensors are usually separate entities, not a second channel of the power entity) — depends on improved HA-binding / EHAL-Com HA mapping UX
-    - Combines with existing `closed_interval` / sampler path — not a replacement for daemon metering
 
 
 ### Version 2.+1
