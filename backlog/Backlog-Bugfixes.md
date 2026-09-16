@@ -26,5 +26,10 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] **SonarCloud new-code security/reliability debt (defer past 2.5.3-alpha.1)** — QG ERROR: new reliability rating 3, security rating 5, new coverage 75.1% (&lt;80). Open leak-period items (triage before official 2.5.3):
+  - `scripts/bump_ha_addon.py` python:S3923 (conditional same value — verify still present after recent edit)
+  - `.github/workflows/ha-addon-publish.yml` / `release.yml`: secrets-in-run (S7636), remaining SHA pins if any
+  - `.devcontainer/Dockerfile` root user (docker:S6471); `.devcontainer/post-create.sh` pip without `--only-binary` (shell:S8541)
+
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

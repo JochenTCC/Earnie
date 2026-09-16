@@ -139,12 +139,15 @@ def test_matrix_is_live_snapshot():
     assert matrix_is_live_snapshot([{"consumption_mode": "live_snapshot"}]) is True
 
 
-def test_normalize_absent_fields_roundtrip(tmp_path):
+def test_normalize_absent_fields_roundtrip(tmp_path, monkeypatch):
     from house_config.profiles_store import (
         normalize_house_profiles_document,
         save_house_profiles_document,
         load_house_profiles_document,
     )
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
 
     doc = {
         "profiles": [
@@ -189,12 +192,15 @@ def test_normalize_absent_fields_roundtrip(tmp_path):
     assert "absent_temp_c" not in thermal
 
 
-def test_normalize_migrates_legacy_absent_temp_c(tmp_path):
+def test_normalize_migrates_legacy_absent_temp_c(tmp_path, monkeypatch):
     from house_config.profiles_store import (
         normalize_house_profiles_document,
         save_house_profiles_document,
         load_house_profiles_document,
     )
+    from tests.fixtures.open_meteo_mock import install_open_meteo_climate_mock
+
+    install_open_meteo_climate_mock(monkeypatch)
 
     doc = {
         "profiles": [

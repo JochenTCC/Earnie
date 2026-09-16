@@ -2,6 +2,16 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.5.3-alpha.1 quality gate snapshot (2026-09-16)
+
+- [x] **Quality checks before pre-release `2.5.3-alpha.1`** (`main` @ feature commit + follow-up)
+  - [x] Coverage baseline — 2372 passed / 6 skipped; overall **80.5%** (`data` 73.4, `ehal` 88.8, `house_config` 78.8, `optimizer` 85.7, `runtime_store` 80.8, `settings` 77.5, `simulation` 86.5); no package &lt; 40%
+  - [x] Dead-code / obsolete-test — vulture `--min-confidence 80`: **0** hits; `--dead-fixtures`: all fixtures used
+  - [x] Simplification — no functional removals this pass; triage deferred
+  - [x] KPI — split `house_config/profiles_thermal_annual.py` from `profiles_store.py` (**592**/600 LOC); no core/UI file &gt; 600 after split
+  - [x] Official docs — absent-mode user docs already in session commit; no new Doc Review Findings
+  - [x] SonarCloud — Actions run failed mid-suite (open-meteo ReadTimeout on absent normalize tests); QG **ERROR** informational (leak-period workflow/devcontainer security + coverage 75.1%); deferred items in `Backlog-Bugfixes.md`. Absent normalize tests now install Open-Meteo climate mock.
+
 ### Remove EHAL-Com "Smarthome-Merker testen" (2026-09-16)
 
 - [x] **Remove button "Smarthome-Merker testen" on EHAL-Com** — Dropped `render_loxone_verify_results` from Live-Lesen (`ui/loxone_debug.py`); helper remains on Smarthome-Backend credentials. Docs: `docs/ui/ehal-com.md`. Backlog **2.5.3**.
