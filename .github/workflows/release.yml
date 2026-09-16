@@ -1,4 +1,4 @@
-# Tag-triggered release: multi-arch Docker → ghcr.io + GitHub Release.
+# Tag-triggered release: multi-arch Docker -> ghcr.io + GitHub Release.
 # Trigger: push annotated tag matching vMAJOR.MINOR.PATCH or SemVer pre-release
 #   (e.g. v2.0.0, v2.2.0-alpha.1).
 # Prerequisite: version.py __version__ must equal the tag without the leading "v".
@@ -111,7 +111,7 @@ jobs:
               if [ "$PRERELEASE" = "true" ]; then
                 echo "### Pre-release (community test)"
                 echo ""
-                echo "This is **not** an official release. Do not use \`:latest\` — pin the version tag."
+                echo "This is **not** an official release. Do not use \`:latest\` - pin the version tag."
                 echo ""
                 echo "### Docker images"
                 echo ""
@@ -127,7 +127,7 @@ jobs:
               echo ""
               echo "Deploy: [docs/einrichtung/container.md](https://github.com/${{ github.repository }}/blob/main/docs/einrichtung/container.md)"
               echo ""
-              echo "Multi-arch: \`linux/amd64\` (Synology / Proxmox) · \`linux/arm64\` (LoxBerry)."
+              echo "Multi-arch: \`linux/amd64\` (Synology / Proxmox) | \`linux/arm64\` (LoxBerry)."
             } > "$OUT"
           fi
           echo "path=${OUT}" >> "$GITHUB_OUTPUT"
