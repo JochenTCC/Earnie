@@ -1,4 +1,4 @@
-# Tag-triggered release: multi-arch Docker -> GHCR + GitHub Release.
+# Tag-triggered release: multi-arch Docker → ghcr.io + GitHub Release.
 # Trigger: push annotated tag matching vMAJOR.MINOR.PATCH or SemVer pre-release
 #   (e.g. v2.0.0, v2.2.0-alpha.1).
 # Prerequisite: version.py __version__ must equal the tag without the leading "v".
@@ -41,7 +41,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install dependencies
-        run: pip install --only-binary=:all: -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Version gate (tag must match version.py)
         id: version
@@ -83,7 +83,9 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          # Prefer PAT write:packages in GHCR_TOKEN; fall back to GITHUB_TOKEN.
+          # Existing user packages often deny GITHUB_TOKEN write unless the package
+          # grants this repo Write under "Manage Actions access". Prefer a PAT
+          # (write:packages) stored as repo secret GHCR_TOKEN.
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Build and push multi-arch image
@@ -109,7 +111,7 @@ jobs:
               if [ "$PRERELEASE" = "true" ]; then
                 echo "### Pre-release (community test)"
                 echo ""
-                echo "This is **not** an official release. Do not use \`:latest\` - pin the version tag."
+                echo "This is **not** an official release. Do not use \`:latest\` — pin the version tag."
                 echo ""
                 echo "### Docker images"
                 echo ""
@@ -125,7 +127,7 @@ jobs:
               echo ""
               echo "Deploy: [docs/einrichtung/container.md](https://github.com/${{ github.repository }}/blob/main/docs/einrichtung/container.md)"
               echo ""
-              echo "Multi-arch: \`linux/amd64\` (Synology / Proxmox) | \`linux/arm64\` (LoxBerry)."
+              echo "Multi-arch: \`linux/amd64\` (Synology / Proxmox) · \`linux/arm64\` (LoxBerry)."
             } > "$OUT"
           fi
           echo "path=${OUT}" >> "$GITHUB_OUTPUT"
@@ -158,10 +160,8 @@ jobs:
       contents: write
     steps:
       - name: Require HA add-on publish token
-        env:
-          HA_ADDON_REPO_TOKEN: ${{ secrets.HA_ADDON_REPO_TOKEN }}
         run: |
-          if [ -z "${HA_ADDON_REPO_TOKEN}" ]; then
+          if [ -z "${{ secrets.HA_ADDON_REPO_TOKEN }}" ]; then
             echo "::error::Missing repository secret HA_ADDON_REPO_TOKEN (PAT with contents:write on Earnie and ha-addon-earnie)."
             exit 1
           fi
