@@ -46,7 +46,7 @@ Die Zeitzone des Hausprofils wird aus `land` abgeleitet (`AT`/`DE`/`CH` → IANA
 Für eine Linux-ausgerichtete Editor-/Laufzeitumgebung (Docker Desktop nötig):
 
 1. Befehlspalette → **Dev Containers: Reopen in Container**
-2. `post-create` abwarten (`pip install -e ".[dev]"`, Bootstrap `earnie_env/`)
+2. `post-create` abwarten (`pip install --only-binary=:all: -e ".[dev]"`, Bootstrap `earnie_env/`; Remote-User `vscode`)
 3. F5 mit **Streamlit app.py (:8531 lokal (earnie_env))**
 
 Konfiguration: `.devcontainer/` (Python 3.14-slim, Env wie `.vscode/launch.json`). UI: `http://localhost:8531`.

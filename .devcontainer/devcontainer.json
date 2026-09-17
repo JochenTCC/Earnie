@@ -3,7 +3,7 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
-  "remoteUser": "root",
+  "remoteUser": "vscode",
   "containerEnv": {
     "EARNIE_ENV_PATH": "earnie_env",
     "EARNIE_UI_STREAMLIT_PORT": "8531",

@@ -331,6 +331,45 @@ def _append_io_check(
         checks.append((label, name, opts or {}))
 
 
+def ev_ehal_binding_collisions(consumer: dict) -> list[tuple[str, str, list[str]]]:
+    """Return (io_name, detail, fields) when distinct EV EHAL roles share one Merker."""
+    from collections import defaultdict
+
+    from settings.ehal_marker_resolve import (
+        marker_get_evcs_nominal_current,
+        marker_get_evcs_soc_min_immediate,
+        marker_sens_evcs_active_power,
+        marker_sens_evcs_connected,
+        marker_set_evcs_max_current,
+        marker_set_evcs_mode,
+    )
+
+    roles = {
+        "sens_evcs_active_power": marker_sens_evcs_active_power(consumer),
+        "sens_evcs_connected": marker_sens_evcs_connected(consumer),
+        "set_evcs_max_current": marker_set_evcs_max_current(consumer),
+        "set_evcs_mode": marker_set_evcs_mode(consumer),
+        "get_evcs_nominal_current": marker_get_evcs_nominal_current(consumer),
+        "get_evcs_soc_min_immediate": marker_get_evcs_soc_min_immediate(consumer),
+    }
+    by_io: dict[str, list[str]] = defaultdict(list)
+    for field, io_name in roles.items():
+        name = str(io_name or "").strip()
+        if name:
+            by_io[name].append(field)
+    out: list[tuple[str, str, list[str]]] = []
+    for io_name, fields in sorted(by_io.items()):
+        if len(fields) < 2:
+            continue
+        detail = (
+            f"EV ehal_bindings collision on '{io_name}': "
+            + ", ".join(fields)
+            + " (writes/reads must use distinct Merker)"
+        )
+        out.append((io_name, detail, fields))
+    return out
+
+
 def _append_ev_read_checks(
     checks: list[tuple[str, str, dict]],
     consumer: dict,
@@ -583,6 +622,20 @@ def run_read_checks() -> list[LoxoneCheck]:
     results: list[LoxoneCheck] = []
     for label, io_name, opts in collect_read_checks():
         results.append(_read_check(label, io_name, **opts))
+    for consumer in _consumers_for_live_reads():
+        if not _is_ev_consumer(consumer):
+            continue
+        cid = consumer["id"]
+        for io_name, detail, _fields in ev_ehal_binding_collisions(consumer):
+            results.append(
+                LoxoneCheck(
+                    f"{cid}:ehal_binding_collision",
+                    io_name,
+                    False,
+                    detail,
+                    severity="warning",
+                )
+            )
     return results
 
 

@@ -23,13 +23,14 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **SonarCloud new-code security/reliability debt** — Code remediations in; confirm on next SonarCloud scan (leak-period QG / ratings):
+  - [x] `scripts/bump_ha_addon.py` python:S3923 — already fixed (`return 0`; no same-value conditional)
+  - [x] S7636 secrets-in-run — `HA_ADDON_REPO_TOKEN` via `env:` in `ha-addon-publish.yml` + `release-publish.yml` (require-token step)
+  - [x] docker:S6471 / shell:S8541 — `.devcontainer` non-root `vscode` user; `pip … --only-binary=:all:`
+  - Accepted: `release-publish.yml` keeps floating action tags (`@v4`/`@v5`); SHA pins blocked tag runs (`e796a01`). `ha-addon-publish.yml` remains SHA-pinned.
+
 
 ## New Bugs (Do not remove this chapter — even if empty)
-
-- [ ] **SonarCloud new-code security/reliability debt (defer past 2.5.3-alpha.1)** — QG ERROR: new reliability rating 3, security rating 5, new coverage 75.1% (&lt;80). Open leak-period items (triage before official 2.5.3):
-  - `scripts/bump_ha_addon.py` python:S3923 (conditional same value — verify still present after recent edit)
-  - `.github/workflows/ha-addon-publish.yml` / `release.yml`: secrets-in-run (S7636), remaining SHA pins if any
-  - `.devcontainer/Dockerfile` root user (docker:S6471); `.devcontainer/post-create.sh` pip without `--only-binary` (shell:S8541)
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

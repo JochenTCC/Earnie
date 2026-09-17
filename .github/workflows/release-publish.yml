@@ -160,8 +160,10 @@ jobs:
       contents: write
     steps:
       - name: Require HA add-on publish token
+        env:
+          HA_ADDON_REPO_TOKEN: ${{ secrets.HA_ADDON_REPO_TOKEN }}
         run: |
-          if [ -z "${{ secrets.HA_ADDON_REPO_TOKEN }}" ]; then
+          if [ -z "${HA_ADDON_REPO_TOKEN}" ]; then
             echo "::error::Missing repository secret HA_ADDON_REPO_TOKEN (PAT with contents:write on Earnie and ha-addon-earnie)."
             exit 1
           fi

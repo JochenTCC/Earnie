@@ -46,7 +46,7 @@ House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `hous
 For a Linux-aligned editor/runtime (Docker Desktop required):
 
 1. Command Palette → **Dev Containers: Reopen in Container**
-2. Wait for `post-create` (`pip install -e ".[dev]"`, bootstrap `earnie_env/`)
+2. Wait for `post-create` (`pip install --only-binary=:all: -e ".[dev]"`, bootstrap `earnie_env/`; remote user `vscode`)
 3. F5 with **Streamlit app.py (:8531 lokal (earnie_env))**
 
 Config: `.devcontainer/` (Python 3.14-slim, env aligned with `.vscode/launch.json`). UI: `http://localhost:8531`.

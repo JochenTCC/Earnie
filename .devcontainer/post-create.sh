@@ -2,7 +2,8 @@
 set -euo pipefail
 
 echo "Installing Earnie (editable) with dev extras..."
-pip install --no-cache-dir -e '.[dev]'
+# Wheel-only deps (shell:S8541); local -e project is still source by design.
+pip install --no-cache-dir --only-binary=:all: -e '.[dev]'
 
 mkdir -p earnie_env/config earnie_env/runtime
 echo "Bootstrapping earnie_env (creates missing files only)..."

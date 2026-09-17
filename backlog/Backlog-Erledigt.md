@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix EV incomplete charge (wrong EHAL bindings) (2026-09-17)
+
+- [x] **EV not fully charged 17.09.26 ~07:45** — Prod `e_auto` ehal_bindings collided / mis-mapped: `set_evcs_mode`→`SOCMinSofort`, `set_evcs_max_current`→`MaxStrom`, `sens_evcs_active_power`→`Angeschlossen`. Overnight history showed remaining ~4 kWh at unplug while Earnie wrote mode enum into SOC-min and current into the nominal-current Merker. Fix: productive bindings corrected to `Modus` / `Soll_A` / `P_act` (reads stay on `MaxStrom` / `SOCMinSofort`); EHAL-Com label `Setpoint Wallbox-Sollstrom (A)`; Loxone verify warns on EV binding collisions (`ev_ehal_binding_collisions`). Live acceptance verified.
+
 ### 2.5.3-alpha.1 quality gate snapshot (2026-09-16)
 
 - [x] **Quality checks before pre-release `2.5.3-alpha.1`** (`main` @ feature commit + follow-up)

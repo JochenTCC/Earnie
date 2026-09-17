@@ -8,9 +8,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
 
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=1000
+RUN groupadd --gid "${USER_GID}" "${USERNAME}" \
+    && useradd --uid "${USER_UID}" --gid "${USER_GID}" -m "${USERNAME}" \
+    && chown -R "${USERNAME}:${USERNAME}" /usr/local
+
 ENV TZ=Europe/Vienna
 ENV PYTHONUTF8=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-ENV PIP_ROOT_USER_ACTION=ignore
 
 WORKDIR /workspaces
+
+USER ${USERNAME}
