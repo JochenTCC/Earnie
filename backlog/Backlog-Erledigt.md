@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix EHAL-Com HTTP-Probe proposals overwrite existing mappings (2026-09-17)
+
+- [x] **EHAL-Com HTTP-Probe proposals overwrite existing mappings** — Field selects used `proposal or existing binding`, so heuristic proposals could displace saved Merker when widgets were first created; Save then wrote the UI map for that entity. Fix: `resolve_field_select_default` prefers existing binding; proposal only fills unbound fields. Test: `test_resolve_field_select_default_keeps_existing_over_proposal`. Live acceptance verified (`e_auto` after HTTP-Probe).
+
 ### Bugfix EV incomplete charge (wrong EHAL bindings) (2026-09-17)
 
 - [x] **EV not fully charged 17.09.26 ~07:45** — Prod `e_auto` ehal_bindings collided / mis-mapped: `set_evcs_mode`→`SOCMinSofort`, `set_evcs_max_current`→`MaxStrom`, `sens_evcs_active_power`→`Angeschlossen`. Overnight history showed remaining ~4 kWh at unplug while Earnie wrote mode enum into SOC-min and current into the nominal-current Merker. Fix: productive bindings corrected to `Modus` / `Soll_A` / `P_act` (reads stay on `MaxStrom` / `SOCMinSofort`); EHAL-Com label `Setpoint Wallbox-Sollstrom (A)`; Loxone verify warns on EV binding collisions (`ev_ehal_binding_collisions`). Live acceptance verified.

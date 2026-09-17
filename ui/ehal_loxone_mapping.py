@@ -153,6 +153,11 @@ def binding_map(raw: object) -> dict[str, str]:
     return {str(k): _nonempty(v) for k, v in raw.items() if _nonempty(v)}
 
 
+def resolve_field_select_default(existing: str, proposed: str) -> str:
+    """Prefer saved binding; use heuristic proposal only when unbound."""
+    return str(existing or proposed or "")
+
+
 def resolve_live_profile_id(house_doc: dict) -> str:
     """Prefer Live-Szenario house_profile_id; else first profile id."""
     refs = get_live_scenario_refs()
@@ -380,7 +385,9 @@ def _render_field_selects(
         st.markdown(f"**{caption}** — `{entity_id}`")
         for field in role_fields:
             prop = proposals.get(field) or {}
-            default = str(prop.get("marker_name") or bindings.get(field) or "")
+            existing = str(bindings.get(field) or "")
+            proposed = str(prop.get("marker_name") or "")
+            default = resolve_field_select_default(existing, proposed)
             mapped = _select_marker(
                 field,
                 entity_id=entity_id,

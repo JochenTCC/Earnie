@@ -15,6 +15,7 @@ from ui.ehal_loxone_mapping import (
     build_entity_rows,
     fields_for_consumer,
     is_known_marker_name,
+    resolve_field_select_default,
 )
 
 
@@ -84,6 +85,22 @@ def test_field_select_caption_includes_ehal_name():
     assert "`sens_ess_soc`" in caption
     assert caption.endswith(" *")
     assert "sens_ess_soc" != caption  # meaning text present beside the name
+
+
+def test_resolve_field_select_default_keeps_existing_over_proposal():
+    # Runtime case: e_auto set_evcs_mode was displaced by SOCMinSofort proposal.
+    assert (
+        resolve_field_select_default("Earnie_EAuto_Modus", "Earnie_EAuto_SOCMinSofort")
+        == "Earnie_EAuto_Modus"
+    )
+    assert (
+        resolve_field_select_default("Earnie_EAuto_Soll_A", "Earnie_EAuto_MaxStrom")
+        == "Earnie_EAuto_Soll_A"
+    )
+    assert resolve_field_select_default("", "Earnie_EAuto_SOCMinSofort") == (
+        "Earnie_EAuto_SOCMinSofort"
+    )
+    assert resolve_field_select_default("", "") == ""
 
 
 def test_build_entity_rows_includes_plant_and_consumers():
