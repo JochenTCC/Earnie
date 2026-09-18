@@ -118,7 +118,7 @@ Kurzfassung der typischen Wege:
 
 | Weg                              | Für wen                                 | Hinweis                                                                                |
 | -------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------- |
-| **Docker (empfohlen Produktiv)** | Synology NAS, LoxBerry, Proxmox LXC, PC | Persistente Ordner `earnie_env/config/` und `earnie_env/runtime/` außerhalb des Images |
+| **Docker (empfohlen Produktiv)** | Synology NAS, LoxBerry, Proxmox LXC, PC (auch VMware `vctl`) | Persistente Ordner `earnie_env/config/` und `earnie_env/runtime/` außerhalb des Images |
 | **Greenfield / Ersteinrichtung** | Erste Was-wäre-wenn-Tests lokal         | Eigener Stack, oft Port **8502** — getrennt vom Produktivsystem                        |
 | **Lokal ohne Container**         | Entwickler, Tests                       | siehe [DEVELOPER.md](../../DEVELOPER.md)                                               |
 
@@ -130,7 +130,7 @@ Kurzfassung der typischen Wege:
 3. Oberfläche im Browser öffnen (Produktiv oft Port **8501**, siehe [Streamlit-Ports](../referenz/streamlit-ports.md)).
 4. Bei geplantem Live-Betrieb: Auf der Seite **Smarthome-Backend** das Backend wählen und den Zugang hinterlegen (siehe [Smarthome-Backend wählen](../einrichtung/smarthome-backend-wahl.md)), danach mit dem Hauskonfigurator fortfahren.
 
-Details: [Container](../einrichtung/container.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md).
+Details: [Container](../einrichtung/container.md) · [VMware `vctl` (Windows-PC)](../einrichtung/vmware-vctl.md) · [Betrieb](../einrichtung/betrieb.md) · [Greenfield](../einrichtung/greenfield-dev-stack.md).
 
 Nach dem Start erscheinen in der Navigation zunächst vor allem **Konfiguration** und **Daemon Control**. Weitere Seiten (Monitor, Szenario-Explorer, …) werden freigeschaltet, sobald die Einrichtung weit genug ist.
 

@@ -39,6 +39,8 @@ LoxBerry **Plugin** (Scope A, ZIP-Install): [`packaging/loxberry/`](../packaging
 
 Home-Assistant-**Add-on** (Supervisor, primär HA Green): [`packaging/homeassistant-addon/earnie/`](../packaging/homeassistant-addon/earnie/) · Anwenderdok: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md)
 
+Windows-PC mit **VMware `vctl`** (kein Compose): [`docs/einrichtung/vmware-vctl.md`](../docs/einrichtung/vmware-vctl.md) · Hilfsskript [`scripts/run_earnie_vctl.ps1`](../scripts/run_earnie_vctl.ps1)
+
 ```powershell
 docker compose --project-directory . -f docker/compose/dev.yml up -d --build
 docker compose --project-directory . -f docker/compose/greenfield.yml up -d --build

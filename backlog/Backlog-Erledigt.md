@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### VMware Workstation vctl (Windows-PC) (2026-09-18)
+
+- [x] **Earnie install path via VMware `vctl` (no Docker Desktop)** — German user doc [`docs/einrichtung/vmware-vctl.md`](../docs/einrichtung/vmware-vctl.md); helper [`scripts/run_earnie_vctl.ps1`](../scripts/run_earnie_vctl.ps1) (`up`/`start`/`stop`/`update`/…). Cross-links: `container.md`, `streamlit-ports.md`, `docker/README.md`, handbook, root/`docs` README. Same GHCR image as Synology/Proxmox prod.
+
 ### Bugfix EHAL-Com HTTP-Probe proposals overwrite existing mappings (2026-09-17)
 
 - [x] **EHAL-Com HTTP-Probe proposals overwrite existing mappings** — Field selects used `proposal or existing binding`, so heuristic proposals could displace saved Merker when widgets were first created; Save then wrote the UI map for that entity. Fix: `resolve_field_select_default` prefers existing binding; proposal only fills unbound fields. Test: `test_resolve_field_select_default_keeps_existing_over_proposal`. Live acceptance verified (`e_auto` after HTTP-Probe).

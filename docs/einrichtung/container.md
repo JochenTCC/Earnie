@@ -4,6 +4,8 @@
 
 **Proxmox VE (LXC + Docker Compose):** [proxmox-lxc.md](proxmox-lxc.md)
 
+**Windows-PC mit VMware Workstation (`vctl`):** [vmware-vctl.md](vmware-vctl.md)
+
 **Docker-Artefakte:** `[docker/README.md](../../docker/README.md)` — Dockerfile, Compose-Dateien und Build-Skripte liegen unter `docker/`. Compose-Befehle immer vom Repo-Root mit `--project-directory .`.
 
 ## Persistente Daten
@@ -274,3 +276,13 @@ docker compose --project-directory . -f compose.yaml up -d
 ```
 
 UI: `http://<lxc-ip>:8501`
+
+## Windows-PC mit VMware Workstation (`vctl`)
+
+Ohne Docker Desktop: veröffentlichtes Image über VMware **`vctl`**, Persistenz unter `%USERPROFILE%\Earnie\earnie_env\`. Hilfsskript und Schritt-für-Schritt: [vmware-vctl.md](vmware-vctl.md).
+
+```powershell
+.\scripts\run_earnie_vctl.ps1 -Action up
+```
+
+UI: `http://localhost:8501`

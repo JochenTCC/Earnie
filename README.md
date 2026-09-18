@@ -81,7 +81,7 @@ Details: [Betrieb](docs/einrichtung/betrieb.md)
 ## Typischer Ablauf
 
 1. **Voraussetzungen klären** — Smarthome-Backend (Loxone / HA+evcc / OpenEMS-Lab), PV + Speicher, verschiebbare Verbraucher, optional dynamischer Tarif
-2. **Deployment wählen** — Container ([Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox LXC](docs/einrichtung/proxmox-lxc.md)) oder lokaler Betrieb → [Container](docs/einrichtung/container.md) · [Betrieb](docs/einrichtung/betrieb.md)
+2. **Deployment wählen** — Container ([Synology](https://www.synology.com/) / [LoxBerry](https://www.loxberry.com/) / [Proxmox LXC](docs/einrichtung/proxmox-lxc.md) / [VMware `vctl`](docs/einrichtung/vmware-vctl.md)) oder lokaler Betrieb → [Container](docs/einrichtung/container.md) · [Betrieb](docs/einrichtung/betrieb.md)
 3. **Konfiguration anlegen** — Bootstrap `earnie_env/config/`, Backend und Mapping → [Erste Schritte](docs/README.md#erste-schritte) · [Smarthome-Backend wählen](docs/einrichtung/smarthome-backend-wahl.md)
 4. **Was-wäre-wenn-Analyse** — Mit Erstkonfiguration klären, ob sich ein Gesamtsystem und Earnie im produktiven Einsatz lohnen
 5. **Verbindung zu Smarthome** — **Smarthome-Backend** (Auswahl/Erkennung), dann **EHAL-Com** (Live-Lesen); bei Loxone optional `python -m scripts.verify_loxone_setup`
@@ -100,7 +100,7 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 | Bereich                | Kapitel                                                                                                                                                                                                          |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Handbuch**           | [Benutzer-Handbuch Earnie](docs/user-manual/Benutzer-Handbuch-Earnie.md)                                                                                                                                         |
-| **Einrichtung**        | [Smarthome-Backend wählen](docs/einrichtung/smarthome-backend-wahl.md) · [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Proxmox LXC](docs/einrichtung/proxmox-lxc.md) |
+| **Einrichtung**        | [Smarthome-Backend wählen](docs/einrichtung/smarthome-backend-wahl.md) · [Loxone-Anbindung](docs/einrichtung/loxone-anbindung.md) · [Betrieb](docs/einrichtung/betrieb.md) · [Container](docs/einrichtung/container.md) · [Proxmox LXC](docs/einrichtung/proxmox-lxc.md) · [VMware `vctl`](docs/einrichtung/vmware-vctl.md) |
 | **Konfiguration**      | [Überblick](docs/konfiguration/overview.md) · [PV & Batterie](docs/konfiguration/batterie-pv.md) · [Flexible Verbraucher](docs/konfiguration/flexible-verbraucher.md) · [Preise](docs/konfiguration/preise.md) |
 | **Benutzeroberfläche** | [Betriebsmodi](docs/ui/betriebsmodi.md) · [Charts](docs/ui/charts.md) · [Smarthome-Backend](docs/ui/smarthome-backend.md) · [EHAL-Com](docs/ui/ehal-com.md)                                                                                            |
 | **Referenz**           | [Abkürzungen](docs/referenz/abbreviations.md) · [Loxone-Signale und Earnie-Library](docs/referenz/loxone-signals.md)                                                                                                                                                                |
@@ -114,6 +114,7 @@ Optional: [Greenfield Dev-Stack](docs/einrichtung/greenfield-dev-stack.md) (Erst
 | Weg                              | Für wen                                                                                                               | Detail                                                                                                             |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | **Docker (empfohlen Prod)**      | [Synology](https://www.synology.com/), [LoxBerry](https://www.loxberry.com/), [Proxmox](https://www.proxmox.com/) LXC | [docs/einrichtung/container.md](docs/einrichtung/container.md) · [proxmox-lxc.md](docs/einrichtung/proxmox-lxc.md) |
+| **VMware `vctl` (Windows-PC)**   | VMware Workstation Pro/Player, kein Docker Desktop                                                                    | [docs/einrichtung/vmware-vctl.md](docs/einrichtung/vmware-vctl.md) · `scripts/run_earnie_vctl.ps1`                    |
 | **Lokal (Dev / ohne Container)** | Entwickler, Tests                                                                                                     | [DEVELOPER.md](DEVELOPER.md)                                                                                       |
 
 
