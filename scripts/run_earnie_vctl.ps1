@@ -102,10 +102,46 @@ function Get-RuntimeDir([string]$Root) {
     return (Join-Path $Root "earnie_env\runtime")
 }
 
+function Get-CrxVmdkPath {
+    return (Join-Path $env:USERPROFILE ".vctl\bin\crx.vmdk")
+}
+
+function Test-CrxVmdkReady {
+    $path = Get-CrxVmdkPath
+    if (-not (Test-Path -LiteralPath $path)) {
+        return $false
+    }
+    $item = Get-Item -LiteralPath $path
+    # Empty / tiny placeholder files are not usable CRX disks.
+    return ($item.Length -gt 1MB)
+}
+
+function Write-CrxVmdkHelp {
+    $path = Get-CrxVmdkPath
+    Write-Host ""
+    Write-Host "VMware vctl needs the CRX disk image (crx.vmdk) to create containers." -ForegroundColor Yellow
+    Write-Host "Expected file: $path"
+    Write-Host ""
+    Write-Host "Typical cause: download3.vmware.com no longer resolves (Broadcom/vctl bug)."
+    Write-Host "Check DNS:  Resolve-DnsName download3.vmware.com"
+    Write-Host "Docs:       docs/einrichtung/vmware-vctl.md  (section Troubleshooting)"
+    Write-Host ""
+    Write-Host "Recommended fallback (same Earnie image, works without vctl):"
+    Write-Host "  Docker Desktop + docker/compose/synology_productive.yml"
+    Write-Host "  See docs/einrichtung/container.md"
+}
+
 function Invoke-Vctl {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$VctlArgs)
-    & $script:VctlExe @VctlArgs
+    $output = & $script:VctlExe @VctlArgs 2>&1 | ForEach-Object { "$_" }
+    $joined = ($output -join "`n")
+    if ($output) {
+        Write-Host $joined
+    }
     if ($LASTEXITCODE -ne 0) {
+        if ($joined -match "crx\.vmdk|download3\.vmware\.com") {
+            Write-CrxVmdkHelp
+        }
         throw "vctl failed (exit $LASTEXITCODE): $($VctlArgs -join ' ')"
     }
 }
@@ -133,6 +169,11 @@ function Test-ContainerRunning([string]$Name) {
 function Start-ContainerRuntime {
     Write-Host "Starting vctl container runtime..."
     Invoke-Vctl system start
+    if (-not (Test-CrxVmdkReady)) {
+        Write-CrxVmdkHelp
+        throw ("CRX disk missing or incomplete after 'vctl system start'. " +
+            "Containers cannot be created until crx.vmdk is available.")
+    }
     Invoke-Vctl system info
 }
 

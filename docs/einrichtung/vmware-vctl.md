@@ -16,8 +16,11 @@ Gleiches Image und gleiche Persistenz wie Synology/Proxmox: `ghcr.io/jochentcc/e
 | Windows-PC mit VMware Workstation, kein Docker Desktop gewünscht | Dauerbetrieb 24/7 wie NAS/Proxmox (besser: Compose auf Linux/NAS) |
 | Live oder Was-wäre-wenn auf dem Desktop-PC | Automatischer Start mit Windows ohne Extra-Arbeit |
 | Schneller Zugriff auf das veröffentlichte GHCR-Image | Erwartung von `docker compose up` (vctl hat **kein** Compose) |
+| `vctl system start` lädt `crx.vmdk` erfolgreich | DNS/Download von `download3.vmware.com` schlägt fehl (häufig seit Broadcom-Migration) |
 
-`vctl` startet jeden Container in einer leichten **CRX-VM**. Der Runtime-Dienst startet **nicht** automatisch mit Workstation — nach jedem Reboot einmal `vctl system start` (bzw. Skript `-Action start`).
+`vctl` startet jeden Container in einer leichten **CRX-VM** und braucht dafür die Datei **`crx.vmdk`** (Download beim ersten `vctl system start` / `vctl kind`). Der Runtime-Dienst startet **nicht** automatisch mit Workstation — nach jedem Reboot einmal `vctl system start` (bzw. Skript `-Action start`).
+
+**Wichtig:** Wenn der Download von `crx.vmdk` fehlschlägt, ist das ein **VMware-/Broadcom-Problem**, kein Earnie-Fehler. Siehe [Troubleshooting](#troubleshooting-crxvmdk).
 
 ## Voraussetzungen
 
@@ -152,3 +155,61 @@ Vorabversionen (Community): Image-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-en
 - **Kein Auto-Start** mit Windows — nach Reboot Runtime + Container starten (Taskplaner optional selbst einrichten).
 - **LAN / Loxone** — Ports liegen auf dem Windows-Host; Erreichbarkeit des Miniservers zuerst vom PC aus prüfen. Bei Problemen alternativ Linux-VM mit bridged Netz + Compose ([proxmox-lxc.md](proxmox-lxc.md) als Muster).
 - Compose-Äquivalent Prod: [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml) / [`synology_productive.yml`](../../docker/compose/synology_productive.yml).
+
+## Troubleshooting: `crx.vmdk`
+
+### Symptome
+
+```text
+Error downloading from https://download3.vmware.com/software/fusion/file/crx.vmdk:
+  dial tcp: lookup download3.vmware.com: no such host
+…
+ERROR failed to create container: require file crx.vmdk, check if it has been downloaded correctly
+```
+
+Danach meldet `-Action start` oft: Container existiert nicht — weil `-Action up` den Container nie anlegen konnte.
+
+### Ursache
+
+`vctl` muss die CRX-Festplatte `crx.vmdk` von Broadcom/VMware herunterladen. Der Hostname **`download3.vmware.com`** löst bei vielen Installationen **nicht mehr auf** (bekanntes Community-Thema; betraf auch aktuelle Workstation 17.6.x). Earnie und GHCR sind dabei nicht beteiligt.
+
+Erwarteter Speicherort nach erfolgreichem Download:
+
+`%USERPROFILE%\.vctl\bin\crx.vmdk`
+
+### Prüfungen
+
+```powershell
+Resolve-DnsName download3.vmware.com
+Test-Path "$env:USERPROFILE\.vctl\bin\crx.vmdk"
+Get-Item "$env:USERPROFILE\.vctl\bin\crx.vmdk" -ErrorAction SilentlyContinue |
+  Select-Object FullName, Length, LastWriteTime
+vctl system start
+```
+
+### Was versuchen (vctl retten)
+
+1. **Workstation aktualisieren** auf die neueste verfügbare Version (Broadcom Support/Portal).
+2. **Anderes DNS / Netz** — z. B. anderer Resolver, VPN aus, Firmen-Proxy prüfen; danach erneut `vctl system start`.
+3. **Datei von einem funktionierenden PC übernehmen** — wenn ein anderer Rechner bereits `%USERPROFILE%\.vctl\bin\crx.vmdk` hat (gleiche Workstation-Major-Version): Ordner `.vctl\bin\` mit `crx.vmdk` (und ggf. mitgelieferten Tools) auf den Ziel-PC kopieren, dann `vctl system start` und erneut `.\scripts\run_earnie_vctl.ps1 -Action up`.
+4. **Broadcom Community / Support** — Stichwort `vctl crx.vmdk download3.vmware.com`.
+
+Es gibt **keinen** offiziellen Earnie-Workaround, der `crx.vmdk` selbst bereitstellt (Lizenz/Distribution der VMware-Datei).
+
+### Empfohlener Ausweichweg (Earnie trotzdem betreiben)
+
+Gleiches Image, ohne `vctl`:
+
+**Option A — Docker Desktop auf dem Windows-PC**
+
+```powershell
+mkdir earnie_env\config, earnie_env\runtime
+docker compose --project-directory . -f docker/compose/synology_productive.yml pull
+docker compose --project-directory . -f docker/compose/synology_productive.yml up -d
+```
+
+UI: `http://localhost:8501` — Details: [container.md](container.md).
+
+**Option B — kleine Linux-VM in VMware** (bridged Netz) mit Docker Engine + Compose — Muster wie [proxmox-lxc.md](proxmox-lxc.md), nur als volle VM statt LXC.
+
+Bestehende Daten unter `%USERPROFILE%\Earnie\earnie_env\` können bei Option A nach `.\earnie_env\` im Compose-Projektordner kopiert werden (gleiche Unterordner `config/` und `runtime/`).
