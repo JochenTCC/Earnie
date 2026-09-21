@@ -41,14 +41,14 @@ class DiscoveredBackend:
 
     kind: BackendKind
     host: str
-    method: Literal["mdns", "ssdp", "port_scan"]
+    method: Literal["mdns", "ssdp", "port_scan", "supervisor"]
     port: int | None = None
     name: str | None = None
     extra: dict = field(default_factory=dict)
 
 
 # --------------------------------------------------------------------------
-# Home Assistant — passive mDNS
+# Home Assistant — Supervisor proxy (add-on) then passive mDNS
 # --------------------------------------------------------------------------
 
 
@@ -83,7 +83,15 @@ def _ha_service_info_to_backend(info) -> DiscoveredBackend | None:
 
 
 def discover_home_assistant(*, timeout_sec: float = 4.0) -> list[DiscoveredBackend]:
-    """mDNS browse for ``_home-assistant._tcp.local.``."""
+    """Discover HA: Supervisor Core proxy first (add-on), then mDNS."""
+    from integrations.ha_supervisor import discover_home_assistant_via_supervisor
+
+    via_supervisor = discover_home_assistant_via_supervisor(
+        timeout_sec=min(timeout_sec, 3.0)
+    )
+    if via_supervisor:
+        return via_supervisor
+
     try:
         from zeroconf import ServiceBrowser, Zeroconf
     except ImportError as exc:

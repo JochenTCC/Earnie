@@ -33,16 +33,17 @@ Add-on-Optionen (`config.yaml` → `options`) sind ein optionales Zusatzangebot,
 
 | Add-on-Option | Env-Variable im Container | Pflicht |
 |---|---|---|
-| `loxone_user` | `LOXONE_USER` | nein (nur bei `ehal.backend=loxone`) |
-| `loxone_pass` | `LOXONE_PASS` | nein |
-| `loxone_ip` | `LOXONE_IP` | nein (IPv4, optional mit Port z. B. `192.168.178.1:85`) |
 | `streamlit_port` (Default `8501`) | `EARNIE_UI_STREAMLIT_PORT` | nein |
 | `ehal_loxone_http_port` (Default `8541`) | aktuell kein Env-Override — wirkt nur über `config.json` `system.ehal_loxone_http_port` | nein |
 | `ui_modes` (Default `sunset2sunset,scenario_explorer,live_environment`) | `EARNIE_UI_MODES` | nein |
 | `auto_start_main` (Default `true`) | `EARNIE_AUTO_START_MAIN` | nein |
 | `timezone` (Default `Europe/Vienna`) | `TZ` | nein |
 
-Loxone-Zugangsdaten, die in den Add-on-Optionen gesetzt sind, überschreiben eine vorhandene `earnie_env/config/.env` (Env gewinnt, wie in den anderen Deployments auch).
+Loxone-Zugangsdaten gehören **nicht** in die Supervisor-Optionen — sie werden in der Earnie-Oberfläche unter **Smarthome-Backend** bzw. in `config.json` gepflegt.
+
+### Home-Assistant-Anbindung im Add-on
+
+Das Manifest setzt `homeassistant_api: true`. Damit injiziert der Supervisor `SUPERVISOR_TOKEN` und erlaubt den Zugriff auf die Core-API unter `http://supervisor/core`. Die Smarthome-Backend-Suche findet diesen lokalen Core ohne mDNS; für `ehal.backend=ha` reicht die URL `http://supervisor/core` ohne manuelles Long-Lived Access Token (leerer Token → Laufzeit nutzt `SUPERVISOR_TOKEN`).
 
 ## Datenpfade
 

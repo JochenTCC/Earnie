@@ -1,13 +1,4 @@
 configuration:
-  loxone_user:
-    name: Loxone user
-    description: Username for the Loxone Miniserver connection (ehal.backend=loxone). Leave empty to configure via config.json/.env instead.
-  loxone_pass:
-    name: Loxone password
-    description: Password for the Loxone user above.
-  loxone_ip:
-    name: Loxone IP
-    description: IP address or hostname of the Loxone Miniserver.
   streamlit_port:
     name: Streamlit port
     description: Internal port for the Earnie web UI.

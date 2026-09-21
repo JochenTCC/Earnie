@@ -2,7 +2,7 @@
 # Entwicklungsquelle im Hauptrepo; Sync nach ha-addon-earnie bei Releases
 # (siehe docs/einrichtung/homeassistant-addon.md und der Entwicklungsplan-Doku).
 name: Earnie
-version: "2.5.3-alpha.2"
+version: "2.5.3-alpha.3"
 slug: earnie
 description: Energiemanagement und Optimierung für Smart Homes
 url: https://github.com/JochenTCC/Earnie
@@ -12,6 +12,10 @@ panel_icon: mdi:solar-power
 arch:
   - aarch64
   - amd64
+
+# Grants SUPERVISOR_TOKEN + Core API via http://supervisor/core (SB self-discovery
+# and EHAL-HA without a manual long-lived access token).
+homeassistant_api: true
 
 # Container-Ports bleiben fix; Streamlit-Host-Port ändert man über die
 # Add-on-Option "streamlit_port" (Compose-analoges Verhalten wäre ein Port-
@@ -31,13 +35,12 @@ map:
   - type: data
     read_only: false
 
-# Dateibasierte Konfiguration bleibt der primäre Weg in 0.1 (config.json
-# manuell unter /data/earnie_env/config pflegen). Die folgenden Optionen sind
-# ein optionales Zusatzangebot und decken nur die gängigsten Env-Variablen ab.
+# Dateibasierte Konfiguration bleibt der primäre Weg (config.json manuell unter
+# /data/earnie_env/config pflegen). Die folgenden Optionen sind ein optionales
+# Zusatzangebot und decken nur die gängigsten Env-Variablen ab.
+# Loxone-Zugangsdaten gehören in die In-App-Smarthome-Backend-Seite / config.json,
+# nicht in die Supervisor-Optionen (Add-on impliziert HA als Backend).
 options:
-  loxone_user: ""
-  loxone_pass: ""
-  loxone_ip: ""
   streamlit_port: 8501
   ehal_loxone_http_port: 8541
   ui_modes: "sunset2sunset,scenario_explorer,live_environment"
@@ -45,9 +48,6 @@ options:
   timezone: "Europe/Vienna"
 
 schema:
-  loxone_user: "str?"
-  loxone_pass: "password?"
-  loxone_ip: "str?"
   streamlit_port: "port?"
   ehal_loxone_http_port: "port?"
   ui_modes: "str?"

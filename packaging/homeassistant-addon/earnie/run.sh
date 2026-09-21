@@ -30,26 +30,12 @@ _opt() {
 export EARNIE_ENV_PATH=/data/earnie_env
 export TZ="$(_opt '.timezone' 'Europe/Vienna')"
 
-LOXONE_USER_OPT="$(_opt '.loxone_user' '')"
-if [ -n "$LOXONE_USER_OPT" ]; then
-    export LOXONE_USER="$LOXONE_USER_OPT"
-fi
-
-LOXONE_PASS_OPT="$(_opt '.loxone_pass' '')"
-if [ -n "$LOXONE_PASS_OPT" ]; then
-    export LOXONE_PASS="$LOXONE_PASS_OPT"
-fi
-
-LOXONE_IP_OPT="$(_opt '.loxone_ip' '')"
-if [ -n "$LOXONE_IP_OPT" ]; then
-    export LOXONE_IP="$LOXONE_IP_OPT"
-fi
-
 export EARNIE_UI_STREAMLIT_PORT="$(_opt '.streamlit_port' '8501')"
 export EARNIE_UI_MODES="$(_opt '.ui_modes' 'sunset2sunset,scenario_explorer,live_environment')"
 
 # Narrows the Smarthome-Backend page's targeted scan to Home Assistant itself
-# (see runtime_store/install_context.py).
+# (see runtime_store/install_context.py). SUPERVISOR_TOKEN is injected by the
+# Supervisor when homeassistant_api: true (config.yaml).
 export EARNIE_INSTALL_CONTEXT=homeassistant_addon
 
 AUTO_START_MAIN="$(_opt '.auto_start_main' 'true')"

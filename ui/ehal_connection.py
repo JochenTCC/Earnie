@@ -113,19 +113,43 @@ def render_openems_connection_form(*, form_key: str = "ehal_openems_form") -> No
 
 def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
     """Persist ehal.ha base_url/token (+ backend=ha); mapping stays in ehal_ha_mapping."""
+    from integrations.ha_supervisor import (
+        SUPERVISOR_CORE_BASE_URL,
+        resolve_ha_base_url,
+        resolve_ha_token,
+        supervisor_proxy_available,
+    )
+
     data = load_main_config()
     ehal = _ehal_block(data)
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
+    use_supervisor = supervisor_proxy_available()
+    default_url = (
+        SUPERVISOR_CORE_BASE_URL
+        if use_supervisor
+        else "http://homeassistant:8123"
+    )
+    stored_url = str(ha.get("base_url") or "").strip()
     st.caption("Zugangsdaten werden in `config.json` unter `ehal.ha` gespeichert.")
+    if use_supervisor:
+        st.caption(
+            "Als Home-Assistant-Add-on: leerer Token nutzt den Supervisor-Proxy "
+            "(`SUPERVISOR_TOKEN`) — kein manuelles Long-Lived Access Token nötig."
+        )
     with st.form(form_key):
         base_url = st.text_input(
             "Home Assistant URL",
-            value=str(ha.get("base_url") or "http://homeassistant:8123"),
+            value=stored_url or default_url,
         ).strip()
         token = st.text_input(
             "Long-Lived Access Token",
             value=str(ha.get("token") or ""),
             type="password",
+            help=(
+                "Optional im Add-on: leer lassen, um SUPERVISOR_TOKEN zu verwenden."
+                if use_supervisor
+                else None
+            ),
         ).strip()
         adapter_id = st.text_input(
             "adapter_id",
@@ -135,15 +159,25 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
 
     if not submitted:
         return
-    if not base_url or not token:
-        st.error("URL und Token sind erforderlich.")
+    if not base_url:
+        st.error("URL ist erforderlich.")
         return
+    if not resolve_ha_token(token):
+        st.error(
+            "Token ist erforderlich "
+            "(oder SUPERVISOR_TOKEN beim Betrieb als Home-Assistant-Add-on)."
+        )
+        return
+    # Prefer resolving empty URL via Supervisor defaults before persist when
+    # the user left the field at the Supervisor Core proxy URL.
+    resolved_url = resolve_ha_base_url(base_url) or base_url
     payload = dict(data)
     block = _ehal_block(payload)
     block["backend"] = BACKEND_HA
     block["adapter_id"] = adapter_id
     existing_ha = dict(ha)
-    existing_ha["base_url"] = base_url
+    existing_ha["base_url"] = resolved_url
+    # Never persist SUPERVISOR_TOKEN — keep empty so runtime resolves it.
     existing_ha["token"] = token
     if "entities" not in existing_ha:
         existing_ha["entities"] = {}

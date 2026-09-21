@@ -49,9 +49,11 @@ def active_ehal_backend(raw_config: dict[str, Any] | None = None) -> str:
 
 
 def _ha_credentials_configured(ehal: dict[str, Any]) -> bool:
+    from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
+
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
-    base_url = str(ha.get("base_url") or "").strip()
-    token = str(ha.get("token") or "").strip()
+    base_url = resolve_ha_base_url(str(ha.get("base_url") or ""))
+    token = resolve_ha_token(str(ha.get("token") or ""))
     return bool(base_url and token)
 
 

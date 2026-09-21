@@ -23,11 +23,11 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
-- [ ] **SonarCloud new-code security/reliability debt** — Code remediations in; confirm on next SonarCloud scan (leak-period QG / ratings):
-  - [x] `scripts/bump_ha_addon.py` python:S3923 — already fixed (`return 0`; no same-value conditional)
-  - [x] S7636 secrets-in-run — `HA_ADDON_REPO_TOKEN` via `env:` in `ha-addon-publish.yml` + `release-publish.yml` (require-token step)
-  - [x] docker:S6471 / shell:S8541 — `.devcontainer` non-root `vscode` user; `pip … --only-binary=:all:`
-  - Accepted: `release-publish.yml` keeps floating action tags (`@v4`/`@v5`); SHA pins blocked tag runs (`e796a01`). `ha-addon-publish.yml` remains SHA-pinned.
+- [ ] **SonarCloud leak-period QG** — Named remediations verified on post-fix scans (`ccebfcf` → e.g. Actions [35350702620](https://github.com/JochenTCC/Earnie/actions/runs/35350702620)); gate still **ERROR** (do not archive until QG OK or explicitly accepted as informational):
+  - [x] Verified cleared: `bump_ha_addon.py` python:S3923; secrets:S7636 (`HA_ADDON_REPO_TOKEN` via `env:`); `.devcontainer` docker:S6471 / shell:S8541; `new_reliability_rating` = A
+  - [ ] Still failing QG: `new_security_rating` = C; `new_coverage` ≈ 76.7% (need ≥ 80%)
+  - Accepted (not separate New Bugs): `release-publish.yml` floating action tags `@v4`/`@v5` (`e796a01`; SHA pins blocked tag runs); `ha-addon-publish.yml` stays SHA-pinned; bulk other new-code findings (Actions smells, `pythonsecurity` on CLI scripts, etc.) — triage only when opening a concrete fix item
+  - Optional follow-ups (open New Bug only if planned): raise new-code coverage; reopen Actions hardening beyond the accepted exception; specific high-signal leftovers (`docker/Dockerfile` root / `ui/chart_trace_segments.py` S3923)
 
 
 ## New Bugs (Do not remove this chapter — even if empty)

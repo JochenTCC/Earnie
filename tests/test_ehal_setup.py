@@ -62,6 +62,28 @@ def test_hub_credentials_ha_and_openems(tmp_path, monkeypatch):
     assert ehal_setup.hub_credentials_configured("openems") is True
 
 
+def test_hub_credentials_ha_via_supervisor_token(tmp_path, monkeypatch):
+    """Add-on: empty ehal.ha.token + SUPERVISOR_TOKEN counts as configured."""
+    config_path = tmp_path / "config.json"
+    monkeypatch.setattr(
+        ehal_setup, "resolve_config_json_path", lambda: str(config_path)
+    )
+    monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+    config_path.write_text(
+        json.dumps(
+            {
+                "ehal": {
+                    "backend": "ha",
+                    "ha": {"base_url": "", "token": ""},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert ehal_setup.hub_credentials_configured("ha") is True
+
+
 def test_hub_credentials_loxone_uses_env(monkeypatch):
     monkeypatch.setattr(ehal_setup, "loxone_credentials_configured", lambda: True)
     monkeypatch.setattr(ehal_setup, "_read_config_json", lambda: {})

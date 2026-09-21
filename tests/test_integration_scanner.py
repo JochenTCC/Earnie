@@ -303,3 +303,35 @@ class TestScanForBackends:
         with patch.object(scanner, "discover_openems") as openems_mock:
             scanner.scan_for_backends("targeted", only_kinds=["openems"])
         openems_mock.assert_not_called()
+
+
+class TestDiscoverHomeAssistantPreferSupervisor:
+    def test_returns_supervisor_hit_without_mdns(self):
+        hit = scanner.DiscoveredBackend(
+            kind="home_assistant",
+            host="supervisor",
+            method="supervisor",
+            extra={"base_url": "http://supervisor/core"},
+        )
+        with patch(
+            "integrations.ha_supervisor.discover_home_assistant_via_supervisor",
+            return_value=[hit],
+        ) as sup_mock, patch(
+            "zeroconf.Zeroconf"
+        ) as zc_mock:
+            results = scanner.discover_home_assistant(timeout_sec=0.1)
+        assert results == [hit]
+        sup_mock.assert_called_once()
+        zc_mock.assert_not_called()
+
+    def test_falls_through_to_mdns_when_supervisor_empty(self):
+        fake_zc = MagicMock()
+        with patch(
+            "integrations.ha_supervisor.discover_home_assistant_via_supervisor",
+            return_value=[],
+        ), patch("zeroconf.Zeroconf", return_value=fake_zc) as zc_cls, patch(
+            "zeroconf.ServiceBrowser"
+        ), patch("time.sleep"):
+            assert scanner.discover_home_assistant(timeout_sec=0.01) == []
+        zc_cls.assert_called_once()
+        fake_zc.close.assert_called_once()

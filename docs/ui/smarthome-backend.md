@@ -10,8 +10,8 @@ The **Smarthome-Backend** page under **Daemon Control** picks and connects the l
 
 ## Discovery
 
-1. **Targeted scan** — if Earnie was installed via the LoxBerry plugin or the Home Assistant add-on (`EARNIE_INSTALL_CONTEXT`, see `runtime_store/install_context.py`), the scan narrows to that backend (SSDP for Loxone, mDNS for Home Assistant). Falls back to a full passive scan if nothing is found.
-2. **Full passive scan** — otherwise, both mDNS (Home Assistant) and SSDP/UPnP (Loxone) run together.
+1. **Targeted scan** — if Earnie was installed via the LoxBerry plugin or the Home Assistant add-on (`EARNIE_INSTALL_CONTEXT`, see `runtime_store/install_context.py`), the scan narrows to that backend (SSDP for Loxone; for the HA add-on: Supervisor Core proxy first via `SUPERVISOR_TOKEN` / `http://supervisor/core`, then mDNS). Falls back to a full passive scan if nothing is found.
+2. **Full passive scan** — otherwise, both mDNS (Home Assistant) and SSDP/UPnP (Loxone) run together. In the HA add-on, Supervisor self-discovery still runs first when HA is scanned.
 3. **Extended scan (opt-in)** — an active TCP port scan (8080/8085) for OpenEMS, offered only after a passive scan finds nothing, since it can trigger firewall/IDS alerts on the home network (e.g. UniFi).
 4. **Zero results** — a hint explains that the automatic consumer/EHAL import and other live-environment pages (EHAL-Com, Optimierer-Dienst) stay disabled until a backend is picked manually.
 5. **Multiple results** — pick one from a list; nothing connects automatically.

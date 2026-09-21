@@ -49,10 +49,19 @@ def _ha_block(data: dict) -> dict[str, Any]:
 
 
 def _adapter_from_form(base_url: str, token: str, entities: dict[str, str]) -> HaAdapter:
+    from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
+
+    resolved_url = resolve_ha_base_url(base_url)
+    resolved_token = resolve_ha_token(token)
+    if not resolved_url or not resolved_token:
+        raise ValueError(
+            "URL und Token sind erforderlich "
+            "(oder SUPERVISOR_TOKEN beim Betrieb als Home-Assistant-Add-on)."
+        )
     return HaAdapter(
         HaConfig(
-            base_url=base_url,
-            token=token,
+            base_url=resolved_url,
+            token=resolved_token,
             adapter_id="ha-home",
             entities=entities,
         )
@@ -84,6 +93,13 @@ def _select_entity(
 
 def render_ehal_ha_mapping_section() -> None:
     """Entity-scan + HITL mapping; persists ehal.ha into config.json."""
+    from integrations.ha_supervisor import (
+        SUPERVISOR_CORE_BASE_URL,
+        resolve_ha_base_url,
+        resolve_ha_token,
+        supervisor_proxy_available,
+    )
+
     st.caption(
         "Human-in-the-Loop: Entities scannen, EHAL-Felder zuweisen, speichern. "
         "Bevorzugt stabile Entities von evcc unter HA. "
@@ -92,10 +108,16 @@ def render_ehal_ha_mapping_section() -> None:
 
     data = load_main_config()
     current = _ha_block(data)
+    use_supervisor = supervisor_proxy_available()
+    default_url = (
+        SUPERVISOR_CORE_BASE_URL
+        if use_supervisor
+        else "http://homeassistant:8123"
+    )
 
     base_url = st.text_input(
         "Home Assistant URL",
-        value=current["base_url"] or "http://homeassistant:8123",
+        value=current["base_url"] or default_url,
         key="ehal_ha_base_url",
     ).strip()
     token = st.text_input(
@@ -103,6 +125,11 @@ def render_ehal_ha_mapping_section() -> None:
         value=current["token"],
         type="password",
         key="ehal_ha_token",
+        help=(
+            "Optional im Add-on: leer lassen, um SUPERVISOR_TOKEN zu verwenden."
+            if use_supervisor
+            else None
+        ),
     ).strip()
     adapter_id = st.text_input(
         "adapter_id",
@@ -204,8 +231,12 @@ def render_ehal_ha_mapping_section() -> None:
 
     if save_clicked:
         missing = [name for name in TELEMETRY_REQUIRED if name not in entities]
-        if not base_url or not token:
-            st.error("URL und Token sind erforderlich.")
+        resolved_url = resolve_ha_base_url(base_url)
+        if not resolved_url or not resolve_ha_token(token):
+            st.error(
+                "URL und Token sind erforderlich "
+                "(oder SUPERVISOR_TOKEN beim Betrieb als Home-Assistant-Add-on)."
+            )
             return
         if missing:
             st.error("Pflichtfelder fehlen: " + ", ".join(missing))
@@ -215,8 +246,8 @@ def render_ehal_ha_mapping_section() -> None:
         ehal["backend"] = "ha"
         ehal["adapter_id"] = adapter_id
         ehal["ha"] = {
-            "base_url": base_url,
-            "token": token,
+            "base_url": resolved_url,
+            "token": token,  # never persist SUPERVISOR_TOKEN
             "entities": entities,
             "sign": sign,
         }

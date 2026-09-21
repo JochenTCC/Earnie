@@ -140,15 +140,18 @@ def get_openems_adapter() -> OpenemsAdapter:
 
 def get_ha_adapter() -> HaAdapter:
     global _ha_adapter
-    base_url = str(config.get("EHAL_HA_BASE_URL") or "").strip()
-    token = str(config.get("EHAL_HA_TOKEN") or "").strip()
+    from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
+
+    base_url = resolve_ha_base_url(str(config.get("EHAL_HA_BASE_URL") or ""))
+    token = resolve_ha_token(str(config.get("EHAL_HA_TOKEN") or ""))
     if not base_url:
         raise ValueError(
             "ehal.backend=ha requires ehal.ha.base_url (EHAL_HA_BASE_URL)."
         )
     if not token:
         raise ValueError(
-            "ehal.backend=ha requires ehal.ha.token (EHAL_HA_TOKEN)."
+            "ehal.backend=ha requires ehal.ha.token (EHAL_HA_TOKEN), "
+            "or SUPERVISOR_TOKEN when running as the Home Assistant add-on."
         )
     entities = config.get("EHAL_HA_ENTITIES") or {}
     if not isinstance(entities, dict):

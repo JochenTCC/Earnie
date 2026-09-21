@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### HA Add-on Phase 1 installation blockers (2026-09-21)
+
+- [x] **Remove Loxone-only Supervisor options** — Dropped `loxone_user` / `loxone_pass` / `loxone_ip` from add-on `config.yaml` `options`/`schema`, `run.sh`, translations, and DOCS (packaging + `ha-addon-earnie`). Credentials stay in-app / `config.json`.
+- [x] **HA self-discovery + Supervisor-Proxy auth** — `homeassistant_api: true`; `integrations/ha_supervisor.py` probes `http://supervisor/core/api/` with `SUPERVISOR_TOKEN`; preferred before mDNS in `discover_home_assistant()`. `get_ha_adapter` / hub ready-check resolve empty URL→`http://supervisor/core` and empty token→`SUPERVISOR_TOKEN` in add-on context (token not persisted). HA connection form makes LLAT optional in add-on.
+
 ### VMware Workstation vctl (Windows-PC) (2026-09-18)
 
 - [x] **Earnie install path via VMware `vctl` (no Docker Desktop)** — German user doc [`docs/einrichtung/vmware-vctl.md`](../docs/einrichtung/vmware-vctl.md); helper [`scripts/run_earnie_vctl.ps1`](../scripts/run_earnie_vctl.ps1) (`up`/`start`/`stop`/`update`/…). Cross-links: `container.md`, `streamlit-ports.md`, `docker/README.md`, handbook, root/`docs` README. Same GHCR image as Synology/Proxmox prod.

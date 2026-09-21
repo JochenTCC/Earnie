@@ -17,16 +17,15 @@ Alle Optionen sind **optional**. Wer nichts einträgt, konfiguriert Earnie statt
 
 | Option | Beschreibung | Standard |
 |---|---|---|
-| `loxone_user` | Benutzername für die Loxone Miniserver-Anbindung (`ehal.backend=loxone`) | leer |
-| `loxone_pass` | Passwort dazu (verschlüsselt im Optionen-UI dargestellt) | leer |
-| `loxone_ip` | IP des Loxone Miniservers (IPv4; optional mit HTTP-Port, z. B. `192.168.178.1:85`) | leer |
 | `streamlit_port` | Interner Streamlit-Port | `8501` |
 | `ehal_loxone_http_port` | Reserviert für den EHAL-Loxone-HTTP-Daemon (aktuell noch ohne Env-Wirkung — Port bleibt `8541`, über `config.json` `system.ehal_loxone_http_port` änderbar) | `8541` |
 | `ui_modes` | Aktive UI-Modi, kommagetrennt (`sunset2sunset`, `scenario_explorer`, `live_environment`, …) | `sunset2sunset,scenario_explorer,live_environment` |
 | `auto_start_main` | Startet den Optimierungsdienst (`main.py`) automatisch mit dem Add-on | `true` |
 | `timezone` | Zeitzone für Planung/Anzeige | `Europe/Vienna` |
 
-Loxone-Zugangsdaten, die hier eingetragen werden, überschreiben eine eventuell vorhandene `earnie_env/config/.env` (Env gewinnt).
+Loxone-Zugangsdaten werden in der Earnie-Oberfläche (**Smarthome-Backend**) bzw. in `config.json` gepflegt — nicht in den Supervisor-Optionen.
+
+Mit `homeassistant_api: true` spricht Earnie die lokale Core-API über `http://supervisor/core` und `SUPERVISOR_TOKEN` an (kein manuelles Long-Lived Access Token nötig).
 
 ## Ports
 
@@ -41,7 +40,7 @@ Config und Laufzeitdaten liegen im Add-on-eigenen Datenverzeichnis unter `/data/
 
 ## Verhältnis zum EHAL-HA-Adapter
 
-Dieses Add-on lässt Earnie **innerhalb** von Home Assistant laufen. Der bestehende EHAL-HA-Adapter (`ehal.backend=ha`) ist unabhängig davon und lässt Earnie stattdessen **außerhalb** von HA laufen und die HA-REST-API ansprechen — beide Betriebsarten schließen sich nicht aus.
+Dieses Add-on lässt Earnie **innerhalb** von Home Assistant laufen. Der bestehende EHAL-HA-Adapter (`ehal.backend=ha`) ist unabhängig davon und lässt Earnie stattdessen **außerhalb** von HA laufen und die HA-REST-API ansprechen — beide Betriebsarten schließen sich nicht aus. Im Add-on-Kontext nutzt der Adapter bevorzugt den Supervisor-Proxy statt eines manuellen Tokens.
 
 ## Einschränkungen (Version 0.1)
 
