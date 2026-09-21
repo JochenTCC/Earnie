@@ -2,7 +2,7 @@
 # Entwicklungsquelle im Hauptrepo; Sync nach ha-addon-earnie bei Releases
 # (siehe docs/einrichtung/homeassistant-addon.md und der Entwicklungsplan-Doku).
 name: Earnie
-version: "2.5.3-alpha.4"
+version: "2.5.3-alpha.5"
 slug: earnie
 description: Energiemanagement und Optimierung für Smart Homes
 url: https://github.com/JochenTCC/Earnie
@@ -18,13 +18,14 @@ arch:
 homeassistant_api: true
 
 # Primary UI path: HA sidebar / OPEN WEB UI via Ingress (no host:8501 lookup).
-# Streamlit listens on ingress_port; run_streamlit sets baseUrlPath from
-# Supervisor /addons/self/info → ingress_entry when available.
+# nginx listens on ingress_port 8501 and proxies to Streamlit on :8502 with
+# baseUrlPath re-attached (HA strips the Ingress path before the add-on).
 ingress: true
 ingress_port: 8501
 
-# Optional direct LAN ports (advanced). Ingress is the happy path for the UI.
-# Container ports stay fixed; streamlit_port option still updates config/env.
+# Optional direct LAN ports (advanced). Same :8501 as Ingress (nginx).
+# Container ports stay fixed; streamlit_port option is informational for the
+# published UI port (Streamlit itself stays on internal 8502 behind nginx).
 ports:
   8501/tcp: 8501
   8541/tcp: 8541

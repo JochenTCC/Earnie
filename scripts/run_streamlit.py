@@ -45,12 +45,18 @@ def _has_base_url_path_flag(argv: list[str]) -> bool:
 
 
 def _with_ingress_base_url_path(argv: list[str]) -> list[str]:
-    """When HA Ingress entry is known, set Streamlit baseUrlPath (equals form)."""
+    """Apply Streamlit baseUrlPath when the add-on entrypoint exported it.
+
+    Home Assistant Ingress strips the entry path before the request reaches the
+    add-on. Packaging ``run.sh`` therefore puts nginx in front (re-attaches the
+    path) and sets ``EARNIE_STREAMLIT_BASE_URL_PATH``. Auto-detecting the path
+    here without nginx made both Ingress and bare ``:8501`` return Not Found.
+    """
     if _has_base_url_path_flag(argv):
         return argv
-    from integrations.ha_supervisor import streamlit_base_url_path
+    import os
 
-    base = streamlit_base_url_path()
+    base = (os.environ.get("EARNIE_STREAMLIT_BASE_URL_PATH") or "").strip().lstrip("/")
     if not base:
         return argv
     flag = f"--server.baseUrlPath={base}"

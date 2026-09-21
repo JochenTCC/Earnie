@@ -10,7 +10,7 @@ Dieses Add-on ist ein dünner Wrapper um das bestehende, produktiv genutzte Earn
 2. **Earnie** in der Liste öffnen → **Installieren**.
 3. Optional: Optionen ausfüllen (siehe unten) → **Start**.
 4. Web-UI über die **HA-Seitenleiste** (Ingress) oder den Button **OPEN WEB UI** auf der Add-on-Seite — **ohne** Host-Port `:8501` / IP-Lookup.
-   Optional (Fortgeschritten): direkter LAN-Zugriff `http://<home-assistant-ip>:8501`.
+   Optional (Fortgeschritten): direkter LAN-Zugriff `http://<home-assistant-ip>:8501` (nginx → Streamlit).
 
 **Erwarte nach dem Start ca. 30 Sekunden**, bis Streamlit erreichbar ist.
 
@@ -22,7 +22,7 @@ Beim **ersten Start** legt Earnie `config.json` an und setzt im Add-on-Kontext a
 
 | Option | Beschreibung | Standard |
 |---|---|---|
-| `streamlit_port` | Streamlit-Port (Env + `config.json` `ui.streamlit_port`) | `8501` |
+| `streamlit_port` | In `config.json` `ui.streamlit_port` (Host/UI-Port `8501`); Streamlit lauscht im Add-on intern auf `8502` hinter nginx | `8501` |
 | `ehal_loxone_http_port` | EHAL-Loxone-HTTP-Port → `config.json` `system.ehal_loxone_http_port` | `8541` |
 | `ui_modes` | Aktive UI-Modi, kommagetrennt | `sunset2sunset,scenario_explorer,live_environment` |
 | `auto_start_main` | Startet `main.py` automatisch mit dem Add-on | `true` |
@@ -36,8 +36,8 @@ Mit `homeassistant_api: true` spricht Earnie die Core-API über `http://supervis
 
 | Port | Zweck |
 |---|---|
-| Ingress (`ingress_port` 8501) | Primäre Web-UI in der HA-Oberfläche |
-| `8501/tcp` | Optionaler Direktzugriff (LAN) |
+| Ingress (`ingress_port` 8501) | Primäre Web-UI in der HA-Oberfläche (nginx → Streamlit `:8502`) |
+| `8501/tcp` | Optionaler Direktzugriff (derselbe nginx) |
 | `8541/tcp` | EHAL Loxone-HTTP — nur bei `ehal.backend=loxone` |
 
 ## Persistenz

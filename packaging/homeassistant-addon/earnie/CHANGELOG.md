@@ -2,6 +2,11 @@
 
 Add-on `version:` mirrors the Earnie app release (`version.py` / GHCR tag). Each release tag auto-publishes via `.github/workflows/release.yml` → job `publish_ha_addon`.
 
+## 2.5.3-alpha.5
+
+- **Ingress fix:** nginx on `:8501` re-attaches Supervisor `ingress_entry` and proxies to Streamlit on `:8502` with `baseUrlPath` (native Streamlit-only path caused "Not found" for Ingress and bare host:8501).
+- Earnie release: [2.5.3-alpha.5](https://github.com/JochenTCC/Earnie/releases/tag/v2.5.3-alpha.5)
+
 ## 2.5.3-alpha.4
 
 - **Ingress:** `ingress: true` / `ingress_port: 8501` — primary UI via HA sidebar / OPEN WEB UI (no `homeassistant.local:8501` lookup). Streamlit `baseUrlPath` from Supervisor `ingress_entry`.

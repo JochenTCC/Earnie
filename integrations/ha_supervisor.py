@@ -75,7 +75,11 @@ def fetch_ingress_entry(*, timeout_sec: float = _PROBE_TIMEOUT_SEC) -> str:
 
 
 def streamlit_base_url_path(*, timeout_sec: float = _PROBE_TIMEOUT_SEC) -> str:
-    """Streamlit ``--server.baseUrlPath`` value (no leading slash), or empty."""
+    """Streamlit ``--server.baseUrlPath`` value (no leading slash), or empty.
+
+    Prefer ``EARNIE_STREAMLIT_BASE_URL_PATH`` (set by the add-on ``run.sh`` when
+    nginx Ingress proxy is active). Falls back to Supervisor ``ingress_entry``.
+    """
     override = str(os.environ.get("EARNIE_STREAMLIT_BASE_URL_PATH") or "").strip()
     if override:
         return override.lstrip("/")

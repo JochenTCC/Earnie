@@ -53,7 +53,9 @@ Das Manifest setzt `homeassistant_api: true`. Damit injiziert der Supervisor `SU
 
 ### Ingress (Add-on 0.2)
 
-`ingress: true` / `ingress_port: 8501` — die UI ist in die HA-Oberfläche eingebettet. Streamlit setzt intern `server.baseUrlPath` aus dem Supervisor-Feld `ingress_entry` (Override: Env `EARNIE_STREAMLIT_BASE_URL_PATH`). Der Host-Port `8501` bleibt optional für Direktzugriff.
+`ingress: true` / `ingress_port: 8501` — die UI ist in die HA-Oberfläche eingebettet. Im Add-on sitzt **nginx** auf Port `8501` und reicht an Streamlit auf internem Port `8502` weiter; dabei wird der von HA abgeschnittene Ingress-Pfad (`ingress_entry`) wieder vorangestellt und Streamlit mit `server.baseUrlPath` gestartet. Ohne diesen Proxy liefert Streamlit unter Ingress und unter `http://<host>:8501/` nur „Not found“.
+
+Direkter LAN-Zugriff nutzt denselben nginx-Port `8501`.
 
 ## Datenpfade
 
@@ -95,12 +97,13 @@ Für Entwickler: siehe [`homeassistant-addon-testumgebung.md`](homeassistant-add
 
 Auf der HAOS-in-VM-Instanz (Synology):
 
-1. Add-on mit Ingress starten — Earnie in der Seitenleiste bzw. OPEN WEB UI **ohne** `:8501` / IP-Lookup.
-2. Charts/Navigation laden (kein leeres Blatt, keine Massen-404 unter `/static` oder `_stcore`).
-3. Frische Daten: Smarthome-Backend zielt auf HA; Supervisor-Proxy-Auth funktioniert.
-4. Neustart: `/data/earnie_env` und gemergte/seeded `config.json` bleiben erhalten.
+1. Add-on ab **`2.5.3-alpha.5`** (oder neuer) mit Ingress starten — Earnie in der Seitenleiste bzw. OPEN WEB UI **ohne** `:8501` / IP-Lookup.
+2. Charts/Navigation laden (kein „Not found“, kein leeres Blatt, keine Massen-404 unter `/static` oder `_stcore`).
+3. Optional: Direkt `http://<ha-ip>:8501` (nginx) öffnet dieselbe UI.
+4. Frische Daten: Smarthome-Backend zielt auf HA; Supervisor-Proxy-Auth funktioniert.
+5. Neustart: `/data/earnie_env` und gemergte/seeded `config.json` bleiben erhalten.
 
-Wenn Ingress mit nativem Streamlit scheitert: nginx-/Pfad-Rewrite-Contingency (siehe Backlog 2.6 / Entwicklungsplan).
+Hinweis: `2.5.3-alpha.4` setzte nur Streamlit-`baseUrlPath` ohne nginx-Pfad-Reinject → Ingress und Host`:8501` meldeten „Not found“.
 
 ## Deinstallation
 

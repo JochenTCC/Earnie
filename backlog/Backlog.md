@@ -30,7 +30,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap, remaining): Options-UI → `config.json` generation; Ingress (embedded UI, no separate port / no `homeassistant.local:8501` lookup)
   - Supervisor-Proxy for EHAL-HA (`homeassistant_api` + `SUPERVISOR_TOKEN` / `http://supervisor/core`) is done (Phase 1 discovery + auth)
-  - **Implemented in tree as `2.5.3-alpha.4` (pending Synology HAOS dogfood):** `runtime_store/addon_options.py` (fresh seed `ehal.backend=ha` + port merge); packaging `ingress: true` / `ingress_port: 8501`; Streamlit `baseUrlPath` from Supervisor `ingress_entry` (`integrations/ha_supervisor.py` + `scripts/run_streamlit.py`). Checklist: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) § Dogfood-Checkliste. Nginx contingency only if native Ingress fails dogfood.
+  - **`2.5.3-alpha.5` Ingress fix (nginx path re-inject):** dogfood re-test on Synology HAOS VM. Checklist: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) § Dogfood-Checkliste. `2.5.3-alpha.4` caused "Not found" (Streamlit `baseUrlPath` without nginx).
   - Confirmed via dogfooding on the new HAOS-in-VM Synology instance (2026-09-16): without Ingress, "OPEN WEB UI" opens `http://homeassistant.local:8501`, which fails when mDNS doesn't resolve the extra port from a fresh tab — user has to manually look up the VM IP. Looks like a broken add-on to a non-technical user; Ingress removes the port/IP lookup entirely
 
 ##### Phase 2 — Rounds out onboarding (not blocking, high value)

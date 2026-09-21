@@ -6,9 +6,17 @@
 # den bestehenden App-Entrypoint (docker/entrypoint.sh -> bootstrap_runtime ->
 # Streamlit). Dateibasierte Konfiguration (config.json unter
 # /data/earnie_env/config) funktioniert davon unabhängig weiter.
+#
+# Ingress: nginx listens on 8501 (ingress_port + optional host port) and
+# re-attaches Supervisor ingress_entry before proxying to Streamlit on :8502
+# with --server.baseUrlPath. Without that rewrite, HA path-stripping makes
+# Streamlit answer "Not found" for both Ingress and bare :8501.
 set -e
 
 OPTIONS_FILE=/data/options.json
+NGINX_TEMPLATE=/etc/earnie-addon/nginx/ingress.conf.template
+NGINX_CONF=/tmp/earnie-ingress-nginx.conf
+STREAMLIT_INTERNAL_PORT=8502
 
 # $1 = jq-Filter (z. B. '.timezone'), $2 = Default, falls Option fehlt/leer/null.
 # Kein "// empty" hier: jq behandelt JSON false wie null/fehlend (Alternative-
@@ -30,7 +38,9 @@ _opt() {
 export EARNIE_ENV_PATH=/data/earnie_env
 export TZ="$(_opt '.timezone' 'Europe/Vienna')"
 
-export EARNIE_UI_STREAMLIT_PORT="$(_opt '.streamlit_port' '8501')"
+# Host/option streamlit_port is the published UI port (nginx). Streamlit itself
+# always listens internally on STREAMLIT_INTERNAL_PORT behind nginx.
+export EARNIE_UI_STREAMLIT_PORT="$STREAMLIT_INTERNAL_PORT"
 export EARNIE_UI_MODES="$(_opt '.ui_modes' 'sunset2sunset,scenario_explorer,live_environment')"
 
 # Narrows the Smarthome-Backend page's targeted scan to Home Assistant itself
@@ -49,11 +59,53 @@ fi
 # system.ehal_loxone_http_port (runtime_store/addon_options.py). Env-Hook
 # bleibt Phase-2-Backlog.
 
-# Ingress: Streamlit --server.baseUrlPath is applied in scripts/run_streamlit.py
-# from Supervisor GET /addons/self/info → data.ingress_entry (or override via
-# EARNIE_STREAMLIT_BASE_URL_PATH). Direct :8501 remains optional/advanced.
-
 cd /app
+
+# Resolve Ingress entry (e.g. /api/hassio_ingress/<token>) for Streamlit baseUrlPath
+# and nginx rewrite. Empty → fall back to Streamlit directly on 8501 (no nginx).
+INGRESS_ENTRY="$(python - <<'PY'
+import json
+import os
+import urllib.error
+import urllib.request
+
+token = (os.environ.get("SUPERVISOR_TOKEN") or "").strip()
+if not token:
+    raise SystemExit(0)
+request = urllib.request.Request(
+    "http://supervisor/addons/self/info",
+    headers={"Authorization": f"Bearer {token}"},
+    method="GET",
+)
+try:
+    with urllib.request.urlopen(request, timeout=3.0) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+except (urllib.error.URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+    raise SystemExit(0)
+data = payload.get("data") if isinstance(payload, dict) else None
+if not isinstance(data, dict):
+    raise SystemExit(0)
+entry = str(data.get("ingress_entry") or "").strip()
+if entry:
+    print(entry)
+PY
+)"
+
+if [ -n "$INGRESS_ENTRY" ] && [ -f "$NGINX_TEMPLATE" ]; then
+    # Streamlit wants baseUrlPath without a leading slash.
+    export EARNIE_STREAMLIT_BASE_URL_PATH="${INGRESS_ENTRY#/}"
+    # Escape & for sed replacement; ingress paths are URL-safe otherwise.
+    _sed_entry="$(printf '%s' "$INGRESS_ENTRY" | sed 's/[&|]/g')"
+    sed "s|__INGRESS_ENTRY__|${_sed_entry}|g" "$NGINX_TEMPLATE" > "$NGINX_CONF"
+    nginx -c "$NGINX_CONF"
+    echo "earnie-addon: nginx Ingress proxy on :8501 → Streamlit :${STREAMLIT_INTERNAL_PORT} (baseUrlPath=${EARNIE_STREAMLIT_BASE_URL_PATH})"
+else
+    # No Ingress entry yet — expose Streamlit on the published port directly.
+    export EARNIE_UI_STREAMLIT_PORT=8501
+    unset EARNIE_STREAMLIT_BASE_URL_PATH || true
+    echo "earnie-addon: no ingress_entry — Streamlit directly on :8501"
+fi
+
 exec /bin/sh docker/entrypoint.sh python -m scripts.run_streamlit -- \
     --server.enableCORS false \
     --server.enableXsrfProtection false
