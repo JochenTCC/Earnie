@@ -57,6 +57,36 @@ class TestDiscoverViaSupervisor:
         assert request.full_url.endswith("/api/")
 
 
+class TestIngressBaseUrlPath:
+    def test_override_env_wins(self, monkeypatch):
+        monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+        monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+        monkeypatch.setenv("EARNIE_STREAMLIT_BASE_URL_PATH", "/api/hassio_ingress/abc")
+        assert hs.streamlit_base_url_path() == "api/hassio_ingress/abc"
+
+    def test_fetch_from_supervisor_info(self, monkeypatch):
+        monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+        monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+        monkeypatch.delenv("EARNIE_STREAMLIT_BASE_URL_PATH", raising=False)
+        response = MagicMock()
+        response.status = 200
+        response.read = MagicMock(
+            return_value=b'{"data":{"ingress_entry":"/api/hassio_ingress/tok"}}'
+        )
+        response.__enter__ = MagicMock(return_value=response)
+        response.__exit__ = MagicMock(return_value=False)
+        with patch("urllib.request.urlopen", return_value=response):
+            assert hs.fetch_ingress_entry() == "/api/hassio_ingress/tok"
+            assert hs.streamlit_base_url_path() == "api/hassio_ingress/tok"
+
+    def test_empty_outside_addon(self, monkeypatch):
+        monkeypatch.delenv("EARNIE_INSTALL_CONTEXT", raising=False)
+        monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+        monkeypatch.delenv("EARNIE_STREAMLIT_BASE_URL_PATH", raising=False)
+        assert hs.fetch_ingress_entry() == ""
+        assert hs.streamlit_base_url_path() == ""
+
+
 class TestGetHaAdapterSupervisorResolve:
     def test_uses_supervisor_defaults(self, monkeypatch):
         import integrations.ehal_live as ehal_live

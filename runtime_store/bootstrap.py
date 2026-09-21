@@ -521,8 +521,12 @@ def run() -> None:
         created.append(config_path("config.example.json"))
     if _bootstrap_config_schema():
         created.append(config_path("config.schema.json"))
-    if _bootstrap_config_json():
+    config_just_created = _bootstrap_config_json()
+    if config_just_created:
         created.append(resolve_config_json_path())
+    from runtime_store.addon_options import apply_addon_options
+
+    apply_addon_options(config_just_created=config_just_created)
     if _bootstrap_backtesting_scenarios_example():
         created.append(config_path("backtesting_scenarios.example.json"))
     if _bootstrap_backtesting_scenarios_schema():

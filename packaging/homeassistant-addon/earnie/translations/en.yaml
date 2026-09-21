@@ -1,10 +1,10 @@
 configuration:
   streamlit_port:
     name: Streamlit port
-    description: Internal port for the Earnie web UI.
+    description: Streamlit listen port (also written to config.json ui.streamlit_port). Prefer HA Ingress for the UI.
   ehal_loxone_http_port:
     name: EHAL Loxone HTTP port
-    description: Reserved for the EHAL Loxone-HTTP daemon. Currently has no effect via this option (still fixed at 8541 / config.json system.ehal_loxone_http_port).
+    description: Written to config.json system.ehal_loxone_http_port on each add-on start (default 8541).
   ui_modes:
     name: UI modes
     description: Comma-separated list of enabled UI modes (e.g. sunset2sunset,scenario_explorer,live_environment).
@@ -15,5 +15,5 @@ configuration:
     name: Timezone
     description: Timezone used for planning and display (e.g. Europe/Vienna).
 network:
-  8501/tcp: Web UI
+  8501/tcp: Web UI (optional direct; prefer Ingress)
   8541/tcp: EHAL Loxone-HTTP

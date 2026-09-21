@@ -24,7 +24,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 def _streamlit_argv(port: int, extra: list[str]) -> list[str]:
     if extra and extra[0] == "--":
         extra = extra[1:]
-    return [
+    argv = [
         "streamlit",
         "run",
         str(_APP_PATH),
@@ -34,6 +34,28 @@ def _streamlit_argv(port: int, extra: list[str]) -> list[str]:
         "0.0.0.0",
         *extra,
     ]
+    return _with_ingress_base_url_path(argv)
+
+
+def _has_base_url_path_flag(argv: list[str]) -> bool:
+    for item in argv:
+        if item == "--server.baseUrlPath" or item.startswith("--server.baseUrlPath="):
+            return True
+    return False
+
+
+def _with_ingress_base_url_path(argv: list[str]) -> list[str]:
+    """When HA Ingress entry is known, set Streamlit baseUrlPath (equals form)."""
+    if _has_base_url_path_flag(argv):
+        return argv
+    from integrations.ha_supervisor import streamlit_base_url_path
+
+    base = streamlit_base_url_path()
+    if not base:
+        return argv
+    flag = f"--server.baseUrlPath={base}"
+    print(f"Streamlit Ingress baseUrlPath={base}", flush=True)
+    return [*argv, flag]
 
 
 def _run_streamlit_cli(argv: list[str]) -> int:

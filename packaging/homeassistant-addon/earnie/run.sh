@@ -45,10 +45,13 @@ else
     export EARNIE_AUTO_START_MAIN=1
 fi
 
-# ehal_loxone_http_port ist als Option vorhanden (config.yaml), hat aber noch
-# keinen Env-Hook im Hauptrepo (Default 8541 reicht für MVP 0.1, siehe
-# Entwicklungsplan-Doku "Offene Punkte" #1). Nur config.json
-# system.ehal_loxone_http_port wirkt aktuell.
+# ehal_loxone_http_port Option: bootstrap merges it into config.json
+# system.ehal_loxone_http_port (runtime_store/addon_options.py). Env-Hook
+# bleibt Phase-2-Backlog.
+
+# Ingress: Streamlit --server.baseUrlPath is applied in scripts/run_streamlit.py
+# from Supervisor GET /addons/self/info → data.ingress_entry (or override via
+# EARNIE_STREAMLIT_BASE_URL_PATH). Direct :8501 remains optional/advanced.
 
 cd /app
 exec /bin/sh docker/entrypoint.sh python -m scripts.run_streamlit -- \

@@ -2,6 +2,13 @@
 
 Add-on `version:` mirrors the Earnie app release (`version.py` / GHCR tag). Each release tag auto-publishes via `.github/workflows/release.yml` → job `publish_ha_addon`.
 
+## 2.5.3-alpha.4
+
+- **Ingress:** `ingress: true` / `ingress_port: 8501` — primary UI via HA sidebar / OPEN WEB UI (no `homeassistant.local:8501` lookup). Streamlit `baseUrlPath` from Supervisor `ingress_entry`.
+- **Options → config.json:** fresh install seeds `ehal.backend=ha`; `streamlit_port` / `ehal_loxone_http_port` merge into `config.json` each start.
+- Host port `8501` remains optional for advanced/direct LAN access.
+- Earnie release: [2.5.3-alpha.4](https://github.com/JochenTCC/Earnie/releases/tag/v2.5.3-alpha.4)
+
 ## 2.5.3-alpha.3
 
 - Community **pre-release** of the **2.5.3** line (follow-up to `2.5.3-alpha.2`). Focus: Home Assistant add-on Phase 1 installation blockers (Supervisor HA discovery/auth).

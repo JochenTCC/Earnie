@@ -2,7 +2,7 @@
 # Entwicklungsquelle im Hauptrepo; Sync nach ha-addon-earnie bei Releases
 # (siehe docs/einrichtung/homeassistant-addon.md und der Entwicklungsplan-Doku).
 name: Earnie
-version: "2.5.3-alpha.3"
+version: "2.5.3-alpha.4"
 slug: earnie
 description: Energiemanagement und Optimierung für Smart Homes
 url: https://github.com/JochenTCC/Earnie
@@ -17,17 +17,20 @@ arch:
 # and EHAL-HA without a manual long-lived access token).
 homeassistant_api: true
 
-# Container-Ports bleiben fix; Streamlit-Host-Port ändert man über die
-# Add-on-Option "streamlit_port" (Compose-analoges Verhalten wäre ein Port-
-# Remap, das Supervisor-Add-ons nicht unterstützen — daher fixes Mapping).
+# Primary UI path: HA sidebar / OPEN WEB UI via Ingress (no host:8501 lookup).
+# Streamlit listens on ingress_port; run_streamlit sets baseUrlPath from
+# Supervisor /addons/self/info → ingress_entry when available.
+ingress: true
+ingress_port: 8501
+
+# Optional direct LAN ports (advanced). Ingress is the happy path for the UI.
+# Container ports stay fixed; streamlit_port option still updates config/env.
 ports:
   8501/tcp: 8501
   8541/tcp: 8541
 ports_description:
-  8501/tcp: "Earnie Web-UI"
+  8501/tcp: "Earnie Web-UI (optional direct; prefer Ingress)"
   8541/tcp: "EHAL Loxone-HTTP (optional, nur bei Loxone-Backend)"
-
-webui: "http://[HOST]:[PORT:8501]"
 
 # Add-on-eigenes Volume; wird nach EARNIE_ENV_PATH=/data/earnie_env gemappt
 # (run.sh) und übersteht Add-on-Updates/-Neustarts/-Backups.
@@ -37,7 +40,8 @@ map:
 
 # Dateibasierte Konfiguration bleibt der primäre Weg (config.json manuell unter
 # /data/earnie_env/config pflegen). Die folgenden Optionen sind ein optionales
-# Zusatzangebot und decken nur die gängigsten Env-Variablen ab.
+# Zusatzangebot; beim Start werden Port-Optionen in config.json gemerged und
+# frische Installs bekommen ehal.backend=ha (siehe runtime_store/addon_options.py).
 # Loxone-Zugangsdaten gehören in die In-App-Smarthome-Backend-Seite / config.json,
 # nicht in die Supervisor-Optionen (Add-on impliziert HA als Backend).
 options:
