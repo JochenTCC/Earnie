@@ -97,7 +97,7 @@ Für Entwickler: siehe [`homeassistant-addon-testumgebung.md`](homeassistant-add
 
 Auf der HAOS-in-VM-Instanz (Synology):
 
-1. Add-on ab **`2.5.3-alpha.5`** (oder neuer) mit Ingress starten — Earnie in der Seitenleiste bzw. OPEN WEB UI **ohne** `:8501` / IP-Lookup.
+1. Add-on ab **`2.5.3-alpha.6`** (oder neuer) mit Ingress starten — Earnie in der Seitenleiste bzw. OPEN WEB UI **ohne** `:8501` / IP-Lookup.
 2. Charts/Navigation laden (kein „Not found“, kein leeres Blatt, keine Massen-404 unter `/static` oder `_stcore`).
 3. Optional: Direkt `http://<ha-ip>:8501` (nginx) öffnet dieselbe UI.
 4. Frische Daten: Smarthome-Backend zielt auf HA; Supervisor-Proxy-Auth funktioniert.

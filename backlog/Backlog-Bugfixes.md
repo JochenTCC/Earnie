@@ -28,9 +28,9 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - [ ] Still failing QG: `new_security_rating` = C; `new_coverage` ≈ 76.7% (need ≥ 80%)
   - Accepted (not separate New Bugs): `release-publish.yml` floating action tags `@v4`/`@v5` (`e796a01`; SHA pins blocked tag runs); `ha-addon-publish.yml` stays SHA-pinned; bulk other new-code findings (Actions smells, `pythonsecurity` on CLI scripts, etc.) — triage only when opening a concrete fix item
   - Optional follow-ups (open New Bug only if planned): raise new-code coverage; reopen Actions hardening beyond the accepted exception; specific high-signal leftovers (`docker/Dockerfile` root / `ui/chart_trace_segments.py` S3923)
+- [ ] **HA add-on Ingress start abort (`20b22c55_…` log)** — `packaging/.../run.sh` used invalid GNU sed that aborted start under `set -e`. Fix: Python `str.replace` for nginx conf (`v2.5.3-alpha.6`). Test: `tests/test_ha_addon_ingress_nginx.py`. Dogfood: Synology HAOS Ingress OPEN WEB UI after add-on update.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
-
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

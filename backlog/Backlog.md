@@ -13,11 +13,20 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Isolated battery modes: charging / discharging / standby
   - batt+inverter modes: optimizing / charging / discharging
   - All batteries are parts of optimization
+  - **One-Way storage type** (e.g. EcoFlow Delta 3 bridged HA `hassio-ecoflow-cloud` → Loxone, see `docs/referenz/loxone-signals.md`): chargeable on command, **not** dischargeable on command, **cannot** feed the house grid
+    - New component classification `batteries[].direction: "bidirectional" | "one_way"` in `components.json` schema (default `bidirectional`, backward compatible); MILP must never plan a forced/automatic discharge for `one_way` batteries and must not count their SoC as grid-offset capacity
+    - New EHAL Setpoint field `set_ess_source_select` (Write, enum `0` = grid / `1` = battery): routes locally-attached consumers on a one-way storage between grid passthrough (storage may charge in parallel) and battery-only island supply (no grid draw, no charging); irrelevant/omit for bidirectional ESS — needs `ehal.md` §Setpoint-API + `share/ehal/setpoint.schema.json` update (schema_version bump)
+    - New Capability-Flag `supports_ess_source_select` in `share/ehal/capabilities.schema.json`
+    - Feasibility confirmed for EcoFlow Delta 3: HA switch `switch.<device>_grid_bypass` (internal key `ban_bypass_en`) maps 1:1 by boolean identity — switch ON = "grid bypass disabled" = battery-only = EHAL `1`; switch OFF = "grid bypass enabled" (charges from AC, loads pass through) = EHAL `0`. Verified against `hassio-ecoflow-cloud` source (`switch.py::BypassBanScalarSwitch`); note the field name itself is confusingly inverted
+    - Schema note: existing HA-adapter `sign: ehal|negate` convention (`share/config/ehal.ha.snippet.json`) only covers **signed power fields**; a boolean/enum field needs a separate invert convention for devices whose polarity doesn't happen to line up
+    - Bridging path when Earnie stays on `ehal.backend=loxone` (no native HA southbound): Merker `Earnie_Speicher_Quellenwahl`, written by Earnie via `VI_Earnie_Plant.xml`-style poll, mirrored to HA via a Virtual-Output webhook — same pattern as `set_ess_charge_power_limit` in `docs/referenz/loxone-signals.md`
 
 
 ## Feature Backlog
 
 ### Version 2.6 - Enhancements for HA coupling
+
+**Versioning note:** While Phase 1 is open, community pre-releases stay on the `2.5.3-alpha.*` line (current: `2.5.3-alpha.6`). **After Phase 1 is finished** (Ingress/Options dogfood closed and the Phase 1 item archived), switch community pre-releases to **`2.6.0-alpha.*`** (explicit `version.py` bump approval at that session — do not keep shipping further `2.5.3-alpha.N` for 2.6 work).
 
 #### Prerequisites for this epic
 - [x] Install HA simulation instance on Synology for testing
@@ -30,7 +39,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap, remaining): Options-UI → `config.json` generation; Ingress (embedded UI, no separate port / no `homeassistant.local:8501` lookup)
   - Supervisor-Proxy for EHAL-HA (`homeassistant_api` + `SUPERVISOR_TOKEN` / `http://supervisor/core`) is done (Phase 1 discovery + auth)
-  - **`2.5.3-alpha.5` Ingress fix (nginx path re-inject):** dogfood re-test on Synology HAOS VM. Checklist: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) § Dogfood-Checkliste. `2.5.3-alpha.4` caused "Not found" (Streamlit `baseUrlPath` without nginx).
+  - **`2.5.3-alpha.6` Ingress start + nginx path:** dogfood re-test on Synology HAOS VM. Checklist: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) § Dogfood-Checkliste. `2.5.3-alpha.4` caused "Not found" (Streamlit `baseUrlPath` without nginx); `2.5.3-alpha.5` nginx path aborted on broken `sed` (fixed in alpha.6).
   - Confirmed via dogfooding on the new HAOS-in-VM Synology instance (2026-09-16): without Ingress, "OPEN WEB UI" opens `http://homeassistant.local:8501`, which fails when mDNS doesn't resolve the extra port from a fresh tab — user has to manually look up the VM IP. Looks like a broken add-on to a non-technical user; Ingress removes the port/IP lookup entirely
 
 ##### Phase 2 — Rounds out onboarding (not blocking, high value)

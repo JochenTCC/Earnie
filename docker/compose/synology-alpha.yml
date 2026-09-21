@@ -1,9 +1,9 @@
-# Synology Container Manager – Alpha / Community Pre-release
+# Synology Container Manager â€“ Alpha / Community Pre-release
 #
 # Parallel zu Produktion (docker/compose/synology_productive.yml):
 #   - Host-Port 8511 (Prod bleibt 8501)
 #   - Eigene Volumes unter ./earnie_env_alpha/ (kein Teilen mit Prod)
-#   - Image-Tag pinnen (kein :latest) — an version.py / GitHub Pre-release anpassen
+#   - Image-Tag pinnen (kein :latest) â€” an version.py / GitHub Pre-release anpassen
 #
 # Warnung: Nicht zwei Daemonen mit Schreibzugriff auf denselben Miniserver laufen lassen,
 # ohne Silent-Mode / klare Absprache. Alpha hat eigenen .env unter earnie_env_alpha/config/.
@@ -26,7 +26,7 @@ x-persist-volumes: &persist-volumes
 
 x-common-env: &common-env
   TZ: Europe/Vienna
-  # Volumes mount host …/{config,runtime} → /app/{config,runtime}; ENV_PATH=. derives both (not baked earnie_env/).
+  # Volumes mount host â€¦/{config,runtime} â†’ /app/{config,runtime}; ENV_PATH=. derives both (not baked earnie_env/).
   EARNIE_ENV_PATH: .
   EARNIE_STRICT_TARIFF_VALIDATE: "1"
   EARNIE_VERIFY_LOXONE_ON_START: "1"
@@ -34,8 +34,8 @@ x-common-env: &common-env
 
 services:
   earnie-alpha:
-    # Pre-release only — bump when a new alpha/rc is published (matches version.py).
-    image: ghcr.io/jochentcc/earnie-energy:2.5.3-alpha.5
+    # Pre-release only â€” bump when a new alpha/rc is published (matches version.py).
+    image: ghcr.io/jochentcc/earnie-energy:2.5.3-alpha.6
     container_name: earnie-alpha
     command: >
       python -m scripts.run_streamlit

@@ -94,9 +94,21 @@ PY
 if [ -n "$INGRESS_ENTRY" ] && [ -f "$NGINX_TEMPLATE" ]; then
     # Streamlit wants baseUrlPath without a leading slash.
     export EARNIE_STREAMLIT_BASE_URL_PATH="${INGRESS_ENTRY#/}"
-    # Escape & for sed replacement; ingress paths are URL-safe otherwise.
-    _sed_entry="$(printf '%s' "$INGRESS_ENTRY" | sed 's/[&|]/g')"
-    sed "s|__INGRESS_ENTRY__|${_sed_entry}|g" "$NGINX_TEMPLATE" > "$NGINX_CONF"
+    # Render nginx conf via Python (avoid sed: a prior broken escape expression
+    # caused GNU sed "unterminated s' command" and aborted start under set -e;
+    # see debug-dumps HA log 20b22c55_…).
+    INGRESS_ENTRY="$INGRESS_ENTRY" NGINX_TEMPLATE="$NGINX_TEMPLATE" NGINX_CONF="$NGINX_CONF" python - <<'PY'
+import os
+from pathlib import Path
+
+template = Path(os.environ["NGINX_TEMPLATE"])
+out = Path(os.environ["NGINX_CONF"])
+entry = os.environ["INGRESS_ENTRY"]
+text = template.read_text(encoding="utf-8")
+if "__INGRESS_ENTRY__" not in text:
+    raise SystemExit("nginx template missing __INGRESS_ENTRY__ placeholder")
+out.write_text(text.replace("__INGRESS_ENTRY__", entry), encoding="utf-8")
+PY
     nginx -c "$NGINX_CONF"
     echo "earnie-addon: nginx Ingress proxy on :8501 → Streamlit :${STREAMLIT_INTERNAL_PORT} (baseUrlPath=${EARNIE_STREAMLIT_BASE_URL_PATH})"
 else
