@@ -2,6 +2,11 @@
 
 Add-on `version:` mirrors the Earnie app release (`version.py` / GHCR tag). Each release tag auto-publishes via `.github/workflows/release.yml` → job `publish_ha_addon`.
 
+## 2.5.3-alpha.3
+
+- Community **pre-release** of the **2.5.3** line (follow-up to `2.5.3-alpha.2`). Focus: Home Assistant add-on Phase 1 installation blockers (Supervisor HA discovery/auth).
+- Earnie release: [2.5.3-alpha.3](https://github.com/JochenTCC/Earnie/releases/tag/v2.5.3-alpha.3)
+
 ## 2.5.3-alpha.2
 
 - Community **pre-release** of the **2.5.3** line (follow-up to `2.5.3-alpha.1`). Focus: EV EHAL binding safety, EHAL-Com mapping UX, and SonarCloud leak-period remediations.
