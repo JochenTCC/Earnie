@@ -43,7 +43,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ##### Phase 3 — Test infrastructure (regression safety net before more feature scope)
 
-- [ ] Build Smoke Test for Integration test / EHAL compatibility fixtures (see Earnie-Projekt\Entwicklungsplan\Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — fixture-based testing with simulated ("faked") device entity signatures instead of real hardware, to test EHAL discovery/mapping against different HA integration shapes. Separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)). Do this before Phase 4 so later feature work doesn't silently regress discovery/mapping for configs beyond the one real dogfooding instance
+- [ ] Build smoke tests / EHAL compatibility fixtures (see Earnie-Projekt `Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md`) — fixture-based testing with simulated ("faked") device entity signatures instead of real hardware. **Mode A:** each fixture ships a golden `ehal.ha.entities` map (as if EHAL-Com already saved it); tests exercise `HaAdapter` read/write, units, `unavailable`/`unknown`, and write-error degrade — not HA auto-propose. Separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)). Do this before Phase 4 so later feature work does not silently regress adapter/mapping contracts beyond the one real dogfooding instance. Does **not** include the closed-loop house simulator (that is follow-up epic **HA Lab** below).
 
 ##### Phase 4 — Larger scope (after the add-on feels reliable)
 
@@ -55,7 +55,15 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
   - Combines with existing `closed_interval` / sampler path — not a replacement for daemon metering
 - [ ] Check possibility to install either latest productive or pre-release version of Earnie
 
+##### Follow-up — HA Lab closed-loop house simulator (does **not** gate Phase 4)
 
+Epic **HA Lab** — details: Earnie-Projekt `Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md` §1.1.3 and §3. Code home: `ha_lab/` in this repo. **Mode A through HA Lab P3** (pre-seeded golden maps). **Mode B** (HA auto-propose/auto-bind, Loxone-style) is a later epic on the same archetypes, not HA Lab P1. No real customer HA install is required; archetypes are hand-authored. Do **not** reuse `simulation/engine.py::run_simulation()`. CI drives `HaAdapter` against the mock (tick-based); do not inject a fake clock into `main.py` in P1.
+
+- [ ] **HA Lab P1** — State-stepper spike (state + Δt + setpoints → next state): SoC coulomb-counter (new; there is no extractable battery stepper), synthetic/historical PV kW series (not `data/pv_forecast.py` / forecast.solar), optional thermal via `optimizer/thermal_model.py::simulate_next_temp_c` (not `thermal_rc_profile.py` planning helper). One reference archetype + golden map + mock REST (`GET /api/states`, `GET /api/states/{id}`, `POST /api/services/{domain}/{service}` + Bearer token; HA state-object shape). Few ticks of write-back, not a full simulated day. EV/heat-pump physics later; `switch.*` is a negative case (`HaAdapter` write domains are `number`/`select`/`input_number` only).
+- [ ] **HA Lab P2** — 2–3 more hand-authored archetypes (domain/naming/i18n variants) on the same physics; verify write-back per archetype. `house_config` supplies physics parameters only; entity IDs come from the archetype, not from Earnie field names.
+- [ ] **HA Lab P3** — Automated harness in CI: short simulated windows, not N live `main.py` days. Static fixture suite from 2.6 Phase 3 stays the fast job.
+- [ ] **HA Lab P4** — Optional real HAOS (`ha_lab/haos-docker`) in wall-clock mode for dogfooding/UX. Optional later: HA diagnosis exports as extra archetype source; hosted multi-user tool (not in this epic).
+- [ ] **HA auto-propose (Mode B, after HA Lab P3)** — Replay the same archetypes with empty `ehal.ha.entities`; Earnie must propose bindings (new feature; HA has no Loxone `heuristic_propose`/Ollama path today). Does not block 2.6 Phase 4 or HA Lab P1–P3.
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)
 
