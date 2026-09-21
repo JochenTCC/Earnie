@@ -12,7 +12,7 @@ Dieses Add-on ist ein dünner Wrapper um das bestehende, produktiv genutzte Earn
 4. Web-UI über die **HA-Seitenleiste** (Ingress) oder den Button **OPEN WEB UI** auf der Add-on-Seite — **ohne** Host-Port `:8501` / IP-Lookup.
    Optional (Fortgeschritten): direkter LAN-Zugriff `http://<home-assistant-ip>:8501` (nginx → Streamlit).
 
-**Erwarte nach dem Start ca. 30 Sekunden**, bis Streamlit erreichbar ist.
+**Nach dem Start ca. 20–40 Sekunden warten**, bis Streamlit bereit ist. Öffnest du die UI zu früh, zeigt Ingress oft **„Bad Gateway / 502“** oder eine kurze Hinweis-Seite „Earnie startet noch“ — das ist normal. Seite nach wenigen Sekunden neu laden.
 
 ## Konfiguration
 

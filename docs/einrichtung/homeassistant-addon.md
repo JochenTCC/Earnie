@@ -25,7 +25,10 @@ Quellbaum im Repo: [`packaging/homeassistant-addon/earnie/`](../../packaging/hom
 4. Optional: App-Optionen ausfüllen (siehe unten) — alle Felder sind optional.
 5. **Start**. Web-UI über die **HA-Seitenleiste** (Ingress) oder **OPEN WEB UI** auf der App-Seite — **ohne** Host-Port `:8501` und ohne manuelles Nachschlagen der VM-/Host-IP.
    Optional (Fortgeschritten): direkter LAN-Zugriff `http://<home-assistant-ip>:8501`.
-   **Erwarte nach dem Start ca. 30 Sekunden Wartezeit**, bis die Oberfläche erreichbar ist — Streamlit muss im Container erst hochfahren (Bootstrap der `earnie_env`-Dateien, dann Streamlit-Server-Start). In dieser Zeit meldet der Browser typischerweise **„Die Website ist nicht erreichbar" / „Verbindung abgelehnt"** — das ist normal, kein Fehler. Einfach kurz warten und die Seite neu laden.
+   **Nach dem Start ca. 20–40 Sekunden warten**, bis die Oberfläche erreichbar ist — Bootstrap der `earnie_env`-Dateien, dann Streamlit hinter nginx. Öffnest du Ingress **sofort**, sind typisch:
+   - Hinweis-Seite **„Earnie startet noch“** (nginx, aktualisiert sich selbst), oder
+   - HA-Meldung **„Bad Gateway / 502“**, falls der Proxy noch gar nicht antwortet.
+   Beides ist beim Kaltstart normal — kurz warten und neu laden / OPEN WEB UI erneut.
 6. Danach Haus-/Entity-Konfiguration in der Earnie-Oberfläche (Smarthome-Backend, Hauskonfigurator) bzw. optional dateibasiert unter dem Add-on-Datenpfad. Beim ersten Start legt der Entrypoint fehlende Dateien an und setzt im Add-on-Kontext `ehal.backend=ha`.
 
 ## Konfiguration
@@ -97,7 +100,7 @@ Für Entwickler: siehe [`homeassistant-addon-testumgebung.md`](homeassistant-add
 
 Auf der HAOS-in-VM-Instanz (Synology):
 
-1. Add-on ab **`2.5.3-alpha.6`** (oder neuer) mit Ingress starten — Earnie in der Seitenleiste bzw. OPEN WEB UI **ohne** `:8501` / IP-Lookup.
+1. Add-on ab **`2.5.3`** (oder neuer) mit Ingress starten — Earnie in der Seitenleiste bzw. OPEN WEB UI **ohne** `:8501` / IP-Lookup. Sofort nach Start: Hinweis-Seite „Earnie startet noch“ oder kurz 502 → nach ~30 s UI OK.
 2. Charts/Navigation laden (kein „Not found“, kein leeres Blatt, keine Massen-404 unter `/static` oder `_stcore`).
 3. Optional: Direkt `http://<ha-ip>:8501` (nginx) öffnet dieselbe UI.
 4. Frische Daten: Smarthome-Backend zielt auf HA; Supervisor-Proxy-Auth funktioniert.

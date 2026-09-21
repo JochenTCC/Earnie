@@ -2,6 +2,11 @@
 
 Add-on `version:` mirrors the Earnie app release (`version.py` / GHCR tag). Each release tag auto-publishes via `.github/workflows/release.yml` → job `publish_ha_addon`.
 
+## 2.5.3
+
+- Official **PATCH** after **2.5.2**. HA add-on Ingress: nginx path re-inject, start-fix (broken `sed`), cold-start page „Earnie startet noch“ (HTTP 200 while Streamlit boots).
+- Earnie release: [2.5.3](https://github.com/JochenTCC/Earnie/releases/tag/v2.5.3)
+
 ## 2.5.3-alpha.6
 
 - **Ingress start fix:** `run.sh` no longer uses a broken GNU `sed` escape (`s/[&|]/g` → unterminated `s` command) that aborted add-on start when `ingress_entry` was present. Nginx conf is rendered with Python `str.replace`.

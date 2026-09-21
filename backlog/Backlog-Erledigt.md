@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix HA add-on Ingress start abort (2026-09-21)
+
+- [x] **HA add-on Ingress start abort (`20b22c55_…` log)** — `run.sh` invalid GNU sed aborted start under `set -e`. Fix: Python `str.replace` for nginx conf. Live: OPEN WEB UI works on Synology HAOS (`v2.5.3-alpha.6` / official **v2.5.3**).
+
 ### HA Add-on Phase 1 installation blockers (2026-09-21)
 
 - [x] **Remove Loxone-only Supervisor options** — Dropped `loxone_user` / `loxone_pass` / `loxone_ip` from add-on `config.yaml` `options`/`schema`, `run.sh`, translations, and DOCS (packaging + `ha-addon-earnie`). Credentials stay in-app / `config.json`.

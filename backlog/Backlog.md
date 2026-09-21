@@ -26,7 +26,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** While Phase 1 is open, community pre-releases stay on the `2.5.3-alpha.*` line (current: `2.5.3-alpha.6`). **After Phase 1 is finished** (Ingress/Options dogfood closed and the Phase 1 item archived), switch community pre-releases to **`2.6.0-alpha.*`** (explicit `version.py` bump approval at that session — do not keep shipping further `2.5.3-alpha.N` for 2.6 work).
+**Versioning note:** Official **2.5.3** ships Phase 1 Ingress. While remaining Phase 1 Options/dogfood checklist items are open, next community pre-releases should move to **`2.6.0-alpha.*`** (explicit `version.py` bump approval — do not continue `2.5.3-alpha.N`). Alpha compose may stay pinned at last pre-release (`2.5.3-alpha.6`) until the next alpha bump.
 
 #### Prerequisites for this epic
 - [x] Install HA simulation instance on Synology for testing
@@ -39,7 +39,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 - [ ] Add-on Version 0.2 (Entwicklungsplan roadmap, remaining): Options-UI → `config.json` generation; Ingress (embedded UI, no separate port / no `homeassistant.local:8501` lookup)
   - Supervisor-Proxy for EHAL-HA (`homeassistant_api` + `SUPERVISOR_TOKEN` / `http://supervisor/core`) is done (Phase 1 discovery + auth)
-  - **`2.5.3-alpha.6` Ingress start + nginx path:** dogfood re-test on Synology HAOS VM. Checklist: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) § Dogfood-Checkliste. `2.5.3-alpha.4` caused "Not found" (Streamlit `baseUrlPath` without nginx); `2.5.3-alpha.5` nginx path aborted on broken `sed` (fixed in alpha.6).
+  - **[x] Ingress (official `2.5.3`):** nginx path re-inject + sed start fix + cold-start page. Dogfood on Synology HAOS: OPEN WEB UI works. Checklist: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) § Dogfood-Checkliste (cold-start page still pending live check). `2.5.3-alpha.4` "Not found"; `2.5.3-alpha.5` broken `sed` start abort.
   - Confirmed via dogfooding on the new HAOS-in-VM Synology instance (2026-09-16): without Ingress, "OPEN WEB UI" opens `http://homeassistant.local:8501`, which fails when mDNS doesn't resolve the extra port from a fresh tab — user has to manually look up the VM IP. Looks like a broken add-on to a non-technical user; Ingress removes the port/IP lookup entirely
 
 ##### Phase 2 — Rounds out onboarding (not blocking, high value)

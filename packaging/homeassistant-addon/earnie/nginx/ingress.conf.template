@@ -22,6 +22,16 @@ http {
         server_name _;
         client_max_body_size 64m;
 
+        # While Streamlit (:8502) is still booting, proxy fails with 502/503.
+        # Map to HTTP 200 + HTML so HA Ingress shows our note instead of a bare
+        # "502: Bad Gateway" (HA often replaces non-2xx bodies).
+        error_page 502 503 504 =200 /earnie-starting.html;
+        location = /earnie-starting.html {
+            internal;
+            default_type text/html;
+            alias /etc/earnie-addon/nginx/earnie-starting.html;
+        }
+
         # Direct / asset URLs that already include the Ingress entry path
         # (Streamlit baseUrlPath). Also covers LAN access after the first HTML load.
         location ~ ^/api/hassio_ingress/[^/]+ {
@@ -34,6 +44,7 @@ http {
             proxy_set_header Connection $connection_upgrade;
             proxy_read_timeout 86400;
             proxy_buffering off;
+            proxy_connect_timeout 2s;
         }
 
         # HA Ingress strips the entry path before the request reaches the add-on.
@@ -50,6 +61,7 @@ http {
             proxy_set_header Connection $connection_upgrade;
             proxy_read_timeout 86400;
             proxy_buffering off;
+            proxy_connect_timeout 2s;
         }
     }
 }
