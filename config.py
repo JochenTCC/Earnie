@@ -328,6 +328,23 @@ class Config:
         return self.is_ehal_openems_backend() or self.is_ehal_ha_backend()
 
     def get_ehal_loxone_http_port(self) -> int:
+        from runtime_store.env_vars import read_env
+
+        raw = read_env("EHAL_LOXONE_HTTP_PORT")
+        if raw:
+            try:
+                value = int(raw)
+            except ValueError as exc:
+                raise ValueError(
+                    "Umgebungsvariable EARNIE_EHAL_LOXONE_HTTP_PORT muss eine "
+                    f"ganze Zahl sein, erhalten: {raw!r}."
+                ) from exc
+            if not 1024 <= value <= 65535:
+                raise ValueError(
+                    "Umgebungsvariable EARNIE_EHAL_LOXONE_HTTP_PORT muss "
+                    "zwischen 1024 und 65535 liegen."
+                )
+            return value
         return int(self.get("EHAL_LOXONE_HTTP_PORT", default=8541))
 
     def get_ui_fragment_charts_sec(self) -> int:

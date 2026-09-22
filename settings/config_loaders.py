@@ -172,7 +172,7 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}
     sign = ha.get("sign") if isinstance(ha.get("sign"), dict) else {}
     if backend == "ha":
-        default_adapter = "ha-home"
+        default_adapter = "earnie-hems"
     elif backend == "openems":
         default_adapter = "openems-lab"
     else:

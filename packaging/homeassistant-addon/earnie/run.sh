@@ -55,9 +55,9 @@ else
     export EARNIE_AUTO_START_MAIN=1
 fi
 
-# ehal_loxone_http_port Option: bootstrap merges it into config.json
-# system.ehal_loxone_http_port (runtime_store/addon_options.py). Env-Hook
-# bleibt Phase-2-Backlog.
+# ehal_loxone_http_port: export for runtime env precedence (config.get_ehal_loxone_http_port)
+# and merge into config.json system.ehal_loxone_http_port (runtime_store/addon_options.py).
+export EARNIE_EHAL_LOXONE_HTTP_PORT="$(_opt '.ehal_loxone_http_port' '8541')"
 
 cd /app
 

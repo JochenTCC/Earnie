@@ -30,7 +30,7 @@ Short overview of the **canonical EHAL wire fields** (same as `docs/ui/ehal-com.
 | ------------------------ | ---------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
 | Envelope                | `schema_version`                  | yes      | integer; wire version (**3** = design C1 `set_ess_active_power`)                                              |
 | Envelope                | `ts`                               | yes      | ISO-8601 timestamp **with timezone** (UTC preferred)                                                          |
-| Envelope                | `adapter_id`                       | yes      | stable adapter ID (e.g. `openems-lab`, `ha-home`)                                                             |
+| Envelope                | `adapter_id`                       | yes      | stable adapter ID (e.g. `openems-lab`, `earnie-hems`)                                                             |
 | Telemetry               | `sens_grid_power_active`           | yes      | **W**; `+` = grid **import**, `-` = **export**                                                                 |
 | Telemetry               | `sens_pv_production_active`        | yes      | **W**; >= 0                                                                                                    |
 | Telemetry               | `sens_ess_soc`                     | yes      | **%**; 0…100                                                                                                   |

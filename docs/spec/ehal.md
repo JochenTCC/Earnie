@@ -36,7 +36,7 @@ Every Telemetry, Setpoint, and Capabilities document uses the same envelope fiel
 |-------|------|----------|---------|
 | `schema_version` | integer | yes | Wire version; **current = `3`** (Design C1 in **2.4.o**; `sens_*` freeze was **2.4.j** / v2; M1 was `1`) |
 | `ts` | string (ISO-8601) | yes | Sample / write time with timezone (`Z` or offset). Prefer UTC. |
-| `adapter_id` | string | yes | Stable adapter instance id (e.g. `openems-lab`, `ha-home`) |
+| `adapter_id` | string | yes | Stable adapter instance id (e.g. `openems-lab`, `earnie-hems`) |
 
 **Frozen choice:** `ts` is **ISO-8601 with timezone**, not epoch milliseconds.
 

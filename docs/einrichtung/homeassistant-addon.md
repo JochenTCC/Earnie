@@ -38,7 +38,7 @@ Add-on-Optionen (`config.yaml` → `options`) sind ein optionales Zusatzangebot,
 | Add-on-Option | Wirkung | Pflicht |
 |---|---|---|
 | `streamlit_port` (Default `8501`) | `EARNIE_UI_STREAMLIT_PORT` und Merge nach `config.json` `ui.streamlit_port` | nein |
-| `ehal_loxone_http_port` (Default `8541`) | Merge nach `config.json` `system.ehal_loxone_http_port` | nein |
+| `ehal_loxone_http_port` (Default `8541`) | `EARNIE_EHAL_LOXONE_HTTP_PORT` und Merge nach `config.json` `system.ehal_loxone_http_port` | nein |
 | `ui_modes` (Default `sunset2sunset,scenario_explorer,live_environment`) | `EARNIE_UI_MODES` | nein |
 | `auto_start_main` (Default `true`) | `EARNIE_AUTO_START_MAIN` | nein |
 | `timezone` (Default `Europe/Vienna`) | `TZ` | nein |
@@ -47,7 +47,7 @@ Loxone-Zugangsdaten gehören **nicht** in die Supervisor-Optionen — sie werden
 
 ### Options → `config.json` (Add-on 0.2)
 
-- **Frische Installation:** fehlende `config.json` wird aus der Minimal-Vorlage angelegt und im Add-on-Kontext auf `ehal.backend=ha` / `adapter_id=ha-home` gesetzt (URL/Token leer → Supervisor-Proxy zur Laufzeit).
+- **Frische Installation:** fehlende `config.json` wird aus der Minimal-Vorlage angelegt und im Add-on-Kontext auf `ehal.backend=ha` / `adapter_id=earnie-hems` gesetzt (URL/Token leer → Supervisor-Proxy zur Laufzeit).
 - **Jeder Start:** `streamlit_port` und `ehal_loxone_http_port` aus `/data/options.json` werden in die genannten `config.json`-Keys geschrieben. Bestehende Backend-Wahl (z. B. bewusst Loxone) wird nicht überschrieben.
 
 ### Home-Assistant-Anbindung im Add-on

@@ -4,7 +4,7 @@ configuration:
     description: Streamlit listen port (also written to config.json ui.streamlit_port). Prefer HA Ingress for the UI.
   ehal_loxone_http_port:
     name: EHAL Loxone HTTP port
-    description: Written to config.json system.ehal_loxone_http_port on each add-on start (default 8541).
+    description: Exported as EARNIE_EHAL_LOXONE_HTTP_PORT and written to config.json system.ehal_loxone_http_port on each add-on start (default 8541).
   ui_modes:
     name: UI modes
     description: Comma-separated list of enabled UI modes (e.g. sunset2sunset,scenario_explorer,live_environment).

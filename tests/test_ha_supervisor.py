@@ -101,7 +101,7 @@ class TestGetHaAdapterSupervisorResolve:
                 "EHAL_HA_TOKEN": "",
                 "EHAL_HA_ENTITIES": {},
                 "EHAL_HA_SIGN": {},
-                "EHAL_ADAPTER_ID": "ha-home",
+                "EHAL_ADAPTER_ID": "earnie-hems",
                 "GLOBAL_TIMEOUT": 5,
             }.get(key, default),
         )

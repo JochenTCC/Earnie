@@ -189,7 +189,7 @@
           "minimum": 1024,
           "maximum": 65535,
           "default": 8541,
-          "description": "Daemon-HTTP for Earnie_Request_Optimize /alive, default 8541."
+          "description": "Daemon-HTTP for Earnie_Request_Optimize /alive (Standard: 8541). Env-Override: EARNIE_EHAL_LOXONE_HTTP_PORT."
         }
       }
     },

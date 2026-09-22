@@ -34,16 +34,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 #### Features
 
-**Priority order (2026-09-16):** phased by "must fix before we publicly promote the HA add-on" — see `Earnie-Projekt/Business-Backlog.md`, Awareness-Sprint item "Earnie ist jetzt auch als HA-Add-On zu haben!". **Phase 1 installation blockers done** (archived, including cold-start dogfood).
-
-##### Phase 2 — Rounds out onboarding (not blocking, high value)
-
-- [ ] Allow changing HTTP port for Home Assistant and OpenEMS (follow-up to Miniserver #9)
-  - HA form already stores a full `ehal.ha.base_url` (default `http://homeassistant:8123`) — port is in the URL, not a separate field
-  - OpenEMS form already stores `ehal.openems.base_url` (default `http://openems-edge:8084`)
-  - Follow-up: make non-default ports obvious in SB Anbindung (help/caption, or dedicated port field if users still cannot change it in practice)
-- [ ] Add-on `ehal_loxone_http_port` env-override in `scripts/bootstrap_runtime.py` (currently `config.json`-only; open point #1 in Earnie_HomeAssistant_Addon_Dokumentation.md — not a 0.1 blocker)
-
 ##### Phase 3 — Test infrastructure (regression safety net before more feature scope)
 
 - [ ] Build smoke tests / EHAL compatibility fixtures (see Earnie-Projekt `Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md`) — fixture-based testing with simulated ("faked") device entity signatures instead of real hardware. **Mode A:** each fixture ships a golden `ehal.ha.entities` map (as if EHAL-Com already saved it); tests exercise `HaAdapter` read/write, units, `unavailable`/`unknown`, and write-error degrade — not HA auto-propose. Separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)). Do this before Phase 4 so later feature work does not silently regress adapter/mapping contracts beyond the one real dogfooding instance. Does **not** include the closed-loop house simulator (that is follow-up epic **HA Lab** below).
@@ -67,6 +57,7 @@ Epic **HA Lab** — details: Earnie-Projekt `Entwicklungsplan/Earnie-HA-Kompatib
 - [ ] **HA Lab P3** — Automated harness in CI: short simulated windows, not N live `main.py` days. Static fixture suite from 2.6 Phase 3 stays the fast job.
 - [ ] **HA Lab P4** — Optional real HAOS (`ha_lab/haos-docker`) in wall-clock mode for dogfooding/UX. Optional later: HA diagnosis exports as extra archetype source; hosted multi-user tool (not in this epic).
 - [ ] **HA auto-propose (Mode B, after HA Lab P3)** — Replay the same archetypes with empty `ehal.ha.entities`; Earnie must propose bindings (new feature; HA has no Loxone `heuristic_propose`/Ollama path today). Does not block 2.6 Phase 4 or HA Lab P1–P3.
+
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)
 

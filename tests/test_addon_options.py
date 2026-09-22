@@ -40,7 +40,7 @@ def test_fresh_seed_sets_ha_backend(tmp_path, monkeypatch):
     assert addon_options.apply_addon_options(config_just_created=True) is True
     payload = _read_json(config_path)
     assert payload["ehal"]["backend"] == "ha"
-    assert payload["ehal"]["adapter_id"] == "ha-home"
+    assert payload["ehal"]["adapter_id"] == "earnie-hems"
     assert payload["ehal"]["ha"].get("base_url", "") == ""
     assert payload["ehal"]["ha"].get("token", "") == ""
 
@@ -66,7 +66,7 @@ def test_port_merge_from_options(tmp_path, monkeypatch):
     _write_json(
         config_path,
         {
-            "ehal": {"backend": "ha", "adapter_id": "ha-home"},
+            "ehal": {"backend": "ha", "adapter_id": "earnie-hems"},
             "ui": {"streamlit_port": 8501},
             "system": {"ehal_loxone_http_port": 8541},
         },

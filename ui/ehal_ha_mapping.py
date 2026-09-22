@@ -36,7 +36,7 @@ def _ha_block(data: dict) -> dict[str, Any]:
     raw_sign = dict(ha.get("sign") or {}) if isinstance(ha.get("sign"), dict) else {}
     return {
         "backend": str(ehal.get("backend") or ""),
-        "adapter_id": str(ehal.get("adapter_id") or "ha-home"),
+        "adapter_id": str(ehal.get("adapter_id") or "earnie-hems"),
         "base_url": str(ha.get("base_url") or "").strip(),
         "token": str(ha.get("token") or "").strip(),
         "entities": canonicalize_ha_entity_keys(
@@ -62,7 +62,7 @@ def _adapter_from_form(base_url: str, token: str, entities: dict[str, str]) -> H
         HaConfig(
             base_url=resolved_url,
             token=resolved_token,
-            adapter_id="ha-home",
+            adapter_id="earnie-hems",
             entities=entities,
         )
     )
@@ -119,7 +119,15 @@ def render_ehal_ha_mapping_section() -> None:
         "Home Assistant URL",
         value=current["base_url"] or default_url,
         key="ehal_ha_base_url",
+        help=(
+            "Vollständige URL inkl. Port, z. B. http://homeassistant:8123 "
+            "(Standard-Port 8123; im Add-on oft http://supervisor/core)."
+        ),
     ).strip()
+    st.caption(
+        "HTTP-Port weicht vom Standard ab? Port in der URL angeben "
+        "(z. B. `http://homeassistant:8124`)."
+    )
     token = st.text_input(
         "Long-Lived Access Token",
         value=current["token"],
@@ -133,9 +141,9 @@ def render_ehal_ha_mapping_section() -> None:
     ).strip()
     adapter_id = st.text_input(
         "adapter_id",
-        value=current["adapter_id"] or "ha-home",
+        value=current["adapter_id"] or "earnie-hems",
         key="ehal_ha_adapter_id",
-    ).strip() or "ha-home"
+    ).strip() or "earnie-hems"
 
     if st.button("Entities scannen", key="ehal_ha_scan_btn"):
         st.session_state.pop(_SESSION_SCAN_ERROR, None)

@@ -2,6 +2,11 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6 Phase 2 — HA/OpenEMS port UX + Loxone HTTP env override (2026-09-22)
+
+- [x] Allow changing HTTP port for Home Assistant and OpenEMS (follow-up to Miniserver #9) — help/caption on SB Anbindung and EHAL-Com HA mapping (`ui/ehal_connection.py`, `ui/ehal_ha_mapping.py`); port remains part of `ehal.*.base_url` (no dedicated field); doc note in `docs/ui/smarthome-backend.md`
+- [x] Add-on `ehal_loxone_http_port` env-override — `run.sh` exports `EARNIE_EHAL_LOXONE_HTTP_PORT`; `Config.get_ehal_loxone_http_port()` prefers env over `config.json`; packaging + `ha-addon-earnie` docs/translations; closed Entwicklungsplan open point #1; tests in `tests/test_ehal_loxone_http_port.py`
+
 ### Bugfix HA add-on Ingress cold-start page (2026-09-22)
 
 - [x] **HA add-on Ingress cold-start page** — nginx „Earnie startet noch“ (HTTP 200) while Streamlit boots (`v2.5.3`). Dogfood verified: OPEN WEB UI immediately after add-on start shows hint page or brief HA 502, then UI.

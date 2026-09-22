@@ -63,7 +63,15 @@ def render_openems_connection_form(*, form_key: str = "ehal_openems_form") -> No
         base_url = st.text_input(
             "OpenEMS Base-URL",
             value=str(openems.get("base_url") or "http://openems-edge:8084"),
+            help=(
+                "Vollständige Base-URL inkl. Port, z. B. http://openems-edge:8084 "
+                "(Standard-Port 8084)."
+            ),
         ).strip()
+        st.caption(
+            "HTTP-Port weicht vom Standard ab? Port in der URL angeben "
+            "(z. B. `http://openems-edge:8085`)."
+        )
         username = st.text_input(
             "Benutzername",
             value=str(openems.get("username") or "x"),
@@ -140,7 +148,15 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
         base_url = st.text_input(
             "Home Assistant URL",
             value=stored_url or default_url,
+            help=(
+                "Vollständige URL inkl. Port, z. B. http://homeassistant:8123 "
+                "(Standard-Port 8123; im Add-on oft http://supervisor/core)."
+            ),
         ).strip()
+        st.caption(
+            "HTTP-Port weicht vom Standard ab? Port in der URL angeben "
+            "(z. B. `http://homeassistant:8124`)."
+        )
         token = st.text_input(
             "Long-Lived Access Token",
             value=str(ha.get("token") or ""),
@@ -153,8 +169,8 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
         ).strip()
         adapter_id = st.text_input(
             "adapter_id",
-            value=str(ehal.get("adapter_id") or "ha-home"),
-        ).strip() or "ha-home"
+            value=str(ehal.get("adapter_id") or "earnie-hems"),
+        ).strip() or "earnie-hems"
         submitted = st.form_submit_button("Speichern", type="primary")
 
     if not submitted:

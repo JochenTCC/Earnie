@@ -2,6 +2,10 @@
 
 Add-on `version:` mirrors the Earnie app release (`version.py` / GHCR tag). Each release tag auto-publishes via `.github/workflows/release.yml` → job `publish_ha_addon`.
 
+## Unreleased
+
+- **`ehal_loxone_http_port`:** `run.sh` exports `EARNIE_EHAL_LOXONE_HTTP_PORT` (runtime env precedence over `config.json`, same pattern as Streamlit port).
+
 ## 2.5.3
 
 - Official **PATCH** after **2.5.2**. HA add-on Ingress: nginx path re-inject, start-fix (broken `sed`), cold-start page „Earnie startet noch“ (HTTP 200 while Streamlit boots).

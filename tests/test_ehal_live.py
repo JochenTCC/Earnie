@@ -37,7 +37,7 @@ def test_read_live_power_kw_ha_backend(config_mock, adapter_factory):
     adapter.read_telemetry.return_value = {
         "schema_version": EHAL_SCHEMA_VERSION,
         "ts": "2026-07-28T12:00:00Z",
-        "adapter_id": "ha-home",
+        "adapter_id": "earnie-hems",
         "sens_grid_power_active": 1000.0,
         "sens_pv_production_active": 2000.0,
         "sens_ess_soc": 50.0,

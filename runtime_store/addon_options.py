@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_OPTIONS_PATH = "/data/options.json"
 _HA_BACKEND = "ha"
-_HA_ADAPTER_ID = "ha-home"
+_HA_ADAPTER_ID = "earnie-hems"
 
 
 def options_path() -> str:

@@ -17,7 +17,7 @@ def _cfg(**kwargs) -> HaConfig:
     base = dict(
         base_url="http://homeassistant:8123",
         token="test-token",
-        adapter_id="ha-home",
+        adapter_id="earnie-hems",
         entities={
             "sens_grid_power_active": "sensor.grid_power",
             "sens_pv_production_active": "sensor.pv_power",
@@ -97,7 +97,7 @@ def test_write_setpoints_number_service(post_mock):
         {
             "schema_version": 3,
             "ts": "2026-07-28T12:00:00Z",
-            "adapter_id": "ha-home",
+            "adapter_id": "earnie-hems",
             "set_ess_charge_power_limit": 1000,
             "set_ess_discharge_power_limit": 2000,
             "set_evcs_max_current": 10,
@@ -124,7 +124,7 @@ def test_write_setpoints_active_power(post_mock):
         {
             "schema_version": 3,
             "ts": "2026-07-28T12:00:00Z",
-            "adapter_id": "ha-home",
+            "adapter_id": "earnie-hems",
             "set_ess_active_power": -1500,
             "set_ess_charge_power_limit": 5000,
             "set_ess_discharge_power_limit": 0,
@@ -148,7 +148,7 @@ def test_write_setpoints_degrades_on_403(post_mock):
         {
             "schema_version": 3,
             "ts": "2026-07-28T12:00:00Z",
-            "adapter_id": "ha-home",
+            "adapter_id": "earnie-hems",
             "set_ess_charge_power_limit": 1000,
         }
     )

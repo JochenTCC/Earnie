@@ -126,7 +126,7 @@ def test_build_ehal_write_records_marks_failed_fields():
     error = {
         "schema_version": 2,
         "ts": "2026-07-28T12:00:00Z",
-        "adapter_id": "ha-home",
+        "adapter_id": "earnie-hems",
         "failed_fields": ["set_ess_charge_power_limit"],
         "message": "HTTP 403",
         "retryable": True,

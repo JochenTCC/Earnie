@@ -23,7 +23,7 @@ Beim **ersten Start** legt Earnie `config.json` an und setzt im Add-on-Kontext a
 | Option | Beschreibung | Standard |
 |---|---|---|
 | `streamlit_port` | In `config.json` `ui.streamlit_port` (Host/UI-Port `8501`); Streamlit lauscht im Add-on intern auf `8502` hinter nginx | `8501` |
-| `ehal_loxone_http_port` | EHAL-Loxone-HTTP-Port → `config.json` `system.ehal_loxone_http_port` | `8541` |
+| `ehal_loxone_http_port` | `EARNIE_EHAL_LOXONE_HTTP_PORT` und `config.json` `system.ehal_loxone_http_port` | `8541` |
 | `ui_modes` | Aktive UI-Modi, kommagetrennt | `sunset2sunset,scenario_explorer,live_environment` |
 | `auto_start_main` | Startet `main.py` automatisch mit dem Add-on | `true` |
 | `timezone` | Zeitzone (`TZ`) | `Europe/Vienna` |

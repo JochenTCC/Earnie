@@ -162,7 +162,7 @@ def get_ha_adapter() -> HaAdapter:
     cfg = HaConfig(
         base_url=base_url,
         token=token,
-        adapter_id=str(config.get("EHAL_ADAPTER_ID") or "ha-home"),
+        adapter_id=str(config.get("EHAL_ADAPTER_ID") or "earnie-hems"),
         entities=canonicalize_ha_entity_keys(
             {str(k): str(v) for k, v in entities.items()}
         ),
