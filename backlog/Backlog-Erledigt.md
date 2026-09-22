@@ -2,6 +2,18 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### Bugfix HA add-on Ingress cold-start page (2026-09-22)
+
+- [x] **HA add-on Ingress cold-start page** — nginx „Earnie startet noch“ (HTTP 200) while Streamlit boots (`v2.5.3`). Dogfood verified: OPEN WEB UI immediately after add-on start shows hint page or brief HA 502, then UI.
+
+### Add-on Version 0.2 — Options + Ingress (2026-09-22)
+
+- [x] **Add-on Version 0.2** (Entwicklungsplan roadmap): Options-UI → `config.json` generation; Ingress (embedded UI, no separate port / no `homeassistant.local:8501` lookup)
+  - Supervisor-Proxy for EHAL-HA (`homeassistant_api` + `SUPERVISOR_TOKEN` / `http://supervisor/core`) — Phase 1 discovery + auth (see also archive 2026-09-21)
+  - Options → `config.json`: fresh install seeds `ehal.backend=ha`; each start merges `streamlit_port` / `ehal_loxone_http_port` from `/data/options.json` (`runtime_store/addon_options.py`, tests)
+  - **Ingress (official `2.5.3`):** nginx path re-inject + start fix + cold-start page. Dogfood on Synology HAOS: OPEN WEB UI works. Checklist: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) § Dogfood-Checkliste. Historical: `2.5.3-alpha.4` "Not found"; `2.5.3-alpha.5` broken `sed` start abort
+  - Without Ingress, OPEN WEB UI opened `http://homeassistant.local:8501` (fails when mDNS does not resolve the extra port) — Ingress removes port/IP lookup
+
 ### Bugfix HA add-on Ingress start abort (2026-09-21)
 
 - [x] **HA add-on Ingress start abort (`20b22c55_…` log)** — `run.sh` invalid GNU sed aborted start under `set -e`. Fix: Python `str.replace` for nginx conf. Live: OPEN WEB UI works on Synology HAOS (`v2.5.3-alpha.6` / official **v2.5.3**).

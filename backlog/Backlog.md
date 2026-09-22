@@ -27,21 +27,14 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships Phase 1 Ingress. While remaining Phase 1 Options/dogfood checklist items are open, next community pre-releases should move to **`2.6.0-alpha.*`** (explicit `version.py` bump approval — do not continue `2.5.3-alpha.N`). Alpha compose may stay pinned at last pre-release (`2.5.3-alpha.6`) until the next alpha bump.
+**Versioning note:** Official **2.5.3** ships Phase 1 (Options → `config.json` + Ingress, cold-start dogfood verified). Next community pre-releases: **`2.6.0-alpha.*`** (explicit `version.py` bump approval — do not continue `2.5.3-alpha.N`). Alpha compose may stay pinned at last pre-release (`2.5.3-alpha.6`) until the next alpha bump.
 
 #### Prerequisites for this epic
 - [x] Install HA simulation instance on Synology for testing
 
 #### Features
 
-**Priority order (2026-09-16):** phased by "must fix before we publicly promote the HA add-on" — see `Earnie-Projekt/Business-Backlog.md`, Awareness-Sprint item "Earnie ist jetzt auch als HA-Add-On zu haben!" (postponed pending Phase 1).
-
-##### Phase 1 — Installation blockers (gate the HA-add-on awareness post)
-
-- [ ] Add-on Version 0.2 (Entwicklungsplan roadmap, remaining): Options-UI → `config.json` generation; Ingress (embedded UI, no separate port / no `homeassistant.local:8501` lookup)
-  - Supervisor-Proxy for EHAL-HA (`homeassistant_api` + `SUPERVISOR_TOKEN` / `http://supervisor/core`) is done (Phase 1 discovery + auth)
-  - **[x] Ingress (official `2.5.3`):** nginx path re-inject + sed start fix + cold-start page. Dogfood on Synology HAOS: OPEN WEB UI works. Checklist: [`docs/einrichtung/homeassistant-addon.md`](../docs/einrichtung/homeassistant-addon.md) § Dogfood-Checkliste (cold-start page still pending live check). `2.5.3-alpha.4` "Not found"; `2.5.3-alpha.5` broken `sed` start abort.
-  - Confirmed via dogfooding on the new HAOS-in-VM Synology instance (2026-09-16): without Ingress, "OPEN WEB UI" opens `http://homeassistant.local:8501`, which fails when mDNS doesn't resolve the extra port from a fresh tab — user has to manually look up the VM IP. Looks like a broken add-on to a non-technical user; Ingress removes the port/IP lookup entirely
+**Priority order (2026-09-16):** phased by "must fix before we publicly promote the HA add-on" — see `Earnie-Projekt/Business-Backlog.md`, Awareness-Sprint item "Earnie ist jetzt auch als HA-Add-On zu haben!". **Phase 1 installation blockers done** (archived, including cold-start dogfood).
 
 ##### Phase 2 — Rounds out onboarding (not blocking, high value)
 

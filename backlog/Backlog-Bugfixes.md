@@ -28,7 +28,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - [ ] Still failing QG: `new_security_rating` = C; `new_coverage` ≈ 76.7% (need ≥ 80%)
   - Accepted (not separate New Bugs): `release-publish.yml` floating action tags `@v4`/`@v5` (`e796a01`; SHA pins blocked tag runs); `ha-addon-publish.yml` stays SHA-pinned; bulk other new-code findings (Actions smells, `pythonsecurity` on CLI scripts, etc.) — triage only when opening a concrete fix item
   - Optional follow-ups (open New Bug only if planned): raise new-code coverage; reopen Actions hardening beyond the accepted exception; specific high-signal leftovers (`docker/Dockerfile` root / `ui/chart_trace_segments.py` S3923)
-- [ ] **HA add-on Ingress cold-start page** — nginx „Earnie startet noch“ (HTTP 200) while Streamlit boots (`v2.5.3`). Dogfood: open OPEN WEB UI immediately after add-on start; expect hint page or brief HA 502, then UI.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
