@@ -1,0 +1,15 @@
+{
+  "battery_capacity_kwh": 10.0,
+  "initial_soc_pct": 55.0,
+  "load_kw": 1.5,
+  "initial_evcs_power_w": 0.0,
+  "thermal_entity_id": "sensor.house_sim_buffer_temp",
+  "thermal": {
+    "initial_temp_c": 42.0,
+    "ambient_c": 18.0,
+    "heat_kw": 0.0,
+    "capacity_kwh_per_k": 0.5,
+    "heat_loss_kw_per_k": 0.05,
+    "heating_efficiency": 1.0
+  }
+}

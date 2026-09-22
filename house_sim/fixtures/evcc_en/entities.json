@@ -1,0 +1,126 @@
+{
+  "entities": [
+    {
+      "entity_id": "sensor.evcc_grid_power",
+      "state": "500.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "evcc Grid Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_pv_power",
+      "state": "0.8",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "kW",
+        "friendly_name": "evcc PV Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_battery_soc",
+      "state": "55.0",
+      "attributes": {
+        "device_class": "battery",
+        "unit_of_measurement": "%",
+        "friendly_name": "evcc Battery SoC",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_battery_power",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "evcc Battery Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_loadpoint_1_charge_power",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "power",
+        "unit_of_measurement": "W",
+        "friendly_name": "evcc Loadpoint 1 Charge Power",
+        "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "input_number.ess_active_power_w",
+      "state": "0.0",
+      "attributes": {
+        "friendly_name": "ESS Active Power",
+        "unit_of_measurement": "W",
+        "min": -10000,
+        "max": 10000,
+        "step": 100
+      }
+    },
+    {
+      "entity_id": "input_number.ess_charge_limit_w",
+      "state": "5000.0",
+      "attributes": {
+        "friendly_name": "ESS Charge Limit",
+        "unit_of_measurement": "W",
+        "min": 0,
+        "max": 10000,
+        "step": 100
+      }
+    },
+    {
+      "entity_id": "input_number.ess_discharge_limit_w",
+      "state": "5000.0",
+      "attributes": {
+        "friendly_name": "ESS Discharge Limit",
+        "unit_of_measurement": "W",
+        "min": 0,
+        "max": 10000,
+        "step": 100
+      }
+    },
+    {
+      "entity_id": "input_number.ess_mode_hint",
+      "state": "0.0",
+      "attributes": {
+        "friendly_name": "ESS Mode Hint",
+        "min": 0,
+        "max": 2,
+        "step": 1
+      }
+    },
+    {
+      "entity_id": "number.evcc_loadpoint_1_max_current",
+      "state": "16.0",
+      "attributes": {
+        "friendly_name": "evcc Loadpoint 1 Max Current",
+        "unit_of_measurement": "A",
+        "min": 6,
+        "max": 32,
+        "step": 1,
+        "mode": "slider"
+      }
+    },
+    {
+      "entity_id": "switch.evcc_loadpoint_1_enable",
+      "state": "on",
+      "attributes": {
+        "friendly_name": "evcc Loadpoint 1 Enable"
+      }
+    },
+    {
+      "entity_id": "sensor.house_sim_buffer_temp",
+      "state": "42.0",
+      "attributes": {
+        "device_class": "temperature",
+        "unit_of_measurement": "°C",
+        "friendly_name": "House Sim Buffer Temp",
+        "state_class": "measurement"
+      }
+    }
+  ]
+}

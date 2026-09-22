@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.a + HA Lab P1 — Developer bench (2026-09-22)
+
+- [x] **2.6.a + HA Lab P1 — Developer bench.** `house_sim/`: mock HA REST (`GET /api/states`, `GET /api/states/{id}`, `POST /api/services/{domain}/{service}` + Bearer) with fixture `evcc_en` (golden `ehal.ha.entities`, `switch.*` negative case, no WP). Short closed-loop stepper (SoC coulomb counter, synthetic PV kW series, optional `simulate_next_temp_c`). Pytest against live mock (`tests/test_house_sim_*`). Spec note: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md). Concept: [HA compatibility tests](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md).
+
 ### 2.6 Phase 2 — HA/OpenEMS port UX + Loxone HTTP env override (2026-09-22)
 
 - [x] Allow changing HTTP port for Home Assistant and OpenEMS (follow-up to Miniserver #9) — help/caption on SB Anbindung and EHAL-Com HA mapping (`ui/ehal_connection.py`, `ui/ehal_ha_mapping.py`); port remains part of `ehal.*.base_url` (no dedicated field); doc note in `docs/ui/smarthome-backend.md`
