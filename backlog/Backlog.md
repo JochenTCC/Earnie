@@ -6,7 +6,7 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ## Research Items
 
-- [ ] **HA-Loxone-Bridge-Builder:** standalone tool (no Earnie/EHAL runtime dependency) to auto-generate HA `rest_command:`/`automation:` YAML for numeric HA→Loxone writes. Design draft: [backlog/HA-Loxone-Bridge-Builder-Draft.md](HA-Loxone-Bridge-Builder-Draft.md)
+- [ ] **HA-Loxone-Bridge-Builder:** standalone tool (no Earnie/EHAL runtime dependency) to auto-generate HA `rest_command:`/`automation:` YAML for numeric HA→Loxone writes. Design draft: [backlog/HA-Loxone-Bridge-Builder-Draft.md](HA-Loxone-Bridge-Builder-Draft.md). **Not part of Version 2.6.** A different audience (any HA+Loxone install). Do not share code with **2.6.b** / **2.6.e** (those map HA entities onto a fixed EHAL vocabulary inside Earnie). Deferred Loxone Virtual-In/Out XML in the draft is also not the Version 2.+1 “Earnie → Loxone template XML” item.
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
@@ -27,36 +27,41 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships Phase 1 (Options → `config.json` + Ingress, cold-start dogfood verified). Next community pre-releases: **`2.6.0-alpha.*`** (explicit `version.py` bump approval — do not continue `2.5.3-alpha.N`). Alpha compose may stay pinned at last pre-release (`2.5.3-alpha.6`) until the next alpha bump.
+**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Next community pre-releases: **`2.6.0-alpha.*`** (explicit `version.py` bump approval — do not continue `2.5.3-alpha.N`). Alpha compose may stay pinned at last pre-release (`2.5.3-alpha.6`) until the next alpha bump.
+
+**Scope:** easier HA coupling for Earnie. There is no productive HA house to test against (unlike Loxone), so the first slice is a mock bench. The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) comes after southbound mapping is usable.
+
+**Documents:**
+
+- [HA compatibility tests / house simulator](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — **2.6.a**, HA Lab P1–P4, **2.6.e**
+- [Entwicklungsplan §3.2 HA entity mapping](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md) — **2.6.b** / **2.6.e** (confirm-before-save; LLM stays out of 2.6)
+- [Add-on plan](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie_HomeAssistant_Addon_Dokumentation.md) — **2.6.f**
+- [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — stable vs pre-release channel (not part of 2.6)
+- [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood walkthrough (done); binding follow-up is **2.6.b**
+- [HA-Loxone-Bridge-Builder draft](HA-Loxone-Bridge-Builder-Draft.md) — research item, not 2.6
 
 #### Prerequisites for this epic
-- [x] Install HA simulation instance on Synology for testing
+- [x] Install HA simulation instance on Synology for testing (same instance as the [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) dogfood walkthrough: Hue, add-on setup, comfort-gap notes). An empty HAOS does not replace **2.6.a**.
 
 #### Features
 
-##### Phase 3 — Test infrastructure (regression safety net before more feature scope)
+- [ ] **2.6.a + HA Lab P1 — Developer bench.** One hand-authored entity signature plus a golden `ehal.ha.entities` map, served by a mock REST Earnie can point at (`GET /api/states`, `GET /api/states/{id}`, `POST /api/services/{domain}/{service}` + Bearer; HA state-object shape). Pytest covers `HaAdapter` read/write, units, `unavailable`/`unknown`, and write-error degrade. The same process runs a short closed loop: state + Δt + setpoints → next state (new SoC coulomb-counter; synthetic/historical PV kW series, not `data/pv_forecast.py`; optional thermal via `optimizer/thermal_model.py::simulate_next_temp_c`). Few ticks, not a full simulated day. EV/heat-pump physics later. `switch.*` is a negative case (`HaAdapter` write domains are `number`/`select`/`input_number` only). Code home: `house_sim/` (not `ha_lab/` — that tree is the existing Earnie+HA+evcc lab and the `haos-docker` Supervisor VM). Do **not** reuse `simulation/engine.py::run_simulation()`. Do not inject a fake clock into `main.py`. Spec: [HA compatibility tests](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md).
 
-- [ ] Build smoke tests / EHAL compatibility fixtures (see Earnie-Projekt `Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md`) — fixture-based testing with simulated ("faked") device entity signatures instead of real hardware. **Mode A:** each fixture ships a golden `ehal.ha.entities` map (as if EHAL-Com already saved it); tests exercise `HaAdapter` read/write, units, `unavailable`/`unknown`, and write-error degrade — not HA auto-propose. Separate from Add-on M3 (archived; Supervisor persistence walkthrough in [docs/einrichtung/homeassistant-addon-testumgebung.md](../docs/einrichtung/homeassistant-addon-testumgebung.md)). Do this before Phase 4 so later feature work does not silently regress adapter/mapping contracts beyond the one real dogfooding instance. Does **not** include the closed-loop house simulator (that is follow-up epic **HA Lab** below).
+- [ ] **2.6.b — Suggest-and-confirm HA binding.** Tried on the 2.6.a mock. EHAL-Com already scans `/api/states`. Propose for empty fields only (never overwrite a saved binding). Hints from domain, `device_class`, `unit_of_measurement`, and name tokens — fixed EHAL vocabulary, analogous to `integrations/loxone_ehal_mapping.py::heuristic_propose`. User confirms, then save `ehal.ha.entities`. No LLM. No write until confirm. Regression: the 2.6.a fixture with an empty map fills the obvious fields and leaves ambiguous ones empty. This is the HA status-post item and [Entwicklungsplan §3.2](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md).
 
-##### Phase 4 — Larger scope (after the add-on feels reliable)
+- [ ] **2.6.c — Energy counters (ΔkWh) for slot Ist on the HA backend.** After the mock can move a cumulative kWh value. Prefer cumulative / `total_increasing` energy entities for grid± / PV when mapped. Same chart contract as Loxone (avg power = ΔE / slot Δt); battery/flex may stay on sampled mean. Energy sensors are separate entities from the power entity, so mapping comes from **2.6.b** (or today's manual map). Combines with `closed_interval` / sampler — not a replacement for daemon metering.
 
-- [ ] Add-on Version 1.0 (Entwicklungsplan roadmap): MQTT Discovery, native Home-Assistant entities for Earnie state, Energy-Dashboard integration — distinct from the "Make also an EHAL adaption for MQTT" item elsewhere in this file (that's an EHAL southbound backend; this is the add-on itself publishing Earnie state via HA's native MQTT Discovery)
-- [ ] **energy counters (ΔkWh) for slot Ist on HA backend**
-  - Prefer cumulative / total-increasing energy entities for grid± / PV when mapped
-  - Same chart contract as Loxone (avg power = ΔE / slot Δt); battery/flex may stay on sampled mean
-  - Needs HA entity discovery/mapping (energy sensors are usually separate entities, not a second channel of the power entity) — depends on improved HA-binding / EHAL-Com HA mapping UX
-  - Combines with existing `closed_interval` / sampler path — not a replacement for daemon metering
-- [ ] Check possibility to install either latest productive or pre-release version of Earnie
+##### HA Lab P2–P4 — more archetypes (after the bench; does not gate 2.6.b–c)
 
-##### Follow-up — HA Lab closed-loop house simulator (does **not** gate Phase 4)
+`house_config` supplies physics parameters only; entity IDs come from the archetype. No real customer HA install. Same spec as **2.6.a**.
 
-Epic **HA Lab** — details: Earnie-Projekt `Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md` §1.1.3 and §3. Code home: `ha_lab/` in this repo. **Mode A through HA Lab P3** (pre-seeded golden maps). **Mode B** (HA auto-propose/auto-bind, Loxone-style) is a later epic on the same archetypes, not HA Lab P1. No real customer HA install is required; archetypes are hand-authored. Do **not** reuse `simulation/engine.py::run_simulation()`. CI drives `HaAdapter` against the mock (tick-based); do not inject a fake clock into `main.py` in P1.
+- [ ] **HA Lab P2** — 2–3 more hand-authored archetypes (domain/naming/i18n) on the same physics; write-back per archetype.
+- [ ] **HA Lab P3** — CI harness: short simulated windows, not N live `main.py` days. The **2.6.a** static fixture stays the fast job.
+- [ ] **HA Lab P4** — Optional. Dogfood the stepper against the existing Synology HAOS or `ha_lab/haos-docker`, wall-clock, states via `template:` / `pyscript`. Diagnosis exports and a hosted multi-user tool stay out of this epic.
 
-- [ ] **HA Lab P1** — State-stepper spike (state + Δt + setpoints → next state): SoC coulomb-counter (new; there is no extractable battery stepper), synthetic/historical PV kW series (not `data/pv_forecast.py` / forecast.solar), optional thermal via `optimizer/thermal_model.py::simulate_next_temp_c` (not `thermal_rc_profile.py` planning helper). One reference archetype + golden map + mock REST (`GET /api/states`, `GET /api/states/{id}`, `POST /api/services/{domain}/{service}` + Bearer token; HA state-object shape). Few ticks of write-back, not a full simulated day. EV/heat-pump physics later; `switch.*` is a negative case (`HaAdapter` write domains are `number`/`select`/`input_number` only).
-- [ ] **HA Lab P2** — 2–3 more hand-authored archetypes (domain/naming/i18n variants) on the same physics; verify write-back per archetype. `house_config` supplies physics parameters only; entity IDs come from the archetype, not from Earnie field names.
-- [ ] **HA Lab P3** — Automated harness in CI: short simulated windows, not N live `main.py` days. Static fixture suite from 2.6 Phase 3 stays the fast job.
-- [ ] **HA Lab P4** — Optional real HAOS (`ha_lab/haos-docker`) in wall-clock mode for dogfooding/UX. Optional later: HA diagnosis exports as extra archetype source; hosted multi-user tool (not in this epic).
-- [ ] **HA auto-propose (Mode B, after HA Lab P3)** — Replay the same archetypes with empty `ehal.ha.entities`; Earnie must propose bindings (new feature; HA has no Loxone `heuristic_propose`/Ollama path today). Does not block 2.6 Phase 4 or HA Lab P1–P3.
+- [ ] **2.6.e — Stronger propose, still confirm-before-save.** After HA Lab P2. Replay archetypes with empty `ehal.ha.entities` and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)).
+
+- [ ] **2.6.f — Add-on Version 1.0.** From the [add-on plan](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie_HomeAssistant_Addon_Dokumentation.md): MQTT Discovery, native Home Assistant entities for Earnie state, HA Energy-dashboard integration, Supervisor health check. Earnie publishing its own state. Checked on the existing Synology HAOS. Not the Version 2.+1 item "EHAL adaptation for MQTT". Comes after southbound mapping is usable. Stable vs pre-release install is the [add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md), not this item.
 
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)

@@ -13,6 +13,7 @@ A generator that scans both sides, proposes a numeric point mapping, and outputs
 - No non-numeric domains (switches/covers/scenes/selects) — numeric points only (sensors, `number`, `input_number` on the HA side; analog Merker/Virtual Inputs on the Loxone side)
 - No Loxone-side Virtual-In/Out XML generation yet — deferred to a later phase
 - Not a persistently running service — a one-shot generator, rerun manually when the setup changes
+- Not an Earnie onboarding feature. Version **2.6.b** / **2.6.e** propose HA entities for a fixed EHAL field list inside Earnie. This tool proposes arbitrary numeric HA↔Loxone pairs and emits YAML. No shared matcher module.
 
 ### Direction split
 
