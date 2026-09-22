@@ -1,0 +1,159 @@
+"""Unit tests for scripts.report_repo_stats (tidy daily CSV export)."""
+
+from __future__ import annotations
+
+import csv
+import json
+from datetime import date
+
+import pytest
+
+from scripts.report_repo_stats import (
+    DAILY_HEADER,
+    build_daily_rows,
+    filter_repos,
+    main,
+    parse_iso_date,
+    parse_repos_filter,
+    render_csv,
+)
+
+
+SAMPLE_SUMMARY = {
+    "generated_at": "2026-09-21T04:24:34Z",
+    "repos": {
+        "ha-addon-earnie": {
+            "since": "2026-09-10",
+            "daily": [
+                {
+                    "date": "2026-09-12",
+                    "clones_total": 1,
+                    "clones_unique": 1,
+                    "views_total": 2,
+                    "views_unique": 1,
+                },
+                {
+                    "date": "2026-09-10",
+                    "clones_total": 3,
+                    "clones_unique": 2,
+                    "views_total": 5,
+                    "views_unique": 3,
+                },
+            ],
+        },
+        "Earnie": {
+            "since": "2026-09-10",
+            "daily": [
+                {
+                    "date": "2026-09-11",
+                    "clones_total": 4,
+                    "clones_unique": 3,
+                    "views_total": 10,
+                    "views_unique": 4,
+                },
+                {
+                    "date": "2026-09-10",
+                    "clones_total": 2,
+                    "clones_unique": 1,
+                    "views_total": 8,
+                    "views_unique": 2,
+                },
+            ],
+        },
+    },
+}
+
+
+def test_build_daily_rows_schema_and_sort() -> None:
+    rows = build_daily_rows(SAMPLE_SUMMARY["repos"])
+    assert rows[0] == DAILY_HEADER
+    body = rows[1:]
+    assert len(body) == 4
+    assert [r[0] for r in body] == ["Earnie", "Earnie", "ha-addon-earnie", "ha-addon-earnie"]
+    assert [r[1] for r in body] == [
+        "2026-09-10",
+        "2026-09-11",
+        "2026-09-10",
+        "2026-09-12",
+    ]
+    assert body[0] == ["Earnie", "2026-09-10", 2, 1, 8, 2]
+
+
+def test_date_and_repo_filters() -> None:
+    filtered = filter_repos(SAMPLE_SUMMARY["repos"], {"Earnie"})
+    rows = build_daily_rows(
+        filtered,
+        date_from=date(2026, 9, 11),
+        date_to=date(2026, 9, 11),
+    )
+    assert rows == [
+        DAILY_HEADER,
+        ["Earnie", "2026-09-11", 4, 3, 10, 4],
+    ]
+
+
+def test_empty_filter_header_only() -> None:
+    rows = build_daily_rows(
+        SAMPLE_SUMMARY["repos"],
+        date_from=date(2099, 1, 1),
+        date_to=date(2099, 1, 2),
+    )
+    assert rows == [DAILY_HEADER]
+    assert render_csv(rows) == ",".join(DAILY_HEADER) + "\n"
+
+
+def test_parse_helpers() -> None:
+    assert parse_repos_filter("Earnie, ha-addon-earnie") == {"Earnie", "ha-addon-earnie"}
+    assert parse_repos_filter(None) is None
+    assert parse_iso_date("--from", "2026-09-01") == date(2026, 9, 1)
+    with pytest.raises(ValueError):
+        parse_iso_date("--from", "09-01-2026")
+
+
+def test_main_writes_csv(tmp_path) -> None:
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
+    out_path = tmp_path / "out.csv"
+    rc = main(
+        [
+            "--input",
+            str(summary_path),
+            "--repos",
+            "Earnie",
+            "--from",
+            "2026-09-10",
+            "--to",
+            "2026-09-11",
+            "-o",
+            str(out_path),
+        ]
+    )
+    assert rc == 0
+    with open(out_path, encoding="utf-8", newline="") as f:
+        reader = list(csv.reader(f))
+    assert reader[0] == DAILY_HEADER
+    assert len(reader) == 3
+    assert reader[1][0] == "Earnie"
+
+
+def test_main_unknown_repo(tmp_path) -> None:
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
+    rc = main(["--input", str(summary_path), "--repos", "MissingRepo"])
+    assert rc == 2
+
+
+def test_main_from_after_to(tmp_path) -> None:
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(json.dumps(SAMPLE_SUMMARY), encoding="utf-8")
+    rc = main(
+        [
+            "--input",
+            str(summary_path),
+            "--from",
+            "2026-09-20",
+            "--to",
+            "2026-09-01",
+        ]
+    )
+    assert rc == 2

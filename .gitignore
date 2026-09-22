@@ -83,3 +83,4 @@ poc_doc_assistant/query.py
 poc_doc_assistant/README.md
 poc_doc_assistant/requirements.txt
 poc_doc_assistant/run_periodic_sync.py
+testmodcom.py
