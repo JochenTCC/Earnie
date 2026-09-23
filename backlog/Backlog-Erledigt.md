@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.g — HA bindings on Pattern B (2026-09-23)
+
+- [x] **2.6.g — HA bindings on Pattern B (`house_profiles`).** Flat `ehal.ha.entities` → `plant.ehal_bindings` / EV consumer `ehal_bindings` (same §C keys as Loxone). One-shot migrator in `house_config/ha_ehal_bindings.py` via `ensure_migrated` / CLI; strip flat entities; `sign` stays in `ehal.ha`. Live: `aggregate_ha_entities` → `get_ha_adapter` (legacy fallback if empty). HITL save writes Pattern B (`ui/ehal_ha_mapping.py`). Golden `evcc_en` map kept for heuristics; house_sim print/docs updated. Tests: `tests/test_ha_ehal_bindings.py` (+ HA suite). Docs: `ehal.md`, `ehal-com.md`, `house-sim.md`, `smarthome-backend-wahl.md`, `loxone-meter-energy-slot-ist.md`, snippet.
+
 ### 2.6.c — HA energy counters for slot Ist (2026-09-23)
 
 - [x] **2.6.c — Energy counters (ΔkWh) for slot Ist on the HA backend.** `house_sim` cumulative `total_increasing` PV/grid± energy (∫P·Δt). Flat optional maps `sens_pv_energy` / `sens_grid_energy_import` / `sens_grid_energy_export`. Reader `integrations/ha_meter_energy.py` → same `overlay_counter_on_closed` shape as Loxone; sampler `_default_read_energy` for HA. Heuristic empty-only propose for energy fields. Battery/flex stay on sample mean. Tests: `tests/test_ha_meter_energy.py`, stepper energy assert, golden map heuristic. Docs: `loxone-meter-energy-slot-ist.md`, `charts.md`, `ehal.md`, `ehal-com.md`, `house-sim.md`.

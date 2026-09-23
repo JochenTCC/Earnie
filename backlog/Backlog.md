@@ -29,16 +29,19 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Next community pre-releases: **`2.6.0-alpha.*`** (explicit `version.py` bump approval — do not continue `2.5.3-alpha.N`). Alpha compose may stay pinned at last pre-release (`2.5.3-alpha.6`) until the next alpha bump.
 
-**Scope:** easier HA coupling for Earnie. There is no productive HA house to test against (unlike Loxone), so the first slice is a mock bench. Flat `ehal.ha.entities` (**2.6.b** / **2.6.e**) is an interim plant-wire map; the goal for this epic is **Pattern B parity with Loxone** (**2.6.g** / **2.6.h**): bindings on `plant` / `consumers[].ehal_bindings`, entity-first EHAL-Com UX. The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) comes after southbound mapping is usable.
+**Next:** **2.6.h** (then **2.6.f**). Bench stays **`house_sim`** (`evcc_en` + golden map). **HA Lab P2–P4** and **2.6.e** are postponed — do not start them in this cycle.
+
+**Scope:** easier HA coupling for Earnie. Flat `ehal.ha.entities` (**2.6.b**) was an interim plant-wire map; Pattern B storage (**2.6.g**, done) puts HA entity IDs on `plant` / `consumers[].ehal_bindings`. Next: entity-first EHAL-Com UX (**2.6.h**). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) comes after southbound mapping is usable.
 
 **Documents:**
 
-- [HA compatibility tests / house simulator](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — **2.6.a**, HA Lab P1–P4, **2.6.e**
-- [Entwicklungsplan §3.2 HA entity mapping](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md) — **2.6.b** / **2.6.e** (confirm-before-save; LLM stays out of 2.6)
-- [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — target shape for **2.6.g** / **2.6.h** (same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**)
+- [House simulator spec](../docs/spec/house-sim.md) — **2.6.a** / HA Lab P1 (done); fixture bench for **2.6.g** / **2.6.h**
+- [HA compatibility tests (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — **2.6.a**; postponed HA Lab P2–P4 / **2.6.e**
+- [Entwicklungsplan §3.2 HA entity mapping](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md) — **2.6.b** (done); postponed **2.6.e** (confirm-before-save; LLM stays out of 2.6)
+- [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — **2.6.g** done; target UX for **2.6.h** (same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**)
 - [Add-on plan](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie_HomeAssistant_Addon_Dokumentation.md) — **2.6.f**
 - [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — stable vs pre-release channel (not part of 2.6)
-- [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood walkthrough (done); HA suggest-and-confirm (**2.6.b**) done; next Pattern B (**2.6.g** / **2.6.h**)
+- [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood walkthrough (done); HA suggest-and-confirm (**2.6.b**) done; Pattern B storage (**2.6.g**) done; next **2.6.h**
 - [HA-Loxone-Bridge-Builder draft](HA-Loxone-Bridge-Builder-Draft.md) — research item, not 2.6
 
 #### Prerequisites for this epic
@@ -46,25 +49,24 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 #### Features
 
-##### HA Lab P2–P4 — more archetypes (after the bench; does not gate 2.6.b–c)
+##### Pattern B parity with Loxone (active — next)
 
-`house_config` supplies physics parameters only; entity IDs come from the archetype. No real customer HA install. Same spec as **2.6.a**.
-
-- [ ] **HA Lab P2** — 2–3 more hand-authored archetypes (domain/naming/i18n) on the same physics; write-back per archetype.
-- [ ] **HA Lab P3** — CI harness: short simulated windows, not N live `main.py` days. The **2.6.a** static fixture stays the fast job.
-- [ ] **HA Lab P4** — Optional. Dogfood the stepper against the existing Synology HAOS or `ha_lab/haos-docker`, wall-clock, states via `template:` / `pyscript`. Diagnosis exports and a hosted multi-user tool stay out of this epic.
-
-- [ ] **2.6.e — Stronger propose, still confirm-before-save.** After HA Lab P2. Replay archetypes with empty `ehal.ha.entities` and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)). After **2.6.g**, the same empty-only propose rules apply to Pattern B bindings.
-
-- [ ] **2.6.f — Add-on Version 1.0.** From the [add-on plan](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie_HomeAssistant_Addon_Dokumentation.md): MQTT Discovery, native Home Assistant entities for Earnie state, HA Energy-dashboard integration, Supervisor health check. Earnie publishing its own state. Checked on the existing Synology HAOS. Not the Version 2.+1 item "EHAL adaptation for MQTT". Comes after southbound mapping is usable. Stable vs pre-release install is the [add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md), not this item.
-
-##### Pattern B parity with Loxone (goal for HA mapping)
-
-Same storage and EHAL-Com workflow as Loxone **2.4.k** — not a second binding model forever. Depends on usable plant southbound (**2.6.b**); does not wait for HA Lab P2–P4. Credentials / `ehal.backend=ha` / `base_url` / `token` stay in `config.json`; only the entity→field map moves.
-
-- [ ] **2.6.g — HA bindings on Pattern B (`house_profiles`).** Move southbound HA entity IDs out of flat `ehal.ha.entities` into `plant.ehal_bindings` / `consumers[].ehal_bindings` (same keys/roles as Loxone). One-shot migrator from existing `ehal.ha.entities` → plant (and documented consumer fields when present). `HaAdapter` / live path read the aggregated house-profile map (or a thin aggregator like Loxone). Drop or deprecate writing new bindings only to `ehal.ha.entities`. Golden maps / `house_sim` fixtures and docs (`ehal.md`, `ehal-com.md`, `house-sim.md`) follow. Tests: migrate round-trip; adapter telemetry/setpoints after migrate; empty map still works.
+Same storage and EHAL-Com workflow as Loxone **2.4.k** — not a second binding model forever. Depends on usable plant southbound (**2.6.b**, done). Credentials / `ehal.backend=ha` / `base_url` / `token` stay in `config.json`; only the entity→field map moves. Regression bench: `house_sim` / `evcc_en` (not HA Lab).
 
 - [ ] **2.6.h — HA EHAL-Com UX parity with Loxone.** Entity picker first (plant + live-profile consumers), then only that entity’s EHAL fields; save writes that entity’s `ehal_bindings` (not one giant form for all plant fields). Reuse Loxone HITL patterns where practical (`build_entity_rows` / role grouping / empty-only propose). Scan HA `/api/states` once per session; suggest-and-confirm still never overwrites saved bindings; no LLM. After save, Live-Lesen/Schreiben show the same entity-centric mapping column contract as Loxone. Regression: house_sim / golden plant map still fillable via the new UI.
+
+- [ ] **2.6.f — Add-on Version 1.0.** From the [add-on plan](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie_HomeAssistant_Addon_Dokumentation.md): MQTT Discovery, native Home Assistant entities for Earnie state, HA Energy-dashboard integration, Supervisor health check. Earnie publishing its own state. Checked on the existing Synology HAOS. Not the Version 2.+1 item "EHAL adaptation for MQTT". Comes after southbound mapping is usable (**2.6.g** / ideally **2.6.h**). Stable vs pre-release install is the [add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md), not this item.
+
+##### Postponed — HA Lab P2–P4 and stronger propose
+
+Do **not** start in this cycle. Bench for Pattern B remains **`house_sim`** only. Resume after **2.6.g** / **2.6.h** (or later) if more archetypes are needed.
+
+`house_config` supplies physics parameters only; entity IDs come from the archetype. No real customer HA install. Same concept doc as **2.6.a**.
+
+- [ ] **HA Lab P2** — 2–3 more hand-authored archetypes (domain/naming/i18n) on the same physics; write-back per archetype. *(postponed)*
+- [ ] **HA Lab P3** — CI harness: short simulated windows, not N live `main.py` days. The **2.6.a** static fixture stays the fast job. *(postponed)*
+- [ ] **HA Lab P4** — Optional. Dogfood the stepper against the existing Synology HAOS or `ha_lab/haos-docker`, wall-clock, states via `template:` / `pyscript`. Diagnosis exports and a hosted multi-user tool stay out of this epic. *(postponed)*
+- [ ] **2.6.e — Stronger propose, still confirm-before-save.** After HA Lab P2 (when resumed). Replay archetypes with empty map and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)). After **2.6.g**, the same empty-only propose rules apply to Pattern B bindings. *(postponed with HA Lab)*
 
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)

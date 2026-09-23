@@ -140,6 +140,10 @@ def get_openems_adapter() -> OpenemsAdapter:
 
 def get_ha_adapter() -> HaAdapter:
     global _ha_adapter
+    from house_config.ha_ehal_bindings import (
+        aggregate_ha_entities,
+        load_house_profiles_for_ha,
+    )
     from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
 
     base_url = resolve_ha_base_url(str(config.get("EHAL_HA_BASE_URL") or ""))
@@ -153,9 +157,12 @@ def get_ha_adapter() -> HaAdapter:
             "ehal.backend=ha requires ehal.ha.token (EHAL_HA_TOKEN), "
             "or SUPERVISOR_TOKEN when running as the Home Assistant add-on."
         )
-    entities = config.get("EHAL_HA_ENTITIES") or {}
-    if not isinstance(entities, dict):
-        entities = {}
+    aggregated = aggregate_ha_entities(load_house_profiles_for_ha())
+    if aggregated:
+        entities = aggregated
+    else:
+        legacy = config.get("EHAL_HA_ENTITIES") or {}
+        entities = legacy if isinstance(legacy, dict) else {}
     sign = config.get("EHAL_HA_SIGN") or {}
     if not isinstance(sign, dict):
         sign = {}

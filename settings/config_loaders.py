@@ -158,7 +158,11 @@ def load_loxone_block_params(
 
 
 def load_ehal_params(raw_config: dict) -> dict[str, Any]:
-    """Optional ehal block; missing/empty/none backend defaults to Loxone-EHAL."""
+    """Optional ehal block; missing/empty/none backend defaults to Loxone-EHAL.
+
+    ``EHAL_HA_ENTITIES`` remains for legacy fallback only — Pattern B bindings
+    live in ``plant`` / ``consumers[].ehal_bindings`` (2.6.g).
+    """
     ehal = raw_config.get("ehal")
     if not isinstance(ehal, dict):
         ehal = {}
@@ -187,6 +191,7 @@ def load_ehal_params(raw_config: dict) -> dict[str, Any]:
         "EHAL_OPENEMS_EVCS_COMPONENT": str(openems.get("evcs_component") or "evcs0"),
         "EHAL_HA_BASE_URL": str(ha.get("base_url") or "").strip(),
         "EHAL_HA_TOKEN": str(ha.get("token") or "").strip(),
+        # Deprecated: prefer house_profiles plant/consumer ehal_bindings.
         "EHAL_HA_ENTITIES": {
             str(key): str(value).strip()
             for key, value in entities.items()

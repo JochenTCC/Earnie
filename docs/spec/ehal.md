@@ -27,6 +27,7 @@ Earnie Core remains the sole strategic optimizer. Hubs provide I/O and device ca
 | Adapter duty | Map hub channels/entities → EHAL; normalize signs and units inside the adapter |
 | Transport | Network only (REST / WebSocket / JSON). No linking or copying hub source into Earnie repos (Separate Works / AGPL shield for OpenEMS) |
 | Loxone today | Default `ehal.backend=loxone` uses [`integrations/loxone_adapter.py`](../../integrations/loxone_adapter.py) for plant telemetry/setpoints; marker names live in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Pattern B). Legacy `loxone_blocks` / unprefixed `*_name` dual-read is removed (fail-fast). Mapping UI: EHAL-Com |
+| HA today | `ehal.backend=ha` uses [`integrations/ha_adapter.py`](../../integrations/ha_adapter.py); entity IDs in the same Pattern B maps (aggregated live). Credentials / optional `sign` stay in `ehal.ha`. Flat `ehal.ha.entities` is one-shot migrated and cleared (**2.6.g**). |
 
 ## Schema version and envelope
 
@@ -215,11 +216,11 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 ## Implementation notes — Home Assistant + evcc
 
 - Adapter: `integrations/ha_adapter.py` (REST only: `/api/states`, `/api/services/...`). Prefer HA entities from evcc.
-- Config: `ehal.backend=ha` + `ehal.ha` (`base_url`, `token`, `entities`, optional `sign`). Snippet: `share/config/ehal.ha.snippet.json`.
+- Config: `ehal.backend=ha` + `ehal.ha` (`base_url`, `token`, optional `sign`). Entity IDs live in `plant.ehal_bindings` / `consumers[].ehal_bindings` (Pattern B, same keys as Loxone). Legacy flat `ehal.ha.entities` is migrated once and cleared. Snippet: `share/config/ehal.ha.snippet.json`.
 - Compose lab: `docker/compose/ha-lab.yml` (Earnie :8506 + HA :8123 + evcc :7070). Setup: [`ha-lab-setup.md`](ha-lab-setup.md). German A2/B: [`../einrichtung/ha-evcc.md`](../einrichtung/ha-evcc.md).
-- HITL mapping UI: Streamlit EHAL-Com expander → `ui/ehal_ha_mapping.py` (entity scan → **heuristic propose** for empty fields only → user confirms → persist `ehal.ha.entities`; **no LLM**). Heuristic: `integrations/ha_ehal_mapping.py` (domain / `device_class` / unit / name tokens).
-- Optional slot-Ist energy maps (not on the EHAL power wire): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` → `integrations/ha_meter_energy.py` + sampler ΔkWh overlay (same contract as Loxone; see [`loxone-meter-energy-slot-ist.md`](loxone-meter-energy-slot-ist.md)).
-- Sign mode per field: `ehal` (already aligned) or `negate`. Units: kW states converted to W; energy Wh→kWh on the side channel.
+- HITL mapping UI: Streamlit EHAL-Com expander → `ui/ehal_ha_mapping.py` (entity scan → **heuristic propose** for empty fields only → user confirms → persist Pattern B bindings; **no LLM**). Giant-form UX until **2.6.h** (entity-picker). Heuristic: `integrations/ha_ehal_mapping.py` (domain / `device_class` / unit / name tokens). Live path: `aggregate_ha_entities` → `HaAdapter`.
+- Optional slot-Ist energy maps (not on the EHAL power wire): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on `plant.ehal_bindings` → `integrations/ha_meter_energy.py` + sampler ΔkWh overlay (same contract as Loxone; see [`loxone-meter-energy-slot-ist.md`](loxone-meter-energy-slot-ist.md)).
+- Sign mode per field: `ehal` (already aligned) or `negate` — still in `ehal.ha.sign` (config). Units: kW states converted to W; energy Wh→kWh on the side channel.
 - Setpoints: typically `number.set_value` on mapped entities (Amps for EVCS; W for ESS limits).
 - Optimizer exclusivity + single Modbus writer: see German checklist in `ha-evcc.md`.
 - Same Live façade / write-error path as OpenEMS (`is_ehal_network_backend()`).

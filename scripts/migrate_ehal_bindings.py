@@ -36,7 +36,10 @@ def _write_json(path: Path, doc: dict) -> None:
 def main(argv: list[str] | None = None) -> None:
     _configure_console_utf8()
     parser = argparse.ArgumentParser(
-        description="Migrate legacy Loxone Merker nests → ehal_bindings and strip leftovers."
+        description=(
+            "Migrate legacy Loxone Merker nests and flat ehal.ha.entities "
+            "→ plant/consumer ehal_bindings; strip leftovers."
+        )
     )
     parser.add_argument(
         "--path",
@@ -46,7 +49,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--config",
         default="",
-        help="Optional config.json (strips migrated loxone_blocks)",
+        help="Optional config.json (strips migrated loxone_blocks / ehal.ha.entities)",
     )
     parser.add_argument(
         "--dry-run",

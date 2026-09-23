@@ -1,4 +1,4 @@
-"""HITL Entity → EHAL mapping UI for Home Assistant (2.4.c)."""
+"""HITL Entity → EHAL mapping UI for Home Assistant (Pattern B persist, 2.6.g)."""
 from __future__ import annotations
 
 from typing import Any
@@ -7,6 +7,11 @@ import streamlit as st
 
 from ehal.profiles import group_fields_by_role, role_field_labels, role_group_label
 from ehal.models import canonicalize_ha_entity_keys
+from house_config.ehal_bindings import ensure_migrated
+from house_config.ha_ehal_bindings import (
+    aggregate_ha_entities,
+    apply_ha_entities_to_house,
+)
 from integrations.ehal_live import reset_adapter_cache
 from integrations.ha_adapter import (
     SETPOINT_FIELDS,
@@ -22,7 +27,12 @@ from integrations.ha_ehal_mapping import (
     heuristic_propose,
     resolve_field_select_default,
 )
-from ui.house_config_io import load_main_config, save_main_config
+from ui.house_config_io import (
+    load_house_profiles,
+    load_main_config,
+    save_house_profiles,
+    save_main_config,
+)
 
 _NONE = "— nicht gemappt —"
 _SESSION_SCAN = "ehal_ha_scan_entities"
@@ -47,25 +57,33 @@ def _proposed_entity_id(proposals: dict[str, dict[str, Any]], field: str) -> str
     return str(entry.get("entity_id") or "").strip()
 
 
-def _ha_block(data: dict) -> dict[str, Any]:
+def _ha_credentials(data: dict) -> dict[str, Any]:
     ehal = data.get("ehal") if isinstance(data.get("ehal"), dict) else {}
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
-    raw_entities = (
-        dict(ha.get("entities") or {}) if isinstance(ha.get("entities"), dict) else {}
-    )
     raw_sign = dict(ha.get("sign") or {}) if isinstance(ha.get("sign"), dict) else {}
     return {
         "backend": str(ehal.get("backend") or ""),
         "adapter_id": str(ehal.get("adapter_id") or "earnie-hems"),
         "base_url": str(ha.get("base_url") or "").strip(),
         "token": str(ha.get("token") or "").strip(),
-        "entities": canonicalize_ha_entity_keys(
-            {str(k): str(v) for k, v in raw_entities.items()}
-        ),
         "sign": canonicalize_ha_entity_keys(
             {str(k): str(v) for k, v in raw_sign.items()}
         ),
     }
+
+
+def _ensure_ha_migrated() -> tuple[dict, dict[str, str]]:
+    """One-shot migrate flat entities → Pattern B; return (config, aggregated map)."""
+    config_doc = load_main_config()
+    house = load_house_profiles()
+    new_house, new_config, changed = ensure_migrated(house, config_doc)
+    if changed:
+        save_house_profiles(new_house)
+        save_main_config(new_config)
+        config_doc = new_config
+        house = new_house
+    entities = aggregate_ha_entities(house)
+    return config_doc, entities
 
 
 def _adapter_from_form(base_url: str, token: str, entities: dict[str, str]) -> HaAdapter:
@@ -116,7 +134,7 @@ def _select_entity(
 
 
 def render_ehal_ha_mapping_section() -> None:
-    """Entity-scan + HITL mapping; persists ehal.ha into config.json."""
+    """Entity-scan + HITL mapping; persists Pattern B bindings + ehal.ha credentials."""
     from integrations.ha_supervisor import (
         SUPERVISOR_CORE_BASE_URL,
         resolve_ha_base_url,
@@ -126,12 +144,14 @@ def render_ehal_ha_mapping_section() -> None:
 
     st.caption(
         "Human-in-the-Loop: Entities scannen → Heuristik schlägt leere Felder vor → "
-        "prüfen → Mapping speichern. Gespeicherte Bindings werden nicht überschrieben. "
+        "prüfen → Mapping speichern in `plant` / `consumers[].ehal_bindings`. "
+        "Gespeicherte Bindings werden nicht überschrieben. "
         "Kein LLM für HA (analog Loxone-Heuristik)."
     )
 
-    data = load_main_config()
-    current = _ha_block(data)
+    data, saved_entities = _ensure_ha_migrated()
+    current = _ha_credentials(data)
+    current_entities = saved_entities
     use_supervisor = supervisor_proxy_available()
     default_url = (
         SUPERVISOR_CORE_BASE_URL
@@ -193,12 +213,12 @@ def render_ehal_ha_mapping_section() -> None:
     if rows:
         st.caption(f"{len(rows)} mappable Entities (sensor/number/select/input_number).")
         empty_saved = sum(
-            1 for field in EHAL_HA_FIELDS if not str(current["entities"].get(field) or "")
+            1 for field in EHAL_HA_FIELDS if not str(current_entities.get(field) or "")
         )
         proposed_for_empty = sum(
             1
             for field in EHAL_HA_FIELDS
-            if not str(current["entities"].get(field) or "")
+            if not str(current_entities.get(field) or "")
             and _proposed_entity_id(proposals, field)
         )
         if proposals:
@@ -221,7 +241,7 @@ def render_ehal_ha_mapping_section() -> None:
             st.caption(f"... und {len(rows) - 40} weitere (Auswahl unten vollständig).")
 
     options = _entity_options(rows) if rows else [_NONE] + sorted(
-        {str(v) for v in current["entities"].values() if str(v).strip()}
+        {str(v) for v in current_entities.values() if str(v).strip()}
     )
 
     entities: dict[str, str] = {}
@@ -231,7 +251,7 @@ def render_ehal_ha_mapping_section() -> None:
         st.markdown(f"**{caption}** (Telemetrie)")
         for field in fields:
             default = resolve_field_select_default(
-                str(current["entities"].get(field) or ""),
+                str(current_entities.get(field) or ""),
                 _proposed_entity_id(proposals, field),
             )
             mapped = _select_entity(
@@ -250,7 +270,7 @@ def render_ehal_ha_mapping_section() -> None:
         st.markdown(f"**{caption}** (Energiezähler für Slot-Ist ΔkWh, optional)")
         for field in fields:
             default = resolve_field_select_default(
-                str(current["entities"].get(field) or ""),
+                str(current_entities.get(field) or ""),
                 _proposed_entity_id(proposals, field),
             )
             mapped = _select_entity(
@@ -267,7 +287,7 @@ def render_ehal_ha_mapping_section() -> None:
         st.markdown(f"**{caption}** (Setpoints)")
         for field in fields:
             default = resolve_field_select_default(
-                str(current["entities"].get(field) or ""),
+                str(current_entities.get(field) or ""),
                 _proposed_entity_id(proposals, field),
             )
             mapped = _select_entity(
@@ -322,6 +342,8 @@ def render_ehal_ha_mapping_section() -> None:
         if missing:
             st.error("Pflichtfelder fehlen: " + ", ".join(missing))
             return
+        house = apply_ha_entities_to_house(load_house_profiles(), entities)
+        save_house_profiles(house)
         payload = dict(data)
         ehal = dict(payload.get("ehal") or {}) if isinstance(payload.get("ehal"), dict) else {}
         ehal["backend"] = "ha"
@@ -329,11 +351,14 @@ def render_ehal_ha_mapping_section() -> None:
         ehal["ha"] = {
             "base_url": resolved_url,
             "token": token,  # never persist SUPERVISOR_TOKEN
-            "entities": entities,
+            "entities": {},
             "sign": sign,
         }
         payload["ehal"] = ehal
         save_main_config(payload)
         reset_adapter_cache()
-        st.success("HA-EHAL-Mapping gespeichert (`ehal.backend=ha`).")
+        st.success(
+            "HA-EHAL-Mapping gespeichert "
+            "(`plant`/`consumers[].ehal_bindings`, `ehal.backend=ha`)."
+        )
         st.rerun()

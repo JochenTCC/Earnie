@@ -57,7 +57,9 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  base_url: {base_url}")
     print(f"  token:    {args.token}")
     print(f"  fixture:  {package.root}")
-    print("  ehal.ha.entities:")
+    print("  Merge golden IDs into house_profiles plant.ehal_bindings")
+    print("  (EV keys → first EV consumer when present); keep ehal.ha.sign in config.")
+    print("  plant.ehal_bindings (golden field→entity_id):")
     print(json.dumps(package.ehal_entities, indent=2))
     if package.ehal_sign:
         print("  ehal.ha.sign:")

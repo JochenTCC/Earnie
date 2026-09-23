@@ -24,7 +24,7 @@ Für neue Setups ohne bestehende Loxone-Anlage lautet die offizielle DACH-Empfeh
 
 1. In Streamlit zur Seite **Daemon Control → Smarthome-Backend** wechseln.
 2. Das Backend wählen — entweder über die automatische Suche (mDNS/SSDP, optional mit OpenEMS-Portscan) oder manuell (Loxone, Home Assistant oder OpenEMS).
-3. Die Zugangsdaten speichern. Bei Home Assistant folgt danach das Entity→EHAL-Mapping, bei Loxone die Merker- bzw. `plant.ehal_bindings`-Zuordnung — beides weiterhin auf **EHAL-Com**.
+3. Die Zugangsdaten speichern. Bei Home Assistant folgt danach das Entity→EHAL-Mapping (`plant.ehal_bindings` / `consumers[].ehal_bindings`), bei Loxone die Merker-Zuordnung — beides weiterhin auf **EHAL-Com**.
 
 Die Auswahl schreibt `ehal.backend` in `config.json` und leert dabei den Adapter-Cache.
 
@@ -49,7 +49,7 @@ Neu zugeordnet werden muss dagegen je Hub Folgendes:
 | Backend | Mapping                                                              |
 | ------- | -------------------------------------------------------------------- |
 | Loxone  | Merker ↔ EHAL-Felder (`plant.ehal_bindings`; Assistent auf EHAL-Com) |
-| HA      | HA-Entities ↔ EHAL (`ehal.ha.entities`, optional `sign`)             |
+| HA      | HA-Entities ↔ EHAL (`plant.ehal_bindings` / `consumers[].ehal_bindings`; optional `sign` in `ehal.ha`) |
 | OpenEMS | REST-Komponenten (`ess0` / `evcs0` u. a. in `ehal.openems`)          |
 
 

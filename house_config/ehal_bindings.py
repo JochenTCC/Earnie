@@ -451,7 +451,16 @@ def ensure_migrated(
     *,
     strip_legacy: bool = True,
 ) -> tuple[dict, dict, bool]:
-    """One-shot in-memory migration of blocks/consumer nests → entity bindings."""
+    """One-shot in-memory migration of blocks/consumer nests → entity bindings.
+
+    Also migrates flat ``ehal.ha.entities`` → Pattern B (2.6.g) and strips the
+    flat map when ``strip_legacy`` is true.
+    """
+    from house_config.ha_ehal_bindings import (
+        migrate_ha_entities_to_house,
+        strip_ha_entities_from_config,
+    )
+
     house = copy.deepcopy(house_doc) if isinstance(house_doc, dict) else {}
     config = copy.deepcopy(config_doc) if isinstance(config_doc, dict) else {}
     changed = False
@@ -485,6 +494,17 @@ def ensure_migrated(
             for consumer in profile.get("consumers") or []:
                 if isinstance(consumer, dict) and _strip_consumer_marker_nests(consumer):
                     changed = True
+    ehal = config.get("ehal") if isinstance(config.get("ehal"), dict) else {}
+    ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
+    ha_entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}
+    if ha_entities:
+        house, ha_changed = migrate_ha_entities_to_house(house, ha_entities)
+        if ha_changed:
+            changed = True
+        if strip_legacy:
+            config, stripped = strip_ha_entities_from_config(config)
+            if stripped:
+                changed = True
     return house, config, changed
 
 
@@ -542,7 +562,12 @@ _OBSOLETE_BLOCK_KEYS: frozenset[str] = frozenset(
 
 
 def strip_migrated_config_keys(config_doc: dict | None) -> dict:
-    """Drop legacy Merker event-trigger keys; drop migrated/obsolete ``loxone_blocks`` keys."""
+    """Drop legacy Merker event-trigger keys; drop migrated/obsolete ``loxone_blocks`` keys.
+
+    Also clears flat ``ehal.ha.entities`` after Pattern B migrate (2.6.g).
+    """
+    from house_config.ha_ehal_bindings import strip_ha_entities_from_config
+
     config = copy.deepcopy(config_doc) if isinstance(config_doc, dict) else {}
     system = dict(config.get("system") or {}) if isinstance(config.get("system"), dict) else {}
     if isinstance(config.get("system"), dict) or any(k in system for k in _LEGACY_SYSTEM_TRIGGER_KEYS):
@@ -561,4 +586,5 @@ def strip_migrated_config_keys(config_doc: dict | None) -> dict:
             config["loxone_blocks"] = remaining
         else:
             config.pop("loxone_blocks", None)
+    config, _ = strip_ha_entities_from_config(config)
     return config

@@ -15,7 +15,7 @@ The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-back
 | Backend        | Storage                                       | Mapping on this page                                 |
 | -------------- | --------------------------------------------- | ------------------------------------------------------ |
 | Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | Loxone Structure → EHAL Mapping                        |
-| Home Assistant | `config.json` → `ehal.ha`                     | HA Entity → EHAL Mapping                               |
+| Home Assistant | `config.json` → `ehal.ha` (URL/Token/`sign`) | HA Entity → EHAL Mapping → `plant` / `consumers[].ehal_bindings` |
 | OpenEMS        | `config.json` → `ehal.openems`                | (credentials on Smarthome-Backend)                     |
 
 
@@ -260,9 +260,9 @@ Units and signs: see §B. Full role matrix: §C.
 
 ### HA Entity → EHAL Mapping
 
-Only with backend **Home Assistant**: scan entities, assign telemetry/setpoint fields, save. The fields are grouped by **device role** (grid / PV / battery / wallbox; templates under `share/ehal/roles/`).
+Only with backend **Home Assistant**: scan entities, assign telemetry/setpoint fields, save into **`plant.ehal_bindings`** / **`consumers[].ehal_bindings`** (Pattern B, same storage as Loxone). Credentials and optional **`sign`** stay in `config.json` → `ehal.ha`. The fields are grouped by **device role** (grid / PV / battery / wallbox; templates under `share/ehal/roles/`). Entity-first picker UX is backlog **2.6.h**; until then the form still shows all plant-wire fields at once.
 
-Optional **energy counters** for slot Ist (ΔkWh → avg kW): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` (`device_class=energy`, preferably `state_class=total_increasing`). Heuristic proposes them empty-only like other fields. Spec: [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md) (HA section).
+Optional **energy counters** for slot Ist (ΔkWh → avg kW): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on plant bindings (`device_class=energy`, preferably `state_class=total_increasing`). Heuristic proposes them empty-only like other fields. Spec: [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md) (HA section).
 
 - Overview / HITL: [Home Assistant + evcc](../einrichtung/ha-evcc.md) (section *If marq24 / evcc is already connected in HA*)
 - Lab acceptance including stub values and table: [HA Lab Spec §5.1](../spec/ha-lab-setup.md#51-after-marq24-ha-evcc-is-connected-lab-follow-up)

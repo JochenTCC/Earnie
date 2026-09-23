@@ -36,9 +36,9 @@
 - Extending EHAL telemetry schema with cumulative kWh.
 - Battery on counters; HA flex energy entities; shared-meter ΔE peel beyond sample mean.
 
-## HA plant energy entities (2.6.c)
+## HA plant energy entities (2.6.c / 2.6.g)
 
-Separate optional maps in flat `ehal.ha.entities` (not on the power entity):
+Separate optional maps on **`plant.ehal_bindings`** (not on the power entity; same §C keys as the former flat `ehal.ha.entities`):
 
 | Field | Role |
 | --- | --- |
@@ -46,4 +46,4 @@ Separate optional maps in flat `ehal.ha.entities` (not on the power entity):
 | `sens_grid_energy_import` | Grid import kWh → `grid.total` |
 | `sens_grid_energy_export` | Grid export kWh → `grid.total_neg` |
 
-Reader: `integrations/ha_meter_energy.py`. Same sampler anchors / `overlay_counter_on_closed` / `*_kw = ΔE / 0.25` as Loxone. Mock bench: `house_sim` advances these counters via ∫P·Δt.
+Reader: `integrations/ha_meter_energy.py` (via aggregated adapter entities). Same sampler anchors / `overlay_counter_on_closed` / `*_kw = ΔE / 0.25` as Loxone. Mock bench: `house_sim` advances these counters via ∫P·Δt.
