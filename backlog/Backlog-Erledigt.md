@@ -14,9 +14,9 @@ Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes �
 
 - [x] **2.6.b — Suggest-and-confirm HA binding (interim flat map).** `integrations/ha_ehal_mapping.py`: empty-only `heuristic_propose` (domain / `device_class` / unit / name tokens; no LLM; no overwrite of saved bindings). EHAL-Com HA mapping: scan → propose → confirm → save `ehal.ha.entities`. Scan rows expose attrs for scoring. Regression: `evcc_en` empty map matches golden; buffer temp / `switch.*` left out; ambiguous names empty. Tests: `tests/test_ha_ehal_mapping.py`. Interim until **2.6.g** / **2.6.h**. Spec cross-links: `docs/spec/ehal.md`, `docs/spec/house-sim.md`.
 
-### 2.6.a + HA Lab P1 — Developer bench (2026-09-22)
+### 2.6.a + HouseSim S1 — Developer bench (2026-09-22)
 
-- [x] **2.6.a + HA Lab P1 — Developer bench.** `house_sim/`: mock HA REST (`GET /api/states`, `GET /api/states/{id}`, `POST /api/services/{domain}/{service}` + Bearer) with fixture `evcc_en` (golden `ehal.ha.entities`, `switch.*` negative case, no WP). Short closed-loop stepper (SoC coulomb counter, synthetic PV kW series, optional `simulate_next_temp_c`). Pytest against live mock (`tests/test_house_sim_*`). Spec note: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md). Concept: [HA compatibility tests](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md).
+- [x] **2.6.a + HouseSim S1 — Developer bench.** `house_sim/`: mock HA REST (`GET /api/states`, `GET /api/states/{id}`, `POST /api/services/{domain}/{service}` + Bearer) with fixture `evcc_en` (golden `ehal.ha.entities`, `switch.*` negative case, no WP). Short closed-loop stepper (SoC coulomb counter, synthetic PV kW series, optional `simulate_next_temp_c`). Pytest against live mock (`tests/test_house_sim_*`). Spec note: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md). Concept: [HA compatibility tests](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md).
 
 ### 2.6 Phase 2 — HA/OpenEMS port UX + Loxone HTTP env override (2026-09-22)
 

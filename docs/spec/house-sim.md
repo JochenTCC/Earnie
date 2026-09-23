@@ -1,13 +1,13 @@
-# House simulator (`house_sim/`) — HA Lab P1 developer bench
+# House simulator (`house_sim/`) — HouseSim S1 developer bench
 
-**Status:** current (Energy-Optimizer **2.6.a** / HA Lab P1; bindings persist **2.6.g** Pattern B)  
+**Status:** current (Energy-Optimizer **2.6.a** / HouseSim S1; bindings persist **2.6.g** Pattern B)  
 **Purpose:** Fixture-based **mock** Home Assistant REST + short closed-loop physics so Earnie can exercise HA bindings locally.
 
 ## What this is (and is not)
 
 `house_sim` is a **mock for Home Assistant**, not a real running HA installation (not HAOS, not the Synology lab, not Compose `homeassistant`). It only implements the few REST endpoints `HaAdapter` needs, so you can **test bindings** (Pattern B `ehal_bindings` reads/writes, units, write-error degrade) without standing up HA.
 
-**Not the same as:** [`ha-lab-setup.md`](ha-lab-setup.md) / `ha_lab/` (Compose Earnie+HAOS+evcc). Do not put this simulator under `ha_lab/`.
+**Not the same as:** [`ha-lab-setup.md`](ha-lab-setup.md) / `ha_lab/` (Compose Earnie+HAOS+evcc = "HA Lab"). Do not put this simulator under `ha_lab/`. Simulator stages are **HouseSim S1–S4** (formerly "HA Lab P1–P4"); S4 = simulated house as HA custom integration (concept doc §5).
 
 **Concept (German):** [Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md)
 
@@ -22,7 +22,7 @@
 | `house_sim/stepper.py` | Few ticks: SoC coulomb counter, synthetic PV kW series, optional `simulate_next_temp_c`, cumulative PV/grid± energy (∫P·Δt → `total_increasing` kWh entities) |
 | Pytest | Real `HaAdapter` HTTP against the mock |
 
-Out of scope for P1: `simulation/engine.py::run_simulation()`, `data/pv_forecast.py`, fake clock in `main.py`, EV/heat-pump physics. Suggest-and-confirm (**2.6.b**) reuses this fixture: empty bindings + `entities.json` → heuristic fills the golden map’s obvious fields and leaves ambiguous ones (e.g. buffer temp) empty. Slot-Ist energy maps (**2.6.c**): golden keys `sens_pv_energy` / `sens_grid_energy_import` / `sens_grid_energy_export` (plant `ehal_bindings` after **2.6.g**).
+Out of scope for S1: `simulation/engine.py::run_simulation()`, `data/pv_forecast.py`, fake clock in `main.py`, EV/heat-pump physics. Suggest-and-confirm (**2.6.b**) reuses this fixture: empty bindings + `entities.json` → heuristic fills the golden map’s obvious fields and leaves ambiguous ones (e.g. buffer temp) empty. Slot-Ist energy maps (**2.6.c**): golden keys `sens_pv_energy` / `sens_grid_energy_import` / `sens_grid_energy_export` (plant `ehal_bindings` after **2.6.g**).
 
 ---
 

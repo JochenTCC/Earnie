@@ -1,4 +1,4 @@
-"""Load hand-authored archetype fixtures for the HA Lab bench."""
+"""Load hand-authored archetype fixtures for the HouseSim bench."""
 from __future__ import annotations
 
 import json

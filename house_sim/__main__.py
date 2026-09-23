@@ -15,7 +15,7 @@ from house_sim.stepper import run_ticks
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m house_sim",
-        description="HA Lab P1 developer bench: mock Home Assistant REST + short physics ticks.",
+        description="HouseSim S1 developer bench: mock Home Assistant REST + short physics ticks.",
     )
     parser.add_argument(
         "--fixture",

@@ -13,7 +13,7 @@
 | --- | --- |
 | [`docker/compose/ha-lab.yml`](../../docker/compose/ha-lab.yml) | Reference Compose |
 | [`ehal.md`](ehal.md) | Frozen EHAL contract + HA adapter notes |
-| [`house-sim.md`](house-sim.md) | **2.6.a / HA Lab P1** mock REST + closed-loop bench (`house_sim/`, not this Compose stack) |
+| [`house-sim.md`](house-sim.md) | **2.6.a / HouseSim S1** mock REST + closed-loop bench (`house_sim/`, not this Compose stack) |
 | [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) | Config fragment to merge into Earnie `config.json` |
 | [`ha_lab/evcc/evcc.yaml`](../../ha_lab/evcc/evcc.yaml) | Committed lab stub (const meters / demo charger) |
 | [`ha_lab/evcc/evcc.example.yaml`](../../ha_lab/evcc/evcc.example.yaml) | Commented Earnie-mode template |

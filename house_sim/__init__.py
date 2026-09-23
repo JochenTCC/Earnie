@@ -1,4 +1,4 @@
-"""HA Lab developer bench: mock HA REST + short closed-loop house physics."""
+"""HouseSim developer bench: mock HA REST + short closed-loop house physics."""
 
 from __future__ import annotations
 
