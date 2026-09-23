@@ -217,7 +217,7 @@ Fields map to known OpenEMS Edge channels (semantic reference). Channel architec
 - Adapter: `integrations/ha_adapter.py` (REST only: `/api/states`, `/api/services/...`). Prefer HA entities from evcc.
 - Config: `ehal.backend=ha` + `ehal.ha` (`base_url`, `token`, `entities`, optional `sign`). Snippet: `share/config/ehal.ha.snippet.json`.
 - Compose lab: `docker/compose/ha-lab.yml` (Earnie :8506 + HA :8123 + evcc :7070). Setup: [`ha-lab-setup.md`](ha-lab-setup.md). German A2/B: [`../einrichtung/ha-evcc.md`](../einrichtung/ha-evcc.md).
-- HITL mapping UI: Streamlit EHAL-Com expander → `ui/ehal_ha_mapping.py` (entity scan → persist mapping; **no LLM** in the shipping UI).
+- HITL mapping UI: Streamlit EHAL-Com expander → `ui/ehal_ha_mapping.py` (entity scan → **heuristic propose** for empty fields only → user confirms → persist `ehal.ha.entities`; **no LLM**). Heuristic: `integrations/ha_ehal_mapping.py` (domain / `device_class` / unit / name tokens).
 - Sign mode per field: `ehal` (already aligned) or `negate`. Units: kW states converted to W.
 - Setpoints: typically `number.set_value` on mapped entities (Amps for EVCS; W for ESS limits).
 - Optimizer exclusivity + single Modbus writer: see German checklist in `ha-evcc.md`.

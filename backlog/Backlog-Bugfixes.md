@@ -32,4 +32,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] Kosten Chart on page Monitor shows cost for the entire optimization horizon (SA_0 - SA_2). This is ambigous because when switching between days (at least in mobile mode) the user does not know if the values belong to the shown day or to the optimization horizon. The other ambiguity comes from the fact that during the day the already achieved cost reduction is "eaten" by the past grey area. 
+  - Show cost reduction always on a daily basis. When complete horizon is shown - split it into two value columns
+  - Show already achieved daily cost reductions in a separate line
+
 ## Document Review Findings (Do not remove this chapter — even if empty)

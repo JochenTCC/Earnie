@@ -152,6 +152,8 @@ class HaAdapter:
                     "domain": domain,
                     "state": item.get("state"),
                     "unit": attrs.get("unit_of_measurement"),
+                    "device_class": attrs.get("device_class"),
+                    "state_class": attrs.get("state_class"),
                     "friendly_name": attrs.get("friendly_name") or entity_id,
                 }
             )

@@ -22,7 +22,7 @@
 | `house_sim/stepper.py` | Few ticks: SoC coulomb counter, synthetic PV kW series, optional `simulate_next_temp_c` |
 | Pytest | Real `HaAdapter` HTTP against the mock |
 
-Out of scope for P1: `simulation/engine.py::run_simulation()`, `data/pv_forecast.py`, fake clock in `main.py`, EV/heat-pump physics, Suggest-and-confirm (**2.6.b**).
+Out of scope for P1: `simulation/engine.py::run_simulation()`, `data/pv_forecast.py`, fake clock in `main.py`, EV/heat-pump physics. Suggest-and-confirm (**2.6.b**) reuses this fixture: empty `ehal.ha.entities` + `entities.json` → heuristic fills the golden map’s obvious fields and leaves ambiguous ones (e.g. buffer temp) empty.
 
 ---
 

@@ -16,15 +16,34 @@ from integrations.ha_adapter import (
     HaConfig,
     HaHttpError,
 )
+from integrations.ha_ehal_mapping import (
+    EHAL_HA_FIELDS,
+    heuristic_propose,
+    resolve_field_select_default,
+)
 from ui.house_config_io import load_main_config, save_main_config
 
 _NONE = "— nicht gemappt —"
 _SESSION_SCAN = "ehal_ha_scan_entities"
 _SESSION_SCAN_ERROR = "ehal_ha_scan_error"
+_SESSION_PROPOSALS = "ehal_ha_proposals"
 
 _FIELD_LABELS: dict[str, str] = role_field_labels()
 
 _SIGN_FIELDS = ("sens_grid_power_active", "sens_ess_power")
+
+
+def _clear_map_widget_keys() -> None:
+    """Drop selectbox keys so defaults re-seed from propose / saved map."""
+    for field in EHAL_HA_FIELDS:
+        st.session_state.pop(f"ehal_ha_map_{field}", None)
+
+
+def _proposed_entity_id(proposals: dict[str, dict[str, Any]], field: str) -> str:
+    entry = proposals.get(field) if isinstance(proposals, dict) else None
+    if not isinstance(entry, dict):
+        return ""
+    return str(entry.get("entity_id") or "").strip()
 
 
 def _ha_block(data: dict) -> dict[str, Any]:
@@ -82,11 +101,15 @@ def _select_entity(
     meaning = _FIELD_LABELS.get(field, field)
     suffix = " *" if required else ""
     choice = current if current in options else _NONE
+    key = f"ehal_ha_map_{field}"
+    # Streamlit keyed selectbox ignores index= after first registration; seed
+    # session_state explicitly so scan→propose can re-bind empty fields.
+    if key not in st.session_state or st.session_state.get(key) not in options:
+        st.session_state[key] = choice
     selected = st.selectbox(
         f"{meaning} (`{field}`){suffix}",
         options=options,
-        index=options.index(choice) if choice in options else 0,
-        key=f"ehal_ha_map_{field}",
+        key=key,
     )
     return "" if selected == _NONE else str(selected)
 
@@ -101,9 +124,9 @@ def render_ehal_ha_mapping_section() -> None:
     )
 
     st.caption(
-        "Human-in-the-Loop: Entities scannen, EHAL-Felder zuweisen, speichern. "
-        "Bevorzugt stabile Entities von evcc unter HA. "
-        "LLM-gestützte Vorschläge gibt es für Loxone (Ollama) unter Backend Loxone."
+        "Human-in-the-Loop: Entities scannen → Heuristik schlägt leere Felder vor → "
+        "prüfen → Mapping speichern. Gespeicherte Bindings werden nicht überschrieben. "
+        "Kein LLM für HA (analog Loxone-Heuristik)."
     )
 
     data = load_main_config()
@@ -147,11 +170,15 @@ def render_ehal_ha_mapping_section() -> None:
 
     if st.button("Entities scannen", key="ehal_ha_scan_btn"):
         st.session_state.pop(_SESSION_SCAN_ERROR, None)
+        st.session_state.pop(_SESSION_PROPOSALS, None)
         try:
             scanned = _adapter_from_form(base_url, token, {}).list_mappable_entities()
             st.session_state[_SESSION_SCAN] = scanned
+            st.session_state[_SESSION_PROPOSALS] = heuristic_propose(scanned)
+            _clear_map_widget_keys()
         except (HaHttpError, ValueError, OSError) as exc:
             st.session_state[_SESSION_SCAN] = []
+            st.session_state[_SESSION_PROPOSALS] = {}
             st.session_state[_SESSION_SCAN_ERROR] = str(exc)
 
     scan_error = st.session_state.get(_SESSION_SCAN_ERROR)
@@ -159,14 +186,32 @@ def render_ehal_ha_mapping_section() -> None:
         st.error(f"Scan fehlgeschlagen: {scan_error}")
 
     rows: list[dict[str, Any]] = list(st.session_state.get(_SESSION_SCAN) or [])
+    proposals: dict[str, dict[str, Any]] = dict(
+        st.session_state.get(_SESSION_PROPOSALS) or {}
+    )
     if rows:
         st.caption(f"{len(rows)} mappable Entities (sensor/number/select/input_number).")
+        empty_saved = sum(
+            1 for field in EHAL_HA_FIELDS if not str(current["entities"].get(field) or "")
+        )
+        proposed_for_empty = sum(
+            1
+            for field in EHAL_HA_FIELDS
+            if not str(current["entities"].get(field) or "")
+            and _proposed_entity_id(proposals, field)
+        )
+        if proposals:
+            st.caption(
+                f"Heuristik: {proposed_for_empty}/{empty_saved} leere Felder vorgeschlagen "
+                "(gespeicherte Bindings bleiben unberührt)."
+            )
         preview = [
             {
                 "entity_id": row["entity_id"],
                 "name": row.get("friendly_name"),
                 "state": row.get("state"),
                 "unit": row.get("unit"),
+                "device_class": row.get("device_class"),
             }
             for row in rows[:40]
         ]
@@ -184,9 +229,13 @@ def render_ehal_ha_mapping_section() -> None:
         caption = role_group_label(role_id) if role_id != "other" else "Weitere Telemetrie"
         st.markdown(f"**{caption}** (Telemetrie)")
         for field in fields:
+            default = resolve_field_select_default(
+                str(current["entities"].get(field) or ""),
+                _proposed_entity_id(proposals, field),
+            )
             mapped = _select_entity(
                 field,
-                current=str(current["entities"].get(field) or ""),
+                current=default,
                 options=options,
                 required=field in TELEMETRY_REQUIRED,
             )
@@ -197,9 +246,13 @@ def render_ehal_ha_mapping_section() -> None:
         caption = role_group_label(role_id) if role_id != "other" else "Weitere Setpoints"
         st.markdown(f"**{caption}** (Setpoints)")
         for field in fields:
+            default = resolve_field_select_default(
+                str(current["entities"].get(field) or ""),
+                _proposed_entity_id(proposals, field),
+            )
             mapped = _select_entity(
                 field,
-                current=str(current["entities"].get(field) or ""),
+                current=default,
                 options=options,
                 required=False,
             )

@@ -35,10 +35,14 @@ def _cfg(**kwargs) -> HaConfig:
     return HaConfig(**base)
 
 
-def _state(entity_id: str, state, unit=None):
+def _state(entity_id: str, state, unit=None, *, device_class=None, state_class=None):
     attrs = {}
     if unit is not None:
         attrs["unit_of_measurement"] = unit
+    if device_class is not None:
+        attrs["device_class"] = device_class
+    if state_class is not None:
+        attrs["state_class"] = state_class
     return {
         "entity_id": entity_id,
         "state": state,
@@ -163,7 +167,7 @@ def test_list_mappable_entities_filters_domains(get_mock):
     response = MagicMock()
     response.status_code = 200
     response.json.return_value = [
-        _state("sensor.grid", "1", "W"),
+        _state("sensor.grid", "1", "W", device_class="power", state_class="measurement"),
         _state("number.max_current", "16", "A"),
         {
             "entity_id": "light.kitchen",
@@ -177,3 +181,7 @@ def test_list_mappable_entities_filters_domains(get_mock):
     assert "sensor.grid" in ids
     assert "number.max_current" in ids
     assert "light.kitchen" not in ids
+    grid = next(row for row in rows if row["entity_id"] == "sensor.grid")
+    assert grid["device_class"] == "power"
+    assert grid["state_class"] == "measurement"
+    assert grid["unit"] == "W"
