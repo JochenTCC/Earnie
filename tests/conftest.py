@@ -34,22 +34,15 @@ def _apply_default_test_config_env() -> None:
     os.environ["EARNIE_CONFIG_PATH"] = str(DEFAULT_TEST_CONFIG_PATH)
     os.environ.setdefault("EARNIE_OFFLINE", "1")
     bt_dir = DEFAULT_TEST_CONFIG_PATH.parent
-    os.environ.setdefault(
-        "EARNIE_TARIFFS_PATH",
-        str(bt_dir / "tariffs.json"),
+    # Force-overwrite (not setdefault): after monkeypatch undo / xdist workers,
+    # leftover sidecar paths must not stick to a previous test's tmp_path.
+    os.environ["EARNIE_TARIFFS_PATH"] = str(bt_dir / "tariffs.json")
+    os.environ["EARNIE_HOUSE_PROFILES_PATH"] = str(bt_dir / "house_profiles.json")
+    os.environ["EARNIE_BACKTESTING_SCENARIOS_PATH"] = str(
+        bt_dir / "backtesting_scenarios.json"
     )
-    os.environ.setdefault(
-        "EARNIE_HOUSE_PROFILES_PATH",
-        str(bt_dir / "house_profiles.json"),
-    )
-    os.environ.setdefault(
-        "EARNIE_BACKTESTING_SCENARIOS_PATH",
-        str(bt_dir / "backtesting_scenarios.json"),
-    )
-    os.environ.setdefault(
-        "EARNIE_COMPONENTS_PATH",
-        str(bt_dir / "components.json"),
-    )
+    os.environ["EARNIE_COMPONENTS_PATH"] = str(bt_dir / "components.json")
+    os.environ.pop("EARNIE_DEVIATION_RULES_PATH", None)
 
 
 _apply_default_test_config_env()
@@ -129,7 +122,12 @@ def _bootstrap_test_config():
 
 @pytest.fixture(autouse=True)
 def _restore_default_test_config_after_test():
-    """Nach jedem Test zurück auf Fixture-Config (tmp_path-Overrides aus Einzeltests)."""
+    """Reset fixture env before/after each test; reinit after (xdist-safe).
+
+    Before: overwrite sidecar env left by the previous test's monkeypatch undo.
+    After: env + reinit once monkeypatch has torn down (outer autouse teardown).
+    """
+    _apply_default_test_config_env()
     yield
     _apply_default_test_config_env()
     _reinit_config_offline()

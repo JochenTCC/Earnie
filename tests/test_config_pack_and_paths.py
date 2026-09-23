@@ -32,10 +32,25 @@ _RUNTIME_ENV_KEYS = (
     "EARNIE_RUNTIME_PATH",
 )
 
+# conftest pins these to tests/fixtures/backtesting/ — clear for pack tests so
+# export/import never read/write the shared fixture tree (xdist races on Windows).
+_SIDECAR_ENV_KEYS = (
+    "EARNIE_TARIFFS_PATH",
+    "EARNIE_HOUSE_PROFILES_PATH",
+    "EARNIE_BACKTESTING_SCENARIOS_PATH",
+    "EARNIE_COMPONENTS_PATH",
+    "EARNIE_DEVIATION_RULES_PATH",
+)
+
 
 def _clear_runtime_overrides(monkeypatch) -> None:
     """Drop PATH overrides so runtime_dir() uses env_root()."""
     for key in _RUNTIME_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+
+def _clear_sidecar_path_overrides(monkeypatch) -> None:
+    for key in _SIDECAR_ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
 
 
@@ -116,6 +131,7 @@ def test_config_pack_round_trip(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.delenv("EARNIE_ENV_PATH", raising=False)
     monkeypatch.delenv("EARNIE_CONFIG_PATH", raising=False)
     _clear_runtime_overrides(monkeypatch)
+    _clear_sidecar_path_overrides(monkeypatch)
     cfg = tmp_path / "earnie_env" / "config"
     cfg.mkdir(parents=True)
     (tmp_path / "earnie_env" / "runtime").mkdir(parents=True)
@@ -180,6 +196,7 @@ def test_config_pack_rejects_v1_manifest(monkeypatch, tmp_path: Path) -> None:
     import io
 
     monkeypatch.chdir(tmp_path)
+    _clear_sidecar_path_overrides(monkeypatch)
     cfg = tmp_path / "earnie_env" / "config"
     cfg.mkdir(parents=True)
     monkeypatch.setenv("EARNIE_CONFIG_PATH", str(cfg))
@@ -202,6 +219,7 @@ def test_config_pack_rejects_bad_model(monkeypatch, tmp_path: Path) -> None:
     import io
 
     monkeypatch.chdir(tmp_path)
+    _clear_sidecar_path_overrides(monkeypatch)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr(

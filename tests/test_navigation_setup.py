@@ -37,6 +37,16 @@ def _write(path, payload):
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
+def _minimal_system_config(**extra) -> dict:
+    """Enough keys for config.reinit_config if a code path reloads mid-test."""
+    payload = {
+        "system": {"global_timeout": 10, "loop_timeout": 900},
+        "flexible_consumers": [],
+    }
+    payload.update(extra)
+    return payload
+
+
 def _write_live_scenario(config_dir: Path, settings: dict) -> None:
     _write(
         config_dir / "backtesting_scenarios.json",
@@ -57,7 +67,7 @@ def test_restricted_navigation_shows_only_setup_pages(tmp_path, monkeypatch):
     monkeypatch.delenv("LOXONE_IP", raising=False)
     monkeypatch.delenv("LOXONE_USER", raising=False)
     monkeypatch.delenv("LOXONE_PASS", raising=False)
-    _write(config_dir / "config.json", {"flexible_consumers": []})
+    _write(config_dir / "config.json", _minimal_system_config())
     _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
     _write(config_dir / "house_profiles.json", {"profiles": []})
     _write(
@@ -98,7 +108,7 @@ def test_restricted_navigation_defaults_to_smarthome_backend_when_live_environme
     monkeypatch.delenv("LOXONE_IP", raising=False)
     monkeypatch.delenv("LOXONE_USER", raising=False)
     monkeypatch.delenv("LOXONE_PASS", raising=False)
-    _write(config_dir / "config.json", {"flexible_consumers": []})
+    _write(config_dir / "config.json", _minimal_system_config())
     _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
     _write(config_dir / "house_profiles.json", {"profiles": []})
     _write(
@@ -128,7 +138,7 @@ def test_restricted_navigation_shows_daemon_pages_once_sb_configured(tmp_path, m
     monkeypatch.setenv("LOXONE_IP", "192.168.178.20")
     monkeypatch.setenv("LOXONE_USER", "earnie")
     monkeypatch.setenv("LOXONE_PASS", "secret")
-    _write(config_dir / "config.json", {"flexible_consumers": []})
+    _write(config_dir / "config.json", _minimal_system_config())
     _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
     _write(config_dir / "house_profiles.json", {"profiles": []})
     _write(
@@ -175,7 +185,9 @@ def test_general_nav_hides_daemon_pages_for_mature_config_without_backend(
     monkeypatch.delenv("LOXONE_PASS", raising=False)
     _write(
         config_dir / "config.json",
-        {"flexible_consumers": [{"id": "swimspa", "name": "SwimSpa"}]},
+        _minimal_system_config(
+            flexible_consumers=[{"id": "swimspa", "name": "SwimSpa"}]
+        ),
     )
     _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
     _write(config_dir / "house_profiles.json", {"profiles": []})
@@ -206,7 +218,9 @@ def test_general_nav_shows_daemon_pages_for_mature_config_once_sb_configured(
     monkeypatch.setenv("LOXONE_PASS", "secret")
     _write(
         config_dir / "config.json",
-        {"flexible_consumers": [{"id": "swimspa", "name": "SwimSpa"}]},
+        _minimal_system_config(
+            flexible_consumers=[{"id": "swimspa", "name": "SwimSpa"}]
+        ),
     )
     _write(config_dir / "components.json", {"batteries": [], "pv_systems": []})
     _write(config_dir / "house_profiles.json", {"profiles": []})
@@ -230,10 +244,10 @@ def test_scenario_editor_after_house_config_ready(tmp_path, monkeypatch):
     monkeypatch.delenv("LOXONE_PASS", raising=False)
     _write(
         config_dir / "config.json",
-        {
-            "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
-            "flexible_consumers": [],
-        },
+        _minimal_system_config(
+            live_scenario_id=DEFAULT_LIVE_SCENARIO_ID,
+            flexible_consumers=[],
+        ),
     )
     _write(
         config_dir / "components.json",
@@ -283,10 +297,10 @@ def test_scenario_explorer_visible_when_planning_ready(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
     _write(
         config_dir / "config.json",
-        {
-            "live_scenario_id": DEFAULT_LIVE_SCENARIO_ID,
-            "flexible_consumers": [],
-        },
+        _minimal_system_config(
+            live_scenario_id=DEFAULT_LIVE_SCENARIO_ID,
+            flexible_consumers=[],
+        ),
     )
     _write(
         config_dir / "components.json",

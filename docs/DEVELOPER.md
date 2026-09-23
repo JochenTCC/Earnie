@@ -39,7 +39,7 @@ python -m scripts.run_streamlit
 
 `requirements-dev.txt` installs the project from `pyproject.toml` (incl. `python-dotenv`, Streamlit, …) plus pytest. Use `python -m pip` so install always targets the active venv. If you see `No module named 'dotenv'`, the venv is missing deps or you are not using `.\.venv\Scripts\python.exe`.
 
-House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `house_config/geo_timezone.py` — no `timezonefinder`/`h3`. Run tests with `python -m pytest` or `python -m scripts.run_pytest` (thin wrapper used by pre-commit).
+House-profile timezone is derived from `land` (`AT`/`DE`/`CH` → IANA) in `house_config/geo_timezone.py` — no `timezonefinder`/`h3`. Run tests with `python -m pytest` or `python -m scripts.run_pytest` (thin wrapper used by pre-commit). With `pytest-xdist` (dev extra), `run_pytest` defaults to `-n auto` (multi-CPU); use `-n 0` for sequential debugging.
 
 ### Dev Container (optional)
 

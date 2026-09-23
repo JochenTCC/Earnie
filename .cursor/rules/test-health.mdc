@@ -10,7 +10,7 @@ Identify **potentially ineffective tests** (never fail but weak coverage / heavy
 
 ## Automatic (every code commit)
 
-Pre-commit (`.githooks/pre-commit`) runs `python -m scripts.run_pytest tests -q` (native pytest). JUnit → `.pytest_cache/test-metrics/junit-last.xml`, then:
+Pre-commit (`.githooks/pre-commit`) runs `python -m scripts.run_pytest tests -q` (native pytest; defaults to `-n auto` when pytest-xdist is installed). JUnit → `.pytest_cache/test-metrics/junit-last.xml`, then:
 
 ```powershell
 .venv\Scripts\python.exe -m scripts.test_health_report ingest
