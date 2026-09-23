@@ -11,8 +11,6 @@ from integrations.ehal_debug_mapping import (
     build_loxone_setpoint_io_index,
     expected_live_read_fields,
     expected_live_write_fields,
-    ha_setpoint_mapping,
-    ha_telemetry_mapping,
     is_live_read_field,
     is_live_write_field,
     loxone_write_field_to_io,
@@ -60,7 +58,9 @@ def mapping_column_label() -> str:
 
 def _network_write_mapping() -> dict[str, str]:
     if config.is_ehal_ha_backend():
-        return ha_setpoint_mapping(config.get("EHAL_HA_ENTITIES") or {})
+        from integrations.ehal_debug_mapping import ha_pattern_b_live_mapping
+
+        return ha_pattern_b_live_mapping()
     if config.is_ehal_openems_backend():
         return openems_setpoint_mapping(
             ess_component=str(config.get("EHAL_OPENEMS_ESS_COMPONENT") or "ess0"),
@@ -93,8 +93,9 @@ def _omitted_write_caption(raw_count: int, rows: list[dict[str, str]]) -> str | 
 
 def _telemetry_mapping_for_adapter(adapter: Any) -> dict[str, str]:
     if config.is_ehal_ha_backend():
-        entities = getattr(getattr(adapter, "cfg", None), "entities", None)
-        mapping = ha_telemetry_mapping(entities)
+        from integrations.ehal_debug_mapping import ha_pattern_b_live_mapping
+
+        mapping = ha_pattern_b_live_mapping()
         if "sens_power_consumers" not in mapping:
             mapping = dict(mapping)
             mapping["sens_power_consumers"] = "—(abgeleitet)"
@@ -175,12 +176,26 @@ def _render_ehal_telemetry_fragment() -> None:
         return
 
     st.caption(f"EHAL-Telemetrie · Stand **{read_at}**")
+    mapping = _telemetry_mapping_for_adapter(adapter)
+    telemetry_payload = dict(telemetry)
+    expected = None
+    if config.is_ehal_ha_backend():
+        from integrations.ehal_debug_mapping import (
+            expand_ha_telemetry_for_live,
+            expected_live_read_fields,
+        )
+        from ui.house_config_io import load_house_profiles
+
+        house = load_house_profiles()
+        telemetry_payload = expand_ha_telemetry_for_live(telemetry_payload, house)
+        expected = expected_live_read_fields(network_backend=False)
     st.dataframe(
         rows_with_mapping_column_label(
             build_telemetry_rows(
-                dict(telemetry),
+                telemetry_payload,
                 read_at,
-                mapping=_telemetry_mapping_for_adapter(adapter),
+                mapping=mapping,
+                expected_fields=expected,
             )
         ),
         width="stretch",

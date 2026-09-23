@@ -326,6 +326,118 @@ def ha_setpoint_mapping(entities: dict[str, str] | None) -> dict[str, str]:
     return out
 
 
+def _binding_map(raw: object) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        str(k): str(v).strip()
+        for k, v in raw.items()
+        if str(v or "").strip()
+    }
+
+
+def _consumers_from_house_doc(house_doc: dict) -> list[dict]:
+    """All consumers across profiles in a house_profiles document."""
+    profiles = house_doc.get("profiles")
+    out: list[dict] = []
+    if isinstance(profiles, dict):
+        iterable = profiles.values()
+    elif isinstance(profiles, list):
+        iterable = profiles
+    else:
+        return out
+    for profile in iterable:
+        if not isinstance(profile, dict):
+            continue
+        for consumer in profile.get("consumers") or []:
+            if isinstance(consumer, dict):
+                out.append(consumer)
+    return out
+
+
+def _ha_live_consumers(house_doc: dict | None) -> list[dict]:
+    """Live consumers with house bindings; house_doc-only when ids do not overlap."""
+    live: list[dict] = []
+    try:
+        live = _all_live_consumers()
+    except Exception:
+        live = []
+    if house_doc is None:
+        return live
+    house_consumers = _consumers_from_house_doc(house_doc)
+    if not live:
+        return house_consumers
+    by_id = {
+        str(c.get("id") or "").strip(): c
+        for c in house_consumers
+        if str(c.get("id") or "").strip()
+    }
+    live_ids = {str(c.get("id") or "").strip() for c in live if str(c.get("id") or "").strip()}
+    if by_id and not (live_ids & set(by_id)):
+        # Unit tests / fixtures whose consumer ids differ from ambient Live profile.
+        return house_consumers
+    return [by_id.get(str(c.get("id") or "").strip()) or c for c in live]
+
+
+def ha_pattern_b_live_mapping(house_doc: dict | None = None) -> dict[str, str]:
+    """Entity-centric EHAL-Feld → HA entity_id from Pattern B (2.6.h Live contract)."""
+    if house_doc is None:
+        from ui.house_config_io import load_house_profiles
+
+        house_doc = load_house_profiles()
+    out: dict[str, str] = {}
+    plant = house_doc.get("plant") if isinstance(house_doc.get("plant"), dict) else {}
+    for field, entity_id in _binding_map(plant.get("ehal_bindings")).items():
+        out[field] = entity_id
+    for consumer in _ha_live_consumers(house_doc):
+        cid = str(consumer.get("id") or "").strip()
+        if not cid:
+            continue
+        for field, entity_id in _binding_map(consumer.get("ehal_bindings")).items():
+            out[f"{cid}:{field}"] = entity_id
+    return out
+
+
+def expand_ha_telemetry_for_live(
+    telemetry: dict[str, Any],
+    house_doc: dict | None = None,
+) -> dict[str, Any]:
+    """Alias flat HA wire keys onto `{cid}:field` Live row ids; drop bare EV keys."""
+    flat = {str(k): v for k, v in telemetry.items()}
+    out: dict[str, Any] = dict(flat)
+    for consumer in _ha_live_consumers(house_doc):
+        cid = str(consumer.get("id") or "").strip()
+        if not cid or not _consumer_is_ev(consumer):
+            continue
+        for name in EV_LIVE_READ_FIELDS:
+            if name in flat:
+                out[f"{cid}:{name}"] = flat[name]
+    for name in EV_LIVE_READ_FIELDS:
+        out.pop(name, None)
+    return out
+
+
+def expand_ha_writes_for_live(
+    writes: list[dict[str, Any]],
+    house_doc: dict | None = None,
+) -> list[dict[str, Any]]:
+    """Rewrite flat EV setpoint field ids to `{cid}:field` for Live-Schreiben."""
+    ev_cid = ""
+    for consumer in _ha_live_consumers(house_doc):
+        cid = str(consumer.get("id") or "").strip()
+        if cid and _consumer_is_ev(consumer):
+            ev_cid = cid
+            break
+    out: list[dict[str, Any]] = []
+    for entry in writes:
+        row = dict(entry)
+        field = str(row.get("field") or "").strip()
+        if ev_cid and field in EV_LIVE_WRITE_FIELDS:
+            row["field"] = f"{ev_cid}:{field}"
+        out.append(row)
+    return out
+
+
 def parse_check_wert(detail: str, *, passed: bool) -> str:
     """Extract Wert from LoxoneCheck.detail when passed (``Wert=…`` / ``raw=…``)."""
     text = str(detail or "")

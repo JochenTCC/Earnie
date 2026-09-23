@@ -267,8 +267,19 @@ def build_ehal_write_rows(
     expected_fields: list[str] | None = None,
 ) -> list[dict[str, str]]:
     source = mapping if mapping is not None else _network_write_mapping()
+    write_entries = list(writes)
+    if expected_fields is None and config.is_ehal_ha_backend():
+        from integrations.ehal_debug_mapping import (
+            expand_ha_writes_for_live,
+            expected_live_write_fields,
+        )
+        from ui.house_config_io import load_house_profiles
+
+        house = load_house_profiles()
+        write_entries = expand_ha_writes_for_live(write_entries, house)
+        expected_fields = expected_live_write_fields(network_backend=False)
     by_field: dict[str, dict[str, Any]] = {}
-    for entry in writes:
+    for entry in write_entries:
         field = str(entry.get("field") or "").strip()
         if not is_live_write_field(field):
             continue

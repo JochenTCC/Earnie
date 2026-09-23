@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.h — HA EHAL-Com UX parity with Loxone (2026-09-23)
+
+- [x] **2.6.h — HA EHAL-Com UX parity with Loxone.** Entity picker first (plant + live-profile consumers), then only that entity’s EHAL fields; save via `apply_entity_bindings` (not giant form). Reuse Loxone HITL (`build_entity_rows` / role grouping / empty-only propose). Scan HA `/api/states` once per session; suggest-and-confirm never overwrites saved bindings; no LLM. Live-Lesen/Schreiben: entity-centric Mapping column from Pattern B. UI: `ui/ehal_ha_mapping.py`; Live helpers in `integrations/ehal_debug_mapping.py`. Tests: `tests/test_ehal_ha_mapping_entities.py` (+ HA / Live suite). Docs: `ehal-com.md`, `ehal.md`, `ha-evcc.md`.
+
 ### 2.6.g — HA bindings on Pattern B (2026-09-23)
 
 - [x] **2.6.g — HA bindings on Pattern B (`house_profiles`).** Flat `ehal.ha.entities` → `plant.ehal_bindings` / EV consumer `ehal_bindings` (same §C keys as Loxone). One-shot migrator in `house_config/ha_ehal_bindings.py` via `ensure_migrated` / CLI; strip flat entities; `sign` stays in `ehal.ha`. Live: `aggregate_ha_entities` → `get_ha_adapter` (legacy fallback if empty). HITL save writes Pattern B (`ui/ehal_ha_mapping.py`). Golden `evcc_en` map kept for heuristics; house_sim print/docs updated. Tests: `tests/test_ha_ehal_bindings.py` (+ HA suite). Docs: `ehal.md`, `ehal-com.md`, `house-sim.md`, `smarthome-backend-wahl.md`, `loxone-meter-energy-slot-ist.md`, snippet.

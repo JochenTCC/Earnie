@@ -260,7 +260,9 @@ Units and signs: see §B. Full role matrix: §C.
 
 ### HA Entity → EHAL Mapping
 
-Only with backend **Home Assistant**: scan entities, assign telemetry/setpoint fields, save into **`plant.ehal_bindings`** / **`consumers[].ehal_bindings`** (Pattern B, same storage as Loxone). Credentials and optional **`sign`** stay in `config.json` → `ehal.ha`. The fields are grouped by **device role** (grid / PV / battery / wallbox; templates under `share/ehal/roles/`). Entity-first picker UX is backlog **2.6.h**; until then the form still shows all plant-wire fields at once.
+Only with backend **Home Assistant**: entity-centric HITL (same Pattern B shape as Loxone **2.4.k**). Pick an entity first (**plant** + consumers from the live house profile), then assign only that entity’s EHAL fields (grouped by device role under `share/ehal/roles/`). **Save mapping** writes that entity’s `ehal_bindings` only. Credentials and optional **`sign`** (plant) stay in `config.json` → `ehal.ha`.
+
+Workflow: scan `/api/states` once per Streamlit session (button refreshes) → heuristic proposes **empty** fields only → confirm → save. Saved bindings are never overwritten by propose; **no LLM**. After save, Live-Lesen / Live-Schreiben use the same entity-centric `EHAL-Feld` + Mapping column contract as Loxone (`{consumer_id}:field` for consumers).
 
 Optional **energy counters** for slot Ist (ΔkWh → avg kW): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` on plant bindings (`device_class=energy`, preferably `state_class=total_increasing`). Heuristic proposes them empty-only like other fields. Spec: [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md) (HA section).
 
