@@ -57,7 +57,7 @@ def _empty_state() -> dict[str, Any]:
 
 
 def _default_read_energy() -> dict[str, dict[str, float]] | None:
-    """Loxone Meter totals for pv/grid and flex when backend is Loxone; else None."""
+    """Plant/flex energy totals: Loxone Meters or HA energy entities (2.6.c)."""
     try:
         import config
         from integrations import ehal_live
@@ -71,7 +71,16 @@ def _default_read_energy() -> dict[str, dict[str, float]] | None:
     except Exception as exc:  # noqa: BLE001
         logger.debug("power_interval_sampler: energy imports failed: %s", exc)
         return None
+    if ehal_live.is_ha_backend():
+        try:
+            from integrations.ha_meter_energy import read_ha_plant_energy
+
+            return read_ha_plant_energy()
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("power_interval_sampler: HA energy read failed: %s", exc)
+            return None
     if ehal_live.is_ehal_network_backend():
+        # OpenEMS (and other network backends): no energy side channel yet.
         return None
     if str(config.get("EHAL_BACKEND") or "loxone").strip().lower() not in (
         "",

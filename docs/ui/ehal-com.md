@@ -262,6 +262,8 @@ Units and signs: see §B. Full role matrix: §C.
 
 Only with backend **Home Assistant**: scan entities, assign telemetry/setpoint fields, save. The fields are grouped by **device role** (grid / PV / battery / wallbox; templates under `share/ehal/roles/`).
 
+Optional **energy counters** for slot Ist (ΔkWh → avg kW): `sens_pv_energy`, `sens_grid_energy_import`, `sens_grid_energy_export` (`device_class=energy`, preferably `state_class=total_increasing`). Heuristic proposes them empty-only like other fields. Spec: [loxone-meter-energy-slot-ist](../spec/loxone-meter-energy-slot-ist.md) (HA section).
+
 - Overview / HITL: [Home Assistant + evcc](../einrichtung/ha-evcc.md) (section *If marq24 / evcc is already connected in HA*)
 - Lab acceptance including stub values and table: [HA Lab Spec §5.1](../spec/ha-lab-setup.md#51-after-marq24-ha-evcc-is-connected-lab-follow-up)
 

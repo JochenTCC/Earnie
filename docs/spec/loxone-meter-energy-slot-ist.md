@@ -1,8 +1,8 @@
 # Loxone Meter energy for slot Ist (ΔkWh)
 
-**Status:** investigation complete — **Go** for Loxone-only side channel  
-**Date:** 2026-09-15  
-**Related:** [`efm-auto-sync-2.4.l.md`](efm-auto-sync-2.4.l.md), backlog **2.+1** energy counters / HA later under Improvements for HA-binding
+**Status:** investigation complete — **Go** for Loxone Meter side channel; **Go** for HA plant energy entities (**2.6.c**)  
+**Date:** 2026-09-15 (HA section 2026-09-23)  
+**Related:** [`efm-auto-sync-2.4.l.md`](efm-auto-sync-2.4.l.md), backlog **2.6.c** (HA plant), **2.+1** flex counters (Loxone done)
 
 ## Verdict
 
@@ -32,6 +32,18 @@
 
 ## Out of scope
 
-- HA / OpenEMS energy entities (later backlog under Improvements for HA-binding).
+- OpenEMS energy entities (no side channel yet).
 - Extending EHAL telemetry schema with cumulative kWh.
-- Battery on counters; shared-meter ΔE peel beyond sample mean.
+- Battery on counters; HA flex energy entities; shared-meter ΔE peel beyond sample mean.
+
+## HA plant energy entities (2.6.c)
+
+Separate optional maps in flat `ehal.ha.entities` (not on the power entity):
+
+| Field | Role |
+| --- | --- |
+| `sens_pv_energy` | PV cumulative kWh (`total_increasing`) → channel `pv.total` |
+| `sens_grid_energy_import` | Grid import kWh → `grid.total` |
+| `sens_grid_energy_export` | Grid export kWh → `grid.total_neg` |
+
+Reader: `integrations/ha_meter_energy.py`. Same sampler anchors / `overlay_counter_on_closed` / `*_kw = ΔE / 0.25` as Loxone. Mock bench: `house_sim` advances these counters via ∫P·Δt.

@@ -11,6 +11,26 @@
       }
     },
     {
+      "entity_id": "sensor.evcc_grid_import_energy",
+      "state": "100.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc Grid Import Energy",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_grid_export_energy",
+      "state": "20.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc Grid Export Energy",
+        "state_class": "total_increasing"
+      }
+    },
+    {
       "entity_id": "sensor.evcc_pv_power",
       "state": "0.8",
       "attributes": {
@@ -18,6 +38,16 @@
         "unit_of_measurement": "kW",
         "friendly_name": "evcc PV Power",
         "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_pv_energy",
+      "state": "10.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc PV Energy",
+        "state_class": "total_increasing"
       }
     },
     {

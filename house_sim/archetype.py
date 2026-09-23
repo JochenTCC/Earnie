@@ -97,6 +97,9 @@ def project_physics_to_store(
         "sens_ess_power": ("ess_power_w", "W"),
         "sens_grid_power_active": ("grid_power_w", "W"),
         "sens_evcs_active_power": ("evcs_power_w", "W"),
+        "sens_pv_energy": ("pv_energy_kwh", "kWh"),
+        "sens_grid_energy_import": ("grid_import_energy_kwh", "kWh"),
+        "sens_grid_energy_export": ("grid_export_energy_kwh", "kWh"),
     }
     for field_name, (phys_key, _unit) in mapping.items():
         entity_id = entities.get(field_name)
@@ -107,6 +110,8 @@ def project_physics_to_store(
             store.set_state(entity_id, f"{float(value):.4f}")
         elif phys_key == "soc_pct":
             store.set_state(entity_id, f"{float(value):.2f}")
+        elif phys_key.endswith("_energy_kwh"):
+            store.set_state(entity_id, f"{float(value):.6f}")
         else:
             store.set_state(entity_id, f"{float(value):.1f}")
 

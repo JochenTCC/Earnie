@@ -17,6 +17,9 @@ class PhysicsState:
     grid_power_w: float
     load_kw: float
     evcs_power_w: float
+    pv_energy_kwh: float
+    grid_import_energy_kwh: float
+    grid_export_energy_kwh: float
     temp_c: float | None
     ambient_c: float | None
 
@@ -29,12 +32,29 @@ class PhysicsState:
             "grid_power_w": self.grid_power_w,
             "load_kw": self.load_kw,
             "evcs_power_w": self.evcs_power_w,
+            "pv_energy_kwh": self.pv_energy_kwh,
+            "grid_import_energy_kwh": self.grid_import_energy_kwh,
+            "grid_export_energy_kwh": self.grid_export_energy_kwh,
         }
         if self.temp_c is not None:
             out["temp_c"] = self.temp_c
         if self.ambient_c is not None:
             out["ambient_c"] = self.ambient_c
         return out
+
+
+def _fixture_energy_kwh(package: ArchetypePackage, field: str, default: float) -> float:
+    entity_id = str(package.ehal_entities.get(field) or "").strip()
+    if not entity_id:
+        return float(default)
+    for item in package.entities:
+        if str(item.get("entity_id") or "").strip() != entity_id:
+            continue
+        try:
+            return float(str(item.get("state") or default).replace(",", "."))
+        except ValueError:
+            return float(default)
+    return float(default)
 
 
 def initial_physics(package: ArchetypePackage) -> PhysicsState:
@@ -48,6 +68,13 @@ def initial_physics(package: ArchetypePackage) -> PhysicsState:
         grid_power_w=0.0,
         load_kw=float(params.get("load_kw", 1.0)),
         evcs_power_w=float(params.get("initial_evcs_power_w", 0.0)),
+        pv_energy_kwh=_fixture_energy_kwh(package, "sens_pv_energy", 0.0),
+        grid_import_energy_kwh=_fixture_energy_kwh(
+            package, "sens_grid_energy_import", 0.0
+        ),
+        grid_export_energy_kwh=_fixture_energy_kwh(
+            package, "sens_grid_energy_export", 0.0
+        ),
         temp_c=float(thermal["initial_temp_c"]) if thermal else None,
         ambient_c=float(thermal["ambient_c"]) if thermal else None,
     )
@@ -111,6 +138,11 @@ def step_physics(
     grid_kw = load_kw - pv_kw + ess_kw
     grid_power_w = grid_kw * 1000.0
 
+    # Cumulative energy (total_increasing): ∫P·Δt over this tick
+    pv_delta = max(0.0, float(pv_kw)) * float(dt_h)
+    import_delta = max(0.0, float(grid_kw)) * float(dt_h)
+    export_delta = max(0.0, -float(grid_kw)) * float(dt_h)
+
     temp_c = state.temp_c
     ambient_c = state.ambient_c
     thermal = package.house_params.get("thermal")
@@ -139,6 +171,9 @@ def step_physics(
         ess_power_w=ess_power_w,
         grid_power_w=grid_power_w,
         load_kw=load_kw,
+        pv_energy_kwh=state.pv_energy_kwh + pv_delta,
+        grid_import_energy_kwh=state.grid_import_energy_kwh + import_delta,
+        grid_export_energy_kwh=state.grid_export_energy_kwh + export_delta,
         temp_c=temp_c,
         ambient_c=ambient_c,
     )

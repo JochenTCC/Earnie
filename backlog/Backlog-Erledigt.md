@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.c — HA energy counters for slot Ist (2026-09-23)
+
+- [x] **2.6.c — Energy counters (ΔkWh) for slot Ist on the HA backend.** `house_sim` cumulative `total_increasing` PV/grid± energy (∫P·Δt). Flat optional maps `sens_pv_energy` / `sens_grid_energy_import` / `sens_grid_energy_export`. Reader `integrations/ha_meter_energy.py` → same `overlay_counter_on_closed` shape as Loxone; sampler `_default_read_energy` for HA. Heuristic empty-only propose for energy fields. Battery/flex stay on sample mean. Tests: `tests/test_ha_meter_energy.py`, stepper energy assert, golden map heuristic. Docs: `loxone-meter-energy-slot-ist.md`, `charts.md`, `ehal.md`, `ehal-com.md`, `house-sim.md`.
+
 ### 2.6.b — Suggest-and-confirm HA binding (2026-09-23)
 
 - [x] **2.6.b — Suggest-and-confirm HA binding (interim flat map).** `integrations/ha_ehal_mapping.py`: empty-only `heuristic_propose` (domain / `device_class` / unit / name tokens; no LLM; no overwrite of saved bindings). EHAL-Com HA mapping: scan → propose → confirm → save `ehal.ha.entities`. Scan rows expose attrs for scoring. Regression: `evcc_en` empty map matches golden; buffer temp / `switch.*` left out; ambiguous names empty. Tests: `tests/test_ha_ehal_mapping.py`. Interim until **2.6.g** / **2.6.h**. Spec cross-links: `docs/spec/ehal.md`, `docs/spec/house-sim.md`.

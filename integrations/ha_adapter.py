@@ -34,6 +34,12 @@ TELEMETRY_OPTIONAL = (
     "sens_evcs_active_power",
     "sens_power_consumers",
 )
+# Slot-Ist ΔkWh side channel (2.6.c) — not part of EHAL telemetry wire.
+TELEMETRY_ENERGY_OPTIONAL = (
+    "sens_pv_energy",
+    "sens_grid_energy_import",
+    "sens_grid_energy_export",
+)
 SETPOINT_FIELDS = (
     "set_ess_active_power",
     "set_ess_charge_power_limit",

@@ -10,6 +10,7 @@ from ehal.models import canonicalize_ha_entity_keys
 from integrations.ehal_live import reset_adapter_cache
 from integrations.ha_adapter import (
     SETPOINT_FIELDS,
+    TELEMETRY_ENERGY_OPTIONAL,
     TELEMETRY_OPTIONAL,
     TELEMETRY_REQUIRED,
     HaAdapter,
@@ -238,6 +239,25 @@ def render_ehal_ha_mapping_section() -> None:
                 current=default,
                 options=options,
                 required=field in TELEMETRY_REQUIRED,
+            )
+            if mapped:
+                entities[field] = mapped
+
+    for role_id, fields in group_fields_by_role(TELEMETRY_ENERGY_OPTIONAL):
+        caption = (
+            role_group_label(role_id) if role_id != "other" else "Weitere Energiezähler"
+        )
+        st.markdown(f"**{caption}** (Energiezähler für Slot-Ist ΔkWh, optional)")
+        for field in fields:
+            default = resolve_field_select_default(
+                str(current["entities"].get(field) or ""),
+                _proposed_entity_id(proposals, field),
+            )
+            mapped = _select_entity(
+                field,
+                current=default,
+                options=options,
+                required=False,
             )
             if mapped:
                 entities[field] = mapped

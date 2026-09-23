@@ -19,10 +19,10 @@
 | --- | --- |
 | `house_sim/fixtures/evcc_en/` | One hand-authored archetype + golden `ehal.ha.entities` (Mode A) |
 | `house_sim/mock_rest.py` | `GET /api/states`, `GET /api/states/{id}`, `POST /api/services/{domain}/{service}` + Bearer |
-| `house_sim/stepper.py` | Few ticks: SoC coulomb counter, synthetic PV kW series, optional `simulate_next_temp_c` |
+| `house_sim/stepper.py` | Few ticks: SoC coulomb counter, synthetic PV kW series, optional `simulate_next_temp_c`, cumulative PV/grid± energy (∫P·Δt → `total_increasing` kWh entities) |
 | Pytest | Real `HaAdapter` HTTP against the mock |
 
-Out of scope for P1: `simulation/engine.py::run_simulation()`, `data/pv_forecast.py`, fake clock in `main.py`, EV/heat-pump physics. Suggest-and-confirm (**2.6.b**) reuses this fixture: empty `ehal.ha.entities` + `entities.json` → heuristic fills the golden map’s obvious fields and leaves ambiguous ones (e.g. buffer temp) empty.
+Out of scope for P1: `simulation/engine.py::run_simulation()`, `data/pv_forecast.py`, fake clock in `main.py`, EV/heat-pump physics. Suggest-and-confirm (**2.6.b**) reuses this fixture: empty `ehal.ha.entities` + `entities.json` → heuristic fills the golden map’s obvious fields and leaves ambiguous ones (e.g. buffer temp) empty. Slot-Ist energy maps (**2.6.c**): golden keys `sens_pv_energy` / `sens_grid_energy_import` / `sens_grid_energy_export`.
 
 ---
 

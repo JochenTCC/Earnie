@@ -1,19 +1,23 @@
-"""HA entity → EHAL field heuristic propose (2.6.b). No LLM."""
+"""HA entity → EHAL field heuristic propose (2.6.b / 2.6.c). No LLM."""
 from __future__ import annotations
 
 from typing import Any
 
 from integrations.ha_adapter import (
     SETPOINT_FIELDS,
+    TELEMETRY_ENERGY_OPTIONAL,
     TELEMETRY_OPTIONAL,
     TELEMETRY_REQUIRED,
     WRITE_DOMAINS,
 )
 
-EHAL_HA_FIELDS = TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + SETPOINT_FIELDS
+EHAL_HA_FIELDS = (
+    TELEMETRY_REQUIRED + TELEMETRY_OPTIONAL + TELEMETRY_ENERGY_OPTIONAL + SETPOINT_FIELDS
+)
 
 _SENSOR_DOMAINS = frozenset({"sensor"})
 _WRITE_DOMAINS = WRITE_DOMAINS
+_ENERGY_EXCLUDE = ("energy", "ertrag", "kwh", "wh ")
 
 # Per-field: name hints, allowed domains, optional device_class / unit boosts.
 _FIELD_RULES: dict[str, dict[str, Any]] = {
@@ -22,12 +26,14 @@ _FIELD_RULES: dict[str, dict[str, Any]] = {
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("power",),
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
+        "exclude_hints": _ENERGY_EXCLUDE,
     },
     "sens_pv_production_active": {
         "hints": ("pv", "solar", "produktion", "erzeug"),
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("power",),
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
+        "exclude_hints": _ENERGY_EXCLUDE,
     },
     "sens_ess_soc": {
         "hints": ("soc", "ladezustand", "battery_soc", "batterie_soc"),
@@ -40,7 +46,8 @@ _FIELD_RULES: dict[str, dict[str, Any]] = {
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("power",),
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
-        "exclude_hints": ("soc", "grid", "pv", "loadpoint", "charge_power"),
+        "exclude_hints": ("soc", "grid", "pv", "loadpoint", "charge_power")
+        + _ENERGY_EXCLUDE,
     },
     "sens_evcs_active_power": {
         "hints": (
@@ -54,12 +61,52 @@ _FIELD_RULES: dict[str, dict[str, Any]] = {
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("power",),
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
+        "exclude_hints": _ENERGY_EXCLUDE,
     },
     "sens_power_consumers": {
         "hints": ("hauslast", "house_load", "house load", "verbraucher", "home_power"),
         "domains": _SENSOR_DOMAINS,
         "device_classes": ("power",),
         "units": ("w", "kw", "watt", "kilowatt", "kilowatts"),
+        "exclude_hints": _ENERGY_EXCLUDE,
+    },
+    "sens_pv_energy": {
+        "hints": ("pv_energy", "pv energy", "solar energy", "solar_energy", "ertrag"),
+        "domains": _SENSOR_DOMAINS,
+        "device_classes": ("energy",),
+        "state_classes": ("total_increasing",),
+        "units": ("kwh", "wh", "kilowatt-hour", "kilowatt-hours", "watt-hour", "watt-hours"),
+        "exclude_hints": ("grid", "import", "export", "battery", "loadpoint"),
+    },
+    "sens_grid_energy_import": {
+        "hints": (
+            "grid_import",
+            "import_energy",
+            "grid import",
+            "netzbezug",
+            "bezug_energy",
+            "energy_from_grid",
+        ),
+        "domains": _SENSOR_DOMAINS,
+        "device_classes": ("energy",),
+        "state_classes": ("total_increasing",),
+        "units": ("kwh", "wh", "kilowatt-hour", "kilowatt-hours", "watt-hour", "watt-hours"),
+        "exclude_hints": ("export", "einspeis", "pv", "solar", "battery"),
+    },
+    "sens_grid_energy_export": {
+        "hints": (
+            "grid_export",
+            "export_energy",
+            "grid export",
+            "einspeis",
+            "feed_in",
+            "energy_to_grid",
+        ),
+        "domains": _SENSOR_DOMAINS,
+        "device_classes": ("energy",),
+        "state_classes": ("total_increasing",),
+        "units": ("kwh", "wh", "kilowatt-hour", "kilowatt-hours", "watt-hour", "watt-hours"),
+        "exclude_hints": ("import", "bezug", "pv", "solar", "battery"),
     },
     "set_ess_active_power": {
         "hints": ("active_power", "sollleistung", "ess setpoint", "ziel leistung"),
@@ -143,6 +190,7 @@ def _normalize_row(row: dict[str, Any]) -> dict[str, Any]:
         domain = entity_id.split(".", 1)[0].lower()
     unit = str(row.get("unit") or "").strip().lower()
     device_class = str(row.get("device_class") or "").strip().lower()
+    state_class = str(row.get("state_class") or "").strip().lower()
     friendly = str(row.get("friendly_name") or entity_id).strip()
     name_blob = f"{entity_id} {friendly}".lower().replace(".", " ").replace("_", " ")
     # Also keep underscored form for token hints like charge_limit
@@ -152,6 +200,7 @@ def _normalize_row(row: dict[str, Any]) -> dict[str, Any]:
         "domain": domain,
         "unit": unit,
         "device_class": device_class,
+        "state_class": state_class,
         "name_blob": name_blob,
         "name_raw": name_raw,
     }
@@ -169,6 +218,9 @@ def _score_row(row: dict[str, Any], rules: dict[str, Any]) -> float:
     device_classes = rules.get("device_classes") or ()
     if device_classes and row["device_class"] in device_classes:
         score = max(score, 0.45) + 0.15
+    state_classes = rules.get("state_classes") or ()
+    if state_classes and row["state_class"] in state_classes:
+        score += 0.10
     units = rules.get("units") or ()
     if units and row["unit"] in units:
         score += 0.10

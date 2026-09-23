@@ -46,8 +46,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 #### Features
 
-- [ ] **2.6.c — Energy counters (ΔkWh) for slot Ist on the HA backend.** After the mock can move a cumulative kWh value. Prefer cumulative / `total_increasing` energy entities for grid± / PV when mapped. Same chart contract as Loxone (avg power = ΔE / slot Δt); battery/flex may stay on sampled mean. Energy sensors are separate entities from the power entity, so mapping comes from **2.6.b** (or today's manual map; later Pattern B). Combines with `closed_interval` / sampler — not a replacement for daemon metering.
-
 ##### HA Lab P2–P4 — more archetypes (after the bench; does not gate 2.6.b–c)
 
 `house_config` supplies physics parameters only; entity IDs come from the archetype. No real customer HA install. Same spec as **2.6.a**.

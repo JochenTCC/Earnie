@@ -71,3 +71,25 @@ def test_thermal_tick_moves_temp():
     assert store.numeric_state("sensor.house_sim_buffer_temp") == pytest.approx(
         nxt.temp_c
     )
+
+
+def test_energy_counters_accumulate_and_project():
+    package = load_archetype("evcc_en")
+    store = package.build_store()
+    state = initial_physics(package)
+    assert state.pv_energy_kwh == pytest.approx(10.0)
+    assert state.grid_import_energy_kwh == pytest.approx(100.0)
+    assert state.grid_export_energy_kwh == pytest.approx(20.0)
+    # load 1.5 kW, pv series tick1=1.2 → grid_kw = 1.5 - 1.2 = 0.3 (import)
+    nxt = step_physics(state, package=package, store=store, dt_h=0.25)
+    assert nxt.pv_kw == pytest.approx(1.2)
+    assert nxt.pv_energy_kwh == pytest.approx(10.0 + 1.2 * 0.25)
+    assert nxt.grid_import_energy_kwh == pytest.approx(100.0 + 0.3 * 0.25)
+    assert nxt.grid_export_energy_kwh == pytest.approx(20.0)
+    project_physics_to_store(store, package=package, physics=nxt.as_dict())
+    assert store.numeric_state("sensor.evcc_pv_energy") == pytest.approx(
+        nxt.pv_energy_kwh
+    )
+    assert store.numeric_state("sensor.evcc_grid_import_energy") == pytest.approx(
+        nxt.grid_import_energy_kwh
+    )
