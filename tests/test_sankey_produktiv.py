@@ -53,6 +53,20 @@ def test_caption_keeps_soll_hint_when_stale():
     assert "Soll-Werte aus diesem Lauf" in caption
 
 
+def test_caption_without_produktiv_uses_backend_label(monkeypatch):
+    monkeypatch.setattr(produktiv, "active_ehal_backend", lambda: "ha")
+    monkeypatch.setattr(produktiv, "backend_label", lambda b: "Home Assistant")
+    caption = produktiv.produktiv_caption(None)
+    assert "Home Assistant" in caption
+    assert "Loxone" not in caption
+
+
+def test_battery_node_label_tolerates_none_soc():
+    label = produktiv.battery_node_label(None, 1.5, _state())
+    assert "SoC —" in label
+    assert "live Entladen" in label
+
+
 def test_flex_sankey_link_uses_placeholder_when_inactive_with_soll():
     sink_sum = 1.0
     link_kw, is_placeholder = produktiv.flex_sankey_link(

@@ -80,6 +80,21 @@ def needs_loxone_setup() -> bool:
     return not hub_credentials_configured()
 
 
+def deferred_loxone_blocks_live() -> bool:
+    """True when main must wait for LOXONE_* before entering the live loop.
+
+    Greenfield may defer Loxone credentials during planning. That wait must
+    not apply when the active EHAL hub is HA/OpenEMS (network backends).
+    """
+    if not loxone_setup_deferred():
+        return False
+    if loxone_credentials_configured():
+        return False
+    from runtime_store.ehal_setup import is_network_backend
+
+    return not is_network_backend()
+
+
 def require_loxone_credentials_for_config() -> bool:
     """Ob config.Config Loxone-Variablen zwingend laden soll."""
     if is_effective_offline():

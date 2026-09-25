@@ -1,0 +1,122 @@
+cloud_pass:
+  name: Cloud pass
+  description: Scale PV for N minutes (simulates a cloud).
+  fields:
+    minutes:
+      name: Minutes
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 240
+          unit_of_measurement: min
+    scale:
+      name: PV scale factor
+      default: 0.2
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.05
+
+car_arrives:
+  name: Car arrives
+  description: Set wallbox charge power (scenario override, no EV SoC model).
+  fields:
+    power_w:
+      name: Charge power
+      default: 7000
+      selector:
+        number:
+          min: 0
+          max: 22000
+          unit_of_measurement: W
+
+car_leaves:
+  name: Car leaves
+  description: Clear wallbox charge power override.
+
+load_spike:
+  name: Load spike
+  description: Add temporary house load.
+  fields:
+    minutes:
+      name: Minutes
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 240
+          unit_of_measurement: min
+    extra_kw:
+      name: Extra load
+      default: 3
+      selector:
+        number:
+          min: 0
+          max: 50
+          unit_of_measurement: kW
+
+set_soc:
+  name: Set battery SoC
+  description: Force battery state of charge.
+  fields:
+    soc_pct:
+      name: SoC
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+
+set_unavailable:
+  name: Set entity unavailable
+  description: Mark an entity unavailable for N minutes.
+  fields:
+    entity_id:
+      name: Entity
+      required: true
+      selector:
+        entity: {}
+    minutes:
+      name: Minutes
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 120
+          unit_of_measurement: min
+
+reject_writes:
+  name: Reject writes
+  description: Make number/switch writes fail (Earnie write-error path).
+  fields:
+    enabled:
+      name: Enabled
+      default: true
+      selector:
+        boolean: {}
+
+setpoint_lag:
+  name: Setpoint lag
+  description: Delay setpoint application by N seconds.
+  fields:
+    seconds:
+      name: Seconds
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: s
+
+unit_flip:
+  name: Unit flip
+  description: Report PV power in W while attributes stay kW (unit test).
+  fields:
+    enabled:
+      name: Enabled
+      default: true
+      selector:
+        boolean: {}

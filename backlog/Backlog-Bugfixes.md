@@ -32,6 +32,8 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
+- [ ] **EHAL-Com — HA credentials editable without dedicated save.** On the EHAL-Com HA mapping UI (`ui/ehal_ha_mapping.py`), URL / token / `adapter_id` can be changed and used immediately for **Entities scannen** / live read, but they are only persisted into `ehal.ha` when the **entity mapping** is saved (`_save_entity_mapping`). There is no standalone “Speichern” for credentials on that page (unlike `ui/ehal_connection.py` on Smarthome-Backend). Reload or leave page → edited credentials are lost; easy to think “binding worked” when only the widget value changed. Fix: add explicit credentials save (and ideally a short connectivity probe), or stop duplicating credential fields on EHAL-Com and deep-link to the connection form.
+- [ ] "debug-dumps\debug_dump_20260923_201155"
 - [ ] Kosten Chart on page Monitor shows cost for the entire optimization horizon (SA_0 - SA_2). This is ambigous because when switching between days (at least in mobile mode) the user does not know if the values belong to the shown day or to the optimization horizon. The other ambiguity comes from the fact that during the day the already achieved cost reduction is "eaten" by the past grey area. 
   - Show cost reduction always on a daily basis. When complete horizon is shown - split it into two value columns
   - Show already achieved daily cost reductions in a separate line

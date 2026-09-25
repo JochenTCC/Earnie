@@ -6,8 +6,9 @@ import plotly.graph_objects as go
 
 import config
 from data import live_consumption
-from integrations import loxone_client
+from integrations import ehal_live
 from runtime_store import run_state
+from runtime_store.ehal_setup import active_ehal_backend, backend_label
 from ui.fragment_refresh import STATUS_FRAGMENT_RUN_EVERY
 from ui.runtime_config import reload_runtime_config
 from ui import sankey_produktiv as produktiv
@@ -54,13 +55,16 @@ def _battery_color(battery_kw: float) -> str:
     return SANKEY_BATTERY_IDLE_COLOR
 
 
-def _live_battery_label(current_soc: float, battery_kw: float) -> str:
+def _live_battery_label(current_soc: float | None, battery_kw: float) -> str:
+    soc_txt = f"{float(current_soc):.1f} %" if current_soc is not None else "SoC —"
     if battery_kw >= 0:
-        return f"🔋 Batterie ({current_soc:.1f} % - Entladen: {battery_kw:.2f} kW)"
-    return f"🔋 Batterie ({current_soc:.1f} % - Laden: {abs(battery_kw):.2f} kW)"
+        return f"🔋 Batterie ({soc_txt} - Entladen: {battery_kw:.2f} kW)"
+    return f"🔋 Batterie ({soc_txt} - Laden: {abs(battery_kw):.2f} kW)"
 
 
-def _battery_label(current_soc: float, battery_kw: float, main_state: dict | None) -> str:
+def _battery_label(
+    current_soc: float | None, battery_kw: float, main_state: dict | None
+) -> str:
     if produktiv.has_produktiv_run(main_state):
         return produktiv.battery_node_label(current_soc, battery_kw, main_state)
     return _live_battery_label(current_soc, battery_kw)
@@ -210,7 +214,7 @@ def _sankey_breakdown_consumers() -> list[dict]:
 
 def _prepare_sankey_data(
     data: dict,
-    current_soc: float,
+    current_soc: float | None,
     breakdown: dict | None = None,
     main_state: dict | None = None,
 ) -> tuple[list[str], _SankeyLinks, list[str]]:
@@ -321,7 +325,7 @@ def _sankey_height(breakdown: dict | None, main_state: dict | None) -> int:
 
 def _create_live_flow_sankey(
     data: dict,
-    current_soc: float,
+    current_soc: float | None,
     breakdown: dict | None = None,
     main_state: dict | None = None,
 ) -> go.Figure:
@@ -367,7 +371,7 @@ def _create_live_flow_sankey(
 
 
 @st.fragment(run_every=STATUS_FRAGMENT_RUN_EVERY)
-def render_live_power_flow(current_soc: float) -> None:
+def render_live_power_flow(current_soc: float | None) -> None:
     """Rendert die Live-Leistungsfluss-Ansicht mit CSS-Fix gegen den Text-Glow."""
     reload_runtime_config()
     st.write("### ⚡ Energiefluss (Live)")
@@ -388,9 +392,12 @@ def render_live_power_flow(current_soc: float) -> None:
         unsafe_allow_html=True,
     )
 
-    data = loxone_client.fetch_loxone_live_power()
+    data = ehal_live.read_live_power_kw()
     if data is None:
-        st.warning("⚠️ Live-Leistungswerte konnten nicht von Loxone geladen werden.")
+        label = backend_label(active_ehal_backend())
+        st.warning(
+            f"⚠️ Live-Leistungswerte konnten nicht von {label} geladen werden."
+        )
         return
 
     # Always resolve live flex (incl. known Merker) so Sankey is not stuck on a

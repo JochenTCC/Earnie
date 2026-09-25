@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-import config
-from integrations import loxone_client
+from integrations import ehal_live
 from ui.auto_refresh import setup_auto_refresh
 from ui.countdown import render_countdown_block
 from ui.help_hint import render_page_title_with_help
@@ -49,7 +48,7 @@ def render() -> None:
     )
     _render_absent_mode_hint()
 
-    current_soc = loxone_client.fetch_loxone_generic_value(config.get("LOXONE_SOC_NAME"))
+    current_soc = ehal_live.read_ess_soc()
     render_optimization_savings_and_chart(current_soc)
     render_live_power_flow(current_soc)
     render_countdown_block()

@@ -574,8 +574,7 @@ if __name__ == "__main__":
     start_loxone_request_http(config.get_ehal_loxone_http_port())
 
     from runtime_store.dotenv_io import (
-        loxone_credentials_configured,
-        loxone_setup_deferred,
+        deferred_loxone_blocks_live,
         needs_loxone_setup,
     )
     from runtime_store.dotenv_loader import load_app_dotenv
@@ -603,7 +602,7 @@ if __name__ == "__main__":
             config.reinit_config()
             continue
 
-        if loxone_setup_deferred() and not loxone_credentials_configured():
+        if deferred_loxone_blocks_live():
             log_setup_gate_wait(
                 _setup_gate_state,
                 "loxone_deferred",

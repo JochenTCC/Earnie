@@ -1,0 +1,25 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Earnie House Simulator",
+        "description": "Pick an archetype and PV source. Weather mode requires a weather entity with cloud_coverage.",
+        "data": {
+          "archetype": "Archetype",
+          "pv_source": "PV source",
+          "pv_kwp": "PV peak power (kWp)",
+          "update_interval_s": "Tick interval (seconds)",
+          "weather_entity_id": "Weather entity"
+        }
+      }
+    },
+    "error": {
+      "weather_required": "Select a weather entity when PV source is weather.",
+      "weather_no_cloud_coverage": "That weather entity has no cloud_coverage attribute."
+    },
+    "abort": {
+      "no_archetypes": "No archetype fixtures found under fixtures/.",
+      "already_configured": "This archetype is already configured."
+    }
+  }
+}

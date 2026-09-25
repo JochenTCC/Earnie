@@ -2,6 +2,14 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### HouseSim S4 — HAOS acceptance verified (2026-09-25)
+
+- [x] **HouseSim S4 — HAOS acceptance** (concept §5 Abnahme; Spec [`docs/spec/house-sim.md`](../docs/spec/house-sim.md) § S4). Verified on live HA: sync/copy integration → restart; config flow `evcc_en` (+ weather PV); Earnie `ehal.backend=ha` via **2.6.h** EHAL-Com; read path (PV/SoC/grid±/counters — early wrong EVCS/PV bindings corrected); faults (`reject_writes` / `set_unavailable`); HA restart keeps energy counters monotonic. **Deferred:** Write path (battery setpoint → SoC/grid next tick) — to be covered by a new testing feature in [Backlog.md](Backlog.md) (not re-opened here).
+
+### HouseSim S4 — Simulated house as HA custom integration (2026-09-24)
+
+- [x] **HouseSim S4 — Simulated house as HA custom integration.** Optional follow-up after **2.6.h** (no S2/S3). Custom integration `earnie_house_sim` for Synology HAOS / `ha_lab/haos-docker`: config flow (archetype + PV source), coordinator ticks pure core on wall clock, native `sensor` / `number` / `switch` with archetype IDs (fixture `input_number.ess_*` → `number.ess_*`), one HA device per component. Shared core `house_sim/core/` (no HA/Earnie imports; thermal Euler + weather PV + scenario overlay); used by mock REST and integration. Packaging variant 1: `scripts/sync_house_sim_integration.py` → `_core/` + `fixtures/` (generated); pytest equality + import-isolation. Energy counters `total_increasing` persisted; PV from HA `weather` `cloud_coverage` or synthetic series; services for scenarios/faults. Earnie via **2.6.h** UI unchanged. Code home `house_sim/ha_integration/custom_components/earnie_house_sim/`. Spec: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md). Live HAOS acceptance → verified 2026-09-25 (Write deferred to new Backlog testing feature).
+
 ### 2.6.h — HA EHAL-Com UX parity with Loxone (2026-09-23)
 
 - [x] **2.6.h — HA EHAL-Com UX parity with Loxone.** Entity picker first (plant + live-profile consumers), then only that entity’s EHAL fields; save via `apply_entity_bindings` (not giant form). Reuse Loxone HITL (`build_entity_rows` / role grouping / empty-only propose). Scan HA `/api/states` once per session; suggest-and-confirm never overwrites saved bindings; no LLM. Live-Lesen/Schreiben: entity-centric Mapping column from Pattern B. UI: `ui/ehal_ha_mapping.py`; Live helpers in `integrations/ehal_debug_mapping.py`. Tests: `tests/test_ehal_ha_mapping_entities.py` (+ HA / Live suite). Docs: `ehal-com.md`, `ehal.md`, `ha-evcc.md`.

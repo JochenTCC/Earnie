@@ -11,7 +11,7 @@ Gilt für die Seite **Monitor** (Sunset-2-Sunset, `ui/simulation_results.py`, `u
 | Menü | `st.navigation`: Abschnitte Live-Cockpit, Konfiguration, Daemon Control |
 | Charts | Chart 1 → Navigation ←/→ → Chart 2 |
 | Darunter | Simulations-Tabelle, Energievergleich (Expander) |
-| Sankey | Live-Energiefluss (Loxone) |
+| Sankey | Live-Energiefluss (aktives Smarthome-Backend) |
 | Footer | Trennlinie → **Datenbasis** (Expander, Log-Pfad) → Optimierungs-Takt / Countdown |
 
 Bei Wartezeit auf **main.py**: blauer Sync-Hinweis **über** den Charts (Countdown + **?**); im Footer zusätzlich **?** beim nächsten main.py-Takt.
@@ -144,7 +144,7 @@ Tabelle je flexiblem Verbraucher über Horizont SA_0-->SA_2:
 
 ## Energiefluss (Live-Sankey)
 
-Sankey aus **aktuellen Loxone-Leistungswerten**; Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden. Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`). Beim Laden eines E-Autos zeigt der Flex-Knoten den aktuellen SoC in der Knotenbeschriftung.
+Sankey aus **aktuellen Live-Leistungswerten** des konfigurierten Smarthome-Backends (Loxone, Home Assistant oder OpenEMS); Produktiv-Overlay aus `runtime/optimizer_run_state.json` (Soll vs. Ist an Batterie/Flex). Aktualisierung ca. alle 10 Sekunden. Flex-Knotenfarben: dieselbe **`chart_color_index`**-Palette wie Chart 1 (`consumer_chart_color`). Beim Laden eines E-Autos zeigt der Flex-Knoten den aktuellen SoC in der Knotenbeschriftung.
 
 ## Footer
 

@@ -1,0 +1,9 @@
+{
+  "domain": "earnie_house_sim",
+  "name": "Earnie House Simulator",
+  "codeowners": ["@JochenTCC"],
+  "config_flow": true,
+  "documentation": "https://github.com/JochenTCC/Energy-Optimizer/blob/main/docs/spec/house-sim.md",
+  "iot_class": "calculated",
+  "version": "1.0.0"
+}
