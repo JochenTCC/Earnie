@@ -2,6 +2,10 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6 quality-gate prep snapshot (2026-09-25)
+
+- [x] **Prepare quality gate** — Ran coverage / vulture / dead-fixtures / KPI / Sonar snapshot on `main` @ `43b317b`; derived open remediations as **2.6.r** in [Backlog.md](Backlog.md) (pulp `&lt;4` pin, `ui/charts.py` split, function-split wave, Sonar leak-period, docs walk).
+
 ### EHAL-Com Schreibtest — bounded write + roundtrip (2026-09-25)
 
 - [x] **EHAL-Com Schreibtest** (Secrets parity / HouseSim write-path verification). Table UI under Live-Schreiben: mapped safe probes (`set_ess_mode`, charge/discharge limits, `set_evcs_max_current`) + optional Force `set_ess_active_power` (±200 W, second confirm); batch write / Auto-Roundtrip as one setpoint; Silent gate; restore Automatik + EVCS 0 A. Core: `integrations/ehal_write_test.py` (+ bounds), UI `ui/ehal_write_test.py`. Tests: `tests/test_ehal_write_test.py`. Docs: `docs/ui/ehal-com.md` § Schreibtest. **Verified** greenfield / HouseSim HA (mode + active power; Force unlocks table row, does not auto-send).

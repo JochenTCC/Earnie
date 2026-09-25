@@ -32,10 +32,44 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood / HA coupling context
 - [HA-Loxone-Bridge-Builder draft](HA-Loxone-Bridge-Builder-Draft.md) — research item, not 2.6
 
-#### Features#
+#### Features
 
-- [ ] No feature - but todo: Prepare quality gate - Do quality checks and derive requested additional todos to achieve quality requirements
 - [ ] No feature - but todo: Publish pre-release 2.6.0-alpha.1
+
+##### 2.6.r — Quality / release hardening (before official 2.6.0; also unblock `2.6.0-alpha.1`)
+
+Same shape as `2.5.r` / skill `quality-gate`. **No `version.py` bump in this chapter.**
+
+**Prep snapshot (2026-09-25, `43b317b`):**
+
+| Check | Result |
+|-------|--------|
+| Coverage | 2500 passed / 6 skipped; overall **80.9%** (`data` 73.7, `ehal` 88.8, `house_config` 80.9, `optimizer` 85.7, `runtime_store` 80.9, `settings` 77.5, `simulation` 86.5); no package &lt; 40% (vs 2.5.r re-check 80.6%) |
+| Vulture `--min-confidence 80` | **0** hits |
+| `pytest --dead-fixtures` | clean |
+| KPI files ≥ 600 | **1**: `ui/charts.py` (**609**) |
+| KPI functions &gt; 60 | **67** (largest: `render_battery_planning_tab` 207, `simulate_horizon` 190, `render_pv_planning_tab` 166, `run_simulation` 156, …) |
+| Near-hard files (500–599) | e.g. `ui/pages/scenario_editor_sections.py` 596, `house_config/profiles_store.py` 592 |
+| SonarCloud (`main`, last successful analysis [36110376214](https://github.com/JochenTCC/Earnie/actions/runs/36110376214) @ `d4ec89d`) | Quality Gate **ERROR** (informational); `new_bugs` **0**; `new_vulnerabilities` **13**; `new_security_rating` **C**; `new_coverage` ≈ **61%**; dashboard coverage **73.6%** |
+| Sonar CI after `ddf5938` | **failed** — CI installed **pulp 4.0.0** (`pulp>=2.8.0`); `LpVariable(..., lowBound=…)` TypeError (89 MILP tests). Local still pulp 3.3.2 |
+
+- [ ] **2.6.r — complete quality gate** (tick after remediations below)
+  - [x] Coverage baseline (prep above)
+  - [x] Dead-code / obsolete-test audit (prep above; health-report flags = expected mock-heavy + `pv_follow_name` fail-fast)
+  - [ ] Simplification triage — propose mechanical deletes only after user accept; deferred this prep
+  - [ ] KPI mega-file: split `ui/charts.py` to ≤ 600 LOC (facade imports stable)
+  - [ ] KPI functions: split bodies &gt; 60 in core/UI (priority wave below); do not defer mega-functions into a later letter
+  - [ ] Official docs — walk `Doc-Review-Checklist.md` for **2.6** HA/HouseSim delta (Pattern B, EHAL-Com HA, energy counters); new findings → `Backlog-Bugfixes.md` Document Review Findings
+  - [ ] SonarCloud snapshot after remediations (informational QG; fail chapter only on **new bugs/vulnerabilities** not deferred in Bugfixes)
+
+**Derived todos (required for gate / CI):**
+
+- [ ] **Pin `pulp` to `&lt;4`** in `pyproject.toml` (and lock/CI) until code migrates to PuLP 4 `prob.add_variable` API — unblocks SonarCloud/Actions pytest (`pulp-4.0.0` broke `main` @ `ddf5938`)
+- [ ] **Split `ui/charts.py`** (609 → ≤ 600; prefer extract day-cost / cumulative helpers already partly in `chart_day_costs.py` / `chart_cumulative.py`)
+- [ ] **Function-split wave 1** (hard &gt; 60, largest first): `ui/planning_battery_form.py::render_battery_planning_tab`, `optimizer/simulation.py::simulate_horizon`, `ui/planning_pv_form.py::render_pv_planning_tab`, `simulation/engine.py::run_simulation`, `optimizer/sim_costs.py::calculate_optimization_savings`, `simulation/matrix_builder.py::build_historical_matrix_for_slots`, `optimizer/milp.py::_solve_milp_to_model` / `milp_optimizer`, `optimizer/milp_horizon.py::_build_milp_model`
+- [ ] **Sonar leak-period** — already tracked under Bugfixes Verifications Pending (`new_security_rating` C, `new_coverage` ≥ 80%); refresh after pulp pin restores analysis. Continue treating bulk `pythonsecurity` on maintainer CLI scripts + accepted Actions float tags as triage-only unless opening a concrete fix item
+- [ ] **Optional near-hard pre-split** (prevent next-letter breach): `ui/pages/scenario_editor_sections.py` (596), `house_config/profiles_store.py` (592)
+
 
 ### Version 2.7 — Multiple storages and export power limitation
 
