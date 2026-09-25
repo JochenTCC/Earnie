@@ -2,6 +2,11 @@
 
 Add-on `version:` mirrors the Earnie app release (`version.py` / GHCR tag). Each release tag auto-publishes via `.github/workflows/release.yml` → job `publish_ha_addon`.
 
+## 2.6.0-alpha.1
+
+- First community **pre-release** of the **2.6** HA-coupling line (follows official **2.5.3**). Do **not** continue `2.5.3-alpha.N` — pin this tag.
+- Earnie release: [2.6.0-alpha.1](https://github.com/JochenTCC/Earnie/releases/tag/v2.6.0-alpha.1)
+
 ## Unreleased
 
 - **`ehal_loxone_http_port`:** `run.sh` exports `EARNIE_EHAL_LOXONE_HTTP_PORT` (runtime env precedence over `config.json`, same pattern as Streamlit port).
