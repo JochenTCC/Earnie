@@ -34,13 +34,23 @@ def build_slot_deviation_series(
     slot_qualities: tuple[str, ...],
     *,
     rules_doc: dict[str, Any] | None = None,
+    closed_by_interval: dict[datetime, dict[str, Any]] | None = None,
 ) -> tuple[tuple[DeviationEvent, ...], ...]:
-    """Pro Slot eine Event-Tuple; nur SLOT_PRESENT mit Log-Eintrag wird ausgewertet."""
+    """Pro Slot eine Event-Tuple; nur SLOT_PRESENT mit Log-Eintrag wird ausgewertet.
+
+    Prefer ``closed_by_interval`` built from the full replay entry list. Indexing only
+    ``by_slot.values()`` drops ``closed_interval`` blocks carried on overwritten
+    same-slot entries (false battery forced-mode errors).
+    """
     from runtime_store.history_timeline import SLOT_PRESENT
     from runtime_store.slot_ist_powers import index_closed_intervals_by_start
 
     document = resolve_deviation_rules_document(rules_doc)
-    closed_by = index_closed_intervals_by_start(list(by_slot.values()))
+    closed_by = (
+        closed_by_interval
+        if closed_by_interval is not None
+        else index_closed_intervals_by_start(list(by_slot.values()))
+    )
     series: list[tuple[DeviationEvent, ...]] = []
     for slot_start, quality in zip(slot_starts, slot_qualities):
         if quality != SLOT_PRESENT:

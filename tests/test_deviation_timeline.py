@@ -115,6 +115,81 @@ class TestChartHistoryDeviations:
         assert result.slot_qualities == (history_timeline.SLOT_MISSING,)
         assert result.slot_deviation_events == ((),)
 
+    def test_closed_interval_survives_same_slot_rewrite(
+        self, history_files, rules_doc, monkeypatch
+    ):
+        """Later same-slot entry without closed_interval must not drop prior-QH mean.
+
+        Mirrors dump debug_dump_20260923_201155: 19:30 rewrite lost closed mean for
+        19:15 → decision snap looked like forced discharge missing.
+        """
+        slot_a = datetime(2026, 9, 23, 19, 15, tzinfo=TZ)
+        slot_b = datetime(2026, 9, 23, 19, 30, 19, tzinfo=TZ)
+        slot_b_rewrite = datetime(2026, 9, 23, 19, 37, 26, tzinfo=TZ)
+        _write_jsonl(
+            history_files,
+            [
+                _entry(
+                    slot_a,
+                    mode=bat.MODE_ZWANGS_ENTLADEN,
+                    target_power_kw=3.317,
+                    battery_plan_kw=-3.317,
+                    consumption_snapshot={"flex_kw": {}, "battery_kw": 0.34},
+                    closed_interval={
+                        "interval_start": "2026-09-23T19:00:00",
+                        "sample_count": 31,
+                        "battery_kw": 0.451,
+                        "pv_kw": 0.0,
+                        "grid_kw": 0.0,
+                        "house_kw": 0.5,
+                        "baseload_kw": 0.5,
+                        "flex_kw": {},
+                    },
+                ),
+                _entry(
+                    slot_b,
+                    mode=bat.MODE_ZWANGS_ENTLADEN,
+                    target_power_kw=5.0,
+                    battery_plan_kw=-5.0,
+                    consumption_snapshot={"flex_kw": {}, "battery_kw": 3.32},
+                    closed_interval={
+                        "interval_start": "2026-09-23T19:15:00",
+                        "sample_count": 31,
+                        "battery_kw": 2.844,
+                        "pv_kw": 0.0,
+                        "grid_kw": -2.0,
+                        "house_kw": 0.5,
+                        "baseload_kw": 0.5,
+                        "flex_kw": {},
+                    },
+                ),
+                _entry(
+                    slot_b_rewrite,
+                    mode=bat.MODE_ZWANGS_ENTLADEN,
+                    target_power_kw=4.19,
+                    battery_plan_kw=-4.19,
+                    consumption_snapshot={"flex_kw": {}, "battery_kw": 5.0},
+                ),
+            ],
+        )
+        from optimizer import deviation_timeline as dt
+
+        monkeypatch.setattr(
+            dt,
+            "resolve_deviation_rules_document",
+            lambda _doc=None: rules_doc,
+        )
+        end = datetime(2026, 9, 23, 19, 45, tzinfo=TZ)
+        result = history_timeline.build_chart_history(slot_a, end)
+        assert result.slot_starts[0] == slot_a
+        battery_events = [
+            ev.rule_id
+            for ev in result.slot_deviation_events[0]
+            if ev.scope == "battery"
+        ]
+        assert battery_events == []
+
+
 
 class TestChartDisplayContextDeviations:
     def test_milp_tail_has_no_deviation_events(self, history_files, monkeypatch):

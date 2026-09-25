@@ -129,6 +129,28 @@ class TestScenarioCatalog:
         assert events[0].scope == "battery"
         assert events[0].rule_id == "battery_forced_discharge_missing"
 
+    def test_forced_discharge_partial_delivery_not_missing(self, rules_doc):
+        """Mean Ist short of Soll is still 'executed' — not S6 'entlädt nicht'."""
+        entry = _entry(
+            mode=bat.MODE_ZWANGS_ENTLADEN,
+            target_power_kw=3.317,
+            battery_plan_kw=-3.317,
+            consumption_snapshot={"flex_kw": {}, "battery_kw": 2.844},
+        )
+        events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
+        assert events == []
+
+    def test_forced_charge_partial_delivery_not_missing(self, rules_doc):
+        entry = _entry(
+            mode=bat.MODE_ZWANGS_LADEN,
+            target_power_kw=2.5,
+            battery_plan_kw=2.5,
+            # Loxone: negative = charge
+            consumption_snapshot={"flex_kw": {}, "battery_kw": -2.0},
+        )
+        events = evaluate_entry_deviations(entry, rules_doc=rules_doc)
+        assert events == []
+
     def test_s2b_ev_pv_follow_error(self, rules_doc, monkeypatch):
         ev_consumer = {
             "id": "ev",

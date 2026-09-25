@@ -547,9 +547,17 @@ def _build_rows_for_slot_starts(
     *,
     include_date: bool = False,
     hold_forward: bool = True,
-) -> tuple[list[dict[str, Any]], tuple[str, ...], int, int, int, dict[datetime, dict[str, Any]]]:
+) -> tuple[
+    list[dict[str, Any]],
+    tuple[str, ...],
+    int,
+    int,
+    int,
+    dict[datetime, dict[str, Any]],
+    dict[datetime, dict[str, Any]],
+]:
     if not slot_starts:
-        return [], (), 0, 0, 0, {}
+        return [], (), 0, 0, 0, {}, {}
     starts = tuple(slot_starts)
     window_start = _coerce_slot_start(starts[0])
     window_end = _coerce_slot_start(starts[-1]) + timedelta(minutes=QUARTER_HOUR_MINUTES)
@@ -557,6 +565,8 @@ def _build_rows_for_slot_starts(
     load_end = window_end + timedelta(minutes=QUARTER_HOUR_MINUTES)
     entries = optimization_history.load_replay_entries_between(window_start, load_end)
     by_slot = _index_entries_by_slot(entries)
+    # Index ALL entries (not by_slot winners): a later same-slot rewrite may omit
+    # closed_interval for the previous QH, which chart/deviation still need.
     closed_by = index_closed_intervals_by_start(entries)
     rows: list[dict[str, Any]] = []
     qualities: list[str] = []
@@ -599,4 +609,4 @@ def _build_rows_for_slot_starts(
     rows = _reconcile_history_battery_with_soc(
         rows, qualities, mean_usable=mean_usable_flags
     )
-    return rows, tuple(qualities), present, held, missing, by_slot
+    return rows, tuple(qualities), present, held, missing, by_slot, closed_by

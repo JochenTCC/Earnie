@@ -23,6 +23,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## Bugfix Verifications Pending (Do not remove this chapter — even if empty) + Testing Todos
 
+- [ ] **False “Zwangs-Entladen nicht ausgeführt”** (`debug_dump_20260923_201155`) — Fix implemented: deviation uses full-entry `closed_by` (not `by_slot` winners); `battery_power_below_tolerance` = Ist ≤ tol only (S6 “nicht ausgeführt”). Tests: `test_deviation_timeline` / `test_deviation_eval`. Dump evening 19:15–19:45 cleared; live Monitor acceptance still pending. Commit/PATCH when ending session.
 - [ ] **SonarCloud leak-period QG** — Named remediations verified on post-fix scans (`ccebfcf` → e.g. Actions [35350702620](https://github.com/JochenTCC/Earnie/actions/runs/35350702620)); gate still **ERROR** (do not archive until QG OK or explicitly accepted as informational):
   - [x] Verified cleared: `bump_ha_addon.py` python:S3923; secrets:S7636 (`HA_ADDON_REPO_TOKEN` via `env:`); `.devcontainer` docker:S6471 / shell:S8541; `new_reliability_rating` = A
   - [ ] Still failing QG: `new_security_rating` = C; `new_coverage` ≈ 76.7% (need ≥ 80%)
@@ -32,7 +33,6 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] "debug-dumps\debug_dump_20260923_201155"
 - [ ] Kosten Chart on page Monitor shows cost for the entire optimization horizon (SA_0 - SA_2). This is ambigous because when switching between days (at least in mobile mode) the user does not know if the values belong to the shown day or to the optimization horizon. The other ambiguity comes from the fact that during the day the already achieved cost reduction is "eaten" by the past grey area. 
   - Show cost reduction always on a daily basis. When complete horizon is shown - split it into two value columns
   - Show already achieved daily cost reductions in a separate line

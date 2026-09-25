@@ -278,14 +278,21 @@ def build_chart_history(
             slot_deviation_events=(),
         )
     slot_starts = quarter_hour_slots_between(window_start, window_end_exclusive)
-    rows, qualities, present, held, missing, by_slot = _build_rows_for_slot_starts(
-        slot_starts,
-        include_date=True,
-        hold_forward=False,
+    rows, qualities, present, held, missing, by_slot, closed_by = (
+        _build_rows_for_slot_starts(
+            slot_starts,
+            include_date=True,
+            hold_forward=False,
+        )
     )
     from optimizer.deviation_timeline import build_slot_deviation_series
 
-    deviation_events = build_slot_deviation_series(by_slot, slot_starts, qualities)
+    deviation_events = build_slot_deviation_series(
+        by_slot,
+        slot_starts,
+        qualities,
+        closed_by_interval=closed_by,
+    )
     sell_price_cent = config.get_push_price_cent()
     slot_costs = [
         0.0 if quality == SLOT_MISSING else _slot_cost_euro(row, sell_price_cent)
@@ -323,7 +330,9 @@ def build_history_timeline(
     """
     window_start, window_end, anchor = history_window_bounds(offset_days, now)
     slot_starts = _slot_starts(window_start)
-    rows, qualities, present, held, missing, _by_slot = _build_rows_for_slot_starts(slot_starts)
+    rows, qualities, present, held, missing, _by_slot, _closed_by = (
+        _build_rows_for_slot_starts(slot_starts)
+    )
     entries = optimization_history.load_replay_entries_between(window_start, window_end)
     by_slot = _index_entries_by_slot(entries)
     sell_price_cent = config.get_push_price_cent()

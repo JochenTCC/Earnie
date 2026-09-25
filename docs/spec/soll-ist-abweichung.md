@@ -161,7 +161,7 @@ Siehe `config/deviation_rules.schema.json` und `config/deviation_rules.example.j
 | `heating_was_scheduled` | Thermik-Schedule sieht Heizen für Slot vor |
 | `mode_is_forced_charge` | `mode == 1` (Zwangs-Laden) |
 | `mode_is_forced_discharge` | `mode == 3` |
-| `battery_power_below_tolerance` | Ist-Lade-/Entladeleistung weicht von Soll ab (Zwangs-Modi) |
+| `battery_power_below_tolerance` | Zwangs-Modus: Soll > Toleranz, Ist-Lade-/Entladeleistung ≤ Toleranz (nicht ausgeführt; kein reines Unterschreiten des Sollwerts) |
 | `pv_follow_scheduled` | `consumer_pv_follow.{scope} == 1` und Loxone-Setpoint > Toleranz |
 | `pv_follow_power_below_tolerance` | pv_follow aktiv, Setpoint − Ist > Toleranz |
 | `slot_quality_present` | Slot hat echten Log-Eintrag |

@@ -86,7 +86,7 @@ def build_swimspa_analysis_data(
         return None
 
     slot_starts = quarter_hour_slots_between(chart.start, history_end)
-    _, qualities, _, _, missing, by_slot = _build_rows_for_slot_starts(
+    _, qualities, _, _, missing, by_slot, _closed_by = _build_rows_for_slot_starts(
         slot_starts,
         include_date=True,
         hold_forward=False,

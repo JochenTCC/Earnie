@@ -163,16 +163,21 @@ def _battery_power_below_tolerance(
     tolerances: dict[str, float],
     params: dict[str, Any],
 ) -> bool:
+    """True when forced charge/discharge Soll is set but Ist is effectively zero.
+
+    Catalog S3/S6 and rule messages say \"nicht ausgeführt\" — not slight
+    underdelivery vs. setpoint (mean Ist can be a few 100 W short of Soll).
+    """
     tol = _power_tolerance(tolerances, params)
     battery = facts.battery
     if battery.soll_mode == bat.MODE_ZWANGS_LADEN:
         soll = max(0.0, battery.soll_plan_kw)
         ist = _ist_charge_kw(battery.ist_power_kw)
-        return soll > tol and (soll - ist) > tol
+        return soll > tol and ist <= tol
     if battery.soll_mode == bat.MODE_ZWANGS_ENTLADEN:
         soll = max(0.0, -battery.soll_plan_kw)
         ist = _ist_discharge_kw(battery.ist_power_kw)
-        return soll > tol and (soll - ist) > tol
+        return soll > tol and ist <= tol
     return False
 
 
