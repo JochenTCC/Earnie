@@ -151,7 +151,7 @@ Connection refused → HA not ready or wrong port.
 
 ### 2.3 Where Earnie stores the token
 
-- Prefer Streamlit **EHAL-Com → HA Entity → EHAL Mapping** (saves into `ha_lab/config/config.json`).
+- Prefer Streamlit **EHAL-Com → HA Entity → EHAL Mapping** (writes Pattern B `plant` / `consumers[].ehal_bindings` into `house_profiles.json`; `ehal.backend` / `sign` stay in `config.json`).
 - Or merge [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) and replace `"token"` + confirm `"base_url": "http://homeassistant:8123"`.
 
 Treat `config.json` as secret-bearing (same as `.env`). Do not commit lab tokens.
@@ -196,7 +196,7 @@ Use this to prove Earnie ↔ HA REST **before** wiring real devices:
 3. Skip evcc entity exposure for this path (evcc stub can keep running idle).
 4. Map those `entity_id`s in the Earnie HITL UI (§5).
 
-Sign convention in EHAL: `grid_power_active` **+** = import; `ess_power` **+** = discharge. If a helper uses the opposite sign, set mapping **sign** to `negate` for that field.
+Sign convention in EHAL: `sens_grid_power_active` **+** = import; `sens_ess_power` **+** = discharge. If a helper uses the opposite sign, set mapping **sign** to `negate` for that field (`ehal.ha.sign`).
 
 ### 3.4 Path B — Lab stub / templates in `evcc.yaml`
 
@@ -340,8 +340,8 @@ Expect on the host:
 
 Either:
 
-1. **UI (preferred):** §5 mapping expander — sets `ehal.backend=ha`, URL, token, entities, sign.
-2. **Manual merge:** copy the `ehal` object from [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) into `ha_lab/config/config.json`, replace token and entity IDs.
+1. **UI (preferred):** **Smarthome-Backend** for `ehal.backend=ha` + URL/token; §5 mapping expander for Pattern B entity IDs (`plant` / `consumers[].ehal_bindings`) and optional `ehal.ha.sign`.
+2. **Manual merge:** copy the `ehal` object from [`ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) into `ha_lab/config/config.json` (backend + `sign` only). Put entity IDs into `house_profiles.json` Pattern B maps — do **not** refill flat `ehal.ha.entities` for new labs (legacy map is one-shot migrated). Fixture golden maps under `house_sim/fixtures/*/ehal.ha.entities.json` are still the field→entity source for the mock bench; merge those keys into plant/consumer bindings when wiring Earnie.
 
 Inside Compose, `base_url` **must** be:
 
@@ -359,27 +359,27 @@ Silent gate: `loxone_silent_mode` also blocks HA setpoint writes (same as OpenEM
 
 1. Open Earnie: http://localhost:8506  
 2. Navigate to **EHAL-Com** (Smarthome / debug page).  
-3. Expand **HA Entity → EHAL Mapping (2.4.c)**.  
+3. Expand **HA Entity → EHAL Mapping**.  
 4. Paste **URL** + **Long-Lived Access Token** (prefilled from config if already saved).  
 5. **Entities scannen** — lists `sensor` / `number` / `select` / `input_number`.  
 6. Assign fields:
 
 | EHAL field | Required | Typical domain |
 | --- | --- | --- |
-| `grid_power_active` | yes | `sensor` (W; or kW → adapter converts) |
-| `pv_production_active` | yes | `sensor` |
-| `ess_soc` | yes | `sensor` (%) |
-| `ess_power` | no | `sensor` |
-| `evcs_active_power` | no | `sensor` |
+| `sens_grid_power_active` | yes | `sensor` (W; or kW → adapter converts) |
+| `sens_pv_production_active` | yes | `sensor` |
+| `sens_ess_soc` | yes | `sensor` (%) |
+| `sens_ess_power` | no | `sensor` |
+| `sens_evcs_active_power` | no | `sensor` |
 | `set_ess_charge_power_limit` | no* | `number` / `input_number` |
 | `set_ess_discharge_power_limit` | no* | `number` / `input_number` |
 | `set_evcs_max_current` | no* | `number` (A) |
 
 \*Needed for write capabilities; omit → capability stays false / writes skipped.
 
-7. Set **sign** `ehal` vs `negate` for grid / ESS power if needed.  
+7. Set **sign** `ehal` vs `negate` for grid / ESS power if needed (`ehal.ha.sign` in `config.json`).  
 8. **Telemetrie testen** → expect validated JSON (SoC, powers).  
-9. **Mapping speichern** → writes `ehal` into `config.json` and reloads runtime config.
+9. **Mapping speichern** → writes that entity’s bindings into `plant` / `consumers[].ehal_bindings` in `house_profiles.json` (Pattern B; legacy flat `ehal.ha.entities` is migrated once and cleared) and reloads runtime config.
 
 LLM-assisted proposals are **not** in the shipping UI (optional Ollama code may exist in `integrations/` for later re-integration).
 
@@ -420,8 +420,8 @@ IDs only (`sensor.evcc_grid_power`, …).
 1. Earnie http://localhost:8506 → **EHAL-Com** → **HA Entity → EHAL Mapping**.
 2. URL inside Compose: `http://homeassistant:8123` + LLAT (§2).
 3. **Entities scannen** → assign at least the three required reads
-   (`grid_power_active`, `pv_production_active`, `ess_soc`).
-4. Optional: `ess_power`, `evcs_active_power`, `set_evcs_max_current` (and ESS
+   (`sens_grid_power_active`, `sens_pv_production_active`, `sens_ess_soc`).
+4. Optional: `sens_ess_power`, `sens_evcs_active_power`, `set_evcs_max_current` (and ESS
    limit numbers if present).
 5. Sign: EHAL grid **+** = import, ESS **+** = discharge. If marq24 uses the
    opposite convention, set that field to **negate**.
@@ -434,7 +434,7 @@ IDs only (`sensor.evcc_grid_power`, …).
 | --- | --- |
 | HA States shows mapped `entity_id`s | yes |
 | HITL **Telemetrie testen** returns SoC (+ powers) | yes |
-| `ha_lab/config/config.json` has `ehal.backend=ha` and those entity IDs | yes |
+| `ha_lab/config/config.json` has `ehal.backend=ha`; entity IDs in `house_profiles.json` Pattern B bindings | yes |
 | Live / logs: no “Kein Zugriff auf EHAL SoC” (§6.3) | yes |
 | Optimizer exclusivity still true (§3.6) | yes |
 

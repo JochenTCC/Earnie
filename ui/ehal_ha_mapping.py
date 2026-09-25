@@ -419,8 +419,7 @@ def _save_entity_mapping(
     st.rerun()
 
 
-def render_ehal_ha_mapping_section() -> None:
-    """Entity-picker HITL; persists Pattern B bindings; HA secrets in .env."""
+def _render_ha_mapping_intro() -> None:
     st.caption(
         "Entity-zentriertes Mapping (wie Loxone): zuerst Entity wählen "
         "(Anlage + Verbraucher aus dem Live-Hausprofil), dann nur deren EHAL-Felder. "
@@ -429,6 +428,47 @@ def render_ehal_ha_mapping_section() -> None:
         "Zugangsdaten in `config/.env` (`EHAL_HA_*`). "
         "Gespeicherte Bindings werden nicht überschrieben. Kein LLM."
     )
+
+
+def _render_mapping_action_buttons() -> tuple[bool, bool]:
+    col_test, col_save = st.columns(2)
+    with col_test:
+        test_clicked = st.button("Telemetrie testen", key="ehal_ha_test_read")
+    with col_save:
+        save_clicked = st.button(
+            "Mapping speichern", key="ehal_ha_save_btn", type="primary"
+        )
+    return bool(test_clicked), bool(save_clicked)
+
+
+def _run_telemetry_smoke_test(
+    house: dict,
+    *,
+    profile_id: str,
+    entity_id: str,
+    ehal_map: dict[str, str],
+    credentials: tuple[str, str],
+) -> None:
+    base_url, token = credentials
+    try:
+        # Smoke-test: merge this entity's edits into aggregated live map.
+        trial_house = apply_entity_bindings(
+            house,
+            profile_id=profile_id,
+            entity_id=entity_id,
+            bindings=ehal_map,
+        )
+        entities_map = aggregate_ha_entities(trial_house)
+        telemetry = _adapter_from_form(base_url, token, entities_map).read_telemetry()
+        st.success("Telemetrie OK")
+        st.json(dict(telemetry))
+    except (HaHttpError, ValueError, OSError) as exc:
+        st.error(f"Telemetrie-Test fehlgeschlagen: {exc}")
+
+
+def render_ehal_ha_mapping_section() -> None:
+    """Entity-picker HITL; persists Pattern B bindings; HA secrets in .env."""
+    _render_ha_mapping_intro()
 
     config_doc, house = _ensure_ha_migrated()
     current = _ha_credentials(config_doc)
@@ -454,29 +494,16 @@ def render_ehal_ha_mapping_section() -> None:
     if str(entity["id"]) == PLANT_ENTITY_ID:
         sign = _render_sign_selects(current["sign"])
 
-    col_test, col_save = st.columns(2)
-    with col_test:
-        test_clicked = st.button("Telemetrie testen", key="ehal_ha_test_read")
-    with col_save:
-        save_clicked = st.button(
-            "Mapping speichern", key="ehal_ha_save_btn", type="primary"
-        )
+    test_clicked, save_clicked = _render_mapping_action_buttons()
 
     if test_clicked:
-        try:
-            # Smoke-test: merge this entity's edits into aggregated live map.
-            trial_house = apply_entity_bindings(
-                house,
-                profile_id=profile_id,
-                entity_id=str(entity["id"]),
-                bindings=ehal_map,
-            )
-            entities_map = aggregate_ha_entities(trial_house)
-            telemetry = _adapter_from_form(base_url, token, entities_map).read_telemetry()
-            st.success("Telemetrie OK")
-            st.json(dict(telemetry))
-        except (HaHttpError, ValueError, OSError) as exc:
-            st.error(f"Telemetrie-Test fehlgeschlagen: {exc}")
+        _run_telemetry_smoke_test(
+            house,
+            profile_id=profile_id,
+            entity_id=str(entity["id"]),
+            ehal_map=ehal_map,
+            credentials=(base_url, token),
+        )
 
     if save_clicked:
         _save_entity_mapping(

@@ -43,6 +43,78 @@ def _format_match_status(reason: str | None) -> tuple[str, str]:
     return "warning", _MATCH_ID_MISMATCH
 
 
+def _render_cons_data_status(path: str) -> bool:
+    """Zeitraum + Konfigurations-Abgleich; True wenn die CSV befüllt ist."""
+    if not cons_data_store.is_cons_data_populated():
+        st.warning(
+            "Keine gültigen Verbrauchsdaten vorhanden. "
+            "Generiere die Datei aus der Hauskonfiguration, bevor du Szenario-Explorer startest."
+        )
+        return False
+    df = cons_data_store.load_cons_data(path)
+    ts_min, ts_max = df.index.min(), df.index.max()
+    st.caption(
+        f"Zeitraum: {ts_min.strftime('%Y-%m-%d %H:%M')} – "
+        f"{ts_max.strftime('%Y-%m-%d %H:%M')} · {len(df)} Stunden"
+    )
+    match_reason = cons_data_store.cons_data_consumer_match_reason(path)
+    level, message = _format_match_status(match_reason)
+    if level == "success":
+        st.success(message)
+    else:
+        st.warning(message)
+    return True
+
+
+def _render_cons_data_generate_button() -> None:
+    if not st.button(
+        "Verbrauchsdaten generieren (synthetisch)",
+        key="backtesting_cons_data_generate_btn",
+    ):
+        return
+    with st.status("Generiere Verbrauchsdaten…", expanded=True) as status:
+        try:
+            generate(source="synthetic")
+        except Exception as exc:
+            status.update(label="Generierung fehlgeschlagen", state="error")
+            st.error(f"Generierung fehlgeschlagen: {exc}")
+        else:
+            status.update(label="Verbrauchsdaten generiert", state="complete")
+            st.rerun()
+
+
+def _pv_scenario_context() -> tuple[list | None, str | None]:
+    """Szenarien + Live-ID für die PV-Overlays; (None, None) wenn nicht auflösbar."""
+    try:
+        return (
+            config.get_backtesting_scenarios(),
+            config.get_live_scenario_id() or DEFAULT_LIVE_SCENARIO_ID,
+        )
+    except Exception:
+        return None, None
+
+
+def _render_cons_data_charts(path: str) -> None:
+    df = cons_data_store.load_cons_data(path)
+    if not cons_data_has_flex_energy(df):
+        st.warning(
+            "Flexible Verbraucher haben in `cons_data.csv` keine "
+            "messbaren Werte (nur Basislast). Bitte Daten neu generieren."
+        )
+    scenarios_for_pv, live_id = _pv_scenario_context()
+    try:
+        render_consumption_display(
+            ConsumptionDisplayMode.CONS_DATA,
+            key_prefix="backtesting_cons_data",
+            cons_data=df,
+            reset_token=str(df.index.max()),
+            scenarios_for_pv=scenarios_for_pv,
+            live_scenario_id=live_id,
+        )
+    except ValueError as exc:
+        st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")
+
+
 def render_cons_data_section() -> bool:
     """Zeigt Verbrauchsdaten-Abschnitt; gibt True zurück wenn Backtesting starten kann."""
     path = cons_data_store.get_output_path()
@@ -51,64 +123,9 @@ def render_cons_data_section() -> bool:
     st.caption(cons_data_section_caption())
     render_time_range_help(key="backtesting_time_ranges_cons_data")
 
-    populated = cons_data_store.is_cons_data_populated()
-    if not populated:
-        st.warning(
-            "Keine gültigen Verbrauchsdaten vorhanden. "
-            "Generiere die Datei aus der Hauskonfiguration, bevor du Szenario-Explorer startest."
-        )
-    else:
-        df = cons_data_store.load_cons_data(path)
-        ts_min, ts_max = df.index.min(), df.index.max()
-        st.caption(
-            f"Zeitraum: {ts_min.strftime('%Y-%m-%d %H:%M')} – "
-            f"{ts_max.strftime('%Y-%m-%d %H:%M')} · {len(df)} Stunden"
-        )
-        match_reason = cons_data_store.cons_data_consumer_match_reason(path)
-        level, message = _format_match_status(match_reason)
-        if level == "success":
-            st.success(message)
-        else:
-            st.warning(message)
-
-    if st.button(
-        "Verbrauchsdaten generieren (synthetisch)",
-        key="backtesting_cons_data_generate_btn",
-    ):
-        with st.status("Generiere Verbrauchsdaten…", expanded=True) as status:
-            try:
-                generate(source="synthetic")
-            except Exception as exc:
-                status.update(label="Generierung fehlgeschlagen", state="error")
-                st.error(f"Generierung fehlgeschlagen: {exc}")
-            else:
-                status.update(label="Verbrauchsdaten generiert", state="complete")
-                st.rerun()
-
+    populated = _render_cons_data_status(path)
+    _render_cons_data_generate_button()
     if populated:
-        df = cons_data_store.load_cons_data(path)
-        if not cons_data_has_flex_energy(df):
-            st.warning(
-                "Flexible Verbraucher haben in `cons_data.csv` keine "
-                "messbaren Werte (nur Basislast). Bitte Daten neu generieren."
-            )
-        try:
-            scenarios_for_pv = None
-            live_id = None
-            try:
-                scenarios_for_pv = config.get_backtesting_scenarios()
-                live_id = config.get_live_scenario_id() or DEFAULT_LIVE_SCENARIO_ID
-            except Exception:
-                scenarios_for_pv = None
-            render_consumption_display(
-                ConsumptionDisplayMode.CONS_DATA,
-                key_prefix="backtesting_cons_data",
-                cons_data=df,
-                reset_token=str(df.index.max()),
-                scenarios_for_pv=scenarios_for_pv,
-                live_scenario_id=live_id,
-            )
-        except ValueError as exc:
-            st.error(f"Verbrauchsdaten konnten nicht visualisiert werden: {exc}")
+        _render_cons_data_charts(path)
 
     return cons_data_ready()

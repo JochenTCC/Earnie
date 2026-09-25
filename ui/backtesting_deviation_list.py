@@ -405,6 +405,33 @@ def _select_scenario_from_radio(
     )
 
 
+def _render_deviation_header(
+    case: dict | None,
+    labels_map: dict[str, str],
+    *,
+    meta: dict,
+    window_anchor: str,
+    scenario_id: str,
+) -> None:
+    """Fenster/Szenario/Art headline plus the kind-specific captions."""
+    window = _format_deviation_window({"window_anchor": window_anchor}, meta)
+    scenario = _scenario_label(scenario_id, labels_map)
+    if case is None:
+        st.markdown(
+            f"**Fenster:** {window} · **Szenario:** {scenario} · **Keine Abweichung**"
+        )
+        return
+    art = kind_label(str(case.get("kind", "?")))
+    delta = format_deviation_delta_kwh(case)
+    st.markdown(
+        f"**Fenster:** {window} · **Szenario:** {scenario} · **Art:** {art} · "
+        f"**Δ kWh (Soll/Ist):** {delta}"
+    )
+    _render_consumption_caption(case)
+    if case.get("kind") != "consumption_tolerance":
+        _render_cbc_facts_caption(case)
+
+
 def render_deviation_detail(
     case: dict | None,
     labels_map: dict[str, str],
@@ -416,22 +443,13 @@ def render_deviation_detail(
     scenario_id: str,
     segment_toggle: str,
 ) -> None:
-    window = _format_deviation_window({"window_anchor": window_anchor}, meta)
-    scenario = _scenario_label(scenario_id, labels_map)
-    if case is None:
-        st.markdown(
-            f"**Fenster:** {window} · **Szenario:** {scenario} · **Keine Abweichung**"
-        )
-    else:
-        art = kind_label(str(case.get("kind", "?")))
-        delta = format_deviation_delta_kwh(case)
-        st.markdown(
-            f"**Fenster:** {window} · **Szenario:** {scenario} · **Art:** {art} · "
-            f"**Δ kWh (Soll/Ist):** {delta}"
-        )
-        _render_consumption_caption(case)
-        if case.get("kind") != "consumption_tolerance":
-            _render_cbc_facts_caption(case)
+    _render_deviation_header(
+        case,
+        labels_map,
+        meta=meta,
+        window_anchor=window_anchor,
+        scenario_id=scenario_id,
+    )
     render_diag_single_window_panel(
         window_anchor,
         scenario_id,
@@ -466,6 +484,56 @@ def _render_detail_mode_radio() -> str:
     )
 
 
+def _render_deviation_summary_caption(cases: list[dict]) -> None:
+    if not cases:
+        st.caption("Keine auffälligen Abweichungen — alle in-run Tage sind dennoch wählbar.")
+        return
+    summary = summarize_critical_cases(cases)
+    st.caption(
+        f"{summary['total']} Abweichungen in {summary['distinct_windows']} Fenstern"
+    )
+
+
+def _scenario_options_for_cell(
+    fallback_ids: list[str],
+    cases_by_scenario: dict[str, dict],
+) -> list[str]:
+    """Szenarien mit Abweichung zuerst, danach die unauffälligen."""
+    with_deviation = [sid for sid in fallback_ids if sid in cases_by_scenario]
+    without_deviation = [sid for sid in fallback_ids if sid not in cases_by_scenario]
+    return with_deviation + without_deviation
+
+
+def _resolve_deviation_selection(
+    index: dict,
+    meta: dict,
+    labels_map: dict[str, str],
+) -> tuple[date, str, str] | None:
+    """Kalendertag, Szenario und Fenster-Anker; None wenn nichts wählbar ist."""
+    selected_date = render_deviation_calendar(index, meta)
+    if selected_date is None:
+        selected_date = default_calendar_date(index)
+    if selected_date is None:
+        return None
+
+    fallback_ids = _optimized_scenario_ids(meta)
+    if not fallback_ids:
+        st.info("Kein optimiertes Szenario für den gewählten Tag.")
+        return None
+
+    cell = index[selected_date]
+    cases_by_scenario = cell.cases_by_scenario
+    scenario_id = _select_scenario_from_radio(
+        selected_date,
+        _scenario_options_for_cell(fallback_ids, cases_by_scenario),
+        cases_by_scenario,
+        labels_map,
+    )
+    if not scenario_id:
+        return None
+    return selected_date, scenario_id, cell.anchor_iso or ""
+
+
 def render_deviation_list(
     meta: dict,
     labels_map: dict[str, str],
@@ -482,61 +550,23 @@ def render_deviation_list(
 
     cases = deviation_cases_for_display(meta)
     index = build_deviation_calendar_index(meta, cases, run_anchors=run_anchors)
+    _render_deviation_summary_caption(cases)
 
-    if cases:
-        summary = summarize_critical_cases(cases)
-        st.caption(
-            f"{summary['total']} Abweichungen in {summary['distinct_windows']} Fenstern"
-        )
-    else:
-        st.caption("Keine auffälligen Abweichungen — alle in-run Tage sind dennoch wählbar.")
-
-    selected_date = render_deviation_calendar(index, meta)
-    if selected_date is None:
-        selected_date = default_calendar_date(index)
-    if selected_date is None:
+    selection = _resolve_deviation_selection(index, meta, labels_map)
+    if selection is None:
         return
+    selected_date, scenario_id, window_anchor = selection
 
-    fallback_ids = _optimized_scenario_ids(meta)
-    if not fallback_ids:
-        st.info("Kein optimiertes Szenario für den gewählten Tag.")
-        return
-
-    cell = index[selected_date]
-    cases_by_scenario = cell.cases_by_scenario
-    with_deviation = [sid for sid in fallback_ids if sid in cases_by_scenario]
-    without_deviation = [sid for sid in fallback_ids if sid not in cases_by_scenario]
-    scenario_options = with_deviation + without_deviation
-
-    scenario_id = _select_scenario_from_radio(
-        selected_date,
-        scenario_options,
-        cases_by_scenario,
-        labels_map,
-    )
-    if not scenario_id:
-        return
-
-    window_anchor = cell.anchor_iso or ""
     detail_mode = _render_detail_mode_radio()
     case = cases_for_date_and_scenario(index, selected_date, scenario_id)
     if detail_mode == _DETAIL_MODE_OVERVIEW:
-        window = _format_deviation_window({"window_anchor": window_anchor}, meta)
-        scenario = _scenario_label(scenario_id, labels_map)
-        if case is None:
-            st.markdown(
-                f"**Fenster:** {window} · **Szenario:** {scenario} · **Keine Abweichung**"
-            )
-        else:
-            art = kind_label(str(case.get("kind", "?")))
-            delta = format_deviation_delta_kwh(case)
-            st.markdown(
-                f"**Fenster:** {window} · **Szenario:** {scenario} · **Art:** {art} · "
-                f"**Δ kWh (Soll/Ist):** {delta}"
-            )
-            _render_consumption_caption(case)
-            if case.get("kind") != "consumption_tolerance":
-                _render_cbc_facts_caption(case)
+        _render_deviation_header(
+            case,
+            labels_map,
+            meta=meta,
+            window_anchor=window_anchor,
+            scenario_id=scenario_id,
+        )
         st.info(
             "Charts und Fenster-Diagnose werden erst nach Auswahl "
             "„Charts & Diagnose laden“ berechnet."

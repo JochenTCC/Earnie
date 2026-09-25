@@ -376,6 +376,156 @@ def _append_cbc_events_jsonl(
     return path
 
 
+def _collect_all_timestamps(results: dict[str, pd.DataFrame]) -> list[pd.Timestamp]:
+    """Alle Stundenstempel über alle Szenarien, tz-naiv."""
+    all_ts: list[pd.Timestamp] = []
+    for df in results.values():
+        if not df.empty:
+            for ts in df.index.tolist():
+                stamp = pd.Timestamp(ts)
+                if stamp.tzinfo is not None:
+                    stamp = stamp.tz_localize(None)
+                all_ts.append(stamp)
+    return all_ts
+
+
+def _fee_breakdown_payload(
+    results: dict[str, pd.DataFrame],
+    fee_breakdown_by_scenario: dict[str, dict[str, float]] | None,
+) -> dict[str, dict[str, float]]:
+    """Fixkosten-Aufschlüsselung je Szenario als float-Payload."""
+    if not fee_breakdown_by_scenario:
+        return {}
+    return {
+        sid: {
+            key: float(value)
+            for key, value in (fee_breakdown_by_scenario.get(sid) or {}).items()
+        }
+        for sid in results
+    }
+
+
+def _fee_and_summary_parts(
+    results: dict[str, pd.DataFrame],
+    labels: dict[str, str],
+    monthly_fee_by_scenario: dict[str, float] | None,
+    fee_breakdown_by_scenario: dict[str, dict[str, float]] | None,
+) -> dict:
+    """Summary- und Fixkosten-Felder des Metadaten-Payloads (Reihenfolge erhalten)."""
+    return {
+        "summary": _build_summary(
+            results, labels, monthly_fee_by_scenario=monthly_fee_by_scenario
+        ),
+        "monthly_fee_by_scenario": {
+            sid: float(monthly_fee_by_scenario.get(sid, 0.0) or 0.0)
+            for sid in results
+        }
+        if monthly_fee_by_scenario
+        else {},
+        "fee_breakdown_by_scenario": _fee_breakdown_payload(
+            results, fee_breakdown_by_scenario
+        ),
+    }
+
+
+def _build_log_payload(
+    results: dict[str, pd.DataFrame],
+    labels: dict[str, str],
+    plausibility_by_scenario: dict[str, PlausibilityReport],
+    period: dict,
+    fee_parts: dict,
+    *,
+    config_fingerprint: str | None,
+) -> dict:
+    """Metadaten-Payload ohne CBC-Events, Snapshots und Periodengrenzen."""
+    return stamp_payload(
+        {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "period": period,
+            "labels": labels,
+            **fee_parts,
+            "plausibility": {
+                sid: _serialize_plausibility(rep)
+                for sid, rep in plausibility_by_scenario.items()
+            },
+            "series_file": BACKTESTING_CSV,
+            "scenario_ids": list(results.keys()),
+            "reference_id": HISTORICAL_REFERENCE_ID,
+            "config_fingerprint": config_fingerprint or _compute_config_fingerprint(period),
+        },
+        schema_version=BACKTESTING_LOG_SCHEMA,
+    )
+
+
+def _attach_cbc_events(
+    payload: dict,
+    target_dir: str,
+    period: dict,
+    cbc_events_by_scenario: dict[str, list[dict]] | None,
+) -> None:
+    """CBC-Event-Felder plus JSONL-Sidecar, sofern Events vorliegen."""
+    if not cbc_events_by_scenario:
+        return
+    payload["cbc_events_by_scenario"] = cbc_events_by_scenario
+    payload["cbc_events_summary"] = _summarize_cbc_events(cbc_events_by_scenario)
+    payload["cbc_events_file"] = BACKTESTING_CBC_EVENTS_JSONL
+    _append_cbc_events_jsonl(target_dir, cbc_events_by_scenario, period)
+
+
+def _attach_critical_cases(
+    payload: dict,
+    plausibility_by_scenario: dict[str, PlausibilityReport],
+    cbc_events_by_scenario: dict[str, list[dict]] | None,
+) -> None:
+    """Kritische Fälle und deren Zusammenfassung in den Payload schreiben."""
+    critical_cases = build_critical_cases(
+        plausibility_by_scenario,
+        cbc_events_by_scenario,
+    )
+    payload["critical_cases"] = critical_cases
+    payload["critical_cases_summary"] = summarize_critical_cases(critical_cases)
+
+
+def _attach_window_snapshots(
+    payload: dict,
+    target_dir: str,
+    period: dict,
+    window_snapshots: list[dict] | None,
+) -> None:
+    """Snapshot-Sidecar schreiben — oder ein vorhandenes entfernen."""
+    if not window_snapshots:
+        remove_window_snapshots_jsonl(target_dir)
+        return
+    snapshots_path = write_window_snapshots_jsonl(target_dir, window_snapshots)
+    if snapshots_path:
+        payload["window_snapshots_file"] = BACKTESTING_WINDOW_SNAPSHOTS_JSONL
+        payload["window_snapshots_count"] = len(window_snapshots)
+        payload["window_snapshots_horizon_mode"] = period.get("horizon_mode")
+
+
+def _attach_period_bounds(
+    payload: dict,
+    period: dict,
+    all_ts: list[pd.Timestamp],
+    scenario_count: int,
+) -> None:
+    """Erste/letzte Stunde, Stundenzahl und optionale Perioden-Zusatzfelder."""
+    if all_ts:
+        payload["period"]["first_ts"] = pd.Timestamp(min(all_ts)).isoformat()
+        payload["period"]["last_ts"] = pd.Timestamp(max(all_ts)).isoformat()
+        payload["period"]["hours"] = len(all_ts) // max(scenario_count, 1)
+    if period.get("reference_by_scenario"):
+        payload["reference_by_scenario"] = period["reference_by_scenario"]
+    if period.get("live_scenario_id"):
+        payload["live_scenario_id"] = period["live_scenario_id"]
+    if period.get("imported_pv_scenario_ids"):
+        payload["imported_pv_scenario_ids"] = list(period["imported_pv_scenario_ids"])
+    if period.get("imported_pv_missing_scenario_ids"):
+        payload["imported_pv_missing_scenario_ids"] = list(
+            period["imported_pv_missing_scenario_ids"]
+        )
+
+
 def save_backtesting_log(
     results: dict[str, pd.DataFrame],
     labels: dict[str, str],
@@ -402,82 +552,21 @@ def save_backtesting_log(
     hourly_df = _hourly_to_csv(results, labels)
     hourly_df.to_csv(csv_path, index=False, sep=";", decimal=",")
 
-    all_ts = []
-    for df in results.values():
-        if not df.empty:
-            for ts in df.index.tolist():
-                stamp = pd.Timestamp(ts)
-                if stamp.tzinfo is not None:
-                    stamp = stamp.tz_localize(None)
-                all_ts.append(stamp)
-
-    fee_breakdown_payload = {
-        sid: {
-            key: float(value)
-            for key, value in (fee_breakdown_by_scenario.get(sid) or {}).items()
-        }
-        for sid in results
-    } if fee_breakdown_by_scenario else {}
-
-    payload = stamp_payload(
-        {
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "period": period,
-            "labels": labels,
-            "summary": _build_summary(
-                results, labels, monthly_fee_by_scenario=monthly_fee_by_scenario
-            ),
-            "monthly_fee_by_scenario": {
-                sid: float(monthly_fee_by_scenario.get(sid, 0.0) or 0.0)
-                for sid in results
-            }
-            if monthly_fee_by_scenario
-            else {},
-            "fee_breakdown_by_scenario": fee_breakdown_payload,
-            "plausibility": {
-                sid: _serialize_plausibility(rep)
-                for sid, rep in plausibility_by_scenario.items()
-            },
-            "series_file": BACKTESTING_CSV,
-            "scenario_ids": list(results.keys()),
-            "reference_id": HISTORICAL_REFERENCE_ID,
-            "config_fingerprint": config_fingerprint or _compute_config_fingerprint(period),
-        },
-        schema_version=BACKTESTING_LOG_SCHEMA,
-    )
-    if cbc_events_by_scenario:
-        payload["cbc_events_by_scenario"] = cbc_events_by_scenario
-        payload["cbc_events_summary"] = _summarize_cbc_events(cbc_events_by_scenario)
-        payload["cbc_events_file"] = BACKTESTING_CBC_EVENTS_JSONL
-        _append_cbc_events_jsonl(target_dir, cbc_events_by_scenario, period)
-    critical_cases = build_critical_cases(
+    all_ts = _collect_all_timestamps(results)
+    payload = _build_log_payload(
+        results,
+        labels,
         plausibility_by_scenario,
-        cbc_events_by_scenario,
+        period,
+        _fee_and_summary_parts(
+            results, labels, monthly_fee_by_scenario, fee_breakdown_by_scenario
+        ),
+        config_fingerprint=config_fingerprint,
     )
-    payload["critical_cases"] = critical_cases
-    payload["critical_cases_summary"] = summarize_critical_cases(critical_cases)
-    if window_snapshots:
-        snapshots_path = write_window_snapshots_jsonl(target_dir, window_snapshots)
-        if snapshots_path:
-            payload["window_snapshots_file"] = BACKTESTING_WINDOW_SNAPSHOTS_JSONL
-            payload["window_snapshots_count"] = len(window_snapshots)
-            payload["window_snapshots_horizon_mode"] = period.get("horizon_mode")
-    else:
-        remove_window_snapshots_jsonl(target_dir)
-    if all_ts:
-        payload["period"]["first_ts"] = pd.Timestamp(min(all_ts)).isoformat()
-        payload["period"]["last_ts"] = pd.Timestamp(max(all_ts)).isoformat()
-        payload["period"]["hours"] = len(all_ts) // max(len(results), 1)
-    if period.get("reference_by_scenario"):
-        payload["reference_by_scenario"] = period["reference_by_scenario"]
-    if period.get("live_scenario_id"):
-        payload["live_scenario_id"] = period["live_scenario_id"]
-    if period.get("imported_pv_scenario_ids"):
-        payload["imported_pv_scenario_ids"] = list(period["imported_pv_scenario_ids"])
-    if period.get("imported_pv_missing_scenario_ids"):
-        payload["imported_pv_missing_scenario_ids"] = list(
-            period["imported_pv_missing_scenario_ids"]
-        )
+    _attach_cbc_events(payload, target_dir, period, cbc_events_by_scenario)
+    _attach_critical_cases(payload, plausibility_by_scenario, cbc_events_by_scenario)
+    _attach_window_snapshots(payload, target_dir, period, window_snapshots)
+    _attach_period_bounds(payload, period, all_ts, len(results))
 
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)

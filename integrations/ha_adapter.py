@@ -55,6 +55,17 @@ _NONNEG_TELEMETRY = frozenset(
 )
 
 
+@dataclass
+class _HaWriteOutcome:
+    """Fehlfelder, Meldungen und Capability-Flips eines Setpoint-Schreibvorgangs."""
+
+    failed: list[str] = field(default_factory=list)
+    messages: list[str] = field(default_factory=list)
+    hub_status: str | None = None
+    flip_ess: bool = False
+    flip_evcs: bool = False
+
+
 @dataclass(frozen=True)
 class HaConfig:
     base_url: str
@@ -225,6 +236,71 @@ class HaAdapter:
             )
         return validate_telemetry(doc)
 
+    def _invalid_setpoint_error(
+        self,
+        raw: dict[str, Any],
+        exc: EhalValidationError,
+    ) -> EhalWriteError:
+        """Write-Error für ein Setpoint-Dokument, das die Validierung nicht besteht."""
+        known = [k for k in SETPOINT_FIELDS if k in raw]
+        return self._record_write_error(
+            failed_fields=known or ["set_ess_charge_power_limit"],
+            message=f"Invalid EHAL setpoint: {exc}",
+            hub_status=None,
+            retryable=False,
+            flip_ess=False,
+            flip_evcs=False,
+        )
+
+    def _write_ess_setpoints(
+        self,
+        doc: dict[str, Any],
+        outcome: _HaWriteOutcome,
+    ) -> None:
+        """ESS-Leistung/Grenzen sowie den Modus schreiben (Modus flippt kein Capability)."""
+        for field_name in (
+            "set_ess_active_power",
+            "set_ess_charge_power_limit",
+            "set_ess_discharge_power_limit",
+        ):
+            if field_name not in doc or not self._supports_ess_write:
+                continue
+            ok, status, msg = self._try_setpoint_write(field_name, float(doc[field_name]))
+            if not ok:
+                outcome.failed.append(field_name)
+                outcome.messages.append(msg)
+                outcome.hub_status = status or outcome.hub_status
+                outcome.flip_ess = True
+
+        if "set_ess_mode" in doc and self.cfg.entities.get("set_ess_mode"):
+            ok, status, msg = self._try_setpoint_write(
+                "set_ess_mode", doc["set_ess_mode"]
+            )
+            if not ok:
+                outcome.failed.append("set_ess_mode")
+                outcome.messages.append(msg)
+                outcome.hub_status = status or outcome.hub_status
+
+    def _write_evcs_setpoints(
+        self,
+        doc: dict[str, Any],
+        outcome: _HaWriteOutcome,
+    ) -> None:
+        """EVCS-Strom (Ampere) und Modus schreiben, sofern Entities gemappt sind."""
+        for field_name in ("set_evcs_max_current", "set_evcs_mode"):
+            if field_name not in doc or not self._supports_evcs_current:
+                continue
+            if not self.cfg.entities.get(field_name):
+                continue
+            value = doc[field_name]
+            numeric = float(value) if field_name != "set_evcs_mode" else value
+            ok, status, msg = self._try_setpoint_write(field_name, numeric)
+            if not ok:
+                outcome.failed.append(field_name)
+                outcome.messages.append(msg)
+                outcome.hub_status = status or outcome.hub_status
+                outcome.flip_evcs = True
+
     def write_setpoints(
         self,
         setpoint: EhalSetpoint | dict[str, Any],
@@ -238,70 +314,23 @@ class HaAdapter:
         try:
             doc = validate_setpoint(raw)
         except EhalValidationError as exc:
-            known = [k for k in SETPOINT_FIELDS if k in raw]
-            return self._record_write_error(
-                failed_fields=known or ["set_ess_charge_power_limit"],
-                message=f"Invalid EHAL setpoint: {exc}",
-                hub_status=None,
-                retryable=False,
-                flip_ess=False,
-                flip_evcs=False,
-            )
+            return self._invalid_setpoint_error(raw, exc)
 
-        failed: list[str] = []
-        messages: list[str] = []
-        hub_status: str | None = None
-        flip_ess = False
-        flip_evcs = False
+        outcome = _HaWriteOutcome()
+        self._write_ess_setpoints(doc, outcome)
+        self._write_evcs_setpoints(doc, outcome)
 
-        for field_name in (
-            "set_ess_active_power",
-            "set_ess_charge_power_limit",
-            "set_ess_discharge_power_limit",
-        ):
-            if field_name not in doc or not self._supports_ess_write:
-                continue
-            ok, status, msg = self._try_setpoint_write(field_name, float(doc[field_name]))
-            if not ok:
-                failed.append(field_name)
-                messages.append(msg)
-                hub_status = status or hub_status
-                flip_ess = True
-
-        if "set_ess_mode" in doc and self.cfg.entities.get("set_ess_mode"):
-            ok, status, msg = self._try_setpoint_write(
-                "set_ess_mode", doc["set_ess_mode"]
-            )
-            if not ok:
-                failed.append("set_ess_mode")
-                messages.append(msg)
-                hub_status = status or hub_status
-
-        for field_name in ("set_evcs_max_current", "set_evcs_mode"):
-            if field_name not in doc or not self._supports_evcs_current:
-                continue
-            if not self.cfg.entities.get(field_name):
-                continue
-            value = doc[field_name]
-            numeric = float(value) if field_name != "set_evcs_mode" else value
-            ok, status, msg = self._try_setpoint_write(field_name, numeric)
-            if not ok:
-                failed.append(field_name)
-                messages.append(msg)
-                hub_status = status or hub_status
-                flip_evcs = True
-
-        if not failed:
+        if not outcome.failed:
             self._last_write_error = None
             return None
 
         return self._record_write_error(
-            failed_fields=failed,
-            message="; ".join(messages),
-            hub_status=hub_status,
+            failed_fields=outcome.failed,
+            message="; ".join(outcome.messages),
+            hub_status=outcome.hub_status,
             retryable=True,
-            flip_ess=flip_ess,
-            flip_evcs=flip_evcs,
+            flip_ess=outcome.flip_ess,
+            flip_evcs=outcome.flip_evcs,
         )
 
     def _get_json(self, path: str) -> Any:

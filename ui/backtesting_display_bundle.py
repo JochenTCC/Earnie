@@ -61,7 +61,6 @@ from ui.backtesting_chart_context import (
     _geo_from_snapshot,
     _parse_slot_datetime,
     _parse_window_anchor,
-    _planning_moment,
     _rows_with_parsed_slots,
     _slot_datetimes_from_sim_rows,
     build_backtesting_chart_context,
@@ -125,22 +124,15 @@ def _select_snapshot_rows(
     )
 
 
-def _build_backtesting_savings_info(
-    matrix: list[dict],
-    chart_rows: list[dict],
+def _backtesting_baseline_rows(
+    prep: tuple[list[dict], list, dict | None],
+    optimized_rows: list[dict],
     *,
     initial_soc: float,
-    consumer_daily_targets_kwh: dict[str, float] | None,
-    sunrise_soc_min_index: int | None,
     battery_params: dict,
-) -> dict:
-    """Savings-Dict für Charts aus persistierten Backtesting-Zeilen (ohne Legacy-Profile)."""
-    matrix_prep, charging_contexts, targets = prepare_optimization_matrix(
-        matrix,
-        consumer_daily_targets_kwh,
-    )
-    filters = resolve_filter_contexts(matrix_prep)
-    optimized_rows = chart_rows
+) -> dict[str, list[dict]]:
+    """Baseline-, Matched-Baseline- und Same-Flex-Zeilen; `prep` wie prepare_optimization_matrix."""
+    matrix_prep, charging_contexts, targets = prep
     baseline_rows = simulate_baseline_horizon(
         matrix_prep,
         initial_soc,
@@ -162,19 +154,22 @@ def _build_backtesting_savings_info(
         initial_soc,
         battery_params=battery_params,
     )
+    return {
+        "baseline_rows": baseline_rows,
+        "matched_baseline_rows": matched_baseline_rows,
+        "baseline_same_flex_rows": baseline_same_flex_rows,
+    }
+
+
+def _backtesting_cost_fields(
+    rows: dict[str, list[dict]],
+    optimized_rows: list[dict],
+) -> dict:
+    baseline_rows = rows["baseline_rows"]
+    matched_baseline_rows = rows["matched_baseline_rows"]
     optimized_cost = calculate_cost_euro_from_rows(optimized_rows, None)
     baseline_cost = calculate_cost_euro_from_rows(baseline_rows, None)
     matched_baseline_cost = calculate_cost_euro_from_rows(matched_baseline_rows, None)
-    hourly_matched_cost = hourly_cost_euro_from_rows(matched_baseline_rows, None)
-    hourly_optimized_cost = hourly_cost_euro_from_rows(optimized_rows, None)
-    hourly_savings = hourly_savings_euro_from_rows(
-        matched_baseline_rows,
-        optimized_rows,
-        None,
-    )
-    hourly_battery_only_cost = hourly_cost_euro_from_rows(baseline_same_flex_rows, None)
-    hourly_matched_consumption = hourly_consumption_kwh_from_rows(matched_baseline_rows)
-    hourly_optimized_consumption = hourly_consumption_kwh_from_rows(optimized_rows)
     return {
         "baseline_cost_euro": round(baseline_cost, 4),
         "matched_baseline_cost_euro": round(matched_baseline_cost, 4),
@@ -188,18 +183,89 @@ def _build_backtesting_savings_info(
         "optimized_consumption_kwh": round(
             total_consumption_kwh_from_rows(optimized_rows), 3
         ),
+    }
+
+
+def _backtesting_hourly_fields(
+    rows: dict[str, list[dict]],
+    optimized_rows: list[dict],
+) -> dict:
+    matched_baseline_rows = rows["matched_baseline_rows"]
+    return {
+        "hourly_matched_baseline_cost_euro": hourly_cost_euro_from_rows(
+            matched_baseline_rows, None
+        ),
+        "hourly_optimized_cost_euro": hourly_cost_euro_from_rows(optimized_rows, None),
+        "hourly_battery_only_baseline_cost_euro": hourly_cost_euro_from_rows(
+            rows["baseline_same_flex_rows"], None
+        ),
+        "hourly_savings_euro": hourly_savings_euro_from_rows(
+            matched_baseline_rows,
+            optimized_rows,
+            None,
+        ),
+        "hourly_matched_baseline_consumption_kwh": hourly_consumption_kwh_from_rows(
+            matched_baseline_rows
+        ),
+        "hourly_optimized_consumption_kwh": hourly_consumption_kwh_from_rows(optimized_rows),
+    }
+
+
+def _build_backtesting_savings_info(
+    matrix: list[dict],
+    chart_rows: list[dict],
+    *,
+    initial_soc: float,
+    consumer_daily_targets_kwh: dict[str, float] | None,
+    sunrise_soc_min_index: int | None,
+    battery_params: dict,
+) -> dict:
+    """Savings-Dict für Charts aus persistierten Backtesting-Zeilen (ohne Legacy-Profile)."""
+    matrix_prep, charging_contexts, targets = prepare_optimization_matrix(
+        matrix,
+        consumer_daily_targets_kwh,
+    )
+    resolve_filter_contexts(matrix_prep)
+    optimized_rows = chart_rows
+    rows = _backtesting_baseline_rows(
+        (matrix_prep, charging_contexts, targets),
+        optimized_rows,
+        initial_soc=initial_soc,
+        battery_params=battery_params,
+    )
+    return {
+        **_backtesting_cost_fields(rows, optimized_rows),
         "charging_contexts": serialize_charging_contexts(charging_contexts),
         "optimized_rows": optimized_rows,
-        "baseline_rows": baseline_rows,
-        "matched_baseline_rows": matched_baseline_rows,
-        "baseline_same_flex_rows": baseline_same_flex_rows,
-        "hourly_matched_baseline_cost_euro": hourly_matched_cost,
-        "hourly_optimized_cost_euro": hourly_optimized_cost,
-        "hourly_battery_only_baseline_cost_euro": hourly_battery_only_cost,
-        "hourly_savings_euro": hourly_savings,
-        "hourly_matched_baseline_consumption_kwh": hourly_matched_consumption,
-        "hourly_optimized_consumption_kwh": hourly_optimized_consumption,
+        **rows,
+        **_backtesting_hourly_fields(rows, optimized_rows),
     }
+
+
+def _snapshot_consumer_targets(snapshot: dict) -> dict[str, float] | None:
+    """Tagesziele aus meta; ältere Snapshots liefern nur `historical_totals`."""
+    meta = snapshot.get("meta") or {}
+    targets_raw = meta.get("consumer_daily_targets_kwh")
+    if targets_raw is None:
+        targets_raw = meta.get("historical_totals")
+    return dict(targets_raw) if targets_raw is not None else None
+
+
+def _backtesting_chart_header(
+    window_anchor: str,
+    *,
+    tz_name: str,
+    view_mode: str,
+    segment_index: int,
+) -> tuple[str | None, str | None]:
+    if view_mode == VIEW_MODE_24H:
+        return _backtesting_24h_header_label(window_anchor, tz_name), None
+    if view_mode == VIEW_MODE_SUNRISE:
+        return (
+            _backtesting_sunrise_header_label(window_anchor, tz_name, segment_index),
+            s2_zone_help_text(),
+        )
+    return None, None
 
 
 def build_backtesting_display_bundle(
@@ -216,11 +282,7 @@ def build_backtesting_display_bundle(
         tz_name=tz_name,
     )
     initial_soc = float(snapshot.get("initial_soc", 50.0))
-    meta = snapshot.get("meta") or {}
-    targets_raw = meta.get("consumer_daily_targets_kwh")
-    if targets_raw is None:
-        targets_raw = meta.get("historical_totals")
-    targets = dict(targets_raw) if targets_raw is not None else None
+    targets = _snapshot_consumer_targets(snapshot)
     sunrise_soc_min_index = snapshot.get("sunrise_soc_min_index")
     if view_mode == VIEW_MODE_24H:
         sunrise_soc_min_index = None
@@ -239,7 +301,6 @@ def build_backtesting_display_bundle(
     matched_rows = savings_info.get("matched_baseline_rows")
     matched_df = pd.DataFrame(matched_rows) if matched_rows else None
 
-    geo = _geo_from_snapshot(snapshot)
     window_anchor = str(snapshot["window_anchor"])
     chart_context = build_backtesting_chart_context(
         window_anchor,
@@ -248,17 +309,12 @@ def build_backtesting_display_bundle(
         sim_rows=chart_rows,
         geo=geo,
     )
-    header_label = None
-    header_help = None
-    if view_mode == VIEW_MODE_24H:
-        header_label = _backtesting_24h_header_label(window_anchor, tz_name)
-    elif view_mode == VIEW_MODE_SUNRISE:
-        header_label = _backtesting_sunrise_header_label(
-            window_anchor,
-            tz_name,
-            segment_index,
-        )
-        header_help = s2_zone_help_text()
+    header_label, header_help = _backtesting_chart_header(
+        window_anchor,
+        tz_name=tz_name,
+        view_mode=view_mode,
+        segment_index=segment_index,
+    )
     flex = flex_consumers_from_snapshot(snapshot)
     return build_optimization_display_bundle(
         savings_info,

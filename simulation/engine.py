@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+from typing import NamedTuple
 
 import pandas as pd
 import config
@@ -27,14 +28,10 @@ from simulation.baseload_validation import (
     resolve_hourly_baseload_kw,
 )
 from simulation.backtesting_horizon import (
-    compute_sunrise_planning_at_anchor,
-    effective_sunrise_soc_min_index,
     geo_params_from_scenario,
     naive_backtesting_slot,
     overlay_step_consumption_on_matrix,
     resolve_sunrise_book_step_for_scenario,
-    step_slot_datetimes,
-    truncate_matrix_for_step_simulation,
     window_start_before_anchor,
 )
 from simulation.horizon_mode import (
@@ -288,6 +285,223 @@ def _critical_snapshot_kind(
     return "unknown"
 
 
+@dataclass(frozen=True)
+class _SimulationRunInit:
+    """Szenario-abgeleitete Laufparameter und die aktiven Solver-Overrides."""
+
+    battery_params: dict
+    flexible_consumers: list
+    feed_in_settings: feed_in_prices.FeedInSettings
+    total_hours: float
+    solver_tokens: tuple
+
+
+@dataclass(frozen=True)
+class _AnchorRunConfig:
+    """Über alle Fenster konstante Eingaben eines ``run_simulation``-Laufs."""
+
+    horizon_mode: str
+    cache: HistoricalDataCache
+    prices_df: pd.DataFrame
+    scenario_params: dict
+    battery_params: dict
+    feed_in_settings: feed_in_prices.FeedInSettings
+    price_resources: BacktestingPriceResources | None
+    scenario_id: str | None
+    collect_cbc: bool
+    snapshot_collector: list[dict] | None
+
+
+class _AnchorStepResult(NamedTuple):
+    """Ergebnis eines Anker-Fensters aus ``_simulate_anchor_step``."""
+
+    chart_rows: list[dict]
+    matrix: list[dict]
+    meta: dict
+    sim_soc: float
+    chart_rows_full: list[dict] | None
+    matrix_full: list[dict] | None
+    sunrise_soc_min_index: int | None
+
+
+def _total_simulation_hours(
+    anchors: list[datetime],
+    scenario_params: dict,
+    horizon_mode: str,
+) -> float:
+    """Fortschritts-Gesamtstunden: Sunrise-Buchungsschritte bzw. 24h je Anker."""
+    if horizon_mode != SUNRISE_WINDOW:
+        return len(anchors) * BACKTESTING_STEP_HOURS
+    return wall_hours_from_slots(
+        sum(
+            resolve_sunrise_book_step_for_scenario(anchor, scenario_params).book_hours
+            for anchor in anchors
+        )
+    )
+
+
+def _init_simulation_run(
+    anchors: list[datetime],
+    scenario_params: dict,
+    horizon_mode: str,
+) -> _SimulationRunInit:
+    """Batterie-/Flex-Parameter, CBC-Overrides und Fortschrittsbasis des Laufs."""
+    battery_params = _scenario_to_battery_params(scenario_params)
+    flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
+    feed_in_settings = config.get_backtesting_feed_in_settings(
+        runtime_override=scenario_params
+    )
+    gap_token = set_cbc_gap_rel_override(config.get_backtesting_cbc_gap_rel())
+    limit_token = set_cbc_strict_time_limit_override(
+        config.get_backtesting_cbc_strict_time_limit_sec()
+    )
+    solver_token = set_milp_solver_override(config.get_backtesting_milp_solver())
+    return _SimulationRunInit(
+        battery_params=battery_params,
+        flexible_consumers=flexible_consumers,
+        feed_in_settings=feed_in_settings,
+        total_hours=_total_simulation_hours(anchors, scenario_params, horizon_mode),
+        solver_tokens=(gap_token, limit_token, solver_token),
+    )
+
+
+def _reset_simulation_run(solver_tokens: tuple) -> None:
+    """Setzt die für den Lauf gesetzten CBC-/Solver-Overrides zurück."""
+    gap_token, limit_token, solver_token = solver_tokens
+    reset_cbc_gap_rel_override(gap_token)
+    reset_cbc_strict_time_limit_override(limit_token)
+    reset_milp_solver_override(solver_token)
+
+
+def _collect_critical_snapshot(
+    cfg: _AnchorRunConfig,
+    anchor: datetime,
+    step: _AnchorStepResult,
+    *,
+    events_before: int,
+    plausibility_ok: bool,
+    window_initial_soc: float,
+) -> None:
+    """Hängt bei Toleranzverletzung oder neuem CBC-Event einen Fenster-Snapshot an."""
+    events_after = count_cbc_events() if cfg.collect_cbc else 0
+    new_cbc_events = (
+        list_cbc_events()[events_before:events_after]
+        if cfg.collect_cbc and events_after > events_before
+        else []
+    )
+    if plausibility_ok and not new_cbc_events:
+        return
+    cfg.snapshot_collector.append(
+        build_window_snapshot(
+            window_anchor=anchor,
+            scenario_id=cfg.scenario_id,
+            horizon_mode=cfg.horizon_mode,
+            kind=_critical_snapshot_kind(plausibility_ok, new_cbc_events),
+            initial_soc=window_initial_soc,
+            meta=step.meta,
+            chart_rows_24h=step.chart_rows,
+            matrix_24h=step.matrix,
+            chart_rows_full=step.chart_rows_full,
+            matrix_full=step.matrix_full,
+            sunrise_soc_min_index=step.sunrise_soc_min_index,
+            scenario_params=cfg.scenario_params,
+            battery_params=cfg.battery_params,
+        )
+    )
+
+
+def _process_anchor_window(
+    cfg: _AnchorRunConfig,
+    anchor: datetime,
+    sim_soc: float,
+    hours_done: int,
+    plausibility: PlausibilityReport,
+) -> _AnchorStepResult:
+    """Simuliert ein Anker-Fenster inkl. Plausibilitätsprüfung und Snapshot-Sammlung."""
+    if cfg.collect_cbc:
+        set_cbc_milp_context(window_anchor=pd.Timestamp(anchor).isoformat())
+    window_initial_soc = sim_soc
+    events_before = count_cbc_events() if cfg.collect_cbc else 0
+    collect_snapshots = (
+        cfg.snapshot_collector is not None and cfg.scenario_id is not None
+    )
+    step = _AnchorStepResult(
+        *_simulate_anchor_step(
+            anchor,
+            sim_soc,
+            horizon_mode=cfg.horizon_mode,
+            cache=cfg.cache,
+            prices_df=cfg.prices_df,
+            scenario_params=cfg.scenario_params,
+            battery_params=cfg.battery_params,
+            feed_in_settings=cfg.feed_in_settings,
+            hours_done=hours_done,
+            collect_cbc=cfg.collect_cbc,
+            price_resources=cfg.price_resources,
+            collect_full_horizon=collect_snapshots,
+        )
+    )
+    if cfg.collect_cbc:
+        set_cbc_milp_context(
+            consumer_targets_kwh=dict(step.meta["consumer_daily_targets_kwh"]),
+        )
+    step.meta["standby_power_kw"] = float(
+        cfg.battery_params.get("standby_power_kw") or 0.0
+    )
+    plausibility_result = validate_window_consumption(step.chart_rows, step.meta)
+    plausibility.add(plausibility_result)
+    if collect_snapshots:
+        _collect_critical_snapshot(
+            cfg,
+            anchor,
+            step,
+            events_before=events_before,
+            plausibility_ok=plausibility_result.ok,
+            window_initial_soc=window_initial_soc,
+        )
+    return step
+
+
+def _finalize_simulation_result(
+    all_chart_rows: list[dict],
+    all_timestamps: list[datetime],
+    flexible_consumers: list,
+) -> pd.DataFrame:
+    """Baut das Ergebnis-DataFrame (Verbrauch, Kosten, SoC, Steuerbefehl) des Laufs."""
+    consumption_columns = _consumption_kw_columns_from_chart_rows(
+        all_chart_rows,
+        flexible_consumers,
+    )
+    cost_parts = [
+        _calculate_step_cost_parts_from_row(row) for row in all_chart_rows
+    ]
+    df_res = pd.DataFrame(
+        {
+            **consumption_columns,
+            "sim_cost": [parts[2] for parts in cost_parts],
+            "import_cost_eur": [parts[0] for parts in cost_parts],
+            "export_earn_eur": [parts[1] for parts in cost_parts],
+            "import_kwh": [parts[3] for parts in cost_parts],
+            "export_kwh": [parts[4] for parts in cost_parts],
+            "k_act": [
+                float(row["Strompreis (Cent/kWh)"]) for row in all_chart_rows
+            ],
+            "k_push_act": [
+                float(row["Einspeisevergütung (Cent/kWh)"])
+                if "Einspeisevergütung (Cent/kWh)" in row
+                else float("nan")
+                for row in all_chart_rows
+            ],
+            "sim_soc": [row["Simulierter SoC (%)"] for row in all_chart_rows],
+            "batt_action_kw": [row["Geplante Batterie-Aktion (kW)"] for row in all_chart_rows],
+            "steuerbefehl": [row["Steuerbefehl"] for row in all_chart_rows],
+        },
+        index=pd.DatetimeIndex(all_timestamps),
+    )
+    df_res.index.name = "ts"
+    return df_res
+
+
 def run_simulation(
     start: pd.Timestamp,
     end: pd.Timestamp,
@@ -321,25 +535,7 @@ def run_simulation(
             f"Keine historischen Verbrauchsfenster zwischen {start.date()} und {end.date()}."
         )
 
-    battery_params = _scenario_to_battery_params(scenario_params)
-    flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
-    feed_in_settings = config.get_backtesting_feed_in_settings(runtime_override=scenario_params)
-    gap_token = set_cbc_gap_rel_override(config.get_backtesting_cbc_gap_rel())
-    limit_token = set_cbc_strict_time_limit_override(
-        config.get_backtesting_cbc_strict_time_limit_sec()
-    )
-    solver_token = set_milp_solver_override(config.get_backtesting_milp_solver())
-    if horizon_mode == SUNRISE_WINDOW:
-        total_hours = wall_hours_from_slots(
-            sum(
-                resolve_sunrise_book_step_for_scenario(
-                    anchor, scenario_params
-                ).book_hours
-                for anchor in anchors
-            )
-        )
-    else:
-        total_hours = len(anchors) * BACKTESTING_STEP_HOURS
+    init = _init_simulation_run(anchors, scenario_params, horizon_mode)
     hours_done = 0
     sim_soc = initial_soc
 
@@ -351,127 +547,41 @@ def run_simulation(
         begin_cbc_event_collection()
         set_cbc_milp_context(scenario_id=scenario_id)
 
-    collect_snapshots = snapshot_collector is not None and scenario_id is not None
-
+    cfg = _AnchorRunConfig(
+        horizon_mode=horizon_mode,
+        cache=cache,
+        prices_df=prices_df,
+        scenario_params=scenario_params,
+        battery_params=init.battery_params,
+        feed_in_settings=init.feed_in_settings,
+        price_resources=price_resources,
+        scenario_id=scenario_id,
+        collect_cbc=collect_cbc,
+        snapshot_collector=snapshot_collector,
+    )
     try:
         for anchor in anchors:
-            if collect_cbc:
-                set_cbc_milp_context(
-                    window_anchor=pd.Timestamp(anchor).isoformat(),
-                )
-            window_initial_soc = sim_soc
-            events_before = count_cbc_events() if collect_cbc else 0
-            (
-                chart_rows,
-                matrix,
-                meta,
-                sim_soc,
-                chart_rows_full,
-                matrix_full,
-                sunrise_soc_min_index,
-            ) = _simulate_anchor_step(
-                anchor,
-                sim_soc,
-                horizon_mode=horizon_mode,
-                cache=cache,
-                prices_df=prices_df,
-                scenario_params=scenario_params,
-                battery_params=battery_params,
-                feed_in_settings=feed_in_settings,
-                hours_done=hours_done,
-                collect_cbc=collect_cbc,
-                price_resources=price_resources,
-                collect_full_horizon=collect_snapshots,
-            )
-            if collect_cbc:
-                set_cbc_milp_context(
-                    consumer_targets_kwh=dict(meta["consumer_daily_targets_kwh"]),
-                )
-            meta["standby_power_kw"] = float(
-                battery_params.get("standby_power_kw") or 0.0
-            )
-            plausibility_result = validate_window_consumption(chart_rows, meta)
-            plausibility.add(plausibility_result)
-
-            if snapshot_collector is not None and scenario_id is not None:
-                events_after = count_cbc_events() if collect_cbc else 0
-                new_cbc_events = (
-                    list_cbc_events()[events_before:events_after]
-                    if collect_cbc and events_after > events_before
-                    else []
-                )
-                is_critical = (not plausibility_result.ok) or bool(new_cbc_events)
-                if is_critical:
-                    snapshot_collector.append(
-                        build_window_snapshot(
-                            window_anchor=anchor,
-                            scenario_id=scenario_id,
-                            horizon_mode=horizon_mode,
-                            kind=_critical_snapshot_kind(
-                                plausibility_result.ok,
-                                new_cbc_events,
-                            ),
-                            initial_soc=window_initial_soc,
-                            meta=meta,
-                            chart_rows_24h=chart_rows,
-                            matrix_24h=matrix,
-                            chart_rows_full=chart_rows_full,
-                            matrix_full=matrix_full,
-                            sunrise_soc_min_index=sunrise_soc_min_index,
-                            scenario_params=scenario_params,
-                            battery_params=battery_params,
-                        )
-                    )
-
-            foresight_flex = list(meta.pop("foresight_flex_rows", []) or [])
+            step = _process_anchor_window(cfg, anchor, sim_soc, hours_done, plausibility)
+            sim_soc = step.sim_soc
+            foresight_flex = list(step.meta.pop("foresight_flex_rows", []) or [])
             if foresight_flex:
                 _merge_foresight_flex_into_series(
                     all_chart_rows, all_timestamps, foresight_flex
                 )
-            all_chart_rows.extend(chart_rows)
-            all_timestamps.extend(row["slot_datetime"] for row in matrix)
+            all_chart_rows.extend(step.chart_rows)
+            all_timestamps.extend(row["slot_datetime"] for row in step.matrix)
 
-            hours_done += len(chart_rows)
+            hours_done += len(step.chart_rows)
             if on_progress is not None:
-                on_progress(wall_hours_from_slots(hours_done), total_hours)
+                on_progress(wall_hours_from_slots(hours_done), init.total_hours)
     finally:
-        reset_cbc_gap_rel_override(gap_token)
-        reset_cbc_strict_time_limit_override(limit_token)
-        reset_milp_solver_override(solver_token)
+        _reset_simulation_run(init.solver_tokens)
         if collect_cbc:
             clear_cbc_milp_context()
 
-    consumption_columns = _consumption_kw_columns_from_chart_rows(
-        all_chart_rows,
-        flexible_consumers,
+    df_res = _finalize_simulation_result(
+        all_chart_rows, all_timestamps, init.flexible_consumers
     )
-    cost_parts = [
-        _calculate_step_cost_parts_from_row(row) for row in all_chart_rows
-    ]
-    df_res = pd.DataFrame(
-        {
-            **consumption_columns,
-            "sim_cost": [parts[2] for parts in cost_parts],
-            "import_cost_eur": [parts[0] for parts in cost_parts],
-            "export_earn_eur": [parts[1] for parts in cost_parts],
-            "import_kwh": [parts[3] for parts in cost_parts],
-            "export_kwh": [parts[4] for parts in cost_parts],
-            "k_act": [
-                float(row["Strompreis (Cent/kWh)"]) for row in all_chart_rows
-            ],
-            "k_push_act": [
-                float(row["Einspeisevergütung (Cent/kWh)"])
-                if "Einspeisevergütung (Cent/kWh)" in row
-                else float("nan")
-                for row in all_chart_rows
-            ],
-            "sim_soc": [row["Simulierter SoC (%)"] for row in all_chart_rows],
-            "batt_action_kw": [row["Geplante Batterie-Aktion (kW)"] for row in all_chart_rows],
-            "steuerbefehl": [row["Steuerbefehl"] for row in all_chart_rows],
-        },
-        index=pd.DatetimeIndex(all_timestamps),
-    )
-    df_res.index.name = "ts"
     cbc_events = take_cbc_events() if collect_cbc else []
     return df_res, plausibility, cbc_events
 

@@ -15,7 +15,7 @@ dependencies = [
     "starlette>=0.46.0,<1.4",
     "plotly>=5.18.0",
     "pandas>=2.0.0",
-    "pulp>=2.8.0",
+    "pulp>=2.8.0,<4",
     "highspy",
     "python-dotenv>=1.0.0",
     "astral>=3.2",

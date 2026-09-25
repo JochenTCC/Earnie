@@ -120,6 +120,77 @@ def _build_day_totals(
     )
 
 
+def _segment_day_totals(
+    chart: UiChartWindow,
+    hourly_matched: Sequence[float],
+    hourly_optimized: Sequence[float],
+    hist: int,
+) -> DayCostTotals:
+    """Totals for a single SA segment (whole series belongs to one day)."""
+    tag = "SA₀→SA₁" if chart.segment_index == 0 else "SA₁→SA₂"
+    day_start = chart.sa0 if chart.segment_index == 0 else chart.sa1
+    limit = min(
+        len(chart.slot_datetimes), len(hourly_matched), len(hourly_optimized)
+    )
+    hist_end = min(hist, limit)
+    return _build_day_totals(
+        label=_day_label(day_start, tag),
+        matched=sum(float(hourly_matched[i] or 0.0) for i in range(limit)),
+        optimized=sum(float(hourly_optimized[i] or 0.0) for i in range(limit)),
+        achieved_matched=sum(
+            float(hourly_matched[i] or 0.0) for i in range(hist_end)
+        ),
+        achieved_optimized=sum(
+            float(hourly_optimized[i] or 0.0) for i in range(hist_end)
+        ),
+        day_slots=limit,
+        history_in_day=hist_end,
+    )
+
+
+def _full_span_day_totals(
+    chart: UiChartWindow,
+    hourly_matched: Sequence[float],
+    hourly_optimized: Sequence[float],
+    hist: int,
+    day: tuple[int, str, datetime],
+) -> DayCostTotals:
+    """Totals for one SA-day of a full SA₀→SA₂ span."""
+    day_index, tag, day_start = day
+    slots = chart.slot_datetimes
+    bounds = dict(sa0=chart.sa0, sa1=chart.sa1, sa2=chart.sa2)
+    matched, optimized = _sum_hourly_for_day(
+        slots,
+        hourly_matched,
+        hourly_optimized,
+        day_index=day_index,
+        **bounds,
+    )
+    achieved_matched, achieved_optimized = _sum_hourly_for_day(
+        slots,
+        hourly_matched,
+        hourly_optimized,
+        day_index=day_index,
+        index_end=hist,
+        **bounds,
+    )
+    day_slots, history_in_day = _day_slot_counts(
+        slots,
+        day_index=day_index,
+        history_slot_count=hist,
+        **bounds,
+    )
+    return _build_day_totals(
+        label=_day_label(day_start, tag),
+        matched=matched,
+        optimized=optimized,
+        achieved_matched=achieved_matched,
+        achieved_optimized=achieved_optimized,
+        day_slots=day_slots,
+        history_in_day=history_in_day,
+    )
+
+
 def day_cost_totals_for_chart(
     chart: UiChartWindow,
     hourly_matched: Sequence[float],
@@ -132,81 +203,15 @@ def day_cost_totals_for_chart(
     On a partially elapsed (running) day, sets ``show_split_savings`` with achieved
     totals for history slots so annotations can show bisher vs erwartet.
     """
-    slots = chart.slot_datetimes
-    if not slots or not hourly_matched or not hourly_optimized:
+    if not chart.slot_datetimes or not hourly_matched or not hourly_optimized:
         return ()
-
     hist = max(0, int(history_slot_count))
-
     if chart.span != "full":
-        tag = "SA₀→SA₁" if chart.segment_index == 0 else "SA₁→SA₂"
-        day_start = chart.sa0 if chart.segment_index == 0 else chart.sa1
-        limit = min(len(slots), len(hourly_matched), len(hourly_optimized))
-        matched = sum(float(hourly_matched[i] or 0.0) for i in range(limit))
-        optimized = sum(float(hourly_optimized[i] or 0.0) for i in range(limit))
-        hist_end = min(hist, limit)
-        achieved_matched = sum(
-            float(hourly_matched[i] or 0.0) for i in range(hist_end)
-        )
-        achieved_optimized = sum(
-            float(hourly_optimized[i] or 0.0) for i in range(hist_end)
-        )
-        return (
-            _build_day_totals(
-                label=_day_label(day_start, tag),
-                matched=matched,
-                optimized=optimized,
-                achieved_matched=achieved_matched,
-                achieved_optimized=achieved_optimized,
-                day_slots=limit,
-                history_in_day=hist_end,
-            ),
-        )
-
-    days: list[DayCostTotals] = []
-    for day_index, tag, day_start in (
-        (0, "SA₀→SA₁", chart.sa0),
-        (1, "SA₁→SA₂", chart.sa1),
-    ):
-        matched, optimized = _sum_hourly_for_day(
-            slots,
-            hourly_matched,
-            hourly_optimized,
-            sa0=chart.sa0,
-            sa1=chart.sa1,
-            sa2=chart.sa2,
-            day_index=day_index,
-        )
-        achieved_matched, achieved_optimized = _sum_hourly_for_day(
-            slots,
-            hourly_matched,
-            hourly_optimized,
-            sa0=chart.sa0,
-            sa1=chart.sa1,
-            sa2=chart.sa2,
-            day_index=day_index,
-            index_end=hist,
-        )
-        day_slots, history_in_day = _day_slot_counts(
-            slots,
-            sa0=chart.sa0,
-            sa1=chart.sa1,
-            sa2=chart.sa2,
-            day_index=day_index,
-            history_slot_count=hist,
-        )
-        days.append(
-            _build_day_totals(
-                label=_day_label(day_start, tag),
-                matched=matched,
-                optimized=optimized,
-                achieved_matched=achieved_matched,
-                achieved_optimized=achieved_optimized,
-                day_slots=day_slots,
-                history_in_day=history_in_day,
-            )
-        )
-    return tuple(days)
+        return (_segment_day_totals(chart, hourly_matched, hourly_optimized, hist),)
+    return tuple(
+        _full_span_day_totals(chart, hourly_matched, hourly_optimized, hist, day)
+        for day in ((0, "SA₀→SA₁", chart.sa0), (1, "SA₁→SA₂", chart.sa1))
+    )
 
 
 def achieved_savings_cumulative_euro(

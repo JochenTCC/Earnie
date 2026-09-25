@@ -154,16 +154,19 @@ def _render_digital_csv_scale_prompt(
             except (ValueError, OSError, FileNotFoundError) as exc:
                 st.error(f"Normalisierung fehlgeschlagen: {exc}")
 
-def _render_consumer_profile_csv_fields(
-    consumer: dict,
-    index: int,
-    *,
-    session_scope: str,
-    nominal_power_kw: float,
-) -> dict:
-    """Historisches Verbraucher-CSV + use_profile_csv-Flag."""
-    from pathlib import Path
+def _consumer_csv_keys(session_scope: str, index: int) -> dict[str, str]:
+    """Session/widget keys for one consumer CSV block (stable naming)."""
+    return {
+        "path": _scoped_key(session_scope, f"hc_profile_csv_path_{index}"),
+        "input": _scoped_key(session_scope, f"hc_profile_csv_input_{index}"),
+        "use": _scoped_key(session_scope, f"hc_use_profile_csv_{index}"),
+        "pending": _scoped_key(session_scope, f"hc_profile_csv_pending_{index}"),
+        "upload_base": _scoped_key(session_scope, f"hc_profile_csv_upload_{index}"),
+        "upload_nonce": _scoped_key(session_scope, f"hc_profile_csv_upload_nonce_{index}"),
+        "flash": _scoped_key(session_scope, f"hc_profile_csv_flash_{index}"),
+    }
 
+def _render_consumer_csv_intro() -> None:
     st.markdown("**Historisches Leistungsprofil [kW] (CSV)**")
     st.caption(
         "Gleiches Format wie Jahres-CSV (`timestamp;power_kw`). "
@@ -173,35 +176,31 @@ def _render_consumer_profile_csv_fields(
         "Live Gesteuert ignoriert CSV. "
         "Digitale 0/1-Signale: beim Import optional × Nennleistung."
     )
-    path_key = _scoped_key(session_scope, f"hc_profile_csv_path_{index}")
-    input_key = _scoped_key(session_scope, f"hc_profile_csv_input_{index}")
-    use_key = _scoped_key(session_scope, f"hc_use_profile_csv_{index}")
-    pending_key = _scoped_key(session_scope, f"hc_profile_csv_pending_{index}")
-    upload_base = _scoped_key(session_scope, f"hc_profile_csv_upload_{index}")
-    upload_nonce_key = _scoped_key(session_scope, f"hc_profile_csv_upload_nonce_{index}")
-    flash_key = _scoped_key(session_scope, f"hc_profile_csv_flash_{index}")
 
-    apply_csv_path_pending(pending_key, path_key, input_key, use_key=use_key)
-    if path_key not in st.session_state:
-        st.session_state[path_key] = str(consumer.get("profile_csv", "") or "").strip()
-    if input_key not in st.session_state:
-        st.session_state[input_key] = st.session_state[path_key]
+def _seed_consumer_csv_session(consumer: dict, keys: dict[str, str]) -> None:
+    if keys["path"] not in st.session_state:
+        st.session_state[keys["path"]] = str(consumer.get("profile_csv", "") or "").strip()
+    if keys["input"] not in st.session_state:
+        st.session_state[keys["input"]] = st.session_state[keys["path"]]
 
-    flash = st.session_state.pop(flash_key, None)
-    if flash:
-        st.success(flash)
-
+def _render_consumer_csv_inputs(
+    index: int,
+    *,
+    session_scope: str,
+    keys: dict[str, str],
+) -> tuple[object | None, bool]:
+    """Path text input plus upload/clear row; returns (upload, clear_clicked)."""
     csv_path = labeled_text_input(
         "CSV-Pfad (Verbraucher)",
-        value=st.session_state[path_key],
-        key=input_key,
+        value=st.session_state[keys["path"]],
+        key=keys["input"],
     )
-    st.session_state[path_key] = csv_path.strip()
+    st.session_state[keys["path"]] = csv_path.strip()
     up_col, clear_col = st.columns([4, 1], vertical_alignment="bottom")
     with up_col:
         upload = single_csv_upload(
             "Verbraucher-CSV hochladen",
-            key=csv_upload_widget_key(upload_base, upload_nonce_key),
+            key=csv_upload_widget_key(keys["upload_base"], keys["upload_nonce"]),
             help="Nur eine CSV-Datei je Verbraucher.",
         )
     with clear_col:
@@ -209,6 +208,16 @@ def _render_consumer_profile_csv_fields(
             "Verbraucher-CSV entfernen",
             key=_scoped_key(session_scope, f"hc_profile_csv_clear_{index}"),
         )
+    return upload, clear
+
+def _store_uploaded_consumer_csv(
+    upload,
+    consumer: dict,
+    index: int,
+    *,
+    session_scope: str,
+    keys: dict[str, str],
+) -> None:
     consumer_slug = slug_id(str(consumer.get("id") or consumer.get("label") or f"c{index}"))
     profile_slug = slug_id(
         str(
@@ -217,46 +226,54 @@ def _render_consumer_profile_csv_fields(
             or "profile"
         )
     )
-    if upload is not None:
-        try:
-            saved = save_profile_consumption_csv(
-                profile_slug,
-                upload.getvalue(),
-                upload.name,
-                consumer_id=consumer_slug or f"c{index}",
-            )
-            decision_key = _digital_csv_decision_key(session_scope, index, saved)
-            st.session_state.pop(decision_key, None)
-            queue_csv_path_update(
-                pending_key,
-                saved,
-                upload_nonce_key=upload_nonce_key,
-                flash_key=flash_key,
-                flash_message=f"CSV gespeichert: `{saved}`",
-            )
-            st.rerun()
-        except (ValueError, OSError, FileNotFoundError) as exc:
-            st.error(f"CSV ungültig: {exc}")
-    if clear:
+    try:
+        saved = save_profile_consumption_csv(
+            profile_slug,
+            upload.getvalue(),
+            upload.name,
+            consumer_id=consumer_slug or f"c{index}",
+        )
+        decision_key = _digital_csv_decision_key(session_scope, index, saved)
+        st.session_state.pop(decision_key, None)
         queue_csv_path_update(
-            pending_key,
-            "",
-            upload_nonce_key=upload_nonce_key,
+            keys["pending"],
+            saved,
+            upload_nonce_key=keys["upload_nonce"],
+            flash_key=keys["flash"],
+            flash_message=f"CSV gespeichert: `{saved}`",
         )
         st.rerun()
-    active = st.session_state[path_key]
-    if active:
-        from runtime_store.persist_paths import resolve_config_prefixed_path
+    except (ValueError, OSError, FileNotFoundError) as exc:
+        st.error(f"CSV ungültig: {exc}")
 
-        if Path(resolve_config_prefixed_path(active)).is_file():
-            _render_digital_csv_scale_prompt(
-                active,
-                index=index,
-                session_scope=session_scope,
-                nominal_power_kw=nominal_power_kw,
-            )
-    if active:
-        use_csv = labeled_checkbox(
+def _maybe_prompt_digital_scale(
+    active: str,
+    *,
+    index: int,
+    session_scope: str,
+    nominal_power_kw: float,
+) -> None:
+    if not active:
+        return
+    from pathlib import Path
+
+    from runtime_store.persist_paths import resolve_config_prefixed_path
+
+    if not Path(resolve_config_prefixed_path(active)).is_file():
+        return
+    _render_digital_csv_scale_prompt(
+        active,
+        index=index,
+        session_scope=session_scope,
+        nominal_power_kw=nominal_power_kw,
+    )
+
+def _render_consumer_csv_use_flag(consumer: dict, *, active: str, use_key: str) -> bool:
+    if not active:
+        st.session_state[use_key] = False
+        return False
+    return bool(
+        labeled_checkbox(
             "Von Basis-Last abziehen",
             value=bool(consumer.get("use_profile_csv", False)),
             key=use_key,
@@ -266,9 +283,52 @@ def _render_consumer_profile_csv_fields(
                 "Live Gesteuert: Schedule; Live Manual: nur Nutzer-Tagesplan."
             ),
         )
-    else:
-        st.session_state[use_key] = False
-        use_csv = False
+    )
+
+def _render_consumer_profile_csv_fields(
+    consumer: dict,
+    index: int,
+    *,
+    session_scope: str,
+    nominal_power_kw: float,
+) -> dict:
+    """Historisches Verbraucher-CSV + use_profile_csv-Flag."""
+    keys = _consumer_csv_keys(session_scope, index)
+    _render_consumer_csv_intro()
+
+    apply_csv_path_pending(
+        keys["pending"], keys["path"], keys["input"], use_key=keys["use"]
+    )
+    _seed_consumer_csv_session(consumer, keys)
+
+    flash = st.session_state.pop(keys["flash"], None)
+    if flash:
+        st.success(flash)
+
+    upload, clear = _render_consumer_csv_inputs(
+        index, session_scope=session_scope, keys=keys
+    )
+    if upload is not None:
+        _store_uploaded_consumer_csv(
+            upload, consumer, index, session_scope=session_scope, keys=keys
+        )
+    if clear:
+        queue_csv_path_update(
+            keys["pending"],
+            "",
+            upload_nonce_key=keys["upload_nonce"],
+        )
+        st.rerun()
+    active = st.session_state[keys["path"]]
+    _maybe_prompt_digital_scale(
+        active,
+        index=index,
+        session_scope=session_scope,
+        nominal_power_kw=nominal_power_kw,
+    )
+    use_csv = _render_consumer_csv_use_flag(
+        consumer, active=active, use_key=keys["use"]
+    )
     return {
         "profile_csv": active,
         "use_profile_csv": bool(use_csv),

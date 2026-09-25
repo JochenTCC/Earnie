@@ -36,3 +36,7 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
 
 
 ## Document Review Findings (Do not remove this chapter — even if empty)
+
+- [ ] **`docs/ui/ehal-com.md` mostly English** — User-doc scope (`docs/ui/`) should be German (`german-user-docs.mdc`). Large translate/rewrite deferred from **2.6.r** official-docs pass; Schreibtest subsection is already German (mixed language).
+- [ ] **`docs/README.md` = landing clone** — Identical to root `README.md` (by design since landing copies); broken anchor `#erste-schritte` (heading missing). Restore a German Anwender-TOC / Erste-Schritte entry, or retarget the link — deferred (larger than this HA delta pass).
+- [ ] **HouseSim absent from German user TOC** — Lab/dev only (`docs/spec/house-sim.md`); no German einrichtung pointer. Optional short note under HA path if operators need the mock bench; not required for Pattern B production docs.

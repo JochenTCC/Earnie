@@ -1,4 +1,4 @@
-"""Flow-balance Plotly traces and flex ghosts (Chart 1)."""
+"""Flow-balance Plotly traces (Chart 1); flex ghosts live in ``chart_flow_ghosts``."""
 from __future__ import annotations
 
 import math
@@ -15,13 +15,12 @@ from data.planning_window import UiChartZones, chart_zone_kind_for_slot_start, p
 from optimizer import battery as bat
 from runtime_store.history_timeline import CHART_IST_BATTERY_KW_COLUMN, PV_IST_COLUMN
 from optimizer.targets import (
-    consumer_column_name,
     consumer_immediate_charge_column_name,
     consumer_immediate_charge_hover_label,
     consumer_pv_follow_column_name,
 )
 
-from ui.chart_consumer_stack import _chart_flex_consumers
+from ui.chart_flow_ghosts import add_matched_flex_ghost_traces  # noqa: F401
 from ui.flow_balance_allocate import FlowAllocation, allocate_slot_flows
 from ui.chart_colors import (
     COLOR_BASELOAD,
@@ -64,7 +63,6 @@ from ui.chart_flow_segments import (
     _flex_hover_lines,
     _flex_kw_pairs,
     _flex_pattern_shape,
-    _safe_float,
     _safe_int_flag,
     build_flow_balance_slots_from_df,
 )
@@ -165,6 +163,61 @@ def flow_balance_plotly_trace_specs(
 
     return _bucket_specs_to_trace_specs(buckets)
 
+def _ordered_flow_specs(
+    specs: Sequence[FlowBalanceTraceSpec],
+) -> list[FlowBalanceTraceSpec]:
+    return sorted(
+        specs,
+        key=lambda spec: (
+            FLOW_BALANCE_TRACE_ORDER.index(spec.kind)
+            if spec.kind in FLOW_BALANCE_TRACE_ORDER
+            else len(FLOW_BALANCE_TRACE_ORDER)
+        ),
+    )
+
+
+def _flow_spec_to_bar(spec: FlowBalanceTraceSpec, show: bool) -> go.Bar:
+    return go.Bar(
+        x=spec.x,
+        y=spec.y,
+        base=spec.base,
+        name=spec.name,
+        legendgroup=spec.legendgroup,
+        showlegend=show,
+        marker=spec.marker,
+        opacity=spec.opacity,
+        width=list(spec.widths),
+        yaxis="y",
+        customdata=spec.customdata,
+        hovertemplate=spec.hovertemplate,
+    )
+
+
+def _flex_legend_placeholder_traces(
+    flex_legend_colors: dict[str, tuple[str, str]],
+    shown: set[str],
+) -> list[go.Bar]:
+    """Unsichtbare Legendeneinträge je Flex-Gruppe; ergänzt ``shown`` in-place."""
+    traces: list[go.Bar] = []
+    for legendgroup, (name, color) in flex_legend_colors.items():
+        if legendgroup in shown:
+            continue
+        shown.add(legendgroup)
+        traces.append(
+            go.Bar(
+                x=[None],
+                y=[None],
+                name=name,
+                legendgroup=legendgroup,
+                showlegend=True,
+                marker=dict(color=color),
+                visible="legendonly",
+                hoverinfo="skip",
+            )
+        )
+    return traces
+
+
 def flow_balance_plotly_traces(
     df: pd.DataFrame,
     slots: Sequence[FlowBalanceSlot],
@@ -200,15 +253,7 @@ def flow_balance_plotly_traces(
     shown = set(legend_shown or ())
     traces: list[go.Bar] = []
     flex_legend_colors: dict[str, tuple[str, str]] = {}
-    ordered_specs = sorted(
-        specs,
-        key=lambda spec: (
-            FLOW_BALANCE_TRACE_ORDER.index(spec.kind)
-            if spec.kind in FLOW_BALANCE_TRACE_ORDER
-            else len(FLOW_BALANCE_TRACE_ORDER)
-        ),
-    )
-    for spec in ordered_specs:
+    for spec in _ordered_flow_specs(specs):
         show = showlegend_by_kind.get(spec.kind, True) if showlegend_by_kind else True
         if chart_zones and spec.kind == KIND_FLEX:
             if spec.legend_color is not None:
@@ -221,39 +266,9 @@ def flow_balance_plotly_traces(
             show = False
         elif show:
             shown.add(spec.legendgroup)
-        traces.append(
-            go.Bar(
-                x=spec.x,
-                y=spec.y,
-                base=spec.base,
-                name=spec.name,
-                legendgroup=spec.legendgroup,
-                showlegend=show,
-                marker=spec.marker,
-                opacity=spec.opacity,
-                width=list(spec.widths),
-                yaxis="y",
-                customdata=spec.customdata,
-                hovertemplate=spec.hovertemplate,
-            )
-        )
+        traces.append(_flow_spec_to_bar(spec, show))
     if chart_zones:
-        for legendgroup, (name, color) in flex_legend_colors.items():
-            if legendgroup in shown:
-                continue
-            shown.add(legendgroup)
-            traces.append(
-                go.Bar(
-                    x=[None],
-                    y=[None],
-                    name=name,
-                    legendgroup=legendgroup,
-                    showlegend=True,
-                    marker=dict(color=color),
-                    visible="legendonly",
-                    hoverinfo="skip",
-                )
-            )
+        traces.extend(_flex_legend_placeholder_traces(flex_legend_colors, shown))
     return traces, shown
 
 def add_flow_balance_traces(
@@ -297,6 +312,122 @@ def add_flow_balance_traces(
 
 
 
+@dataclass(frozen=True)
+class _SlotBucketContext:
+    """Slot-Kontext für die Up-/Down-Stack-Akkumulation eines Zeitschritts."""
+
+    x_val: Any
+    time_label: str
+    bar_width_ms: float
+    chart_zones: UiChartZones | None
+    slot_start: datetime | None
+    row: pd.Series | None
+    flex_by_id: Mapping[str, tuple[Mapping[str, Any], str]]
+
+
+def _accumulate_up_segments(
+    buckets: dict[str, dict[str, list[Any]]],
+    slot: FlowBalanceSlot,
+    ctx: _SlotBucketContext,
+) -> None:
+    cumulative_up = 0.0
+    for segment in slot.up:
+        zone_kind = None
+        bar_color = None
+        if (
+            ctx.chart_zones is not None
+            and ctx.slot_start is not None
+            and segment.kind == KIND_PV
+        ):
+            zone_kind = chart_zone_kind_for_slot_start(ctx.slot_start, ctx.chart_zones)
+            bar_color = chart1_pv_color_for_zone(zone_kind)
+        _append_stack_bucket(
+            buckets,
+            segment,
+            ctx.x_val,
+            ctx.time_label,
+            direction="up",
+            cumulative=cumulative_up,
+            power_kw=segment.kw,
+            bar_width_ms=ctx.bar_width_ms,
+            zone_kind=zone_kind,
+            bar_color=bar_color,
+        )
+        cumulative_up += segment.kw
+
+
+def _flex_segment_style(
+    consumer: Mapping[str, Any],
+    column: str,
+    row: pd.Series | None,
+    zone_kind: str | None,
+) -> tuple[str, tuple[Any, ...], str | None]:
+    """Pattern, Hover-Metadaten und Zonenfarbe eines Flex-Segments."""
+    pattern_shape = _flex_pattern_shape(
+        row.to_dict() if row is not None else None,
+        consumer,
+        column,
+    )
+    if not pattern_shape:
+        from optimizer.appliance_schedule import is_manual_appliance_chart_consumer
+
+        if is_manual_appliance_chart_consumer(consumer):
+            pattern_shape = manual_appliance_pattern_shape(
+                str(consumer.get("id", "")),
+            )
+    flex_meta: tuple[Any, ...] = ()
+    if row is not None:
+        pv_col = consumer_pv_follow_column_name(consumer)
+        imm_col = consumer_immediate_charge_column_name(consumer)
+        flex_meta = (
+            _safe_int_flag(row.get(pv_col, 0)) if pv_col in row else 0,
+            _safe_int_flag(row.get(imm_col, 0)) if imm_col in row else 0,
+            consumer_immediate_charge_hover_label(consumer),
+        )
+    bar_color: str | None = None
+    if zone_kind is not None:
+        saturation = consumer_chart_saturation_for_zone(zone_kind)
+        bar_color = flex_bar_chart_color(consumer, saturation_factor=saturation)
+    return pattern_shape, flex_meta, bar_color
+
+
+def _accumulate_down_segments(
+    buckets: dict[str, dict[str, list[Any]]],
+    slot: FlowBalanceSlot,
+    ctx: _SlotBucketContext,
+) -> None:
+    cumulative_down = 0.0
+    for segment in slot.down:
+        pattern_shape = ""
+        flex_meta: tuple[Any, ...] = ()
+        zone_kind: str | None = None
+        bar_color: str | None = None
+        if ctx.chart_zones is not None and ctx.slot_start is not None:
+            zone_kind = chart_zone_kind_for_slot_start(ctx.slot_start, ctx.chart_zones)
+        if segment.kind == KIND_FLEX and segment.consumer_id in ctx.flex_by_id:
+            consumer, column = ctx.flex_by_id[segment.consumer_id]
+            pattern_shape, flex_meta, bar_color = _flex_segment_style(
+                consumer, column, ctx.row, zone_kind
+            )
+        elif segment.kind == KIND_BASELOAD and zone_kind is not None:
+            bar_color = chart1_baseload_color_for_zone(zone_kind)
+        _append_stack_bucket(
+            buckets,
+            segment,
+            ctx.x_val,
+            ctx.time_label,
+            direction="down",
+            cumulative=cumulative_down,
+            power_kw=segment.kw,
+            pattern_shape=pattern_shape,
+            flex_meta=flex_meta,
+            bar_width_ms=ctx.bar_width_ms,
+            zone_kind=zone_kind,
+            bar_color=bar_color,
+        )
+        cumulative_down += segment.kw
+
+
 def _accumulate_slot_traces(
     buckets: dict[str, dict[str, list[Any]]],
     slot: FlowBalanceSlot,
@@ -309,88 +440,20 @@ def _accumulate_slot_traces(
     chart_zones: UiChartZones | None = None,
     slot_start: datetime | None = None,
 ) -> None:
-    flex_by_id = {
-        str(consumer.get("id", "")): (consumer, column)
-        for consumer, column in (flex_consumers or ())
-    }
-    cumulative_up = 0.0
-    for segment in slot.up:
-        zone_kind = None
-        bar_color = None
-        if (
-            chart_zones is not None
-            and slot_start is not None
-            and segment.kind == KIND_PV
-        ):
-            zone_kind = chart_zone_kind_for_slot_start(slot_start, chart_zones)
-            bar_color = chart1_pv_color_for_zone(zone_kind)
-        _append_stack_bucket(
-            buckets,
-            segment,
-            x_val,
-            time_label,
-            direction="up",
-            cumulative=cumulative_up,
-            power_kw=segment.kw,
-            bar_width_ms=bar_width_ms,
-            zone_kind=zone_kind,
-            bar_color=bar_color,
-        )
-        cumulative_up += segment.kw
-
-    cumulative_down = 0.0
-    for segment in slot.down:
-        pattern_shape = ""
-        flex_meta: tuple[Any, ...] = ()
-        zone_kind: str | None = None
-        bar_color: str | None = None
-        if chart_zones is not None and slot_start is not None:
-            zone_kind = chart_zone_kind_for_slot_start(slot_start, chart_zones)
-        if segment.kind == KIND_FLEX and segment.consumer_id in flex_by_id:
-            consumer, column = flex_by_id[segment.consumer_id]
-            pattern_shape = _flex_pattern_shape(
-                row.to_dict() if row is not None else None,
-                consumer,
-                column,
-            )
-            if not pattern_shape:
-                from optimizer.appliance_schedule import is_manual_appliance_chart_consumer
-
-                if is_manual_appliance_chart_consumer(consumer):
-                    pattern_shape = manual_appliance_pattern_shape(
-                        str(consumer.get("id", "")),
-                    )
-            if row is not None:
-                pv_col = consumer_pv_follow_column_name(consumer)
-                imm_col = consumer_immediate_charge_column_name(consumer)
-                flex_meta = (
-                    _safe_int_flag(row.get(pv_col, 0)) if pv_col in row else 0,
-                    _safe_int_flag(row.get(imm_col, 0)) if imm_col in row else 0,
-                    consumer_immediate_charge_hover_label(consumer),
-                )
-            if zone_kind is not None:
-                saturation = consumer_chart_saturation_for_zone(zone_kind)
-                bar_color = flex_bar_chart_color(
-                    consumer,
-                    saturation_factor=saturation,
-                )
-        elif segment.kind == KIND_BASELOAD and zone_kind is not None:
-            bar_color = chart1_baseload_color_for_zone(zone_kind)
-        _append_stack_bucket(
-            buckets,
-            segment,
-            x_val,
-            time_label,
-            direction="down",
-            cumulative=cumulative_down,
-            power_kw=segment.kw,
-            pattern_shape=pattern_shape,
-            flex_meta=flex_meta,
-            bar_width_ms=bar_width_ms,
-            zone_kind=zone_kind,
-            bar_color=bar_color,
-        )
-        cumulative_down += segment.kw
+    ctx = _SlotBucketContext(
+        x_val=x_val,
+        time_label=time_label,
+        bar_width_ms=bar_width_ms,
+        chart_zones=chart_zones,
+        slot_start=slot_start,
+        row=row,
+        flex_by_id={
+            str(consumer.get("id", "")): (consumer, column)
+            for consumer, column in (flex_consumers or ())
+        },
+    )
+    _accumulate_up_segments(buckets, slot, ctx)
+    _accumulate_down_segments(buckets, slot, ctx)
 
 def _bucket_key(segment: FlowBalanceSegment, *, zone_kind: str | None = None) -> str:
     if segment.kind in {KIND_PV, KIND_BASELOAD} and zone_kind is not None:
@@ -501,110 +564,3 @@ def _bucket_specs_to_trace_specs(
             )
         )
     return specs
-
-
-_GHOST_LINE_WIDTH = 2.5
-
-_GHOST_MIN_KWH = 1.0
-
-def add_matched_flex_ghost_traces(
-    fig: go.Figure,
-    matched_baseline_df: pd.DataFrame | None,
-    axis: Any,
-    *,
-    flex_consumers: Sequence[tuple[Mapping[str, Any], str]] | None = None,
-    history_slot_count: int | None = None,
-) -> None:
-    """
-    Umrandete (nicht gefüllte) Flex-Balken für Original-Schedule (BL-Ziel-Lastzeiten).
-
-    Stackt nur die Matched-Baseline-Flex-Leistung (kW) ab ``history_slot_count``
-    nach unten — unabhängig vom optimierten Stack. Segmente mit
-    Energie-Äquivalent unter ``_GHOST_MIN_KWH`` (Roh-kW × Slotdauer) werden
-    weggelassen. Balkenhöhe ist auf ``nominal_power_kw`` begrenzt, wenn gesetzt.
-    """
-    if matched_baseline_df is None or matched_baseline_df.empty:
-        return
-    from ui.chart_slot_axis import _battery_bar_times
-
-    length = len(matched_baseline_df)
-    start = int(history_slot_count or 0)
-    if start >= length:
-        return
-    pairs = list(flex_consumers) if flex_consumers is not None else None
-    if pairs is None:
-        pairs = []
-        for consumer in _chart_flex_consumers():
-            column = consumer_column_name(consumer)
-            if column in matched_baseline_df.columns:
-                pairs.append((consumer, column))
-    if not pairs:
-        return
-
-    buckets: dict[str, dict[str, list[Any]]] = {}
-    for index in range(start, length):
-        row = matched_baseline_df.iloc[index]
-        x_val = list(_battery_bar_times(axis, slice(index, index + 1)))[0]
-        time_label = str(row.get("Uhrzeit", ""))
-        bar_width_ms = axis.bar_width_ms(FLOW_BALANCE_BAR_WIDTH_FRACTION, index)
-        slot_hours = axis.slot_duration(index).total_seconds() / 3600.0
-        cumulative = 0.0
-        for consumer, column in pairs:
-            raw_kw = _safe_float(row.get(column))
-            if raw_kw <= 1e-9:
-                continue
-            if raw_kw * slot_hours < _GHOST_MIN_KWH:
-                continue
-            nominal = _safe_float(consumer.get("nominal_power_kw"))
-            # Matched-baseline energy can concentrate into few slots above nominal
-            # (shape-preserving scale). Ghost outlines are capped for chart realism.
-            kw = min(raw_kw, nominal) if nominal > 0 else raw_kw
-            cid = str(consumer.get("id", "")) or column
-            label = str(consumer.get("name", consumer.get("id", column)))
-            color = flex_bar_chart_color(consumer)
-            bucket = buckets.setdefault(
-                cid,
-                {
-                    "label": label,
-                    "color": color,
-                    "x": [],
-                    "y": [],
-                    "base": [],
-                    "customdata": [],
-                    "widths": [],
-                },
-            )
-            bucket["x"].append(x_val)
-            bucket["y"].append(-kw)
-            bucket["base"].append(-cumulative)
-            bucket["customdata"].append((time_label, kw, label))
-            bucket["widths"].append(bar_width_ms)
-            cumulative += kw
-
-    legend_shown = False
-    for bucket in buckets.values():
-        if not bucket["x"]:
-            continue
-        showlegend = not legend_shown
-        legend_shown = True
-        fig.add_trace(
-            go.Bar(
-                x=bucket["x"],
-                y=bucket["y"],
-                base=bucket["base"],
-                width=bucket["widths"],
-                name="Original-Schedule",
-                legendgroup="ghost_bl_ziel",
-                showlegend=showlegend,
-                marker=dict(
-                    color="rgba(0,0,0,0)",
-                    line=dict(color=bucket["color"], width=_GHOST_LINE_WIDTH),
-                ),
-                opacity=1.0,
-                customdata=bucket["customdata"],
-                hovertemplate=(
-                    "Uhrzeit: %{customdata[0]}<br>Original-Schedule %{customdata[2]}: "
-                    "%{customdata[1]:.2f} kW<extra></extra>"
-                ),
-            )
-        )

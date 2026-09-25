@@ -15,8 +15,7 @@ from .charging_context import (
     split_eligible_by_urgent_deadline,
     summarize_urgent_rule_usage,
 )
-from .consumer_power import power_limits_kw, uses_pv_follow
-from .eauto_milp import milp_uses_power_setpoint
+from .consumer_power import power_limits_kw
 from .filter_context import (
     apply_slot_availability_constraints,
     consumer_flex_eligible_indices,

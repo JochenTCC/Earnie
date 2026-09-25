@@ -183,10 +183,43 @@ def _battery_by_id() -> dict[str, dict]:
     return {item["id"]: item for item in list_batteries()}
 
 
-def render_battery_planning_tab() -> None:
-    st.caption(
-        "Nicht optional, da ansonsten identisch mit Nicht optimierter Referenz."
+def _battery_selectbox(options: list[str], initial_index: int | None) -> str:
+    if initial_index is not None:
+        return labeled_selectbox(
+            "Batterie",
+            options=options,
+            index=initial_index,
+            key="planning_battery_select",
+        )
+    return labeled_selectbox(
+        "Batterie",
+        options=options,
+        key="planning_battery_select",
     )
+
+
+def _resolve_battery_existing(
+    selected: str,
+    battery_map: dict[str, dict],
+    *,
+    is_new: bool,
+) -> dict:
+    if is_new:
+        source_id = str(st.session_state.get(_SESSION_TEMPLATE_SOURCE_KEY) or "")
+        return new_battery_template(
+            list_batteries(),
+            source_id=source_id,
+            live_battery_id=str(
+                get_runtime_scenario_refs().get("battery_id", "") or ""
+            ),
+        )
+    _remember_battery_template_source(selected)
+    st.session_state[_SESSION_SELECTED_ID_KEY] = selected
+    return battery_map.get(selected, {})
+
+
+def _render_battery_select() -> dict:
+    """Battery selectbox plus session reseed; returns the editor context."""
     _apply_pending_battery_select()
     battery_map = _battery_by_id()
     battery_ids = sorted(battery_map.keys())
@@ -199,46 +232,26 @@ def render_battery_planning_tab() -> None:
         id_by_display=id_by_display,
     )
     initial_index = _initial_battery_index(battery_ids)
-
-    if initial_index is not None:
-        selected_display = labeled_selectbox(
-            "Batterie",
-            options=options,
-            index=initial_index,
-            key="planning_battery_select",
-        )
-    else:
-        selected_display = labeled_selectbox(
-            "Batterie",
-            options=options,
-            key="planning_battery_select",
-        )
+    selected_display = _battery_selectbox(options, initial_index)
     selected = resolve_label_select(selected_display, id_by_display)
     is_new = selected == NEW_OPTION
-    if is_new:
-        source_id = str(st.session_state.get(_SESSION_TEMPLATE_SOURCE_KEY) or "")
-        existing = new_battery_template(
-            list_batteries(),
-            source_id=source_id,
-            live_battery_id=str(
-                get_runtime_scenario_refs().get("battery_id", "") or ""
-            ),
-        )
-    else:
-        _remember_battery_template_source(selected)
-        st.session_state[_SESSION_SELECTED_ID_KEY] = selected
-        existing = battery_map.get(selected, {})
-
+    existing = _resolve_battery_existing(selected, battery_map, is_new=is_new)
     session_scope = _battery_session_scope(selected, is_new=is_new)
     file_stamp = _config_file_stamp()
     _sync_battery_session(session_scope, existing, file_stamp=file_stamp)
+    return {
+        "battery_ids": battery_ids,
+        "is_new": is_new,
+        "existing": existing,
+        "session_scope": session_scope,
+    }
 
+
+def _render_battery_core_fields(session_scope: str) -> dict:
     label = labeled_text_input(
         "Bezeichnung",
         key=_scoped_key(session_scope, "planning_battery_label"),
     )
-    stable_id = "" if is_new else str(existing.get("id", ""))
-
     capacity = labeled_number_input(
         "Kapazität (kWh)",
         min_value=0.1,
@@ -259,6 +272,15 @@ def render_battery_planning_tab() -> None:
         step=0.01,
         key=_scoped_key(session_scope, "planning_battery_efficiency"),
     )
+    return {
+        "label": label,
+        "capacity": capacity,
+        "max_power": max_power,
+        "efficiency": efficiency,
+    }
+
+
+def _render_battery_limit_fields(session_scope: str) -> dict:
     min_soc = labeled_number_input(
         "Minimaler SoC (%)",
         min_value=0.0,
@@ -285,81 +307,98 @@ def render_battery_planning_tab() -> None:
         help="Dauerhafte AC-Eigenleistung der Batterie (24/7 Verbrauch).",
         key=_scoped_key(session_scope, "planning_battery_standby"),
     )
+    return {
+        "min_soc": min_soc,
+        "max_soc": max_soc,
+        "threshold_percent": threshold_percent,
+        "standby_power": standby_power,
+    }
+
+
+def _render_battery_wear_fields(session_scope: str) -> dict:
     wear_enabled = labeled_checkbox(
         "Verschleiß berücksichtigen",
         key=_scoped_key(session_scope, "planning_battery_wear_enabled"),
     )
-    if wear_enabled:
-        wear_replacement_cost = labeled_number_input(
-            "Ersatzkosten (€)",
-            min_value=0.01,
-            step=50.0,
-            key=_scoped_key(session_scope, "planning_battery_wear_replacement_cost"),
-        )
-        wear_expected_cycles = labeled_number_input(
-            "Erwartete Vollzyklen",
-            min_value=1.0,
-            step=100.0,
-            key=_scoped_key(session_scope, "planning_battery_wear_expected_cycles"),
-        )
-        wear_cycle_fraction = labeled_number_input(
-            "Anteil zyklenbedingter Kosten",
-            min_value=0.01,
-            max_value=1.0,
-            step=0.05,
-            help="Rest wird als Kalenderalterung angenommen (nicht separat modelliert).",
-            key=_scoped_key(session_scope, "planning_battery_wear_cycle_fraction"),
-        )
-        battery_wear_payload = {
-            "enabled": True,
-            "replacement_cost_euro": wear_replacement_cost,
-            "expected_cycles": wear_expected_cycles,
-            "cycle_cost_fraction": wear_cycle_fraction,
-        }
-    else:
-        battery_wear_payload = {"enabled": False}
-
-    ready = bool(str(label or "").strip()) and float(capacity or 0) > 0
-    taken = {bid for bid in battery_ids if bid != stable_id}
-    entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
-    payload = {
-        "id": entity_id,
-        "label": label,
-        "battery_capacity_kwh": capacity,
-        "battery_max_power_kw": max_power,
-        "battery_efficiency": efficiency,
-        "battery_min_soc": min_soc,
-        "battery_max_soc": max_soc,
-        "threshold_power": threshold_percent / 100.0,
-        "standby_power_kw": float(standby_power or 0.0),
-        "battery_wear": battery_wear_payload,
+    if not wear_enabled:
+        return {"enabled": False}
+    wear_replacement_cost = labeled_number_input(
+        "Ersatzkosten (€)",
+        min_value=0.01,
+        step=50.0,
+        key=_scoped_key(session_scope, "planning_battery_wear_replacement_cost"),
+    )
+    wear_expected_cycles = labeled_number_input(
+        "Erwartete Vollzyklen",
+        min_value=1.0,
+        step=100.0,
+        key=_scoped_key(session_scope, "planning_battery_wear_expected_cycles"),
+    )
+    wear_cycle_fraction = labeled_number_input(
+        "Anteil zyklenbedingter Kosten",
+        min_value=0.01,
+        max_value=1.0,
+        step=0.05,
+        help="Rest wird als Kalenderalterung angenommen (nicht separat modelliert).",
+        key=_scoped_key(session_scope, "planning_battery_wear_cycle_fraction"),
+    )
+    return {
+        "enabled": True,
+        "replacement_cost_euro": wear_replacement_cost,
+        "expected_cycles": wear_expected_cycles,
+        "cycle_cost_fraction": wear_cycle_fraction,
     }
 
-    def _save_battery() -> None:
-        try:
-            upsert_battery(
-                {
-                    "label": label,
-                    "battery_capacity_kwh": capacity,
-                    "battery_max_power_kw": max_power,
-                    "battery_efficiency": efficiency,
-                    "battery_min_soc": min_soc,
-                    "battery_max_soc": max_soc,
-                    "threshold_power": threshold_percent / 100.0,
-                    "standby_power_kw": float(standby_power or 0.0),
-                    "battery_wear": battery_wear_payload,
-                },
-                stable_id=stable_id,
-            )
-        except ValueError as exc:
-            st.error(str(exc))
-            return
-        st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
-        if is_new:
-            st.session_state[_SESSION_SELECT_PENDING_KEY] = entity_id
-            st.session_state[_SESSION_SYNC_KEY] = None
-            st.rerun()
 
+def _render_battery_fields(session_scope: str) -> dict:
+    fields = _render_battery_core_fields(session_scope)
+    fields.update(_render_battery_limit_fields(session_scope))
+    fields["battery_wear"] = _render_battery_wear_fields(session_scope)
+    return fields
+
+
+def _battery_save_payload(fields: dict) -> dict:
+    return {
+        "label": fields["label"],
+        "battery_capacity_kwh": fields["capacity"],
+        "battery_max_power_kw": fields["max_power"],
+        "battery_efficiency": fields["efficiency"],
+        "battery_min_soc": fields["min_soc"],
+        "battery_max_soc": fields["max_soc"],
+        "threshold_power": fields["threshold_percent"] / 100.0,
+        "standby_power_kw": float(fields["standby_power"] or 0.0),
+        "battery_wear": fields["battery_wear"],
+    }
+
+
+def _save_battery(
+    fields: dict,
+    *,
+    stable_id: str,
+    entity_id: str,
+    is_new: bool,
+) -> None:
+    try:
+        upsert_battery(_battery_save_payload(fields), stable_id=stable_id)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
+    if is_new:
+        st.session_state[_SESSION_SELECT_PENDING_KEY] = entity_id
+        st.session_state[_SESSION_SYNC_KEY] = None
+        st.rerun()
+
+
+def _persist_battery_form(
+    fields: dict,
+    *,
+    stable_id: str,
+    entity_id: str,
+    is_new: bool,
+    ready: bool,
+) -> None:
+    payload = {"id": entity_id, **_battery_save_payload(fields)}
     persist_key = f"planning_battery::{entity_id}"
     suppress = bool(st.session_state.pop(_SESSION_SUPPRESS_AUTOPERSIST_KEY, False))
     if suppress and ready:
@@ -372,31 +411,59 @@ def render_battery_planning_tab() -> None:
         wrote = auto_persist(
             state_key=persist_key,
             payload=payload,
-            save=_save_battery,
+            save=lambda: _save_battery(
+                fields,
+                stable_id=stable_id,
+                entity_id=entity_id,
+                is_new=is_new,
+            ),
             ready=ready,
         )
     if wrote:
         st.rerun()
 
+
+def _render_battery_delete(stable_id: str) -> None:
+    if not st.button("Batterie entfernen", key="planning_battery_delete"):
+        return
+    try:
+        delete_battery(stable_id)
+    except ValueError as exc:
+        st.error(str(exc))
+        return
+    remaining_ids = sorted(_battery_by_id().keys())
+    fallback = remaining_ids[0] if remaining_ids else NEW_OPTION
+    _clear_scoped_widget_keys(stable_id)
+    _clear_scoped_widget_keys("__new__")
+    st.session_state.pop(_SESSION_SELECTED_ID_KEY, None)
+    st.session_state.pop(f"_auto_persist_fp::planning_battery::{stable_id}", None)
+    st.session_state[_SESSION_SELECT_PENDING_KEY] = fallback
+    st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
+    st.session_state[_SESSION_SYNC_KEY] = None
+    if fallback == NEW_OPTION:
+        st.session_state[_SESSION_SUPPRESS_AUTOPERSIST_KEY] = True
+    st.success("Batterie entfernt.")
+    st.rerun()
+
+
+def render_battery_planning_tab() -> None:
+    st.caption(
+        "Nicht optional, da ansonsten identisch mit Nicht optimierter Referenz."
+    )
+    ctx = _render_battery_select()
+    is_new = ctx["is_new"]
+    fields = _render_battery_fields(ctx["session_scope"])
+    stable_id = "" if is_new else str(ctx["existing"].get("id", ""))
+    label = fields["label"]
+    ready = bool(str(label or "").strip()) and float(fields["capacity"] or 0) > 0
+    taken = {bid for bid in ctx["battery_ids"] if bid != stable_id}
+    entity_id = stable_id.strip() or slug_id(label or "batterie", existing=taken)
+    _persist_battery_form(
+        fields,
+        stable_id=stable_id,
+        entity_id=entity_id,
+        is_new=is_new,
+        ready=ready,
+    )
     if not is_new and stable_id:
-        if st.button("Batterie entfernen", key="planning_battery_delete"):
-            try:
-                delete_battery(stable_id)
-            except ValueError as exc:
-                st.error(str(exc))
-            else:
-                remaining_ids = sorted(_battery_by_id().keys())
-                fallback = remaining_ids[0] if remaining_ids else NEW_OPTION
-                _clear_scoped_widget_keys(stable_id)
-                _clear_scoped_widget_keys("__new__")
-                st.session_state.pop(_SESSION_SELECTED_ID_KEY, None)
-                st.session_state.pop(
-                    f"_auto_persist_fp::planning_battery::{stable_id}", None
-                )
-                st.session_state[_SESSION_SELECT_PENDING_KEY] = fallback
-                st.session_state[_SESSION_FILE_STAMP_KEY] = _config_file_stamp()
-                st.session_state[_SESSION_SYNC_KEY] = None
-                if fallback == NEW_OPTION:
-                    st.session_state[_SESSION_SUPPRESS_AUTOPERSIST_KEY] = True
-                st.success("Batterie entfernt.")
-                st.rerun()
+        _render_battery_delete(stable_id)

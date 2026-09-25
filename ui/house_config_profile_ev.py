@@ -172,9 +172,8 @@ def _render_day_schedule(
         ),
     }
 
-def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict:
-    sched = dict(consumer.get("charging_schedule") or {})
-    item: dict = {
+def _render_ev_power_fields(consumer: dict, index: int, *, session_scope: str) -> dict:
+    return {
         "min_power_kw": labeled_number_input(
             "Mindestleistung (kW)",
             min_value=0.0,
@@ -196,7 +195,37 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
             key=_scoped_key(session_scope, f"hc_ev_cap_{index}"),
         ),
     }
-    item["charging_schedule"] = {
+
+def _render_ev_amp_conversion_fields(
+    sched: dict, index: int, *, session_scope: str
+) -> dict:
+    """Nennspannung / Phasen — only used when the Lademerker delivers Ampere."""
+    return {
+        "nominal_power_voltage_v": labeled_number_input(
+            "Nennspannung (V) für A→kW",
+            min_value=100.0,
+            max_value=500.0,
+            value=float(sched.get("nominal_power_voltage_v", 230.0)),
+            step=1.0,
+            ratios=WIDE_LABEL_RATIOS,
+            key=_scoped_key(session_scope, f"hc_ev_voltage_{index}"),
+            help="Nur relevant, wenn der Lademerker Ampere liefert. Standard: 230 V.",
+        ),
+        "nominal_power_phases": labeled_number_input(
+            "Phasen für A→kW",
+            min_value=1,
+            max_value=3,
+            value=int(sched.get("nominal_power_phases", 1)),
+            step=1,
+            key=_scoped_key(session_scope, f"hc_ev_phases_{index}"),
+            help="Standard: 1 Phase.",
+        ),
+    }
+
+def _render_ev_charging_schedule(
+    sched: dict, index: int, *, session_scope: str
+) -> dict:
+    return {
         "target_soc_percent": labeled_number_input(
             "Ziel-SOC (%)",
             min_value=0.0,
@@ -221,24 +250,8 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
                 "Unabhängig vom Haus-Abwesenheitsmodus."
             ),
         ),
-        "nominal_power_voltage_v": labeled_number_input(
-            "Nennspannung (V) für A→kW",
-            min_value=100.0,
-            max_value=500.0,
-            value=float(sched.get("nominal_power_voltage_v", 230.0)),
-            step=1.0,
-            ratios=WIDE_LABEL_RATIOS,
-            key=_scoped_key(session_scope, f"hc_ev_voltage_{index}"),
-            help="Nur relevant, wenn der Lademerker Ampere liefert. Standard: 230 V.",
-        ),
-        "nominal_power_phases": labeled_number_input(
-            "Phasen für A→kW",
-            min_value=1,
-            max_value=3,
-            value=int(sched.get("nominal_power_phases", 1)),
-            step=1,
-            key=_scoped_key(session_scope, f"hc_ev_phases_{index}"),
-            help="Standard: 1 Phase.",
+        **_render_ev_amp_conversion_fields(
+            sched, index, session_scope=session_scope
         ),
         "weekday": _render_day_schedule(
             "Werktag",
@@ -253,6 +266,13 @@ def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict
             session_scope=session_scope,
         ),
     }
+
+def _render_ev_fields(consumer: dict, index: int, *, session_scope: str) -> dict:
+    sched = dict(consumer.get("charging_schedule") or {})
+    item: dict = _render_ev_power_fields(consumer, index, session_scope=session_scope)
+    item["charging_schedule"] = _render_ev_charging_schedule(
+        sched, index, session_scope=session_scope
+    )
     if _live_markers_enabled():
         st.caption(
             "E-Auto-Merker unter **Daemon Control → EHAL-Com** "

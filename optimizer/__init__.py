@@ -50,12 +50,7 @@ from .battery import (
     MODE_ZWANGS_ENTLADEN,
     MODE_ZWANGS_LADEN,
     apply_soc_change as _apply_soc_change,
-    automatik_discharge_kw as _automatik_discharge_kw,
     battery_plan_kw_from_control,
-    charge_kw_for_hourly_soc as _charge_kw_for_hourly_soc,
-    clamp_power as _clamp_power,
-    discharge_kw_for_hourly_soc as _discharge_kw_for_hourly_soc,
-    power_threshold_kw as _power_threshold_kw,
     steuerbefehl_for_mode,
 )
 from .milp import milp_optimizer
@@ -307,27 +302,22 @@ def _optimization_interval_hours() -> float:
     return schedule.optimization_interval_hours()
 
 
-def register_consumer_delivery(
+def _book_active_consumer_deliveries(
+    active: list,
     consumer_powers: dict[str, float],
-    charging_contexts: dict[str, dict] | None = None,
-    consumers: list | None = None,
+    charging_contexts: dict[str, dict] | None,
     *,
-    live_flex_kw: dict[str, float] | None = None,
-    sent_flex_kw: dict[str, float] | None = None,
-    book_planned: bool = True,
+    live_flex_kw: dict[str, float] | None,
+    sent_flex_kw: dict[str, float] | None,
+    book_planned: bool,
+    interval_h: float,
+    delivered: dict,
+    sessions: dict,
+    generic_flex_run: dict,
 ) -> dict[str, dict]:
-    """Bucht gelieferte Energie und liefert Soll-Ist-Kennzahlen je Verbraucher."""
     from .generic_flex_run import update_generic_flex_run_state
 
-    interval_h = _optimization_interval_hours()
-    active = _active_consumers(consumers)
-    consumers_by_id = _consumers_by_id(active)
-    state = _load_consumer_state(charging_contexts, active)
-    delivered = dict(state.get("delivered", {}))
-    sessions = dict(state.get("charging_sessions", {}))
-    generic_flex_run = dict(state.get("generic_flex_run") or {})
     compliance: dict[str, dict] = {}
-
     for consumer in active:
         cid = consumer["id"]
         planned_kw = float(consumer_powers.get(cid, 0.0) or 0.0)
@@ -358,10 +348,15 @@ def register_consumer_delivery(
         else:
             delivered[cid] = round(float(delivered.get(cid, 0.0)) + delta_kwh, 3)
         update_generic_flex_run_state(generic_flex_run, consumer, power_kw)
+    return compliance
 
-    state["delivered"] = delivered
-    state["charging_sessions"] = sessions
-    state["generic_flex_run"] = generic_flex_run
+
+def _update_plug_cycle_after_delivery(
+    state: dict,
+    active: list,
+    charging_contexts: dict[str, dict] | None,
+    sessions: dict,
+) -> None:
     fulfilled = dict(state.get("plug_cycle_fulfilled") or {})
     for consumer in active:
         cid = consumer["id"]
@@ -381,6 +376,40 @@ def register_consumer_delivery(
         plug_cycle_fulfilled=state["plug_cycle_fulfilled"],
         now=datetime.now(),
     )
+
+
+def register_consumer_delivery(
+    consumer_powers: dict[str, float],
+    charging_contexts: dict[str, dict] | None = None,
+    consumers: list | None = None,
+    *,
+    live_flex_kw: dict[str, float] | None = None,
+    sent_flex_kw: dict[str, float] | None = None,
+    book_planned: bool = True,
+) -> dict[str, dict]:
+    """Bucht gelieferte Energie und liefert Soll-Ist-Kennzahlen je Verbraucher."""
+    interval_h = _optimization_interval_hours()
+    active = _active_consumers(consumers)
+    state = _load_consumer_state(charging_contexts, active)
+    delivered = dict(state.get("delivered", {}))
+    sessions = dict(state.get("charging_sessions", {}))
+    generic_flex_run = dict(state.get("generic_flex_run") or {})
+    compliance = _book_active_consumer_deliveries(
+        active,
+        consumer_powers,
+        charging_contexts,
+        live_flex_kw=live_flex_kw,
+        sent_flex_kw=sent_flex_kw,
+        book_planned=book_planned,
+        interval_h=interval_h,
+        delivered=delivered,
+        sessions=sessions,
+        generic_flex_run=generic_flex_run,
+    )
+    state["delivered"] = delivered
+    state["charging_sessions"] = sessions
+    state["generic_flex_run"] = generic_flex_run
+    _update_plug_cycle_after_delivery(state, active, charging_contexts, sessions)
     _save_consumer_state(state)
     return compliance
 

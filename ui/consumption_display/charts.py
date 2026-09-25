@@ -56,17 +56,14 @@ def _stack_keys(bundle: ConsumptionSeriesBundle) -> list[str]:
     return [*bundle.consumer_ids(), _BASELOAD_KEY]
 
 
-def stacked_monthly_chart(
+def _add_monthly_consumer_bars(
+    fig: go.Figure,
     bundle: ConsumptionSeriesBundle,
     *,
-    title: str = "Monatsverbrauch (kWh)",
-) -> go.Figure:
-    """Gestapelte Monatsbalken je Verbraucher + Basislast; PV als Config-Summen."""
-    months = sorted(monthly_total_kwh(bundle).keys())
-    by_month = monthly_kwh_by_consumer(bundle)
-    fig = go.Figure()
-    stack_keys = _stack_keys(bundle)
-    for index, key in enumerate(stack_keys):
+    months: list[str],
+    by_month: dict[str, dict[str, float]],
+) -> None:
+    for index, key in enumerate(_stack_keys(bundle)):
         if key == _BASELOAD_KEY:
             values = [by_month.get(month, {}).get(_BASELOAD_KEY, 0.0) for month in months]
             label = _consumer_label(bundle, _BASELOAD_KEY)
@@ -77,12 +74,26 @@ def stacked_monthly_chart(
             color = _consumer_color(key, index)
         fig.add_bar(name=label, x=months, y=values, marker_color=color)
 
+
+def _monthly_pv_months(
+    bundle: ConsumptionSeriesBundle,
+    months: list[str],
+) -> list[str]:
+    """PV-Config-Monate als Rückfall, wenn der Verbraucher-Stack leer ist."""
+    if months or not bundle.pv_by_config:
+        return months
+    month_keys: set[str] = set()
+    for series in bundle.pv_by_config.values():
+        month_keys.update(monthly_kwh_from_series(series, bundle.timestamps))
+    return sorted(month_keys)
+
+
+def _add_monthly_pv_traces(
+    fig: go.Figure,
+    bundle: ConsumptionSeriesBundle,
+    months: list[str],
+) -> None:
     if bundle.pv_by_config:
-        if not months:
-            month_keys: set[str] = set()
-            for series in bundle.pv_by_config.values():
-                month_keys.update(monthly_kwh_from_series(series, bundle.timestamps))
-            months = sorted(month_keys)
         for index, (config_id, series) in enumerate(bundle.pv_by_config.items()):
             pv_monthly = monthly_kwh_from_series(series, bundle.timestamps)
             label = bundle.pv_config_labels.get(config_id) or config_id
@@ -94,31 +105,54 @@ def stacked_monthly_chart(
                 line=dict(color=_pv_yellow(index), width=2),
                 yaxis="y",
             )
-    else:
-        pv_monthly = monthly_pv_kwh(bundle)
-        if pv_monthly:
-            fig.add_scatter(
-                name="PV-Erzeugung",
-                x=months,
-                y=[pv_monthly.get(month, 0.0) for month in months],
-                mode="lines+markers",
-                line=dict(color=_PV_COLOR, width=2),
-                yaxis="y",
-            )
+        return
+    pv_monthly = monthly_pv_kwh(bundle)
+    if pv_monthly:
+        fig.add_scatter(
+            name="PV-Erzeugung",
+            x=months,
+            y=[pv_monthly.get(month, 0.0) for month in months],
+            mode="lines+markers",
+            line=dict(color=_PV_COLOR, width=2),
+            yaxis="y",
+        )
 
-    if bundle.pv_imported is not None:
-        imported_monthly = monthly_kwh_from_series(bundle.pv_imported, bundle.timestamps)
-        if imported_monthly:
-            if not months:
-                months = sorted(imported_monthly.keys())
-            fig.add_scatter(
-                name="PV importiert",
-                x=months,
-                y=[imported_monthly.get(month, 0.0) for month in months],
-                mode="lines+markers",
-                line=dict(color=_PV_COLOR, width=2, dash="dot"),
-                yaxis="y",
-            )
+
+def _add_monthly_imported_pv(
+    fig: go.Figure,
+    bundle: ConsumptionSeriesBundle,
+    months: list[str],
+) -> None:
+    if bundle.pv_imported is None:
+        return
+    imported_monthly = monthly_kwh_from_series(bundle.pv_imported, bundle.timestamps)
+    if not imported_monthly:
+        return
+    x_months = months or sorted(imported_monthly.keys())
+    fig.add_scatter(
+        name="PV importiert",
+        x=x_months,
+        y=[imported_monthly.get(month, 0.0) for month in x_months],
+        mode="lines+markers",
+        line=dict(color=_PV_COLOR, width=2, dash="dot"),
+        yaxis="y",
+    )
+
+
+def stacked_monthly_chart(
+    bundle: ConsumptionSeriesBundle,
+    *,
+    title: str = "Monatsverbrauch (kWh)",
+) -> go.Figure:
+    """Gestapelte Monatsbalken je Verbraucher + Basislast; PV als Config-Summen."""
+    months = sorted(monthly_total_kwh(bundle).keys())
+    by_month = monthly_kwh_by_consumer(bundle)
+    fig = go.Figure()
+    _add_monthly_consumer_bars(fig, bundle, months=months, by_month=by_month)
+
+    months = _monthly_pv_months(bundle, months)
+    _add_monthly_pv_traces(fig, bundle, months)
+    _add_monthly_imported_pv(fig, bundle, months)
 
     fig.update_layout(
         barmode="stack",
@@ -184,18 +218,12 @@ def csv_validation_monthly_chart(
     return fig
 
 
-def timeseries_chart(
+def _add_consumer_timeseries(
+    fig: go.Figure,
     bundle: ConsumptionSeriesBundle,
-    *,
-    title: str,
-) -> go.Figure:
-    """Stündlicher Verlauf: Linien je Verbraucher + Basislast; PV und Ist separat."""
-    if not bundle.timestamps:
-        raise ValueError("Keine Daten für den gewählten Zeitraum.")
-    x_values = [parse_timestamp(ts_raw) for ts_raw in bundle.timestamps]
-    fig = go.Figure()
-    stack_keys = _stack_keys(bundle)
-    for index, key in enumerate(stack_keys):
+    x_values: list,
+) -> None:
+    for index, key in enumerate(_stack_keys(bundle)):
         if key == _BASELOAD_KEY:
             values = bundle.baseload
             label = _consumer_label(bundle, _BASELOAD_KEY)
@@ -211,6 +239,14 @@ def timeseries_chart(
             mode="lines",
             line=dict(width=1.5, color=color),
         )
+
+
+def _add_pv_timeseries(
+    fig: go.Figure,
+    bundle: ConsumptionSeriesBundle,
+    x_values: list,
+) -> None:
+    """Per-Anlage/Config-Linien oder PV-Summe, plus importierte PV."""
     pv_color_index = 0
     if bundle.pv_by_system:
         for system_id, values in bundle.pv_by_system.items():
@@ -251,6 +287,20 @@ def timeseries_chart(
             mode="lines",
             line=dict(color=_PV_COLOR, width=2, dash="dot"),
         )
+
+
+def timeseries_chart(
+    bundle: ConsumptionSeriesBundle,
+    *,
+    title: str,
+) -> go.Figure:
+    """Stündlicher Verlauf: Linien je Verbraucher + Basislast; PV und Ist separat."""
+    if not bundle.timestamps:
+        raise ValueError("Keine Daten für den gewählten Zeitraum.")
+    x_values = [parse_timestamp(ts_raw) for ts_raw in bundle.timestamps]
+    fig = go.Figure()
+    _add_consumer_timeseries(fig, bundle, x_values)
+    _add_pv_timeseries(fig, bundle, x_values)
     if bundle.actual_total is not None:
         fig.add_scatter(
             name="Ist-Verbrauch",

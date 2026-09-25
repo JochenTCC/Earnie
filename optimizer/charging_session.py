@@ -274,18 +274,9 @@ def add_session_delivery(
     )
 
 
-def normalize_consumer_state(
+def _coerce_flag_maps(
     raw: dict[str, Any],
-    today: str,
-    charging_contexts: dict[str, dict] | None,
-    consumers_by_id: dict[str, dict],
-    now: dt.datetime | None = None,
-) -> dict[str, Any]:
-    """
-    Tägliche delivered-Werte nur für Nicht-Session-Verbraucher zurücksetzen.
-    charging_sessions bleiben bis zur Deadline erhalten.
-    """
-    current = now or dt.datetime.now()
+) -> tuple[dict[str, dict], dict[str, bool], dict[str, str]]:
     sessions = dict(raw.get("charging_sessions") or {})
     if not isinstance(sessions, dict):
         sessions = {}
@@ -303,7 +294,17 @@ def normalize_consumer_state(
         for cid, dl in open_raw.items()
         if dl is not None and str(dl).strip()
     }
+    return sessions, fulfilled, open_deadlines
 
+
+def _sync_session_flags(
+    sessions: dict[str, dict],
+    fulfilled: dict[str, bool],
+    open_deadlines: dict[str, str],
+    charging_contexts: dict[str, dict] | None,
+    consumers_by_id: dict[str, dict],
+    current: dt.datetime,
+) -> tuple[dict[str, bool], dict[str, str]]:
     if charging_contexts:
         purged_fulfilled = sync_charging_sessions(
             sessions,
@@ -324,30 +325,55 @@ def normalize_consumer_state(
             plug_cycle_fulfilled=fulfilled,
             now=current,
         )
-    else:
-        purged_fulfilled = purge_expired_sessions(sessions, current)
-        for cid in purged_fulfilled:
-            fulfilled[cid] = True
-        open_deadlines = sync_open_charging_deadlines(
-            open_deadlines,
-            {},
-            plug_cycle_fulfilled=fulfilled,
-            now=current,
-        )
+        return fulfilled, open_deadlines
 
+    purged_fulfilled = purge_expired_sessions(sessions, current)
+    for cid in purged_fulfilled:
+        fulfilled[cid] = True
+    open_deadlines = sync_open_charging_deadlines(
+        open_deadlines,
+        {},
+        plug_cycle_fulfilled=fulfilled,
+        now=current,
+    )
+    return fulfilled, open_deadlines
+
+
+def _daily_maps_for_today(raw: dict[str, Any], today: str) -> tuple[dict, dict]:
     delivered = dict(raw.get("delivered") or {})
     if not isinstance(delivered, dict):
         delivered = {}
-
-    if raw.get("date") != today:
-        delivered = {}
-
     generic_flex_run = dict(raw.get("generic_flex_run") or {})
     if not isinstance(generic_flex_run, dict):
         generic_flex_run = {}
     if raw.get("date") != today:
+        delivered = {}
         generic_flex_run = {}
+    return delivered, generic_flex_run
 
+
+def normalize_consumer_state(
+    raw: dict[str, Any],
+    today: str,
+    charging_contexts: dict[str, dict] | None,
+    consumers_by_id: dict[str, dict],
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    """
+    Tägliche delivered-Werte nur für Nicht-Session-Verbraucher zurücksetzen.
+    charging_sessions bleiben bis zur Deadline erhalten.
+    """
+    current = now or dt.datetime.now()
+    sessions, fulfilled, open_deadlines = _coerce_flag_maps(raw)
+    fulfilled, open_deadlines = _sync_session_flags(
+        sessions,
+        fulfilled,
+        open_deadlines,
+        charging_contexts,
+        consumers_by_id,
+        current,
+    )
+    delivered, generic_flex_run = _daily_maps_for_today(raw, today)
     return {
         "date": today,
         "delivered": delivered,

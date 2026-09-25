@@ -29,19 +29,89 @@ _SESSION_RESULT = "ehal_write_test_result"
 _DEFAULT_FORCE_W = 100.0
 
 
+def _render_write_test_intro() -> None:
+    st.caption(
+        "Mehrere gemappte Sollwerte in einer Tabelle setzen und mit **einem** "
+        "Klick schreiben (ein Setpoint-Dokument). Optional Auto-Roundtrip. "
+        "Gleicher Adapter-Pfad wie der Produktiv-Lauf."
+    )
+    if looks_like_housesim():
+        st.info(
+            "HouseSim / Lab-Adapter erkannt — ideal zum Testen, "
+            "bevor echte Anlagenwerte geschrieben werden."
+        )
+
+
+def _render_force_checkbox(*, disabled: bool) -> bool:
+    return bool(
+        st.checkbox(
+            f"``set_ess_active_power`` in Tabelle freigeben (±{ACTIVE_POWER_MAX_ABS_W:g} W)",
+            value=False,
+            key="ehal_write_test_force",
+            disabled=disabled,
+            help=(
+                "Blendet die Zeile ``set_ess_active_power`` ein (Default "
+                f"{_DEFAULT_FORCE_W:g} W). Schreibt **nicht** automatisch — "
+                "Wert in der Tabelle setzen, dann „Alle schreiben“."
+            ),
+        )
+    )
+
+
+def _render_wait_input(*, disabled: bool) -> float:
+    return float(
+        st.number_input(
+            "Roundtrip-Wartezeit (s)",
+            min_value=0.0,
+            max_value=10.0,
+            value=float(DEFAULT_ROUNDTRIP_WAIT_S),
+            step=0.5,
+            key="ehal_write_test_wait",
+            disabled=disabled,
+        )
+    )
+
+
+def _render_write_test_buttons(
+    *,
+    selected: dict[str, Any],
+    force: bool,
+    wait_s: float,
+    silent: bool,
+) -> None:
+    col_manual, col_auto, col_restore = st.columns(3)
+    with col_manual:
+        if st.button(
+            "Alle schreiben",
+            key="ehal_write_test_manual_btn",
+            disabled=silent or not selected,
+            type="primary",
+        ):
+            _queue_action("manual", values=selected, force=force, wait_s=wait_s)
+            st.rerun()
+    with col_auto:
+        if st.button(
+            "Auto-Roundtrip",
+            key="ehal_write_test_auto_btn",
+            disabled=silent or not selected,
+        ):
+            _queue_action("roundtrip", values=selected, force=force, wait_s=wait_s)
+            st.rerun()
+    with col_restore:
+        if st.button(
+            "Sicher wiederherstellen",
+            key="ehal_write_test_restore_btn",
+            disabled=silent,
+            help="ESS Automatik + EVCS 0 A (wie Startup-Safe-Push).",
+        ):
+            _queue_action("restore", values={}, force=False, wait_s=0.0)
+            st.rerun()
+
+
 def render_write_test_section() -> None:
     """Expander under Live-Schreiben: table of probes, one send / roundtrip."""
     with st.expander("Schreibtest", expanded=False):
-        st.caption(
-            "Mehrere gemappte Sollwerte in einer Tabelle setzen und mit **einem** "
-            "Klick schreiben (ein Setpoint-Dokument). Optional Auto-Roundtrip. "
-            "Gleicher Adapter-Pfad wie der Produktiv-Lauf."
-        )
-        if looks_like_housesim():
-            st.info(
-                "HouseSim / Lab-Adapter erkannt — ideal zum Testen, "
-                "bevor echte Anlagenwerte geschrieben werden."
-            )
+        _render_write_test_intro()
 
         silent = not writes_allowed()
         if silent:
@@ -50,20 +120,10 @@ def render_write_test_section() -> None:
                 "Silent auf **Optimierer-Dienst** bzw. in der Statusleiste ausschalten."
             )
 
-        force = st.checkbox(
-            f"``set_ess_active_power`` in Tabelle freigeben (±{ACTIVE_POWER_MAX_ABS_W:g} W)",
-            value=False,
-            key="ehal_write_test_force",
-            disabled=silent,
-            help=(
-                "Blendet die Zeile ``set_ess_active_power`` ein (Default "
-                f"{_DEFAULT_FORCE_W:g} W). Schreibt **nicht** automatisch — "
-                "Wert in der Tabelle setzen, dann „Alle schreiben“."
-            ),
-        )
+        force = _render_force_checkbox(disabled=silent)
 
         try:
-            fields = allowed_probe_fields(force_ess_active=bool(force))
+            fields = allowed_probe_fields(force_ess_active=force)
             targets = mapped_write_targets()
         except (ValueError, OSError) as exc:
             st.error(f"Adapter/Mapping nicht verfügbar: {exc}")
@@ -75,64 +135,22 @@ def render_write_test_section() -> None:
             )
             return
 
-        max_kw = float(config.get_battery_params().get("max_power_kw") or 0.0)
-        ev_a = default_ev_nominal_a()
         selected = _render_probe_table(
             fields,
             targets=targets,
-            max_power_kw=max_kw,
-            ev_nominal_a=ev_a,
-            force_ess_active=bool(force),
+            max_power_kw=float(config.get_battery_params().get("max_power_kw") or 0.0),
+            ev_nominal_a=default_ev_nominal_a(),
+            force_ess_active=force,
             disabled=silent,
         )
 
-        wait_s = st.number_input(
-            "Roundtrip-Wartezeit (s)",
-            min_value=0.0,
-            max_value=10.0,
-            value=float(DEFAULT_ROUNDTRIP_WAIT_S),
-            step=0.5,
-            key="ehal_write_test_wait",
-            disabled=silent,
+        wait_s = _render_wait_input(disabled=silent)
+        _render_write_test_buttons(
+            selected=selected,
+            force=force,
+            wait_s=wait_s,
+            silent=silent,
         )
-
-        col_manual, col_auto, col_restore = st.columns(3)
-        with col_manual:
-            if st.button(
-                "Alle schreiben",
-                key="ehal_write_test_manual_btn",
-                disabled=silent or not selected,
-                type="primary",
-            ):
-                _queue_action(
-                    "manual",
-                    values=selected,
-                    force=bool(force),
-                    wait_s=float(wait_s),
-                )
-                st.rerun()
-        with col_auto:
-            if st.button(
-                "Auto-Roundtrip",
-                key="ehal_write_test_auto_btn",
-                disabled=silent or not selected,
-            ):
-                _queue_action(
-                    "roundtrip",
-                    values=selected,
-                    force=bool(force),
-                    wait_s=float(wait_s),
-                )
-                st.rerun()
-        with col_restore:
-            if st.button(
-                "Sicher wiederherstellen",
-                key="ehal_write_test_restore_btn",
-                disabled=silent,
-                help="ESS Automatik + EVCS 0 A (wie Startup-Safe-Push).",
-            ):
-                _queue_action("restore", values={}, force=False, wait_s=0.0)
-                st.rerun()
 
         pending = st.session_state.get(_SESSION_PENDING)
         if isinstance(pending, dict) and pending.get("action"):
@@ -253,54 +271,53 @@ def _queue_action(
     }
 
 
-@st.dialog("Schreibtest bestätigen")
-def _confirm_write_test_dialog() -> None:
-    pending = st.session_state.get(_SESSION_PENDING) or {}
-    action = str(pending.get("action") or "")
-    values = pending.get("values") if isinstance(pending.get("values"), dict) else {}
+def _render_restore_confirm() -> None:
+    st.markdown(
+        "Sichere Sollwerte schreiben (**ESS Automatik**, **EVCS 0 A**) "
+        "auf das **live** Backend?"
+    )
+    col_yes, col_no = st.columns(2)
+    with col_yes:
+        if st.button("Ja, wiederherstellen", type="primary", key="ewt_restore_yes"):
+            _run_restore()
+            st.session_state.pop(_SESSION_PENDING, None)
+            st.rerun()
+    with col_no:
+        if st.button("Abbrechen", key="ewt_restore_no"):
+            st.session_state.pop(_SESSION_PENDING, None)
+            st.rerun()
 
-    if action == "restore":
-        st.markdown(
-            "Sichere Sollwerte schreiben (**ESS Automatik**, **EVCS 0 A**) "
-            "auf das **live** Backend?"
-        )
-        col_yes, col_no = st.columns(2)
-        with col_yes:
-            if st.button("Ja, wiederherstellen", type="primary", key="ewt_restore_yes"):
-                _run_restore()
-                st.session_state.pop(_SESSION_PENDING, None)
-                st.rerun()
-        with col_no:
-            if st.button("Abbrechen", key="ewt_restore_no"):
-                st.session_state.pop(_SESSION_PENDING, None)
-                st.rerun()
-        return
 
-    has_force = FORCE_ESS_ACTIVE_POWER in values
-    if has_force and not pending.get("force_confirmed"):
-        st.error(
-            f"**Zweite Bestätigung:** ``{FORCE_ESS_ACTIVE_POWER} = "
-            f"{values.get(FORCE_ESS_ACTIVE_POWER)!r}`` "
-            f"(max ±{ACTIVE_POWER_MAX_ABS_W:g} W) erzwingt Batterieleistung."
-        )
-        st.caption("Nur wenn Sie bewusst testen — danach wiederherstellen.")
-        col_yes, col_no = st.columns(2)
-        with col_yes:
-            if st.button(
-                "Ja, Force bestätigen",
-                type="primary",
-                key="ewt_force_yes",
-            ):
-                pending = dict(pending)
-                pending["force_confirmed"] = True
-                st.session_state[_SESSION_PENDING] = pending
-                st.rerun()
-        with col_no:
-            if st.button("Abbrechen", key="ewt_force_no"):
-                st.session_state.pop(_SESSION_PENDING, None)
-                st.rerun()
-        return
+def _render_force_confirm(pending: dict, values: dict[str, Any]) -> None:
+    st.error(
+        f"**Zweite Bestätigung:** ``{FORCE_ESS_ACTIVE_POWER} = "
+        f"{values.get(FORCE_ESS_ACTIVE_POWER)!r}`` "
+        f"(max ±{ACTIVE_POWER_MAX_ABS_W:g} W) erzwingt Batterieleistung."
+    )
+    st.caption("Nur wenn Sie bewusst testen — danach wiederherstellen.")
+    col_yes, col_no = st.columns(2)
+    with col_yes:
+        if st.button(
+            "Ja, Force bestätigen",
+            type="primary",
+            key="ewt_force_yes",
+        ):
+            confirmed = dict(pending)
+            confirmed["force_confirmed"] = True
+            st.session_state[_SESSION_PENDING] = confirmed
+            st.rerun()
+    with col_no:
+        if st.button("Abbrechen", key="ewt_force_no"):
+            st.session_state.pop(_SESSION_PENDING, None)
+            st.rerun()
 
+
+def _render_execute_confirm(
+    *,
+    action: str,
+    values: dict[str, Any],
+    has_force: bool,
+) -> None:
     verb = "Auto-Roundtrip" if action == "roundtrip" else "Alle schreiben"
     lines = ", ".join(f"`{k}={v!r}`" for k, v in values.items()) or "—"
     st.markdown(
@@ -319,6 +336,24 @@ def _confirm_write_test_dialog() -> None:
         if st.button("Abbrechen", key="ewt_run_no"):
             st.session_state.pop(_SESSION_PENDING, None)
             st.rerun()
+
+
+@st.dialog("Schreibtest bestätigen")
+def _confirm_write_test_dialog() -> None:
+    pending = st.session_state.get(_SESSION_PENDING) or {}
+    action = str(pending.get("action") or "")
+    values = pending.get("values") if isinstance(pending.get("values"), dict) else {}
+
+    if action == "restore":
+        _render_restore_confirm()
+        return
+
+    has_force = FORCE_ESS_ACTIVE_POWER in values
+    if has_force and not pending.get("force_confirmed"):
+        _render_force_confirm(pending, values)
+        return
+
+    _render_execute_confirm(action=action, values=values, has_force=has_force)
 
 
 def _execute_pending() -> None:

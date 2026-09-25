@@ -1,6 +1,8 @@
 """Live-Sankey-Diagramm für den Echtzeit-Leistungsfluss."""
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import streamlit as st
 import plotly.graph_objects as go
 
@@ -212,94 +214,135 @@ def _sankey_breakdown_consumers() -> list[dict]:
     return consumers
 
 
-def _prepare_sankey_data(
-    data: dict,
-    current_soc: float | None,
-    breakdown: dict | None = None,
-    main_state: dict | None = None,
-) -> tuple[list[str], _SankeyLinks, list[str]]:
-    """Sankey: Energiebilanz; optional Auflösung Haus → Grundlast + flexible Verbraucher."""
-    lbl_pv = f"☀️ PV-Anlage ({data['pv']:.2f} kW)"
-    lbl_grid = _grid_label(data["grid"])
-    lbl_bat = _battery_label(current_soc, data["battery"], main_state)
-    c_grid = _grid_color(data["grid"])
-    c_bat = _battery_color(data["battery"])
-    links = _SankeyLinks()
+@dataclass(frozen=True)
+class _SankeyHead:
+    """Labels und Farben der drei Quellknoten (PV, Netz, Batterie)."""
 
-    if breakdown:
-        consumers = _sankey_breakdown_consumers()
-        flex_kw = breakdown.get("flex_kw") or {}
-        lbl_baseload = f"🏠 Grundlast ({breakdown['baseload_kw']:.2f} kW)"
-        flex_labels = [
-            _flex_label(
-                consumer,
+    lbl_pv: str
+    lbl_grid: str
+    lbl_bat: str
+    color_grid: str
+    color_bat: str
+
+
+def _breakdown_node_labels_colors(
+    breakdown: dict,
+    consumers: list[dict],
+    main_state: dict | None,
+    head: _SankeyHead,
+) -> tuple[list[str], list[str]]:
+    """Knotenbeschriftungen und -farben für die aufgelöste Haus-Darstellung."""
+    flex_kw = breakdown.get("flex_kw") or {}
+    lbl_baseload = f"🏠 Grundlast ({breakdown['baseload_kw']:.2f} kW)"
+    flex_labels = [
+        _flex_label(
+            consumer,
+            _flex_kw_for_consumer(flex_kw, consumer),
+            main_state,
+        )
+        for consumer in consumers
+    ]
+    labels = [
+        head.lbl_pv,
+        head.lbl_grid,
+        head.lbl_bat,
+        "⚙️ System-Knoten",
+        lbl_baseload,
+        *flex_labels,
+    ]
+    node_colors = [
+        SANKEY_NODE_PV,
+        head.color_grid,
+        head.color_bat,
+        SANKEY_NODE_SYSTEM,
+        SANKEY_NODE_BASELOAD,
+    ]
+    overlay = produktiv.has_produktiv_run(main_state)
+    for consumer in consumers:
+        node_color = consumer_chart_color(consumer)
+        if overlay:
+            node_color = produktiv.flex_node_color(
+                node_color,
                 _flex_kw_for_consumer(flex_kw, consumer),
+                consumer["id"],
                 main_state,
             )
-            for consumer in consumers
-        ]
+        node_colors.append(node_color)
+    return labels, node_colors
 
-        labels = [lbl_pv, lbl_grid, lbl_bat, "⚙️ System-Knoten", lbl_baseload, *flex_labels]
-        system_idx = 3
-        baseload_idx = 4
-        flex_start = 5
 
-        node_colors = [SANKEY_NODE_PV, c_grid, c_bat, SANKEY_NODE_SYSTEM, SANKEY_NODE_BASELOAD]
-        overlay = produktiv.has_produktiv_run(main_state)
-        for consumer in consumers:
-            node_color = consumer_chart_color(consumer)
-            live_kw = _flex_kw_for_consumer(breakdown.get("flex_kw") or {}, consumer)
-            if overlay:
-                node_color = produktiv.flex_node_color(
-                    node_color,
-                    live_kw,
-                    consumer["id"],
-                    main_state,
-                )
-            node_colors.append(node_color)
-
-        _append_sources_to_system(links, data, system_idx)
-
-        if breakdown["baseload_kw"] > _MIN_FLOW_KW:
-            links.add(
-                system_idx,
-                baseload_idx,
-                breakdown["baseload_kw"],
-                hover=f"Grundlast: {breakdown['baseload_kw']:.2f} kW",
-            )
-        sink_sum_kw = _real_sink_sum_kw(data, breakdown, consumers)
-        for i, consumer in enumerate(consumers):
-            live_kw = _flex_kw_for_consumer(breakdown.get("flex_kw") or {}, consumer)
-            link_kw, is_placeholder = produktiv.flex_sankey_link(
+def _append_breakdown_links(
+    links: _SankeyLinks,
+    data: dict,
+    breakdown: dict,
+    consumers: list[dict],
+    main_state: dict | None,
+) -> None:
+    """Quellen → System → Grundlast/Flex → Rückflüsse (Indizes wie in den Labels)."""
+    system_idx = 3
+    baseload_idx = 4
+    flex_start = 5
+    _append_sources_to_system(links, data, system_idx)
+    if breakdown["baseload_kw"] > _MIN_FLOW_KW:
+        links.add(
+            system_idx,
+            baseload_idx,
+            breakdown["baseload_kw"],
+            hover=f"Grundlast: {breakdown['baseload_kw']:.2f} kW",
+        )
+    sink_sum_kw = _real_sink_sum_kw(data, breakdown, consumers)
+    for i, consumer in enumerate(consumers):
+        live_kw = _flex_kw_for_consumer(breakdown.get("flex_kw") or {}, consumer)
+        link_kw, is_placeholder = produktiv.flex_sankey_link(
+            live_kw,
+            consumer["id"],
+            main_state,
+            sink_sum_kw,
+        )
+        if link_kw is None:
+            continue
+        links.add(
+            system_idx,
+            flex_start + i,
+            link_kw,
+            color=(
+                SANKEY_SOLL_PLACEHOLDER_LINK_COLOR
+                if is_placeholder
+                else SANKEY_DEFAULT_LINK_COLOR
+            ),
+            hover=produktiv.flex_link_hover(
                 live_kw,
                 consumer["id"],
                 main_state,
-                sink_sum_kw,
-            )
-            if link_kw is None:
-                continue
-            links.add(
-                system_idx,
-                flex_start + i,
-                link_kw,
-                color=(
-                    SANKEY_SOLL_PLACEHOLDER_LINK_COLOR
-                    if is_placeholder
-                    else SANKEY_DEFAULT_LINK_COLOR
-                ),
-                hover=produktiv.flex_link_hover(
-                    live_kw,
-                    consumer["id"],
-                    main_state,
-                    is_placeholder,
-                ),
-            )
-        _append_return_flows(links, data, system_idx)
+                is_placeholder,
+            ),
+        )
+    _append_return_flows(links, data, system_idx)
 
-        return labels, links, node_colors
 
+def _breakdown_sankey_data(
+    data: dict,
+    breakdown: dict,
+    main_state: dict | None,
+    head: _SankeyHead,
+) -> tuple[list[str], _SankeyLinks, list[str]]:
+    consumers = _sankey_breakdown_consumers()
+    links = _SankeyLinks()
+    labels, node_colors = _breakdown_node_labels_colors(
+        breakdown, consumers, main_state, head
+    )
+    _append_breakdown_links(links, data, breakdown, consumers, main_state)
+    return labels, links, node_colors
+
+
+def _house_sankey_data(
+    data: dict,
+    head: _SankeyHead,
+) -> tuple[list[str], _SankeyLinks, list[str]]:
+    """Kompakte Darstellung ohne Auflösung des Hausverbrauchs."""
+    links = _SankeyLinks()
     lbl_house = f"🏠 Wohnhaus ({data['house']:.2f} kW)"
-    labels = [lbl_pv, lbl_grid, lbl_bat, lbl_house, "⚙️ System-Knoten"]
+    labels = [head.lbl_pv, head.lbl_grid, head.lbl_bat, lbl_house, "⚙️ System-Knoten"]
 
     if data["pv"] > _MIN_FLOW_KW:
         links.add(0, 4, data["pv"])
@@ -311,8 +354,33 @@ def _prepare_sankey_data(
         links.add(4, 3, data["house"], hover=f"Wohnhaus: {data['house']:.2f} kW")
     _append_return_flows(links, data, 4)
 
-    colors = [SANKEY_NODE_PV, c_grid, c_bat, SANKEY_NODE_HOUSE, SANKEY_NODE_SYSTEM]
+    colors = [
+        SANKEY_NODE_PV,
+        head.color_grid,
+        head.color_bat,
+        SANKEY_NODE_HOUSE,
+        SANKEY_NODE_SYSTEM,
+    ]
     return labels, links, colors
+
+
+def _prepare_sankey_data(
+    data: dict,
+    current_soc: float | None,
+    breakdown: dict | None = None,
+    main_state: dict | None = None,
+) -> tuple[list[str], _SankeyLinks, list[str]]:
+    """Sankey: Energiebilanz; optional Auflösung Haus → Grundlast + flexible Verbraucher."""
+    head = _SankeyHead(
+        lbl_pv=f"☀️ PV-Anlage ({data['pv']:.2f} kW)",
+        lbl_grid=_grid_label(data["grid"]),
+        lbl_bat=_battery_label(current_soc, data["battery"], main_state),
+        color_grid=_grid_color(data["grid"]),
+        color_bat=_battery_color(data["battery"]),
+    )
+    if breakdown:
+        return _breakdown_sankey_data(data, breakdown, main_state, head)
+    return _house_sankey_data(data, head)
 
 
 def _sankey_height(breakdown: dict | None, main_state: dict | None) -> int:

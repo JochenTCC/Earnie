@@ -58,30 +58,45 @@ def _normalize_fixed_flex_by_t(
     }
 
 
-def _build_milp_model(
+@dataclass
+class _GridBatteryVars:
+    """Netz- und Batterievariablen eines Solve-Fensters inkl. Big-M-Schranke."""
+
+    p_grid_buy: list
+    p_grid_sell: list
+    p_charge: list
+    p_discharge: list
+    e_batt: list
+    delta_charge: list
+    delta_import: list
+    big_m_grid: float
+
+
+@dataclass
+class _ConsumerVarBlock:
+    """Verbrauchervariablen-Maps, wie sie MilpHorizonModel erwartet."""
+
+    consumer_on: dict[str, list]
+    consumer_p: dict[str, list]
+    consumer_p_fixed: dict[str, list]
+    consumer_pv_follow: dict[str, list]
+    consumer_milp_charge_kw: dict[str, float]
+
+
+def _create_grid_battery_vars(
     matrix: list[dict[str, Any]],
     horizon: int,
     battery_params: dict,
-    current_soc: float,
     planned_consumers: list,
-    fixed_flex_kw_t0_or_by_t: float | dict[int, float],
-    remaining_by_consumer: dict[str, float],
-    ev_milp_params_by_id: dict[str, dict[str, float]],
-    consumer_continue_on: dict[str, bool] | None = None,
-    *,
-    dt_h: float = DEFAULT_DT_H,
-) -> MilpHorizonModel:
-    dt_h = validate_dt_h(dt_h)
+) -> _GridBatteryVars:
+    """LpVariables für Netzbezug/-einspeisung, Lade-/Entladeleistung und SOC-Energie."""
     min_soc = battery_params["min_soc"]
     max_soc = battery_params["max_soc"]
     max_power = battery_params["max_power_kw"]
     battery_capacity = battery_params["battery_capacity_kwh"]
-    efficiency = battery_params["efficiency"]
     e_min = (min_soc / 100.0) * battery_capacity
     e_max = (max_soc / 100.0) * battery_capacity
-    e_init = (current_soc / 100.0) * battery_capacity
 
-    prob = pulp.LpProblem("Energy_Cost_Minimization", pulp.LpMinimize)
     p_grid_buy = [pulp.LpVariable(f"p_grid_buy_{t}", lowBound=0) for t in range(horizon)]
     p_grid_sell = [pulp.LpVariable(f"p_grid_sell_{t}", lowBound=0) for t in range(horizon)]
     p_charge = [
@@ -105,18 +120,41 @@ def _build_milp_model(
     max_pv = max((row["expected_p_pv"] for row in matrix[:horizon]), default=0.0)
     big_m_grid = max(max_load + max_flex_power + max_power, max_pv + max_power, 50.0)
     delta_import = [pulp.LpVariable(f"delta_import_{t}", cat=pulp.LpBinary) for t in range(horizon)]
+    return _GridBatteryVars(
+        p_grid_buy=p_grid_buy,
+        p_grid_sell=p_grid_sell,
+        p_charge=p_charge,
+        p_discharge=p_discharge,
+        e_batt=e_batt,
+        delta_charge=delta_charge,
+        delta_import=delta_import,
+        big_m_grid=big_m_grid,
+    )
 
-    consumer_on: dict[str, list] = {}
-    consumer_p: dict[str, list] = {}
-    consumer_p_fixed: dict[str, list] = {}
-    consumer_pv_follow: dict[str, list] = {}
-    consumer_milp_charge_kw: dict[str, float] = {}
+
+def _add_consumer_var_block(
+    prob: pulp.LpProblem,
+    matrix: list[dict[str, Any]],
+    horizon: int,
+    planned_consumers: list,
+    remaining_by_consumer: dict[str, float],
+    ev_milp_params_by_id: dict[str, dict[str, float]],
+    consumer_continue_on: dict[str, bool] | None,
+) -> _ConsumerVarBlock:
+    """On/Leistung/PV-Follow je geplantem Verbraucher plus Binär-Ladeleistung."""
+    block = _ConsumerVarBlock(
+        consumer_on={},
+        consumer_p={},
+        consumer_p_fixed={},
+        consumer_pv_follow={},
+        consumer_milp_charge_kw={},
+    )
     continue_on = consumer_continue_on or {}
     for consumer in planned_consumers:
         cid = consumer["id"]
         rem = remaining_by_consumer.get(cid, 0.0)
         ev_params = ev_milp_params_by_id.get(cid)
-        consumer_milp_charge_kw[cid] = milp_binary_charge_kw(
+        block.consumer_milp_charge_kw[cid] = milp_binary_charge_kw(
             consumer, matrix, rem, ev_params
         )
         _add_consumer_power_variables(
@@ -124,16 +162,45 @@ def _build_milp_model(
             consumer,
             horizon,
             matrix,
-            consumer_on,
-            consumer_p,
-            consumer_p_fixed,
-            consumer_pv_follow,
+            block.consumer_on,
+            block.consumer_p,
+            block.consumer_p_fixed,
+            block.consumer_pv_follow,
             rem,
             ev_params,
             continue_on=bool(continue_on.get(cid, False)),
         )
+    return block
 
-    fixed_flex_by_t = _normalize_fixed_flex_by_t(fixed_flex_kw_t0_or_by_t)
+
+def _add_power_balance_and_soc_dynamics(
+    prob: pulp.LpProblem,
+    matrix: list[dict[str, Any]],
+    battery_params: dict,
+    current_soc: float,
+    grid_vars: _GridBatteryVars,
+    consumer_vars: _ConsumerVarBlock,
+    planned_consumers: list,
+    fixed_flex_by_t: dict[int, float],
+    *,
+    horizon: int,
+    dt_h: float,
+) -> None:
+    """Energiebilanz, Netz-/Batterie-Exklusivität und SOC-Rekursion je Slot."""
+    max_power = battery_params["max_power_kw"]
+    efficiency = battery_params["efficiency"]
+    e_init = (current_soc / 100.0) * battery_params["battery_capacity_kwh"]
+    p_grid_buy = grid_vars.p_grid_buy
+    p_grid_sell = grid_vars.p_grid_sell
+    p_charge = grid_vars.p_charge
+    p_discharge = grid_vars.p_discharge
+    e_batt = grid_vars.e_batt
+    delta_charge = grid_vars.delta_charge
+    delta_import = grid_vars.delta_import
+    big_m_grid = grid_vars.big_m_grid
+    consumer_on = consumer_vars.consumer_on
+    consumer_p = consumer_vars.consumer_p
+    consumer_milp_charge_kw = consumer_vars.consumer_milp_charge_kw
     for t in range(horizon):
         p_pv = matrix[t]["expected_p_pv"]
         p_con = effective_p_act(matrix[t], battery_params)
@@ -169,20 +236,60 @@ def _build_milp_model(
                 + (p_charge[t] * efficiency - p_discharge[t] / efficiency) * dt_h
             )
 
+
+def _build_milp_model(
+    matrix: list[dict[str, Any]],
+    horizon: int,
+    battery_params: dict,
+    current_soc: float,
+    planned_consumers: list,
+    fixed_flex_kw_t0_or_by_t: float | dict[int, float],
+    remaining_by_consumer: dict[str, float],
+    ev_milp_params_by_id: dict[str, dict[str, float]],
+    consumer_continue_on: dict[str, bool] | None = None,
+    *,
+    dt_h: float = DEFAULT_DT_H,
+) -> MilpHorizonModel:
+    dt_h = validate_dt_h(dt_h)
+    prob = pulp.LpProblem("Energy_Cost_Minimization", pulp.LpMinimize)
+    grid_vars = _create_grid_battery_vars(
+        matrix, horizon, battery_params, planned_consumers
+    )
+    consumer_vars = _add_consumer_var_block(
+        prob,
+        matrix,
+        horizon,
+        planned_consumers,
+        remaining_by_consumer,
+        ev_milp_params_by_id,
+        consumer_continue_on,
+    )
+    _add_power_balance_and_soc_dynamics(
+        prob,
+        matrix,
+        battery_params,
+        current_soc,
+        grid_vars,
+        consumer_vars,
+        planned_consumers,
+        _normalize_fixed_flex_by_t(fixed_flex_kw_t0_or_by_t),
+        horizon=horizon,
+        dt_h=dt_h,
+    )
     return MilpHorizonModel(
         prob=prob,
         horizon=horizon,
-        p_grid_buy=p_grid_buy,
-        p_grid_sell=p_grid_sell,
-        p_charge=p_charge,
-        p_discharge=p_discharge,
-        e_batt=e_batt,
-        consumer_on=consumer_on,
-        consumer_p=consumer_p,
-        consumer_p_fixed=consumer_p_fixed,
-        consumer_pv_follow=consumer_pv_follow,
+        p_grid_buy=grid_vars.p_grid_buy,
+        p_grid_sell=grid_vars.p_grid_sell,
+        p_charge=grid_vars.p_charge,
+        p_discharge=grid_vars.p_discharge,
+        e_batt=grid_vars.e_batt,
+        consumer_on=consumer_vars.consumer_on,
+        consumer_p=consumer_vars.consumer_p,
+        consumer_p_fixed=consumer_vars.consumer_p_fixed,
+        consumer_pv_follow=consumer_vars.consumer_pv_follow,
         planned_consumers=planned_consumers,
-        consumer_milp_charge_kw=consumer_milp_charge_kw,
+        consumer_milp_charge_kw=consumer_vars.consumer_milp_charge_kw,
         dt_h=dt_h,
     )
 

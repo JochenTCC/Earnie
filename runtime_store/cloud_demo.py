@@ -134,12 +134,57 @@ def _feedback_config_zip_filename() -> str:
     return f"earnie_cloud_demo_config_{stamp}.zip"
 
 
+def _render_feedback_config_zip(st, SUPPORT_EMAIL: str) -> None:
+    import logging
+
+    try:
+        from runtime_store.config_pack import build_config_pack_bytes
+
+        pack = build_config_pack_bytes()
+    except Exception as exc:  # noqa: BLE001 — surface to user
+        logging.getLogger(__name__).exception(
+            "cloud demo feedback config pack failed"
+        )
+        st.error(f"ZIP-Erstellung fehlgeschlagen: {exc}")
+        pack = b""
+    if not pack:
+        return
+    st.download_button(
+        label="Konfigurations-ZIP herunterladen",
+        data=pack,
+        file_name=_feedback_config_zip_filename(),
+        mime="application/zip",
+        key="earnie_cloud_se_feedback_zip_download",
+    )
+    st.caption(
+        "ZIP bleibt lokal. Nicht in öffentliche Issues anhängen. "
+        f"Bei Bedarf an {SUPPORT_EMAIL} senden."
+    )
+
+
+def _render_feedback_actions(st, message: str) -> None:
+    issue_url = build_cloud_demo_feedback_issue_url(message)
+    col_issue, col_dismiss = st.columns(2)
+    with col_issue:
+        st.link_button(
+            "Feedback als GitHub-Issue",
+            issue_url,
+            width="stretch",
+        )
+    with col_dismiss:
+        if st.button(
+            "Später",
+            key="earnie_cloud_se_feedback_dismiss",
+            width="stretch",
+        ):
+            st.session_state[SESSION_SE_FEEDBACK_DISMISSED_KEY] = True
+            st.rerun()
+
+
 def render_cloud_demo_feedback_banner() -> None:
     """Ask for feedback after SE simulation start; only in EARNIE_CLOUD_DEMO."""
     if not is_cloud_demo():
         return
-    import logging
-
     import streamlit as st
 
     from ui.truth_banner import SUPPORT_EMAIL
@@ -168,42 +213,5 @@ def render_cloud_demo_feedback_banner() -> None:
         key="earnie_cloud_se_feedback_attach_config",
     )
     if attach_config:
-        try:
-            from runtime_store.config_pack import build_config_pack_bytes
-
-            pack = build_config_pack_bytes()
-        except Exception as exc:  # noqa: BLE001 — surface to user
-            logging.getLogger(__name__).exception(
-                "cloud demo feedback config pack failed"
-            )
-            st.error(f"ZIP-Erstellung fehlgeschlagen: {exc}")
-            pack = b""
-        if pack:
-            st.download_button(
-                label="Konfigurations-ZIP herunterladen",
-                data=pack,
-                file_name=_feedback_config_zip_filename(),
-                mime="application/zip",
-                key="earnie_cloud_se_feedback_zip_download",
-            )
-            st.caption(
-                "ZIP bleibt lokal. Nicht in öffentliche Issues anhängen. "
-                f"Bei Bedarf an {SUPPORT_EMAIL} senden."
-            )
-
-    issue_url = build_cloud_demo_feedback_issue_url(message)
-    col_issue, col_dismiss = st.columns(2)
-    with col_issue:
-        st.link_button(
-            "Feedback als GitHub-Issue",
-            issue_url,
-            width="stretch",
-        )
-    with col_dismiss:
-        if st.button(
-            "Später",
-            key="earnie_cloud_se_feedback_dismiss",
-            width="stretch",
-        ):
-            st.session_state[SESSION_SE_FEEDBACK_DISMISSED_KEY] = True
-            st.rerun()
+        _render_feedback_config_zip(st, SUPPORT_EMAIL)
+    _render_feedback_actions(st, message)

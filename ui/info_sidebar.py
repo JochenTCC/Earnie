@@ -69,59 +69,89 @@ def _contact_zip_filename() -> str:
     return f"{_CONTACT_ZIP_PREFIX}_{stamp}.zip"
 
 
+def _render_info_links() -> None:
+    st.link_button(
+        "Benutzer-Handbuch",
+        MANUAL_URL,
+        width="stretch",
+    )
+    st.link_button("Website", SITE_URL, width="stretch")
+    st.link_button(
+        "GitHub / Issues",
+        f"{OFFICIAL_REPO_URL.rstrip('/')}/issues",
+        width="stretch",
+    )
+
+
+def _render_contact_inputs() -> tuple[str, str, str, list[Any]]:
+    """Art / Thema / Beschreibung / Anhänge; returns them in that order."""
+    st.markdown("#### Kontakt")
+    st.caption(
+        "Standardweg: **öffentliches** GitHub-Issue. Keine Passwörter, "
+        "Hostnamen, Kundennamen oder vollständigen Config-/Debug-Dumps "
+        "einfügen. ZIP bleibt lokal — nur sichere Ausschnitte pasten."
+    )
+    kind = st.selectbox(
+        "Art",
+        options=list(ISSUE_KIND_LABELS),
+        key="info_contact_kind",
+    )
+    topic = st.text_input("Thema", key="info_contact_topic")
+    description = st.text_area("Beschreibung", key="info_contact_description")
+    attachments = st.file_uploader(
+        "Anhänge (nur für lokale ZIP)",
+        accept_multiple_files=True,
+        key="info_contact_attachments",
+    )
+    return kind, topic, description, list(attachments or [])
+
+
+def _render_contact_zip_download(attachments: list[Any]) -> None:
+    try:
+        bundle = build_contact_bundle_bytes(attachments)
+    except Exception as exc:  # noqa: BLE001 — surface to user
+        st.error(f"ZIP-Erstellung fehlgeschlagen: {exc}")
+        logger.exception("contact bundle export failed")
+        bundle = b""
+    if not bundle:
+        return
+    st.download_button(
+        label="Informationen in ZIP sammeln",
+        data=bundle,
+        file_name=_contact_zip_filename(),
+        mime="application/zip",
+        key="info_contact_zip_download",
+    )
+    st.caption(
+        "ZIP wird **nicht** hochgeladen. Für öffentliche Issues nur "
+        "sichere Ausschnitte pasten; für Vertrauliches die ZIP der "
+        f"Mail an {SUPPORT_EMAIL} anhängen."
+    )
+
+
+def _render_private_support_expander(topic: str, description: str) -> None:
+    with st.expander("Privater Support (Registry / vertraulich)"):
+        st.caption(
+            "Nur wenn öffentliche Issues ungeeignet sind: Registry-"
+            "Fingerprint, Zugangsdaten, vollständige Dumps. "
+            f"Adresse: {SUPPORT_EMAIL}."
+        )
+        private_mailto = build_mailto_url(topic, description)
+        st.link_button(
+            "Private E-Mail vorbereiten",
+            private_mailto,
+            width="stretch",
+        )
+
+
 def render_info_sidebar() -> None:
     """Info / About expander: attribution banner, version, contact form."""
     with st.sidebar.expander("Info / About", expanded=False):
         render_truth_banner(where="inline")
         render_registry_status_caption()
-        st.link_button(
-            "Benutzer-Handbuch",
-            MANUAL_URL,
-            width="stretch",
-        )
-        st.link_button("Website", SITE_URL, width="stretch")
-        st.link_button(
-            "GitHub / Issues",
-            f"{OFFICIAL_REPO_URL.rstrip('/')}/issues",
-            width="stretch",
-        )
-        st.markdown("#### Kontakt")
-        st.caption(
-            "Standardweg: **öffentliches** GitHub-Issue. Keine Passwörter, "
-            "Hostnamen, Kundennamen oder vollständigen Config-/Debug-Dumps "
-            "einfügen. ZIP bleibt lokal — nur sichere Ausschnitte pasten."
-        )
-        kind = st.selectbox(
-            "Art",
-            options=list(ISSUE_KIND_LABELS),
-            key="info_contact_kind",
-        )
-        topic = st.text_input("Thema", key="info_contact_topic")
-        description = st.text_area("Beschreibung", key="info_contact_description")
-        attachments = st.file_uploader(
-            "Anhänge (nur für lokale ZIP)",
-            accept_multiple_files=True,
-            key="info_contact_attachments",
-        )
-        try:
-            bundle = build_contact_bundle_bytes(list(attachments or []))
-        except Exception as exc:  # noqa: BLE001 — surface to user
-            st.error(f"ZIP-Erstellung fehlgeschlagen: {exc}")
-            logger.exception("contact bundle export failed")
-            bundle = b""
-        if bundle:
-            st.download_button(
-                label="Informationen in ZIP sammeln",
-                data=bundle,
-                file_name=_contact_zip_filename(),
-                mime="application/zip",
-                key="info_contact_zip_download",
-            )
-            st.caption(
-                "ZIP wird **nicht** hochgeladen. Für öffentliche Issues nur "
-                "sichere Ausschnitte pasten; für Vertrauliches die ZIP der "
-                f"Mail an {SUPPORT_EMAIL} anhängen."
-            )
+        _render_info_links()
+        kind, topic, description, attachments = _render_contact_inputs()
+        _render_contact_zip_download(attachments)
         issue_url = build_github_issue_url(
             kind,
             topic,
@@ -129,18 +159,7 @@ def render_info_sidebar() -> None:
             version=__version__,
         )
         st.link_button("GitHub-Issue öffnen", issue_url, width="stretch")
-        with st.expander("Privater Support (Registry / vertraulich)"):
-            st.caption(
-                "Nur wenn öffentliche Issues ungeeignet sind: Registry-"
-                "Fingerprint, Zugangsdaten, vollständige Dumps. "
-                f"Adresse: {SUPPORT_EMAIL}."
-            )
-            private_mailto = build_mailto_url(topic, description)
-            st.link_button(
-                "Private E-Mail vorbereiten",
-                private_mailto,
-                width="stretch",
-            )
+        _render_private_support_expander(topic, description)
 
 
 def render_missing_next_month_tariff_sidebar() -> None:

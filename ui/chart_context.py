@@ -359,6 +359,86 @@ def _display_deviation_events(
     return history_events + tail
 
 
+def _milp_only_context(
+    chart: UiChartWindow,
+    rows_input: list[dict],
+) -> ChartDisplayContext:
+    """Segment SA₁→SA₂: ausschließlich MILP-Zeilen auf den Chart-Slots."""
+    hourly_rows = align_rows_to_chart_slots(rows_input, chart)
+    return ChartDisplayContext(
+        rows=hourly_rows,
+        slot_datetimes=chart.slot_datetimes,
+        slot_qualities=tuple(SLOT_MILP for _ in hourly_rows),
+        history_slot_count=0,
+        history_result=None,
+        gap_notice=None,
+        history_only=False,
+        slot_deviation_events=empty_deviation_series(len(hourly_rows)),
+    )
+
+
+def _history_only_context(chart: UiChartWindow) -> ChartDisplayContext:
+    """Vergangener SA-Zyklus: ausschließlich Produktiv-Log."""
+    history = build_chart_history(chart.start, chart.end + timedelta(hours=1))
+    return ChartDisplayContext(
+        rows=history.rows,
+        slot_datetimes=history.slot_starts,
+        slot_qualities=history.slot_qualities,
+        history_slot_count=len(history.rows),
+        history_result=history,
+        gap_notice=_history_gap_notice(history),
+        history_only=True,
+        slot_deviation_events=history.slot_deviation_events,
+    )
+
+
+def _milp_tail_context(
+    chart_context: LiveChartContext,
+    rows_input: list[dict],
+    history_end: datetime,
+) -> ChartDisplayContext:
+    """Live-Segment ohne Log-Historie: nur der MILP-Tail."""
+    milp_rows, milp_slots, milp_qualities = _milp_tail_rows(
+        chart_context, rows_input, history_end
+    )
+    return ChartDisplayContext(
+        rows=milp_rows,
+        slot_datetimes=milp_slots,
+        slot_qualities=milp_qualities,
+        history_slot_count=0,
+        history_result=None,
+        gap_notice=None,
+        history_only=False,
+        slot_deviation_events=empty_deviation_series(len(milp_rows)),
+    )
+
+
+def _mixed_history_milp_context(
+    chart_context: LiveChartContext,
+    rows_input: list[dict],
+    history_end: datetime,
+) -> ChartDisplayContext:
+    """Live-Segment: Produktiv-Log bis ``history_end``, danach MILP."""
+    history = build_chart_history(chart_context.chart_window.start, history_end)
+    milp_rows, milp_slots, milp_qualities = _milp_tail_rows(
+        chart_context, rows_input, history_end
+    )
+    return ChartDisplayContext(
+        rows=history.rows + milp_rows,
+        slot_datetimes=history.slot_starts + milp_slots,
+        slot_qualities=history.slot_qualities + milp_qualities,
+        history_slot_count=len(history.rows),
+        history_result=history,
+        gap_notice=_history_gap_notice(history),
+        history_only=False,
+        slot_deviation_events=_display_deviation_events(
+            history,
+            len(history.rows),
+            len(history.rows) + len(milp_rows),
+        ),
+    )
+
+
 def build_chart_display_context(
     chart_context: LiveChartContext,
     sim_rows: list[dict] | None,
@@ -370,72 +450,16 @@ def build_chart_display_context(
     """
     chart = chart_context.chart_window
     rows_input = sim_rows or []
-    uses_live_tail = chart_uses_live_zones(chart, chart_context.now)
 
     if chart.span == "segment" and chart.segment_index == 1:
-        hourly_rows = align_rows_to_chart_slots(rows_input, chart)
-        qualities = tuple(SLOT_MILP for _ in hourly_rows)
-        return ChartDisplayContext(
-            rows=hourly_rows,
-            slot_datetimes=chart.slot_datetimes,
-            slot_qualities=qualities,
-            history_slot_count=0,
-            history_result=None,
-            gap_notice=None,
-            history_only=False,
-            slot_deviation_events=empty_deviation_series(len(hourly_rows)),
-        )
-
-    if not uses_live_tail:
-        history_end = chart.end + timedelta(hours=1)
-        history = build_chart_history(chart.start, history_end)
-        return ChartDisplayContext(
-            rows=history.rows,
-            slot_datetimes=history.slot_starts,
-            slot_qualities=history.slot_qualities,
-            history_slot_count=len(history.rows),
-            history_result=history,
-            gap_notice=_history_gap_notice(history),
-            history_only=True,
-            slot_deviation_events=history.slot_deviation_events,
-        )
+        return _milp_only_context(chart, rows_input)
+    if not chart_uses_live_zones(chart, chart_context.now):
+        return _history_only_context(chart)
 
     history_end = history_log_end_exclusive(chart_context.now, chart)
     if history_end <= chart.start:
-        milp_rows, milp_slots, milp_qualities = _milp_tail_rows(
-            chart_context, rows_input, history_end
-        )
-        return ChartDisplayContext(
-            rows=milp_rows,
-            slot_datetimes=milp_slots,
-            slot_qualities=milp_qualities,
-            history_slot_count=0,
-            history_result=None,
-            gap_notice=None,
-            history_only=False,
-            slot_deviation_events=empty_deviation_series(len(milp_rows)),
-        )
-
-    history = build_chart_history(chart.start, history_end)
-    milp_rows, milp_slots, milp_qualities = _milp_tail_rows(
-        chart_context, rows_input, history_end
-    )
-    qualities = history.slot_qualities + milp_qualities
-    total_slots = len(history.rows) + len(milp_rows)
-    return ChartDisplayContext(
-        rows=history.rows + milp_rows,
-        slot_datetimes=history.slot_starts + milp_slots,
-        slot_qualities=qualities,
-        history_slot_count=len(history.rows),
-        history_result=history,
-        gap_notice=_history_gap_notice(history),
-        history_only=False,
-        slot_deviation_events=_display_deviation_events(
-            history,
-            len(history.rows),
-            total_slots,
-        ),
-    )
+        return _milp_tail_context(chart_context, rows_input, history_end)
+    return _mixed_history_milp_context(chart_context, rows_input, history_end)
 
 
 def align_rows_to_display_slots(

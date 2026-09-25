@@ -1,6 +1,7 @@
 """Plotly-Charts für Optimierungsdarstellung (sunrise→sunrise Live, 24h Historie)."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 import streamlit as st
@@ -9,11 +10,12 @@ import plotly.graph_objects as go
 
 from data.planning_window import UiChartWindow
 from optimizer.deviation_eval import DeviationEvent
+from ui.chart_cumulative_render import (
+    render_cumulative_cost_chart,
+    render_price_savings_chart,
+)
 from ui.chart_decorations import (
     ChartSunMarkers,
-    _CHART2_S2_HELP,
-    _CHART2_S2_TITLE,
-    _add_cost_summary_annotations,
     _add_deviation_markers,
     _add_missing_slot_backgrounds,
     _add_sun_markers,
@@ -25,12 +27,6 @@ from ui.chart_decorations import (
     build_sun_markers,
 )
 from ui.chart_consumer_stack import get_bar_colors, ordered_active_consumers_for_stack
-from ui.chart_cumulative import (
-    add_achieved_savings_trace,
-    add_cumulative_consumption_traces,
-    add_cumulative_cost_traces,
-    add_cumulative_s2_split_traces,
-)
 from ui.chart_slot_axis import ChartSlotAxis, _chart_xaxis_config
 from ui.chart_soc import (
     add_baseline_soc_traces,
@@ -99,6 +95,122 @@ def add_power_traces(
         )
 
 
+@dataclass(frozen=True)
+class _Chart1Options:
+    """Gemeinsame Optionen der Chart-1-Trace-Layer (Leistung, SoC, Preis)."""
+
+    chart_window: UiChartWindow | None
+    chart_zones: object | None
+    slot_qualities: tuple[str, ...] | None
+    matched_baseline_df: pd.DataFrame | None
+    optimization_matrix: list[dict] | None
+    show_soc_plausibility: bool
+    show_baseline_soc: bool
+    history_slot_count: int | None
+    chart_now: datetime | None
+    battery_params: dict | None
+
+
+def _add_power_layer(
+    fig: go.Figure,
+    plot_df: pd.DataFrame,
+    axis: ChartSlotAxis,
+    options: _Chart1Options,
+) -> None:
+    extrap_start, extrap_end = _extrapolation_bounds(plot_df)
+    range_start = _chart_range_start(options.chart_window)
+    if options.chart_zones is not None:
+        _add_zone_backgrounds(fig, options.chart_zones, axis, range_start=range_start)
+    _add_missing_slot_backgrounds(fig, axis, options.slot_qualities)
+    add_power_traces(
+        fig,
+        plot_df,
+        get_bar_colors(plot_df),
+        axis,
+        extrap_start,
+        extrap_end,
+        matrix=options.optimization_matrix,
+        chart_window=options.chart_window,
+        chart_zones=options.chart_zones,
+        matched_baseline_df=options.matched_baseline_df,
+        show_soc_plausibility=options.show_soc_plausibility,
+        history_slot_count=options.history_slot_count,
+    )
+
+
+def _add_soc_price_layer(
+    fig: go.Figure,
+    plot_df: pd.DataFrame,
+    axis: ChartSlotAxis,
+    options: _Chart1Options,
+) -> None:
+    extrap_start, extrap_end = _extrapolation_bounds(plot_df)
+    add_ess_mode_soc_underlay_traces(
+        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
+        history_slot_count=options.history_slot_count,
+        chart_now=options.chart_now,
+        battery_params=options.battery_params,
+    )
+    add_optimized_soc_trace(
+        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
+        history_slot_count=options.history_slot_count,
+        chart_now=options.chart_now,
+        battery_params=options.battery_params,
+    )
+    if options.show_baseline_soc:
+        soc_at_now = _soc_at_chart_now(
+            axis, plot_df, options.chart_now, options.history_slot_count,
+            battery_params=options.battery_params,
+        )
+        add_baseline_soc_traces(
+            fig,
+            options.matched_baseline_df,
+            extrap_start=extrap_start,
+            extrap_end=extrap_end,
+            chart_now=options.chart_now,
+            history_slot_count=options.history_slot_count,
+            soc_at_now=soc_at_now,
+            battery_params=options.battery_params,
+        )
+    add_price_on_soc_axis_trace(
+        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
+    )
+    add_export_price_on_soc_axis_trace(
+        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
+    )
+
+
+def _power_soc_layout(
+    axis: ChartSlotAxis,
+    *,
+    chart_window: UiChartWindow | None,
+    chart_title: str | None,
+    chart_header_label: str | None,
+) -> dict:
+    default_title = (
+        _sunrise_chart_title(chart_window)
+        if chart_window is not None
+        else "24-Stunden-Zeithorizont (Leistung, SoC & Preis)"
+    )
+    plotly_title = None if chart_header_label else chart_title or default_title
+    layout_title = plotly_title if plotly_title else ""
+    top_margin = 20 if chart_header_label else 50
+    return dict(
+        title=layout_title,
+        xaxis=_chart_xaxis_config(axis, range_start=_chart_range_start(chart_window)),
+        barmode="overlay",
+        yaxis=dict(title="Leistung (kW)", side="left"),
+        yaxis2=dict(
+            title="SoC (%) / Preis (Cent/kWh)",
+            side="right",
+            overlaying="y",
+            showgrid=False,
+            range=[-5, 105],
+        ),
+        **_collapsible_chart_layout(top_margin=top_margin),
+    )
+
+
 def build_power_soc_chart_figure(
     df: pd.DataFrame,
     baseline_df: pd.DataFrame | None = None,
@@ -119,90 +231,36 @@ def build_power_soc_chart_figure(
     battery_params: dict | None = None,
 ) -> go.Figure:
     """Baut Chart 1 (Leistung, SoC, Preis) ohne Streamlit-Rendering."""
-    plot_df = _mask_missing_log_slots(df, slot_qualities)
-    bar_colors = get_bar_colors(plot_df)
-    axis = ChartSlotAxis.from_dataframe(plot_df)
-    extrap_start, extrap_end = _extrapolation_bounds(plot_df)
-    range_start = _chart_range_start(chart_window)
-    fig = go.Figure()
-
-    if chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_zones, axis, range_start=range_start)
-    _add_missing_slot_backgrounds(fig, axis, slot_qualities)
-
-    add_power_traces(
-        fig,
-        plot_df,
-        bar_colors,
-        axis,
-        extrap_start,
-        extrap_end,
-        matrix=optimization_matrix,
+    options = _Chart1Options(
         chart_window=chart_window,
         chart_zones=chart_zones,
+        slot_qualities=slot_qualities,
         matched_baseline_df=matched_baseline_df,
+        optimization_matrix=optimization_matrix,
         show_soc_plausibility=show_soc_plausibility,
-        history_slot_count=history_slot_count,
-    )
-    add_ess_mode_soc_underlay_traces(
-        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
+        show_baseline_soc=show_baseline_soc,
         history_slot_count=history_slot_count,
         chart_now=chart_now,
         battery_params=battery_params,
     )
-    add_optimized_soc_trace(
-        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end,
-        history_slot_count=history_slot_count,
-        chart_now=chart_now,
-        battery_params=battery_params,
-    )
-    if show_baseline_soc:
-        soc_at_now = _soc_at_chart_now(
-            axis, plot_df, chart_now, history_slot_count,
-            battery_params=battery_params,
-        )
-        add_baseline_soc_traces(
-            fig,
-            matched_baseline_df,
-            extrap_start=extrap_start,
-            extrap_end=extrap_end,
-            chart_now=chart_now,
-            history_slot_count=history_slot_count,
-            soc_at_now=soc_at_now,
-            battery_params=battery_params,
-        )
-    add_price_on_soc_axis_trace(
-        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
-    )
-    add_export_price_on_soc_axis_trace(
-        fig, plot_df, axis, extrap_start=extrap_start, extrap_end=extrap_end
-    )
+    plot_df = _mask_missing_log_slots(df, slot_qualities)
+    axis = ChartSlotAxis.from_dataframe(plot_df)
+    fig = go.Figure()
+
+    _add_power_layer(fig, plot_df, axis, options)
+    _add_soc_price_layer(fig, plot_df, axis, options)
 
     if sun_markers is not None:
         _add_sun_markers(fig, sun_markers)
     _add_deviation_markers(fig, axis, plot_df, slot_deviation_events)
 
-    default_title = (
-        _sunrise_chart_title(chart_window)
-        if chart_window is not None
-        else "24-Stunden-Zeithorizont (Leistung, SoC & Preis)"
-    )
-    plotly_title = None if chart_header_label else chart_title or default_title
-    layout_title = plotly_title if plotly_title else ""
-    top_margin = 20 if chart_header_label else 50
     fig.update_layout(
-        title=layout_title,
-        xaxis=_chart_xaxis_config(axis, range_start=range_start),
-        barmode="overlay",
-        yaxis=dict(title="Leistung (kW)", side="left"),
-        yaxis2=dict(
-            title="SoC (%) / Preis (Cent/kWh)",
-            side="right",
-            overlaying="y",
-            showgrid=False,
-            range=[-5, 105],
-        ),
-        **_collapsible_chart_layout(top_margin=top_margin),
+        **_power_soc_layout(
+            axis,
+            chart_window=chart_window,
+            chart_title=chart_title,
+            chart_header_label=chart_header_label,
+        )
     )
     return fig
 
@@ -259,187 +317,6 @@ def render_power_soc_chart(
     inject_mobile_legend_css()
     st.plotly_chart(fig, **plotly_kwargs)
     render_collapsible_legend_from_figure(fig)
-
-
-def render_cumulative_cost_chart(
-    df: pd.DataFrame,
-    hourly_matched_baseline_cost_euro: list[float] | None = None,
-    hourly_optimized_cost_euro: list[float] | None = None,
-    hourly_matched_baseline_consumption_kwh: list[float] | None = None,
-    hourly_optimized_consumption_kwh: list[float] | None = None,
-    *,
-    matched_baseline_cost_euro: float | None = None,
-    optimized_cost_euro: float | None = None,
-    cost_summary_days=None,
-    hourly_savings_euro: list[float] | None = None,
-    chart_window: UiChartWindow | None = None,
-    chart_now: datetime | None = None,
-    chart_zones=None,
-    slot_qualities: tuple[str, ...] | None = None,
-    history_slot_count: int | None = None,
-    slot_actual_cost_euro: list[float] | None = None,
-    slot_actual_consumption_kwh: list[float] | None = None,
-    chart_key: str | None = None,
-) -> None:
-    axis = ChartSlotAxis.from_dataframe(df)
-    extrap_start, extrap_end = _extrapolation_bounds(df)
-    range_start = _chart_range_start(chart_window)
-    fig = go.Figure()
-    if chart_zones is not None:
-        _add_zone_backgrounds(fig, chart_zones, axis, range_start=range_start)
-    _add_missing_slot_backgrounds(fig, axis, slot_qualities)
-    split_mode = (
-        history_slot_count is not None
-        and history_slot_count > 0
-        and slot_actual_cost_euro is not None
-        and slot_actual_consumption_kwh is not None
-    )
-    has_costs = bool(hourly_matched_baseline_cost_euro and hourly_optimized_cost_euro)
-    has_consumption = bool(
-        hourly_matched_baseline_consumption_kwh and hourly_optimized_consumption_kwh
-    )
-    if split_mode:
-        add_cumulative_s2_split_traces(
-            fig,
-            df["Uhrzeit"],
-            axis,
-            history_slot_count=history_slot_count,
-            slot_actual_cost_euro=slot_actual_cost_euro or [],
-            slot_actual_consumption_kwh=slot_actual_consumption_kwh or [],
-            hourly_matched_baseline_cost_euro=hourly_matched_baseline_cost_euro or [],
-            hourly_optimized_cost_euro=hourly_optimized_cost_euro or [],
-            hourly_matched_baseline_consumption_kwh=(
-                hourly_matched_baseline_consumption_kwh or []
-            ),
-            hourly_optimized_consumption_kwh=hourly_optimized_consumption_kwh or [],
-        )
-        has_costs = has_costs or history_slot_count > 0
-        has_consumption = has_consumption or history_slot_count > 0
-        if hourly_savings_euro and chart_window is not None:
-            from ui.chart_day_costs import achieved_savings_cumulative_euro
-
-            achieved = achieved_savings_cumulative_euro(
-                list(axis.starts),
-                hourly_savings_euro,
-                history_slot_count=history_slot_count,
-                sa0=chart_window.sa0,
-                sa1=chart_window.sa1,
-                sa2=chart_window.sa2,
-            )
-            add_achieved_savings_trace(fig, df["Uhrzeit"], axis, achieved)
-    elif has_costs:
-        add_cumulative_cost_traces(
-            fig,
-            df["Uhrzeit"],
-            axis,
-            hourly_matched_baseline_cost_euro or [],
-            hourly_optimized_cost_euro or [],
-            extrap_start=extrap_start,
-            extrap_end=extrap_end,
-        )
-    if not split_mode and has_consumption:
-        add_cumulative_consumption_traces(
-            fig,
-            df["Uhrzeit"],
-            axis,
-            hourly_matched_baseline_consumption_kwh or [],
-            hourly_optimized_consumption_kwh or [],
-            extrap_start=extrap_start,
-            extrap_end=extrap_end,
-        )
-
-    show_cost_summary = bool(cost_summary_days) or (
-        has_costs
-        and matched_baseline_cost_euro is not None
-        and optimized_cost_euro is not None
-    )
-    if show_cost_summary:
-        _add_cost_summary_annotations(
-            fig,
-            matched_baseline_cost_euro,
-            optimized_cost_euro,
-            days=cost_summary_days,
-        )
-
-    if split_mode:
-        render_title_with_help(_CHART2_S2_TITLE, _CHART2_S2_HELP, key="chart2_s2_help")
-
-    default_title = (
-        _CHART2_S2_TITLE
-        if chart_window is not None
-        else "Kumulierte Kosten & Verbrauch"
-    )
-    plotly_title = "" if split_mode else default_title
-    top_margin = 20 if split_mode else 50
-    layout = dict(
-        title=plotly_title,
-        xaxis=_chart_xaxis_config(axis, range_start=range_start),
-        yaxis=dict(title="Kosten (€, kumuliert)"),
-        **_collapsible_chart_layout(top_margin=top_margin),
-    )
-    if has_consumption:
-        layout["yaxis2"] = dict(
-            title="Verbrauch (kWh, kumuliert)",
-            side="right",
-            overlaying="y",
-            showgrid=False,
-        )
-    fig.update_layout(**layout)
-    if (has_costs or has_consumption) and not split_mode:
-        extrap_start, _ = _extrapolation_bounds(df)
-        if extrap_start is None:
-            st.caption(
-                "Durchgezogene Linien: Kosten. Gestrichelte Linien (rechte Achse): "
-                "Gesamtverbrauch Grundlast + Flex. BL Ziel: historisches Profil skaliert."
-            )
-    inject_mobile_legend_css()
-    plotly_kwargs: dict = {"width": "stretch"}
-    if chart_key:
-        plotly_kwargs["key"] = chart_key
-    st.plotly_chart(fig, **plotly_kwargs)
-    render_collapsible_legend_from_figure(fig)
-
-
-def render_price_savings_chart(
-    df: pd.DataFrame,
-    hourly_matched_baseline_cost_euro: list[float] | None = None,
-    hourly_optimized_cost_euro: list[float] | None = None,
-    hourly_matched_baseline_consumption_kwh: list[float] | None = None,
-    hourly_optimized_consumption_kwh: list[float] | None = None,
-    *,
-    matched_baseline_cost_euro: float | None = None,
-    optimized_cost_euro: float | None = None,
-    cost_summary_days=None,
-    hourly_savings_euro: list[float] | None = None,
-    chart_window: UiChartWindow | None = None,
-    chart_now: datetime | None = None,
-    chart_zones=None,
-    slot_qualities: tuple[str, ...] | None = None,
-    history_slot_count: int | None = None,
-    slot_actual_cost_euro: list[float] | None = None,
-    slot_actual_consumption_kwh: list[float] | None = None,
-    chart_key: str | None = None,
-) -> None:
-    """Alias für kumulierte Kosten- und Verbrauchslinien."""
-    render_cumulative_cost_chart(
-        df,
-        hourly_matched_baseline_cost_euro,
-        hourly_optimized_cost_euro,
-        hourly_matched_baseline_consumption_kwh,
-        hourly_optimized_consumption_kwh,
-        matched_baseline_cost_euro=matched_baseline_cost_euro,
-        optimized_cost_euro=optimized_cost_euro,
-        cost_summary_days=cost_summary_days,
-        hourly_savings_euro=hourly_savings_euro,
-        chart_window=chart_window,
-        chart_now=chart_now,
-        chart_zones=chart_zones,
-        slot_qualities=slot_qualities,
-        history_slot_count=history_slot_count,
-        slot_actual_cost_euro=slot_actual_cost_euro,
-        slot_actual_consumption_kwh=slot_actual_consumption_kwh,
-        chart_key=chart_key,
-    )
 
 
 def render_optimization_chart(
@@ -641,4 +518,3 @@ __all__ = [
     "render_power_soc_chart",
     "render_price_savings_chart",
 ]
-

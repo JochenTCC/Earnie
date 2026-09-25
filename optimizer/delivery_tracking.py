@@ -87,46 +87,45 @@ def effective_session_delivered_kwh(
     return min(float(delivered_kwh), cap)
 
 
-def assess_session_delivery(
+def _assess_loxone_soc_complete(
     consumer: dict,
-    ctx: dict | None,
+    ctx: dict,
     delivered_kwh: float,
     *,
     live_kw: float | None,
-    trigger_snapshot: dict[str, Any] | None,
-    session: dict | None = None,
-) -> tuple[float, dict[str, Any] | None]:
-    """Liefert wirksam gebuchte kWh und optional einen Plausibilitäts-Hinweis."""
-    if ctx is None or not is_charging_session_context(consumer, ctx):
-        return float(delivered_kwh), None
-
-    if loxone_reports_charge_complete(consumer):
-        compare_note = compare_ev_soc_sources(
-            consumer,
-            session,
-            delivered_kwh,
-            live_kw=live_kw,
-        )
-        target_kwh = float(ctx.get("target_kwh") or 0.0)
-        effective = max(float(delivered_kwh), target_kwh) if target_kwh > 0 else float(delivered_kwh)
-        note = {
-            "role": "loxone_soc_complete",
-            "booked_delivered_kwh": round(float(delivered_kwh), 3),
-            "effective_delivered_kwh": round(effective, 3),
-        }
-        if compare_note:
-            note.update(compare_note)
-        return effective, note
-
+    session: dict | None,
+) -> tuple[float, dict[str, Any]]:
+    compare_note = compare_ev_soc_sources(
+        consumer,
+        session,
+        delivered_kwh,
+        live_kw=live_kw,
+    )
     target_kwh = float(ctx.get("target_kwh") or 0.0)
-    remaining_before = max(0.0, target_kwh - float(delivered_kwh))
-    if remaining_before > DELIVERY_REOPEN_KWH:
-        return float(delivered_kwh), None
+    effective = (
+        max(float(delivered_kwh), target_kwh) if target_kwh > 0 else float(delivered_kwh)
+    )
+    note = {
+        "role": "loxone_soc_complete",
+        "booked_delivered_kwh": round(float(delivered_kwh), 3),
+        "effective_delivered_kwh": round(effective, 3),
+    }
+    if compare_note:
+        note.update(compare_note)
+    return effective, note
 
+
+def _resolve_immediate_and_still_needs(
+    consumer: dict,
+    ctx: dict,
+    *,
+    live_kw: float | None,
+    trigger_snapshot: dict[str, Any] | None,
+    session: dict | None,
+) -> tuple[bool | None, bool]:
     immediate = _charge_immediate_from_snapshot(consumer["id"], trigger_snapshot)
     if immediate is None:
         immediate = fetch_charge_immediate_switch(consumer)
-
     still_needs = session_still_needs_charge(
         consumer,
         ctx,
@@ -134,17 +133,17 @@ def assess_session_delivery(
         charge_immediate_on=immediate,
         session=session,
     )
-    if not still_needs:
-        compare_note = compare_ev_soc_sources(
-            consumer,
-            session,
-            delivered_kwh,
-            live_kw=live_kw,
-        )
-        if compare_note:
-            return float(delivered_kwh), compare_note
-        return float(delivered_kwh), None
+    return immediate, still_needs
 
+
+def _session_reopened_result(
+    consumer: dict,
+    delivered_kwh: float,
+    target_kwh: float,
+    *,
+    live_kw: float | None,
+    immediate: bool | None,
+) -> tuple[float, dict[str, Any]]:
     effective = effective_session_delivered_kwh(
         delivered_kwh,
         target_kwh,
@@ -168,6 +167,75 @@ def assess_session_delivery(
         immediate,
     )
     return effective, note
+
+
+def _assess_session_reopen(
+    consumer: dict,
+    ctx: dict,
+    delivered_kwh: float,
+    *,
+    live_kw: float | None,
+    trigger_snapshot: dict[str, Any] | None,
+    session: dict | None,
+) -> tuple[float, dict[str, Any] | None]:
+    target_kwh = float(ctx.get("target_kwh") or 0.0)
+    remaining_before = max(0.0, target_kwh - float(delivered_kwh))
+    if remaining_before > DELIVERY_REOPEN_KWH:
+        return float(delivered_kwh), None
+
+    immediate, still_needs = _resolve_immediate_and_still_needs(
+        consumer,
+        ctx,
+        live_kw=live_kw,
+        trigger_snapshot=trigger_snapshot,
+        session=session,
+    )
+    if not still_needs:
+        compare_note = compare_ev_soc_sources(
+            consumer,
+            session,
+            delivered_kwh,
+            live_kw=live_kw,
+        )
+        if compare_note:
+            return float(delivered_kwh), compare_note
+        return float(delivered_kwh), None
+
+    return _session_reopened_result(
+        consumer,
+        delivered_kwh,
+        target_kwh,
+        live_kw=live_kw,
+        immediate=immediate,
+    )
+
+
+def assess_session_delivery(
+    consumer: dict,
+    ctx: dict | None,
+    delivered_kwh: float,
+    *,
+    live_kw: float | None,
+    trigger_snapshot: dict[str, Any] | None,
+    session: dict | None = None,
+) -> tuple[float, dict[str, Any] | None]:
+    """Liefert wirksam gebuchte kWh und optional einen Plausibilitäts-Hinweis."""
+    if ctx is None or not is_charging_session_context(consumer, ctx):
+        return float(delivered_kwh), None
+
+    if loxone_reports_charge_complete(consumer):
+        return _assess_loxone_soc_complete(
+            consumer, ctx, delivered_kwh, live_kw=live_kw, session=session
+        )
+
+    return _assess_session_reopen(
+        consumer,
+        ctx,
+        delivered_kwh,
+        live_kw=live_kw,
+        trigger_snapshot=trigger_snapshot,
+        session=session,
+    )
 
 
 def build_delivery_compliance_row(

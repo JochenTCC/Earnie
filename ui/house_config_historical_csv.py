@@ -102,23 +102,39 @@ def historical_csv_save_fields(preview_id: str, existing: dict) -> dict[str, str
     }
 
 
-def render_historical_csv_section(
-    *,
-    existing: dict,
-    preview_id: str,
-    annual_kwh: float,
-    resolved: list[dict],
-    preview: dict,
-) -> None:
-    """CSV imports (collapsible) + always-visible Gesamt-Lastverhalten charts."""
-    init_historical_csv_session(preview_id, existing)
-    keys = session_keys(preview_id)
+def _historical_csv_state(preview_id: str, keys: dict[str, str]) -> dict:
+    """Current CSV paths and Bilanz sign flags from session state."""
+    return {
+        "verbrauch": str(st.session_state.get(keys["verbrauch"], "") or "").strip(),
+        "pv": str(st.session_state.get(keys["pv"], "") or "").strip(),
+        "battery": str(st.session_state.get(keys["battery"], "") or "").strip(),
+        "grid": str(st.session_state.get(keys["grid"], "") or "").strip(),
+        "invert_pv": bool(
+            st.session_state.get(f"house_profile_balance_invert_pv_{preview_id}", False)
+        ),
+        "invert_battery": bool(
+            st.session_state.get(
+                f"house_profile_balance_invert_batt_{preview_id}", False
+            )
+        ),
+        "invert_grid": bool(
+            st.session_state.get(
+                f"house_profile_balance_invert_grid_{preview_id}", False
+            )
+        ),
+    }
 
+
+def _render_historical_csv_intro() -> None:
     st.subheader("Historische Jahres-Leistungsprofile [kW]")
     st.caption(
         "Optional — für Ist-vs-Modell, Bilanz-Import und realistischere "
         "Explorer-Rechnungen. Ohne CSV gilt nur das modellierte Hausprofil."
     )
+
+
+def _render_csv_import_expander(preview_id: str, keys: dict[str, str]) -> None:
+    """Import-mode radio, per-mode upload widgets and the QC block."""
     with st.expander("Historische Jahres-Leistungsprofile [kW] (CSV)", expanded=True):
         st.caption(
             "Lastprofil [kW] (für Ist in Gesamt-Lastverhalten) und optional "
@@ -148,78 +164,75 @@ def render_historical_csv_section(
         else:
             _render_separate_mode(preview_id, keys)
 
-        active_path = str(st.session_state.get(keys["verbrauch"], "") or "").strip()
-        pv_path = str(st.session_state.get(keys["pv"], "") or "").strip()
-        battery_path = str(st.session_state.get(keys["battery"], "") or "").strip()
-        grid_path = str(st.session_state.get(keys["grid"], "") or "").strip()
-        invert_pv = bool(
-            st.session_state.get(f"house_profile_balance_invert_pv_{preview_id}", False)
-        )
-        invert_battery = bool(
-            st.session_state.get(
-                f"house_profile_balance_invert_batt_{preview_id}", False
-            )
-        )
-        invert_grid = bool(
-            st.session_state.get(
-                f"house_profile_balance_invert_grid_{preview_id}", False
-            )
-        )
-        if active_path or pv_path or battery_path or grid_path:
+        state = _historical_csv_state(preview_id, keys)
+        if state["verbrauch"] or state["pv"] or state["battery"] or state["grid"]:
             from ui.house_config_import_qc import render_import_power_qc
 
             render_import_power_qc(
                 preview_id=preview_id,
-                verbrauch_path=active_path,
-                pv_path=pv_path,
-                battery_path=battery_path,
-                grid_path=grid_path,
-                invert_pv=invert_pv,
-                invert_battery=invert_battery,
-                invert_grid=invert_grid,
+                verbrauch_path=state["verbrauch"],
+                pv_path=state["pv"],
+                battery_path=state["battery"],
+                grid_path=state["grid"],
+                invert_pv=state["invert_pv"],
+                invert_battery=state["invert_battery"],
+                invert_grid=state["invert_grid"],
             )
 
-    active_path = str(st.session_state.get(keys["verbrauch"], "") or "").strip()
-    pv_path = str(st.session_state.get(keys["pv"], "") or "").strip()
-    battery_path = str(st.session_state.get(keys["battery"], "") or "").strip()
-    grid_path = str(st.session_state.get(keys["grid"], "") or "").strip()
-    invert_pv = bool(
-        st.session_state.get(f"house_profile_balance_invert_pv_{preview_id}", False)
-    )
-    invert_battery = bool(
-        st.session_state.get(f"house_profile_balance_invert_batt_{preview_id}", False)
-    )
-    invert_grid = bool(
-        st.session_state.get(f"house_profile_balance_invert_grid_{preview_id}", False)
-    )
-    balance_series = None
-    if pv_path and grid_path:
-        from ui.house_config_import_qc import load_balance_gesamt_series
 
-        balance_series, _clipped = load_balance_gesamt_series(
-            pv_path,
-            battery_path,
-            grid_path,
-            invert_pv=invert_pv,
-            invert_battery=invert_battery,
-            invert_grid=invert_grid,
-        )
+def _load_balance_series(state: dict) -> list[tuple[str, float]] | None:
+    if not (state["pv"] and state["grid"]):
+        return None
+    from ui.house_config_import_qc import load_balance_gesamt_series
+
+    balance_series, _clipped = load_balance_gesamt_series(
+        state["pv"],
+        state["battery"],
+        state["grid"],
+        invert_pv=state["invert_pv"],
+        invert_battery=state["invert_battery"],
+        invert_grid=state["invert_grid"],
+    )
+    return balance_series
+
+
+def _balance_reset_extra(state: dict) -> str:
+    return (
+        f"{state['invert_pv']:d}{state['invert_battery']:d}{state['invert_grid']:d}:"
+        f"{state['pv']}:{state['battery']}:{state['grid']}"
+    )
+
+
+def render_historical_csv_section(
+    *,
+    existing: dict,
+    preview_id: str,
+    annual_kwh: float,
+    resolved: list[dict],
+    preview: dict,
+) -> None:
+    """CSV imports (collapsible) + always-visible Gesamt-Lastverhalten charts."""
+    init_historical_csv_session(preview_id, existing)
+    keys = session_keys(preview_id)
+
+    _render_historical_csv_intro()
+    _render_csv_import_expander(preview_id, keys)
+
+    state = _historical_csv_state(preview_id, keys)
+    balance_series = _load_balance_series(state)
 
     _render_gesamtverbraeuche(
         preview_id=preview_id,
         annual_kwh=annual_kwh,
         resolved=resolved,
         preview=preview,
-        active_path=active_path,
-        pv_path=pv_path,
-        battery_path=battery_path,
-        grid_path=grid_path,
+        active_path=state["verbrauch"],
+        pv_path=state["pv"],
+        battery_path=state["battery"],
+        grid_path=state["grid"],
         balance_series=balance_series,
         reset_extra=(
-            f"{invert_pv:d}{invert_battery:d}{invert_grid:d}:"
-            f"{pv_path}:{battery_path}:{grid_path}"
-            if balance_series is not None
-            else ""
+            _balance_reset_extra(state) if balance_series is not None else ""
         ),
     )
 
@@ -244,6 +257,57 @@ def render_historical_csv_section(
 
 
 
+def _load_ist_series(
+    active_path: str,
+    csv_series: list[tuple[str, float]] | None,
+) -> list[tuple[str, float]]:
+    if csv_series is not None:
+        return csv_series
+    from house_config.consumption_csv import (
+        load_hourly_profile_csv,
+        normalize_profile_csv_file,
+    )
+
+    try:
+        return load_hourly_profile_csv(active_path)
+    except ValueError:
+        return normalize_profile_csv_file(active_path)
+
+
+def _render_baseload_dist_radio(preview_id: str) -> str:
+    return st.radio(
+        "Basislast-Verteilung",
+        options=[_DIST_EQUAL, _DIST_MONTHLY],
+        format_func=lambda value: _DIST_LABELS[value],
+        key=f"house_profile_baseload_dist_{preview_id}",
+        horizontal=True,
+        help=(
+            "Jahres-Rest: konstante Grundlast (SE-Pfad A flat). "
+            "Monats-Rest: pro Kalendermonat Ist − Verbraucher (≥ 0) — "
+            "gilt für Gesamt-Lastverhalten-Charts und SE-Pfad A, wenn eine "
+            "Gesamt-CSV vorhanden ist. SE-Pfad B (alle Gesteuert/Manual "
+            "mit CSV) bleibt der stündliche Meter-Rest."
+        ),
+    )
+
+
+def _resolve_baseload_display(
+    probe,
+    series: list[tuple[str, float]],
+    *,
+    dist_mode: str,
+    annual_kwh: float,
+    resolved: list[dict],
+):
+    if dist_mode == _DIST_MONTHLY:
+        return _baseload_display_monthly(probe, series)
+    return _baseload_display_equal(
+        probe,
+        annual_kwh=annual_kwh,
+        resolved=resolved,
+    )
+
+
 def _render_ist_vs_modell(
     *,
     active_path: str,
@@ -255,60 +319,32 @@ def _render_ist_vs_modell(
     csv_series: list[tuple[str, float]] | None = None,
     reset_extra: str = "",
 ) -> None:
-    from house_config.consumption_csv import (
-        load_hourly_profile_csv,
-        normalize_profile_csv_file,
-    )
     from ui.consumption_display import ConsumptionDisplayMode, render_consumption_display
     from ui.consumption_display.adapters import bundle_from_csv_validation
 
     try:
-        profile_total_path = (
-            active_path if not active_path.startswith("bilanz:") else ""
-        )
         modeled_profile = {
             "annual_kwh": annual_kwh,
             "baseload_kwh": preview["baseload_kwh"],
             "consumers": resolved,
-            "total_profile_csv": profile_total_path,
+            "total_profile_csv": (
+                active_path if not active_path.startswith("bilanz:") else ""
+            ),
             "pv_profile_csv": pv_path,
         }
-        if csv_series is not None:
-            series = csv_series
-        else:
-            try:
-                series = load_hourly_profile_csv(active_path)
-            except ValueError:
-                series = normalize_profile_csv_file(active_path)
-
+        series = _load_ist_series(active_path, csv_series)
         probe = bundle_from_csv_validation(
             series,
             {**modeled_profile, "baseload_kwh": 0.0},
         )
-        dist_mode = st.radio(
-            "Basislast-Verteilung",
-            options=[_DIST_EQUAL, _DIST_MONTHLY],
-            format_func=lambda value: _DIST_LABELS[value],
-            key=f"house_profile_baseload_dist_{preview_id}",
-            horizontal=True,
-            help=(
-                "Jahres-Rest: konstante Grundlast (SE-Pfad A flat). "
-                "Monats-Rest: pro Kalendermonat Ist − Verbraucher (≥ 0) — "
-                "gilt für Gesamt-Lastverhalten-Charts und SE-Pfad A, wenn eine "
-                "Gesamt-CSV vorhanden ist. SE-Pfad B (alle Gesteuert/Manual "
-                "mit CSV) bleibt der stündliche Meter-Rest."
-            ),
+        dist_mode = _render_baseload_dist_radio(preview_id)
+        display_bundle, display_bl_kwh, caption = _resolve_baseload_display(
+            probe,
+            series,
+            dist_mode=dist_mode,
+            annual_kwh=annual_kwh,
+            resolved=resolved,
         )
-        if dist_mode == _DIST_MONTHLY:
-            display_bundle, display_bl_kwh, caption = _baseload_display_monthly(
-                probe, series
-            )
-        else:
-            display_bundle, display_bl_kwh, caption = _baseload_display_equal(
-                probe,
-                annual_kwh=annual_kwh,
-                resolved=resolved,
-            )
         st.caption(caption)
         render_consumption_display(
             ConsumptionDisplayMode.CSV_VALIDATION,

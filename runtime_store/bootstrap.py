@@ -510,13 +510,12 @@ def _bootstrap_dotenv() -> bool:
     )
 
 
-def run() -> None:
-    """Fehlende Laufzeitdateien anlegen; bestehende Dateien bleiben unverändert."""
-    _ensure_directory(runtime_dir())
-    _ensure_directory(config_dir())
+def _bootstrap_config_pack_artifacts() -> tuple[list[str], bool]:
+    """Config/scenarios/tariffs/house/components/deviation artifacts.
 
+    Returns ``(created_paths, config_just_created)``.
+    """
     created: list[str] = []
-
     if _bootstrap_config_example():
         created.append(config_path("config.example.json"))
     if _bootstrap_config_schema():
@@ -524,9 +523,6 @@ def run() -> None:
     config_just_created = _bootstrap_config_json()
     if config_just_created:
         created.append(resolve_config_json_path())
-    from runtime_store.addon_options import apply_addon_options
-
-    apply_addon_options(config_just_created=config_just_created)
     if _bootstrap_backtesting_scenarios_example():
         created.append(config_path("backtesting_scenarios.example.json"))
     if _bootstrap_backtesting_scenarios_schema():
@@ -557,6 +553,12 @@ def run() -> None:
         created.append(config_path("deviation_rules.schema.json"))
     if _bootstrap_deviation_rules_json():
         created.append(resolve_deviation_rules_json_path())
+    return created, config_just_created
+
+
+def _bootstrap_runtime_data_artifacts() -> list[str]:
+    """Local settings, dotenv, cons_data, consumer state, profile CSVs, log."""
+    created: list[str] = []
     for path in _stamp_pack_jsons_to_current_data_model():
         created.append(path)
     if _bootstrap_local_settings_json():
@@ -578,6 +580,25 @@ def run() -> None:
             created.append(path_fn())
     if _bootstrap_log_file():
         created.append(log_file())
+    return created
+
+
+def _bootstrap_all_artifacts() -> list[str]:
+    """Create missing runtime artifacts; return paths of newly created files."""
+    created, config_just_created = _bootstrap_config_pack_artifacts()
+    from runtime_store.addon_options import apply_addon_options
+
+    apply_addon_options(config_just_created=config_just_created)
+    created.extend(_bootstrap_runtime_data_artifacts())
+    return created
+
+
+def run() -> None:
+    """Fehlende Laufzeitdateien anlegen; bestehende Dateien bleiben unverändert."""
+    _ensure_directory(runtime_dir())
+    _ensure_directory(config_dir())
+
+    created = _bootstrap_all_artifacts()
 
     if created:
         logger.info("bootstrap: %s neue Datei(en) angelegt.", len(created))

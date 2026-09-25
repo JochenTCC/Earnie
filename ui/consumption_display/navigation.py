@@ -211,6 +211,70 @@ def _render_period_chrome(
         st.caption(f"⚠ {jump_error}")
 
 
+def _sync_period_index(
+    *,
+    key_prefix: str,
+    windows: list[TimeWindow],
+    token: str,
+    default_to_latest: bool,
+) -> int:
+    """Reset on token change, mirror the legacy week_idx keys, clamp to range."""
+    period_idx_key = f"{key_prefix}_period_idx"
+    period_reset_key = f"{key_prefix}_period_reset"
+    jump_error_key = f"{key_prefix}_period_jump_error"
+    # Legacy ISO keys — keep reset in sync when SE/HK still use week_idx.
+    legacy_week_idx_key = f"{key_prefix}_week_idx"
+    legacy_week_reset_key = f"{key_prefix}_week_reset"
+
+    if st.session_state.get(period_reset_key) != token:
+        st.session_state[period_reset_key] = token
+        initial = len(windows) - 1 if default_to_latest else 0
+        st.session_state[period_idx_key] = initial
+        st.session_state[legacy_week_reset_key] = token
+        st.session_state[legacy_week_idx_key] = initial
+        st.session_state.pop(jump_error_key, None)
+        st.session_state.pop(f"{key_prefix}_week_jump_error", None)
+
+    period_idx = int(st.session_state.get(period_idx_key, 0))
+    period_idx = max(0, min(period_idx, len(windows) - 1))
+    st.session_state[period_idx_key] = period_idx
+    st.session_state[legacy_week_idx_key] = period_idx
+    return period_idx
+
+
+def _render_navigation_chrome(
+    windows: list[TimeWindow],
+    *,
+    key_prefix: str,
+    period_kind: PeriodKind,
+    period_idx: int,
+    label: str,
+) -> None:
+    period_idx_key = f"{key_prefix}_period_idx"
+    jump_error_key = f"{key_prefix}_period_jump_error"
+    is_iso_week = period_kind == PeriodKind.ISO_WEEK
+
+    def _jump(text: str) -> None:
+        apply_jump = _apply_iso_week_jump if is_iso_week else _apply_date_jump
+        apply_jump(
+            windows,
+            text,
+            period_idx_key=period_idx_key,
+            error_key=jump_error_key,
+        )
+
+    _render_period_chrome(
+        key_prefix=key_prefix,
+        period_idx=period_idx,
+        windows=windows,
+        label=label,
+        back_help="Vorherige Kalenderwoche" if is_iso_week else "Vorheriges Zeitfenster",
+        forward_help="Nächste Kalenderwoche" if is_iso_week else "Nächstes Zeitfenster",
+        jump_placeholder="12 oder 12/2025" if is_iso_week else "14.09.2026",
+        on_jump=_jump,
+    )
+
+
 def render_period_navigation(
     timestamps: list[str],
     *,
@@ -227,70 +291,22 @@ def render_period_navigation(
     if not windows:
         return None
 
-    period_idx_key = f"{key_prefix}_period_idx"
-    period_reset_key = f"{key_prefix}_period_reset"
-    jump_error_key = f"{key_prefix}_period_jump_error"
-    # Legacy ISO keys — keep reset in sync when SE/HK still use week_idx.
-    legacy_week_idx_key = f"{key_prefix}_week_idx"
-    legacy_week_reset_key = f"{key_prefix}_week_reset"
-
     token = reset_token if reset_token is not None else str(len(timestamps))
     token = f"{token}:{period_kind.value}"
-    if st.session_state.get(period_reset_key) != token:
-        st.session_state[period_reset_key] = token
-        initial = len(windows) - 1 if default_to_latest else 0
-        st.session_state[period_idx_key] = initial
-        st.session_state[legacy_week_reset_key] = token
-        st.session_state[legacy_week_idx_key] = initial
-        st.session_state.pop(jump_error_key, None)
-        st.session_state.pop(f"{key_prefix}_week_jump_error", None)
-
-    period_idx = int(st.session_state.get(period_idx_key, 0))
-    period_idx = max(0, min(period_idx, len(windows) - 1))
-    st.session_state[period_idx_key] = period_idx
-    st.session_state[legacy_week_idx_key] = period_idx
+    period_idx = _sync_period_index(
+        key_prefix=key_prefix,
+        windows=windows,
+        token=token,
+        default_to_latest=default_to_latest,
+    )
     window = windows[period_idx]
-    label = format_window_label(window)
-
-    if period_kind == PeriodKind.ISO_WEEK:
-        def _jump(text: str) -> None:
-            _apply_iso_week_jump(
-                windows,
-                text,
-                period_idx_key=period_idx_key,
-                error_key=jump_error_key,
-            )
-
-        _render_period_chrome(
-            key_prefix=key_prefix,
-            period_idx=period_idx,
-            windows=windows,
-            label=label,
-            back_help="Vorherige Kalenderwoche",
-            forward_help="Nächste Kalenderwoche",
-            jump_placeholder="12 oder 12/2025",
-            on_jump=_jump,
-        )
-    else:
-        def _jump(text: str) -> None:
-            _apply_date_jump(
-                windows,
-                text,
-                period_idx_key=period_idx_key,
-                error_key=jump_error_key,
-            )
-
-        _render_period_chrome(
-            key_prefix=key_prefix,
-            period_idx=period_idx,
-            windows=windows,
-            label=label,
-            back_help="Vorheriges Zeitfenster",
-            forward_help="Nächstes Zeitfenster",
-            jump_placeholder="14.09.2026",
-            on_jump=_jump,
-        )
-
+    _render_navigation_chrome(
+        windows,
+        key_prefix=key_prefix,
+        period_kind=period_kind,
+        period_idx=period_idx,
+        label=format_window_label(window),
+    )
     return window
 
 

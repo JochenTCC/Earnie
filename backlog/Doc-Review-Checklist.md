@@ -20,3 +20,17 @@
 - [x] `docs/spec/swimspa-filter.md` / `docs/spec/ui-menu-structure.md` — QH matrix granularity
 - [x] `docs/konfiguration/preise.md` — already documents QH plan vs hourly settlement (`settlement_mtu`)
 - [x] `docs/konfiguration/batterie-pv.md` — `standby_power_kw` already documented
+
+## 2.6.0 — HA / HouseSim / Pattern B (2026-09-25)
+- [x] `docs/spec/ehal.md` — Pattern B truth: HA entity IDs in `plant` / `consumers[].ehal_bindings`; flat `ehal.ha.entities` one-shot migrate+clear (**2.6.g**)
+- [x] `docs/einrichtung/ha-evcc.md` — Pattern B storage + `sens_*` field names; optional energy-counter maps; no refill of `ehal.ha.entities`
+- [x] `docs/einrichtung/smarthome-backend-wahl.md` — already Pattern B for HA/Loxone mapping paths
+- [x] `docs/ui/ehal-com.md` — HA Entity → EHAL Mapping + energy counters already on plant bindings; HouseSim note in Schreibtest
+- [x] `docs/ui/charts.md` — HA-Energiezähler wording → `plant.ehal_bindings` (was stale `ehal.ha.entities`)
+- [x] `docs/spec/ha-lab-setup.md` — HITL / accept table / §4.2 aligned to Pattern B + `sens_*` keys
+- [x] `docs/spec/house-sim.md` — already documents HouseSim S1–S4 vs HA Lab; Pattern B merge for golden maps
+- [x] `share/config/ehal.ha.snippet.json` — drop empty legacy `entities` key (backend + `sign` only)
+- [x] `docs/einrichtung/homeassistant-addon.md` — version example → `2.6.0` / `2.6.0-alpha.1`
+- [x] `.github/ISSUE_TEMPLATE/bug.yml` — version placeholder `2.6.0`
+- [x] Landing `README.md` / `docs/README.md` — EHAL backends already correct; no Pattern B detail needed at landing depth
+- [x] Handbook live-mapping step — already cites `plant.ehal_bindings` / `consumers[].ehal_bindings`

@@ -98,26 +98,8 @@ def _concat_hourly_chunks(chunks: list[pd.Series]) -> pd.Series:
     return series[~series.index.duplicated(keep="last")].sort_index()
 
 
-def _fetch_hourly_archive_chunk(
-    *,
-    lat: float,
-    lon: float,
-    timezone: str,
-    start: date,
-    end: date,
-    hourly_vars: str,
-    extra_params: dict[str, Any] | None = None,
-) -> dict[str, pd.Series]:
-    params: dict[str, Any] = {
-        "latitude": lat,
-        "longitude": lon,
-        "start_date": start.isoformat(),
-        "end_date": (end - timedelta(days=1)).isoformat(),
-        "hourly": hourly_vars,
-        "timezone": timezone,
-    }
-    if extra_params:
-        params.update(extra_params)
+def _archive_http_get(params: dict[str, Any]) -> Any:
+    """GET Open-Meteo archive with retries; returns response with JSON body."""
     response: requests.Response | None = None
     last_error: Exception | None = None
     for attempt in range(_ARCHIVE_RETRY_ATTEMPTS):
@@ -150,7 +132,16 @@ def _fetch_hourly_archive_chunk(
             raise last_error
         raise RuntimeError("Open-Meteo archive: Abruf ohne Antwort fehlgeschlagen.")
     assert response is not None
-    payload = response.json()
+    return response
+
+
+def _hourly_series_from_payload(
+    payload: dict[str, Any],
+    *,
+    hourly_vars: str,
+    start: date,
+    end: date,
+) -> dict[str, pd.Series]:
     hourly = payload.get("hourly") or {}
     times = hourly.get("time") or []
     if not times:
@@ -170,6 +161,35 @@ def _fetch_hourly_archive_chunk(
             )
         result[var_name] = pd.Series(values, index=index, dtype=float)
     return result
+
+
+def _fetch_hourly_archive_chunk(
+    *,
+    lat: float,
+    lon: float,
+    timezone: str,
+    start: date,
+    end: date,
+    hourly_vars: str,
+    extra_params: dict[str, Any] | None = None,
+) -> dict[str, pd.Series]:
+    params: dict[str, Any] = {
+        "latitude": lat,
+        "longitude": lon,
+        "start_date": start.isoformat(),
+        "end_date": (end - timedelta(days=1)).isoformat(),
+        "hourly": hourly_vars,
+        "timezone": timezone,
+    }
+    if extra_params:
+        params.update(extra_params)
+    response = _archive_http_get(params)
+    return _hourly_series_from_payload(
+        response.json(),
+        hourly_vars=hourly_vars,
+        start=start,
+        end=end,
+    )
 
 
 def fetch_hourly_temperature_c_series(

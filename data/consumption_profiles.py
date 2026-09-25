@@ -116,8 +116,81 @@ def modeled_consumer_kw_at_datetime(
     return consumer_kwh / MODELED_PROFILE_HOURS_PER_YEAR
 
 
-def _modeled_consumer_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
+def _flat_annual_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
+    consumer_kwh = consumer_annual_kwh(consumer)
+    add_kw = consumer_kwh / max(1, hours)
+    return [add_kw] * hours
+
+
+def _modeled_ev_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     hourly = [0.0] * hours
+    start_day = date(2023, 1, 1)
+    for hour_index in range(hours):
+        day = start_day + timedelta(days=hour_index // 24)
+        day_hourly = ev_hourly_kw_for_day(consumer, day)
+        hourly[hour_index] = day_hourly[hour_index % 24]
+    return hourly
+
+
+def _modeled_thermal_annual_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
+    thermal = consumer.get("thermal") or consumer
+    daily = daily_electric_kwh(**heating_params_from_thermal(thermal))
+    nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
+    if nominal > 0.0:
+        return thermal_daily_pwm_hourly_profile(
+            daily,
+            nominal_power_kw=nominal,
+            hours_per_year=hours,
+        )
+    weekly = weekly_electric_kwh(**heating_params_from_thermal(thermal))
+    return hourly_profile_for_year(weekly, hours_per_year=hours)
+
+
+def _modeled_thermal_rc_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
+    from house_config.thermal_rc_profile import thermal_rc_hourly_kw_from_ambient
+
+    rc = consumer.get("thermal_rc") or consumer
+    lat = rc.get("latitude")
+    lon = rc.get("longitude")
+    if lat is None or lon is None:
+        return _flat_annual_hourly_kw(consumer, hours=hours)
+    import config as _cfg
+
+    if getattr(_cfg, "CONFIG", None) is None:
+        return _flat_annual_hourly_kw(consumer, hours=hours)
+    from data.open_meteo_solar_archive import (
+        build_open_meteo_climate_bundle_for_year,
+        last_full_archive_year,
+    )
+
+    year = last_full_archive_year()
+    bundle = build_open_meteo_climate_bundle_for_year(
+        year,
+        lat=float(lat),
+        lon=float(lon),
+        timezone=str(rc.get("timezone_name") or _cfg.get_planning_timezone()),
+        surfaces=[],
+    )
+    profile = thermal_rc_hourly_kw_from_ambient(consumer, bundle.temperature_c)
+    if len(profile) >= hours:
+        return profile[:hours]
+    pad = profile[-1] if profile else 0.0
+    return profile + [pad] * (hours - len(profile))
+
+
+def _modeled_generic_schedule_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
+    from house_config.generic_schedule import generic_hourly_kw_for_day
+
+    hourly = [0.0] * hours
+    start_day = date(2023, 1, 1)
+    for hour_index in range(hours):
+        day = start_day + timedelta(days=hour_index // 24)
+        day_hourly = generic_hourly_kw_for_day(consumer, day)
+        hourly[hour_index] = day_hourly[hour_index % 24]
+    return hourly
+
+
+def _modeled_consumer_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
     if consumer_uses_profile_csv(consumer):
         path = consumer["profile_csv"]
         return [
@@ -125,70 +198,14 @@ def _modeled_consumer_hourly_kw(consumer: dict, *, hours: int) -> list[float]:
             for i in range(hours)
         ]
     if consumer.get("type") == "ev":
-        start_day = date(2023, 1, 1)
-        for hour_index in range(hours):
-            day = start_day + timedelta(days=hour_index // 24)
-            day_hourly = ev_hourly_kw_for_day(consumer, day)
-            hourly[hour_index] = day_hourly[hour_index % 24]
-        return hourly
+        return _modeled_ev_hourly_kw(consumer, hours=hours)
     if consumer.get("type") == "thermal_annual":
-        thermal = consumer.get("thermal") or consumer
-        daily = daily_electric_kwh(**heating_params_from_thermal(thermal))
-        nominal = float(consumer.get("nominal_power_kw", 0.0) or 0.0)
-        if nominal > 0.0:
-            return thermal_daily_pwm_hourly_profile(
-                daily,
-                nominal_power_kw=nominal,
-                hours_per_year=hours,
-            )
-        weekly = weekly_electric_kwh(**heating_params_from_thermal(thermal))
-        return hourly_profile_for_year(weekly, hours_per_year=hours)
+        return _modeled_thermal_annual_hourly_kw(consumer, hours=hours)
     if consumer.get("type") == "thermal_rc":
-        from house_config.thermal_rc_profile import thermal_rc_hourly_kw_from_ambient
-
-        rc = consumer.get("thermal_rc") or consumer
-        lat = rc.get("latitude")
-        lon = rc.get("longitude")
-        if lat is not None and lon is not None:
-            import config as _cfg
-
-            if getattr(_cfg, "CONFIG", None) is not None:
-                from data.open_meteo_solar_archive import (
-                    build_open_meteo_climate_bundle_for_year,
-                    last_full_archive_year,
-                )
-
-                year = last_full_archive_year()
-                bundle = build_open_meteo_climate_bundle_for_year(
-                    year,
-                    lat=float(lat),
-                    lon=float(lon),
-                    timezone=str(rc.get("timezone_name") or _cfg.get_planning_timezone()),
-                    surfaces=[],
-                )
-                profile = thermal_rc_hourly_kw_from_ambient(
-                    consumer,
-                    bundle.temperature_c,
-                )
-                if len(profile) >= hours:
-                    return profile[:hours]
-                pad = profile[-1] if profile else 0.0
-                return profile + [pad] * (hours - len(profile))
-        consumer_kwh = consumer_annual_kwh(consumer)
-        add_kw = consumer_kwh / max(1, hours)
-        return [add_kw] * hours
+        return _modeled_thermal_rc_hourly_kw(consumer, hours=hours)
     if consumer.get("type") == "generic" and consumer.get("schedule"):
-        from house_config.generic_schedule import generic_hourly_kw_for_day
-
-        start_day = date(2023, 1, 1)
-        for hour_index in range(hours):
-            day = start_day + timedelta(days=hour_index // 24)
-            day_hourly = generic_hourly_kw_for_day(consumer, day)
-            hourly[hour_index] = day_hourly[hour_index % 24]
-        return hourly
-    consumer_kwh = consumer_annual_kwh(consumer)
-    add_kw = consumer_kwh / max(1, hours)
-    return [add_kw] * hours
+        return _modeled_generic_schedule_hourly_kw(consumer, hours=hours)
+    return _flat_annual_hourly_kw(consumer, hours=hours)
 
 
 def build_modeled_hourly_kw_by_consumer(

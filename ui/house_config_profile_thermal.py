@@ -93,13 +93,15 @@ def _inject_profile_geo(
         enriched.append(item)
     return enriched
 
-def _render_location_fields(*, session_scope: str) -> dict:
-    st.subheader("Standort")
+def _seed_land_widget_key(session_scope: str) -> str:
     land_key = _scoped_key(session_scope, "house_profile_land")
     if land_key not in st.session_state:
         st.session_state[land_key] = "AT"
     elif st.session_state[land_key] not in {"AT", "DE", "CH"}:
         st.session_state[land_key] = "AT"
+    return land_key
+
+def _render_geo_row(*, session_scope: str, land_key: str) -> tuple[float, float, str]:
     col_lat, col_lon, col_land = st.columns(3)
     with col_lat:
         latitude = labeled_number_input(
@@ -120,10 +122,9 @@ def _render_location_fields(*, session_scope: str) -> dict:
             key=land_key,
             help="Land für Tariffilter im Szenarienkonfigurator (Bezug/Einspeise).",
         )
-    from house_config.geo_timezone import timezone_for_land
+    return float(latitude), float(longitude), str(land)
 
-    timezone_name = timezone_for_land(str(land))
-    st.caption(f"Zeitzone (aus Land): **{timezone_name}**")
+def _render_pv_default_row(*, session_scope: str) -> tuple[float, float]:
     col_c, col_d = st.columns(2)
     with col_c:
         default_pv_tilt = labeled_number_input(
@@ -141,6 +142,9 @@ def _render_location_fields(*, session_scope: str) -> dict:
             help="0 = Süd, -90 = Ost, 90 = West. Überschreibbar im Tab PV-Anlagen.",
             key=_scoped_key(session_scope, "house_profile_default_pv_azimuth"),
         )
+    return float(default_pv_tilt), float(default_pv_azimuth)
+
+def _render_nne_arbeitspreis(*, session_scope: str) -> float:
     nne_ap = labeled_number_input(
         "Netznutzung Arbeitspreis (Cent/kWh)",
         min_value=0.0,
@@ -153,14 +157,30 @@ def _render_location_fields(*, session_scope: str) -> dict:
         ratios=WIDE_LABEL_RATIOS,
         key=_scoped_key(session_scope, "house_profile_nne_ap"),
     )
+    return float(nne_ap or 0.0)
+
+def _render_location_fields(*, session_scope: str) -> dict:
+    st.subheader("Standort")
+    land_key = _seed_land_widget_key(session_scope)
+    latitude, longitude, land = _render_geo_row(
+        session_scope=session_scope, land_key=land_key
+    )
+    from house_config.geo_timezone import timezone_for_land
+
+    timezone_name = timezone_for_land(land)
+    st.caption(f"Zeitzone (aus Land): **{timezone_name}**")
+    default_pv_tilt, default_pv_azimuth = _render_pv_default_row(
+        session_scope=session_scope
+    )
+    nne_ap = _render_nne_arbeitspreis(session_scope=session_scope)
     return {
-        "land": str(land),
-        "latitude": float(latitude),
-        "longitude": float(longitude),
+        "land": land,
+        "latitude": latitude,
+        "longitude": longitude,
         "timezone_name": timezone_name,
-        "default_pv_tilt": float(default_pv_tilt),
-        "default_pv_azimuth": float(default_pv_azimuth),
-        "netznutzung_arbeitspreis_cent_kwh": float(nne_ap or 0.0),
+        "default_pv_tilt": default_pv_tilt,
+        "default_pv_azimuth": default_pv_azimuth,
+        "netznutzung_arbeitspreis_cent_kwh": nne_ap,
     }
 
 def _render_thermal_rc_fields(
@@ -276,18 +296,13 @@ def _render_thermal_annual_building_fields(
     return item
 
 
-def _render_thermal_annual_wp_preview(
+def _render_thermal_comfort_fields(
     item: dict,
     thermal: dict,
     index: int,
     *,
     session_scope: str,
-    location: dict,
 ) -> None:
-    latitude = location["latitude"]
-    longitude = location["longitude"]
-    default_pv_tilt = location["default_pv_tilt"]
-    default_pv_azimuth = location["default_pv_azimuth"]
     item["heat_pump_type"] = labeled_selectbox(
         "WP-Typ",
         options=["luft", "erde"],
@@ -317,30 +332,21 @@ def _render_thermal_annual_wp_preview(
             "Live-Soll = Solltemperatur − Absenkung; Warmwasser dann 0."
         ),
     )
-    item.update(
-        _render_thermal_solar_fields(
-            thermal,
-            index,
-            session_scope=session_scope,
-            default_tilt=default_pv_tilt,
-            default_azimuth=default_pv_azimuth,
-        )
-    )
-    if _live_markers_enabled():
-        st.caption(
-            "WP-Merker unter **Daemon Control → EHAL-Com** "
-            "(Entity-Mapping, `flex.*`) pflegen."
-        )
+
+
+def _render_wp_annual_metric(item: dict, *, location: dict) -> None:
     from data.modeled_climate import thermal_annual_kwh_from_archive
 
+    latitude = location["latitude"]
+    longitude = location["longitude"]
     thermal_preview = {**item, "latitude": latitude, "longitude": longitude}
     wp_annual, ref_year = thermal_annual_kwh_from_archive(
         thermal_preview,
         house_profile={
             "latitude": latitude,
             "longitude": longitude,
-            "default_pv_tilt": default_pv_tilt,
-            "default_pv_azimuth": default_pv_azimuth,
+            "default_pv_tilt": location["default_pv_tilt"],
+            "default_pv_azimuth": location["default_pv_azimuth"],
         },
     )
     st.metric("Geschätzter WP-Jahresbedarf (kWh/a)", f"{wp_annual:.0f}")
@@ -348,6 +354,34 @@ def _render_thermal_annual_wp_preview(
         f"Basis: Open-Meteo-Archiv {ref_year} "
         f"({latitude:.4f}°N, {longitude:.4f}°E)"
     )
+
+
+def _render_thermal_annual_wp_preview(
+    item: dict,
+    thermal: dict,
+    index: int,
+    *,
+    session_scope: str,
+    location: dict,
+) -> None:
+    _render_thermal_comfort_fields(
+        item, thermal, index, session_scope=session_scope
+    )
+    item.update(
+        _render_thermal_solar_fields(
+            thermal,
+            index,
+            session_scope=session_scope,
+            default_tilt=location["default_pv_tilt"],
+            default_azimuth=location["default_pv_azimuth"],
+        )
+    )
+    if _live_markers_enabled():
+        st.caption(
+            "WP-Merker unter **Daemon Control → EHAL-Com** "
+            "(Entity-Mapping, `flex.*`) pflegen."
+        )
+    _render_wp_annual_metric(item, location=location)
 
 
 def _render_thermal_annual_fields(

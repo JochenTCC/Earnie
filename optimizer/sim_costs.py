@@ -1,6 +1,8 @@
 """Cost and savings helpers for horizon simulation outputs."""
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import config
 from optimizer.slot_duration import DEFAULT_DT_H, validate_dt_h
 from optimizer.sim_chart_rows import (
@@ -194,47 +196,36 @@ def build_savings_snapshot(savings_info: dict) -> dict:
     }
 
 
-def calculate_optimization_savings(
-    optimization_matrix: list,
-    initial_soc: float,
-    consumer_daily_targets_kwh: dict[str, float] | None = None,
-    sunrise_soc_min_index: int | None = None,
-    filter_contexts: dict[str, dict] | None = None,
-    consumers: list | None = None,
-) -> dict:
-    """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation.
+class _SavingsRows(NamedTuple):
+    """Simulationszeilen der drei Vergleichsläufe einer Einsparungsrechnung."""
 
-    Optimized path uses open-loop ``commit_hours=len(matrix)`` (one MILP), not
-    per-slot MPC — Live control already solved once; savings/charts must stay fast
-    on QH horizons (~188 slots).
-    """
-    from optimizer.charge_immediate import prepare_optimization_matrix
-    from optimizer.charging_context import (
-        apply_horizon_charging_limits,
-        serialize_charging_contexts,
-    )
-    from optimizer.filter_context import resolve_filter_contexts
+    optimized: list
+    baseline: list
+    matched_baseline: list
+
+
+def _run_savings_horizons(
+    matrix: list,
+    initial_soc: float,
+    targets: dict[str, float] | None,
+    charging_contexts: dict[str, dict] | None,
+    filters: dict[str, dict] | None,
+    *,
+    sunrise_soc_min_index: int | None,
+    consumers: list | None,
+) -> _SavingsRows:
+    """Optimierter Open-Loop-Lauf plus freie und ziel-gematchte Baseline."""
+    from optimizer.charging_context import apply_horizon_charging_limits
     from optimizer.sim_baseline import (
         simulate_baseline_horizon,
-        simulate_baseline_with_optimized_flex,
         simulate_matched_baseline_horizon,
     )
     from optimizer.simulation import simulate_horizon
     from optimizer.targets import (
-        build_applied_targets_detail,
-        build_baseline_targets_detail,
-        build_energy_comparison_detail,
-        resolve_baseload_kwh,
         resolve_horizon_consumer_targets_kwh,
         resolve_matched_baseline_horizon_targets,
     )
 
-    matrix, charging_contexts, targets = prepare_optimization_matrix(
-        optimization_matrix,
-        consumer_daily_targets_kwh,
-        consumers=consumers,
-    )
-    filters = filter_contexts or resolve_filter_contexts(matrix, consumers)
     # Open-loop: one CBC solve for the display horizon (not commit_hours=1 MPC).
     optimized_rows = simulate_horizon(
         matrix,
@@ -268,53 +259,22 @@ def calculate_optimization_savings(
         matched_targets,
         charging_contexts,
     )
+    return _SavingsRows(optimized_rows, baseline_rows, matched_baseline_rows)
+
+
+def _savings_cost_block(rows: _SavingsRows) -> dict:
+    """Kosten- und Verbrauchssummen der drei Vergleichsläufe."""
     sell_price_cent = None
-    optimized_cost = calculate_cost_euro_from_rows(optimized_rows, sell_price_cent)
-    baseline_cost = calculate_cost_euro_from_rows(baseline_rows, sell_price_cent)
+    optimized_cost = calculate_cost_euro_from_rows(rows.optimized, sell_price_cent)
+    baseline_cost = calculate_cost_euro_from_rows(rows.baseline, sell_price_cent)
     matched_baseline_cost = calculate_cost_euro_from_rows(
-        matched_baseline_rows, sell_price_cent
+        rows.matched_baseline, sell_price_cent
     )
     savings = baseline_cost - optimized_cost
     savings_matched_euro = matched_baseline_cost - optimized_cost
-    baseline_kwh = total_consumption_kwh_from_rows(baseline_rows)
-    matched_baseline_kwh = total_consumption_kwh_from_rows(matched_baseline_rows)
-    optimized_kwh = total_consumption_kwh_from_rows(optimized_rows)
-    applied_targets = build_applied_targets_detail(
-        matrix,
-        targets,
-        consumers=consumers,
-    )
-    baseline_targets = build_baseline_targets_detail(matrix, consumers=consumers)
-    matched_flex_kwh = (
-        delivered_flex_kwh_from_rows(
-            matched_baseline_rows, flexible_consumers=consumers
-        )
-        if matched_baseline_rows
-        else None
-    )
-    energy_comparison = build_energy_comparison_detail(
-        matrix,
-        targets,
-        matched_flex_kwh=matched_flex_kwh,
-        consumers=consumers,
-    )
-    baseline_same_flex_rows = simulate_baseline_with_optimized_flex(
-        matrix,
-        optimized_rows,
-        initial_soc,
-    )
-    hourly_matched_cost = hourly_cost_euro_from_rows(
-        matched_baseline_rows, sell_price_cent
-    )
-    hourly_optimized_cost = hourly_cost_euro_from_rows(optimized_rows, sell_price_cent)
-    hourly_savings = hourly_savings_euro_from_rows(
-        matched_baseline_rows, optimized_rows, sell_price_cent
-    )
-    hourly_battery_only_cost = hourly_cost_euro_from_rows(
-        baseline_same_flex_rows, sell_price_cent
-    )
-    hourly_matched_consumption = hourly_consumption_kwh_from_rows(matched_baseline_rows)
-    hourly_optimized_consumption = hourly_consumption_kwh_from_rows(optimized_rows)
+    baseline_kwh = total_consumption_kwh_from_rows(rows.baseline)
+    matched_baseline_kwh = total_consumption_kwh_from_rows(rows.matched_baseline)
+    optimized_kwh = total_consumption_kwh_from_rows(rows.optimized)
     return {
         "baseline_cost_euro": round(baseline_cost, 4),
         "matched_baseline_cost_euro": round(matched_baseline_cost, 4),
@@ -324,19 +284,145 @@ def calculate_optimization_savings(
         "baseline_consumption_kwh": round(baseline_kwh, 3),
         "matched_baseline_consumption_kwh": round(matched_baseline_kwh, 3),
         "optimized_consumption_kwh": round(optimized_kwh, 3),
-        "baseload_kwh": resolve_baseload_kwh(matrix),
+    }
+
+
+def _savings_target_block(
+    matrix: list,
+    targets: dict[str, float] | None,
+    rows: _SavingsRows,
+    consumers: list | None,
+) -> dict:
+    """Baseline-/angewandte Ziele und der Energievergleich je Verbraucher."""
+    from optimizer.targets import (
+        build_applied_targets_detail,
+        build_baseline_targets_detail,
+        build_energy_comparison_detail,
+    )
+
+    applied_targets = build_applied_targets_detail(
+        matrix,
+        targets,
+        consumers=consumers,
+    )
+    baseline_targets = build_baseline_targets_detail(matrix, consumers=consumers)
+    matched_flex_kwh = (
+        delivered_flex_kwh_from_rows(
+            rows.matched_baseline, flexible_consumers=consumers
+        )
+        if rows.matched_baseline
+        else None
+    )
+    energy_comparison = build_energy_comparison_detail(
+        matrix,
+        targets,
+        matched_flex_kwh=matched_flex_kwh,
+        consumers=consumers,
+    )
+    return {
         "baseline_targets": baseline_targets,
         "applied_targets": applied_targets,
         "energy_comparison": energy_comparison,
-        "charging_contexts": serialize_charging_contexts(charging_contexts),
-        "optimized_rows": optimized_rows,
-        "baseline_rows": baseline_rows,
-        "matched_baseline_rows": matched_baseline_rows,
-        "baseline_same_flex_rows": baseline_same_flex_rows,
+    }
+
+
+def _savings_hourly_block(rows: _SavingsRows, baseline_same_flex_rows: list) -> dict:
+    """Stündliche Kosten-, Einsparungs- und Verbrauchsreihen."""
+    sell_price_cent = None
+    hourly_matched_cost = hourly_cost_euro_from_rows(
+        rows.matched_baseline, sell_price_cent
+    )
+    hourly_optimized_cost = hourly_cost_euro_from_rows(rows.optimized, sell_price_cent)
+    hourly_savings = hourly_savings_euro_from_rows(
+        rows.matched_baseline, rows.optimized, sell_price_cent
+    )
+    hourly_battery_only_cost = hourly_cost_euro_from_rows(
+        baseline_same_flex_rows, sell_price_cent
+    )
+    return {
         "hourly_matched_baseline_cost_euro": hourly_matched_cost,
         "hourly_optimized_cost_euro": hourly_optimized_cost,
         "hourly_battery_only_baseline_cost_euro": hourly_battery_only_cost,
         "hourly_savings_euro": hourly_savings,
-        "hourly_matched_baseline_consumption_kwh": hourly_matched_consumption,
-        "hourly_optimized_consumption_kwh": hourly_optimized_consumption,
+        "hourly_matched_baseline_consumption_kwh": hourly_consumption_kwh_from_rows(
+            rows.matched_baseline
+        ),
+        "hourly_optimized_consumption_kwh": hourly_consumption_kwh_from_rows(
+            rows.optimized
+        ),
     }
+
+
+def _assemble_savings_dict(
+    matrix: list,
+    initial_soc: float,
+    targets: dict[str, float] | None,
+    charging_contexts: dict[str, dict] | None,
+    rows: _SavingsRows,
+    consumers: list | None,
+) -> dict:
+    """Fügt Kosten, Ziele, Simulationszeilen und Stundenreihen zum Payload zusammen."""
+    from optimizer.charging_context import serialize_charging_contexts
+    from optimizer.sim_baseline import simulate_baseline_with_optimized_flex
+    from optimizer.targets import resolve_baseload_kwh
+
+    costs = _savings_cost_block(rows)
+    target_details = _savings_target_block(matrix, targets, rows, consumers)
+    baseline_same_flex_rows = simulate_baseline_with_optimized_flex(
+        matrix,
+        rows.optimized,
+        initial_soc,
+    )
+    return {
+        **costs,
+        "baseload_kwh": resolve_baseload_kwh(matrix),
+        **target_details,
+        "charging_contexts": serialize_charging_contexts(charging_contexts),
+        "optimized_rows": rows.optimized,
+        "baseline_rows": rows.baseline,
+        "matched_baseline_rows": rows.matched_baseline,
+        "baseline_same_flex_rows": baseline_same_flex_rows,
+        **_savings_hourly_block(rows, baseline_same_flex_rows),
+    }
+
+
+def calculate_optimization_savings(
+    optimization_matrix: list,
+    initial_soc: float,
+    consumer_daily_targets_kwh: dict[str, float] | None = None,
+    sunrise_soc_min_index: int | None = None,
+    filter_contexts: dict[str, dict] | None = None,
+    consumers: list | None = None,
+) -> dict:
+    """Berechnet die Einsparung in Euro gegenüber einer nicht-optimierten Baseline-Simulation.
+
+    Optimized path uses open-loop ``commit_hours=len(matrix)`` (one MILP), not
+    per-slot MPC — Live control already solved once; savings/charts must stay fast
+    on QH horizons (~188 slots).
+    """
+    from optimizer.charge_immediate import prepare_optimization_matrix
+    from optimizer.filter_context import resolve_filter_contexts
+
+    matrix, charging_contexts, targets = prepare_optimization_matrix(
+        optimization_matrix,
+        consumer_daily_targets_kwh,
+        consumers=consumers,
+    )
+    filters = filter_contexts or resolve_filter_contexts(matrix, consumers)
+    rows = _run_savings_horizons(
+        matrix,
+        initial_soc,
+        targets,
+        charging_contexts,
+        filters,
+        sunrise_soc_min_index=sunrise_soc_min_index,
+        consumers=consumers,
+    )
+    return _assemble_savings_dict(
+        matrix,
+        initial_soc,
+        targets,
+        charging_contexts,
+        rows,
+        consumers,
+    )

@@ -374,16 +374,19 @@ def roundtrip(
     )
 
 
-def roundtrip_batch(
+def _batch_write_phase(
     values: dict[str, Any],
     *,
-    force_ess_active: bool = False,
-    wait_s: float = DEFAULT_ROUNDTRIP_WAIT_S,
-    restore: bool = True,
-    max_power_kw: float | None = None,
-    ev_nominal_a: float | None = None,
-) -> BatchRoundtripResult:
-    """Write many fields in one setpoint → wait → per-field read-back → optional restore."""
+    force_ess_active: bool,
+    restore: bool,
+    max_power_kw: float | None,
+    ev_nominal_a: float | None,
+) -> dict[str, Any] | BatchRoundtripResult:
+    """Silent-Gate plus Setpoint-Schreiben.
+
+    Rückgabe: geklammerte Schreibwerte, oder ein Abbruch-``BatchRoundtripResult``
+    (Silent, Clamp-Fehler, Schreibfehler).
+    """
     if not writes_allowed():
         return BatchRoundtripResult(
             status=RoundtripStatus.SILENT,
@@ -423,6 +426,77 @@ def roundtrip_batch(
             field_results=(),
             write_error=error,
         )
+    return clamped
+
+
+def _roundtrip_read_back(field: str, written: Any) -> tuple[Any | None, RoundtripResult]:
+    """Ein Feld zurücklesen und als (Echo, RoundtripResult) bewerten."""
+    echo: Any | None = None
+    try:
+        echo = read_back(field)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Write-test read-back failed for %s: %s", field, exc)
+        echo = None
+    if echo is None:
+        return echo, RoundtripResult(
+            status=RoundtripStatus.PARTIAL,
+            field=field,
+            written=written,
+            read_back=None,
+            message=(
+                f"{field}: Schreiben OK, aber kein lesbares Echo."
+            ),
+        )
+    if values_match(written, echo):
+        return echo, RoundtripResult(
+            status=RoundtripStatus.PASS,
+            field=field,
+            written=written,
+            read_back=echo,
+            message=f"{field}: Roundtrip OK.",
+        )
+    return echo, RoundtripResult(
+        status=RoundtripStatus.FAIL,
+        field=field,
+        written=written,
+        read_back=echo,
+        message=(
+            f"{field}: Mismatch — geschrieben {written!r}, "
+            f"gelesen {echo!r}."
+        ),
+    )
+
+
+def _batch_overall_status(field_results: list[RoundtripResult]) -> RoundtripStatus:
+    """Gesamtstatus in Vorrangfolge FAIL → PARTIAL → PASS."""
+    statuses = {row.status for row in field_results}
+    if RoundtripStatus.FAIL in statuses:
+        return RoundtripStatus.FAIL
+    if RoundtripStatus.PARTIAL in statuses:
+        return RoundtripStatus.PARTIAL
+    return RoundtripStatus.PASS
+
+
+def roundtrip_batch(
+    values: dict[str, Any],
+    *,
+    force_ess_active: bool = False,
+    wait_s: float = DEFAULT_ROUNDTRIP_WAIT_S,
+    restore: bool = True,
+    max_power_kw: float | None = None,
+    ev_nominal_a: float | None = None,
+) -> BatchRoundtripResult:
+    """Write many fields in one setpoint → wait → per-field read-back → optional restore."""
+    written_or_result = _batch_write_phase(
+        values,
+        force_ess_active=force_ess_active,
+        restore=restore,
+        max_power_kw=max_power_kw,
+        ev_nominal_a=ev_nominal_a,
+    )
+    if isinstance(written_or_result, BatchRoundtripResult):
+        return written_or_result
+    clamped = written_or_result
 
     if wait_s > 0:
         time.sleep(float(wait_s))
@@ -430,62 +504,16 @@ def roundtrip_batch(
     field_results: list[RoundtripResult] = []
     echoes: dict[str, Any | None] = {}
     for field, written in clamped.items():
-        echo: Any | None = None
-        try:
-            echo = read_back(field)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Write-test read-back failed for %s: %s", field, exc)
-            echo = None
+        echo, result = _roundtrip_read_back(field, written)
         echoes[field] = echo
-        if echo is None:
-            field_results.append(
-                RoundtripResult(
-                    status=RoundtripStatus.PARTIAL,
-                    field=field,
-                    written=written,
-                    read_back=None,
-                    message=(
-                        f"{field}: Schreiben OK, aber kein lesbares Echo."
-                    ),
-                )
-            )
-        elif values_match(written, echo):
-            field_results.append(
-                RoundtripResult(
-                    status=RoundtripStatus.PASS,
-                    field=field,
-                    written=written,
-                    read_back=echo,
-                    message=f"{field}: Roundtrip OK.",
-                )
-            )
-        else:
-            field_results.append(
-                RoundtripResult(
-                    status=RoundtripStatus.FAIL,
-                    field=field,
-                    written=written,
-                    read_back=echo,
-                    message=(
-                        f"{field}: Mismatch — geschrieben {written!r}, "
-                        f"gelesen {echo!r}."
-                    ),
-                )
-            )
+        field_results.append(result)
 
     if restore:
         restore_safe_setpoints()
 
-    statuses = {row.status for row in field_results}
-    if RoundtripStatus.FAIL in statuses:
-        overall = RoundtripStatus.FAIL
-    elif RoundtripStatus.PARTIAL in statuses:
-        overall = RoundtripStatus.PARTIAL
-    else:
-        overall = RoundtripStatus.PASS
     parts = [row.message for row in field_results]
     return BatchRoundtripResult(
-        status=overall,
+        status=_batch_overall_status(field_results),
         written=clamped,
         echoes=echoes,
         message=" · ".join(parts) if parts else "Roundtrip ohne Felder.",

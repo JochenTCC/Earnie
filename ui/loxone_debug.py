@@ -242,80 +242,73 @@ def render_live_reads_section() -> None:
     _render_live_reads_fragment()
 
 
-def render_last_writes_section(main_state: dict | None) -> None:
-    st.subheader("Live-Schreiben")
-
-    silent_now = config.is_silent_mode()
-    silent_run = bool(
-        (main_state or {}).get("silent_mode", (main_state or {}).get("loxone_silent_mode"))
+def _render_write_table(rows: list[dict[str, str]]) -> None:
+    st.dataframe(
+        rows_with_mapping_column_label(rows),
+        width="stretch",
+        hide_index=True,
     )
-    completed_at = str((main_state or {}).get("completed_at") or "")
-    loxone_sent = (main_state or {}).get("loxone_sent") or {}
-    ehal_writes = (main_state or {}).get("ehal_writes")
 
-    if config.is_ehal_network_backend():
-        if not has_produktiv_run(main_state):
-            st.caption("Noch kein Produktiv-Durchlauf — Sollwerte leer, Mapping aus Config.")
-            st.dataframe(
-                rows_with_mapping_column_label(build_ehal_write_rows([])),
-                width="stretch",
-                hide_index=True,
-            )
-            return
-        if silent_run or ehal_writes is None:
-            st.info("Silent-Modus beim letzten Lauf — keine EHAL-Schreibvorgänge.")
-            st.dataframe(
-                rows_with_mapping_column_label(
-                    build_intended_write_rows(loxone_sent, completed_at)
-                    if loxone_sent
-                    else build_ehal_write_rows([])
-                ),
-                width="stretch",
-                hide_index=True,
-            )
-            return
-        write_rows = build_ehal_write_rows(ehal_writes or [])
-        summary = write_summary_from_rows(write_rows)
-        failed = [
-            row for row in write_rows if row.get("Erfolg") == "Nein"
-        ]
-        if ehal_writes:
-            if failed:
-                st.error(summary)
-            else:
-                st.success(summary)
-            omitted = _omitted_write_caption(len(ehal_writes), write_rows)
-            if omitted:
-                st.caption(omitted)
-        else:
-            st.caption("Letzter Lauf ohne EHAL-Schreibdatensätze.")
-        st.dataframe(
-            rows_with_mapping_column_label(write_rows),
-            width="stretch",
-            hide_index=True,
-        )
-        return
 
+def _render_write_summary(rows: list[dict[str, str]], raw_count: int) -> None:
+    """Success/error summary plus the omitted-Merker caption."""
+    failed = [row for row in rows if row.get("Erfolg") == "Nein"]
+    summary = write_summary_from_rows(rows)
+    if failed:
+        st.error(summary)
+    else:
+        st.success(summary)
+    omitted = _omitted_write_caption(raw_count, rows)
+    if omitted:
+        st.caption(omitted)
+
+
+def _render_ehal_writes(
+    main_state: dict | None,
+    *,
+    silent_run: bool,
+    completed_at: str,
+    loxone_sent: dict,
+    ehal_writes: list | None,
+) -> None:
     if not has_produktiv_run(main_state):
         st.caption("Noch kein Produktiv-Durchlauf — Sollwerte leer, Mapping aus Config.")
-        st.dataframe(
-            rows_with_mapping_column_label(build_write_rows_from_trace([])),
-            width="stretch",
-            hide_index=True,
+        _render_write_table(build_ehal_write_rows([]))
+        return
+    if silent_run or ehal_writes is None:
+        st.info("Silent-Modus beim letzten Lauf — keine EHAL-Schreibvorgänge.")
+        _render_write_table(
+            build_intended_write_rows(loxone_sent, completed_at)
+            if loxone_sent
+            else build_ehal_write_rows([])
         )
+        return
+    write_rows = build_ehal_write_rows(ehal_writes or [])
+    if ehal_writes:
+        _render_write_summary(write_rows, len(ehal_writes))
+    else:
+        st.caption("Letzter Lauf ohne EHAL-Schreibdatensätze.")
+    _render_write_table(write_rows)
+
+
+def _render_loxone_writes(
+    main_state: dict | None,
+    *,
+    silent_now: bool,
+    silent_run: bool,
+    completed_at: str,
+    loxone_sent: dict,
+) -> None:
+    if not has_produktiv_run(main_state):
+        st.caption("Noch kein Produktiv-Durchlauf — Sollwerte leer, Mapping aus Config.")
+        _render_write_table(build_write_rows_from_trace([]))
         return
 
     loxone_writes = main_state.get("loxone_writes")
 
     if silent_run or loxone_writes is None:
         st.info("Silent-Modus beim letzten Lauf — keine Schreibvorgänge ausgeführt.")
-        st.dataframe(
-            rows_with_mapping_column_label(
-                build_intended_write_rows(loxone_sent, completed_at)
-            ),
-            width="stretch",
-            hide_index=True,
-        )
+        _render_write_table(build_intended_write_rows(loxone_sent, completed_at))
         if not loxone_sent and silent_now:
             st.caption("Keine `loxone_sent`-Werte im letzten Lauf gespeichert.")
         return
@@ -325,31 +318,44 @@ def render_last_writes_section(main_state: dict | None) -> None:
             "Letzter Lauf ohne Silent-Modus, aber keine `loxone_writes` gespeichert "
             "(Lauf vor dem Debug-Update?)."
         )
-        st.dataframe(
-            rows_with_mapping_column_label(
-                build_intended_write_rows(loxone_sent, completed_at)
-                if loxone_sent
-                else build_write_rows_from_trace([])
-            ),
-            width="stretch",
-            hide_index=True,
+        _render_write_table(
+            build_intended_write_rows(loxone_sent, completed_at)
+            if loxone_sent
+            else build_write_rows_from_trace([])
         )
         return
 
     write_rows = build_write_rows_from_trace(loxone_writes)
-    failed = [row for row in write_rows if row.get("Erfolg") == "Nein"]
-    summary = write_summary_from_rows(write_rows)
-    omitted = _omitted_write_caption(len(loxone_writes), write_rows)
-    if failed:
-        st.error(summary)
-    else:
-        st.success(summary)
-    if omitted:
-        st.caption(omitted)
-    st.dataframe(
-        rows_with_mapping_column_label(write_rows),
-        width="stretch",
-        hide_index=True,
+    _render_write_summary(write_rows, len(loxone_writes))
+    _render_write_table(write_rows)
+
+
+def render_last_writes_section(main_state: dict | None) -> None:
+    st.subheader("Live-Schreiben")
+
+    silent_now = config.is_silent_mode()
+    silent_run = bool(
+        (main_state or {}).get("silent_mode", (main_state or {}).get("loxone_silent_mode"))
+    )
+    completed_at = str((main_state or {}).get("completed_at") or "")
+    loxone_sent = (main_state or {}).get("loxone_sent") or {}
+
+    if config.is_ehal_network_backend():
+        _render_ehal_writes(
+            main_state,
+            silent_run=silent_run,
+            completed_at=completed_at,
+            loxone_sent=loxone_sent,
+            ehal_writes=(main_state or {}).get("ehal_writes"),
+        )
+        return
+
+    _render_loxone_writes(
+        main_state,
+        silent_now=silent_now,
+        silent_run=silent_run,
+        completed_at=completed_at,
+        loxone_sent=loxone_sent,
     )
 
 

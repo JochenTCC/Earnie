@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import NamedTuple
 
 import pandas as pd
 import config
@@ -80,38 +81,25 @@ def _pricing_kwargs_from_scenario(scenario_params: dict | None) -> dict:
     return pricing_kwargs_from_resolved(scenario_params)
 
 
-def _profile_spec_baseload_and_targets(
+def _profile_spec_baseload_kw(
     profile: dict,
     slot_datetimes: list[datetime],
-    scenario_params: dict | None,
+    climate,
     flexible_consumers: list | None,
-    historical_totals: dict,
-    window_end: datetime,
-) -> tuple[list[float], float, list[float], dict, float, float, int]:
-    """PROFILE_SPEC consumption source: baseload/targets tuple used by ``build_historical_matrix_for_slots``.
-
-    Returns ``(baseload_kw, historical_baseload_kwh, matrix_total_kw,
-    consumer_daily_targets_kwh, spec_flex_kwh, spec_total_kwh, residual_clipped_hours)``.
-    """
+) -> tuple[list[float], int]:
+    """Baseload kW series plus residual_clipped_hours for PROFILE_SPEC."""
     from house_config.planning_flex_bridge import (
         house_profile_baseload_overlay,
         meter_residual_baseload_kw,
         milp_flex_thermal_annual_ids,
         monthly_residual_baseload_kw,
         profile_flat_baseload_kw,
-        resolve_profile_spec_flex_targets,
     )
     from house_config.profile_csv_policy import (
         se_uses_meter_residual_baseload,
         se_uses_monthly_baseload,
     )
-    from data.modeled_climate import ModeledClimateContext
 
-    if not profile:
-        raise ValueError(
-            "consumption_source=profile_spec erfordert _house_profile im Szenario."
-        )
-    climate = ModeledClimateContext.from_scenario(scenario_params)
     thermal_milp_ids = milp_flex_thermal_annual_ids(flexible_consumers)
     overlay = house_profile_baseload_overlay(
         profile,
@@ -139,6 +127,33 @@ def _profile_spec_baseload_and_targets(
     else:
         flat_kw = profile_flat_baseload_kw(profile)
         baseload_kw = [round(flat_kw + extra, 3) for extra in overlay]
+    return baseload_kw, residual_clipped_hours
+
+
+def _profile_spec_baseload_and_targets(
+    profile: dict,
+    slot_datetimes: list[datetime],
+    scenario_params: dict | None,
+    flexible_consumers: list | None,
+    historical_totals: dict,
+    window_end: datetime,
+) -> tuple[list[float], float, list[float], dict, float, float, int]:
+    """PROFILE_SPEC consumption source: baseload/targets tuple used by ``build_historical_matrix_for_slots``.
+
+    Returns ``(baseload_kw, historical_baseload_kwh, matrix_total_kw,
+    consumer_daily_targets_kwh, spec_flex_kwh, spec_total_kwh, residual_clipped_hours)``.
+    """
+    from house_config.planning_flex_bridge import resolve_profile_spec_flex_targets
+    from data.modeled_climate import ModeledClimateContext
+
+    if not profile:
+        raise ValueError(
+            "consumption_source=profile_spec erfordert _house_profile im Szenario."
+        )
+    climate = ModeledClimateContext.from_scenario(scenario_params)
+    baseload_kw, residual_clipped_hours = _profile_spec_baseload_kw(
+        profile, slot_datetimes, climate, flexible_consumers
+    )
     historical_baseload_kwh = round(sum(baseload_kw) * float(DEFAULT_DT_H), 3)
     matrix_total_kw = list(baseload_kw)
     consumer_daily_targets_kwh = resolve_profile_spec_flex_targets(
@@ -211,69 +226,62 @@ def _historical_baseload_and_targets(
     )
 
 
-def build_historical_matrix_for_slots(
+class _MatrixConsumption(NamedTuple):
+    """Basislast, Flex-Ziele und Summen der gewählten Verbrauchsquelle."""
+
+    baseload_kw: list[float]
+    historical_baseload_kwh: float
+    matrix_total_kw: list[float]
+    consumer_daily_targets_kwh: dict
+    spec_flex_kwh: float
+    spec_total_kwh: float
+    residual_clipped_hours: int
+
+
+def _flex_consumers_for_matrix(
+    scenario_params: dict | None,
+) -> tuple[list | None, list[str] | None]:
+    """Aufgelöste Flex-Verbraucher des Szenarios und deren IDs (je ``None`` ohne Szenario)."""
+    if not scenario_params:
+        return None, None
+    from simulation.engine import _flexible_consumers_from_scenario
+
+    flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
+    if not flexible_consumers:
+        return flexible_consumers, None
+    return flexible_consumers, [consumer["id"] for consumer in flexible_consumers]
+
+
+def _resolve_matrix_consumption(
+    consumption_source: str,
     slot_datetimes: list[datetime],
     cache: HistoricalDataCache,
-    prices_df: pd.DataFrame,
-    *,
     window_end: datetime,
-    feed_in_settings: feed_in_prices.FeedInSettings | None = None,
-    charging_anchor: datetime | None = None,
-    price_resources: BacktestingPriceResources | None = None,
-    planning_moment: datetime | None = None,
-    scenario_params: dict | None = None,
-) -> tuple[list[dict], dict]:
-    """Baut eine Optimierungsmatrix für beliebige stündliche Slots aus historischen Logs."""
-    from house_config.planning_flex_bridge import PROFILE_SPEC, resolve_consumption_source
-
-    consumption_source = resolve_consumption_source(scenario_params)
-    profile = (scenario_params or {}).get("_house_profile")
-    flexible_consumers = None
-    flex_consumer_ids = None
-    if scenario_params:
-        from simulation.engine import _flexible_consumers_from_scenario
-        flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
-        if flexible_consumers:
-            flex_consumer_ids = [consumer["id"] for consumer in flexible_consumers]
-
-    baseload_stored, historical_totals, total_load, hourly_flex = (
-        cache.get_window_consumption(
-            slot_datetimes,
-            flex_consumer_ids=flex_consumer_ids,
-        )
-    )
-    _, all_consumer_totals, reference_total_load, _ = cache.get_window_consumption(
-        slot_datetimes
-    )
-    reference_total_kwh = round(sum(reference_total_load), 3)
+    *,
+    profile: dict | None,
+    scenario_params: dict | None,
+    flexible_consumers: list | None,
+    historical_totals: dict,
+    all_consumer_totals: dict,
+    total_load: list[float],
+    hourly_flex,
+) -> _MatrixConsumption:
+    """Wählt die PROFILE_SPEC- oder die Historien-Auflösung für Basislast und Ziele."""
+    from house_config.planning_flex_bridge import PROFILE_SPEC
 
     if consumption_source == PROFILE_SPEC:
-        (
-            baseload_kw,
-            historical_baseload_kwh,
-            matrix_total_kw,
-            consumer_daily_targets_kwh,
-            spec_flex_kwh,
-            spec_total_kwh,
-            residual_clipped_hours,
-        ) = _profile_spec_baseload_and_targets(
-            profile,
-            slot_datetimes,
-            scenario_params,
-            flexible_consumers,
-            historical_totals,
-            window_end,
+        return _MatrixConsumption(
+            *_profile_spec_baseload_and_targets(
+                profile,
+                slot_datetimes,
+                scenario_params,
+                flexible_consumers,
+                historical_totals,
+                window_end,
+            )
         )
-    else:
-        residual_clipped_hours = 0
-        (
-            baseload_kw,
-            historical_baseload_kwh,
-            matrix_total_kw,
-            consumer_daily_targets_kwh,
-            spec_flex_kwh,
-            spec_total_kwh,
-        ) = _historical_baseload_and_targets(
+    return _MatrixConsumption(
+        *_historical_baseload_and_targets(
             profile,
             slot_datetimes,
             scenario_params,
@@ -282,9 +290,21 @@ def build_historical_matrix_for_slots(
             hourly_flex,
             historical_totals,
             all_consumer_totals,
-        )
+        ),
+        residual_clipped_hours=0,
+    )
 
-    stored_baseload_kwh = round(sum(baseload_stored) * float(DEFAULT_DT_H), 3)
+
+def _matrix_price_inputs(
+    slot_datetimes: list[datetime],
+    cache: HistoricalDataCache,
+    prices_df: pd.DataFrame,
+    *,
+    scenario_params: dict | None,
+    price_resources: BacktestingPriceResources | None,
+    planning_moment: datetime | None,
+) -> tuple[list[float], list[float], list[float], list[str]]:
+    """PV-Profil sowie EPEX-/Brutto-Preise und Preisquellen für die Slots."""
     pv_profile = cache.get_pv_for_slots(
         slot_datetimes,
         scenario_params=scenario_params,
@@ -301,16 +321,28 @@ def build_historical_matrix_for_slots(
         planning_moment=planning_moment,
         **_pricing_kwargs_from_scenario(scenario_params),
     )
-    anchor = charging_anchor if charging_anchor is not None else window_end
+    return pv_profile, epex_prices, brutto_prices, price_sources
 
+
+def _matrix_rows_from_slots(
+    slot_datetimes: list[datetime],
+    consumption: _MatrixConsumption,
+    prices: tuple[list[float], list[float], list[str]],
+    *,
+    pv_profile: list[float],
+    consumption_source: str,
+    anchor: datetime,
+) -> list[dict]:
+    """Baut die Matrix-Zeilen aus Slots, Preisen, PV-Profil und Verbrauchsreihen."""
+    epex_prices, brutto_prices, price_sources = prices
     matrix = []
     for slot_dt, price, epex, pv, base, total, price_source in zip(
         slot_datetimes,
         brutto_prices,
         epex_prices,
         pv_profile,
-        baseload_kw,
-        matrix_total_kw,
+        consumption.baseload_kw,
+        consumption.matrix_total_kw,
         price_sources,
     ):
         row = {
@@ -327,37 +359,116 @@ def build_historical_matrix_for_slots(
             "charging_anchor": anchor,
         }
         matrix.append(row)
+    return matrix
 
-    settings = feed_in_settings or config.get_feed_in_settings()
-    feed_in_prices.enrich_matrix_feed_in_prices(matrix, settings)
 
+def _matrix_meta_block(
+    consumption: _MatrixConsumption,
+    *,
+    consumption_source: str,
+    window_end: datetime,
+    historical_totals: dict,
+    total_load: list[float],
+    reference_total_kwh: float,
+    baseload_stored: list[float],
+) -> dict:
+    """Meta-Block der Matrix: Verbrauchsquelle, Ziele und Basislast-Abgleich."""
+    from house_config.planning_flex_bridge import PROFILE_SPEC
+
+    stored_baseload_kwh = round(sum(baseload_stored) * float(DEFAULT_DT_H), 3)
     if consumption_source == PROFILE_SPEC:
-        reference_totals = dict(historical_totals)
-        meta_historical_totals = dict(consumer_daily_targets_kwh)
-        meta_historical_total_kwh = spec_total_kwh
+        meta_historical_totals = dict(consumption.consumer_daily_targets_kwh)
+        meta_historical_total_kwh = consumption.spec_total_kwh
     else:
-        reference_totals = dict(historical_totals)
         meta_historical_totals = dict(historical_totals)
         meta_historical_total_kwh = round(sum(total_load) * float(DEFAULT_DT_H), 3)
-
-    meta = {
+    return {
         "window_end": window_end,
         "consumption_source": consumption_source,
-        "spec_baseload_kwh": historical_baseload_kwh,
-        "spec_flex_targets_kwh": dict(consumer_daily_targets_kwh),
-        "spec_total_kwh": spec_total_kwh,
-        "reference_totals": reference_totals,
+        "spec_baseload_kwh": consumption.historical_baseload_kwh,
+        "spec_flex_targets_kwh": dict(consumption.consumer_daily_targets_kwh),
+        "spec_total_kwh": consumption.spec_total_kwh,
+        "reference_totals": dict(historical_totals),
         "reference_total_kwh": reference_total_kwh,
         "historical_totals": meta_historical_totals,
         "historical_total_kwh": meta_historical_total_kwh,
-        "baseload_kwh": historical_baseload_kwh,
+        "baseload_kwh": consumption.historical_baseload_kwh,
         "baseload_stored_kwh": stored_baseload_kwh,
         "baseload_adjustment_kwh": round(
-            stored_baseload_kwh - historical_baseload_kwh, 3
+            stored_baseload_kwh - consumption.historical_baseload_kwh, 3
         ),
-        "consumer_daily_targets_kwh": consumer_daily_targets_kwh,
-        "residual_clipped_hours": residual_clipped_hours,
+        "consumer_daily_targets_kwh": consumption.consumer_daily_targets_kwh,
+        "residual_clipped_hours": consumption.residual_clipped_hours,
     }
+
+
+def build_historical_matrix_for_slots(
+    slot_datetimes: list[datetime],
+    cache: HistoricalDataCache,
+    prices_df: pd.DataFrame,
+    *,
+    window_end: datetime,
+    feed_in_settings: feed_in_prices.FeedInSettings | None = None,
+    charging_anchor: datetime | None = None,
+    price_resources: BacktestingPriceResources | None = None,
+    planning_moment: datetime | None = None,
+    scenario_params: dict | None = None,
+) -> tuple[list[dict], dict]:
+    """Baut eine Optimierungsmatrix für beliebige stündliche Slots aus historischen Logs."""
+    from house_config.planning_flex_bridge import resolve_consumption_source
+
+    consumption_source = resolve_consumption_source(scenario_params)
+    profile = (scenario_params or {}).get("_house_profile")
+    flexible_consumers, flex_consumer_ids = _flex_consumers_for_matrix(scenario_params)
+    baseload_stored, historical_totals, total_load, hourly_flex = (
+        cache.get_window_consumption(
+            slot_datetimes,
+            flex_consumer_ids=flex_consumer_ids,
+        )
+    )
+    _, all_consumer_totals, reference_total_load, _ = cache.get_window_consumption(
+        slot_datetimes
+    )
+    consumption = _resolve_matrix_consumption(
+        consumption_source,
+        slot_datetimes,
+        cache,
+        window_end,
+        profile=profile,
+        scenario_params=scenario_params,
+        flexible_consumers=flexible_consumers,
+        historical_totals=historical_totals,
+        all_consumer_totals=all_consumer_totals,
+        total_load=total_load,
+        hourly_flex=hourly_flex,
+    )
+    pv_profile, epex_prices, brutto_prices, price_sources = _matrix_price_inputs(
+        slot_datetimes,
+        cache,
+        prices_df,
+        scenario_params=scenario_params,
+        price_resources=price_resources,
+        planning_moment=planning_moment,
+    )
+    matrix = _matrix_rows_from_slots(
+        slot_datetimes,
+        consumption,
+        (epex_prices, brutto_prices, price_sources),
+        pv_profile=pv_profile,
+        consumption_source=consumption_source,
+        anchor=charging_anchor if charging_anchor is not None else window_end,
+    )
+    settings = feed_in_settings or config.get_feed_in_settings()
+    feed_in_prices.enrich_matrix_feed_in_prices(matrix, settings)
+    meta = _matrix_meta_block(
+        consumption,
+        consumption_source=consumption_source,
+        window_end=window_end,
+        historical_totals=historical_totals,
+        total_load=total_load,
+        reference_total_kwh=round(sum(reference_total_load), 3),
+        baseload_stored=baseload_stored,
+    )
     if flexible_consumers:
         meta["_flexible_consumers"] = flexible_consumers
     return matrix, meta

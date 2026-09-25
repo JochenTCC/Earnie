@@ -2,9 +2,26 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.0-alpha.1 pre-release (2026-09-25)
+
+- [x] Publish community pre-release **2.6.0-alpha.1** (`version.py` + alpha compose pin + tag `v2.6.0-alpha.1`)
+
+### 2.6.r Quality / release hardening (2026-09-25)
+
+- [x] **2.6.r — Quality / release hardening** (same shape as `2.5.r` / skill `quality-gate`; no `version.py` bump)
+  - [x] Coverage baseline — prep @ `43b317b`: 2500 passed / 6 skipped; overall **80.9%**; no package &lt; 40%
+  - [x] Dead-code / obsolete-test audit — `vulture` (confidence 80) clean; `pytest --dead-fixtures` clean; health-report flags = expected mock-heavy + `pv_follow_name` fail-fast
+  - [x] Simplification triage — mechanical unused-import removals (`simulation/engine`, `backtesting_single_window`, `ui/backtesting_display_bundle`, `chart_trace_segments`, `loxone_debug_rows`, `optimizer/consistency`, `simulation`, `milp_consumer_*`, `__init__` battery aliases); deferred needs-accept: identical helpers / charts barrel trim / `_anchor_fraction_from_legacy_shift`
+  - [x] KPI mega-files — **0** core/UI files &gt; 600 LOC: `ui/charts.py` → facade + `chart_cumulative_render.py` (+ flow ghosts); `data/planning_window.py` → `planning_window_zones.py`; `optimizer/milp.py` via `milp_inputs.py`
+  - [x] KPI functions — **0** bodies &gt; 60 LOC in quality-gate packages (Wave 1 + full follow-on; full hard-limit bar)
+  - [x] Official docs — `Doc-Review-Checklist.md` §2.6.0 HA/HouseSim/Pattern B; Pattern B drift fixed in HA/user docs; issue-template placeholder `2.6.0`; 3 deferred findings → [Backlog-Bugfixes.md](Backlog-Bugfixes.md) Document Review Findings
+  - [x] SonarCloud snapshot — last successful analysis [36110376214](https://github.com/JochenTCC/Earnie/actions/runs/36110376214) @ `d4ec89d`: QG **ERROR** (informational); `new_bugs` **0**; `new_vulnerabilities` **13** deferred under Bugfixes Verifications Pending / accepted triage. Post-`ddf5938` CI pulp-4 fail unblocked by pin below (refresh leak-period after push)
+  - [x] **Pin `pulp` to `&lt;4`** in `pyproject.toml` (`pulp>=2.8.0,&lt;4`); local MILP smoke green on 3.3.2
+  - [x] Optional near-hard pre-split (`scenario_editor_sections` ~598, `profiles_store` ~595) — **skipped** (explicit; not required for gate)
+
 ### 2.6 quality-gate prep snapshot (2026-09-25)
 
-- [x] **Prepare quality gate** — Ran coverage / vulture / dead-fixtures / KPI / Sonar snapshot on `main` @ `43b317b`; derived open remediations as **2.6.r** in [Backlog.md](Backlog.md) (pulp `&lt;4` pin, `ui/charts.py` split, function-split wave, Sonar leak-period, docs walk).
+- [x] **Prepare quality gate** — Ran coverage / vulture / dead-fixtures / KPI / Sonar snapshot on `main` @ `43b317b`; remediations completed as **2.6.r** (archived above).
 
 ### EHAL-Com Schreibtest — bounded write + roundtrip (2026-09-25)
 

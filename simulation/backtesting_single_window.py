@@ -12,7 +12,6 @@ from scripts.run_backtesting import resolve_backtesting_window
 from simulation.backtesting_snapshots import build_window_snapshot, normalize_window_anchor_key
 from simulation.engine import (
     HistoricalDataCache,
-    _flexible_consumers_from_scenario,
     _scenario_to_battery_params,
     _simulate_anchor_step,
     window_slot_datetimes,

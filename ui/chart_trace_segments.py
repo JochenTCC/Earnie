@@ -13,7 +13,6 @@ from ui.chart_slot_axis import (
     _EMPTY_FLOAT_SERIES,
     _LINE_ANCHOR_SLOT_CENTER,
     _LINE_ANCHOR_SLOT_START,
-    _anchor_fraction_from_legacy_shift,
     _chart_time_series,
     _empty_chart_time_series,
     _line_plot_float,

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote
@@ -41,6 +41,17 @@ class OpenemsHttpError(RuntimeError):
     def __init__(self, message: str, *, status_code: int | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
+
+
+@dataclass
+class _OpenemsWriteOutcome:
+    """Fehlfelder, Meldungen und Capability-Flips eines Setpoint-Schreibvorgangs."""
+
+    failed: list[str] = field(default_factory=list)
+    messages: list[str] = field(default_factory=list)
+    hub_status: str | None = None
+    flip_ess: bool = False
+    flip_evcs: bool = False
 
 
 def _utc_ts() -> str:
@@ -161,6 +172,95 @@ class OpenemsAdapter:
         doc["sens_power_consumers"] = max(0.0, pv_w - grid_w - ess_w)
         return validate_telemetry(doc)
 
+    def _invalid_setpoint_error(
+        self,
+        raw: dict[str, Any],
+        exc: EhalValidationError,
+    ) -> EhalWriteError:
+        """Write-Error für ein Setpoint-Dokument, das die Validierung nicht besteht."""
+        known = [
+            k
+            for k in (
+                "set_ess_active_power",
+                "set_ess_charge_power_limit",
+                "set_ess_discharge_power_limit",
+                "set_ess_mode",
+                "set_evcs_max_current",
+                "set_evcs_mode",
+            )
+            if k in raw
+        ]
+        return self._record_write_error(
+            failed_fields=known or ["set_ess_charge_power_limit"],
+            message=f"Invalid EHAL setpoint: {exc}",
+            hub_status=None,
+            retryable=False,
+            flip_ess=False,
+            flip_evcs=False,
+        )
+
+    def _write_ess_setpoints(
+        self,
+        doc: dict[str, Any],
+        outcome: _OpenemsWriteOutcome,
+    ) -> None:
+        """Design C1: active_power → Equals; limits → Greater/Less; set_ess_mode ignored."""
+        if "set_ess_active_power" in doc and self._supports_ess_write:
+            ok, status, msg = self._try_ess_write(
+                "SetActivePowerEquals",
+                float(doc["set_ess_active_power"]),
+            )
+            if not ok:
+                outcome.failed.append("set_ess_active_power")
+                outcome.messages.append(msg)
+                outcome.hub_status = status
+                outcome.flip_ess = True
+
+        if "set_ess_charge_power_limit" in doc and self._supports_ess_write:
+            ok, status, msg = self._try_ess_write(
+                "SetActivePowerGreaterOrEquals",
+                ehal_charge_limit_to_openems(doc["set_ess_charge_power_limit"]),
+            )
+            if not ok:
+                outcome.failed.append("set_ess_charge_power_limit")
+                outcome.messages.append(msg)
+                outcome.hub_status = status or outcome.hub_status
+                outcome.flip_ess = True
+
+        if "set_ess_discharge_power_limit" in doc and self._supports_ess_write:
+            ok, status, msg = self._try_ess_write(
+                "SetActivePowerLessOrEquals",
+                ehal_discharge_limit_to_openems(doc["set_ess_discharge_power_limit"]),
+            )
+            if not ok:
+                outcome.failed.append("set_ess_discharge_power_limit")
+                outcome.messages.append(msg)
+                outcome.hub_status = status or outcome.hub_status
+                outcome.flip_ess = True
+
+    def _write_evcs_setpoint(
+        self,
+        doc: dict[str, Any],
+        outcome: _OpenemsWriteOutcome,
+        *,
+        evcs_voltage_v: float,
+        evcs_phases: int,
+    ) -> None:
+        """EVCS-Stromgrenze als Wirkleistung schreiben."""
+        if "set_evcs_max_current" not in doc or not self._supports_evcs_current:
+            return
+        watts = evcs_amps_to_watts(
+            doc["set_evcs_max_current"],
+            voltage_v=evcs_voltage_v,
+            phases=evcs_phases,
+        )
+        ok, status, msg = self._try_evcs_write(watts)
+        if not ok:
+            outcome.failed.append("set_evcs_max_current")
+            outcome.messages.append(msg)
+            outcome.hub_status = status or outcome.hub_status
+            outcome.flip_evcs = True
+
     def write_setpoints(
         self,
         setpoint: EhalSetpoint | dict[str, Any],
@@ -173,91 +273,28 @@ class OpenemsAdapter:
         try:
             doc = validate_setpoint(raw)
         except EhalValidationError as exc:
-            known = [
-                k
-                for k in (
-                    "set_ess_active_power",
-                    "set_ess_charge_power_limit",
-                    "set_ess_discharge_power_limit",
-                    "set_ess_mode",
-                    "set_evcs_max_current",
-                    "set_evcs_mode",
-                )
-                if k in raw
-            ]
-            return self._record_write_error(
-                failed_fields=known or ["set_ess_charge_power_limit"],
-                message=f"Invalid EHAL setpoint: {exc}",
-                hub_status=None,
-                retryable=False,
-                flip_ess=False,
-                flip_evcs=False,
-            )
+            return self._invalid_setpoint_error(raw, exc)
 
-        failed: list[str] = []
-        messages: list[str] = []
-        hub_status: str | None = None
-        flip_ess = False
-        flip_evcs = False
+        outcome = _OpenemsWriteOutcome()
+        self._write_ess_setpoints(doc, outcome)
+        self._write_evcs_setpoint(
+            doc,
+            outcome,
+            evcs_voltage_v=evcs_voltage_v,
+            evcs_phases=evcs_phases,
+        )
 
-        # Design C1: active_power → Equals; limits → Greater/Less; set_ess_mode ignored.
-        if "set_ess_active_power" in doc and self._supports_ess_write:
-            ok, status, msg = self._try_ess_write(
-                "SetActivePowerEquals",
-                float(doc["set_ess_active_power"]),
-            )
-            if not ok:
-                failed.append("set_ess_active_power")
-                messages.append(msg)
-                hub_status = status
-                flip_ess = True
-
-        if "set_ess_charge_power_limit" in doc and self._supports_ess_write:
-            ok, status, msg = self._try_ess_write(
-                "SetActivePowerGreaterOrEquals",
-                ehal_charge_limit_to_openems(doc["set_ess_charge_power_limit"]),
-            )
-            if not ok:
-                failed.append("set_ess_charge_power_limit")
-                messages.append(msg)
-                hub_status = status or hub_status
-                flip_ess = True
-
-        if "set_ess_discharge_power_limit" in doc and self._supports_ess_write:
-            ok, status, msg = self._try_ess_write(
-                "SetActivePowerLessOrEquals",
-                ehal_discharge_limit_to_openems(doc["set_ess_discharge_power_limit"]),
-            )
-            if not ok:
-                failed.append("set_ess_discharge_power_limit")
-                messages.append(msg)
-                hub_status = status or hub_status
-                flip_ess = True
-
-        if "set_evcs_max_current" in doc and self._supports_evcs_current:
-            watts = evcs_amps_to_watts(
-                doc["set_evcs_max_current"],
-                voltage_v=evcs_voltage_v,
-                phases=evcs_phases,
-            )
-            ok, status, msg = self._try_evcs_write(watts)
-            if not ok:
-                failed.append("set_evcs_max_current")
-                messages.append(msg)
-                hub_status = status or hub_status
-                flip_evcs = True
-
-        if not failed:
+        if not outcome.failed:
             self._last_write_error = None
             return None
 
         return self._record_write_error(
-            failed_fields=failed,
-            message="; ".join(messages),
-            hub_status=hub_status,
+            failed_fields=outcome.failed,
+            message="; ".join(outcome.messages),
+            hub_status=outcome.hub_status,
             retryable=True,
-            flip_ess=flip_ess,
-            flip_evcs=flip_evcs,
+            flip_ess=outcome.flip_ess,
+            flip_evcs=outcome.flip_evcs,
         )
 
     def _channel_url(self, component: str, channel: str) -> str:

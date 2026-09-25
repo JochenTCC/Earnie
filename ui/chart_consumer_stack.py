@@ -355,6 +355,67 @@ def _known_energy_from_df(
     return energy
 
 
+def _sum_matrix_horizon_energy(
+    energy: dict[str, float],
+    matrix: list[dict],
+    consumers: list[dict],
+    chart_window: UiChartWindow,
+) -> None:
+    """Add MILP-matrix flex energy inside SA₀…SA₂ to ``energy`` in place."""
+    horizon_start = normalize_hour_slot(chart_window.sa0)
+    horizon_end = normalize_hour_slot(chart_window.sa2)
+    for row in matrix:
+        slot = row.get("slot_datetime")
+        if not isinstance(slot, datetime):
+            continue
+        slot = normalize_hour_slot(slot)
+        if not (horizon_start <= slot <= horizon_end):
+            continue
+        for consumer in consumers:
+            col = consumer_column_name(consumer)
+            energy[consumer["id"]] += float(row.get(col, 0.0) or 0.0)
+
+
+def _sum_df_horizon_energy(
+    energy: dict[str, float],
+    df: pd.DataFrame,
+    consumers: list[dict],
+    chart_window: UiChartWindow,
+) -> None:
+    """Add display-DataFrame flex energy inside SA₀…SA₂ to ``energy`` in place."""
+    horizon_start = normalize_hour_slot(chart_window.sa0)
+    horizon_end = normalize_hour_slot(chart_window.sa2)
+    for _, row in df.iterrows():
+        slot = row.get("slot_datetime")
+        if isinstance(slot, datetime):
+            slot = normalize_hour_slot(slot)
+            if not (horizon_start <= slot <= horizon_end):
+                continue
+        for consumer in consumers:
+            col = consumer_column_name(consumer)
+            if col in df.columns:
+                energy[consumer["id"]] += float(row.get(col, 0.0) or 0.0)
+
+
+def _merge_appliance_and_known_energy(
+    energy: dict[str, float],
+    matrix: list[dict] | None,
+    chart_window: UiChartWindow | None,
+    df: pd.DataFrame,
+    known_consumers: list[dict],
+) -> dict[str, float]:
+    """Add appliance energy and overwrite known-generic totals from the DataFrame."""
+    for appliance_id, kwh in _appliance_horizon_energy_kwh(
+        matrix, chart_window, df
+    ).items():
+        energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
+    for consumer_id, kwh in _known_energy_from_df(
+        df, chart_window, known_consumers
+    ).items():
+        energy[consumer_id] = kwh
+    return energy
+
+
 def _consumer_horizon_energy_kwh(
     matrix: list[dict] | None,
     chart_window: UiChartWindow | None,
@@ -369,59 +430,22 @@ def _consumer_horizon_energy_kwh(
     for consumer in known_consumers:
         energy[consumer["id"]] = 0.0
     if matrix and chart_window is not None:
-        horizon_start = normalize_hour_slot(chart_window.sa0)
-        horizon_end = normalize_hour_slot(chart_window.sa2)
-        for row in matrix:
-            slot = row.get("slot_datetime")
-            if not isinstance(slot, datetime):
-                continue
-            slot = normalize_hour_slot(slot)
-            if not (horizon_start <= slot <= horizon_end):
-                continue
-            for consumer in consumers:
-                col = consumer_column_name(consumer)
-                energy[consumer["id"]] += float(row.get(col, 0.0) or 0.0)
-        appliance_energy = _appliance_horizon_energy_kwh(matrix, chart_window, df)
-        for appliance_id, kwh in appliance_energy.items():
-            energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
-        for consumer_id, kwh in _known_energy_from_df(
-            df, chart_window, known_consumers
-        ).items():
-            energy[consumer_id] = kwh
-        return energy
+        _sum_matrix_horizon_energy(energy, matrix, consumers, chart_window)
+        return _merge_appliance_and_known_energy(
+            energy, matrix, chart_window, df, known_consumers
+        )
     if chart_window is not None:
-        horizon_start = normalize_hour_slot(chart_window.sa0)
-        horizon_end = normalize_hour_slot(chart_window.sa2)
-        for _, row in df.iterrows():
-            slot = row.get("slot_datetime")
-            if isinstance(slot, datetime):
-                slot = normalize_hour_slot(slot)
-                if not (horizon_start <= slot <= horizon_end):
-                    continue
-            for consumer in consumers:
-                col = consumer_column_name(consumer)
-                if col in df.columns:
-                    energy[consumer["id"]] += float(row.get(col, 0.0) or 0.0)
-        appliance_energy = _appliance_horizon_energy_kwh(None, chart_window, df)
-        for appliance_id, kwh in appliance_energy.items():
-            energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
-        for consumer_id, kwh in _known_energy_from_df(
-            df, chart_window, known_consumers
-        ).items():
-            energy[consumer_id] = kwh
-        return energy
+        _sum_df_horizon_energy(energy, df, consumers, chart_window)
+        return _merge_appliance_and_known_energy(
+            energy, None, chart_window, df, known_consumers
+        )
     for consumer in consumers:
         col = consumer_column_name(consumer)
         if col in df.columns:
             energy[consumer["id"]] = float(df[col].fillna(0.0).sum())
-    appliance_energy = _appliance_horizon_energy_kwh(matrix, chart_window, df)
-    for appliance_id, kwh in appliance_energy.items():
-        energy[appliance_id] = energy.get(appliance_id, 0.0) + kwh
-    for consumer_id, kwh in _known_energy_from_df(
-        df, chart_window, known_consumers
-    ).items():
-        energy[consumer_id] = kwh
-    return energy
+    return _merge_appliance_and_known_energy(
+        energy, matrix, chart_window, df, known_consumers
+    )
 
 
 def _stack_order_cache_key(chart_window: UiChartWindow | None) -> str:

@@ -69,6 +69,99 @@ def _historical_target_kwh(
     )
 
 
+def _target_from_thermal(
+    consumer: dict,
+    target_date: date,
+    matrix: list | None,
+    cache: dict,
+) -> float:
+    today = datetime.now().date()
+    if target_date != today:
+        return _historical_target_kwh(consumer, target_date, matrix, cache)
+    from optimizer.thermal_targets import (
+        resolve_thermal_daily_target_kwh,
+        thermal_horizon_hours_from_slots,
+    )
+
+    horizon = thermal_horizon_hours_from_slots(len(matrix)) if matrix else 24
+    return resolve_thermal_daily_target_kwh(consumer, horizon=horizon)
+
+
+def _target_from_config(consumer: dict, target_date: date, fallback: float) -> float:
+    if consumer.get("charging_schedule", {}).get("enabled"):
+        capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
+        computed = config.Config.target_kwh_from_day_schedule(
+            consumer,
+            datetime.combine(target_date, time(12, 0)),
+            capacity_kwh=capacity_kwh,
+        )
+        if computed is not None:
+            return computed
+    return fallback
+
+
+def _target_from_historical(
+    consumer: dict,
+    target_date: date,
+    matrix: list | None,
+    cache: dict,
+    fallback: float,
+) -> float:
+    cid = consumer["id"]
+    if matrix:
+        day_rows = [row for row in matrix if row.get("date") == target_date]
+        if day_rows and any(row.get("expected_flex_kw") for row in day_rows):
+            return sum(
+                flex_kw_lookup(row.get("expected_flex_kw"), consumer)
+                for row in day_rows
+            )
+    totals = _historical_totals_for_date(target_date, cache)
+    if cid in totals:
+        return float(totals[cid])
+    return fallback
+
+
+def _target_from_loxone(
+    consumer: dict,
+    target_date: date,
+    cache: dict,
+    fallback: float,
+) -> float:
+    cid = consumer["id"]
+    loxone_name = consumer.get("loxone_target_kwh_name", "")
+    today = datetime.now().date()
+    if loxone_name and target_date == today:
+        value = loxone_client.fetch_loxone_generic_value(loxone_name)
+        if value is not None and value >= 0:
+            return float(value)
+    totals = _historical_totals_for_date(target_date, cache)
+    if cid in totals:
+        return float(totals[cid])
+    return fallback
+
+
+def _target_from_loxone_remaining_hours(
+    consumer: dict,
+    target_date: date,
+    cache: dict,
+    fallback: float,
+) -> float:
+    from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
+
+    cid = consumer["id"]
+    loxone_name = marker_get_filter_remaining_hours(consumer)
+    today = datetime.now().date()
+    if loxone_name and target_date == today:
+        hours = loxone_client.fetch_loxone_generic_value(loxone_name)
+        return _loxone_remaining_hours_target_kwh(consumer, hours)
+    if not loxone_name and target_date == today:
+        return _loxone_remaining_hours_target_kwh(consumer, None)
+    totals = _historical_totals_for_date(target_date, cache)
+    if cid in totals:
+        return float(totals[cid])
+    return fallback
+
+
 def _resolve_single_consumer_daily_target_kwh(
     consumer: dict,
     target_date: date,
@@ -80,77 +173,21 @@ def _resolve_single_consumer_daily_target_kwh(
     config | historical | loxone | loxone_remaining_hours | thermal.
     """
     source = consumer.get("daily_target_source", "config")
-    cid = consumer["id"]
     fallback = float(consumer.get("daily_target_kwh", 0.0) or 0.0)
     cache = historical_cache if historical_cache is not None else {}
 
     if source == "thermal":
-        today = datetime.now().date()
-        if target_date != today:
-            return _historical_target_kwh(consumer, target_date, matrix, cache)
-        from optimizer.thermal_targets import (
-            resolve_thermal_daily_target_kwh,
-            thermal_horizon_hours_from_slots,
-        )
-
-        if matrix:
-            horizon = thermal_horizon_hours_from_slots(len(matrix))
-        else:
-            horizon = 24
-        return resolve_thermal_daily_target_kwh(consumer, horizon=horizon)
-
+        return _target_from_thermal(consumer, target_date, matrix, cache)
     if source == "config":
-        if consumer.get("charging_schedule", {}).get("enabled"):
-            capacity_kwh = loxone_client.resolve_consumer_battery_capacity_kwh(consumer)
-            computed = config.Config.target_kwh_from_day_schedule(
-                consumer,
-                datetime.combine(target_date, time(12, 0)),
-                capacity_kwh=capacity_kwh,
-            )
-            if computed is not None:
-                return computed
-        return fallback
-
+        return _target_from_config(consumer, target_date, fallback)
     if source == "historical":
-        if matrix:
-            day_rows = [row for row in matrix if row.get("date") == target_date]
-            if day_rows and any(row.get("expected_flex_kw") for row in day_rows):
-                return sum(
-                    flex_kw_lookup(row.get("expected_flex_kw"), consumer)
-                    for row in day_rows
-                )
-        totals = _historical_totals_for_date(target_date, cache)
-        if cid in totals:
-            return float(totals[cid])
-        return fallback
-
+        return _target_from_historical(consumer, target_date, matrix, cache, fallback)
     if source == "loxone":
-        loxone_name = consumer.get("loxone_target_kwh_name", "")
-        today = datetime.now().date()
-        if loxone_name and target_date == today:
-            value = loxone_client.fetch_loxone_generic_value(loxone_name)
-            if value is not None and value >= 0:
-                return float(value)
-        totals = _historical_totals_for_date(target_date, cache)
-        if cid in totals:
-            return float(totals[cid])
-        return fallback
-
+        return _target_from_loxone(consumer, target_date, cache, fallback)
     if source == "loxone_remaining_hours":
-        from settings.ehal_marker_resolve import marker_get_filter_remaining_hours
-
-        loxone_name = marker_get_filter_remaining_hours(consumer)
-        today = datetime.now().date()
-        if loxone_name and target_date == today:
-            hours = loxone_client.fetch_loxone_generic_value(loxone_name)
-            return _loxone_remaining_hours_target_kwh(consumer, hours)
-        if not loxone_name and target_date == today:
-            return _loxone_remaining_hours_target_kwh(consumer, None)
-        totals = _historical_totals_for_date(target_date, cache)
-        if cid in totals:
-            return float(totals[cid])
-        return fallback
-
+        return _target_from_loxone_remaining_hours(
+            consumer, target_date, cache, fallback
+        )
     return fallback
 
 

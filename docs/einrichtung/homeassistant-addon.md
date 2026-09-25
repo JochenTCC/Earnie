@@ -83,7 +83,7 @@ Port-Gesamtübersicht: [`docs/referenz/streamlit-ports.md`](../referenz/streamli
 
 ## Add-on-Update vs. Image-Update
 
-Die Add-on-`version:` in `config.yaml` **entspricht der Earnie-App-Version** (z. B. `2.5.0` oder `2.5.0-alpha.9`). Bei jedem Earnie-Release-Tag wird das Add-on-Repository [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) automatisch aktualisiert — der Supervisor zeigt dann **Update verfügbar**, sobald die neue `version:` im Repository ankommt.
+Die Add-on-`version:` in `config.yaml` **entspricht der Earnie-App-Version** (z. B. `2.6.0` oder `2.6.0-alpha.1`). Bei jedem Earnie-Release-Tag wird das Add-on-Repository [`ha-addon-earnie`](https://github.com/JochenTCC/ha-addon-earnie) automatisch aktualisiert — der Supervisor zeigt dann **Update verfügbar**, sobald die neue `version:` im Repository ankommt.
 
 Unterschied zum LoxBerry-Plugin: dort zieht die Compose-Datei `:latest`; beim HA-Add-on wird das Release-Image explizit über `build.yaml` / `EARNIE_VERSION` gepinnt.
 

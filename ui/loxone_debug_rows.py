@@ -1,6 +1,11 @@
 """Loxone/EHAL debug row builders."""
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Any
+
+import streamlit as st
+
 import config
 from ui.loxone_debug import (
     _format_age_text,
@@ -8,19 +13,11 @@ from ui.loxone_debug import (
     mapping_column_label,
     render_ehal_write_error_banner,
 )
-
-from datetime import datetime
-from typing import Any
-
-import streamlit as st
-
-import config
 from integrations.ehal_debug_mapping import (
     build_loxone_setpoint_io_index,
     expected_live_read_fields,
     expected_live_write_fields,
     ha_setpoint_mapping,
-    ha_telemetry_mapping,
     is_live_read_field,
     is_live_write_field,
     loxone_write_field_to_io,

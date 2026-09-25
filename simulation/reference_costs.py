@@ -56,6 +56,93 @@ def resolve_reference_hourly_load(
     return total_load
 
 
+_REFERENCE_COST_COLUMNS = (
+    "sim_cost",
+    "import_cost_eur",
+    "export_earn_eur",
+    "import_kwh",
+    "export_kwh",
+    "consumption_kw",
+    "k_act",
+    "k_push_act",
+)
+
+
+def _empty_reference_series() -> dict[str, list[float]]:
+    """Leere Spaltenlisten der Referenzkosten-Zeitreihe."""
+    return {name: [] for name in _REFERENCE_COST_COLUMNS}
+
+
+def _reference_feed_in_settings(
+    feed_in_settings: feed_in_prices.FeedInSettings,
+    scenario_params: dict | None,
+) -> feed_in_prices.FeedInSettings:
+    """Szenario-Einspeisetarife, sonst die übergebenen Settings."""
+    if scenario_params is None:
+        return feed_in_settings
+    return config.get_backtesting_feed_in_settings(runtime_override=scenario_params)
+
+
+def _reference_window_inputs(
+    anchor: datetime,
+    cache: HistoricalDataCache,
+    prices_df: pd.DataFrame,
+    scenario_params: dict | None,
+) -> tuple[list[datetime], list[float], list[float], list[float], list[float]]:
+    """Slots, Referenzlast, PV, Brutto- und EPEX-Preise eines Anker-Fensters."""
+    from simulation.engine import _brutto_prices_for_slots, window_slot_datetimes
+
+    slot_datetimes = window_slot_datetimes(anchor)
+    total_load = resolve_reference_hourly_load(
+        cache,
+        slot_datetimes,
+        scenario_params=scenario_params,
+    )
+    pv_profile = cache.get_pv_for_slots(
+        slot_datetimes,
+        scenario_params=scenario_params,
+    )
+    brutto_prices = _brutto_prices_for_slots(
+        prices_df,
+        slot_datetimes,
+        scenario_params=scenario_params,
+    )
+    epex_prices = epex_prices_for_slots(prices_df, slot_datetimes)
+    return slot_datetimes, total_load, pv_profile, brutto_prices, epex_prices
+
+
+def _append_reference_slot(
+    series: dict[str, list[float]],
+    cost_parts: tuple[float, float, float, float, float],
+    load: float,
+    price: float,
+    k_push: float,
+) -> None:
+    """Eine Slot-Zeile an die Spaltenlisten anhängen."""
+    import_eur, export_eur, net_eur, import_kwh, export_kwh = cost_parts
+    series["sim_cost"].append(net_eur)
+    series["import_cost_eur"].append(import_eur)
+    series["export_earn_eur"].append(export_eur)
+    series["import_kwh"].append(import_kwh)
+    series["export_kwh"].append(export_kwh)
+    series["consumption_kw"].append(float(load))
+    series["k_act"].append(float(price))
+    series["k_push_act"].append(float(k_push))
+
+
+def _reference_costs_frame(
+    series: dict[str, list[float]],
+    timestamps: list[datetime],
+) -> pd.DataFrame:
+    """Spaltenlisten als DataFrame mit ``ts``-Index."""
+    df_res = pd.DataFrame(
+        {name: series[name] for name in _REFERENCE_COST_COLUMNS},
+        index=pd.DatetimeIndex(timestamps),
+    )
+    df_res.index.name = "ts"
+    return df_res
+
+
 def compute_historical_reference_costs(
     start: pd.Timestamp,
     end: pd.Timestamp,
@@ -75,8 +162,6 @@ def compute_historical_reference_costs(
 
     from simulation.engine import (
         list_simulation_anchors,
-        window_slot_datetimes,
-        _brutto_prices_for_slots,
         _hour_cost_parts_without_optimization,
     )
     anchors = list_simulation_anchors(start, end, cache)
@@ -86,40 +171,14 @@ def compute_historical_reference_costs(
         )
 
     timestamps: list[datetime] = []
-    costs: list[float] = []
-    import_costs: list[float] = []
-    export_earns: list[float] = []
-    import_kwhs: list[float] = []
-    export_kwhs: list[float] = []
-    consumption_kws: list[float] = []
-    k_act_values: list[float] = []
-    k_push_values: list[float] = []
-    ref_settings = feed_in_settings
-    if scenario_params is not None:
-        ref_settings = config.get_backtesting_feed_in_settings(
-            runtime_override=scenario_params
-        )
-
+    series = _empty_reference_series()
+    ref_settings = _reference_feed_in_settings(feed_in_settings, scenario_params)
     total_hours = len(anchors) * BACKTESTING_STEP_HOURS
     hours_done = 0
     for anchor in anchors:
-        slot_datetimes = window_slot_datetimes(anchor)
-        total_load = resolve_reference_hourly_load(
-            cache,
-            slot_datetimes,
-            scenario_params=scenario_params,
+        slot_datetimes, total_load, pv_profile, brutto_prices, epex_prices = (
+            _reference_window_inputs(anchor, cache, prices_df, scenario_params)
         )
-        pv_profile = cache.get_pv_for_slots(
-            slot_datetimes,
-            scenario_params=scenario_params,
-        )
-        brutto_prices = _brutto_prices_for_slots(
-            prices_df,
-            slot_datetimes,
-            scenario_params=scenario_params,
-        )
-        epex_prices = epex_prices_for_slots(prices_df, slot_datetimes)
-
         for slot_dt, load, pv, price, epex in zip(
             slot_datetimes, total_load, pv_profile, brutto_prices, epex_prices
         ):
@@ -127,36 +186,18 @@ def compute_historical_reference_costs(
             k_push = feed_in_prices.resolve_k_push_act(
                 epex, ref_settings, slot_datetime=slot_dt
             )
-            import_eur, export_eur, net_eur, import_kwh, export_kwh = (
-                _hour_cost_parts_without_optimization(load, pv, price, k_push)
+            _append_reference_slot(
+                series,
+                _hour_cost_parts_without_optimization(load, pv, price, k_push),
+                load,
+                price,
+                k_push,
             )
-            costs.append(net_eur)
-            import_costs.append(import_eur)
-            export_earns.append(export_eur)
-            import_kwhs.append(import_kwh)
-            export_kwhs.append(export_kwh)
-            consumption_kws.append(float(load))
-            k_act_values.append(float(price))
-            k_push_values.append(float(k_push))
             hours_done += 1
             if on_progress is not None:
                 on_progress(wall_hours_from_slots(hours_done), total_hours)
 
-    df_res = pd.DataFrame(
-        {
-            "sim_cost": costs,
-            "import_cost_eur": import_costs,
-            "export_earn_eur": export_earns,
-            "import_kwh": import_kwhs,
-            "export_kwh": export_kwhs,
-            "consumption_kw": consumption_kws,
-            "k_act": k_act_values,
-            "k_push_act": k_push_values,
-        },
-        index=pd.DatetimeIndex(timestamps),
-    )
-    df_res.index.name = "ts"
-    return df_res
+    return _reference_costs_frame(series, timestamps)
 
 
 def default_own_reference(

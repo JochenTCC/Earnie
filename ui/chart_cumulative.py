@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -163,6 +164,138 @@ def _add_region_cumulative_hv_trace(
     )
 
 
+@dataclass(frozen=True)
+class _S2SplitSeries:
+    """Slot-Reihen und Ist/Prognose-Grenze für den Chart-2-S-2-Split."""
+
+    split: int
+    length: int
+    actual_cost_euro: list[float]
+    actual_consumption_kwh: list[float]
+    matched_cost_euro: list[float]
+    optimized_cost_euro: list[float]
+    matched_consumption_kwh: list[float]
+    optimized_consumption_kwh: list[float]
+
+
+def _add_s2_forecast_cost_traces(
+    fig: go.Figure,
+    uhrzeit: pd.Series,
+    axis: ChartSlotAxis,
+    series: _S2SplitSeries,
+) -> None:
+    _add_region_cumulative_hv_trace(
+        fig,
+        uhrzeit,
+        axis,
+        series.matched_cost_euro,
+        series.split,
+        series.length,
+        name="Kosten BL Ziel (Prognose)",
+        line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, shape="hv"),
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Kosten BL Ziel (Prognose, kumuliert): "
+            "%{y:.3f} €<extra></extra>"
+        ),
+        history_increments=series.actual_cost_euro,
+    )
+    _add_region_cumulative_hv_trace(
+        fig,
+        uhrzeit,
+        axis,
+        series.optimized_cost_euro,
+        series.split,
+        series.length,
+        name="Kosten optimiert (Prognose)",
+        line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, shape="hv"),
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Kosten optimiert (Prognose, kumuliert): "
+            "%{y:.3f} €<extra></extra>"
+        ),
+        history_increments=series.actual_cost_euro,
+    )
+
+
+def _add_s2_forecast_consumption_traces(
+    fig: go.Figure,
+    uhrzeit: pd.Series,
+    axis: ChartSlotAxis,
+    series: _S2SplitSeries,
+) -> None:
+    _add_region_cumulative_hv_trace(
+        fig,
+        uhrzeit,
+        axis,
+        series.matched_consumption_kwh,
+        series.split,
+        series.length,
+        name="Verbrauch BL Ziel (Prognose)",
+        line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, dash="dash", shape="hv"),
+        yaxis="y2",
+        y_format=".2f",
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Verbrauch BL Ziel (Prognose, kumuliert): "
+            "%{y:.2f} kWh<extra></extra>"
+        ),
+        history_increments=series.actual_consumption_kwh,
+    )
+    _add_region_cumulative_hv_trace(
+        fig,
+        uhrzeit,
+        axis,
+        series.optimized_consumption_kwh,
+        series.split,
+        series.length,
+        name="Verbrauch optimiert (Prognose)",
+        line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
+        yaxis="y2",
+        y_format=".2f",
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Verbrauch optimiert (Prognose, kumuliert): "
+            "%{y:.2f} kWh<extra></extra>"
+        ),
+        history_increments=series.actual_consumption_kwh,
+    )
+
+
+def _add_s2_actual_traces(
+    fig: go.Figure,
+    uhrzeit: pd.Series,
+    axis: ChartSlotAxis,
+    series: _S2SplitSeries,
+) -> None:
+    _add_region_cumulative_hv_trace(
+        fig,
+        uhrzeit,
+        axis,
+        series.actual_cost_euro,
+        0,
+        series.split,
+        name="Kosten (Ist bisher)",
+        line_kwargs=dict(color=COLOR_COST_ACTUAL, width=2.5, shape="hv"),
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Kosten (Ist bisher, kumuliert): "
+            "%{y:.3f} €<extra></extra>"
+        ),
+    )
+    _add_region_cumulative_hv_trace(
+        fig,
+        uhrzeit,
+        axis,
+        series.actual_consumption_kwh,
+        0,
+        series.split,
+        name="Verbrauch (Ist bisher)",
+        line_kwargs=dict(color=COLOR_COST_ACTUAL, width=2.5, dash="dash", shape="hv"),
+        yaxis="y2",
+        y_format=".2f",
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Verbrauch (Ist bisher, kumuliert): "
+            "%{y:.2f} kWh<extra></extra>"
+        ),
+    )
+
+
 def add_cumulative_s2_split_traces(
     fig: go.Figure,
     uhrzeit: pd.Series,
@@ -182,102 +315,20 @@ def add_cumulative_s2_split_traces(
     if split <= 0 or split > length:
         return
 
+    series = _S2SplitSeries(
+        split=split,
+        length=length,
+        actual_cost_euro=slot_actual_cost_euro,
+        actual_consumption_kwh=slot_actual_consumption_kwh,
+        matched_cost_euro=hourly_matched_baseline_cost_euro,
+        optimized_cost_euro=hourly_optimized_cost_euro,
+        matched_consumption_kwh=hourly_matched_baseline_consumption_kwh,
+        optimized_consumption_kwh=hourly_optimized_consumption_kwh,
+    )
     if split < length:
-        _add_region_cumulative_hv_trace(
-            fig,
-            uhrzeit,
-            axis,
-            hourly_matched_baseline_cost_euro,
-            split,
-            length,
-            name="Kosten BL Ziel (Prognose)",
-            line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, shape="hv"),
-            segment_hover_template=(
-                "Uhrzeit: %{customdata}<br>Kosten BL Ziel (Prognose, kumuliert): "
-                "%{y:.3f} €<extra></extra>"
-            ),
-            history_increments=slot_actual_cost_euro,
-        )
-        _add_region_cumulative_hv_trace(
-            fig,
-            uhrzeit,
-            axis,
-            hourly_optimized_cost_euro,
-            split,
-            length,
-            name="Kosten optimiert (Prognose)",
-            line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, shape="hv"),
-            segment_hover_template=(
-                "Uhrzeit: %{customdata}<br>Kosten optimiert (Prognose, kumuliert): "
-                "%{y:.3f} €<extra></extra>"
-            ),
-            history_increments=slot_actual_cost_euro,
-        )
-        _add_region_cumulative_hv_trace(
-            fig,
-            uhrzeit,
-            axis,
-            hourly_matched_baseline_consumption_kwh,
-            split,
-            length,
-            name="Verbrauch BL Ziel (Prognose)",
-            line_kwargs=dict(color=COLOR_COST_BASELINE, width=2.5, dash="dash", shape="hv"),
-            yaxis="y2",
-            y_format=".2f",
-            segment_hover_template=(
-                "Uhrzeit: %{customdata}<br>Verbrauch BL Ziel (Prognose, kumuliert): "
-                "%{y:.2f} kWh<extra></extra>"
-            ),
-            history_increments=slot_actual_consumption_kwh,
-        )
-        _add_region_cumulative_hv_trace(
-            fig,
-            uhrzeit,
-            axis,
-            hourly_optimized_consumption_kwh,
-            split,
-            length,
-            name="Verbrauch optimiert (Prognose)",
-            line_kwargs=dict(color=COLOR_COST_OPTIMIZED, width=2.5, dash="dash", shape="hv"),
-            yaxis="y2",
-            y_format=".2f",
-            segment_hover_template=(
-                "Uhrzeit: %{customdata}<br>Verbrauch optimiert (Prognose, kumuliert): "
-                "%{y:.2f} kWh<extra></extra>"
-            ),
-            history_increments=slot_actual_consumption_kwh,
-        )
-
-    _add_region_cumulative_hv_trace(
-        fig,
-        uhrzeit,
-        axis,
-        slot_actual_cost_euro,
-        0,
-        split,
-        name="Kosten (Ist bisher)",
-        line_kwargs=dict(color=COLOR_COST_ACTUAL, width=2.5, shape="hv"),
-        segment_hover_template=(
-            "Uhrzeit: %{customdata}<br>Kosten (Ist bisher, kumuliert): "
-            "%{y:.3f} €<extra></extra>"
-        ),
-    )
-    _add_region_cumulative_hv_trace(
-        fig,
-        uhrzeit,
-        axis,
-        slot_actual_consumption_kwh,
-        0,
-        split,
-        name="Verbrauch (Ist bisher)",
-        line_kwargs=dict(color=COLOR_COST_ACTUAL, width=2.5, dash="dash", shape="hv"),
-        yaxis="y2",
-        y_format=".2f",
-        segment_hover_template=(
-            "Uhrzeit: %{customdata}<br>Verbrauch (Ist bisher, kumuliert): "
-            "%{y:.2f} kWh<extra></extra>"
-        ),
-    )
+        _add_s2_forecast_cost_traces(fig, uhrzeit, axis, series)
+        _add_s2_forecast_consumption_traces(fig, uhrzeit, axis, series)
+    _add_s2_actual_traces(fig, uhrzeit, axis, series)
 
 
 def add_cumulative_cost_traces(

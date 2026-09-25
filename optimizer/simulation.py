@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
+from typing import NamedTuple
 
 import config
 from .cbc_events import (
@@ -17,11 +19,9 @@ from .charging_context import (
     consumer_charging_eligible_indices,
     resolve_charging_contexts,
 )
-from . import battery as bat
 from .generic_flex_run import continue_on_from_state, update_generic_flex_run_state
 from .filter_context import adjust_targets_for_native_filter, resolve_filter_contexts
 from .milp import milp_horizon_schedule, milp_optimizer
-from .slot_duration import DEFAULT_DT_H, slots_for_wall_hours, validate_dt_h
 from .targets import (
     consumer_column_name,
     resolve_horizon_consumer_targets_kwh,
@@ -60,23 +60,16 @@ from .sim_costs import (
     hourly_savings_euro_from_rows,
     total_consumption_kwh_from_rows,
 )
+from .sim_horizon_helpers import (
+    _apply_forced_grid_recharge_at_horizon_end,
+    _cap_flex_delivery,
+    _commit_slots_for_buffer,
+    _flex_indices_for_book_hours,
+    _relative_sunrise_index,
+    _terminal_soc_for_commit,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def _relative_sunrise_index(
-    sunrise_soc_min_index: int | None,
-    slice_start: int,
-    slice_len: int,
-) -> int | None:
-    if sunrise_soc_min_index is None:
-        return None
-    if sunrise_soc_min_index < slice_start:
-        return None
-    rel = sunrise_soc_min_index - slice_start
-    if rel < 0 or rel >= slice_len:
-        return None
-    return rel
 
 
 def _simulate_single_hour_optimizer(
@@ -143,147 +136,302 @@ def _simulate_single_hour_optimizer(
     )
 
 
-def _commit_slots_for_buffer(
-    commit_hours: int,
+@dataclass(frozen=True)
+class _HorizonOptions:
+    """Unveränderte ``simulate_horizon``-Steuerparameter für die Slot-Helfer."""
+
+    k_push: float | None
+    verbose: bool
+    commit_hours: int
+    flex_book_hours: int | None
+    flex_book_start: int
+    sunrise_soc_min_index: int | None
+    soc_hold_index: int | None
+    soc_hold_percent: float | None
+
+
+@dataclass(frozen=True)
+class _HorizonSetup:
+    """Vorbereitete Matrix, Kontexte und Flex-Grenzen eines Horizontlaufs."""
+
+    matrix: list
+    consumers_cfg: list
+    battery_params: dict
+    charging_contexts: dict[str, dict] | None
+    filters: dict[str, dict] | None
+    horizon_limits: dict[str, float]
+    horizon_terminal_soc: float | None
+    options: _HorizonOptions
+
+
+class _SlotInputs(NamedTuple):
+    """Slot-abhängige MILP-Eingaben (Restmatrix, Restenergie, Flex-Fenster)."""
+
+    remaining_slice: list
+    remaining: dict[str, float]
+    continue_on: dict[str, bool]
+    flex_indices: list[int]
+
+
+def _prepare_horizon_state(
+    optimization_matrix: list,
+    initial_soc: float,
+    options: _HorizonOptions,
     *,
-    matrix_len: int,
-    remaining_len: int,
-) -> int:
-    """Wall-clock commit_hours → QH slot count; open-loop when >= matrix_len."""
-    if commit_hours >= matrix_len:
-        return remaining_len
-    return min(
-        remaining_len,
-        max(1, slots_for_wall_hours(float(commit_hours), DEFAULT_DT_H)),
+    battery_params: dict | None,
+    consumer_daily_targets_kwh: dict[str, float] | None,
+    charging_contexts: dict[str, dict] | None,
+    filter_contexts: dict[str, dict] | None,
+    matrix_prepared: bool,
+    disable_horizon_soc_anchor: bool,
+    flexible_consumers: list | None,
+) -> _HorizonSetup:
+    """Bereitet Matrix, Lade-/Filterkontexte, Flex-Horizontgrenzen und Terminal-SoC auf."""
+    consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
+    if not matrix_prepared:
+        from .charge_immediate import prepare_optimization_matrix
+
+        optimization_matrix, charging_contexts, targets = prepare_optimization_matrix(
+            optimization_matrix,
+            consumer_daily_targets_kwh,
+            consumers=consumers_cfg,
+        )
+        if consumer_daily_targets_kwh is None:
+            consumer_daily_targets_kwh = targets
+    elif charging_contexts is None:
+        charging_contexts = resolve_charging_contexts(
+            optimization_matrix,
+            consumer_daily_targets_kwh,
+            consumers=consumers_cfg,
+        )
+    battery_params = battery_params or config.get_battery_params()
+    horizon_limits = resolve_horizon_consumer_targets_kwh(
+        optimization_matrix,
+        consumer_daily_targets_kwh,
+        flexible_consumers=consumers_cfg,
+    )
+    charging_contexts = charging_contexts or resolve_charging_contexts(
+        optimization_matrix,
+        consumer_daily_targets_kwh,
+        consumers=consumers_cfg,
+    )
+    horizon_limits = apply_horizon_charging_limits(horizon_limits, charging_contexts)
+    filters = filter_contexts or resolve_filter_contexts(
+        optimization_matrix, consumers_cfg
+    )
+    horizon_limits = adjust_targets_for_native_filter(
+        horizon_limits, consumers_cfg, optimization_matrix, filters
+    )
+    if disable_horizon_soc_anchor:
+        horizon_terminal_soc = None
+    else:
+        horizon_terminal_soc = (
+            None if options.sunrise_soc_min_index is not None else initial_soc
+        )
+    return _HorizonSetup(
+        matrix=optimization_matrix,
+        consumers_cfg=consumers_cfg,
+        battery_params=battery_params,
+        charging_contexts=charging_contexts,
+        filters=filters,
+        horizon_limits=horizon_limits,
+        horizon_terminal_soc=horizon_terminal_soc,
+        options=options,
     )
 
 
-def _terminal_soc_for_commit(
-    commit_hours: int,
-    remaining_slice_len: int,
-    horizon_terminal_soc: float | None,
-) -> float | None:
-    """K=1: Terminal nur in der letzten Slot-Solve; K>1: Terminal solange Fensterende enthalten."""
-    if horizon_terminal_soc is None:
-        return None
-    if commit_hours <= 1:
-        return horizon_terminal_soc if remaining_slice_len == 1 else None
-    return horizon_terminal_soc
-
-
-def _flex_indices_for_book_hours(
-    remaining_len: int,
+def _slot_solve_inputs(
+    setup: _HorizonSetup,
     hour_index: int,
-    flex_book_hours: int | None,
-    flex_book_start: int = 0,
-) -> list[int]:
-    """
-    Flex-eligible indices relative to remaining_slice.
-
-    flex_book_hours=None: all remaining hours (Live / truncated SE).
-    Otherwise only absolute hours [flex_book_start, flex_book_start + flex_book_hours).
-    """
-    if flex_book_hours is None:
-        return list(range(remaining_len))
-    if flex_book_hours < 1:
-        raise ValueError(
-            f"flex_book_hours must be >= 1 when set (got {flex_book_hours})."
-        )
-    if flex_book_start < 0:
-        raise ValueError(
-            f"flex_book_start must be >= 0 (got {flex_book_start})."
-        )
-    book_end = flex_book_start + flex_book_hours
-    return [
-        index
-        for index in range(remaining_len)
-        if flex_book_start <= hour_index + index < book_end
-    ]
-
-
-def _cap_flex_delivery(
-    chart_row: dict,
-    consumers_cfg: list,
-    horizon_limits: dict[str, float],
     delivered_horizon: dict[str, float],
-    *,
-    dt_h: float = DEFAULT_DT_H,
-) -> bool:
-    """Begrenzt Flex-Leistung auf verbleibendes Horizontziel; True wenn gekappt."""
-    dt_h = validate_dt_h(dt_h)
-    flex_capped = False
-    for consumer in consumers_cfg:
-        col = consumer_column_name(consumer)
-        cid = consumer["id"]
-        power = float(chart_row.get(col, 0.0) or 0.0)
-        if power <= 0:
-            continue
-        max_kwh = horizon_limits.get(cid, 0.0)
-        already = delivered_horizon.get(cid, 0.0)
-        room = max(0.0, max_kwh - already)
-        energy = power * dt_h
-        if energy > room + 1e-6:
-            power = room / dt_h
-            chart_row[col] = round(power, 2)
-            flex_capped = True
-            energy = power * dt_h
-        if energy > 0:
-            delivered_horizon[cid] = already + energy
-    return flex_capped
+    generic_flex_run: dict[str, dict],
+) -> _SlotInputs:
+    """Restenergie, Restmatrix, offene min_on-Blöcke und Flex-Indizes für einen Slot."""
+    remaining = {
+        consumer["id"]: max(
+            0.0,
+            setup.horizon_limits.get(consumer["id"], 0.0)
+            - delivered_horizon.get(consumer["id"], 0.0),
+        )
+        for consumer in setup.consumers_cfg
+    }
+    remaining_slice = setup.matrix[hour_index:]
+    continue_on = continue_on_from_state(
+        {"generic_flex_run": generic_flex_run},
+        setup.consumers_cfg,
+    )
+    flex_indices = _flex_indices_for_book_hours(
+        len(remaining_slice),
+        hour_index,
+        setup.options.flex_book_hours,
+        setup.options.flex_book_start,
+    )
+    return _SlotInputs(remaining_slice, remaining, continue_on, flex_indices)
 
 
-def _apply_forced_grid_recharge_at_horizon_end(
-    chart_rows: list[dict],
-    end_soc: float,
-    *,
-    battery_params: dict,
-    horizon_anchor_soc: float,
+def _solve_slot_mpc(
+    setup: _HorizonSetup,
+    row: dict,
+    sim_soc: float,
+    hour_index: int,
+    slot_in: _SlotInputs,
+) -> tuple[float, dict, int, float]:
+    """Slot-Neuoptimierung für ``commit_hours=1`` (Live-MPC)."""
+    options = setup.options
+    terminal_soc_percent = _terminal_soc_for_commit(
+        options.commit_hours,
+        len(slot_in.remaining_slice),
+        setup.horizon_terminal_soc,
+    )
+    return _simulate_single_hour_optimizer(
+        slot_in.remaining_slice,
+        row,
+        sim_soc,
+        setup.battery_params,
+        k_push=options.k_push,
+        verbose=options.verbose,
+        consumer_remaining_kwh=slot_in.remaining,
+        spa_remaining_kwh=None,
+        flex_indices=slot_in.flex_indices,
+        charging_contexts=setup.charging_contexts,
+        filter_contexts=setup.filters,
+        terminal_soc_percent=terminal_soc_percent,
+        sunrise_soc_min_index=options.sunrise_soc_min_index,
+        matrix_hour_index=hour_index,
+        flexible_consumers=setup.consumers_cfg,
+        consumer_continue_on=slot_in.continue_on,
+        soc_hold_index=options.soc_hold_index,
+        soc_hold_percent=options.soc_hold_percent,
+    )
+
+
+def _refill_commit_buffer(
+    setup: _HorizonSetup,
+    sim_soc: float,
+    hour_index: int,
+    slot_in: _SlotInputs,
+) -> list[dict]:
+    """Open-Loop-MILP über die Restmatrix; liefert die festgeschriebenen Slots."""
+    options = setup.options
+    remaining_slice = slot_in.remaining_slice
+    rel_sunrise = _relative_sunrise_index(
+        options.sunrise_soc_min_index,
+        hour_index,
+        len(remaining_slice),
+    )
+    rel_hold = _relative_sunrise_index(
+        options.soc_hold_index,
+        hour_index,
+        len(remaining_slice),
+    )
+    terminal_soc_percent = _terminal_soc_for_commit(
+        options.commit_hours, len(remaining_slice), setup.horizon_terminal_soc
+    )
+    schedule = milp_horizon_schedule(
+        remaining_slice,
+        sim_soc,
+        battery_params=setup.battery_params,
+        k_push=options.k_push,
+        verbose=options.verbose,
+        consumers=setup.consumers_cfg,
+        consumer_remaining_kwh=slot_in.remaining,
+        flex_indices=slot_in.flex_indices,
+        charging_contexts=setup.charging_contexts,
+        filter_contexts=setup.filters,
+        terminal_soc_percent=terminal_soc_percent,
+        sunrise_soc_min_index=rel_sunrise,
+        consumer_continue_on=slot_in.continue_on,
+        soc_hold_index=rel_hold,
+        soc_hold_percent=(
+            options.soc_hold_percent if rel_hold is not None else None
+        ),
+    )
+    commit_slots = _commit_slots_for_buffer(
+        options.commit_hours,
+        matrix_len=len(setup.matrix),
+        remaining_len=len(schedule),
+    )
+    return schedule[:commit_slots]
+
+
+def _advance_delivered_and_flex_run(
+    setup: _HorizonSetup,
+    chart_row: dict,
+    mode: int,
+    target_power: float,
+    delivered_horizon: dict[str, float],
+    generic_flex_run: dict[str, dict],
 ) -> float:
-    """
-    Netz-Zwangsladen am Horizontende, wenn SoC auf SOC_min liegt und der
-    Terminal-Anker (Simulations-initial_soc) darüber liegt.
-    """
-    if not chart_rows or battery_params.get("battery_capacity_kwh", 0.0) <= 0.0:
-        return end_soc
-    min_soc = float(battery_params["min_soc"])
-    max_soc = float(battery_params["max_soc"])
-    if end_soc > min_soc + bat.SOC_DELTA_THRESHOLD:
-        return end_soc
-    target = min(max_soc, float(horizon_anchor_soc))
-    if target <= min_soc + bat.SOC_DELTA_THRESHOLD:
-        return end_soc
-    charge_kw = bat.charge_kw_for_hourly_soc(
-        end_soc,
-        target,
-        battery_params["battery_capacity_kwh"],
-        battery_params["efficiency"],
-        battery_params["max_power_kw"],
-        min_soc,
-        max_soc,
-        dt_h=DEFAULT_DT_H,
+    """Kappt Flex auf das Horizontziel, schreibt den Run-State fort, finalisiert die Energie."""
+    _cap_flex_delivery(
+        chart_row, setup.consumers_cfg, setup.horizon_limits, delivered_horizon
     )
-    if charge_kw <= 0.0:
-        return end_soc
+    for consumer in setup.consumers_cfg:
+        power = float(chart_row.get(consumer_column_name(consumer), 0.0) or 0.0)
+        update_generic_flex_run_state(generic_flex_run, consumer, power)
+    old_soc = float(chart_row["Simulierter SoC (%)"])
+    return finalize_chart_row_energy(
+        chart_row, mode, target_power, old_soc, setup.battery_params
+    )
 
-    last = chart_rows[-1]
-    start_last = float(last["Simulierter SoC (%)"])
-    batt_old = float(last.get("Geplante Batterie-Aktion (kW)", 0.0) or 0.0)
-    new_end_soc, batt_new = bat.apply_soc_change(
-        start_last,
-        batt_old + charge_kw,
-        battery_params["battery_capacity_kwh"],
-        battery_params["efficiency"],
-        min_soc,
-        max_soc,
-        dt_h=DEFAULT_DT_H,
-    )
-    last["Geplante Batterie-Aktion (kW)"] = round(batt_new, 2)
-    # Steuerbefehl must match the applied charge power (after SoC clip / prior action).
-    last["Steuerbefehl"] = bat.steuerbefehl_for_mode(
-        bat.MODE_ZWANGS_LADEN, max(0.0, float(batt_new))
-    )
-    sync_chart_row_netzbezug(last)
-    return round(new_end_soc, 1)
+
+def _run_horizon_slots(
+    setup: _HorizonSetup,
+    initial_soc: float,
+    on_progress,
+    simulation_hour_offset: int | None,
+) -> tuple[list[dict], float]:
+    """Läuft die Matrix Slot für Slot ab (MPC bzw. Open-Loop-Commit-Puffer)."""
+    chart_rows: list[dict] = []
+    sim_soc = initial_soc
+    total_steps = len(setup.matrix)
+    delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in setup.consumers_cfg}
+    generic_flex_run: dict[str, dict] = {}
+    commit_buffer: list[dict] = []
+    buffer_pos = 0
+    own_cbc_collection = not cbc_event_collection_active()
+    if own_cbc_collection:
+        begin_cbc_event_collection()
+    try:
+        hour_base = simulation_hour_offset or 0
+        for i, row in enumerate(setup.matrix):
+            set_cbc_milp_context(simulation_hour_index=hour_base + i)
+            slot_in = _slot_solve_inputs(setup, i, delivered_horizon, generic_flex_run)
+            if setup.options.commit_hours <= 1:
+                sim_soc, chart_row, mode, target_power = _solve_slot_mpc(
+                    setup, row, sim_soc, i, slot_in
+                )
+            else:
+                if buffer_pos >= len(commit_buffer):
+                    commit_buffer = _refill_commit_buffer(setup, sim_soc, i, slot_in)
+                    buffer_pos = 0
+                slot = commit_buffer[buffer_pos]
+                buffer_pos += 1
+                sim_soc, chart_row, mode, target_power = _chart_row_from_schedule_slot(
+                    row,
+                    sim_soc,
+                    setup.battery_params,
+                    setup.consumers_cfg,
+                    slot,
+                )
+            sim_soc = _advance_delivered_and_flex_run(
+                setup,
+                chart_row,
+                mode,
+                target_power,
+                delivered_horizon,
+                generic_flex_run,
+            )
+            chart_rows.append(chart_row)
+            if on_progress is not None:
+                on_progress(i + 1, total_steps)
+    finally:
+        if own_cbc_collection:
+            summary = summarize_cbc_events(take_cbc_events())
+            if summary:
+                logger.info(summary)
+            clear_cbc_milp_context()
+    return chart_rows, sim_soc
 
 
 def simulate_horizon(
@@ -324,189 +472,44 @@ def simulate_horizon(
         )
     if disable_horizon_soc_anchor:
         sunrise_soc_min_index = None
-    consumers_cfg = flexible_consumers or config.get_flexible_consumers(optimizer_only=True)
-    if not matrix_prepared:
-        from .charge_immediate import prepare_optimization_matrix
-
-        optimization_matrix, charging_contexts, targets = prepare_optimization_matrix(
-            optimization_matrix,
-            consumer_daily_targets_kwh,
-            consumers=consumers_cfg,
-        )
-        if consumer_daily_targets_kwh is None:
-            consumer_daily_targets_kwh = targets
-    elif charging_contexts is None:
-        charging_contexts = resolve_charging_contexts(
-            optimization_matrix,
-            consumer_daily_targets_kwh,
-            consumers=consumers_cfg,
-        )
-
-    chart_rows = []
-    sim_soc = initial_soc
-    battery_params = battery_params or config.get_battery_params()
-    total_steps = len(optimization_matrix)
-    horizon_limits = resolve_horizon_consumer_targets_kwh(
+    options = _HorizonOptions(
+        k_push=k_push,
+        verbose=verbose,
+        commit_hours=commit_hours,
+        flex_book_hours=flex_book_hours,
+        flex_book_start=flex_book_start,
+        sunrise_soc_min_index=sunrise_soc_min_index,
+        soc_hold_index=soc_hold_index,
+        soc_hold_percent=soc_hold_percent,
+    )
+    setup = _prepare_horizon_state(
         optimization_matrix,
-        consumer_daily_targets_kwh,
-        flexible_consumers=consumers_cfg,
+        initial_soc,
+        options,
+        battery_params=battery_params,
+        consumer_daily_targets_kwh=consumer_daily_targets_kwh,
+        charging_contexts=charging_contexts,
+        filter_contexts=filter_contexts,
+        matrix_prepared=matrix_prepared,
+        disable_horizon_soc_anchor=disable_horizon_soc_anchor,
+        flexible_consumers=flexible_consumers,
     )
-    charging_contexts = charging_contexts or resolve_charging_contexts(
-        optimization_matrix,
-        consumer_daily_targets_kwh,
-        consumers=consumers_cfg,
+    chart_rows, sim_soc = _run_horizon_slots(
+        setup, initial_soc, on_progress, simulation_hour_offset
     )
-    horizon_limits = apply_horizon_charging_limits(horizon_limits, charging_contexts)
-    filters = filter_contexts or resolve_filter_contexts(
-        optimization_matrix, consumers_cfg
-    )
-    horizon_limits = adjust_targets_for_native_filter(
-        horizon_limits, consumers_cfg, optimization_matrix, filters
-    )
-    delivered_horizon: dict[str, float] = {c["id"]: 0.0 for c in consumers_cfg}
-    generic_flex_run: dict[str, dict] = {}
-    if disable_horizon_soc_anchor:
-        horizon_terminal_soc = None
-    else:
-        horizon_terminal_soc = (
-            None if sunrise_soc_min_index is not None else initial_soc
-        )
-    commit_buffer: list[dict] = []
-    buffer_pos = 0
-    own_cbc_collection = not cbc_event_collection_active()
-    if own_cbc_collection:
-        begin_cbc_event_collection()
-    try:
-        hour_base = simulation_hour_offset or 0
-        for i, row in enumerate(optimization_matrix):
-            set_cbc_milp_context(simulation_hour_index=hour_base + i)
-            remaining = {
-                consumer["id"]: max(
-                    0.0,
-                    horizon_limits.get(consumer["id"], 0.0)
-                    - delivered_horizon.get(consumer["id"], 0.0),
-                )
-                for consumer in consumers_cfg
-            }
-            remaining_slice = optimization_matrix[i:]
-            continue_on = continue_on_from_state(
-                {"generic_flex_run": generic_flex_run},
-                consumers_cfg,
-            )
-            flex_indices = _flex_indices_for_book_hours(
-                len(remaining_slice),
-                i,
-                flex_book_hours,
-                flex_book_start,
-            )
-            if commit_hours <= 1:
-                terminal_soc_percent = _terminal_soc_for_commit(
-                    commit_hours, len(remaining_slice), horizon_terminal_soc
-                )
-                sim_soc, chart_row, mode, target_power = _simulate_single_hour_optimizer(
-                    remaining_slice,
-                    row,
-                    sim_soc,
-                    battery_params,
-                    k_push=k_push,
-                    verbose=verbose,
-                    consumer_remaining_kwh=remaining,
-                    spa_remaining_kwh=None,
-                    flex_indices=flex_indices,
-                    charging_contexts=charging_contexts,
-                    filter_contexts=filters,
-                    terminal_soc_percent=terminal_soc_percent,
-                    sunrise_soc_min_index=sunrise_soc_min_index,
-                    matrix_hour_index=i,
-                    flexible_consumers=consumers_cfg,
-                    consumer_continue_on=continue_on,
-                    soc_hold_index=soc_hold_index,
-                    soc_hold_percent=soc_hold_percent,
-                )
-            else:
-                if buffer_pos >= len(commit_buffer):
-                    rel_sunrise = _relative_sunrise_index(
-                        sunrise_soc_min_index,
-                        i,
-                        len(remaining_slice),
-                    )
-                    rel_hold = _relative_sunrise_index(
-                        soc_hold_index,
-                        i,
-                        len(remaining_slice),
-                    )
-                    terminal_soc_percent = _terminal_soc_for_commit(
-                        commit_hours, len(remaining_slice), horizon_terminal_soc
-                    )
-                    schedule = milp_horizon_schedule(
-                        remaining_slice,
-                        sim_soc,
-                        battery_params=battery_params,
-                        k_push=k_push,
-                        verbose=verbose,
-                        consumers=consumers_cfg,
-                        consumer_remaining_kwh=remaining,
-                        flex_indices=flex_indices,
-                        charging_contexts=charging_contexts,
-                        filter_contexts=filters,
-                        terminal_soc_percent=terminal_soc_percent,
-                        sunrise_soc_min_index=rel_sunrise,
-                        consumer_continue_on=continue_on,
-                        soc_hold_index=rel_hold,
-                        soc_hold_percent=(
-                            soc_hold_percent if rel_hold is not None else None
-                        ),
-                    )
-                    commit_slots = _commit_slots_for_buffer(
-                        commit_hours,
-                        matrix_len=len(optimization_matrix),
-                        remaining_len=len(schedule),
-                    )
-                    commit_buffer = schedule[:commit_slots]
-                    buffer_pos = 0
-                slot = commit_buffer[buffer_pos]
-                buffer_pos += 1
-                sim_soc, chart_row, mode, target_power = _chart_row_from_schedule_slot(
-                    row,
-                    sim_soc,
-                    battery_params,
-                    consumers_cfg,
-                    slot,
-                )
-            _cap_flex_delivery(
-                chart_row, consumers_cfg, horizon_limits, delivered_horizon
-            )
-            for consumer in consumers_cfg:
-                power = float(
-                    chart_row.get(consumer_column_name(consumer), 0.0) or 0.0
-                )
-                update_generic_flex_run_state(generic_flex_run, consumer, power)
-            old_soc = float(chart_row["Simulierter SoC (%)"])
-            sim_soc = finalize_chart_row_energy(
-                chart_row, mode, target_power, old_soc, battery_params
-            )
-            chart_rows.append(chart_row)
-            if on_progress is not None:
-                on_progress(i + 1, total_steps)
-    finally:
-        if own_cbc_collection:
-            summary = summarize_cbc_events(take_cbc_events())
-            if summary:
-                logger.info(summary)
-            clear_cbc_milp_context()
     if sunrise_soc_min_index is None and not disable_horizon_soc_anchor:
         sim_soc = _apply_forced_grid_recharge_at_horizon_end(
             chart_rows,
             sim_soc,
-            battery_params=battery_params,
+            battery_params=setup.battery_params,
             horizon_anchor_soc=initial_soc,
         )
-    _finalize_chart_rows_for_display(chart_rows, charging_contexts)
+    _finalize_chart_rows_for_display(chart_rows, setup.charging_contexts)
     if chart_rows:
         chart_rows[-1]["_horizon_end_soc"] = horizon_end_soc_percent(
             chart_rows,
             initial_soc,
-            battery_params,
+            setup.battery_params,
         )
     return chart_rows
 

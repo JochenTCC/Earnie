@@ -1,6 +1,7 @@
 """Per-anchor backtesting simulation step helpers."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
 import pandas as pd
@@ -118,6 +119,142 @@ def _merge_foresight_flex_into_series(
             all_timestamps[index] = row["slot_datetime"]
 
 
+@dataclass
+class _AnchorWindowPlan:
+    """Fenster-Matrix plus MILP-Anker- und Book-Parameter eines Backtesting-Schritts."""
+
+    matrix: list[dict]
+    meta: dict
+    matrix_full: list[dict] | None
+    sunrise_soc_min_index: int | None
+    disable_soc_anchor: bool
+    soc_hold_index: int | None
+    soc_hold_percent: float | None
+    flex_book_hours: int | None
+    flex_book_start: int
+    commit_hours: int | None
+
+
+def _build_anchor_window_plan(
+    anchor: datetime,
+    step_start_soc: float,
+    *,
+    horizon_mode: str,
+    cache: HistoricalDataCache,
+    prices_df: pd.DataFrame,
+    scenario_params: dict,
+    feed_in_settings: feed_in_prices.FeedInSettings,
+    price_resources: BacktestingPriceResources | None,
+) -> _AnchorWindowPlan:
+    """Fenstermatrix und Ankerparameter für fixed_24h bzw. sunrise_window."""
+    disable_soc_anchor = config.get_backtesting_disable_horizon_soc_anchor()
+    commit_hours = config.get_backtesting_commit_hours()
+    if horizon_mode != SUNRISE_WINDOW:
+        matrix, meta = build_historical_window_matrix(
+            anchor,
+            cache,
+            prices_df,
+            feed_in_settings=feed_in_settings,
+            scenario_params=scenario_params,
+        )
+        return _AnchorWindowPlan(
+            matrix=matrix,
+            meta=meta,
+            matrix_full=None,
+            sunrise_soc_min_index=None,
+            disable_soc_anchor=disable_soc_anchor,
+            soc_hold_index=None,
+            soc_hold_percent=None,
+            flex_book_hours=None,
+            flex_book_start=0,
+            commit_hours=commit_hours,
+        )
+    book_matrix, meta, sa1_index, matrix_full = build_sunrise_window_matrix(
+        anchor,
+        cache,
+        prices_df,
+        scenario_params,
+        feed_in_settings,
+        price_resources=price_resources,
+    )
+    matrix = list(matrix_full)
+    # Product path: full SA₀→SA₂ MILP, book [SA₁, SA₂), SoC hold at SA₁ start.
+    # Initial SoC at SA₀: use carry-in (equality at SA₁ keeps night net-neutral).
+    soc_hold_index = int(sa1_index) - 1 if sa1_index > 0 else None
+    return _AnchorWindowPlan(
+        matrix=matrix,
+        meta=meta,
+        matrix_full=matrix_full,
+        sunrise_soc_min_index=None,
+        disable_soc_anchor=True,
+        soc_hold_index=soc_hold_index,
+        soc_hold_percent=step_start_soc if soc_hold_index is not None else None,
+        flex_book_hours=int(meta["book_hours"]),
+        flex_book_start=int(sa1_index),
+        commit_hours=len(matrix),
+    )
+
+
+def _anchor_step_end_soc(
+    chart_rows: list[dict],
+    step_start_soc: float,
+    battery_params: dict,
+    *,
+    horizon_mode: str,
+) -> float:
+    """End-SoC des Schritts: Sunrise nimmt die letzte Buchstunde, sonst das Horizontende."""
+    if horizon_mode == SUNRISE_WINDOW and chart_rows:
+        return float(chart_rows[-1]["Simulierter SoC (%)"])
+    end_soc = horizon_end_soc_from_chart_rows(chart_rows)
+    if end_soc is None:
+        end_soc = horizon_end_soc_percent(
+            chart_rows, step_start_soc, battery_params
+        )
+    return (
+        end_soc
+        if end_soc is not None
+        else float(chart_rows[-1]["Simulierter SoC (%)"])
+    )
+
+
+def _simulate_plan_horizon(
+    plan,
+    sim_soc: float,
+    *,
+    battery_params: dict,
+    hours_done: int,
+    collect_cbc: bool,
+    scenario_params: dict,
+) -> list[dict]:
+    return _simulate_horizon(
+        plan.matrix,
+        sim_soc,
+        battery_params=battery_params,
+        verbose=False,
+        consumer_daily_targets_kwh=plan.meta["consumer_daily_targets_kwh"],
+        simulation_hour_offset=hours_done if collect_cbc else None,
+        sunrise_soc_min_index=plan.sunrise_soc_min_index,
+        flexible_consumers=_flexible_consumers_from_scenario(scenario_params),
+        commit_hours=plan.commit_hours,
+        disable_horizon_soc_anchor=plan.disable_soc_anchor,
+        flex_book_hours=plan.flex_book_hours,
+        flex_book_start=plan.flex_book_start,
+        soc_hold_index=plan.soc_hold_index,
+        soc_hold_percent=plan.soc_hold_percent,
+    )
+
+
+def _optional_full_horizon_snapshot(
+    plan,
+    chart_rows: list[dict],
+    *,
+    collect_full_horizon: bool,
+) -> tuple[list[dict] | None, list[dict] | None]:
+    if collect_full_horizon and plan.matrix_full is not None:
+        return list(chart_rows), plan.matrix_full
+    return None, None
+
+
 def _simulate_anchor_step(
     anchor: datetime,
     sim_soc: float,
@@ -142,93 +279,45 @@ def _simulate_anchor_step(
     int | None,
 ]:
     """Ein Backtesting-Schritt für fixed_24h oder sunrise_window (ready_by → SA₂ book)."""
-    sunrise_soc_min_index = None
-    matrix_full: list[dict] | None = None
-    disable_soc_anchor = config.get_backtesting_disable_horizon_soc_anchor()
     step_start_soc = float(sim_soc)
-    soc_hold_index: int | None = None
-    soc_hold_percent: float | None = None
-    flex_book_hours: int | None = None
-    flex_book_start = 0
-    commit_hours = config.get_backtesting_commit_hours()
-
-    if horizon_mode == SUNRISE_WINDOW:
-        book_matrix, meta, sa1_index, matrix_full = build_sunrise_window_matrix(
-            anchor,
-            cache,
-            prices_df,
-            scenario_params,
-            feed_in_settings,
-            price_resources=price_resources,
-        )
-        matrix = list(matrix_full)
-        # Product path: full SA₀→SA₂ MILP, book [SA₁, SA₂), SoC hold at SA₁ start.
-        disable_soc_anchor = True
-        sunrise_soc_min_index = None
-        flex_book_start = int(sa1_index)
-        flex_book_hours = int(meta["book_hours"])
-        commit_hours = len(matrix)
-        if sa1_index > 0:
-            soc_hold_index = int(sa1_index) - 1
-            soc_hold_percent = step_start_soc
-        # Initial SoC at SA₀: use carry-in (equality at SA₁ keeps night net-neutral).
-    else:
-        matrix, meta = build_historical_window_matrix(
-            anchor,
-            cache,
-            prices_df,
-            feed_in_settings=feed_in_settings,
-            scenario_params=scenario_params,
-        )
-
-    chart_rows = _simulate_horizon(
-        matrix,
+    plan = _build_anchor_window_plan(
+        anchor,
+        step_start_soc,
+        horizon_mode=horizon_mode,
+        cache=cache,
+        prices_df=prices_df,
+        scenario_params=scenario_params,
+        feed_in_settings=feed_in_settings,
+        price_resources=price_resources,
+    )
+    chart_rows = _simulate_plan_horizon(
+        plan,
         sim_soc,
         battery_params=battery_params,
-        verbose=False,
-        consumer_daily_targets_kwh=meta["consumer_daily_targets_kwh"],
-        simulation_hour_offset=hours_done if collect_cbc else None,
-        sunrise_soc_min_index=sunrise_soc_min_index,
-        flexible_consumers=_flexible_consumers_from_scenario(scenario_params),
-        commit_hours=commit_hours,
-        disable_horizon_soc_anchor=disable_soc_anchor,
-        flex_book_hours=flex_book_hours,
-        flex_book_start=flex_book_start,
-        soc_hold_index=soc_hold_index,
-        soc_hold_percent=soc_hold_percent,
+        hours_done=hours_done,
+        collect_cbc=collect_cbc,
+        scenario_params=scenario_params,
     )
     flexible_consumers = _flexible_consumers_from_scenario(scenario_params)
     if horizon_mode == SUNRISE_WINDOW:
-        _stash_sunrise_full_horizon_flex(meta, chart_rows, flexible_consumers)
-    full_rows: list[dict] | None = None
-    full_matrix: list[dict] | None = None
-    if collect_full_horizon and matrix_full is not None:
-        full_rows = list(chart_rows)
-        full_matrix = matrix_full
-    chart_rows, matrix = _apply_backtesting_step(
-        chart_rows, matrix, meta, horizon_mode=horizon_mode
+        _stash_sunrise_full_horizon_flex(plan.meta, chart_rows, flexible_consumers)
+    full_rows, full_matrix = _optional_full_horizon_snapshot(
+        plan, chart_rows, collect_full_horizon=collect_full_horizon
     )
-    if horizon_mode == SUNRISE_WINDOW and chart_rows:
-        new_soc = float(chart_rows[-1]["Simulierter SoC (%)"])
-    else:
-        end_soc = horizon_end_soc_from_chart_rows(chart_rows)
-        if end_soc is None:
-            end_soc = horizon_end_soc_percent(
-                chart_rows, step_start_soc, battery_params
-            )
-        new_soc = (
-            end_soc
-            if end_soc is not None
-            else float(chart_rows[-1]["Simulierter SoC (%)"])
-        )
+    chart_rows, matrix = _apply_backtesting_step(
+        chart_rows, plan.matrix, plan.meta, horizon_mode=horizon_mode
+    )
+    new_soc = _anchor_step_end_soc(
+        chart_rows, step_start_soc, battery_params, horizon_mode=horizon_mode
+    )
     return (
         chart_rows,
         matrix,
-        meta,
+        plan.meta,
         new_soc,
         full_rows,
         full_matrix,
-        sunrise_soc_min_index,
+        plan.sunrise_soc_min_index,
     )
 
 

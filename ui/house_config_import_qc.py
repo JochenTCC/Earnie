@@ -190,96 +190,78 @@ def _shared_bounds(
     return start, end
 
 
-def render_import_power_qc(
+_QC_MISSING_LABELS = (
+    ("verbrauch", "Lastprofil"),
+    ("pv", "PV"),
+    ("battery", "Batterie"),
+    ("grid", "Netz"),
+)
+
+
+def _apply_balance_derivation(
+    rows: dict[str, list[tuple[str, float]] | None],
     *,
-    preview_id: str,
-    verbrauch_path: str,
-    pv_path: str,
-    battery_path: str = "",
-    grid_path: str = "",
-    invert_pv: bool = False,
-    invert_battery: bool = False,
-    invert_grid: bool = False,
+    invert_pv: bool,
+    invert_battery: bool,
+    invert_grid: bool,
 ) -> None:
-    """Plot + SE horizon warning/caption after Verbrauch / PV / Bilanz import."""
-    verbrauch_rows = _load_profile_rows(verbrauch_path)
-    pv_rows = _load_profile_rows(pv_path)
-    battery_rows = _load_profile_rows(battery_path)
-    grid_rows = _load_profile_rows(grid_path)
+    """Replace Gesamt rows by the PV/Batterie/Netz balance when derivable."""
     derived, clipped = balance_gesamt_for_chart(
-        pv_rows,
-        battery_rows,
-        grid_rows,
+        rows["pv"],
+        rows["battery"],
+        rows["grid"],
         invert_pv=invert_pv,
         invert_battery=invert_battery,
         invert_grid=invert_grid,
     )
-    if derived is not None:
-        verbrauch_rows = derived
-        if clipped:
-            st.warning(
-                f"{clipped} Stunden mit negativem P_Ges auf 0 gekappt "
-                "(Vorzeichen prüfen)."
-            )
-        else:
-            st.caption(
-                "Lastprofil [kW] (Gesamt) aus Bilanz berechnet: "
-                "`P_Ges = P_PV + P_Batt + P_Grid` "
-                "(fehlende Batterie = 0 kW)."
-            )
-    if (
-        verbrauch_rows is None
-        and pv_rows is None
-        and battery_rows is None
-        and grid_rows is None
-    ):
-        if verbrauch_path:
-            st.warning(f"Lastprofil-CSV nicht gefunden: `{verbrauch_path}`")
-        if pv_path:
-            st.warning(f"PV-CSV nicht gefunden: `{pv_path}`")
-        if battery_path:
-            st.warning(f"Batterie-CSV nicht gefunden: `{battery_path}`")
-        if grid_path:
-            st.warning(f"Netz-CSV nicht gefunden: `{grid_path}`")
+    if derived is None:
         return
-
-    span_bounds = _shared_bounds(verbrauch_rows, pv_rows, battery_rows, grid_rows)
-    if span_bounds is not None:
-        span_h = int(
-            (span_bounds[1] - span_bounds[0]).total_seconds() // 3600
-        ) + 1
-    else:
-        span_h = shared_import_span_hours(verbrauch_rows, pv_rows)
-    bounds = span_bounds
-    months_approx = span_h / (MIN_HOURS_FULL_YEAR / 12.0) if span_h else 0.0
-    if bounds is not None:
-        st.caption(
-            f"Zeitraum (Schnittmenge der geladenen Serien): "
-            f"{bounds[0].strftime('%Y-%m-%d')} – {bounds[1].strftime('%Y-%m-%d')} "
-            f"({span_h} h, ca. {months_approx:.1f} Monate)."
+    rows["verbrauch"] = derived
+    if clipped:
+        st.warning(
+            f"{clipped} Stunden mit negativem P_Ges auf 0 gekappt "
+            "(Vorzeichen prüfen)."
         )
-    st.plotly_chart(
-        import_power_qc_figure(
-            verbrauch_rows,
-            pv_rows,
-            battery_rows=battery_rows,
-            grid_rows=grid_rows,
-        ),
-        width="stretch",
-        key=f"house_profile_import_qc_{preview_id}",
+    else:
+        st.caption(
+            "Lastprofil [kW] (Gesamt) aus Bilanz berechnet: "
+            "`P_Ges = P_PV + P_Batt + P_Grid` "
+            "(fehlende Batterie = 0 kW)."
+        )
+
+
+def _warn_missing_import_csvs(paths: dict[str, str]) -> None:
+    for slot, label in _QC_MISSING_LABELS:
+        if paths[slot]:
+            st.warning(f"{label}-CSV nicht gefunden: `{paths[slot]}`")
+
+
+def _import_span(
+    rows: dict[str, list[tuple[str, float]] | None],
+) -> tuple[tuple[pd.Timestamp, pd.Timestamp] | None, int]:
+    bounds = _shared_bounds(rows["verbrauch"], rows["pv"], rows["battery"], rows["grid"])
+    if bounds is not None:
+        span_h = int((bounds[1] - bounds[0]).total_seconds() // 3600) + 1
+    else:
+        span_h = shared_import_span_hours(rows["verbrauch"], rows["pv"])
+    return bounds, span_h
+
+
+def _render_span_caption(
+    bounds: tuple[pd.Timestamp, pd.Timestamp] | None,
+    span_h: int,
+) -> None:
+    if bounds is None:
+        return
+    months_approx = span_h / (MIN_HOURS_FULL_YEAR / 12.0) if span_h else 0.0
+    st.caption(
+        f"Zeitraum (Schnittmenge der geladenen Serien): "
+        f"{bounds[0].strftime('%Y-%m-%d')} – {bounds[1].strftime('%Y-%m-%d')} "
+        f"({span_h} h, ca. {months_approx:.1f} Monate)."
     )
 
-    adequate = import_span_adequate_for_se(verbrauch_rows, pv_rows)
-    if not adequate:
-        st.warning(
-            "Szenario-Explorer benötigt mindestens 12 Monate Daten. "
-            "Kurze CSV-Importe dienen nur der visuellen Kontrolle (QC). "
-            "Im SE werden synthetische Verbrauchs- und PV-Werte genutzt "
-            "(Hausprofil / Open-Meteo) — nicht die kurze Meter-CSV."
-        )
-        return
 
-    assert bounds is not None
+def _render_se_horizon_info(bounds: tuple[pd.Timestamp, pd.Timestamp]) -> None:
     se_start, se_end = _se_window_from_data_max(bounds[1])
     se_start = max(se_start, bounds[0])
     test_month = _march_in_window(se_start, se_end)
@@ -293,3 +275,58 @@ def render_import_power_qc(
         f"{se_start.strftime('%Y-%m-%d')} – {se_end.strftime('%Y-%m-%d')}. "
         f"{month_label}."
     )
+
+
+def render_import_power_qc(
+    *,
+    preview_id: str,
+    verbrauch_path: str,
+    pv_path: str,
+    battery_path: str = "",
+    grid_path: str = "",
+    invert_pv: bool = False,
+    invert_battery: bool = False,
+    invert_grid: bool = False,
+) -> None:
+    """Plot + SE horizon warning/caption after Verbrauch / PV / Bilanz import."""
+    paths = {
+        "verbrauch": verbrauch_path,
+        "pv": pv_path,
+        "battery": battery_path,
+        "grid": grid_path,
+    }
+    rows = {slot: _load_profile_rows(path) for slot, path in paths.items()}
+    _apply_balance_derivation(
+        rows,
+        invert_pv=invert_pv,
+        invert_battery=invert_battery,
+        invert_grid=invert_grid,
+    )
+    if all(value is None for value in rows.values()):
+        _warn_missing_import_csvs(paths)
+        return
+
+    bounds, span_h = _import_span(rows)
+    _render_span_caption(bounds, span_h)
+    st.plotly_chart(
+        import_power_qc_figure(
+            rows["verbrauch"],
+            rows["pv"],
+            battery_rows=rows["battery"],
+            grid_rows=rows["grid"],
+        ),
+        width="stretch",
+        key=f"house_profile_import_qc_{preview_id}",
+    )
+
+    if not import_span_adequate_for_se(rows["verbrauch"], rows["pv"]):
+        st.warning(
+            "Szenario-Explorer benötigt mindestens 12 Monate Daten. "
+            "Kurze CSV-Importe dienen nur der visuellen Kontrolle (QC). "
+            "Im SE werden synthetische Verbrauchs- und PV-Werte genutzt "
+            "(Hausprofil / Open-Meteo) — nicht die kurze Meter-CSV."
+        )
+        return
+
+    assert bounds is not None
+    _render_se_horizon_info(bounds)

@@ -3,7 +3,6 @@
     "backend": "ha",
     "adapter_id": "earnie-hems",
     "ha": {
-      "entities": {},
       "sign": {
         "sens_grid_power_active": "ehal",
         "sens_ess_power": "ehal"

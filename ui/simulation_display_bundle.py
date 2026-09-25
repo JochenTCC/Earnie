@@ -99,6 +99,48 @@ def _apply_backtesting_chart_merge(
     return savings_view, display_df, display_matched, display_df
 
 
+def _live_chart_zones(
+    chart_context: LiveChartContext,
+    optimized_df: pd.DataFrame,
+    display_ctx,
+):
+    uses_live = chart_uses_live_zones(chart_context.chart_window, chart_context.now)
+    zone_now = (
+        chart_context.now
+        if uses_live
+        else chart_context.chart_window.end
+    )
+    return ui_chart_zones(
+        zone_now,
+        chart_context.chart_window,
+        sim_rows=optimized_df.to_dict("records"),
+        is_live_segment=uses_live,
+        slot_datetimes=display_ctx.slot_datetimes,
+    )
+
+
+def _live_display_matched(
+    matched_baseline_df: pd.DataFrame | None,
+    display_ctx,
+) -> pd.DataFrame | None:
+    """Matched baseline auf die Display-Slots; None bei reiner Historie."""
+    if display_ctx.history_only:
+        return None
+    if matched_baseline_df is None:
+        return None
+    display_matched = pd.DataFrame(
+        align_rows_to_display_slots(
+            matched_baseline_df.to_dict("records"),
+            display_ctx.slot_datetimes,
+        )
+    )
+    if display_ctx.slot_qualities is not None:
+        display_matched = _mask_missing_log_slots(
+            display_matched, display_ctx.slot_qualities
+        )
+    return display_matched
+
+
 def _apply_live_chart_merge(
     savings_info: dict,
     optimized_df: pd.DataFrame,
@@ -116,19 +158,7 @@ def _apply_live_chart_merge(
         chart_context,
         optimized_df.to_dict("records"),
     )
-    uses_live = chart_uses_live_zones(chart_context.chart_window, chart_context.now)
-    zone_now = (
-        chart_context.now
-        if uses_live
-        else chart_context.chart_window.end
-    )
-    chart_zones = ui_chart_zones(
-        zone_now,
-        chart_context.chart_window,
-        sim_rows=optimized_df.to_dict("records"),
-        is_live_segment=uses_live,
-        slot_datetimes=display_ctx.slot_datetimes,
-    )
+    chart_zones = _live_chart_zones(chart_context, optimized_df, display_ctx)
     savings_view = build_display_savings_series(
         display_ctx,
         savings_view,
@@ -138,20 +168,7 @@ def _apply_live_chart_merge(
     )
     table_df = pd.DataFrame(display_ctx.rows)
     display_df = pd.DataFrame(display_ctx.rows)
-    display_matched = matched_baseline_df
-    if matched_baseline_df is not None and not display_ctx.history_only:
-        display_matched = pd.DataFrame(
-            align_rows_to_display_slots(
-                matched_baseline_df.to_dict("records"),
-                display_ctx.slot_datetimes,
-            )
-        )
-        if display_ctx.slot_qualities is not None:
-            display_matched = _mask_missing_log_slots(
-                display_matched, display_ctx.slot_qualities
-            )
-    elif display_ctx.history_only:
-        display_matched = None
+    display_matched = _live_display_matched(matched_baseline_df, display_ctx)
     sun_markers = build_sun_markers(
         chart_context.chart_window,
         chart_context.now,

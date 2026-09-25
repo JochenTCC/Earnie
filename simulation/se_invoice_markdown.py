@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import dataclass
 from typing import Literal
 
 import pandas as pd
@@ -325,25 +326,41 @@ def _hinweise_lines(*, has_netznutzung_ap: bool) -> list[str]:
     ]
 
 
-def render_scenario_invoice_markdown(
-    *,
-    scenario_id: str,
-    label: str,
+@dataclass(frozen=True)
+class _InvoiceYearContext:
+    """Monatsreihen und Jahreswerte einer Fake-Jahresrechnung."""
+
+    months: list[str]
+    import_cost: pd.Series
+    export_earn: pd.Series
+    import_kwh: pd.Series
+    export_kwh: pd.Series
+    k_act: pd.Series
+    k_push_act: pd.Series
+    import_year: float
+    export_year: float
+    import_kwh_year: float
+    export_kwh_year: float
+    consumption_kwh_year: float
+    total_year: float
+    ap_net_cent: float
+    ap_gross_cent: float
+    netznutzung_ap_eur: float
+
+    @property
+    def month_count(self) -> int:
+        return len(self.months)
+
+
+def _build_invoice_year_context(
     df: pd.DataFrame,
+    *,
     fees: ScenarioFeeBreakdown,
     import_spec: dict | None,
-    export_spec: dict | None,
-    verbrauch_info_kwh: float | None = None,
-    netznutzung_arbeitspreis_cent_kwh: float = 0.0,
-) -> str:
-    """Build one German fake-Jahresrechnung markdown body.
-
-    ``verbrauch_info_kwh`` should match SE Gesamtkosten Jahres Verbrauch when set;
-    otherwise falls back to summing hourly ``consumption_kw`` (legacy).
-
-    ``netznutzung_arbeitspreis_cent_kwh`` is the house-profile net AP (Cent/kWh).
-    When > 0, Jahr splits Lieferant vs Netznutzung (same Gesamt; AP already in k_act).
-    """
+    verbrauch_info_kwh: float | None,
+    netznutzung_arbeitspreis_cent_kwh: float,
+) -> _InvoiceYearContext:
+    """Monatsreihen plus Jahressummen, Netznutzungs-AP und Gesamtbetrag."""
     (
         import_cost,
         export_earn,
@@ -374,50 +391,71 @@ def render_scenario_invoice_markdown(
     )
     if nne_eur > import_year:
         nne_eur = import_year
+    return _InvoiceYearContext(
+        months=months,
+        import_cost=import_cost,
+        export_earn=export_earn,
+        import_kwh=import_kwh,
+        export_kwh=export_kwh,
+        k_act=k_act,
+        k_push_act=k_push_act,
+        import_year=import_year,
+        export_year=export_year,
+        import_kwh_year=import_kwh_year,
+        export_kwh_year=export_kwh_year,
+        consumption_kwh_year=consumption_kwh_year,
+        total_year=total_year,
+        ap_net_cent=ap_net,
+        ap_gross_cent=ap_gross,
+        netznutzung_ap_eur=nne_eur,
+    )
 
-    lines = [
-        f"# Fake-Jahresrechnung — {label}",
-        "",
-        f"Szenario-ID: `{scenario_id}`",
-        "",
-        _tariff_line(import_spec, kind="Bezugstarif"),
-        "",
-        _tariff_line(export_spec, kind="Einspeisetarif"),
-        "",
-    ]
+
+def _invoice_summary_lines(
+    ctx: _InvoiceYearContext,
+    fees: ScenarioFeeBreakdown,
+) -> list[str]:
+    """Jahresübersicht plus Netznutzungs-Abschnitt, sofern ein AP gesetzt ist."""
+    lines: list[str] = []
     lines.extend(
         _year_summary_lines(
-            import_year=import_year,
-            export_year=export_year,
-            import_kwh_year=import_kwh_year,
-            export_kwh_year=export_kwh_year,
-            consumption_kwh_year=consumption_kwh_year,
+            import_year=ctx.import_year,
+            export_year=ctx.export_year,
+            import_kwh_year=ctx.import_kwh_year,
+            export_kwh_year=ctx.export_kwh_year,
+            consumption_kwh_year=ctx.consumption_kwh_year,
             fees=fees,
-            month_count=month_count,
-            total_year=total_year,
-            netznutzung_ap_eur=nne_eur,
+            month_count=ctx.month_count,
+            total_year=ctx.total_year,
+            netznutzung_ap_eur=ctx.netznutzung_ap_eur,
         )
     )
-    if ap_net > 0.0:
+    if ctx.ap_net_cent > 0.0:
         lines.extend(
             _netznutzung_section_lines(
-                ap_net_cent=ap_net,
-                ap_gross_cent=ap_gross,
-                import_kwh_year=import_kwh_year,
-                netznutzung_ap_eur=nne_eur,
+                ap_net_cent=ctx.ap_net_cent,
+                ap_gross_cent=ctx.ap_gross_cent,
+                import_kwh_year=ctx.import_kwh_year,
+                netznutzung_ap_eur=ctx.netznutzung_ap_eur,
                 fees=fees,
-                month_count=month_count,
+                month_count=ctx.month_count,
             )
         )
+    return lines
+
+
+def _invoice_month_table_lines(ctx: _InvoiceYearContext) -> list[str]:
+    """Monatstabellen für Bezug und Einspeisung."""
+    lines: list[str] = []
     lines.extend(
         _energy_table_lines(
             title="Bezug",
             energy_label="Bezug kWh",
             eur_label="Bezug €",
-            months=months,
-            energy=import_kwh,
-            cost_eur=import_cost,
-            price_cent=k_act,
+            months=ctx.months,
+            energy=ctx.import_kwh,
+            cost_eur=ctx.import_cost,
+            price_cent=ctx.k_act,
         )
     )
     lines.extend(
@@ -425,13 +463,21 @@ def render_scenario_invoice_markdown(
             title="Einspeisung",
             energy_label="Einspeisung kWh",
             eur_label="Einspeisung €",
-            months=months,
-            energy=export_kwh,
-            cost_eur=export_earn,
-            price_cent=k_push_act,
+            months=ctx.months,
+            energy=ctx.export_kwh,
+            cost_eur=ctx.export_earn,
+            price_cent=ctx.k_push_act,
         )
     )
-    lines.extend(_hinweise_lines(has_netznutzung_ap=ap_net > 0.0))
+    return lines
+
+
+def _invoice_catalog_lines(
+    import_spec: dict | None,
+    export_spec: dict | None,
+) -> list[str]:
+    """Katalogparameter-Tabellen für Bezug und Einspeisung."""
+    lines: list[str] = []
     lines.extend(
         _catalog_table_lines(
             title="Katalogparameter Bezug",
@@ -446,6 +492,49 @@ def render_scenario_invoice_markdown(
             kind="export",
         )
     )
+    return lines
+
+
+def render_scenario_invoice_markdown(
+    *,
+    scenario_id: str,
+    label: str,
+    df: pd.DataFrame,
+    fees: ScenarioFeeBreakdown,
+    import_spec: dict | None,
+    export_spec: dict | None,
+    verbrauch_info_kwh: float | None = None,
+    netznutzung_arbeitspreis_cent_kwh: float = 0.0,
+) -> str:
+    """Build one German fake-Jahresrechnung markdown body.
+
+    ``verbrauch_info_kwh`` should match SE Gesamtkosten Jahres Verbrauch when set;
+    otherwise falls back to summing hourly ``consumption_kw`` (legacy).
+
+    ``netznutzung_arbeitspreis_cent_kwh`` is the house-profile net AP (Cent/kWh).
+    When > 0, Jahr splits Lieferant vs Netznutzung (same Gesamt; AP already in k_act).
+    """
+    ctx = _build_invoice_year_context(
+        df,
+        fees=fees,
+        import_spec=import_spec,
+        verbrauch_info_kwh=verbrauch_info_kwh,
+        netznutzung_arbeitspreis_cent_kwh=netznutzung_arbeitspreis_cent_kwh,
+    )
+    lines = [
+        f"# Fake-Jahresrechnung — {label}",
+        "",
+        f"Szenario-ID: `{scenario_id}`",
+        "",
+        _tariff_line(import_spec, kind="Bezugstarif"),
+        "",
+        _tariff_line(export_spec, kind="Einspeisetarif"),
+        "",
+    ]
+    lines.extend(_invoice_summary_lines(ctx, fees))
+    lines.extend(_invoice_month_table_lines(ctx))
+    lines.extend(_hinweise_lines(has_netznutzung_ap=ctx.ap_net_cent > 0.0))
+    lines.extend(_invoice_catalog_lines(import_spec, export_spec))
     return "\n".join(lines)
 
 

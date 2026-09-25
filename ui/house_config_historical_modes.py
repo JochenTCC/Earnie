@@ -116,6 +116,92 @@ def _render_gesamtverbraeuche(
         ),
     )
 
+def _component_upload_keys(path_key: str) -> dict[str, str]:
+    return {
+        "input": f"{path_key}_input",
+        "pending": f"{path_key}_pending",
+        "upload_base": f"{path_key}_upload",
+        "nonce": f"{path_key}_upload_nonce",
+        "flash": f"{path_key}_flash",
+    }
+
+def _render_component_path_input(
+    path_key: str,
+    *,
+    input_key: str,
+    label: str,
+    help_path: str,
+    invert_key: str | None,
+) -> str:
+    """CSV path text input, optionally preceded by a sign-invert checkbox."""
+    path_label = f"CSV-Pfad {label}"
+    if invert_key is None:
+        return labeled_text_input(
+            path_label,
+            value=st.session_state.get(path_key, ""),
+            key=input_key,
+            help=help_path,
+        )
+    invert_col, label_col, input_col = st.columns(
+        [1.6, 1.4, 3.0],
+        vertical_alignment="center",
+    )
+    with invert_col:
+        st.checkbox(
+            f"Vorzeichen {label} umkehren",
+            value=False,
+            key=invert_key,
+        )
+    label_col.markdown(path_label)
+    return input_col.text_input(
+        path_label,
+        value=st.session_state.get(path_key, ""),
+        key=input_key,
+        help=help_path,
+        label_visibility="collapsed",
+    )
+
+def _render_component_upload_row(
+    label: str,
+    *,
+    path_key: str,
+    ckeys: dict[str, str],
+) -> tuple[object | None, bool]:
+    up_col, clear_col = st.columns([4, 1], vertical_alignment="bottom")
+    with up_col:
+        upload = single_csv_upload(
+            f"{label}-CSV hochladen",
+            key=csv_upload_widget_key(ckeys["upload_base"], ckeys["nonce"]),
+            help=f"Nur eine CSV-Datei für {label}.",
+        )
+    with clear_col:
+        clear = st.button(
+            "Zuordnung entfernen",
+            key=f"{path_key}_clear",
+        )
+    return upload, clear
+
+def _save_component_csv(
+    upload,
+    *,
+    preview_id: str,
+    role: str,
+    preserve_sign: bool,
+) -> str:
+    if preserve_sign:
+        return _save_signed_component_csv(
+            preview_id,
+            upload.getvalue(),
+            upload.name,
+            role=role,
+        )
+    return save_profile_consumption_csv(
+        preview_id,
+        upload.getvalue(),
+        upload.name,
+        role=role,
+    )
+
 def _render_component_upload(
     *,
     preview_id: str,
@@ -126,88 +212,47 @@ def _render_component_upload(
     preserve_sign: bool = False,
     invert_key: str | None = None,
 ) -> None:
-    input_key = f"{path_key}_input"
-    pending = f"{path_key}_pending"
-    upload_base = f"{path_key}_upload"
-    nonce = f"{path_key}_upload_nonce"
-    flash_key = f"{path_key}_flash"
+    ckeys = _component_upload_keys(path_key)
 
-    apply_csv_path_pending(pending, path_key, input_key)
-    if input_key not in st.session_state:
-        st.session_state[input_key] = st.session_state.get(path_key, "")
+    apply_csv_path_pending(ckeys["pending"], path_key, ckeys["input"])
+    if ckeys["input"] not in st.session_state:
+        st.session_state[ckeys["input"]] = st.session_state.get(path_key, "")
 
-    flash = st.session_state.pop(flash_key, None)
+    flash = st.session_state.pop(ckeys["flash"], None)
     if flash:
         st.success(flash)
 
-    path_label = f"CSV-Pfad {label}"
-    if invert_key is not None:
-        invert_col, label_col, input_col = st.columns(
-            [1.6, 1.4, 3.0],
-            vertical_alignment="center",
-        )
-        with invert_col:
-            st.checkbox(
-                f"Vorzeichen {label} umkehren",
-                value=False,
-                key=invert_key,
-            )
-        label_col.markdown(path_label)
-        path = input_col.text_input(
-            path_label,
-            value=st.session_state.get(path_key, ""),
-            key=input_key,
-            help=help_path,
-            label_visibility="collapsed",
-        )
-    else:
-        path = labeled_text_input(
-            path_label,
-            value=st.session_state.get(path_key, ""),
-            key=input_key,
-            help=help_path,
-        )
+    path = _render_component_path_input(
+        path_key,
+        input_key=ckeys["input"],
+        label=label,
+        help_path=help_path,
+        invert_key=invert_key,
+    )
     st.session_state[path_key] = path.strip()
-    up_col, clear_col = st.columns([4, 1], vertical_alignment="bottom")
-    with up_col:
-        upload = single_csv_upload(
-            f"{label}-CSV hochladen",
-            key=csv_upload_widget_key(upload_base, nonce),
-            help=f"Nur eine CSV-Datei für {label}.",
-        )
-    with clear_col:
-        clear = st.button(
-            "Zuordnung entfernen",
-            key=f"{path_key}_clear",
-        )
+    upload, clear = _render_component_upload_row(
+        label, path_key=path_key, ckeys=ckeys
+    )
     if upload is not None:
         try:
-            if preserve_sign:
-                saved = _save_signed_component_csv(
-                    preview_id,
-                    upload.getvalue(),
-                    upload.name,
-                    role=role,
-                )
-            else:
-                saved = save_profile_consumption_csv(
-                    preview_id,
-                    upload.getvalue(),
-                    upload.name,
-                    role=role,
-                )
+            saved = _save_component_csv(
+                upload,
+                preview_id=preview_id,
+                role=role,
+                preserve_sign=preserve_sign,
+            )
             queue_csv_path_update(
-                pending,
+                ckeys["pending"],
                 saved,
-                upload_nonce_key=nonce,
-                flash_key=flash_key,
+                upload_nonce_key=ckeys["nonce"],
+                flash_key=ckeys["flash"],
                 flash_message=f"{label} gespeichert und normalisiert: `{saved}`",
             )
             st.rerun()
         except (ValueError, OSError, FileNotFoundError) as exc:
             st.error(f"{label}-CSV ungültig: {exc}")
     if clear:
-        queue_csv_path_update(pending, "", upload_nonce_key=nonce)
+        queue_csv_path_update(ckeys["pending"], "", upload_nonce_key=ckeys["nonce"])
         st.rerun()
 
 def _save_signed_component_csv(
@@ -378,6 +423,69 @@ def _maybe_persist_balance_total(
             "(Vorzeichen prüfen)."
         )
 
+_EM_SLOTS = ("verbrauch", "pv", "battery", "grid")
+_EM_CAPTION_LABELS = (
+    ("verbrauch", "Lastprofil"),
+    ("pv", "PV-Erzeugungsprofil"),
+    ("battery", "Batterie"),
+    ("grid", "Netz"),
+)
+_EM_MISSING_HINTS = (
+    ("pv", "PV", " (keine Produktionsspalte — PV leer)"),
+    ("battery", "Batterie", " (keine Batterie-Spalte — Batterie leer)"),
+    ("grid", "Netz", " (keine Energieversorger-Spalte — Netz leer)"),
+)
+
+def _em_set_paths(keys: dict[str, str], values: dict[str, str]) -> None:
+    """Write both the store key and its `_input` widget twin per component."""
+    for slot in _EM_SLOTS:
+        st.session_state[keys[slot]] = values[slot]
+        st.session_state[f"{keys[slot]}_input"] = values[slot]
+
+def _em_flash_message(values: dict[str, str]) -> str:
+    msg = f"Lastprofil: `{values['verbrauch']}`"
+    for slot, label, missing in _EM_MISSING_HINTS:
+        if values[slot]:
+            msg += f"; {label}: `{values[slot]}`"
+        else:
+            msg += missing
+    return msg
+
+def _bump_nonce(nonce_key: str) -> None:
+    st.session_state[nonce_key] = int(st.session_state.get(nonce_key, 0) or 0) + 1
+
+def _store_energiemonitor_upload(
+    upload,
+    *,
+    preview_id: str,
+    keys: dict[str, str],
+    flash_key: str,
+    nonce_key: str,
+) -> None:
+    try:
+        result = save_energiemonitor_profile_csvs(
+            preview_id,
+            upload.getvalue(),
+            upload.name,
+        )
+        values = {
+            "verbrauch": result["total_profile_csv"],
+            "pv": result.get("pv_profile_csv", ""),
+            "battery": result.get("battery_profile_csv", ""),
+            "grid": result.get("grid_profile_csv", ""),
+        }
+        _em_set_paths(keys, values)
+        st.session_state[flash_key] = _em_flash_message(values)
+        _bump_nonce(nonce_key)
+        st.rerun()
+    except (ValueError, OSError, FileNotFoundError) as exc:
+        st.error(f"Energiemonitor-CSV ungültig: {exc}")
+
+def _render_energiemonitor_captions(keys: dict[str, str]) -> None:
+    for slot, label in _EM_CAPTION_LABELS:
+        if st.session_state.get(keys[slot]):
+            st.caption(f"{label}: `{st.session_state[keys[slot]]}`")
+
 def _render_energiemonitor_mode(preview_id: str, keys: dict[str, str]) -> None:
     st.caption(
         "Erwartete Spalten: `Leistung Verbrauch [kW]` (Pflicht, direkt als "
@@ -388,10 +496,6 @@ def _render_energiemonitor_mode(preview_id: str, keys: dict[str, str]) -> None:
     em_upload_base = f"house_profile_em_csv_upload_{preview_id}"
     em_nonce = f"house_profile_em_csv_upload_nonce_{preview_id}"
     em_flash = f"house_profile_em_csv_flash_{preview_id}"
-    verbrauch_input_key = f"{keys['verbrauch']}_input"
-    pv_input_key = f"{keys['pv']}_input"
-    battery_input_key = f"{keys['battery']}_input"
-    grid_input_key = f"{keys['grid']}_input"
 
     flash = st.session_state.pop(em_flash, None)
     if flash:
@@ -410,62 +514,19 @@ def _render_energiemonitor_mode(preview_id: str, keys: dict[str, str]) -> None:
             key=f"house_profile_em_csv_clear_{preview_id}",
         )
     if upload is not None:
-        try:
-            result = save_energiemonitor_profile_csvs(
-                preview_id,
-                upload.getvalue(),
-                upload.name,
-            )
-            total = result["total_profile_csv"]
-            pv = result.get("pv_profile_csv", "")
-            battery = result.get("battery_profile_csv", "")
-            grid = result.get("grid_profile_csv", "")
-            st.session_state[keys["verbrauch"]] = total
-            st.session_state[verbrauch_input_key] = total
-            st.session_state[keys["pv"]] = pv
-            st.session_state[pv_input_key] = pv
-            st.session_state[keys["battery"]] = battery
-            st.session_state[battery_input_key] = battery
-            st.session_state[keys["grid"]] = grid
-            st.session_state[grid_input_key] = grid
-            msg = f"Lastprofil: `{total}`"
-            if pv:
-                msg += f"; PV: `{pv}`"
-            else:
-                msg += " (keine Produktionsspalte — PV leer)"
-            if battery:
-                msg += f"; Batterie: `{battery}`"
-            else:
-                msg += " (keine Batterie-Spalte — Batterie leer)"
-            if grid:
-                msg += f"; Netz: `{grid}`"
-            else:
-                msg += " (keine Energieversorger-Spalte — Netz leer)"
-            st.session_state[em_flash] = msg
-            st.session_state[em_nonce] = int(st.session_state.get(em_nonce, 0) or 0) + 1
-            st.rerun()
-        except (ValueError, OSError, FileNotFoundError) as exc:
-            st.error(f"Energiemonitor-CSV ungültig: {exc}")
+        _store_energiemonitor_upload(
+            upload,
+            preview_id=preview_id,
+            keys=keys,
+            flash_key=em_flash,
+            nonce_key=em_nonce,
+        )
 
-    if st.session_state.get(keys["verbrauch"]):
-        st.caption(f"Lastprofil: `{st.session_state[keys['verbrauch']]}`")
-    if st.session_state.get(keys["pv"]):
-        st.caption(f"PV-Erzeugungsprofil: `{st.session_state[keys['pv']]}`")
-    if st.session_state.get(keys["battery"]):
-        st.caption(f"Batterie: `{st.session_state[keys['battery']]}`")
-    if st.session_state.get(keys["grid"]):
-        st.caption(f"Netz: `{st.session_state[keys['grid']]}`")
+    _render_energiemonitor_captions(keys)
 
     if clear:
-        st.session_state[keys["verbrauch"]] = ""
-        st.session_state[verbrauch_input_key] = ""
-        st.session_state[keys["pv"]] = ""
-        st.session_state[pv_input_key] = ""
-        st.session_state[keys["battery"]] = ""
-        st.session_state[battery_input_key] = ""
-        st.session_state[keys["grid"]] = ""
-        st.session_state[grid_input_key] = ""
-        st.session_state[em_nonce] = int(st.session_state.get(em_nonce, 0) or 0) + 1
+        _em_set_paths(keys, {slot: "" for slot in _EM_SLOTS})
+        _bump_nonce(em_nonce)
         st.rerun()
 
 def _hourly_consumer_sum(consumer_series: dict[str, list[float]]) -> list[float]:

@@ -208,78 +208,91 @@ def _ensure_one_default(specs: list[PageSpec]) -> list[PageSpec]:
     ]
 
 
+def _betrieb_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
+    from ui.pages import page_cockpit, page_consumer_analysis, page_devices
+
+    specs = [
+        PageSpec(
+            page_cockpit.render,
+            "Monitor",
+            "🔋",
+            SECTION_BETRIEB,
+            "cockpit",
+            default=True,
+        ),
+        PageSpec(
+            page_devices.render,
+            "Manuelle Geräte",
+            "🔌",
+            SECTION_BETRIEB,
+            "devices",
+        ),
+    ]
+    if "live_environment" in enabled_mode_keys:
+        specs.append(
+            PageSpec(
+                wrap_offline_stub(
+                    page_consumer_analysis.render,
+                    _VA_OFFLINE_NOTICE,
+                ),
+                "Analyse Verbrauch & Kosten",
+                "📈",
+                SECTION_BETRIEB,
+                "consumer-analysis",
+            )
+        )
+    return specs
+
+
+def _price_forecast_spec(*, is_default: bool) -> PageSpec:
+    from ui.pages import page_price_forecast
+
+    return PageSpec(
+        page_price_forecast.render,
+        "Preis-Prognose (Dev)",
+        "💹",
+        SECTION_BETRIEB,
+        "price-forecast",
+        default=is_default,
+    )
+
+
+def _scenario_explorer_spec(*, is_default: bool) -> PageSpec:
+    from ui.pages import page_backtesting
+
+    return PageSpec(
+        page_backtesting.render,
+        "Szenario-Explorer",
+        "📊",
+        SECTION_KONFIGURATION,
+        "scenario-explorer",
+        default=is_default,
+    )
+
+
 def build_page_specs(enabled_mode_keys: list[str]) -> list[PageSpec]:
     """Liefert die zu registrierenden Seiten anhand des Modus-Gatings."""
     if is_setup_navigation_restricted():
         return _restricted_page_specs(enabled_mode_keys)
-
-    from ui.pages import (
-        page_backtesting,
-        page_cockpit,
-        page_consumer_analysis,
-        page_devices,
-        page_price_forecast,
-    )
 
     specs: list[PageSpec] = []
     betrieb_shown = (
         is_betrieb_unlocked() and "sunset2sunset" in enabled_mode_keys
     )
     if betrieb_shown:
-        specs.extend(
-            [
-                PageSpec(
-                    page_cockpit.render,
-                    "Monitor",
-                    "🔋",
-                    SECTION_BETRIEB,
-                    "cockpit",
-                    default=True,
-                ),
-                PageSpec(
-                    page_devices.render,
-                    "Manuelle Geräte",
-                    "🔌",
-                    SECTION_BETRIEB,
-                    "devices",
-                ),
-            ]
-        )
-        if "live_environment" in enabled_mode_keys:
-            specs.append(
-                PageSpec(
-                    wrap_offline_stub(
-                        page_consumer_analysis.render,
-                        _VA_OFFLINE_NOTICE,
-                    ),
-                    "Analyse Verbrauch & Kosten",
-                    "📈",
-                    SECTION_BETRIEB,
-                    "consumer-analysis",
-                )
-            )
+        specs.extend(_betrieb_page_specs(enabled_mode_keys))
 
     if "price_forecast" in enabled_mode_keys:
         specs.append(
-            PageSpec(
-                page_price_forecast.render,
-                "Preis-Prognose (Dev)",
-                "💹",
-                SECTION_BETRIEB,
-                "price-forecast",
-                default=not betrieb_shown and not any(s.default for s in specs),
+            _price_forecast_spec(
+                is_default=not betrieb_shown and not any(s.default for s in specs),
             )
         )
 
     scenario_explorer: PageSpec | None = None
     if "scenario_explorer" in enabled_mode_keys and is_planning_ready():
-        scenario_explorer = PageSpec(
-            page_backtesting.render,
-            "Szenario-Explorer",
-            "📊",
-            SECTION_KONFIGURATION,
-            "scenario-explorer",
-            default=not any(s.default for s in specs),
+        scenario_explorer = _scenario_explorer_spec(
+            is_default=not any(s.default for s in specs),
         )
 
     _append_konfiguration_and_echtzeit(

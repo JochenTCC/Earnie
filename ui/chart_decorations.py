@@ -353,28 +353,14 @@ def _append_summary_line(
     return line_index + 1
 
 
-def _cost_summary_column_annotations(
+def _cost_summary_head_lines(
+    base: dict,
+    summary_font: dict,
     matched_baseline_cost_euro: float,
     optimized_cost_euro: float,
-    *,
-    x: float = 0.01,
-    label: str | None = None,
-    achieved_savings_euro: float | None = None,
-    show_split_savings: bool = False,
-) -> list[dict]:
-    """One KPI column (optional day label + BL / Optimiert / Ersparnis)."""
-    savings_euro = optimized_cost_euro - matched_baseline_cost_euro
-    summary_font = dict(size=_COST_SUMMARY_FONT_SIZE)
-    base = dict(
-        xref="paper",
-        yref="y domain",
-        x=x,
-        y=_COST_SUMMARY_Y_TOP,
-        showarrow=False,
-        xanchor="left",
-        yanchor="top",
-        font=summary_font,
-    )
+    label: str | None,
+) -> tuple[list[dict], int]:
+    """Optional day label plus the BL-Ziel / Optimiert rows; returns next line index."""
     lines: list[dict] = []
     line_index = 0
     if label:
@@ -402,7 +388,20 @@ def _cost_summary_column_annotations(
         line_index=line_index,
         color=COLOR_COST_OPTIMIZED,
     )
-    if show_split_savings and achieved_savings_euro is not None:
+    return lines, line_index
+
+
+def _append_cost_summary_savings(
+    lines: list[dict],
+    base: dict,
+    summary_font: dict,
+    *,
+    line_index: int,
+    savings_euro: float,
+    achieved_savings_euro: float | None,
+) -> None:
+    """Single Ersparnis row, or bisher + erwartet when an achieved value is given."""
+    if achieved_savings_euro is not None:
         line_index = _append_summary_line(
             lines,
             base,
@@ -419,15 +418,55 @@ def _cost_summary_column_annotations(
             line_index=line_index,
             color=_savings_annotation_color(savings_euro),
         )
-    else:
-        _append_summary_line(
-            lines,
-            base,
-            summary_font,
-            text=f"Ersparnis: {savings_euro:+.2f} €",
-            line_index=line_index,
-            color=_savings_annotation_color(savings_euro),
-        )
+        return
+    _append_summary_line(
+        lines,
+        base,
+        summary_font,
+        text=f"Ersparnis: {savings_euro:+.2f} €",
+        line_index=line_index,
+        color=_savings_annotation_color(savings_euro),
+    )
+
+
+def _cost_summary_column_annotations(
+    matched_baseline_cost_euro: float,
+    optimized_cost_euro: float,
+    *,
+    x: float = 0.01,
+    label: str | None = None,
+    achieved_savings_euro: float | None = None,
+    show_split_savings: bool = False,
+) -> list[dict]:
+    """One KPI column (optional day label + BL / Optimiert / Ersparnis)."""
+    summary_font = dict(size=_COST_SUMMARY_FONT_SIZE)
+    base = dict(
+        xref="paper",
+        yref="y domain",
+        x=x,
+        y=_COST_SUMMARY_Y_TOP,
+        showarrow=False,
+        xanchor="left",
+        yanchor="top",
+        font=summary_font,
+    )
+    lines, line_index = _cost_summary_head_lines(
+        base,
+        summary_font,
+        matched_baseline_cost_euro,
+        optimized_cost_euro,
+        label,
+    )
+    _append_cost_summary_savings(
+        lines,
+        base,
+        summary_font,
+        line_index=line_index,
+        savings_euro=optimized_cost_euro - matched_baseline_cost_euro,
+        achieved_savings_euro=(
+            achieved_savings_euro if show_split_savings else None
+        ),
+    )
     return lines
 
 

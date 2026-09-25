@@ -268,8 +268,63 @@ _REC_TABLE_COL_WIDTHS = [1, 1, 1, 1]
 _REC_TABLE_COL_REM = (1.55, 5.0, 6.0, 5.0)
 
 
-def _recommendation_table_css() -> str:
-    col_rules = "\n".join(
+_REC_TABLE_LAYOUT_CSS = """[class*="st-key-appliance_rec_table_"] {
+    width: fit-content !important;
+    max-width: 100%;
+}
+[class*="st-key-appliance_rec_table_"] [data-testid="stVerticalBlock"] {
+    gap: 0.4rem !important;
+}
+[class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"] {
+    width: fit-content !important;
+    max-width: 100%;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.2rem !important;
+    min-height: 0.8em;
+}
+[class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"]:first-child {
+    padding-bottom: 1.3rem; 
+    margin-bottom: 0.0rem;
+    border-bottom: 1px solid rgba(49, 51, 63, 0.18);
+}
+[class*="st-key-appliance_rec_table_"] [data-testid="stColumn"] {
+    flex: 0 0 auto !important;
+    flex-grow: 0 !important;
+    min-width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}"""
+
+_REC_TABLE_CELL_CSS = """[class*="st-key-appliance_rec_table_"] [data-testid="stMarkdown"] p {
+    margin-top: 0;
+    margin-bottom: 0;
+    line-height: 0.8;
+}
+[class*="st-key-appliance_rec_table_"] [data-testid="stCheckbox"] label {
+    min-height: 0;
+    padding: 0;
+}
+[class*="st-key-appliance_rec_table_"] [data-testid="stCheckbox"] {
+    padding: 0;
+    margin: 0;
+}
+[class*="st-key-appliance_rec_table_"] [data-testid="stColumn"]:nth-child(1) [data-testid="stVerticalBlock"] {
+    justify-content: center;
+}
+@media (max-width: 768px) {
+    [class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"] {
+        overflow-x: auto;
+    }
+}
+.stApp[data-theme="dark"] [class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"]:first-child {
+    border-bottom-color: rgba(250, 250, 250, 0.15);
+}"""
+
+
+def _rec_table_col_rules() -> str:
+    """Per-column width rules derived from _REC_TABLE_COL_REM."""
+    return "\n".join(
         f"""[class*="st-key-appliance_rec_table_"] [data-testid="stColumn"]:nth-child({index}) {{
     width: {width_rem}rem !important;
     flex-basis: {width_rem}rem !important;
@@ -277,60 +332,15 @@ def _recommendation_table_css() -> str:
 }}"""
         for index, width_rem in enumerate(_REC_TABLE_COL_REM, start=1)
     )
+
+
+def _recommendation_table_css() -> str:
+    col_rules = _rec_table_col_rules()
     return f"""
 <style>
-[class*="st-key-appliance_rec_table_"] {{
-    width: fit-content !important;
-    max-width: 100%;
-}}
-[class*="st-key-appliance_rec_table_"] [data-testid="stVerticalBlock"] {{
-    gap: 0.4rem !important;
-}}
-[class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"] {{
-    width: fit-content !important;
-    max-width: 100%;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    gap: 0.2rem !important;
-    min-height: 0.8em;
-}}
-[class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"]:first-child {{
-    padding-bottom: 1.3rem; 
-    margin-bottom: 0.0rem;
-    border-bottom: 1px solid rgba(49, 51, 63, 0.18);
-}}
-[class*="st-key-appliance_rec_table_"] [data-testid="stColumn"] {{
-    flex: 0 0 auto !important;
-    flex-grow: 0 !important;
-    min-width: 0 !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-}}
+{_REC_TABLE_LAYOUT_CSS}
 {col_rules}
-[class*="st-key-appliance_rec_table_"] [data-testid="stMarkdown"] p {{
-    margin-top: 0;
-    margin-bottom: 0;
-    line-height: 0.8;
-}}
-[class*="st-key-appliance_rec_table_"] [data-testid="stCheckbox"] label {{
-    min-height: 0;
-    padding: 0;
-}}
-[class*="st-key-appliance_rec_table_"] [data-testid="stCheckbox"] {{
-    padding: 0;
-    margin: 0;
-}}
-[class*="st-key-appliance_rec_table_"] [data-testid="stColumn"]:nth-child(1) [data-testid="stVerticalBlock"] {{
-    justify-content: center;
-}}
-@media (max-width: 768px) {{
-    [class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"] {{
-        overflow-x: auto;
-    }}
-}}
-.stApp[data-theme="dark"] [class*="st-key-appliance_rec_table_"] [data-testid="stHorizontalBlock"]:first-child {{
-    border-bottom-color: rgba(250, 250, 250, 0.15);
-}}
+{_REC_TABLE_CELL_CSS}
 </style>
 """
 

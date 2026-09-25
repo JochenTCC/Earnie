@@ -172,6 +172,59 @@ def _store_opt_in_display_bundle(
     )
 
 
+def _restore_cached_opt_in_bundle() -> None:
+    cached_savings = st.session_state["live_savings_info"]
+    cached_df = st.session_state["live_optimization_df"]
+    _store_opt_in_display_bundle(
+        cached_savings,
+        cached_df,
+        pd.DataFrame(cached_savings.get("baseline_rows", [])),
+        pd.DataFrame(cached_savings.get("matched_baseline_rows", [])),
+        st.session_state.get("live_optimization_matrix", []),
+        st.session_state.get("live_planning_window"),
+    )
+
+
+def _opt_in_planning_inputs() -> tuple[object, list] | None:
+    """Planungsfenster + Matrix; None wenn keine Börsenpreise verfügbar sind."""
+    planning_window = profile_manager.compute_live_planning_window()
+    market_data = fetch_live_day_ahead_prices(planning_end=planning_window.end)
+    if not market_data:
+        st.error(
+            "🚨 Fehler: Börsenstrompreise (Energy-Charts / aWATTar-Fallback) "
+            "konnten nicht geladen werden. Abbruch der Simulation."
+        )
+        st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
+        return None
+    matrix = profile_manager.build_live_planning_matrix(market_data, planning_window)
+    return planning_window, matrix
+
+
+def _opt_in_consumption_snapshot(main_state: dict | None):
+    """Frischen Snapshot des Haupt-Laufs weiterverwenden, sonst live lesen."""
+    if main_state and main_state.get("consumption_snapshot"):
+        age = run_state.age_seconds(main_state)
+        if age is not None and age <= optimization_schedule.QUARTER_HOUR_SECONDS * 1.5:
+            return main_state["consumption_snapshot"]
+    return live_consumption.fetch_live_consumption_snapshot(main_state)
+
+
+def _store_opt_in_session_state(
+    cache_key: str,
+    *,
+    optimized_df: pd.DataFrame,
+    savings_info: dict,
+    matrix: list,
+    planning_window,
+) -> None:
+    st.session_state["live_opt_in_cache_key"] = cache_key
+    st.session_state["live_optimization_df"] = optimized_df
+    st.session_state["live_savings_info"] = savings_info
+    st.session_state["live_optimization_matrix"] = matrix
+    st.session_state["live_planning_window"] = planning_window
+    st.session_state.pop(SESSION_OPT_IN_SIMULATION, None)
+
+
 def _run_opt_in_live_simulation(
     current_soc: float,
     main_state: dict | None,
@@ -181,44 +234,19 @@ def _run_opt_in_live_simulation(
     """Einmalige UI-Simulation — nur nach expliziter Nutzerbestätigung."""
     cache_key = _opt_in_cache_key(current_slot, main_state)
     if _opt_in_cache_valid(cache_key):
-        cached_savings = st.session_state["live_savings_info"]
-        cached_df = st.session_state["live_optimization_df"]
-        baseline_df = pd.DataFrame(cached_savings.get("baseline_rows", []))
-        matched_baseline_df = pd.DataFrame(cached_savings.get("matched_baseline_rows", []))
-        _store_opt_in_display_bundle(
-            cached_savings,
-            cached_df,
-            baseline_df,
-            matched_baseline_df,
-            st.session_state.get("live_optimization_matrix", []),
-            st.session_state.get("live_planning_window"),
-        )
+        _restore_cached_opt_in_bundle()
         return
 
-    planning_window = profile_manager.compute_live_planning_window()
-    market_data = fetch_live_day_ahead_prices(planning_end=planning_window.end)
-    if not market_data:
-        st.error(
-            "🚨 Fehler: Börsenstrompreise (Energy-Charts / aWATTar-Fallback) "
-            "konnten nicht geladen werden. Abbruch der Simulation."
-        )
-        st.session_state.pop(SESSION_LIVE_DISPLAY_BUNDLE, None)
+    inputs = _opt_in_planning_inputs()
+    if inputs is None:
         return
+    planning_window, matrix = inputs
 
-    matrix = profile_manager.build_live_planning_matrix(market_data, planning_window)
     from data.planning_window import sunrise_anchor_slot_index
 
     sunrise_soc_min_index = sunrise_anchor_slot_index(planning_window)
 
-    snapshot = None
-    if main_state and main_state.get("consumption_snapshot"):
-        age = run_state.age_seconds(main_state)
-        if age is not None and age <= optimization_schedule.QUARTER_HOUR_SECONDS * 1.5:
-            snapshot = main_state["consumption_snapshot"]
-
-    if snapshot is None:
-        snapshot = live_consumption.fetch_live_consumption_snapshot(main_state)
-
+    snapshot = _opt_in_consumption_snapshot(main_state)
     if snapshot:
         matrix = live_consumption.apply_live_snapshot_to_matrix(matrix, snapshot, hour_index=0)
 
@@ -239,12 +267,13 @@ def _run_opt_in_live_simulation(
         rows = optimizer.overlay_main_run_on_rows(optimized_df.to_dict("records"), main_state)
         optimized_df = pd.DataFrame(rows)
 
-    st.session_state["live_opt_in_cache_key"] = cache_key
-    st.session_state["live_optimization_df"] = optimized_df
-    st.session_state["live_savings_info"] = savings_info
-    st.session_state["live_optimization_matrix"] = matrix
-    st.session_state["live_planning_window"] = planning_window
-    st.session_state.pop(SESSION_OPT_IN_SIMULATION, None)
+    _store_opt_in_session_state(
+        cache_key,
+        optimized_df=optimized_df,
+        savings_info=savings_info,
+        matrix=matrix,
+        planning_window=planning_window,
+    )
 
     _store_opt_in_display_bundle(
         savings_info,

@@ -17,9 +17,6 @@ from .generic_flex_context import (
     consumer_generic_eligible_indices,
     generic_flex_window,
 )
-from .slot_duration import DEFAULT_DT_H
-
-
 def _min_on_hours(consumer: dict) -> int:
     """Minimum consecutive ON slots (config key remains min_on_quarterhours)."""
     min_on_qh = int(consumer.get("min_on_quarterhours", 4) or 4)
