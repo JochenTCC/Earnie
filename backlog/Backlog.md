@@ -29,47 +29,31 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 **Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Next community pre-releases: **`2.6.0-alpha.*`** (explicit `version.py` bump approval — do not continue `2.5.3-alpha.N`). Alpha compose may stay pinned at last pre-release (`2.5.3-alpha.6`) until the next alpha bump.
 
-**Next:** **HouseSim S4** done (HAOS acceptance verified 2026-09-25; Write-path testing deferred to a new feature item). Then **HouseSim S2 → S3 → 2.6.e** (mock-bench archetypes / CI / stronger propose).
+**Next:** **HouseSim S2 → S3 → 2.6.e** (mock-bench archetypes / CI / stronger propose).
 
-**Scope:** easier HA coupling for Earnie. Flat `ehal.ha.entities` (**2.6.b**) was an interim plant-wire map; Pattern B storage (**2.6.g**, done) and entity-first EHAL-Com UX (**2.6.h**, done) put HA entity IDs on `plant` / `consumers[].ehal_bindings` with Loxone-parity HITL. The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
+**Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
 **Documents:**
 
-- [House simulator spec](../docs/spec/house-sim.md) — **2.6.a** / HouseSim S1 (done); **HouseSim S4** integration + HAOS acceptance (done; Write-path testing deferred)
-- [HA compatibility tests (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — **2.6.a**; HouseSim S2–S4 / **2.6.e**
-- [Entwicklungsplan §3.2 HA entity mapping](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md) — **2.6.b** (done); **2.6.e** (confirm-before-save; LLM stays out of 2.6)
-- [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — **2.6.g** / **2.6.h** done (same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**)
+- [House simulator spec](../docs/spec/house-sim.md) — HouseSim S2–S4 basis
+- [HA compatibility tests (concept)](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-HA-Kompatibilitaetstests-Entwicklungsdokument.md) — HouseSim S2–S3 / **2.6.e**
+- [Entwicklungsplan §3.2 HA entity mapping](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md) — **2.6.e** (confirm-before-save; LLM stays out of 2.6)
+- [EHAL spec — Pattern B / Loxone HITL](../docs/spec/ehal.md) — same `plant` / `consumers[].ehal_bindings` as Loxone **2.4.k**
 - [Add-on backlog](https://github.com/JochenTCC/ha-addon-earnie/blob/main/BACKLOG.md) — stable vs pre-release channel (not part of 2.6)
-- [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood walkthrough (done); HA suggest-and-confirm (**2.6.b**) done; Pattern B + entity UX (**2.6.g** / **2.6.h**) done; **HouseSim S4** done (HAOS acceptance verified; Write-path testing deferred)
+- [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood / HA coupling context
 - [HA-Loxone-Bridge-Builder draft](HA-Loxone-Bridge-Builder-Draft.md) — research item, not 2.6
 
-#### Prerequisites for this epic
-- [x] Install HA simulation instance on Synology for testing (same instance as the [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) dogfood walkthrough: Hue, add-on setup, comfort-gap notes). An empty HAOS does not replace **2.6.a**.
-
 #### Features
-
-##### Pattern B parity with Loxone (done — 2.6.g / 2.6.h)
-
-Same storage and EHAL-Com workflow as Loxone **2.4.k**. `ehal.backend=ha` stays in `config.json`; entity→field map on `plant` / `consumers[].ehal_bindings`. HA URL/token secrets move to `.env` in **2.6.i**. Regression bench: `house_sim` / `evcc_en` (not the `ha_lab/` Compose stack).
-
-##### Secrets parity with Loxone
-
-- [ ] **2.6.i — HA credentials in `.env` (Loxone parity).** Today Loxone secrets live in `earnie_env/config/.env` (`LOXONE_IP` / `LOXONE_USER` / `LOXONE_PASS`); HA `base_url` / `token` are persisted in `config.json` under `ehal.ha`. Move the long-lived access token (and preferably `base_url`) into `.env` (e.g. `EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`), keep non-secret `ehal.backend=ha` / `sign` / mapping in `config.json`, update Smarthome-Backend persistence + loaders (`.env.example`, docs), and migrate existing `ehal.ha.token` / `base_url` out of `config.json` once. Add-on path unchanged: empty values still resolve via Supervisor proxy (`SUPERVISOR_TOKEN` / `http://supervisor/core`). Optional follow-up (same pattern): OpenEMS credentials currently under `ehal.openems`.
-- [ ] Add a testing feature on EHAL-com page where user or can set Writing values manually within allowed boundaries (useful values) - just to see if new values are received from Smarthome-Backend.Would be also nice to have an automatic testing with roundtrip success control if possible. Should not harm real plant!
-
-##### HouseSim S4 — done (HAOS acceptance verified 2026-09-25)
-
-Code + acceptance archived in [Backlog-Erledigt.md](Backlog-Erledigt.md). Write path (battery setpoint → SoC/grid) still unverified — cover via a new testing feature (not re-opened under Verifications Pending).
-
-**Naming (2026-09-23):** simulator stages are **HouseSim S1–S4** (formerly "HA Lab P1–P4"). **HA Lab** now means only the `ha_lab/` Compose stack (Earnie + HAOS + evcc, [ha-lab-setup.md](../docs/spec/ha-lab-setup.md)).
 
 ##### HouseSim S2 → S3 and stronger propose
 
 Mock-bench expansion; S3 soft-depends on more archetypes (S2). **2.6.e** needs S2.
 
+**Naming:** simulator stages are **HouseSim S1–S4** (formerly "HA Lab P1–P4"). **HA Lab** now means only the `ha_lab/` Compose stack (Earnie + HAOS + evcc, [ha-lab-setup.md](../docs/spec/ha-lab-setup.md)).
+
 - [ ] **HouseSim S2** — 2–3 more hand-authored archetypes (domain/naming/i18n) on the same physics; write-back per archetype.
 - [ ] **HouseSim S3** — CI harness: short simulated windows, not N live `main.py` days. The **2.6.a** static fixture stays the fast job.
-- [ ] **2.6.e — Stronger propose, still confirm-before-save.** After HouseSim S2. Replay archetypes with empty map and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)). After **2.6.g**, the same empty-only propose rules apply to Pattern B bindings.
+- [ ] **2.6.e — Stronger propose, still confirm-before-save.** After HouseSim S2. Replay archetypes with empty map and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)). Empty-only propose rules apply to Pattern B bindings.
 
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)

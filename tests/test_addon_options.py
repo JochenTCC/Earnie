@@ -41,8 +41,8 @@ def test_fresh_seed_sets_ha_backend(tmp_path, monkeypatch):
     payload = _read_json(config_path)
     assert payload["ehal"]["backend"] == "ha"
     assert payload["ehal"]["adapter_id"] == "earnie-hems"
-    assert payload["ehal"]["ha"].get("base_url", "") == ""
-    assert payload["ehal"]["ha"].get("token", "") == ""
+    assert "base_url" not in payload["ehal"]["ha"]
+    assert "token" not in payload["ehal"]["ha"]
 
 
 def test_existing_loxone_config_not_force_switched(tmp_path, monkeypatch):

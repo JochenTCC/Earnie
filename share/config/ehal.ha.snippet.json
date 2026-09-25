@@ -3,8 +3,6 @@
     "backend": "ha",
     "adapter_id": "earnie-hems",
     "ha": {
-      "base_url": "http://homeassistant:8123",
-      "token": "<long-lived-access-token>",
       "entities": {},
       "sign": {
         "sens_grid_power_active": "ehal",

@@ -23,7 +23,7 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./earnie_env/config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
 | `./earnie_env/runtime/`                          | `cons_data.csv`, Zustands-JSONs, Profile, Logs                                                                   |
 | `./earnie_env/runtime/local_settings.json`       | Lokale Einstellungen (z. B. Silent-Mode)                                                                                |
-| `./earnie_env/config/.env`                       | Loxone-Zugangsdaten                                                                                                     |
+| `./earnie_env/config/.env`                       | Loxone- und HA-Zugangsdaten (`LOXONE_*` / `EHAL_HA_*`)                                                                  |
 
 
 Umgebungsvariable in Compose: `EARNIE_ENV_PATH=.` (leitet `/app/config` und `/app/runtime` ab; Host-Mounts `./…/config` → `/app/config`, `./…/runtime` → `/app/runtime`)

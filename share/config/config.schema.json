@@ -464,19 +464,11 @@
         },
         "ha": {
           "type": "object",
-          "description": "Home Assistant REST connection (2.4.c); prefer stable entities from evcc.",
+          "description": "Home Assistant non-secret settings (2.6.i). URL/token live in config/.env as EHAL_HA_BASE_URL / EHAL_HA_TOKEN.",
           "properties": {
-            "base_url": {
-              "type": "string",
-              "description": "HA REST base, e.g. http://homeassistant:8123"
-            },
-            "token": {
-              "type": "string",
-              "description": "Long-lived access token (Bearer)."
-            },
             "entities": {
               "type": "object",
-              "description": "Map EHAL M1 field name → HA entity_id.",
+              "description": "Deprecated flat map EHAL field → entity_id (cleared after Pattern B migrate).",
               "additionalProperties": {
                 "type": "string"
               }

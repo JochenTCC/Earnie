@@ -2,13 +2,25 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### EHAL-Com Schreibtest — bounded write + roundtrip (2026-09-25)
+
+- [x] **EHAL-Com Schreibtest** (Secrets parity / HouseSim write-path verification). Table UI under Live-Schreiben: mapped safe probes (`set_ess_mode`, charge/discharge limits, `set_evcs_max_current`) + optional Force `set_ess_active_power` (±200 W, second confirm); batch write / Auto-Roundtrip as one setpoint; Silent gate; restore Automatik + EVCS 0 A. Core: `integrations/ehal_write_test.py` (+ bounds), UI `ui/ehal_write_test.py`. Tests: `tests/test_ehal_write_test.py`. Docs: `docs/ui/ehal-com.md` § Schreibtest. **Verified** greenfield / HouseSim HA (mode + active power; Force unlocks table row, does not auto-send).
+
+### Bugfix EHAL-Com HA credentials save (2026-09-25)
+
+- [x] **EHAL-Com — HA credentials editable without dedicated save.** Credentials on HA mapping (`ui/ehal_ha_mapping.py`) persist via mapping save → `write_ha_dotenv` / `adapter_id` in config (**2.6.i**); primary Anbindung remains on Smarthome-Backend. **Verified** by user 2026-09-25.
+
+### 2.6.i — HA credentials in `.env` (Loxone parity) (2026-09-25)
+
+- [x] **2.6.i — HA credentials in `.env` (Loxone parity).** `EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN` in `config/.env` (merge-upsert with `LOXONE_*`); `ehal.backend` / `sign` stay in `config.json`. One-shot migrate strips JSON secrets (`runtime_store/ha_secrets_migrate.py`). SB + EHAL-Com write via `write_ha_dotenv`. Add-on: empty `.env` → Supervisor proxy unchanged. OpenEMS still `config.json` (follow-up). Tests: `test_dotenv_io`, `test_ha_secrets_migrate`, readiness/setup/addon. Docs/schema/snippet updated.
+
 ### HouseSim S4 — HAOS acceptance verified (2026-09-25)
 
-- [x] **HouseSim S4 — HAOS acceptance** (concept §5 Abnahme; Spec [`docs/spec/house-sim.md`](../docs/spec/house-sim.md) § S4). Verified on live HA: sync/copy integration → restart; config flow `evcc_en` (+ weather PV); Earnie `ehal.backend=ha` via **2.6.h** EHAL-Com; read path (PV/SoC/grid±/counters — early wrong EVCS/PV bindings corrected); faults (`reject_writes` / `set_unavailable`); HA restart keeps energy counters monotonic. **Deferred:** Write path (battery setpoint → SoC/grid next tick) — to be covered by a new testing feature in [Backlog.md](Backlog.md) (not re-opened here).
+- [x] **HouseSim S4 — HAOS acceptance** (concept §5 Abnahme; Spec [`docs/spec/house-sim.md`](../docs/spec/house-sim.md) § S4). Verified on live HA: sync/copy integration → restart; config flow `evcc_en` (+ weather PV); Earnie `ehal.backend=ha` via **2.6.h** EHAL-Com; read path (PV/SoC/grid±/counters — early wrong EVCS/PV bindings corrected); faults (`reject_writes` / `set_unavailable`); HA restart keeps energy counters monotonic. Write path (battery setpoint → SoC/grid) covered by **EHAL-Com Schreibtest** (verified 2026-09-25).
 
 ### HouseSim S4 — Simulated house as HA custom integration (2026-09-24)
 
-- [x] **HouseSim S4 — Simulated house as HA custom integration.** Optional follow-up after **2.6.h** (no S2/S3). Custom integration `earnie_house_sim` for Synology HAOS / `ha_lab/haos-docker`: config flow (archetype + PV source), coordinator ticks pure core on wall clock, native `sensor` / `number` / `switch` with archetype IDs (fixture `input_number.ess_*` → `number.ess_*`), one HA device per component. Shared core `house_sim/core/` (no HA/Earnie imports; thermal Euler + weather PV + scenario overlay); used by mock REST and integration. Packaging variant 1: `scripts/sync_house_sim_integration.py` → `_core/` + `fixtures/` (generated); pytest equality + import-isolation. Energy counters `total_increasing` persisted; PV from HA `weather` `cloud_coverage` or synthetic series; services for scenarios/faults. Earnie via **2.6.h** UI unchanged. Code home `house_sim/ha_integration/custom_components/earnie_house_sim/`. Spec: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md). Live HAOS acceptance → verified 2026-09-25 (Write deferred to new Backlog testing feature).
+- [x] **HouseSim S4 — Simulated house as HA custom integration.** Optional follow-up after **2.6.h** (no S2/S3). Custom integration `earnie_house_sim` for Synology HAOS / `ha_lab/haos-docker`: config flow (archetype + PV source), coordinator ticks pure core on wall clock, native `sensor` / `number` / `switch` with archetype IDs (fixture `input_number.ess_*` → `number.ess_*`), one HA device per component. Shared core `house_sim/core/` (no HA/Earnie imports; thermal Euler + weather PV + scenario overlay); used by mock REST and integration. Packaging variant 1: `scripts/sync_house_sim_integration.py` → `_core/` + `fixtures/` (generated); pytest equality + import-isolation. Energy counters `total_increasing` persisted; PV from HA `weather` `cloud_coverage` or synthetic series; services for scenarios/faults. Earnie via **2.6.h** UI unchanged. Code home `house_sim/ha_integration/custom_components/earnie_house_sim/`. Spec: [`docs/spec/house-sim.md`](../docs/spec/house-sim.md). Live HAOS acceptance → verified 2026-09-25 (Write path later covered by EHAL-Com Schreibtest).
 
 ### 2.6.h — HA EHAL-Com UX parity with Loxone (2026-09-23)
 

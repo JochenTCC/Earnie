@@ -376,6 +376,9 @@ def render_loxone_debug_block() -> None:
     render_status_strip(main_state)
     render_live_reads_section()
     render_last_writes_section(main_state)
+    from ui.ehal_write_test import render_write_test_section
+
+    render_write_test_section()
     render_last_run_snapshot_expander(main_state)
 
 from ui.loxone_debug_rows import (  # noqa: E402

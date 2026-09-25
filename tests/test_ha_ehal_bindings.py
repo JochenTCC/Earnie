@@ -67,7 +67,9 @@ def test_migrate_empty_only_does_not_overwrite():
     assert house["plant"]["ehal_bindings"]["sens_grid_power_active"] == "sensor.grid"
 
 
-def test_ensure_migrated_strips_ha_entities():
+def test_ensure_migrated_strips_ha_entities(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", str(tmp_path / ".env"))
     entities = _golden_entities()
     config = {
         "ehal": {
@@ -85,8 +87,11 @@ def test_ensure_migrated_strips_ha_entities():
     assert aggregate_ha_entities(house)["sens_ess_soc"] == entities["sens_ess_soc"]
     assert config_out["ehal"]["ha"]["entities"] == {}
     assert config_out["ehal"]["ha"]["sign"]["sens_grid_power_active"] == "ehal"
+    assert "base_url" not in config_out["ehal"]["ha"]
+    assert "token" not in config_out["ehal"]["ha"]
     stripped = strip_migrated_config_keys(config)
     assert stripped["ehal"]["ha"]["entities"] == {}
+    assert "base_url" not in stripped["ehal"]["ha"]
 
 
 def test_apply_ha_entities_overwrites_and_clears():

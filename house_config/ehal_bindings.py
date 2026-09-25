@@ -454,7 +454,8 @@ def ensure_migrated(
     """One-shot in-memory migration of blocks/consumer nests → entity bindings.
 
     Also migrates flat ``ehal.ha.entities`` → Pattern B (2.6.g) and strips the
-    flat map when ``strip_legacy`` is true.
+    flat map when ``strip_legacy`` is true. With ``strip_legacy``, also moves
+    ``ehal.ha`` URL/token into ``.env`` and strips those JSON keys (2.6.i).
     """
     from house_config.ha_ehal_bindings import (
         migrate_ha_entities_to_house,
@@ -505,6 +506,12 @@ def ensure_migrated(
             config, stripped = strip_ha_entities_from_config(config)
             if stripped:
                 changed = True
+    if strip_legacy:
+        from runtime_store.ha_secrets_migrate import migrate_ha_secrets_to_dotenv
+
+        config, secret_changed = migrate_ha_secrets_to_dotenv(config)
+        if secret_changed:
+            changed = True
     return house, config, changed
 
 
@@ -564,9 +571,11 @@ _OBSOLETE_BLOCK_KEYS: frozenset[str] = frozenset(
 def strip_migrated_config_keys(config_doc: dict | None) -> dict:
     """Drop legacy Merker event-trigger keys; drop migrated/obsolete ``loxone_blocks`` keys.
 
-    Also clears flat ``ehal.ha.entities`` after Pattern B migrate (2.6.g).
+    Also clears flat ``ehal.ha.entities`` after Pattern B migrate (2.6.g) and
+    strips ``ehal.ha`` URL/token keys (2.6.i; dotenv write is separate).
     """
     from house_config.ha_ehal_bindings import strip_ha_entities_from_config
+    from runtime_store.ha_secrets_migrate import strip_ha_secrets_from_config
 
     config = copy.deepcopy(config_doc) if isinstance(config_doc, dict) else {}
     system = dict(config.get("system") or {}) if isinstance(config.get("system"), dict) else {}
@@ -587,4 +596,5 @@ def strip_migrated_config_keys(config_doc: dict | None) -> dict:
         else:
             config.pop("loxone_blocks", None)
     config, _ = strip_ha_entities_from_config(config)
+    config, _ = strip_ha_secrets_from_config(config)
     return config

@@ -43,7 +43,7 @@ Add-on-Optionen (`config.yaml` → `options`) sind ein optionales Zusatzangebot,
 | `auto_start_main` (Default `true`) | `EARNIE_AUTO_START_MAIN` | nein |
 | `timezone` (Default `Europe/Vienna`) | `TZ` | nein |
 
-Loxone-Zugangsdaten gehören **nicht** in die Supervisor-Optionen — sie werden in der Earnie-Oberfläche unter **Smarthome-Backend** bzw. in `config.json` gepflegt.
+Loxone- und HA-Zugangsdaten gehören **nicht** in die Supervisor-Optionen — sie werden in der Earnie-Oberfläche unter **Smarthome-Backend** bzw. in `config/.env` gepflegt (im Add-on oft leer → Supervisor-Proxy).
 
 ### Options → `config.json` (Add-on 0.2)
 

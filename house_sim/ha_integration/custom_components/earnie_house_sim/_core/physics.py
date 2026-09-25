@@ -7,7 +7,12 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Any
 
-from .archetype import ArchetypePackage, StateWriter, project_physics_to_store
+from .archetype import (
+    ArchetypePackage,
+    StateWriter,
+    battery_energy_entity_id,
+    project_physics_to_store,
+)
 from .thermal import simulate_next_temp_c
 
 
@@ -63,6 +68,8 @@ class PhysicsState:
     grid_export_energy_kwh: float
     temp_c: float | None
     ambient_c: float | None
+    ess_charge_energy_kwh: float = 0.0
+    ess_discharge_energy_kwh: float = 0.0
 
     def as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -76,6 +83,8 @@ class PhysicsState:
             "pv_energy_kwh": self.pv_energy_kwh,
             "grid_import_energy_kwh": self.grid_import_energy_kwh,
             "grid_export_energy_kwh": self.grid_export_energy_kwh,
+            "ess_charge_energy_kwh": self.ess_charge_energy_kwh,
+            "ess_discharge_energy_kwh": self.ess_discharge_energy_kwh,
         }
         if self.temp_c is not None:
             out["temp_c"] = self.temp_c
@@ -86,6 +95,10 @@ class PhysicsState:
 
 def _fixture_energy_kwh(package: ArchetypePackage, field: str, default: float) -> float:
     entity_id = str(package.ehal_entities.get(field) or "").strip()
+    return _fixture_state_kwh(package, entity_id, default)
+
+
+def _fixture_state_kwh(package: ArchetypePackage, entity_id: str, default: float) -> float:
     if not entity_id:
         return float(default)
     for item in package.entities:
@@ -118,6 +131,12 @@ def initial_physics(package: ArchetypePackage) -> PhysicsState:
         ),
         temp_c=float(thermal["initial_temp_c"]) if thermal else None,
         ambient_c=float(thermal["ambient_c"]) if thermal else None,
+        ess_charge_energy_kwh=_fixture_state_kwh(
+            package, battery_energy_entity_id(package, "charge"), 0.0
+        ),
+        ess_discharge_energy_kwh=_fixture_state_kwh(
+            package, battery_energy_entity_id(package, "discharge"), 0.0
+        ),
     )
 
 
@@ -184,6 +203,9 @@ def step_physics(
     pv_delta = max(0.0, float(pv_kw)) * float(dt_h)
     import_delta = max(0.0, float(grid_kw)) * float(dt_h)
     export_delta = max(0.0, -float(grid_kw)) * float(dt_h)
+    # EHAL sign: + discharge, − charge.
+    charge_delta = max(0.0, -ess_kw) * float(dt_h)
+    discharge_delta = max(0.0, ess_kw) * float(dt_h)
 
     temp_c = state.temp_c
     ambient_c = state.ambient_c
@@ -217,6 +239,8 @@ def step_physics(
         grid_export_energy_kwh=state.grid_export_energy_kwh + export_delta,
         temp_c=temp_c,
         ambient_c=ambient_c,
+        ess_charge_energy_kwh=state.ess_charge_energy_kwh + charge_delta,
+        ess_discharge_energy_kwh=state.ess_discharge_energy_kwh + discharge_delta,
     )
 
 

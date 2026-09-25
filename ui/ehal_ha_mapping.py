@@ -21,6 +21,7 @@ from integrations.ha_ehal_mapping import (
     heuristic_propose,
     resolve_field_select_default,
 )
+from runtime_store.ehal_setup import BACKEND_HA, default_adapter_id, resolve_adapter_id
 from ui.ehal_loxone_mapping import (
     PLANT_ENTITY_ID,
     apply_entity_bindings,
@@ -59,14 +60,17 @@ def _proposed_entity_id(proposals: dict[str, dict[str, Any]], field: str) -> str
 
 
 def _ha_credentials(data: dict) -> dict[str, Any]:
+    from runtime_store.dotenv_io import read_ha_credentials
+
     ehal = data.get("ehal") if isinstance(data.get("ehal"), dict) else {}
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
     raw_sign = dict(ha.get("sign") or {}) if isinstance(ha.get("sign"), dict) else {}
+    base_url, token = read_ha_credentials()
     return {
         "backend": str(ehal.get("backend") or ""),
-        "adapter_id": str(ehal.get("adapter_id") or "earnie-hems"),
-        "base_url": str(ha.get("base_url") or "").strip(),
-        "token": str(ha.get("token") or "").strip(),
+        "adapter_id": resolve_adapter_id(ehal.get("adapter_id"), BACKEND_HA),
+        "base_url": base_url,
+        "token": token,
         "sign": canonicalize_ha_entity_keys(
             {str(k): str(v) for k, v in raw_sign.items()}
         ),
@@ -99,7 +103,7 @@ def _adapter_from_form(base_url: str, token: str, entities: dict[str, str]) -> H
         HaConfig(
             base_url=resolved_url,
             token=resolved_token,
-            adapter_id="earnie-hems",
+            adapter_id=default_adapter_id(BACKEND_HA),
             entities=entities,
         )
     )
@@ -187,9 +191,9 @@ def _render_credentials_form(current: dict[str, Any]) -> tuple[str, str, str]:
     ).strip()
     adapter_id = st.text_input(
         "adapter_id",
-        value=current["adapter_id"] or "earnie-hems",
+        value=resolve_adapter_id(current.get("adapter_id"), BACKEND_HA),
         key="ehal_ha_adapter_id",
-    ).strip() or "earnie-hems"
+    ).strip() or default_adapter_id(BACKEND_HA)
     return base_url, token, adapter_id
 
 
@@ -362,6 +366,8 @@ def _save_entity_mapping(
     sign: dict[str, str],
 ) -> None:
     from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
+    from runtime_store.dotenv_io import write_ha_dotenv
+    from runtime_store.dotenv_loader import load_app_dotenv
 
     error = _validate_mapping_save(entity_id, ehal_map)
     if error:
@@ -374,6 +380,13 @@ def _save_entity_mapping(
             "(oder SUPERVISOR_TOKEN beim Betrieb als Home-Assistant-Add-on)."
         )
         return
+    try:
+        # Never persist SUPERVISOR_TOKEN — empty token stays empty in .env.
+        write_ha_dotenv(resolved_url, token)
+    except (OSError, PermissionError) as exc:
+        st.error(f"Speichern der .env fehlgeschlagen: {exc}")
+        return
+    load_app_dotenv(override=True)
     migrated_house, migrated_config, _ = ensure_migrated(house, config_doc)
     updated = apply_entity_bindings(
         migrated_house,
@@ -393,8 +406,6 @@ def _save_entity_mapping(
         else {}
     )
     ehal["ha"] = {
-        "base_url": resolved_url,
-        "token": token,  # never persist SUPERVISOR_TOKEN
         "entities": {},
         "sign": sign if entity_id == PLANT_ENTITY_ID else existing_sign,
     }
@@ -409,12 +420,13 @@ def _save_entity_mapping(
 
 
 def render_ehal_ha_mapping_section() -> None:
-    """Entity-picker HITL; persists Pattern B bindings + ehal.ha credentials."""
+    """Entity-picker HITL; persists Pattern B bindings; HA secrets in .env."""
     st.caption(
         "Entity-zentriertes Mapping (wie Loxone): zuerst Entity wählen "
         "(Anlage + Verbraucher aus dem Live-Hausprofil), dann nur deren EHAL-Felder. "
         "Scan einmal pro Session → Heuristik schlägt leere Felder vor → prüfen → "
         "Mapping speichern in `plant` / `consumers[].ehal_bindings`. "
+        "Zugangsdaten in `config/.env` (`EHAL_HA_*`). "
         "Gespeicherte Bindings werden nicht überschrieben. Kein LLM."
     )
 

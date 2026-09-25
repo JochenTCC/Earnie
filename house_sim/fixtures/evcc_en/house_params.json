@@ -4,6 +4,10 @@
   "load_kw": 1.5,
   "initial_evcs_power_w": 0.0,
   "thermal_entity_id": "sensor.house_sim_buffer_temp",
+  "battery_energy_entities": {
+    "charge": "sensor.evcc_battery_charge_energy",
+    "discharge": "sensor.evcc_battery_discharge_energy"
+  },
   "thermal": {
     "initial_temp_c": 42.0,
     "ambient_c": 18.0,

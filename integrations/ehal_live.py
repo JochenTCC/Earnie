@@ -150,11 +150,12 @@ def get_ha_adapter() -> HaAdapter:
     token = resolve_ha_token(str(config.get("EHAL_HA_TOKEN") or ""))
     if not base_url:
         raise ValueError(
-            "ehal.backend=ha requires ehal.ha.base_url (EHAL_HA_BASE_URL)."
+            "ehal.backend=ha requires EHAL_HA_BASE_URL in config/.env "
+            "(or Supervisor Core URL in the Home Assistant add-on)."
         )
     if not token:
         raise ValueError(
-            "ehal.backend=ha requires ehal.ha.token (EHAL_HA_TOKEN), "
+            "ehal.backend=ha requires EHAL_HA_TOKEN in config/.env, "
             "or SUPERVISOR_TOKEN when running as the Home Assistant add-on."
         )
     aggregated = aggregate_ha_entities(load_house_profiles_for_ha())

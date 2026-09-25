@@ -1,4 +1,4 @@
-"""Lesen und Schreiben der Loxone-Zugangsdaten in config/.env."""
+"""Lesen und Schreiben der Zugangsdaten (Loxone / HA) in config/.env."""
 from __future__ import annotations
 
 import os
@@ -11,11 +11,14 @@ _IPV4_RE = re.compile(
     r"^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}"
     r"(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$"
 )
+_ENV_ASSIGN_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 
 _PLACEHOLDER_USERS = frozenset({"name-des-benutzers-in-der-loxone"})
 _PLACEHOLDER_PASSES = frozenset({"passwort-des-benutzers-in-der-loxone"})
 
 _LOXONE_KEYS = ("LOXONE_IP", "LOXONE_USER", "LOXONE_PASS")
+_HA_KEYS = ("EHAL_HA_BASE_URL", "EHAL_HA_TOKEN")
+_QUOTED_KEYS = frozenset({"LOXONE_USER", "LOXONE_PASS", "EHAL_HA_TOKEN"})
 
 
 def _normalized_env_value(key: str) -> str:
@@ -37,6 +40,14 @@ def read_loxone_credentials() -> tuple[str, str, str]:
         _normalized_env_value("LOXONE_IP"),
         _normalized_env_value("LOXONE_USER"),
         _normalized_env_value("LOXONE_PASS"),
+    )
+
+
+def read_ha_credentials() -> tuple[str, str]:
+    """Return ``(base_url, token)`` from the process environment (normalized)."""
+    return (
+        _normalized_env_value("EHAL_HA_BASE_URL"),
+        _normalized_env_value("EHAL_HA_TOKEN"),
     )
 
 
@@ -160,6 +171,17 @@ def read_loxone_dotenv_file(path: str) -> tuple[str, str, str]:
     )
 
 
+def read_ha_dotenv_file(path: str) -> tuple[str, str]:
+    """Return ``(base_url, token)`` from a specific .env file."""
+    from dotenv import dotenv_values
+
+    vals = dotenv_values(path)
+    return (
+        str(vals.get("EHAL_HA_BASE_URL") or "").strip().strip('"'),
+        str(vals.get("EHAL_HA_TOKEN") or "").strip().strip('"'),
+    )
+
+
 def _loxone_credentials_fingerprint(ip: str, user: str, password: str) -> str:
     import hashlib
 
@@ -206,15 +228,43 @@ def import_loxone_dotenv_from(source_path: str) -> str:
     return write_loxone_dotenv(ip, user, password)
 
 
+def _escape_dotenv_value(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _format_env_assignment(key: str, value: str) -> str:
+    if key in _QUOTED_KEYS:
+        return f'{key}="{_escape_dotenv_value(value)}"\n'
+    return f"{key}={value}\n"
+
+
 def format_loxone_dotenv(ip: str, user: str, password: str) -> str:
-    """Erzeugt den Inhalt von config/.env (ohne optionale Kommentarzeilen)."""
-    escaped_user = user.strip().replace("\\", "\\\\").replace('"', '\\"')
-    escaped_pass = password.replace("\\", "\\\\").replace('"', '\\"')
+    """Erzeugt nur die Loxone-Zeilen (ohne Merge; Tests / Vorlagen)."""
     return (
-        f'LOXONE_USER="{escaped_user}"\n'
-        f'LOXONE_PASS="{escaped_pass}"\n'
-        f"LOXONE_IP={ip.strip()}\n"
+        _format_env_assignment("LOXONE_USER", user.strip())
+        + _format_env_assignment("LOXONE_PASS", password)
+        + _format_env_assignment("LOXONE_IP", ip.strip())
     )
+
+
+def _merge_dotenv_content(existing: str | None, updates: dict[str, str]) -> str:
+    """Replace or append KEY=value lines; preserve other lines and comments."""
+    pending = dict(updates)
+    lines_out: list[str] = []
+    source = existing or ""
+    for raw_line in source.splitlines(keepends=True):
+        stripped = raw_line.rstrip("\r\n")
+        match = _ENV_ASSIGN_RE.match(stripped)
+        if match and match.group(1) in pending:
+            key = match.group(1)
+            lines_out.append(_format_env_assignment(key, pending.pop(key)))
+            continue
+        lines_out.append(raw_line if raw_line.endswith("\n") else raw_line + "\n")
+    if lines_out and not lines_out[-1].endswith("\n"):
+        lines_out[-1] = lines_out[-1] + "\n"
+    for key, value in pending.items():
+        lines_out.append(_format_env_assignment(key, value))
+    return "".join(lines_out)
 
 
 def _read_text_file(path: str) -> str | None:
@@ -267,24 +317,14 @@ def _cleanup_tmp_file(tmp_path: str) -> None:
             pass
 
 
-def write_loxone_dotenv(ip: str, user: str, password: str) -> str:
-    """
-    Schreibt Loxone-Zugangsdaten atomar nach config/.env.
-
-    Returns:
-        Pfad der geschriebenen Datei.
-    """
-    error = validate_loxone_credentials(ip, user, password)
-    if error:
-        raise ValueError(error)
-
+def _atomic_write_dotenv(content: str) -> str:
+    """Atomically write full .env content; returns path."""
     path = resolve_dotenv_path()
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
     _assert_dotenv_target_usable(path)
 
-    content = format_loxone_dotenv(ip, user, password)
     backup = _read_text_file(path) if os.path.isfile(path) else None
     tmp_path = f"{path}.tmp"
     try:
@@ -319,3 +359,47 @@ def write_loxone_dotenv(ip: str, user: str, password: str) -> str:
         except OSError:
             pass
     return path
+
+
+def upsert_dotenv_keys(updates: dict[str, str]) -> str:
+    """Merge KEY=value updates into the active .env; preserve other keys/lines."""
+    if not updates:
+        return resolve_dotenv_path()
+    path = resolve_dotenv_path()
+    existing = _read_text_file(path) if os.path.isfile(path) else None
+    content = _merge_dotenv_content(existing, updates)
+    return _atomic_write_dotenv(content)
+
+
+def write_loxone_dotenv(ip: str, user: str, password: str) -> str:
+    """
+    Schreibt Loxone-Zugangsdaten atomar nach config/.env (merge-upsert).
+
+    Returns:
+        Pfad der geschriebenen Datei.
+    """
+    error = validate_loxone_credentials(ip, user, password)
+    if error:
+        raise ValueError(error)
+    return upsert_dotenv_keys(
+        {
+            "LOXONE_USER": user.strip(),
+            "LOXONE_PASS": password,
+            "LOXONE_IP": ip.strip(),
+        }
+    )
+
+
+def write_ha_dotenv(base_url: str, token: str) -> str:
+    """
+    Schreibt HA base_url/token atomar nach config/.env (merge-upsert).
+
+    Empty token is allowed (Supervisor add-on resolves SUPERVISOR_TOKEN at runtime).
+    Never persist SUPERVISOR_TOKEN itself.
+    """
+    return upsert_dotenv_keys(
+        {
+            "EHAL_HA_BASE_URL": str(base_url or "").strip(),
+            "EHAL_HA_TOKEN": str(token or "").strip(),
+        }
+    )

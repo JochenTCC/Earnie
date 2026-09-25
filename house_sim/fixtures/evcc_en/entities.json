@@ -29,6 +29,8 @@
       "entity_ids": [
         "sensor.evcc_battery_soc",
         "sensor.evcc_battery_power",
+        "sensor.evcc_battery_charge_energy",
+        "sensor.evcc_battery_discharge_energy",
         "input_number.ess_active_power_w",
         "input_number.ess_charge_limit_w",
         "input_number.ess_discharge_limit_w",
@@ -125,6 +127,26 @@
         "unit_of_measurement": "W",
         "friendly_name": "evcc Battery Power",
         "state_class": "measurement"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_battery_charge_energy",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc Battery Charge Energy",
+        "state_class": "total_increasing"
+      }
+    },
+    {
+      "entity_id": "sensor.evcc_battery_discharge_energy",
+      "state": "0.0",
+      "attributes": {
+        "device_class": "energy",
+        "unit_of_measurement": "kWh",
+        "friendly_name": "evcc Battery Discharge Energy",
+        "state_class": "total_increasing"
       }
     },
     {

@@ -28,14 +28,14 @@ Für neue Setups ohne bestehende Loxone-Anlage lautet die offizielle DACH-Empfeh
 
 Die Auswahl schreibt `ehal.backend` in `config.json` und leert dabei den Adapter-Cache.
 
-### Manuell in `config.json`
+### Manuell in `config.json` / `.env`
 
 Für Home Assistant und OpenEMS liegen passende Snippets unter `share/config/`:
 
-- HA: `[ehal.ha.snippet.json](../../share/config/ehal.ha.snippet.json)`
+- HA: `[ehal.ha.snippet.json](../../share/config/ehal.ha.snippet.json)` (`ehal.backend` / `sign`; URL und Token gehören in `config/.env`)
 - OpenEMS: `[ehal.openems.snippet.json](../../share/config/ehal.openems.snippet.json)`
 
-Die Loxone-Zugangsdaten liegen dagegen in `config/.env` (`LOXONE_IP`, `LOXONE_USER`, `LOXONE_PASS`), die Merker-Namen stehen in `plant.ehal_bindings` bzw. im Hausprofil. Details dazu: [Loxone-Signale](../referenz/loxone-signals.md).
+Loxone- und HA-Zugangsdaten liegen in `config/.env` (`LOXONE_IP` / `LOXONE_USER` / `LOXONE_PASS` bzw. `EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`). Merker-/Entity-Namen stehen in `plant.ehal_bindings` bzw. im Hausprofil. Details: [Loxone-Signale](../referenz/loxone-signals.md), [Home Assistant + evcc](ha-evcc.md).
 
 Nach jedem Wechsel sollte die Verbindung auf **EHAL-Com** (Live-Lesen / Verbindungstest) geprüft werden, bevor der Silent-Modus ausgeschaltet wird.
 

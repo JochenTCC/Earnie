@@ -90,6 +90,14 @@ def load_archetype(name: str, *, fixtures_dir: Path | None = None) -> ArchetypeP
     )
 
 
+def battery_energy_entity_id(package: ArchetypePackage, direction: str) -> str:
+    """Sim-only battery kWh counter (``charge`` / ``discharge``); not an EHAL field."""
+    raw = package.house_params.get("battery_energy_entities")
+    if not isinstance(raw, dict):
+        return ""
+    return str(raw.get(direction) or "").strip()
+
+
 def project_physics_to_store(
     store: StateWriter,
     *,
@@ -121,6 +129,12 @@ def project_physics_to_store(
             store.set_state(entity_id, f"{float(value):.6f}")
         else:
             store.set_state(entity_id, f"{float(value):.1f}")
+
+    for direction in ("charge", "discharge"):
+        entity_id = battery_energy_entity_id(package, direction)
+        phys_key = f"ess_{direction}_energy_kwh"
+        if entity_id and phys_key in physics:
+            store.set_state(entity_id, f"{float(physics[phys_key]):.6f}")
 
     thermal_id = str(package.house_params.get("thermal_entity_id") or "").strip()
     if thermal_id and "temp_c" in physics:

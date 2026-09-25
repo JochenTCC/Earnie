@@ -15,7 +15,7 @@ The **smarthome backend** itself is picked on [Smarthome-Backend](smarthome-back
 | Backend        | Storage                                       | Mapping on this page                                 |
 | -------------- | --------------------------------------------- | ------------------------------------------------------ |
 | Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) | Loxone Structure → EHAL Mapping                        |
-| Home Assistant | `config.json` → `ehal.ha` (URL/Token/`sign`) | HA Entity → EHAL Mapping → `plant` / `consumers[].ehal_bindings` |
+| Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); `sign` in `config.json` → `ehal.ha` | HA Entity → EHAL Mapping → `plant` / `consumers[].ehal_bindings` |
 | OpenEMS        | `config.json` → `ehal.openems`                | (credentials on Smarthome-Backend)                     |
 
 
@@ -256,11 +256,39 @@ Units and signs: see §B. Full role matrix: §C.
 - **Loxone:** trace `loxone_writes` (IO name is traced back to the EHAL field); silent: planned setpoints from `loxone_sent` with status "not sent".
 - **HA / OpenEMS:** `ehal_writes` (field, value, success, time, message); error banner from `runtime/ehal_write_error.json`.
 
+### Schreibtest
 
+Unter **Live-Schreiben** liegt der Expander **Schreibtest**: gemappte Probe-Felder in einer **Tabelle** (Senden-Haken + Wert), mit **einem** Klick als ein Setpoint-Dokument schreiben. Optional **Auto-Roundtrip** (Schreiben → kurze Wartezeit → Lesen je Feld → Vergleich → Wiederherstellen). Es wird derselbe Adapter-Pfad wie im Produktiv-Lauf genutzt (`adapter.write_setpoints`).
+
+**Voraussetzungen**
+
+- Silent-Modus **aus** (gleiche Sperre wie der Daemon). Bei Silent sind die Buttons deaktiviert.
+- Nur **gemappte** Probe-Felder: `set_ess_mode`, `set_ess_charge_power_limit`, `set_ess_discharge_power_limit`, `set_evcs_max_current`.
+- Bestätigungsdialog vor jedem Live-Schreiben.
+
+**Grenzen (nützliche / sichere Werte)**
+
+| Feld | Bereich |
+|------|---------|
+| Limits (Laden/Entladen) | `0 … max_power_kw` (als W auf dem Wire) |
+| `set_evcs_max_current` | `0 … min(Nennstrom, 6 A)` |
+| `set_ess_mode` | `0` Automatik / `1` Laden / `2` Entladen |
+
+**Force ESS-Leistung:** Checkbox blendet die Tabellenzeile ``set_ess_active_power`` ein (Default 100 W, hart ±200 W) mit **zweiter** Bestätigung beim Senden. Die Checkbox allein schreibt nichts — Wert setzen und **Alle schreiben** / **Auto-Roundtrip**. HouseSim nutzt für die Physik nur die Active-Power-Sollwert-Entity, nicht den Mode-Hint.
+
+**Auto-Roundtrip**
+
+| Ergebnis | Bedeutung |
+|----------|-----------|
+| Pass | Schreiben OK, Echo stimmt (Toleranz abs ≤ 1 bzw. relativ ≤ 1 %) |
+| Partial | Schreiben OK, aber kein lesbares Echo (z. B. OpenEMS ohne Channel-Readback) |
+| Fail / Write-Error | Mismatch oder Adapterfehler |
+
+Nach Auto-Roundtrip werden immer sichere Sollwerte geschrieben (ESS Automatik, EVCS 0 A). Manuell: Button **Sicher wiederherstellen**. HouseSim/Lab-Adapter werden nur per Hinweis erkannt (kein Hard-Block).
 
 ### HA Entity → EHAL Mapping
 
-Only with backend **Home Assistant**: entity-centric HITL (same Pattern B shape as Loxone **2.4.k**). Pick an entity first (**plant** + consumers from the live house profile), then assign only that entity’s EHAL fields (grouped by device role under `share/ehal/roles/`). **Save mapping** writes that entity’s `ehal_bindings` only. Credentials and optional **`sign`** (plant) stay in `config.json` → `ehal.ha`.
+Only with backend **Home Assistant**: entity-centric HITL (same Pattern B shape as Loxone **2.4.k**). Pick an entity first (**plant** + consumers from the live house profile), then assign only that entity’s EHAL fields (grouped by device role under `share/ehal/roles/`). **Save mapping** writes that entity’s `ehal_bindings` only. Credentials live in `config/.env` (`EHAL_HA_*`); optional **`sign`** (plant) stays in `config.json` → `ehal.ha`.
 
 Workflow: scan `/api/states` once per Streamlit session (button refreshes) → heuristic proposes **empty** fields only → confirm → save. Saved bindings are never overwritten by propose; **no LLM**. After save, Live-Lesen / Live-Schreiben use the same entity-centric `EHAL-Feld` + Mapping column contract as Loxone (`{consumer_id}:field` for consumers).
 

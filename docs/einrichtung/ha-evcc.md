@@ -34,7 +34,7 @@ Persistenz Earnie: `ha_lab/config/` und `ha_lab/runtime/`. HA-Konfiguration: `ha
 ## Entity-Mapping (Human-in-the-Loop)
 
 1. In Home Assistant ein **Long-Lived Access Token** anlegen.
-2. Backend **Home Assistant** wählen und URL/Token auf **Daemon Control → Smarthome-Backend** eintragen (setzt `ehal.backend=ha`) — alternativ das Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) direkt in `config.json` übernehmen (IDs nur **Beispiele**).
+2. Backend **Home Assistant** wählen und URL/Token auf **Daemon Control → Smarthome-Backend** eintragen (schreibt `ehal.backend=ha` und `EHAL_HA_*` in `config/.env`) — alternativ `ehal.backend` aus dem Snippet [`share/config/ehal.ha.snippet.json`](../../share/config/ehal.ha.snippet.json) und die Zugangsdaten in `.env` setzen.
 3. Danach auf **Daemon Control → EHAL-Com** im Expander **HA Entity → EHAL Mapping**: Entities scannen (einmal pro Session), Entity wählen (Anlage oder Verbraucher), nur deren EHAL-Felder zuweisen, **Mapping speichern**.
 4. Optional **Telemetrie testen**. LLM-gestützte Vorschläge sind **nicht** Teil der ausgelieferten UI.
 

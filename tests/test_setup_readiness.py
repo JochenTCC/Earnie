@@ -411,13 +411,15 @@ def test_sb_configured_with_loxone_env_credentials(tmp_path, monkeypatch):
 
 def test_sb_configured_with_ha_backend_credentials(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.setenv("EHAL_HA_BASE_URL", "http://homeassistant:8123")
+    monkeypatch.setenv("EHAL_HA_TOKEN", "secret-token")
     _write(
         config_dir / "config.json",
         {
             "flexible_consumers": [],
             "ehal": {
                 "backend": "ha",
-                "ha": {"base_url": "http://homeassistant:8123", "token": "secret-token"},
+                "ha": {},
             },
         },
     )
@@ -427,11 +429,14 @@ def test_sb_configured_with_ha_backend_credentials(tmp_path, monkeypatch):
 
 def test_sb_not_configured_with_ha_backend_missing_token(tmp_path, monkeypatch):
     config_dir = _bind_config_paths(tmp_path, monkeypatch)
+    monkeypatch.setenv("EHAL_HA_BASE_URL", "http://homeassistant:8123")
+    monkeypatch.delenv("EHAL_HA_TOKEN", raising=False)
+    monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
     _write(
         config_dir / "config.json",
         {
             "flexible_consumers": [],
-            "ehal": {"backend": "ha", "ha": {"base_url": "http://homeassistant:8123"}},
+            "ehal": {"backend": "ha", "ha": {}},
         },
     )
 

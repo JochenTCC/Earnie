@@ -17,6 +17,13 @@ _BACKEND_LABELS = {
     BACKEND_OPENEMS: "OpenEMS",
 }
 
+_DEFAULT_ADAPTER_ID = {
+    BACKEND_LOXONE: "loxone-home",
+    BACKEND_HA: "earnie-hems",
+    BACKEND_OPENEMS: "openems-lab",
+}
+_KNOWN_DEFAULT_ADAPTER_IDS = frozenset(_DEFAULT_ADAPTER_ID.values())
+
 
 def backend_label(backend: str) -> str:
     return _BACKEND_LABELS.get(backend, backend)
@@ -29,6 +36,20 @@ def normalize_backend(raw: object) -> str:
     if value in (BACKEND_HA, BACKEND_OPENEMS):
         return value
     return BACKEND_LOXONE
+
+
+def default_adapter_id(backend: str) -> str:
+    """Canonical default ``adapter_id`` for the given hub backend."""
+    return _DEFAULT_ADAPTER_ID[normalize_backend(backend)]
+
+
+def resolve_adapter_id(stored: object, backend: str) -> str:
+    """Prefer a custom stored id; replace empty / foreign hub defaults."""
+    wanted = default_adapter_id(backend)
+    text = str(stored or "").strip()
+    if not text or (text in _KNOWN_DEFAULT_ADAPTER_IDS and text != wanted):
+        return wanted
+    return text
 
 
 def _read_config_json() -> dict[str, Any]:
@@ -50,10 +71,11 @@ def active_ehal_backend(raw_config: dict[str, Any] | None = None) -> str:
 
 def _ha_credentials_configured(ehal: dict[str, Any]) -> bool:
     from integrations.ha_supervisor import resolve_ha_base_url, resolve_ha_token
+    from runtime_store.dotenv_io import read_ha_credentials
 
-    ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
-    base_url = resolve_ha_base_url(str(ha.get("base_url") or ""))
-    token = resolve_ha_token(str(ha.get("token") or ""))
+    base_url_cfg, token_cfg = read_ha_credentials()
+    base_url = resolve_ha_base_url(base_url_cfg)
+    token = resolve_ha_token(token_cfg)
     return bool(base_url and token)
 
 

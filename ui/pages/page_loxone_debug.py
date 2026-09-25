@@ -23,6 +23,8 @@ _EHAL_COM_HELP = (
     "Live-Lesen zeigt `sens_*`/`get_*` mit EHAL-Feld und Backend-Mapping; "
     "Live-Schreiben die Schreibvorgänge (`set_*`, Flex-Freigabe/`set_enable`) "
     "aus dem Produktiv-Lauf von main.py. "
+    "**Schreibtest** erlaubt begrenzte manuelle Sollwerte und Auto-Roundtrip "
+    "(nur bei ausgeschaltetem Silent-Modus). "
     "Loxone-Bindings werden entity-zentriert unter "
     "Loxone Struktur → EHAL Mapping gepflegt. "
     "Außerplanmäßige Optimierung: Earnie_Request_Optimize (Port 8541)."

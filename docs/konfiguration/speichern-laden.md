@@ -27,7 +27,7 @@ Enthaltene Dateien:
 | `deviation_rules.json` | Soll/Ist-Regeln |
 | `uploads/*` | Profil-CSVs |
 
-**Nicht** enthalten: `config/.env` (Loxone-Zugangsdaten bleiben lokal).
+**Nicht** enthalten: `config/.env` (Loxone- und HA-Zugangsdaten bleiben lokal).
 
 Jedes JSON trägt das Feld `earnie_data_model` (aktuell `3`; Import akzeptiert weiterhin `1` und `2` und stuft beim Laden/Schreiben auf `3` hoch). Beim Import prüft Earnie die Kompatibilität; unbekannte Versionen werden abgelehnt.
 

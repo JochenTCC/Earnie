@@ -8,7 +8,10 @@ from ui import ehal_connection
 
 def test_persist_ehal_backend_writes_config(tmp_path, monkeypatch):
     config_path = tmp_path / "config.json"
-    config_path.write_text("{}", encoding="utf-8")
+    config_path.write_text(
+        json.dumps({"ehal": {"backend": "loxone", "adapter_id": "loxone-home"}}),
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(
         "ui.house_config_io.resolve_config_json_path", lambda: str(config_path)
@@ -23,7 +26,29 @@ def test_persist_ehal_backend_writes_config(tmp_path, monkeypatch):
     ehal_connection.persist_ehal_backend("ha")
     data = json.loads(config_path.read_text(encoding="utf-8"))
     assert data["ehal"]["backend"] == "ha"
+    assert data["ehal"]["adapter_id"] == "earnie-hems"
 
     ehal_connection.persist_ehal_backend("loxone")
     data = json.loads(config_path.read_text(encoding="utf-8"))
     assert data["ehal"]["backend"] == "loxone"
+    assert data["ehal"]["adapter_id"] == "loxone-home"
+
+
+def test_persist_ehal_backend_keeps_custom_adapter_id(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps({"ehal": {"backend": "loxone", "adapter_id": "prod-lab"}}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "ui.house_config_io.resolve_config_json_path", lambda: str(config_path)
+    )
+    monkeypatch.setattr(ehal_connection, "reset_adapter_cache", lambda: None)
+    monkeypatch.setattr(
+        "ui.house_config_io.config.reinit_config", lambda **kwargs: None
+    )
+
+    ehal_connection.persist_ehal_backend("ha")
+    data = json.loads(config_path.read_text(encoding="utf-8"))
+    assert data["ehal"]["adapter_id"] == "prod-lab"

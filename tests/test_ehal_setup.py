@@ -25,20 +25,38 @@ def test_load_ehal_params_defaults_to_loxone_backend():
     assert explicit["EHAL_ADAPTER_ID"] == "prod"
 
 
+def test_resolve_adapter_id_replaces_foreign_defaults():
+    assert ehal_setup.default_adapter_id("ha") == "earnie-hems"
+    assert ehal_setup.resolve_adapter_id("loxone-home", "ha") == "earnie-hems"
+    assert ehal_setup.resolve_adapter_id("openems-lab", "ha") == "earnie-hems"
+    assert ehal_setup.resolve_adapter_id("", "ha") == "earnie-hems"
+    assert ehal_setup.resolve_adapter_id("custom-ha", "ha") == "custom-ha"
+    assert ehal_setup.resolve_adapter_id("earnie-hems", "loxone") == "loxone-home"
+
+
+def test_load_ehal_params_ha_replaces_loxone_adapter_default():
+    from settings.config_loaders import load_ehal_params
+
+    params = load_ehal_params(
+        {"ehal": {"backend": "ha", "adapter_id": "loxone-home"}}
+    )
+    assert params["EHAL_BACKEND"] == "ha"
+    assert params["EHAL_ADAPTER_ID"] == "earnie-hems"
+
+
 def test_hub_credentials_ha_and_openems(tmp_path, monkeypatch):
     config_path = tmp_path / "config.json"
     monkeypatch.setattr(
         ehal_setup, "resolve_config_json_path", lambda: str(config_path)
     )
+    monkeypatch.setenv("EHAL_HA_BASE_URL", "http://homeassistant:8123")
+    monkeypatch.setenv("EHAL_HA_TOKEN", "secret-token")
     config_path.write_text(
         json.dumps(
             {
                 "ehal": {
                     "backend": "ha",
-                    "ha": {
-                        "base_url": "http://homeassistant:8123",
-                        "token": "secret-token",
-                    },
+                    "ha": {"sign": {}},
                 }
             }
         ),
@@ -63,19 +81,21 @@ def test_hub_credentials_ha_and_openems(tmp_path, monkeypatch):
 
 
 def test_hub_credentials_ha_via_supervisor_token(tmp_path, monkeypatch):
-    """Add-on: empty ehal.ha.token + SUPERVISOR_TOKEN counts as configured."""
+    """Add-on: empty EHAL_HA_* + SUPERVISOR_TOKEN counts as configured."""
     config_path = tmp_path / "config.json"
     monkeypatch.setattr(
         ehal_setup, "resolve_config_json_path", lambda: str(config_path)
     )
     monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
     monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+    monkeypatch.delenv("EHAL_HA_BASE_URL", raising=False)
+    monkeypatch.delenv("EHAL_HA_TOKEN", raising=False)
     config_path.write_text(
         json.dumps(
             {
                 "ehal": {
                     "backend": "ha",
-                    "ha": {"base_url": "", "token": ""},
+                    "ha": {},
                 }
             }
         ),
@@ -102,15 +122,14 @@ def test_require_loxone_credentials_false_for_ha(tmp_path, monkeypatch):
             {
                 "ehal": {
                     "backend": "ha",
-                    "ha": {
-                        "base_url": "http://homeassistant:8123",
-                        "token": "tok",
-                    },
+                    "ha": {},
                 }
             }
         ),
         encoding="utf-8",
     )
+    monkeypatch.setenv("EHAL_HA_BASE_URL", "http://homeassistant:8123")
+    monkeypatch.setenv("EHAL_HA_TOKEN", "tok")
     monkeypatch.setattr(dotenv_io, "loxone_setup_deferred", lambda: False)
     monkeypatch.setattr(
         "runtime_store.ehal_setup.resolve_config_json_path",
@@ -136,15 +155,14 @@ def test_deferred_loxone_does_not_block_live_for_ha(tmp_path, monkeypatch):
                 "flexible_consumers": [],
                 "ehal": {
                     "backend": "ha",
-                    "ha": {
-                        "base_url": "http://homeassistant:8123",
-                        "token": "tok",
-                    },
+                    "ha": {},
                 },
             }
         ),
         encoding="utf-8",
     )
+    monkeypatch.setenv("EHAL_HA_BASE_URL", "http://homeassistant:8123")
+    monkeypatch.setenv("EHAL_HA_TOKEN", "tok")
     monkeypatch.setattr(
         "runtime_store.ehal_setup.resolve_config_json_path",
         lambda: str(config_path),

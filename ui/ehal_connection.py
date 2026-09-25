@@ -12,7 +12,9 @@ from runtime_store.ehal_setup import (
     BACKEND_LOXONE,
     BACKEND_OPENEMS,
     backend_label,
+    default_adapter_id,
     normalize_backend,
+    resolve_adapter_id,
 )
 from ui.house_config_io import load_main_config, save_main_config
 
@@ -40,7 +42,7 @@ def render_anbindung_section(backend: str, *, form_key_prefix: str) -> None:
 
 
 def persist_ehal_backend(backend: str) -> None:
-    """Write ehal.backend and reload runtime config."""
+    """Write ehal.backend (+ matching default adapter_id) and reload runtime config."""
     resolved = normalize_backend(backend)
     data = load_main_config()
     ehal = _ehal_block(data)
@@ -48,6 +50,7 @@ def persist_ehal_backend(backend: str) -> None:
         ehal["backend"] = "loxone"
     else:
         ehal["backend"] = resolved
+    ehal["adapter_id"] = resolve_adapter_id(ehal.get("adapter_id"), resolved)
     data["ehal"] = ehal
     save_main_config(data)
     reset_adapter_cache()
@@ -89,10 +92,11 @@ def render_openems_connection_form(*, form_key: str = "ehal_openems_form") -> No
             "EVCS-Komponente",
             value=str(openems.get("evcs_component") or "evcs0"),
         ).strip() or "evcs0"
+        openems_default = default_adapter_id(BACKEND_OPENEMS)
         adapter_id = st.text_input(
             "adapter_id",
-            value=str(ehal.get("adapter_id") or "openems-lab"),
-        ).strip() or "openems-lab"
+            value=resolve_adapter_id(ehal.get("adapter_id"), BACKEND_OPENEMS),
+        ).strip() or openems_default
         submitted = st.form_submit_button("Speichern", type="primary")
 
     if not submitted:
@@ -120,13 +124,15 @@ def render_openems_connection_form(*, form_key: str = "ehal_openems_form") -> No
 
 
 def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
-    """Persist ehal.ha base_url/token (+ backend=ha); mapping stays in ehal_ha_mapping."""
+    """Persist HA URL/token to .env (+ backend=ha); mapping stays in ehal_ha_mapping."""
     from integrations.ha_supervisor import (
         SUPERVISOR_CORE_BASE_URL,
         resolve_ha_base_url,
         resolve_ha_token,
         supervisor_proxy_available,
     )
+    from runtime_store.dotenv_io import read_ha_credentials, write_ha_dotenv
+    from runtime_store.dotenv_loader import load_app_dotenv
 
     data = load_main_config()
     ehal = _ehal_block(data)
@@ -137,8 +143,11 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
         if use_supervisor
         else "http://homeassistant:8123"
     )
-    stored_url = str(ha.get("base_url") or "").strip()
-    st.caption("Zugangsdaten werden in `config.json` unter `ehal.ha` gespeichert.")
+    stored_url, stored_token = read_ha_credentials()
+    st.caption(
+        "Zugangsdaten werden in `config/.env` gespeichert "
+        "(`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`)."
+    )
     if use_supervisor:
         st.caption(
             "Als Home-Assistant-Add-on: leerer Token nutzt den Supervisor-Proxy "
@@ -159,7 +168,7 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
         )
         token = st.text_input(
             "Long-Lived Access Token",
-            value=str(ha.get("token") or ""),
+            value=stored_token,
             type="password",
             help=(
                 "Optional im Add-on: leer lassen, um SUPERVISOR_TOKEN zu verwenden."
@@ -167,10 +176,11 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
                 else None
             ),
         ).strip()
+        ha_default = default_adapter_id(BACKEND_HA)
         adapter_id = st.text_input(
             "adapter_id",
-            value=str(ehal.get("adapter_id") or "earnie-hems"),
-        ).strip() or "earnie-hems"
+            value=resolve_adapter_id(ehal.get("adapter_id"), BACKEND_HA),
+        ).strip() or ha_default
         submitted = st.form_submit_button("Speichern", type="primary")
 
     if not submitted:
@@ -187,14 +197,20 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
     # Prefer resolving empty URL via Supervisor defaults before persist when
     # the user left the field at the Supervisor Core proxy URL.
     resolved_url = resolve_ha_base_url(base_url) or base_url
+    # Never persist SUPERVISOR_TOKEN — keep empty so runtime resolves it.
+    try:
+        write_ha_dotenv(resolved_url, token)
+    except (OSError, PermissionError) as exc:
+        st.error(f"Speichern der .env fehlgeschlagen: {exc}")
+        return
+    load_app_dotenv(override=True)
     payload = dict(data)
     block = _ehal_block(payload)
     block["backend"] = BACKEND_HA
     block["adapter_id"] = adapter_id
     existing_ha = dict(ha)
-    existing_ha["base_url"] = resolved_url
-    # Never persist SUPERVISOR_TOKEN — keep empty so runtime resolves it.
-    existing_ha["token"] = token
+    existing_ha.pop("base_url", None)
+    existing_ha.pop("token", None)
     if "entities" not in existing_ha:
         existing_ha["entities"] = {}
     if "sign" not in existing_ha:
@@ -204,5 +220,5 @@ def render_ha_connection_form(*, form_key: str = "ehal_ha_conn_form") -> None:
     save_main_config(payload)
     reset_adapter_cache()
     config.reinit_config(require_loxone_credentials=False)
-    st.success("HA-Zugang gespeichert (`ehal.backend=ha`).")
+    st.success("HA-Zugang gespeichert (`ehal.backend=ha`, Zugangsdaten in `.env`).")
     st.rerun()

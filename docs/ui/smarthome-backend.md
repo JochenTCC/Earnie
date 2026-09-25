@@ -27,12 +27,12 @@ Same storage as before, just reached from here now:
 | Backend        | Storage                                       |
 | -------------- | ---------------------------------------------- |
 | Loxone         | `config/.env` (`LOXONE_IP` / `USER` / `PASS`) |
-| Home Assistant | `config.json` → `ehal.ha`                     |
+| Home Assistant | `config/.env` (`EHAL_HA_BASE_URL` / `EHAL_HA_TOKEN`); `sign` in `config.json` → `ehal.ha` |
 | OpenEMS        | `config.json` → `ehal.openems`                |
 
 For Loxone, `LOXONE_IP` may include an optional HTTP port (`192.168.178.1:85`; default without a port is 80).
 
-For Home Assistant and OpenEMS, the HTTP port is part of the Base-URL field (`ehal.ha.base_url` / `ehal.openems.base_url`) — there is no separate port input. Defaults embed `:8123` (HA) and `:8084` (OpenEMS); use e.g. `http://homeassistant:8124` or `http://openems-edge:8085` when the hub listens elsewhere.
+For Home Assistant and OpenEMS, the HTTP port is part of the Base-URL field (`EHAL_HA_BASE_URL` in `.env` / `ehal.openems.base_url`) — there is no separate port input. Defaults embed `:8123` (HA) and `:8084` (OpenEMS); use e.g. `http://homeassistant:8124` or `http://openems-edge:8085` when the hub listens elsewhere.
 
 Saving credentials sets `ehal.backend` and unlocks **EHAL-Com** and **Optimierer-Dienst**.
 

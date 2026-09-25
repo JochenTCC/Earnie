@@ -32,6 +32,7 @@ def _abort_config_error(exc: BaseException) -> None:
 def prepare_config_path() -> str:
     """Lädt .env und prüft, dass config.json existiert."""
     from runtime_store.dotenv_loader import load_app_dotenv
+    from runtime_store.ha_secrets_migrate import apply_ha_secrets_migration_to_disk
     from runtime_store.persist_paths import resolve_config_json_path
 
     load_app_dotenv(override=True)
@@ -39,6 +40,9 @@ def prepare_config_path() -> str:
     if not os.path.isfile(config_path):
         print(_missing_config_message(config_path), file=sys.stderr)
         raise SystemExit(1)
+    # 2.6.i: move ehal.ha base_url/token into .env before Config reads env.
+    if apply_ha_secrets_migration_to_disk():
+        load_app_dotenv(override=True)
     return config_path
 
 

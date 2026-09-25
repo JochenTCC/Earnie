@@ -141,6 +141,44 @@ def test_write_loxone_dotenv_creates_file(tmp_path, monkeypatch):
     assert "LOXONE_IP=10.0.0.5" in content
 
 
+def test_write_ha_dotenv_preserves_loxone_keys(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    env_path = config_dir / ".env"
+    env_path.write_text(
+        'LOXONE_USER="keep"\nLOXONE_PASS="secret"\nLOXONE_IP=10.0.0.1\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", "config/.env")
+
+    dotenv_io.write_ha_dotenv("http://homeassistant:8123", "ha-token")
+    content = env_path.read_text(encoding="utf-8")
+    assert 'LOXONE_USER="keep"' in content
+    assert "LOXONE_IP=10.0.0.1" in content
+    assert "EHAL_HA_BASE_URL=http://homeassistant:8123" in content
+    assert 'EHAL_HA_TOKEN="ha-token"' in content
+
+
+def test_write_loxone_dotenv_preserves_ha_keys(tmp_path, monkeypatch):
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    env_path = config_dir / ".env"
+    env_path.write_text(
+        'EHAL_HA_BASE_URL=http://homeassistant:8123\nEHAL_HA_TOKEN="tok"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EARNIE_DOTENV_PATH", "config/.env")
+
+    dotenv_io.write_loxone_dotenv("10.0.0.5", "loxuser", "loxpass")
+    content = env_path.read_text(encoding="utf-8")
+    assert "EHAL_HA_BASE_URL=http://homeassistant:8123" in content
+    assert 'EHAL_HA_TOKEN="tok"' in content
+    assert 'LOXONE_USER="loxuser"' in content
+    assert "LOXONE_IP=10.0.0.5" in content
+
+
 def test_write_loxone_dotenv_rejects_empty_user(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("EARNIE_DOTENV_PATH", "config/.env")

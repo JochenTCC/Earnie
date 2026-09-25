@@ -5,6 +5,7 @@ import json
 import os
 from typing import Any
 
+from runtime_store.ehal_setup import normalize_backend, resolve_adapter_id
 from runtime_store.persist_paths import resolve_dotenv_path
 from settings import legacy_config_gates
 from settings import system_settings
@@ -50,14 +51,22 @@ def load_env_vars(*, require_loxone_credentials: bool) -> dict[str, Any]:
         "LOXONE_IP": os.getenv("LOXONE_IP"),
         "LOXONE_USER": os.getenv("LOXONE_USER"),
         "LOXONE_PASS": os.getenv("LOXONE_PASS"),
+        "EHAL_HA_BASE_URL": str(os.getenv("EHAL_HA_BASE_URL") or "").strip(),
+        "EHAL_HA_TOKEN": str(os.getenv("EHAL_HA_TOKEN") or "").strip(),
     }
-    if require_loxone_credentials and not all(attrs.values()):
-        missing = [k for k in attrs if not os.getenv(k)]
-        dotenv_path = resolve_dotenv_path()
-        raise ValueError(
-            f"Kritischer Fehler: Fehlende sensible Daten in '{dotenv_path}': "
-            f"{', '.join(missing)}"
-        )
+    if require_loxone_credentials:
+        loxone_attrs = {
+            "LOXONE_IP": attrs["LOXONE_IP"],
+            "LOXONE_USER": attrs["LOXONE_USER"],
+            "LOXONE_PASS": attrs["LOXONE_PASS"],
+        }
+        if not all(loxone_attrs.values()):
+            missing = [k for k in loxone_attrs if not os.getenv(k)]
+            dotenv_path = resolve_dotenv_path()
+            raise ValueError(
+                f"Kritischer Fehler: Fehlende sensible Daten in '{dotenv_path}': "
+                f"{', '.join(missing)}"
+            )
     return attrs
 
 
@@ -160,37 +169,26 @@ def load_loxone_block_params(
 def load_ehal_params(raw_config: dict) -> dict[str, Any]:
     """Optional ehal block; missing/empty/none backend defaults to Loxone-EHAL.
 
+    HA URL/token live in ``.env`` (``EHAL_HA_*`` via ``load_env_vars``, 2.6.i).
     ``EHAL_HA_ENTITIES`` remains for legacy fallback only — Pattern B bindings
     live in ``plant`` / ``consumers[].ehal_bindings`` (2.6.g).
     """
     ehal = raw_config.get("ehal")
     if not isinstance(ehal, dict):
         ehal = {}
-    backend = str(ehal.get("backend") or "").strip().lower()
-    if backend in ("", "loxone", "none"):
-        backend = "loxone"
-    elif backend not in ("ha", "openems"):
-        backend = "loxone"
+    backend = normalize_backend(ehal.get("backend"))
     openems = ehal.get("openems") if isinstance(ehal.get("openems"), dict) else {}
     ha = ehal.get("ha") if isinstance(ehal.get("ha"), dict) else {}
     entities = ha.get("entities") if isinstance(ha.get("entities"), dict) else {}
     sign = ha.get("sign") if isinstance(ha.get("sign"), dict) else {}
-    if backend == "ha":
-        default_adapter = "earnie-hems"
-    elif backend == "openems":
-        default_adapter = "openems-lab"
-    else:
-        default_adapter = "loxone-home"
     return {
         "EHAL_BACKEND": backend,
-        "EHAL_ADAPTER_ID": str(ehal.get("adapter_id") or default_adapter),
+        "EHAL_ADAPTER_ID": resolve_adapter_id(ehal.get("adapter_id"), backend),
         "EHAL_OPENEMS_BASE_URL": str(openems.get("base_url") or "").strip(),
         "EHAL_OPENEMS_USERNAME": str(openems.get("username") or "x"),
         "EHAL_OPENEMS_PASSWORD": str(openems.get("password") or "admin"),
         "EHAL_OPENEMS_ESS_COMPONENT": str(openems.get("ess_component") or "ess0"),
         "EHAL_OPENEMS_EVCS_COMPONENT": str(openems.get("evcs_component") or "evcs0"),
-        "EHAL_HA_BASE_URL": str(ha.get("base_url") or "").strip(),
-        "EHAL_HA_TOKEN": str(ha.get("token") or "").strip(),
         # Deprecated: prefer house_profiles plant/consumer ehal_bindings.
         "EHAL_HA_ENTITIES": {
             str(key): str(value).strip()

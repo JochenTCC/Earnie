@@ -30,7 +30,11 @@ from .const import (
 )
 from .entity_map import ha_entity_id
 
-from ._core.archetype import ArchetypePackage, load_archetype
+from ._core.archetype import (
+    ArchetypePackage,
+    battery_energy_entity_id,
+    load_archetype,
+)
 from ._core.physics import (
     EssSetpoints,
     PhysicsState,
@@ -108,6 +112,14 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
             grid_export_energy_kwh=float(
                 raw.get("grid_export_energy_kwh", self.physics.grid_export_energy_kwh)
             ),
+            ess_charge_energy_kwh=float(
+                raw.get("ess_charge_energy_kwh", self.physics.ess_charge_energy_kwh)
+            ),
+            ess_discharge_energy_kwh=float(
+                raw.get(
+                    "ess_discharge_energy_kwh", self.physics.ess_discharge_energy_kwh
+                )
+            ),
             temp_c=(
                 float(raw["temp_c"])
                 if raw.get("temp_c") is not None
@@ -132,6 +144,8 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
                 "pv_energy_kwh": self.physics.pv_energy_kwh,
                 "grid_import_energy_kwh": self.physics.grid_import_energy_kwh,
                 "grid_export_energy_kwh": self.physics.grid_export_energy_kwh,
+                "ess_charge_energy_kwh": self.physics.ess_charge_energy_kwh,
+                "ess_discharge_energy_kwh": self.physics.ess_discharge_energy_kwh,
                 "temp_c": self.physics.temp_c,
                 "evcs_power_w": self.physics.evcs_power_w,
                 "setpoints": dict(self.setpoints),
@@ -212,6 +226,11 @@ class HouseSimCoordinator(DataUpdateCoordinator[PhysicsState]):
             if self.unit_flip and field_name == "sens_pv_production_active":
                 return float(value) * 1000.0
             return value
+
+        if fixture_entity_id == battery_energy_entity_id(self.package, "charge"):
+            return physics.ess_charge_energy_kwh
+        if fixture_entity_id == battery_energy_entity_id(self.package, "discharge"):
+            return physics.ess_discharge_energy_kwh
 
         thermal_id = str(self.package.house_params.get("thermal_entity_id") or "")
         if fixture_entity_id == thermal_id and physics.temp_c is not None:

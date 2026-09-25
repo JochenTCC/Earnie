@@ -76,9 +76,9 @@ def _seed_ha_backend(payload: dict[str, Any]) -> bool:
     ha = ehal.setdefault("ha", {})
     if not isinstance(ha, dict):
         ehal["ha"] = ha = {}
-    # Leave URL/token empty so runtime resolves Supervisor proxy.
-    ha.setdefault("base_url", "")
-    ha.setdefault("token", "")
+    # URL/token live in .env (2.6.i); empty → Supervisor proxy at runtime.
+    ha.pop("base_url", None)
+    ha.pop("token", None)
     ha.setdefault("entities", ha.get("entities") if isinstance(ha.get("entities"), dict) else {})
     after = (ehal.get("backend"), ehal.get("adapter_id"))
     if before != after:

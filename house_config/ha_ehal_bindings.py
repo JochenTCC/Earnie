@@ -200,7 +200,7 @@ def apply_ha_entities_to_house(
 
 
 def strip_ha_entities_from_config(config_doc: dict | None) -> tuple[dict, bool]:
-    """Clear ``ehal.ha.entities`` (keep sign / URL / token)."""
+    """Clear ``ehal.ha.entities`` (keep sign; URL/token migrate via 2.6.i)."""
     config = copy.deepcopy(config_doc) if isinstance(config_doc, dict) else {}
     ehal = config.get("ehal")
     if not isinstance(ehal, dict):
