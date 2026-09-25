@@ -407,7 +407,7 @@ Earnie Monitor
 Unter **Live-Cockpit → Monitor** (Sunset-2-Sunset): einheitliches Cockpit über Vergangenheit, Jetzt und Vorausschau — Desktop als SA₀→SA₂-Fenster, Mobil in Sonnenaufgangs-Segmenten. Chart 1 / SoC-Linien / Sankey: [Charts & Panels](../ui/charts.md) · Modus: [Betriebsmodi](../ui/betriebsmodi.md).
 
 Ist der **Abwesenheitsmodus** wirksam (Earnie-Schalter und/oder Smarthome `Earnie_Abwesend`), erscheint oben ein Hinweis „Abwesenheitsmodus aktiv“ inkl. Quelle. Opt-in-Verbraucher außer Haus-Wärme fallen dann aus der Live-Optimierung; Haus-Wärme läuft mit Absenktemperatur.
-Kennzahlen zur Ersparnis beziehen sich auf den **vollen Planungshorizont** (Jetzt bis übernächster Sonnenaufgang).
+Kennzahlen zur Ersparnis in Chart 2 beziehen sich **pro Sonnenaufgangs-Tag** (Mobil: sichtbarer Tag; Desktop: zwei Spalten für SA₀→SA₁ und SA₁→SA₂). Am laufenden Tag sehen Sie **Ersparnis bisher** (seit Sonnenaufgang bis jetzt) und **Ersparnis erwartet** (bis zum nächsten Sonnenaufgang). Der Energievergleich im Expander bleibt auf dem vollen Planungshorizont (Jetzt bis übernächster Sonnenaufgang).
 
 #### Chart 1: SoC-Linien (Plausibilität)
 

@@ -563,7 +563,7 @@ def savings_view_for_chart(
     matrix: list[dict],
     chart: UiChartWindow,
 ) -> dict:
-    """Stunden-Inkremente auf das Chart-Segment abbilden; Kennzahlen-Summen unverändert."""
+    """Stunden-Inkremente auf das Chart-Segment abbilden; Horizont-Summen im Dict unverändert."""
     if not matrix_indices_for_chart(matrix, chart):
         return savings_info
 

@@ -68,6 +68,7 @@ class OptimizationDisplayBundle:
     battery_params: dict | None = None
     flex_consumers: tuple[dict, ...] | None = None
     show_soc_plausibility: bool = False
+    cost_summary_days: tuple = ()
 
 
 def _apply_backtesting_chart_merge(
@@ -240,18 +241,37 @@ def _resolve_bundle_headers(
     chart_header_label: str | None,
     chart_header_help: str | None,
     show_soc_plausibility: bool,
-) -> tuple[float | None, float | None, str | None, str | None]:
+    savings_view: dict | None = None,
+    history_slot_count: int | None = None,
+) -> tuple[float | None, float | None, str | None, str | None, tuple]:
+    from ui.chart_day_costs import day_cost_totals_for_chart
     from ui.simulation_results import _cost_totals_from_savings
 
     matched_cost, optimized_cost = _cost_totals_from_savings(savings_info)
+    cost_summary_days: tuple = ()
+    view = savings_view if savings_view is not None else savings_info
+    if chart_context is not None:
+        cost_summary_days = day_cost_totals_for_chart(
+            chart_context.chart_window,
+            view.get("hourly_matched_baseline_cost_euro") or [],
+            view.get("hourly_optimized_cost_euro") or [],
+            history_slot_count=int(history_slot_count or 0),
+        )
+        if len(cost_summary_days) == 1:
+            matched_cost = cost_summary_days[0].matched_baseline_cost_euro
+            optimized_cost = cost_summary_days[0].optimized_cost_euro
+        elif len(cost_summary_days) > 1:
+            matched_cost = sum(day.matched_baseline_cost_euro for day in cost_summary_days)
+            optimized_cost = sum(day.optimized_cost_euro for day in cost_summary_days)
     if chart_header_label is None and chart_context is not None:
         return (
             matched_cost,
             optimized_cost,
             s2_chart_header_label(chart_context),
             s2_zone_help_text(include_soc_plausibility=show_soc_plausibility),
+            cost_summary_days,
         )
-    return matched_cost, optimized_cost, chart_header_label, chart_header_help
+    return matched_cost, optimized_cost, chart_header_label, chart_header_help, cost_summary_days
 
 
 def build_optimization_display_bundle(
@@ -287,12 +307,16 @@ def build_optimization_display_bundle(
             merge_active=merged["merge_active"],
             history_slot_count=merged["history_slot_count"],
         )
-    matched_cost, optimized_cost, header_label, header_help = _resolve_bundle_headers(
-        savings_info,
-        chart_context,
-        chart_header_label,
-        chart_header_help,
-        show_soc_plausibility,
+    matched_cost, optimized_cost, header_label, header_help, cost_summary_days = (
+        _resolve_bundle_headers(
+            savings_info,
+            chart_context,
+            chart_header_label,
+            chart_header_help,
+            show_soc_plausibility,
+            savings_view=merged.get("savings_view"),
+            history_slot_count=merged.get("history_slot_count"),
+        )
     )
     return _make_optimization_display_bundle(
         {
@@ -302,6 +326,7 @@ def build_optimization_display_bundle(
             "chart_context": chart_context,
             "matched_cost": matched_cost,
             "optimized_cost": optimized_cost,
+            "cost_summary_days": cost_summary_days,
             "header_label": header_label,
             "header_help": header_help,
             "simulation_table_title": simulation_table_title,
@@ -331,6 +356,7 @@ def _make_optimization_display_bundle(parts: dict) -> OptimizationDisplayBundle:
         history_slot_count=merged["history_slot_count"],
         matched_cost=parts["matched_cost"],
         optimized_cost=parts["optimized_cost"],
+        cost_summary_days=parts.get("cost_summary_days") or (),
         chart_header_label=parts["header_label"],
         chart_header_help=parts["header_help"],
         slot_deviation_events=merged["slot_deviation_events"],

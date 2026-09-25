@@ -90,6 +90,8 @@ def render_optimization_chart2(
         bundle.savings_view.get("hourly_optimized_consumption_kwh"),
         matched_baseline_cost_euro=bundle.matched_cost,
         optimized_cost_euro=bundle.optimized_cost,
+        cost_summary_days=bundle.cost_summary_days or None,
+        hourly_savings_euro=bundle.savings_view.get("hourly_savings_euro"),
         chart_window=bundle.chart_context.chart_window if bundle.chart_context else None,
         chart_now=bundle.chart_context.zone_reference if bundle.chart_context else None,
         chart_zones=bundle.chart_zones,

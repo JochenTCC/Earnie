@@ -26,6 +26,7 @@ from ui.chart_decorations import (
 )
 from ui.chart_consumer_stack import get_bar_colors, ordered_active_consumers_for_stack
 from ui.chart_cumulative import (
+    add_achieved_savings_trace,
     add_cumulative_consumption_traces,
     add_cumulative_cost_traces,
     add_cumulative_s2_split_traces,
@@ -269,6 +270,8 @@ def render_cumulative_cost_chart(
     *,
     matched_baseline_cost_euro: float | None = None,
     optimized_cost_euro: float | None = None,
+    cost_summary_days=None,
+    hourly_savings_euro: list[float] | None = None,
     chart_window: UiChartWindow | None = None,
     chart_now: datetime | None = None,
     chart_zones=None,
@@ -285,7 +288,6 @@ def render_cumulative_cost_chart(
     if chart_zones is not None:
         _add_zone_backgrounds(fig, chart_zones, axis, range_start=range_start)
     _add_missing_slot_backgrounds(fig, axis, slot_qualities)
-    length = len(axis.starts)
     split_mode = (
         history_slot_count is not None
         and history_slot_count > 0
@@ -313,6 +315,18 @@ def render_cumulative_cost_chart(
         )
         has_costs = has_costs or history_slot_count > 0
         has_consumption = has_consumption or history_slot_count > 0
+        if hourly_savings_euro and chart_window is not None:
+            from ui.chart_day_costs import achieved_savings_cumulative_euro
+
+            achieved = achieved_savings_cumulative_euro(
+                list(axis.starts),
+                hourly_savings_euro,
+                history_slot_count=history_slot_count,
+                sa0=chart_window.sa0,
+                sa1=chart_window.sa1,
+                sa2=chart_window.sa2,
+            )
+            add_achieved_savings_trace(fig, df["Uhrzeit"], axis, achieved)
     elif has_costs:
         add_cumulative_cost_traces(
             fig,
@@ -334,7 +348,7 @@ def render_cumulative_cost_chart(
             extrap_end=extrap_end,
         )
 
-    show_cost_summary = (
+    show_cost_summary = bool(cost_summary_days) or (
         has_costs
         and matched_baseline_cost_euro is not None
         and optimized_cost_euro is not None
@@ -344,6 +358,7 @@ def render_cumulative_cost_chart(
             fig,
             matched_baseline_cost_euro,
             optimized_cost_euro,
+            days=cost_summary_days,
         )
 
     if split_mode:
@@ -394,6 +409,8 @@ def render_price_savings_chart(
     *,
     matched_baseline_cost_euro: float | None = None,
     optimized_cost_euro: float | None = None,
+    cost_summary_days=None,
+    hourly_savings_euro: list[float] | None = None,
     chart_window: UiChartWindow | None = None,
     chart_now: datetime | None = None,
     chart_zones=None,
@@ -412,6 +429,8 @@ def render_price_savings_chart(
         hourly_optimized_consumption_kwh,
         matched_baseline_cost_euro=matched_baseline_cost_euro,
         optimized_cost_euro=optimized_cost_euro,
+        cost_summary_days=cost_summary_days,
+        hourly_savings_euro=hourly_savings_euro,
         chart_window=chart_window,
         chart_now=chart_now,
         chart_zones=chart_zones,
@@ -584,6 +603,7 @@ from ui.chart_cumulative import (
     add_cumulative_consumption_traces,
     add_cumulative_cost_traces,
     add_cumulative_s2_split_traces,
+    add_achieved_savings_trace,
     add_projected_savings_trace,
 )
 from ui.chart_soc import (

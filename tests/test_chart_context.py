@@ -49,8 +49,8 @@ def test_align_rows_fills_missing_past_slots():
     assert any(row["PV-Prognose (kW)"] == 1.0 for row in aligned)
 
 
-def test_savings_view_preserves_full_horizon_totals():
-    """S-2 P3d: Kennzahlen-Summen bleiben auf vollem Horizont, nur Stundenlisten segmentiert."""
+def test_savings_view_preserves_full_horizon_totals_in_dict():
+    """Hourly lists are segmented; dict horizon totals stay for matching/debug."""
     now = _dt(2026, 6, 15, 14, 0)
     chart = compute_ui_chart_window(now, LAT, LON, TZ)
     matrix = [
@@ -72,6 +72,35 @@ def test_savings_view_preserves_full_horizon_totals():
     assert view["savings_matched_euro"] == 11.0
     assert len(view["hourly_matched_baseline_cost_euro"]) == len(chart.slot_datetimes)
     assert sum(view["hourly_matched_baseline_cost_euro"]) == 21.0
+
+
+def test_day_cost_totals_from_segmented_savings_view():
+    """Chart 2 KPIs sum aligned hourly costs for the visible SA-day."""
+    from ui.chart_day_costs import day_cost_totals_for_chart
+
+    now = _dt(2026, 6, 15, 14, 0)
+    chart = compute_ui_chart_window(now, LAT, LON, TZ)
+    matrix = [
+        {"slot_datetime": _dt(2026, 6, 15, hour, 0)} for hour in range(14, 20)
+    ]
+    savings = {
+        "matched_baseline_cost_euro": 99.0,
+        "optimized_cost_euro": 88.0,
+        "hourly_matched_baseline_cost_euro": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        "hourly_optimized_cost_euro": [0.5, 1.5, 2.5, 3.5, 4.5, 5.5],
+        "hourly_savings_euro": [0.5] * 6,
+        "hourly_matched_baseline_consumption_kwh": [1.0] * 6,
+        "hourly_optimized_consumption_kwh": [1.0] * 6,
+    }
+    view = savings_view_for_chart(savings, matrix, chart)
+    days = day_cost_totals_for_chart(
+        chart,
+        view["hourly_matched_baseline_cost_euro"],
+        view["hourly_optimized_cost_euro"],
+    )
+    assert len(days) == 1
+    assert days[0].matched_baseline_cost_euro == 21.0
+    assert days[0].optimized_cost_euro == 18.0
 
 
 def test_max_sunrise_cycle_offset_accepts_naive_log_timestamp(monkeypatch):

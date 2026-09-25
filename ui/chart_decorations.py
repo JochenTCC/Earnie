@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Sequence
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -57,11 +58,13 @@ _CHART2_S2_TITLE = "Kumulierte Kosten & Verbrauch (Sonnenaufgang→Sonnenaufgang
 
 
 _CHART2_S2_HELP = (
-    "Grauer Bereich: **Ist bisher** (blau, kumuliert aus Produktiv-Log). "
-    "Neutral/Grün: **Prognose** (BL Ziel / optimiert, kumuliert ab SA₀ und "
-    "ans Ist an der Log-Grenze angeschlossen). Kennzahlen BL Ziel / Optimiert / "
-    "Ersparnis: Horizont SA₀→SA₂ (Neustart bei SA₀-Wechsel). "
-    "Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
+    "Grauer Bereich: **Ist bisher** (blau, kumuliert aus Produktiv-Log) und "
+    "**Ersparnis bisher** (geplante BL−Opt-Differenz der abgelaufenen Slots, "
+    "pro SA-Tag). Neutral/Grün: **Prognose** (BL Ziel / optimiert, an Ist an der "
+    "Log-Grenze angeschlossen). Kennzahlen BL Ziel / Optimiert: **pro SA-Tag** "
+    "(Mobil: sichtbarer Tag; Desktop SA₀→SA₂: zwei Spalten). Am laufenden Tag "
+    "zusätzlich **Ersparnis bisher** (SA→Jetzt) und **Ersparnis erwartet** "
+    "(ganzer SA-Tag). Fehlende Log-Slots: orange, Lücken in Ist-Kurven."
 )
 
 
@@ -319,59 +322,156 @@ _COST_SUMMARY_LINE_SHIFT = 20
 _COST_SUMMARY_Y_TOP = 1.0
 
 
-def _cost_summary_annotations(
+_COST_SUMMARY_COLUMN_X = (0.01, 0.52)
+
+
+def _savings_annotation_color(savings_euro: float) -> str:
+    if savings_euro < 0:
+        return COLOR_COST_SAVINGS
+    if savings_euro > 0:
+        return COLOR_COST_SAVINGS_NEGATIVE
+    return COLOR_COST_BASELINE
+
+
+def _append_summary_line(
+    lines: list[dict],
+    base: dict,
+    summary_font: dict,
+    *,
+    text: str,
+    line_index: int,
+    color: str,
+) -> int:
+    lines.append(
+        {
+            **base,
+            "text": text,
+            "yshift": -line_index * _COST_SUMMARY_LINE_SHIFT,
+            "font": {**summary_font, "color": color},
+        }
+    )
+    return line_index + 1
+
+
+def _cost_summary_column_annotations(
     matched_baseline_cost_euro: float,
     optimized_cost_euro: float,
+    *,
+    x: float = 0.01,
+    label: str | None = None,
+    achieved_savings_euro: float | None = None,
+    show_split_savings: bool = False,
 ) -> list[dict]:
-    """Plotly-Annotationen für die Gesamtkosten (oben links im Chart)."""
+    """One KPI column (optional day label + BL / Optimiert / Ersparnis)."""
     savings_euro = optimized_cost_euro - matched_baseline_cost_euro
-    if savings_euro < 0:
-        savings_color = COLOR_COST_SAVINGS
-    elif savings_euro > 0:
-        savings_color = COLOR_COST_SAVINGS_NEGATIVE
-    else:
-        savings_color = COLOR_COST_BASELINE
-
     summary_font = dict(size=_COST_SUMMARY_FONT_SIZE)
     base = dict(
         xref="paper",
         yref="y domain",
-        x=0.01,
+        x=x,
         y=_COST_SUMMARY_Y_TOP,
         showarrow=False,
         xanchor="left",
         yanchor="top",
         font=summary_font,
     )
-    return [
-        {
-            **base,
-            "text": f"BL Ziel: {matched_baseline_cost_euro:.2f} €",
-            "font": {**summary_font, "color": COLOR_COST_BASELINE},
-        },
-        {
-            **base,
-            "text": f"Optimiert: {optimized_cost_euro:.2f} €",
-            "yshift": -_COST_SUMMARY_LINE_SHIFT,
-            "font": {**summary_font, "color": COLOR_COST_OPTIMIZED},
-        },
-        {
-            **base,
-            "text": f"Ersparnis: {savings_euro:+.2f} €",
-            "yshift": -2 * _COST_SUMMARY_LINE_SHIFT,
-            "font": {**summary_font, "color": savings_color},
-        },
-    ]
+    lines: list[dict] = []
+    line_index = 0
+    if label:
+        lines.append(
+            {
+                **base,
+                "text": label,
+                "font": {**summary_font, "color": COLOR_COST_BASELINE},
+            }
+        )
+        line_index = 1
+    line_index = _append_summary_line(
+        lines,
+        base,
+        summary_font,
+        text=f"BL Ziel: {matched_baseline_cost_euro:.2f} €",
+        line_index=line_index,
+        color=COLOR_COST_BASELINE,
+    )
+    line_index = _append_summary_line(
+        lines,
+        base,
+        summary_font,
+        text=f"Optimiert: {optimized_cost_euro:.2f} €",
+        line_index=line_index,
+        color=COLOR_COST_OPTIMIZED,
+    )
+    if show_split_savings and achieved_savings_euro is not None:
+        line_index = _append_summary_line(
+            lines,
+            base,
+            summary_font,
+            text=f"Ersparnis bisher: {achieved_savings_euro:+.2f} €",
+            line_index=line_index,
+            color=_savings_annotation_color(achieved_savings_euro),
+        )
+        _append_summary_line(
+            lines,
+            base,
+            summary_font,
+            text=f"Ersparnis erwartet: {savings_euro:+.2f} €",
+            line_index=line_index,
+            color=_savings_annotation_color(savings_euro),
+        )
+    else:
+        _append_summary_line(
+            lines,
+            base,
+            summary_font,
+            text=f"Ersparnis: {savings_euro:+.2f} €",
+            line_index=line_index,
+            color=_savings_annotation_color(savings_euro),
+        )
+    return lines
+
+
+def _cost_summary_annotations(
+    matched_baseline_cost_euro: float | None = None,
+    optimized_cost_euro: float | None = None,
+    *,
+    days: Sequence | None = None,
+) -> list[dict]:
+    """Plotly cost KPIs: one column (legacy floats) or one/two SA-day columns."""
+    if days:
+        annotations: list[dict] = []
+        for index, day in enumerate(days[:2]):
+            x = _COST_SUMMARY_COLUMN_X[min(index, len(_COST_SUMMARY_COLUMN_X) - 1)]
+            annotations.extend(
+                _cost_summary_column_annotations(
+                    day.matched_baseline_cost_euro,
+                    day.optimized_cost_euro,
+                    x=x,
+                    label=day.label if len(days) > 1 else None,
+                    achieved_savings_euro=day.achieved_savings_euro,
+                    show_split_savings=bool(day.show_split_savings),
+                )
+            )
+        return annotations
+    if matched_baseline_cost_euro is None or optimized_cost_euro is None:
+        return []
+    return _cost_summary_column_annotations(
+        matched_baseline_cost_euro,
+        optimized_cost_euro,
+    )
 
 
 def _add_cost_summary_annotations(
     fig: go.Figure,
-    matched_baseline_cost_euro: float,
-    optimized_cost_euro: float,
+    matched_baseline_cost_euro: float | None = None,
+    optimized_cost_euro: float | None = None,
+    *,
+    days: Sequence | None = None,
 ) -> None:
     for annotation in _cost_summary_annotations(
         matched_baseline_cost_euro,
         optimized_cost_euro,
+        days=days,
     ):
         fig.add_annotation(**annotation)
 

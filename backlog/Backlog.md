@@ -10,17 +10,6 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [ ] **Swim spa:** second heat path into ground (lookup `bodentemperaturen_nach_monat`):
   - 1: 6.5, 2: 5.0, 3: 4.0, 4: 5.5, 5: 8.5, 6: 11.5, 7: 14.0, 8: 16.0, 9: 17.5, 10: 15.5, 11: 12.5, 12: 9.5 (°C)
 - [ ] Add a predictive model for Grundlast with logged Grundlast from the past. Research for Models (AI?). Take date / average temperature / week day / and other factors into account
-- [ ] Enable multiple isolated battery or battery+Inverter entities
-  - Isolated battery modes: charging / discharging / standby
-  - batt+inverter modes: optimizing / charging / discharging
-  - All batteries are parts of optimization
-  - **One-Way storage type** (e.g. EcoFlow Delta 3 bridged HA `hassio-ecoflow-cloud` → Loxone, see `docs/referenz/loxone-signals.md`): chargeable on command, **not** dischargeable on command, **cannot** feed the house grid
-    - New component classification `batteries[].direction: "bidirectional" | "one_way"` in `components.json` schema (default `bidirectional`, backward compatible); MILP must never plan a forced/automatic discharge for `one_way` batteries and must not count their SoC as grid-offset capacity
-    - New EHAL Setpoint field `set_ess_source_select` (Write, enum `0` = grid / `1` = battery): routes locally-attached consumers on a one-way storage between grid passthrough (storage may charge in parallel) and battery-only island supply (no grid draw, no charging); irrelevant/omit for bidirectional ESS — needs `ehal.md` §Setpoint-API + `share/ehal/setpoint.schema.json` update (schema_version bump)
-    - New Capability-Flag `supports_ess_source_select` in `share/ehal/capabilities.schema.json`
-    - Feasibility confirmed for EcoFlow Delta 3: HA switch `switch.<device>_grid_bypass` (internal key `ban_bypass_en`) maps 1:1 by boolean identity — switch ON = "grid bypass disabled" = battery-only = EHAL `1`; switch OFF = "grid bypass enabled" (charges from AC, loads pass through) = EHAL `0`. Verified against `hassio-ecoflow-cloud` source (`switch.py::BypassBanScalarSwitch`); note the field name itself is confusingly inverted
-    - Schema note: existing HA-adapter `sign: ehal|negate` convention (`share/config/ehal.ha.snippet.json`) only covers **signed power fields**; a boolean/enum field needs a separate invert convention for devices whose polarity doesn't happen to line up
-    - Bridging path when Earnie stays on `ehal.backend=loxone` (no native HA southbound): Merker `Earnie_Speicher_Quellenwahl`, written by Earnie via `VI_Earnie_Plant.xml`-style poll, mirrored to HA via a Virtual-Output webhook — same pattern as `set_ess_charge_power_limit` in `docs/referenz/loxone-signals.md`
 
 
 ## Feature Backlog
@@ -43,17 +32,38 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 - [Business backlog](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Business-Backlog.md) — Synology dogfood / HA coupling context
 - [HA-Loxone-Bridge-Builder draft](HA-Loxone-Bridge-Builder-Draft.md) — research item, not 2.6
 
+#### Features#
+
+- [ ] No feature - but todo: Prepare quality gate - Do quality checks and derive requested additional todos to achieve quality requirements
+- [ ] No feature - but todo: Publish pre-release 2.6.0-alpha.1
+
+### Version 2.7 — Multiple storages and export power limitation
+
 #### Features
 
-##### HouseSim S2 → S3 and stronger propose
-
-Mock-bench expansion; S3 soft-depends on more archetypes (S2). **2.6.e** needs S2.
-
-**Naming:** simulator stages are **HouseSim S1–S4** (formerly "HA Lab P1–P4"). **HA Lab** now means only the `ha_lab/` Compose stack (Earnie + HAOS + evcc, [ha-lab-setup.md](../docs/spec/ha-lab-setup.md)).
-
-- [ ] **HouseSim S2** — 2–3 more hand-authored archetypes (domain/naming/i18n) on the same physics; write-back per archetype.
-- [ ] **HouseSim S3** — CI harness: short simulated windows, not N live `main.py` days. The **2.6.a** static fixture stays the fast job.
-- [ ] **2.6.e — Stronger propose, still confirm-before-save.** After HouseSim S2. Replay archetypes with empty map and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)). Empty-only propose rules apply to Pattern B bindings.
+- [ ] Limiting exporting power as new setting value. In addition to manipulate battery working mode it should also be possible to limit the power exported to the grid.    
+  - See how this is done in HA / evcc and openEMS as "best practice
+  - Define new EHAL standard value (set_*) for limiting power
+  - Add new VI to Loxone VI Template
+  - Add new templates to HA binding if appropriate
+  - Implement mapping in Loxone productive config (Jochen)
+  - Use control value for these purposes:
+    1. User can set new parameter on house configuration as max power that is allowed to be exported (constant value)
+    2. MILP can use it to prevent exporting when dynamic exporting tariffs are positive (user must pay to export power)
+    3. Limitation comes from grid (externally - new EHAL value as input to Earnie) and is used solely as additional variable constraint that overrides the static parameter setting
+    4. MILP has to take limitation coming from setting or external as constraint for optimization
+    limitation from different sources must be treated in a useful prioritization (MILP-limit - than internal limit - than external limit)
+- [ ] Enable multiple isolated battery or battery+Inverter entities
+  - Isolated battery modes: charging / discharging / standby
+  - batt+inverter modes: optimizing / charging / discharging
+  - All batteries are parts of optimization
+  - **One-Way storage type** (e.g. EcoFlow Delta 3 bridged HA `hassio-ecoflow-cloud` → Loxone, see `docs/referenz/loxone-signals.md`): chargeable on command, **not** dischargeable on command, **cannot** feed the house grid
+    - New component classification `batteries[].direction: "bidirectional" | "one_way"` in `components.json` schema (default `bidirectional`, backward compatible); MILP must never plan a forced/automatic discharge for `one_way` batteries and must not count their SoC as grid-offset capacity
+    - New EHAL Setpoint field `set_ess_source_select` (Write, enum `0` = grid / `1` = battery): routes locally-attached consumers on a one-way storage between grid passthrough (storage may charge in parallel) and battery-only island supply (no grid draw, no charging); irrelevant/omit for bidirectional ESS — needs `ehal.md` §Setpoint-API + `share/ehal/setpoint.schema.json` update (schema_version bump)
+    - New Capability-Flag `supports_ess_source_select` in `share/ehal/capabilities.schema.json`
+    - Feasibility confirmed for EcoFlow Delta 3: HA switch `switch.<device>_grid_bypass` (internal key `ban_bypass_en`) maps 1:1 by boolean identity — switch ON = "grid bypass disabled" = battery-only = EHAL `1`; switch OFF = "grid bypass enabled" (charges from AC, loads pass through) = EHAL `0`. Verified against `hassio-ecoflow-cloud` source (`switch.py::BypassBanScalarSwitch`); note the field name itself is confusingly inverted
+    - Schema note: existing HA-adapter `sign: ehal|negate` convention (`share/config/ehal.ha.snippet.json`) only covers **signed power fields**; a boolean/enum field needs a separate invert convention for devices whose polarity doesn't happen to line up
+    - Bridging path when Earnie stays on `ehal.backend=loxone` (no native HA southbound): Merker `Earnie_Speicher_Quellenwahl`, written by Earnie via `VI_Earnie_Plant.xml`-style poll, mirrored to HA via a Virtual-Output webhook — same pattern as `set_ess_charge_power_limit` in `docs/referenz/loxone-signals.md`
 
 
 ### Version 2.+1 — Introducing nested data models / Epics **Adaptation** & **Thermals** (architecture first)
@@ -84,6 +94,15 @@ Mock-bench expansion; S3 soft-depends on more archetypes (S2). **2.6.e** needs S
 - [ ] **Adaptation P4** — UI visualization adaptation algos (after Adaptation P3 and Thermals P3)
 - [ ] Better consumption optimization with temperature-control devices
   - [ ] Heat pump (Prio3) — only indirect control via setpoint adjustment via Loxone setpoint (after **Thermals P2**); distinct from **Thermals P1a** (direct enable/PWM flex from daily HDD budget)
+
+
+### Version 2.+1
+
+**Naming:** simulator stages are **HouseSim S1–S4** (formerly "HA Lab P1–P4"). **HA Lab** now means only the `ha_lab/` Compose stack (Earnie + HAOS + evcc, [ha-lab-setup.md](../docs/spec/ha-lab-setup.md)).
+
+- [ ] **HouseSim S2** — 2–3 more hand-authored archetypes (domain/naming/i18n) on the same physics; write-back per archetype.
+- [ ] **HouseSim S3** — CI harness: short simulated windows, not N live `main.py` days. 
+- [ ] **2.6.e — Stronger propose, still confirm-before-save.** After HouseSim S2. Replay archetypes with empty map and vendor-style names. Obvious fields proposed; ambiguous or `switch.*` cases left empty. Optional LLM stays out (same status as Loxone MCP in [Entwicklungsplan §3.1](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Entwicklungs-Plan-Earnie-cons.md)). Empty-only propose rules apply to Pattern B bindings.
 
 
 ### Version 2.+1 - Enhance Loxone Auto Binding functionality

@@ -1299,6 +1299,9 @@ def test_planning_thermal_rc_with_pool_filter():
 
 
 def test_consumer_annual_kwh_thermal_rc_with_geo():
+    # Open-Meteo RC path needs config.CONFIG (xdist workers may not have imported it yet).
+    import config  # noqa: F401
+
     consumer = {
         "id": "swimspa",
         "type": "thermal_rc",
@@ -1320,6 +1323,7 @@ def test_consumer_annual_kwh_thermal_rc_with_geo():
 
 
 def test_inject_profile_geo_adds_thermal_rc_coordinates():
+    import config  # noqa: F401
     from ui.house_config_profile_form import _inject_profile_geo
 
     consumers = [

@@ -29,12 +29,10 @@ Fix is **implemented** (code + tests + optional PATCH in `version.py`), but **pr
   - [ ] Still failing QG: `new_security_rating` = C; `new_coverage` ≈ 76.7% (need ≥ 80%)
   - Accepted (not separate New Bugs): `release-publish.yml` floating action tags `@v4`/`@v5` (`e796a01`; SHA pins blocked tag runs); `ha-addon-publish.yml` stays SHA-pinned; bulk other new-code findings (Actions smells, `pythonsecurity` on CLI scripts, etc.) — triage only when opening a concrete fix item
   - Optional follow-ups (open New Bug only if planned): raise new-code coverage; reopen Actions hardening beyond the accepted exception; specific high-signal leftovers (`docker/Dockerfile` root / `ui/chart_trace_segments.py` S3923)
+- [ ] **Monitor Chart 2 daily Kosten KPIs** — Implemented: SA-day annotation columns (full span = two cols; segment = visible day); plan-based **Ersparnis bisher** line in gray zone (`ui/chart_day_costs.py`). Live Monitor acceptance pending.
 
 
 ## New Bugs (Do not remove this chapter — even if empty)
 
-- [ ] Kosten Chart on page Monitor shows cost for the entire optimization horizon (SA_0 - SA_2). This is ambigous because when switching between days (at least in mobile mode) the user does not know if the values belong to the shown day or to the optimization horizon. The other ambiguity comes from the fact that during the day the already achieved cost reduction is "eaten" by the past grey area. 
-  - Show cost reduction always on a daily basis. When complete horizon is shown - split it into two value columns
-  - Show already achieved daily cost reductions in a separate line
 
 ## Document Review Findings (Do not remove this chapter — even if empty)

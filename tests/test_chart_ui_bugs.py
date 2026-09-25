@@ -556,7 +556,9 @@ def test_green_zone_left_at_quarter_to_hour_transition():
 
 
 def test_chart2_s2_split_mode_shows_cost_summary_annotations(monkeypatch):
-    """Backlog: Einsparungs-Text auch in SA₀→SA₁ und SA₁→SA₂ (Gesamt-Horizont)."""
+    """Chart 2 annotations use day-scoped totals (visible SA-day / columns)."""
+    from ui.chart_day_costs import DayCostTotals
+
     captured: dict = {}
 
     def _capture_chart(fig, **_kwargs):
@@ -573,26 +575,53 @@ def test_chart2_s2_split_mode_shows_cost_summary_annotations(monkeypatch):
         "Uhrzeit": [slot.strftime("%d.%m. %H:%M") for slot in slots],
         "Preis extrapoliert": [False] * slot_count,
     })
+    day = DayCostTotals(
+        label="SA₀→SA₁ · 15.06.",
+        matched_baseline_cost_euro=2.50,
+        optimized_cost_euro=1.80,
+        achieved_matched_cost_euro=0.90,
+        achieved_optimized_cost_euro=0.60,
+        show_split_savings=True,
+    )
     render_cumulative_cost_chart(
         df,
         hourly_matched_baseline_cost_euro=[0.1] * slot_count,
         hourly_optimized_cost_euro=[0.08] * slot_count,
         hourly_matched_baseline_consumption_kwh=[0.5] * slot_count,
         hourly_optimized_consumption_kwh=[0.45] * slot_count,
-        matched_baseline_cost_euro=12.34,
-        optimized_cost_euro=11.50,
+        hourly_savings_euro=[0.02] * slot_count,
+        cost_summary_days=(day,),
         history_slot_count=history_slot_count,
         slot_actual_cost_euro=[0.05] * history_slot_count,
         slot_actual_consumption_kwh=[0.2] * history_slot_count,
+        chart_window=_fake_chart_window(slots),
     )
     texts = [
         getattr(item, "text", "")
         for item in (captured["fig"].layout.annotations or [])
     ]
-    assert any("BL Ziel: 12.34" in text for text in texts)
-    assert any("Optimiert: 11.50" in text for text in texts)
-    assert any(text.startswith("Ersparnis:") for text in texts)
+    assert any("BL Ziel: 2.50" in text for text in texts)
+    assert any("Optimiert: 1.80" in text for text in texts)
+    assert any("Ersparnis bisher:" in text for text in texts)
+    assert any("Ersparnis erwartet:" in text for text in texts)
+    trace_names = [trace.name for trace in captured["fig"].data]
+    assert "Ersparnis bisher" in trace_names
 
+
+def _fake_chart_window(slots):
+    from data.planning_window import UiChartWindow
+
+    start = slots[0]
+    return UiChartWindow(
+        start=start,
+        end=slots[-1] + timedelta(hours=1),
+        sa0=start,
+        sa1=start + timedelta(hours=24),
+        sa2=start + timedelta(hours=48),
+        segment_index=0,
+        slot_datetimes=tuple(slots),
+        span="segment",
+    )
 
 def test_gray_zone_reaches_axis_end_for_past_cycle():
     now = _dt(2026, 6, 15, 14, 0)

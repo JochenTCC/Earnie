@@ -448,3 +448,35 @@ def add_projected_savings_trace(
         ),
     )
 
+
+def add_achieved_savings_trace(
+    fig: go.Figure,
+    uhrzeit: pd.Series,
+    axis: ChartSlotAxis,
+    achieved_savings_cumulative_euro: list[float],
+) -> None:
+    """Plan-based Ersparnis bisher (gray/history only; NaN gaps stop the line)."""
+    if not achieved_savings_cumulative_euro:
+        return
+    length = len(axis.starts)
+    if not any(
+        _increment_is_finite(value)
+        for value in achieved_savings_cumulative_euro[:length]
+    ):
+        return
+    savings_cum = pd.Series(achieved_savings_cumulative_euro[:length], dtype=float)
+    segments = _trace_segments(length, None, None)
+    _add_segmented_hv_line(
+        fig,
+        axis,
+        savings_cum,
+        uhrzeit,
+        segments,
+        name="Ersparnis bisher",
+        line_kwargs=dict(color=COLOR_COST_SAVINGS, width=2.5, dash="dot", shape="hv"),
+        segment_hover_template=(
+            "Uhrzeit: %{customdata}<br>Ersparnis bisher (kumuliert): %{y:.3f} €"
+            "<extra></extra>"
+        ),
+    )
+

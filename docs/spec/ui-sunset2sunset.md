@@ -106,9 +106,11 @@ Hold-Forward (bisher „hellorange / gehalten“) gilt im S-2-Modus **nicht**. F
 
 **Chart 1 (grau):** Ist aus Log — SOC, Verbrauch, PV, Batterie/Flex, Preis zum Laufzeitpunkt. Keine rückwirkende MILP-Simulation.
 
-**Chart 2:** getrennt — „Ist bisher“ (Log, 15 min, inkl. abgeschlossene Viertelstunden der laufenden Stunde ab x:15) und „Prognose optimiert“ (Soll-Viertelstunden der laufenden Stunde ab x:15, danach MILP ab nächster voller Stunde); kein künstliches Zusammenfügen der Kurven.
+**Chart 2:** getrennt — „Ist bisher“ (Log) und „Prognose“ (BL/Opt, an Ist an der Log-Grenze angeschlossen); zusätzlich **Ersparnis bisher** (planbasierte kumulierte `hourly_savings` nur im Graubereich, Neustart bei SA₁).
 
-**Kennzahlen-Horizont (BL Ziel, Energievergleich, Ersparnis-Summen):** **Jetzt → SA₂** (voller MILP-Planungshorizont). BL Ziel und Optimierung werden über diesen Zeitraum auf gleiche Flex-Energie ausgerichtet. Die Chart-Segmente SA₀→SA₁ und SA₁→SA₂ sind **Darstellungsfenster** — kumulierte Kurven darin sind Ausschnitte, keine eigene Matching-Periode. Ist-Anteil (Log) unterliegt dem Matching nicht.
+**Chart-2-Kennzahlen (Annotationen BL Ziel / Optimiert / Ersparnis):** **pro SA-Tag** — Mobil = sichtbares Segment; Desktop SA₀→SA₂ = zwei Spalten. Summe aus den stündlichen Kostenlisten des sichtbaren Fensters. Laufender Tag: **Ersparnis bisher** (History/grau) und **Ersparnis erwartet** (ganzer SA-Tag).
+
+**Matching-Horizont (BL Ziel-Energieabgleich, Energievergleich-Tabelle):** weiterhin **Jetzt → SA₂** (voller MILP-Planungshorizont). Die Chart-Segmente sind Darstellungsfenster; Ist-Anteil (Log) unterliegt dem Matching nicht.
 
 ## 7. Live-Panels
 

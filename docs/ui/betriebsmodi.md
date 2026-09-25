@@ -100,7 +100,9 @@ Details: [Charts & Panels](charts.md).
 
 ### Kennzahlen-Horizont
 
-Ersparnis-, Kosten-Kennzahlen und Energievergleich beziehen sich auf **Jetzt → SA₂** (voller MILP-Planungshorizont). Die Chart-Fenster (Desktop SA₀→SA₂ bzw. Mobil-Segmente) sind **Darstellungsfenster** — kumulierte Kurven darin sind Ausschnitte, keine eigene Matching-Periode.
+**Chart 2** (Kosten-Annotationen BL Ziel / Optimiert / Ersparnis): **pro SA-Tag** — Mobil nur der sichtbare Tag, Desktop SA₀→SA₂ zwei Spalten. Am laufenden Tag **Ersparnis bisher** (SA→Jetzt) und **Ersparnis erwartet** (ganzer Tag); Graubereich zusätzlich Kurve **Ersparnis bisher**.
+
+**Energievergleich** und MILP-Matching bleiben auf **Jetzt → SA₂** (voller Planungshorizont). Die Chart-Fenster sind Darstellungsfenster — kumulierte Kurven darin sind Ausschnitte, keine eigene Matching-Periode.
 
 ## Szenario-Explorer
 

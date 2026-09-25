@@ -125,12 +125,12 @@ Kompakte Buttons in einer Zeile **ohne** Fließtext dazwischen (mobil-tauglich).
 
 | Bereich | Kurven |
 |---------|--------|
-| Grau (Log) | **Ist bisher** — kumuliert aus Produktiv-Log |
-| Neutral/Grün | **Prognose** — BL Ziel / optimiert ab Log-Grenze (ohne Anschluss an Ist) |
+| Grau (Log) | **Ist bisher** — kumuliert aus Produktiv-Log; **Ersparnis bisher** — geplante BL−Opt-Differenz der abgelaufenen Slots (pro SA-Tag, Neustart bei SA₁) |
+| Neutral/Grün | **Prognose** — BL Ziel / optimiert ab Log-Grenze (an Ist angeschlossen) |
 
 Fehlende Log-Slots: orange Markierung, Lücken in Ist-Kurven.
 
-Kennzahlen **BL Ziel**, **Optimiert**, **Ersparnis** beziehen sich auf den Horizont **Jetzt → SA₂** (nicht nur das sichtbare Chart-Segment). Linienfarben: `_HSL_COST_*` in `ui/chart_colors.py`.
+Kennzahlen **BL Ziel**, **Optimiert** (Annotationen) beziehen sich **pro SA-Tag**: Mobil nur der sichtbare Tag; Desktop SA₀→SA₂ zwei Spalten (SA₀→SA₁ | SA₁→SA₂). Am **laufenden Tag** zusätzlich **Ersparnis bisher** (SA→Jetzt, geplante Differenz der abgelaufenen Slots) und **Ersparnis erwartet** (ganzer SA-Tag bis SA₁ bzw. SA₂). Der MILP-Matching-Horizont (Jetzt → SA₂) bleibt unverändert — siehe Energievergleich. Linienfarben: `_HSL_COST_*` in `ui/chart_colors.py`.
 
 ## Expander: Simulations-Details
 
