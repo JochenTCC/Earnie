@@ -251,6 +251,27 @@ function earnie_host_tz()
 	return $tz !== "" ? $tz : "Europe/Vienna";
 }
 
+function earnie_detect_lan_subnet()
+{
+	$out = [];
+	@exec("ip -4 route get 1.1.1.1 2>/dev/null", $out);
+	$line = isset($out[0]) ? (string) $out[0] : "";
+	if (!preg_match('/\bsrc\s+(\d+\.\d+\.\d+\.\d+)\b/', $line, $m)) {
+		return "";
+	}
+	$ip = $m[1];
+	$parts = explode(".", $ip);
+	if (count($parts) !== 4) {
+		return "";
+	}
+	$o1 = (int) $parts[0];
+	$o2 = (int) $parts[1];
+	if ($o1 === 172 && $o2 >= 16 && $o2 <= 31) {
+		return "";
+	}
+	return $parts[0] . "." . $parts[1] . "." . $parts[2] . ".0/24";
+}
+
 function earnie_sync_compose_env($compose_dir, $port, $plugin_env = null, $tag = "latest")
 {
 	$script = rtrim($compose_dir, "/") . "/sync_compose_env.sh";
@@ -269,6 +290,10 @@ function earnie_sync_compose_env($compose_dir, $port, $plugin_env = null, $tag =
 	$body = "STREAMLIT_PORT=" . (int) $port
 		. "\nEARNIE_IMAGE_TAG=" . $tag
 		. "\nTZ=" . earnie_host_tz() . "\n";
+	$subnet = earnie_detect_lan_subnet();
+	if ($subnet !== "") {
+		$body .= "EARNIE_LAN_SUBNET=" . $subnet . "\n";
+	}
 	return file_put_contents($path, $body) !== false;
 }
 

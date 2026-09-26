@@ -153,7 +153,7 @@ Vorabversionen (Community): Image-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-en
 
 - **Kein Docker Compose** — Start/Stop/Update über `vctl` bzw. das Hilfsskript.
 - **Kein Auto-Start** mit Windows — nach Reboot Runtime + Container starten (Taskplaner optional selbst einrichten).
-- **LAN / Loxone** — Ports liegen auf dem Windows-Host; Erreichbarkeit des Miniservers zuerst vom PC aus prüfen. Bei Problemen alternativ Linux-VM mit bridged Netz + Compose ([proxmox-lxc.md](proxmox-lxc.md) als Muster).
+- **LAN / Loxone** — Ports liegen auf dem Windows-Host; Erreichbarkeit des Miniservers zuerst vom PC aus prüfen. Der Miniserver muss Earnie auf Port **8541** erreichen können — dafür braucht die VM **Bridged**-Netz (nicht NAT) und eine **feste IP** bzw. DHCP-Reservierung für den Earnie-Host (siehe [container.md](container.md) § Netzwerk). Bei Problemen alternativ Linux-VM mit bridged Netz + Compose ([proxmox-lxc.md](proxmox-lxc.md) als Muster).
 - Compose-Äquivalent Prod: [`docker/compose/proxmox_productive.yml`](../../docker/compose/proxmox_productive.yml) / [`synology_productive.yml`](../../docker/compose/synology_productive.yml).
 
 ## Troubleshooting: `crx.vmdk`

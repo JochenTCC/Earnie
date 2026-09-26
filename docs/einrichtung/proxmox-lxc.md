@@ -17,7 +17,7 @@ Earnie auf einem **Proxmox VE**-Host in einem **unprivileged LXC** mit Docker Co
 | Features | `nesting=1`, `keyctl=1` | Docker ohne Nesting |
 | RAM | mind. **2 GB** (4 GB empfohlen bei Backtesting) | unter 1 GB |
 | Disk | mind. **8 GB** Rootfs (+ optional Bind-Mount für Daten) | sehr knappe Rootfs |
-| Netz | Bridge (`vmbr0`), Port **8501** im LAN erreichbar | Port 8501 ungeschützt ins Internet |
+| Netz | Bridge (`vmbr0`), Port **8501** im LAN erreichbar; für Miniserver-Rückkanal Port **8541** und feste IP / DHCP-Reservierung (kein NAT) — siehe [container.md](container.md) § Netzwerk | Port 8501 ungeschützt ins Internet |
 
 Das Image `ghcr.io/jochentcc/earnie-energy:latest` liefert `linux/amd64` (wie Synology).
 

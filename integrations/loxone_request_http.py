@@ -49,13 +49,24 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args) -> None:  # noqa: A003
         logger.debug("loxone_request_http: " + format, *args)
 
+    def _record_peer(self) -> None:
+        try:
+            from runtime_store.loxone_callback_status import record_loxone_callback
+
+            peer = self.client_address[0] if self.client_address else ""
+            record_loxone_callback(peer)
+        except Exception:  # noqa: BLE001 — never fail the Miniserver callback path
+            logger.exception("loxone_request_http: failed to record last callback")
+
     def do_GET(self) -> None:  # noqa: N802
         path = _normalize_path(self.path)
         if path == ALIVE_PATH.rstrip("/") or path == ALIVE_PATH:
+            self._record_peer()
             self.send_response(204)
             self.end_headers()
             return
         if path == STATUS_PATH.rstrip("/") or path == STATUS_PATH:
+            self._record_peer()
             from integrations.loxone_status_json import build_loxone_status_payload
 
             body = json.dumps(build_loxone_status_payload()).encode("utf-8")
@@ -73,6 +84,7 @@ class _LoxoneRequestHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
             if length > 0:
                 self.rfile.read(length)
+            self._record_peer()
             signal_optimize_request()
             logger.info("Earnie_Request_Optimize received — early optimize queued.")
             self.send_response(204)

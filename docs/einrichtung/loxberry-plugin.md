@@ -53,7 +53,7 @@ Kleine Plugin-Notizdatei: `…/config/plugins/earnie/plugin.env` (kein Geheimnis
 | `STREAMLIT_PORT`          | Host-Port (Standard **8501**)                                             |
 
 
-Beim Speichern in der Plugin-UI schreibt `sync_compose_env.sh` nach `…/data/plugins/earnie/docker/.env`: `STREAMLIT_PORT`, `EARNIE_IMAGE_TAG` (`latest` / `next` / SemVer) und `TZ=…` aus der LoxBerry-Host-Zeitzone (`/etc/timezone`, Fallback `Europe/Vienna`). Override von `TZ` manuell in dieser `.env` möglich.
+Beim Speichern in der Plugin-UI schreibt `sync_compose_env.sh` nach `…/data/plugins/earnie/docker/.env`: `STREAMLIT_PORT`, `EARNIE_IMAGE_TAG` (`latest` / `next` / SemVer), `TZ=…` aus der LoxBerry-Host-Zeitzone (`/etc/timezone`, Fallback `Europe/Vienna`) und `EARNIE_LAN_SUBNET=<Host-LAN>/24` (aus der Default-Route des Hosts, sofern noch nicht gesetzt). Override von `TZ` bzw. `EARNIE_LAN_SUBNET` manuell in dieser `.env` möglich.
 
 ## Versionskanäle (Earnie-Image)
 

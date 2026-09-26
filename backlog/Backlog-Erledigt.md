@@ -2,6 +2,13 @@
 
 Archive of completed work. Open todos → [Backlog.md](Backlog.md) · Bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md).
 
+### 2.6.l Sprint 3 — network Loxone + HA (2026-09-26)
+
+- [x] **2.6.l — Sprint 3: network (Loxone + HA)** (ships in community pre-release **`2.6.0-alpha.2`**). **H11** stays under **2.6.j**.
+  - [x] **H9 (fix)** `EARNIE_LAN_SUBNET` (+ LoxBerry install sync / compose `.env`); Docker `172.16.0.0/12` gate with SB CIDR prompt; HA add-on host IP via Supervisor `/network/info`.
+  - [x] **H10** Last Miniserver callback (time + peer IP) on SB / EHAL-Com (`runtime/loxone_last_callback.json`); docs bridged VM + fixed IP / DHCP reservation.
+  - [x] **H8** SB: on Docker bridge (non–add-on) offer HA URL + LLAT instead of empty mDNS-only path; `docs/einrichtung/container.md` § Netzwerk.
+
 ### 2.6.k Sprint 2 — release pipeline + version channels (2026-09-26)
 
 - [x] **2.6.k — Sprint 2: release pipeline + version channels** (concept doc §3). Code on `main`; ships with the next publish after **2.6.m** (no mid-sprint tag).

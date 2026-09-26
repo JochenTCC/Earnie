@@ -231,6 +231,63 @@ class TestDiscoverOpenems:
         assert results[0].extra["felix_console_confirmed"] is False
 
 
+class TestDockerBridgeAndLanSubnet:
+    def test_is_docker_bridge_ipv4(self):
+        assert scanner.is_docker_bridge_ipv4("172.17.0.2")
+        assert scanner.is_docker_bridge_ipv4("172.30.32.1")
+        assert not scanner.is_docker_bridge_ipv4("192.168.178.1")
+        assert not scanner.is_docker_bridge_ipv4("10.0.0.5")
+        assert not scanner.is_docker_bridge_ipv4("172.15.0.1")
+        assert not scanner.is_docker_bridge_ipv4("172.32.0.1")
+
+    def test_parse_lan_subnet_cidr(self):
+        assert scanner.parse_lan_subnet_cidr("192.168.178.0/24") == "192.168.178"
+        assert scanner.parse_lan_subnet_cidr("10.0.0.42/24") == "10.0.0"
+        assert scanner.parse_lan_subnet_cidr("192.168.178.0/16") is None
+        assert scanner.parse_lan_subnet_cidr("not-a-cidr") is None
+
+    def test_resolve_scan_hosts_uses_env(self, monkeypatch):
+        monkeypatch.setenv("EARNIE_LAN_SUBNET", "192.168.1.0/24")
+        with patch.object(scanner, "local_ipv4_address", return_value="172.17.0.2"):
+            hosts = scanner.resolve_scan_hosts()
+        assert hosts is not None
+        assert "192.168.1.1" in hosts
+        assert "172.17.0.1" not in hosts
+
+    def test_resolve_scan_hosts_blocks_docker_without_env(self, monkeypatch):
+        monkeypatch.delenv("EARNIE_LAN_SUBNET", raising=False)
+        with patch.object(scanner, "local_ipv4_address", return_value="172.17.0.2"), patch(
+            "integrations.ha_supervisor.supervisor_host_lan_ipv4", return_value=None
+        ):
+            assert scanner.resolve_scan_hosts() is None
+
+    def test_resolve_scan_hosts_uses_supervisor_host_ip(self, monkeypatch):
+        monkeypatch.delenv("EARNIE_LAN_SUBNET", raising=False)
+        with patch(
+            "integrations.ha_supervisor.supervisor_host_lan_ipv4",
+            return_value="192.168.178.50",
+        ), patch.object(scanner, "local_ipv4_address", return_value="172.30.32.1"):
+            hosts = scanner.resolve_scan_hosts()
+        assert hosts is not None
+        assert "192.168.178.1" in hosts
+        assert "192.168.178.50" not in hosts
+
+    def test_discover_openems_skips_when_resolve_none(self):
+        with patch.object(scanner, "resolve_scan_hosts", return_value=None), patch.object(
+            scanner, "_tcp_port_open"
+        ) as tcp:
+            assert scanner.discover_openems() == []
+        tcp.assert_not_called()
+
+    def test_bridge_without_lan_subnet_helper(self, monkeypatch):
+        monkeypatch.delenv("EARNIE_LAN_SUBNET", raising=False)
+        with patch.object(scanner, "local_ipv4_address", return_value="172.17.0.2"):
+            assert scanner.is_bridge_network_without_lan_subnet() is True
+        monkeypatch.setenv("EARNIE_LAN_SUBNET", "192.168.1.0/24")
+        with patch.object(scanner, "local_ipv4_address", return_value="172.17.0.2"):
+            assert scanner.is_bridge_network_without_lan_subnet() is False
+
+
 class TestLocalIpv4HostsForScan:
     def test_builds_254_candidates_excluding_self(self):
         fake_probe = MagicMock()

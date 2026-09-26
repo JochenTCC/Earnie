@@ -16,9 +16,9 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 
 ### Version 2.6 - Enhancements for HA coupling
 
-**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.1`**.
+**Versioning note:** Official **2.5.3** ships the old Phase 1 (Options → `config.json` + Ingress; archived). Community channel: **`2.6.0-alpha.*`** on `main` (do not continue `2.5.3-alpha.N`). Alpha compose currently pins **`2.6.0-alpha.2`**.
 
-**Next:** Live **H11** Gen2 check (closes **2.6.j** with **H0**; no interim publish). In parallel **2.6.e**. Then **2.6.l → 2.6.m**. **One publish after 2.6.m** (ships **H0** + Sprint 2–4; propose path **B** `2.6.0-alpha.N` or **C** official — dual-channel `earnie_prerelease` is done in **2.6.k**). Then **2.6.n** (battery controllability).
+**Next:** Live **H11** Gen2 check under **2.6.j** (verify → close without change, or **H11 (fix)** in the same chapter). In parallel **2.6.e**. Then **2.6.m**. **H0** ships with the publish after **2.6.m** (or path **B**/**C** then). Then **2.6.n** (battery controllability).
 
 **Scope:** easier HA coupling for Earnie. HA entity IDs live on `plant` / `consumers[].ehal_bindings` (Pattern B, Loxone-parity HITL). The generic HA↔Loxone bridge stays under Research Items. Add-on 1.0 (Earnie publishing its own state) is deferred to **Version 2.+1**.
 
@@ -38,15 +38,10 @@ Open bugfixes → [Backlog-Bugfixes.md](Backlog-Bugfixes.md)
 Trigger: support case 2026-09-25 (HA add-on crash loop on a `kvm64` VM, see [Backlog-Erledigt.md](Backlog-Erledigt.md)). IDs **H0–H13** refer to the [concept doc](https://github.com/JochenTCC/Earnie-Projekt/blob/main/Entwicklungsplan/Earnie-Installation-Haertung-Entwicklungsdokument.md).
 
 - [ ] **2.6.j — Sprint 1: quick safeguards + verification** (code done 2026-09-26; see [Backlog-Erledigt.md](Backlog-Erledigt.md))
-  - [ ] **H0** Ship x86-64-v2 preflight with the **next** image publish (deferred until after **2.6.m**; no interim `alpha.2` for Sprint 1 alone)
+  - [ ] **H0** Ship x86-64-v2 preflight with the **next** image publish after **2.6.m** (deferred; not required for community `2.6.0-alpha.2`)
   - [ ] **H11 (verify)** Gen2 Miniserver set to HTTPS-only vs. hard-coded `http://` in `integrations/loxone_client.py`
-    - **Live checklist (leave open until run):** on Gen2 with Config → Network → „Nur verschlüsselt“ / HTTPS only: (1) `http://<ms-ip>/jdev/sps/status` (or any jdev Earnie uses); (2) `http://<ms-ip>/data/LoxAPP3.json`; (3) optional write path `http://<ms-ip>/dev/sps/io/...`. If all fail (timeout / connection refused / TLS redirect only) → confirm H11 and do **2.6.l H11 (fix)**. If HTTP still works → close H11 without code change.
-
-- [ ] **2.6.l — Sprint 3: network (Loxone + HA)**
-  - [ ] **H9 (fix)** Scan subnet via `EARNIE_LAN_SUBNET` (LoxBerry sets it at install, compose `.env` for others); detect Docker subnets (`172.16.0.0/12`) and ask in the UI instead of scanning blindly; HA add-on: host IP via Supervisor `/network/info` (`hassio_api: true`)
-  - [ ] **H10** Show „letzter Aufruf vom Miniserver: vor X min von IP Y“ (callback on `:8541`) in SB page / EHAL-Com; docs: bridged VM network (no NAT), fixed IP / DHCP reservation for the Earnie host
-  - [ ] **H8** SB page: when running in a bridge network with HA backend, offer HA URL + long-lived token directly instead of an empty mDNS scan; hint in `docs/einrichtung/container.md`
-  - [ ] **H11 (fix, only if 2.6.j confirms)** Configurable `http`/`https` for the Miniserver; pin the self-signed certificate by fingerprint instead of `verify=False`
+    - **Live checklist (leave open until run):** on Gen2 with Config → Network → „Nur verschlüsselt“ / HTTPS only: (1) `http://<ms-ip>/jdev/sps/status` (or any jdev Earnie uses); (2) `http://<ms-ip>/data/LoxAPP3.json`; (3) optional write path `http://<ms-ip>/dev/sps/io/...`. If all fail (timeout / connection refused / TLS redirect only) → confirm H11 and do **H11 (fix)** below. If HTTP still works → close H11 without code change.
+  - [ ] **H11 (fix, only if verify confirms)** Configurable `http`/`https` for the Miniserver; pin the self-signed certificate by fingerprint instead of `verify=False`
 
 - [ ] **2.6.m — Sprint 4: startup checks + runtime monitoring**
   - [ ] **H1** Extend `docker/cpu_check.sh` to `preflight.sh`: abort on non-writable data dir and on a clock before the image build date (wait briefly for NTP first); warn on RAM < 2 GB and < 500 MB free disk

@@ -129,6 +129,42 @@ class TestWaitForSupervisorCore:
             ) is False
 
 
+class TestSupervisorHostLanIpv4:
+    def test_picks_primary_from_list_payload(self, monkeypatch):
+        monkeypatch.setenv("EARNIE_INSTALL_CONTEXT", "homeassistant_addon")
+        monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+        payload = {
+            "result": "ok",
+            "data": {
+                "interfaces": [
+                    {
+                        "interface": "hassio",
+                        "primary": False,
+                        "connected": True,
+                        "ipv4": {"address": ["172.30.32.1/23"]},
+                    },
+                    {
+                        "interface": "eth0",
+                        "primary": True,
+                        "connected": True,
+                        "ipv4": {"address": ["192.168.178.40/24"]},
+                    },
+                ]
+            },
+        }
+        response = MagicMock()
+        response.read = MagicMock(return_value=__import__("json").dumps(payload).encode())
+        response.__enter__ = MagicMock(return_value=response)
+        response.__exit__ = MagicMock(return_value=False)
+        with patch("urllib.request.urlopen", return_value=response):
+            assert hs.supervisor_host_lan_ipv4() == "192.168.178.40"
+
+    def test_empty_outside_addon(self, monkeypatch):
+        monkeypatch.delenv("EARNIE_INSTALL_CONTEXT", raising=False)
+        monkeypatch.setenv("SUPERVISOR_TOKEN", "sup-token")
+        assert hs.supervisor_host_lan_ipv4() is None
+
+
 class TestGetHaAdapterSupervisorResolve:
     def test_uses_supervisor_defaults(self, monkeypatch):
         import integrations.ehal_live as ehal_live

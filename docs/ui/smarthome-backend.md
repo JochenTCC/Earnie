@@ -12,9 +12,11 @@ Die Seite **Smarthome-Backend** unter **Daemon Control** wählt und verbindet de
 
 1. **Gezielter Scan** — bei Installation über LoxBerry-Plugin oder Home-Assistant-Add-on (`EARNIE_INSTALL_CONTEXT`, siehe `runtime_store/install_context.py`) wird der Scan auf dieses Backend eingegrenzt (SSDP für Loxone; beim HA-Add-on zuerst Supervisor-Core-Proxy über `SUPERVISOR_TOKEN` / `http://supervisor/core`, dann mDNS). Findet nichts → Fallback auf vollen passiven Scan.
 2. **Voller passiver Scan** — sonst laufen mDNS (Home Assistant) und SSDP/UPnP (Loxone) parallel. Im HA-Add-on läuft die Supervisor-Self-Discovery beim HA-Scan weiterhin zuerst.
-3. **Erweiterter Scan (opt-in)** — aktiver TCP-Portscan (8080/8085) für OpenEMS, nur angeboten wenn der passive Scan nichts findet (kann Firewall-/IDS-Alarme im Heimnetz auslösen, z. B. UniFi).
-4. **Keine Treffer** — Hinweis, dass automatischer Verbraucher-/EHAL-Import und weitere Live-Seiten (EHAL-Com, Optimierer-Dienst) deaktiviert bleiben, bis ein Backend manuell gewählt wird.
+3. **Erweiterter Scan (opt-in)** — aktiver TCP-Portscan (8080/8085) für OpenEMS, nur angeboten wenn der passive Scan nichts findet (kann Firewall-/IDS-Alarme im Heimnetz auslösen, z. B. UniFi). Voraussetzung: Heimnetz bekannt (`EARNIE_LAN_SUBNET` oder Host-IP über Supervisor); bei Container-IP in `172.16.0.0/12` fragt die Seite nach dem LAN-CIDR statt blind zu scannen — siehe [container.md](../einrichtung/container.md) § Netzwerk.
+4. **Keine Treffer** — Hinweis, dass automatischer Verbraucher-/EHAL-Import und weitere Live-Seiten (EHAL-Com, Optimierer-Dienst) deaktiviert bleiben, bis ein Backend gewählt wird. Im Docker-Bridge-Netz (ohne HA-Add-on) bietet die Seite zusätzlich sofort das Formular für HA-URL + Long-Lived Token an (mDNS oft leer).
 5. **Mehrere Treffer** — Auswahl aus einer Liste; nichts verbindet sich automatisch.
+
+Bei verbundenem Loxone zeigt die Seite (und EHAL-Com) den **letzten Aufruf vom Miniserver** auf Port 8541 (Zeit + Peer-IP).
 
 Hintergrund: [SB-Identification-Draft](../../backlog/SB-Identification-Draft.md) und [Entwicklungsplan](../spec/smarthome-backend-page.md).
 

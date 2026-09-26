@@ -79,6 +79,21 @@ def test_http_get_alive() -> None:
         assert resp.status == 204
 
 
+def test_http_alive_records_callback(tmp_path, monkeypatch) -> None:
+    from runtime_store import loxone_callback_status as cbs
+
+    monkeypatch.setenv("EARNIE_RUNTIME_PATH", str(tmp_path))
+    server = http_mod.start_loxone_request_http(0)
+    port = server.server_address[1]
+    with urllib.request.urlopen(
+        f"http://127.0.0.1:{port}/ehal/loxone/alive", timeout=2
+    ) as resp:
+        assert resp.status == 204
+    status = cbs.load_loxone_callback_status()
+    assert status is not None
+    assert status["client_ip"] in ("127.0.0.1", "::1", "localhost")
+
+
 def test_http_get_status_json(monkeypatch) -> None:
     import json
 

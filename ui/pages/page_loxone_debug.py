@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import streamlit as st
 
-import config
 from runtime_store.ehal_setup import (
     BACKEND_HA,
     BACKEND_LOXONE,
@@ -48,6 +47,8 @@ def _render_cockpit_locked_notice() -> None:
 
 
 def render() -> None:
+    import config
+
     render_page_title_with_help(
         "🔗 EHAL-Com",
         _EHAL_COM_HELP,
@@ -62,6 +63,10 @@ def render() -> None:
         "Zugangsdaten und Backend-Wechsel auf **Smarthome-Backend**. "
         "Diese Seite zeigt Live-Lesen/Schreiben und das Signal-Mapping."
     )
+    if backend == BACKEND_LOXONE:
+        from runtime_store.loxone_callback_status import format_loxone_callback_caption
+
+        st.caption(format_loxone_callback_caption())
 
     render_loxone_debug_block()
 

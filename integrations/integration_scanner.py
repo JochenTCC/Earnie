@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import http.client
 import logging
+import os
 import socket
 from dataclasses import dataclass, field
 from typing import Literal, Sequence
@@ -33,6 +34,11 @@ _MDNS_HA_SERVICE_TYPE = "_home-assistant._tcp.local."
 _SSDP_MULTICAST_ADDR = ("239.255.255.250", 1900)
 _OPENEMS_PORTS: tuple[int, ...] = (8080, 8085)
 _OPENEMS_FELIX_PATH = "/system/console"
+_LAN_SUBNET_ENV = "EARNIE_LAN_SUBNET"
+# Docker default bridge / swarm / HA hassio range sit in 172.16.0.0/12.
+_DOCKER_BRIDGE_OCTET1 = 172
+_DOCKER_BRIDGE_OCTET2_MIN = 16
+_DOCKER_BRIDGE_OCTET2_MAX = 31
 
 
 @dataclass(frozen=True)
@@ -252,25 +258,123 @@ def _tcp_port_open(host: str, port: int, *, timeout_sec: float) -> bool:
         sock.close()
 
 
+def is_docker_bridge_ipv4(ip: str) -> bool:
+    """True for addresses in ``172.16.0.0/12`` (Docker / hassio typical ranges)."""
+    parts = str(ip or "").strip().split(".")
+    if len(parts) != 4:
+        return False
+    try:
+        first, second = int(parts[0]), int(parts[1])
+    except ValueError:
+        return False
+    return (
+        first == _DOCKER_BRIDGE_OCTET1
+        and _DOCKER_BRIDGE_OCTET2_MIN <= second <= _DOCKER_BRIDGE_OCTET2_MAX
+    )
+
+
+def local_ipv4_address() -> str | None:
+    """Best-effort local IPv4 via UDP routing trick (no packets sent)."""
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("8.8.8.8", 80))
+        return str(probe.getsockname()[0] or "") or None
+    except OSError:
+        return None
+    finally:
+        probe.close()
+
+
+def hosts_from_ipv4_prefix(prefix: str, *, exclude_ip: str | None = None) -> list[str]:
+    """Expand ``a.b.c`` to ``a.b.c.1``–``.254``, optionally excluding one host."""
+    base = str(prefix or "").strip().rstrip(".")
+    parts = base.split(".")
+    if len(parts) != 3:
+        return []
+    try:
+        if not all(0 <= int(p) <= 255 for p in parts):
+            return []
+    except ValueError:
+        return []
+    skip = str(exclude_ip or "").strip()
+    return [f"{base}.{i}" for i in range(1, 255) if f"{base}.{i}" != skip]
+
+
+def parse_lan_subnet_cidr(cidr: str) -> str | None:
+    """Return ``a.b.c`` prefix for a ``/24`` CIDR (``a.b.c.0/24`` or ``a.b.c.N/24``)."""
+    raw = str(cidr or "").strip()
+    if "/" not in raw:
+        return None
+    addr, _, mask = raw.partition("/")
+    if mask.strip() != "24":
+        return None
+    parts = addr.strip().split(".")
+    if len(parts) != 4:
+        return None
+    try:
+        if not all(0 <= int(p) <= 255 for p in parts):
+            return None
+    except ValueError:
+        return None
+    return ".".join(parts[:3])
+
+
+def configured_lan_subnet() -> str:
+    return str(os.environ.get(_LAN_SUBNET_ENV) or "").strip()
+
+
+def is_bridge_network_without_lan_subnet() -> bool:
+    """True when the process IP looks like Docker and no ``EARNIE_LAN_SUBNET`` is set."""
+    if configured_lan_subnet():
+        return False
+    ip = local_ipv4_address()
+    return bool(ip and is_docker_bridge_ipv4(ip))
+
+
+def resolve_scan_hosts() -> list[str] | None:
+    """Hosts for an active LAN scan, or ``None`` when scanning would hit a Docker net.
+
+    Resolution order: ``EARNIE_LAN_SUBNET`` → Supervisor host IP (HA add-on) →
+    local ``/24`` when not a Docker-bridge address. ``None`` means the UI must
+    ask for a CIDR / IP instead of scanning blindly.
+    """
+    from_env = parse_lan_subnet_cidr(configured_lan_subnet())
+    if from_env:
+        return hosts_from_ipv4_prefix(from_env)
+
+    from integrations.ha_supervisor import supervisor_host_lan_ipv4
+
+    host_ip = supervisor_host_lan_ipv4()
+    if host_ip and not is_docker_bridge_ipv4(host_ip):
+        prefix = ".".join(host_ip.split(".")[:3])
+        return hosts_from_ipv4_prefix(prefix, exclude_ip=host_ip)
+
+    local_ip = local_ipv4_address()
+    if not local_ip:
+        return []
+    if is_docker_bridge_ipv4(local_ip):
+        return None
+    prefix = ".".join(local_ip.split(".")[:3])
+    return hosts_from_ipv4_prefix(prefix, exclude_ip=local_ip)
+
+
 def local_ipv4_hosts_for_scan(*, subnet_size: int = 24) -> list[str]:
     """Candidate hosts on the local /24 (home-LAN assumption, same as elsewhere in Earnie).
 
     Determines the local IPv4 address without sending traffic (UDP "connect" to a
     public IP only resolves routing, per the standard socket trick), then assumes a
     /24 subnet. Excludes the network address, broadcast address and own IP.
+
+    Prefer :func:`resolve_scan_hosts` for discovery — this helper ignores
+    ``EARNIE_LAN_SUBNET`` and the Docker-bridge gate (kept for unit tests).
     """
     if subnet_size != 24:
         raise ValueError("only /24 is supported for now")
-    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        probe.connect(("8.8.8.8", 80))
-        local_ip = probe.getsockname()[0]
-    except OSError:
+    local_ip = local_ipv4_address()
+    if not local_ip:
         return []
-    finally:
-        probe.close()
     prefix = ".".join(local_ip.split(".")[:3])
-    return [f"{prefix}.{i}" for i in range(1, 255) if f"{prefix}.{i}" != local_ip]
+    return hosts_from_ipv4_prefix(prefix, exclude_ip=local_ip)
 
 
 def discover_openems(
@@ -280,10 +384,21 @@ def discover_openems(
 ) -> list[DiscoveredBackend]:
     """Active TCP scan for ports 8080 (Felix)/8085 (UI websocket). Opt-in only.
 
-    ``hosts`` defaults to :func:`local_ipv4_hosts_for_scan` — pass an explicit
-    list to scan a narrower range (e.g. after a slow full-subnet pass timed out).
+    ``hosts`` defaults to :func:`resolve_scan_hosts`. When that returns ``None``
+    (Docker bridge without ``EARNIE_LAN_SUBNET``), no scan runs.
     """
-    candidates = list(hosts) if hosts is not None else local_ipv4_hosts_for_scan()
+    if hosts is not None:
+        candidates = list(hosts)
+    else:
+        resolved = resolve_scan_hosts()
+        if resolved is None:
+            logger.info(
+                "OpenEMS scan skipped: container IP is in 172.16.0.0/12 and "
+                "%s is unset — set a LAN CIDR (e.g. 192.168.1.0/24) first",
+                _LAN_SUBNET_ENV,
+            )
+            return []
+        candidates = resolved
     found: list[DiscoveredBackend] = []
     for host in candidates:
         open_ports = [

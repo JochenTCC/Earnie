@@ -38,10 +38,33 @@ Diese Verzeichnisse liegen **außerhalb des Images** und überleben Image-Update
 | `./earnie_env/config/config.example.json`        | Optional auf dem Host; fehlt sie, kopiert der Entrypoint die Vorlage aus dem Image (`share/config/`) für Drift-Hinweise |
 | `./earnie_env/runtime/`                          | `cons_data.csv`, Zustands-JSONs, Profile, Logs                                                                   |
 | `./earnie_env/runtime/local_settings.json`       | Lokale Einstellungen (z. B. Silent-Mode)                                                                                |
-| `./earnie_env/config/.env`                       | Loxone- und HA-Zugangsdaten (`LOXONE_*` / `EHAL_HA_*`)                                                                  |
+| `./earnie_env/config/.env`                       | Loxone- und HA-Zugangsdaten (`LOXONE_*` / `EHAL_HA_*`); optional `EARNIE_LAN_SUBNET` |
 
 
 Umgebungsvariable in Compose: `EARNIE_ENV_PATH=.` (leitet `/app/config` und `/app/runtime` ab; Host-Mounts `./…/config` → `/app/config`, `./…/runtime` → `/app/runtime`)
+
+## Netzwerk: Docker-Bridge, Heimnetz und Miniserver-Rückkanal
+
+Earnie läuft in Compose **ohne** `network_mode: host`. Die Container-IP liegt typischerweise in `172.16.0.0/12` (Docker-Bridge). Dadurch:
+
+- **mDNS/SSDP** (Suche nach Home Assistant / Loxone) erreicht oft das Heimnetz nicht.
+- Ein aktiver Portscan ohne Angabe würde fälschlich das **Docker-Netz** durchsuchen.
+
+**Heimnetz für die erweiterte Suche:** `EARNIE_LAN_SUBNET` als `/24`-CIDR setzen, z. B. `192.168.178.0/24`:
+
+- in `earnie_env/config/.env` bzw. Compose-`.env`, oder
+- auf der Seite **Smarthome-Backend**, wenn Earnie nach dem LAN fragt.
+
+LoxBerry setzt `EARNIE_LAN_SUBNET` beim Install/Upgrade aus der Host-IP. Im HA-Add-on wird die Host-LAN-IP über die Supervisor-API (`/network/info`) ermittelt.
+
+**Home Assistant als Backend (nicht Add-on):** Wenn die Suche leer bleibt, auf **Smarthome-Backend** direkt `EHAL_HA_BASE_URL` und Long-Lived Token eintragen (nicht auf mDNS warten).
+
+**Miniserver → Earnie (Port 8541):** Der Miniserver muss den Earnie-Host unter einer stabilen Adresse erreichen (`VO_Earnie_Status` / Virtual In → Host:8541). Dazu:
+
+- VM/Container im **Bridged**-LAN (nicht NAT) betreiben, und
+- dem Earnie-Host eine **feste IP** oder **DHCP-Reservierung** geben, damit die Adresse in der Loxone Config gültig bleibt.
+
+Auf **Smarthome-Backend** und **EHAL-Com** zeigt Earnie „Letzter Aufruf vom Miniserver: vor X min von IP Y“ — so prüft man den Rückkanal ohne Extra-Tools.
 
 ## Erstinstallation (NAS)
 
@@ -77,7 +100,7 @@ Das Image ist ein **Multi-Arch-Manifest** (`linux/amd64` für Synology, `linux/a
 
 **Veröffentlichte Images** kommen von GitHub Releases: ein Tag `vX.Y.Z` (passend zu `version.py`) startet [`.github/workflows/release.yml`](../../.github/workflows/release.yml) und pusht u. a. `ghcr.io/jochentcc/earnie-energy:X.Y.Z` sowie `:latest`. Details für Entwickler: [DEVELOPER.md](../../DEVELOPER.md) § Release.
 
-**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und die Image-Tags `:<version>` sowie `:next` — **nicht** `:latest`. Zum Testen `:next` oder den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.1`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
+**Vorabversionen (Community-Test):** Tag `vX.Y.Z-alpha.N` bzw. `vX.Y.Z-rc.N` (ebenfalls passend zu `version.py`) erzeugt ein GitHub **Pre-release** und die Image-Tags `:<version>` sowie `:next` — **nicht** `:latest`. Zum Testen `:next` oder den Versions-Tag pinnen, z. B. `ghcr.io/jochentcc/earnie-energy:2.6.0-alpha.2`. Prod-Compose (`*_productive.yml`) mit `:latest` bleibt auf der letzten offiziellen Version.
 
 ### Alpha parallel zur Produktion (Port 8511)
 
@@ -85,7 +108,7 @@ Eigene Compose-Dateien (nicht in der Prod-YAML): `docker/compose/synology-alpha.
 
 - Container `earnie-alpha`, Host-Port **8511**, Volumes unter `./earnie_env_alpha/`
 - Compose-Projektname `earnie-alpha` (kollidiert nicht mit Prod `earnie-productive`)
-- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.0-alpha.1`)
+- Image-Tag in der YAML an die gewünschte Pre-release anpassen (aktuell in den Dateien: `2.6.0-alpha.2`)
 
 ```powershell
 mkdir -p earnie_env_alpha/config earnie_env_alpha/runtime

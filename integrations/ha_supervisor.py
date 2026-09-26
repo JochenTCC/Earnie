@@ -28,7 +28,10 @@ logger = logging.getLogger(__name__)
 SUPERVISOR_CORE_BASE_URL = "http://supervisor/core"
 _SUPERVISOR_CORE_API = f"{SUPERVISOR_CORE_BASE_URL}/api/"
 _SUPERVISOR_ADDON_SELF_INFO = "http://supervisor/addons/self/info"
+_SUPERVISOR_NETWORK_INFO = "http://supervisor/network/info"
 _PROBE_TIMEOUT_SEC = 3.0
+# Host interfaces whose names imply Docker / hassio, not the LAN.
+_SKIP_INTERFACE_NAME_FRAGMENTS = ("hassio", "docker", "veth", "br-")
 
 
 def supervisor_token() -> str:
@@ -164,6 +167,110 @@ def wait_for_supervisor_core(
             )
             return False
         time.sleep(min(interval, remaining))
+
+
+def _ipv4_from_address_entry(entry: object) -> str | None:
+    """Parse ``192.168.1.10/24`` or bare ``192.168.1.10`` → host IPv4 string."""
+    raw = str(entry or "").strip()
+    if not raw:
+        return None
+    host = raw.split("/", 1)[0].strip()
+    parts = host.split(".")
+    if len(parts) != 4:
+        return None
+    try:
+        if not all(0 <= int(p) <= 255 for p in parts):
+            return None
+    except ValueError:
+        return None
+    return host
+
+
+def _interface_should_skip(iface: dict) -> bool:
+    name = str(iface.get("interface") or iface.get("name") or "").lower()
+    return any(frag in name for frag in _SKIP_INTERFACE_NAME_FRAGMENTS)
+
+
+def _ipv4_from_interface(iface: dict) -> str | None:
+    """Extract first usable IPv4 from a Supervisor interface dict."""
+    from integrations.integration_scanner import is_docker_bridge_ipv4
+
+    ipv4 = iface.get("ipv4")
+    if isinstance(ipv4, dict):
+        addresses = ipv4.get("address") or []
+        if isinstance(addresses, str):
+            addresses = [addresses]
+        for entry in addresses:
+            host = _ipv4_from_address_entry(entry)
+            if host and not is_docker_bridge_ipv4(host):
+                return host
+    # Older docs used a single ``ip_address`` field.
+    host = _ipv4_from_address_entry(iface.get("ip_address"))
+    if host and not is_docker_bridge_ipv4(host):
+        return host
+    return None
+
+
+def _pick_host_lan_ipv4(interfaces: list) -> str | None:
+    """Prefer primary connected interface; skip Docker-named / Docker-range IPs."""
+    ranked: list[tuple[int, str]] = []
+    for item in interfaces:
+        if not isinstance(item, dict) or _interface_should_skip(item):
+            continue
+        host = _ipv4_from_interface(item)
+        if not host:
+            continue
+        primary = 0 if item.get("primary") else 1
+        connected = 0 if item.get("connected", True) else 1
+        ranked.append((primary + connected, host))
+    if not ranked:
+        return None
+    ranked.sort(key=lambda row: row[0])
+    return ranked[0][1]
+
+
+def supervisor_host_lan_ipv4(*, timeout_sec: float = _PROBE_TIMEOUT_SEC) -> str | None:
+    """Host LAN IPv4 from Supervisor ``GET /network/info`` (HA add-on, ``hassio_api``).
+
+    Returns ``None`` when not an add-on, token missing, request fails, or no
+    suitable non-Docker host address is found.
+    """
+    token = supervisor_token()
+    if not token or not is_homeassistant_addon_context():
+        return None
+    request = urllib.request.Request(
+        _SUPERVISOR_NETWORK_INFO,
+        headers={"Authorization": f"Bearer {token}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_sec) as response:
+            raw = response.read().decode("utf-8")
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+        logger.info("Supervisor network/info failed: %s", exc)
+        return None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        logger.info("Supervisor network/info JSON invalid: %s", exc)
+        return None
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        return None
+    interfaces = data.get("interfaces")
+    if isinstance(interfaces, dict):
+        # Docs example keyed by name; live API returns a list.
+        iface_list = [
+            {**value, "interface": key}
+            if isinstance(value, dict)
+            else value
+            for key, value in interfaces.items()
+        ]
+    elif isinstance(interfaces, list):
+        iface_list = interfaces
+    else:
+        return None
+    return _pick_host_lan_ipv4(iface_list)
 
 
 def discover_home_assistant_via_supervisor(

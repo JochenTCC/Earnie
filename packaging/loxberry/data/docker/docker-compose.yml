@@ -24,6 +24,8 @@ x-common-env: &common-env
   # Narrows the Smarthome-Backend page's targeted scan to Loxone (LoxBerry is a
   # Loxone companion box) — see runtime_store/install_context.py.
   EARNIE_INSTALL_CONTEXT: loxberry
+  # Host LAN /24 for active discovery (OpenEMS); set by sync_compose_env.sh.
+  EARNIE_LAN_SUBNET: ${EARNIE_LAN_SUBNET:-}
 
 services:
   earnie-productive:

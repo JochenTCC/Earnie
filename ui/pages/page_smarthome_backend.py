@@ -7,9 +7,18 @@ one place to pick/verify a backend. See docs/spec/smarthome-backend-page.md.
 """
 from __future__ import annotations
 
+import os
+
 import streamlit as st
 
-from integrations.integration_scanner import DiscoveredBackend, scan_for_backends
+from integrations.ha_supervisor import is_homeassistant_addon_context
+from integrations.integration_scanner import (
+    DiscoveredBackend,
+    is_bridge_network_without_lan_subnet,
+    parse_lan_subnet_cidr,
+    resolve_scan_hosts,
+    scan_for_backends,
+)
 from runtime_store.ehal_setup import (
     BACKEND_HA,
     BACKEND_LOXONE,
@@ -18,6 +27,7 @@ from runtime_store.ehal_setup import (
     backend_label,
 )
 from runtime_store.install_context import install_context_target_kinds
+from runtime_store.loxone_callback_status import format_loxone_callback_caption
 from ui.ehal_connection import (
     persist_ehal_backend,
     render_anbindung_section,
@@ -66,6 +76,57 @@ def _describe_hit(hit: DiscoveredBackend) -> str:
     return detail
 
 
+def _render_miniserver_callback_caption() -> None:
+    st.caption(format_loxone_callback_caption())
+
+
+def _persist_lan_subnet(cidr: str) -> None:
+    from runtime_store.dotenv_io import upsert_dotenv_keys
+
+    cleaned = cidr.strip()
+    upsert_dotenv_keys({"EARNIE_LAN_SUBNET": cleaned})
+    os.environ["EARNIE_LAN_SUBNET"] = cleaned
+
+
+def _render_lan_subnet_prompt() -> None:
+    """H9: ask for LAN CIDR when active scan would hit a Docker subnet."""
+    if resolve_scan_hosts() is not None:
+        return
+    st.warning(
+        "Die Container-IP liegt im Docker-Bereich (`172.16.0.0/12`). "
+        "Ohne Heimnetz-Angabe würde eine erweiterte Suche das Docker-Netz "
+        "scannen. Bitte LAN-CIDR eintragen (z. B. `192.168.178.0/24`) — "
+        "siehe Dokumentation *Einrichtung → Container-Betrieb*."
+    )
+    cidr = st.text_input(
+        "Heimnetz (CIDR /24)",
+        value=os.environ.get("EARNIE_LAN_SUBNET", ""),
+        key="sb_lan_subnet_input",
+        placeholder="192.168.178.0/24",
+        help="Wird als EARNIE_LAN_SUBNET in config/.env gespeichert.",
+    )
+    if st.button("LAN-Subnet übernehmen", key="sb_lan_subnet_save"):
+        if parse_lan_subnet_cidr(cidr) is None:
+            st.error("Ungültig — erwartet wird z. B. `192.168.178.0/24`.")
+            return
+        try:
+            _persist_lan_subnet(cidr)
+        except OSError as exc:
+            st.error(f"Speichern fehlgeschlagen: {exc}")
+            return
+        st.session_state.pop(_SESSION_RESULTS, None)
+        st.session_state.pop(_SESSION_RAN_ACTIVE, None)
+        st.success(f"EARNIE_LAN_SUBNET={cidr.strip()} gespeichert.")
+        st.rerun()
+
+
+def _offer_ha_on_bridge() -> bool:
+    """H8: Docker bridge + not HA add-on → promote HA URL/token without manual pick."""
+    if is_homeassistant_addon_context():
+        return False
+    return is_bridge_network_without_lan_subnet()
+
+
 def _render_backend_import_section(backend: str) -> None:
     """Automated consumer/EHAL import for the connected backend (Loxone today)."""
     if backend == BACKEND_LOXONE:
@@ -83,6 +144,8 @@ def _render_configured_summary() -> None:
     backend = active_ehal_backend()
     st.success(f"Smarthome-Backend verbunden: **{backend_label(backend)}**")
     st.caption("EHAL-Com und Optimierer-Dienst sind freigeschaltet.")
+    if backend == BACKEND_LOXONE:
+        _render_miniserver_callback_caption()
     render_anbindung_section(backend, form_key_prefix="sb_anbindung")
     with st.expander("Backend ändern", expanded=False):
         _render_discovery_flow()
@@ -144,6 +207,7 @@ def _render_credentials_step(backend: str) -> None:
         persist_ehal_backend(BACKEND_LOXONE)
         render_loxone_credentials_form(form_key="sb_loxone_form")
         render_loxone_verify_results(button_key="sb_loxone_verify_button")
+        _render_miniserver_callback_caption()
     elif backend == BACKEND_HA:
         render_ha_connection_form(form_key="sb_ha_form")
     elif backend == BACKEND_OPENEMS:
@@ -151,6 +215,16 @@ def _render_credentials_step(backend: str) -> None:
     if st.button("Andere Auswahl", key="sb_credentials_back"):
         st.session_state.pop(_SESSION_CHOSEN_BACKEND, None)
         st.rerun()
+
+
+def _render_bridge_ha_shortcut() -> None:
+    """H8: empty mDNS on Docker bridge → HA URL + token without Manuelle Auswahl."""
+    st.info(
+        "Im Docker-Bridge-Netz erreicht mDNS oft kein Home Assistant. "
+        "URL und Long-Lived Token direkt eintragen "
+        "(Hinweis in der Doku: *Einrichtung → Container-Betrieb*)."
+    )
+    render_ha_connection_form(form_key="sb_ha_bridge_form")
 
 
 def _render_discovery_flow() -> None:
@@ -165,17 +239,28 @@ def _render_discovery_flow() -> None:
 
     results = st.session_state[_SESSION_RESULTS]
     _render_scan_results(results)
+    _render_lan_subnet_prompt()
+
+    if not results and _offer_ha_on_bridge():
+        _render_bridge_ha_shortcut()
 
     if not results and not st.session_state.get(_SESSION_RAN_ACTIVE):
+        can_active = resolve_scan_hosts() is not None
         st.caption(
             "Zusätzlich per aktivem Portscan nach OpenEMS suchen? Kann im "
             "Heimnetz Firewall-/IDS-Warnungen auslösen (z. B. UniFi)."
         )
-        if st.button("Erweiterte Suche (inkl. OpenEMS-Portscan)", key="sb_active_scan_button"):
+        if can_active and st.button(
+            "Erweiterte Suche (inkl. OpenEMS-Portscan)", key="sb_active_scan_button"
+        ):
             with st.spinner("Erweiterte Suche inkl. OpenEMS-Portscan…"):
                 st.session_state[_SESSION_RESULTS] = _run_scan(active=True)
             st.session_state[_SESSION_RAN_ACTIVE] = True
             st.rerun()
+        elif not can_active:
+            st.caption(
+                "Erweiterte Suche erst nach Angabe von `EARNIE_LAN_SUBNET` möglich."
+            )
 
     if st.button("Neu scannen", key="sb_rescan_button"):
         st.session_state.pop(_SESSION_RESULTS, None)
